@@ -10816,6 +10816,330 @@ extern "C"
 		return environmentPath;
 	}
 
+	/**
+	 * Address: 0x0090F0A0 (FUN_0090F0A0, luaB_setfenv)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_setfenv(lua_State *L);
+	 *
+	 * What it does:
+	 * Installs a new environment table on a function. A `__fenv` key in the
+	 * current environment marks it protected and refuses the change. Level 0
+	 * targets the running thread's own globals rather than a function.
+	 */
+	int luaB_setfenv(lua_State* const state)
+	{
+		luaL_checktype(state, 2, LUA_TTABLE);
+		getfunc(state);
+
+		lua_getfenv(state, -1);
+		lua_pushlstring(state, "__fenv", 6u);
+		lua_rawget(state, -2);
+		if (lua_type(state, -1) != LUA_TNIL) {
+			luaL_error(state, "`setfenv' cannot change a protected environment");
+		}
+
+		lua_settop(state, -3);
+		lua_pushvalue(state, 2);
+
+		if (lua_isnumber(state, 1) != 0 && lua_tonumber(state, 1) == 0.0) {
+			lua_replace(state, LUA_GLOBALSINDEX);
+			return 0;
+		}
+
+		if (lua_setfenv(state, -2) == 0) {
+			luaL_error(state, "`setfenv' cannot change environment of given function");
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Address: 0x0090FDE0 (FUN_0090FDE0, luaB_tostring)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_tostring(lua_State *L);
+	 *
+	 * What it does:
+	 * Renders argument 1 as a string. A `__tostring` metamethod wins outright;
+	 * otherwise each tag gets its own form, and userdata is described through
+	 * the reflection system - type name, address and lexical value - which is
+	 * this fork's departure from stock Lua's bare "userdata: %p".
+	 */
+	int luaB_tostring(lua_State* const state)
+	{
+		constexpr std::size_t kRenderBufferSize = 512;
+
+		luaL_checkany(state, 1);
+		if (luaL_callmeta(state, 1, "__tostring") != 0) {
+			return 1;
+		}
+
+		char rendered[kRenderBufferSize];
+
+		switch (lua_type(state, 1)) {
+			case LUA_TNIL:
+				lua_pushlstring(state, "nil", 3u);
+				return 1;
+			case LUA_TBOOLEAN:
+				lua_pushstring(state, lua_toboolean(state, 1) ? "true" : "false");
+				return 1;
+			case LUA_TNUMBER:
+				lua_pushstring(state, lua_tostring(state, 1));
+				return 1;
+			case LUA_TSTRING:
+				lua_pushvalue(state, 1);
+				return 1;
+			case LUA_TUPVALUE:
+				lua_pushlstring(state, "upval", 5u);
+				return 1;
+			case LUA_TLIGHTUSERDATA:
+				std::sprintf(rendered, "pointer: %p", lua_tolightuserdata(state, 1));
+				break;
+			case LUA_TTABLE:
+				std::sprintf(rendered, "table: %p", lua_topointer(state, 1));
+				break;
+			case LUA_CFUNCTION:
+				std::sprintf(rendered, "cfunction: %p", lua_topointer(state, 1));
+				break;
+			case LUA_TFUNCTION:
+				std::sprintf(rendered, "function: %p", lua_topointer(state, 1));
+				break;
+			case LUA_TTHREAD:
+				std::sprintf(rendered, "thread: %p", static_cast<void*>(lua_tothread(state, 1)));
+				break;
+			case LUA_TUSERDATA: {
+				gpg::RRef reference{};
+				GetRRefFromUserdata(&reference, state, 1);
+				const msvc8::string lexical = reference.GetLexical();
+				std::sprintf(
+					rendered,
+					"userdata: %.80s at %p = %.80s",
+					reference.GetName(),
+					reference.mObj,
+					lexical.c_str()
+				);
+				break;
+			}
+			case LUA_TPROTO: {
+				const Proto* const proto = static_cast<const Proto*>(state->base->value.p);
+				std::sprintf(rendered, "code: %.200s(%d)", proto->source->str, proto->lineDefined);
+				break;
+			}
+			default:
+				rendered[0] = '\0';
+				break;
+		}
+
+		lua_pushstring(state, rendered);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090F7F0 (FUN_0090F7F0, luaB_require)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_require(lua_State *L);
+	 *
+	 * What it does:
+	 * Loads a package once. Already-loaded names come straight back out of
+	 * `_LOADED`; otherwise each ';'-separated template in the search path is
+	 * tried in turn until one loads. The chunk runs with `_REQUIREDNAME` set to
+	 * the requested name, and whatever it returns - or `true` if it returns
+	 * nothing - is cached under that name.
+	 */
+	int luaB_require(lua_State* const state)
+	{
+		constexpr int kFileNotFound = 2;
+
+		int status = kFileNotFound;
+
+		luaL_checklstring(state, 1, nullptr);
+		lua_settop(state, 1);
+		lua_pushstring(state, "_LOADED");
+		lua_gettable(state, LUA_GLOBALSINDEX);
+		if (lua_type(state, 2) != LUA_TTABLE) {
+			luaL_error(state, "`_LOADED' is not a table");
+		}
+
+		const char* path = getpath(state);
+		lua_pushvalue(state, 1);
+		lua_rawget(state, 2);
+
+		if (!lua_toboolean(state, -1)) {
+			while (status == kFileNotFound) {
+				lua_settop(state, 3);
+				if (*path == '\0') {
+					break;
+				}
+
+				const char* component = path;
+				if (*component == ';') {
+					++component;
+				}
+
+				const char* end = std::strchr(component, ';');
+				if (end == nullptr) {
+					end = component + std::strlen(component);
+				}
+
+				lua_pushlstring(state, component, static_cast<size_t>(end - component));
+				if (end == nullptr) {
+					break;
+				}
+
+				path = end;
+				pushcomposename(state);
+				status = luaL_loadfile(state, lua_tostring(state, -1));
+			}
+
+			if (status != 0) {
+				if (status != kFileNotFound) {
+					const char* const reason = lua_tostring(state, -1);
+					luaL_error(state, "error loading package `%s' (%s)", lua_tostring(state, 1), reason);
+				}
+
+				const char* const searched = getpath(state);
+				luaL_error(state, "could not load package `%s' from path `%s'", lua_tostring(state, 1), searched);
+			}
+
+			lua_pushstring(state, "_REQUIREDNAME");
+			lua_gettable(state, LUA_GLOBALSINDEX);
+			lua_insert(state, -2);
+			lua_pushvalue(state, 1);
+			lua_pushstring(state, "_REQUIREDNAME");
+			lua_insert(state, -2);
+			lua_settable(state, LUA_GLOBALSINDEX);
+
+			lua_call(state, 0, 1);
+
+			lua_insert(state, -2);
+			lua_pushstring(state, "_REQUIREDNAME");
+			lua_insert(state, -2);
+			lua_settable(state, LUA_GLOBALSINDEX);
+
+			if (lua_type(state, -1) == LUA_TNIL) {
+				lua_pushboolean(state, 1);
+				lua_replace(state, -2);
+			}
+
+			lua_pushvalue(state, 1);
+			lua_pushvalue(state, -2);
+			lua_rawset(state, 2);
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00D45170 (base_funcs)
+	 *
+	 * What it does:
+	 * The global functions `base_open` registers straight into the globals
+	 * table. Read out of the shipped image in this exact order.
+	 */
+	const luaL_reg base_funcs[]{
+		{"error", luaB_error},
+		{"getmetatable", luaB_getmetatable},
+		{"setmetatable", luaB_setmetatable},
+		{"getfenv", luaB_getfenv},
+		{"setfenv", luaB_setfenv},
+		{"next", luaB_next},
+		{"ipairs", luaB_ipairs},
+		{"pairs", luaB_pairs},
+		{"print", luaB_print},
+		{"tonumber", luaB_tonumber},
+		{"tostring", luaB_tostring},
+		{"type", luaB_type},
+		{"assert", luaB_assert},
+		{"unpack", luaB_unpack},
+		{"rawequal", luaB_rawequal},
+		{"rawget", luaB_rawget},
+		{"rawset", luaB_rawset},
+		{"pcall", luaB_pcall},
+		{"collectgarbage", luaB_collectgarbage},
+		{"gcinfo", luaB_gcinfo},
+		{"loadfile", luaB_loadfile},
+		{"dofile", luaB_dofile},
+		{"loadstring", luaB_loadstring},
+		{"require", luaB_require},
+		{nullptr, nullptr},
+	};
+
+	/**
+	 * Address: 0x00D45238 (co_funcs)
+	 *
+	 * What it does:
+	 * The `coroutine` table's contents.
+	 */
+	const luaL_reg co_funcs[]{
+		{"create", luaB_cocreate},
+		{"wrap", luaB_cowrap},
+		{"resume", luaB_coresume},
+		{"yield", luaB_yield},
+		{"status", luaB_costatus},
+		{nullptr, nullptr},
+	};
+
+	/**
+	 * Address: 0x0090FCD0 (FUN_0090FCD0, base_open)
+	 *
+	 * IDA signature:
+	 * void __usercall base_open(lua_State *L@<esi>);
+	 *
+	 * What it does:
+	 * Opens the base library into the globals table itself - `_G` names it,
+	 * `_VERSION` records the dialect - and installs `newproxy`, whose upvalue
+	 * is a weak-keyed table remembering which proxies it created.
+	 */
+	static void base_open(lua_State* const state)
+	{
+		lua_pushlstring(state, "_G", 2u);
+		lua_pushvalue(state, LUA_GLOBALSINDEX);
+		luaL_openlib(state, nullptr, base_funcs, 0);
+
+		lua_pushlstring(state, "_VERSION", 8u);
+		lua_pushlstring(state, "Lua 5.0.1", 9u);
+		lua_rawset(state, -3);
+
+		lua_pushlstring(state, "newproxy", 8u);
+		lua_newtable(state);
+		lua_pushvalue(state, -1);
+		lua_setmetatable(state, -2);
+		lua_pushlstring(state, "__mode", 6u);
+		lua_pushlstring(state, "k", 1u);
+		lua_rawset(state, -3);
+		lua_pushcclosure(state, luaB_newproxy, 1);
+		lua_rawset(state, -3);
+
+		lua_rawset(state, -1);
+	}
+
+	/**
+	 * Address: 0x0090FD90 (FUN_0090FD90, luaopen_base)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaopen_base(lua_State *L);
+	 *
+	 * What it does:
+	 * Opens the base library and the `coroutine` table, then seeds `_LOADED`.
+	 * Note what it does *not* do: the prebuilt LuaPlus asks for a default
+	 * metatable here through lua_getdefaultmetatable, a function the shipped
+	 * binary does not contain at all - which is why the lib's copy of this
+	 * function asserted against our global_State.
+	 */
+	int luaopen_base(lua_State* const state)
+	{
+		base_open(state);
+		luaL_openlib(state, "coroutine", co_funcs, 0);
+
+		lua_newtable(state);
+		lua_pushstring(state, "_LOADED");
+		lua_insert(state, -2);
+		lua_settable(state, LUA_REGISTRYINDEX);
+		return 0;
+	}
+
 	// luaV_gettable and the two paths below are mutually recursive: a metatable
 	// whose __index is itself a table sends the lookup back around.
 	const TObject* luaV_getnotable(lua_State* state, const TObject* t, const TObject* key, int loop);
