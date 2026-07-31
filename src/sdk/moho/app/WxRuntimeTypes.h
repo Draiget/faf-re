@@ -2307,6 +2307,43 @@ public:
   bool HandleMouseEvent(unsigned int message, std::int32_t x, std::int32_t y, unsigned int flags);
 
   /**
+   * Address: 0x0096A580 (FUN_0096A580)
+   * Mangled: ?HandleMouseMove@wxWindow@@IAE_NHHI@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::HandleMouseMove(wxWindow *this, int x, int y, WXUINT flags);
+   *
+   * What it does:
+   * Notices the pointer arriving over this window and raises an enter event
+   * once, then reports the motion itself.
+   */
+  bool HandleMouseMove(std::int32_t x, std::int32_t y, unsigned int flags);
+
+  /**
+   * Address: 0x0096A660 (FUN_0096A660)
+   * Mangled: ?HandleMouseWheel@wxWindow@@IAE_NIJ@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::HandleMouseWheel(wxWindow *this, WXWPARAM wParam, WXLPARAM lParam);
+   *
+   * What it does:
+   * Raises a wheel event carrying how far the wheel turned and how far the
+   * system says one notch should scroll.
+   */
+  bool HandleMouseWheel(unsigned int wParam, long lParam);
+
+  /**
+   * Address: 0x00968180 (FUN_00968180)
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::IsMouseInWindow(wxWindow *this);
+   *
+   * What it does:
+   * Whether the pointer is over this window or anything nested inside it.
+   */
+  [[nodiscard]] bool IsMouseInWindow() const;
+
+  /**
    * Address: 0x00969F40 (FUN_00969F40)
    * Mangled: ?OnEraseBackground@wxWindow@@IAEXAAVwxEraseEvent@@@Z
    *
