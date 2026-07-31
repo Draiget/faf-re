@@ -11325,6 +11325,9 @@ namespace
     // wxWindow sets this in its destructor (the +0x0CC bit-3 flag at
     // 0x0096BF4E); a window on the way out stops raising focus events.
     std::uint8_t isBeingDeleted = 0;
+    // The +0x110 bit-2 flag: set once the pointer is known to be over this
+    // window, so the enter event is raised on arrival and not on every move.
+    std::uint8_t mouseInWindow = 0;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
     std::vector<wxWindowBase*> children{};
@@ -33141,6 +33144,123 @@ bool wxWindowMswRuntime::HandleMouseEvent(
 }
 
 /**
+ * Address: 0x00968180 (FUN_00968180)
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::IsMouseInWindow(wxWindow *this);
+ *
+ * What it does:
+ * Whether the pointer is over this window or anything nested inside it. The
+ * walk up from whatever is under the cursor is what makes a pointer over a
+ * child still count as being over the parent.
+ */
+bool wxWindowMswRuntime::IsMouseInWindow() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr) {
+    return false;
+  }
+
+  auto* const window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state->nativeHandle));
+
+  POINT cursorPosition{};
+  (void)::GetCursorPos(&cursorPosition);
+
+  for (HWND under = ::WindowFromPoint(cursorPosition); under != nullptr; under = ::GetParent(under)) {
+    if (under == window) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Address: 0x0096A580 (FUN_0096A580)
+ * Mangled: ?HandleMouseMove@wxWindow@@IAE_NHHI@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleMouseMove(wxWindow *this, int x, int y, WXUINT flags);
+ *
+ * What it does:
+ * Raises an enter event the first time the pointer shows up over this window,
+ * then reports the motion itself.
+ *
+ * While this window holds the mouse capture it still receives moves with the
+ * pointer somewhere else entirely, so in that case the pointer's real position
+ * is checked before claiming it arrived. Without capture the message alone is
+ * proof enough. The matching leave event is raised from OnIdle, not here -
+ * Windows sends no message when the pointer leaves.
+ */
+bool wxWindowMswRuntime::HandleMouseMove(
+  const std::int32_t x,
+  const std::int32_t y,
+  const unsigned int flags
+)
+{
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  if (state.mouseInWindow == 0u && (!HasCapture() || IsMouseInWindow())) {
+    state.mouseInWindow = 1u;
+
+    WxMouseEventFactoryRuntime enterEvent{*WxEventTypeSlot(gWxEvtEnterWindowRuntimeType)};
+    InitWxMouseEventRuntime(*this, enterEvent, x, y, flags);
+    (void)GetEventHandler()->ProcessEvent(&enterEvent);
+  }
+
+  return HandleMouseEvent(WM_MOUSEMOVE, x, y, flags);
+}
+
+/**
+ * Address: 0x0096A660 (FUN_0096A660)
+ * Mangled: ?HandleMouseWheel@wxWindow@@IAE_NIJ@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleMouseWheel(wxWindow *this, WXWPARAM wParam, WXLPARAM lParam);
+ *
+ * What it does:
+ * Raises a wheel event carrying how far the wheel turned and how far one notch
+ * should scroll.
+ *
+ * The lines-per-notch figure is a system setting, read once and kept - the
+ * binary seeds its static to -1 and treats a failed read as three lines. A
+ * wheel position arrives in the high half of wParam as a signed count of
+ * WHEEL_DELTA units, and the low half carries the same button and modifier
+ * flags every other mouse message uses.
+ */
+bool wxWindowMswRuntime::HandleMouseWheel(
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  constexpr std::int32_t kWheelDelta = 120;
+  constexpr std::int32_t kDefaultLinesPerRotation = 3;
+
+  static std::int32_t sLinesPerRotation = -1;
+  if (sLinesPerRotation == -1) {
+    UINT linesPerRotation = 0;
+    if (::SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &linesPerRotation, 0) != 0) {
+      sLinesPerRotation = static_cast<std::int32_t>(linesPerRotation);
+    } else {
+      sLinesPerRotation = kDefaultLinesPerRotation;
+    }
+  }
+
+  WxMouseEventFactoryRuntime event{*WxEventTypeSlot(gWxEvtMouseWheelRuntimeType)};
+  InitWxMouseEventRuntime(
+    *this,
+    event,
+    static_cast<std::int16_t>(LOWORD(lParam)),
+    static_cast<std::int16_t>(HIWORD(lParam)),
+    LOWORD(wParam)
+  );
+
+  event.mWheelRotation = static_cast<std::int16_t>(HIWORD(wParam));
+  event.mWheelDelta = kWheelDelta;
+  event.mLinesPerAction = sLinesPerRotation;
+
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
  * Address: 0x00969B80 (FUN_00969B80)
  * Mangled: ?OnSysColourChanged@wxWindow@@IAEXAAVwxSysColourChangedEvent@@@Z
  *
@@ -34406,6 +34526,17 @@ long wxWindowMswRuntime::MSWWindowProc(
     break;
 
   case WM_MOUSEMOVE:
+    processed = HandleMouseMove(
+      static_cast<std::int16_t>(LOWORD(lParam)),
+      static_cast<std::int16_t>(HIWORD(lParam)),
+      wParam
+    );
+    break;
+
+  case WM_MOUSEWHEEL:
+    processed = HandleMouseWheel(wParam, lParam);
+    break;
+
   case WM_LBUTTONDOWN:
   case WM_LBUTTONUP:
   case WM_LBUTTONDBLCLK:
