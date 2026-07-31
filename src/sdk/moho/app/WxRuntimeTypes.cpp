@@ -39275,8 +39275,6 @@ const void* moho::WD3DViewport::GetEventTable() const
 
 namespace
 {
-  constexpr std::uintptr_t kWxBlackBrushToken = 1u;
-  constexpr std::uintptr_t kWxNullBrushToken = 0u;
   constexpr std::uint16_t kClientHitTestCode = 1u;
 
   void DrawBackgroundFill(
@@ -39286,10 +39284,16 @@ namespace
     std::int32_t width = 0;
     std::int32_t height = 0;
 
-    deviceContext.SetBrush(reinterpret_cast<const void*>(kWxBlackBrushToken));
+    // The binary selects the wxBLACK_BRUSH global here. wxWindows builds that
+    // one over the GDI stock black brush, so asking GDI for it directly gives
+    // the same object without needing the wx brush globals modelled first.
+    //
+    // What stood here was the literal 1 cast to a pointer, which SetBrush
+    // handed to SelectObject as a handle on every erase-background message.
+    deviceContext.SetBrush(::GetStockObject(BLACK_BRUSH));
     deviceContext.DoGetSize(&width, &height);
     deviceContext.DoDrawRectangle(0, 0, width, height);
-    deviceContext.SetBrush(reinterpret_cast<const void*>(kWxNullBrushToken));
+    deviceContext.SetBrush(nullptr);
   }
 
 } // namespace
