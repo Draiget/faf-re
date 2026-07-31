@@ -5508,42 +5508,6 @@ public:
   std::uint8_t mReserved1F = 0;
 };
 
-// Derived events put their payload straight after the 0x20-byte base; the
-// offsets below are read off the HandleMove / HandleSize / HandleShow stack
-// frames.
-class wxMoveEventRuntime : public wxEventRuntime
-{
-public:
-  explicit wxMoveEventRuntime(std::int32_t windowId = 0);
-  [[nodiscard]] wxEventRuntime* Clone() const override;
-
-  std::int32_t mX = 0; // +0x20
-  std::int32_t mY = 0; // +0x24
-};
-
-class wxSizeEventRuntime : public wxEventRuntime
-{
-public:
-  explicit wxSizeEventRuntime(std::int32_t windowId = 0);
-  [[nodiscard]] wxEventRuntime* Clone() const override;
-
-  std::int32_t mWidth = 0;  // +0x20
-  std::int32_t mHeight = 0; // +0x24
-};
-
-class wxShowEventRuntime : public wxEventRuntime
-{
-public:
-  explicit wxShowEventRuntime(std::int32_t windowId = 0);
-  [[nodiscard]] wxEventRuntime* Clone() const override;
-
-  std::int32_t mShow = 0; // +0x20
-};
-
-extern const std::int32_t wxEVT_MOVE;
-extern const std::int32_t wxEVT_SIZE;
-extern const std::int32_t wxEVT_SHOW;
-
 static_assert(offsetof(wxEventRuntime, mRefData) == 0x4, "wxEventRuntime::mRefData offset must be 0x4");
 static_assert(offsetof(wxEventRuntime, mEventObject) == 0x8, "wxEventRuntime::mEventObject offset must be 0x8");
 static_assert(offsetof(wxEventRuntime, mEventType) == 0xC, "wxEventRuntime::mEventType offset must be 0xC");

@@ -33511,31 +33511,6 @@ bool wxWindowBase::ProcessEvent(void* const event)
 // the HandleSize/HandleMove/HandleShow stack frames.
 // ---------------------------------------------------------------------------
 
-const std::int32_t wxEVT_MOVE = wxNewEventType();
-const std::int32_t wxEVT_SIZE = wxNewEventType();
-const std::int32_t wxEVT_SHOW = wxNewEventType();
-
-wxMoveEventRuntime::wxMoveEventRuntime(const std::int32_t windowId)
-  : wxEventRuntime(windowId, wxEVT_MOVE)
-{
-}
-
-wxEventRuntime* wxMoveEventRuntime::Clone() const { return new wxMoveEventRuntime(*this); }
-
-wxSizeEventRuntime::wxSizeEventRuntime(const std::int32_t windowId)
-  : wxEventRuntime(windowId, wxEVT_SIZE)
-{
-}
-
-wxEventRuntime* wxSizeEventRuntime::Clone() const { return new wxSizeEventRuntime(*this); }
-
-wxShowEventRuntime::wxShowEventRuntime(const std::int32_t windowId)
-  : wxEventRuntime(windowId, wxEVT_SHOW)
-{
-}
-
-wxEventRuntime* wxShowEventRuntime::Clone() const { return new wxShowEventRuntime(*this); }
-
 
 
 /**
@@ -33564,7 +33539,8 @@ wxWindowBase* wxWindowBase::GetEventHandler()
 bool wxWindowMswRuntime::HandleMove(const std::int32_t x, const std::int32_t y)
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
-  wxMoveEventRuntime event(state != nullptr ? state->windowId : -1);
+  WxMoveEventFactoryRuntime event;
+  event.mEventId = (state != nullptr) ? state->windowId : -1;
   event.mEventObject = this;
   event.mX = x;
   event.mY = y;
@@ -33598,10 +33574,11 @@ bool wxWindowMswRuntime::HandleSize(
   DoGetClientSize(&clientWidth, &clientHeight);
 
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
-  wxSizeEventRuntime event(state != nullptr ? state->windowId : -1);
+  WxSizeEventFactoryRuntime event;
+  event.mEventId = (state != nullptr) ? state->windowId : -1;
   event.mEventObject = this;
-  event.mWidth = clientWidth;
-  event.mHeight = clientHeight;
+  event.mSizeX = clientWidth;
+  event.mSizeY = clientHeight;
   return GetEventHandler()->ProcessEvent(&event);
 }
 
@@ -33620,9 +33597,10 @@ bool wxWindowMswRuntime::HandleShow(const bool show, const std::int32_t status)
   (void)status;
 
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
-  wxShowEventRuntime event(state != nullptr ? state->windowId : -1);
+  WxShowEventFactoryRuntime event;
+  event.mEventId = (state != nullptr) ? state->windowId : -1;
   event.mEventObject = this;
-  event.mShow = show ? 1 : 0;
+  event.mShown = show ? std::uint8_t{1} : std::uint8_t{0};
   return GetEventHandler()->ProcessEvent(&event);
 }
 
