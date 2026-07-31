@@ -3436,13 +3436,41 @@ wxStringRuntime* wxExtractLeadingIdentifierToken(
  */
 wxStringRuntime* wxBuildUserConfigRootPath(wxStringRuntime* outText);
 
+/**
+ * The drawing state every device context carries: pens, brushes, fonts,
+ * colours, the mapping mode and the scale/origin pair, plus the bounding box
+ * the drawing primitives accumulate.
+ *
+ * Those fields have not been mapped yet - what is pinned is the size, because
+ * wxDC's own first field sits at +0xE8 (`mov [esi+0E8h], edi` in the wxDC
+ * constructor at 0x009CA490), so everything below it belongs here.
+ */
 class wxDCBase
 {
 public:
   wxDCBase();
   virtual ~wxDCBase() = default;
+
+  void* m_refData = nullptr;                 // +0x04, from wxObject
+  std::uint8_t m_flags = 0;                  // +0x08 bit 1: the DC is usable
+  std::uint8_t mDrawingState[0xDF]{};        // +0x09, not yet mapped
 };
 
+static_assert(offsetof(wxDCBase, m_refData) == 0x04, "wxDCBase::m_refData offset must be 0x04");
+static_assert(offsetof(wxDCBase, m_flags) == 0x08, "wxDCBase::m_flags offset must be 0x08");
+static_assert(sizeof(wxDCBase) == 0xE8, "wxDCBase size must be 0xE8");
+
+/**
+ * A Win32 device context.
+ *
+ * Offsets are read off the constructor at 0x009CA490, which writes every one
+ * of them; the decompiler lists them in a different order than the stores
+ * happen, so the disassembly is what they come from.
+ *
+ * The total size is not asserted: the fields run to +0x114 and the deepest
+ * stack frame holding one by value (HandleEraseBkgnd at 0x00969DF0, `wxDC dc`
+ * at ebp-0x124) bounds it below 0x120, which is not tight enough to pin.
+ */
 class wxDC : public wxDCBase
 {
 public:
@@ -3450,28 +3478,41 @@ public:
    * Address: 0x009CA490 (FUN_009CA490)
    * Mangled: ??0wxDC@@QAE@@Z
    *
+   * IDA signature:
+   * wxDC *__thiscall wxDC::wxDC(wxDC *this);
+   *
    * What it does:
-   * Initializes base device-context lanes and clears selected object / native
-   * handle state.
+   * Clears the selected-object backups and the native handle, and hands the
+   * DC to nobody - it owns neither the handle nor a canvas until something
+   * assigns them.
    */
   wxDC();
   ~wxDC() override = default;
 
   [[nodiscard]] void* GetNativeHandle() const noexcept { return m_hDC; }
 
-protected:
-  void* m_selectedBitmap = nullptr;
-  std::uint8_t m_bOwnsDC = 0;
-  std::uint8_t m_flags = 0;
-  std::uint8_t mPadding0A[0x2]{};
-  void* m_canvas = nullptr;
-  void* m_oldBitmap = nullptr;
-  void* m_oldPen = nullptr;
-  void* m_oldBrush = nullptr;
-  void* m_oldFont = nullptr;
-  void* m_oldPalette = nullptr;
-  void* m_hDC = nullptr;
+  void* m_canvas = nullptr;                  // +0xE8 the window being drawn on
+  void* m_selectedBitmap = nullptr;          // +0xEC wxBitmap, 0xC bytes
+  std::uint8_t mSelectedBitmapRest[0x8]{};   // +0xF0
+  std::uint8_t m_bOwnsDC = 0;                // +0xF8 bit 0: destroy m_hDC with the DC
+  std::uint8_t mPaddingF9[0x3]{};            // +0xF9
+  void* m_hDC = nullptr;                     // +0xFC
+  void* m_oldBitmap = nullptr;               // +0x100
+  void* m_oldPen = nullptr;                  // +0x104
+  void* m_oldBrush = nullptr;                // +0x108
+  void* m_oldFont = nullptr;                 // +0x10C
+  void* m_oldPalette = nullptr;              // +0x110
 };
+
+static_assert(offsetof(wxDC, m_canvas) == 0xE8, "wxDC::m_canvas offset must be 0xE8");
+static_assert(offsetof(wxDC, m_selectedBitmap) == 0xEC, "wxDC::m_selectedBitmap offset must be 0xEC");
+static_assert(offsetof(wxDC, m_bOwnsDC) == 0xF8, "wxDC::m_bOwnsDC offset must be 0xF8");
+static_assert(offsetof(wxDC, m_hDC) == 0xFC, "wxDC::m_hDC offset must be 0xFC");
+static_assert(offsetof(wxDC, m_oldBitmap) == 0x100, "wxDC::m_oldBitmap offset must be 0x100");
+static_assert(offsetof(wxDC, m_oldPen) == 0x104, "wxDC::m_oldPen offset must be 0x104");
+static_assert(offsetof(wxDC, m_oldBrush) == 0x108, "wxDC::m_oldBrush offset must be 0x108");
+static_assert(offsetof(wxDC, m_oldFont) == 0x10C, "wxDC::m_oldFont offset must be 0x10C");
+static_assert(offsetof(wxDC, m_oldPalette) == 0x110, "wxDC::m_oldPalette offset must be 0x110");
 
 class wxMemoryDC : public wxDC
 {
