@@ -34843,7 +34843,7 @@ unsigned long wxTextCtrlRuntime::OnCtlColor(
   }
 
   const COLORREF backgroundColorRef =
-    RGB(backgroundColour.mStorage[0], backgroundColour.mStorage[1], backgroundColour.mStorage[2]);
+    RGB(backgroundColour.Red(), backgroundColour.Green(), backgroundColour.Blue());
   (void)::SetBkColor(nativeDc, backgroundColorRef);
 
   const COLORREF textColorRef = ::GetSysColor(COLOR_WINDOWTEXT);
@@ -54412,23 +54412,6 @@ wxColourRuntime* wxRGBToColour(wxColourRuntime* const outColour, const std::uint
 
 namespace
 {
-  struct WxPackedColourLaneRuntimeView
-  {
-    std::uint8_t lane00_07[0x08]{};
-    std::uint32_t packedNativeColour = 0; // +0x08
-    std::uint8_t initialized = 0;          // +0x0C
-    std::uint8_t red = 0;                  // +0x0D
-    std::uint8_t blue = 0;                 // +0x0E
-    std::uint8_t green = 0;                // +0x0F
-  };
-  static_assert(
-    offsetof(WxPackedColourLaneRuntimeView, packedNativeColour) == 0x08,
-    "WxPackedColourLaneRuntimeView::packedNativeColour offset must be 0x08"
-  );
-  static_assert(offsetof(WxPackedColourLaneRuntimeView, initialized) == 0x0C, "WxPackedColourLaneRuntimeView::initialized offset must be 0x0C");
-  static_assert(offsetof(WxPackedColourLaneRuntimeView, red) == 0x0D, "WxPackedColourLaneRuntimeView::red offset must be 0x0D");
-  static_assert(offsetof(WxPackedColourLaneRuntimeView, blue) == 0x0E, "WxPackedColourLaneRuntimeView::blue offset must be 0x0E");
-  static_assert(offsetof(WxPackedColourLaneRuntimeView, green) == 0x0F, "WxPackedColourLaneRuntimeView::green offset must be 0x0F");
 
   /**
    * Address: 0x0096FBF0 (FUN_0096FBF0)
@@ -54445,14 +54428,14 @@ namespace
     const std::uint8_t blue
   ) noexcept
   {
-    auto* const colour = static_cast<WxPackedColourLaneRuntimeView*>(colourRuntime);
-    colour->green = green;
-    colour->red = red;
-    colour->packedNativeColour =
+    auto* const colour = static_cast<wxColourRuntime*>(colourRuntime);
+    colour->mGreen = green;
+    colour->mRed = red;
+    colour->mPackedNativeColour =
       static_cast<std::uint32_t>(red)
       | ((static_cast<std::uint32_t>(green) | ((static_cast<std::uint32_t>(blue) | 0x200u) << 8u)) << 8u);
-    colour->blue = blue;
-    colour->initialized = 1u;
+    colour->mBlue = blue;
+    colour->mIsInit = 1u;
     return red;
   }
 } // namespace
@@ -54465,10 +54448,6 @@ wxColourRuntime wxColourRuntime::FromRgb(
 {
   wxColourRuntime color{};
   (void)wxSetPackedColourRgbLaneRuntime(&color, red, green, blue);
-  color.mStorage[0] = red;
-  color.mStorage[1] = green;
-  color.mStorage[2] = blue;
-  color.mStorage[3] = 0xFF;
   return color;
 }
 
@@ -87015,10 +86994,11 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
     return 0;
   }
 
-  const auto* const bytes = colourRuntime->mStorage;
+  // The same PALETTERGB the colour already carries, rebuilt from its bytes the
+  // way the binary does at this call site.
   const LPARAM packedColour = static_cast<LPARAM>(
-    bytes[13] |
-    ((bytes[15] | ((static_cast<std::uint32_t>(bytes[14]) | 0x200u) << 8u)) << 8u)
+    colourRuntime->Red()
+    | ((colourRuntime->Green() | ((static_cast<std::uint32_t>(colourRuntime->Blue()) | 0x200u) << 8u)) << 8u)
   );
   return ::SendMessageW(runtime->mNativeHandle, LVM_SETTEXTCOLOR, 0, packedColour);
 }

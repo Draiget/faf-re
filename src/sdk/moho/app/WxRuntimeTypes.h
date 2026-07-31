@@ -4222,25 +4222,46 @@ public:
 static_assert(offsetof(wxImageRuntime, mRefData) == 0x4, "wxImageRuntime::mRefData offset must be 0x4");
 static_assert(sizeof(wxImageRuntime) == 0x8, "wxImageRuntime size must be 0x8");
 
+/**
+ * A colour.
+ *
+ * The byte order is the binary's, not a convenient one: red, then blue, then
+ * green. Two independent routes agree on it - wxWindow::OnEraseBackground
+ * (0x00969F40) reads the window's background colour at +0x8D/+0x8E/+0x8F, and
+ * wxWindow::OnSysColourChanged (0x00969B80) writes that same colour as the
+ * object at window+0x80, which puts red at +0x0D within it.
+ *
+ * The packed lane is what GDI is handed, and it is a PALETTERGB rather than an
+ * RGB - the 0x02000000 asks for the nearest entry in the logical palette.
+ */
 struct wxColourRuntime
 {
-  std::uint8_t mStorage[0x10]{};
+  std::uint8_t mReserved00To07[0x08]{}; // +0x00 wxObject head, not mapped
+  std::uint32_t mPackedNativeColour = 0; // +0x08 PALETTERGB(red, green, blue)
+  std::uint8_t mIsInit = 0;              // +0x0C
+  std::uint8_t mRed = 0;                 // +0x0D
+  std::uint8_t mBlue = 0;                // +0x0E
+  std::uint8_t mGreen = 0;               // +0x0F
 
   [[nodiscard]] static wxColourRuntime FromRgb(
     std::uint8_t red, std::uint8_t green, std::uint8_t blue
   ) noexcept;
   [[nodiscard]] static const wxColourRuntime& Null() noexcept;
 
-  // Named the way FromRgb writes them. The binary's wxColour keeps red, blue
-  // then green in that order - see the byte reads at 0x8D/0x8E/0x8F in
-  // wxWindow::OnEraseBackground (0x00969F40) - but nothing outside that class
-  // depends on the order, so the packing here stays as it was.
-  [[nodiscard]] std::uint8_t Red() const noexcept { return mStorage[0]; }
-  [[nodiscard]] std::uint8_t Green() const noexcept { return mStorage[1]; }
-  [[nodiscard]] std::uint8_t Blue() const noexcept { return mStorage[2]; }
-  [[nodiscard]] bool IsSet() const noexcept { return mStorage[3] != 0; }
+  [[nodiscard]] std::uint8_t Red() const noexcept { return mRed; }
+  [[nodiscard]] std::uint8_t Green() const noexcept { return mGreen; }
+  [[nodiscard]] std::uint8_t Blue() const noexcept { return mBlue; }
+  [[nodiscard]] bool IsSet() const noexcept { return mIsInit != 0; }
 };
 
+static_assert(
+  offsetof(wxColourRuntime, mPackedNativeColour) == 0x08,
+  "wxColourRuntime::mPackedNativeColour offset must be 0x08"
+);
+static_assert(offsetof(wxColourRuntime, mIsInit) == 0x0C, "wxColourRuntime::mIsInit offset must be 0x0C");
+static_assert(offsetof(wxColourRuntime, mRed) == 0x0D, "wxColourRuntime::mRed offset must be 0x0D");
+static_assert(offsetof(wxColourRuntime, mBlue) == 0x0E, "wxColourRuntime::mBlue offset must be 0x0E");
+static_assert(offsetof(wxColourRuntime, mGreen) == 0x0F, "wxColourRuntime::mGreen offset must be 0x0F");
 static_assert(sizeof(wxColourRuntime) == 0x10, "wxColourRuntime size must be 0x10");
 
 struct wxFontRuntime
