@@ -11482,6 +11482,8 @@ namespace
   std::int32_t gWxEvtInitDialogRuntimeType = 0;
   std::int32_t gWxEvtSysColourChangedRuntimeType = 0;
   std::int32_t gWxEvtDisplayChangedRuntimeType = 0;
+  std::int32_t gWxEvtQueryEndSessionRuntimeType = 0;
+  std::int32_t gWxEvtEndSessionRuntimeType = 0;
   std::int32_t gWxEvtNavigationKeyRuntimeType = 0;
   std::int32_t gWxEvtKeyDownRuntimeType = 0;
   std::int32_t gWxEvtKeyUpRuntimeType = 0;
@@ -12268,17 +12270,24 @@ namespace
       return new (std::nothrow) WxCloseEventFactoryRuntime(*this);
     }
 
-    std::uint8_t mCanVeto = 1;
-    std::uint8_t mVeto = 0;
+    // Order from the binary: HandleQueryEndSession (0x00968DC0) writes the
+    // logging-off flag at +0x20 and a 0x0100 pair over +0x21/+0x22, and
+    // HandleEndSession (0x00968E90) clears can-veto at +0x22. Can-veto and
+    // logging-off had been the other way round.
     std::uint8_t mLoggingOff = 1;
+    std::uint8_t mVeto = 0;
+    std::uint8_t mCanVeto = 1;
     std::uint8_t mReserved23 = 0;
   };
 
-  static_assert(offsetof(WxCloseEventFactoryRuntime, mCanVeto) == 0x20, "WxCloseEventFactoryRuntime::mCanVeto offset must be 0x20");
+  static_assert(
+    offsetof(WxCloseEventFactoryRuntime, mLoggingOff) == 0x20,
+    "WxCloseEventFactoryRuntime::mLoggingOff offset must be 0x20"
+  );
   static_assert(offsetof(WxCloseEventFactoryRuntime, mVeto) == 0x21, "WxCloseEventFactoryRuntime::mVeto offset must be 0x21");
   static_assert(
-    offsetof(WxCloseEventFactoryRuntime, mLoggingOff) == 0x22,
-    "WxCloseEventFactoryRuntime::mLoggingOff offset must be 0x22"
+    offsetof(WxCloseEventFactoryRuntime, mCanVeto) == 0x22,
+    "WxCloseEventFactoryRuntime::mCanVeto offset must be 0x22"
   );
   static_assert(sizeof(WxCloseEventFactoryRuntime) == 0x24, "WxCloseEventFactoryRuntime size must be 0x24");
 
@@ -33263,6 +33272,97 @@ bool wxWindowMswRuntime::HandleMouseWheel(
 }
 
 /**
+ * Address: 0x009696F0 (FUN_009696F0)
+ * Mangled: ?HandleDisplayChange@wxWindow@@IAE_NXZ
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleDisplayChange(wxWindow *this);
+ *
+ * What it does:
+ * Raises wxEVT_DISPLAY_CHANGED so a window can react to the screen resolution
+ * or colour depth changing under it.
+ */
+bool wxWindowMswRuntime::HandleDisplayChange()
+{
+  WxDisplayChangedEventFactoryRuntime event{};
+  event.mEventObject = this;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x00968DC0 (FUN_00968DC0)
+ * Mangled: ?HandleQueryEndSession@wxWindow@@IAE_NJPA_N@Z
+ *
+ * IDA signature:
+ * bool __stdcall wxWindow::HandleQueryEndSession(long logOff, bool *mayEnd);
+ *
+ * What it does:
+ * Answers Windows asking whether the session may end. The application gets a
+ * close event it is allowed to object to, and the answer is no only if it both
+ * may object and did.
+ *
+ * The event goes to the application rather than to any window, which is why
+ * this does not use `this` at all - Windows asks once, not once per window.
+ */
+bool wxWindowMswRuntime::HandleQueryEndSession(
+  const long logOff,
+  bool* const mayEnd
+)
+{
+  if (wxTheApp == nullptr) {
+    return false;
+  }
+
+  WxCloseEventFactoryRuntime event{};
+  event.mEventType = *WxEventTypeSlot(gWxEvtQueryEndSessionRuntimeType);
+  event.mEventId = -1;
+  event.mLoggingOff = (logOff == ENDSESSION_LOGOFF) ? 1u : 0u;
+  event.mVeto = 0u;
+  event.mCanVeto = 1u;
+  event.mEventObject = wxTheApp;
+
+  const bool handled = wxTheApp->ProcessEvent(&event);
+  if (handled && mayEnd != nullptr) {
+    *mayEnd = !(event.mCanVeto != 0u && event.mVeto != 0u);
+  }
+  return handled;
+}
+
+/**
+ * Address: 0x00968E90 (FUN_00968E90)
+ * Mangled: ?HandleEndSession@wxWindow@@IAE_N_NJ@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleEndSession(wxWindow *this, bool endSession, long logOff);
+ *
+ * What it does:
+ * Tells the application the session really is ending. Nothing happens when
+ * Windows says it is not, and only the main window reports it, so the
+ * application hears once rather than once per window.
+ *
+ * There is no objecting at this point - the event says it cannot be vetoed,
+ * unlike the one that asked.
+ */
+bool wxWindowMswRuntime::HandleEndSession(
+  const bool endSession,
+  const long logOff
+)
+{
+  if (!endSession || wxTheApp == nullptr || this != wxTheApp->GetTopWindow()) {
+    return false;
+  }
+
+  WxCloseEventFactoryRuntime event{};
+  event.mEventType = *WxEventTypeSlot(gWxEvtEndSessionRuntimeType);
+  event.mEventId = -1;
+  event.mLoggingOff = (logOff == ENDSESSION_LOGOFF) ? 1u : 0u;
+  event.mCanVeto = 0u;
+  event.mEventObject = wxTheApp;
+
+  return wxTheApp->ProcessEvent(&event);
+}
+
+/**
  * Address: 0x00969B80 (FUN_00969B80)
  * Mangled: ?OnSysColourChanged@wxWindow@@IAEXAAVwxSysColourChangedEvent@@@Z
  *
@@ -34683,6 +34783,25 @@ long wxWindowMswRuntime::MSWWindowProc(
     processed = wxWindowDispatchCharRuntime(
       this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam), true
     );
+    break;
+
+  case WM_DISPLAYCHANGE:
+    processed = HandleDisplayChange();
+    break;
+
+  case WM_QUERYENDSESSION: {
+    // Answering means "the session may end"; saying nothing leaves the
+    // decision to the default handler.
+    bool mayEnd = true;
+    processed = HandleQueryEndSession(static_cast<long>(lParam), &mayEnd);
+    if (processed) {
+      return mayEnd ? 1 : 0;
+    }
+    return MSWDefWindowProc(message, wParam, lParam);
+  }
+
+  case WM_ENDSESSION:
+    processed = HandleEndSession(wParam != 0u, static_cast<long>(lParam));
     break;
 
   case WM_ERASEBKGND:
