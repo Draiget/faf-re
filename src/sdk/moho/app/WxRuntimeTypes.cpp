@@ -11332,6 +11332,9 @@ namespace
     // stores it branchlessly, shifting the result up three bits and xor-ing it
     // into place.
     std::uint8_t lastKeyDownHandled = 0;
+    // Which child held the focus when this top-level window was last
+    // deactivated, so it can be given back on the way in.
+    wxWindowBase* lastFocusedChild = nullptr;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
     std::vector<wxWindowBase*> children{};
@@ -30646,6 +30649,103 @@ wxLogWindowRuntime::~wxLogWindowRuntime()
  * What it does:
  * Reports this runtime lane as a top-level wx window.
  */
+namespace
+{
+  // Defined further down, beside the focus helpers it belongs with.
+  [[nodiscard]] bool wxSetFocusToChildRuntime(wxWindowBase* window, wxWindowBase** childLastFocused);
+} // namespace
+
+wxEventTable wxTopLevelWindowRuntime::sm_eventTable = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+
+/**
+ * Address: 0x0098C8C0 (FUN_0098C8C0)
+ * Mangled: ?OnActivate@wxTopLevelWindowMSW@@IAEXAAVwxActivateEvent@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxTopLevelWindowMSW::OnActivate(wxTopLevelWindowMSW *this,
+ *                                                 wxActivateEvent *event);
+ *
+ * What it does:
+ * Carries the focus across a window being switched away from and back to.
+ *
+ * On the way out it notes which of its children held the focus, walking up
+ * from whatever has it until a top-level window is reached: if that is this
+ * window the child is worth remembering, and if it is some other window the
+ * focus was never here and the note is cleared. A focus that belongs to no
+ * top-level window at all leaves the note alone.
+ *
+ * On the way in it hands the focus back - to the remembered child if it still
+ * has a parent, and otherwise to this window's own first willing child.
+ *
+ * The deactivation path always skips the event, so anything else watching for
+ * it still runs; the activation path does not.
+ */
+void wxTopLevelWindowRuntime::OnActivate(
+  wxEventRuntime& activateEvent
+)
+{
+  auto& event = static_cast<WxActivateEventFactoryRuntime&>(activateEvent);
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+
+  if (event.mIsActive != 0u) {
+    wxWindowBase* const remembered = state.lastFocusedChild;
+    wxWindowBase* focusTarget = nullptr;
+    if (remembered != nullptr) {
+      const WxWindowBaseRuntimeState* const rememberedState =
+        FindWxWindowBaseRuntimeState(remembered);
+      focusTarget = rememberedState != nullptr ? rememberedState->parentWindow : nullptr;
+    }
+    if (focusTarget == nullptr) {
+      focusTarget = this;
+    }
+    (void)wxSetFocusToChildRuntime(focusTarget, &state.lastFocusedChild);
+    return;
+  }
+
+  wxWindowBase* focused = wxWindowBase::FindFocus();
+  state.lastFocusedChild = focused;
+
+  while (focused != nullptr && !focused->IsTopLevel()) {
+    const WxWindowBaseRuntimeState* const focusedState = FindWxWindowBaseRuntimeState(focused);
+    focused = focusedState != nullptr ? focusedState->parentWindow : nullptr;
+    if (focused == nullptr) {
+      // The focus is not inside any top-level window; leave the note as it is.
+      event.mSkipped = 1;
+      return;
+    }
+  }
+
+  if (focused != nullptr && focused != this) {
+    // The focus was somewhere else entirely, so there is nothing to restore.
+    state.lastFocusedChild = nullptr;
+  }
+  event.mSkipped = 1;
+}
+
+/**
+ * Address: 0x0098C900 (FUN_0098C900)
+ * Mangled: ?GetEventTable@wxTopLevelWindowMSW@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Hands back this class's event table, which claims wxEVT_ACTIVATE and chains
+ * the rest to wxWindow's.
+ *
+ * Table at 0x00D54A58 = {base 0x00D54B24, rows 0x00F34B24}; the single row
+ * there is {-1, -1, 0x0098C8C0 OnActivate, 0, &0x00F8F480 wxEVT_ACTIVATE}.
+ */
+const void* wxTopLevelWindowRuntime::GetEventTable() const
+{
+  static const wxEventTableEntry entries[] = {
+    MakeWxEventTableEntry(
+      -1, -1, &wxTopLevelWindowRuntime::OnActivate, WxEventTypeSlot(gWxEvtActivateRuntimeType)
+    ),
+    wxEventTableEntry{}, // null handler: end of table
+  };
+
+  sm_eventTable.entries = entries;
+  return &sm_eventTable;
+}
+
 bool wxTopLevelWindowRuntime::IsTopLevel() const
 {
   return true;
@@ -33289,6 +33389,82 @@ bool wxWindowMswRuntime::HandleMouseEvent(
  * walk up from whatever is under the cursor is what makes a pointer over a
  * child still count as being over the parent.
  */
+/**
+ * Address: 0x0096C050 (FUN_0096C050)
+ * Mangled: ?FindFocus@wxWindowBase@@SAPAVwxWindow@@XZ
+ *
+ * IDA signature:
+ * wxWindow *wxWindowBase::FindFocus();
+ *
+ * What it does:
+ * The window holding the keyboard focus. Windows answers with a handle, which
+ * is only ours if wx knows it - a focused window belonging to something else
+ * comes back as nothing.
+ */
+wxWindowBase* wxWindowBase::FindFocus()
+{
+  HWND const focused = ::GetFocus();
+  if (focused == nullptr) {
+    return nullptr;
+  }
+  return wxFindWinFromHandle(static_cast<int>(reinterpret_cast<std::intptr_t>(focused)));
+}
+
+namespace
+{
+  /**
+   * Address: 0x009904F0 (FUN_009904F0)
+   * Mangled: ?wxSetFocusToChild@@YA_NPAVwxWindow@@PAPAV1@@Z
+   *
+   * IDA signature:
+   * bool __usercall wxSetFocusToChild(wxWindow *win, wxWindow **childLastFocused);
+   *
+   * What it does:
+   * Gives the focus to a window's child - the one that had it before if that
+   * is still a child of this window, otherwise the first that will take it.
+   *
+   * A remembered child that has since been reparented is forgotten rather
+   * than focused, which is what stops the focus jumping to somewhere the user
+   * is no longer looking.
+   *
+   * The first-child search skips anything that will not take focus from the
+   * keyboard and anything that is a window in its own right, since a
+   * top-level child manages its own focus.
+   *
+   * The binary also writes a trace line through wxLogTrace on both paths;
+   * that is diagnostic output only and is left out.
+   */
+  [[nodiscard]] bool wxSetFocusToChildRuntime(
+    wxWindowBase* const window,
+    wxWindowBase** const childLastFocused
+  )
+  {
+    if (window == nullptr || childLastFocused == nullptr) {
+      return false;
+    }
+
+    if (wxWindowBase* const remembered = *childLastFocused; remembered != nullptr) {
+      const WxWindowBaseRuntimeState* const rememberedState =
+        FindWxWindowBaseRuntimeState(remembered);
+      if (rememberedState != nullptr && rememberedState->parentWindow == window) {
+        remembered->SetFocus();
+        return true;
+      }
+      *childLastFocused = nullptr;
+    }
+
+    for (wxWindowBase* const child : window->GetChildren()) {
+      if (child == nullptr || !child->AcceptsFocusFromKeyboard() || child->IsTopLevel()) {
+        continue;
+      }
+      *childLastFocused = child;
+      child->SetFocusFromKbd();
+      return true;
+    }
+    return false;
+  }
+} // namespace
+
 bool wxWindowMswRuntime::IsMouseInWindow() const
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
