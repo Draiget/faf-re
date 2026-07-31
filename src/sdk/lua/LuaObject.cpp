@@ -3154,7 +3154,10 @@ extern "C"
 	}
 
 	/**
-	 * Address: 0x00910260 (lcode.c::luaK_fixjump, file-local in original Lua)
+	 * Address: 0x00910010 (FUN_00910010, fixjump)
+	 *
+	 * IDA signature:
+	 * void __usercall fixjump(int dest@<eax>, int pc@<ecx>, FuncState *fs@<ebx>);
 	 *
 	 * What it does:
 	 * Patches the sBx field of one jump instruction in `fs->f->code[from]` to
