@@ -12899,11 +12899,11 @@ namespace
   public:
     WxUpdateUIEventRuntime()
       : wxCommandEventRuntime(EnsureWxEvtUpdateUiRuntimeType(), 0)
-      , mSetChecked(0)
+      , mChecked(0)
+      , mEnabled(0)
       , mSetEnabled(0)
-      , mSetShown(0)
       , mSetText(0)
-      , mSetTextColour(0)
+      , mSetChecked(0)
       , mPadding39To3B{0, 0, 0}
       , mTextLabel{}
     {
@@ -12919,11 +12919,11 @@ namespace
      */
     WxUpdateUIEventRuntime(const WxUpdateUIEventRuntime& source)
       : wxCommandEventRuntime(source)
-      , mSetChecked(source.mSetChecked)
+      , mChecked(source.mChecked)
+      , mEnabled(source.mEnabled)
       , mSetEnabled(source.mSetEnabled)
-      , mSetShown(source.mSetShown)
       , mSetText(source.mSetText)
-      , mSetTextColour(source.mSetTextColour)
+      , mSetChecked(source.mSetChecked)
       , mPadding39To3B{
         source.mPadding39To3B[0],
         source.mPadding39To3B[1],
@@ -12959,24 +12959,38 @@ namespace
      */
     wxStringRuntime* GetText(wxStringRuntime* outValue) const;
 
-    std::uint8_t mSetChecked = 0;
-    std::uint8_t mSetEnabled = 0;
-    std::uint8_t mSetShown = 0;
-    std::uint8_t mSetText = 0;
-    std::uint8_t mSetTextColour = 0;
+    // Values and flags in pairs, not five flags. wxWindowBase::UpdateWindowUI
+    // (0x009654A0) tests +0x36 and then passes +0x35 to Enable, and tests
+    // +0x38 and then passes +0x34 to SetValue; the constructor clears exactly
+    // these five bytes. They had been named as though all five were flags,
+    // which put the enabled value where a shown flag was expected.
+    std::uint8_t mChecked = 0;    // +0x34 the value to check to
+    std::uint8_t mEnabled = 0;    // +0x35 the value to enable to
+    std::uint8_t mSetEnabled = 0; // +0x36 whether the enabled value was set
+    std::uint8_t mSetText = 0;    // +0x37 whether the text was set
+    std::uint8_t mSetChecked = 0; // +0x38 whether the checked value was set
     std::uint8_t mPadding39To3B[3] = {0, 0, 0};
     wxStringRuntime mTextLabel{};
   };
 
   static_assert(
-    offsetof(WxUpdateUIEventRuntime, mSetChecked) == 0x34,
-    "WxUpdateUIEventRuntime::mSetChecked offset must be 0x34"
+    offsetof(WxUpdateUIEventRuntime, mChecked) == 0x34,
+    "WxUpdateUIEventRuntime::mChecked offset must be 0x34"
   );
   static_assert(
     offsetof(WxUpdateUIEventRuntime, mTextLabel) == 0x3C,
     "WxUpdateUIEventRuntime::mTextLabel offset must be 0x3C"
   );
   static_assert(sizeof(WxUpdateUIEventRuntime) == 0x40, "WxUpdateUIEventRuntime size must be 0x40");
+  static_assert(offsetof(WxUpdateUIEventRuntime, mChecked) == 0x34, "wxUpdateUIEvent::m_checked offset must be 0x34");
+  static_assert(offsetof(WxUpdateUIEventRuntime, mEnabled) == 0x35, "wxUpdateUIEvent::m_enabled offset must be 0x35");
+  static_assert(
+    offsetof(WxUpdateUIEventRuntime, mSetEnabled) == 0x36, "wxUpdateUIEvent::m_setEnabled offset must be 0x36"
+  );
+  static_assert(offsetof(WxUpdateUIEventRuntime, mSetText) == 0x37, "wxUpdateUIEvent::m_setText offset must be 0x37");
+  static_assert(
+    offsetof(WxUpdateUIEventRuntime, mSetChecked) == 0x38, "wxUpdateUIEvent::m_setChecked offset must be 0x38"
+  );
 
   /**
    * Address: 0x00962B80 (FUN_00962B80)
@@ -12984,7 +12998,7 @@ namespace
    * What it does:
    * Returns the update-UI "set checked" flag lane.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetCheckedFlagRuntime(
+  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetCheckedValueRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -12997,7 +13011,7 @@ namespace
    * What it does:
    * Returns the update-UI "set enabled" flag lane.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetEnabledFlagRuntime(
+  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetEnabledValueRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13021,26 +13035,28 @@ namespace
    * Address: 0x00962BB0 (FUN_00962BB0)
    *
    * What it does:
-   * Returns the update-UI "set text colour" flag lane.
+   * Returns whether the event set a checked value. The byte at +0x38 is that
+   * flag, not a text-colour one - see the field comments.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetTextColourFlagRuntime(
+  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetCheckedFlagRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
-    return eventRuntime->mSetTextColour;
+    return eventRuntime->mSetChecked;
   }
 
   /**
    * Address: 0x00962BC0 (FUN_00962BC0)
    *
    * What it does:
-   * Returns the update-UI "set shown" flag lane.
+   * Returns whether the event set an enabled value. The byte at +0x36 is that
+   * flag, not a shown one.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetShownFlagRuntime(
+  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetEnabledFlagRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
-    return eventRuntime->mSetShown;
+    return eventRuntime->mSetEnabled;
   }
 
   /**
