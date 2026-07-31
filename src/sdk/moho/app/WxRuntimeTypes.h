@@ -94,6 +94,7 @@ static_assert(sizeof(WxAnonymousPipeHandles) == 0x8, "WxAnonymousPipeHandles siz
 struct wxStringRuntime;
 struct wxColourRuntime;
 class wxMoveEventRuntime;
+class wxEraseEventRuntime;
 class wxCloseEventRuntime;
 class wxCommandEventRuntime;
 class wxCursor;
@@ -2212,6 +2213,21 @@ public:
   bool HandleGetMinMaxInfo(void* minMaxInfo);
 
   /**
+   * Address: 0x00969F40 (FUN_00969F40)
+   * Mangled: ?OnEraseBackground@wxWindow@@IAEXAAVwxEraseEvent@@@Z
+   *
+   * IDA signature:
+   * void __thiscall wxWindow::OnEraseBackground(wxWindow *this, wxEraseEvent *event);
+   *
+   * What it does:
+   * Fills the whole client area with the window's background colour. The row
+   * that binds this is the first one in wxWindow's event table, so it is what
+   * every window's background comes from unless a derived class claims
+   * wxEVT_ERASE_BACKGROUND for itself, the way the viewport does.
+   */
+  void OnEraseBackground(wxEraseEventRuntime& eraseEvent);
+
+  /**
    * Address: 0x009691A0 (FUN_009691A0)
    * Mangled: ?HandleSetFocus@wxWindow@@IAE_NPAX@Z
    */
@@ -3491,6 +3507,20 @@ public:
 
   [[nodiscard]] void* GetNativeHandle() const noexcept { return m_hDC; }
 
+  /**
+   * The three drawing calls WD3DViewport::DrawBackgroundImage (0x00430A60)
+   * dispatches through, at vtable slots +0x3C, +0xE8 and +0xC4 - the same
+   * +0xC4 for DoDrawRectangle that the curve editor's vtable view asserts.
+   */
+  virtual void SetBrush(const void* brush) noexcept;
+  virtual void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept;
+  virtual void DoDrawRectangle(
+    std::int32_t x,
+    std::int32_t y,
+    std::int32_t width,
+    std::int32_t height
+  ) noexcept;
+
   void* m_canvas = nullptr;                  // +0xE8 the window being drawn on
   void* m_selectedBitmap = nullptr;          // +0xEC wxBitmap, 0xC bytes
   std::uint8_t mSelectedBitmapRest[0x8]{};   // +0xF0
@@ -4071,6 +4101,15 @@ struct wxColourRuntime
     std::uint8_t red, std::uint8_t green, std::uint8_t blue
   ) noexcept;
   [[nodiscard]] static const wxColourRuntime& Null() noexcept;
+
+  // Named the way FromRgb writes them. The binary's wxColour keeps red, blue
+  // then green in that order - see the byte reads at 0x8D/0x8E/0x8F in
+  // wxWindow::OnEraseBackground (0x00969F40) - but nothing outside that class
+  // depends on the order, so the packing here stays as it was.
+  [[nodiscard]] std::uint8_t Red() const noexcept { return mStorage[0]; }
+  [[nodiscard]] std::uint8_t Green() const noexcept { return mStorage[1]; }
+  [[nodiscard]] std::uint8_t Blue() const noexcept { return mStorage[2]; }
+  [[nodiscard]] bool IsSet() const noexcept { return mStorage[3] != 0; }
 };
 
 static_assert(sizeof(wxColourRuntime) == 0x10, "wxColourRuntime size must be 0x10");
@@ -5595,11 +5634,6 @@ static_assert(
 );
 static_assert(sizeof(wxEventRuntime) == 0x20, "wxEventRuntime size must be 0x20");
 
-namespace moho
-{
-  struct wxDCRuntime;
-}
-
 /**
  * Minimal recovered `wxEraseEvent` runtime projection.
  *
@@ -5616,7 +5650,7 @@ public:
 
   wxEraseEventRuntime* Clone() const override { return nullptr; }
 
-  moho::wxDCRuntime* mDeviceContext = nullptr; // +0x20
+  wxDC* mDeviceContext = nullptr; // +0x20
 };
 
 /**
@@ -6710,23 +6744,15 @@ namespace moho
   static_assert(offsetof(WRenViewport, mEnabled) == 0x1D, "moho::WRenViewport::mEnabled offset must be 0x1D");
   static_assert(offsetof(WRenViewport, m_parent) == 0x2C, "moho::WRenViewport::m_parent offset must be 0x2C");
 
-  struct wxDCRuntime
-  {
-    explicit wxDCRuntime(wxWindowBase* ownerWindow) noexcept;
+  // There is one device context, not two: this used to be a second, unrelated
+  // stand-in with a do-nothing DoDrawRectangle, so the viewport background it
+  // was asked to paint never appeared.
+  using wxDCRuntime = ::wxDC;
 
-    void SetBrush(const void* brushToken) noexcept;
-    void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept;
-    void DoDrawRectangle(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height) noexcept;
-
-  private:
-    wxWindowBase* mOwnerWindow = nullptr;
-    const void* mActiveBrush = nullptr;
-  };
-
-  struct wxPaintDCRuntime : wxDCRuntime
+  struct wxPaintDCRuntime : ::wxDC
   {
     explicit wxPaintDCRuntime(wxWindowBase* ownerWindow) noexcept;
-    ~wxPaintDCRuntime();
+    ~wxPaintDCRuntime() override;
   };
 
   struct WPreviewImageRuntime
