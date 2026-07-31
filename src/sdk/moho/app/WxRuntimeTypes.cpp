@@ -33706,6 +33706,144 @@ void wxWindowMswRuntime::OnIdle(
   UpdateWindowUI();
 }
 
+/**
+ * Address: 0x00969800 (FUN_00969800, wxWindow vtable slot 130)
+ * Mangled: ?OnCtlColor@wxWindow@@MAEPAXPAX0IIIJ@Z
+ *
+ * IDA signature:
+ * void *__thiscall wxWindow::OnCtlColor(wxWindow *this, HDC hdc, HWND hwnd,
+ *                                       UINT ctlType, UINT msg, UINT wParam, LONG lParam);
+ *
+ * What it does:
+ * The brush a window wants a control drawn with. The base answers with none,
+ * which leaves the control its default colours - a window only overrides this
+ * when it actually wants to recolour its children.
+ */
+void* wxWindowMswRuntime::OnCtlColor(
+  void* const deviceContext,
+  void* const controlHandle,
+  const unsigned int controlType,
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  (void)deviceContext;
+  (void)controlHandle;
+  (void)controlType;
+  (void)message;
+  (void)wParam;
+  (void)lParam;
+  return nullptr;
+}
+
+namespace
+{
+  /**
+   * Address: 0x00967580 (FUN_00967580)
+   *
+   * IDA signature:
+   * wxWindow *__thiscall sub_967580(wxWindow *this, WXHWND handle, bool controlsOnly);
+   *
+   * What it does:
+   * Finds the window owning a native handle among this one's descendants.
+   *
+   * Depth first, and the deeper search always looks at every kind of window -
+   * only the top level of each step is narrowed to controls when asked. A
+   * control built from several native windows is matched through
+   * ContainsHWND, so a handle belonging to one of its parts still resolves to
+   * the control itself rather than to nothing.
+   */
+  [[nodiscard]] wxWindowMswRuntime* WxFindWindowForHandleRuntime(
+    wxWindowBase* const window,
+    const unsigned long handle,
+    const bool controlsOnly
+  )
+  {
+    if (window == nullptr) {
+      return nullptr;
+    }
+
+    for (wxWindowBase* const child : window->GetChildren()) {
+      if (child == nullptr) {
+        continue;
+      }
+
+      // The recursion drops the narrowing: a control can sit anywhere below.
+      if (auto* const found = WxFindWindowForHandleRuntime(child, handle, false); found != nullptr) {
+        return found;
+      }
+
+      if (controlsOnly && !child->IsKindOf(&wxControlRuntime::sm_classInfo)) {
+        continue;
+      }
+
+      const WxWindowBaseRuntimeState* const childState = FindWxWindowBaseRuntimeState(child);
+      if (childState != nullptr && childState->nativeHandle == handle) {
+        return static_cast<wxWindowMswRuntime*>(child);
+      }
+      if (static_cast<wxWindowMswRuntime*>(child)->ContainsHWND(handle)) {
+        return static_cast<wxWindowMswRuntime*>(child);
+      }
+    }
+    return nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x00969780 (FUN_00969780)
+ * Mangled: ?HandleCtlColor@wxWindow@@IAE_NPAPAXPAX@Z
+ *
+ * IDA signature:
+ * BOOL __thiscall wxWindow::HandleCtlColor(wxWindow *this, WXHBRUSH *brush, WXHDC hdc,
+ *                                          WXHWND hwnd, WXUINT ctlType, UINT msg,
+ *                                          WXWPARAM wParam, WXLPARAM lParam);
+ *
+ * What it does:
+ * Answers a control asking its parent what colour to draw itself in.
+ *
+ * A dialog asks itself; anything else is a control, so the window that owns
+ * the handle is found first and asked instead - which is what lets a control
+ * choose its own colours even though the message arrives at its parent. A
+ * handle nobody claims is left to Windows.
+ *
+ * Only a brush that was actually offered is passed back, and offering one is
+ * what marks the message handled.
+ */
+bool wxWindowMswRuntime::HandleCtlColor(
+  void** const brushOut,
+  void* const deviceContext,
+  void* const controlHandle,
+  const unsigned int controlType,
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  constexpr unsigned int kControlTypeDialog = 4u;
+
+  void* brush = nullptr;
+  if (controlType == kControlTypeDialog) {
+    brush = OnCtlColor(deviceContext, controlHandle, controlType, message, wParam, lParam);
+  } else {
+    wxWindowMswRuntime* const owner = WxFindWindowForHandleRuntime(
+      this, static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(controlHandle)), true
+    );
+    if (owner == nullptr) {
+      return false;
+    }
+    brush = owner->OnCtlColor(deviceContext, controlHandle, controlType, message, wParam, lParam);
+  }
+
+  if (brush == nullptr) {
+    return false;
+  }
+  if (brushOut != nullptr) {
+    *brushOut = brush;
+  }
+  return true;
+}
+
 bool wxWindowMswRuntime::IsMouseInWindow() const
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
@@ -35980,6 +36118,31 @@ long wxWindowMswRuntime::MSWWindowProc(
     long notifyResult = 0;
     if (HandleNotify(static_cast<std::int32_t>(wParam), lParam, &notifyResult)) {
       return notifyResult;
+    }
+    return MSWDefWindowProc(message, wParam, lParam);
+  }
+
+  case WM_CTLCOLORMSGBOX:
+  case WM_CTLCOLOREDIT:
+  case WM_CTLCOLORLISTBOX:
+  case WM_CTLCOLORBTN:
+  case WM_CTLCOLORDLG:
+  case WM_CTLCOLORSCROLLBAR:
+  case WM_CTLCOLORSTATIC: {
+    // The control type is which of the seven messages arrived; the device
+    // context and the asking control travel in the two parameters.
+    void* brush = nullptr;
+    if (HandleCtlColor(
+          &brush,
+          reinterpret_cast<void*>(static_cast<std::uintptr_t>(wParam)),
+          reinterpret_cast<void*>(static_cast<std::uintptr_t>(lParam)),
+          message - WM_CTLCOLORMSGBOX,
+          message,
+          wParam,
+          lParam
+        )) {
+      // A handled colour message answers with the brush itself.
+      return static_cast<long>(reinterpret_cast<std::intptr_t>(brush));
     }
     return MSWDefWindowProc(message, wParam, lParam);
   }

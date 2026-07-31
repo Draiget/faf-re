@@ -2517,6 +2517,23 @@ public:
    */
   void OnIdle(wxEventRuntime& idleEvent);
 
+  /**
+   * Address: 0x00969780 (FUN_00969780)
+   * Mangled: ?HandleCtlColor@wxWindow@@IAE_NPAPAXPAX@Z
+   *
+   * What it does:
+   * Answers a control asking its parent what colour to draw itself in.
+   */
+  bool HandleCtlColor(
+    void** brushOut,
+    void* deviceContext,
+    void* controlHandle,
+    unsigned int controlType,
+    unsigned int message,
+    unsigned int wParam,
+    long lParam
+  );
+
   bool HandleSetCursor(unsigned int hitTestCode);
 
   bool HandleQueryNewPalette();
@@ -2728,6 +2745,24 @@ public:
    * Base window runtime does not consume Win32 command notifications.
    */
   virtual bool MSWCommand(unsigned int commandId, unsigned short notificationCode);
+
+  /**
+   * Address: 0x00969800 (FUN_00969800, wxWindow vtable slot 130)
+   * Mangled: ?OnCtlColor@wxWindow@@MAEPAXPAX0IIIJ@Z
+   *
+   * What it does:
+   * The brush a window wants a control drawn with. The base answers with
+   * none, leaving the control its default colours.
+   */
+  virtual void* OnCtlColor(
+    void* deviceContext,
+    void* controlHandle,
+    unsigned int controlType,
+    unsigned int message,
+    unsigned int wParam,
+    long lParam
+  );
+
 
   /**
    * Address: 0x00968B10 (FUN_00968B10, wxWindow::UnpackCommand)
