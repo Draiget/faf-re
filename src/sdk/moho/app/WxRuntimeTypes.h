@@ -1382,6 +1382,38 @@ namespace wx
  */
 wxStringRuntime* wxBuildUpperHexByteStringRuntime(wxStringRuntime* outText, int byteValue);
 
+// One row of a wx event table: which event type, which id or id range, and the
+// handler to call. Layout read off wxEvtHandler::SearchEventTable (0x00979900):
+// the stride is 0x14 (lea esi*5 scaled by 4 at 0x00979976) and m_fn at +8
+// terminates the table when null.
+struct wxEventTableEntry
+{
+  std::int32_t m_id;               // +0x00 single id, or range start
+  std::int32_t m_lastId;           // +0x04 range end; -1 when not a range
+  void* m_fn;                      // +0x08 handler; null ends the table
+  void* m_callbackUserData;        // +0x0C copied onto the event before dispatch
+  const std::int32_t* m_eventType; // +0x10 by pointer, so ids can be assigned at startup
+};
+static_assert(offsetof(wxEventTableEntry, m_id) == 0x00, "wxEventTableEntry::m_id offset must be 0x00");
+static_assert(offsetof(wxEventTableEntry, m_lastId) == 0x04, "wxEventTableEntry::m_lastId offset must be 0x04");
+static_assert(offsetof(wxEventTableEntry, m_fn) == 0x08, "wxEventTableEntry::m_fn offset must be 0x08");
+static_assert(
+  offsetof(wxEventTableEntry, m_callbackUserData) == 0x0C,
+  "wxEventTableEntry::m_callbackUserData offset must be 0x0C"
+);
+static_assert(offsetof(wxEventTableEntry, m_eventType) == 0x10, "wxEventTableEntry::m_eventType offset must be 0x10");
+static_assert(sizeof(wxEventTableEntry) == 0x14, "wxEventTableEntry size must be 0x14");
+
+// A class's event table, chained to its base class's.
+struct wxEventTable
+{
+  const wxEventTable* baseTable;    // +0x00
+  const wxEventTableEntry* entries; // +0x04
+};
+static_assert(offsetof(wxEventTable, baseTable) == 0x00, "wxEventTable::baseTable offset must be 0x00");
+static_assert(offsetof(wxEventTable, entries) == 0x04, "wxEventTable::entries offset must be 0x04");
+static_assert(sizeof(wxEventTable) == 0x08, "wxEventTable size must be 0x08");
+
 class wxWindowBase
 {
 public:
@@ -1400,17 +1432,25 @@ public:
     (void)sourceRefData;
     return nullptr;
   }
-  virtual bool ProcessEvent(void* event)
-  {
-    (void)event;
-    return false;
-  }
-  virtual bool SearchEventTable(void* eventTable, void* event)
-  {
-    (void)eventTable;
-    (void)event;
-    return false;
-  }
+  /**
+   * Address: 0x0097AF30 (FUN_0097AF30)
+   * Mangled: ?ProcessEvent@wxEvtHandler@@UAE_NAAVwxEvent@@@Z
+   *
+   * What it does:
+   * Offers an event to everything that could handle it, in wx's order: dynamic
+   * bindings, this class's static event table and every base-class table behind
+   * it, the next handler in the chain, then the application object.
+   */
+  virtual bool ProcessEvent(void* event);
+
+  /**
+   * Address: 0x00979900 (FUN_00979900)
+   * Mangled: ?SearchEventTable@wxEvtHandler@@UAE_NAAUwxEventTable@@AAVwxEvent@@@Z
+   *
+   * What it does:
+   * Looks for a handler in one table, matching on event type and id range.
+   */
+  virtual bool SearchEventTable(void* eventTable, void* event);
   virtual const void* GetEventTable() const { return nullptr; }
   virtual void DoSetClientObject(void* clientObject) { (void)clientObject; }
   virtual void* DoGetClientObject() const { return nullptr; }
