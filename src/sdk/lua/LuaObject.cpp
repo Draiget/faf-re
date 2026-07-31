@@ -5025,7 +5025,7 @@ namespace
 	 * Resolves one binary-operation metamethod across both operands, executes it
 	 * when callable, and writes the result back to caller-selected stack slot.
 	 */
-	[[maybe_unused]] int call_binTM(
+	int call_binTM(
 		lua_State* const state,
 		const TObject* const firstOperand,
 		const TObject* const secondOperand,
@@ -5055,7 +5055,7 @@ namespace
 	 * Attempts one binary-arithmetic metamethod dispatch, then raises one
 	 * arithmetic type error when no metamethod resolves.
 	 */
-	[[maybe_unused]] int CallBinTmOrRaiseArithmeticTypeError(
+	int CallBinTmOrRaiseArithmeticTypeError(
 		const int event,
 		TObject* const leftOperand,
 		lua_State* const state,
@@ -12517,6 +12517,696 @@ extern "C"
 			last -= handled - 1;
 		} while (total > 1);
 	}
+	// -----------------------------------------------------------------------
+	// lvm.c - the interpreter loop.
+	// -----------------------------------------------------------------------
+
+	// Instruction field positions. The operand range limits and MAXSTACK
+	// already sit above with the symbolic executor's tables; only the field
+	// offsets are new here.
+	constexpr int kLuaSizeOp = 6;
+	constexpr int kLuaSizeC = 9;
+	constexpr int kLuaSizeB = 9;
+	constexpr int kLuaPosC = kLuaSizeOp;
+	constexpr int kLuaPosBx = kLuaPosC;
+	constexpr int kLuaPosB = kLuaPosC + kLuaSizeC;
+	constexpr int kLuaPosA = kLuaPosB + kLuaSizeB;
+
+
+
+	// Opcodes. Stock Lua 5.0.2 with this fork's four extra bit operators
+	// spliced in after OP_DIV, which shifts everything from there up by four.
+	enum LuaOpcode : int
+	{
+		kOpMove = 0, kOpLoadK, kOpLoadBool, kOpLoadNil, kOpGetUpval,
+		kOpGetGlobal, kOpGetTable, kOpSetGlobal, kOpSetUpval, kOpSetTable,
+		kOpNewTable, kOpSelf,
+		kOpAdd, kOpSub, kOpMul, kOpDiv,
+		kOpBAnd, kOpBOr, kOpBShl, kOpBShr, kOpBXor,
+		kOpUnm, kOpNot, kOpConcat,
+		kOpJmp, kOpEq, kOpLt, kOpLe, kOpTest,
+		kOpCall, kOpTailCall, kOpReturn,
+		kOpForLoop, kOpTForLoop, kOpTForPrep,
+		kOpSetList, kOpSetListO, kOpClose, kOpClosure
+	};
+
+	// Tag-method slots. This fork has no TM_MODE and adds one per bit
+	// operator, so TM_EQ lands at 3 and the arithmetic block runs 4..13 -
+	// which is what global_State::tmname[18] is sized for.
+	enum LuaTagMethod : int
+	{
+		kTmIndex = 0, kTmNewIndex, kTmGc, kTmEq,
+		kTmAdd, kTmSub, kTmMul, kTmDiv,
+		kTmBAnd, kTmBOr, kTmBShl, kTmBShr, kTmBXor,
+		kTmUnm, kTmLt, kTmLe, kTmConcat, kTmCall
+	};
+
+	// CallInfo::state. Not the bit flags stock Lua uses - this fork stores a
+	// small enumeration, read back from how luaV_execute and luaD_precall
+	// write it.
+	constexpr int kFrameRunning = 0;   // a Lua frame executing here
+	constexpr int kFrameCalling = 1;   // its callee's frame sits on top
+	constexpr int kFrameSuspended = 2; // unwind out to the C caller
+
+	// Hook masks and event codes.
+	constexpr int kHookMaskCall = 1;
+	constexpr int kHookMaskLine = 4;
+	constexpr int kHookMaskCount = 8;
+	constexpr int kHookEventCall = 0;
+	constexpr int kHookEventLine = 2;
+	constexpr int kHookEventCount = 3;
+
+	[[nodiscard]] static constexpr int LuaGetOpcode(const Instruction i) noexcept
+	{
+		return static_cast<int>(i & ((1u << kLuaSizeOp) - 1u));
+	}
+
+	[[nodiscard]] static constexpr int LuaGetArgA(const Instruction i) noexcept
+	{
+		return static_cast<int>((i >> kLuaPosA) & 0xFFu);
+	}
+
+	[[nodiscard]] static constexpr int LuaGetArgB(const Instruction i) noexcept
+	{
+		return static_cast<int>((i >> kLuaPosB) & 0x1FFu);
+	}
+
+	[[nodiscard]] static constexpr int LuaGetArgC(const Instruction i) noexcept
+	{
+		return static_cast<int>((i >> kLuaPosC) & 0x1FFu);
+	}
+
+	[[nodiscard]] static constexpr int LuaGetArgBx(const Instruction i) noexcept
+	{
+		return static_cast<int>((i >> kLuaPosBx) & kLuaMaxArgBx);
+	}
+
+	[[nodiscard]] static constexpr int LuaGetArgSBx(const Instruction i) noexcept
+	{
+		return LuaGetArgBx(i) - kLuaMaxArgSBx;
+	}
+
+	[[nodiscard]] static constexpr bool LuaIsFalse(const TObject* const o) noexcept
+	{
+		return o->tt == LUA_TNIL || (o->tt == LUA_TBOOLEAN && o->value.b == 0);
+	}
+
+	// The bit operators work on the 32-bit truncation of their operands and
+	// hand the result back as a number. A negative result is re-read as
+	// unsigned first, so `-1 >> 0` is 4294967295 rather than -1 - the binary
+	// adds 2^32 (the constant at 0x00E4F710) whenever the sign bit is set.
+	[[nodiscard]] static inline float LuaBitwiseResult(const std::int32_t value) noexcept
+	{
+		float result = static_cast<float>(value);
+		if (value < 0) {
+			result += 4294967296.0f;
+		}
+		return result;
+	}
+
+	[[nodiscard]] static inline std::int32_t LuaToBitwiseOperand(const float value) noexcept
+	{
+		return static_cast<std::int32_t>(value);
+	}
+
+	/**
+	 * Address: 0x00929C60 (FUN_00929C60, luaV_execute)
+	 *
+	 * IDA signature:
+	 * TObject *__cdecl luaV_execute(lua_State *L);
+	 *
+	 * What it does:
+	 * Runs Lua bytecode. Returns the first result of the frame that finished
+	 * when control has to go back to whatever C code called in, or null when the
+	 * interpreter was unwound by a yield.
+	 *
+	 * The loop is entered twice over: `callentry` for a fresh call, which fires
+	 * the call hook first, and `retentry` for resuming a caller whose callee has
+	 * just returned. A Lua-to-Lua call therefore never recurses into this
+	 * function - OP_CALL jumps back to the top with the new frame in place, and
+	 * OP_RETURN jumps back with the old one restored.
+	 */
+	TObject* luaV_execute(lua_State* L)
+	{
+		global_State* const G = L->l_G;
+		lua_State* const previousActiveThread = G->lstate;
+		G->lstate = L;
+
+		LClosure* cl = nullptr;
+		const Instruction* pc = nullptr;
+		TObject* k = nullptr;
+		int oldline = -1;
+
+	callentry: // a fresh call: the call hook sees it before the first instruction
+		if ((G->hookmask & kHookMaskCall) != 0) {
+			luaD_callhook(L, kHookEventCall, -1);
+		}
+
+	retentry: // resuming: the frame is already set up
+		cl = &static_cast<GCObject*>(L->base[-1].value.p)->cl.l;
+		pc = L->ci->savedpc;
+		k = cl->p->k;
+		oldline = -1;
+
+		for (;;) {
+			const Instruction i = *pc++;
+
+			if ((G->hookmask & (kHookMaskLine | kHookMaskCount)) != 0) {
+				--G->hookcount;
+				if (G->hookcount == 0 || (G->hookmask & kHookMaskLine) != 0) {
+					L->ci->savedpc = pc - 1;
+
+					if ((G->hookmask & kHookMaskCount) != 0 && G->hookcount == 0) {
+						G->hookcount = G->basehookcount;
+						luaD_callhook(L, kHookEventCount, -1);
+					} else if ((G->hookmask & kHookMaskLine) != 0) {
+						// Only report a line once, however many instructions it
+						// covers.
+						const CallInfo* const ci = L->ci;
+						const Proto* const p = static_cast<GCObject*>(ci->base[-1].value.p)->cl.l.p;
+						const int line = (p->lineinfo != nullptr)
+							? p->lineinfo[ci->savedpc - p->code]
+							: 0;
+						if (line != oldline) {
+							oldline = line;
+							luaD_callhook(L, kHookEventLine, line);
+						}
+					}
+
+					if (L->ci->state == kFrameSuspended) { // did the hook yield?
+						G->lstate = previousActiveThread;
+						return nullptr;
+					}
+				}
+			}
+
+			StkId const base = L->base;
+			StkId const ra = base + LuaGetArgA(i);
+
+			// Operand accessors. RKB/RKC pick a constant instead of a register
+			// once the index passes MAXSTACK.
+			const auto rb = [&]() -> StkId { return base + LuaGetArgB(i); };
+			const auto rkb = [&]() -> TObject* {
+				const int index = LuaGetArgB(i);
+				return (index >= kLuaMaxStack) ? &k[index - kLuaMaxStack] : &base[index];
+			};
+			const auto rkc = [&]() -> TObject* {
+				const int index = LuaGetArgC(i);
+				return (index >= kLuaMaxStack) ? &k[index - kLuaMaxStack] : &base[index];
+			};
+
+			switch (LuaGetOpcode(i)) {
+			case kOpMove:
+				*ra = *rb();
+				break;
+
+			case kOpLoadK:
+				*ra = k[LuaGetArgBx(i)];
+				break;
+
+			case kOpLoadBool:
+				ra->value.b = LuaGetArgB(i);
+				ra->tt = LUA_TBOOLEAN;
+				if (LuaGetArgC(i) != 0) {
+					++pc; // C says skip the next instruction
+				}
+				break;
+
+			case kOpLoadNil: {
+				StkId slot = rb();
+				do {
+					slot->tt = LUA_TNIL;
+					--slot;
+				} while (slot >= ra);
+				break;
+			}
+
+			case kOpGetUpval:
+				*ra = *cl->upvals[LuaGetArgB(i)]->v;
+				break;
+
+			case kOpGetGlobal: {
+				const TObject* const key = &k[LuaGetArgBx(i)];
+				const TObject* value = luaH_getstr(
+					static_cast<Table*>(cl->g.value.p),
+					static_cast<TString*>(key->value.p)
+				);
+				if (value->tt == LUA_TNIL) {
+					value = luaV_index(L, &cl->g, key, 0);
+				}
+				*(L->base + LuaGetArgA(i)) = *value;
+				break;
+			}
+
+			case kOpGetTable: {
+				StkId const table = rb();
+				const TObject* const key = rkc();
+				const TObject* value = nullptr;
+				if (table->tt == LUA_TTABLE) {
+					value = luaH_get(static_cast<Table*>(table->value.p), key);
+					if (value->tt == LUA_TNIL) {
+						value = luaV_index(L, table, key, 0);
+					}
+				} else {
+					value = luaV_getnotable(L, table, key, 0);
+				}
+				*(L->base + LuaGetArgA(i)) = *value;
+				break;
+			}
+
+			case kOpSetGlobal:
+				luaV_settable(L, &cl->g, &k[LuaGetArgBx(i)], ra);
+				break;
+
+			case kOpSetUpval:
+				*cl->upvals[LuaGetArgB(i)]->v = *ra;
+				break;
+
+			case kOpSetTable:
+				luaV_settable(L, ra, rkb(), rkc());
+				break;
+
+			case kOpNewTable: {
+				// B is a floating byte: three mantissa bits and an exponent, as
+				// packed by luaO_int2fb.
+				const int sizeHint = LuaGetArgB(i);
+				Table* const table = luaH_new(L, (sizeHint & 7) << (sizeHint >> 3), LuaGetArgC(i));
+				ra->tt = static_cast<int>(table->tt);
+				ra->value.p = table;
+				luaC_checkGC(L);
+				break;
+			}
+
+			case kOpSelf: {
+				StkId const object = rb();
+				const TObject* const key = rkc();
+				if (key->tt != LUA_TSTRING) {
+					// The code generator only ever emits OP_SELF with a string
+					// key; a chunk that says otherwise is not one this
+					// interpreter can run.
+					G->lstate = previousActiveThread;
+					return nullptr;
+				}
+
+				ra[1] = *object;
+				const TObject* value = nullptr;
+				if (object->tt == LUA_TTABLE) {
+					value = luaH_getstr(
+						static_cast<Table*>(object->value.p),
+						static_cast<TString*>(key->value.p)
+					);
+					if (value->tt != LUA_TNIL) {
+						*ra = *value;
+						break;
+					}
+					value = luaV_index(L, object, key, 0);
+				} else {
+					value = luaV_getnotable(L, object, key, 0);
+				}
+				*(L->base + LuaGetArgA(i)) = *value;
+				break;
+			}
+
+			case kOpAdd: {
+				const TObject* const b = rkb();
+				const TObject* const c = rkc();
+				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
+					ra->value.n = c->value.n + b->value.n;
+					ra->tt = LUA_TNUMBER;
+				} else {
+					// Note there is no string coercion here: unlike stock Lua,
+					// this fork goes straight to the tag method.
+					(void)CallBinTmOrRaiseArithmeticTypeError(
+						kTmAdd, const_cast<TObject*>(b), L, const_cast<TObject*>(c), ra);
+				}
+				break;
+			}
+
+			case kOpSub: {
+				const TObject* const b = rkb();
+				const TObject* const c = rkc();
+				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
+					ra->value.n = b->value.n - c->value.n;
+					ra->tt = LUA_TNUMBER;
+				} else {
+					(void)CallBinTmOrRaiseArithmeticTypeError(
+						kTmSub, const_cast<TObject*>(b), L, const_cast<TObject*>(c), ra);
+				}
+				break;
+			}
+
+			case kOpMul: {
+				const TObject* const b = rkb();
+				const TObject* const c = rkc();
+				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
+					ra->value.n = c->value.n * b->value.n;
+					ra->tt = LUA_TNUMBER;
+				} else {
+					(void)CallBinTmOrRaiseArithmeticTypeError(
+						kTmMul, const_cast<TObject*>(b), L, const_cast<TObject*>(c), ra);
+				}
+				break;
+			}
+
+			case kOpDiv: {
+				const TObject* const b = rkb();
+				const TObject* const c = rkc();
+				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
+					ra->value.n = b->value.n / c->value.n;
+					ra->tt = LUA_TNUMBER;
+				} else {
+					(void)CallBinTmOrRaiseArithmeticTypeError(
+						kTmDiv, const_cast<TObject*>(b), L, const_cast<TObject*>(c), ra);
+				}
+				break;
+			}
+
+			case kOpBAnd:
+			case kOpBOr:
+			case kOpBShl:
+			case kOpBShr:
+			case kOpBXor: {
+				const TObject* const b = rkb();
+				const TObject* const c = rkc();
+				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
+					const std::int32_t left = LuaToBitwiseOperand(b->value.n);
+					const std::int32_t right = LuaToBitwiseOperand(c->value.n);
+					std::int32_t result = 0;
+					switch (LuaGetOpcode(i)) {
+					case kOpBAnd: result = left & right; break;
+					case kOpBOr:  result = left | right; break;
+					case kOpBShl: result = left << right; break;
+					case kOpBShr: result = static_cast<std::int32_t>(
+						static_cast<std::uint32_t>(left) >> right); break;
+					default:      result = left ^ right; break; // kOpBXor
+					}
+					ra->value.n = LuaBitwiseResult(result);
+					ra->tt = LUA_TNUMBER;
+				} else {
+					const int event = kTmBAnd + (LuaGetOpcode(i) - kOpBAnd);
+					(void)CallBinTmOrRaiseArithmeticTypeError(
+						event, const_cast<TObject*>(b), L, const_cast<TObject*>(c), ra);
+				}
+				break;
+			}
+
+			case kOpUnm: {
+				const TObject* operand = rb();
+				TObject coerced{};
+				if (operand->tt != LUA_TNUMBER) {
+					float parsed = 0.0f;
+					if (operand->tt == LUA_TSTRING
+						&& luaO_str2d(static_cast<const TString*>(operand->value.p)->str, &parsed) != 0) {
+						// Unary minus is the one arithmetic operator here that
+						// still coerces a numeric string.
+						coerced.value.n = parsed;
+						coerced.tt = LUA_TNUMBER;
+						operand = &coerced;
+					} else {
+						TObject secondOperand{};
+						secondOperand.tt = LUA_TNIL;
+						(void)CallBinTmOrRaiseArithmeticTypeError(
+							kTmUnm, const_cast<TObject*>(operand), L, &secondOperand, ra);
+						break;
+					}
+				}
+				ra->value.n = -0.0f - operand->value.n;
+				ra->tt = LUA_TNUMBER;
+				break;
+			}
+
+			case kOpNot:
+				ra->value.b = LuaIsFalse(rb()) ? 1 : 0;
+				ra->tt = LUA_TBOOLEAN;
+				break;
+
+			case kOpConcat: {
+				const int b = LuaGetArgB(i);
+				const int c = LuaGetArgC(i);
+				luaV_concat(L, c - b + 1, c); // may change the stack
+				*(L->base + LuaGetArgA(i)) = *(L->base + b);
+				luaC_checkGC(L);
+				break;
+			}
+
+			case kOpJmp:
+				pc += LuaGetArgSBx(i);
+				break;
+
+			case kOpEq: {
+				const TObject* const b = rkb();
+				const TObject* const c = rkc();
+				int equal = 0;
+				if (b->tt == c->tt) {
+					equal = luaV_equalval(L, rkb(), rkc()) ? 1 : 0;
+				}
+				if (equal == LuaGetArgA(i)) {
+					pc += LuaGetArgSBx(*pc) + 1;
+				} else {
+					++pc; // skip the jump that follows
+				}
+				break;
+			}
+
+			case kOpLt:
+				if (luaV_lessthan(L, rkb(), rkc()) == LuaGetArgA(i)) {
+					pc += LuaGetArgSBx(*pc) + 1;
+				} else {
+					++pc;
+				}
+				break;
+
+			case kOpLe:
+				if (luaV_lessequal(L, rkb(), rkc()) == LuaGetArgA(i)) {
+					pc += LuaGetArgSBx(*pc) + 1;
+				} else {
+					++pc;
+				}
+				break;
+
+			case kOpTest: {
+				StkId const value = rb();
+				if ((LuaIsFalse(value) ? 1 : 0) == LuaGetArgC(i)) {
+					++pc;
+				} else {
+					*ra = *value;
+					pc += LuaGetArgSBx(*pc) + 1;
+				}
+				break;
+			}
+
+			case kOpCall:
+			case kOpTailCall: {
+				if (LuaGetArgB(i) != 0) {
+					L->top = ra + LuaGetArgB(i);
+				}
+				const int nresults = LuaGetArgC(i) - 1;
+
+				StkId const firstResult = luaD_precall(L, ra);
+				if (firstResult == nullptr) { // a Lua function: run it here
+					if (LuaGetOpcode(i) == kOpCall) {
+						L->ci[-1].state = kFrameCalling;
+						L->ci[-1].savedpc = pc - 1; // points at this OP_CALL
+					} else {
+						// Tail call: slide the new frame down over the caller's,
+						// so the two share one stack level.
+						StkId const callerBase = L->ci[-1].base;
+						StkId const source = callerBase + LuaGetArgA(i);
+						if (L->openupval != nullptr) {
+							luaF_close(L, callerBase);
+						}
+
+						int moved = 0;
+						while (source + moved < L->top) {
+							callerBase[moved - 1] = source[moved];
+							++moved;
+						}
+
+						L->top = callerBase + moved;
+						L->ci[-1].top = L->top;
+						L->ci[-1].savedpc = L->ci->savedpc;
+						++L->ci[-1].tailcalls; // one more call lost to the trace
+						--L->ci;
+						L->base = L->ci->base;
+					}
+					goto callentry;
+				}
+
+				if (firstResult > L->top) { // the C function yielded
+					L->ci[-1].state = kFrameSuspended;
+					L->ci[-1].savedpc = pc;
+					G->lstate = previousActiveThread;
+					return nullptr;
+				}
+
+				luaD_poscall(L, nresults, firstResult);
+				if (nresults >= 0) {
+					L->top = L->ci->top;
+				}
+				break;
+			}
+
+			case kOpReturn: {
+				CallInfo* const caller = &L->ci[-1];
+				const int b = LuaGetArgB(i);
+				if (b != 0) {
+					L->top = ra + b - 1;
+				}
+				if (L->openupval != nullptr) {
+					luaF_close(L, base);
+				}
+				L->ci->savedpc = pc;
+
+				if (caller->state != kFrameCalling) {
+					// Whoever called in was C code, so hand the results back.
+					G->lstate = previousActiveThread;
+					return ra;
+				}
+
+				// The caller is Lua and is waiting at its OP_CALL: finish the
+				// call and resume it without leaving this function.
+				const int nresults = LuaGetArgC(*caller->savedpc) - 1;
+				luaD_poscall(L, nresults, ra);
+				if (nresults >= 0) {
+					L->top = L->ci->top;
+				}
+				L->ci->state = kFrameRunning;
+				++L->ci->savedpc; // step past the OP_CALL
+				goto retentry;
+			}
+
+			case kOpForLoop: {
+				if (ra->tt != LUA_TNUMBER) {
+					luaG_runerror(L, "`for' initial value must be a number");
+				}
+				if (ra[1].tt != LUA_TNUMBER) {
+					float parsed = 0.0f;
+					if (ra[1].tt != LUA_TSTRING
+						|| luaO_str2d(static_cast<const TString*>(ra[1].value.p)->str, &parsed) == 0) {
+						luaG_runerror(L, "`for' limit must be a number");
+					}
+					ra[1].value.n = parsed;
+					ra[1].tt = LUA_TNUMBER;
+				}
+				if (ra[2].tt != LUA_TNUMBER) {
+					float parsed = 0.0f;
+					if (ra[2].tt != LUA_TSTRING
+						|| luaO_str2d(static_cast<const TString*>(ra[2].value.p)->str, &parsed) == 0) {
+						luaG_runerror(L, "`for' step must be a number");
+					}
+					ra[2].value.n = parsed;
+					ra[2].tt = LUA_TNUMBER;
+				}
+
+				const float step = ra[2].value.n;
+				const float limit = ra[1].value.n;
+				const float index = ra->value.n + step;
+				if ((step > 0.0f) ? (index <= limit) : (index >= limit)) {
+					pc += LuaGetArgSBx(i); // jump back to the body
+					ra->value.n = index;
+				}
+				break;
+			}
+
+			case kOpTForLoop: {
+				const int nvar = LuaGetArgC(i) + 1;
+				StkId callBase = ra + nvar + 2;
+				callBase[0] = ra[0];
+				callBase[1] = ra[1];
+				callBase[2] = ra[2];
+				L->top = callBase + 3; // iterator + state + control
+				(void)luaD_call(L, callBase, nvar);
+
+				L->top = L->ci->top;
+				// the call may have moved the stack, so find the slots again
+				callBase = L->base + LuaGetArgA(i) + 2;
+				for (int slot = nvar - 1; slot >= 0; --slot) {
+					callBase[slot] = callBase[slot + nvar];
+				}
+
+				if (callBase->tt != LUA_TNIL) {
+					pc += LuaGetArgSBx(*pc) + 1; // go round again
+				} else {
+					++pc; // control variable is nil: leave the loop
+				}
+				break;
+			}
+
+			case kOpTForPrep: {
+				if (ra->tt == LUA_TTABLE) {
+					// `for x in t' is shorthand for `for x in next, t'.
+					ra[1].tt = LUA_TTABLE;
+					ra[1].value.p = ra->value.p;
+					TString* const nextName = luaS_newlstr(L, "next", 4u);
+					*ra = *luaH_getstr(static_cast<Table*>(L->_gt.value.p), nextName);
+				} else if (!IsCallableTag(ra->tt)) {
+					L->ci->savedpc = pc - 1;
+					luaG_typeerror(L, ra, "loop over");
+				}
+				pc += LuaGetArgSBx(i);
+				break;
+			}
+
+			case kOpSetList:
+			case kOpSetListO: {
+				if (ra->tt != LUA_TTABLE) {
+					// Only a table constructor emits these, so a chunk that
+					// reaches here with anything else is not runnable.
+					G->lstate = previousActiveThread;
+					return nullptr;
+				}
+
+				Table* const table = static_cast<Table*>(ra->value.p);
+				const int bc = LuaGetArgBx(i);
+				int n = 0;
+				if (LuaGetOpcode(i) == kOpSetList) {
+					n = (bc & static_cast<int>(kLuaFieldsPerFlushM1)) + 1;
+				} else {
+					n = static_cast<int>(L->top - ra) - 1; // the open call's results
+					L->top = L->ci->top;
+				}
+
+				const int batchBase = bc & ~static_cast<int>(kLuaFieldsPerFlushM1);
+				for (; n > 0; --n) {
+					*luaH_setnum(L, table, batchBase + n) = ra[n];
+				}
+				break;
+			}
+
+			case kOpClose:
+				luaF_close(L, ra);
+				break;
+
+			case kOpClosure: {
+				Proto* const proto = cl->p->p[LuaGetArgBx(i)];
+				const int nups = proto->nups;
+				Closure* const closure = luaF_newLclosure(L, nups, &cl->g);
+				closure->l.p = proto;
+
+				// Each upvalue is described by one pseudo-instruction following
+				// the OP_CLOSURE: either GETUPVAL to share the enclosing
+				// closure's, or MOVE to capture a local.
+				for (int up = 0; up < nups; ++up, ++pc) {
+					const int index = LuaGetArgB(*pc);
+					closure->l.upvals[up] = (LuaGetOpcode(*pc) == kOpGetUpval)
+						? cl->upvals[index]
+						: luaF_findupval(L, base + index);
+				}
+
+				ra->tt = static_cast<int>(closure->l.tt);
+				ra->value.p = closure;
+				luaC_checkGC(L);
+				break;
+			}
+
+			default:
+				break;
+			}
+
+			L->ci->savedpc = pc;
+		}
+	}
+
 
 	/**
 	 * Address: 0x0091A690 (FUN_0091A690, luaO_pushvfstring)
