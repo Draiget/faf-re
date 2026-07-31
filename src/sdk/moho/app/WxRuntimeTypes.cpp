@@ -34959,6 +34959,17 @@ long wxWindowMswRuntime::MSWWindowProc(
     );
     break;
 
+  case WM_CAPTURECHANGED:
+    // Windows says the capture went elsewhere; lParam names whoever took it.
+    processed = HandleCaptureChanged(static_cast<int>(lParam));
+    break;
+
+  case WM_DROPFILES:
+    // wParam is the drop handle. The handler releases it, so it must not be
+    // touched afterwards.
+    processed = HandleDropFiles(reinterpret_cast<void*>(static_cast<std::uintptr_t>(wParam)));
+    break;
+
   case WM_ACTIVATE: {
     // The three pieces travel packed across both parameters.
     unsigned short activationState = 0;
