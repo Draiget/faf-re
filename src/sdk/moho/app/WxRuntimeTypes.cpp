@@ -3962,11 +3962,35 @@ namespace
     ) = 0;
   };
 
+  /**
+   * Resolves the registered classes' base links, once.
+   *
+   * The binary does this from wxApp::Initialize (0x009927E0), which is the
+   * only caller of InitializeClasses there. That function has no definition
+   * in this tree and its own caller, wxEntryStart, is never invoked - so
+   * nothing on that chain runs, and until something did, every base link
+   * stayed null and any kind-of test could only ever match a class exactly.
+   *
+   * Doing it here instead is a deliberate deviation: this is the narrowest
+   * point that actually executes, and every reader of the links goes through
+   * a kind-of test, so none of them can see an unresolved list.
+   */
+  void EnsureWxClassesInitialisedRuntime() noexcept
+  {
+    static const bool initialised = [] {
+      wxClassInfo::InitializeClasses();
+      return true;
+    }();
+    (void)initialised;
+  }
+
   [[nodiscard]] bool WxClassInfoIsKindOfNamedRuntime(
     const wxClassInfo* const classInfo,
     const wchar_t* const className
   ) noexcept
   {
+    EnsureWxClassesInitialisedRuntime();
+
     if (classInfo == nullptr || className == nullptr) {
       return false;
     }
