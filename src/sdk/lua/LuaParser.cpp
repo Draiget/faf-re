@@ -679,6 +679,7 @@ namespace
     void luaK_patchlist(FuncState* fs, std::int32_t list, std::int32_t target);
     void luaX_setinput(lua_State* L, LexState* ls, LuaUndumpZioRuntimeView* z, TString* source);
     void chunk(LexState* ls);
+    void f_parser(SParser* parser, lua_State* state);
     int luaI_registerlocalvar(LexState* ls, TString* varname);
     void new_localvarstr(const char* name, LexState* ls, int n);
     void code_params(LexState* ls, int nparams, int dots);
@@ -2841,6 +2842,42 @@ namespace
   }
 
   /**
+   * Address: 0x00913F90 (FUN_00913F90, luaD_protectedparser)
+   *
+   * IDA signature:
+   * int __cdecl luaD_protectedparser(lua_State *L, ZIO *z, int bin);
+   *
+   * What it does:
+   * Compiles one chunk and releases the scratch buffer afterwards, whether the
+   * parse finished or threw. Lives here rather than with the rest of ldo.c
+   * because SParser and f_parser do.
+   */
+  extern "C" std::int32_t luaD_protectedparser(lua_State* const L, LuaUndumpZioRuntimeView* const z, const int bin)
+  {
+    SParser parser;
+    parser.z = z;
+    parser.bin = bin;
+    parser.buff.buffer = nullptr;
+    parser.buff.buffsize = 0;
+
+    // The original frees the buffer from a __finally; the guard is the same
+    // thing said in C++.
+    struct BufferGuard
+    {
+      lua_State* state;
+      Mbuffer* buffer;
+
+      ~BufferGuard()
+      {
+        (void)luaM_realloc(state, buffer->buffer, static_cast<lu_mem>(buffer->buffsize), 0u);
+      }
+    } const guard{L, &parser.buff};
+
+    f_parser(&parser, L);
+    return 0;
+  }
+
+  /**
    * Address: 0x0091ACA0 (FUN_0091ACA0, codestring)
    *
    * What it does:
@@ -3470,7 +3507,7 @@ namespace
    * `Proto`, wraps it into one new Lua closure, and pushes that closure on
    * the VM stack.
    */
-  void f_parser(SParser* const parser, lua_State* const state)
+  extern "C" void f_parser(SParser* const parser, lua_State* const state)
   {
     auto* const globalState = reinterpret_cast<LuaParserGlobalStateRuntimeView*>(state->l_G);
     if (globalState->totalBytes >= globalState->gcThreshold && globalState->panic == nullptr) {
