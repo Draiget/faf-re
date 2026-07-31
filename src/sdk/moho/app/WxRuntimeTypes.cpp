@@ -1434,6 +1434,18 @@ void wxClassInfo::InitializeClasses()
 }
 
 
+// The control classes, so a kind-of test can tell them apart. Each records
+// its base by name; InitializeClasses turns those into links.
+wxClassInfo wxControlRuntime::sm_classInfo{
+  L"wxControl", L"wxWindow", nullptr, static_cast<std::int32_t>(sizeof(wxControlRuntime))
+};
+wxClassInfo wxCheckBoxRuntime::sm_classInfo{
+  L"wxCheckBox", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxCheckBoxRuntime))
+};
+wxClassInfo wxTextCtrlRuntime::sm_classInfo{
+  L"wxTextCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTextCtrlRuntime))
+};
+
 wxClassInfo* wxClassInfo::sm_first = nullptr;
 wxHashTableRuntime* wxClassInfo::sm_classTable = nullptr;
 
