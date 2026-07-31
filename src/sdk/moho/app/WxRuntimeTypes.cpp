@@ -11339,6 +11339,10 @@ namespace
     // foreground, which is what stops a system-colour change overwriting
     // either - the same bits as the flags byte at window+0xCC.
     wxColourRuntime backgroundColour{}; // window+0x80
+    // window+0xE0 and +0xEC: a window may carry a palette of its own, which
+    // its descendants borrow when the display is palettised.
+    wxPaletteRuntime palette{};
+    std::uint8_t hasCustomPalette = 0;
     wxColourRuntime foregroundColour{}; // window+0x90
     void* dropTarget = nullptr;
   };
@@ -33302,6 +33306,163 @@ bool wxWindowMswRuntime::HandleDisplayChange()
   return GetEventHandler()->ProcessEvent(&event);
 }
 
+void* wxPaletteRuntime::ExchangeNativePalette(
+  void* const nativePalette
+) noexcept
+{
+  if (mRefData == nullptr) {
+    return nullptr;
+  }
+  void* const previous = mRefData->mNativePalette;
+  mRefData->mNativePalette = nativePalette;
+  return previous;
+}
+
+/**
+ * The nearest window up the chain - this one included - carrying a palette of
+ * its own. A child inherits its ancestor's palette rather than having one.
+ */
+wxWindowMswRuntime* wxWindowMswRuntime::GetAncestorWithCustomPalette()
+{
+  for (wxWindowBase* window = this; window != nullptr;) {
+    const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(window);
+    if (state == nullptr) {
+      return nullptr;
+    }
+    if (state->hasCustomPalette != 0u) {
+      return static_cast<wxWindowMswRuntime*>(window);
+    }
+    window = state->parentWindow;
+  }
+  return nullptr;
+}
+
+namespace
+{
+  /**
+   * Selects a window's palette into a device context and realises it, keeping
+   * whatever it displaced so the context can be handed back unchanged.
+   *
+   * It is done twice, which looks redundant and is not: the first realise maps
+   * the palette's colours into the system one, and the second re-selects the
+   * now-mapped palette so the window draws through the mapping rather than
+   * around it. The answer is how many entries the first realise had to change,
+   * which is what says whether anything on screen is now wrong.
+   */
+  [[nodiscard]] int RealisePaletteIntoDeviceContext(
+    wxPaletteRuntime& palette,
+    HDC const deviceContext,
+    const bool forceToForeground
+  )
+  {
+    HPALETTE const first = static_cast<HPALETTE>(palette.GetNativePalette());
+    void* const displaced = ::SelectPalette(deviceContext, first, FALSE);
+    (void)palette.ExchangeNativePalette(displaced);
+
+    const int changedEntries = static_cast<int>(::RealizePalette(deviceContext));
+
+    HPALETTE const second = static_cast<HPALETTE>(palette.GetNativePalette());
+    void* const displacedAgain =
+      ::SelectPalette(deviceContext, second, forceToForeground ? TRUE : FALSE);
+    (void)palette.ExchangeNativePalette(displacedAgain);
+    (void)::RealizePalette(deviceContext);
+
+    return changedEntries;
+  }
+} // namespace
+
+/**
+ * Address: 0x00969A20 (FUN_00969A20)
+ * Mangled: ?HandleQueryNewPalette@wxWindow@@IAE_NXZ
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleQueryNewPalette(wxWindow *this);
+ *
+ * What it does:
+ * Claims the foreground palette as this window is activated, then raises
+ * wxEVT_QUERY_NEW_PALETTE.
+ *
+ * The second select forces the palette to the foreground here, which the
+ * palette-changed path deliberately does not - a window being activated is
+ * entitled to the foreground, one merely reacting to somebody else's change is
+ * not. If realising it had to move any entries, what is already on screen is
+ * wrong and the window is invalidated.
+ *
+ * The message is reported handled only if the handler both handled it and set
+ * the event's flag.
+ */
+bool wxWindowMswRuntime::HandleQueryNewPalette()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  auto* const window = reinterpret_cast<HWND>(
+    static_cast<std::uintptr_t>(state != nullptr ? state->nativeHandle : 0u)
+  );
+
+  if (wxWindowMswRuntime* const owner = GetAncestorWithCustomPalette(); owner != nullptr) {
+    WxWindowBaseRuntimeState& ownerState = EnsureWxWindowBaseRuntimeState(owner);
+    HDC const deviceContext = ::GetDC(window);
+    if (deviceContext != nullptr) {
+      const int changedEntries = RealisePaletteIntoDeviceContext(ownerState.palette, deviceContext, true);
+      (void)::ReleaseDC(window, deviceContext);
+      if (changedEntries > 0) {
+        (void)::InvalidateRect(window, nullptr, TRUE);
+      }
+    }
+  }
+
+  WxQueryNewPaletteEventFactoryRuntime event{};
+  event.mEventId = state != nullptr ? state->windowId : -1;
+  event.mEventObject = this;
+  return GetEventHandler()->ProcessEvent(&event) && event.mPaletteRealized != 0u;
+}
+
+/**
+ * Address: 0x00969810 (FUN_00969810)
+ * Mangled: ?HandlePaletteChanged@wxWindow@@IAE_NPAX@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandlePaletteChanged(wxWindow *this, WXHWND changedWindow);
+ *
+ * What it does:
+ * Re-realises this window's palette after another window changed the system
+ * one, then raises wxEVT_PALETTE_CHANGED.
+ *
+ * Nothing is realised when this window is the one that made the change - it
+ * already has what it asked for, and reacting to itself would loop. Unlike the
+ * activation path the palette is not forced to the foreground, and the device
+ * context comes from the window that changed rather than this one.
+ */
+bool wxWindowMswRuntime::HandlePaletteChanged(
+  void* const changedWindow
+)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  auto* const changed = static_cast<HWND>(changedWindow);
+  auto* const self = reinterpret_cast<HWND>(
+    static_cast<std::uintptr_t>(state != nullptr ? state->nativeHandle : 0u)
+  );
+
+  if (changed != self) {
+    if (wxWindowMswRuntime* const owner = GetAncestorWithCustomPalette(); owner != nullptr) {
+      WxWindowBaseRuntimeState& ownerState = EnsureWxWindowBaseRuntimeState(owner);
+      HDC const deviceContext = ::GetDC(changed);
+      if (deviceContext != nullptr) {
+        const int changedEntries = RealisePaletteIntoDeviceContext(ownerState.palette, deviceContext, false);
+        (void)::ReleaseDC(changed, deviceContext);
+        if (changedEntries > 0) {
+          (void)::InvalidateRect(changed, nullptr, TRUE);
+        }
+      }
+    }
+  }
+
+  WxPaletteChangedEventFactoryRuntime event{};
+  event.mEventId = state != nullptr ? state->windowId : -1;
+  event.mEventObject = this;
+  event.mChangedWindow = wxFindWinFromHandle(static_cast<int>(reinterpret_cast<std::intptr_t>(changed)));
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
 /**
  * Address: 0x00969660 (FUN_00969660)
  * Mangled: ?HandleSysColorChange@wxWindow@@IAE_NXZ
@@ -35001,6 +35162,16 @@ long wxWindowMswRuntime::MSWWindowProc(
     }
     return MSWDefWindowProc(message, wParam, lParam);
   }
+
+  case WM_QUERYNEWPALETTE:
+    processed = HandleQueryNewPalette();
+    break;
+
+  case WM_PALETTECHANGED:
+    processed = HandlePaletteChanged(
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(wParam))
+    );
+    break;
 
   case WM_SYSCOLORCHANGE:
     // Always reported unhandled so the default handler runs as well.
