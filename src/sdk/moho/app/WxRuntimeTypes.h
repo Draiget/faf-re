@@ -1465,6 +1465,86 @@ struct wxPaletteRuntime
 static_assert(offsetof(wxPaletteRuntime, mRefData) == 0x04, "wxPaletteRuntime::mRefData offset must be 0x04");
 static_assert(sizeof(wxPaletteRuntime) == 0xC, "wxPaletteRuntime size must be 0xC");
 
+class wxHashTableRuntime;
+
+/**
+ * What a class knows about itself: its name, which classes it derives from,
+ * and the links that make the kind-of test possible.
+ *
+ * A class records its bases by NAME rather than by pointer, because at
+ * static-init time a base's class-info object may not have been constructed
+ * yet. InitializeClasses walks the registered list afterwards and turns each
+ * name into the pointer the test actually follows - so nothing works until
+ * that has run.
+ *
+ * Offsets confirmed from wxClassInfo::IsKindOf (0x009627D0), which reads the
+ * two base links at +0x14 and +0x18.
+ */
+class wxClassInfo
+{
+public:
+  /**
+   * Registering constructor: every class that wants to be recognisable
+   * declares one of these, and it puts itself on the list as it is built.
+   */
+  wxClassInfo(
+    const wchar_t* className,
+    const wchar_t* baseClassName1,
+    const wchar_t* baseClassName2,
+    std::int32_t objectSize
+  ) noexcept
+    : m_className(className)
+    , m_baseClassName1(baseClassName1)
+    , m_baseClassName2(baseClassName2)
+    , m_objectSize(objectSize)
+    , m_next(sm_first)
+  {
+    sm_first = this;
+  }
+
+  wxClassInfo() = default;
+
+  /**
+   * Address: 0x00977DA0 (FUN_00977DA0)
+   *
+   * What it does:
+   * Resolves every registered class's base names into base pointers.
+   */
+  static void InitializeClasses();
+
+  /**
+   * Address: 0x009627D0 (FUN_009627D0)
+   * Mangled: ?IsKindOf@wxClassInfo@@QBE_NPBV1@@Z
+   *
+   * What it does:
+   * Whether this class is the one being asked about, or descends from it.
+   * Both base links are searched, not just the first - a class here may have
+   * two bases, so the answer is a search rather than a walk.
+   */
+  [[nodiscard]] bool IsKindOf(const wxClassInfo* info) const;
+
+  static wxClassInfo* sm_first;
+  static wxHashTableRuntime* sm_classTable;
+
+  const wchar_t* m_className = nullptr;      // +0x00
+  const wchar_t* m_baseClassName1 = nullptr; // +0x04
+  const wchar_t* m_baseClassName2 = nullptr; // +0x08
+  std::int32_t m_objectSize = 0;             // +0x0C
+  void* m_objectConstructor = nullptr;       // +0x10
+  wxClassInfo* m_baseInfo1 = nullptr;        // +0x14
+  wxClassInfo* m_baseInfo2 = nullptr;        // +0x18
+  wxClassInfo* m_next = nullptr;             // +0x1C
+};
+
+static_assert(offsetof(wxClassInfo, m_className) == 0x00, "wxClassInfo::m_className offset must be 0x00");
+static_assert(offsetof(wxClassInfo, m_baseClassName1) == 0x04, "wxClassInfo::m_baseClassName1 offset must be 0x04");
+static_assert(offsetof(wxClassInfo, m_baseClassName2) == 0x08, "wxClassInfo::m_baseClassName2 offset must be 0x08");
+static_assert(offsetof(wxClassInfo, m_objectSize) == 0x0C, "wxClassInfo::m_objectSize offset must be 0x0C");
+static_assert(offsetof(wxClassInfo, m_baseInfo1) == 0x14, "wxClassInfo::m_baseInfo1 offset must be 0x14");
+static_assert(offsetof(wxClassInfo, m_baseInfo2) == 0x18, "wxClassInfo::m_baseInfo2 offset must be 0x18");
+static_assert(offsetof(wxClassInfo, m_next) == 0x1C, "wxClassInfo::m_next offset must be 0x1C");
+static_assert(sizeof(wxClassInfo) == 0x20, "wxClassInfo size must be 0x20");
+
 class wxWindowBase
 {
 public:
@@ -1869,6 +1949,7 @@ public:
    * focused window is not one of ours.
    */
   [[nodiscard]] static wxWindowBase* FindFocus();
+
 
   /**
    * Address: 0x00964CA0 (FUN_00964CA0)
@@ -5237,7 +5318,7 @@ public:
    */
   static wxTopLevelWindowRootRuntime* DestroyWithoutDelete(wxTopLevelWindowRootRuntime* object) noexcept;
 
-  static void* sm_classInfo[1];
+  static wxClassInfo sm_classInfo;
 };
 
 static_assert(sizeof(wxTopLevelWindowRootRuntime) == 0x4, "wxTopLevelWindowRootRuntime size must be 0x4");
@@ -5250,7 +5331,7 @@ static_assert(sizeof(wxTopLevelWindowRootRuntime) == 0x4, "wxTopLevelWindowRootR
  * Returns the shared class-info lane used by frame/dialog/top-level
  * `GetClassInfo` slot-0 entries.
  */
-[[nodiscard]] void** WX_FrameBaseGetClassInfo() noexcept;
+[[nodiscard]] wxClassInfo* WX_FrameBaseGetClassInfo() noexcept;
 
 /**
  * Address: 0x009C7EF0 (FUN_009C7EF0, wxGetWindowId)
@@ -5557,7 +5638,7 @@ public:
    */
   std::int32_t OnApplyCommand(wxCommandEventRuntime& event);
 
-  static void* sm_classInfo[1];
+  static wxClassInfo sm_classInfo;
   static wxEventTable sm_eventTable;
 
   std::uint8_t mUnknown15CTo16F[0x14]{};
@@ -5802,7 +5883,7 @@ public:
   void SetItemHasChildren(const wxTreeItemIdRuntime& item, bool hasChildren) noexcept;
   void SetItemText(const wxTreeItemIdRuntime& item, std::uint32_t column, const wxStringRuntime& text);
 
-  static void* sm_classInfo[1];
+  static wxClassInfo sm_classInfo;
   static wxEventTable sm_eventTable;
 
   std::uint8_t mUnknown04To13F[0x13C]{};

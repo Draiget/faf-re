@@ -1405,53 +1405,34 @@ std::uint32_t wxHashTableNextBucketThresholdRuntime(
   return 0u;
 }
 
-class wxClassInfo
+/**
+ * Address: 0x00977DA0 (FUN_00977DA0, wxClassInfo::InitializeClasses)
+ *
+ * What it does:
+ * Turns the registered list into a usable hierarchy. Every class recorded its
+ * base classes by NAME at static-init time, because a base's class-info object
+ * may not have been constructed yet when a derived one registers; this walks
+ * the list once to build a name lookup, then again to turn each name into the
+ * pointer the kind-of test follows.
+ */
+void wxClassInfo::InitializeClasses()
 {
-public:
-  /**
-   * Address: 0x00977DA0 (FUN_00977DA0, wxClassInfo::InitializeClasses)
-   *
-   * What it does:
-   * Builds one class-name lookup table from the linked class-info list, then
-   * resolves primary/secondary base-class pointers from base-name lanes.
-   */
-  static void InitializeClasses()
-  {
-    sm_classTable = new wxHashTableRuntime(2, 1000);
+  sm_classTable = new wxHashTableRuntime(2, 1000);
 
-    for (wxClassInfo* classInfo = sm_first; classInfo != nullptr; classInfo = classInfo->m_next) {
-      if (classInfo->m_className != nullptr) {
-        sm_classTable->Put(classInfo->m_className, classInfo);
-      }
-    }
-
-    for (wxClassInfo* classInfo = sm_first; classInfo != nullptr; classInfo = classInfo->m_next) {
-      classInfo->m_baseInfo1 =
-        classInfo->m_baseClassName1 != nullptr ? sm_classTable->Get(classInfo->m_baseClassName1) : nullptr;
-      classInfo->m_baseInfo2 =
-        classInfo->m_baseClassName2 != nullptr ? sm_classTable->Get(classInfo->m_baseClassName2) : nullptr;
+  for (wxClassInfo* classInfo = sm_first; classInfo != nullptr; classInfo = classInfo->m_next) {
+    if (classInfo->m_className != nullptr) {
+      sm_classTable->Put(classInfo->m_className, classInfo);
     }
   }
 
-  static wxClassInfo* sm_first;
-  static wxHashTableRuntime* sm_classTable;
+  for (wxClassInfo* classInfo = sm_first; classInfo != nullptr; classInfo = classInfo->m_next) {
+    classInfo->m_baseInfo1 =
+      classInfo->m_baseClassName1 != nullptr ? sm_classTable->Get(classInfo->m_baseClassName1) : nullptr;
+    classInfo->m_baseInfo2 =
+      classInfo->m_baseClassName2 != nullptr ? sm_classTable->Get(classInfo->m_baseClassName2) : nullptr;
+  }
+}
 
-  const wchar_t* m_className = nullptr;      // +0x00
-  const wchar_t* m_baseClassName1 = nullptr; // +0x04
-  const wchar_t* m_baseClassName2 = nullptr; // +0x08
-  std::uint8_t mReserved0C[0x8]{};           // +0x0C
-  wxClassInfo* m_baseInfo1 = nullptr;        // +0x14
-  wxClassInfo* m_baseInfo2 = nullptr;        // +0x18
-  wxClassInfo* m_next = nullptr;             // +0x1C
-};
-
-static_assert(offsetof(wxClassInfo, m_className) == 0x00, "wxClassInfo::m_className offset must be 0x00");
-static_assert(offsetof(wxClassInfo, m_baseClassName1) == 0x04, "wxClassInfo::m_baseClassName1 offset must be 0x04");
-static_assert(offsetof(wxClassInfo, m_baseClassName2) == 0x08, "wxClassInfo::m_baseClassName2 offset must be 0x08");
-static_assert(offsetof(wxClassInfo, m_baseInfo1) == 0x14, "wxClassInfo::m_baseInfo1 offset must be 0x14");
-static_assert(offsetof(wxClassInfo, m_baseInfo2) == 0x18, "wxClassInfo::m_baseInfo2 offset must be 0x18");
-static_assert(offsetof(wxClassInfo, m_next) == 0x1C, "wxClassInfo::m_next offset must be 0x1C");
-static_assert(sizeof(wxClassInfo) == 0x20, "wxClassInfo size must be 0x20");
 
 wxClassInfo* wxClassInfo::sm_first = nullptr;
 wxHashTableRuntime* wxClassInfo::sm_classTable = nullptr;
@@ -29551,7 +29532,8 @@ HCURSOR wxCreateCursorFromBitmapMask(
   return cursor;
 }
 
-void* wxTopLevelWindowRootRuntime::sm_classInfo[1] = {nullptr};
+// Registers itself on wxClassInfo::sm_first as it is constructed.
+wxClassInfo wxTopLevelWindowRootRuntime::sm_classInfo{L"wxTopLevelWindowMSW", L"wxTopLevelWindow", nullptr, static_cast<std::int32_t>(sizeof(wxTopLevelWindowRootRuntime))};
 
 /**
  * Address: 0x004A3690 (FUN_004A3690)
@@ -30860,7 +30842,8 @@ void wxControlContainerRuntime::Initialize(
   mAcceptsFocusRecursion = acceptsFocusRecursion ? 1 : 0;
 }
 
-void* wxDialogRuntime::sm_classInfo[1] = {nullptr};
+// Registers itself on wxClassInfo::sm_first as it is constructed.
+wxClassInfo wxDialogRuntime::sm_classInfo{L"wxDialog", L"wxDialogBase", nullptr, static_cast<std::int32_t>(sizeof(wxDialogRuntime))};
 wxEventTable wxDialogRuntime::sm_eventTable = {nullptr, nullptr};
 
 /**
@@ -30966,7 +30949,7 @@ wxDialogRuntime::wxDialogRuntime(
  */
 void* wxDialogRuntime::GetClassInfo() const
 {
-  return sm_classInfo;
+  return &sm_classInfo;
 }
 
 /**
@@ -31550,7 +31533,8 @@ wxTreeListColumnInfoRuntime* wxTreeListColumnInfoRuntime::DeleteWithFlag(
   return object;
 }
 
-void* wxTreeListCtrlRuntime::sm_classInfo[1] = {nullptr};
+// Registers itself on wxClassInfo::sm_first as it is constructed.
+wxClassInfo wxTreeListCtrlRuntime::sm_classInfo{L"wxTreeListCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTreeListCtrlRuntime))};
 wxEventTable wxTreeListCtrlRuntime::sm_eventTable = {&gWxControlEventTableRuntime, nullptr};
 
 /**
@@ -31961,7 +31945,7 @@ long wxTreeListCtrlRuntime::GetWindowStyleFlag() const
  */
 void* wxTreeListCtrlRuntime::GetClassInfo() const
 {
-  return sm_classInfo;
+  return &sm_classInfo;
 }
 
 /**
@@ -32262,9 +32246,9 @@ void wxTreeListCtrlRuntime::SetItemText(
  * Returns the shared class-info lane used by frame/dialog/top-level
  * `GetClassInfo` slot-0 entries.
  */
-void** WX_FrameBaseGetClassInfo() noexcept
+wxClassInfo* WX_FrameBaseGetClassInfo() noexcept
 {
-  return wxTopLevelWindowRootRuntime::sm_classInfo;
+  return &wxTopLevelWindowRootRuntime::sm_classInfo;
 }
 
 /**
@@ -71430,18 +71414,16 @@ namespace
     "WxTreeWindowRuntimeView::treeWindowHandle offset must be 0x108"
   );
 
-  using GetClassInfoFn = void*(__thiscall*)(void*);
-
   auto* const runtime = static_cast<WxTreeWindowRuntimeView*>(treeCtrlRuntime);
   if (runtime == nullptr || runtime->treeWindowHandle == nullptr) {
     return 0;
   }
 
-  auto** const vtable = *reinterpret_cast<void***>(treeCtrlRuntime);
-  void* const classInfo =
-    (vtable != nullptr && vtable[0] != nullptr) ? reinterpret_cast<GetClassInfoFn>(vtable[0])(treeCtrlRuntime) : nullptr;
-
-  if (classInfo == wxTreeListCtrlRuntime::sm_classInfo[0]) {
+  // Asking the object what it is, rather than reaching into its vtable to do
+  // the same thing by hand. The test is identity, not kind-of: a class derived
+  // from the tree control sorts through the callback below instead.
+  auto* const window = static_cast<wxWindowBase*>(treeCtrlRuntime);
+  if (window->GetClassInfo() == &wxTreeListCtrlRuntime::sm_classInfo) {
     return ::SendMessageW(runtime->treeWindowHandle, TVM_SORTCHILDREN, 0, parentItemLane);
   }
 
