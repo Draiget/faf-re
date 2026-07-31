@@ -14163,6 +14163,7 @@ namespace
 
     bool Destroy() override
     {
+      DestroyNativeWindow();
       gWxTopLevelWindowRuntimeStateByWindow.erase(this);
       gWxWindowBaseStateByWindow.erase(this);
       gSupComFrameStateByFrame.erase(this);
@@ -33299,6 +33300,65 @@ long wxWindowMswRuntime::MSWDefWindowProc(
     static_cast<WPARAM>(wParam),
     static_cast<LPARAM>(lParam)
   ));
+}
+
+/**
+ * Address: 0x0096C090 (FUN_0096C090, wxWindowMSW::UnsubclassWin)
+ *
+ * IDA signature:
+ * void __thiscall wxWindowMSW::UnsubclassWin(wxWindowMSW *this);
+ *
+ * What it does:
+ * Undoes SubclassWin. The handle association goes first, then - only if this
+ * window displaced someone else's window procedure and that HWND is still
+ * alive - the original procedure is put back.
+ */
+void wxWindowMswRuntime::UnsubclassWin()
+{
+  wxRemoveHandleAssociation(this);
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  const HWND hwnd = reinterpret_cast<HWND>(state.nativeHandle);
+  if (hwnd == nullptr) {
+    return;
+  }
+
+  state.nativeHandle = 0u;
+  if (::IsWindow(hwnd) == FALSE) {
+    return;
+  }
+
+  if (state.previousWindowProc != 0) {
+    if (!DoesWindowClassUseWindowProc(hwnd, reinterpret_cast<WNDPROC>(state.previousWindowProc))) {
+      (void)::SetWindowLongW(hwnd, GWL_WNDPROC, state.previousWindowProc);
+    }
+    state.previousWindowProc = 0;
+  }
+}
+
+/**
+ * Address: 0x0096BF40 (FUN_0096BF40, wxWindow::~wxWindow), tail at 0x0096BF78
+ *
+ * IDA signature:
+ * void __thiscall wxWindow::~wxWindow(wxWindow *this);
+ *
+ * What it does:
+ * The destructor's native teardown. Destroying the window before dropping the
+ * association is deliberate: ::DestroyWindow sends WM_DESTROY and WM_NCDESTROY
+ * synchronously, and the window procedure has to still be able to find this
+ * object while it does. Leaving a dead HWND associated is worse than either -
+ * Windows keeps delivering to it and the lookup hands back freed memory.
+ */
+void wxWindowMswRuntime::DestroyNativeWindow()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  const HWND hwnd = (state != nullptr) ? reinterpret_cast<HWND>(state->nativeHandle) : nullptr;
+  if (hwnd == nullptr) {
+    return;
+  }
+
+  (void)::DestroyWindow(hwnd);
+  wxRemoveHandleAssociation(this);
 }
 
 unsigned long wxWindowBase::GetHandle() const

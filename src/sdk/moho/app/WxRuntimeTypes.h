@@ -2120,6 +2120,25 @@ public:
    * Points an existing HWND at the wx window procedure.
    */
   void SubclassWin(unsigned long nativeHandle);
+
+  /**
+   * Address: 0x0096C090 (FUN_0096C090, wxWindowMSW::UnsubclassWin)
+   *
+   * What it does:
+   * Undoes SubclassWin: drops the handle association and, if this window
+   * displaced someone else's window procedure, puts theirs back.
+   */
+  void UnsubclassWin();
+
+  /**
+   * Address: 0x0096BF40 (FUN_0096BF40, wxWindow::~wxWindow), tail at 0x0096BF78
+   *
+   * What it does:
+   * The destructor's native teardown: destroys the window and drops its
+   * handle association, in that order - the association has to outlive
+   * ::DestroyWindow because the window procedure still runs during it.
+   */
+  void DestroyNativeWindow();
   /**
    * Address: 0x009675F0 (FUN_009675F0)
    * Mangled: ?MSWCommand@wxWindow@@UAE_NIG@Z
