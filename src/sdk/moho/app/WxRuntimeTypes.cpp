@@ -33628,6 +33628,84 @@ void wxWindowBase::UpdateWindowUI()
   }
 }
 
+/**
+ * Address: 0x0096C100 (FUN_0096C100)
+ * Mangled: ?OnIdle@wxWindow@@IAEXAAVwxIdleEvent@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxWindow::OnIdle(wxWindow *this, wxIdleEvent *event);
+ *
+ * What it does:
+ * Two unrelated jobs that share the idle moment.
+ *
+ * The first is noticing that the pointer has left. Windows sends nothing when
+ * it does - only arrival has a message - so a window that believes the
+ * pointer is inside it checks, and raises the leave event itself when it is
+ * not. That is why the belief is a flag on the window rather than something
+ * worked out per message.
+ *
+ * The leave position is where the pointer actually is, made relative to the
+ * window, so it usually lies outside the client area - which is the point.
+ * The button and modifier state is read from the keyboard directly, there
+ * being no message to carry it: the two modifier keys are down when their
+ * high bit is set, while the three buttons count as down on any bit at all.
+ *
+ * The second job is refreshing whatever the window shows.
+ */
+void wxWindowMswRuntime::OnIdle(
+  wxEventRuntime& idleEvent
+)
+{
+  (void)idleEvent;
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  if (state.mouseInWindow != 0u && !IsMouseInWindow()) {
+    state.mouseInWindow = 0u;
+
+    constexpr unsigned int kMouseFlagLeftButton = 0x0001u;
+    constexpr unsigned int kMouseFlagRightButton = 0x0002u;
+    constexpr unsigned int kMouseFlagShift = 0x0004u;
+    constexpr unsigned int kMouseFlagControl = 0x0008u;
+    constexpr unsigned int kMouseFlagMiddleButton = 0x0010u;
+
+    unsigned int mouseFlags = 0;
+    if (::GetKeyState(VK_SHIFT) < 0) {
+      mouseFlags |= kMouseFlagShift;
+    }
+    if (::GetKeyState(VK_CONTROL) < 0) {
+      mouseFlags |= kMouseFlagControl;
+    }
+    if (::GetKeyState(VK_LBUTTON) != 0) {
+      mouseFlags |= kMouseFlagLeftButton;
+    }
+    if (::GetKeyState(VK_MBUTTON) != 0) {
+      mouseFlags |= kMouseFlagMiddleButton;
+    }
+    if (::GetKeyState(VK_RBUTTON) != 0) {
+      mouseFlags |= kMouseFlagRightButton;
+    }
+
+    POINT cursorPosition{};
+    (void)::GetCursorPos(&cursorPosition);
+
+    auto* const window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state.nativeHandle));
+    RECT windowRect{};
+    (void)::GetWindowRect(window, &windowRect);
+
+    WxMouseEventFactoryRuntime leaveEvent{*WxEventTypeSlot(gWxEvtLeaveWindowRuntimeType)};
+    InitWxMouseEventRuntime(
+      *this,
+      leaveEvent,
+      cursorPosition.x - windowRect.left,
+      cursorPosition.y - windowRect.top,
+      mouseFlags
+    );
+    (void)GetEventHandler()->ProcessEvent(&leaveEvent);
+  }
+
+  UpdateWindowUI();
+}
+
 bool wxWindowMswRuntime::IsMouseInWindow() const
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
@@ -34447,6 +34525,9 @@ const void* wxWindowMswRuntime::GetEventTable() const
     // letting the chain find it one hop later.
     MakeWxEventTableEntry(
       -1, -1, &wxWindowBase::OnInitDialog, WxEventTypeSlot(gWxEvtInitDialogRuntimeType)
+    ),
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowMswRuntime::OnIdle, WxEventTypeSlot(gWxEvtIdleRuntimeType)
     ),
     wxEventTableEntry{}, // null handler: end of table
   };

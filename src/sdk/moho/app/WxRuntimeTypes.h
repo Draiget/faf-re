@@ -2507,6 +2507,16 @@ public:
    */
   void TranslateKbdEventToMouse(std::int32_t* x, std::int32_t* y, unsigned int* flags) const;
 
+  /**
+   * Address: 0x0096C100 (FUN_0096C100)
+   * Mangled: ?OnIdle@wxWindow@@IAEXAAVwxIdleEvent@@@Z
+   *
+   * What it does:
+   * Notices the pointer having left this window - Windows sends nothing when
+   * it does - and refreshes whatever the window shows.
+   */
+  void OnIdle(wxEventRuntime& idleEvent);
+
   bool HandleSetCursor(unsigned int hitTestCode);
 
   bool HandleQueryNewPalette();
