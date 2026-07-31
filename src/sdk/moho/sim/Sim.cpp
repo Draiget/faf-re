@@ -290,7 +290,7 @@ namespace moho
      */
     void OnTreeEndLabelEdit(const wxTreeEventRuntime& event);
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
 
     wxTreeListCtrlRuntime* mTreeControl = nullptr;
     wxTreeItemIdRuntime mActiveItem{};
@@ -332,7 +332,7 @@ moho::CPrfTimeLogItem::~CPrfTimeLogItem()
   gpg::Logf(messageFormat, gpg::time::CyclesToSeconds(timer.ElapsedCycles()) * scale);
 }
 
-void* moho::WRefEditDialog::sm_eventTable[1] = {nullptr};
+wxEventTable moho::WRefEditDialog::sm_eventTable = {nullptr, nullptr};
 
 namespace
 {
@@ -457,7 +457,7 @@ moho::WRefEditDialog::WRefEditDialog(const gpg::RRef& rootRef, const char* const
  */
 const void* moho::WRefEditDialog::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**

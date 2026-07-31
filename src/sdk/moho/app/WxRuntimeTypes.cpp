@@ -1627,21 +1627,54 @@ namespace
   void* gWxProtoInfoClassInfoTable[1] = {nullptr};
   void* gWxProtocolClassInfoTable[1] = {nullptr};
 
-  void* gWxControlEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxTextCtrlEventTableRuntime[1] = {gWxControlEventTableRuntime};
-  void* gWxPanelEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxScrolledWindowEventTableRuntime[1] = {gWxPanelEventTableRuntime};
-  void* gWxTreeListTextCtrlEventTableRuntime[1] = {gWxTextCtrlEventTableRuntime};
-  void* gWxTreeListHeaderWindowEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxTreeListMainWindowEventTableRuntime[1] = {gWxScrolledWindowEventTableRuntime};
-  void* gWxGenericDirCtrlEventTableRuntime[1] = {gWxControlEventTableRuntime};
-  void* gWxSplashScreenBaseEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxSplashScreenEventTableRuntime[1] = {gWxSplashScreenBaseEventTableRuntime};
-  void* gWxSplashScreenWindowEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxTipWindowEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxTipWindowViewEventTableRuntime[1] = {wxWindowMswRuntime::sm_eventTable};
-  void* gWxTextEntryDialogEventTableRuntime[1] = {wxDialogRuntime::sm_eventTable};
-  void* gWxSingleChoiceDialogEventTableRuntime[1] = {wxDialogRuntime::sm_eventTable};
+  wxEventTable gWxControlEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxTextCtrlEventTableRuntime = {&gWxControlEventTableRuntime, nullptr};
+  wxEventTable gWxPanelEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxScrolledWindowEventTableRuntime = {&gWxPanelEventTableRuntime, nullptr};
+  wxEventTable gWxTreeListTextCtrlEventTableRuntime = {&gWxTextCtrlEventTableRuntime, nullptr};
+  wxEventTable gWxTreeListHeaderWindowEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxTreeListMainWindowEventTableRuntime = {&gWxScrolledWindowEventTableRuntime, nullptr};
+  wxEventTable gWxGenericDirCtrlEventTableRuntime = {&gWxControlEventTableRuntime, nullptr};
+  wxEventTable gWxSplashScreenBaseEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxSplashScreenEventTableRuntime = {&gWxSplashScreenBaseEventTableRuntime, nullptr};
+  wxEventTable gWxSplashScreenWindowEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxTipWindowEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxTipWindowViewEventTableRuntime = {&wxWindowMswRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxTextEntryDialogEventTableRuntime = {&wxDialogRuntime::sm_eventTable, nullptr};
+  wxEventTable gWxSingleChoiceDialogEventTableRuntime = {&wxDialogRuntime::sm_eventTable, nullptr};
+
+  /**
+   * Builds one event-table row.
+   *
+   * The binary lays its rows out in `.rdata` because there a handler slot is a
+   * plain code address. Here the same slot holds a member-function pointer,
+   * which no constant expression can produce, so a class's rows are built once
+   * on first use instead of at load time. `SearchEventTable` reads them back
+   * through `wxWindowBase`, which works for the same reason it works in the
+   * binary: every window class is a single-inheritance chain rooted at
+   * `wxWindowBase`, so the handler's own class shares its address.
+   */
+  template <typename HandlerFn>
+  [[nodiscard]] wxEventTableEntry MakeWxEventTableEntry(
+    const std::int32_t id,
+    const std::int32_t lastId,
+    const HandlerFn handler,
+    const std::int32_t* const eventType
+  )
+  {
+    static_assert(
+      sizeof(HandlerFn) == sizeof(void*),
+      "a row reserves one pointer for its handler, so the owning class must be single-inheritance-shaped"
+    );
+
+    wxEventTableEntry entry{};
+    entry.m_id = id;
+    entry.m_lastId = lastId;
+    std::memcpy(&entry.m_fn, &handler, sizeof(entry.m_fn));
+    entry.m_callbackUserData = nullptr;
+    entry.m_eventType = eventType;
+    return entry;
+  }
 
   HICON gWxStdMdiParentFrameIcon = nullptr;
   HICON gWxDefaultMdiParentFrameIcon = nullptr;
@@ -11397,6 +11430,24 @@ namespace
     static std::int32_t sLastUsedEventType = 10000;
     return sLastUsedEventType++;
   }
+
+  /**
+   * The id slot an event-table row points at.
+   *
+   * Rows hold the address of an id rather than the id itself - that is how the
+   * binary lays them out, because the ids are only handed out once the image is
+   * running. Here they are handed out lazily instead of in static-init order,
+   * so a row has to force its own id or it would be left pointing at a zero
+   * that matches nothing.
+   */
+  [[nodiscard]] const std::int32_t* WxEventTypeSlot(std::int32_t& eventTypeId)
+  {
+    if (eventTypeId == 0) {
+      eventTypeId = wxNewEventType();
+    }
+    return &eventTypeId;
+  }
+
   std::int32_t gWxEvtIdleRuntimeType = 0;
   std::int32_t gWxEvtDropFilesRuntimeType = 0;
   std::int32_t gWxEvtMotionRuntimeType = 0;
@@ -11986,11 +12037,11 @@ namespace
   );
   static_assert(sizeof(WxSizeEventFactoryRuntime) == 0x28, "WxSizeEventFactoryRuntime size must be 0x28");
 
-  class WxPaintEventFactoryRuntime final : public wxEventRuntime
+  class WxPaintEventFactoryRuntime final : public wxPaintEventRuntime
   {
   public:
     WxPaintEventFactoryRuntime()
-      : wxEventRuntime(0, EnsureWxEvtPaintRuntimeType())
+      : wxPaintEventRuntime(0, EnsureWxEvtPaintRuntimeType())
     {}
 
     WxPaintEventFactoryRuntime* Clone() const override
@@ -12046,12 +12097,11 @@ namespace
 
   static_assert(sizeof(WxNcPaintEventFactoryRuntime) == 0x20, "WxNcPaintEventFactoryRuntime size must be 0x20");
 
-  class WxEraseEventFactoryRuntime final : public wxEventRuntime
+  class WxEraseEventFactoryRuntime final : public wxEraseEventRuntime
   {
   public:
     WxEraseEventFactoryRuntime()
-      : wxEventRuntime(0, EnsureWxEvtEraseBackgroundRuntimeType())
-      , mDeviceContext(nullptr)
+      : wxEraseEventRuntime(0, EnsureWxEvtEraseBackgroundRuntimeType())
     {}
 
     /**
@@ -12062,18 +12112,16 @@ namespace
      * wx-event lanes and the device-context pointer lane.
      */
     WxEraseEventFactoryRuntime(const WxEraseEventFactoryRuntime& source)
-      : wxEventRuntime(source.mEventId, source.mEventType)
-      , mDeviceContext(source.mDeviceContext)
+      : wxEraseEventRuntime(source.mEventId, source.mEventType)
     {
       CopyWxEventRuntimeBaseLanes(*this, source);
+      mDeviceContext = source.mDeviceContext;
     }
 
     WxEraseEventFactoryRuntime* Clone() const override
     {
       return new (std::nothrow) WxEraseEventFactoryRuntime(*this);
     }
-
-    void* mDeviceContext = nullptr;
   };
 
   static_assert(
@@ -20359,7 +20407,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  */
 [[maybe_unused]] const void* wxTreeListTextCtrlGetEventTableRuntime() noexcept
 {
-  return gWxTreeListTextCtrlEventTableRuntime;
+  return &gWxTreeListTextCtrlEventTableRuntime;
 }
 
 /**
@@ -20370,7 +20418,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  */
 [[maybe_unused]] const void* wxTreeListHeaderWindowGetEventTableRuntime() noexcept
 {
-  return gWxTreeListHeaderWindowEventTableRuntime;
+  return &gWxTreeListHeaderWindowEventTableRuntime;
 }
 
 /**
@@ -20382,7 +20430,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  */
 [[maybe_unused]] const void* wxTreeListMainWindowGetEventTableRuntime() noexcept
 {
-  return gWxTreeListMainWindowEventTableRuntime;
+  return &gWxTreeListMainWindowEventTableRuntime;
 }
 
 /**
@@ -20431,7 +20479,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  */
 [[maybe_unused]] const void* wxScrolledWindowGetEventTableRuntime() noexcept
 {
-  return gWxScrolledWindowEventTableRuntime;
+  return &gWxScrolledWindowEventTableRuntime;
 }
 
 /**
@@ -20705,7 +20753,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  */
 [[maybe_unused]] const void* wxGenericDirCtrlGetEventTableRuntime() noexcept
 {
-  return gWxGenericDirCtrlEventTableRuntime;
+  return &gWxGenericDirCtrlEventTableRuntime;
 }
 
 /**
@@ -20983,7 +21031,7 @@ static_assert(
  */
 [[maybe_unused]] const void* wxTipWindowGetEventTableRuntime() noexcept
 {
-  return gWxTipWindowEventTableRuntime;
+  return &gWxTipWindowEventTableRuntime;
 }
 
 /**
@@ -20994,7 +21042,7 @@ static_assert(
  */
 [[maybe_unused]] const void* wxTipWindowViewGetEventTableRuntime() noexcept
 {
-  return gWxTipWindowViewEventTableRuntime;
+  return &gWxTipWindowViewEventTableRuntime;
 }
 
 namespace
@@ -21210,7 +21258,7 @@ namespace
  */
 [[maybe_unused]] const void* wxTextEntryDialogGetEventTableRuntime() noexcept
 {
-  return gWxTextEntryDialogEventTableRuntime;
+  return &gWxTextEntryDialogEventTableRuntime;
 }
 
 /**
@@ -21269,7 +21317,7 @@ namespace
  */
 [[maybe_unused]] const void* wxSingleChoiceDialogGetEventTableRuntime() noexcept
 {
-  return gWxSingleChoiceDialogEventTableRuntime;
+  return &gWxSingleChoiceDialogEventTableRuntime;
 }
 
 /**
@@ -21473,7 +21521,7 @@ namespace
  */
 [[maybe_unused]] const void* wxSplashScreenGetEventTableRuntime() noexcept
 {
-  return gWxSplashScreenEventTableRuntime;
+  return &gWxSplashScreenEventTableRuntime;
 }
 
 /**
@@ -21496,7 +21544,7 @@ namespace
  */
 [[maybe_unused]] const void* wxSplashScreenWindowGetEventTableRuntime() noexcept
 {
-  return gWxSplashScreenWindowEventTableRuntime;
+  return &gWxSplashScreenWindowEventTableRuntime;
 }
 
 /**
@@ -21519,7 +21567,7 @@ namespace
  */
 [[maybe_unused]] const void* wxPanelGetEventTableRuntime() noexcept
 {
-  return gWxPanelEventTableRuntime;
+  return &gWxPanelEventTableRuntime;
 }
 
 /**
@@ -30634,7 +30682,7 @@ void wxControlContainerRuntime::Initialize(
 }
 
 void* wxDialogRuntime::sm_classInfo[1] = {nullptr};
-void* wxDialogRuntime::sm_eventTable[1] = {nullptr};
+wxEventTable wxDialogRuntime::sm_eventTable = {nullptr, nullptr};
 
 /**
  * Address: 0x004A3860 (FUN_004A3860)
@@ -30751,7 +30799,7 @@ void* wxDialogRuntime::GetClassInfo() const
  */
 const void* wxDialogRuntime::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 [[maybe_unused]] bool wxShouldExitMainLoopOnLastTopLevelWindowDelete(
@@ -31324,7 +31372,7 @@ wxTreeListColumnInfoRuntime* wxTreeListColumnInfoRuntime::DeleteWithFlag(
 }
 
 void* wxTreeListCtrlRuntime::sm_classInfo[1] = {nullptr};
-void* wxTreeListCtrlRuntime::sm_eventTable[1] = {gWxControlEventTableRuntime};
+wxEventTable wxTreeListCtrlRuntime::sm_eventTable = {&gWxControlEventTableRuntime, nullptr};
 
 /**
  * Address: 0x004A3B50 (FUN_004A3B50)
@@ -31746,7 +31794,7 @@ void* wxTreeListCtrlRuntime::GetClassInfo() const
  */
 const void* wxTreeListCtrlRuntime::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**
@@ -32422,7 +32470,7 @@ unsigned short wxWindowMswRuntime::UnpackCommand(
   return notificationCode;
 }
 
-void* wxWindowMswRuntime::sm_eventTable[1] = {nullptr};
+wxEventTable wxWindowMswRuntime::sm_eventTable = {nullptr, nullptr};
 
 /**
  * Address: 0x00968B40 (FUN_00968B40, wxWindow::UnpackActivate)
@@ -32593,7 +32641,7 @@ bool wxWindowMswRuntime::ContainsHWND(
  */
 const void* wxWindowMswRuntime::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**
@@ -36077,10 +36125,11 @@ msvc8::vector<moho::ManagedWindowSlot> moho::managedWindows{};
 msvc8::vector<moho::ManagedWindowSlot> moho::managedFrames{};
 wxWindowBase* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
-void* moho::WCurveEditorPanel::sm_eventTable[1] = {nullptr};
-void* moho::WBitmapPanel::sm_eventTable[1] = {nullptr};
-void* moho::WBitmapCheckBox::sm_eventTable[1] = {nullptr};
-void* moho::WRenViewport::sm_eventTable[1] = {nullptr};
+wxEventTable moho::WCurveEditorPanel::sm_eventTable = {nullptr, nullptr};
+wxEventTable moho::WBitmapPanel::sm_eventTable = {nullptr, nullptr};
+wxEventTable moho::WBitmapCheckBox::sm_eventTable = {nullptr, nullptr};
+wxEventTable moho::WRenViewport::sm_eventTable = {nullptr, nullptr};
+wxEventTable moho::WWxInputBox::sm_eventTable = {nullptr, nullptr};
 
 namespace
 {
@@ -36325,7 +36374,9 @@ moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
   return new (std::nothrow) SplashScreenRuntimeImpl(splashPathText, size);
 }
 
-void* moho::WD3DViewport::sm_eventTable[1] = {nullptr};
+// 0x00DFFC84: chains straight to wxWindow's table (0x00D4D740), not to
+// WRenViewport's; the rows are filled in by GetEventTable on first use.
+wxEventTable moho::WD3DViewport::sm_eventTable = {&wxWindowMswRuntime::sm_eventTable, nullptr};
 
 /**
  * Address: 0x00430980 (FUN_00430980)
@@ -36411,12 +36462,34 @@ moho::CD3DPrimBatcher* moho::WD3DViewport::GetPrimBatcher() const
  * Address: 0x00430970 (FUN_00430970)
  * Mangled: ?GetEventTable@WD3DViewport@Moho@@MBEPBUwxEventTable@@XZ
  *
+ * IDA signature:
+ * const wxEventTable* __thiscall Moho::WD3DViewport::GetEventTable(WD3DViewport *this);
+ *
  * What it does:
- * Returns the static event-table lane for this viewport runtime type.
+ * Hands back this class's event table, which claims WM_PAINT and
+ * WM_ERASEBKGND for the viewport and chains everything else to wxWindow's.
+ *
+ * Table at 0x00DFFC84 = {base 0x00D4D740 (wxWindow::sm_eventTable),
+ * rows 0x00F59078}; the rows there are
+ *   {-1, -1, 0x00430AC0 OnPaint,           0, &0x00F8F5B4 wxEVT_PAINT}
+ *   {-1, -1, 0x00430B70 OnEraseBackground, 0, &0x00F8F5A4 wxEVT_ERASE_BACKGROUND}
+ * followed by the null-handler row that ends the table. Note the chain skips
+ * WRenViewport (whose own table is at 0x00DFE950) and goes straight to
+ * wxWindow, which is what naming wxWindow as the base in the table declaration
+ * does.
  */
 const void* moho::WD3DViewport::GetEventTable() const
 {
-  return sm_eventTable;
+  static const wxEventTableEntry entries[] = {
+    MakeWxEventTableEntry(-1, -1, &WD3DViewport::OnPaint, WxEventTypeSlot(gWxEvtPaintRuntimeType)),
+    MakeWxEventTableEntry(
+      -1, -1, &WD3DViewport::OnEraseBackground, WxEventTypeSlot(gWxEvtEraseBackgroundRuntimeType)
+    ),
+    wxEventTableEntry{}, // null handler: end of table
+  };
+
+  sm_eventTable.entries = entries;
+  return &sm_eventTable;
 }
 
 namespace
@@ -36438,37 +36511,6 @@ namespace
     deviceContext.SetBrush(reinterpret_cast<const void*>(kWxNullBrushToken));
   }
 
-  struct [[maybe_unused]] WD3DViewportPaintCallbackFrame
-  {
-    std::uint8_t mUnknown00To1F[0x20]{};
-    moho::wxDCRuntime* mDeviceContext = nullptr;
-  };
-
-  static_assert(
-    offsetof(WD3DViewportPaintCallbackFrame, mDeviceContext) == 0x20,
-    "WD3DViewportPaintCallbackFrame::mDeviceContext offset must be 0x20"
-  );
-
-  /**
-   * Address: 0x00430B70 (FUN_00430B70)
-   *
-   * What it does:
-   * Draws viewport background into the supplied paint DC when D3D device is
-   * missing or still in background-fallback mode.
-   */
-  [[maybe_unused]] void WD3DViewportPaintBackgroundFallback(
-    WD3DViewportPaintCallbackFrame* const callbackFrame
-  )
-  {
-    moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    if (callbackFrame == nullptr || callbackFrame->mDeviceContext == nullptr) {
-      return;
-    }
-
-    if (device == nullptr || device->ShouldDrawViewportBackground()) {
-      DrawBackgroundFill(*callbackFrame->mDeviceContext);
-    }
-  }
 } // namespace
 
 /**
@@ -36483,6 +36525,38 @@ void moho::WD3DViewport::DrawBackgroundImage(
 )
 {
   DrawBackgroundFill(deviceContext);
+}
+
+/**
+ * Address: 0x00430B70 (FUN_00430B70)
+ *
+ * IDA signature:
+ * void __stdcall sub_430B70(int event);
+ *
+ * What it does:
+ * Paints the viewport background on WM_ERASEBKGND, but only while the D3D
+ * device is absent or has asked for its background to be drawn - once the
+ * device is presenting, erasing underneath it would only flicker.
+ *
+ * The decompiler shows this as a free __stdcall function because `this` goes
+ * unused; it is the second row of this class's event table, so wx calls it as
+ * a member with the erase event as its argument.
+ */
+void moho::WD3DViewport::OnEraseBackground(
+  wxEraseEventRuntime& eraseEvent
+)
+{
+  CD3DDevice* const device = D3D_GetDevice();
+  if (device != nullptr && !device->ShouldDrawViewportBackground()) {
+    return;
+  }
+
+  // The binary dereferences the event's DC without checking it. wx always
+  // fills it in for WM_ERASEBKGND, so a null one would mean a broken raiser
+  // rather than a state the original had to cope with.
+  if (eraseEvent.mDeviceContext != nullptr) {
+    DrawBackgroundImage(*eraseEvent.mDeviceContext);
+  }
 }
 
 /**
@@ -60025,7 +60099,7 @@ moho::WCurveEditorPanel* moho::WCurveEditorPanel::DeleteWithFlag(
  */
 const void* moho::WCurveEditorPanel::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**
@@ -60136,7 +60210,7 @@ moho::WBitmapPanel::WBitmapPanel(
  */
 const void* moho::WBitmapPanel::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**
@@ -60224,7 +60298,7 @@ moho::WBitmapCheckBox::WBitmapCheckBox(
  */
 const void* moho::WBitmapCheckBox::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**
@@ -60504,7 +60578,7 @@ moho::WPreviewImageRuntime moho::WRenViewport::GetPreviewImage() const
  */
 const void* moho::WRenViewport::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**

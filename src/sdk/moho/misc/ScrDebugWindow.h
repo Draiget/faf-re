@@ -294,7 +294,7 @@ namespace moho
      */
     void OnWindowMoved(void* commandEvent);
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
 
     std::uint8_t mUnknown004To177[0x174]{};
     std::uint8_t mIsInitializingControls = 0; // +0x178

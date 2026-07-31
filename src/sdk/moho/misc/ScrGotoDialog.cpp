@@ -4,7 +4,7 @@
 
 #include "moho/misc/StartupHelpers.h"
 
-void* moho::ScrGotoDialog::sm_eventTable[1] = {nullptr};
+wxEventTable moho::ScrGotoDialog::sm_eventTable = {nullptr, nullptr};
 
 /**
  * Address: 0x004BBEA0 (FUN_004BBEA0)
@@ -53,7 +53,7 @@ moho::ScrGotoDialog* moho::ScrGotoDialog::DeleteWithFlag(
  */
 const void* moho::ScrGotoDialog::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**

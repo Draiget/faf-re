@@ -51,7 +51,7 @@ namespace moho
      */
     [[nodiscard]] int ParseRequestedLineNumber() const;
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
 
     std::uint8_t mIsInitializing = 0;
     std::uint8_t mPadding171To173[0x3]{};

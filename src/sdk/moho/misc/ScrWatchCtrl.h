@@ -54,7 +54,7 @@ namespace moho
     void AddWatch(const wxTreeItemIdRuntime& parentItem, const ScrWatch& watch);
 
   public:
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
     wxTreeItemIdRuntime mRootItem{}; // +0x140
   };
 
