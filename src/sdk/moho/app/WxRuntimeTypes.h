@@ -1888,10 +1888,31 @@ public:
   }
   virtual bool Layout() { return false; }
   /**
-   * Address: 0x0042B820
+   * Address: 0x0042B820 (FUN_0042B820)
    * Mangled: ?GetHandle@wxWindow@@UBEKXZ
+   *
+   * What it does:
+   * Returns the native window handle, which the binary keeps in
+   * wxWindow::m_hWnd at +0x108.
    */
-  virtual unsigned long GetHandle() const { return 0; }
+  [[nodiscard]] virtual unsigned long GetHandle() const;
+
+  /**
+   * Address: 0x00963190 (FUN_00963190)
+   * Mangled: ?CreateBase@wxWindowBase@@IAE_NPAVwxWindow@@HABVwxPoint@@ABVwxSize@@JABVwxValidator@@ABVwxString@@@Z
+   *
+   * What it does:
+   * Fills in the platform-independent window state shared by every wx window:
+   * id, name, style, parent, and the inheritable extra-style flag.
+   */
+  bool CreateBase(
+    wxWindowBase* parent,
+    std::int32_t id,
+    const wxPoint& position,
+    const wxSize& size,
+    long style,
+    const wxStringRuntime& name
+  );
   virtual std::int32_t GetDefaultBorder() const { return 0; }
   virtual void DoClientToScreen(std::int32_t* x, std::int32_t* y) const
   {
@@ -2052,7 +2073,53 @@ public:
    * masks, including 3D-control and top-level adjustments.
    */
   [[nodiscard]] unsigned long MSWGetStyle(long style, unsigned long* extendedStyle) const;
-  virtual unsigned long MSWGetParent() const { return 0; }
+  /**
+   * Address: 0x00968CF0 (FUN_00968CF0)
+   * Mangled: ?MSWGetParent@wxWindow@@UBEKXZ
+   *
+   * What it does:
+   * The handle CreateWindowEx should parent this window to.
+   */
+  [[nodiscard]] virtual unsigned long MSWGetParent() const;
+
+  /**
+   * Address: 0x0096DE00 (FUN_0096DE00, wxWindowMSW::Create)
+   *
+   * What it does:
+   * Creates an ordinary child window: common state, parent's child list, then
+   * the native window.
+   */
+  bool Create(
+    wxWindowBase* parent,
+    std::int32_t id,
+    const wxPoint& position,
+    const wxSize& size,
+    long style,
+    const wxStringRuntime& name
+  );
+
+  /**
+   * Address: 0x0096DC20 (FUN_0096DC20, wxWindow::MSWCreate)
+   *
+   * What it does:
+   * The one place wx calls ::CreateWindowExW, then subclasses the result.
+   */
+  bool MSWCreate(
+    const wchar_t* windowClassName,
+    const wchar_t* title,
+    const wxPoint& position,
+    const wxSize& size,
+    unsigned long style,
+    unsigned long extendedStyle
+  );
+
+  /**
+   * Address: 0x0096DBC0 (FUN_0096DBC0, wxWindowMSW::SubclassWin)
+   *
+   * What it does:
+   * Points an existing HWND at the wx window procedure.
+   */
+  void SubclassWin(unsigned long nativeHandle);
   /**
    * Address: 0x009675F0 (FUN_009675F0)
    * Mangled: ?MSWCommand@wxWindow@@UAE_NIG@Z
@@ -2188,20 +2255,32 @@ public:
     (void)measureItemStruct;
     return false;
   }
+  /**
+   * Address: 0x0096D110 (FUN_0096D110)
+   * Mangled: ?MSWWindowProc@wxWindow@@UAEJIIJ@Z
+   *
+   * What it does:
+   * The wx side of the window procedure. Every message wx does not handle
+   * itself ends up at MSWDefWindowProc, which is what this base does for all
+   * of them - the per-message handling in the binary's 571-instruction version
+   * is not recovered yet, and returning 0 instead of defaulting would abort
+   * window creation at WM_NCCREATE.
+   */
   virtual long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam)
   {
-    (void)message;
-    (void)wParam;
-    (void)lParam;
-    return 0;
+    return MSWDefWindowProc(message, wParam, lParam);
   }
-  virtual long MSWDefWindowProc(unsigned int message, unsigned int wParam, long lParam)
-  {
-    (void)message;
-    (void)wParam;
-    (void)lParam;
-    return 0;
-  }
+
+  /**
+   * Address: 0x00968A90 (FUN_00968A90)
+   * Mangled: ?MSWDefWindowProc@wxWindow@@UAEJIIJ@Z
+   *
+   * What it does:
+   * Default message handling: the window procedure this window replaced when
+   * it subclassed an existing HWND, or the system default when wx created the
+   * window itself.
+   */
+  virtual long MSWDefWindowProc(unsigned int message, unsigned int wParam, long lParam);
   /**
    * Address: 0x00968B00 (FUN_00968B00)
    * Mangled: ?MSWShouldPreProcessMessage@wxWindow@@UAE_NPAPAX@Z
@@ -4301,6 +4380,44 @@ public:
    * top-level wx windows, then returns its native handle lane.
    */
   [[nodiscard]] unsigned long MSWGetParent() const override;
+
+  /**
+   * Address: 0x0098C050 (FUN_0098C050)
+   * Mangled: ?MSWGetStyle@wxTopLevelWindowMSW@@MBEKJPAK@Z
+   *
+   * What it does:
+   * Translates a top-level window's wx style into the Win32 style pair. Unlike
+   * the child-window version this decides the frame furniture - caption,
+   * sizing border, min/max boxes, system menu - and the initial minimised or
+   * maximised state.
+   */
+  [[nodiscard]] unsigned long MSWGetStyle(long style, unsigned long* extendedStyle) const;
+
+  /**
+   * Address: 0x0098C160 (FUN_0098C160, wxTopLevelWindowMSW::CreateFrame)
+   *
+   * What it does:
+   * Creates the native window behind a frame, with the styles this class
+   * computes rather than the child-window ones.
+   */
+  bool CreateFrame(const wchar_t* title, const wxPoint& position, const wxSize& size);
+
+  /**
+   * Address: 0x0098CD30 (FUN_0098CD30, wxTopLevelWindow::Create)
+   *
+   * What it does:
+   * Creates a top-level window: common state, registration in the top-level
+   * window list, then the native frame.
+   */
+  bool Create(
+    wxWindowBase* parent,
+    std::int32_t id,
+    const wchar_t* title,
+    const wxPoint& position,
+    const wxSize& size,
+    long style,
+    const wxStringRuntime& name
+  );
 
   /**
    * Address: 0x0098C760 (FUN_0098C760)
