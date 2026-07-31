@@ -32633,14 +32633,77 @@ bool wxWindowMswRuntime::ContainsHWND(
 }
 
 /**
+ * Address: 0x00969F40 (FUN_00969F40)
+ * Mangled: ?OnEraseBackground@wxWindow@@IAEXAAVwxEraseEvent@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxWindow::OnEraseBackground(wxWindow *this, wxEraseEvent *event);
+ *
+ * What it does:
+ * Fills the whole client area with the window's background colour, drawing in
+ * device units so the fill covers the client rectangle it just measured
+ * whatever mapping mode was in force - the original map mode is put back
+ * before returning.
+ *
+ * The colour is composed as PALETTERGB rather than RGB: the binary ors 0x200
+ * into the byte it then shifts left 16, which is the 0x02000000 that asks GDI
+ * to match the nearest entry in the logical palette. The three bytes it reads
+ * are the window's background wxColour, which keeps red at +0x8D, blue at
+ * +0x8E and green at +0x8F.
+ */
+void wxWindowMswRuntime::OnEraseBackground(
+  wxEraseEventRuntime& eraseEvent
+)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr || eraseEvent.mDeviceContext == nullptr) {
+    return;
+  }
+
+  auto* const window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state->nativeHandle));
+  RECT clientRect{};
+  (void)::GetClientRect(window, &clientRect);
+
+  const wxColourRuntime& background = state->backgroundColour;
+  HBRUSH const brush = ::CreateSolidBrush(
+    PALETTERGB(background.Red(), background.Green(), background.Blue())
+  );
+
+  auto* const deviceContext = static_cast<HDC>(eraseEvent.mDeviceContext->GetNativeHandle());
+  const int previousMapMode = ::SetMapMode(deviceContext, MM_TEXT);
+  (void)::FillRect(deviceContext, &clientRect, brush);
+  (void)::DeleteObject(brush);
+  (void)::SetMapMode(deviceContext, previousMapMode);
+}
+
+/**
  * Address: 0x00967570 (FUN_00967570)
  * Mangled: ?GetEventTable@wxWindow@@MBEPBUwxEventTable@@XZ
  *
+ * IDA signature:
+ * const wxEventTable* __thiscall wxWindow::GetEventTable(wxWindow *this);
+ *
  * What it does:
- * Returns the static event-table lane for wx window runtime dispatch.
+ * Hands back the table every window chains to.
+ *
+ * Table at 0x00D4D740 = {base 0x00D4D0EC (wxWindowBase's), rows 0x00F33210};
+ * the rows there are OnEraseBackground 0x00969F40 on wxEVT_ERASE_BACKGROUND,
+ * OnSysColourChanged 0x00969B80 on wxEVT_SYS_COLOUR_CHANGED, OnInitDialog
+ * 0x00964A10 on wxEVT_INIT_DIALOG and OnIdle 0x0096C100 on wxEVT_IDLE. Only
+ * the first is recovered so far; the other three are not bound yet, which
+ * leaves their events falling through to the parent exactly as they did while
+ * this table was empty.
  */
 const void* wxWindowMswRuntime::GetEventTable() const
 {
+  static const wxEventTableEntry entries[] = {
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowMswRuntime::OnEraseBackground, WxEventTypeSlot(gWxEvtEraseBackgroundRuntimeType)
+    ),
+    wxEventTableEntry{}, // null handler: end of table
+  };
+
+  sm_eventTable.entries = entries;
   return &sm_eventTable;
 }
 
@@ -36185,56 +36248,86 @@ namespace
   return moho::ren_Viewport;
 }
 
-moho::wxDCRuntime::wxDCRuntime(
-  wxWindowBase* const ownerWindow
-) noexcept
-  : mOwnerWindow(ownerWindow)
-{}
-
-void moho::wxDCRuntime::SetBrush(
-  const void* const brushToken
+/**
+ * Selects a brush into the device context, keeping the one it replaced so the
+ * context can be handed back the way it was found.
+ *
+ * A null brush means "put the original back", which is what
+ * DrawBackgroundImage's closing SetBrush(wxNullBrush) is for.
+ */
+void wxDC::SetBrush(
+  const void* const brush
 ) noexcept
 {
-  mActiveBrush = brushToken;
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+  if (deviceContext == nullptr) {
+    return;
+  }
+
+  if (brush == nullptr) {
+    if (m_oldBrush != nullptr) {
+      (void)::SelectObject(deviceContext, m_oldBrush);
+      m_oldBrush = nullptr;
+    }
+    return;
+  }
+
+  HGDIOBJ const previous = ::SelectObject(deviceContext, const_cast<void*>(brush));
+  if (m_oldBrush == nullptr) {
+    m_oldBrush = previous;
+  }
 }
 
-void moho::wxDCRuntime::DoGetSize(
+/**
+ * The drawable extent: the canvas's client area when the context belongs to a
+ * window, and the device's own extent otherwise.
+ */
+void wxDC::DoGetSize(
   std::int32_t* const outWidth,
   std::int32_t* const outHeight
 ) const noexcept
 {
-  if (mOwnerWindow != nullptr) {
-    mOwnerWindow->DoGetSize(outWidth, outHeight);
+  if (m_canvas != nullptr) {
+    static_cast<wxWindowBase*>(m_canvas)->DoGetSize(outWidth, outHeight);
     return;
   }
 
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
   if (outWidth != nullptr) {
-    *outWidth = 0;
+    *outWidth = deviceContext != nullptr ? ::GetDeviceCaps(deviceContext, HORZRES) : 0;
   }
   if (outHeight != nullptr) {
-    *outHeight = 0;
+    *outHeight = deviceContext != nullptr ? ::GetDeviceCaps(deviceContext, VERTRES) : 0;
   }
 }
 
-void moho::wxDCRuntime::DoDrawRectangle(
+/**
+ * Fills a rectangle with the selected brush.
+ *
+ * This had an empty body, so every background the viewport asked for went
+ * nowhere.
+ */
+void wxDC::DoDrawRectangle(
   const std::int32_t x,
   const std::int32_t y,
   const std::int32_t width,
   const std::int32_t height
 ) noexcept
 {
-  (void)x;
-  (void)y;
-  (void)width;
-  (void)height;
-  (void)mActiveBrush;
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+  if (deviceContext == nullptr) {
+    return;
+  }
+
+  (void)::Rectangle(deviceContext, x, y, x + width, y + height);
 }
 
 moho::wxPaintDCRuntime::wxPaintDCRuntime(
   wxWindowBase* const ownerWindow
 ) noexcept
-  : wxDCRuntime(ownerWindow)
-{}
+{
+  m_canvas = ownerWindow;
+}
 
 moho::wxPaintDCRuntime::~wxPaintDCRuntime() = default;
 
