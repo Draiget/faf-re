@@ -5003,15 +5003,42 @@ namespace
     return (::RectInRegion(refData->regionHandle, &rectangle) != FALSE) ? TRUE : FALSE;
   }
 
+  // Defined further down with the owned-string allocator.
+  [[nodiscard]] bool IsOwnedWxString(const wxStringRuntime& value) noexcept;
+  void ForgetOwnedWxStringHeader(void* header) noexcept;
+
+  /**
+   * What it does:
+   * Drops a reference to a wx string payload.
+   *
+   * The header lives in the three words before the text, and wx guarantees
+   * every wxString points at one - either an allocated buffer or the shared
+   * empty singleton, whose count is -1 so it is never freed. This
+   * reconstruction does not hold that invariant: wxStringRuntime::Borrow
+   * points straight at a bare literal with no header at all, and there are
+   * upwards of forty such strings. Reading three words back from one of those
+   * lands in .rdata ahead of the literal, which is an outright fault - it took
+   * the first HandleCreate raising a window-create event to expose it, because
+   * the command-event base releases exactly such a string when it dies.
+   *
+   * IsOwnedWxString answers the question the header cannot: the allocator
+   * registers every payload it makes, so anything absent from that registry is
+   * borrowed and has nothing to release.
+   */
   void ReleaseWxStringSharedPayload(
     wxStringRuntime& value
   ) noexcept
   {
+    if (!IsOwnedWxString(value)) {
+      return;
+    }
+
     std::int32_t* const sharedPrefixWords = reinterpret_cast<std::int32_t*>(value.m_pchData) - 3;
     const std::int32_t sharedRefCount = sharedPrefixWords[0];
     if (sharedRefCount != -1) {
       sharedPrefixWords[0] = sharedRefCount - 1;
       if (sharedRefCount == 1) {
+        ForgetOwnedWxStringHeader(sharedPrefixWords);
         ::operator delete(sharedPrefixWords);
       }
     }
@@ -8580,6 +8607,14 @@ namespace
     return runtime;
   }
 
+  void ForgetOwnedWxStringHeader(
+    void* const header
+  ) noexcept
+  {
+    const std::lock_guard<std::mutex> lock(gOwnedWxStringLock);
+    gOwnedWxStringHeaders.erase(header);
+  }
+
   [[nodiscard]] bool IsOwnedWxString(
     const wxStringRuntime& value
   ) noexcept
@@ -11254,6 +11289,9 @@ namespace
     std::uint8_t handlerEnabled = 1;
     void* dynamicEvents = nullptr;
     wxWindowBase* nextHandler = nullptr;
+    // wxWindow sets this in its destructor (the +0x0CC bit-3 flag at
+    // 0x0096BF4E); a window on the way out stops raising focus events.
+    std::uint8_t isBeingDeleted = 0;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
     wxWindowBase* eventHandler = nullptr;
@@ -11381,6 +11419,8 @@ namespace
   std::int32_t gWxEvtPaletteChangedRuntimeType = 0;
   std::int32_t gWxEvtQueryNewPaletteRuntimeType = 0;
   std::int32_t gWxEvtShowRuntimeType = 0;
+  std::int32_t gWxEvtSetFocusRuntimeType = 0;
+  std::int32_t gWxEvtKillFocusRuntimeType = 0;
   std::int32_t gWxEvtMaximizeRuntimeType = 0;
   std::int32_t gWxEvtIconizeRuntimeType = 0;
   std::int32_t gWxEvtChildFocusRuntimeType = 0;
@@ -11567,6 +11607,22 @@ namespace
       gWxEvtShowRuntimeType = wxNewEventType();
     }
     return gWxEvtShowRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtSetFocusRuntimeType()
+  {
+    if (gWxEvtSetFocusRuntimeType == 0) {
+      gWxEvtSetFocusRuntimeType = wxNewEventType();
+    }
+    return gWxEvtSetFocusRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtKillFocusRuntimeType()
+  {
+    if (gWxEvtKillFocusRuntimeType == 0) {
+      gWxEvtKillFocusRuntimeType = wxNewEventType();
+    }
+    return gWxEvtKillFocusRuntimeType;
   }
 
   [[nodiscard]] std::int32_t EnsureWxEvtMaximizeRuntimeType()
@@ -33364,6 +33420,8 @@ void wxWindowMswRuntime::UnsubclassWin()
  */
 void wxWindowMswRuntime::DestroyNativeWindow()
 {
+  EnsureWxWindowBaseRuntimeState(this).isBeingDeleted = 1;
+
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
   const HWND hwnd = (state != nullptr) ? reinterpret_cast<HWND>(state->nativeHandle) : nullptr;
   if (hwnd == nullptr) {
@@ -33708,6 +33766,29 @@ long wxWindowMswRuntime::MSWWindowProc(
     processed = HandleGetMinMaxInfo(reinterpret_cast<void*>(lParam));
     break;
 
+  case WM_CREATE: {
+    bool mayCreate = true;
+    processed = HandleCreate(reinterpret_cast<void*>(lParam), &mayCreate);
+    if (processed && !mayCreate) {
+      return -1; // refuse the window
+    }
+    break;
+  }
+
+  case WM_DESTROY:
+    // The binary raises the destroy event and then still lets the default
+    // handler run (FUN_0096D110 case WM_DESTROY), so the result is discarded.
+    (void)HandleDestroy();
+    return MSWDefWindowProc(message, wParam, lParam);
+
+  case WM_SETFOCUS:
+    processed = HandleSetFocus(static_cast<unsigned long>(wParam));
+    break;
+
+  case WM_KILLFOCUS:
+    processed = HandleKillFocus(static_cast<unsigned long>(wParam));
+    break;
+
   default:
     return MSWDefWindowProc(message, wParam, lParam);
   }
@@ -33716,6 +33797,152 @@ long wxWindowMswRuntime::MSWWindowProc(
     return MSWDefWindowProc(message, wParam, lParam);
   }
   return 0;
+}
+
+wxWindowBase* wxWindowMswRuntime::GetParentWindow() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return (state != nullptr) ? state->parentWindow : nullptr;
+}
+
+/**
+ * Address: 0x009691A0 (FUN_009691A0)
+ * Mangled: ?HandleSetFocus@wxWindow@@IAE_NPAX@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleSetFocus(wxWindow *this, WXHWND hwndLost);
+ *
+ * What it does:
+ * Answers WM_SETFOCUS. A child-focus event goes out first so an owning frame
+ * can note which of its children now has focus, then the focus event itself,
+ * carrying the window that lost it. A text control is left to its own native
+ * handling and reports the message unhandled.
+ */
+bool wxWindowMswRuntime::HandleSetFocus(const unsigned long windowLosingFocus)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  {
+    WxChildFocusEventFactoryRuntime childFocusEvent(this);
+    (void)GetEventHandler()->ProcessEvent(&childFocusEvent);
+  }
+
+  // A text control does its own thing with focus.
+  if (dynamic_cast<const wxTextCtrlRuntime*>(this) != nullptr) {
+    return false;
+  }
+
+  WxFocusEventFactoryRuntime event;
+  event.mEventType = EnsureWxEvtSetFocusRuntimeType();
+  event.mEventId = (state != nullptr) ? state->windowId : -1;
+  event.mEventObject = this;
+  event.mFocusedWindow = wxFindWinFromHandle(static_cast<int>(windowLosingFocus));
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x009692D0 (FUN_009692D0)
+ * Mangled: ?HandleKillFocus@wxWindow@@IAE_NPAX@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleKillFocus(wxWindow *this, WXHWND hwndGot);
+ *
+ * What it does:
+ * Answers WM_KILLFOCUS with the window that is gaining focus. Reports the
+ * message unhandled for a text control, and for a window already being
+ * destroyed - by then its handler may be half gone.
+ */
+bool wxWindowMswRuntime::HandleKillFocus(const unsigned long windowGainingFocus)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  if (dynamic_cast<const wxTextCtrlRuntime*>(this) != nullptr) {
+    return false;
+  }
+  if (state != nullptr && state->isBeingDeleted != 0) {
+    return false;
+  }
+
+  WxFocusEventFactoryRuntime event;
+  event.mEventType = EnsureWxEvtKillFocusRuntimeType();
+  event.mEventId = (state != nullptr) ? state->windowId : -1;
+  event.mEventObject = this;
+  event.mFocusedWindow = wxFindWinFromHandle(static_cast<int>(windowGainingFocus));
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x00968F70 (FUN_00968F70)
+ * Mangled: ?HandleCreate@wxWindow@@IAE_NPAUtagCREATESTRUCTW@@PA_N@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleCreate(wxWindow *this, CREATESTRUCT *cs, bool *mayCreate);
+ *
+ * What it does:
+ * Answers WM_CREATE. A window created with WS_EX_CONTROLPARENT needs every
+ * ancestor up to the first top-level window to carry the same bit, or tab
+ * traversal stops at the first one that does not - so the chain is walked and
+ * fixed up here. Then the create event goes out and creation is allowed to
+ * proceed.
+ */
+bool wxWindowMswRuntime::HandleCreate(void* const createStruct, bool* const mayCreate)
+{
+  const auto* const cs = static_cast<const CREATESTRUCTW*>(createStruct);
+  if (cs != nullptr && (cs->dwExStyle & WS_EX_CONTROLPARENT) != 0) {
+    for (wxWindowBase* ancestor = GetParentWindow(); ancestor != nullptr;) {
+      if (ancestor->IsTopLevel()) {
+        break;
+      }
+
+      const HWND ancestorHandle = reinterpret_cast<HWND>(ancestor->GetHandle());
+      if (ancestorHandle != nullptr) {
+        const LONG exStyle = ::GetWindowLongW(ancestorHandle, GWL_EXSTYLE);
+        if ((exStyle & WS_EX_CONTROLPARENT) == 0) {
+          (void)::SetWindowLongW(ancestorHandle, GWL_EXSTYLE, exStyle | WS_EX_CONTROLPARENT);
+        }
+      }
+
+      const WxWindowBaseRuntimeState* const ancestorState = FindWxWindowBaseRuntimeState(ancestor);
+      ancestor = (ancestorState != nullptr) ? ancestorState->parentWindow : nullptr;
+    }
+  }
+
+  WxWindowCreateEventFactoryRuntime event(this);
+  (void)GetEventHandler()->ProcessEvent(&event);
+
+  if (mayCreate != nullptr) {
+    *mayCreate = true;
+  }
+  return true;
+}
+
+/**
+ * Address: 0x00969050 (FUN_00969050)
+ * Mangled: ?HandleDestroy@wxWindow@@IAE_NXZ
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleDestroy(wxWindow *this);
+ *
+ * What it does:
+ * Answers WM_DESTROY with the destroy event, then releases the drop target if
+ * this window had one - the native registration has to go before the HWND
+ * does.
+ */
+bool wxWindowMswRuntime::HandleDestroy()
+{
+  WxWindowDestroyEventFactoryRuntime event(this);
+  (void)GetEventHandler()->ProcessEvent(&event);
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  if (state.dropTarget != nullptr) {
+    const HWND handle = reinterpret_cast<HWND>(state.nativeHandle);
+    if (handle != nullptr) {
+      ::RevokeDragDrop(handle);
+    }
+    state.dropTarget = nullptr;
+  }
+
+  return true;
 }
 
 unsigned long wxWindowBase::GetHandle() const

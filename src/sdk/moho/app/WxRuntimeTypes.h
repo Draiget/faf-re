@@ -2210,6 +2210,36 @@ public:
    * Mangled: ?HandleGetMinMaxInfo@wxWindow@@IAE_NPAX@Z
    */
   bool HandleGetMinMaxInfo(void* minMaxInfo);
+
+  /**
+   * Address: 0x009691A0 (FUN_009691A0)
+   * Mangled: ?HandleSetFocus@wxWindow@@IAE_NPAX@Z
+   */
+  bool HandleSetFocus(unsigned long windowLosingFocus);
+
+  /**
+   * Address: 0x009692D0 (FUN_009692D0)
+   * Mangled: ?HandleKillFocus@wxWindow@@IAE_NPAX@Z
+   */
+  bool HandleKillFocus(unsigned long windowGainingFocus);
+
+  /**
+   * Address: 0x00968F70 (FUN_00968F70)
+   * Mangled: ?HandleCreate@wxWindow@@IAE_NPAUtagCREATESTRUCTW@@PA_N@Z
+   */
+  bool HandleCreate(void* createStruct, bool* mayCreate);
+
+  /**
+   * Address: 0x00969050 (FUN_00969050)
+   * Mangled: ?HandleDestroy@wxWindow@@IAE_NXZ
+   */
+  bool HandleDestroy();
+
+  /**
+   * What it does:
+   * The parent window, or null at the top of the chain.
+   */
+  [[nodiscard]] wxWindowBase* GetParentWindow() const;
   /**
    * Address: 0x009675F0 (FUN_009675F0)
    * Mangled: ?MSWCommand@wxWindow@@UAE_NIG@Z
