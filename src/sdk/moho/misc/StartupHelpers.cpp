@@ -45,6 +45,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/sim/CVFSImpl.h"
 #include "moho/misc/XFileError.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -982,6 +983,67 @@ namespace
     }
 
     return protocols;
+  }
+
+  /**
+   * Reads the mount table the data-path script leaves in the global `path`.
+   *
+   * Each entry is a table carrying `dir` and `mountpoint`; the binary reads
+   * exactly those two keys at 0x0045A211 and 0x0045A1FE and builds one
+   * SVFSMountPoint per entry, in table order, which is mount order.
+   */
+  [[nodiscard]] msvc8::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(LuaPlus::LuaState* const state)
+  {
+    msvc8::vector<moho::SVFSMountPoint> mountPoints;
+    if (state == nullptr) {
+      return mountPoints;
+    }
+
+    LuaPlus::LuaObject pathTable = state->GetGlobal("path");
+    if (!pathTable.IsTable()) {
+      return mountPoints;
+    }
+
+    LuaPlus::LuaTableIterator iter(&pathTable, 1);
+    while (iter) {
+      LuaPlus::LuaObject entry = iter.GetValue();
+      if (entry.IsTable()) {
+        const char* const dir = entry["dir"].GetString();
+        const char* const mountpoint = entry["mountpoint"].GetString();
+        if (dir != nullptr && dir[0] != '\0') {
+          mountPoints.push_back(
+            moho::SVFSMountPoint(dir, mountpoint != nullptr ? mountpoint : "/")
+          );
+        }
+      }
+      iter.Next();
+    }
+
+    return mountPoints;
+  }
+
+  /**
+   * Registers every directory the script lists in the global `hook`.
+   */
+  void ApplyHookDirectoriesFromLua(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr) {
+      return;
+    }
+
+    LuaPlus::LuaObject hookTable = state->GetGlobal("hook");
+    if (!hookTable.IsTable()) {
+      return;
+    }
+
+    LuaPlus::LuaTableIterator iter(&hookTable, 1);
+    while (iter) {
+      const char* const hookDirectory = iter.GetValue().GetString();
+      if (hookDirectory != nullptr && hookDirectory[0] != '\0') {
+        moho::SCR_AddHookDirectory(hookDirectory);
+      }
+      iter.Next();
+    }
   }
 
   [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* const state, const char* const modulePath)
@@ -6027,9 +6089,22 @@ bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName,
   }
 
   std::vector<std::wstring> allowedProtocols;
+  msvc8::vector<moho::SVFSMountPoint> mountPoints;
   if (LuaPlus::LuaState* const startupState = ResolveStartupLuaState(); startupState != nullptr) {
     patch_InitLuaState(startupState, 2);
+
+    // Run the data-path script before reading anything out of it. Without this
+    // its globals were never defined, so the protocol list below came back
+    // empty too and the mount table was never there to read.
+    const msvc8::string scriptPathUtf8(absoluteScriptPath.string().c_str());
+    LuaPlus::LuaObject scriptEnvironment;
+    if (!moho::SCR_LuaDoFile(startupState, scriptPathUtf8.c_str(), &scriptEnvironment)) {
+      return false;
+    }
+
     allowedProtocols = CollectAllowedProtocolsFromLua(startupState);
+    mountPoints = CollectMountPointsFromLua(startupState);
+    ApplyHookDirectoriesFromLua(startupState);
   }
 
   {
@@ -6037,6 +6112,15 @@ bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName,
     gLaunchDirectory = absoluteLaunchDirectory;
     gDataPathScriptFile = absoluteScriptPath;
     gAllowedProtocols = std::move(allowedProtocols);
+  }
+
+  // Mount it. The binary does this at 0x0045A336-0x0045A376: ensure the
+  // wait-handle set exists, build the file system over the mount table, store
+  // it, and destroy whatever was mounted before.
+  if (moho::CVirtualFileSystem* const previous =
+        moho::DISK_ExchangeVFS(moho::VFS_Create(mountPoints, absoluteLaunchDirectory));
+      previous != nullptr) {
+    delete previous;
   }
 
   return true;

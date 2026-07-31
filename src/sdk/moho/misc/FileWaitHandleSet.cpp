@@ -2392,6 +2392,24 @@ moho::CVirtualFileSystem* moho::DISK_GetVFS()
 }
 
 /**
+ * Installs the mounted virtual file system, returning the previous one.
+ *
+ * See the header for why this exists: the binary performs this store inline in
+ * DISK_SetupDataAndSearchPaths, where the wait-handle set is in reach.
+ */
+moho::CVirtualFileSystem* moho::DISK_ExchangeVFS(CVirtualFileSystem* const virtualFileSystem)
+{
+  FILE_EnsureWaitHandleSet();
+  if (sPFWaitHandleSet == nullptr) {
+    return nullptr;
+  }
+
+  CVirtualFileSystem* const previous = sPFWaitHandleSet->mHandle;
+  sPFWaitHandleSet->mHandle = virtualFileSystem;
+  return previous;
+}
+
+/**
  * Address: 0x00459B60 (FUN_00459B60, ?DISK_InvalidateFileInfoCache@Moho@@YAXVStrArg@gpg@@@Z)
  *
  * gpg::StrArg
