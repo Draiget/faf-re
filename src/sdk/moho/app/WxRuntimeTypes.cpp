@@ -32757,6 +32757,23 @@ void wxWindowBase::RemoveChild(
   EnsureWxWindowBaseRuntimeState(child).parentWindow = nullptr;
 }
 
+/**
+ * Address: 0x009C89D0 (FUN_009C89D0)
+ * Mangled: ?GetPalette@wxWindowBase@@QBE?AVwxPalette@@XZ
+ *
+ * IDA signature:
+ * wxPalette *__userpurge wxWindowBase::GetPalette(wxWindow *this, wxPalette *result);
+ *
+ * What it does:
+ * This window's palette. A copy names the same handle rather than duplicating
+ * it, which is what makes a device context able to share it.
+ */
+wxPaletteRuntime wxWindowMswRuntime::GetPalette() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->palette : wxPaletteRuntime{};
+}
+
 std::span<wxWindowBase* const> wxWindowBase::GetChildren() const
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
@@ -32884,6 +32901,68 @@ void wxDC::InitializePalette()
 
   if (displayDepth > 8) {
     return;
+  }
+
+  auto* const canvas = static_cast<wxWindowMswRuntime*>(m_canvas);
+  if (canvas == nullptr) {
+    m_hasCustomPalette = 0u;
+    return;
+  }
+
+  wxWindowMswRuntime* const paletteOwner = canvas->GetAncestorWithCustomPalette();
+  m_hasCustomPalette = paletteOwner != nullptr ? 1u : 0u;
+  if (paletteOwner == nullptr) {
+    return;
+  }
+
+  // Share the window's palette rather than copying it - both now name the
+  // same handle, so the reference count goes up.
+  const wxPaletteRuntime ownerPalette = paletteOwner->GetPalette();
+  if (m_palette.mRefData != ownerPalette.mRefData) {
+    m_palette = ownerPalette;
+  }
+
+  DoSelectPalette(false);
+}
+
+/**
+ * Address: 0x009C9900 (FUN_009C9900)
+ * Mangled: ?DoSelectPalette@wxDC@@MAEX_N@Z
+ *
+ * IDA signature:
+ * void __thiscall wxDC::DoSelectPalette(wxDC *this, bool realize);
+ *
+ * What it does:
+ * Puts this context's palette in place, and realises it when asked.
+ *
+ * Whatever palette was displaced last time is put back first, so repeated
+ * calls do not lose the context's original. The one displaced this time is
+ * only remembered if nothing is being held already - the original is what
+ * matters, not the most recent.
+ */
+void wxDC::DoSelectPalette(
+  const bool realize
+)
+{
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+
+  if (m_oldPalette != nullptr) {
+    (void)::SelectPalette(deviceContext, static_cast<HPALETTE>(m_oldPalette), FALSE);
+    m_oldPalette = nullptr;
+  }
+
+  if (!m_palette.Ok()) {
+    return;
+  }
+
+  void* const displaced =
+    ::SelectPalette(deviceContext, static_cast<HPALETTE>(m_palette.GetNativePalette()), FALSE);
+  if (m_oldPalette == nullptr) {
+    m_oldPalette = displaced;
+  }
+
+  if (realize) {
+    (void)::RealizePalette(deviceContext);
   }
 }
 
