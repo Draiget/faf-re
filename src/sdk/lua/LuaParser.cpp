@@ -1,5 +1,7 @@
 #include "LuaRuntimeTypes.h"
 
+#include "lua/LuaError.h"
+
 #include <array>
 #include <cctype>
 #include <utility>
@@ -371,19 +373,37 @@ namespace
   constexpr std::int32_t OPR_MINUS = 0x00;
   constexpr std::int32_t OPR_NOT = 0x01;
   constexpr std::int32_t OPR_NOUNOPR = 0x02;
+  // Token codes. The reserved words come first in alphabetical order starting
+  // at FIRST_RESERVED, so the numbering is fixed by the keyword list - which
+  // for this build carries FAF's extra `continue`, shifting everything from
+  // `do` onwards by one relative to stock Lua 5.0.2. Read back from the token
+  // name table the lexer indexes at 0x00D45C0C[token].
+  constexpr std::int32_t FIRST_RESERVED = 0x101;
   constexpr std::int32_t TK_AND = 0x101;
-  constexpr std::int32_t TK_FALSE = 0x108;
+  constexpr std::int32_t TK_BREAK = 0x102;
+  constexpr std::int32_t TK_CONTINUE = 0x103;
+  constexpr std::int32_t TK_DO = 0x104;
   constexpr std::int32_t TK_ELSE = 0x105;
   constexpr std::int32_t TK_ELSEIF = 0x106;
   constexpr std::int32_t TK_END = 0x107;
+  constexpr std::int32_t TK_FALSE = 0x108;
+  constexpr std::int32_t TK_FOR = 0x109;
   constexpr std::int32_t TK_FUNCTION = 0x10A;
   constexpr std::int32_t TK_IF = 0x10B;
+  constexpr std::int32_t TK_IN = 0x10C;
+  constexpr std::int32_t TK_LOCAL = 0x10D;
   constexpr std::int32_t TK_NIL = 0x10E;
   constexpr std::int32_t TK_NOT = 0x10F;
   constexpr std::int32_t TK_OR = 0x110;
+  constexpr std::int32_t TK_REPEAT = 0x111;
+  constexpr std::int32_t TK_RETURN = 0x112;
   constexpr std::int32_t TK_THEN = 0x113;
   constexpr std::int32_t TK_TRUE = 0x114;
+  constexpr std::int32_t TK_UNTIL = 0x115;
+  constexpr std::int32_t TK_WHILE = 0x116;
+  constexpr std::int32_t TK_NAME = 0x117;
   constexpr std::int32_t TK_CONCAT = 0x118;
+  constexpr std::int32_t TK_DOTS = 0x119;
   constexpr std::int32_t TK_EQ = 0x11A;
   constexpr std::int32_t TK_GE = 0x11B;
   constexpr std::int32_t TK_LE = 0x11C;
@@ -394,6 +414,16 @@ namespace
   constexpr std::int32_t TK_BSHR = 0x121;
   constexpr std::int32_t TK_EOS = 0x122;
   constexpr std::int32_t UNARY_PRIORITY = 8;
+
+  // Printable names, in token order from FIRST_RESERVED. Mirrors the table the
+  // binary indexes at 0x00D45C0C[token].
+  constexpr std::array<const char*, (TK_EOS - FIRST_RESERVED) + 1> luaX_tokens{
+    "and", "break", "continue", "do", "else", "elseif", "end", "false", "for",
+    "function", "if", "in", "local", "nil", "not", "or", "repeat", "return",
+    "then", "true", "until", "while",
+    "*name", "..", "...", "==", ">=", "<=", "~=", "*number", "*string",
+    "<<", ">>", "<eof>"
+  };
 
   // LuaPlus's parser records the left and right binding powers as one
   // two-byte pair per BinOpr. std::pair expresses that source-level record
@@ -563,6 +593,7 @@ namespace
     void body(LexState* ls, expdesc* outExpression, int needself, int line);
     void primaryexp(expdesc* outExpression, LexState* ls);
     std::int32_t luaZ_fill(LuaZioRuntimeView* stream);
+    void luaO_chunkid(char* out, const char* source, int bufflen);
     char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
     void luaG_runerror(lua_State* L, const char* format, ...);
     int luaK_exp2anyreg(FuncState* fs, expdesc* e);
@@ -576,6 +607,107 @@ namespace
       expdesc* rightExpression
     );
   }
+
+  // ---------------------------------------------------------------------
+  // llex.c - error reporting and limit checks.
+  //
+  // luaX_errorline throws, and these carry C language linkage so they replace
+  // the same symbols in the prebuilt LuaPlus library; MSVC warns about the
+  // combination under /EHc even though the throw is exactly what the binary
+  // does.
+  // ---------------------------------------------------------------------
+#pragma warning(push)
+#pragma warning(disable : 4297) // function assumed not to throw but does
+
+  /**
+   * Address: 0x00918120 (FUN_00918120, luaX_token2str)
+   *
+   * IDA signature:
+   * const char *__cdecl luaX_token2str(LexState *ls, int token);
+   *
+   * What it does:
+   * Names a token for an error message: reserved words and multi-character
+   * symbols come from the token table, single characters are formatted into a
+   * fresh Lua string.
+   */
+  extern "C" const char* luaX_token2str(LexState* const ls, const int token)
+  {
+    if (token < FIRST_RESERVED) {
+      return luaO_pushfstring(ls->L, "%c", token);
+    }
+    return luaX_tokens[static_cast<std::size_t>(token - FIRST_RESERVED)];
+  }
+
+  /**
+   * Address: 0x00918310 (FUN_00918310, luaX_errorline)
+   *
+   * IDA signature:
+   * void __cdecl __noreturn luaX_errorline(LexState *ls, const char *s,
+   *                                        const char *token, int line);
+   *
+   * What it does:
+   * Builds "<chunk>(<line>): <message> near `<token>'", pushes it on the Lua
+   * stack and throws it as a syntax error.
+   */
+  extern "C" void
+  luaX_errorline(LexState* const ls, const char* const s, const char* const token, const int line)
+  {
+    // llex.c's own cap on how much of a chunk name an error may quote; this is
+    // MAXSRC, not the (smaller) LUA_IDSIZE that lua_Debug::short_src uses.
+    constexpr int kMaxSourceNameLength = 80;
+
+    lua_State* const L = ls->L;
+    char buff[kMaxSourceNameLength];
+    luaO_chunkid(buff, ls->source->str, kMaxSourceNameLength);
+    luaO_pushfstring(L, "%s(%d): %s near `%s'", buff, line, s, token);
+    throw lua_SyntaxError(lua::lua_Error(L, LUA_ERRSYNTAX));
+  }
+
+  /**
+   * Address: 0x009183B0 (FUN_009183B0, luaX_syntaxerror)
+   *
+   * What it does:
+   * Reports `msg` against whatever the lexer is currently looking at. Names and
+   * literals quote their own text - the literal straight out of the lexer's
+   * scratch buffer, since its token value carries no string - everything else
+   * is named through the token table.
+   */
+  extern "C" void luaX_syntaxerror(LexState* const ls, const char* const msg)
+  {
+    const char* lasttoken = nullptr;
+    switch (ls->t.token) {
+    case TK_NAME:
+      lasttoken = ls->t.seminfo.ts->str;
+      break;
+
+    case TK_STRING:
+    case TK_NUMBER:
+      lasttoken = static_cast<Mbuffer*>(ls->buff)->buffer;
+      break;
+
+    default:
+      lasttoken = luaX_token2str(ls, ls->t.token);
+      break;
+    }
+
+    luaX_errorline(ls, msg, lasttoken, ls->linenumber);
+  }
+
+  /**
+   * Address: 0x009188F0 (FUN_009188F0, luaX_checklimit)
+   *
+   * What it does:
+   * Raises "too many <what> (limit=<n>)" when a compile-time count runs past
+   * one of the parser's fixed ceilings.
+   */
+  extern "C" void luaX_checklimit(LexState* const ls, const int val, const int limit, const char* const msg)
+  {
+    if (val > limit) {
+      luaX_syntaxerror(ls, luaO_pushfstring(ls->L, "too many %s (limit=%d)", msg, limit));
+    }
+  }
+
+#pragma warning(pop)
 
   /**
    * Address: 0x0091C4B0 (FUN_0091C4B0, getbinopr)
@@ -810,18 +942,19 @@ namespace
   }
 
   /**
-   * Address: 0x0091AC60 (lparser.c::str_checkname, file-local in original Lua)
+   * Address: 0x0091AC20 (FUN_0091AC20, str_checkname)
+   *
+   * IDA signature:
+   * TString *__usercall str_checkname@<eax>(LexState *ls@<esi>);
    *
    * What it does:
-   * Asserts the current lexer token is `TK_NAME` (`0x104`), captures the
-   * semantic-info `TString*`, advances to the next token, and returns the
-   * captured identifier. Recovered as a free function here because callers
-   * (e.g., `singlevar`) live in our recovered LuaParser.cpp.
+   * Asserts the current lexer token is `TK_NAME`, captures the semantic-info
+   * `TString*`, advances to the next token, and returns the captured
+   * identifier.
    */
   extern "C" TString* str_checkname(LexState* const ls)
   {
-    constexpr std::int32_t kTkName = 0x104;
-    if (ls->t.token != kTkName) {
+    if (ls->t.token != TK_NAME) {
       luaX_syntaxerror(ls, "<name> expected");
     }
 
