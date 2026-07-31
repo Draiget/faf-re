@@ -2329,6 +2329,15 @@ public:
    */
   bool HandleJoystickEvent(unsigned int message, std::int32_t x, std::int32_t y, unsigned int flags);
 
+  /**
+   * Address: 0x00969500 (FUN_00969500)
+   * Mangled: ?HandleSetCursor@wxWindow@@IAE_NPAXGI@Z
+   *
+   * What it does:
+   * Chooses the cursor for a pointer sitting over this window's client area.
+   */
+  bool HandleSetCursor(unsigned int hitTestCode);
+
   bool HandleQueryNewPalette();
 
   /**
@@ -4491,6 +4500,51 @@ struct wxPaletteRuntime
 
 static_assert(offsetof(wxPaletteRuntime, mRefData) == 0x04, "wxPaletteRuntime::mRefData offset must be 0x04");
 static_assert(sizeof(wxPaletteRuntime) == 0xC, "wxPaletteRuntime size must be 0xC");
+
+/**
+ * A mouse cursor.
+ *
+ * Like the palette, the native handle lives in shared reference data so copies
+ * name one HCURSOR. Offsets are off wxWindow::HandleSetCursor (0x00969500),
+ * which reads the reference data at +0x04 and the handle at +0x14 within it;
+ * wxCursor::Ok (0x004FB7B0) tests the same pair.
+ */
+struct wxCursorRefDataRuntime
+{
+  std::uint8_t mReserved00To13[0x14]{}; // +0x00, not mapped
+  void* mNativeCursor = nullptr;        // +0x14
+};
+
+static_assert(
+  offsetof(wxCursorRefDataRuntime, mNativeCursor) == 0x14,
+  "wxCursorRefDataRuntime::mNativeCursor offset must be 0x14"
+);
+
+struct wxCursorRuntime
+{
+  void* mVTable = nullptr;                    // +0x00
+  wxCursorRefDataRuntime* mRefData = nullptr; // +0x04
+  std::uint8_t mReserved08[0x4]{};            // +0x08
+
+  /**
+   * Address: 0x004FB7B0 (FUN_004FB7B0)
+   *
+   * What it does:
+   * Whether this cursor names a real one - reference data with a handle in it.
+   */
+  [[nodiscard]] bool Ok() const noexcept
+  {
+    return mRefData != nullptr && mRefData->mNativeCursor != nullptr;
+  }
+
+  [[nodiscard]] void* GetNativeCursor() const noexcept
+  {
+    return mRefData != nullptr ? mRefData->mNativeCursor : nullptr;
+  }
+};
+
+static_assert(offsetof(wxCursorRuntime, mRefData) == 0x04, "wxCursorRuntime::mRefData offset must be 0x04");
+static_assert(sizeof(wxCursorRuntime) == 0xC, "wxCursorRuntime size must be 0xC");
 
 struct wxFontRuntime
 {
