@@ -33059,10 +33059,16 @@ void wxWindowBase::OnInitDialog(
  *
  * Table at 0x00D4D0EC = {base 0x00D4E8F4 (wxEvtHandler's), rows 0x00F32DE8};
  * the rows there are OnSysColourChanged 0x00964960, OnInitDialog 0x00964A10,
- * OnMiddleClick 0x00964A20 and OnHelp 0x00964100. Only OnInitDialog is
- * recovered so far - the other three need the child-broadcast walk, wxMessageBox
- * and wxHelpProvider respectively - so they stay unbound and their events keep
- * going unhandled, as they did while this returned nothing at all.
+ * OnMiddleClick 0x00964A20 and OnHelp 0x00964100. The first two are bound
+ * below; the last two want wxMessageBox and wxHelpProvider, which this tree
+ * does not model yet, so they stay unbound.
+ *
+ * An unbound row here does not mean the event goes unhandled. main.exe also
+ * links dependencies/wxWindows-2.4.2/lib/wxmsw.lib, which defines this class
+ * and this table as well - 63 of the 70 wx-named functions this file defines
+ * are defined there too. ForceFileOutput and /IGNORE:4006 resolve every such
+ * collision silently to whichever object the linker sees first, so the library
+ * still answers for whatever this tree leaves out, and no warning is printed.
  */
 const void* wxWindowBase::GetEventTable() const
 {
