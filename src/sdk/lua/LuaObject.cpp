@@ -4115,7 +4115,8 @@ namespace
 		int luaO_log2(unsigned int x);
 		const TObject* luaV_gettable(lua_State* L, const TObject* t, const TObject* key, int loop);
 		void luaV_settable(lua_State* L, const TObject* t, TObject* key, StkId val);
-		int luaV_tonumber(const TObject* obj, TObject* outNumber);
+		const TObject* luaV_tonumber(const TObject* obj, TObject* outNumber);
+		int luaO_str2d(const char* s, float* result);
 		int luaV_tostring(lua_State* L, TObject* obj);
 		const char* getobjname(int stackPos, CallInfo* callInfo, const char** nameOut);
 		void luaG_runerror(lua_State* L, const char* format, ...);
@@ -12388,6 +12389,36 @@ extern "C"
 		}
 
 		throw lua_RuntimeError(lua::lua_Error(state, LUA_ERRRUN));
+	}
+
+	/**
+	 * Address: 0x00929150 (FUN_00929150, luaV_tonumber)
+	 *
+	 * IDA signature:
+	 * const TObject *__usercall luaV_tonumber@<eax>(const TObject *obj, TObject *n);
+	 *
+	 * What it does:
+	 * Views a value as a number. Numbers are returned as they are; a string is
+	 * parsed into the caller's scratch slot and that is returned instead.
+	 * Anything else - or a string that does not parse - gives null, which is
+	 * what makes arithmetic on it fall through to a tag method.
+	 */
+	const TObject* luaV_tonumber(const TObject* const obj, TObject* const n)
+	{
+		if (obj->tt == LUA_TNUMBER) {
+			return obj;
+		}
+
+		if (obj->tt == LUA_TSTRING) {
+			float parsed = 0.0f;
+			if (luaO_str2d(static_cast<const TString*>(obj->value.p)->str, &parsed) != 0) {
+				n->value.n = parsed;
+				n->tt = LUA_TNUMBER;
+				return n;
+			}
+		}
+
+		return nullptr;
 	}
 
 	/**
