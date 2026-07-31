@@ -2293,6 +2293,20 @@ public:
   bool HandleEraseBkgnd(void* nativeDeviceContext);
 
   /**
+   * Address: 0x0096A450 (FUN_0096A450)
+   * Mangled: ?HandleMouseEvent@wxWindow@@IAE_NIHHI@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::HandleMouseEvent(wxWindow *this, UINT msg,
+   *                                            int x, int y, WXUINT flags);
+   *
+   * What it does:
+   * Turns one of the ten mouse messages into the matching wx mouse event and
+   * offers it to this window's handler.
+   */
+  bool HandleMouseEvent(unsigned int message, std::int32_t x, std::int32_t y, unsigned int flags);
+
+  /**
    * Address: 0x00969F40 (FUN_00969F40)
    * Mangled: ?OnEraseBackground@wxWindow@@IAEXAAVwxEraseEvent@@@Z
    *

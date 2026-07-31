@@ -11456,6 +11456,15 @@ namespace
   std::int32_t gWxEvtIdleRuntimeType = 0;
   std::int32_t gWxEvtDropFilesRuntimeType = 0;
   std::int32_t gWxEvtMotionRuntimeType = 0;
+  std::int32_t gWxEvtLeftDownRuntimeType = 0;
+  std::int32_t gWxEvtLeftUpRuntimeType = 0;
+  std::int32_t gWxEvtLeftDClickRuntimeType = 0;
+  std::int32_t gWxEvtRightDownRuntimeType = 0;
+  std::int32_t gWxEvtRightUpRuntimeType = 0;
+  std::int32_t gWxEvtRightDClickRuntimeType = 0;
+  std::int32_t gWxEvtMiddleDownRuntimeType = 0;
+  std::int32_t gWxEvtMiddleUpRuntimeType = 0;
+  std::int32_t gWxEvtMiddleDClickRuntimeType = 0;
   std::int32_t gWxEvtMouseWheelRuntimeType = 0;
   std::int32_t gWxEvtMouseCaptureChangedRuntimeType = 0;
   std::int32_t gWxEvtUpdateUiRuntimeType = 0;
@@ -13093,21 +13102,8 @@ namespace
   class WxMouseEventFactoryRuntime final : public wxEventRuntime
   {
   public:
-    WxMouseEventFactoryRuntime()
-      : wxEventRuntime(0, 0)
-      , mMetaDown(0)
-      , mAltDown(0)
-      , mControlDown(0)
-      , mShiftDown(0)
-      , mLeftDown(0)
-      , mRightDown(0)
-      , mMiddleDown(0)
-      , mReserved27(0)
-      , mX(0)
-      , mY(0)
-      , mWheelRotation(0)
-      , mWheelDelta(0)
-      , mLinesPerAction(0)
+    explicit WxMouseEventFactoryRuntime(const std::int32_t eventType = 0)
+      : wxEventRuntime(0, eventType)
     {}
 
     /**
@@ -13123,20 +13119,39 @@ namespace
       return clone;
     }
 
-    std::uint8_t mMetaDown = 0;
-    std::uint8_t mAltDown = 0;
-    std::uint8_t mControlDown = 0;
-    std::uint8_t mShiftDown = 0;
-    std::uint8_t mLeftDown = 0;
-    std::uint8_t mRightDown = 0;
-    std::uint8_t mMiddleDown = 0;
-    std::uint8_t mReserved27 = 0;
-    std::int32_t mX = 0;
-    std::int32_t mY = 0;
-    std::int32_t mWheelRotation = 0;
-    std::int32_t mWheelDelta = 0;
-    std::int32_t mLinesPerAction = 0;
+    // The order is the binary's, read off wxWindow::InitMouseEvent
+    // (0x0096A300): position first at +0x20, then the buttons, then the
+    // modifier keys. wxWindowBase::OnMiddleClick agrees - it tests +0x2B and
+    // +0x2D for control and alt.
+    std::int32_t mX = 0;             // +0x20
+    std::int32_t mY = 0;             // +0x24
+    std::uint8_t mLeftDown = 0;      // +0x28
+    std::uint8_t mMiddleDown = 0;    // +0x29
+    std::uint8_t mRightDown = 0;     // +0x2A
+    std::uint8_t mControlDown = 0;   // +0x2B
+    std::uint8_t mShiftDown = 0;     // +0x2C
+    std::uint8_t mAltDown = 0;       // +0x2D
+    std::uint8_t mMetaDown = 0;      // +0x2E
+    std::uint8_t mReserved2F = 0;    // +0x2F
+    std::int32_t mWheelRotation = 0; // +0x30
+    std::int32_t mWheelDelta = 0;    // +0x34
+    std::int32_t mLinesPerAction = 0; // +0x38
   };
+  static_assert(offsetof(WxMouseEventFactoryRuntime, mX) == 0x20, "wxMouseEvent::m_x offset must be 0x20");
+  static_assert(offsetof(WxMouseEventFactoryRuntime, mY) == 0x24, "wxMouseEvent::m_y offset must be 0x24");
+  static_assert(offsetof(WxMouseEventFactoryRuntime, mLeftDown) == 0x28, "wxMouseEvent::m_leftDown offset must be 0x28");
+  static_assert(
+    offsetof(WxMouseEventFactoryRuntime, mMiddleDown) == 0x29, "wxMouseEvent::m_middleDown offset must be 0x29"
+  );
+  static_assert(offsetof(WxMouseEventFactoryRuntime, mRightDown) == 0x2A, "wxMouseEvent::m_rightDown offset must be 0x2A");
+  static_assert(
+    offsetof(WxMouseEventFactoryRuntime, mControlDown) == 0x2B, "wxMouseEvent::m_controlDown offset must be 0x2B"
+  );
+  static_assert(offsetof(WxMouseEventFactoryRuntime, mShiftDown) == 0x2C, "wxMouseEvent::m_shiftDown offset must be 0x2C");
+  static_assert(offsetof(WxMouseEventFactoryRuntime, mAltDown) == 0x2D, "wxMouseEvent::m_altDown offset must be 0x2D");
+  static_assert(
+    offsetof(WxMouseEventFactoryRuntime, mWheelRotation) == 0x30, "wxMouseEvent::m_wheelRotation offset must be 0x30"
+  );
   static_assert(sizeof(WxMouseEventFactoryRuntime) == 0x3C, "WxMouseEventFactoryRuntime size must be 0x3C");
 
   /**
@@ -33018,6 +33033,113 @@ namespace
   constexpr std::uint8_t kWxWindowHasOwnForegroundColour = 0x20;
 } // namespace
 
+namespace
+{
+  // MK_* as they arrive in a mouse message's wParam.
+  constexpr unsigned int kMouseFlagLeftButton = 0x0001u;
+  constexpr unsigned int kMouseFlagRightButton = 0x0002u;
+  constexpr unsigned int kMouseFlagShift = 0x0004u;
+  constexpr unsigned int kMouseFlagControl = 0x0008u;
+  constexpr unsigned int kMouseFlagMiddleButton = 0x0010u;
+
+  /**
+   * Address: 0x0096A300 (FUN_0096A300)
+   * Mangled: ?InitMouseEvent@wxWindow@@IAEXAAVwxMouseEvent@@HHI@Z
+   *
+   * IDA signature:
+   * void __thiscall wxWindow::InitMouseEvent(wxWindow *this, wxMouseEvent *event,
+   *                                          int x, int y, WXUINT flags);
+   *
+   * What it does:
+   * Fills in everything a mouse event carries besides its type: the position,
+   * measured from the client area's origin rather than the window's, which
+   * button and modifier keys were down, and when it happened.
+   *
+   * Alt is the odd one out - it does not travel in the message flags, so it is
+   * read from the keyboard directly.
+   */
+  void InitWxMouseEventRuntime(
+    wxWindowMswRuntime& window,
+    WxMouseEventFactoryRuntime& event,
+    const std::int32_t x,
+    const std::int32_t y,
+    const unsigned int flags
+  )
+  {
+    const wxPoint clientOrigin = window.GetClientAreaOrigin();
+    event.mX = x - clientOrigin.x;
+    event.mY = y - clientOrigin.y;
+
+    event.mControlDown = (flags & kMouseFlagControl) != 0u ? 1u : 0u;
+    event.mShiftDown = (flags & kMouseFlagShift) != 0u ? 1u : 0u;
+    event.mLeftDown = (flags & kMouseFlagLeftButton) != 0u ? 1u : 0u;
+    event.mMiddleDown = (flags & kMouseFlagMiddleButton) != 0u ? 1u : 0u;
+    event.mRightDown = (flags & kMouseFlagRightButton) != 0u ? 1u : 0u;
+    event.mAltDown = ::GetKeyState(VK_MENU) < 0 ? 1u : 0u;
+
+    event.mEventObject = &window;
+    event.mEventTimestamp = static_cast<std::int32_t>(::GetMessageTime());
+
+    const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(&window);
+    event.mEventId = state != nullptr ? state->windowId : -1;
+  }
+
+  /**
+   * The ten mouse messages, in the order WM_MOUSEMOVE..WM_MBUTTONDBLCLK sit in,
+   * which is how the binary indexes its table with `message - WM_MOUSEMOVE`.
+   */
+  [[nodiscard]] const std::int32_t* WxMouseEventTypeSlotForMessage(const unsigned int message)
+  {
+    switch (message) {
+    case WM_MOUSEMOVE:      return WxEventTypeSlot(gWxEvtMotionRuntimeType);
+    case WM_LBUTTONDOWN:    return WxEventTypeSlot(gWxEvtLeftDownRuntimeType);
+    case WM_LBUTTONUP:      return WxEventTypeSlot(gWxEvtLeftUpRuntimeType);
+    case WM_LBUTTONDBLCLK:  return WxEventTypeSlot(gWxEvtLeftDClickRuntimeType);
+    case WM_RBUTTONDOWN:    return WxEventTypeSlot(gWxEvtRightDownRuntimeType);
+    case WM_RBUTTONUP:      return WxEventTypeSlot(gWxEvtRightUpRuntimeType);
+    case WM_RBUTTONDBLCLK:  return WxEventTypeSlot(gWxEvtRightDClickRuntimeType);
+    case WM_MBUTTONDOWN:    return WxEventTypeSlot(gWxEvtMiddleDownRuntimeType);
+    case WM_MBUTTONUP:      return WxEventTypeSlot(gWxEvtMiddleUpRuntimeType);
+    case WM_MBUTTONDBLCLK:  return WxEventTypeSlot(gWxEvtMiddleDClickRuntimeType);
+    default:                return nullptr;
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x0096A450 (FUN_0096A450)
+ * Mangled: ?HandleMouseEvent@wxWindow@@IAE_NIHHI@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleMouseEvent(wxWindow *this, UINT msg,
+ *                                            int x, int y, WXUINT flags);
+ *
+ * What it does:
+ * Turns one of the ten mouse messages into the matching wx mouse event and
+ * offers it to this window's handler.
+ *
+ * The binary keeps the message-to-type mapping in a static array it fills on
+ * first use, indexed by `message - WM_MOUSEMOVE` - the ten messages are
+ * consecutive, so the subtraction is the lookup. A switch says the same thing
+ * without depending on the numbering staying contiguous.
+ */
+bool wxWindowMswRuntime::HandleMouseEvent(
+  const unsigned int message,
+  const std::int32_t x,
+  const std::int32_t y,
+  const unsigned int flags
+)
+{
+  const std::int32_t* const eventTypeSlot = WxMouseEventTypeSlotForMessage(message);
+  if (eventTypeSlot == nullptr) {
+    return false;
+  }
+
+  WxMouseEventFactoryRuntime event{*eventTypeSlot};
+  InitWxMouseEventRuntime(*this, event, x, y, flags);
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
 /**
  * Address: 0x00969B80 (FUN_00969B80)
  * Mangled: ?OnSysColourChanged@wxWindow@@IAEXAAVwxSysColourChangedEvent@@@Z
@@ -34281,6 +34403,27 @@ long wxWindowMswRuntime::MSWWindowProc(
 
   case WM_GETMINMAXINFO:
     processed = HandleGetMinMaxInfo(reinterpret_cast<void*>(lParam));
+    break;
+
+  case WM_MOUSEMOVE:
+  case WM_LBUTTONDOWN:
+  case WM_LBUTTONUP:
+  case WM_LBUTTONDBLCLK:
+  case WM_RBUTTONDOWN:
+  case WM_RBUTTONUP:
+  case WM_RBUTTONDBLCLK:
+  case WM_MBUTTONDOWN:
+  case WM_MBUTTONUP:
+  case WM_MBUTTONDBLCLK:
+    // The position rides in lParam as a signed pair, so a drag that leaves the
+    // window to the left or above reports negative coordinates rather than
+    // enormous ones.
+    processed = HandleMouseEvent(
+      message,
+      static_cast<std::int16_t>(LOWORD(lParam)),
+      static_cast<std::int16_t>(HIWORD(lParam)),
+      wParam
+    );
     break;
 
   case WM_ERASEBKGND:
