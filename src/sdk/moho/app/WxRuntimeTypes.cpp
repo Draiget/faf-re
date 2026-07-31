@@ -11327,6 +11327,7 @@ namespace
     std::uint8_t isBeingDeleted = 0;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
+    std::vector<wxWindowBase*> children{};
     wxWindowBase* eventHandler = nullptr;
     bool themeEnabled = false;
     std::uint8_t bitfields = 0;
@@ -32636,6 +32637,98 @@ bool wxWindowMswRuntime::ContainsHWND(
 wxEventTable wxWindowBase::sm_eventTable = {nullptr, nullptr};
 
 /**
+ * Address: 0x009636F0 (FUN_009636F0)
+ * Mangled: ?AddChild@wxWindowBase@@UAEXPAV1@@Z
+ *
+ * IDA signature:
+ * wxObjectListNode *__thiscall wxWindowBase::AddChild(wxWindowBase *this, wxWindowBase *child);
+ *
+ * What it does:
+ * Takes a window into this one's child list and points it back at its new
+ * parent. The list node the binary returns is its own bookkeeping and no
+ * caller looks at it.
+ */
+void wxWindowBase::AddChild(
+  wxWindowBase* const child
+)
+{
+  if (child == nullptr) {
+    return;
+  }
+
+  EnsureWxWindowBaseRuntimeState(this).children.push_back(child);
+  EnsureWxWindowBaseRuntimeState(child).parentWindow = this;
+}
+
+/**
+ * Address: 0x00963710 (FUN_00963710)
+ * Mangled: ?RemoveChild@wxWindowBase@@UAEXPAV1@@Z
+ *
+ * IDA signature:
+ * char __thiscall wxWindowBase::RemoveChild(wxWindowBase *this, wxWindowBase *child);
+ *
+ * What it does:
+ * Drops a window from this one's child list and orphans it. The binary clears
+ * the parent whether or not the child was actually in the list.
+ */
+void wxWindowBase::RemoveChild(
+  wxWindowBase* const child
+)
+{
+  if (child == nullptr) {
+    return;
+  }
+
+  std::erase(EnsureWxWindowBaseRuntimeState(this).children, child);
+  EnsureWxWindowBaseRuntimeState(child).parentWindow = nullptr;
+}
+
+std::span<wxWindowBase* const> wxWindowBase::GetChildren() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr) {
+    return {};
+  }
+  return state->children;
+}
+
+/**
+ * Address: 0x00964960 (FUN_00964960)
+ * Mangled: ?OnSysColourChanged@wxWindowBase@@IAEXAAVwxSysColourChangedEvent@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxWindowBase::OnSysColourChanged(wxWindowBase *this,
+ *                                                  wxSysColourChangedEvent *event);
+ *
+ * What it does:
+ * Passes a system-colour change down to every child that is not a window in
+ * its own right - a top-level child gets the message from Windows directly, so
+ * forwarding to it would deliver it twice.
+ *
+ * Each child is sent a freshly built event rather than the one that arrived.
+ * The binary still writes the child into the *incoming* event's object field
+ * before doing so, which cannot be observed by the child and looks like it was
+ * meant to be the new event's - it is upstream wx's own slip, kept here
+ * because leaving it out would change what a handler further up sees when this
+ * returns.
+ */
+void wxWindowBase::OnSysColourChanged(
+  wxEventRuntime& sysColourChangedEvent
+)
+{
+  for (wxWindowBase* const child : GetChildren()) {
+    if (child == nullptr || child->IsTopLevel()) {
+      continue;
+    }
+
+    sysColourChangedEvent.mEventObject = child;
+
+    WxSysColourChangedEventFactoryRuntime forwarded{};
+    (void)child->GetEventHandler()->ProcessEvent(&forwarded);
+  }
+}
+
+/**
  * Address: 0x00964A10 (FUN_00964A10)
  * Mangled: ?OnInitDialog@wxWindowBase@@IAEXAAVwxInitDialogEvent@@@Z
  *
@@ -32673,6 +32766,9 @@ void wxWindowBase::OnInitDialog(
 const void* wxWindowBase::GetEventTable() const
 {
   static const wxEventTableEntry entries[] = {
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowBase::OnSysColourChanged, WxEventTypeSlot(gWxEvtSysColourChangedRuntimeType)
+    ),
     MakeWxEventTableEntry(
       -1, -1, &wxWindowBase::OnInitDialog, WxEventTypeSlot(gWxEvtInitDialogRuntimeType)
     ),
