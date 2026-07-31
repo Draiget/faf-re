@@ -11484,6 +11484,8 @@ namespace
   std::int32_t gWxEvtDisplayChangedRuntimeType = 0;
   std::int32_t gWxEvtNavigationKeyRuntimeType = 0;
   std::int32_t gWxEvtKeyDownRuntimeType = 0;
+  std::int32_t gWxEvtKeyUpRuntimeType = 0;
+  std::int32_t gWxEvtCharRuntimeType = 0;
   std::int32_t gWxEvtPaletteChangedRuntimeType = 0;
   std::int32_t gWxEvtQueryNewPaletteRuntimeType = 0;
   std::int32_t gWxEvtShowRuntimeType = 0;
@@ -34487,6 +34489,20 @@ bool wxWindowMswRuntime::HandleGetMinMaxInfo(void* const minMaxInfo)
  * the binary's switch (mouse, keyboard, palette, session, control colours) is
  * still to come, and until then behaves exactly as an unhandled message should.
  */
+namespace
+{
+  // Defined further down, next to the key-event builder they share.
+  [[nodiscard]] bool wxWindowDispatchKeyDownRuntime(
+    wxWindowMswRuntime* window, int virtualKeyCode, std::uint32_t rawFlags
+  );
+  [[nodiscard]] bool wxWindowDispatchKeyUpRuntime(
+    wxWindowMswRuntime* window, int virtualKeyCode, std::uint32_t rawFlags
+  );
+  [[nodiscard]] bool wxWindowDispatchCharRuntime(
+    wxWindowMswRuntime* window, int wParam, std::uint32_t rawFlags, bool isAscii
+  );
+} // namespace
+
 long wxWindowMswRuntime::MSWWindowProc(
   const unsigned int message,
   const unsigned int wParam,
@@ -34554,6 +34570,38 @@ long wxWindowMswRuntime::MSWWindowProc(
       static_cast<std::int16_t>(LOWORD(lParam)),
       static_cast<std::int16_t>(HIWORD(lParam)),
       wParam
+    );
+    break;
+
+  case WM_KEYDOWN:
+  case WM_SYSKEYDOWN:
+    processed = wxWindowDispatchKeyDownRuntime(
+      this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam)
+    );
+    // A system key still has to reach the default handler afterwards, or Alt
+    // stops opening the menu and F10 stops working.
+    if (message == WM_SYSKEYDOWN) {
+      (void)MSWDefWindowProc(message, wParam, lParam);
+    }
+    break;
+
+  case WM_KEYUP:
+  case WM_SYSKEYUP:
+    processed = wxWindowDispatchKeyUpRuntime(
+      this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam)
+    );
+    if (message == WM_SYSKEYUP) {
+      (void)MSWDefWindowProc(message, wParam, lParam);
+    }
+    break;
+
+  case WM_CHAR:
+  case WM_SYSCHAR:
+    // The character is already translated here, which is what the last
+    // argument says - a key message would have to be run through the
+    // translation first.
+    processed = wxWindowDispatchCharRuntime(
+      this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam), true
     );
     break;
 
@@ -34997,6 +35045,115 @@ namespace
     wxWindowBase* const eventHandler = state.eventHandler != nullptr ? state.eventHandler : window;
     const bool handled = eventHandler->ProcessEvent(&event);
 
+    RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&event));
+    return handled;
+  }
+
+  /**
+   * Address: 0x0096CF60 (FUN_0096CF60)
+   * Mangled: ?HandleKeyUp@wxWindow@@IAE_NIJ@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::HandleKeyUp(wxWindow *this, int wParam, wxUint32 lParam);
+   *
+   * What it does:
+   * The release half of a key press. Same shape as the key-down dispatcher,
+   * down to keeping the Win32 code when the translation has no wx equivalent
+   * and dropping the key entirely when it maps to -1.
+   */
+  [[nodiscard]] bool wxWindowDispatchKeyUpRuntime(
+    wxWindowMswRuntime* const window,
+    const int virtualKeyCode,
+    const std::uint32_t rawFlags
+  )
+  {
+    if (window == nullptr) {
+      return false;
+    }
+
+    int keyCode = wxCharCodeMSWToWX(virtualKeyCode);
+    if (keyCode == 0) {
+      keyCode = virtualKeyCode;
+    }
+    if (keyCode == -1) {
+      return false;
+    }
+
+    WxKeyEventFactoryRuntime event{};
+    (void)wxWindowCreateKeyEventRuntime(
+      window,
+      &event,
+      *WxEventTypeSlot(gWxEvtKeyUpRuntimeType),
+      keyCode,
+      rawFlags,
+      static_cast<std::uint32_t>(virtualKeyCode)
+    );
+
+    const bool handled = window->GetEventHandler()->ProcessEvent(&event);
+    RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&event));
+    return handled;
+  }
+
+  /**
+   * Address: 0x0096CD80 (FUN_0096CD80)
+   * Mangled: ?HandleChar@wxWindow@@IAE_NIJ_N@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::HandleChar(wxWindow *this, int wParam,
+   *                                      wxUint32 lParam, bool isASCII);
+   *
+   * What it does:
+   * The typed character, as opposed to the key that produced it. A character
+   * message already carries the character, so it is taken as-is; a key message
+   * has to be translated, and a key with no wx equivalent produces nothing.
+   *
+   * The odd part is real: when control and alt are both down and the result is
+   * a printable character, both flags are cleared before the event goes out.
+   * That combination is how AltGr arrives on European keyboards, and a handler
+   * seeing it as Ctrl+Alt would treat an ordinary typed character as an
+   * accelerator.
+   */
+  [[nodiscard]] bool wxWindowDispatchCharRuntime(
+    wxWindowMswRuntime* const window,
+    const int wParam,
+    const std::uint32_t rawFlags,
+    const bool isAscii
+  )
+  {
+    if (window == nullptr) {
+      return false;
+    }
+
+    int keyCode = wParam;
+    if (!isAscii) {
+      // The binary's ASCII branch runs the code through a jump table that
+      // hands back every value unchanged, so only the translated branch
+      // actually changes anything.
+      keyCode = wxCharCodeMSWToWX(wParam);
+      if (keyCode == 0) {
+        return false;
+      }
+    }
+
+    WxKeyEventFactoryRuntime event{};
+    (void)wxWindowCreateKeyEventRuntime(
+      window,
+      &event,
+      *WxEventTypeSlot(gWxEvtCharRuntimeType),
+      keyCode,
+      rawFlags,
+      static_cast<std::uint32_t>(wParam)
+    );
+
+    constexpr int kFirstPrintable = 32;
+    constexpr int kLastPrintable = 255;
+    if (event.mControlDown != 0u && event.mAltDown != 0u
+      && keyCode >= kFirstPrintable && keyCode <= kLastPrintable) {
+      event.mAltDown = 0u;
+      event.mControlDown = 0u;
+    }
+
+    const bool handled = window->GetEventHandler()->ProcessEvent(&event);
     RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&event));
     return handled;
   }
