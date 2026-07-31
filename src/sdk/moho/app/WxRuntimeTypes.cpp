@@ -1475,6 +1475,12 @@ namespace
   constexpr long kWxWindowStyleSimpleBorderAlt = 0x10000000;
   constexpr long kWxWindowStyleNoParentBg = 0x00080000;
   constexpr long kWxWindowStyleTabTraversal = 0x00100000;
+  constexpr long kWxWindowStyleNoFullRepaintOnResize = 0x00010000;
+  // The bit wxTopLevelWindowMSW::MSWGetStyle forces on before delegating to
+  // the child-window translation (0x0098C063).
+  constexpr long kWxWindowStyleSunkenBorderBit = 0x00200000;
+  constexpr long kWxWindowStylePopupWindow = 0x00020000;
+  constexpr long kWxWindowExtraStyleInheritable = 0x00000001;
   constexpr unsigned long kMswStyleBase = 0x50000000u;
   constexpr unsigned long kMswStyleClipChildren = 0x52000000u;
   constexpr unsigned long kMswStyleRaisedBorder = 0x04000000u;
@@ -1514,12 +1520,18 @@ namespace
   constexpr long kMdiChildStyleStartMaximized = 0x00002000;
   constexpr long kMdiChildStyleDecoratedCaption = 0x20000000;
 
-  constexpr wchar_t kWxCanvasClassName[] = L"wxCanvas";
-  constexpr wchar_t kWxCanvasClassNameNoRedraw[] = L"wxCanvasNR";
-  constexpr wchar_t kWxMdiFrameClassName[] = L"wxMDIFrame";
-  constexpr wchar_t kWxMdiFrameClassNameNoRedraw[] = L"wxMDIFrameNoRedraw";
-  constexpr wchar_t kWxMdiChildFrameClassName[] = L"wxMDIChildFrame";
-  constexpr wchar_t kWxMdiChildFrameClassNameNoRedraw[] = L"wxMDIChildFrameNoRedraw";
+  // The names wxApp::RegisterWindowClasses registers, read out of the
+  // globals it fills at 0x00F34E80..0x00F34E94 (strings at 0x00D5584C..
+  // 0x00D5590C). MSWCreate appends "NR" itself, which is why each pair
+  // differs only by that suffix.
+  // wxFrameNameStr at 0x00F33D20.
+  constexpr wchar_t kWxFrameDefaultName[] = L"frame";
+  constexpr wchar_t kWxCanvasClassName[] = L"wxWindowClass";
+  constexpr wchar_t kWxCanvasClassNameNoRedraw[] = L"wxWindowClassNR";
+  constexpr wchar_t kWxMdiFrameClassName[] = L"wxMDIFrameClass";
+  constexpr wchar_t kWxMdiFrameClassNameNoRedraw[] = L"wxMDIFrameClassNR";
+  constexpr wchar_t kWxMdiChildFrameClassName[] = L"wxMDIChildFrameClass";
+  constexpr wchar_t kWxMdiChildFrameClassNameNoRedraw[] = L"wxMDIChildFrameClassNR";
 
   void* gCLogAdditionEventClassInfoTable[1] = {nullptr};
   void* gWxWindowBaseClassInfoTable[1] = {nullptr};
@@ -1638,8 +1650,10 @@ namespace
   void* gWxPrintPaperModuleRuntimeSingleton = nullptr;
   void* gWxClipboardModuleRuntimeSingleton = nullptr;
   HINSTANCE gWxInstanceHandle = ::GetModuleHandleW(nullptr);
-  std::int32_t gWxWindowBaseLastControlId = -1;
   std::vector<wxWindowBase*> gWxModelessWindows{};
+  // wxTopLevelWindows: every top-level window, so the app knows when the
+  // last one has gone.
+  std::vector<wxWindowBase*> gWxTopLevelWindows{};
   void* gWxTreeListSortComparatorOwnerRuntime = nullptr;
   void* gWxWindowBaseEventTableProbeRuntime = nullptr;
   std::uint8_t gWxWindowBaseEventProbeGuardFlag = 0u;
@@ -11234,6 +11248,7 @@ namespace
     long windowStyle = 0;
     long extraStyle = 0;
     unsigned long nativeHandle = 0;
+    long previousWindowProc = 0;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
     wxWindowBase* eventHandler = nullptr;
@@ -11256,6 +11271,9 @@ namespace
   };
 
   std::unordered_map<const wxWindowBase*, WxWindowBaseRuntimeState> gWxWindowBaseStateByWindow{};
+
+  // wxWindowBase::ms_lastControlId at 0x00F32DC0; ships initialised to -200.
+  std::int32_t gWxWindowBaseLastControlId = -200;
   std::unordered_map<const wxTextCtrlRuntime*, WxTextCtrlRuntimeState> gWxTextCtrlStateByControl{};
   std::unordered_map<int, wxWindowMswRuntime*> gWxWindowByNativeHandle{};
   std::array<HMODULE, 2> gWxRichEditModuleHandles{};
@@ -14123,6 +14141,24 @@ namespace
       state.name.assign(kSupComFrameWindowName);
       state.iconResourceName.assign(kSupComFrameIconResourceName);
       state.iconResourceAssigned = true;
+
+      // Binary: WSupComFrame::WSupComFrame runs
+      //   wxFrame::wxFrame(this, nullptr, -1, title, pos, size, style, L"frame")
+      // at 0x008CD92E, and that constructor form is the one that creates the
+      // native window. The frame's HWND is what the viewport parents itself to
+      // and what GetHeadParameters hands D3D as hDeviceWindow for a windowed
+      // primary head, so nothing downstream works without it.
+      wxStringRuntime frameName{};
+      (void)wxString::InitWith(&frameName, kWxFrameDefaultName, 0, -101);
+      (void)Create(
+        nullptr,
+        -1,
+        state.title.c_str(),
+        initialPosition,
+        initialClientSize,
+        static_cast<long>(style),
+        frameName
+      );
     }
 
     bool Destroy() override
@@ -14202,11 +14238,10 @@ namespace
       EnsureSupComFrameState(this).focused = true;
     }
 
-    [[nodiscard]] unsigned long GetHandle() const override
-    {
-      const SupComFrameState* const state = FindSupComFrameState(this);
-      return state != nullptr ? static_cast<unsigned long>(state->pseudoWindowHandle) : 0u;
-    }
+    // GetHandle is not overridden here any more: wxWindowBase::GetHandle
+    // returns the native handle the creation path recorded, which is what the
+    // binary's wxWindow::GetHandle does. The pseudo handle this used to return
+    // was only ever a stand-in for a window that was never created.
 
     void DoGetClientSize(
       std::int32_t* const outWidth,
@@ -32231,7 +32266,7 @@ void* wxGetInstance()
  * Resolves one HWND class descriptor and checks whether its registered
  * window-proc lane matches the expected callback.
  */
-[[maybe_unused]] static bool DoesWindowClassUseWindowProc(
+static bool DoesWindowClassUseWindowProc(
   const HWND nativeWindow,
   WNDPROC const expectedWindowProc
 )
@@ -32603,6 +32638,675 @@ unsigned long wxWindowMswRuntime::MSWGetStyle(
   }
   return nativeStyle;
 }
+// ---------------------------------------------------------------------------
+// wx Win32 window creation.
+//
+// This is the path that turns a wx window object into a real HWND:
+//
+//   wxWindowMSW::Create  ->  wxWindow::MSWCreate  ->  ::CreateWindowExW
+//                                                 ->  wxWindowMSW::SubclassWin
+//
+// The binary keeps the resulting handle in wxWindow::m_hWnd at +0x108
+// (wxWindow::GetHandle at 0x0042B820 is a two-instruction load from there).
+// This reconstruction models wx window state in a side table rather than at
+// binary offsets, so the handle lives in WxWindowBaseRuntimeState::nativeHandle
+// and GetHandle reads it from there; everything else - the styles computed, the
+// class registered, the arguments handed to CreateWindowExW, the order of the
+// subclass and font calls - follows the binary.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+  constexpr unsigned int kWxClassStyleRedraw = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS; // 0x0B
+  constexpr unsigned int kWxClassStyleNoRedraw = CS_DBLCLKS;                         // 0x08
+
+  // The window currently inside ::CreateWindowExW. The class window-proc runs
+  // before CreateWindowExW returns, so this is how the first messages find
+  // their wx object - there is no handle to look up yet.
+  wxWindowBase* gWxWindowBeingCreated = nullptr;
+
+  bool gWxWindowClassesRegistered = false;
+
+  // wxWindow::MSWGetCreateWindowCoords treats a -1 lane as "let Windows
+  // decide", and substitutes its own defaults for a missing extent.
+  constexpr std::int32_t kWxDefaultCoord = -1;
+  constexpr std::int32_t kWxDefaultCreateWidth = 200;
+  constexpr std::int32_t kWxDefaultCreateHeight = 250;
+
+  /**
+   * Address: 0x00968BF0 / 0x00968C00 (wxWindowCreationHook ctor / dtor)
+   *
+   * What it does:
+   * Publishes the window being created for the duration of the
+   * ::CreateWindowExW call, then clears it.
+   */
+  class WxWindowCreationHook
+  {
+  public:
+    explicit WxWindowCreationHook(wxWindowBase* const window) noexcept
+    {
+      gWxWindowBeingCreated = window;
+    }
+
+    ~WxWindowCreationHook() noexcept
+    {
+      gWxWindowBeingCreated = nullptr;
+    }
+
+    WxWindowCreationHook(const WxWindowCreationHook&) = delete;
+    WxWindowCreationHook& operator=(const WxWindowCreationHook&) = delete;
+  };
+
+  /**
+   * Address: 0x00968C70 (FUN_00968C70, wxWindow::MSWGetCreateWindowCoords)
+   *
+   * IDA signature:
+   * char __stdcall wxWindow::MSWGetCreateWindowCoords(const wxPoint *pos, const wxSize *size,
+   *                                                   int *x, int *y, int *w, int *h);
+   *
+   * What it does:
+   * Converts a wx position/size pair into CreateWindowEx arguments. A -1
+   * position becomes CW_USEDEFAULT for both lanes; a -1 extent falls back to
+   * 200x250. Returns whether anything was actually specified, which the caller
+   * uses to decide if it has to size the window itself afterwards.
+   */
+  bool WxMSWGetCreateWindowCoords(
+    const wxPoint& position,
+    const wxSize& size,
+    int* const outX,
+    int* const outY,
+    int* const outWidth,
+    int* const outHeight
+  ) noexcept
+  {
+    bool specified = false;
+
+    if (position.x == kWxDefaultCoord) {
+      *outX = CW_USEDEFAULT;
+      *outY = CW_USEDEFAULT;
+    } else {
+      *outX = position.x;
+      *outY = (position.y == kWxDefaultCoord) ? kWxDefaultCreateWidth : position.y;
+      specified = true;
+    }
+
+    if (size.x == kWxDefaultCoord) {
+      *outWidth = CW_USEDEFAULT;
+      *outHeight = CW_USEDEFAULT;
+    } else {
+      *outWidth = size.x;
+      *outHeight = (size.y == kWxDefaultCoord) ? kWxDefaultCreateHeight : size.y;
+      specified = true;
+    }
+
+    return specified;
+  }
+} // namespace
+
+/**
+ * Address: 0x0096D090 (FUN_0096D090, wxWndProc)
+ *
+ * IDA signature:
+ * LRESULT __stdcall wxWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+ *
+ * What it does:
+ * The window procedure every wx-created window is registered with. Routes to
+ * the wx object's MSWWindowProc once the handle is known. The very first
+ * messages arrive before ::CreateWindowExW has returned, so there is no
+ * association yet - those are matched against the window being created, which
+ * is also where the association and the handle get recorded.
+ */
+LRESULT CALLBACK wxWndProc(
+  const HWND hWnd,
+  const UINT message,
+  const WPARAM wParam,
+  const LPARAM lParam
+)
+{
+  const int nativeHandleKey = static_cast<int>(reinterpret_cast<std::uintptr_t>(hWnd));
+  wxWindowMswRuntime* window = wxFindWinFromHandle(nativeHandleKey);
+
+  if (window == nullptr && gWxWindowBeingCreated != nullptr) {
+    window = static_cast<wxWindowMswRuntime*>(gWxWindowBeingCreated);
+    wxAssociateWinWithHandle(hWnd, window);
+    gWxWindowBeingCreated = nullptr;
+    EnsureWxWindowBaseRuntimeState(window).nativeHandle =
+      static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(hWnd));
+  }
+
+  if (window == nullptr) {
+    return ::DefWindowProcW(hWnd, message, wParam, lParam);
+  }
+
+  return static_cast<LRESULT>(window->MSWWindowProc(
+    static_cast<unsigned int>(message),
+    static_cast<unsigned int>(wParam),
+    static_cast<long>(lParam)
+  ));
+}
+
+/**
+ * Address: 0x00991E70 (FUN_00991E70, wxApp::RegisterWindowClasses)
+ *
+ * What it does:
+ * Registers the six window classes wx creates its windows with. They differ
+ * only in whether the class redraws on resize (CS_HREDRAW|CS_VREDRAW) and in
+ * the background brush: canvas windows get COLOR_BTNFACE+1, MDI frames get
+ * none at all so the client area is not painted twice, MDI children get
+ * COLOR_WINDOW+1.
+ */
+bool wxAppRegisterWindowClasses()
+{
+  if (gWxWindowClassesRegistered) {
+    return true;
+  }
+
+  WNDCLASSW windowClass{};
+  windowClass.cbClsExtra = 0;
+  windowClass.cbWndExtra = 0;
+  windowClass.hIcon = nullptr;
+  windowClass.lpszMenuName = nullptr;
+  windowClass.lpfnWndProc = &wxWndProc;
+  windowClass.hInstance = static_cast<HINSTANCE>(wxGetInstance());
+  windowClass.hCursor = ::LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
+
+  windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+  windowClass.lpszClassName = kWxCanvasClassName;
+  windowClass.style = kWxClassStyleRedraw;
+  (void)::RegisterClassW(&windowClass);
+
+  windowClass.lpszClassName = kWxCanvasClassNameNoRedraw;
+  windowClass.style = kWxClassStyleNoRedraw;
+  (void)::RegisterClassW(&windowClass);
+
+  windowClass.hbrBackground = nullptr;
+  windowClass.lpszClassName = kWxMdiFrameClassName;
+  windowClass.style = kWxClassStyleRedraw;
+  (void)::RegisterClassW(&windowClass);
+
+  windowClass.lpszClassName = kWxMdiFrameClassNameNoRedraw;
+  windowClass.style = kWxClassStyleNoRedraw;
+  (void)::RegisterClassW(&windowClass);
+
+  windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+  windowClass.lpszClassName = kWxMdiChildFrameClassName;
+  windowClass.style = kWxClassStyleRedraw;
+  (void)::RegisterClassW(&windowClass);
+
+  windowClass.lpszClassName = kWxMdiChildFrameClassNameNoRedraw;
+  windowClass.style = kWxClassStyleNoRedraw;
+  (void)::RegisterClassW(&windowClass);
+
+  gWxWindowClassesRegistered = true;
+  return true;
+}
+
+/**
+ * Address: 0x0096DBC0 (FUN_0096DBC0, wxWindowMSW::SubclassWin)
+ *
+ * IDA signature:
+ * LONG __thiscall wxWindowMSW::SubclassWin(wxWindow *this, HWND hWnd);
+ *
+ * What it does:
+ * Points an existing HWND at the wx window procedure, remembering the one it
+ * replaced so unsubclassing can put it back. A window already running
+ * wxWndProc - which is every window wx created itself - is left alone and
+ * records no previous proc.
+ */
+void wxWindowMswRuntime::SubclassWin(const unsigned long nativeHandle)
+{
+  const HWND hwnd = reinterpret_cast<HWND>(nativeHandle);
+  if (::IsWindow(hwnd) == FALSE) {
+    return;
+  }
+
+  wxAssociateWinWithHandle(hwnd, this);
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  state.previousWindowProc = ::GetWindowLongW(hwnd, GWL_WNDPROC);
+
+  if (DoesWindowClassUseWindowProc(hwnd, &wxWndProc)) {
+    state.previousWindowProc = 0;
+    return;
+  }
+
+  (void)::SetWindowLongW(hwnd, GWL_WNDPROC, reinterpret_cast<LONG>(&wxWndProc));
+}
+
+/**
+ * Address: 0x0096DC20 (FUN_0096DC20, wxWindow::MSWCreate)
+ *
+ * IDA signature:
+ * char __thiscall wxWindow::MSWCreate(wxWindow *this, const wxChar *wclass, const wxChar *title,
+ *                                     const wxPoint *pos, const wxSize *size,
+ *                                     DWORD style, DWORD exstyle);
+ *
+ * What it does:
+ * The single point where wx actually calls ::CreateWindowExW. Picks the "NR"
+ * variant of the class when the window asks not to be fully repainted on
+ * resize, passes the window id as the child-window HMENU only for child
+ * windows, and on success subclasses the new handle and gives it the system
+ * default GUI font.
+ */
+bool wxWindowMswRuntime::MSWCreate(
+  const wchar_t* const windowClassName,
+  const wchar_t* const title,
+  const wxPoint& position,
+  const wxSize& size,
+  unsigned long style,
+  unsigned long extendedStyle
+)
+{
+  wxAppRegisterWindowClasses();
+
+  int x = 0;
+  int y = 0;
+  int width = 0;
+  int height = 0;
+  (void)WxMSWGetCreateWindowCoords(position, size, &x, &y, &width, &height);
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+
+  // Only a child window carries its id in the HMENU slot; for a top-level
+  // window that argument is the menu bar.
+  HMENU childId = nullptr;
+  if ((style & WS_CHILD) != 0) {
+    childId = reinterpret_cast<HMENU>(static_cast<std::uintptr_t>(state.windowId));
+  }
+
+  std::wstring className(windowClassName != nullptr ? windowClassName : kWxCanvasClassName);
+  if ((GetWindowStyleFlag() & kWxWindowStyleNoFullRepaintOnResize) != 0) {
+    className += L"NR";
+  }
+
+  const wchar_t* const windowTitle = (title != nullptr) ? title : L"";
+  const HWND parentHandle = reinterpret_cast<HWND>(MSWGetParent());
+
+  HWND createdWindow = nullptr;
+  {
+    const WxWindowCreationHook creationHook(this);
+    createdWindow = ::CreateWindowExW(
+      static_cast<DWORD>(extendedStyle),
+      className.c_str(),
+      windowTitle,
+      static_cast<DWORD>(style),
+      x,
+      y,
+      width,
+      height,
+      parentHandle,
+      childId,
+      static_cast<HINSTANCE>(wxGetInstance()),
+      nullptr
+    );
+  }
+
+  state.nativeHandle = static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(createdWindow));
+  if (createdWindow == nullptr) {
+    (void)wxLogSysError(L"Can't create window of class %s", className.c_str());
+    return false;
+  }
+
+  SubclassWin(state.nativeHandle);
+  (void)SetFont(::GetStockObject(DEFAULT_GUI_FONT));
+  return true;
+}
+
+/**
+ * Address: 0x0096DE00 (FUN_0096DE00, wxWindowMSW::Create)
+ *
+ * IDA signature:
+ * char __thiscall wxWindowMSW::Create(wxWindow *this, wxWindow *parent, wxWindowID id,
+ *                                     const wxPoint *pos, const wxSize *size,
+ *                                     long style, const wxString *name);
+ *
+ * What it does:
+ * Creates an ordinary child window. Refuses a null parent outright - only a
+ * top-level window may have none - then fills in the common wx state, joins
+ * the parent's child list, and hands the translated styles to MSWCreate. The
+ * window is created visible unless it asked otherwise.
+ */
+bool wxWindowMswRuntime::Create(
+  wxWindowBase* const parent,
+  const std::int32_t id,
+  const wxPoint& position,
+  const wxSize& size,
+  const long style,
+  const wxStringRuntime& name
+)
+{
+  if (parent == nullptr) {
+    return false;
+  }
+
+  if (!CreateBase(parent, id, position, size, style, name)) {
+    return false;
+  }
+
+  parent->AddChild(this);
+
+  unsigned long extendedStyle = 0;
+  unsigned long nativeStyle = MSWGetStyle(GetWindowStyleFlag(), &extendedStyle);
+
+  if ((style & kWxWindowStylePopupWindow) != 0) {
+    nativeStyle &= ~static_cast<unsigned long>(WS_VISIBLE);
+    EnsureWxWindowBaseRuntimeState(this).bitfields &= static_cast<std::uint8_t>(~0x02u);
+  } else {
+    nativeStyle |= static_cast<unsigned long>(WS_VISIBLE);
+  }
+
+  return MSWCreate(kWxCanvasClassName, nullptr, position, size, nativeStyle, extendedStyle);
+}
+
+/**
+ * Address: 0x00963190 (FUN_00963190, wxWindowBase::CreateBase)
+ *
+ * IDA signature:
+ * bool __thiscall wxWindowBase::CreateBase(wxWindow *this, wxWindow *parent, wxWindowID id,
+ *                                          const wxPoint *pos, const wxSize *size, int style,
+ *                                          const wxValidator *validator, const wxString *name);
+ *
+ * What it does:
+ * Fills in the window state every wx window has regardless of platform. An id
+ * of -1 draws the next value from the descending auto-id counter. A parent
+ * that propagates its extra style passes that flag down.
+ */
+bool wxWindowBase::CreateBase(
+  wxWindowBase* const parent,
+  const std::int32_t id,
+  const wxPoint& position,
+  const wxSize& size,
+  const long style,
+  const wxStringRuntime& name
+)
+{
+  (void)position;
+  (void)size;
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  state.windowId = (id == kWxDefaultCoord) ? --gWxWindowBaseLastControlId : id;
+
+  SetName(name);
+  SetWindowStyleFlag(style);
+  state.parentWindow = parent;
+
+  if (parent != nullptr) {
+    const WxWindowBaseRuntimeState* const parentState = FindWxWindowBaseRuntimeState(parent);
+    if (parentState != nullptr && (parentState->extraStyle & kWxWindowExtraStyleInheritable) != 0) {
+      SetExtraStyle(state.extraStyle | kWxWindowExtraStyleInheritable);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Address: 0x00968CF0 (FUN_00968CF0, wxWindow::MSWGetParent)
+ *
+ * What it does:
+ * The handle CreateWindowEx should parent this window to: the wx parent's
+ * handle, or none when there is no parent.
+ */
+unsigned long wxWindowMswRuntime::MSWGetParent() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr || state->parentWindow == nullptr) {
+    return 0u;
+  }
+  return state->parentWindow->GetHandle();
+}
+
+/**
+ * Address: 0x0042B820 (FUN_0042B820)
+ * Mangled: ?GetHandle@wxWindow@@UBEKXZ
+ *
+ * IDA signature:
+ * WXHWND __thiscall wxWindow::GetHandle(wxWindow *this);
+ *
+ * What it does:
+ * Returns the native window handle. The binary reads wxWindow::m_hWnd at
+ * +0x108; this reconstruction keeps window state in a side table, so the same
+ * value comes from WxWindowBaseRuntimeState::nativeHandle.
+ */
+/**
+ * Address: 0x0098C050 (FUN_0098C050)
+ * Mangled: ?MSWGetStyle@wxTopLevelWindowMSW@@MBEKJPAK@Z
+ *
+ * IDA signature:
+ * unsigned int __thiscall wxTopLevelWindowMSW::MSWGetStyle(wxTopLevelWindowMSW *this,
+ *                                                          int style, unsigned int *exstyle);
+ *
+ * What it does:
+ * Turns a top-level window's wx style into the Win32 style pair. It starts
+ * from the child-window translation with the border bits masked off and
+ * WS_SUNKENBORDER forced on, then decides the frame furniture: a resize border
+ * for wxRESIZE_BORDER, otherwise a thin dialog frame or a plain popup. Caption,
+ * min/max boxes, system menu and the initial minimised/maximised state follow
+ * from their own style bits.
+ */
+unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
+  const long style,
+  unsigned long* const extendedStyle
+) const
+{
+  constexpr long kWxStyleFrameStyleMask = static_cast<long>(0xE0DFFFFFu);
+  constexpr long kWxStyleResizeBorder = 0x00000040;
+  constexpr long kWxStyleCaption = 0x00000004;
+  constexpr long kWxStyleMinimizeBox = 0x00000400;
+  constexpr long kWxStyleMaximizeBox = 0x00000200;
+  constexpr long kWxStyleSystemMenu = 0x00000800;
+  constexpr long kWxStyleMinimize = 0x00004000;
+  constexpr long kWxStyleMaximize = 0x00002000;
+  constexpr long kWxStyleThinFrame = 0x00000180;
+  constexpr long kWxStyleNoBorderPair = 0x14000000;
+  constexpr long kWxStyleFrameToolWindow = 0x20000000;
+  constexpr long kWxStyleDialogLike = 0x00000002;
+
+  constexpr unsigned long kMswStylePopup = 0x80000000u;
+  constexpr unsigned long kMswStyleThickFrame = 0x00040000u;
+  constexpr unsigned long kMswStyleDlgFrameOnly = 0x00800000u;
+  constexpr unsigned long kMswStyleCaption = 0x00C00000u;
+  constexpr unsigned long kMswStyleMinimizeBox = 0x00020000u;
+  constexpr unsigned long kMswStyleMaximizeBox = 0x00010000u;
+  constexpr unsigned long kMswStyleSystemMenu = 0x00080000u;
+  constexpr unsigned long kMswStyleMinimize = 0x20000000u;
+  constexpr unsigned long kMswStyleMaximize = 0x01000000u;
+  constexpr unsigned long kMswStyleChildClipMask = 0xAFFFFFFFu;
+
+  constexpr unsigned long kMswExStyleDlgModalFrameBit = 0x00000001u;
+  constexpr unsigned long kMswExStyleToolWindow = 0x00000080u;
+  constexpr unsigned long kMswExStyleControlParent = 0x00040000u;
+  constexpr unsigned long kMswExStyleTopmost = 0x00000008u;
+  constexpr unsigned long kMswExStyleAppWindow = 0x00040000u;
+  constexpr unsigned long kMswExStyleTransparent = 0x00000400u;
+
+  constexpr long kWxExStyleNoDlgFrame = 0x00000008;
+  constexpr long kWxExStyleTransparent = 0x00000004;
+
+  long frameStyle = style;
+
+  unsigned long nativeStyle =
+    wxWindowMswRuntime::MSWGetStyle((style & kWxStyleFrameStyleMask) | kWxWindowStyleSunkenBorderBit, extendedStyle)
+    & kMswStyleChildClipMask;
+
+  if ((style & kWxStyleCaption) != 0) {
+    nativeStyle |= kMswStylePopup;
+  }
+
+  if ((style & kWxStyleResizeBorder) != 0) {
+    nativeStyle |= kMswStyleThickFrame;
+  } else if (extendedStyle != nullptr && (style & kWxStyleNoBorderPair) != 0) {
+    *extendedStyle |= kMswExStyleDlgModalFrameBit;
+  } else if ((style & kWxWindowStyleSunkenBorderBit) != 0) {
+    nativeStyle |= kMswStylePopup;
+  } else {
+    nativeStyle |= kMswStyleDlgFrameOnly;
+  }
+
+  unsigned long result = ((style & kWxStyleFrameToolWindow) != 0)
+    ? (kMswStyleCaption | nativeStyle)
+    : (nativeStyle | kMswStylePopup);
+
+  if ((style & kWxStyleMinimizeBox) != 0) {
+    result |= kMswStyleMinimizeBox;
+  }
+  if ((style & kWxStyleMaximizeBox) != 0) {
+    result |= kMswStyleMaximizeBox;
+  }
+  if ((style & kWxStyleSystemMenu) != 0) {
+    result |= kMswStyleSystemMenu;
+  }
+  if ((style & kWxStyleMinimize) != 0) {
+    result |= kMswStyleMinimize;
+  }
+  if ((style & kWxStyleMaximize) != 0) {
+    result |= kMswStyleMaximize;
+  }
+  if ((style & kWxStyleThinFrame) != 0) {
+    result |= kMswStyleCaption;
+  }
+
+  if (extendedStyle != nullptr) {
+    const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+    const long ownExtraStyle = state != nullptr ? state->extraStyle : 0;
+
+    if ((ownExtraStyle & kWxExStyleNoDlgFrame) == 0) {
+      if ((style & kWxStyleCaption) != 0) {
+        *extendedStyle |= kMswExStyleToolWindow;
+        frameStyle |= kWxStyleDialogLike;
+      }
+      if ((frameStyle & kWxStyleDialogLike) == 0
+        && state != nullptr && state->parentWindow != nullptr) {
+        *extendedStyle |= kMswExStyleControlParent;
+      }
+    }
+
+    // The binary tests the sign of the low half of the style word here.
+    if (static_cast<std::int16_t>(frameStyle) < 0) {
+      *extendedStyle |= kMswExStyleTopmost;
+    }
+    if ((ownExtraStyle & kWxExStyleTransparent) != 0) {
+      *extendedStyle |= kMswExStyleTransparent;
+    }
+  }
+
+  static_cast<void>(kMswExStyleAppWindow);
+  return result;
+}
+
+/**
+ * Address: 0x0098C160 (FUN_0098C160, wxTopLevelWindowMSW::CreateFrame)
+ *
+ * IDA signature:
+ * char __thiscall wxTopLevelWindowMSW::CreateFrame(wxWindow *this, const wxString *title,
+ *                                                  const wxPoint *pos, const wxSize *size);
+ *
+ * What it does:
+ * Creates the native window behind a frame. Same class as an ordinary canvas
+ * window - the class name global at 0x00F34E80 is shared - but with the
+ * top-level style translation.
+ */
+bool wxTopLevelWindowRuntime::CreateFrame(
+  const wchar_t* const title,
+  const wxPoint& position,
+  const wxSize& size
+)
+{
+  unsigned long extendedStyle = 0;
+  const unsigned long nativeStyle = MSWGetStyle(GetWindowStyleFlag(), &extendedStyle);
+  return MSWCreate(kWxCanvasClassName, title, position, size, nativeStyle, extendedStyle);
+}
+
+/**
+ * Address: 0x0098CD30 (FUN_0098CD30, wxTopLevelWindow::Create)
+ *
+ * IDA signature:
+ * char __thiscall wxTopLevelWindow::Create(int this, int parent, int id, int title,
+ *                                          const wxPoint *pos, const wxSize *size,
+ *                                          long style, const wxString *name);
+ *
+ * What it does:
+ * Creates a top-level window. Unlike a child window it may have no parent, it
+ * joins the global top-level window list so the application knows when the
+ * last one closes, and it is created through CreateFrame rather than the
+ * child-window path. The dialog-template branch the binary also has here is
+ * not reachable for a frame.
+ */
+bool wxTopLevelWindowRuntime::Create(
+  wxWindowBase* const parent,
+  const std::int32_t id,
+  const wchar_t* const title,
+  const wxPoint& position,
+  const wxSize& size,
+  const long style,
+  const wxStringRuntime& name
+)
+{
+  SetName(name);
+  SetWindowStyleFlag(style);
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  state.windowId = (id == -1) ? --gWxWindowBaseLastControlId : id;
+  state.parentWindow = parent;
+
+  gWxTopLevelWindows.push_back(this);
+
+  if (parent != nullptr) {
+    parent->AddChild(this);
+  }
+
+  return CreateFrame(title, position, size);
+}
+
+/**
+ * Address: 0x00968A90 (FUN_00968A90)
+ * Mangled: ?MSWDefWindowProc@wxWindow@@UAEJIIJ@Z
+ *
+ * IDA signature:
+ * LRESULT __thiscall wxWindow::MSWDefWindowProc(wxWindow *this, UINT Msg,
+ *                                               WPARAM wParam, LPARAM lParam);
+ *
+ * What it does:
+ * Hands a message to whatever was handling it before: the window procedure
+ * this window displaced when it subclassed an existing HWND, or the system
+ * default when wx created the window itself.
+ */
+long wxWindowMswRuntime::MSWDefWindowProc(
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  const HWND handle = (state != nullptr)
+    ? reinterpret_cast<HWND>(state->nativeHandle)
+    : nullptr;
+  const LONG previousWindowProc = (state != nullptr) ? state->previousWindowProc : 0;
+
+  if (previousWindowProc != 0) {
+    return static_cast<long>(::CallWindowProcW(
+      reinterpret_cast<WNDPROC>(previousWindowProc),
+      handle,
+      static_cast<UINT>(message),
+      static_cast<WPARAM>(wParam),
+      static_cast<LPARAM>(lParam)
+    ));
+  }
+
+  return static_cast<long>(::DefWindowProcW(
+    handle,
+    static_cast<UINT>(message),
+    static_cast<WPARAM>(wParam),
+    static_cast<LPARAM>(lParam)
+  ));
+}
+
+unsigned long wxWindowBase::GetHandle() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->nativeHandle : 0u;
+}
+
 
 /**
  * Address: 0x0097CCC0 (FUN_0097CCC0)
@@ -58017,8 +58721,24 @@ namespace
     // internal-default-position behavior (the WD3DViewport ctor forwards
     // `wxDefaultPosition` to `wxWindow::wxWindow` regardless of any
     // caller-side position argument; see FUN_00430980).
-    constexpr wxPoint defaultPosition{0, 0};
+    // wxDefaultPosition is (-1, -1) - the global at 0x00F33E00 - not the
+    // origin. MSWGetCreateWindowCoords keys off that -1 to pass CW_USEDEFAULT
+    // to CreateWindowEx, so the distinction is not cosmetic.
+    constexpr wxPoint defaultPosition{-1, -1};
     std::construct_at(viewport, parentWindow, title, defaultPosition, viewportSize);
+
+    // Binary: the WD3DViewport constructor runs
+    //   wxWindow::wxWindow(this, parent, -1, wxDefaultPosition, size, 0, name)
+    // at 0x004309EB, and that wxWindow constructor form is the one that calls
+    // Create(). This is what gives the viewport a real HWND - without it
+    // GetHandle() returns 0 and CScApp::CreateAppFrame hands D3D a null
+    // window, which is what GetHeadParameters refuses to fill in.
+    {
+      const std::wstring wideTitle = gpg::STR_Utf8ToWide(title != nullptr ? title : "");
+      wxStringRuntime viewportName{};
+      (void)wxString::InitWith(&viewportName, wideTitle.c_str(), 0, -101);
+      (void)viewport->Create(parentWindow, -1, defaultPosition, viewportSize, 0, viewportName);
+    }
 
     auto* const runtime = reinterpret_cast<WRenViewportDestroyRuntimeView*>(viewport);
 
