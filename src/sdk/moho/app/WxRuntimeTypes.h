@@ -2313,6 +2313,41 @@ public:
   bool HandleSysColorChange();
 
   /**
+   * Address: 0x00969FD0 (FUN_00969FD0)
+   *
+   * What it does:
+   * Raises wxEVT_ICONIZE saying the window was minimised.
+   */
+  bool HandleMinimize();
+
+  /**
+   * Address: 0x0096A070 (FUN_0096A070)
+   *
+   * What it does:
+   * Raises wxEVT_MAXIMIZE.
+   */
+  bool HandleMaximize();
+
+  /**
+   * Address: 0x0096A2D0 (FUN_0096A2D0)
+   * Mangled: ?HandleSysCommand@wxWindow@@IAE_NIJ@Z
+   *
+   * What it does:
+   * Picks out the two system-menu commands wx cares about, minimise and
+   * maximise, and lets everything else alone.
+   */
+  bool HandleSysCommand(unsigned int wParam, long lParam);
+
+  /**
+   * Address: 0x00968D10 (FUN_00968D10)
+   * Mangled: ?HandleNotify@wxWindow@@IAE_NHJPAJ@Z
+   *
+   * What it does:
+   * Hands a common-control notification to the control it came from.
+   */
+  bool HandleNotify(std::int32_t controlId, long notification, long* result);
+
+  /**
    * Address: 0x00969470 (FUN_00969470)
    * Mangled: ?HandleInitDialog@wxWindow@@IAE_NPAX@Z
    *

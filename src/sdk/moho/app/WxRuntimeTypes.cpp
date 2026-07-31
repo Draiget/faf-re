@@ -33314,6 +33314,112 @@ bool wxWindowMswRuntime::HandleSysColorChange()
 }
 
 /**
+ * Address: 0x00969FD0 (FUN_00969FD0)
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleMinimize(wxWindow *this);
+ *
+ * What it does:
+ * Raises wxEVT_ICONIZE, saying the window went to the taskbar rather than
+ * came back - the same event carries both, told apart by its flag.
+ */
+bool wxWindowMswRuntime::HandleMinimize()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  WxIconizeEventFactoryRuntime event{};
+  event.mEventId = state != nullptr ? state->windowId : -1;
+  event.mIconized = 1u;
+  event.mEventObject = this;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x0096A070 (FUN_0096A070)
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleMaximize(wxWindow *this);
+ *
+ * What it does:
+ * Raises wxEVT_MAXIMIZE.
+ */
+bool wxWindowMswRuntime::HandleMaximize()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  WxMaximizeEventFactoryRuntime event{};
+  event.mEventId = state != nullptr ? state->windowId : -1;
+  event.mEventObject = this;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x0096A2D0 (FUN_0096A2D0)
+ * Mangled: ?HandleSysCommand@wxWindow@@IAE_NIJ@Z
+ *
+ * IDA signature:
+ * bool __stdcall wxWindow::HandleSysCommand(WXWPARAM wParam, WXLPARAM lParam);
+ *
+ * What it does:
+ * Picks out the two system-menu commands wx cares about and lets everything
+ * else - move, size, close, the rest of the menu - alone.
+ *
+ * The low four bits are masked off first: Windows uses them internally for
+ * things like which mnemonic was pressed, so the command has to be rounded
+ * down before it can be compared.
+ */
+bool wxWindowMswRuntime::HandleSysCommand(
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  (void)lParam;
+
+  switch (wParam & 0xFFF0u) {
+  case SC_MINIMIZE:
+    return HandleMinimize();
+  case SC_MAXIMIZE:
+    return HandleMaximize();
+  default:
+    return false;
+  }
+}
+
+/**
+ * Address: 0x00968D10 (FUN_00968D10)
+ * Mangled: ?HandleNotify@wxWindow@@IAE_NHJPAJ@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleNotify(wxWindow *this, int idCtrl,
+ *                                        WXLPARAM lParam, WXLPARAM *result);
+ *
+ * What it does:
+ * A common control sends its notifications to the parent, so this hands one
+ * back to the control it came from - the sender's window handle is the first
+ * thing in the notification header. A notification from something wx does not
+ * know about is offered to this window instead.
+ */
+bool wxWindowMswRuntime::HandleNotify(
+  const std::int32_t controlId,
+  const long notification,
+  long* const result
+)
+{
+  // The header starts with the sending window's handle.
+  const auto* const notificationHeader = reinterpret_cast<const NMHDR*>(notification);
+  if (notificationHeader != nullptr) {
+    wxWindowMswRuntime* const sender = wxFindWinFromHandle(
+      static_cast<int>(reinterpret_cast<std::intptr_t>(notificationHeader->hwndFrom))
+    );
+    if (sender != nullptr) {
+      return sender->MSWOnNotify(controlId, notification, result);
+    }
+  }
+
+  return MSWOnNotify(controlId, notification, result);
+}
+
+/**
  * Address: 0x00969470 (FUN_00969470)
  * Mangled: ?HandleInitDialog@wxWindow@@IAE_NPAX@Z
  *
@@ -34834,6 +34940,20 @@ long wxWindowMswRuntime::MSWWindowProc(
       this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam), true
     );
     break;
+
+  case WM_SYSCOMMAND:
+    processed = HandleSysCommand(wParam, lParam);
+    break;
+
+  case WM_NOTIFY: {
+    // A notification answers with a value of its own rather than the plain
+    // zero every other handled message returns.
+    long notifyResult = 0;
+    if (HandleNotify(static_cast<std::int32_t>(wParam), lParam, &notifyResult)) {
+      return notifyResult;
+    }
+    return MSWDefWindowProc(message, wParam, lParam);
+  }
 
   case WM_SYSCOLORCHANGE:
     // Always reported unhandled so the default handler runs as well.
