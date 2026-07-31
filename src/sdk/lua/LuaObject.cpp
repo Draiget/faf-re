@@ -11690,6 +11690,249 @@ extern "C"
 
 		return static_cast<unsigned char>(*stream->cursor);
 	}
+	/**
+	 * Address: 0x0090CE50 (FUN_0090CE50, lua_pushvfstring)
+	 *
+	 * What it does:
+	 * Formats a string onto the Lua stack. The API entry gives the collector a
+	 * chance to run first, which the internal luaO_pushvfstring does not.
+	 */
+	const char* lua_pushvfstring(lua_State* const state, const char* const fmt, va_list argp)
+	{
+		luaC_checkGC(state);
+		return luaO_pushvfstring(state, fmt, argp);
+	}
+
+	/**
+	 * Address: 0x0090CE90 (FUN_0090CE90, lua_pushfstring)
+	 *
+	 * What it does:
+	 * The varargs form of lua_pushvfstring.
+	 */
+	const char* lua_pushfstring(lua_State* const state, const char* const fmt, ...)
+	{
+		va_list argp;
+		va_start(argp, fmt);
+		luaC_checkGC(state);
+		const char* const result = luaO_pushvfstring(state, fmt, argp);
+		va_end(argp);
+		return result;
+	}
+
+	/**
+	 * Address: 0x0090CA90 (FUN_0090CA90, lua_tostring)
+	 *
+	 * IDA signature:
+	 * const char *__usercall lua_tostring@<eax>(lua_State *L, int idx);
+	 *
+	 * What it does:
+	 * Reads a stack slot as a string, converting a number in place if that is
+	 * what is there. The conversion allocates, so the collector gets a chance
+	 * to run before returning - which is also why the returned pointer is only
+	 * good until the slot changes.
+	 */
+	const char* lua_tostring(lua_State* const state, const int idx)
+	{
+		TObject* object = nullptr;
+		if (idx <= 0) {
+			object = negindex(state, idx);
+		} else {
+			object = &state->base[idx - 1];
+			if (object >= state->top) {
+				return nullptr;
+			}
+		}
+
+		if (object == nullptr) {
+			return nullptr;
+		}
+
+		if (object->tt == LUA_TSTRING) {
+			return static_cast<const TString*>(object->value.p)->str;
+		}
+
+		const char* result = nullptr;
+		if (luaV_tostring(state, object) != 0) {
+			result = static_cast<const TString*>(object->value.p)->str;
+		}
+
+		luaC_checkGC(state);
+		return result;
+	}
+
+	// Defined in LuaParser.cpp, alongside f_parser and SParser.
+	int luaD_protectedparser(lua_State* L, LuaZioRuntimeView* z, int bin);
+
+	/**
+	 * Address: 0x0090D5C0 (FUN_0090D5C0, lua_load)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_load(lua_State *L, lua_Chunkreader reader, void *data, const char *chunkname);
+	 *
+	 * What it does:
+	 * Compiles a chunk pulled from `reader`. One byte of lookahead decides
+	 * whether it is precompiled - a leading ESC marks a binary chunk - so
+	 * source and bytecode load through the same entry point.
+	 */
+	int lua_load(lua_State* const state, const lua_Chunkreader reader, void* const data, const char* chunkname)
+	{
+		constexpr int kLuaSignatureFirstByte = 0x1B; // ESC, the binary-chunk marker
+
+		if (chunkname == nullptr) {
+			chunkname = "?";
+		}
+
+		LuaZioRuntimeView stream;
+		luaZ_init(&stream, reader, data, chunkname);
+		const int first = luaZ_lookahead(&stream);
+		return luaD_protectedparser(state, &stream, first == kLuaSignatureFirstByte);
+	}
+
+	// One block of a file being loaded. luaL_loadfile keeps this on its own
+	// stack and hands it to lua_load as the reader's state.
+	struct LuaLoadFileState
+	{
+		FILE* f;
+		char buff[512];
+	};
+
+	// The whole of a string being loaded, handed over in one go.
+	struct LuaLoadStringState
+	{
+		const char* s;
+		size_t size;
+	};
+
+	/**
+	 * Address: 0x0090E550 (FUN_0090E550, getWF)
+	 *
+	 * What it does:
+	 * Reader for luaL_loadfile: hands over one buffer's worth at a time.
+	 */
+	const char* getWF(lua_State* const state, void* const data, size_t* const size)
+	{
+		(void)state;
+		auto* const lf = static_cast<LuaLoadFileState*>(data);
+		if (std::feof(lf->f) != 0) {
+			return nullptr;
+		}
+
+		*size = std::fread(lf->buff, 1u, sizeof(lf->buff), lf->f);
+		return (*size > 0u) ? lf->buff : nullptr;
+	}
+
+	/**
+	 * Address: 0x0090E740 (FUN_0090E740, getS)
+	 *
+	 * What it does:
+	 * Reader for luaL_loadbuffer: the whole string once, then end of stream.
+	 */
+	const char* getS(lua_State* const state, void* const data, size_t* const size)
+	{
+		(void)state;
+		auto* const ls = static_cast<LuaLoadStringState*>(data);
+		if (ls->size == 0u) {
+			return nullptr;
+		}
+
+		*size = ls->size;
+		ls->size = 0u;
+		return ls->s;
+	}
+
+	/**
+	 * Address: 0x0090E590 (FUN_0090E590, errfile)
+	 *
+	 * IDA signature:
+	 * int __usercall errfile@<eax>(int fnameindex@<ebx>, lua_State *L@<edi>);
+	 *
+	 * What it does:
+	 * Replaces the pushed chunk name with "cannot read <file>: <reason>" and
+	 * reports it as a file error. The name is skipped past its `@` marker.
+	 */
+	int errfile(lua_State* const state, const int fnameindex)
+	{
+		const char* const filename = lua_tostring(state, fnameindex) + 1;
+		lua_pushfstring(state, "cannot read %s: %s", filename, std::strerror(errno));
+		lua_remove(state, fnameindex);
+		return LUA_ERRFILE;
+	}
+
+	/**
+	 * Address: 0x0090E5D0 (FUN_0090E5D0, luaL_loadfile)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_loadfile(lua_State *L, const char *filename);
+	 *
+	 * What it does:
+	 * Loads a chunk from a file, or from stdin when `filename` is null. The
+	 * chunk name is pushed first so an error can name the file even if opening
+	 * it failed. If the first byte is neither printable nor whitespace the file
+	 * is reopened in binary mode, which is how a precompiled chunk survives the
+	 * text-mode line-ending translation.
+	 */
+	int luaL_loadfile(lua_State* const state, const char* const filename)
+	{
+		const int fnameindex = lua_gettop(state) + 1; // where the chunk name lands
+
+		LuaLoadFileState lf;
+		if (filename != nullptr) {
+			lua_pushfstring(state, "@%s", filename);
+			lf.f = std::fopen(filename, "r");
+		} else {
+			lua_pushlstring(state, "=stdin", 6u);
+			lf.f = stdin;
+		}
+
+		if (lf.f == nullptr) {
+			return errfile(state, fnameindex);
+		}
+
+		const int first = std::getc(lf.f);
+		std::ungetc(first, lf.f);
+		if (std::isspace(first) == 0 && std::isprint(first) == 0 && lf.f != stdin) {
+			std::fclose(lf.f);
+			lf.f = std::fopen(filename, "rb");
+			if (lf.f == nullptr) {
+				return errfile(state, fnameindex);
+			}
+		}
+
+		const int status =
+			lua_load(state, reinterpret_cast<lua_Chunkreader>(getWF), &lf, lua_tostring(state, -1));
+
+		const int readstatus = std::ferror(lf.f);
+		if (lf.f != stdin) {
+			std::fclose(lf.f);
+		}
+		if (readstatus != 0) {
+			lua_settop(state, fnameindex); // drop whatever the load left behind
+			return errfile(state, fnameindex);
+		}
+
+		lua_remove(state, fnameindex);
+		return status;
+	}
+
+	/**
+	 * Address: 0x0090E760 (FUN_0090E760, luaL_loadbuffer)
+	 *
+	 * What it does:
+	 * Loads a chunk from memory.
+	 */
+	int luaL_loadbuffer(
+		lua_State* const state,
+		const char* const buff,
+		const size_t size,
+		const char* const name
+	)
+	{
+		LuaLoadStringState ls;
+		ls.s = buff;
+		ls.size = size;
+		return lua_load(state, reinterpret_cast<lua_Chunkreader>(getS), &ls, name);
+	}
+
 
 	/**
 	 * Address: 0x0092BA40 (FUN_0092BA40, luaZ_read)
