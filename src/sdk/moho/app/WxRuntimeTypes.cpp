@@ -18133,6 +18133,19 @@ bool wxHandleWindowActivationEvent(
   return handled;
 }
 
+namespace
+{
+  bool wxHandleWindowActivationEventForwardRuntime(
+    void* const windowRuntime,
+    const unsigned short activationState,
+    const bool minimized,
+    const unsigned int activatedNativeHandle
+  )
+  {
+    return wxHandleWindowActivationEvent(windowRuntime, activationState, minimized, activatedNativeHandle);
+  }
+} // namespace
+
 /**
  * Address: 0x009F25A0 (FUN_009F25A0)
  *
@@ -34747,6 +34760,11 @@ bool wxWindowMswRuntime::HandleGetMinMaxInfo(void* const minMaxInfo)
  */
 namespace
 {
+  // Defined further up; the dispatcher is the only thing that raises it.
+  bool wxHandleWindowActivationEventForwardRuntime(
+    void* windowRuntime, unsigned short activationState, bool minimized, unsigned int activatedNativeHandle
+  );
+
   /**
    * Address: 0x0096A390 (FUN_0096A390)
    * Mangled: ?FindWindowForMouseEvent@wxWindow@@MBEPAV1@PAV1@PAJ1@Z
@@ -34940,6 +34958,24 @@ long wxWindowMswRuntime::MSWWindowProc(
       this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam), true
     );
     break;
+
+  case WM_ACTIVATE: {
+    // The three pieces travel packed across both parameters.
+    unsigned short activationState = 0;
+    unsigned short minimized = 0;
+    unsigned int activatedNativeHandle = 0;
+    (void)UnpackActivate(
+      static_cast<int>(wParam),
+      static_cast<int>(lParam),
+      &activationState,
+      &minimized,
+      &activatedNativeHandle
+    );
+    processed = wxHandleWindowActivationEventForwardRuntime(
+      this, activationState, minimized != 0u, activatedNativeHandle
+    );
+    break;
+  }
 
   case WM_SYSCOMMAND:
     processed = HandleSysCommand(wParam, lParam);
