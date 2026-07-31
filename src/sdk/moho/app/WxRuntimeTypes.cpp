@@ -33139,9 +33139,14 @@ void wxWindowBase::OnHelp(wxEventRuntime& helpEvent)
  *
  * Matching the signature - MBEPBUwxEventTable@@ per the mangling recorded in
  * the header, so protected and returning wxEventTable const* rather than
- * public and const void* - would make ours displace the library's and take
- * over dispatch. That has to come last, not first: displacing costs us
- * whatever the library's table holds and ours does not.
+ * public and const void* - is worth doing for fidelity, but it changes
+ * nothing at runtime and is not what would retire the library. Windows built
+ * here already dispatch entirely through this tree: ProcessEvent above is
+ * ours alone, since wxWindows declares it on wxEvtHandler rather than here,
+ * and the GetEventTable it calls resolves through our own vtable to our own
+ * override. Displacing the library's symbol would only matter for objects
+ * the library itself constructs, and the one that exists - wxTheApp - has no
+ * definition here to displace, GetEventTable being pure in our wxApp.
  *
  * This table is the only one still short. It binds two of the four rows the
  * binary's holds - OnMiddleClick 0x00964A20 and OnHelp 0x00964100 are out,
