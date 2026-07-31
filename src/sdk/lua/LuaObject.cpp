@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 
+#include <array>
 #include <cerrno>
 #include <cctype>
 #include <clocale>
@@ -12574,6 +12575,63 @@ extern "C"
 
 		addinfo(state, message);
 		luaG_errormsg(state);
+	}
+
+	/**
+	 * Address: 0x0091A510 (FUN_0091A510, luaO_log2)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaO_log2(unsigned int x);
+	 *
+	 * What it does:
+	 * Returns floor(log2(x)), or -1 for zero. Works a byte at a time off a
+	 * 256-entry lookup table, so the answer costs one table read plus a
+	 * constant.
+	 */
+	int luaO_log2(const unsigned int x)
+	{
+		// The binary carries this as 256 literal bytes at 0x00D46407; every
+		// entry from 1 up is floor(log2(i)), which is cheaper to state than to
+		// transcribe. Entry 0 is 0 there and unreachable here either way.
+		static constexpr auto kLog2Byte = [] {
+			std::array<unsigned char, 256> table{};
+			for (unsigned int i = 2; i < 256; ++i) {
+				table[i] = static_cast<unsigned char>(table[i / 2] + 1);
+			}
+			return table;
+		}();
+
+		if (x >= 0x10000u) {
+			return (x >= 0x1000000u)
+				? kLog2Byte[x >> 24] + 24
+				: kLog2Byte[(x >> 16) & 0xFFu] + 16;
+		}
+		if (x >= 0x100u) {
+			return kLog2Byte[(x >> 8) & 0xFFu] + 8;
+		}
+		return (x != 0u) ? kLog2Byte[x] : -1;
+	}
+
+	/**
+	 * Address: 0x0091A4E0 (FUN_0091A4E0, luaO_int2fb)
+	 *
+	 * IDA signature:
+	 * unsigned int __cdecl luaO_int2fb(unsigned int x);
+	 *
+	 * What it does:
+	 * Packs a size into Lua's "floating byte" form - three mantissa bits and an
+	 * exponent - so that a table's array-part hint fits one instruction field.
+	 * Values under 8 pass through unchanged.
+	 */
+	unsigned int luaO_int2fb(const unsigned int x)
+	{
+		unsigned int mantissa = x;
+		int exponent = 0;
+		while (mantissa >= 8u) {
+			mantissa = (mantissa + 1u) >> 1;
+			++exponent;
+		}
+		return mantissa | (static_cast<unsigned int>(exponent) << 3);
 	}
 
 	/**

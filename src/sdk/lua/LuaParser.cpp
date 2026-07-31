@@ -224,6 +224,7 @@ namespace
   static_assert(offsetof(LuaUndumpZioRuntimeView, name) == 0x10, "LuaUndumpZioRuntimeView::name offset must be 0x10");
 
   constexpr std::int32_t NO_JUMP = -1;
+  constexpr std::int32_t VVOID = 0x00;
   constexpr std::int32_t VNIL = 0x01;
   constexpr std::int32_t VTRUE = 0x02;
   constexpr std::int32_t VFALSE = 0x03;
@@ -257,6 +258,7 @@ namespace
   constexpr std::int32_t OP_SETGLOBAL = 0x07;
   constexpr std::int32_t OP_SETUPVAL = 0x08;
   constexpr std::int32_t OP_SETTABLE = 0x09;
+  constexpr std::int32_t OP_NEWTABLE = 0x0A;
   constexpr std::int32_t OP_SELF = 0x0B;
   constexpr std::int32_t OP_ADD = 0x0C;
   constexpr std::int32_t OP_UNM = 0x15;
@@ -267,9 +269,16 @@ namespace
   constexpr std::int32_t OP_LT = 0x1A;
   constexpr std::int32_t OP_LE = 0x1B;
   constexpr std::int32_t OP_TEST = 0x1C;
+  constexpr std::int32_t OP_CALL = 0x1D;
   constexpr std::int32_t OP_RETURN = 0x1F;
+  constexpr std::int32_t OP_SETLIST = 0x23;
+  constexpr std::int32_t OP_SETLISTO = 0x24;
   constexpr std::int32_t OP_CLOSURE = 0x26;
+  constexpr std::int32_t LFIELDS_PER_FLUSH = 0x20;
   constexpr std::int32_t MAXSTACK = 0xFA;
+  // Lua's MAX_INT: INT_MAX-2, kept clear of the maximum so `n+1` and `n+2`
+  // stay representable.
+  constexpr std::int32_t MAX_INT = 0x7FFFFFFD;
 
   // Instruction field geometry (lopcodes.h in the original tree).
   constexpr int kSizeOp = 6;
@@ -536,6 +545,8 @@ namespace
   }
 
   void singlevaraux(FuncState* fs, TString* name, expdesc* outVariable, int base);
+  std::int32_t explist1(LexState* ls, expdesc* expression);
+  void lastlistfield(FuncState* fs, ConsControl* cc);
 
   extern "C"
   {
@@ -594,6 +605,14 @@ namespace
     void primaryexp(expdesc* outExpression, LexState* ls);
     std::int32_t luaZ_fill(LuaZioRuntimeView* stream);
     void luaO_chunkid(char* out, const char* source, int bufflen);
+    int luaO_log2(unsigned int x);
+    unsigned int luaO_int2fb(unsigned int x);
+    void funcargs(LexState* ls, expdesc* f);
+    void recfield(LexState* ls, ConsControl* cc);
+    void prefixexp(LexState* ls, expdesc* v);
+    void error_expected(LexState* ls, std::int32_t token);
+    void luaY_index(LexState* ls, expdesc* v);
+    void luaK_self(FuncState* fs, expdesc* e, expdesc* key);
     char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
     void luaG_runerror(lua_State* L, const char* format, ...);
     int luaK_exp2anyreg(FuncState* fs, expdesc* e);
@@ -906,7 +925,7 @@ namespace
    * Flushes pending list-constructor value lanes, preserving VCALL/multret
    * semantics for the final list field store.
    */
-  [[maybe_unused]] void lastlistfield(FuncState* const functionState, ConsControl* const constructorState)
+  void lastlistfield(FuncState* const functionState, ConsControl* const constructorState)
   {
     if (constructorState->tostore == 0) {
       return;
@@ -1529,14 +1548,13 @@ namespace
     // `pc` will change, so resolve everything still waiting on it first.
     luaK_dischargejpc(fs);
 
-    constexpr int kMaxArraySize = 0x7FFFFFFD;
     if (fsView->pc + 1 > f->sizecode) {
       f->code = static_cast<Instruction*>(luaM_growaux(
         fsView->L,
         f->code,
         &f->sizecode,
         static_cast<int>(sizeof(Instruction)),
-        kMaxArraySize,
+        MAX_INT,
         "code size overflow"
       ));
     }
@@ -1548,7 +1566,7 @@ namespace
         f->lineinfo,
         &f->sizelineinfo,
         static_cast<int>(sizeof(int)),
-        kMaxArraySize,
+        MAX_INT,
         "code size overflow"
       ));
     }
@@ -1979,6 +1997,30 @@ namespace
   }
 
   /**
+   * Address: 0x00910E60 (FUN_00910E60, luaK_self)
+   *
+   * What it does:
+   * Compiles the `obj:method` form: OP_SELF drops the method and the receiver
+   * into two adjacent fresh registers, ready for the call that follows.
+   */
+  extern "C" void luaK_self(FuncState* const fs, expdesc* const e, expdesc* const key)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+
+    luaK_exp2anyreg(fs, e);
+    freeexp(e, fs);
+
+    const std::int32_t func = fsView->freereg;
+    luaK_reserveregs(fs, 2);
+    const std::int32_t rkKey = luaK_exp2RK(fs, key);
+    luaK_codeABC(fs, OP_SELF, func, e->info, rkKey);
+    freeexp(key, fs);
+
+    e->info = func;
+    e->k = VNONRELOC;
+  }
+
+  /**
    * Address: 0x00911070 (FUN_00911070, luaK_goiffalse)
    *
    * What it does:
@@ -2166,6 +2208,387 @@ namespace
     outExpression->t = NO_JUMP;
     outExpression->f = NO_JUMP;
     outExpression->k = VK;
+  }
+
+  // ---------------------------------------------------------------------
+  // lparser.c - token checks and expression parsing.
+  //
+  // error_expected / check / check_match are file-local in the original and
+  // this build inlined every call, so they have no address of their own; the
+  // bodies below are what those inlined sequences expand to, and their two
+  // message strings sit at 0x00E4A5C3 and 0x00E4A5D1.
+  // ---------------------------------------------------------------------
+
+  /**
+   * What it does:
+   * Reports "`<token>' expected" against the current lexer position.
+   */
+  extern "C" void error_expected(LexState* const ls, const std::int32_t token)
+  {
+    luaX_syntaxerror(ls, luaO_pushfstring(ls->L, "`%s' expected", luaX_token2str(ls, token)));
+  }
+
+  /**
+   * What it does:
+   * Consumes the expected token, or reports it as missing.
+   */
+  extern "C" void check(LexState* const ls, const std::int32_t c)
+  {
+    if (ls->t.token != c) {
+      error_expected(ls, c);
+    }
+    next(ls);
+  }
+
+  /**
+   * What it does:
+   * Consumes a closing token. When the construct it closes was opened on an
+   * earlier line, the message names that line so the reader can find it.
+   */
+  extern "C" void
+  check_match(LexState* const ls, const std::int32_t what, const std::int32_t who, const std::int32_t where)
+  {
+    if (testnext(ls, what) != 0) {
+      return;
+    }
+
+    if (where == ls->linenumber) {
+      error_expected(ls, what);
+      return;
+    }
+
+    luaX_syntaxerror(
+      ls,
+      luaO_pushfstring(
+        ls->L,
+        "`%s' expected (to close `%s' at line %d)",
+        luaX_token2str(ls, what),
+        luaX_token2str(ls, who),
+        where
+      )
+    );
+  }
+
+  /**
+   * Address: 0x0091B4F0 (FUN_0091B4F0, luaY_index)
+   *
+   * IDA signature:
+   * void __usercall luaY_index(LexState *ls@<eax>, expdesc *v@<edi>);
+   *
+   * What it does:
+   * Parses the `[ exp ]` of a bracketed table access, leaving the key in `v`.
+   */
+  extern "C" void luaY_index(LexState* const ls, expdesc* const v)
+  {
+    next(ls); // skip the '['
+    subexpr(ls, v, -1);
+    luaK_exp2val(ls->fs, v);
+    check(ls, ']');
+  }
+
+  /**
+   * Address: 0x0091B550 (FUN_0091B550, recfield)
+   *
+   * IDA signature:
+   * void __usercall recfield(LexState *ls@<eax>, ConsControl *cc);
+   *
+   * What it does:
+   * Parses one `key = value` entry of a table constructor and emits its
+   * SETTABLE. Both key and value are evaluated into scratch registers that are
+   * released again afterwards, so a long constructor does not grow the frame.
+   */
+  extern "C" void recfield(LexState* const ls, ConsControl* const cc)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    const std::int32_t reg = fsView->freereg;
+
+    expdesc key;
+    expdesc val;
+
+    if (ls->t.token == TK_NAME) {
+      luaX_checklimit(ls, cc->nh, MAX_INT, "items in a constructor");
+      ++cc->nh;
+      codestring(str_checkname(ls), ls, &key);
+    } else {
+      luaY_index(ls, &key);
+    }
+
+    check(ls, '=');
+    luaK_exp2RK(fs, &key);
+    subexpr(ls, &val, -1);
+    const std::int32_t rkValue = luaK_exp2RK(fs, &val);
+    const std::int32_t rkKey = luaK_exp2RK(fs, &key);
+    luaK_codeABC(fs, OP_SETTABLE, cc->t->info, rkKey, rkValue);
+
+    fsView->freereg = reg; // free registers
+  }
+
+  /**
+   * Address: 0x0091B710 (FUN_0091B710, constructor)
+   *
+   * IDA signature:
+   * void __usercall constructor(expdesc *t@<eax>, LexState *ls@<ecx>);
+   *
+   * What it does:
+   * Parses a table constructor. List entries accumulate in registers and are
+   * flushed to the table every LFIELDS_PER_FLUSH values; record entries emit
+   * their store immediately. The final OP_NEWTABLE is back-patched with the
+   * sizes actually seen, so the table is allocated once at the right size.
+   *
+   * This build also accepts a leading `&<n>` (and a second `&<n>`) after the
+   * opening brace, which forces the hash and array size hints - a FAF
+   * extension with no equivalent in stock Lua.
+   */
+  extern "C" void constructor(expdesc* const t, LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    const int line = ls->linenumber;
+    const int pc = luaK_codeABC(fs, OP_NEWTABLE, 0, 0, 0);
+
+    ConsControl cc;
+    cc.na = 0;
+    cc.nh = 0;
+    cc.tostore = 0;
+    cc.t = t;
+    cc.v.k = VVOID;
+    cc.v.info = 0;
+    cc.v.t = NO_JUMP;
+    cc.v.f = NO_JUMP;
+
+    t->t = NO_JUMP;
+    t->f = NO_JUMP;
+    t->k = VRELOCABLE;
+    t->info = pc;
+
+    luaK_exp2nextreg(ls->fs, t); // fix it at stack top (for gc optimization)
+    check(ls, '{');
+
+    std::int32_t forcedHashSize = 0;
+    std::int32_t forcedArraySize = 0;
+    if (ls->t.token == '&') {
+      next(ls);
+      if (ls->t.token != TK_NUMBER) {
+        luaX_syntaxerror(ls, luaO_pushfstring(ls->L, "size expected following & (line %d)", ls->linenumber));
+      }
+      forcedHashSize = static_cast<std::int32_t>(ls->t.seminfo.r);
+      next(ls);
+
+      if (ls->t.token == '&') {
+        next(ls);
+        if (ls->t.token != TK_NUMBER) {
+          luaX_syntaxerror(ls, luaO_pushfstring(ls->L, "size expected following & (line %d)", ls->linenumber));
+        }
+        forcedArraySize = static_cast<std::int32_t>(ls->t.seminfo.r);
+        next(ls);
+      }
+    }
+
+    for (;;) {
+      if (ls->t.token == ';') {
+        next(ls);
+      }
+      if (ls->t.token == '}') {
+        break;
+      }
+
+      // closelistfield: settle the value parsed last, and flush a full batch.
+      if (cc.v.k != VVOID) {
+        luaK_exp2nextreg(fs, &cc.v);
+        cc.v.k = VVOID;
+        if (cc.tostore == LFIELDS_PER_FLUSH) {
+          luaK_codeABx(fs, OP_SETLIST, cc.t->info, static_cast<std::uint32_t>(cc.na - 1));
+          cc.tostore = 0; // no more items pending
+          fsView->freereg = cc.t->info + 1; // free registers
+        }
+      }
+
+      // `[key]=v` and `name=v` are record entries; anything else is a list
+      // entry. Telling `name=v` from a bare `name` needs one token of
+      // lookahead.
+      const std::int32_t token = ls->t.token;
+      bool isRecordField = (token == '[');
+      if (!isRecordField && token == TK_NAME) {
+        ls->lookahead.token = luaX_lex(ls, &ls->lookahead.seminfo);
+        isRecordField = (ls->lookahead.token == '=');
+      }
+
+      if (isRecordField) {
+        recfield(ls, &cc);
+      } else {
+        subexpr(ls, &cc.v, -1);
+        luaX_checklimit(ls, cc.na++, LUA_MAXARG_Bx, "items in a constructor");
+        ++cc.tostore;
+      }
+
+      if (ls->t.token != ',' && ls->t.token != ';') {
+        break;
+      }
+      next(ls);
+    }
+
+    check_match(ls, '}', '{', line);
+    lastlistfield(fs, &cc);
+
+    if (forcedArraySize > cc.na) {
+      cc.na = forcedArraySize;
+    }
+    if (forcedHashSize > cc.nh) {
+      cc.nh = forcedHashSize;
+    }
+
+    Instruction* const newTable = &fsView->f->code[pc];
+    if (cc.na > 0) {
+      SETARG_B(*newTable, static_cast<std::int32_t>(luaO_int2fb(static_cast<unsigned int>(cc.na))));
+    }
+    SETARG_C(*newTable, luaO_log2(static_cast<unsigned int>(cc.nh)) + 1);
+  }
+
+  /**
+   * Address: 0x0091BF10 (FUN_0091BF10, prefixexp)
+   *
+   * IDA signature:
+   * void __usercall prefixexp(LexState *ls@<eax>, expdesc *v@<ebx>);
+   *
+   * What it does:
+   * Parses what a suffixed expression starts from - either a parenthesised
+   * expression or a single variable name.
+   */
+  extern "C" void prefixexp(LexState* const ls, expdesc* const v)
+  {
+    if (ls->t.token == '(') {
+      const std::int32_t line = ls->linenumber;
+      next(ls);
+      subexpr(ls, v, -1);
+      check_match(ls, ')', '(', line);
+      luaK_dischargevars(ls->fs, v);
+      return;
+    }
+
+    if (ls->t.token != TK_NAME) {
+      luaX_syntaxerror(ls, "unexpected symbol");
+    }
+    singlevaraux(ls->fs, str_checkname(ls), v, 1);
+  }
+
+  /**
+   * Address: 0x0091BDA0 (FUN_0091BDA0, funcargs)
+   *
+   * IDA signature:
+   * void __usercall funcargs(LexState *ls@<eax>, expdesc *f);
+   *
+   * What it does:
+   * Parses a call's arguments in any of the three forms Lua accepts - `(...)`,
+   * a table constructor, or a string literal - and emits the OP_CALL. The
+   * whole argument block collapses back to one register, which the call's
+   * result then occupies.
+   */
+  extern "C" void funcargs(LexState* const ls, expdesc* const f)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    const std::int32_t line = ls->linenumber;
+
+    expdesc args;
+    switch (ls->t.token) {
+    case '(':
+      // A call whose '(' opens on the next line reads as a fresh statement to
+      // a human, so refuse it rather than silently pairing them up.
+      if (line != ls->lastline) {
+        luaX_syntaxerror(ls, "ambiguous syntax (function call x new statement)");
+      }
+      next(ls);
+      if (ls->t.token == ')') { // arg list is empty?
+        args.k = VVOID;
+      } else {
+        explist1(ls, &args);
+        luaK_setcallreturns(fs, &args, LUA_MULTRET);
+      }
+      check_match(ls, ')', '(', line);
+      break;
+
+    case '{':
+      constructor(&args, ls);
+      break;
+
+    case TK_STRING:
+      codestring(ls->t.seminfo.ts, ls, &args);
+      next(ls); // must use `seminfo' before `next'
+      break;
+
+    default:
+      luaX_syntaxerror(ls, "function arguments expected");
+      break;
+    }
+
+    const std::int32_t base = f->info; // base register for call
+    std::int32_t nparams = LUA_MULTRET; // open call
+    if (args.k != VCALL) {
+      if (args.k != VVOID) {
+        luaK_exp2nextreg(fs, &args); // close last argument
+      }
+      nparams = fsView->freereg - (base + 1);
+    }
+
+    f->info = luaK_codeABC(fs, OP_CALL, base, nparams + 1, 2);
+    f->t = NO_JUMP;
+    f->f = NO_JUMP;
+    f->k = VCALL;
+    luaK_fixline(fs, line); // call `instruction' uses the line where it was called
+    fsView->freereg = base + 1; // call removes function and arguments and leaves (unless changed) one result
+  }
+
+  /**
+   * Address: 0x0091BFB0 (FUN_0091BFB0, primaryexp)
+   *
+   * IDA signature:
+   * unsigned int __usercall primaryexp@<eax>(expdesc *v@<eax>, LexState *ls@<esi>);
+   *
+   * What it does:
+   * Parses a prefix expression followed by any run of suffixes: `.name`,
+   * `[key]`, `:method(args)`, and calls. Each suffix consumes the expression
+   * built so far and replaces it, so `a.b[c]:d(e)` folds left to right.
+   */
+  extern "C" void primaryexp(expdesc* const v, LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    prefixexp(ls, v);
+
+    for (;;) {
+      switch (ls->t.token) {
+      case '.': // field
+        luaY_field(ls, v);
+        break;
+
+      case '[': { // `[' exp1 `]'
+        expdesc key;
+        luaK_exp2anyreg(fs, v);
+        luaY_index(ls, &key);
+        luaK_indexed(fs, v, &key);
+        break;
+      }
+
+      case ':': { // `:' NAME funcargs
+        expdesc key;
+        next(ls);
+        codestring(str_checkname(ls), ls, &key);
+        luaK_self(fs, v, &key);
+        funcargs(ls, v);
+        break;
+      }
+
+      case '(':
+      case TK_STRING:
+      case '{': // funcargs
+        luaK_exp2nextreg(fs, v);
+        funcargs(ls, v);
+        break;
+
+      default:
+        return; // should be follow
+      }
+    }
   }
 
   /**
