@@ -1861,6 +1861,16 @@ public:
   [[nodiscard]] static wxWindowBase* GetCapture();
 
   /**
+   * Address: 0x0096C050 (FUN_0096C050)
+   * Mangled: ?FindFocus@wxWindowBase@@SAPAVwxWindow@@XZ
+   *
+   * What it does:
+   * The window that currently has the keyboard focus, or nothing when the
+   * focused window is not one of ours.
+   */
+  [[nodiscard]] static wxWindowBase* FindFocus();
+
+  /**
    * Address: 0x00964CA0 (FUN_00964CA0)
    * Mangled: ?CaptureMouse@wxWindowBase@@QAEXXZ
    *
@@ -5150,6 +5160,24 @@ public:
    * Reports this runtime lane as a top-level wx window.
    */
   [[nodiscard]] bool IsTopLevel() const override;
+
+  /**
+   * Address: 0x0098C8C0 (FUN_0098C8C0)
+   * Mangled: ?OnActivate@wxTopLevelWindowMSW@@IAEXAAVwxActivateEvent@@@Z
+   *
+   * What it does:
+   * Remembers which child had the focus when the window is deactivated, and
+   * puts it back when the window is activated again.
+   */
+  void OnActivate(wxEventRuntime& activateEvent);
+
+  /**
+   * Address: 0x0098C900 (FUN_0098C900)
+   * Mangled: ?GetEventTable@wxTopLevelWindowMSW@@MBEPBUwxEventTable@@XZ
+   */
+  [[nodiscard]] const void* GetEventTable() const override;
+
+  static wxEventTable sm_eventTable;
 
   /**
    * Address: 0x004A3780 (FUN_004A3780)
