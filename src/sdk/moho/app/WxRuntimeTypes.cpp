@@ -33078,6 +33078,15 @@ void wxWindowBase::OnInitDialog(
  * Library dispatch therefore never reads the rows built here - only our own
  * ProcessEvent/SearchEventTable do. A table added for a class we do not also
  * dispatch for ourselves, wxApp being the case in point, would be unreachable.
+ *
+ * Matching the signature - MBEPBUwxEventTable@@ per the mangling recorded in
+ * the header, so protected and returning wxEventTable const* rather than
+ * public and const void* - would make ours displace the library's and take
+ * over dispatch. That has to come last, not first. Our table here binds two
+ * of the four rows the binary's holds, and wxWindow's idle row is unbound,
+ * so displacing today would trade complete library tables for incomplete ones
+ * and lose OnMiddleClick, OnHelp and idle delivery to windows. Finish the rows
+ * first, then flip the signature.
  */
 const void* wxWindowBase::GetEventTable() const
 {
