@@ -11618,6 +11618,7 @@ namespace
   std::int32_t gWxEvtProcessRuntimeType = 0;
   std::int32_t gWxEvtEnterWindowRuntimeType = 0;
   std::int32_t gWxEvtLeaveWindowRuntimeType = 0;
+  std::int32_t gWxEvtHelpRuntimeType = 0;
 
   [[nodiscard]] std::int32_t EnsureWxEvtIdleRuntimeType()
   {
@@ -33051,6 +33052,63 @@ void wxWindowBase::OnInitDialog(
 }
 
 /**
+/**
+ * The provider an application installs, or nothing.
+ *
+ * Mangled: ?ms_helpProvider@wxHelpProvider@@0PAV1@A (0x00FB29D4)
+ *
+ * What it does:
+ * Starts empty and stays empty unless something installs a provider. This
+ * engine never does, so OnHelp below always takes its skip path - which is
+ * also why the four bodies underneath are never reached here, though they are
+ * what wxWindows defines and so what this has to say.
+ */
+wxHelpProvider* wxHelpProvider::ms_helpProvider = nullptr;
+
+void wxHelpProvider::AddHelp(wxWindowBase* const window, const wxStringRuntime& text)
+{
+  (void)window;
+  (void)text;
+}
+
+void wxHelpProvider::AddHelp(const int id, const wxStringRuntime& text)
+{
+  (void)id;
+  (void)text;
+}
+
+void wxHelpProvider::RemoveHelp(wxWindowBase* const window)
+{
+  (void)window;
+}
+
+wxHelpProvider::~wxHelpProvider() = default;
+
+/**
+ * Address: 0x00964100 (FUN_00964100)
+ * Mangled: ?OnHelp@wxWindowBase@@IAEXAAVwxHelpEvent@@@Z
+ *
+ * IDA signature:
+ * int __thiscall wxWindowBase::OnHelp(wxWindowBase *this, int event);
+ *
+ * What it does:
+ * Hands the request to the installed provider and skips the event unless the
+ * provider says it showed something. Both halves of that test are one
+ * short-circuit in the binary, so a missing provider and a provider with
+ * nothing to say leave by the same path.
+ *
+ * The skip writes the base event's flag at +0x1C, which is the offset this
+ * tree already asserts for wxEventRuntime::mSkipped.
+ */
+void wxWindowBase::OnHelp(wxEventRuntime& helpEvent)
+{
+  wxHelpProvider* const helpProvider = wxHelpProvider::Get();
+  if (helpProvider == nullptr || !helpProvider->ShowHelp(this)) {
+    helpEvent.mSkipped = 1;
+  }
+}
+
+/**
  * Address: 0x00964A50 (FUN_00964A50)
  * Mangled: ?GetEventTable@wxWindowBase@@MBEPBUwxEventTable@@XZ
  *
@@ -33099,6 +33157,12 @@ const void* wxWindowBase::GetEventTable() const
     ),
     MakeWxEventTableEntry(
       -1, -1, &wxWindowBase::OnInitDialog, WxEventTypeSlot(gWxEvtInitDialogRuntimeType)
+    ),
+    // The binary puts OnMiddleClick 0x00964A20 between these two. It wants
+    // wxMessageBox, which takes a wxString this tree does not model, so its
+    // row is still out; the ones either side of it are in their own order.
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowBase::OnHelp, WxEventTypeSlot(gWxEvtHelpRuntimeType)
     ),
     wxEventTableEntry{}, // null handler: end of table
   };

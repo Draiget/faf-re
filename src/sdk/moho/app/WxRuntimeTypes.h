@@ -1581,6 +1581,48 @@ static_assert(offsetof(wxClassInfo, m_baseInfo2) == 0x18, "wxClassInfo::m_baseIn
 static_assert(offsetof(wxClassInfo, m_next) == 0x1C, "wxClassInfo::m_next offset must be 0x1C");
 static_assert(sizeof(wxClassInfo) == 0x20, "wxClassInfo size must be 0x20");
 
+class wxWindowBase;
+
+/**
+ * The application-global source of context-sensitive help.
+ *
+ * Mangled: ?ms_helpProvider@wxHelpProvider@@0PAV1@A (0x00FB29D4)
+ *
+ * What it does:
+ * wxWindows never creates a provider on demand - an application installs one
+ * or there is none - which is why every user of it tests the global first.
+ * Set and Get are inline statics rather than virtuals, so they take no vtable
+ * slot; that is why the binary reads the global directly at each of its nine
+ * reference sites instead of calling an accessor.
+ *
+ * The slot order below is the binary's and has to stay: OnHelp (0x00964100)
+ * dispatches through virtual +4, the second slot, which is where declaring
+ * GetHelp first and ShowHelp second puts it. The destructor is declared last,
+ * as wxWindows declares it, so it takes the final slot rather than the first.
+ */
+class wxHelpProvider
+{
+public:
+  static wxHelpProvider* Set(wxHelpProvider* const helpProvider)
+  {
+    wxHelpProvider* const previous = ms_helpProvider;
+    ms_helpProvider = helpProvider;
+    return previous;
+  }
+
+  [[nodiscard]] static wxHelpProvider* Get() { return ms_helpProvider; }
+
+  virtual wxStringRuntime GetHelp(const wxWindowBase* window) = 0;
+  virtual bool ShowHelp(wxWindowBase* window) = 0;
+  virtual void AddHelp(wxWindowBase* window, const wxStringRuntime& text);
+  virtual void AddHelp(int id, const wxStringRuntime& text);
+  virtual void RemoveHelp(wxWindowBase* window);
+  virtual ~wxHelpProvider();
+
+private:
+  static wxHelpProvider* ms_helpProvider;
+};
+
 class wxWindowBase
 {
 public:
@@ -1616,6 +1658,20 @@ public:
    * been pushed in front of it.
    */
   [[nodiscard]] wxWindowBase* GetEventHandler();
+
+  /**
+   * Address: 0x00964100 (FUN_00964100)
+   * Mangled: ?OnHelp@wxWindowBase@@IAEXAAVwxHelpEvent@@@Z
+   *
+   * IDA signature:
+   * int __thiscall wxWindowBase::OnHelp(wxWindowBase *this, int event);
+   *
+   * What it does:
+   * Offers the help request to the installed help provider, and skips the
+   * event when there is no provider or the provider had nothing to show, so
+   * that a parent window still gets its turn.
+   */
+  void OnHelp(wxEventRuntime& helpEvent);
 
   /**
    * Address: 0x00979900 (FUN_00979900)
