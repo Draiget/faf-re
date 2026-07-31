@@ -11156,18 +11156,14 @@ namespace
     bool focused = false;
     bool iconized = false;
     bool iconResourceAssigned = false;
-    std::uintptr_t pseudoWindowHandle = 0;
     std::wstring title;
     std::wstring name;
     std::wstring iconResourceName;
   };
 
-  constexpr std::uintptr_t kFirstSupComFramePseudoHandle = 0x1000u;
-  constexpr std::uintptr_t kSupComFramePseudoHandleStride = 0x10u;
   constexpr wchar_t kSupComFrameWindowName[] = L"frame";
   constexpr wchar_t kSupComFrameIconResourceName[] = L"ID";
 
-  std::uintptr_t gNextSupComFramePseudoHandle = kFirstSupComFramePseudoHandle;
   std::unordered_map<const WSupComFrame*, SupComFrameState> gSupComFrameStateByFrame{};
   struct WxTopLevelWindowRuntimeState
   {
@@ -14285,13 +14281,6 @@ namespace
     return new (std::nothrow) WxNotifyEventRuntime();
   }
 
-  [[nodiscard]] std::uintptr_t AllocateSupComFramePseudoHandle() noexcept
-  {
-    const std::uintptr_t handle = gNextSupComFramePseudoHandle;
-    gNextSupComFramePseudoHandle += kSupComFramePseudoHandleStride;
-    return handle;
-  }
-
   [[nodiscard]] SupComFrameState* FindSupComFrameState(
     const WSupComFrame* const frame
   ) noexcept
@@ -14426,7 +14415,6 @@ namespace
       state.windowX = initialPosition.x;
       state.windowY = initialPosition.y;
       state.windowStyle = style;
-      state.pseudoWindowHandle = AllocateSupComFramePseudoHandle();
       state.title = gpg::STR_Utf8ToWide(titleUtf8 != nullptr ? titleUtf8 : "");
       state.name.assign(kSupComFrameWindowName);
       state.iconResourceName.assign(kSupComFrameIconResourceName);
