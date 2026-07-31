@@ -34491,6 +34491,67 @@ bool wxWindowMswRuntime::HandleGetMinMaxInfo(void* const minMaxInfo)
  */
 namespace
 {
+  /**
+   * Address: 0x0096A390 (FUN_0096A390)
+   * Mangled: ?FindWindowForMouseEvent@wxWindow@@MBEPAV1@PAV1@PAJ1@Z
+   *
+   * IDA signature:
+   * wxWindow *__cdecl wxWindow::FindWindowForMouseEvent(wxWindow *win, LONG *x, LONG *y);
+   *
+   * What it does:
+   * Works out which window a mouse event at this point really belongs to. A
+   * click inside a child control arrives at the parent, so without this the
+   * parent would be told about a click that was not on it, at coordinates
+   * measured from the wrong corner.
+   *
+   * The child has to be one wx knows about, and visible and enabled, or the
+   * event stays with the window it arrived at. When a child does take it, the
+   * point is converted into that child's client space on the way out - which
+   * is why x and y are passed by pointer.
+   */
+  [[nodiscard]] wxWindowMswRuntime* wxWindowFindWindowForMouseEventRuntime(
+    wxWindowMswRuntime* const window,
+    std::int32_t* const x,
+    std::int32_t* const y
+  )
+  {
+    if (window == nullptr || x == nullptr || y == nullptr) {
+      return window;
+    }
+
+    const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(window);
+    if (state == nullptr) {
+      return window;
+    }
+
+    auto* const parentWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state->nativeHandle));
+    const POINT point{*x, *y};
+
+    // Skip anything the pointer cannot actually reach; if that finds nothing,
+    // fall back to the plain hit test, which does not skip.
+    constexpr UINT kSkipUnreachable = CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT;
+    HWND hit = ::ChildWindowFromPointEx(parentWindow, point, kSkipUnreachable);
+    if (hit == nullptr || hit == parentWindow) {
+      hit = ::ChildWindowFromPoint(parentWindow, point);
+    }
+
+    if (hit == nullptr || hit == parentWindow) {
+      return window;
+    }
+    if (::IsWindowVisible(hit) == 0 || ::IsWindowEnabled(hit) == 0) {
+      return window;
+    }
+
+    auto* const child = wxFindWinFromHandle(static_cast<int>(reinterpret_cast<std::intptr_t>(hit)));
+    if (child == nullptr) {
+      return window;
+    }
+
+    window->DoClientToScreen(x, y);
+    child->DoScreenToClient(x, y);
+    return child;
+  }
+
   // Defined further down, next to the key-event builder they share.
   [[nodiscard]] bool wxWindowDispatchKeyDownRuntime(
     wxWindowMswRuntime* window, int virtualKeyCode, std::uint32_t rawFlags
@@ -34561,17 +34622,36 @@ long wxWindowMswRuntime::MSWWindowProc(
   case WM_RBUTTONDBLCLK:
   case WM_MBUTTONDOWN:
   case WM_MBUTTONUP:
-  case WM_MBUTTONDBLCLK:
+  case WM_MBUTTONDBLCLK: {
     // The position rides in lParam as a signed pair, so a drag that leaves the
     // window to the left or above reports negative coordinates rather than
     // enormous ones.
-    processed = HandleMouseEvent(
-      message,
-      static_cast<std::int16_t>(LOWORD(lParam)),
-      static_cast<std::int16_t>(HIWORD(lParam)),
-      wParam
-    );
+    std::int32_t x = static_cast<std::int16_t>(LOWORD(lParam));
+    std::int32_t y = static_cast<std::int16_t>(HIWORD(lParam));
+
+    // A window holding the capture keeps the event whatever it is over.
+    // Otherwise the click belongs to whichever child is under the pointer.
+    wxWindowMswRuntime* target = this;
+    if (GetCapture() != this) {
+      target = wxWindowFindWindowForMouseEventRuntime(this, &x, &y);
+      if (target == nullptr) {
+        return MSWDefWindowProc(message, wParam, lParam);
+      }
+
+      // Clicking a control focuses it, unless it is a native control wx has
+      // subclassed - those do their own focus handling, and the marker for
+      // one is that it kept the window procedure it displaced.
+      const WxWindowBaseRuntimeState* const targetState = FindWxWindowBaseRuntimeState(target);
+      const bool isSubclassedNativeControl =
+        targetState != nullptr && targetState->previousWindowProc != 0;
+      if (!isSubclassedNativeControl && message == WM_LBUTTONDOWN && target->AcceptsFocus()) {
+        target->SetFocus();
+      }
+    }
+
+    processed = target->HandleMouseEvent(message, x, y, wParam);
     break;
+  }
 
   case WM_KEYDOWN:
   case WM_SYSKEYDOWN:
