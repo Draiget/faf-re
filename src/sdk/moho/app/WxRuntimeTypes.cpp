@@ -1446,6 +1446,65 @@ wxClassInfo wxTextCtrlRuntime::sm_classInfo{
   L"wxTextCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTextCtrlRuntime))
 };
 
+namespace
+{
+  // Defined further down, next to the kind-of test it guards.
+  void EnsureWxClassesInitialisedRuntime() noexcept;
+} // namespace
+
+/**
+ * Address: 0x009627D0 (FUN_009627D0)
+ * Mangled: ?IsKindOf@wxClassInfo@@QBE_NPBV1@@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxClassInfo::IsKindOf(wxClassInfo *this, wxClassInfo *info);
+ *
+ * What it does:
+ * Whether this class is the one being asked about, or descends from it. Both
+ * base links are searched, not just the first, because a class here may have
+ * two bases - so the answer is a search rather than a walk.
+ */
+bool wxClassInfo::IsKindOf(
+  const wxClassInfo* const info
+) const
+{
+  if (info == nullptr) {
+    return false;
+  }
+  if (info == this) {
+    return true;
+  }
+  if (m_baseInfo1 != nullptr && m_baseInfo1->IsKindOf(info)) {
+    return true;
+  }
+  return m_baseInfo2 != nullptr && m_baseInfo2->IsKindOf(info);
+}
+
+/**
+ * Address: 0x00977C90 (FUN_00977C90)
+ * Mangled: ?IsKindOf@wxObject@@QBE_NPBVwxClassInfo@@@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::IsKindOf(wxWindow *this, wxClassInfo *info);
+ *
+ * What it does:
+ * Whether this object is the class being asked about, or something derived
+ * from it. An object that does not know its own class answers no, which the
+ * binary checks before it looks at the question at all.
+ */
+bool wxWindowBase::IsKindOf(
+  const wxClassInfo* const info
+) const
+{
+  EnsureWxClassesInitialisedRuntime();
+
+  const auto* const ownClass = static_cast<const wxClassInfo*>(GetClassInfo());
+  if (ownClass == nullptr) {
+    return false;
+  }
+  return ownClass->IsKindOf(info);
+}
+
 wxClassInfo* wxClassInfo::sm_first = nullptr;
 wxHashTableRuntime* wxClassInfo::sm_classTable = nullptr;
 
@@ -3987,6 +4046,16 @@ namespace
    * point that actually executes, and every reader of the links goes through
    * a kind-of test, so none of them can see an unresolved list.
    */
+  // Two strings differ when one is present and the other is not, or when
+  // their contents do not match.
+  [[nodiscard]] bool WxStringDiffersRuntime(const wchar_t* const left, const wchar_t* const right) noexcept
+  {
+    if (left == nullptr || right == nullptr) {
+      return left != right;
+    }
+    return std::wcscmp(left, right) != 0;
+  }
+
   void EnsureWxClassesInitialisedRuntime() noexcept
   {
     static const bool initialised = [] {
@@ -33500,6 +33569,64 @@ namespace
     return false;
   }
 } // namespace
+
+/**
+ * Address: 0x009654A0 (FUN_009654A0)
+ * Mangled: ?UpdateWindowUI@wxWindowBase@@UAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall wxWindowBase::UpdateWindowUI(wxWindowBase *this);
+ *
+ * What it does:
+ * Asks whatever is watching this window how it should currently look, and
+ * applies whichever of enabled, text and checked it was told about. A handler
+ * that does not take the event leaves the window exactly as it was.
+ *
+ * Text goes to a text control's contents and to anything else's label, and
+ * only when it differs from what is already there - a control that reassigned
+ * its own text every idle would lose the caret position and flicker.
+ *
+ * The binary also handles a radio button alongside the check box, through the
+ * same slot. There is no wxRadioButton in this tree, so no object can be one
+ * and that branch is unreachable; it is left out rather than written against
+ * a class that does not exist.
+ */
+void wxWindowBase::UpdateWindowUI()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  WxUpdateUIEventRuntime event{};
+  event.mEventId = state != nullptr ? state->windowId : -1;
+  event.mEventObject = this;
+
+  if (!GetEventHandler()->ProcessEvent(&event)) {
+    return;
+  }
+
+  if (event.mSetEnabled != 0u) {
+    (void)Enable(event.mEnabled != 0u);
+  }
+
+  if (event.mSetText != 0u && IsKindOf(&wxControlRuntime::sm_classInfo)) {
+    const wchar_t* const wanted = event.mTextLabel.c_str();
+    if (IsKindOf(&wxTextCtrlRuntime::sm_classInfo)) {
+      auto* const textControl = static_cast<wxTextCtrlRuntime*>(this);
+      const wxStringRuntime current = textControl->GetValue();
+      if (WxStringDiffersRuntime(current.c_str(), wanted)) {
+        textControl->SetValue(event.mTextLabel);
+      }
+    } else {
+      const wxStringRuntime current = GetLabel();
+      if (WxStringDiffersRuntime(current.c_str(), wanted)) {
+        SetLabel(event.mTextLabel);
+      }
+    }
+  }
+
+  if (event.mSetChecked != 0u && IsKindOf(&wxCheckBoxRuntime::sm_classInfo)) {
+    static_cast<wxCheckBoxRuntime*>(this)->SetValue(event.mChecked != 0u);
+  }
+}
 
 bool wxWindowMswRuntime::IsMouseInWindow() const
 {

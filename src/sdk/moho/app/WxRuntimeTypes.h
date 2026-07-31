@@ -1950,6 +1950,26 @@ public:
    */
   [[nodiscard]] static wxWindowBase* FindFocus();
 
+  /**
+   * Address: 0x00977C90 (FUN_00977C90)
+   * Mangled: ?IsKindOf@wxObject@@QBE_NPBVwxClassInfo@@@Z
+   *
+   * What it does:
+   * Whether this object is the class being asked about, or something derived
+   * from it.
+   */
+  [[nodiscard]] bool IsKindOf(const wxClassInfo* info) const;
+
+  /**
+   * Address: 0x009654A0 (FUN_009654A0)
+   * Mangled: ?UpdateWindowUI@wxWindowBase@@UAEXXZ
+   *
+   * What it does:
+   * Asks whatever is watching this window how it should currently look, and
+   * applies whichever of enabled, text and checked it was told about.
+   */
+  virtual void UpdateWindowUI();
+
 
   /**
    * Address: 0x00964CA0 (FUN_00964CA0)
