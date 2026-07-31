@@ -2898,6 +2898,9 @@ static_assert(sizeof(wxWindowMswRuntime) == 0x4, "wxWindowMswRuntime size must b
 class wxControlRuntime : public wxWindowMswRuntime
 {
 public:
+  // Registers itself with wxClassInfo so a kind-of test can recognise it.
+  static wxClassInfo sm_classInfo;
+
   /**
    * Address: 0x004A3830 (FUN_004A3830)
    * Mangled: ?Command@wxControl@@UAEXAAVwxCommandEvent@@@Z
@@ -4978,6 +4981,9 @@ public:
 class wxCheckBoxRuntime : public wxControlRuntime
 {
 public:
+  // Registers itself with wxClassInfo so a kind-of test can recognise it.
+  static wxClassInfo sm_classInfo;
+
   /**
    * Address: 0x009ACBE0 (slot 134 in `wxCheckBox`)
    * Mangled: ?SetValue@wxCheckBox@@UAEX_N@Z
@@ -4999,6 +5005,9 @@ static_assert(sizeof(wxCheckBoxRuntime) == 0x4, "wxCheckBoxRuntime size must be 
 class wxTextCtrlRuntime : public wxControlRuntime
 {
 public:
+  // Registers itself with wxClassInfo so a kind-of test can recognise it.
+  static wxClassInfo sm_classInfo;
+
   /**
    * Address: 0x00993670 (FUN_00993670)
    * Mangled: ?AdoptAttributesFromHWND@wxTextCtrl@@UAEXXZ
