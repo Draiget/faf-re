@@ -93,6 +93,7 @@ static_assert(sizeof(WxAnonymousPipeHandles) == 0x8, "WxAnonymousPipeHandles siz
 
 struct wxStringRuntime;
 struct wxColourRuntime;
+class wxEventRuntime;
 class wxMoveEventRuntime;
 class wxEraseEventRuntime;
 class wxCloseEventRuntime;
@@ -1459,7 +1460,30 @@ public:
    * Looks for a handler in one table, matching on event type and id range.
    */
   virtual bool SearchEventTable(void* eventTable, void* event);
-  virtual const void* GetEventTable() const { return nullptr; }
+
+  /**
+   * Address: 0x00964A50 (FUN_00964A50)
+   * Mangled: ?GetEventTable@wxWindowBase@@MBEPBUwxEventTable@@XZ
+   *
+   * What it does:
+   * Hands back the table at the root of every window's chain.
+   */
+  [[nodiscard]] virtual const void* GetEventTable() const;
+
+  /**
+   * Address: 0x00964A10 (FUN_00964A10)
+   * Mangled: ?OnInitDialog@wxWindowBase@@IAEXAAVwxInitDialogEvent@@@Z
+   *
+   * IDA signature:
+   * void __thiscall wxWindowBase::OnInitDialog(wxWindowBase *this, wxInitDialogEvent *event);
+   *
+   * What it does:
+   * Pushes the values behind a dialog into the controls showing them, which is
+   * what makes a dialog come up filled in.
+   */
+  void OnInitDialog(wxEventRuntime& initDialogEvent);
+
+  static wxEventTable sm_eventTable;
   virtual void DoSetClientObject(void* clientObject) { (void)clientObject; }
   virtual void* DoGetClientObject() const { return nullptr; }
   virtual void DoSetClientData(void* clientData) { (void)clientData; }

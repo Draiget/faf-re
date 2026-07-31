@@ -32470,7 +32470,8 @@ unsigned short wxWindowMswRuntime::UnpackCommand(
   return notificationCode;
 }
 
-wxEventTable wxWindowMswRuntime::sm_eventTable = {nullptr, nullptr};
+// 0x00D4D740: chains to wxWindowBase's table at 0x00D4D0EC.
+wxEventTable wxWindowMswRuntime::sm_eventTable = {&wxWindowBase::sm_eventTable, nullptr};
 
 /**
  * Address: 0x00968B40 (FUN_00968B40, wxWindow::UnpackActivate)
@@ -32630,6 +32631,56 @@ bool wxWindowMswRuntime::ContainsHWND(
 {
   (void)nativeHandle;
   return false;
+}
+
+wxEventTable wxWindowBase::sm_eventTable = {nullptr, nullptr};
+
+/**
+ * Address: 0x00964A10 (FUN_00964A10)
+ * Mangled: ?OnInitDialog@wxWindowBase@@IAEXAAVwxInitDialogEvent@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxWindowBase::OnInitDialog(wxWindowBase *this, wxInitDialogEvent *event);
+ *
+ * What it does:
+ * Pushes the values behind a dialog into the controls showing them, which is
+ * what makes a dialog come up filled in rather than blank. The binary tail-
+ * calls the virtual at vtable+0xD8 and drops its result - whether the transfer
+ * succeeded does not change how the event is reported.
+ */
+void wxWindowBase::OnInitDialog(
+  wxEventRuntime& initDialogEvent
+)
+{
+  (void)initDialogEvent;
+  (void)TransferDataToWindow();
+}
+
+/**
+ * Address: 0x00964A50 (FUN_00964A50)
+ * Mangled: ?GetEventTable@wxWindowBase@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Hands back the table at the root of every window's chain.
+ *
+ * Table at 0x00D4D0EC = {base 0x00D4E8F4 (wxEvtHandler's), rows 0x00F32DE8};
+ * the rows there are OnSysColourChanged 0x00964960, OnInitDialog 0x00964A10,
+ * OnMiddleClick 0x00964A20 and OnHelp 0x00964100. Only OnInitDialog is
+ * recovered so far - the other three need the child-broadcast walk, wxMessageBox
+ * and wxHelpProvider respectively - so they stay unbound and their events keep
+ * going unhandled, as they did while this returned nothing at all.
+ */
+const void* wxWindowBase::GetEventTable() const
+{
+  static const wxEventTableEntry entries[] = {
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowBase::OnInitDialog, WxEventTypeSlot(gWxEvtInitDialogRuntimeType)
+    ),
+    wxEventTableEntry{}, // null handler: end of table
+  };
+
+  sm_eventTable.entries = entries;
+  return &sm_eventTable;
 }
 
 /**
@@ -32852,6 +32903,11 @@ const void* wxWindowMswRuntime::GetEventTable() const
   static const wxEventTableEntry entries[] = {
     MakeWxEventTableEntry(
       -1, -1, &wxWindowMswRuntime::OnEraseBackground, WxEventTypeSlot(gWxEvtEraseBackgroundRuntimeType)
+    ),
+    // The binary repeats the base class's init-dialog row here rather than
+    // letting the chain find it one hop later.
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowBase::OnInitDialog, WxEventTypeSlot(gWxEvtInitDialogRuntimeType)
     ),
     wxEventTableEntry{}, // null handler: end of table
   };
