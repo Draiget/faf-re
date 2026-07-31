@@ -11346,10 +11346,18 @@ namespace
     std::uint32_t fileCount = 0;
   };
 
+  /**
+   * Address: 0x00978FD0 (FUN_00978FD0, wxNewEventType)
+   *
+   * What it does:
+   * Hands out the next event type id. The binary post-increments
+   * s_lastUsedEventType (0x00F3371C), which the image seeds at 10000, so the
+   * first id handed out is 10000 rather than 10001.
+   */
   int wxNewEventType()
   {
-    static std::int32_t nextRuntimeEventType = 10000;
-    return ++nextRuntimeEventType;
+    static std::int32_t sLastUsedEventType = 10000;
+    return sLastUsedEventType++;
   }
   std::int32_t gWxEvtIdleRuntimeType = 0;
   std::int32_t gWxEvtDropFilesRuntimeType = 0;
@@ -33485,6 +33493,251 @@ bool wxWindowBase::ProcessEvent(void* const event)
   }
 
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// wx event types and the message handlers that raise them.
+//
+// Event types are not compile-time constants in this build: wxNewEventType
+// (0x00978FD0) post-increments s_lastUsedEventType, which the image seeds at
+// 10000 (0x00F3371C), so every DEFINE_EVENT_TYPE takes the next id in static
+// initialisation order. The absolute values therefore depend on that order;
+// what matters for behaviour is that the tables and the handlers agree, which
+// they do because both read these same globals.
+//
+// Each handler below has the same shape as the binary's: build the event on the
+// stack, fill its payload, and hand it to the window's event handler. Payloads
+// start at +0x20, straight after the 0x20-byte wxEvent base - confirmed from
+// the HandleSize/HandleMove/HandleShow stack frames.
+// ---------------------------------------------------------------------------
+
+const std::int32_t wxEVT_MOVE = wxNewEventType();
+const std::int32_t wxEVT_SIZE = wxNewEventType();
+const std::int32_t wxEVT_SHOW = wxNewEventType();
+
+wxMoveEventRuntime::wxMoveEventRuntime(const std::int32_t windowId)
+  : wxEventRuntime(windowId, wxEVT_MOVE)
+{
+}
+
+wxEventRuntime* wxMoveEventRuntime::Clone() const { return new wxMoveEventRuntime(*this); }
+
+wxSizeEventRuntime::wxSizeEventRuntime(const std::int32_t windowId)
+  : wxEventRuntime(windowId, wxEVT_SIZE)
+{
+}
+
+wxEventRuntime* wxSizeEventRuntime::Clone() const { return new wxSizeEventRuntime(*this); }
+
+wxShowEventRuntime::wxShowEventRuntime(const std::int32_t windowId)
+  : wxEventRuntime(windowId, wxEVT_SHOW)
+{
+}
+
+wxEventRuntime* wxShowEventRuntime::Clone() const { return new wxShowEventRuntime(*this); }
+
+
+
+/**
+ * The window's event handler, which is the window itself unless one has been
+ * pushed in front of it.
+ */
+wxWindowBase* wxWindowBase::GetEventHandler()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state != nullptr && state->eventHandler != nullptr) {
+    return state->eventHandler;
+  }
+  return this;
+}
+
+/**
+ * Address: 0x0096A100 (FUN_0096A100)
+ * Mangled: ?HandleMove@wxWindow@@IAE_NHH@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleMove(wxWindow *this, int x, int y);
+ *
+ * What it does:
+ * Raises wxEVT_MOVE for WM_MOVE.
+ */
+bool wxWindowMswRuntime::HandleMove(const std::int32_t x, const std::int32_t y)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  wxMoveEventRuntime event(state != nullptr ? state->windowId : -1);
+  event.mEventObject = this;
+  event.mX = x;
+  event.mY = y;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x0096A1B0 (FUN_0096A1B0)
+ * Mangled: ?HandleSize@wxWindow@@IAE_NHHI@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleSize(wxWindow *this, int w, int h, UINT flag);
+ *
+ * What it does:
+ * Raises wxEVT_SIZE for WM_SIZE. The size reported is the client size read back
+ * from the window rather than the one in the message, so a handler sees the
+ * area it can actually draw in.
+ */
+bool wxWindowMswRuntime::HandleSize(
+  const std::int32_t width,
+  const std::int32_t height,
+  const unsigned int flags
+)
+{
+  (void)width;
+  (void)height;
+  (void)flags;
+
+  std::int32_t clientWidth = 0;
+  std::int32_t clientHeight = 0;
+  DoGetClientSize(&clientWidth, &clientHeight);
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  wxSizeEventRuntime event(state != nullptr ? state->windowId : -1);
+  event.mEventObject = this;
+  event.mWidth = clientWidth;
+  event.mHeight = clientHeight;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x009693D0 (FUN_009693D0)
+ * Mangled: ?HandleShow@wxWindow@@IAE_N_NH@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleShow(wxWindow *this, bool show, int status);
+ *
+ * What it does:
+ * Raises wxEVT_SHOW for WM_SHOWWINDOW.
+ */
+bool wxWindowMswRuntime::HandleShow(const bool show, const std::int32_t status)
+{
+  (void)status;
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  wxShowEventRuntime event(state != nullptr ? state->windowId : -1);
+  event.mEventObject = this;
+  event.mShow = show ? 1 : 0;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
+ * Address: 0x0096A270 (FUN_0096A270)
+ * Mangled: ?HandleGetMinMaxInfo@wxWindow@@IAE_NPAX@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleGetMinMaxInfo(wxWindow *this, MINMAXINFO *mmi);
+ *
+ * What it does:
+ * Answers WM_GETMINMAXINFO from the window's own size hints, reporting the
+ * message handled only if at least one hint was actually set. Anything left at
+ * -1 is passed over so Windows keeps its own limit.
+ */
+bool wxWindowMswRuntime::HandleGetMinMaxInfo(void* const minMaxInfo)
+{
+  auto* const mmi = static_cast<MINMAXINFO*>(minMaxInfo);
+  if (mmi == nullptr) {
+    return false;
+  }
+
+  bool answered = false;
+
+  const std::int32_t minWidth = GetMinWidth();
+  if (minWidth != -1) {
+    mmi->ptMinTrackSize.x = minWidth;
+    answered = true;
+  }
+
+  const std::int32_t minHeight = GetMinHeight();
+  if (minHeight != -1) {
+    mmi->ptMinTrackSize.y = minHeight;
+    answered = true;
+  }
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  const std::int32_t maxWidth = (state != nullptr) ? state->maxWidth : -1;
+  if (maxWidth != -1) {
+    mmi->ptMaxTrackSize.x = maxWidth;
+    answered = true;
+  }
+
+  const std::int32_t maxHeight = (state != nullptr) ? state->maxHeight : -1;
+  if (maxHeight != -1) {
+    mmi->ptMaxTrackSize.y = maxHeight;
+    answered = true;
+  }
+
+  return answered;
+}
+
+/**
+ * Address: 0x0096D110 (FUN_0096D110)
+ * Mangled: ?MSWWindowProc@wxWindow@@UAEJIIJ@Z
+ *
+ * IDA signature:
+ * LRESULT __thiscall wxWindow::MSWWindowProc(wxWindow *this, UINT message,
+ *                                            WPARAM wParam, LPARAM lParam);
+ *
+ * What it does:
+ * Turns a Win32 message into the wx event that stands for it. A message whose
+ * event nobody handles - and any message with no case here yet - falls through
+ * to MSWDefWindowProc, which is what wx does with them too.
+ *
+ * Only the geometry and visibility messages are translated so far; the rest of
+ * the binary's switch (mouse, keyboard, palette, session, control colours) is
+ * still to come, and until then behaves exactly as an unhandled message should.
+ */
+long wxWindowMswRuntime::MSWWindowProc(
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  bool processed = false;
+
+  switch (message) {
+  case WM_MOVE:
+    processed = HandleMove(
+      static_cast<std::int16_t>(LOWORD(lParam)),
+      static_cast<std::int16_t>(HIWORD(lParam))
+    );
+    break;
+
+  case WM_SIZE:
+    // A window being minimised, or hidden/shown because its parent was, carries
+    // no useful client size - the binary hands those three straight to the
+    // default handler.
+    if (wParam == SIZE_MINIMIZED || wParam == SIZE_MAXHIDE || wParam == SIZE_MAXSHOW) {
+      return MSWDefWindowProc(message, wParam, lParam);
+    }
+    processed = HandleSize(
+      static_cast<std::int32_t>(LOWORD(lParam)),
+      static_cast<std::int32_t>(HIWORD(lParam)),
+      wParam
+    );
+    break;
+
+  case WM_SHOWWINDOW:
+    processed = HandleShow(wParam != 0u, static_cast<std::int32_t>(lParam));
+    break;
+
+  case WM_GETMINMAXINFO:
+    processed = HandleGetMinMaxInfo(reinterpret_cast<void*>(lParam));
+    break;
+
+  default:
+    return MSWDefWindowProc(message, wParam, lParam);
+  }
+
+  if (!processed) {
+    return MSWDefWindowProc(message, wParam, lParam);
+  }
+  return 0;
 }
 
 unsigned long wxWindowBase::GetHandle() const

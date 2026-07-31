@@ -1444,6 +1444,13 @@ public:
   virtual bool ProcessEvent(void* event);
 
   /**
+   * What it does:
+   * The handler events are offered to: this window, unless another handler has
+   * been pushed in front of it.
+   */
+  [[nodiscard]] wxWindowBase* GetEventHandler();
+
+  /**
    * Address: 0x00979900 (FUN_00979900)
    * Mangled: ?SearchEventTable@wxEvtHandler@@UAE_NAAUwxEventTable@@AAVwxEvent@@@Z
    *
@@ -2179,6 +2186,30 @@ public:
    * ::DestroyWindow because the window procedure still runs during it.
    */
   void DestroyNativeWindow();
+
+  /**
+   * Address: 0x0096A100 (FUN_0096A100)
+   * Mangled: ?HandleMove@wxWindow@@IAE_NHH@Z
+   */
+  bool HandleMove(std::int32_t x, std::int32_t y);
+
+  /**
+   * Address: 0x0096A1B0 (FUN_0096A1B0)
+   * Mangled: ?HandleSize@wxWindow@@IAE_NHHI@Z
+   */
+  bool HandleSize(std::int32_t width, std::int32_t height, unsigned int flags);
+
+  /**
+   * Address: 0x009693D0 (FUN_009693D0)
+   * Mangled: ?HandleShow@wxWindow@@IAE_N_NH@Z
+   */
+  bool HandleShow(bool show, std::int32_t status);
+
+  /**
+   * Address: 0x0096A270 (FUN_0096A270)
+   * Mangled: ?HandleGetMinMaxInfo@wxWindow@@IAE_NPAX@Z
+   */
+  bool HandleGetMinMaxInfo(void* minMaxInfo);
   /**
    * Address: 0x009675F0 (FUN_009675F0)
    * Mangled: ?MSWCommand@wxWindow@@UAE_NIG@Z
@@ -2325,10 +2356,7 @@ public:
    * is not recovered yet, and returning 0 instead of defaulting would abort
    * window creation at WM_NCCREATE.
    */
-  virtual long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam)
-  {
-    return MSWDefWindowProc(message, wParam, lParam);
-  }
+  virtual long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam);
 
   /**
    * Address: 0x00968A90 (FUN_00968A90)
@@ -5479,6 +5507,42 @@ public:
   std::uint8_t mReserved1E = 0;
   std::uint8_t mReserved1F = 0;
 };
+
+// Derived events put their payload straight after the 0x20-byte base; the
+// offsets below are read off the HandleMove / HandleSize / HandleShow stack
+// frames.
+class wxMoveEventRuntime : public wxEventRuntime
+{
+public:
+  explicit wxMoveEventRuntime(std::int32_t windowId = 0);
+  [[nodiscard]] wxEventRuntime* Clone() const override;
+
+  std::int32_t mX = 0; // +0x20
+  std::int32_t mY = 0; // +0x24
+};
+
+class wxSizeEventRuntime : public wxEventRuntime
+{
+public:
+  explicit wxSizeEventRuntime(std::int32_t windowId = 0);
+  [[nodiscard]] wxEventRuntime* Clone() const override;
+
+  std::int32_t mWidth = 0;  // +0x20
+  std::int32_t mHeight = 0; // +0x24
+};
+
+class wxShowEventRuntime : public wxEventRuntime
+{
+public:
+  explicit wxShowEventRuntime(std::int32_t windowId = 0);
+  [[nodiscard]] wxEventRuntime* Clone() const override;
+
+  std::int32_t mShow = 0; // +0x20
+};
+
+extern const std::int32_t wxEVT_MOVE;
+extern const std::int32_t wxEVT_SIZE;
+extern const std::int32_t wxEVT_SHOW;
 
 static_assert(offsetof(wxEventRuntime, mRefData) == 0x4, "wxEventRuntime::mRefData offset must be 0x4");
 static_assert(offsetof(wxEventRuntime, mEventObject) == 0x8, "wxEventRuntime::mEventObject offset must be 0x8");
