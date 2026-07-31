@@ -3727,6 +3727,49 @@ wxStringRuntime* wxExtractLeadingIdentifierToken(
 wxStringRuntime* wxBuildUserConfigRootPath(wxStringRuntime* outText);
 
 /**
+ * A logical palette.
+ *
+ * The native handle lives in the shared reference data rather than in the
+ * object, so copies of a palette share one HPALETTE. Offsets are off
+ * wxWindow::HandleQueryNewPalette (0x00969A20), which reads the reference
+ * data at +0x04 and the handle at +0x08 within it - the decompiler renders
+ * that second step as an array subscript and gets the offset wrong.
+ */
+struct wxPaletteRefDataRuntime
+{
+  void* mVTable = nullptr;        // +0x00
+  std::int32_t mRefCount = 0;     // +0x04
+  void* mNativePalette = nullptr; // +0x08
+};
+
+static_assert(
+  offsetof(wxPaletteRefDataRuntime, mNativePalette) == 0x08,
+  "wxPaletteRefDataRuntime::mNativePalette offset must be 0x08"
+);
+
+struct wxPaletteRuntime
+{
+  void* mVTable = nullptr;                    // +0x00
+  wxPaletteRefDataRuntime* mRefData = nullptr; // +0x04
+  std::uint8_t mReserved08[0x4]{};            // +0x08
+
+  /**
+   * Address: swaps the handle the reference data holds and hands back what
+   * was there, which is how the select/realize pair keeps hold of the palette
+   * it displaced.
+   */
+  void* ExchangeNativePalette(void* nativePalette) noexcept;
+
+  [[nodiscard]] void* GetNativePalette() const noexcept
+  {
+    return mRefData != nullptr ? mRefData->mNativePalette : nullptr;
+  }
+};
+
+static_assert(offsetof(wxPaletteRuntime, mRefData) == 0x04, "wxPaletteRuntime::mRefData offset must be 0x04");
+static_assert(sizeof(wxPaletteRuntime) == 0xC, "wxPaletteRuntime size must be 0xC");
+
+/**
  * The drawing state every device context carries: pens, brushes, fonts,
  * colours, the mapping mode and the scale/origin pair, plus the bounding box
  * the drawing primitives accumulate.
@@ -3743,11 +3786,23 @@ public:
 
   void* m_refData = nullptr;                 // +0x04, from wxObject
   std::uint8_t m_flags = 0;                  // +0x08 bit 1: the DC is usable
-  std::uint8_t mDrawingState[0xDF]{};        // +0x09, not yet mapped
+  std::uint8_t mDrawingState[0xCB]{};        // +0x09, not yet mapped
+  // The palette a context draws through, borrowed from whichever window up
+  // the chain owns one. Offsets from wxDC::InitializePalette (0x009CAAA0),
+  // which writes the flag at +0xE0 and takes a reference on the palette at
+  // +0xD4.
+  wxPaletteRuntime m_palette{};              // +0xD4
+  std::uint8_t m_hasCustomPalette = 0;       // +0xE0
+  std::uint8_t mPaddingE1[0x7]{};            // +0xE1
 };
 
 static_assert(offsetof(wxDCBase, m_refData) == 0x04, "wxDCBase::m_refData offset must be 0x04");
 static_assert(offsetof(wxDCBase, m_flags) == 0x08, "wxDCBase::m_flags offset must be 0x08");
+static_assert(offsetof(wxDCBase, m_palette) == 0xD4, "wxDCBase::m_palette offset must be 0xD4");
+static_assert(
+  offsetof(wxDCBase, m_hasCustomPalette) == 0xE0,
+  "wxDCBase::m_hasCustomPalette offset must be 0xE0"
+);
 static_assert(sizeof(wxDCBase) == 0xE8, "wxDCBase size must be 0xE8");
 
 /**
@@ -4458,48 +4513,6 @@ static_assert(offsetof(wxColourRuntime, mBlue) == 0x0E, "wxColourRuntime::mBlue 
 static_assert(offsetof(wxColourRuntime, mGreen) == 0x0F, "wxColourRuntime::mGreen offset must be 0x0F");
 static_assert(sizeof(wxColourRuntime) == 0x10, "wxColourRuntime size must be 0x10");
 
-/**
- * A logical palette.
- *
- * The native handle lives in the shared reference data rather than in the
- * object, so copies of a palette share one HPALETTE. Offsets are off
- * wxWindow::HandleQueryNewPalette (0x00969A20), which reads the reference
- * data at +0x04 and the handle at +0x08 within it - the decompiler renders
- * that second step as an array subscript and gets the offset wrong.
- */
-struct wxPaletteRefDataRuntime
-{
-  void* mVTable = nullptr;        // +0x00
-  std::int32_t mRefCount = 0;     // +0x04
-  void* mNativePalette = nullptr; // +0x08
-};
-
-static_assert(
-  offsetof(wxPaletteRefDataRuntime, mNativePalette) == 0x08,
-  "wxPaletteRefDataRuntime::mNativePalette offset must be 0x08"
-);
-
-struct wxPaletteRuntime
-{
-  void* mVTable = nullptr;                    // +0x00
-  wxPaletteRefDataRuntime* mRefData = nullptr; // +0x04
-  std::uint8_t mReserved08[0x4]{};            // +0x08
-
-  /**
-   * Address: swaps the handle the reference data holds and hands back what
-   * was there, which is how the select/realize pair keeps hold of the palette
-   * it displaced.
-   */
-  void* ExchangeNativePalette(void* nativePalette) noexcept;
-
-  [[nodiscard]] void* GetNativePalette() const noexcept
-  {
-    return mRefData != nullptr ? mRefData->mNativePalette : nullptr;
-  }
-};
-
-static_assert(offsetof(wxPaletteRuntime, mRefData) == 0x04, "wxPaletteRuntime::mRefData offset must be 0x04");
-static_assert(sizeof(wxPaletteRuntime) == 0xC, "wxPaletteRuntime size must be 0xC");
 
 /**
  * A mouse cursor.
