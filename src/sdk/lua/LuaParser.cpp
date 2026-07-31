@@ -233,18 +233,122 @@ namespace
   constexpr std::int32_t VRELOCABLE = 0x0A;
   constexpr std::int32_t VNONRELOC = 0x0B;
   constexpr std::int32_t VCALL = 0x0C;
+  constexpr std::int32_t VINDEXED = 0x08;
   constexpr std::int32_t NO_REG = 0xFF;
+
+  // Opcode numbering for this build. It is stock Lua 5.0.2 with the four FAF
+  // bit operators (BAND/BOR/BSHL/BSHR) spliced in after OP_DIV, which shifts
+  // every opcode from OP_POW upwards by four. Confirmed against the binary:
+  // luaK_jump emits 0x7FFF98 (opcode 24 = JMP), luaK_prefix emits opcode 0x15
+  // for unary minus, luaK_posfix emits 0x17 for concat, luaK_self emits 0x0B,
+  // patchlistaux tests for 0x1C, and the comparison dispatch table at
+  // 0x00D45640 holds { 25, 25, 26, 27, 26, 27 } for OPR_NE..OPR_GE. The
+  // opmode table below independently agrees: its "test" bit (0x80) is set for
+  // exactly 25, 26, 27, 28 and 33 - EQ, LT, LE, TEST and TFORLOOP.
   constexpr std::int32_t OP_MOVE = 0x00;
+  constexpr std::int32_t OP_LOADK = 0x01;
+  constexpr std::int32_t OP_LOADBOOL = 0x02;
+  constexpr std::int32_t OP_LOADNIL = 0x03;
   constexpr std::int32_t OP_GETUPVAL = 0x04;
+  constexpr std::int32_t OP_GETGLOBAL = 0x05;
+  constexpr std::int32_t OP_GETTABLE = 0x06;
+  constexpr std::int32_t OP_SETGLOBAL = 0x07;
+  constexpr std::int32_t OP_SETUPVAL = 0x08;
+  constexpr std::int32_t OP_SETTABLE = 0x09;
+  constexpr std::int32_t OP_SELF = 0x0B;
+  constexpr std::int32_t OP_ADD = 0x0C;
+  constexpr std::int32_t OP_UNM = 0x15;
   constexpr std::int32_t OP_NOT = 0x16;
+  constexpr std::int32_t OP_CONCAT = 0x17;
+  constexpr std::int32_t OP_JMP = 0x18;
+  constexpr std::int32_t OP_EQ = 0x19;
+  constexpr std::int32_t OP_LT = 0x1A;
+  constexpr std::int32_t OP_LE = 0x1B;
+  constexpr std::int32_t OP_TEST = 0x1C;
   constexpr std::int32_t OP_RETURN = 0x1F;
   constexpr std::int32_t OP_CLOSURE = 0x26;
-  constexpr std::int32_t OP_EQ = 0x17;
-  constexpr std::int32_t OP_LT = 0x18;
-  constexpr std::int32_t OP_LE = 0x19;
-  constexpr std::int32_t OP_TESTSET = 0x1C;
   constexpr std::int32_t MAXSTACK = 0xFA;
-  constexpr std::int32_t LUA_MAXARG_Bx = 0x3FFFF;
+
+  // Instruction field geometry (lopcodes.h in the original tree).
+  constexpr int kSizeOp = 6;
+  constexpr int kSizeC = 9;
+  constexpr int kSizeB = 9;
+  constexpr int kSizeBx = kSizeC + kSizeB;
+  constexpr int kPosC = kSizeOp;
+  constexpr int kPosBx = kPosC;
+  constexpr int kPosB = kPosC + kSizeC;
+  constexpr int kPosA = kPosB + kSizeB;
+  constexpr std::int32_t LUA_MAXARG_Bx = (1 << kSizeBx) - 1;
+  constexpr std::int32_t LUA_MAXARG_sBx = LUA_MAXARG_Bx >> 1;
+  constexpr std::int32_t MAXARG_A = (1 << 8) - 1;
+  constexpr std::int32_t MAXARG_B = (1 << kSizeB) - 1;
+  constexpr std::int32_t MAXARG_C = (1 << kSizeC) - 1;
+
+  [[nodiscard]] constexpr std::int32_t GET_OPCODE(const Instruction i) noexcept
+  {
+    return static_cast<std::int32_t>(i & ((1u << kSizeOp) - 1u));
+  }
+
+  [[nodiscard]] constexpr std::int32_t GETARG_A(const Instruction i) noexcept
+  {
+    return static_cast<std::int32_t>((i >> kPosA) & MAXARG_A);
+  }
+
+  [[nodiscard]] constexpr std::int32_t GETARG_B(const Instruction i) noexcept
+  {
+    return static_cast<std::int32_t>((i >> kPosB) & MAXARG_B);
+  }
+
+  [[nodiscard]] constexpr std::int32_t GETARG_C(const Instruction i) noexcept
+  {
+    return static_cast<std::int32_t>((i >> kPosC) & MAXARG_C);
+  }
+
+  [[nodiscard]] constexpr std::int32_t GETARG_sBx(const Instruction i) noexcept
+  {
+    return static_cast<std::int32_t>((i >> kPosBx) & LUA_MAXARG_Bx) - LUA_MAXARG_sBx;
+  }
+
+  constexpr void SETARG_A(Instruction& i, const std::int32_t a) noexcept
+  {
+    i = (i & ~(static_cast<Instruction>(MAXARG_A) << kPosA))
+      | (static_cast<Instruction>(a) << kPosA);
+  }
+
+  constexpr void SETARG_B(Instruction& i, const std::int32_t b) noexcept
+  {
+    i = (i & ~(static_cast<Instruction>(MAXARG_B) << kPosB))
+      | (static_cast<Instruction>(b) << kPosB);
+  }
+
+  constexpr void SETARG_C(Instruction& i, const std::int32_t c) noexcept
+  {
+    i = (i & ~(static_cast<Instruction>(MAXARG_C) << kPosC))
+      | (static_cast<Instruction>(c) << kPosC);
+  }
+
+  constexpr void SETARG_sBx(Instruction& i, const std::int32_t offset) noexcept
+  {
+    i = (i & ~(static_cast<Instruction>(LUA_MAXARG_Bx) << kPosBx))
+      | (static_cast<Instruction>(offset + LUA_MAXARG_sBx) << kPosBx);
+  }
+
+  [[nodiscard]] constexpr Instruction
+  CREATE_ABC(const std::int32_t o, const std::int32_t a, const std::int32_t b, const std::int32_t c) noexcept
+  {
+    return static_cast<Instruction>(o)
+      | (static_cast<Instruction>(a) << kPosA)
+      | (static_cast<Instruction>(b) << kPosB)
+      | (static_cast<Instruction>(c) << kPosC);
+  }
+
+  [[nodiscard]] constexpr Instruction
+  CREATE_ABx(const std::int32_t o, const std::int32_t a, const std::uint32_t bx) noexcept
+  {
+    return static_cast<Instruction>(o)
+      | (static_cast<Instruction>(a) << kPosA)
+      | (static_cast<Instruction>(bx) << kPosBx);
+  }
   constexpr std::int32_t OPR_ADD = 0x00;
   constexpr std::int32_t OPR_SUB = 0x01;
   constexpr std::int32_t OPR_MULT = 0x02;
@@ -343,18 +447,13 @@ namespace
    * Patches one Lua test-instruction A-register lane; when `registerIndex`
    * equals `NO_REG` (`0xFF`), keeps the existing encoded register value.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t
-  LuaPatchTestRegisterField(std::int32_t registerIndex, Instruction* const instructionSlot) noexcept
+  void LuaPatchTestRegisterField(std::int32_t registerIndex, Instruction* const instructionSlot) noexcept
   {
     if (registerIndex == NO_REG) {
-      registerIndex = static_cast<std::int32_t>((*instructionSlot >> 15) & 0x1FFu);
+      registerIndex = GETARG_B(*instructionSlot);
     }
 
-    const std::int32_t patchedAField = registerIndex << 24;
-    *instructionSlot = static_cast<Instruction>(
-      (static_cast<std::uint32_t>(*instructionSlot) & 0x00FFFFFFu) | static_cast<std::uint32_t>(patchedAField)
-    );
-    return patchedAField;
+    SETARG_A(*instructionSlot, registerIndex);
   }
 
   /**
@@ -967,33 +1066,39 @@ namespace
    * Lowers one binary-operator lane into bytecode (`OP_*`) or conditional-jump
    * form and stores the resulting expression kind/info lanes.
    */
-  [[maybe_unused]] void codebinop(
-    const int leftOperandRegister,
+  // Comparison lowering table at 0x00D45640, indexed by `BinOpr - OPR_NE`.
+  // GT/GE reuse the LT/LE opcodes with the operands swapped, and NE reuses EQ
+  // with the jump sense inverted, so only three opcodes appear here.
+  constexpr std::array<std::int32_t, 6> kComparisonOpcodes{
+    OP_EQ, // OPR_NE - taken with cond 0
+    OP_EQ, // OPR_EQ
+    OP_LT, // OPR_LT
+    OP_LE, // OPR_LE
+    OP_LT, // OPR_GT - operands swapped
+    OP_LE  // OPR_GE - operands swapped
+  };
+
+  void codebinop(
+    int rightOperand,
     const int binaryOperator,
-    int rightOperandRegister,
+    int leftOperand,
     expdesc* const result,
     FuncState* const fs
   )
   {
-    int lhsRegister = leftOperandRegister;
     if (binaryOperator > OPR_POW) {
       int jumpSense = 1;
       if (binaryOperator < OPR_GT) {
+        // `a ~= b` is `a == b` with the jump sense flipped.
         jumpSense = (binaryOperator != OPR_NE) ? 1 : 0;
       } else {
-        const int swapped = rightOperandRegister;
-        rightOperandRegister = lhsRegister;
-        lhsRegister = swapped;
+        // `a > b` / `a >= b` are `b < a` / `b <= a`.
+        std::swap(leftOperand, rightOperand);
       }
 
-      int comparisonOpcode = OP_EQ;
-      if (binaryOperator == (OPR_NE + 2) || binaryOperator == OPR_GT) {
-        comparisonOpcode = OP_LT;
-      } else if (binaryOperator == (OPR_NE + 3) || binaryOperator == (OPR_GT + 1)) {
-        comparisonOpcode = OP_LE;
-      }
-
-      const int jumpList = luaK_condjump(jumpSense, fs, comparisonOpcode, rightOperandRegister, lhsRegister);
+      const std::int32_t comparisonOpcode =
+        kComparisonOpcodes[static_cast<std::size_t>(binaryOperator - OPR_NE)];
+      const int jumpList = luaK_condjump(jumpSense, fs, comparisonOpcode, leftOperand, rightOperand);
       result->k = VJMP;
       result->info = jumpList;
       return;
@@ -1001,9 +1106,8 @@ namespace
 
     auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
-    const Instruction instruction = static_cast<Instruction>(
-      (binaryOperator + 12) | ((leftOperandRegister | (rightOperandRegister << 9)) << 6)
-    );
+    const Instruction instruction =
+      CREATE_ABC(binaryOperator + OP_ADD, 0, leftOperand, rightOperand);
     const int opcodeIndex = luaK_code(fs, instruction, lexState->lastline);
     result->k = VRELOCABLE;
     result->info = opcodeIndex;
@@ -1071,13 +1175,11 @@ namespace
       Instruction* const controllingInstruction = LuaResolveControllingInstruction(fs, list);
 
       const Instruction testInstruction = *controllingInstruction;
-      const std::int32_t opcode = static_cast<std::int32_t>(testInstruction & 0x3Fu);
-      const std::int32_t jumpCondition = static_cast<std::int32_t>((testInstruction >> 6) & 0x1FFu);
-      if (opcode != OP_TESTSET || jumpCondition != cond) {
+      if (GET_OPCODE(testInstruction) != OP_TEST || GETARG_C(testInstruction) != cond) {
         return 1;
       }
 
-      const std::int32_t jumpOffset = static_cast<std::int32_t>((*jumpInstruction >> 6) & 0x3FFFFu) - 0x1FFFF;
+      const std::int32_t jumpOffset = GETARG_sBx(*jumpInstruction);
       if (jumpOffset == NO_JUMP) {
         return 0;
       }
@@ -1162,6 +1264,760 @@ namespace
     const std::int32_t falseList = expression->f;
     expression->f = expression->t;
     expression->t = falseList;
+  }
+
+  // ---------------------------------------------------------------------
+  // lcode.c - bytecode emission and register allocation.
+  //
+  // The rest of this module's file-local helpers (getjumpcontrol,
+  // patchtestreg, need_value, freereg, freeexp, condjump, code_label,
+  // invertjump, jumponcond, codenot, codebinop) sit above; luaK_concat,
+  // luaK_fixjump, addk, nil_constant, discharge2reg and discharge2anyreg
+  // were recovered into LuaObject.cpp and are declared here.
+  // ---------------------------------------------------------------------
+
+  extern "C"
+  {
+    int addk(LuaPlus::TObject* value, FuncState* fs, LuaPlus::TObject* key);
+    int nil_constant(FuncState* fs);
+    void discharge2reg(expdesc* e, int reg, FuncState* fs);
+    void luaK_fixjump(int to, int from, FuncState* fs);
+
+    std::int32_t luaK_getlabel(FuncState* fs);
+    void luaK_checkstack(FuncState* fs, int n);
+    void luaK_exp2val(FuncState* fs, expdesc* e);
+    std::int32_t luaK_exp2RK(FuncState* fs, expdesc* e);
+    void luaK_goiffalse(FuncState* fs, expdesc* e);
+  }
+
+  void patchlistaux(
+    FuncState* fs,
+    std::int32_t list,
+    std::int32_t ttarget,
+    std::int32_t treg,
+    std::int32_t ftarget,
+    std::int32_t freg,
+    std::int32_t dtarget
+  );
+  void luaK_dischargejpc(FuncState* fs);
+  void exp2reg(FuncState* fs, expdesc* e, std::int32_t reg);
+
+  /**
+   * Address: 0x00910070 (FUN_00910070, getjump)
+   *
+   * IDA signature:
+   * Instruction __usercall getjump@<eax>(FuncState *fs@<eax>, int pc@<ecx>);
+   *
+   * What it does:
+   * Turns the relative sBx displacement stored in the jump at `pc` into an
+   * absolute destination. A displacement of NO_JUMP is returned unchanged - a
+   * jump that points at itself is how a jump list marks its end.
+   */
+  [[nodiscard]] std::int32_t getjump(FuncState* const fs, const std::int32_t pc) noexcept
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    const std::int32_t offset = GETARG_sBx(fsView->f->code[pc]);
+    if (offset == NO_JUMP) {
+      return NO_JUMP;
+    }
+    return (pc + 1) + offset;
+  }
+
+  /**
+   * Address: 0x00910180 (FUN_00910180, patchlistaux)
+   *
+   * IDA signature:
+   * void __usercall patchlistaux(int list@<edx>, FuncState *fs@<ebx>, int ttarget,
+   *                              int treg, int ftarget, int freg, int dtarget);
+   *
+   * What it does:
+   * Walks one jump list and retargets every link. Plain jumps go to `dtarget`;
+   * jumps controlled by an OP_TEST are split by the test's C field, so the ones
+   * that fire on a true result land on `ttarget` (loading their value into
+   * `treg`) and the ones that fire on false land on `ftarget` / `freg`.
+   */
+  void patchlistaux(
+    FuncState* const fs,
+    std::int32_t list,
+    const std::int32_t ttarget,
+    const std::int32_t treg,
+    const std::int32_t ftarget,
+    const std::int32_t freg,
+    const std::int32_t dtarget
+  )
+  {
+    while (list != NO_JUMP) {
+      const std::int32_t next = getjump(fs, list);
+      Instruction* const controllingInstruction = LuaResolveControllingInstruction(fs, list);
+
+      if (GET_OPCODE(*controllingInstruction) != OP_TEST) {
+        luaK_fixjump(dtarget, list, fs);
+      } else if (GETARG_C(*controllingInstruction) != 0) {
+        LuaPatchTestRegisterField(treg, controllingInstruction);
+        luaK_fixjump(ttarget, list, fs);
+      } else {
+        LuaPatchTestRegisterField(freg, controllingInstruction);
+        luaK_fixjump(ftarget, list, fs);
+      }
+
+      list = next;
+    }
+  }
+
+  /**
+   * Address: 0x009102C0 (FUN_009102C0, dischargejpc)
+   *
+   * What it does:
+   * Retargets every jump that was left pending on `fs->jpc` to the instruction
+   * about to be emitted, then empties the pending list.
+   */
+  void luaK_dischargejpc(FuncState* const fs)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    patchlistaux(fs, fsView->jpc, fsView->pc, NO_REG, fsView->pc, NO_REG, fsView->pc);
+    fsView->jpc = NO_JUMP;
+  }
+
+  /**
+   * Address: 0x00910600 (FUN_00910600, luaK_code)
+   *
+   * IDA signature:
+   * int __cdecl luaK_code(FuncState *fs, Instruction i, int line);
+   *
+   * What it does:
+   * Appends one instruction plus its source line to the prototype being built,
+   * growing the code and lineinfo arrays on demand, and returns its pc.
+   */
+  extern "C" std::int32_t luaK_code(FuncState* const fs, const Instruction i, const int line)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    Proto* const f = fsView->f;
+
+    // `pc` will change, so resolve everything still waiting on it first.
+    luaK_dischargejpc(fs);
+
+    constexpr int kMaxArraySize = 0x7FFFFFFD;
+    if (fsView->pc + 1 > f->sizecode) {
+      f->code = static_cast<Instruction*>(luaM_growaux(
+        fsView->L,
+        f->code,
+        &f->sizecode,
+        static_cast<int>(sizeof(Instruction)),
+        kMaxArraySize,
+        "code size overflow"
+      ));
+    }
+    f->code[fsView->pc] = i;
+
+    if (fsView->pc + 1 > f->sizelineinfo) {
+      f->lineinfo = static_cast<int*>(luaM_growaux(
+        fsView->L,
+        f->lineinfo,
+        &f->sizelineinfo,
+        static_cast<int>(sizeof(int)),
+        kMaxArraySize,
+        "code size overflow"
+      ));
+    }
+    f->lineinfo[fsView->pc] = line;
+
+    return fsView->pc++;
+  }
+
+  /**
+   * Address: 0x009106B0 (FUN_009106B0, luaK_codeABC)
+   *
+   * What it does:
+   * Packs `o/a/b/c` into an iABC instruction and emits it at the lexer's
+   * current line.
+   */
+  extern "C" std::int32_t
+  luaK_codeABC(FuncState* const fs, const int o, const int a, const int b, const int c)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    return luaK_code(fs, CREATE_ABC(o, a, b, c), lexState->lastline);
+  }
+
+  /**
+   * Address: 0x009106E0 (FUN_009106E0, luaK_codeABx)
+   *
+   * What it does:
+   * Packs `o/a/bx` into an iABx instruction and emits it at the lexer's current
+   * line.
+   */
+  extern "C" std::int32_t
+  luaK_codeABx(FuncState* const fs, const int o, const int a, const unsigned int bc)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    return luaK_code(fs, CREATE_ABx(o, a, bc), lexState->lastline);
+  }
+
+  /**
+   * Address: 0x009105E0 (FUN_009105E0, luaK_fixline)
+   *
+   * What it does:
+   * Rewrites the source line recorded for the instruction emitted last.
+   */
+  extern "C" void luaK_fixline(FuncState* const fs, const int line)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    fsView->f->lineinfo[fsView->pc - 1] = line;
+  }
+
+  /**
+   * Address: 0x00910060 (FUN_00910060, luaK_getlabel)
+   *
+   * What it does:
+   * Marks the next instruction slot as a jump target - which blocks the
+   * peephole optimisations that assume straight-line flow - and returns it.
+   */
+  extern "C" std::int32_t luaK_getlabel(FuncState* const fs)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    fsView->lasttarget = fsView->pc;
+    return fsView->pc;
+  }
+
+  /**
+   * Address: 0x009107A0 (FUN_009107A0, luaK_jump)
+   *
+   * What it does:
+   * Emits an unconditional jump with an as-yet unknown destination and hands
+   * back its pc, folding any pending jumps into the same list.
+   */
+  extern "C" std::int32_t luaK_jump(FuncState* const fs)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+
+    const std::int32_t jpc = fsView->jpc; // save list of jumps to here
+    fsView->jpc = NO_JUMP;
+
+    std::int32_t j = luaK_code(
+      fs,
+      CREATE_ABx(OP_JMP, 0, static_cast<std::uint32_t>(NO_JUMP + LUA_MAXARG_sBx)),
+      lexState->lastline
+    );
+    luaK_concat(fs, &j, jpc); // keep them on hold
+    return j;
+  }
+
+  /**
+   * Address: 0x00910840 (FUN_00910840, luaK_patchtohere)
+   *
+   * What it does:
+   * Defers `list` until the next instruction is emitted, at which point
+   * luaK_code's dischargejpc pass will point it here.
+   */
+  extern "C" void luaK_patchtohere(FuncState* const fs, const std::int32_t list)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    luaK_getlabel(fs);
+    luaK_concat(fs, &fsView->jpc, list);
+  }
+
+  /**
+   * Address: 0x00910340 (FUN_00910340, luaK_checkstack)
+   *
+   * What it does:
+   * Raises the prototype's recorded stack requirement to cover `n` more
+   * registers, refusing anything that would exceed the Lua register limit.
+   */
+  extern "C" void luaK_checkstack(FuncState* const fs, const int n)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+
+    const std::int32_t newstack = fsView->freereg + n;
+    if (newstack > fsView->f->maxstacksize) {
+      if (newstack >= MAXSTACK) {
+        luaX_syntaxerror(lexState, "function or expression too complex");
+      }
+      fsView->f->maxstacksize = static_cast<lu_byte>(newstack);
+    }
+  }
+
+  /**
+   * Address: 0x00910380 (FUN_00910380, luaK_reserveregs)
+   *
+   * What it does:
+   * Claims the next `n` registers for the expression being compiled.
+   */
+  extern "C" void luaK_reserveregs(FuncState* const fs, const int n)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    luaK_checkstack(fs, n);
+    fsView->freereg += n;
+  }
+
+  /**
+   * Address: 0x00910490 (FUN_00910490, luaK_stringK)
+   *
+   * What it does:
+   * Interns one string into the prototype's constant table and returns its
+   * index.
+   */
+  extern "C" std::int32_t luaK_stringK(FuncState* const fs, TString* const s)
+  {
+    LuaPlus::TObject o;
+    o.tt = static_cast<int>(s->tt);
+    o.value.p = s;
+    return addk(&o, fs, &o);
+  }
+
+  /**
+   * Address: 0x009104C0 (FUN_009104C0, luaK_numberK)
+   *
+   * What it does:
+   * Interns one number into the prototype's constant table and returns its
+   * index.
+   */
+  extern "C" std::int32_t luaK_numberK(FuncState* const fs, const float r)
+  {
+    LuaPlus::TObject o;
+    o.tt = LUA_TNUMBER;
+    o.value.n = r;
+    return addk(&o, fs, &o);
+  }
+
+  /**
+   * Address: 0x00910710 (FUN_00910710, luaK_nil)
+   *
+   * What it does:
+   * Nils out `n` registers starting at `from`, extending the preceding
+   * OP_LOADNIL instead of emitting a second one whenever the two ranges touch.
+   */
+  extern "C" void luaK_nil(FuncState* const fs, const int from, const int n)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+
+    if (fsView->pc > fsView->lasttarget) { // no jumps to current position?
+      Instruction* const previous = &fsView->f->code[fsView->pc - 1];
+      if (GET_OPCODE(*previous) == OP_LOADNIL) {
+        const std::int32_t pfrom = GETARG_A(*previous);
+        const std::int32_t pto = GETARG_B(*previous);
+        if (pfrom <= from && from <= pto + 1) { // can connect both?
+          if (from + n - 1 > pto) {
+            SETARG_B(*previous, from + n - 1);
+          }
+          return;
+        }
+      }
+    }
+
+    luaK_codeABC(fs, OP_LOADNIL, from, from + n - 1, 0);
+  }
+
+  /**
+   * Address: 0x00910540 (FUN_00910540, luaK_setcallreturns)
+   *
+   * What it does:
+   * Rewrites the result count of a pending call expression. Asking for exactly
+   * one result also settles the expression into the register the call already
+   * writes to.
+   */
+  extern "C" void luaK_setcallreturns(FuncState* const fs, expdesc* const e, const int nresults)
+  {
+    if (e->k != VCALL) {
+      return;
+    }
+
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    Instruction* const call = &fsView->f->code[e->info];
+    SETARG_C(*call, nresults + 1);
+    if (nresults == 1) { // `regular' expression?
+      e->k = VNONRELOC;
+      e->info = GETARG_A(*call);
+    }
+  }
+
+  /**
+   * Address: 0x00910860 (FUN_00910860, luaK_dischargevars)
+   *
+   * What it does:
+   * Turns a variable reference into a value: locals are already in a register,
+   * upvalues/globals/table fields become the instruction that fetches them, and
+   * a pending call is trimmed to a single result.
+   */
+  extern "C" void luaK_dischargevars(FuncState* const fs, expdesc* const e)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+
+    switch (e->k) {
+    case VLOCAL:
+      e->k = VNONRELOC;
+      break;
+
+    case VUPVAL:
+      e->info = luaK_code(fs, CREATE_ABC(OP_GETUPVAL, 0, e->info, 0), lexState->lastline);
+      e->k = VRELOCABLE;
+      break;
+
+    case VGLOBAL:
+      e->info = luaK_code(fs, CREATE_ABx(OP_GETGLOBAL, 0, static_cast<std::uint32_t>(e->info)), lexState->lastline);
+      e->k = VRELOCABLE;
+      break;
+
+    case VINDEXED:
+      freereg(fs, e->aux);
+      freereg(fs, e->info);
+      e->info = luaK_codeABC(fs, OP_GETTABLE, 0, e->info, e->aux);
+      e->k = VRELOCABLE;
+      break;
+
+    case VCALL:
+      luaK_setcallreturns(fs, e, 1);
+      break;
+
+    default:
+      break; // there is one value available (somewhere)
+    }
+  }
+
+  /**
+   * Address: 0x00910AD0 (FUN_00910AD0, exp2reg)
+   *
+   * IDA signature:
+   * int __usercall exp2reg@<eax>(FuncState *fs@<eax>, expdesc *e, int reg);
+   *
+   * What it does:
+   * Settles an expression into `reg`. When the expression carries jump lists,
+   * the true and false sides are patched to land on a pair of OP_LOADBOOL
+   * labels so that whichever path runs leaves the value in `reg`.
+   */
+  void exp2reg(FuncState* const fs, expdesc* const e, const std::int32_t reg)
+  {
+    discharge2reg(e, reg, fs);
+    if (e->k == VJMP) {
+      luaK_concat(fs, &e->t, e->info); // put this jump in `t' list
+    }
+
+    if (e->t != e->f) { // expression has jumps
+      std::int32_t p_f = NO_JUMP; // position of an eventual LOAD false
+      std::int32_t p_t = NO_JUMP; // position of an eventual LOAD true
+
+      if (need_value(fs, e->t, 1) != 0 || need_value(fs, e->f, 0) != 0) {
+        const std::int32_t fj = (e->k != VJMP) ? luaK_jump(fs) : NO_JUMP;
+        p_f = code_label(reg, fs, 0, 1);
+        p_t = code_label(reg, fs, 1, 0);
+        luaK_patchtohere(fs, fj);
+      }
+
+      const std::int32_t finalLabel = luaK_getlabel(fs); // position after whole expression
+      patchlistaux(fs, e->f, p_f, NO_REG, finalLabel, reg, p_f);
+      patchlistaux(fs, e->t, finalLabel, reg, p_t, NO_REG, p_t);
+    }
+
+    e->f = NO_JUMP;
+    e->t = NO_JUMP;
+    e->info = reg;
+    e->k = VNONRELOC;
+  }
+
+  /**
+   * Address: 0x00910C00 (FUN_00910C00, luaK_exp2nextreg)
+   *
+   * What it does:
+   * Settles an expression into a freshly reserved register.
+   */
+  extern "C" void luaK_exp2nextreg(FuncState* const fs, expdesc* const e)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    luaK_dischargevars(fs, e);
+    freeexp(e, fs);
+    luaK_checkstack(fs, 1);
+    exp2reg(fs, e, fsView->freereg++);
+  }
+
+  /**
+   * Address: 0x00910C80 (FUN_00910C80, luaK_exp2anyreg)
+   *
+   * What it does:
+   * Settles an expression into whichever register is cheapest - the one it
+   * already occupies when that is legal, otherwise a fresh one - and returns it.
+   */
+  extern "C" std::int32_t luaK_exp2anyreg(FuncState* const fs, expdesc* const e)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    luaK_dischargevars(fs, e);
+
+    if (e->k == VNONRELOC) {
+      if (e->t == e->f) { // exp is not a test?
+        return e->info;   // result is already in a register
+      }
+      if (e->info >= fsView->nactvar) { // reg. is not a local?
+        exp2reg(fs, e, e->info);        // put value on it
+        return e->info;
+      }
+    }
+
+    luaK_exp2nextreg(fs, e); // default
+    return e->info;
+  }
+
+  /**
+   * Address: 0x00910CD0 (FUN_00910CD0, luaK_exp2val)
+   *
+   * What it does:
+   * Reduces an expression to a value, forcing it into a register only when it
+   * still carries jump lists.
+   */
+  extern "C" void luaK_exp2val(FuncState* const fs, expdesc* const e)
+  {
+    if (e->t != e->f) {
+      luaK_exp2anyreg(fs, e);
+    } else {
+      luaK_dischargevars(fs, e);
+    }
+  }
+
+  /**
+   * Address: 0x00910CF0 (FUN_00910CF0, luaK_exp2RK)
+   *
+   * What it does:
+   * Produces an RK operand: a constant index biased by MAXSTACK when the value
+   * is a constant that still fits the 9-bit field, otherwise a register.
+   */
+  extern "C" std::int32_t luaK_exp2RK(FuncState* const fs, expdesc* const e)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    luaK_exp2val(fs, e);
+
+    if (e->k == VNIL) {
+      if (fsView->nk + MAXSTACK <= MAXARG_C) { // constant fits in argC?
+        e->info = nil_constant(fs);
+        e->k = VK;
+        return e->info + MAXSTACK;
+      }
+    } else if (e->k == VK) {
+      if (e->info + MAXSTACK <= MAXARG_C) { // constant fits in argC?
+        return e->info + MAXSTACK;
+      }
+    }
+
+    return luaK_exp2anyreg(fs, e); // not a constant in the right range
+  }
+
+  /**
+   * Address: 0x00910D70 (FUN_00910D70, luaK_storevar)
+   *
+   * What it does:
+   * Emits the store that writes `ex` back through the variable reference in
+   * `var` - a register move for locals, SETUPVAL / SETGLOBAL / SETTABLE
+   * otherwise - and releases the value's register afterwards.
+   */
+  extern "C" void luaK_storevar(FuncState* const fs, expdesc* const var, expdesc* const ex)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+
+    switch (var->k) {
+    case VLOCAL:
+      freeexp(ex, fs);
+      exp2reg(fs, ex, var->info);
+      return;
+
+    case VUPVAL: {
+      const std::int32_t e = luaK_exp2anyreg(fs, ex);
+      luaK_code(fs, CREATE_ABC(OP_SETUPVAL, e, var->info, 0), lexState->lastline);
+      break;
+    }
+
+    case VGLOBAL: {
+      const std::int32_t e = luaK_exp2anyreg(fs, ex);
+      luaK_code(fs, CREATE_ABx(OP_SETGLOBAL, e, static_cast<std::uint32_t>(var->info)), lexState->lastline);
+      break;
+    }
+
+    case VINDEXED: {
+      const std::int32_t e = luaK_exp2RK(fs, ex);
+      luaK_codeABC(fs, OP_SETTABLE, var->info, var->aux, e);
+      break;
+    }
+
+    default:
+      break; // invalid var kind to store
+    }
+
+    freeexp(ex, fs);
+  }
+
+  /**
+   * Address: 0x00911070 (FUN_00911070, luaK_goiffalse)
+   *
+   * What it does:
+   * Emits the jumps that make control fall through only when the expression is
+   * false, collecting the true-side exits on `e->t`.
+   */
+  extern "C" void luaK_goiffalse(FuncState* const fs, expdesc* const e)
+  {
+    luaK_dischargevars(fs, e);
+
+    std::int32_t pc = NO_JUMP; // pc of last jump
+    switch (e->k) {
+    case VNIL:
+    case VFALSE:
+      pc = NO_JUMP; // always false; do nothing
+      break;
+
+    case VTRUE:
+      pc = luaK_jump(fs); // always jump
+      break;
+
+    case VJMP:
+      pc = e->info;
+      break;
+
+    default:
+      pc = jumponcond(fs, 1, e);
+      break;
+    }
+
+    luaK_concat(fs, &e->t, pc); // insert last jump in `t' list
+  }
+
+  /**
+   * Address: 0x009111F0 (FUN_009111F0, luaK_indexed)
+   *
+   * What it does:
+   * Folds a key expression into the table reference it indexes, producing a
+   * VINDEXED lane that dischargevars/storevar later turn into GETTABLE or
+   * SETTABLE.
+   */
+  extern "C" void luaK_indexed(FuncState* const fs, expdesc* const t, expdesc* const k)
+  {
+    t->aux = luaK_exp2RK(fs, k);
+    t->k = VINDEXED;
+  }
+
+  /**
+   * Address: 0x00911210 (FUN_00911210, luaK_prefix)
+   *
+   * What it does:
+   * Applies a unary operator. Negating a numeric constant is folded at compile
+   * time into a new constant; everything else becomes OP_UNM, and `not` is
+   * handled by codenot.
+   */
+  extern "C" void luaK_prefix(FuncState* const fs, const std::int32_t op, expdesc* const e)
+  {
+    if (op != OPR_MINUS) {
+      codenot(fs, e);
+      return;
+    }
+
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+
+    luaK_exp2val(fs, e);
+    LuaPlus::TObject* const constants = fsView->f->k;
+    if (e->k == VK && constants[e->info].tt == LUA_TNUMBER) {
+      e->info = luaK_numberK(fs, -constants[e->info].value.n);
+      return;
+    }
+
+    luaK_exp2anyreg(fs, e);
+    freeexp(e, fs);
+    e->info = luaK_code(fs, CREATE_ABC(OP_UNM, 0, e->info, 0), lexState->lastline);
+    e->k = VRELOCABLE;
+  }
+
+  /**
+   * Address: 0x009112D0 (FUN_009112D0, luaK_infix)
+   *
+   * What it does:
+   * Prepares the left operand once the binary operator is known: `and` / `or`
+   * emit their short-circuit jumps here, concat needs its operand stacked, and
+   * everything else only needs an RK operand.
+   */
+  extern "C" void luaK_infix(FuncState* const fs, const std::int32_t op, expdesc* const v)
+  {
+    switch (op) {
+    case OPR_AND:
+      luaK_goiftrue(fs, v);
+      luaK_patchtohere(fs, v->t);
+      v->t = NO_JUMP;
+      break;
+
+    case OPR_OR:
+      luaK_goiffalse(fs, v);
+      luaK_patchtohere(fs, v->f);
+      v->f = NO_JUMP;
+      break;
+
+    case OPR_CONCAT:
+      luaK_exp2nextreg(fs, v); // operand must be on the `stack'
+      break;
+
+    default:
+      luaK_exp2RK(fs, v);
+      break;
+    }
+  }
+
+  /**
+   * Address: 0x009113F0 (FUN_009113F0, luaK_posfix)
+   *
+   * What it does:
+   * Finishes a binary operator now that both operands exist. `and` / `or` merge
+   * the two jump lists, adjacent concats fuse into the single OP_CONCAT run the
+   * VM expects, and the rest go through codebinop.
+   */
+  extern "C" void
+  luaK_posfix(FuncState* const fs, const std::int32_t op, expdesc* const e1, expdesc* const e2)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+
+    switch (op) {
+    case OPR_AND:
+      luaK_dischargevars(fs, e2);
+      luaK_concat(fs, &e1->f, e2->f);
+      e1->k = e2->k;
+      e1->info = e2->info;
+      e1->aux = e2->aux;
+      e1->t = e2->t;
+      break;
+
+    case OPR_OR:
+      luaK_dischargevars(fs, e2);
+      luaK_concat(fs, &e1->t, e2->t);
+      e1->k = e2->k;
+      e1->info = e2->info;
+      e1->aux = e2->aux;
+      e1->f = e2->f;
+      break;
+
+    case OPR_CONCAT: {
+      luaK_exp2val(fs, e2);
+      Proto* const f = fsView->f;
+      if (e2->k == VRELOCABLE && GET_OPCODE(f->code[e2->info]) == OP_CONCAT) {
+        // `e1 .. (a .. b)` - widen the existing run instead of nesting.
+        freeexp(e1, fs);
+        SETARG_B(f->code[e2->info], e1->info);
+        e1->k = e2->k;
+        e1->info = e2->info;
+      } else {
+        luaK_exp2nextreg(fs, e2); // operand must be on the `stack'
+        freeexp(e2, fs);
+        freeexp(e1, fs);
+        e1->info = luaK_code(fs, CREATE_ABC(OP_CONCAT, 0, e1->info, e2->info), lexState->lastline);
+        e1->k = VRELOCABLE;
+      }
+      break;
+    }
+
+    default: {
+      const std::int32_t o1 = luaK_exp2RK(fs, e1);
+      const std::int32_t o2 = luaK_exp2RK(fs, e2);
+      freeexp(e2, fs);
+      freeexp(e1, fs);
+      codebinop(o2, op, o1, e1, fs);
+      break;
+    }
+    }
   }
 
   /**
