@@ -276,6 +276,17 @@ namespace moho
   void FILE_EnsureWaitHandleSet();
 
   /**
+   * Installs the mounted virtual file system and hands back the one it
+   * replaced, so the caller can destroy it.
+   *
+   * The binary stores straight into the wait-handle set at +0x4C from inside
+   * DISK_SetupDataAndSearchPaths (0x0045A369), the set being reachable there.
+   * Here that pointer is file-static, so the store needs a named door. This is
+   * a structural accommodation, not recovered behaviour of its own.
+   */
+  CVirtualFileSystem* DISK_ExchangeVFS(CVirtualFileSystem* virtualFileSystem);
+
+  /**
    * Address: 0x00457ED0 (FUN_00457ED0, Moho::GetFWaitHandleSet)
    *
    * What it does:
