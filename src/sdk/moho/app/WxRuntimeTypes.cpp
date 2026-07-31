@@ -11342,6 +11342,7 @@ namespace
     // window+0xE0 and +0xEC: a window may carry a palette of its own, which
     // its descendants borrow when the display is palettised.
     wxPaletteRuntime palette{};
+    wxCursorRuntime cursor{}; // window+0x68, its reference data at +0x6C
     std::uint8_t hasCustomPalette = 0;
     wxColourRuntime foregroundColour{}; // window+0x90
     void* dropTarget = nullptr;
@@ -13351,7 +13352,7 @@ namespace
       : wxEventRuntime(0, EnsureWxEvtSetCursorRuntimeType())
       , mX(0)
       , mY(0)
-      , mCursorStorage{0, 0, 0}
+      , mCursor{}
     {}
 
     /**
@@ -13365,9 +13366,10 @@ namespace
       : wxEventRuntime(source)
       , mX(source.mX)
       , mY(source.mY)
-      , mCursorStorage{source.mCursorStorage[0], source.mCursorStorage[1], source.mCursorStorage[2]}
+      , mCursor(source.mCursor)
     {
-      auto* const sharedCursorRefData = reinterpret_cast<WxObjectRefDataRuntimeView*>(mCursorStorage[1]);
+      // Both events now name the same cursor, so it gains a reference.
+      auto* const sharedCursorRefData = reinterpret_cast<WxObjectRefDataRuntimeView*>(mCursor.mRefData);
       if (sharedCursorRefData != nullptr) {
         ++sharedCursorRefData->refCount;
       }
@@ -13380,8 +13382,15 @@ namespace
 
     std::int32_t mX = 0;
     std::int32_t mY = 0;
-    std::int32_t mCursorStorage[3] = {0, 0, 0};
+    // The cursor a handler wants shown; it was an untyped three-int block
+    // before wxCursor existed, and the copy constructor already read the
+    // middle word as the reference data.
+    wxCursorRuntime mCursor{};
   };
+  static_assert(
+    offsetof(WxSetCursorEventFactoryRuntime, mCursor) == 0x28,
+    "wxSetCursorEvent::m_cursor offset must be 0x28"
+  );
   static_assert(sizeof(WxSetCursorEventFactoryRuntime) == 0x34, "WxSetCursorEventFactoryRuntime size must be 0x34");
 
   class WxWindowCreateEventFactoryRuntime final : public wxCommandEventRuntime
@@ -33386,6 +33395,95 @@ namespace
   }
 } // namespace
 
+namespace
+{
+  // gs_wxBusyCursorCount and gs_wxBusyCursor, behind the two accessors the
+  // binary reads them through (0x009C7C30 and 0x009C7BA0).
+  std::int32_t gWxBusyCursorCount = 0;
+  void* gWxBusyCursor = nullptr;
+
+  // dword_00F8F6B8: the cursor a window falls back to when it has none of its
+  // own and nothing else has claimed one.
+  wxCursorRuntime* gWxGlobalCursor = nullptr;
+
+  [[nodiscard]] bool WxIsBusyRuntime() noexcept { return gWxBusyCursorCount > 0; }
+  [[nodiscard]] void* WxGetBusyCursorRuntime() noexcept { return gWxBusyCursor; }
+} // namespace
+
+/**
+ * Address: 0x00969500 (FUN_00969500)
+ * Mangled: ?HandleSetCursor@wxWindow@@IAE_NPAXGI@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleSetCursor(wxWindow *this, WXHWND hWnd,
+ *                                           short hitTest, WXUINT msg);
+ *
+ * What it does:
+ * Chooses the cursor for a pointer sitting over this window's client area.
+ * Anywhere else - a border, the caption, a scrollbar - is left to Windows,
+ * which is what the hit-test check at the top is for.
+ *
+ * A handler gets first refusal, through an event carrying where the pointer is
+ * in client coordinates. Failing that the window's own cursor is used, but
+ * only when no handler took the event at all.
+ *
+ * The last two fallbacks belong to top-level windows alone: a child that has
+ * settled on nothing reports the message unhandled so the question passes to
+ * its parent, which is how a cursor set on a frame covers everything inside
+ * it. For a top-level window the busy cursor wins while the application is
+ * busy, and otherwise the global default applies.
+ */
+bool wxWindowMswRuntime::HandleSetCursor(
+  const unsigned int hitTestCode
+)
+{
+  constexpr unsigned int kHitTestClientArea = 1u; // HTCLIENT
+  if (hitTestCode != kHitTestClientArea) {
+    return false;
+  }
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  void* chosenCursor = nullptr;
+
+  POINT cursorPosition{};
+  (void)::GetCursorPos(&cursorPosition);
+
+  std::int32_t clientX = cursorPosition.x;
+  std::int32_t clientY = cursorPosition.y;
+  DoScreenToClient(&clientX, &clientY);
+
+  WxSetCursorEventFactoryRuntime event{};
+  event.mEventObject = this;
+  event.mX = clientX;
+  event.mY = clientY;
+
+  const bool handled = GetEventHandler()->ProcessEvent(&event);
+  if (handled && event.mCursor.Ok()) {
+    (void)::SetCursor(static_cast<HCURSOR>(event.mCursor.GetNativeCursor()));
+    return true;
+  }
+
+  if (!handled && state != nullptr && state->cursor.Ok()) {
+    chosenCursor = state->cursor.GetNativeCursor();
+  }
+
+  const bool isTopLevel = state == nullptr || state->parentWindow == nullptr;
+  if (isTopLevel && chosenCursor == nullptr) {
+    if (WxIsBusyRuntime()) {
+      chosenCursor = WxGetBusyCursorRuntime();
+    } else if (gWxGlobalCursor != nullptr && gWxGlobalCursor->Ok()) {
+      chosenCursor = gWxGlobalCursor->GetNativeCursor();
+    }
+  }
+
+  if (chosenCursor == nullptr) {
+    return false;
+  }
+
+  (void)::SetCursor(static_cast<HCURSOR>(chosenCursor));
+  return true;
+}
+
 /**
  * Address: 0x0096A760 (FUN_0096A760)
  * Mangled: ?HandleJoystickEvent@wxWindow@@IAE_NIHHI@Z
@@ -35257,6 +35355,11 @@ long wxWindowMswRuntime::MSWWindowProc(
     }
     return MSWDefWindowProc(message, wParam, lParam);
   }
+
+  case WM_SETCURSOR:
+    // The hit-test code rides in the low half of lParam.
+    processed = HandleSetCursor(LOWORD(lParam));
+    break;
 
   case kJoystick1Move:
   case kJoystick2Move:
