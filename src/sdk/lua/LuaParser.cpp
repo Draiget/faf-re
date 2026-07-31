@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cctype>
+#include <climits>
 #include <cmath>
 #include <cstring>
 #include <utility>
@@ -663,6 +664,11 @@ namespace
     std::int32_t luaZ_fill(LuaZioRuntimeView* stream);
     void luaO_chunkid(char* out, const char* source, int bufflen);
     int luaO_log2(unsigned int x);
+    int luaO_str2d(const char* s, float* result);
+    void inclinenumber(LexState* ls);
+    std::int32_t read_numeral(LexState* ls, int period, SemInfo* seminfo);
+    void read_long_string(LexState* ls, SemInfo* seminfo);
+    void read_string(LexState* ls, int del, SemInfo* seminfo);
     unsigned int luaO_int2fb(unsigned int x);
     void funcargs(LexState* ls, expdesc* f);
     void recfield(LexState* ls, ConsControl* cc);
@@ -801,6 +807,17 @@ namespace
    * buffer when it runs dry. This is llex.c's `next` macro; the parser's `next`
    * is a different thing (luaX_next, which reads a whole token).
    */
+  std::size_t ReadIdentifierName(char firstCharacter, LexState* lexState);
+
+  /**
+   * What it does:
+   * True for a lowercased hexadecimal digit.
+   */
+  [[nodiscard]] constexpr bool IsHexDigit(const int lowercased) noexcept
+  {
+    return (lowercased >= '0' && lowercased <= '9') || (lowercased >= 'a' && lowercased <= 'f');
+  }
+
   std::int32_t nextchar(LexState* const ls)
   {
     auto* const z = static_cast<LuaZioRuntimeView*>(ls->z);
@@ -809,6 +826,534 @@ namespace
       ? static_cast<unsigned char>(*z->cursor++)
       : luaZ_fill(z);
     return ls->current;
+  }
+
+  // ---------------------------------------------------------------------
+  // llex.c - the scanner.
+  //
+  // Literals are assembled in the shared LexState scratch buffer, which grows
+  // on demand; `l` is the write cursor throughout, matching the original's
+  // save()/checkbuffer() macro pair.
+  // ---------------------------------------------------------------------
+
+  /**
+   * What it does:
+   * Makes room in the token scratch buffer for `length` bytes plus the slack
+   * the readers write past the cursor (llex.c's checkbuffer).
+   */
+  void checkbuffer(LexState* const ls, const std::int32_t length)
+  {
+    auto* const buff = static_cast<Mbuffer*>(ls->buff);
+    if (static_cast<std::size_t>(length + 5) > buff->buffsize) {
+      (void)luaZ_openspace(ls->L, buff, static_cast<std::size_t>(length + 32));
+    }
+  }
+
+  [[nodiscard]] char* lexbuffer(LexState* const ls) noexcept
+  {
+    return static_cast<Mbuffer*>(ls->buff)->buffer;
+  }
+
+  /**
+   * Address: 0x00918920 (FUN_00918920, inclinenumber)
+   *
+   * What it does:
+   * Steps over a newline and bumps the line counter.
+   */
+  extern "C" void inclinenumber(LexState* const ls)
+  {
+    nextchar(ls); // skip the '\n'
+    ++ls->linenumber;
+    if (ls->linenumber > MAX_INT) {
+      luaX_syntaxerror(ls, luaO_pushfstring(ls->L, "too many %s (limit=%d)", "lines in a chunk", MAX_INT));
+    }
+  }
+
+  /**
+   * Address: 0x00918440 (FUN_00918440, read_numeral)
+   *
+   * IDA signature:
+   * int __usercall read_numeral(LexState *LS, int period, SemInfo *seminfo);
+   *
+   * What it does:
+   * Scans a numeric literal. `period` says the leading '.' was already
+   * consumed. A `0x` prefix is scanned here as up to eight hex digits - this
+   * build accepts hex literals, stock Lua 5.0 does not - and everything else is
+   * assembled as text and handed to luaO_str2d.
+   */
+  extern "C" std::int32_t read_numeral(LexState* const ls, const int period, SemInfo* const seminfo)
+  {
+    std::int32_t l = 0;
+    bool isReal = false;
+    const bool startWithZero = (ls->current == '0');
+
+    checkbuffer(ls, 0);
+    if (period != 0) {
+      lexbuffer(ls)[l++] = '.';
+      isReal = true;
+    }
+
+    if (startWithZero) {
+      nextchar(ls); // skip the '0'
+      if (ls->current == 'x') {
+        nextchar(ls); // skip the 'x'
+        std::int32_t value = 0;
+        std::int32_t digits = 0;
+        do {
+          const int c = std::tolower(ls->current);
+          if (std::isdigit(c) != 0) {
+            value = value * 16 + (c - '0');
+          } else if (c >= 'a' && c <= 'f') {
+            value = value * 16 + (c - 'a' + 10);
+          }
+          nextchar(ls);
+          ++digits;
+        } while (digits < 8 && IsHexDigit(std::tolower(ls->current)));
+
+        seminfo->r = static_cast<float>(value);
+        return TK_NUMBER;
+      }
+
+      checkbuffer(ls, 1);
+      lexbuffer(ls)[l++] = '0';
+    }
+
+    while (std::isdigit(ls->current) != 0) {
+      checkbuffer(ls, l);
+      lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+      nextchar(ls);
+    }
+
+    if (ls->current == '.') {
+      lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+      isReal = true;
+      nextchar(ls);
+      if (ls->current == '.') {
+        // `1..x' could be a malformed number or a concatenation; either way the
+        // author has to say which.
+        lexbuffer(ls)[l++] = '.';
+        nextchar(ls);
+        lexbuffer(ls)[l] = '\0';
+        luaX_errorline(
+          ls,
+          "ambiguous syntax (decimal point x string concatenation)",
+          lexbuffer(ls),
+          ls->linenumber
+        );
+      }
+    }
+
+    while (std::isdigit(ls->current) != 0) {
+      checkbuffer(ls, l);
+      lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+      nextchar(ls);
+    }
+
+    if (ls->current == 'e' || ls->current == 'E') {
+      lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+      isReal = true;
+      nextchar(ls);
+      if (ls->current == '+' || ls->current == '-') {
+        lexbuffer(ls)[l++] = static_cast<char>(ls->current); // optional exponent sign
+        nextchar(ls);
+      }
+      while (std::isdigit(ls->current) != 0) {
+        checkbuffer(ls, l);
+        lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+        nextchar(ls);
+      }
+    }
+
+    lexbuffer(ls)[l] = '\0';
+    if (luaO_str2d(lexbuffer(ls), &seminfo->r) == 0) {
+      luaX_errorline(ls, isReal ? "malformed number" : "malformed integer", lexbuffer(ls), ls->linenumber);
+    }
+    return TK_NUMBER;
+  }
+
+  /**
+   * Address: 0x00918980 (FUN_00918980, read_long_string)
+   *
+   * IDA signature:
+   * void __usercall read_long_string(LexState *LS@<eax>, SemInfo *seminfo);
+   *
+   * What it does:
+   * Scans a `[[ ... ]]` literal, honouring nesting. A null `seminfo` means this
+   * is a long comment, in which case the text is discarded and the buffer is
+   * reset at every newline so a long comment costs no memory.
+   */
+  extern "C" void read_long_string(LexState* const ls, SemInfo* const seminfo)
+  {
+    std::int32_t cont = 0;
+    std::int32_t l = 0;
+
+    checkbuffer(ls, 0);
+    lexbuffer(ls)[l++] = '['; // save first '['
+    lexbuffer(ls)[l++] = static_cast<char>(ls->current); // save second '['
+    nextchar(ls); // skip the second '['
+    if (ls->current == '\n') {
+      inclinenumber(ls); // skip a newline right after the opening bracket
+    }
+
+    for (;;) {
+      checkbuffer(ls, l);
+      switch (ls->current) {
+      case kLuaEndOfStream:
+        lexbuffer(ls)[l] = '\0';
+        luaX_errorline(
+          ls,
+          (seminfo != nullptr) ? "unfinished long string" : "unfinished long comment",
+          "<eof>",
+          ls->linenumber
+        );
+        break;
+
+      case '[':
+        lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+        nextchar(ls);
+        if (ls->current == '[') {
+          ++cont;
+          lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+          nextchar(ls);
+        }
+        break;
+
+      case ']':
+        lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+        nextchar(ls);
+        if (ls->current == ']') {
+          if (cont == 0) {
+            lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+            nextchar(ls);
+            lexbuffer(ls)[l] = '\0';
+            if (seminfo != nullptr) {
+              // trim the two brackets off each end
+              seminfo->ts = luaS_newlstr(ls->L, lexbuffer(ls) + 2, static_cast<std::size_t>(l - 4));
+            }
+            return;
+          }
+          --cont;
+          lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+          nextchar(ls);
+        }
+        break;
+
+      case '\n':
+        lexbuffer(ls)[l++] = '\n';
+        inclinenumber(ls);
+        if (seminfo == nullptr) {
+          l = 0; // a comment keeps nothing, so reuse the buffer
+        }
+        break;
+
+      default:
+        lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+        nextchar(ls);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00918C40 (FUN_00918C40, read_string)
+   *
+   * IDA signature:
+   * TString *__usercall read_string@<eax>(LexState *LS@<eax>, int del, SemInfo *seminfo);
+   *
+   * What it does:
+   * Scans a quoted string, resolving escapes. Alongside stock Lua's named and
+   * decimal escapes this build accepts `\xNN`.
+   */
+  extern "C" void read_string(LexState* const ls, const int del, SemInfo* const seminfo)
+  {
+    std::int32_t l = 0;
+
+    checkbuffer(ls, 0);
+    lexbuffer(ls)[l++] = static_cast<char>(ls->current); // save the delimiter
+    nextchar(ls);
+
+    while (ls->current != del) {
+      checkbuffer(ls, l);
+      switch (ls->current) {
+      case kLuaEndOfStream:
+        lexbuffer(ls)[l] = '\0';
+        luaX_errorline(ls, "unfinished string", "<eof>", ls->linenumber);
+        break;
+
+      case '\n':
+        lexbuffer(ls)[l] = '\0';
+        luaX_errorline(ls, "unfinished string", lexbuffer(ls), ls->linenumber);
+        break;
+
+      case '\\': {
+        nextchar(ls); // do not save the '\'
+        switch (ls->current) {
+        case 'a': lexbuffer(ls)[l++] = '\a'; nextchar(ls); break;
+        case 'b': lexbuffer(ls)[l++] = '\b'; nextchar(ls); break;
+        case 'f': lexbuffer(ls)[l++] = '\f'; nextchar(ls); break;
+        case 'n': lexbuffer(ls)[l++] = '\n'; nextchar(ls); break;
+        case 'r': lexbuffer(ls)[l++] = '\r'; nextchar(ls); break;
+        case 't': lexbuffer(ls)[l++] = '\t'; nextchar(ls); break;
+        case 'v': lexbuffer(ls)[l++] = '\v'; nextchar(ls); break;
+
+        case '\n':
+          lexbuffer(ls)[l++] = '\n';
+          inclinenumber(ls);
+          break;
+
+        case kLuaEndOfStream:
+          break; // will raise an error next loop
+
+        case 'x': {
+          nextchar(ls); // skip the 'x'
+          if (!IsHexDigit(std::tolower(ls->current))) {
+            lexbuffer(ls)[l++] = 'x'; // not an escape after all
+            break;
+          }
+
+          std::int32_t value = 0;
+          std::int32_t digits = 0;
+          for (;;) {
+            const int c = std::tolower(ls->current);
+            if (std::isdigit(c) != 0) {
+              value = value * 16 + (c - '0');
+            } else if (c >= 'a' && c <= 'f') {
+              value = value * 16 + (c - 'a' + 10);
+            }
+            nextchar(ls);
+            if (++digits >= 2 || !IsHexDigit(std::tolower(ls->current))) {
+              break;
+            }
+          }
+          lexbuffer(ls)[l++] = static_cast<char>(value);
+          break;
+        }
+
+        default:
+          if (std::isdigit(ls->current) == 0) {
+            lexbuffer(ls)[l++] = static_cast<char>(ls->current); // handles \\, \" and \'
+            nextchar(ls);
+            break;
+          }
+
+          std::int32_t value = 0;
+          std::int32_t digits = 0;
+          do {
+            value = value * 10 + (ls->current - '0');
+            nextchar(ls);
+            ++digits;
+          } while (digits < 3 && std::isdigit(ls->current) != 0);
+
+          if (value > UCHAR_MAX) {
+            lexbuffer(ls)[l] = '\0';
+            luaX_errorline(ls, "escape sequence too large", lexbuffer(ls), ls->linenumber);
+          }
+          lexbuffer(ls)[l++] = static_cast<char>(value);
+          break;
+        }
+        break;
+      }
+
+      default:
+        lexbuffer(ls)[l++] = static_cast<char>(ls->current);
+        nextchar(ls);
+        break;
+      }
+    }
+
+    lexbuffer(ls)[l++] = static_cast<char>(ls->current); // save the closing delimiter
+    nextchar(ls);
+    lexbuffer(ls)[l] = '\0';
+    // trim the delimiter off each end
+    seminfo->ts = luaS_newlstr(ls->L, lexbuffer(ls) + 1, static_cast<std::size_t>(l - 2));
+  }
+
+  /**
+   * Address: 0x00919100 (FUN_00919100, luaX_lex)
+   *
+   * IDA signature:
+   * int __cdecl luaX_lex(LexState *LS, SemInfo *seminfo);
+   *
+   * What it does:
+   * Produces the next token. Single characters return as themselves, reserved
+   * words return their code straight out of the interned string's `reserved`
+   * field, and literals fill `seminfo`.
+   *
+   * Three things here are not stock Lua 5.0: `<<` and `>>` are tokens, `!=` is
+   * accepted as a spelling of `~=`, and a UTF-8 byte-order mark at the start of
+   * a file is skipped rather than rejected as an invalid character.
+   */
+  extern "C" std::int32_t luaX_lex(LexState* const ls, SemInfo* const seminfo)
+  {
+    for (;;) {
+      switch (ls->current) {
+      case kLuaEndOfStream:
+        return TK_EOS;
+
+      case '\n':
+        inclinenumber(ls);
+        continue;
+
+      case '-':
+        nextchar(ls);
+        if (ls->current != '-') {
+          return '-';
+        }
+        nextchar(ls);
+        if (ls->current == '[') {
+          nextchar(ls);
+          if (ls->current == '[') {
+            read_long_string(ls, nullptr); // long comment
+            continue;
+          }
+        }
+        // else short comment: skip to end of line
+        while (ls->current != '\n' && ls->current != kLuaEndOfStream) {
+          nextchar(ls);
+        }
+        continue;
+
+      case '[':
+        nextchar(ls);
+        if (ls->current != '[') {
+          return '[';
+        }
+        read_long_string(ls, seminfo);
+        return TK_STRING;
+
+      case '=':
+        nextchar(ls);
+        if (ls->current != '=') {
+          return '=';
+        }
+        nextchar(ls);
+        return TK_EQ;
+
+      case '<':
+        nextchar(ls);
+        if (ls->current == '<') {
+          nextchar(ls);
+          return TK_BSHL;
+        }
+        if (ls->current == '=') {
+          nextchar(ls);
+          return TK_LE;
+        }
+        return '<';
+
+      case '>':
+        nextchar(ls);
+        if (ls->current == '>') {
+          nextchar(ls);
+          return TK_BSHR;
+        }
+        if (ls->current == '=') {
+          nextchar(ls);
+          return TK_GE;
+        }
+        return '>';
+
+      case '!':
+        nextchar(ls);
+        if (ls->current != '=') {
+          luaX_errorline(ls, "invalid character", "!", ls->linenumber);
+        }
+        nextchar(ls);
+        return TK_NE;
+
+      case '~':
+        nextchar(ls);
+        if (ls->current != '=') {
+          return '~';
+        }
+        nextchar(ls);
+        return TK_NE;
+
+      case '"':
+      case '\'':
+        read_string(ls, ls->current, seminfo);
+        return TK_STRING;
+
+      case '.':
+        nextchar(ls);
+        if (ls->current == '.') {
+          nextchar(ls);
+          if (ls->current == '.') {
+            nextchar(ls);
+            return TK_DOTS; // ...
+          }
+          return TK_CONCAT; // ..
+        }
+        if (std::isdigit(ls->current) == 0) {
+          return '.';
+        }
+        return read_numeral(ls, 1, seminfo);
+
+      case '#':
+        // `#' to end of line: the shebang guard in luaX_setinput only covers
+        // the first line, so treat it as a comment wherever else it appears.
+        nextchar(ls);
+        while (ls->current != '\n' && ls->current != kLuaEndOfStream) {
+          nextchar(ls);
+        }
+        continue;
+
+      default:
+        if ((ls->current & 0x80) != 0) {
+          // A UTF-8 byte-order mark is tolerated; any other high byte is not.
+          if (ls->current == '\xEF') {
+            nextchar(ls);
+            if (ls->current == '\xBB') {
+              nextchar(ls);
+              if (ls->current == '\xBF') {
+                nextchar(ls);
+                continue;
+              }
+            }
+          }
+          luaX_errorline(
+            ls,
+            "invalid character",
+            luaO_pushfstring(ls->L, "char(%d)", ls->current),
+            ls->linenumber
+          );
+          continue;
+        }
+
+        if (std::isspace(ls->current) != 0) {
+          nextchar(ls);
+          continue;
+        }
+
+        if (std::isdigit(ls->current) != 0) {
+          return read_numeral(ls, 0, seminfo);
+        }
+
+        if (std::isalpha(ls->current) != 0 || ls->current == '_') {
+          const std::size_t l = ReadIdentifierName(0, ls);
+          TString* const ts = luaS_newlstr(ls->L, lexbuffer(ls), l);
+          if (ts->reserved != 0) { // reserved word?
+            return static_cast<std::int32_t>(ts->reserved) + (FIRST_RESERVED - 1);
+          }
+          seminfo->ts = ts;
+          return TK_NAME;
+        }
+
+        {
+          const std::int32_t c = ls->current;
+          if (std::iscntrl(c) != 0) {
+            luaX_errorline(
+              ls,
+              "invalid control char",
+              luaO_pushfstring(ls->L, "char(%d)", c),
+              ls->linenumber
+            );
+          }
+          nextchar(ls);
+          return c; // single-char tokens (+ - / ...)
+        }
+      }
+    }
   }
 
   /**
@@ -955,7 +1500,7 @@ namespace
    * consuming `[A-Za-z0-9_]` continuation bytes from the input stream and
    * returning token length.
    */
-  [[maybe_unused]] std::size_t ReadIdentifierName(const char firstCharacter, LexState* const lexState)
+  std::size_t ReadIdentifierName(const char firstCharacter, LexState* const lexState)
   {
     auto* const buffer = static_cast<Mbuffer*>(lexState->buff);
     std::size_t length = 0;

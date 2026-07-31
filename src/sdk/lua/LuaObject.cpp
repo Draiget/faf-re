@@ -12613,6 +12613,36 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0091A5D0 (FUN_0091A5D0, luaO_str2d)
+	 *
+	 * IDA signature:
+	 * int __usercall luaO_str2d@<eax>(const char *s, Number *result);
+	 *
+	 * What it does:
+	 * Converts a numeric literal, accepting it only when the whole string is
+	 * consumed apart from trailing space. Returns 0 on anything else, which is
+	 * what makes `tonumber("1x")` nil.
+	 */
+	int luaO_str2d(const char* const s, float* const result)
+	{
+		char* end = nullptr;
+		const float value = static_cast<float>(std::strtod(s, &end));
+		if (end == s) {
+			return 0; // nothing converted
+		}
+
+		while (std::isspace(static_cast<unsigned char>(*end)) != 0) {
+			++end; // trailing space is fine
+		}
+		if (*end != '\0') {
+			return 0; // but nothing else is
+		}
+
+		*result = value;
+		return 1;
+	}
+
+	/**
 	 * Address: 0x0091A4E0 (FUN_0091A4E0, luaO_int2fb)
 	 *
 	 * IDA signature:
