@@ -221,7 +221,7 @@ namespace moho
     void SetVirtualLineCount(int lineCount) noexcept;
 
   public:
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
 
     std::uint8_t mUnknown004To107[0x104]{};
     void* mListViewHandle = nullptr; // +0x108

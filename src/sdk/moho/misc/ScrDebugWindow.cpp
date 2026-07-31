@@ -1065,7 +1065,7 @@ namespace
   }
 } // namespace
 
-void* moho::ScrDebugWindow::sm_eventTable[1] = {nullptr};
+wxEventTable moho::ScrDebugWindow::sm_eventTable = {nullptr, nullptr};
 
 /**
  * Address: 0x004BEB70 (FUN_004BEB70)
@@ -1145,7 +1145,7 @@ bool moho::ScrDebugWindow::OpenMountedSourcePathAndTrackRecent(const msvc8::stri
  */
 const void* moho::ScrDebugWindow::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**

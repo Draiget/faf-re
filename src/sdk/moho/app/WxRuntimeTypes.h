@@ -2440,7 +2440,7 @@ public:
     long result
   );
 
-  static void* sm_eventTable[1];
+  static wxEventTable sm_eventTable;
 };
 
 static_assert(sizeof(wxWindowMswRuntime) == 0x4, "wxWindowMswRuntime size must be 0x4");
@@ -4969,7 +4969,7 @@ public:
   std::int32_t OnApplyCommand(wxCommandEventRuntime& event);
 
   static void* sm_classInfo[1];
-  static void* sm_eventTable[1];
+  static wxEventTable sm_eventTable;
 
   std::uint8_t mUnknown15CTo16F[0x14]{};
 };
@@ -5214,7 +5214,7 @@ public:
   void SetItemText(const wxTreeItemIdRuntime& item, std::uint32_t column, const wxStringRuntime& text);
 
   static void* sm_classInfo[1];
-  static void* sm_eventTable[1];
+  static wxEventTable sm_eventTable;
 
   std::uint8_t mUnknown04To13F[0x13C]{};
 };
@@ -5554,6 +5554,11 @@ static_assert(
 );
 static_assert(sizeof(wxEventRuntime) == 0x20, "wxEventRuntime size must be 0x20");
 
+namespace moho
+{
+  struct wxDCRuntime;
+}
+
 /**
  * Minimal recovered `wxEraseEvent` runtime projection.
  *
@@ -5564,10 +5569,33 @@ static_assert(sizeof(wxEventRuntime) == 0x20, "wxEventRuntime size must be 0x20"
 class wxEraseEventRuntime : public wxEventRuntime
 {
 public:
+  explicit wxEraseEventRuntime(std::int32_t eventId = 0, std::int32_t eventType = 0)
+    : wxEventRuntime(eventId, eventType)
+  {}
+
   wxEraseEventRuntime* Clone() const override { return nullptr; }
 
-  void* mDeviceContext = nullptr; // +0x20
+  moho::wxDCRuntime* mDeviceContext = nullptr; // +0x20
 };
+
+/**
+ * Minimal recovered `wxPaintEvent` runtime projection.
+ *
+ * Evidence:
+ * - wxPaintEvent adds no payload of its own, so it is the bare 0x20-byte
+ *   wxEvent base; the erase event next to it is what carries a DC.
+ */
+class wxPaintEventRuntime : public wxEventRuntime
+{
+public:
+  explicit wxPaintEventRuntime(std::int32_t eventId = 0, std::int32_t eventType = 0)
+    : wxEventRuntime(eventId, eventType)
+  {}
+
+  wxPaintEventRuntime* Clone() const override { return nullptr; }
+};
+
+static_assert(sizeof(wxPaintEventRuntime) == 0x20, "wxPaintEventRuntime size must be 0x20");
 
 static_assert(offsetof(wxEraseEventRuntime, mDeviceContext) == 0x20, "wxEraseEventRuntime::mDeviceContext offset must be 0x20");
 static_assert(sizeof(wxEraseEventRuntime) == 0x24, "wxEraseEventRuntime size must be 0x24");
@@ -6143,7 +6171,7 @@ namespace moho
      */
     [[nodiscard]] const void* GetEventTable() const override;
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
   };
 
   /**
@@ -6187,7 +6215,7 @@ namespace moho
      */
     void OnEraseBackground(wxEraseEventRuntime& eraseEvent);
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
   };
 
   static_assert(offsetof(WBitmapPanel, mBitmapLane) == 0x134, "moho::WBitmapPanel::mBitmapLane offset must be 0x134");
@@ -6246,7 +6274,7 @@ namespace moho
      */
     void SetChecked(bool checked);
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
   };
 
   static_assert(
@@ -6304,7 +6332,7 @@ namespace moho
      */
     [[nodiscard]] bool TransferDataFromTextControl();
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
   };
 
   static_assert(
@@ -6634,19 +6662,12 @@ namespace moho
      */
     void RenderTerrainNormals(TerrainCommon* terrain);
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
   };
 
   static_assert(offsetof(WRenViewport, mRenderState0C) == 0x0C, "moho::WRenViewport::mRenderState0C offset must be 0x0C");
   static_assert(offsetof(WRenViewport, mEnabled) == 0x1D, "moho::WRenViewport::mEnabled offset must be 0x1D");
   static_assert(offsetof(WRenViewport, m_parent) == 0x2C, "moho::WRenViewport::m_parent offset must be 0x2C");
-
-  struct wxPaintEventRuntime
-  {
-    std::uint8_t mStorage[0x24];
-  };
-
-  static_assert(sizeof(wxPaintEventRuntime) == 0x24, "moho::wxPaintEventRuntime size must be 0x24");
 
   struct wxDCRuntime
   {
@@ -6756,6 +6777,21 @@ namespace moho
     void DrawBackgroundImage(wxDCRuntime& deviceContext);
 
     /**
+     * Address: 0x00430B70 (FUN_00430B70)
+     *
+     * IDA signature:
+     * void __stdcall sub_430B70(int event);
+     *
+     * What it does:
+     * Paints the viewport background on WM_ERASEBKGND, but only while the D3D
+     * device is absent or has asked for the background to be drawn - once the
+     * device is presenting, erasing underneath it would only flicker. Bound as
+     * the second row of this class's event table; `this` goes unused, which is
+     * why the decompiler shows it as a free __stdcall function.
+     */
+    void OnEraseBackground(wxEraseEventRuntime& eraseEvent);
+
+    /**
      * Address: 0x00430B90 (FUN_00430B90)
      * Mangled: ?MSWWindowProc@WD3DViewport@Moho@@UAEJIIJ@Z
      *
@@ -6765,7 +6801,7 @@ namespace moho
      */
     long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam) override;
 
-    static void* sm_eventTable[1];
+    static wxEventTable sm_eventTable;
     void* mD3DDevice = nullptr;
   };
 

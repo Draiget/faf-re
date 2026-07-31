@@ -1351,7 +1351,7 @@ bool CScApp::CreateAppFrame(
       secondaryHead.mWindow = reinterpret_cast<void*>(static_cast<std::uintptr_t>(frame->GetHandle()));
     }
 
-    moho::wxPaintEventRuntime paintEvent{};
+    wxPaintEventRuntime paintEvent{};
     viewport->OnPaint(paintEvent);
 
     moho::CD3DDevice* const device = moho::D3D_GetDevice();

@@ -65,7 +65,7 @@ namespace
   }
 } // namespace
 
-void* moho::ScrWatchCtrl::sm_eventTable[1] = {nullptr};
+wxEventTable moho::ScrWatchCtrl::sm_eventTable = {nullptr, nullptr};
 
 /**
  * Address: 0x004D6FE0 (FUN_004D6FE0, Moho::ScrWatchCtrl::GetEventTable)
@@ -75,7 +75,7 @@ void* moho::ScrWatchCtrl::sm_eventTable[1] = {nullptr};
  */
 const void* moho::ScrWatchCtrl::GetEventTable() const
 {
-  return sm_eventTable;
+  return &sm_eventTable;
 }
 
 /**
