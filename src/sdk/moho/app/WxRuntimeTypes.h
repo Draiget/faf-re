@@ -2293,6 +2293,36 @@ public:
   bool HandleEraseBkgnd(void* nativeDeviceContext);
 
   /**
+   * Address: 0x009696F0 (FUN_009696F0)
+   * Mangled: ?HandleDisplayChange@wxWindow@@IAE_NXZ
+   *
+   * What it does:
+   * Raises wxEVT_DISPLAY_CHANGED so a window can react to the screen
+   * resolution or colour depth changing under it.
+   */
+  bool HandleDisplayChange();
+
+  /**
+   * Address: 0x00968DC0 (FUN_00968DC0)
+   * Mangled: ?HandleQueryEndSession@wxWindow@@IAE_NJPA_N@Z
+   *
+   * What it does:
+   * Answers Windows asking whether the session may end, by offering the
+   * application a chance to object.
+   */
+  static bool HandleQueryEndSession(long logOff, bool* mayEnd);
+
+  /**
+   * Address: 0x00968E90 (FUN_00968E90)
+   * Mangled: ?HandleEndSession@wxWindow@@IAE_N_NJ@Z
+   *
+   * What it does:
+   * Tells the application the session really is ending, once, through the
+   * main window.
+   */
+  bool HandleEndSession(bool endSession, long logOff);
+
+  /**
    * Address: 0x0096A450 (FUN_0096A450)
    * Mangled: ?HandleMouseEvent@wxWindow@@IAE_NIHHI@Z
    *
