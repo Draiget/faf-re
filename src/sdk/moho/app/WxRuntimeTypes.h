@@ -1483,6 +1483,20 @@ public:
    */
   void OnInitDialog(wxEventRuntime& initDialogEvent);
 
+  /**
+   * Address: 0x00964960 (FUN_00964960)
+   * Mangled: ?OnSysColourChanged@wxWindowBase@@IAEXAAVwxSysColourChangedEvent@@@Z
+   *
+   * IDA signature:
+   * void __thiscall wxWindowBase::OnSysColourChanged(wxWindowBase *this,
+   *                                                  wxSysColourChangedEvent *event);
+   *
+   * What it does:
+   * Passes a system-colour change down to every child that is not a top-level
+   * window in its own right.
+   */
+  void OnSysColourChanged(wxEventRuntime& sysColourChangedEvent);
+
   static wxEventTable sm_eventTable;
   virtual void DoSetClientObject(void* clientObject) { (void)clientObject; }
   virtual void* DoGetClientObject() const { return nullptr; }
@@ -1743,8 +1757,36 @@ public:
     (void)parent;
     return false;
   }
-  virtual void AddChild(wxWindowBase* child) { (void)child; }
-  virtual void RemoveChild(wxWindowBase* child) { (void)child; }
+  /**
+   * Address: 0x009636F0 (FUN_009636F0)
+   * Mangled: ?AddChild@wxWindowBase@@UAEXPAV1@@Z
+   *
+   * IDA signature:
+   * wxObjectListNode *__thiscall wxWindowBase::AddChild(wxWindowBase *this, wxWindowBase *child);
+   *
+   * What it does:
+   * Takes a window into this one's child list and points it back at its new
+   * parent. Both halves had been missing, so the hierarchy had no downward
+   * links at all.
+   */
+  virtual void AddChild(wxWindowBase* child);
+
+  /**
+   * Address: 0x00963710 (FUN_00963710)
+   * Mangled: ?RemoveChild@wxWindowBase@@UAEXPAV1@@Z
+   *
+   * IDA signature:
+   * char __thiscall wxWindowBase::RemoveChild(wxWindowBase *this, wxWindowBase *child);
+   *
+   * What it does:
+   * Drops a window from this one's child list and orphans it.
+   */
+  virtual void RemoveChild(wxWindowBase* child);
+
+  /**
+   * The windows parented to this one, in the order they were added.
+   */
+  [[nodiscard]] std::span<wxWindowBase* const> GetChildren() const;
   virtual void SetValidator(const void* validator) { (void)validator; }
   virtual void* GetValidator() { return nullptr; }
   virtual bool Validate() { return false; }
