@@ -600,13 +600,36 @@ namespace
    * Validates windowed command-line option arguments as two positive
    * integer dimensions.
    */
+  // Deliberate deviation from the shipped binary, for development only.
+  //
+  // The binary treats a missing or malformed /windowed as a request for
+  // fullscreen, which takes the whole display the moment the engine starts and
+  // rearranges every other window on the desktop. That is the wrong default
+  // while the engine is being launched dozens of times a day under a debugger,
+  // so an unspecified mode means windowed here and fullscreen has to be asked
+  // for by name. Pass /fullscreen for the binary's own behaviour.
+  constexpr const char* kDevelopmentWindowedWidth = "1024";
+  constexpr const char* kDevelopmentWindowedHeight = "768";
+
   [[nodiscard]] bool TryGetWindowedOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
   {
-    if (!moho::CFG_GetArgOptionAliases(moho::CFG_GetWindowedOptionAliases(), 2, outArgs)) {
+    if (moho::CFG_GetArgOptionAliases(moho::CFG_GetWindowedOptionAliases(), 2, outArgs)
+      && outArgs->size() == 2
+      && IsPositiveIntegerArg((*outArgs)[0])
+      && IsPositiveIntegerArg((*outArgs)[1])) {
+      return true;
+    }
+
+    // Asked for fullscreen by name: let the caller fall through to it.
+    msvc8::vector<msvc8::string> fullscreenArgs;
+    if (moho::CFG_GetArgOption("fullscreen", 0, &fullscreenArgs)) {
       return false;
     }
 
-    return outArgs->size() == 2 && IsPositiveIntegerArg((*outArgs)[0]) && IsPositiveIntegerArg((*outArgs)[1]);
+    outArgs->clear();
+    outArgs->push_back(msvc8::string(kDevelopmentWindowedWidth));
+    outArgs->push_back(msvc8::string(kDevelopmentWindowedHeight));
+    return true;
   }
 
   [[nodiscard]] bool IsDisabledAdapterToken(const msvc8::string& value)
