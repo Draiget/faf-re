@@ -11436,6 +11436,7 @@ namespace
     // its descendants borrow when the display is palettised.
     wxPaletteRuntime palette{};
     wxCursorRuntime cursor{}; // window+0x68, its reference data at +0x6C
+    wxRegionRuntime updateRegion{}; // window+0xA4: the part needing repaint
     std::uint8_t hasCustomPalette = 0;
     wxColourRuntime foregroundColour{}; // window+0x90
     void* dropTarget = nullptr;
@@ -33844,6 +33845,66 @@ bool wxWindowMswRuntime::HandleCtlColor(
   return true;
 }
 
+/**
+ * Address: 0x00969CA0 (FUN_00969CA0)
+ * Mangled: ?HandlePaint@wxWindow@@IAE_NXZ
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandlePaint(wxWindow *this);
+ *
+ * What it does:
+ * Records which part of the window Windows says needs redrawing, then asks
+ * for it to be painted.
+ *
+ * The update region is taken before either event goes out, because a handler
+ * is entitled to ask what needs redrawing and clipping to it is the whole
+ * point of being told. It is shared into the window rather than copied - one
+ * region, two owners - which is why the temporary built around the handle can
+ * be discarded immediately.
+ *
+ * Two events follow: the client area, then the frame around it. Only the
+ * first decides whether the message was handled; whether anything wanted the
+ * non-client area does not change the answer.
+ */
+bool wxWindowMswRuntime::HandlePaint()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  auto* const window = reinterpret_cast<HWND>(
+    static_cast<std::uintptr_t>(state != nullptr ? state->nativeHandle : 0u)
+  );
+
+  HRGN const updateRegion = ::CreateRectRgn(0, 0, 0, 0);
+  (void)::GetUpdateRgn(window, updateRegion, FALSE);
+
+  // Sharing a new region into the window drops whatever it held before. The
+  // binary does this through the reference count; here the window is the only
+  // owner by the time the temporary is gone, so releasing the old one outright
+  // is the same thing - and skipping it would leak a GDI region on every
+  // single paint.
+  wxRegionRuntime& windowRegion = EnsureWxWindowBaseRuntimeState(this).updateRegion;
+  if (windowRegion.mRefData != nullptr) {
+    if (windowRegion.mRefData->mNativeRegion != nullptr) {
+      (void)::DeleteObject(static_cast<HRGN>(windowRegion.mRefData->mNativeRegion));
+    }
+    delete windowRegion.mRefData;
+  }
+  windowRegion.mRefData = new (std::nothrow) wxRegionRefDataRuntime{nullptr, 1, updateRegion};
+
+  const std::int32_t windowId = state != nullptr ? state->windowId : -1;
+
+  WxPaintEventFactoryRuntime paintEvent{};
+  paintEvent.mEventId = windowId;
+  paintEvent.mEventObject = this;
+  const bool processed = GetEventHandler()->ProcessEvent(&paintEvent);
+
+  WxNcPaintEventFactoryRuntime nonClientPaintEvent{};
+  nonClientPaintEvent.mEventId = windowId;
+  nonClientPaintEvent.mEventObject = this;
+  (void)GetEventHandler()->ProcessEvent(&nonClientPaintEvent);
+
+  return processed;
+}
+
 bool wxWindowMswRuntime::IsMouseInWindow() const
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
@@ -36204,6 +36265,10 @@ long wxWindowMswRuntime::MSWWindowProc(
 
   case WM_ENDSESSION:
     processed = HandleEndSession(wParam != 0u, static_cast<long>(lParam));
+    break;
+
+  case WM_PAINT:
+    processed = HandlePaint();
     break;
 
   case WM_ERASEBKGND:

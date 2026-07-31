@@ -1417,6 +1417,42 @@ static_assert(offsetof(wxEventTable, entries) == 0x04, "wxEventTable::entries of
 static_assert(sizeof(wxEventTable) == 0x08, "wxEventTable size must be 0x08");
 
 /**
+ * A region - an arbitrary shape, used here for the part of a window that
+ * needs repainting.
+ *
+ * Same shared-handle shape as wxPalette and wxCursor: the native handle lives
+ * in reference data so copies name one region rather than duplicating it.
+ * Offsets from the constructor at 0x0097BB30, which allocates twelve bytes of
+ * reference data, sets its count to one and stores the handle at +0x08.
+ */
+struct wxRegionRefDataRuntime
+{
+  void* mVTable = nullptr;      // +0x00
+  std::int32_t mRefCount = 0;   // +0x04
+  void* mNativeRegion = nullptr; // +0x08
+};
+
+static_assert(
+  offsetof(wxRegionRefDataRuntime, mNativeRegion) == 0x08,
+  "wxRegionRefDataRuntime::mNativeRegion offset must be 0x08"
+);
+
+struct wxRegionRuntime
+{
+  void* mVTable = nullptr;                    // +0x00
+  wxRegionRefDataRuntime* mRefData = nullptr; // +0x04
+  std::uint8_t mReserved08[0x4]{};            // +0x08
+
+  [[nodiscard]] void* GetNativeRegion() const noexcept
+  {
+    return mRefData != nullptr ? mRefData->mNativeRegion : nullptr;
+  }
+};
+
+static_assert(offsetof(wxRegionRuntime, mRefData) == 0x04, "wxRegionRuntime::mRefData offset must be 0x04");
+static_assert(sizeof(wxRegionRuntime) == 0xC, "wxRegionRuntime size must be 0xC");
+
+/**
  * A logical palette.
  *
  * The native handle lives in the shared reference data rather than in the
@@ -2533,6 +2569,16 @@ public:
     unsigned int wParam,
     long lParam
   );
+
+  /**
+   * Address: 0x00969CA0 (FUN_00969CA0)
+   * Mangled: ?HandlePaint@wxWindow@@IAE_NXZ
+   *
+   * What it does:
+   * Records which part of the window needs redrawing and asks for it to be
+   * painted.
+   */
+  bool HandlePaint();
 
   bool HandleSetCursor(unsigned int hitTestCode);
 
