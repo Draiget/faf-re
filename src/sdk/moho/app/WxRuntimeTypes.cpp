@@ -11249,6 +11249,11 @@ namespace
     long extraStyle = 0;
     unsigned long nativeHandle = 0;
     long previousWindowProc = 0;
+    // wxEvtHandler lanes: whether this handler is listening, its dynamic
+    // bindings, and the next handler in the chain.
+    std::uint8_t handlerEnabled = 1;
+    void* dynamicEvents = nullptr;
+    wxWindowBase* nextHandler = nullptr;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
     wxWindowBase* eventHandler = nullptr;
@@ -33359,6 +33364,127 @@ void wxWindowMswRuntime::DestroyNativeWindow()
 
   (void)::DestroyWindow(hwnd);
   wxRemoveHandleAssociation(this);
+}
+
+namespace
+{
+  // An event-table entry holds its handler in one pointer-sized slot, which is
+  // what a member-function pointer to a single-inheritance class is on this
+  // ABI. Round-tripping through the stored void* is how the table stays the
+  // 0x14 bytes the binary lays out.
+  using WxEventTableHandlerFn = void (wxWindowBase::*)(wxEventRuntime&);
+
+  void InvokeWxEventTableHandler(wxWindowBase* const handler, void* const storedFn, wxEventRuntime& event)
+  {
+    static_assert(
+      sizeof(WxEventTableHandlerFn) == sizeof(void*),
+      "event-table handlers must fit the single pointer the table reserves"
+    );
+    WxEventTableHandlerFn memberFn{};
+    std::memcpy(&memberFn, &storedFn, sizeof(storedFn));
+    (handler->*memberFn)(event);
+  }
+} // namespace
+
+/**
+ * Address: 0x00979900 (FUN_00979900)
+ * Mangled: ?SearchEventTable@wxEvtHandler@@UAE_NAAUwxEventTable@@AAVwxEvent@@@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxEvtHandler::SearchEventTable(wxEvtHandler *this,
+ *                                                wxEventTable *table, wxEvent *event);
+ *
+ * What it does:
+ * Looks for a handler in one table. An entry matches when the event type is the
+ * same and the id falls in its range - an m_id of -1 matches any id, and an
+ * m_lastId of -1 means the entry names a single id rather than a range. The
+ * handler runs with m_skipped cleared, so calling Skip() inside it is what makes
+ * this report the event as unhandled after all.
+ */
+bool wxWindowBase::SearchEventTable(void* const eventTable, void* const event)
+{
+  const auto* const table = static_cast<const wxEventTable*>(eventTable);
+  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
+  if (table == nullptr || wxEvent == nullptr) {
+    return false;
+  }
+
+  const wxEventTableEntry* entry = table->entries;
+  if (entry == nullptr || entry->m_fn == nullptr) {
+    return false;
+  }
+
+  const std::int32_t eventType = wxEvent->mEventType;
+  const std::int32_t eventId = wxEvent->mEventId;
+
+  for (; entry->m_fn != nullptr; ++entry) {
+    if (entry->m_eventType == nullptr || *entry->m_eventType != eventType) {
+      continue;
+    }
+
+    const bool matches = (entry->m_id == -1)
+      || (entry->m_lastId == -1
+            ? (eventId == entry->m_id)
+            : (eventId >= entry->m_id && eventId <= entry->m_lastId));
+    if (!matches) {
+      continue;
+    }
+
+    wxEvent->mSkipped = 0;
+    wxEvent->mCallbackUserData = entry->m_callbackUserData;
+    InvokeWxEventTableHandler(this, entry->m_fn, *wxEvent);
+    return wxEvent->mSkipped == 0;
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x0097AF30 (FUN_0097AF30)
+ * Mangled: ?ProcessEvent@wxEvtHandler@@UAE_NAAVwxEvent@@@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxEvtHandler::ProcessEvent(wxEvtHandler *this, wxEvent *event);
+ *
+ * What it does:
+ * Offers an event to everything that could handle it, in the order wx defines:
+ * this handler's dynamic bindings, then its static event table and every
+ * base-class table behind it, then the next handler in the chain, then the
+ * application object.
+ *
+ * The binary consults wxTheApp->FilterEvent first and returns outright if it
+ * gives a verdict. wxAppBase::FilterEvent (0x009AA9D0) is two instructions -
+ * `return -1`, meaning no opinion - and nothing in this binary overrides it, so
+ * that step can only ever fall through and is left out rather than modelled as
+ * a call that always declines.
+ */
+bool wxWindowBase::ProcessEvent(void* const event)
+{
+  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
+  if (wxEvent == nullptr) {
+    return false;
+  }
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  if (state == nullptr || state->handlerEnabled != 0) {
+    // Static tables: this class's, then each base class's behind it.
+    for (const auto* table = static_cast<const wxEventTable*>(GetEventTable());
+         table != nullptr;
+         table = table->baseTable) {
+      if (SearchEventTable(const_cast<wxEventTable*>(table), event)) {
+        return true;
+      }
+    }
+  }
+
+  if (state != nullptr && state->nextHandler != nullptr) {
+    if (state->nextHandler->ProcessEvent(event)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 unsigned long wxWindowBase::GetHandle() const
