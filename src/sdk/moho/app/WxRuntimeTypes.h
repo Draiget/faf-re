@@ -2213,6 +2213,20 @@ public:
   bool HandleGetMinMaxInfo(void* minMaxInfo);
 
   /**
+   * Address: 0x00969DF0 (FUN_00969DF0)
+   * Mangled: ?HandleEraseBkgnd@wxWindow@@IAE_NPAX@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxWindow::HandleEraseBkgnd(wxWindow *this, HDC hdc);
+   *
+   * What it does:
+   * Turns WM_ERASEBKGND into wxEVT_ERASE_BACKGROUND, wrapping the handle the
+   * message supplied in a borrowed device context so a handler can draw
+   * through it.
+   */
+  bool HandleEraseBkgnd(void* nativeDeviceContext);
+
+  /**
    * Address: 0x00969F40 (FUN_00969F40)
    * Mangled: ?OnEraseBackground@wxWindow@@IAEXAAVwxEraseEvent@@@Z
    *
@@ -3507,6 +3521,14 @@ public:
 
   [[nodiscard]] void* GetNativeHandle() const noexcept { return m_hDC; }
 
+  // Drops a handle this context never owned, so destroying it cannot take the
+  // lender's handle down too.
+  void ForgetNativeHandle() noexcept
+  {
+    m_bOwnsDC &= static_cast<std::uint8_t>(~1u);
+    m_hDC = nullptr;
+  }
+
   /**
    * The three drawing calls WD3DViewport::DrawBackgroundImage (0x00430A60)
    * dispatches through, at vtable slots +0x3C, +0xE8 and +0xC4 - the same
@@ -3520,6 +3542,19 @@ public:
     std::int32_t width,
     std::int32_t height
   ) noexcept;
+
+  /**
+   * Address: 0x009CAAA0 (FUN_009CAAA0)
+   * Mangled: ?InitializePalette@wxDC@@IAEXXZ
+   *
+   * IDA signature:
+   * void __thiscall wxDC::InitializePalette(wxDC *this);
+   *
+   * What it does:
+   * Adopts the palette of the nearest ancestor that has a custom one, and
+   * selects it into the context - but only on a palettised display.
+   */
+  void InitializePalette();
 
   void* m_canvas = nullptr;                  // +0xE8 the window being drawn on
   void* m_selectedBitmap = nullptr;          // +0xEC wxBitmap, 0xC bytes
@@ -3543,6 +3578,34 @@ static_assert(offsetof(wxDC, m_oldPen) == 0x104, "wxDC::m_oldPen offset must be 
 static_assert(offsetof(wxDC, m_oldBrush) == 0x108, "wxDC::m_oldBrush offset must be 0x108");
 static_assert(offsetof(wxDC, m_oldFont) == 0x10C, "wxDC::m_oldFont offset must be 0x10C");
 static_assert(offsetof(wxDC, m_oldPalette) == 0x110, "wxDC::m_oldPalette offset must be 0x110");
+
+/**
+ * A device context borrowed from somewhere else.
+ *
+ * The handle belongs to whoever supplied it - m_bOwnsDC stays clear - so
+ * destroying one of these must not destroy the DC. The binary builds these
+ * inline by constructing a wxDC and overwriting its vtable pointer, which is
+ * exactly what a wxDCTemp constructor compiles to.
+ */
+class wxDCTemp : public wxDC
+{
+public:
+  wxDCTemp(void* nativeDeviceContext, wxWindowBase* canvas) noexcept;
+  ~wxDCTemp() override = default;
+
+  /**
+   * Address: 0x009CA520 (FUN_009CA520)
+   * Mangled: ?SelectOldObjects@wxDCTemp@@IAEXPAX@Z
+   *
+   * IDA signature:
+   * void __thiscall wxDCTemp::SelectOldObjects(wxDC *this, HDC hdc);
+   *
+   * What it does:
+   * Puts back every GDI object this context displaced, in the order the
+   * binary does, and forgets the backups so a second call is harmless.
+   */
+  void SelectOldObjects(void* nativeDeviceContext) noexcept;
+};
 
 class wxMemoryDC : public wxDC
 {

@@ -32633,6 +32633,159 @@ bool wxWindowMswRuntime::ContainsHWND(
 }
 
 /**
+ * Address: 0x009CAAA0 (FUN_009CAAA0)
+ * Mangled: ?InitializePalette@wxDC@@IAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall wxDC::InitializePalette(wxDC *this);
+ *
+ * What it does:
+ * Nothing at all unless the display is palettised - the binary's whole body
+ * sits behind `wxDisplayDepth() <= 8`. On anything deeper than 8 bits per
+ * pixel, which is every display this engine will meet, there is no logical
+ * palette to adopt and the call is a no-op.
+ *
+ * The palettised branch would walk up to the nearest ancestor holding a custom
+ * palette, take a reference to it and select it in. That needs wxPalette and
+ * wxWindowBase::GetAncestorWithCustomPalette, neither of which is recovered;
+ * it is left out rather than guessed, and cannot be reached on a display this
+ * decade.
+ */
+void wxDC::InitializePalette()
+{
+  HDC const screen = ::GetDC(nullptr);
+  if (screen == nullptr) {
+    return;
+  }
+
+  const int displayDepth = ::GetDeviceCaps(screen, BITSPIXEL) * ::GetDeviceCaps(screen, PLANES);
+  (void)::ReleaseDC(nullptr, screen);
+
+  if (displayDepth > 8) {
+    return;
+  }
+}
+
+/**
+ * Address: 0x009CA520 (FUN_009CA520)
+ * Mangled: ?SelectOldObjects@wxDCTemp@@IAEXPAX@Z
+ *
+ * IDA signature:
+ * void __thiscall wxDCTemp::SelectOldObjects(wxDC *this, HDC hdc);
+ *
+ * What it does:
+ * Puts back every GDI object this context displaced - bitmap, pen, brush,
+ * font, then palette, in that order - and forgets each backup as it goes, so
+ * calling it twice is harmless.
+ */
+void wxDCTemp::SelectOldObjects(
+  void* const nativeDeviceContext
+) noexcept
+{
+  auto* const deviceContext = static_cast<HDC>(nativeDeviceContext);
+  if (deviceContext == nullptr) {
+    return;
+  }
+
+  if (m_oldBitmap != nullptr) {
+    (void)::SelectObject(deviceContext, m_oldBitmap);
+    // The binary also clears the "still selected" flag inside the wxBitmap it
+    // was holding. wxBitmap's reference data is not recovered, so that part is
+    // left out; nothing in this tree selects a bitmap into a DC, which is the
+    // only way m_oldBitmap becomes non-null.
+    m_oldBitmap = nullptr;
+  }
+
+  if (m_oldPen != nullptr) {
+    (void)::SelectObject(deviceContext, m_oldPen);
+    m_oldPen = nullptr;
+  }
+
+  if (m_oldBrush != nullptr) {
+    (void)::SelectObject(deviceContext, m_oldBrush);
+    m_oldBrush = nullptr;
+  }
+
+  if (m_oldFont != nullptr) {
+    (void)::SelectObject(deviceContext, m_oldFont);
+    m_oldFont = nullptr;
+  }
+
+  if (m_oldPalette != nullptr) {
+    (void)::SelectPalette(deviceContext, static_cast<HPALETTE>(m_oldPalette), FALSE);
+    m_oldPalette = nullptr;
+  }
+}
+
+/**
+ * A context wrapped around a handle that belongs to somebody else.
+ *
+ * The binary builds one of these inline - construct a wxDC, overwrite its
+ * vtable pointer with wxDCTemp's, then fill in the handle, the canvas and the
+ * cleared owns-handle bit (0x00969E36..0x00969E76). That is what a wxDCTemp
+ * constructor compiles to.
+ */
+wxDCTemp::wxDCTemp(
+  void* const nativeDeviceContext,
+  wxWindowBase* const canvas
+) noexcept
+{
+  m_hDC = nativeDeviceContext;
+  m_canvas = canvas;
+  m_bOwnsDC &= static_cast<std::uint8_t>(~1u);
+}
+
+/**
+ * Address: 0x00969DF0 (FUN_00969DF0)
+ * Mangled: ?HandleEraseBkgnd@wxWindow@@IAE_NPAX@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleEraseBkgnd(wxWindow *this, HDC hdc);
+ *
+ * What it does:
+ * Turns WM_ERASEBKGND into wxEVT_ERASE_BACKGROUND. An iconised window reports
+ * the message handled without raising anything - there is no client area worth
+ * painting while minimised.
+ *
+ * Otherwise the handle the message supplied is wrapped in a borrowed context
+ * so a handler can draw through it, the event carries that context and this
+ * window, and once the handler is done every GDI object it displaced goes
+ * back. The context is emptied before it dies so its destructor cannot take
+ * the caller's handle with it.
+ */
+bool wxWindowMswRuntime::HandleEraseBkgnd(
+  void* const nativeDeviceContext
+)
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  auto* const window = reinterpret_cast<HWND>(
+    static_cast<std::uintptr_t>(state != nullptr ? state->nativeHandle : 0u)
+  );
+
+  if (::IsIconic(window) != 0) {
+    return true;
+  }
+
+  wxDCTemp deviceContext(nativeDeviceContext, this);
+  deviceContext.InitializePalette();
+
+  bool processed = false;
+  {
+    WxEraseEventFactoryRuntime event{};
+    event.mEventId = state != nullptr ? state->windowId : -1;
+    event.mEventObject = this;
+    event.mDeviceContext = &deviceContext;
+    processed = GetEventHandler()->ProcessEvent(&event);
+  }
+
+  deviceContext.SelectOldObjects(nativeDeviceContext);
+
+  // The handle came from the message, so let go of it before the context dies.
+  deviceContext.ForgetNativeHandle();
+  return processed;
+}
+
+/**
  * Address: 0x00969F40 (FUN_00969F40)
  * Mangled: ?OnEraseBackground@wxWindow@@IAEXAAVwxEraseEvent@@@Z
  *
@@ -33876,6 +34029,15 @@ long wxWindowMswRuntime::MSWWindowProc(
   case WM_GETMINMAXINFO:
     processed = HandleGetMinMaxInfo(reinterpret_cast<void*>(lParam));
     break;
+
+  case WM_ERASEBKGND:
+    // Answering this one means "the background is painted"; the reply is 1
+    // rather than the 0 the other handled messages return, since 0 here would
+    // tell Windows the background was left alone.
+    if (HandleEraseBkgnd(reinterpret_cast<void*>(static_cast<std::uintptr_t>(wParam)))) {
+      return 1;
+    }
+    return MSWDefWindowProc(message, wParam, lParam);
 
   case WM_CREATE: {
     bool mayCreate = true;
