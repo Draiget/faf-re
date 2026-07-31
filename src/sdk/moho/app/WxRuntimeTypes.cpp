@@ -11494,6 +11494,21 @@ namespace
   std::int32_t gWxEvtCharRuntimeType = 0;
   std::int32_t gWxEvtPaletteChangedRuntimeType = 0;
   std::int32_t gWxEvtQueryNewPaletteRuntimeType = 0;
+  // The joystick messages, by value - they live in mmsystem.h, which this
+  // translation unit does not pull in.
+  constexpr unsigned int kJoystick1Move = 0x3A0u;       // MM_JOY1MOVE
+  constexpr unsigned int kJoystick2Move = 0x3A1u;       // MM_JOY2MOVE
+  constexpr unsigned int kJoystick1ZMove = 0x3A2u;      // MM_JOY1ZMOVE
+  constexpr unsigned int kJoystick2ZMove = 0x3A3u;      // MM_JOY2ZMOVE
+  constexpr unsigned int kJoystick1ButtonDown = 0x3B5u; // MM_JOY1BUTTONDOWN
+  constexpr unsigned int kJoystick2ButtonDown = 0x3B6u; // MM_JOY2BUTTONDOWN
+  constexpr unsigned int kJoystick1ButtonUp = 0x3B7u;   // MM_JOY1BUTTONUP
+  constexpr unsigned int kJoystick2ButtonUp = 0x3B8u;   // MM_JOY2BUTTONUP
+
+  std::int32_t gWxEvtJoyMoveRuntimeType = 0;
+  std::int32_t gWxEvtJoyZMoveRuntimeType = 0;
+  std::int32_t gWxEvtJoyButtonDownRuntimeType = 0;
+  std::int32_t gWxEvtJoyButtonUpRuntimeType = 0;
   std::int32_t gWxEvtShowRuntimeType = 0;
   std::int32_t gWxEvtSetFocusRuntimeType = 0;
   std::int32_t gWxEvtKillFocusRuntimeType = 0;
@@ -33372,6 +33387,86 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x0096A760 (FUN_0096A760)
+ * Mangled: ?HandleJoystickEvent@wxWindow@@IAE_NIHHI@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleJoystickEvent(wxWindow *this, UINT msg,
+ *                                               int x, int y, WXUINT flags);
+ *
+ * What it does:
+ * Turns one of the eight joystick messages into the matching wx event. The
+ * messages come in pairs, one per stick, and which of the pair arrived is the
+ * only thing that says which stick moved - so the stick number comes from the
+ * message rather than from anything in it.
+ *
+ * The flags carry two different things in two halves: the low four bits say
+ * which buttons are down now, and the four bits from 0x100 up say which one
+ * just changed. The change is a plain assignment rather than an or, so when
+ * more than one bit is set the highest wins - that is the binary's chain of
+ * ifs, not a mistake in reading it.
+ *
+ * Anything that is not one of the eight is left alone.
+ */
+bool wxWindowMswRuntime::HandleJoystickEvent(
+  const unsigned int message,
+  const std::int32_t x,
+  const std::int32_t y,
+  const unsigned int flags
+)
+{
+  constexpr unsigned int kJoyButton1Changed = 0x0100u;
+  constexpr unsigned int kJoyButton2Changed = 0x0200u;
+  constexpr unsigned int kJoyButton3Changed = 0x0400u;
+  constexpr unsigned int kJoyButton4Changed = 0x0800u;
+  constexpr unsigned int kJoyButtonStateMask = 0x000Fu;
+
+  std::int32_t buttonChange = 0;
+  if ((flags & kJoyButton1Changed) != 0u) {
+    buttonChange = 1;
+  }
+  if ((flags & kJoyButton2Changed) != 0u) {
+    buttonChange = 2;
+  }
+  if ((flags & kJoyButton3Changed) != 0u) {
+    buttonChange = 4;
+  }
+  if ((flags & kJoyButton4Changed) != 0u) {
+    buttonChange = 8;
+  }
+
+  const auto buttonState = static_cast<std::int32_t>(flags & kJoyButtonStateMask);
+
+  const std::int32_t* eventTypeSlot = nullptr;
+  std::int32_t joystickIndex = 0;
+
+  switch (message) {
+  case kJoystick1Move:       eventTypeSlot = WxEventTypeSlot(gWxEvtJoyMoveRuntimeType);       joystickIndex = 1; break;
+  case kJoystick2Move:       eventTypeSlot = WxEventTypeSlot(gWxEvtJoyMoveRuntimeType);       joystickIndex = 2; break;
+  case kJoystick1ZMove:      eventTypeSlot = WxEventTypeSlot(gWxEvtJoyZMoveRuntimeType);      joystickIndex = 1; break;
+  case kJoystick2ZMove:      eventTypeSlot = WxEventTypeSlot(gWxEvtJoyZMoveRuntimeType);      joystickIndex = 2; break;
+  case kJoystick1ButtonDown: eventTypeSlot = WxEventTypeSlot(gWxEvtJoyButtonDownRuntimeType); joystickIndex = 1; break;
+  case kJoystick2ButtonDown: eventTypeSlot = WxEventTypeSlot(gWxEvtJoyButtonDownRuntimeType); joystickIndex = 2; break;
+  case kJoystick1ButtonUp:   eventTypeSlot = WxEventTypeSlot(gWxEvtJoyButtonUpRuntimeType);   joystickIndex = 1; break;
+  case kJoystick2ButtonUp:   eventTypeSlot = WxEventTypeSlot(gWxEvtJoyButtonUpRuntimeType);   joystickIndex = 2; break;
+  default:
+    return false;
+  }
+
+  WxJoystickEventFactoryRuntime event{};
+  event.mEventType = *eventTypeSlot;
+  event.mEventObject = this;
+  event.mPositionX = x;
+  event.mPositionY = y;
+  event.mPositionZ = 0;
+  event.mButtonChange = buttonChange;
+  event.mButtonState = buttonState;
+  event.mJoystickIndex = joystickIndex;
+
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
  * Address: 0x00969A20 (FUN_00969A20)
  * Mangled: ?HandleQueryNewPalette@wxWindow@@IAE_NXZ
  *
@@ -35162,6 +35257,22 @@ long wxWindowMswRuntime::MSWWindowProc(
     }
     return MSWDefWindowProc(message, wParam, lParam);
   }
+
+  case kJoystick1Move:
+  case kJoystick2Move:
+  case kJoystick1ZMove:
+  case kJoystick2ZMove:
+  case kJoystick1ButtonDown:
+  case kJoystick2ButtonDown:
+  case kJoystick1ButtonUp:
+  case kJoystick2ButtonUp:
+    processed = HandleJoystickEvent(
+      message,
+      static_cast<std::int16_t>(LOWORD(lParam)),
+      static_cast<std::int16_t>(HIWORD(lParam)),
+      wParam
+    );
+    break;
 
   case WM_QUERYNEWPALETTE:
     processed = HandleQueryNewPalette();
