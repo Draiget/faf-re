@@ -4,7 +4,22 @@
 
 #include <array>
 #include <cctype>
+#include <cmath>
+#include <cstring>
 #include <utility>
+
+namespace lua
+{
+  /**
+   * Address: 0x00F317C0 (lua::enable_tailcalls)
+   *
+   * What it does:
+   * Enables the parser's tail-call rewrite. On by default in the shipped
+   * binary. With it off, `return f()` emits an ordinary OP_CALL and the frame
+   * stays on the stack, which is what a debugger needs to show the caller.
+   */
+  int enable_tailcalls = 1;
+} // namespace lua
 
 namespace LuaPlus
 {
@@ -117,10 +132,12 @@ namespace
 
   struct BlockCntRuntimeView
   {
-    BlockCntRuntimeView* previous;
-    std::uint8_t reserved04To0B[0x08];
-    std::int32_t nactvar;
-    std::int32_t upval;
+    BlockCntRuntimeView* previous; // +0x00 enclosing block
+    std::int32_t breaklist;        // +0x04 jumps out of this loop
+    std::int32_t continuelist;     // +0x08 jumps back to this loop's step
+    std::int32_t nactvar;          // +0x0C actives outside the block
+    std::int32_t upval;            // +0x10 some local here is an upvalue
+    std::int32_t isbreakable;      // +0x14 block is a loop
   };
 
   struct FuncStateRuntimeView
@@ -197,8 +214,18 @@ namespace
   static_assert(offsetof(LHS_assign, v) == 0x04, "LHS_assign::v offset must be 0x04");
   static_assert(sizeof(LHS_assign) == 0x18, "LHS_assign size must be 0x18");
   static_assert(offsetof(BlockCntRuntimeView, previous) == 0x00, "BlockCntRuntimeView::previous offset must be 0x00");
+  static_assert(offsetof(BlockCntRuntimeView, breaklist) == 0x04, "BlockCntRuntimeView::breaklist offset must be 0x04");
+  static_assert(
+    offsetof(BlockCntRuntimeView, continuelist) == 0x08,
+    "BlockCntRuntimeView::continuelist offset must be 0x08"
+  );
   static_assert(offsetof(BlockCntRuntimeView, nactvar) == 0x0C, "BlockCntRuntimeView::nactvar offset must be 0x0C");
   static_assert(offsetof(BlockCntRuntimeView, upval) == 0x10, "BlockCntRuntimeView::upval offset must be 0x10");
+  static_assert(
+    offsetof(BlockCntRuntimeView, isbreakable) == 0x14,
+    "BlockCntRuntimeView::isbreakable offset must be 0x14"
+  );
+  static_assert(sizeof(BlockCntRuntimeView) == 0x18, "BlockCntRuntimeView size must be 0x18");
   static_assert(offsetof(FuncStateRuntimeView, f) == 0x00, "FuncStateRuntimeView::f offset must be 0x00");
   static_assert(offsetof(FuncStateRuntimeView, h) == 0x04, "FuncStateRuntimeView::h offset must be 0x04");
   static_assert(offsetof(FuncStateRuntimeView, prev) == 0x08, "FuncStateRuntimeView::prev offset must be 0x08");
@@ -221,6 +248,7 @@ namespace
   );
   static_assert(offsetof(FuncStateRuntimeView, upvalues) == 0x38, "FuncStateRuntimeView::upvalues offset must be 0x38");
   static_assert(offsetof(FuncStateRuntimeView, actvar) == 0x2B8, "FuncStateRuntimeView::actvar offset must be 0x2B8");
+  static_assert(sizeof(FuncStateRuntimeView) == 0x5D8, "FuncStateRuntimeView size must be 0x5D8");
   static_assert(offsetof(LuaUndumpZioRuntimeView, name) == 0x10, "LuaUndumpZioRuntimeView::name offset must be 0x10");
 
   constexpr std::int32_t NO_JUMP = -1;
@@ -270,11 +298,26 @@ namespace
   constexpr std::int32_t OP_LE = 0x1B;
   constexpr std::int32_t OP_TEST = 0x1C;
   constexpr std::int32_t OP_CALL = 0x1D;
+  constexpr std::int32_t OP_TAILCALL = 0x1E;
   constexpr std::int32_t OP_RETURN = 0x1F;
+  constexpr std::int32_t OP_FORLOOP = 0x20;
+  constexpr std::int32_t OP_TFORLOOP = 0x21;
+  constexpr std::int32_t OP_TFORPREP = 0x22;
   constexpr std::int32_t OP_SETLIST = 0x23;
   constexpr std::int32_t OP_SETLISTO = 0x24;
+  constexpr std::int32_t OP_CLOSE = 0x25;
   constexpr std::int32_t OP_CLOSURE = 0x26;
+  constexpr std::int32_t OP_SUB = 0x0D;
   constexpr std::int32_t LFIELDS_PER_FLUSH = 0x20;
+
+  // Parser ceilings.
+  constexpr std::int32_t MAXVARS = 0xC8;            // locals per function
+  constexpr std::int32_t MAXPARAMS = 0x64;          // declared parameters
+  constexpr std::int32_t MAXUPVALUES = 0x20;        // upvalues per closure
+  constexpr std::int32_t MAXEXPWHILE = 0x64;        // instructions in a rotated `while' condition
+  constexpr std::int32_t LUA_MAXPARSERLEVEL = 0xC8; // nested chunks
+
+  constexpr std::int32_t kLuaEndOfStream = -1;
   constexpr std::int32_t MAXSTACK = 0xFA;
   // Lua's MAX_INT: INT_MAX-2, kept clear of the maximum so `n+1` and `n+2`
   // stay representable.
@@ -547,6 +590,20 @@ namespace
   void singlevaraux(FuncState* fs, TString* name, expdesc* outVariable, int base);
   std::int32_t explist1(LexState* ls, expdesc* expression);
   void lastlistfield(FuncState* fs, ConsControl* cc);
+  void adjustlocalvars(LexState* ls, int nvars);
+  void adjust_assign(LexState* ls, int nvars, expdesc* expression, int nexps);
+  void check_conflict(LHS_assign* lhs, LexState* ls, expdesc* value);
+  void pushclosure(expdesc* outExpression, LexState* ls, FuncState* childFunction);
+  void open_func(LexState* ls, FuncState* fs);
+  FuncState* close_func(LexState* ls);
+  void ifstat(LexState* ls, std::int32_t line);
+  void funcstat(LexState* ls, int line);
+  void exprstat(LexState* ls);
+  void enterblock(FuncState* fs, BlockCntRuntimeView* bl, std::int32_t isbreakable);
+  void leaveblock(FuncState* fs);
+  void new_localvar(LexState* ls, TString* name, int n);
+  void parlist(LexState* ls);
+  std::int32_t statement(LexState* ls);
 
   extern "C"
   {
@@ -591,7 +648,7 @@ namespace
     Table* luaH_new(lua_State* L, int narray, int lnhash);
     LClosure* luaF_newLclosure(lua_State* L, int nelems, LuaPlus::TObject* e);
     Proto* luaU_undump(lua_State* state, LuaUndumpZioRuntimeView* stream, Mbuffer* buffer);
-    Proto* luaY_parser(lua_State* L, void* z, Mbuffer* buff);
+    Proto* luaY_parser(lua_State* L, LuaUndumpZioRuntimeView* z, Mbuffer* buff);
     std::int32_t luaX_lex(LexState* ls, SemInfo* seminfo);
     std::int32_t indexupvalue(FuncState* fs, expdesc* value, TString* name);
     TString* str_checkname(LexState* ls);
@@ -613,6 +670,16 @@ namespace
     void error_expected(LexState* ls, std::int32_t token);
     void luaY_index(LexState* ls, expdesc* v);
     void luaK_self(FuncState* fs, expdesc* e, expdesc* key);
+    void luaK_patchlist(FuncState* fs, std::int32_t list, std::int32_t target);
+    void luaX_setinput(lua_State* L, LexState* ls, LuaUndumpZioRuntimeView* z, TString* source);
+    void chunk(LexState* ls);
+    int luaI_registerlocalvar(LexState* ls, TString* varname);
+    void new_localvarstr(const char* name, LexState* ls, int n);
+    void code_params(LexState* ls, int nparams, int dots);
+    void cond(LexState* ls, expdesc* v);
+    void test_then_block(LexState* ls, expdesc* v);
+    void forbody(LexState* ls, int base, int line, int nvars, int isnum);
+    TString* luaS_newlstr(lua_State* L, const char* str, std::size_t len);
     char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
     void luaG_runerror(lua_State* L, const char* format, ...);
     int luaK_exp2anyreg(FuncState* fs, expdesc* e);
@@ -727,6 +794,22 @@ namespace
   }
 
 #pragma warning(pop)
+
+  /**
+   * What it does:
+   * Reads the next source character into `ls->current`, refilling the stream
+   * buffer when it runs dry. This is llex.c's `next` macro; the parser's `next`
+   * is a different thing (luaX_next, which reads a whole token).
+   */
+  std::int32_t nextchar(LexState* const ls)
+  {
+    auto* const z = static_cast<LuaZioRuntimeView*>(ls->z);
+    const std::uint32_t remaining = static_cast<std::uint32_t>(z->remainingBytes--);
+    ls->current = (remaining > 0u)
+      ? static_cast<unsigned char>(*z->cursor++)
+      : luaZ_fill(z);
+    return ls->current;
+  }
 
   /**
    * Address: 0x0091C4B0 (FUN_0091C4B0, getbinopr)
@@ -1667,6 +1750,23 @@ namespace
     auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     luaK_getlabel(fs);
     luaK_concat(fs, &fsView->jpc, list);
+  }
+
+  /**
+   * Address: 0x009115E0 (FUN_009115E0, luaK_patchlist)
+   *
+   * What it does:
+   * Points every jump in `list` at `target`, or holds them on the pending list
+   * when `target` is the instruction about to be emitted.
+   */
+  extern "C" void luaK_patchlist(FuncState* const fs, const std::int32_t list, const std::int32_t target)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    if (target == fsView->pc) {
+      luaK_patchtohere(fs, list);
+    } else {
+      patchlistaux(fs, list, target, NO_REG, target, NO_REG, target);
+    }
   }
 
   /**
@@ -2773,19 +2873,13 @@ namespace
     expdesc v{};
     std::int32_t escapelist = NO_JUMP;
 
-    next(ls);
-    cond(ls, &v);
-    check(ls, TK_THEN);
-    block(ls);
+    test_then_block(ls, &v); // IF cond THEN block
 
     while (ls->t.token == TK_ELSEIF) {
       luaK_concat(fs, &escapelist, luaK_jump(fs));
       luaK_patchtohere(fs, v.f);
 
-      next(ls);
-      cond(ls, &v);
-      check(ls, TK_THEN);
-      block(ls);
+      test_then_block(ls, &v); // ELSEIF cond THEN block
     }
 
     if (ls->t.token == TK_ELSE) {
@@ -2840,7 +2934,7 @@ namespace
 
     Proto* const parsedProto = (parser->bin != 0)
       ? luaU_undump(state, static_cast<LuaUndumpZioRuntimeView*>(parser->z), &parser->buff)
-      : luaY_parser(state, parser->z, &parser->buff);
+      : luaY_parser(state, static_cast<LuaUndumpZioRuntimeView*>(parser->z), &parser->buff);
 
     LClosure* const closure = luaF_newLclosure(state, 0, &state->_gt);
     const int closureTypeTag = static_cast<int>(reinterpret_cast<const CClosure*>(closure)->tt);
@@ -3059,6 +3153,889 @@ namespace
     ls->fs = fsView->prev;
     return fsView->prev;
   }
+  // ---------------------------------------------------------------------
+  // lparser.c - blocks, statements and the parser entry point.
+  //
+  // enterblock / leaveblock / block_follow / new_localvar / cond are
+  // file-local in the original and were inlined at every use here, so they
+  // carry no address of their own.
+  // ---------------------------------------------------------------------
+
+  /**
+   * What it does:
+   * Pushes one lexical block onto the FuncState chain, remembering how many
+   * locals were active outside it.
+   */
+  void enterblock(FuncState* const fs, BlockCntRuntimeView* const bl, const std::int32_t isbreakable)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    bl->breaklist = NO_JUMP;
+    bl->continuelist = NO_JUMP;
+    bl->isbreakable = isbreakable;
+    bl->nactvar = fsView->nactvar;
+    bl->upval = 0;
+    bl->previous = fsView->bl;
+    fsView->bl = bl;
+  }
+
+  /**
+   * What it does:
+   * Pops the innermost block: its locals go out of scope, any upvalue closed
+   * over inside it is closed, and the jumps that left it via `break` land here.
+   */
+  void leaveblock(FuncState* const fs)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    BlockCntRuntimeView* const bl = fsView->bl;
+
+    fsView->bl = bl->previous;
+    removevars(reinterpret_cast<LexState*>(fsView->lexState), bl->nactvar);
+    if (bl->upval != 0) {
+      luaK_codeABC(fs, OP_CLOSE, bl->nactvar, 0, 0);
+    }
+    fsView->freereg = fsView->nactvar; // free registers
+    luaK_patchtohere(fs, bl->breaklist);
+  }
+
+  /**
+   * What it does:
+   * True for the tokens that can only appear after a block has ended.
+   */
+  [[nodiscard]] constexpr bool block_follow(const std::int32_t token) noexcept
+  {
+    switch (token) {
+    case TK_ELSE:
+    case TK_ELSEIF:
+    case TK_END:
+    case TK_UNTIL:
+    case TK_EOS:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /**
+   * Address: 0x0091C820 (FUN_0091C820, block)
+   *
+   * What it does:
+   * Parses a scoped statement list.
+   */
+  extern "C" void block(LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    BlockCntRuntimeView bl;
+    enterblock(fs, &bl, 0);
+    chunk(ls);
+    leaveblock(fs);
+  }
+
+  /**
+   * Address: 0x0091ACF0 (FUN_0091ACF0, luaI_registerlocalvar)
+   *
+   * IDA signature:
+   * int __usercall luaI_registerlocalvar@<eax>(LexState *ls@<ecx>, TString *varname);
+   *
+   * What it does:
+   * Appends one entry to the prototype's local-variable debug table and returns
+   * its index.
+   */
+  extern "C" int luaI_registerlocalvar(LexState* const ls, TString* const varname)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
+    Proto* const f = fsView->f;
+
+    if (fsView->nlocvars + 1 > f->sizelocvars) {
+      f->locvars = static_cast<LocVar*>(luaM_growaux(
+        ls->L, f->locvars, &f->sizelocvars, static_cast<int>(sizeof(LocVar)), MAX_INT, ""));
+    }
+    f->locvars[fsView->nlocvars].varname = varname;
+    return fsView->nlocvars++;
+  }
+
+  /**
+   * What it does:
+   * Declares the n'th local of a group that is not active yet - `local a, b, c`
+   * registers all three before any of them becomes visible.
+   */
+  void new_localvar(LexState* const ls, TString* const name, const int n)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
+    luaX_checklimit(ls, fsView->nactvar + n + 1, MAXVARS, "local variables");
+    fsView->actvar[fsView->nactvar + n] = luaI_registerlocalvar(ls, name);
+  }
+
+  /**
+   * Address: 0x0091AE00 (FUN_0091AE00, new_localvarstr)
+   *
+   * IDA signature:
+   * void __usercall new_localvarstr(const char *name@<edx>, LexState *ls@<edi>, int n);
+   *
+   * What it does:
+   * Declares a compiler-generated local - the hidden `arg`, `self`, and the
+   * `(for ...)` control variables - from a C string.
+   */
+  extern "C" void new_localvarstr(const char* const name, LexState* const ls, const int n)
+  {
+    TString* const ts = luaS_newlstr(ls->L, name, std::strlen(name));
+    new_localvar(ls, ts, n);
+  }
+
+  /**
+   * Address: 0x0091B140 (FUN_0091B140, code_params)
+   *
+   * IDA signature:
+   * void __usercall code_params(LexState *ls@<eax>, int nparams@<edx>, int dots@<ebx>);
+   *
+   * What it does:
+   * Turns the parsed parameter names into the function's active locals and
+   * records how many there are. A vararg function also gets the hidden `arg`
+   * table, which occupies one more register.
+   */
+  extern "C" void code_params(LexState* const ls, const int nparams, const int dots)
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
+
+    adjustlocalvars(ls, nparams);
+    luaX_checklimit(ls, fsView->nactvar, MAXPARAMS, "parameters");
+    fsView->f->numparams = static_cast<lu_byte>(fsView->nactvar);
+    fsView->f->is_vararg = static_cast<lu_byte>(dots);
+    if (dots != 0) {
+      new_localvarstr("arg", ls, 0);
+      adjustlocalvars(ls, 1);
+    }
+    luaK_reserveregs(ls->fs, fsView->nactvar); // reserve register for parameters
+  }
+
+  /**
+   * Address: 0x0091BAD0 (FUN_0091BAD0, parlist)
+   *
+   * What it does:
+   * Parses a parameter list, with an optional trailing `...`.
+   */
+  void parlist(LexState* const ls)
+  {
+    int nparams = 0;
+    int dots = 0;
+
+    if (ls->t.token != ')') { // is `parlist' not empty?
+      while (ls->t.token == TK_NAME) {
+        new_localvar(ls, str_checkname(ls), nparams++);
+        if (!testnext(ls, ',')) {
+          code_params(ls, nparams, dots);
+          return;
+        }
+      }
+
+      if (ls->t.token != TK_DOTS) {
+        luaX_syntaxerror(ls, "<name> or `...' expected");
+      }
+      dots = 1;
+      next(ls);
+    }
+
+    code_params(ls, nparams, dots);
+  }
+
+  /**
+   * Address: 0x0091BC70 (FUN_0091BC70, body)
+   *
+   * What it does:
+   * Parses a function body into a nested prototype and leaves an OP_CLOSURE
+   * expression behind. `needself` adds the implicit `self` of `a:b()` form.
+   */
+  extern "C" void body(LexState* const ls, expdesc* const e, const int needself, const int line)
+  {
+    FuncStateRuntimeView new_fs;
+    auto* const newFuncState = reinterpret_cast<FuncState*>(&new_fs);
+    open_func(ls, newFuncState);
+    new_fs.f->lineDefined = line;
+
+    check(ls, '(');
+    if (needself != 0) {
+      new_localvarstr("self", ls, 0);
+      adjustlocalvars(ls, 1);
+    }
+    parlist(ls);
+    check(ls, ')');
+    chunk(ls);
+    check_match(ls, TK_END, TK_FUNCTION, line);
+    close_func(ls);
+    pushclosure(e, ls, newFuncState);
+  }
+
+  /**
+   * What it does:
+   * Parses a loop or branch condition and emits the jumps that skip the body
+   * when it is false. `nil` is folded to `false` so the constant path is used.
+   */
+  extern "C" void cond(LexState* const ls, expdesc* const v)
+  {
+    subexpr(ls, v, -1);
+    if (v->k == VNIL) {
+      v->k = VFALSE; // `falses' are all equal here
+    }
+    luaK_goiftrue(ls->fs, v);
+    luaK_patchtohere(ls->fs, v->t);
+  }
+
+  /**
+   * Address: 0x0091D410 (FUN_0091D410, test_then_block)
+   *
+   * What it does:
+   * Parses one `<cond> THEN <block>` arm of an if/elseif chain.
+   */
+  extern "C" void test_then_block(LexState* const ls, expdesc* const v)
+  {
+    next(ls); // skip IF or ELSEIF
+    cond(ls, v);
+    check(ls, TK_THEN);
+    block(ls); // `then' part
+  }
+
+  /**
+   * Address: 0x0091CA90 (FUN_0091CA90, whilestat)
+   *
+   * What it does:
+   * Parses `while cond do block end`. The condition is compiled first, lifted
+   * back out of the instruction stream, and re-emitted after the body - so the
+   * loop costs one jump on entry and none per iteration, instead of a jump back
+   * and forth every time round. That rotation is why the condition has a size
+   * limit and why the true/false jump lists have to be relocated by hand.
+   */
+  extern "C" void whilestat(LexState* const ls, const std::int32_t line)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    Instruction codeexp[MAXEXPWHILE];
+    expdesc v;
+    BlockCntRuntimeView bl;
+
+    next(ls); // skip WHILE
+
+    const std::int32_t whileinit = luaK_jump(fs);
+    const std::int32_t expinit = luaK_getlabel(fs);
+    subexpr(ls, &v, -1);
+    if (v.k == VK) {
+      v.k = VTRUE; // `while true' - the condition is not worth testing
+    }
+    const std::int32_t lineexp = ls->linenumber;
+    luaK_goiffalse(fs, &v);
+    luaK_concat(fs, &v.f, fsView->jpc);
+    fsView->jpc = NO_JUMP;
+
+    const std::int32_t sizeexp = fsView->pc - expinit; // size of expression code
+    if (sizeexp > MAXEXPWHILE) {
+      luaX_syntaxerror(ls, "`while' condition too complex");
+    }
+    for (std::int32_t i = 0; i < sizeexp; ++i) { // save `exp' code
+      codeexp[i] = fsView->f->code[expinit + i];
+    }
+    fsView->pc = expinit; // remove `exp' code
+
+    enterblock(fs, &bl, 1);
+    check(ls, TK_DO);
+    const std::int32_t blockinit = luaK_getlabel(fs);
+    block(ls);
+    luaK_patchtohere(fs, whileinit); // initial jump jumps to here
+    luaK_patchtohere(fs, bl.continuelist);
+
+    // move `exp' back to code
+    if (v.t != NO_JUMP) {
+      v.t += fsView->pc - expinit;
+    }
+    if (v.f != NO_JUMP) {
+      v.f += fsView->pc - expinit;
+    }
+    for (std::int32_t i = 0; i < sizeexp; ++i) {
+      luaK_code(fs, codeexp[i], lineexp);
+    }
+
+    check_match(ls, TK_END, TK_WHILE, line);
+    leaveblock(fs);
+    luaK_patchlist(fs, v.t, blockinit); // true conditions go back to loop
+    luaK_patchtohere(fs, v.f);          // false conditions finish the loop
+  }
+
+  /**
+   * Address: 0x0091CD40 (FUN_0091CD40, repeatstat)
+   *
+   * What it does:
+   * Parses `repeat block until cond`. The body runs before the test, so the
+   * false branch jumps back to the top.
+   */
+  extern "C" void repeatstat(LexState* const ls, const std::int32_t line)
+  {
+    FuncState* const fs = ls->fs;
+    const std::int32_t repeat_init = luaK_getlabel(fs);
+    expdesc v;
+    BlockCntRuntimeView bl;
+
+    enterblock(fs, &bl, 1);
+    next(ls); // skip REPEAT
+    block(ls);
+    luaK_patchtohere(fs, bl.continuelist);
+    check_match(ls, TK_UNTIL, TK_REPEAT, line);
+
+    cond(ls, &v);
+    luaK_patchlist(fs, v.f, repeat_init);
+    leaveblock(fs);
+  }
+
+  /**
+   * Address: 0x0091CEA0 (FUN_0091CEA0, forbody)
+   *
+   * IDA signature:
+   * void __usercall forbody(LexState *ls@<eax>, int base, int line, int nvars, int isnum);
+   *
+   * What it does:
+   * Parses the `do block end` shared by both `for` forms and closes the loop -
+   * OP_FORLOOP for the numeric form, OP_TFORLOOP plus a jump for the generic
+   * one.
+   */
+  extern "C" void
+  forbody(LexState* const ls, const int base, const int line, const int nvars, const int isnum)
+  {
+    FuncState* const fs = ls->fs;
+    BlockCntRuntimeView bl;
+
+    adjustlocalvars(ls, nvars); // scope for all variables
+    check(ls, TK_DO);
+    enterblock(fs, &bl, 1);
+    const std::int32_t prep = luaK_getlabel(fs);
+    block(ls);
+    luaK_patchtohere(fs, bl.continuelist);
+    luaK_patchtohere(fs, prep - 1);
+
+    const std::int32_t endfor = (isnum != 0)
+      ? luaK_codeABx(fs, OP_FORLOOP, base, static_cast<std::uint32_t>(NO_JUMP + LUA_MAXARG_sBx))
+      : luaK_codeABC(fs, OP_TFORLOOP, base, 0, nvars - 3);
+    luaK_fixline(fs, line); // pretend that `OP_FOR' starts the loop
+
+    luaK_patchlist(fs, (isnum != 0) ? endfor : luaK_jump(fs), prep);
+    leaveblock(fs);
+  }
+
+  /**
+   * Address: 0x0091CFC0 (FUN_0091CFC0, fornum)
+   *
+   * What it does:
+   * Parses `for name = init, limit [, step] do`. The three control values live
+   * in hidden locals; the initial value is pre-decremented by one step so the
+   * loop opcode can increment first and test afterwards.
+   */
+  extern "C" void fornum(LexState* const ls, TString* const varname, const std::int32_t line)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    const int base = fsView->freereg;
+    expdesc v;
+
+    new_localvar(ls, varname, 0);
+    new_localvarstr("(for limit)", ls, 1);
+    new_localvarstr("(for step)", ls, 2);
+
+    check(ls, '=');
+    subexpr(ls, &v, -1); // initial value
+    luaK_exp2nextreg(ls->fs, &v);
+    check(ls, ',');
+    subexpr(ls, &v, -1); // limit
+    luaK_exp2nextreg(ls->fs, &v);
+
+    if (testnext(ls, ',')) {
+      subexpr(ls, &v, -1); // optional step
+      luaK_exp2nextreg(ls->fs, &v);
+    } else { // default step = 1
+      luaK_codeABx(fs, OP_LOADK, fsView->freereg, static_cast<std::uint32_t>(luaK_numberK(fs, 1.0f)));
+      luaK_reserveregs(fs, 1);
+    }
+
+    luaK_codeABC(fs, OP_SUB, fsView->freereg - 3, fsView->freereg - 3, fsView->freereg - 1);
+    luaK_jump(fs);
+    forbody(ls, base, line, 3, 1);
+  }
+
+  /**
+   * Address: 0x0091D120 (FUN_0091D120, forlist)
+   *
+   * What it does:
+   * Parses `for a, b, ... in explist do`. Two hidden locals hold the iterator
+   * function and its state, followed by the visible control variables.
+   */
+  extern "C" void forlist(LexState* const ls, TString* const indexname)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    const int base = fsView->freereg;
+    expdesc e;
+
+    new_localvarstr("(for generator)", ls, 0);
+    new_localvarstr("(for state)", ls, 1);
+    new_localvar(ls, indexname, 2);
+
+    int nvars = 3;
+    while (testnext(ls, ',')) {
+      new_localvar(ls, str_checkname(ls), nvars++);
+    }
+
+    check(ls, TK_IN);
+    const std::int32_t line = ls->linenumber;
+    adjust_assign(ls, nvars, &e, explist1(ls, &e));
+    luaK_checkstack(fs, 3); // extra space to call generator
+    luaK_codeABx(fs, OP_TFORPREP, base, static_cast<std::uint32_t>(NO_JUMP + LUA_MAXARG_sBx));
+    forbody(ls, base, line, nvars, 0);
+  }
+
+  /**
+   * Address: 0x0091D300 (FUN_0091D300, forstat)
+   *
+   * What it does:
+   * Parses either `for` form; the token after the first name decides which.
+   * The whole loop sits in its own block so the control variables disappear
+   * with it.
+   */
+  extern "C" void forstat(LexState* const ls, const std::int32_t line)
+  {
+    FuncState* const fs = ls->fs;
+    BlockCntRuntimeView bl;
+    enterblock(fs, &bl, 0); // scope for loop and control variables
+
+    next(ls); // skip `for'
+    TString* const varname = str_checkname(ls); // first variable name
+
+    switch (ls->t.token) {
+    case '=':
+      fornum(ls, varname, line);
+      break;
+
+    case ',':
+    case TK_IN:
+      forlist(ls, varname);
+      break;
+
+    default:
+      luaX_syntaxerror(ls, "`=' or `in' expected");
+      break;
+    }
+
+    check_match(ls, TK_END, TK_FOR, line);
+    leaveblock(fs);
+  }
+
+  /**
+   * Address: 0x0091D590 (FUN_0091D590, localfunc)
+   *
+   * What it does:
+   * Parses `local function f() ... end`. The local is declared before the body
+   * is compiled, so the function can call itself by name.
+   */
+  extern "C" void localfunc(LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    expdesc v;
+    expdesc b;
+
+    new_localvar(ls, str_checkname(ls), 0);
+    v.k = VLOCAL;
+    v.info = fsView->freereg;
+    v.t = NO_JUMP;
+    v.f = NO_JUMP;
+    luaK_reserveregs(fs, 1);
+    adjustlocalvars(ls, 1);
+
+    body(ls, &b, 0, ls->linenumber);
+    luaK_storevar(fs, &v, &b);
+
+    // debug information will only see the variable after this point
+    fsView->f->locvars[fsView->actvar[fsView->nactvar - 1]].startpc = fsView->pc;
+  }
+
+  /**
+   * Address: 0x0091D6B0 (FUN_0091D6B0, localstat)
+   *
+   * What it does:
+   * Parses `local a, b, c [= explist]`. The names are only made visible after
+   * the initialisers are compiled, so `local x = x` reads the outer `x`.
+   */
+  extern "C" void localstat(LexState* const ls)
+  {
+    int nvars = 0;
+    int nexps = 0;
+    expdesc e;
+
+    do {
+      new_localvar(ls, str_checkname(ls), nvars++);
+    } while (testnext(ls, ','));
+
+    if (testnext(ls, '=')) {
+      nexps = explist1(ls, &e);
+    } else {
+      e.k = VVOID;
+      nexps = 0;
+    }
+
+    adjust_assign(ls, nvars, &e, nexps);
+    adjustlocalvars(ls, nvars);
+  }
+
+  /**
+   * Address: 0x0091D980 (FUN_0091D980, retstat)
+   *
+   * What it does:
+   * Parses `return [explist]`. A lone call in tail position becomes
+   * OP_TAILCALL when tail calls are enabled, so recursion through it does not
+   * grow the C stack.
+   */
+  extern "C" void retstat(LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    expdesc e;
+
+    next(ls); // skip RETURN
+
+    std::int32_t first = 0; // registers with returned values
+    std::int32_t nret = 0;
+    if (!block_follow(ls->t.token) && ls->t.token != ';') { // there are return values
+      nret = explist1(ls, &e);
+      if (e.k == VCALL) {
+        luaK_setcallreturns(fs, &e, LUA_MULTRET);
+        if (lua::enable_tailcalls != 0 && nret == 1) { // tail call?
+          Instruction& call = fsView->f->code[e.info];
+          call = (call & ~static_cast<Instruction>(0x3Fu)) | static_cast<Instruction>(OP_TAILCALL);
+        }
+        first = fsView->nactvar;
+        nret = LUA_MULTRET; // return all values
+      } else if (nret == 1) { // only one single value?
+        first = luaK_exp2anyreg(fs, &e);
+      } else {
+        luaK_exp2nextreg(fs, &e); // values must go to the `stack'
+        first = fsView->nactvar;  // return all `active' values
+      }
+    }
+
+    luaK_codeABC(fs, OP_RETURN, first, nret + 1, 0);
+  }
+
+  /**
+   * What it does:
+   * Walks out `levels` enclosing loops for `break`/`continue`, collecting
+   * whether any block on the way holds an upvalue. Returns the loop that was
+   * landed on, or null when there is none.
+   */
+  struct LoopExitTarget
+  {
+    BlockCntRuntimeView* loop;      // the loop reached, or null
+    BlockCntRuntimeView* lastLoop;  // the loop reached one level in
+    std::int32_t upvalAtLevel;      // upvalues seen before the final level
+  };
+
+  [[nodiscard]] LoopExitTarget FindEnclosingLoop(FuncState* const fs, std::int32_t levels) noexcept
+  {
+    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
+    LoopExitTarget target{nullptr, nullptr, 0};
+
+    BlockCntRuntimeView* bl = fsView->bl;
+    std::int32_t upval = 0;
+    for (;;) {
+      --levels;
+      target.upvalAtLevel = upval;
+      if (bl != nullptr) {
+        while (bl->isbreakable == 0) {
+          upval |= bl->upval;
+          bl = bl->previous;
+          if (bl == nullptr) {
+            break;
+          }
+        }
+        if (bl != nullptr) {
+          if (levels <= 0) {
+            break;
+          }
+          target.lastLoop = bl;
+          bl = bl->previous;
+        }
+      }
+      if (levels <= 0) {
+        break;
+      }
+    }
+
+    target.loop = bl;
+    return target;
+  }
+
+  /**
+   * What it does:
+   * Parses the optional loop count that this build accepts after `break` and
+   * `continue`, so `break 2` leaves two loops at once.
+   */
+  [[nodiscard]] std::int32_t ReadLoopLevelCount(LexState* const ls)
+  {
+    next(ls);
+    if (ls->t.token != TK_NUMBER) {
+      return 1;
+    }
+
+    next(ls);
+    const float r = ls->t.seminfo.r;
+    if (r != std::floor(r)) {
+      luaX_syntaxerror(ls, "loop block number must be integer");
+    }
+
+    const std::int32_t levels = static_cast<std::int32_t>(r);
+    if (levels < 1 || levels > MAXEXPWHILE) {
+      luaX_syntaxerror(ls, "loop block number out of range");
+    }
+    return levels;
+  }
+
+  /**
+   * Address: 0x0091DAA0 (FUN_0091DAA0, breakstat)
+   *
+   * What it does:
+   * Parses `break [n]` and adds the jump to the target loop's break list, which
+   * leaveblock will later point past the loop.
+   */
+  extern "C" void breakstat(LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    const std::int32_t levels = ReadLoopLevelCount(ls);
+
+    const LoopExitTarget target = FindEnclosingLoop(fs, levels);
+    if (target.loop == nullptr) {
+      luaX_syntaxerror(ls, "no loop to break");
+    }
+
+    if (target.upvalAtLevel != 0) {
+      luaK_codeABC(fs, OP_CLOSE, target.loop->nactvar, 0, 0);
+    }
+    luaK_concat(fs, &target.loop->breaklist, luaK_jump(fs));
+  }
+
+  /**
+   * Address: 0x0091DBF0 (FUN_0091DBF0, continuestat)
+   *
+   * What it does:
+   * Parses `continue [n]`, the loop-restart statement this build adds. The jump
+   * joins the target loop's continue list, which each loop patches to its own
+   * step. The OP_CLOSE it emits closes over the loop one level in, not the
+   * target - which only matters for `continue n` with n above 1.
+   */
+  extern "C" void continuestat(LexState* const ls)
+  {
+    FuncState* const fs = ls->fs;
+    const std::int32_t levels = ReadLoopLevelCount(ls);
+
+    const LoopExitTarget target = FindEnclosingLoop(fs, levels);
+    if (target.loop == nullptr) {
+      luaX_syntaxerror(ls, "no loop to continue");
+    }
+
+    if (target.upvalAtLevel != 0) {
+      luaK_codeABC(fs, OP_CLOSE, target.lastLoop->nactvar, 0, 0);
+    }
+    luaK_concat(fs, &target.loop->continuelist, luaK_jump(fs));
+  }
+
+  /**
+   * Address: 0x0091C910 (FUN_0091C910, assignment)
+   *
+   * What it does:
+   * Parses the rest of an assignment. It recurses across the comma-separated
+   * targets so that the stores happen right to left, after every value has been
+   * evaluated.
+   */
+  extern "C" void assignment(LexState* const ls, LHS_assign* const lh, const std::int32_t nvars)
+  {
+    expdesc e;
+
+    if (lh->v.k < VLOCAL || lh->v.k > VINDEXED) {
+      luaX_syntaxerror(ls, "syntax error");
+    }
+
+    if (testnext(ls, ',')) { // assignment -> `,' primaryexp assignment
+      LHS_assign nv;
+      nv.prev = lh;
+      primaryexp(&nv.v, ls);
+      if (nv.v.k == VLOCAL) {
+        check_conflict(lh, ls, &nv.v);
+      }
+      assignment(ls, &nv, nvars + 1);
+    } else { // assignment -> `=' explist1
+      check(ls, '=');
+      const std::int32_t nexps = explist1(ls, &e);
+      if (nexps != nvars) {
+        adjust_assign(ls, nvars, &e, nexps);
+        if (nexps > nvars) {
+          // remove extra values
+          reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->freereg -= nexps - nvars;
+        }
+      } else {
+        luaK_setcallreturns(ls->fs, &e, 1); // close last expression
+        luaK_storevar(ls->fs, &lh->v, &e);
+        return; // avoid default
+      }
+    }
+
+    // default assignment
+    e.k = VNONRELOC;
+    e.info = reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->freereg - 1;
+    e.t = NO_JUMP;
+    e.f = NO_JUMP;
+    luaK_storevar(ls->fs, &lh->v, &e);
+  }
+
+  /**
+   * Address: 0x0091DD60 (FUN_0091DD60, statement)
+   *
+   * What it does:
+   * Parses one statement. Returns non-zero for the two that must end a block -
+   * `return` and `break`.
+   */
+  std::int32_t statement(LexState* const ls)
+  {
+    const std::int32_t line = ls->linenumber; // may be needed for error messages
+
+    switch (ls->t.token) {
+    case TK_IF:
+      ifstat(ls, line);
+      return 0;
+
+    case TK_WHILE:
+      whilestat(ls, line);
+      return 0;
+
+    case TK_DO:
+      next(ls); // skip DO
+      block(ls);
+      check_match(ls, TK_END, TK_DO, line);
+      return 0;
+
+    case TK_FOR:
+      forstat(ls, line);
+      return 0;
+
+    case TK_REPEAT:
+      repeatstat(ls, line);
+      return 0;
+
+    case TK_FUNCTION:
+      funcstat(ls, line);
+      return 0;
+
+    case TK_LOCAL:
+      next(ls); // skip LOCAL
+      if (testnext(ls, TK_FUNCTION)) { // local function?
+        localfunc(ls);
+      } else {
+        localstat(ls);
+      }
+      return 0;
+
+    case TK_RETURN:
+      retstat(ls);
+      return 1; // must be last statement
+
+    case TK_BREAK:
+      breakstat(ls);
+      return 1; // must be last statement
+
+    case TK_CONTINUE:
+      continuestat(ls);
+      return 1; // must be last statement
+
+    default:
+      exprstat(ls);
+      return 0;
+    }
+  }
+
+  /**
+   * Address: 0x0091DEB0 (FUN_0091DEB0, chunk)
+   *
+   * What it does:
+   * Parses a statement list, stopping at the token that closes the enclosing
+   * construct or after a statement that has to come last. The nesting counter
+   * bounds recursion so a pathological source cannot run the C stack out.
+   */
+  extern "C" void chunk(LexState* const ls)
+  {
+    if (++ls->nestlevel > LUA_MAXPARSERLEVEL) {
+      luaX_syntaxerror(ls, "too many syntax levels");
+    }
+
+    while (!block_follow(ls->t.token)) {
+      const std::int32_t islast = statement(ls);
+      testnext(ls, ';');
+
+      // statements only produce values through their side effects, so every
+      // register above the active locals is free again
+      reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->freereg =
+        reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->nactvar;
+
+      if (islast != 0) {
+        break;
+      }
+    }
+
+    --ls->nestlevel;
+  }
+
+  /**
+   * Address: 0x00918150 (FUN_00918150, luaX_setinput)
+   *
+   * What it does:
+   * Points the lexer at a stream and reads the first character. A leading `#!`
+   * line is skipped, so a chunk can be a shell script.
+   */
+  extern "C" void
+  luaX_setinput(lua_State* const L, LexState* const ls, LuaUndumpZioRuntimeView* const z, TString* const source)
+  {
+    ls->L = L;
+    ls->linenumber = 1;
+    ls->lastline = 1;
+    ls->lookahead.token = TK_EOS; // no look-ahead token
+    ls->z = z;
+    ls->fs = nullptr;
+    ls->source = source;
+
+    nextchar(ls); // read first char
+    if (ls->current == '#') {
+      do { // skip first line
+        nextchar(ls);
+      } while (ls->current != '\n' && ls->current != kLuaEndOfStream);
+    }
+  }
+
+  /**
+   * Address: 0x0091DF80 (FUN_0091DF80, luaY_parser)
+   *
+   * What it does:
+   * Compiles one chunk of Lua source into a prototype - the entry point the
+   * loader calls once it has ruled out a precompiled chunk.
+   */
+  extern "C" Proto* luaY_parser(lua_State* const L, LuaUndumpZioRuntimeView* const z, Mbuffer* const buff)
+  {
+    LexState lexstate;
+    FuncStateRuntimeView funcstate;
+
+    lexstate.buff = buff;
+    lexstate.nestlevel = 0;
+    luaX_setinput(L, &lexstate, z, luaS_newlstr(L, z->name, std::strlen(z->name)));
+
+    open_func(&lexstate, reinterpret_cast<FuncState*>(&funcstate));
+    next(&lexstate); // read first token
+    chunk(&lexstate);
+    if (lexstate.t.token != TK_EOS) {
+      luaX_syntaxerror(&lexstate, "<eof> expected");
+    }
+    close_func(&lexstate);
+
+    return funcstate.f;
+  }
+
 } // namespace
 
 extern "C"
