@@ -38066,14 +38066,94 @@ int wxApp::OnExit()
  * Builds one idle event, dispatches it through the app event-handler lane,
  * and returns the idle-event `request more` flag.
  */
+namespace
+{
+  /**
+   * Address: 0x00992BC0 (FUN_00992BC0)
+   *
+   * IDA signature:
+   * bool __stdcall sub_992BC0(wxWindow *win);
+   *
+   * What it does:
+   * Offers an idle event to one window and then to everything nested inside
+   * it, and reports whether any of them asked to be woken again.
+   *
+   * Each window gets its own event rather than one being passed around, so a
+   * child asking for more idle cannot be undone by a sibling that does not.
+   */
+  bool WxSendIdleEventsToWindowRuntime(wxWindowBase* const window)
+  {
+    if (window == nullptr) {
+      return false;
+    }
+
+    bool wantsMore = false;
+    {
+      WxIdleEventRuntime idleEvent{};
+      idleEvent.mEventObject = window;
+      (void)window->GetEventHandler()->ProcessEvent(&idleEvent);
+      wantsMore = idleEvent.mRequestMore;
+      RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&idleEvent));
+    }
+
+    for (wxWindowBase* const child : window->GetChildren()) {
+      if (WxSendIdleEventsToWindowRuntime(child)) {
+        wantsMore = true;
+      }
+    }
+    return wantsMore;
+  }
+
+  /**
+   * Address: 0x00993240 (FUN_00993240)
+   *
+   * IDA signature:
+   * bool sub_993240();
+   *
+   * What it does:
+   * Sends idle to every top-level window, and through them to every window
+   * there is. This is how an idle event reaches a window at all - the one the
+   * application object receives goes no further on its own.
+   *
+   * Every window is visited even once one has asked for more idle; the answer
+   * is the accumulation, not the first yes.
+   */
+  [[nodiscard]] bool WxSendIdleEventsRuntime()
+  {
+    bool wantsMore = false;
+    for (wxWindowBase* const topLevelWindow : gWxTopLevelWindows) {
+      if (WxSendIdleEventsToWindowRuntime(topLevelWindow)) {
+        wantsMore = true;
+      }
+    }
+    return wantsMore;
+  }
+} // namespace
+
 bool wxApp::ProcessIdle()
 {
   WxIdleEventRuntime idleEvent{};
   idleEvent.mEventObject = this;
 
   (void)ProcessEvent(&idleEvent);
-  const bool requestMore = idleEvent.mRequestMore;
+  bool requestMore = idleEvent.mRequestMore;
   RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&idleEvent));
+
+  // The event above reaches the application object and stops there. What
+  // carries idle on to the windows is wxApp::OnIdle (0x009932B0), bound as the
+  // first row of wxApp's own event table at 0x00D55930, which calls the
+  // sender below and takes its answer as the request-more flag.
+  //
+  // That table does not exist here, and building it needs wxApp::OnIdle,
+  // which also flushes the log target, deletes pending objects and runs
+  // periodic work behind a mouse-button check - none of which is recovered.
+  // So the sender is called directly and the routing through the table is the
+  // deviation. Everything the windows see is the same; what is missing is the
+  // chance for an application-level handler to intervene first.
+  if (WxSendIdleEventsRuntime()) {
+    requestMore = true;
+  }
+
   return requestMore;
 }
 
