@@ -2308,6 +2308,20 @@ public:
   void OnEraseBackground(wxEraseEventRuntime& eraseEvent);
 
   /**
+   * Address: 0x00969B80 (FUN_00969B80)
+   * Mangled: ?OnSysColourChanged@wxWindow@@IAEXAAVwxSysColourChangedEvent@@@Z
+   *
+   * IDA signature:
+   * void __thiscall wxWindow::OnSysColourChanged(wxWindow *this,
+   *                                              wxSysColourChangedEvent *event);
+   *
+   * What it does:
+   * Tells every child window the system colours moved, and takes the new
+   * defaults for any colour the caller never overrode.
+   */
+  void OnSysColourChanged(wxEventRuntime& sysColourChangedEvent);
+
+  /**
    * Address: 0x009691A0 (FUN_009691A0)
    * Mangled: ?HandleSetFocus@wxWindow@@IAE_NPAX@Z
    */

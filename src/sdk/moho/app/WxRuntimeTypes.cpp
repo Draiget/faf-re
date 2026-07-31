@@ -11332,7 +11332,11 @@ namespace
     bool themeEnabled = false;
     std::uint8_t bitfields = 0;
     std::wstring windowName{};
-    wxColourRuntime backgroundColour{};
+    // Bit 0x10 marks the background as the caller's own choice and 0x20 the
+    // foreground, which is what stops a system-colour change overwriting
+    // either - the same bits as the flags byte at window+0xCC.
+    wxColourRuntime backgroundColour{}; // window+0x80
+    wxColourRuntime foregroundColour{}; // window+0x90
     void* dropTarget = nullptr;
   };
 
@@ -32976,6 +32980,100 @@ void wxWindowMswRuntime::OnEraseBackground(
   (void)::SetMapMode(deviceContext, previousMapMode);
 }
 
+namespace
+{
+  // byte_F8F344: cleared whenever a top-level window hears the system colours
+  // moved, so the next reader takes them afresh.
+  std::uint8_t gWxSystemColoursStillCurrent = 0;
+
+  /**
+   * Address: 0x00967480 (FUN_00967480)
+   *
+   * IDA signature:
+   * wxColour *__cdecl sub_967480(wxColour *result, int index);
+   *
+   * What it does:
+   * One of the system's own colours. The binary forwards to
+   * wxSystemSettingsNative::GetColour, and wx's colour indices are the Win32
+   * COLOR_* constants unchanged - index 8 is COLOR_WINDOWTEXT, 15 is
+   * COLOR_BTNFACE - so the index goes straight through.
+   *
+   * The binary caches these and uses the flag above to know when the cache
+   * went stale. Reading them afresh each time gives the same answer, so the
+   * cache is not modelled; the flag is, because the handler that clears it is
+   * being recovered here.
+   */
+  [[nodiscard]] wxColourRuntime WxSystemSettingsGetColour(const std::int32_t colourIndex)
+  {
+    const COLORREF systemColour = ::GetSysColor(colourIndex);
+    return wxColourRuntime::FromRgb(
+      GetRValue(systemColour), GetGValue(systemColour), GetBValue(systemColour)
+    );
+  }
+
+  constexpr std::int32_t kWxSysColourWindowText = 8;  // COLOR_WINDOWTEXT
+  constexpr std::int32_t kWxSysColourButtonFace = 15; // COLOR_BTNFACE
+
+  constexpr std::uint8_t kWxWindowHasOwnBackgroundColour = 0x10;
+  constexpr std::uint8_t kWxWindowHasOwnForegroundColour = 0x20;
+} // namespace
+
+/**
+ * Address: 0x00969B80 (FUN_00969B80)
+ * Mangled: ?OnSysColourChanged@wxWindow@@IAEXAAVwxSysColourChangedEvent@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxWindow::OnSysColourChanged(wxWindow *this,
+ *                                              wxSysColourChangedEvent *event);
+ *
+ * What it does:
+ * Reacts to the system colours moving. A top-level window marks the cached
+ * copies stale - it is the one that hears from Windows, so it is the one that
+ * knows. Then every child that is not top-level in its own right is sent
+ * WM_SYSCOLORCHANGE, since Windows only delivers it to top-level windows and
+ * a control would otherwise never hear.
+ *
+ * Finally the window takes the new defaults, but only for colours the caller
+ * never set: the flags at +0xCC carry a bit for each, and a set bit means the
+ * colour is the caller's and must not be overwritten. Foreground comes from
+ * COLOR_WINDOWTEXT and background from COLOR_BTNFACE.
+ */
+void wxWindowMswRuntime::OnSysColourChanged(
+  wxEventRuntime& sysColourChangedEvent
+)
+{
+  if (IsTopLevel()) {
+    gWxSystemColoursStillCurrent = 0;
+  }
+
+  for (wxWindowBase* const child : GetChildren()) {
+    if (child == nullptr || child->IsTopLevel()) {
+      continue;
+    }
+
+    const WxWindowBaseRuntimeState* const childState = FindWxWindowBaseRuntimeState(child);
+    if (childState == nullptr) {
+      continue;
+    }
+
+    auto* const childWindow = reinterpret_cast<HWND>(
+      static_cast<std::uintptr_t>(childState->nativeHandle)
+    );
+    (void)::SendMessageW(childWindow, WM_SYSCOLORCHANGE, 0, 0);
+  }
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  if ((state.bitfields & kWxWindowHasOwnForegroundColour) == 0u) {
+    state.foregroundColour = WxSystemSettingsGetColour(kWxSysColourWindowText);
+  }
+  if ((state.bitfields & kWxWindowHasOwnBackgroundColour) == 0u) {
+    state.backgroundColour = WxSystemSettingsGetColour(kWxSysColourButtonFace);
+  }
+
+  // The base implementation carries the event on down to the children.
+  wxWindowBase::OnSysColourChanged(sysColourChangedEvent);
+}
+
 /**
  * Address: 0x00967570 (FUN_00967570)
  * Mangled: ?GetEventTable@wxWindow@@MBEPBUwxEventTable@@XZ
@@ -32999,6 +33097,9 @@ const void* wxWindowMswRuntime::GetEventTable() const
   static const wxEventTableEntry entries[] = {
     MakeWxEventTableEntry(
       -1, -1, &wxWindowMswRuntime::OnEraseBackground, WxEventTypeSlot(gWxEvtEraseBackgroundRuntimeType)
+    ),
+    MakeWxEventTableEntry(
+      -1, -1, &wxWindowMswRuntime::OnSysColourChanged, WxEventTypeSlot(gWxEvtSysColourChangedRuntimeType)
     ),
     // The binary repeats the base class's init-dialog row here rather than
     // letting the chain find it one hop later.
