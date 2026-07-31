@@ -33065,10 +33065,19 @@ void wxWindowBase::OnInitDialog(
  *
  * An unbound row here does not mean the event goes unhandled. main.exe also
  * links dependencies/wxWindows-2.4.2/lib/wxmsw.lib, which defines this class
- * and this table as well - 63 of the 70 wx-named functions this file defines
- * are defined there too. ForceFileOutput and /IGNORE:4006 resolve every such
- * collision silently to whichever object the linker sees first, so the library
- * still answers for whatever this tree leaves out, and no warning is printed.
+ * and this table as well. Comparing this file's object against that archive by
+ * full mangled name, 54 of the 140 wx-class symbols we emit collide exactly.
+ * ForceFileOutput and /IGNORE:4006 resolve each one silently to whichever
+ * object the linker sees first - ours, since the objects precede the libraries
+ * - so those 54 bodies already displace the library's, and no warning is
+ * printed either way.
+ *
+ * The rest do not collide because the signature differs, and that is what
+ * keeps this table private: the library declares GetEventTable as returning
+ * wxEventTable const*, this tree returns const void*, so the two mangle apart.
+ * Library dispatch therefore never reads the rows built here - only our own
+ * ProcessEvent/SearchEventTable do. A table added for a class we do not also
+ * dispatch for ourselves, wxApp being the case in point, would be unreachable.
  */
 const void* wxWindowBase::GetEventTable() const
 {
