@@ -2319,6 +2319,16 @@ public:
    * What it does:
    * Takes the foreground palette when this window is being activated.
    */
+  /**
+   * Address: 0x0096A760 (FUN_0096A760)
+   * Mangled: ?HandleJoystickEvent@wxWindow@@IAE_NIHHI@Z
+   *
+   * What it does:
+   * Turns one of the eight joystick messages into the matching wx joystick
+   * event.
+   */
+  bool HandleJoystickEvent(unsigned int message, std::int32_t x, std::int32_t y, unsigned int flags);
+
   bool HandleQueryNewPalette();
 
   /**
