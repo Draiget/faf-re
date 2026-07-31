@@ -11328,6 +11328,10 @@ namespace
     // The +0x110 bit-2 flag: set once the pointer is known to be over this
     // window, so the enter event is raised on arrival and not on every move.
     std::uint8_t mouseInWindow = 0;
+    // The +0x110 bit-3 flag: whether the last key-down was handled. The binary
+    // stores it branchlessly, shifting the result up three bits and xor-ing it
+    // into place.
+    std::uint8_t lastKeyDownHandled = 0;
     std::int32_t windowId = -1;
     wxWindowBase* parentWindow = nullptr;
     std::vector<wxWindowBase*> children{};
@@ -33490,6 +33494,59 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x0096B4E0 (FUN_0096B4E0)
+ * Mangled: ?TranslateKbdEventToMouse@wxWindow@@IAEXPAH00@Z
+ *
+ * IDA signature:
+ * void __usercall wxWindow::TranslateKbdEventToMouse(int *x, int *y,
+ *                                                    unsigned int *flags, wxWindow *this);
+ *
+ * What it does:
+ * Describes the pointer as though the right button had just been pressed
+ * there, so a keyboard request for a context menu can be delivered as a click.
+ *
+ * The right button is reported down whether or not it is, because that is the
+ * whole point - the caller is synthesising one. Only shift and control are
+ * carried across; alt is not, since the menu key is not an alt combination.
+ * The position comes from the message that was being processed rather than
+ * from the cursor now, which keeps it consistent with the key press that
+ * asked for it.
+ */
+void wxWindowMswRuntime::TranslateKbdEventToMouse(
+  std::int32_t* const x,
+  std::int32_t* const y,
+  unsigned int* const flags
+) const
+{
+  constexpr unsigned int kMouseFlagRightButtonDown = 0x0002u;
+  constexpr unsigned int kMouseFlagShiftDown = 0x0004u;
+  constexpr unsigned int kMouseFlagControlDown = 0x0008u;
+
+  unsigned int mouseFlags = kMouseFlagRightButtonDown;
+  if (::GetKeyState(VK_CONTROL) < 0) {
+    mouseFlags |= kMouseFlagControlDown;
+  }
+  if (::GetKeyState(VK_SHIFT) < 0) {
+    mouseFlags |= kMouseFlagShiftDown;
+  }
+
+  const DWORD messagePosition = ::GetMessagePos();
+  std::int32_t screenX = static_cast<std::int16_t>(LOWORD(messagePosition));
+  std::int32_t screenY = static_cast<std::int16_t>(HIWORD(messagePosition));
+  DoScreenToClient(&screenX, &screenY);
+
+  if (x != nullptr) {
+    *x = screenX;
+  }
+  if (y != nullptr) {
+    *y = screenY;
+  }
+  if (flags != nullptr) {
+    *flags = mouseFlags;
+  }
+}
+
+/**
  * Address: 0x00969500 (FUN_00969500)
  * Mangled: ?HandleSetCursor@wxWindow@@IAE_NPAXGI@Z
  *
@@ -35361,26 +35418,98 @@ long wxWindowMswRuntime::MSWWindowProc(
   }
 
   case WM_KEYDOWN:
-  case WM_SYSKEYDOWN:
-    processed = wxWindowDispatchKeyDownRuntime(
-      this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam)
-    );
+  case WM_SYSKEYDOWN: {
+    const int virtualKey = static_cast<int>(LOWORD(wParam));
+    const auto rawFlags = static_cast<std::uint32_t>(lParam);
+
+    processed = wxWindowDispatchKeyDownRuntime(this, virtualKey, rawFlags);
+    EnsureWxWindowBaseRuntimeState(this).lastKeyDownHandled = processed ? 1u : 0u;
+
+    if (!processed) {
+      // Nobody wanted the key event itself, so decide what the key means.
+      switch (virtualKey) {
+      // Modifiers and locks produce no character and nothing further should
+      // see them, so they are swallowed here.
+      case VK_SHIFT:
+      case VK_CONTROL:
+      case VK_MENU:
+      case VK_CAPITAL:
+      case VK_NUMLOCK:
+      case VK_SCROLL:
+        processed = true;
+        break;
+
+      // These do produce a character, and Windows will send WM_CHAR for them
+      // in a moment - claiming them now would deliver the key twice.
+      case VK_BACK:
+      case VK_TAB:
+      case VK_RETURN:
+      case VK_ESCAPE:
+      case VK_SPACE:
+      case VK_MULTIPLY:
+      case VK_ADD:
+      case VK_SUBTRACT:
+      case VK_DIVIDE:
+      case VK_OEM_1:
+      case VK_OEM_PLUS:
+      case VK_OEM_COMMA:
+      case VK_OEM_MINUS:
+      case VK_OEM_PERIOD:
+      case VK_OEM_2:
+      case VK_OEM_3:
+      case VK_OEM_4:
+      case VK_OEM_5:
+      case VK_OEM_6:
+      case VK_OEM_7:
+        processed = false;
+        break;
+
+      // The menu key stands in for a right-click, at wherever the pointer is.
+      case VK_APPS: {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        unsigned int mouseFlags = 0;
+        TranslateKbdEventToMouse(&x, &y, &mouseFlags);
+        processed = HandleMouseEvent(WM_RBUTTONDOWN, x, y, mouseFlags);
+        break;
+      }
+
+      // Everything else has no WM_CHAR coming, so the character event is
+      // raised from here - with the code untranslated, which is what makes
+      // HandleChar run the translation itself.
+      default:
+        processed = wxWindowDispatchCharRuntime(this, virtualKey, rawFlags, false);
+        break;
+      }
+    }
+
     // A system key still has to reach the default handler afterwards, or Alt
     // stops opening the menu and F10 stops working.
     if (message == WM_SYSKEYDOWN) {
       (void)MSWDefWindowProc(message, wParam, lParam);
     }
     break;
+  }
 
   case WM_KEYUP:
-  case WM_SYSKEYUP:
-    processed = wxWindowDispatchKeyUpRuntime(
-      this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam)
-    );
+  case WM_SYSKEYUP: {
+    const int virtualKey = static_cast<int>(LOWORD(wParam));
+    processed = wxWindowDispatchKeyUpRuntime(this, virtualKey, static_cast<std::uint32_t>(lParam));
+
+    // The menu key's release is the matching right-button up.
+    if (!processed && virtualKey == VK_APPS) {
+      std::int32_t x = 0;
+      std::int32_t y = 0;
+      unsigned int mouseFlags = 0;
+      TranslateKbdEventToMouse(&x, &y, &mouseFlags);
+      processed = HandleMouseEvent(WM_RBUTTONUP, x, y, mouseFlags);
+    }
+
     if (message == WM_SYSKEYUP) {
       (void)MSWDefWindowProc(message, wParam, lParam);
     }
     break;
+  }
 
   case WM_CHAR:
   case WM_SYSCHAR:

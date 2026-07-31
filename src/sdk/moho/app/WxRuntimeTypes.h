@@ -2385,6 +2385,17 @@ public:
    * What it does:
    * Chooses the cursor for a pointer sitting over this window's client area.
    */
+  /**
+   * Address: 0x0096B4E0 (FUN_0096B4E0)
+   * Mangled: ?TranslateKbdEventToMouse@wxWindow@@IAEXPAH00@Z
+   *
+   * What it does:
+   * Describes the pointer as though the right button had just been pressed
+   * there, so a keyboard request for a context menu can be delivered as a
+   * click.
+   */
+  void TranslateKbdEventToMouse(std::int32_t* x, std::int32_t* y, unsigned int* flags) const;
+
   bool HandleSetCursor(unsigned int hitTestCode);
 
   bool HandleQueryNewPalette();
