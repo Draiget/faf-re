@@ -33082,11 +33082,14 @@ void wxWindowBase::OnInitDialog(
  * Matching the signature - MBEPBUwxEventTable@@ per the mangling recorded in
  * the header, so protected and returning wxEventTable const* rather than
  * public and const void* - would make ours displace the library's and take
- * over dispatch. That has to come last, not first. Our table here binds two
- * of the four rows the binary's holds, and wxWindow's idle row is unbound,
- * so displacing today would trade complete library tables for incomplete ones
- * and lose OnMiddleClick, OnHelp and idle delivery to windows. Finish the rows
- * first, then flip the signature.
+ * over dispatch. That has to come last, not first: displacing costs us
+ * whatever the library's table holds and ours does not.
+ *
+ * This table is the only one still short. It binds two of the four rows the
+ * binary's holds - OnMiddleClick 0x00964A20 and OnHelp 0x00964100 are out,
+ * wanting wxMessageBox and wxHelpProvider. wxWindow's four rows are all
+ * bound, idle included, so idle delivery is not at risk; recover those two
+ * and the signature can flip.
  */
 const void* wxWindowBase::GetEventTable() const
 {
