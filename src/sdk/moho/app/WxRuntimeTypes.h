@@ -2303,6 +2303,26 @@ public:
   bool HandleDisplayChange();
 
   /**
+   * Address: 0x00969660 (FUN_00969660)
+   * Mangled: ?HandleSysColorChange@wxWindow@@IAE_NXZ
+   *
+   * What it does:
+   * Raises wxEVT_SYS_COLOUR_CHANGED when Windows says the system colours
+   * moved. This is the message side; OnSysColourChanged is what receives it.
+   */
+  bool HandleSysColorChange();
+
+  /**
+   * Address: 0x00969470 (FUN_00969470)
+   * Mangled: ?HandleInitDialog@wxWindow@@IAE_NPAX@Z
+   *
+   * What it does:
+   * Raises wxEVT_INIT_DIALOG so a dialog fills its controls in before it is
+   * shown.
+   */
+  bool HandleInitDialog(void* focusWindow);
+
+  /**
    * Address: 0x00968DC0 (FUN_00968DC0)
    * Mangled: ?HandleQueryEndSession@wxWindow@@IAE_NJPA_N@Z
    *

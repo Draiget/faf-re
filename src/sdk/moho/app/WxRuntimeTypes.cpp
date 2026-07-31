@@ -33290,6 +33290,56 @@ bool wxWindowMswRuntime::HandleDisplayChange()
 }
 
 /**
+ * Address: 0x00969660 (FUN_00969660)
+ * Mangled: ?HandleSysColorChange@wxWindow@@IAE_NXZ
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleSysColorChange(wxWindow *this);
+ *
+ * What it does:
+ * Raises wxEVT_SYS_COLOUR_CHANGED when Windows reports the system colours
+ * moved. This is the message side of the pair - OnSysColourChanged is what
+ * receives the event and does the work.
+ *
+ * It reports the message unhandled whatever the handler decided, so the
+ * default handler runs too. Returning handled here would stop Windows telling
+ * the controls that draw themselves from their own copies of the colours.
+ */
+bool wxWindowMswRuntime::HandleSysColorChange()
+{
+  WxSysColourChangedEventFactoryRuntime event{};
+  event.mEventObject = this;
+  (void)GetEventHandler()->ProcessEvent(&event);
+  return false;
+}
+
+/**
+ * Address: 0x00969470 (FUN_00969470)
+ * Mangled: ?HandleInitDialog@wxWindow@@IAE_NPAX@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxWindow::HandleInitDialog(wxWindow *this, WXHWND focusWindow);
+ *
+ * What it does:
+ * Raises wxEVT_INIT_DIALOG, which is what makes a dialog fill its controls in
+ * before it is shown. The window Windows offers as the initial focus is not
+ * used - wx decides that for itself.
+ */
+bool wxWindowMswRuntime::HandleInitDialog(
+  void* const focusWindow
+)
+{
+  (void)focusWindow;
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+
+  WxInitDialogEventFactoryRuntime event{};
+  event.mEventId = state != nullptr ? state->windowId : -1;
+  event.mEventObject = this;
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
  * Address: 0x00968DC0 (FUN_00968DC0)
  * Mangled: ?HandleQueryEndSession@wxWindow@@IAE_NJPA_N@Z
  *
@@ -34783,6 +34833,15 @@ long wxWindowMswRuntime::MSWWindowProc(
     processed = wxWindowDispatchCharRuntime(
       this, static_cast<int>(wParam), static_cast<std::uint32_t>(lParam), true
     );
+    break;
+
+  case WM_SYSCOLORCHANGE:
+    // Always reported unhandled so the default handler runs as well.
+    (void)HandleSysColorChange();
+    return MSWDefWindowProc(message, wParam, lParam);
+
+  case WM_INITDIALOG:
+    processed = HandleInitDialog(reinterpret_cast<void*>(static_cast<std::uintptr_t>(wParam)));
     break;
 
   case WM_DISPLAYCHANGE:
