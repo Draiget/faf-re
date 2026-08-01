@@ -596,13 +596,17 @@ int gpg::STR_Xtoi(
 {
   int res = 0;
   if (str != nullptr) {
-    for (char c = *str; c != NULL; c = *++str) {
+    // All three digit tests are `cmp dl, N / ja` - unsigned byte compares, so
+    // they only accept the digit ranges themselves. Spelling them as the signed
+    // `c - '0' <= 9` accepted every byte below '0' too and folded its negative
+    // value into the result instead of stopping at the first non-digit.
+    for (char c = *str; c != '\0'; c = *++str) {
       res *= 16;
-      if (c - '0' <= 9) {
+      if (c >= '0' && c <= '9') {
         res += c - '0';
-      } else if (c - 'A' <= 5) {
+      } else if (c >= 'A' && c <= 'F') {
         res += 10 + c - 'A';
-      } else if (c - 'a' <= 5) {
+      } else if (c >= 'a' && c <= 'f') {
         res += 10 + c - 'a';
       } else {
         return res;
@@ -906,15 +910,27 @@ msvc8::string gpg::STR_Chop(
   }
 }
 
-// 0x00938A80
+/**
+ * Address: 0x00938A80 (FUN_00938A80, gpg::STR_ToLower)
+ *
+ * What it does:
+ * Produces one lowercase ASCII copy of the input string.
+ *
+ * The range test is `lea ecx, [eax-41h] / cmp ecx, 19h / ja`, an *unsigned*
+ * compare - so it only fires for 'A'..'Z'. Writing that as the signed
+ * `c - 'A' <= 25` made it fire for every byte below 'A' as well, which turned
+ * ':' into 'Z' and '.' into 'N'. Canonizing "C:\ProgramData\...\SupComDataPath.lua"
+ * then produced "cZ\programdata\...\supcomdatapathNlua", so no absolute path
+ * could ever be opened and startup died in gpg::Die on the data-path script.
+ */
 msvc8::string gpg::STR_ToLower(
   StrArg str
 )
 {
   msvc8::string builder{};
   builder.reserve(strlen(str));
-  for (char c = *str; c != NULL; c = *++str) {
-    if (c - 'A' <= 25) {
+  for (char c = *str; c != '\0'; c = *++str) {
+    if (c >= 'A' && c <= 'Z') {
       c += 'a' - 'A';
     }
     builder.append(1, c);
@@ -927,6 +943,9 @@ msvc8::string gpg::STR_ToLower(
  *
  * What it does:
  * Produces one uppercase ASCII copy of the input string.
+ *
+ * `lea ecx, [eax-61h] / cmp ecx, 19h / ja` - the same unsigned range test as
+ * STR_ToLower, so only 'a'..'z' are touched.
  */
 msvc8::string gpg::STR_ToUpper(
   StrArg str
@@ -934,8 +953,8 @@ msvc8::string gpg::STR_ToUpper(
 {
   msvc8::string builder{};
   builder.reserve(strlen(str));
-  for (char c = *str; c != NULL; c = *++str) {
-    if (c - 'a' <= 25) {
+  for (char c = *str; c != '\0'; c = *++str) {
+    if (c >= 'a' && c <= 'z') {
       c -= 'a' - 'A';
     }
     builder.append(1, c);
