@@ -4140,58 +4140,56 @@ namespace
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
 
+	// Defined below; both are the fork's own userdata builders.
+	[[nodiscard]] Udata* CreateDefaultConstructedUserdata(lua_State* state, gpg::RType* type);
+	[[nodiscard]] gpg::RRef BuildRefFromUserdata(Udata* userdata);
+
 	/**
-	 * Allocates one reflected userdata carrying a `gpg::RRef`, in the shape the
-	 * fork uses everywhere else.
+	 * Address: 0x00924B90 shape (the fork's three-argument `lua_newuserdata`).
 	 *
-	 * This used to ask the stock `lua_newuserdata` for plain bytes and write an
-	 * RRef into them. That is not how this Lua stores userdata: both recovered
-	 * creators next door - `luaS_newudata` 0x00924A10 and `luaS_newudata2`
-	 * 0x00924AF0 - allocate `sizeof(Udata)` plus the type's own size, tag the
-	 * header, put the RType in `len`, and link the object into the global root
-	 * list so collection and the userdata metatable reach it. Storage from the
-	 * stock allocator has none of that: no metatable, not on the root list, and
-	 * `len` holding a byte count where the rest of this file reads a type.
+	 * What it does:
+	 * Builds one reflected userdata of `type`, pushes it on the stack, and hands
+	 * the caller a ref to its payload through `outRef`.
 	 *
-	 * It was also the one place our own code called into the prebuilt
-	 * LuaPlusLibD_1081, whose debug `api_incr_top` asserts on a stack this tree
-	 * grows instead - the assert that stops startup inside LuaState::Init.
+	 * The three-argument shape is the binary's, not stock Lua's: `newfile`
+	 * 0x00917190 calls `lua_newuserdata(&rt, L, WrapFile::RType)` and then
+	 * upcasts `rt`, so the ref goes out through the argument rather than the
+	 * return value. This used to take a source ref in that first slot and return
+	 * the new one, which left both callers upcasting a ref nothing had filled -
+	 * `NewFileUserdata` threw BadRefCast on it the moment the recovered
+	 * `luaopen_io` first ran.
+	 *
+	 * A null type is `newproxy`'s case: stock Lua makes a userdata of no size,
+	 * which here is one carrying no RType in `len` and so no constructor to run.
 	 */
-	[[nodiscard]] gpg::RRef* lua_newuserdata_ref(
-		const gpg::RRef* const sourceRef,
+	gpg::RRef* lua_newuserdata_ref(
+		gpg::RRef* const outRef,
 		lua_State* const state,
-		gpg::RType* const fallbackType
+		gpg::RType* const type
 	)
 	{
-		gpg::RType* const userdataType =
-			(sourceRef != nullptr && sourceRef->mType != nullptr) ? sourceRef->mType : fallbackType;
-
-		const std::size_t userdataSize = sizeof(Udata) + sizeof(gpg::RRef);
-		auto* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
-		if (userdata == nullptr) {
-			return nullptr;
-		}
-
-		userdata->len = reinterpret_cast<std::size_t>(userdataType);
-		userdata->tt = LUA_TUSERDATA;
-		userdata->marked = (userdataType != nullptr && userdataType->dtrFunc_ != nullptr) ? 2u : 0u;
-
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
-		userdata->metatable = globalStateRuntime->userdataMetatable;
-		userdata->next = globalStateRuntime->rootUserdata;
-		globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
-
-		auto* const outRef =
-			reinterpret_cast<gpg::RRef*>(reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata));
-		if (sourceRef != nullptr) {
-			*outRef = *sourceRef;
+		Udata* userdata = nullptr;
+		if (type != nullptr) {
+			userdata = CreateDefaultConstructedUserdata(state, type);
 		} else {
-			outRef->mObj = nullptr;
-			outRef->mType = nullptr;
+			userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, sizeof(Udata)));
+			userdata->len = 0u;
+			userdata->tt = LUA_TUSERDATA;
+			userdata->marked = 0u;
+
+			auto* const globalStateRuntime =
+				reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
+			userdata->metatable = globalStateRuntime->userdataMetatable;
+			userdata->next = globalStateRuntime->rootUserdata;
+			globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
 		}
 
-		if (outRef->mType == nullptr) {
-			outRef->mType = fallbackType;
+		state->top->tt = static_cast<int>(userdata->tt);
+		state->top->value.p = userdata;
+		api_incr_top(state);
+
+		if (outRef != nullptr) {
+			*outRef = BuildRefFromUserdata(userdata);
 		}
 		return outRef;
 	}
