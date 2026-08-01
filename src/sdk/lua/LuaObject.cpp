@@ -6863,6 +6863,105 @@ namespace
 		return kLuaFileMethods;
 	}
 
+	/**
+	 * The `iolib` registration table, head at 0x00D45C20.
+	 *
+	 * Order is the binary's. `dir` is this engine's own addition - stock Lua
+	 * 5.0 has no such entry - and sits last, after the ten it kept.
+	 */
+	const luaL_reg kLuaIoLibrary[] = {
+		{"input", &LuaIoInput},
+		{"output", &LuaIoOutput},
+		{"lines", &LuaIoLines},
+		{"close", &LuaIoClose},
+		{"flush", &LuaIoFlush},
+		{"open", &LuaIoOpen},
+		{"popen", &LuaIoPopen},
+		{"read", &LuaIoRead},
+		{"tmpfile", &LuaIoTmpFile},
+		{"write", &LuaIoWrite},
+		{"dir", &LuaIoDir},
+		{nullptr, nullptr}
+	};
+
+	/**
+	 * The `syslib` registration table, head at 0x00D45CC0.
+	 *
+	 * Registered under the name "os" - the libname the decompiler shows as a
+	 * pointer at 0x00D45F28 is not one: those four bytes are the string
+	 * itself.
+	 */
+	const luaL_reg kLuaOsLibrary[] = {
+		{"clock", &io_clock},
+		{"date", &LuaOsDate},
+		{"difftime", &io_difftime},
+		{"execute", &io_execute},
+		{"exit", &io_exit},
+		{"getenv", &io_getenv},
+		{"remove", &io_remove},
+		{"rename", &io_rename},
+		{"setlocale", &io_setloc},
+		{"time", &LuaOsTime},
+		{"tmpname", &io_tmpname},
+		{nullptr, nullptr}
+	};
+
+	/**
+	 * Address: 0x00917BC0 (FUN_00917BC0, luaopen_io)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaopen_io(lua_State *L);
+	 *
+	 * What it does:
+	 * Opens both libraries this Lua exposes over files - "os" from syslib and
+	 * "io" from iolib - and builds the shared "FILE*" metatable between them.
+	 *
+	 * The metatable is its own `__index`, so file methods resolve through it,
+	 * and the file-method table goes in with a null library name so it lands
+	 * on that metatable rather than a global. The io table is then opened with
+	 * one upvalue - the metatable itself - which is how its functions reach
+	 * the type without a registry lookup on every call.
+	 *
+	 * Finally the three standard streams are wrapped and installed: stdin and
+	 * stdout are also bound to the globals `_input` and `_output`, which is
+	 * what io.read, io.write and io.flush answer to, while stderr is only
+	 * reachable as io.stderr. None of the three is marked closeable, so
+	 * file:close() on them cannot take the process's own streams down.
+	 */
+	int LuaOpenIo(lua_State* const state)
+	{
+		luaL_openlib(state, "os", kLuaOsLibrary, 0);
+
+		luaL_newmetatable(state, "FILE*");
+		lua_pushlstring(state, "__index", 7u);
+		lua_pushvalue(state, -2);
+		lua_rawset(state, -3);
+		luaL_openlib(state, nullptr, kLuaFileMethods, 0);
+
+		lua_pushvalue(state, -1);
+		luaL_openlib(state, "io", kLuaIoLibrary, 1);
+
+		lua_pushstring(state, "stdin");
+		NewFileUserdata(state, false)->stream = stdin;
+		lua_pushstring(state, "_input");
+		lua_pushvalue(state, -2);
+		lua_settable(state, -6);
+		lua_settable(state, -3);
+
+		lua_pushstring(state, "stdout");
+		NewFileUserdata(state, false)->stream = stdout;
+		lua_pushstring(state, "_output");
+		lua_pushvalue(state, -2);
+		lua_settable(state, -6);
+		lua_settable(state, -3);
+
+		lua_pushstring(state, "stderr");
+		NewFileUserdata(state, false)->stream = stderr;
+		lua_settable(state, -3);
+
+		return 1;
+	}
+
 	int ReadZioByte(LuaZioRuntimeView* const stream)
 	{
 		const int available = stream->remainingBytes;
@@ -15569,7 +15668,10 @@ void LuaState::Init(const StandardLibraries initStandardLibrary)
 		luaopen_base(state);
 		luaopen_table(state);
 		if (initStandardLibrary == LIB_OSIO) {
-			luaopen_io(state);
+			// Ours, not the prebuilt lib's. The vendored liolib walks a
+			// lua_State this tree builds and asserts in its debug
+			// lua_newuserdata; this one is the binary's own 0x00917BC0.
+			LuaOpenIo(state);
 		}
 		luaopen_serialize(state);
 		luaopen_string(state);
