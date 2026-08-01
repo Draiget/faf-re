@@ -906,6 +906,11 @@ extern "C"
 	TObject* luaH_setnum(lua_State* L, Table* t, int key);
 	TObject* negindex(lua_State* L, int idx);
 	Table* luaH_new(lua_State* L, int narray, int lnhash);
+	Table* luaT_getmetatable(lua_State* L, const TObject* o);
+	const TObject* luaV_tonumber(const TObject* obj, TObject* outNumber);
+	int luaV_lessthan(lua_State* L, const TObject* l, const TObject* r);
+	int luaH_next(lua_State* L, Table* table, TObject* key);
+	void luaG_errormsg(lua_State* L);
 
 	/**
 	 * Address: 0x00D474D8 (luaT_typenames)
@@ -1190,6 +1195,23 @@ extern "C"
 			return &state->base[stackIndex - 1];
 		}
 		return negindex(state, stackIndex);
+	}
+
+	/**
+	 * What it does:
+	 * Resolves one stack index the way every read-only lua_* accessor does:
+	 * like `luaA_index`, except a positive index past the top yields nothing
+	 * instead of a slot nobody pushed. The binary open-codes this three-line
+	 * test at the head of each accessor rather than calling a helper.
+	 */
+	[[nodiscard]] TObject* luaA_indexAcceptable(lua_State* const state, const int stackIndex)
+	{
+		if (stackIndex <= 0) {
+			return negindex(state, stackIndex);
+		}
+
+		TObject* const candidate = &state->base[stackIndex - 1];
+		return candidate < state->top ? candidate : nullptr;
 	}
 
 	/**
@@ -1823,6 +1845,431 @@ extern "C"
 		const char* const gotName = lua_typename(state, gotTag);
 		const char* const message = lua_pushfstring(state, "%s expected, got %s", expectedName, gotName);
 		return luaL_argerror(state, argumentIndex, message);
+	}
+
+	// ---------------------------------------------------------------------
+	// Public C API accessors that were still resolving to the prebuilt
+	// LuaPlus library.
+	//
+	// Every one of these reads the lua_State and global_State this tree
+	// builds, and the library's copies read them at stock offsets - so each
+	// was a live fault waiting for the first script that touched it.
+	// lua_getmetatable was the one that fired: tostring(ClientVersion) in
+	// init_faf.lua reached luaL_callmeta, and the library's copy compared
+	// against a defaultmeta it found at the wrong place and pushed a table
+	// that was not one.
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Address: 0x0090D180 (FUN_0090D180, lua_getmetatable)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_getmetatable(lua_State *L, int objindex);
+	 *
+	 * What it does:
+	 * Pushes the metatable governing one value and always reports success.
+	 * That is a fork change: stock Lua returns 0 and pushes nothing when the
+	 * value has no metatable of its own, whereas here every type has one -
+	 * tables and userdata carry theirs, everything else shares the per-type
+	 * default - so `luaT_getmetatable` always has something to hand back.
+	 */
+	int lua_getmetatable(lua_State* const state, const int objindex)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, objindex);
+		Table* const metatable = luaT_getmetatable(state, object);
+
+		state->top->tt = static_cast<int>(metatable->tt);
+		state->top->value.p = metatable;
+		api_incr_top(state);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090C9F0 (FUN_0090C9F0, lua_tonumber)
+	 *
+	 * What it does:
+	 * Reads one stack slot as a number, parsing a numeric string on the way
+	 * through a scratch slot. Anything else reads as zero.
+	 */
+	lua_Number lua_tonumber(lua_State* const state, const int idx)
+	{
+		const TObject* object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr) {
+			return 0.0f;
+		}
+
+		TObject scratch{};
+		if (object->tt != LUA_TNUMBER) {
+			object = luaV_tonumber(object, &scratch);
+			if (object == nullptr) {
+				return 0.0f;
+			}
+		}
+
+		return object->value.n;
+	}
+
+	/**
+	 * Address: 0x0090C7A0 (FUN_0090C7A0, lua_isnumber)
+	 *
+	 * What it does:
+	 * Reports whether one stack slot is a number or a string that parses as
+	 * one.
+	 */
+	int lua_isnumber(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr) {
+			return 0;
+		}
+
+		TObject scratch{};
+		return (object->tt == LUA_TNUMBER || luaV_tonumber(object, &scratch) != nullptr) ? 1 : 0;
+	}
+
+	/**
+	 * Address: 0x0090C800 (FUN_0090C800, lua_isstring)
+	 *
+	 * What it does:
+	 * Reports whether one stack slot holds a string. Note this fork does not
+	 * accept a number here the way stock Lua does - the tag test is exact.
+	 */
+	int lua_isstring(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		return (object != nullptr && object->tt == LUA_TSTRING) ? 1 : 0;
+	}
+
+	/**
+	 * Address: 0x0090C890 (FUN_0090C890, lua_rawequal)
+	 *
+	 * What it does:
+	 * Compares two stack slots by identity, without consulting `__eq`.
+	 */
+	int lua_rawequal(lua_State* const state, const int index1, const int index2)
+	{
+		const TObject* const left = luaA_indexAcceptable(state, index1);
+		const TObject* const right = luaA_indexAcceptable(state, index2);
+		return (left != nullptr && right != nullptr && luaO_rawequalObj(left, right) != 0) ? 1 : 0;
+	}
+
+	/**
+	 * Address: 0x0090C980 (FUN_0090C980, lua_lessthan)
+	 *
+	 * What it does:
+	 * Orders two stack slots with full `__lt` semantics.
+	 */
+	int lua_lessthan(lua_State* const state, const int index1, const int index2)
+	{
+		const TObject* const left = luaA_indexAcceptable(state, index1);
+		const TObject* const right = luaA_indexAcceptable(state, index2);
+		if (left == nullptr || right == nullptr) {
+			return 0;
+		}
+
+		return luaV_lessthan(state, left, right);
+	}
+
+	/**
+	 * Address: 0x0090CC90 (FUN_0090CC90, lua_topointer)
+	 *
+	 * What it does:
+	 * Returns an identity pointer for the collectable value at one index -
+	 * the payload itself for userdata, the object for everything else, and
+	 * nothing for values that are not collectable.
+	 */
+	const void* lua_topointer(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr) {
+			return nullptr;
+		}
+
+		switch (object->tt) {
+			case LUA_TLIGHTUSERDATA:
+			case LUA_TTABLE:
+			case LUA_CFUNCTION:
+			case LUA_TFUNCTION:
+			case LUA_TTHREAD:
+				return object->value.p;
+			case LUA_TUSERDATA:
+				// Full userdata identifies by its payload, which starts one
+				// header past the object - `add eax, 10h`.
+				return reinterpret_cast<const std::uint8_t*>(object->value.p) + sizeof(Udata);
+			default:
+				return nullptr;
+		}
+	}
+
+	/**
+	 * Address: 0x0090CC50 (FUN_0090CC50, lua_tothread)
+	 *
+	 * What it does:
+	 * Returns the coroutine at one index, or nothing when the slot holds
+	 * something else.
+	 */
+	lua_State* lua_tothread(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr || object->tt != LUA_TTHREAD) {
+			return nullptr;
+		}
+
+		return static_cast<lua_State*>(object->value.p);
+	}
+
+	/**
+	 * Address: 0x0090C460 (FUN_0090C460, lua_checkstack)
+	 *
+	 * What it does:
+	 * Makes room for `size` more slots, growing the stack and widening the
+	 * current frame's ceiling if that is what it takes. Reports failure only
+	 * when the request would push the frame past the API stack limit.
+	 */
+	int lua_checkstack(lua_State* const state, const int size)
+	{
+		constexpr int kMaxApiStackSlots = 0x800; // "cmp edx, 800h" at 0x0090C476
+
+		if (size + (state->top - state->base) > kMaxApiStackSlots) {
+			return 0;
+		}
+
+		if (state->stack_last - state->top <= size) {
+			luaD_growstack(state, size);
+		}
+
+		StkId const requiredTop = state->top + size;
+		if (state->ci->top < requiredTop) {
+			state->ci->top = requiredTop;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090EA70 (FUN_0090EA70, luaL_checkany)
+	 *
+	 * What it does:
+	 * Requires that an argument slot exists at all. The decompile shows it
+	 * returning lua_type's result, but that is just the value left in EAX by
+	 * the tail call - the declared shape is void, as in stock Lua.
+	 */
+	void luaL_checkany(lua_State* const state, const int narg)
+	{
+		if (lua_type(state, narg) == LUA_TNONE) {
+			(void)luaL_argerror(state, narg, "value expected");
+		}
+	}
+
+	/**
+	 * Address: 0x0090EA20 (FUN_0090EA20, luaL_checktype)
+	 *
+	 * What it does:
+	 * Requires that an argument slot holds exactly type `t`.
+	 */
+	void luaL_checktype(lua_State* const state, const int narg, const int t)
+	{
+		if (lua_type(state, narg) != t) {
+			(void)tag_error(t, narg, state);
+		}
+	}
+
+	/**
+	 * Address: 0x0090EAA0 (FUN_0090EAA0, luaL_checklstring)
+	 *
+	 * What it does:
+	 * Requires that an argument slot reads as a string, optionally reporting
+	 * its length.
+	 */
+	const char* luaL_checklstring(lua_State* const state, const int narg, size_t* const len)
+	{
+		const char* const text = lua_tostring(state, narg);
+		if (text == nullptr) {
+			(void)tag_error(LUA_TSTRING, narg, state);
+		}
+
+		if (len != nullptr) {
+			*len = lua_strlen(state, narg);
+		}
+
+		return text;
+	}
+
+	/**
+	 * Address: 0x0090EB10 (FUN_0090EB10, luaL_optlstring)
+	 *
+	 * What it does:
+	 * Same as `luaL_checklstring`, except an absent or nil argument yields
+	 * the caller's default.
+	 */
+	const char* luaL_optlstring(
+		lua_State* const state,
+		const int narg,
+		const char* const def,
+		size_t* const len
+	)
+	{
+		if (lua_type(state, narg) > LUA_TNIL) {
+			return luaL_checklstring(state, narg, len);
+		}
+
+		if (len != nullptr) {
+			*len = (def != nullptr) ? std::strlen(def) : 0u;
+		}
+
+		return def;
+	}
+
+	/**
+	 * Address: 0x0090EB70 (FUN_0090EB70, luaL_checknumber)
+	 *
+	 * What it does:
+	 * Requires that an argument slot reads as a number. Zero is ambiguous -
+	 * lua_tonumber returns it both for the number zero and for anything
+	 * unconvertible - so that one case is re-tested with lua_isnumber.
+	 */
+	lua_Number luaL_checknumber(lua_State* const state, const int narg)
+	{
+		const lua_Number value = lua_tonumber(state, narg);
+		if (value == 0.0f && lua_isnumber(state, narg) == 0) {
+			(void)tag_error(LUA_TNUMBER, narg, state);
+		}
+
+		return value;
+	}
+
+	/**
+	 * Address: 0x0090D6D0 (FUN_0090D6D0, lua_next)
+	 *
+	 * What it does:
+	 * Advances one table traversal: takes the key on top, replaces it with the
+	 * next key and pushes that key's value. On reaching the end it pops the key
+	 * and reports 0.
+	 *
+	 * Note the index resolution here is `luaA_index`, not the acceptable-index
+	 * form the read-only accessors use - a positive index past the top is not
+	 * defended against, because a caller that has no table there is already
+	 * wrong.
+	 */
+	int lua_next(lua_State* const state, const int idx)
+	{
+		const TObject* const table = luaA_index(state, idx);
+		const int hasMore = luaH_next(state, static_cast<Table*>(table->value.p), state->top - 1);
+
+		if (hasMore == 0) {
+			--state->top; // traversal finished: drop the key
+			return 0;
+		}
+
+		api_incr_top(state); // key was replaced in place; publish its value
+		return hasMore;
+	}
+
+	/**
+	 * Address: 0x0090D0A0 (FUN_0090D0A0, lua_rawgeti)
+	 *
+	 * What it does:
+	 * Pushes `t[n]` for an integer key without consulting `__index`.
+	 */
+	void lua_rawgeti(lua_State* const state, const int idx, const int n)
+	{
+		const TObject* const table = luaA_index(state, idx);
+		*state->top = *luaH_getnum(static_cast<Table*>(table->value.p), n);
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090D6C0 (FUN_0090D6C0, lua_error)
+	 *
+	 * What it does:
+	 * Raises the value on top of the stack as an error. The binary's body is a
+	 * bare tail call to luaG_errormsg with no return value, because this fork
+	 * throws rather than longjmps and control never comes back; the int here is
+	 * only what the API declaration asks for.
+	 */
+	int lua_error(lua_State* const state)
+	{
+		luaG_errormsg(state);
+		return 0; // unreachable
+	}
+
+	/**
+	 * Address: 0x0090D1F0 (FUN_0090D1F0, lua_getfenv)
+	 *
+	 * What it does:
+	 * Pushes the environment of the function at `idx`; anything that is not a
+	 * Lua closure answers with the running thread's globals.
+	 */
+	void lua_getfenv(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_index(state, idx);
+		const TObject* const environment = (object->tt == LUA_TFUNCTION)
+			? &static_cast<GCObject*>(object->value.p)->cl.l.g
+			: &state->_gt;
+
+		*state->top = *environment;
+		api_incr_top(state);
+	}
+
+	/**
+	 * Address: 0x0090D3B0 (FUN_0090D3B0, lua_setfenv)
+	 *
+	 * What it does:
+	 * Pops a value and installs it as the environment of the Lua closure at
+	 * `idx`. The value is consumed either way; only the assignment is
+	 * conditional.
+	 */
+	int lua_setfenv(lua_State* const state, const int idx)
+	{
+		TObject* const object = luaA_index(state, idx);
+		--state->top;
+
+		if (object->tt != LUA_TFUNCTION) {
+			return 0;
+		}
+
+		static_cast<GCObject*>(object->value.p)->cl.l.g = *state->top;
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090AD30 (FUN_0090AD30, lua_getn)
+	 *
+	 * What it does:
+	 * Answers a table's length the way this fork defines it: an `n` field wins
+	 * outright; otherwise it is the larger of the array part's last non-nil
+	 * index and the largest numeric key in the hash part.
+	 */
+	int lua_getn(lua_State* const state, const int index)
+	{
+		const TObject* const object = luaA_index(state, index);
+		Table* const table = static_cast<Table*>(object->value.p);
+
+		TString* const nField = luaS_newlstr(state, "n", 1u);
+		const TObject* const recorded = luaH_getstr(table, nField);
+		if (recorded->tt == LUA_TNUMBER) {
+			return static_cast<int>(recorded->value.n);
+		}
+
+		// Walk the array part back to its last non-nil slot. An empty or
+		// all-nil array leaves the index at -1, so the count comes out zero.
+		int lastArrayIndex = table->sizearray - 1;
+		for (; lastArrayIndex >= 0; --lastArrayIndex) {
+			if (table->array[lastArrayIndex].tt != LUA_TNIL) {
+				break;
+			}
+		}
+
+		auto largest = static_cast<float>(lastArrayIndex + 1);
+
+		const Node* node = table->node;
+		for (int remaining = 1 << table->lsizenode; remaining != 0; --remaining, ++node) {
+			if (node->i_key.tt == LUA_TNUMBER && node->i_val.tt != LUA_TNIL && node->i_key.value.n > largest) {
+				largest = node->i_key.value.n;
+			}
+		}
+
+		return static_cast<int>(largest);
 	}
 
 	/**
@@ -8293,6 +8740,91 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00912850 (FUN_00912850, info_tailcall)
+	 *
+	 * What it does:
+	 * Fills one activation record for a frame that only exists as a tail call,
+	 * where there is no function object left to describe, and pushes a nil in
+	 * place of the function `lua_getinfo` would otherwise have left behind.
+	 */
+	void info_tailcall(::lua_Debug* const activationRecord, lua_State* const state)
+	{
+		activationRecord->namewhat = "";
+		activationRecord->name = "";
+		activationRecord->currentline = -1;
+		activationRecord->linedefined = -1;
+		activationRecord->what = "tail";
+		activationRecord->source = "=(tail call)";
+		luaO_chunkid(activationRecord->short_src, activationRecord->source, LUA_IDSIZE);
+		activationRecord->nups = 0;
+		state->top->tt = LUA_TNIL;
+	}
+
+	/**
+	 * Address: 0x00913020 (FUN_00913020, auxgetinfo)
+	 *
+	 * IDA signature:
+	 * int __usercall auxgetinfo(const char *what@<eax>, TObject *f@<edi>,
+	 *     lua_Debug *ar@<esi>, lua_State *L, CallInfo *ci);
+	 *
+	 * What it does:
+	 * Fills the activation record for one frame, a field per option letter.
+	 * An unrecognised letter leaves the record alone and makes the whole call
+	 * report failure, but the rest of the string is still processed.
+	 */
+	int auxgetinfo(
+		const char* what,
+		TObject* const functionObject,
+		::lua_Debug* const activationRecord,
+		lua_State* const state,
+		CallInfo* const ci
+	)
+	{
+		int status = 1;
+
+		for (; *what != '\0'; ++what) {
+			switch (*what) {
+				case 'S':
+					LuaDebugPopulateFuncInfo(activationRecord, functionObject);
+					break;
+
+				case 'f':
+					// Parked at the top for lua_getinfo to publish once it has
+					// seen an 'f' in the option string.
+					*state->top = *functionObject;
+					break;
+
+				case 'l':
+					activationRecord->currentline = (ci != nullptr) ? currentline(ci) : -1;
+					break;
+
+				case 'n': {
+					const char* nameWhat = (ci != nullptr) ? getfuncname(&activationRecord->name, ci) : nullptr;
+					activationRecord->namewhat = nameWhat;
+					if (nameWhat == nullptr) {
+						// Not resolvable from the call site, so fall back to
+						// whatever global happens to hold this function.
+						const char* const globalName = travglobals(state, functionObject);
+						activationRecord->name = globalName;
+						activationRecord->namewhat = (globalName != nullptr) ? "global" : "";
+					}
+					break;
+				}
+
+				case 'u':
+					activationRecord->nups = static_cast<const Closure*>(functionObject->value.p)->c.nupvalues;
+					break;
+
+				default:
+					status = 0;
+					break;
+			}
+		}
+
+		return status;
+	}
+
+	/**
 	 * Address: 0x00911EC0 (FUN_00911EC0, listcode_buildop)
 	 *
 	 * What it does:
@@ -10663,6 +11195,89 @@ namespace
 
 		object.AddToUsedList(state);
 	}
+}
+
+/**
+ * Address: 0x009125E0 (FUN_009125E0, lua_getstack)
+ *
+ * What it does:
+ * Walks `level` frames down from the current one and records which
+ * CallInfo that landed on, so `lua_getinfo` can describe it. Tail calls
+ * collapsed into a Lua frame each count as a level of their own, which is
+ * why a frame's `tailcalls` comes off the counter. Reports failure once the
+ * walk reaches the base frame with levels still to go.
+ */
+int lua_getstack(lua_State* const state, const int level, ::lua_Debug* const activationRecord)
+{
+	constexpr int kFrameCFunction = 3;
+
+	int remaining = level;
+	CallInfo* ci = state->ci;
+
+	if (level > 0) {
+		for (; ci > state->base_ci; --ci) {
+			--remaining;
+			if (ci->state < kFrameCFunction) {
+				remaining -= ci->tailcalls;
+			}
+			if (remaining <= 0) {
+				break;
+			}
+		}
+
+		if (ci <= state->base_ci && remaining > 0) {
+			return 0;
+		}
+	}
+
+	if (ci == state->base_ci) {
+		return 0;
+	}
+
+	// A negative remainder means the level landed inside a run of tail
+	// calls rather than on a real frame; i_ci = 0 marks that for
+	// lua_getinfo, which then answers from info_tailcall.
+	activationRecord->i_ci = (remaining >= 0) ? static_cast<int>(ci - state->base_ci) : 0;
+	return 1;
+}
+
+/**
+ * Address: 0x009132F0 (FUN_009132F0, lua_getinfo)
+ *
+ * What it does:
+ * Describes either the function on top of the stack (`what` starting with
+ * '>') or the frame `lua_getstack` recorded. When the option string asks
+ * for 'f', the function object auxgetinfo parked at the top is published.
+ */
+int lua_getinfo(lua_State* const state, const char* what, ::lua_Debug* const activationRecord)
+{
+	int status = 1;
+
+	if (*what == '>') {
+		StkId const functionSlot = state->top - 1;
+		// `or eax, 1 / cmp eax, 7` - the two function tags differ only in the
+		// low bit, so this is one test for "callable".
+		if ((functionSlot->tt | 1) != LUA_TFUNCTION) {
+			luaG_runerror(state, "value for `lua_getinfo' is not a function");
+		}
+
+		status = auxgetinfo(what + 1, functionSlot, activationRecord, state, nullptr);
+		--state->top; // the function was an argument; consume it
+	} else if (activationRecord->i_ci != 0) {
+		CallInfo* const ci = state->base_ci + activationRecord->i_ci;
+		status = auxgetinfo(what, ci->base - 1, activationRecord, state, ci);
+	} else {
+		info_tailcall(activationRecord, state);
+	}
+
+	if (std::strchr(what, 'f') != nullptr) {
+		if (state->stack_last - state->top <= 1) {
+			luaD_growstack(state, 1);
+		}
+		++state->top;
+	}
+
+	return status;
 }
 
 namespace LuaPlus
@@ -14070,20 +14685,40 @@ extern "C"
 
 	/**
 	 * Address: 0x0090D430 (FUN_0090D430, lua_call)
-	 * Mangled: ?lua_call@@YAXPAUlua_State@@HH@Z
 	 *
 	 * IDA signature:
-	 * void __cdecl lua_call(lua_State *L, int nargs, int nresults);
+	 * int __cdecl lua_call(lua_State *L, int nargs, int nresults);
 	 *
 	 * What it does:
 	 * Calls the function sitting `nargs` slots below the top, leaving
-	 * `nresults` values in its place. Errors propagate to the caller - it is
-	 * lua_pcall that catches them.
+	 * `nresults` values in its place, and reports whether it got there: 0 on
+	 * success, the raised lua::lua_Error's own code otherwise, or LUA_ERRRUN
+	 * for anything else that escapes.
+	 *
+	 * This is the fork's only protected-call entry point - it has no
+	 * lua_pcall, no luaD_pcall and no luaD_rawrunprotected, because the C++
+	 * exceptions it raises need a try rather than a setjmp. The body is one EH
+	 * region around luaD_call with two handlers, at 0x0090D48D (reads `code`
+	 * from the error at +0x28 and returns it) and 0x0090D4B0 (returns 1).
+	 *
+	 * It used to be recovered as a void passthrough on the assumption that
+	 * "lua_pcall catches them", so callers reached for the prebuilt LuaPlus
+	 * lua_pcall instead - which walks this state at stock offsets, writes an
+	 * errfunc field past the end of our 0x48-byte lua_State, and cannot catch a
+	 * C++ throw through its setjmp anyway. A script error consequently unwound
+	 * past every protected boundary and out of WinMain.
 	 */
-	void lua_call(lua_State* const state, const int nargs, const int nresults)
+	int LuaCallProtected(lua_State* const state, const int nargs, const int nresults)
 	{
 		StkId const func = state->top - (nargs + 1);
-		(void)luaD_call(state, func, nresults);
+		try {
+			(void)luaD_call(state, func, nresults);
+		} catch (const lua::lua_Error& error) {
+			return error.code;
+		} catch (...) {
+			return LUA_ERRRUN;
+		}
+		return 0;
 	}
 
 	/**
@@ -14175,7 +14810,17 @@ extern "C"
 	{
 		constexpr int kMinCStackSlots = 20;
 		constexpr lu_byte kHookMaskCall = 1 << 0;
-		constexpr int kCallInfoSavedPc = 1 << 0;
+
+		// This fork's CallInfo::state is a small enum, not stock Lua's bitmask:
+		// 0 is a Lua frame running here, 1 is a frame whose callee sits on top,
+		// 2 is one unwinding out to its C caller, and 3 is a C function's own
+		// frame - `mov dword ptr [eax+8], 3` at 0x009143D3.
+		//
+		// Writing 1 here instead marked every C frame "calling", so when a
+		// chunk invoked from C returned, OP_RETURN took the resume path and
+		// dereferenced the null savedpc that belongs to a C frame. Any script
+		// loaded through dofile faulted the moment it finished.
+		constexpr int kFrameCFunction = 3;
 
 		const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
 
@@ -14232,7 +14877,7 @@ extern "C"
 		ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
 		state->base = ci->base;
 		ci->top = state->top + kMinCStackSlots;
-		ci->state = kCallInfoSavedPc;
+		ci->state = kFrameCFunction;
 		ci->savedpc = nullptr;
 		ci->tailcalls = 0;
 		ci->pc = nullptr;

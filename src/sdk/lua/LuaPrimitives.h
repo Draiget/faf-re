@@ -55,8 +55,21 @@ extern "C"
 #define lua_upvalueindex(i) (LUA_GLOBALSINDEX - (i))
 #endif
 
-#ifndef lua_getn
-#define lua_getn luaL_getn
+// `lua_getn` is a real function in this fork (0x0090AD30), not vanilla Lua's
+// alias for luaL_getn (0x0090E870). The two differ: luaL_getn consults the
+// "sizes" weak table and then counts up from 1, whereas lua_getn goes straight
+// at the table's array and hash parts. Aliasing them made every lua_getn call
+// site reach the wrong body.
+#ifdef lua_getn
+#undef lua_getn
+#endif
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+int lua_getn(lua_State* L, int index);
+#ifdef __cplusplus
+}
 #endif
 
 #ifndef LUA_OK
@@ -173,6 +186,30 @@ inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
 
 // Preserve typed SDK call sites while matching LuaPlus API signature.
 #define lua_getglobaluserdata lua_getglobaluserdata_typed
+
+/**
+ * Address: 0x0090D430 (FUN_0090D430, lua_call)
+ *
+ * This fork contains no lua_pcall, no luaD_pcall and no
+ * luaD_rawrunprotected - the setjmp machinery was removed and lua_call took
+ * over the job. It wraps luaD_call in a C++ try with two handlers: the one at
+ * 0x0090D48D returns the caught lua::lua_Error's `code` (read at +0x28, which
+ * the constructor at 0x0090DA40 pins with `mov [esi+28h], edx`), and the one
+ * at 0x0090D4B0 returns 1 for anything else. So lua_call *is* the protected
+ * call here, and it returns a status where vanilla LuaPlus 1081 declares void.
+ *
+ * The macro is how every call site gets to see the real signature without
+ * editing the vendored lua.h, the same shape lua_getglobaluserdata uses above.
+ */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+int LuaCallProtected(lua_State* L, int nargs, int nresults);
+#ifdef __cplusplus
+}
+#endif
+#define lua_call LuaCallProtected
 
 namespace LuaPlus
 {
