@@ -6552,6 +6552,26 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00917A50 (FUN_00917A50, lua::io_flush)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua::io_flush(lua_State *L);
+	 *
+	 * What it does:
+	 * Lua `io.flush()`. Flushes the file currently bound to the global
+	 * `_output`, raising the closed-file error when that handle has no stream,
+	 * and answers with the io library's usual pair of shapes: `true` when the
+	 * flush succeeded, or the `(nil, strerror(errno), errno)` tuple when it did
+	 * not. No path is named in the failure, so the message carries only the
+	 * CRT's own text.
+	 */
+	[[maybe_unused]] int LuaIoFlush(lua_State* const state)
+	{
+		std::FILE* const stream = GetIoFileFromGlobal(state, "_output");
+		return pushresult(nullptr, state, std::fflush(stream) == 0);
+	}
+
+	/**
 	 * Address: 0x00917880 (FUN_00917880, lua::io_write)
 	 *
 	 * What it does:
