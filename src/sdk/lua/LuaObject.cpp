@@ -6552,6 +6552,77 @@ namespace
 	}
 
 	/**
+	 * `getfield`, inlined at every use in the binary.
+	 *
+	 * Reads one integer field off the date table on the stack top. A negative
+	 * default marks the field as required, which is how day, month and year
+	 * are spelled: absent, they raise rather than defaulting.
+	 */
+	int GetDateTableField(lua_State* const state, const char* const key, const int defaultValue)
+	{
+		lua_pushstring(state, key);
+		lua_gettable(state, -2);
+
+		int value = defaultValue;
+		if (lua_isnumber(state, -1)) {
+			value = static_cast<int>(lua_tonumber(state, -1));
+		} else if (defaultValue < 0) {
+			luaL_error(state, "field `%s' missing in date table", key);
+		}
+
+		lua_settop(state, -2);
+		return value;
+	}
+
+	/**
+	 * Address: 0x009169E0 (FUN_009169E0, lua::os_time)
+	 *
+	 * IDA signature:
+	 * int __cdecl io_time(lua_State *L);
+	 *
+	 * What it does:
+	 * Lua `os.time([table])`. With no table it answers the current time. With
+	 * one it reads the broken-down fields back out and runs them through
+	 * mktime: seconds and minutes default to zero, the hour to noon, and day,
+	 * month and year are required. Month and year carry the C offsets - one
+	 * less, and 1900 less - and isdst is read as a plain truth value. A time
+	 * mktime cannot represent comes back as nil rather than an error.
+	 */
+	[[maybe_unused]] int LuaOsTime(lua_State* const state)
+	{
+		__time64_t when = 0;
+
+		if (lua_type(state, 1) <= LUA_TNIL) {
+			when = _time64(nullptr);
+		} else {
+			luaL_checktype(state, 1, LUA_TTABLE);
+			lua_settop(state, 1);
+
+			std::tm brokenDown{};
+			brokenDown.tm_sec = GetDateTableField(state, "sec", 0);
+			brokenDown.tm_min = GetDateTableField(state, "min", 0);
+			brokenDown.tm_hour = GetDateTableField(state, "hour", 12);
+			brokenDown.tm_mday = GetDateTableField(state, "day", -1);
+			brokenDown.tm_mon = GetDateTableField(state, "month", -1) - 1;
+			brokenDown.tm_year = GetDateTableField(state, "year", -1) - 1900;
+
+			lua_pushstring(state, "isdst");
+			lua_gettable(state, -2);
+			brokenDown.tm_isdst = lua_toboolean(state, -1);
+			lua_settop(state, -2);
+
+			when = _mktime64(&brokenDown);
+			if (when == static_cast<__time64_t>(-1)) {
+				lua_pushnil(state);
+				return 1;
+			}
+		}
+
+		lua_pushnumber(state, static_cast<lua_Number>(static_cast<double>(when)));
+		return 1;
+	}
+
+	/**
 	 * Address: 0x00917E40 (FUN_00917E40, lua::io_lines)
 	 *
 	 * IDA signature:
