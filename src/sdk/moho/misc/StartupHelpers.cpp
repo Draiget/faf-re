@@ -5999,15 +5999,14 @@ std::filesystem::path moho::DISK_GetLaunchDir()
     executablePathBuffer[0] = '.';
   }
 
-  // Take the directory straight off the resolved path.
+  // Take the directory straight off the resolved path rather than routing it
+  // through a canonizing helper: this is the launch directory, and the callers
+  // want it exactly as _fullpath resolved it.
   //
-  // Routing it through msvc8::string first does not survive: that wrapper has
-  // a 15-character inline buffer and never reallocates, so a real executable
-  // path is silently truncated - "G:\projects\faf-main\output\..." came back
-  // as "gZ\projects\faf", exactly 15 characters and no longer absolute. The
-  // caller then resolved it against the working directory and looked for
-  // SupComDataPath.lua in a path that cannot exist, so
-  // DISK_SetupDataAndSearchPaths failed and startup died in gpg::Die.
+  // An earlier note here blamed a 15-character truncation in msvc8::string for
+  // "G:\projects\faf-main\output\..." arriving as "gZ\projects\faf". The "gZ"
+  // half of that was really gpg::STR_ToLower mapping ':' to 'Z' through a
+  // signed range test - see the comment on that function.
   return std::filesystem::path(executablePathBuffer.data()).parent_path();
 }
 
@@ -6109,9 +6108,15 @@ bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName,
     // Run the data-path script before reading anything out of it. Without this
     // its globals were never defined, so the protocol list below came back
     // empty too and the mount table was never there to read.
+    //
+    // The environment argument is null: 0x00459E39 zeroes EBP and 0x0045A047
+    // pushes it as `env`, so the script runs against the globals rather than a
+    // private fenv - which is exactly why the three collectors below can read
+    // what it defined. Passing a default-constructed LuaObject instead made
+    // SCR_LuaDoFile take the `if (env)` branch and PushStack threw
+    // LuaAssertion("state->m_rootState == m_state") on the unbound object.
     const msvc8::string scriptPathUtf8(absoluteScriptPath.string().c_str());
-    LuaPlus::LuaObject scriptEnvironment;
-    if (!moho::SCR_LuaDoFile(startupState, scriptPathUtf8.c_str(), &scriptEnvironment)) {
+    if (!moho::SCR_LuaDoFile(startupState, scriptPathUtf8.c_str(), nullptr)) {
       return false;
     }
 
