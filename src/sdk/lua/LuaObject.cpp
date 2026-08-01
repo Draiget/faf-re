@@ -6552,6 +6552,46 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00917E40 (FUN_00917E40, lua::io_lines)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua::io_lines(lua_State *L);
+	 *
+	 * What it does:
+	 * Lua `io.lines([filename])`. Given a filename it opens that file for
+	 * reading and hands back an iterator closed over three upvalues - the
+	 * "FILE*" metatable out of the registry, the new file userdata, and a
+	 * true flag marking the file as one the iterator owns and should close
+	 * when it runs out. A failed open is reported against argument 1 rather
+	 * than as a return value, so the caller sees the CRT text. Given nothing
+	 * it iterates the file bound to the global `_input` instead, which is
+	 * the shared path with `file:lines()`.
+	 */
+	[[maybe_unused]] int LuaIoLines(lua_State* const state)
+	{
+		if (lua_type(state, 1) <= LUA_TNIL) {
+			lua_pushstring(state, "_input");
+			lua_rawget(state, LUA_GLOBALSINDEX);
+			return LuaAuxLines(state);
+		}
+
+		const char* const fileName = luaL_checklstring(state, 1, nullptr);
+		WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
+		wrapFile->stream = std::fopen(fileName, "r");
+		if (wrapFile->stream == nullptr) {
+			luaL_argerror(state, 1, std::strerror(errno));
+		}
+
+		const int fileIndex = lua_gettop(state);
+		lua_pushlstring(state, "FILE*", 5u);
+		lua_rawget(state, LUA_REGISTRYINDEX);
+		lua_pushvalue(state, fileIndex);
+		lua_pushboolean(state, 1);
+		lua_pushcclosure(state, LuaIoReadline, 3);
+		return 1;
+	}
+
+	/**
 	 * Address: 0x00917A50 (FUN_00917A50, lua::io_flush)
 	 *
 	 * IDA signature:
