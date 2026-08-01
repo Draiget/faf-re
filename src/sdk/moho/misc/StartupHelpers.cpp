@@ -3236,6 +3236,34 @@ moho::CScrLuaInitForm* moho::register_SHGetFolderPath_LuaFuncDef()
   return func_SHGetFolderPath_LuaFuncDef();
 }
 
+namespace
+{
+  /**
+   * Runs the three registration thunks this file owns at static-init time,
+   * which is where the binary drives them from - each has an entry in the
+   * CRT initialiser array (`register_SHGetFolderPath_LuaFuncDef` at
+   * 0x00BC6700, the two command-line ones at 0x00BC3800 and 0x00BC3810).
+   *
+   * Without this the thunks were defined and never called, so the binders they
+   * build never linked themselves into their sets and the functions did not
+   * exist in any Lua state. init_faf.lua died on
+   * `attempt to call global 'SHGetFolderPath' (a nil value)` at line 602 -
+   * silently, because luaB_dofile discards lua_call's status exactly as the
+   * binary's does.
+   */
+  struct StartupHelpersLuaFunctionBootstrap
+  {
+    StartupHelpersLuaFunctionBootstrap()
+    {
+      (void)moho::register_GetCommandLineArg_LuaFuncDef();
+      (void)moho::register_HasCommandLineArg_LuaFuncDef();
+      (void)moho::register_SHGetFolderPath_LuaFuncDef();
+    }
+  };
+
+  const StartupHelpersLuaFunctionBootstrap gStartupHelpersLuaFunctionBootstrap{};
+} // namespace
+
 /**
  * Address: 0x00780AF0 (FUN_00780AF0, cfunc_GetTextureDimensionsL)
  *
@@ -6104,6 +6132,17 @@ bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName,
 
   {
     patch_InitLuaState(startupState, LuaPlus::LuaState::LIB_OSIO);
+
+    // Expose the "unsafe" bindings - the ones that reach the filesystem and
+    // the shell - to this state before the script runs. The binary walks the
+    // set inline at 0x00459EF0-0x00459F16, calling each form's Run and
+    // stamping mRegistered on the way, which is what RunInits does.
+    //
+    // init_faf.lua calls SHGetFolderPath at line 602 to find the shader cache;
+    // without this walk that global is nil, the script dies there, and the
+    // mount table it had not yet built stayed empty - so the VFS came up with
+    // nothing in it and the FX store found no /effects/*.fx.
+    UnsafeLuaInitSet().RunInits(startupState);
 
     // Publish the two globals the data-path script reads. Both are set on the
     // globals table straight after patch_InitLuaState and before the script
