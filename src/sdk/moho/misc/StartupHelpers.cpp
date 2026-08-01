@@ -6090,8 +6090,21 @@ bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName,
 
   std::vector<std::wstring> allowedProtocols;
   msvc8::vector<moho::SVFSMountPoint> mountPoints;
-  if (LuaPlus::LuaState* const startupState = ResolveStartupLuaState(); startupState != nullptr) {
-    patch_InitLuaState(startupState, 2);
+
+  // The binary builds its own state for this on the stack, initialises it, and
+  // destroys it before returning - 0x00459ED4 takes the address of a local and
+  // calls Init on it, and both exits at 0x0045A074 and 0x0045A12F destroy it.
+  // Reaching for the UI manager's state instead was wrong twice over: nothing
+  // has created it this early in startup, so it came back null and none of the
+  // script's globals were ever read.
+  LuaPlus::LuaState localStartupState{LuaPlus::LuaState::LIB_OSIO};
+  LuaPlus::LuaState* const startupState = &localStartupState;
+  if (startupState->m_state == nullptr) {
+    return false;
+  }
+
+  {
+    patch_InitLuaState(startupState, LuaPlus::LuaState::LIB_OSIO);
 
     // Run the data-path script before reading anything out of it. Without this
     // its globals were never defined, so the protocol list below came back
