@@ -5,27 +5,6 @@
 
 namespace gpg::gal
 {
-    namespace
-    {
-        class DeviceCreateEffectSlotView
-        {
-        public:
-            virtual void Slot0() = 0;
-            virtual void Slot1() = 0;
-            virtual void Slot2() = 0;
-            virtual void Slot3() = 0;
-            virtual void Slot4() = 0;
-            virtual void Slot5() = 0;
-            virtual void Slot6() = 0;
-            virtual void Slot7() = 0;
-            virtual void Slot8() = 0;
-            virtual boost::shared_ptr<Effect>* CreateEffect(
-                boost::shared_ptr<Effect>* outEffect,
-                const EffectContext* context
-            ) = 0;
-        };
-    }
-
     /**
      * Address: 0x009415A0 (FUN_009415A0)
      *
@@ -58,8 +37,7 @@ namespace gpg::gal
     boost::shared_ptr<Effect> Effect::Create(const EffectContext& context)
     {
         boost::shared_ptr<Effect> createdEffect{};
-        auto* const device = reinterpret_cast<DeviceCreateEffectSlotView*>(Device::GetInstance());
-        (void)device->CreateEffect(&createdEffect, &context);
+        (void)Device::GetInstance()->CreateEffect(&createdEffect, const_cast<EffectContext*>(&context));
         return createdEffect;
     }
 }
