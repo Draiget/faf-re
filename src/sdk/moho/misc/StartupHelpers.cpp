@@ -6105,6 +6105,22 @@ bool moho::DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName,
   {
     patch_InitLuaState(startupState, LuaPlus::LuaState::LIB_OSIO);
 
+    // Publish the two globals the data-path script reads. Both are set on the
+    // globals table straight after patch_InitLuaState and before the script
+    // runs: "LaunchDir" at 0x00459F4C and "InitFileDir" at 0x00459FD4, each
+    // going through GetGlobals().SetString. The value in both cases is a path
+    // rendered to a string - the launch directory for the first, and the
+    // directory holding the script for the second, which 0x00459F93 takes with
+    // a branch_path off the resolved script path.
+    //
+    // Without them SupComDataPath.lua's `dofile(InitFileDir .. '\\init_faf.lua')`
+    // concatenated a nil and the script never ran.
+    const std::string launchDirectoryText = absoluteLaunchDirectory.string();
+    const std::string initFileDirectoryText = absoluteScriptPath.parent_path().string();
+    LuaPlus::LuaObject startupGlobals = startupState->GetGlobals();
+    startupGlobals.SetString("LaunchDir", launchDirectoryText.c_str());
+    startupGlobals.SetString("InitFileDir", initFileDirectoryText.c_str());
+
     // Run the data-path script before reading anything out of it. Without this
     // its globals were never defined, so the protocol list below came back
     // empty too and the mount table was never there to read.

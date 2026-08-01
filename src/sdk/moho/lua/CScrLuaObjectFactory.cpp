@@ -1032,11 +1032,11 @@ namespace moho
       lua_setfenv(rawState, -2);
     }
 
-    // Note: the FA binary links against a modified Lua where `lua_call` returns
-    // a status code. Our project headers (vanilla LuaPlus 1081) declare it void,
-    // so we model the same protected execution via `lua_pcall` to keep the
-    // error-reporting branch faithful.
-    if (lua_pcall(rawState, 0, 0, 0) != 0) {
+    // `lua_call` is this fork's protected call and returns the status directly
+    // (see LuaPrimitives.h). Reaching for the prebuilt lua_pcall instead put a
+    // stock-layout walker over our lua_State and, because that one protects
+    // with setjmp, let the C++ error unwind straight past here.
+    if (lua_call(rawState, 0, 0) != 0) {
       LuaPlus::LuaStackObject errorStackObject{};
       errorStackObject.m_state = state;
       errorStackObject.m_stackIndex = -1;
