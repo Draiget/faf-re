@@ -13037,6 +13037,21 @@ extern "C"
 	 * back to `__concat`, which handles one pair at a time - hence the outer
 	 * loop.
 	 */
+	// Lua's own `tostring` macro, and the shape the binary open-codes at each of
+	// the three sites below: `if (slot->tt != LUA_TSTRING) { convert or fail }`.
+	//
+	// `luaV_tostring` alone is NOT this test - it reports 0 for a value that is
+	// already a string, because its job is only the number-to-string conversion.
+	// Calling it bare on the right-hand operand made every string-to-string
+	// concatenation take the __concat path and raise "concatenate expected but
+	// got string". Since luaO_pushvfstring builds every Lua error message with
+	// exactly that concatenation, each error raised a fresh error while
+	// formatting itself, and the first one to occur overflowed the stack.
+	[[nodiscard]] static bool CoerceToStringInPlace(lua_State* const state, StkId const slot)
+	{
+		return slot->tt == LUA_TSTRING || luaV_tostring(state, slot) != 0;
+	}
+
 	void luaV_concat(lua_State* const state, int total, int last)
 	{
 		constexpr int kTagMethodConcat = 16;
@@ -13046,8 +13061,7 @@ extern "C"
 			StkId const top = state->base + last + 1;
 			int handled = 2;
 
-			const bool leftIsText = (top[-2].tt == LUA_TSTRING) || luaV_tostring(state, top - 2) != 0;
-			if (!leftIsText || luaV_tostring(state, top - 1) == 0) {
+			if (!CoerceToStringInPlace(state, top - 2) || !CoerceToStringInPlace(state, top - 1)) {
 				const TObject* handler = luaT_gettmbyobj(state, top - 2, kTagMethodConcat);
 				if (handler->tt == LUA_TNIL) {
 					handler = luaT_gettmbyobj(state, top - 1, kTagMethodConcat);
@@ -13067,7 +13081,7 @@ extern "C"
 				size_t joinedLength = static_cast<TString*>(top[-1].value.p)->len
 					+ static_cast<TString*>(top[-2].value.p)->len;
 
-				while (handled < total && luaV_tostring(state, top - handled - 1) != 0) {
+				while (handled < total && CoerceToStringInPlace(state, top - handled - 1)) {
 					joinedLength += static_cast<TString*>(top[-handled - 1].value.p)->len;
 					++handled;
 				}
@@ -15172,6 +15186,55 @@ extern "C"
 		}
 
 		return state;
+	}
+
+	/**
+	 * Address: 0x009243E0 (FUN_009243E0, lua_close)
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_close(lua_State *L);
+	 *
+	 * What it does:
+	 * Tears the whole VM down through its main thread: open upvalues are closed,
+	 * every userdata still owing a finaliser is moved onto `tmudata`, and those
+	 * finalisers then run on a stack rewound to the base frame. A finaliser that
+	 * throws only costs itself - `luaC_callGCTM` unlinks each userdata before
+	 * calling it - so the rewind-and-run is simply repeated until one pass gets
+	 * through. That retry is how the binary spells stock Lua's
+	 * `do { ... } while (luaD_rawrunprotected(L, callallgcTM, NULL) != 0)`: the
+	 * fork raises C++ exceptions, so the loop is an EH region whose handler at
+	 * 0x00924463 reloads the main thread and jumps back to the rewind at
+	 * 0x00924420. `close_state` then releases the arrays and both state objects.
+	 *
+	 * Recovered because the prebuilt LuaPlus copy reads this state at stock
+	 * offsets and so walked garbage from its very first line:
+	 * `global_State::mainthread` is at +0x40 here, and `rootudata`/`tmudata` sit
+	 * at +0x14/+0x18 rather than the stock +0x10/+0x14 because the fork carries
+	 * a second GC lane.
+	 */
+	void lua_close(lua_State* const state)
+	{
+		lua_State* const mainThread = state->l_G->mainthread;
+
+		luaF_close(mainThread, mainThread->stack);
+		(void)luaC_separateudata(mainThread);
+
+		for (bool finalisersFinished = false; !finalisersFinished;) {
+			mainThread->ci = mainThread->base_ci;
+			mainThread->top = mainThread->base_ci->base;
+			mainThread->base = mainThread->top;
+			mainThread->nCcalls = 0u;
+
+			try {
+				luaC_callGCTM(mainThread);
+				finalisersFinished = true;
+			} catch (...) {
+				// Whatever threw is already off `tmudata`; rewind and run the
+				// rest, which is all the binary's catch funclet does.
+			}
+		}
+
+		close_state(mainThread);
 	}
 }
 #pragma warning(pop)
