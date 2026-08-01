@@ -4140,18 +4140,49 @@ namespace
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
 
+	/**
+	 * Allocates one reflected userdata carrying a `gpg::RRef`, in the shape the
+	 * fork uses everywhere else.
+	 *
+	 * This used to ask the stock `lua_newuserdata` for plain bytes and write an
+	 * RRef into them. That is not how this Lua stores userdata: both recovered
+	 * creators next door - `luaS_newudata` 0x00924A10 and `luaS_newudata2`
+	 * 0x00924AF0 - allocate `sizeof(Udata)` plus the type's own size, tag the
+	 * header, put the RType in `len`, and link the object into the global root
+	 * list so collection and the userdata metatable reach it. Storage from the
+	 * stock allocator has none of that: no metatable, not on the root list, and
+	 * `len` holding a byte count where the rest of this file reads a type.
+	 *
+	 * It was also the one place our own code called into the prebuilt
+	 * LuaPlusLibD_1081, whose debug `api_incr_top` asserts on a stack this tree
+	 * grows instead - the assert that stops startup inside LuaState::Init.
+	 */
 	[[nodiscard]] gpg::RRef* lua_newuserdata_ref(
 		const gpg::RRef* const sourceRef,
 		lua_State* const state,
 		gpg::RType* const fallbackType
 	)
 	{
-		void* const storage = lua_newuserdata(state, sizeof(gpg::RRef));
-		if (storage == nullptr) {
+		gpg::RType* const userdataType =
+			(sourceRef != nullptr && sourceRef->mType != nullptr) ? sourceRef->mType : fallbackType;
+
+		const std::size_t userdataSize = sizeof(Udata) + sizeof(gpg::RRef);
+		auto* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
+		if (userdata == nullptr) {
 			return nullptr;
 		}
 
-		auto* const outRef = static_cast<gpg::RRef*>(storage);
+		userdata->len = reinterpret_cast<std::size_t>(userdataType);
+		userdata->tt = LUA_TUSERDATA;
+		userdata->marked = (userdataType != nullptr && userdataType->dtrFunc_ != nullptr) ? 2u : 0u;
+
+		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
+		userdata->metatable = globalStateRuntime->userdataMetatable;
+		userdata->next = globalStateRuntime->rootUserdata;
+		globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
+
+		auto* const outRef =
+			reinterpret_cast<gpg::RRef*>(reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata));
 		if (sourceRef != nullptr) {
 			*outRef = *sourceRef;
 		} else {
