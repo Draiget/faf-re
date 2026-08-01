@@ -2,12 +2,15 @@
 
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
 #include "gpg/gal/OutputContext.hpp"
 
 namespace gpg::gal
 {
   class Device;
   class DeviceContext;
+  class Effect;
+  class EffectContext;
 
   /**
    * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
@@ -127,8 +130,25 @@ namespace gpg::gal
      * Address: 0x00A82547
      * Slot: 9
      * Demangled: _purecall
+     *
+     * What it does:
+     * Creates one backend effect from `context` and hands it back through
+     * `outEffect`. Pure in the binary - only a backend ever answers it - but
+     * carried here with a body so `Device` stays instantiable like its 45
+     * siblings.
+     *
+     * The signature has to live on the base. It used to be declared
+     * `purecall9()` with no arguments, which meant DeviceD3D9::CreateEffect
+     * did not override it - C++ appended the backend's method as a new slot
+     * past the base's, so slot 9 still held this stub. Effect::Create pushes
+     * two arguments and expects a __thiscall callee to pop 8; the stub popped
+     * 0, and the debug CRT's _RTC_CheckEsp trapped the moment the first
+     * effect was compiled.
      */
-    virtual void purecall9() {}
+    virtual boost::shared_ptr<Effect>* CreateEffect(
+      boost::shared_ptr<Effect>* outEffect,
+      EffectContext* context
+    );
     /**
      * Address: 0x00A82547
      * Slot: 10

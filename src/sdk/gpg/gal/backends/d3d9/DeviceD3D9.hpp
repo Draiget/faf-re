@@ -136,10 +136,10 @@ namespace gal {
        * Dispatches `Func1` and chooses source-compile vs cached-binary effect
        * creation based on `EffectContext::useCache`.
        */
-      virtual boost::shared_ptr<EffectD3D9>* CreateEffect(
-          boost::shared_ptr<EffectD3D9>* outEffect,
+      boost::shared_ptr<Effect>* CreateEffect(
+          boost::shared_ptr<Effect>* outEffect,
           EffectContext* context
-       );
+       ) override;
       /**
        * Address: 0x008EACC0 (FUN_008EACC0)
        * Slot: 10

@@ -1502,8 +1502,16 @@ namespace gpg::gal
             void** const outCompilationErrors
         )
         {
+            // ID3DXEffectCompiler::CompileEffect is slot 59, not 3. Slot 3 is
+            // ID3DXBaseEffect::GetDesc, which takes a single out-pointer, so
+            // the call wrote through `flags` and faulted inside D3DX the first
+            // time an effect was compiled from source. The binary reads
+            // `[ecx+0ECh]` at 0x008F0C13, and 0xEC/4 is 59; the sibling
+            // helpers here already use ID3DXBaseEffect numbering
+            // (GetTechniqueByName 13, GetAnnotationByName 19), which is the
+            // same base this index counts from.
             auto** const vtable = *reinterpret_cast<void***>(effectCompiler);
-            auto* const compileEffect = reinterpret_cast<effect_compiler_compile_effect_fn>(vtable[3]);
+            auto* const compileEffect = reinterpret_cast<effect_compiler_compile_effect_fn>(vtable[59]);
             return compileEffect(effectCompiler, flags, outCompiledEffectBuffer, outCompilationErrors);
         }
 
@@ -5886,18 +5894,34 @@ namespace gpg::gal
      * Dispatches effect creation through cache-binary or source-compile paths
      * based on `EffectContext::useCache`.
      */
-    boost::shared_ptr<EffectD3D9>*
-    DeviceD3D9::CreateEffect(boost::shared_ptr<EffectD3D9>* const outEffect, EffectContext* const context)
+    boost::shared_ptr<Effect>*
+    DeviceD3D9::CreateEffect(boost::shared_ptr<Effect>* const outEffect, EffectContext* const context)
     {
         Func1();
+
+        // The binary has one effect type: EffectD3D9 derives from Effect, so
+        // the backend writes straight into the caller's shared_ptr and no
+        // conversion happens. This reconstruction has not modelled that
+        // inheritance yet - gal::Effect is still a wall of pure `purecallN`
+        // slots that EffectD3D9 does not implement, so deriving from it would
+        // make the backend abstract - and boost 1.34 predates the aliasing
+        // constructor that would otherwise bridge the two. The layouts are
+        // identical and it is the same object either way, so the builders are
+        // pointed at the caller's slot directly. Remove this cast once Effect
+        // carries its real virtual signatures, the way Device now does.
+        auto* const backendSlot = reinterpret_cast<boost::shared_ptr<EffectD3D9>*>(outEffect);
 
         const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
         if (contextRuntime->field08 != 0U)
         {
-            return CreateEffectFromCachedBinary(this, outEffect, context);
+            (void)CreateEffectFromCachedBinary(this, backendSlot, context);
+        }
+        else
+        {
+            (void)CreateEffectFromSourceBuffer(this, backendSlot, context);
         }
 
-        return CreateEffectFromSourceBuffer(this, outEffect, context);
+        return outEffect;
     }
 
     /**
