@@ -1885,6 +1885,35 @@ extern "C"
 	}
 
 	/**
+	 * What it does:
+	 * Returns the raw pointer behind a userdata slot: the payload for a full
+	 * userdata, the stored pointer for a light one.
+	 *
+	 * The shipped binary has no lua_touserdata - every site that wants this
+	 * open-codes it, as func_GetRRefFromUserdata does at 0x0090CBB0 - but this
+	 * tree calls it from eight places, so it needs a body here. Without one it
+	 * resolved to the prebuilt LuaPlus copy, which tests stock's LUA_TUSERDATA
+	 * of 7; this fork numbers cfunction 6, function 7, full userdata 8. Every
+	 * one of those eight calls was therefore answering null.
+	 */
+	void* lua_touserdata(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr) {
+			return nullptr;
+		}
+
+		switch (object->tt) {
+			case LUA_TUSERDATA:
+				return reinterpret_cast<std::uint8_t*>(object->value.p) + sizeof(Udata);
+			case LUA_TLIGHTUSERDATA:
+				return object->value.p;
+			default:
+				return nullptr;
+		}
+	}
+
+	/**
 	 * Address: 0x0090C9F0 (FUN_0090C9F0, lua_tonumber)
 	 *
 	 * What it does:
@@ -5754,8 +5783,15 @@ namespace
 
 	constexpr int kLuaRefUserdataTypeTag = LUA_TUSERDATA;
 	constexpr int kLuaIoUpvalueEnvIndex = lua_upvalueindex(1);
-	constexpr int kLuaIoReadlineFileUpvalueIndex = lua_upvalueindex(1);
-	constexpr int kLuaIoReadlineCloseOnEofUpvalueIndex = lua_upvalueindex(2);
+	// The line-iterator closure carries three upvalues, and both places that
+	// build it push them in the same order: the "FILE*" metatable first (held
+	// only to keep it alive), then the file, then the close-on-eof flag. The
+	// binary reads the file at -10003 and the flag at -10004, which is upvalues
+	// 2 and 3 - reading them as 1 and 2 handed the metatable to
+	// TryUpcast_WrapFile, and `for line in handle:lines()` threw BadRefCast
+	// "can't convert null to WrapFile" on the first iteration.
+	constexpr int kLuaIoReadlineFileUpvalueIndex = lua_upvalueindex(2);
+	constexpr int kLuaIoReadlineCloseOnEofUpvalueIndex = lua_upvalueindex(3);
 	constexpr std::size_t kLuaIoReadChunkSize = 0x200;
 	constexpr const char* kLuaDebugHookRegistryKey = "h";
 	constexpr const char* kLuaDebugExternalHookLabel = "external hook";
@@ -5789,20 +5825,24 @@ namespace
 			return;
 		}
 
-		out->mObj = nullptr;
-		out->mType = nullptr;
-		if (state == nullptr || lua_type(state, index) != kLuaRefUserdataTypeTag) {
+		// The binary reads the slot itself rather than going through
+		// lua_touserdata - `dest->mType = p->u.rtype` at +0x0C and
+		// `dest->mObj = &p->th.l_G` at +0x10, which is the payload. Routing it
+		// through lua_touserdata was worse than a detour: that function is not
+		// defined anywhere in this tree, so it resolved to the prebuilt
+		// LuaPlus copy, whose tag test is stock's LUA_TUSERDATA of 7 while this
+		// fork numbers full userdata 8. It answered null for every reflected
+		// object, and `handle:lines()` threw BadRefCast on the first call.
+		const TObject* const object = luaA_indexAcceptable(state, index);
+		if (object == nullptr || object->tt != kLuaRefUserdataTypeTag) {
+			out->mObj = nullptr;
+			out->mType = nullptr;
 			return;
 		}
 
-		// Lua userdata payload starts at +0x10 from GCObject; rtype lane is at +0x0C.
-		std::uint8_t* const payload = static_cast<std::uint8_t*>(lua_touserdata(state, index));
-		if (payload == nullptr) {
-			return;
-		}
-
-		out->mObj = payload;
-		out->mType = *reinterpret_cast<gpg::RType* const*>(payload - sizeof(void*));
+		auto* const userdata = static_cast<Udata*>(object->value.p);
+		out->mType = reinterpret_cast<gpg::RType*>(userdata->len);
+		out->mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
 	}
 
 	bool IsWrapFileTypeName(const char* const typeName)
