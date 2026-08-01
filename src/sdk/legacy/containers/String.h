@@ -32,20 +32,20 @@ namespace msvc8
         }
 
         /**
-         * From C-string: SSO copy if fits.
-         * If not, adopt pointer without ownership (no growth).
+         * From C-string: copies, as MSVC8's own converting ctor does. Input of
+         * 15 characters or fewer lands in the inline buffer, longer input gets
+         * its own heap block.
          */
         string(const char* s) noexcept;
 
         /**
-         * From string_view: same policy as above (SSO copy if fits, else adopt pointer).
+         * From string_view: same copying policy as above.
          */
         explicit string(std::string_view sv) noexcept;
 
         /**
-         * From pointer + length.
-		 * SSO copy if fits (≤15), otherwise adopt external buffer
-		 * (no ownership, no guaranteed trailing NUL).
+         * From pointer + length: same copying policy as above, always NUL
+         * terminated.
          */
         explicit string(const char* p, std::size_t n) noexcept;
 
@@ -180,29 +180,39 @@ namespace msvc8
         void assign_owned(const char* value);
 
         /**
-         * resize(newSize, ch) - in-place only; returns false if not enough capacity
+         * Grows capacity to hold at least `need` characters, reallocating when
+         * the current buffer is too small. Mirrors MSVC8's
+         * `basic_string::_Copy`: the request is rounded up with `| 15`, and a
+         * request that would grow by less than half is bumped to 1.5x so
+         * repeated appends stay amortised. Returns false only on an absurd
+         * request or a broken object.
+         */
+        bool ensure_capacity(std::size_t need) noexcept;
+
+        /**
+         * resize(newSize, ch) - grows the buffer when needed.
          */
         bool resize(std::size_t newSize, char ch = '\0') noexcept;
 
         /**
-         * append(ptr,len) - in-place only; returns false if not enough capacity
+         * append(ptr,len) - grows the buffer when needed.
          */
         bool append(const char* s, std::size_t n) noexcept;
 
         /**
-         * append(string_view) - in-place only
+         * append(string_view)
          */
         bool append(const std::string_view sv) noexcept {
 	        return append(sv.data(), sv.size());
         }
 
         /**
-         * append(count, ch) - in-place only; returns false if not enough capacity
+         * append(count, ch) - grows the buffer when needed.
          */
         bool append(std::size_t count, char ch) noexcept;
 
         /**
-         * push_back - in-place only
+         * push_back
          */
         bool push_back(const char ch) noexcept {
 	        return append(&ch, 1);
@@ -214,10 +224,10 @@ namespace msvc8
         void reverse() noexcept;
 
         /**
-         * try-reserve: check-only, no reallocation.
-         * Returns true if capacity() already >= newCap.
+         * reserve(newCap) - grows the buffer to hold at least `newCap`
+         * characters. Never shrinks, matching MSVC8.
          */
-    	void reserve(std::size_t newCap) const noexcept;
+    	void reserve(std::size_t newCap) noexcept;
 
         /**
          * find(char, pos) - naive scan; returns npos if not found
