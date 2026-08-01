@@ -1,60 +1,54 @@
 #include "String.h"
 
+#include <algorithm>
+#include <cstring>
+#include <limits>
+#include <new>
+
+// All three converting constructors copy, which is what MSVC8's
+// `std::basic_string` does: short input goes in the inline buffer, anything
+// longer gets a heap block of its own.
+//
+// They used to *adopt* the caller's pointer once the input passed 15
+// characters, and that was wrong in two directions at once. A `myRes` above 15
+// means "heap-backed" to the rest of this class, so `tidy` would
+// `::operator delete` a buffer the string never allocated; and the string
+// stayed valid only as long as the caller's buffer did, which is never true for
+// the common `msvc8::string s(temporary.c_str())` form - the temporary dies at
+// the end of the full expression and the allocator writes its free-list link
+// over the first four bytes. That is exactly what killed startup: the
+// data-path script came back as "\xE0\xB7\x55\x04" + "rogramData\FAForever\bin\
+// SupComDataPath.lua", so the file could not be opened and
+// DISK_SetupDataAndSearchPaths died in gpg::Die.
+//
+// These stay `noexcept`, so an allocation failure terminates rather than
+// unwinding as MSVC8's would. Nothing on these paths catches std::bad_alloc,
+// so the outcome is the same either way.
 msvc8::string::string(const char* s) noexcept {
     alVal = nullptr;
-    if (!s) {
-        bx.buf[0] = '\0';
-        mySize = 0;
-        myRes = 15;
-    } else {
-        const std::size_t n = std::strlen(s);
-        if (n <= 15) {
-            std::memcpy(bx.buf, s, n);
-            bx.buf[n] = '\0';
-            mySize = static_cast<uint32_t>(n);
-            myRes = 15;
-        } else {
-            // Adopt external buffer (NO ownership). Capacity == length, no growth allowed.
-            bx.ptr = const_cast<char*>(s);
-            mySize = static_cast<uint32_t>(n);
-            myRes = static_cast<uint32_t>(n);
-        }
+    bx.buf[0] = '\0';
+    mySize = 0;
+    myRes = 15;
+    if (s != nullptr) {
+        assign_owned(std::string_view(s));
     }
 }
 
 msvc8::string::string(std::string_view sv) noexcept {
     alVal = nullptr;
-    if (sv.size() <= 15) {
-        if (!sv.empty())
-            std::memcpy(bx.buf, sv.data(), sv.size());
-        bx.buf[sv.size()] = '\0';
-        mySize = sv.size();
-        myRes = 15;
-    } else {
-        bx.ptr = const_cast<char*>(sv.data());
-        mySize = sv.size();
-        myRes = sv.size();
-    }
+    bx.buf[0] = '\0';
+    mySize = 0;
+    myRes = 15;
+    assign_owned(sv);
 }
 
 msvc8::string::string(const char* p, const std::size_t n) noexcept {
     alVal = nullptr;
-    if (!p) {
-        bx.buf[0] = '\0';
-        mySize = 0;
-        myRes = 15;
-        return;
-    }
-    if (n <= 15) {
-        if (n) std::memcpy(bx.buf, p, n);
-        bx.buf[n] = '\0';
-        mySize = n;
-        myRes = 15;
-    } else {
-        // Adopt external storage (non-owning). We do NOT write a NUL terminator here.
-        bx.ptr = const_cast<char*>(p);
-        mySize = n;
-        myRes = n;
+    bx.buf[0] = '\0';
+    mySize = 0;
+    myRes = 15;
+    if (p != nullptr && n != 0U) {
+        assign_owned(std::string_view(p, n));
     }
 }
 
@@ -180,13 +174,60 @@ bool msvc8::string::equals_no_case(const std::string_view rhs) const noexcept {
     return true;
 }
 
-bool msvc8::string::resize(const std::size_t newSize, const char ch) noexcept {
+// MSVC8's `basic_string::_Copy`, which is what every growing operation on this
+// type funnels through in the binary. The requested size is rounded up with
+// `| 15` so the first heap block is a whole allocation quantum, and a request
+// that would grow the buffer by less than half is bumped to 1.5x instead, which
+// is what keeps repeated appends amortised.
+//
+// This shim used to refuse to grow at all - `reserve` was a no-op and both
+// `append` overloads returned false once the 15-character inline buffer was
+// full. Every string the engine builds character by character was therefore
+// silently cut to 15 bytes: gpg::STR_ToLower turned
+// "C:\ProgramData\FAForever\bin\SupComDataPath.lua" into "c:\programdata\", so
+// STR_CanonizeFilename handed CreateFileW a directory, the data-path script
+// could not be opened, and startup died in gpg::Die.
+bool msvc8::string::ensure_capacity(const std::size_t need) noexcept {
     if (!basic_sanity()) {
         return false;
     }
-    if (newSize > myRes) {
-        // no reallocation by design
-        return false; 
+    if (need <= myRes) {
+        return true;
+    }
+    if (need > maxCapGuard) {
+        return false;
+    }
+
+    std::size_t newCapacity = need | 15U;
+    if (newCapacity > maxCapGuard) {
+        newCapacity = need;
+    } else if (newCapacity / 3U < myRes / 2U && myRes <= maxCapGuard - myRes / 2U) {
+        newCapacity = static_cast<std::size_t>(myRes) + myRes / 2U;
+    }
+
+    auto* const grown = static_cast<char*>(::operator new(newCapacity + 1U, std::nothrow));
+    if (grown == nullptr) {
+        return false;
+    }
+
+    const char* const old = raw_data_unsafe();
+    if (mySize != 0U) {
+        std::memcpy(grown, old, mySize);
+    }
+    grown[mySize] = '\0';
+
+    if (myRes >= 16U && bx.ptr != nullptr) {
+        ::operator delete(bx.ptr);
+    }
+
+    bx.ptr = grown;
+    myRes = static_cast<uint32_t>(newCapacity);
+    return true;
+}
+
+bool msvc8::string::resize(const std::size_t newSize, const char ch) noexcept {
+    if (!ensure_capacity(newSize)) {
+        return false;
     }
     char* p = raw_data_mut_unsafe();
     if (newSize > mySize) {
@@ -201,12 +242,14 @@ bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
     if (!basic_sanity() || s == nullptr) {
         return false;
     }
-    if (mySize > myRes || n > (std::numeric_limits<uint32_t>::max)()) {
+    if (n > (std::numeric_limits<uint32_t>::max)() - mySize) {
         return false;
     }
-    if (mySize + n > myRes) {
-        // no growth
-        return false; 
+    if (n == 0) {
+        return true;
+    }
+    if (!ensure_capacity(mySize + n)) {
+        return false;
     }
     char* p = raw_data_mut_unsafe();
     std::memcpy(p + mySize, s, n);
@@ -222,14 +265,11 @@ bool msvc8::string::append(const std::size_t count, const char ch) noexcept {
     if (count == 0) {
         return true;
     }
-    if (mySize > myRes) {
+    if (count > std::numeric_limits<uint32_t>::max() - mySize) {
         return false;
     }
-    if (count > std::numeric_limits<uint32_t>::max()) {
+    if (!ensure_capacity(mySize + count)) {
         return false;
-    }
-    if (mySize + count > myRes) {
-        return false; // no reallocation by design
     }
 
     char* p = raw_data_mut_unsafe();
@@ -254,20 +294,10 @@ void msvc8::string::reverse() noexcept {
     // p[mySize] remains '\0'
 }
 
-void msvc8::string::reserve(const std::size_t newCap) const noexcept {
-    // Basic invariants first
-    if (!basic_sanity()) {
-        return;
-    }
-
-    // Guard against absurd requests (mirrors the sanity guard)
-    if (newCap > maxCapGuard) {
-        return;
-    }
-
-    // We never grow in this safe shim: success only if already enough.
-    // return newCap <= myRes;
-    // Use for (bool) implementation when needed.
+void msvc8::string::reserve(const std::size_t newCap) noexcept {
+    // MSVC8's reserve never shrinks below the current size, and a request that
+    // already fits is a no-op; ensure_capacity covers both.
+    (void)ensure_capacity(newCap);
 }
 
 std::size_t msvc8::string::find(const char ch, const std::size_t pos) const noexcept {
