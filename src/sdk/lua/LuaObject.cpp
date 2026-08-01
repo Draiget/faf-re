@@ -6552,6 +6552,81 @@ namespace
 	}
 
 	/**
+	 * `setfield`, likewise inlined at every use.
+	 *
+	 * Writes one integer field into the date table being built on the stack
+	 * top. Numbers go out as this fork's float lua_Number.
+	 */
+	void SetDateTableField(lua_State* const state, const char* const key, const int value)
+	{
+		lua_pushstring(state, key);
+		lua_pushnumber(state, static_cast<lua_Number>(value));
+		lua_rawset(state, -3);
+	}
+
+	/**
+	 * Address: 0x00916740 (FUN_00916740, lua::os_date)
+	 *
+	 * IDA signature:
+	 * int __cdecl io_date(lua_State *L);
+	 *
+	 * What it does:
+	 * Lua `os.date([format [, time]])`. Formats a time - the current one
+	 * unless given - through strftime, defaulting to "%c". A leading `!` asks
+	 * for UTC and is stripped before the format is used. The format "*t"
+	 * instead returns the broken-down table that os.time reads back, with
+	 * month, weekday and yearday moved to Lua's 1-based counting and the year
+	 * made absolute. A time the C library will not break down comes back as
+	 * nil, and a result that will not fit 256 bytes raises.
+	 */
+	[[maybe_unused]] int LuaOsDate(lua_State* const state)
+	{
+		const char* format = luaL_optlstring(state, 1, "%c", nullptr);
+
+		__time64_t when = static_cast<__time64_t>(luaL_optnumber(state, 2, static_cast<lua_Number>(-1)));
+		if (when == static_cast<__time64_t>(-1)) {
+			when = _time64(nullptr);
+		}
+
+		std::tm* brokenDown = nullptr;
+		if (*format == '!') {
+			brokenDown = _gmtime64(&when);
+			++format;
+		} else {
+			brokenDown = _localtime64(&when);
+		}
+
+		if (brokenDown == nullptr) {
+			lua_pushnil(state);
+			return 1;
+		}
+
+		if (std::strcmp(format, "*t") == 0) {
+			lua_newtable(state);
+			SetDateTableField(state, "sec", brokenDown->tm_sec);
+			SetDateTableField(state, "min", brokenDown->tm_min);
+			SetDateTableField(state, "hour", brokenDown->tm_hour);
+			SetDateTableField(state, "day", brokenDown->tm_mday);
+			SetDateTableField(state, "month", brokenDown->tm_mon + 1);
+			SetDateTableField(state, "year", brokenDown->tm_year + 1900);
+			SetDateTableField(state, "wday", brokenDown->tm_wday + 1);
+			SetDateTableField(state, "yday", brokenDown->tm_yday + 1);
+			lua_pushstring(state, "isdst");
+			lua_pushboolean(state, brokenDown->tm_isdst);
+			lua_rawset(state, -3);
+			return 1;
+		}
+
+		char formatted[256];
+		if (std::strftime(formatted, sizeof(formatted), format, brokenDown) == 0) {
+			luaL_error(state, "`date' format too long");
+		}
+
+		lua_pushstring(state, formatted);
+		return 1;
+	}
+
+	/**
 	 * `getfield`, inlined at every use in the binary.
 	 *
 	 * Reads one integer field off the date table on the stack top. A negative
