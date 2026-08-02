@@ -608,26 +608,21 @@ namespace msvc8
             return s.basic_sanity() ? std::string_view{ s.raw_data_unsafe(), s.size() } : std::string_view{};
         }
 
-        /** Core concatenation: SSO if total ≤ 15, else adopt TLS buffer. */
+        /**
+         * Core concatenation. The result owns its bytes.
+         *
+         * The long path used to hand back a string pointing into a
+         * thread-local arena with myRes set to the arena capacity, which made
+         * it look heap-backed: a later tidy() would ::operator delete an arena
+         * pointer, and the next concatenation on the same thread overwrote the
+         * text of a string somebody was still holding.
+         */
         inline string concat_impl(const std::string_view a, const std::string_view b) noexcept {
-            const std::size_t total = a.size() + b.size();
-
-            // SSO fast path
-            if (total <= 15) {
-                string out;
-                (void)out.append(a.data(), a.size());
-                (void)out.append(b.data(), b.size());
-                return out;
-            }
-
-            // TLS buffer + adopt
-            auto [buf, cap] = get_concat_buffer(total + 1 /* NUL */);
-            if (!a.empty()) std::memcpy(buf, a.data(), a.size());
-            if (!b.empty()) std::memcpy(buf + a.size(), b.data(), b.size());
-            buf[total] = '\0';
-
-            const uint32_t effCap = (cap > 0) ? static_cast<uint32_t>(cap - 1) : 0u; // capacity excludes NUL
-            return string::adopt(buf, static_cast<uint32_t>(total), effCap);
+            string out;
+            out.reserve(a.size() + b.size());
+            (void)out.append(a.data(), a.size());
+            (void)out.append(b.data(), b.size());
+            return out;
         }
 
     } // namespace detail
