@@ -53,4 +53,13 @@ namespace moho
   };
 
   static_assert(sizeof(EUIStateTypeInfo) == 0x78, "EUIStateTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x00BE49F0 (FUN_00BE49F0, sub_BE49F0)
+   *
+   * What it does:
+   * Constructs the EUIState enum type info and schedules its teardown, which
+   * is what runs PreRegisterRType for the enum.
+   */
+  void register_EUIStateTypeInfoStartup();
 } // namespace moho
