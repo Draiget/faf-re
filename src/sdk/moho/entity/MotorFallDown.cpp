@@ -784,11 +784,11 @@ namespace moho
 
     [[nodiscard]] CScrLuaInitFormSet& MotorFallDownSimLuaInitSet()
     {
-      if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+      if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
         return *set;
       }
 
-      static CScrLuaInitFormSet fallbackSet("sim");
+      static CScrLuaInitFormSet fallbackSet("Sim");
       return fallbackSet;
     }
 

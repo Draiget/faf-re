@@ -15,7 +15,7 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
       return *set;
     }
 
@@ -27,14 +27,14 @@ namespace
 
     // half the binders never get run.
 
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("user"); existing != nullptr) {
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
 
       return *existing;
 
     }
 
 
-    static moho::CScrLuaInitFormSet sSet("user");
+    static moho::CScrLuaInitFormSet sSet("User");
     return sSet;
   }
 

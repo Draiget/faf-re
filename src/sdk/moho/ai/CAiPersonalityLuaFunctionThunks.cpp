@@ -82,7 +82,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_aiPersonalityStartupAnchor()
   {
-    CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("sim");
+    CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("Sim");
     if (simSet == nullptr) {
       gRecoveredSimLuaInitFormPrev_AiPersonalityStartup = nullptr;
       return nullptr;

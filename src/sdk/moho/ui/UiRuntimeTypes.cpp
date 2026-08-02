@@ -3399,11 +3399,11 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     // exists. Declaring a fresh static here creates a second set with the
     // same name, and SCR_FindLuaInitFormSet returns only the first - so
     // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("user"); existing != nullptr) {
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
       return *existing;
     }
 
-    static moho::CScrLuaInitFormSet sSet("user");
+    static moho::CScrLuaInitFormSet sSet("User");
     return sSet;
   }
 
@@ -24290,8 +24290,8 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
   ScrDiskWatcherTask* const diskWatcherTask = new (std::nothrow) ScrDiskWatcherTask(gUserLuaState);
   AttachTaskToStage(diskWatcherTask, sUserStage, true);
 
-  RunLuaInitFormSetIfPresent("core", gUserLuaState);
-  RunLuaInitFormSetIfPresent("user", gUserLuaState);
+  RunLuaInitFormSetIfPresent("Core", gUserLuaState);
+  RunLuaInitFormSetIfPresent("User", gUserLuaState);
 
   // Run the game's own top-level Lua bootstrap. Its header says exactly what
   // it is for: "This is the top-level lua initialization file. It is run at

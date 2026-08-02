@@ -237,7 +237,7 @@ namespace
       return set;
     }
 
-    return moho::SCR_FindLuaInitFormSet("user");
+    return moho::SCR_FindLuaInitFormSet("User");
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()

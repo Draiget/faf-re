@@ -247,11 +247,11 @@ namespace
 
   [[nodiscard]] CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
       return *set;
     }
 
-    static CScrLuaInitFormSet fallbackSet("sim");
+    static CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
   }
 
@@ -1149,7 +1149,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplCanPathToGoal_LuaFuncDef()
  */
 CScrLuaInitForm* moho::register_CAiNavigatorImplLuaInitFormAnchor()
 {
-  CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
+  CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
   if (simSet == nullptr) {
     gRecoveredSimLuaInitFormPrev_off_F59970 = nullptr;
     gRecoveredSimLuaInitFormAnchor_off_F59960 = nullptr;

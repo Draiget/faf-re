@@ -19,7 +19,8 @@
 #include "moho/containers/BitStorage32.h"
 #include "legacy/containers/Vector.h"
 #include "moho/lua/CScrLuaInitForm.h"
-#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -107,7 +108,7 @@ namespace
   template <moho::CScrLuaInitForm** PrevLane, moho::CScrLuaInitForm** AnchorLane>
   [[nodiscard]] moho::CScrLuaInitForm* RegisterRecoveredSimInitLinkerLane() noexcept
   {
-    moho::CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("sim");
+    moho::CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("Sim");
     if (simSet == nullptr) {
       *PrevLane = nullptr;
       return nullptr;

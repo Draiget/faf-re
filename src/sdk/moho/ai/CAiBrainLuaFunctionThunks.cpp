@@ -870,7 +870,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_resourceDepositFactoryAnchor()
   {
-    CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("sim");
+    CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("Sim");
     if (simSet == nullptr) {
       gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = nullptr;
       return nullptr;

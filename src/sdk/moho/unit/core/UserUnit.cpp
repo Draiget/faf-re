@@ -4036,11 +4036,11 @@ namespace
 
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
       return *set;
     }
 
-    static CScrLuaInitFormSet fallbackSet("user");
+    static CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
   }
 
