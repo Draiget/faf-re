@@ -24,6 +24,36 @@
 // These stay `noexcept`, so an allocation failure terminates rather than
 // unwinding as MSVC8's would. Nothing on these paths catches std::bad_alloc,
 // so the outcome is the same either way.
+msvc8::string::string(const string& other) noexcept {
+    alVal = nullptr;
+    bx.buf[0] = '\0';
+    mySize = 0;
+    myRes = 15;
+    if (other.basic_sanity() && other.mySize != 0U) {
+        assign_owned(std::string_view(other.raw_data_unsafe(), other.mySize));
+    }
+}
+
+msvc8::string& msvc8::string::operator=(const string& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    // Read the source before tidy() touches this object - self-overlapping
+    // buffers would otherwise be freed mid-copy.
+    if (!other.basic_sanity() || other.mySize == 0U) {
+        assign_owned(std::string_view{});
+        return *this;
+    }
+
+    const string copied(other);
+    tidy(true, 0U);
+    bx = copied.bx;
+    mySize = copied.mySize;
+    myRes = copied.myRes;
+    return *this;
+}
+
 msvc8::string::string(const char* s) noexcept {
     alVal = nullptr;
     bx.buf[0] = '\0';

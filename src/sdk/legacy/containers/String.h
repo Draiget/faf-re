@@ -32,6 +32,28 @@ namespace msvc8
         }
 
         /**
+         * Copy semantics, as MSVC8's basic_string has them: each string owns
+         * its own buffer.
+         *
+         * These have to exist now that the converting constructors and the
+         * grow path allocate. The implicit shallow copy left two strings
+         * pointing at one heap block, and any `tidy` on either - which
+         * assign_owned, resize, append and reserve all perform - freed it out
+         * from under the other. It showed up as a technique name read back as
+         * the contents of an unrelated local: the D3D9 effect loader's
+         * `msvc8::vector<msvc8::string>` grew, relocated its elements
+         * shallowly, released the originals, and the allocator handed the same
+         * block to the next `msvc8::string` built in the loop.
+         *
+         * There is deliberately no destructor: nothing in this reconstruction
+         * frees a string on scope exit today, and adding that is a separate,
+         * wider change. Copies therefore leak rather than dangle, which is the
+         * behaviour these call sites already assumed.
+         */
+        string(const string& other) noexcept;
+        string& operator=(const string& other) noexcept;
+
+        /**
          * From C-string: copies, as MSVC8's own converting ctor does. Input of
          * 15 characters or fewer lands in the inline buffer, longer input gets
          * its own heap block.
