@@ -214,6 +214,20 @@ namespace
     return fallbackSet;
   }
 
+  /**
+   * Sixteen of this file's binders go into the user set, not the sim one -
+   * the command-queue accessors the UI reads while a game is running.
+   */
+  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("User");
+    return fallbackSet;
+  }
+
   [[nodiscard]] gpg::RType* CachedUnitType()
   {
     static gpg::RType* cachedType = nullptr;
@@ -1733,7 +1747,7 @@ namespace moho
   CScrLuaInitForm* func_DecreaseBuildCountInQueue_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kDecreaseBuildCountInQueueName,
       &moho::cfunc_DecreaseBuildCountInQueue,
       nullptr,
@@ -1753,7 +1767,7 @@ namespace moho
   CScrLuaInitForm* func_IncreaseBuildCountInQueue_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kIncreaseBuildCountInQueueName,
       &moho::cfunc_IncreaseBuildCountInQueue,
       nullptr,
@@ -1772,7 +1786,7 @@ namespace moho
   CScrLuaInitForm* func_GetUnitCommandData_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kGetUnitCommandDataName,
       &moho::cfunc_GetUnitCommandData,
       nullptr,
@@ -1791,7 +1805,7 @@ namespace moho
   CScrLuaInitForm* func_IssueDockCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kIssueDockCommandName,
       &moho::cfunc_IssueDockCommand,
       nullptr,
@@ -1810,7 +1824,7 @@ namespace moho
   CScrLuaInitForm* func_IssueCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kIssueCommandName,
       &moho::cfunc_IssueCommand,
       nullptr,
@@ -1829,7 +1843,7 @@ namespace moho
   CScrLuaInitForm* func_IssueUnitCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kIssueUnitCommandName,
       &moho::cfunc_IssueUnitCommand,
       nullptr,
@@ -1849,7 +1863,7 @@ namespace moho
   CScrLuaInitForm* func_IssueBlueprintCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kIssueBlueprintCommandName,
       &moho::cfunc_IssueBlueprintCommand,
       nullptr,
@@ -1868,7 +1882,7 @@ namespace moho
   CScrLuaInitForm* func_GetRolloverInfo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kGetRolloverInfoName,
       &moho::cfunc_GetRolloverInfo,
       nullptr,
@@ -1888,7 +1902,7 @@ namespace moho
   CScrLuaInitForm* func_UISelectionByCategory_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kUISelectionByCategoryName,
       &moho::cfunc_UISelectionByCategory,
       nullptr,
@@ -1907,7 +1921,7 @@ namespace moho
   CScrLuaInitForm* func_UISelectAndZoomTo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kUISelectAndZoomToName,
       &moho::cfunc_UISelectAndZoomTo,
       nullptr,
@@ -1926,7 +1940,7 @@ namespace moho
   CScrLuaInitForm* func_UIZoomTo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kUIZoomToName,
       &moho::cfunc_UIZoomTo,
       nullptr,
@@ -1945,7 +1959,7 @@ namespace moho
   CScrLuaInitForm* func_SetOverlayFilter_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kSetOverlayFilterName,
       &moho::cfunc_SetOverlayFilter,
       nullptr,
@@ -1964,7 +1978,7 @@ namespace moho
   CScrLuaInitForm* func_GetActiveBuildTemplate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kGetActiveBuildTemplateName,
       &moho::cfunc_GetActiveBuildTemplate,
       nullptr,
@@ -1983,7 +1997,7 @@ namespace moho
   CScrLuaInitForm* func_SetActiveBuildTemplate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kSetActiveBuildTemplateName,
       &moho::cfunc_SetActiveBuildTemplate,
       nullptr,
@@ -2002,7 +2016,7 @@ namespace moho
   CScrLuaInitForm* func_OpenURL_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kOpenURLName,
       &moho::cfunc_OpenURL,
       nullptr,
@@ -2021,7 +2035,7 @@ namespace moho
   CScrLuaInitForm* func_SetCursor_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      UserLuaInitSet(),
       kSetCursorName,
       &moho::cfunc_SetCursor,
       nullptr,

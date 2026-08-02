@@ -14961,7 +14961,7 @@ int moho::cfunc_RegisterBeamBlueprint(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SpecFootprints_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    CoreLuaInitSet(),
     "SpecFootprints",
     &moho::cfunc_SpecFootprints,
     nullptr,
@@ -18050,7 +18050,7 @@ int moho::cfunc_SimCallback(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SimCallback_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    UserLuaInitSet(),
     "SimCallback",
     &moho::cfunc_SimCallback,
     nullptr,
@@ -18996,7 +18996,7 @@ int moho::cfunc_GetSelectedUnits(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetSelectedUnits_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    UserLuaInitSet(),
     "GetSelectedUnits",
     &moho::cfunc_GetSelectedUnits,
     nullptr,
@@ -19777,7 +19777,7 @@ int moho::cfunc_GetEconomyTotals(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetEconomyTotals_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    UserLuaInitSet(),
     "GetEconomyTotals",
     &moho::cfunc_GetEconomyTotals,
     nullptr,
@@ -21311,7 +21311,7 @@ int moho::cfunc_FormatTime(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_FormatTime_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    UserLuaInitSet(),
     "FormatTime",
     &moho::cfunc_FormatTime,
     nullptr,
