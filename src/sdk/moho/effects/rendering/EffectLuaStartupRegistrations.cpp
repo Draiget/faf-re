@@ -3451,3 +3451,55 @@ namespace
 
   [[maybe_unused]] EffectLuaStartupRegistrationsBootstrap gEffectLuaStartupRegistrationsBootstrap;
 } // namespace
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct EffectLuaStartupRegistrationsLuaFuncDefBootstrap
+  {
+    EffectLuaStartupRegistrationsLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_IEffectSetBeamParam_LuaFuncDef();
+      (void)::moho::func_IEffectSetEmitterParam_LuaFuncDef();
+      (void)::moho::func_IEffectScaleEmitter_LuaFuncDef();
+      (void)::moho::func_IEffectResizeEmitterCurve_LuaFuncDef();
+      (void)::moho::func_IEffectSetEmitterCurveParam_LuaFuncDef();
+      (void)::moho::func_IEffectOffsetEmitter_LuaFuncDef();
+      (void)::moho::func_IEffectDestroy_LuaFuncDef();
+      (void)::moho::func_CDecalHandleDestroy_LuaFuncDef();
+      (void)::moho::func_CreateDecal_LuaFuncDef();
+      (void)::moho::func_CreateSplat_LuaFuncDef();
+      (void)::moho::func_CreateSplatOnBone_LuaFuncDef();
+      (void)::moho::func_CreateEmitterAtEntity_LuaFuncDef();
+      (void)::moho::func_CreateEmitterOnEntity_LuaFuncDef();
+      (void)::moho::func_CreateLightParticle_LuaFuncDef();
+      (void)::moho::func_CreateLightParticleIntel_LuaFuncDef();
+      (void)::moho::func_CreateAttachedEmitter_LuaFuncDef();
+      (void)::moho::func_CreateTrail_LuaFuncDef();
+      (void)::moho::func_CreateAttachedBeam_LuaFuncDef();
+      (void)::moho::func_CreateBeamToEntityBone_LuaFuncDef();
+      (void)::moho::func_CreateEmitterAtBone_LuaFuncDef();
+      (void)::moho::func_CreateBeamEmitter_LuaFuncDef();
+      (void)::moho::func_CreateBeamEmitterOnEntity_LuaFuncDef();
+      (void)::moho::func_CreateBeamEntityToEntity_LuaFuncDef();
+      (void)::moho::func_AttachBeamEntityToEntity_LuaFuncDef();
+      (void)::moho::func_AttachBeamToEntity_LuaFuncDef();
+    }
+  };
+
+  const EffectLuaStartupRegistrationsLuaFuncDefBootstrap gEffectLuaStartupRegistrationsLuaFuncDefBootstrap{};
+} // namespace

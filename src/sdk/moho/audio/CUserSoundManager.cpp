@@ -3037,3 +3037,43 @@ namespace moho
     return 1;
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CUserSoundManagerLuaFuncDefBootstrap
+  {
+    CUserSoundManagerLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_PlaySound_LuaFuncDef();
+      (void)::moho::func_PauseSound_LuaFuncDef();
+      (void)::moho::func_PauseVoice_LuaFuncDef();
+      (void)::moho::func_SoundIsPrepared_LuaFuncDef();
+      (void)::moho::func_StartSound_LuaFuncDef();
+      (void)::moho::func_SetVolume_LuaFuncDef();
+      (void)::moho::func_GetVolume_LuaFuncDef();
+      (void)::moho::func_StopSound_LuaFuncDef();
+      (void)::moho::func_StopAllSounds_LuaFuncDef();
+      (void)::moho::func_DisableWorldSounds_LuaFuncDef();
+      (void)::moho::func_EnableWorldSounds_LuaFuncDef();
+      (void)::moho::func_PlayTutorialVO_LuaFuncDef();
+      (void)::moho::func_PlayVoice_LuaFuncDef();
+    }
+  };
+
+  const CUserSoundManagerLuaFuncDefBootstrap gCUserSoundManagerLuaFuncDefBootstrap{};
+} // namespace

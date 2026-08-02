@@ -18,7 +18,8 @@
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/CEconomy.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -1582,3 +1583,33 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(PreregisterCEconomyEventPointerType_bf228f, moho::PreregisterCEconomyEventPointerType)
 GPG_PREREGISTER_INIT(preregister_CEconomyEventTypeInfo_bf228f, moho::preregister_CEconomyEventTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CEconomyEventLuaFuncDefBootstrap
+  {
+    CEconomyEventLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CreateEconomyEvent_LuaFuncDef();
+      (void)::moho::func_RemoveEconomyEvent_LuaFuncDef();
+      (void)::moho::func_EconomyEventIsDone_LuaFuncDef();
+    }
+  };
+
+  const CEconomyEventLuaFuncDefBootstrap gCEconomyEventLuaFuncDefBootstrap{};
+} // namespace

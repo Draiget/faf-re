@@ -67,7 +67,8 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/STIMap.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -9213,3 +9214,82 @@ namespace moho
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(PreregisterEntityPointerType_26ac7a, moho::PreregisterEntityPointerType)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct EntityLuaFuncDefBootstrap
+  {
+    EntityLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_EntityCreateProjectile_LuaFuncDef();
+      (void)::moho::func_EntityCreateProjectileAtBone_LuaFuncDef();
+      (void)::moho::func_EntityShakeCamera_LuaFuncDef();
+      (void)::moho::func_GetBlueprintSim_LuaFuncDef();
+      (void)::moho::func__c_CreateEntity_LuaFuncDef();
+      (void)::moho::func_EntityGetAIBrain_LuaFuncDef();
+      (void)::moho::func_EntityGetBlueprint_LuaFuncDef();
+      (void)::moho::func_EntityGetArmy_LuaFuncDef();
+      (void)::moho::func_EntityGetBoneDirection_LuaFuncDef();
+      (void)::moho::func_EntityIsValidBone_LuaFuncDef();
+      (void)::moho::func_EntityGetBoneCount_LuaFuncDef();
+      (void)::moho::func_EntityGetBoneName_LuaFuncDef();
+      (void)::moho::func_EntityRequestRefreshUI_LuaFuncDef();
+      (void)::moho::func_EntityAttachBoneTo_LuaFuncDef();
+      (void)::moho::func_EntitySetParentOffset_LuaFuncDef();
+      (void)::moho::func_EntityDetachFrom_LuaFuncDef();
+      (void)::moho::func_EntityGetParent_LuaFuncDef();
+      (void)::moho::func_EntityGetCollisionExtents_LuaFuncDef();
+      (void)::moho::func_EntityPlaySound_LuaFuncDef();
+      (void)::moho::func_EntitySetAmbientSound_LuaFuncDef();
+      (void)::moho::func_EntityGetFractionComplete_LuaFuncDef();
+      (void)::moho::func_EntityAdjustHealth_LuaFuncDef();
+      (void)::moho::func_EntityGetHealth_LuaFuncDef();
+      (void)::moho::func_EntityGetMaxHealth_LuaFuncDef();
+      (void)::moho::func_EntitySetHealth_LuaFuncDef();
+      (void)::moho::func_EntitySetMaxHealth_LuaFuncDef();
+      (void)::moho::func_EntitySetVizToFocusPlayer_LuaFuncDef();
+      (void)::moho::func_EntitySetVizToEnemies_LuaFuncDef();
+      (void)::moho::func_EntitySetVizToAllies_LuaFuncDef();
+      (void)::moho::func_EntitySetVizToNeutrals_LuaFuncDef();
+      (void)::moho::func_EntityGetEntityId_LuaFuncDef();
+      (void)::moho::func_EntityDetachAll_LuaFuncDef();
+      (void)::moho::func_EntitySetCollisionShape_LuaFuncDef();
+      (void)::moho::func_EntityReachedMaxShooters_LuaFuncDef();
+      (void)::moho::func_EntityGetOrientation_LuaFuncDef();
+      (void)::moho::func_EntityGetHeading_LuaFuncDef();
+      (void)::moho::func_EntityGetScale_LuaFuncDef();
+      (void)::moho::func_EntityAddLocalImpulse_LuaFuncDef();
+      (void)::moho::func_EntityAddWorldImpulse_LuaFuncDef();
+      (void)::moho::func_EntitySetMesh_LuaFuncDef();
+      (void)::moho::func_EntitySetScale_LuaFuncDef();
+      (void)::moho::func_EntityAddManualScroller_LuaFuncDef();
+      (void)::moho::func_EntityAddThreadScroller_LuaFuncDef();
+      (void)::moho::func_EntityAddPingPongScroller_LuaFuncDef();
+      (void)::moho::func_EntityRemoveScroller_LuaFuncDef();
+      (void)::moho::func_EntityDestroy_LuaFuncDef();
+      (void)::moho::func_EntityBeenDestroyed_LuaFuncDef();
+      (void)::moho::func_EntityKill_LuaFuncDef();
+      (void)::moho::func_EntitySetDrawScale_LuaFuncDef();
+      (void)::moho::func_EntityFallDown_LuaFuncDef();
+      (void)::moho::func_EntitySinkAway_LuaFuncDef();
+      (void)::moho::func_EntityPushOver_LuaFuncDef();
+    }
+  };
+
+  const EntityLuaFuncDefBootstrap gEntityLuaFuncDefBootstrap{};
+} // namespace

@@ -65,7 +65,8 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -8973,3 +8974,95 @@ int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_BuildReserveMapTypeInfo_f3fc29, preregister_BuildReserveMapTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CAiBrainLuaFuncDefBootstrap
+  {
+    CAiBrainLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CAiBrainIsOpponentAIRunning_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetArmyIndex_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetFactionIndex_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetCurrentPlan_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetPersonality_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetCurrentEnemy_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetCurrentEnemy_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetUnitBlueprint_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetArmyStat_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetArmyStat_LuaFuncDef();
+      (void)::moho::func_CAiBrainAddArmyStat_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetGreaterOf_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetBlueprintStat_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetCurrentUnits_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetArmyStatsTrigger_LuaFuncDef();
+      (void)::moho::func_CAiBrainRemoveArmyStatsTrigger_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetListOfUnits_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetResourceSharing_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetArmyStartPos_LuaFuncDef();
+      (void)::moho::func_CAiBrainCreateUnitNearSpot_LuaFuncDef();
+      (void)::moho::func_CAiBrainFindPlaceToBuild_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetAttackVectors_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetEconomyStored_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetEconomyIncome_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetEconomyUsage_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetEconomyRequested_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetEconomyTrend_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetMapWaterRatio_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetEconomyStoredRatio_LuaFuncDef();
+      (void)::moho::func_CAiBrainGiveResource_LuaFuncDef();
+      (void)::moho::func_CAiBrainGiveStorage_LuaFuncDef();
+      (void)::moho::func_CAiBrainTakeResource_LuaFuncDef();
+      (void)::moho::func_CAiBrainFindUnit_LuaFuncDef();
+      (void)::moho::func_CAiBrainFindUpgradeBP_LuaFuncDef();
+      (void)::moho::func_CAiBrainFindUnitToUpgrade_LuaFuncDef();
+      (void)::moho::func_CAiBrainDecideWhatToBuild_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetAvailableFactories_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetThreatAtPosition_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetThreatBetweenPositions_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetThreatsAroundPosition_LuaFuncDef();
+      (void)::moho::func_CAiBrainPickBestAttackVector_LuaFuncDef();
+      (void)::moho::func_CAiBrainCanBuildStructureAt_LuaFuncDef();
+      (void)::moho::func_CAiBrainAssignThreatAtPosition_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetHighestThreatPosition_LuaFuncDef();
+      (void)::moho::func_CAiBrainBuildStructure_LuaFuncDef();
+      (void)::moho::func_CAiBrainNumCurrentlyBuilding_LuaFuncDef();
+      (void)::moho::func_CAiBrainBuildUnit_LuaFuncDef();
+      (void)::moho::func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetNumPlatoonsWithAI_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef();
+      (void)::moho::func_CAiBrainPlatoonExists_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetPlatoonsList_LuaFuncDef();
+      (void)::moho::func_CAiBrainDisbandPlatoon_LuaFuncDef();
+      (void)::moho::func_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetNoRushTicks_LuaFuncDef();
+      (void)::moho::func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef();
+      (void)::moho::func_CAiBrainFindClosestArmyWithBase_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetUnitsAroundPoint_LuaFuncDef();
+      (void)::moho::func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef();
+      (void)::moho::func_CAiBrainCheckBlockingTerrain_LuaFuncDef();
+      (void)::moho::func_CAiBrainBuildPlatoon_LuaFuncDef();
+      (void)::moho::func_CAiBrainAssignUnitsToPlatoon_LuaFuncDef();
+      (void)::moho::func_CAiBrainMakePlatoon_LuaFuncDef();
+      (void)::moho::func_CAiBrainCanBuildPlatoon_LuaFuncDef();
+    }
+  };
+
+  const CAiBrainLuaFuncDefBootstrap gCAiBrainLuaFuncDefBootstrap{};
+} // namespace

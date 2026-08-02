@@ -17,7 +17,8 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -863,3 +864,32 @@ namespace gpg
 GPG_PREREGISTER_INIT(register_CSlaveManipulatorTypeInfoStartup_28b2e3, register_CSlaveManipulatorTypeInfoStartup)
 
 GPG_PREREGISTER_INIT(preregister_CSlaveManipulatorTypeInfo_28b2e3, preregister_CSlaveManipulatorTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CSlaveManipulatorLuaFuncDefBootstrap
+  {
+    CSlaveManipulatorLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CreateSlaver_LuaFuncDef();
+      (void)::moho::func_CSlaveManipulatorSetMaxRate_LuaFuncDef();
+    }
+  };
+
+  const CSlaveManipulatorLuaFuncDefBootstrap gCSlaveManipulatorLuaFuncDefBootstrap{};
+} // namespace

@@ -7754,3 +7754,68 @@ int moho::cfunc_GetBlueprintUserL(LuaPlus::LuaState* const state)
   }
   return 1;
 }
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct UserUnitLuaFuncDefBootstrap
+  {
+    UserUnitLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_UserUnitCanAttackTarget_LuaFuncDef();
+      (void)::moho::func_UserUnitGetFootPrintSize_LuaFuncDef();
+      (void)::moho::func_UserUnitGetUnitId_LuaFuncDef();
+      (void)::moho::func_UserUnitGetBlueprint_LuaFuncDef();
+      (void)::moho::func_UserUnitIsAutoMode_LuaFuncDef();
+      (void)::moho::func_UserUnitIsAutoSurfaceMode_LuaFuncDef();
+      (void)::moho::func_UserUnitIsRepeatQueue_LuaFuncDef();
+      (void)::moho::func_UserUnitGetEntityId_LuaFuncDef();
+      (void)::moho::func_UserUnitHasUnloadCommandQueuedUp_LuaFuncDef();
+      (void)::moho::func_UserUnitProcessInfo_LuaFuncDef();
+      (void)::moho::func_UserUnitSetCustomName_LuaFuncDef();
+      (void)::moho::func_UserUnitAddSelectionSet_LuaFuncDef();
+      (void)::moho::func_UserUnitRemoveSelectionSet_LuaFuncDef();
+      (void)::moho::func_UserUnitGetSelectionSets_LuaFuncDef();
+      (void)::moho::func_UserUnitIsInCategory_LuaFuncDef();
+      (void)::moho::func_UserUnitGetHealth_LuaFuncDef();
+      (void)::moho::func_UserUnitGetMaxHealth_LuaFuncDef();
+      (void)::moho::func_UserUnitGetBuildRate_LuaFuncDef();
+      (void)::moho::func_UserUnitIsOverchargePaused_LuaFuncDef();
+      (void)::moho::func_UserUnitIsDead_LuaFuncDef();
+      (void)::moho::func_UserUnitGetFuelRatio_LuaFuncDef();
+      (void)::moho::func_UserUnitGetShieldRatio_LuaFuncDef();
+      (void)::moho::func_UserUnitGetWorkProgress_LuaFuncDef();
+      (void)::moho::func_UserUnitGetStat_LuaFuncDef();
+      (void)::moho::func_UserUnitIsStunned_LuaFuncDef();
+      (void)::moho::func_UserUnitGetCustomName_LuaFuncDef();
+      (void)::moho::func_UserUnitHasSelectionSet_LuaFuncDef();
+      (void)::moho::func_UserUnitIsIdle_LuaFuncDef();
+      (void)::moho::func_UserUnitGetFocus_LuaFuncDef();
+      (void)::moho::func_UserUnitGetGuardedEntity_LuaFuncDef();
+      (void)::moho::func_UserUnitGetCreator_LuaFuncDef();
+      (void)::moho::func_UserUnitGetPosition_LuaFuncDef();
+      (void)::moho::func_UserUnitGetArmy_LuaFuncDef();
+      (void)::moho::func_UserUnitGetEconData_LuaFuncDef();
+      (void)::moho::func_UserUnitGetCommandQueue_LuaFuncDef();
+      (void)::moho::func_UserUnitGetMissileInfo_LuaFuncDef();
+      (void)::moho::func_SetCurrentFactoryForQueueDisplay_LuaFuncDef();
+      (void)::moho::func_GetBlueprintUser_LuaFuncDef();
+    }
+  };
+
+  const UserUnitLuaFuncDefBootstrap gUserUnitLuaFuncDefBootstrap{};
+} // namespace
