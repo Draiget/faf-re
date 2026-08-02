@@ -1275,6 +1275,36 @@ moho::CScrLuaInitForm* moho::register_doscript_LuaFuncDef()
   return func_doscript_LuaFuncDef();
 }
 
+namespace
+{
+  /**
+   * Runs this file's registration thunks at static-init time, which is where
+   * the binary drives them from - each has its own entry in the CRT initialiser
+   * array (register_doscript_LuaFuncDef at 0x00BC64A0 and friends).
+   *
+   * Without this they were defined and never called, so the binders they build
+   * never linked themselves into the "core" set and none of these functions
+   * existed in any Lua state. That is why /lua/globalInit.lua could load and
+   * still accomplish nothing: every `doscript` line in it called a nil, so
+   * /lua/system/import.lua never ran and import() stayed the engine stub.
+   */
+  struct ScriptObjectLuaFunctionBootstrap
+  {
+    ScriptObjectLuaFunctionBootstrap()
+    {
+      (void)moho::register_IsDestroyed_LuaFuncDef();
+      (void)moho::register_printUser_LuaFuncDef();
+      (void)moho::register_LOG_LuaFuncDef();
+      (void)moho::register_WARN_LuaFuncDef();
+      (void)moho::register_SPEW_LuaFuncDef();
+      (void)moho::register_doscript_LuaFuncDef();
+    }
+  };
+
+  const ScriptObjectLuaFunctionBootstrap gScriptObjectLuaFunctionBootstrap{};
+} // namespace
+
+
 /**
  * Address: 0x00581AA0
  */

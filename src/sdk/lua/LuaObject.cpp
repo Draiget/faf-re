@@ -2048,6 +2048,25 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090C4C0 (FUN_0090C4C0, lua_xmove)
+	 *
+	 * What it does:
+	 * Moves `n` values off one thread's stack and onto another's, in order.
+	 * Both threads share a global_State, so the values are copied as they are.
+	 *
+	 * `add [ebx+8], eax` with eax = -n*8 is the source pop; the loop then reads
+	 * `[ecx+edi*8]` and its +4 half, which is one 8-byte TObject per step.
+	 */
+	void lua_xmove(lua_State* const from, lua_State* const to, const int n)
+	{
+		from->top -= n;
+		for (int index = 0; index < n; ++index) {
+			*to->top = from->top[index];
+			api_incr_top(to);
+		}
+	}
+
+	/**
 	 * Address: 0x0090C460 (FUN_0090C460, lua_checkstack)
 	 *
 	 * What it does:
