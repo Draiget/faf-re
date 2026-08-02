@@ -24284,6 +24284,28 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
   RunLuaInitFormSetIfPresent("core", gUserLuaState);
   RunLuaInitFormSetIfPresent("user", gUserLuaState);
 
+  // Run the game's own top-level Lua bootstrap. Its header says exactly what
+  // it is for: "This is the top-level lua initialization file. It is run at
+  // initialization time to set up all lua state." It doscripts
+  // /lua/system/config.lua, import.lua, utils.lua, repr.lua, class.lua and the
+  // rest.
+  //
+  // This matters because `import` is not a C function here. LS_import
+  // (0x0090AF80) is a 16-instruction stub that pushes false - the shipped
+  // binary's is identical - and the working import() is defined in Lua by
+  // /lua/system/import.lua. Without this load every import() answered false,
+  // so SCR_Import handed back a boolean, CMauiFrame::Create found no callable
+  // Frame(), and no UI could be built.
+  //
+  // It runs after the init-form sets because the scripts it pulls in call the
+  // bindings those sets register, `doscript` among them.
+  // The path is a VFS path, so it goes through SCR_LuaDoScript, which resolves
+  // it against the mounted archives; SCR_LuaDoFile opens the real filesystem
+  // and cannot see inside lua.nx2.
+  if (!moho::SCR_LuaDoScript(gUserLuaState, "/lua/globalInit.lua", nullptr)) {
+    gpg::Warnf("USER_GetLuaState: /lua/globalInit.lua failed; import() will not exist.");
+  }
+
   return gUserLuaState;
 }
 
