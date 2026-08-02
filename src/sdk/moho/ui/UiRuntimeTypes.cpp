@@ -3514,24 +3514,11 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 
   gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
-    gpg::RRef out{};
     if (!userDataObject.IsUserData()) {
-      return out;
+      return gpg::RRef{};
     }
 
-    lua_State* const lstate = userDataObject.GetActiveCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(userDataObject).PushStack(lstate);
-    void* const raw = lua_touserdata(lstate, -1);
-    if (raw) {
-      out = *static_cast<gpg::RRef*>(raw);
-    }
-    lua_settop(lstate, savedTop);
-    return out;
+    return userDataObject.GetUserData();
   }
 
   moho::CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
