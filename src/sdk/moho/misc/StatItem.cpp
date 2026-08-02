@@ -2726,6 +2726,22 @@ namespace
   };
 
   StatItemSerializerBootstrap gStatItemSerializerBootstrap;
+
+  /**
+   * Drives this file's two Lua binder definitions. Their register_ thunks
+   * exist but nothing calls those either, so without this the binders are
+   * never constructed and the globals do not exist.
+   */
+  struct StatItemLuaFuncDefBootstrap
+  {
+    StatItemLuaFuncDefBootstrap()
+    {
+      (void)moho::func_BeginLoggingStats_LuaFuncDef();
+      (void)moho::func_EndLoggingStats_LuaFuncDef();
+    }
+  };
+
+  const StatItemLuaFuncDefBootstrap gStatItemLuaFuncDefBootstrap{};
 } // namespace
 
 

@@ -17889,8 +17889,11 @@ int moho::cfunc_EntityCategoryFilterOut(lua_State* const luaContext)
  */
 moho::CScrLuaInitForm* moho::func_EntityCategoryFilterOut_LuaFuncDef()
 {
+  // User, not Sim. The binary links this one into scr_UserInits
+  // (FUN_008BA240) - the UI reads it while the front end comes up, and the
+  // Sim set is not run against the user Lua state at all.
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    UserLuaInitSet(),
     "EntityCategoryFilterOut",
     &moho::cfunc_EntityCategoryFilterOut,
     nullptr,
@@ -29781,6 +29784,8 @@ namespace
       (void)::moho::func_EntityCategoryContainsUser_LuaFuncDef();
       (void)::moho::func_EntityCategoryFilterDownUser_LuaFuncDef();
       (void)::moho::func_EntityCategoryFilterOut_LuaFuncDef();
+      (void)::moho::func_BlueprintLoaderUpdateProgress_LuaFuncDef();
+      (void)::moho::func_RegisterBeamBlueprint_LuaFuncDef();
       (void)::moho::func_ExecLuaInSim_LuaFuncDef();
       (void)::moho::func_SimCallback_LuaFuncDef();
       (void)::moho::func_SetAutoSurfaceMode_LuaFuncDef();

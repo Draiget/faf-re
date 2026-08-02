@@ -3297,6 +3297,8 @@ namespace
       (void)moho::func_GetOptions_LuaFuncDef();
       (void)moho::func_GetPreference_LuaFuncDef();
       (void)moho::func_SetPreference_LuaFuncDef();
+      (void)moho::func_SavePreferences_LuaFuncDef();
+      (void)moho::func_DebugFacilitiesEnabled_LuaFuncDef();
     }
   };
 
