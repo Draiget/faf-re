@@ -68,6 +68,14 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
+    // Every file that wants this set must resolve the one that already
+    // exists. Declaring a fresh static here creates a second set with the
+    // same name, and SCR_FindLuaInitFormSet returns only the first - so
+    // half the binders never get run.
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("core"); existing != nullptr) {
+      return *existing;
+    }
+
     static moho::CScrLuaInitFormSet sSet("core");
     return sSet;
   }
