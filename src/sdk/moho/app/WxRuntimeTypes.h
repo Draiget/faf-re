@@ -6077,20 +6077,20 @@ public:
     kExitOnFrameDeleteYes = 1,
   };
 
-  virtual void* GetClassInfo() const = 0;
-  virtual void DeleteObject() = 0;
-  virtual void* CreateRefData() const = 0;
-  virtual void* CloneRefData(const void* sourceRefData) const = 0;
-  virtual bool ProcessEvent(void* event) = 0;
-  virtual bool SearchEventTable(void* eventTable, void* event) = 0;
-  virtual const void* GetEventTable() const = 0;
-  virtual void DoSetClientObject(void* clientObject) = 0;
-  virtual void* DoGetClientObject() const = 0;
-  virtual void DoSetClientData(void* clientData) = 0;
-  virtual void* DoGetClientData() const = 0;
+  virtual void* GetClassInfo() const;
+  virtual void DeleteObject();
+  virtual void* CreateRefData() const;
+  virtual void* CloneRefData(const void* sourceRefData) const;
+  virtual bool ProcessEvent(void* event);
+  virtual bool SearchEventTable(void* eventTable, void* event);
+  virtual const void* GetEventTable() const;
+  virtual void DoSetClientObject(void* clientObject);
+  virtual void* DoGetClientObject() const;
+  virtual void DoSetClientData(void* clientData);
+  virtual void* DoGetClientData() const;
   virtual bool OnInit() = 0;
-  virtual bool OnInitGui() = 0;
-  virtual int OnRun() = 0;
+  virtual bool OnInitGui();
+  virtual int OnRun();
 
   /**
    * Address: 0x009AA860
@@ -6098,10 +6098,10 @@ public:
    */
   virtual int OnExit();
 
-  virtual void OnFatalException() = 0;
-  virtual int MainLoop() = 0;
-  virtual void ExitMainLoop() = 0;
-  virtual bool Initialized() = 0;
+  virtual void OnFatalException();
+  virtual int MainLoop();
+  virtual void ExitMainLoop();
+  virtual bool Initialized();
 
   /**
    * Address: 0x00992230
@@ -6122,29 +6122,29 @@ public:
 #ifdef Yield
 #undef Yield
 #endif
-  virtual bool Yield(bool onlyIfNeeded) = 0;
+  virtual bool Yield(bool onlyIfNeeded);
 
   /**
    * Address: 0x00992190
    * Mangled: ?ProcessIdle@wxApp@@UAE_NXZ
    */
   virtual bool ProcessIdle();
-  virtual bool IsActive() const = 0;
-  virtual wxWindowBase* GetTopWindow() const = 0;
-  virtual void OnInitCmdLine(void* cmdLineParser) = 0;
-  virtual bool OnCmdLineParsed(void* cmdLineParser) = 0;
-  virtual bool OnCmdLineHelp(void* cmdLineParser) = 0;
-  virtual bool OnCmdLineError(void* cmdLineParser) = 0;
-  virtual void* CreateLogTarget() = 0;
-  virtual void* CreateMessageOutput() = 0;
-  virtual void* GetStdIcon(std::int32_t iconId) const = 0;
-  virtual void* GetDisplayMode() const = 0;
-  virtual bool SetDisplayMode(const void* displayMode) = 0;
-  virtual void SetPrintMode(std::int32_t mode) = 0;
-  virtual void SetActive(bool isActive, wxWindowBase* topWindow) = 0;
-  virtual std::int32_t FilterEvent(void* event) = 0;
-  virtual void ProcessPendingEvents() = 0;
-  virtual std::int32_t GetPrintMode() const = 0;
+  virtual bool IsActive() const;
+  virtual wxWindowBase* GetTopWindow() const;
+  virtual void OnInitCmdLine(void* cmdLineParser);
+  virtual bool OnCmdLineParsed(void* cmdLineParser);
+  virtual bool OnCmdLineHelp(void* cmdLineParser);
+  virtual bool OnCmdLineError(void* cmdLineParser);
+  virtual void* CreateLogTarget();
+  virtual void* CreateMessageOutput();
+  virtual void* GetStdIcon(std::int32_t iconId) const;
+  virtual void* GetDisplayMode() const;
+  virtual bool SetDisplayMode(const void* displayMode);
+  virtual void SetPrintMode(std::int32_t mode);
+  virtual void SetActive(bool isActive, wxWindowBase* topWindow);
+  virtual std::int32_t FilterEvent(void* event);
+  virtual void ProcessPendingEvents();
+  virtual std::int32_t GetPrintMode() const;
 
   /**
    * Address: 0x00993100 (FUN_00993100)
@@ -6155,8 +6155,8 @@ public:
    * the GUI owner thread and deferring cross-thread deliveries.
    */
   virtual bool DoMessage();
-  virtual void DoMessage(void** message) = 0;
-  virtual bool ProcessMessage(void** message) = 0;
+  virtual void DoMessage(void** message);
+  virtual bool ProcessMessage(void** message);
 
   /**
    * Address: 0x009927E0 (FUN_009927E0)
@@ -6926,6 +6926,12 @@ namespace moho
    * - `FUN_004F1E80` clears `wxApp::m_keepGoing` (`+0x5C`) to stop the main
    *   loop.
    */
+  /**
+   * Creates the single application object and publishes it as wxTheApp.
+   * Must run before WIN_AppExecute enters its message loop.
+   */
+  void WX_EnsureApplicationObject();
+
   struct MohoApp : wxApp
   {
     /**

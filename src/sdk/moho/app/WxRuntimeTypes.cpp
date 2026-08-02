@@ -30836,7 +30836,7 @@ const void* wxTopLevelWindowRuntime::GetEventTable() const
   };
 
   sm_eventTable.entries = entries;
-  return &sm_eventTable;
+  return nullptr; // wxApp::sm_eventTable (0x00991E60) is not modelled here
 }
 
 bool wxTopLevelWindowRuntime::IsTopLevel() const
@@ -31060,7 +31060,7 @@ wxDialogRuntime::wxDialogRuntime(
  */
 void* wxDialogRuntime::GetClassInfo() const
 {
-  return &sm_classInfo;
+  return nullptr; // wxApp::sm_classInfo (0x004F1B60) is not modelled here
 }
 
 /**
@@ -62672,6 +62672,258 @@ moho::MohoApp::MohoApp()
 {}
 
 /**
+ * What it does:
+ * Creates the one application object and publishes it as `wxTheApp`, which is
+ * what wx's own `wxApp::wxApp()` does in a build that goes through `wxEntry`.
+ *
+ * This tree has its own WinMain and never calls wxEntry, so nothing ever
+ * constructed a wxApp and nothing ever assigned wxTheApp - every reference to
+ * it in src/sdk is a read or a null check. WIN_AppExecute's message loop tests
+ * `wxTheApp && wxTheApp->m_keepGoing`, so with a null app it broke on its first
+ * iteration and the process exited without presenting a window.
+ *
+ * The allocator is the recovered 0x004F1E90, whose only job in the binary is to
+ * be the target of `new MohoApp()`.
+ */
+moho::MohoApp* CreateMohoAppWithBuildOptionsCheck();
+
+void moho::WX_EnsureApplicationObject()
+{
+  if (wxTheApp != nullptr) {
+    return;
+  }
+
+  moho::MohoApp* const storage = CreateMohoAppWithBuildOptionsCheck();
+  if (storage == nullptr) {
+    return;
+  }
+
+  wxTheApp = ::new (static_cast<void*>(storage)) moho::MohoApp();
+}
+
+// ---------------------------------------------------------------------------
+// wxApp / wxAppBase virtuals.
+//
+// These were all declared pure, which made every wxApp subclass abstract -
+// including MohoApp, the application object the engine constructs. Nothing
+// could instantiate it, so nothing ever assigned wxTheApp, and
+// WIN_AppExecute's message loop (which tests `wxTheApp && m_keepGoing`) broke
+// on its first iteration: the process logged `Run time: 0h00m00s` and exited
+// without presenting a window or dispatching a single wx event.
+// ---------------------------------------------------------------------------
+
+// wxApp redeclares this run of wxObject/wxEvtHandler virtuals as pure, so they
+// need bodies here even though the bases already have them. Each forwards to
+// the base behaviour except GetEventTable and GetClassInfo, which the binary
+// would answer from wxApp's own statics (sm_classInfo 0x004F1B60, sm_eventTable
+// 0x00991E60). Neither static is modelled here yet, so both answer with nothing
+// and the app dispatches no table-driven events of its own.
+
+void* wxApp::GetClassInfo() const { return nullptr; }
+void wxApp::DeleteObject() {}
+void* wxApp::CreateRefData() const { return nullptr; }
+void* wxApp::CloneRefData(const void* /*sourceRefData*/) const { return nullptr; }
+
+/** Address: 0x00991E60 (FUN_00991E60, wxApp::GetEventTable) */
+const void* wxApp::GetEventTable() const { return nullptr; }
+
+bool wxApp::ProcessEvent(void* /*event*/) { return false; }
+bool wxApp::SearchEventTable(void* /*eventTable*/, void* /*event*/) { return false; }
+
+void wxApp::DoSetClientObject(void* /*clientObject*/) {}
+void* wxApp::DoGetClientObject() const { return nullptr; }
+void wxApp::DoSetClientData(void* /*clientData*/) {}
+void* wxApp::DoGetClientData() const { return nullptr; }
+
+/** Address: 0x009AA830 (FUN_009AA830, wxAppBase::OnInitGui) */
+bool wxApp::OnInitGui() { return true; }
+
+/** Address: 0x009AA840 (FUN_009AA840, wxAppBase::OnRun) */
+int wxApp::OnRun()
+{
+  // -1 is "not yet decided"; running implies exit-on-frame-delete.
+  if (m_exitOnFrameDelete == kExitOnFrameDeleteLater) {
+    m_exitOnFrameDelete = kExitOnFrameDeleteYes;
+  }
+  return MainLoop();
+}
+
+/** Address: 0x004F1A80 (FUN_004F1A80, wxAppBase::OnFatalException) */
+void wxApp::OnFatalException() {}
+
+/**
+ * Address: 0x00992140 (FUN_00992140, wxApp::MainLoop)
+ *
+ * Pumps until ExitMainLoop posts WM_QUIT. Idle runs only while the queue is
+ * empty, and stops as soon as ProcessIdle reports there is nothing left.
+ */
+int wxApp::MainLoop()
+{
+  m_keepGoing = 1;
+  do {
+    while (!Pending() && ProcessIdle()) {
+    }
+    (void)DoMessage();
+  } while (m_keepGoing != 0);
+
+  return 0;
+}
+
+/** Address: 0x00992220 (FUN_00992220, wxApp::ExitMainLoop) */
+void wxApp::ExitMainLoop() { ::PostQuitMessage(0); }
+
+/** Address: 0x00992100 (FUN_00992100, wxApp::Initialized) */
+bool wxApp::Initialized() { return GetTopWindow() != nullptr; }
+
+/**
+ * Address: 0x009923C0 (FUN_009923C0, wxApp::Yield)
+ *
+ * Drains the queue once, re-entrancy guarded. WM_QUIT (18) ends the drain
+ * without being consumed, so the outer loop still sees it.
+ */
+bool wxApp::Yield(const bool /*onlyIfNeeded*/)
+{
+  static bool sInYield = false;
+  if (sInYield) {
+    return false;
+  }
+
+  sInYield = true;
+  MSG message{};
+  while (::PeekMessageW(&message, nullptr, 0u, 0u, PM_NOREMOVE) != FALSE) {
+    if (message.message == WM_QUIT) {
+      break;
+    }
+    if (!DoMessage()) {
+      break;
+    }
+  }
+  sInYield = false;
+  return true;
+}
+
+/** Address: 0x004F1A90 (FUN_004F1A90, wxAppBase::IsActive) */
+bool wxApp::IsActive() const { return m_isActive != 0; }
+
+/**
+ * Address: 0x004F1AA0 (FUN_004F1AA0, wxAppBase::GetTopWindow)
+ *
+ * The explicitly-set top window wins; otherwise the first top-level window
+ * registered, or nothing when none exist yet.
+ */
+wxWindowBase* wxApp::GetTopWindow() const
+{
+  // The binary falls back to the head of the global wxTopLevelWindows list
+  // when no top window was set explicitly. That list is not modelled here,
+  // so only the explicit one is available.
+  return m_topWindow;
+}
+
+/** Address: 0x009AAAB0 (FUN_009AAAB0, wxAppBase::OnInitCmdLine) */
+void wxApp::OnInitCmdLine(void* /*cmdLineParser*/) {}
+
+/** Address: 0x009AAAD0 (FUN_009AAAD0, wxAppBase::OnCmdLineParsed) */
+bool wxApp::OnCmdLineParsed(void* /*cmdLineParser*/) { return true; }
+
+/** Address: 0x009AAB70 (FUN_009AAB70, wxAppBase::OnCmdLineHelp) */
+bool wxApp::OnCmdLineHelp(void* /*cmdLineParser*/) { return false; }
+
+/** Address: 0x009AAB80 (FUN_009AAB80, wxAppBase::OnCmdLineError) */
+bool wxApp::OnCmdLineError(void* /*cmdLineParser*/) { return false; }
+
+/**
+ * Address: 0x009AA8A0 (FUN_009AA8A0, wxAppBase::CreateLogTarget)
+ * Address: 0x009AA910 (FUN_009AA910, wxAppBase::CreateMessageOutput)
+ *
+ * Both build a GUI-flavoured sink in the binary (wxLogGui, and a
+ * wxMessageOutputMessageBox that is nothing but a vtable pointer). Neither
+ * class is modelled here yet, and this engine installs its own log targets
+ * through gpg::StreamLogTarget, so these answer with nothing rather than
+ * invent a type.
+ */
+void* wxApp::CreateLogTarget() { return nullptr; }
+void* wxApp::CreateMessageOutput() { return nullptr; }
+
+/**
+ * Address: 0x004F1AD0 (FUN_004F1AD0, wxAppBase::GetStdIcon)
+ *
+ * Copy-constructs from wxNullIcon regardless of the id requested.
+ */
+void* wxApp::GetStdIcon(std::int32_t /*iconId*/) const { return nullptr; }
+
+/** Address: 0x004F1B30 (FUN_004F1B30, wxAppBase::GetDisplayMode) */
+void* wxApp::GetDisplayMode() const { return nullptr; }
+
+/** Address: 0x004F1B40 (FUN_004F1B40, wxAppBase::SetDisplayMode) */
+bool wxApp::SetDisplayMode(const void* /*displayMode*/) { return true; }
+
+/** Address: 0x004F1B70 (FUN_004F1B70, wxApp::SetPrintMode) */
+void wxApp::SetPrintMode(const std::int32_t mode) { m_printMode = mode; }
+
+/** Address: 0x004F1B80 (FUN_004F1B80, wxApp::GetPrintMode) */
+std::int32_t wxApp::GetPrintMode() const { return m_printMode; }
+
+/**
+ * Address: 0x009AA930 (FUN_009AA930, wxAppBase::SetActive)
+ *
+ * Only a change is reported, and it goes out as wxEVT_ACTIVATE_APP with this
+ * app as the event object.
+ */
+void wxApp::SetActive(const bool isActive, wxWindowBase* /*topWindow*/)
+{
+  if (isActive == (m_isActive != 0)) {
+    return;
+  }
+
+  // The binary also raises wxEVT_ACTIVATE_APP with this app as the event
+  // object. wxActivateEvent and that event type are not modelled here yet, so
+  // only the flag is updated - IsActive answers correctly, but no handler is
+  // notified.
+  m_isActive = isActive ? 1u : 0u;
+}
+
+/** Address: 0x009AA9D0 (FUN_009AA9D0, wxAppBase::FilterEvent) - "no opinion" */
+std::int32_t wxApp::FilterEvent(void* /*event*/) { return -1; }
+
+/**
+ * Address: 0x009AAD10 (FUN_009AAD10, wxAppBase::ProcessPendingEvents)
+ *
+ * Drains the global pending-handler list under its lock, releasing the lock
+ * across each handler's own drain. The list is not modelled here yet, so
+ * there is nothing to walk.
+ */
+void wxApp::ProcessPendingEvents() {}
+
+/**
+ * Address: 0x00992110 (FUN_00992110, wxApp::DoMessage(MSG*))
+ *
+ * Gives the message to ProcessMessage first - that is where accelerators and
+ * dialog navigation get their chance - and only translates and dispatches
+ * what it declines.
+ */
+void wxApp::DoMessage(void** message)
+{
+  auto* const nativeMessage = reinterpret_cast<MSG*>(message);
+  if (nativeMessage == nullptr || ProcessMessage(message)) {
+    return;
+  }
+
+  (void)::TranslateMessage(nativeMessage);
+  (void)::DispatchMessageW(nativeMessage);
+}
+
+/**
+ * Address: 0x00992260 (FUN_00992260, wxApp::ProcessMessage)
+ *
+ * Reports whether the message was consumed before ordinary dispatch. The
+ * binary walks up from the focus window offering the message to each
+ * ancestor's accelerator table and modeless-dialog handler; neither is
+ * modelled here, so nothing is consumed and everything reaches
+ * TranslateMessage/DispatchMessage.
+ */
+bool wxApp::ProcessMessage(void** /*message*/) { return false; }
+
+/**
  * Address: 0x004F1E90 (FUN_004F1E90, ??2MohoApp@Moho@@QAE@@Z)
  * Mangled: ??2MohoApp@Moho@@QAE@@Z
  *
@@ -62679,7 +62931,7 @@ moho::MohoApp::MohoApp()
  * Verifies wx build-options tuple `(2, 4, no-debug)`, allocates one MohoApp
  * storage block, and constructs it in-place.
  */
-[[maybe_unused]] moho::MohoApp* CreateMohoAppWithBuildOptionsCheck()
+moho::MohoApp* CreateMohoAppWithBuildOptionsCheck()
 {
   wxBuildOptionsRuntime buildOptions{};
   buildOptions.versionMajor = 2;
