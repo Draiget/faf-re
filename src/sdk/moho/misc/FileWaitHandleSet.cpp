@@ -29,7 +29,25 @@ namespace
   moho::FWaitHandleSet sFWaitHandleSet{};
   moho::FWaitHandleSet* sPFWaitHandleSet = nullptr;
   std::once_flag sFileWaitHandleSetInitOnce;
-  thread_local std::unordered_map<const moho::FWHSThreadStateRuntime*, msvc8::string*> sDiskThreadStateStrings{};
+  using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadStateRuntime*, msvc8::string*>;
+
+  /**
+   * Per-thread error-string storage, standing in for the
+   * `boost::thread_specific_ptr` the binary keeps in `FWHSThreadStateRuntime`.
+   *
+   * The map is allocated once per thread and deliberately never destroyed.
+   * FileWaitHandleSetAtProcessExit is an atexit handler, and MSVC runs those
+   * after the primary thread's thread_local destructors, so a plain
+   * `thread_local` map was already gone by the time the handler reached in to
+   * release its entry - the find faulted inside _Find_last on freed bucket
+   * storage. A TSS slot has the same lifetime shape: it outlives everything
+   * that reads it, and its contents go with the process.
+   */
+  [[nodiscard]] DiskThreadStateStringMap& DiskThreadStateStrings()
+  {
+    static thread_local auto* const strings = new DiskThreadStateStringMap();
+    return *strings;
+  }
   constexpr const char* kDiskFindFilesHelpText =
     "files = DiskFindFiles(directory, pattern)\nreturns a list of files in a directory";
   constexpr const char* kDiskGetFileInfoHelpText =
@@ -92,10 +110,10 @@ namespace
     const moho::FWHSThreadStateRuntime& runtime
   )
   {
-    const auto it = sDiskThreadStateStrings.find(&runtime);
-    if (it != sDiskThreadStateStrings.end()) {
+    const auto it = DiskThreadStateStrings().find(&runtime);
+    if (it != DiskThreadStateStrings().end()) {
       DestroyDiskThreadStateString(it->second);
-      sDiskThreadStateStrings.erase(it);
+      DiskThreadStateStrings().erase(it);
     }
   }
 
@@ -104,10 +122,10 @@ namespace
     moho::FWHSThreadStateRuntime& runtime
   )
   {
-    if (msvc8::string*& slot = sDiskThreadStateStrings[&runtime]; slot == nullptr) {
+    if (msvc8::string*& slot = DiskThreadStateStrings()[&runtime]; slot == nullptr) {
       slot = new msvc8::string();
     }
-    return sDiskThreadStateStrings[&runtime];
+    return DiskThreadStateStrings()[&runtime];
   }
 
   /**
