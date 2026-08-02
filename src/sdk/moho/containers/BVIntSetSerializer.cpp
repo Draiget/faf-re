@@ -6,7 +6,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/containers/TDatList.h"
-#include "moho/containers/BVIntSetTypeInfo.h"
+#include "moho/containers/BVIntSetTypeInfo.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 // Make BVIntSet registration run before default-segment bootstrap objects that
@@ -138,7 +138,15 @@ namespace
   [[maybe_unused]] SerHelperNode* ResetGlobalBVIntSetSerializerNodeA()
   {
     SerHelperNode* const node = SerializerNode(&gBVIntSetSerializer);
-    node->ListUnlink();
+
+    // The node is the serializer's own mHelperNext/mHelperPrev pair viewed as
+    // a list item, and it is only self-linked once the serializer joins a
+    // helper chain. This runs from static cleanup, where a serializer that was
+    // never linked still has null links - ListUnlink would then write through
+    // mPrev->mNext at address zero.
+    if (node->mNext != nullptr && node->mPrev != nullptr) {
+      node->ListUnlink();
+    }
     return node;
   }
 
