@@ -2210,7 +2210,7 @@ namespace moho
 
       lua_pushstring(lstate, scriptPath);
       const_cast<LuaPlus::LuaObject&>(environment).PushStack(lstate);
-      if (lua_pcall(lstate, 2, 0, 0) != 0) {
+      if (lua_call(lstate, 2, 0) != 0) {
         const char* const errorText = lua_tostring(lstate, -1);
         gpg::Warnf("WLD_LoadScenarioInfo: doscript(%s) failed: %s", scriptPath, errorText ? errorText : "<unknown>");
         lua_settop(lstate, savedTop);
@@ -3187,7 +3187,7 @@ namespace moho
     }
 
     lua_pushstring(cstate, "/lua/ui/game/commandgraph.lua");
-    if (lua_pcall(cstate, 1, 1, 0) != 0) {
+    if (lua_call(cstate, 1, 1) != 0) {
       lua_settop(cstate, savedTop);
       return;
     }
@@ -3206,7 +3206,7 @@ namespace moho
     }
 
     lua_pushboolean(cstate, visible ? 1 : 0);
-    lua_pcall(cstate, 1, 0, 0);
+    lua_call(cstate, 1, 0);
     lua_settop(cstate, savedTop);
   }
 

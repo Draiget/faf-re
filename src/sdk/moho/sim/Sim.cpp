@@ -11798,7 +11798,7 @@ void Sim::ExecuteLuaInSim(const char* functionName, const LuaPlus::LuaObject& ar
     lua_pushnil(state);
   }
 
-  if (lua_pcall(state, 1, 0, 0) != 0) {
+  if (lua_call(state, 1, 0) != 0) {
     const char* err = lua_tostring(state, -1);
     gpg::Warnf("Sim::ExecuteLuaInSim('%s') failed: %s", functionName, err ? err : "<unknown>");
   }
@@ -13559,7 +13559,7 @@ void Sim::SaveState(gpg::WriteArchive* const archive)
     if (state && !isOpEndedFn.IsNil()) {
       const int savedTop = lua_gettop(state);
       isOpEndedFn.PushStack(state);
-      if (lua_isfunction(state, -1) && lua_pcall(state, 0, 1, 0) == 0) {
+      if (lua_isfunction(state, -1) && lua_call(state, 0, 1) == 0) {
         isNisMode = lua_toboolean(state, -1) != 0;
       }
       lua_settop(state, savedTop);

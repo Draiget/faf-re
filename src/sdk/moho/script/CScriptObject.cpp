@@ -764,7 +764,7 @@ void CScriptObject::CreateLuaObject(
     }
 
     const int nargs = lua_gettop(lstate) - funcTop;
-    if (lua_pcall(lstate, nargs, 1, 0) != 0) {
+    if (lua_call(lstate, nargs, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       gpg::Warnf("Error in lua: %s", err.GetString());
       lua_settop(lstate, stackTop);
@@ -889,7 +889,7 @@ bool CScriptObject::RunScriptMultiRet(
   }
 
   const int nargs = lua_gettop(lstate) - funcTop;
-  if (lua_pcall(lstate, nargs, LUA_MULTRET, 0) != 0) {
+  if (lua_call(lstate, nargs, LUA_MULTRET) != 0) {
     const LuaPlus::LuaStackObject err(state, -1);
     LogScriptWarning(this, funcName ? funcName : "<unknown>", err.GetString());
     out.Clear();
@@ -1300,7 +1300,7 @@ void CScriptObject::CallbackStr(const char* callback)
     script.PushStack(lstate);
     mLuaObj.PushStack(lstate);
 
-    if (lua_pcall(lstate, 1, 1, 0) != 0) {
+    if (lua_call(lstate, 1, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
     }
@@ -1340,7 +1340,7 @@ void CScriptObject::CallbackStr(const char* callback, const char** arg0)
     mLuaObj.PushStack(lstate);
     lua_pushstring(lstate, (arg0 && *arg0) ? *arg0 : nullptr);
 
-    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+    if (lua_call(lstate, 2, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
     }
@@ -1381,7 +1381,7 @@ void CScriptObject::CallbackStr(const char* callback, const char** arg0, const c
     lua_pushstring(lstate, (arg0 && *arg0) ? *arg0 : nullptr);
     lua_pushstring(lstate, (arg1 && *arg1) ? *arg1 : nullptr);
 
-    if (lua_pcall(lstate, 3, 1, 0) != 0) {
+    if (lua_call(lstate, 3, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
     }
@@ -1421,7 +1421,7 @@ void CScriptObject::CallbackInt(const char* callback, const int value)
     mLuaObj.PushStack(lstate);
     lua_pushnumber(lstate, static_cast<lua_Number>(value));
 
-    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+    if (lua_call(lstate, 2, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
       lua_settop(lstate, stackTop);
@@ -1465,7 +1465,7 @@ void CScriptObject::LuaPCall(const char* scriptName, const char* const* args, Lu
     lua_pushstring(lstate, (args && *args) ? *args : nullptr);
     LuaPush(lstate, obj);
 
-    if (lua_pcall(lstate, 3, 1, 0) != 0) {
+    if (lua_call(lstate, 3, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", err.GetString());
     }
@@ -2129,7 +2129,7 @@ void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj)
     mLuaObj.PushStack(lstate);
     LuaPush(lstate, obj);
 
-    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+    if (lua_call(lstate, 2, 1) != 0) {
       const LuaPlus::LuaStackObject err(state, -1);
       LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", err.GetString());
     }
