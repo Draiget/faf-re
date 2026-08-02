@@ -916,6 +916,19 @@ bool CScApp::Init()
     moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
   }
 
+  // The user-side Lua bootstrap, which the binary runs here: after
+  // USER_LoadPreferences ("SCMain AppInit 2") and before OpenDocuments and
+  // UI_Init ("AppInit 4" and "AppInit 6"). It must precede UI_Init, because
+  // that pulls in key mappings and options, and those reach back into Lua
+  // through SCR_Import.
+  //
+  // userInit.lua sets __language and then doscripts globalInit.lua, which is
+  // what replaces the `import` C stub (LS_import, which just pushes false)
+  // with the real Lua one. Run it any later and those early imports get the
+  // stub: SCR_Import hands back a boolean and the callers fail with
+  // "index expected but got boolean".
+  moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+
   moho::USER_EnsureDocumentDirectories();
   moho::UI_Init();
   if (!CreateDevice()) {
@@ -923,17 +936,6 @@ bool CScApp::Init()
   }
 
   moho::WIN_SetMainWindow(supcomFrame);
-
-  // The user-side Lua bootstrap, which the binary runs here - between its
-  // "SCMain AppInit 3" and "SCMain AppInit 4" markers, before OpenDocuments
-  // and the /profile handling.
-  //
-  // This is what sets `__language` for the UI. userInit.lua reads it back
-  // out of preferences with GetPreference, and its own comment says the
-  // engine only sets that global for the Sim - so with this script never
-  // run, every UI script that touches __language hit config.lua's raising
-  // __index on _G.
-  moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
 
   if (!::SystemParametersInfoW(SPI_GETSCREENSAVEACTIVE, 0, &usingScreensaver, 0)) {
     usingScreensaver = 0;
