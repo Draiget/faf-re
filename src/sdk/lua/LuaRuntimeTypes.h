@@ -30,11 +30,33 @@ struct __declspec(align(4)) TString
 	GCObject* next;
 	lu_byte tt;
 	lu_byte marked;
-	int32_t reserved;    // Header padding / reserved flags in this build.
+	lu_byte commonHeaderPad[2]; // +0x06 CommonHeader tail padding in this fork.
+
+	/**
+	 * Reserved-word index, one-based, or 0 for an ordinary string.
+	 *
+	 * A SINGLE BYTE, and it must stay one. `newlstr` (0x00924860) clears it
+	 * with `mov byte ptr [esi+8], 0` and `luaX_init` (0x009180D0) sets it with
+	 * `*((_BYTE *)v2 + 8) = i` - neither ever touches +0x09..+0x0B, so those
+	 * three bytes hold whatever the allocator left. Widening this field to an
+	 * int32 reads that garbage: it made ordinary identifiers come back with a
+	 * non-zero `reserved`, so the lexer returned `reserved + FIRST_RESERVED-1`
+	 * instead of TK_NAME and every `local <name>` after one could fail.
+	 */
+	lu_byte reserved;
+	lu_byte reservedPad[3];     // +0x09 never written by the binary.
+
 	lu_hash hash;        // Cached hash for string table lookup.
 	size_t len;          // String length in bytes.
 	char str[1];         // Flexible array tail.
 };
+static_assert(offsetof(TString, tt) == 0x04, "TString::tt must be at +0x04");
+static_assert(offsetof(TString, marked) == 0x05, "TString::marked must be at +0x05");
+static_assert(offsetof(TString, reserved) == 0x08, "TString::reserved must be at +0x08");
+static_assert(offsetof(TString, hash) == 0x0C, "TString::hash must be at +0x0C");
+static_assert(offsetof(TString, len) == 0x10, "TString::len must be at +0x10");
+// `newlstr` allocates `len + 0x15`: a 20-byte header plus the NUL terminator.
+static_assert(offsetof(TString, str) == 0x14, "TString::str must be at +0x14");
 
 struct Node
 {
