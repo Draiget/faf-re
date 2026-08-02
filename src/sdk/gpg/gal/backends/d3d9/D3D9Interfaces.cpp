@@ -499,10 +499,17 @@ namespace gpg::gal
 
         msvc8::vector<msvc8::string> gD3D9LogStorage{};
 
+        // D3DXTECHNIQUE_DESC as D3DX9 writes it - three fields, 12 bytes. Only
+        // the name was modelled, so ID3DXBaseEffect::GetTechniqueDesc wrote
+        // eight bytes past the caller's local and the debug CRT's
+        // _RTC_CheckStackVars trapped on the way out of GetTechniques.
         struct D3DXTechniqueDescRuntime final
         {
-            const char* name = nullptr; // +0x00
+            const char* name = nullptr;      // +0x00
+            unsigned int passes = 0U;        // +0x04
+            unsigned int annotations = 0U;   // +0x08
         };
+        static_assert(sizeof(D3DXTechniqueDescRuntime) == 0x0C, "D3DXTECHNIQUE_DESC is 12 bytes");
 
         struct D3DXMacroRuntime final
         {
@@ -2222,7 +2229,21 @@ namespace gpg::gal
             EffectD3D9* const effect
         )
         {
-            return ::new (outEffect) boost::shared_ptr<EffectD3D9>(effect);
+            auto* const constructed = ::new (outEffect) boost::shared_ptr<EffectD3D9>(effect);
+
+            // Bind the weak self-reference, which is the whole point of this
+            // emission. EffectD3D9 keeps its weak_this at +0x04 but does not
+            // derive from boost::enable_shared_from_this, so boost's
+            // shared_ptr(Y*) constructor has nothing to hook and left it empty.
+            // GetTechniques, GetTechniqueByName and GetVariableByName all
+            // resolve their owner through it, so every one of them threw
+            // "invalid effect" - which is what stopped DevResInitResources on
+            // the first effect it loaded.
+            if (effect != nullptr) {
+                effect->selfWeak_ = *constructed;
+            }
+
+            return constructed;
         }
 
         /**
