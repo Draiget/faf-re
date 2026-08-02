@@ -202,14 +202,16 @@ namespace moho
       return out;
     }
 
-    gpg::RRef objectRef{};
-    if (type->newRefFunc_) {
-      objectRef = type->newRefFunc_();
-    } else {
-      objectRef = gpg::RRef{new (std::nothrow) CPrefetchSet(), type};
-    }
-
-    out.AssignNewUserData(state, objectRef);
+    // The type overload, which is the one the binary calls here. It allocates
+    // the payload inside the userdata and default-constructs it through the
+    // type's own ctorRefFunc_.
+    //
+    // The RRef overload is a different thing: it *copies* an existing object
+    // in, so it needs movRefFunc_, and CPrefetchSetTypeInfo::Init (0x004A5180)
+    // never sets that one - it wires only newRefFunc_, ctorRefFunc_,
+    // deleteFunc_ and dtrFunc_. Building a ref first and passing it here is
+    // what produced "type CPrefetchSet is not copy constructible".
+    (void)out.AssignNewUserData(state, type);
     out.SetMetaTable(metatable);
     return out;
   }
