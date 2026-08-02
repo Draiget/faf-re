@@ -35,7 +35,7 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
-#include "moho/unit/core/UserUnit.h"
+#include "moho/unit/core/UserUnit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -782,45 +782,15 @@ namespace
     return gpg::RRef_CScriptEvent(outRef, event);
   }
 
-  template <typename T>
-  gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
   /**
    * Address: 0x004CB570 (FUN_004CB570, CScriptEventTypeInfo::newRefFunc_)
    */
   [[nodiscard]]
   gpg::RRef CreateScriptEventRefOwned()
   {
-    return MakeTypedRef(new CScriptEvent(), CachedCScriptEventType());
+    gpg::RRef out{};
+    (void)gpg::RRef_CScriptEvent(&out, new CScriptEvent());
+    return out;
   }
 
   /**
@@ -841,7 +811,9 @@ namespace
     if (event) {
       new (event) CScriptEvent();
     }
-    return MakeTypedRef(event, CachedCScriptEventType());
+    gpg::RRef out{};
+    (void)gpg::RRef_CScriptEvent(&out, event);
+    return out;
   }
 
   /**
@@ -977,7 +949,9 @@ gpg::RType* CScriptEvent::GetClass() const
  */
 gpg::RRef CScriptEvent::GetDerivedObjectRef()
 {
-  return MakeTypedRef(this, CachedCScriptEventType());
+  gpg::RRef out{};
+  (void)gpg::RRef_CScriptEvent(&out, this);
+  return out;
 }
 
 /**
@@ -3026,7 +3000,9 @@ Prop* moho::SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState
  */
 gpg::RRef moho::SCR_MakeScriptObjectRef(CScriptObject* object)
 {
-  return MakeTypedRef(object, CachedCScriptObjectType());
+  gpg::RRef out{};
+  (void)gpg::RRef_CScriptObject(&out, object);
+  return out;
 }
 
 /**
