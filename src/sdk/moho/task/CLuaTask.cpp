@@ -1044,6 +1044,37 @@ moho::CScrLuaInitForm* moho::register_CurrentThread_LuaFuncDef()
   return func_CurrentThread_LuaFuncDef();
 }
 
+namespace
+{
+  /**
+   * Runs this file's registration thunks at static-init time, which is where
+   * the binary drives them from (the CRT initialiser array).
+   *
+   * They were defined and never called, so the binders never joined their
+   * init-form set and these globals did not exist in any Lua state. The
+   * damage was not a missing function - FAF's /lua/system/config.lua puts an
+   * __index on _G that raises on any nonexistent global, and that handler
+   * itself calls repr(), which globalInit only defines a file later. So the
+   * first missing global sent __index into unbounded recursion and killed the
+   * whole bootstrap with a C stack overflow.
+   */
+  struct LuaTaskLuaFunctionBootstrap
+  {
+    LuaTaskLuaFunctionBootstrap()
+    {
+      (void)moho::register_WaitFor_LuaFuncDef();
+      (void)moho::register_ForkThread_LuaFuncDef();
+      (void)moho::register_KillThread_LuaFuncDef();
+      (void)moho::register_SuspendCurrentThread_LuaFuncDef();
+      (void)moho::register_ResumeThread_LuaFuncDef();
+      (void)moho::register_CurrentThread_LuaFuncDef();
+    }
+  };
+
+  const LuaTaskLuaFunctionBootstrap gLuaTaskLuaFunctionBootstrap{};
+} // namespace
+
+
 /**
  * Address: 0x004CC2B0 (FUN_004CC2B0, Moho::CLuaTask::MemberDeserialize)
  */
