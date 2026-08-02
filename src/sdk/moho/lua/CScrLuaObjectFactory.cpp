@@ -538,7 +538,7 @@ namespace moho
     }
 
     lua_pushstring(lstate, modulePath);
-    if (lua_pcall(lstate, 1, 1, 0) != 0) {
+    if (lua_call(lstate, 1, 1) != 0) {
       lua_settop(lstate, savedTop);
       return {};
     }
@@ -947,7 +947,7 @@ namespace moho
     lua_State* const rawState = state->m_state;
     const int savedTop = lua_gettop(rawState);
     const int loadStatus = luaL_loadbuffer(rawState, scriptText, std::strlen(scriptText), scriptText);
-    const int runStatus = (loadStatus == 0) ? lua_pcall(rawState, 0, LUA_MULTRET, 0) : 0;
+    const int runStatus = (loadStatus == 0) ? lua_call(rawState, 0, LUA_MULTRET) : 0;
 
     if (loadStatus != 0 || runStatus != 0) {
       LuaPlus::LuaStackObject errorObject{};

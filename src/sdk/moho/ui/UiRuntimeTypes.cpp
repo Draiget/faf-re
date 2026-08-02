@@ -5404,7 +5404,7 @@ moho::CScriptLazyVar_float::CScriptLazyVar_float(LuaPlus::LuaState* const state)
   createFn.PushStack(state);
   lua_pushnumber(rawState, 0.0f);
 
-  if (lua_pcall(rawState, 1, 1, 0) != 0) {
+  if (lua_call(rawState, 1, 1) != 0) {
     LuaPlus::LuaStackObject errorStack(state, -1);
     const char* errorText = errorStack.GetString();
     if (errorText == nullptr) {
@@ -5449,7 +5449,7 @@ float moho::CScriptLazyVar_float::GetValue(const CScriptLazyVar_float* const val
     const int savedTop = lua_gettop(rawState);
 
     lazyVarObject.PushStack(activeState);
-    if (lua_pcall(rawState, 0, 1, 0) != 0) {
+    if (lua_call(rawState, 0, 1) != 0) {
       LuaPlus::LuaStackObject errorStack(activeState, -1);
       const char* errorText = errorStack.GetString();
       if (errorText == nullptr) {
@@ -5502,7 +5502,7 @@ void moho::CScriptLazyVar_float::SetValue(CScriptLazyVar_float* const value, con
   lazyVarObject.PushStack(activeState);
   lua_pushnumber(rawState, next);
 
-  if (lua_pcall(rawState, 2, 0, 0) != 0) {
+  if (lua_call(rawState, 2, 0) != 0) {
     LuaPlus::LuaStackObject errorStack(activeState, -1);
     const char* errorText = errorStack.GetString();
     if (errorText == nullptr) {
@@ -23832,7 +23832,7 @@ boost::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(LuaPlus::LuaState* 
   LuaPlus::LuaObject frameFactory = moduleObject.GetByName("Frame");
   frameFactory.PushStack(state);
 
-  const int callStatus = lua_pcall(rawState, 0, 1, 0);
+  const int callStatus = lua_call(rawState, 0, 1);
   if (callStatus != 0) {
     const char* errorText = lua_tostring(rawState, -1);
     if (errorText == nullptr) {

@@ -288,7 +288,7 @@ namespace
     lua_pushstring(lstate, scriptPath);
     const_cast<LuaPlus::LuaObject&>(envTable).PushStack(lstate);
 
-    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+    if (lua_call(lstate, 2, 1) != 0) {
       lua_settop(lstate, savedTop);
       return false;
     }

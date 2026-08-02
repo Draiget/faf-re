@@ -442,7 +442,7 @@ int moho::FORMATION_PickBestFormation(
   pickBestFn.PushStack(rawState);
   formationTypeArg.PushStack(rawState);
   radiusArg.PushStack(rawState);
-  if (lua_pcall(rawState, 2, 1, 0) != 0) {
+  if (lua_call(rawState, 2, 1) != 0) {
     lua_settop(rawState, savedTop);
     return 0;
   }
