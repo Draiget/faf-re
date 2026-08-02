@@ -3414,6 +3414,10 @@ void moho::WIN_AppExecute(IWinApp* const app)
     ::TerminateProcess(::GetCurrentProcess(), 1u);
   }
 
+  // Nothing else constructs the application object; see
+  // WX_EnsureApplicationObject. Without it EnableLoopFlags has nothing to set
+  // and KeepGoing answers false, so the loop below ended before it started.
+  moho::WX_EnsureApplicationObject();
   moho::WxAppRuntime::EnableLoopFlags();
 
   _controlfp(0x20000, 0x30000);
