@@ -6889,3 +6889,59 @@ namespace moho
     return 0;
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct CCommandLuaFunctionRegistrationsLuaBinderBootstrap
+  {
+    CCommandLuaFunctionRegistrationsLuaBinderBootstrap()
+    {
+      (void)::moho::register_IssueClearCommands_LuaFuncDef();
+      (void)::moho::register_IssueStop_LuaFuncDef();
+      (void)::moho::register_IssueOverCharge_LuaFuncDef();
+      (void)::moho::register_IssueDive_LuaFuncDef();
+      (void)::moho::register_IssueFactoryRallyPoint_LuaFuncDef();
+      (void)::moho::register_IssueClearFactoryCommands_LuaFuncDef();
+      (void)::moho::register_IssueFormMove_LuaFuncDef();
+      (void)::moho::register_IssueAttack_LuaFuncDef();
+      (void)::moho::register_IssueFormAttack_LuaFuncDef();
+      (void)::moho::register_IssueSiloBuildTactical_LuaFuncDef();
+      (void)::moho::register_IssueSiloBuildNuke_LuaFuncDef();
+      (void)::moho::register_IssueNuke_LuaFuncDef();
+      (void)::moho::register_IssueTactical_LuaFuncDef();
+      (void)::moho::register_IssuePatrol_LuaFuncDef();
+      (void)::moho::register_IssueFormPatrol_LuaFuncDef();
+      (void)::moho::register_IssueFormAggressiveMove_LuaFuncDef();
+      (void)::moho::register_IssueFerry_LuaFuncDef();
+      (void)::moho::register_IssueRepair_LuaFuncDef();
+      (void)::moho::register_IssueSacrifice_LuaFuncDef();
+      (void)::moho::register_IssueUpgrade_LuaFuncDef();
+      (void)::moho::register_IssueScript_LuaFuncDef();
+      (void)::moho::register_IssueReclaim_LuaFuncDef();
+      (void)::moho::register_IssueKillSelf_LuaFuncDef();
+      (void)::moho::register_IssueDestroySelf_LuaFuncDef();
+      (void)::moho::register_IssueTransportUnload_LuaFuncDef();
+      (void)::moho::register_IssueTeleportToBeacon_LuaFuncDef();
+      (void)::moho::register_IssueBuildFactory_LuaFuncDef();
+      (void)::moho::register_UISelectionByCategory_LuaFuncDef();
+      (void)::moho::register_UISelectAndZoomTo_LuaFuncDef();
+      (void)::moho::register_UIZoomTo_LuaFuncDef();
+    }
+  };
+
+  const CCommandLuaFunctionRegistrationsLuaBinderBootstrap gCCommandLuaFunctionRegistrationsLuaBinderBootstrap{};
+} // namespace

@@ -16,7 +16,8 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RBlueprint.h"
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -953,3 +954,34 @@ namespace
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(register_EntityCategoryHelperTypeInfoStartup_887a87, moho::register_EntityCategoryHelperTypeInfoStartup)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct EntityCategoryReflectionLuaBinderBootstrap
+  {
+    EntityCategoryReflectionLuaBinderBootstrap()
+    {
+      (void)::moho::register_EntityCategory__add_LuaFuncDef();
+      (void)::moho::register_EntityCategory__sub_LuaFuncDef();
+      (void)::moho::register_EntityCategory__mul_LuaFuncDef();
+      (void)::moho::register_EntityCategoryEmpty_LuaFuncDef();
+      (void)::moho::register_EntityCategoryGetUnitList_LuaFuncDef();
+    }
+  };
+
+  const EntityCategoryReflectionLuaBinderBootstrap gEntityCategoryReflectionLuaBinderBootstrap{};
+} // namespace

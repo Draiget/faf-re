@@ -143,7 +143,8 @@
 #include "moho/unit/core/UserUnit.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
-#include "moho/unit/CUnitMotion.h"
+#include "moho/unit/CUnitMotion.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -29686,3 +29687,35 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_SimTypeInfo_e0dc23, preregister_SimTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct SimLuaBinderBootstrap
+  {
+    SimLuaBinderBootstrap()
+    {
+      (void)::moho::register_RegisterUnitBlueprint_LuaFuncDef();
+      (void)::moho::register_RegisterPropBlueprint_LuaFuncDef();
+      (void)::moho::register_RegisterProjectileBlueprint_LuaFuncDef();
+      (void)::moho::register_RegisterMeshBlueprint_LuaFuncDef();
+      (void)::moho::register_RegisterTrailEmitterBlueprint_LuaFuncDef();
+      (void)::moho::register_RegisterEmitterBlueprint_LuaFuncDef();
+    }
+  };
+
+  const SimLuaBinderBootstrap gSimLuaBinderBootstrap{};
+} // namespace

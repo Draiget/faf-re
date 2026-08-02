@@ -26409,3 +26409,34 @@ namespace
 
 
 
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct UiRuntimeTypesLuaBinderBootstrap
+  {
+    UiRuntimeTypesLuaBinderBootstrap()
+    {
+      (void)::moho::register_FlushEvents_LuaFuncDef();
+      (void)::moho::register_ClearCurrentFactoryForQueueDisplay_LuaFuncDef();
+      (void)::moho::register_IN_AddKeyMapTable_LuaFuncDef();
+      (void)::moho::register_IN_RemoveKeyMapTable_LuaFuncDef();
+      (void)::moho::register_IN_ClearKeyMap_LuaFuncDef();
+    }
+  };
+
+  const UiRuntimeTypesLuaBinderBootstrap gUiRuntimeTypesLuaBinderBootstrap{};
+} // namespace
