@@ -2896,6 +2896,37 @@ moho::CScrLuaInitForm* moho::register_FileCollapsePath_LuaFuncDef()
   return func_FileCollapsePath_LuaFuncDef();
 }
 
+namespace
+{
+  /**
+   * Runs this file's registration thunks at static-init time, which is where
+   * the binary drives them from (the CRT initialiser array).
+   *
+   * They were defined and never called, so the binders never joined their
+   * init-form set and these globals did not exist in any Lua state. The
+   * damage was not a missing function - FAF's /lua/system/config.lua puts an
+   * __index on _G that raises on any nonexistent global, and that handler
+   * itself calls repr(), which globalInit only defines a file later. So the
+   * first missing global sent __index into unbounded recursion and killed the
+   * whole bootstrap with a C stack overflow.
+   */
+  struct FileWaitHandleSetLuaFunctionBootstrap
+  {
+    FileWaitHandleSetLuaFunctionBootstrap()
+    {
+      (void)moho::register_DiskFindFiles_LuaFuncDef();
+      (void)moho::register_DiskGetFileInfo_LuaFuncDef();
+      (void)moho::register_DiskToLocal_LuaFuncDef();
+      (void)moho::register_Basename_LuaFuncDef();
+      (void)moho::register_Dirname_LuaFuncDef();
+      (void)moho::register_FileCollapsePath_LuaFuncDef();
+    }
+  };
+
+  const FileWaitHandleSetLuaFunctionBootstrap gFileWaitHandleSetLuaFunctionBootstrap{};
+} // namespace
+
+
 /**
  * Address: 0x00413F90 (FUN_00413F90, Moho::FWaitHandleSet::Wait)
  *
