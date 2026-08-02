@@ -1768,31 +1768,31 @@ namespace
 
   [[nodiscard]] CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
       return *set;
     }
 
-    static CScrLuaInitFormSet fallbackSet("sim");
+    static CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
   }
 
   [[nodiscard]] CScrLuaInitFormSet& CoreLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("core"); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Core"); set != nullptr) {
       return *set;
     }
 
-    static CScrLuaInitFormSet fallbackSet("core");
+    static CScrLuaInitFormSet fallbackSet("Core");
     return fallbackSet;
   }
 
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
       return *set;
     }
 
-    static CScrLuaInitFormSet fallbackSet("user");
+    static CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
   }
 
@@ -9978,10 +9978,10 @@ Sim::Sim(LaunchInfoBase* const info)
   }
   lua_setglobaluserdata(mLuaState->m_state, this);
 
-  if (CScrLuaInitFormSet* const coreSet = SCR_FindLuaInitFormSet("core"); coreSet != nullptr) {
+  if (CScrLuaInitFormSet* const coreSet = SCR_FindLuaInitFormSet("Core"); coreSet != nullptr) {
     coreSet->RunInits(mLuaState);
   }
-  if (CScrLuaInitFormSet* const simSet = SCR_FindLuaInitFormSet("sim"); simSet != nullptr) {
+  if (CScrLuaInitFormSet* const simSet = SCR_FindLuaInitFormSet("Sim"); simSet != nullptr) {
     simSet->RunInits(mLuaState);
   }
   if (SCR_IsDebugWindowActive()) {

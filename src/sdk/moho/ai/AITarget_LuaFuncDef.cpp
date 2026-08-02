@@ -12,11 +12,11 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("core"); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Core"); set != nullptr) {
       return *set;
     }
 
-    static moho::CScrLuaInitFormSet fallbackSet("core");
+    static moho::CScrLuaInitFormSet fallbackSet("Core");
     return fallbackSet;
   }
 

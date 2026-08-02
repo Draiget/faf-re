@@ -2098,7 +2098,7 @@ namespace moho
       return;
     }
 
-    if (CScrLuaInitFormSet* const coreInitSet = SCR_FindLuaInitFormSet("core"); coreInitSet != nullptr) {
+    if (CScrLuaInitFormSet* const coreInitSet = SCR_FindLuaInitFormSet("Core"); coreInitSet != nullptr) {
       coreInitSet->RunInits(mLuaState);
     }
 

@@ -93,7 +93,17 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
-    static moho::CScrLuaInitFormSet set("user");
+    // Look the set up before making one. Several translation units reach for
+    // the same set during static init, and CScrLuaInitFormSet's ctor pushes
+    // onto the front of a single global list - so a second set with the same
+    // name does not merge, it *hides* the first, and every form already linked
+    // into that one silently stops running.
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User");
+        existing != nullptr) {
+      return *existing;
+    }
+
+    static moho::CScrLuaInitFormSet set("User");
     return set;
   }
 

@@ -1856,21 +1856,21 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
       return *set;
     }
 
-    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    static moho::CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
       return *set;
     }
 
-    static moho::CScrLuaInitFormSet fallbackSet("user");
+    static moho::CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
   }
 

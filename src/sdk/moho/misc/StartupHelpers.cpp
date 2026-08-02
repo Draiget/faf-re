@@ -582,11 +582,11 @@ namespace
     // exists. Declaring a fresh static here creates a second set with the
     // same name, and SCR_FindLuaInitFormSet returns only the first - so
     // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("user"); existing != nullptr) {
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
       return *existing;
     }
 
-    static moho::CScrLuaInitFormSet sSet("user");
+    static moho::CScrLuaInitFormSet sSet("User");
     return sSet;
   }
 
@@ -596,11 +596,11 @@ namespace
     // exists. Declaring a fresh static here creates a second set with the
     // same name, and SCR_FindLuaInitFormSet returns only the first - so
     // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("core"); existing != nullptr) {
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
       return *existing;
     }
 
-    static moho::CScrLuaInitFormSet sSet("core");
+    static moho::CScrLuaInitFormSet sSet("Core");
     return sSet;
   }
 
@@ -610,11 +610,11 @@ namespace
     // exists. Declaring a fresh static here creates a second set with the
     // same name, and SCR_FindLuaInitFormSet returns only the first - so
     // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("unsafe"); existing != nullptr) {
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Unsafe"); existing != nullptr) {
       return *existing;
     }
 
-    static moho::CScrLuaInitFormSet sSet("unsafe");
+    static moho::CScrLuaInitFormSet sSet("Unsafe");
     return sSet;
   }
 

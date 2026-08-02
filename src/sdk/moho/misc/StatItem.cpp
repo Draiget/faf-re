@@ -29,7 +29,8 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/UserArmy.h"
 #include "moho/ui/CUIManager.h"
-#include "platform/Platform.h"
+#include "platform/Platform.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -63,11 +64,11 @@ namespace
     // exists. Declaring a fresh static here creates a second set with the
     // same name, and SCR_FindLuaInitFormSet returns only the first - so
     // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("core"); existing != nullptr) {
+    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
       return *existing;
     }
 
-    static moho::CScrLuaInitFormSet sSet("core");
+    static moho::CScrLuaInitFormSet sSet("Core");
     return sSet;
   }
 

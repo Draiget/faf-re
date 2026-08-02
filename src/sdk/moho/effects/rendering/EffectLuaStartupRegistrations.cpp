@@ -120,7 +120,7 @@ namespace
   [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitFormSet() noexcept
   {
     for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "Sim") == 0) {
         return set;
       }
     }
@@ -133,7 +133,7 @@ namespace
       return *set;
     }
 
-    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    static moho::CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
   }
 
