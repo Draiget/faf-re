@@ -3282,6 +3282,21 @@ namespace
       (void)moho::register_GetCommandLineArg_LuaFuncDef();
       (void)moho::register_HasCommandLineArg_LuaFuncDef();
       (void)moho::register_SHGetFolderPath_LuaFuncDef();
+
+      // The rest of this file's binders. These have no register_ thunk, so
+      // the definition itself is what has to be named - and until it is, the
+      // binder is never constructed and the global never exists. GetPreference
+      // is the one that showed: /lua/user/prefs.lua reads it while the splash
+      // screen is coming up, and config.lua's __index on _G turns the miss
+      // into a raised error.
+      (void)moho::func_GetTextureDimensions_LuaFuncDef();
+      (void)moho::func_SetMovieVolume_LuaFuncDef();
+      (void)moho::func_GetMovieVolume_LuaFuncDef();
+      (void)moho::func_GetMovieDuration_LuaFuncDef();
+      (void)moho::func_GetAntiAliasingOptions_LuaFuncDef();
+      (void)moho::func_GetOptions_LuaFuncDef();
+      (void)moho::func_GetPreference_LuaFuncDef();
+      (void)moho::func_SetPreference_LuaFuncDef();
     }
   };
 
