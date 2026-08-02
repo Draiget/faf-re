@@ -26,11 +26,23 @@ namespace gpg::core
         // owner -> (ptr, deleter)
         std::unordered_map<const void*, std::pair<void*, ErasedDeleter>> map;
 
-        ~TLRegistry() noexcept {
-            // Delete all remaining per-thread values on thread exit
+        /**
+         * Deletes every per-thread value but leaves this registry usable.
+         *
+         * This is deliberately not a destructor. Objects that outlive thread
+         * storage still consult the registry while they unwind - gpg::LogContext
+         * does it from its own destructor, which for the main thread runs out of
+         * an atexit handler, after thread_local destructors have already gone.
+         * Draining leaves an empty map that answers nullptr, which every caller
+         * here already handles; destroying it left find() walking freed bucket
+         * storage.
+         */
+        void drain() noexcept {
             for (auto& val : map | std::views::values) {
                 auto& [fst, snd] = val;
-                snd(fst);
+                if (fst != nullptr && snd) {
+                    snd(fst);
+                }
                 fst = nullptr;
             }
             map.clear();
@@ -64,8 +76,21 @@ namespace gpg::core
         }
     };
 
-    // One registry per thread
-    inline thread_local TLRegistry gTlsRegistry{};
+    // One registry per thread, allocated on first use and never destroyed, so
+    // that anything unwinding after thread storage is gone still finds a valid
+    // (if empty) map. A separate guard drains the values when the thread ends.
+    inline TLRegistry& TlsRegistry() noexcept
+    {
+        static thread_local TLRegistry* const registry = new TLRegistry();
+        return *registry;
+    }
+
+    struct TLRegistryDrainGuard final
+    {
+        ~TLRegistryDrainGuard() noexcept { TlsRegistry().drain(); }
+    };
+
+    inline thread_local TLRegistryDrainGuard gTlsRegistryDrainGuard{};
 
     template<class T, class Deleter = std::default_delete<T>>
     class TssPtr
@@ -83,7 +108,7 @@ namespace gpg::core
          * Delete current-thread value (if any) and remove the entry for this owner.
          */
         ~TssPtr() noexcept {
-            auto [ptr, del] = gTlsRegistry.extract(this);
+            auto [ptr, del] = TlsRegistry().extract(this);
             (void)del; // deleter isn't needed here; we delete explicitly below to be precise
             if (ptr) {
                 // Use our own deleter to match the stored type exactly
@@ -98,28 +123,28 @@ namespace gpg::core
          * Get value for current thread (may be null).
          */
         T* get() const noexcept {
-            return static_cast<T*>(gTlsRegistry.get_raw(this));
+            return static_cast<T*>(TlsRegistry().get_raw(this));
         }
 
         /**
          * Replace value without deleting the previous one (use carefully).
          */
         void set_no_delete(T* p) noexcept {
-            gTlsRegistry.set_raw(this, p, erased_deleter());
+            TlsRegistry().set_raw(this, p, erased_deleter());
         }
 
         /**
          * Replace value and delete the previous one with Deleter.
          */
         void reset(T* p = nullptr) noexcept {
-            gTlsRegistry.reset_and_delete(this, p, erased_deleter());
+            TlsRegistry().reset_and_delete(this, p, erased_deleter());
         }
 
         /**
          * Release current value without deleting it and remove from registry.
          */
         T* release() noexcept {
-            auto [ptr, _] = gTlsRegistry.extract(this);
+            auto [ptr, _] = TlsRegistry().extract(this);
             return static_cast<T*>(ptr);
         }
 

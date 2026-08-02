@@ -455,11 +455,13 @@ msvc8::string& msvc8::string::operator=(const char* s) noexcept {
         return *this;
     }
 
-    // Otherwise adopt external buffer (non-owning, no growth).
-    // Capacity becomes exactly n (excludes the terminator).
-    bx.ptr = const_cast<char*>(s);
-    mySize = static_cast<uint32_t>(n);
-    myRes = static_cast<uint32_t>(n);
+    // Otherwise grow and copy, as MSVC8's assign does. This used to adopt the
+    // caller's pointer and set myRes to its length, which marks the string
+    // heap-backed to the rest of the class - so a later tidy() ran
+    // ::operator delete over whatever was assigned. Every one of these was a
+    // string literal: CConAlias::ShutdownRecovered freed .rdata at process
+    // exit and took the engine allocator down with it.
+    assign_owned(std::string_view(s, n));
     return *this;
 }
 
@@ -560,10 +562,10 @@ msvc8::string& msvc8::string::assign(const char* data, const std::size_t size) n
         return *this;
     }
 
-    // Long data: adopt external buffer (non-owning, no guaranteed trailing NUL).
-    bx.ptr = const_cast<char*>(data);
-    mySize = size;
-    myRes = size > maxCapGuard ? maxCapGuard : size;
+    // Long data: copy into owned storage. Adopting here marked the string
+    // heap-backed while it pointed at the caller's buffer, so tidy() freed
+    // memory this string never allocated.
+    assign_owned(std::string_view(data, size));
     return *this;
 }
 
@@ -579,27 +581,14 @@ msvc8::string msvc8::string::operator+(const char* rhs) const noexcept {
     return detail::concat_impl(view(), std::string_view(rhs ? rhs : ""));
 }
 
+// Owning concatenation; see detail::concat_impl in the header for why the
+// thread-local arena path had to go.
 msvc8::string msvc8::string::concat_impl_(const std::string_view a, const std::string_view b) noexcept {
-    const std::size_t total = a.size() + b.size();
-
-    if (total <= 15) {
-        string out;
-        (void)out.append(a.data(), a.size());
-        (void)out.append(b.data(), b.size());
-        return out;
-    }
-
-    auto [buf, cap] = detail::get_concat_buffer(total + 1 /* NUL */);
-    if (!a.empty()) {
-	    std::memcpy(buf, a.data(), a.size());
-    }
-    if (!b.empty()) {
-	    std::memcpy(buf + a.size(), b.data(), b.size());
-    }
-    buf[total] = '\0';
-
-    const uint32_t effCap = (cap > 0) ? cap - 1 : 0u; // cap excludes NUL
-    return adopt(buf, total, effCap);
+    string out;
+    out.reserve(a.size() + b.size());
+    (void)out.append(a.data(), a.size());
+    (void)out.append(b.data(), b.size());
+    return out;
 }
 
 msvc8::string msvc8::operator+(const std::string_view lhs, const string& rhs) noexcept {
