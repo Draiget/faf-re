@@ -32,6 +32,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
@@ -26439,4 +26440,360 @@ namespace
   };
 
   const UiRuntimeTypesLuaBinderBootstrap gUiRuntimeTypesLuaBinderBootstrap{};
+} // namespace
+
+namespace
+{
+  /**
+   * The Maui class binders.
+   *
+   * Every `moho.<x>_methods` table Lua reaches its UI classes through is a
+   * `CScrLuaClassBinder` - a form whose name is a dotted path, so
+   * `CScrLuaClassBinder::Run` walks it, creating `moho` under globals on the
+   * first one and setting the tail segment to the class's metatable. Without
+   * these there is no `moho` table at all, and `/lua/maui/control.lua` fails
+   * on its first line: `Control = ClassUI(moho.control_methods)`.
+   *
+   * In the binary each is a statically-initialized record in `.data` linked
+   * into `scr_UserInits` by a four-instruction thunk; the addresses below are
+   * those records. Names and class strings are read from the image, and the
+   * doc string is empty in every one of them.
+   */
+  /**
+   * Address: 0x00BDD9F0 (FUN_00BDD9F0) -- record at 0x00F5A1F0
+   *
+   * Publishes CMauiBitmap's method table as `moho.bitmap_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiBitmap()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.bitmap_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiBitmap>::Instance(),
+      "CMauiBitmap",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDDC40 (FUN_00BDDC40) -- record at 0x00F5A224
+   *
+   * Publishes CMauiBorder's method table as `moho.border_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiBorder()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.border_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiBorder>::Instance(),
+      "CMauiBorder",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDDD80 (FUN_00BDDD80) -- record at 0x00F5A258
+   *
+   * Publishes CMauiControl's method table as `moho.control_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiControl()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.control_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiControl",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE010 (FUN_00BDE010) -- record at 0x00F5A280
+   *
+   * Publishes CMauiCursor's method table as `moho.cursor_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiCursor()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.cursor_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiCursor>::Instance(),
+      "CMauiCursor",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE150 (FUN_00BDE150) -- record at 0x00F5A298
+   *
+   * Publishes CMauiLuaDragger's method table as `moho.dragger_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiLuaDragger()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.dragger_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>::Instance(),
+      "CMauiLuaDragger",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE250 (FUN_00BDE250) -- record at 0x00F5A2B0
+   *
+   * Publishes CMauiEdit's method table as `moho.edit_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiEdit()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.edit_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiEdit>::Instance(),
+      "CMauiEdit",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE5D0 (FUN_00BDE5D0) -- record at 0x00F5A2E4
+   *
+   * Publishes CMauiFrame's method table as `moho.frame_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiFrame()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.frame_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiFrame>::Instance(),
+      "CMauiFrame",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE700 (FUN_00BDE700) -- record at 0x00F5A318
+   *
+   * Publishes CMauiGroup's method table as `moho.group_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiGroup()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.group_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiGroup>::Instance(),
+      "CMauiGroup",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE800 (FUN_00BDE800) -- record at 0x00F5A34C
+   *
+   * Publishes CMauiHistogram's method table as `moho.histogram_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiHistogram()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.histogram_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiHistogram>::Instance(),
+      "CMauiHistogram",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDE930 (FUN_00BDE930) -- record at 0x00F5A380
+   *
+   * Publishes CMauiItemList's method table as `moho.item_list_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiItemList()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.item_list_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiItemList>::Instance(),
+      "CMauiItemList",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDEC30 (FUN_00BDEC30) -- record at 0x00F5A3B4
+   *
+   * Publishes CMauiMesh's method table as `moho.mesh_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiMesh()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.mesh_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiMesh>::Instance(),
+      "CMauiMesh",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDED50 (FUN_00BDED50) -- record at 0x00F5A3E8
+   *
+   * Publishes CMauiMovie's method table as `moho.movie_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiMovie()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.movie_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiMovie>::Instance(),
+      "CMauiMovie",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDEEC0 (FUN_00BDEEC0) -- record at 0x00F5A41C
+   *
+   * Publishes CMauiScrollbar's method table as `moho.scrollbar_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiScrollbar()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.scrollbar_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiScrollbar>::Instance(),
+      "CMauiScrollbar",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BDF000 (FUN_00BDF000) -- record at 0x00F5A450
+   *
+   * Publishes CMauiText's method table as `moho.text_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCMauiText()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.text_methods",
+      &moho::CScrLuaMetatableFactory<moho::CMauiText>::Instance(),
+      "CMauiText",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BE4F60 (FUN_00BE4F60) -- record at 0x00F5B1CC
+   *
+   * Publishes CUIMapPreview's method table as `moho.ui_map_preview_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCUIMapPreview()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.ui_map_preview_methods",
+      &moho::CScrLuaMetatableFactory<moho::CUIMapPreview>::Instance(),
+      "CUIMapPreview",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BE63F0 (FUN_00BE63F0) -- record at 0x00F5B558
+   *
+   * Publishes CLuaWldUIProvider's method table as `moho.WldUIProvider_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCLuaWldUIProvider()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.WldUIProvider_methods",
+      &moho::CScrLuaMetatableFactory<moho::CLuaWldUIProvider>::Instance(),
+      "CLuaWldUIProvider",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BE64E0 (FUN_00BE64E0) -- record at 0x00F5B570
+   *
+   * Publishes CUIWorldMesh's method table as `moho.world_mesh_methods`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCUIWorldMesh()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.world_mesh_methods",
+      &moho::CScrLuaMetatableFactory<moho::CUIWorldMesh>::Instance(),
+      "CUIWorldMesh",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00BE6A50 (FUN_00BE6A50) -- record at 0x00F5B674
+   *
+   * Publishes CUIWorldView's method table as `moho.UIWorldView`.
+   */
+  moho::CScrLuaInitForm* RegisterLuaClassCUIWorldView()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(),
+      "moho.UIWorldView",
+      &moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance(),
+      "CUIWorldView",
+      ""
+    );
+    return &binder;
+  }
+
+  /**
+   * Drives the class binders above. In the binary the CRT static-init array
+   * runs each record's linking thunk before main; this object is that pass,
+   * and the source-level invocation that keeps them linked in.
+   */
+  struct MauiLuaClassBinderBootstrap
+  {
+    MauiLuaClassBinderBootstrap()
+    {
+      (void)RegisterLuaClassCMauiBitmap();
+      (void)RegisterLuaClassCMauiBorder();
+      (void)RegisterLuaClassCMauiControl();
+      (void)RegisterLuaClassCMauiCursor();
+      (void)RegisterLuaClassCMauiLuaDragger();
+      (void)RegisterLuaClassCMauiEdit();
+      (void)RegisterLuaClassCMauiFrame();
+      (void)RegisterLuaClassCMauiGroup();
+      (void)RegisterLuaClassCMauiHistogram();
+      (void)RegisterLuaClassCMauiItemList();
+      (void)RegisterLuaClassCMauiMesh();
+      (void)RegisterLuaClassCMauiMovie();
+      (void)RegisterLuaClassCMauiScrollbar();
+      (void)RegisterLuaClassCMauiText();
+      (void)RegisterLuaClassCUIMapPreview();
+      (void)RegisterLuaClassCLuaWldUIProvider();
+      (void)RegisterLuaClassCUIWorldMesh();
+      (void)RegisterLuaClassCUIWorldView();
+    }
+  };
+
+  const MauiLuaClassBinderBootstrap gMauiLuaClassBinderBootstrap{};
 } // namespace
