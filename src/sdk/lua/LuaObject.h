@@ -862,6 +862,23 @@ namespace LuaPlus
 		[[nodiscard]] bool IsUserData() const noexcept;
 
 		/**
+		 * Address: 0x00907BC0 (FUN_00907BC0, LuaPlus::LuaObject::GetUserData)
+		 * Mangled: ?GetUserData@LuaObject@LuaPlus@@QBE?AVRRef@gpg@@XZ
+		 *
+		 * IDA signature:
+		 * gpg::RRef *__thiscall LuaPlus::LuaObject::GetUserData(
+		 *     LuaPlus::LuaObject *this, gpg::RRef *dest);
+		 *
+		 * What it does:
+		 * Builds the reflection reference a full userdata stands for. The
+		 * engine stores the object's `gpg::RType*` in the `Udata` header's
+		 * `len` field and lays the object itself out immediately after the
+		 * header, so the reference is *assembled* from the two - it is not
+		 * stored in the payload.
+		 */
+		[[nodiscard]] gpg::RRef GetUserData() const;
+
+		/**
 		 * Value getters
 		 */
 		/**

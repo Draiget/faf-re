@@ -18959,6 +18959,48 @@ bool LuaObject::IsUserData() const noexcept
 }
 
 /**
+ * Address: 0x00907BC0 (FUN_00907BC0, LuaPlus::LuaObject::GetUserData)
+ * Mangled: ?GetUserData@LuaObject@LuaPlus@@QBE?AVRRef@gpg@@XZ
+ *
+ * IDA signature:
+ * gpg::RRef *__thiscall LuaPlus::LuaObject::GetUserData(
+ *     LuaPlus::LuaObject *this, gpg::RRef *dest);
+ *
+ * What it does:
+ * Builds the reflection reference a full userdata stands for.
+ *
+ * Only the full-userdata tag is accepted here - the light-userdata one that
+ * `IsUserData` also answers to has no header to read a type out of, so it
+ * takes the type-error path.
+ *
+ * The two loads are the whole contract, and they are worth stating because
+ * both hand-rolled copies of this in the tree had them wrong:
+ *
+ *     lea edx, [ecx+10h]   ; mObj  = the object, laid out after the header
+ *     mov ecx, [ecx+0Ch]   ; mType = Udata::len, reinterpreted as RType*
+ *
+ * This fork reuses `Udata::len` to carry the `gpg::RType*` rather than a
+ * byte count, so the reference is assembled from the header and the payload
+ * pointer. It is not a `gpg::RRef` stored inside the payload, and the type
+ * does not sit inside the payload either.
+ */
+gpg::RRef LuaObject::GetUserData() const
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	if (m_object.tt != LUA_TUSERDATA) {
+		luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as UserData");
+	}
+
+	auto* const userdata = static_cast<Udata*>(m_object.value.p);
+
+	gpg::RRef out{};
+	out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+	out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
+	return out;
+}
+
+/**
  * Address: 0x00907810 (FUN_00907810, LuaPlus::LuaObject::IsFunction)
  *
  * What it does:

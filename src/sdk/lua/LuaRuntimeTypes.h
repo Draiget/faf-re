@@ -100,6 +100,9 @@ struct Udata
 	lu_byte tt;
 	lu_byte marked;
 	Table* metatable;
+	/// Reused by this fork to carry the object's `gpg::RType*` rather than a
+	/// byte count - see LuaObject::GetUserData (0x00907BC0), which reads it
+	/// from +0x0C and takes the payload from +0x10.
 	size_t len;
 
 	/**
@@ -120,6 +123,9 @@ struct Udata
 	 */
 	static void MemberDeserialize(gpg::ReadArchive* archive, Udata* object, int version, const gpg::RRef& ownerRef);
 };
+static_assert(offsetof(Udata, metatable) == 0x08, "Udata::metatable offset must be 0x08");
+static_assert(offsetof(Udata, len) == 0x0C, "Udata::len offset must be 0x0C");
+static_assert(sizeof(Udata) == 0x10, "Udata size must be 0x10");
 
 struct CClosure
 {

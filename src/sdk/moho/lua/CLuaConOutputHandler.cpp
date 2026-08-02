@@ -95,26 +95,11 @@ namespace
    */
   gpg::RRef ExtractUserDataSlotRef(const LuaPlus::LuaObject& userDataObject)
   {
-    gpg::RRef out{};
     if (!userDataObject.IsUserData()) {
-      return out;
+      return gpg::RRef{};
     }
 
-    lua_State* const lstate = userDataObject.GetActiveCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(userDataObject).PushStack(lstate);
-    void* const rawUserData = lua_touserdata(lstate, -1);
-    if (rawUserData) {
-      auto* const bytes = static_cast<std::uint8_t*>(rawUserData);
-      out.mObj = rawUserData;
-      out.mType = *reinterpret_cast<gpg::RType**>(bytes + sizeof(void*));
-    }
-    lua_settop(lstate, top);
-    return out;
+    return userDataObject.GetUserData();
   }
 
   void ValidateLuaArgCount(LuaPlus::LuaState* const state, const char* const help, const int expectedCount)
