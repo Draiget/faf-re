@@ -501,3 +501,36 @@ moho::CScrLuaInitForm* moho::register_GetVersion_LuaFuncDef()
 {
   return func_GetVersion_LuaFuncDef();
 }
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct SCRStringLuaBinderBootstrap
+  {
+    SCRStringLuaBinderBootstrap()
+    {
+      (void)::moho::register_STR_xtoi_LuaFuncDef();
+      (void)::moho::register_STR_itox_LuaFuncDef();
+      (void)::moho::register_STR_Utf8Len_LuaFuncDef();
+      (void)::moho::register_STR_Utf8SubString_LuaFuncDef();
+      (void)::moho::register_STR_GetTokens_LuaFuncDef();
+      (void)::moho::register_exists_LuaFuncDef();
+      (void)::moho::register_GetVersion_LuaFuncDef();
+    }
+  };
+
+  const SCRStringLuaBinderBootstrap gSCRStringLuaBinderBootstrap{};
+} // namespace

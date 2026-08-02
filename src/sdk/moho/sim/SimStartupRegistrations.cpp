@@ -2021,3 +2021,67 @@ namespace moho
 } // namespace moho
 
 
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct SimStartupRegistrationsLuaBinderBootstrap
+  {
+    SimStartupRegistrationsLuaBinderBootstrap()
+    {
+      (void)::moho::register_SpecFootprints_LuaFuncDef();
+      (void)::moho::register_CreateResourceDeposit_LuaFuncDef();
+      (void)::moho::register_EntityCreatePropAtBone_LuaFuncDef();
+      (void)::moho::register_SplitProp_LuaFuncDef();
+      (void)::moho::register_EntityPushOver_LuaFuncDef();
+      (void)::moho::register_PropAddBoundedProp_LuaFuncDef();
+      (void)::moho::register_CreateProp_LuaFuncDef();
+      (void)::moho::register_EndGame_LuaFuncDef();
+      (void)::moho::register_IsGameOver_LuaFuncDef();
+      (void)::moho::register_GetEntityById_LuaFuncDef();
+      (void)::moho::register_GetUnitByIdSim_LuaFuncDef();
+      (void)::moho::register_ClearBuildTemplates_LuaFuncDef();
+      (void)::moho::register_RenderOverlayIntel_LuaFuncDef();
+      (void)::moho::register_RenderOverlayEconomy_LuaFuncDef();
+      (void)::moho::register_GetUnitByIdUser_LuaFuncDef();
+      (void)::moho::register_SimConExecute_LuaFuncDef();
+      (void)::moho::register_FlattenMapRect_LuaFuncDef();
+      (void)::moho::register_EntityCategoryContains_LuaFuncDef();
+      (void)::moho::register_EntityCategoryFilterDownSim_LuaFuncDef();
+      (void)::moho::register_EntityCategoryCount_LuaFuncDef();
+      (void)::moho::register_GenerateRandomOrientation_LuaFuncDef();
+      (void)::moho::register_GetGameTimeSecondsSim_LuaFuncDef();
+      (void)::moho::register_GetGameTick_LuaFuncDef();
+      (void)::moho::register_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef();
+      (void)::moho::register_Warp_LuaFuncDef();
+      (void)::moho::register_ChangeUnitArmy_LuaFuncDef();
+      (void)::moho::register_GetTerrainHeight_LuaFuncDef();
+      (void)::moho::register_GetSurfaceHeight_LuaFuncDef();
+      (void)::moho::register_GetTerrainTypeOffset_LuaFuncDef();
+      (void)::moho::register_GetTerrainType_LuaFuncDef();
+      (void)::moho::register_SetTerrainType_LuaFuncDef();
+      (void)::moho::register_SetTerrainTypeRect_LuaFuncDef();
+      (void)::moho::register_SetPlayableRect_LuaFuncDef();
+      (void)::moho::register_FlushIntelInRect_LuaFuncDef();
+      (void)::moho::register_GetUnitBlueprintByName_LuaFuncDef();
+      (void)::moho::register_SetArmyStatsSyncArmy_LuaFuncDef();
+      (void)::moho::register_DrawLine_LuaFuncDef();
+      (void)::moho::register_DrawCircle_LuaFuncDef();
+    }
+  };
+
+  const SimStartupRegistrationsLuaBinderBootstrap gSimStartupRegistrationsLuaBinderBootstrap{};
+} // namespace

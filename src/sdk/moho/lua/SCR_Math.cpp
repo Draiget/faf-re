@@ -1495,3 +1495,48 @@ moho::CScrLuaInitForm* moho::register_MATH_Lerp_LuaFuncDef()
 {
   return func_MATH_Lerp_LuaFuncDef();
 }
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder registrations.
+   *
+   * In the shipped binary each `register_*_LuaFuncDef` thunk is a
+   * compiler-generated dynamic initializer, so the CRT's static-init array
+   * calls every one of them before `main`. Nothing in this tree reproduces
+   * that array, so a recovered thunk that no source line names is simply
+   * never run - the binder is never constructed, the form never joins its
+   * init-form set, and the global it publishes is missing at runtime with no
+   * diagnostic beyond FAF's own "access to nonexistent global variable".
+   *
+   * This object is that call, and it is also the source-level invocation
+   * that keeps the thunks out of the linker's dead-strip.
+   */
+  struct SCRMathLuaBinderBootstrap
+  {
+    SCRMathLuaBinderBootstrap()
+    {
+      (void)::moho::register_OrientFromDir_LuaFuncDef();
+      (void)::moho::register_EulerToQuaternion_LuaFuncDef();
+      (void)::moho::register_MinLerp_LuaFuncDef();
+      (void)::moho::register_MinSlerp_LuaFuncDef();
+      (void)::moho::register_Vector_LuaFuncDef();
+      (void)::moho::register_Vector2_LuaFuncDef();
+      (void)::moho::register_PointVector_LuaFuncDef();
+      (void)::moho::register_Rect_LuaFuncDef();
+      (void)::moho::register_VDist3_LuaFuncDef();
+      (void)::moho::register_VDist3Sq_LuaFuncDef();
+      (void)::moho::register_VDist2_LuaFuncDef();
+      (void)::moho::register_VDist2Sq_LuaFuncDef();
+      (void)::moho::register_VDot_LuaFuncDef();
+      (void)::moho::register_VDiff_LuaFuncDef();
+      (void)::moho::register_VAdd_LuaFuncDef();
+      (void)::moho::register_VMult_LuaFuncDef();
+      (void)::moho::register_VPerpDot_LuaFuncDef();
+      (void)::moho::register_MATH_IRound_LuaFuncDef();
+      (void)::moho::register_MATH_Lerp_LuaFuncDef();
+    }
+  };
+
+  const SCRMathLuaBinderBootstrap gSCRMathLuaBinderBootstrap{};
+} // namespace
