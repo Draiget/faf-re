@@ -526,14 +526,22 @@ msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const
         return *this;
     }
 
-    // Destination pointer and capacity.
+    // Grow first, exactly as MSVC8's assign() does. Truncating to whatever
+    // capacity happened to be there silently caps the result at 15 bytes for
+    // any string still in its small buffer - which is how the preferences path
+    // came out as "C:\Users\Draige".
+    (void)ensure_capacity(len);
+
+    // Destination pointer and capacity, read after any reallocation.
     char* dst = raw_data_mut_unsafe();
     const auto  dstCap = myRes;
 
-    // Source pointer (to substring start).
+    // Source pointer (to substring start). Taken after the grow too: `other`
+    // is a different object here (the self-assign case returned above), so it
+    // cannot have moved, but reading it late keeps the two in step.
     const char* src = other.raw_data_unsafe() + pos;
 
-    // MSVC8 would reallocate if len > capacity(); we cannot, so we truncate.
+    // Only clamp if the grow failed.
     const std::size_t ncopy = (len <= dstCap) ? len : dstCap;
 
     if (ncopy) {
