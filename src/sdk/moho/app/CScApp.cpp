@@ -924,6 +924,17 @@ bool CScApp::Init()
 
   moho::WIN_SetMainWindow(supcomFrame);
 
+  // The user-side Lua bootstrap, which the binary runs here - between its
+  // "SCMain AppInit 3" and "SCMain AppInit 4" markers, before OpenDocuments
+  // and the /profile handling.
+  //
+  // This is what sets `__language` for the UI. userInit.lua reads it back
+  // out of preferences with GetPreference, and its own comment says the
+  // engine only sets that global for the Sim - so with this script never
+  // run, every UI script that touches __language hit config.lua's raising
+  // __index on _G.
+  moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+
   if (!::SystemParametersInfoW(SPI_GETSCREENSAVEACTIVE, 0, &usingScreensaver, 0)) {
     usingScreensaver = 0;
   }
