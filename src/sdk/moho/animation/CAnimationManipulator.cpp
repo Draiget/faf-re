@@ -21,7 +21,8 @@
 #include "moho/resource/RScaResource.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -1977,3 +1978,43 @@ namespace
 GPG_PREREGISTER_INIT(register_CAnimationManipulatorTypeInfo_344280, moho::register_CAnimationManipulatorTypeInfo)
 
 GPG_PREREGISTER_INIT(GetCAnimationManipulatorTypeInfo_344280, GetCAnimationManipulatorTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CAnimationManipulatorLuaFuncDefBootstrap
+  {
+    CAnimationManipulatorLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CreateAnimator_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorPlayAnim_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetRate_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorGetRate_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorGetAnimationFraction_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetAnimationFraction_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorGetAnimationTime_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetAnimationTime_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorGetAnimationDuration_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetBoneEnabled_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetOverwriteMode_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetDisableOnSignal_LuaFuncDef();
+      (void)::moho::func_CAnimationManipulatorSetDirectionalAnim_LuaFuncDef();
+    }
+  };
+
+  const CAnimationManipulatorLuaFuncDefBootstrap gCAnimationManipulatorLuaFuncDefBootstrap{};
+} // namespace

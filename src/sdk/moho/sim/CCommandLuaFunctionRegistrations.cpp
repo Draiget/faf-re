@@ -6945,3 +6945,86 @@ namespace
 
   const CCommandLuaFunctionRegistrationsLuaBinderBootstrap gCCommandLuaFunctionRegistrationsLuaBinderBootstrap{};
 } // namespace
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CCommandLuaFunctionRegistrationsLuaFuncDefBootstrap
+  {
+    CCommandLuaFunctionRegistrationsLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_IsCommandDone_LuaFuncDef();
+      (void)::moho::func_IssuePause_LuaFuncDef();
+      (void)::moho::func_IssueMove_LuaFuncDef();
+      (void)::moho::func_IssueMoveOffFactory_LuaFuncDef();
+      (void)::moho::func_IssueGuard_LuaFuncDef();
+      (void)::moho::func_IssueFactoryAssist_LuaFuncDef();
+      (void)::moho::func_CoordinateAttacks_LuaFuncDef();
+      (void)::moho::func_IssueTeleport_LuaFuncDef();
+      (void)::moho::func_IssueAggressiveMove_LuaFuncDef();
+      (void)::moho::func_IssueBuildMobile_LuaFuncDef();
+      (void)::moho::func_IssueCapture_LuaFuncDef();
+      (void)::moho::func_IssueTransportLoad_LuaFuncDef();
+      (void)::moho::func_IssueTransportUnloadSpecific_LuaFuncDef();
+      (void)::moho::func_DecreaseBuildCountInQueue_LuaFuncDef();
+      (void)::moho::func_IncreaseBuildCountInQueue_LuaFuncDef();
+      (void)::moho::func_GetUnitCommandData_LuaFuncDef();
+      (void)::moho::func_IssueDockCommand_LuaFuncDef();
+      (void)::moho::func_IssueCommand_LuaFuncDef();
+      (void)::moho::func_IssueUnitCommand_LuaFuncDef();
+      (void)::moho::func_IssueBlueprintCommand_LuaFuncDef();
+      (void)::moho::func_GetRolloverInfo_LuaFuncDef();
+      (void)::moho::func_UISelectionByCategory_LuaFuncDef();
+      (void)::moho::func_UISelectAndZoomTo_LuaFuncDef();
+      (void)::moho::func_UIZoomTo_LuaFuncDef();
+      (void)::moho::func_SetOverlayFilter_LuaFuncDef();
+      (void)::moho::func_GetActiveBuildTemplate_LuaFuncDef();
+      (void)::moho::func_SetActiveBuildTemplate_LuaFuncDef();
+      (void)::moho::func_OpenURL_LuaFuncDef();
+      (void)::moho::func_SetCursor_LuaFuncDef();
+      (void)::moho::func_IssueClearCommands_LuaFuncDef();
+      (void)::moho::func_IssueStop_LuaFuncDef();
+      (void)::moho::func_IssueOverCharge_LuaFuncDef();
+      (void)::moho::func_IssueDive_LuaFuncDef();
+      (void)::moho::func_IssueFactoryRallyPoint_LuaFuncDef();
+      (void)::moho::func_IssueClearFactoryCommands_LuaFuncDef();
+      (void)::moho::func_IssueFormMove_LuaFuncDef();
+      (void)::moho::func_IssueAttack_LuaFuncDef();
+      (void)::moho::func_IssueFormAttack_LuaFuncDef();
+      (void)::moho::func_IssueSiloBuildTactical_LuaFuncDef();
+      (void)::moho::func_IssueSiloBuildNuke_LuaFuncDef();
+      (void)::moho::func_IssueNuke_LuaFuncDef();
+      (void)::moho::func_IssueTactical_LuaFuncDef();
+      (void)::moho::func_IssuePatrol_LuaFuncDef();
+      (void)::moho::func_IssueFormPatrol_LuaFuncDef();
+      (void)::moho::func_IssueFormAggressiveMove_LuaFuncDef();
+      (void)::moho::func_IssueFerry_LuaFuncDef();
+      (void)::moho::func_IssueRepair_LuaFuncDef();
+      (void)::moho::func_IssueSacrifice_LuaFuncDef();
+      (void)::moho::func_IssueUpgrade_LuaFuncDef();
+      (void)::moho::func_IssueScript_LuaFuncDef();
+      (void)::moho::func_IssueReclaim_LuaFuncDef();
+      (void)::moho::func_IssueKillSelf_LuaFuncDef();
+      (void)::moho::func_IssueDestroySelf_LuaFuncDef();
+      (void)::moho::func_IssueTransportUnload_LuaFuncDef();
+      (void)::moho::func_IssueTeleportToBeacon_LuaFuncDef();
+      (void)::moho::func_IssueBuildFactory_LuaFuncDef();
+    }
+  };
+
+  const CCommandLuaFunctionRegistrationsLuaFuncDefBootstrap gCCommandLuaFunctionRegistrationsLuaFuncDefBootstrap{};
+} // namespace

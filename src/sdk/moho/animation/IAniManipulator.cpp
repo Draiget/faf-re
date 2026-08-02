@@ -22,7 +22,8 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -2409,3 +2410,34 @@ namespace
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(AcquireIAniManipulatorTypeInfo_80a9e7, AcquireIAniManipulatorTypeInfo)
 GPG_PREREGISTER_INIT(PreregisterIAniManipulatorPointerType_80a9e7, moho::PreregisterIAniManipulatorPointerType)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct IAniManipulatorLuaFuncDefBootstrap
+  {
+    IAniManipulatorLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_IAniManipulatorSetPrecedence_LuaFuncDef();
+      (void)::moho::func_IAniManipulatorEnable_LuaFuncDef();
+      (void)::moho::func_IAniManipulatorDisable_LuaFuncDef();
+      (void)::moho::func_IAniManipulatorDestroy_LuaFuncDef();
+    }
+  };
+
+  const IAniManipulatorLuaFuncDefBootstrap gIAniManipulatorLuaFuncDefBootstrap{};
+} // namespace

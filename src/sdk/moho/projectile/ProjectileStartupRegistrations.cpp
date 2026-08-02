@@ -22,7 +22,8 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SPhysConstants.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -3324,3 +3325,60 @@ GPG_PREREGISTER_INIT(register_EProjectileImpactEventTypeInfo_6d193a, moho::regis
 GPG_PREREGISTER_INIT(register_CProjectileAttributesTypeInfo_6d193a, moho::register_CProjectileAttributesTypeInfo)
 GPG_PREREGISTER_INIT(register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo_6d193a, moho::register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
 GPG_PREREGISTER_INIT(register_ManyToOneListener_EProjectileImpactEvent_TypeInfo_6d193a, moho::register_ManyToOneListener_EProjectileImpactEvent_TypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct ProjectileStartupRegistrationsLuaFuncDefBootstrap
+  {
+    ProjectileStartupRegistrationsLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_ProjectileGetLauncher_LuaFuncDef();
+      (void)::moho::func_ProjectileGetTrackingTarget_LuaFuncDef();
+      (void)::moho::func_ProjectileGetCurrentTargetPosition_LuaFuncDef();
+      (void)::moho::func_ProjectileSetNewTarget_LuaFuncDef();
+      (void)::moho::func_ProjectileSetNewTargetGround_LuaFuncDef();
+      (void)::moho::func_ProjectileSetLifetime_LuaFuncDef();
+      (void)::moho::func_ProjectileSetDamage_LuaFuncDef();
+      (void)::moho::func_ProjectileSetMaxSpeed_LuaFuncDef();
+      (void)::moho::func_ProjectileSetAcceleration_LuaFuncDef();
+      (void)::moho::func_ProjectileSetBallisticAcceleration_LuaFuncDef();
+      (void)::moho::func_ProjectileSetDestroyOnWater_LuaFuncDef();
+      (void)::moho::func_ProjectileSetTurnRate_LuaFuncDef();
+      (void)::moho::func_ProjectileGetCurrentSpeed_LuaFuncDef();
+      (void)::moho::func_ProjectileGetVelocity_LuaFuncDef();
+      (void)::moho::func_ProjectileSetVelocity_LuaFuncDef();
+      (void)::moho::func_ProjectileSetScaleVelocity_LuaFuncDef();
+      (void)::moho::func_ProjectileSetLocalAngularVelocity_LuaFuncDef();
+      (void)::moho::func_ProjectileSetCollision_LuaFuncDef();
+      (void)::moho::func_ProjectileSetCollideSurface_LuaFuncDef();
+      (void)::moho::func_ProjectileSetCollideEntity_LuaFuncDef();
+      (void)::moho::func_ProjectileStayUnderwater_LuaFuncDef();
+      (void)::moho::func_ProjectileTrackTarget_LuaFuncDef();
+      (void)::moho::func_ProjectileSetStayUpright_LuaFuncDef();
+      (void)::moho::func_ProjectileSetVelocityAlign_LuaFuncDef();
+      (void)::moho::func_ProjectileCreateChildProjectile_LuaFuncDef();
+      (void)::moho::func_ProjectileSetVelocityRandomUpVector_LuaFuncDef();
+      (void)::moho::func_ProjectileChangeMaxZigZag_LuaFuncDef();
+      (void)::moho::func_ProjectileChangeZigZagFrequency_LuaFuncDef();
+      (void)::moho::func_ProjectileChangeDetonateAboveHeight_LuaFuncDef();
+      (void)::moho::func_ProjectileChangeDetonateBelowHeight_LuaFuncDef();
+    }
+  };
+
+  const ProjectileStartupRegistrationsLuaFuncDefBootstrap gProjectileStartupRegistrationsLuaFuncDefBootstrap{};
+} // namespace

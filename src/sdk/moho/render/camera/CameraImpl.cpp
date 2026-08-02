@@ -5452,3 +5452,56 @@ moho::CScrLuaInitForm* moho::func_CameraImplDisableEaseInOut_LuaFuncDef()
   );
   return &binder;
 }
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CameraImplLuaFuncDefBootstrap
+  {
+    CameraImplLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_GetCamera_LuaFuncDef();
+      (void)::moho::func_CameraImplSnapTo_LuaFuncDef();
+      (void)::moho::func_CameraImplMoveToRegion_LuaFuncDef();
+      (void)::moho::func_CameraImplSetZoom_LuaFuncDef();
+      (void)::moho::func_CameraImplSetTargetZoom_LuaFuncDef();
+      (void)::moho::func_CameraImplMoveTo_LuaFuncDef();
+      (void)::moho::func_CameraImplGetMinZoom_LuaFuncDef();
+      (void)::moho::func_CameraImplSetMaxZoomMult_LuaFuncDef();
+      (void)::moho::func_CameraImplSetAccMode_LuaFuncDef();
+      (void)::moho::func_CameraImplSpin_LuaFuncDef();
+      (void)::moho::func_CameraImplReset_LuaFuncDef();
+      (void)::moho::func_CameraImplTrackEntities_LuaFuncDef();
+      (void)::moho::func_CameraImplTargetEntities_LuaFuncDef();
+      (void)::moho::func_CameraImplNoseCam_LuaFuncDef();
+      (void)::moho::func_CameraImplHoldRotation_LuaFuncDef();
+      (void)::moho::func_CameraImplRevertRotation_LuaFuncDef();
+      (void)::moho::func_CameraImplGetZoom_LuaFuncDef();
+      (void)::moho::func_CameraImplGetFocusPosition_LuaFuncDef();
+      (void)::moho::func_CameraImplSaveSettings_LuaFuncDef();
+      (void)::moho::func_CameraImplRestoreSettings_LuaFuncDef();
+      (void)::moho::func_CameraImplGetTargetZoom_LuaFuncDef();
+      (void)::moho::func_CameraImplGetMaxZoom_LuaFuncDef();
+      (void)::moho::func_CameraImplUseGameClock_LuaFuncDef();
+      (void)::moho::func_CameraImplUseSystemClock_LuaFuncDef();
+      (void)::moho::func_CameraImplEnableEaseInOut_LuaFuncDef();
+      (void)::moho::func_CameraImplDisableEaseInOut_LuaFuncDef();
+    }
+  };
+
+  const CameraImplLuaFuncDefBootstrap gCameraImplLuaFuncDefBootstrap{};
+} // namespace

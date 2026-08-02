@@ -29719,3 +29719,220 @@ namespace
 
   const SimLuaBinderBootstrap gSimLuaBinderBootstrap{};
 } // namespace
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct SimLuaFuncDefBootstrap
+  {
+    SimLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_SpecFootprints_LuaFuncDef();
+      (void)::moho::func_RandomSim_LuaFuncDef();
+      (void)::moho::func_SelectedUnit_LuaFuncDef();
+      (void)::moho::func_SimConExecute_LuaFuncDef();
+      (void)::moho::func_FlattenMapRect_LuaFuncDef();
+      (void)::moho::func_ParseEntityCategorySim_LuaFuncDef();
+      (void)::moho::func_ParseEntityCategoryUser_LuaFuncDef();
+      (void)::moho::func_EntityCategoryContainsSim_LuaFuncDef();
+      (void)::moho::func_EntityCategoryFilterDownSim_LuaFuncDef();
+      (void)::moho::func_EntityCategoryCount_LuaFuncDef();
+      (void)::moho::func_EntityCategoryCountAroundPosition_LuaFuncDef();
+      (void)::moho::func_Warp_LuaFuncDef();
+      (void)::moho::func_ChangeUnitArmy_LuaFuncDef();
+      (void)::moho::func_DebugGetSelection_LuaFuncDef();
+      (void)::moho::func_IsEntity_LuaFuncDef();
+      (void)::moho::func_IsUnit_LuaFuncDef();
+      (void)::moho::func_IsProp_LuaFuncDef();
+      (void)::moho::func_IsBlip_LuaFuncDef();
+      (void)::moho::func_IsProjectile_LuaFuncDef();
+      (void)::moho::func_IsCollisionBeam_LuaFuncDef();
+      (void)::moho::func_GetUnitCommandFromCommandCap_LuaFuncDef();
+      (void)::moho::func_EjectSessionClient_LuaFuncDef();
+      (void)::moho::func_WorldIsLoading_LuaFuncDef();
+      (void)::moho::func_WorldIsPlaying_LuaFuncDef();
+      (void)::moho::func_GetGameSpeed_LuaFuncDef();
+      (void)::moho::func_SetGameSpeed_LuaFuncDef();
+      (void)::moho::func_AddToSessionExtraSelectList_LuaFuncDef();
+      (void)::moho::func_RemoveFromSessionExtraSelectList_LuaFuncDef();
+      (void)::moho::func_ClearSessionExtraSelectList_LuaFuncDef();
+      (void)::moho::func_CurrentTime_LuaFuncDef();
+      (void)::moho::func_GameTime_LuaFuncDef();
+      (void)::moho::func_GameTick_LuaFuncDef();
+      (void)::moho::func_IsAllyUser_LuaFuncDef();
+      (void)::moho::func_IsEnemyUser_LuaFuncDef();
+      (void)::moho::func_IsNeutral_LuaFuncDef();
+      (void)::moho::func_SyncPlayableRect_LuaFuncDef();
+      (void)::moho::func_RandomUser_LuaFuncDef();
+      (void)::moho::func_EntityCategoryContainsUser_LuaFuncDef();
+      (void)::moho::func_EntityCategoryFilterDownUser_LuaFuncDef();
+      (void)::moho::func_EntityCategoryFilterOut_LuaFuncDef();
+      (void)::moho::func_ExecLuaInSim_LuaFuncDef();
+      (void)::moho::func_SimCallback_LuaFuncDef();
+      (void)::moho::func_SetAutoSurfaceMode_LuaFuncDef();
+      (void)::moho::func_ToggleScriptBit_LuaFuncDef();
+      (void)::moho::func_SetPaused_LuaFuncDef();
+      (void)::moho::func_GetAttachedUnitsList_LuaFuncDef();
+      (void)::moho::func_ValidateUnitsList_LuaFuncDef();
+      (void)::moho::func_GetAssistingUnitsList_LuaFuncDef();
+      (void)::moho::func_GetArmyAvatars_LuaFuncDef();
+      (void)::moho::func_GetIdleEngineers_LuaFuncDef();
+      (void)::moho::func_GetIdleFactories_LuaFuncDef();
+      (void)::moho::func_GetSelectedUnits_LuaFuncDef();
+      (void)::moho::func_GetValidAttackingUnits_LuaFuncDef();
+      (void)::moho::func_SelectUnits_LuaFuncDef();
+      (void)::moho::func_AddSelectUnits_LuaFuncDef();
+      (void)::moho::func_EngineStartSplashScreens_LuaFuncDef();
+      (void)::moho::func_EngineStartFrontEndUI_LuaFuncDef();
+      (void)::moho::func_ExitApplication_LuaFuncDef();
+      (void)::moho::func_ExitGame_LuaFuncDef();
+      (void)::moho::func_RestartSession_LuaFuncDef();
+      (void)::moho::func_GetFrame_LuaFuncDef();
+      (void)::moho::func_ClearFrame_LuaFuncDef();
+      (void)::moho::func_GetNumRootFrames_LuaFuncDef();
+      (void)::moho::func_GetEconomyTotals_LuaFuncDef();
+      (void)::moho::func_GetResourceSharing_LuaFuncDef();
+      (void)::moho::func_GetCurrentUIState_LuaFuncDef();
+      (void)::moho::func_GetSimTicksPerSecond_LuaFuncDef();
+      (void)::moho::func_SessionRequestPause_LuaFuncDef();
+      (void)::moho::func_SessionResume_LuaFuncDef();
+      (void)::moho::func_SessionIsPaused_LuaFuncDef();
+      (void)::moho::func_SessionIsGameOver_LuaFuncDef();
+      (void)::moho::func_SessionGetLocalCommandSource_LuaFuncDef();
+      (void)::moho::func_SessionIsReplayUser_LuaFuncDef();
+      (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();
+      (void)::moho::func_SessionIsMultiplayer_LuaFuncDef();
+      (void)::moho::func_SessionIsObservingAllowed_LuaFuncDef();
+      (void)::moho::func_SessionCanRestart_LuaFuncDef();
+      (void)::moho::func_SessionIsActive_LuaFuncDef();
+      (void)::moho::func_SessionGetScenarioInfo_LuaFuncDef();
+      (void)::moho::func_GetMouseWorldPosUser_LuaFuncDef();
+      (void)::moho::func_GetMouseScreenPos_LuaFuncDef();
+      (void)::moho::func_SetFocusArmyUser_LuaFuncDef();
+      (void)::moho::func_GetFocusArmyUser_LuaFuncDef();
+      (void)::moho::func_IsObserver_LuaFuncDef();
+      (void)::moho::func_GetGameTime_LuaFuncDef();
+      (void)::moho::func_GetGameTimeSecondsUser_LuaFuncDef();
+      (void)::moho::func_GetSystemTime_LuaFuncDef();
+      (void)::moho::func_GetSystemTimeSeconds_LuaFuncDef();
+      (void)::moho::func_FormatTime_LuaFuncDef();
+      (void)::moho::func_GetSimRate_LuaFuncDef();
+      (void)::moho::func_GetArmiesTable_LuaFuncDef();
+      (void)::moho::func_GetArmyScore_LuaFuncDef();
+      (void)::moho::func_DeleteCommand_LuaFuncDef();
+      (void)::moho::func_GetSpecialFiles_LuaFuncDef();
+      (void)::moho::func_GetSpecialFilePath_LuaFuncDef();
+      (void)::moho::func_GetSpecialFolder_LuaFuncDef();
+      (void)::moho::func_RemoveSpecialFile_LuaFuncDef();
+      (void)::moho::func_GetSpecialFileInfo_LuaFuncDef();
+      (void)::moho::func_RemoveProfileDirectories_LuaFuncDef();
+      (void)::moho::func_CopyCurrentReplay_LuaFuncDef();
+      (void)::moho::func_SetOverlayFilters_LuaFuncDef();
+      (void)::moho::func_GenerateBuildTemplateFromSelection_LuaFuncDef();
+      (void)::moho::func_ClearBuildTemplates_LuaFuncDef();
+      (void)::moho::func_RenderOverlayMilitary_LuaFuncDef();
+      (void)::moho::func_RenderOverlayIntel_LuaFuncDef();
+      (void)::moho::func_RenderOverlayEconomy_LuaFuncDef();
+      (void)::moho::func_TeamColorMode_LuaFuncDef();
+      (void)::moho::func_GetUnitByIdUser_LuaFuncDef();
+      (void)::moho::func_printSim_LuaFuncDef();
+      (void)::moho::func_CheatsEnabled_LuaFuncDef();
+      (void)::moho::func_GetCurrentCommandSource_LuaFuncDef();
+      (void)::moho::func_GenerateRandomOrientation_LuaFuncDef();
+      (void)::moho::func_GetGameTimeSecondsSim_LuaFuncDef();
+      (void)::moho::func_GetGameTick_LuaFuncDef();
+      (void)::moho::func_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef();
+      (void)::moho::func_GetEntitiesInRect_LuaFuncDef();
+      (void)::moho::func_GetUnitsInRect_LuaFuncDef();
+      (void)::moho::func_GetReclaimablesInRect_LuaFuncDef();
+      (void)::moho::func_GetMapSize_LuaFuncDef();
+      (void)::moho::func_GetTerrainHeight_LuaFuncDef();
+      (void)::moho::func_GetSurfaceHeight_LuaFuncDef();
+      (void)::moho::func_GetTerrainTypeOffset_LuaFuncDef();
+      (void)::moho::func_GetTerrainType_LuaFuncDef();
+      (void)::moho::func_SetTerrainType_LuaFuncDef();
+      (void)::moho::func_SetTerrainTypeRect_LuaFuncDef();
+      (void)::moho::func_FlushIntelInRect_LuaFuncDef();
+      (void)::moho::func_SetArmyStatsSyncArmy_LuaFuncDef();
+      (void)::moho::func_GetUnitBlueprintByName_LuaFuncDef();
+      (void)::moho::func_DrawLine_LuaFuncDef();
+      (void)::moho::func_DrawLinePop_LuaFuncDef();
+      (void)::moho::func_DrawCircle_LuaFuncDef();
+      (void)::moho::func_EntityAttachTo_LuaFuncDef();
+      (void)::moho::func_EntitySetOrientation_LuaFuncDef();
+      (void)::moho::func_EntitySetPosition_LuaFuncDef();
+      (void)::moho::func_EntityGetPosition_LuaFuncDef();
+      (void)::moho::func_EntityGetPositionXYZ_LuaFuncDef();
+      (void)::moho::func_EntityIsIntelEnabled_LuaFuncDef();
+      (void)::moho::func_EntityEnableIntel_LuaFuncDef();
+      (void)::moho::func_EntityDisableIntel_LuaFuncDef();
+      (void)::moho::func_EntitySetIntelRadius_LuaFuncDef();
+      (void)::moho::func_EntityGetIntelRadius_LuaFuncDef();
+      (void)::moho::func_EntityInitIntel_LuaFuncDef();
+      (void)::moho::func_EntityAddShooter_LuaFuncDef();
+      (void)::moho::func_EntityRemoveShooter_LuaFuncDef();
+      (void)::moho::func_CreateProp_LuaFuncDef();
+      (void)::moho::func_CreateUnitAtMouse_LuaFuncDef();
+      (void)::moho::func_EntityCreatePropAtBone_LuaFuncDef();
+      (void)::moho::func_CreateResourceDeposit_LuaFuncDef();
+      (void)::moho::func_ShouldCreateInitialArmyUnits_LuaFuncDef();
+      (void)::moho::func_ListArmies_LuaFuncDef();
+      (void)::moho::func_GetArmyBrain_LuaFuncDef();
+      (void)::moho::func_SetArmyStart_LuaFuncDef();
+      (void)::moho::func_GenerateArmyStart_LuaFuncDef();
+      (void)::moho::func_ArmyInitializePrebuiltUnits_LuaFuncDef();
+      (void)::moho::func_SetIgnoreArmyUnitCap_LuaFuncDef();
+      (void)::moho::func_SetIgnorePlayableRect_LuaFuncDef();
+      (void)::moho::func_IsAllySim_LuaFuncDef();
+      (void)::moho::func_IsEnemySim_LuaFuncDef();
+      (void)::moho::func_IsNeutralSim_LuaFuncDef();
+      (void)::moho::func_ArmyIsCivilian_LuaFuncDef();
+      (void)::moho::func_SetArmyFactionIndex_LuaFuncDef();
+      (void)::moho::func_OkayToMessWithArmy_LuaFuncDef();
+      (void)::moho::func_ArmyIsOutOfGame_LuaFuncDef();
+      (void)::moho::func_SetArmyOutOfGame_LuaFuncDef();
+      (void)::moho::func_SetAlliance_LuaFuncDef();
+      (void)::moho::func_SetAllianceOneWay_LuaFuncDef();
+      (void)::moho::func_SetAlliedVictory_LuaFuncDef();
+      (void)::moho::func_ArmyGetHandicap_LuaFuncDef();
+      (void)::moho::func_SetArmyEconomy_LuaFuncDef();
+      (void)::moho::func_GetArmyUnitCostTotal_LuaFuncDef();
+      (void)::moho::func_GetArmyUnitCap_LuaFuncDef();
+      (void)::moho::func_SetArmyUnitCap_LuaFuncDef();
+      (void)::moho::func_SetArmyAIPersonality_LuaFuncDef();
+      (void)::moho::func_SetArmyShowScore_LuaFuncDef();
+      (void)::moho::func_SetArmyPlans_LuaFuncDef();
+      (void)::moho::func_InitializeArmyAI_LuaFuncDef();
+      (void)::moho::func_SetArmyColor_LuaFuncDef();
+      (void)::moho::func_EndGame_LuaFuncDef();
+      (void)::moho::func_IsGameOver_LuaFuncDef();
+      (void)::moho::func_GetEntityById_LuaFuncDef();
+      (void)::moho::func_GetUnitByIdSim_LuaFuncDef();
+      (void)::moho::func_SetPlayableRect_LuaFuncDef();
+      (void)::moho::func_GetFocusArmySim_LuaFuncDef();
+      (void)::moho::func_AudioSetLanguageSim_LuaFuncDef();
+      (void)::moho::func_AudioSetLanguageUser_LuaFuncDef();
+      (void)::moho::func_HasLocalizedVOUser_LuaFuncDef();
+      (void)::moho::func_HasLocalizedVOSim_LuaFuncDef();
+      (void)::moho::func_SubmitXMLArmyStats_LuaFuncDef();
+      (void)::moho::func_PlayLoop_LuaFuncDef();
+      (void)::moho::func_StopLoop_LuaFuncDef();
+    }
+  };
+
+  const SimLuaFuncDefBootstrap gSimLuaFuncDefBootstrap{};
+} // namespace

@@ -4561,3 +4561,62 @@ namespace moho
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(PreregisterUnitWeaponPointerType_2b5e7d, moho::PreregisterUnitWeaponPointerType)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct UnitWeaponLuaFuncDefBootstrap
+  {
+    UnitWeaponLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_UnitWeaponPlaySound_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetEnabled_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetTargetEntity_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetTargetGround_LuaFuncDef();
+      (void)::moho::func_UnitWeaponResetTarget_LuaFuncDef();
+      (void)::moho::func_UnitWeaponCreateProjectile_LuaFuncDef();
+      (void)::moho::func_UnitWeaponDoInstaHit_LuaFuncDef();
+      (void)::moho::func_UnitWeaponGetProjectileBlueprint_LuaFuncDef();
+      (void)::moho::func_UnitWeaponHasTarget_LuaFuncDef();
+      (void)::moho::func_UnitWeaponFireWeapon_LuaFuncDef();
+      (void)::moho::func_UnitWeaponIsFireControl_LuaFuncDef();
+      (void)::moho::func_UnitWeaponGetCurrentTarget_LuaFuncDef();
+      (void)::moho::func_UnitWeaponGetCurrentTargetPos_LuaFuncDef();
+      (void)::moho::func_UnitWeaponCanFire_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetTargetingPriorities_LuaFuncDef();
+      (void)::moho::func_UnitWeaponGetFiringRandomness_LuaFuncDef();
+      (void)::moho::func_UnitWeaponGetFireClockPct_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeProjectileBlueprint_LuaFuncDef();
+      (void)::moho::func_UnitWeaponTransferTarget_LuaFuncDef();
+      (void)::moho::func_UnitWeaponBeenDestroyed_LuaFuncDef();
+      (void)::moho::func_UnitWeaponGetBlueprint_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetFireControl_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeFiringTolerance_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeRateOfFire_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeMinRadius_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeMaxRadius_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeMaxHeightDiff_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeDamageType_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeDamageRadius_LuaFuncDef();
+      (void)::moho::func_UnitWeaponChangeDamage_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetFiringRandomness_LuaFuncDef();
+      (void)::moho::func_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef();
+    }
+  };
+
+  const UnitWeaponLuaFuncDefBootstrap gUnitWeaponLuaFuncDefBootstrap{};
+} // namespace

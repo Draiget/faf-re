@@ -2538,3 +2538,51 @@ namespace moho
     return ForwardManipulatorLuaThunk<&func_CThrustManipulatorSetThrustingParam_LuaFuncDef>();
   }
 } // namespace moho
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct ManipulatorLuaFunctionThunksLuaFuncDefBootstrap
+  {
+    ManipulatorLuaFunctionThunksLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CreateAimController_LuaFuncDef();
+      (void)::moho::func_CBoneEntityManipulatorSetPivot_LuaFuncDef();
+      (void)::moho::func_CreateBuilderArmController_LuaFuncDef();
+      (void)::moho::func_CBuilderArmManipulatorSetAimingArc_LuaFuncDef();
+      (void)::moho::func_CBuilderArmManipulatorGetHeadingPitch_LuaFuncDef();
+      (void)::moho::func_CBuilderArmManipulatorSetHeadingPitch_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorClearGoal_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetSpeed_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetTargetSpeed_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetAccel_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetFollowBone_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorGetCurrentAngle_LuaFuncDef();
+      (void)::moho::func_CreateStorageManip_LuaFuncDef();
+      (void)::moho::func_CreateThrustController_LuaFuncDef();
+      (void)::moho::func_CThrustManipulatorSetThrustingParam_LuaFuncDef();
+      (void)::moho::func_EntityAttachBoneToEntityBone_LuaFuncDef();
+      (void)::moho::func_CreateFootPlantController_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetSpinDown_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetGoal_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorClearFollowBone_LuaFuncDef();
+      (void)::moho::func_CRotateManipulatorSetCurrentAngle_LuaFuncDef();
+    }
+  };
+
+  const ManipulatorLuaFunctionThunksLuaFuncDefBootstrap gManipulatorLuaFunctionThunksLuaFuncDefBootstrap{};
+} // namespace

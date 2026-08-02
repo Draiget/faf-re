@@ -3564,3 +3564,49 @@ namespace
 
   const CLobbyLuaBinderBootstrap gCLobbyLuaBinderBootstrap{};
 } // namespace
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CLobbyLuaFuncDefBootstrap
+  {
+    CLobbyLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CLobbyDestroy_LuaFuncDef();
+      (void)::moho::func_CLobbyMakeValidGameName_LuaFuncDef();
+      (void)::moho::func_CLobbyMakeValidPlayerName_LuaFuncDef();
+      (void)::moho::func_CLobbyHostGame_LuaFuncDef();
+      (void)::moho::func_CLobbyJoinGame_LuaFuncDef();
+      (void)::moho::func_CLobbyBroadcastData_LuaFuncDef();
+      (void)::moho::func_CLobbySendData_LuaFuncDef();
+      (void)::moho::func_CLobbyGetPeers_LuaFuncDef();
+      (void)::moho::func_CLobbyGetPeer_LuaFuncDef();
+      (void)::moho::func_CLobbyGetLocalPlayerName_LuaFuncDef();
+      (void)::moho::func_CLobbyGetLocalPlayerID_LuaFuncDef();
+      (void)::moho::func_CLobbyIsHost_LuaFuncDef();
+      (void)::moho::func_CLobbyGetLocalPort_LuaFuncDef();
+      (void)::moho::func_CLobbyEjectPeer_LuaFuncDef();
+      (void)::moho::func_CLobbyConnectToPeer_LuaFuncDef();
+      (void)::moho::func_CLobbyDisconnectFromPeer_LuaFuncDef();
+      (void)::moho::func_CLobbyLaunchGame_LuaFuncDef();
+      (void)::moho::func_CLobbyDebugDump_LuaFuncDef();
+      (void)::moho::func_ValidateIPAddress_LuaFuncDef();
+    }
+  };
+
+  const CLobbyLuaFuncDefBootstrap gCLobbyLuaFuncDefBootstrap{};
+} // namespace

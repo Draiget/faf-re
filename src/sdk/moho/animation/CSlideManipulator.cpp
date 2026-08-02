@@ -19,7 +19,8 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
-#include "Wm3Vector3.h"
+#include "Wm3Vector3.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -1472,3 +1473,37 @@ namespace gpg
 GPG_PREREGISTER_INIT(register_CSlideManipulatorTypeInfoStartup_aadc13, register_CSlideManipulatorTypeInfoStartup)
 
 GPG_PREREGISTER_INIT(preregister_CSlideManipulatorTypeInfo_aadc13, preregister_CSlideManipulatorTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CSlideManipulatorLuaFuncDefBootstrap
+  {
+    CSlideManipulatorLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CreateSlider_LuaFuncDef();
+      (void)::moho::func_CSlideManipulatorSetWorldUnits_LuaFuncDef();
+      (void)::moho::func_CSlideManipulatorSetSpeed_LuaFuncDef();
+      (void)::moho::func_CSlideManipulatorSetAcceleration_LuaFuncDef();
+      (void)::moho::func_CSlideManipulatorSetDeceleration_LuaFuncDef();
+      (void)::moho::func_CSlideManipulatorSetGoal_LuaFuncDef();
+      (void)::moho::func_CSlideManipulatorBeenDestroyed_LuaFuncDef();
+    }
+  };
+
+  const CSlideManipulatorLuaFuncDefBootstrap gCSlideManipulatorLuaFuncDefBootstrap{};
+} // namespace

@@ -86,7 +86,8 @@
 #include "moho/unit/core/UnitLuaFunctionThunks.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CUnitAssistMoveTask.h"
-#include "moho/unit/core/UserUnit.h"
+#include "moho/unit/core/UserUnit.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -17662,3 +17663,166 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(preregister_UnitWeaponInfoTypeInfo_d3b904, moho::preregister_UnitWeaponInfoTypeInfo)
 GPG_PREREGISTER_INIT(preregister_SSTIUnitVariableDataTypeInfo_d3b904, moho::preregister_SSTIUnitVariableDataTypeInfo)
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct UnitLuaFuncDefBootstrap
+  {
+    UnitLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_UnitGetUnitId_LuaFuncDef();
+      (void)::moho::func_UnitSetCreator_LuaFuncDef();
+      (void)::moho::func_UnitGetCargo_LuaFuncDef();
+      (void)::moho::func_UnitAlterArmor_LuaFuncDef();
+      (void)::moho::func_UnitGetArmorMult_LuaFuncDef();
+      (void)::moho::func_UnitClearFocusEntity_LuaFuncDef();
+      (void)::moho::func_UnitSetFocusEntity_LuaFuncDef();
+      (void)::moho::func_UnitGetFocusUnit_LuaFuncDef();
+      (void)::moho::func_UnitGetWeapon_LuaFuncDef();
+      (void)::moho::func_UnitGetWeaponCount_LuaFuncDef();
+      (void)::moho::func_UnitGetTargetEntity_LuaFuncDef();
+      (void)::moho::func_UnitGetHealth_LuaFuncDef();
+      (void)::moho::func_UnitGetAttacker_LuaFuncDef();
+      (void)::moho::func_UnitEnableManipulators_LuaFuncDef();
+      (void)::moho::func_UnitKillManipulator_LuaFuncDef();
+      (void)::moho::func_UnitKillManipulators_LuaFuncDef();
+      (void)::moho::func_UnitScaleGetBuiltEmitter_LuaFuncDef();
+      (void)::moho::func_UnitSetStrategicUnderlay_LuaFuncDef();
+      (void)::moho::func_GetIsPaused_LuaFuncDef();
+      (void)::moho::func_GetIsAutoMode_LuaFuncDef();
+      (void)::moho::func_SetFireState_LuaFuncDef();
+      (void)::moho::func_ToggleFireState_LuaFuncDef();
+      (void)::moho::func_GetFireState_LuaFuncDef();
+      (void)::moho::func_GetIsSubmerged_LuaFuncDef();
+      (void)::moho::func_GetIsAutoSurfaceMode_LuaFuncDef();
+      (void)::moho::func_UnitGetGuards_LuaFuncDef();
+      (void)::moho::func_UnitGetTransportFerryBeacon_LuaFuncDef();
+      (void)::moho::func_UnitGetGuardedUnit_LuaFuncDef();
+      (void)::moho::func_UnitHasValidTeleportDest_LuaFuncDef();
+      (void)::moho::func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef();
+      (void)::moho::func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef();
+      (void)::moho::func_UnitAddUnitToStorage_LuaFuncDef();
+      (void)::moho::func_UnitGetCurrentMoveLocation_LuaFuncDef();
+      (void)::moho::func_UnitGiveNukeSiloAmmo_LuaFuncDef();
+      (void)::moho::func_UnitRemoveNukeSiloAmmo_LuaFuncDef();
+      (void)::moho::func_UnitGetNukeSiloAmmoCount_LuaFuncDef();
+      (void)::moho::func_UnitGiveTacticalSiloAmmo_LuaFuncDef();
+      (void)::moho::func_UnitRemoveTacticalSiloAmmo_LuaFuncDef();
+      (void)::moho::func_UnitGetTacticalSiloAmmoCount_LuaFuncDef();
+      (void)::moho::func_UnitSetCustomName_LuaFuncDef();
+      (void)::moho::func_UnitGetCommandQueue_LuaFuncDef();
+      (void)::moho::func_UnitPrintCommandQueue_LuaFuncDef();
+      (void)::moho::func_UnitIsIdleState_LuaFuncDef();
+      (void)::moho::func_UnitIsStunned_LuaFuncDef();
+      (void)::moho::func_UnitIsBeingBuilt_LuaFuncDef();
+      (void)::moho::func_UnitIsPaused_LuaFuncDef();
+      (void)::moho::func_UnitSetPaused_LuaFuncDef();
+      (void)::moho::func_UnitSetConsumptionActive_LuaFuncDef();
+      (void)::moho::func_UnitSetConsumptionPerSecondEnergy_LuaFuncDef();
+      (void)::moho::func_UnitSetConsumptionPerSecondMass_LuaFuncDef();
+      (void)::moho::func_UnitSetRegenRate_LuaFuncDef();
+      (void)::moho::func_UnitRevertRegenRate_LuaFuncDef();
+      (void)::moho::func_UnitSetBuildRate_LuaFuncDef();
+      (void)::moho::func_UnitGetBuildRate_LuaFuncDef();
+      (void)::moho::func_UnitSetProductionPerSecondEnergy_LuaFuncDef();
+      (void)::moho::func_UnitSetProductionPerSecondMass_LuaFuncDef();
+      (void)::moho::func_UnitGetConsumptionPerSecondEnergy_LuaFuncDef();
+      (void)::moho::func_UnitGetConsumptionPerSecondMass_LuaFuncDef();
+      (void)::moho::func_UnitGetProductionPerSecondEnergy_LuaFuncDef();
+      (void)::moho::func_UnitGetProductionPerSecondMass_LuaFuncDef();
+      (void)::moho::func_UnitGetResourceConsumed_LuaFuncDef();
+      (void)::moho::func_UnitSetElevation_LuaFuncDef();
+      (void)::moho::func_UnitRevertElevation_LuaFuncDef();
+      (void)::moho::func_UnitSetSpeedMult_LuaFuncDef();
+      (void)::moho::func_UnitSetAccMult_LuaFuncDef();
+      (void)::moho::func_UnitSetTurnMult_LuaFuncDef();
+      (void)::moho::func_UnitSetBreakOffTriggerMult_LuaFuncDef();
+      (void)::moho::func_UnitSetBreakOffDistanceMult_LuaFuncDef();
+      (void)::moho::func_UnitSetStat_LuaFuncDef();
+      (void)::moho::func_UnitSetWorkProgress_LuaFuncDef();
+      (void)::moho::func_UnitGetWorkProgress_LuaFuncDef();
+      (void)::moho::func_UnitIsUnitState_LuaFuncDef();
+      (void)::moho::func_UnitSetProductionActive_LuaFuncDef();
+      (void)::moho::func_UnitSetBusy_LuaFuncDef();
+      (void)::moho::func_UnitSetBlockCommandQueue_LuaFuncDef();
+      (void)::moho::func_UnitSetImmobile_LuaFuncDef();
+      (void)::moho::func_UnitSetUnSelectable_LuaFuncDef();
+      (void)::moho::func_UnitSetDoNotTarget_LuaFuncDef();
+      (void)::moho::func_UnitStopSiloBuild_LuaFuncDef();
+      (void)::moho::func_UnitSetIsValidTarget_LuaFuncDef();
+      (void)::moho::func_UnitIsValidTarget_LuaFuncDef();
+      (void)::moho::func_UnitGetNumBuildOrders_LuaFuncDef();
+      (void)::moho::func_UnitCalculateWorldPositionFromRelative_LuaFuncDef();
+      (void)::moho::func_UnitSetStunned_LuaFuncDef();
+      (void)::moho::func_UnitSetUnitState_LuaFuncDef();
+      (void)::moho::func_GetScriptBit_LuaFuncDef();
+      (void)::moho::func_UnitGetScriptBit_LuaFuncDef();
+      (void)::moho::func_UnitSetScriptBit_LuaFuncDef();
+      (void)::moho::func_UnitToggleScriptBit_LuaFuncDef();
+      (void)::moho::func_UnitToggleFireState_LuaFuncDef();
+      (void)::moho::func_UnitSetFireState_LuaFuncDef();
+      (void)::moho::func_UnitGetFireState_LuaFuncDef();
+      (void)::moho::func_UnitSetAutoMode_LuaFuncDef();
+      (void)::moho::func_UnitAddBuildRestriction_LuaFuncDef();
+      (void)::moho::func_UnitRemoveBuildRestriction_LuaFuncDef();
+      (void)::moho::func_UnitRestoreBuildRestrictions_LuaFuncDef();
+      (void)::moho::func_UnitAddCommandCap_LuaFuncDef();
+      (void)::moho::func_UnitRemoveCommandCap_LuaFuncDef();
+      (void)::moho::func_UnitRestoreCommandCaps_LuaFuncDef();
+      (void)::moho::func_UnitAddToggleCap_LuaFuncDef();
+      (void)::moho::func_UnitRemoveToggleCap_LuaFuncDef();
+      (void)::moho::func_UnitRestoreToggleCaps_LuaFuncDef();
+      (void)::moho::func_UnitTestCommandCaps_LuaFuncDef();
+      (void)::moho::func_UnitTestToggleCaps_LuaFuncDef();
+      (void)::moho::func_UnitGetRallyPoint_LuaFuncDef();
+      (void)::moho::func_UnitGetFuelUseTime_LuaFuncDef();
+      (void)::moho::func_UnitGetFuelRatio_LuaFuncDef();
+      (void)::moho::func_UnitGetShieldRatio_LuaFuncDef();
+      (void)::moho::func_UnitGetBlip_LuaFuncDef();
+      (void)::moho::func_UnitTransportHasSpaceFor_LuaFuncDef();
+      (void)::moho::func_UnitTransportHasAvailableStorage_LuaFuncDef();
+      (void)::moho::func_UnitTransportDetachAllUnits_LuaFuncDef();
+      (void)::moho::func_UnitShowBone_LuaFuncDef();
+      (void)::moho::func_UnitHideBone_LuaFuncDef();
+      (void)::moho::func_UnitSetShieldRatio_LuaFuncDef();
+      (void)::moho::func_UnitSetReclaimable_LuaFuncDef();
+      (void)::moho::func_UnitSetCapturable_LuaFuncDef();
+      (void)::moho::func_UnitIsCapturable_LuaFuncDef();
+      (void)::moho::func_UnitSetOverchargePaused_LuaFuncDef();
+      (void)::moho::func_UnitIsOverchargePaused_LuaFuncDef();
+      (void)::moho::func_UnitRevertCollisionShape_LuaFuncDef();
+      (void)::moho::func_UnitRecoilImpulse_LuaFuncDef();
+      (void)::moho::func_UnitGetCurrentLayer_LuaFuncDef();
+      (void)::moho::func_UnitCanPathTo_LuaFuncDef();
+      (void)::moho::func_UnitCanPathToRect_LuaFuncDef();
+      (void)::moho::func_UnitIsMobile_LuaFuncDef();
+      (void)::moho::func_UnitIsMoving_LuaFuncDef();
+      (void)::moho::func_UnitGetNavigator_LuaFuncDef();
+      (void)::moho::func_UnitGetVelocity_LuaFuncDef();
+      (void)::moho::func_UnitGetStat_LuaFuncDef();
+      (void)::moho::func_UnitCanBuild_LuaFuncDef();
+      (void)::moho::func_UnitSetFuelUseTime_LuaFuncDef();
+      (void)::moho::func_UnitSetFuelRatio_LuaFuncDef();
+      (void)::moho::func_CreateUnit2_LuaFuncDef();
+      (void)::moho::func_CreateUnit_LuaFuncDef();
+      (void)::moho::func_CreateUnitHPR_LuaFuncDef();
+    }
+  };
+
+  const UnitLuaFuncDefBootstrap gUnitLuaFuncDefBootstrap{};
+} // namespace

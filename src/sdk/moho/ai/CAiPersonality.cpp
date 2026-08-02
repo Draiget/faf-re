@@ -2217,3 +2217,65 @@ void CAiPersonality::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mChatFrequency), owner);
   archive->WriteFloat(mDifficulty);
 }
+
+namespace
+{
+  /**
+   * Drives this file's Lua binder definitions.
+   *
+   * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
+   * links it into its init-form set. In the shipped binary they are reached
+   * through compiler-generated dynamic initializers that the CRT's static-init
+   * array runs before `main`; nothing here reproduces that array, so a
+   * definition no source line names is never run - the binder is never
+   * constructed, the form never joins its set, and the Lua global or method it
+   * publishes is simply absent, with no diagnostic beyond FAF's own "access to
+   * nonexistent global variable".
+   *
+   * This object is that call, and the source-level invocation that keeps these
+   * definitions off the linker's dead-strip list.
+   */
+  struct CAiPersonalityLuaFuncDefBootstrap
+  {
+    CAiPersonalityLuaFuncDefBootstrap()
+    {
+      (void)::moho::func_CAiPersonalityGetPersonalityName_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetChatPersonality_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetDifficulty_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetArmySize_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetPlatoonSize_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetAttackFrequency_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetRepeatAttackFrequency_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetCounterForces_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetIntelGathering_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetCoordinatedAttacks_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetExpansionDriven_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetTechAdvancement_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetUpgradesDriven_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetDefenseDriven_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetEconomyDriven_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetFactoryTycoon_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetIntelBuildingTycoon_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetSuperWeaponTendency_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetFavouriteStructures_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetAirUnitsEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetTankUnitsEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetBotUnitsEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetSeaUnitsEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetSpecialtyForcesEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetSupportUnitsEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetDirectDamageEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetInDirectDamageEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetFavouriteUnits_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetSurvivalEmphasis_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetTeamSupport_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetFormationUse_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetTargetSpread_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetQuittingTendency_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityGetChatFrequency_LuaFuncDef();
+      (void)::moho::func_CAiPersonalityAdjustDelay_LuaFuncDef();
+    }
+  };
+
+  const CAiPersonalityLuaFuncDefBootstrap gCAiPersonalityLuaFuncDefBootstrap{};
+} // namespace
