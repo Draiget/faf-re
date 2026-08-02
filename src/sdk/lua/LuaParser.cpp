@@ -1302,11 +1302,17 @@ namespace
       default:
         if ((ls->current & 0x80) != 0) {
           // A UTF-8 byte-order mark is tolerated; any other high byte is not.
-          if (ls->current == '\xEF') {
+          //
+          // These must be compared as unsigned. `nextchar` widens through
+          // `unsigned char`, so `current` carries 0xEF as 239 - while the
+          // char literal `'\xEF'` is signed on this compiler and is -17, so
+          // the two never matched and every file with a BOM died here on
+          // "invalid character" instead of skipping three bytes.
+          if (ls->current == 0xEF) {
             nextchar(ls);
-            if (ls->current == '\xBB') {
+            if (ls->current == 0xBB) {
               nextchar(ls);
-              if (ls->current == '\xBF') {
+              if (ls->current == 0xBF) {
                 nextchar(ls);
                 continue;
               }
