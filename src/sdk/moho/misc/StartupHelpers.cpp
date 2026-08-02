@@ -3853,7 +3853,15 @@ int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
   key.assign_owned(keyText);
 
   if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
-    preferences->SetObject(key, &valueObject);
+    // The value arrives on the caller's Lua state, and the preference tree
+    // lives on the preferences' own one, so it has to be copied across before
+    // it can be stored. LuaObject::SetObject asserts that a table and the
+    // value written into it share a state, and passing the caller's object
+    // straight through tripped that on every SetPreference - which is as far
+    // as userInit.lua got.
+    auto* const prefsState = static_cast<LuaPlus::LuaState*>(preferences->GetState());
+    LuaPlus::LuaObject copiedValue = moho::SCR_Copy(valueObject, prefsState);
+    preferences->SetObject(key, &copiedValue);
   }
 
   return 0;
