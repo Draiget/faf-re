@@ -23640,7 +23640,14 @@ moho::CMauiFrame::CMauiFrame(LuaPlus::LuaObject* const luaObject, CMauiControl* 
   : CMauiControl(luaObject, parent, "frame")
 {
   CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
-  frameView->mSelfWeak = boost::weak_ptr<CMauiFrame>{};
+
+  // Construct the weak self-reference; do not assign to it. This is fresh
+  // memory - CMauiControl's ctor does not touch these bytes - so
+  // weak_ptr::operator= would call weak_release() on whatever `pi_` happened
+  // to hold and write through it. The binary zeroes the two words outright
+  // (`this->mPtr.px = 0; this->mPtr.pn.pi_ = 0` at 0x00796360), which is the
+  // same thing a placement-construct emits.
+  new (&frameView->mSelfWeak) boost::weak_ptr<CMauiFrame>{};
 
   auto* const deletedListHead = static_cast<CMauiControlListNode*>(&frameView->mDeletedControlList);
   frameView->mDeletedControlList.mNext = deletedListHead;
