@@ -7146,10 +7146,30 @@ namespace moho
   // was asked to paint never appeared.
   using wxDCRuntime = ::wxDC;
 
+  /**
+   * Mangled: ??0wxPaintDC@@QAE@PAVwxWindow@@@Z / ??1wxPaintDC@@UAE@XZ
+   *
+   * wxPaintDC's whole job is the BeginPaint/EndPaint pair. wx answers WM_PAINT
+   * from its event table and never lets the message reach DefWindowProc, so
+   * this destructor is the only thing that validates the update region. With
+   * the pair missing, the region stayed dirty, Windows regenerated WM_PAINT
+   * immediately, and wxApp::Pending() never went false - the main loop in
+   * WIN_AppExecute spun on Dispatch() and never reached ProcessIdle() or
+   * app->Main().
+   *
+   * wx caches these per window so nested wxPaintDCs on one window share a
+   * single BeginPaint; the engine only ever builds one at a time (the paint
+   * handlers each construct exactly one on the stack), so the count is kept
+   * here rather than in a process-wide cache.
+   */
   struct wxPaintDCRuntime : ::wxDC
   {
     explicit wxPaintDCRuntime(wxWindowBase* ownerWindow) noexcept;
     ~wxPaintDCRuntime() override;
+
+  private:
+    PAINTSTRUCT mPaintStruct{};
+    bool mOwnsPaint = false;
   };
 
   struct WPreviewImageRuntime

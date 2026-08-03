@@ -38454,7 +38454,21 @@ bool wxApp::DoMessage()
 
   if (IsGuiOwnedByMainThread()) {
     DispatchDeferredThreadMessages(*this);
-    ProcessMessage(reinterpret_cast<void**>(&gCurrentMessage));
+    // The overload, not ProcessMessage. wxApp's vtable has DoMessage(MSG*) at
+    // +0xA0 and ProcessMessage at +0xA4, and 0x00993100 calls +0xA0 - IDA's
+    // pseudocode names that call ProcessMessage, but the slot arithmetic in
+    // DoMessage(MSG*) itself settles it: that body calls `*(this + 164)`
+    // (= +0xA4 = ProcessMessage) and then translates and dispatches whatever
+    // ProcessMessage declines.
+    //
+    // Calling ProcessMessage straight from here skipped TranslateMessage and
+    // DispatchMessageW entirely, so every posted message was pulled off the
+    // queue and thrown away. Only sent messages reached a window procedure,
+    // which is why the frame drew its non-client area and answered
+    // WM_ERASEBKGND but no window ever saw WM_PAINT: the generated paint kept
+    // the update region dirty, Pending() therefore never went false, and the
+    // main loop in WIN_AppExecute never reached ProcessIdle() or app->Main().
+    DoMessage(reinterpret_cast<void**>(&gCurrentMessage));
   } else {
     gIsDispatchingDeferredMessages = false;
     if (!ShouldSuppressDeferredCommandMessages() || gCurrentMessage.message != kWin32CommandMessageId) {
@@ -38951,9 +38965,29 @@ moho::wxPaintDCRuntime::wxPaintDCRuntime(
 ) noexcept
 {
   m_canvas = ownerWindow;
+
+  const HWND handle = GetWxWindowNativeHandle(ownerWindow);
+  if (handle == nullptr) {
+    return;
+  }
+
+  m_hDC = ::BeginPaint(handle, &mPaintStruct);
+  mOwnsPaint = true;
 }
 
-moho::wxPaintDCRuntime::~wxPaintDCRuntime() = default;
+moho::wxPaintDCRuntime::~wxPaintDCRuntime()
+{
+  if (!mOwnsPaint) {
+    return;
+  }
+
+  const HWND handle = GetWxWindowNativeHandle(static_cast<const wxWindowBase*>(m_canvas));
+  if (handle != nullptr) {
+    (void)::EndPaint(handle, &mPaintStruct);
+  }
+  m_hDC = nullptr;
+  mOwnsPaint = false;
+}
 
 /**
  * Address: 0x0097DE00 (FUN_0097DE00)
