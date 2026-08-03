@@ -53490,7 +53490,16 @@ static_assert(offsetof(WxOffsetB8RuntimeView, anchorB8) == 0xB8, "WxOffsetB8Runt
   return wxStoreDwordAtOffset0CAndReturnRuntime(runtime, value);
 }
 
-wxDCBase::wxDCBase() = default;
+// wxDCBase::wxDCBase and wxDC::wxDC are deliberately left undefined here.
+//
+// wxmsw.lib supplies ??0wxDCBase@@QAE@XZ and ??0wxDC@@QAE@XZ, and it already
+// supplies the vtables these objects carry, so the constructors have to come
+// from the same place: they are what build the wxBrush, wxPen, wxFont, colour
+// and palette members the library's own wxDC::SetBrush reads through. Ours
+// were `= default` and a handful of pointer stores, which left every one of
+// those members raw - SetBrush got past the null brush only to fault one field
+// deeper on the DC's own state. The binary's wxDC::wxDC (0x009CA490) opens
+// with `wxDCBase::wxDCBase(this)` for exactly this reason.
 
 namespace
 {
@@ -53550,19 +53559,6 @@ namespace
  * Initializes one device-context lane with cleared selected object and native
  * handle ownership state.
  */
-wxDC::wxDC()
-  : wxDCBase()
-{
-  m_selectedBitmap = nullptr;
-  m_bOwnsDC &= static_cast<std::uint8_t>(~1u);
-  m_canvas = nullptr;
-  m_oldBitmap = nullptr;
-  m_oldPen = nullptr;
-  m_oldBrush = nullptr;
-  m_oldFont = nullptr;
-  m_oldPalette = nullptr;
-  m_hDC = nullptr;
-}
 
 /**
  * Address: 0x009CB5D0 (FUN_009CB5D0)
