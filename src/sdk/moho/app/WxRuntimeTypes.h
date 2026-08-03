@@ -2375,13 +2375,46 @@ public:
 class wxWindowMswRuntime : public wxWindowBase
 {
 public:
-  virtual void DoMoveWindow(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height)
-  {
-    (void)x;
-    (void)y;
-    (void)width;
-    (void)height;
-  }
+  /**
+   * Address: 0x00968640 (FUN_00968640)
+   * Mangled: ?DoMoveWindow@wxWindow@@MAEXHHHH@Z
+   *
+   * IDA signature:
+   * BOOL __thiscall wxWindow::DoMoveWindow(HWND *this, int X, int Y,
+   *                                        int nWidth, int nHeight);
+   *
+   * What it does:
+   * Moves and resizes the native window, clamping negative extents to zero
+   * and repainting. The binary reads the handle as `*(this + 66)`, i.e.
+   * +0x108 - which is exactly `sizeof(wxWindowBase)`, so it is wxWindowMSW's
+   * first member.
+   */
+  virtual void DoMoveWindow(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height);
+
+  /**
+   * Address: 0x009684C0 (FUN_009684C0)
+   * Mangled: ?DoGetClientSize@wxWindow@@MBEXPAH0@Z
+   *
+   * What it does:
+   * Reports the native client rectangle's extent. wxFrame's override
+   * (0x0099E990) subtracts the client-area origin and a shown status bar's
+   * height on top of this; the SupCom frame has neither, so it reduces to
+   * this body.
+   */
+  void DoGetClientSize(std::int32_t* outWidth, std::int32_t* outHeight) const override;
+
+  /**
+   * Address: 0x009687B0 (FUN_009687B0)
+   * Mangled: ?DoSetClientSize@wxWindow@@MAEXHH@Z
+   *
+   * What it does:
+   * Grows the window until its client area matches the requested size, by
+   * adding the current window/client difference and moving. It iterates up to
+   * four times because the first move can change the non-client metrics
+   * (a scrollbar appearing or disappearing), and stops early once the client
+   * rectangle already matches. -1 means "leave this axis alone".
+   */
+  void DoSetClientSize(std::int32_t width, std::int32_t height) override;
   virtual void DoSetToolTip(void* tooltip) { (void)tooltip; }
   virtual bool DoPopupMenu(void* menu, std::int32_t x, std::int32_t y)
   {
