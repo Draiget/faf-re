@@ -1054,26 +1054,28 @@ namespace
     return args;
   }
 
+  /**
+   * The reflected reference is assembled from the userdata HEADER, not read out
+   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
+   * value itself starts one header past the allocation, which is exactly what
+   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
+   *
+   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
+   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
+   *
+   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
+   * takes the first eight payload bytes as if they were a reference. For a
+   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
+   * whatever the allocator left, so every upcast failed and each caller reported
+   * "Expected a game object" for a perfectly good object.
+   */
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
-    gpg::RRef out{};
     if (!userDataObject.IsUserData()) {
-      return out;
+      return gpg::RRef{};
     }
 
-    lua_State* const rawState = userDataObject.GetActiveCState();
-    if (!rawState) {
-      return out;
-    }
-
-    const int top = lua_gettop(rawState);
-    const_cast<LuaPlus::LuaObject&>(userDataObject).PushStack(rawState);
-    void* const rawUserData = lua_touserdata(rawState, -1);
-    if (rawUserData != nullptr) {
-      out = *static_cast<gpg::RRef*>(rawUserData);
-    }
-    lua_settop(rawState, top);
-    return out;
+    return userDataObject.GetUserData();
   }
 
   [[nodiscard]] moho::CSndParams* ResolveSoundParamsFromLuaObject(const LuaPlus::LuaObject& object)
