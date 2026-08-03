@@ -756,17 +756,13 @@ namespace moho
         }
 
         {
-          gpg::RRef userDataRef{};
-          lua_State* const lstate = source.GetActiveCState();
-          if (lstate != nullptr) {
-            const int savedTop = lua_gettop(lstate);
-            const_cast<LuaPlus::LuaObject&>(source).PushStack(lstate);
-            void* const rawUserData = lua_touserdata(lstate, -1);
-            if (rawUserData != nullptr) {
-              userDataRef = *static_cast<gpg::RRef*>(rawUserData);
-            }
-            lua_settop(lstate, savedTop);
-          }
+          // The reference lives in the userdata HEADER, not in its payload:
+          // `Udata::len` carries the `gpg::RType*` and the value itself starts
+          // one header further on. Reading `*(gpg::RRef*)lua_touserdata(...)`
+          // instead took the first eight payload bytes as if they were a
+          // reference, so this clone copied from a bogus address through
+          // whatever type those bytes happened to spell.
+          const gpg::RRef userDataRef = source.GetUserData();
 
           if (userDataRef.mType->movRefFunc_ == nullptr) {
             gpg::Die("Can't clone %s userdata.", userDataRef.mType->GetName());
