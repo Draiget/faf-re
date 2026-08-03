@@ -77,16 +77,46 @@ $buildCommands = @(
     "cd /d `"$mswDir`""
 )
 
+# UNICODE=1 because the shipped engine linked a Unicode wxWidgets:
+# wxApp::RegisterWindowClasses (0x00991E70) fills in a WNDCLASSW and calls
+# RegisterClassW with wxChar* class names, and FUN_00848050 takes the
+# const wchar_t* out of wxURL::GetProtocolName straight into wcsicmp. An ANSI
+# build of the same source has matching class layouts but the wrong character
+# type throughout, which showed up as a truncated window class name and title.
+#
+# /EHsc replaces the makefile's /GX-: the binary's wxTempFile::~wxTempFile has
+# exception frames and a security cookie, which /GX- does not produce.
+#
+# This produces lib\wxmswu.lib and lib\mswu\wx\setup.h, leaving any previously
+# built ANSI wxmsw.lib in place.
+$unicodeFlags = 'UNICODE=1 "OVERRIDEFLAGS=/DUNICODE /D_UNICODE /EHsc"'
+
 if ($Clean) {
-    $buildCommands += "nmake /f makefile.vc clean FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD"
+    $buildCommands += "nmake /f makefile.vc clean FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD $unicodeFlags"
 }
 
-$buildCommands += "nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD"
+$buildCommands += "nmake /f makefile.vc FINAL=1 DLL=0 WXMAKINGDLL= CRTFLAG=/MD $unicodeFlags"
 $buildCommand = ($buildCommands -join " && ")
 
 & cmd.exe /c $buildCommand
 if ($LASTEXITCODE -ne 0) {
     throw "wx build failed with exit code $LASTEXITCODE."
+}
+
+# makefile.vc only copies include\wx\msw\setup.h into the per-configuration
+# directory, so the Unicode configuration's setup.h still says
+# `wxUSE_UNICODE 0`. Left alone, the library is Unicode while everything that
+# includes its headers sees wxChar as char.
+$unicodeSetupHeader = Join-Path $libDir "mswu\wx\setup.h"
+Require-Path -PathValue $unicodeSetupHeader -Label "Unicode setup.h"
+$setupText = Get-Content -LiteralPath $unicodeSetupHeader -Raw
+$ansiDefine = "#ifndef wxUSE_UNICODE`r`n    #define wxUSE_UNICODE 0`r`n#endif"
+if ($setupText.Contains($ansiDefine)) {
+    $setupText = $setupText.Replace($ansiDefine, "#ifndef wxUSE_UNICODE`r`n    #define wxUSE_UNICODE 1`r`n#endif")
+    Set-Content -LiteralPath $unicodeSetupHeader -Value $setupText -Encoding utf8 -NoNewline
+    Write-Host "[wx] Stamped wxUSE_UNICODE=1 into $unicodeSetupHeader"
+} elseif ($setupText -notmatch "#define wxUSE_UNICODE 1") {
+    throw "Could not stamp wxUSE_UNICODE=1 into $unicodeSetupHeader - check the template."
 }
 
 $requiredLibs = @(
@@ -95,7 +125,7 @@ $requiredLibs = @(
     "jpeg.lib",
     "tiff.lib",
     "regex.lib",
-    "wxmsw.lib"
+    "wxmswu.lib"
 )
 
 $missingLibs = @()

@@ -6,11 +6,15 @@
 #include <shellapi.h>
 #include <wx/url.h>
 
-#include "gpg/core/containers/String.h"
 #include "moho/misc/StartupHelpers.h"
 
-#if wxUSE_UNICODE
-#error WxUrl.cpp must use the ANSI configuration of the vendored wxmsw.lib
+// The shipped binary linked a Unicode wxWidgets: `wxApp::RegisterWindowClasses`
+// (0x00991E70) builds a `WNDCLASSW` and calls `RegisterClassW` with `wxChar*`
+// class names. FUN_00848050 - the block this file is lifted from - reads that
+// straight through: `wxURL::GetProtocolName` hands back a `const wchar_t**` and
+// it goes directly into `wcsicmp`, with no conversion anywhere in the body.
+#if !wxUSE_UNICODE
+#error WxUrl.cpp needs the Unicode configuration of the vendored wx (wxmswu.lib)
 #endif
 
 namespace moho
@@ -19,9 +23,7 @@ namespace moho
   {
     bool ProtocolNamesEqual(const wxString& protocolName, const std::wstring& allowedProtocol)
     {
-      // URL schemes are restricted to ASCII, which is also valid UTF-8.
-      const std::wstring wideProtocolName = gpg::STR_Utf8ToWide(protocolName.c_str());
-      return ::_wcsicmp(wideProtocolName.c_str(), allowedProtocol.c_str()) == 0;
+      return ::_wcsicmp(protocolName.c_str(), allowedProtocol.c_str()) == 0;
     }
   }
 

@@ -92,8 +92,6 @@
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/ui/IUIManager.h"
 
-using WXHDC = HDC;
-
 constexpr std::int32_t wxEVT_NULL = 0;
 constexpr std::int32_t wxEVT_ENTER_WINDOW = 1010;
 constexpr std::int32_t wxEVT_LEAVE_WINDOW = 1011;
@@ -107,9 +105,6 @@ constexpr std::int32_t wxEVT_RIGHT_DOWN = 1120;
 constexpr std::int32_t wxEVT_RIGHT_UP = 1121;
 constexpr std::int32_t wxEVT_RIGHT_DCLICK = 1122;
 constexpr std::int32_t wxEVT_COMMAND_MENU_SELECTED = 2000;
-constexpr std::int32_t wxFromStart = 0;
-constexpr std::int32_t wxFromCurrent = 1;
-constexpr std::int32_t wxFromEnd = 2;
 const wxSize wxDefaultSize{-1, -1};
 
 namespace
@@ -190,8 +185,6 @@ namespace
     FILE* m_stream = nullptr; // +0x04
   };
 
-  // wxWidgets exposes this globally; keep a local runtime-compatible lane.
-  wchar_t wxEmptyString[] = L"";
   bool gWxUrlUseDefaultProxy = false;
   WxHttpProxyRuntime* gWxUrlDefaultProxyRuntime = nullptr;
   WxHelpProviderRuntime* gWxHelpProviderRuntime = nullptr;
@@ -211,7 +204,7 @@ namespace
   std::uint8_t gWxUseCompactStatusBarRuntimeFlag = 0u;
   std::uint8_t gWxTextValidatorSilentFlag = 0u;
   __time64_t* gWxDateTimeZoneBucketRuntime = nullptr;
-  wchar_t* gWxLogTimestampRuntime = wxEmptyString;
+  wchar_t* gWxLogTimestampRuntime = const_cast<wchar_t*>(wxEmptyString);
   std::uint8_t gWxLogDialogRuntimeFlag = 0u;
   const wchar_t* gWxPluginLibraryExtensionSuffix = L".dll";
 
@@ -228,8 +221,6 @@ namespace
   std::recursive_mutex gWxLogMessageMutex;
 }
 
-void* wxConvCurrent = nullptr;
-void* wxConvLibc = nullptr;
 
 extern "C" void __cdecl _free_crt(void* ptr);
 extern "C" void __cdecl _dosmaperr(unsigned long errcode);
@@ -280,8 +271,6 @@ bool wxFileExists(const wxStringRuntime* fileName);
   const wchar_t* storedNodeKeyLane
 ) noexcept;
 extern wxListRuntime gWxImageHandlerRegistryRuntimeList;
-extern void* wxConvCurrent;
-extern void* wxConvLibc;
 [[maybe_unused]] char** wxConvertWideTextToAllocatedMultiByteRuntimeAdapter(
   void* converterRuntime,
   char** outTextStorage,
@@ -303,9 +292,16 @@ extern void* wxConvLibc;
   const wxStringRuntime* sourceText
 ) noexcept;
 
-class wxString
+/**
+ * The three `wxStringRuntime` primitives the recovered bodies in this file
+ * share. They were declared as statics of a class named `wxString`, which gave
+ * them wxWidgets' own mangled names (`?Empty@wxString@@...`) even though they
+ * take a `wxStringRuntime*` and have nothing to do with the library's type -
+ * so each one was a second definition of a symbol `wxmswu.lib` already
+ * provides, and which of the two the linker used per call site was arbitrary.
+ */
+struct WxStringRuntimeOps
 {
-public:
   static wxStringRuntime* Empty(wxStringRuntime* value, std::uint32_t newLength);
   static wxStringRuntime* InitWith(
     wxStringRuntime* outValue,
@@ -1405,46 +1401,19 @@ std::uint32_t wxHashTableNextBucketThresholdRuntime(
   return 0u;
 }
 
-/**
- * Address: 0x00977DA0 (FUN_00977DA0, wxClassInfo::InitializeClasses)
- *
- * What it does:
- * Turns the registered list into a usable hierarchy. Every class recorded its
- * base classes by NAME at static-init time, because a base's class-info object
- * may not have been constructed yet when a derived one registers; this walks
- * the list once to build a name lookup, then again to turn each name into the
- * pointer the kind-of test follows.
- */
-void wxClassInfo::InitializeClasses()
-{
-  sm_classTable = new wxHashTableRuntime(2, 1000);
-
-  for (wxClassInfo* classInfo = sm_first; classInfo != nullptr; classInfo = classInfo->m_next) {
-    if (classInfo->m_className != nullptr) {
-      sm_classTable->Put(classInfo->m_className, classInfo);
-    }
-  }
-
-  for (wxClassInfo* classInfo = sm_first; classInfo != nullptr; classInfo = classInfo->m_next) {
-    classInfo->m_baseInfo1 =
-      classInfo->m_baseClassName1 != nullptr ? sm_classTable->Get(classInfo->m_baseClassName1) : nullptr;
-    classInfo->m_baseInfo2 =
-      classInfo->m_baseClassName2 != nullptr ? sm_classTable->Get(classInfo->m_baseClassName2) : nullptr;
-  }
-}
 
 
 // The control classes, so a kind-of test can tell them apart. Each records
 // its base by name; InitializeClasses turns those into links.
-wxClassInfo wxControlRuntime::sm_classInfo{
-  L"wxControl", L"wxWindow", nullptr, static_cast<std::int32_t>(sizeof(wxControlRuntime))
-};
-wxClassInfo wxCheckBoxRuntime::sm_classInfo{
-  L"wxCheckBox", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxCheckBoxRuntime))
-};
-wxClassInfo wxTextCtrlRuntime::sm_classInfo{
-  L"wxTextCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTextCtrlRuntime))
-};
+wxClassInfo wxControlRuntime::sm_classInfo(
+  L"wxControl", L"wxWindow", nullptr, static_cast<std::int32_t>(sizeof(wxControlRuntime)), nullptr
+);
+wxClassInfo wxCheckBoxRuntime::sm_classInfo(
+  L"wxCheckBox", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxCheckBoxRuntime)), nullptr
+);
+wxClassInfo wxTextCtrlRuntime::sm_classInfo(
+  L"wxTextCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTextCtrlRuntime)), nullptr
+);
 
 namespace
 {
@@ -1452,33 +1421,6 @@ namespace
   void EnsureWxClassesInitialisedRuntime() noexcept;
 } // namespace
 
-/**
- * Address: 0x009627D0 (FUN_009627D0)
- * Mangled: ?IsKindOf@wxClassInfo@@QBE_NPBV1@@Z
- *
- * IDA signature:
- * bool __thiscall wxClassInfo::IsKindOf(wxClassInfo *this, wxClassInfo *info);
- *
- * What it does:
- * Whether this class is the one being asked about, or descends from it. Both
- * base links are searched, not just the first, because a class here may have
- * two bases - so the answer is a search rather than a walk.
- */
-bool wxClassInfo::IsKindOf(
-  const wxClassInfo* const info
-) const
-{
-  if (info == nullptr) {
-    return false;
-  }
-  if (info == this) {
-    return true;
-  }
-  if (m_baseInfo1 != nullptr && m_baseInfo1->IsKindOf(info)) {
-    return true;
-  }
-  return m_baseInfo2 != nullptr && m_baseInfo2->IsKindOf(info);
-}
 
 /**
  * Address: 0x00977C90 (FUN_00977C90)
@@ -1505,8 +1447,6 @@ bool wxWindowBase::IsKindOf(
   return ownClass->IsKindOf(info);
 }
 
-wxClassInfo* wxClassInfo::sm_first = nullptr;
-wxHashTableRuntime* wxClassInfo::sm_classTable = nullptr;
 
 namespace
 {
@@ -1619,7 +1559,7 @@ namespace
     std::uint8_t reserved0A = 0;              // +0x0A
     std::uint8_t reserved0B = 0;              // +0x0B
     std::int32_t userData = 0;                // +0x0C
-    wchar_t* text = wxEmptyString;            // +0x10
+    wchar_t* text = const_cast<wchar_t*>(wxEmptyString);  // +0x10
     std::int32_t width = -1;                  // +0x14
     std::int32_t imageIndex = -1;             // +0x18
     void* ownerTreeControl = nullptr;         // +0x1C
@@ -5425,21 +5365,11 @@ namespace
   );
   static_assert(sizeof(WxTextBufferRuntimeView) == 0x2C, "WxTextBufferRuntimeView size must be 0x2C");
 
-  struct WxTextFileFileLaneRuntimeView
-  {
-    std::int32_t fileDescriptor = -1; // +0x00
-    std::uint8_t errorState = 0;      // +0x04
-    std::uint8_t reserved05_07[0x03]{};
-  };
-  static_assert(
-    offsetof(WxTextFileFileLaneRuntimeView, fileDescriptor) == 0x00,
-    "WxTextFileFileLaneRuntimeView::fileDescriptor offset must be 0x00"
-  );
-  static_assert(
-    offsetof(WxTextFileFileLaneRuntimeView, errorState) == 0x04,
-    "WxTextFileFileLaneRuntimeView::errorState offset must be 0x04"
-  );
-  static_assert(sizeof(WxTextFileFileLaneRuntimeView) == 0x08, "WxTextFileFileLaneRuntimeView size must be 0x08");
+  // wxTextFile embeds a wxFile: `int m_fd` at +0x00 and `bool m_error` at
+  // +0x04, eight bytes with padding - which is what this lane used to
+  // re-declare so it could be reinterpret_cast to one.
+  using WxTextFileFileLaneRuntimeView = wxFile;
+  static_assert(sizeof(WxTextFileFileLaneRuntimeView) == 0x8, "wxFile size must be 0x8");
 
   struct WxTextFileRuntimeView
   {
@@ -8160,8 +8090,7 @@ namespace
 
     (void)WxTextBufferConstructWithFileName(&textFile->textBuffer, fileName);
     textFile->textBuffer.vtable = nullptr;
-    textFile->fileLane.fileDescriptor = -1;
-    textFile->fileLane.errorState = 0;
+    new (&textFile->fileLane) wxFile();
     return textFile;
   }
 
@@ -8192,8 +8121,11 @@ namespace
     const int openModeSelector
   )
   {
-    auto* const fileLane = reinterpret_cast<wxFile*>(&textFile->fileLane);
-    return fileLane->Open(*fileNameStorage, static_cast<wxFile::OpenMode>(openModeSelector == 1), 438);
+    return textFile->fileLane.Open(
+      *fileNameStorage,
+      static_cast<wxFile::OpenMode>(openModeSelector == 1),
+      438
+    );
   }
 
   /**
@@ -8206,8 +8138,7 @@ namespace
     WxTextFileRuntimeView* const textFile
   )
   {
-    auto* const fileLane = reinterpret_cast<wxFile*>(&textFile->fileLane);
-    return fileLane->Attach();
+    return textFile->fileLane.Close();
   }
 
   /**
@@ -8225,10 +8156,7 @@ namespace
       return nullptr;
     }
 
-    auto* const fileLane = reinterpret_cast<wxFile*>(&textFile->fileLane);
-    (void)fileLane->Attach();
-    textFile->fileLane.fileDescriptor = fileLane->m_fd;
-    textFile->fileLane.errorState = fileLane->m_error;
+    (void)textFile->fileLane.Close();
 
     WxTextBufferDestroy(&textFile->textBuffer);
     return textFile;
@@ -8901,7 +8829,7 @@ namespace
 
     if (sourceText == nullptr) {
       outValue->m_pchData = nullptr;
-      return wxString::InitWith(outValue, wxEmptyString, 0, -101);
+      return WxStringRuntimeOps::InitWith(outValue, wxEmptyString, 0, -101);
     }
 
     const std::size_t sourceLength = std::strlen(sourceText);
@@ -14433,7 +14361,7 @@ namespace
       // and what GetHeadParameters hands D3D as hDeviceWindow for a windowed
       // primary head, so nothing downstream works without it.
       wxStringRuntime frameName{};
-      (void)wxString::InitWith(&frameName, kWxFrameDefaultName, 0, -101);
+      (void)WxStringRuntimeOps::InitWith(&frameName, kWxFrameDefaultName, 0, -101);
       (void)Create(
         nullptr,
         -1,
@@ -28654,17 +28582,17 @@ const wchar_t* wxRegistryKeyComposePathWithSubKeyRuntime(
     && wxWideStringLengthOrZero(childSubKeyName) != 0
     && childSubKeyName[0] != L'\\') {
     const wchar_t separator = L'\\';
-    wxString::append(&childPath, 1, &separator);
+    WxStringRuntimeOps::append(&childPath, 1, &separator);
   }
   if (childSubKeyName != nullptr) {
-    wxString::append(&childPath, wxWideStringLengthOrZero(childSubKeyName), childSubKeyName);
+    WxStringRuntimeOps::append(&childPath, wxWideStringLengthOrZero(childSubKeyName), childSubKeyName);
   }
 
   if (wxWideStringLengthOrZero(childPath.m_pchData) != 0) {
     (void)EnsureUniqueOwnedWxStringBuffer(&childPath);
     const std::int32_t pathLength = wxWideStringLengthOrZero(childPath.m_pchData);
     if (pathLength > 0 && childPath.m_pchData[pathLength - 1] == L'\\') {
-      wxString::Empty(&childPath, pathLength - 1);
+      WxStringRuntimeOps::Empty(&childPath, pathLength - 1);
     }
   }
 
@@ -28910,7 +28838,7 @@ bool wxRegistryKeyGetFirstSubKeyRuntime(
  * write-buffer handle. When the value type is `REG_EXPAND_SZ` and
  * `suppressExpand` is false, expands environment variables via
  * `ExpandEnvironmentStringsW` into a temporary wx-string and swaps it in.
- * Empty values yield `wxString::Empty(0)`.
+ * Empty values yield `WxStringRuntimeOps::Empty(0)`.
  *
  * On any failure (open, Win32 query, or size-0 early path) emits a
  * localized "Can't read value of '%s'" system-error log entry scoped to
@@ -29649,7 +29577,9 @@ HCURSOR wxCreateCursorFromBitmapMask(
 }
 
 // Registers itself on wxClassInfo::sm_first as it is constructed.
-wxClassInfo wxTopLevelWindowRootRuntime::sm_classInfo{L"wxTopLevelWindowMSW", L"wxTopLevelWindow", nullptr, static_cast<std::int32_t>(sizeof(wxTopLevelWindowRootRuntime))};
+wxClassInfo wxTopLevelWindowRootRuntime::sm_classInfo(
+  L"wxTopLevelWindowMSW", L"wxTopLevelWindow", nullptr, static_cast<std::int32_t>(sizeof(wxTopLevelWindowRootRuntime)), nullptr
+);
 
 /**
  * Address: 0x004A3690 (FUN_004A3690)
@@ -31048,7 +30978,9 @@ void wxControlContainerRuntime::Initialize(
 }
 
 // Registers itself on wxClassInfo::sm_first as it is constructed.
-wxClassInfo wxDialogRuntime::sm_classInfo{L"wxDialog", L"wxDialogBase", nullptr, static_cast<std::int32_t>(sizeof(wxDialogRuntime))};
+wxClassInfo wxDialogRuntime::sm_classInfo(
+  L"wxDialog", L"wxDialogBase", nullptr, static_cast<std::int32_t>(sizeof(wxDialogRuntime)), nullptr
+);
 wxEventTable wxDialogRuntime::sm_eventTable = {nullptr, nullptr};
 
 /**
@@ -31739,7 +31671,9 @@ wxTreeListColumnInfoRuntime* wxTreeListColumnInfoRuntime::DeleteWithFlag(
 }
 
 // Registers itself on wxClassInfo::sm_first as it is constructed.
-wxClassInfo wxTreeListCtrlRuntime::sm_classInfo{L"wxTreeListCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTreeListCtrlRuntime))};
+wxClassInfo wxTreeListCtrlRuntime::sm_classInfo(
+  L"wxTreeListCtrl", L"wxControl", nullptr, static_cast<std::int32_t>(sizeof(wxTreeListCtrlRuntime)), nullptr
+);
 wxEventTable wxTreeListCtrlRuntime::sm_eventTable = {&gWxControlEventTableRuntime, nullptr};
 
 /**
@@ -39179,7 +39113,7 @@ moho::wxPaintDCRuntime::~wxPaintDCRuntime() = default;
 
   const auto* const event = static_cast<const WxPaintDcLookupEventRuntimeView*>(eventRuntime);
   const int paintDcHandle = static_cast<int>(
-    reinterpret_cast<std::uintptr_t>(wxFindPaintDcHandleForWindowRuntime(event->windowRuntimeLane08))
+    static_cast<std::uintptr_t>(wxFindPaintDcHandleForWindowRuntime(event->windowRuntimeLane08))
   );
   if (paintDcHandle != 0) {
     auto* const vtable = *reinterpret_cast<WxVirtualSlot1F4DispatchVTableRuntimeView**>(dispatchOwnerRuntime);
@@ -39770,29 +39704,6 @@ namespace
   std::uint8_t gWxPipeOutputStreamRuntimeVTableTag = 0;
 }
 
-/**
- * Address: 0x00A13460 (FUN_00A13460)
- *
- * What it does:
- * Initializes one `wxPipeInputStream` payload in-place by running
- * `wxInputStream` base construction, storing the owned native handle lane, and
- * binding the pipe-input runtime vtable lane.
- */
-[[maybe_unused]] void* wxConstructPipeInputStreamRuntimeInPlace(
-  void* const streamRuntime,
-  void* const nativeHandle
-) noexcept
-{
-  auto* const runtime = static_cast<WxPipeInputStreamRuntimeView*>(streamRuntime);
-  if (runtime == nullptr) {
-    return nullptr;
-  }
-
-  auto* const baseStream = new (runtime) wxInputStream();
-  runtime->nativeHandle = static_cast<HANDLE>(nativeHandle);
-  runtime->vtable = &gWxPipeInputStreamRuntimeVTableTag;
-  return baseStream;
-}
 
 /**
  * Address: 0x00A13480 (FUN_00A13480)
@@ -39933,68 +39844,9 @@ namespace
   return DestroyWxOutputStreamBaseRuntime(reinterpret_cast<wxStreamBase*>(pipeOutputStreamRuntime));
 }
 
-/**
- * Address: 0x009DCEE0 (FUN_009DCEE0)
- * Mangled: ??0wxStreamBase@@QAE@@Z
- *
- * What it does:
- * Initializes one stream-base runtime lane and binds the base vtable.
- */
-wxStreamBase::wxStreamBase() = default;
 
-/**
- * Address: 0x009DCF40 (FUN_009DCF40)
- * Mangled: ??0wxInputStream@@QAE@@Z
- *
- * What it does:
- * Initializes pushback-lane counters to zero and binds input-stream base
- * runtime state.
- */
-wxInputStream::wxInputStream()
-  : wxStreamBase()
-  , m_wback(0)
-  , m_wbackcur(0)
-  , m_wbacksize(0)
-{}
 
-/**
- * Address: 0x009DD2B0 (FUN_009DD2B0)
- * Mangled: ??0wxOutputStream@@QAE@@Z
- *
- * What it does:
- * Initializes one output-stream runtime lane and binds the derived vtable.
- */
-wxOutputStream::wxOutputStream()
-  : wxStreamBase()
-{}
 
-/**
- * Address: 0x009DD0F0 (FUN_009DD0F0)
- *
- * What it does:
- * Reads one byte through the virtual stream read lane and returns the
- * resulting character.
- */
-char wxInputStream::GetC()
-{
-  class WxInputStreamReadDispatch
-  {
-  public:
-    virtual void Slot00() = 0;
-    virtual void Slot04() = 0;
-    virtual void Slot08() = 0;
-    virtual void Slot0C() = 0;
-    virtual void Slot10() = 0;
-    virtual void* ReadBytes(void* destination, int byteCount) = 0;
-  };
-
-  std::uint8_t value = static_cast<std::uint8_t>((reinterpret_cast<std::uintptr_t>(this) >> 8u) & 0xFFu);
-  auto* const dispatch = reinterpret_cast<WxInputStreamReadDispatch*>(this);
-  if (dispatch != nullptr) {
-    (void)dispatch->ReadBytes(&value, 1);
-  }
-  return static_cast<char>(value);
-}
 
 /**
  * Address: 0x009710B0 (FUN_009710B0)
@@ -40302,7 +40154,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
 )
 {
   if (wxFileExists(filePath)) {
-    wxFileInputStream inputStream(*filePath);
+    wxFileInputStream inputStream(filePath->c_str());
     return wxInputStreamHasPngSignature(&inputStream) || wxInputStreamHasXpmSignature(&inputStream);
   }
 
@@ -41584,74 +41436,9 @@ bool wxFileExists(
   return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
-/**
- * Address: 0x00A12870 (FUN_00A12870)
- * Mangled: ??0wxFile@@QAE@PBGW4OpenMode@0@@Z
- *
- * What it does:
- * Initializes one file lane and opens the provided wide path with read mode.
- */
-wxFile::wxFile(
-  const wchar_t* const fileName,
-  const OpenMode mode
-)
-  : m_fd(-1)
-  , m_error(0)
-{
-  (void)Open(fileName, mode, 438);
-}
 
-wxFile::~wxFile()
-{
-  (void)Attach();
-}
 
-/**
- * Address: 0x00A11F50 (FUN_00A11F50)
- * Mangled: ?Exists@wxFile@@SA_NPB_W@Z
- *
- * What it does:
- * Builds one temporary wx-string from a wide path and probes whether it maps
- * to an existing non-directory file.
- */
-bool wxFile::Exists(
-  const wchar_t* const fileName
-)
-{
-  wxStringRuntime path = AllocateOwnedWxString(fileName != nullptr ? std::wstring(fileName) : std::wstring());
-  const bool exists = wxFileExists(&path);
-  ReleaseOwnedWxString(path);
-  return exists;
-}
 
-/**
- * Address: 0x00A12020 (FUN_00A12020, wxFile::Attach)
- * Mangled: ?Attach@wxFile@@QAE_NXZ
- *
- * What it does:
- * Closes one open file descriptor lane and resets it to `-1`, reporting
- * failure when the close operation returns an error.
- */
-bool wxFile::Attach()
-{
-  if (m_fd == -1) {
-    return true;
-  }
-
-  if (_close(m_fd) != -1) {
-    m_fd = -1;
-    return true;
-  }
-
-  const wchar_t* messageTemplate = L"can't close file descriptor %d";
-  if (wxLocale* const locale = wxGetLocale(); locale != nullptr) {
-    messageTemplate = locale->GetString(messageTemplate, 0);
-  }
-
-  wxLogSysError(messageTemplate, m_fd);
-  m_fd = -1;
-  return false;
-}
 
 /**
  * Address: 0x00A94D8C (FUN_00A94D8C, wxOpen)
@@ -41660,7 +41447,7 @@ bool wxFile::Attach()
  * Opens one wide filesystem path with `_SH_DENYNO` sharing via CRT secure
  * open dispatch and returns either the file descriptor or `-1`.
  */
-int wxOpen(
+int WxOpenWideSharedRuntime(
   const wchar_t* const fileName,
   const int openFlags,
   const int permissions
@@ -41703,75 +41490,8 @@ namespace
   }
 } // namespace
 
-/**
- * Address: 0x00A12080 (FUN_00A12080, wxFile::Read)
- * Mangled: ?Read@wxFile@@QAEJPAXJ@Z
- *
- * What it does:
- * Reads one byte span from the descriptor lane into `buffer` and reports a
- * localized system error when `_read()` fails.
- */
-long wxFile::Read(
-  void* const buffer,
-  const long bytesToRead
-)
-{
-  if (buffer == nullptr || m_fd == -1) {
-    return 0;
-  }
 
-  const int readResult = _read(m_fd, buffer, static_cast<unsigned int>(bytesToRead));
-  if (readResult == -1) {
-    WxLogSysErrorLocalized(L"can't read from file descriptor %d", m_fd);
-    return -1;
-  }
 
-  return readResult;
-}
-
-/**
- * Address: 0x00A120F0 (FUN_00A120F0, wxFile::Write)
- * Mangled: ?Write@wxFile@@QAEJPBXJ@Z
- *
- * What it does:
- * Writes one byte span into the descriptor lane and sets the wx error byte
- * when `_write()` fails.
- */
-long wxFile::Write(
-  const void* const buffer,
-  const long bytesToWrite
-)
-{
-  if (buffer != nullptr && m_fd != -1) {
-    const int writeResult = _write(m_fd, buffer, static_cast<unsigned int>(bytesToWrite));
-    if (writeResult != -1) {
-      return writeResult;
-    }
-
-    WxLogSysErrorLocalized(L"can't write to file descriptor %d", m_fd);
-    m_error = 1;
-  }
-
-  return 0;
-}
-
-/**
- * Address: 0x00A12150 (FUN_00A12150, wxFile::Flush)
- * Mangled: ?Flush@wxFile@@QAE_NXZ
- *
- * What it does:
- * Commits one open descriptor lane and reports a localized system error when
- * `_commit()` fails.
- */
-bool wxFile::Flush()
-{
-  if (m_fd == -1 || _commit(m_fd) != -1) {
-    return true;
-  }
-
-  WxLogSysErrorLocalized(L"can't flush file descriptor %d", m_fd);
-  return false;
-}
 
 /**
  * Address: 0x00A12290 (FUN_00A12290, wxFile::Length)
@@ -41783,409 +41503,26 @@ bool wxFile::Flush()
  */
 extern "C" long __cdecl RuntimeFileLength(int fileHandle);
 
-long wxFile::Length() const
-{
-  const long fileLength = RuntimeFileLength(m_fd);
-  if (fileLength == -1) {
-    WxLogSysErrorLocalized(L"can't find length of file on file descriptor %d", m_fd);
-    return -1;
-  }
 
-  return fileLength;
-}
 
-/**
- * Address: 0x00A12230 (FUN_00A12230, wxFile::Tell)
- * Mangled: ?Tell@wxFile@@QBEJXZ
- *
- * What it does:
- * Returns the descriptor seek-position lane and logs a localized system error
- * when seek-position resolution fails.
- */
-long wxFile::Tell() const
-{
-  const long seekPosition = _tell(m_fd);
-  if (seekPosition == -1L) {
-    WxLogSysErrorLocalized(L"can't get seek position on file descriptor %d", m_fd);
-  }
 
-  return seekPosition;
-}
 
-/**
- * Address: 0x00A121B0 (FUN_00A121B0, wxFile::Seek)
- * Mangled: ?Seek@wxFile@@QAEJJW4wxSeekMode@@@Z
- *
- * What it does:
- * Applies one descriptor seek with wx-origin mapping and logs a localized
- * system error when the seek fails.
- */
-long wxFile::Seek(
-  const long distanceToMove,
-  const int seekMode
-)
-{
-  int moveMethod = 0;
-  if (seekMode == 1) {
-    moveMethod = 1;
-  } else if (seekMode == 2) {
-    moveMethod = 2;
-  }
-
-  const long seekPosition = _lseek(m_fd, distanceToMove, moveMethod);
-  if (seekPosition == -1L) {
-    WxLogSysErrorLocalized(L"can't seek on file descriptor %d", m_fd);
-  }
-
-  return seekPosition;
-}
-
-/**
- * Address: 0x00A12600 (FUN_00A12600, wxFile::Create)
- *
- * What it does:
- * Opens one writable descriptor for `fileName` in overwrite (`_O_TRUNC`) or
- * exclusive-create (`_O_EXCL`) mode and replaces the currently attached lane.
- */
-bool wxFile::Create(
-  const wchar_t* const fileName,
-  const bool overwrite,
-  const std::int32_t permissions
-)
-{
-  const int openFlags = (overwrite ? _O_TRUNC : _O_EXCL) | _O_BINARY | _O_WRONLY | _O_CREAT;
-  const int fileDescriptor = wxOpen(fileName, openFlags, permissions);
-  if (fileDescriptor == -1) {
-    WxLogSysErrorLocalized(L"can't create file '%s'", fileName);
-    return false;
-  }
-
-  (void)Attach();
-  m_fd = fileDescriptor;
-  return true;
-}
-
-/**
- * Address: 0x00A12690 (FUN_00A12690, wxFile::Open)
- * Mangled: ?Open@wxFile@@QAE_NPB_WW4OpenMode@1@H@Z
- *
- * What it does:
- * Translates one wx open-mode lane into CRT flags, opens the requested path,
- * and rebinds `m_fd` on success.
- */
-bool wxFile::Open(
-  const wchar_t* const fileName,
-  const OpenMode mode,
-  const std::int32_t permissions
-)
-{
-  int openFlags = _O_BINARY | _O_RDONLY;
-
-  switch (mode) {
-    case OpenWrite:
-      openFlags = _O_BINARY | _O_WRONLY | _O_CREAT | _O_TRUNC;
-      break;
-
-    case OpenReadWrite:
-      openFlags = _O_BINARY | _O_RDWR;
-      break;
-
-    case OpenWriteAppend:
-      if (Exists(fileName)) {
-        openFlags = _O_BINARY | _O_WRONLY | _O_APPEND;
-      } else {
-        openFlags = _O_BINARY | _O_WRONLY | _O_CREAT | _O_TRUNC;
-      }
-      break;
-
-    case OpenWriteExcl:
-      openFlags = _O_BINARY | _O_WRONLY | _O_CREAT | _O_EXCL;
-      break;
-
-    case OpenRead:
-    default:
-      break;
-  }
-
-  const int fileDescriptor = wxOpen(fileName, openFlags, permissions);
-  if (fileDescriptor == -1) {
-    WxLogSysErrorLocalized(L"can't open file '%s'", fileName);
-    return false;
-  }
-
-  (void)Attach();
-  m_fd = fileDescriptor;
-  return true;
-}
 
 // File-scope forward declaration for the CRT-style helper defined in
 // moho/misc/CrtRuntimeHelpers.cpp. Block-scope language-linkage specifications
 // are illegal in C++, so the declaration must live at namespace scope.
 extern "C" std::size_t __cdecl RuntimeWcsToMbs(char*, const wchar_t*, std::size_t);
 
-/**
- * Address: 0x009FAA30 (FUN_009FAA30)
- *
- * What it does:
- * Converts one wide file-name lane to a narrow C-runtime path, opens it with
- * `fopen`, stores the resulting handle, and localizes/logs one system-error
- * message on open failure.
- */
-[[maybe_unused]] bool wxFFileOpenFromWidePathRuntime(
-  wxFFile* const fileRuntime,
-  const wchar_t* const fileName,
-  const char* const mode
-)
-{
-  const wchar_t* const safeWideName = (fileName != nullptr) ? fileName : wxEmptyString;
-  const std::size_t wideLength = std::wcslen(safeWideName);
-  const std::size_t narrowCapacity = wideLength + 1u;
 
-  auto* const narrowPath = static_cast<char*>(::operator new(narrowCapacity));
-  if (RuntimeWcsToMbs(narrowPath, safeWideName, narrowCapacity) == static_cast<std::size_t>(-1)) {
-    narrowPath[0] = '\0';
-  }
 
-  fileRuntime->m_file = std::fopen(narrowPath, mode);
-  ::operator delete(narrowPath);
 
-  if (fileRuntime->m_file != nullptr) {
-    (void)wxAssignWideSpanToRuntimeString(&fileRuntime->m_name, wideLength, safeWideName);
-    return true;
-  }
 
-  WxLogSysErrorLocalized(L"can't open file '%s'", safeWideName);
-  return false;
-}
 
-/**
- * Address: 0x009FADB0 (FUN_009FADB0)
- *
- * What it does:
- * Initializes one `wxFFile` payload to empty (`m_file=null`, `m_name=empty`)
- * and then dispatches the wide-path open lane.
- */
-[[maybe_unused]] wxFFile* wxFFileConstructAndOpenRuntime(
-  wxFFile* const fileRuntime,
-  const wchar_t* const fileName,
-  const char* const mode
-)
-{
-  fileRuntime->m_name.m_pchData = const_cast<wchar_t*>(wxEmptyString);
-  fileRuntime->m_file = nullptr;
-  (void)wxFFileOpenFromWidePathRuntime(fileRuntime, fileName, mode);
-  return fileRuntime;
-}
 
-/**
- * Address: 0x009FAAE0 (FUN_009FAAE0, wxFFile::Close)
- *
- * What it does:
- * Closes one active `FILE*` lane and logs a localized system error when
- * `fclose()` fails.
- */
-bool wxFFile::Close()
-{
-  if (m_file == nullptr) {
-    return true;
-  }
 
-  if (std::fclose(m_file) == 0) {
-    m_file = nullptr;
-    return true;
-  }
 
-  WxLogSysErrorLocalized(L"can't close file '%s'", m_name.m_pchData);
-  return false;
-}
 
-/**
- * Address: 0x00999A00 (FUN_00999A00)
- *
- * What it does:
- * Closes one `wxFFile` lane and releases shared ownership for the file-name
- * string payload.
- */
-wxFFile::~wxFFile()
-{
-  (void)Close();
-  ReleaseWxStringSharedPayload(m_name);
-}
 
-/**
- * Address: 0x009FAB40 (FUN_009FAB40, wxFFile::Read)
- * Mangled: ?Read@wxFFile@@QAEIPAXI@Z
- *
- * What it does:
- * Reads one byte span from the backing `FILE*` and logs a localized system
- * error when `ferror()` reports failure.
- */
-unsigned int wxFFile::Read(
-  void* const buffer,
-  const unsigned int byteCount
-)
-{
-  if (buffer == nullptr || m_file == nullptr) {
-    return 0;
-  }
-
-  const std::size_t requestedBytes = static_cast<std::size_t>(byteCount);
-  const std::size_t bytesRead = std::fread(buffer, 1u, requestedBytes, m_file);
-  if (bytesRead < requestedBytes && std::ferror(m_file) != 0) {
-    WxLogSysErrorLocalized(L"Read error on file '%s'", m_name.m_pchData);
-  }
-
-  return static_cast<unsigned int>(bytesRead);
-}
-
-/**
- * Address: 0x009FABD0 (FUN_009FABD0, wxFFile::Write)
- * Mangled: ?Write@wxFFile@@QAEIPBXI@Z
- *
- * What it does:
- * Writes one byte span into the active `FILE*` lane and logs a localized
- * system error when the number of written bytes is short.
- */
-unsigned int wxFFile::Write(
-  const void* const buffer,
-  const unsigned int byteCount
-)
-{
-  if (buffer == nullptr || m_file == nullptr) {
-    return 0;
-  }
-
-  const std::size_t requestedBytes = static_cast<std::size_t>(byteCount);
-  const std::size_t bytesWritten = std::fwrite(buffer, 1u, requestedBytes, m_file);
-  if (bytesWritten < requestedBytes) {
-    WxLogSysErrorLocalized(L"Write error on file '%s'", m_name.m_pchData);
-  }
-
-  return static_cast<unsigned int>(bytesWritten);
-}
-
-/**
- * Address: 0x00999960 (FUN_00999960)
- *
- * What it does:
- * Converts one UTF-16 wx string into ACP bytes and writes the full converted
- * span into this file lane.
- */
-bool wxFFile::Write(
-  const wxStringRuntime& text
-)
-{
-  const wchar_t* const wideText = text.c_str();
-  if (wideText == nullptr) {
-    return false;
-  }
-
-  const int requiredBytes = ::WideCharToMultiByte(CP_ACP, 0, wideText, -1, nullptr, 0, nullptr, nullptr);
-  if (requiredBytes <= 0) {
-    return false;
-  }
-
-  std::string narrowText(static_cast<std::size_t>(requiredBytes - 1), '\0');
-  if (requiredBytes > 1) {
-    (void)::WideCharToMultiByte(
-      CP_ACP,
-      0,
-      wideText,
-      -1,
-      narrowText.data(),
-      requiredBytes,
-      nullptr,
-      nullptr
-    );
-  }
-
-  const unsigned int expectedBytes = static_cast<unsigned int>(narrowText.size());
-  return Write(narrowText.data(), expectedBytes) == expectedBytes;
-}
-
-/**
- * Address: 0x009FAC50 (FUN_009FAC50, wxFFile::Flush)
- * Mangled: ?Flush@wxFFile@@QAE_NXZ
- *
- * What it does:
- * Flushes one active `FILE*` lane and reports a localized system error when
- * `fflush()` fails.
- */
-bool wxFFile::Flush()
-{
-  if (m_file == nullptr || std::fflush(m_file) == 0) {
-    return true;
-  }
-
-  WxLogSysErrorLocalized(L"failed to flush the file '%s'", m_name.m_pchData);
-  return false;
-}
-
-/**
- * Address: 0x009FACB0 (FUN_009FACB0, sub_9FACB0)
- *
- * What it does:
- * Repositions one active `FILE*` lane using wx seek-mode semantics and logs
- * a localized system error on seek failure.
- */
-bool wxFFile::Seek(const long distanceToMove, const int seekMode)
-{
-  if (m_file == nullptr) {
-    return false;
-  }
-
-  int whence = SEEK_SET;
-  if (seekMode == 1) {
-    whence = SEEK_CUR;
-  } else if (seekMode == 2) {
-    whence = SEEK_END;
-  }
-
-  if (std::fseek(m_file, distanceToMove, whence) == 0) {
-    return true;
-  }
-
-  WxLogSysErrorLocalized(L"Seek error on file '%s'", m_name.m_pchData);
-  return false;
-}
-
-/**
- * Address: 0x009FAD40 (FUN_009FAD40, wxFFile::Tell)
- * Mangled: ?Tell@wxFFile@@QBEIXZ
- *
- * What it does:
- * Returns one `FILE*` position lane (`ftell`) and logs a localized system
- * error when position lookup fails.
- */
-unsigned int wxFFile::Tell() const
-{
-  const long filePosition = std::ftell(m_file);
-  if (filePosition == -1L) {
-    WxLogSysErrorLocalized(L"Can't find current position in file '%s'", m_name.m_pchData);
-    return static_cast<unsigned int>(-1);
-  }
-
-  return static_cast<unsigned int>(filePosition);
-}
-
-/**
- * Address: 0x009FAE20 (FUN_009FAE20, sub_9FAE20)
- *
- * What it does:
- * Computes one file-length lane by seeking to end, reading that position, and
- * restoring the original seek position.
- */
-int wxFFile::Length()
-{
-  const int originalOffset = static_cast<int>(Tell());
-  if (originalOffset == -1 || !Seek(0L, 2)) {
-    return -1;
-  }
-
-  const int fileLength = static_cast<int>(Tell());
-  (void)Seek(originalOffset, 0);
-  return fileLength;
-}
 
 /**
  * Address: 0x00A910E9 (FUN_00A910E9)
@@ -42619,78 +41956,6 @@ void wxRemoveFileExtensionInPlace(
   AssignOwnedWxString(pathText, source.substr(0u, separatorIndex));
 }
 
-/**
- * Address: 0x009F64F0 (FUN_009F64F0, wxFileName::CreateTempFileName)
- *
- * IDA signature:
- * wxString *__cdecl sub_9F64F0(wxString *arg0, wxString *a1, wxFile *a3);
- *
- * What it does:
- * Splits `prefix` into a directory and a name, resolves an empty directory to
- * the Win32 temp path (falling back to `.`) and normalises `/` to `\` in a
- * supplied one, then names a unique file with `GetTempFileNameW`. When
- * `fileTemp` is supplied and still closed, the new file is opened for writing
- * with mode 0600. Either failure logs the localized diagnostic and clears
- * `outPath`.
- */
-wxStringRuntime* wxFileName::CreateTempFileName(
-  wxStringRuntime* const outPath,
-  const wxStringRuntime& prefix,
-  wxFile* const fileTemp
-)
-{
-  if (outPath == nullptr) {
-    return nullptr;
-  }
-
-  wxStringRuntime directoryText = AllocateOwnedWxString(std::wstring());
-  wxStringRuntime nameText = AllocateOwnedWxString(std::wstring());
-  wxFileName::SplitPath_0(prefix, &directoryText, &nameText, nullptr, nullptr);
-
-  std::wstring directory = directoryText.c_str() != nullptr ? std::wstring(directoryText.c_str()) : std::wstring();
-  if (!directory.empty()) {
-    // GetTempFileNameW is the one Win32 path API that rejects forward slashes.
-    std::replace(directory.begin(), directory.end(), L'/', L'\\');
-  } else {
-    std::array<wchar_t, 0x105> tempPathBuffer{};
-    const DWORD tempPathLength = ::GetTempPathW(0x104u, tempPathBuffer.data());
-    if (tempPathLength > 0u && tempPathLength < tempPathBuffer.size()) {
-      directory.assign(tempPathBuffer.data());
-    }
-    if (directory.empty()) {
-      directory.assign(1u, L'.');
-    }
-  }
-
-  const std::wstring namePrefix = nameText.c_str() != nullptr ? std::wstring(nameText.c_str()) : std::wstring();
-  std::array<wchar_t, 0x105> fileNameBuffer{};
-  const bool didCreate =
-    ::GetTempFileNameW(directory.c_str(), namePrefix.c_str(), 0u, fileNameBuffer.data()) != 0u;
-
-  if (!didCreate) {
-    // 0x009F660D / 0x009F6624
-    WxLogSysErrorLocalized(L"Failed to create a temporary file name");
-    AssignOwnedWxString(outPath, std::wstring());
-    ReleaseOwnedWxString(nameText);
-    ReleaseOwnedWxString(directoryText);
-    return outPath;
-  }
-
-  AssignOwnedWxString(outPath, std::wstring(fileNameBuffer.data()));
-
-  // 0x009F6634-0x009F667D: only open when the caller supplied a wxFile that is
-  // still closed; an already-open handle is left alone.
-  if (fileTemp != nullptr && fileTemp->m_fd == -1) {
-    if (!fileTemp->Open(fileNameBuffer.data(), wxFile::OpenWrite, 0600)) {
-      wxLogError(WxResolveLocalizedMessage(L"Failed to open temporary file."));
-      AssignOwnedWxString(outPath, std::wstring());
-    }
-  }
-
-  ReleaseOwnedWxString(nameText);
-  ReleaseOwnedWxString(directoryText);
-  return outPath;
-}
 
 /**
  * Address: 0x009DE3D0 (FUN_009DE3D0)
@@ -42711,13 +41976,11 @@ bool wxCreateTempFileNameFromPrefix(
     return false;
   }
 
-  wxStringRuntime named = AllocateOwnedWxString(std::wstring());
   const wxStringRuntime prefixSource =
     prefixText != nullptr ? *prefixText : wxStringRuntime::Borrow(L"");
-  (void)wxFileName::CreateTempFileName(&named, prefixSource, nullptr);
+  const wxString named = wxFileName::CreateTempFileName(prefixSource.c_str(), nullptr);
 
   AssignOwnedWxString(outFileName, named.c_str() != nullptr ? std::wstring(named.c_str()) : std::wstring());
-  ReleaseOwnedWxString(named);
 
   const wchar_t* const outputText = outFileName->c_str();
   return outputText != nullptr && *outputText != L'\0';
@@ -42768,147 +42031,13 @@ BOOL wxDeleteFileFromPointerRuntime(
   return wxDeleteFileWithErrnoMapping(*fileNameStorage) == 0 ? TRUE : FALSE;
 }
 
-/**
- * Address: 0x00A127D0 (FUN_00A127D0, ??1wxTempFile@@QAE@XZ)
- * Mangled: ??1wxTempFile@@QAE@XZ
- *
- * What it does:
- * Tears down one temp-file lane by discarding active temp state, closing the
- * embedded `wxFile`, and releasing both owned path strings.
- */
-wxTempFile::~wxTempFile()
-{
-  if (m_file.m_fd != -1) {
-    Discard();
-  }
 
-  (void)m_file.Attach();
-  ReleaseOwnedWxString(m_originalPath);
-  ReleaseOwnedWxString(m_tempPath);
-}
 
-/**
- * Address: 0x00A12580 (FUN_00A12580, wxTempFile::Discard)
- * Mangled: ?Discard@wxTempFile@@QAEXXZ
- *
- * What it does:
- * Closes the embedded temp-file descriptor and removes the temp-file path,
- * logging a localized system error when remove fails.
- */
-void wxTempFile::Discard()
-{
-  (void)m_file.Attach();
 
-  if (wxDeleteFileWithErrnoMapping(m_tempPath.m_pchData) == 0) {
-    return;
-  }
 
-  WxLogSysErrorLocalized(L"can't remove temporary file '%s'", m_tempPath.m_pchData);
-}
 
-/**
- * Address: 0x009DBCE0 (FUN_009DBCE0)
- *
- * What it does:
- * Initializes one file-backed output stream by opening a `wxFile` lane in
- * write mode, marks stream ownership, and propagates open failure into the
- * stream status lane.
- */
-wxFileOutputStream::wxFileOutputStream(
-  const wxStringRuntime& fileName
-)
-{
-  std::memset(m_streamRuntime00, 0, sizeof(m_streamRuntime00));
 
-  m_file = new (std::nothrow) wxFile(fileName.c_str(), wxFile::OpenWrite);
-  m_ownsFile = 1u;
 
-  auto& statusLane = *reinterpret_cast<std::int32_t*>(&m_streamRuntime00[0x8]);
-  statusLane = 0;
-  if (m_file == nullptr || m_file->m_fd == -1 || m_file->m_error != 0u) {
-    statusLane = 2;
-  }
-}
-
-/**
- * Address: 0x009DBDD0 (FUN_009DBDD0)
- *
- * What it does:
- * Initializes one file-backed output stream from an already-open descriptor by
- * allocating a raw `wxFile` lane, binding `m_fd`, and marking stream-owned
- * file destruction.
- */
-wxFileOutputStream::wxFileOutputStream(
-  const int fileDescriptor
-)
-{
-  std::memset(m_streamRuntime00, 0, sizeof(m_streamRuntime00));
-
-  auto* const fileRuntime = static_cast<wxFile*>(
-    ::operator new(sizeof(wxFile), std::nothrow)
-  );
-  if (fileRuntime != nullptr) {
-    fileRuntime->m_fd = fileDescriptor;
-  }
-
-  m_file = fileRuntime;
-  m_ownsFile = 1u;
-}
-
-/**
- * Address: 0x009DBE90 (FUN_009DBE90, wxFileOutputStream::Sync)
- * Mangled: ?Sync@wxFileOutputStream@@UAEXXZ
- *
- * What it does:
- * Runs one no-op flush hook lane, then synchronizes the wrapped `wxFile`
- * descriptor.
- */
-void wxFileOutputStream::Sync()
-{
-  wxNoOpFileFlushHook();
-  (void)m_file->Flush();
-}
-
-/**
- * Address: 0x009DBE70 (FUN_009DBE70, wxFileOutputStream::OnSysTell)
- * Mangled: ?OnSysTell@wxFileOutputStream@@MBEJXZ
- *
- * What it does:
- * Delegates output-stream tell requests into the wrapped `wxFile` lane.
- */
-long wxFileOutputStream::OnSysTell() const
-{
-  return m_file->Tell();
-}
-
-/**
- * Address: 0x009DBE80 (FUN_009DBE80, wxFileOutputStream::OnSysSeek)
- * Mangled: ?OnSysSeek@wxFileOutputStream@@MAEJJW4wxSeekMode@@@Z
- *
- * What it does:
- * Delegates output-stream seek requests into the wrapped `wxFile` lane.
- */
-long wxFileOutputStream::OnSysSeek(
-  const long distanceToMove,
-  const int seekMode
-)
-{
-  return m_file->Seek(distanceToMove, seekMode);
-}
-
-/**
- * Address: 0x009DC2C0 (FUN_009DC2C0, wxFFileOutputStream::Sync)
- * Mangled: ?Sync@wxFFileOutputStream@@UAEXXZ
- *
- * What it does:
- * Runs one no-op flush hook lane, then synchronizes the wrapped `wxFFile`
- * stream.
- */
-void wxFFileOutputStream::Sync()
-{
-  wxNoOpFileFlushHook();
-  (void)m_file->Flush();
-}
 
 namespace
 {
@@ -43002,7 +42131,7 @@ namespace
     streamRuntime->mFile->Read(destinationBuffer, static_cast<unsigned int>(byteCount))
   );
 
-  if (std::feof(streamRuntime->mFile->m_file) != 0) {
+  if (streamRuntime->mFile->Eof()) {
     streamRuntime->mStatus = 1;
   }
 
@@ -43069,7 +42198,7 @@ namespace
 ) noexcept
 {
   const int writeResult = streamRuntime->mFile->Write(sourceBuffer, static_cast<long>(byteCount));
-  streamRuntime->mStatus = (streamRuntime->mFile->m_error != 0u) ? 2 : 0;
+  streamRuntime->mStatus = streamRuntime->mFile->Error() ? 2 : 0;
   return writeResult;
 }
 
@@ -43112,7 +42241,7 @@ namespace
   const int seekMode
 ) noexcept
 {
-  return streamRuntime->mFile->Seek(distanceToMove, seekMode) ? distanceToMove : -1;
+  return streamRuntime->mFile->Seek(distanceToMove, static_cast<wxSeekMode>(seekMode)) ? distanceToMove : -1;
 }
 
 /**
@@ -43156,7 +42285,7 @@ namespace
   const int seekMode
 ) noexcept
 {
-  return streamRuntime->mFile->Seek(distanceToMove, seekMode) ? distanceToMove : -1;
+  return streamRuntime->mFile->Seek(distanceToMove, static_cast<wxSeekMode>(seekMode)) ? distanceToMove : -1;
 }
 
 /**
@@ -43206,60 +42335,9 @@ bool wxCreateAnonymousPipe(
   return false;
 }
 
-/**
- * Address: 0x009DBAF0 (FUN_009DBAF0)
- * Mangled: ??0wxFileInputStream@@QAE@@Z
- *
- * What it does:
- * Builds one file-backed input stream from a path string by allocating a
- * `wxFile` lane and marking it as stream-owned for destruction.
- */
-wxFileInputStream::wxFileInputStream(
-  const wxStringRuntime& fileName
-)
-  : wxInputStream()
-{
-  if (wxFile* const file = new (std::nothrow) wxFile(fileName.c_str(), wxFile::OpenRead); file != nullptr) {
-    m_file = file;
-  } else {
-    m_file = nullptr;
-  }
-  m_file_destroy = 1;
-}
 
-wxFileInputStream::~wxFileInputStream()
-{
-  if (m_file_destroy != 0u) {
-    delete m_file;
-  }
-  m_file = nullptr;
-  m_file_destroy = 0;
-}
 
-/**
- * Address: 0x009DBCD0 (FUN_009DBCD0)
- *
- * What it does:
- * Delegates input-stream tell requests into the wrapped `wxFile` lane.
- */
-long wxFileInputStream::OnSysTell() const
-{
-  return m_file->Tell();
-}
 
-/**
- * Address: 0x009DBCC0 (FUN_009DBCC0)
- *
- * What it does:
- * Delegates input-stream seek requests into the wrapped `wxFile` lane.
- */
-long wxFileInputStream::OnSysSeek(
-  const long distanceToMove,
-  const int seekMode
-)
-{
-  return m_file->Seek(distanceToMove, seekMode);
-}
 
 namespace
 {
@@ -44461,74 +43539,7 @@ static_assert(
   return static_cast<std::uint16_t>(*left) - static_cast<std::uint16_t>(*right);
 }
 
-/**
- * Address: 0x009F3A00 (FUN_009F3A00, wxFileName::Clear)
- *
- * What it does:
- * Clears the path-component array, resets both cached auxiliary string lanes
- * to empty, copies that empty value into the primary string lane, and
- * restores case-sensitive comparisons.
- */
-wxStringRuntime* wxFileName::Clear()
-{
-  mComponents.Clear();
 
-  ReleaseWxStringSharedPayload(mTertiaryText);
-  (void)wxString::InitWith(&mTertiaryText, wxEmptyString, 0, -101);
-
-  ReleaseWxStringSharedPayload(mSecondaryText);
-  (void)wxCopySharedWxStringRuntime(&mTertiaryText, &mSecondaryText);
-
-  ReleaseWxStringSharedPayload(mPrimaryText);
-  (void)wxCopySharedWxStringRuntime(&mSecondaryText, &mPrimaryText);
-
-  mCaseSensitive = 1;
-  return &mPrimaryText;
-}
-
-void wxFileName::SplitPath(
-  const wxStringRuntime& input,
-  wxStringRuntime* const volume,
-  wxStringRuntime* const path,
-  wxStringRuntime* const name,
-  wxStringRuntime* const ext,
-  const wchar_t* const formatHint
-)
-{
-  (void)formatHint;
-
-  std::wstring volumeText;
-  std::wstring pathText;
-  std::wstring nameText;
-  std::wstring extText;
-
-  try {
-    const std::filesystem::path inputPath(input.c_str());
-    volumeText = inputPath.root_name().wstring();
-
-    pathText = inputPath.parent_path().wstring();
-    const std::wstring rootPathText = inputPath.root_path().wstring();
-    if (!rootPathText.empty() && pathText.rfind(rootPathText, 0) == 0) {
-      pathText.erase(0, rootPathText.size());
-    }
-
-    nameText = inputPath.stem().wstring();
-    extText = inputPath.extension().wstring();
-    if (!extText.empty() && extText.front() == L'.') {
-      extText.erase(0, 1);
-    }
-  } catch (const std::exception&) {
-    volumeText.clear();
-    pathText.clear();
-    nameText.clear();
-    extText.clear();
-  }
-
-  AssignOwnedWxString(volume, volumeText);
-  AssignOwnedWxString(path, pathText);
-  AssignOwnedWxString(name, nameText);
-  AssignOwnedWxString(ext, extText);
-}
 
 /**
  * Address: 0x009F46E0 (FUN_009F46E0)
@@ -44711,7 +43722,7 @@ namespace
   return outText;
 }
 
-wxStringRuntime* wxString::Empty(
+wxStringRuntime* WxStringRuntimeOps::Empty(
   wxStringRuntime* const value,
   const std::uint32_t newLength
 )
@@ -44719,7 +43730,7 @@ wxStringRuntime* wxString::Empty(
   return value != nullptr ? value->Empty(newLength) : nullptr;
 }
 
-wxStringRuntime* wxString::InitWith(
+wxStringRuntime* WxStringRuntimeOps::InitWith(
   wxStringRuntime* const outValue,
   const wchar_t* const sourceText,
   const std::int32_t beginOffset,
@@ -44756,7 +43767,7 @@ wxStringRuntime* wxString::InitWith(
   return outValue;
 }
 
-wxStringRuntime* wxString::append(
+wxStringRuntime* WxStringRuntimeOps::append(
   wxStringRuntime* const outValue,
   const std::int32_t lengthHint,
   const wchar_t* const sourceText
@@ -44949,7 +43960,7 @@ wxStringRuntime* wxString::append(
       volumeCopy,
       reinterpret_cast<const wchar_t*>(static_cast<std::uintptr_t>(pathFormat))
     );
-    (void)wxString::append(
+    (void)WxStringRuntimeOps::append(
       outPath,
       static_cast<std::int32_t>(std::wcslen(volumePrefix.m_pchData != nullptr ? volumePrefix.m_pchData : wxEmptyString)),
       volumePrefix.m_pchData != nullptr ? volumePrefix.m_pchData : wxEmptyString
@@ -44964,14 +43975,14 @@ wxStringRuntime* wxString::append(
     case 2:
       if (fileNameRuntime->isRelativePath != 0u) {
         wchar_t separator = L':';
-        (void)wxString::append(outPath, 1, &separator);
+        (void)WxStringRuntimeOps::append(outPath, 1, &separator);
       }
       break;
 
     case 3:
       if (fileNameRuntime->isRelativePath == 0u) {
         wchar_t separator = L'\\';
-        (void)wxString::append(outPath, 1, &separator);
+        (void)WxStringRuntimeOps::append(outPath, 1, &separator);
       }
       break;
 
@@ -44987,7 +43998,7 @@ wxStringRuntime* wxString::append(
             : nullptr;
         if (!WxPathComponentIsSingleTildeRuntime(firstComponent)) {
           wchar_t separator = L'/';
-          (void)wxString::append(outPath, 1, &separator);
+          (void)WxStringRuntimeOps::append(outPath, 1, &separator);
         }
       }
       break;
@@ -44997,7 +44008,7 @@ wxStringRuntime* wxString::append(
   {
     if (pathFormat == 4) {
       wchar_t openBracket = L'[';
-      (void)wxString::append(outPath, 1, &openBracket);
+      (void)WxStringRuntimeOps::append(outPath, 1, &openBracket);
     }
 
     for (std::uint32_t index = 0; index < fileNameRuntime->componentCount; ++index)
@@ -45017,18 +44028,18 @@ wxStringRuntime* wxString::append(
       }
 
       if (shouldAppendComponent) {
-        (void)wxString::append(outPath, static_cast<std::int32_t>(std::wcslen(component)), component);
+        (void)WxStringRuntimeOps::append(outPath, static_cast<std::int32_t>(std::wcslen(component)), component);
       }
 
       if ((composeFlags & 0x02u) != 0u || index + 1u != fileNameRuntime->componentCount) {
         wchar_t separator = wxGetPathSeparatorCharacterForFormatRuntime(pathFormat);
-        (void)wxString::append(outPath, 1, &separator);
+        (void)WxStringRuntimeOps::append(outPath, 1, &separator);
       }
     }
 
     if (pathFormat == 4) {
       wchar_t closeBracket = L']';
-      (void)wxString::append(outPath, 1, &closeBracket);
+      (void)WxStringRuntimeOps::append(outPath, 1, &closeBracket);
     }
   }
 
@@ -45059,14 +44070,14 @@ wxStringRuntime* wxString::append(
   (void)wxCopySharedWxStringRuntime(&fileNameRuntime->fileNameText, &fileNameWithExtension);
   if (fileNameRuntime->extensionText.m_pchData != nullptr && fileNameRuntime->extensionText.m_pchData[0] != L'\0') {
     wchar_t dot = L'.';
-    (void)wxString::append(&fileNameWithExtension, 1, &dot);
-    (void)wxString::append(
+    (void)WxStringRuntimeOps::append(&fileNameWithExtension, 1, &dot);
+    (void)WxStringRuntimeOps::append(
       &fileNameWithExtension,
       static_cast<std::int32_t>(std::wcslen(fileNameRuntime->extensionText.m_pchData)),
       fileNameRuntime->extensionText.m_pchData
     );
   }
-  (void)wxString::append(
+  (void)WxStringRuntimeOps::append(
     outText,
     static_cast<std::int32_t>(std::wcslen(fileNameWithExtension.m_pchData != nullptr ? fileNameWithExtension.m_pchData : wxEmptyString)),
     fileNameWithExtension.m_pchData != nullptr ? fileNameWithExtension.m_pchData : wxEmptyString
@@ -45076,33 +44087,6 @@ wxStringRuntime* wxString::append(
   return outText;
 }
 
-/**
- * Address: 0x009F5820 (FUN_009F5820)
- * Mangled: ?SplitPath_0@wxFileName@@SAXABVwxString@@PAV2@00PA_W@Z
- *
- * What it does:
- * Splits path components, then prepends the computed volume-prefix lane onto
- * the output path lane when requested.
- */
-void wxFileName::SplitPath_0(
-  const wxStringRuntime& input,
-  wxStringRuntime* const path,
-  wxStringRuntime* const name,
-  wxStringRuntime* const ext,
-  const wchar_t* const formatHint
-)
-{
-  wxStringRuntime volume = wxStringRuntime::Borrow(L"");
-  SplitPath(input, &volume, path, name, ext, formatHint);
-
-  if (path != nullptr) {
-    wxStringRuntime volumePrefix = wxGetVolumeString(volume, formatHint);
-    PrependOwnedWxString(path, volumePrefix);
-    ReleaseOwnedWxString(volumePrefix);
-  }
-
-  ReleaseOwnedWxString(volume);
-}
 
 /**
  * Address: 0x009DF260 (FUN_009DF260)
@@ -45119,11 +44103,11 @@ wxStringRuntime* wxBuildFileNameFromPath(
     return nullptr;
   }
 
-  wxStringRuntime namePart = AllocateOwnedWxString(std::wstring());
-  wxStringRuntime extensionPart = AllocateOwnedWxString(std::wstring());
+  wxString namePart;
+  wxString extensionPart;
 
   const wxStringRuntime inputPath = sourcePath != nullptr ? *sourcePath : wxStringRuntime::Borrow(L"");
-  wxFileName::SplitPath_0(inputPath, nullptr, &namePart, &extensionPart, nullptr);
+  wxFileName::SplitPath(inputPath.c_str(), nullptr, &namePart, &extensionPart);
 
   std::wstring fileName(namePart.c_str());
   if (const wchar_t* const extensionText = extensionPart.c_str(); extensionText != nullptr && *extensionText != L'\0') {
@@ -45132,9 +44116,8 @@ wxStringRuntime* wxBuildFileNameFromPath(
   }
 
   AssignOwnedWxString(outFileName, fileName);
-
-  ReleaseOwnedWxString(extensionPart);
-  ReleaseOwnedWxString(namePart);
+  // namePart/extensionPart are wxString now - their own destructors do the
+  // refcount drop the manual release calls used to stand in for.
   return outFileName;
 }
 
@@ -45237,8 +44220,26 @@ namespace
       const wchar_t* const sourceText = srcPath.m_pchData;
       srcPath.m_pchData = nullptr;
       // InitWith(begin=0, len=-101) == assign-without-copy: own the full source lane.
-      wxString::InitWith(&srcPath, sourceText, 0, -101);
-      wxFileName::SplitPath_0(srcPath, outDir, outName, outExt, nullptr);
+      WxStringRuntimeOps::InitWith(&srcPath, sourceText, 0, -101);
+
+      wxString directoryPart;
+      wxString namePart;
+      wxString extensionPart;
+      wxFileName::SplitPath(
+        srcPath.c_str(),
+        outDir != nullptr ? &directoryPart : nullptr,
+        outName != nullptr ? &namePart : nullptr,
+        outExt != nullptr ? &extensionPart : nullptr
+      );
+      if (outDir != nullptr) {
+        AssignOwnedWxString(outDir, std::wstring(directoryPart.c_str()));
+      }
+      if (outName != nullptr) {
+        AssignOwnedWxString(outName, std::wstring(namePart.c_str()));
+      }
+      if (outExt != nullptr) {
+        AssignOwnedWxString(outExt, std::wstring(extensionPart.c_str()));
+      }
       // wxString dtor tail: refcount-decrement, delete on drop.
       ReleaseWxStringSharedPayload(srcPath);
     }
@@ -48051,33 +47052,6 @@ namespace
   }
 } // namespace
 
-/**
- * Address: 0x00A2FA80 (FUN_00A2FA80)
- *
- * What it does:
- * Constructs one `wxSocketStream` runtime object by constructing input/output
- * stream subobjects with the same socket handle, then binding the stream and
- * output-subobject vtable lanes.
- */
-[[maybe_unused]] WxSocketStreamRuntimeView* wxConstructSocketStreamRuntime(
-  WxSocketStreamRuntimeView* const streamRuntime,
-  const std::int32_t socketHandle
-)
-{
-  auto* const inputStream = &streamRuntime->inputStream;
-  (void)new (reinterpret_cast<wxInputStream*>(inputStream)) wxInputStream();
-  inputStream->socketHandle = socketHandle;
-  inputStream->vtable = &gWxSocketInputStreamRuntimeVTableTag;
-
-  auto* const outputStream = &streamRuntime->outputStream;
-  (void)new (reinterpret_cast<wxOutputStream*>(outputStream)) wxOutputStream();
-  outputStream->socketHandle = socketHandle;
-  outputStream->vtable = &gWxSocketOutputStreamRuntimeVTableTag;
-
-  inputStream->vtable = &gWxSocketStreamRuntimeVTableTag;
-  outputStream->vtable = &gWxSocketStreamOutputSubobjectRuntimeVTableTag;
-  return streamRuntime;
-}
 
 /**
  * Address: 0x00A2FAF0 (FUN_00A2FAF0)
@@ -49767,7 +48741,7 @@ namespace
   wxStringRuntime statusPrefix{};
   statusPrefix.m_pchData = const_cast<wchar_t*>(wxEmptyString);
 
-  wxString::Empty(&runtime->replyBuffer, 0);
+  WxStringRuntimeOps::Empty(&runtime->replyBuffer, 0);
 
   bool expectingFirstLine = true;
   bool replyComplete = false;
@@ -49792,11 +48766,11 @@ namespace
 
     if (wxWideStringLengthOrZero(runtime->replyBuffer.m_pchData) != 0) {
       const wchar_t newlineCharacter = L'\n';
-      wxString::append(&runtime->replyBuffer, 1, &newlineCharacter);
+      WxStringRuntimeOps::append(&runtime->replyBuffer, 1, &newlineCharacter);
     }
 
     const std::int32_t lineLength = wxWideStringLengthOrZero(lineValue.m_pchData);
-    wxString::append(&runtime->replyBuffer, lineLength, lineValue.m_pchData);
+    WxStringRuntimeOps::append(&runtime->replyBuffer, lineLength, lineValue.m_pchData);
 
     if (lineLength < 4) {
       if (expectingFirstLine) {
@@ -49812,7 +48786,7 @@ namespace
     if (expectingFirstLine) {
       wxStringRuntime prefixCopy{};
       prefixCopy.m_pchData = nullptr;
-      wxString::InitWith(&prefixCopy, lineValue.m_pchData, 0, 3);
+      WxStringRuntimeOps::InitWith(&prefixCopy, lineValue.m_pchData, 0, 3);
       (void)wxCopySharedWxStringRuntime(&prefixCopy, &statusPrefix);
       ReleaseWxStringSharedPayload(prefixCopy);
 
@@ -53934,7 +52908,7 @@ std::int32_t wxStringRuntime::FindCharacterIndex(
  *
  * What it does:
  * Assigns one wx string from the UTF-16 half-open pointer range
- * `[begin,end)`, mirroring the original `wxString::InitWith(begin,0,len)`
+ * `[begin,end)`, mirroring the original `WxStringRuntimeOps::InitWith(begin,0,len)`
  * wrapper lane.
  */
 [[maybe_unused]] wxStringRuntime* wxStringAssignFromWidePointerRange(
@@ -54297,7 +53271,7 @@ wxStringRuntime* wxStringRuntime::BeforeLast(
 
   wxStringRuntime temporary{};
   temporary.m_pchData = nullptr;
-  wxString::InitWith(&temporary, m_pchData, 0, lastIndex);
+  WxStringRuntimeOps::InitWith(&temporary, m_pchData, 0, lastIndex);
 
   // wxString::operator=(outPrefix, temp): shared-retain from temp.
   RetainWxStringRuntime(outPrefix, &temporary);
@@ -62297,7 +61271,7 @@ namespace
     {
       const std::wstring wideTitle = gpg::STR_Utf8ToWide(title != nullptr ? title : "");
       wxStringRuntime viewportName{};
-      (void)wxString::InitWith(&viewportName, wideTitle.c_str(), 0, -101);
+      (void)WxStringRuntimeOps::InitWith(&viewportName, wideTitle.c_str(), 0, -101);
       (void)viewport->Create(parentWindow, -1, defaultPosition, viewportSize, 0, viewportName);
     }
 
@@ -68108,26 +67082,6 @@ wxStringRuntime* wxCopySharedWxStringRuntime(
   return outValue;
 }
 
-/**
- * Address: 0x00961420 (FUN_00961420, wxArrayString::Clear)
- *
- * What it does:
- * Releases all shared string payloads, resets size/count lanes to zero, and
- * deletes the backing item-pointer storage when present.
- */
-void wxArrayString::Clear()
-{
-  auto* const arrayRuntime = reinterpret_cast<WxArrayStringStorageRuntimeView*>(this);
-  wxArrayStringReleaseSharedItems(arrayRuntime);
-
-  wchar_t** const items = mItems;
-  mCount = 0;
-  mSize = 0;
-  if (items != nullptr) {
-    ::operator delete(items);
-    mItems = nullptr;
-  }
-}
 
 namespace
 {
@@ -70271,7 +69225,7 @@ namespace
   (void)wxConvertStoredWideTextToAllocatedMultiByteRuntime(
     sourceRuntime,
     outTextStorage,
-    wxConvCurrent
+    &wxConvCurrent
   );
   return outTextStorage;
 }
@@ -70376,7 +69330,7 @@ namespace
   (void)wxConvertStoredWideTextToAllocatedMultiByteRuntime(
     reinterpret_cast<const WxSourceTextLaneRuntimeView*>(hostNameText),
     &hostNameBytes,
-    wxConvLibc
+    &wxConvLibc
   );
 
   const bool resolved = wxSocketSetAddressIpv4FromHostNameRuntime(addressRuntime->socketPort, hostNameBytes) == 0;
@@ -70400,7 +69354,7 @@ namespace
   (void)wxConvertStoredWideTextToAllocatedMultiByteRuntime(
     sourceRuntime,
     &serviceName,
-    wxConvLibc
+    &wxConvLibc
   );
 
   const bool resolved = wxSocketSetServiceNameRuntime(
@@ -70432,7 +69386,7 @@ namespace
 
   wxStringRuntime commandWithTerminator{};
   commandWithTerminator.m_pchData = nullptr;
-  wxString::InitWith(
+  WxStringRuntimeOps::InitWith(
     &commandWithTerminator,
     (commandText != nullptr && commandText->m_pchData != nullptr) ? commandText->m_pchData : wxEmptyString,
     0,
@@ -70440,13 +69394,13 @@ namespace
   );
 
   constexpr wchar_t kFtpLineTerminatorWide[] = L"\r\n";
-  wxString::append(&commandWithTerminator, 2, kFtpLineTerminatorWide);
+  WxStringRuntimeOps::append(&commandWithTerminator, 2, kFtpLineTerminatorWide);
 
   char* commandBytes = nullptr;
   (void)wxConvertStoredWideTextToAllocatedMultiByteRuntime(
     reinterpret_cast<const WxSourceTextLaneRuntimeView*>(&commandWithTerminator),
     &commandBytes,
-    wxConvLibc
+    &wxConvLibc
   );
 
   const int commandByteCount = (commandBytes != nullptr)
@@ -70482,7 +69436,7 @@ namespace
 {
   wxStringRuntime commandLine{};
   commandLine.m_pchData = nullptr;
-  wxString::InitWith(
+  WxStringRuntimeOps::InitWith(
     &commandLine,
     commandVerb != nullptr ? commandVerb : wxEmptyString,
     0,
@@ -70493,8 +69447,8 @@ namespace
   const std::int32_t suffixLength = wxWideStringLengthOrZero(suffixText);
   if (suffixLength != 0) {
     const wchar_t separator = L' ';
-    wxString::append(&commandLine, 1, &separator);
-    wxString::append(&commandLine, suffixLength, suffixText);
+    WxStringRuntimeOps::append(&commandLine, 1, &separator);
+    WxStringRuntimeOps::append(&commandLine, suffixLength, suffixText);
   }
 
   const char replyClass = wxFtpSendCommandAndClassifyReplyRuntime(runtime, &commandLine);
@@ -70535,7 +69489,7 @@ namespace
   if (runtime->eventFlag14 != 0u) {
     wxStringRuntime quitCommand{};
     quitCommand.m_pchData = nullptr;
-    wxString::InitWith(&quitCommand, L"QUIT", 0, -101);
+    WxStringRuntimeOps::InitWith(&quitCommand, L"QUIT", 0, -101);
 
     const bool positiveCompletion =
       wxFtpSendCommandAndClassifyReplyRuntime(runtime, &quitCommand) == '2';
@@ -72791,7 +71745,7 @@ static_assert(
     return nullptr;
   }
 
-  return new (std::nothrow) wxFileInputStream(*fileName);
+  return new (std::nothrow) wxFileInputStream(fileName->c_str());
 }
 
 namespace
@@ -80074,7 +79028,7 @@ wxStringRuntime* wxBuildLocaleMessagesCatalogPath(
 
   const auto appendText = [outPath](const wchar_t* const text) {
     const std::int32_t count = (text != nullptr) ? static_cast<std::int32_t>(std::wcslen(text)) : 0;
-    (void)wxString::append(outPath, count, text);
+    (void)WxStringRuntimeOps::append(outPath, count, text);
   };
 
   const wchar_t directorySeparator = L'\\';
@@ -80084,17 +79038,17 @@ wxStringRuntime* wxBuildLocaleMessagesCatalogPath(
   outPath->m_pchData = const_cast<wchar_t*>(wxEmptyString);
 
   appendText(localeDirectory);
-  (void)wxString::append(outPath, 1, &directorySeparator);
+  (void)WxStringRuntimeOps::append(outPath, 1, &directorySeparator);
   appendText(localeName);
-  (void)wxString::append(outPath, 1, &directorySeparator);
-  (void)wxString::append(outPath, 11, L"LC_MESSAGES");
-  (void)wxString::append(outPath, 1, &localePathSeparator);
+  (void)WxStringRuntimeOps::append(outPath, 1, &directorySeparator);
+  (void)WxStringRuntimeOps::append(outPath, 11, L"LC_MESSAGES");
+  (void)WxStringRuntimeOps::append(outPath, 1, &localePathSeparator);
   appendText(localeDirectory);
-  (void)wxString::append(outPath, 1, &directorySeparator);
+  (void)WxStringRuntimeOps::append(outPath, 1, &directorySeparator);
   appendText(localeName);
-  (void)wxString::append(outPath, 1, &localePathSeparator);
+  (void)WxStringRuntimeOps::append(outPath, 1, &localePathSeparator);
   appendText(localeDirectory);
-  (void)wxString::append(outPath, 1, &localePathSeparator);
+  (void)WxStringRuntimeOps::append(outPath, 1, &localePathSeparator);
 
   return outPath;
 }
@@ -86909,40 +85863,6 @@ namespace
     (void)DestroyWxOutputStreamBaseRuntime(reinterpret_cast<wxStreamBase*>(outputStreamRuntime));
   }
 
-  /**
-   * Address: 0x009DC370 (FUN_009DC370, wxFileOutputStream::~wxFileOutputStream)
-   *
-   * What it does:
-   * Non-deleting destructor for `wxFileOutputStream`:
-   * 1. Rebinds the vtable to the `wxFileOutputStream` slot.
-   * 2. When `m_ownsFile` (+0x10) is set, calls `Sync()` (`sub_9DBE90`),
-   *    then if `m_file` (+0x0C) is non-null, invokes `wxFile::Attach()`
-   *    to release the native handle and deallocates the `wxFile` wrapper
-   *    via `operator delete` (matches binary).
-   * 3. Chains into `wxOutputStream::~wxOutputStream` (`sub_9DD2C0`).
-   */
-  void wxDestroyFileOutputStreamNoDeleteRuntime(
-    void* const fileOutputStreamRuntime
-  ) noexcept
-  {
-    static std::uint8_t sWxFileOutputStreamRuntimeVTableTag = 0;
-
-    auto* const stream = static_cast<wxFileOutputStream*>(fileOutputStreamRuntime);
-    if (stream == nullptr) {
-      return;
-    }
-
-    *reinterpret_cast<void**>(stream) = &sWxFileOutputStreamRuntimeVTableTag;
-    if (stream->m_ownsFile != 0u) {
-      stream->Sync();
-      if (stream->m_file != nullptr) {
-        (void)stream->m_file->Attach();
-        ::operator delete(stream->m_file);
-      }
-    }
-
-    wxDestroyOutputStreamNoDeleteRuntime(stream);
-  }
 
   /**
    * Address: 0x009DC4D0 (FUN_009DC4D0, wxFFileInputStream::~wxFFileInputStream)
@@ -86978,40 +85898,6 @@ namespace
     inputStream->~wxInputStream();
   }
 
-  /**
-   * Address: 0x009DC550 (FUN_009DC550, wxFFileOutputStream::~wxFFileOutputStream)
-   *
-   * What it does:
-   * Non-deleting destructor for `wxFFileOutputStream`:
-   * 1. Rebinds the vtable to the `wxFFileOutputStream` slot.
-   * 2. When `m_ownsFile` (+0x10) is set, calls `Sync()` (sub_9DC2C0), then
-   *    if `m_file` (+0x0C) is non-null destroys and deallocates the
-   *    backing `wxFFile` (sub_999A00 is `wxFFile::~wxFFile`, then
-   *    `operator delete`).
-   * 3. Chains into `wxOutputStream::~wxOutputStream` (sub_9DD2C0).
-   */
-  void wxDestroyFFileOutputStreamNoDeleteRuntime(
-    void* const ffileOutputStreamRuntime
-  ) noexcept
-  {
-    static std::uint8_t sWxFFileOutputStreamRuntimeVTableTag = 0;
-
-    auto* const stream = static_cast<wxFFileOutputStream*>(ffileOutputStreamRuntime);
-    if (stream == nullptr) {
-      return;
-    }
-
-    *reinterpret_cast<void**>(stream) = &sWxFFileOutputStreamRuntimeVTableTag;
-    if (stream->m_ownsFile != 0u) {
-      stream->Sync();
-      if (stream->m_file != nullptr) {
-        stream->m_file->~wxFFile();
-        ::operator delete(stream->m_file);
-      }
-    }
-
-    wxDestroyOutputStreamNoDeleteRuntime(stream);
-  }
 
   void wxDestroyStreamBufferNoDeleteRuntime(
     void* const streamBufferRuntime
@@ -87295,19 +86181,6 @@ namespace
   return DeleteRuntimeObjectWithFlag(fileInputStreamRuntime, deleteFlags, wxDestroyFileInputStreamNoDeleteRuntime);
 }
 
-/**
- * Address: 0x009DC6D0 (FUN_009DC6D0)
- *
- * What it does:
- * Runs one deleting-dtor thunk lane for `wxFileOutputStream`.
- */
-[[maybe_unused]] void* wxDestroyFileOutputStreamDeletingThunk(
-  void* const fileOutputStreamRuntime,
-  const std::uint8_t deleteFlags
-) noexcept
-{
-  return DeleteRuntimeObjectWithFlag(fileOutputStreamRuntime, deleteFlags, wxDestroyFileOutputStreamNoDeleteRuntime);
-}
 
 /**
  * Address: 0x009DC710 (FUN_009DC710)
@@ -87328,14 +86201,6 @@ namespace
  *
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFFileOutputStream`.
- */
-[[maybe_unused]] void* wxDestroyFFileOutputStreamDeletingThunk(
-  void* const ffileOutputStreamRuntime,
-  const std::uint8_t deleteFlags
-) noexcept
-{
-  return DeleteRuntimeObjectWithFlag(ffileOutputStreamRuntime, deleteFlags, wxDestroyFFileOutputStreamNoDeleteRuntime);
-}
 
 /**
  * Address: 0x009DD840 (FUN_009DD840)
@@ -92506,7 +91371,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
   (void)wxBuildNormalizedFindDataRootDirectoryRuntime(runtimeStorageSlot, &baseDirectory);
 
   const wchar_t directorySeparator = L'\\';
-  (void)wxString::append(&baseDirectory, 1, &directorySeparator);
+  (void)WxStringRuntimeOps::append(&baseDirectory, 1, &directorySeparator);
 
   if ((enumerateFlags & kWxFindDataIncludeDirectories) != 0u) {
     wxStringRuntime directoryEntryName{};
