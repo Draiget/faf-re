@@ -39366,16 +39366,17 @@ namespace
     std::int32_t width = 0;
     std::int32_t height = 0;
 
-    // The binary selects the wxBLACK_BRUSH global here. wxWindows builds that
-    // one over the GDI stock black brush, so asking GDI for it directly gives
-    // the same object without needing the wx brush globals modelled first.
+    // Binary (0x00430A60):
+    //   SetBrush(wxBLACK_BRUSH); DoGetSize(&w,&h);
+    //   DoDrawRectangle(0,0,w,h); SetBrush(&wxNullBrush);
     //
-    // What stood here was the literal 1 cast to a pointer, which SetBrush
-    // handed to SelectObject as a handle on every erase-background message.
-    deviceContext.SetBrush(::GetStockObject(BLACK_BRUSH));
+    // wxBLACK_BRUSH is already a wxBrush*, so it goes across as-is; wxNullBrush
+    // is an object and its address is what gets passed. Both must be the real
+    // wx stock objects - SetBrush ref-counts what it is given.
+    deviceContext.SetBrush(wxBLACK_BRUSH);
     deviceContext.DoGetSize(&width, &height);
     deviceContext.DoDrawRectangle(0, 0, width, height);
-    deviceContext.SetBrush(nullptr);
+    deviceContext.SetBrush(&wxNullBrush);
   }
 
 } // namespace
@@ -62786,6 +62787,22 @@ void moho::WX_EnsureApplicationObject()
   if (wxTheApp != nullptr) {
     return;
   }
+
+  // wxEntry runs wxEntryStart -> wxApp::Initialize (0x009927E0) before the
+  // application object exists; that is what builds the class-info links, the
+  // colour database and the stock GDI objects. We enter through
+  // WIN_AppExecute rather than wxEntry, so nothing on that chain was running
+  // and every stock object stayed null - wxBLACK_BRUSH among them, which made
+  // the very first WM_ERASEBKGND dereference a null brush inside
+  // wxDC::SetBrush.
+  (void)wxEntryStart();
+
+  // wxApp::Initialize gates its whole body on `wxGetOsVersion(0,0) == 18`,
+  // which no longer holds on a current Windows, so the call above returns
+  // without building anything. The stock objects are not optional - the erase
+  // path selects wxBLACK_BRUSH on the first paint - so ask for them directly.
+  // This is the same routine wxApp::Initialize would have called.
+  wxInitializeStockObjects();
 
   moho::MohoApp* const storage = CreateMohoAppWithBuildOptionsCheck();
   if (storage == nullptr) {
