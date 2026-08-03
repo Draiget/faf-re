@@ -1426,3 +1426,24 @@
    * What it does:
    * Clears active lanes for all fixed RNA timing-node pool slots.
    */
+
+  /**
+   * Address: 0x00AC9F60 (FUN_00AC9F60, _mwPlySetFrmSync)
+   *
+   * IDA signature:
+   * void __cdecl mwPlySetFrmSync(MWPLY ply, int mode);
+   *
+   * What it does:
+   * Stores the frame-sync mode on one playback handle after checking the
+   * handle is live, and reports an invalid handle through the Sofdec error
+   * sink instead. The binary writes the mode straight to +0x54.
+   */
+  extern "C" void mwPlySetFrmSync(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t mode)
+  {
+    if (MWSFD_IsEnableHndl(ply) != 1) {
+      (void)MWSFSVM_Error("E1122629: mwPlySetFrmSync: handle is invalid.");
+      return;
+    }
+
+    ply->disableIntermediateFrameDrop = mode;
+  }
