@@ -75,7 +75,11 @@ void mwPlyFxCnvFrmARGB8888(
  * What it does:
  * Parses one Sofdec .sfd header block into the caller header-info view.
  */
-std::int32_t mwPlyGetHdrInf(const char* buffer, std::int32_t size, void* outHeaderInfo);
+// extern "C" to match the definition's linkage. Without it this asks the
+// linker for ?mwPlyGetHdrInf@@YAHPBDHPAX@Z while StartupHelpers.cpp exports
+// the C name, so the call went unresolved and /FORCE bound it to the image
+// base - a jump to address 0 the moment a movie is opened.
+extern "C" std::int32_t mwPlyGetHdrInf(const char* buffer, std::int32_t size, void* outHeaderInfo);
 
 /**
  * Address: 0x00AC7D00 (FUN_00AC7D00, _mwPlyCalcWorkCprmSfd)
