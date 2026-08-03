@@ -42,7 +42,8 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/resource/ResourceManager.h"
-#include "moho/core/Thread.h"
+#include "moho/core/Thread.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 #pragma warning(push)
@@ -3410,14 +3411,17 @@ void moho::WIN_AppExecute(IWinApp* const app)
   wakeupTimer.Reset();
   wakeupTimerDur = kInfiniteWakeupMs;
 
-  if (!app->Init()) {
-    ::TerminateProcess(::GetCurrentProcess(), 1u);
-  }
-
-  // Nothing else constructs the application object; see
+  // Ahead of app->Init(), which is what creates the device and the frame:
+  // wxEntry brings wx up before any window exists, and the stock GDI objects
+  // this publishes are what the frame's first WM_ERASEBKGND selects. It also
+  // constructs the application object - nothing else does; see
   // WX_EnsureApplicationObject. Without it EnableLoopFlags has nothing to set
   // and KeepGoing answers false, so the loop below ended before it started.
   moho::WX_EnsureApplicationObject();
+
+  if (!app->Init()) {
+    ::TerminateProcess(::GetCurrentProcess(), 1u);
+  }
   moho::WxAppRuntime::EnableLoopFlags();
 
   _controlfp(0x20000, 0x30000);

@@ -120,6 +120,32 @@ extern wxBrush* wxBLACK_BRUSH;
 extern wxBrush wxNullBrush;
 
 /**
+ * The named-colour table the stock objects are built from.
+ *
+ * `wxApp::Initialize` (0x009927E0) does `operator new(0x1Cu)` followed by
+ * `wxColourDatabase::wxColourDatabase(db, 2)` and publishes the result in
+ * `wxTheColourDatabase`, immediately before calling
+ * `wxInitializeStockObjects` - which goes straight to
+ * `wxColour::InitFromName` and would read through a null table otherwise.
+ *
+ * Only the size and the constructor are modelled: 0x1C from that allocation,
+ * and `??0wxColourDatabase@@QAE@H@Z` from `wxmsw.lib`, which is where the
+ * body stays. Nothing here needs its fields.
+ */
+class wxColourDatabase
+{
+public:
+  explicit wxColourDatabase(int type);
+
+private:
+  std::uint8_t mStorage[0x1C]{};
+};
+
+static_assert(sizeof(wxColourDatabase) == 0x1C, "wxColourDatabase size must be 0x1C");
+
+extern wxColourDatabase* wxTheColourDatabase;
+
+/**
  * Builds the wx stock pens, brushes, fonts and cursors.
  * `?wxInitializeStockObjects@@YAXXZ` in `wxmsw.lib`; `wxApp::Initialize`
  * (0x009927E0) is what calls it in the binary.

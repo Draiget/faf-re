@@ -62784,25 +62784,33 @@ moho::MohoApp* CreateMohoAppWithBuildOptionsCheck();
 
 void moho::WX_EnsureApplicationObject()
 {
+  // wxEntry brings wx up before any window exists, and the stock GDI objects
+  // that publishes are what the very first WM_ERASEBKGND selects. We come in
+  // through WIN_AppExecute instead, so none of it was running and
+  // wxBLACK_BRUSH stayed null - wxDC::SetBrush then ref-counted through a
+  // null brush on the first paint the frame ever received.
+  //
+  // wxApp::Initialize (0x009927E0) is the binary's version of this, but
+  // calling all of it walks into wxModule::RegisterModules, whose hash table
+  // this hybrid link never builds. The two steps the window actually needs
+  // are the ones it runs back to back: build the colour database, then the
+  // stock objects, which read named colours out of it.
+  //
+  // Kept ahead of the wxTheApp check on purpose - the vendored library's own
+  // wxApp constructor publishes wxTheApp from a static initializer, so that
+  // early return is usually taken and anything after it would never run.
+  static bool sWxStockObjectsBuilt = false;
+  if (!sWxStockObjectsBuilt) {
+    sWxStockObjectsBuilt = true;
+    if (wxTheColourDatabase == nullptr) {
+      wxTheColourDatabase = new wxColourDatabase(2);
+    }
+    wxInitializeStockObjects();
+  }
+
   if (wxTheApp != nullptr) {
     return;
   }
-
-  // wxEntry runs wxEntryStart -> wxApp::Initialize (0x009927E0) before the
-  // application object exists; that is what builds the class-info links, the
-  // colour database and the stock GDI objects. We enter through
-  // WIN_AppExecute rather than wxEntry, so nothing on that chain was running
-  // and every stock object stayed null - wxBLACK_BRUSH among them, which made
-  // the very first WM_ERASEBKGND dereference a null brush inside
-  // wxDC::SetBrush.
-  (void)wxEntryStart();
-
-  // wxApp::Initialize gates its whole body on `wxGetOsVersion(0,0) == 18`,
-  // which no longer holds on a current Windows, so the call above returns
-  // without building anything. The stock objects are not optional - the erase
-  // path selects wxBLACK_BRUSH on the first paint - so ask for them directly.
-  // This is the same routine wxApp::Initialize would have called.
-  wxInitializeStockObjects();
 
   moho::MohoApp* const storage = CreateMohoAppWithBuildOptionsCheck();
   if (storage == nullptr) {
