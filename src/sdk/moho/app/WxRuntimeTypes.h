@@ -5374,14 +5374,35 @@ public:
   bool SetSystemCloseMenuItemEnabled(bool enabled);
 
   /**
-   * Address: 0x0098C1E0 family
+   * Address: 0x0098C390 (FUN_0098C390, wxTopLevelWindowMSW::Maximize)
    * Mangled: ?Maximize@wxTopLevelWindowMSW@@UAEX_N@Z
+   *
+   * What it does:
+   * Maximises or restores the frame when it is already on screen; otherwise
+   * parks the request in `maximizeOnShow` for the next `Show(true)` to apply.
    */
-  virtual void Maximize(bool maximize) { (void)maximize; }
+  virtual void Maximize(bool maximize);
+
   virtual void Restore() {}
-  virtual void Iconize(bool iconize) { (void)iconize; }
+
+  /**
+   * Address: 0x0098C3E0 (FUN_0098C3E0, wxTopLevelWindowMSW::Iconize)
+   * Mangled: ?Iconize@wxTopLevelWindowMSW@@UAEX_N@Z
+   *
+   * What it does:
+   * Minimises or restores the frame through `DoShowWindow`.
+   */
+  virtual void Iconize(bool iconize);
+
+  /**
+   * Address: 0x0098C420 family
+   *
+   * What it does:
+   * Reports the minimised state recorded by `DoShowWindow`.
+   */
+  [[nodiscard]] virtual bool IsIconized() const;
+
   virtual bool IsMaximized() const { return false; }
-  virtual bool IsIconized() const { return false; }
   virtual void SetIcon(const void* icon) { (void)icon; }
   virtual void SetIcons(const void* iconBundle) { (void)iconBundle; }
   virtual bool ShowFullScreen(bool show, long style)
@@ -5390,6 +5411,20 @@ public:
     (void)style;
     return false;
   }
+
+  /**
+   * Address: 0x0098C250 (FUN_0098C250, wxTopLevelWindowMSW::DoShowWindow)
+   *
+   * IDA signature:
+   * BOOL __thiscall wxTopLevelWindowMSW::DoShowWindow(int this, int nCmdShow);
+   *
+   * What it does:
+   * Hands `nCmdShow` to `::ShowWindow` for this frame's native handle and
+   * records whether the command minimised it. Every visibility change in this
+   * class goes through here - Show, Maximize, Iconize and Restore all funnel
+   * into it, and it is the only place the native window is actually shown.
+   */
+  bool DoShowWindow(std::int32_t showCommand);
 
   /**
    * Address: 0x004A3770 (FUN_004A3770)
