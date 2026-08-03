@@ -251,16 +251,11 @@ public:
 inline const wchar_t* wxLocale::GetString(const wchar_t* sourceText, int) { return sourceText; }
 
 wxLocale* wxGetLocale();
-/**
- * Address: 0x009C5C00 (FUN_009C5C00, wxLogSysError)
- *
- * What it does:
- * Builds one variadic text payload and routes it through the wx system-error
- * logging lane using the current Win32 `GetLastError()` code.
- */
-int wxLogSysError(const wchar_t* formatText, ...);
-void wxLogError(const wchar_t* formatText, ...);
-int wxCharCodeMSWToWX(int keyCode);
+// wxmswu.lib supplies both, and it is the same wxWidgets the binary linked
+// (see the header). wx/log.h declares wxLogError; wxCharCodeMSWToWX lives in
+// wx/msw/private.h, which is not on the public include path.
+#include <wx/log.h>
+extern int wxCharCodeMSWToWX(int keyCode);
 wxStringRuntime* wxCopySharedWxStringRuntime(
   const wxStringRuntime* source,
   wxStringRuntime* outValue
@@ -14730,17 +14725,6 @@ bool wxThreadIsMain()
   return ::GetCurrentThreadId() == gs_idMainThread;
 }
 
-/**
- * Address: 0x009AD660 (FUN_009AD660, wxGuiOwnedByMainThread)
- *
- * What it does:
- * Returns the wx GUI-ownership flag managed by the GUI mutex helpers.
- */
-bool wxGuiOwnedByMainThread()
-{
-  EnsureGuiMutexRuntimeInitialized();
-  return gs_bGuiOwnedByMainThread != 0;
-}
 
 /**
  * Address: 0x009AD670 (FUN_009AD670, wxWakeUpMainThread)
@@ -14923,77 +14907,9 @@ bool wxThreadHasDoubleSuspendState(
   return suspendState == 2u;
 }
 
-/**
- * Address: 0x009674D0 (FUN_009674D0, wxIsShiftDown)
- *
- * What it does:
- * Returns whether the Win32 Shift key is currently pressed.
- */
-bool wxIsShiftDown()
-{
-  return ::GetKeyState(VK_SHIFT) < 0;
-}
 
-/**
- * Address: 0x009674F0 (FUN_009674F0, wxIsCtrlDown)
- *
- * What it does:
- * Returns whether the Win32 Control key is currently pressed.
- */
-bool wxIsCtrlDown()
-{
-  return ::GetKeyState(VK_CONTROL) < 0;
-}
 
-/**
- * Address: 0x009ADC20 (FUN_009ADC20, wxMutexGuiLeave)
- *
- * What it does:
- * Releases GUI ownership for the calling lane and unlocks wx GUI/waiting
- * critical sections with the original runtime ordering.
- */
-void wxMutexGuiLeave()
-{
-  _RTL_CRITICAL_SECTION* const waitingForGuiCriticalSection = WaitingForGuiCriticalSection();
-  wxENTER_CRIT_SECT(waitingForGuiCriticalSection);
 
-  if (wxThreadIsMain()) {
-    gs_bGuiOwnedByMainThread = 0;
-  } else {
-    --gs_nWaitingForGui;
-    (void)wxWakeUpMainThread();
-  }
-
-  wxLEAVE_CRIT_SECT(GuiCriticalSection());
-  wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
-}
-
-/**
- * Address: 0x009ADC70 (FUN_009ADC70, wxMutexGuiLeaveOrEnter)
- *
- * What it does:
- * Reconciles GUI ownership against waiting-thread state, leaving or entering
- * the wx GUI critical section as required by the original runtime contract.
- */
-void wxMutexGuiLeaveOrEnter()
-{
-  _RTL_CRITICAL_SECTION* const waitingForGuiCriticalSection = WaitingForGuiCriticalSection();
-  wxENTER_CRIT_SECT(waitingForGuiCriticalSection);
-
-  const bool guiOwnedByMainThread = wxGuiOwnedByMainThread();
-  if (gs_nWaitingForGui != 0) {
-    if (guiOwnedByMainThread) {
-      wxMutexGuiLeave();
-    }
-  } else if (!guiOwnedByMainThread) {
-    wxENTER_CRIT_SECT(GuiCriticalSection());
-    gs_bGuiOwnedByMainThread = 1;
-    wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
-    return;
-  }
-
-  wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
-}
 
 struct WxMutexHandleStorageRuntime
 {
@@ -15461,55 +15377,6 @@ namespace
   return ::MessageBeep(0xFFFFFFFFu);
 }
 
-/**
- * Address: 0x009C7540 (FUN_009C7540, wxGetOsVersion)
- *
- * What it does:
- * Caches Win32 platform-id and major/minor version lanes and returns the wx
- * OS-family enum value.
- */
-int wxGetOsVersion(
-  int* const majorVsn,
-  int* const minorVsn
-)
-{
-  int result = gWxGetOsVersionCache;
-  if (gWxGetOsVersionCache == -1) {
-    OSVERSIONINFOW versionInformation{};
-    gWxGetOsVersionCache = 15;
-    versionInformation.dwOSVersionInfoSize = sizeof(versionInformation);
-#pragma warning(push)
-#pragma warning(disable : 4996)
-    const BOOL hasVersionInfo = ::GetVersionExW(&versionInformation);
-#pragma warning(pop)
-    if (hasVersionInfo != 0) {
-      gWxGetOsVersionMinor = static_cast<int>(versionInformation.dwMinorVersion);
-      gWxGetOsVersionMajor = static_cast<int>(versionInformation.dwMajorVersion);
-      if (versionInformation.dwPlatformId == 0) {
-        result = 19;
-        gWxGetOsVersionCache = result;
-      } else if (versionInformation.dwPlatformId == 1) {
-        result = 20;
-        gWxGetOsVersionCache = result;
-      } else if (versionInformation.dwPlatformId == 2) {
-        result = 18;
-        gWxGetOsVersionCache = result;
-      } else {
-        result = gWxGetOsVersionCache;
-      }
-    } else {
-      result = gWxGetOsVersionCache;
-    }
-  }
-
-  if (majorVsn != nullptr && gWxGetOsVersionMajor != -1) {
-    *majorVsn = gWxGetOsVersionMajor;
-  }
-  if (minorVsn != nullptr && gWxGetOsVersionMinor != -1) {
-    *minorVsn = gWxGetOsVersionMinor;
-  }
-  return result;
-}
 
 /**
  * Address: 0x009AAF60 (FUN_009AAF60)
@@ -22056,20 +21923,6 @@ void wxLogTrace(
 )
 {}
 
-/**
- * Address: 0x00962908 (FUN_00962908, wxLogError)
- *
- * What it does:
- * Preserves wx error-log callsites as a no-op lane. Signature matches the
- * forward declaration at line 238 (`const wchar_t*, ...`) to keep our local
- * Unicode callers link-compatible; the prebuilt wxmsw.lib ships an ANSI
- * `wxLogError(const char*, ...)` variant we do not route through.
- */
-void wxLogError(
-  const wchar_t*,
-  ...
-)
-{}
 
 /**
  * Address: 0x00966E60 (FUN_00966E60, nullsub_3482)
@@ -23986,20 +23839,6 @@ void __stdcall wxNoOpRuntimeStdCall1E(const std::int32_t reservedArg0)
 void wxNoOpFileFlushHook()
 {}
 
-/**
- * Address: 0x009BCDD0 (FUN_009BCDD0, wxDeleteStockLists)
- *
- * What it does:
- * Releases each global wx stock-list singleton (brush, pen, font, bitmap)
- * and clears the stored singleton pointer lanes.
- */
-void wxDeleteStockLists()
-{
-  DeleteStockList(wxTheBrushList);
-  DeleteStockList(wxThePenList);
-  DeleteStockList(wxTheFontList);
-  DeleteStockList(wxTheBitmapList);
-}
 
 /**
  * Address: 0x009C47D0 (FUN_009C47D0)
@@ -24493,24 +24332,6 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
   return wxAppendSystemErrorSuffixAndDispatchRuntime(lastError);
 }
 
-/**
- * Address: 0x009C5C00 (FUN_009C5C00, wxLogSysError)
- *
- * What it does:
- * Builds one variadic text payload and routes it through the wx system-error
- * logging lane using the current Win32 `GetLastError()` code.
- */
-int wxLogSysError(
-  const wchar_t* const formatText,
-  ...
-)
-{
-  va_list argumentList;
-  va_start(argumentList, formatText);
-  const int result = wxLogSystemErrorFromLastErrorRuntime(formatText, argumentList);
-  va_end(argumentList);
-  return result;
-}
 
 /**
  * Address: 0x009C5C20 (FUN_009C5C20)
@@ -38717,19 +38538,6 @@ namespace
   return outPath;
 }
 
-/**
- * Address: 0x00992FE0 (FUN_00992FE0, wxEntryCleanup)
- *
- * IDA signature:
- * void __cdecl wxEntryCleanup();
- *
- * What it does:
- * Runs wx shutdown cleanup used by the `wxEntry` exit path.
- */
-void wxEntryCleanup()
-{
-  wxApp::CleanUp();
-}
 
 /**
  * Address: 0x009CDBC0 (FUN_009CDBC0)
