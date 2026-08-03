@@ -2999,7 +2999,12 @@ namespace gpg::gal
         {
             void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const getDepthStencilSurface = reinterpret_cast<d3d9_device_get_depth_stencil_surface_fn>(vtable[39]);
+            // IDirect3DDevice9 declares SetDepthStencilSurface (39) *before*
+            // GetDepthStencilSurface (40), between GetRenderTarget (38) and
+            // BeginScene (41). These two were transposed, so every ClearTarget
+            // fed its output pointer to SetDepthStencilSurface as the new
+            // Z-stencil surface and faulted inside d3d9.dll.
+            auto* const getDepthStencilSurface = reinterpret_cast<d3d9_device_get_depth_stencil_surface_fn>(vtable[40]);
             return getDepthStencilSurface(nativeDevice, outDepthStencilSurface);
         }
 
@@ -3007,7 +3012,7 @@ namespace gpg::gal
         {
             void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setDepthStencilSurface = reinterpret_cast<d3d9_device_set_depth_stencil_surface_fn>(vtable[40]);
+            auto* const setDepthStencilSurface = reinterpret_cast<d3d9_device_set_depth_stencil_surface_fn>(vtable[39]);
             return setDepthStencilSurface(nativeDevice, depthStencilSurface);
         }
 
