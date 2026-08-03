@@ -1094,6 +1094,7 @@
     <ClCompile Include="moho\render\BoxRenderer.cpp" />
     <ClCompile Include="moho\render\CRenFrame.cpp" />
     <ClCompile Include="moho\render\CDecalTypes.cpp" />
+    <ClCompile Include="moho\render\ScreenQuadVertexSheet.cpp" />
     <ClCompile Include="moho\render\Silhouette.cpp" />
     <ClCompile Include="moho\render\CDecalHandleSerializer.cpp" />
     <ClCompile Include="moho\ui\UiRuntimeTypes.cpp" />
@@ -1642,6 +1643,7 @@
     <ClInclude Include="moho\render\CRenFrame.h" />
     <ClInclude Include="moho\render\RCamManager.h" />
     <ClInclude Include="moho\render\CDecalTypes.h" />
+    <ClInclude Include="moho\render\ScreenQuadVertexSheet.h" />
     <ClInclude Include="moho\render\Silhouette.h" />
     <ClInclude Include="moho\render\RangeRenderer.h" />
     <ClInclude Include="moho\render\RangeRendererStartupRegistrations.h" />

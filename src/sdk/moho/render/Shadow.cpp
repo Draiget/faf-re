@@ -2,72 +2,46 @@
 
 #include <Windows.h>
 
+#include <cstring>
 #include <new>
+
+#include "gpg/core/utils/Logging.h"
+#include "gpg/gal/Device.hpp"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/ID3DVertexSheet.h"
+#include "moho/render/ScreenQuadVertexSheet.h"
+#include "moho/render/d3d/CD3DDepthStencil.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
+#include "moho/render/d3d/CD3DVertexSheet.h"
 
 namespace
 {
-  struct ShadowRuntimeSharedRefRuntimeView
-  {
-    void* mVtable = nullptr;             // +0x00
-    volatile long mStrongRefs = 0;       // +0x04
-    volatile long mWeakRefs = 0;         // +0x08
-  };
-
-  static_assert(sizeof(ShadowRuntimeSharedRefRuntimeView) == 0x0C, "ShadowRuntimeSharedRefRuntimeView size must be 0xC");
-  static_assert(
-    offsetof(ShadowRuntimeSharedRefRuntimeView, mStrongRefs) == 0x04,
-    "ShadowRuntimeSharedRefRuntimeView::mStrongRefs offset must be 0x4"
-  );
-  static_assert(
-    offsetof(ShadowRuntimeSharedRefRuntimeView, mWeakRefs) == 0x08,
-    "ShadowRuntimeSharedRefRuntimeView::mWeakRefs offset must be 0x8"
-  );
-
-  using ReleaseVirtualFn = void(__thiscall*)(ShadowRuntimeSharedRefRuntimeView*);
-
-  [[nodiscard]] inline ReleaseVirtualFn ResolveReleaseVirtual(
-    ShadowRuntimeSharedRefRuntimeView* const resource,
-    const std::size_t slotIndex
-  ) noexcept
-  {
-    auto** const vtable = reinterpret_cast<void**>(resource->mVtable);
-    return reinterpret_cast<ReleaseVirtualFn>(vtable[slotIndex]);
-  }
-
-  void ReleaseShadowRuntimeSharedRef(moho::ShadowRuntimeSharedRef* const resource) noexcept
-  {
-    auto* const runtime = reinterpret_cast<ShadowRuntimeSharedRefRuntimeView*>(resource);
-    if (runtime == nullptr) {
-      return;
-    }
-
-    if (::InterlockedDecrement(&runtime->mStrongRefs) == 0) {
-      ResolveReleaseVirtual(runtime, 1)(runtime);
-      if (::InterlockedDecrement(&runtime->mWeakRefs) == 0) {
-        ResolveReleaseVirtual(runtime, 2)(runtime);
-      }
-    }
-  }
+  // Depth-stencil format the shadow map's companion buffer is created with.
+  constexpr int kShadowDepthStencilFormat = 3;
 
   /**
    * Address: 0x007FE760 (FUN_007FE760)
    *
    * What it does:
-   * Clears shadow fidelity/size state and resets all seven runtime
-   * `(state,shared-ref)` lanes at `+0x2E0`, releasing each previous shared-ref.
+   * Clears the cached fidelity/blur/size settings and releases every render
+   * resource the shadow renderer holds. Called both from the destructor and
+   * from `Init` - on entry, and again on either failure path.
    */
-  [[maybe_unused]] int ResetShadowRuntimeLanesAndReleaseRefs(
-    moho::Shadow* const shadow
-  ) noexcept
+  int ReleaseShadowRenderResources(moho::Shadow* const shadow) noexcept
   {
     shadow->mShadowFidelity = 0;
     shadow->mShadowBlurEnabled = false;
-    for (moho::ShadowRuntimeLane& lane : shadow->mRuntimeLanes) {
-      lane.mState = 0;
-      moho::ShadowRuntimeSharedRef* const previous = lane.mResource;
-      lane.mResource = nullptr;
-      ReleaseShadowRuntimeSharedRef(previous);
+
+    shadow->mShadowMap.reset();
+    shadow->mBlurTargetA.reset();
+    shadow->mBlurTargetB.reset();
+    shadow->mDepthStencil.reset();
+    shadow->mQuadVertexSheet.reset();
+    for (boost::shared_ptr<void>& resource : shadow->mUnreferencedResources) {
+      resource.reset();
     }
+
     shadow->mShadowSize = 0;
     return 0;
   }
@@ -108,20 +82,31 @@ namespace
 
 namespace moho
 {
+  extern int ren_ShadowSize;
+  extern bool ren_ShadowBlur;
+
   /**
    * Address: 0x007FE120 (FUN_007FE120, ??0Shadow@Moho@@QAE@@Z)
    *
    * What it does:
-   * Initializes shadow-renderer fidelity/size flags, constructs the embedded
-   * camera at `+0x18`, and clears runtime state lanes.
+   * Initializes shadow-renderer fidelity/size flags, constructs the light-space
+   * camera at `+0x18`, and null-clears every resource handle.
    */
   Shadow::Shadow()
-    : mShadowFidelity(0)
+    : mUnusedHeaderWord(0)
+    , mShadowFidelity(0)
     , mShadowBlurEnabled(false)
+    , mPadding0D_0F{}
     , mShadowSize(0)
-    , mUnknown14(false)
+    , mShadowCameraValid(false)
+    , mPadding15_17{}
     , mCamera()
-    , mRuntimeLanes{}
+    , mShadowMap()
+    , mBlurTargetA()
+    , mBlurTargetB()
+    , mDepthStencil()
+    , mQuadVertexSheet()
+    , mUnreferencedResources{}
   {}
 
   /**
@@ -132,7 +117,93 @@ namespace moho
    */
   Shadow::~Shadow()
   {
-    (void)ResetShadowRuntimeLanesAndReleaseRefs(this);
+    (void)ReleaseShadowRenderResources(this);
+  }
+
+  /**
+   * Address: 0x007DB350 (FUN_007DB350)
+   *
+   * What it does:
+   * Returns a retained copy of the shadow-map render target for shader binding.
+   */
+  boost::shared_ptr<CD3DRenderTarget>& Shadow::GetShadowMap(
+    boost::shared_ptr<CD3DRenderTarget>& outShadowMap
+  ) const
+  {
+    outShadowMap = mShadowMap;
+    return outShadowMap;
+  }
+
+  /**
+   * Address: 0x007FE3E0 (FUN_007FE3E0, Moho::Shadow::Init)
+   *
+   * IDA signature:
+   * int __usercall Moho::Shadow::Init@<eax>(int fidelity, Moho::Shadow *this);
+   *
+   * What it does:
+   * Rebuilds every shadow render resource for the requested fidelity. Latches
+   * the current shadow-size/blur tuning, drops what was held before, and for a
+   * non-zero fidelity allocates the shadow-map target (plus the two blur
+   * ping-pong targets when blur is enabled), the depth stencil, and the
+   * fullscreen quad the blur passes draw - scaled to the shadow resolution.
+   */
+  int Shadow::Init(const int fidelity)
+  {
+    // Both tuning values are sampled before the reset below, which zeroes the
+    // cached copies.
+    const int shadowSize = ren_ShadowSize;
+    const bool shadowBlur = ren_ShadowBlur;
+
+    (void)ReleaseShadowRenderResources(this);
+
+    mShadowFidelity = fidelity;
+    mShadowBlurEnabled = shadowBlur;
+    mShadowSize = shadowSize;
+
+    if (fidelity == 0) {
+      return 1;
+    }
+
+    // Fidelity 1 uses the cheaper target format; every higher level uses the
+    // wider one.
+    const int targetFormat = (fidelity != 1) ? 7 : 2;
+
+    // The binary pulls the GAL device singleton here and discards it; the call
+    // is kept because it is what forces the backend to be resolved before the
+    // resource factory below is used.
+    (void)gpg::gal::Device::GetInstance();
+
+    ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
+
+    resources->CreateRenderTarget(mShadowMap, shadowSize, shadowSize, targetFormat);
+    if (mShadowBlurEnabled) {
+      resources->CreateRenderTarget(mBlurTargetA, shadowSize, shadowSize, targetFormat);
+      resources->CreateRenderTarget(mBlurTargetB, shadowSize, shadowSize, targetFormat);
+    }
+
+    resources->CreateDepthStencil(mDepthStencil, shadowSize, shadowSize, kShadowDepthStencilFormat);
+    if (!mDepthStencil) {
+      gpg::Warnf("unable to create depth sheet used by the shadow map");
+      (void)ReleaseShadowRenderResources(this);
+      return 0;
+    }
+
+    CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(kScreenQuadVertexFormatToken);
+    mQuadVertexSheet.reset(
+      resources->NewVertexSheet(kScreenQuadStreamUsage, kScreenQuadVertexCount, vertexFormat)
+    );
+    if (!mQuadVertexSheet) {
+      gpg::Warnf("unable to create the main vertex sheet used by the shadow map");
+      (void)ReleaseShadowRenderResources(this);
+      return 0;
+    }
+
+    // The template is a unit quad; scale it out to the shadow-map resolution.
+    // The binary leaves the texture coordinates alone, which is what passing
+    // 1.0f for both texture scales does here.
+    const float shadowSizeF = static_cast<float>(shadowSize);
+    FillScreenQuadVertexSheet(*mQuadVertexSheet, shadowSizeF, shadowSizeF, 1.0f, 1.0f);
+    return 1;
   }
 
   /**
@@ -151,4 +222,3 @@ namespace moho
     return shadow;
   }
 } // namespace moho
-

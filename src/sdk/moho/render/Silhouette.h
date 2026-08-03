@@ -5,29 +5,22 @@
 
 #include "boost/shared_ptr.h"
 
-namespace Moho
+namespace moho
 {
-  /**
-   * Opaque payload owned by `Silhouette` through a `boost::shared_ptr` slot.
-   *
-   * The binary destructor only exercises the `boost::detail::sp_counted_base`
-   * slot-4/slot-8 virtual dispatch sequence (dispose + destroy), so the
-   * payload type identity is not required for correct teardown. The typed
-   * placeholder keeps the owning shared_ptr ABI-compatible with the binary
-   * layout `{px at +0x04, pi_ at +0x08}` without re-introducing raw vtable
-   * offset magic in callers.
-   */
-  struct SilhouettePayload;
+  class ID3DVertexSheet;
 
   /**
    * VFTABLE: 0x00E42098
    * COL:     0x00E98B74
    *
-   * Owning handle for one silhouette-rendering payload attached to a render
-   * viewport. The object's only runtime responsibility is to retain one
-   * reference-counted payload through construction/copy and release it on
-   * destruction; all rendering work lives in the payload type and the
-   * viewport pipeline that consumes it.
+   * Draws the full-screen quad the silhouette pass renders through. The whole
+   * object is that one quad: `Init` (0x008145A0) builds a four-vertex sheet
+   * sized to the primary head, and the destructor releases it.
+   *
+   * IDA labels the Init export `Moho::Silohouette::Init`, but the destructor's
+   * mangled name (`??1Silhouette@Moho@@UAE@XZ`) spells the class correctly, so
+   * that spelling is used here. The namespace is folded to `moho` to match
+   * every other recovered type in this tree.
    */
   class Silhouette
   {
@@ -40,14 +33,31 @@ namespace Moho
      * int __thiscall sub_8144E0(volatile signed __int32 **this);
      *
      * What it does:
-     * Re-seats the vftable to `Moho::Silhouette` and releases the owned
-     * silhouette payload through `boost::shared_ptr`'s inlined release
-     * sequence. The binary-visible release block is emitted twice over the
-     * same `pn.pi_` slot; the second pass is dead after the first because
-     * the slot is cleared in-place, but keeping both preserves 1:1 binary
-     * control flow during SEH unwind.
+     * Re-seats the vftable to `Silhouette` and releases the owned vertex
+     * sheet. The compiler inlined the shared_ptr release sequence (use-count
+     * decrement + optional dispose vcall, weak-count decrement + optional
+     * destroy vcall) twice over the same slot; the second pass is dead
+     * because the first clears the slot in place.
      */
     virtual ~Silhouette();
+
+    /**
+     * Address: 0x008145A0 (FUN_008145A0, Moho::Silhouette::Init)
+     *
+     * IDA signature:
+     * int __usercall Moho::Silohouette::Init@<eax>(Moho::Silohouette *a1@<eax>);
+     *
+     * What it does:
+     * Rebuilds the silhouette pass's full-screen quad. Drops whatever sheet
+     * was held, allocates a fresh four-vertex sheet, and writes a quad scaled
+     * to the primary head's pixel size, with texture coordinates scaled by the
+     * head's aspect ratio so the shorter axis keeps a 0..1 range.
+     *
+     * Returns nothing: the binary's `eax` on exit is just whatever the stream
+     * Unlock call left there, and its only caller
+     * (WRenViewport::D3DWindowOnDeviceInit) discards it.
+     */
+    void Init();
 
     /**
      * Address: 0x008144C0 (FUN_008144C0, Moho::Silhouette::dtr)
@@ -58,18 +68,24 @@ namespace Moho
      * void* __thiscall Moho::Silhouette::dtr(Silhouette* this, char deleteFlags);
      *
      * What it does:
-     * Runs the virtual destructor and conditionally frees memory with
-     * `operator delete` when the low flag bit is set. This is the standard
-     * MSVC8 scalar deleting destructor thunk that appears at vftable slot 0.
+     * Runs the virtual destructor and conditionally frees backing memory with
+     * `operator delete` when the low flag bit is set. Standard MSVC8 scalar
+     * deleting destructor thunk at vftable slot 0.
      */
     void* ScalarDeletingDestructor(std::uint8_t deleteFlags);
 
   public:
-    boost::shared_ptr<SilhouettePayload> mPayload; // +0x04..+0x0B
+    // The quad itself. `Init` assigns through boost::shared_ptr's operator=,
+    // which IDA names `boost::shared_ptr_ID3DVertexSheet::operator=` - that
+    // label is what pins the pointee type.
+    boost::shared_ptr<ID3DVertexSheet> mQuadVertexSheet; // +0x04..+0x0B
   };
 
-  static_assert(offsetof(Silhouette, mPayload) == 0x04, "Silhouette::mPayload offset must be 0x04");
+  static_assert(
+    offsetof(Silhouette, mQuadVertexSheet) == 0x04,
+    "Silhouette::mQuadVertexSheet offset must be 0x04"
+  );
   // sizeof(Silhouette) is at least 0x0C (vftable + shared_ptr{px, pi_}); the
   // ABI-exact total size depends on trailing fields that are still under
   // recovery in the render-viewport subsystem, so no hard size_assert here.
-} // namespace Moho
+} // namespace moho

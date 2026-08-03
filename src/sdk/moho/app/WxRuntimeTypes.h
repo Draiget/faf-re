@@ -6981,6 +6981,36 @@ namespace moho
     void RenderAllHeads();
 
     /**
+     * Address: 0x007F6B60 (FUN_007F6B60)
+     * Mangled: ?D3DWindowOnDeviceInit@WRenViewport@Moho@@UAEX_N@Z
+     *
+     * IDA signature:
+     * int __thiscall Moho::WRenViewport::D3DWindowOnDeviceInit(
+     *     Moho::WRenViewport *this, bool a2);
+     *
+     * What it does:
+     * Builds every device-dependent resource this viewport renders through:
+     * the texture and primitive batchers, the debug font, each sub-renderer's
+     * own resources, the shared dynamic texture sheet, and - per head - the
+     * bloom renderer, the two offscreen colour targets and the depth stencil.
+     *
+     * `createBatchers` separates the two entry paths. `CD3DDevice::SetRenViewport`
+     * (0x0042DC10) passes true when the viewport is first bound and the
+     * batchers do not exist yet; `CD3DDevice::InitContext` (0x0042E1E0) passes
+     * false when an existing device context is rebound, keeping the batchers
+     * that are already there. Everything after that gate runs either way, and
+     * the per-head resources are each guarded so a rebind only fills the slots
+     * that were released.
+     *
+     * Notes:
+     * - In the binary this is `WRenViewport`'s override of the empty
+     *   `WD3DViewport::D3DWindowOnDeviceInit` slot. This tree models the
+     *   inheritance inverted, so the body lives here and the slot forwards,
+     *   exactly as for `RenderAllHeads`.
+     */
+    void InitDeviceResources(bool createBatchers);
+
+    /**
      * Address: 0x007F6610 (FUN_007F6610, ?OnMouseEnter@WRenViewport@Moho@@QAEXAAVwxMouseEvent@@@Z)
      *
      * What it does:
@@ -7260,8 +7290,12 @@ namespace moho
 
     /**
      * Address: 0x0042BAF0 (FUN_0042BAF0)
+     *
+     * The binary's `WD3DViewport` body is a bare `retn`; the real work is
+     * `WRenViewport`'s override (0x007F6B60), which this tree reaches by
+     * forwarding because the inheritance is modelled inverted.
      */
-    virtual void D3DWindowOnDeviceInit();
+    virtual void D3DWindowOnDeviceInit(bool createBatchers);
 
     /**
      * Address: 0x0042BB00 (FUN_0042BB00)
