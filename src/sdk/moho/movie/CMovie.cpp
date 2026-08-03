@@ -104,7 +104,7 @@ moho::MwsfdPlaybackStateSubobj* mwPlyCreateSofdec(void* createParams);
  * What it does:
  * Sets the frame-sync mode on one Sofdec playback handle.
  */
-void mwPlySetFrmSync(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t mode);
+extern "C" void mwPlySetFrmSync(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t mode);
 
 namespace moho
 {
