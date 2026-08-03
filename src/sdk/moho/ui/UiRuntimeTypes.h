@@ -2874,8 +2874,12 @@ namespace moho
   struct CMauiControlExtendedRuntimeView : CMauiControlRuntimeView
   {
     float mDepth = 0.0f; // +0xD4
-    std::uint8_t mUnknown0D8To0DB[0x4]{};
-    msvc8::vector<CMauiControl*> mRenderedChildren{}; // +0xDC
+    // +0xD8, 0x10 bytes. The MSVC8 vector stores its allocator as a real data
+    // member ahead of the first/last/end triple, so the container starts at
+    // 0xD8 and the pointers land at 0xDC/0xE0/0xE4 - it is not a 4-byte hole
+    // followed by a 12-byte vector. Modelling it that way pushed every field
+    // from mInvalidated onwards 4 bytes too high.
+    msvc8::vector<CMauiControl*> mRenderedChildren{}; // +0xD8
     bool mInvalidated = false; // +0xE8
     bool mDisableHitTest = false; // +0xE9
     bool mIsHidden = false;       // +0xEA
@@ -2886,9 +2890,13 @@ namespace moho
     std::uint32_t mVertexAlpha = 0; // +0xF4
     std::int32_t mRenderPass = 0; // +0xF8
     CMauiControl* mRootFrame = nullptr; // +0xFC
-    msvc8::string mDebugName{}; // +0x100
-    std::uint8_t mUnknown11CTo12F[0x14]{};
-    void* mEventMapper = nullptr; // +0x130  (root-frame event handler; AddWorldView head arg)
+    msvc8::string mDebugName{}; // +0x100 .. 0x11B - last field of the control
+
+    // NOTE: the control's own layout ends at 0x11C. The 0x18 bytes that used
+    // to be modelled here (a 0x14 "unknown" run plus mEventMapper at 0x130)
+    // are CMauiFrame's fields - see CMauiFrameRuntimeView - and claiming them
+    // here made every derived view's fields overrun the object the binary
+    // allocates (`operator new(0x134)` for a frame).
 
     [[nodiscard]] static CMauiControlExtendedRuntimeView* FromControl(CMauiControl* control) noexcept
     {
@@ -2922,8 +2930,13 @@ namespace moho
     "CMauiControlExtendedRuntimeView::mNeedsFrameUpdate offset must be 0xEB"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mRenderedChildren) == 0xDC,
-    "CMauiControlExtendedRuntimeView::mRenderedChildren offset must be 0xDC"
+    offsetof(CMauiControlExtendedRuntimeView, mRenderedChildren) == 0xD8,
+    "CMauiControlExtendedRuntimeView::mRenderedChildren offset must be 0xD8"
+  );
+  static_assert(sizeof(msvc8::vector<CMauiControl*>) == 0x10, "msvc8::vector must be 0x10");
+  static_assert(
+    sizeof(CMauiControlExtendedRuntimeView) == 0x11C,
+    "CMauiControlExtendedRuntimeView size must be 0x11C - CMauiFrame's fields start there"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CMauiControlExtendedRuntimeView, mDepth) == 0xD4,
@@ -2950,10 +2963,6 @@ namespace moho
     "CMauiControlExtendedRuntimeView::mDebugName offset must be 0x100"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::string) == 0x1C, "msvc8::string size must be 0x1C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mEventMapper) == 0x130,
-    "CMauiControlExtendedRuntimeView::mEventMapper offset must be 0x130"
-  );
 
   /**
    * Runtime view for global keyboard-focus tracking lane.

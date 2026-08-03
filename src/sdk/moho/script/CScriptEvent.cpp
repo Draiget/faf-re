@@ -789,7 +789,11 @@ namespace
   gpg::RRef CreateScriptEventRefOwned()
   {
     gpg::RRef out{};
-    (void)gpg::RRef_CScriptEvent(&out, new CScriptEvent());
+    // Binary: `operator new(0x44)` - the event's real object size, not the
+    // thin behaviour class `sizeof` reports.
+    auto* const event = static_cast<CScriptEvent*>(::operator new(0x44u));
+    new (event) CScriptEvent();
+    (void)gpg::RRef_CScriptEvent(&out, event);
     return out;
   }
 
