@@ -14303,6 +14303,19 @@ namespace
     return it != gWxWindowBaseStateByWindow.end() ? &it->second : nullptr;
   }
 
+  /**
+   * The native handle wx keeps in `wxWindowMSW::m_hWnd`. The binary reads it
+   * straight off the object - `wxWindow::DoMoveWindow` (0x00968640) uses
+   * `*(this + 66)`, i.e. +0x108, which is `sizeof(wxWindowBase)` - but this
+   * reconstruction has no data members on `wxWindowBase`, so the handle lives
+   * in the runtime state beside the object instead.
+   */
+  [[nodiscard]] HWND GetWxWindowNativeHandle(const wxWindowBase* const window) noexcept
+  {
+    const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(window);
+    return (state != nullptr) ? reinterpret_cast<HWND>(state->nativeHandle) : nullptr;
+  }
+
   [[nodiscard]] WxWindowBaseRuntimeState& EnsureWxWindowBaseRuntimeState(
     const wxWindowBase* const window
   )
@@ -35398,6 +35411,105 @@ bool wxTopLevelWindowRuntime::Create(
   }
 
   return CreateFrame(title, position, size);
+}
+
+/**
+ * Address: 0x00968640 (FUN_00968640)
+ * Mangled: ?DoMoveWindow@wxWindow@@MAEXHHHH@Z
+ *
+ * What it does:
+ * Moves and resizes the native window, clamping negative extents to zero and
+ * asking for a repaint.
+ */
+void wxWindowMswRuntime::DoMoveWindow(
+  const std::int32_t x,
+  const std::int32_t y,
+  const std::int32_t width,
+  const std::int32_t height
+)
+{
+  const HWND handle = GetWxWindowNativeHandle(this);
+  if (handle == nullptr) {
+    return;
+  }
+
+  (void)::MoveWindow(handle, x, y, width < 0 ? 0 : width, height < 0 ? 0 : height, TRUE);
+}
+
+/**
+ * Address: 0x009684C0 (FUN_009684C0)
+ * Mangled: ?DoGetClientSize@wxWindow@@MBEXPAH0@Z
+ *
+ * What it does:
+ * Reports the native client rectangle's extent.
+ */
+void wxWindowMswRuntime::DoGetClientSize(
+  std::int32_t* const outWidth,
+  std::int32_t* const outHeight
+) const
+{
+  RECT clientRect{};
+  const HWND handle = GetWxWindowNativeHandle(this);
+  if (handle != nullptr) {
+    (void)::GetClientRect(handle, &clientRect);
+  }
+
+  if (outWidth != nullptr) {
+    *outWidth = clientRect.right;
+  }
+  if (outHeight != nullptr) {
+    *outHeight = clientRect.bottom;
+  }
+}
+
+/**
+ * Address: 0x009687B0 (FUN_009687B0)
+ * Mangled: ?DoSetClientSize@wxWindow@@MAEXHH@Z
+ *
+ * What it does:
+ * Grows the window until its client area is the requested size, by adding the
+ * current window/client difference and moving. Repeats up to four times
+ * because a move can change the non-client metrics, and stops as soon as the
+ * client rectangle already matches. -1 leaves that axis alone.
+ */
+void wxWindowMswRuntime::DoSetClientSize(
+  const std::int32_t width,
+  const std::int32_t height
+)
+{
+  const HWND handle = GetWxWindowNativeHandle(this);
+  if (handle == nullptr) {
+    return;
+  }
+
+  for (int attempt = 0; attempt < 4; ++attempt) {
+    RECT clientRect{};
+    (void)::GetClientRect(handle, &clientRect);
+    const bool widthSettled = (clientRect.right == width) || (width == -1);
+    const bool heightSettled = (clientRect.bottom == height) || (height == -1);
+    if (widthSettled && heightSettled) {
+      break;
+    }
+
+    RECT windowRect{};
+    (void)::GetWindowRect(handle, &windowRect);
+
+    POINT topLeft{windowRect.left, windowRect.top};
+    const std::int32_t targetWidth =
+      width + (windowRect.right - windowRect.left) - clientRect.right;
+    const std::int32_t targetHeight =
+      height + (windowRect.bottom - windowRect.top) - clientRect.bottom;
+
+    if (!IsTopLevel()) {
+      if (const wxWindowBase* const parent = GetParentWindow(); parent != nullptr) {
+        if (const HWND parentHandle = GetWxWindowNativeHandle(parent); parentHandle != nullptr) {
+          (void)::ScreenToClient(parentHandle, &topLeft);
+        }
+      }
+    }
+
+    DoMoveWindow(topLeft.x, topLeft.y, targetWidth, targetHeight);
+  }
 }
 
 /**
