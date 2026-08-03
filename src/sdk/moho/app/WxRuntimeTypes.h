@@ -5766,9 +5766,16 @@ public:
   std::int32_t argc = 0;
   char** argv = nullptr;
 
-  wxStringRuntime m_className{};
+  // Declaration order from `wxAppBase` in the vendored
+  // `include/wx/app.h` - `wxString m_vendorName, m_appName, m_className;` -
+  // which is the order the binary has, because the binary links this library.
+  // These three had been labelled one slot apart: m_className on +0x34 and the
+  // other two pushed down, so GetAppName() would have handed back the vendor
+  // string. Nothing in the recovered tree reads them yet, so this is a naming
+  // correction rather than a behaviour change.
   wxStringRuntime m_vendorName{};
   wxStringRuntime m_appName{};
+  wxStringRuntime m_className{};
 
   wxWindowBase* m_topWindow = nullptr;
   std::int32_t m_exitOnFrameDelete = kExitOnFrameDeleteLater;
@@ -5797,16 +5804,16 @@ static_assert(
   "wxApp::argv offset must be 0x30"
 );
 static_assert(
-  offsetof(wxApp, m_className) == 0x34,
-  "wxApp::m_className offset must be 0x34"
+  offsetof(wxApp, m_vendorName) == 0x34,
+  "wxApp::m_vendorName offset must be 0x34"
 );
 static_assert(
-  offsetof(wxApp, m_vendorName) == 0x38,
-  "wxApp::m_vendorName offset must be 0x38"
+  offsetof(wxApp, m_appName) == 0x38,
+  "wxApp::m_appName offset must be 0x38"
 );
 static_assert(
-  offsetof(wxApp, m_appName) == 0x3C,
-  "wxApp::m_appName offset must be 0x3C"
+  offsetof(wxApp, m_className) == 0x3C,
+  "wxApp::m_className offset must be 0x3C"
 );
 static_assert(
   offsetof(wxApp, m_topWindow) == 0x40,
