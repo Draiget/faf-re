@@ -5700,7 +5700,9 @@ int moho::cfunc__c_CreateCursorL(LuaPlus::LuaState* const state)
   CMauiCursor* cursor = nullptr;
   {
     LuaPlus::LuaObject luaObjectArgument(LuaPlus::LuaStackObject(state, 1));
-    cursor = new CMauiCursor(&luaObjectArgument);
+    // Binary: `operator new(0x58)`.
+    cursor = static_cast<CMauiCursor*>(::operator new(0x58u));
+    new (cursor) CMauiCursor(&luaObjectArgument);
   }
 
   // CMauiCursor shares the CScriptObject runtime layout (cObject @+0x0C, mLuaObj @+0x20).
@@ -12664,7 +12666,10 @@ int moho::cfunc_InternalCreateBitmapL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiBitmap* const bitmap = new CMauiBitmap(&luaObject, parentControl);
+  // Binary: `operator new(0x18C)`. See cfunc_InternalCreateFrameL for why the
+  // real object size has to be spelled out here.
+  auto* const bitmap = static_cast<CMauiBitmap*>(::operator new(0x18Cu));
+  new (bitmap) CMauiBitmap(&luaObject, parentControl);
   bitmap->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(bitmap)->mLuaObj.PushStack(state);
   return 1;
@@ -12716,7 +12721,14 @@ int moho::cfunc_InternalCreateFrameL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiFrame* const frame = new CMauiFrame(&luaObject, nullptr);
+  // Binary: `operator new(0x134)` - the frame's real object size. The recovered
+  // `CMauiFrame` is a thin behaviour class (the layout lives in
+  // CMauiFrameRuntimeView), so `sizeof` here is just the vptr: a plain `new`
+  // hands back a 4-byte block and the base ctor writes straight past it,
+  // corrupting the allocator's free list. Allocate the real size, construct in
+  // place - which is exactly what the binary does.
+  auto* const frame = static_cast<CMauiFrame*>(::operator new(0x134u));
+  new (frame) CMauiFrame(&luaObject, nullptr);
   frame->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(frame)->mLuaObj.PushStack(state);
   return 1;
@@ -12824,7 +12836,9 @@ int moho::cfunc_InternalCreateBorderL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiBorder* const border = new CMauiBorder(&luaObject, parentControl);
+  // Binary: `operator new(0x174)`.
+  auto* const border = static_cast<CMauiBorder*>(::operator new(0x174u));
+  new (border) CMauiBorder(&luaObject, parentControl);
   border->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(border)->mLuaObj.PushStack(state);
   return 1;
@@ -12927,7 +12941,9 @@ int moho::cfunc_InternalCreateEditL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiEdit* const edit = new CMauiEdit(&luaObject, parentControl);
+  // Binary: `operator new(0x198)`.
+  auto* const edit = static_cast<CMauiEdit*>(::operator new(0x198u));
+  new (edit) CMauiEdit(&luaObject, parentControl);
   edit->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(edit)->mLuaObj.PushStack(state);
   return 1;
@@ -12981,7 +12997,9 @@ int moho::cfunc_InternalCreateGroupL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiGroup* const group = new CMauiGroup(&luaObject, parentControl);
+  // Binary: `operator new(0x11C)`.
+  auto* const group = static_cast<CMauiGroup*>(::operator new(0x11Cu));
+  new (group) CMauiGroup(&luaObject, parentControl);
   group->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(group)->mLuaObj.PushStack(state);
   return 1;
@@ -13057,7 +13075,9 @@ int moho::cfunc_InternalCreateHistogramL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiHistogram* const histogram = new CMauiHistogram(&luaObject, parentControl);
+  // Binary: `operator new(0x134)`.
+  auto* const histogram = static_cast<CMauiHistogram*>(::operator new(0x134u));
+  new (histogram) CMauiHistogram(&luaObject, parentControl);
   histogram->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(histogram)->mLuaObj.PushStack(state);
   return 1;
@@ -13183,7 +13203,9 @@ int moho::cfunc_InternalCreateMeshL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiMesh* const mesh = new CMauiMesh(&luaObject, parentControl);
+  // Binary: `operator new(0x140)`.
+  auto* const mesh = static_cast<CMauiMesh*>(::operator new(0x140u));
+  new (mesh) CMauiMesh(&luaObject, parentControl);
   mesh->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(mesh)->mLuaObj.PushStack(state);
   return 1;
@@ -13280,7 +13302,9 @@ int moho::cfunc_InternalCreateMovieL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiMovie* const movie = new CMauiMovie(&luaObject, parentControl);
+  // Binary: `operator new(0x168)`.
+  auto* const movie = static_cast<CMauiMovie*>(::operator new(0x168u));
+  new (movie) CMauiMovie(&luaObject, parentControl);
   movie->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(movie)->mLuaObj.PushStack(state);
   return 1;
@@ -13346,7 +13370,9 @@ int moho::cfunc_InternalCreateScrollbarL(LuaPlus::LuaState* const state)
   (void)axisRef.SetLexical(axisLexical);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiScrollbar* const scrollbar = new CMauiScrollbar(&luaObject, parentControl, axis);
+  // Binary: `operator new(0x158)`.
+  auto* const scrollbar = static_cast<CMauiScrollbar*>(::operator new(0x158u));
+  new (scrollbar) CMauiScrollbar(&luaObject, parentControl, axis);
   scrollbar->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(scrollbar)->mLuaObj.PushStack(state);
   return 1;
@@ -13400,7 +13426,9 @@ int moho::cfunc_InternalCreateTextL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiText* const text = new CMauiText(&luaObject, parentControl);
+  // Binary: `operator new(0x194)`.
+  auto* const text = static_cast<CMauiText*>(::operator new(0x194u));
+  new (text) CMauiText(&luaObject, parentControl);
   text->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(text)->mLuaObj.PushStack(state);
   return 1;
@@ -13542,7 +13570,9 @@ int moho::cfunc_InternalCreateItemListL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiItemList* const itemList = new CMauiItemList(&luaObject, parentControl);
+  // Binary: `operator new(0x158)`.
+  auto* const itemList = static_cast<CMauiItemList*>(::operator new(0x158u));
+  new (itemList) CMauiItemList(&luaObject, parentControl);
   itemList->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(itemList)->mLuaObj.PushStack(state);
   return 1;
@@ -17855,7 +17885,9 @@ int moho::cfunc_InternalCreateMapPreviewL(LuaPlus::LuaState* const state)
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CUIMapPreview* const mapPreview = new CUIMapPreview(&luaObject, parentControl);
+  // Binary: `operator new(0x124)`.
+  auto* const mapPreview = static_cast<CUIMapPreview*>(::operator new(0x124u));
+  new (mapPreview) CUIMapPreview(&luaObject, parentControl);
   mapPreview->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(mapPreview)->mLuaObj.PushStack(state);
   return 1;
@@ -18709,10 +18741,10 @@ namespace
     moho::CMauiControlExtendedRuntimeView* const extendedView =
       moho::CMauiControlExtendedRuntimeView::FromControl(control);
     moho::CMauiControl* const rootFrame = extendedView->mRootFrame;
-    moho::CMauiControlExtendedRuntimeView* const rootFrameView =
-      moho::CMauiControlExtendedRuntimeView::FromControl(rootFrame);
-    moho::ren_Viewport->AddWorldView(
-      renderView, static_cast<int>(reinterpret_cast<std::intptr_t>(rootFrameView->mEventMapper)), view->mWorldViewDepth);
+    // +0x130 on the root frame, which is a CMauiFrame - not a control field.
+    moho::CMauiFrameRuntimeView* const rootFrameView =
+      moho::CMauiFrameRuntimeView::FromFrame(reinterpret_cast<moho::CMauiFrame*>(rootFrame));
+    moho::ren_Viewport->AddWorldView(renderView, rootFrameView->mTargetHead, view->mWorldViewDepth);
 
     view->mNeedsFrameUpdate = 1;
 
@@ -19570,7 +19602,9 @@ int moho::cfunc_InternalCreateWorldMeshL(LuaPlus::LuaState* const state)
   }
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CUIWorldMesh* const worldMesh = new CUIWorldMesh(luaObject);
+  // Binary: `operator new(0x38)`.
+  auto* const worldMesh = static_cast<CUIWorldMesh*>(::operator new(0x38u));
+  new (worldMesh) CUIWorldMesh(luaObject);
   static_cast<CScriptObject*>(worldMesh)->mLuaObj.PushStack(state);
   return 1;
 }
@@ -20723,12 +20757,10 @@ void moho::UIWorldViewSetHidden(CUIWorldView* const worldView, const bool hidden
   } else {
     CMauiControl* const rootFrame =
       CMauiControlExtendedRuntimeView::FromControl(reinterpret_cast<CMauiControl*>(worldView))->mRootFrame;
-    CMauiControlExtendedRuntimeView* const rootFrameView =
-      CMauiControlExtendedRuntimeView::FromControl(rootFrame);
-    ren_Viewport->AddWorldView(
-      renderView,
-      static_cast<int>(reinterpret_cast<std::intptr_t>(rootFrameView->mEventMapper)),
-      view->mWorldViewDepth);
+    // +0x130 on the root frame, which is a CMauiFrame - not a control field.
+    CMauiFrameRuntimeView* const rootFrameView =
+      CMauiFrameRuntimeView::FromFrame(reinterpret_cast<CMauiFrame*>(rootFrame));
+    ren_Viewport->AddWorldView(renderView, rootFrameView->mTargetHead, view->mWorldViewDepth);
   }
 }
 
@@ -20942,6 +20974,7 @@ moho::CMauiControl::CMauiControl(
   if (luaObject != nullptr) {
     scriptObject->SetLuaObject(*luaObject);
   }
+
 
   if (parent != nullptr) {
     CMauiControlHierarchyRuntimeView* const parentView = CMauiControlHierarchyRuntimeView::FromControl(parent);

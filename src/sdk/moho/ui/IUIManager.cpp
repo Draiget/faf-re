@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <exception>
+#include <new>
 
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/MemBufferStream.h"
@@ -190,7 +191,11 @@ moho::CUIManager* moho::IUIManager::Create()
     return g_UIManager;
   }
 
-  CUIManager* const created = new CUIManager();
+  // Binary: `operator new(0x78)` - the manager's real object size. `CUIManager`
+  // is a thin behaviour class here, so a plain `new` would allocate only the
+  // vptr and the ctor would write past the block.
+  auto* const created = static_cast<CUIManager*>(::operator new(0x78u));
+  new (created) CUIManager();
   g_UIManager = created;
   return g_UIManager;
 }
