@@ -6934,6 +6934,23 @@ namespace moho
     void Render(int head, void* worldViewInfoVector);
 
     /**
+     * Address: 0x007F7B30 (FUN_007F7B30)
+     * Mangled: ?D3DWindowOnDeviceRender@WRenViewport@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Drives one engine frame: resets the per-frame render stat counters, ticks
+     * each registered world view, advances the global mesh interpolant, then
+     * runs `Render` once per configured head. Re-entrant paints are dropped.
+     *
+     * Notes:
+     * - In the binary this is `WRenViewport`'s override of the empty
+     *   `WD3DViewport::D3DWindowOnDeviceRender` slot that `CD3DDevice::Paint`
+     *   dispatches. This tree models the inheritance inverted, so the body
+     *   lives here as a plain member and the `WD3DViewport` slot forwards.
+     */
+    void RenderAllHeads();
+
+    /**
      * Address: 0x007F6610 (FUN_007F6610, ?OnMouseEnter@WRenViewport@Moho@@QAEXAAVwxMouseEvent@@@Z)
      *
      * What it does:
