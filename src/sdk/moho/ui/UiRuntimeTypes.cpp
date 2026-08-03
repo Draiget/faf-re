@@ -5671,7 +5671,13 @@ moho::CMauiCursor::~CMauiCursor()
   CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
   cursorView->mTexture.reset();
   cursorView->mDefaultTexture.reset();
-  reinterpret_cast<CScriptObject*>(this)->~CScriptObject();
+  // Qualified so the call is NOT virtually dispatched. ~CScriptObject is
+  // virtual, and this class does not derive from CScriptObject - it overlays
+  // one - so an unqualified `->~CScriptObject()` dispatches through this
+  // object's own vptr and lands on an unrelated slot. CScriptObject's
+  // cObject/mLuaObj then never destruct, stay linked in the Lua used-object
+  // list, and operator delete hands the still-linked nodes back to the heap.
+  reinterpret_cast<CScriptObject*>(this)->CScriptObject::~CScriptObject();
 }
 
 /**
@@ -21071,7 +21077,13 @@ moho::CMauiControl::~CMauiControl()
   CMauiControlListNode* const parentListNode = &hierarchyView->mParentList;
   parentListNode->ListUnlink();
 
-  reinterpret_cast<CScriptObject*>(this)->~CScriptObject();
+  // Qualified so the call is NOT virtually dispatched. ~CScriptObject is
+  // virtual, and this class does not derive from CScriptObject - it overlays
+  // one - so an unqualified `->~CScriptObject()` dispatches through this
+  // object's own vptr and lands on an unrelated slot. CScriptObject's
+  // cObject/mLuaObj then never destruct, stay linked in the Lua used-object
+  // list, and operator delete hands the still-linked nodes back to the heap.
+  reinterpret_cast<CScriptObject*>(this)->CScriptObject::~CScriptObject();
 }
 
 /**
