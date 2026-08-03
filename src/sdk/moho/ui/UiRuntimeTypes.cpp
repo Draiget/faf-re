@@ -23697,6 +23697,13 @@ void moho::CMauiControl::Dump()
  * fields, creates one frame-owned wx event mapper, and marks this control as
  * requiring one frame update from itself as root owner.
  */
+// The ctor below seeds four fields through CMauiFrameRuntimeView into the
+// 0x134 block cfunc_InternalCreateFrameL allocates, so the view has to end
+// inside it. The FAF_RUNTIME_LAYOUT_ASSERT offsets on the view are compiled
+// out unless FAF_ENFORCE_STRICT_LAYOUT_ASSERTS is on; this one is not.
+static_assert(sizeof(moho::CMauiFrameRuntimeView) <= 0x134,
+  "CMauiFrameRuntimeView must fit inside the 0x134 CMauiFrame allocation");
+
 moho::CMauiFrame::CMauiFrame(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
   : CMauiControl(luaObject, parent, "frame")
 {
