@@ -36512,6 +36512,40 @@ unsigned long wxWindowBase::GetHandle() const
   return state != nullptr ? state->nativeHandle : 0u;
 }
 
+/**
+ * Address: 0x00968350 (FUN_00968350)
+ * Mangled: ?Refresh@wxWindow@@UAEX_NPBVwxRect@@@Z
+ *
+ * IDA signature:
+ * BOOL __thiscall wxWindow::Refresh(wxWindow *this, bool a2,
+ *                                   const struct wxRect *a3);
+ *
+ * What it does:
+ * Invalidates this window so Windows will send it a WM_PAINT. With no
+ * rectangle the whole client area is invalidated; with one, only that
+ * rectangle, converted from wx's origin+extent form to a Win32 RECT.
+ * Windows with no native handle yet are silently skipped.
+ */
+void wxWindowBase::Refresh(const bool eraseBackground, const wxRect* const updateRect)
+{
+  const auto nativeWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+  if (nativeWindow == nullptr) {
+    return;
+  }
+
+  if (updateRect == nullptr) {
+    (void)::InvalidateRect(nativeWindow, nullptr, eraseBackground ? TRUE : FALSE);
+    return;
+  }
+
+  RECT invalidArea{};
+  invalidArea.left = updateRect->x;
+  invalidArea.top = updateRect->y;
+  invalidArea.right = updateRect->x + updateRect->width;
+  invalidArea.bottom = updateRect->y + updateRect->height;
+  (void)::InvalidateRect(nativeWindow, &invalidArea, eraseBackground ? TRUE : FALSE);
+}
+
 
 /**
  * Address: 0x0097CCC0 (FUN_0097CCC0)

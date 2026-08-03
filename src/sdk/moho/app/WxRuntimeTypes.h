@@ -67,6 +67,21 @@ struct wxSize
 
 static_assert(sizeof(wxSize) == 0x8, "wxSize size must be 0x8");
 
+/**
+ * Origin plus extent, in the order wxWindow::Refresh (0x00968350) reads them:
+ * `x` at +0x00, `y` at +0x04, `width` at +0x08 and `height` at +0x0C, which it
+ * turns into a Win32 RECT as {x, y, x + width, y + height}.
+ */
+struct wxRect
+{
+  std::int32_t x = 0;
+  std::int32_t y = 0;
+  std::int32_t width = 0;
+  std::int32_t height = 0;
+};
+
+static_assert(sizeof(wxRect) == 0x10, "wxRect size must be 0x10");
+
 struct WxDisplaySizePairRuntime
 {
   std::int32_t widthPixels = 0;
@@ -2077,11 +2092,26 @@ public:
    */
   void CaptureMouse();
 
-  virtual void Refresh(bool eraseBackground, const void* updateRect)
-  {
-    (void)eraseBackground;
-    (void)updateRect;
-  }
+  /**
+   * Address: 0x00968350 (FUN_00968350)
+   * Mangled: ?Refresh@wxWindow@@UAEX_NPBVwxRect@@@Z
+   *
+   * IDA signature:
+   * BOOL __thiscall wxWindow::Refresh(wxWindow *this, bool a2,
+   *                                   const struct wxRect *a3);
+   *
+   * What it does:
+   * Marks this window's area as needing a repaint. A null `updateRect`
+   * invalidates the whole client area; otherwise only the given rectangle is
+   * invalidated. `eraseBackground` decides whether Windows also raises
+   * WM_ERASEBKGND for the invalidated region.
+   *
+   * This is the engine's frame trigger: CScApp::Main calls
+   * CD3DDevice::Refresh once per frame, which lands here on the viewport, and
+   * the resulting WM_PAINT is the only thing that ever reaches
+   * WD3DViewport::OnPaint -> CD3DDevice::Paint.
+   */
+  virtual void Refresh(bool eraseBackground, const wxRect* updateRect);
   /**
    * Address: 0x0042B700 (FUN_0042B700)
    */

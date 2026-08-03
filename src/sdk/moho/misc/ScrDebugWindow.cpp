@@ -60,16 +60,6 @@ namespace
     "wxSplitterSashEventRuntimeView::mSashPosition offset must be 0x38"
   );
 
-  struct wxRectRuntime
-  {
-    std::int32_t x = 0;
-    std::int32_t y = 0;
-    std::int32_t width = 0;
-    std::int32_t height = 0;
-  };
-
-  static_assert(sizeof(wxRectRuntime) == 0x10, "wxRectRuntime size must be 0x10");
-
   struct ScrSourceLineRuntimeRecord
   {
     std::uint8_t mUnknown00To03[0x04];
@@ -875,7 +865,7 @@ namespace
       reinterpret_cast<LPARAM>(&listRect)
     );
 
-    wxRectRuntime refreshRect{};
+    wxRect refreshRect{};
     refreshRect.x = static_cast<std::int32_t>(listRect.left);
     refreshRect.y = static_cast<std::int32_t>(listRect.top);
     refreshRect.width = static_cast<std::int32_t>(listRect.right - listRect.left);
