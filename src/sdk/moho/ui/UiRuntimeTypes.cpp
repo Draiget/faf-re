@@ -90,6 +90,34 @@
 #include "moho/entity/UserEntity.h"
 #include "moho/unit/core/UserUnit.h"
 
+
+namespace
+{
+  /**
+   * The UI classes here are thin: their real layout lives in the matching
+   * `*RuntimeView`, so placement-new runs only the vptr-carrying constructors
+   * and none of the member constructors the binary's real classes have.
+   * `operator new` hands back uninitialised bytes, so lanes such as
+   * `CScriptObject::cObject` (+0x0C) and `mLuaObj` (+0x20) start as garbage.
+   *
+   * `CScriptObject::SetLuaObject` then assigns to them, and
+   * `LuaPlus::LuaObject::operator=` sees a non-null `m_state`, takes its unlink
+   * branch, and executes `*m_prev = m_next` through a garbage pointer. That
+   * wild write lands in the root state's used-object list, and the Lua GC walks
+   * off the end of it on the next collection.
+   *
+   * Zeroing first is what the binary's constructor chain leaves behind for
+   * those lanes - null links and `tt = LUA_TNIL = 0`.
+   */
+  template <typename T>
+  [[nodiscard]] T* AllocateZeroedUiObject(const std::size_t byteSize)
+  {
+    void* const storage = ::operator new(byteSize);
+    std::memset(storage, 0, byteSize);
+    return static_cast<T*>(storage);
+  }
+}
+
 namespace moho
 {
   bool WIN_CopyToClipboard(const wchar_t* text);
@@ -5701,7 +5729,7 @@ int moho::cfunc__c_CreateCursorL(LuaPlus::LuaState* const state)
   {
     LuaPlus::LuaObject luaObjectArgument(LuaPlus::LuaStackObject(state, 1));
     // Binary: `operator new(0x58)`.
-    cursor = static_cast<CMauiCursor*>(::operator new(0x58u));
+    cursor = AllocateZeroedUiObject<CMauiCursor>(0x58u);
     new (cursor) CMauiCursor(&luaObjectArgument);
   }
 
@@ -12668,7 +12696,7 @@ int moho::cfunc_InternalCreateBitmapL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x18C)`. See cfunc_InternalCreateFrameL for why the
   // real object size has to be spelled out here.
-  auto* const bitmap = static_cast<CMauiBitmap*>(::operator new(0x18Cu));
+  auto* const bitmap = AllocateZeroedUiObject<CMauiBitmap>(0x18Cu);
   new (bitmap) CMauiBitmap(&luaObject, parentControl);
   bitmap->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(bitmap)->mLuaObj.PushStack(state);
@@ -12727,7 +12755,7 @@ int moho::cfunc_InternalCreateFrameL(LuaPlus::LuaState* const state)
   // hands back a 4-byte block and the base ctor writes straight past it,
   // corrupting the allocator's free list. Allocate the real size, construct in
   // place - which is exactly what the binary does.
-  auto* const frame = static_cast<CMauiFrame*>(::operator new(0x134u));
+  auto* const frame = AllocateZeroedUiObject<CMauiFrame>(0x134u);
   new (frame) CMauiFrame(&luaObject, nullptr);
   frame->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(frame)->mLuaObj.PushStack(state);
@@ -12780,7 +12808,7 @@ int moho::cfunc_InternalCreateDraggerL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateDraggerHelpText, 1, argumentCount);
   }
 
-  auto* const dragger = static_cast<CMauiLuaDragger*>(::operator new(0x3C));
+  auto* const dragger = AllocateZeroedUiObject<CMauiLuaDragger>(0x3C);
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   func_CMauiLuaDraggerConstruct(dragger, &luaObject);
   reinterpret_cast<CScriptObject*>(dragger)->mLuaObj.PushStack(state);
@@ -12837,7 +12865,7 @@ int moho::cfunc_InternalCreateBorderL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x174)`.
-  auto* const border = static_cast<CMauiBorder*>(::operator new(0x174u));
+  auto* const border = AllocateZeroedUiObject<CMauiBorder>(0x174u);
   new (border) CMauiBorder(&luaObject, parentControl);
   border->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(border)->mLuaObj.PushStack(state);
@@ -12942,7 +12970,7 @@ int moho::cfunc_InternalCreateEditL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x198)`.
-  auto* const edit = static_cast<CMauiEdit*>(::operator new(0x198u));
+  auto* const edit = AllocateZeroedUiObject<CMauiEdit>(0x198u);
   new (edit) CMauiEdit(&luaObject, parentControl);
   edit->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(edit)->mLuaObj.PushStack(state);
@@ -12998,7 +13026,7 @@ int moho::cfunc_InternalCreateGroupL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x11C)`.
-  auto* const group = static_cast<CMauiGroup*>(::operator new(0x11Cu));
+  auto* const group = AllocateZeroedUiObject<CMauiGroup>(0x11Cu);
   new (group) CMauiGroup(&luaObject, parentControl);
   group->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(group)->mLuaObj.PushStack(state);
@@ -13076,7 +13104,7 @@ int moho::cfunc_InternalCreateHistogramL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x134)`.
-  auto* const histogram = static_cast<CMauiHistogram*>(::operator new(0x134u));
+  auto* const histogram = AllocateZeroedUiObject<CMauiHistogram>(0x134u);
   new (histogram) CMauiHistogram(&luaObject, parentControl);
   histogram->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(histogram)->mLuaObj.PushStack(state);
@@ -13204,7 +13232,7 @@ int moho::cfunc_InternalCreateMeshL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x140)`.
-  auto* const mesh = static_cast<CMauiMesh*>(::operator new(0x140u));
+  auto* const mesh = AllocateZeroedUiObject<CMauiMesh>(0x140u);
   new (mesh) CMauiMesh(&luaObject, parentControl);
   mesh->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(mesh)->mLuaObj.PushStack(state);
@@ -13303,7 +13331,7 @@ int moho::cfunc_InternalCreateMovieL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x168)`.
-  auto* const movie = static_cast<CMauiMovie*>(::operator new(0x168u));
+  auto* const movie = AllocateZeroedUiObject<CMauiMovie>(0x168u);
   new (movie) CMauiMovie(&luaObject, parentControl);
   movie->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(movie)->mLuaObj.PushStack(state);
@@ -13371,7 +13399,7 @@ int moho::cfunc_InternalCreateScrollbarL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x158)`.
-  auto* const scrollbar = static_cast<CMauiScrollbar*>(::operator new(0x158u));
+  auto* const scrollbar = AllocateZeroedUiObject<CMauiScrollbar>(0x158u);
   new (scrollbar) CMauiScrollbar(&luaObject, parentControl, axis);
   scrollbar->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(scrollbar)->mLuaObj.PushStack(state);
@@ -13427,7 +13455,7 @@ int moho::cfunc_InternalCreateTextL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x194)`.
-  auto* const text = static_cast<CMauiText*>(::operator new(0x194u));
+  auto* const text = AllocateZeroedUiObject<CMauiText>(0x194u);
   new (text) CMauiText(&luaObject, parentControl);
   text->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(text)->mLuaObj.PushStack(state);
@@ -13571,7 +13599,7 @@ int moho::cfunc_InternalCreateItemListL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x158)`.
-  auto* const itemList = static_cast<CMauiItemList*>(::operator new(0x158u));
+  auto* const itemList = AllocateZeroedUiObject<CMauiItemList>(0x158u);
   new (itemList) CMauiItemList(&luaObject, parentControl);
   itemList->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(itemList)->mLuaObj.PushStack(state);
@@ -17886,7 +17914,7 @@ int moho::cfunc_InternalCreateMapPreviewL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x124)`.
-  auto* const mapPreview = static_cast<CUIMapPreview*>(::operator new(0x124u));
+  auto* const mapPreview = AllocateZeroedUiObject<CUIMapPreview>(0x124u);
   new (mapPreview) CUIMapPreview(&luaObject, parentControl);
   mapPreview->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(mapPreview)->mLuaObj.PushStack(state);
@@ -18803,7 +18831,7 @@ int moho::cfunc_CUIWorldView__initL(LuaPlus::LuaState* const state)
     trackCamera = msvc8::string(trackStr, std::strlen(trackStr));
   }
 
-  void* const storage = ::operator new(0x2A8u);
+  void* const storage = AllocateZeroedUiObject<void>(0x2A8u);
   CUIWorldView* worldView = nullptr;
   if (storage != nullptr) {
     LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
@@ -19603,7 +19631,7 @@ int moho::cfunc_InternalCreateWorldMeshL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
   // Binary: `operator new(0x38)`.
-  auto* const worldMesh = static_cast<CUIWorldMesh*>(::operator new(0x38u));
+  auto* const worldMesh = AllocateZeroedUiObject<CUIWorldMesh>(0x38u);
   new (worldMesh) CUIWorldMesh(luaObject);
   static_cast<CScriptObject*>(worldMesh)->mLuaObj.PushStack(state);
   return 1;
