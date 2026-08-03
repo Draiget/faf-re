@@ -189,16 +189,39 @@ namespace moho
      */
     void CallbackInt(const char* callback, int value);
 
+    /**
+     * Address: 0x00581AA0 (FUN_00581AA0, Moho::CScriptObject::RunScript)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CScriptObject::RunScript(Moho::CScriptObject *this,
+     *     const char *name);
+     *
+     * What it does:
+     * Looks the named callback up on this object's Lua table and invokes it as
+     * a *method*: the binary copies `this->mLuaObj` into a local and passes it
+     * as the first argument, so the script sees the usual `self`. The whole
+     * lookup-and-call runs inside a weak-link guard, installed before
+     * `FindScript`, so a callback that destroys this object is observable to
+     * the weak-pointer machinery instead of leaving a dangling link.
+     *
+     * Omitting `self` here is not a harmless simplification: every Lua-side
+     * handler is declared `function(self, ...)`, so the arguments shift by one
+     * and `Control:OnInit` ends up calling `ResetLayout` on nothing.
+     */
     template <class... Ts>
     LuaPlus::LuaObject RunScript(const char* name, Ts... args)
     {
+      const WeakObject::ScopedWeakLinkGuard weakGuard(this);
+
       LuaPlus::LuaObject script;
       FindScript(&script, name);
-      if (script) {
-        LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
-        return fn(args...);
+      if (!script) {
+        return {};
       }
-      return {};
+
+      const LuaPlus::LuaObject self(mLuaObj);
+      LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
+      return fn(self, args...);
     }
 
     /**
