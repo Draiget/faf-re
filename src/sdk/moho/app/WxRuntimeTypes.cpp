@@ -11436,6 +11436,12 @@ namespace
     std::uint8_t hasCustomPalette = 0;
     wxColourRuntime foregroundColour{}; // window+0x90
     void* dropTarget = nullptr;
+    // wxTopLevelWindowMSW's two show-state bytes. DoShowWindow (0x0098C250)
+    // writes `iconized = (nCmdShow == SW_MINIMIZE)` at window+0x130, and
+    // Maximize (0x0098C390) parks its request in `maximizeOnShow` at
+    // window+0x131 when the window is not on screen yet, for Show to consume.
+    std::uint8_t iconized = 0;
+    std::uint8_t maximizeOnShow = 0;
   };
 
   struct WxTextCtrlRuntimeState
@@ -14449,13 +14455,12 @@ namespace
       return true;
     }
 
-    bool Show(
-      const bool show
-    ) override
-    {
-      EnsureSupComFrameState(this).visible = show;
-      return true;
-    }
+    // No Show override here. WSupComFrame does not declare one in the binary -
+    // CScApp::CreateAppFrame dispatches straight into wxTopLevelWindowMSW::Show
+    // (0x0098C280), which is what calls DoShowWindow and puts the frame on
+    // screen. The override that used to sit here only wrote a `visible` flag
+    // that nothing ever read, so ::ShowWindow was never reached and the frame
+    // stayed invisible for the whole run.
 
     void SetTitle(
       const wxStringRuntime& title
@@ -30263,6 +30268,75 @@ namespace
 }
 
 /**
+ * Address: 0x0098C250 (FUN_0098C250, wxTopLevelWindowMSW::DoShowWindow)
+ *
+ * IDA signature:
+ * BOOL __thiscall wxTopLevelWindowMSW::DoShowWindow(int this, int nCmdShow);
+ *
+ * What it does:
+ * Applies one `ShowWindow` command to this frame's native handle and records
+ * whether it left the frame minimised (`nCmdShow == SW_MINIMIZE`).
+ */
+bool wxTopLevelWindowRuntime::DoShowWindow(
+  const std::int32_t showCommand
+)
+{
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  const BOOL previouslyVisible =
+    state.nativeHandle != 0u
+      ? ::ShowWindow(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state.nativeHandle)), showCommand)
+      : FALSE;
+  state.iconized = (showCommand == SW_MINIMIZE) ? 1u : 0u;
+  return previouslyVisible != FALSE;
+}
+
+/**
+ * Address: 0x0098C390 (FUN_0098C390, wxTopLevelWindowMSW::Maximize)
+ * Mangled: ?Maximize@wxTopLevelWindowMSW@@UAEX_N@Z
+ *
+ * What it does:
+ * Maximises (or restores) the frame straight away when it is already shown -
+ * the visible bit at window+0xCC - and otherwise remembers the request so the
+ * next `Show(true)` can raise it maximised instead.
+ */
+void wxTopLevelWindowRuntime::Maximize(
+  const bool maximize
+)
+{
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  if ((state.bitfields & 0x2u) != 0u) {
+    (void)DoShowWindow(maximize ? SW_MAXIMIZE : SW_RESTORE);
+    return;
+  }
+
+  state.maximizeOnShow = maximize ? 1u : 0u;
+}
+
+/**
+ * Address: 0x0098C3E0 (FUN_0098C3E0, wxTopLevelWindowMSW::Iconize)
+ * Mangled: ?Iconize@wxTopLevelWindowMSW@@UAEX_N@Z
+ *
+ * What it does:
+ * Minimises or restores the frame.
+ */
+void wxTopLevelWindowRuntime::Iconize(
+  const bool iconize
+)
+{
+  (void)DoShowWindow(iconize ? SW_MINIMIZE : SW_RESTORE);
+}
+
+/**
+ * What it does:
+ * Reports the minimised state `DoShowWindow` recorded.
+ */
+bool wxTopLevelWindowRuntime::IsIconized() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr && state->iconized != 0u;
+}
+
+/**
  * Address: 0x0098C280 (FUN_0098C280, wxTopLevelWindowMSW::Show)
  * Mangled: ?Show@wxTopLevelWindowMSW@@UAE_N_N@Z
  *
@@ -30278,11 +30352,31 @@ bool wxTopLevelWindowRuntime::Show(
     return false;
   }
 
+  // The native call is the whole point of this override and it used to be
+  // missing: the base only flips the visible bit, so without DoShowWindow the
+  // frame was created, sized and raised but never actually put on screen -
+  // EnumWindows found it with IsWindowVisible false for the entire run.
+  std::int32_t showCommand = SW_HIDE;
+  if (show) {
+    WxWindowBaseRuntimeState& showState = EnsureWxWindowBaseRuntimeState(this);
+    if (showState.maximizeOnShow != 0u) {
+      showCommand = SW_MAXIMIZE;
+      showState.maximizeOnShow = 0u;
+    } else {
+      showCommand = SW_SHOW;
+    }
+  }
+  (void)DoShowWindow(showCommand);
+
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
   if (show) {
     if (state != nullptr && state->nativeHandle != 0u) {
       ::BringWindowToTop(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state->nativeHandle)));
     }
+    // The binary also raises a wxEVT_ACTIVATE through this window's own
+    // handler here (0x0098C2E8 onwards). wxActivateEvent has no recovered type
+    // in this tree yet, so that dispatch is still outstanding - the window
+    // itself now shows, but nothing observes the activation.
   } else if (state != nullptr && state->parentWindow != nullptr) {
     const WxWindowBaseRuntimeState* const parentState = FindWxWindowBaseRuntimeState(state->parentWindow);
     if (parentState != nullptr && parentState->nativeHandle != 0u) {
