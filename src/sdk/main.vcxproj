@@ -1101,6 +1101,7 @@
     <ClCompile Include="moho\ui\CMauiControlTypeInfo.cpp" />
     <ClCompile Include="moho\ui\EMauiEventTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiFrameTypeInfo.cpp" />
+    <ClCompile Include="moho\ui\CMauiCursorTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CUIWorldMesh.cpp" />
     <ClCompile Include="moho\ui\EMauiKeyCodeTypeInfo.cpp" />
     <ClCompile Include="moho\render\camera\CameraImplTypeInfo.cpp" />
@@ -2224,6 +2225,7 @@
     <ClInclude Include="moho\terrain\water\ShoreCell.h" />
     <ClInclude Include="moho\ui\CMauiControlTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiFrameTypeInfo.h" />
+    <ClInclude Include="moho\ui\CMauiCursorTypeInfo.h" />
     <ClInclude Include="moho\ui\CUIWorldMesh.h" />
     <ClInclude Include="moho\ui\CUIWorldMeshTypeInfo.h" />
     <ClInclude Include="moho\ui\CUIManager.h" />
