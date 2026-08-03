@@ -76,6 +76,8 @@
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/Common.h"
@@ -39180,8 +39182,17 @@ void moho::WD3DViewport::D3DWindowOnDeviceInit() {}
 
 /**
  * Address: 0x0042BB00 (FUN_0042BB00)
+ *
+ * The binary's `WD3DViewport` body is a bare `retn` - it is the do-nothing
+ * default for viewports that do not render the world. The real frame driver is
+ * `WRenViewport`'s override (0x007F7B30), which `CD3DDevice::Paint` reaches
+ * through this slot. This tree models the inheritance inverted (see
+ * `WRenViewport::RenderAllHeads`), so the slot forwards instead of overriding.
  */
-void moho::WD3DViewport::D3DWindowOnDeviceRender() {}
+void moho::WD3DViewport::D3DWindowOnDeviceRender()
+{
+  RenderAllHeads();
+}
 
 /**
  * Address: 0x0042BB10 (FUN_0042BB10)
@@ -62991,6 +63002,17 @@ namespace moho
   // The RenderUI pass invokes ed_Hook's second vtable slot (Hook1, +0x04) when
   // both are set (asm 0x007F89FB..0x007F8A13).
 
+  // Frame-driver tuning globals read by WRenViewport::RenderAllHeads /
+  // WRenViewport::Render. Types byte-verified from the referencing .asm
+  // (FUN_007F7B30 and FUN_007F90D0 all use `cmp <sym>, 0` on a 1-byte lane).
+  extern bool ren_RenderNothing;   // ?ren_RenderNothing@Moho@@3_NA @0x010A6416
+  extern bool ren_ShowWireframe;   // ?ren_ShowWireframe@Moho@@3_NA @0x010A641C
+  extern bool ren_OnlyFirstView;   // ?ren_OnlyFirstView@Moho@@3_NA @0x010A641D
+
+  // Sound-frame sequence counter bumped once per rendered frame by the
+  // frame driver (asm 0x007F7CD7 `add snd_index, 1`). Defined in the audio TU.
+  extern int snd_index;
+
   // Forward declarations for the debug/UI render pass so each callee can be
   // invoked by name before its definition and across the WRenViewport members.
   void REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, int head);
@@ -63507,6 +63529,112 @@ void moho::REN_RenderViewportUI(WRenViewport* const viewport, const void* const 
   }
 }
 
+namespace
+{
+  // ---- WRenViewport frame-driver state --------------------------------------
+  // Both persist across frames in the shipped binary:
+  //   render_lock                  @0x010C7768 (1-byte re-entrancy guard)
+  //   sEngineStat_Render_UnitCount @0x010C776C (lazily-bound StatItem*)
+  // The guard is a plain byte, not an interlocked flag - a paint that arrives
+  // while a frame is already in flight is dropped, not queued.
+  bool gRenderLock = false;
+  moho::StatItem* gEngineStatRenderUnitCount = nullptr;
+
+  /**
+   * Lazily binds the `Render_UnitCount` engine stat and atomically zeroes its
+   * counter. The binary emits this inline in D3DWindowOnDeviceRender as a
+   * lazy GetItem("Render_UnitCount", true) + Release(0) followed by the
+   * double-`lock cmpxchg` read-then-store idiom at 0x007F7BB0..0x007F7BC7.
+   */
+  void ResetRenderUnitCountStat()
+  {
+    if (gEngineStatRenderUnitCount == nullptr) {
+      if (moho::EngineStats* const stats = moho::GetEngineStats(); stats != nullptr) {
+        gEngineStatRenderUnitCount = stats->GetItem2("Render_UnitCount");
+        if (gEngineStatRenderUnitCount != nullptr) {
+          (void)gEngineStatRenderUnitCount->Release(0);
+        }
+      }
+    }
+
+    if (gEngineStatRenderUnitCount == nullptr) {
+      return;
+    }
+
+    volatile long* const counter =
+      reinterpret_cast<volatile long*>(&gEngineStatRenderUnitCount->mPrimaryValueBits);
+    long observed = 0;
+    do {
+      observed = ::InterlockedCompareExchange(counter, 0, 0);
+    } while (::InterlockedCompareExchange(counter, 0, observed) != observed);
+  }
+} // namespace
+
+/**
+ * Address: 0x007F7B30 (FUN_007F7B30)
+ * Mangled: ?D3DWindowOnDeviceRender@WRenViewport@Moho@@UAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall Moho::WRenViewport::D3DWindowOnDeviceRender(Moho::WRenViewport *this);
+ *
+ * What it does:
+ * Drives one engine frame. Resets the per-frame unit stat and every render
+ * counter, ticks each registered world view's terrain, advances the global mesh
+ * frame counter/interpolant, then runs `Render` once per configured head. A
+ * re-entrant paint while a frame is in flight is dropped by the guard byte.
+ *
+ * Placement note: in the binary this is `WRenViewport`'s override of the empty
+ * `WD3DViewport::D3DWindowOnDeviceRender` (0x0042BB00) vtable slot, which
+ * `CD3DDevice::Paint` dispatches. This SDK tree currently models the
+ * inheritance the other way round (`WD3DViewport` derives from
+ * `WRenViewport`), so the body lives on `WRenViewport` - where every field it
+ * touches lives - and the `WD3DViewport` slot forwards to it.
+ * `REN_CreateGameViewport` builds a `WD3DViewport` and that is the only
+ * concrete viewport this tree constructs, so the dispatched behaviour matches.
+ */
+void moho::WRenViewport::RenderAllHeads()
+{
+  moho::CTimeBarSection renderSection("Render");
+  if (gRenderLock) {
+    return;
+  }
+  gRenderLock = true;
+
+  ResetRenderUnitCountStat();
+  (void)moho::D3D_GetDevice()->InitRenderEngineStats();
+
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  for (WRenViewportWorldViewParamRuntime* worldView = runtime->mWorldViews.mFirst;
+       worldView != runtime->mWorldViews.mLast;
+       ++worldView) {
+    worldView->view->Func1();
+  }
+
+  // `++sFrameCounter; sCurrentInterpolant = REN_GetSimDeltaSeconds();` - the
+  // binary open-codes both stores here; the recovered helper is byte-identical.
+  moho::MeshInstance::SetCurrentInterpolant();
+
+  auto* const headView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+  for (int head = 0; head < headView->mNumHeads; ++head) {
+    const bool hasAnyWorldView =
+      runtime->mWorldViews.mFirst != nullptr && runtime->mWorldViews.mLast != runtime->mWorldViews.mFirst;
+
+    if (moho::ren_OnlyFirstView && hasAnyWorldView) {
+      // Debug mode: render only the first registered world view. The binary
+      // copy-constructs a fresh one-element vector from `mWorldViews[0]` for
+      // the duration of the call rather than passing the live vector.
+      msvc8::vector<WRenViewportWorldViewParamRuntime> firstViewOnly{};
+      firstViewOnly.push_back(*runtime->mWorldViews.mFirst);
+      Render(head, &firstViewOnly);
+    } else {
+      Render(head, AsWorldViewVector(runtime));
+    }
+  }
+
+  ++moho::snd_index;
+  gRenderLock = false;
+}
+
 /**
  * Address: 0x007F90D0 (FUN_007F90D0, Moho::WRenViewport::Render)
  *
@@ -63526,8 +63654,64 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     return;
   }
 
+  gpg::gal::DeviceD3D9* const galDevice = device->GetDeviceD3D9();
+
+  // Clamp the requested fidelity into the range this adapter actually supports.
+  // The binary also latches and clears `ren_RegenShore` here; that flag is not
+  // modelled in this tree yet, so it is not touched.
+  if (moho::graphics_Fidelity >= moho::graphics_FidelitySupported) {
+    moho::graphics_Fidelity = moho::graphics_FidelitySupported;
+  }
+  if (moho::graphics_Fidelity < 0) {
+    moho::graphics_Fidelity = 0;
+  }
+
   WRenViewportRenderView* const runtime = AsRenderView(this);
   runtime->mHead = head;
+
+  if (moho::ren_RenderNothing) {
+    return;
+  }
+
+  // ---- Per-head device setup -----------------------------------------------
+  // This block runs before any world-view work and unconditionally, which is
+  // what makes a frame renderable at all: `SetRenderTarget2` is the only thing
+  // on the D3D9 path that binds a depth-stencil surface (it reaches
+  // `CD3DDevice::SetRenderTarget1` -> `DeviceD3D9::ClearTarget` ->
+  // `SetDepthStencilSurface`). The device is created with
+  // `EnableAutoDepthStencil = 0`, so until this runs once, any clear that asks
+  // for Z or stencil - such as the one `CD3DDevice::Paint` issues while the
+  // window is being resized - fails with D3DERR_INVALIDCALL and the GAL throws.
+  //
+  // Binary order (FUN_007F90D0.asm 0x007F914D..0x007F91D9):
+  //   ValidateFrame -> SetWireframeState -> BeginScene -> RenderThumbnails
+  //   -> SetRenderTarget2(mHead, clear=1, color=0, z=1.0f, stencil=0)
+  //   -> RenderFrames
+  // The SetRenderTarget2 arguments are read straight off the push sequence at
+  // 0x007F919E..0x007F91B1 (stencil, z via fld1/fstp, color, clear, index).
+  moho::IUIManager* const uiManager = moho::ren_Ui ? moho::UI_GetManager() : nullptr;
+  if (uiManager != nullptr) {
+    uiManager->ValidateFrame(head);
+  }
+
+  if (galDevice != nullptr) {
+    (void)galDevice->SetWireframeState(moho::ren_ShowWireframe);
+  }
+
+  device->BeginScene();
+
+  auto* const headView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+  headView->mThumbnailRenderer.ProcessPendingRequests();
+
+  device->SetRenderTarget2(runtime->mHead, true, 0, 1.0f, 0);
+
+  if (uiManager != nullptr) {
+    // Batcher read straight out of the viewport at +0x215C, matching the
+    // binary's direct field load at 0x007F91C4 (same lane `GetPrimBatcher`
+    // returns).
+    uiManager->RenderFrames(runtime->mHead, runtime->mDebugCanvas.mPrimBatcher);
+  }
+
   UpdateRenderViewportCoordinates();
 
   // Re-center border mesh stances over the active terrain every frame.

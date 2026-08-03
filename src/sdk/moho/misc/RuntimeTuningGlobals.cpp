@@ -13,6 +13,14 @@ namespace moho
   bool snd_CheckLOS = true;
   bool debug_movie = false;
 
+  // Frame-driver debug toggles read by WRenViewport::RenderAllHeads /
+  // WRenViewport::Render. All three live in .bss in the shipped binary
+  // (0x010A6416 / 0x010A641C / 0x010A641D), so the image default is false:
+  // render normally, filled polygons, every world view.
+  bool ren_RenderNothing = false;
+  bool ren_ShowWireframe = false;
+  bool ren_OnlyFirstView = false;
+
   int snd_index = 0;
 
   float cam_NearZoom = 10.0f;
