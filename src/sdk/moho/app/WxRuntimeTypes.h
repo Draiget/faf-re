@@ -100,6 +100,31 @@ class wxCloseEventRuntime;
 class wxCommandEventRuntime;
 class wxCursor;
 class wxBitmap;
+class wxBrush;
+
+/**
+ * The two stock brushes `WD3DViewport::DrawBackgroundImage` (0x00430A60)
+ * selects: `wxBLACK_BRUSH` (a `wxBrush*`) to fill with, and `&wxNullBrush` to
+ * put back afterwards. Both live in `wxmsw.lib` as
+ * `?wxBLACK_BRUSH@@3PAVwxBrush@@A` / `?wxNullBrush@@3VwxBrush@@A` and are
+ * built by `wxInitializeStockObjects`, which `wxApp::Initialize` (0x009927E0)
+ * runs.
+ *
+ * They have to be the real wx objects: `wxDC::SetBrush` takes a `wxBrush&`
+ * and ref-counts it, so handing it a raw GDI `HBRUSH` from
+ * `GetStockObject(BLACK_BRUSH)` - which is what stood here - made
+ * `wxObject::Ref` write through a stock-object handle as if it were an
+ * object pointer.
+ */
+extern wxBrush* wxBLACK_BRUSH;
+extern wxBrush wxNullBrush;
+
+/**
+ * Builds the wx stock pens, brushes, fonts and cursors.
+ * `?wxInitializeStockObjects@@YAXXZ` in `wxmsw.lib`; `wxApp::Initialize`
+ * (0x009927E0) is what calls it in the binary.
+ */
+void wxInitializeStockObjects();
 struct wxMouseEventRuntime;
 class wxBitmapListRuntime;
 struct WxThreadSuspendControllerRuntime;
@@ -4070,7 +4095,115 @@ class wxDCBase
 {
 public:
   wxDCBase();
-  virtual ~wxDCBase() = default;
+
+  /**
+   * The vtable shape, not a behaviour recovery.
+   *
+   * `wxmsw.lib` supplies `??_7wxDC@@6B@` and `??_7wxDCTemp@@6B@`, so the
+   * vtable actually installed in every device context we construct is the
+   * library's - the real wxWidgets 2.4.2 one, which is what the shipped
+   * binary used too. Our call sites therefore have to index it with the
+   * library's slot numbers, and the only way to make the compiler emit those
+   * numbers is to declare the same virtuals in the same order.
+   *
+   * The order is transcribed from `wxDCBase` in the in-repo
+   * `dependencies/wxWindows-2.4.2/include/wx/dc.h`, on top of the four slots
+   * wxObject contributes (GetClassInfo, the deleting destructor,
+   * CreateRefData, CloneRefData - the shape this project already read off the
+   * WSupComFrame vtable). `SetColourMap` is left out because it sits behind
+   * `WXWIN_COMPATIBILITY`, which the shipped build had off.
+   *
+   * That reproduces the three offsets the disassembly of
+   * `WD3DViewport::DrawBackgroundImage` (0x00430A60) dispatches through
+   * exactly: SetBrush at +0x3C, DoDrawRectangle at +0xC4, DoGetSize at +0xE8.
+   * Before this the class declared one virtual of its own, so `SetBrush`
+   * compiled to slot 1 - the library's deleting destructor - and erasing the
+   * background deleted the borrowed DC and faulted in `free`.
+   *
+   * The bodies below are never entered: virtual dispatch goes through the
+   * library's vtable, and the linker discards the duplicate we emit. They
+   * exist so the slots line up, the same way the byte arrays in this class
+   * exist so the fields line up.
+   */
+  virtual void* GetClassInfo() const { return nullptr; } // slot 0 (+0x00)
+  virtual ~wxDCBase() = default;                         // slot 1 (+0x04)
+  virtual void* CreateRefData() const { return nullptr; } // slot 2 (+0x08)
+  virtual void* CloneRefData(const void*) const { return nullptr; } // slot 3 (+0x0C)
+
+  virtual void BeginDrawing() {} // slot 4 (+0x10)
+  virtual void EndDrawing() {} // slot 5 (+0x14)
+  virtual void DrawObject() {} // slot 6 (+0x18)
+  virtual void DrawLabel() {} // slot 7 (+0x1C)
+  virtual void Clear() {} // slot 8 (+0x20)
+  virtual void StartDoc() {} // slot 9 (+0x24)
+  virtual void EndDoc() {} // slot 10 (+0x28)
+  virtual void StartPage() {} // slot 11 (+0x2C)
+  virtual void EndPage() {} // slot 12 (+0x30)
+  virtual void SetFont() {} // slot 13 (+0x34)
+  virtual void SetPen() {} // slot 14 (+0x38)
+  // slot 15 (+0x3C)
+  virtual void SetBrush(const void* brush) noexcept;
+  virtual void SetBackground() {} // slot 16 (+0x40)
+  virtual void SetBackgroundMode() {} // slot 17 (+0x44)
+  virtual void SetPalette() {} // slot 18 (+0x48)
+  virtual void DestroyClippingRegion() {} // slot 19 (+0x4C)
+  virtual void GetCharHeight() {} // slot 20 (+0x50)
+  virtual void GetCharWidth() {} // slot 21 (+0x54)
+  virtual void GetMultiLineTextExtent() {} // slot 22 (+0x58)
+  virtual void CanDrawBitmap() {} // slot 23 (+0x5C)
+  virtual void CanGetTextExtent() {} // slot 24 (+0x60)
+  virtual void GetDepth() {} // slot 25 (+0x64)
+  virtual void GetPPI() {} // slot 26 (+0x68)
+  virtual void Ok() {} // slot 27 (+0x6C)
+  virtual void SetTextForeground() {} // slot 28 (+0x70)
+  virtual void SetTextBackground() {} // slot 29 (+0x74)
+  virtual void SetMapMode() {} // slot 30 (+0x78)
+  virtual void GetUserScale() {} // slot 31 (+0x7C)
+  virtual void SetUserScale() {} // slot 32 (+0x80)
+  virtual void GetLogicalScale() {} // slot 33 (+0x84)
+  virtual void SetLogicalScale() {} // slot 34 (+0x88)
+  virtual void SetLogicalOrigin() {} // slot 35 (+0x8C)
+  virtual void SetDeviceOrigin() {} // slot 36 (+0x90)
+  virtual void SetAxisOrientation() {} // slot 37 (+0x94)
+  virtual void SetLogicalFunction() {} // slot 38 (+0x98)
+  virtual void SetOptimization() {} // slot 39 (+0x9C)
+  virtual void GetOptimization() {} // slot 40 (+0xA0)
+  virtual void CalcBoundingBox() {} // slot 41 (+0xA4)
+  virtual void DoFloodFill() {} // slot 42 (+0xA8)
+  virtual void DoGetPixel() {} // slot 43 (+0xAC)
+  virtual void DoDrawPoint() {} // slot 44 (+0xB0)
+  virtual void DoDrawLine() {} // slot 45 (+0xB4)
+  virtual void DoDrawArc() {} // slot 46 (+0xB8)
+  virtual void DoDrawCheckMark() {} // slot 47 (+0xBC)
+  virtual void DoDrawEllipticArc() {} // slot 48 (+0xC0)
+  // slot 49 (+0xC4)
+  virtual void DoDrawRectangle(
+    std::int32_t x,
+    std::int32_t y,
+    std::int32_t width,
+    std::int32_t height
+  ) noexcept;
+  virtual void DoDrawRoundedRectangle() {} // slot 50 (+0xC8)
+  virtual void DoDrawEllipse() {} // slot 51 (+0xCC)
+  virtual void DoCrossHair() {} // slot 52 (+0xD0)
+  virtual void DoDrawIcon() {} // slot 53 (+0xD4)
+  virtual void DoDrawBitmap() {} // slot 54 (+0xD8)
+  virtual void DoDrawText() {} // slot 55 (+0xDC)
+  virtual void DoDrawRotatedText() {} // slot 56 (+0xE0)
+  virtual void DoBlit() {} // slot 57 (+0xE4)
+  // slot 58 (+0xE8)
+  virtual void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept;
+  virtual void DoGetSizeMM() {} // slot 59 (+0xEC)
+  virtual void DoDrawLines() {} // slot 60 (+0xF0)
+  virtual void DoDrawPolygon() {} // slot 61 (+0xF4)
+  virtual void DoSetClippingRegionAsRegion() {} // slot 62 (+0xF8)
+  virtual void DoSetClippingRegion() {} // slot 63 (+0xFC)
+  virtual void DoGetClippingRegion() {} // slot 64 (+0x100)
+  virtual void DoGetClippingBox() {} // slot 65 (+0x104)
+  virtual void DoGetLogicalOrigin() {} // slot 66 (+0x108)
+  virtual void DoGetDeviceOrigin() {} // slot 67 (+0x10C)
+  virtual void DoGetTextExtent() {} // slot 68 (+0x110)
+  virtual void DoDrawSpline() {} // slot 69 (+0x114)
 
   void* m_refData = nullptr;                 // +0x04, from wxObject
   std::uint8_t m_flags = 0;                  // +0x08 bit 1: the DC is usable
@@ -4137,14 +4270,14 @@ public:
    * dispatches through, at vtable slots +0x3C, +0xE8 and +0xC4 - the same
    * +0xC4 for DoDrawRectangle that the curve editor's vtable view asserts.
    */
-  virtual void SetBrush(const void* brush) noexcept;
-  virtual void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept;
-  virtual void DoDrawRectangle(
+  void SetBrush(const void* brush) noexcept override;
+  void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept override;
+  void DoDrawRectangle(
     std::int32_t x,
     std::int32_t y,
     std::int32_t width,
     std::int32_t height
-  ) noexcept;
+  ) noexcept override;
 
   /**
    * Address: 0x009CAAA0 (FUN_009CAAA0)
