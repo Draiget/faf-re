@@ -6696,16 +6696,24 @@ namespace moho
         sv.shadowMatrix.SetMatrix4x4(&shadow->mCamera.viewProjection);
       }
 
-      // Bind the shadow map as a weak texture handle (matches the binary's
-      // weak-handle GetTexture overload for the shadow lane, sub_491280). The
-      // shadow-map weak handle lives at Shadow+0x2E0; the current Shadow layout
-      // models that word range as `mRuntimeLanes[]` (an {int,ptr} placeholder
-      // that byte-overlaps a `boost::weak_ptr` {px, pn.pi_}). Read it typed off
-      // the first named lane; the shared_ptr copy retains the control block for
-      // the duration of the bind, matching sub_7DB350 + sub_4303C0.
-      const auto& shadowTextureHandle =
-        *reinterpret_cast<const boost::weak_ptr<gpg::gal::TextureD3D9>*>(&shadow->mRuntimeLanes[0]);
-      sv.shadowTexture.GetTexture(shadowTextureHandle);
+      // Bind the shadow map for sampling. The binary reaches it through
+      // Shadow::GetShadowMap (sub_7DB350), which takes a *strong* reference -
+      // it increments the control block's use_count_ at +0x04 - and hands the
+      // retained render target to the shader-variable texture setter
+      // (sub_491280), which pulls the texture off the target's own vtable.
+      // The retained copy is released when it leaves scope, matching the
+      // binary's trailing shared_ptr teardown.
+      boost::shared_ptr<CD3DRenderTarget> shadowMap{};
+      shadow->GetShadowMap(shadowMap);
+      // The bridge cast is the same one CRenFrame::BindFrameTexture uses and is
+      // still wrong: ShaderVar::GetTexture (FUN_00491280) does not lock a weak
+      // handle - it calls the render target's GetSurface (vtable slot 2) and
+      // binds the result through the effect variable's SetTexture2 lane. Fixing
+      // that signature is a separate pass over ShaderVar + CRenFrame; the
+      // shadow side above is now correctly typed and correctly retained.
+      sv.shadowTexture.GetTexture(
+        reinterpret_cast<const boost::weak_ptr<gpg::gal::TextureD3D9>&>(shadowMap)
+      );
 
       const float shadowBias = ren_ShadowBias; // 0.005
       if (sv.shadowBias.Exists()) {

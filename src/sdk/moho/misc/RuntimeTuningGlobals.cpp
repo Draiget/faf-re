@@ -21,6 +21,12 @@ namespace moho
   bool ren_ShowWireframe = false;
   bool ren_OnlyFirstView = false;
 
+  // Shadow-map tuning latched by Shadow::Init. Both are initialized in .data in
+  // the shipped image: ren_ShadowBlur @0x00F57E54 = 1, ren_ShadowSize
+  // @0x00F57E58 = 0x400.
+  bool ren_ShadowBlur = true;
+  int ren_ShadowSize = 1024;
+
   int snd_index = 0;
 
   float cam_NearZoom = 10.0f;

@@ -659,7 +659,7 @@ namespace
       (void)mResources.InitResources(false);
 
       if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit();
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(false);
       }
 
       const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
@@ -825,7 +825,7 @@ namespace moho
     (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
 
     if (runtime->mViewport != nullptr) {
-      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit();
+      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(true);
     }
     runtime->mInitialized = 1u;
   }

@@ -73,6 +73,7 @@
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DDepthStencil.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -39212,7 +39213,10 @@ moho::WD3DViewport::~WD3DViewport()
 /**
  * Address: 0x0042BAF0 (FUN_0042BAF0)
  */
-void moho::WD3DViewport::D3DWindowOnDeviceInit() {}
+void moho::WD3DViewport::D3DWindowOnDeviceInit(const bool createBatchers)
+{
+  InitDeviceResources(createBatchers);
+}
 
 /**
  * Address: 0x0042BB00 (FUN_0042BB00)
@@ -60658,8 +60662,11 @@ namespace
 
   struct CBloomRendererRuntime final
   {
-    std::uint32_t mUnknown00 = 0;                                  // +0x00
-    std::uint32_t mUnknown04 = 0;                                  // +0x04
+    // Half the head's dimensions - the bloom extract/blur targets run at
+    // quarter area. Written by InitBloomRendererHead from the shr-by-1 of
+    // GetHeadWidth/GetHeadHeight (asm 0x007F4D2E..0x007F4D49).
+    std::uint32_t mHalfWidth = 0;                                  // +0x00
+    std::uint32_t mHalfHeight = 0;                                 // +0x04
     boost::shared_ptr<moho::ID3DRenderTarget> mRenderTargetLocks[2]; // +0x08
     moho::CRenFrame mExtractFrame;                                 // +0x18
     moho::CRenFrame mCompositeFrame;                               // +0x60
@@ -60717,6 +60724,57 @@ namespace
   }
 
   /**
+   * Address: 0x007F4D00 (FUN_007F4D00, Moho::CBloomRenderer::Init)
+   *
+   * IDA signature:
+   * int __usercall Moho::CBloomRenderer::Init@<eax>(
+   *     Moho::CBloomRenderer *this@<esi>, int idx@<ebp>);
+   *
+   * What it does:
+   * Binds one bloom renderer to a head: caches half the head's dimensions,
+   * allocates the two half-resolution render targets the blur ping-pongs
+   * between, and lays out both frame quads - the composite pass at half
+   * resolution and the extract pass at full head resolution.
+   */
+  int InitBloomRendererHead(CBloomRendererRuntime* const bloomRenderer, const int headIndex)
+  {
+    bloomRenderer->mHeadIndex = static_cast<std::uint32_t>(headIndex);
+
+    const unsigned int headIndexU = static_cast<unsigned int>(headIndex);
+    bloomRenderer->mHalfWidth =
+      static_cast<std::uint32_t>(moho::D3D_GetDevice()->GetHeadWidth(headIndexU)) >> 1;
+    bloomRenderer->mHalfHeight =
+      static_cast<std::uint32_t>(moho::D3D_GetDevice()->GetHeadHeight(headIndexU)) >> 1;
+
+    // Both targets are created at the cached half size. The binary re-fetches
+    // the device singleton for each call rather than caching it.
+    for (auto& renderTargetLock : bloomRenderer->mRenderTargetLocks) {
+      moho::ID3DDeviceResources* const resources = moho::D3D_GetDevice()->GetResources();
+      moho::ID3DDeviceResources::RenderTargetHandle newTarget{};
+      resources->CreateRenderTarget(
+        newTarget,
+        static_cast<int>(bloomRenderer->mHalfWidth),
+        static_cast<int>(bloomRenderer->mHalfHeight),
+        2
+      );
+      renderTargetLock = newTarget;
+    }
+
+    bloomRenderer->mCompositeFrame.InitTransformedVerts(
+      static_cast<float>(bloomRenderer->mHalfWidth),
+      static_cast<float>(bloomRenderer->mHalfHeight)
+    );
+
+    // The extract quad covers the whole head, not the half-size target.
+    bloomRenderer->mExtractFrame.InitTransformedVerts(
+      static_cast<float>(static_cast<unsigned int>(moho::D3D_GetDevice()->GetHeadWidth(headIndexU))),
+      static_cast<float>(static_cast<unsigned int>(moho::D3D_GetDevice()->GetHeadHeight(headIndexU)))
+    );
+
+    return 1;
+  }
+
+  /**
    * Address: 0x007F6420 (FUN_007F6420, Moho::CBloomRenderer::CBloomRenderer)
    * Mangled: ??0CBloomRenderer@Moho@@QAE@XZ
    *
@@ -60735,8 +60793,8 @@ namespace
     ConstructSharedPtrArrayForward(bloomRenderer->mRenderTargetLocks);
     std::construct_at(&bloomRenderer->mExtractFrame);
     std::construct_at(&bloomRenderer->mCompositeFrame);
-    bloomRenderer->mUnknown04 = 0u;
-    bloomRenderer->mUnknown00 = 0u;
+    bloomRenderer->mHalfHeight = 0u;
+    bloomRenderer->mHalfWidth = 0u;
     bloomRenderer->mHeadIndex = 0u;
     return bloomRenderer;
   }
@@ -60815,8 +60873,8 @@ namespace
     // ignores the slot and always assigns mFrameTexture1, so slot 0 is 1:1.
     frame.SetTexture(0u, texture);
     frame.Render(
-      static_cast<int>(bloomRenderer->mUnknown00),
-      static_cast<int>(bloomRenderer->mUnknown04)
+      static_cast<int>(bloomRenderer->mHalfWidth),
+      static_cast<int>(bloomRenderer->mHalfHeight)
     );
   }
 
@@ -60928,8 +60986,8 @@ namespace
     RenBloomViewport bloomViewport{};
     bloomViewport.x = 0u;
     bloomViewport.y = 0u;
-    bloomViewport.width = bloomRenderer->mUnknown00;
-    bloomViewport.height = bloomRenderer->mUnknown04;
+    bloomViewport.width = bloomRenderer->mHalfWidth;
+    bloomViewport.height = bloomRenderer->mHalfHeight;
     bloomViewport.minZ = 0.0f;
     bloomViewport.maxZ = 1.0f;
     deviceInstance->SetViewport(&bloomViewport);
@@ -61052,14 +61110,18 @@ namespace
     moho::BoundaryRenderer mBoundaryRenderer;                             // +0x0488
     moho::Shadow mShadowRenderer;                                         // +0x04F0
     moho::Clutter mClutter;                                               // +0x0808
-    Moho::Silhouette mSilhouetteRenderer;                                 // +0x2134
+    moho::Silhouette mSilhouetteRenderer;                                 // +0x2134
     std::uint32_t mWorldViewState = 0;                                    // +0x2140
     WRenViewportWorldViewStorageRuntime mWorldViewStorage;                // +0x2144
     boost::shared_ptr<moho::CD3DTextureBatcher> mTexBatcher;              // +0x2154
     boost::shared_ptr<moho::CD3DPrimBatcher> mPrimBatcher;                // +0x215C
-    boost::shared_ptr<moho::ID3DRenderTarget> mPrimaryTargetLocks[2];     // +0x2164
-    boost::shared_ptr<moho::ID3DRenderTarget> mSecondaryTargetLocks[2];   // +0x2174
-    boost::shared_ptr<moho::ID3DDepthStencil> mDepthStencilLocks[2];      // +0x2184
+    // Concrete types, not the interfaces: InitDeviceResources fills these
+    // straight from ID3DDeviceResources::CreateRenderTarget /
+    // CreateDepthStencil, whose handles are shared_ptr<CD3DRenderTarget> and
+    // shared_ptr<CD3DDepthStencil> - which is also how IDA types the stores.
+    boost::shared_ptr<moho::CD3DRenderTarget> mPrimaryTargetLocks[2];     // +0x2164
+    boost::shared_ptr<moho::CD3DRenderTarget> mSecondaryTargetLocks[2];   // +0x2174
+    boost::shared_ptr<moho::CD3DDepthStencil> mDepthStencilLocks[2];      // +0x2184
     boost::shared_ptr<moho::CD3DDynamicTextureSheet> mDynamicTextureSheet; // +0x2194
     moho::GeomCamera3* mCam = nullptr;                                    // +0x219C
     moho::CD3DFont* mFont = nullptr;                                      // +0x21A0
@@ -61318,7 +61380,7 @@ namespace
     std::construct_at(&runtime->mClutter);
 
     // Silhouette: binary seats the vftable then zeroes the embedded
-    // shared_ptr<SilhouettePayload> slot (`v1 = 0; v2 = 0`). Default-construct
+    // shared_ptr<ID3DVertexSheet> slot (`v1 = 0; v2 = 0`). Default-construct
     // it to obtain identical layout without raw vtable offset arithmetic.
     std::construct_at(&runtime->mSilhouetteRenderer);
 
@@ -63626,6 +63688,114 @@ namespace
  * `REN_CreateGameViewport` builds a `WD3DViewport` and that is the only
  * concrete viewport this tree constructs, so the dispatched behaviour matches.
  */
+namespace
+{
+  // Resource parameters WRenViewport::InitDeviceResources (0x007F6B60) builds
+  // its device-dependent objects with.
+  constexpr std::int32_t kViewportDebugFontPointSize = 12;
+  constexpr const char* kViewportDebugFontFace = "Courier New";
+  constexpr int kViewportDynamicSheetExtent = 256;
+  constexpr int kViewportDynamicSheetFormat = 2;
+  constexpr int kViewportHeadTargetFormat = 2;
+  constexpr int kViewportHeadDepthStencilFormat = 3;
+} // namespace
+
+/**
+ * Address: 0x007F6B60 (FUN_007F6B60, Moho::WRenViewport::D3DWindowOnDeviceInit)
+ * Mangled: ?D3DWindowOnDeviceInit@WRenViewport@Moho@@UAEX_N@Z
+ *
+ * IDA signature:
+ * int __thiscall Moho::WRenViewport::D3DWindowOnDeviceInit(
+ *     Moho::WRenViewport *this, bool a2);
+ *
+ * What it does:
+ * Creates every device-dependent resource the viewport renders through. See
+ * the declaration for how `createBatchers` splits the first-bind path from the
+ * device-rebind path.
+ */
+void moho::WRenViewport::InitDeviceResources(const bool createBatchers)
+{
+  auto* const runtime = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+
+  moho::snd_index = 0;
+
+  if (createBatchers) {
+    runtime->mTexBatcher.reset(new moho::CD3DTextureBatcher());
+    runtime->mPrimBatcher.reset(new moho::CD3DPrimBatcher(runtime->mTexBatcher.get()));
+
+    // The font cache hands back a handle that already owns one reference, so
+    // the swap below takes its own and then drops the handle's, exactly as the
+    // binary's inlined sequence does.
+    const boost::SharedPtrRaw<moho::CD3DFont> fontHandle =
+      moho::CD3DFont::Create(kViewportDebugFontPointSize, kViewportDebugFontFace);
+    moho::CD3DFont* const font = fontHandle.px;
+    if (runtime->mFont != font) {
+      if (runtime->mFont != nullptr) {
+        (void)runtime->mFont->Release(1);
+      }
+      runtime->mFont = font;
+      if (font != nullptr) {
+        font->AddReference();
+      }
+    }
+    if (font != nullptr) {
+      (void)font->Release(1);
+    }
+  }
+
+  runtime->mRangeRenderer.Init();
+  runtime->mVisionRenderer.Init();
+  runtime->mBoundaryRenderer.Init();
+  // Fidelity 0: the shadow renderer starts with its settings latched but no
+  // targets allocated. WRenViewport::RenderShadows re-inits it at the real
+  // fidelity once it knows what the frame needs.
+  (void)runtime->mShadowRenderer.Init(0);
+  runtime->mSilhouetteRenderer.Init();
+  moho::MeshRenderer::GetInstance()->Reset();
+
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  moho::ID3DDeviceResources* const resources = device->GetResources();
+
+  if (!runtime->mDynamicTextureSheet) {
+    (void)resources->NewDynamicTextureSheet(
+      runtime->mDynamicTextureSheet,
+      kViewportDynamicSheetExtent,
+      kViewportDynamicSheetExtent,
+      kViewportDynamicSheetFormat
+    );
+  }
+
+  for (int head = 0; head < runtime->mNumHeads; ++head) {
+    (void)InitBloomRendererHead(&runtime->mBloomRenderers[head], head);
+
+    if (moho::IUIManager* const uiManager = moho::UI_GetManager(); uiManager != nullptr) {
+      uiManager->OnResize(head, device->GetHeadWidth(head), device->GetHeadHeight(head));
+    }
+
+    const int headWidth = device->GetHeadWidth(head);
+    const int headHeight = device->GetHeadHeight(head);
+    const auto headSlot = static_cast<std::size_t>(head);
+
+    // Each slot is filled only when empty, so a device rebind restores just
+    // the targets that were released rather than reallocating all of them.
+    if (!runtime->mPrimaryTargetLocks[headSlot]) {
+      resources->CreateRenderTarget(
+        runtime->mPrimaryTargetLocks[headSlot], headWidth, headHeight, kViewportHeadTargetFormat
+      );
+    }
+    if (!runtime->mSecondaryTargetLocks[headSlot]) {
+      resources->CreateRenderTarget(
+        runtime->mSecondaryTargetLocks[headSlot], headWidth, headHeight, kViewportHeadTargetFormat
+      );
+    }
+    if (!runtime->mDepthStencilLocks[headSlot]) {
+      resources->CreateDepthStencil(
+        runtime->mDepthStencilLocks[headSlot], headWidth, headHeight, kViewportHeadDepthStencilFormat
+      );
+    }
+  }
+}
+
 void moho::WRenViewport::RenderAllHeads()
 {
   moho::CTimeBarSection renderSection("Render");

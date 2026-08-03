@@ -2100,6 +2100,9 @@
     <ClCompile Include="moho\render\CDecalTypes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\ScreenQuadVertexSheet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\Silhouette.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4954,6 +4957,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\CDecalTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\ScreenQuadVertexSheet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\Silhouette.h">
