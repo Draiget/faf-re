@@ -6078,6 +6078,44 @@ namespace
     return result;
   }
 
+  /**
+   * Transfer sink the MWL/RNA lane pushes decoded PCM runs into.
+   *
+   * Evidence: `FUN_00B15330` dispatches `(**(owner) + 0x54)` with
+   * `(channelIndex, startUnit, sourceAddress, transferUnits)`. That is the only
+   * slot this lane reaches, so the rest of the table stays unmodelled rather
+   * than invented. Same shape as `moho::SofdecSjSupplyVtable`: a C dispatch
+   * table of `__cdecl` entries taking the handle explicitly, not a C++ vtable.
+   */
+  using MwlRnaTransferChunkFn = void(__cdecl*)(
+    void* callbackOwner,
+    std::int32_t channelIndex,
+    std::int32_t startUnit,
+    std::int32_t sourceAddress,
+    std::int32_t transferUnits
+  );
+
+  struct MwlRnaTransferSinkVtable
+  {
+    std::uint8_t mUnknown00[0x54]{};
+    MwlRnaTransferChunkFn transferChunk = nullptr; // +0x54
+  };
+
+  static_assert(
+    offsetof(MwlRnaTransferSinkVtable, transferChunk) == 0x54,
+    "MwlRnaTransferSinkVtable::transferChunk offset must be 0x54"
+  );
+
+  struct MwlRnaTransferSink
+  {
+    MwlRnaTransferSinkVtable* dispatchTable = nullptr; // +0x00
+  };
+
+  static_assert(
+    offsetof(MwlRnaTransferSink, dispatchTable) == 0x00,
+    "MwlRnaTransferSink::dispatchTable offset must be 0x00"
+  );
+
   struct MwlRnaRuntimeView
   {
     std::uint8_t inUse = 0; // +0x00
@@ -6090,13 +6128,13 @@ namespace
     std::uint8_t outputSyncPending = 0; // +0x07
     std::int32_t bitsPerSample = 0; // +0x08
     std::uint8_t mUnknown0C[0x14]{}; // +0x0C
-    void* channelSjHandle0 = nullptr; // +0x20
-    void* channelSjHandle1 = nullptr; // +0x24
+    moho::SofdecSjSupplyHandle* channelSjHandle0 = nullptr; // +0x20
+    moho::SofdecSjSupplyHandle* channelSjHandle1 = nullptr; // +0x24
     std::int32_t transferCapacityBytes = 0; // +0x28
     std::int32_t transferWriteCursor = 0; // +0x2C
     std::int32_t transferReadCursor = 0; // +0x30
     std::int32_t transferConsumedBytes = 0; // +0x34
-    void* transferCallbackOwner = nullptr; // +0x38
+    MwlRnaTransferSink* transferCallbackOwner = nullptr; // +0x38
     std::int32_t lastTransferUnits = 0; // +0x3C
     std::uint8_t mUnknown40_4F[0x10]{}; // +0x40
     std::int32_t transferFreezePosition = 0; // +0x50
@@ -6167,52 +6205,6 @@ namespace
     "MwlRnaRuntimeView::transferIssuedFlag offset must be 0x5C"
   );
 
-  struct SjRuntimeChunkView
-  {
-    std::int32_t bufferAddress = 0; // +0x00
-    std::int32_t byteCount = 0; // +0x04
-  };
-
-  static_assert(offsetof(SjRuntimeChunkView, bufferAddress) == 0x00, "SjRuntimeChunkView::bufferAddress offset must be 0x00");
-  static_assert(offsetof(SjRuntimeChunkView, byteCount) == 0x04, "SjRuntimeChunkView::byteCount offset must be 0x04");
-  static_assert(sizeof(SjRuntimeChunkView) == 0x08, "SjRuntimeChunkView size must be 0x08");
-
-  using SjAcquireChunkFn = void(__cdecl*)(void* handle, std::int32_t lane, std::int32_t requestedBytes, SjRuntimeChunkView* outChunk);
-  using SjSubmitChunkFn = void(__cdecl*)(void* handle, std::int32_t lane, SjRuntimeChunkView* chunk);
-  using M2asjdStreamDestroyFn = void(__cdecl*)(M2asjdIoStream* stream);
-  using RnaTransferDispatchFn =
-    void(__cdecl*)(void* callbackOwner, std::int32_t channelIndex, std::int32_t startUnit, std::int32_t sourceAddress, std::int32_t transferUnits);
-
-  [[nodiscard]] SjAcquireChunkFn ResolveSjAcquireChunkFn(void* const sjHandle)
-  {
-    auto** const vtable = *reinterpret_cast<void***>(sjHandle);
-    return reinterpret_cast<SjAcquireChunkFn>(vtable[6]); // +0x18
-  }
-
-  [[nodiscard]] SjSubmitChunkFn ResolveSjSubmitChunkFn(void* const sjHandle)
-  {
-    auto** const vtable = *reinterpret_cast<void***>(sjHandle);
-    return reinterpret_cast<SjSubmitChunkFn>(vtable[7]); // +0x1C
-  }
-
-  [[nodiscard]] SjSubmitChunkFn ResolveSjReturnChunkFn(void* const sjHandle)
-  {
-    auto** const vtable = *reinterpret_cast<void***>(sjHandle);
-    return reinterpret_cast<SjSubmitChunkFn>(vtable[8]); // +0x20
-  }
-
-  [[nodiscard]] M2asjdStreamDestroyFn ResolveM2asjdStreamDestroyFn(M2asjdIoStream* const stream)
-  {
-    auto** const vtable = *reinterpret_cast<void***>(stream);
-    return reinterpret_cast<M2asjdStreamDestroyFn>(vtable[3]); // +0x0C
-  }
-
-  [[nodiscard]] RnaTransferDispatchFn ResolveRnaTransferDispatchFn(void* const callbackOwner)
-  {
-    auto** const vtable = *reinterpret_cast<void***>(callbackOwner);
-    return reinterpret_cast<RnaTransferDispatchFn>(vtable[21]); // +0x54
-  }
-
   std::int32_t gMwlRnaChunkScratch0 = 0;
   std::int32_t gMwlRnaChunkScratch1 = 0;
 
@@ -6234,13 +6226,8 @@ namespace
       return 0;
     }
 
-    ResolveRnaTransferDispatchFn(runtime->transferCallbackOwner)(
-      runtime->transferCallbackOwner,
-      channelIndex,
-      startUnit,
-      sourceAddress,
-      transferUnits
-    );
+    MwlRnaTransferSink* const sink = runtime->transferCallbackOwner;
+    sink->dispatchTable->transferChunk(sink, channelIndex, startUnit, sourceAddress, transferUnits);
     runtime->transferIssuedFlag = 1;
     return transferUnits;
   }
@@ -6267,14 +6254,15 @@ namespace
     const std::int32_t availableTransferBytes = runtime->transferCapacityBytes - runtime->transferConsumedBytes;
     const std::int32_t maxTransferUnits = unitStride * (availableTransferBytes / unitStride);
 
-    std::array<SjRuntimeChunkView, 2> sourceChunks{};
+    std::array<moho::SjChunkRange, 2> sourceChunks{};
     for (std::int32_t channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
-      void* const sjHandle = (channelIndex == 0) ? runtime->channelSjHandle0 : runtime->channelSjHandle1;
+      moho::SofdecSjSupplyHandle* const sjHandle =
+        (channelIndex == 0) ? runtime->channelSjHandle0 : runtime->channelSjHandle1;
       if (sjHandle == nullptr) {
         CRIERR_CallErr(kMwlRnaStartTransNullSjMessage);
       }
 
-      ResolveSjAcquireChunkFn(sjHandle)(
+      sjHandle->dispatchTable->getChunk(
         sjHandle,
         1,
         (maxTransferUnits * runtime->bitsPerSample) / 8,
@@ -6301,7 +6289,8 @@ namespace
     if (transferUnits > 0) {
       std::int32_t transferredUnits = 0;
       for (std::int32_t channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
-        void* const sjHandle = (channelIndex == 0) ? runtime->channelSjHandle0 : runtime->channelSjHandle1;
+        moho::SofdecSjSupplyHandle* const sjHandle =
+        (channelIndex == 0) ? runtime->channelSjHandle0 : runtime->channelSjHandle1;
         gMwlRnaChunkScratch0 = 0;
         transferredUnits = mwlRnaDispatchTransferChunk(
           runtime,
@@ -6312,16 +6301,16 @@ namespace
         );
         gMwlRnaChunkScratch1 = 0;
 
-        SjRuntimeChunkView headChunk{};
-        SjRuntimeChunkView tailChunk{};
+        moho::SjChunkRange headChunk{};
+        moho::SjChunkRange tailChunk{};
         SJ_SplitChunk(
-          reinterpret_cast<moho::SjChunkRange*>(&sourceChunks[static_cast<std::size_t>(channelIndex)]),
+          &sourceChunks[static_cast<std::size_t>(channelIndex)],
           (transferredUnits * runtime->bitsPerSample) / 8,
-          reinterpret_cast<moho::SjChunkRange*>(&headChunk),
-          reinterpret_cast<moho::SjChunkRange*>(&tailChunk)
+          &headChunk,
+          &tailChunk
         );
-        ResolveSjReturnChunkFn(sjHandle)(sjHandle, 0, &headChunk);
-        ResolveSjSubmitChunkFn(sjHandle)(sjHandle, 1, &tailChunk);
+        sjHandle->dispatchTable->submitChunk(sjHandle, 0, &headChunk);
+        sjHandle->dispatchTable->putChunk(sjHandle, 1, &tailChunk);
       }
 
       runtime->lastTransferUnits = transferredUnits;
@@ -6329,12 +6318,13 @@ namespace
     }
 
     for (std::int32_t channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
-      void* const sjHandle = (channelIndex == 0) ? runtime->channelSjHandle0 : runtime->channelSjHandle1;
+      moho::SofdecSjSupplyHandle* const sjHandle =
+        (channelIndex == 0) ? runtime->channelSjHandle0 : runtime->channelSjHandle1;
       if (sjHandle == nullptr) {
         CRIERR_CallErr(kMwlRnaStartTransNullSjMessage);
       }
 
-      ResolveSjSubmitChunkFn(sjHandle)(sjHandle, 1, &sourceChunks[static_cast<std::size_t>(channelIndex)]);
+      sjHandle->dispatchTable->putChunk(sjHandle, 1, &sourceChunks[static_cast<std::size_t>(channelIndex)]);
     }
 
     return 0;
