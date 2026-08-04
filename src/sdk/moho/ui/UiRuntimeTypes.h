@@ -1876,13 +1876,37 @@ namespace moho
     void Dump() override;
 
     /**
-     * Address: 0x007870F0 (FUN_007870F0, Moho::CMauiFrame::DoRender)
+     * Address: 0x007870F0 (FUN_007870F0)
      *
      * What it does:
-     * Walks rendered child controls and dispatches render calls for
-     * visible-pass-matching children while frame visibility allows.
+     * Walks this frame's flattened rendered-children lane and dispatches the
+     * virtual render call for every visible child whose render-pass mask
+     * intersects the requested draw mask.
+     *
+     * Not virtual, and deliberately NOT named DoRender. IDA labels 0x007870F0
+     * "Moho::CMauiFrame::DoRender", but that name is inferred - the address
+     * carries no mangled symbol, unlike the base
+     * ?DoRender@CMauiControl@Moho@@UAEXPAVCD3DPrimBatcher@2@I@Z at 0x00787160.
+     * 0x007870F0 has no data xrefs at all, so it is in no vtable; it is reached
+     * by three direct calls, from CUIManager::RenderFrames (0x0084D5AE),
+     * CUIManager::DrawUI (0x0084D62E) and CUIManager::DrawHead (0x0084D6AE).
+     * It also takes `this` in edi rather than ecx, which a virtual member
+     * would not. The DoRender slot of ??_7CMauiFrame@Moho@@6B@ holds
+     * CMauiControl::DoRender - the no-op default - exactly as the base
+     * declares it, so the frame does not override the virtual at all.
+     *
+     * That distinction is load-bearing. CMauiControl::Render seeds the
+     * rendered-children lane with the subtree root itself, so a frame is always
+     * the first entry in its own lane - confirmed live: a frame's lane held
+     * three entries with entry 0 pointing back at the frame. The `[edx+18h]`
+     * dispatch this function performs on each entry therefore reaches the frame
+     * again and must land on the base no-op. Declaring this as an override of
+     * DoRender sent it back here instead and the frame recursed into itself
+     * until the stack gave out. Dropping `override` alone does not help - a
+     * derived function with the base's signature overrides whether or not the
+     * keyword is written - which is why this carries its own name.
      */
-    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+    void RenderChildControls(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
 
     /**
      * Address: 0x007965A0 (FUN_007965A0, Moho::CMauiFrame::Frame)
@@ -3041,8 +3065,15 @@ namespace moho
   struct CMauiBitmapRuntimeView : CMauiControlRuntimeView
   {
     std::uint8_t mUnknown0D4To11B[0x48]{};
+    // The MSVC8 vector is 0x10 bytes - it carries its allocator as a real data
+    // member ahead of the first/last/end triple - so this container already
+    // covers 0x11C..0x12B and the next field follows immediately. The 4 bytes
+    // of padding that used to sit here double-counted that allocator word and
+    // pushed every field from mBitmapWidthLV onwards 4 bytes too high, so a
+    // bitmap wrote past the object the binary allocates for it and over its
+    // neighbours. Same trap as the one called out on
+    // CMauiControlExtendedRuntimeView::mRenderedChildren.
     msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
-    std::uint8_t mUnknown128To12B[0x4]{};
     CScriptLazyVar_float mBitmapWidthLV{};  // +0x12C
     CScriptLazyVar_float mBitmapHeightLV{}; // +0x140
     float mU0 = 0.0f; // +0x154
@@ -3262,6 +3293,16 @@ namespace moho
     std::uint8_t mUnknown0D4To11B[0x48]{};
     std::int32_t mXIncrement = 0;              // +0x11C
     std::int32_t mYIncrement = 0;              // +0x120
+    // +0x124 is a real field of this control that was missing from the model,
+    // so the column-array triple below sat 4 bytes low and a histogram wrote
+    // past the object the binary allocates for it. No histogram function in
+    // the binary reads or writes +0x124 - the constructor at 0x007977A0 and
+    // the destructor at 0x00797840 touch only 0x128/0x12C/0x130 - so its
+    // meaning is still unknown. It is deliberately not modelled as an MSVC8
+    // vector allocator proxy: SHistogramColumn keeps its own value buffer as a
+    // bare begin/end/capacity triple with no proxy word (sizeof 0x14), so this
+    // control does not use vectors for its arrays.
+    std::uint8_t mUnknown124To127[0x4]{};      // +0x124
     SHistogramColumn* mDataStart = nullptr;    // +0x128 column-array begin (owned)
     SHistogramColumn* mDataEnd = nullptr;      // +0x12C column-array end
     SHistogramColumn* mDataCapacity = nullptr; // +0x130 column-array capacity

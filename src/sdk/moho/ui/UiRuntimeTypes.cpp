@@ -21422,7 +21422,7 @@ moho::CMauiControl* moho::CMauiControl::DepthFirstSuccessor(CMauiControl* const 
  * Walks the rendered-child lane and dispatches `DoRender` for each visible
  * child whose render-pass mask intersects the requested draw mask.
  */
-void moho::CMauiFrame::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+void moho::CMauiFrame::RenderChildControls(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
 {
   if (CMauiControlExtendedRuntimeView::FromControl(this)->mInvisible) {
     return;
