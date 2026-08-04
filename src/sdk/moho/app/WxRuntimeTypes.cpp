@@ -54,6 +54,8 @@
 #include "moho/particles/CWorldParticles.h"
 #include "moho/mesh/MeshThumbnailRenderer.h"
 #include "moho/render/BoundaryRenderer.h"
+#include "moho/render/BoxRenderer.h"
+#include "moho/render/Cartographic.h"
 #include "moho/render/Clutter.h"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/MapImager.h"
@@ -39234,8 +39236,18 @@ void moho::WD3DViewport::D3DWindowOnDeviceRender()
 
 /**
  * Address: 0x0042BB10 (FUN_0042BB10)
+ *
+ * The binary's `WD3DViewport` body is a bare `retn` - the do-nothing default
+ * for viewports that hold no device resources. The real release pass is
+ * `WRenViewport`'s override (0x007F70F0), which `CD3DDevice::InitContext` and
+ * `CD3DDevice::Destroy` reach through this slot. This tree models the
+ * inheritance inverted (see `WRenViewport::RenderAllHeads`), so the slot
+ * forwards instead of overriding.
  */
-void moho::WD3DViewport::D3DWindowOnDeviceExit() {}
+void moho::WD3DViewport::D3DWindowOnDeviceExit(const bool fullShutdown)
+{
+  ReleaseDeviceResources(fullShutdown);
+}
 
 /**
  * Address: 0x0042BB20 (FUN_0042BB20)
@@ -60709,7 +60721,7 @@ namespace
    * Releases both cached frame vertex sheets and clears the two retained
    * render-target lock handles used by one bloom renderer head.
    */
-  [[maybe_unused]] void ResetBloomRendererTargets(
+  void ResetBloomRendererTargets(
     CBloomRendererRuntime* const bloomRenderer
   ) noexcept
   {
@@ -63794,6 +63806,78 @@ void moho::WRenViewport::InitDeviceResources(const bool createBatchers)
       );
     }
   }
+}
+
+/**
+ * Address: 0x007F70F0 (FUN_007F70F0,
+ * ?D3DWindowOnDeviceExit@WRenViewport@Moho@@UAEX_N@Z)
+ *
+ * IDA signature:
+ * int __thiscall Moho::WRenViewport::D3DWindowOnDeviceExit(
+ *     Moho::WRenViewport *this, bool a2);
+ *
+ * What it does:
+ * Drops every device-dependent resource the viewport owns, in the exact
+ * inverse of `InitDeviceResources`. See the declaration for how
+ * `fullShutdown` splits the device-rebind path from the app-shutdown path.
+ */
+void moho::WRenViewport::ReleaseDeviceResources(const bool fullShutdown)
+{
+  auto* const runtime = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+
+  // The singleton is fetched before the branch in the binary, because both
+  // sides use it.
+  moho::MeshRenderer* const meshRenderer = moho::MeshRenderer::GetInstance();
+
+  if (fullShutdown) {
+    runtime->mPrimBatcher.reset();
+    runtime->mTexBatcher.reset();
+    runtime->mMapImager.ClearBorder();
+    meshRenderer->Shutdown();
+
+    // The binary follows this with a call to the shared terrain/water global
+    // teardown at 0x00809E80, which releases a set of file-scope texture
+    // batchers and texture-sheet handles that this tree has not modelled yet.
+    // It is shutdown-only bookkeeping - it releases globals as the process
+    // exits and has no bearing on the device-rebind path below - so its
+    // absence does not affect a reset. Tracked as its own recovery item.
+  } else {
+    meshRenderer->Reset();
+  }
+
+  runtime->mFrame.ResetTransientResources();
+
+  // `if (sWldMap && sWldMap->mTerrainRes)` in the binary - which is exactly
+  // what REN_GetTerrainRes (0x007FA170) returns a non-null pointer for.
+  if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes(); terrainRes != nullptr) {
+    terrainRes->GetCartographic().Shutdown();
+    terrainRes->GetSkyDome().Reset();
+  }
+
+  runtime->mSilhouetteRenderer.mQuadVertexSheet.reset();
+  runtime->mClutter.Shutdown();
+  (void)runtime->mShadowRenderer.ReleaseRenderResources();
+  runtime->mRangeRenderer.ResetRenderResources();
+
+  runtime->mBoundaryRenderer.mFrame.ResetTransientResources();
+  runtime->mBoundaryRenderer.mBoundaryRendererBody.ResetRenderResources();
+
+  runtime->mVisionRenderer.ResetRenderResources();
+  runtime->mThumbnailRenderer.ReleaseTargets();
+
+  ResetBloomRendererTargets(&runtime->mBloomRenderers[0]);
+  ResetBloomRendererTargets(&runtime->mBloomRenderers[1]);
+
+  // Release order is the binary's: the shared dynamic sheet first, then the
+  // six per-head locks. These are the default-pool surfaces that make
+  // `IDirect3DDevice9::Reset` fail if any of them outlives this call.
+  runtime->mDynamicTextureSheet.reset();
+  runtime->mPrimaryTargetLocks[0].reset();
+  runtime->mPrimaryTargetLocks[1].reset();
+  runtime->mSecondaryTargetLocks[0].reset();
+  runtime->mSecondaryTargetLocks[1].reset();
+  runtime->mDepthStencilLocks[0].reset();
+  runtime->mDepthStencilLocks[1].reset();
 }
 
 void moho::WRenViewport::RenderAllHeads()

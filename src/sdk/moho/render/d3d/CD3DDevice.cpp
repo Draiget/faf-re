@@ -620,8 +620,11 @@ namespace
       const std::size_t lockHeadCount =
         std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
 
+      // false = rebind, not shutdown: keep the batchers, only Reset the mesh
+      // renderer. Everything else the viewport holds is released either way,
+      // which is what lets `Func9`'s `IDirect3DDevice9::Reset` succeed.
       if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit();
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(false);
       }
 
       const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
@@ -690,8 +693,11 @@ namespace
     {
       CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
       runtime->mInitialized = 0;
+      // true = app shutdown (the binary pushes 1 at 0x0042E786): the batchers
+      // and the map-imager border go too, and the mesh renderer is fully shut
+      // down rather than reset.
       if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit();
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(true);
       }
 
       const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};

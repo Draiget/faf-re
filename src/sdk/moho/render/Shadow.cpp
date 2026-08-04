@@ -20,32 +20,6 @@ namespace
   // Depth-stencil format the shadow map's companion buffer is created with.
   constexpr int kShadowDepthStencilFormat = 3;
 
-  /**
-   * Address: 0x007FE760 (FUN_007FE760)
-   *
-   * What it does:
-   * Clears the cached fidelity/blur/size settings and releases every render
-   * resource the shadow renderer holds. Called both from the destructor and
-   * from `Init` - on entry, and again on either failure path.
-   */
-  int ReleaseShadowRenderResources(moho::Shadow* const shadow) noexcept
-  {
-    shadow->mShadowFidelity = 0;
-    shadow->mShadowBlurEnabled = false;
-
-    shadow->mShadowMap.reset();
-    shadow->mBlurTargetA.reset();
-    shadow->mBlurTargetB.reset();
-    shadow->mDepthStencil.reset();
-    shadow->mQuadVertexSheet.reset();
-    for (boost::shared_ptr<void>& resource : shadow->mUnreferencedResources) {
-      resource.reset();
-    }
-
-    shadow->mShadowSize = 0;
-    return 0;
-  }
-
   struct BlinkyBoxListNode
   {
     BlinkyBoxListNode* next;
@@ -110,6 +84,37 @@ namespace moho
   {}
 
   /**
+   * Address: 0x007FE760 (FUN_007FE760)
+   *
+   * IDA signature:
+   * int __usercall sub_7FE760@<eax>(Moho::Shadow *this@<esi>);
+   *
+   * What it does:
+   * Clears the cached fidelity/blur/size settings and releases every render
+   * resource the shadow renderer holds. Called from the destructor, from
+   * `Init` (on entry and again on either failure path), and from
+   * `WRenViewport::D3DWindowOnDeviceExit` when the device drops its
+   * default-pool resources.
+   */
+  int Shadow::ReleaseRenderResources() noexcept
+  {
+    mShadowFidelity = 0;
+    mShadowBlurEnabled = false;
+
+    mShadowMap.reset();
+    mBlurTargetA.reset();
+    mBlurTargetB.reset();
+    mDepthStencil.reset();
+    mQuadVertexSheet.reset();
+    for (boost::shared_ptr<void>& resource : mUnreferencedResources) {
+      resource.reset();
+    }
+
+    mShadowSize = 0;
+    return 0;
+  }
+
+  /**
    * Address: 0x007FE200 (FUN_007FE200, ??1Shadow@Moho@@UAE@XZ)
    *
    * What it does:
@@ -117,7 +122,7 @@ namespace moho
    */
   Shadow::~Shadow()
   {
-    (void)ReleaseShadowRenderResources(this);
+    (void)ReleaseRenderResources();
   }
 
   /**
@@ -154,7 +159,7 @@ namespace moho
     const int shadowSize = ren_ShadowSize;
     const bool shadowBlur = ren_ShadowBlur;
 
-    (void)ReleaseShadowRenderResources(this);
+    (void)ReleaseRenderResources();
 
     mShadowFidelity = fidelity;
     mShadowBlurEnabled = shadowBlur;
@@ -184,7 +189,7 @@ namespace moho
     resources->CreateDepthStencil(mDepthStencil, shadowSize, shadowSize, kShadowDepthStencilFormat);
     if (!mDepthStencil) {
       gpg::Warnf("unable to create depth sheet used by the shadow map");
-      (void)ReleaseShadowRenderResources(this);
+      (void)ReleaseRenderResources();
       return 0;
     }
 
@@ -194,7 +199,7 @@ namespace moho
     );
     if (!mQuadVertexSheet) {
       gpg::Warnf("unable to create the main vertex sheet used by the shadow map");
-      (void)ReleaseShadowRenderResources(this);
+      (void)ReleaseRenderResources();
       return 0;
     }
 

@@ -7011,6 +7011,38 @@ namespace moho
     void InitDeviceResources(bool createBatchers);
 
     /**
+     * Address: 0x007F70F0 (FUN_007F70F0,
+     * ?D3DWindowOnDeviceExit@WRenViewport@Moho@@UAEX_N@Z)
+     *
+     * IDA signature:
+     * int __thiscall Moho::WRenViewport::D3DWindowOnDeviceExit(
+     *     Moho::WRenViewport *this, bool a2);
+     *
+     * What it does:
+     * The exact inverse of `InitDeviceResources`: drops every device-dependent
+     * resource the viewport holds so none of them survives into
+     * `IDirect3DDevice9::Reset`. D3D9 fails a reset outright while any
+     * default-pool surface is still referenced, so a missed release here does
+     * not leak quietly - it takes the resize path down.
+     *
+     * `fullShutdown` separates the two entry paths, mirroring
+     * `createBatchers`. `CD3DDevice::InitContext` (0x0042E1E0) passes false to
+     * rebind an existing context: the batchers are kept and the mesh renderer
+     * is only `Reset`. `CD3DDevice::Destroy` (0x0042E750) passes true at app
+     * shutdown: the batchers go too, the map-imager border is cleared and the
+     * mesh renderer is fully `Shutdown`. Everything after that gate runs either
+     * way.
+     *
+     * Notes:
+     * - In the binary this is `WRenViewport`'s override of the empty
+     *   `WD3DViewport::D3DWindowOnDeviceExit` slot (vtable slot 133,
+     *   0x00E405BC+0x214). This tree models the inheritance inverted, so the
+     *   body lives here and the slot forwards, exactly as for
+     *   `InitDeviceResources` and `RenderAllHeads`.
+     */
+    void ReleaseDeviceResources(bool fullShutdown);
+
+    /**
      * Address: 0x007F6610 (FUN_007F6610, ?OnMouseEnter@WRenViewport@Moho@@QAEXAAVwxMouseEvent@@@Z)
      *
      * What it does:
@@ -7304,8 +7336,12 @@ namespace moho
 
     /**
      * Address: 0x0042BB10 (FUN_0042BB10)
+     *
+     * The binary's `WD3DViewport` body is a bare `retn`; the real work is
+     * `WRenViewport`'s override (0x007F70F0), which this tree reaches by
+     * forwarding because the inheritance is modelled inverted.
      */
-    virtual void D3DWindowOnDeviceExit();
+    virtual void D3DWindowOnDeviceExit(bool fullShutdown);
 
     /**
      * Address: 0x0042BB20 (FUN_0042BB20)

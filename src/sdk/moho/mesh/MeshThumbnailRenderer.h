@@ -100,6 +100,18 @@ namespace moho
      */
     void ClearCompletedRequests();
 
+    /**
+     * Address: 0x007EAD80 (FUN_007EAD80)
+     *
+     * What it does:
+     * Releases render-target/depth-stencil ownership and marks targets as
+     * uninitialized. Public because `WRenViewport::D3DWindowOnDeviceExit`
+     * (0x007F70F0, at `+0x340`) calls it directly: these are default-pool
+     * surfaces and every one of them has to be gone before
+     * `IDirect3DDevice9::Reset` runs.
+     */
+    void ReleaseTargets();
+
   private:
     /**
      * Address: 0x007EAAF0 (FUN_007EAAF0)
@@ -108,14 +120,6 @@ namespace moho
      * Lazily initializes thumbnail texture/render-target/depth-stencil resources.
      */
     void EnsureTargets();
-
-    /**
-     * Address: 0x007EAD80 (FUN_007EAD80)
-     *
-     * What it does:
-     * Releases render-target/depth-stencil ownership and marks targets as uninitialized.
-     */
-    void ReleaseTargets();
 
     /**
      * Address: 0x007EB740 (FUN_007EB740)
