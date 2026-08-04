@@ -107,27 +107,12 @@ extern "C" std::FILE* __cdecl __iob_func(void)
 	return sLegacyIobFallback;
 }
 
-/**
- * Address: 0x00923F20 (FUN_00923F20, luaHelper_ReallocFunction)
- *
- * What it does:
- * Reallocates one Lua helper buffer lane through CRT `realloc`.
- */
-[[nodiscard]] void* luaHelper_ReallocFunction(LuaPlus::LuaState* const ptr, const int, const unsigned int size)
-{
-	return std::realloc(ptr, static_cast<std::size_t>(size));
-}
-
-/**
- * Address: 0x00923F40 (FUN_00923F40, luaHelper_FreeFunction)
- *
- * What it does:
- * Releases one Lua helper allocation lane through CRT `_free_crt`.
- */
-void luaHelper_FreeFunction(void* const ptr)
-{
-	_free_crt(ptr);
-}
+// FUN_00923F20 / FUN_00923F40 are recovered once, further down this file, as
+// the `extern "C"` pair that `luaHelper_Realloc` / `luaHelper_Free` point at.
+// A second copy used to live here with the same two addresses and the wrong
+// allocator - `std::realloc` and the CRT's `_free_crt` rather than the
+// engine's `realloc_0` / `free_crt`. It was unreferenced, but it is exactly
+// the pairing Global.cpp warns about, so it is gone rather than dormant.
 
 class TableSerializer
 {
