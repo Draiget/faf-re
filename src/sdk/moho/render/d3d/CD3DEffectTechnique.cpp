@@ -377,31 +377,34 @@ namespace moho
     }
 
     /**
-     * OPEN BUG - this test never answers false.
+     * A lane counts as defined once it has been given a non-empty name.
      *
-     * Technique's constructor placement-constructs all three lanes up front
-     * (which is faithful: FUN_0042BE40 runs an eh vector constructor iterator
-     * over 3 x 0x38), and Implementation's constructor sets mName's capacity
-     * to 15 (FUN_0042BB80). So every lane reports "constructed" before any
-     * fidelity has been defined, the registration loop in ReloadEffectFile
-     * rejects the first definition of every technique as a redundant
-     * fidelity, and the technique tree never gets a usable implementation
-     * name. CD3DEffect::SetTechnique then falls through to its
-     * invalid-fidelity path and hands the abstract technique name straight to
-     * D3DX, which does not know it - GetTechniqueByName returns null and
-     * EffectD3D9::SetTechnique throws. That is the "invalid effect technique
-     * requested: TAlphaBlendLinearSampleNoDepth" crash, with 371 of these
-     * warnings logged ahead of it.
+     * Every lane is constructed up front - Technique's constructor runs an eh
+     * vector constructor iterator over 3 x 0x38 (FUN_0042BE40) and each
+     * Implementation starts out as an empty SSO string with capacity 15
+     * (FUN_0042BB80) - so capacity cannot distinguish a defined lane from an
+     * untouched one. Length can, and length is what the binary reads.
      *
-     * What has not been pinned yet is which word the binary actually tests.
-     * FUN_0042C650 checks `v50[17 + 14k]` with lane k based at `v50 + 11 +
-     * 14k`, i.e. lane+0x18 - but mName sits at lane+0x04 and is 0x18 bytes
-     * long, so that word is the member *after* the name, not its capacity.
-     * Resolve that before changing this test.
+     * The word is lane+0x18. mName sits at lane+0x04 and msvc8::string keeps
+     * its allocator cookie at +0x00, so the layout is bx at lane+0x08,
+     * mySize at lane+0x18, myRes at lane+0x1C - which is exactly what the
+     * Implementation constructor stores (`mov [esi+1Ch], 0Fh` for the
+     * capacity, `mov [esi+18h], ebx` for the length, `mov [esi+8], bl` for
+     * the first buffer byte).
+     *
+     * Three independent sites agree on lane+0x18:
+     *   - FUN_0042BF40 tests this+0x38 / +0x70 / +0xA8 against lanes based at
+     *     this+0x20 / +0x58 / +0x90,
+     *   - FUN_0042C650 tests `v50[17 + 14k]` against lanes at `v50 + 11 + 14k`
+     *     (v50 is the TechniqueNode, whose mTechnique starts at +0x0C),
+     *   - FUN_0042D290 tests `v3[14 * fidelity + 17]` and then reads
+     *     `v3[14 * fidelity + 18] < 0x10` to pick between the SSO buffer and
+     *     the heap pointer. That capacity-versus-16 test one word higher is
+     *     what pins lane+0x1C as myRes and therefore lane+0x18 as mySize.
      */
     [[nodiscard]] bool HasConstructedLaneName(const Implementation& lane) noexcept
     {
-      return lane.mName.myRes != 0U;
+      return lane.mName.mySize != 0U;
     }
 
     template <typename NodeT>
@@ -1459,7 +1462,7 @@ namespace moho
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
     Technique::Implementation* const lanes = definition->mTechnique.GetImplementationLanes();
     Technique::Implementation& selectedLane = lanes[fidelityIndex];
-    if (selectedLane.mName.myRes == 0U) {
+    if (!HasConstructedLaneName(selectedLane)) {
       selectAndWarnInvalid();
       return;
     }

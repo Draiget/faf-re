@@ -161,6 +161,20 @@ namespace moho
         StringAnnotationTree mStringAnnotations; // +0x2C
       };
 
+      // Every offset below is a direct store in the constructor at 0x0042BB80:
+      //   mov [esi], offset ??_7Implementation@...@6B@   vftable  +0x00
+      //   mov [esi+8], bl                                mName.bx +0x08
+      //   mov [esi+18h], ebx                             mName.mySize
+      //   mov [esi+1Ch], 0Fh                             mName.myRes
+      //   mov [esi+24h], eax / mov [esi+28h], ebx        integer tree head, size
+      //   mov [esi+30h], eax / mov [esi+34h], ebx        string tree head, size
+      // The 0x38 stride is corroborated by the lane arithmetic in 0x0042BF40,
+      // 0x0042C650 and 0x0042D290.
+      static_assert(offsetof(Implementation, mName) == 0x04, "CD3DEffect::Technique::Implementation::mName offset must be 0x04");
+      static_assert(offsetof(Implementation, mIntegerAnnotations) == 0x20, "CD3DEffect::Technique::Implementation::mIntegerAnnotations offset must be 0x20");
+      static_assert(offsetof(Implementation, mStringAnnotations) == 0x2C, "CD3DEffect::Technique::Implementation::mStringAnnotations offset must be 0x2C");
+      static_assert(sizeof(Implementation) == 0x38, "CD3DEffect::Technique::Implementation size must be 0x38");
+
       /**
        * Address: 0x0042BE40 (FUN_0042BE40)
        * Mangled: ??0Technique@CD3DEffect@Moho@@QAE@@Z
