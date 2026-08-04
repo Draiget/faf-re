@@ -7468,7 +7468,10 @@ namespace gpg::gal
     {
         Func1();
 
-        if (filePath.myRes == 0U)
+        // `!*(_DWORD *)(a3 + 20)` - string+0x14 is mySize, not myRes: msvc8::string
+        // keeps its allocator cookie at +0x00, bx at +0x04, mySize at +0x14 and
+        // myRes at +0x18. The guard rejects an empty path.
+        if (filePath.mySize == 0U)
         {
             ThrowGalError("DeviceD3D9.cpp", 736, "Missing file");
         }
@@ -7503,7 +7506,9 @@ namespace gpg::gal
     {
         Func1();
 
-        if (filePath.myRes == 0U)
+        // string+0x14 is mySize (see DeviceD3D9::Func3) - the guard rejects an
+        // empty path, and an SSO string's myRes is 15 even when empty.
+        if (filePath.mySize == 0U)
         {
             ThrowGalError("DeviceD3D9.cpp", 715, "Missing file");
         }
