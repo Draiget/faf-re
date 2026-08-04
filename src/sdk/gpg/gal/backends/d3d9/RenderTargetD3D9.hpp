@@ -66,10 +66,10 @@ namespace gpg::gal
          * Mangled: ?GetSurface@D3DSurface@Moho@@QAEPAUIDirect3DSurface9@@XZ
          *
          * What it does:
-         * Returns the retained render-target texture/surface payload lane at
-         * `this+0x14`. Callers in `DeviceD3D9::StretchRect`,
-         * `CreateRenderTarget`, `Func4`, and `ClearTarget` use this lane as an
-         * `IDirect3DSurface9*` handle.
+         * Returns the retained `IDirect3DSurface9*` lane at `this+0x14`. All
+         * five callers consume it as a surface: `DeviceD3D9::StretchRect`
+         * (both operands), `CreateRenderTarget`, `Func4`
+         * (`D3DXSaveSurfaceToFile`), and `ClearTarget` (`SetRenderTarget`).
          */
         void* GetSurface();
 
@@ -77,17 +77,25 @@ namespace gpg::gal
          * Address: 0x008F52E0 (FUN_008F52E0)
          *
          * What it does:
-         * Returns the retained render-target surface pointer lane at `this+0x18`.
+         * Returns the retained `IDirect3DBaseTexture9*` lane at `this+0x18`.
+         * Its single caller is `EffectVariableD3D9::Func3`, which hands the
+         * result straight to `ID3DXEffect::SetTexture` - so this lane holds
+         * the texture, not the surface that was derived from it.
          */
-        void* GetRenderSurface();
+        void* GetTexture();
 
         /**
          * Address: 0x008F5300 (FUN_008F5300)
          *
+         * IDA signature:
+         * int __userpurge sub_8F5300@<eax>(RenderTargetD3D9 *this@<ecx>);
+         *
          * What it does:
-         * Returns surface level 0 from the retained render-target texture handle.
+         * Returns a GDI device context for the retained render surface -
+         * `IDirect3DSurface9::GetDC` (vtable slot 15) on the `this+0x14`
+         * lane. Reached only through vtable slot 2 (`0x00D42EC4`).
          */
-        virtual void* GetSurfaceLevel0();
+        virtual void* GetSurfaceDC();
 
         /**
          * Address: 0x008F5500 (FUN_008F5500)
@@ -100,12 +108,17 @@ namespace gpg::gal
 
     public:
         RenderTargetContext context_{}; // +0x04
-        void* renderTexture_ = nullptr; // +0x14
-        void* renderSurface_ = nullptr; // +0x18
+        // `SetRenderTexture` (0x008F5500) stores the caller's texture at +0x18
+        // and writes `GetSurfaceLevel(texture, 0)` into +0x14; the surface lane
+        // is then the object `GetDesc` (slot 12) and `GetDC` (slot 15) are
+        // dispatched on. Keep the two apart - handing D3DX the surface where a
+        // texture belongs faults inside the d3d9 draw, not at bind time.
+        void* surface_ = nullptr; // +0x14, IDirect3DSurface9*
+        void* texture_ = nullptr; // +0x18, IDirect3DBaseTexture9*
     };
 
     static_assert(offsetof(RenderTargetD3D9, context_) == 0x04, "RenderTargetD3D9::context_ offset must be 0x04");
-    static_assert(offsetof(RenderTargetD3D9, renderTexture_) == 0x14, "RenderTargetD3D9::renderTexture_ offset must be 0x14");
-    static_assert(offsetof(RenderTargetD3D9, renderSurface_) == 0x18, "RenderTargetD3D9::renderSurface_ offset must be 0x18");
+    static_assert(offsetof(RenderTargetD3D9, surface_) == 0x14, "RenderTargetD3D9::surface_ offset must be 0x14");
+    static_assert(offsetof(RenderTargetD3D9, texture_) == 0x18, "RenderTargetD3D9::texture_ offset must be 0x18");
     static_assert(sizeof(RenderTargetD3D9) == 0x1C, "RenderTargetD3D9 size must be 0x1C");
 }
