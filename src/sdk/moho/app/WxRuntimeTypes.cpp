@@ -64012,6 +64012,29 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // before it.
   UpdateRenderViewportCoordinates();
 
+  // Draw the UI control tree over the rendered viewport. The binary does this
+  // at 0x007F97B7..0x007F97DD, immediately after the coordinate update and
+  // before the bloom pass:
+  //   cmp  ren_Ui, 0                 ; skip entirely when the UI is off
+  //   mov  ecx, Moho__UI_Manager     ; and when no manager exists yet
+  //   mov  eax, [ebp+215Ch]          ; mPrimBatcher.px
+  //   mov  edx, [edx+40h]            ; vtable slot 16
+  //   mov  eax, [ebp+320h]           ; mHead
+  //   call edx                       ; CUIManager::DrawUI(head, primBatcher)
+  // Slot 16 is DrawUI on the concrete CUIManager vtable at 0x00E462CC
+  // (+0x40 -> 0x0084D5D0); IUIManager's own vtable is all _purecall, so the
+  // slot has to be read off the derived table.
+  //
+  // This call was missing, and it is the whole reason the window rendered
+  // black: CUIManager::RenderFrames/DrawUI were never reached, so the control
+  // tree - the entire front end - was never drawn.
+  if (moho::ren_Ui) {
+    if (moho::IUIManager* const uiManager = moho::UI_GetManager(); uiManager != nullptr) {
+      auto* const uiHost = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+      uiManager->DrawUI(uiHost->mHead, uiHost->mPrimBatcher.get());
+    }
+  }
+
   // Bloom post-process pass. Binary (WRenViewport::Render @0x007F90D0, the
   // DoBloom call at 0x007F983A) gates it on `!ren_Oblivion && ren_Bloom &&
   // !ren_ShowNormals` and invokes it on the active head's bloom renderer:
