@@ -210,11 +210,6 @@ namespace gpg::gal
         using effect_set_state_manager_fn = HRESULT(__stdcall*)(void*, void*);
         using effect_on_reset_device_fn = HRESULT(__stdcall*)(void*);
         using effect_on_lost_device_fn = HRESULT(__stdcall*)(void*);
-        using device_get_context_fn = void*(__thiscall*)(Device*);
-        using device_get_pipeline_state_fn = void(__thiscall*)(Device*, boost::shared_ptr<PipelineStateD3D9>*);
-        using device_create_vertex_format_fn = void(__thiscall*)(Device*, void*, int);
-        using device_begin_technique_fn = void(__thiscall*)(Device*);
-        using device_end_technique_fn = void(__thiscall*)(Device*);
         using d3d9_device_show_cursor_fn = int(__stdcall*)(void*, int);
         using d3d9_device_create_texture_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, unsigned int, std::uint32_t, D3DPOOL, void**, void*);
         using d3d9_device_create_cube_texture_fn =
@@ -1726,39 +1721,30 @@ namespace gpg::gal
             return onLostDevice(effect);
         }
 
-        void* InvokeDeviceGetContext(Device* const device)
+        /**
+         * The active backend device whenever any D3D9 body in this file runs.
+         *
+         * These bodies reach `Device::GetInstance()`, which is typed as the
+         * abstract base. The methods they need (`GetPipelineState`,
+         * `CreateVertexFormat`, ...) are declared only on `DeviceD3D9`, so the
+         * call has to go through the backend type. This used to be done by
+         * hand-indexing the vtable (`vtable[8]`, `vtable[14]`, ...), which was
+         * doubly wrong: the base declares those slots as no-arg `purecallN()`
+         * stubs, so the backend methods never actually override them - the
+         * compiler appends them past the base's 50 slots and the stub still
+         * sits at the indexed position. Dispatching `vtable[8]` therefore
+         * called an empty `void purecall8()`: the output parameter was left
+         * untouched, and because a `__thiscall` callee pops its own arguments,
+         * the no-arg stub popped 0 bytes where the caller pushed 4 and the
+         * debug CRT's `_RTC_CheckEsp` trapped on return.
+         *
+         * `Device::InitCursor` (Device.cpp) resolves the same problem the same
+         * way. See the note on `Device::CreateEffect` for the one slot whose
+         * signature was hoisted onto the base instead.
+         */
+        [[nodiscard]] DeviceD3D9& ActiveDeviceD3D9()
         {
-            auto** const vtable = *reinterpret_cast<void***>(device);
-            auto* const getContext = reinterpret_cast<device_get_context_fn>(vtable[2]);
-            return getContext(device);
-        }
-
-        void InvokeDeviceGetPipelineState(Device* const device, boost::shared_ptr<PipelineStateD3D9>* const outPipelineState)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(device);
-            auto* const getPipelineState = reinterpret_cast<device_get_pipeline_state_fn>(vtable[8]);
-            getPipelineState(device, outPipelineState);
-        }
-
-        void InvokeDeviceCreateVertexFormat(Device* const device, void* const outVertexFormatToken, const int formatCode)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(device);
-            auto* const createVertexFormat = reinterpret_cast<device_create_vertex_format_fn>(vtable[14]);
-            createVertexFormat(device, outVertexFormatToken, formatCode);
-        }
-
-        void InvokeDeviceBeginTechnique(Device* const device)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(device);
-            auto* const beginTechnique = reinterpret_cast<device_begin_technique_fn>(vtable[48]);
-            beginTechnique(device);
-        }
-
-        void InvokeDeviceEndTechnique(Device* const device)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(device);
-            auto* const endTechnique = reinterpret_cast<device_end_technique_fn>(vtable[49]);
-            endTechnique(device);
+            return *static_cast<DeviceD3D9*>(Device::GetInstance());
         }
 
         DeviceD3D9RuntimeView& AsDeviceD3D9Runtime(DeviceD3D9& device) noexcept
@@ -5198,8 +5184,7 @@ namespace gpg::gal
      */
     BOOL func_AllowMeshInstancing()
     {
-        Device* const device = Device::GetInstance();
-        auto* const deviceContext = static_cast<const DeviceContext*>(InvokeDeviceGetContext(device));
+        const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
         return (sMeshAllowInstancing != 0U) && deviceContext->mHWBasedInstancing;
     }
 
@@ -5212,8 +5197,7 @@ namespace gpg::gal
      */
     BOOL func_AllowMeshFloat16()
     {
-        Device* const device = Device::GetInstance();
-        auto* const deviceContext = static_cast<const DeviceContext*>(InvokeDeviceGetContext(device));
+        const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
         return (sMeshAllowFloat16 != 0U) && deviceContext->mSupportsFloat16;
     }
 
@@ -5265,8 +5249,7 @@ namespace gpg::gal
      */
     Float16HardwareVertexFormatterD3D9* GetHardwareVertexFormatter()
     {
-        Device* const device = Device::GetInstance();
-        const auto* const deviceContext = static_cast<const DeviceContext*>(InvokeDeviceGetContext(device));
+        const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
         const std::int32_t deviceTypeSelector = deviceContext->mDeviceType - 1;
 
         if (sCurrentHardwareVertexFormatter != nullptr) {
@@ -5459,8 +5442,12 @@ namespace gpg::gal
         const std::int32_t /*layoutVariant*/
     )
     {
-        Device* const device = Device::GetInstance();
-        InvokeDeviceCreateVertexFormat(device, reinterpret_cast<void*>(streamToken), 14);
+        // `streamToken` is the caller's `shared_ptr<VertexFormatD3D9>` output
+        // slot; `CreateVertexFormat` fills it and hands it back. The opaque
+        // `uintptr_t` spelling comes from the `MeshFormatter` virtual this
+        // overrides, which still carries the decompiler's typing.
+        auto* const outVertexFormat = reinterpret_cast<boost::shared_ptr<VertexFormatD3D9>*>(streamToken);
+        ActiveDeviceD3D9().CreateVertexFormat(outVertexFormat, 14U);
         return streamToken;
     }
 
@@ -5552,9 +5539,9 @@ namespace gpg::gal
         const std::int32_t layoutVariant
     )
     {
-        Device* const device = Device::GetInstance();
-        const int formatCode = (layoutVariant != 0) ? 16 : 15;
-        InvokeDeviceCreateVertexFormat(device, reinterpret_cast<void*>(streamToken), formatCode);
+        const std::uint32_t formatCode = (layoutVariant != 0) ? 16U : 15U;
+        auto* const outVertexFormat = reinterpret_cast<boost::shared_ptr<VertexFormatD3D9>*>(streamToken);
+        ActiveDeviceD3D9().CreateVertexFormat(outVertexFormat, formatCode);
         return streamToken;
     }
 
@@ -8568,8 +8555,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 58, setTechniqueResult);
         }
 
-        Device* const device = Device::GetInstance();
-        InvokeDeviceBeginTechnique(device);
+        ActiveDeviceD3D9().BeginTechnique();
 
         unsigned int passCount = 0U;
         const HRESULT beginResult = InvokeEffectBeginTechnique(dxEffect, &passCount, 1U);
@@ -8602,8 +8588,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 84, result);
         }
 
-        Device* const device = Device::GetInstance();
-        InvokeDeviceEndTechnique(device);
+        ActiveDeviceD3D9().EndTechnique();
         beginEndActive_ = false;
     }
 
@@ -8785,9 +8770,8 @@ namespace gpg::gal
             ThrowGalError("EffectD3D9.cpp", 96, "invalid effect");
         }
 
-        Device* const device = Device::GetInstance();
         boost::shared_ptr<PipelineStateD3D9> pipelineState;
-        InvokeDeviceGetPipelineState(device, &pipelineState);
+        ActiveDeviceD3D9().GetPipelineState(&pipelineState);
 
         StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
         static_cast<void>(InvokeEffectSetStateManager(dxEffect_, stateManager));

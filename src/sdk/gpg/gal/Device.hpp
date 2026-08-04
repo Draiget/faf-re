@@ -26,6 +26,40 @@ namespace gpg::gal
   /**
    * VFTABLE: 0x00D42224
    * COL:     0x00E5050C
+   *
+   * KNOWN DEVIATION - the `purecallN()` slots below.
+   *
+   * In the binary these are pure virtuals carrying the backend's real
+   * signature; this reconstruction lost the signature and kept only a no-arg
+   * `virtual void purecallN() {}` placeholder. `DeviceD3D9` declares the real
+   * method at each of those positions, but a different name/signature does not
+   * override - the compiler appends the backend method past this class's 50
+   * slots, and the placeholder stays at the indexed slot. `DeviceD3D9`'s vtable
+   * is therefore 71 entries where the binary has 50, and slots
+   * 5, 8, 10-24, 32, 40-42 hold these do-nothing stubs.
+   *
+   * That is inert for a normal `deviceD3D9->Method()` call (it binds to the
+   * appended slot and reaches the right body) but fatal two ways for anything
+   * that reaches a backend method through a base `Device*`:
+   *   - the stub runs instead of the real body, leaving output parameters
+   *     untouched, and
+   *   - a `__thiscall` callee pops its own arguments, so a no-arg stub pops 0
+   *     where the caller pushed N and `_RTC_CheckEsp` traps on return.
+   *
+   * Do NOT reach these slots by hand-indexing the vtable - that is what caused
+   * the resize crash through `EffectD3D9::OnReset` (slot 8) and would have
+   * caused a second one through the hardware vertex formatter (slot 14). Use a
+   * typed `static_cast<DeviceD3D9*>` (see `Device::InitCursor` in Device.cpp
+   * and `ActiveDeviceD3D9` in D3D9Interfaces.cpp), or hoist the real signature
+   * onto this class the way slot 9 (`CreateEffect`) already does.
+   *
+   * The full repair is to give every `purecallN` its real signature so the
+   * backend genuinely overrides and the vtable is 50 entries again. That needs
+   * the D3D9 wrapper types (`TextureD3D9`, `PipelineStateD3D9`, ...) to derive
+   * from their GAL base interfaces first, since the base cannot name backend
+   * types; none of them do today. Tracked as debt, not attempted here.
+   *
+   * `DeviceD3D10` does not derive from this class at all, so it is unaffected.
    */
   class Device
   {
