@@ -18,6 +18,7 @@ namespace gpg::gal
 
 namespace moho
 {
+  class ID3DRenderTarget;
   struct GeomCamera3;
   class ID3DIndexSheet;
   struct ParticleBucketTreeNodeRuntime;
@@ -278,7 +279,7 @@ namespace moho
       GeomCamera3* camera,
       int tick,
       float frameDelta,
-      boost::weak_ptr<gpg::gal::TextureD3D9> backgroundTexture
+      const boost::shared_ptr<ID3DRenderTarget>& backgroundTexture
     );
 
   public:

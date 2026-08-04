@@ -483,13 +483,10 @@ namespace
     const moho::CParticleTexture::TextureResourceHandle& textureResource
   )
   {
-    boost::shared_ptr<gpg::gal::TextureD3D9> textureHandle;
-    if (textureResource != nullptr) {
-      textureResource->GetTexture(textureHandle);
-    }
-
-    boost::weak_ptr<gpg::gal::TextureD3D9> weakTexture(textureHandle);
-    shaderVar.GetTexture(weakTexture);
+    // RD3DTextureResource is an ID3DTextureSheet, so the sheet binder does the
+    // GetTexture-then-SetTexture pair itself - there is no reason to resolve the
+    // handle here and re-wrap it.
+    shaderVar.GetTexture(textureResource);
   }
 
   void BindParticleCameraShaderState(
@@ -8594,7 +8591,7 @@ namespace moho
     GeomCamera3* const camera,
     const int tick,
     const float frameDelta,
-    boost::weak_ptr<gpg::gal::TextureD3D9> backgroundTexture
+    const boost::shared_ptr<ID3DRenderTarget>& backgroundTexture
   )
   {
     Init();
@@ -8604,7 +8601,7 @@ namespace moho
 
     BindParticleCameraShaderState(camera, tick, frameDelta);
     if (shaderVarParticleBackgroundTexture.Exists()) {
-      shaderVarParticleBackgroundTexture.GetTexture(backgroundTexture);
+      shaderVarParticleBackgroundTexture.SetRenderTargetTexture(backgroundTexture);
     }
 
     auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);

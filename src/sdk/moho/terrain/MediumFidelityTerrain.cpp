@@ -27,6 +27,7 @@
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaterFactory.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
 
 namespace
 {
@@ -108,7 +109,7 @@ namespace
    * otherwise the primary texture at +0x2E0, and returns a retained (strong-ref)
    * copy of that `boost::shared_ptr<gpg::gal::TextureD3D9>`.
    */
-  [[nodiscard]] boost::shared_ptr<gpg::gal::TextureD3D9> GetActiveShadowTexture(
+  [[nodiscard]] boost::shared_ptr<moho::CD3DRenderTarget> GetActiveShadowTexture(
     const moho::TerrainShadowContext& shadowContext
   )
   {
@@ -268,7 +269,7 @@ namespace moho
    * updates terrain-scale and viewport normalization constants, and forwards
    * the optional terrain-normal map texture handle for terrain normal passes.
    */
-  void MediumFidelityTerrain::LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture)
+  void MediumFidelityTerrain::LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture)
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -323,7 +324,7 @@ namespace moho
     SetShaderVarMem(shaderVars.stratum6NormalTile, 4U, &strata.mStratum6NormalTexture.mScaleX);
     SetShaderVarMem(shaderVars.stratum7NormalTile, 4U, &strata.mStratum7NormalTexture.mScaleX);
 
-    shaderVars.normalTexture.GetTexture(terrainNormalTexture);
+    shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
     const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
     const auto* const activeTerrainView = reinterpret_cast<const TerrainWaterResourceView*>(activeMap->mTerrainRes);
@@ -466,8 +467,8 @@ namespace moho
         shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
       }
 
-      const boost::shared_ptr<gpg::gal::TextureD3D9> shadowTexture = GetActiveShadowTexture(*shadowContext);
-      shaderVars.shadowTexture.GetTexture(boost::weak_ptr<gpg::gal::TextureD3D9>(shadowTexture));
+      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = GetActiveShadowTexture(*shadowContext);
+      shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsDisabledBlob, 4U);
@@ -555,7 +556,7 @@ namespace moho
 
     shaderVars.overlayTexture.GetTexture(overlayTexture);
 
-    LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9>());
+    LoadShaderVars({});
 
     DrawTriangles();
   }
@@ -914,7 +915,7 @@ namespace moho
   bool MediumFidelityTerrain::DrawNormals(
     MeshRenderer* const renderer,
     const float lod,
-    boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture,
+    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
     TerrainShadowContext* const shadowContext
   )
   {

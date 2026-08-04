@@ -12,6 +12,7 @@ namespace gpg::gal
 
 namespace moho
 {
+  class ID3DRenderTarget;
   class CWaterShaderProperties;
   struct GeomCamera3;
 
@@ -109,8 +110,8 @@ namespace moho
       float tickLerp,
       const GeomCamera3* camera,
       const CWaterShaderProperties* shaderProperties,
-      boost::weak_ptr<gpg::gal::TextureD3D9> refractionTexture,
-      boost::weak_ptr<gpg::gal::TextureD3D9> reflectionTexture
+      const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
+      const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) = 0;
   };
 } // namespace moho

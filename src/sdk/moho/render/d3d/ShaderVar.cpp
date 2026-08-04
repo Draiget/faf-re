@@ -9,6 +9,8 @@
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/ID3DRenderTarget.h"
+#include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 
@@ -214,10 +216,10 @@ namespace moho
    * Resolves this shader-var if needed and pushes one optional texture handle
    * into the bound effect-variable lane.
    */
-  ShaderVar* ShaderVar::GetTexture(const boost::shared_ptr<CD3DDynamicTextureSheet>& textureSheet)
+  ShaderVar* ShaderVar::GetTexture(const boost::shared_ptr<ID3DTextureSheet>& textureSheet)
   {
     if (Exists()) {
-      CD3DDynamicTextureSheet::TextureHandle textureHandle{};
+      ID3DTextureSheet::TextureHandle textureHandle{};
       if (textureSheet != nullptr) {
         textureSheet->GetTexture(textureHandle);
       }
@@ -228,20 +230,32 @@ namespace moho
   }
 
   /**
-   * Address: 0x00491280 (FUN_00491280, sub_491280)
+   * Address: 0x00491280 (FUN_00491280)
    *
    * What it does:
-   * Resolves this shader-var if needed and binds one weak texture handle to
-   * the backing effect-variable lane.
+   * Resolves this shader-var if needed, asks the render target for its GAL
+   * surface and binds that surface to the effect variable. A null render target
+   * binds an empty surface handle.
+   *
+   * The binary reads only the handle's px word (0x00491299 `mov ecx, [eax]`),
+   * calls vtable slot 2 of that object (0x004912AA `mov edx, [edx+8]`) - which
+   * is ID3DRenderTarget::GetSurface, writing a
+   * boost::shared_ptr<gpg::gal::RenderTargetD3D9> into an 8-byte temporary -
+   * and hands that temporary to effect-variable vtable slot 3 (0x004912B5
+   * `mov edx, [eax+0Ch]`), the render-target binder. The null branch at
+   * 0x004912C6 zeroes the same temporary and calls the same slot, so both paths
+   * bind, they only differ in what.
    */
-  ShaderVar* ShaderVar::GetTexture(const boost::weak_ptr<gpg::gal::TextureD3D9>& textureHandle)
+  ShaderVar* ShaderVar::SetRenderTargetTexture(const boost::shared_ptr<ID3DRenderTarget>& renderTarget)
   {
-    if (!Exists()) {
-      return this;
+    if (Exists()) {
+      ID3DRenderTarget::SurfaceHandle surfaceHandle{};
+      if (renderTarget != nullptr) {
+        renderTarget->GetSurface(surfaceHandle);
+      }
+      mEffectVariable->Func3(surfaceHandle);
     }
 
-    boost::shared_ptr<gpg::gal::TextureD3D9> resolvedTexture = textureHandle.lock();
-    mEffectVariable->SetTexture(resolvedTexture);
     return this;
   }
 

@@ -228,7 +228,7 @@ namespace moho
    * updates terrain-scale and viewport normalization constants, and forwards
    * the optional terrain-normal map texture handle for terrain normal passes.
    */
-  void HighFidelityTerrain::LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture)
+  void HighFidelityTerrain::LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture)
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -283,7 +283,7 @@ namespace moho
     SetShaderVarMem(shaderVars.stratum6NormalTile, 4U, &strata.mStratum6NormalTexture.mScaleX);
     SetShaderVarMem(shaderVars.stratum7NormalTile, 4U, &strata.mStratum7NormalTexture.mScaleX);
 
-    shaderVars.normalTexture.GetTexture(terrainNormalTexture);
+    shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
     const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
     const auto* const activeTerrainView = reinterpret_cast<const TerrainWaterResourceView*>(activeMap->mTerrainRes);

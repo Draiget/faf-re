@@ -7,6 +7,7 @@
 
 namespace moho
 {
+  class ID3DRenderTarget;
   class CD3DIndexSheet;
   class CD3DVertexSheet;
 
@@ -66,8 +67,8 @@ namespace moho
       float tickLerp,
       const GeomCamera3* camera,
       const CWaterShaderProperties* shaderProperties,
-      boost::weak_ptr<gpg::gal::TextureD3D9> refractionTexture,
-      boost::weak_ptr<gpg::gal::TextureD3D9> reflectionTexture
+      const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
+      const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) override;
 
     TerrainWaterResourceView* mTerrainRes = nullptr; // +0x04

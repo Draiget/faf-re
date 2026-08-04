@@ -17,6 +17,8 @@ namespace gpg::gal
 namespace moho
 {
   class CD3DDynamicTextureSheet;
+  class ID3DTextureSheet;
+  class ID3DRenderTarget;
 
   struct ShaderVar
   {
@@ -42,19 +44,43 @@ namespace moho
      * Address: 0x00438140 (FUN_00438140, struct_ShaderVar::GetTexture)
      *
      * What it does:
-     * Resolves this shader-var if needed and pushes one optional texture handle
-     * into the bound effect-variable lane.
+     * Resolves this shader-var if needed, asks the sheet for its texture and
+     * pushes that handle into the bound effect-variable lane. A null sheet
+     * binds an empty handle.
+     *
+     * The parameter is the ID3DTextureSheet interface, not one concrete sheet:
+     * the binary reaches the sheet's GetTexture through its vtable, and every
+     * caller supplies a different implementation (dynamic sheets from the prim
+     * batcher, RD3DTextureResource from terrain, water and particles). IDA
+     * spells the argument as a CD3DDynamicTextureSheet handle, which is its
+     * usual concrete-type guess at a virtual call.
      */
-    ShaderVar* GetTexture(const boost::shared_ptr<CD3DDynamicTextureSheet>& textureSheet);
+    ShaderVar* GetTexture(const boost::shared_ptr<ID3DTextureSheet>& textureSheet);
 
     /**
-     * Address: 0x00491280 (FUN_00491280, sub_491280)
+     * Address: 0x00491280 (FUN_00491280)
      *
      * What it does:
-     * Resolves this shader-var if needed and binds one weak texture handle to
-     * the backing effect-variable lane.
+     * Resolves this shader-var if needed, asks the render target for its GAL
+     * surface and binds that surface to the effect variable. A null render
+     * target binds an empty surface handle.
+     *
+     * This binds a RENDER TARGET, not a texture, which is why it is not an
+     * overload of GetTexture. The binary reads only the handle's px word, calls
+     * vtable slot 2 of that object - ID3DRenderTarget::GetSurface, which yields
+     * a boost::shared_ptr<gpg::gal::RenderTargetD3D9> - and passes the result to
+     * effect-variable vtable slot 3 (+0x0C), the render-target binder, never to
+     * slot 4 (SetTexture). All fifteen callers agree: CRenFrame::Render's four
+     * frame-texture slots, MeshRenderer::ConfigureShader's shadow map,
+     * HighFidelityWater, the terrain shader vars and
+     * CWorldParticles::RenderRefractingEffects.
+     *
+     * It was previously modelled as taking a weak_ptr<TextureD3D9> that it
+     * locked. Callers bridged to that by reinterpret_casting a
+     * shared_ptr<ID3DRenderTarget>, so D3DX received a render target where it
+     * expected a texture and faulted inside SetTexture.
      */
-    ShaderVar* GetTexture(const boost::weak_ptr<gpg::gal::TextureD3D9>& textureHandle);
+    ShaderVar* SetRenderTargetTexture(const boost::shared_ptr<ID3DRenderTarget>& renderTarget);
 
     /**
      * Address: 0x004380D0 (FUN_004380D0, struct_ShaderVar::SetFloat)

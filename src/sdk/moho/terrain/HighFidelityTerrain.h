@@ -16,6 +16,7 @@ namespace gpg::gal
 
 namespace moho
 {
+  class ID3DRenderTarget;
   class CD3DIndexSheet;
   class CD3DVertexSheet;
   class CTesselator;
@@ -95,7 +96,7 @@ namespace moho
      * normalization constants, and forwards the optional terrain-normal texture
      * weak handle into the active terrain effect.
      */
-    void LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture);
+    void LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture);
 
     /**
      * Address: 0x008033E0 (FUN_008033E0, Moho::HighFidelityTerrain::DrawWaterline)
