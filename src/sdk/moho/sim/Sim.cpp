@@ -1241,16 +1241,11 @@ namespace
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaInvalidBoolWarning = "%s\n  invalid argument %d, use as boolean";
-  constexpr const char* kKernel32ModuleName = "kernel32.dll";
-  constexpr const char* kVirtualProtectExportName = "VirtualProtect";
   constexpr std::uint32_t kIntelRadiusMagnitudeMask = 0x7FFFFFFFu;
   constexpr std::uint32_t kIntelEnabledFlagMask = ~kIntelRadiusMagnitudeMask;
   constexpr std::size_t kEntityIntelAttributesOffset = 0x128u;
   constexpr std::size_t kDiscardClientSlotCount = 17u;
-  constexpr SIZE_T kInvertMidMousePatchSize = 0x9u;
   constexpr std::uintptr_t kLuaCallbackDispatchBlockedFlagEa = 0x011FD23Fu;
-  constexpr std::uintptr_t kInvertMidMouseOpcodeXEa = 0x0086E01Fu;
-  constexpr std::uintptr_t kInvertMidMouseOpcodeYEa = 0x0086E027u;
 
   struct EntityIntelAttributeRangesView
   {
@@ -1565,11 +1560,6 @@ namespace
     return static_cast<std::size_t>(currentClientCount - 1u);
   }
 
-  [[nodiscard]] std::uint8_t ResolveMiddleMousePatchOpcode(const bool invert) noexcept
-  {
-    return invert ? std::uint8_t{0x29u} : std::uint8_t{0x01u};
-  }
-
   [[nodiscard]] bool IsLuaCallbackDispatchBlocked() noexcept
   {
 #if defined(_M_IX86)
@@ -1579,34 +1569,6 @@ namespace
 #else
     return false;
 #endif
-  }
-
-  using VirtualProtectFn = BOOL(WINAPI*)(LPVOID, SIZE_T, DWORD, PDWORD);
-
-  void PatchMiddleMouseScrubOpcode(const bool invert)
-  {
-    const HMODULE kernel32Module = ::GetModuleHandleA(kKernel32ModuleName);
-    auto* const virtualProtect = kernel32Module != nullptr
-                                   ? reinterpret_cast<VirtualProtectFn>(
-                                       ::GetProcAddress(kernel32Module, kVirtualProtectExportName)
-                                     )
-                                   : nullptr;
-    if (virtualProtect == nullptr) {
-      return;
-    }
-
-    auto* const patchBaseAddress = reinterpret_cast<LPVOID>(kInvertMidMouseOpcodeXEa);
-    DWORD oldProtect = 0;
-    if (!virtualProtect(patchBaseAddress, kInvertMidMousePatchSize, PAGE_EXECUTE_READWRITE, &oldProtect)) {
-      return;
-    }
-
-    const std::uint8_t opcode = ResolveMiddleMousePatchOpcode(invert);
-    *reinterpret_cast<volatile std::uint8_t*>(kInvertMidMouseOpcodeXEa) = opcode;
-    *reinterpret_cast<volatile std::uint8_t*>(kInvertMidMouseOpcodeYEa) = opcode;
-
-    DWORD ignoredProtect = 0;
-    virtualProtect(patchBaseAddress, kInvertMidMousePatchSize, oldProtect, &ignoredProtect);
   }
 
   [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
@@ -22850,8 +22812,33 @@ int moho::cfunc_SetInvertMidMouseButton(lua_State* const luaContext)
   }
 
   const bool invertMiddleMouse = lua_toboolean(luaContext, 1) != 0;
-  PatchMiddleMouseScrubOpcode(invertMiddleMouse);
+  UI_SetInvertMidMouseScrub(invertMiddleMouse);
   return 0;
+}
+
+/**
+ * What it does:
+ * Publishes the global Lua binder definition for `SetInvertMidMouseButton`.
+ *
+ * The shipped build carries this binding in its `.exxt` patch section rather
+ * than a `func_*_LuaFuncDef` factory, so there is no address to cite for the
+ * factory itself - only for the bound worker, `cfunc_SetInvertMidMouseButton`
+ * at 0x0128B2F9. `/lua/options/options.lua` calls the global from the
+ * `invert_middle_mouse_button` option's `set` handler, which runs at startup,
+ * so without this registration every options pass died on "access to
+ * nonexistent global variable".
+ */
+moho::CScrLuaInitForm* moho::func_SetInvertMidMouseButton_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetInvertMidMouseButton",
+    &moho::cfunc_SetInvertMidMouseButton,
+    nullptr,
+    "<global>",
+    kSetInvertMidMouseButtonHelpText
+  );
+  return &binder;
 }
 
 /**
@@ -29828,6 +29815,7 @@ namespace
       (void)::moho::func_GetMouseWorldPosUser_LuaFuncDef();
       (void)::moho::func_GetMouseScreenPos_LuaFuncDef();
       (void)::moho::func_SetFocusArmyUser_LuaFuncDef();
+      (void)::moho::func_SetInvertMidMouseButton_LuaFuncDef();
       (void)::moho::func_GetFocusArmyUser_LuaFuncDef();
       (void)::moho::func_IsObserver_LuaFuncDef();
       (void)::moho::func_GetGameTime_LuaFuncDef();
