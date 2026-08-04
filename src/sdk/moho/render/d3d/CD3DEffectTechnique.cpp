@@ -376,6 +376,29 @@ namespace moho
       return destination;
     }
 
+    /**
+     * OPEN BUG - this test never answers false.
+     *
+     * Technique's constructor placement-constructs all three lanes up front
+     * (which is faithful: FUN_0042BE40 runs an eh vector constructor iterator
+     * over 3 x 0x38), and Implementation's constructor sets mName's capacity
+     * to 15 (FUN_0042BB80). So every lane reports "constructed" before any
+     * fidelity has been defined, the registration loop in ReloadEffectFile
+     * rejects the first definition of every technique as a redundant
+     * fidelity, and the technique tree never gets a usable implementation
+     * name. CD3DEffect::SetTechnique then falls through to its
+     * invalid-fidelity path and hands the abstract technique name straight to
+     * D3DX, which does not know it - GetTechniqueByName returns null and
+     * EffectD3D9::SetTechnique throws. That is the "invalid effect technique
+     * requested: TAlphaBlendLinearSampleNoDepth" crash, with 371 of these
+     * warnings logged ahead of it.
+     *
+     * What has not been pinned yet is which word the binary actually tests.
+     * FUN_0042C650 checks `v50[17 + 14k]` with lane k based at `v50 + 11 +
+     * 14k`, i.e. lane+0x18 - but mName sits at lane+0x04 and is 0x18 bytes
+     * long, so that word is the member *after* the name, not its capacity.
+     * Resolve that before changing this test.
+     */
     [[nodiscard]] bool HasConstructedLaneName(const Implementation& lane) noexcept
     {
       return lane.mName.myRes != 0U;
