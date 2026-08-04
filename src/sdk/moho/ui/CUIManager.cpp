@@ -434,7 +434,7 @@ void moho::CUIManager::RenderFrames(const int head, CD3DPrimBatcher* const primB
   CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
 
   if (IsValidFrameIndex(*this, head) && mFrames[static_cast<std::size_t>(head)]) {
-    mFrames[static_cast<std::size_t>(head)]->DoRender(primBatcher, 1);
+    mFrames[static_cast<std::size_t>(head)]->RenderChildControls(primBatcher, 1);
   }
 
   primBatcher->Flush();
@@ -454,7 +454,7 @@ void moho::CUIManager::DrawUI(const int head, CD3DPrimBatcher* const primBatcher
   CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
 
   if (IsValidFrameIndex(*this, head) && mFrames[static_cast<std::size_t>(head)]) {
-    mFrames[static_cast<std::size_t>(head)]->DoRender(primBatcher, 4);
+    mFrames[static_cast<std::size_t>(head)]->RenderChildControls(primBatcher, 4);
   }
 
   primBatcher->Flush();
@@ -474,7 +474,7 @@ void moho::CUIManager::DrawHead(const int head, CD3DPrimBatcher* const primBatch
   CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
 
   if (IsValidFrameIndex(*this, head) && mFrames[static_cast<std::size_t>(head)]) {
-    mFrames[static_cast<std::size_t>(head)]->DoRender(primBatcher, 8);
+    mFrames[static_cast<std::size_t>(head)]->RenderChildControls(primBatcher, 8);
   }
 
   primBatcher->Flush();
