@@ -236,7 +236,10 @@ namespace gpg::gal
 
         Device* const device = sDeviceD3D;
         sDeviceD3D = nullptr;
-        device->purecall0();
+        // Slot 0. MSVC puts the scalar deleting destructor there, so this is
+        // what actually tears the backend down; it used to dispatch a
+        // do-nothing purecall stub, so the device was never destroyed.
+        device->DestroyBackendObject();
     }
 
     /**
