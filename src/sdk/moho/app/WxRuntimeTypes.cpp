@@ -63916,8 +63916,6 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     uiManager->RenderFrames(runtime->mHead, runtime->mDebugCanvas.mPrimBatcher);
   }
 
-  UpdateRenderViewportCoordinates();
-
   // Re-center border mesh stances over the active terrain every frame.
   struct WRenViewportMapImagerAccessView
   {
@@ -63931,11 +63929,20 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   auto* const mapImagerView = reinterpret_cast<WRenViewportMapImagerAccessView*>(this);
   mapImagerView->mMapImager.UpdateMeshStances();
 
-  const WRenViewportWorldViewParamRuntime* const begin = runtime->mWorldViews.mFirst;
-  const WRenViewportWorldViewParamRuntime* const end = runtime->mWorldViews.mLast;
-  if (begin == nullptr || end == nullptr || begin == end) {
-    return;
-  }
+  // An empty world-view list skips only the per-view loop - it is not a return.
+  // The binary tests the list at 0x007F9253 (`cmp ecx, [ebx+8]` / `jz
+  // loc_7F9779`) and loc_7F9779 lands *inside* the shared tail, ahead of
+  // UpdateRenderViewportCoordinates. Of the 61 jumps in this function exactly
+  // one leaves before the tail: `ren_RenderNothing` at 0x007F9147, and that one
+  // is taken before the scene is ever opened. Returning here instead would
+  // strand the scene BeginScene opened above, and the Present that
+  // CD3DDevice::Paint issues at the head of the next frame would fail with
+  // D3DERR_INVALIDCALL.
+  const WRenViewportWorldViewParamRuntime* const first = runtime->mWorldViews.mFirst;
+  const WRenViewportWorldViewParamRuntime* const last = runtime->mWorldViews.mLast;
+  const bool hasWorldViews = (first != nullptr) && (last != nullptr) && (first != last);
+  const WRenViewportWorldViewParamRuntime* const begin = hasWorldViews ? first : nullptr;
+  const WRenViewportWorldViewParamRuntime* const end = hasWorldViews ? last : nullptr;
 
   for (const WRenViewportWorldViewParamRuntime* worldView = begin; worldView != end; ++worldView) {
     if (worldView->head != head || worldView->view == nullptr) {
@@ -63999,6 +64006,12 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     runtime->mCam = nullptr;
   }
 
+  // Shared tail, reached from the per-view loop, from the empty-list jump
+  // (loc_7F9779) and from the ren_Oblivion jump (loc_7F979E) alike. The binary
+  // has exactly one call to this at 0x007F97A4, after the loop rather than
+  // before it.
+  UpdateRenderViewportCoordinates();
+
   // Bloom post-process pass. Binary (WRenViewport::Render @0x007F90D0, the
   // DoBloom call at 0x007F983A) gates it on `!ren_Oblivion && ren_Bloom &&
   // !ren_ShowNormals` and invokes it on the active head's bloom renderer:
@@ -64019,6 +64032,18 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // REN_RenderViewportUI (the SDK header cannot declare the private member in
   // this pass) and is invoked here by name exactly where the binary calls it.
   moho::REN_RenderViewportUI(this, worldViewInfoVector);
+
+  // Close the scene opened before the thumbnail pass. The binary dispatches
+  // this through CD3DDevice vtable slot 34 (+0x88) right after RenderUI and
+  // before the frame dump:
+  //   0x007F984A  mov ecx, [esp+104h+var_E0]   ; the same device local
+  //   0x007F984E  mov edx, [ecx]
+  //   0x007F9850  mov eax, [edx+88h]           ; CD3DDevice::EndScene
+  //   0x007F9856  call eax
+  // Without it the device keeps an open scene across frames and the Present
+  // that CD3DDevice::Paint issues at the head of the next paint fails with
+  // D3DERR_INVALIDCALL - Present is illegal between BeginScene and EndScene.
+  device->EndScene();
 
   // Conditionally dump the just-rendered frame to a numbered screenshot file.
   // In the binary this is the tail call of WRenViewport::Render @0x007F90D0
