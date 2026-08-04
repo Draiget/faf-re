@@ -2132,6 +2132,14 @@ namespace moho
   int cfunc_SetInvertMidMouseButton(lua_State* luaContext);
 
   /**
+   * What it does:
+   * Publishes the global Lua binder definition for `SetInvertMidMouseButton`.
+   * The shipped build carries this binding in its `.exxt` patch section, so
+   * only the bound worker (0x0128B2F9) has an address of its own.
+   */
+  CScrLuaInitForm* func_SetInvertMidMouseButton_LuaFuncDef();
+
+  /**
    * Address: 0x00758F90 (FUN_00758F90, cfunc_RandomSim)
    *
    * lua_State *

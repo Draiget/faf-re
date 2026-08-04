@@ -320,6 +320,19 @@ namespace moho
    */
   extern bool ui_DisableCursorFixing;
   /**
+   * What it does:
+   * Selects the sign the middle-mouse scrub accumulation is applied with,
+   * driven by the `SetInvertMidMouseButton` Lua global.
+   *
+   * The shipped build implements this by rewriting two instructions in
+   * `func_ProcessMouseScrubbing` (0x0086DFF0) in place - `add
+   * mCurMouseScrub.x, eax` at 0x0086E01F and `add mCurMouseScrub.y, ecx` at
+   * 0x0086E027 become `sub`. Self-patching absolute addresses of the original
+   * image has no meaning in recovered source, so the same choice is carried as
+   * a flag the scrub accumulation reads.
+   */
+  void UI_SetInvertMidMouseScrub(bool invert) noexcept;
+  /**
    * Address: 0x00F57A90 (?ui_SelectTolerance@Moho@@3MA)
    *
    * World-view unit pick tolerance (pixels); seeded to 4.0, overridden from

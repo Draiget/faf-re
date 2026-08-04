@@ -2908,6 +2908,7 @@ namespace
   std::uint8_t sMouseIsScrubbing = 0;
   POINT sMouseMoveStart{};
   POINT sMouseScrubDelta{};
+  bool sInvertMidMouseScrub = false;
   POINT sMouseScrubAnchor{};
 
   /**
@@ -9504,13 +9505,22 @@ static IMauiDragger* func_GetCurrentDragger2()
 
   POINT cursorPoint{};
   ::GetCursorPos(&cursorPoint);
-  sMouseScrubDelta.x += cursorPoint.x - sMouseScrubAnchor.x;
-  sMouseScrubDelta.y += cursorPoint.y - sMouseScrubAnchor.y;
+  // The shipped build flips these two accumulations from `add` to `sub` by
+  // rewriting the instructions at 0x0086E01F / 0x0086E027; carry that choice
+  // as a sign instead. See UI_SetInvertMidMouseScrub.
+  const LONG scrubSign = sInvertMidMouseScrub ? -1 : 1;
+  sMouseScrubDelta.x += scrubSign * (cursorPoint.x - sMouseScrubAnchor.x);
+  sMouseScrubDelta.y += scrubSign * (cursorPoint.y - sMouseScrubAnchor.y);
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
 
   auto* const cursor = moho::g_UIManager->GetCursor();
   auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
   (void)SetCursorShowingAndMarkDirty(cursorView, false);
+}
+
+void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
+{
+  sInvertMidMouseScrub = invert;
 }
 
 /**
