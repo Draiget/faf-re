@@ -37,6 +37,7 @@
 #include "moho/app/WxAppRuntime.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/app/WinApp.h"
+#include "moho/math/MathReflection.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/sim/CWldSession.h"
@@ -900,6 +901,11 @@ bool CScApp::Init()
   initialized = 0;
   isMinimized = 0;
 
+  // First statement in the binary. Note the sense: the argument is the
+  // *presence* of "/sse2", so a default launch passes false and the SSE2 lane
+  // starts disabled.
+  (void)RuntimeSetSse2Mode(moho::CFG_GetArgOption("/sse2", 0, nullptr) ? 1 : 0);
+
   if (moho::CFG_GetArgOption("/splash", 0, nullptr)) {
     const msvc8::string splashImagePath = BuildSplashImagePath();
     moho::WINX_InitSplash(splashImagePath.c_str());
@@ -930,6 +936,27 @@ bool CScApp::Init()
   moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
 
   moho::USER_EnsureDocumentDirectories();
+
+  msvc8::vector<msvc8::string> profileArgs;
+  if (moho::CFG_GetArgOption("/profile", 1, &profileArgs) && !profileArgs.empty()) {
+    moho::USER_SetCurrentProfile(profileArgs[0]);
+  }
+
+  // The binary calls this and discards the result, then guards a single-
+  // instance check on it: CreateMutexA("SupComMutex") and, on
+  // ERROR_ALREADY_EXISTS, an "already running" message box and a false return.
+  // FAF patches that out - at 0x008CF0D2 the `jnz` past the check is an
+  // unconditional `jmp` (E9), so the shipped binary always skips it and
+  // multiple instances are allowed. Kept as a plain call to match, with no
+  // mutex: reinstating one would change shipped behaviour.
+  [[maybe_unused]] const bool debugFacilitiesEnabled = moho::USER_DebugFacilitiesEnabled();
+
+  // "SCMain AppInit 5". Enumerates /fonts/*.ttf and registers each with
+  // AddFontMemResourceEx. Dropping this was why the recovered engine logged
+  // zero "adding font file" lines where the shipped binary logs 14 - no
+  // registered font faces means no UI text can render.
+  moho::REN_Init();
+
   moho::UI_Init();
   if (!CreateDevice()) {
     return false;
@@ -953,6 +980,23 @@ bool CScApp::Init()
       PublishWindowedPresentationBounds(reinterpret_cast<HWND>(primaryHead.mHandle));
     } else if (!primaryHead.mWindowed && primaryHead.mHandle != nullptr && moho::USER_DebugFacilitiesEnabled()) {
       (void)AppendLuaDebuggerSystemMenu(reinterpret_cast<HWND>(primaryHead.mHandle));
+    }
+  }
+
+  // The binary applies the option set here, after the heads are up - not at
+  // the tail of CreateDevice, where this tree used to call it. CreateDevice
+  // (0x008D0370) ends at func_SetupBasicMovieManager and never calls this.
+  moho::OPTIONS_Apply();
+
+  // Single windowed head only: optionally pin the cursor to the client area.
+  if (context->GetHeadCount() == 1 && context->GetHead(0).mWindowed) {
+    if (moho::OPTIONS_GetInt("lock_fullscreen_cursor_to_window") == 1) {
+      const auto frameHandle =
+        reinterpret_cast<HWND>(static_cast<std::uintptr_t>(supcomFrame->GetHandle()));
+      RECT windowRect{};
+      if (::GetWindowRect(frameHandle, &windowRect)) {
+        ::ClipCursor(&windowRect);
+      }
     }
   }
 
@@ -1274,7 +1318,6 @@ bool CScApp::CreateDevice()
   (void)gpg::gal::Device::GetInstance();
   ConfigureStartupGraphicsOptionGroups(secondarySetupMode);
   moho::SetupBasicMovieManager();
-  moho::OPTIONS_Apply();
 
   gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
   (void)device->GetDeviceContext();

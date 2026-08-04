@@ -892,3 +892,15 @@ namespace moho
   static_assert(offsetof(VAxes3, vY) == 0x0C, "VAxes3::vY offset must be 0x0C");
   static_assert(offsetof(VAxes3, vZ) == 0x18, "VAxes3::vZ offset must be 0x18");
 } // namespace moho
+
+/**
+ * Address: 0x00A8ECD3 (FUN_00A8ECD3, func_SetSSE2)
+ *
+ * What it does:
+ * Enables/disables the SSE2 runtime lane by masking with the startup
+ * compatibility flag, then publishes and returns the resulting mode value.
+ * `CScApp::Init` calls this first thing with the result of
+ * `CFG_GetArgOption("/sse2")`, so the default launch - no `/sse2` on the
+ * command line - deliberately turns the SSE2 lane off.
+ */
+extern "C" int __cdecl RuntimeSetSse2Mode(int enableSse2);
