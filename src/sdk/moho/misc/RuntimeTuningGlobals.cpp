@@ -27,6 +27,33 @@ namespace moho
   bool ren_ShadowBlur = true;
   int ren_ShadowSize = 1024;
 
+  // Render/UI/editor toggles that were declared extern all over the tree but
+  // never defined anywhere. The link runs with /FORCE, so each one resolved to
+  // the image base instead of failing - and the first byte there is 'M' from
+  // the MZ header, so every one of these bools read back as true. That is how
+  // the frame-time bar HUD came to draw during startup and take an access
+  // violation in CD3DPrimBatcher::SetTexture.
+  //
+  // Every value below is read straight out of ForgedAlliance.exe at the address
+  // given. Addresses in the zero-fill tail of .data carry no bytes in the image
+  // and therefore start at zero.
+  bool ren_Ui = true;                     // 0x00F57DE7 = 0x01
+  bool ren_Decals = true;                 // 0x00F57DDD = 0x01
+  bool ren_glowingDecals = true;          // 0x00F57DE1 = 0x01
+  bool ren_Bloom = true;                  // 0x00F57E51 = 0x01
+  bool ed_EnableHook = true;              // 0x00F57E55 = 0x01
+  bool ren_Oblivion = false;              // 0x010A6417, zero-fill
+  bool ren_ShowNormals = false;           // 0x010A643C, zero-fill
+  bool ren_DecalOverDraw = false;         // 0x010A6440, zero-fill
+  bool ren_ShowFrameTimes = false;        // 0x010A6430, zero-fill
+  bool ren_ShowNetworkStats = false;      // 0x010A6431, zero-fill
+  bool ren_ShowBandwidthUsage = false;    // 0x010A6432, zero-fill
+  bool UI_ShowControlUnderMouse = false;  // 0x010A6423, zero-fill
+
+  int ren_BloomBlurCount = 2;             // 0x00F57E7C = 2
+  float ren_BandwidthDisplaySeconds = 10.0f; // 0x00F57E84 = 10.0f
+  float ren_BandwidthDisplayKernel = 1.0f;   // 0x00F57E88 = 1.0f
+
   int snd_index = 0;
 
   float cam_NearZoom = 10.0f;
