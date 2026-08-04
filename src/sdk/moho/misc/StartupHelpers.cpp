@@ -3781,7 +3781,12 @@ int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
 
   if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
     const LuaPlus::LuaObject preferenceTable = preferences->GetPreferenceTable();
-    preferenceObject = preferenceTable.Lookup(key.c_str());
+    // The preferences table lives on the preferences LuaState, so the looked-up
+    // value is bound to that state and cannot be pushed onto the caller's -
+    // PushStack rejects it on `state->l_G == m_state->m_state->l_G`, which is a
+    // check the binary has too. The binary copies across first: FUN_008C98D0
+    // calls SCR_Copy(&result, looked_up, callerState) before the push.
+    preferenceObject = SCR_Copy(preferenceTable.Lookup(key.c_str()), state);
   }
 
   if (preferenceObject.IsNil()) {
