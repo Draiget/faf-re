@@ -31,8 +31,8 @@ namespace
       float,
       const moho::GeomCamera3*,
       const moho::CWaterShaderProperties*,
-      boost::weak_ptr<gpg::gal::TextureD3D9>,
-      boost::weak_ptr<gpg::gal::TextureD3D9>
+      const boost::shared_ptr<moho::ID3DRenderTarget>&,
+      const boost::shared_ptr<moho::ID3DRenderTarget>&
     ) override
     {
       return false;

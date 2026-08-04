@@ -287,8 +287,8 @@ namespace moho
     const float tickLerp,
     const GeomCamera3* const camera,
     const CWaterShaderProperties* const shaderProperties,
-    boost::weak_ptr<gpg::gal::TextureD3D9> refractionTexture,
-    boost::weak_ptr<gpg::gal::TextureD3D9> reflectionTexture
+    const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
+    const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
   )
   {
     CD3DDevice* const device = D3D_GetDevice();
@@ -312,8 +312,8 @@ namespace moho
     BindTextureShaderVar(GetWater2NormalMap3ShaderVar(), shaderProperties->GetNormalMap(3));
     BindTextureShaderVar(GetWater2WaterRampShaderVar(), shaderProperties->GetWaterRamp());
 
-    GetWater2RefractionMapShaderVar().GetTexture(refractionTexture);
-    GetWater2ReflectionMapShaderVar().GetTexture(reflectionTexture);
+    GetWater2RefractionMapShaderVar().SetRenderTargetTexture(refractionTexture);
+    GetWater2ReflectionMapShaderVar().SetRenderTargetTexture(reflectionTexture);
     GetWater2TimeShaderVar().SetFloat(static_cast<float>(tick) + tickLerp);
 
     const WaterShaderRuntimeView& shaderState = AsWaterShaderRuntimeView(*shaderProperties);

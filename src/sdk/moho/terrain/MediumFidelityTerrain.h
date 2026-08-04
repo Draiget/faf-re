@@ -18,6 +18,8 @@ namespace gpg::gal
 
 namespace moho
 {
+  class CD3DRenderTarget;
+  class ID3DRenderTarget;
   class CWldTerrainDecal;
   class MeshRenderer;
 
@@ -96,12 +98,12 @@ namespace moho
     std::uint8_t reservedF4[0x1EC]; // +0xF4
 
     /// Retained shadow texture used when `useSecondaryShadowTexture == false`.
-    boost::shared_ptr<gpg::gal::TextureD3D9> primaryShadowTexture; // +0x2E0
+    boost::shared_ptr<CD3DRenderTarget> primaryShadowTexture; // +0x2E0
 
     std::uint8_t reserved2E8[0x08]; // +0x2E8
 
     /// Retained shadow texture used when `useSecondaryShadowTexture == true`.
-    boost::shared_ptr<gpg::gal::TextureD3D9> secondaryShadowTexture; // +0x2F0
+    boost::shared_ptr<CD3DRenderTarget> secondaryShadowTexture; // +0x2F0
   };
 
   static_assert(
@@ -198,7 +200,7 @@ namespace moho
      * normalization constants, and forwards the optional terrain-normal texture
      * weak handle into the active terrain effect.
      */
-    void LoadShaderVars(boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture);
+    void LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture);
 
     /**
      * Address: 0x00805600 (FUN_00805600, sub_805600)
@@ -270,7 +272,7 @@ namespace moho
     virtual bool DrawNormals(
       MeshRenderer* renderer,
       float lod,
-      boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture,
+      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       TerrainShadowContext* shadowContext
     );
 

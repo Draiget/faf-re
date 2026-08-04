@@ -2060,13 +2060,7 @@ namespace
 
   void BindBeamTextureShaderVar(moho::ShaderVar& shaderVar, const moho::TextureSheetHandle& textureSheet)
   {
-    moho::ID3DTextureSheet::TextureHandle textureHandle{};
-    if (textureSheet != nullptr) {
-      textureSheet->GetTexture(textureHandle);
-    }
-
-    boost::weak_ptr<gpg::gal::TextureD3D9> weakTexture = textureHandle;
-    shaderVar.GetTexture(weakTexture);
+    shaderVar.GetTexture(textureSheet);
   }
 
   void BindBeamTextureShaderVar(
@@ -2074,13 +2068,9 @@ namespace
     const moho::CParticleTexture::TextureResourceHandle& textureResource
   )
   {
-    boost::shared_ptr<gpg::gal::TextureD3D9> textureHandle{};
-    if (textureResource != nullptr) {
-      textureResource->GetTexture(textureHandle);
-    }
-
-    boost::weak_ptr<gpg::gal::TextureD3D9> weakTexture(textureHandle);
-    shaderVar.GetTexture(weakTexture);
+    // RD3DTextureResource is an ID3DTextureSheet - bind it through the sheet
+    // binder rather than resolving the texture handle by hand.
+    shaderVar.GetTexture(textureResource);
   }
 } // namespace
 

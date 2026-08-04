@@ -98,19 +98,13 @@ namespace moho
 
 #undef DEFINE_FRAME_SHADER_VAR_GETTER
 
-    // The frame texture slots are bound through the weak-texture binder
-    // (ShaderVar::GetTexture(const boost::weak_ptr<gpg::gal::TextureD3D9>&),
-    // FUN_00491280). In the binary the &mFrameTextureN handle
-    // (boost::shared_ptr<ID3DRenderTarget>) is passed directly to that binder:
-    // boost's shared_ptr and weak_ptr share the same {px, pn} two-pointer
-    // layout, and the binder only reads px + the shared-count lane. The same
-    // reinterpret bridge is used for the refraction slot in WRenViewport
-    // (moho/app/WxRuntimeTypes.cpp).
+    // The frame texture slots are bound through the render-target binder at
+    // FUN_00491280, which is what the binary calls here (0x007F6076, 0x007F6084,
+    // 0x007F6092 and 0x007F60A0 all pass a &mFrameTextureN handle). It takes the
+    // shared_ptr<ID3DRenderTarget> as-is - no cast, and nothing to lock.
     void BindFrameTexture(ShaderVar& shaderVar, const boost::shared_ptr<ID3DRenderTarget>& renderTarget)
     {
-      shaderVar.GetTexture(
-        reinterpret_cast<const boost::weak_ptr<gpg::gal::TextureD3D9>&>(renderTarget)
-      );
+      shaderVar.SetRenderTargetTexture(renderTarget);
     }
   } // namespace
 

@@ -24,6 +24,7 @@
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/WaterFactory.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
 
 namespace
 {
@@ -529,10 +530,10 @@ namespace moho
         shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
       }
 
-      const boost::shared_ptr<gpg::gal::TextureD3D9> shadowTexture =
+      const boost::shared_ptr<CD3DRenderTarget> shadowTexture =
         shadowContext->useSecondaryShadowTexture ? shadowContext->secondaryShadowTexture
                                                   : shadowContext->primaryShadowTexture;
-      shaderVars.shadowTexture.GetTexture(boost::weak_ptr<gpg::gal::TextureD3D9>(shadowTexture));
+      shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
       SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsDisabledBlob, 4U);

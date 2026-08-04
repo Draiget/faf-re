@@ -196,8 +196,8 @@ namespace moho
     const float tickLerp,
     const GeomCamera3* const camera,
     const CWaterShaderProperties* const shaderProperties,
-    boost::weak_ptr<gpg::gal::TextureD3D9> refractionTexture,
-    boost::weak_ptr<gpg::gal::TextureD3D9> reflectionTexture
+    const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
+    const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
   )
   {
     (void)refractionTexture;

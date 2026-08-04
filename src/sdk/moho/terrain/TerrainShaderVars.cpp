@@ -106,11 +106,10 @@ namespace moho
 
   void BindTextureShaderVar(ShaderVar& shaderVar, const boost::shared_ptr<ID3DTextureSheet>& textureSheet)
   {
-    ID3DTextureSheet::TextureHandle textureHandle{};
-    if (textureSheet != nullptr) {
-      textureSheet->GetTexture(textureHandle);
-    }
-    shaderVar.GetTexture(boost::weak_ptr<gpg::gal::TextureD3D9>(textureHandle));
+    // The sheet binder resolves the texture off the sheet's own vtable and
+    // pushes it into the effect variable, which is exactly what this used to do
+    // by hand before re-wrapping the handle.
+    shaderVar.GetTexture(textureSheet);
   }
 
   void BindTextureShaderVar(

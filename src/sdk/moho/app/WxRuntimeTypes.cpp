@@ -64281,23 +64281,15 @@ void moho::WRenViewport::RenderRefractingEffects()
   device->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
   device->SetColorWriteState(true, false);
 
-  // The refraction-background slot is stored alongside the primary writer-lock
-  // array. In the binary the decompiler observes a direct {px, pn.pi_} copy
-  // from this slot into a boost::weak_ptr<gpg::gal::TextureD3D9> (the 4th
-  // parameter consumed by CWorldParticles::RenderRefractingEffects); this is
-  // safe because boost's shared_ptr and weak_ptr share identical two-pointer
-  // layout and the callee uses the shared-count lane. We reinterpret the
-  // slot to match that contract exactly.
-  using WeakRefractionBackground = boost::weak_ptr<gpg::gal::TextureD3D9>;
-  const auto& refractionSlot = reinterpret_cast<const WeakRefractionBackground&>(
-    passView->mPrimaryTargetLocks[runtime->mHead]
-  );
-
+  // The refraction background is the head's primary render target, passed
+  // straight through. CWorldParticles::RenderRefractingEffects binds it with
+  // the render-target binder at 0x00491280, so no cast is involved - the
+  // decompiler's {px, pn.pi_} copy is just a shared_ptr copy.
   moho::sWorldParticles.RenderRefractingEffects(
     runtime->mCam,
     moho::REN_GetGameTick(),
     moho::REN_GetSimDeltaSeconds(),
-    refractionSlot
+    passView->mPrimaryTargetLocks[runtime->mHead]
   );
 }
 
