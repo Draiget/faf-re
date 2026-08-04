@@ -255,9 +255,12 @@ bool gpg::STR_GetToken(
     c = *++find;
   }
   if (c) {
+    // Run to the end of the token: advance while the character is NOT a
+    // delimiter, and stop on the first one that is. The binary breaks out of
+    // this loop on `strchr(str, c)` succeeding, so the test is negated here.
     const char* start = find;
     c = *++find;
-    while (c && strchr(str, c) != nullptr) {
+    while (c && strchr(str, c) == nullptr) {
       c = *++find;
     }
     dest = msvc8::string{start, find};
