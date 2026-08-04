@@ -1833,7 +1833,7 @@ extern "C"
   void __cdecl MWSFSVR_MainThrdProc();
   void __cdecl MWSFSVR_IdleThrdProc();
   void MWSFSVR_SetMwsfdSvrFlg(std::int32_t enabled);
-  void mwsflib_LscErrFunc(std::int32_t callbackObject, const char* message);
+  std::int32_t mwsflib_LscErrFunc(std::int32_t callbackObject, const char* message);
   void mwsflib_InitLibWork(moho::MwsfdInitPrm* initParams);
   std::int32_t mwsflib_SetDefCond(const float* startupConditionValue);
   void MWSFLIB_SetSeekFlg(std::int32_t enabled);

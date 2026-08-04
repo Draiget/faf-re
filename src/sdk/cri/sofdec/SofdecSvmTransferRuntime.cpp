@@ -3,6 +3,40 @@
 #endif
 
   /**
+   * Address: 0x00ACCCC0 (FUN_00ACCCC0, _MWSFSVM_Error)
+   *
+   * IDA signature:
+   * void __cdecl MWSFSVM_Error(const char *fmt, ...);
+   *
+   * What it does:
+   * Formats one middleware diagnostic into the shared 0x100-byte buffer at
+   * 0x00FB9820 and hands it to the registered error callback. Every Sofdec
+   * diagnostic in the tree routes through here.
+   *
+   * Two deliberate departures from the disassembly, both documented rather
+   * than silent:
+   *   - the binary uses `vsprintf` into a fixed 0x100 buffer with no bound;
+   *     this uses the counted form against the same buffer, which differs only
+   *     where the original would have overrun it.
+   *   - the binary's body is `void` and leaves EAX holding whatever
+   *     `mwl_callErrCb` left. Several recovered callers in this subsystem are
+   *     spelled `return MWSFSVM_Error(...)` from int-returning reporters, so a
+   *     defined 0 is returned rather than propagating an undefined register.
+   */
+  std::int32_t MWSFSVM_Error(const char* const format, ...)
+  {
+    std::memset(gMwsfsvmErrorMessage, 0, sizeof(gMwsfsvmErrorMessage));
+
+    std::va_list args;
+    va_start(args, format);
+    (void)std::vsnprintf(gMwsfsvmErrorMessage, sizeof(gMwsfsvmErrorMessage), format, args);
+    va_end(args);
+
+    mwl_callErrCb(gMwsfsvmErrorMessage);
+    return 0;
+  }
+
+  /**
    * Address: 0x00ACCAE0 (FUN_00ACCAE0, _MWSFSVM_EntryVint)
    *
    * What it does:
