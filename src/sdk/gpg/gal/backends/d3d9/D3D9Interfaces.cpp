@@ -254,6 +254,7 @@ namespace gpg::gal
         using surface_get_desc_fn = HRESULT(__stdcall*)(void*, void*);
         using surface_lock_rect_fn = HRESULT(__stdcall*)(void*, void*, const RECT*, unsigned int);
         using surface_unlock_rect_fn = HRESULT(__stdcall*)(void*);
+        using surface_get_dc_fn = HRESULT(__stdcall*)(void*, void**);
         using query_issue_fn = HRESULT(__stdcall*)(void*, unsigned int);
         using query_get_data_fn = HRESULT(__stdcall*)(void*, void*, unsigned int, unsigned int);
         using texture_get_level_desc_fn = HRESULT(__stdcall*)(void*, unsigned int, void*);
@@ -1476,16 +1477,11 @@ namespace gpg::gal
             return unlockRect(surface);
         }
 
-        void* GetSurfaceLevel0FromTexture(void* const texture)
+        HRESULT InvokeSurfaceGetDC(void* const surface, void** const outDeviceContext)
         {
-            if (texture == nullptr)
-            {
-                return nullptr;
-            }
-
-            void* surface = nullptr;
-            static_cast<void>(InvokeGetSurfaceLevel(texture, 0U, &surface));
-            return surface;
+            auto** const vtable = *reinterpret_cast<void***>(surface);
+            auto* const getDC = reinterpret_cast<surface_get_dc_fn>(vtable[15]);
+            return getDC(surface, outDeviceContext);
         }
 
         unsigned int GetD3DXBufferSize(void* const d3dxBuffer)
@@ -5036,8 +5032,8 @@ namespace gpg::gal
          */
         void ResetRenderTargetD3D9State(RenderTargetD3D9* const renderTarget) noexcept
         {
-            ReleaseComLike(renderTarget->renderTexture_);
-            ReleaseComLike(renderTarget->renderSurface_);
+            ReleaseComLike(renderTarget->surface_);
+            ReleaseComLike(renderTarget->texture_);
 
             const RenderTargetContext resetContext{};
             renderTarget->context_.width_ = resetContext.width_;
@@ -5060,7 +5056,7 @@ namespace gpg::gal
         ) noexcept
         {
             ResetRenderTargetD3D9State(renderTarget);
-            renderTarget->renderTexture_ = surface;
+            renderTarget->surface_ = surface;
 
             D3DSurfaceDescRuntime surfaceDesc{};
             const int getDescResult = static_cast<int>(InvokeSurfaceGetDesc(surface, &surfaceDesc));
@@ -6249,12 +6245,10 @@ namespace gpg::gal
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1462, createDepthResult);
             }
 
-            RenderTargetContext renderTargetContext{};
-            renderTargetContext.width_ = surfaceDesc.width;
-            renderTargetContext.height_ = surfaceDesc.height;
-            renderTargetContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
-            RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(&renderTargetContext, nullptr);
-            renderTarget->renderSurface_ = backBuffer.release();
+            // The head owns the back buffer directly: no render-target context
+            // is built here, and the surface-wrap ctor takes the dimensions
+            // back off the surface descriptor itself.
+            RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(backBuffer.release());
             (void)AssignSharedRenderTargetFromRaw(&outputHeads[headIndex].renderTarget, renderTarget);
 
             const DepthStencilTargetContext depthStencilContext(surfaceDesc.width, surfaceDesc.height, 3U, false);
@@ -7340,7 +7334,7 @@ namespace gpg::gal
             ThrowGalError("DeviceD3D9.cpp", 646, "Missing dest   texture");
         }
 
-        void* const sourceSurface = (*sourceTexture)->GetRenderSurface();
+        void* const sourceSurface = (*sourceTexture)->GetSurface();
 
         ComObjectScope destinationSurface{};
         const HRESULT getSurfaceResult =
@@ -7387,9 +7381,9 @@ namespace gpg::gal
 
         const HRESULT stretchResult = InvokeNativeStretchRect(
             this,
-            (*sourceTexture)->GetRenderSurface(),
+            (*sourceTexture)->GetSurface(),
             reinterpret_cast<const RECT*>(sourceRect),
-            (*destinationTexture)->GetRenderSurface(),
+            (*destinationTexture)->GetSurface(),
             reinterpret_cast<const RECT*>(destinationRect),
             kD3DTexFilterLinear
         );
@@ -7513,7 +7507,7 @@ namespace gpg::gal
             ThrowGalError("DeviceD3D9.cpp", 715, "Missing file");
         }
 
-        if (((*renderTarget)->GetRenderSurface()) == nullptr)
+        if (((*renderTarget)->GetSurface()) == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 720, "Unable to get back buffer surface");
         }
@@ -7521,7 +7515,7 @@ namespace gpg::gal
         const HRESULT saveResult = InvokeD3DXSaveSurfaceToFileA(
             GetStringDataRaw(filePath),
             MapImageFormatTokenToD3DX(fileFormatToken),
-            (*renderTarget)->GetRenderSurface()
+            (*renderTarget)->GetSurface()
         );
         if (saveResult < 0)
         {
@@ -7948,7 +7942,7 @@ namespace gpg::gal
 
         if (runtimeContext.renderTarget.get() != nullptr)
         {
-            void* const targetSurface = runtimeContext.renderTarget->GetRenderSurface();
+            void* const targetSurface = runtimeContext.renderTarget->GetSurface();
             if (currentRenderTarget.get() != targetSurface)
             {
                 const HRESULT setResult = InvokeNativeSetRenderTarget(this, 0U, targetSurface);
@@ -9044,7 +9038,7 @@ namespace gpg::gal
     void EffectVariableD3D9::Func3(boost::shared_ptr<RenderTargetD3D9> renderTarget)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 189);
-        void* const textureHandle = (renderTarget.get() != nullptr) ? renderTarget->GetRenderSurface() : nullptr;
+        void* const textureHandle = (renderTarget.get() != nullptr) ? renderTarget->GetTexture() : nullptr;
 
         const HRESULT result = InvokeEffectSetTexture(effect->GetDxEffect(), handle_, textureHandle);
         if (result < 0)
@@ -9402,8 +9396,8 @@ namespace gpg::gal
      */
     RenderTargetD3D9::RenderTargetD3D9()
         : context_()
-        , renderTexture_(nullptr)
-        , renderSurface_(nullptr)
+        , surface_(nullptr)
+        , texture_(nullptr)
     {}
 
     /**
@@ -9418,8 +9412,8 @@ namespace gpg::gal
         void* const renderTexture
     )
         : context_()
-        , renderTexture_(nullptr)
-        , renderSurface_(nullptr)
+        , surface_(nullptr)
+        , texture_(nullptr)
     {
         static_cast<void>(SetRenderTexture(context, renderTexture));
     }
@@ -9431,15 +9425,15 @@ namespace gpg::gal
      * What it does:
      * Surface-wrap overload used by `DeviceD3D9::CreateHeads` to wrap a
      * pre-existing `IDirect3DSurface9*` (typically a back-buffer) without an
-     * owning `RenderTargetContext`. Resets lane state, caches the surface as
-     * the retained render-target payload at `renderTexture_` (+0x14), then
-     * queries surface width/height from the D3D9 descriptor and stores them
-     * in the embedded context lane.
+     * owning `RenderTargetContext`. Resets lane state, caches the back buffer
+     * in `surface_` (+0x14) and leaves `texture_` null, then queries surface
+     * width/height from the D3D9 descriptor and stores them in the embedded
+     * context lane.
      */
     RenderTargetD3D9::RenderTargetD3D9(void* const backBufferSurface)
         : context_()
-        , renderTexture_(nullptr)
-        , renderSurface_(nullptr)
+        , surface_(nullptr)
+        , texture_(nullptr)
     {
         static_cast<void>(InitializeRenderTargetD3D9FromSurface(this, backBufferSurface));
     }
@@ -9448,8 +9442,10 @@ namespace gpg::gal
      * Address: 0x008F5500 (FUN_008F5500)
      *
      * What it does:
-     * Resets prior render-target state, stores one context + texture payload,
-     * then acquires and caches level-0 render surface state.
+     * Resets prior render-target state, stores the caller's texture in the
+     * `texture_` lane, then derives and caches its level-0 surface. The
+     * descriptor query runs on the derived surface and overwrites the context
+     * dimensions unconditionally - the binary ignores its `HRESULT`.
      */
     void* RenderTargetD3D9::SetRenderTexture(
         const RenderTargetContext* const context,
@@ -9461,29 +9457,26 @@ namespace gpg::gal
         context_.width_ = context->width_;
         context_.height_ = context->height_;
         context_.format_ = context->format_;
-        renderTexture_ = renderTexture;
+        texture_ = renderTexture;
 
-        if (renderTexture_ == nullptr)
+        if (texture_ == nullptr)
         {
-            renderSurface_ = nullptr;
+            surface_ = nullptr;
             return nullptr;
         }
 
-        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(renderTexture_, 0U, &renderSurface_);
+        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(texture_, 0U, &surface_);
         if (getSurfaceResult < 0)
         {
             ThrowGalErrorFromHresult("RenderTargetD3D9.cpp", 89, getSurfaceResult);
         }
 
         D3DSurfaceDescRuntime surfaceDesc{};
-        const HRESULT getDescResult = InvokeSurfaceGetDesc(renderSurface_, &surfaceDesc);
-        if (getDescResult >= 0)
-        {
-            context_.width_ = surfaceDesc.width;
-            context_.height_ = surfaceDesc.height;
-        }
+        static_cast<void>(InvokeSurfaceGetDesc(surface_, &surfaceDesc));
+        context_.width_ = surfaceDesc.width;
+        context_.height_ = surfaceDesc.height;
 
-        return renderSurface_;
+        return surface_;
     }
 
     /**
@@ -9513,36 +9506,37 @@ namespace gpg::gal
      * Mangled: ?GetSurface@D3DSurface@Moho@@QAEPAUIDirect3DSurface9@@XZ
      *
      * What it does:
-     * Returns the retained render-target texture/surface payload lane at
-     * `this+0x14`. Callers in `DeviceD3D9::StretchRect`,
-     * `CreateRenderTarget`, `Func4`, and `ClearTarget` use this lane as an
-     * `IDirect3DSurface9*` handle.
+     * Returns the retained `IDirect3DSurface9*` lane at `this+0x14`.
      */
     void* RenderTargetD3D9::GetSurface()
     {
-        return renderTexture_;
+        return surface_;
     }
 
     /**
      * Address: 0x008F52E0 (FUN_008F52E0)
      *
      * What it does:
-     * Returns the retained render-target surface pointer lane at `this+0x18`.
+     * Returns the retained `IDirect3DBaseTexture9*` lane at `this+0x18` for
+     * `EffectVariableD3D9::Func3` to bind through `ID3DXEffect::SetTexture`.
      */
-    void* RenderTargetD3D9::GetRenderSurface()
+    void* RenderTargetD3D9::GetTexture()
     {
-        return renderSurface_;
+        return texture_;
     }
 
     /**
      * Address: 0x008F5300 (FUN_008F5300)
      *
      * What it does:
-     * Returns surface level 0 from the retained render-target texture handle.
+     * Returns a GDI device context for the retained render surface via
+     * `IDirect3DSurface9::GetDC` (vtable slot 15).
      */
-    void* RenderTargetD3D9::GetSurfaceLevel0()
+    void* RenderTargetD3D9::GetSurfaceDC()
     {
-        return GetSurfaceLevel0FromTexture(renderTexture_);
+        void* deviceContext = nullptr;
+        static_cast<void>(InvokeSurfaceGetDC(surface_, &deviceContext));
+        return deviceContext;
     }
 
     /**
