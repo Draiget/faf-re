@@ -3891,6 +3891,10 @@
   std::int32_t gMwsfsvmIdleSlotId = 0;
   std::int32_t gMwsfsvmMainSlotId = 0;
 
+  /// 0x00FB9820 (`logfunc_MWSFSVM_Error`) - the shared scratch every
+  /// `MWSFSVM_Error` message is formatted into before it reaches the callback.
+  char gMwsfsvmErrorMessage[0x100]{};
+
   using AdxbExpandSamplePairCallback =
     void(__cdecl*)(moho::AdxBitstreamDecoderState* decoder, std::int32_t sampleValue, const std::int16_t* leftSample, const std::int16_t* rightSample);
   using AdxbUpdateSampleRateCallback =

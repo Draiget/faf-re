@@ -1761,10 +1761,13 @@
    * What it does:
    * Forwards one LSC runtime error message into the shared MWSFSVM error lane.
    */
-  void mwsflib_LscErrFunc(const std::int32_t callbackObject, const char* const message)
+  std::int32_t mwsflib_LscErrFunc(const std::int32_t callbackObject, const char* const message)
   {
     (void)callbackObject;
-    (void)MWSFSVM_Error(message);
+    // 0x00AC9285 calls straight into MWSFSVM_Error and returns with EAX
+    // untouched, so the callback forwards that result - which is also what the
+    // LscErrorCallback slot it is installed into expects.
+    return MWSFSVM_Error(message);
   }
 
   /**
@@ -3633,7 +3636,7 @@
    * What it does:
    * Registers or clears the LSC error callback lane and callback object.
    */
-  [[maybe_unused]] std::int32_t LSC_EntryErrFunc(const LscErrorCallback callback, const std::int32_t callbackObject)
+  std::int32_t LSC_EntryErrFunc(const LscErrorCallback callback, const std::int32_t callbackObject)
   {
     if (callback != nullptr) {
       gLscErrorCallback = callback;
@@ -3693,7 +3696,7 @@
    * Initializes shared LSC runtime state on first entry and increments init
    * reference count under SJ critical-section lock.
    */
-  [[maybe_unused]] void LSC_Init()
+  void LSC_Init()
   {
     SJCRS_Lock();
     if (gLscInitCount == 0) {

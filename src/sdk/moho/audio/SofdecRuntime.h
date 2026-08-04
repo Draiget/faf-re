@@ -2275,9 +2275,11 @@ std::int32_t mwPlySfdFinish();
  * Address: 0x00AC9280 (_mwsflib_LscErrFunc)
  *
  * What it does:
- * Bridges one LSC error callback message into `MWSFSVM_Error`.
+ * Bridges one LSC error callback message into `MWSFSVM_Error`. Returns that
+ * call's result: 0x00AC9285 tail-calls it and returns with EAX untouched,
+ * which is also what the `LscErrorCallback` slot it is installed into expects.
  */
-void mwsflib_LscErrFunc(std::int32_t callbackObject, const char* message);
+std::int32_t mwsflib_LscErrFunc(std::int32_t callbackObject, const char* message);
 
 /**
  * Address: 0x00AC92D0 (_mwsflib_InitLibWork)

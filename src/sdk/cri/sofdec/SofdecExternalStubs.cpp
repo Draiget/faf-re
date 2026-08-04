@@ -77,7 +77,7 @@ extern "C" {
   void* MWSFD_SetCond() { return nullptr; }
   void* MWSFD_SetReqSvrBdrHn() { return nullptr; }
   void* MWSFPLY_SetFlowLimit() { return nullptr; }
-  void* MWSFSVM_Error() { return nullptr; }
+  // MWSFSVM_Error: real body in SofdecSvmTransferRuntime.cpp.
   void* MWSFSVM_GotoIdleBorder() { return nullptr; }
   void* MWSFSVR_CheckForceSvrBdr() { return nullptr; }
   void* MWSFSVR_IdleThrdProc() { return nullptr; }
@@ -147,6 +147,14 @@ extern "C" {
   // mpvcmc_InitMcOiTa: real body in SofdecMpvRuntime.cpp.
   void* mpvhdec_ReadKernelIntraIdcPrec3() { return nullptr; }
   void* mwPlyFinishSfdFx() { return nullptr; }
+  // mwPlyInitSfdFx (0x00AC9130) is fully recovered and verified, but cannot be
+  // enabled yet: it reaches SFD_Init -> sflib_InitLibWork -> SFTRN_Init, which
+  // copies the 60-byte SFD transfer descriptor table out of
+  // mwsfd_initsfdpara.callbacks. That static (0x00D7F40C -> table at
+  // 0x00D7F3D0) is not modelled, so the pointer is null and the copy faults.
+  // Modelling it needs the 8 descriptor blocks it points at - 116 entries, of
+  // which 31 are still unrecovered (the SFAOAP and SFADXT families). Until
+  // those land, this stays a no-op stub so startup does not crash.
   void* mwPlyInitSfdFx() { return nullptr; }
   void* mwPlyIsNextFrmReady() { return nullptr; }
   void* mwPlyPause() { return nullptr; }
