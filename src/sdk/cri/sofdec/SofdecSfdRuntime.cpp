@@ -16376,6 +16376,333 @@
     return 0;
   }
 
+  // ---------------------------------------------------------------------------
+  // SFAOAP - audio-output adapter transfer handler
+  // ---------------------------------------------------------------------------
+  //
+  // One of the eight stream-type handlers the SFD transfer layer dispatches
+  // through. Every entry point is gated on condition 6 (the "adapter present"
+  // lane): when it is clear the handler reports the caller's condition result
+  // unchanged and does nothing, which is how a stream without an audio-output
+  // adapter passes straight through this lane.
+
+  struct SfdAudioOutputAdapterRuntimeView
+  {
+    std::uint8_t mUnknown00[0x2114]{};                 // +0x0000
+    std::int32_t* outputDescriptorWords = nullptr;     // +0x2114
+    std::uint8_t mUnknown2118[0x04]{};                 // +0x2118
+    std::int32_t sfbufLaneIndex = 0;                   // +0x211C (read as *(obj+8476))
+    std::uint8_t mUnknown2120[0x13DC]{};               // +0x2120
+    std::int32_t outputInlineHeader = 0;               // +0x34FC
+  };
+
+  static_assert(
+    offsetof(SfdAudioOutputAdapterRuntimeView, outputDescriptorWords) == 0x2114,
+    "SfdAudioOutputAdapterRuntimeView::outputDescriptorWords offset must be 0x2114"
+  );
+  static_assert(
+    offsetof(SfdAudioOutputAdapterRuntimeView, sfbufLaneIndex) == 0x211C,
+    "SfdAudioOutputAdapterRuntimeView::sfbufLaneIndex offset must be 0x211C"
+  );
+  static_assert(
+    offsetof(SfdAudioOutputAdapterRuntimeView, outputInlineHeader) == 0x34FC,
+    "SfdAudioOutputAdapterRuntimeView::outputInlineHeader offset must be 0x34FC"
+  );
+
+  /// Transfer-lane index this handler owns in the prepare/terminate flag sets.
+  constexpr std::int32_t kSfaoapTransferLane = 7;
+
+  /// Condition id gating every SFAOAP entry point.
+  constexpr std::int32_t kSfaoapEnabledCondition = 6;
+
+  /// Transfer-handle id SFAOAP addresses when forwarding a TRIF command.
+  constexpr std::int32_t kSfaoapTrifHandle = 3;
+
+  /// TRIF command ids for the transport verbs SFAOAP forwards.
+  constexpr std::int32_t kSfaoapTrifRequestStop = 5;
+  constexpr std::int32_t kSfaoapTrifStart = 6;
+  constexpr std::int32_t kSfaoapTrifStop = 7;
+  constexpr std::int32_t kSfaoapTrifPause = 8;
+
+  /// Error the read/write cursor lanes report: this handler owns no ring
+  /// buffer of its own, so those four entries are unsupported by design.
+  constexpr std::int32_t kSfaoapErrUnsupportedCursor = -16774655;
+
+  /**
+   * Address: 0x00ACFCF0 (FUN_00ACFCF0, _sfaoap_InitInf)
+   *
+   * IDA signature:
+   * void sfaoap_InitInf();
+   *
+   * What it does:
+   * Nothing - the body is a bare `retn`. The descriptor it is handed is left
+   * exactly as `SFAOAP_Create` bound it. Kept because the call is part of the
+   * create sequence and the symbol exists in the binary.
+   */
+  void sfaoap_InitInf(std::int32_t* const /*outputDescriptorWords*/)
+  {
+  }
+
+  /**
+   * Address: 0x00ACFC40 (FUN_00ACFC40, _sfaoap_ChkPrepFlg)
+   *
+   * What it does:
+   * Promotes the adapter's prepare flag once the underlying SFBUF lane reports
+   * prepared. Latches: once this lane's flag reads 1 the check short-circuits.
+   */
+  std::int32_t sfaoap_ChkPrepFlg(const std::int32_t workctrlAddress)
+  {
+    std::int32_t result = SFTRN_GetPrepFlg(workctrlAddress, kSfaoapTransferLane);
+    if (result != 1) {
+      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapterRuntimeView*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+      );
+      result = SFBUF_GetPrepFlg(workctrlAddress, runtimeView->sfbufLaneIndex);
+      if (result == 1) {
+        return SFTRN_SetPrepFlg(workctrlAddress, kSfaoapTransferLane, 1);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x00ACFC80 (FUN_00ACFC80, _sfaoap_ChkTermFlg)
+   *
+   * What it does:
+   * The terminate-side mirror of `sfaoap_ChkPrepFlg`.
+   */
+  std::int32_t sfaoap_ChkTermFlg(const std::int32_t workctrlAddress)
+  {
+    std::int32_t result = SFTRN_GetTermFlg(workctrlAddress, kSfaoapTransferLane);
+    if (result != 1) {
+      const auto* const runtimeView = reinterpret_cast<const SfdAudioOutputAdapterRuntimeView*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+      );
+      result = SFBUF_GetTermFlg(workctrlAddress, runtimeView->sfbufLaneIndex);
+      if (result == 1) {
+        return SFTRN_SetTermFlg(workctrlAddress, kSfaoapTransferLane, 1);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x00ACFC20 (FUN_00ACFC20, _sfaoap_OutputServer)
+   *
+   * What it does:
+   * Runs both flag promotions for one server tick and always reports success -
+   * the flag checks own their own error reporting.
+   */
+  std::int32_t sfaoap_OutputServer(const std::int32_t workctrlAddress)
+  {
+    (void)sfaoap_ChkPrepFlg(workctrlAddress);
+    (void)sfaoap_ChkTermFlg(workctrlAddress);
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACFBD0 (FUN_00ACFBD0, _SFAOAP_Init)
+   *
+   * What it does:
+   * No-op library init lane for the audio-output adapter handler.
+   */
+  std::int32_t SFAOAP_Init()
+  {
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACFBE0 (FUN_00ACFBE0, _SFAOAP_Finish)
+   *
+   * What it does:
+   * No-op library teardown lane for the audio-output adapter handler.
+   */
+  std::int32_t SFAOAP_Finish()
+  {
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACFBF0 (FUN_00ACFBF0, _SFAOAP_ExecServer)
+   *
+   * What it does:
+   * Per-tick server entry. Runs the output server only while the adapter
+   * condition is set; otherwise reports that condition result unchanged.
+   */
+  std::int32_t SFAOAP_ExecServer(const std::int32_t workctrlAddress)
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+    );
+    const std::int32_t condition = SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition);
+    if (condition != 0) {
+      return sfaoap_OutputServer(workctrlAddress);
+    }
+    return condition;
+  }
+
+  /**
+   * Address: 0x00ACFCC0 (FUN_00ACFCC0, _SFAOAP_Create)
+   *
+   * What it does:
+   * Points the adapter's descriptor lane at the object's own inline descriptor
+   * storage and runs the (empty) descriptor init. Always reports success, even
+   * when the adapter condition is clear and nothing was bound.
+   */
+  std::int32_t SFAOAP_Create(const std::int32_t workctrlAddress)
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+    );
+    if (SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition) != 0) {
+      auto* const runtimeView = reinterpret_cast<SfdAudioOutputAdapterRuntimeView*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+      );
+      runtimeView->outputDescriptorWords = &runtimeView->outputInlineHeader;
+      sfaoap_InitInf(runtimeView->outputDescriptorWords);
+    }
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACFD00 (FUN_00ACFD00, _SFAOAP_Destroy)
+   *
+   * What it does:
+   * No-op destroy lane - the descriptor lives inside the object being torn down.
+   */
+  std::int32_t SFAOAP_Destroy()
+  {
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACFD10 (FUN_00ACFD10, _SFAOAP_RequestStop)
+   *
+   * What it does:
+   * Forwards a request-stop to the adapter's TRIF lane while enabled.
+   */
+  std::int32_t SFAOAP_RequestStop(const std::int32_t workctrlAddress)
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+    );
+    const std::int32_t condition = SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition);
+    if (condition != 0) {
+      return SFTRN_CallTrtTrif(workctrlAddress, kSfaoapTrifHandle, kSfaoapTrifRequestStop, 0, 0);
+    }
+    return condition;
+  }
+
+  /**
+   * Address: 0x00ACFD40 (FUN_00ACFD40, _SFAOAP_Start)
+   *
+   * What it does:
+   * Forwards a start to the adapter's TRIF lane while enabled.
+   */
+  std::int32_t SFAOAP_Start(const std::int32_t workctrlAddress)
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+    );
+    const std::int32_t condition = SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition);
+    if (condition != 0) {
+      return SFTRN_CallTrtTrif(workctrlAddress, kSfaoapTrifHandle, kSfaoapTrifStart, 0, 0);
+    }
+    return condition;
+  }
+
+  /**
+   * Address: 0x00ACFD70 (FUN_00ACFD70, _SFAOAP_Stop)
+   *
+   * What it does:
+   * Forwards a stop to the adapter's TRIF lane while enabled.
+   */
+  std::int32_t SFAOAP_Stop(const std::int32_t workctrlAddress)
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+    );
+    const std::int32_t condition = SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition);
+    if (condition != 0) {
+      return SFTRN_CallTrtTrif(workctrlAddress, kSfaoapTrifHandle, kSfaoapTrifStop, 0, 0);
+    }
+    return condition;
+  }
+
+  /**
+   * Address: 0x00ACFDA0 (FUN_00ACFDA0, _SFAOAP_Pause)
+   *
+   * What it does:
+   * Forwards a pause/resume to the adapter's TRIF lane while enabled, passing
+   * the caller's pause state through as the command argument.
+   */
+  std::int32_t SFAOAP_Pause(const std::int32_t workctrlAddress, const std::int32_t pauseState)
+  {
+    auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(workctrlAddress))
+    );
+    const std::int32_t condition = SFSET_GetCond(workctrlSubobj, kSfaoapEnabledCondition);
+    if (condition != 0) {
+      return SFTRN_CallTrtTrif(workctrlAddress, kSfaoapTrifHandle, kSfaoapTrifPause, pauseState, 0);
+    }
+    return condition;
+  }
+
+  /**
+   * Address: 0x00ACFDD0 (FUN_00ACFDD0, _SFAOAP_GetWrite)
+   *
+   * What it does:
+   * Reports the unsupported-cursor error - this handler owns no ring buffer.
+   */
+  std::int32_t SFAOAP_GetWrite(const std::int32_t workctrlAddress)
+  {
+    return SFLIB_SetErr(workctrlAddress, kSfaoapErrUnsupportedCursor);
+  }
+
+  /**
+   * Address: 0x00ACFDF0 (FUN_00ACFDF0, _SFAOAP_AddWrite)
+   *
+   * What it does:
+   * Reports the unsupported-cursor error - this handler owns no ring buffer.
+   */
+  std::int32_t SFAOAP_AddWrite(const std::int32_t workctrlAddress)
+  {
+    return SFLIB_SetErr(workctrlAddress, kSfaoapErrUnsupportedCursor);
+  }
+
+  /**
+   * Address: 0x00ACFE10 (FUN_00ACFE10, _SFAOAP_GetRead)
+   *
+   * What it does:
+   * Reports the unsupported-cursor error - this handler owns no ring buffer.
+   */
+  std::int32_t SFAOAP_GetRead(const std::int32_t workctrlAddress)
+  {
+    return SFLIB_SetErr(workctrlAddress, kSfaoapErrUnsupportedCursor);
+  }
+
+  /**
+   * Address: 0x00ACFE30 (FUN_00ACFE30, _SFAOAP_AddRead)
+   *
+   * What it does:
+   * Reports the unsupported-cursor error - this handler owns no ring buffer.
+   */
+  std::int32_t SFAOAP_AddRead(const std::int32_t workctrlAddress)
+  {
+    return SFLIB_SetErr(workctrlAddress, kSfaoapErrUnsupportedCursor);
+  }
+
+  /**
+   * Address: 0x00ACFE50 (FUN_00ACFE50, _SFAOAP_Seek)
+   *
+   * What it does:
+   * No-op seek lane for the audio-output adapter handler.
+   */
+  std::int32_t SFAOAP_Seek()
+  {
+    return 0;
+  }
+
   /**
    * Address: 0x00ACE010 (FUN_00ACE010, _SFD_SetSystemUsrSj)
    *
