@@ -65,6 +65,21 @@ namespace moho
     int Init(int fidelity);
 
     /**
+     * Address: 0x007FE760 (FUN_007FE760)
+     *
+     * IDA signature:
+     * int __usercall sub_7FE760@<eax>(Moho::Shadow *this@<esi>);
+     *
+     * What it does:
+     * Clears the cached fidelity/blur/size settings and releases every render
+     * resource the shadow renderer holds. Reached from the destructor, from
+     * `Init`, and from `WRenViewport::D3DWindowOnDeviceExit` - the last one is
+     * why this is public: the D3D device must not still own default-pool
+     * surfaces when `IDirect3DDevice9::Reset` runs.
+     */
+    int ReleaseRenderResources() noexcept;
+
+    /**
      * Address: 0x007DB350 (FUN_007DB350)
      *
      * IDA signature:

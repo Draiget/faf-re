@@ -188,9 +188,23 @@ namespace moho
     mVertexSheet->GetVertStream(0U)->Unlock();
   }
 
+  /**
+   * What it does:
+   * Releases the frame's dynamic vertex sheet and clears the slot. Every
+   * binary site that drops this lane - `RangeRenderer::ResetRenderResources`
+   * (0x007EE430 at `+0x68`), `VisionRenderer::ResetRenderResources`
+   * (0x0081C550) and `WRenViewport::D3DWindowOnDeviceExit` (0x007F70F0 at
+   * `+0x29C` and `+0x4C4`) - dispatches `ID3DVertexSheet::Destroy` (vtable
+   * `+0x04`, the slot after the virtual dtor) before nulling the pointer. The
+   * destroy is not optional: the sheet holds a default-pool D3D buffer, and
+   * `IDirect3DDevice9::Reset` fails outright while one is still referenced.
+   */
   void CRenFrame::ResetTransientResources() noexcept
   {
-    mVertexSheet = nullptr;
+    if (ID3DVertexSheet* const vertexSheet = mVertexSheet; vertexSheet != nullptr) {
+      vertexSheet->Destroy();
+      mVertexSheet = nullptr;
+    }
   }
 
   /**
