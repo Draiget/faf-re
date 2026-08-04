@@ -3051,7 +3051,7 @@
 
     M2aDecoderContext* decoderContext = nullptr;
     if (M2ADEC_Create(M2aPtrToWord(heapManagerHandle), &decoderContext) < 0) {
-      ResolveM2asjdStreamDestroyFn(decoder->stagingStream)(decoder->stagingStream);
+      decoder->stagingStream->Destroy();
       m2asjd_free(M2aPtrToWord(heapManagerHandle), decoder->stagingBuffer);
       HEAPMNG_Destroy(heapManagerHandle);
       return -1;
@@ -3105,7 +3105,7 @@
     }
 
     if (decoder->stagingStream != nullptr) {
-      ResolveM2asjdStreamDestroyFn(decoder->stagingStream)(decoder->stagingStream);
+      decoder->stagingStream->Destroy();
       decoder->stagingStream = nullptr;
     }
 

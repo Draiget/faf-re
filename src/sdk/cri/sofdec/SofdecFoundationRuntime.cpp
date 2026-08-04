@@ -1366,7 +1366,14 @@ struct M2asjdIoStream
   virtual void Reserved00() = 0;
   virtual void Reserved04() = 0;
   virtual void Reserved08() = 0;
-  virtual void Reserved0C() = 0;
+  /**
+   * Slot 3 (+0x0C) - tears the stream joint down.
+   *
+   * Evidence: the M2A decoder teardown in `SofdecAdxXeficRuntime.cpp` calls
+   * this slot with no arguments beyond the object, on the failure path next to
+   * `HEAPMNG_Destroy` and again when releasing `stagingStream`.
+   */
+  virtual void Destroy() = 0;
   virtual void Reserved10() = 0;
   virtual void Reset() = 0;
   virtual void AcquireChunk(std::int32_t lane, std::int32_t requestedBytes, SjChunkRange* outChunk) = 0;
