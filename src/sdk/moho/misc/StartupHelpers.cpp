@@ -405,8 +405,56 @@ namespace
   static_assert(sizeof(SofdecCreateInfoRuntimeView) == 0x40, "SofdecCreateInfoRuntimeView size must be 0x40");
 
   extern "C" void SFD_AnalyCreInf(const char* buffer, std::int32_t size, SofdecCreateInfoRuntimeView* outInfo);
-  extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const SofdecCreateInfoRuntimeView* headerInfo);
-  extern "C" std::int32_t mwsfdcre_IsPlayableByHdrInf(const SofdecHeaderInfoRuntimeView* headerInfo);
+
+  // Sofdec stream-type codes. mwPlyGetHdrInf's callers treat 1 and 3 as the
+  // playable SFD shapes; 2 is the video-only elementary stream.
+  constexpr std::int32_t kSofdecFtypeNone = 0;
+  constexpr std::int32_t kSofdecFtypeSfdWithAudio = 1;
+  constexpr std::int32_t kSofdecFtypeVideoOnlyStream = 2;
+  constexpr std::int32_t kSofdecFtypeSfdVideoOnly = 3;
+
+  /**
+   * Address: 0x00AC8F00 (FUN_00AC8F00, _mwsfcre_DecideFtypeByHdrInf)
+   *
+   * IDA signature:
+   * int __cdecl sub_AC8F00(struct_sofdec_unk1 *a1);
+   *
+   * What it does:
+   * Classifies an analysed Sofdec header into a stream-type code from which
+   * of the three descriptor lanes the analyser filled in. A system-stream
+   * descriptor means a real SFD container - 3 when it carries video only, 1
+   * when an audio descriptor is present too. With no system stream, a bare
+   * video descriptor is the elementary-stream case (2). Anything else is not
+   * a Sofdec stream at all (0), which is what makes mwPlyGetHdrInf report
+   * "not a valid SFD file".
+   */
+  extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const SofdecCreateInfoRuntimeView* const headerInfo)
+  {
+    if (headerInfo->streamDescriptor != nullptr) {
+      return (headerInfo->audioDescriptor == nullptr) ? kSofdecFtypeSfdVideoOnly : kSofdecFtypeSfdWithAudio;
+    }
+
+    if (headerInfo->videoDescriptor != nullptr && headerInfo->audioDescriptor == nullptr) {
+      return kSofdecFtypeVideoOnlyStream;
+    }
+
+    return kSofdecFtypeNone;
+  }
+
+  /**
+   * Address: 0x00AC8F30 (FUN_00AC8F30, _mwsfdcre_IsPlayableByHdrInf)
+   *
+   * IDA signature:
+   * BOOL __cdecl sub_AC8F30(struct_SFD *a1);
+   *
+   * What it does:
+   * Reports whether a parsed header describes something the player can open,
+   * which reduces to "the stream type was classified at all".
+   */
+  extern "C" std::int32_t mwsfdcre_IsPlayableByHdrInf(const SofdecHeaderInfoRuntimeView* const headerInfo)
+  {
+    return (headerInfo->streamType != kSofdecFtypeNone) ? 1 : 0;
+  }
   /**
    * Address: 0x00ACA8E0 (FUN_00ACA8E0, _MWSFFRM_AnalyzeSofdecHeader)
    *

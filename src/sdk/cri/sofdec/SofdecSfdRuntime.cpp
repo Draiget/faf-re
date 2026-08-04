@@ -107,6 +107,32 @@
     return selectedSlot;
   }
 
+  // Sofdec system-header layout, offsets relative to the start of the 2 KiB
+  // pack the analyzer is bound to. Read off FUN_00ADC890 / FUN_00ADCB30 /
+  // FUN_00ADCB70: the signature compare is `repe cmpsd` over 6 dwords at
+  // `[ebx+4] + 0x20`, the tool banner is 8 dwords at `[eax+4] + 0x60`, and the
+  // two raw version bytes sit at the tail of the signature field.
+  constexpr std::uint32_t kSofdecPackBytes = 0x800u;
+  constexpr std::int32_t kSofdecHeaderSignatureOffset = 0x20;
+  constexpr std::int32_t kSofdecHeaderToolBannerOffset = 0x60;
+  constexpr std::size_t kSofdecStreamSignatureBytes = 24;
+  constexpr std::size_t kSofdecToolBannerBytes = 32;
+  constexpr std::size_t kSofdecSignatureMajorByte = 24;
+  constexpr std::size_t kSofdecSignatureMinorByte = 25;
+  // Exactly the 24 bytes the binary compares: "SofdecStream" padded to width.
+  constexpr char kSofdecStreamSignature[kSofdecStreamSignatureBytes + 1] = "SofdecStream            ";
+
+  extern "C" std::int32_t isEffectiveObj(const SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" std::int32_t
+  SFH_AnlyHdrToolInf(const SofdecHeaderAnalyzerRuntimeView* handle, char* outToolBanner);
+  extern "C" std::int32_t SFH_AnlyHdrToolVer(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::uint32_t* outMajor,
+    std::uint32_t* outMinor
+  );
+  extern "C" std::int32_t getToolVer(char* text, std::uint32_t* major, std::uint32_t* minor);
+  extern "C" void func_SofDef_InitAllUnk5(std::int32_t slotCount, SofdecHeaderAnalyzerRuntimeView* slotArray);
+
   /**
    * Address: 0x00ADC820 (FUN_00ADC820, _initSfhObj)
    *
@@ -130,6 +156,257 @@
   extern "C" std::int32_t func_SofDec_Unk5Unused(SofdecHeaderAnalyzerRuntimeView* const handle)
   {
     return handle->state == 0 ? 1 : 0;
+  }
+
+  // SFH analyzer slot states. 0 is idle, 1 is bound to a buffer, 2 means the
+  // "SofdecStream" signature was matched; -1 marks a slot that failed the
+  // check. isEffectiveObj accepts only states outside [-1, 1], i.e. a slot
+  // that has actually parsed a header.
+  constexpr std::int32_t kSfhStateFailed = -1;
+  constexpr std::int32_t kSfhStateBound = 1;
+  constexpr std::int32_t kSfhStateHeaderMatched = 2;
+
+  // SFH analyzer pool backing store. SFHDS_Init hands SFH_Init 32 slots
+  // (`push 20h` at 0x00AE7155) out of this static array; sfh_workinfo just
+  // points at it.
+  constexpr std::int32_t kSfhAnalyzerSlotCount = 32;
+  extern "C" SofdecHeaderAnalyzerRuntimeView sfh_work[kSfhAnalyzerSlotCount]{};
+  extern "C" std::int32_t sfh_init_cont = 0;
+  extern "C" const char* cri_verstr_ptr_sfh = nullptr;
+
+  /**
+   * Address: 0x00ADC6E0 (FUN_00ADC6E0, _SFH_GetSbverStr)
+   *
+   * What it does:
+   * Returns the CRI SFH build banner. The pointer is latched into
+   * `cri_verstr_ptr_sfh` so the version string is retained in the image.
+   */
+  extern "C" const char* SFH_GetSbverStr()
+  {
+    return "\nCRI SFH/PC Ver.1.19 Build:Feb 28 2005 21:33:57\n";
+  }
+
+  /**
+   * Address: 0x00ADC700 (FUN_00ADC700, _SFH_Init)
+   *
+   * IDA signature:
+   * void __cdecl SFH_Init(int num, struct_sofdec_unk5 *ptr);
+   *
+   * What it does:
+   * One-shot init of the SFH analyzer pool: latches the version banner, resets
+   * every slot, and publishes the slot array through `sfh_workinfo`. The
+   * `sfh_init_cont` guard makes repeat calls no-ops.
+   */
+  extern "C" void SFH_Init(const std::int32_t slotCount, SofdecHeaderAnalyzerRuntimeView* const slotArray)
+  {
+    if (sfh_init_cont > 0) {
+      return;
+    }
+
+    ++sfh_init_cont;
+    cri_verstr_ptr_sfh = SFH_GetSbverStr();
+    func_SofDef_InitAllUnk5(slotCount, slotArray);
+    (void)func_SofDec_InitSfhWork(&sfh_workinfo, slotCount, slotArray);
+  }
+
+  /**
+   * Address: 0x00AE7150 (FUN_00AE7150, _SFHDS_Init)
+   *
+   * What it does:
+   * Brings up the SFH analyzer pool with its 32 static slots. `sflib_InitSub`
+   * calls this during Sofdec library init; while it was stubbed the pool stayed
+   * empty, so every `SFH_Create` returned null and no movie could ever be
+   * identified as an SFD.
+   */
+  // Declared without extern "C" in SofdecAdxDeclarationsRuntime.cpp, so this
+  // definition must match that linkage or sflib_InitSub calls a different
+  // symbol entirely - which /FORCE would then quietly bind to the image base.
+  void SFHDS_Init()
+  {
+    SFH_Init(kSfhAnalyzerSlotCount, sfh_work);
+  }
+
+  /**
+   * Address: 0x00ADC9B0 (FUN_00ADC9B0, _isEffectiveObj)
+   *
+   * IDA signature:
+   * BOOL __cdecl func_SofDec_Unk5CorrectState(struct_sofdec_unk5 *a1);
+   *
+   * What it does:
+   * Reports whether one analyzer slot holds a parsed header, which is any
+   * state outside the idle/bound/failed band.
+   */
+  extern "C" std::int32_t isEffectiveObj(const SofdecHeaderAnalyzerRuntimeView* const handle)
+  {
+    return (handle->state < kSfhStateFailed || handle->state > kSfhStateBound) ? 1 : 0;
+  }
+
+  /**
+   * Address: 0x00ADC7D0 (FUN_00ADC7D0, _SFH_Destroy)
+   *
+   * What it does:
+   * Returns one analyzer slot to the pool and drops the active-slot count.
+   */
+  extern "C" std::int32_t SFH_Destroy(SofdecHeaderAnalyzerRuntimeView* const handle)
+  {
+    initSfhObj(handle);
+    return --sfh_workinfo.cur;
+  }
+
+  /**
+   * Address: 0x00ADCB30 (FUN_00ADCB30, _SFH_AnlyHdrToolInf)
+   *
+   * IDA signature:
+   * BOOL __cdecl sub_ADCB30(struct_sofdec_unk5 *a1, _BYTE *a2);
+   *
+   * What it does:
+   * Copies the 32-byte authoring-tool banner out of the Sofdec header (at
+   * `+0x60` of the analysed pack) into a NUL-terminated caller buffer.
+   */
+  extern "C" std::int32_t
+  SFH_AnlyHdrToolInf(const SofdecHeaderAnalyzerRuntimeView* const handle, char* const outToolBanner)
+  {
+    outToolBanner[0] = '\0';
+    const char* const bannerSource =
+      reinterpret_cast<const char*>(static_cast<std::uintptr_t>(handle->bufferAddress)) + kSofdecHeaderToolBannerOffset;
+
+    if (isEffectiveObj(handle) == 0) {
+      return 0;
+    }
+
+    std::memset(outToolBanner, 0, kSofdecToolBannerBytes);
+    outToolBanner[kSofdecToolBannerBytes] = '\0';
+    std::memcpy(outToolBanner, bannerSource, kSofdecToolBannerBytes);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00ADCB70 (FUN_00ADCB70, _SFH_AnlyHdrToolVer)
+   *
+   * IDA signature:
+   * int __cdecl func_SofDec_VersionFromObj(
+   *     struct_sofdec_unk5 *a1, unsigned int *major, unsigned int *minor);
+   *
+   * What it does:
+   * Resolves the authoring-tool version two ways and reports whichever is
+   * newer: the two raw bytes the header carries at `+0x38`/`+0x39`, and the
+   * "Ver.X.Y" text parsed out of the tool banner. Versions compare as
+   * `minor + 100 * major`.
+   */
+  extern "C" std::int32_t SFH_AnlyHdrToolVer(
+    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    std::uint32_t* const outMajor,
+    std::uint32_t* const outMinor
+  )
+  {
+    *outMajor = 0;
+    *outMinor = 0;
+
+    const auto* const headerSignature =
+      reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(handle->bufferAddress))
+      + kSofdecHeaderSignatureOffset;
+
+    char toolBanner[kSofdecToolBannerBytes + 4]{};
+    if (SFH_AnlyHdrToolInf(handle, toolBanner) == 0) {
+      return 0;
+    }
+
+    const std::uint32_t embeddedMajor = headerSignature[kSofdecSignatureMajorByte];
+    const std::uint32_t embeddedMinor = headerSignature[kSofdecSignatureMinorByte];
+
+    std::uint32_t bannerMajor = 0;
+    std::uint32_t bannerMinor = 0;
+    if (getToolVer(toolBanner, &bannerMajor, &bannerMinor) == 0) {
+      return 0;
+    }
+
+    const std::int32_t embeddedVersion = static_cast<std::int32_t>(embeddedMinor + 100u * embeddedMajor);
+    const std::int32_t bannerVersion = static_cast<std::int32_t>(bannerMinor + 100u * bannerMajor);
+    if (embeddedVersion < bannerVersion) {
+      *outMajor = bannerMajor;
+      *outMinor = bannerMinor;
+    } else {
+      *outMajor = embeddedMajor;
+      *outMinor = embeddedMinor;
+    }
+    return 1;
+  }
+
+  /**
+   * Address: 0x00ADC890 (FUN_00ADC890, _SFH_IsSfdHeader)
+   *
+   * IDA signature:
+   * int __cdecl func_SofDec_Unk5LoadVersion(
+   *     struct_sofdec_unk5 *a1, unsigned int *success);
+   *
+   * What it does:
+   * Decides whether the bound pack is a Sofdec system header: it must be a
+   * full 2 KiB pack and carry the literal "SofdecStream" banner at `+0x20`.
+   * On a match the slot advances to the header-matched state and latches the
+   * authoring-tool version; anything else parks the slot as failed.
+   */
+  extern "C" std::int32_t
+  SFH_IsSfdHeader(SofdecHeaderAnalyzerRuntimeView* const handle, std::uint32_t* const outIsSfdHeader)
+  {
+    *outIsSfdHeader = 0;
+
+    if (func_SofDec_Unk5Unused(handle) == 1) {
+      return 0;
+    }
+
+    if (static_cast<std::uint32_t>(handle->remainingBytes) < kSofdecPackBytes) {
+      handle->state = kSfhStateFailed;
+      return 0;
+    }
+
+    const char* const signature =
+      reinterpret_cast<const char*>(static_cast<std::uintptr_t>(handle->bufferAddress)) + kSofdecHeaderSignatureOffset;
+    if (std::memcmp(signature, kSofdecStreamSignature, kSofdecStreamSignatureBytes) != 0) {
+      handle->state = kSfhStateFailed;
+      return 0;
+    }
+
+    handle->state = kSfhStateHeaderMatched;
+
+    std::uint32_t toolMajor = 0;
+    std::uint32_t toolMinor = 0;
+    if (SFH_AnlyHdrToolVer(handle, &toolMajor, &toolMinor) == 0) {
+      return 0;
+    }
+
+    handle->version = static_cast<std::int32_t>(toolMinor + 100u * toolMajor);
+    *outIsSfdHeader = 1;
+    return 1;
+  }
+
+  /**
+   * Address: 0x00AE7280 (FUN_00AE7280, _SFHDS_IsSfdHeader)
+   *
+   * IDA signature:
+   * struct_sofdec_unk5 *__cdecl SFHDS_IsSfdHeader(int a1, int a2);
+   *
+   * What it does:
+   * Borrows an analyzer slot for one candidate pack, asks whether it is a
+   * Sofdec system header, and returns the slot before reporting the answer.
+   * This is the gate `sfcre_AnalySfh` probes each 2 KiB pack with - while it
+   * was stubbed to zero no SFD ever identified itself, so `SFD_AnalyCreInf`
+   * left both header-valid bytes clear and every movie was rejected as "not a
+   * valid SFD file".
+   */
+  extern "C" std::int32_t SFHDS_IsSfdHeader(const std::int32_t bufferAddress, const std::int32_t sizeBytes)
+  {
+    SofdecHeaderAnalyzerRuntimeView* const handle = SFH_Create(bufferAddress, sizeBytes);
+    if (handle == nullptr) {
+      return 0;
+    }
+
+    std::uint32_t isSfdHeader = 0;
+    if (SFH_IsSfdHeader(handle, &isSfdHeader) == 0) {
+      isSfdHeader = 0;
+    }
+
+    (void)SFH_Destroy(handle);
+    return static_cast<std::int32_t>(isSfdHeader);
   }
 
   /**
@@ -16973,7 +17250,7 @@
   void sflib_InitSub()
   {
     SFPLY_Init();
-    (void)SFHDS_Init();
+    SFHDS_Init();
   }
 
   /**

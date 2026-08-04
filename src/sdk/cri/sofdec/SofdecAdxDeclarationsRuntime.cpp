@@ -3062,7 +3062,8 @@
   struct SflibErrorInfo;
   struct SflibLibWorkRuntime;
   using SflibErrorCallback = std::int32_t(__cdecl*)(std::int32_t callbackObject, std::int32_t errorCode);
-  std::int32_t SFHDS_Init();
+  // 0x00AE7150: void, not int - it just forwards 32 static slots to SFH_Init.
+  void SFHDS_Init();
   std::int32_t SFHDS_Finish();
   std::int32_t SFPLY_Init();
   std::int32_t sfply_ChkCondDfl();
