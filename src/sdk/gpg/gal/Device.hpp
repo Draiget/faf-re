@@ -10,7 +10,9 @@ namespace gpg::gal
   class Device;
   class DeviceContext;
   class Effect;
+  class CursorContext;
   class EffectContext;
+  class Head;
 
   /**
    * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
@@ -70,17 +72,22 @@ namespace gpg::gal
     static void InitCursor();
 
     /**
-     * Address: 0x00A82547
-     * Slot: 0
-     * Demangled: _purecall
+     * Slot: 0 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Tears the backend device down. MSVC puts the scalar deleting destructor
+     * in slot 0, which is what `DestroyInstance` dispatches through.
      */
-    virtual void purecall0() {}
+    virtual void DestroyBackendObject() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 1
-     * Demangled: _purecall
+     * Slot: 1 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Returns the backend's log sink.
      */
-    virtual void purecall1() {}
+    virtual void* GetLog() = 0;
     /**
      * Address context:
      * - 0x008D0E7C callsite in `CScApp::CreateDevice` (`FUN_008D0370`)
@@ -91,17 +98,21 @@ namespace gpg::gal
      */
     virtual DeviceContext* GetDeviceContext() { return nullptr; }
     /**
-     * Address: 0x00A82547
-     * Slot: 3
-     * Demangled: _purecall
+     * Slot: 3 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Returns the thread id the device was created on.
      */
-    virtual void purecall3() {}
+    virtual int GetCurThreadId() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 4
-     * Demangled: _purecall
+     * Slot: 4 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Per-call pre-hook every backend entry point runs first.
      */
-    virtual void purecall4() {}
+    virtual void Func1() = 0;
     /**
      * Address: 0x00A82547
      * Slot: 5
@@ -109,17 +120,21 @@ namespace gpg::gal
      */
     virtual void purecall5() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 6
-     * Demangled: _purecall
+     * Slot: 6 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Returns one head descriptor by index.
      */
-    virtual void purecall6() {}
+    virtual Head* GetHead1(unsigned int headIndex) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 7
-     * Demangled: _purecall
+     * Slot: 7 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Returns one head output context by index.
      */
-    virtual void purecall7() {}
+    virtual Head* GetHead2(unsigned int headIndex) = 0;
     /**
      * Address: 0x00A82547
      * Slot: 8
@@ -240,47 +255,61 @@ namespace gpg::gal
      */
     virtual void purecall24() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 25
-     * Demangled: _purecall
+     * Slot: 25 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Backend state query.
      */
-    virtual void purecall25() {}
+    virtual int Func8() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 26
-     * Demangled: _purecall
+     * Slot: 26 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Rebinds the device to one context.
      */
-    virtual void purecall26() {}
+    virtual int Func9(DeviceContext* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 27
-     * Demangled: _purecall
+     * Slot: 27 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Reports whether the device is usable, lost, or needs a reset.
      */
-    virtual void purecall27() {}
+    virtual int TestCooperativeLevel() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 28
-     * Demangled: _purecall
+     * Slot: 28 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Opens a scene.
      */
-    virtual void purecall28() {}
+    virtual int BeginScene() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 29
-     * Demangled: _purecall
+     * Slot: 29 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Closes the open scene.
      */
-    virtual void purecal29l() {}
+    virtual void EndScene() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 30
-     * Demangled: _purecall
+     * Slot: 30 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Presents the back buffer.
      */
-    virtual void purecall30() {}
+    virtual void Present() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 31
-     * Demangled: _purecall
+     * Slot: 31 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Uploads the hardware cursor image.
      */
-    virtual void purecall31() {}
+    virtual void SetCursor(const CursorContext* context) = 0;
     /**
      * Address: 0x00A82547
      * Slot: 32
@@ -288,23 +317,29 @@ namespace gpg::gal
      */
     virtual void purecall32() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 33
-     * Demangled: _purecall
+     * Slot: 33 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Shows or hides the hardware cursor.
      */
-    virtual void purecall33() {}
+    virtual int ShowCursor(bool show) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 34
-     * Demangled: _purecall
+     * Slot: 34 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Binds one viewport rectangle.
      */
-    virtual void purecall34() {}
+    virtual void SetViewport(const void* viewport) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 35
-     * Demangled: _purecall
+     * Slot: 35 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Reads the bound viewport rectangle.
      */
-    virtual void purecall35() {}
+    virtual void GetViewport(void* outViewport) = 0;
 
     /**
      * Address: 0x008E6940 (FUN_008E6940)
@@ -327,17 +362,28 @@ namespace gpg::gal
     virtual void GetContext(OutputContext* outContext);
 
     /**
-     * Address: 0x00A82547
-     * Slot: 38
-     * Demangled: _purecall
+     * Slot: 38 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Clears the bound target, depth and stencil.
      */
-    virtual void purecall38() {}
+    virtual void Clear(
+        bool clearTarget,
+        bool clearZbuffer,
+        bool clearStencil,
+        std::uint32_t color,
+        float depth,
+        int stencil
+    ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 39
-     * Demangled: _purecall
+     * Slot: 39 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Unbinds every texture stage.
      */
-    virtual void purecall39() {}
+    virtual int ClearTextures() = 0;
     /**
      * Address: 0x00A82547
      * Slot: 40
@@ -357,47 +403,67 @@ namespace gpg::gal
      */
     virtual void purecall42() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 43
-     * Demangled: _purecall
+     * Slot: 43 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Sets the fixed-function fog parameters.
      */
-    virtual void purecall43() {}
+    virtual void SetFogState(
+        bool enable,
+        const void* projection,
+        float fogStart,
+        float fogEnd,
+        int fogColor
+    ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 44
-     * Demangled: _purecall
+     * Slot: 44 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Switches between filled and wireframe fill mode.
      */
-    virtual void purecall44() {}
+    virtual int SetWireframeState(bool enabled) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 45
-     * Demangled: _purecall
+     * Slot: 45 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Sets the colour-write mask.
      */
-    virtual void purecall45() {}
+    virtual int SetColorWriteState(bool arg1, bool arg2) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 46
-     * Demangled: _purecall
+     * Slot: 46 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Issues one indexed draw.
      */
-    virtual void purecall46() {}
+    virtual int DrawIndexedPrimitive(const void* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 47
-     * Demangled: _purecall
+     * Slot: 47 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Issues one non-indexed draw.
      */
-    virtual void purecall47() {}
+    virtual int DrawPrimitive(const void* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 48
-     * Demangled: _purecall
+     * Slot: 48 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Begins the selected effect technique.
      */
-    virtual void purecall48() {}
+    virtual void BeginTechnique() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 49
-     * Demangled: _purecall
+     * Slot: 49 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
+     * DeviceD3D9 overrides it at the same index)
+     *
+     * What it does:
+     * Ends the active effect technique.
      */
-    virtual void purecall49() {}
+    virtual void EndTechnique() = 0;
 
   protected:
     std::uint32_t reserved0x04_ = 0; // +0x04

@@ -5951,17 +5951,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address family:
-     * - slot 44 runtime dispatch from `Device` surface
-     *
-     * What it does:
-     * Preserves the unresolved no-argument context-export slot.
-     */
-    void DeviceD3D9::GetContext()
-    {
-    }
-
-    /**
      * Address: 0x008EFD50 (FUN_008EFD50)
      *
      * What it does:

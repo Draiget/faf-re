@@ -450,12 +450,10 @@ namespace gal {
        * payload onto the native D3D9 device.
        */
       virtual void ClearTarget(const OutputContext* context);
-      /**
-       * Address: 0x008E6810
-       * Slot: 37
-       * Demangled: gpg::gal::Device::GetContext
-       */
-      virtual void GetContext();
+      // Slot 37 is gpg::gal::Device::GetContext (0x008E6810). Both
+      // ??_7Device@gal@gpg@@6B@ and ??_7DeviceD3D9@gal@gpg@@6B@ carry that
+      // same address there, so the backend inherits it rather than
+      // overriding - redeclaring it here only added a second virtual.
       /**
        * Address: 0x008EDE30 (FUN_008EDE30)
        * Slot: 38
