@@ -19197,10 +19197,16 @@ StkId LuaObject::PushStack(lua_State* state) const
 	return PushRawLuaObjectToStack(&m_object, state);
 }
 
+// Convenience overload with no counterpart in the binary, which exports only
+// ?PushStack@LuaObject@LuaPlus@@QBEXPAUlua_State@@@Z (0x00907D10). That one
+// guards on the two objects sharing a `global_State` and nothing more, so this
+// forwarder must not add a stricter test: demanding the same *root* LuaState
+// rejects pushes between the sim and UI roots, which are distinct roots over
+// one global_State, and that rejection is what was failing every
+// cfunc_GetPreference call at startup.
 StkId LuaObject::PushStack(LuaState* state) const
 {
 	Ensure(state != nullptr, "state");
-	Ensure(state->m_rootState == m_state, "state->m_rootState == m_state");
 	return PushStack(state->GetCState());
 }
 
