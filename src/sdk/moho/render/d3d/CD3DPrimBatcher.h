@@ -313,8 +313,18 @@ namespace moho
       std::uint32_t primitiveCount,
       std::uint32_t verticesPerPrimitive
     );
+
+  private:
+    // Every field of this object is declared by CD3DPrimBatcherRuntimeView and
+    // written through it, so the class itself has to own the bytes the view
+    // addresses. Without them `new CD3DPrimBatcher` reserves only the vptr and
+    // the constructor writes 0x120 bytes past the end of its allocation. The
+    // binary sizes the object explicitly - `push 124h` immediately before the
+    // `operator new` that feeds the ctor at 0x007F6BCB.
+    std::uint8_t mRuntimeStorage[0x120]{}; // +0x04
   };
 
+  static_assert(sizeof(CD3DPrimBatcher) == 0x124, "moho::CD3DPrimBatcher size must be 0x124");
   static_assert(sizeof(CD3DPrimBatcher::Vertex) == 0x18, "moho::CD3DPrimBatcher::Vertex size must be 0x18");
   static_assert(offsetof(CD3DPrimBatcher::Vertex, mX) == 0x00, "moho::CD3DPrimBatcher::Vertex::mX offset must be 0x00");
   static_assert(offsetof(CD3DPrimBatcher::Vertex, mY) == 0x04, "moho::CD3DPrimBatcher::Vertex::mY offset must be 0x04");
@@ -412,6 +422,10 @@ namespace moho
   static_assert(
     offsetof(CD3DPrimBatcherRuntimeView, mRebuildComposite) == 0x11D,
     "moho::CD3DPrimBatcherRuntimeView::mRebuildComposite offset must be 0x11D"
+  );
+  static_assert(
+    sizeof(CD3DPrimBatcherRuntimeView) == 0x124,
+    "moho::CD3DPrimBatcherRuntimeView size must be 0x124"
   );
   static_assert(
     offsetof(CD3DPrimBatcherRuntimeView, mAlphaMultiplier) == 0x120,
