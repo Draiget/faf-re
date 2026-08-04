@@ -99,14 +99,14 @@ extern "C" {
   void* SFHDS_Finish() { return nullptr; }
   void* SFHDS_FinishFhd() { return nullptr; }
   void* SFHDS_GetMuxVerNum() { return nullptr; }
-  void* SFHDS_Init() { return nullptr; }
+  // SFHDS_Init: real body in SofdecSfdRuntime.cpp (0x00AE7150).
   void* SFHDS_InitFhd() { return nullptr; }
-  void* SFHDS_IsSfdHeader() { return nullptr; }
+  // SFHDS_IsSfdHeader: real body in SofdecSfdRuntime.cpp (0x00AE7280).
   void* SFHDS_ProcessHdr() { return nullptr; }
   void* SFHDS_ReprocessHdr() { return nullptr; }
   void* SFHDS_SetHdr() { return nullptr; }
-  void* SFH_Destroy() { return nullptr; }
-  void* SFH_IsSfdHeader() { return nullptr; }
+  // SFH_Destroy: real body in SofdecSfdRuntime.cpp (0x00ADC7D0).
+  // SFH_IsSfdHeader: real body in SofdecSfdRuntime.cpp (0x00ADC890).
   // SFMPVF_GetNumFrm now has real body in SofdecMpvRuntime.cpp (compiled).
   // SFPLY_DecideSvrStat: real body now in SofdecSfdRuntime.cpp (was named lowercase `sfply_DecideSvrStat`; renamed to match callers).
   // SFTIM_InitTcode, SFTIM_InitTtu: real bodies in SofdecMpvRuntime.cpp.
@@ -155,12 +155,15 @@ extern "C" {
   void* mw_sfd_start_ex() { return nullptr; }
   void* mwl_convFrmInfFromSFD() { return nullptr; }
   void* mwsfcre_AllFree() { return nullptr; }
-  void* mwsfcre_DecideFtypeByHdrInf() { return nullptr; }
+  // mwsfcre_DecideFtypeByHdrInf: real body in moho/misc/StartupHelpers.cpp,
+  // next to its only caller mwPlyGetHdrInf (adjacent addresses 0x00AC8F00 /
+  // 0x00AC8DF0 - same original translation unit).
   void* mwsfcre_GetMallocCnt() { return nullptr; }
   void* mwsfcre_IncMallocCnt() { return nullptr; }
   void* mwsfcre_OrgMalloc() { return nullptr; }
   void* mwsfcre_UsrMalloc() { return nullptr; }
-  void* mwsfdcre_IsPlayableByHdrInf() { return nullptr; }
+  // mwsfdcre_IsPlayableByHdrInf: real body in moho/misc/StartupHelpers.cpp
+  // (0x00AC8F30, same original translation unit as mwPlyGetHdrInf).
   void* mwsffrm_AnalyFxType() { return nullptr; }
   void* mwsffrm_AnalyTotalFrm() { return nullptr; }
   void* mwsffrm_CheckAinf() { return nullptr; }
