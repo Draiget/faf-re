@@ -2406,6 +2406,20 @@ class wxWindowMswRuntime : public wxWindowBase
 {
 public:
   /**
+   * Address: 0x009678C0 (FUN_009678C0)
+   * Mangled: ?SetTitle@wxWindow@@UAEXPBG@Z
+   *
+   * IDA signature:
+   * BOOL __thiscall wxWindow::SetTitle(wxWindow *this, LPCWSTR *a2);
+   *
+   * What it does:
+   * Pushes the title straight onto the native window; wxWindowBase's version
+   * (0x0042B3E0) accepts and ignores it because a plain wxWindowBase has no
+   * handle to push it to.
+   */
+  void SetTitle(const wxStringRuntime& title) override;
+
+  /**
    * Address: 0x00968640 (FUN_00968640)
    * Mangled: ?DoMoveWindow@wxWindow@@MAEXHHHH@Z
    *
@@ -2445,6 +2459,56 @@ public:
    * rectangle already matches. -1 means "leave this axis alone".
    */
   void DoSetClientSize(std::int32_t width, std::int32_t height) override;
+
+  /**
+   * Address: 0x00968500 (FUN_00968500)
+   * Mangled: ?DoGetPosition@wxWindow@@MBEXPAH0@Z
+   *
+   * IDA signature:
+   * int *__thiscall wxWindow::DoGetPosition(wxWindow *this, int *a2, int *a3);
+   *
+   * What it does:
+   * Reports where the window sits. A top-level window reports its screen
+   * position; a child reports its position in the parent's client area, so the
+   * screen point is mapped through the parent and the parent's client-area
+   * origin is subtracted.
+   */
+  void DoGetPosition(std::int32_t* x, std::int32_t* y) const override;
+
+  /**
+   * Address: 0x00968480 (FUN_00968480)
+   * Mangled: ?DoGetSize@wxWindow@@MBEXPAH0@Z
+   *
+   * IDA signature:
+   * int *__thiscall wxWindow::DoGetSize(wxWindow *this, int *a2, int *a3);
+   *
+   * What it does:
+   * Reports the outer (window rectangle) extent, non-client area included.
+   */
+  void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const override;
+
+  /**
+   * Address: 0x00968680 (FUN_00968680)
+   * Mangled: ?DoSetSize@wxWindow@@MAEXHHHHH@Z
+   *
+   * IDA signature:
+   * int __thiscall wxWindow::DoSetSize(wxWindow *this, int a2, int a3, int a4,
+   *                                    int a5, int a6);
+   *
+   * What it does:
+   * Resolves the -1 "leave this alone" placeholders against the window's
+   * current geometry - or against its best size when the matching wxSIZE_AUTO_*
+   * flag is set - and moves the window. Returns without touching the window
+   * when the requested rectangle already matches the current one.
+   */
+  void DoSetSize(
+    std::int32_t x,
+    std::int32_t y,
+    std::int32_t width,
+    std::int32_t height,
+    std::int32_t sizeFlags
+  ) override;
+
   virtual void DoSetToolTip(void* tooltip) { (void)tooltip; }
   virtual bool DoPopupMenu(void* menu, std::int32_t x, std::int32_t y)
   {
@@ -2453,12 +2517,24 @@ public:
     (void)y;
     return false;
   }
-  virtual void AdjustForParentClientOrigin(std::int32_t& x, std::int32_t& y, std::int32_t sizeFlags) const
-  {
-    (void)x;
-    (void)y;
-    (void)sizeFlags;
-  }
+  /**
+   * Address: 0x00964840 (FUN_00964840)
+   * Mangled: ?AdjustForParentClientOrigin@wxWindowBase@@UBEXAAH0H@Z
+   *
+   * IDA signature:
+   * int *__thiscall wxWindowBase::AdjustForParentClientOrigin(
+   *     wxWindowBase *this, int *a2, int *a3, char a4);
+   *
+   * What it does:
+   * Shifts a child's requested position by the parent's client-area origin, so
+   * a caller can ask for a position in client coordinates. Top-level windows,
+   * parentless windows, and callers passing wxSIZE_NO_ADJUSTMENTS are left
+   * alone.
+   *
+   * The binary declares this on wxWindowBase; it is kept here because the only
+   * caller in this reconstruction is wxWindow::DoSetSize just below.
+   */
+  virtual void AdjustForParentClientOrigin(std::int32_t& x, std::int32_t& y, std::int32_t sizeFlags) const;
   virtual void DragAcceptFiles(bool accept) { (void)accept; }
   virtual bool LoadNativeDialogByName(void* parent, const void* dialogName)
   {
@@ -5008,14 +5084,31 @@ public:
   virtual void Iconize(bool iconize);
 
   /**
-   * Address: 0x0098C420 family
+   * Address: 0x0098C400 (FUN_0098C400)
+   * Mangled: ?IsIconized@wxTopLevelWindowMSW@@UBE_NXZ
+   *
+   * IDA signature:
+   * bool __thiscall wxTopLevelWindowMSW::IsIconized(wxTopLevelWindowMSW *this);
    *
    * What it does:
-   * Reports the minimised state recorded by `DoShowWindow`.
+   * Asks Windows whether the frame is minimised and caches the answer in
+   * `m_iconized`. The state is read from the window, never from a flag this
+   * process wrote - a minimise the user performed with the caption button
+   * has to be observable too.
    */
   [[nodiscard]] virtual bool IsIconized() const;
 
-  virtual bool IsMaximized() const { return false; }
+  /**
+   * Address: 0x0098C3C0 (FUN_0098C3C0)
+   * Mangled: ?IsMaximized@wxTopLevelWindowMSW@@UBE_NXZ
+   *
+   * IDA signature:
+   * BOOL __thiscall wxTopLevelWindowMSW::IsMaximized(wxTopLevelWindowMSW *this);
+   *
+   * What it does:
+   * Asks Windows whether the frame is maximised.
+   */
+  [[nodiscard]] virtual bool IsMaximized() const;
   virtual void SetIcon(const void* icon) { (void)icon; }
   virtual void SetIcons(const void* iconBundle) { (void)iconBundle; }
   virtual bool ShowFullScreen(bool show, long style)

@@ -11070,26 +11070,17 @@ namespace
     }
   }
 
+  // What is left of the SupCom frame's runtime state once the geometry lanes
+  // are gone. Everything else this used to carry - client size, position,
+  // style, title, name, and the visible/maximized/focused/iconized flags -
+  // shadowed state that belongs to the native window, and the shadow is what
+  // broke resizing; see the note in WSupComFrameRuntime.
   struct SupComFrameState
   {
-    std::int32_t clientWidth = 0;
-    std::int32_t clientHeight = 0;
-    std::int32_t minWidth = 0;
-    std::int32_t minHeight = 0;
-    std::int32_t windowX = -1;
-    std::int32_t windowY = -1;
-    std::int32_t windowStyle = 0;
-    bool visible = false;
-    bool maximized = false;
-    bool focused = false;
-    bool iconized = false;
     bool iconResourceAssigned = false;
-    std::wstring title;
-    std::wstring name;
     std::wstring iconResourceName;
   };
 
-  constexpr wchar_t kSupComFrameWindowName[] = L"frame";
   constexpr wchar_t kSupComFrameIconResourceName[] = L"ID";
 
   std::unordered_map<const WSupComFrame*, SupComFrameState> gSupComFrameStateByFrame{};
@@ -14215,14 +14206,6 @@ namespace
     return new (std::nothrow) WxNotifyEventRuntime();
   }
 
-  [[nodiscard]] SupComFrameState* FindSupComFrameState(
-    const WSupComFrame* const frame
-  ) noexcept
-  {
-    const auto it = gSupComFrameStateByFrame.find(frame);
-    return it != gSupComFrameStateByFrame.end() ? &it->second : nullptr;
-  }
-
   [[nodiscard]] const WxTopLevelWindowRuntimeState* FindWxTopLevelWindowRuntimeState(
     const wxTopLevelWindowRuntime* const window
   ) noexcept
@@ -14357,13 +14340,6 @@ namespace
       mIsApplicationActive = 0;
 
       SupComFrameState& state = EnsureSupComFrameState(this);
-      state.clientWidth = initialClientSize.x > 0 ? initialClientSize.x : 0;
-      state.clientHeight = initialClientSize.y > 0 ? initialClientSize.y : 0;
-      state.windowX = initialPosition.x;
-      state.windowY = initialPosition.y;
-      state.windowStyle = style;
-      state.title = gpg::STR_Utf8ToWide(titleUtf8 != nullptr ? titleUtf8 : "");
-      state.name.assign(kSupComFrameWindowName);
       state.iconResourceName.assign(kSupComFrameIconResourceName);
       state.iconResourceAssigned = true;
 
@@ -14373,12 +14349,13 @@ namespace
       // native window. The frame's HWND is what the viewport parents itself to
       // and what GetHeadParameters hands D3D as hDeviceWindow for a windowed
       // primary head, so nothing downstream works without it.
+      const std::wstring title = gpg::STR_Utf8ToWide(titleUtf8 != nullptr ? titleUtf8 : "");
       wxStringRuntime frameName{};
       (void)WxStringRuntimeOps::InitWith(&frameName, kWxFrameDefaultName, 0, -101);
       (void)Create(
         nullptr,
         -1,
-        state.title.c_str(),
+        title.c_str(),
         initialPosition,
         initialClientSize,
         static_cast<long>(style),
@@ -14403,177 +14380,26 @@ namespace
     // that nothing ever read, so ::ShowWindow was never reached and the frame
     // stayed invisible for the whole run.
 
-    void SetTitle(
-      const wxStringRuntime& title
-    ) override
-    {
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.title.assign(title.c_str());
-    }
-
-    void SetName(
-      const wxStringRuntime& name
-    ) override
-    {
-      wxWindowBase::SetName(name);
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.name.assign(name.c_str());
-    }
-
-    void SetWindowStyleFlag(
-      const long style
-    ) override
-    {
-      EnsureSupComFrameState(this).windowStyle = static_cast<std::int32_t>(style);
-    }
-
-    [[nodiscard]] long GetWindowStyleFlag() const override
-    {
-      const SupComFrameState* const state = FindSupComFrameState(this);
-      return state != nullptr ? state->windowStyle : 0;
-    }
-
-    void SetSizeHints(
-      const std::int32_t minWidth,
-      const std::int32_t minHeight,
-      const std::int32_t maxWidth,
-      const std::int32_t maxHeight,
-      const std::int32_t incWidth,
-      const std::int32_t incHeight
-    ) override
-    {
-      (void)maxWidth;
-      (void)maxHeight;
-      (void)incWidth;
-      (void)incHeight;
-
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.minWidth = minWidth > 0 ? minWidth : 0;
-      state.minHeight = minHeight > 0 ? minHeight : 0;
-      if (state.clientWidth < state.minWidth) {
-        state.clientWidth = state.minWidth;
-      }
-      if (state.clientHeight < state.minHeight) {
-        state.clientHeight = state.minHeight;
-      }
-    }
-
-    void SetFocus() override
-    {
-      EnsureSupComFrameState(this).focused = true;
-    }
-
     // GetHandle is not overridden here any more: wxWindowBase::GetHandle
     // returns the native handle the creation path recorded, which is what the
     // binary's wxWindow::GetHandle does. The pseudo handle this used to return
     // was only ever a stand-in for a window that was never created.
-
-    void DoGetClientSize(
-      std::int32_t* const outWidth,
-      std::int32_t* const outHeight
-    ) const override
-    {
-      if (outWidth != nullptr) {
-        *outWidth = 0;
-      }
-      if (outHeight != nullptr) {
-        *outHeight = 0;
-      }
-
-      const SupComFrameState* const state = FindSupComFrameState(this);
-      if (state == nullptr) {
-        return;
-      }
-
-      if (outWidth != nullptr) {
-        *outWidth = state->clientWidth;
-      }
-      if (outHeight != nullptr) {
-        *outHeight = state->clientHeight;
-      }
-    }
-
-    void DoSetClientSize(
-      const std::int32_t width,
-      const std::int32_t height
-    ) override
-    {
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      const std::int32_t requestedWidth = width > 0 ? width : 0;
-      const std::int32_t requestedHeight = height > 0 ? height : 0;
-      state.clientWidth = requestedWidth > state.minWidth ? requestedWidth : state.minWidth;
-      state.clientHeight = requestedHeight > state.minHeight ? requestedHeight : state.minHeight;
-    }
-
-    void DoGetPosition(
-      std::int32_t* const x,
-      std::int32_t* const y
-    ) const override
-    {
-      if (x != nullptr) {
-        *x = 0;
-      }
-      if (y != nullptr) {
-        *y = 0;
-      }
-
-      const SupComFrameState* const state = FindSupComFrameState(this);
-      if (state == nullptr) {
-        return;
-      }
-
-      if (x != nullptr) {
-        *x = state->windowX;
-      }
-      if (y != nullptr) {
-        *y = state->windowY;
-      }
-    }
-
-    void DoSetSize(
-      const std::int32_t x,
-      const std::int32_t y,
-      const std::int32_t width,
-      const std::int32_t height,
-      const std::int32_t sizeFlags
-    ) override
-    {
-      (void)sizeFlags;
-
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.windowX = x;
-      state.windowY = y;
-      DoSetClientSize(width, height);
-    }
-
-    void Maximize(
-      const bool maximize
-    ) override
-    {
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.maximized = maximize;
-      mPendingMaximizeSync = maximize ? 1 : 0;
-      mPersistedMaximizeSync = maximize ? 1 : 0;
-    }
-
-    void Iconize(
-      const bool iconize
-    ) override
-    {
-      EnsureSupComFrameState(this).iconized = iconize;
-    }
-
-    [[nodiscard]] bool IsMaximized() const override
-    {
-      const SupComFrameState* const state = FindSupComFrameState(this);
-      return state != nullptr && state->maximized;
-    }
-
-    [[nodiscard]] bool IsIconized() const override
-    {
-      const SupComFrameState* const state = FindSupComFrameState(this);
-      return state != nullptr && state->iconized;
-    }
+    //
+    // Neither are SetTitle, SetName, Set/GetWindowStyleFlag, SetSizeHints,
+    // SetFocus, DoGet/DoSetClientSize, DoGetPosition, DoSetSize, Maximize,
+    // Iconize, IsMaximized or IsIconized. ??_7WSupComFrame@@6B@ (0x00E4F434)
+    // differs from ??_7wxFrame@@6B@ (0x00D571AC) in exactly four slots - the
+    // deleting dtor (+0x004), GetEventTable (+0x018), MSWWindowProc (+0x1F0)
+    // and MSWDefWindowProc (+0x1F4) - so every one of those was inherited.
+    //
+    // They used to be overridden here against a `SupComFrameState` side table
+    // that shadowed the real window. That made resizing a no-op: DoGetClientSize
+    // returned the side table's `clientWidth`, whose only writer was
+    // DoSetClientSize being handed the value DoGetClientSize had just produced.
+    // The pair was a closed loop that never touched the HWND, so it stayed
+    // pinned at the wnd_MinDrag* seed for the life of the process and the
+    // viewport - and the D3D head behind it - was rebuilt at 1024x768 no matter
+    // how large the frame actually was.
 
     void SetIcon(
       const void* const icon
@@ -30096,13 +29922,39 @@ void wxTopLevelWindowRuntime::Iconize(
 }
 
 /**
+ * Address: 0x0098C400 (FUN_0098C400)
+ * Mangled: ?IsIconized@wxTopLevelWindowMSW@@UBE_NXZ
+ *
+ * IDA signature:
+ * bool __thiscall wxTopLevelWindowMSW::IsIconized(wxTopLevelWindowMSW *this);
+ *
  * What it does:
- * Reports the minimised state `DoShowWindow` recorded.
+ * Asks Windows whether the frame is minimised and caches the answer in
+ * `m_iconized`. Reading the window rather than a flag this process wrote is
+ * what makes a minimise performed with the caption button observable.
  */
 bool wxTopLevelWindowRuntime::IsIconized() const
 {
-  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
-  return state != nullptr && state->iconized != 0u;
+  const HWND handle = GetWxWindowNativeHandle(this);
+  const bool iconized = (handle != nullptr) && (::IsIconic(handle) != FALSE);
+  EnsureWxWindowBaseRuntimeState(this).iconized = iconized ? 1u : 0u;
+  return iconized;
+}
+
+/**
+ * Address: 0x0098C3C0 (FUN_0098C3C0)
+ * Mangled: ?IsMaximized@wxTopLevelWindowMSW@@UBE_NXZ
+ *
+ * IDA signature:
+ * BOOL __thiscall wxTopLevelWindowMSW::IsMaximized(wxTopLevelWindowMSW *this);
+ *
+ * What it does:
+ * Asks Windows whether the frame is maximised.
+ */
+bool wxTopLevelWindowRuntime::IsMaximized() const
+{
+  const HWND handle = GetWxWindowNativeHandle(this);
+  return (handle != nullptr) && (::IsZoomed(handle) != FALSE);
 }
 
 /**
@@ -35515,6 +35367,225 @@ void wxWindowMswRuntime::DoSetClientSize(
 
     DoMoveWindow(topLeft.x, topLeft.y, targetWidth, targetHeight);
   }
+}
+
+namespace
+{
+  // wx's sizeFlags bits, as wxWindow::DoSetSize (0x00968680) and
+  // wxWindowBase::AdjustForParentClientOrigin (0x00964840) test them.
+  constexpr std::int32_t kWxSizeAutoWidth = 0x1;
+  constexpr std::int32_t kWxSizeAutoHeight = 0x2;
+  constexpr std::int32_t kWxSizeAllowMinusOne = 0x4;
+  constexpr std::int32_t kWxSizeNoAdjustments = 0x8;
+
+  // "leave this axis as it is" placeholder shared by DoSetSize's arguments.
+  constexpr std::int32_t kWxSizeUnchanged = -1;
+} // namespace
+
+/**
+ * Address: 0x009678C0 (FUN_009678C0)
+ * Mangled: ?SetTitle@wxWindow@@UAEXPBG@Z
+ *
+ * IDA signature:
+ * BOOL __thiscall wxWindow::SetTitle(wxWindow *this, LPCWSTR *a2);
+ *
+ * What it does:
+ * Pushes the title straight onto the native window.
+ */
+void wxWindowMswRuntime::SetTitle(
+  const wxStringRuntime& title
+)
+{
+  const HWND handle = GetWxWindowNativeHandle(this);
+  if (handle == nullptr) {
+    return;
+  }
+
+  (void)::SetWindowTextW(handle, title.c_str());
+}
+
+/**
+ * Address: 0x00968500 (FUN_00968500)
+ * Mangled: ?DoGetPosition@wxWindow@@MBEXPAH0@Z
+ *
+ * IDA signature:
+ * int *__thiscall wxWindow::DoGetPosition(wxWindow *this, int *a2, int *a3);
+ *
+ * What it does:
+ * Reports where the window sits. A top-level window reports its screen
+ * position; a child reports its position inside the parent's client area, so
+ * the screen point is mapped through the parent and the parent's client-area
+ * origin subtracted.
+ */
+void wxWindowMswRuntime::DoGetPosition(
+  std::int32_t* const x,
+  std::int32_t* const y
+) const
+{
+  RECT windowRect{};
+  if (const HWND handle = GetWxWindowNativeHandle(this); handle != nullptr) {
+    (void)::GetWindowRect(handle, &windowRect);
+  }
+
+  POINT position{windowRect.left, windowRect.top};
+
+  if (!IsTopLevel()) {
+    if (const wxWindowBase* const parent = GetParentWindow(); parent != nullptr) {
+      if (const HWND parentHandle = GetWxWindowNativeHandle(parent); parentHandle != nullptr) {
+        (void)::ScreenToClient(parentHandle, &position);
+      }
+
+      const wxPoint parentClientOrigin = parent->GetClientAreaOrigin();
+      position.x -= parentClientOrigin.x;
+      position.y -= parentClientOrigin.y;
+    }
+  }
+
+  if (x != nullptr) {
+    *x = position.x;
+  }
+  if (y != nullptr) {
+    *y = position.y;
+  }
+}
+
+/**
+ * Address: 0x00968480 (FUN_00968480)
+ * Mangled: ?DoGetSize@wxWindow@@MBEXPAH0@Z
+ *
+ * IDA signature:
+ * int *__thiscall wxWindow::DoGetSize(wxWindow *this, int *a2, int *a3);
+ *
+ * What it does:
+ * Reports the outer (window rectangle) extent, non-client area included.
+ */
+void wxWindowMswRuntime::DoGetSize(
+  std::int32_t* const outWidth,
+  std::int32_t* const outHeight
+) const
+{
+  RECT windowRect{};
+  if (const HWND handle = GetWxWindowNativeHandle(this); handle != nullptr) {
+    (void)::GetWindowRect(handle, &windowRect);
+  }
+
+  if (outWidth != nullptr) {
+    *outWidth = windowRect.right - windowRect.left;
+  }
+  if (outHeight != nullptr) {
+    *outHeight = windowRect.bottom - windowRect.top;
+  }
+}
+
+/**
+ * Address: 0x00964840 (FUN_00964840)
+ * Mangled: ?AdjustForParentClientOrigin@wxWindowBase@@UBEXAAH0H@Z
+ *
+ * IDA signature:
+ * int *__thiscall wxWindowBase::AdjustForParentClientOrigin(
+ *     wxWindowBase *this, int *a2, int *a3, char a4);
+ *
+ * What it does:
+ * Shifts a child's requested position by the parent's client-area origin, so a
+ * caller can ask for a position in client coordinates. Top-level windows,
+ * parentless windows, and callers passing wxSIZE_NO_ADJUSTMENTS are left alone.
+ */
+void wxWindowMswRuntime::AdjustForParentClientOrigin(
+  std::int32_t& x,
+  std::int32_t& y,
+  const std::int32_t sizeFlags
+) const
+{
+  if (IsTopLevel() || (sizeFlags & kWxSizeNoAdjustments) != 0) {
+    return;
+  }
+
+  const wxWindowBase* const parent = GetParentWindow();
+  if (parent == nullptr) {
+    return;
+  }
+
+  const wxPoint parentClientOrigin = parent->GetClientAreaOrigin();
+  x += parentClientOrigin.x;
+  y += parentClientOrigin.y;
+}
+
+/**
+ * Address: 0x00968680 (FUN_00968680)
+ * Mangled: ?DoSetSize@wxWindow@@MAEXHHHHH@Z
+ *
+ * IDA signature:
+ * int __thiscall wxWindow::DoSetSize(wxWindow *this, int a2, int a3, int a4,
+ *                                    int a5, int a6);
+ *
+ * What it does:
+ * Resolves the -1 "leave this alone" placeholders against the window's current
+ * geometry - or against its best size when the matching wxSIZE_AUTO_* flag is
+ * set - and moves the window. Returns without touching the window when the
+ * requested rectangle already matches the current one, which is what keeps a
+ * WM_SIZE-driven relayout from recursing.
+ */
+void wxWindowMswRuntime::DoSetSize(
+  const std::int32_t x,
+  const std::int32_t y,
+  const std::int32_t width,
+  const std::int32_t height,
+  const std::int32_t sizeFlags
+)
+{
+  std::int32_t currentX = 0;
+  std::int32_t currentY = 0;
+  DoGetPosition(&currentX, &currentY);
+
+  std::int32_t currentWidth = 0;
+  std::int32_t currentHeight = 0;
+  DoGetSize(&currentWidth, &currentHeight);
+
+  if (x == currentX && y == currentY && width == currentWidth && height == currentHeight) {
+    return;
+  }
+
+  std::int32_t targetX = x;
+  std::int32_t targetY = y;
+  if ((sizeFlags & kWxSizeAllowMinusOne) == 0) {
+    if (targetX == kWxSizeUnchanged) {
+      targetX = currentX;
+    }
+    if (targetY == kWxSizeUnchanged) {
+      targetY = currentY;
+    }
+  }
+
+  AdjustForParentClientOrigin(targetX, targetY, sizeFlags);
+
+  // The binary computes the best size at most once and reuses both axes of it.
+  bool bestSizeQueried = false;
+  wxSize bestSize{};
+
+  std::int32_t targetWidth = width;
+  if (targetWidth == kWxSizeUnchanged) {
+    if ((sizeFlags & kWxSizeAutoWidth) != 0) {
+      bestSize = DoGetBestSize();
+      bestSizeQueried = true;
+      targetWidth = bestSize.x;
+    } else {
+      targetWidth = currentWidth;
+    }
+  }
+
+  std::int32_t targetHeight = height;
+  if (targetHeight == kWxSizeUnchanged) {
+    if ((sizeFlags & kWxSizeAutoHeight) != 0) {
+      if (!bestSizeQueried) {
+        bestSize = DoGetBestSize();
+      }
+      targetHeight = bestSize.y;
+    } else {
+      targetHeight = currentHeight;
+    }
+  }
+
+  DoMoveWindow(targetX, targetY, targetWidth, targetHeight);
 }
 
 /**
