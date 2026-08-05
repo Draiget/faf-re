@@ -66474,6 +66474,40 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x00965730 (FUN_00965730, wxWindowBase::~wxWindowBase)
+ * Mangled: ??1wxWindowBase@@UAE@XZ
+ *
+ * IDA signature:
+ * void __thiscall wxWindowBase::~wxWindowBase(wxWindowBase *this);
+ *
+ * What it does:
+ * Takes the window back out of the two lists that hold bare pointers to it.
+ * The binary opens its destructor with exactly this pair, before it touches
+ * the caret, validator, constraints, sizers, drop target, tooltip or name:
+ *
+ *   wxList::DeleteObject(&wxPendingDelete, this);
+ *   wxList::DeleteObject(&wxTopLevelWindows, this);
+ *
+ * Neither removal happened here. wxTopLevelWindows is appended to in
+ * wxWindow::Create and was never erased from, so once the frame went away the
+ * list held a dangling pointer - and WxSendIdleEventsRuntime walks it on the
+ * way out of WIN_AppExecute, calling GetEventHandler()->ProcessEvent through
+ * whatever the freed memory now held. That is an access violation on exit,
+ * and it only became reachable once WM_CLOSE started ending the main loop.
+ *
+ * The rest of the binary's destructor is not modelled: this tree keeps that
+ * state in maps beside the object and the owning teardown paths already clear
+ * their own entries.
+ *
+ * Defined this far down the file because both lists are declared here.
+ */
+wxWindowMswRuntime::~wxWindowMswRuntime()
+{
+  (void)WxRuntimeListDeleteObject(&wxPendingDelete, this);
+  std::erase(gWxTopLevelWindows, static_cast<wxWindowBase*>(this));
+}
+
+/**
  * Address: 0x009DDD40 (FUN_009DDD40, sub_9DDD40)
  *
  * What it does:

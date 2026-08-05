@@ -2421,6 +2421,31 @@ class wxWindowMswRuntime : public wxWindowBase
 {
 public:
   /**
+   * Address: 0x00965730 (FUN_00965730, wxWindowBase::~wxWindowBase)
+   * Mangled: ??1wxWindowBase@@UAE@XZ
+   *
+   * What it does:
+   * Takes the window back out of the two lists that hold bare pointers to it,
+   * which is the first thing the binary's destructor does:
+   *
+   *   wxList::DeleteObject(&wxPendingDelete, this);
+   *   wxList::DeleteObject(&wxTopLevelWindows, this);
+   *
+   * Nothing else may hold a raw pointer to a window past its lifetime - both
+   * lists are walked long after, wxTopLevelWindows by the idle pump on the way
+   * out of the main loop.
+   *
+   * This is the wxWindowBase destructor's work, but it lives here because
+   * wxWindowBase models the binary's vtable slot-for-slot (its deleting-dtor
+   * slot is `DeleteObject`) and giving it a real C++ destructor would insert a
+   * slot that the binary does not have. Every window teardown path in this
+   * tree runs ~wxWindowMswRuntime, so the effect is the same.
+   *
+   * Deliberately non-virtual, for the same reason.
+   */
+  ~wxWindowMswRuntime();
+
+  /**
    * Address: 0x009678C0 (FUN_009678C0)
    * Mangled: ?SetTitle@wxWindow@@UAEXPBG@Z
    *
