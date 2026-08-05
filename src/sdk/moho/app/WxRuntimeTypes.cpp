@@ -1472,6 +1472,15 @@ namespace
   // the child-window translation (0x0098C063).
   constexpr long kWxWindowStyleSunkenBorderBit = 0x00200000;
   constexpr long kWxWindowStylePopupWindow = 0x00020000;
+  // Top-level-window style bits. The taskbar pair works together: a frame is
+  // kept off the taskbar by giving it an owner (the hidden module window), and
+  // a frame that has an owner but still wants a button asks for WS_EX_APPWINDOW.
+  constexpr long kWxFrameStyleNoTaskbar = 0x00000002;
+  constexpr long kWxFrameStyleToolWindow = 0x00000004;
+  constexpr long kWxFrameStyleFloatOnParent = 0x00000008;
+  constexpr long kWxFrameStyleStayOnTop = 0x00008000;
+  // wxTOPLEVEL_EX_DIALOG: set on dialogs, which opt out of the taskbar rules.
+  constexpr long kWxTopLevelExtraStyleDialog = 0x00000008;
   constexpr long kWxWindowExtraStyleInheritable = 0x00000001;
   constexpr unsigned long kMswStyleBase = 0x50000000u;
   constexpr unsigned long kMswStyleClipChildren = 0x52000000u;
@@ -30007,47 +30016,87 @@ bool wxTopLevelWindowRuntime::Show(
   return true;
 }
 
+namespace
+{
+  /**
+   * Address: 0x0098C9B0 (FUN_0098C9B0, wxTLWHiddenParentModule::GetHWND)
+   * Mangled: ?GetHWND@wxTLWHiddenParentModule@@SAPAUHWND__@@XZ
+   *
+   * IDA signature:
+   * HWND __cdecl wxTLWHiddenParentModule::GetHWND();
+   *
+   * What it does:
+   * Lazily registers the hidden top-level-parent class and creates the single
+   * hidden window that owns every frame asking to stay off the taskbar. Takes
+   * no `this` and sits in no vtable - it is the module's static accessor, and
+   * `MSWGetParent` below is its only caller.
+   */
+  HWND WxTopLevelHiddenParentGetHandle()
+  {
+    if (gWxHiddenTopLevelParentWindow != nullptr) {
+      return gWxHiddenTopLevelParentWindow;
+    }
+
+    if (gWxHiddenTopLevelParentClassName == nullptr) {
+      WNDCLASSW windowClass{};
+      windowClass.lpfnWndProc = ::DefWindowProcW;
+      windowClass.hInstance = ::GetModuleHandleW(nullptr);
+      windowClass.lpszClassName = kWxHiddenTopLevelParentClassName;
+      if (::RegisterClassW(&windowClass) != 0) {
+        gWxHiddenTopLevelParentClassName = kWxHiddenTopLevelParentClassName;
+      }
+    }
+
+    gWxHiddenTopLevelParentWindow = ::CreateWindowExW(
+      0,
+      gWxHiddenTopLevelParentClassName,
+      kWxHiddenTopLevelParentWindowName,
+      0,
+      0,
+      0,
+      0,
+      0,
+      nullptr,
+      nullptr,
+      ::GetModuleHandleW(nullptr),
+      nullptr
+    );
+    return gWxHiddenTopLevelParentWindow;
+  }
+}  // namespace
+
 /**
- * Address: 0x0098C9B0 (FUN_0098C9B0, wxTopLevelWindowMSW::MSWGetParent)
+ * Address: 0x0098CAB0 (FUN_0098CAB0, wxTopLevelWindowMSW::MSWGetParent)
  * Mangled: ?MSWGetParent@wxTopLevelWindowMSW@@UBEKXZ
  *
+ * IDA signature:
+ * HWND __thiscall wxTopLevelWindowMSW::MSWGetParent(wxTopLevelWindowMSW *this);
+ *
  * What it does:
- * Lazily registers the hidden top-level-parent class and creates one hidden
- * parent window used by wx top-level-window creation paths.
+ * Picks the owner window handed to ::CreateWindowExW. A top-level window is
+ * deliberately unowned unless it asked to float on its parent, because an owned
+ * window is always drawn above that parent. The hidden module window is used
+ * only to keep a wxFRAME_NO_TASKBAR frame off the taskbar - having any owner is
+ * what suppresses the taskbar button, which is the whole trick.
+ *
+ * So an ordinary frame - SupCom's included - gets a null owner here and a
+ * taskbar button of its own.
  */
 unsigned long wxTopLevelWindowRuntime::MSWGetParent() const
 {
-  (void)this;
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  const long style = (state != nullptr) ? state->windowStyle : 0;
 
-  if (gWxHiddenTopLevelParentWindow != nullptr) {
-    return static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(gWxHiddenTopLevelParentWindow));
+  HWND ownerHandle = nullptr;
+  if ((style & kWxFrameStyleFloatOnParent) != 0 && state != nullptr && state->parentWindow != nullptr) {
+    ownerHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state->parentWindow->GetHandle()));
   }
 
-  if (gWxHiddenTopLevelParentClassName == nullptr) {
-    WNDCLASSW windowClass{};
-    windowClass.lpfnWndProc = ::DefWindowProcW;
-    windowClass.hInstance = ::GetModuleHandleW(nullptr);
-    windowClass.lpszClassName = kWxHiddenTopLevelParentClassName;
-    if (::RegisterClassW(&windowClass) != 0) {
-      gWxHiddenTopLevelParentClassName = kWxHiddenTopLevelParentClassName;
-    }
+  if ((style & kWxFrameStyleNoTaskbar) != 0 && ownerHandle == nullptr) {
+    ownerHandle = WxTopLevelHiddenParentGetHandle();
   }
 
-  gWxHiddenTopLevelParentWindow = ::CreateWindowExW(
-    0,
-    gWxHiddenTopLevelParentClassName,
-    kWxHiddenTopLevelParentWindowName,
-    0,
-    0,
-    0,
-    0,
-    0,
-    nullptr,
-    nullptr,
-    ::GetModuleHandleW(nullptr),
-    nullptr
-  );
-  return static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(gWxHiddenTopLevelParentWindow));
+  return static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(ownerHandle));
 }
 
 /**
@@ -35586,7 +35635,6 @@ unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
 {
   constexpr long kWxStyleFrameStyleMask = static_cast<long>(0xE0DFFFFFu);
   constexpr long kWxStyleResizeBorder = 0x00000040;
-  constexpr long kWxStyleCaption = 0x00000004;
   constexpr long kWxStyleMinimizeBox = 0x00000400;
   constexpr long kWxStyleMaximizeBox = 0x00000200;
   constexpr long kWxStyleSystemMenu = 0x00000800;
@@ -35594,8 +35642,7 @@ unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
   constexpr long kWxStyleMaximize = 0x00002000;
   constexpr long kWxStyleThinFrame = 0x00000180;
   constexpr long kWxStyleNoBorderPair = 0x14000000;
-  constexpr long kWxStyleFrameToolWindow = 0x20000000;
-  constexpr long kWxStyleDialogLike = 0x00000002;
+  constexpr long kWxStyleCaption = 0x20000000;
 
   constexpr unsigned long kMswStylePopup = 0x80000000u;
   constexpr unsigned long kMswStyleThickFrame = 0x00040000u;
@@ -35610,13 +35657,11 @@ unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
 
   constexpr unsigned long kMswExStyleDlgModalFrameBit = 0x00000001u;
   constexpr unsigned long kMswExStyleToolWindow = 0x00000080u;
-  constexpr unsigned long kMswExStyleControlParent = 0x00040000u;
   constexpr unsigned long kMswExStyleTopmost = 0x00000008u;
   constexpr unsigned long kMswExStyleAppWindow = 0x00040000u;
-  constexpr unsigned long kMswExStyleTransparent = 0x00000400u;
+  constexpr unsigned long kMswExStyleContextHelp = 0x00000400u;
 
-  constexpr long kWxExStyleNoDlgFrame = 0x00000008;
-  constexpr long kWxExStyleTransparent = 0x00000004;
+  constexpr long kWxExStyleContextHelp = 0x00000004;
 
   long frameStyle = style;
 
@@ -35624,7 +35669,7 @@ unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
     wxWindowMswRuntime::MSWGetStyle((style & kWxStyleFrameStyleMask) | kWxWindowStyleSunkenBorderBit, extendedStyle)
     & kMswStyleChildClipMask;
 
-  if ((style & kWxStyleCaption) != 0) {
+  if ((style & kWxFrameStyleToolWindow) != 0) {
     nativeStyle |= kMswStylePopup;
   }
 
@@ -35638,7 +35683,7 @@ unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
     nativeStyle |= kMswStyleDlgFrameOnly;
   }
 
-  unsigned long result = ((style & kWxStyleFrameToolWindow) != 0)
+  unsigned long result = ((style & kWxStyleCaption) != 0)
     ? (kMswStyleCaption | nativeStyle)
     : (nativeStyle | kMswStylePopup);
 
@@ -35665,27 +35710,34 @@ unsigned long wxTopLevelWindowRuntime::MSWGetStyle(
     const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
     const long ownExtraStyle = state != nullptr ? state->extraStyle : 0;
 
-    if ((ownExtraStyle & kWxExStyleNoDlgFrame) == 0) {
-      if ((style & kWxStyleCaption) != 0) {
+    // Dialogs opt out of the taskbar rules entirely.
+    if ((ownExtraStyle & kWxTopLevelExtraStyleDialog) == 0) {
+      // A tool window is a palette: it gets the thin frame and, by
+      // documentation, no taskbar button - which is spelled here as
+      // wxFRAME_NO_TASKBAR so MSWGetParent gives it the hidden owner.
+      if ((style & kWxFrameStyleToolWindow) != 0) {
         *extendedStyle |= kMswExStyleToolWindow;
-        frameStyle |= kWxStyleDialogLike;
+        frameStyle |= kWxFrameStyleNoTaskbar;
       }
-      if ((frameStyle & kWxStyleDialogLike) == 0
+      // The other half of the taskbar problem: a frame that wants a button but
+      // has a real parent would not get one, because owned windows are skipped.
+      // WS_EX_APPWINDOW forces it back.
+      if ((frameStyle & kWxFrameStyleNoTaskbar) == 0
         && state != nullptr && state->parentWindow != nullptr) {
-        *extendedStyle |= kMswExStyleControlParent;
+        *extendedStyle |= kMswExStyleAppWindow;
       }
     }
 
-    // The binary tests the sign of the low half of the style word here.
-    if (static_cast<std::int16_t>(frameStyle) < 0) {
+    // The binary tests the sign of the low half of the style word, which is
+    // this bit.
+    if ((frameStyle & kWxFrameStyleStayOnTop) != 0) {
       *extendedStyle |= kMswExStyleTopmost;
     }
-    if ((ownExtraStyle & kWxExStyleTransparent) != 0) {
-      *extendedStyle |= kMswExStyleTransparent;
+    if ((ownExtraStyle & kWxExStyleContextHelp) != 0) {
+      *extendedStyle |= kMswExStyleContextHelp;
     }
   }
 
-  static_cast<void>(kMswExStyleAppWindow);
   return result;
 }
 

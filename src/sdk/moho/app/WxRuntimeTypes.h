@@ -5167,12 +5167,14 @@ public:
   bool Show(bool show) override;
 
   /**
-   * Address: 0x0098C9B0 (FUN_0098C9B0, wxTopLevelWindowMSW::MSWGetParent)
+   * Address: 0x0098CAB0 (FUN_0098CAB0, wxTopLevelWindowMSW::MSWGetParent)
    * Mangled: ?MSWGetParent@wxTopLevelWindowMSW@@UBEKXZ
    *
    * What it does:
-   * Lazily registers and creates the hidden Win32 parent window used by
-   * top-level wx windows, then returns its native handle lane.
+   * Picks the owner window for ::CreateWindowExW. Null for an ordinary frame -
+   * an owned top-level window is pinned above its owner and gets no taskbar
+   * button of its own. The hidden module window is returned only for a
+   * wxFRAME_NO_TASKBAR frame, where suppressing that button is the point.
    */
   [[nodiscard]] unsigned long MSWGetParent() const override;
 
