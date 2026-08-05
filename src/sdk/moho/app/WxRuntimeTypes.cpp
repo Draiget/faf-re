@@ -11081,7 +11081,13 @@ namespace
     std::wstring iconResourceName;
   };
 
-  constexpr wchar_t kSupComFrameIconResourceName[] = L"ID";
+  // The frame's icon resource, as WSupComFrame::WSupComFrame (0x008CD8C0)
+  // names it at 0x008CD9F2. IDA prints that operand as "ID" because it decodes
+  // the literal as ANSI and stops at the first embedded NUL; the bytes at
+  // 0x00E4E5D8 are UTF-16 and spell IDI_WIN_FAICON, which is exactly the name
+  // of the GROUP_ICON at rva 0x00E8A2E0 in the shipped binary. Any wide-string
+  // constant taken from an IDA aXxx label is worth re-reading the same way.
+  constexpr wchar_t kSupComFrameIconResourceName[] = L"IDI_WIN_FAICON";
 
   std::unordered_map<const WSupComFrame*, SupComFrameState> gSupComFrameStateByFrame{};
   struct WxTopLevelWindowRuntimeState
