@@ -2527,6 +2527,12 @@
     <ClInclude Include="moho\unit\core\SUnitConstructionParams.h" />
   </ItemGroup>
   <ItemGroup>
+    <ResourceCompile Include="moho\app\MohoResources.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="moho\app\res\faicon.ico" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="$(FafRepoRoot)dependencies\WildMagic3p8\Foundation\Foundation.vcxproj">
       <Project>{2CB49086-4D27-765D-E093-2579A0302DA9}</Project>
     </ProjectReference>

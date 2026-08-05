@@ -4997,6 +4997,127 @@ public:
 
 static_assert(sizeof(wxTextCtrlRuntime) == 0x4, "wxTextCtrlRuntime size must be 0x4");
 
+/**
+ * One loaded icon.
+ *
+ * The binary keeps this behind a ref-counted wxGDIImageRefData: width at
+ * +0x08, height at +0x0C, depth at +0x10 and the HICON at +0x14. That is the
+ * layout wxICOResourceHandler::Load (0x009ABE80) writes and the one
+ * wxIconBundle::GetIcon (0x009F2FE0), wxIcon::Ok (0x004FB7B0),
+ * wxIcon::GetWidth (0x004FB7D0) and wxIcon::GetHeight (0x004FB7E0) read back.
+ *
+ * This tree does not lay wx objects out to match the binary - wxWindowBase
+ * already keeps its state in a map beside the object - so the three fields the
+ * icon path actually uses are held directly and the binary offsets are
+ * recorded here rather than asserted. Nothing reads them by offset.
+ */
+class wxIcon
+{
+public:
+  wxIcon() = default;
+
+  /**
+   * Address: 0x009AA610 (FUN_009AA610)
+   * Mangled: ??0wxIcon@@QAE@ABVwxString@@HHH@Z
+   *
+   * IDA signature:
+   * wxIcon *__thiscall wxIcon::wxIcon(wxIcon *this, int a2, int a3, int a4,
+   *                                   int a5);
+   *
+   * What it does:
+   * Starts empty and immediately loads: this is the form
+   * WSupComFrame's constructor uses, as
+   * wxIcon(L"IDI_WIN_FAICON", wxBITMAP_TYPE_ICO_RESOURCE, -1, -1).
+   */
+  wxIcon(
+    const wchar_t* resourceName,
+    std::int32_t bitmapType,
+    std::int32_t desiredWidth = -1,
+    std::int32_t desiredHeight = -1
+  );
+
+  /**
+   * Address: 0x009AA540 (FUN_009AA540)
+   *
+   * What it does:
+   * Drops whatever was loaded, finds the handler registered for this bitmap
+   * type, and lets it load. No handler for the type means no icon.
+   */
+  bool LoadFile(
+    const wchar_t* resourceName,
+    std::int32_t bitmapType,
+    std::int32_t desiredWidth,
+    std::int32_t desiredHeight
+  );
+
+  /** Address: 0x004FB7B0 (FUN_004FB7B0) - refData present and its handle set. */
+  [[nodiscard]] bool Ok() const noexcept { return mNativeIcon != 0UL; }
+
+  /** Address: 0x004FB7D0 (FUN_004FB7D0) - refData +0x08. */
+  [[nodiscard]] std::int32_t GetWidth() const noexcept { return mWidth; }
+
+  /** Address: 0x004FB7E0 (FUN_004FB7E0) - refData +0x0C. */
+  [[nodiscard]] std::int32_t GetHeight() const noexcept { return mHeight; }
+
+  /** refData +0x14. */
+  [[nodiscard]] unsigned long GetNativeIcon() const noexcept { return mNativeIcon; }
+
+  /**
+   * What it does:
+   * Takes ownership lanes from a handler that has just loaded one - the
+   * assignment wxICOResourceHandler::Load makes to refData +0x08/+0x0C/+0x14.
+   */
+  void AdoptNativeIcon(unsigned long nativeIcon, std::int32_t width, std::int32_t height) noexcept;
+
+private:
+  std::int32_t mWidth = 0;        // wxGDIImageRefData +0x08
+  std::int32_t mHeight = 0;       // wxGDIImageRefData +0x0C
+  unsigned long mNativeIcon = 0;  // wxGDIImageRefData +0x14
+};
+
+/**
+ * The set of sizes one icon is available in. A frame keeps one so it can
+ * answer both halves of WM_SETICON from whatever the application supplied.
+ */
+class wxIconBundle
+{
+public:
+  wxIconBundle() = default;
+
+  /**
+   * Address: 0x0098BEC0 (FUN_0098BEC0)
+   *
+   * What it does:
+   * The single-icon bundle wxTopLevelWindowMSW::SetIcon builds before handing
+   * the work to SetIcons.
+   */
+  explicit wxIconBundle(const wxIcon& icon);
+
+  /**
+   * Address: 0x009F3220 (FUN_009F3220)
+   *
+   * What it does:
+   * Adds an icon, replacing whichever entry already has the same width and
+   * height rather than letting a size appear twice.
+   */
+  void AddIcon(const wxIcon& icon);
+
+  /**
+   * Address: 0x009F2FE0 (FUN_009F2FE0)
+   *
+   * What it does:
+   * Picks the icon for a requested size: an exact match if the bundle has one,
+   * otherwise the one matching the system icon metric, otherwise the first.
+   * An empty bundle answers with an empty icon.
+   */
+  [[nodiscard]] wxIcon GetIcon(std::int32_t width, std::int32_t height) const;
+
+  [[nodiscard]] bool IsEmpty() const noexcept { return mIcons.empty(); }
+
+private:
+  msvc8::vector<wxIcon> mIcons;
+};
+
 class wxTopLevelWindowRuntime : public wxWindowMswRuntime
 {
 public:
@@ -5124,8 +5245,44 @@ public:
    * Asks Windows whether the frame is maximised.
    */
   [[nodiscard]] virtual bool IsMaximized() const;
-  virtual void SetIcon(const void* icon) { (void)icon; }
-  virtual void SetIcons(const void* iconBundle) { (void)iconBundle; }
+  /**
+   * Address: 0x0098C640 (FUN_0098C640)
+   * Mangled: ?SetIcon@wxTopLevelWindowMSW@@UAEXABVwxIcon@@@Z
+   *
+   * IDA signature:
+   * int __thiscall wxTopLevelWindowMSW::SetIcon(wxTopLevelWindowMSW *this,
+   *                                             const struct wxIcon *a2);
+   *
+   * What it does:
+   * Wraps the icon in a one-entry bundle and hands it to SetIcons, which is
+   * the only thing that talks to the window.
+   */
+  virtual void SetIcon(const wxIcon& icon);
+
+  /**
+   * Address: 0x0098C6B0 (FUN_0098C6B0)
+   * Mangled: ?SetIcons@wxTopLevelWindowMSW@@UAEXABVwxIconBundle@@@Z
+   *
+   * IDA signature:
+   * wxObjectRefData *__thiscall wxTopLevelWindowMSW::SetIcons(
+   *     wxTopLevelWindowMSW *this, wxArrayDCInfo *arg0);
+   *
+   * What it does:
+   * Keeps the bundle, then sets the small and large window icons from it -
+   * but only from an entry that is *exactly* 16x16 and 32x32 respectively.
+   * The frame's own icon is loaded at the default size, so in practice only
+   * the large one is set and Windows scales the caption icon down from it.
+   */
+  virtual void SetIcons(const wxIconBundle& icons);
+
+  /**
+   * Address: 0x0098BFA0 (FUN_0098BFA0)
+   *
+   * What it does:
+   * The bundle's answer for "no particular size", which is how the frame's
+   * icon is asked for when something needs one and does not care.
+   */
+  [[nodiscard]] virtual wxIcon GetIcon() const;
   virtual bool ShowFullScreen(bool show, long style)
   {
     (void)show;

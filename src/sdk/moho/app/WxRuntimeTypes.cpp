@@ -11097,6 +11097,9 @@ namespace
     std::int32_t fsOldWidth = 0;
     std::int32_t fsOldHeight = 0;
     std::uint8_t flag34 = 0;
+    // wxTopLevelWindowMSW::m_icons, which the binary keeps on the object at
+    // +0x124 (wxTopLevelWindowMSW::GetIcon, 0x0098BFA0, reads it there).
+    wxIconBundle icons{};
   };
 
   struct WxDialogRuntimeState
@@ -14354,10 +14357,6 @@ namespace
       mPersistedMaximizeSync = 0;
       mIsApplicationActive = 0;
 
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.iconResourceName.assign(kSupComFrameIconResourceName);
-      state.iconResourceAssigned = true;
-
       // Binary: WSupComFrame::WSupComFrame runs
       //   wxFrame::wxFrame(this, nullptr, -1, title, pos, size, style, L"frame")
       // at 0x008CD92E, and that constructor form is the one that creates the
@@ -14416,25 +14415,10 @@ namespace
     // viewport - and the D3D head behind it - was rebuilt at 1024x768 no matter
     // how large the frame actually was.
 
-    void SetIcon(
-      const void* const icon
-    ) override
-    {
-      SupComFrameState& state = EnsureSupComFrameState(this);
-      state.iconResourceAssigned = icon != nullptr;
-      if (state.iconResourceAssigned) {
-        state.iconResourceName.assign(kSupComFrameIconResourceName);
-      } else {
-        state.iconResourceName.clear();
-      }
-    }
-
-    void SetIcons(
-      const void* const iconBundle
-    ) override
-    {
-      SetIcon(iconBundle);
-    }
+    // SetIcon and SetIcons are not overridden here either, for the same
+    // reason: the binary inherits wxTopLevelWindowMSW's (0x0098C640 and
+    // 0x0098C6B0). What used to stand here recorded a resource name in the
+    // side table and never went near the window, so the frame had no icon.
   };
 
   struct DwordLaneRuntimeView
@@ -30477,6 +30461,486 @@ namespace
   // Defined further down, beside the focus helpers it belongs with.
   [[nodiscard]] bool wxSetFocusToChildRuntime(wxWindowBase* window, wxWindowBase** childLastFocused);
 } // namespace
+
+// ---------------------------------------------------------------------------
+// Icons: loading one, keeping a set of them, and putting one on a window.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+  // wxBitmapType, as wxGDIImage's handlers register themselves for it. The
+  // four standard handlers take 1 (BMP resource), 2 (BMP file), 4 (ICO
+  // resource) and 3 (ICO file) - see wxGDIImage::InitStandardHandlers
+  // (0x009ABA70) and the constructors it calls.
+  constexpr std::int32_t kWxBitmapTypeIcoResource = 4;
+
+  // wxSystemMetric ids, which is what wxSystemSettings::GetMetric (0x009C6A70)
+  // indexes its table with. These two are the system icon size.
+  constexpr std::int32_t kWxSysIconX = 15;
+  constexpr std::int32_t kWxSysIconY = 16;
+
+  // The sizes SetIcons (0x0098C6B0) insists on before it will set each half of
+  // WM_SETICON. They are literal in the binary, not metrics.
+  constexpr std::int32_t kWxSmallIconExtent = 16;
+  constexpr std::int32_t kWxLargeIconExtent = 32;
+
+  // What an icon reports when nothing could be measured - the seed
+  // wxGetHiconSize (0x009AAF60) writes before it asks Windows anything.
+  constexpr std::int32_t kWxDefaultIconExtent = 32;
+
+  /**
+   * Address: 0x009C6A70 (FUN_009C6A70)
+   * Mangled: ?GetMetric@wxSystemSettingsNative@@SAHW4wxSystemMetric@@@Z
+   *
+   * What it does:
+   * Maps a wxSystemMetric onto the GetSystemMetrics index it stands for. Only
+   * the two the icon path needs are mapped here; the binary's table covers the
+   * whole enum up to 0x25 and answers 0 for the ones with no Windows metric.
+   */
+  [[nodiscard]] std::int32_t WxGetSystemMetric(const std::int32_t metric) noexcept
+  {
+    switch (metric) {
+      case kWxSysIconX:
+        return ::GetSystemMetrics(SM_CXICON);
+      case kWxSysIconY:
+        return ::GetSystemMetrics(SM_CYICON);
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Address: 0x009AAF60 (FUN_009AAF60)
+   * Mangled: ?wxGetHiconSize@@YAXPAUHICON__@@PAVwxSize@@@Z
+   *
+   * IDA signature:
+   * _DWORD *__cdecl sub_9AAF60(_DWORD *a1, HICON hIcon);
+   *
+   * What it does:
+   * Measures a loaded icon by looking at its mask bitmap, and answers 32x32
+   * when it cannot. The binary skips the measurement entirely on one OS
+   * version (wxGetOsVersion() == 19, i.e. wxWIN32S) where GetIconInfo is not
+   * dependable; that check is dropped here because this build does not run
+   * there.
+   */
+  void WxGetNativeIconSize(const HICON icon, std::int32_t& outWidth, std::int32_t& outHeight) noexcept
+  {
+    outWidth = kWxDefaultIconExtent;
+    outHeight = kWxDefaultIconExtent;
+
+    if (icon == nullptr) {
+      return;
+    }
+
+    ICONINFO iconInfo{};
+    if (::GetIconInfo(icon, &iconInfo) == FALSE) {
+      return;
+    }
+
+    if (iconInfo.hbmMask != nullptr) {
+      BITMAP maskBitmap{};
+      if (::GetObjectW(iconInfo.hbmMask, static_cast<int>(sizeof(maskBitmap)), &maskBitmap) != 0) {
+        outWidth = maskBitmap.bmWidth;
+        outHeight = maskBitmap.bmHeight;
+      }
+      (void)::DeleteObject(iconInfo.hbmMask);
+    }
+
+    if (iconInfo.hbmColor != nullptr) {
+      (void)::DeleteObject(iconInfo.hbmColor);
+    }
+  }
+
+  /**
+   * The handler a wxGDIImage load is dispatched to. The binary keeps a name,
+   * an extension and the bitmap type on each one; only the type is ever read,
+   * by wxGDIImage::FindHandler (0x009ABA00).
+   */
+  class WxGdiImageHandler
+  {
+  public:
+    explicit WxGdiImageHandler(const std::int32_t bitmapType) noexcept
+      : mBitmapType(bitmapType)
+    {}
+
+    virtual ~WxGdiImageHandler() = default;
+
+    [[nodiscard]] std::int32_t GetBitmapType() const noexcept { return mBitmapType; }
+
+    virtual bool Load(
+      wxIcon& icon,
+      const wchar_t* resourceName,
+      std::int32_t desiredWidth,
+      std::int32_t desiredHeight
+    ) = 0;
+
+  private:
+    std::int32_t mBitmapType;
+  };
+
+  /**
+   * Address: 0x009ABE80 (FUN_009ABE80)
+   * Mangled: ?Load@wxICOResourceHandler@@UAE_NPAVwxGDIImage@@ABVwxString@@JHH@Z
+   *
+   * IDA signature:
+   * BOOL __stdcall sub_9ABE80(_DWORD *a1, const WCHAR **a2, int a3, int a4,
+   *                           int cy);
+   *
+   * What it does:
+   * Loads an icon out of the executable's own resources by name. Asking for no
+   * particular size goes through LoadIcon, which takes the resource's default
+   * size; asking for one goes through LoadImage.
+   *
+   * A by-name load that finds nothing falls back to the four stock Windows
+   * icons, matched on the wx names for them - the table at 0x00D59EF8 pairs
+   * wxICON_QUESTION/WARNING/ERROR/INFORMATION with IDI_QUESTION (32514),
+   * IDI_EXCLAMATION (32515), IDI_HAND (32513) and IDI_ASTERISK (32516). A
+   * sized load gets no fallback.
+   */
+  class WxIcoResourceHandler final : public WxGdiImageHandler
+  {
+  public:
+    WxIcoResourceHandler() noexcept
+      : WxGdiImageHandler(kWxBitmapTypeIcoResource)
+    {}
+
+    bool Load(
+      wxIcon& icon,
+      const wchar_t* const resourceName,
+      const std::int32_t desiredWidth,
+      const std::int32_t desiredHeight
+    ) override
+    {
+      if (resourceName == nullptr) {
+        return false;
+      }
+
+      auto* const instance = static_cast<HINSTANCE>(wxGetInstance());
+      const bool sizeRequested = !(desiredWidth == -1 && desiredHeight == -1);
+
+      HICON nativeIcon = nullptr;
+      if (sizeRequested) {
+        nativeIcon = static_cast<HICON>(::LoadImageW(
+          instance, resourceName, IMAGE_ICON, desiredWidth, desiredHeight, 0U
+        ));
+      } else {
+        nativeIcon = ::LoadIconW(instance, resourceName);
+      }
+
+      if (nativeIcon == nullptr && !sizeRequested) {
+        struct StockIcon
+        {
+          const wchar_t* name;
+          unsigned int systemIconId;
+        };
+        // The table at 0x00D59EF8, read out of the image: four (name, id)
+        // pairs. The ids are IDI_QUESTION, IDI_EXCLAMATION, IDI_HAND and
+        // IDI_ASTERISK, spelled numerically because this translation unit is
+        // not built with UNICODE and the IDI_* macros would resolve to the
+        // ANSI forms.
+        static const StockIcon kStockIcons[] = {
+          {L"wxICON_QUESTION", 32514U},
+          {L"wxICON_WARNING", 32515U},
+          {L"wxICON_ERROR", 32513U},
+          {L"wxICON_INFORMATION", 32516U},
+        };
+
+        for (const StockIcon& stock : kStockIcons) {
+          if (std::wcscmp(resourceName, stock.name) == 0) {
+            nativeIcon = ::LoadIconW(nullptr, MAKEINTRESOURCEW(stock.systemIconId));
+            break;
+          }
+        }
+      }
+
+      std::int32_t width = 0;
+      std::int32_t height = 0;
+      WxGetNativeIconSize(nativeIcon, width, height);
+      icon.AdoptNativeIcon(reinterpret_cast<std::uintptr_t>(nativeIcon), width, height);
+      return icon.Ok();
+    }
+  };
+
+  std::vector<WxGdiImageHandler*> gWxGdiImageHandlers{};
+
+  /**
+   * Address: 0x009AAE00 (FUN_009AAE00)
+   * Mangled: ?AddHandler@wxGDIImage@@SAXPAVwxGDIImageHandler@@@Z
+   */
+  void WxGdiImageAddHandler(WxGdiImageHandler* const handler)
+  {
+    if (handler != nullptr) {
+      gWxGdiImageHandlers.push_back(handler);
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x009ABA00 (FUN_009ABA00)
+ * Mangled: ?FindHandler@wxGDIImage@@SAPAVwxGDIImageHandler@@W4wxBitmapType@@@Z
+ *
+ * What it does:
+ * The first registered handler that claims this bitmap type, or none.
+ */
+namespace
+{
+  [[nodiscard]] WxGdiImageHandler* WxGdiImageFindHandler(const std::int32_t bitmapType)
+  {
+    for (WxGdiImageHandler* const handler : gWxGdiImageHandlers) {
+      if (handler != nullptr && handler->GetBitmapType() == bitmapType) {
+        return handler;
+      }
+    }
+    return nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x009ABA70 (FUN_009ABA70)
+ * Mangled: ?InitStandardHandlers@wxGDIImage@@KAXXZ
+ *
+ * What it does:
+ * Registers the handlers a fresh wx knows about. The binary registers four -
+ * BMP resource, BMP file, ICO resource and ICO file. Only the ICO resource
+ * one is recovered here, because it is the only type anything in this engine
+ * loads: the frame icon, by name, out of the executable. The other three want
+ * wxBitmap, which this tree does not model yet.
+ *
+ * Safe to call more than once; it does nothing after the first time.
+ */
+void wxInitializeGdiImageHandlers()
+{
+  if (!gWxGdiImageHandlers.empty()) {
+    return;
+  }
+
+  WxGdiImageAddHandler(new (std::nothrow) WxIcoResourceHandler());
+}
+
+void wxIcon::AdoptNativeIcon(
+  const unsigned long nativeIcon,
+  const std::int32_t width,
+  const std::int32_t height
+) noexcept
+{
+  mNativeIcon = nativeIcon;
+  mWidth = width;
+  mHeight = height;
+}
+
+/**
+ * Address: 0x009AA540 (FUN_009AA540)
+ *
+ * What it does:
+ * Drops whatever was loaded, finds the handler registered for this bitmap
+ * type, and lets it load. No handler for the type means no icon.
+ */
+bool wxIcon::LoadFile(
+  const wchar_t* const resourceName,
+  const std::int32_t bitmapType,
+  const std::int32_t desiredWidth,
+  const std::int32_t desiredHeight
+)
+{
+  AdoptNativeIcon(0UL, 0, 0);
+
+  WxGdiImageHandler* const handler = WxGdiImageFindHandler(bitmapType);
+  if (handler == nullptr) {
+    return false;
+  }
+
+  return handler->Load(*this, resourceName, desiredWidth, desiredHeight);
+}
+
+/**
+ * Address: 0x009AA610 (FUN_009AA610)
+ * Mangled: ??0wxIcon@@QAE@ABVwxString@@HHH@Z
+ *
+ * What it does:
+ * Starts empty and immediately loads.
+ */
+wxIcon::wxIcon(
+  const wchar_t* const resourceName,
+  const std::int32_t bitmapType,
+  const std::int32_t desiredWidth,
+  const std::int32_t desiredHeight
+)
+{
+  (void)LoadFile(resourceName, bitmapType, desiredWidth, desiredHeight);
+}
+
+/**
+ * Address: 0x0098BEC0 (FUN_0098BEC0)
+ *
+ * What it does:
+ * The single-icon bundle SetIcon builds before handing the work to SetIcons.
+ */
+wxIconBundle::wxIconBundle(
+  const wxIcon& icon
+)
+{
+  AddIcon(icon);
+}
+
+/**
+ * Address: 0x009F3220 (FUN_009F3220)
+ * Mangled: ?AddIcon@wxIconBundle@@QAEXABVwxIcon@@@Z
+ *
+ * What it does:
+ * Adds an icon, replacing whichever entry already has the same width and
+ * height rather than letting one size appear twice. Entries that carry no
+ * handle are skipped when looking for that match, so an empty slot never
+ * shadows a real icon.
+ */
+void wxIconBundle::AddIcon(
+  const wxIcon& icon
+)
+{
+  for (wxIcon& existing : mIcons) {
+    if (!existing.Ok()) {
+      continue;
+    }
+    if (existing.GetWidth() == icon.GetWidth() && existing.GetHeight() == icon.GetHeight()) {
+      existing = icon;
+      return;
+    }
+  }
+
+  mIcons.push_back(icon);
+}
+
+/**
+ * Address: 0x009F2FE0 (FUN_009F2FE0)
+ * Mangled: ?GetIcon@wxIconBundle@@QBEABVwxIcon@@ABVwxSize@@@Z
+ *
+ * What it does:
+ * Picks the icon for a requested size. An exact match wins outright. Failing
+ * that the one matching the system icon metric is remembered while the walk
+ * continues, and is the answer if no exact match turns up. Failing even that
+ * the first entry is handed back. An empty bundle answers with an empty icon.
+ */
+wxIcon wxIconBundle::GetIcon(
+  const std::int32_t width,
+  const std::int32_t height
+) const
+{
+  const std::int32_t systemIconWidth = WxGetSystemMetric(kWxSysIconX);
+  const std::int32_t systemIconHeight = WxGetSystemMetric(kWxSysIconY);
+
+  if (mIcons.empty()) {
+    return wxIcon{};
+  }
+
+  const wxIcon* systemSized = nullptr;
+  for (const wxIcon& candidate : mIcons) {
+    if (!candidate.Ok()) {
+      continue;
+    }
+
+    if (candidate.GetWidth() == width && candidate.GetHeight() == height) {
+      return candidate;
+    }
+
+    if (candidate.GetWidth() == systemIconWidth && candidate.GetHeight() == systemIconHeight) {
+      systemSized = &candidate;
+    }
+  }
+
+  return (systemSized != nullptr) ? *systemSized : mIcons.front();
+}
+
+/**
+ * Address: 0x0098C640 (FUN_0098C640)
+ * Mangled: ?SetIcon@wxTopLevelWindowMSW@@UAEXABVwxIcon@@@Z
+ *
+ * What it does:
+ * Wraps the icon in a one-entry bundle and hands it to SetIcons, which is the
+ * only thing that talks to the window.
+ */
+void wxTopLevelWindowRuntime::SetIcon(
+  const wxIcon& icon
+)
+{
+  SetIcons(wxIconBundle(icon));
+}
+
+/**
+ * Address: 0x0098C6B0 (FUN_0098C6B0)
+ * Mangled: ?SetIcons@wxTopLevelWindowMSW@@UAEXABVwxIconBundle@@@Z
+ *
+ * What it does:
+ * Keeps the bundle, then sets the small and large window icons from it - but
+ * only from an entry that is *exactly* 16x16 and 32x32. GetIcon will happily
+ * substitute a different size, so each answer is re-checked against the size
+ * that was asked for before it reaches WM_SETICON.
+ *
+ * The 16 and 32 are literal in the binary, not metrics, and that has a visible
+ * consequence: LoadIcon hands back the icon at the *physical* large-icon size,
+ * so on a scaled display a DPI-unaware process like this one gets 48x48 and
+ * neither check passes. Measured on the shipped binary at 150%: WM_GETICON
+ * answers ICON_BIG and ICON_SMALL with nothing and the window class carries no
+ * icon either, exactly as this does. The icon on the taskbar button there is
+ * the executable's own resource, which Windows falls back to - which is why
+ * MohoResources.rc matters more than this function does.
+ *
+ * At 100% the large-icon metric is 32, both the load and the check line up,
+ * and this sets ICON_BIG. Windows scales the caption icon down from it.
+ */
+void wxTopLevelWindowRuntime::SetIcons(
+  const wxIconBundle& icons
+)
+{
+  EnsureWxTopLevelWindowRuntimeState(this).icons = icons;
+
+  const HWND handle = GetWxWindowNativeHandle(this);
+  if (handle == nullptr) {
+    return;
+  }
+
+  const wxIcon smallIcon = icons.GetIcon(kWxSmallIconExtent, kWxSmallIconExtent);
+  if (
+    smallIcon.Ok() && smallIcon.GetWidth() == kWxSmallIconExtent
+    && smallIcon.GetHeight() == kWxSmallIconExtent
+  ) {
+    (void)::SendMessageW(
+      handle,
+      WM_SETICON,
+      static_cast<WPARAM>(ICON_SMALL),
+      static_cast<LPARAM>(smallIcon.GetNativeIcon())
+    );
+  }
+
+  const wxIcon largeIcon = icons.GetIcon(kWxLargeIconExtent, kWxLargeIconExtent);
+  if (
+    largeIcon.Ok() && largeIcon.GetWidth() == kWxLargeIconExtent
+    && largeIcon.GetHeight() == kWxLargeIconExtent
+  ) {
+    (void)::SendMessageW(
+      handle,
+      WM_SETICON,
+      static_cast<WPARAM>(ICON_BIG),
+      static_cast<LPARAM>(largeIcon.GetNativeIcon())
+    );
+  }
+}
+
+/**
+ * Address: 0x0098BFA0 (FUN_0098BFA0)
+ *
+ * What it does:
+ * The bundle's answer for "no particular size" - the binary asks with
+ * wxSize(-1, -1), which never matches an entry exactly, so this is the
+ * system-icon-sized one or the first.
+ */
+wxIcon wxTopLevelWindowRuntime::GetIcon() const
+{
+  const WxTopLevelWindowRuntimeState* const state = FindWxTopLevelWindowRuntimeState(this);
+  if (state == nullptr) {
+    return wxIcon{};
+  }
+
+  return state->icons.GetIcon(-1, -1);
+}
 
 wxEventTable wxTopLevelWindowRuntime::sm_eventTable = {&wxWindowMswRuntime::sm_eventTable, nullptr};
 
@@ -59955,6 +60419,12 @@ WSupComFrame* WX_CreateSupComFrame(
 {
   auto* const frame = new WSupComFrameRuntime(title, position, size, style);
   frame->SetSizeHints(moho::wnd_MinDragWidth, moho::wnd_MinDragHeight, -1, -1, -1, -1);
+
+  // The tail of the binary's constructor, from 0x008CD9E9: build a wxIcon on
+  // the resource named IDI_WIN_FAICON and hand it to SetIcon, which is what
+  // puts an icon on the caption bar and in the taskbar. The name is UTF-16 in
+  // the image; IDA prints it "ID" because it reads the literal as ANSI.
+  frame->SetIcon(wxIcon(kSupComFrameIconResourceName, kWxBitmapTypeIcoResource));
   return frame;
 }
 
@@ -62042,6 +62512,11 @@ void moho::WX_EnsureApplicationObject()
       wxTheColourDatabase = new wxColourDatabase(2);
     }
     wxInitializeStockObjects();
+
+    // wxApp::Initialize runs this too. Without it wxGDIImage's handler list is
+    // empty, wxIcon::LoadFile finds nothing to dispatch to, and the frame's
+    // icon never loads.
+    wxInitializeGdiImageHandlers();
   }
 
   if (wxTheApp != nullptr) {

@@ -1,0 +1,17 @@
+// Win32 resource script for the engine executable.
+//
+// The shipped binary carries a GROUP_ICON whose resource name is the string
+// IDI_WIN_FAICON (rva 0x00E8A2E0, nine images: 16/32/48/256 px at 4, 8 and 32
+// bpp). It is a *named* resource, not a numeric id, which is what an .rc line
+// produces when the symbol on the left is not #defined - so the original
+// script said the same thing this one does.
+//
+// WSupComFrame's constructor (0x008CD8C0) asks for exactly this name at
+// 0x008CD9F2, via wxIcon(L"IDI_WIN_FAICON", wxBITMAP_TYPE_ICO_RESOURCE), and
+// wxICOResourceHandler::Load (0x009ABE80) resolves it with
+// LoadIconW(wxGetInstance(), name). Without this script that lookup returns
+// null, the frame has no icon, and Windows falls back to the generic default
+// in the caption bar and the taskbar.
+//
+// faicon.ico was rebuilt from that GROUP_ICON and its nine ICON resources.
+IDI_WIN_FAICON ICON "res/faicon.ico"
