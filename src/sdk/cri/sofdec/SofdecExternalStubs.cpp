@@ -102,7 +102,11 @@ extern "C" {
   // SFHDS_Init: real body in SofdecSfdRuntime.cpp (0x00AE7150).
   void* SFHDS_InitFhd() { return nullptr; }
   // SFHDS_IsSfdHeader: real body in SofdecSfdRuntime.cpp (0x00AE7280).
-  void* SFHDS_ProcessHdr() { return nullptr; }
+  // SFHDS_ProcessHdr: real body in SofdecSfdRuntime.cpp (0x00AE7400). It was a
+  // no-argument stub here, and because C linkage ignores parameters when
+  // mangling it silently satisfied the properly-declared call in
+  // sfcre_ProcessHdr - so the SFD header-valid flag was never set and every
+  // movie was rejected as "not a valid SFD file".
   void* SFHDS_ReprocessHdr() { return nullptr; }
   void* SFHDS_SetHdr() { return nullptr; }
   // SFH_Destroy: real body in SofdecSfdRuntime.cpp (0x00ADC7D0).

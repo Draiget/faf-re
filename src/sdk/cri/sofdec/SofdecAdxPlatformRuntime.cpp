@@ -3280,11 +3280,17 @@
     ply->pendingStartRequestType = 1;
   }
 
+  // The analyzer slot. `version` is at +0x0C, not +0x08: isEffectiveVer
+  // (0x00ADC980) reads it with `mov eax, [esi+0Ch]`, and SFH_AnlyByteRate
+  // (0x00ADCF00) tests it with `cmp dword ptr [edi+0Ch], 6Eh`. The lane at
+  // +0x08 is the remaining byte count, so the version check here was reading
+  // a length and comparing it against 107/110.
   struct SofdecFeatureHeaderRuntimeView
   {
     std::int32_t state = 0; // +0x00
     std::uint8_t* elementInfoBuffer = nullptr; // +0x04
-    std::int32_t version = 0; // +0x08
+    std::int32_t remainingBytes = 0; // +0x08
+    std::int32_t version = 0; // +0x0C
   };
 
   static_assert(
@@ -3296,8 +3302,8 @@
     "SofdecFeatureHeaderRuntimeView::elementInfoBuffer offset must be 0x04"
   );
   static_assert(
-    offsetof(SofdecFeatureHeaderRuntimeView, version) == 0x08,
-    "SofdecFeatureHeaderRuntimeView::version offset must be 0x08"
+    offsetof(SofdecFeatureHeaderRuntimeView, version) == 0x0C,
+    "SofdecFeatureHeaderRuntimeView::version offset must be 0x0C"
   );
 
   constexpr std::int32_t kSfhElementTableOffset = 0x180;
