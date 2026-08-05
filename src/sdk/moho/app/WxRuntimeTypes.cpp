@@ -11498,6 +11498,7 @@ namespace
   std::int32_t gWxEvtNcPaintRuntimeType = 0;
   std::int32_t gWxEvtEraseBackgroundRuntimeType = 0;
   std::int32_t gWxEvtMoveRuntimeType = 0;
+  std::int32_t gWxEvtCloseWindowRuntimeType = 0;
   std::int32_t gWxEvtActivateRuntimeType = 0;
   std::int32_t gWxEvtInitDialogRuntimeType = 0;
   std::int32_t gWxEvtSysColourChangedRuntimeType = 0;
@@ -11643,6 +11644,14 @@ namespace
       gWxEvtMoveRuntimeType = wxNewEventType();
     }
     return gWxEvtMoveRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtCloseWindowRuntimeType()
+  {
+    if (gWxEvtCloseWindowRuntimeType == 0) {
+      gWxEvtCloseWindowRuntimeType = wxNewEventType();
+    }
+    return gWxEvtCloseWindowRuntimeType;
   }
 
   [[nodiscard]] std::int32_t EnsureWxEvtActivateRuntimeType()
@@ -30551,7 +30560,11 @@ const void* wxTopLevelWindowRuntime::GetEventTable() const
   };
 
   sm_eventTable.entries = entries;
-  return nullptr; // wxApp::sm_eventTable (0x00991E60) is not modelled here
+  // Hand back this class's table, not null. ProcessEvent walks the chain
+  // itself through wxEventTable::baseTable - which sm_eventTable already
+  // points at wxWindow's - so returning null here dropped both this table's
+  // wxEVT_ACTIVATE row and every base table behind it on the floor.
+  return &sm_eventTable;
 }
 
 bool wxTopLevelWindowRuntime::IsTopLevel() const
@@ -35842,6 +35855,39 @@ wxWindowBase* wxWindowBase::GetEventHandler()
     return state->eventHandler;
   }
   return this;
+}
+
+/**
+ * Address: 0x00963220 (FUN_00963220)
+ * Mangled: ?Close@wxWindowBase@@QAE_N_N@Z
+ *
+ * IDA signature:
+ * char __thiscall wxWindowBase::Close(wxWindowBase *this, bool force);
+ *
+ * What it does:
+ * Raises wxEVT_CLOSE_WINDOW at the window's event handler and reports whether
+ * the close should go ahead: the handler has to have taken the event, and it
+ * must not have vetoed it while allowed to. `force` is what takes that right
+ * away. Destroying the window is the handler's job, not this function's.
+ *
+ * The event's own flags carry the negotiation - the constructor seeds
+ * loggingOff = 1 and veto = 0 (the single 16-bit store at +0x20 in the
+ * binary), and this sets canVeto at +0x22.
+ */
+bool wxWindowBase::Close(
+  const bool force
+)
+{
+  WxCloseEventFactoryRuntime event{};
+  event.mEventType = EnsureWxEvtCloseWindowRuntimeType();
+
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  event.mEventId = (state != nullptr) ? state->windowId : 0;
+  event.mEventObject = this;
+  event.mCanVeto = force ? 0u : 1u;
+
+  const bool processed = GetEventHandler()->ProcessEvent(&event);
+  return processed && (event.mCanVeto == 0u || event.mVeto == 0u);
 }
 
 /**
@@ -60045,6 +60091,76 @@ WSupComFrame* WSupComFrame::DeleteWithFlag(
   }
 
   return object;
+}
+
+/**
+ * Address: 0x0099F4B0 (FUN_0099F4B0)
+ * Mangled: ?MSWWindowProc@wxFrame@@UAEJIIJ@Z
+ *
+ * IDA signature:
+ * wxWindow *__thiscall wxFrame::MSWWindowProc(wxWindow *this,
+ *     enum_AllMessages message, HWND hWnd, unsigned int a5);
+ *
+ * What it does:
+ * Turns WM_CLOSE into the wxEVT_CLOSE_WINDOW negotiation and reports the
+ * message handled when the close was refused - which is how a window that does
+ * not want to go away tells Windows to leave it alone. Everything else goes to
+ * wxWindow::MSWWindowProc.
+ *
+ * The binary is `v8 = wxWindowBase::Close(this, 0) == 0`, i.e. processed =
+ * !Close(false): a close that goes ahead is *not* marked handled, so
+ * DefWindowProc gets it and destroys the window; a close that was vetoed is
+ * marked handled and stops there.
+ *
+ * See the declaration for which of the binary's other cases are still to come.
+ */
+long wxTopLevelWindowRuntime::MSWWindowProc(
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  if (message == WM_CLOSE) {
+    if (!Close(false)) {
+      return 0;
+    }
+  }
+
+  return wxWindowMswRuntime::MSWWindowProc(message, wParam, lParam);
+}
+
+wxEventTable WSupComFrame::sm_eventTable = {&wxTopLevelWindowRuntime::sm_eventTable, nullptr};
+
+/**
+ * Address: 0x008CE090 (FUN_008CE090)
+ * Mangled: ?GetEventTable@WSupComFrame@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Hands back this class's event table, which claims wxEVT_CLOSE_WINDOW and
+ * wxEVT_MOVE and chains the rest to the frame's bases.
+ *
+ * Table at 0x00DFE4EC = {base 0x00D56F70, rows 0x00F5BB4C}; the two rows are
+ * {-1, -1, 0x008CDAA0 OnCloseWindow, 0, &0x00F8F40C wxEVT_CLOSE_WINDOW} and
+ * {-1, -1, 0x008CDAD0 OnMove, 0, &0x00F8F48C wxEVT_MOVE}.
+ *
+ * Without this both handlers were dead code: nothing in the tree published a
+ * table carrying them, so the close event raised by wxWindowBase::Close found
+ * no row and the frame never asked the game whether to quit.
+ */
+const void* WSupComFrame::GetEventTable() const
+{
+  static const wxEventTableEntry entries[] = {
+    MakeWxEventTableEntry(
+      -1, -1, &WSupComFrame::OnCloseWindow, WxEventTypeSlot(gWxEvtCloseWindowRuntimeType)
+    ),
+    MakeWxEventTableEntry(
+      -1, -1, &WSupComFrame::OnMove, WxEventTypeSlot(gWxEvtMoveRuntimeType)
+    ),
+    wxEventTableEntry{}, // null handler: end of table
+  };
+
+  sm_eventTable.entries = entries;
+  return &sm_eventTable;
 }
 
 /**
