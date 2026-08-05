@@ -1748,6 +1748,21 @@ public:
    * Mangled: ?Destroy@wxWindowBase@@UAE_NXZ
    */
   virtual bool Destroy() { return false; }
+
+  /**
+   * Address: 0x00963220 (FUN_00963220)
+   * Mangled: ?Close@wxWindowBase@@QAE_N_N@Z
+   *
+   * IDA signature:
+   * char __thiscall wxWindowBase::Close(wxWindowBase *this, bool force);
+   *
+   * What it does:
+   * Asks the window to close by raising wxEVT_CLOSE_WINDOW at its event
+   * handler, and reports whether the close should go ahead. `force` suppresses
+   * the handler's right to veto. Raising the event is all this does - actually
+   * destroying the window is the handler's business.
+   */
+  bool Close(bool force = false);
   /**
    * Address: 0x0042B3E0 (FUN_0042B3E0)
    * Mangled: ?SetTitle@wxWindowBase@@UAEXPBG@Z
@@ -5178,6 +5193,31 @@ public:
   static wxEventTable sm_eventTable;
 
   /**
+   * Address: 0x0099F4B0 (FUN_0099F4B0)
+   * Mangled: ?MSWWindowProc@wxFrame@@UAEJIIJ@Z
+   *
+   * IDA signature:
+   * wxWindow *__thiscall wxFrame::MSWWindowProc(wxWindow *this,
+   *     enum_AllMessages message, HWND hWnd, unsigned int a5);
+   *
+   * What it does:
+   * Translates the messages a frame answers for into wx events, and hands
+   * everything else to wxWindow::MSWWindowProc.
+   *
+   * This is wxFrame's slot. The binary's chain is
+   * WSupComFrame -> wxFrame -> wxWindow; this tree has no wxFrame class
+   * between the top-level window and the SupCom frame, so the row lives here,
+   * which is exactly where WSupComFrame::MSWWindowProc already forwards.
+   *
+   * Only WM_CLOSE is translated so far. The binary's switch also covers
+   * WM_MENUSELECT, WM_ENTERMENULOOP/WM_EXITMENULOOP, WM_COMMAND, WM_SIZE,
+   * WM_PAINT and WM_QUERYDRAGICON; those want the menu-event, frame-layout and
+   * icon-bundle machinery and are still to come. Until then they fall through
+   * exactly as an unhandled message should.
+   */
+  long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam) override;
+
+  /**
    * Address: 0x004A3780 (FUN_004A3780)
    *
    * What it does:
@@ -6026,6 +6066,23 @@ public:
    * Implements deleting-dtor thunk semantics for SupCom frame runtime lanes.
    */
   static WSupComFrame* DeleteWithFlag(WSupComFrame* object, std::uint8_t deleteFlags) noexcept;
+
+  /**
+   * Address: 0x008CE090 (FUN_008CE090)
+   * Mangled: ?GetEventTable@WSupComFrame@@MBEPBUwxEventTable@@XZ
+   *
+   * What it does:
+   * Hands back this class's event table, which claims wxEVT_CLOSE_WINDOW and
+   * wxEVT_MOVE and chains the rest to wxFrame's.
+   *
+   * Table at 0x00DFE4EC = {base 0x00D56F70, rows 0x00F5BB4C}; the two rows are
+   * {-1, -1, 0x008CDAA0 OnCloseWindow, 0, &0x00F8F40C wxEVT_CLOSE_WINDOW} and
+   * {-1, -1, 0x008CDAD0 OnMove, 0, &0x00F8F48C wxEVT_MOVE}. This is one of the
+   * four slots WSupComFrame actually overrides.
+   */
+  [[nodiscard]] const void* GetEventTable() const override;
+
+  static wxEventTable sm_eventTable;
 
   /**
    * Address: 0x008CDAA0 (FUN_008CDAA0, WSupComFrame::OnCloseWindow)
