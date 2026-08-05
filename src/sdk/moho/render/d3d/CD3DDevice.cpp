@@ -16,6 +16,7 @@
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/MeshFormatter.h"
 #include "gpg/gal/OutputContext.hpp"
@@ -1806,7 +1807,22 @@ namespace moho
    * Address: 0x004300E0 (FUN_004300E0)
    *
    * What it does:
-   * Clears active render targets/depth/stencil with opaque black.
+   * Clears active render targets/depth/stencil with opaque black, and swallows
+   * a gal::Error if the device refuses.
+   *
+   * The catch is not defensive padding - it is in the shipped binary and it is
+   * load-bearing. `__ehfuncinfo` at 0x00EC2D50 describes one try block with one
+   * handler whose type is `.?AVError@gal@gpg@@` and whose adjectives are 0x9
+   * (const + reference) with dispCatchObj 0, i.e. `catch (const gal::Error&)`
+   * with an unnamed parameter; the handler funclet at 0x00430158 does nothing
+   * but return the address of the epilogue.
+   *
+   * It matters because this is called from the frame's WM_SIZE handler, which
+   * runs between frames. The swapchain is created with EnableAutoDepthStencil
+   * = 0 (GetHeadParameters, 0x008E82B0), so the only depth-stencil is whatever
+   * the last render pass bound - and a UI-only pass binds none. Clearing Z and
+   * stencil with no depth-stencil surface attached is D3DERR_INVALIDCALL, so
+   * on that path this throw is the expected outcome, not an error.
    */
   void CD3DDevice::Clear()
   {
@@ -1814,10 +1830,13 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    (void)device->BeginScene();
-    device->Clear(true, true, true, 0xFF000000u, 1.0f, 0);
-    device->EndScene();
+    try {
+      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      (void)device->BeginScene();
+      device->Clear(true, true, true, 0xFF000000u, 1.0f, 0);
+      device->EndScene();
+    } catch (const gpg::gal::Error&) {
+    }
   }
 
   /**
