@@ -3832,6 +3832,26 @@
   }
 
   /**
+   * Address: 0x00ACBA10 (FUN_00ACBA10, _MWSFD_IsEnableHndl)
+   *
+   * IDA signature:
+   * int __usercall MWSFD_IsEnableHndl@<eax>(MWPLY a1);
+   *
+   * What it does:
+   * The guard every public `mwPly*` entry point opens with. A handle counts as
+   * enabled once `mwPlyCreateSofdec` has set its `used` lane, which is the
+   * first dword of the playback state (`mov eax, [eax]` at 0x00ACBA19); a null
+   * handle answers with the null itself.
+   */
+  std::int32_t MWSFD_IsEnableHndl(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    if (ply == nullptr) {
+      return 0;
+    }
+    return ply->used;
+  }
+
+  /**
    * Address: 0x00ACBA90 (FUN_00ACBA90, _mwPlyGetStat)
    *
    * What it does:
