@@ -3832,9 +3832,12 @@
   }
 
 
-  extern "C" SofdecCreateStreamDescriptor SFD_tr_sd_m2ts;
-  extern "C" SofdecCreateStreamDescriptor SFD_tr_sd_mps;
-  extern "C" SofdecCreateStreamDescriptor SFD_tr_vd_mpv;
+  // These are the binary's own names for three of the transfer-strategy
+  // descriptors defined later in this file. They were also standing as 4 KB
+  // zero stubs, so every createInfo descriptor handed out here was empty.
+  extern "C" SofdecTransferStrategy SFD_tr_sd_m2ts;
+  extern "C" SofdecTransferStrategy SFD_tr_sd_mps;
+  extern "C" SofdecTransferStrategy SFD_tr_vd_mpv;
   extern "C" void SFD_tr_ad_adxt();
   extern "C" std::int32_t ADXT_DetachMpa();
   extern "C" std::int32_t ADXT_DetachMPEG2AAC(void* adxtRuntime);
@@ -4713,7 +4716,7 @@
       return 0;
     }
 
-    createInfo->streamDescriptor = &SFD_tr_sd_m2ts;
+    createInfo->streamDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_sd_m2ts);
     (void)sfcre_AnalyMpv(buffer, sizeBytes, createInfo);
     if (createInfo->videoDescriptor != nullptr) {
       createInfo->audioDescriptor = reinterpret_cast<const void*>(&SFD_tr_ad_adxt);
@@ -4769,7 +4772,7 @@
             createInfo->streamTimingMetric = timingMetric * 50;
           }
 
-          createInfo->videoDescriptor = &SFD_tr_vd_mpv;
+          createInfo->videoDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_vd_mpv);
           createInfo->videoFrameMetric = sfcre_mpv_picrate[static_cast<std::size_t>(pictureRateIndex)];
           createInfo->videoBitRate =
             static_cast<std::int32_t>((static_cast<std::int32_t>(byte0B >> 3) | (32 * static_cast<std::int32_t>(byte0A & 0x1Fu)))
@@ -4854,7 +4857,7 @@
         createInfo->streamTimingMetric = packetSizeCandidate * 50;
       }
 
-      createInfo->streamDescriptor = &SFD_tr_sd_mps;
+      createInfo->streamDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_sd_mps);
       sfcre_AnalySfh(buffer, sizeBytes, createInfo);
       sfcre_AnalyAudio(buffer, sizeBytes, createInfo);
       sfcre_AnalyMpv(buffer, sizeBytes, createInfo);
@@ -5399,7 +5402,7 @@
     }
     if (sfcre_fhd.videoFrameMetric > 0) {
       createInfo->videoFrameMetric = sfcre_fhd.videoFrameMetric;
-      createInfo->videoDescriptor = &SFD_tr_vd_mpv;
+      createInfo->videoDescriptor = reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_vd_mpv);
     }
   }
 
@@ -19075,7 +19078,7 @@
 
     if (workctrlSubobj != nullptr) {
       const auto* const runtimeView = reinterpret_cast<const SfdPlaybackTimestampSourceRuntimeView*>(workctrlSubobj);
-      if (runtimeView->streamDescriptor == &SFD_tr_sd_m2ts) {
+      if (runtimeView->streamDescriptor == reinterpret_cast<const SofdecCreateStreamDescriptor*>(&SFD_tr_sd_m2ts)) {
         const auto* const m2tsdRuntime = reinterpret_cast<const M2TsdRuntimeView*>(
           SjAddressToPointer(runtimeView->streamPrepRuntime->m2tsdRuntimeAddress)
         );
@@ -19555,7 +19558,7 @@
   };
 
   /** Strategy descriptor for SFMPS (0x00D7F670). */
-  SofdecTransferStrategy gSfmpsTransferStrategy = {
+  extern "C" SofdecTransferStrategy SFD_tr_sd_mps = {
     /* init        */ &SFMPS_Init,
     /* finish      */ &SFMPS_Finish,
     /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_ExecServer),
@@ -19573,7 +19576,7 @@
   };
 
   /** Strategy descriptor for SFMPV (0x00D7F5D4). */
-  SofdecTransferStrategy gSfmpvTransferStrategy = {
+  extern "C" SofdecTransferStrategy SFD_tr_vd_mpv = {
     /* init        */ &SFMPV_Init,
     /* finish      */ &SFMPV_Finish,
     /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_ExecServer),
@@ -19609,7 +19612,7 @@
   };
 
   /** Strategy descriptor for SFM2TS (0x00D7F4D4). */
-  SofdecTransferStrategy gSfm2tsTransferStrategy = {
+  extern "C" SofdecTransferStrategy SFD_tr_sd_m2ts = {
     /* init        */ &SFM2TS_Init,
     /* finish      */ &SFM2TS_Finish,
     /* execServer  */ nullptr, // TODO-TABLE SFM2TS_ExecServer 0x00ACF140
@@ -19669,10 +19672,10 @@
    */
   SftrnEntryListView gSofdecTransferStrategyList = {{
     &gSfmemTransferStrategy,   // [0] 0x00D7F6B8
-    &gSfmpsTransferStrategy,   // [1] 0x00D7F670
-    &gSfmpvTransferStrategy,   // [2] 0x00D7F5D4
+    &SFD_tr_sd_mps,   // [1] 0x00D7F670
+    &SFD_tr_vd_mpv,   // [2] 0x00D7F5D4
     &gSfvomTransferStrategy,   // [3] 0x00D7F544
-    &gSfm2tsTransferStrategy,  // [4] 0x00D7F4D4
+    &SFD_tr_sd_m2ts,  // [4] 0x00D7F4D4
     // [5] 0x00D7F57C SFADXT - TODO-TABLE, the family is not recovered yet.
     // It is listed LAST here rather than in binary position, because
     // `sftrn_CallTrEntry` stops at the first null entry and a hole in slot 5
