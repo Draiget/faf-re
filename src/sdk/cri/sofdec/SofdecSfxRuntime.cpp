@@ -100,18 +100,57 @@ void SUD_Init();
 
 namespace moho_cri_sfx_internal {
 
-/// Recovered head of the global SFX library work area (0x011F9B20, 0x12A8
-/// bytes). The first DWORD is the dispatcher tag set by SFX_Init's callees;
-/// the second is the `last` slot reset by `sfx_InitLibWork` to the cell-cap
-/// sentinel `32`.
+/// One SFX composition handle. `sfx_InitHn` clears all 0x94 bytes and then
+/// seeds the lanes below; `sfx_SearchFreeHn` walks the pool at stride 0x94
+/// testing the first dword.
+struct SfxHandle {
+  std::int32_t used;          ///< +0x00 set to 1 by sfx_InitHn
+  std::int32_t reserved04;    ///< +0x04
+  std::int32_t reserved08;    ///< +0x08
+  std::int32_t reserved0C;    ///< +0x0C
+  std::uint8_t mUnknown10[0x14]; ///< +0x10
+  std::int32_t sfxz;          ///< +0x24 SFXZ sub-handle (SFX_Create)
+  std::uint8_t mUnknown28_[0x08]; ///< +0x28 (+0x28 = 1, +0x2C = 0)
+  std::int32_t sfxa;          ///< +0x30 SFXA sub-handle (SFX_Create)
+  std::int32_t reserved34;    ///< +0x34
+  std::int32_t planeBase;     ///< +0x38 work address aligned up to 32
+  std::int32_t plane1;        ///< +0x3C planeBase + 1024
+  std::int32_t plane2;        ///< +0x40 plane1 + 1024
+  std::int32_t plane3;        ///< +0x44 plane2 + 1024
+  std::uint8_t mUnknown48[0x08]; ///< +0x48
+  std::int32_t workAddress;   ///< +0x50
+  std::int32_t configTag;     ///< +0x54
+  std::int32_t reserved58;    ///< +0x58 seeded to -1
+  std::uint8_t mUnknown5C[0x08]; ///< +0x5C
+  std::int32_t reserved64;    ///< +0x64
+  std::uint8_t mUnknown68[0x2C]; ///< +0x68
+};
+
+static_assert(sizeof(SfxHandle) == 0x94, "SfxHandle size must be 0x94");
+static_assert(offsetof(SfxHandle, sfxz) == 0x24, "SfxHandle::sfxz must live at offset 0x24");
+static_assert(offsetof(SfxHandle, sfxa) == 0x30, "SfxHandle::sfxa must live at offset 0x30");
+static_assert(offsetof(SfxHandle, planeBase) == 0x38, "SfxHandle::planeBase must live at offset 0x38");
+static_assert(offsetof(SfxHandle, workAddress) == 0x50, "SfxHandle::workAddress must live at offset 0x50");
+static_assert(offsetof(SfxHandle, configTag) == 0x54, "SfxHandle::configTag must live at offset 0x54");
+
+/// Handles the SFX pool holds. `sfx_InitLibWork` seeds `last` with this.
+constexpr std::int32_t kSfxHandlePoolSize = 32;
+
+/// Global SFX library work area (0x011F9B20). `cur` counts live handles and
+/// `last` is the cell cap `sfx_InitLibWork` seeds with 32; the handle pool
+/// follows at +0x18.
 struct SfxLibWorkHead {
-  std::uint32_t dispatcher_tag;  ///< +0x00 (filled in by deeper SFX init)
+  std::int32_t  cur;             ///< +0x00 live-handle count (SFX_Create/Destroy)
   std::int32_t  last;            ///< +0x04 last-cell sentinel (= 32)
   std::int32_t  errFn;           ///< +0x08 error callback (SFX_SetErrFn)
   std::int32_t  errParam;        ///< +0x0C error callback context
   std::int32_t  reserved10;      ///< +0x10
   std::int32_t  cirFx;           ///< +0x14 CCIR matrix selector
+  SfxHandle     objs[kSfxHandlePoolSize]; ///< +0x18, stride 0x94
 };
+
+static_assert(offsetof(SfxLibWorkHead, objs) == 0x18,
+              "SfxLibWorkHead::objs must live at offset 0x18");
 
 static_assert(offsetof(SfxLibWorkHead, last) == 0x04,
               "SfxLibWorkHead::last must live at offset 0x04");
@@ -121,11 +160,30 @@ static_assert(offsetof(SfxLibWorkHead, cirFx) == 0x14,
               "SfxLibWorkHead::cirFx must live at offset 0x14");
 
 /// Head of the SFXZ (depth/Z-blit) work area (0x011F9180, 0x98C bytes).
+/// One SFXZ (depth/Z-blit) handle; the pool stride is 0x4C.
+struct SfxzHandle {
+  std::int32_t used;             ///< +0x00 set to 1 by SFXZ_Create
+  std::int32_t reserved04;       ///< +0x04 cleared by sfxzmv_InitHn
+  std::uint8_t mUnknown08[0x34]; ///< +0x08
+  std::int32_t reserved3C;       ///< +0x3C cleared by sfxzmv_InitHn
+  std::int32_t reserved40;       ///< +0x40
+  std::int32_t reserved44;       ///< +0x44
+  std::int32_t reserved48;       ///< +0x48
+};
+
+static_assert(sizeof(SfxzHandle) == 0x4C, "SfxzHandle size must be 0x4C");
+
 struct SfxzWorkHead {
-  std::int32_t reserved00;  ///< +0x00
+  std::int32_t cur;         ///< +0x00 live-handle count (SFXZ_Create)
   std::int32_t zbufType;    ///< +0x04 selector written by SFXZ_SetZbufType
   std::int32_t last;        ///< +0x08 last-cell sentinel (= 32)
+  SfxzHandle   objs[32];    ///< +0x0C, stride 0x4C
 };
+
+static_assert(offsetof(SfxzWorkHead, objs) == 0x0C,
+              "SfxzWorkHead::objs must live at offset 0x0C");
+// 0x0C + 32 * 0x4C == 0x98C, the extent sfxzmv_InitLibWork clears.
+static_assert(sizeof(SfxzWorkHead) == 0x98C, "SfxzWorkHead size must be 0x98C");
 
 static_assert(offsetof(SfxzWorkHead, zbufType) == 0x04,
               "SfxzWorkHead::zbufType must live at offset 0x04");
@@ -152,7 +210,6 @@ moho_cri_sfx_internal::SfxLibWorkHead sfx_libwork{};
 /// the same range the binary clears.
 struct SfxzWorkStorage {
   moho_cri_sfx_internal::SfxzWorkHead head;
-  std::uint8_t remainder[0x98C - sizeof(moho_cri_sfx_internal::SfxzWorkHead)];
 };
 SfxzWorkStorage sfxz_work{};
 
@@ -552,6 +609,186 @@ std::int32_t SFX_Finish()
   CFT_Finish();
   --sfx_init_cnt;
   return 0;
+}
+
+// Declared with the shared parameter types in SofdecAdxDeclarationsRuntime.cpp
+// and SofdecSvmTransferRuntime.cpp; SFX_Destroy has no declaration of its own
+// yet. SFXLIB_Error takes typed context pointers the create path has none of,
+// which is why the calls below pass null for both.
+void SFX_Destroy(void* sfxHandle);
+
+namespace {
+
+constexpr char kSfxErrWorkSizeShort[] = "E201194: sfx_InitHn: work size is short.";
+constexpr char kSfxErrSfxzCreate[] = "E201281: SfxZHn: can't create.";
+constexpr char kSfxErrSfxaCreate[] = "E202011: SfxAHn: can't create.";
+
+/// Composition planes are 1 KB apart, starting from a 32-byte-aligned base.
+constexpr std::int32_t kSfxPlaneStrideBytes = 1024;
+constexpr std::int32_t kSfxPlaneAlignBytes = 32;
+
+}  // namespace
+
+/**
+ * Address: 0x00ACC910 (FUN_00ACC910, _sfx_SearchFreeHn)
+ *
+ * What it does:
+ * Returns the first unused SFX handle in the pool, or null when all `last`
+ * slots are taken.
+ */
+moho_cri_sfx_internal::SfxHandle* sfx_SearchFreeHn()
+{
+  for (std::int32_t index = 0; index < sfx_libwork.last; ++index) {
+    if (sfx_libwork.objs[index].used == 0) {
+      return &sfx_libwork.objs[index];
+    }
+  }
+  return nullptr;
+}
+
+/**
+ * Address: 0x00ACC9B0 (FUN_00ACC9B0, _sfx_IsEnoughHnWorkSize)
+ *
+ * What it does:
+ * Reports whether a caller-supplied work buffer covers the three composition
+ * planes plus fixed overhead for a stream `frameWidth` wide.
+ */
+std::int32_t sfx_IsEnoughHnWorkSize(const std::int32_t workBytes, const std::int32_t frameWidth)
+{
+  return workBytes >= 8 * (frameWidth + frameWidth / 2) + 8285;
+}
+
+/**
+ * Address: 0x00ACC940 (FUN_00ACC940, _sfx_InitHn)
+ *
+ * What it does:
+ * Clears one SFX handle and lays the composition planes out across the
+ * caller's work buffer, 1 KB apart from a 32-byte-aligned base.
+ */
+std::int32_t sfx_InitHn(
+  moho_cri_sfx_internal::SfxHandle* const handle,
+  const std::int32_t workAddress,
+  const std::int32_t configTag
+)
+{
+  std::memset(handle, 0, sizeof(*handle));
+
+  const std::int32_t planeBase = (workAddress + (kSfxPlaneAlignBytes - 1)) & ~(kSfxPlaneAlignBytes - 1);
+  handle->workAddress = workAddress;
+  handle->planeBase = planeBase;
+  handle->plane1 = planeBase + kSfxPlaneStrideBytes;
+  handle->plane2 = handle->plane1 + kSfxPlaneStrideBytes;
+  handle->plane3 = handle->plane2 + kSfxPlaneStrideBytes;
+
+  // The memset already zeroed every other lane the binary writes zero to; only
+  // the two non-zero seeds and the -1 sentinel are left.
+  *reinterpret_cast<std::int32_t*>(reinterpret_cast<std::uint8_t*>(handle) + 0x28) = 1;
+  handle->configTag = configTag;
+  handle->reserved58 = -1;
+  handle->used = 1;
+  return configTag;
+}
+
+/**
+ * Address: 0x00ACD620 (FUN_00ACD620, _sfxzmv_SearchFreeHn)
+ *
+ * What it does:
+ * Returns the first unused SFXZ handle in the pool.
+ */
+moho_cri_sfx_internal::SfxzHandle* sfxzmv_SearchFreeHn()
+{
+  for (std::int32_t index = 0; index < sfxz_work.head.last; ++index) {
+    if (sfxz_work.head.objs[index].used == 0) {
+      return &sfxz_work.head.objs[index];
+    }
+  }
+  return nullptr;
+}
+
+/**
+ * Address: 0x00ACD650 (FUN_00ACD650, _sfxzmv_InitHn)
+ *
+ * What it does:
+ * Clears the mutable lanes of one SFXZ handle, leaving the rest of the slot
+ * as the pool left it.
+ */
+moho_cri_sfx_internal::SfxzHandle* sfxzmv_InitHn(moho_cri_sfx_internal::SfxzHandle* const handle)
+{
+  handle->reserved3C = 0;
+  handle->reserved40 = 0;
+  handle->reserved44 = 0;
+  handle->reserved48 = 0;
+  handle->reserved04 = 0;
+  return handle;
+}
+
+/**
+ * Address: 0x00ACD5F0 (FUN_00ACD5F0, _SFXZ_Create)
+ *
+ * What it does:
+ * Claims one SFXZ handle out of the pool and marks it live.
+ */
+moho_cri_sfx_internal::SfxzHandle* SFXZ_Create()
+{
+  moho_cri_sfx_internal::SfxzHandle* const handle = sfxzmv_SearchFreeHn();
+  if (handle == nullptr) {
+    return nullptr;
+  }
+
+  (void)sfxzmv_InitHn(handle);
+  ++sfxz_work.head.cur;
+  handle->used = 1;
+  return handle;
+}
+
+/**
+ * Address: 0x00ACC860 (FUN_00ACC860, _SFX_Create)
+ *
+ * IDA signature:
+ * struct_sofdec_sfx_hn *__cdecl SFX_Create(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Builds one SFX composition handle: claims a pool slot, checks the caller's
+ * work buffer is big enough for the frame width, lays the planes out in it,
+ * then attaches the SFXZ and SFXA sub-handles. Any failure after the slot is
+ * claimed tears the whole handle back down.
+ */
+void* SFX_Create(
+  const std::int32_t workAddress,
+  const std::int32_t workBytes,
+  const std::int32_t frameWidth
+)
+{
+  moho_cri_sfx_internal::SfxHandle* const handle = sfx_SearchFreeHn();
+  if (handle == nullptr) {
+    return nullptr;
+  }
+
+  if (sfx_IsEnoughHnWorkSize(workBytes, frameWidth) == 0) {
+    SFXLIB_Error(nullptr, nullptr, kSfxErrWorkSizeShort);
+    return nullptr;
+  }
+
+  (void)sfx_InitHn(handle, workAddress, workBytes);
+
+  moho_cri_sfx_internal::SfxzHandle* const depthHandle = SFXZ_Create();
+  if (depthHandle == nullptr) {
+    SFXLIB_Error(nullptr, nullptr, kSfxErrSfxzCreate);
+    SFX_Destroy(handle);
+    return nullptr;
+  }
+  handle->sfxz = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(depthHandle));
+
+  const std::int32_t audioHandle = SFXA_Create();
+  if (audioHandle == 0) {
+    SFXLIB_Error(nullptr, nullptr, kSfxErrSfxaCreate);
+    SFX_Destroy(handle);
+    return nullptr;
+  }
+  handle->sfxa = audioHandle;
+
+  ++sfx_libwork.cur;
+  return handle;
 }
 
 }  // extern "C"
