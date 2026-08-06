@@ -3564,6 +3564,28 @@
     return header;
   }
 
+  /**
+   * Address: 0x00AE7190 (FUN_00AE7190, _SFHDS_FinishFhd)
+   * Mangled: _SFHDS_FinishFhd (C linkage)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl SFHDS_FinishFhd(_DWORD *a1);
+   *
+   * What it does:
+   * Retires one file-header record on handle destroy. Clears the valid flag,
+   * the byte rate and the copied-header length - the three lanes that would
+   * otherwise make a stale header look parsed to the next `SFHDS_ProcessHdr`.
+   * Unlike `SFHDS_InitFhd` it leaves the tool-version pair alone, because
+   * nothing reads those without the valid flag.
+   */
+  extern "C" SfcreHeaderRuntimeView* SFHDS_FinishFhd(SfcreHeaderRuntimeView* const header)
+  {
+    header->headerValid = 0;
+    header->byteRate = 0;
+    header->copiedHeaderBytes = 0;
+    return header;
+  }
+
   // ---------------------------------------------------------------------------
   // SFD header analysis (0x00AE7400 - 0x00AE7830).
   //
@@ -17175,8 +17197,7 @@
 
     (void)SFPLY_Stop(workctrlSubobj);
 
-    auto* const fileHeaderView = reinterpret_cast<SfplyFileHeaderLaneView*>(workctrlSubobj);
-    (void)SFHDS_FinishFhd(fileHeaderView->fileHeaderState);
+    (void)SFHDS_FinishFhd(SfplyFileHeaderOf(workctrlSubobj));
     SFBUF_DestroySj(workctrlSubobj);
 
     const std::int32_t destroyResult = sfply_TrDestroy(workctrlSubobj);
