@@ -29,9 +29,31 @@
 //     for the full prioritized list.
 //
 // Data stubs are zero-initialized 4 KB buffers; indexed accesses stay
-// in-range but yield zeros. Real data tables live as .rdata in the FA
-// binary — recovering them requires reading fixed-size arrays from the
-// binary at each symbol's address.
+// in-range but yield zeros.
+//
+// TREAT EVERY DATA STUB BELOW AS SUSPECT. A sweep of these names against
+// the PE section map found 28 of them are real initialized .rdata/.data in
+// the shipped image — we are silently substituting zeros for live tables,
+// which produces subsystems that initialize cleanly and then behave as if
+// their content were empty. Two rounds of that were already fixed:
+// mpvvlt_run_level_* (the MPEG-1 run/level VLC tables, so every decoder
+// lookup returned nothing) and SFD_tr_vd_mpv / SFD_tr_sd_mps /
+// SFD_tr_sd_m2ts (transfer-strategy descriptors that existed BOTH here as
+// zeros and as populated objects in SofdecSfdRuntime.cpp, with the create
+// path binding the zeros).
+//
+// To classify one: grep the .asm exports for `offset _NAME`, take the
+// 4-byte immediate out of the instruction encoding to get its VA, then
+// check it against the PE section table — `rva - sectionVA >= rawSize`
+// means genuine BSS (a zero stub is correct), otherwise it is initialized
+// and the bytes are at `ptr + (rva - sectionVA)`. Size comes from whatever
+// copies or walks the table, the way mpvvlc_SetVlcRunLevel gave the
+// run/level dword counts.
+//
+// Still outstanding are the Dolby/MPEG audio tables (dolby_*, sin_*,
+// mpadcd_*, alloc_len_*, book, m2adec_*) — that is movie sound. Only 54 of
+// these names resolved to addresses via the `offset _NAME` scan; the other
+// 71 are referenced some other way and are unclassified.
 
 #include <cstdint>
 
