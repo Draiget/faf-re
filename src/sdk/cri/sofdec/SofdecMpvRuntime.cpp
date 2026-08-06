@@ -2125,7 +2125,7 @@ extern "C" {
   extern std::int32_t sfmpv_conv_59_94[];
   extern SfmpvPara sfmpv_para;
   extern std::int32_t sfmpv_rfb_adr_tbl[2];
-  extern std::int32_t sfmpv_work;
+  extern std::uint8_t sfmpv_work[];
   extern std::int32_t sfmpv_discard_wsiz;
   extern std::int32_t sfmpv_picusr_pbuf;
   extern std::int32_t sfmpv_picusr_bufnum;
@@ -2730,6 +2730,25 @@ std::int32_t sfmpv_ChkFatal()
   return 0;
 }
 
+/** Decoder slots SFMPV asks `MPV_Init` for (`push 20h` at 0x00AD1B79). */
+constexpr std::int32_t kSfmpvMpvObjectCount = 32;
+
+/**
+ * Address: 0x00FB9CB0 (`_sfmpv_work`, `.data` BSS)
+ *
+ * The MPV library's whole work arena. `mpvlib_InitWork` aligns the base up to
+ * 32 bytes and then clears `(objectCount + 1) << 13` bytes of it, so this must
+ * be at least that large - the `alignas` makes the alignment step a no-op and
+ * removes the need for slack. The layout MPV then carves out of it (32 object
+ * slots of 0x13C0, the conceal state, the VLC lanes, the clip mirror and the
+ * DCT scale table) all sits well inside that span.
+ *
+ * The binary only ever takes this symbol's address: `SFMPV_Init` passes it to
+ * `MPV_Init`, and `SFD_SetMpvParaTbl` / `sfmpv_CheckMpvPara` compare pointers
+ * against it. Nothing indexes it, so the cleared span is what fixes the size.
+ */
+alignas(32) std::uint8_t sfmpv_work[(kSfmpvMpvObjectCount + 1) << 13] = {};
+
 /**
  * Address: 0x00AD1B70 (FUN_00AD1B70, _SFMPV_Init)
  *
@@ -2745,7 +2764,7 @@ std::int32_t SFMPV_Init()
     }
   }
 
-  const std::int32_t initResult = MPV_Init(32, reinterpret_cast<std::int32_t>(&sfmpv_work));
+  const std::int32_t initResult = MPV_Init(kSfmpvMpvObjectCount, reinterpret_cast<std::int32_t>(sfmpv_work));
   if (initResult != 0) {
     std::int32_t errorCode = -(initResult != -16515323);
     errorCode &= 0xEE;
@@ -2806,7 +2825,7 @@ std::int32_t sfmpvf_CheckMpvPara()
   const auto* rfbEntry = &sfmpv_rfb_adr_tbl[0];
   while (*rfbEntry != 0) {
     ++rfbEntry;
-    if (reinterpret_cast<std::uintptr_t>(rfbEntry) >= reinterpret_cast<std::uintptr_t>(&sfmpv_work)) {
+    if (reinterpret_cast<std::uintptr_t>(rfbEntry) >= reinterpret_cast<std::uintptr_t>(sfmpv_work)) {
       // All rfb entries non-zero; now check SofDec tabs
       for (std::int32_t idx = 0; idx < sfmpv_para.nfrm_pool_wk; ++idx) {
         if (sSofDec_tabs[idx] == 0) {

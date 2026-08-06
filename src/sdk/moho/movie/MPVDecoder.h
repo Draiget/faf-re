@@ -601,6 +601,56 @@ namespace moho::movie
 extern "C"
 {
   /**
+   * Address: 0x00AE7950 (FUN_00AE7950, _MPV_Init)
+   *
+   * What it does:
+   * Library entry point: publishes the CRI banner, runs the fatal preflight,
+   * carves `objectCount` decoder slots plus the conceal-state arena out of
+   * `workAddress`, and initializes every MPV decode stage against it.
+   */
+  std::int32_t MPV_Init(std::int32_t objectCount, std::int32_t workAddress);
+
+  /**
+   * Address: 0x00AEAE60 (FUN_00AEAE60, _MPVERR_Init)
+   *
+   * What it does:
+   * Resets the library-wide MPV error record.
+   */
+  void* MPVERR_Init();
+
+  /**
+   * Address: 0x00AEAB10 (FUN_00AEAB10, _MPVFRM_Init)
+   *
+   * What it does:
+   * Frame-store startup hook (no-op in the PC build).
+   */
+  void MPVFRM_Init();
+
+  /**
+   * Address: 0x00AF61F0 (FUN_00AF61F0, _MPVBDEC_Init)
+   *
+   * What it does:
+   * Initializes block-decode state in the runtime work arena.
+   */
+  int MPVBDEC_Init(int handleAddress);
+
+  /**
+   * Address: 0x00AF6030 (FUN_00AF6030, _MPVUMC_Init)
+   *
+   * What it does:
+   * Initializes the motion-compensation stage.
+   */
+  int MPVUMC_Init();
+
+  /**
+   * Address: 0x00AF5E70 (FUN_00AF5E70, _MPVCDEC_Init)
+   *
+   * What it does:
+   * Initializes the colour-conversion stage.
+   */
+  int MPVCDEC_Init();
+
+  /**
    * Address: 0x00AE79E0 (FUN_00AE79E0, _mpvlib_ChkFatal)
    *
    * What it does:
@@ -979,8 +1029,12 @@ extern "C"
    * What it does:
    * Initializes all static MPV VLC tables and optionally builds runtime VLC
    * state for a provided setup context.
+   *
+   * `runtimeWorkBase` is pushed by the sole call site (`MPV_Init` at
+   * 0x00AE79A3) but never read by the body, which reads only `[esp+arg_0]`.
+   * Kept so the recovered call matches the binary's two-argument form.
    */
-  int MPVVLC_Init(int vlcContextBase);
+  int MPVVLC_Init(int vlcContextBase, int runtimeWorkBase);
 
   /**
    * Address: 0x00AF63E0 (FUN_00AF63E0, _mpvvlc_InitMbai)

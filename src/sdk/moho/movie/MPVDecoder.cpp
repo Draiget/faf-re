@@ -47,7 +47,6 @@ namespace
 
   extern "C" {
     extern MPVLibWorkState mpvlib_libwork;
-    extern const std::uint32_t mpvlib_cond_dfl[16];
     extern std::uint8_t mpv_clip_0_255_tbl[0x400];
     extern int mpv_clip_0_255_base;
 
@@ -130,6 +129,15 @@ namespace
      */
     int MPVVLC_IsVlcSizErr();
     int MPVLIB_CheckHn(int handleAddress);
+
+    /**
+     * Address: 0x00AF5C40 (FUN_00AF5C40, _MPVM2V_Init)
+     *
+     * Lives with the rest of the SFMPV glue in
+     * `cri/sofdec/SofdecMpvRuntime.cpp`; `MPV_Init` closes library startup with
+     * it.
+     */
+    std::int32_t MPVM2V_Init();
     int MPV_CheckDelim(const std::uint8_t* bitstreamCursor);
     std::uint8_t* MPV_BsearchDelim(std::uint8_t* bitstreamCursor, unsigned int scanLengthBytes, int delimiterMask);
     std::uint8_t* MPV_SearchDelim(const std::uint8_t* bitstreamCursor, int scanLengthBytes, int delimiterMask);
@@ -1127,6 +1135,10 @@ namespace
   constexpr int kMpvHandleSizeBytes = 0x13B0;
   constexpr int kMpvDctScaleTableOffset = 0x1160;
   constexpr int kMpvClipTableBaseOffset = 0x180;
+  /** Runtime VLC lane arena, relative to the conceal-state base. */
+  constexpr int kMpvVlcContextOffset = 0x12B0;
+  /** Per-run clip-table mirror, relative to the conceal-state base. */
+  constexpr int kMpvClipTableStorageOffset = 0x1860;
   constexpr unsigned int kMpvClipTableDwordCount = 0x100;
   constexpr unsigned int kMpvConditionCallbackDwordCount = 0x10;
   constexpr int kMpvHandleSlotStateFree = 1;
@@ -1145,8 +1157,35 @@ namespace
   constexpr int kMpvErrInvalidDecodeFrameHandle = -16580087;
   constexpr int kMpvErrInvalidSetErrFuncHandle = -16580093;
   constexpr int kMpvErrInvalidGetErrInfoHandle = -16580092;
+  /**
+   * The only `mpvlib_ChkFatal` status `MPV_Init` propagates to its caller
+   * (`cmp eax, 0FF03FF05h` at 0x00AE7963). Neither status `mpvlib_ChkFatal`
+   * can actually produce — `-16515325` (VLC table sized wrong) and `-16515321`
+   * (decoder version mismatch) — equals it, so in the shipped binary *any*
+   * fatal preflight failure falls through to the spin below rather than
+   * returning. Both gates pass in this build, so the spin is unreachable.
+   */
+  constexpr int kMpvFatalStatusReportable = -16515323;
   constexpr int kMpvErrorInfoOffset = 0x250;
   constexpr const char kExpectedMpvDecoderVersion[] = "1.958";
+
+  /**
+   * Address: 0x00D7FC38 (`_MPVLIB_version_str`)
+   *
+   * The literal embeds a NUL: the banner is what `cri_verstr_ptr_mpv`
+   * publishes, and the "Append:" tail is a separate string the CRI tools read
+   * out of the same blob.
+   */
+  constexpr char kMpvLibVersionString[] =
+    "\nCRI MPV/PC Ver.1.958 Build:Feb 28 2005 21:33:32\n\0Append: MSC1200\n";
+
+  /**
+   * Address: 0x01000C00 (`_cri_verstr_ptr_mpv`)
+   *
+   * Published by `MPV_Init` purely so the banner survives into the image for
+   * CRI's support tooling; the library itself never reads it back.
+   */
+  const char* cri_verstr_ptr_mpv = nullptr;
   constexpr std::size_t kMpvBlockEntryCount = 64;
   constexpr std::size_t kFsriB0TableByteCount = 0x50;
   constexpr std::size_t kMpvAbdecForwardMaskCount = 8;
@@ -1521,6 +1560,105 @@ extern "C" int MPV_IsConformable(const std::uint8_t* const bitstreamCursor, cons
 
   const int delimiterType = MPV_CheckDelim(nextDelimiter);
   return (static_cast<unsigned int>((~delimiterType) & 0x10) >> 4);
+}
+
+/**
+ * Address: 0x00AE7FD0 (nullsub_26)
+ *
+ * What it does:
+ * Nothing - a bare `retn`. It is the address slot 8 of `mpvlib_cond_dfl`
+ * carries, i.e. the conceal callback every MPV handle starts out with. The
+ * linker folded it together with the binary's other empty callbacks
+ * (`/OPT:ICF`), so the single address backs more than this one use.
+ */
+extern "C" void mpvlib_ConcealDefault()
+{
+}
+
+/**
+ * Address: 0x00D7FC80 (`_mpvlib_cond_dfl`, `.rdata`)
+ *
+ * The 16 default decode-condition lanes. `mpvlib_InitWork` copies them into
+ * `mpvlib_libwork` at library startup, and `mpvlib_InitHn` copies those into
+ * every decoder handle it hands out, so these are the values a stream decodes
+ * under unless the caller overrides them through `MPVLIB_SetCond`.
+ *
+ * Verified byte-for-byte against `bin/2025.7.1/ForgedAlliance.exe` at file
+ * offset 0x97FC80.
+ */
+extern "C" const std::uint32_t mpvlib_cond_dfl[16] = {
+  0u,
+  1u,
+  1u,
+  0u,
+  0u,
+  0u,
+  3u,
+  0x7FFFFFFFu,
+  // Slot 8 == kMpvConditionIndexConcealDefault.
+  static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&mpvlib_ConcealDefault)),
+  0u,
+  0u,
+  0u,
+  0u,
+  0u,
+  0u,
+  0u,
+};
+
+/**
+ * Address: 0x00AE7950 (FUN_00AE7950, _MPV_Init)
+ * Mangled: _MPV_Init
+ *
+ * IDA signature:
+ * int __usercall MPV_Init@<eax>(int a1, int a2);
+ *
+ * What it does:
+ * Brings the MPV (MPEG-1/2 video) decoder library up. Publishes the CRI
+ * version banner, runs the fatal preflight, then carves the caller's work
+ * memory into `objectCount` decoder slots plus the shared conceal-state arena
+ * and initializes every decode stage against that arena: error reporting,
+ * header decode, frame store, VLC tables, block decode, motion compensation,
+ * colour conversion, the clip table, the object table, the DCT scale table and
+ * finally the M2V backend.
+ */
+extern "C" std::int32_t MPV_Init(const std::int32_t objectCount, const std::int32_t workAddress)
+{
+  cri_verstr_ptr_mpv = kMpvLibVersionString;
+
+  const int fatalStatus = mpvlib_ChkFatal();
+  if (fatalStatus != 0) {
+    if (fatalStatus != kMpvFatalStatusReportable) {
+      // The shipped binary spins here (`jmp $` at 0x00AE796B) rather than
+      // unwinding a preflight failure it has no error path for. Reproduced
+      // as-is; both gates pass in this build so it is unreachable.
+      for (;;) {
+      }
+    }
+    return fatalStatus;
+  }
+
+  mpvlib_ChkCacheMode();
+  mpvlib_InitWork(objectCount, MPVLIB_ConvWorkAddr(workAddress));
+
+  // Every stage below is rooted at the conceal-state base `mpvlib_InitWork`
+  // just published, which sits past the per-object slot array.
+  const int runtimeWorkBase = mpvlib_libwork.concealStateBaseAddress;
+
+  MPVERR_Init();
+  MPVHDEC_Init();
+  MPVFRM_Init();
+  MPVVLC_Init(runtimeWorkBase + kMpvVlcContextOffset, runtimeWorkBase);
+  MPVBDEC_Init(runtimeWorkBase);
+  MPVUMC_Init();
+  MPVCDEC_Init();
+  mpvlib_InitClip(
+    reinterpret_cast<std::int32_t*>(AddressToMutablePointer(runtimeWorkBase + kMpvClipTableStorageOffset))
+  );
+  mpvlib_InitObjTbl();
+  mpvlib_InitDct(runtimeWorkBase);
+  MPVM2V_Init();
+  return 0;
 }
 
 /**
@@ -3876,8 +4014,11 @@ extern "C" int MPVBDEC_Init(const int handleAddress)
  * What it does:
  * Initializes all static MPV VLC seed tables and, when a runtime setup
  * context is provided, builds runtime VLC lanes into that context.
+ *
+ * The body reads only `[esp+arg_0]`; `runtimeWorkBase` is the second dword
+ * `MPV_Init` pushes at 0x00AE79A3 and is unused in this build.
  */
-extern "C" int MPVVLC_Init(const int vlcContextBase)
+extern "C" int MPVVLC_Init(const int vlcContextBase, [[maybe_unused]] const int runtimeWorkBase)
 {
   mpvvlc_InitMbai();
   mpvvlc_InitMbType();
