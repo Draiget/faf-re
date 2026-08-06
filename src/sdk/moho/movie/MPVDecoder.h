@@ -230,6 +230,21 @@ namespace moho::movie
    * then multiplied by `MPVDecoderScanContext::dequantScaleTable[scanIndex]`
    * on its way into `coefficients`.
    */
+  /**
+   * IMPORTANT: this is a VIEW, never an object to allocate.
+   *
+   * `ProbeScanSlot` calls the kernel as
+   * `readKernel(context, &context->decodeBitstreamWord)`, so the second
+   * argument is `context + 0x68` and the fields below alias the scan
+   * context's own lanes: `level` is `decodeBitstreamWord`, `run` is
+   * `decodeHuffmanPrimary`, `signBit` is `decodeHuffmanSecondary`,
+   * `codeLengthBits` is `decodePhase`, and `scanIndexLimit` overlaps
+   * `decodeFlags`. Instantiating one and writing through it would update a
+   * detached copy while the decoder kept reading the context - a decoder
+   * that builds, links, runs, and silently produces wrong coefficients.
+   *
+   * Only ever reach it by casting the kernel's second argument.
+   */
   struct MPVCoefficientDecodeState
   {
     std::int32_t level;          // +0x00
