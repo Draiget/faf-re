@@ -205,7 +205,10 @@ extern "C" {
   // New stubs introduced by SofdecMpvRuntime.cpp going live. These are
   // referenced by the newly-compiled MPV runtime but their real bodies are
   // in different Sofdec sources that are still not compiled.
-  int MPV_Init() { return 0; }
+  // MPV_Init (0x00AE7950) is recovered in moho/movie/MPVDecoder.cpp, next to
+  // the fan-out it drives. Its stub here took no arguments, so C linkage let it
+  // silently satisfy SFMPV_Init's two-argument call while returning success
+  // without initializing a single decoder stage.
   int MPV_IsEmptyBpic(int) { return 0; }
   int MPV_IsEmptyPpic(int) { return 0; }
   int sfmpv_ExecServerSub(int) { return 0; }
@@ -218,7 +221,9 @@ extern "C" {
   int sfmpv_fps_round = 0;
   int sfmpv_conv_29_97 = 0;
   int sfmpv_conv_59_94 = 0;
-  int sfmpv_work = 0;
+  // sfmpv_work is the MPV work arena, not a scalar - a 4-byte stub here meant
+  // MPV_Init's 264 KB clear ran straight off the end of it. Sized properly in
+  // cri/sofdec/SofdecMpvRuntime.cpp next to SFMPV_Init, its only real user.
   int sfmpv_discard_wsiz = 0;
   void* sfmpv_picusr_pbuf = nullptr;
   int sfmpv_picusr_bufnum = 0;
@@ -305,7 +310,10 @@ extern "C" {
   std::uint8_t mpadcd_synthesis_window_tail_table[4096] = {};
   std::uint8_t mpv_clip_0_255_base[4096] = {};
   std::uint8_t mpv_clip_0_255_tbl[4096] = {};
-  std::uint8_t mpvlib_cond_dfl[4096] = {};
+  // mpvlib_cond_dfl (0x00D7FC80) is real .rdata, not BSS - it is recovered
+  // with its true contents in moho/movie/MPVDecoder.cpp. The zero blob that
+  // used to stand in here silently handed every decoder handle null condition
+  // defaults, including a null conceal callback.
   std::uint8_t mpvlib_libwork[4096] = {};
   std::uint8_t mpvvlc2_c_dcsiz[4096] = {};
   std::uint8_t mpvvlc2_y_dcsiz[4096] = {};
