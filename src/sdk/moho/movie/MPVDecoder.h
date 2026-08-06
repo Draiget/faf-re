@@ -229,6 +229,12 @@ namespace moho::movie
    * `(quantScale * 2 * level * quantMatrix[scanIndex]) >> 4`, negated by sign,
    * then multiplied by `MPVDecoderScanContext::dequantScaleTable[scanIndex]`
    * on its way into `coefficients`.
+   *
+   * NOTE the field order: `run` is at +0x00 and `level` at +0x04, which is
+   * the opposite of the order the names suggest. Both kernels take the run
+   * from the low byte of a VLC table entry and the level from the (signed)
+   * next byte up, so a swapped model decodes every coefficient wrongly while
+   * still building, linking and running.
    */
   /**
    * IMPORTANT: this is a VIEW, never an object to allocate.
@@ -247,8 +253,14 @@ namespace moho::movie
    */
   struct MPVCoefficientDecodeState
   {
-    std::int32_t level;          // +0x00
-    std::int32_t run;            // +0x04
+    /**
+     * Zero coefficients to skip before the one this code carries; the scan
+     * cursor advances by `run + 1`. The escape marker in the short-code
+     * table is a run of 64, which no real code can produce.
+     */
+    std::int32_t run;            // +0x00
+    /** Signed magnitude fed to the dequantizer; a level of zero ends the block. */
+    std::int32_t level;          // +0x04
     std::int32_t signBit;        // +0x08
     std::int32_t codeLengthBits; // +0x0C
     std::int32_t scanIndexLimit; // +0x10
@@ -273,18 +285,24 @@ namespace moho::movie
   {
     MPVBitstreamState bitstreamState; // +0x00
     /**
-     * Run/level VLC tables, one per code-length class, selected by the
-     * leading bits of the window. Each entry is indexed as
-     * `table[coefficientIndex >> 1]` and yields a packed 16-bit word whose
-     * high byte is the run and low byte the level.
-     *
-     * The mapping is read straight off the decode switch in
-     * `mpvhdec_ReadKernelIntraDefault` (0x00AFAE50), where each path sets the
-     * code length into the decode state and then picks its table:
-     * length 20 -> [0], 11 -> [1], 13 -> [2], 14 -> [3], 15 -> [4],
-     * 16 -> [5], 17 -> [6].
+     * The 128-entry dword dispatch table (`mpvvlt_run_level_8`) covering
+     * every MPEG-1 Table B-14 AC code whose top window bit is clear. It is
+     * indexed by window bits 30..24, and each entry packs
+     * `length << 16 | level << 8 | run` with the level signed. Entries 0..3
+     * are zero, meaning "too long for this table - fall through to
+     * `acLongRunLevelTables`"; entries 4..7 carry the escape marker
+     * (a run of 64).
      */
-    const std::uint16_t* acRunLevelVlcTables[7]; // +0x10 .. +0x2B
+    const std::uint32_t* acShortRunLevelTable; // +0x10
+    /**
+     * Word tables for the codes with seven or more leading zeros, in the
+     * order the decode switch selects them by code length:
+     * [0] = 11 bits, [1] = 13, [2] = 14, [3] = 15, [4] = 16, [5] = 17.
+     * Each is indexed by the code bits with the trailing sign bit shifted
+     * out, and yields `level << 8 | run` with the level signed.
+     */
+    const std::uint16_t* acLongRunLevelTables[6]; // +0x14 .. +0x2B
+    /** Base of the 64-entry zigzag scan order; the AC cursor walks it. */
     std::uint8_t* coefficientWriteCursor;        // +0x2C
     /** Width-indexed bit masks: `bitMaskByWidth[n] & window` keeps n bits. */
     const std::uint16_t* bitMaskByWidth;         // +0x30
@@ -307,7 +325,14 @@ namespace moho::movie
     std::uint8_t reserved_01B8[0x1D8 - 0x1B8];
     int macroblocksPerRow;   // +0x1D8
     int macroblockRowsCount; // +0x1DC
-    std::uint8_t reserved_01E0[0x2C4 - 0x1E0];
+    std::uint8_t reserved_01E0[0x1E8 - 0x1E0];
+    /**
+     * Selects how far the read kernels scan a block. A value of 4 means
+     * DC-only: the kernel emits the DC coefficient and returns without
+     * running the AC run/level loop at all.
+     */
+    int coefficientScanMode; // +0x1E8
+    std::uint8_t reserved_01EC[0x2C4 - 0x1EC];
     MPVDecodeSkipRunFn decodeSkipRun; // +0x2C4
     MPVDecodeContextFn decodeIntraMacroblock; // +0x2C8
     MPVDecodeContextFn decodeResidualMacroblock; // +0x2CC
@@ -362,8 +387,16 @@ namespace moho::movie
   );
 
   static_assert(
-    offsetof(MPVDecoderScanContext, acRunLevelVlcTables) == 0x10,
-    "MPVDecoderScanContext::acRunLevelVlcTables offset must be 0x10"
+    offsetof(MPVDecoderScanContext, acShortRunLevelTable) == 0x10,
+    "MPVDecoderScanContext::acShortRunLevelTable offset must be 0x10"
+  );
+  static_assert(
+    offsetof(MPVDecoderScanContext, acLongRunLevelTables) == 0x14,
+    "MPVDecoderScanContext::acLongRunLevelTables offset must be 0x14"
+  );
+  static_assert(
+    offsetof(MPVDecoderScanContext, coefficientScanMode) == 0x1E8,
+    "MPVDecoderScanContext::coefficientScanMode offset must be 0x1E8"
   );
   static_assert(
     offsetof(MPVDecoderScanContext, coefficientWriteCursor) == 0x2C,
