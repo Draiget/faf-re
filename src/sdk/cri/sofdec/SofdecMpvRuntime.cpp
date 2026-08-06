@@ -44,6 +44,10 @@ extern "C" {
   std::int32_t SFMPVF_IsTermDec(std::int32_t workctrlAddress);
   std::int32_t SFMPVF_GetNumFrm(std::int32_t workctrlAddress);
   std::int32_t MPV_Init(std::int32_t framePoolCount, std::int32_t workAddress);
+  std::int32_t MPV_Create();
+  std::int32_t MPV_SetErrFunc(std::int32_t handleAddress, std::int32_t errorCallbackAddress, std::int32_t errorCallbackContext);
+  std::int32_t MPV_SetCond(std::int32_t handleAddress, std::int32_t conditionId, std::int32_t (*conditionCallback)());
+  std::int32_t SFPLY_GetResetFlg();
   std::int32_t M2V_Init(std::int32_t framePoolCount, void* workAddress, std::int32_t workBytes);
   std::int32_t UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
   std::int32_t UTY_MulDiv(std::int32_t lhs, std::int32_t rhs, std::int32_t divisor);
@@ -1119,12 +1123,41 @@ struct SfmpvTimingLane
   std::int32_t ptsBiasHigh = -1; // +0x154
   std::uint8_t mUnknown158To163[0x0C]{}; // +0x158
   std::int32_t decodeProgressTime = 0; // +0x164
-  std::uint8_t mUnknown168To293[0x12C]{}; // +0x168
+  std::int32_t concatTimeHistoryWriteOrdinal = 0; // +0x168
+  std::int32_t concatTimeHistory[32]{}; // +0x16C
+  std::int32_t queuedAudioSampleRate = 0; // +0x1EC
+  std::int32_t audioTotalSampleCount = 0; // +0x1F0
+  std::int32_t totalSampleQueueWriteOrdinal = 0; // +0x1F4
+  std::int32_t totalSampleQueueReadOrdinal = 0; // +0x1F8
+  std::int32_t totalSampleQueueTotals[32]{}; // +0x1FC
+  std::int32_t readFrameTimeMajor = 0; // +0x27C
+  std::int32_t readFrameTimeMinor = 0; // +0x280
+  std::int32_t maxFrameTimeMajor = 0; // +0x284
+  std::int32_t maxFrameTimeMinor = 0; // +0x288
+  std::uint8_t mUnknown28CTo293[0x08]{}; // +0x28C
   std::int32_t interpolationWindowTimeBase = 0; // +0x294
   std::int32_t interpolationWindowAdaptiveStep = 0; // +0x298
   std::int32_t interpolationWindowMaxStep = 0; // +0x29C
   std::int32_t interpolationWindowMinStep = 0; // +0x2A0
 };
+
+static_assert(sizeof(SfmpvTimingLane) == 0x2A4, "SfmpvTimingLane size must be 0x2A4");
+static_assert(
+  offsetof(SfmpvTimingLane, concatTimeHistoryWriteOrdinal) == 0x168,
+  "SfmpvTimingLane::concatTimeHistoryWriteOrdinal offset must be 0x168"
+);
+static_assert(
+  offsetof(SfmpvTimingLane, totalSampleQueueTotals) == 0x1FC,
+  "SfmpvTimingLane::totalSampleQueueTotals offset must be 0x1FC"
+);
+static_assert(
+  offsetof(SfmpvTimingLane, readFrameTimeMajor) == 0x27C,
+  "SfmpvTimingLane::readFrameTimeMajor offset must be 0x27C"
+);
+static_assert(
+  offsetof(SfmpvTimingLane, interpolationWindowTimeBase) == 0x294,
+  "SfmpvTimingLane::interpolationWindowTimeBase offset must be 0x294"
+);
 
 static_assert(offsetof(SfmpvTimingLane, isLateCallback) == 0x18, "SfmpvTimingLane::isLateCallback offset must be 0x18");
 static_assert(
@@ -1469,28 +1502,15 @@ struct SfmpvHandleRuntimeView
   std::int32_t frameDeltaMajor = 0; // +0xAB4
   std::int32_t frameDeltaMinor = 0; // +0xAB8
   std::uint8_t mUnknownABCToD2F[0x274]{}; // +0xABC
-  // NOTE: SfmpvTimingLane as defined is 0x2A4 bytes total, but the binary
-  // places `concatTimeHistoryWriteOrdinal` only 0x168 bytes after the start
-  // of timingLane. Fields past the 0x168 boundary (interpolationWindow*)
-  // belong to a standalone SFTIM buffer, not the embedded one here. The
-  // embedded object therefore overlaps with the fields below in this C++
-  // layout; offsets beyond 0xE97 validated via the failing static_asserts
-  // that follow have been commented out pending struct-ownership recovery.
-  // All current code paths access only the first 0x168 prefix via
-  // `workctrl->timingLane.xxx`, so behavior is preserved.
+  // The timing lane runs the full 0x2A4 bytes to +0xFD4. Everything the SFTIM
+  // helpers touch lives inside it: `SFTIM_UpdateItime` (0x00ADAC60) reads
+  // `[esi+294h]` off the pointer `sfmpv_IsLate` hands it, and that pointer is
+  // `lea edi, [ebx+0D30h]` — this lane's own base. The concat-time and
+  // total-sample queues that used to be declared out here as siblings are
+  // interior lane fields at +0x168..+0x288; they are reached as
+  // `workctrl->timingLane.xxx`.
   SfmpvTimingLane timingLane{}; // +0xD30
-  std::int32_t concatTimeHistoryWriteOrdinal = 0; // +0xE98 (nominal)
-  std::int32_t concatTimeHistory[32]{}; // +0xE9C
-  std::int32_t queuedAudioSampleRate = 0; // +0xF1C
-  std::int32_t audioTotalSampleCount = 0; // +0xF20
-  std::int32_t totalSampleQueueWriteOrdinal = 0; // +0xF24
-  std::int32_t totalSampleQueueReadOrdinal = 0; // +0xF28
-  std::int32_t totalSampleQueueTotals[32]{}; // +0xF2C
-  std::int32_t readFrameTimeMajor = 0; // +0xFAC
-  std::int32_t readFrameTimeMinor = 0; // +0xFB0
-  std::int32_t maxFrameTimeMajor = 0; // +0xFB4
-  std::int32_t maxFrameTimeMinor = 0; // +0xFB8
-  std::uint8_t mUnknownFBCTo11DF[0x224]{}; // +0xFBC
+  std::uint8_t mUnknownFD4To11DF[0x20C]{}; // +0xFD4
   SfmpvRepeatFieldHistoryRuntimeView repeatFieldHistory{}; // +0x11E0
   std::uint8_t mUnknown12E0To1FBF[0xCE0]{}; // +0x12E0
   SfmpvInfoRuntimeView* mpvInfo = nullptr; // +0x1FC0
@@ -1499,7 +1519,15 @@ struct SfmpvHandleRuntimeView
   std::int32_t prepDestinationLaneIndex = 0; // +0x1FCC
   std::uint8_t mUnknown1FD0To1FD7[0x08]{}; // +0x1FD0
   std::int32_t seekFixedReadTotal = -1; // +0x1FD8
-  std::uint8_t mUnknown1FDCTo354F[0x1574]{}; // +0x1FDC
+  std::uint8_t mUnknown1FDCTo23A7[0x3CC]{}; // +0x1FDC
+  /**
+   * The MPV info block lives inside the workctrl. `SFMPV_Create` publishes its
+   * address into `mpvInfo` above (`lea ebx, [esi+23A8h]` / `mov [esi+1FC0h],
+   * ebx` at 0x00AD4BBA), so the pointer and the storage it points at are the
+   * same object.
+   */
+  SfmpvInfoRuntimeView embeddedMpvInfo{}; // +0x23A8
+  std::uint8_t mUnknownInfoTailTo354F[0x3550 - 0x23A8 - sizeof(SfmpvInfoRuntimeView)]{};
   std::int32_t headerWorkspaceBaseAddress = 0; // +0x3550
   std::uint8_t mUnknown3554To3557[0x04]{}; // +0x3554
   std::int32_t seekSkipTimeMajor = -1; // +0x3558
@@ -1610,15 +1638,6 @@ static_assert(
   offsetof(SfmpvHandleRuntimeView, ptype3DecodeEnable) == 0xA1C,
   "SfmpvHandleRuntimeView::ptype3DecodeEnable offset must be 0xA1C"
 );
-// TODO(recovery): Offsets below are shifted because the embedded SfmpvTimingLane
-// is 0x2A4 bytes in C++ but only 0x168 bytes in binary layout. All static_asserts
-// past timingLane are therefore disabled pending struct-ownership recovery. Field
-// access via `workctrl->field` still compiles and works for fields that do not
-// overlap the timingLane tail.
-// static_assert(offsetof(SfmpvHandleRuntimeView, readFrameTimeMajor) == 0xFAC, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, readFrameTimeMinor) == 0xFB0, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, maxFrameTimeMajor) == 0xFB4, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, maxFrameTimeMinor) == 0xFB8, ...);
 static_assert(
   offsetof(SfmpvHandleRuntimeView, prepFrameRequiredCount) == 0xA68,
   "SfmpvHandleRuntimeView::prepFrameRequiredCount offset must be 0xA68"
@@ -1636,24 +1655,42 @@ static_assert(
   "SfmpvHandleRuntimeView::frameDeltaMinor offset must be 0xAB8"
 );
 static_assert(offsetof(SfmpvHandleRuntimeView, timingLane) == 0xD30, "SfmpvHandleRuntimeView::timingLane offset must be 0xD30");
-// Offset asserts past timingLane commented out — see TODO note above.
-// static_assert(offsetof(SfmpvHandleRuntimeView, concatTimeHistoryWriteOrdinal) == 0xE98, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, concatTimeHistory) == 0xE9C, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, queuedAudioSampleRate) == 0xF1C, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, audioTotalSampleCount) == 0xF20, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, totalSampleQueueWriteOrdinal) == 0xF24, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, totalSampleQueueReadOrdinal) == 0xF28, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, totalSampleQueueTotals) == 0xF2C, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, repeatFieldHistory) == 0x11E0, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, mpvInfo) == 0x1FC0, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, prepSourceLaneIndex) == 0x1FC8, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, prepDestinationLaneIndex) == 0x1FCC, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, seekFixedReadTotal) == 0x1FD8, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, headerWorkspaceBaseAddress) == 0x3550, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, seekSkipTimeMajor) == 0x3558, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, seekSkipTimeMinor) == 0x355C, ...);
-// static_assert(offsetof(SfmpvHandleRuntimeView, decodeTimeSumsByPictureType) == 0x3560, ...);
-// static_assert(sizeof(SfmpvHandleRuntimeView) == 0x35E0, ...);
+// The timing-lane extent is settled (see the note on the member), so every
+// offset past it is checkable again.
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, repeatFieldHistory) == 0x11E0,
+  "SfmpvHandleRuntimeView::repeatFieldHistory offset must be 0x11E0"
+);
+static_assert(offsetof(SfmpvHandleRuntimeView, mpvInfo) == 0x1FC0, "SfmpvHandleRuntimeView::mpvInfo offset must be 0x1FC0");
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, prepSourceLaneIndex) == 0x1FC8,
+  "SfmpvHandleRuntimeView::prepSourceLaneIndex offset must be 0x1FC8"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, prepDestinationLaneIndex) == 0x1FCC,
+  "SfmpvHandleRuntimeView::prepDestinationLaneIndex offset must be 0x1FCC"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, seekFixedReadTotal) == 0x1FD8,
+  "SfmpvHandleRuntimeView::seekFixedReadTotal offset must be 0x1FD8"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, headerWorkspaceBaseAddress) == 0x3550,
+  "SfmpvHandleRuntimeView::headerWorkspaceBaseAddress offset must be 0x3550"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, seekSkipTimeMajor) == 0x3558,
+  "SfmpvHandleRuntimeView::seekSkipTimeMajor offset must be 0x3558"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, seekSkipTimeMinor) == 0x355C,
+  "SfmpvHandleRuntimeView::seekSkipTimeMinor offset must be 0x355C"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, decodeTimeSumsByPictureType) == 0x3560,
+  "SfmpvHandleRuntimeView::decodeTimeSumsByPictureType offset must be 0x3560"
+);
+static_assert(sizeof(SfmpvHandleRuntimeView) == 0x35E0, "SfmpvHandleRuntimeView size must be 0x35E0");
 
 struct SfmpvfVfrmDataRuntime
 {
@@ -2151,6 +2188,8 @@ namespace
   constexpr std::int32_t kSfmpvErrInvalidVfrmDrawState = -16773362; // 0xFF000F0E
   constexpr std::int32_t kSfmpvErrFrameObjectMismatch = -16773361; // 0xFF000F0F
   constexpr std::int32_t kSfmpvErrDestroySubFailed = -16773364; // 0xFF000F0C
+  constexpr std::int32_t kSfmpvErrCreateFailed = -16773366; // 0xFF000F0A
+  constexpr std::int32_t kSfmpvErrSetErrFuncFailed = -16773365; // 0xFF000F0B
   constexpr std::int32_t kSfmpvErrWriteApiUnsupported = -16773363; // 0xFF000F0D
   constexpr std::int32_t kSfmpvErrFrameBufferTooSmall = -16773353; // 0xFF000F17
 
@@ -2158,6 +2197,17 @@ namespace
   [[nodiscard]] T* AddressToPointer(const std::int32_t address) noexcept
   {
     return reinterpret_cast<T*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
+  }
+
+  /**
+   * MPV condition slots 1, 2 and 6 carry callback addresses, but the workctrl
+   * stores them - and `SFSET_GetCond` returns them - as plain words. The
+   * binary hands the word straight to `MPV_SetCond`; this makes that
+   * reinterpretation explicit rather than leaving a bare cast at each site.
+   */
+  [[nodiscard]] std::int32_t (*AsMpvConditionCallback(const std::int32_t conditionWord) noexcept)()
+  {
+    return reinterpret_cast<std::int32_t (*)()>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(conditionWord)));
   }
 
   [[nodiscard]] std::int32_t AlignAddressTo0x800(const std::int32_t address) noexcept
@@ -3621,6 +3671,7 @@ std::int32_t sfmpv_ReformTc(
     std::int64_t presentationPts,
     std::int32_t detectErrorMode);
 std::int32_t sfmpv_IsLate(std::int32_t workctrlAddress, std::int32_t updateMode);
+std::int32_t sfmpv_ErrFn(std::int32_t workctrlAddress, std::int32_t statusCode);
 
 /**
  * Address: 0x00AD2690 (FUN_00AD2690, _sfmpv_DecodeOneUnit)
@@ -3891,8 +3942,8 @@ std::int32_t sfmpv_CalcAudioTotTime(const std::int32_t workctrlAddress)
     }
   }
 
-  totalSamples += workctrl->audioTotalSampleCount;
-  workctrl->audioTotalSampleCount = totalSamples;
+  totalSamples += workctrl->timingLane.audioTotalSampleCount;
+  workctrl->timingLane.audioTotalSampleCount = totalSamples;
 
   const std::int32_t concatAudioTime =
     UTY_MulDiv(totalSamples, static_cast<std::int32_t>(workctrl->timingLane.concatVideoTimeUnit[10]), sampleRate)
@@ -4111,9 +4162,9 @@ void SFCON_UpdateConcatTime(const std::int32_t workctrlAddress, const std::int32
   const std::int32_t updatedConcatTime = workctrl->timingLane.decodeProgressTime + totalTime;
   workctrl->timingLane.decodeProgressTime = updatedConcatTime;
 
-  const std::int32_t nextWriteOrdinal = workctrl->concatTimeHistoryWriteOrdinal + 1;
-  workctrl->concatTimeHistory[Modulo32Index(nextWriteOrdinal)] = updatedConcatTime;
-  workctrl->concatTimeHistoryWriteOrdinal = nextWriteOrdinal;
+  const std::int32_t nextWriteOrdinal = workctrl->timingLane.concatTimeHistoryWriteOrdinal + 1;
+  workctrl->timingLane.concatTimeHistory[Modulo32Index(nextWriteOrdinal)] = updatedConcatTime;
+  workctrl->timingLane.concatTimeHistoryWriteOrdinal = nextWriteOrdinal;
   SFLIB_UnlockCs();
 }
 
@@ -4133,15 +4184,15 @@ std::int32_t SFCON_WriteTotSmplQue(
   auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
 
   SFLIB_LockCs();
-  const std::int32_t queuedCount = workctrl->totalSampleQueueWriteOrdinal - workctrl->totalSampleQueueReadOrdinal;
+  const std::int32_t queuedCount = workctrl->timingLane.totalSampleQueueWriteOrdinal - workctrl->timingLane.totalSampleQueueReadOrdinal;
   if (queuedCount >= 32) {
     SFLIB_UnlockCs();
     return 0;
   }
 
-  workctrl->queuedAudioSampleRate = sampleRate;
-  workctrl->totalSampleQueueTotals[Modulo32Index(workctrl->totalSampleQueueWriteOrdinal)] = totalSamples;
-  ++workctrl->totalSampleQueueWriteOrdinal;
+  workctrl->timingLane.queuedAudioSampleRate = sampleRate;
+  workctrl->timingLane.totalSampleQueueTotals[Modulo32Index(workctrl->timingLane.totalSampleQueueWriteOrdinal)] = totalSamples;
+  ++workctrl->timingLane.totalSampleQueueWriteOrdinal;
   SFLIB_UnlockCs();
   return 1;
 }
@@ -4162,16 +4213,16 @@ std::int32_t SFCON_ReadTotSmplQue(
   auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
 
   SFLIB_LockCs();
-  const std::int32_t queuedCount = workctrl->totalSampleQueueWriteOrdinal - workctrl->totalSampleQueueReadOrdinal;
+  const std::int32_t queuedCount = workctrl->timingLane.totalSampleQueueWriteOrdinal - workctrl->timingLane.totalSampleQueueReadOrdinal;
   if (queuedCount <= 0) {
     *outTotalSamples = -1;
     SFLIB_UnlockCs();
     return 0;
   }
 
-  *outSampleRate = workctrl->queuedAudioSampleRate;
-  *outTotalSamples = workctrl->totalSampleQueueTotals[Modulo32Index(workctrl->totalSampleQueueReadOrdinal)];
-  ++workctrl->totalSampleQueueReadOrdinal;
+  *outSampleRate = workctrl->timingLane.queuedAudioSampleRate;
+  *outTotalSamples = workctrl->timingLane.totalSampleQueueTotals[Modulo32Index(workctrl->timingLane.totalSampleQueueReadOrdinal)];
+  ++workctrl->timingLane.totalSampleQueueReadOrdinal;
   SFLIB_UnlockCs();
   return 1;
 }
@@ -5071,10 +5122,10 @@ std::int32_t sfmpv_CalcFrmTime(const std::int32_t workctrlAddress, const std::in
   frameTiming->frameStartTimeMajor = frameTiming->frameTtu.timeMajor;
   frameTiming->frameEndTimeMajor = frameTiming->frameTtu.timeMajor + workctrl->timingLane.decodeProgressTime;
 
-  if (workctrl->maxFrameTimeMajor < frameTiming->resolvedTimeMajor) {
-    workctrl->maxFrameTimeMajor = frameTiming->resolvedTimeMajor;
+  if (workctrl->timingLane.maxFrameTimeMajor < frameTiming->resolvedTimeMajor) {
+    workctrl->timingLane.maxFrameTimeMajor = frameTiming->resolvedTimeMajor;
     result = frameTiming->resolvedTimeMinor;
-    workctrl->maxFrameTimeMinor = result;
+    workctrl->timingLane.maxFrameTimeMinor = result;
   }
 
   return result;
@@ -6241,6 +6292,59 @@ std::int32_t sfmpv_SkipFrm(const std::int32_t workctrlAddress, const std::int32_
 }
 
 /**
+ * Address: 0x00AD4BA0 (FUN_00AD4BA0, _SFMPV_Create)
+ *
+ * IDA signature:
+ * int __cdecl SFMPV_Create(int a1);
+ *
+ * What it does:
+ * The `create` slot of the SFMPV transfer strategy. When the workctrl's video
+ * condition is enabled, it anchors the MPV info block inside the workctrl,
+ * seeds it from the current global MPV parameters, allocates a decoder handle,
+ * routes that handle's errors back through `sfmpv_ErrFn`, forwards three of
+ * the workctrl's conditions onto the decoder, and finally re-installs the
+ * caller's picture-user buffers when the playback layer is coming back from a
+ * reset. With the video condition off the whole thing is skipped and it
+ * succeeds silently.
+ */
+std::int32_t SFMPV_Create(const std::int32_t workctrlAddress)
+{
+  if (SFSET_GetCond(workctrlAddress, 5) == 0) {
+    return 0;
+  }
+
+  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  SfmpvInfoRuntimeView* const mpvInfo = &workctrl->embeddedMpvInfo;
+  workctrl->mpvInfo = mpvInfo;
+
+  const std::int32_t initInfoResult = sfmpv_InitInf(workctrlAddress, reinterpret_cast<std::uint32_t*>(mpvInfo));
+  if (initInfoResult != 0) {
+    return initInfoResult;
+  }
+
+  const std::int32_t decoderHandle = MPV_Create();
+  if (decoderHandle == 0) {
+    return SFLIB_SetErr(0, kSfmpvErrCreateFailed);
+  }
+
+  if (MPV_SetErrFunc(decoderHandle, reinterpret_cast<std::int32_t>(&sfmpv_ErrFn), workctrlAddress) != 0) {
+    sfmpv_DestroySub(decoderHandle);
+    return SFLIB_SetErr(0, kSfmpvErrSetErrFuncFailed);
+  }
+
+  MPV_SetCond(decoderHandle, 1, AsMpvConditionCallback(SFSET_GetCond(workctrlAddress, 0)));
+  MPV_SetCond(decoderHandle, 2, AsMpvConditionCallback(SFSET_GetCond(workctrlAddress, 1)));
+  MPV_SetCond(decoderHandle, 6, AsMpvConditionCallback(workctrl->mpvCond6Value));
+
+  mpvInfo->decoderHandle = decoderHandle;
+
+  if (SFPLY_GetResetFlg() != 0) {
+    sfmpvf_SetPicUsrBuf(workctrlAddress, sfmpv_picusr_pbuf, sfmpv_picusr_bufnum, sfmpv_picusr_buf1siz);
+  }
+  return 0;
+}
+
+/**
  * Address: 0x00AD4F10 (FUN_00AD4F10, _SFMPV_Destroy)
  *
  * What it does:
@@ -6378,8 +6482,8 @@ std::int32_t SFMPVF_GetRead(
   sfmpvf_SearchFrmInf(workctrlAddress, frameObjectAddress, outFrameInfo);
   SfmpvfFrameInfoRuntimeView* const frameInfo = *outFrameInfo;
 
-  workctrl->readFrameTimeMajor = frameInfo->presentationTimeMajor;
-  workctrl->readFrameTimeMinor = frameInfo->presentationTimeMinor;
+  workctrl->timingLane.readFrameTimeMajor = frameInfo->presentationTimeMajor;
+  workctrl->timingLane.readFrameTimeMinor = frameInfo->presentationTimeMinor;
 
   if (SFTIM_IsGetFrmTime(workctrlAddress, frameInfo) == 0) {
     *outFrameInfo = nullptr;

@@ -2788,6 +2788,7 @@ std::int32_t SFD_SetVideoUsrSj(
    */
   std::int32_t SFMPV_Finish();
   std::int32_t SFMPV_ExecServer(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_Create(std::int32_t workctrlAddress);
   std::int32_t SFMPV_Destroy(std::int32_t workctrlAddress);
   std::int32_t SFMPV_RequestStop();
   std::int32_t SFMPV_Start();
