@@ -11343,7 +11343,7 @@ namespace
 	 * Pushes one interned error string into the coroutine base slot, grows the
 	 * stack when needed, and returns a single Lua result lane.
 	 */
-	[[maybe_unused]] int resume_error(lua_State* const state, const char* const message)
+	int resume_error(lua_State* const state, const char* const message)
 	{
 		TObject* const base = state->ci->base;
 		state->top = base;
@@ -11358,6 +11358,127 @@ namespace
 
 		++state->top;
 		return 1;
+	}
+
+	/**
+	 * A `CallInfo::state` of 4 marks a frame that yielded; 2 marks one that is
+	 * still inside a C function. Only those two can be resumed.
+	 */
+	constexpr int kCallInfoStateYielded = 4;
+	constexpr int kCallInfoStateInC = 2;
+
+	/** Argument C of an instruction: bits 6..14. */
+	[[nodiscard]] constexpr int GetInstructionArgC(const Instruction instruction)
+	{
+		return static_cast<int>((instruction >> 6) & 0x1FFu);
+	}
+
+	/**
+	 * Address: 0x00914580 (FUN_00914580, resume)
+	 *
+	 * IDA signature:
+	 * void __usercall resume(int *ud@<eax>, lua_State *L@<edi>);
+	 *
+	 * What it does:
+	 * The body `lua_resume` runs inside its protected region. Either starts the
+	 * coroutine's function, or picks the suspended frame back up - a frame that
+	 * yielded finishes the call that yielded first, using the result count of
+	 * the instruction that issued it - and then runs the interpreter.
+	 */
+	void resume(lua_State* const state, const int nargs)
+	{
+		CallInfo* const ci = state->ci;
+
+		if (ci == state->base_ci) {
+			// First resume: start the coroutine body itself.
+			luaD_precall(state, state->top - (nargs + 1));
+		} else if (ci->state == kCallInfoStateYielded) {
+			// Finish the call that yielded. Its result count comes from argument
+			// C of the CALL instruction that issued it, which sits one word
+			// behind the saved program counter of the caller's frame.
+			const int nresults = GetInstructionArgC(ci[-1].savedpc[-1]) - 1;
+			ci[-1].state = 0;
+
+			luaD_poscall(state, nresults, state->top - nargs);
+			if (nresults >= 0) {
+				state->top = state->ci->top;
+			}
+		} else {
+			ci->state = 0;
+		}
+
+		StkId const firstResult = luaV_execute(state);
+		if (firstResult != nullptr) {
+			luaD_poscall(state, -1, firstResult);
+		}
+	}
+
+	/**
+	 * Unwinds a coroutine back to its base frame after `resume` threw, leaving
+	 * the error text as the single value on its stack.
+	 */
+	void RestoreCoroutineAfterError(
+		lua_State* const state, const char* const errorText, const lu_byte savedAllowHook
+	)
+	{
+		state->ci = state->base_ci;
+		state->base = state->ci->base;
+		state->nCcalls = 0;
+
+		luaF_close(state, state->base);
+		(void)PushLuaStringAtStackSlot(state, state->base, errorText);
+
+		state->l_G->allowhook = savedAllowHook;
+		(void)luaD_refreshstacklimit(state);
+	}
+
+	/**
+	 * Address: 0x00914610 (FUN_00914610, lua_resume)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_resume(lua_State *L, int nargs);
+	 *
+	 * What it does:
+	 * Resumes a coroutine: rejects one that is dead or not suspended, then runs
+	 * `resume` protected. On the way out of an error it rewinds to the base
+	 * frame, closes pending upvalues, replaces the stack with the error text
+	 * and restores the hook flag, returning the raised lua::lua_Error's own
+	 * code (or LUA_ERRRUN for anything else that escapes).
+	 *
+	 * Like lua_call this fork protects with a C++ try rather than a setjmp, so
+	 * the two handlers at 0x009146BF and 0x00914728 are the EH funclets the
+	 * decompiler elides - `luaD_rawrunprotected` does not exist here.
+	 *
+	 * Recovering this matters beyond fidelity: while it resolved to the
+	 * prebuilt LuaPlus library, resume walked our coroutine at stock Lua
+	 * offsets and wrote 12-byte TObjects onto an 8-byte stack, so every script
+	 * error came back as a garbage value - "<non-string lua error>".
+	 */
+	extern "C" int lua_resume(lua_State* const state, const int nargs)
+	{
+		CallInfo* const ci = state->ci;
+
+		if (ci == state->base_ci) {
+			if (nargs >= state->top - state->base) {
+				return resume_error(state, "cannot resume dead coroutine");
+			}
+		} else if (ci->state != kCallInfoStateYielded && ci->state != kCallInfoStateInC) {
+			return resume_error(state, "cannot resume non-suspended coroutine");
+		}
+
+		const lu_byte savedAllowHook = state->l_G->allowhook;
+
+		try {
+			resume(state, nargs);
+		} catch (const lua::lua_Error& error) {
+			RestoreCoroutineAfterError(state, error.what(), savedAllowHook);
+			return error.code;
+		} catch (const std::exception& error) {
+			RestoreCoroutineAfterError(state, error.what(), savedAllowHook);
+			return LUA_ERRRUN;
+		}
+
+		return 0;
 	}
 
 	/**
