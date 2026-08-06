@@ -48,7 +48,8 @@ extern "C" {
   void* CRIERR_CallErr() { return nullptr; }
   void* M2TSD_Init() { return nullptr; }
   void* M2T_Create() { return nullptr; }
-  void* MPS_Create() { return nullptr; }
+  // MPS_Create: real body in SofdecSfdRuntime.cpp (0x00AEB200). This stub made
+  // SFMPS_Create fail with SFD ERROR(FF000D08) and took every movie with it.
   void* MPS_DecHd() { return nullptr; }
   void* MPS_Destroy() { return nullptr; }
   void* MPS_Finish() { return nullptr; }

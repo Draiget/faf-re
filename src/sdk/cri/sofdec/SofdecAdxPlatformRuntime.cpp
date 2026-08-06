@@ -6087,10 +6087,13 @@
    * What it does:
    * Creates one M2P parser runtime through linked backend callback lane.
    */
-  std::int32_t M2P_Create()
+  std::int32_t M2P_Create(const std::int32_t workAddress, const std::int32_t workSizeBytes)
   {
+    // The backend slots are one generic pointer type because arity differs per
+    // entry point; `mpslib_InitHn`'s caller passes a work block and its size.
+    using M2pCreateCallback = std::int32_t(__cdecl*)(std::int32_t workAddress, std::int32_t workSizeBytes);
     if (m2sapi_m2p_Create != nullptr) {
-      return m2sapi_m2p_Create();
+      return reinterpret_cast<M2pCreateCallback>(m2sapi_m2p_Create)(workAddress, workSizeBytes);
     }
     return 0;
   }
@@ -6115,10 +6118,17 @@
    * What it does:
    * Applies error-callback lane configuration on linked M2P backend.
    */
-  std::int32_t M2P_SetErrFn()
+  std::int32_t M2P_SetErrFn(
+    const std::int32_t handleAddress,
+    const std::int32_t callbackAddress,
+    const std::int32_t callbackObject
+  )
   {
+    using M2pSetErrFnCallback =
+      std::int32_t(__cdecl*)(std::int32_t handleAddress, std::int32_t callbackAddress, std::int32_t callbackObject);
     if (m2sapi_m2p_SetErrFn != nullptr) {
-      return m2sapi_m2p_SetErrFn();
+      return reinterpret_cast<M2pSetErrFnCallback>(m2sapi_m2p_SetErrFn)(
+        handleAddress, callbackAddress, callbackObject);
     }
     return 0;
   }
