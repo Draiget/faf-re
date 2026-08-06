@@ -508,4 +508,50 @@ void SFX_Init()
   }
 }
 
+/**
+ * Address: 0x00ACD5E0 (FUN_00ACD5E0, _SFXZ_Finish)
+ * Mangled: _SFXZ_Finish (C linkage)
+ *
+ * IDA signature:
+ * void SFXZ_Finish();
+ *
+ * What it does:
+ * Nothing. The SFXZ teardown hook exists so `SFX_Finish` can call every
+ * submodule uniformly, but this build's Z-buffer path holds no resources
+ * that need releasing - the body really is a bare `retn` at 0x00ACD5E0.
+ */
+void SFXZ_Finish()
+{
+}
+
+/**
+ * Address: 0x00ACC810 (FUN_00ACC810, _SFX_Finish)
+ * Mangled: _SFX_Finish (C linkage)
+ *
+ * IDA signature:
+ * int SFX_Finish();
+ *
+ * What it does:
+ * Mirror of `SFX_Init`: guarded by the same init counter, tears down the
+ * submodules in reverse order and decrements the guard. Returns the counter
+ * unchanged when the library was never initialized, otherwise the result of
+ * the final `CFT_Finish`.
+ */
+std::int32_t SFX_Finish()
+{
+  if (sfx_init_cnt <= 0) {
+    return sfx_init_cnt;
+  }
+
+  SFXZ_Finish();
+  SFXA_Finish();
+  (void)SFXSUD_Finish();
+  // The binary returns whatever CFT_Finish left in eax. Our recovered
+  // CFT_Finish is void - it has no failure path - so the observable result is
+  // the success code its callers test for.
+  CFT_Finish();
+  --sfx_init_cnt;
+  return 0;
+}
+
 }  // extern "C"
