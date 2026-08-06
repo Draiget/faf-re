@@ -864,7 +864,7 @@
     if (ply == nullptr) {
       return 0;
     }
-    return (ply->fileType == kSofdecFileTypeVideoElementary) ? 1 : 0;
+    return (ply->params.ftype == kSofdecFileTypeVideoElementary) ? 1 : 0;
   }
 
   /**
@@ -2039,6 +2039,888 @@
     return mwPlyCalcWorkSfd(params) + mwPlyCalcWorkCompo(params);
   }
 
+  // Defined later in this aggregate translation unit.
+  moho::SofdecSfdWorkctrlSubobj* sfply_Create(const moho::SfplyCreateParams* createParams, std::int32_t createContext);
+  std::int32_t SFD_SetErrFn(std::int32_t errorObjectAddress, std::int32_t callbackAddress, std::int32_t callbackObject);
+  std::int32_t SFD_SetAdxtPara(const moho::SofdecAdxtParams* params);
+  std::int32_t SFD_SetCond(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t value);
+  std::int32_t SFD_GetTrHn(
+    moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
+    std::int32_t transferLaneIndex,
+    std::int32_t* outTransferHandle
+  );
+  std::int32_t MWSFLSC_SetFlowLimit(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t flowLimit);
+  std::int32_t MWSFSFX_SetCompoMode(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t compositionMode);
+  std::int32_t MWSFTAG_SetAinfSj(moho::MwsfdPlaybackStateSubobj* ply);
+  void MWSFTAG_InitTagInf(moho::MwsfdPlaybackStateSubobj* ply);
+  void* MWSFSFX_Create(std::int32_t workBufferAddress, std::int32_t workBufferSize, std::int32_t configTag);
+  void mwsffrm_CallbackAnalyzeSofdecHeader();
+
+  // Both live in fragments compiled later in this aggregate; declared with the
+  // shared parameter types so the C-linkage symbols still match.
+  extern "C" std::int32_t SFD_SetMpvParaTbl(
+    const moho::MwsfdMpvPara* parameterTable,
+    const std::int32_t* ringFrameBufferAddressTable,
+    void* const* sofDecTabAddressTable
+  );
+  // `SFD_SetM2tsPara` is declared against the SFD runtime's own view of this
+  // static, which is defined later in the aggregate; the call site casts.
+  struct Sfm2tsParameterSnapshot;
+  extern "C" void SFD_SetM2tsPara(const Sfm2tsParameterSnapshot* parameterSnapshot);
+
+  void mwsfcre_AttachPicUsrBuf(moho::MwsfdPlaybackStateSubobj* ply);
+  void* LSC_Create(void* sourceJoinObject);
+  void* LSC_SetStmHndl(void* lscHandle, void* streamHandle);
+
+  /**
+   * Address: 0x00FB8C5C (`_mwsfd_sisjadr`) / 0x00F40164 (`_mwsfd_packsize`)
+   *
+   * The aligned SJ ring address the last create computed, and the Sofdec pack
+   * size every stream type but elementary video uses.
+   */
+  std::int32_t mwsfd_sisjadr = 0;
+  std::int32_t mwsfd_packsize = kMwsfcreSofdecPackBytes;
+
+  /** Address: 0x00F40124 / 0x00F40150 / the MPEG-2 TS lane block. */
+  moho::MwsfdMpvPara mwsfd_mpvpara{};
+  moho::SofdecAdxtParams mwsfd_adxtpara{};
+  moho::MwsfdM2tsPara mwsfd_m2tspara{};
+
+  // The eight strategy descriptors are defined at the end of
+  // cri/sofdec/SofdecSfdRuntime.cpp, once every strategy body is in scope.
+  extern SofdecTransferStrategy gSfmemTransferStrategy;
+  extern SofdecTransferStrategy gSfmpsTransferStrategy;
+  extern SofdecTransferStrategy gSfmpvTransferStrategy;
+  extern SofdecTransferStrategy gSfvomTransferStrategy;
+  extern SofdecTransferStrategy gSfm2tsTransferStrategy;
+  extern SofdecTransferStrategy gSfaoapTransferStrategy;
+  extern SofdecTransferStrategy gSfuoTransferStrategy;
+
+  /**
+   * Address: 0x00D7F2FC / 0x00D7F320 / 0x00D7F344 / 0x00D7F368
+   *
+   * Per-stream-type strategy selections. Every slot names one of the eight
+   * descriptors above; a null slot means that lane is unused for this stream
+   * type. Note that video-only (0x00D7F344) does not reference SFADXT at all,
+   * which is why an unrecovered SFADXT does not block a silent movie.
+   *
+   * SFADXT itself is not recovered yet, so the two lanes that would name it
+   * (MPS slot 3 and MPEG-2 TS slot 3) are null here.
+   */
+  std::array<SofdecTransferStrategy*, 9> gMwsfdMpsStrategyTable = {
+    &gSfmemTransferStrategy, &gSfmpsTransferStrategy, &gSfmpvTransferStrategy,
+    nullptr /* SFADXT */, nullptr, nullptr,
+    &gSfvomTransferStrategy, &gSfaoapTransferStrategy, &gSfuoTransferStrategy,
+  };
+  std::array<SofdecTransferStrategy*, 9> gMwsfdMpvStrategyTable = {
+    &gSfmemTransferStrategy, nullptr, &gSfmpvTransferStrategy,
+    nullptr, nullptr, nullptr,
+    &gSfvomTransferStrategy, nullptr, nullptr,
+  };
+  std::array<SofdecTransferStrategy*, 9> gMwsfdVideoOnlyStrategyTable = {
+    &gSfmemTransferStrategy, &gSfmpsTransferStrategy, &gSfmpvTransferStrategy,
+    nullptr, nullptr, nullptr,
+    &gSfvomTransferStrategy, nullptr, &gSfuoTransferStrategy,
+  };
+  std::array<SofdecTransferStrategy*, 9> gMwsfdMpeg2TsStrategyTable = {
+    &gSfmemTransferStrategy, &gSfm2tsTransferStrategy, &gSfmpvTransferStrategy,
+    nullptr /* SFADXT */, nullptr, nullptr,
+    &gSfvomTransferStrategy, &gSfaoapTransferStrategy, &gSfuoTransferStrategy,
+  };
+
+  // -------------------------------------------------------------------------
+  // Playback create path (mwPlyCreateSofdec chain)
+  // -------------------------------------------------------------------------
+
+  constexpr char kMwsfcreErrBadBufferFormat[] = "E3012102: buffmt is illigal.";
+  constexpr char kMwsfcreErrTooManyFramePool[] = "E4110901: number of frame pool is illigal.";
+  constexpr char kMwsfcreErrNoCompoWork[] = "E2053003: not enough work: sfx_wk";
+  constexpr char kMwsfcreErrNoAinfBuffer[] = "E2053004: not enough work: ainfsj_buf";
+  constexpr char kMwsfcreErrNoWork[] = "E2053002: not enough work";
+  constexpr char kMwsfcreErrNoAudioWork[] = "E4041301: not enough work";
+  constexpr char kMwsfcreErrSfdCreateFailed[] = "E20010703C mwPlyCreateSofdec: create error";
+  constexpr char kMwsfcreErrSfdSetErrCbFailed[] = "E20010703D mwPlyCreateSofdec: set errcb";
+  constexpr char kMwsfcreErrCreateParamsNull[] = "E1122612 mwPlyCreateSofdec : cprm is NULL.";
+  constexpr char kMwsfcreErrNoFreeHandle[] =
+    "E4061801 mwPlyCreateSofdec: Number of MWPLY handles exceeds its maximum number.";
+  constexpr char kMwsfcreErrNoAllocator[] = "E2053006 mwPlyCreateSofdec: Didn't set malloc/free func.";
+  constexpr char kMwsfcreErrCreateSfdFailed[] = "E2012 mwPlyCreate:can't create SFD";
+  constexpr char kMwsfcreErrCreateSjFailed[] = "E2013 mwPlyCreate:can't create SJ";
+  constexpr char kMwsfcreErrCreateSjMemFailed[] = "E2020 mwPlyCreate:can't create SJ";
+  constexpr char kMwsfcreErrCreateSfxFailed[] = "E201185: can't create SfxHn";
+  constexpr char kMwsfcreErrSetAinfSjFailed[] = "E201212 mwPlyCreate: can't set AddInfSJ";
+  constexpr char kMwsfcreErrCreateAinfSjFailed[] = "E201211 mwPlyCreate: can't create AddInfSJ";
+
+  // SFD condition ids used by the create path (`SFD_SetCond` selectors).
+  constexpr std::int32_t kSfdCondReserved00 = 0;
+  constexpr std::int32_t kSfdCondPlayMode = 1;
+  constexpr std::int32_t kSfdCondReserved08 = 8;
+  constexpr std::int32_t kSfdCondReserved0E = 14;
+  constexpr std::int32_t kSfdCondTimeSource = 15;
+  constexpr std::int32_t kSfdCondReserved1C = 28;
+  constexpr std::int32_t kSfdCondDecodeMode = 23;
+  constexpr std::int32_t kSfdCondFrameInterval2 = 42;
+  constexpr std::int32_t kSfdCondFrameInterval1 = 44;
+  constexpr std::int32_t kSfdCondFrameInterval0 = 45;
+  constexpr std::int32_t kSfdCondReserved33 = 51;
+  constexpr std::int32_t kSfdCondSofdecHeaderCallback = 75;
+  constexpr std::int32_t kSfdCondSofdecHeaderContext = 76;
+  constexpr std::int32_t kSfdMpvCondOutputFormat = 5;
+
+  constexpr std::int32_t kMwsfcreErrCodeNoFreeHandle = -11;
+  constexpr std::int32_t kMwsfcreErrCodeSetErrCb = -303;
+  constexpr std::int32_t kMwsfcreErrCodeCreate = -305;
+  /// `SFD_GetTrHn` lane index the playback handle caches for audio.
+  constexpr std::int32_t kMwsfcreAudioTransferLane = 3;
+
+  /**
+   * Address: 0x00AC8C10 (FUN_00AC8C10, _mwsfcre_IsOkCprm)
+   *
+   * What it does:
+   * Validates the two create parameters the binary range-checks: the buffer
+   * format must be the default or the AINF override, and the frame pool must
+   * not exceed 14 entries. Both failures report before returning.
+   */
+  std::int32_t mwsfcre_IsOkCprm(const moho::MwsfcreCreateParams* const params)
+  {
+    std::int32_t accepted = 1;
+
+    const std::int32_t bufferFormat = params->outerFramePoolNum;
+    if (bufferFormat != 0 && bufferFormat != 3) {
+      (void)MWSFSVM_Error(kMwsfcreErrBadBufferFormat);
+      accepted = 0;
+    }
+
+    if (params->framePoolWork > kMwsfcreMaxFramePoolWork) {
+      (void)MWSFSVM_Error(kMwsfcreErrTooManyFramePool);
+      return 0;
+    }
+    return accepted;
+  }
+
+  /**
+   * Address: 0x00AC8B90 (FUN_00AC8B90, _mwsfcre_IsOkUsrMalloc)
+   *
+   * What it does:
+   * A create without its own work arena has to borrow the library's user
+   * allocator, so both callbacks must be installed. Returns -1 when either is
+   * missing.
+   */
+  std::int32_t mwsfcre_IsOkUsrMalloc(const moho::MwsfcreCreateParams* const params)
+  {
+    const moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
+    std::int32_t result = 0;
+    if (params->work == nullptr) {
+      if (libWork->userMallocFn == nullptr) {
+        result = -1;
+      }
+      if (libWork->userFreeFn == nullptr) {
+        return -1;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x00AC8BC0 (FUN_00AC8BC0, _mwsfcre_InitMemMng)
+   *
+   * What it does:
+   * Seeds the playback bump allocator from the caller-supplied arena and
+   * clears the allocation table.
+   */
+  std::int32_t mwsfcre_InitMemMng(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const moho::MwsfcreCreateParams* const params
+  )
+  {
+    ply->mwsfcreWorkBase = static_cast<std::uint8_t*>(params->work);
+    ply->mwsfcreWorkCapacity = params->workSize;
+    ply->mwsfcreWorkCursor = static_cast<std::uint8_t*>(params->work);
+    ply->mwsfcreWorkUsedBytes = 0;
+    ply->mwsfcreAllocationCount = 0;
+    ply->mwsfcreAllocations.fill(nullptr);
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AC8B10 (FUN_00AC8B10, _mwsfcre_IsPlayAudio)
+   *
+   * What it does:
+   * Stream types 2 (elementary video) and 3 (video-only) carry no audio;
+   * everything else does.
+   */
+  bool mwsfcre_IsPlayAudio(const std::int32_t ftype)
+  {
+    return ftype < moho::kMwsfcreStreamMpvOnly || ftype > moho::kMwsfcreStreamVideoOnly;
+  }
+
+  /**
+   * Address: 0x00AC8B60 (FUN_00AC8B60, _mwsfcre_CreateSj)
+   *
+   * What it does:
+   * Builds the stream SJ ring from the geometry `mwsfcre_CreateSfd` stored on
+   * the handle.
+   */
+  void* mwsfcre_CreateSj(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    return SJRBF_Create(ply->sjRingBufferAddress, ply->sjRingUsableBytes, ply->sjRingPackBytes);
+  }
+
+  /**
+   * Address: 0x00AC8B30 (FUN_00AC8B30, _MWSKG_Create)
+   *
+   * What it does:
+   * Fills the in-handle seek-key-group descriptor and publishes a pointer to
+   * it. The descriptor lives inside the handle, so there is nothing to free.
+   */
+  std::int32_t* MWSKG_Create(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t recordBufferAddress,
+    const std::int32_t recordBlockBytes,
+    const std::int32_t recordEntryBytes
+  )
+  {
+    ply->seekKeyGroup[0] = recordBufferAddress;
+    ply->seekKeyGroup[1] = recordBlockBytes;
+    ply->seekKeyGroup[2] = recordEntryBytes;
+    ply->seekKeyGroupPtr = ply->seekKeyGroup.data();
+    return ply->seekKeyGroupPtr;
+  }
+
+  /**
+   * Address: 0x00AC8920 (FUN_00AC8920, _mwsfcre_MallocRfb)
+   *
+   * What it does:
+   * Allocates the reference-frame pair, or hands back the caller-installed
+   * buffers when those are in use. Fails if either slot ends up null.
+   */
+  std::int32_t mwsfcre_MallocRfb(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const moho::MwsfcreCreateParams* const params,
+    void** const outReferenceFrames
+  )
+  {
+    const std::int32_t frameBytes = MwsfcreFrameBufferBytes(params->maxWidth, params->maxHeight);
+
+    if (mwsfcre_usrfrm_bufnum != 0) {
+      if (mwsfcre_usrfrm_bufnum < static_cast<std::int32_t>(kMwsfcreReferenceFrameCount)
+          || mwsfcre_usrfrm_bufsiz < frameBytes) {
+        outReferenceFrames[0] = nullptr;
+        outReferenceFrames[1] = nullptr;
+        return -1;
+      }
+      outReferenceFrames[0] = mwsfcre_usrfrm_pbuf[0];
+      outReferenceFrames[1] = mwsfcre_usrfrm_pbuf[1];
+    } else {
+      outReferenceFrames[0] = MWSFD_Malloc(ply, frameBytes);
+      outReferenceFrames[1] = MWSFD_Malloc(ply, frameBytes);
+    }
+
+    const bool bothPresent = outReferenceFrames[0] != nullptr && outReferenceFrames[1] != nullptr;
+    return bothPresent ? 0 : -1;
+  }
+
+  /**
+   * Address: 0x00AC8A00 (FUN_00AC8A00, _mwsfcre_MallocTab)
+   *
+   * What it does:
+   * Fills the frame-pool table, either from the caller-installed buffers
+   * (which follow the reference-frame pair) or from the arena.
+   */
+  std::int32_t mwsfcre_MallocTab(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const moho::MwsfcreCreateParams* const params,
+    void** const outFramePool
+  )
+  {
+    const std::int32_t poolCount = params->framePoolWork;
+    (void)mwsfcre_ConvBufFmtFromMwsfd(params->outerFramePoolNum);
+    const std::int32_t frameBytes = MwsfcreFrameBufferBytes(params->maxWidth, params->maxHeight);
+
+    std::int32_t status = 0;
+
+    if (mwsfcre_usrfrm_bufnum != 0) {
+      if (mwsfcre_usrfrm_bufnum < poolCount + static_cast<std::int32_t>(kMwsfcreReferenceFrameCount)
+          || mwsfcre_usrfrm_bufsiz < frameBytes) {
+        return -1;
+      }
+      for (std::int32_t index = 0; index < poolCount; ++index) {
+        void* const buffer = mwsfcre_usrfrm_pbuf[kMwsfcreReferenceFrameCount + static_cast<std::size_t>(index)];
+        outFramePool[index] = buffer;
+        if (buffer == nullptr) {
+          status = -1;
+        }
+      }
+      return status;
+    }
+
+    for (std::int32_t index = 0; index < poolCount; ++index) {
+      void* const buffer = MWSFD_Malloc(ply, frameBytes);
+      outFramePool[index] = buffer;
+      if (buffer == nullptr) {
+        status = -1;
+      }
+    }
+    return status;
+  }
+
+  /**
+   * Address: 0x00AC8C50 (FUN_00AC8C50, _mwsfcre_MallocCompoWork)
+   *
+   * What it does:
+   * Allocates the SFX composition work block and, when the stream carries an
+   * additional-info side stream, its buffer too. Releases everything on
+   * failure.
+   */
+  std::int32_t mwsfcre_MallocCompoWork(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    const std::int32_t compositionBytes = MWSFSFX_CalcHnWorkSiz(ply->params.maxWidth);
+    void* const compositionWork = MWSFD_Malloc(ply, compositionBytes);
+    if (compositionWork == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrNoCompoWork);
+      mwsfcre_AllFree(ply);
+      return -1;
+    }
+    ply->sfxWork = compositionWork;
+    ply->sfxWorkBytes = compositionBytes;
+
+    if (!MWSFTAG_IsUseAinfSj(&ply->params)) {
+      ply->ainfBuffer = nullptr;
+      ply->ainfBufferBytes = 0;
+      return 0;
+    }
+
+    void* const ainfBuffer = MWSFD_Malloc(ply, kMwsfcreAinfSjBytes);
+    if (ainfBuffer == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrNoAinfBuffer);
+      mwsfcre_AllFree(ply);
+      return -1;
+    }
+    ply->ainfBuffer = ainfBuffer;
+    ply->ainfBufferBytes = kMwsfcreAinfSjBytes;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AC6F40 (FUN_00AC6F40, _MWSFTAG_CreateAinfSj)
+   *
+   * What it does:
+   * Builds the additional-info side-stream SJ ring, when the stream uses one.
+   * A failure tears the whole playback handle down.
+   */
+  void* MWSFTAG_CreateAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    if (!MWSFTAG_IsUseAinfSj(&ply->params)) {
+      return nullptr;
+    }
+
+    void* const ainfSj = SJRBF_Create(
+      reinterpret_cast<std::int32_t>(ply->ainfBuffer), ply->ainfBufferBytes, 0);
+    if (ainfSj != nullptr) {
+      return ainfSj;
+    }
+
+    (void)MWSFSVM_Error(kMwsfcreErrCreateAinfSjFailed);
+    mwPlyDestroy(ply);
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00ACAAD0 (FUN_00ACAAD0, _MWSFFRM_SetShfCbFn)
+   *
+   * What it does:
+   * Registers the Sofdec-header analysis callback and its context on the SFD
+   * work control, so each new header reaches `MWSFFRM_AnalyzeSofdecHeader`.
+   */
+  void MWSFFRM_SetShfCbFn(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    auto* const workctrl = static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    (void)SFD_SetCond(
+      workctrl,
+      kSfdCondSofdecHeaderCallback,
+      reinterpret_cast<std::int32_t>(&mwsffrm_CallbackAnalyzeSofdecHeader));
+    (void)SFD_SetCond(workctrl, kSfdCondSofdecHeaderContext, reinterpret_cast<std::int32_t>(ply));
+  }
+
+  /**
+   * Address: 0x00ACAA90 (FUN_00ACAA90, _MWSFFRM_InitSfhInfTable)
+   *
+   * What it does:
+   * Clears the header-record ring and marks every slot unused.
+   */
+  void MWSFFRM_InitSfhInfTable(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    ply->retrievedFrameCount = 0;
+    ply->lastFrameConcatCount = 0;
+    ply->sfhInfoWriteIndex = 0;
+    for (moho::SofdecSfhInfoEntry& entry : ply->sfhInfoTable) {
+      entry = moho::SofdecSfhInfoEntry{};
+      entry.state = moho::kSofdecSfhInfoSlotUnused;
+    }
+  }
+
+  /**
+   * Address: 0x00AC7F70 (FUN_00AC7F70, _MWSFCRE_SetCondSfd)
+   *
+   * What it does:
+   * Installs the fixed playback conditions on a freshly created SFD work
+   * control, including the three timing lanes derived from the display rate.
+   */
+  std::int32_t MWSFCRE_SetCondSfd(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const moho::MwsfcreCreateParams*,
+    const std::int32_t displayCycle,
+    const std::int32_t displayRateMilliHz
+  )
+  {
+    auto* const workctrl = static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+
+    (void)SFD_SetCond(workctrl, kSfdCondReserved08, 0);
+    (void)SFD_SetCond(workctrl, kSfdCondPlayMode, 1);
+    (void)SFD_SetCond(workctrl, kSfdCondReserved00, 0);
+    (void)SFD_SetCond(workctrl, kSfdCondDecodeMode, 4);
+
+    // The binary rounds `1000 * displayRateMilliHz * displayCycle` half-up
+    // through the x87 truncating store, which is a plain round for the
+    // non-negative values this ever sees.
+    const auto frameIntervalMicroseconds = static_cast<std::int32_t>(
+      static_cast<double>(1000 * displayRateMilliHz * displayCycle) + 0.5);
+
+    (void)SFD_SetCond(workctrl, kSfdCondFrameInterval0, frameIntervalMicroseconds);
+    (void)SFD_SetCond(workctrl, kSfdCondFrameInterval1, frameIntervalMicroseconds);
+    (void)SFD_SetCond(workctrl, kSfdCondFrameInterval2, frameIntervalMicroseconds);
+    (void)SFD_SetCond(workctrl, kSfdCondTimeSource, 2);
+    (void)SFD_SetCond(workctrl, kSfdCondReserved33, 0);
+    (void)SFD_SetCond(workctrl, kSfdCondReserved0E, 0);
+    (void)SFD_SetCond(workctrl, kSfdCondReserved1C, 0);
+    return SFD_SetMpvCond(workctrl, kSfdMpvCondOutputFormat, 0);
+  }
+
+  /**
+   * Address: 0x00AD90C0 (FUN_00AD90C0, _MWSTM_Create)
+   */
+  void* MWSTM_Create(moho::SofdecSjSupplyHandle* const sourceJoinObject)
+  {
+    return ADXSTM_Create(sourceJoinObject, 0);
+  }
+
+  /**
+   * Address: 0x00AD9060 (FUN_00AD9060, _MWSTM_SetFlowLimit)
+   */
+  std::int32_t MWSTM_SetFlowLimit(
+    void* const streamHandle,
+    const std::int32_t minBufferSectors,
+    const std::int32_t maxBufferSectors
+  )
+  {
+    if (streamHandle == nullptr) {
+      return 0;
+    }
+    return ADXSTM_SetBufSize(streamHandle, minBufferSectors, maxBufferSectors);
+  }
+
+  /**
+   * Address: 0x00ACB990 (FUN_00ACB990, _MWSFD_SetFlowLimit)
+   */
+  std::int32_t MWSFD_SetFlowLimit(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t lowWaterMark,
+    const std::int32_t highWaterMark
+  )
+  {
+    (void)MWSTM_SetFlowLimit(ply->adxStreamHandle, lowWaterMark, highWaterMark);
+    return MWSFLSC_SetFlowLimit(ply, lowWaterMark);
+  }
+
+  /**
+   * Address: 0x00ACB330 (FUN_00ACB330, _MWSFPLY_SetFlowLimit)
+   *
+   * What it does:
+   * Sets the stream flow limits to 80% / 100% of the SJ ring extent.
+   */
+  void MWSFPLY_SetFlowLimit(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    constexpr double kMwsfdFlowLimitLowFraction = 0.8;
+    const std::int32_t ringBytes = ply->sjRingUsableBytes;
+    const auto lowWaterMark = static_cast<std::int32_t>(static_cast<double>(ringBytes) * kMwsfdFlowLimitLowFraction);
+    (void)MWSFD_SetFlowLimit(ply, lowWaterMark, ringBytes);
+  }
+
+  // ---- Per-stream-type create templates -----------------------------------
+  //
+  // Address: 0x00F40008 / 0x00F40050 / 0x00F40098 / 0x00F400E0. The four
+  // blocks are byte-identical apart from `strategyTable`, which selects which
+  // of the eight transfer strategies this stream type uses (0x00D7F2FC /
+  // 0x00D7F320 / 0x00D7F344 / 0x00D7F368). `mwsfcre_CreateSfd` copies the
+  // matching block and then overwrites the sized lanes.
+
+  constexpr std::int32_t kMwsfcreTemplateStreamInputBytes = 0x10000;
+  constexpr std::int32_t kMwsfcreTemplateVideoInputBytes = 0x50800;
+  constexpr std::int32_t kMwsfcreTemplateAudioInputBytes = 0x12000;
+  constexpr std::int32_t kMwsfcreTemplateFramePoolWork = 3;
+  constexpr std::int32_t kMwsfcreTemplateBufferFormat = 3;
+
+  /** Shared body of all four create templates. */
+  moho::SfplyCreateParams MakeMwsfcreCreateTemplate(void* const strategyTable)
+  {
+    moho::SfplyCreateParams params{};
+    params.strategyTable = strategyTable;
+    params.streamInputBytes = kMwsfcreTemplateStreamInputBytes;
+    params.videoInputBytes = kMwsfcreTemplateVideoInputBytes;
+    params.audioInputBytes = kMwsfcreTemplateAudioInputBytes;
+    params.packBytes = kMwsfcreSofdecPackBytes;
+    params.framePoolWork = kMwsfcreTemplateFramePoolWork;
+    params.bufferFormat = kMwsfcreTemplateBufferFormat;
+    return params;
+  }
+
+  /**
+   * Address: 0x00AC8380 (FUN_00AC8380, _mwsfcre_CreateSfd)
+   * Mangled: _mwsfcre_CreateSfd
+   *
+   * IDA signature:
+   * struct_sofdec_sfd_workctrl_subobj *__cdecl mwsfcre_CreateSfd(
+   *     MWPLY ply, _mwsfcre_MallocTab *prm);
+   *
+   * What it does:
+   * Carves every SFD-side work lane out of the playback arena, publishes the
+   * frame geometry into the MPV/ADXT/M2TS parameter blocks, fills the
+   * per-stream-type create template and hands it to `sfply_Create`. Frees the
+   * whole arena and reports if any allocation came up short.
+   */
+  moho::SofdecSfdWorkctrlSubobj* mwsfcre_CreateSfd(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const moho::MwsfcreCreateParams* const params
+  )
+  {
+    const std::int32_t framePoolWork = params->framePoolWork;
+    const std::int32_t maxWidth = params->maxWidth;
+    const std::int32_t maxHeight = params->maxHeight;
+    const std::int32_t ftype = params->ftype;
+
+    std::int32_t sjBytes = 0;
+    std::int32_t streamInputBytes = 0;
+    std::int32_t videoInputBytes = 0;
+    std::int32_t audioInputBytes = 0;
+    std::int32_t adxWorkBytes = 0;
+    std::int32_t adxInputBytes = 0;
+    mwsfcre_CalcWorkStmBuf(
+      params, &sjBytes, &streamInputBytes, &videoInputBytes, &audioInputBytes, &adxWorkBytes, &adxInputBytes);
+
+    std::int32_t referenceFrameBytes = 0;
+    std::int32_t framePoolBytes = 0;
+    mwsfcre_CalcWorkFrmBuf(params, &referenceFrameBytes, &framePoolBytes);
+
+    std::int32_t ctrlPrimaryBytes = 0;
+    std::int32_t ctrlSecondaryBytes = 0;
+    (void)mwsfcre_CalcWorkCtrl(params, &ctrlPrimaryBytes, &ctrlSecondaryBytes);
+
+    const std::int32_t recordBytes = mwsfcre_CalcWorkRecordMalloc();
+
+    std::int32_t m2tsHandleBytes = 0;
+    std::int32_t m2tsBufferBytes = 0;
+    std::int32_t m2tsInputBytes = 0;
+    (void)mwsfcre_CalcWorkM2ts(params, &m2tsHandleBytes, &m2tsBufferBytes, &m2tsInputBytes);
+
+    void* const inputBuffers = MWSFD_Malloc(ply, videoInputBytes + streamInputBytes + audioInputBytes + 32);
+    void* const streamRing = MWSFD_Malloc(ply, sjBytes + 64);
+
+    std::array<void*, 2> referenceFrames{};
+    const std::int32_t referenceFrameStatus = mwsfcre_MallocRfb(ply, params, referenceFrames.data());
+
+    std::array<void*, kMwsfcreMaxFramePoolWork> framePool{};
+    const std::int32_t framePoolStatus = mwsfcre_MallocTab(ply, params, framePool.data());
+
+    void* adxWork = nullptr;
+    void* adxInput = nullptr;
+    if (mwsfcre_IsPlayAudio(ftype)) {
+      adxWork = MWSFD_Malloc(ply, adxWorkBytes);
+      adxInput = MWSFD_Malloc(ply, adxInputBytes);
+    }
+
+    void* const seekRecord = MWSFD_Malloc(ply, kMwsfcreSofdecPackBytes);
+    void* const ctrlPrimary = MWSFD_Malloc(ply, ctrlPrimaryBytes);
+    void* const ctrlSecondary = MWSFD_Malloc(ply, ctrlSecondaryBytes);
+    void* const m2tsHandle = MWSFD_Malloc(ply, m2tsHandleBytes);
+    void* const m2tsBuffer = MWSFD_Malloc(ply, m2tsBufferBytes);
+    void* const m2tsInput = MWSFD_Malloc(ply, m2tsInputBytes);
+    void* const recordBuffer = MWSFD_Malloc(ply, recordBytes);
+
+    const bool anyLaneMissing = inputBuffers == nullptr || streamRing == nullptr || referenceFrameStatus != 0
+                             || framePoolStatus != 0 || seekRecord == nullptr || ctrlPrimary == nullptr
+                             || m2tsHandle == nullptr || m2tsBuffer == nullptr || m2tsInput == nullptr
+                             || recordBuffer == nullptr || ctrlSecondary == nullptr;
+    if (anyLaneMissing) {
+      (void)MWSFSVM_Error(kMwsfcreErrNoWork);
+      mwsfcre_AllFree(ply);
+      return nullptr;
+    }
+    if (mwsfcre_IsPlayAudio(ftype) && (adxWork == nullptr || adxInput == nullptr)) {
+      (void)MWSFSVM_Error(kMwsfcreErrNoAudioWork);
+      mwsfcre_AllFree(ply);
+      return nullptr;
+    }
+
+    // The SJ ring starts at the next 64-byte boundary inside its block.
+    constexpr std::uintptr_t kSjRingAlignment = 0x40;
+    const auto streamRingAddress = static_cast<std::int32_t>(
+      (reinterpret_cast<std::uintptr_t>(streamRing) + (kSjRingAlignment - 1)) & ~(kSjRingAlignment - 1));
+    mwsfd_sisjadr = streamRingAddress;
+
+    std::int32_t lumaWidth = 0;
+    std::int32_t lumaHeight = 0;
+    std::int32_t chromaStride = 0;
+    std::int32_t chromaHeight = 0;
+    mwsfcre_CalcFrmRes(params, &lumaWidth, &lumaHeight, &chromaStride, &chromaHeight);
+
+    mwsfd_mpvpara.chromaHeight = chromaHeight;
+    mwsfd_mpvpara.chromaStride = chromaStride;
+    mwsfd_mpvpara.widthPrimary = lumaWidth;
+    mwsfd_mpvpara.widthSecondary = lumaWidth;
+    mwsfd_mpvpara.heightPrimary = lumaHeight;
+    mwsfd_mpvpara.heightSecondary = lumaHeight;
+    mwsfd_mpvpara.reserved10 = 0;
+    mwsfd_mpvpara.reserved20 = 0;
+    mwsfd_mpvpara.framePoolWork = framePoolWork;
+    mwsfd_adxtpara.value4 = reinterpret_cast<std::int32_t>(adxInput);
+    mwsfd_adxtpara.value0 = reinterpret_cast<std::int32_t>(adxWork);
+
+    moho::SfplyCreateParams createParams{};
+    switch (ftype) {
+      case moho::kMwsfcreStreamMps:
+        createParams = MakeMwsfcreCreateTemplate(gMwsfdMpsStrategyTable.data());
+        break;
+      case moho::kMwsfcreStreamMpvOnly:
+        createParams = MakeMwsfcreCreateTemplate(gMwsfdMpvStrategyTable.data());
+        break;
+      case moho::kMwsfcreStreamVideoOnly:
+        createParams = MakeMwsfcreCreateTemplate(gMwsfdVideoOnlyStrategyTable.data());
+        break;
+      case moho::kMwsfcreStreamMpeg2Ts:
+        createParams = MakeMwsfcreCreateTemplate(gMwsfdMpeg2TsStrategyTable.data());
+        break;
+      default:
+        break;
+    }
+
+    if (ftype == moho::kMwsfcreStreamMpvOnly) {
+      // Elementary video streams use a plain 2048-byte pack.
+      ply->sjRingBufferAddress = mwsfd_sisjadr;
+      ply->sjRingPackBytes = kMwsfcreSofdecPackBytes;
+      ply->sjRingUsableBytes = sjBytes - kMwsfcreSofdecPackBytes;
+    } else if (ftype == moho::kMwsfcreStreamMps || ftype == moho::kMwsfcreStreamVideoOnly
+               || ftype == moho::kMwsfcreStreamMpeg2Ts) {
+      ply->sjRingBufferAddress = mwsfd_sisjadr;
+      ply->sjRingUsableBytes = sjBytes - mwsfd_packsize;
+      ply->sjRingPackBytes = mwsfd_packsize;
+    }
+
+    createParams.packBytes = mwsfd_packsize;
+    if (streamInputBytes != 0) {
+      streamInputBytes -= streamInputBytes % mwsfd_packsize;
+    }
+
+    createParams.workControlBuffer = inputBuffers;
+    createParams.streamInputBytes = streamInputBytes;
+    createParams.videoInputBytes = videoInputBytes;
+    createParams.audioInputBytes = audioInputBytes;
+    createParams.framePoolWork = framePoolWork;
+    createParams.maxWidth = maxWidth;
+    createParams.maxHeight = maxHeight;
+    createParams.workControlBufferPrimary = ctrlPrimary;
+    createParams.bufferFormat = mwsfcre_ConvBufFmtFromMwsfd(params->outerFramePoolNum);
+    createParams.workControlSizeBytes = static_cast<std::uint32_t>(ctrlPrimaryBytes);
+
+    SFD_SetMpvParaTbl(
+      &mwsfd_mpvpara,
+      reinterpret_cast<const std::int32_t*>(referenceFrames.data()),
+      framePool.data());
+    if (ftype == moho::kMwsfcreStreamMps) {
+      SFD_SetAdxtPara(&mwsfd_adxtpara);
+    } else if (ftype == moho::kMwsfcreStreamMpeg2Ts) {
+      mwsfd_m2tspara.handle = m2tsHandle;
+      mwsfd_m2tspara.handleBytes = m2tsHandleBytes;
+      mwsfd_m2tspara.buffer = m2tsBuffer;
+      mwsfd_m2tspara.streamCount = 2;
+      mwsfd_m2tspara.bufferBytes = m2tsBufferBytes;
+      mwsfd_m2tspara.input = m2tsInput;
+      mwsfd_m2tspara.inputBytes = m2tsInputBytes;
+      SFD_SetM2tsPara(reinterpret_cast<const Sfm2tsParameterSnapshot*>(&mwsfd_m2tspara));
+      SFD_SetAdxtPara(&mwsfd_adxtpara);
+    }
+
+    moho::SofdecSfdWorkctrlSubobj* const workctrl = sfply_Create(&createParams, 0);
+    if (workctrl == nullptr) {
+      (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeCreate);
+      (void)MWSFSVM_Error(kMwsfcreErrSfdCreateFailed);
+      return nullptr;
+    }
+
+    if (SFD_SetErrFn(
+          reinterpret_cast<std::int32_t>(workctrl),
+          reinterpret_cast<std::int32_t>(&MWSFLIB_SfdErrFunc),
+          reinterpret_cast<std::int32_t>(ply))
+        != 0) {
+      (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeSetErrCb);
+      (void)MWSFSVM_Error(kMwsfcreErrSfdSetErrCbFailed);
+      return nullptr;
+    }
+
+    ply->fname = static_cast<char*>(recordBuffer);
+    ply->fnameCapacity = recordBytes;
+    (void)MWSKG_Create(ply, reinterpret_cast<std::int32_t>(seekRecord), kMwsfcreSofdecPackBytes, 64);
+    ply->apiType = 0;
+    return workctrl;
+  }
+
+  /**
+   * Address: 0x00AC80C0 (FUN_00AC80C0, _mwPlyCreateSofdec)
+   * Mangled: _mwPlyCreateSofdec
+   *
+   * IDA signature:
+   * struct_sofdec_ply *__cdecl mwPlyCreateSofdec(_mwsfcre_MallocTab *cprm);
+   *
+   * What it does:
+   * Claims a free playback slot, seeds its arena from the caller's work
+   * buffer, then builds the SFD work control, the stream SJ ring, the SJ
+   * memory pool, the ADX stream, the LSC lane, the SFX composition handle and
+   * the additional-info side stream. Any failure tears the whole handle back
+   * down through `mwPlyDestroy`.
+   */
+  moho::MwsfdPlaybackStateSubobj* mwPlyCreateSofdec(const moho::MwsfcreCreateParams* const createParams)
+  {
+    if (createParams == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrCreateParamsNull);
+      return nullptr;
+    }
+    if (mwsfcre_IsOkCprm(createParams) != 1) {
+      return nullptr;
+    }
+
+    moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
+    auto* const slots = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(libWork->playbackSlotsRaw);
+
+    moho::MwsfdPlaybackStateSubobj* ply = nullptr;
+    std::int32_t slotIndex = 0;
+    for (; slotIndex < moho::kMwsfdDecodeServerSlotCount; ++slotIndex) {
+      ply = &slots[slotIndex];
+      if (ply->used != 1) {
+        break;
+      }
+    }
+    if (slotIndex == moho::kMwsfdDecodeServerSlotCount) {
+      (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeNoFreeHandle);
+      (void)MWSFSVM_Error(kMwsfcreErrNoFreeHandle);
+      return nullptr;
+    }
+
+    if (mwsfcre_IsOkUsrMalloc(createParams) == -1) {
+      (void)MWSFSVM_Error(kMwsfcreErrNoAllocator);
+      return nullptr;
+    }
+
+    *ply = moho::MwsfdPlaybackStateSubobj{};
+    (void)mwsfcre_InitMemMng(ply, createParams);
+    ply->params = *createParams;
+
+    moho::SofdecSfdWorkctrlSubobj* const workctrl = mwsfcre_CreateSfd(ply, createParams);
+    ply->handle = workctrl;
+    if (workctrl == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrCreateSfdFailed);
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+
+    mwsfcre_AttachPicUsrBuf(ply);
+
+    std::int32_t sjBytes = 0;
+    std::int32_t streamInputBytes = 0;
+    std::int32_t videoInputBytes = 0;
+    std::int32_t audioInputBytes = 0;
+    std::int32_t adxWorkBytes = 0;
+    std::int32_t adxInputBytes = 0;
+    mwsfcre_CalcWorkStmBuf(
+      createParams, &sjBytes, &streamInputBytes, &videoInputBytes, &audioInputBytes, &adxWorkBytes, &adxInputBytes);
+
+    (void)MWSFCRE_SetCondSfd(ply, createParams, libWork->displayCycle, libWork->displayLatency);
+
+    void* const streamSj = mwsfcre_CreateSj(ply);
+    ply->sjRingBufferHandle = static_cast<moho::SofdecSjRingBufferHandle*>(streamSj);
+    if (streamSj == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrCreateSjFailed);
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+
+    void* const sjMemory = SJMEM_Create(0, 0);
+    ply->sjMemoryHandle = static_cast<moho::SofdecSjMemoryHandle*>(sjMemory);
+    if (sjMemory == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrCreateSjMemFailed);
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+
+    ply->created = 1;
+    ply->streamBufferBytes = sjBytes;
+    ply->decodeServerDispatchFlag = 0;
+    ply->compoMode = 0;
+    ply->sfxCompoModeLocked = createParams->bufferFormat;
+    ply->sfxCompoModeOverride = createParams->bufferFormat;
+
+    if (SFD_GetTrHn(workctrl, kMwsfcreAudioTransferLane, &ply->audioTransferHandle) != 0) {
+      ply->audioTransferHandle = 0;
+    }
+
+    ply->serverWorkEnabled = 1;
+    ply->concatPlayArmed = 0;
+    ply->isPrepared = 0;
+    ply->paused = 0;
+    ply->mUnknown73 = 0;
+    ply->disableIntermediateFrameDrop = 0;
+    (void)MWSFSVR_SetHnMwplySvrFlg(ply, 0);
+    (void)MWSFSVR_SetHnSfdSvrFlg(ply, 0);
+    ply->releasedFrameCount = 0;
+    ply->seamlessEntryCount = 0;
+
+    void* const adxStream = MWSTM_Create(reinterpret_cast<moho::SofdecSjSupplyHandle*>(ply->sjRingBufferHandle));
+    ply->adxStreamHandle = adxStream;
+    if (adxStream == nullptr) {
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+
+    MWSFPLY_SetFlowLimit(ply);
+    ply->lscHandle = LSC_Create(ply->sjRingBufferHandle);
+    (void)LSC_SetStmHndl(ply->lscHandle, ply->adxStreamHandle);
+    if (mwsfcre_MallocCompoWork(ply) == -1) {
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+
+    void* const sfxHandle = MWSFSFX_Create(
+      reinterpret_cast<std::int32_t>(ply->sfxWork), ply->sfxWorkBytes, createParams->maxWidth);
+    if (sfxHandle == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrCreateSfxFailed);
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+    ply->sfxHandle = sfxHandle;
+    (void)MWSFSFX_SetCompoMode(ply, ply->params.bufferFormat);
+
+    ply->ainfSjHandle = MWSFTAG_CreateAinfSj(ply);
+    if (MWSFTAG_SetAinfSj(ply) != 0) {
+      (void)MWSFSVM_Error(kMwsfcreErrSetAinfSjFailed);
+      mwPlyDestroy(ply);
+      return nullptr;
+    }
+    MWSFTAG_InitTagInf(ply);
+    MWSFFRM_InitSfhInfTable(ply);
+    MWSFFRM_SetShfCbFn(ply);
+
+    ply->used = 1;
+    return ply;
+  }
+
   /**
    * Address: 0x00AC8FD0 (FUN_00AC8FD0, _mwsfcre_OrgMalloc)
    *
@@ -2588,7 +3470,7 @@
     }
 
     if (ply->disableIntermediateFrameDrop == 0) {
-      const std::int32_t framePoolSize = ply->framePoolSize;
+      const std::int32_t framePoolSize = ply->params.framePoolWork;
       for (std::int32_t droppedFrames = 0; droppedFrames < framePoolSize; ++droppedFrames) {
         if (mwPlyIsNextFrmReady(ply) != 1) {
           break;
@@ -3634,7 +4516,7 @@
     if (MWSFD_IsEnableHndl(ply) != 1) {
       return MWSFSVM_Error(kMwsfdErrStartMemInvalidHandle);
     }
-    if (ply->fileType == kMwsfdFileTypeMpv) {
+    if (ply->params.ftype == kMwsfdFileTypeMpv) {
       return MWSFSVM_Error(kMwsfdErrStartMemUnsupportedMpv);
     }
 
@@ -11361,7 +12243,7 @@
    * Validates optional external picture-user buffer lane and binds it to the
    * current SFD handle when global user-buffer mode is enabled.
    */
-  [[maybe_unused]] void mwsfcre_AttachPicUsrBuf(moho::MwsfdPlaybackStateSubobj* const ply)
+  void mwsfcre_AttachPicUsrBuf(moho::MwsfdPlaybackStateSubobj* const ply)
   {
     const auto* const playbackView = reinterpret_cast<const MwsfdPlaybackPicUserView*>(ply);
     const MwsfdPicUserBufferDescriptor* const userBuffer = playbackView->picUserBuffer;
@@ -11370,7 +12252,7 @@
       return;
     }
 
-    const std::int32_t frameSlotCount = ply->framePoolSize + 3;
+    const std::int32_t frameSlotCount = ply->params.framePoolWork + 3;
     if (userBuffer->bufferBytes < (userBuffer->bytesPerFrame * frameSlotCount)) {
       (void)MWSFSVM_Error(kMwsfcreErrAttachPicUsrBufShort);
       return;
