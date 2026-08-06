@@ -218,6 +218,42 @@ namespace moho::movie
   using MPVDecodeSkipRunFn = void(__cdecl*)(MPVDecoderScanContext* decoderContext, unsigned int skipCount);
   using MPVDecoderServiceFn = void(__cdecl*)(int serviceToken);
 
+  /**
+   * The per-block working state the read kernels
+   * (`mpvhdec_ReadKernel*`, 0x00AFAE50 / 0x00AFD7C0) carry alongside the scan
+   * context. Every lane below is taken from their own accesses; the run/level
+   * quartet at the front is what each VLC path fills in before the coefficient
+   * is emitted.
+   *
+   * Dequantization is
+   * `(quantScale * 2 * level * quantMatrix[scanIndex]) >> 4`, negated by sign,
+   * then multiplied by `MPVDecoderScanContext::dequantScaleTable[scanIndex]`
+   * on its way into `coefficients`.
+   */
+  struct MPVCoefficientDecodeState
+  {
+    std::int32_t level;          // +0x00
+    std::int32_t run;            // +0x04
+    std::int32_t signBit;        // +0x08
+    std::int32_t codeLengthBits; // +0x0C
+    std::int32_t scanIndexLimit; // +0x10
+    std::int32_t scanIndex;      // +0x14
+    std::uint8_t reserved_18[0x04];
+    float* coefficients;              // +0x1C
+    const std::uint8_t* quantMatrix;  // +0x20
+    std::int32_t quantScale;          // +0x24
+    std::int32_t* dcAccumulator;      // +0x28
+    const std::uint8_t* dcSizeTable;  // +0x2C
+  };
+
+  static_assert(offsetof(MPVCoefficientDecodeState, codeLengthBits) == 0x0C, "MPVCoefficientDecodeState::codeLengthBits offset must be 0x0C");
+  static_assert(offsetof(MPVCoefficientDecodeState, scanIndex) == 0x14, "MPVCoefficientDecodeState::scanIndex offset must be 0x14");
+  static_assert(offsetof(MPVCoefficientDecodeState, coefficients) == 0x1C, "MPVCoefficientDecodeState::coefficients offset must be 0x1C");
+  static_assert(offsetof(MPVCoefficientDecodeState, quantMatrix) == 0x20, "MPVCoefficientDecodeState::quantMatrix offset must be 0x20");
+  static_assert(offsetof(MPVCoefficientDecodeState, quantScale) == 0x24, "MPVCoefficientDecodeState::quantScale offset must be 0x24");
+  static_assert(offsetof(MPVCoefficientDecodeState, dcAccumulator) == 0x28, "MPVCoefficientDecodeState::dcAccumulator offset must be 0x28");
+  static_assert(offsetof(MPVCoefficientDecodeState, dcSizeTable) == 0x2C, "MPVCoefficientDecodeState::dcSizeTable offset must be 0x2C");
+
   struct MPVDecoderScanContext
   {
     MPVBitstreamState bitstreamState; // +0x00
@@ -237,7 +273,9 @@ namespace moho::movie
     std::uint8_t* coefficientWriteCursor;        // +0x2C
     /** Width-indexed bit masks: `bitMaskByWidth[n] & window` keeps n bits. */
     const std::uint16_t* bitMaskByWidth;         // +0x30
-    std::uint8_t reserved_0034[0x60 - 0x34];
+    /** Per-scan-position float scale folded into each dequantized coefficient. */
+    const float* dequantScaleTable;              // +0x34
+    std::uint8_t reserved_0038[0x60 - 0x38];
     int decodeCurrentSource; // +0x60
     int decodeWorkBase;      // +0x64
     int decodeBitstreamWord; // +0x68
@@ -303,6 +341,11 @@ namespace moho::movie
   };
 
   static_assert(offsetof(MPVDecoderScanContext, bitstreamState) == 0x00, "MPVDecoderScanContext::bitstreamState offset must be 0x00");
+  static_assert(
+    offsetof(MPVDecoderScanContext, dequantScaleTable) == 0x34,
+    "MPVDecoderScanContext::dequantScaleTable offset must be 0x34"
+  );
+
   static_assert(
     offsetof(MPVDecoderScanContext, acRunLevelVlcTables) == 0x10,
     "MPVDecoderScanContext::acRunLevelVlcTables offset must be 0x10"
