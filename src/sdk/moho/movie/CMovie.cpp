@@ -81,22 +81,10 @@ void mwPlyFxCnvFrmARGB8888(
 // base - a jump to address 0 the moment a movie is opened.
 extern "C" std::int32_t mwPlyGetHdrInf(const char* buffer, std::int32_t size, void* outHeaderInfo);
 
-/**
- * Address: 0x00AC7D00 (FUN_00AC7D00, _mwPlyCalcWorkCprmSfd)
- *
- * What it does:
- * Computes the Sofdec work-buffer size for the given create params; returns a
- * value <= 0 on failure.
- */
-std::int32_t mwPlyCalcWorkCprmSfd(void* createParams);
-
-/**
- * Address: 0x00AC80C0 (FUN_00AC80C0, _mwPlyCreateSofdec)
- *
- * What it does:
- * Creates one Sofdec playback handle from the create params + work buffer.
- */
-moho::MwsfdPlaybackStateSubobj* mwPlyCreateSofdec(void* createParams);
+// mwPlyCalcWorkCprmSfd / mwPlyCreateSofdec are declared with their real
+// parameter type in moho/audio/SofdecRuntime.h. They used to be declared here
+// taking `void*`, which gave them a different C++ mangling from the recovered
+// definitions and left both unresolved.
 
 /**
  * Address: 0x00AC9F60 (FUN_00AC9F60, _mwPlySetFrmSync)
@@ -144,22 +132,10 @@ namespace moho
     static_assert(sizeof(SofdecSfdHeaderInfo) == 0x2C, "SofdecSfdHeaderInfo size must be 0x2C");
 
     // _mwsfcre_MallocTab create-params; the binary memsets 0x30 bytes then fills.
-    struct SofdecCreateParams
-    {
-      std::int32_t ftype = 0;             // +0x00
-      std::int32_t maxBitsPerSecond = 0;  // +0x04
-      std::int32_t maxWidth = 0;          // +0x08
-      std::int32_t maxHeight = 0;         // +0x0C
-      std::int32_t framePoolWork = 0;     // +0x10
-      std::int32_t maxStreams = 0;        // +0x14
-      void* work = nullptr;               // +0x18
-      std::int32_t workSize = 0;          // +0x1C
-      std::int32_t bufferFormat = 0;      // +0x20
-      std::int32_t outerFramePoolNum = 0; // +0x24
-      std::uint8_t reserved28[0x08]{};    // +0x28
-    };
-
-    static_assert(sizeof(SofdecCreateParams) == 0x30, "SofdecCreateParams size must be 0x30");
+    // The create-parameter layout is shared with the recovered mwsfcre create
+    // path, so it lives in moho/audio/SofdecRuntime.h rather than being
+    // duplicated here.
+    using SofdecCreateParams = ::moho::MwsfcreCreateParams;
 
     constexpr std::int32_t kSofdecStatFailed = 4;
     constexpr std::int32_t kSofdecStatPreparing = 1;

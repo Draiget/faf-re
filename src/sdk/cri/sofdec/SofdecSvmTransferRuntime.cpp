@@ -4713,6 +4713,10 @@
     return static_cast<std::int64_t>((static_cast<std::uint64_t>(nextHigh) << 32u) | nextLow);
   }
 
+  /** `sftrn_CallTrEntry` slot selectors. */
+  constexpr std::int32_t kSftrnEntrySelectorInit = 0;
+  constexpr std::int32_t kSftrnEntrySelectorFinish = 1;
+
   /**
    * Address: 0x00ADF7F0 (FUN_00ADF7F0, _SFTRN_Init)
    */
@@ -4721,7 +4725,7 @@
     auto* const outEntryList = reinterpret_cast<SftrnEntryListView*>(outTransferEntryTable);
     auto* const sourceEntryList = reinterpret_cast<SftrnEntryListView*>(transferEntryTable);
     std::memcpy(outEntryList, sourceEntryList, sizeof(SftrnEntryListView));
-    return sftrn_CallTrEntry(sourceEntryList, 0);
+    return sftrn_CallTrEntry(sourceEntryList, kSftrnEntrySelectorInit);
   }
 
   /**
@@ -4729,7 +4733,7 @@
    */
   std::int32_t SFTRN_Finish(void* const transferEntryTable)
   {
-    return sftrn_CallTrEntry(transferEntryTable, 1);
+    return sftrn_CallTrEntry(transferEntryTable, kSftrnEntrySelectorFinish);
   }
 
   /**
@@ -4739,12 +4743,13 @@
   {
     auto* const entryList = reinterpret_cast<SftrnEntryListView*>(transferEntryTable);
     std::int32_t result = 0;
-    for (std::int32_t entryIndex = 0; entryIndex < static_cast<std::int32_t>(entryList->entries.size()); ++entryIndex) {
-      SftrnEntryDispatchView* const entryDispatch = entryList->entries[entryIndex];
-      if (entryDispatch == nullptr) {
+    for (SofdecTransferStrategy* const strategy : entryList->entries) {
+      if (strategy == nullptr) {
         break;
       }
-      result = entryDispatch->entryCallbacks[entrySelector](0, 0, 0, 0);
+      // The binary indexes slot 0/1 of the descriptor and pushes four unused
+      // __cdecl arguments; both slots are `Sint32 (*)(void)` in every family.
+      result = (entrySelector == kSftrnEntrySelectorInit) ? strategy->init() : strategy->finish();
       if (result != 0) {
         break;
       }

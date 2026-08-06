@@ -1715,6 +1715,449 @@
     mwply_Destroy(ply);
   }
 
+  // The SFX composition layer is defined later in this aggregate translation
+  // unit (cri/sofdec/SofdecSfxRuntime.cpp).
+  std::int32_t MWSFSFX_Init();
+  std::int32_t MWSFSFX_CalcHnWorkSiz(std::int32_t cellCount);
+
+  // -------------------------------------------------------------------------
+  // Work-size calculation (mwPlyCalcWorkCprmSfd chain)
+  //
+  // CMovie::OpenMovie calls mwPlyCalcWorkCprmSfd first to size the malloc it
+  // then hands back as the create arena, so this whole chain runs before any
+  // playback object exists. Every routine here is pure arithmetic over the
+  // create parameters.
+  // -------------------------------------------------------------------------
+
+  /** Control-lane work sizes; both are fixed in the binary. */
+  constexpr std::int32_t kMwsfcreWorkCtrlPrimaryBytes = 0x4000;
+  constexpr std::int32_t kMwsfcreWorkCtrlSecondaryBytes = 0x700;
+  /** Record-malloc lane is a fixed 256-byte block. */
+  constexpr std::int32_t kMwsfcreWorkRecordBytes = 256;
+  /** Fixed slack the SFD create adds on top of every sized lane. */
+  constexpr std::int32_t kMwsfcreWorkFixedOverheadBytes = 0x860;
+  /** MPEG-2 TS demux lanes, only sized for `ftype == 5`. */
+  constexpr std::int32_t kMwsfcreWorkM2tsHandleBytes = 0x548;
+  constexpr std::int32_t kMwsfcreWorkM2tsBufferBytes = 0x100000;
+  constexpr std::int32_t kMwsfcreWorkM2tsInputBytes = 20480;
+  /** ADX audio lanes, sized for every stream type that carries audio. */
+  constexpr std::int32_t kMwsfcreWorkAdxInputBytes = 0x5DCC;
+  constexpr std::int32_t kMwsfcreWorkAdxWorkBytes = 0x5F0C;
+  constexpr std::int32_t kMwsfcreWorkAdxInputBufferBytes = 0x81C0;
+  /** The tag-info side stream, when the AINF SJ lane is in use. */
+  constexpr std::int32_t kMwsfcreAinfSjBytes = 0x20000;
+  constexpr std::int32_t kMwsfcreSofdecPackBytes = 2048;
+  /** Guard from `mwsfcre_IsOkCprm`. */
+  constexpr std::int32_t kMwsfcreMaxFramePoolWork = 14;
+
+  constexpr char kMwsfcreErrCalcWorkParamsNull[] = "E1122613 mwPlyCalcWorkCprmSfd: cprm is NULL.";
+  constexpr char kMwsfcreErrUnknownBufferFormat[] = "E206011: MwsfdCrePrm: illigal buffmt.";
+
+  /**
+   * Address: 0x00AC7CC0 (FUN_00AC7CC0, _mwsfcre_CalcWorkRecordMalloc)
+   */
+  std::int32_t mwsfcre_CalcWorkRecordMalloc()
+  {
+    return kMwsfcreWorkRecordBytes;
+  }
+
+  /**
+   * Address: 0x00AC7C40 (FUN_00AC7C40, _mwsfcre_CalcWorkCtrl)
+   *
+   * What it does:
+   * Reports the two fixed control-lane sizes and their total. The create
+   * parameters are ignored - the binary takes the argument and never reads it.
+   */
+  std::int32_t mwsfcre_CalcWorkCtrl(
+    const moho::MwsfcreCreateParams*,
+    std::int32_t* const outPrimaryBytes,
+    std::int32_t* const outSecondaryBytes
+  )
+  {
+    *outPrimaryBytes = kMwsfcreWorkCtrlPrimaryBytes;
+    *outSecondaryBytes = kMwsfcreWorkCtrlSecondaryBytes;
+    return *outPrimaryBytes + kMwsfcreWorkCtrlSecondaryBytes;
+  }
+
+  /**
+   * Address: 0x00AC7C60 (FUN_00AC7C60, _mwsfcre_CalcWorkM2ts)
+   *
+   * What it does:
+   * Sizes the MPEG-2 transport-stream demux lanes, which exist only for
+   * `ftype == 5`; every other stream type gets zeroes.
+   */
+  std::int32_t mwsfcre_CalcWorkM2ts(
+    const moho::MwsfcreCreateParams* const params,
+    std::int32_t* const outHandleBytes,
+    std::int32_t* const outBufferBytes,
+    std::int32_t* const outInputBytes
+  )
+  {
+    if (params->ftype == moho::kMwsfcreStreamMpeg2Ts) {
+      *outHandleBytes = kMwsfcreWorkM2tsHandleBytes;
+      *outBufferBytes = kMwsfcreWorkM2tsBufferBytes;
+      *outInputBytes = kMwsfcreWorkM2tsInputBytes;
+    } else {
+      *outHandleBytes = 0;
+      *outBufferBytes = 0;
+      *outInputBytes = 0;
+    }
+    return *outInputBytes + *outBufferBytes + *outHandleBytes;
+  }
+
+  /**
+   * Address: 0x00AC7990 (FUN_00AC7990, _mwsfcre_CalcWorkStmBuf)
+   *
+   * What it does:
+   * Sizes the stream-buffer lanes from the bitrate budget. `ftype == 2`
+   * (elementary video) needs only the SJ ring; `ftype == 3` (video-only)
+   * additionally needs the video input buffer but no ADX lanes; everything
+   * else carries audio and gets the three fixed ADX lanes as well.
+   */
+  void mwsfcre_CalcWorkStmBuf(
+    const moho::MwsfcreCreateParams* const params,
+    std::int32_t* const outSjBytes,
+    std::int32_t* const outStreamInputBytes,
+    std::int32_t* const outVideoInputBytes,
+    std::int32_t* const outAudioInputBytes,
+    std::int32_t* const outAdxWorkBytes,
+    std::int32_t* const outAdxInputBytes
+  )
+  {
+    const std::int32_t ftype = params->ftype;
+    const std::int32_t streamCount = (params->maxStreams > 0) ? params->maxStreams : 1;
+    const std::int32_t packsPerSecond = params->maxBitsPerSecond / 8 / kMwsfcreSofdecPackBytes;
+
+    *outSjBytes = (streamCount * packsPerSecond) * kMwsfcreSofdecPackBytes;
+    *outStreamInputBytes = 0;
+
+    if (ftype == moho::kMwsfcreStreamMpvOnly) {
+      *outVideoInputBytes = 0;
+      *outAudioInputBytes = 0;
+      *outAdxWorkBytes = 0;
+      *outAdxInputBytes = 0;
+      return;
+    }
+
+    *outVideoInputBytes = (packsPerSecond * kMwsfcreSofdecPackBytes) / 2 + kMwsfcreSofdecPackBytes;
+
+    if (ftype == moho::kMwsfcreStreamVideoOnly) {
+      *outAudioInputBytes = 0;
+      *outAdxWorkBytes = 0;
+      *outAdxInputBytes = 0;
+    } else {
+      *outAudioInputBytes = kMwsfcreWorkAdxInputBytes;
+      *outAdxWorkBytes = kMwsfcreWorkAdxWorkBytes;
+      *outAdxInputBytes = kMwsfcreWorkAdxInputBufferBytes;
+    }
+  }
+
+  /**
+   * Optional caller-installed frame buffers (0x00FB8C78 / 0x00FB8D10 /
+   * 0x00FB8D14). When `count` is non-zero the create path uses these instead
+   * of allocating frame buffers out of the arena, and the work-size
+   * calculation reports zero for the frame lanes. Slots [0] and [1] are the
+   * reference-frame pair; [2...] are the frame-pool entries.
+   *
+   * Forged Alliance never installs these, so the normal path allocates.
+   */
+  constexpr std::size_t kMwsfcreUserFrameBufferSlots = 38; // (0xFB8D10 - 0xFB8C78) / 4
+  std::array<void*, kMwsfcreUserFrameBufferSlots> mwsfcre_usrfrm_pbuf{}; // 0x00FB8C78
+  std::int32_t mwsfcre_usrfrm_bufnum = 0;                                // 0x00FB8D10
+  std::int32_t mwsfcre_usrfrm_bufsiz = 0;                                // 0x00FB8D14
+
+  /** Reference-frame pair occupies the first two user-buffer slots. */
+  constexpr std::size_t kMwsfcreReferenceFrameCount = 2;
+
+  /**
+   * Address: 0x00AC7C00 (FUN_00AC7C00, _mwsfcre_ConvBufFmtFromMwsfd)
+   *
+   * What it does:
+   * Maps an MWSFD buffer-format selector onto the SFD one. Unknown selectors
+   * raise the CRI error and fall through to the same default as 0/3.
+   */
+  std::int32_t mwsfcre_ConvBufFmtFromMwsfd(const std::int32_t mwsfdBufferFormat)
+  {
+    switch (mwsfdBufferFormat) {
+      case 1:
+        return 1;
+      case 2:
+        return 2;
+      case 0:
+      case 3:
+        return 3;
+      default:
+        (void)MWSFSVM_Error(kMwsfcreErrUnknownBufferFormat);
+        return 3;
+    }
+  }
+
+  /**
+   * Address: 0x00AC7BB0 (FUN_00AC7BB0, _mwsfcre_CalcFrmRes)
+   *
+   * What it does:
+   * Reports the luma resolution unchanged plus the chroma-plane stride and
+   * height for a 4:2:0 frame.
+   */
+  void mwsfcre_CalcFrmRes(
+    const moho::MwsfcreCreateParams* const params,
+    std::int32_t* const outLumaWidth,
+    std::int32_t* const outLumaHeight,
+    std::int32_t* const outChromaStride,
+    std::int32_t* const outChromaHeight
+  )
+  {
+    const std::int32_t width = params->maxWidth;
+    const std::int32_t height = params->maxHeight;
+    *outChromaStride = 32 * ((width / 2 + 31) / 32);
+    *outChromaHeight = height / 2;
+    *outLumaWidth = width;
+    *outLumaHeight = height;
+  }
+
+  /**
+   * Macroblock-tiled size of one decoded frame, in bytes.
+   *
+   * Both `mwsfcre_CalcWorkFrmBuf` and `mwsfcre_MallocRfb` open-code this same
+   * expression in the binary; it is lifted here so the sizing pass and the
+   * allocation pass cannot drift apart. Luma is padded to a 16-pixel macro-
+   * block grid then counted in 32-byte tiles, with two extra tiles of header,
+   * and the half-resolution chroma plane is counted the same way.
+   */
+  [[nodiscard]] std::int32_t MwsfcreFrameBufferBytes(const std::int32_t width, const std::int32_t height)
+  {
+    const std::int32_t paddedWidth = 16 * ((width + 15) / 16);
+    const std::int32_t tileRows = (height + 31) / 32;
+    const std::int32_t lumaTiles = tileRows * ((paddedWidth + 31) / 32) + 2;
+    const std::int32_t chromaTiles = (tileRows * 32 / 2) * ((paddedWidth / 2 + 31) / 32);
+    return (16 * lumaTiles + chromaTiles) << 6;
+  }
+
+  /**
+   * Address: 0x00AC7AD0 (FUN_00AC7AD0, _mwsfcre_CalcWorkFrmBuf)
+   *
+   * What it does:
+   * Sizes the reference-frame pair and the frame pool. Both are zero when the
+   * caller installed its own frame buffers.
+   */
+  void mwsfcre_CalcWorkFrmBuf(
+    const moho::MwsfcreCreateParams* const params,
+    std::int32_t* const outReferenceFrameBytes,
+    std::int32_t* const outFramePoolBytes
+  )
+  {
+    if (mwsfcre_usrfrm_bufnum != 0) {
+      *outReferenceFrameBytes = 0;
+      *outFramePoolBytes = 0;
+      return;
+    }
+
+    std::int32_t lumaWidth = 0;
+    std::int32_t lumaHeight = 0;
+    std::int32_t chromaStride = 0;
+    std::int32_t chromaHeight = 0;
+    mwsfcre_CalcFrmRes(params, &lumaWidth, &lumaHeight, &chromaStride, &chromaHeight);
+    (void)mwsfcre_ConvBufFmtFromMwsfd(params->outerFramePoolNum);
+
+    const std::int32_t frameBytes = MwsfcreFrameBufferBytes(lumaWidth, lumaHeight);
+    *outReferenceFrameBytes = frameBytes * static_cast<std::int32_t>(kMwsfcreReferenceFrameCount);
+    *outFramePoolBytes = params->framePoolWork * frameBytes;
+  }
+
+  /**
+   * Address: 0x00AC78E0 (FUN_00AC78E0, _mwPlyCalcWorkSfd)
+   *
+   * What it does:
+   * Totals every SFD-side work lane: stream buffers, frame buffers, the
+   * control lanes, the MPEG-2 TS demux lanes, the record lane and the fixed
+   * per-handle overhead.
+   */
+  std::int32_t mwPlyCalcWorkSfd(const moho::MwsfcreCreateParams* const params)
+  {
+    std::int32_t sjBytes = 0;
+    std::int32_t streamInputBytes = 0;
+    std::int32_t videoInputBytes = 0;
+    std::int32_t audioInputBytes = 0;
+    std::int32_t adxWorkBytes = 0;
+    std::int32_t adxInputBytes = 0;
+    mwsfcre_CalcWorkStmBuf(
+      params, &sjBytes, &streamInputBytes, &videoInputBytes, &audioInputBytes, &adxWorkBytes, &adxInputBytes);
+
+    std::int32_t referenceFrameBytes = 0;
+    std::int32_t framePoolBytes = 0;
+    mwsfcre_CalcWorkFrmBuf(params, &referenceFrameBytes, &framePoolBytes);
+
+    std::int32_t ctrlPrimaryBytes = 0;
+    std::int32_t ctrlSecondaryBytes = 0;
+    const std::int32_t ctrlTotal = mwsfcre_CalcWorkCtrl(params, &ctrlPrimaryBytes, &ctrlSecondaryBytes);
+
+    std::int32_t m2tsHandleBytes = 0;
+    std::int32_t m2tsBufferBytes = 0;
+    std::int32_t m2tsInputBytes = 0;
+    const std::int32_t m2tsTotal =
+      mwsfcre_CalcWorkM2ts(params, &m2tsHandleBytes, &m2tsBufferBytes, &m2tsInputBytes);
+
+    return adxWorkBytes + audioInputBytes + videoInputBytes + streamInputBytes + sjBytes + framePoolBytes
+         + referenceFrameBytes + ctrlTotal + m2tsTotal + mwsfcre_CalcWorkRecordMalloc() + adxInputBytes
+         + kMwsfcreWorkFixedOverheadBytes;
+  }
+
+  /**
+   * Address: 0x00AC7CD0 (FUN_00AC7CD0, _mwPlyCalcWorkCompo)
+   *
+   * What it does:
+   * Sizes the SFX composition handle, plus the tag-info side stream when the
+   * stream is configured to carry one.
+   */
+  std::int32_t mwPlyCalcWorkCompo(const moho::MwsfcreCreateParams* const params)
+  {
+    const std::int32_t compositionBytes = MWSFSFX_CalcHnWorkSiz(params->maxWidth);
+    if (!MWSFTAG_IsUseAinfSj(params)) {
+      return compositionBytes;
+    }
+    return compositionBytes + kMwsfcreAinfSjBytes;
+  }
+
+  /**
+   * Address: 0x00AC7D00 (FUN_00AC7D00, _mwPlyCalcWorkCprmSfd)
+   * Mangled: _mwPlyCalcWorkCprmSfd
+   *
+   * IDA signature:
+   * int __cdecl mwPlyCalcWorkCprmSfd(_mwsfcre_MallocTab *a1);
+   *
+   * What it does:
+   * Public entry point that sizes the whole playback work arena for one set
+   * of create parameters. `CMovie::OpenMovie` calls this first and mallocs
+   * exactly this many bytes to hand back as the create arena.
+   */
+  std::int32_t mwPlyCalcWorkCprmSfd(const moho::MwsfcreCreateParams* const params)
+  {
+    if (params == nullptr) {
+      (void)MWSFSVM_Error(kMwsfcreErrCalcWorkParamsNull);
+      return 0;
+    }
+    return mwPlyCalcWorkSfd(params) + mwPlyCalcWorkCompo(params);
+  }
+
+  /**
+   * Address: 0x00AC8FD0 (FUN_00AC8FD0, _mwsfcre_OrgMalloc)
+   *
+   * IDA signature:
+   * int __cdecl mwsfcre_OrgMalloc(MWPLY ply, int size);
+   *
+   * What it does:
+   * Bump-allocates `size` bytes out of the playback work arena, refusing the
+   * request when it would run past the arena capacity.
+   */
+  void* mwsfcre_OrgMalloc(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t size)
+  {
+    const std::int32_t usedAfter = ply->mwsfcreWorkUsedBytes + size;
+    if (static_cast<std::uint32_t>(usedAfter) > static_cast<std::uint32_t>(ply->mwsfcreWorkCapacity)) {
+      return nullptr;
+    }
+
+    std::uint8_t* const allocation = ply->mwsfcreWorkCursor;
+    ply->mwsfcreWorkUsedBytes = usedAfter;
+    ply->mwsfcreWorkCursor = allocation + size;
+    return allocation;
+  }
+
+  /**
+   * Address: 0x00AC9010 (FUN_00AC9010, _mwsfcre_UsrMalloc)
+   *
+   * What it does:
+   * Routes an allocation through the user-supplied malloc callback registered
+   * in the MWSFD library work area.
+   */
+  void* mwsfcre_UsrMalloc(const std::int32_t size)
+  {
+    moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
+    return libWork->userMallocFn(libWork->userAllocObject, size);
+  }
+
+  /**
+   * Address: 0x00AC90E0 (FUN_00AC90E0, _mwsfcre_IncMallocCnt)
+   */
+  void mwsfcre_IncMallocCnt(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    ++ply->mwsfcreAllocationCount;
+  }
+
+  /**
+   * Address: 0x00AC90F0 (FUN_00AC90F0, _mwsfcre_DecMallocCnt)
+   */
+  moho::MwsfdPlaybackStateSubobj* mwsfcre_DecMallocCnt(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    --ply->mwsfcreAllocationCount;
+    return ply;
+  }
+
+  /**
+   * Address: 0x00AC9100 (FUN_00AC9100, _mwsfcre_GetMallocCnt)
+   */
+  std::int32_t mwsfcre_GetMallocCnt(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    return ply->mwsfcreAllocationCount;
+  }
+
+  /**
+   * Address: 0x00AC9070 (FUN_00AC9070, _mwsfcre_OrgFree)
+   *
+   * What it does:
+   * Nothing. Arena blocks are released wholesale when the work buffer goes
+   * away, so the per-block free is a deliberate no-op in the binary too.
+   */
+  void mwsfcre_OrgFree(moho::MwsfdPlaybackStateSubobj*, void*)
+  {
+  }
+
+  /**
+   * Address: 0x00AC9080 (FUN_00AC9080, _mwsfcre_UsrFree)
+   */
+  std::int32_t mwsfcre_UsrFree(void* const allocation)
+  {
+    moho::MwsfdLibWork* const libWork = MWSFLIB_GetLibWorkPtr();
+    return libWork->userFreeFn(libWork->userAllocObject, allocation);
+  }
+
+  /**
+   * Address: 0x00AC9030 (FUN_00AC9030, _MWSFD_Free)
+   *
+   * What it does:
+   * Releases one playback-owned block through whichever allocator produced it
+   * and decrements the outstanding-allocation count.
+   */
+  moho::MwsfdPlaybackStateSubobj* MWSFD_Free(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    void* const allocation
+  )
+  {
+    if (ply->mwsfcreWorkBase != nullptr) {
+      mwsfcre_OrgFree(ply, allocation);
+    } else {
+      (void)mwsfcre_UsrFree(allocation);
+    }
+    return mwsfcre_DecMallocCnt(ply);
+  }
+
+  /**
+   * Address: 0x00AC90A0 (FUN_00AC90A0, _mwsfcre_AllFree)
+   *
+   * What it does:
+   * Frees every recorded playback allocation, walking the table from the top
+   * down exactly as the binary does, and clears each slot.
+   */
+  void mwsfcre_AllFree(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    for (std::size_t index = ply->mwsfcreAllocations.size(); index-- > 0;) {
+      void*& slot = ply->mwsfcreAllocations[index];
+      if (slot != nullptr) {
+        (void)MWSFD_Free(ply, slot);
+        slot = nullptr;
+      }
+    }
+  }
+
   /**
    * Address: 0x00AC8F60 (FUN_00AC8F60, _MWSFD_Malloc)
    *
@@ -1734,7 +2177,7 @@
     }
 
     void* allocation = nullptr;
-    if (ply->mwsfcreWorkSizeBytes != 0) {
+    if (ply->mwsfcreWorkBase != nullptr) {
       allocation = mwsfcre_OrgMalloc(ply, size);
     } else {
       allocation = mwsfcre_UsrMalloc(size);
@@ -1823,6 +2266,131 @@
   {
     MWSFLIB_GetLibWorkPtr()->lastErrorCode = errorCode;
     return errorCode;
+  }
+
+  // Defined later in this aggregate translation unit; the Sofdec startup path
+  // sits ahead of the SVM/LSC/SFX layers it brings up.
+  void mwsflib_SetSvrFunc();
+  std::int32_t SVM_Init();
+  void LSC_Init();
+  std::int32_t LSC_EntryErrFunc(
+    std::int32_t(__cdecl* callback)(std::int32_t callbackObject, const char* message),
+    std::int32_t callbackObject
+  );
+
+  /** MWSFD server-registration ids, cleared by `MWSFSVM_Init`. */
+  std::int32_t mwg_vbin_fid = 0;
+  std::int32_t mwg_vsync_fid = 0;
+  std::int32_t mwg_idle_fid = 0;
+  std::int32_t mwg_main_fid = 0;
+
+  /**
+   * Address: 0x00ACCAB0 (FUN_00ACCAB0, _MWSFSVM_Init)
+   *
+   * IDA signature:
+   * void __cdecl MWSFSVM_Init();
+   *
+   * What it does:
+   * Brings up the CRI server-manager layer, then clears the four MWSFD server
+   * registration ids so `mwsflib_SetSvrFunc` can re-register them.
+   */
+  void MWSFSVM_Init()
+  {
+    SVM_Init();
+    mwg_vbin_fid = 0;
+    mwg_vsync_fid = 0;
+    mwg_idle_fid = 0;
+    mwg_main_fid = 0;
+  }
+
+  /** Nesting count that guards the one-time half of `mwPlyInitSfdFx`. */
+  std::int32_t mwsfd_init_cnt = 0;
+
+  /**
+   * Address: 0x00D7F390 (`_mwsfd_ver_str`)
+   *
+   * The literal embeds a NUL: the banner is what `cri_verstr_ptr_mwsfd`
+   * publishes, and the "Append:" tail is a separate string the CRI tools read
+   * out of the same blob.
+   */
+  constexpr char kMwsfdVersionString[] =
+    "\nMWSFD/PC Ver.3.50 Build:Feb 28 2005 21:33:44\n\0Append: MSC1200\n";
+  const char* cri_verstr_ptr_mwsfd = nullptr;
+
+  constexpr char kMwsfdErrInitPrmNull[] = "E1122611 mwPlyInitSfdFx: iprm is NULL.";
+  constexpr char kMwsfdErrCantInitGsc[] = "E2005 mwPlyInitSfdFx: can't init GSC";
+  constexpr char kMwsfdErrSfdInitFailed[] = "ERR20010421A : mwPlyInitSfdFx";
+  constexpr std::int32_t kMwsfdErrGscInitFailed = -101;
+  /** The binary drops two display frames of latency, clamped at zero. */
+  constexpr std::int32_t kMwsfdDisplayLatencyBias = 2;
+  /** `mwPlySfdInit` takes milli-hertz; the binary rounds `vhz * 1000`. */
+  constexpr float kMwsfdMilliHertzScale = 1000.0f;
+
+  /**
+   * Address: 0x00AC9130 (FUN_00AC9130, _mwPlyInitSfdFx)
+   * Mangled: _mwPlyInitSfdFx
+   *
+   * IDA signature:
+   * void __cdecl mwPlyInitSfdFx(MwsfdInitPrm *iprm);
+   *
+   * What it does:
+   * One-time bring-up of the entire Sofdec playback stack: ADX transport, the
+   * SJ memory/ring/unit allocators, the GSC streamer, the MWSFD library work
+   * area and - through `mwPlySfdInit` - `SFD_Init`, which is what finally
+   * builds the SFH header-analyzer pool. Repeat calls only bump the nesting
+   * count.
+   */
+  void mwPlyInitSfdFx(moho::MwsfdInitPrm* const iprm)
+  {
+    if (iprm == nullptr) {
+      (void)MWSFSVM_Error(kMwsfdErrInitPrmNull);
+      return;
+    }
+
+    moho::MwsfdInitPrm initParams{};
+    initParams.vhz = iprm->vhz;
+    initParams.disp_cycle = iprm->disp_cycle;
+    initParams.disp_latency = iprm->disp_latency;
+    initParams.dec_svr = iprm->dec_svr;
+    std::copy(std::begin(iprm->rsv), std::end(iprm->rsv), std::begin(initParams.rsv));
+
+    cri_verstr_ptr_mwsfd = kMwsfdVersionString;
+    MWSFSVM_Init();
+
+    initParams.disp_latency -= kMwsfdDisplayLatencyBias;
+    if (initParams.disp_latency < 0) {
+      initParams.disp_latency = 0;
+    }
+
+    if (mwsfd_init_cnt == 0) {
+      ADXT_Init();
+      SJRBF_Init();
+      SJMEM_Init();
+      SJUNI_Init();
+
+      if (MWSTM_InitStatic() != 0) {
+        (void)MWSFLIB_SetErrCode(kMwsfdErrGscInitFailed);
+        (void)MWSFSVM_Error(kMwsfdErrCantInitGsc);
+      }
+
+      mwsflib_InitLibWork(&initParams);
+      mwg_vcnt = 0;
+
+      const auto requestedVersion =
+        static_cast<std::int32_t>(initParams.vhz * kMwsfdMilliHertzScale + 0.5f);
+      if (mwPlySfdInit(requestedVersion) != 0) {
+        (void)MWSFSVM_Error(kMwsfdErrSfdInitFailed);
+      }
+
+      mwsfd_init_flag = 1;
+      (void)mwsflib_SetDefCond(&initParams.vhz);
+      LSC_Init();
+      (void)LSC_EntryErrFunc(&mwsflib_LscErrFunc, 0);
+      (void)MWSFSFX_Init();
+      mwsflib_SetSvrFunc();
+    }
+
+    ++mwsfd_init_cnt;
   }
 
   /**

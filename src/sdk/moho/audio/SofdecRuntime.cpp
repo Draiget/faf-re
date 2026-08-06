@@ -3,6 +3,7 @@
 #include "cri/sofdec/SofdecAdxRuntime.cpp"
 #include "cri/sofdec/SofdecSvmTransferRuntime.cpp"
 #include "cri/sofdec/SofdecSfdRuntime.cpp"
+#include "cri/sofdec/SofdecSfxRuntime.cpp"
 #include "cri/sofdec/SofdecMwPlaybackRuntime.cpp"
 #include "cri/sofdec/SofdecVirtualDispatchRuntime.cpp"
 #include "cri/sofdec/SofdecAdxbBootstrapRuntime.cpp"

@@ -18600,3 +18600,169 @@
 
     return destroyResult;
   }
+
+  // -------------------------------------------------------------------------
+  // SFD transfer strategy table
+  //
+  // Address: 0x00D7F3D0 (`SftrnEntryListView`, 15 slots, null-terminated after
+  //          eight entries) and 0x00D7F49C / 0x00D7F4D4 / 0x00D7F50C /
+  //          0x00D7F544 / 0x00D7F57C / 0x00D7F5D4 / 0x00D7F670 / 0x00D7F6B8
+  //          (the eight `SofdecTransferStrategy` descriptors, 0x38 apart).
+  //
+  // What it does:
+  // `mwsfd_initsfdpara.callbacks` (0x00D7F40C, the static immediately after
+  // the list) points at the list head. `mwPlySfdInit` copies that pointer into
+  // its own init parameters, `SFD_Init` hands it to `sflib_InitLibWork`, and
+  // `SFTRN_Init` memcpy's the list into `gSflibLibWork.transferInitState`
+  // before calling every strategy's `init` slot in turn. If any of those
+  // returns non-zero the walk stops and `SFD_Init` returns early WITHOUT
+  // running `sflib_InitSub`, which is the only caller of `SFHDS_Init` - so the
+  // SFH analyzer pool stays at size 0 and every movie is rejected as "not a
+  // valid SFD file".
+  // -------------------------------------------------------------------------
+
+  /** Strategy descriptor for SFMEM (0x00D7F6B8). */
+  SofdecTransferStrategy gSfmemTransferStrategy = {
+    /* init        */ &SFMEM_Init,
+    /* finish      */ &SFMEM_Finish,
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_ExecServer),
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_Create),
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFMEM_Seek),
+  };
+
+  /** Strategy descriptor for SFMPS (0x00D7F670). */
+  SofdecTransferStrategy gSfmpsTransferStrategy = {
+    /* init        */ &SFMPS_Init,
+    /* finish      */ &SFMPS_Finish,
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_ExecServer),
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_Create),
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFMPS_Seek),
+  };
+
+  /** Strategy descriptor for SFMPV (0x00D7F5D4). */
+  SofdecTransferStrategy gSfmpvTransferStrategy = {
+    /* init        */ &SFMPV_Init,
+    /* finish      */ &SFMPV_Finish,
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_ExecServer),
+    /* create      */ nullptr, // TODO-TABLE SFMPV_Create 0x00AD4BA0
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFMPVF_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Seek),
+  };
+
+  /** Strategy descriptor for SFVOM (0x00D7F544). */
+  SofdecTransferStrategy gSfvomTransferStrategy = {
+    /* init        */ &SFVOM_Init,
+    /* finish      */ &SFVOM_Finish,
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_ExecServer),
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_Create),
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFVOM_Seek),
+  };
+
+  /** Strategy descriptor for SFM2TS (0x00D7F4D4). */
+  SofdecTransferStrategy gSfm2tsTransferStrategy = {
+    /* init        */ &SFM2TS_Init,
+    /* finish      */ &SFM2TS_Finish,
+    /* execServer  */ nullptr, // TODO-TABLE SFM2TS_ExecServer 0x00ACF140
+    /* create      */ nullptr, // TODO-TABLE SFM2TS_Create 0x00ACF800
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Seek),
+  };
+
+  /** Strategy descriptor for SFAOAP (0x00D7F50C). */
+  SofdecTransferStrategy gSfaoapTransferStrategy = {
+    /* init        */ &SFAOAP_Init,
+    /* finish      */ &SFAOAP_Finish,
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_ExecServer),
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_Create),
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFAOAP_Seek),
+  };
+
+  /** Strategy descriptor for SFUO (0x00D7F49C). */
+  SofdecTransferStrategy gSfuoTransferStrategy = {
+    /* init        */ &SFUO_Init,
+    /* finish      */ &SFUO_Finish,
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFUO_ExecServer),
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFUO_Create),
+    /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFUO_Destroy),
+    /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFUO_RequestStop),
+    /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFUO_Start),
+    /* stop        */ reinterpret_cast<SftrnEntryCallback>(&SFUO_Stop),
+    /* pause       */ reinterpret_cast<SftrnEntryCallback>(&SFUO_Pause),
+    /* getWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFUO_GetWrite),
+    /* addWrite    */ reinterpret_cast<SftrnEntryCallback>(&SFUO_AddWrite),
+    /* getRead     */ reinterpret_cast<SftrnEntryCallback>(&SFUO_GetRead),
+    /* addRead     */ reinterpret_cast<SftrnEntryCallback>(&SFUO_AddRead),
+    /* seek        */ reinterpret_cast<SftrnEntryCallback>(&SFUO_Seek),
+  };
+
+  /**
+   * Address: 0x00D7F3D0 (`_mwsfd_trentry_tbl`)
+   *
+   * Strategy walk order taken verbatim from the binary's pointer list.
+   */
+  SftrnEntryListView gSofdecTransferStrategyList = {{
+    &gSfmemTransferStrategy,   // [0] 0x00D7F6B8
+    &gSfmpsTransferStrategy,   // [1] 0x00D7F670
+    &gSfmpvTransferStrategy,   // [2] 0x00D7F5D4
+    &gSfvomTransferStrategy,   // [3] 0x00D7F544
+    &gSfm2tsTransferStrategy,  // [4] 0x00D7F4D4
+    // [5] 0x00D7F57C SFADXT - TODO-TABLE, the family is not recovered yet.
+    // It is listed LAST here rather than in binary position, because
+    // `sftrn_CallTrEntry` stops at the first null entry and a hole in slot 5
+    // would silently skip SFAOAP and SFUO as well.
+    &gSfaoapTransferStrategy,  // [6] 0x00D7F50C
+    &gSfuoTransferStrategy,    // [7] 0x00D7F49C
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+  }};

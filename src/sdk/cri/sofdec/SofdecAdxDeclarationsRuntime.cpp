@@ -3618,7 +3618,22 @@
   );
 
   SflibLibWorkRuntime gSflibLibWork{};
-  moho::MwsfdInitSfdParams gMwsfdInitSfdParams{};
+
+  /**
+   * Address: 0x00D7F40C (`_mwsfd_initsfdpara`)
+   *
+   * What it does:
+   * Holds the address of the SFD transfer strategy list (0x00D7F3D0, defined
+   * at the end of `cri/sofdec/SofdecSfdRuntime.cpp` once every strategy body
+   * is in scope). `mwPlySfdInit` copies `callbacks` into the parameter block
+   * it hands to `SFD_Init`; a null here stops `SFTRN_Init` from reaching
+   * `sflib_InitSub`, so the SFH analyzer pool never gets built.
+   */
+  extern SftrnEntryListView gSofdecTransferStrategyList;
+  moho::MwsfdInitSfdParams gMwsfdInitSfdParams{
+    reinterpret_cast<std::uintptr_t>(&gSofdecTransferStrategyList),
+    0
+  };
   std::int32_t gMwsfdLastMwsfdHandle = 0;
   std::int32_t gMwsfdLastSfdHandle = 0;
   moho::MwsfdPlaybackStateSubobj* mwsfd_hn_last = nullptr;

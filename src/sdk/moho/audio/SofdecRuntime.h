@@ -45,6 +45,41 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfdInitPrm) == 0x20, "MwsfdInitPrm size must be 0x20");
 
   /**
+   * Create parameters handed to `mwPlyCalcWorkCprmSfd` / `mwPlyCreateSofdec`
+   * (IDA calls it `_mwsfcre_MallocTab`).
+   *
+   * `work`/`workSize` describe the caller-supplied arena; when `work` is null
+   * the create routes every allocation through `MwsfdLibWork`'s user
+   * allocator instead, which is what `mwsfcre_IsOkUsrMalloc` validates.
+   */
+  struct MwsfcreCreateParams
+  {
+    std::int32_t ftype = 0;             // +0x00
+    std::int32_t maxBitsPerSecond = 0;  // +0x04
+    std::int32_t maxWidth = 0;          // +0x08
+    std::int32_t maxHeight = 0;         // +0x0C
+    std::int32_t framePoolWork = 0;     // +0x10
+    std::int32_t maxStreams = 0;        // +0x14
+    void* work = nullptr;               // +0x18
+    std::int32_t workSize = 0;          // +0x1C
+    std::int32_t bufferFormat = 0;      // +0x20
+    std::int32_t outerFramePoolNum = 0; // +0x24
+    std::uint8_t reserved28[0x08]{};    // +0x28
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(MwsfcreCreateParams, work) == 0x18, "MwsfcreCreateParams::work offset must be 0x18");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfcreCreateParams) == 0x30, "MwsfcreCreateParams size must be 0x30");
+
+  /** Sofdec stream types accepted by the create path. */
+  enum MwsfcreStreamType : std::int32_t
+  {
+    kMwsfcreStreamMps = 1,     ///< MPEG program stream (video + ADX audio)
+    kMwsfcreStreamMpvOnly = 2, ///< elementary MPEG video
+    kMwsfcreStreamVideoOnly = 3,
+    kMwsfcreStreamMpeg2Ts = 5,
+  };
+
+  /**
    * Runtime SFD init parameter lane used by `mwPlySfdInit`.
    */
   struct MwsfdInitSfdParams
@@ -68,6 +103,10 @@ namespace moho
    */
   using MwsfdDecodeServerCallback = std::int32_t(__cdecl*)(std::int32_t callbackContext);
 
+  /** User-supplied allocator installed in `MwsfdLibWork` (+0x28 / +0x2C). */
+  using MwsfdUserMallocCallback = void*(__cdecl*)(std::int32_t allocObject, std::int32_t size);
+  using MwsfdUserFreeCallback = std::int32_t(__cdecl*)(std::int32_t allocObject, void* allocation);
+
   constexpr std::int32_t kMwsfdDecodeServerSlotCount = 32;
 
   /**
@@ -90,7 +129,12 @@ namespace moho
     std::int32_t decodeServerSelection = 0; // +0x10
     std::uint8_t mUnknown14[0x10]{};
     std::int32_t requestServerBridgeFlag = 0; // +0x24
-    std::uint8_t mUnknown28[0x0C]{};
+    // User-supplied allocator, used whenever a playback handle was created
+    // without its own work arena. `mwsfcre_IsOkUsrMalloc` refuses such a
+    // create unless both callbacks are installed.
+    MwsfdUserMallocCallback userMallocFn = nullptr; // +0x28
+    MwsfdUserFreeCallback userFreeFn = nullptr;     // +0x2C
+    std::int32_t userAllocObject = 0;               // +0x30
     std::int32_t seekFlag = 0;                                    // +0x34
     std::int32_t defaultConditionInitialized = 0;                 // +0x38
     std::int32_t defaultConditionReserved = 0;                    // +0x3C
@@ -639,8 +683,15 @@ namespace moho
     SofdecSjMemoryHandle* sjMemoryHandle = nullptr; // +0x1E0
     std::int32_t sjMemoryBufferAddress = 0;         // +0x1E4
     std::int32_t sjMemoryBufferSize = 0;            // +0x1E8
-    std::int32_t mwsfcreWorkSizeBytes = 0;          // +0x1EC
-    std::uint8_t mUnknown1F0[0x0C]{};
+    // Bump allocator carved out of the caller-supplied work buffer.
+    // `mwsfcre_InitMemMng` seeds base/limit/cursor from the create params and
+    // `mwsfcre_OrgMalloc` hands out blocks until `usedBytes + size > capacity`.
+    // A null base means "no arena" and routes allocation to the user callback
+    // instead - that is the test `MWSFD_Malloc` makes.
+    std::uint8_t* mwsfcreWorkBase = nullptr;    // +0x1EC
+    std::int32_t mwsfcreWorkCapacity = 0;       // +0x1F0
+    std::uint8_t* mwsfcreWorkCursor = nullptr;  // +0x1F4
+    std::int32_t mwsfcreWorkUsedBytes = 0;      // +0x1F8
     std::int32_t mwsfcreAllocationCount = 0;    // +0x1FC
     std::array<void*, 32> mwsfcreAllocations{}; // +0x200
     MwsstStreamStateSubobj streamState{};
@@ -796,8 +847,8 @@ namespace moho
     "MwsfdPlaybackStateSubobj::sjMemoryBufferSize offset must be 0x1E8"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(MwsfdPlaybackStateSubobj, mwsfcreWorkSizeBytes) == 0x1EC,
-    "MwsfdPlaybackStateSubobj::mwsfcreWorkSizeBytes offset must be 0x1EC"
+    offsetof(MwsfdPlaybackStateSubobj, mwsfcreWorkBase) == 0x1EC,
+    "MwsfdPlaybackStateSubobj::mwsfcreWorkBase offset must be 0x1EC"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(MwsfdPlaybackStateSubobj, mwsfcreAllocationCount) == 0x1FC,
@@ -2527,6 +2578,48 @@ std::int32_t SFD_SetVideoUsrSj(
    * and clears the MPV parameter/table storage on success.
    */
   std::int32_t SFMPV_Init();
+
+  /**
+   * Address: 0x00AC7D00 (_mwPlyCalcWorkCprmSfd)
+   *
+   * What it does:
+   * Sizes the whole playback work arena for one set of create parameters.
+   */
+  std::int32_t mwPlyCalcWorkCprmSfd(const moho::MwsfcreCreateParams* createParams);
+
+  /**
+   * Address: 0x00AC80C0 (_mwPlyCreateSofdec)
+   *
+   * What it does:
+   * Builds one Sofdec playback handle out of the caller-supplied work arena.
+   */
+  moho::MwsfdPlaybackStateSubobj* mwPlyCreateSofdec(const moho::MwsfcreCreateParams* createParams);
+
+  /**
+   * Remaining slots of the SFMPV transfer strategy (0x00D7F5D4).
+   *
+   * SFMPV is the one strategy family whose bodies live in their own
+   * translation unit (`cri/sofdec/SofdecMpvRuntime.cpp`); the other seven are
+   * part of the `moho/audio/SofdecRuntime.cpp` aggregate that also builds the
+   * strategy table, so only these need cross-TU declarations.
+   */
+  std::int32_t SFMPV_Finish();
+  std::int32_t SFMPV_ExecServer(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_Destroy(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_RequestStop();
+  std::int32_t SFMPV_Start();
+  std::int32_t SFMPV_Stop();
+  std::int32_t SFMPV_Pause();
+  std::int32_t SFMPV_GetWrite(std::int32_t workctrlAddress);
+  struct SfmpvfFrameInfoRuntimeView;
+  std::int32_t SFMPVF_GetRead(
+    std::int32_t workctrlAddress,
+    SfmpvfFrameInfoRuntimeView** outFrameInfo,
+    std::int32_t* outFrameId
+  );
+  std::int32_t SFMPV_AddWrite(std::int32_t workctrlAddress);
+  std::int32_t SFMPV_AddRead(std::int32_t workctrlAddress, std::int32_t frameInfoIndex, std::int32_t frameObjectId);
+  std::int32_t SFMPV_Seek(std::int32_t workctrlAddress);
 
   /**
    * Address: 0x00AD9290 (FUN_00AD9290, _mwSfdVsync)
