@@ -7186,30 +7186,21 @@ namespace moho::movie
     };
 
     /**
-     * Decodes one MPEG-1 Table B-14 AC run/level code out of a 32-bit peek of
-     * the bitstream window.
+     * Decodes the MPEG-1 Table B-14 codes whose top window bit is clear, which
+     * is every code except the two shortest. Shared by both read kernels: they
+     * differ only in how they treat a leading one bit.
      *
-     * The shipped kernels hand-unroll this: they retire up to two codes per
-     * dispatch and inline the short ones, which is why each is ~2500 lines of
-     * decompiler output. That unrolling is optimizer shape, not semantics -
-     * the (run, level, sign, length) quadruple is identical, and every path of
-     * the original resolves to exactly one of the three cases below.
+     * The shipped kernels hand-unroll all of this - they retire up to two
+     * codes per dispatch and inline the short ones, which is why each is ~2500
+     * lines of decompiler output. That unrolling is optimizer shape, not
+     * semantics: every path resolves to one (run, level, sign, length)
+     * quadruple, so a single-symbol decoder over the binary's own tables
+     * produces identical coefficients.
      */
-    [[nodiscard]] MPVAcRunLevel DecodeAcRunLevel(const MPVDecoderScanContext& context, const std::uint32_t window)
+    [[nodiscard]] MPVAcRunLevel DecodeTableRunLevel(const MPVDecoderScanContext& context, const std::uint32_t window)
     {
-      const std::uint32_t topByte = window >> 24;
-
-      if (topByte >= 0x80u) {
-        // The two shortest codes cannot be told apart by the short table's
-        // seven-bit index (it drops bit 31), so they are matched up front:
-        // 10 ends the block, and 11s is run 0 / level 1.
-        if (topByte < 0xC0u) {
-          return MPVAcRunLevel{0, 0, 0, 2, true};
-        }
-        return MPVAcRunLevel{0, 1, static_cast<int>((topByte >> 5) & 1u), 3, false};
-      }
-
       // With bit 31 clear the top byte is itself the table index (bits 30..24).
+      const std::uint32_t topByte = window >> 24;
       const std::uint32_t entry = context.acShortRunLevelTable[topByte];
       const int run = static_cast<int>(entry & 0xFFu);
 
@@ -7285,16 +7276,52 @@ namespace moho::movie
     }
 
     /**
-     * Dequantizes one AC coefficient and stores it, exactly as the kernels do:
-     * `(2 * quantScale * level * quantMatrix[i]) >> 4`, forced odd, negated on
-     * sign, then scaled by the per-scan-position float the context carries.
+     * Decodes one AC run/level code at any position where end-of-block is
+     * legal: a leading `10` ends the block and `11s` is run 0 / level 1.
      */
-    void EmitDequantizedCoefficient(
-      const MPVDecoderScanContext& context, MPVCoefficientDecodeState& state, const int scanIndex, const int level,
-      const int signBit
+    [[nodiscard]] MPVAcRunLevel DecodeAcRunLevel(const MPVDecoderScanContext& context, const std::uint32_t window)
+    {
+      const std::uint32_t topByte = window >> 24;
+      if (topByte >= 0x80u) {
+        if (topByte < 0xC0u) {
+          return MPVAcRunLevel{0, 0, 0, 2, true};
+        }
+        return MPVAcRunLevel{0, 1, static_cast<int>((topByte >> 5) & 1u), 3, false};
+      }
+
+      return DecodeTableRunLevel(context, window);
+    }
+
+    /**
+     * Decodes the first coefficient of a non-intra block, where end-of-block
+     * cannot occur yet: a leading one is `1s`, run 0 / level 1 in two bits
+     * rather than the three the same run/level costs everywhere else.
+     */
+    [[nodiscard]] MPVAcRunLevel DecodeFirstPredictedRunLevel(
+      const MPVDecoderScanContext& context, const std::uint32_t window
     )
     {
-      int value = (state.quantScale * 2 * level * state.quantMatrix[scanIndex]) >> 4;
+      if ((window & 0x80000000u) != 0) {
+        return MPVAcRunLevel{0, 1, static_cast<int>((window >> 30) & 1u), 2, false};
+      }
+
+      return DecodeTableRunLevel(context, window);
+    }
+
+    /**
+     * Dequantizes one coefficient and stores it, exactly as the kernels do:
+     * `(quantScale * magnitude * quantMatrix[i]) >> 4`, forced odd, negated on
+     * sign, then scaled by the per-scan-position float the context carries.
+     *
+     * `quantizedMagnitude` is where intra and non-intra blocks diverge: MPEG-1
+     * scales an intra level by two and a non-intra level by two plus one.
+     */
+    void EmitDequantizedCoefficient(
+      const MPVDecoderScanContext& context, MPVCoefficientDecodeState& state, const int scanIndex,
+      const int quantizedMagnitude, const int signBit
+    )
+    {
+      int value = (state.quantScale * quantizedMagnitude * state.quantMatrix[scanIndex]) >> 4;
       if (value != 0) {
         value = (value - 1) | 1;
       }
@@ -7304,6 +7331,15 @@ namespace moho::movie
 
       state.coefficients[scanIndex] =
         static_cast<float>(static_cast<double>(value) * static_cast<double>(context.dequantScaleTable[scanIndex]));
+    }
+
+    /** Publishes a decoded symbol into the kernel's shared decode lanes. */
+    void StoreDecodedRunLevel(MPVCoefficientDecodeState& state, const MPVAcRunLevel& code)
+    {
+      state.run = code.run;
+      state.level = code.level;
+      state.signBit = code.signBit;
+      state.codeLengthBits = code.lengthBits;
     }
   } // namespace
 
@@ -7376,11 +7412,7 @@ namespace moho::movie
 
       for (;;) {
         const MPVAcRunLevel code = DecodeAcRunLevel(*decoderContext, PeekWindowBits(bitstreamState, 0));
-
-        state.run = code.run;
-        state.level = code.level;
-        state.signBit = code.signBit;
-        state.codeLengthBits = code.lengthBits;
+        StoreDecodedRunLevel(state, code);
 
         if (code.endOfBlock) {
           ConsumeBits(
@@ -7401,7 +7433,7 @@ namespace moho::movie
 
         const int scanIndex = *scanCursor;
         state.scanIndex = scanIndex;
-        EmitDequantizedCoefficient(*decoderContext, state, scanIndex, code.level, code.signBit);
+        EmitDequantizedCoefficient(*decoderContext, state, scanIndex, 2 * code.level, code.signBit);
 
         ConsumeBits(
           bitstreamState.bitWindowPrimary,
@@ -7419,4 +7451,95 @@ namespace moho::movie
     return static_cast<std::uint8_t>(result);
   }
 
+  /**
+   * Address: 0x00AFD7C0 (sub_AFD7C0, `_mpvhdec_ReadKernelPredictedDefault`)
+   *
+   * IDA signature:
+   * int __cdecl sub_AFD7C0(int *a1, int *a2);
+   *
+   * What it does:
+   * Reads one non-intra (predicted) MPEG-1 block. There is no DC prediction,
+   * so the block is cleared first and every coefficient - including the first
+   * - comes from a Table B-14 run/level code. The first code addresses the
+   * scan directly and cannot be an end-of-block, which is why a leading one
+   * bit costs two bits there and three everywhere after.
+   *
+   * Dequantization uses the non-intra rule, `(2 * level + 1)` rather than the
+   * intra `2 * level`.
+   *
+   * The scan position of that first coefficient becomes `scanIndexLimit`, so
+   * the returned flag is negative exactly when the block carried more than one
+   * coefficient.
+   */
+  extern "C" std::uint8_t mpvhdec_ReadKernelPredictedDefault(
+    MPVDecoderScanContext* const decoderContext, void* const decodeState
+  )
+  {
+    MPVCoefficientDecodeState& state = *static_cast<MPVCoefficientDecodeState*>(decodeState);
+    MPVBitstreamState& bitstreamState = decoderContext->bitstreamState;
+
+    // No DC prediction carries into a predicted block, so it starts empty.
+    std::fill_n(state.coefficients, kMpvCoefficientsPerBlock, 0.0f);
+
+    // ---- first coefficient -----------------------------------------------
+    const MPVAcRunLevel firstCode = DecodeFirstPredictedRunLevel(*decoderContext, PeekWindowBits(bitstreamState, 0));
+    StoreDecodedRunLevel(state, firstCode);
+
+    ConsumeBits(
+      bitstreamState.bitWindowPrimary,
+      bitstreamState.bitWindowSecondary,
+      bitstreamState.bitCount,
+      bitstreamState.byteCursor,
+      firstCode.lengthBits
+    );
+
+    const std::uint8_t* const scanBase = decoderContext->coefficientWriteCursor;
+    const std::uint8_t* const scanEnd = scanBase + kMpvCoefficientsPerBlock;
+    const std::uint8_t* scanCursor = scanBase + firstCode.run;
+
+    int scanIndex = *scanCursor;
+    state.scanIndexLimit = scanIndex;
+    state.scanIndex = scanIndex;
+    EmitDequantizedCoefficient(*decoderContext, state, scanIndex, 2 * firstCode.level + 1, firstCode.signBit);
+
+    // ---- remaining coefficients ------------------------------------------
+    for (;;) {
+      const MPVAcRunLevel code = DecodeAcRunLevel(*decoderContext, PeekWindowBits(bitstreamState, 0));
+      StoreDecodedRunLevel(state, code);
+
+      if (code.endOfBlock) {
+        ConsumeBits(
+          bitstreamState.bitWindowPrimary,
+          bitstreamState.bitWindowSecondary,
+          bitstreamState.bitCount,
+          bitstreamState.byteCursor,
+          code.lengthBits
+        );
+        break;
+      }
+
+      scanCursor += code.run + 1;
+      if (scanCursor >= scanEnd || code.level == 0) {
+        decoderContext->recoverNeededFlag = 1;
+        break;
+      }
+
+      scanIndex = *scanCursor;
+      state.scanIndex = scanIndex;
+      EmitDequantizedCoefficient(*decoderContext, state, scanIndex, 2 * code.level + 1, code.signBit);
+
+      ConsumeBits(
+        bitstreamState.bitWindowPrimary,
+        bitstreamState.bitWindowSecondary,
+        bitstreamState.bitCount,
+        bitstreamState.byteCursor,
+        code.lengthBits
+      );
+    }
+
+    const int reachedIndex = state.scanIndex;
+    const int result = (reachedIndex != state.scanIndexLimit) ? -reachedIndex : reachedIndex;
+    state.scanIndex = result;
+    return static_cast<std::uint8_t>(result);
+  }
 } // namespace moho::movie
