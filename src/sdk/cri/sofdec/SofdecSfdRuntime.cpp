@@ -9053,12 +9053,107 @@
   };
   static_assert(sizeof(MpslibErrorInfoRuntimeView) == 0x0C, "MpslibErrorInfoRuntimeView size must be 0x0C");
 
+  /**
+   * The MPEG-1 pack header (ISO/IEC 11172-1), as `mpsdec_DecPackHd` parses it.
+   * `mpslib_InitPack` primes all four lanes with -1.
+   */
+  struct MpsPackHeader
+  {
+    std::int32_t systemClockReferenceLow = -1;  // +0x00
+    std::int32_t systemClockReferenceHigh = -1; // +0x04  SCR is 33 bits
+    /// Set from the two bits that follow the start code: '00' is the MPEG-1
+    /// '0010' prefix, anything else is the MPEG-2 '01' pack layout.
+    std::int32_t isMpeg1Layout = -1;            // +0x08
+    std::int32_t muxRate = -1;                  // +0x0C
+  };
+  static_assert(sizeof(MpsPackHeader) == 0x10, "MpsPackHeader size must be 0x10");
+
+  /**
+   * The MPEG-1 system header. `mpslib_InitSys` primes eight lanes with -1, and
+   * the handle carries four of these blocks.
+   */
+  struct MpsSystemHeader
+  {
+    std::int32_t headerLengthBytes = -1;   // +0x00
+    std::int32_t rateBound = -1;           // +0x04
+    std::int32_t audioBound = -1;          // +0x08
+    std::int32_t videoBound = -1;          // +0x0C
+    std::int32_t fixedFlag = -1;           // +0x10
+    std::int32_t cspsFlag = -1;            // +0x14
+    std::int32_t systemAudioLockFlag = -1; // +0x18
+    std::int32_t systemVideoLockFlag = -1; // +0x1C
+  };
+  static_assert(sizeof(MpsSystemHeader) == 0x20, "MpsSystemHeader size must be 0x20");
+
+  /**
+   * The MPEG-1 packet header. `mpslib_InitPket` primes ten lanes with -1.
+   */
+  struct MpsPacketHeader
+  {
+    std::int32_t presentationTimeStampLow = -1;  // +0x00
+    std::int32_t presentationTimeStampHigh = -1; // +0x04
+    std::int32_t decodeTimeStampLow = -1;        // +0x08
+    std::int32_t decodeTimeStampHigh = -1;       // +0x0C
+    std::int32_t streamId = -1;                  // +0x10
+    std::int32_t streamKind = -1;                // +0x14  see kMpsStreamKind*
+    std::int32_t streamIndex = -1;               // +0x18  index within the kind
+    std::int32_t packetLengthBytes = -1;         // +0x1C
+    std::int32_t stdBufferSizeBytes = -1;        // +0x20
+    std::int32_t payloadLengthBytes = -1;        // +0x24
+  };
+  static_assert(sizeof(MpsPacketHeader) == 0x28, "MpsPacketHeader size must be 0x28");
+
+  struct MpslibHandleRuntimeView;
+
+  /// `MPSDEC_dechd` selects one of these; this build ships the MPEG-1 decoder.
+  using MpsDecodeHeaderFn = std::int32_t(__cdecl*)(
+    MpslibHandleRuntimeView* handle,
+    const std::uint8_t* data,
+    std::int32_t sizeBytes,
+    std::int32_t* outConsumedBytes,
+    std::uint32_t* outDelimiterFlags
+  );
+  using MpsSystemHeaderCallback = std::int32_t(__cdecl*)(std::int32_t callbackObject, const std::int32_t* summary);
+  using MpsPacketCallback = void(__cdecl*)(std::int32_t callbackObject, std::int32_t streamId);
+
   struct MpslibHandleRuntimeView
   {
-    std::int32_t handleState = 1; // +0x00
-    std::uint8_t reserved04_FF[0xFC]{}; // +0x04
+    std::int32_t handleState = 1;                   // +0x00  1 = free, 2 = in use
+    MpslibErrorInfoRuntimeView errInfo{};           // +0x04
+    /// Packet-header dialect. `mpslib_InitHn` sets 2, which is the layout that
+    /// carries a 16-bit packet_length; `mpsdec_DecPketHd` gates on it.
+    std::int32_t packetHeaderMode = 0;              // +0x10
+    std::int32_t reserved14 = 0;                    // +0x14
+    MpsPackHeader packHeader{};                     // +0x18
+    /// Slot 0 is the header just parsed; `MPSDEC_DecHdMpeg1` archives it into
+    /// slot 1..3 by content once a system header completes.
+    std::array<MpsSystemHeader, 4> systemHeaders{}; // +0x28
+    MpsPacketHeader packetHeader{};                 // +0xA8
+    std::int32_t m2pHandleAddress = 0;              // +0xD0
+    MpsDecodeHeaderFn decodeHeader = nullptr;       // +0xD4
+    std::int32_t reservedD8 = 0;                    // +0xD8
+    std::int32_t reservedDC = 0;                    // +0xDC
+    std::int32_t reservedE0 = 0;                    // +0xE0
+    MpsSystemHeaderCallback systemHeaderCallback = nullptr; // +0xE4
+    std::int32_t systemHeaderCallbackObject = 0;    // +0xE8
+    std::int32_t reservedEC = 0;                    // +0xEC
+    std::int32_t reservedF0 = 0;                    // +0xF0
+    MpsPacketCallback packetCallback = nullptr;     // +0xF4
+    std::int32_t packetCallbackObject = 0;          // +0xF8
+    std::int32_t reservedFC = 0;                    // +0xFC
   };
   static_assert(offsetof(MpslibHandleRuntimeView, handleState) == 0x00, "MpslibHandleRuntimeView::handleState offset must be 0x00");
+  static_assert(offsetof(MpslibHandleRuntimeView, packetHeaderMode) == 0x10, "MpslibHandleRuntimeView::packetHeaderMode @0x10");
+  static_assert(offsetof(MpslibHandleRuntimeView, packHeader) == 0x18, "MpslibHandleRuntimeView::packHeader @0x18");
+  static_assert(offsetof(MpslibHandleRuntimeView, systemHeaders) == 0x28, "MpslibHandleRuntimeView::systemHeaders @0x28");
+  static_assert(offsetof(MpslibHandleRuntimeView, packetHeader) == 0xA8, "MpslibHandleRuntimeView::packetHeader @0xA8");
+  static_assert(offsetof(MpslibHandleRuntimeView, m2pHandleAddress) == 0xD0, "MpslibHandleRuntimeView::m2pHandleAddress @0xD0");
+  static_assert(offsetof(MpslibHandleRuntimeView, decodeHeader) == 0xD4, "MpslibHandleRuntimeView::decodeHeader @0xD4");
+  static_assert(
+    offsetof(MpslibHandleRuntimeView, systemHeaderCallback) == 0xE4,
+    "MpslibHandleRuntimeView::systemHeaderCallback @0xE4"
+  );
+  static_assert(offsetof(MpslibHandleRuntimeView, packetCallback) == 0xF4, "MpslibHandleRuntimeView::packetCallback @0xF4");
   static_assert(sizeof(MpslibHandleRuntimeView) == 0x100, "MpslibHandleRuntimeView size must be 0x100");
 
   struct MpslibRuntimeView
@@ -9291,6 +9386,633 @@
     }
 
     return nullptr;
+  }
+
+  // ---------------------------------------------------------------------------
+  // MPEG-1 program-stream header decoding (0x00AEB200 - 0x00AECA81).
+  //
+  // The three `mpsdec_Dec*Hd` bodies decompile into ~1600 lines of variable
+  // soup because the compiler inlined one big-endian `getbits` reader at every
+  // single field. It is one reader, not three algorithms: recovered once here
+  // as `MpsBitReader`, which lets each parser read as the ISO/IEC 11172-1 field
+  // list it is.
+  // ---------------------------------------------------------------------------
+
+  /// Delimiter classes returned by `MPS_CheckDelim`.
+  constexpr std::int32_t kMpsDelimiterPack = 0x00010000;
+  constexpr std::int32_t kMpsDelimiterSystem = 0x00020000;
+  constexpr std::int32_t kMpsDelimiterPacket = 0x00040000;
+
+  /// A complete MPEG-1 pack header is always 12 bytes.
+  constexpr std::int32_t kMpsPackHeaderBytes = 12;
+
+  /// `mpsdec_DecPketHd` only parses the length-bearing layout for this mode,
+  /// which is the one `mpslib_InitHn` installs.
+  constexpr std::int32_t kMpsPacketHeaderModeMpeg1 = 2;
+
+  constexpr std::int32_t kMpsStreamKindAudio = 0;
+  constexpr std::int32_t kMpsStreamKindVideo = 1;
+  constexpr std::int32_t kMpsStreamKindPrivate = 2;
+  constexpr std::int32_t kMpsStreamKindPadding = 3;
+  constexpr std::int32_t kMpsStreamKindOther = 4;
+
+  constexpr std::int32_t kMpsStreamIdPrivate1 = 0xBD;
+  constexpr std::int32_t kMpsStreamIdPadding = 0xBE;
+  constexpr std::int32_t kMpsStreamIdPrivate2 = 0xBF;
+  constexpr std::int32_t kMpsStreamIdAudioFirst = 0xC0;
+  constexpr std::int32_t kMpsStreamIdAudioLast = 0xDF;
+  constexpr std::int32_t kMpsStreamIdVideoFirst = 0xE0;
+  constexpr std::int32_t kMpsStreamIdVideoLast = 0xEF;
+
+  /// `'0010'` before a 33-bit stamp means PTS only; `'0011'` means PTS + DTS.
+  constexpr std::uint32_t kMpsTimeStampFlagsPtsOnly = 2;
+  constexpr std::uint32_t kMpsTimeStampFlagsPtsAndDts = 3;
+
+  /// The largest number of per-stream P-STD bounds one system header can carry.
+  constexpr std::size_t kMpsMaxSystemStreamBounds = 48;
+
+  /**
+   * Big-endian, MSB-first bitstream reader over one program-stream header.
+   *
+   * The binary's loads are 4-byte aligned: the window starts at the first
+   * 4-boundary at or after `packet + 1`, and the initial bit position discards
+   * whatever lies before `packet + 4`. The net effect is that the bit stream
+   * begins just past the 32-bit start code, which is why no parser reads it.
+   * The alignment is reproduced exactly because the parsers derive their
+   * consumed-byte counts from the load cursor, which runs eight bytes (window
+   * plus lookahead) ahead of the bit position.
+   */
+  class MpsBitReader
+  {
+  public:
+    explicit MpsBitReader(const std::uint8_t* const packet) noexcept : mPacketStart(packet), mNext(packet)
+    {
+      const auto packetAddress = reinterpret_cast<std::uintptr_t>(packet);
+      const auto* const windowStart =
+        reinterpret_cast<const std::uint8_t*>((packetAddress + 4u) & ~static_cast<std::uintptr_t>(3u));
+      mConsumedBits = 32 - 8 * static_cast<std::int32_t>(windowStart - packet);
+      mNext = windowStart;
+      mWindow = LoadBigEndianWord() << mConsumedBits;
+      mLookahead = LoadBigEndianWord();
+    }
+
+    [[nodiscard]] std::uint32_t Read(const std::int32_t widthBits) noexcept
+    {
+      const std::int32_t tailBits = 32 - widthBits;
+      if (mConsumedBits < tailBits) {
+        const std::uint32_t value = mWindow >> tailBits;
+        mWindow <<= widthBits;
+        mConsumedBits += widthBits;
+        return value;
+      }
+
+      mConsumedBits -= tailBits;
+      std::uint32_t value;
+      if (mConsumedBits != 0) {
+        value = (mWindow | (mLookahead >> (widthBits - mConsumedBits))) >> tailBits;
+        mLookahead <<= mConsumedBits;
+      } else {
+        value = mWindow >> tailBits;
+      }
+      mWindow = mLookahead;
+      mLookahead = LoadBigEndianWord();
+      return value;
+    }
+
+    void Skip(const std::int32_t widthBits) noexcept { (void)Read(widthBits); }
+
+    /// Look at the next `widthBits` without consuming them. The parsers test
+    /// stuffing bytes and the two timestamp-flag patterns this way.
+    [[nodiscard]] std::uint32_t Peek(const std::int32_t widthBits) const noexcept
+    {
+      const std::int32_t tailBits = 32 - widthBits;
+      std::uint32_t value = mWindow >> tailBits;
+      if (mConsumedBits > tailBits) {
+        value |= mLookahead >> (32 + tailBits - mConsumedBits);
+      }
+      return value;
+    }
+
+    /// One past the last header byte, rounded up from the bit position. The
+    /// load cursor is eight bytes ahead, hence the bias.
+    [[nodiscard]] const std::uint8_t* ConsumedEnd() const noexcept
+    {
+      return mNext + ((mConsumedBits + 7) >> 3) - 8;
+    }
+
+    [[nodiscard]] std::int32_t ConsumedBytes() const noexcept
+    {
+      return static_cast<std::int32_t>(ConsumedEnd() - mPacketStart);
+    }
+
+  private:
+    [[nodiscard]] std::uint32_t LoadBigEndianWord() noexcept
+    {
+      const std::uint32_t word = (static_cast<std::uint32_t>(mNext[0]) << 24)
+        | (static_cast<std::uint32_t>(mNext[1]) << 16) | (static_cast<std::uint32_t>(mNext[2]) << 8)
+        | static_cast<std::uint32_t>(mNext[3]);
+      mNext += 4;
+      return word;
+    }
+
+    const std::uint8_t* mPacketStart;
+    const std::uint8_t* mNext;
+    std::uint32_t mWindow = 0;
+    std::uint32_t mLookahead = 0;
+    std::int32_t mConsumedBits = 0;
+  };
+
+  /**
+   * Reads one 33-bit MPEG-1 timestamp: three high bits, then two 15-bit groups,
+   * each followed by a marker bit. Shared by the pack header's SCR and the
+   * packet header's PTS/DTS, which use the identical encoding.
+   */
+  [[nodiscard]] std::uint64_t ReadMpsTimeStamp(MpsBitReader& reader) noexcept
+  {
+    const std::uint64_t high = reader.Read(3);
+    reader.Skip(1);
+    const std::uint64_t middle = reader.Read(15);
+    reader.Skip(1);
+    const std::uint64_t low = reader.Read(15);
+    reader.Skip(1);
+    return (((high << 15) | middle) << 15) | low;
+  }
+
+  /**
+   * Address: 0x00AEB6F0 (FUN_00AEB6F0, _mpsdec_DecPackHd)
+   * Mangled: _mpsdec_DecPackHd (C linkage)
+   *
+   * What it does:
+   * Parses one MPEG-1 pack header - system clock reference and mux rate - into
+   * the handle's pack lane. Always consumes 12 bytes.
+   */
+  MpslibHandleRuntimeView* mpsdec_DecPackHd(
+    MpslibHandleRuntimeView* const handle,
+    const std::uint8_t* const packet,
+    std::int32_t* const outConsumedBytes
+  )
+  {
+    MpsBitReader reader(packet);
+
+    // '0010' in MPEG-1; the MPEG-2 pack header opens '01' instead, and the
+    // first two bits are all the parser keeps to tell them apart.
+    const std::uint32_t layoutPrefix = reader.Read(2);
+    reader.Skip(2);
+
+    const std::uint64_t systemClockReference = ReadMpsTimeStamp(reader);
+    reader.Skip(1);
+    const std::uint32_t muxRate = reader.Read(22);
+
+    MpsPackHeader& packHeader = handle->packHeader;
+    packHeader.systemClockReferenceLow = static_cast<std::int32_t>(systemClockReference);
+    packHeader.systemClockReferenceHigh = static_cast<std::int32_t>(systemClockReference >> 32);
+    packHeader.isMpeg1Layout = (layoutPrefix == 0) ? 1 : 0;
+    packHeader.muxRate = static_cast<std::int32_t>(muxRate);
+
+    *outConsumedBytes = kMpsPackHeaderBytes;
+    return handle;
+  }
+
+  /// One per-stream P-STD bound from a system header, in the packed shape the
+  /// summary callback receives.
+  struct MpsSystemStreamBound
+  {
+    std::uint8_t streamId = 0;
+    std::uint8_t bufferBoundScale = 0;
+    std::uint16_t bufferSizeBound = 0;
+  };
+  static_assert(sizeof(MpsSystemStreamBound) == 4, "MpsSystemStreamBound must stay 4 bytes");
+
+  /// The summary `mpsdec_DecSysHd` hands to an installed system-header
+  /// callback. Assembled on the stack exactly as the binary builds it.
+  struct MpsSystemHeaderSummary
+  {
+    std::int32_t rateBound = 0;
+    std::uint8_t audioBound = 0;
+    std::uint8_t fixedFlag = 0;
+    std::uint8_t cspsFlag = 0;
+    std::uint8_t systemAudioLockFlag = 0;
+    std::uint8_t systemVideoLockFlag = 0;
+    std::uint8_t videoBound = 0;
+    std::uint8_t packetRateRestrictionFlag = 0;
+    std::uint8_t reservedBits = 0;
+    std::array<MpsSystemStreamBound, kMpsMaxSystemStreamBounds> streamBounds{};
+  };
+
+  /**
+   * Address: 0x00AEBA40 (FUN_00AEBA40, _mpsdec_DecSysHd)
+   * Mangled: _mpsdec_DecSysHd (C linkage)
+   *
+   * What it does:
+   * Parses one MPEG-1 system header into system-header slot 0, walks the
+   * trailing per-stream P-STD bound list, and reports a summary to the
+   * installed callback if there is one. Writes the header byte length it
+   * consumed, nudged by one when the next delimiter only lines up a byte later.
+   */
+  MpslibHandleRuntimeView* mpsdec_DecSysHd(
+    MpslibHandleRuntimeView* const handle,
+    const std::uint8_t* const packet,
+    std::int32_t* const outConsumedBytes
+  )
+  {
+    MpsBitReader reader(packet);
+    MpsSystemHeader& systemHeader = handle->systemHeaders[0];
+
+    systemHeader.headerLengthBytes = static_cast<std::int32_t>(reader.Read(16));
+    reader.Skip(1);
+    systemHeader.rateBound = static_cast<std::int32_t>(reader.Read(22));
+    reader.Skip(1);
+    systemHeader.audioBound = static_cast<std::int32_t>(reader.Read(6));
+    systemHeader.fixedFlag = static_cast<std::int32_t>(reader.Read(1));
+    systemHeader.cspsFlag = static_cast<std::int32_t>(reader.Read(1));
+    systemHeader.systemAudioLockFlag = static_cast<std::int32_t>(reader.Read(1));
+    systemHeader.systemVideoLockFlag = static_cast<std::int32_t>(reader.Read(1));
+    reader.Skip(1);
+    systemHeader.videoBound = static_cast<std::int32_t>(reader.Read(5));
+
+    const std::uint32_t trailingBits = reader.Read(8);
+
+    // Every stream id is >= 0x80, so a clear top bit ends the bound list.
+    MpsSystemHeaderSummary summary{};
+    std::size_t streamBoundCount = 0;
+    while (reader.Peek(1) != 0) {
+      const std::uint32_t streamId = reader.Read(8);
+      reader.Skip(2);
+      const std::uint32_t bufferBoundScale = reader.Read(1);
+      const std::uint32_t bufferSizeBound = reader.Read(13);
+      if (streamBoundCount < summary.streamBounds.size()) {
+        summary.streamBounds[streamBoundCount] = {
+          static_cast<std::uint8_t>(streamId),
+          static_cast<std::uint8_t>(bufferBoundScale),
+          static_cast<std::uint16_t>(bufferSizeBound)
+        };
+        ++streamBoundCount;
+      }
+    }
+
+    const std::uint8_t* const headerEnd = reader.ConsumedEnd();
+    *outConsumedBytes = static_cast<std::int32_t>(headerEnd - packet);
+    if (MPS_CheckDelim(headerEnd) == 0 && MPS_CheckDelim(headerEnd + 1) == kMpsDelimiterPacket) {
+      ++*outConsumedBytes;
+    }
+
+    if (handle->systemHeaderCallback != nullptr) {
+      summary.rateBound = systemHeader.rateBound;
+      summary.audioBound = static_cast<std::uint8_t>(systemHeader.audioBound);
+      summary.fixedFlag = static_cast<std::uint8_t>(systemHeader.fixedFlag);
+      summary.cspsFlag = static_cast<std::uint8_t>(systemHeader.cspsFlag);
+      summary.systemAudioLockFlag = static_cast<std::uint8_t>(systemHeader.systemAudioLockFlag);
+      summary.systemVideoLockFlag = static_cast<std::uint8_t>(systemHeader.systemVideoLockFlag);
+      summary.videoBound = static_cast<std::uint8_t>(systemHeader.videoBound);
+      summary.packetRateRestrictionFlag = static_cast<std::uint8_t>((trailingBits & 0x80u) != 0 ? 1 : 0);
+      summary.reservedBits = static_cast<std::uint8_t>(trailingBits & 0x7Fu);
+      (void)handle->systemHeaderCallback(
+        handle->systemHeaderCallbackObject,
+        reinterpret_cast<const std::int32_t*>(&summary)
+      );
+    }
+    return handle;
+  }
+
+  /**
+   * Address: 0x00AEC050 (FUN_00AEC050, _mpsdec_DecPketHd)
+   * Mangled: _mpsdec_DecPketHd (C linkage)
+   *
+   * What it does:
+   * Parses one MPEG-1 packet header: stream id and its classification, packet
+   * length, the stuffing run, an optional P-STD buffer bound, and the optional
+   * PTS / PTS+DTS pair. Publishes the payload length left after the header and
+   * returns the packet length.
+   */
+  std::int32_t mpsdec_DecPketHd(
+    MpslibHandleRuntimeView* const handle,
+    const std::uint8_t* const packet,
+    std::int32_t* const outConsumedBytes,
+    const std::int32_t packetHeaderMode
+  )
+  {
+    MpsBitReader reader(packet);
+    MpsPacketHeader& packetHeader = handle->packetHeader;
+
+    const std::int32_t streamId = static_cast<std::int32_t>(reader.Read(8));
+    packetHeader.streamId = streamId;
+
+    std::int32_t streamKind = kMpsStreamKindPrivate;
+    std::int32_t streamIndex = 0;
+    if (streamId >= kMpsStreamIdVideoFirst && streamId <= kMpsStreamIdVideoLast) {
+      streamKind = kMpsStreamKindVideo;
+      streamIndex = streamId - kMpsStreamIdVideoFirst;
+    } else if (streamId >= kMpsStreamIdAudioFirst && streamId <= kMpsStreamIdAudioLast) {
+      streamKind = kMpsStreamKindAudio;
+      streamIndex = streamId - kMpsStreamIdAudioFirst;
+    } else if (streamId == kMpsStreamIdPrivate1) {
+      streamIndex = 1;
+    } else if (streamId == kMpsStreamIdPrivate2) {
+      streamIndex = 2;
+    } else {
+      streamKind = (streamId == kMpsStreamIdPadding) ? kMpsStreamKindPadding : kMpsStreamKindOther;
+    }
+    packetHeader.streamKind = streamKind;
+    packetHeader.streamIndex = streamIndex;
+
+    if (packetHeaderMode != kMpsPacketHeaderModeMpeg1) {
+      *outConsumedBytes = reader.ConsumedBytes();
+      packetHeader.payloadLengthBytes = packetHeader.packetLengthBytes;
+      return packetHeader.packetLengthBytes;
+    }
+
+    packetHeader.packetLengthBytes = static_cast<std::int32_t>(reader.Read(16));
+    const std::int32_t bytesThroughLength = reader.ConsumedBytes();
+
+    // Padding and the second private stream carry no header extension.
+    if (streamId != kMpsStreamIdPrivate2 && streamId != kMpsStreamIdPadding) {
+      while (reader.Peek(8) == 0xFFu) {
+        reader.Skip(8);
+      }
+
+      // '01' introduces the P-STD buffer bound; the scale picks 128- or
+      // 1024-byte units.
+      if (reader.Peek(2) == 1) {
+        reader.Skip(2);
+        const std::uint32_t bufferBoundScale = reader.Read(1);
+        const std::uint32_t bufferSizeBound = reader.Read(13);
+        packetHeader.stdBufferSizeBytes =
+          static_cast<std::int32_t>(bufferSizeBound << (bufferBoundScale != 0 ? 10 : 7));
+      }
+
+      const std::uint32_t timeStampFlags = reader.Peek(4);
+      if (timeStampFlags == kMpsTimeStampFlagsPtsOnly || timeStampFlags == kMpsTimeStampFlagsPtsAndDts) {
+        reader.Skip(4);
+        const std::uint64_t presentationTimeStamp = ReadMpsTimeStamp(reader);
+        packetHeader.presentationTimeStampLow = static_cast<std::int32_t>(presentationTimeStamp);
+        packetHeader.presentationTimeStampHigh = static_cast<std::int32_t>(presentationTimeStamp >> 32);
+        packetHeader.decodeTimeStampLow = -1;
+        packetHeader.decodeTimeStampHigh = -1;
+
+        if (timeStampFlags == kMpsTimeStampFlagsPtsAndDts) {
+          reader.Skip(4);
+          const std::uint64_t decodeTimeStamp = ReadMpsTimeStamp(reader);
+          packetHeader.decodeTimeStampLow = static_cast<std::int32_t>(decodeTimeStamp);
+          packetHeader.decodeTimeStampHigh = static_cast<std::int32_t>(decodeTimeStamp >> 32);
+        }
+      } else {
+        // '0000 1111' closes a header that carries no timestamps at all.
+        reader.Skip(8);
+        packetHeader.presentationTimeStampLow = -1;
+        packetHeader.presentationTimeStampHigh = -1;
+        packetHeader.decodeTimeStampLow = -1;
+        packetHeader.decodeTimeStampHigh = -1;
+      }
+    }
+
+    const std::int32_t headerBytes = reader.ConsumedBytes();
+    *outConsumedBytes = headerBytes;
+    packetHeader.payloadLengthBytes = packetHeader.packetLengthBytes + (bytesThroughLength - headerBytes);
+    return packetHeader.packetLengthBytes;
+  }
+
+  /**
+   * Address: 0x00AEB650 (FUN_00AEB650, _mpsdec_DecOneHd)
+   * Mangled: _mpsdec_DecOneHd (C linkage)
+   *
+   * What it does:
+   * Classifies the delimiter at the cursor and dispatches one pack, system or
+   * packet header. Returns non-zero while more headers can follow in the same
+   * run - a packet header ends it, because payload comes next.
+   */
+  std::int32_t mpsdec_DecOneHd(
+    MpslibHandleRuntimeView* const handle,
+    const std::uint8_t* const data,
+    [[maybe_unused]] const std::int32_t sizeBytes,
+    std::int32_t* const outConsumedBytes,
+    std::int32_t* const outDelimiter
+  )
+  {
+    *outConsumedBytes = 0;
+    const std::int32_t delimiter = MPS_CheckDelim(data);
+    *outDelimiter = delimiter;
+
+    if (delimiter == kMpsDelimiterPack) {
+      (void)mpsdec_DecPackHd(handle, data, outConsumedBytes);
+      return 1;
+    }
+    if (delimiter == kMpsDelimiterSystem) {
+      (void)mpsdec_DecSysHd(handle, data, outConsumedBytes);
+      return 1;
+    }
+    if (delimiter == kMpsDelimiterPacket) {
+      (void)mpsdec_DecPketHd(handle, data, outConsumedBytes, handle->packetHeaderMode);
+      if (handle->packetCallback != nullptr) {
+        handle->packetCallback(
+          handle->packetCallbackObject,
+          static_cast<std::int32_t>(static_cast<std::uint8_t>(handle->packetHeader.streamId))
+        );
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AEB5C0 (FUN_00AEB5C0, _MPSDEC_DecHdMpeg1)
+   * Mangled: _MPSDEC_DecHdMpeg1 (C linkage)
+   *
+   * What it does:
+   * Decodes the whole run of MPEG-1 headers at the cursor, accumulating the
+   * bytes consumed and the union of delimiter classes seen. When the run
+   * included a system header, archives it into the slot that matches its
+   * content so later packs can be compared against it.
+   */
+  std::int32_t MPSDEC_DecHdMpeg1(
+    MpslibHandleRuntimeView* const handle,
+    const std::uint8_t* const data,
+    const std::int32_t sizeBytes,
+    std::int32_t* const outConsumedBytes,
+    std::uint32_t* const outDelimiterFlags
+  )
+  {
+    constexpr std::int32_t kMpsMinHeaderBytes = 4;
+
+    const std::uint8_t* cursor = data;
+    std::int32_t remainingBytes = sizeBytes;
+    if (remainingBytes >= kMpsMinHeaderBytes) {
+      for (;;) {
+        std::int32_t consumedBytes = 0;
+        std::int32_t delimiter = 0;
+        const std::int32_t moreHeadersFollow =
+          mpsdec_DecOneHd(handle, cursor, remainingBytes, &consumedBytes, &delimiter);
+
+        *outDelimiterFlags |= static_cast<std::uint32_t>(delimiter);
+        cursor += consumedBytes;
+        remainingBytes -= consumedBytes;
+        *outConsumedBytes += consumedBytes;
+
+        if (moreHeadersFollow == 0 || remainingBytes < kMpsMinHeaderBytes) {
+          break;
+        }
+      }
+    }
+
+    if ((*outDelimiterFlags & static_cast<std::uint32_t>(kMpsDelimiterSystem)) != 0) {
+      const MpsSystemHeader& parsed = handle->systemHeaders[0];
+      std::size_t archiveSlot = 1;
+      if (parsed.audioBound == 0) {
+        archiveSlot = (parsed.videoBound != 0) ? 2 : 3;
+      }
+      handle->systemHeaders[archiveSlot] = parsed;
+    }
+    return 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // MPS handle construction (0x00AEB200 - 0x00AEB450).
+  // ---------------------------------------------------------------------------
+
+  /// `MPSDEC_Init` never reassigns this in this build; the data section ships it
+  /// already pointing at the MPEG-1 decoder.
+  MpsDecodeHeaderFn MPSDEC_dechd = &MPSDEC_DecHdMpeg1;
+
+  /// The M2P sub-handles an MPS handle can borrow, and the block they are
+  /// carved from. Both are zero-filled at load time in the binary.
+  constexpr std::size_t kMpslibM2pHandleCount = 32;
+  constexpr std::int32_t kMpslibM2pHandleBytes = 944;
+  std::array<std::int32_t, kMpslibM2pHandleCount> mpslib_m2p{};
+  std::int32_t mpslib_m2p_hnwk = 0;
+
+  /**
+   * Address: 0x00AEB350 (FUN_00AEB350, _mpslib_InitPack)
+   *
+   * What it does:
+   * Invalidates one pack-header lane.
+   */
+  MpsPackHeader* mpslib_InitPack(MpsPackHeader* const packHeader)
+  {
+    *packHeader = {};
+    return packHeader;
+  }
+
+  /**
+   * Address: 0x00AEB370 (FUN_00AEB370, _mpslib_InitSys)
+   *
+   * What it does:
+   * Invalidates one system-header lane.
+   */
+  MpsSystemHeader* mpslib_InitSys(MpsSystemHeader* const systemHeader)
+  {
+    *systemHeader = {};
+    return systemHeader;
+  }
+
+  /**
+   * Address: 0x00AEB390 (FUN_00AEB390, _mpslib_InitPket)
+   *
+   * What it does:
+   * Invalidates one packet-header lane.
+   */
+  MpsPacketHeader* mpslib_InitPket(MpsPacketHeader* const packetHeader)
+  {
+    *packetHeader = {};
+    return packetHeader;
+  }
+
+  /**
+   * Address: 0x00AEB430 (FUN_00AEB430, _mpslib_M2sErrFn)
+   *
+   * What it does:
+   * Thunk that forwards one M2P backend error to the MPSLIB error channel.
+   */
+  std::int32_t mpslib_M2sErrFn(const std::int32_t errorObjectAddress, const std::int32_t errorCode)
+  {
+    return MPSLIB_SetErr(errorObjectAddress, errorCode);
+  }
+
+  /**
+   * Address: 0x00AEB450 (FUN_00AEB450, _mpslib_SearchM2pHnWk)
+   *
+   * What it does:
+   * Returns the first M2P slot holding `handleAddress`, or `-1`. Passing `0`
+   * therefore finds the first free slot.
+   */
+  std::int32_t mpslib_SearchM2pHnWk(const std::int32_t handleAddress)
+  {
+    for (std::size_t slotIndex = 0; slotIndex < mpslib_m2p.size(); ++slotIndex) {
+      if (mpslib_m2p[slotIndex] == handleAddress) {
+        return static_cast<std::int32_t>(slotIndex);
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Address: 0x00AEB2B0 (FUN_00AEB2B0, _mpslib_InitHn)
+   *
+   * What it does:
+   * Clears one MPS handle, marks it in use, invalidates every header lane and
+   * installs the MPEG-1 header decoder.
+   */
+  MpslibHandleRuntimeView* mpslib_InitHn(MpslibHandleRuntimeView* const handle)
+  {
+    constexpr unsigned int kMpslibHandleDwords = sizeof(MpslibHandleRuntimeView) / sizeof(std::uint32_t);
+    constexpr std::int32_t kMpslibHandleStateInUse = 2;
+
+    (void)UTY_MemsetDword(handle, 0, kMpslibHandleDwords);
+    handle->handleState = kMpslibHandleStateInUse;
+    (void)MPSLIB_InitErrInf(&handle->errInfo);
+    handle->packetHeaderMode = kMpsPacketHeaderModeMpeg1;
+
+    (void)mpslib_InitPack(&handle->packHeader);
+    for (MpsSystemHeader& systemHeader : handle->systemHeaders) {
+      (void)mpslib_InitSys(&systemHeader);
+    }
+    (void)mpslib_InitPket(&handle->packetHeader);
+
+    handle->m2pHandleAddress = 0;
+    handle->reservedD8 = 0;
+    handle->reservedDC = 0;
+    handle->reservedE0 = 0;
+    handle->systemHeaderCallback = nullptr;
+    handle->systemHeaderCallbackObject = 0;
+    handle->decodeHeader = MPSDEC_dechd;
+    return handle;
+  }
+
+  /**
+   * Address: 0x00AEB200 (FUN_00AEB200, _MPS_Create)
+   * Mangled: _MPS_Create (C linkage)
+   *
+   * What it does:
+   * Claims one free MPS handle and initializes it. Also tries to attach an M2P
+   * sub-handle, but that is best-effort: this build links no M2P backend, so
+   * `M2P_Create` returns 0 and the handle is still returned.
+   *
+   * This was a no-argument `nullptr` stub, which made `SFMPS_Create` fail with
+   * `SFD ERROR(FF000D08)` and took every movie down with
+   * "E2012 mwPlyCreate:can't create SFD".
+   */
+  std::int32_t MPS_Create()
+  {
+    MpslibHandleRuntimeView* const freeHandle = mpslib_SearchFreeHn();
+    if (freeHandle == nullptr) {
+      return 0;
+    }
+
+    MpslibHandleRuntimeView* const handle = mpslib_InitHn(freeHandle);
+
+    const std::int32_t m2pSlot = mpslib_SearchM2pHnWk(0);
+    if (m2pSlot >= 0) {
+      handle->m2pHandleAddress = M2P_Create(
+        mpslib_m2p_hnwk + m2pSlot * kMpslibM2pHandleBytes,
+        kMpslibM2pHandleBytes
+      );
+      if (handle->m2pHandleAddress != 0) {
+        mpslib_m2p[static_cast<std::size_t>(m2pSlot)] = handle->m2pHandleAddress;
+        (void)M2P_SetErrFn(
+          handle->m2pHandleAddress,
+          reinterpret_cast<std::int32_t>(&mpslib_M2sErrFn),
+          reinterpret_cast<std::int32_t>(handle)
+        );
+      }
+    }
+    return reinterpret_cast<std::int32_t>(handle);
   }
 
   /**
