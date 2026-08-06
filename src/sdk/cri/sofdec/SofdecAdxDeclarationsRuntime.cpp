@@ -3094,7 +3094,7 @@
   std::int32_t sfply_IsStagnant(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_IsPlayTimeAutoStop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_Fin(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
-  moho::SofdecSfdWorkctrlSubobj* sfply_Create(const moho::SfplyCreateParams* createParams, std::int32_t createContext);
+  moho::SofdecSfdWorkctrlSubobj* sfply_Create(moho::SfplyCreateParams* createParams, std::int32_t createContext);
   std::int32_t sfply_ChkCrePara(const moho::SfplyCreateParams* createParams);
   std::int32_t sfply_SearchFreeHn();
   std::int32_t sfply_InitMvInf(moho::SfplyMovieInfo* movieInfo);
@@ -3122,7 +3122,7 @@
   std::int32_t SFPLY_GetResetFlg();
   std::int32_t sfply_TrStop(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_ResetHn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
-  moho::SofdecSfdWorkctrlSubobj* sfply_InitHn(const moho::SfplyCreateParams* createParams, std::int32_t createContext);
+  moho::SofdecSfdWorkctrlSubobj* sfply_InitHn(moho::SfplyCreateParams* createParams, std::int32_t createContext);
   std::int32_t sfply_IsAnyoneTerm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_EnoughViData(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_EnoughAiData(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);

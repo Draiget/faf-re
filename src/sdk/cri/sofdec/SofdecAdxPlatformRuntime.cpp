@@ -2040,7 +2040,7 @@
   }
 
   // Defined later in this aggregate translation unit.
-  moho::SofdecSfdWorkctrlSubobj* sfply_Create(const moho::SfplyCreateParams* createParams, std::int32_t createContext);
+  moho::SofdecSfdWorkctrlSubobj* sfply_Create(moho::SfplyCreateParams* createParams, std::int32_t createContext);
   std::int32_t SFD_SetErrFn(std::int32_t errorObjectAddress, std::int32_t callbackAddress, std::int32_t callbackObject);
   std::int32_t SFD_SetAdxtPara(const moho::SofdecAdxtParams* params);
   std::int32_t SFD_SetCond(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t value);
@@ -2727,7 +2727,7 @@
     createParams.framePoolWork = framePoolWork;
     createParams.maxWidth = maxWidth;
     createParams.maxHeight = maxHeight;
-    createParams.workControlBufferPrimary = ctrlPrimary;
+    createParams.workControlBuffer = ctrlPrimary;
     createParams.bufferFormat = mwsfcre_ConvBufFmtFromMwsfd(params->outerFramePoolNum);
     createParams.workControlSizeBytes = static_cast<std::uint32_t>(ctrlPrimaryBytes);
 

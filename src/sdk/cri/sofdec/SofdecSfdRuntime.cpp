@@ -3535,6 +3535,35 @@
   );
   static_assert(sizeof(SfcreHeaderRuntimeView) == 0x894, "SfcreHeaderRuntimeView size must be 0x894");
 
+  /**
+   * Address: 0x00AE7170 (FUN_00AE7170, _SFHDS_InitFhd)
+   * Mangled: _SFHDS_InitFhd (C linkage)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl SFHDS_InitFhd(_DWORD *a1);
+   *
+   * What it does:
+   * Resets one file-header record to "not parsed yet": clears the valid flag,
+   * both tool-version lanes and the byte rate, then drops the length of the
+   * raw header bytes copied in behind them. Everything else is left alone -
+   * `sfhds_DoProcessHdr` overwrites the remaining lanes wholesale when a
+   * header actually arrives.
+   *
+   * This was a no-argument `nullptr` stub, the sixth instance of the C-linkage
+   * trap in this subsystem: `void* SFHDS_InitFhd()` mangles identically to the
+   * real one-parameter function, so it silently satisfied both call sites and
+   * the linker never complained.
+   */
+  extern "C" SfcreHeaderRuntimeView* SFHDS_InitFhd(SfcreHeaderRuntimeView* const header)
+  {
+    header->headerValid = 0;
+    header->toolVersionMajor = 0;
+    header->toolVersionMinor = 0;
+    header->byteRate = 0;
+    header->copiedHeaderBytes = 0;
+    return header;
+  }
+
   // ---------------------------------------------------------------------------
   // SFD header analysis (0x00AE7400 - 0x00AE7830).
   //
@@ -5922,12 +5951,11 @@
       std::int32_t headAnalyzedFlag = 0; // +0x0000
       std::int32_t streamByteRateHint = 0; // +0x0004
       std::int32_t streamTimeMinorHint = 0; // +0x0008
-      std::int32_t hasMuxHeaderTiming = 0; // +0x000C
-      std::uint8_t reserved0010[0x08]{};
-      std::int32_t muxHeaderTimeMajor = 0; // +0x0018
-      std::uint8_t reserved001C[0x24]{};
-      std::int32_t muxHeaderTimeMinor = 0; // +0x0040
-      std::uint8_t reserved0044[0x85C]{};
+      /// The parsed mux header. `sfsee_InitHeadInf` passes `&fileHeader` to
+      /// `SFHDS_InitFhd`, which is what identifies this lane - and the record
+      /// is 0x894 bytes, so it ends at 0x8A0 exactly where `mpsStreamDetected`
+      /// already sat. That boundary is the cross-check on both models.
+      SfcreHeaderRuntimeView fileHeader{}; // +0x000C
       std::int32_t mpsStreamDetected = 0; // +0x08A0
       std::int32_t mpsFallbackTimeMajor = 0; // +0x08A4
       std::int32_t mpsFallbackTimeMinor = 0; // +0x08A8
@@ -5972,16 +6000,16 @@
       "SfseeRuntimeView::streamTimeMinorHint offset must be 0x0008"
     );
     static_assert(
-      offsetof(SfseeRuntimeView, hasMuxHeaderTiming) == 0x000C,
-      "SfseeRuntimeView::hasMuxHeaderTiming offset must be 0x000C"
+      offsetof(SfseeRuntimeView, fileHeader) == 0x000C,
+      "SfseeRuntimeView::fileHeader offset must be 0x000C"
     );
     static_assert(
-      offsetof(SfseeRuntimeView, muxHeaderTimeMajor) == 0x0018,
-      "SfseeRuntimeView::muxHeaderTimeMajor offset must be 0x0018"
+      offsetof(SfseeRuntimeView, fileHeader) + offsetof(SfcreHeaderRuntimeView, byteRate) == 0x0018,
+      "SfseeRuntimeView::fileHeader.byteRate offset must be 0x0018"
     );
     static_assert(
-      offsetof(SfseeRuntimeView, muxHeaderTimeMinor) == 0x0040,
-      "SfseeRuntimeView::muxHeaderTimeMinor offset must be 0x0040"
+      offsetof(SfseeRuntimeView, fileHeader) + offsetof(SfcreHeaderRuntimeView, maxPlayLengthVideo) == 0x0040,
+      "SfseeRuntimeView::fileHeader.maxPlayLengthVideo offset must be 0x0040"
     );
     static_assert(
       offsetof(SfseeRuntimeView, mpsStreamDetected) == 0x08A0,
@@ -6167,7 +6195,6 @@
     std::int32_t ptsEntryCount
   );
   extern "C" std::int32_t UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
-  extern "C" std::int32_t SFHDS_InitFhd(void* headerAddress);
   extern "C" std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue);
   extern "C" std::int32_t sfsee_UpdateEByteRate(std::int32_t workctrlAddress);
   std::int32_t sfsee_GetInSjReadTot(std::int32_t workctrlAddress);
@@ -6594,7 +6621,7 @@
     sfseeHandle->headAnalyzedFlag = 0;
     sfseeHandle->streamByteRateHint = 0;
     sfseeHandle->streamTimeMinorHint = 0;
-    (void)SFHDS_InitFhd(&sfseeHandle->hasMuxHeaderTiming);
+    (void)SFHDS_InitFhd(&sfseeHandle->fileHeader);
 
     sfseeHandle->mpsStreamDetected = 0;
     sfseeHandle->mpsFallbackTimeMajor = 0;
@@ -6833,13 +6860,13 @@
       }
     } else {
       runtimeView->mpsStreamDetected = 1;
-      if (runtimeView->hasMuxHeaderTiming != 0) {
-        streamTimeMajor = runtimeView->muxHeaderTimeMajor;
+      if (runtimeView->fileHeader.headerValid != 0) {
+        streamTimeMajor = runtimeView->fileHeader.byteRate;
         if (streamTimeMajor > 0) {
           const std::int32_t fileSizeBytes = runtimeView->fileSizeBytes;
-          const std::int32_t muxHeaderTimeMinor = runtimeView->muxHeaderTimeMinor;
-          if (fileSizeBytes > 0 && muxHeaderTimeMinor > 0) {
-            streamTimeMajor = UTY_MulDiv(fileSizeBytes, 1000, muxHeaderTimeMinor);
+          const std::int32_t maxPlayLengthVideo = runtimeView->fileHeader.maxPlayLengthVideo;
+          if (fileSizeBytes > 0 && maxPlayLengthVideo > 0) {
+            streamTimeMajor = UTY_MulDiv(fileSizeBytes, 1000, maxPlayLengthVideo);
           }
           streamTimeMinor = runtimeView->mpsFallbackTimeMinor;
         } else {
@@ -15969,7 +15996,7 @@
    * Validates create parameters, allocates one free SFLIB slot, and initializes one SFPLY handle.
    */
   moho::SofdecSfdWorkctrlSubobj*
-  sfply_Create(const moho::SfplyCreateParams* const createParams, const std::int32_t createContext)
+  sfply_Create(moho::SfplyCreateParams* const createParams, const std::int32_t createContext)
   {
     if (sfply_ChkCrePara(createParams) != 0) {
       return nullptr;
@@ -16017,6 +16044,151 @@
       }
     }
     return -1;
+  }
+
+  // ---------------------------------------------------------------------------
+  // SFPLY handle construction (0x00AD7AE0).
+  // ---------------------------------------------------------------------------
+
+  /// SFPLY handles are built on a 32-byte boundary inside the caller's buffer.
+  constexpr std::uintptr_t kSfplyHandleAlignment = 32;
+
+  [[nodiscard]] constexpr std::uintptr_t AlignUpToSfplyBoundary(const std::uintptr_t address) noexcept
+  {
+    return (address + (kSfplyHandleAlignment - 1)) & ~(kSfplyHandleAlignment - 1);
+  }
+
+  // The three lanes below are sized storage in the shared header because their
+  // layouts are private to this translation unit. These helpers put the names
+  // back at the call sites; none of them does offset arithmetic - each one
+  // re-types one named member.
+  [[nodiscard]] SfcreHeaderRuntimeView* SfplyFileHeaderOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
+  {
+    static_assert(
+      sizeof(SfcreHeaderRuntimeView) == sizeof(moho::SofdecSfdWorkctrlSubobj::fileHeader),
+      "SFPLY file-header lane must hold one SfcreHeaderRuntimeView"
+    );
+    return reinterpret_cast<SfcreHeaderRuntimeView*>(handle->fileHeader);
+  }
+
+  [[nodiscard]] SflibErrorInfo* SfplyErrorInfoOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
+  {
+    static_assert(
+      sizeof(SflibErrorInfo) == sizeof(moho::SofdecSfdWorkctrlSubobj::errorInfo),
+      "SFPLY error-info lane must hold one SflibErrorInfo"
+    );
+    return reinterpret_cast<SflibErrorInfo*>(handle->errorInfo);
+  }
+
+  [[nodiscard]] SfseeInitHandleRuntimeView* SfplySeekHandleOf(moho::SofdecSfdWorkctrlSubobj* const handle) noexcept
+  {
+    static_assert(
+      sizeof(SfseeInitHandleRuntimeView) == sizeof(moho::SofdecSfdWorkctrlSubobj::seekHandle),
+      "SFPLY seek lane must hold one SfseeInitHandleRuntimeView"
+    );
+    return reinterpret_cast<SfseeInitHandleRuntimeView*>(handle->seekHandle);
+  }
+
+  /// The work-control size of the first handle SFPLY accepted. Every later
+  /// create has to ask for the same size; the library sizes its shared pools
+  /// off this one value and cannot serve two different geometries at once.
+  std::int32_t gSfplyLastHandleWorkSizeBytes = 0;
+
+  /**
+   * Address: 0x00AD7AE0 (FUN_00AD7AE0, _sfply_InitHn)
+   * Mangled: _sfply_InitHn (C linkage)
+   *
+   * IDA signature:
+   * struct_sofdec_sfd_workctrl_subobj *__cdecl sfply_InitHn(struct_sofdec_unk2 *a1);
+   *
+   * What it does:
+   * Builds one SFPLY playback handle inside the caller's work-control buffer:
+   * clears the buffer, places the handle on the next 32-byte boundary, copies
+   * the create parameters in as the handle's template, then initializes every
+   * sub-object in turn - file header, movie/playback/timer info, error info,
+   * both condition blocks, and the timer, buffer, transfer and seek handles.
+   * Returns null if the parameters are unusable or if the buffer or transfer
+   * construction fails.
+   *
+   * This was a no-argument `nullptr` stub, so `sfply_Create` always handed
+   * `mwsfcre_CreateSfd` a null handle and every movie failed to create with
+   * "E2012 mwPlyCreate:can't create SFD". Fifth instance of the C-linkage trap
+   * in this subsystem.
+   */
+  moho::SofdecSfdWorkctrlSubobj*
+  sfply_InitHn(moho::SfplyCreateParams* const createParams, const std::int32_t createContext)
+  {
+    /// 0x3660 (the `sfply_ChkCrePara` minimum) doubled - the largest handle
+    /// geometry the library will build.
+    constexpr std::uint32_t kSfplyMaxHandleWorkBytes = 0x6CC0;
+
+    const std::uint32_t workBytes = createParams->workControlSizeBytes;
+    void* const workBuffer = createParams->workControlBuffer;
+    if (workBuffer == nullptr || static_cast<std::int32_t>(workBytes) <= 0
+        || workBytes > kSfplyMaxHandleWorkBytes
+        || (gSfplyLastHandleWorkSizeBytes != 0
+            && gSfplyLastHandleWorkSizeBytes != static_cast<std::int32_t>(workBytes))) {
+      return nullptr;
+    }
+    gSfplyLastHandleWorkSizeBytes = static_cast<std::int32_t>(workBytes);
+
+    (void)UTY_MemsetDword(workBuffer, 0, workBytes >> 2);
+
+    auto* const handle = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(
+      AlignUpToSfplyBoundary(reinterpret_cast<std::uintptr_t>(workBuffer)));
+    handle->createComplete = 0;
+    handle->handleState = 0;
+
+    // Aligned before the template is copied, so the handle's own copy carries
+    // the aligned base - `SFBUF_InitHn` carves its lane buffers out of it.
+    createParams->inputBufferPoolBase = reinterpret_cast<void*>(
+      AlignUpToSfplyBoundary(reinterpret_cast<std::uintptr_t>(createParams->inputBufferPoolBase)));
+    handle->createTemplate = *createParams;
+
+    handle->initialized = 1;
+    handle->reserved50 = 0;
+    handle->reserved54 = 0;
+    handle->reserved58 = 0;
+    handle->reserved5C = 0;
+
+    (void)SFHDS_InitFhd(SfplyFileHeaderOf(handle));
+    (void)sfply_InitMvInf(&handle->movieInfo);
+    (void)sfply_InitPlyInf(&handle->playbackInfo);
+    (void)sfply_InitTmrInf(&handle->timerInfo);
+    (void)SFLIB_InitErrInf(SfplyErrorInfoOf(handle));
+
+    // Both condition blocks start life as a copy of the library defaults.
+    (void)MEM_Copy(handle->conditions, gSflibLibWork.defaultConditions.data(), sizeof(handle->conditions));
+    (void)MEM_Copy(
+      handle->defaultConditions,
+      gSflibLibWork.defaultConditions.data(),
+      sizeof(handle->defaultConditions)
+    );
+
+    (void)SFTIM_InitHn(reinterpret_cast<std::int32_t>(handle), handle->timerHandle);
+    if (SFBUF_InitHn(
+          reinterpret_cast<std::int32_t>(handle),
+          reinterpret_cast<std::int32_t>(handle->bufferHandle),
+          reinterpret_cast<const std::int32_t*>(createParams))
+        != 0) {
+      return nullptr;
+    }
+
+    // The binary pushes `createContext` as a fourth argument here; SFTRN_InitHn
+    // reads only three and the caller cleans the stack, so it never mattered.
+    (void)SFTRN_InitHn(
+      reinterpret_cast<std::int32_t>(handle),
+      reinterpret_cast<std::int32_t>(handle->transferHandle),
+      reinterpret_cast<const std::int32_t*>(&createParams->strategyTable));
+    (void)SFSEE_InitHn(SfplySeekHandleOf(handle));
+
+    if (sfply_TrCreate(handle) != 0) {
+      return nullptr;
+    }
+
+    handle->createComplete = 1;
+    handle->handleState = 1;
+    return handle;
   }
 
   /**

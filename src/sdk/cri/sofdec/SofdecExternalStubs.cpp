@@ -100,7 +100,9 @@ extern "C" {
   void* SFHDS_FinishFhd() { return nullptr; }
   void* SFHDS_GetMuxVerNum() { return nullptr; }
   // SFHDS_Init: real body in SofdecSfdRuntime.cpp (0x00AE7150).
-  void* SFHDS_InitFhd() { return nullptr; }
+  // SFHDS_InitFhd: real body in SofdecSfdRuntime.cpp (0x00AE7170). Another
+  // no-argument stub that C linkage let stand in for the real one-parameter
+  // function, so no file-header record was ever reset.
   // SFHDS_IsSfdHeader: real body in SofdecSfdRuntime.cpp (0x00AE7280).
   // SFHDS_ProcessHdr: real body in SofdecSfdRuntime.cpp (0x00AE7400). It was a
   // no-argument stub here, and because C linkage ignores parameters when
@@ -182,7 +184,9 @@ extern "C" {
   void* sfcre_AnalyMpa() { return nullptr; }
   // sfmpvf_IsChkFirst, sfmpvf_SetPicUsrBuf: real bodies in SofdecMpvRuntime.cpp.
   void* sfply_ExecOne() { return nullptr; }
-  void* sfply_InitHn() { return nullptr; }
+  // sfply_InitHn: real body in SofdecSfdRuntime.cpp (0x00AD7AE0). While this
+  // stub stood, sfply_Create always returned null and every movie failed with
+  // "E2012 mwPlyCreate:can't create SFD".
   void* sfply_ResetHn() { return nullptr; }
   void* sfxcnv_ExecCnvFrmByCbFunc() { return nullptr; }
   void* sfxcnv_ExecFullAlphaByCbFunc() { return nullptr; }
