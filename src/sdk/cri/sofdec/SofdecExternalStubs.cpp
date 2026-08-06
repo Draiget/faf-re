@@ -242,15 +242,15 @@ extern "C" {
   int(*conceal_fn_tbl[256])(int) = {};
 }
 
+// SFD_tr_sd_m2ts / SFD_tr_sd_mps / SFD_tr_vd_mpv are the binary's names for
+// three recovered transfer-strategy descriptors; they now live in
+// cri/sofdec/SofdecSfdRuntime.cpp instead of being zeroed here.
 // === Data stubs (zero-init 4 KB buffers) ===
 extern "C" {
   std::uint8_t AdxQtbl[4096] = {};
   std::uint8_t AdxQtblFloat0[4096] = {};
   std::uint8_t AdxQtblFloat1[4096] = {};
   std::uint8_t M2T_libobj[4096] = {};
-  std::uint8_t SFD_tr_sd_m2ts[4096] = {};
-  std::uint8_t SFD_tr_sd_mps[4096] = {};
-  std::uint8_t SFD_tr_vd_mpv[4096] = {};
   std::uint8_t SFTIM_prate[4096] = {};
   std::uint8_t adxt_q12_mix_table[4096] = {};
   std::uint8_t alloc_len_08sb[4096] = {};
