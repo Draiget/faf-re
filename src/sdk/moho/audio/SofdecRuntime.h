@@ -45,6 +45,62 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfdInitPrm) == 0x20, "MwsfdInitPrm size must be 0x20");
 
   /**
+   * Address: 0x00F40124 (`_mwsfd_mpvpara`)
+   *
+   * Frame geometry the create path publishes for the MPV decoder. Same layout
+   * as `SfmpvPara` in the MPV runtime; named here because the create path is
+   * what fills it.
+   */
+  struct MwsfdMpvPara
+  {
+    std::int32_t chromaStride = 0;     // +0x00
+    std::int32_t chromaHeight = 0;     // +0x04
+    std::int32_t widthPrimary = 0;     // +0x08
+    std::int32_t heightPrimary = 0;    // +0x0C
+    std::int32_t reserved10 = 0;       // +0x10
+    std::int32_t widthSecondary = 0;   // +0x14
+    std::int32_t heightSecondary = 0;  // +0x18
+    std::int32_t framePoolWork = 0;    // +0x1C
+    std::int32_t reserved20 = 0;       // +0x20
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfdMpvPara) == 0x24, "MwsfdMpvPara size must be 0x24");
+
+  /**
+   * MPEG-2 transport-stream demux lanes, published for `ftype == 5` only.
+   */
+  struct MwsfdM2tsPara
+  {
+    void* handle = nullptr;        // +0x00
+    std::int32_t handleBytes = 0;  // +0x04
+    void* buffer = nullptr;        // +0x08
+    std::int32_t bufferBytes = 0;  // +0x0C
+    void* input = nullptr;         // +0x10
+    std::int32_t inputBytes = 0;   // +0x14
+    std::int32_t streamCount = 0;  // +0x18
+  };
+
+  /**
+   * One Sofdec-header record in the playback handle's SFH info ring.
+   *
+   * `MWSFFRM_InitSfhInfTable` zeroes the first four lanes and sets `state` to
+   * the 0x11 sentinel that means "slot unused".
+   */
+  struct SofdecSfhInfoEntry
+  {
+    std::int32_t streamPosition = 0; // +0x00
+    std::int32_t frameIndex = 0;     // +0x04
+    std::int32_t headerWord0 = 0;    // +0x08
+    std::int32_t headerWord1 = 0;    // +0x0C
+    std::int32_t state = 0;          // +0x10
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSfhInfoEntry) == 0x14, "SofdecSfhInfoEntry size must be 0x14");
+
+  /** Value `MWSFFRM_InitSfhInfTable` writes into every entry's `state`. */
+  constexpr std::int32_t kSofdecSfhInfoSlotUnused = 0x11;
+
+  /**
    * Create parameters handed to `mwPlyCalcWorkCprmSfd` / `mwPlyCreateSofdec`
    * (IDA calls it `_mwsfcre_MallocTab`).
    *
@@ -305,10 +361,23 @@ namespace moho
    */
   struct SfplyCreateParams
   {
-    std::uint8_t mUnknown00[0x04]{};
-    void* workControlBuffer = nullptr; // +0x04
-    std::uint8_t mUnknown08[0x38]{};
-    std::uint32_t workControlSizeBytes = 0; // +0x40
+    /// Per-stream-type transfer strategy list (one of the four sub-tables at
+    /// 0x00D7F2FC / 0x00D7F320 / 0x00D7F344 / 0x00D7F368). Every entry points
+    /// at one of the eight `SofdecTransferStrategy` descriptors.
+    void* strategyTable = nullptr;     // +0x00
+    void* workControlBuffer = nullptr; // +0x04  (IDA `obj2`)
+    std::int32_t streamInputBytes = 0; // +0x08  (`sib`)
+    std::int32_t videoInputBytes = 0;  // +0x0C  (`vib`)
+    std::int32_t audioInputBytes = 0;  // +0x10  (`aib`)
+    std::uint8_t mUnknown14[0x10]{};
+    std::int32_t packBytes = 0; // +0x24
+    std::uint8_t mUnknown28[0x04]{};
+    std::int32_t framePoolWork = 0;          // +0x2C
+    std::int32_t maxWidth = 0;               // +0x30
+    std::int32_t maxHeight = 0;              // +0x34
+    std::int32_t bufferFormat = 0;           // +0x38
+    void* workControlBufferPrimary = nullptr; // +0x3C
+    std::uint32_t workControlSizeBytes = 0;  // +0x40
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -627,10 +696,12 @@ namespace moho
   {
     std::int32_t used = 0; // +0x00
     std::int32_t compoMode = 0;
-    std::int32_t fileType = 0; // +0x08
-    std::uint8_t mUnknown0C[0x0C]{};
-    std::int32_t framePoolSize = 0; // +0x18 (nfrm_pool_wk)
-    std::uint8_t mUnknown1C[0x20]{};
+    // `mwPlyCreateSofdec` copies the caller's create parameters here wholesale,
+    // and the rest of the playback code reads them back out of the handle.
+    // What used to be `fileType` (+0x08) and `framePoolSize` (+0x18) are
+    // `params.ftype` and `params.framePoolWork`.
+    MwsfcreCreateParams params{}; // +0x08 .. +0x38
+    std::int32_t created = 0;     // +0x38
     void* handle = nullptr;          // +0x3C
     void* adxStreamHandle = nullptr; // +0x40
     std::int32_t mUnknown44 = 0;     // +0x44
@@ -646,11 +717,16 @@ namespace moho
     /// SFX runtime's default static composition mode.
     std::int32_t sfxCompoModeOverride = 0;         // +0x50
     std::int32_t disableIntermediateFrameDrop = 0; // +0x54
-    std::uint8_t mUnknown58[0x8]{};
+    /// Stream-buffer byte budget handed to the SJ ring (the `sjb` lane).
+    std::int32_t streamBufferBytes = 0; // +0x58
+    /// Set to 1 by `mwPlyCreateSofdec`; gates the per-frame server work.
+    std::int32_t serverWorkEnabled = 0; // +0x5C
     std::int32_t mwplyServerFlag = 0;          // +0x60
     std::int32_t sfdServerFlag = 0;            // +0x64
     std::int32_t decodeServerDispatchFlag = 0; // +0x68
-    std::uint8_t mUnknown6C[0x4]{};
+    /// Transfer handle for lane 3, fetched with `SFD_GetTrHn` at create time
+    /// and left at 0 when the stream has no such lane.
+    std::int32_t audioTransferHandle = 0; // +0x6C
     std::uint8_t concatPlayArmed = 0; // +0x70
     std::uint8_t isPrepared = 0;
     std::int8_t paused = 0;
@@ -662,9 +738,26 @@ namespace moho
     std::int32_t releasedFrameCount = 0;  // +0x84
     std::uint8_t mUnknown88[0x20]{};
     void* sfxHandle = nullptr; // +0xA8
-    std::uint8_t mUnknownAC[0xC]{};
+    /// SFX composition work block carved out of the playback arena.
+    void* sfxWork = nullptr;          // +0xAC
+    std::int32_t sfxWorkBytes = 0;    // +0xB0
+    std::uint8_t mUnknownB4[0x4]{};
     std::int32_t lastFrameConcatCount = 0; // +0xB8
-    std::uint8_t mUnknownBC[0xD4]{};
+    std::int32_t sfhInfoWriteIndex = 0;    // +0xBC
+    /// Ring of Sofdec-header records filled by the header-analysis callback.
+    /// `MWSFFRM_InitSfhInfTable` primes every `state` to the 0x11 sentinel.
+    std::array<SofdecSfhInfoEntry, 8> sfhInfoTable{}; // +0xC0 .. +0x160
+    /// Seek-key-group descriptor built in place by `MWSKG_Create`; the handle
+    /// keeps a pointer to its own block at +0x178.
+    std::array<std::int32_t, 3> seekKeyGroup{}; // +0x160
+    std::uint8_t mUnknown16C[0x0C]{};
+    std::int32_t* seekKeyGroupPtr = nullptr; // +0x178
+    /// Additional-info side stream (AINF), only built when the stream carries
+    /// one; `ainfBuffer`/`ainfBufferBytes` back the SJ ring at `ainfSjHandle`.
+    void* ainfSjHandle = nullptr;    // +0x17C
+    void* ainfBuffer = nullptr;      // +0x180
+    std::int32_t ainfBufferBytes = 0; // +0x184
+    std::uint8_t mUnknown188[0x08]{};
     std::int32_t additionalInfoStamp = 0; // +0x190
     std::uint8_t mUnknown194[0x10]{};
     char* fname = nullptr;                                  // +0x1A4
@@ -675,7 +768,12 @@ namespace moho
     std::int32_t pendingStartRangeEnd = 0;                  // +0x1B8
     SofdecSjSupplyHandle* sjSupplyHandle = nullptr;         // +0x1BC
     SofdecSjRingBufferHandle* sjRingBufferHandle = nullptr; // +0x1C0
-    std::uint8_t mUnknown1C4[0xC]{};
+    /// SJ ring geometry `mwsfcre_CreateSj` feeds to `SJRBF_Create`: the
+    /// aligned buffer address, the usable extent (stream budget minus one
+    /// pack) and the pack size.
+    std::int32_t sjRingBufferAddress = 0; // +0x1C4
+    std::int32_t sjRingUsableBytes = 0;   // +0x1C8
+    std::int32_t sjRingPackBytes = 0;     // +0x1CC
     std::int32_t sjSupplyMode = 0;                  // +0x1D0
     std::int32_t sjSupplyArg0 = 0;                  // +0x1D4
     std::int32_t sjSupplyArg1 = 0;                  // +0x1D8
