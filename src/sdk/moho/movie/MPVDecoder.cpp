@@ -7166,4 +7166,257 @@ namespace moho::movie
     context->decodeFinalizePredicted(context->decodeFlags);
     return 0;
   }
+  namespace
+  {
+    /** The short-code table flags the MPEG-1 escape with a run no real code can carry. */
+    constexpr int kMpvRunLevelEscapeMarker = 64;
+    /** `coefficientScanMode` value that suppresses the AC pass entirely. */
+    constexpr int kMpvScanModeDcOnly = 4;
+    /** An MPEG-1 block holds 64 coefficients; walking past that means a broken block. */
+    constexpr std::ptrdiff_t kMpvCoefficientsPerBlock = 64;
+
+    /** One decoded AC symbol: how far to skip, the signed magnitude, and the code width. */
+    struct MPVAcRunLevel
+    {
+      int run;
+      int level;
+      int signBit;
+      int lengthBits;
+      bool endOfBlock;
+    };
+
+    /**
+     * Decodes one MPEG-1 Table B-14 AC run/level code out of a 32-bit peek of
+     * the bitstream window.
+     *
+     * The shipped kernels hand-unroll this: they retire up to two codes per
+     * dispatch and inline the short ones, which is why each is ~2500 lines of
+     * decompiler output. That unrolling is optimizer shape, not semantics -
+     * the (run, level, sign, length) quadruple is identical, and every path of
+     * the original resolves to exactly one of the three cases below.
+     */
+    [[nodiscard]] MPVAcRunLevel DecodeAcRunLevel(const MPVDecoderScanContext& context, const std::uint32_t window)
+    {
+      const std::uint32_t topByte = window >> 24;
+
+      if (topByte >= 0x80u) {
+        // The two shortest codes cannot be told apart by the short table's
+        // seven-bit index (it drops bit 31), so they are matched up front:
+        // 10 ends the block, and 11s is run 0 / level 1.
+        if (topByte < 0xC0u) {
+          return MPVAcRunLevel{0, 0, 0, 2, true};
+        }
+        return MPVAcRunLevel{0, 1, static_cast<int>((topByte >> 5) & 1u), 3, false};
+      }
+
+      // With bit 31 clear the top byte is itself the table index (bits 30..24).
+      const std::uint32_t entry = context.acShortRunLevelTable[topByte];
+      const int run = static_cast<int>(entry & 0xFFu);
+
+      if (run == kMpvRunLevelEscapeMarker) {
+        // Escape prefix, then a 6-bit run and an 8-bit level. A level of 0 or
+        // -128 is forbidden and instead means eight more bits follow, which
+        // widens the whole code from 20 bits to 28.
+        int lengthBits = 20;
+        int level = static_cast<std::int8_t>(window >> 12);
+        if ((level & 0x7F) == 0) {
+          level = (level * 2) | static_cast<int>((window >> 4) & 0xFFu);
+          lengthBits = 28;
+        }
+
+        const int signBit = (level < 0) ? 1 : 0;
+        return MPVAcRunLevel{
+          static_cast<int>((window >> 20) & 0x3Fu), (signBit != 0) ? -level : level, signBit, lengthBits, false
+        };
+      }
+
+      if (entry != 0) {
+        const int lengthBits = static_cast<int>(entry >> 16);
+        return MPVAcRunLevel{
+          run,
+          static_cast<std::int8_t>(entry >> 8),
+          static_cast<int>((window >> (32 - lengthBits)) & 1u),
+          lengthBits,
+          false
+        };
+      }
+
+      // Entries 0..3 are zero: seven or more leading zeros, too long for the
+      // short table. The run of zeros picks one of the six word tables, and
+      // the low bit of the extracted code is the sign.
+      int lengthBits = 0;
+      std::uint32_t codeBits = 0;
+      const std::uint16_t* table = nullptr;
+
+      if (topByte >= 2u) {
+        lengthBits = 11;
+        codeBits = (window >> 21) & 0x3FFu;
+        table = context.acLongRunLevelTables[0];
+      } else if (topByte == 1u) {
+        lengthBits = 13;
+        codeBits = (window >> 19) & 0xFFFu;
+        table = context.acLongRunLevelTables[1];
+      } else if ((window & 0x00800000u) != 0) {
+        lengthBits = 14;
+        codeBits = (window >> 18) & 0x1FFFu;
+        table = context.acLongRunLevelTables[2];
+      } else if ((window & 0x00400000u) != 0) {
+        lengthBits = 15;
+        codeBits = (window >> 17) & 0x1Fu;
+        table = context.acLongRunLevelTables[3];
+      } else if ((window & 0x00200000u) != 0) {
+        lengthBits = 16;
+        codeBits = (window >> 16) & 0x1Fu;
+        table = context.acLongRunLevelTables[4];
+      } else {
+        lengthBits = 17;
+        codeBits = (window >> 15) & 0x1Fu;
+        table = context.acLongRunLevelTables[5];
+      }
+
+      const std::uint16_t longEntry = table[codeBits >> 1];
+      return MPVAcRunLevel{
+        static_cast<int>(longEntry & 0xFFu),
+        static_cast<std::int8_t>(longEntry >> 8),
+        static_cast<int>(codeBits & 1u),
+        lengthBits,
+        false
+      };
+    }
+
+    /**
+     * Dequantizes one AC coefficient and stores it, exactly as the kernels do:
+     * `(2 * quantScale * level * quantMatrix[i]) >> 4`, forced odd, negated on
+     * sign, then scaled by the per-scan-position float the context carries.
+     */
+    void EmitDequantizedCoefficient(
+      const MPVDecoderScanContext& context, MPVCoefficientDecodeState& state, const int scanIndex, const int level,
+      const int signBit
+    )
+    {
+      int value = (state.quantScale * 2 * level * state.quantMatrix[scanIndex]) >> 4;
+      if (value != 0) {
+        value = (value - 1) | 1;
+      }
+      if (signBit != 0) {
+        value = -value;
+      }
+
+      state.coefficients[scanIndex] =
+        static_cast<float>(static_cast<double>(value) * static_cast<double>(context.dequantScaleTable[scanIndex]));
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00AFAE50 (sub_AFAE50, `_mpvhdec_ReadKernelIntraDefault`)
+   *
+   * IDA signature:
+   * int __cdecl sub_AFAE50(int *a1, int a2);
+   *
+   * What it does:
+   * Reads one intra-coded MPEG-1 block out of the bitstream: the DC difference
+   * through `dcSizeTable`, then Table B-14 AC run/level codes until an
+   * end-of-block code, a zero level, or the 64th coefficient. Each coefficient
+   * is dequantized into `coefficients`, and the bit window is written back
+   * before returning.
+   *
+   * The return value is the scan position reached, negated when the block did
+   * not finish at `scanIndexLimit`; callers store it as that slot's decode flag.
+   *
+   * `decodeState` is not a separate object - `ProbeScanSlot` passes
+   * `&context->decodeBitstreamWord`, so it aliases the scan context from +0x68.
+   */
+  extern "C" std::uint8_t mpvhdec_ReadKernelIntraDefault(
+    MPVDecoderScanContext* const decoderContext, void* const decodeState
+  )
+  {
+    MPVCoefficientDecodeState& state = *static_cast<MPVCoefficientDecodeState*>(decodeState);
+    MPVBitstreamState& bitstreamState = decoderContext->bitstreamState;
+
+    // ---- DC coefficient --------------------------------------------------
+    const std::uint32_t dcWindow = PeekWindowBits(bitstreamState, 16);
+    const std::uint32_t dcSizeCode = state.dcSizeTable[dcWindow >> 9];
+
+    int dcConsumeBits = static_cast<int>(dcSizeCode & 0xFu);
+    const int dcMagnitudeBits = static_cast<int>(dcSizeCode >> 4);
+    int dcDelta = 0;
+
+    if (dcMagnitudeBits != 0) {
+      const int dcTotalBits = dcMagnitudeBits + dcConsumeBits;
+      int magnitude = static_cast<int>(decoderContext->bitMaskByWidth[dcConsumeBits] & dcWindow) >> (16 - dcTotalBits);
+
+      // The magnitude carries no sign bit: values below the midpoint denote
+      // the negative half of the range.
+      const int signPivot = 1 << (dcMagnitudeBits - 1);
+      if ((signPivot & magnitude) == 0) {
+        magnitude = (1 - 2 * signPivot) + magnitude;
+      }
+
+      dcDelta = 8 * magnitude;
+      dcConsumeBits = dcTotalBits;
+    }
+
+    ConsumeBits(
+      bitstreamState.bitWindowPrimary,
+      bitstreamState.bitWindowSecondary,
+      bitstreamState.bitCount,
+      bitstreamState.byteCursor,
+      dcConsumeBits
+    );
+
+    *state.dcAccumulator += dcDelta;
+    state.coefficients[0] = static_cast<float>(static_cast<double>(*state.dcAccumulator) * 0.125);
+    state.scanIndexLimit = 0;
+    state.scanIndex = 0;
+
+    // ---- AC run/level pass -----------------------------------------------
+    if (decoderContext->coefficientScanMode != kMpvScanModeDcOnly) {
+      const std::uint8_t* scanCursor = decoderContext->coefficientWriteCursor;
+      const std::uint8_t* const scanEnd = scanCursor + kMpvCoefficientsPerBlock;
+
+      for (;;) {
+        const MPVAcRunLevel code = DecodeAcRunLevel(*decoderContext, PeekWindowBits(bitstreamState, 0));
+
+        state.run = code.run;
+        state.level = code.level;
+        state.signBit = code.signBit;
+        state.codeLengthBits = code.lengthBits;
+
+        if (code.endOfBlock) {
+          ConsumeBits(
+            bitstreamState.bitWindowPrimary,
+            bitstreamState.bitWindowSecondary,
+            bitstreamState.bitCount,
+            bitstreamState.byteCursor,
+            code.lengthBits
+          );
+          break;
+        }
+
+        scanCursor += code.run + 1;
+        if (scanCursor >= scanEnd || code.level == 0) {
+          decoderContext->recoverNeededFlag = 1;
+          break;
+        }
+
+        const int scanIndex = *scanCursor;
+        state.scanIndex = scanIndex;
+        EmitDequantizedCoefficient(*decoderContext, state, scanIndex, code.level, code.signBit);
+
+        ConsumeBits(
+          bitstreamState.bitWindowPrimary,
+          bitstreamState.bitWindowSecondary,
+          bitstreamState.bitCount,
+          bitstreamState.byteCursor,
+          code.lengthBits
+        );
+      }
+    }
+
+    const int reachedIndex = state.scanIndex;
+    const int result = (reachedIndex != state.scanIndexLimit) ? -reachedIndex : reachedIndex;
+    state.scanIndex = result;
+    return static_cast<std::uint8_t>(result);
+  }
+
 } // namespace moho::movie

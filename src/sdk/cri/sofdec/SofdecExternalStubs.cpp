@@ -218,7 +218,10 @@ extern "C" {
   void* sfxcnv_ExecCnvFrmByCbFunc() { return nullptr; }
   void* sfxcnv_ExecFullAlphaByCbFunc() { return nullptr; }
   void* sfxcnv_MakeZTbl() { return nullptr; }
-  void* mpvhdec_ReadKernelIntraDefault() { return nullptr; }
+  // mpvhdec_ReadKernelIntraDefault (0x00AFAE50) is recovered in
+  // moho/movie/MPVDecoder.cpp. While this stub stood, every intra block came
+  // back with no coefficients at all, so the decoder ran without ever
+  // producing a picture.
   void* mpvhdec_ReadKernelPredictedDefault() { return nullptr; }
   void* sub_C0E1B0() { return nullptr; }
   void* sub_C0E2E0() { return nullptr; }
