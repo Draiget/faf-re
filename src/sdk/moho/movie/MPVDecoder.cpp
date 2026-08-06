@@ -65,12 +65,6 @@ namespace
     extern std::uint16_t mpvvlt_c_dcsiz[];
     extern std::uint16_t mpvvlt2_y_dcsiz[];
     extern std::uint16_t mpvvlt2_c_dcsiz[];
-    extern std::uint32_t mpvvlt_run_level_0c[];
-    extern std::uint32_t mpvvlt_run_level_0b[];
-    extern std::uint32_t mpvvlt_run_level_0a[];
-    extern std::uint32_t mpvvlt_run_level_1[];
-    extern std::uint32_t mpvvlt_run_level_2[];
-    extern std::uint32_t mpvvlt_run_level_4[];
 
     extern const std::uint16_t* mpvvlc_motion_0;
     extern const std::uint16_t* mpvvlc_motion_1;
@@ -1560,6 +1554,87 @@ extern "C" int MPV_IsConformable(const std::uint8_t* const bitstreamCursor, cons
 
   const int delimiterType = MPV_CheckDelim(nextDelimiter);
   return (static_cast<unsigned int>((~delimiterType) & 0x10) >> 4);
+}
+
+/**
+ * MPEG-1 Table B-14 run/level payloads, one static table per code-length
+ * class. `mpvvlc_SetVlcRunLevel` copies these into the runtime setup arena
+ * and `mpvvlc_SetDflPtr` points the active lanes back at them.
+ *
+ * Each entry is a packed pair `(level << 8) | run`; the read kernels take the
+ * high byte as the signed level and the low byte as the run. Decoded, these
+ * are exactly the standard's codes - run_level_4 holds the 10-bit set
+ * (run 16/level 1, run 5/level 2, run 0/level 7, ...), run_level_2 the 12-bit
+ * set, and 0a/0b the long level-only escapes.
+ *
+ * They were 4 KB zero stubs, which would have made every run/level lookup
+ * decode to nothing regardless of the kernel driving it.
+ */
+extern "C" {
+/**
+ * Address: 0x00D7FEB8 (`_mpvvlt_run_level_0c`, `.rdata`)
+ *
+ * 16 packed run/level pairs: `(level << 8) | run`, matching MPEG-1
+ * Table B-14. Verified against bin/2025.7.1/ForgedAlliance.exe.
+ */
+std::uint32_t mpvvlt_run_level_0c[8] = {
+  0x11011201, 0x0F011001, 0x02100306, 0x020E020F,
+  0x020C020D, 0x011F020B, 0x011D011E, 0x011B011C,
+};
+
+/**
+ * Address: 0x00D7FED8 (`_mpvvlt_run_level_0b`, `.rdata`)
+ *
+ * 16 packed run/level pairs: `(level << 8) | run`, matching MPEG-1
+ * Table B-14. Verified against bin/2025.7.1/ForgedAlliance.exe.
+ */
+std::uint32_t mpvvlt_run_level_0b[8] = {
+  0x27002800, 0x25002600, 0x23002400, 0x21002200,
+  0x0E012000, 0x0C010D01, 0x0A010B01, 0x08010901,
+};
+
+/**
+ * Address: 0x00D7FEF8 (`_mpvvlt_run_level_0a`, `.rdata`)
+ *
+ * 16 packed run/level pairs: `(level << 8) | run`, matching MPEG-1
+ * Table B-14. Verified against bin/2025.7.1/ForgedAlliance.exe.
+ */
+std::uint32_t mpvvlt_run_level_0a[8] = {
+  0x1E001F00, 0x1C001D00, 0x1A001B00, 0x18001900,
+  0x16001700, 0x14001500, 0x12001300, 0x10001100,
+};
+
+/**
+ * Address: 0x00D7FF18 (`_mpvvlt_run_level_1`, `.rdata`)
+ *
+ * 16 packed run/level pairs: `(level << 8) | run`, matching MPEG-1
+ * Table B-14. Verified against bin/2025.7.1/ForgedAlliance.exe.
+ */
+std::uint32_t mpvvlt_run_level_1[8] = {
+  0x0209020A, 0x04030305, 0x07010502, 0x0F000601,
+  0x0D000E00, 0x011A0C00, 0x01180119, 0x01160117,
+};
+
+/**
+ * Address: 0x00D7FF38 (`_mpvvlt_run_level_2`, `.rdata`)
+ *
+ * 16 packed run/level pairs: `(level << 8) | run`, matching MPEG-1
+ * Table B-14. Verified against bin/2025.7.1/ForgedAlliance.exe.
+ */
+std::uint32_t mpvvlt_run_level_2[8] = {
+  0x02080B00, 0x0A000304, 0x02070402, 0x01140115,
+  0x01130900, 0x05010112, 0x08000303, 0x01110206,
+};
+
+/**
+ * Address: 0x00D7FF58 (`_mpvvlt_run_level_4`, `.rdata`)
+ *
+ * 8 packed run/level pairs: `(level << 8) | run`, matching MPEG-1
+ * Table B-14. Verified against bin/2025.7.1/ForgedAlliance.exe.
+ */
+std::uint32_t mpvvlt_run_level_4[4] = {
+  0x02050110, 0x03020700, 0x010F0401, 0x0204010E,
+};
 }
 
 /**

@@ -355,12 +355,6 @@ extern "C" {
   std::uint8_t mpvvlt_motion_0[4096] = {};
   std::uint8_t mpvvlt_motion_1[4096] = {};
   std::uint8_t mpvvlt_p_mbtype[4096] = {};
-  std::uint8_t mpvvlt_run_level_0a[4096] = {};
-  std::uint8_t mpvvlt_run_level_0b[4096] = {};
-  std::uint8_t mpvvlt_run_level_0c[4096] = {};
-  std::uint8_t mpvvlt_run_level_1[4096] = {};
-  std::uint8_t mpvvlt_run_level_2[4096] = {};
-  std::uint8_t mpvvlt_run_level_4[4096] = {};
   std::uint8_t mpvvlt_y_dcsiz[4096] = {};
   std::uint8_t mwsfd_init_flag[4096] = {};
   std::uint8_t sSofDec_tabs[4096] = {};
