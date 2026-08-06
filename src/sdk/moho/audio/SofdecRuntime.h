@@ -718,6 +718,7 @@ namespace moho
   using SofdecSjSupplySubmitChunkFn =
     void(__cdecl*)(SofdecSjSupplyHandle* handle, std::int32_t lane, moho::SjChunkRange* chunkRange);
   using SofdecSjSupplyQueryAvailableFn = std::int32_t(__cdecl*)(SofdecSjSupplyHandle* handle, std::int32_t lane);
+  using SofdecSjSupplyGetUuidFn = std::int32_t(__cdecl*)(SofdecSjSupplyHandle* handle);
 
   /**
    * Runtime dispatch table lane used by SJ supply handles.
@@ -730,7 +731,7 @@ namespace moho
   {
     std::uint8_t mUnknown00[0x0C]{};
     SofdecSjSupplyDestroyFn destroy = nullptr; // +0x0C
-    std::uint8_t mUnknown10[0x04]{};
+    SofdecSjSupplyGetUuidFn getUuid = nullptr; // +0x10
     SofdecSjSupplyOnStartFn onStart = nullptr;                    // +0x14
     SofdecSjSupplyGetChunkFn getChunk = nullptr;                  // +0x18
     SofdecSjSupplyPutChunkFn putChunk = nullptr;                  // +0x1C

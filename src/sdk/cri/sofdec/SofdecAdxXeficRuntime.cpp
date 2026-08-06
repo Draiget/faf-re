@@ -7632,6 +7632,46 @@
     return nextCount;
   }
 
+  void SJRBF_Destroy(moho::SofdecSjRingBufferHandle* handle);
+  std::int32_t SJRBF_GetUuid(moho::SofdecSjRingBufferHandle* handle);
+  void SJRBF_Reset(moho::SofdecSjRingBufferHandle* handle);
+  std::int32_t SJRBF_GetNumData(moho::SofdecSjRingBufferHandle* handle, std::int32_t lane);
+  void SJRBF_GetChunk(
+    moho::SofdecSjRingBufferHandle* handle,
+    std::int32_t lane,
+    std::int32_t requestedBytes,
+    moho::SjChunkRange* outChunkRange
+  );
+  void SJRBF_PutChunk(moho::SofdecSjRingBufferHandle* handle, std::int32_t lane, moho::SjChunkRange* chunkRange);
+  void SJRBF_UngetChunk(moho::SofdecSjRingBufferHandle* handle, std::int32_t lane, moho::SjChunkRange* chunkRange);
+
+  /**
+   * Address: 0x00F44068 (`_sjrbf_vtbl`, `.data`)
+   *
+   * The dispatch table every ring-buffer source-join handle is published with
+   * (`mov dword ptr [esi], offset _sjrbf_vtbl` at 0x00B07DA1). Consumers reach
+   * it as `SofdecSjSupplyHandle::dispatchTable` at +0x00 and call through it -
+   * `ADXSTMF_SetupHandleMember` asks for `queryAvailableBytes` at +0x24 as soon
+   * as a stream is created, so an unpopulated table is an immediate null
+   * dispatch.
+   *
+   * The first three slots are genuinely null in the shipped image; the rest are
+   * verified against `bin/2025.7.1/ForgedAlliance.exe` at file offset 0xB44068.
+   * The handles are the same object under two views, hence the casts.
+   */
+  moho::SofdecSjSupplyVtable gSofdecSjRingBufferVtable = {
+    /* +0x00 */ {},
+    /* +0x0C */ reinterpret_cast<moho::SofdecSjSupplyDestroyFn>(&SJRBF_Destroy),
+    /* +0x10 */ reinterpret_cast<moho::SofdecSjSupplyGetUuidFn>(&SJRBF_GetUuid),
+    /* +0x14 */ reinterpret_cast<moho::SofdecSjSupplyOnStartFn>(&SJRBF_Reset),
+    /* +0x18 */ reinterpret_cast<moho::SofdecSjSupplyGetChunkFn>(&SJRBF_GetChunk),
+    // The binary's +0x1C/+0x20 pair is unget/put, which is the reverse of what
+    // the generic field names suggest. Wired by slot, per the table above.
+    /* +0x1C */ reinterpret_cast<moho::SofdecSjSupplyPutChunkFn>(&SJRBF_UngetChunk),
+    /* +0x20 */ reinterpret_cast<moho::SofdecSjSupplySubmitChunkFn>(&SJRBF_PutChunk),
+    /* +0x24 */ reinterpret_cast<moho::SofdecSjSupplyQueryAvailableFn>(&SJRBF_GetNumData),
+  };
+
   /**
    * Address: 0x00B07D30 (FUN_00B07D30, _SJRBF_Create)
    */
@@ -7666,7 +7706,7 @@
 
     moho::SofdecSjRingBufferHandle* const handle = &gSofdecSjRingBufferPool[slotIndex];
     handle->used = 1;
-    handle->runtimeSlot = SjPointerToAddress(&gSofdecSjRingBufferVtableTag);
+    handle->runtimeSlot = SjPointerToAddress(&gSofdecSjRingBufferVtable);
     handle->bufferBase = SjAddressToPointer(bufferAddress);
     handle->bufferSize = bufferSize;
     handle->extraSize = extraSize;
