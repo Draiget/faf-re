@@ -14199,10 +14199,28 @@
   );
   std::int32_t gSfadxtAttachCount = 0;
   std::int32_t gAdxstmInitCount = 0;
-  std::int32_t adxstmf_nrml_ofst = 0;
-  std::int32_t adxstmf_nrml_num = 0;
-  std::int32_t adxstmf_rtim_ofst = 0;
-  std::int32_t adxstmf_rtim_num = 0;
+  /**
+   * ADXSTM partitions the fixed `kAdxstmServerSlotCount` slot pool into a
+   * realtime range at the front and a normal range behind it. `ADXT_Setup*NumStm`
+   * can repartition at runtime, but nothing in the binary ever calls either one
+   * (`_ADXT_SetupRtimeNumStm` at 0x00B0F5E0 has zero xrefs) - the split is
+   * simply the value these live in `.data` with. Read out of
+   * `bin/2025.7.1/ForgedAlliance.exe`: rtim 0..47, nrml 48..79.
+   *
+   * They are load-bearing: `ADXSTMF_CreateCvfsRt` searches the realtime
+   * partition for a free slot, so a zero count means every ADX stream create
+   * fails, and `mwPlyCreateSofdec` returns null without reporting anything.
+   * `adxstmf_rtim_ofst` really is BSS (0x010597B8), so zero is correct for it.
+   */
+  std::int32_t adxstmf_nrml_ofst = 48; // 0x00F45B04
+  std::int32_t adxstmf_nrml_num = 32;  // 0x00F45B08
+  std::int32_t adxstmf_rtim_ofst = 0;  // 0x010597B8 (BSS)
+  std::int32_t adxstmf_rtim_num = 48;  // 0x00F45B00
+
+  static_assert(
+    kAdxstmServerSlotCount == 48 + 32,
+    "ADXSTM realtime and normal partitions must tile the whole slot pool"
+  );
   std::array<AdxstmServerSlotView, kAdxstmServerSlotCount> gAdxstmObjectPool{};
 
   /**
