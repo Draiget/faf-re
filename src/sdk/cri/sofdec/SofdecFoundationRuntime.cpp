@@ -1028,19 +1028,64 @@ struct SfbufRuntimeHandleView
 
 static_assert(offsetof(SfbufRuntimeHandleView, lanes) == 0x1310, "SfbufRuntimeHandleView::lanes offset must be 0x1310");
 
+/**
+ * Per-stream entry point of a transfer strategy.
+ *
+ * The eight strategy descriptors in the binary are plain C tables whose slots
+ * hold functions with per-family signatures - `SFMEM_GetWrite` takes an out
+ * cursor where `SFVOM_GetWrite` does not, `SFUO_Create` takes a handle where
+ * `SFMEM_Create` takes none. The original C source therefore declared one
+ * generic pointer type for those slots; only the lifecycle pair below is
+ * uniform across every family.
+ */
 using SftrnEntryCallback =
   std::int32_t(__cdecl*)(std::int32_t arg0, std::int32_t arg1, std::int32_t arg2, std::int32_t arg3);
 
-struct SftrnEntryDispatchView
+/** Init/Finish are `Sint32 (*)(void)` in all eight strategies. */
+using SftrnLifecycleCallback = std::int32_t(__cdecl*)();
+
+/**
+ * One SFD transfer strategy (SFMEM / SFMPS / SFMPV / SFVOM / SFM2TS / SFADXT /
+ * SFAOAP / SFUO).
+ *
+ * Evidence: the eight descriptor blocks at 0x00D7F49C, 0x00D7F4D4, 0x00D7F50C,
+ * 0x00D7F544, 0x00D7F57C, 0x00D7F5D4, 0x00D7F670 and 0x00D7F6B8 are spaced
+ * 0x38 apart, and the IDA symbol at every one of the 14 slots agrees on the
+ * slot role across all eight families (`_SF*_Init`, `_SF*_Finish`,
+ * `_SF*_ExecServer`, ... `_SF*_Seek`).
+ */
+struct SofdecTransferStrategy
 {
-  std::array<SftrnEntryCallback, 2> entryCallbacks{};
+  SftrnLifecycleCallback init = nullptr; // +0x00
+  SftrnLifecycleCallback finish = nullptr; // +0x04
+  SftrnEntryCallback execServer = nullptr; // +0x08
+  SftrnEntryCallback create = nullptr; // +0x0C
+  SftrnEntryCallback destroy = nullptr; // +0x10
+  SftrnEntryCallback requestStop = nullptr; // +0x14
+  SftrnEntryCallback start = nullptr; // +0x18
+  SftrnEntryCallback stop = nullptr; // +0x1C
+  SftrnEntryCallback pause = nullptr; // +0x20
+  SftrnEntryCallback getWrite = nullptr; // +0x24
+  SftrnEntryCallback addWrite = nullptr; // +0x28
+  SftrnEntryCallback getRead = nullptr; // +0x2C
+  SftrnEntryCallback addRead = nullptr; // +0x30
+  SftrnEntryCallback seek = nullptr; // +0x34
 };
 
-static_assert(sizeof(SftrnEntryDispatchView) == 0x8, "SftrnEntryDispatchView size must be 0x8");
+static_assert(offsetof(SofdecTransferStrategy, execServer) == 0x08, "SofdecTransferStrategy::execServer offset must be 0x08");
+static_assert(offsetof(SofdecTransferStrategy, seek) == 0x34, "SofdecTransferStrategy::seek offset must be 0x34");
+static_assert(sizeof(SofdecTransferStrategy) == 0x38, "SofdecTransferStrategy size must be 0x38");
 
+/**
+ * Null-terminated strategy list copied wholesale by `SFTRN_Init`.
+ *
+ * Evidence: the list head sits at 0x00D7F3D0 and is exactly 0x3C bytes - the
+ * next static, `mwsfd_initsfdpara`, begins at 0x00D7F40C and its `callbacks`
+ * field points back at 0x00D7F3D0.
+ */
 struct SftrnEntryListView
 {
-  std::array<SftrnEntryDispatchView*, 15> entries{};
+  std::array<SofdecTransferStrategy*, 15> entries{};
 };
 
 static_assert(sizeof(SftrnEntryListView) == 0x3C, "SftrnEntryListView size must be 0x3C");

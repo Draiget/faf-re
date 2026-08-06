@@ -151,29 +151,24 @@ extern "C" {
   // mpvcmc_InitMcOiTa: real body in SofdecMpvRuntime.cpp.
   void* mpvhdec_ReadKernelIntraIdcPrec3() { return nullptr; }
   void* mwPlyFinishSfdFx() { return nullptr; }
-  // mwPlyInitSfdFx (0x00AC9130) is fully recovered and verified, but cannot be
-  // enabled yet: it reaches SFD_Init -> sflib_InitLibWork -> SFTRN_Init, which
-  // copies the 60-byte SFD transfer descriptor table out of
-  // mwsfd_initsfdpara.callbacks. That static (0x00D7F40C -> table at
-  // 0x00D7F3D0) is not modelled, so the pointer is null and the copy faults.
-  // Modelling it needs the 8 descriptor blocks it points at - 116 entries, of
-  // which 31 are still unrecovered (the SFAOAP and SFADXT families). Until
-  // those land, this stays a no-op stub so startup does not crash.
-  void* mwPlyInitSfdFx() { return nullptr; }
+  // mwPlyInitSfdFx: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp, next
+  // to mwPlySfdInit. The SFD transfer strategy table it depends on
+  // (mwsfd_initsfdpara.callbacks -> 0x00D7F3D0) is now modelled at the end of
+  // cri/sofdec/SofdecSfdRuntime.cpp.
   void* mwPlyIsNextFrmReady() { return nullptr; }
   void* mwPlyPause() { return nullptr; }
   void* mwPlySfdStart() { return nullptr; }
   void* mwRnaCreate() { return nullptr; }
   void* mw_sfd_start_ex() { return nullptr; }
   void* mwl_convFrmInfFromSFD() { return nullptr; }
-  void* mwsfcre_AllFree() { return nullptr; }
+  // mwsfcre_AllFree: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfcre_DecideFtypeByHdrInf: real body in moho/misc/StartupHelpers.cpp,
   // next to its only caller mwPlyGetHdrInf (adjacent addresses 0x00AC8F00 /
   // 0x00AC8DF0 - same original translation unit).
-  void* mwsfcre_GetMallocCnt() { return nullptr; }
-  void* mwsfcre_IncMallocCnt() { return nullptr; }
-  void* mwsfcre_OrgMalloc() { return nullptr; }
-  void* mwsfcre_UsrMalloc() { return nullptr; }
+  // mwsfcre_GetMallocCnt: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
+  // mwsfcre_IncMallocCnt: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
+  // mwsfcre_OrgMalloc: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
+  // mwsfcre_UsrMalloc: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfdcre_IsPlayableByHdrInf: real body in moho/misc/StartupHelpers.cpp
   // (0x00AC8F30, same original translation unit as mwPlyGetHdrInf).
   void* mwsffrm_AnalyFxType() { return nullptr; }

@@ -35,9 +35,8 @@ extern "C" {
 /// without re-ordering the file.
 void SFX_Init();
 
-/// Registers an error-callback with the SFX core. The callback receives a
-/// context tag and an error-message string pointer. Returns an opaque status
-/// code from the CRI error dispatcher.
+/// Installs the SFX error callback and its context. Defined below, once the
+/// work-area globals are in scope.
 std::int32_t SFX_SetErrFn(std::int32_t errorCallbackAddress,
                           std::int32_t errorCallbackContext);
 
@@ -54,7 +53,7 @@ void* SFX_Create(std::int32_t workBufferAddress,
 /// Reports a formatted Sofdec-SVM error message through the shared MWSFSVM
 /// error channel. Only the string pointer is used; the leading context slot
 /// matches the CRI-internal error-callback ABI.
-void MWSFSVM_Error(const char* errorMessage);
+std::int32_t MWSFSVM_Error(const char* format, ...);
 
 // Lower-level SFX dependencies pulled in by `SFX_Init` and the SFX init
 // chain. These remain externs because their bodies live in deeper SFX
@@ -62,17 +61,17 @@ void MWSFSVM_Error(const char* errorMessage);
 // init/dispatch entry point with no engine-visible side effects beyond the
 // Sofdec library work area.
 
-/// Selects the CCIR matrix variant used by the SFX colour pipeline. The
-/// argument is a small enum-like selector (`1` = the standard CCIR-601
-/// pipeline used by the Forged Alliance build).
-void SFX_SetCcirFx(std::int32_t mode);
+/// Selects the CCIR matrix variant used by the SFX colour pipeline. Defined
+/// below, once the work-area globals are in scope.
+std::int32_t SFX_SetCcirFx(std::int32_t mode);
 
 /// Initialises the CFT (Color Format Table) module. Pairs with the matching
 /// teardown in the CFT runtime.
 void CFT_Init();
 
-/// SFXZ (depth/Z-blit) library work-area initialiser. Returns the CRI
-/// success/error status of the underlying init.
+/// SFXZ (depth/Z-blit) library work-area initialiser. Defined below, once the
+/// work-area globals are in scope.
+std::int32_t SFXZ_SetZbufType(std::int32_t zbufType);
 std::int32_t sfxzmv_InitLibWork();
 
 /// SFXA (audio) library work-area initialiser. Returns the CRI
@@ -101,16 +100,37 @@ void SUD_Init();
 
 namespace moho_cri_sfx_internal {
 
-/// Recovered head of the global SFX library work area. The first DWORD is
-/// the dispatcher tag set by SFX_Init's callees; the second is the
-/// `last` slot reset by `sfx_InitLibWork` to the cell-cap sentinel `32`.
+/// Recovered head of the global SFX library work area (0x011F9B20, 0x12A8
+/// bytes). The first DWORD is the dispatcher tag set by SFX_Init's callees;
+/// the second is the `last` slot reset by `sfx_InitLibWork` to the cell-cap
+/// sentinel `32`.
 struct SfxLibWorkHead {
   std::uint32_t dispatcher_tag;  ///< +0x00 (filled in by deeper SFX init)
   std::int32_t  last;            ///< +0x04 last-cell sentinel (= 32)
+  std::int32_t  errFn;           ///< +0x08 error callback (SFX_SetErrFn)
+  std::int32_t  errParam;        ///< +0x0C error callback context
+  std::int32_t  reserved10;      ///< +0x10
+  std::int32_t  cirFx;           ///< +0x14 CCIR matrix selector
 };
 
 static_assert(offsetof(SfxLibWorkHead, last) == 0x04,
               "SfxLibWorkHead::last must live at offset 0x04");
+static_assert(offsetof(SfxLibWorkHead, errFn) == 0x08,
+              "SfxLibWorkHead::errFn must live at offset 0x08");
+static_assert(offsetof(SfxLibWorkHead, cirFx) == 0x14,
+              "SfxLibWorkHead::cirFx must live at offset 0x14");
+
+/// Head of the SFXZ (depth/Z-blit) work area (0x011F9180, 0x98C bytes).
+struct SfxzWorkHead {
+  std::int32_t reserved00;  ///< +0x00
+  std::int32_t zbufType;    ///< +0x04 selector written by SFXZ_SetZbufType
+  std::int32_t last;        ///< +0x08 last-cell sentinel (= 32)
+};
+
+static_assert(offsetof(SfxzWorkHead, zbufType) == 0x04,
+              "SfxzWorkHead::zbufType must live at offset 0x04");
+static_assert(offsetof(SfxzWorkHead, last) == 0x08,
+              "SfxzWorkHead::last must live at offset 0x08");
 
 }  // namespace moho_cri_sfx_internal
 
@@ -127,7 +147,74 @@ static_assert(offsetof(SfxLibWorkHead, last) == 0x04,
 /// SFX runtime is being reconstructed.
 moho_cri_sfx_internal::SfxLibWorkHead sfx_libwork{};
 
+/// Global SFXZ work area. Like `sfx_libwork` only the head is typed; the
+/// full 0x98C-byte extent is reserved so `sfxzmv_InitLibWork`'s clear covers
+/// the same range the binary clears.
+struct SfxzWorkStorage {
+  moho_cri_sfx_internal::SfxzWorkHead head;
+  std::uint8_t remainder[0x98C - sizeof(moho_cri_sfx_internal::SfxzWorkHead)];
+};
+SfxzWorkStorage sfxz_work{};
+
 extern "C" {
+
+/**
+ * Address: 0x00ACC840 (FUN_00ACC840, _SFX_SetErrFn)
+ *
+ * IDA signature:
+ * int __cdecl SFX_SetErrFn(int a1, int a2);
+ *
+ * What it does:
+ * Installs the SFX error callback and its context, and echoes the callback
+ * back to the caller.
+ */
+std::int32_t SFX_SetErrFn(std::int32_t errorCallbackAddress,
+                          std::int32_t errorCallbackContext)
+{
+  sfx_libwork.errFn = errorCallbackAddress;
+  sfx_libwork.errParam = errorCallbackContext;
+  return errorCallbackAddress;
+}
+
+/**
+ * Address: 0x00ACCA50 (FUN_00ACCA50, _SFX_SetCcirFx)
+ *
+ * What it does:
+ * Selects the CCIR matrix variant used by the SFX colour pipeline. The
+ * argument is a small enum-like selector; `sfx_InitLibWork` installs `1`.
+ */
+std::int32_t SFX_SetCcirFx(std::int32_t mode)
+{
+  sfx_libwork.cirFx = mode;
+  return mode;
+}
+
+/**
+ * Address: 0x00ACDDF0 (FUN_00ACDDF0, _SFXZ_SetZbufType)
+ */
+std::int32_t SFXZ_SetZbufType(std::int32_t zbufType)
+{
+  sfxz_work.head.zbufType = zbufType;
+  return zbufType;
+}
+
+/**
+ * Address: 0x00ACD5B0 (FUN_00ACD5B0, _sfxzmv_InitLibWork)
+ *
+ * What it does:
+ * Clears the SFXZ work area, primes the cell-cap sentinel and selects the
+ * default Z-buffer type. This is the leaf `SFXZ_Init` tail-jumps to, and it
+ * sits on the startup path through `MWSFSFX_Init` -> `SFX_Init`.
+ */
+std::int32_t sfxzmv_InitLibWork()
+{
+  constexpr std::int32_t kSfxzLastCellSentinel = 32;
+  constexpr std::int32_t kSfxzDefaultZbufType = 0;
+
+  std::memset(&sfxz_work, 0, sizeof(sfxz_work));
+  sfxz_work.head.last = kSfxzLastCellSentinel;
+  return SFXZ_SetZbufType(kSfxzDefaultZbufType);
+}
 
 /// One-shot init guard for `SFX_Init`. Incremented on first successful
 /// init; subsequent calls become no-ops.
@@ -368,10 +455,8 @@ std::int32_t SFXZ_Init()
  * `_sfxalp_InitLibWork` in the binary; the C++ forwarder preserves the
  * same call semantics and returns the underlying init status code.
  */
-std::int32_t SFXA_Init()
-{
-  return sfxalp_InitLibWork();
-}
+// Body lives in cri/sofdec/SofdecSvmTransferRuntime.cpp, which is part of the
+// same aggregate translation unit as this fragment.
 
 /**
  * Address: 0x00ADE3E0 (FUN_00ADE3E0)
@@ -385,10 +470,8 @@ std::int32_t SFXA_Init()
  * Tail-jumps to `_SUD_Init` in the binary; the C++ forwarder preserves
  * the same call semantics.
  */
-void SFXSUD_Init()
-{
-  SUD_Init();
-}
+// Body lives in cri/sofdec/SofdecSvmTransferRuntime.cpp, which is part of the
+// same aggregate translation unit as this fragment.
 
 /**
  * Address: 0x00ACC790 (FUN_00ACC790)
