@@ -2089,10 +2089,10 @@
   // The eight strategy descriptors are defined at the end of
   // cri/sofdec/SofdecSfdRuntime.cpp, once every strategy body is in scope.
   extern SofdecTransferStrategy gSfmemTransferStrategy;
-  extern SofdecTransferStrategy gSfmpsTransferStrategy;
-  extern SofdecTransferStrategy gSfmpvTransferStrategy;
+  extern "C" SofdecTransferStrategy SFD_tr_sd_mps;
+  extern "C" SofdecTransferStrategy SFD_tr_vd_mpv;
   extern SofdecTransferStrategy gSfvomTransferStrategy;
-  extern SofdecTransferStrategy gSfm2tsTransferStrategy;
+  extern "C" SofdecTransferStrategy SFD_tr_sd_m2ts;
   extern SofdecTransferStrategy gSfaoapTransferStrategy;
   extern SofdecTransferStrategy gSfuoTransferStrategy;
 
@@ -2108,22 +2108,22 @@
    * (MPS slot 3 and MPEG-2 TS slot 3) are null here.
    */
   std::array<SofdecTransferStrategy*, 9> gMwsfdMpsStrategyTable = {
-    &gSfmemTransferStrategy, &gSfmpsTransferStrategy, &gSfmpvTransferStrategy,
+    &gSfmemTransferStrategy, &SFD_tr_sd_mps, &SFD_tr_vd_mpv,
     nullptr /* SFADXT */, nullptr, nullptr,
     &gSfvomTransferStrategy, &gSfaoapTransferStrategy, &gSfuoTransferStrategy,
   };
   std::array<SofdecTransferStrategy*, 9> gMwsfdMpvStrategyTable = {
-    &gSfmemTransferStrategy, nullptr, &gSfmpvTransferStrategy,
+    &gSfmemTransferStrategy, nullptr, &SFD_tr_vd_mpv,
     nullptr, nullptr, nullptr,
     &gSfvomTransferStrategy, nullptr, nullptr,
   };
   std::array<SofdecTransferStrategy*, 9> gMwsfdVideoOnlyStrategyTable = {
-    &gSfmemTransferStrategy, &gSfmpsTransferStrategy, &gSfmpvTransferStrategy,
+    &gSfmemTransferStrategy, &SFD_tr_sd_mps, &SFD_tr_vd_mpv,
     nullptr, nullptr, nullptr,
     &gSfvomTransferStrategy, nullptr, &gSfuoTransferStrategy,
   };
   std::array<SofdecTransferStrategy*, 9> gMwsfdMpeg2TsStrategyTable = {
-    &gSfmemTransferStrategy, &gSfm2tsTransferStrategy, &gSfmpvTransferStrategy,
+    &gSfmemTransferStrategy, &SFD_tr_sd_m2ts, &SFD_tr_vd_mpv,
     nullptr /* SFADXT */, nullptr, nullptr,
     &gSfvomTransferStrategy, &gSfaoapTransferStrategy, &gSfuoTransferStrategy,
   };
