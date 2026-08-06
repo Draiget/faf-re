@@ -347,9 +347,45 @@ namespace moho
    */
   struct SofdecSfdWorkctrlSubobj
   {
-    std::uint8_t mUnknown00[0x48]{};
-    std::int32_t handleState = 0;
+    /// `sfply_InitHn` copies the 0x44-byte create template in verbatim.
+    std::uint8_t createTemplate[0x44]{};
+    std::int32_t initialized = 0; // +0x44
+    std::int32_t handleState = 0; // +0x48 (`flibHn`)
+    std::int32_t createComplete = 0; // +0x4C
+    std::int32_t reserved50 = 0;     // +0x50
+    std::int32_t reserved54 = 0;     // +0x54
+    std::int32_t reserved58 = 0;     // +0x58
+    std::int32_t reserved5C = 0;     // +0x5C
+    std::uint8_t mUnknown60[0x18]{};
+    /// Sofdec file-header record (`SFHDS_InitFhd`), 0x894 bytes - the same
+    /// layout the header analyzer fills.
+    std::uint8_t fileHeader[0x894]{};    // +0x78
+    std::uint8_t movieInfo[0x40]{};      // +0x90C  (SfplyMovieInfo)
+    std::uint8_t mUnknown94C[0x04]{};
+    std::uint8_t playbackInfo[0xA8]{};   // +0x950  (SfplyPlaybackInfo)
+    std::uint8_t errorInfo[0x14]{};      // +0x9F8
+    std::uint8_t conditions[0x190]{};    // +0xA0C  (400 bytes from SFLIB_libwork)
+    std::uint8_t defaultConditions[0x190]{}; // +0xB9C
+    std::uint8_t mUnknownD2C[0x04]{};
+    std::uint8_t timerHandle[0x5E0]{};   // +0xD30
+    std::uint8_t bufferHandle[0xC20]{};  // +0x1310
+    std::uint8_t transferHandle[0x1620]{}; // +0x1F30
+    std::uint8_t seekHandle[0x10]{};     // +0x3550
+    std::uint8_t timerInfo[0xE0]{};      // +0x3560 (SfplyTimerInfo)
   };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, initialized) == 0x44, "workctrl initialized @0x44");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, createComplete) == 0x4C, "workctrl createComplete @0x4C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, fileHeader) == 0x78, "workctrl fileHeader @0x78");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, movieInfo) == 0x90C, "workctrl movieInfo @0x90C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, playbackInfo) == 0x950, "workctrl playbackInfo @0x950");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, errorInfo) == 0x9F8, "workctrl errorInfo @0x9F8");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, conditions) == 0xA0C, "workctrl conditions @0xA0C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerHandle) == 0xD30, "workctrl timerHandle @0xD30");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, bufferHandle) == 0x1310, "workctrl bufferHandle @0x1310");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, transferHandle) == 0x1F30, "workctrl transferHandle @0x1F30");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekHandle) == 0x3550, "workctrl seekHandle @0x3550");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerInfo) == 0x3560, "workctrl timerInfo @0x3560");
 
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SofdecSfdWorkctrlSubobj, handleState) == 0x48,
