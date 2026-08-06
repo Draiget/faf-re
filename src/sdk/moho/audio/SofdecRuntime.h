@@ -339,60 +339,6 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfTagWindow) == 0x8, "MwsfTagWindow size must be 0x8");
 
   /**
-   * Partial runtime view for Sofdec SFD work-control subobject used by handle
-   * validation helper lanes.
-   *
-   * Evidence:
-   * - `FUN_00AD8E90` tests non-zero state at offset `+0x48`.
-   */
-  struct SofdecSfdWorkctrlSubobj
-  {
-    /// `sfply_InitHn` copies the 0x44-byte create template in verbatim.
-    std::uint8_t createTemplate[0x44]{};
-    std::int32_t initialized = 0; // +0x44
-    std::int32_t handleState = 0; // +0x48 (`flibHn`)
-    std::int32_t createComplete = 0; // +0x4C
-    std::int32_t reserved50 = 0;     // +0x50
-    std::int32_t reserved54 = 0;     // +0x54
-    std::int32_t reserved58 = 0;     // +0x58
-    std::int32_t reserved5C = 0;     // +0x5C
-    std::uint8_t mUnknown60[0x18]{};
-    /// Sofdec file-header record (`SFHDS_InitFhd`), 0x894 bytes - the same
-    /// layout the header analyzer fills.
-    std::uint8_t fileHeader[0x894]{};    // +0x78
-    std::uint8_t movieInfo[0x40]{};      // +0x90C  (SfplyMovieInfo)
-    std::uint8_t mUnknown94C[0x04]{};
-    std::uint8_t playbackInfo[0xA8]{};   // +0x950  (SfplyPlaybackInfo)
-    std::uint8_t errorInfo[0x14]{};      // +0x9F8
-    std::uint8_t conditions[0x190]{};    // +0xA0C  (400 bytes from SFLIB_libwork)
-    std::uint8_t defaultConditions[0x190]{}; // +0xB9C
-    std::uint8_t mUnknownD2C[0x04]{};
-    std::uint8_t timerHandle[0x5E0]{};   // +0xD30
-    std::uint8_t bufferHandle[0xC20]{};  // +0x1310
-    std::uint8_t transferHandle[0x1620]{}; // +0x1F30
-    std::uint8_t seekHandle[0x10]{};     // +0x3550
-    std::uint8_t timerInfo[0xE0]{};      // +0x3560 (SfplyTimerInfo)
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, initialized) == 0x44, "workctrl initialized @0x44");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, createComplete) == 0x4C, "workctrl createComplete @0x4C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, fileHeader) == 0x78, "workctrl fileHeader @0x78");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, movieInfo) == 0x90C, "workctrl movieInfo @0x90C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, playbackInfo) == 0x950, "workctrl playbackInfo @0x950");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, errorInfo) == 0x9F8, "workctrl errorInfo @0x9F8");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, conditions) == 0xA0C, "workctrl conditions @0xA0C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerHandle) == 0xD30, "workctrl timerHandle @0xD30");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, bufferHandle) == 0x1310, "workctrl bufferHandle @0x1310");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, transferHandle) == 0x1F30, "workctrl transferHandle @0x1F30");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekHandle) == 0x3550, "workctrl seekHandle @0x3550");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerInfo) == 0x3560, "workctrl timerInfo @0x3560");
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SofdecSfdWorkctrlSubobj, handleState) == 0x48,
-    "SofdecSfdWorkctrlSubobj::handleState offset must be 0x48"
-  );
-
-  /**
    * Partial create-parameter view consumed by SFPLY create/validation lanes.
    */
   struct SfplyCreateParams
@@ -401,29 +347,66 @@ namespace moho
     /// 0x00D7F2FC / 0x00D7F320 / 0x00D7F344 / 0x00D7F368). Every entry points
     /// at one of the eight `SofdecTransferStrategy` descriptors.
     void* strategyTable = nullptr;     // +0x00
-    void* workControlBuffer = nullptr; // +0x04  (IDA `obj2`)
-    std::int32_t streamInputBytes = 0; // +0x08  (`sib`)
-    std::int32_t videoInputBytes = 0;  // +0x0C  (`vib`)
-    std::int32_t audioInputBytes = 0;  // +0x10  (`aib`)
-    std::uint8_t mUnknown14[0x10]{};
-    std::int32_t packBytes = 0; // +0x24
-    std::uint8_t mUnknown28[0x04]{};
+    /// Base of the stream/video/audio input buffer pool. `sfply_InitHn` rounds
+    /// this up to a 32-byte boundary in place before `SFBUF_InitHn` carves the
+    /// per-lane buffers out of it.
+    void* inputBufferPoolBase = nullptr; // +0x04  (IDA `obj2`)
+    // `SFBUF_InitHn` reads +0x08 as an eight-lane buffer-size table and pairs
+    // it with `inputBufferPoolBase`; the lane roles below are its own lane
+    // constants. The shipped create templates leave lanes 3..7 zero, and
+    // `sfbuf_InitRingSj` treats a zero lane as "not backed by an SJ".
+    std::int32_t streamInputBytes = 0;    // +0x08  lane 0 (`sib`)
+    std::int32_t videoInputBytes = 0;     // +0x0C  lane 1 (`vib`)
+    std::int32_t audioInputBytes = 0;     // +0x10  lane 2 (`aib`)
+    std::int32_t vfrmBufferBytes0 = 0;    // +0x14  lane 3
+    std::int32_t aringBufferBytes0 = 0;   // +0x18  lane 4
+    std::int32_t vfrmBufferBytes1 = 0;    // +0x1C  lane 5
+    std::int32_t aringBufferBytes1 = 0;   // +0x20  lane 6
+    std::int32_t uoBufferBytes = 0;       // +0x24  lane 7
+    /// Pack size. `SFBUF_InitHn` divides lane 0's size by this to size the
+    /// ring's extra span, so a zero here is an integer divide fault - which is
+    /// exactly what a previous model of this struct produced by placing the
+    /// field at +0x24.
+    std::int32_t packBytes = 0;              // +0x28
     std::int32_t framePoolWork = 0;          // +0x2C
     std::int32_t maxWidth = 0;               // +0x30
     std::int32_t maxHeight = 0;              // +0x34
     std::int32_t bufferFormat = 0;           // +0x38
-    void* workControlBufferPrimary = nullptr; // +0x3C
+    /// Storage the SFPLY handle itself is built in. `sfply_InitHn` clears it,
+    /// rounds the base up to 32 bytes and returns that as the handle.
+    void* workControlBuffer = nullptr;       // +0x3C
     std::uint32_t workControlSizeBytes = 0;  // +0x40
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SfplyCreateParams, workControlBuffer) == 0x04,
-    "SfplyCreateParams::workControlBuffer offset must be 0x04"
+    offsetof(SfplyCreateParams, inputBufferPoolBase) == 0x04,
+    "SfplyCreateParams::inputBufferPoolBase offset must be 0x04"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyCreateParams, streamInputBytes) == 0x08,
+    "SfplyCreateParams::streamInputBytes offset must be 0x08"
+  );
+  // `mwsfcre_CreateSfd` stores `mwsfd_packsize` at [esp+0x98] against a frame
+  // base of 0x70, and the four shipped create templates all carry 0x800 here.
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyCreateParams, packBytes) == 0x28,
+    "SfplyCreateParams::packBytes offset must be 0x28"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyCreateParams, framePoolWork) == 0x2C,
+    "SfplyCreateParams::framePoolWork offset must be 0x2C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyCreateParams, workControlBuffer) == 0x3C,
+    "SfplyCreateParams::workControlBuffer offset must be 0x3C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SfplyCreateParams, workControlSizeBytes) == 0x40,
     "SfplyCreateParams::workControlSizeBytes offset must be 0x40"
   );
+  // `sfply_InitHn` copies exactly this many bytes into the handle it builds
+  // (`rep movsd` with ecx = 0x11), which is what fixes the template size.
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyCreateParams) == 0x44, "SfplyCreateParams size must be 0x44");
 
   /**
    * SFPLY flow-counter lane used by playback-info snapshots.
@@ -595,6 +578,72 @@ namespace moho
     "SfplyTimerInfo::mUnknownC0 offset must be 0xC0"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyTimerInfo) == 0xE0, "SfplyTimerInfo size must be 0xE0");
+
+  /**
+   * The SFPLY playback handle. `sfply_InitHn` (0x00AD7AE0) builds one of these
+   * at the 32-byte-aligned base of the caller's work-control buffer, and every
+   * sub-object offset below is one of its `lea` displacements.
+   *
+   * The extent is confirmed twice over: the last lane ends at 0x3640, and
+   * `sfply_ChkCrePara` rejects any work-control buffer smaller than 0x3660 -
+   * exactly 0x3640 plus the 32 bytes the alignment step can consume.
+   *
+   * The four handle lanes below (timer / buffer / transfer / seek) stay sized
+   * storage because their layouts are file-local to `SofdecSfdRuntime.cpp`;
+   * that translation unit re-types them by name, never by offset.
+   */
+  struct SofdecSfdWorkctrlSubobj
+  {
+    /// `sfply_InitHn` copies the create parameters in verbatim.
+    SfplyCreateParams createTemplate{};       // +0x00
+    std::int32_t initialized = 0;             // +0x44
+    std::int32_t handleState = 0;             // +0x48 (`flibHn`)
+    std::int32_t createComplete = 0;          // +0x4C
+    std::int32_t reserved50 = 0;              // +0x50
+    std::int32_t reserved54 = 0;              // +0x54
+    std::int32_t reserved58 = 0;              // +0x58
+    std::int32_t reserved5C = 0;              // +0x5C
+    std::uint8_t mUnknown60[0x18]{};
+    /// Sofdec file-header record (`SFHDS_InitFhd`), 0x894 bytes - the same
+    /// layout the header analyzer fills.
+    std::uint8_t fileHeader[0x894]{};         // +0x78
+    SfplyMovieInfo movieInfo{};               // +0x90C
+    std::uint8_t mUnknown94C[0x04]{};
+    SfplyPlaybackInfo playbackInfo{};         // +0x950
+    std::uint8_t errorInfo[0x14]{};           // +0x9F8
+    /// Playback conditions, seeded from the SFLIB library defaults.
+    std::uint8_t conditions[0x190]{};         // +0xA0C
+    std::uint8_t defaultConditions[0x190]{};  // +0xB9C
+    std::uint8_t mUnknownD2C[0x04]{};
+    std::uint8_t timerHandle[0x5E0]{};        // +0xD30
+    std::uint8_t bufferHandle[0xC20]{};       // +0x1310
+    std::uint8_t transferHandle[0x1620]{};    // +0x1F30
+    std::uint8_t seekHandle[0x10]{};          // +0x3550
+    SfplyTimerInfo timerInfo{};               // +0x3560
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, initialized) == 0x44, "workctrl initialized @0x44");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, createComplete) == 0x4C, "workctrl createComplete @0x4C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, fileHeader) == 0x78, "workctrl fileHeader @0x78");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, movieInfo) == 0x90C, "workctrl movieInfo @0x90C");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, playbackInfo) == 0x950, "workctrl playbackInfo @0x950");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, errorInfo) == 0x9F8, "workctrl errorInfo @0x9F8");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, conditions) == 0xA0C, "workctrl conditions @0xA0C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSfdWorkctrlSubobj, defaultConditions) == 0xB9C,
+    "workctrl defaultConditions @0xB9C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerHandle) == 0xD30, "workctrl timerHandle @0xD30");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, bufferHandle) == 0x1310, "workctrl bufferHandle @0x1310");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, transferHandle) == 0x1F30, "workctrl transferHandle @0x1F30");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, seekHandle) == 0x3550, "workctrl seekHandle @0x3550");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSfdWorkctrlSubobj, timerInfo) == 0x3560, "workctrl timerInfo @0x3560");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSfdWorkctrlSubobj) == 0x3640, "workctrl size must be 0x3640");
+
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSfdWorkctrlSubobj, handleState) == 0x48,
+    "SofdecSfdWorkctrlSubobj::handleState offset must be 0x48"
+  );
 
   struct MwsstPauseGate;
   struct SofdecSjRingBufferHandle;
@@ -3131,7 +3180,7 @@ std::int32_t sfply_DecideSvrStat();
  * What it does:
  * Validates create parameters, allocates a free SFLIB slot, and initializes one SFPLY handle.
  */
-moho::SofdecSfdWorkctrlSubobj* sfply_Create(const moho::SfplyCreateParams* createParams, std::int32_t createContext);
+moho::SofdecSfdWorkctrlSubobj* sfply_Create(moho::SfplyCreateParams* createParams, std::int32_t createContext);
 
 /**
  * Address: 0x00AD7A80 (FUN_00AD7A80, _sfply_ChkCrePara)
