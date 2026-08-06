@@ -19577,7 +19577,7 @@
     /* init        */ &SFMPV_Init,
     /* finish      */ &SFMPV_Finish,
     /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_ExecServer),
-    /* create      */ nullptr, // TODO-TABLE SFMPV_Create 0x00AD4BA0
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Create),
     /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Destroy),
     /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_RequestStop),
     /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFMPV_Start),
