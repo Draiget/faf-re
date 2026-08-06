@@ -3141,7 +3141,6 @@
    * Switches one handle to standby phase lane.
    */
   std::int32_t SFPL2_Standby(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
-  std::int32_t SFHDS_FinishFhd(void* fileHeaderState);
   void SFBUF_DestroySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   /**
    * Address: 0x00AEADC0 (FUN_00AEADC0, _SFTMR_InitTsum)

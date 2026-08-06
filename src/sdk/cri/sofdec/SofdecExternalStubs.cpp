@@ -98,7 +98,7 @@ extern "C" {
   void* SFAOAP_SetSpeed() { return nullptr; }
   void* SFD_tr_ad_adxt() { return nullptr; }
   void* SFHDS_Finish() { return nullptr; }
-  void* SFHDS_FinishFhd() { return nullptr; }
+  // SFHDS_FinishFhd: real body in SofdecSfdRuntime.cpp (0x00AE7190).
   void* SFHDS_GetMuxVerNum() { return nullptr; }
   // SFHDS_Init: real body in SofdecSfdRuntime.cpp (0x00AE7150).
   // SFHDS_InitFhd: real body in SofdecSfdRuntime.cpp (0x00AE7170). Another
