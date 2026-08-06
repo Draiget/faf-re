@@ -74,7 +74,11 @@ extern "C" {
   void* MWSFCRE_DestroySfd() { return nullptr; }
   void* MWSFCRE_SetSupplySj() { return nullptr; }
   void* MWSFD_GetUsePicUsr() { return nullptr; }
-  void* MWSFD_IsEnableHndl() { return nullptr; }
+  // MWSFD_IsEnableHndl (0x00ACBA10) is recovered in SofdecFoundationRuntime.cpp.
+  // Its stub took no arguments, so C linkage let it satisfy every
+  // MWSFD_IsEnableHndl(ply) call while always answering "not enabled" -- which
+  // is why a successfully created playback handle still drew "handle is
+  // invalid" from mwPlyGetStat, mwPlySetFrmSync and mwPlyStartFname alike.
   void* MWSFD_SetCond() { return nullptr; }
   void* MWSFD_SetReqSvrBdrHn() { return nullptr; }
   void* MWSFPLY_SetFlowLimit() { return nullptr; }
