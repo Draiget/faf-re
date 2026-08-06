@@ -2720,7 +2720,9 @@
       streamInputBytes -= streamInputBytes % mwsfd_packsize;
     }
 
-    createParams.workControlBuffer = inputBuffers;
+    // `mov [esp+0F8h+a1.obj2], ecx` at 0x00AC8740 - the input-buffer pool at
+    // +0x04, not the work-control slot at +0x3C that `ctrlPrimary` fills below.
+    createParams.inputBufferPoolBase = inputBuffers;
     createParams.streamInputBytes = streamInputBytes;
     createParams.videoInputBytes = videoInputBytes;
     createParams.audioInputBytes = audioInputBytes;

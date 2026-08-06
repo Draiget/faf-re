@@ -2190,6 +2190,16 @@ namespace
   constexpr std::int32_t kSfmpvErrDestroySubFailed = -16773364; // 0xFF000F0C
   constexpr std::int32_t kSfmpvErrCreateFailed = -16773366; // 0xFF000F0A
   constexpr std::int32_t kSfmpvErrSetErrFuncFailed = -16773365; // 0xFF000F0B
+
+  /**
+   * Reference-frame-buffer address entries. The binary bounds its walks of
+   * `sfmpv_rfb_adr_tbl` (0x00FB9CA8) with `offset _sfmpv_work` (0x00FB9CB0),
+   * i.e. the table is exactly the eight bytes between the two symbols.
+   */
+  constexpr std::int32_t kSfmpvRfbAddressTableCount = 2;
+
+  /** Frame-pool entries `sfmpvf_CheckMpvPara` accepts and `SFD_SetMpvParaTbl` writes. */
+  constexpr std::int32_t kSfmpvMaxFramePoolCount = 16;
   constexpr std::int32_t kSfmpvErrWriteApiUnsupported = -16773363; // 0xFF000F0D
   constexpr std::int32_t kSfmpvErrFrameBufferTooSmall = -16773353; // 0xFF000F17
 
@@ -2510,11 +2520,11 @@ std::int32_t SFD_SetMpvParaTbl(
   sfmpv_para.val4 = 0;
   sfmpv_para.val8 = 0;
 
-  for (std::int32_t tableIndex = 0; tableIndex < 2; ++tableIndex) {
+  for (std::int32_t tableIndex = 0; tableIndex < kSfmpvRfbAddressTableCount; ++tableIndex) {
     sfmpv_rfb_adr_tbl[tableIndex] = AlignAddressTo0x800(ringFrameBufferAddressTable[tableIndex]);
   }
 
-  for (std::int32_t tabIndex = 0; tabIndex < 16; ++tabIndex) {
+  for (std::int32_t tabIndex = 0; tabIndex < kSfmpvMaxFramePoolCount; ++tabIndex) {
     if (tabIndex >= parameterTable->nfrm_pool_wk) {
       sSofDec_tabs[tabIndex] = 0;
     } else {
@@ -2863,7 +2873,7 @@ std::int32_t SFMPV_ExecServer(const std::int32_t workctrlAddress)
  */
 std::int32_t sfmpvf_CheckMpvPara()
 {
-  if (sfmpv_para.nfrm_pool_wk <= 0 || sfmpv_para.nfrm_pool_wk > 16) {
+  if (sfmpv_para.nfrm_pool_wk <= 0 || sfmpv_para.nfrm_pool_wk > kSfmpvMaxFramePoolCount) {
     return -1;
   }
 
@@ -2871,22 +2881,24 @@ std::int32_t sfmpvf_CheckMpvPara()
     return 0;
   }
 
-  // Check rfb address table -- all entries up to sfmpv_work boundary must be non-zero
-  const auto* rfbEntry = &sfmpv_rfb_adr_tbl[0];
-  while (*rfbEntry != 0) {
-    ++rfbEntry;
-    if (reinterpret_cast<std::uintptr_t>(rfbEntry) >= reinterpret_cast<std::uintptr_t>(sfmpv_work)) {
-      // All rfb entries non-zero; now check SofDec tabs
-      for (std::int32_t idx = 0; idx < sfmpv_para.nfrm_pool_wk; ++idx) {
-        if (sSofDec_tabs[idx] == 0) {
-          return -1;
-        }
-      }
-      return 0;
+  // Every reference-frame-buffer entry must be populated. The binary walks the
+  // table until the cursor reaches `sfmpv_work`, which is simply the next
+  // symbol in BSS (_sfmpv_rfb_adr_tbl 0x00FB9CA8, _sfmpv_work 0x00FB9CB0) - an
+  // end-of-table sentinel, not a bound with any meaning of its own. Our two
+  // symbols live in different translation units, so the comparison has to be
+  // expressed as what it actually measured: the table's own extent.
+  for (std::int32_t index = 0; index < kSfmpvRfbAddressTableCount; ++index) {
+    if (sfmpv_rfb_adr_tbl[index] == 0) {
+      return -1;
     }
   }
 
-  return -1;
+  for (std::int32_t index = 0; index < sfmpv_para.nfrm_pool_wk; ++index) {
+    if (sSofDec_tabs[index] == 0) {
+      return -1;
+    }
+  }
+  return 0;
 }
 
 /**
