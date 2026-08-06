@@ -221,7 +221,23 @@ namespace moho::movie
   struct MPVDecoderScanContext
   {
     MPVBitstreamState bitstreamState; // +0x00
-    std::uint8_t reserved_0010[0x60 - 0x10];
+    /**
+     * Run/level VLC tables, one per code-length class, selected by the
+     * leading bits of the window. Each entry is indexed as
+     * `table[coefficientIndex >> 1]` and yields a packed 16-bit word whose
+     * high byte is the run and low byte the level.
+     *
+     * The mapping is read straight off the decode switch in
+     * `mpvhdec_ReadKernelIntraDefault` (0x00AFAE50), where each path sets the
+     * code length into the decode state and then picks its table:
+     * length 20 -> [0], 11 -> [1], 13 -> [2], 14 -> [3], 15 -> [4],
+     * 16 -> [5], 17 -> [6].
+     */
+    const std::uint16_t* acRunLevelVlcTables[7]; // +0x10 .. +0x2B
+    std::uint8_t* coefficientWriteCursor;        // +0x2C
+    /** Width-indexed bit masks: `bitMaskByWidth[n] & window` keeps n bits. */
+    const std::uint16_t* bitMaskByWidth;         // +0x30
+    std::uint8_t reserved_0034[0x60 - 0x34];
     int decodeCurrentSource; // +0x60
     int decodeWorkBase;      // +0x64
     int decodeBitstreamWord; // +0x68
@@ -287,6 +303,19 @@ namespace moho::movie
   };
 
   static_assert(offsetof(MPVDecoderScanContext, bitstreamState) == 0x00, "MPVDecoderScanContext::bitstreamState offset must be 0x00");
+  static_assert(
+    offsetof(MPVDecoderScanContext, acRunLevelVlcTables) == 0x10,
+    "MPVDecoderScanContext::acRunLevelVlcTables offset must be 0x10"
+  );
+  static_assert(
+    offsetof(MPVDecoderScanContext, coefficientWriteCursor) == 0x2C,
+    "MPVDecoderScanContext::coefficientWriteCursor offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(MPVDecoderScanContext, bitMaskByWidth) == 0x30,
+    "MPVDecoderScanContext::bitMaskByWidth offset must be 0x30"
+  );
+
   static_assert(offsetof(MPVDecoderScanContext, decodeCurrentSource) == 0x60, "MPVDecoderScanContext::decodeCurrentSource offset must be 0x60");
   static_assert(offsetof(MPVDecoderScanContext, decodeWorkBase) == 0x64, "MPVDecoderScanContext::decodeWorkBase offset must be 0x64");
   static_assert(offsetof(MPVDecoderScanContext, decodeFlags) == 0x78, "MPVDecoderScanContext::decodeFlags offset must be 0x78");
