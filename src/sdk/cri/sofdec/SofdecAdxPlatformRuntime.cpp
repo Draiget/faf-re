@@ -17864,6 +17864,14 @@
   constexpr std::int32_t kAdxmDefaultMwIdlePriority = -2;
 
   /**
+   * The 1 ms multimedia-timer tick (0x00B07510). Defined further along in
+   * cri/sofdec/SofdecMwPlaybackRuntime.cpp; declared here because the thread
+   * setup arms the timer with it before that point in the aggregate TU.
+   */
+  void CALLBACK AdxmMultimediaTimerTick(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+
+  /**
+
    * Address: 0x00B06C10 (FUN_00B06C10, _adxm_setup_thrd)
    *
    * IDA signature:
@@ -17913,7 +17921,7 @@
 
       if (gAdxmTimerSwitchState == 0) {
         timeBeginPeriod(1u);
-        gAdxmMultimediaTimerId = timeSetEvent(1u, 0u, gAdxmMultimediaTimerCallback, 0u, 0u);
+        gAdxmMultimediaTimerId = timeSetEvent(1u, 0u, &AdxmMultimediaTimerTick, 0u, 0u);
       }
 
       (void)SVM_Init();

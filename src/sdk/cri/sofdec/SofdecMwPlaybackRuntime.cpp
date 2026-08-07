@@ -1174,6 +1174,95 @@
   }
 
   /**
+   * Address: 0x00B07510 (FUN_00B07510, fptc)
+   *
+   * IDA signature:
+   * void __stdcall fptc(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2);
+   *
+   * What it does:
+   * The Sofdec runtime's heartbeat. It is the one-shot multimedia-timer
+   * callback that `adxm_setup_thrd` and `ADXM_StartMultimediaTimer` arm, and it
+   * re-arms itself on every firing, so killing and re-creating the timer here
+   * is how the period is allowed to change from tick to tick.
+   *
+   * With a published vsync interval it measures the display against the
+   * performance counter and schedules the next tick on the next frame
+   * boundary; with no interval it falls back to a fixed period. Either way the
+   * last thing it does is pulse the vsync event, which is what releases every
+   * thread parked in `ADXM_WaitVsync`. While nothing was installed as the
+   * callback, `timeSetEvent` was handed a null pointer, the event was never
+   * pulsed, and the whole runtime only advanced when a caller happened to
+   * drive `ADXM_ExecMain` by hand.
+   */
+  void CALLBACK AdxmMultimediaTimerTick(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR)
+  {
+    /** Tick period used when no vsync interval has been published, in ms. */
+    constexpr std::int32_t kAdxmFallbackTickPeriodMs = 16;
+    /** Hundred-nanosecond units per second, the scale the deadline is built in. */
+    constexpr std::int64_t kAdxmDeadlineUnitsPerSecond = 100000000;
+
+    const std::int32_t vsyncInterval = gAdxmInterval1;
+    const std::uint32_t screenHeight = static_cast<std::uint32_t>(gSofdecScreenHeight2);
+
+    LARGE_INTEGER tickCounter{};
+    QueryPerformanceCounter(&tickCounter);
+
+    std::int32_t nextPeriodMs = kAdxmFallbackTickPeriodMs;
+    if (vsyncInterval != 0) {
+      if (SofdecWaitForSignal2(gSofdecSignalLane2) != 0) {
+        if (gSofdecFrameReadCallback != nullptr) {
+          std::uint32_t currentScanline = gSofdecFrameReadCallback();
+          (void)SofdecApplyScanlineOffset(&currentScanline, screenHeight);
+          if (currentScanline > screenHeight) {
+            currentScanline = 0;
+          }
+
+          if (screenHeight != 0) {
+            // Pull the cadence origin back to where this frame actually began,
+            // measured from how far down the display the beam already is.
+            const std::int64_t scanlineSlackMicroseconds =
+              static_cast<std::int64_t>(
+                currentScanline * (kAdxmDeadlineUnitsPerSecond / vsyncInterval) / (screenHeight + 50)
+                - 1000 * gAdxmVsyncFrameRepeatCount);
+            gAdxmVsyncOriginCounter =
+              tickCounter.QuadPart - (scanlineSlackMicroseconds * gAdxmPerformanceFrequency / 1000 / 1000);
+
+            gAdxmVsyncTickOrdinal =
+              (gAdxmVsyncFrameRepeatCount <= 1 && currentScanline > (screenHeight >> 1)) ? 1 : 0;
+          }
+        }
+        SofdecSignalReleaseNoOp(gSofdecSignalLane2);
+      }
+
+      // Walk forward to the first tick boundary that is still in the future.
+      std::int64_t tickOrdinal = gAdxmVsyncTickOrdinal;
+      do {
+        ++tickOrdinal;
+        gAdxmVsyncTickDeadline =
+          gAdxmVsyncOriginCounter + (100 * tickOrdinal * gAdxmPerformanceFrequency / vsyncInterval);
+        nextPeriodMs = static_cast<std::int32_t>(
+          1000 * (gAdxmVsyncTickDeadline - tickCounter.QuadPart) / gAdxmPerformanceFrequency);
+      } while (nextPeriodMs <= 0);
+      gAdxmVsyncTickOrdinal = tickOrdinal;
+    }
+
+    timeKillEvent(gAdxmMultimediaTimerId);
+    timeEndPeriod(1u);
+
+    if (gAdxmTimerSwitchSignal != 0) {
+      gAdxmTimerSwitchSignal = 0;
+      return;
+    }
+
+    timeBeginPeriod(1u);
+    gAdxmMultimediaTimerId =
+      timeSetEvent(static_cast<UINT>(nextPeriodMs), 0u, &AdxmMultimediaTimerTick, 0u, 0u);
+    if (gAdxtVsyncEventHandle != nullptr) {
+      PulseEvent(gAdxtVsyncEventHandle);
+    }
+  }
+
+  /**
    * Address: 0x00B07450 (FUN_00B07450, sub_B07450)
    *
    * What it does:
@@ -1185,8 +1274,71 @@
       gAdxmTimerSwitchState = 0;
       gAdxmTimerSwitchSignal = 0;
       timeBeginPeriod(1u);
-      gAdxmMultimediaTimerId = timeSetEvent(1u, 0u, gAdxmMultimediaTimerCallback, 0u, 0u);
+      gAdxmMultimediaTimerId = timeSetEvent(1u, 0u, &AdxmMultimediaTimerTick, 0u, 0u);
     }
+  }
+
+  /**
+   * Address: 0x00B06E60 (FUN_00B06E60, _ADXM_WaitVsync)
+   *
+   * IDA signature:
+   * int sub_B06E60();
+   *
+   * What it does:
+   * Parks the calling thread until the next display tick and timestamps the
+   * wake-up. With no scanline probe installed - which is this build, since
+   * nothing calls `ADXM_SetVsyncFunc` - that reduces to waiting on the event
+   * the multimedia-timer tick pulses. Callers such as `CMovie::OpenMovie`'s
+   * prepare loop rely on this to pace themselves; while it returned
+   * immediately the loop span at full speed, starving the Sofdec server
+   * threads it was waiting on and flooding the log target it writes to on
+   * every pass.
+   */
+  std::int32_t ADXM_WaitVsync()
+  {
+    if (gSofdecFrameReadCallback == nullptr) {
+      if (gAdxtVsyncEventHandle != nullptr) {
+        WaitForSingleObject(gAdxtVsyncEventHandle, INFINITE);
+      }
+      return QueryPerformanceCounter(&gAdxmLastSyncCounter);
+    }
+
+    const std::int32_t vsyncInterval = gAdxmInterval1;
+    if (vsyncInterval == 0) {
+      return vsyncInterval;
+    }
+
+    if (gAdxmPerformanceFrequency == 0) {
+      LARGE_INTEGER frequency{};
+      QueryPerformanceFrequency(&frequency);
+      gAdxmPerformanceFrequency = frequency.QuadPart;
+    }
+
+    const std::int32_t signalAcquired = SofdecWaitForSignal2(gSofdecSignalLane2);
+    if (signalAcquired == 0) {
+      return signalAcquired;
+    }
+
+    if (gSofdecFrameReadCallback != nullptr) {
+      const std::uint32_t screenHeight = static_cast<std::uint32_t>(gSofdecScreenHeight2);
+      std::uint32_t currentScanline = gSofdecFrameReadCallback();
+      (void)SofdecApplyScanlineOffset(&currentScanline, screenHeight);
+
+      bool waitForBeam = (currentScanline <= screenHeight);
+      if (!waitForBeam) {
+        QueryPerformanceCounter(&gAdxmProbeCounter);
+        const std::int64_t elapsedMicroseconds =
+          (gAdxmLastSyncCounter.QuadPart - gAdxmProbeCounter.QuadPart) * 1000000 / gAdxmPerformanceFrequency;
+        waitForBeam = elapsedMicroseconds < ((100000000 / vsyncInterval) >> 1);
+      }
+
+      if (waitForBeam) {
+        (void)ADXM_WaitForScanlineTarget(static_cast<std::uint32_t>(vsyncInterval), screenHeight);
+      }
+    }
+
+    SofdecSignalReleaseNoOp(gSofdecSignalLane2);
+    return QueryPerformanceCounter(&gAdxmLastSyncCounter);
   }
 
   /**
