@@ -73,20 +73,19 @@ extern "C" {
   void* CRIERR_CallErr() { return nullptr; }
   void* M2TSD_Init() { return nullptr; }
   void* M2T_Create() { return nullptr; }
+  // The twelve MPS_* public entry points (MPS_DecHd 0x00AEB560, MPS_Destroy
+  // 0x00AEB3C0, MPS_Finish 0x00AEB030, MPS_GetElementaryInfo 0x00AECBC0,
+  // MPS_GetLastSysHd 0x00AECB40, MPS_GetPackHd 0x00AECAB0, MPS_GetPketHd
+  // 0x00AECB80, MPS_GetSysHd 0x00AECB00, MPS_SetPesFn 0x00AEB530,
+  // MPS_SetPesSw 0x00AECC00, MPS_SetPsMapFn 0x00AEB500, MPS_SetSystemFn
+  // 0x00AEB4D0) have real bodies in cri/sofdec/SofdecSfdRuntime.cpp.
+  //
+  // As no-arg stubs they answered every call with "no error, nothing
+  // parsed", which hung the engine: sfmps_DecodeSomeUnit loops until a
+  // callee errors or consumes zero bytes, and a demuxer that always
+  // succeeds without consuming satisfies neither.
   // MPS_Create: real body in SofdecSfdRuntime.cpp (0x00AEB200). This stub made
   // SFMPS_Create fail with SFD ERROR(FF000D08) and took every movie with it.
-  void* MPS_DecHd() { return nullptr; }
-  void* MPS_Destroy() { return nullptr; }
-  void* MPS_Finish() { return nullptr; }
-  void* MPS_GetElementaryInfo() { return nullptr; }
-  void* MPS_GetLastSysHd() { return nullptr; }
-  void* MPS_GetPackHd() { return nullptr; }
-  void* MPS_GetPketHd() { return nullptr; }
-  void* MPS_GetSysHd() { return nullptr; }
-  void* MPS_SetPesFn() { return nullptr; }
-  void* MPS_SetPesSw() { return nullptr; }
-  void* MPS_SetPsMapFn() { return nullptr; }
-  void* MPS_SetSystemFn() { return nullptr; }
   // TODO(recovery): MPVCMC_InitMcOiRt, MPVCMC_SetCcnt, MPVUMC_EndOfFrame,
   // MPVUMC_Finish, MPVUMC_InitOutRfb have recovered bodies in
   // cri/sofdec/SofdecMpvRuntime.cpp, but that file has ~25 struct-layout

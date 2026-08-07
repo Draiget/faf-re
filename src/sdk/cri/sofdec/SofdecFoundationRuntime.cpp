@@ -1023,7 +1023,13 @@ static_assert(sizeof(SfbufAringTransferSnapshotView) == 0x2C, "SfbufAringTransfe
 struct SfbufRuntimeHandleView
 {
   std::uint8_t mUnknown00[0x1310]{}; // +0x00
-  std::array<SfbufSupplyLaneView, 8> lanes{}; // +0x1310
+  /// Nine lanes, not eight. `SFBUF_InitHn` only builds 0..7, which is what the
+  /// eight-entry guess was based on, but lane 8 is live: `sfmps_GetTermDst`
+  /// reads its termination flag, and `SFTRN_CallTrSetup` walks nine transfer
+  /// lanes (the matching `SftrnTransferRuntimeView::transferLanes` is 9 too).
+  /// Sized at eight, the lane-8 read tripped the debug bounds check inside
+  /// `std::array` and wedged the process partway through the SFD prepare pass.
+  std::array<SfbufSupplyLaneView, 9> lanes{}; // +0x1310
 };
 
 static_assert(offsetof(SfbufRuntimeHandleView, lanes) == 0x1310, "SfbufRuntimeHandleView::lanes offset must be 0x1310");
