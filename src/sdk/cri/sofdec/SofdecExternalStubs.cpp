@@ -112,7 +112,9 @@ extern "C" {
   // `sib = 0` on purpose, which leaves SFBUF lane 0 "awaiting supply" - this
   // function is what hands it the ring. Without it the demuxer parsed an empty
   // ring on every server tick and no movie ever produced a frame.
-  void* MWSFD_GetUsePicUsr() { return nullptr; }
+  // MWSFD_GetUsePicUsr (0x00AC9350) reads the library's use-picture-user-data
+  // lane; recovered in cri/sofdec/SofdecAdxPlatformRuntime.cpp next to the
+  // frame-info conversion that is its only real caller.
   // MWSFD_IsEnableHndl (0x00ACBA10) is recovered in SofdecFoundationRuntime.cpp.
   // Its stub took no arguments, so C linkage let it satisfy every
   // MWSFD_IsEnableHndl(ply) call while always answering "not enabled" -- which
@@ -226,7 +228,10 @@ extern "C" {
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This is the shared tail of every
   // playback start; it reaches mwPlySfdStandby, the only path that writes the
   // SFPLY phase lane. While it was a stub the machine never left STOP.
-  void* mwl_convFrmInfFromSFD() { return nullptr; }
+  // mwl_convFrmInfFromSFD (0x00ACA210) is what fills the outgoing frame info -
+  // including the frame buffer address CMovie::UploadCurrentFrameToTexture
+  // reads, which stayed null for every frame while this stub stood. Recovered
+  // in cri/sofdec/SofdecAdxPlatformRuntime.cpp with its four mwsffrm_* helpers.
   // mwsfcre_AllFree: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfcre_DecideFtypeByHdrInf: real body in moho/misc/StartupHelpers.cpp,
   // next to its only caller mwPlyGetHdrInf (adjacent addresses 0x00AC8F00 /

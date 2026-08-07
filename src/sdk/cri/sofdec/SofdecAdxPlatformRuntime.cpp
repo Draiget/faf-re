@@ -3265,7 +3265,7 @@
     }
 
     libWork->pauseBorder = 0;
-    libWork->defaultConditionInitialized = 1;
+    libWork->usePictureUserData = 1;
   }
 
   /**
@@ -18449,6 +18449,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   constexpr char kSfxErrInvalidChromaFormat[] = "E301273 : chroma_format is invalid.";
   constexpr char kSfxErrInvalidChromaPos[] = "E301274 : chromapos is invalid.";
   constexpr char kMwsfdErrInvalidPtypeFromSfd[] = "mwl_convPtypeFromSFD : Invalid Ptype";
+  constexpr char kMwsfdErrInvalidFrameStructure[] = "E301271 mwsffrm_DecideFrmType: illegal frame structure";
+  constexpr char kMwsfdErrGetFpsFailed[] = "E201301 mwsfd_GetFps failed";
   constexpr char kMwsfdErrInvalidPtypeToSfd[] = "mwl_convPtypeToSFD : Invalid Ptype";
 
   // Forward decls for the helpers below (definition order matches the
@@ -18825,6 +18827,340 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
       return 2;
     }
     return 3;
+  }
+
+  // Both live further along the aggregate TU - SFD_GetFps in SofdecSfdRuntime.cpp
+  // and SUD_AnalyTypeDivField in SofdecSfxRuntime.cpp - so the frame-info
+  // conversion below, which is compiled first, needs them declared here.
+  std::int32_t SFD_GetFps(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outFramesPerSecond);
+  std::int32_t SUD_AnalyTypeDivField(std::int32_t sudRecordAddress, std::int32_t sudFieldIndex);
+
+  /**
+   * The SFD-side frame descriptor `SFD_GetFrm` hands back, as the
+   * frame-info conversion lane reads it. Offsets are the `a2[n]` indices in
+   * `mwl_convFrmInfFromSFD` (0x00ACA210) and `mwsffrm_SaveFrmDetail`
+   * (0x00ACA4E0).
+   */
+  struct SofdecSfdFrameRuntimeView
+  {
+    std::int32_t widthPixels = 0;          // +0x00
+    std::int32_t heightPixels = 0;         // +0x04
+    std::int32_t lumaStrideBytes = 0;      // +0x08
+    std::int32_t chromaStrideBytes = 0;    // +0x0C
+    std::int32_t sfdPictureType = 0;       // +0x10
+    std::int32_t reserved14 = 0;           // +0x14
+    std::int32_t frameRateDivisor = 0;     // +0x18
+    std::int32_t sfdBufferFormat = 0;      // +0x1C
+    std::int32_t frameBufferAddress = 0;   // +0x20
+    std::int32_t cropOffsetX = 0;          // +0x24
+    std::int32_t cropOffsetY = 0;          // +0x28
+    std::int32_t frameNumber = 0;          // +0x2C
+    std::int32_t decodeTimeUnits = 0;      // +0x30
+    std::int32_t presentTimeUnits = 0;     // +0x34
+    /** `{ address, byteCount }` of this frame's picture-user payload. */
+    const std::int32_t* pictureUserPayload = nullptr; // +0x38
+    std::int32_t reserved3C_47[3]{};       // +0x3C
+    std::uint8_t trailingDetail[0x38]{};   // +0x48
+  };
+  static_assert(
+    offsetof(SofdecSfdFrameRuntimeView, frameBufferAddress) == 0x20,
+    "SofdecSfdFrameRuntimeView::frameBufferAddress offset must be 0x20"
+  );
+  static_assert(
+    offsetof(SofdecSfdFrameRuntimeView, pictureUserPayload) == 0x38,
+    "SofdecSfdFrameRuntimeView::pictureUserPayload offset must be 0x38"
+  );
+  static_assert(
+    offsetof(SofdecSfdFrameRuntimeView, trailingDetail) == 0x48,
+    "SofdecSfdFrameRuntimeView::trailingDetail offset must be 0x48"
+  );
+
+  /** Lanes of `MwsfdFrameInfo` the conversion fills that the struct leaves unnamed. */
+  struct MwsfdFrameInfoFillRuntimeView
+  {
+    std::int32_t frameBufferAddress = 0;  // +0x00
+    std::int32_t frameId = 0;             // +0x04
+    std::int32_t bufferFormat = 0;        // +0x08
+    std::int32_t widthPixels = 0;         // +0x0C
+    std::int32_t heightPixels = 0;        // +0x10
+    std::int32_t lumaStrideBytes = 0;     // +0x14
+    std::int32_t chromaStrideBytes = 0;   // +0x18
+    std::int32_t pictureType = 0;         // +0x1C
+    std::int32_t frameRateTimes1000 = 0;  // +0x20
+    std::int32_t presentFrameCount = 0;   // +0x24
+    std::int32_t presentTimeUnits = 0;    // +0x28
+    std::int32_t frameRateDivisor = 0;    // +0x2C
+    std::int32_t frameNumber = 0;         // +0x30
+    std::int32_t decodeFrameCount = 0;    // +0x34
+    std::int32_t decodeTimeUnits = 0;     // +0x38
+    std::int32_t cropOffsetX = 0;         // +0x3C
+    std::int32_t cropOffsetY = 0;         // +0x40
+    std::int32_t reserved44 = 0;          // +0x44
+    std::int32_t pictureUserAddress = 0;  // +0x48
+    std::int32_t frameFieldType = 0;      // +0x4C
+    std::uint8_t trailingDetail[0x38]{};  // +0x50
+    std::int32_t subtitleDataAddress = 0; // +0x88
+    std::int32_t subtitleDataBytes = 0;   // +0x8C
+  };
+  static_assert(
+    offsetof(MwsfdFrameInfoFillRuntimeView, frameFieldType) == 0x4C,
+    "MwsfdFrameInfoFillRuntimeView::frameFieldType offset must be 0x4C"
+  );
+  static_assert(
+    offsetof(MwsfdFrameInfoFillRuntimeView, subtitleDataAddress) == 0x88,
+    "MwsfdFrameInfoFillRuntimeView::subtitleDataAddress offset must be 0x88"
+  );
+  static_assert(sizeof(MwsfdFrameInfoFillRuntimeView) == 0x90, "MwsfdFrameInfoFillRuntimeView size must be 0x90");
+
+  /**
+   * Address: 0x00ACD590 (FUN_00ACD590, _SUD_GetSudDatSize)
+   *
+   * What it does:
+   * Reports the fixed size of one subtitle-data record, or zero for a null
+   * record pointer.
+   */
+  std::int32_t SUD_GetSudDatSize(const std::int32_t recordAddress)
+  {
+    constexpr std::int32_t kSudRecordBytes = 0x23;
+    return (recordAddress != 0) ? kSudRecordBytes : 0;
+  }
+
+  /**
+   * Address: 0x00ACD520 (FUN_00ACD520, _SUD_SearchSudDat)
+   *
+   * What it does:
+   * Scans one buffer for the `<SUDPS_>` subtitle-record marker and reports the
+   * address and size of the last record it finds. The scan is byte-granular
+   * and deliberately runs to the end of the buffer rather than stopping at the
+   * first hit.
+   */
+  std::int32_t SUD_SearchSudDat(
+    const char* const buffer,
+    const std::int32_t bufferBytes,
+    std::int32_t* const outRecordAddress,
+    std::int32_t* const outRecordBytes
+  )
+  {
+    static constexpr char kSudRecordMarker[] = "<SUDPS_>";
+    constexpr std::size_t kSudRecordMarkerBytes = 8;
+
+    *outRecordAddress = 0;
+    *outRecordBytes = 0;
+    if (buffer == nullptr || bufferBytes <= 0) {
+      return bufferBytes;
+    }
+
+    const char* cursor = buffer;
+    std::int32_t remaining = bufferBytes;
+    do {
+      if (*cursor == kSudRecordMarker[0] && std::memcmp(cursor, kSudRecordMarker, kSudRecordMarkerBytes) == 0) {
+        const auto recordAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(cursor));
+        *outRecordAddress = recordAddress;
+        *outRecordBytes = SUD_GetSudDatSize(recordAddress);
+      }
+      ++cursor;
+      --remaining;
+    } while (remaining != 0);
+
+    return remaining;
+  }
+
+  /**
+   * Address: 0x00AC9350 (FUN_00AC9350, _MWSFD_GetUsePicUsr)
+   *
+   * What it does:
+   * Reports whether the library was configured to surface per-picture user
+   * data on decoded frames.
+   */
+  std::int32_t MWSFD_GetUsePicUsr()
+  {
+    return MWSFLIB_GetLibWorkPtr()->usePictureUserData;
+  }
+
+  /**
+   * Address: 0x00ACA3F0 (FUN_00ACA3F0, _mwsffrm_CalcFrmCnt)
+   *
+   * What it does:
+   * Converts one time value in the stream's own units into a frame count for
+   * the given milli-fps rate.
+   */
+  std::int32_t
+  mwsffrm_CalcFrmCnt(const std::int32_t timeUnits, const std::int32_t frameRateTimes1000, const std::int32_t timeScale)
+  {
+    return UTY_MulDiv(timeUnits, frameRateTimes1000, 1000 * timeScale);
+  }
+
+  /**
+   * Address: 0x00ACA380 (FUN_00ACA380, _mwsffrm_SetPicUsrInf)
+   *
+   * What it does:
+   * Publishes this frame's picture-user payload on the outgoing frame info.
+   * The payload is suppressed entirely when the library is not configured for
+   * picture-user data, or when the frame carries the playback object's own
+   * inline buffer rather than a stream-supplied one. A real payload has its
+   * four-byte header skipped.
+   */
+  std::int32_t mwsffrm_SetPicUsrInf(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const SofdecSfdFrameRuntimeView* const sfdFrame,
+    MwsfdFrameInfoFillRuntimeView* const outFrameInfo
+  )
+  {
+    constexpr std::int32_t kPictureUserHeaderBytes = 4;
+
+    const std::int32_t payloadAddress = sfdFrame->pictureUserPayload[0];
+    const std::int32_t payloadBytes = sfdFrame->pictureUserPayload[1];
+
+    if (MWSFD_GetUsePicUsr() != 1 || ply->seekKeyGroupPtr == ply->seekKeyGroup.data()) {
+      outFrameInfo->pictureUserAddress = 0;
+      outFrameInfo->frameFieldType = 0;
+      return SjPointerToAddress(outFrameInfo);
+    }
+
+    std::int32_t publishedAddress = payloadAddress;
+    std::int32_t publishedBytes = payloadBytes;
+    if (publishedAddress != 0 && publishedBytes > kPictureUserHeaderBytes) {
+      publishedAddress += kPictureUserHeaderBytes;
+      publishedBytes -= kPictureUserHeaderBytes;
+    }
+
+    outFrameInfo->pictureUserAddress = publishedAddress;
+    outFrameInfo->frameFieldType = publishedBytes;
+    return SjPointerToAddress(outFrameInfo);
+  }
+
+  /**
+   * Address: 0x00ACA540 (FUN_00ACA540, _mwsffrm_SetSudDatInf)
+   *
+   * What it does:
+   * Publishes the subtitle record carried in this frame's picture-user
+   * payload, if any, on the outgoing frame info.
+   */
+  std::int32_t mwsffrm_SetSudDatInf(
+    moho::MwsfdPlaybackStateSubobj* const /*ply*/,
+    const SofdecSfdFrameRuntimeView* const sfdFrame,
+    MwsfdFrameInfoFillRuntimeView* const outFrameInfo
+  )
+  {
+    constexpr std::int32_t kPictureUserHeaderBytes = 4;
+
+    const std::int32_t payloadAddress = sfdFrame->pictureUserPayload[0];
+    std::int32_t result = sfdFrame->pictureUserPayload[1];
+
+    outFrameInfo->subtitleDataAddress = 0;
+    outFrameInfo->subtitleDataBytes = 0;
+    if (payloadAddress == 0 || result <= kPictureUserHeaderBytes) {
+      return result;
+    }
+
+    std::int32_t recordAddress = 0;
+    std::int32_t recordBytes = 0;
+    (void)SUD_SearchSudDat(
+      reinterpret_cast<const char*>(static_cast<std::uintptr_t>(payloadAddress + kPictureUserHeaderBytes)),
+      result - kPictureUserHeaderBytes,
+      &recordAddress,
+      &recordBytes
+    );
+
+    result = recordAddress;
+    if (recordAddress != 0 && recordBytes > 0) {
+      outFrameInfo->subtitleDataAddress = recordAddress;
+      outFrameInfo->subtitleDataBytes = recordBytes;
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x00ACA480 (FUN_00ACA480, _mwsffrm_DecideFrmType)
+   *
+   * What it does:
+   * Classifies the decoded frame as progressive or field-paired. Anything the
+   * SFD side reports outside `1..3` is a stream error; `3` is progressive
+   * unless the frame's own field flag says otherwise. A subtitle record that
+   * declares field division overrides the result.
+   */
+  std::int32_t mwsffrm_DecideFrmType(
+    moho::MwsfdPlaybackStateSubobj* const /*ply*/,
+    const SofdecSfdFrameRuntimeView* const sfdFrame,
+    const std::int32_t subtitleRecordAddress,
+    const std::int32_t subtitleRecordBytes
+  )
+  {
+    constexpr std::int32_t kFrameTypeFieldPaired = 2;
+
+    const auto* const detail = reinterpret_cast<const std::int32_t*>(sfdFrame->trailingDetail);
+    const std::int32_t declaredStructure = detail[(0x58 - 0x48) / 4];
+
+    std::int32_t frameType = 0;
+    if (declaredStructure <= 0 || declaredStructure > 3) {
+      (void)MWSFSVM_Error(kMwsfdErrInvalidFrameStructure);
+    } else if (declaredStructure <= 2 || sfdFrame->trailingDetail[0x6C - 0x48] == 0) {
+      frameType = kFrameTypeFieldPaired;
+    }
+
+    if (MWSFD_GetUsePicUsr() != 1) {
+      return frameType;
+    }
+    return (SUD_AnalyTypeDivField(subtitleRecordAddress, subtitleRecordBytes) == 1) ? kFrameTypeFieldPaired : frameType;
+  }
+
+  /**
+   * Address: 0x00ACA210 (FUN_00ACA210, _mwl_convFrmInfFromSFD)
+   *
+   * IDA signature:
+   * int __cdecl mwl_convFrmInfFromSFD(int a1, int *a2, _DWORD *a3);
+   *
+   * What it does:
+   * Converts one SFD frame descriptor into the outward-facing `MwsfdFrameInfo`
+   * the player hands to callers - most importantly the frame buffer address
+   * that `CMovie::UploadCurrentFrameToTexture` reads. Time lanes are converted
+   * to frame counts against the stream's frame rate, the picture type and
+   * buffer format are mapped from their SFD encodings, and the picture-user
+   * and subtitle lanes are filled from the frame's own payload.
+   */
+  void mwl_convFrmInfFromSFD(
+    const std::int32_t plyAddress,
+    const std::int32_t sfdFrameAddress,
+    const std::int32_t outFrameInfoAddress
+  )
+  {
+    auto* const ply = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
+    const auto* const sfdFrame =
+      reinterpret_cast<const SofdecSfdFrameRuntimeView*>(SjAddressToPointer(sfdFrameAddress));
+    auto* const outFrameInfo =
+      reinterpret_cast<MwsfdFrameInfoFillRuntimeView*>(SjAddressToPointer(outFrameInfoAddress));
+
+    std::int32_t frameRateTimes1000 = 0;
+    if (SFD_GetFps(static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle), &frameRateTimes1000) != 0) {
+      (void)MWSFSVM_Error(kMwsfdErrGetFpsFailed);
+    }
+
+    outFrameInfo->frameBufferAddress = sfdFrame->frameBufferAddress;
+    outFrameInfo->bufferFormat = mwl_convBufFmtFromSFD(sfdFrame->sfdBufferFormat);
+    outFrameInfo->widthPixels = sfdFrame->widthPixels;
+    outFrameInfo->heightPixels = sfdFrame->heightPixels;
+    outFrameInfo->lumaStrideBytes = sfdFrame->lumaStrideBytes;
+    outFrameInfo->chromaStrideBytes = sfdFrame->chromaStrideBytes;
+    outFrameInfo->pictureType = mwl_convPtypeFromSFD(sfdFrame->sfdPictureType);
+    outFrameInfo->frameRateTimes1000 = frameRateTimes1000;
+    outFrameInfo->presentFrameCount =
+      mwsffrm_CalcFrmCnt(sfdFrame->presentTimeUnits, frameRateTimes1000, sfdFrame->frameRateDivisor);
+    outFrameInfo->presentTimeUnits = sfdFrame->presentTimeUnits;
+    outFrameInfo->frameRateDivisor = sfdFrame->frameRateDivisor;
+    outFrameInfo->frameNumber = sfdFrame->frameNumber;
+    outFrameInfo->decodeFrameCount =
+      mwsffrm_CalcFrmCnt(sfdFrame->decodeTimeUnits, frameRateTimes1000, sfdFrame->frameRateDivisor);
+    outFrameInfo->decodeTimeUnits = sfdFrame->decodeTimeUnits;
+    outFrameInfo->cropOffsetX = sfdFrame->cropOffsetX;
+    outFrameInfo->cropOffsetY = sfdFrame->cropOffsetY;
+
+    (void)mwsffrm_SetPicUsrInf(ply, sfdFrame, outFrameInfo);
+    (void)mwsffrm_SetSudDatInf(ply, sfdFrame, outFrameInfo);
+
+    const std::int32_t frameType =
+      mwsffrm_DecideFrmType(ply, sfdFrame, outFrameInfo->subtitleDataAddress, outFrameInfo->subtitleDataBytes);
+    outFrameInfo->frameFieldType = frameType;
+    std::memcpy(outFrameInfo->trailingDetail, sfdFrame->trailingDetail, sizeof(outFrameInfo->trailingDetail));
   }
 
   /**
