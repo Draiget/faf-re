@@ -128,11 +128,14 @@ extern "C" {
   void* MWSST_GetStat() { return nullptr; }
   // MWSST_Stop (0x00AD9C10), MWSST_Pause (0x00AD9CC0): real bodies in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp.
-  void* MWSTM_Destroy() { return nullptr; }
-  void* MWSTM_GetStat() { return nullptr; }
-  void* MWSTM_ReqStart() { return nullptr; }
-  void* MWSTM_ReqStop() { return nullptr; }
-  void* MWSTM_SetFileRange() { return nullptr; }
+  // The MWSTM family (0x00AD90D0 / 0x00AD91A0 / 0x00AD9150 / 0x00AD9160 /
+  // 0x00AD9110) now has real bodies in cri/sofdec/SofdecAdxPlatformRuntime.cpp
+  // next to MWSTM_Create. Each is a thin wrapper over ADXSTM, and all five were
+  // no-arg stubs: MWSTM_SetFileRange bound the streamer to nothing,
+  // MWSTM_ReqStart answered 0 ("started") without starting anything, and
+  // MWSTM_GetStat answered 0 forever. The SJ ring therefore stayed empty, the
+  // MPS demuxer consumed 0 bytes per server tick, and every movie sat in
+  // "Preparing" until the process was killed.
   void* SFADXT_SetAudioStreamType() { return nullptr; }
   void* SFAOAP_SetSpeed() { return nullptr; }
   void* SFD_tr_ad_adxt() { return nullptr; }

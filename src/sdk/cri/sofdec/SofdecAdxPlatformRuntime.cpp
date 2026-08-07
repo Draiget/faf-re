@@ -2570,6 +2570,81 @@
   }
 
   /**
+   * Address: 0x00AD90D0 (FUN_00AD90D0, _MWSTM_Destroy)
+   * Mangled: _MWSTM_Destroy
+   *
+   * IDA signature:
+   * int __cdecl MWSTM_Destroy(ADXSTM *a1);  // thunk
+   */
+  std::int32_t MWSTM_Destroy(void* const streamHandle)
+  {
+    return ADXSTM_Destroy(streamHandle);
+  }
+
+  /**
+   * Address: 0x00AD9110 (FUN_00AD9110, _MWSTM_SetFileRange)
+   * Mangled: _MWSTM_SetFileRange
+   *
+   * IDA signature:
+   * int __cdecl MWSTM_SetFileRange(ADXSTM *a1, int a2, int a3, int a4, int a5);
+   *
+   * What it does:
+   * Rebinds one ADXSTM stream to a byte range of a file and pins end-of-stream
+   * at the range end. `mwsfsvr_StartStream` calls this immediately before
+   * `MWSTM_ReqStart`, so a stub here left the streamer bound to nothing and the
+   * SJ ring never received a byte of the movie.
+   */
+  std::int32_t MWSTM_SetFileRange(
+    void* const streamHandle,
+    const char* const fileName,
+    const std::int32_t startOffset,
+    const std::int32_t rangeStart,
+    const std::int32_t rangeEnd
+  )
+  {
+    ADXSTM_ReleaseFileNw(streamHandle);
+    ADXSTM_BindFileNw(streamHandle, fileName, startOffset, rangeStart, rangeEnd);
+    return ADXSTM_SetEos(streamHandle, rangeEnd);
+  }
+
+  /**
+   * Address: 0x00AD9150 (FUN_00AD9150, _MWSTM_ReqStart)
+   * Mangled: _MWSTM_ReqStart
+   *
+   * IDA signature:
+   * int __cdecl MWSTM_ReqStart(int a1);  // thunk
+   */
+  std::int32_t MWSTM_ReqStart(void* const streamHandle)
+  {
+    return ADXSTM_Start(streamHandle);
+  }
+
+  /**
+   * Address: 0x00AD9160 (FUN_00AD9160, _MWSTM_ReqStop)
+   * Mangled: _MWSTM_ReqStop
+   *
+   * IDA signature:
+   * void __cdecl MWSTM_ReqStop(ADXSTM *a1);
+   */
+  void MWSTM_ReqStop(void* const streamHandle)
+  {
+    ADXSTM_StopNw(streamHandle);
+    ADXSTM_ReleaseFileNw(streamHandle);
+  }
+
+  /**
+   * Address: 0x00AD91A0 (FUN_00AD91A0, _MWSTM_GetStat)
+   * Mangled: _MWSTM_GetStat
+   *
+   * IDA signature:
+   * int __cdecl MWSTM_GetStat(int a1);  // thunk
+   */
+  std::int32_t MWSTM_GetStat(void* const streamHandle)
+  {
+    return ADXSTM_GetStat(streamHandle);
+  }
+
+  /**
    * Address: 0x00AD9060 (FUN_00AD9060, _MWSTM_SetFlowLimit)
    */
   std::int32_t MWSTM_SetFlowLimit(

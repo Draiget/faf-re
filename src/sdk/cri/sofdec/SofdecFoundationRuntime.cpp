@@ -1939,9 +1939,9 @@ extern "C"
   void MWSFTAG_DestroyAinfSj(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t MWSFTAG_UpdateTagInf(moho::MwsfdPlaybackStateSubobj* ply);
   void MWSFSFX_Destroy(void* sfxHandle);
-  void MWSTM_Destroy(void* streamHandle);
+  std::int32_t MWSTM_Destroy(void* streamHandle);
   std::int32_t MWSTM_GetStat(void* streamHandle);
-  void MWSTM_SetFileRange(
+  std::int32_t MWSTM_SetFileRange(
     void* streamHandle,
     const char* fileName,
     std::int32_t startOffset,
