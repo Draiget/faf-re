@@ -177,6 +177,8 @@ extern "C" {
   );
   std::int32_t sfmpv_GetTermDst(std::int32_t workctrlAddress);
   std::int32_t sfmpv_GetTermSrc(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_ChkPrepFlg(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_ChkTermFlg(std::int32_t workctrlAddress);
   std::int32_t MPV_GetBitRate(std::int32_t decoderHandle, std::int32_t* outBitRate);
   std::int32_t MPV_GetVbvBufSiz(
     std::int32_t decoderHandle,
@@ -1459,7 +1461,14 @@ struct SfmpvHandleRuntimeView
   std::int32_t prepFrameTargetCount = 0; // +0x2C
   std::uint8_t mUnknown30To37[0x08]{}; // +0x30
   std::int32_t mpvCond6Value = 0; // +0x38
-  std::uint8_t mUnknown3CTo57[0x1C]{}; // +0x3C
+  std::uint8_t mUnknown3CTo47[0x0C]{}; // +0x3C
+  /**
+   * Shared SFPLY execution-stage lane. Every transfer strategy reads it off the
+   * same workctrl base, so this is the same word `SfmpsExecRuntimeView` calls
+   * `executionStage` - `2` is the PREP stage.
+   */
+  std::int32_t executionStage = 0; // +0x48
+  std::uint8_t mUnknown4CTo57[0x0C]{}; // +0x4C
   std::int32_t decodePathMode = 0; // +0x58
   std::int32_t frameIdCounter = 0; // +0x5C
   std::uint8_t mUnknown60To77[0x18]{}; // +0x60
@@ -1544,6 +1553,7 @@ static_assert(
   "SfmpvHandleRuntimeView::prepFrameTargetCount offset must be 0x2C"
 );
 static_assert(offsetof(SfmpvHandleRuntimeView, mpvCond6Value) == 0x38, "SfmpvHandleRuntimeView::mpvCond6Value offset must be 0x38");
+static_assert(offsetof(SfmpvHandleRuntimeView, executionStage) == 0x48, "SfmpvHandleRuntimeView::executionStage offset must be 0x48");
 static_assert(offsetof(SfmpvHandleRuntimeView, decodePathMode) == 0x58, "SfmpvHandleRuntimeView::decodePathMode offset must be 0x58");
 static_assert(offsetof(SfmpvHandleRuntimeView, frameIdCounter) == 0x5C, "SfmpvHandleRuntimeView::frameIdCounter offset must be 0x5C");
 static_assert(
@@ -2861,6 +2871,47 @@ std::int32_t SFMPV_Finish()
 std::int32_t SFMPV_ExecServer(const std::int32_t workctrlAddress)
 {
   return sfmpv_ExecServerSub(workctrlAddress);
+}
+
+/**
+ * Address: 0x00AD1C10 (FUN_00AD1C10, _sfmpv_ExecServerSub)
+ *
+ * IDA signature:
+ * int __cdecl sfmpv_ExecServerSub(int a1);
+ *
+ * What it does:
+ * One MPV decode-server tick. Skips entirely when the video condition lane is
+ * off, and reports "no work" once the destination side has terminated.
+ * Otherwise it refreshes the Y16 colour-type condition, runs the auxiliary
+ * sequence-header pass while the player is still in the PREP stage, decodes as
+ * many pictures as the ring and frame pool allow, and finally latches the MPV
+ * prep and term flags - the prep latch is what raises SFBUF's prep flag for the
+ * video-output lane, which is how SFPLY learns that PREP is complete.
+ */
+std::int32_t sfmpv_ExecServerSub(const std::int32_t workctrlAddress)
+{
+  constexpr std::int32_t kSfsetCondVideo = 5;
+  constexpr std::int32_t kSfplyExecutionStagePrep = 2;
+
+  const std::int32_t videoCondition = SFSET_GetCond(workctrlAddress, kSfsetCondVideo);
+  if (videoCondition == 0) {
+    return videoCondition;
+  }
+  if (sfmpv_GetTermDst(workctrlAddress) == 1) {
+    return 0;
+  }
+
+  (void)sfmpv_SetCondY16(workctrlAddress);
+
+  const auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  if (workctrl->executionStage == kSfplyExecutionStagePrep) {
+    (void)sfmpv_ProcessAuxShc(workctrlAddress);
+  }
+
+  const std::int32_t decodedPictureResult = sfmpv_DecodeSomePic(workctrlAddress);
+  (void)sfmpv_ChkPrepFlg(workctrlAddress);
+  (void)sfmpv_ChkTermFlg(workctrlAddress);
+  return decodedPictureResult;
 }
 
 /**
