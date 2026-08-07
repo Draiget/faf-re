@@ -9156,13 +9156,18 @@
     MpsPacketHeader packetHeader{};                 // +0xA8
     std::int32_t m2pHandleAddress = 0;              // +0xD0
     MpsDecodeHeaderFn decodeHeader = nullptr;       // +0xD4
-    std::int32_t reservedD8 = 0;                    // +0xD8
-    std::int32_t reservedDC = 0;                    // +0xDC
-    std::int32_t reservedE0 = 0;                    // +0xE0
+    /// The elementary-stream pair `MPS_GetElementaryInfo` hands back: which
+    /// stream was last seen, and its descriptor.
+    std::int32_t elementaryStreamId = 0;            // +0xD8
+    std::int32_t elementaryStreamInfo = 0;          // +0xDC
+    /// PES pass-through switch, set by `MPS_SetPesSw`.
+    std::int32_t pesSwitch = 0;                     // +0xE0
     MpsSystemHeaderCallback systemHeaderCallback = nullptr; // +0xE4
     std::int32_t systemHeaderCallbackObject = 0;    // +0xE8
-    std::int32_t reservedEC = 0;                    // +0xEC
-    std::int32_t reservedF0 = 0;                    // +0xF0
+    /// Program-stream-map callback pair, set by `MPS_SetPsMapFn`.
+    MpsSystemHeaderCallback psMapCallback = nullptr; // +0xEC
+    std::int32_t psMapCallbackObject = 0;           // +0xF0
+    /// PES callback pair, set by `MPS_SetPesFn`.
     MpsPacketCallback packetCallback = nullptr;     // +0xF4
     std::int32_t packetCallbackObject = 0;          // +0xF8
     std::int32_t reservedFC = 0;                    // +0xFC
@@ -9179,6 +9184,9 @@
     "MpslibHandleRuntimeView::systemHeaderCallback @0xE4"
   );
   static_assert(offsetof(MpslibHandleRuntimeView, packetCallback) == 0xF4, "MpslibHandleRuntimeView::packetCallback @0xF4");
+  static_assert(offsetof(MpslibHandleRuntimeView, elementaryStreamId) == 0xD8, "MpslibHandleRuntimeView::elementaryStreamId @0xD8");
+  static_assert(offsetof(MpslibHandleRuntimeView, pesSwitch) == 0xE0, "MpslibHandleRuntimeView::pesSwitch @0xE0");
+  static_assert(offsetof(MpslibHandleRuntimeView, psMapCallback) == 0xEC, "MpslibHandleRuntimeView::psMapCallback @0xEC");
   static_assert(sizeof(MpslibHandleRuntimeView) == 0x100, "MpslibHandleRuntimeView size must be 0x100");
 
   struct MpslibRuntimeView
@@ -9991,9 +9999,9 @@
     (void)mpslib_InitPket(&handle->packetHeader);
 
     handle->m2pHandleAddress = 0;
-    handle->reservedD8 = 0;
-    handle->reservedDC = 0;
-    handle->reservedE0 = 0;
+    handle->elementaryStreamId = 0;
+    handle->elementaryStreamInfo = 0;
+    handle->pesSwitch = 0;
     handle->systemHeaderCallback = nullptr;
     handle->systemHeaderCallbackObject = 0;
     handle->decodeHeader = MPSDEC_dechd;
@@ -10038,6 +10046,294 @@
       }
     }
     return reinterpret_cast<std::int32_t>(handle);
+  }
+
+  struct MpsElementaryInfoEntryView;
+  void MPSDEC_Finish();
+  void MPSGET_Finish();
+  std::int32_t M2P_Destroy(std::int32_t m2pHandleAddress);
+
+  // --- MPS public entry points --------------------------------------------
+  //
+  // Every one of these was a `void* f() { return nullptr; }` C-linkage stub, so
+  // the MPS demuxer answered "no error, nothing parsed" to everything. That is
+  // worse than failing: `sfmps_DecodeSomeUnit` loops until a callee reports an
+  // error or reports zero bytes consumed, and a demuxer that always succeeds
+  // without consuming never satisfies either, so the SFD prepare pass spun
+  // forever on the main thread.
+
+  constexpr std::int32_t kMpsErrDecHdInvalidHandle = static_cast<std::int32_t>(0xFF040101u);
+  constexpr std::int32_t kMpsErrDestroyInvalidHandle = static_cast<std::int32_t>(0xFF03FF03u);
+  constexpr std::int32_t kMpsErrGetPackHdInvalidHandle = static_cast<std::int32_t>(0xFF040001u);
+  constexpr std::int32_t kMpsErrGetSysHdInvalidHandle = static_cast<std::int32_t>(0xFF040002u);
+  constexpr std::int32_t kMpsErrGetPketHdInvalidHandle = static_cast<std::int32_t>(0xFF040003u);
+
+  /**
+   * Address: 0x00AEB560 (FUN_00AEB560, _MPS_DecHd)
+   *
+   * What it does:
+   * Decodes one program-stream header out of the caller's buffer by dispatching
+   * to the dialect decoder `mpslib_InitHn` installed (`MPSDEC_dechd`, MPEG-1 in
+   * this build). Both outputs are cleared first, so a rejected handle reports
+   * "nothing consumed" rather than leaving the caller's locals undefined.
+   */
+  std::int32_t MPS_DecHd(
+    const std::int32_t mpsHandleAddress,
+    void* const decodeRuntimeAddress,
+    const std::int32_t expectedLength,
+    std::int32_t* const ioParserRuntimeAddress,
+    std::int32_t* const ioHeaderRuntimeAddress
+  )
+  {
+    *ioParserRuntimeAddress = 0;
+    *ioHeaderRuntimeAddress = 0;
+
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    if (MPSLIB_CheckHn(handle) != 0) {
+      return MPSLIB_SetErr(0, kMpsErrDecHdInvalidHandle);
+    }
+
+    return handle->decodeHeader(
+      handle,
+      static_cast<const std::uint8_t*>(decodeRuntimeAddress),
+      expectedLength,
+      ioParserRuntimeAddress,
+      reinterpret_cast<std::uint32_t*>(ioHeaderRuntimeAddress)
+    );
+  }
+
+  /**
+   * Address: 0x00AEB3C0 (FUN_00AEB3C0, _MPS_Destroy)
+   *
+   * What it does:
+   * Releases one MPS handle: tears down its M2P sub-handle, frees the matching
+   * pool slot, and marks the handle free again.
+   */
+  std::int32_t MPS_Destroy(const std::int32_t mpsHandleAddress)
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    if (MPSLIB_CheckHn(handle) != 0) {
+      return MPSLIB_SetErr(0, kMpsErrDestroyInvalidHandle);
+    }
+
+    if (handle->m2pHandleAddress != 0) {
+      (void)M2P_Destroy(handle->m2pHandleAddress);
+      const std::int32_t m2pSlot = mpslib_SearchM2pHnWk(handle->m2pHandleAddress);
+      if (m2pSlot >= 0) {
+        mpslib_m2p[static_cast<std::size_t>(m2pSlot)] = 0;
+      }
+      handle->m2pHandleAddress = 0;
+    }
+
+    handle->handleState = 1;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AEB030 (FUN_00AEB030, _MPS_Finish)
+   *
+   * What it does:
+   * Shuts the MPS layer down: destroys every handle still in use, then finishes
+   * the decoder and getter helpers.
+   */
+  void MPS_Finish()
+  {
+    (void)M2P_Finish();
+
+    for (std::int32_t slotIndex = 0; slotIndex < MPSLIB_libwork->handleCount; ++slotIndex) {
+      MpslibHandleRuntimeView* const handle = &MPSLIB_libwork->handles[static_cast<std::size_t>(slotIndex)];
+      if (handle->handleState != 1) {
+        (void)MPS_Destroy(SjPointerToAddress(handle));
+      }
+    }
+
+    MPSDEC_Finish();
+    MPSGET_Finish();
+  }
+
+  /**
+   * Address: 0x00AECBC0 (FUN_00AECBC0, _MPS_GetElementaryInfo)
+   *
+   * What it does:
+   * Reports the last elementary stream the demuxer saw and its descriptor.
+   * Unlike its siblings this one does not raise an error on a bad handle - it
+   * returns the check result with both outputs left zeroed.
+   */
+  std::int32_t MPS_GetElementaryInfo(
+    const void* const mpsHandle,
+    std::int32_t* const outElementaryCount,
+    const MpsElementaryInfoEntryView** const outElementaryEntries
+  )
+  {
+    *outElementaryCount = 0;
+    *outElementaryEntries = nullptr;
+
+    auto* const handle =
+      static_cast<MpslibHandleRuntimeView*>(const_cast<void*>(mpsHandle));
+    const std::int32_t checkResult = MPSLIB_CheckHn(handle);
+    if (checkResult != 0) {
+      return checkResult;
+    }
+
+    *outElementaryCount = handle->elementaryStreamId;
+    *outElementaryEntries = reinterpret_cast<const MpsElementaryInfoEntryView*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->elementaryStreamInfo))
+    );
+    return checkResult;
+  }
+
+  /**
+   * Address: 0x00AECAB0 (FUN_00AECAB0, _MPS_GetPackHd)
+   *
+   * What it does:
+   * Copies the last parsed pack header out to the caller.
+   */
+  std::int32_t MPS_GetPackHd(const void* const mpsHandle, void* const outPackHeader)
+  {
+    auto* const handle = static_cast<MpslibHandleRuntimeView*>(const_cast<void*>(mpsHandle));
+    if (MPSLIB_CheckHn(handle) != 0) {
+      return MPSLIB_SetErr(0, kMpsErrGetPackHdInvalidHandle);
+    }
+
+    *static_cast<MpsPackHeader*>(outPackHeader) = handle->packHeader;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AECB00 (FUN_00AECB00, _MPS_GetSysHd)
+   *
+   * What it does:
+   * Copies one archived system header out to the caller. Slot 0 of the array is
+   * the header currently being parsed, so the caller index is offset by one
+   * into the archive slots.
+   */
+  std::int32_t MPS_GetSysHd(const void* const mpsHandle, void* const outSystemHeader, const std::int32_t headerSlot)
+  {
+    auto* const handle = static_cast<MpslibHandleRuntimeView*>(const_cast<void*>(mpsHandle));
+    if (MPSLIB_CheckHn(handle) != 0) {
+      return MPSLIB_SetErr(0, kMpsErrGetSysHdInvalidHandle);
+    }
+
+    *static_cast<MpsSystemHeader*>(outSystemHeader) =
+      handle->systemHeaders[static_cast<std::size_t>(headerSlot) + 1];
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AECB40 (FUN_00AECB40, _MPS_GetLastSysHd)
+   *
+   * What it does:
+   * Copies the in-progress system header (archive slot 0) out to the caller.
+   * Shares an error code with `MPS_GetSysHd`, as the binary does.
+   */
+  std::int32_t MPS_GetLastSysHd(const std::int32_t mpsHandleAddress, void* const outLastSystemHeaderProbe)
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    if (MPSLIB_CheckHn(handle) != 0) {
+      return MPSLIB_SetErr(0, kMpsErrGetSysHdInvalidHandle);
+    }
+
+    *static_cast<MpsSystemHeader*>(outLastSystemHeaderProbe) = handle->systemHeaders[0];
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AECB80 (FUN_00AECB80, _MPS_GetPketHd)
+   *
+   * What it does:
+   * Copies the last parsed packet header out to the caller.
+   */
+  std::int32_t MPS_GetPketHd(const std::int32_t mpsHandleAddress, void* const outPacketHeader)
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    if (MPSLIB_CheckHn(handle) != 0) {
+      return MPSLIB_SetErr(0, kMpsErrGetPketHdInvalidHandle);
+    }
+
+    *static_cast<MpsPacketHeader*>(outPacketHeader) = handle->packetHeader;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AEB530 (FUN_00AEB530, _MPS_SetPesFn)
+   *
+   * What it does:
+   * Installs the PES callback pair. Returns the callback on success, so callers
+   * can chain, and the check result otherwise.
+   */
+  std::int32_t MPS_SetPesFn(
+    const std::int32_t mpsHandleAddress, const std::int32_t pesCondition, const std::int32_t pesAuxCondition
+  )
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    const std::int32_t checkResult = MPSLIB_CheckHn(handle);
+    if (checkResult != 0) {
+      return checkResult;
+    }
+
+    handle->packetCallback = reinterpret_cast<MpsPacketCallback>(pesCondition);
+    handle->packetCallbackObject = pesAuxCondition;
+    return pesCondition;
+  }
+
+  /**
+   * Address: 0x00AEB4D0 (FUN_00AEB4D0, _MPS_SetSystemFn)
+   *
+   * What it does:
+   * Installs the system-header callback pair.
+   */
+  std::int32_t MPS_SetSystemFn(
+    const std::int32_t mpsHandleAddress, const std::int32_t systemFnCondition, const std::int32_t systemFnAuxCondition
+  )
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    const std::int32_t checkResult = MPSLIB_CheckHn(handle);
+    if (checkResult != 0) {
+      return checkResult;
+    }
+
+    handle->systemHeaderCallback = reinterpret_cast<MpsSystemHeaderCallback>(systemFnCondition);
+    handle->systemHeaderCallbackObject = systemFnAuxCondition;
+    return systemFnCondition;
+  }
+
+  /**
+   * Address: 0x00AEB500 (FUN_00AEB500, _MPS_SetPsMapFn)
+   *
+   * What it does:
+   * Installs the program-stream-map callback pair.
+   */
+  std::int32_t MPS_SetPsMapFn(
+    const std::int32_t mpsHandleAddress, const std::int32_t psMapCondition, const std::int32_t psMapAuxCondition
+  )
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    const std::int32_t checkResult = MPSLIB_CheckHn(handle);
+    if (checkResult != 0) {
+      return checkResult;
+    }
+
+    handle->psMapCallback = reinterpret_cast<MpsSystemHeaderCallback>(psMapCondition);
+    handle->psMapCallbackObject = psMapAuxCondition;
+    return psMapCondition;
+  }
+
+  /**
+   * Address: 0x00AECC00 (FUN_00AECC00, _MPS_SetPesSw)
+   *
+   * What it does:
+   * Sets the PES pass-through switch.
+   */
+  std::int32_t MPS_SetPesSw(const std::int32_t mpsHandleAddress, const std::int32_t pesSwitchCondition)
+  {
+    auto* const handle = reinterpret_cast<MpslibHandleRuntimeView*>(SjAddressToPointer(mpsHandleAddress));
+    const std::int32_t checkResult = MPSLIB_CheckHn(handle);
+    if (checkResult != 0) {
+      return checkResult;
+    }
+
+    handle->pesSwitch = pesSwitchCondition;
+    return pesSwitchCondition;
   }
 
   /**
@@ -11543,7 +11839,7 @@
    */
   std::int32_t SFMPS_Finish()
   {
-    MPS_Finish();
+    (void)MPS_Finish();
     return 0;
   }
 
@@ -14994,7 +15290,6 @@
         result = sftim_HnVbIn(workctrlSubobj);
       }
     }
-
     return result;
   }
 

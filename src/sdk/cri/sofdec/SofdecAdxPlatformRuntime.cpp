@@ -6628,10 +6628,13 @@
    * What it does:
    * Destroys one M2P parser runtime through linked backend callback lane.
    */
-  std::int32_t M2P_Destroy()
+  std::int32_t M2P_Destroy(const std::int32_t m2pHandleAddress)
   {
+    // The binary tail-jumps into the backend, so the caller-pushed handle is
+    // forwarded untouched; spelled out here as an explicit forwarding call.
+    using M2pDestroyCallback = std::int32_t(__cdecl*)(std::int32_t m2pHandleAddress);
     if (m2sapi_m2p_Destroy != nullptr) {
-      return m2sapi_m2p_Destroy();
+      return reinterpret_cast<M2pDestroyCallback>(m2sapi_m2p_Destroy)(m2pHandleAddress);
     }
     return 0;
   }
