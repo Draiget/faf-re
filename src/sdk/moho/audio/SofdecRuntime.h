@@ -192,7 +192,10 @@ namespace moho
     MwsfdUserFreeCallback userFreeFn = nullptr;     // +0x2C
     std::int32_t userAllocObject = 0;               // +0x30
     std::int32_t seekFlag = 0;                                    // +0x34
-    std::int32_t defaultConditionInitialized = 0;                 // +0x38
+    /// Whether decoded frames surface their per-picture user data. Set by the
+    /// create path and read back by `MWSFD_GetUsePicUsr` (0x00AC9350), which
+    /// returns this word verbatim.
+    std::int32_t usePictureUserData = 0;                          // +0x38
     /// Pause-border lane, read by `MWSFD_GetPauseBdr` (0x00AC9370). Decides
     /// whether `mwPlyPause` puts the decode server to sleep across a pause.
     std::int32_t pauseBorder = 0;                                  // +0x3C
