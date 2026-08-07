@@ -4963,6 +4963,54 @@
   }
 
   /**
+   * Address: 0x00B11790 (FUN_00B11790, _xeCiSetSctLen)
+   * Mangled: _xeCiSetSctLen
+   *
+   * IDA signature:
+   * void __cdecl xeCiSetSctLen(int a1, __int64 a2);
+   *
+   * What it does:
+   * Re-chunks one XECI object to a new transfer granularity, rescaling the
+   * chunk count, the current chunk index and the running transfer total to
+   * match. Note the 32-byte alignment check reads the CURRENT granularity, not
+   * the requested one - `and eax, 8000001Fh` at 0x00B117BA loads `[esi+8]`
+   * before the store at 0x00B117FD, and the surrounding
+   * `jns`/`dec`/`or 0FFFFFFE0h`/`inc` is the signed-remainder idiom, so the
+   * lane is compared as a signed value.
+   */
+  void __cdecl xeCiSetSctLen(XeciObject* const object, const std::int32_t sectorLengthBytes)
+  {
+    if (object == nullptr) {
+      xeci_assert(0, kXeciSetSctLenNullHandleMessage);
+      return;
+    }
+
+    if ((static_cast<std::int32_t>(object->readChunkSizeBytes) % 32) != 0) {
+      xeci_assert(0, kXeciSetSctLenInvalidSizeMessage);
+      return;
+    }
+
+    const std::int64_t consumedBytes =
+      static_cast<std::int64_t>(static_cast<std::int32_t>(object->readChunkSizeBytes))
+      * static_cast<std::int64_t>(object->currentChunkIndex);
+
+    object->readChunkSizeBytes = static_cast<std::uint32_t>(sectorLengthBytes);
+
+    const auto fileSizeBytes = static_cast<std::int64_t>(
+      (static_cast<std::uint64_t>(static_cast<std::uint32_t>(object->fileSizeHigh)) << 32)
+      | static_cast<std::uint64_t>(object->fileSizeLow));
+    object->transferChunkCount = static_cast<std::uint32_t>(
+      (fileSizeBytes + sectorLengthBytes - 1) / sectorLengthBytes);
+    object->currentChunkIndex = static_cast<std::int32_t>(consumedBytes / sectorLengthBytes);
+
+    const std::int64_t transferTotalBytes =
+      static_cast<std::int64_t>(object->readChunkCount) * static_cast<std::int64_t>(sectorLengthBytes);
+    object->transferCountLow = static_cast<std::uint32_t>(transferTotalBytes);
+    object->transferCountHigh =
+      static_cast<std::uint32_t>(static_cast<std::uint64_t>(transferTotalBytes) >> 32);
+  }
+
+  /**
    * Address: 0x00B11740 (FUN_00B11740, xeci_more_work)
    *
    * What it does:
@@ -5010,19 +5058,27 @@
    */
   void* xeCiGetInterface()
   {
+    // Slot-for-slot with the shipped static table at 0x00F45B48. Four entries
+    // were wrong before: `getFileSize` (+0x08) was left null even though the
+    // binary points it at `xeCiGetFileSize`, `xeCiGetFileSize` was instead
+    // installed in `getFileSizeEx` (+0x5C) which the binary leaves null,
+    // `setSectorLength` (+0x34) was missing, and `requestWrite` (+0x24) held a
+    // no-op the binary does not have. The null `getFileSize` is what broke
+    // movie playback: `adxstmf_stat_exec` calls `cvFsGetFileSize` on every
+    // stream open, and the miss took the whole FS server lane down with it.
     xeci_vtbl.execServer = reinterpret_cast<CvFsNoArgOperationFn>(&xeCiExecServer);
     xeci_vtbl.registerUserErrorBridge = reinterpret_cast<CvFsRegisterUserErrorFn>(&xeCiEntryErrFunc);
+    xeci_vtbl.getFileSize = reinterpret_cast<CvFsPathOperationFn>(&xeCiGetFileSize);
     xeci_vtbl.openFile = reinterpret_cast<CvFsDeviceOpenFn>(&xeCiOpen);
     xeci_vtbl.closeFile = reinterpret_cast<CvFsCloseBridgeFn>(&xeCiClose);
     xeci_vtbl.seekFile = reinterpret_cast<CvFsSeekBridgeFn>(&xeCiSeek);
     xeci_vtbl.tellPosition = reinterpret_cast<CvFsHandleOperationFn>(&xeCiTell);
     xeci_vtbl.requestRead = reinterpret_cast<CvFsHandleReadWriteFn>(&xeCiReqRead);
-    xeci_vtbl.requestWrite = reinterpret_cast<CvFsHandleReadWriteFn>(&xeci_LegacyNoOpCallback);
     xeci_vtbl.stopTransfer = reinterpret_cast<CvFsHandleOperationFn>(&xeCiStopTr);
     xeci_vtbl.getStat = reinterpret_cast<CvFsGetStatBridgeFn>(&xeCiGetStat);
     xeci_vtbl.getSectorLength = reinterpret_cast<CvFsHandleOperationFn>(&xeCiGetSctLen);
+    xeci_vtbl.setSectorLength = reinterpret_cast<CvFsHandleOperationFn>(&xeCiSetSctLen);
     xeci_vtbl.getTransferCount = reinterpret_cast<CvFsHandleOperationFn>(&xeCiGetNumTr);
-    xeci_vtbl.getFileSizeEx = reinterpret_cast<CvFsPathArgOperationFn>(&xeCiGetFileSize);
     xeci_vtbl.option = reinterpret_cast<CvFsDeviceOptionFn>(&xeCiOptionFunc);
     return &xeci_vtbl;
   }

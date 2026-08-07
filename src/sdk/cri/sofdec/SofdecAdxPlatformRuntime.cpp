@@ -15912,7 +15912,13 @@
     auto* const runtime = AsAdxstmRuntimeView(streamHandle);
     runtime->sourceStreamedBytes = 0;
     runtime->streamErrorCount = 0;
-    runtime->streamStatus = (runtime->pendingReadSectors != 0) ? 2 : 3;
+    // `cmp [eax+14h], 0` at 0x00B0FA7C - the bound file length, not the pending
+    // read count at +0x20. A stream is started right after `MWSTM_SetFileRange`
+    // has bound a range but before the file is open, so the length is non-zero
+    // and the correct state is 2 (reading). Selecting on `pendingReadSectors`
+    // left it at 3, and `ADXSTMF_ExecHndl` only drives `adxstmf_stat_exec` for
+    // state 2, so the stream never issued a single read.
+    runtime->streamStatus = (runtime->fileLengthSectors != 0) ? 2 : 3;
     runtime->readFlag = 0;
     runtime->pendingChunk.bufferAddress = 0;
     runtime->pendingChunk.byteCount = 0;
