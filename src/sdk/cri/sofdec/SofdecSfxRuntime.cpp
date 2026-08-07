@@ -103,6 +103,10 @@ namespace moho_cri_sfx_internal {
 /// One SFX composition handle. `sfx_InitHn` clears all 0x94 bytes and then
 /// seeds the lanes below; `sfx_SearchFreeHn` walks the pool at stride 0x94
 /// testing the first dword.
+using SfxCnvFrmCallback = void(__cdecl*)(const std::int32_t* source, const std::int32_t* target, const std::int32_t* tableParams);
+using SfxCopyAlphaCallback = void(__cdecl*)(const std::int32_t* source, const std::int32_t* target, const std::int32_t* tableParams);
+using SfxMakeTableCallback = void(__cdecl*)(std::int32_t tableBase, std::int32_t param);
+
 struct SfxHandle {
   std::int32_t used;          ///< +0x00 set to 1 by sfx_InitHn
   std::int32_t reserved04;    ///< +0x04
@@ -118,19 +122,30 @@ struct SfxHandle {
   std::int32_t plane2;        ///< +0x40 plane1 + 1024
   std::int32_t plane3;        ///< +0x44 plane2 + 1024
   std::uint8_t mUnknown48[0x08]; ///< +0x48
-  std::int32_t workAddress;   ///< +0x50
+  /// +0x50 seeded with the raw work address by `sfx_InitHn`, then reused by
+  /// `SFX_CnvFrmARGB8888ByCbFunc` as the colour-adjust table base. Nothing
+  /// reads it back as a work address, so both writes stand.
+  std::int32_t tableBase;
   std::int32_t configTag;     ///< +0x54
-  std::int32_t reserved58;    ///< +0x58 seeded to -1
-  std::uint8_t mUnknown5C[0x08]; ///< +0x5C
-  std::int32_t reserved64;    ///< +0x64
-  std::uint8_t mUnknown68[0x2C]; ///< +0x68
+  std::int32_t splitField;    ///< +0x58 seeded to -1 = "decide from the stream"
+  std::int32_t progOut;       ///< +0x5C progressive-output request
+  std::int32_t mUnknown60;    ///< +0x60
+  std::int32_t cnvBottomUp;   ///< +0x64 write converted rows bottom-up
+  SfxCnvFrmCallback  cnvFrmCallback;    ///< +0x68 installed per pixel format
+  SfxCopyAlphaCallback copyAlphaCallback; ///< +0x6C
+  SfxMakeTableCallback colorAdjustTableCallback; ///< +0x70
+  std::uint8_t mUnknown74[0x20]; ///< +0x74
 };
 
 static_assert(sizeof(SfxHandle) == 0x94, "SfxHandle size must be 0x94");
 static_assert(offsetof(SfxHandle, sfxz) == 0x24, "SfxHandle::sfxz must live at offset 0x24");
 static_assert(offsetof(SfxHandle, sfxa) == 0x30, "SfxHandle::sfxa must live at offset 0x30");
 static_assert(offsetof(SfxHandle, planeBase) == 0x38, "SfxHandle::planeBase must live at offset 0x38");
-static_assert(offsetof(SfxHandle, workAddress) == 0x50, "SfxHandle::workAddress must live at offset 0x50");
+static_assert(offsetof(SfxHandle, tableBase) == 0x50, "SfxHandle::tableBase must live at offset 0x50");
+static_assert(offsetof(SfxHandle, splitField) == 0x58, "SfxHandle::splitField must live at offset 0x58");
+static_assert(offsetof(SfxHandle, progOut) == 0x5C, "SfxHandle::progOut must live at offset 0x5C");
+static_assert(offsetof(SfxHandle, cnvBottomUp) == 0x64, "SfxHandle::cnvBottomUp must live at offset 0x64");
+static_assert(offsetof(SfxHandle, cnvFrmCallback) == 0x68, "SfxHandle::cnvFrmCallback must live at offset 0x68");
 static_assert(offsetof(SfxHandle, configTag) == 0x54, "SfxHandle::configTag must live at offset 0x54");
 
 /// Handles the SFX pool holds. `sfx_InitLibWork` seeds `last` with this.
@@ -674,7 +689,7 @@ std::int32_t sfx_InitHn(
   std::memset(handle, 0, sizeof(*handle));
 
   const std::int32_t planeBase = (workAddress + (kSfxPlaneAlignBytes - 1)) & ~(kSfxPlaneAlignBytes - 1);
-  handle->workAddress = workAddress;
+  handle->tableBase = workAddress;
   handle->planeBase = planeBase;
   handle->plane1 = planeBase + kSfxPlaneStrideBytes;
   handle->plane2 = handle->plane1 + kSfxPlaneStrideBytes;
@@ -684,7 +699,7 @@ std::int32_t sfx_InitHn(
   // the two non-zero seeds and the -1 sentinel are left.
   *reinterpret_cast<std::int32_t*>(reinterpret_cast<std::uint8_t*>(handle) + 0x28) = 1;
   handle->configTag = configTag;
-  handle->reserved58 = -1;
+  handle->splitField = -1;
   handle->used = 1;
   return configTag;
 }
