@@ -105,8 +105,13 @@ namespace
   [[nodiscard]]
   moho::SZipFileNameIndexMapNode* NameIndexMapRoot(const moho::SZipFileNameIndexMap& map)
   {
-    if (IsNameIndexMapSentinel(map.mHead)) {
-      return map.mHead;
+    // The head node IS the nil sentinel - `InitializeNameIndexMap` builds it
+    // with `mIsNil = 1`, exactly as MSVC8's `_Myhead`. Testing it with
+    // `IsNameIndexMapSentinel` therefore always succeeded and this returned the
+    // head instead of `_Myhead->_Parent`, hiding the whole tree. Only a null
+    // map has no root.
+    if (map.mHead == nullptr) {
+      return nullptr;
     }
     return map.mHead->mParent;
   }
@@ -264,8 +269,13 @@ namespace
     moho::SZipFileNameIndexMap& map, const msvc8::string& canonicalPath, const std::uint32_t entryIndex
   )
   {
+    // Same trap as `NameIndexMapRoot`: the head is the nil sentinel, so a
+    // sentinel test here rejected every insert. The map stayed empty, every
+    // archive entry was reported as a duplicate (tens of thousands of log lines
+    // per run), and `CZipFile::FindFile` could never resolve anything, because
+    // the tree it searches was never built.
     moho::SZipFileNameIndexMapNode* const head = map.mHead;
-    if (IsNameIndexMapSentinel(head)) {
+    if (head == nullptr) {
       return false;
     }
 
