@@ -16934,6 +16934,196 @@
     return 0;
   }
 
+  // --- ADXM worker-thread lanes -------------------------------------------
+  //
+  // The three Sofdec worker threads, their ids, and the calling thread's own
+  // handle. `adxm_setup_thrd` creates them suspended and resumes them once the
+  // priorities are set; every SFD server tick runs on one of them.
+
+  /// Thread-creation hook. The engine plants its own factory here before
+  /// calling the setup, which is why the binary reads it indirectly rather
+  /// than calling _beginthreadex outright.
+  using AdxmBeginThreadEx = std::uintptr_t(__cdecl*)(
+    void* security,
+    unsigned stackSize,
+    unsigned(__stdcall* startAddress)(void*),
+    void* argList,
+    unsigned initFlag,
+    unsigned* threadId
+  );
+  AdxmBeginThreadEx adxm_beginthreadex = nullptr;
+
+  HANDLE adxm_vsync_thrdhn = nullptr;
+  HANDLE adxm_fs_thrdhn = nullptr;
+  HANDLE adxm_mwidle_thrdhn = nullptr;
+  HANDLE adxm_cur_thread = nullptr;
+  unsigned adxm_vsync_tid = 0;
+  unsigned adxm_fs_tid = 0;
+  unsigned adxm_mwidle_tid = 0;
+
+  /// Thread priorities, in creation order: vsync, fs, (unused), mwidle.
+  /// `adxm_setup_thrd` seeds {1, 1, ?, -2} when the caller supplies no
+  /// parameter block of its own.
+  std::array<std::int32_t, 4> adxm_thread_sprm{};
+
+  /// Each worker gets a 1 MB stack and is created suspended (flag 4).
+  constexpr unsigned kAdxmThreadStackBytes = 0x100000u;
+  constexpr unsigned kAdxmThreadCreateSuspended = 4u;
+
+  /// Every worker is pinned to CPU 0, as is the thread that set them up.
+  constexpr DWORD_PTR kAdxmThreadAffinity = 1u;
+
+  constexpr char kAdxmErrCreateVsyncThread[] =
+    "E02100911 : The error occurred within the CreateThread function.";
+  constexpr char kAdxmErrCreateFsThread[] =
+    "E02100912 : The error occurred within the CreateThread function.";
+  constexpr char kAdxmErrCreateMwidleThread[] =
+    "E02100913 : The error occurred within the CreateThread function.";
+  constexpr char kAdxmErrGetCurrentThread[] =
+    "E02100914 : The error occurred within the GetCurrentThread function.";
+  constexpr char kAdxmErrSetThreadAffinity[] =
+    "E02100916 : The error occurred within the SetThreadAffinityMask function.";
+  constexpr char kAdxmErrSetPriorityVsync[] =
+    "E02100921 : The error occurred within the SetThreadPriority function.";
+  constexpr char kAdxmErrSetPriorityFs[] =
+    "E02100922 : The error occurred within the SetThreadPriority function.";
+  constexpr char kAdxmErrSetPriorityMwidle[] =
+    "E02100923 : The error occurred within the SetThreadPriority function.";
+  constexpr char kAdxmErrBoostVsync[] =
+    "E02100931 : The error occurred within the SetThreadPriorityBoost function.";
+  constexpr char kAdxmErrBoostFs[] =
+    "E02100932 : The error occurred within the SetThreadPriorityBoost function.";
+  constexpr char kAdxmErrBoostMwidle[] =
+    "E02100933 : The error occurred within the SetThreadPriorityBoost function.";
+  constexpr char kAdxmErrBoostCurrent[] =
+    "E02100934 : The error occurred within the SetThreadPriorityBoost function.";
+
+  /**
+   * Address: 0x00B06FE0 (FUN_00B06FE0, _adxm_create_thrd)
+   *
+   * IDA signature:
+   * HANDLE __userpurge adxm_create_thrd@<eax>();
+   *
+   * What it does:
+   * Creates the three Sofdec worker threads suspended, takes a handle to the
+   * calling thread, and pins all four to CPU 0. Returns 0 on success and -1 on
+   * the first failure, after reporting it.
+   *
+   * The affinity pin is not incidental: the middleware uses a plain
+   * test-and-set for its own lock, so the workers and their creator are kept
+   * on one core.
+   *
+   * While this was absent, the thread bodies existed but no thread ever ran
+   * them, so the SFD decode server was never ticked and no movie frame was
+   * ever produced.
+   */
+  std::int32_t adxm_create_thrd()
+  {
+    if (adxm_beginthreadex == nullptr) {
+      return 0;
+    }
+
+    adxm_vsync_thrdhn = reinterpret_cast<HANDLE>(adxm_beginthreadex(
+      nullptr, kAdxmThreadStackBytes, adxm_vsync_proc, nullptr, kAdxmThreadCreateSuspended, &adxm_vsync_tid
+    ));
+    if (adxm_vsync_thrdhn == nullptr) {
+      SVM_CallErr1(kAdxmErrCreateVsyncThread);
+      return -1;
+    }
+
+    adxm_fs_thrdhn = reinterpret_cast<HANDLE>(adxm_beginthreadex(
+      nullptr, kAdxmThreadStackBytes, adxm_fs_proc, nullptr, kAdxmThreadCreateSuspended, &adxm_fs_tid
+    ));
+    if (adxm_fs_thrdhn == nullptr) {
+      SVM_CallErr1(kAdxmErrCreateFsThread);
+      return -1;
+    }
+
+    adxm_mwidle_thrdhn = reinterpret_cast<HANDLE>(adxm_beginthreadex(
+      nullptr, kAdxmThreadStackBytes, adxm_mwidle_proc, nullptr, kAdxmThreadCreateSuspended, &adxm_mwidle_tid
+    ));
+    if (adxm_mwidle_thrdhn == nullptr) {
+      SVM_CallErr1(kAdxmErrCreateMwidleThread);
+      return -1;
+    }
+
+    adxm_cur_thread = GetCurrentThread();
+    if (adxm_cur_thread == nullptr) {
+      SVM_CallErr1(kAdxmErrGetCurrentThread);
+      return -1;
+    }
+
+    const bool pinned =
+      SetThreadAffinityMask(adxm_vsync_thrdhn, kAdxmThreadAffinity) != 0 &&
+      SetThreadAffinityMask(adxm_fs_thrdhn, kAdxmThreadAffinity) != 0 &&
+      SetThreadAffinityMask(adxm_mwidle_thrdhn, kAdxmThreadAffinity) != 0 &&
+      SetThreadAffinityMask(adxm_cur_thread, kAdxmThreadAffinity) != 0;
+    if (!pinned) {
+      SVM_CallErr1(kAdxmErrSetThreadAffinity);
+      return -1;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x00B072D0 (FUN_00B072D0, _adxm_set_thrd_prio)
+   *
+   * What it does:
+   * Applies the configured priorities to the three workers and, on NT-family
+   * Windows only, disables the scheduler priority boost for all four threads.
+   * Every failure is reported and decrements the returned count, so the caller
+   * sees a negative value if anything went wrong but the remaining threads
+   * still get configured.
+   *
+   * The mwidle thread takes its priority from slot 3, not slot 2 - slot 2 is
+   * not read here.
+   */
+  std::int32_t adxm_set_thrd_prio()
+  {
+    std::int32_t failures = 0;
+
+    if (SetThreadPriority(adxm_vsync_thrdhn, adxm_thread_sprm[0]) == 0) {
+      SVM_CallErr1(kAdxmErrSetPriorityVsync);
+      failures = -1;
+    }
+    if (SetThreadPriority(adxm_fs_thrdhn, adxm_thread_sprm[1]) == 0) {
+      SVM_CallErr1(kAdxmErrSetPriorityFs);
+      --failures;
+    }
+    if (SetThreadPriority(adxm_mwidle_thrdhn, adxm_thread_sprm[3]) == 0) {
+      SVM_CallErr1(kAdxmErrSetPriorityMwidle);
+      --failures;
+    }
+
+    OSVERSIONINFOA versionInformation{};
+    versionInformation.dwOSVersionInfoSize = sizeof(versionInformation);
+    (void)GetVersionExA(&versionInformation);
+    if (versionInformation.dwPlatformId != VER_PLATFORM_WIN32_NT) {
+      return failures;
+    }
+
+    if (SetThreadPriorityBoost(adxm_vsync_thrdhn, TRUE) == 0) {
+      SVM_CallErr1(kAdxmErrBoostVsync);
+      --failures;
+    }
+    if (SetThreadPriorityBoost(adxm_fs_thrdhn, TRUE) == 0) {
+      SVM_CallErr1(kAdxmErrBoostFs);
+      --failures;
+    }
+    if (SetThreadPriorityBoost(adxm_mwidle_thrdhn, TRUE) == 0) {
+      SVM_CallErr1(kAdxmErrBoostMwidle);
+      --failures;
+    }
+    if (SetThreadPriorityBoost(adxm_cur_thread, TRUE) == 0) {
+      SVM_CallErr1(kAdxmErrBoostCurrent);
+      --failures;
+    }
+
+    return failures;
+  }
+
+
   /**
    * Address: 0x00B06E40 (FUN_00B06E40, _ADXM_GetLockLevel)
    *
