@@ -173,9 +173,13 @@ extern "C" {
   void* ahxtermsupplyfunc() { return nullptr; }
   void* cft_c_Ycc420plnToArgb8888Int1smp() { return nullptr; }
   void* cft_c_Ycc420plnToArgb8888Prg1smp() { return nullptr; }
-  void* cft_mmx_Ycc420plnToArgb8888UserTable() { return nullptr; }
+  // cft_mmx_Ycc420plnToArgb8888UserTable (0x00AF3040) and
+  // cft_sse_Ycc420plnToArgb8888UserTable (0x00AF2B20): real bodies in
+  // SofdecSvmTransferRuntime.cpp. These are the kernels that write the movie's
+  // pixels. While they stood as C-linkage stubs the whole pipeline reported
+  // success - the frame decoded, the texture was locked and unlocked - and
+  // every frame came out transparent black.
   void* cft_sse_Ycc420plnToArgb8888Int1smp() { return nullptr; }
-  void* cft_sse_Ycc420plnToArgb8888UserTable() { return nullptr; }
   void* decodeTsSub() { return nullptr; }
   // mpvcmc_InitMcOiTa: real body in SofdecMpvRuntime.cpp.
   void* mpvhdec_ReadKernelIntraIdcPrec3() { return nullptr; }
