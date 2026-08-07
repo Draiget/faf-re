@@ -317,7 +317,11 @@ extern "C" {
   void(*ahxsetdecsmplfunc)(void*, std::int32_t) = nullptr;
   void(*ahxsetextfunc)(void*, const std::int16_t*) = nullptr;
   std::int32_t(*SFPLY_SetPtsInfo)(std::int32_t, std::int32_t*) = nullptr;
-  int(*conceal_fn_tbl[256])(int) = {};
+  // conceal_fn_tbl (0x00D7FFFC) is a real four-entry dispatch table, not a
+  // zeroed buffer. MPVCONCEAL_StartFrame installs one of its slots as the
+  // handle's macroblock-discontinuity handler, so a null slot meant the first
+  // discontinuity in any picture called through a null pointer. Defined next
+  // to its four handlers in moho/movie/MPVDecoder.cpp.
 }
 
 // SFD_tr_sd_m2ts / SFD_tr_sd_mps / SFD_tr_vd_mpv are the binary's names for

@@ -409,7 +409,7 @@ namespace
      * boundaries.
      */
     int MPV_GoNextDelimSj(moho::movie::MPVSjStream* stream);
-    extern int(__cdecl* conceal_fn_tbl[])(int handleAddress);
+    unsigned int __cdecl concealOnExec(std::int32_t decoderAddress, unsigned int startMacroblock);
   }
 
   using moho::movie::MPVBitstreamState;
@@ -3662,6 +3662,93 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x00B00D80 (FUN_00B00D80, _concealOff)
+ *
+ * What it does:
+ * Nothing. This is the conceal-disabled entry of `conceal_fn_tbl`, so a
+ * decoder configured without concealment still has a callable handler at the
+ * discontinuity sites rather than a null slot.
+ */
+extern "C" void concealOff(int)
+{
+}
+
+/**
+ * Address: 0x00B00D90 (FUN_00B00D90, _concealOn)
+ *
+ * IDA signature:
+ * int __cdecl concealOn(int a1);
+ *
+ * What it does:
+ * Conceals the macroblocks between the conceal scan marker and the current
+ * decode position. A P picture with nothing already concealed takes the
+ * straight pixel-cloning path; otherwise the run is concealed by replaying it
+ * as a skip run with the motion state forced to "no motion" - the four
+ * prediction deltas are zeroed for the call and restored afterwards, as are
+ * the picture type and macroblock-type lanes it has to spoof to make the skip
+ * run behave like the right picture type.
+ */
+extern "C" int concealOn(const int handleAddress)
+{
+  constexpr int kPictureTypeI = 1;
+  constexpr int kPictureTypeP = 2;
+  constexpr int kPictureTypeB = 3;
+  constexpr int kMacroblockTypeForwardMotion = 8;
+  constexpr int kMacroblockTypeBackwardMotion = 4;
+  constexpr int kMacroblockTypeAnyMotion = kMacroblockTypeForwardMotion | kMacroblockTypeBackwardMotion;
+
+  auto* const handle = AsHandleView(handleAddress);
+  auto* const context = reinterpret_cast<MPVDecoderScanContext*>(handle);
+
+  const int concealStart =
+    (handle->concealScanStartMacroblock < 0) ? 0 : handle->concealScanStartMacroblock;
+
+  int& pictureType = handle->pictureAttributes.headerControlWords[6];
+  if (pictureType == kPictureTypeP && handle->postCreateMarker == 0) {
+    return static_cast<int>(concealOnExec(handleAddress, static_cast<unsigned int>(concealStart)));
+  }
+
+  // Save everything the spoofed skip run is about to trample.
+  const int savedForwardHorizontal = context->forwardPredictionVector.horizontalDelta;
+  const int savedForwardVertical = context->forwardPredictionVector.verticalDelta;
+  const int savedBackwardHorizontal = context->backwardPredictionVector.horizontalDelta;
+  const int savedBackwardVertical = context->backwardPredictionVector.verticalDelta;
+  const int savedMacroblockTypeFlags = context->macroblockTypeFlags;
+  const int savedPictureType = pictureType;
+
+  // An I picture has no skip run of its own, so conceal it as a P picture
+  // whose macroblocks all carry forward motion.
+  if (pictureType == kPictureTypeI) {
+    pictureType = kPictureTypeP;
+    context->macroblockTypeFlags = kMacroblockTypeForwardMotion;
+  }
+
+  if (pictureType == kPictureTypeP) {
+    context->macroblockTypeFlags |= kMacroblockTypeForwardMotion;
+  }
+  if (pictureType == kPictureTypeB && (context->macroblockTypeFlags & kMacroblockTypeAnyMotion) == 0) {
+    context->macroblockTypeFlags |= kMacroblockTypeBackwardMotion;
+  }
+
+  const int concealRunLength = context->macroblockLinearIndex - concealStart;
+
+  context->forwardPredictionVector.horizontalDelta = 0;
+  context->forwardPredictionVector.verticalDelta = 0;
+  context->backwardPredictionVector.horizontalDelta = 0;
+  context->backwardPredictionVector.verticalDelta = 0;
+
+  context->decodeSkipRun(context, static_cast<unsigned int>(concealRunLength + 1));
+
+  context->backwardPredictionVector.horizontalDelta = savedBackwardHorizontal;
+  context->forwardPredictionVector.verticalDelta = savedForwardVertical;
+  context->forwardPredictionVector.horizontalDelta = savedForwardHorizontal;
+  context->backwardPredictionVector.verticalDelta = savedBackwardVertical;
+  pictureType = savedPictureType;
+  context->macroblockTypeFlags = savedMacroblockTypeFlags;
+  return savedMacroblockTypeFlags;
+}
+
+/**
  * Address: 0x00B010F0 (FUN_00B010F0, _concealOffMarking)
  *
  * What it does:
@@ -3725,6 +3812,22 @@ extern "C" int concealOnMarking(const int handleAddress)
 }
 
 /**
+ * Address: 0x00D7FFFC
+ *
+ * Conceal-strategy dispatch, indexed by condition lane 12. Slot 0 is the
+ * no-op used when concealment is off; `MPVCONCEAL_StartFrame` copies the
+ * selected slot into the handle, and the three macroblock-discontinuity sites
+ * call it through there. A zeroed table put a null pointer in that lane, so
+ * the first discontinuity in any picture killed the decode thread outright.
+ */
+extern "C" int (__cdecl* conceal_fn_tbl[4])(int handleAddress) = {
+  reinterpret_cast<int(__cdecl*)(int)>(&::concealOff),
+  reinterpret_cast<int(__cdecl*)(int)>(&::concealOn),
+  reinterpret_cast<int(__cdecl*)(int)>(&::concealOffMarking),
+  reinterpret_cast<int(__cdecl*)(int)>(&::concealOnMarking),
+};
+
+/**
  * Address: 0x00B00D50 (FUN_00B00D50, _MPVCONCEAL_StartFrame)
  *
  * What it does:
@@ -3736,7 +3839,7 @@ extern "C" void MPVCONCEAL_StartFrame(const int handleAddress)
   MPVHandleInitView* const handle = AsHandleView(handleAddress);
   const int concealMode = handle->conditionCallbacks[kMpvConditionIndexConcealMode];
   handle->concealScanStartMacroblock = -1;
-  handle->concealFrameHandler = conceal_fn_tbl[concealMode];
+  handle->concealFrameHandler = ::conceal_fn_tbl[concealMode];
 }
 
 /**
