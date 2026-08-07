@@ -214,7 +214,10 @@ extern "C" {
   void* parse_PES_packet_sub() { return nullptr; }
   void* sfcre_AnalyMpa() { return nullptr; }
   // sfmpvf_IsChkFirst, sfmpvf_SetPicUsrBuf: real bodies in SofdecMpvRuntime.cpp.
-  void* sfply_ExecOne() { return nullptr; }
+  // sfply_ExecOne (0x00AD6F00): real body in SofdecSfdRuntime.cpp. This is the
+  // SFD playback state-machine pump. While it was a stub the machine never
+  // advanced, nothing was ever decoded, and every movie stayed black even
+  // though all five state handlers already had real bodies.
   // sfply_InitHn: real body in SofdecSfdRuntime.cpp (0x00AD7AE0). While this
   // stub stood, sfply_Create always returned null and every movie failed with
   // "E2012 mwPlyCreate:can't create SFD".
