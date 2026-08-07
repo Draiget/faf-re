@@ -150,7 +150,7 @@ extern "C" {
   void* SFX_DecideTableAlph3() { return nullptr; }
   void* SFX_GetCompoMode() { return nullptr; }
   void* SFX_MakeTable() { return nullptr; }
-  void* SFX_SetOutBufSize() { return nullptr; }
+  // SFX_SetOutBufSize (0x00ACCD50): real body in SofdecSfxRuntime.cpp.
   void* SFX_SetUnitWidth() { return nullptr; }
   void* SFX_SetZbit() { return nullptr; }
   void* SUD_AnalyTypeCcs() { return nullptr; }
@@ -422,4 +422,6 @@ namespace moho {
 int mwPlyGetSubtitle(moho::MwsfdPlaybackStateSubobj*, char*, int, int*) { return 0; }
 int mwPlyIsPause(moho::MwsfdPlaybackStateSubobj*) { return 0; }
 int mwPlyPause(moho::MwsfdPlaybackStateSubobj*, int) { return 0; }
-void mwPlyFxCnvFrmARGB8888(moho::MwsfdPlaybackStateSubobj*, const moho::MwsfdFrameInfo*, void*) {}
+// mwPlyFxCnvFrmARGB8888 (0x00ACC6E0): real body in cri/sofdec/SofdecSfxRuntime.cpp.
+// While this empty body stood, CMovie locked its texture sheet, wrote
+// nothing and unlocked it, so every movie frame arrived transparent black.
