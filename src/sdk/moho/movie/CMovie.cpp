@@ -569,7 +569,9 @@ namespace moho
    * Copies the movie texture shared-handle pair into caller output storage and
    * increments the shared owner refcount.
    */
-  CMovie::TextureSheetHandle* CMovie::GetTextureSheetHandle(TextureSheetHandle* const outHandle)
+  boost::shared_ptr<ID3DTextureSheet>* CMovie::GetTextureSheetHandle(
+    boost::shared_ptr<ID3DTextureSheet>* const outHandle
+  )
   {
     (void)boost::AssignSharedPairRetain(
       reinterpret_cast<boost::SharedCountPair*>(outHandle),

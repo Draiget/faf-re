@@ -1976,32 +1976,12 @@ namespace
     }
   }
 
-  class CMoviePlaybackInterface
-  {
-  public:
-    virtual ~CMoviePlaybackInterface() = default;
-    virtual void UnknownVirtual1() = 0;
-    virtual void UnknownVirtual2() = 0;
-    virtual void PlayMovie() = 0;
-    virtual void StopMovie() = 0;
-    virtual void RestartMovie() = 0;
-    [[nodiscard]] virtual bool IsLoaded() = 0;
-    [[nodiscard]] virtual bool HasPlaybackFinished() = 0;
-    virtual void StepPlayback() = 0;
-    virtual void UnknownVirtual8() = 0;
-    virtual void UnknownVirtual9() = 0;
-    [[nodiscard]] virtual std::int32_t GetFrameCount() = 0;
-    [[nodiscard]] virtual float GetFrameRate() = 0;
-    [[nodiscard]] virtual const msvc8::string* GetSubtitleText() = 0;
-    virtual void GetTexture(boost::shared_ptr<moho::CD3DBatchTexture>* texture) = 0;
-  };
-
   struct CMauiMovieRuntimeView : moho::CMauiControlFrameUpdateRuntimeView
   {
     std::uint8_t mUnknown0ECTo0F3[0x8]{};
     float mTextureU = 0.0f; // +0xF4
     std::uint8_t mUnknown0F8To11B[0x24]{};
-    CMoviePlaybackInterface* mMovie = nullptr; // +0x11C
+    moho::CMovie* mMovie = nullptr; // +0x11C
     bool mIsPlaying = false; // +0x120
     bool mDoLoop = false;    // +0x121
     bool mIsStopped = false; // +0x122
@@ -15614,18 +15594,17 @@ bool moho::CMauiMovie::LoadFile(const char* const filename)
   moho::CMovie::AllocateAndConstruct(&newMovie);
 
   // Swap it into the movie slot, deleting the previous movie (if distinct)
-  // through the IMovie virtual deleting destructor. mMovie is the overlay's
-  // CMoviePlaybackInterface* view of the concrete CMovie stored by the binary.
-  moho::CMovie* const previousMovie = reinterpret_cast<moho::CMovie*>(movieView->mMovie);
+  // through the IMovie virtual deleting destructor.
+  moho::CMovie* const previousMovie = movieView->mMovie;
   if (newMovie != previousMovie && previousMovie != nullptr) {
     delete previousMovie;
   }
-  movieView->mMovie = reinterpret_cast<CMoviePlaybackInterface*>(newMovie);
+  movieView->mMovie = newMovie;
 
   if (!newMovie->OpenMovie(filename)) {
     gpg::Warnf("Error opening movie %s", filename);
     if (movieView->mMovie != nullptr) {
-      delete reinterpret_cast<moho::CMovie*>(movieView->mMovie);
+      delete movieView->mMovie;
     }
     movieView->mMovie = nullptr;
     movieView->mIsPlaying = false;
@@ -15648,7 +15627,7 @@ bool moho::CMauiMovie::LoadFile(const char* const filename)
  * Tears down one movie control in-place in reverse construction order:
  * destroys `mMovieHeightLV` (+0x154), destroys `mMovieWidthLV` (+0x140),
  * releases `mSubtitleCache` string storage (+0x124), deletes the
- * `CMoviePlaybackInterface* mMovie` (+0x11C) via its virtual deleting
+ * `moho::CMovie* mMovie` (+0x11C) via its virtual deleting
  * destructor when non-null, and then chains into `CMauiControl::~CMauiControl`
  * through the compiler-emitted base-class teardown.
  *
@@ -15703,14 +15682,14 @@ void moho::CMauiMovie::Frame(const float deltaSeconds)
     return;
   }
 
-  CMoviePlaybackInterface* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = movieView->mMovie;
   if (moviePlayback == nullptr) {
     return;
   }
 
   if (moviePlayback->HasPlaybackFinished()) {
     if (movieView->mDoLoop) {
-      moviePlayback->RestartMovie();
+      moviePlayback->StartMoviePlaybackFromName();
     } else {
       movieView->mIsPlaying = false;
       CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
@@ -15719,7 +15698,7 @@ void moho::CMauiMovie::Frame(const float deltaSeconds)
     return;
   }
 
-  moviePlayback->StepPlayback();
+  moviePlayback->UpdatePlaybackFrame();
 
   const msvc8::string* const subtitle = moviePlayback->GetSubtitleText();
   if (subtitle != nullptr && movieView->mSubtitleCache.view() != subtitle->view()) {
@@ -15740,7 +15719,7 @@ void moho::CMauiMovie::DoRender(CD3DPrimBatcher* const primBatcher, const std::i
   (void)drawMask;
 
   CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  CMoviePlaybackInterface* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = movieView->mMovie;
   if (moviePlayback == nullptr || !movieView->mIsPlaying) {
     return;
   }
@@ -15751,9 +15730,12 @@ void moho::CMauiMovie::DoRender(CD3DPrimBatcher* const primBatcher, const std::i
   const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
   const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
 
-  boost::shared_ptr<CD3DBatchTexture> movieTexture{};
-  moviePlayback->GetTexture(&movieTexture);
-  primBatcher->SetTexture(movieTexture);
+  // Slot 14 hands back a retained (px, pi) pair, which the binary pushes as
+  // two words into the sheet overload of SetTexture (0x00438870) - not the
+  // CD3DBatchTexture overload.
+  boost::shared_ptr<ID3DTextureSheet> movieSheet{};
+  moviePlayback->GetTextureSheetHandle(&movieSheet);
+  primBatcher->SetTexture(movieSheet);
 
   const float textureU = movieView->mTextureU;
 
@@ -15805,9 +15787,9 @@ void moho::CMauiMovie::OnMinimized(const bool minimized)
 
   if (minimized) {
     if (movieView->mIsPlaying && !movieView->mIsStopped) {
-      CMoviePlaybackInterface* const moviePlayback = movieView->mMovie;
+      moho::CMovie* const moviePlayback = movieView->mMovie;
       if (moviePlayback != nullptr) {
-        moviePlayback->StopMovie();
+        moviePlayback->Stop();
         movieView->mIsMinimized = true;
         CMauiControl::OnMinimized(minimized);
         return;
@@ -15841,7 +15823,7 @@ void moho::CMauiMovie::Loop(const bool shouldLoop)
 void moho::CMauiMovie::Play()
 {
   CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  CMoviePlaybackInterface* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = movieView->mMovie;
 
   movieView->mIsPlaying = false;
   CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
@@ -15861,10 +15843,10 @@ void moho::CMauiMovie::Play()
 void moho::CMauiMovie::Stop()
 {
   CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  CMoviePlaybackInterface* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = movieView->mMovie;
   if (moviePlayback != nullptr) {
     movieView->mIsStopped = true;
-    moviePlayback->StopMovie();
+    moviePlayback->Stop();
   }
 }
 
