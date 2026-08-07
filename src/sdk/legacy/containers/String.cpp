@@ -54,6 +54,38 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
     return *this;
 }
 
+msvc8::string::string(string&& other) noexcept {
+    alVal = other.alVal;
+    bx = other.bx;
+    mySize = other.mySize;
+    myRes = other.myRes;
+    other.alVal = nullptr;
+    other.bx.buf[0] = '\0';
+    other.mySize = 0;
+    other.myRes = 15;
+}
+
+msvc8::string& msvc8::string::operator=(string&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    // Release whatever this string owned before taking the source's buffer;
+    // without this the displaced block would leak exactly as the copy
+    // assignment used to.
+    tidy(true, 0U);
+
+    alVal = other.alVal;
+    bx = other.bx;
+    mySize = other.mySize;
+    myRes = other.myRes;
+    other.alVal = nullptr;
+    other.bx.buf[0] = '\0';
+    other.mySize = 0;
+    other.myRes = 15;
+    return *this;
+}
+
 msvc8::string::string(const char* s) noexcept {
     alVal = nullptr;
     bx.buf[0] = '\0';
