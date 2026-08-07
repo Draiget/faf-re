@@ -256,8 +256,15 @@ namespace moho
      * What it does:
      * Copies the movie texture shared-handle `(px,pi)` pair into caller output
      * storage and retains one shared owner reference.
+     *
+     * The out parameter is a real `boost::shared_ptr`, not the raw pair the
+     * member lane uses: the only caller, `CMauiMovie::DoRender`, hands the
+     * result straight to `CD3DPrimBatcher::SetTexture(shared_ptr<...>)`, which
+     * the binary calls at 0x00438870 by pushing the pair as two words.
      */
-    virtual TextureSheetHandle* GetTextureSheetHandle(TextureSheetHandle* outHandle);
+    virtual boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
+      boost::shared_ptr<ID3DTextureSheet>* outHandle
+    );
 
   public:
     DeviceEventListenerLane mDeviceListener{}; // +0x04
