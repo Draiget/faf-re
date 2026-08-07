@@ -64,7 +64,11 @@ extern "C" {
   // This is what creates the three Sofdec worker threads. While it was a
   // stub none of them existed, so nothing ticked the SFD decode server and
   // no movie frame was ever decoded.
-  void* ADXM_WaitVsync() { return nullptr; }
+  // ADXM_WaitVsync (0x00B06E60) parks the caller until the multimedia-timer
+  // tick pulses the vsync event. Returning immediately turned every caller's
+  // pacing loop into a busy spin - CMovie::OpenMovie's prepare loop in
+  // particular, which then starved the Sofdec server threads it was waiting on.
+  // Recovered next to the timer tick in cri/sofdec/SofdecMwPlaybackRuntime.cpp.
   void* ADXPC_SetupSoundDirectSound8() { return nullptr; }
   void* ADXRNA_ExecHndl() { return nullptr; }
   void* ADXT_AttachDolbyProLogicII() { return nullptr; }

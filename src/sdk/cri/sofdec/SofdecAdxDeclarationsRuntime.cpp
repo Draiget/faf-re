@@ -3819,11 +3819,26 @@
   std::int32_t gAdxmTimerSwitchState = 0;
   std::int32_t gAdxmTimerSwitchSignal = 0;
   MMRESULT gAdxmMultimediaTimerId = 0;
-  LPTIMECALLBACK gAdxmMultimediaTimerCallback = nullptr;
   HANDLE gAdxmSyncEventHandle = nullptr;
   std::int64_t gAdxmPerformanceFrequency = 0;
   LARGE_INTEGER gAdxmLastSyncCounter{};
   LARGE_INTEGER gAdxmProbeCounter{};
+
+  /**
+   * Address: 0x01059080 / 0x01059070 / 0x01059078 / 0x01059098
+   *
+   * Timing lanes the 1 ms multimedia-timer tick keeps between firings: the
+   * performance-counter origin the current vsync cadence is measured from, the
+   * deadline of the tick being scheduled, the tick ordinal within the current
+   * frame, and the frame-repeat count the scanline probe derives its slack
+   * from. All four are only live once a vsync interval has been published
+   * through `ADXM_SetVsyncInterval`; with no interval the tick just re-arms
+   * itself at the fixed fallback period.
+   */
+  std::int64_t gAdxmVsyncOriginCounter = 0;
+  std::int64_t gAdxmVsyncTickDeadline = 0;
+  std::int64_t gAdxmVsyncTickOrdinal = 0;
+  std::int32_t gAdxmVsyncFrameRepeatCount = 0;
   std::int32_t gAdxmInterval1 = 0;
   struct AdxmMwIdleSleepCallbackBinding
   {
