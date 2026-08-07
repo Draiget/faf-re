@@ -17067,6 +17067,94 @@
     return 0;
   }
 
+  /// Each worker gets up to 30 one-second attempts to notice its exit flag.
+  constexpr std::int32_t kAdxmThreadStopAttempts = 30;
+  constexpr DWORD kAdxmThreadStopWaitMs = 1000u;
+
+  /// Priority a thread is nudged to while it is being asked to exit, so it
+  /// gets scheduled promptly enough to see the flag.
+  constexpr std::int32_t kAdxmThreadStopPriority = 2;
+
+  constexpr char kAdxmErrStopVsyncTimeout[] = "02100901: Timeout Error: adxm_destroy_thrd (vsync)";
+  constexpr char kAdxmErrStopFsTimeout[] = "02100902: Timeout Error: ADXWIN_DisableFsThrd";
+  constexpr char kAdxmErrStopMwIdleTimeout[] = "02100903: Timeout Error: adxm_destroy_thrd (mwidle)";
+
+  /**
+   * Asks one worker thread to exit and waits for it.
+   *
+   * The loop is what the binary spells out three times: raise the exit flag,
+   * bump the priority, resume in case the thread is suspended, then wait a
+   * second. `WAIT_TIMEOUT` means it has not noticed yet, so try again - up to
+   * 30 times. Returns true when the thread stopped, false on timeout.
+   */
+  [[nodiscard]] bool adxm_StopWorkerThread(
+    HANDLE& threadHandle, std::int32_t& loopFlag, std::int32_t& exitFlag, const char* const timeoutMessage
+  )
+  {
+    std::int32_t attempt = 0;
+    for (; attempt < kAdxmThreadStopAttempts; ++attempt) {
+      loopFlag = 1;
+      SetThreadPriority(threadHandle, kAdxmThreadStopPriority);
+      ResumeThread(threadHandle);
+      if (WaitForSingleObject(threadHandle, kAdxmThreadStopWaitMs) != WAIT_TIMEOUT) {
+        break;
+      }
+    }
+
+    const bool stopped = attempt != kAdxmThreadStopAttempts;
+    if (!stopped) {
+      SVM_CallErr1(timeoutMessage);
+    }
+
+    exitFlag = 0;
+    loopFlag = 0;
+    CloseHandle(threadHandle);
+    return stopped;
+  }
+
+  /**
+   * Address: 0x00B07120 (FUN_00B07120, _adxm_destroy_thrd)
+   *
+   * IDA signature:
+   * int adxm_destroy_thrd();
+   *
+   * What it does:
+   * Stops and closes the three Sofdec worker threads. Each is asked to exit up
+   * to thirty times, a second apart, being resumed and bumped in priority each
+   * round so it actually gets scheduled to see the flag. A thread that never
+   * stops is reported and decrements the returned count, but teardown carries
+   * on to the remaining threads either way.
+   *
+   * `adxm_setup_thrd` calls this on its own failure path, before SVM_Finish.
+   *
+   * The three timeout strings are as the binary spells them - note the fs one
+   * names ADXWIN_DisableFsThrd rather than this function, which is a quirk of
+   * the original source, not a transcription slip.
+   */
+  std::int32_t adxm_destroy_thrd()
+  {
+    std::int32_t failures = 0;
+
+    if (adxm_vsync_thrdhn != nullptr &&
+        !adxm_StopWorkerThread(adxm_vsync_thrdhn, gAdxmVsyncLoop, gAdxmVsyncExit, kAdxmErrStopVsyncTimeout)) {
+      failures = -1;
+    }
+
+    if (adxm_fs_thrdhn != nullptr &&
+        !adxm_StopWorkerThread(adxm_fs_thrdhn, gAdxmFsLoop, gAdxmFsExit, kAdxmErrStopFsTimeout)) {
+      --failures;
+    }
+
+    if (gAdxmMwIdleThreadHandle != nullptr &&
+        !adxm_StopWorkerThread(
+          gAdxmMwIdleThreadHandle, gAdxmMwIdleLoop, gAdxmMwIdleExit, kAdxmErrStopMwIdleTimeout
+        )) {
+      --failures;
+    }
+
+    return failures;
+  }
+
   /**
    * Address: 0x00B072D0 (FUN_00B072D0, _adxm_set_thrd_prio)
    *
