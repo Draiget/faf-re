@@ -54,6 +54,25 @@ namespace msvc8
         string& operator=(const string& other) noexcept;
 
         /**
+         * Move semantics: transfer the buffer and leave the source an empty
+         * inline string, so ownership stays single and nothing is copied.
+         *
+         * MSVC8's basic_string had no move operations - it did not need them,
+         * because its destructor freed whatever a relocation displaced. This
+         * reconstruction has no destructor (see above), so before these existed
+         * every `std::move` fell back on the copy assignment: it allocated a
+         * fresh buffer for the copy and abandoned the one it displaced.
+         *
+         * `msvc8::vector::erase` moves the whole tail down one slot per erased
+         * element. With the log window's committed history at tens of thousands
+         * of lines, one capped log write leaked that many blocks, and a busy
+         * logging window exhausted the heap - `assign_owned` then memcpy'd
+         * through a failed allocation.
+         */
+        string(string&& other) noexcept;
+        string& operator=(string&& other) noexcept;
+
+        /**
          * From C-string: copies, as MSVC8's own converting ctor does. Input of
          * 15 characters or fewer lands in the inline buffer, longer input gets
          * its own heap block.

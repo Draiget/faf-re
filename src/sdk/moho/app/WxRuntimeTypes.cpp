@@ -60405,22 +60405,33 @@ void moho::WWinLogWindow::AppendCommittedLine(
  * Address: 0x004F6470 (FUN_004F6470)
  *
  * What it does:
- * Merges pending lines into committed history and refreshes output when the
- * committed count changed.
+ * Merges pending lines into committed history, then appends just the lines the
+ * merge added to the visible output.
+ *
+ * The count is sampled before the merge (`0x004F647C..0x004F64A4`) and the
+ * loop at `0x004F64C0` walks `[previousCount, CommittedLineCount())` one entry
+ * at a time through `AppendCommittedLine` (0x004F5AE0), re-reading the count
+ * each iteration. It does NOT rebuild the whole visible list: doing that
+ * cleared the output control and replayed every committed line on every single
+ * log message, which is quadratic once the 10,000-line cap is reached - the
+ * engine appeared to hang, and the repeated full walk raced the other threads
+ * that log into the same target.
  */
 void moho::WWinLogWindow::OnTargetPendingLinesChanged(
   const CLogAdditionEvent& event
 )
 {
   (void)event;
-  if (mOwnerTarget == nullptr) {
+  CWinLogTarget* const target = mOwnerTarget;
+  if (target == nullptr) {
     return;
   }
 
-  const std::size_t previousCommittedLineCount = mOwnerTarget->CommittedLineCount();
-  mOwnerTarget->MergePendingLines();
-  if (previousCommittedLineCount != mOwnerTarget->CommittedLineCount()) {
-    RebuildVisibleLinesFromControls();
+  std::size_t index = target->CommittedLineCount();
+  target->MergePendingLines();
+  while (index < target->CommittedLineCount()) {
+    AppendCommittedLine(target->CommittedLines()[index]);
+    ++index;
   }
 }
 
