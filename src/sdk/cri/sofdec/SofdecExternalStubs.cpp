@@ -290,9 +290,11 @@ extern "C" {
 // These live in .bss/.data in the FA binary; we provide zero-initialised
 // stand-ins so the link succeeds. Movies won't play until recovered.
 extern "C" {
-  int sfmpv_fps_round = 0;
-  int sfmpv_conv_29_97 = 0;
-  int sfmpv_conv_59_94 = 0;
+  // sfmpv_fps_round (0x00D7F60C), sfmpv_conv_29_97 (0x00D7F630) and
+  // sfmpv_conv_59_94 (0x00D7F650) are real timecode tables, not scalars. As
+  // zeroed ints they made sfmpv_Pts2Tc divide by zero on the first picture
+  // header, killing the MPV decode thread outright. Defined from the binary
+  // bytes next to sfmpv_Pts2Tc in cri/sofdec/SofdecMpvRuntime.cpp.
   // sfmpv_work is the MPV work arena, not a scalar - a 4-byte stub here meant
   // MPV_Init's 264 KB clear ran straight off the end of it. Sized properly in
   // cri/sofdec/SofdecMpvRuntime.cpp next to SFMPV_Init, its only real user.

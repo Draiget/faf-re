@@ -828,7 +828,23 @@ namespace
     return value;
   }
 
-  inline void LoadBitstreamFromChunk(const MPVSjChunk& chunk, const int bitAlignment, MPVBitstreamState& bitstreamState)
+  /**
+   * Bytes the header decoders skip past the aligned base before loading their
+   * first bit window. `mpvhdec_DecShcSj` / `DecGscSj` / `DecPscSj` all do
+   * `and <reg>, 0FFFFFFFCh` immediately followed by `add <reg>, 4` (e.g.
+   * 0x00AE8E2A / 0x00AE8E2E), because the chunk they are handed still starts
+   * with the four-byte `00 00 01 xx` start code and the header fields begin
+   * after it. The slice loader at 0x00C0CD50 has no such `add` and reads
+   * straight from the aligned base, so it passes zero.
+   */
+  constexpr int kMpvHeaderStartCodeSkipBytes = 4;
+
+  inline void LoadBitstreamFromChunk(
+    const MPVSjChunk& chunk,
+    const int bitAlignment,
+    MPVBitstreamState& bitstreamState,
+    const int alignedBaseSkipBytes = 0
+  )
   {
     std::uint8_t* alignedData =
       reinterpret_cast<std::uint8_t*>(reinterpret_cast<std::uintptr_t>(chunk.data) & static_cast<std::uintptr_t>(0xFFFFFFFCu));
@@ -836,9 +852,10 @@ namespace
     const int chunkBitOffset = byteOffset * 8;
     int bitCount = bitAlignment + chunkBitOffset;
 
-    std::uint32_t bitWindowPrimary = ReadBigEndianWord(alignedData) << chunkBitOffset;
-    std::uint32_t bitWindowSecondary = ReadBigEndianWord(alignedData + 4);
-    std::uint8_t* byteCursor = alignedData + 8;
+    std::uint8_t* const windowBase = alignedData + alignedBaseSkipBytes;
+    std::uint32_t bitWindowPrimary = ReadBigEndianWord(windowBase) << chunkBitOffset;
+    std::uint32_t bitWindowSecondary = ReadBigEndianWord(windowBase + 4);
+    std::uint8_t* byteCursor = windowBase + 8;
 
     if (bitCount < 32) {
       bitWindowPrimary <<= bitAlignment;
@@ -934,7 +951,7 @@ namespace
   inline void LoadHeaderChunkBitstream(MPVHandleInitView* handle, MPVSjStream* stream, MPVBitstreamState& bitstreamState)
   {
     SjRequestChunk(stream, handle->activeHeaderChunk);
-    LoadBitstreamFromChunk(handle->activeHeaderChunk, 0, bitstreamState);
+    LoadBitstreamFromChunk(handle->activeHeaderChunk, 0, bitstreamState, kMpvHeaderStartCodeSkipBytes);
   }
 
   inline int ComputeHeaderChunkSplitOffset(const MPVHandleInitView* handle, const MPVBitstreamState& bitstreamState)

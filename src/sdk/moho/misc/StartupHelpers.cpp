@@ -364,24 +364,30 @@ namespace
   {
     std::int32_t headerValid = 0;            // +0x00
     std::int32_t streamType = 0;             // +0x04
-    std::int32_t reserved08 = 0;             // +0x08
-    std::int32_t reserved0C = 0;             // +0x0C
+    std::int32_t videoWidth = 0;             // +0x08
+    std::int32_t videoHeight = 0;            // +0x0C
     std::int32_t frameRateTimes1000 = 0;     // +0x10
     std::int32_t frameCount = 0;             // +0x14
-    std::int32_t reserved18 = 0;             // +0x18
-    std::int32_t reserved1C = 0;             // +0x1C
-    std::int32_t reserved20 = 0;             // +0x20
-    std::int32_t reserved24 = 0;             // +0x24
-    std::int32_t reserved28 = 0;             // +0x28
+    std::int32_t compositionMode = 0;        // +0x18
+    std::int32_t videoChannelCount = 0;      // +0x1C
+    std::int32_t audioChannelCount = 0;      // +0x20
+    std::int32_t streamTimingMetric = 0;     // +0x24
+    std::int32_t frameCountLowByte = 0;      // +0x28
   };
 
   static_assert(offsetof(SofdecHeaderInfoRuntimeView, headerValid) == 0x00, "headerValid offset must be 0x00");
   static_assert(offsetof(SofdecHeaderInfoRuntimeView, streamType) == 0x04, "streamType offset must be 0x04");
+  static_assert(offsetof(SofdecHeaderInfoRuntimeView, videoWidth) == 0x08, "videoWidth offset must be 0x08");
+  static_assert(offsetof(SofdecHeaderInfoRuntimeView, videoHeight) == 0x0C, "videoHeight offset must be 0x0C");
   static_assert(
     offsetof(SofdecHeaderInfoRuntimeView, frameRateTimes1000) == 0x10,
     "frameRateTimes1000 offset must be 0x10"
   );
   static_assert(offsetof(SofdecHeaderInfoRuntimeView, frameCount) == 0x14, "frameCount offset must be 0x14");
+  static_assert(
+    offsetof(SofdecHeaderInfoRuntimeView, compositionMode) == 0x18,
+    "compositionMode offset must be 0x18"
+  );
   static_assert(sizeof(SofdecHeaderInfoRuntimeView) == 0x2C, "SofdecHeaderInfoRuntimeView size must be 0x2C");
 
   struct SofdecCreateInfoRuntimeView
@@ -508,15 +514,15 @@ namespace
         unsigned int headerKind = 0;
         if (SFH_IsSfdHeader(handle, &headerKind) == 1 && headerKind == 1) {
           headerInfo->frameCount = mwsffrm_AnalyTotalFrm(handle);
-          headerInfo->reserved18 = mwsffrm_AnalyFxType(handle);
-          headerInfo->reserved1C = mwsffrm_GetNumVideoCh(handle);
-          headerInfo->reserved20 = mwsffrm_GetNumAudioCh(handle);
+          headerInfo->compositionMode = mwsffrm_AnalyFxType(handle);
+          headerInfo->videoChannelCount = mwsffrm_GetNumVideoCh(handle);
+          headerInfo->audioChannelCount = mwsffrm_GetNumAudioCh(handle);
           SFH_Destroy(handle);
           return;
         }
 
         headerInfo->frameCount = -1;
-        headerInfo->reserved18 = -1;
+        headerInfo->compositionMode = -1;
         SFH_Destroy(handle);
       }
 
@@ -561,12 +567,19 @@ namespace
       return 0;
     }
 
+    // Field-for-field as 0x00AC8E6C..0x00AC8E9C writes them: the analysed
+    // create-info's width lands at +0x08 and its height at +0x0C - which is
+    // where `CMovie::OpenMovie` reads the frame size it hands to
+    // `mwPlyCreateSofdec` as maxWidth/maxHeight. The remaining lanes at
+    // +0x14..+0x20 are filled by `MWSFFRM_AnalyzeSofdecHeader` below, so
+    // nothing is written to them here.
     parsedHeader.streamType = mwsfcre_DecideFtypeByHdrInf(&createInfo);
+    parsedHeader.videoWidth = createInfo.videoWidthPixels;
+    parsedHeader.videoHeight = createInfo.videoHeightPixels;
     parsedHeader.frameRateTimes1000 = createInfo.videoFrameMetric;
-    parsedHeader.reserved18 = createInfo.videoHeightPixels;
-    parsedHeader.reserved1C = createInfo.videoWidthPixels;
-    parsedHeader.frameCount = createInfo.frameCountMetric;
-    parsedHeader.reserved24 = createInfo.extraMetric;
+    parsedHeader.streamTimingMetric = createInfo.extraMetric;
+    parsedHeader.frameCountLowByte =
+      static_cast<std::int32_t>(static_cast<std::int8_t>(createInfo.frameCountMetric & 0xFF));
     MWSFFRM_AnalyzeSofdecHeader(buffer, size, &parsedHeader);
     parsedHeader.headerValid = mwsfdcre_IsPlayableByHdrInf(&parsedHeader);
     std::memcpy(outHeaderInfo, &parsedHeader, sizeof(parsedHeader));
