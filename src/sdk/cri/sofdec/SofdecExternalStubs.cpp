@@ -69,7 +69,12 @@ extern "C" {
   void* ADXRNA_ExecHndl() { return nullptr; }
   void* ADXT_AttachDolbyProLogicII() { return nullptr; }
   void* ADXT_DetachMPEG2AAC() { return nullptr; }
-  void* ADXT_Init() { return nullptr; }
+  // ADXT_Init (0x00B0A390): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This is the ADX runtime bootstrap
+  // and, critically, the registrar for the three ADXT server callbacks. While
+  // it was a stub nothing ever registered adxt_exec_fssvr on the FS lane, so
+  // adxstm_ExecServer never ran and no ADXSTM slot was ever serviced: movies
+  // bound their file, started their stream, and read zero bytes forever.
   void* CRIERR_CallErr() { return nullptr; }
   void* M2TSD_Init() { return nullptr; }
   void* M2T_Create() { return nullptr; }
