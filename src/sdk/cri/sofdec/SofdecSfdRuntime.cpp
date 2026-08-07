@@ -15923,6 +15923,95 @@
     return 0;
   }
 
+  /// SFPLY handle states, as `sfply_ExecOne` dispatches on them.
+  enum : std::int32_t
+  {
+    kSfplyStateStop = 1,
+    kSfplyStatePrep = 2,
+    kSfplyStateStby = 3,
+    kSfplyStatePlay = 4,
+    kSfplyStateFin = 6,
+  };
+
+  /// `sfply_ExecOne` accumulates its own elapsed time into the last of the six
+  /// timer summary lanes (`timerInfo + 0xA0` in the disassembly).
+  constexpr std::size_t kSfplyExecOneTimerSummary = 5;
+
+  /**
+   * Address: 0x00AD6F00 (FUN_00AD6F00, _sfply_ExecOne)
+   *
+   * IDA signature:
+   * void __cdecl sfply_ExecOne(_DWORD *a1);
+   *
+   * What it does:
+   * One tick of the SFD playback state machine. This is the pump: it consumes
+   * the pending-tick flag, runs the transfer and seek servers for the states
+   * that stream, then dispatches to the handler for the current state and
+   * stores whatever state that handler returns.
+   *
+   * While this was a `{ return nullptr; }` C-linkage stub the machine never
+   * advanced and no frame was ever decoded, so mwPlyGetCurFrm always came back
+   * with a null SFD frame and every movie stayed black - even though all five
+   * state handlers below already had real bodies.
+   *
+   * Two details worth keeping: the state is re-read after the servers run,
+   * because they can advance it, and states outside the switch fall through
+   * with the state left as-is rather than being zeroed.
+   *
+   * The binary body is `void`; the shared declaration is int-returning and its
+   * callers discard the value, so a defined 0 is returned rather than
+   * propagating an undefined register.
+   */
+  std::int32_t sfply_ExecOne(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    const std::int32_t entryState = workctrlSubobj->handleState;
+    const bool isPumpedState =
+      entryState == kSfplyStateStop || entryState == kSfplyStatePrep ||
+      entryState == kSfplyStateStby || entryState == kSfplyStatePlay;
+    if (!isPumpedState || workctrlSubobj->initialized == 0) {
+      return 0;
+    }
+
+    workctrlSubobj->initialized = 0;
+    const std::int64_t startTicks = SFTMR_GetTmr();
+
+    if (entryState != kSfplyStateStop) {
+      (void)sfply_ExecOneSub(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)));
+    }
+
+    // Re-read: the transfer and seek servers above can move the state on.
+    std::int32_t nextState = workctrlSubobj->handleState;
+    switch (nextState) {
+      case kSfplyStateStop:
+        nextState = sfply_StatStop(workctrlSubobj);
+        break;
+      case kSfplyStatePrep:
+        nextState = sfply_StatPrep(workctrlSubobj);
+        break;
+      case kSfplyStateStby:
+        nextState = sfply_StatStby(workctrlSubobj);
+        break;
+      case kSfplyStatePlay:
+        nextState = sfply_StatPlay(workctrlSubobj);
+        break;
+      case kSfplyStateFin:
+        nextState = sfply_StatFin(workctrlSubobj);
+        break;
+      default:
+        // Left unchanged, exactly as the binary does.
+        break;
+    }
+    workctrlSubobj->handleState = nextState;
+
+    const std::int64_t elapsedTicks = SFTMR_GetTmr() - startTicks;
+    (void)SFTMR_AddTsum(
+      &workctrlSubobj->timerInfo.summaries[kSfplyExecOneTimerSummary],
+      static_cast<std::int32_t>(elapsedTicks & 0xFFFFFFFF),
+      static_cast<std::int32_t>(static_cast<std::uint64_t>(elapsedTicks) >> 32)
+    );
+    return 0;
+  }
+
   /**
    * Address: 0x00AD6FD0 (FUN_00AD6FD0, _sfply_ExecOneSub)
    *
