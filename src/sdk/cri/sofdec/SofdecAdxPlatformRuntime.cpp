@@ -4415,6 +4415,73 @@
   }
 
   /**
+   * Address: 0x00AD9270 (FUN_00AD9270, _MWSFSVR_GetDecSvrFromIprm)
+   *
+   * What it does:
+   * Reports which worker thread the decode server is to run on, as configured
+   * in the library init parameters. 1 selects the main server thread; anything
+   * else leaves the work to the idle thread.
+   */
+  std::int32_t MWSFSVR_GetDecSvrFromIprm()
+  {
+    return MWSFLIB_GetLibWorkPtr()->decodeServerSelection;
+  }
+
+  /**
+   * Address: 0x00AD9280 (FUN_00AD9280, _MWSFSVR_TimeServer)
+   *
+   * What it does:
+   * One tick of the time server: drives the SFD vsync lane and always reports
+   * success.
+   */
+  std::int32_t MWSFSVR_TimeServer()
+  {
+    (void)mwSfdVsync();
+    return 0;
+  }
+
+  /**
+   * Address: 0x00AD9230 (FUN_00AD9230, _MWSFSVR_MainThrdProc)
+   *
+   * What it does:
+   * Body of the main Sofdec server thread. It runs the decode server only when
+   * the init parameters put the decode server on this thread; otherwise the
+   * idle thread owns it and this returns false without doing work.
+   *
+   * This was a stub, which is one of the reasons nothing ever ticked the SFD
+   * state machine and no movie frame was ever decoded.
+   */
+  void MWSFSVR_MainThrdProc()
+  {
+    (void)(MWSFSVR_GetDecSvrFromIprm() == 1 && mwsfsvr_DecodeServer() != 0);
+  }
+
+  /**
+   * Address: 0x00AD9250 (FUN_00AD9250, _MWSFSVR_IdleThrdProc)
+   *
+   * What it does:
+   * Body of the idle Sofdec thread - the exact complement of the main thread
+   * above: it runs the decode server precisely when the init parameters did
+   * not put it on the main thread.
+   */
+  void MWSFSVR_IdleThrdProc()
+  {
+    (void)(MWSFSVR_GetDecSvrFromIprm() != 1 && mwsfsvr_DecodeServer() != 0);
+  }
+
+  /**
+   * Address: 0x00AD9220 (FUN_00AD9220, _MWSFSVR_VsyncThrdProc)
+   *
+   * What it does:
+   * Body of the vsync thread; a straight tail-call to the time server. IDA
+   * marks it a thunk, and it is one instruction in the binary.
+   */
+  void MWSFSVR_VsyncThrdProc()
+  {
+    (void)MWSFSVR_TimeServer();
+  }
+
+  /**
    * Address: 0x00AD9340 (FUN_00AD9340, _mwsfsvr_DecodeServer)
    *
    * What it does:
