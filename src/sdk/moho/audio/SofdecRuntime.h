@@ -312,15 +312,35 @@ namespace moho
    * Evidence:
    * - `FUN_00B06C10` copies `0x18` bytes when non-null.
    */
+  /**
+   * The 0x18-byte thread parameter block `adxm_setup_thrd` (0x00B06C10) either
+   * copies from the caller or fills with defaults.
+   *
+   * The field order is pinned by absolute addresses rather than by shape.
+   * `adxm_setup_thrd` writes `nPriority` at 0x0105900C, the next lane at
+   * 0x01059010, and `adxm_thread_sprm+0xC` at 0x01059020, which puts
+   * `adxm_thread_sprm` at 0x01059014 - so the array overlays this block from
+   * +0x08 on. `adxm_set_thrd_prio` (0x00B072D0) then applies `sprm[0]` to the
+   * vsync thread, `sprm[1]` to the fs thread and `sprm[3]` to the mwidle
+   * thread, which lands them at +0x08, +0x0C and +0x14.
+   *
+   * The previous ordering had the fs and vsync lanes transposed and put the
+   * mwidle lane at +0x0C, so `adxm_goto_mwidle_border` restored the fs
+   * priority to the mwidle thread instead of its own. Confirmed against
+   * 0x00B06A4A, which reads `adxm_thread_sprm+0Ch` = 0x01059020 = +0x14.
+   */
   struct AdxmThreadStartupParams
   {
-    std::int32_t nPriority = 0;
-    std::int32_t fsPriority = 0;
-    std::int32_t vsyncPriority = 0;
-    std::int32_t mwidlePriority = 0;
-    std::int32_t threadCount = 0;
-    std::int32_t reserved = 0;
+    std::int32_t nPriority = 0;      // +0x00 default 15
+    std::int32_t mUnknown04 = 0;     // +0x04 default 2
+    std::int32_t vsyncPriority = 0;  // +0x08 default 1  (sprm[0])
+    std::int32_t fsPriority = 0;     // +0x0C default 1  (sprm[1])
+    std::int32_t mUnknown10 = 0;     // +0x10            (sprm[2], not defaulted)
+    std::int32_t mwidlePriority = 0; // +0x14 default -2 (sprm[3])
   };
+  static_assert(offsetof(AdxmThreadStartupParams, vsyncPriority) == 0x08, "vsyncPriority @ +0x08");
+  static_assert(offsetof(AdxmThreadStartupParams, fsPriority) == 0x0C, "fsPriority @ +0x0C");
+  static_assert(offsetof(AdxmThreadStartupParams, mwidlePriority) == 0x14, "mwidlePriority @ +0x14");
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(AdxmThreadStartupParams) == 0x18, "AdxmThreadStartupParams size must be 0x18");
 
