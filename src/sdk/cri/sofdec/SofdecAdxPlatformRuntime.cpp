@@ -7401,9 +7401,12 @@
    * What it does:
    * Bridges ADXRNA error callback text into ADXERR reporter lane.
    */
-  void adxini_rnaerr_cbfn(const std::int32_t /*errorObject*/, const char* const message)
+  int adxini_rnaerr_cbfn(const std::uint32_t /*errorCode*/, const char* const message)
   {
-    (void)ADXERR_CallErrFunc1_(message);
+    // 0x00B0A345 calls straight into `ADXERR_CallErrFunc1_` and returns with
+    // EAX untouched, so the bridge forwards that result - which is what the
+    // `AdxmErrorCallback` slot it is installed into expects.
+    return ADXERR_CallErrFunc1_(message);
   }
 
   /**
@@ -7412,9 +7415,11 @@
    * What it does:
    * Bridges LSC error callback messages into the shared ADX error reporter.
    */
-  [[maybe_unused]] void adxini_lscerr_cbfn(const std::int32_t /*errorObject*/, const char* const message)
+  std::int32_t adxini_lscerr_cbfn(const std::int32_t /*callbackObject*/, const char* const message)
   {
-    (void)ADXERR_CallErrFunc1_(message);
+    // Same shape as `adxini_rnaerr_cbfn`: 0x00B0A355 leaves EAX from
+    // `ADXERR_CallErrFunc1_`, matching the `LscErrorCallback` slot.
+    return ADXERR_CallErrFunc1_(message);
   }
 
   /**
@@ -7463,6 +7468,96 @@
   {
     adxt_ExecLscSvr();
     return 0;
+  }
+
+  // Defined later in this aggregate translation unit.
+  std::int32_t ADXSJD_Init();
+  std::int32_t ADXF_Init();
+  std::int32_t SVM_SetCbSvrWithString(
+    std::int32_t svtype,
+    std::int32_t callbackAddress,
+    std::int32_t callbackObject,
+    const char* callbackName
+  );
+  void SVM_SetCbSvrIdWithString(
+    std::int32_t svtype,
+    std::int32_t laneId,
+    std::int32_t callbackAddress,
+    std::int32_t callbackObject,
+    const char* callbackName
+  );
+
+  /** SVM slot ids `ADXT_Init` claims for the FS and MAIN server lanes. */
+  std::int32_t gAdxtServerFsSlotId = 0;   // 0x01059414
+  std::int32_t gAdxtServerMainSlotId = 0; // 0x0105940C
+  /** Published build banner (`_adxt_BuildInfo` @0x01059400). */
+  const char* gAdxtBuildInfo = nullptr;
+
+  constexpr char kAdxtExecTsvrName[] = "adxt_exec_tsvr";
+  constexpr char kAdxtExecFssvrName[] = "adxt_exec_fssvr";
+  constexpr char kAdxtExecMainThreadName[] = "adxt_exec_main_thrd";
+
+  /** `ADXT_Init` arms the ADXT server at 60 Hz. */
+  constexpr std::int32_t kAdxtDefaultServerFrequencyHz = 60;
+
+  /**
+   * Address: 0x00B0A390 (FUN_00B0A390, _ADXT_Init)
+   * Mangled: _ADXT_Init
+   *
+   * IDA signature:
+   * void __cdecl ADXT_Init();
+   *
+   * What it does:
+   * Brings up the whole ADX runtime once - the critical section, the three SJ
+   * flavours, the error reporter, the stream/seek/file layers, the audio
+   * renderer, the seamless loader and the server manager - installs the ADXRNA
+   * and LSC error bridges, clears the ADXT handle pool, and registers the three
+   * ADXT server callbacks: the decode tick at VSYNC slot 1, the filesystem tick
+   * on the FS lane, and the seamless-LSC tick on the MAIN lane. Reference
+   * counted, so only the first call does any of it.
+   *
+   * The filesystem registration is what makes `adxstm_ExecServer` run, and that
+   * is the only thing that ever reads bytes off disk into an SJ. While this was
+   * a stub the ADXSTM slot pool was never serviced, so a movie could be created,
+   * bound to a file and started, and its ring would still be empty forever.
+   */
+  void ADXT_Init()
+  {
+    gAdxtBuildInfo = kAdxtBuildVersion;
+    if (gAdxtInitCount == 0) {
+      (void)ADXCRS_Init();
+      ADXCRS_Lock();
+
+      SJUNI_Init();
+      SJRBF_Init();
+      SJMEM_Init();
+      (void)ADXERR_Init();
+      (void)ADXSTM_Init();
+      (void)ADXSJD_Init();
+      (void)ADXF_Init();
+      (void)ADXRNA_Init();
+      LSC_Init();
+      (void)SVM_Init();
+
+      (void)ADXRNA_EntryErrFunc(&adxini_rnaerr_cbfn, 0);
+      (void)LSC_EntryErrFunc(&adxini_lscerr_cbfn, 0);
+
+      gAdxtRuntimePool = {};
+
+      SVM_SetCbSvrIdWithString(
+        2, 1, reinterpret_cast<std::int32_t>(&adxt_exec_tsvr), 0, kAdxtExecTsvrName);
+      gAdxtServerFsSlotId = SVM_SetCbSvrWithString(
+        4, reinterpret_cast<std::int32_t>(&adxt_exec_fssvr), 0, kAdxtExecFssvrName);
+      gAdxtServerMainSlotId = SVM_SetCbSvrWithString(
+        5, reinterpret_cast<std::int32_t>(&adxt_exec_main_thrd), 0, kAdxtExecMainThreadName);
+
+      gAdxtVsyncCount = 0;
+      adxt_output_mono_flag = 0;
+      ADXT_SetDefSvrFreq(kAdxtDefaultServerFrequencyHz);
+
+      ADXCRS_Unlock();
+    }
+    ++gAdxtInitCount;
   }
 
   /**
@@ -16430,10 +16525,6 @@
   std::int32_t adxstm_ExecServer()
   {
     std::int32_t result = static_cast<std::int32_t>(adxstm_test_and_set(&adxstmf_execsvr_flg));
-    if (result == 0) {
-      return result;
-    }
-
     for (AdxstmServerSlotView& slot : gAdxstmObjectPool) {
       if (slot.slotState == 1) {
         result = ADXSTMF_ExecHndl(&slot);

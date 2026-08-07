@@ -18,7 +18,7 @@
    * What it does:
    * Bridges ADXRNA error callback text into ADXERR reporter lane.
    */
-  void adxini_rnaerr_cbfn(std::int32_t errorObject, const char* message);
+  int adxini_rnaerr_cbfn(std::uint32_t errorCode, const char* message);
   /**
    * Address: 0x00B0A360 (FUN_00B0A360, _ADXT_VsyncProc)
    *
