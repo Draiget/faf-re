@@ -60,7 +60,10 @@
 // === Function stubs (cdecl no-arg, return 0/null) ===
 extern "C" {
   void* ADXM_Finish() { return nullptr; }
-  void* ADXM_SetupThrd() { return nullptr; }
+  // ADXM_SetupThrd (0x00B07C80): real body in SofdecAdxPlatformRuntime.cpp.
+  // This is what creates the three Sofdec worker threads. While it was a
+  // stub none of them existed, so nothing ticked the SFD decode server and
+  // no movie frame was ever decoded.
   void* ADXM_WaitVsync() { return nullptr; }
   void* ADXPC_SetupSoundDirectSound8() { return nullptr; }
   void* ADXRNA_ExecHndl() { return nullptr; }
