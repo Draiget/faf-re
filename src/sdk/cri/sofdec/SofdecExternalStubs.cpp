@@ -262,8 +262,12 @@ extern "C" {
   // moho/movie/MPVDecoder.cpp. While these stubs stood, every block came back
   // with no coefficients at all, so the decoder ran without ever producing a
   // picture.
-  void* sub_C0E1B0() { return nullptr; }
-  void* sub_C0E2E0() { return nullptr; }
+  // sub_C0E1B0 / sub_C0E2E0 are the intra and predicted macroblock scan-state
+  // initializers. Their real bodies were already recovered as
+  // MPVDEC_InitScanStateIntra / MPVDEC_InitScanStatePredicted in
+  // moho/movie/MPVDecoder.cpp but nothing referenced them - mpvhdec_DecPscSj
+  // installed these stubs as the picture's read drivers instead, so every
+  // macroblock came back with no coefficients. Wired up at the install site.
 
   // C-linkage stubs for callers in MPVDecoder.cpp (now extern "C") whose real
   // bodies aren't in any compiled Sofdec source. Return 0 as no-op.
