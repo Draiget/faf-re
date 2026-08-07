@@ -103,15 +103,34 @@ namespace moho_cri_sfx_internal {
 /// One SFX composition handle. `sfx_InitHn` clears all 0x94 bytes and then
 /// seeds the lanes below; `sfx_SearchFreeHn` walks the pool at stride 0x94
 /// testing the first dword.
-using SfxCnvFrmCallback = void(__cdecl*)(const std::int32_t* source, const std::int32_t* target, const std::int32_t* tableParams);
-using SfxCopyAlphaCallback = void(__cdecl*)(const std::int32_t* source, const std::int32_t* target, const std::int32_t* tableParams);
-using SfxMakeTableCallback = void(__cdecl*)(std::int32_t tableBase, std::int32_t param);
+using SfxCnvFrmCallback = std::int32_t(__cdecl*)(
+  const CftYcc420PlanarPackedWords* source,
+  const CftRgb16OutputPackedWords* target,
+  const std::int32_t* tableParams
+);
+using SfxCopyAlphaCallback = std::uint8_t*(__cdecl*)(
+  std::uint8_t** sourcePlanes,
+  const std::int32_t* conversionWords,
+  const std::int32_t* userTableAddress
+);
+
+/// Signature of the three alpha/luminance table builders reached through the
+/// SFXA sub-handle: <pivot, min, max, tableAddress>.
+using SfxMakeTableCallback = std::int32_t(__cdecl*)(
+  std::int32_t luminancePivot,
+  std::int32_t luminanceMin,
+  std::int32_t luminanceMax,
+  std::int32_t tableAddress
+);
+
+/// The colour-adjust builder takes only the table address.
+using SfxMakeColorAdjustTableCallback = std::int32_t(__cdecl*)(std::int32_t tableAddress);
 
 struct SfxHandle {
   std::int32_t used;          ///< +0x00 set to 1 by sfx_InitHn
-  std::int32_t reserved04;    ///< +0x04
-  std::int32_t reserved08;    ///< +0x08
-  std::int32_t reserved0C;    ///< +0x0C
+  std::int32_t compositionCode; ///< +0x04 composition mode (sfxcnv_IsCnvUpHalf)
+  std::int32_t outputBufferWidth;  ///< +0x08 SFX_Set/GetOutBufSize
+  std::int32_t outputBufferHeight; ///< +0x0C SFX_Set/GetOutBufSize
   std::uint8_t mUnknown10[0x14]; ///< +0x10
   std::int32_t sfxz;          ///< +0x24 SFXZ sub-handle (SFX_Create)
   std::uint8_t mUnknown28_[0x08]; ///< +0x28 (+0x28 = 1, +0x2C = 0)
@@ -133,12 +152,15 @@ struct SfxHandle {
   std::int32_t cnvBottomUp;   ///< +0x64 write converted rows bottom-up
   SfxCnvFrmCallback  cnvFrmCallback;    ///< +0x68 installed per pixel format
   SfxCopyAlphaCallback copyAlphaCallback; ///< +0x6C
-  SfxMakeTableCallback colorAdjustTableCallback; ///< +0x70
+  SfxMakeColorAdjustTableCallback colorAdjustTableCallback; ///< +0x70
   std::uint8_t mUnknown74[0x20]; ///< +0x74
 };
 
 static_assert(sizeof(SfxHandle) == 0x94, "SfxHandle size must be 0x94");
 static_assert(offsetof(SfxHandle, sfxz) == 0x24, "SfxHandle::sfxz must live at offset 0x24");
+static_assert(offsetof(SfxHandle, compositionCode) == 0x04, "SfxHandle::compositionCode must live at offset 0x04");
+static_assert(offsetof(SfxHandle, outputBufferWidth) == 0x08, "SfxHandle::outputBufferWidth must live at offset 0x08");
+static_assert(offsetof(SfxHandle, outputBufferHeight) == 0x0C, "SfxHandle::outputBufferHeight must live at offset 0x0C");
 static_assert(offsetof(SfxHandle, sfxa) == 0x30, "SfxHandle::sfxa must live at offset 0x30");
 static_assert(offsetof(SfxHandle, planeBase) == 0x38, "SfxHandle::planeBase must live at offset 0x38");
 static_assert(offsetof(SfxHandle, tableBase) == 0x50, "SfxHandle::tableBase must live at offset 0x50");
@@ -1006,10 +1028,652 @@ void sfxcnv_ExecCnvFrmByCbFunc(
   }
 
   if (handle->cnvFrmCallback != nullptr) {
-    handle->cnvFrmCallback(
-      reinterpret_cast<const std::int32_t*>(&source),
-      reinterpret_cast<const std::int32_t*>(target),
+    (void)handle->cnvFrmCallback(
+      reinterpret_cast<const CftYcc420PlanarPackedWords*>(&source),
+      reinterpret_cast<const CftRgb16OutputPackedWords*>(target),
       tableParams
     );
   }
+}
+
+namespace moho_cri_sfx_internal {
+
+/**
+ * Head of the SFXA sub-handle, far enough to reach the table-building
+ * callbacks. Three of the six setters below dereference `SfxHandle::sfxa`
+ * (+0x30) before writing, so these callbacks live here rather than on the SFX
+ * handle itself.
+ */
+struct SfxaTableCallbacks
+{
+  std::uint8_t mUnknown00[0x18];         ///< +0x00
+  SfxMakeTableCallback makeLumiTable;    ///< +0x18
+  SfxMakeTableCallback makeAlp3110Table; ///< +0x1C
+  SfxMakeTableCallback makeAlp3Table;    ///< +0x20
+};
+static_assert(offsetof(SfxaTableCallbacks, makeLumiTable) == 0x18, "SfxaTableCallbacks::makeLumiTable offset");
+static_assert(offsetof(SfxaTableCallbacks, makeAlp3110Table) == 0x1C, "SfxaTableCallbacks::makeAlp3110Table offset");
+static_assert(offsetof(SfxaTableCallbacks, makeAlp3Table) == 0x20, "SfxaTableCallbacks::makeAlp3Table offset");
+
+[[nodiscard]] inline SfxaTableCallbacks* SfxaTableCallbacksOf(SfxHandle* const handle) noexcept
+{
+  return reinterpret_cast<SfxaTableCallbacks*>(
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->sfxa))
+  );
+}
+
+}  // namespace moho_cri_sfx_internal
+
+/**
+ * Address: 0x00ACE940 (FUN_00ACE940, _SFX_SetCnvFrmCbFunc)
+ *
+ * What it does:
+ * Installs the per-pixel-format frame converter the executor invokes.
+ */
+moho_cri_sfx_internal::SfxCnvFrmCallback SFX_SetCnvFrmCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxCnvFrmCallback callback
+)
+{
+  handle->cnvFrmCallback = callback;
+  return callback;
+}
+
+/**
+ * Address: 0x00ACE950 (FUN_00ACE950, _SFX_SetCopyAlphaCbFunc)
+ *
+ * What it does:
+ * Installs the alpha-plane copier used by the full-alpha composition modes.
+ */
+moho_cri_sfx_internal::SfxCopyAlphaCallback SFX_SetCopyAlphaCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxCopyAlphaCallback callback
+)
+{
+  handle->copyAlphaCallback = callback;
+  return callback;
+}
+
+/**
+ * Address: 0x00ACE960 (FUN_00ACE960, _SFX_SetMakeLumiTableCbFunc)
+ *
+ * What it does:
+ * Installs the luminance-table builder on the SFXA sub-handle.
+ */
+moho_cri_sfx_internal::SfxHandle* SFX_SetMakeLumiTableCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeTableCallback callback
+)
+{
+  moho_cri_sfx_internal::SfxaTableCallbacksOf(handle)->makeLumiTable = callback;
+  return handle;
+}
+
+/**
+ * Address: 0x00ACE970 (FUN_00ACE970, _SFX_SetMakeAlp3TableCbFunc)
+ *
+ * What it does:
+ * Installs the 3-bit-alpha (3:2:1:1) table builder on the SFXA sub-handle.
+ */
+moho_cri_sfx_internal::SfxHandle* SFX_SetMakeAlp3TableCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeTableCallback callback
+)
+{
+  moho_cri_sfx_internal::SfxaTableCallbacksOf(handle)->makeAlp3Table = callback;
+  return handle;
+}
+
+/**
+ * Address: 0x00ACE980 (FUN_00ACE980, _SFX_SetMakeAlp3110TableCbFunc)
+ *
+ * What it does:
+ * Installs the 3:1:1:0-alpha table builder on the SFXA sub-handle.
+ */
+moho_cri_sfx_internal::SfxHandle* SFX_SetMakeAlp3110TableCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle, const moho_cri_sfx_internal::SfxMakeTableCallback callback
+)
+{
+  moho_cri_sfx_internal::SfxaTableCallbacksOf(handle)->makeAlp3110Table = callback;
+  return handle;
+}
+
+/**
+ * Address: 0x00ACE990 (FUN_00ACE990, _SFX_SetMakeColAdjTableCbFunc)
+ *
+ * What it does:
+ * Installs the colour-adjust table builder. Unlike the three above this one
+ * lives on the SFX handle itself.
+ */
+moho_cri_sfx_internal::SfxMakeColorAdjustTableCallback SFX_SetMakeColAdjTableCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle,
+  const moho_cri_sfx_internal::SfxMakeColorAdjustTableCallback callback
+)
+{
+  handle->colorAdjustTableCallback = callback;
+  return callback;
+}
+
+// ---------------------------------------------------------------------------
+// ARGB8888 conversion entry points.
+//
+// This is the top of the movie pipeline tail: CMovie locks its texture sheet
+// and calls mwPlyFxCnvFrmARGB8888, which walks down through the clipping and
+// destination-buffer setup below to SFX_CnvFrmByCbFunc and finally the CFT
+// pixel kernel.
+// ---------------------------------------------------------------------------
+
+// The progressive and interlaced ARGB variants are only address-taken by
+// SFX_CnvFrmARGB8888ByCbFunc below. Their bodies (0x00AEEB40 / 0x00AEE960)
+// and the cft_c_/cft_sse_ leaf tier under them are the next recovery step.
+extern "C" std::int32_t CFT_Ycc420plnToArgb8888Prg(
+  const CftYcc420PlanarPackedWords* inputWords,
+  const CftRgb16OutputPackedWords* outputWords,
+  const std::int32_t* userTableAddress
+);
+extern "C" std::int32_t CFT_Ycc420plnToArgb8888Int(
+  const CftYcc420PlanarPackedWords* inputWords,
+  const CftRgb16OutputPackedWords* outputWords,
+  const std::int32_t* userTableAddress
+);
+
+namespace moho_cri_sfx_internal {
+
+/// `sfxcnv_forcesplit`: library-wide override that suppresses field merging
+/// regardless of what the stream asks for. Nothing in this build sets it;
+/// `SFX_SetForceSplitField` is its only writer.
+std::int32_t sfxcnv_forcesplit = 0;
+
+constexpr char kSfxErrCnvUpHalfCompo[] = "E201312: sfxcnv_IsCnvUpHalf : compo is invalid.";
+
+/// First byte `SUD_AnalyTypeDivField` matches in a SUD type string.
+constexpr char kSudDivFieldTypeTag[] = "d";
+
+/// Offset of the type string inside a SUD record.
+constexpr std::int32_t kSudTypeStringOffset = 18;
+
+/// Distance from the composition plane base to the colour-adjust table.
+constexpr std::int32_t kSfxColorAdjustTableOffset = 8223;
+
+/**
+ * Composition codes whose converted output covers only the top half of the
+ * destination rectangle. `sfxcnv_IsCnvUpHalf` accepts exactly this set plus
+ * the full-height set below; anything else is a library error.
+ */
+constexpr std::int32_t kSfxCompoUpHalfCodes[] = {33, 257};
+
+/// Composition codes whose converted output covers the full destination.
+constexpr std::int32_t kSfxCompoFullHeightCodes[] = {17, 49, 65, 81, 97, 113, 241, 273, 4097};
+
+}  // namespace moho_cri_sfx_internal
+
+/**
+ * Address: 0x00ACD0D0 (FUN_00ACD0D0, _sfxset_ShiftBufInfByPix)
+ *
+ * IDA signature:
+ * _DWORD* __cdecl sfxset_ShiftBufInfByPix(_DWORD *a1, int a2, int a3);
+ *
+ * What it does:
+ * Advances one plane record to a clip origin and shrinks its remaining row
+ * count to match.
+ */
+MwsfdSfxBufInf* sfxset_ShiftBufInfByPix(
+  MwsfdSfxBufInf* const plane, const std::int32_t rows, const std::int32_t columns
+)
+{
+  const std::int32_t remainingRows = plane->height - rows;
+  plane->address += columns + rows * plane->pitch;
+  plane->height = remainingRows;
+  return plane;
+}
+
+/**
+ * Address: 0x00ACD030 (FUN_00ACD030, _sfxset_ShiftBufInfByLine)
+ *
+ * IDA signature:
+ * _DWORD* __cdecl sfxset_ShiftBufInfByLine(_DWORD *a1, int a2);
+ *
+ * What it does:
+ * Row-only form of the shift above, used when merging the second field.
+ */
+MwsfdSfxBufInf* sfxset_ShiftBufInfByLine(MwsfdSfxBufInf* const plane, const std::int32_t rows)
+{
+  const std::int32_t remainingRows = plane->height - rows;
+  plane->address += rows * plane->pitch;
+  plane->height = remainingRows;
+  return plane;
+}
+
+/**
+ * Address: 0x00ACD070 (FUN_00ACD070, _SFX_ShiftYccPtrByPix)
+ *
+ * What it does:
+ * Moves all three YCbCr plane records to a clip origin. The origin is snapped
+ * down to an even pixel so the chroma planes, which move by half as much, stay
+ * aligned to the luma quad grid.
+ */
+void SFX_ShiftYccPtrByPix(
+  MwsfdSfxFrameInfo* const frameInfo, const std::int32_t left, const std::int32_t top
+)
+{
+  const std::int32_t lumaLeft = 2 * (left / 2);
+  const std::int32_t lumaTop = 2 * (top / 2);
+  (void)sfxset_ShiftBufInfByPix(&frameInfo->yPlane, lumaTop, lumaLeft);
+
+  const std::int32_t chromaLeft = lumaLeft / 2;
+  const std::int32_t chromaTop = lumaTop / 2;
+  (void)sfxset_ShiftBufInfByPix(&frameInfo->cbPlane, chromaTop, chromaLeft);
+  (void)sfxset_ShiftBufInfByPix(&frameInfo->crPlane, chromaTop, chromaLeft);
+}
+
+/**
+ * Address: 0x00ACCFF0 (FUN_00ACCFF0, _SFX_ShiftYccPtrByLine)
+ *
+ * What it does:
+ * Row-only form of the shift above; the field-merge path uses it to step from
+ * the first field to the second.
+ */
+void SFX_ShiftYccPtrByLine(MwsfdSfxFrameInfo* const frameInfo, const std::int32_t rows)
+{
+  const std::int32_t lumaRows = 2 * (rows / 2);
+  (void)sfxset_ShiftBufInfByLine(&frameInfo->yPlane, lumaRows);
+
+  const std::int32_t chromaRows = lumaRows / 2;
+  (void)sfxset_ShiftBufInfByLine(&frameInfo->cbPlane, chromaRows);
+  (void)sfxset_ShiftBufInfByLine(&frameInfo->crPlane, chromaRows);
+}
+
+/**
+ * Address: 0x00ACD050 (FUN_00ACD050, _SFX_SetMaxRowToYccPln)
+ *
+ * What it does:
+ * Caps the row count of all three plane records, halving it for chroma.
+ */
+std::int32_t SFX_SetMaxRowToYccPln(MwsfdSfxFrameInfo* const frameInfo, const std::int32_t rows)
+{
+  const std::int32_t lumaRows = 2 * (rows / 2);
+  frameInfo->yPlane.height = lumaRows;
+
+  const std::int32_t chromaRows = lumaRows / 2;
+  frameInfo->cbPlane.height = chromaRows;
+  frameInfo->crPlane.height = chromaRows;
+  return chromaRows;
+}
+
+/**
+ * Address: 0x00ACE480 (FUN_00ACE480, _SFX_SetClipping)
+ *
+ * IDA signature:
+ * int __cdecl SFX_SetClipping(int a1, int a2, int a3, int a4, int a5, int a6);
+ *
+ * What it does:
+ * Records the clip rectangle size on the frame info and shifts the plane
+ * pointers to its origin. The handle argument is unused - the binary takes it
+ * only to keep the SFX calling shape uniform.
+ */
+void SFX_SetClipping(
+  moho_cri_sfx_internal::SfxHandle* const /*handle*/,
+  MwsfdSfxFrameInfo* const frameInfo,
+  const std::int32_t left,
+  const std::int32_t top,
+  const std::int32_t width,
+  const std::int32_t height
+)
+{
+  frameInfo->cachedWidth = width;
+  frameInfo->cachedHeight = height;
+  SFX_ShiftYccPtrByPix(frameInfo, left, top);
+}
+
+/**
+ * Address: 0x00ACE510 (FUN_00ACE510, _sfxcnv_IsCnvUpHalf)
+ *
+ * IDA signature:
+ * int __cdecl sfxcnv_IsCnvUpHalf(int a1);
+ *
+ * What it does:
+ * Reports whether the composition mode on the handle produces output covering
+ * only the top half of the destination rectangle, which is how the interlaced
+ * modes hand back one field at a time. Unrecognised codes are a library error
+ * and fall through as full-height.
+ */
+std::int32_t sfxcnv_IsCnvUpHalf(const moho_cri_sfx_internal::SfxHandle* const handle)
+{
+  using namespace moho_cri_sfx_internal;
+
+  const std::int32_t compositionCode = handle->compositionCode;
+
+  if (std::ranges::find(kSfxCompoUpHalfCodes, compositionCode) != std::ranges::end(kSfxCompoUpHalfCodes)) {
+    return 1;
+  }
+
+  if (std::ranges::find(kSfxCompoFullHeightCodes, compositionCode) == std::ranges::end(kSfxCompoFullHeightCodes)) {
+    SFXLIB_Error(nullptr, nullptr, kSfxErrCnvUpHalfCompo);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x00ACEDB0 (FUN_00ACEDB0, _sfxcnv_MakeDstBufInf)
+ *
+ * IDA signature:
+ * int __cdecl sfxcnv_MakeDstBufInf(int a1, int a2, int a3, int a4, int a5);
+ *
+ * What it does:
+ * Fills one destination record from the clip rectangle. The pitch comes from
+ * the output-buffer width on the handle when one has been set, otherwise the
+ * clip width is used, and modes that convert only the top field get half the
+ * rows.
+ *
+ * The records overlap by one dword - record N owns dwords 4N..4N+4 - so the
+ * pitch of record N is written through the base of record N+1, exactly as the
+ * binary does.
+ */
+std::int32_t sfxcnv_MakeDstBufInf(
+  const moho_cri_sfx_internal::SfxHandle* const handle,
+  const MwsfdSfxFrameInfo* const frameInfo,
+  const std::int32_t pixels,
+  moho_cri_sfx_internal::SfxCftTargetBuffer* const outTarget,
+  const std::int32_t recordIndex
+)
+{
+  using namespace moho_cri_sfx_internal;
+
+  auto* const record = reinterpret_cast<SfxCftTargetBuffer*>(
+    reinterpret_cast<std::uint8_t*>(outTarget) + (0x10 * recordIndex)
+  );
+
+  record->pixels = pixels;
+  record->width = frameInfo->cachedWidth;
+  record->height =
+    (sfxcnv_IsCnvUpHalf(handle) == 1) ? frameInfo->cachedHeight / 2 : frameInfo->cachedHeight;
+
+  const std::int32_t outputBufferWidth = handle->outputBufferWidth;
+  auto* const nextRecord = reinterpret_cast<SfxCftTargetBuffer*>(
+    reinterpret_cast<std::uint8_t*>(outTarget) + (0x10 * (recordIndex + 1))
+  );
+  nextRecord->planeCount = (outputBufferWidth != 0) ? outputBufferWidth : frameInfo->cachedWidth;
+  return outputBufferWidth;
+}
+
+/**
+ * Address: 0x00ACED60 (FUN_00ACED60, _SFX_Make1PlaneCftDstBuf)
+ *
+ * What it does:
+ * Applies the clip rectangle and builds the single-plane destination
+ * descriptor the ARGB converters write into.
+ */
+std::int32_t SFX_Make1PlaneCftDstBuf(
+  moho_cri_sfx_internal::SfxHandle* const handle,
+  MwsfdSfxFrameInfo* const frameInfo,
+  const std::int32_t pixels,
+  moho_cri_sfx_internal::SfxCftTargetBuffer* const outTarget,
+  const std::int32_t left,
+  const std::int32_t top,
+  const std::int32_t width,
+  const std::int32_t height
+)
+{
+  SFX_SetClipping(handle, frameInfo, left, top, width, height);
+  const std::int32_t result = sfxcnv_MakeDstBufInf(handle, frameInfo, pixels, outTarget, 0);
+  outTarget->planeCount = 1;
+  return result;
+}
+
+/**
+ * Address: 0x00ACCA80 (FUN_00ACCA80, _SFX_GetForceSplitField)
+ *
+ * What it does:
+ * Reports the library-wide override that suppresses field merging.
+ */
+std::int32_t SFX_GetForceSplitField()
+{
+  return moho_cri_sfx_internal::sfxcnv_forcesplit;
+}
+
+// SFX_GetSplitField: already recovered in SofdecAdxPlatformRuntime.cpp against its own
+// SfxHandleSettingsView; this chain calls that definition rather than adding a
+// second one with the same C linkage.
+
+// SFX_GetProgOut: already recovered in SofdecAdxPlatformRuntime.cpp against its own
+// SfxHandleSettingsView; this chain calls that definition rather than adding a
+// second one with the same C linkage.
+
+/**
+ * Address: 0x00ACD290 (FUN_00ACD290, _SUD_AnalyTypeDivField)
+ *
+ * IDA signature:
+ * BOOL __cdecl SUD_AnalyTypeDivField(int a1, int a2);
+ *
+ * What it does:
+ * Reports whether a SUD record describes a divided-field stream, which it does
+ * by matching the first character of the type string in the record.
+ */
+std::int32_t SUD_AnalyTypeDivField(const std::int32_t sudRecordAddress, const std::int32_t sudFieldIndex)
+{
+  using namespace moho_cri_sfx_internal;
+
+  if (sudRecordAddress == 0 || sudFieldIndex < 0) {
+    return 0;
+  }
+
+  const auto* const typeString = reinterpret_cast<const char*>(
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sudRecordAddress)) + kSudTypeStringOffset
+  );
+  return std::strncmp(typeString, kSudDivFieldTypeTag, 1) == 0 ? 1 : 0;
+}
+
+/**
+ * Address: 0x00ACE3C0 (FUN_00ACE3C0, _SFX_IsMergeField)
+ *
+ * IDA signature:
+ * BOOL __cdecl SFX_IsMergeField(int a1, int a2);
+ *
+ * What it does:
+ * Decides whether the two fields of one frame are to be merged into a single
+ * destination rectangle. An explicit per-handle request wins; the seeded -1
+ * defers to the stream, where a divided-field SUD record merges only when
+ * progressive output was not asked for.
+ */
+std::int32_t SFX_IsMergeField(
+  const moho_cri_sfx_internal::SfxHandle* const handle, const MwsfdSfxFrameInfo* const frameInfo
+)
+{
+  if (SFX_GetForceSplitField() == 1) {
+    return 0;
+  }
+
+  const std::int32_t splitField = SFX_GetSplitField(const_cast<moho_cri_sfx_internal::SfxHandle*>(handle));
+  if (splitField != -1) {
+    return (splitField == 1) ? 1 : 0;
+  }
+
+  const std::int32_t sudRecordAddress = frameInfo->constrainedParametersFlag;
+  if (sudRecordAddress != 0 && SUD_AnalyTypeDivField(sudRecordAddress, frameInfo->progressiveSequence) != 0) {
+    return (SFX_GetProgOut(const_cast<moho_cri_sfx_internal::SfxHandle*>(handle)) == 0) ? 1 : 0;
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x00ACCD70 (FUN_00ACCD70, _SFX_GetOutBufSize)
+ *
+ * What it does:
+ * Reads back the output-buffer dimensions set by `SFX_SetOutBufSize`.
+ */
+std::int32_t SFX_GetOutBufSize(
+  const moho_cri_sfx_internal::SfxHandle* const handle, std::int32_t* const outWidth, std::int32_t* const outHeight
+)
+{
+  *outWidth = handle->outputBufferWidth;
+  *outHeight = handle->outputBufferHeight;
+  return handle->outputBufferHeight;
+}
+
+/**
+ * Address: 0x00ACEE30 (FUN_00ACEE30, _SFX_CnvFrmAndMargFieldByCbFunc)
+ *
+ * What it does:
+ * Converts an interlaced frame as two half-height passes woven into one
+ * destination rectangle: the first field fills one set of rows, then the plane
+ * pointers advance by half a frame and the second pass fills from the next row
+ * down. The doubled width handed to `SFX_SetOutBufSize` is what leaves a whole
+ * row of gap between the output rows of the two passes.
+ */
+std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle,
+  MwsfdSfxFrameInfo* const frameInfo,
+  moho_cri_sfx_internal::SfxCftTargetBuffer* const target
+)
+{
+  const std::int32_t fullHeight = frameInfo->cachedHeight;
+
+  std::int32_t outputBufferWidth = 0;
+  std::int32_t outputBufferHeight = 0;
+  (void)SFX_GetOutBufSize(handle, &outputBufferWidth, &outputBufferHeight);
+
+  (void)SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
+  frameInfo->cachedHeight /= 2;
+  (void)SFX_SetMaxRowToYccPln(frameInfo, fullHeight / 2);
+  (void)SFX_Make1PlaneCftDstBuf(
+    handle, frameInfo, target->pixels, target, 0, 0, frameInfo->cachedWidth, frameInfo->cachedHeight
+  );
+  SFX_CnvFrmByCbFunc(
+    reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
+    reinterpret_cast<moho::SfxStreamState*>(frameInfo),
+    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
+  );
+
+  (void)SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
+  (void)SFX_SetMaxRowToYccPln(frameInfo, fullHeight);
+  SFX_ShiftYccPtrByLine(frameInfo, fullHeight / 2);
+
+  target->pixels += outputBufferWidth;
+  (void)SFX_Make1PlaneCftDstBuf(
+    handle, frameInfo, target->pixels, target, 0, 0, frameInfo->cachedWidth, frameInfo->cachedHeight
+  );
+  SFX_CnvFrmByCbFunc(
+    reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
+    reinterpret_cast<moho::SfxStreamState*>(frameInfo),
+    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
+  );
+  return 0;
+}
+
+/**
+ * Address: 0x00ADE110 (FUN_00ADE110, _SFX_CnvFrmARGB8888ByCbFunc)
+ *
+ * IDA signature:
+ * int __cdecl SFX_CnvFrmARGB8888ByCbFunc(int a1, int a2, _DWORD *a3);
+ *
+ * What it does:
+ * Installs the ARGB8888 family of conversion callbacks on the handle and runs
+ * the frame through whichever field strategy the stream calls for. The plain
+ * converter is used when the frame reports a single chroma-position lane;
+ * otherwise the colour-adjust table base is armed and the progressive or
+ * interlaced variant is chosen from the picture detail on the frame.
+ *
+ * The four table-building callbacks are only address-taken here; they run
+ * later, from `SFX_MakeTable`.
+ */
+std::int32_t SFX_CnvFrmARGB8888ByCbFunc(
+  moho_cri_sfx_internal::SfxHandle* const handle,
+  MwsfdSfxFrameInfo* const frameInfo,
+  moho_cri_sfx_internal::SfxCftTargetBuffer* const target
+)
+{
+  using namespace moho_cri_sfx_internal;
+
+  handle->tableBase = 0;
+
+  SfxCnvFrmCallback conversion = &CFT_Ycc420plnToArgb8888;
+  if (frameInfo->chromaPosLo != 1) {
+    handle->tableBase = handle->planeBase + kSfxColorAdjustTableOffset;
+    conversion = (frameInfo->pictureDetail68 == 1) ? &CFT_Ycc420plnToArgb8888Prg : &CFT_Ycc420plnToArgb8888Int;
+  }
+
+  (void)SFX_SetCnvFrmCbFunc(handle, conversion);
+  (void)SFX_SetCopyAlphaCbFunc(handle, &CFT_Ycc420plnToA256V);
+  (void)SFX_SetMakeLumiTableCbFunc(handle, &CFT_MakeArgb8888AlpLumiTbl);
+  (void)SFX_SetMakeAlp3TableCbFunc(handle, &CFT_MakeArgb8888Alp3211Tbl);
+  (void)SFX_SetMakeAlp3110TableCbFunc(handle, &CFT_MakeArgb8888Alp3110Tbl);
+  (void)SFX_SetMakeColAdjTableCbFunc(handle, &CFT_MakeArgb8888ColAdjTbl);
+
+  if (SFX_IsMergeField(handle, frameInfo) == 1) {
+    return SFX_CnvFrmAndMargFieldByCbFunc(handle, frameInfo, target);
+  }
+
+  SFX_CnvFrmByCbFunc(
+    reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
+    reinterpret_cast<moho::SfxStreamState*>(frameInfo),
+    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
+  );
+  return 0;
+}
+
+/**
+ * Address: 0x00ACC710 (FUN_00ACC710, _mwPlyFxCnvFrmClipARGB8888)
+ *
+ * IDA signature:
+ * int __cdecl mwPlyFxCnvFrmClipARGB8888(MWPLY a1, MwsfdFrmObj *a2, int a3,
+ *                                       int a4, int a5, int a6, int a7);
+ *
+ * What it does:
+ * Converts the clip rectangle of one decoded frame into ARGB8888 pixels in the
+ * caller buffer. The frame descriptor is translated into the SFX-side info
+ * block on the stack, the destination descriptor is built from the clip
+ * rectangle, and the ARGB dispatcher does the rest.
+ */
+void mwPlyFxCnvFrmClipARGB8888(
+  moho::MwsfdPlaybackStateSubobj* const ply,
+  MwsfdSfdFrmObj* const frm,
+  void* const outputBits,
+  const std::int32_t left,
+  const std::int32_t top,
+  const std::int32_t width,
+  const std::int32_t height
+)
+{
+  using namespace moho_cri_sfx_internal;
+
+  auto* const handle = static_cast<SfxHandle*>(MWSFSFX_GetSfxHn(ply));
+
+  MwsfdSfxFrameInfo frameInfo{};
+  (void)MWSFSFX_CnvFrmInfToSfx(ply, frm, &frameInfo);
+
+  SfxCftTargetBuffer target{};
+  (void)SFX_Make1PlaneCftDstBuf(
+    handle,
+    &frameInfo,
+    static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(outputBits)),
+    &target,
+    left,
+    top,
+    width,
+    height
+  );
+
+  (void)SFX_CnvFrmARGB8888ByCbFunc(handle, &frameInfo, &target);
+}
+
+/**
+ * Address: 0x00ACC6E0 (FUN_00ACC6E0, _mwPlyFxCnvFrmARGB8888)
+ *
+ * IDA signature:
+ * int __cdecl mwPlyFxCnvFrmARGB8888(MWPLY a1, MwsfdFrmObj *a2, int a3);
+ *
+ * What it does:
+ * Converts one whole decoded frame to ARGB8888 - the unclipped form of the
+ * call above, with the clip rectangle set to the frame dimensions.
+ * `CMovie::UploadCurrentFrameToTexture` calls this with a locked texture
+ * surface; while it was an empty stub the surface was locked, left untouched
+ * and unlocked, so every frame arrived transparent black.
+ */
+void mwPlyFxCnvFrmARGB8888(
+  moho::MwsfdPlaybackStateSubobj* const ply, const moho::MwsfdFrameInfo* const frameObject, void* const outputBits
+)
+{
+  // The parameter type comes from the declaration CMovie.cpp calls through;
+  // `moho::MwsfdFrameInfo` and `MwsfdSfdFrmObj` model the same SFD frame
+  // descriptor, and only the latter names the plane geometry this needs.
+  auto* const frm = const_cast<MwsfdSfdFrmObj*>(reinterpret_cast<const MwsfdSfdFrmObj*>(frameObject));
+  mwPlyFxCnvFrmClipARGB8888(ply, frm, outputBits, 0, 0, frm->planeWidth, frm->planeHeight);
 }
