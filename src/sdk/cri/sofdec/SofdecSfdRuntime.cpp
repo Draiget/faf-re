@@ -11481,14 +11481,6 @@
     "SfmpsHeaderDecodeControlView::secondExpectedLength offset must be 0x164"
   );
 
-  struct SfbufRingReadDescriptorView
-  {
-    std::int32_t readAddress = 0; // +0x00
-    std::int32_t readBytes = 0; // +0x04
-    std::int32_t reserved08 = 0; // +0x08
-    std::int32_t trailingBytes = 0; // +0x0C
-  };
-  static_assert(sizeof(SfbufRingReadDescriptorView) == 0x10, "SfbufRingReadDescriptorView size must be 0x10");
 
   struct SjBufferedSourceDispatch
   {
@@ -12832,20 +12824,25 @@
     (void)unusedArg;
 
     const auto* const runtimeView = reinterpret_cast<const SfmpsWorkctrlRuntimeView*>(workctrlSubobj);
-    SfbufRingReadDescriptorView readDescriptor{};
+    // Must be the full cursor snapshot, not a 16-byte read-descriptor view:
+    // `sfbuf_RingGetSub` clears `reservedWords` at +0x10..+0x1B as well as the
+    // two chunk ranges, so a smaller local is written twelve bytes past its end
+    // and the frame this function returns through is destroyed. The binary
+    // reserves the matching 0x1C of stack (`ebp-1Ch` .. `ebp-10h`).
+    SfbufRingCursorSnapshotView ringSnapshot{};
     const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
     const std::int32_t result = SFBUF_RingGetRead(
       workctrlAddress,
       runtimeView->activeSupplyLaneIndex,
-      reinterpret_cast<std::int32_t*>(&readDescriptor)
+      reinterpret_cast<std::int32_t*>(&ringSnapshot)
     );
     if (result != 0) {
       return result;
     }
 
-    *outReadAddress = readDescriptor.readAddress;
-    *outReadBytes = readDescriptor.readBytes;
-    *outReadEndAddress = readDescriptor.readBytes + readDescriptor.trailingBytes;
+    *outReadAddress = ringSnapshot.firstChunk.bufferAddress;
+    *outReadBytes = ringSnapshot.firstChunk.byteCount;
+    *outReadEndAddress = ringSnapshot.firstChunk.byteCount + ringSnapshot.secondChunk.byteCount;
     return 0;
   }
 
