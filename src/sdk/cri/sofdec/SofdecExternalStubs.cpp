@@ -219,7 +219,10 @@ extern "C" {
   // stub stood, sfply_Create always returned null and every movie failed with
   // "E2012 mwPlyCreate:can't create SFD".
   void* sfply_ResetHn() { return nullptr; }
-  void* sfxcnv_ExecCnvFrmByCbFunc() { return nullptr; }
+  // sfxcnv_ExecCnvFrmByCbFunc (0x00ACEB10): real body in SofdecSfxRuntime.cpp.
+  // This is where a decoded frame becomes pixels. While it stood as a stub the
+  // whole conversion path completed and reported success without ever writing
+  // to the destination surface.
   void* sfxcnv_ExecFullAlphaByCbFunc() { return nullptr; }
   void* sfxcnv_MakeZTbl() { return nullptr; }
   // mpvhdec_ReadKernelIntraDefault (0x00AFAE50) and
