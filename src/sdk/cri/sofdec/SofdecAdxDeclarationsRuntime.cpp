@@ -7144,6 +7144,8 @@ namespace
   constexpr const char* kXeciReqReadIllegalBufferAlignmentMessage = "E0109153:illegal buffer alignment.";
   constexpr const char* kXeciReadCompletionErrorMessage = "E0109251:The reading error occurred.";
   constexpr const char* kXeciGetSctLenNullHandleMessage = "E0040301:handl is null.";
+  constexpr const char* kXeciSetSctLenNullHandleMessage = "E0040302:handl is null.";
+  constexpr const char* kXeciSetSctLenInvalidSizeMessage = "E0040303:invalidate size.";
   constexpr const char* kMfciSetSctLenNullHandleMessage = "E0040302:handl is null.";
   constexpr const char* kMfciOpenEntryInvalidEntryCountMessage = "E1041001:invalid entry number.(mfCiOpenEntry)";
   constexpr const char* kMfciOpenEntryInvalidRwModeMessage = "E1041002:rw is illigal.(mfCiOpenEntry)";
