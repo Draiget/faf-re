@@ -12688,12 +12688,25 @@
     const std::int32_t packetTimestampHigh
   )
   {
-    SfbufRingWriteDescriptorView writeDescriptor{};
+    // Must be the full 0x1C cursor snapshot, not the 0x14 write-descriptor view:
+    // `SFBUF_RingGetWrite` forwards to `sfbuf_RingGetSub`, which clears both
+    // chunk ranges AND the three reserved words at +0x10..+0x1B. A 0x14 local is
+    // written eight bytes past its end and destroys the frame this function
+    // returns through - the same defect already fixed on the read side in
+    // `sfmps_RingGetRead`.
+    SfbufRingCursorSnapshotView writeSnapshot{};
     std::int32_t result = SFBUF_RingGetWrite(
       workctrlAddress,
       destinationLaneIndex,
-      reinterpret_cast<std::int32_t*>(&writeDescriptor)
+      reinterpret_cast<std::int32_t*>(&writeSnapshot)
     );
+    const SfbufRingWriteDescriptorView writeDescriptor{
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(writeSnapshot.firstChunk.bufferAddress)),
+      writeSnapshot.firstChunk.byteCount,
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(writeSnapshot.secondChunk.bufferAddress)),
+      writeSnapshot.secondChunk.byteCount,
+      writeSnapshot.reservedWords[0],
+    };
     if (result != 0) {
       return result;
     }
