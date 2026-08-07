@@ -106,11 +106,13 @@ extern "C" {
   void* MWSFPLY_SetFlowLimit() { return nullptr; }
   // MWSFSVM_Error: real body in SofdecSvmTransferRuntime.cpp.
   void* MWSFSVM_GotoIdleBorder() { return nullptr; }
+  // MWSFSVR_MainThrdProc (0x00AD9230), MWSFSVR_IdleThrdProc (0x00AD9250) and
+  // MWSFSVR_VsyncThrdProc (0x00AD9220): real bodies in
+  // SofdecAdxPlatformRuntime.cpp. These are the Sofdec worker-thread bodies;
+  // while they were stubs nothing ticked the SFD decode server, so no movie
+  // frame was ever decoded.
   void* MWSFSVR_CheckForceSvrBdr() { return nullptr; }
-  void* MWSFSVR_IdleThrdProc() { return nullptr; }
-  void* MWSFSVR_MainThrdProc() { return nullptr; }
   void* MWSFSVR_SetMwsfdSvrFlg() { return nullptr; }
-  void* MWSFSVR_VsyncThrdProc() { return nullptr; }
   void* MWSST_Destroy() { return nullptr; }
   void* MWSST_GetStat() { return nullptr; }
   void* MWSST_Pause() { return nullptr; }
