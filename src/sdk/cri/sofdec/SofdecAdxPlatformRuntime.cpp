@@ -17155,6 +17155,142 @@
     return failures;
   }
 
+  // Defined just below; the setup function is spliced in ahead of it.
+  std::int32_t adxm_set_thrd_prio();
+
+  /// Nesting counter: only the first ADXM_SetupThrd actually builds anything,
+  /// and every later call just deepens the count.
+  std::int32_t adxm_init_level = 0;
+
+  /// Performance-counter reading taken when the middleware started, the base
+  /// every later elapsed-time calculation is relative to.
+  std::int64_t gAdxmPerformanceBaseCount = 0;
+
+  /// Border id the mw-idle handoff callback is registered against.
+  constexpr std::int32_t kAdxmMwIdleBorderId = 6;
+
+  /// Defaults `adxm_setup_thrd` installs when the caller supplies no thread
+  /// parameter block of its own.
+  constexpr std::int32_t kAdxmDefaultNPriority = 15;
+  constexpr std::int32_t kAdxmDefaultUnknown04 = 2;
+  constexpr std::int32_t kAdxmDefaultVsyncPriority = 1;
+  constexpr std::int32_t kAdxmDefaultFsPriority = 1;
+  constexpr std::int32_t kAdxmDefaultMwIdlePriority = -2;
+
+  /**
+   * Address: 0x00B06C10 (FUN_00B06C10, _adxm_setup_thrd)
+   *
+   * IDA signature:
+   * void adxm_setup_thrd();
+   *
+   * What it does:
+   * Brings the ADXM middleware up: clears the worker loop and exit lanes,
+   * takes the performance-counter base, creates the vsync event, starts the
+   * 1 ms multimedia timer, initialises SVM and hands it this platform's lock,
+   * unlock and test-and-set primitives, installs the thread parameter block,
+   * then creates the three workers, sets their priorities and resumes them.
+   * Finally it registers the mw-idle border handoff.
+   *
+   * Guarded by a nesting counter, so only the first call builds anything.
+   * If either thread step fails the partial state is torn down again and SVM
+   * is shut back down, leaving the counter untouched so a later call can retry.
+   *
+   * This is the function whose absence kept the movie black: without it none
+   * of the three worker threads existed, so nothing ever ticked the SFD decode
+   * server, no frame was decoded, and mwPlyGetCurFrm always came back empty.
+   */
+  void adxm_setup_thrd(const moho::AdxmThreadStartupParams* const startupParams)
+  {
+    if (adxm_init_level == 0) {
+      gAdxmSpinWaitReleaseFlag = 0;
+      gAdxmSpinWaitCompletedFlag = 0;
+      gAdxmVsyncLoop = 0;
+      gAdxmVsyncExit = 0;
+      gAdxmMwIdleLoop = 0;
+      gAdxmMwIdleExit = 0;
+      gAdxmVsyncCount = 0;
+
+      InitializeCriticalSection(&gAdxmLock);
+
+      LARGE_INTEGER frequency{};
+      QueryPerformanceFrequency(&frequency);
+      gAdxmPerformanceFrequency = frequency.QuadPart;
+
+      LARGE_INTEGER baseCount{};
+      QueryPerformanceCounter(&baseCount);
+      gAdxmPerformanceBaseCount = baseCount.QuadPart;
+
+      gAdxmMwIdleCount = 0;
+      gAdxmSpinWaitIterationCount = 0;
+
+      gAdxtVsyncEventHandle = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+
+      if (gAdxmTimerSwitchState == 0) {
+        timeBeginPeriod(1u);
+        gAdxmMultimediaTimerId = timeSetEvent(1u, 0u, gAdxmMultimediaTimerCallback, 0u, 0u);
+      }
+
+      (void)SVM_Init();
+      // The binary stores these addresses raw; the two lock primitives are
+      // declared without the callback-object parameter SVM passes, so they are
+      // reinterpreted here rather than having their recovered signatures bent.
+      (void)SVM_SetCbLock(reinterpret_cast<SvmLockCallback>(&func_SofdecEnterLock1), 0);
+      (void)SVM_SetCbUnlock(reinterpret_cast<SvmLockCallback>(&func_SofdecLeaveLock1), 0);
+      (void)SVM_SetCbTestAndSet(reinterpret_cast<SofdecTestAndSetOverride>(&adxm_test_and_set));
+
+      if (startupParams != nullptr) {
+        gAdxmThreadStartupParams = *startupParams;
+      } else {
+        gAdxmThreadStartupParams.nPriority = kAdxmDefaultNPriority;
+        gAdxmThreadStartupParams.mUnknown04 = kAdxmDefaultUnknown04;
+        gAdxmThreadStartupParams.vsyncPriority = kAdxmDefaultVsyncPriority;
+        gAdxmThreadStartupParams.fsPriority = kAdxmDefaultFsPriority;
+        gAdxmThreadStartupParams.mwidlePriority = kAdxmDefaultMwIdlePriority;
+      }
+
+      if (adxm_create_thrd() < 0 || adxm_set_thrd_prio() < 0) {
+        (void)adxm_destroy_thrd();
+        SVM_Finish();
+        return;
+      }
+
+      ResumeThread(adxm_vsync_thrdhn);
+      ResumeThread(adxm_fs_thrdhn);
+      ResumeThread(gAdxmMwIdleThreadHandle);
+
+      SVM_SetCbBdr(
+        kAdxmMwIdleBorderId,
+        static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&adxm_goto_mwidle_border)),
+        0
+      );
+    }
+
+    ++adxm_init_level;
+  }
+
+/**
+ * Address: 0x00B07C80 (FUN_00B07C80, _ADXM_SetupThrd)
+ *
+ * IDA signature:
+ * void __cdecl ADXM_SetupThrd(moho::AdxmThreadStartupParams const* startupParams);
+ *
+ * What it does:
+ * Public entry point for bringing the ADXM middleware up. It plants the
+ * thread-creation factory into the slot adxm_create_thrd reads and then runs
+ * the setup.
+ *
+ * The indirection is the whole point: adxm_create_thrd never calls
+ * _beginthreadex directly, it calls whatever sits in this slot, and returns
+ * without creating anything when the slot is empty. That is how the engine
+ * substitutes its own thread creation.
+ */
+void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
+{
+  adxm_beginthreadex = &_beginthreadex;
+  adxm_setup_thrd(startupParams);
+}
+
+
   /**
    * Address: 0x00B072D0 (FUN_00B072D0, _adxm_set_thrd_prio)
    *
