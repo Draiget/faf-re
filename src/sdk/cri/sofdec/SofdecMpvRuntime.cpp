@@ -179,6 +179,9 @@ extern "C" {
   std::int32_t sfmpv_GetTermSrc(std::int32_t workctrlAddress);
   std::int32_t sfmpv_ChkPrepFlg(std::int32_t workctrlAddress);
   std::int32_t sfmpv_ChkTermFlg(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_IsPrepEnd(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_IsPrepFrmEnough(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_IsVbvEnough(std::int32_t workctrlAddress);
   std::int32_t MPV_GetBitRate(std::int32_t decoderHandle, std::int32_t* outBitRate);
   std::int32_t MPV_GetVbvBufSiz(
     std::int32_t decoderHandle,
@@ -2167,9 +2170,28 @@ static_assert(offsetof(MpvcmcRuntimeView, initWord0D20) == 0xD20, "MpvcmcRuntime
 
 extern "C" {
   extern std::int32_t SFTIM_prate[];
-  extern std::int32_t sfmpv_fps_round[];
-  extern std::int32_t sfmpv_conv_29_97[];
-  extern std::int32_t sfmpv_conv_59_94[];
+
+  /**
+   * Address: 0x00D7F60C
+   *
+   * Nominal integer frame rate per MPEG `frame_rate_code`, i.e. the number of
+   * frames a timecode second holds. `sfmpv_Pts2Tc` and `sfmpv_NextTc` divide by
+   * it, so index `0` (the forbidden code) must never reach them.
+   */
+  std::int32_t sfmpv_fps_round[9] = { 0, 24, 24, 25, 30, 30, 50, 60, 60 };
+
+  /**
+   * Address: 0x00D7F630 / 0x00D7F650
+   *
+   * SMPTE drop-frame conversion constants for the two 1000/1001 rates, laid out
+   * as `SfmpvDropFrameConversionTable`: cycle (one hour), ten-minute chunk,
+   * first-minute threshold, drop-minute length, drop-minute head, frames per
+   * second, minutes per chunk, and the head frame number that a drop minute
+   * starts on (`02` at 29.97, `04` at 59.94).
+   */
+  std::int32_t sfmpv_conv_29_97[8] = { 107892, 17982, 1800, 1798, 28, 30, 10, 2 };
+  std::int32_t sfmpv_conv_59_94[8] = { 215784, 35964, 3600, 3596, 56, 60, 10, 4 };
+
   extern SfmpvPara sfmpv_para;
   extern std::int32_t sfmpv_rfb_adr_tbl[2];
   extern std::uint8_t sfmpv_work[];
