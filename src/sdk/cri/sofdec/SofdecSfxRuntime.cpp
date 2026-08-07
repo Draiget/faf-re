@@ -1494,6 +1494,27 @@ std::int32_t SFX_IsMergeField(
 }
 
 /**
+ * Address: 0x00ACCD50 (FUN_00ACCD50, _SFX_SetOutBufSize)
+ *
+ * IDA signature:
+ * int __cdecl SFX_SetOutBufSize(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Records the destination surface dimensions on the handle. The width becomes
+ * the pitch `sfxcnv_MakeDstBufInf` hands the converters when it is non-zero,
+ * which is how a caller makes them write into a surface wider than the frame.
+ *
+ * The parameter is spelled `void*` to match the declaration
+ * SofdecFoundationRuntime.cpp already publishes for MWSFSFX_SetOutBufSize.
+ */
+void SFX_SetOutBufSize(void* const sfxHandle, const std::int32_t outputPitch, const std::int32_t outputHeight)
+{
+  auto* const handle = static_cast<moho_cri_sfx_internal::SfxHandle*>(sfxHandle);
+  handle->outputBufferWidth = outputPitch;
+  handle->outputBufferHeight = outputHeight;
+}
+
+/**
  * Address: 0x00ACCD70 (FUN_00ACCD70, _SFX_GetOutBufSize)
  *
  * What it does:
@@ -1530,7 +1551,7 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
   std::int32_t outputBufferHeight = 0;
   (void)SFX_GetOutBufSize(handle, &outputBufferWidth, &outputBufferHeight);
 
-  (void)SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
+  SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
   frameInfo->cachedHeight /= 2;
   (void)SFX_SetMaxRowToYccPln(frameInfo, fullHeight / 2);
   (void)SFX_Make1PlaneCftDstBuf(
@@ -1542,7 +1563,7 @@ std::int32_t SFX_CnvFrmAndMargFieldByCbFunc(
     static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(target))
   );
 
-  (void)SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
+  SFX_SetOutBufSize(handle, 2 * outputBufferWidth, fullHeight);
   (void)SFX_SetMaxRowToYccPln(frameInfo, fullHeight);
   SFX_ShiftYccPtrByLine(frameInfo, fullHeight / 2);
 

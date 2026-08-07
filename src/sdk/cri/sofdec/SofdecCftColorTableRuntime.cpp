@@ -1,9 +1,5 @@
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-
-#include "moho/audio/SofdecRuntime.h"
+// Fragment of the Sofdec translation unit; see moho/audio/SofdecRuntime.cpp.
+// Headers and the SofdecRuntime.h declarations come from the aggregator.
 
 namespace
 {
@@ -91,16 +87,8 @@ namespace
     return reinterpret_cast<T*>(address);
   }
 
-  [[nodiscard]] double ClampToByteRange(const double value)
-  {
-    if (value < 0.0) {
-      return 0.0;
-    }
-    if (value > 255.0) {
-      return 255.0;
-    }
-    return value;
-  }
+  // ClampToByteRange: shared with SofdecSvmTransferRuntime.cpp, which defines it
+  // earlier in this translation unit.
 
   [[nodiscard]] CftArgb8888AlphaTablePack* ResolveAlphaPack(const std::int32_t tableAddress)
   {
@@ -548,157 +536,14 @@ std::int32_t CFT_MakeArgb8888ColAdjTbl(const std::int32_t tableAddress)
   return cftfx_makeConvYccRgbTable();
 }
 
-/**
- * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)
- *
- * What it does:
- * Builds one ARGB8888 alpha table pack for 3110 blend mode.
- */
-std::int32_t CFT_MakeArgb8888Alp3110Tbl(
-  const std::int32_t tableAddress,
-  const std::int32_t alpha0,
-  const std::int32_t alpha1,
-  const std::int32_t alpha2
-)
-{
-  constexpr double kLane1RScale = 129.088;
-  constexpr double kLane1GScale = 25.088;
-  constexpr double kLane2GScale = 52.032;
-  constexpr double kLane2BScale = 102.144;
-  constexpr double kBaseMidScale = 148.3636363636364;
-  constexpr std::int32_t kAlphaShift = 6;
+// CFT_MakeArgb8888Alp3110Tbl: the canonical body is compiled from
+// SofdecSvmTransferRuntime.cpp; this file carried a second, identical
+// emission of it, which would be a duplicate symbol once this fragment is
+// included into the Sofdec translation unit.
 
-  auto* const tables = ResolveAlphaPack(tableAddress);
 
-  for (std::int32_t chroma = -128; chroma < 128; ++chroma) {
-    const std::size_t laneIndex = static_cast<std::size_t>(chroma + 128);
+// CFT_MakeArgb8888Alp3211Tbl: the canonical body is compiled from
+// SofdecSvmTransferRuntime.cpp; this file carried a second, identical
+// emission of it, which would be a duplicate symbol once this fragment is
+// included into the Sofdec translation unit.
 
-    auto& lane1 = tables->lane1[laneIndex];
-    lane1.r = static_cast<std::int16_t>(static_cast<std::int32_t>(kLane1RScale * static_cast<double>(chroma) + 0.5));
-    lane1.g = static_cast<std::int16_t>(static_cast<std::int32_t>(0.5 - kLane1GScale * static_cast<double>(chroma)));
-    lane1.b = 0;
-    lane1.a = 0;
-
-    auto& lane2 = tables->lane2[laneIndex];
-    lane2.r = 0;
-    lane2.g = static_cast<std::int16_t>(static_cast<std::int32_t>(0.5 - kLane2GScale * static_cast<double>(chroma)));
-    lane2.b = static_cast<std::int16_t>(static_cast<std::int32_t>(kLane2BScale * static_cast<double>(chroma) + 0.5));
-    lane2.a = 0;
-  }
-
-  const auto alpha0Lane = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha0));
-  const auto alpha1Lane = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha1) << kAlphaShift);
-  const auto alpha2Lane = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha2) << kAlphaShift);
-
-  for (std::int32_t index = 0; index < 9; ++index) {
-    auto& lane = tables->base[static_cast<std::size_t>(index)];
-    lane.r = 0;
-    lane.g = 0;
-    lane.b = 0;
-    lane.a = alpha0Lane;
-  }
-
-  for (std::int32_t index = 9; index < 134; ++index) {
-    const double clamped = ClampToByteRange(static_cast<double>(index) - 16.0);
-    const auto value = static_cast<std::int16_t>(static_cast<std::int32_t>(clamped * kBaseMidScale + 0.5));
-
-    auto& lane = tables->base[static_cast<std::size_t>(index)];
-    lane.r = value;
-    lane.g = value;
-    lane.b = value;
-    lane.a = alpha1Lane;
-  }
-
-  std::int32_t result = 0;
-  for (std::int32_t index = 134; index < 256; ++index) {
-    const double clamped = ClampToByteRange(251.0 - static_cast<double>(index));
-    result = static_cast<std::int32_t>(clamped * kBaseMidScale + 0.5);
-
-    auto& lane = tables->base[static_cast<std::size_t>(index)];
-    const auto value = static_cast<std::int16_t>(result);
-    lane.r = value;
-    lane.g = value;
-    lane.b = value;
-    lane.a = alpha2Lane;
-  }
-
-  return result;
-}
-
-/**
- * Address: 0x00AEDD50 (FUN_00AEDD50, _CFT_MakeArgb8888Alp3211Tbl)
- *
- * What it does:
- * Builds one ARGB8888 alpha table pack for 3211 blend mode.
- */
-std::int32_t CFT_MakeArgb8888Alp3211Tbl(
-  const std::int32_t tableAddress,
-  const std::int32_t alpha0,
-  const std::int32_t alpha1,
-  const std::int32_t alpha2
-)
-{
-  constexpr double kLane1RScale = 129.088;
-  constexpr double kLane1GScale = 25.088;
-  constexpr double kLane2GScale = 52.032;
-  constexpr double kLane2BScale = 102.144;
-  constexpr double kBaseMidScale = 296.7272727272727;
-  constexpr double kBaseTailScale = 147.027027027027;
-  constexpr std::int32_t kAlphaShift = 6;
-
-  auto* const tables = ResolveAlphaPack(tableAddress);
-
-  for (std::int32_t chroma = -128; chroma < 128; ++chroma) {
-    const std::size_t laneIndex = static_cast<std::size_t>(chroma + 128);
-
-    auto& lane1 = tables->lane1[laneIndex];
-    lane1.r = static_cast<std::int16_t>(static_cast<std::int32_t>(kLane1RScale * static_cast<double>(chroma) + 0.5));
-    lane1.g = static_cast<std::int16_t>(static_cast<std::int32_t>(0.5 - kLane1GScale * static_cast<double>(chroma)));
-    lane1.b = 0;
-    lane1.a = 0;
-
-    auto& lane2 = tables->lane2[laneIndex];
-    lane2.r = 0;
-    lane2.g = static_cast<std::int16_t>(static_cast<std::int32_t>(0.5 - kLane2GScale * static_cast<double>(chroma)));
-    lane2.b = static_cast<std::int16_t>(static_cast<std::int32_t>(kLane2BScale * static_cast<double>(chroma) + 0.5));
-    lane2.a = 0;
-  }
-
-  const auto alpha0Lane = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha0));
-  const auto alpha1Lane = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha1) << kAlphaShift);
-  const auto alpha2Lane = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha2) << kAlphaShift);
-
-  for (std::int32_t index = 0; index < 48; ++index) {
-    auto& lane = tables->base[static_cast<std::size_t>(index)];
-    lane.r = -1160;
-    lane.g = -1160;
-    lane.b = -1160;
-    lane.a = alpha0Lane;
-  }
-
-  for (std::int32_t index = 48; index < 130; ++index) {
-    const double clamped = ClampToByteRange(static_cast<double>(index) - 68.0);
-    const auto value = static_cast<std::int16_t>(static_cast<std::int32_t>(clamped * kBaseMidScale + 0.5));
-
-    auto& lane = tables->base[static_cast<std::size_t>(index)];
-    lane.r = value;
-    lane.g = value;
-    lane.b = value;
-    lane.a = alpha1Lane;
-  }
-
-  std::int32_t result = 0;
-  for (std::int32_t index = 130; index < 256; ++index) {
-    const double clamped = ClampToByteRange(247.0 - static_cast<double>(index));
-    result = static_cast<std::int32_t>(clamped * kBaseTailScale + 0.5);
-
-    auto& lane = tables->base[static_cast<std::size_t>(index)];
-    const auto value = static_cast<std::int16_t>(result);
-    lane.r = value;
-    lane.g = value;
-    lane.b = value;
-    lane.a = alpha2Lane;
-  }
-
-  return result;
-}

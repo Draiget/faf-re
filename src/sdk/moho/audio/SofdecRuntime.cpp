@@ -10,4 +10,5 @@
 #include "cri/sofdec/SofdecAdxCodecRuntime.cpp"
 #include "cri/sofdec/SofdecMpaRuntime.cpp"
 #include "cri/sofdec/SofdecM2aDecoderRuntime.cpp"
+#include "cri/sofdec/SofdecCftColorTableRuntime.cpp"
 #include "cri/sofdec/SofdecVirtualDispatchTableRuntime.cpp"

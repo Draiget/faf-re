@@ -63,7 +63,11 @@ extern "C" std::int32_t ADXM_WaitVsync();
  * Converts one decoded MWSFD frame descriptor into ARGB8888 pixels in the
  * caller-provided output buffer.
  */
-void mwPlyFxCnvFrmARGB8888(
+// extern "C" to match the definition's linkage, the same way mwPlyGetHdrInf
+// below does. The Sofdec side declares this inside an extern "C" block, so it
+// exports _mwPlyFxCnvFrmARGB8888; without this the call would ask for
+// ?mwPlyFxCnvFrmARGB8888@@YAX... and go unresolved.
+extern "C" void mwPlyFxCnvFrmARGB8888(
   moho::MwsfdPlaybackStateSubobj* ply,
   const moho::MwsfdFrameInfo* frameInfo,
   void* outputBits
