@@ -9734,8 +9734,15 @@
   std::int32_t gAdxpcVideoProcessingSignal = 0;
   std::int32_t gAdxpcDisplayHeight = 0;
   std::int32_t gAdxmSelectedFrameworkMode = 0;
-  std::int32_t gAdxmFramework = 0;
-  std::int32_t gAdxmInitLevel = 0;
+
+  /// `_adxm_framework` (0x00F45B38). Initialised to -1 in the binary's `.data`,
+  /// which is "auto": `adxmng_DecideFramework` then picks lane 1 once the ADXM
+  /// worker threads exist, so `ADXM_ExecMain` runs `ADXM_ExecSvrAll` and every
+  /// service lane - including the MAIN lane the SFD decode server sits on - is
+  /// pumped. Seeding this to 0 instead makes `ADXMNG_CallMainServerFunctions`
+  /// fall through all three branches and pump nothing, which is what kept the
+  /// decode server from ever running and left every movie frame black.
+  std::int32_t gAdxmFramework = -1;
 
   std::int32_t ADXM_SetInterval2Thunk(std::int32_t interval);
 
