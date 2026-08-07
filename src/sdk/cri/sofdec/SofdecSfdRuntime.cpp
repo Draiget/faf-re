@@ -15279,6 +15279,51 @@
   }
 
   /**
+   * Address: 0x00D7FA28
+   *
+   * Picture rate per MPEG `frame_rate_code`, in milli-frames per second. Index
+   * `0` is the forbidden code and index `9` closes out the table, so only
+   * `1..8` carry a real rate. `SFTIM_Tc2Time` hands the selected entry to the
+   * converter as its `frameRateUnits` argument, and `sfmpv_Pts2Nfrm` divides
+   * `2 * rate` into a 90 MHz PTS to get half-frames.
+   */
+  extern "C" std::int32_t SFTIM_prate[10] = {
+    1,     // 0: forbidden
+    23976, // 1: 24000/1001
+    24000, // 2
+    25000, // 3
+    29970, // 4: 30000/1001
+    30000, // 5
+    50000, // 6
+    59940, // 7: 60000/1001
+    60000, // 8
+    0,     // 9
+  };
+
+  /**
+   * Address: 0x00D7FA50
+   *
+   * Timecode-to-time converter dispatch, indexed by
+   * `modeIndex + 2 * frameRateIndex` - i.e. two entries per MPEG
+   * `frame_rate_code`, non-drop-frame first then drop-frame. Only the three
+   * 1000/1001 rates carry a distinct drop-frame converter; every integer rate
+   * shares the generic `sftim_Tc2TimeN` in both slots, and the forbidden code
+   * `0` is null in both, which is the pair that makes `SFTIM_Tc2Time` raise
+   * `FF000221`.
+   */
+  extern "C" SftimTc2TimeFunction sftim_tc2time[18] = {
+    nullptr,             nullptr,             // 0: forbidden
+    &sftim_Tc2Time23N,   &sftim_Tc2Time23D,   // 1: 23.976
+    &sftim_Tc2TimeN,     &sftim_Tc2TimeN,     // 2: 24
+    &sftim_Tc2TimeN,     &sftim_Tc2TimeN,     // 3: 25
+    &sftim_Tc2Time29N,   &sftim_Tc2Time29D,   // 4: 29.97
+    &sftim_Tc2TimeN,     &sftim_Tc2TimeN,     // 5: 30
+    &sftim_Tc2TimeN,     &sftim_Tc2TimeN,     // 6: 50
+    &sftim_Tc2Time59N,   &sftim_Tc2Time59D,   // 7: 59.94
+    &sftim_Tc2TimeN,     &sftim_Tc2TimeN,     // 8: 60
+  };
+
+  /**
    * Address: 0x00ADB620 (FUN_00ADB620, _SFTIM_Tc2Time)
    *
    * What it does:

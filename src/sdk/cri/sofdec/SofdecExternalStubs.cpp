@@ -279,7 +279,11 @@ extern "C" {
   // without initializing a single decoder stage.
   int MPV_IsEmptyBpic(int) { return 0; }
   int MPV_IsEmptyPpic(int) { return 0; }
-  int sfmpv_ExecServerSub(int) { return 0; }
+  // sfmpv_ExecServerSub (0x00AD1C10) is the MPV decode-server tick - the whole
+  // video decode path hangs off it, and while it was stubbed no picture was
+  // ever decoded and sfmpv_ChkPrepFlg never latched the video-output lane's
+  // prep flag, so SFPLY sat in PREP forever. Recovered next to the rest of the
+  // MPV server lane in cri/sofdec/SofdecMpvRuntime.cpp.
 }
 
 // SofdecMpv data globals — referenced by newly-compiled SofdecMpvRuntime.
@@ -315,7 +319,9 @@ extern "C" {
   std::uint8_t AdxQtblFloat0[4096] = {};
   std::uint8_t AdxQtblFloat1[4096] = {};
   std::uint8_t M2T_libobj[4096] = {};
-  std::uint8_t SFTIM_prate[4096] = {};
+  // SFTIM_prate (0x00D7FA28) is a real 10-entry milli-fps table, not a buffer;
+  // zeroed here it made every timecode convert to zero. Defined from the binary
+  // bytes next to SFTIM_Tc2Time in cri/sofdec/SofdecSfdRuntime.cpp.
   std::uint8_t adxt_q12_mix_table[4096] = {};
   std::uint8_t alloc_len_08sb[4096] = {};
   std::uint8_t alloc_len_12sb[4096] = {};
@@ -427,7 +433,10 @@ extern "C" {
   std::uint8_t sfh_workinfo[4096] = {};
   std::uint8_t sfmpv_para[4096] = {};
   std::uint8_t sfmpv_rfb_adr_tbl[4096] = {};
-  std::uint8_t sftim_tc2time[4096] = {};
+  // sftim_tc2time (0x00D7FA50) is an 18-entry converter dispatch table, not a
+  // buffer. Zeroed here, SFTIM_Tc2Time found a null slot for every frame rate
+  // and raised FF000221 forever. Defined from the binary bytes next to the
+  // converters in cri/sofdec/SofdecSfdRuntime.cpp.
   std::uint8_t sin_long[4096] = {};
   std::uint8_t sin_short[4096] = {};
   std::uint8_t sin_start[4096] = {};
