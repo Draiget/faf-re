@@ -807,3 +807,209 @@ void* SFX_Create(
 }
 
 }  // extern "C"
+
+// ---------------------------------------------------------------------------
+// SFX -> CFT frame conversion.
+//
+// This is the tail of the movie pipeline: it flattens one decoded frame's
+// plane descriptors into the buffer shape the CFT kernels read, then invokes
+// the pixel-format callback that was installed on the handle.
+//
+// The two parameter types the shared declarations use are placeholders for the
+// real ones. `SfxCallbackFrameContext` is an `SfxHandle` - every offset the
+// binary touches here (+0x38 planeBase, +0x50 tableBase, +0x64 cnvBottomUp,
+// +0x68 cnvFrmCallback) is a named field of it - and `SfxStreamState` is a
+// `MwsfdSfxFrameInfo`, whose 0x94-byte span and +0x90 lane the placeholder was
+// modelled from. They are aliased here rather than renamed globally because
+// the placeholders live in moho/audio/SofdecRuntime.h while `SfxHandle` is
+// local to this fragment; the same aliasing pattern is already used by
+// `CFT_Ycc420plnToArgb8888` for its `...View` types.
+// ---------------------------------------------------------------------------
+
+namespace moho_cri_sfx_internal {
+
+/// One plane descriptor in the buffer the CFT kernels read.
+struct SfxCftPlaneRecord
+{
+  std::int32_t address; ///< +0x00
+  std::int32_t width;   ///< +0x04
+  std::int32_t height;  ///< +0x08
+  std::int32_t pitch;   ///< +0x0C
+};
+static_assert(sizeof(SfxCftPlaneRecord) == 0x10, "SfxCftPlaneRecord must be 16 bytes");
+
+/**
+ * Source descriptor `sfxcnv_MakeCftSrcBuf` fills.
+ *
+ * The CFT side sees this same block as `CftYcc420PlanarPackedWords`, which is
+ * why the plane addresses land at +0x04 / +0x14 / +0x24 and the pitches at
+ * +0x10 / +0x20 / +0x30. The binary's stack object is 68 bytes and memset to
+ * zero before use, so the tail beyond the three records is kept.
+ */
+struct SfxCftSourceBuffer
+{
+  std::int32_t planeCount = 0;      ///< +0x00 1 = packed, 3 = planar YCbCr
+  SfxCftPlaneRecord planes[3]{};    ///< +0x04, +0x14, +0x24
+  std::int32_t reserved34[4]{};     ///< +0x34
+};
+static_assert(offsetof(SfxCftSourceBuffer, planes) == 0x04, "SfxCftSourceBuffer::planes offset must be 0x04");
+static_assert(sizeof(SfxCftSourceBuffer) == 0x44, "SfxCftSourceBuffer must be 68 bytes");
+
+/**
+ * Destination rectangle handed to the CFT kernels; the CFT side sees it as
+ * `CftRgb16OutputPackedWords`.
+ */
+struct SfxCftTargetBuffer
+{
+  std::int32_t planeCount; ///< +0x00
+  std::int32_t pixels;     ///< +0x04
+  std::int32_t width;      ///< +0x08
+  std::int32_t height;     ///< +0x0C
+  std::int32_t pitch;      ///< +0x10 negative once flipped bottom-up
+};
+static_assert(offsetof(SfxCftTargetBuffer, pitch) == 0x10, "SfxCftTargetBuffer::pitch offset must be 0x10");
+
+constexpr char kSfxErrCnvSrcFrameFormat[] = "E4111901: sfxcnv_MakeCftSrcBuf : frame format is invalid.";
+
+/// Composition codes `sfxcnv_MakeCftSrcBuf` accepts, from the frame info's +0x00 lane.
+constexpr std::int32_t kSfxFrameFormatPacked = 1;
+constexpr std::int32_t kSfxFrameFormatPackedAlt = 2;
+constexpr std::int32_t kSfxFrameFormatPlanarYcc420 = 3;
+
+}  // namespace moho_cri_sfx_internal
+
+/**
+ * Address: 0x00ACCFE0 (FUN_00ACCFE0, _SFX_GetCnvBottomUp)
+ *
+ * IDA signature:
+ * int __cdecl SFX_GetCnvBottomUp(int a1);
+ *
+ * What it does:
+ * Reports whether converted rows are to be written bottom-up.
+ */
+std::int32_t SFX_GetCnvBottomUp(const moho_cri_sfx_internal::SfxHandle* const handle)
+{
+  return handle->cnvBottomUp;
+}
+
+/**
+ * Address: 0x00ACE4B0 (FUN_00ACE4B0, _SFX_SetBottomUpDstBuf)
+ *
+ * IDA signature:
+ * _DWORD* __cdecl SFX_SetBottomUpDstBuf(_DWORD *a1);
+ *
+ * What it does:
+ * Re-points a destination rectangle at its last row and negates the pitch, so
+ * the same kernel fills it bottom-up without needing a second code path.
+ */
+moho_cri_sfx_internal::SfxCftTargetBuffer*
+SFX_SetBottomUpDstBuf(moho_cri_sfx_internal::SfxCftTargetBuffer* const target)
+{
+  const std::int32_t pitch = target->pitch;
+  target->pixels += pitch * (target->height - 1);
+  target->pitch = -pitch;
+  return target;
+}
+
+/**
+ * Address: 0x00ACEB90 (FUN_00ACEB90, _sfxcnv_MakeCftSrcBuf)
+ *
+ * IDA signature:
+ * void __cdecl sfxcnv_MakeCftSrcBuf(int a1, _DWORD *a2, _DWORD *a3);
+ *
+ * What it does:
+ * Flattens one decoded frame's plane descriptors into the record layout the
+ * CFT kernels read. Packed formats carry a single plane; planar YCC 4:2:0
+ * carries three, with the chroma planes half as wide. Anything else is a
+ * library error and leaves the buffer as the caller zeroed it.
+ *
+ * Note the width comes from the frame info's cached width lane rather than
+ * from each plane record - the plane records carry pitch and height only.
+ */
+void sfxcnv_MakeCftSrcBuf(
+  moho_cri_sfx_internal::SfxHandle* const handle,
+  const MwsfdSfxFrameInfo* const frameInfo,
+  moho_cri_sfx_internal::SfxCftSourceBuffer* const outSource
+)
+{
+  using namespace moho_cri_sfx_internal;
+
+  const std::int32_t frameFormat = frameInfo->compositionMode;
+  const std::int32_t lumaWidth = frameInfo->cachedWidth;
+
+  if (frameFormat == kSfxFrameFormatPacked || frameFormat == kSfxFrameFormatPackedAlt) {
+    outSource->planeCount = 1;
+    outSource->planes[0] = {frameInfo->yPlane.address, lumaWidth, frameInfo->yPlane.height, frameInfo->yPlane.pitch};
+    return;
+  }
+
+  if (frameFormat == kSfxFrameFormatPlanarYcc420) {
+    const std::int32_t chromaWidth = lumaWidth / 2;
+    outSource->planeCount = 3;
+    outSource->planes[0] = {frameInfo->yPlane.address, lumaWidth, frameInfo->yPlane.height, frameInfo->yPlane.pitch};
+    outSource->planes[1] = {
+      frameInfo->cbPlane.address, chromaWidth, frameInfo->cbPlane.height, frameInfo->cbPlane.pitch
+    };
+    outSource->planes[2] = {
+      frameInfo->crPlane.address, chromaWidth, frameInfo->crPlane.height, frameInfo->crPlane.pitch
+    };
+    return;
+  }
+
+  SFXLIB_Error(
+    reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
+    reinterpret_cast<moho::SfxStreamState*>(const_cast<MwsfdSfxFrameInfo*>(frameInfo)),
+    kSfxErrCnvSrcFrameFormat
+  );
+}
+
+/**
+ * Address: 0x00ACEB10 (FUN_00ACEB10, _sfxcnv_ExecCnvFrmByCbFunc)
+ *
+ * IDA signature:
+ * int __cdecl sfxcnv_ExecCnvFrmByCbFunc(_DWORD *a1, int a2, int a3, int a4);
+ *
+ * What it does:
+ * Runs one decoded frame through the pixel-format callback installed on the
+ * handle. This is where a frame becomes pixels; while it stood as a
+ * `{ return nullptr; }` C-linkage stub the whole conversion path completed and
+ * reported success without ever writing to the destination surface.
+ *
+ * `useLookupTable` selects whether the callback gets the handle's composition
+ * plane base as its table - the composition modes that call `SFX_MakeTable`
+ * first pass 1 - or zero, which makes the CFT entry fall back to the static
+ * default table.
+ */
+void sfxcnv_ExecCnvFrmByCbFunc(
+  moho::SfxCallbackFrameContext* const conversionState,
+  moho::SfxStreamState* const streamState,
+  const std::int32_t callbackArg,
+  const std::int32_t useLookupTable
+)
+{
+  using namespace moho_cri_sfx_internal;
+
+  auto* const handle = reinterpret_cast<SfxHandle*>(conversionState);
+  const auto* const frameInfo = reinterpret_cast<const MwsfdSfxFrameInfo*>(streamState);
+  auto* const target = reinterpret_cast<SfxCftTargetBuffer*>(static_cast<std::uintptr_t>(callbackArg));
+
+  SfxCftSourceBuffer source{};
+  sfxcnv_MakeCftSrcBuf(handle, frameInfo, &source);
+
+  const std::int32_t tableParams[2] = {
+    (useLookupTable == 1) ? handle->planeBase : 0,
+    handle->tableBase,
+  };
+
+  if (SFX_GetCnvBottomUp(handle) == 1) {
+    (void)SFX_SetBottomUpDstBuf(target);
+  }
+
+  if (handle->cnvFrmCallback != nullptr) {
+    handle->cnvFrmCallback(
+      reinterpret_cast<const std::int32_t*>(&source),
+      reinterpret_cast<const std::int32_t*>(target),
+      tableParams
+    );
+  }
+}

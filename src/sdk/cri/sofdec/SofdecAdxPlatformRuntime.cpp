@@ -17083,13 +17083,24 @@
    * One <address, pitch, height> SFX buffer descriptor written by
    * `mwsfsfx_SetSfxBufInf` for the Y / Cb / Cr planes.
    */
+  /**
+   * One plane descriptor inside `MwsfdSfxFrameInfo`.
+   *
+   * `mwsfsfx_SetSfxBufInf` (0x00AC6960) writes only the first three dwords,
+   * but the three records are laid out 16 bytes apart, not 12:
+   * `mwsfsfx_SetYcc420plnInfToSfx` (0x00AC68B0) fills them at `a2+1`, `a2+5`
+   * and `a2+9`, i.e. +0x04, +0x14 and +0x24. The trailing dword is never
+   * touched by that path and is carried as a reserved lane so the following
+   * records land where the binary puts them.
+   */
   struct MwsfdSfxBufInf
   {
     std::int32_t address;
     std::int32_t pitch;
     std::int32_t height;
+    std::int32_t reserved0C;
   };
-  static_assert(sizeof(MwsfdSfxBufInf) == 0x0C, "MwsfdSfxBufInf must be 12 bytes");
+  static_assert(sizeof(MwsfdSfxBufInf) == 0x10, "MwsfdSfxBufInf must be 16 bytes");
 
   /**
    * SFD-side scratch geometry emitted by `SFD_CalcYccPlane`.
@@ -17157,11 +17168,8 @@
   {
     std::int32_t compositionMode;                  ///< +0x00 buffer-format type
     MwsfdSfxBufInf yPlane;                         ///< +0x04
-    MwsfdSfxBufInf cbPlane;                        ///< +0x10
-    MwsfdSfxBufInf crPlane;                        ///< +0x1C
-    std::int32_t planeWidth;                       ///< +0x28 (cached width)
-    std::int32_t planeHeight;                      ///< +0x2C (cached height)
-    std::int32_t mUnknown30;                       ///< +0x30
+    MwsfdSfxBufInf cbPlane;                        ///< +0x14
+    MwsfdSfxBufInf crPlane;                        ///< +0x24
     std::int32_t mUnknown34;                       ///< +0x34
     std::int32_t mUnknown38;                       ///< +0x38
     std::int32_t mUnknown3C;                       ///< +0x3C
@@ -17188,8 +17196,8 @@
   };
   static_assert(offsetof(MwsfdSfxFrameInfo, compositionMode) == 0x00, "MwsfdSfxFrameInfo::compositionMode offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, yPlane) == 0x04, "MwsfdSfxFrameInfo::yPlane offset");
-  static_assert(offsetof(MwsfdSfxFrameInfo, cbPlane) == 0x10, "MwsfdSfxFrameInfo::cbPlane offset");
-  static_assert(offsetof(MwsfdSfxFrameInfo, crPlane) == 0x1C, "MwsfdSfxFrameInfo::crPlane offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, cbPlane) == 0x14, "MwsfdSfxFrameInfo::cbPlane offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, crPlane) == 0x24, "MwsfdSfxFrameInfo::crPlane offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, cachedWidth) == 0x44, "MwsfdSfxFrameInfo::cachedWidth offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, cachedHeight) == 0x48, "MwsfdSfxFrameInfo::cachedHeight offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, nfrm) == 0x4C, "MwsfdSfxFrameInfo::nfrm offset");
