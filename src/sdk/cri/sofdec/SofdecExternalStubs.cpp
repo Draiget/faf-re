@@ -96,7 +96,13 @@ extern "C" {
   // MPVCMC_InitMcOiRt, MPVCMC_SetCcnt, MPVUMC_EndOfFrame, MPVUMC_Finish,
   // MPVUMC_InitOutRfb.
   void* MWSFCRE_DestroySfd() { return nullptr; }
-  void* MWSFCRE_SetSupplySj() { return nullptr; }
+  // MWSFCRE_SetSupplySj (0x00AC7D80): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. As a no-arg stub it silently
+  // satisfied every `MWSFCRE_SetSupplySj(ply)` call, so the SFD's input lane
+  // was never bound to the stream SJ ring. `mwsfcre_CalcWorkStmBuf` reports
+  // `sib = 0` on purpose, which leaves SFBUF lane 0 "awaiting supply" - this
+  // function is what hands it the ring. Without it the demuxer parsed an empty
+  // ring on every server tick and no movie ever produced a frame.
   void* MWSFD_GetUsePicUsr() { return nullptr; }
   // MWSFD_IsEnableHndl (0x00ACBA10) is recovered in SofdecFoundationRuntime.cpp.
   // Its stub took no arguments, so C linkage let it satisfy every
