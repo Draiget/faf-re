@@ -237,19 +237,12 @@ namespace moho::movie
    * still building, linking and running.
    */
   /**
-   * IMPORTANT: this is a VIEW, never an object to allocate.
-   *
-   * `ProbeScanSlot` calls the kernel as
-   * `readKernel(context, &context->decodeBitstreamWord)`, so the second
-   * argument is `context + 0x68` and the fields below alias the scan
-   * context's own lanes: `level` is `decodeBitstreamWord`, `run` is
-   * `decodeHuffmanPrimary`, `signBit` is `decodeHuffmanSecondary`,
-   * `codeLengthBits` is `decodePhase`, and `scanIndexLimit` overlaps
-   * `decodeFlags`. Instantiating one and writing through it would update a
-   * detached copy while the decoder kept reading the context - a decoder
-   * that builds, links, runs, and silently produces wrong coefficients.
-   *
-   * Only ever reach it by casting the kernel's second argument.
+   * This block lives inside the scan context, at +0x44, as
+   * `MPVDecoderScanContext::coefficientDecodeState`. The scan-state
+   * initializers fill its per-macroblock lanes and then pass its address as
+   * the kernel's second argument; the kernel reads and writes the same
+   * storage. Never allocate a detached one and write through it - the decoder
+   * would keep reading the context and silently produce wrong coefficients.
    */
   struct MPVCoefficientDecodeState
   {
@@ -280,6 +273,7 @@ namespace moho::movie
   static_assert(offsetof(MPVCoefficientDecodeState, quantScale) == 0x24, "MPVCoefficientDecodeState::quantScale offset must be 0x24");
   static_assert(offsetof(MPVCoefficientDecodeState, dcAccumulator) == 0x28, "MPVCoefficientDecodeState::dcAccumulator offset must be 0x28");
   static_assert(offsetof(MPVCoefficientDecodeState, dcSizeTable) == 0x2C, "MPVCoefficientDecodeState::dcSizeTable offset must be 0x2C");
+  static_assert(sizeof(MPVCoefficientDecodeState) == 0x30, "MPVCoefficientDecodeState size must be 0x30");
 
   struct MPVDecoderScanContext
   {
@@ -308,13 +302,19 @@ namespace moho::movie
     const std::uint16_t* bitMaskByWidth;         // +0x30
     /** Per-scan-position float scale folded into each dequantized coefficient. */
     const float* dequantScaleTable;              // +0x34
-    std::uint8_t reserved_0038[0x60 - 0x38];
-    int decodeCurrentSource; // +0x60
-    int decodeWorkBase;      // +0x64
-    int decodeBitstreamWord; // +0x68
-    int decodeHuffmanPrimary;   // +0x6C
-    int decodeHuffmanSecondary; // +0x70
-    int decodePhase;            // +0x74
+    std::uint8_t reserved_0038[0x44 - 0x38];
+    /**
+     * The parameter/result block the read kernels work through. Both scan-state
+     * initializers hand its address straight to the kernel - `sub_C0E1B0` calls
+     * `readKernel(context, context + 68)` - and the kernel reads `dcSizeTable`
+     * as `[edx+2Ch]` (0x00AFAE90), i.e. context +0x70. That anchors the view
+     * here at +0x44, and every field then lands on the lane the initializers
+     * fill: `coefficients` +0x60, `quantMatrix` +0x64, `quantScale` +0x68,
+     * `dcAccumulator` +0x6C, `dcSizeTable` +0x70.
+     */
+    MPVCoefficientDecodeState coefficientDecodeState; // +0x44
+    /** Zero while reading an intra macroblock, one while reading a predicted one. */
+    int blockScanPhase;          // +0x74
     std::uint8_t decodeFlags[6]; // +0x78
     std::uint8_t reserved_007E[0xA0 - 0x7E];
     int decodeSignLadder; // +0xA0
@@ -407,8 +407,19 @@ namespace moho::movie
     "MPVDecoderScanContext::bitMaskByWidth offset must be 0x30"
   );
 
-  static_assert(offsetof(MPVDecoderScanContext, decodeCurrentSource) == 0x60, "MPVDecoderScanContext::decodeCurrentSource offset must be 0x60");
-  static_assert(offsetof(MPVDecoderScanContext, decodeWorkBase) == 0x64, "MPVDecoderScanContext::decodeWorkBase offset must be 0x64");
+  static_assert(
+    offsetof(MPVDecoderScanContext, coefficientDecodeState) == 0x44,
+    "MPVDecoderScanContext::coefficientDecodeState offset must be 0x44"
+  );
+  static_assert(
+    offsetof(MPVDecoderScanContext, coefficientDecodeState.coefficients) == 0x60,
+    "MPVCoefficientDecodeState::coefficients must land on context +0x60"
+  );
+  static_assert(
+    offsetof(MPVDecoderScanContext, coefficientDecodeState.dcSizeTable) == 0x70,
+    "MPVCoefficientDecodeState::dcSizeTable must land on context +0x70"
+  );
+  static_assert(offsetof(MPVDecoderScanContext, blockScanPhase) == 0x74, "MPVDecoderScanContext::blockScanPhase offset must be 0x74");
   static_assert(offsetof(MPVDecoderScanContext, decodeFlags) == 0x78, "MPVDecoderScanContext::decodeFlags offset must be 0x78");
   static_assert(offsetof(MPVDecoderScanContext, decodeSignLadder) == 0xA0, "MPVDecoderScanContext::decodeSignLadder offset must be 0xA0");
   static_assert(offsetof(MPVDecoderScanContext, serviceReloadInterval) == 0x1AC, "MPVDecoderScanContext::serviceReloadInterval offset must be 0x1AC");

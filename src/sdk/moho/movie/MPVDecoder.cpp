@@ -12,6 +12,12 @@ namespace moho
   struct SofdecSjMemoryHandle;
 }
 
+namespace moho::movie
+{
+  int MPVDEC_InitScanStateIntra(MPVDecoderScanContext* context);
+  int MPVDEC_InitScanStatePredicted(MPVDecoderScanContext* context);
+}
+
 namespace
 {
   struct MPVLibWorkState
@@ -283,8 +289,10 @@ namespace
     std::int32_t* mpvhdec_InitNqm(int handleAddress);
     int mpvhdec_AnalyUd(std::int32_t* handleWords, std::uint8_t* userDataStart, int chunkSize);
     int mpvhdec_DecSeqUdsc(std::int32_t* handleWords, const std::uint8_t* userDataStart, int consumedByteCount);
-    void sub_C0E1B0(moho::movie::MPVDecoderScanContext* decoderContext);
-    void sub_C0E2E0(moho::movie::MPVDecoderScanContext* decoderContext);
+    // The two scan-state initializers the picture header installs as this
+    // picture's macroblock read drivers. Defined further down in
+    // `namespace moho::movie`; declared here because `mpvhdec_DecPscSj` takes
+    // their addresses long before that point.
     /**
      * Address: 0x00AF6100 (FUN_00AF6100, _MPVUMC_InitOutRfb)
      *
@@ -405,6 +413,7 @@ namespace
   }
 
   using moho::movie::MPVBitstreamState;
+  using moho::movie::MPVCoefficientDecodeState;
   using moho::movie::MPVBlockSourceSet;
   using moho::movie::MPVCopyDestinationSet;
   using moho::movie::MPVDecoderContextPrefix;
@@ -1047,20 +1056,26 @@ namespace
     std::memset(context->scanScratch0, 0, BlockCount * sizeof(context->scanScratch0));
   }
 
+  /**
+   * Points the coefficient block at one of the six scan scratch buffers and
+   * runs the read kernel over it. The kernel's second argument is the context's
+   * own `coefficientDecodeState` (context +0x44), which is what both scan-state
+   * initializers pass - `sub_C0E2E0` even writes the block base through it, as
+   * `*(stateBase + 28) = blockBase`.
+   */
+  inline std::uint8_t
+  ProbeScanSlot(MPVDecoderScanContext* context, const MPVDecodeReadKernelFn readKernel, std::uint8_t* scanScratchBase)
+  {
+    MPVCoefficientDecodeState& state = context->coefficientDecodeState;
+    state.coefficients = reinterpret_cast<float*>(scanScratchBase);
+    return readKernel(context, &state);
+  }
+
   template <std::size_t SlotIndex>
   inline std::uint8_t ProbeScanSlot(MPVDecoderScanContext* context, const MPVDecodeReadKernelFn readKernel)
   {
     static_assert(SlotIndex < 6, "SlotIndex must be between 0 and 5");
-    context->decodeWorkBase = PointerToAddress(context->scanScratch0 + SlotIndex * sizeof(context->scanScratch0));
-    return readKernel(context, &context->decodeBitstreamWord);
-  }
-
-  inline std::uint8_t ProbeScanSlot(
-    MPVDecoderScanContext* context, const MPVDecodeReadKernelFn readKernel, const std::uint8_t* scanScratchBase
-  )
-  {
-    context->decodeWorkBase = PointerToAddress(scanScratchBase);
-    return readKernel(context, &context->decodeBitstreamWord);
+    return ProbeScanSlot(context, readKernel, context->scanScratch0 + SlotIndex * sizeof(context->scanScratch0));
   }
 
   inline void InitializeMpvInterpolationDispatch()
@@ -2978,8 +2993,8 @@ extern "C" int mpvhdec_DecPscSj(const int handleAddress, MPVSjStream* const stre
   const int dispatchIndex = pictureCodingType + profileBias * 5;
   const int intraDispatchIndex = 10 * handle->conditionCallbacks[4] + pictureCodingType + profileBias * 5;
 
-  handle->decodeReadKernelPrimary = reinterpret_cast<MPVMacroblockDecodeFn>(&sub_C0E1B0);
-  handle->decodeReadKernelSecondary = reinterpret_cast<MPVMacroblockDecodeFn>(&sub_C0E2E0);
+  handle->decodeReadKernelPrimary = reinterpret_cast<MPVMacroblockDecodeFn>(&moho::movie::MPVDEC_InitScanStateIntra);
+  handle->decodeReadKernelSecondary = reinterpret_cast<MPVMacroblockDecodeFn>(&moho::movie::MPVDEC_InitScanStatePredicted);
   handle->decodeMacroblockByType = dec_mbs_func[pictureCodingType];
 
   if (handle->conditionCallbacks[10] != 0) {
@@ -7131,22 +7146,26 @@ namespace moho::movie
   {
     ClearScanScratchBlocks<6>(context);
 
-    context->decodeBitstreamWord = context->decodeBitWindow;
-    context->decodeCurrentSource = PointerToAddress(context->decodeWorkScratchIntra);
-    context->decodePhase = 0;
-    context->decodeHuffmanSecondary = context->decodeTablePrimary;
-    context->decodeHuffmanPrimary = PointerToAddress(&context->dcPredictorY);
+    MPVCoefficientDecodeState& state = context->coefficientDecodeState;
+    state.quantScale = context->decodeBitWindow;
+    state.quantMatrix = context->decodeWorkScratchIntra;
+    context->blockScanPhase = 0;
+    state.dcSizeTable = AddressToPointer(context->decodeTablePrimary);
+    state.dcAccumulator = &context->dcPredictorY;
 
+    // The four luma blocks share the luma DC predictor and DC size table.
     context->decodeFlags[0] = ProbeScanSlot<0>(context, context->decodeReadKernelIntra);
     context->decodeFlags[1] = ProbeScanSlot<1>(context, context->decodeReadKernelIntra);
     context->decodeFlags[2] = ProbeScanSlot<2>(context, context->decodeReadKernelIntra);
     context->decodeFlags[3] = ProbeScanSlot<3>(context, context->decodeReadKernelIntra);
 
-    context->decodeHuffmanSecondary = context->decodeTableSecondary;
-    context->decodeHuffmanPrimary = PointerToAddress(&context->dcPredictorCb);
+    // Both chroma blocks switch to the chroma DC size table, each with its own
+    // DC predictor.
+    state.dcSizeTable = AddressToPointer(context->decodeTableSecondary);
+    state.dcAccumulator = &context->dcPredictorCb;
     context->decodeFlags[4] = ProbeScanSlot<4>(context, context->decodeReadKernelIntra);
 
-    context->decodeHuffmanPrimary = PointerToAddress(&context->dcPredictorCr);
+    state.dcAccumulator = &context->dcPredictorCr;
     context->decodeFlags[5] = ProbeScanSlot<5>(context, context->decodeReadKernelIntra);
 
     context->decodeFinalizeIntra(context->decodeFlags);
@@ -7162,15 +7181,17 @@ namespace moho::movie
    */
   int MPVDEC_InitScanStatePredicted(MPVDecoderScanContext* context)
   {
-    context->decodeBitstreamWord = context->decodeBitWindow;
-    context->decodeCurrentSource = PointerToAddress(context->decodeWorkScratchPredicted);
-    context->decodePhase = 1;
+    MPVCoefficientDecodeState& state = context->coefficientDecodeState;
+    state.quantScale = context->decodeBitWindow;
+    state.quantMatrix = context->decodeWorkScratchPredicted;
+    context->blockScanPhase = 1;
 
+    // Non-intra blocks carry no DC prediction, so the DC lanes are left alone.
     int signLadder = context->predictionSignState * 4;
     context->decodeSignLadder = signLadder;
 
     const MPVDecodeReadKernelFn readKernel = context->decodeReadKernelPredicted;
-    const std::uint8_t* scanScratchBase = context->scanScratch0;
+    std::uint8_t* scanScratchBase = context->scanScratch0;
     for (int flagIndex = 0; flagIndex < 6; ++flagIndex) {
       if (signLadder < 0) {
         context->decodeFlags[flagIndex] = ProbeScanSlot(context, readKernel, scanScratchBase);
