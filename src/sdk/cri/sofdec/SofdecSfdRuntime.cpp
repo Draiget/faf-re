@@ -8324,11 +8324,21 @@
 
   /**
    * Address: 0x00ADFD60 (FUN_00ADFD60, _SFTRN_IsSetup)
+   *
+   * What it does:
+   * Reports whether one transfer lane has a strategy bound. The binary reads
+   * `[edx+ecx*4+1F3Ch]` with `ecx = index * 17`, i.e. lane `+0x0C` - the
+   * descriptor `sftrn_InitTrData` publishes - and NOT the `prepFlag` at
+   * `+0x00` that `SFTRN_GetPrepFlg` (`+0x1F30`) returns. Reading `prepFlag`
+   * here made `SFBUF_SetSupplySj` route the stream SJ at whichever lane had
+   * merely been prepared, so it aimed the supply descriptor at lane 1 - which
+   * owns its own SJ - and the bind failed with `FF000409`
+   * ("lane not awaiting supply") on every movie.
    */
   std::int32_t SFTRN_IsSetup(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t transferLaneType)
   {
     const auto* const transferRuntime = reinterpret_cast<const SftrnTransferRuntimeView*>(workctrlSubobj);
-    return (transferRuntime->transferLanes[transferLaneType].prepFlag != 0) ? 1 : 0;
+    return (transferRuntime->transferLanes[transferLaneType].transferDescriptorAddress != 0) ? 1 : 0;
   }
 
   /**

@@ -4464,6 +4464,23 @@
   }
 
   /**
+   * `sfply_InitHn` calls `SFBUF_InitHn(v3, &v3->bufHn, a1)`, so every routine
+   * reachable from it is handed the lane array itself and indexes it directly
+   * as `base + laneIndex * 0x74`. The accessors that run afterwards
+   * (`sfbuf_SetSupplySjSub`, `sfbuf_RingGetSub`, `SFBUF_RingGetDataSiz`, ...)
+   * are handed the workctrl base instead and reach the same storage through
+   * `SfbufRuntimeHandleView::lanes` at +0x1310. Overlaying the handle view on
+   * an already-offset base put every lane 0x1310 bytes past where the readers
+   * look, so the whole array stayed zero and `MWSFCRE_SetSupplySj` reported
+   * `FF000409` ("lane not awaiting supply") for a lane that had never been
+   * initialised at all.
+   */
+  std::array<SfbufSupplyLaneView, 9>& SfbufLanesAt(const std::int32_t sfbufLaneArrayAddress)
+  {
+    return *reinterpret_cast<std::array<SfbufSupplyLaneView, 9>*>(SjAddressToPointer(sfbufLaneArrayAddress));
+  }
+
+  /**
    * Address: 0x00ADE910 (FUN_00ADE910, _sfbuf_InitUoSj)
    */
   std::int32_t* sfbuf_InitUoSj(std::int32_t* const uoSjStateWords)
@@ -4483,7 +4500,7 @@
    * Address: 0x00ADE8B0 (FUN_00ADE8B0, _sfbuf_InitUoSjBuf)
    */
   std::int32_t* sfbuf_InitUoSjBuf(
-    const std::int32_t sfbufHandleAddress,
+    const std::int32_t sfbufLaneArrayAddress,
     const std::int32_t* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex
@@ -4492,8 +4509,7 @@
     (void)bufferAddressTable;
     (void)bufferSizeTable;
 
-    auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufSupplyLaneView* const laneView = &runtimeView->lanes[laneIndex];
+    SfbufSupplyLaneView* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 3, 1);
     return sfbuf_InitUoSj(&laneView->sourceBufferAddress);
   }
@@ -4502,14 +4518,13 @@
    * Address: 0x00ADE7D0 (FUN_00ADE7D0, _sfbuf_InitAringBuf)
    */
   std::int32_t sfbuf_InitAringBuf(
-    const std::int32_t sfbufHandleAddress,
+    const std::int32_t sfbufLaneArrayAddress,
     const std::int32_t* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufSupplyLaneView* const laneView = &runtimeView->lanes[laneIndex];
+    SfbufSupplyLaneView* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     const std::int32_t setupState = (bufferSizeTable[laneIndex] != 0) ? 1 : 0;
     (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 2, setupState);
     laneView->sourceBufferAddress = bufferAddressTable[laneIndex];
@@ -4571,7 +4586,7 @@
    */
   std::int32_t sfbuf_InitVfrmBuf(
     const std::int32_t vfrmOwnerAddress,
-    const std::int32_t sfbufHandleAddress,
+    const std::int32_t sfbufLaneArrayAddress,
     const std::int32_t* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex
@@ -4581,8 +4596,7 @@
     constexpr std::int32_t kVfrmScratchClearSpan = 0x880;
     constexpr std::int32_t kVfrmScratchStride = 0x88;
 
-    auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufSupplyLaneView* const laneView = &runtimeView->lanes[laneIndex];
+    SfbufSupplyLaneView* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     const std::int32_t setupState = (bufferSizeTable[laneIndex] != 0) ? 1 : 0;
     (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 1, setupState);
     laneView->sourceBufferAddress = bufferAddressTable[laneIndex];
@@ -4636,15 +4650,14 @@
    * Address: 0x00ADE5B0 (FUN_00ADE5B0, _sfbuf_InitRingSj)
    */
   std::int32_t sfbuf_InitRingSj(
-    const std::int32_t sfbufHandleAddress,
+    const std::int32_t sfbufLaneArrayAddress,
     const std::int32_t* const bufferAddressTable,
     const std::int32_t* const bufferSizeTable,
     const std::int32_t laneIndex,
     const std::int32_t extraBufferBytes
   )
   {
-    auto* const runtimeView = reinterpret_cast<SfbufRuntimeHandleView*>(SjAddressToPointer(sfbufHandleAddress));
-    SfbufSupplyLaneView* const laneView = &runtimeView->lanes[laneIndex];
+    SfbufSupplyLaneView* const laneView = &SfbufLanesAt(sfbufLaneArrayAddress)[laneIndex];
     const std::int32_t laneBufferBytes = bufferSizeTable[laneIndex];
     if (laneBufferBytes == 0) {
       (void)sfbuf_InitBufData(reinterpret_cast<std::int32_t*>(laneView), 4, 0);
@@ -4677,7 +4690,7 @@
    */
   std::int32_t SFBUF_InitHn(
     const std::int32_t vfrmOwnerAddress,
-    const std::int32_t sfbufHandleAddress,
+    const std::int32_t sfbufLaneArrayAddress,
     const std::int32_t* const sfbufInitConfigWords
   )
   {
@@ -4696,7 +4709,7 @@
     (void)sfbuf_MakeBufPtr(laneBufferAddresses.data(), laneBufferSizes, initConfig->baseBufferAddress);
 
     std::int32_t status = sfbuf_InitRingSj(
-      sfbufHandleAddress,
+      sfbufLaneArrayAddress,
       laneBufferAddresses.data(),
       laneBufferSizes,
       kSfbufRingLane0,
@@ -4706,33 +4719,33 @@
       return status;
     }
 
-    status = sfbuf_InitRingSj(sfbufHandleAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufRingLane1, 0x800);
+    status = sfbuf_InitRingSj(sfbufLaneArrayAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufRingLane1, 0x800);
     if (status != 0) {
       return status;
     }
 
-    status = sfbuf_InitRingSj(sfbufHandleAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufRingLane2, 0);
+    status = sfbuf_InitRingSj(sfbufLaneArrayAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufRingLane2, 0);
     if (status != 0) {
       return status;
     }
 
     (void)sfbuf_InitVfrmBuf(
       vfrmOwnerAddress,
-      sfbufHandleAddress,
+      sfbufLaneArrayAddress,
       laneBufferAddresses.data(),
       laneBufferSizes,
       kSfbufVfrmLane0
     );
-    (void)sfbuf_InitAringBuf(sfbufHandleAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufAringLane0);
+    (void)sfbuf_InitAringBuf(sfbufLaneArrayAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufAringLane0);
     (void)sfbuf_InitVfrmBuf(
       vfrmOwnerAddress,
-      sfbufHandleAddress,
+      sfbufLaneArrayAddress,
       laneBufferAddresses.data(),
       laneBufferSizes,
       kSfbufVfrmLane1
     );
-    (void)sfbuf_InitAringBuf(sfbufHandleAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufAringLane1);
-    (void)sfbuf_InitUoSjBuf(sfbufHandleAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufUoSjLane);
+    (void)sfbuf_InitAringBuf(sfbufLaneArrayAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufAringLane1);
+    (void)sfbuf_InitUoSjBuf(sfbufLaneArrayAddress, laneBufferAddresses.data(), laneBufferSizes, kSfbufUoSjLane);
     return 0;
   }
 

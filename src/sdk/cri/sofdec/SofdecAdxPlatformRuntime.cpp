@@ -2042,6 +2042,7 @@
   // Defined later in this aggregate translation unit.
   moho::SofdecSfdWorkctrlSubobj* sfply_Create(moho::SfplyCreateParams* createParams, std::int32_t createContext);
   std::int32_t SFD_SetErrFn(std::int32_t errorObjectAddress, std::int32_t callbackAddress, std::int32_t callbackObject);
+  std::int32_t SFD_SetSupplySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* supplyDescriptorWords);
   std::int32_t SFD_SetAdxtPara(const moho::SofdecAdxtParams* params);
   std::int32_t SFD_SetCond(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t value);
   std::int32_t SFD_GetTrHn(
@@ -2172,6 +2173,70 @@
   constexpr std::int32_t kMwsfcreErrCodeCreate = -305;
   /// `SFD_GetTrHn` lane index the playback handle caches for audio.
   constexpr std::int32_t kMwsfcreAudioTransferLane = 3;
+
+  constexpr std::int32_t kMwsfcreErrCodeSetSupplySj = -312;
+  constexpr char kMwsfcreErrSetSupplySjFailed[] = "E20010703B MWSFCRE_SetSupplySj: ";
+
+  /**
+   * Address: 0x00AC7D80 (FUN_00AC7D80, _MWSFCRE_SetSupplySj)
+   * Mangled: _MWSFCRE_SetSupplySj
+   *
+   * IDA signature:
+   * _DWORD *__cdecl MWSFCRE_SetSupplySj(_DWORD *a1);
+   *
+   * What it does:
+   * Publishes the playback handle's currently-selected source join into the
+   * SFD's input lane. The handle carries three candidate sources, and which
+   * one describes the active SJ is decided by pointer identity rather than by
+   * a mode field: the `SJMEM` block started by `mwPlyStartMem`, the `SJRBF`
+   * stream ring the loader fills, or a caller-installed SJ whose descriptor
+   * `mwPlyStartSj` stashed in the generic supply lanes.
+   *
+   * This is the only writer of the SFD's supply descriptor. The create
+   * templates deliberately size SFBUF lane 0 at zero bytes (`mwsfcre_CalcWorkStmBuf`
+   * always reports `sib = 0`), so `sfbuf_InitRingSj` leaves that lane in the
+   * "awaiting supply" state with no SJ attached; the ring the demuxer reads is
+   * bound here and nowhere else.
+   */
+  std::int32_t MWSFCRE_SetSupplySj(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    moho::SofdecSjSupplyHandle* const supplyHandle = ply->sjSupplyHandle;
+    auto* const workctrl = static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    if (supplyHandle == nullptr) {
+      // The binary returns its argument untouched on this path.
+      return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply));
+    }
+
+    // Same six-word shape `sfbuf_CreateSj` builds for the lanes it owns:
+    // {kind, sj, buffer address, buffer bytes, extra bytes, 0}.
+    SfbufSjCreateStateView supplyDescriptor{};
+    supplyDescriptor.sjHandle = reinterpret_cast<moho::SofdecSjRingBufferHandle*>(supplyHandle);
+    if (supplyHandle == reinterpret_cast<moho::SofdecSjSupplyHandle*>(ply->sjMemoryHandle)) {
+      supplyDescriptor.ownerTag = 1;
+      supplyDescriptor.sourceBufferAddress = ply->sjMemoryBufferAddress;
+      supplyDescriptor.sourceBufferBytes = ply->sjMemoryBufferSize;
+      supplyDescriptor.extraBufferBytes = 0;
+    } else if (supplyHandle == reinterpret_cast<moho::SofdecSjSupplyHandle*>(ply->sjRingBufferHandle)) {
+      supplyDescriptor.ownerTag = 0;
+      supplyDescriptor.sourceBufferAddress = ply->sjRingBufferAddress;
+      supplyDescriptor.sourceBufferBytes = ply->sjRingUsableBytes;
+      supplyDescriptor.extraBufferBytes = ply->sjRingPackBytes;
+    } else {
+      supplyDescriptor.ownerTag = ply->sjSupplyMode;
+      supplyDescriptor.sourceBufferAddress = ply->sjSupplyArg0;
+      supplyDescriptor.sourceBufferBytes = ply->sjSupplyArg1;
+      supplyDescriptor.extraBufferBytes = ply->sjSupplyArg2;
+    }
+    supplyDescriptor.mUnknown14 = 0;
+
+    const std::int32_t status =
+      SFD_SetSupplySj(workctrl, reinterpret_cast<const std::int32_t*>(&supplyDescriptor));
+    if (status != 0) {
+      (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeSetSupplySj);
+      return MWSFSVM_Error(kMwsfcreErrSetSupplySjFailed);
+    }
+    return status;
+  }
 
   /**
    * Address: 0x00AC8C10 (FUN_00AC8C10, _mwsfcre_IsOkCprm)
