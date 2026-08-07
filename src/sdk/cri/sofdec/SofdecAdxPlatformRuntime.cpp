@@ -4482,6 +4482,27 @@
   }
 
   /**
+   * Address: 0x00AD9870 (FUN_00AD9870, _MWSFSVR_SetMwsfdSvrFlg)
+   *
+   * IDA signature:
+   * struct_sofdec_mwsfd_libwork *__cdecl sub_AD9870(int a1);
+   *
+   * What it does:
+   * Writes the decode-server gate lane in the library work block. This is the
+   * release half of the `MWSFSVM_TestAndSet` gate `mwsfsvr_DecodeServer` takes
+   * on entry: without it the very first decode pass leaves the lane latched at
+   * 1 and every later pass turns back at the gate, so exactly one frame's worth
+   * of decode work ever happens and the movie stays black.
+   *
+   * The binary leaves the work-block pointer in `eax` as a side effect of the
+   * `MWSFLIB_GetLibWorkPtr` tail; no caller reads it, so this stays `void`.
+   */
+  void MWSFSVR_SetMwsfdSvrFlg(const std::int32_t enabled)
+  {
+    MWSFLIB_GetLibWorkPtr()->decodeServerSignal = enabled;
+  }
+
+  /**
    * Address: 0x00AD9340 (FUN_00AD9340, _mwsfsvr_DecodeServer)
    *
    * What it does:
@@ -16689,6 +16710,13 @@
     return SVM_ExecSvrUsrIdle();
   }
 
+  /// `_adxm_init_level` (0x01059008), defined further down next to
+  /// `adxm_setup_thrd`. Both this predicate and the setup nesting counter read
+  /// and write the same lane in the binary - keeping them as two separate
+  /// globals left `ADXM_IsSetupThrd` permanently false, so the framework mode
+  /// never resolved to "threads are up".
+  extern std::int32_t adxm_init_level;
+
   /**
    * Address: 0x00B06BF0 (FUN_00B06BF0, _ADXM_IsSetupThrd)
    *
@@ -16697,7 +16725,7 @@
    */
   std::int32_t ADXM_IsSetupThrd()
   {
-    return (gAdxmInitLevel != 0) ? 1 : 0;
+    return (adxm_init_level != 0) ? 1 : 0;
   }
 
   /**
@@ -17054,6 +17082,9 @@
       return -1;
     }
 
+    // All four threads are pinned to CPU 0, exactly as the binary does: the
+    // middleware guards its own state with a plain test-and-set, so it relies
+    // on the workers and their creator sharing one core.
     const bool pinned =
       SetThreadAffinityMask(adxm_vsync_thrdhn, kAdxmThreadAffinity) != 0 &&
       SetThreadAffinityMask(adxm_fs_thrdhn, kAdxmThreadAffinity) != 0 &&
@@ -17158,8 +17189,9 @@
   // Defined just below; the setup function is spliced in ahead of it.
   std::int32_t adxm_set_thrd_prio();
 
-  /// Nesting counter: only the first ADXM_SetupThrd actually builds anything,
-  /// and every later call just deepens the count.
+  /// `_adxm_init_level` (0x01059008). Nesting counter: only the first
+  /// ADXM_SetupThrd actually builds anything, and every later call just deepens
+  /// the count. `ADXM_IsSetupThrd` reads this same lane.
   std::int32_t adxm_init_level = 0;
 
   /// Performance-counter reading taken when the middleware started, the base

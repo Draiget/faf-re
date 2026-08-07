@@ -115,7 +115,10 @@ extern "C" {
   // while they were stubs nothing ticked the SFD decode server, so no movie
   // frame was ever decoded.
   void* MWSFSVR_CheckForceSvrBdr() { return nullptr; }
-  void* MWSFSVR_SetMwsfdSvrFlg() { return nullptr; }
+  // MWSFSVR_SetMwsfdSvrFlg (0x00AD9870): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This releases the decode-server
+  // gate; while it was a no-op stub the first decode pass latched the gate and
+  // no later pass ever got past it.
   void* MWSST_Destroy() { return nullptr; }
   void* MWSST_GetStat() { return nullptr; }
   void* MWSST_Pause() { return nullptr; }
