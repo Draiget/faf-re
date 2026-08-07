@@ -3124,7 +3124,7 @@
       libWork->decodeServerSelection = 0;
     }
 
-    libWork->defaultConditionReserved = 0;
+    libWork->pauseBorder = 0;
     libWork->defaultConditionInitialized = 1;
   }
 
@@ -4540,6 +4540,420 @@
     }
 
     return decodePassFinished;
+  }
+
+  // All live in the SFD fragment, which is spliced in after this one.
+  std::int32_t SFD_GetCond(
+    moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t* outValue
+  );
+  std::int32_t SFD_Pause(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t pauseRequested);
+  std::int32_t SFD_Standby(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  std::int32_t SFD_SetElementOutSj(
+    moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
+    std::int32_t elementType,
+    std::int32_t elementOutputJoinAddress,
+    std::int32_t copyCompleteCallbackAddress,
+    std::int32_t copyCompleteCallbackContext
+  );
+
+  constexpr char kMwsfdErrSfdStartFailed[] = "E20010703G mwPlySfdStart: ";
+  constexpr std::int32_t kMwsfdErrSfdStartCode = -307;
+
+  constexpr char kMwsfdErrSfdStandbyFailed[] = "E20010703F mwPlySfdStandby: ";
+  constexpr std::int32_t kMwsfdErrSfdStandbyCode = -311;
+
+  /// `_mwsstmng` (0x00FFE008). Null in `.data` and only ever written by
+  /// `MWSST_SetIfTbl`, which nothing in this binary calls - so the whole MWSST
+  /// lane below is inert here. Kept because `mw_sfd_start_ex` walks through it.
+  void** gMwsstManagerTable = nullptr;
+
+  // --- MWSST: the pluggable stream-manager lane ---------------------------
+  //
+  // `mwsstmng` (0x00FFE008) is a vtable-style descriptor a host application can
+  // install with `MWSST_SetIfTbl` to drive streaming itself. Nothing in this
+  // binary calls the setter and the lane starts null in `.data`, so every entry
+  // point below short-circuits at `MWSST_IsEnable` - this game feeds the
+  // decoder through the SJ path instead. The bodies are recovered because they
+  // are on the `mw_sfd_start_ex` path and must behave, not because they run.
+
+  /// Slot offsets in the installed stream-manager descriptor.
+  constexpr std::size_t kMwsstIfStartSjSlot = 20 / sizeof(void*);
+  constexpr std::size_t kMwsstIfStopSlot = 24 / sizeof(void*);
+  constexpr std::size_t kMwsstIfPauseSlot = 36 / sizeof(void*);
+
+  using MwsstIfTable = void**;
+
+  /**
+   * Address: 0x00AD9F70 (FUN_00AD9F70, _MWSST_GetIfTbl)
+   *
+   * What it does:
+   * Returns the installed stream-manager descriptor, or null when the host
+   * never installed one - which is the case in this binary.
+   */
+  MwsstIfTable MWSST_GetIfTbl()
+  {
+    return gMwsstManagerTable;
+  }
+
+  /**
+   * Address: 0x00AD9F90 (FUN_00AD9F90, _MWSST_IsEnable)
+   *
+   * What it does:
+   * Reports whether one stream lane is live: a descriptor must be installed,
+   * the lane must be in state 1, and it must carry a stream object.
+   */
+  std::int32_t MWSST_IsEnable(moho::MwsstStreamStateSubobj* const streamState)
+  {
+    if (MWSST_GetIfTbl() == nullptr) {
+      return 0;
+    }
+    if (streamState->state != 1) {
+      return 0;
+    }
+    return (streamState->streamObject != nullptr) ? 1 : 0;
+  }
+
+  /**
+   * Address: 0x00AD9BD0 (FUN_00AD9BD0, _MWSST_StartSj)
+   *
+   * What it does:
+   * Dispatches the descriptor's start-supply entry for one live stream lane.
+   */
+  void MWSST_StartSj(moho::MwsstStreamStateSubobj* const streamState)
+  {
+    if (MWSST_IsEnable(streamState) != 1) {
+      return;
+    }
+
+    const MwsstIfTable ifTable = MWSST_GetIfTbl();
+    if (ifTable == nullptr) {
+      return;
+    }
+
+    const auto startSj = reinterpret_cast<void(__cdecl*)(void*, void*)>(ifTable[kMwsstIfStartSjSlot]);
+    if (startSj != nullptr) {
+      startSj(streamState->streamObject, streamState->pauseGate);
+    }
+  }
+
+  /**
+   * Address: 0x00AD9C10 (FUN_00AD9C10, _MWSST_Stop)
+   *
+   * What it does:
+   * Dispatches the descriptor's stop entry for one live stream lane.
+   */
+  std::int32_t MWSST_Stop(moho::MwsstStreamStateSubobj* const streamState)
+  {
+    const std::int32_t enabled = MWSST_IsEnable(streamState);
+    if (enabled != 1) {
+      return enabled;
+    }
+
+    const MwsstIfTable ifTable = MWSST_GetIfTbl();
+    if (ifTable == nullptr) {
+      return 0;
+    }
+
+    const auto stop = reinterpret_cast<std::int32_t(__cdecl*)(void*)>(ifTable[kMwsstIfStopSlot]);
+    if (stop == nullptr) {
+      return 0;
+    }
+    return stop(streamState->streamObject);
+  }
+
+  /**
+   * Address: 0x00AD9CC0 (FUN_00AD9CC0, _MWSST_Pause)
+   *
+   * What it does:
+   * Dispatches the descriptor's pause entry for one live stream lane.
+   */
+  void MWSST_Pause(moho::MwsstStreamStateSubobj* const streamState, const std::int32_t paused)
+  {
+    if (MWSST_IsEnable(streamState) != 1) {
+      return;
+    }
+
+    const MwsstIfTable ifTable = MWSST_GetIfTbl();
+    if (ifTable == nullptr) {
+      return;
+    }
+
+    const auto pause = reinterpret_cast<void(__cdecl*)(void*, std::int32_t)>(ifTable[kMwsstIfPauseSlot]);
+    if (pause != nullptr) {
+      pause(streamState->streamObject, paused);
+    }
+  }
+
+  constexpr char kMwsfcreErrResetStopFailed[] = "E0203261: MWSFCRE_ResetSfdHn: SFD_Stop() failed.";
+  constexpr char kMwsfcreErrResetSetErrFnFailed[] = "E0203262: MWSFCRE_ResetSfdHn: SFD_SetErrFn() failed.";
+  constexpr std::int32_t kMwsfcreErrResetSetErrFnCode = -303;
+
+  constexpr char kMwsfdErrStartExResetFailed[] = "E0203263: mw_sfd_start_ex: RESET failed.";
+  constexpr char kMwsfdErrStartExAddInfSjFailed[] = "E201213 mw_sfd_start_ex: can't set AddInfSJ";
+
+  /// Byte offset from the stream owner block to the SFH info block that
+  /// `MWSST_Reset` hands to `SFD_SetElementOutSj`.
+  constexpr std::size_t kMwsstOwnerSfhInfoOffset = 0xC0;
+
+  /**
+   * Address: 0x00AD9E90 (FUN_00AD9E90, _MWSST_Reset)
+   *
+   * What it does:
+   * Re-points one playback object's stream lane at a fresh element output:
+   * stops the current stream object, resets the pause gate, and rebinds the
+   * SFD element output to the owner's SFH info block.
+   *
+   * The stop call is handed the stream object rather than the stream state -
+   * that is what the binary does, and it is harmless because `MWSST_Stop`
+   * short-circuits on the null descriptor before dereferencing anything.
+   */
+  std::int32_t MWSST_Reset(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    void* const handle = ply->handle;
+    moho::MwsstStreamStateSubobj* const streamState = &ply->streamState;
+
+    (void)MWSST_GetIfTbl();
+    void* const streamOwner = streamState->streamOwner;
+    void* const streamObject = streamState->streamObject;
+    moho::MwsstPauseGate* const pauseGate = streamState->pauseGate;
+
+    const std::int32_t enabled = MWSST_IsEnable(streamState);
+    if (enabled != 1) {
+      return enabled;
+    }
+
+    if (streamObject != nullptr) {
+      (void)MWSST_Stop(static_cast<moho::MwsstStreamStateSubobj*>(streamObject));
+    }
+
+    pauseGate->dispatchTable->reset(pauseGate);
+
+    auto* const sfhInfo = static_cast<std::uint8_t*>(streamOwner) + kMwsstOwnerSfhInfoOffset;
+    return SFD_SetElementOutSj(
+      static_cast<moho::SofdecSfdWorkctrlSubobj*>(handle),
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sfhInfo)),
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(pauseGate)),
+      0,
+      0
+    );
+  }
+
+  /**
+   * Address: 0x00ACAD60 (FUN_00ACAD60, _mwPlySfdStandby)
+   *
+   * What it does:
+   * Puts the playback object's SFD handle into standby. `SFD_Standby` reaches
+   * `SFPL2_Standby`, which writes STBY into the phase lane - and that is what
+   * finally lets `sfply_StatStop` leave STOP, so the state machine can walk
+   * STOP -> PREP -> STBY and `mwsfsvr_StartPlayback` can see status 3.
+   */
+  void mwPlySfdStandby(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    if (SFD_Standby(static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle)) == 0) {
+      return;
+    }
+
+    (void)MWSFLIB_SetErrCode(kMwsfdErrSfdStandbyCode);
+    (void)MWSFSVM_Error(kMwsfdErrSfdStandbyFailed);
+  }
+
+  /**
+   * Address: 0x00AC8040 (FUN_00AC8040, _MWSFCRE_ResetSfdHn)
+   *
+   * What it does:
+   * Recycles an already-created SFD handle for a fresh playback: it clears the
+   * handle lane first so a failing stop cannot leave a half-torn handle
+   * published, stops the handle, republishes it, reattaches the error callback,
+   * and reattaches the user picture buffer.
+   */
+  std::int32_t MWSFCRE_ResetSfdHn(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    void* const handle = ply->handle;
+    ply->handle = nullptr;
+
+    if (SFD_Stop(static_cast<moho::SofdecSfdWorkctrlSubobj*>(handle)) != 0) {
+      (void)MWSFSVM_Error(kMwsfcreErrResetStopFailed);
+      return -1;
+    }
+
+    ply->handle = handle;
+    if (SFD_SetErrFn(
+          static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(handle)),
+          static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&MWSFLIB_SfdErrFunc)),
+          static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply))
+        ) != 0) {
+      (void)MWSFLIB_SetErrCode(kMwsfcreErrResetSetErrFnCode);
+      (void)MWSFSVM_Error(kMwsfcreErrResetSetErrFnFailed);
+      return -1;
+    }
+
+    mwsfcre_AttachPicUsrBuf(ply);
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACB000 (FUN_00ACB000, _mwsfd_InitForStart)
+   *
+   * What it does:
+   * Clears the two per-playback frame counters before a start, so a replayed
+   * handle does not inherit the previous run's retrieved-frame bookkeeping.
+   */
+  void mwsfd_InitForStart(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    ply->retrievedFrameCount = 0;
+    ply->mUnknown80 = 0;
+  }
+
+  /**
+   * Address: 0x00ACAF40 (FUN_00ACAF40, _mw_sfd_start_ex)
+   *
+   * IDA signature:
+   * void __cdecl mw_sfd_start_ex(MWPLY a1);
+   *
+   * What it does:
+   * The shared tail of every "start this playback object" entry point
+   * (`mwSfdStartFnameSub`, `mwPlyStartMem`, `mwPlyStartSj`). It recycles an
+   * existing SFD handle, resets the stream and tag lanes, then hands the handle
+   * to standby, restores the caller's pause state, and arms the stream lane.
+   *
+   * This is the function whose absence kept the picture black even after the
+   * decode server was running: `mwPlySfdStandby` here is the only reachable
+   * path that writes the SFPLY phase lane, so while this was a
+   * `{ return nullptr; }` C-linkage stub the playback machine sat in STOP
+   * forever and no frame was ever requested, let alone decoded.
+   *
+   * The two failure paths tail-call `MWSFSVM_Error` and return without
+   * starting, exactly as the binary does.
+   */
+  void mw_sfd_start_ex(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    (void)MWSFLIB_GetLibWorkPtr();
+
+    if (ply->handle != nullptr) {
+      if (MWSFCRE_ResetSfdHn(ply) != 0) {
+        (void)MWSFSVM_Error(kMwsfdErrStartExResetFailed);
+        return;
+      }
+
+      (void)MWSST_Reset(ply);
+      (void)MWSFTAG_ResetAinfSj(ply);
+      if (MWSFTAG_SetAinfSj(ply) != 0) {
+        (void)MWSFSVM_Error(kMwsfdErrStartExAddInfSjFailed);
+        return;
+      }
+
+      MWSFTAG_InitTagInf(ply);
+      (void)MWSFFRM_InitSfhInfTable(ply);
+    }
+
+    mwsfd_InitForStart(ply);
+    mwPlySfdStandby(ply);
+    mwPlyPause(ply, ply->paused);
+    (void)MWSST_Pause(&ply->streamState, 1);
+    MWSST_StartSj(&ply->streamState);
+
+    ply->releasedFrameCount = 0;
+    ply->isPrepared = 0;
+    ply->compoMode = 1;
+    ply->apiType = 0;
+  }
+
+  constexpr char kMwsfdErrPauseInvalidHandle[] = "E1122604 mwPlyPause; handle is invalid.";
+  constexpr char kMwsfdErrPauseFailed[] = "E2007 mwPlyPause; can't pause (%s)";
+  constexpr char kMwsfdPauseStateOn[] = "ON";
+  constexpr char kMwsfdPauseStateOff[] = "OFF";
+  constexpr std::int32_t kMwsfdErrPauseCode = -310;
+
+  /// SFD condition id carrying "this stream wants the decode server parked
+  /// across a pause".
+  constexpr std::int32_t kSfdCondPauseSleepsDecodeServer = 6;
+
+  /// `params.ftype` value that selects the SFD (video) stream flavour, the only
+  /// one for which the pause border applies.
+  constexpr std::int32_t kMwsfdFileTypeSfd = 1;
+
+  /**
+   * Address: 0x00AC9370 (FUN_00AC9370, _MWSFD_GetPauseBdr)
+   *
+   * What it does:
+   * Reads the library-wide pause-border lane. `mwPlyPause` consults it to
+   * decide whether pausing an SFD stream should also park the decode server.
+   */
+  std::int32_t MWSFD_GetPauseBdr()
+  {
+    return MWSFLIB_GetLibWorkPtr()->pauseBorder;
+  }
+
+  /**
+   * Address: 0x00ACB220 (FUN_00ACB220, _mwPlyPause)
+   *
+   * IDA signature:
+   * void __cdecl mwPlyPause(MWPLY ply, int paused);
+   *
+   * What it does:
+   * Pauses or resumes one playback object, and mirrors the new state onto the
+   * stream lane. The whole body is gated on "already paused, or being asked to
+   * pause" - resuming a handle that was never paused is a no-op, which is why
+   * the initial `mwPlyPause(ply, 1)` in `CMovie::OpenMovie` matters: it is what
+   * arms the later `mwPlyPause(ply, 0)` that actually starts the picture.
+   *
+   * While this was a `{ return nullptr; }` C-linkage stub neither call did
+   * anything, so playback could never be resumed.
+   */
+  void mwPlyPause(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t paused)
+  {
+    if (MWSFD_IsEnableHndl(ply) != 1) {
+      (void)MWSFSVM_Error(kMwsfdErrPauseInvalidHandle);
+      return;
+    }
+
+    auto* const handle = static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+    if (ply->paused == 0 && paused == 0) {
+      return;
+    }
+
+    if (MWSFD_GetPauseBdr() == 1 && ply->params.ftype == kMwsfdFileTypeSfd) {
+      std::int32_t pauseSleepsDecodeServer = 0;
+      if (SFD_GetCond(handle, kSfdCondPauseSleepsDecodeServer, &pauseSleepsDecodeServer) != 0
+          || pauseSleepsDecodeServer == 1) {
+        (void)mwlSfdSleepDecSvr(ply);
+      }
+    }
+
+    if (SFD_Pause(handle, paused) != 0) {
+      (void)MWSFLIB_SetErrCode(kMwsfdErrPauseCode);
+      (void)MWSFSVM_Error(
+        kMwsfdErrPauseFailed, (paused == 1) ? kMwsfdPauseStateOn : kMwsfdPauseStateOff
+      );
+    }
+
+    (void)MWSST_Pause(&ply->streamState, paused);
+    ply->paused = static_cast<std::uint8_t>(paused);
+  }
+
+  /**
+   * Address: 0x00ACADA0 (FUN_00ACADA0, _mwPlySfdStart)
+   *
+   * IDA signature:
+   * int __cdecl mwPlySfdStart(int a1);
+   *
+   * What it does:
+   * Hands the playback object's SFD handle to `SFD_Start`, which is what moves
+   * the handle out of STOP: `sfply_Start` writes PLAY into the phase lane, and
+   * the next `sfply_ExecOne` tick sees it and advances the state machine.
+   *
+   * While this was a `{ return nullptr; }` C-linkage stub the phase lane stayed
+   * at 1 forever, `sfply_StatStop` kept re-returning the current state, and the
+   * playback machine idled in STOP no matter how well everything below it ran.
+   */
+  void mwPlySfdStart(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    if (SFD_Start(ply->handle) == 0) {
+      return;
+    }
+
+    (void)MWSFLIB_SetErrCode(kMwsfdErrSfdStartCode);
+    (void)MWSFSVM_Error(kMwsfdErrSfdStartFailed);
   }
 
   /**

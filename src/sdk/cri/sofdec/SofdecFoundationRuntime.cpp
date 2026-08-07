@@ -1919,9 +1919,9 @@ extern "C"
   std::int32_t SFD_GetPlyInf(std::int32_t sfdHandleAddress, void* outPlyInfo);
   std::int32_t SFD_GetTmrInf(std::int32_t sfdHandleAddress, void* outTimerInfo);
   std::int32_t MWSST_GetStat(moho::MwsstStreamStateSubobj* streamState);
-  void MWSST_Stop(moho::MwsstStreamStateSubobj* streamState);
+  std::int32_t MWSST_Stop(moho::MwsstStreamStateSubobj* streamState);
   void MWSST_Destroy(moho::MwsstStreamStateSubobj* streamState);
-  std::int32_t MWSST_Pause(moho::MwsstStreamStateSubobj* streamState, std::int32_t paused);
+  void MWSST_Pause(moho::MwsstStreamStateSubobj* streamState, std::int32_t paused);
   std::int32_t UTY_CmpTime(
     std::int32_t leftTime,
     std::int32_t timeUnit,
