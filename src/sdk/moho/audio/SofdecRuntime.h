@@ -193,7 +193,9 @@ namespace moho
     std::int32_t userAllocObject = 0;               // +0x30
     std::int32_t seekFlag = 0;                                    // +0x34
     std::int32_t defaultConditionInitialized = 0;                 // +0x38
-    std::int32_t defaultConditionReserved = 0;                    // +0x3C
+    /// Pause-border lane, read by `MWSFD_GetPauseBdr` (0x00AC9370). Decides
+    /// whether `mwPlyPause` puts the decode server to sleep across a pause.
+    std::int32_t pauseBorder = 0;                                  // +0x3C
     MwsfdDecodeServerCallback decodeServerTopCallback = nullptr;  // +0x40
     std::int32_t decodeServerTopContext = 0;                      // +0x44
     MwsfdDecodeServerCallback decodeServerEndCallback = nullptr;  // +0x48
@@ -233,8 +235,8 @@ namespace moho
     "MwsfdLibWork::defaultConditionInitialized offset must be 0x38"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(MwsfdLibWork, defaultConditionReserved) == 0x3C,
-    "MwsfdLibWork::defaultConditionReserved offset must be 0x3C"
+    offsetof(MwsfdLibWork, pauseBorder) == 0x3C,
+    "MwsfdLibWork::pauseBorder offset must be 0x3C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(MwsfdLibWork, decodeServerTopCallback) == 0x40,
@@ -674,12 +676,21 @@ namespace moho
   /**
    * Runtime dispatch table lane used by one MWSST pause-gate owner.
    */
+  using MwsstPauseGateResetFn = void(__stdcall*)(moho::MwsstPauseGate* gate);
+
   struct MwsstPauseGateVtable
   {
-    std::uint8_t mUnknown00[0x24]{};
+    std::uint8_t mUnknown00[0x14]{};
+    /// Called by `MWSST_Reset` before the SFD element output is re-pointed.
+    MwsstPauseGateResetFn reset = nullptr; // +0x14
+    std::uint8_t mUnknown18[0x0C]{};
     MwsstPauseGateQueryStartFn queryStart = nullptr; // +0x24
   };
 
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(MwsstPauseGateVtable, reset) == 0x14,
+    "MwsstPauseGateVtable::reset offset must be 0x14"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(MwsstPauseGateVtable, queryStart) == 0x24,
     "MwsstPauseGateVtable::queryStart offset must be 0x24"
@@ -706,7 +717,13 @@ namespace moho
     std::int32_t state = 0; // +0x00
     std::uint8_t mUnknown04[0x8]{};
     MwsstPauseGate* pauseGate = nullptr; // +0x0C
-    std::uint8_t mUnknown10[0x10]{};
+    /// Owner block `MWSST_Reset` offsets by 0xC0 to reach the SFH info the SFD
+    /// element output is re-pointed at.
+    void* streamOwner = nullptr; // +0x10
+    /// The host-installed stream object every `mwsstmng` descriptor entry is
+    /// dispatched against. `MWSST_IsEnable` requires it to be non-null.
+    void* streamObject = nullptr; // +0x14
+    std::uint8_t mUnknown18[0x8]{};
     std::int32_t decodeServerSleepState = 0; // +0x20
   };
 

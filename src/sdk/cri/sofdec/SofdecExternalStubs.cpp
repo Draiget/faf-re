@@ -121,8 +121,8 @@ extern "C" {
   // no later pass ever got past it.
   void* MWSST_Destroy() { return nullptr; }
   void* MWSST_GetStat() { return nullptr; }
-  void* MWSST_Pause() { return nullptr; }
-  void* MWSST_Stop() { return nullptr; }
+  // MWSST_Stop (0x00AD9C10), MWSST_Pause (0x00AD9CC0): real bodies in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   void* MWSTM_Destroy() { return nullptr; }
   void* MWSTM_GetStat() { return nullptr; }
   void* MWSTM_ReqStart() { return nullptr; }
@@ -197,10 +197,18 @@ extern "C" {
   // (mwsfd_initsfdpara.callbacks -> 0x00D7F3D0) is now modelled at the end of
   // cri/sofdec/SofdecSfdRuntime.cpp.
   void* mwPlyIsNextFrmReady() { return nullptr; }
-  void* mwPlyPause() { return nullptr; }
-  void* mwPlySfdStart() { return nullptr; }
+  // mwPlyPause (0x00ACB220): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. CMovie arms the pause in
+  // OpenMovie and releases it in PlayMovie; while this was a stub neither call
+  // did anything and playback could never be resumed.
+  // mwPlySfdStart (0x00ACADA0): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This is what calls SFD_Start, so
+  // while it was a stub the SFPLY phase lane never left STOP.
   void* mwRnaCreate() { return nullptr; }
-  void* mw_sfd_start_ex() { return nullptr; }
+  // mw_sfd_start_ex (0x00ACAF40): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This is the shared tail of every
+  // playback start; it reaches mwPlySfdStandby, the only path that writes the
+  // SFPLY phase lane. While it was a stub the machine never left STOP.
   void* mwl_convFrmInfFromSFD() { return nullptr; }
   // mwsfcre_AllFree: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfcre_DecideFtypeByHdrInf: real body in moho/misc/StartupHelpers.cpp,
