@@ -9488,12 +9488,23 @@
   class MpsBitReader
   {
   public:
+    /// The load window is aligned DOWN-from-`packet+3` (`lea eax,[ecx+3]` then
+    /// `and al,0FCh` at 0x00AEC05A), and the reader opens with 24 bits already
+    /// consumed (`lea esi, ds:18h[ecx*8]`, `ecx = packet - alignedStart`). Those
+    /// 24 bits are the `00 00 01` start-code prefix, so the first `Read(8)` of
+    /// every header decoder yields the byte at `packet[3]` - the stream id.
+    ///
+    /// Rounding with `+4` and opening at 32 instead started every parse one byte
+    /// late: the packet decoder read `packet[4]` as the stream id, so a padding
+    /// packet `00 00 01 BE 07 DF` came back as stream 7 with a 55088-byte
+    /// payload, and `sfmps_CopyPketData` then indexed a 4-entry dispatch table
+    /// with 4 and an element table with -181.
     explicit MpsBitReader(const std::uint8_t* const packet) noexcept : mPacketStart(packet), mNext(packet)
     {
       const auto packetAddress = reinterpret_cast<std::uintptr_t>(packet);
       const auto* const windowStart =
-        reinterpret_cast<const std::uint8_t*>((packetAddress + 4u) & ~static_cast<std::uintptr_t>(3u));
-      mConsumedBits = 32 - 8 * static_cast<std::int32_t>(windowStart - packet);
+        reinterpret_cast<const std::uint8_t*>((packetAddress + 3u) & ~static_cast<std::uintptr_t>(3u));
+      mConsumedBits = 24 - 8 * static_cast<std::int32_t>(windowStart - packet);
       mNext = windowStart;
       mWindow = LoadBigEndianWord() << mConsumedBits;
       mLookahead = LoadBigEndianWord();
