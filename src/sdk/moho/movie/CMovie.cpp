@@ -139,6 +139,8 @@ namespace moho
 
     constexpr std::int32_t kSofdecStatFailed = 4;
     constexpr std::int32_t kSofdecStatPreparing = 1;
+    /** Sofdec player has run the movie to its end; the UI polls for this. */
+    constexpr std::int32_t kSofdecStatPlayEnd = 3;
     constexpr std::int32_t kMovieMaxBitsPerSecond = 6000000;
     constexpr std::int32_t kSofdecHeaderProbeBytes = 5000;
   }
@@ -596,6 +598,81 @@ namespace moho
   std::int32_t CMovie::GetHeight() const
   {
     return mHeight;
+  }
+
+  /**
+   * Address: 0x00874630 (FUN_00874630) - vtable slot 6
+   *
+   * IDA signature:
+   * char __thiscall Moho::CMovie::Func4(_BYTE *this);
+   *
+   * What it does:
+   * Reports whether a movie is loaded and playable. That is exactly the
+   * playback-enabled lane, which OpenMovie raises only once the player, the
+   * texture sheet and the subtitle buffer are all in place.
+   */
+  bool CMovie::IsLoaded()
+  {
+    return mPlaybackEnabled != 0;
+  }
+
+  /**
+   * Address: 0x00874640 (FUN_00874640) - vtable slot 7
+   *
+   * IDA signature:
+   * bool __thiscall Moho::CMovie::Func5(Moho::CMovie *this);
+   *
+   * What it does:
+   * Reports whether the Sofdec player has reached playback-end status.
+   */
+  bool CMovie::HasPlaybackFinished()
+  {
+    return ::mwPlyGetStat(mPly) == kSofdecStatPlayEnd;
+  }
+
+  /**
+   * Address: 0x00874870 (FUN_00874870) - vtable slot 11
+   *
+   * IDA signature:
+   * int __thiscall Moho::CMovie::Func7(Moho::CMovie *this);
+   *
+   * What it does:
+   * Returns the frame count read out of the SFD header.
+   */
+  std::int32_t CMovie::GetFrameCount()
+  {
+    return mFrameCount;
+  }
+
+  /**
+   * Address: 0x00874880 (FUN_00874880) - vtable slot 12
+   *
+   * IDA signature:
+   * double __thiscall Moho::CMovie::Func8(Moho::CMovie *this);
+   *
+   * What it does:
+   * Returns the frame rate read out of the SFD header. The decompiler reports
+   * a double only because the value comes back on the x87 stack; the load is
+   * `fld dword ptr [ecx+40h]`, so both field and result are single precision.
+   */
+  float CMovie::GetFrameRate()
+  {
+    return mFrameRate;
+  }
+
+  /**
+   * Address: 0x00874740 (FUN_00874740, Moho::CMovie::Func9) - vtable slot 13
+   *
+   * IDA signature:
+   * char *__thiscall Moho::CMovie::Func9(Moho::CMovie *this);
+   *
+   * What it does:
+   * Hands out the subtitle string lane itself - `lea eax, [ecx+60h]`, not a
+   * copy - which UpdatePlaybackFrame refreshes on every tick.
+   */
+  const msvc8::string* CMovie::GetSubtitleText()
+  {
+    return &mSubtitleText;
   }
 
   /**
