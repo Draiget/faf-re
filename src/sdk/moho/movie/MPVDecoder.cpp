@@ -6845,14 +6845,14 @@ namespace moho::movie
         const int decodeForwardX = mpvdec_MotionSub(
           &context->bitstreamState,
           &context->forwardPredictionVector.decodeConfig,
-          &context->forwardPredictionVector.predictorX,
-          &context->forwardPredictionVector.horizontalDelta
+          &context->forwardPredictionVector.horizontalDelta,
+          &context->forwardPredictionVector.predictorX
         );
         const int decodeForwardY = mpvdec_MotionSub(
           &context->bitstreamState,
           &context->forwardPredictionVector.decodeConfig,
-          &context->forwardPredictionVector.predictorY,
-          &context->forwardPredictionVector.verticalDelta
+          &context->forwardPredictionVector.verticalDelta,
+          &context->forwardPredictionVector.predictorY
         );
         if ((decodeForwardX | decodeForwardY) != 0) {
           break;
@@ -7139,14 +7139,14 @@ namespace moho::movie
         const int decodeForwardX = mpvdec_MotionSub(
           &context->bitstreamState,
           &context->forwardPredictionVector.decodeConfig,
-          &context->forwardPredictionVector.predictorX,
-          &context->forwardPredictionVector.horizontalDelta
+          &context->forwardPredictionVector.horizontalDelta,
+          &context->forwardPredictionVector.predictorX
         );
         const int decodeForwardY = mpvdec_MotionSub(
           &context->bitstreamState,
           &context->forwardPredictionVector.decodeConfig,
-          &context->forwardPredictionVector.predictorY,
-          &context->forwardPredictionVector.verticalDelta
+          &context->forwardPredictionVector.verticalDelta,
+          &context->forwardPredictionVector.predictorY
         );
         if ((decodeForwardX | decodeForwardY) != 0) {
           break;
@@ -7157,14 +7157,14 @@ namespace moho::movie
         const int decodeBackwardX = mpvdec_MotionSub(
           &context->bitstreamState,
           &context->backwardPredictionVector.decodeConfig,
-          &context->backwardPredictionVector.predictorX,
-          &context->backwardPredictionVector.horizontalDelta
+          &context->backwardPredictionVector.horizontalDelta,
+          &context->backwardPredictionVector.predictorX
         );
         const int decodeBackwardY = mpvdec_MotionSub(
           &context->bitstreamState,
           &context->backwardPredictionVector.decodeConfig,
-          &context->backwardPredictionVector.predictorY,
-          &context->backwardPredictionVector.verticalDelta
+          &context->backwardPredictionVector.verticalDelta,
+          &context->backwardPredictionVector.predictorY
         );
         if ((decodeBackwardX | decodeBackwardY) != 0) {
           break;
