@@ -61787,35 +61787,53 @@ namespace
   {
     struct DebugCanvasRuntimeView final
     {
-      moho::CD3DPrimBatcher* mPrimBatcher = nullptr; // +0x00
-      std::uint8_t mUnknown04To3F[0x3C]{};
+      std::uint8_t mUnknown00To3F[0x40]{};
     };
 
     static_assert(sizeof(DebugCanvasRuntimeView) == 0x40, "WRenViewportRenderView::DebugCanvasRuntimeView size must be 0x40");
 
-    std::uint8_t mUnknown0000_2147[0x2148];
-    WRenViewportWorldViewVectorRuntime mWorldViews; // +0x2148
-    std::uint8_t mUnknown2154_215B[0x08];
-    DebugCanvasRuntimeView mDebugCanvas;
-    moho::GeomCamera3* mCam; // +0x219C
-    std::uint8_t mUnknown21A0_2C7[0x128];
     struct PrimBatcherView final
     {
-      moho::CD3DPrimBatcher* batcher;
+      moho::CD3DPrimBatcher* batcher = nullptr; // +0x00 - the shared_ptr's px word
     };
-    PrimBatcherView mPrimBatcher; // +0x2C8
-    std::uint8_t mUnknown2CC_307[0x3C];
-    Wm3::Vector2i mScreenPos; // +0x308
-    Wm3::Vector2i mScreenSize; // +0x310
-    Wm3::Vector2i mFullScreen; // +0x318
-    std::int32_t mHead; // +0x320
-    std::uint8_t mUnknown324_4EF[0x1CC];
+
     struct ShadowView final
     {
       std::uint8_t mUnknown00_07[0x08];
       std::int32_t shadow_Fidelity; // +0x08
     };
+
+    // The head/viewport lanes sit near the head of the object, WELL BEFORE
+    // mWorldViews and mCam - they are not trailing fields. UpdateRenderViewport-
+    // Coordinates (FUN_007F87F0) settles it:
+    //   0x007F87F6  mov ecx, [esi+320h]   ; mHead
+    //   0x007F881D  mov [esi+318h], edi   ; mFullScreen.x
+    //   0x007F8823  mov [esi+31Ch], eax   ; mFullScreen.y
+    //   0x007F885B  mov [esi+308h], eax   ; mScreenPos.x
+    //   0x007F886F  mov [esi+310h], eax   ; mScreenSize.x
+    //   0x007F8829  mov eax, [esi+219Ch]  ; mCam
+    // Declaring them after mCam put every one of them 0x2000 bytes too high, so
+    // UpdateRenderViewportCoordinates wrote the head extent into dead space and
+    // RenderUI read a permanently-zero mFullScreen - which it handed straight to
+    // SetViewport, clipping every draw in the engine away to a 0x0 rectangle.
+    // RenderMeshes (FUN_007F8290) pins the other two: the prim batcher it hands
+    // MeshRenderer::RenderSkeletons is `[esi+215Ch]` (0x007F831A) and the debug
+    // canvas is `esi + 2C8h` (0x007F8322) - the reverse of how this view used to
+    // name them.
+    std::uint8_t mUnknown0000_02C7[0x2C8];
+    DebugCanvasRuntimeView mDebugCanvas; // +0x2C8
+    Wm3::Vector2i mScreenPos;            // +0x308
+    Wm3::Vector2i mScreenSize;           // +0x310
+    Wm3::Vector2i mFullScreen;           // +0x318
+    std::int32_t mHead;                  // +0x320
+    std::uint8_t mUnknown0324_04EF[0x4F0 - 0x324];
     ShadowView mShadowRenderer; // +0x4F0
+    std::uint8_t mUnknown04FC_2147[0x2148 - 0x4FC];
+    WRenViewportWorldViewVectorRuntime mWorldViews; // +0x2148
+    std::uint8_t mUnknown2154_215B[0x08];
+    PrimBatcherView mPrimBatcher;      // +0x215C
+    std::uint8_t mUnknown2160_219B[0x3C];
+    moho::GeomCamera3* mCam;           // +0x219C
   };
 
   struct WRenViewportRenderPassRuntime final
@@ -62282,10 +62300,6 @@ namespace
   static_assert(sizeof(WRenViewportReflectionPassView) == 0x20);
 
   static_assert(
-    offsetof(WRenViewportRenderView, mDebugCanvas) == 0x215C,
-    "WRenViewportRenderView::mDebugCanvas offset must be 0x215C"
-  );
-  static_assert(
     offsetof(WRenViewportRenderView, mWorldViews) == 0x2148,
     "WRenViewportRenderView::mWorldViews offset must be 0x2148"
   );
@@ -62296,12 +62310,36 @@ namespace
     offsetof(WRenViewportPreviewImageView, mPreviewImage) == 0x2194,
     "WRenViewportPreviewImageView::mPreviewImage offset must be 0x2194"
   );
-#if defined(MOHO_ABI_MSVC8_COMPAT)
+  // Unconditional: these four are read/written by FUN_007F87F0 at these exact
+  // displacements, and a silent drift here clips the whole engine to a 0x0
+  // viewport (see the note on the struct).
+  static_assert(
+    offsetof(WRenViewportRenderView, mScreenPos) == 0x308,
+    "WRenViewportRenderView::mScreenPos offset must be 0x308"
+  );
+  static_assert(
+    offsetof(WRenViewportRenderView, mScreenSize) == 0x310,
+    "WRenViewportRenderView::mScreenSize offset must be 0x310"
+  );
   static_assert(
     offsetof(WRenViewportRenderView, mFullScreen) == 0x318,
     "WRenViewportRenderView::mFullScreen offset must be 0x318"
   );
-#endif
+  static_assert(
+    offsetof(WRenViewportRenderView, mHead) == 0x320, "WRenViewportRenderView::mHead offset must be 0x320"
+  );
+  static_assert(
+    offsetof(WRenViewportRenderView, mShadowRenderer) == 0x4F0,
+    "WRenViewportRenderView::mShadowRenderer offset must be 0x4F0"
+  );
+  static_assert(
+    offsetof(WRenViewportRenderView, mDebugCanvas) == 0x2C8,
+    "WRenViewportRenderView::mDebugCanvas offset must be 0x2C8"
+  );
+  static_assert(
+    offsetof(WRenViewportRenderView, mPrimBatcher) == 0x215C,
+    "WRenViewportRenderView::mPrimBatcher offset must be 0x215C"
+  );
   [[nodiscard]] WRenViewportRenderView* AsRenderView(moho::WRenViewport* const viewport) noexcept
   {
     return reinterpret_cast<WRenViewportRenderView*>(viewport);
@@ -63488,7 +63526,7 @@ const void* moho::WRenViewport::GetEventTable() const
 moho::CD3DPrimBatcher* moho::WRenViewport::GetPrimBatcher() const
 {
   const WRenViewportRenderView* const runtime = AsRenderView(const_cast<WRenViewport*>(this));
-  return runtime->mDebugCanvas.mPrimBatcher;
+  return runtime->mPrimBatcher.batcher;
 }
 
 /**
@@ -64728,7 +64766,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     // Batcher read straight out of the viewport at +0x215C, matching the
     // binary's direct field load at 0x007F91C4 (same lane `GetPrimBatcher`
     // returns).
-    uiManager->RenderFrames(runtime->mHead, runtime->mDebugCanvas.mPrimBatcher);
+    uiManager->RenderFrames(runtime->mHead, runtime->mPrimBatcher.batcher);
   }
 
   // Re-center border mesh stances over the active terrain every frame.
