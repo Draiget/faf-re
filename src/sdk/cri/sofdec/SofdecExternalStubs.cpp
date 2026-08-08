@@ -247,7 +247,6 @@ extern "C" {
   void* mwsffrm_CheckAinf() { return nullptr; }
   void* mwsffrm_GetNumAudioCh() { return nullptr; }
   void* mwsffrm_GetNumVideoCh() { return nullptr; }
-  void* mwsffrm_SaveFrmDetail() { return nullptr; }
   void* mwsffrm_SetFrmApi() { return nullptr; }
   void* parse_PES_packet_sub() { return nullptr; }
   void* sfcre_AnalyMpa() { return nullptr; }

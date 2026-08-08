@@ -862,7 +862,20 @@ namespace moho
     std::int32_t retrievedFrameCount = 0; // +0x7C
     std::int32_t mUnknown80 = 0;          // +0x80
     std::int32_t releasedFrameCount = 0;  // +0x84
-    std::uint8_t mUnknown88[0x20]{};
+    /// Per-frame MPEG picture-detail block. `mwsffrm_SaveFrmDetail`
+    /// (0x00ACA4E0) copies it out of the SFD frame lane on every
+    /// `mwPlyGetCurFrm`, and `mwsfsfx_SetFrmDetail` (0x00AC69C0) reads it back
+    /// out of the *handle* - not out of the frame - when building the SFX
+    /// frame-info block.
+    std::int32_t framePictureStructure = 0;   // +0x88
+    std::int32_t frameChromaFormat = 0;       // +0x8C
+    /// Three signed bytes carried verbatim into the SFX picture-detail lanes.
+    std::int32_t framePictureDetail0 = 0;     // +0x90
+    std::int32_t framePictureDetail1 = 0;     // +0x94
+    std::int32_t framePictureDetail2 = 0;     // +0x98
+    std::int32_t frameChromaPositionLow = 0;  // +0x9C
+    std::int32_t frameChromaPositionHigh = 0; // +0xA0
+    std::int32_t frameDetailReserved = 0;     // +0xA4
     void* sfxHandle = nullptr; // +0xA8
     /// SFX composition work block carved out of the playback arena.
     void* sfxWork = nullptr;          // +0xAC
