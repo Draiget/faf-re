@@ -17387,13 +17387,39 @@
    *
    * What it does:
    * Resolves default framework lane when caller requests auto mode (`-1`).
+   *
+   * The binary computes `2 - (ADXM_IsSetupThrd() != 1)`:
+   *
+   *   call _ADXM_IsSetupThrd   ; 1 when the ADXM workers are up, else 0
+   *   dec / neg / sbb eax, eax ; up -> 0, down -> -1
+   *   add eax, 2               ; up -> 2, DOWN -> 1
+   *
+   * so "workers up" selects lane 2 and "workers down" selects lane 1. That is
+   * the opposite of what it reads like, and the reason matters: lane 1 makes
+   * `ADXMNG_CallMainServerFunctions` run `ADXM_ExecSvrAll`, i.e. the caller's
+   * own thread drives every service lane - vint, vsync, fs, main, idle. It is
+   * the no-worker-threads fallback. Lane 2 runs only the main lane, which is
+   * all that is needed when the three ADXM workers are alive and pumping the
+   * rest themselves.
+   *
+   * This predicate was inverted here, and that is what made movie playback hang
+   * whenever `adxm_setup_thrd` failed. `adxm_create_thrd` pins all four Sofdec
+   * threads to CPU 0 and gives up if any pin fails, and FAF's `init.lua` sets
+   * the process affinity to 0x00FFFFFC ("skip the first two computing units")
+   * on any machine with 24+ logical CPUs - so CPU 0 is not in the process mask,
+   * every SetThreadAffinityMask fails with ERROR_INVALID_PARAMETER, and the
+   * workers are torn down. With the inversion the engine then picked the
+   * main-only lane, so nothing ever ran the vsync lane, `sftim_UpdateTime`
+   * never re-armed the SFPLY per-tick flag at `+0x44`, `sfply_ExecOne` returned
+   * immediately forever, the SFD handle stayed in PREP, and `CMovie::OpenMovie`
+   * spun in its prepare loop logging "Preparing movie" until the process died.
    */
   std::int32_t adxmng_DecideFramework(const std::int32_t frameworkMode)
   {
     if (frameworkMode != -1) {
       return frameworkMode;
     }
-    return (ADXM_IsSetupThrd() == 1) ? 1 : 2;
+    return (ADXM_IsSetupThrd() == 1) ? 2 : 1;
   }
 
   /**
