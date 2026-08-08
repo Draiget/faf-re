@@ -11367,6 +11367,13 @@ namespace
 	constexpr int kCallInfoStateYielded = 4;
 	constexpr int kCallInfoStateInC = 2;
 
+	/**
+	 * The threshold `lua_yield` tests: a frame at 3 or above is running Lua code
+	 * and yields for real, anything below has not started and is only marked as
+	 * being in C.
+	 */
+	constexpr int kCallInfoStateRunningLuaFrame = 3;
+
 	/** Argument C of an instruction: bits 6..14. */
 	[[nodiscard]] constexpr int GetInstructionArgC(const Instruction instruction)
 	{
@@ -11430,6 +11437,63 @@ namespace
 
 		state->l_G->allowhook = savedAllowHook;
 		(void)luaD_refreshstacklimit(state);
+	}
+
+	/**
+	 * Address: 0x00913E40 (FUN_00913E40, lua_yield)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_yield(lua_State *L, int nresults);
+	 *
+	 * What it does:
+	 * Suspends the running coroutine. A frame that has not started executing Lua
+	 * yet (`state < 3`) is only marked as sitting in C; a live Lua frame first
+	 * refuses to yield across a C function, then slides its `nresults` return
+	 * values down to the frame base, trims the stack to them, and marks itself
+	 * yielded. Always returns -1, which `luaD_precall` reads as "this frame did
+	 * not produce results here".
+	 *
+	 * The two state values are the whole point, and the binary spells them out:
+	 *
+	 *   0x00913EF0: mov dword ptr [edi+8], 2   ; state < 3  -> in-C
+	 *   0x00913EE2: mov dword ptr [edi+8], 4   ; otherwise  -> yielded
+	 *
+	 * which are exactly the two values `lua_resume` accepts. Until this was
+	 * recovered the call resolved to the prebuilt LuaPlus library instead, and
+	 * that build writes stock Lua 5.0 `CI_*` bitmask flags into the same field.
+	 * Our `lua_resume` then compared them against this fork's enum, found
+	 * neither 4 nor 2, and rejected every resume with "cannot resume
+	 * non-suspended coroutine" - which killed the script driving the intro
+	 * movies.
+	 */
+	extern "C" int lua_yield(lua_State* const state, const int nresults)
+	{
+		CallInfo* const ci = state->ci;
+
+		if (state->nCcalls != 0) {
+			luaG_runerror(state, "attempt to yield across metamethod/C-call boundary");
+		}
+
+		if (ci->state < kCallInfoStateRunningLuaFrame) {
+			ci->state = kCallInfoStateInC;
+			return -1;
+		}
+
+		if (ci[-1].state != 0) {
+			luaG_runerror(state, "cannot yield a C function");
+		}
+
+		// Only move anything when the results are not already sitting at the
+		// frame base; the binary guards the whole block on this comparison.
+		if (&state->top[-nresults] > state->base) {
+			for (int i = 0; i < nresults; ++i) {
+				state->base[i] = state->top[i - nresults];
+			}
+			state->top = &state->base[nresults];
+		}
+
+		ci->state = kCallInfoStateYielded;
+		return -1;
 	}
 
 	/**
