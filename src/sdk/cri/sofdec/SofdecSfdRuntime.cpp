@@ -8547,6 +8547,7 @@
     std::int32_t allowSingleFrameOutput = 0; // +0x80
     std::uint8_t reserved84[0xF4]{}; // +0x84
     std::int32_t frameObjectCount = 0; // +0x178
+    std::uint8_t reserved17C[0x04]{}; // +0x17C
     std::array<SfmpvfFrameObjectRuntimeView, 16> frameObjects{}; // +0x180
   };
   static_assert(
@@ -8560,6 +8561,13 @@
   static_assert(
     offsetof(SfmpvfInfoRuntimeView, frameObjectCount) == 0x178,
     "SfmpvfInfoRuntimeView::frameObjectCount offset must be 0x178"
+  );
+  // `SFMPVF_SearchFrmObj` (0x00ADC050) returns `*(a1 + 8128) + 384 + 232 * idx`
+  // and `SFMPVF_SearchVfrmData` (0x00ADC0D0) walks from `mpvInfo + 384`, so the
+  // frame-object array starts at +0x180 - one dword past `frameObjectCount`.
+  static_assert(
+    offsetof(SfmpvfInfoRuntimeView, frameObjects) == 0x180,
+    "SfmpvfInfoRuntimeView::frameObjects offset must be 0x180"
   );
 
   struct SfmpvfSearchWorkctrlRuntimeView
