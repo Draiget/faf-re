@@ -7099,12 +7099,14 @@ namespace moho::movie
         break;
       }
 
+      // The two are mutually exclusive: FUN_00C0DA80 jumps straight to LABEL_31
+      // out of the skip-run branch, so a run that was already filled by
+      // decodeSkipRun is never handed to the discontinuity handler on top. The
+      // P-picture loop has the same shape.
       if (isFirstMacroblock == 0 && macroblockAdvance > 1) {
         context->decodeSkipRun(context, macroblockAdvance);
         MPVDEC_ResetDc(reinterpret_cast<MPVDecoderContextPrefix*>(context));
-      }
-
-      if (context->macroblockLinearIndex > context->lastDecodedMacroblockIndex + 1) {
+      } else if (context->macroblockLinearIndex > context->lastDecodedMacroblockIndex + 1) {
         context->macroblockDiscontinuityHandler(context);
       }
 
