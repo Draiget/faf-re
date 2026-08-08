@@ -4506,7 +4506,10 @@ extern "C" int mpvvlc_InitMotion()
   FillTableDwords(mpvvlt_motion_0, motion0Word / 2, 8, 0x07FC07FCu);
 
   WriteTableDword(mpvvlt_motion_1, 0, 0x007F007Fu);
-  WriteTableDword(mpvvlt_motion_1, 1, 0x05FD05F3u);
+  // FUN_00AF6CC0 writes `mpvvlt_motion_1[1] = 100467971` = 0x05FD0503. The low
+  // word is `(length << 8) | (int8)delta`, so it is length 5 / delta +3; this
+  // tree had 0x05F3 there, i.e. delta -13.
+  WriteTableDword(mpvvlt_motion_1, 1, 0x05FD0503u);
   WriteTableDword(mpvvlt_motion_1, 2, 0x04020402u);
   WriteTableDword(mpvvlt_motion_1, 3, 0x04FE04FEu);
   WriteTableDword(mpvvlt_motion_1, 4, 0x03010301u);
