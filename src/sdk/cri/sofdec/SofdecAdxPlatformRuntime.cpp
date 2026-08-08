@@ -18464,9 +18464,9 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
   void mwsfsfx_SetNfrm(const MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
   void mwsfsfx_SetSfxInfTag(moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
-  void mwsfsfx_SetFrmDetail(const MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
-  std::int32_t mwsfsfx_CnvPictureStructure(const MwsfdSfdFrmObj* frm);
-  std::int32_t mwsfsfx_CnvSfxChromaFormat(const MwsfdSfdFrmObj* frm);
+  void mwsfsfx_SetFrmDetail(const moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfxFrameInfo* outSfx);
+  std::int32_t mwsfsfx_CnvPictureStructure(const moho::MwsfdPlaybackStateSubobj* ply);
+  std::int32_t mwsfsfx_CnvSfxChromaFormat(const moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t mwsfsfx_CnvSfxChromaPos(std::int32_t chromaPos);
 
   // SFX core lanes used by the helpers below.
@@ -18602,7 +18602,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     (void)mwsfsfx_SetYcc420plnInfToSfx(frm, outSfx);
     mwsfsfx_SetNfrm(frm, outSfx);
     mwsfsfx_SetSfxInfTag(ply, frm, outSfx);
-    mwsfsfx_SetFrmDetail(frm, outSfx);
+    // FUN_00AC6710 line 7 passes `a1` - the playback handle - not the frame.
+    mwsfsfx_SetFrmDetail(ply, outSfx);
 
     // Copy the two-dword `frmcodec.u.frmm2v.{constrained_parameters_flag,
     // progressive_sequence}` pair as a single QWORD load/store, matching the
@@ -18859,8 +18860,26 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t presentTimeUnits = 0;     // +0x34
     /** `{ address, byteCount }` of this frame's picture-user payload. */
     const std::int32_t* pictureUserPayload = nullptr; // +0x38
-    std::int32_t reserved3C_47[3]{};       // +0x3C
-    std::uint8_t trailingDetail[0x38]{};   // +0x48
+    /// Picture-detail lanes `mwsffrm_SaveFrmDetail` (0x00ACA4E0) lifts into the
+    /// playback handle. `sfmpvf_SearchFrmInf` (0x00AD50C0) is what fills them:
+    /// +0x3C/+0x40 from the frame object's +0x9C/+0xA0 chroma-position pair,
+    /// +0x58/+0x5C from its +0x94/+0x98 pair, and +0x6C..+0x6E from the three
+    /// bytes at +0xB1..+0xB3.
+    std::int32_t chromaPositionLow = 0;      // +0x3C
+    std::int32_t chromaPositionHigh = 0;     // +0x40
+    std::uint8_t reserved44_57[0x14]{};      // +0x44
+    std::int32_t pictureStructure = 0;       // +0x58
+    std::int32_t chromaFormat = 0;           // +0x5C
+    std::uint8_t reserved60_6B[0x0C]{};      // +0x60
+    std::int8_t pictureDetail[3]{};          // +0x6C
+    std::uint8_t reserved6F_7F[0x11]{};      // +0x6F
+
+    /// The 0x38-byte run starting at +0x48 that `mwl_convFrmInfFromSFD`
+    /// block-copies wholesale into the outward-facing frame info.
+    [[nodiscard]] const std::uint8_t* TrailingDetail() const noexcept
+    {
+      return reinterpret_cast<const std::uint8_t*>(this) + 0x48;
+    }
   };
   static_assert(
     offsetof(SofdecSfdFrameRuntimeView, frameBufferAddress) == 0x20,
@@ -18871,9 +18890,22 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     "SofdecSfdFrameRuntimeView::pictureUserPayload offset must be 0x38"
   );
   static_assert(
-    offsetof(SofdecSfdFrameRuntimeView, trailingDetail) == 0x48,
-    "SofdecSfdFrameRuntimeView::trailingDetail offset must be 0x48"
+    offsetof(SofdecSfdFrameRuntimeView, chromaPositionLow) == 0x3C,
+    "SofdecSfdFrameRuntimeView::chromaPositionLow offset must be 0x3C"
   );
+  static_assert(
+    offsetof(SofdecSfdFrameRuntimeView, pictureStructure) == 0x58,
+    "SofdecSfdFrameRuntimeView::pictureStructure offset must be 0x58"
+  );
+  static_assert(
+    offsetof(SofdecSfdFrameRuntimeView, chromaFormat) == 0x5C,
+    "SofdecSfdFrameRuntimeView::chromaFormat offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(SofdecSfdFrameRuntimeView, pictureDetail) == 0x6C,
+    "SofdecSfdFrameRuntimeView::pictureDetail offset must be 0x6C"
+  );
+  static_assert(sizeof(SofdecSfdFrameRuntimeView) == 0x80, "SofdecSfdFrameRuntimeView size must be 0x80");
 
   /** Lanes of `MwsfdFrameInfo` the conversion fills that the struct leaves unnamed. */
   struct MwsfdFrameInfoFillRuntimeView
@@ -19088,13 +19120,12 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   {
     constexpr std::int32_t kFrameTypeFieldPaired = 2;
 
-    const auto* const detail = reinterpret_cast<const std::int32_t*>(sfdFrame->trailingDetail);
-    const std::int32_t declaredStructure = detail[(0x58 - 0x48) / 4];
+    const std::int32_t declaredStructure = sfdFrame->pictureStructure;
 
     std::int32_t frameType = 0;
     if (declaredStructure <= 0 || declaredStructure > 3) {
       (void)MWSFSVM_Error(kMwsfdErrInvalidFrameStructure);
-    } else if (declaredStructure <= 2 || sfdFrame->trailingDetail[0x6C - 0x48] == 0) {
+    } else if (declaredStructure <= 2 || sfdFrame->pictureDetail[0] == 0) {
       frameType = kFrameTypeFieldPaired;
     }
 
@@ -19102,6 +19133,34 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
       return frameType;
     }
     return (SUD_AnalyTypeDivField(subtitleRecordAddress, subtitleRecordBytes) == 1) ? kFrameTypeFieldPaired : frameType;
+  }
+
+  /**
+   * Address: 0x00ACA4E0 (FUN_00ACA4E0, _mwsffrm_SaveFrmDetail)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl mwsffrm_SaveFrmDetail(_DWORD *a1, int a2);
+   *
+   * What it does:
+   * Lifts the current frame's MPEG picture-detail lanes out of the SFD frame
+   * descriptor into the playback handle, where `mwsfsfx_SetFrmDetail`
+   * (0x00AC69C0) reads them back when it builds the SFX frame-info block. The
+   * three narrow lanes are loaded as *signed* bytes (`movsx`) and widened.
+   */
+  void mwsffrm_SaveFrmDetail(const std::int32_t plyAddress, const std::int32_t sfdFrameAddress)
+  {
+    auto* const ply = reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
+    const auto* const sfdFrame =
+      reinterpret_cast<const SofdecSfdFrameRuntimeView*>(SjAddressToPointer(sfdFrameAddress));
+
+    ply->framePictureStructure = sfdFrame->pictureStructure;
+    ply->frameChromaFormat = sfdFrame->chromaFormat;
+    ply->framePictureDetail0 = sfdFrame->pictureDetail[0];
+    ply->framePictureDetail1 = sfdFrame->pictureDetail[1];
+    ply->framePictureDetail2 = sfdFrame->pictureDetail[2];
+    ply->frameChromaPositionLow = sfdFrame->chromaPositionLow;
+    ply->frameChromaPositionHigh = sfdFrame->chromaPositionHigh;
+    ply->frameDetailReserved = 0;
   }
 
   /**
@@ -19160,7 +19219,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     const std::int32_t frameType =
       mwsffrm_DecideFrmType(ply, sfdFrame, outFrameInfo->subtitleDataAddress, outFrameInfo->subtitleDataBytes);
     outFrameInfo->frameFieldType = frameType;
-    std::memcpy(outFrameInfo->trailingDetail, sfdFrame->trailingDetail, sizeof(outFrameInfo->trailingDetail));
+    std::memcpy(outFrameInfo->trailingDetail, sfdFrame->TrailingDetail(), sizeof(outFrameInfo->trailingDetail));
   }
 
   /**
@@ -19408,15 +19467,15 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * the small `mwsfsfx_Cnv*` validators which fault to default values via
    * `MWSFSVM_Error` when the source value is out of range.
    */
-  void mwsfsfx_SetFrmDetail(const MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
+  void mwsfsfx_SetFrmDetail(const moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfxFrameInfo* const outSfx)
   {
-    outSfx->pictureStructure = mwsfsfx_CnvPictureStructure(frm);
-    outSfx->chromaFormat = mwsfsfx_CnvSfxChromaFormat(frm);
-    outSfx->pictureDetail68 = frm->picture_structure_src;
-    outSfx->pictureDetail6C = frm->chroma_format_src;
-    outSfx->pictureDetail70 = frm->picture_detail_unknown_98;
-    outSfx->chromaPosLo = mwsfsfx_CnvSfxChromaPos(frm->chroma_pos_lo_src);
-    outSfx->chromaPosHi = mwsfsfx_CnvSfxChromaPos(frm->chroma_pos_hi_src);
+    outSfx->pictureStructure = mwsfsfx_CnvPictureStructure(ply);
+    outSfx->chromaFormat = mwsfsfx_CnvSfxChromaFormat(ply);
+    outSfx->pictureDetail68 = ply->framePictureDetail0;
+    outSfx->pictureDetail6C = ply->framePictureDetail1;
+    outSfx->pictureDetail70 = ply->framePictureDetail2;
+    outSfx->chromaPosLo = mwsfsfx_CnvSfxChromaPos(ply->frameChromaPositionLow);
+    outSfx->chromaPosHi = mwsfsfx_CnvSfxChromaPos(ply->frameChromaPositionHigh);
   }
 
   /**
@@ -19430,9 +19489,9 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * 2 = bottom field, 3 = frame). Out-of-range values are reported via the
    * Sofdec-SVM error channel and remapped to `3` to keep playback alive.
    */
-  std::int32_t mwsfsfx_CnvPictureStructure(const MwsfdSfdFrmObj* const frm)
+  std::int32_t mwsfsfx_CnvPictureStructure(const moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    const std::int32_t pictureStructure = frm->constrained_parameters_flag; // +0x88 in the binary
+    const std::int32_t pictureStructure = ply->framePictureStructure; // +0x88 in the binary
     if (pictureStructure == 1) {
       return 1;
     }
@@ -19456,9 +19515,9 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * Out-of-range values are reported through the Sofdec-SVM error channel and
    * remapped to `1` (4:2:0).
    */
-  std::int32_t mwsfsfx_CnvSfxChromaFormat(const MwsfdSfdFrmObj* const frm)
+  std::int32_t mwsfsfx_CnvSfxChromaFormat(const moho::MwsfdPlaybackStateSubobj* const ply)
   {
-    const std::int32_t chromaFormat = frm->progressive_sequence; // +0x8C in the binary
+    const std::int32_t chromaFormat = ply->frameChromaFormat; // +0x8C in the binary
     switch (chromaFormat) {
       case 1: return 1;
       case 2: return 2;
