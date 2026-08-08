@@ -1978,9 +1978,10 @@ namespace
 
   struct CMauiMovieRuntimeView : moho::CMauiControlFrameUpdateRuntimeView
   {
-    std::uint8_t mUnknown0ECTo0F3[0x8]{};
-    float mTextureU = 0.0f; // +0xF4
-    std::uint8_t mUnknown0F8To11B[0x24]{};
+    // +0xEC..0x11B are CMauiControl's own tail (mInvisible, mAlpha,
+    // mVertexAlpha, mRenderPass, mRootFrame, mDebugName) - reach them through
+    // CMauiControlExtendedRuntimeView rather than redeclaring them here.
+    std::uint8_t mUnknown0ECTo11B[0x30]{};
     moho::CMovie* mMovie = nullptr; // +0x11C
     bool mIsPlaying = false; // +0x120
     bool mDoLoop = false;    // +0x121
@@ -2002,7 +2003,6 @@ namespace
   };
 
   static_assert(offsetof(CMauiMovieRuntimeView, mMovie) == 0x11C, "CMauiMovieRuntimeView::mMovie offset must be 0x11C");
-  static_assert(offsetof(CMauiMovieRuntimeView, mTextureU) == 0xF4, "CMauiMovieRuntimeView::mTextureU offset must be 0xF4");
   static_assert(offsetof(CMauiMovieRuntimeView, mIsPlaying) == 0x120, "CMauiMovieRuntimeView::mIsPlaying offset must be 0x120");
   static_assert(offsetof(CMauiMovieRuntimeView, mDoLoop) == 0x121, "CMauiMovieRuntimeView::mDoLoop offset must be 0x121");
   static_assert(offsetof(CMauiMovieRuntimeView, mIsStopped) == 0x122, "CMauiMovieRuntimeView::mIsStopped offset must be 0x122");
@@ -15737,39 +15737,43 @@ void moho::CMauiMovie::DoRender(CD3DPrimBatcher* const primBatcher, const std::i
   moviePlayback->GetTextureSheetHandle(&movieSheet);
   primBatcher->SetTexture(movieSheet);
 
-  const float textureU = movieView->mTextureU;
+  // 0x0079F3A2 `mov ebx, [ebx+0F4h]` loads the control's packed vertex colour
+  // and 0x0079F403/F413/F423/F43F store it into all four vertices' mColor.
+  // The UVs are the plain corner constants: `xorps xmm0,xmm0` supplies 0.0 and
+  // `movss xmm1, ds:a7` (0x00DFEC20 = 1.0f) supplies 1.0.
+  const std::uint32_t vertexColor = CMauiControlExtendedRuntimeView::FromControl(this)->mVertexAlpha;
 
   CD3DPrimBatcher::Vertex topLeft{};
   topLeft.mX = left;
   topLeft.mY = top;
   topLeft.mZ = 0.0f;
-  topLeft.mColor = 0;
-  topLeft.mU = textureU;
+  topLeft.mColor = vertexColor;
+  topLeft.mU = 0.0f;
   topLeft.mV = 0.0f;
 
   CD3DPrimBatcher::Vertex topRight{};
   topRight.mX = right;
   topRight.mY = top;
   topRight.mZ = 0.0f;
-  topRight.mColor = 0;
-  topRight.mU = textureU;
-  topRight.mV = 1.0f;
+  topRight.mColor = vertexColor;
+  topRight.mU = 1.0f;
+  topRight.mV = 0.0f;
 
   CD3DPrimBatcher::Vertex bottomRight{};
   bottomRight.mX = right;
   bottomRight.mY = bottom;
   bottomRight.mZ = 0.0f;
-  bottomRight.mColor = 0;
-  bottomRight.mU = textureU;
+  bottomRight.mColor = vertexColor;
+  bottomRight.mU = 1.0f;
   bottomRight.mV = 1.0f;
 
   CD3DPrimBatcher::Vertex bottomLeft{};
   bottomLeft.mX = left;
   bottomLeft.mY = bottom;
   bottomLeft.mZ = 0.0f;
-  bottomLeft.mColor = 0;
-  bottomLeft.mU = textureU;
-  bottomLeft.mV = 0.0f;
+  bottomLeft.mColor = vertexColor;
+  bottomLeft.mU = 0.0f;
+  bottomLeft.mV = 1.0f;
 
   primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
 }
