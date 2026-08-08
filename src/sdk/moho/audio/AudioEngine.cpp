@@ -2499,30 +2499,6 @@ namespace
     return count;
   }
 
-  [[nodiscard]] moho::SoundConfiguration* EnsureSoundConfigurationForCreate()
-  {
-    if (moho::sSoundConfiguration != nullptr) {
-      return moho::sSoundConfiguration;
-    }
-
-    auto* const configuration = new moho::SoundConfiguration{};
-    configuration->mEngines.mAllocatorCookie = nullptr;
-    configuration->mEngines.mStart = nullptr;
-    configuration->mEngines.mFinish = nullptr;
-    configuration->mEngines.mCapacity = nullptr;
-    configuration->mNoSound = 1u;
-    configuration->mSpeakerConfiguration = 0x03u;
-    configuration->mAudioRuntimeModule = nullptr;
-    configuration->mLookAheadTimeMs = 250u;
-    configuration->mGlobalSettingsStart = nullptr;
-    configuration->mGlobalSettingsLength = 0u;
-    configuration->mRuntimeFlags = 0u;
-    configuration->mHandleSoundEvent = nullptr;
-    configuration->mAudition = 0u;
-    moho::sSoundConfiguration = configuration;
-    return configuration;
-  }
-
   /**
    * Address: 0x004DC230 (FUN_004DC230)
    *
@@ -3521,16 +3497,35 @@ namespace moho
    */
   const char* func_SoundErrorCodeToMsg(int errorCode);
 
+  /// Receives what `IXACTEngine::GetFinalMixFormat` writes, which is a full
+  /// `WAVEFORMATEXTENSIBLE`: `WAVEFORMATEX` (0x12) plus the `Samples` union
+  /// (0x02), then `dwChannelMask` at 0x14, then the 16-byte `SubFormat` GUID -
+  /// 0x28 bytes in total.
+  ///
+  /// The binary reserves exactly that: `func_AudioInitialize` subtracts 0x2C,
+  /// puts the buffer at `ebp-0x28` and reads the speaker mask from `ebp-0x14`.
+  /// IDA splits it into `char v7[20]` plus a separate `SpeakerChannelMask`
+  /// local, but both name one buffer.
+  ///
+  /// This view was 0x18 bytes, so XACT wrote the trailing GUID 16 bytes past
+  /// the end of the stack object. `/RTC` caught it as "Run-Time Check Failure
+  /// #2 - Stack around the variable 'finalMixFormat' was corrupted" and startup
+  /// stopped on a modal CRT dialog.
   struct AudioFinalMixFormatRuntimeView
   {
-    std::array<std::uint8_t, 0x14> mReserved00{};
-    std::uint32_t mSpeakerChannelMask = 0; // +0x14
+    std::array<std::uint8_t, 0x14> mWaveFormat{};    // +0x00 WAVEFORMATEX + Samples
+    std::uint32_t mSpeakerChannelMask = 0;           // +0x14 dwChannelMask
+    std::array<std::uint8_t, 0x10> mSubFormatGuid{}; // +0x18 SubFormat GUID
   };
   static_assert(
     offsetof(AudioFinalMixFormatRuntimeView, mSpeakerChannelMask) == 0x14,
     "AudioFinalMixFormatRuntimeView::mSpeakerChannelMask offset must be 0x14"
   );
-  static_assert(sizeof(AudioFinalMixFormatRuntimeView) == 0x18, "AudioFinalMixFormatRuntimeView size must be 0x18");
+  static_assert(
+    offsetof(AudioFinalMixFormatRuntimeView, mSubFormatGuid) == 0x18,
+    "AudioFinalMixFormatRuntimeView::mSubFormatGuid offset must be 0x18"
+  );
+  static_assert(sizeof(AudioFinalMixFormatRuntimeView) == 0x28, "AudioFinalMixFormatRuntimeView size must be 0x28");
 
   /**
    * Address: 0x004D8170 (FUN_004D8170, func_AudioInitialize)
@@ -4409,7 +4404,22 @@ namespace moho
     const msvc8::string globalSettingsDigest = md5Context.Digest().ToString();
     gpg::Logf("MD5 of global settings: %s", globalSettingsDigest.c_str());
 
-    const int initializeResult = mImpl->mInstance->Initialize(&configuration->mSpeakerConfiguration);
+    // XACT's runtime-parameter block is embedded in SoundConfiguration starting
+    // at +0x34, so the engine hands it the address of that field rather than a
+    // separate struct. The binary is explicit about it:
+    //
+    //   mov edx, sSoundConfiguration
+    //   add edx, 34h                  ; <- params head = &mLookAheadTimeMs
+    //   push edx
+    //
+    // and func_InitSound fills that block through the same offsets:
+    // [+0x34] = 0xFA (250 ms look-ahead), [+0x38]/[+0x3C] the global-settings
+    // pointer and length, [+0x40] the flags, [+0x50] func_HandleSoundEvent.
+    //
+    // This passed &mSpeakerConfiguration (+0x2C) instead, i.e. the block eight
+    // bytes early, so XACT read lookAheadTime = 3 and took mAudioRuntimeModule
+    // as the global-settings pointer and rejected the lot with "Invalid arg".
+    const int initializeResult = mImpl->mInstance->Initialize(&configuration->mLookAheadTimeMs);
     if (initializeResult < 0) {
       gpg::Warnf("SND: Error initializing audio engine.\n%s", func_SoundErrorCodeToMsg(initializeResult));
       configuration->mNoSound = 1u;
@@ -4454,12 +4464,27 @@ namespace moho
    */
   boost::shared_ptr<AudioEngine> AudioEngine::Create(const gpg::StrArg voicePath)
   {
-    SoundConfiguration* const configuration = EnsureSoundConfigurationForCreate();
+    // The binary opens with `if (!sSoundConfiguration) func_InitSound();`, and
+    // func_InitSound is the only thing that builds a *usable* configuration: it
+    // parses /audition and /nosound, primes the 250 ms look-ahead, installs
+    // func_HandleSoundEvent as the XACT notification handler, loads
+    // /sounds/SupCom.xgs into the global settings buffer and probes the
+    // DirectSound speaker mode.
+    //
+    // This used to call a local EnsureSoundConfigurationForCreate() helper that
+    // allocated a bare SoundConfiguration with mNoSound = 1 and
+    // mHandleSoundEvent = nullptr, so the engine came up permanently muted with
+    // no notification sink - zero "Wavebank prepared" lines, against 270 from
+    // the shipped binary on the same startup.
+    if (sSoundConfiguration == nullptr) {
+      func_InitSound();
+    }
+
     AudioEngine* const createdEngine = new AudioEngine(voicePath);
 
     boost::shared_ptr<AudioEngine> result(createdEngine);
-    if (configuration != nullptr && createdEngine != nullptr) {
-      RegisterEngineRef(*configuration, result);
+    if (sSoundConfiguration != nullptr && createdEngine != nullptr) {
+      RegisterEngineRef(*sSoundConfiguration, result);
     }
 
     return result;
