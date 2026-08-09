@@ -4,7 +4,6 @@ using namespace gpg;
 LARGE_INTEGER sPerformanceFrequency; // 0x00F8ED58
 float sTimerCycleToSeconds; // 0x00F8ED60
 volatile LONGLONG cycle; // 0x00F8ED68
-time::Timer systemTimer; // 0x00F8ED78, first set at 0x00BEAB90
 
 /**
  * Address: 0x00955480 (FUN_00955480)
@@ -12,7 +11,7 @@ time::Timer systemTimer; // 0x00F8ED78, first set at 0x00BEAB90
  * What it does:
  * Caches QueryPerformanceFrequency and precomputes cycle-to-seconds scale.
  */
-[[maybe_unused]] BOOL InitializePerformanceFrequencyCache()
+BOOL InitializePerformanceFrequencyCache()
 {
     const BOOL result = QueryPerformanceFrequency(&sPerformanceFrequency);
     sTimerCycleToSeconds = 1.0f / static_cast<float>(sPerformanceFrequency.QuadPart);
@@ -162,16 +161,25 @@ float time::CyclesToSeconds(const LONGLONG cycles) {
 
 /**
  * Address: 0x00955730 (FUN_00955730)
+ * Mangled: ?GetSystemTimer@time@gpg@@YAABVTimer@12@XZ
+ *
+ * IDA signature:
+ * gpg::time::Timer *__usercall gpg::time::GetSystemTimer@<eax>();
  *
  * What it does:
- * Returns process-wide system timer singleton with one-time baseline initialization.
+ * Returns the process-wide system timer, captured on first use.
+ *
+ * The timer is a *function-local* static (`gpg::time::system_timer` at
+ * 0x00F8ED78, magic-static guard byte at 0x00F8ED80). The binary tests and
+ * sets the guard inline and then stores `GetCycle()` straight into
+ * `system_timer.mTime` - i.e. the `Timer()` constructor inlined into the
+ * guarded block. The baseline is therefore taken on the FIRST CALL, never
+ * during static initialization; declaring this as a namespace-scope global
+ * with a dynamic initializer would sample `GetCycle()` at a different point
+ * in process startup than the original does.
  */
 time::Timer const& time::GetSystemTimer() {
-    static int guard = 0; // 0x00F8ED80
-    if ((guard & 1) == 0) {
-        guard |= 1;
-        systemTimer = Timer{};
-    }
+    static const Timer systemTimer; // 0x00F8ED78, guard byte 0x00F8ED80
     return systemTimer;
 }
 
