@@ -101279,7 +101279,11 @@ namespace
    */
   [[maybe_unused]] void wxInvokeCrtInvalidParameterNoContextRuntime()
   {
-    ::_invalid_parameter(nullptr, nullptr, nullptr, 0u, static_cast<std::uintptr_t>(0u));
+    // The 5-argument `_invalid_parameter` is declared only in debug CRTs.
+    // `_invalid_parameter_noinfo` is the always-available spelling and is
+    // defined as `_invalid_parameter(NULL, NULL, NULL, 0, 0)` - the exact call
+    // the binary makes.
+    ::_invalid_parameter_noinfo();
   }
 
   /**

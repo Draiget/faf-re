@@ -2374,6 +2374,9 @@ namespace
  * Preserves the CRT's SSE2/control-word dispatch gate and computes arccosine
  * for the supplied angle lane.
  */
+// Optimizing builds turn `acos` into an intrinsic, which makes defining it an
+// error. The engine ships its own body, so ask for the real function.
+#pragma function(acos)
 extern "C" double __cdecl acos(double value)
 {
   if (global_mode_sse2 != 0) {
@@ -2396,6 +2399,8 @@ extern "C" double __cdecl acos(double value)
  * Preserves the CRT's SSE2/control-word dispatch gate and computes one
  * ceil-rounded scalar with legacy negative-zero behavior.
  */
+// As with `acos` above: `ceil` is an intrinsic in optimizing builds.
+#pragma function(ceil)
 extern "C" double __cdecl ceil(double value)
 {
   if (global_mode_sse2 != 0 && IsDefaultFloatingPointEnvironment()) {
