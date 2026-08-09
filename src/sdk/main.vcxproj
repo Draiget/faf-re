@@ -155,7 +155,12 @@
       <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\LuaPlus_Build1081\Prebuilt\Lib\win32;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
-      <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <!-- Mirror of the Debug link, which excludes the release CRT so nothing
+           can drag it in beside the debug one. This configuration uses the
+           release CRT, so it is the debug CRT that has to go: excluding
+           msvcrt.lib here removed this build's own CRT and left ~297
+           unresolved externals, most of them compiler EH helpers. -->
+      <IgnoreSpecificDefaultLibraries>msvcrtd.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
     </Link>
     <PostBuildEvent>
