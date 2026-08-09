@@ -4401,7 +4401,11 @@ namespace Wm3
 
     void SignalInvalidParameterRecoveredInvariant() noexcept
     {
-      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      // The 5-argument `_invalid_parameter` is declared only in debug CRTs.
+      // `_invalid_parameter_noinfo` is the always-available spelling and is
+      // defined as `_invalid_parameter(NULL, NULL, NULL, 0, 0)` - the exact
+      // call the binary makes.
+      _invalid_parameter_noinfo();
     }
 
     template <class TOwner>
