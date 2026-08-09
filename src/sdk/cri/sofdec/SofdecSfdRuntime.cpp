@@ -11328,25 +11328,6 @@
   );
   static_assert(sizeof(SfbufRingWriteDescriptorView) == 0x14, "SfbufRingWriteDescriptorView size must be 0x14");
 
-  struct MpsLastSystemHeaderProbeRuntimeView
-  {
-    std::uint8_t reserved00[0x08]{};
-    std::int32_t hasSecondarySystemHeader = 0; // +0x08
-    std::int32_t hasPrimarySystemHeader = 0; // +0x0C
-  };
-  static_assert(
-    offsetof(MpsLastSystemHeaderProbeRuntimeView, hasSecondarySystemHeader) == 0x08,
-    "MpsLastSystemHeaderProbeRuntimeView::hasSecondarySystemHeader offset must be 0x08"
-  );
-  static_assert(
-    offsetof(MpsLastSystemHeaderProbeRuntimeView, hasPrimarySystemHeader) == 0x0C,
-    "MpsLastSystemHeaderProbeRuntimeView::hasPrimarySystemHeader offset must be 0x0C"
-  );
-  static_assert(
-    sizeof(MpsLastSystemHeaderProbeRuntimeView) == 0x10,
-    "MpsLastSystemHeaderProbeRuntimeView size must be 0x10"
-  );
-
   struct SfmpsHeaderRawCaptureRuntimeView
   {
     std::int32_t activeFlag = 0; // +0x00
@@ -13487,8 +13468,13 @@
       auto* const headerCaptureView =
         reinterpret_cast<SfmpsHeaderRawCaptureRuntimeView*>(SjAddressToPointer(static_cast<std::int32_t>(result)));
       if (headerCaptureView->activeFlag == 0) {
-        MpsLastSystemHeaderProbeRuntimeView lastSystemHeaderProbe{};
-        (void)MPS_GetLastSysHd(parserHandleAddress, &lastSystemHeaderProbe);
+        // `MPS_GetLastSysHd` copies a whole 0x20-byte `MpsSystemHeader` out.
+        // This used to be a 0x10-byte probe view, so every call wrote 16 bytes
+        // past the end of it and corrupted the caller's stack; only an
+        // optimizing build diagnoses that (C4789). The two lanes read below are
+        // the header's video and audio bounds, at +0x0C and +0x08.
+        MpsSystemHeader lastSystemHeader{};
+        (void)MPS_GetLastSysHd(parserHandleAddress, &lastSystemHeader);
 
         std::int32_t copyBytes = packetBytes;
         if (copyBytes >= 0xB0) {
@@ -13496,7 +13482,7 @@
         }
 
         result = static_cast<std::uint32_t>(copyBytes);
-        if (lastSystemHeaderProbe.hasPrimarySystemHeader > 0) {
+        if (lastSystemHeader.videoBound > 0) {
           headerCaptureView->primaryMpsRawBytes = copyBytes;
           return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(MEM_Copy(
             headerCaptureView->primaryMpsRaw.data(),
@@ -13505,7 +13491,7 @@
           )));
         }
 
-        if (lastSystemHeaderProbe.hasSecondarySystemHeader > 0) {
+        if (lastSystemHeader.audioBound > 0) {
           headerCaptureView->secondaryMpsRawBytes = copyBytes;
           return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(MEM_Copy(
             headerCaptureView->secondaryMpsRaw.data(),
