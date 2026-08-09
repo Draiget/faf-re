@@ -3585,6 +3585,32 @@
    * Fetches the current SFD frame into one runtime frame-info object and
    * updates playback frame counters/concat tracking lanes.
    */
+  /**
+   * Address: 0x00ACA1A0 (FUN_00ACA1A0, _mwsffrm_SetFrmApi)
+   *
+   * IDA signature:
+   * void __cdecl mwsffrm_SetFrmApi(MWPLY ply, int type);
+   *
+   * What it does:
+   * Latches which frame get/release API pair the caller is using on this
+   * playback handle (`ply->apiType`, +0x2A4). The first call wins; a later call
+   * with a different type reports the CRI diagnostic rather than switching, so
+   * mixing `mwPlyGetCurFrm`/`mwPlyRelCurFrm` with the id-frame pair is caught.
+   */
+  void mwsffrm_SetFrmApi(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t type)
+  {
+    constexpr char kMwsfdErrMixedFrameApi[] =
+      "E4110902: Don't use another type get/release frame API.";
+
+    if (ply->apiType == 0) {
+      ply->apiType = type;
+      return;
+    }
+    if (ply->apiType != type) {
+      (void)MWSFSVM_Error(kMwsfdErrMixedFrameApi);
+    }
+  }
+
   moho::MwsfdFrameInfo*
   mwPlyGetCurFrm(moho::MwsfdPlaybackStateSubobj* const ply, moho::MwsfdFrameInfo* const outFrameInfo)
   {
