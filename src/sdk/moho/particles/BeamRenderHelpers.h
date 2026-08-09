@@ -2,9 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <map>
 
 #include "boost/shared_ptr.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "legacy/containers/String.h"
 #include "moho/math/Vector4f.h"
@@ -260,8 +260,11 @@ namespace moho
     ) const noexcept;
   };
 
+  // Binary-facing layout: the MSVC8 tree header is 0x0C bytes, which `std::map`
+  // only measures under `_ITERATOR_DEBUG_LEVEL=2`. Using the legacy tree keeps
+  // `CWorldParticles` at 0xDC in every build configuration.
   using BeamTextureBucketMapRuntime =
-    std::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>, BeamTextureBucketKeyLess>;
+    msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>, BeamTextureBucketKeyLess>;
 
   /**
    * What it does:

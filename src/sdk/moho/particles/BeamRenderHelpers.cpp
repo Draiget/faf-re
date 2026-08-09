@@ -248,7 +248,7 @@ namespace
       (candidate == mapEnd) || buckets.key_comp()(key, candidate->first);
 
     if (keyPrecedesCandidate) {
-      candidate = buckets.emplace_hint(candidate, key, msvc8::vector<moho::SWorldBeam>{});
+      candidate = buckets.insert(candidate, {key, msvc8::vector<moho::SWorldBeam>{}});
       outPosition->inserted = true;
     } else {
       outPosition->inserted = false;
@@ -814,7 +814,7 @@ namespace
       }
     }
 
-    *outIterator = buckets.emplace_hint(hint, key, msvc8::vector<moho::SWorldBeam>{});
+    *outIterator = buckets.insert(hint, {key, msvc8::vector<moho::SWorldBeam>{}});
     return outIterator;
   }
 
