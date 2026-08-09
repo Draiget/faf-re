@@ -14062,10 +14062,14 @@
 
   struct SflibTimerStateRuntimeView
   {
-    std::int32_t verticalBlankCount = 0; // +0x00
-    std::int32_t timerVersion = 0; // +0x04
-    std::int32_t ticksPerSecond = 0; // +0x08
+    std::int32_t verticalBlankCount = 0; // +0x00 (`SFLIB_libwork.time.val1`, 0x011F9070)
+    std::int32_t reservedLane04 = 0; // +0x04 (0x011F9074) - zeroed by SFTIM_Init, never read
+    std::int32_t ticksPerSecond = 0; // +0x08 (0x011F9078) - the timer unit
   };
+  // `SFTIM_Init` (0x00ADA9C0) writes `[p]=0`, `[p+4]=0`, `[p+8]=rate`, and every
+  // one of the seven functions in the binary that reads this block reads
+  // 0x011F9078, i.e. `+0x08`. Nothing anywhere references 0x011F9074, so a read
+  // of `reservedLane04` is always a mis-modelled `ticksPerSecond` read.
   static_assert(sizeof(SflibTimerStateRuntimeView) == 0x0C, "SflibTimerStateRuntimeView size must be 0x0C");
 
   struct SftimWorkctrlRuntimeView
@@ -14538,6 +14542,17 @@
   );
   static_assert(sizeof(SftimVblankCounterLaneView) == 0x5BC, "SftimVblankCounterLaneView size must be 0x5BC");
 
+  /**
+   * Byte offset of the SFTIM VBlank/timer lane inside one SFD workctrl.
+   *
+   * Every SFTIM entry point that touches this lane reaches it through the same
+   * displacement: `SFTIM_SetTimeFn` writes `*(handle + 4*mode + 3376)`,
+   * `SFTIM_GetNowTime` dispatches on `*(handle + 4*cond15 + 3376)`, and
+   * `sftim_UpdateTime` caches the resolved time at `handle + 3376 + 652/656`
+   * (= the `+0xFBC`/`+0xFC0` pair `SFTIM_GetTime` reads back).
+   */
+  inline constexpr std::size_t kSftimVblankCounterLaneOffset = 0xD30;
+
   struct SftimInitHandleRuntimeView
   {
     std::array<SftimGetNowTimeFunction, 6> nowTimeFunctions{}; // +0x000
@@ -14829,7 +14844,7 @@
   {
     auto* const timerView = static_cast<SflibTimerStateRuntimeView*>(timerState);
     timerView->verticalBlankCount = 0;
-    timerView->timerVersion = 0;
+    timerView->reservedLane04 = 0;
     timerView->ticksPerSecond = versionTag;
   }
 
@@ -14861,7 +14876,7 @@
     if (SFSET_GetCond(workctrlSubobj, 71) == 1) {
       *outTimeMajor = counterLane->accumulatedTicks - counterLane->currentVtimeMajor;
       const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
-      *outTimeMinor = (timerState != nullptr) ? timerState->timerVersion : 0;
+      *outTimeMinor = (timerState != nullptr) ? timerState->ticksPerSecond : 0;
       return;
     }
 
@@ -14872,14 +14887,25 @@
   /**
    * Address: 0x00ADB600 (FUN_00ADB600, _SFTIM_SetTimeFn)
    *
+   * IDA signature:
+   * int __cdecl SFTIM_SetTimeFn(int a1, int a2, int a3);
+   *
    * What it does:
    * Stores one time-source callback in the per-handle timer callback table slot
    * selected by `timeModeIndex`.
+   *
+   * The binary writes `*(a1 + 4 * a3 + 3376)`, i.e. the table lives at
+   * `workctrl + 0xD30` - the same base `SFTIM_GetNowTime` (0x00ADB170) reads
+   * its dispatch entry from. The `SftimVblankCounterLaneView` must therefore be
+   * placed at that offset here too, exactly as every other user of that view
+   * does.
    */
   std::int32_t
   SFTIM_SetTimeFn(const std::int32_t workctrlAddress, const std::int32_t callbackAddress, const std::int32_t timeModeIndex)
   {
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(SjAddressToPointer(workctrlAddress));
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+      reinterpret_cast<std::uint8_t*>(SjAddressToPointer(workctrlAddress)) + kSftimVblankCounterLaneOffset
+    );
     counterLane->nowTimeFunctions[static_cast<std::size_t>(timeModeIndex)] = reinterpret_cast<SftimGetNowTimeFunction>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(callbackAddress))
     );
@@ -15053,7 +15079,7 @@
   )
   {
     const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
-    const std::int32_t additionalTicks = UTY_MulDiv(timerState->timerVersion, frameTimeMajor, frameTimeMinor);
+    const std::int32_t additionalTicks = UTY_MulDiv(timerState->ticksPerSecond, frameTimeMajor, frameTimeMinor);
 
     SFLIB_LockCs();
     auto* const runtimeView = reinterpret_cast<SftimWorkctrlRuntimeView*>(workctrlSubobj);
@@ -15457,7 +15483,7 @@
       const auto* const runtimeView = reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj);
       const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
       *outTimeMajor = runtimeView->vsyncTimeMajor;
-      *outTimeMinor = timerState->timerVersion;
+      *outTimeMinor = timerState->ticksPerSecond;
     }
     return 0;
   }
@@ -15543,7 +15569,9 @@
     SFLIB_LockCs();
 
     auto* const workctrlSubobj = reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(reinterpret_cast<std::uint8_t*>(workctrlSubobj) + 0xD30);
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+      reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
+    );
     const std::int32_t timerMode = SFSET_GetCond(workctrlSubobj, 15);
 
     SftimGetNowTimeFunction nowTimeFunction = *(counterLane->nowTimeFunctions.data() + timerMode);
@@ -15765,7 +15793,9 @@
    */
   std::int32_t sftim_CntupHnVbIn(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(reinterpret_cast<std::uint8_t*>(workctrlSubobj) + 0xD30);
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+      reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
+    );
     if (sftim_IsTimeIncre(workctrlSubobj) != 0) {
       counterLane->accumulatedTicks += counterLane->tickStep;
     }
@@ -15787,7 +15817,9 @@
    */
   std::int32_t sftim_UpdateTime(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
   {
-    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(reinterpret_cast<std::uint8_t*>(workctrlSubobj) + 0xD30);
+    auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+      reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
+    );
 
     std::int32_t nowMajor = 0;
     std::int32_t nowMinor = 0;
@@ -16966,7 +16998,7 @@
     std::int32_t vtimeMajor = 0;
     std::int32_t vtimeMinor = 0;
     auto* const counterLane = reinterpret_cast<SftimVblankCounterLaneView*>(
-      static_cast<std::uint8_t*>(static_cast<void*>(workctrlSubobj)) + 0xD30
+      static_cast<std::uint8_t*>(static_cast<void*>(workctrlSubobj)) + kSftimVblankCounterLaneOffset
     );
     sftim_GetVtimeTmr(workctrlSubobj, counterLane, &vtimeMajor, &vtimeMinor);
     if (vtimeMinor == 0) {
@@ -17568,7 +17600,7 @@
     }
 
     const auto* const timerState = reinterpret_cast<const SflibTimerStateRuntimeView*>(gSflibLibWork.timeState);
-    sftmr_tmrunit = static_cast<std::int64_t>(timerState->timerVersion);
+    sftmr_tmrunit = static_cast<std::int64_t>(timerState->ticksPerSecond);
     return static_cast<std::int64_t>(timerState->verticalBlankCount) * 1000ll;
   }
 

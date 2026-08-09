@@ -18444,16 +18444,29 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   // path. The `used` flag and the two child handles are pinned by the asm of
   // `SFX_Destroy` at 0x00ACC9E0..0x00ACCA0F (decoded as `[esi+0x*]` accesses).
 
+  /**
+   * Teardown view over one SFX handle.
+   *
+   * Offsets are taken from `SFX_Destroy` (0x00ACC9E0), which reads
+   * `mov esi, [eax+30h]` for the SFXA child, `mov dword ptr [eax], 0` for the
+   * lifecycle flag and `mov eax, [eax+24h]` for the SFXZ child.
+   */
   struct SfxHandleTeardownView
   {
-    std::int32_t used;          ///< +0x00 lifecycle flag (cleared on Destroy)
-    std::int32_t mUnknown04;    ///< +0x04
-    void*        sfxz;          ///< +0x08 SFXZ child handle
-    std::int32_t sfxa;          ///< +0x0C SFXA child handle (integer address ABI)
+    std::int32_t used;                          ///< +0x00 lifecycle flag (cleared on Destroy)
+    std::int32_t compositionMode;               ///< +0x04 written by SFX_SetCompoMode
+    std::array<std::uint8_t, 0x1C> mUnknown08;  ///< +0x08
+    void*        sfxz;                          ///< +0x24 SFXZ child handle
+    std::array<std::uint8_t, 0x08> mUnknown28;  ///< +0x28
+    std::int32_t sfxa;                          ///< +0x30 SFXA child handle (integer address ABI)
   };
   static_assert(offsetof(SfxHandleTeardownView, used) == 0x00, "SfxHandleTeardownView::used offset");
-  static_assert(offsetof(SfxHandleTeardownView, sfxz) == 0x08, "SfxHandleTeardownView::sfxz offset");
-  static_assert(offsetof(SfxHandleTeardownView, sfxa) == 0x0C, "SfxHandleTeardownView::sfxa offset");
+  static_assert(
+    offsetof(SfxHandleTeardownView, compositionMode) == 0x04,
+    "SfxHandleTeardownView::compositionMode offset"
+  );
+  static_assert(offsetof(SfxHandleTeardownView, sfxz) == 0x24, "SfxHandleTeardownView::sfxz offset");
+  static_assert(offsetof(SfxHandleTeardownView, sfxa) == 0x30, "SfxHandleTeardownView::sfxa offset");
 
   // ---------------------------------------------------------------------------
   // Constants & error strings
@@ -19671,7 +19684,7 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   std::int32_t SFX_SetCompoMode(void* const sfxHandle, const std::int32_t compositionMode)
   {
     auto* const view = static_cast<SfxHandleTeardownView*>(sfxHandle);
-    view->mUnknown04 = compositionMode;
+    view->compositionMode = compositionMode;
     return compositionMode;
   }
 
