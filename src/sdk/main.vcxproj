@@ -37,7 +37,11 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <!-- The recovery tree still has unresolved externals, so this project links
+         with /FORCE. That switch is ignored under whole-program optimization,
+         where the linker fails with LNK1120 instead of emitting the image, so
+         WPO stays off here. /O2 is unaffected. -->
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -152,6 +156,7 @@
       <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ForceFileOutput>Enabled</ForceFileOutput>
     </Link>
     <PostBuildEvent>
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
