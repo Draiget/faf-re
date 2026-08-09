@@ -2,10 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <map>
 
 #include "gpg/core/containers/FastVector.h"
 #include "moho/ai/IFormationInstance.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/containers/TDatList.h"
@@ -160,8 +160,11 @@ namespace moho
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
-    // std::map<EntId, SUnitOffsetInfo>; EntId is int32_t (see moho/entity/Entity.h).
-    std::map<std::int32_t, SUnitOffsetInfo> mUnitOffsets; // +0x00
+    // map<EntId, SUnitOffsetInfo>; EntId is int32_t (see moho/entity/Entity.h).
+    // Binary-facing layout: the MSVC8 tree is 0x0C bytes. `std::map` only
+    // happens to measure 0x0C under `_ITERATOR_DEBUG_LEVEL=2`, so the size
+    // assert below failed in every non-debug configuration.
+    msvc8::map<std::int32_t, SUnitOffsetInfo> mUnitOffsets; // +0x00
     Wm3::Vec3f mPos;                                       // +0x0C
     SCoordsVec2 mCoords1;                                  // +0x18
     SCoordsVec2 mCoords2;                                  // +0x20
