@@ -247,7 +247,11 @@ extern "C" {
   void* mwsffrm_CheckAinf() { return nullptr; }
   void* mwsffrm_GetNumAudioCh() { return nullptr; }
   void* mwsffrm_GetNumVideoCh() { return nullptr; }
-  void* mwsffrm_SetFrmApi() { return nullptr; }
+  // mwsffrm_SetFrmApi: real body in SofdecAdxPlatformRuntime.cpp (0x00ACA1A0).
+  // As a no-argument stub it silently satisfied the two properly-declared
+  // `mwsffrm_SetFrmApi(ply, 1)` calls in mwPlyGetCurFrm / mwPlyRelCurFrm, so the
+  // MWSFD-side frame-API lane at ply+0x2A4 was never latched and the
+  // "Don't use another type get/rel frame API" diagnostic could never fire.
   void* parse_PES_packet_sub() { return nullptr; }
   void* sfcre_AnalyMpa() { return nullptr; }
   // sfmpvf_IsChkFirst, sfmpvf_SetPicUsrBuf: real bodies in SofdecMpvRuntime.cpp.
