@@ -209,13 +209,13 @@ namespace moho
    */
   CMovie::CMovie()
   {
-    mDeviceListener.mLink.ListResetLinks();
+    mListenerLink.ListResetLinks();
 
+    // The device's listener ring is its own Broadcaster base, which is the
+    // +0x04 the binary indexes. Reaching it as a base rather than by offset
+    // arithmetic is the same address and keeps the types honest.
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
-      auto* const deviceListenerHead = reinterpret_cast<TDatListItem<CMovie, void>*>(
-        reinterpret_cast<std::uint8_t*>(device) + 0x04
-      );
-      mDeviceListener.mLink.ListLinkBefore(deviceListenerHead);
+      mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(device));
     }
   }
 
@@ -239,7 +239,7 @@ namespace moho
     // self-contained and does not need the ring head).
     if (D3D_GetDevice() != nullptr) {
       (void)D3D_GetDevice();
-      mDeviceListener.mLink.ListUnlink();
+      mListenerLink.ListUnlink();
     }
 
     // [0x00873DDA] Tear down active Sofdec playback + texture-sheet owner lane.
@@ -267,7 +267,10 @@ namespace moho
     // [0x00873EDF-0x00873EF9] ~Listener<SD3DDeviceEvent const&> base subobject:
     // unlink this listener node from its ring (no-op when the conditional
     // unlink above already ran; the real unlink when no device was present).
-    mDeviceListener.mLink.ListUnlink();
+    // This must happen before the base subobject goes away: a node left in the
+    // device ring outlives the movie and the next device event dispatches
+    // through freed memory.
+    mListenerLink.ListUnlink();
   }
 
   /**
@@ -724,7 +727,7 @@ namespace moho
    * Handles one movie texture lifecycle event lane from the D3D listener path:
    * release-on-exit and rebuild-and-clear-on-init.
    */
-  void CMovie::OnDeviceEvent(const SD3DDeviceEvent& event)
+  void CMovie::OnEvent(const SD3DDeviceEvent& event)
   {
     if (event.mEventType == 1u) {
       mTextureSheet.release();
