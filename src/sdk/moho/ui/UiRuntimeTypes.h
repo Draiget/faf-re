@@ -670,6 +670,17 @@ namespace moho
   struct wxEvtHandlerRuntime
   {
     virtual ~wxEvtHandlerRuntime() = default;
+
+    /**
+     * Offers one wx event to this handler. Returns true when it was consumed.
+     *
+     * In the binary these handlers are real `wxEvtHandler`s carrying a
+     * compiler-emitted event table, and wx walks it during `ProcessEvent`.
+     * This tree models the pushed-handler chain itself (see
+     * `WX_PushEventHandler`), so the table's job - match the event type, call
+     * the bound sink - is done by the override instead.
+     */
+    virtual bool ProcessWxEvent(void* /*event*/) { return false; }
   };
 
   /**
@@ -8723,6 +8734,12 @@ namespace moho
 
   [[nodiscard]] wxEvtHandlerRuntime* UI_CreateKeyHandler();
   void WX_PushEventHandler(wxWindowBase* window, wxEvtHandlerRuntime* handler);
+
+  /**
+   * Binds a frame's MAUI event mapper to the input window it will receive
+   * events from. No-op for handlers that are not event mappers.
+   */
+  void SetMauiEventMapperWindow(wxEvtHandlerRuntime* handler, wxWindowBase* window);
   [[nodiscard]] wxEvtHandlerRuntime* WX_PopEventHandler(wxWindowBase* window, bool deleteHandler);
   void WX_GetClientSize(wxWindowBase* window, std::int32_t& outWidth, std::int32_t& outHeight);
   void WX_ScreenToClient(wxWindowBase* window, std::int32_t& inOutX, std::int32_t& inOutY);

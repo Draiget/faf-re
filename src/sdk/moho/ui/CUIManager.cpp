@@ -221,6 +221,12 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
     CScriptLazyVar_float::SetValue(&frameView->mHeightLV, static_cast<float>(height));
 
     if (frameView->mEventHandler != nullptr && mInputWindows[head] != nullptr) {
+      // The mapper needs the window it is bound to before it starts receiving
+      // events: wheel events arrive in screen coordinates and are converted to
+      // client space through this lane. Everything else uses the event's own
+      // client coordinates, so a null here would silently misplace only the
+      // wheel.
+      SetMauiEventMapperWindow(frameView->mEventHandler, mInputWindows[head]);
       WX_PushEventHandler(mInputWindows[head], frameView->mEventHandler);
     }
 

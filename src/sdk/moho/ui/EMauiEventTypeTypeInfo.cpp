@@ -1,8 +1,11 @@
 #include "moho/ui/EMauiEventTypeTypeInfo.h"
 
 #include <cstdint>
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
@@ -62,3 +65,61 @@ namespace moho
     AddEnum(StripPrefix("MET_Char"), static_cast<std::int32_t>(MET_Char));
   }
 } // namespace moho
+
+namespace
+{
+  alignas(moho::EMauiEventTypeTypeInfo) unsigned char
+    gEMauiEventTypeTypeInfoStorage[sizeof(moho::EMauiEventTypeTypeInfo)]{};
+  bool gEMauiEventTypeTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::EMauiEventTypeTypeInfo& GetEMauiEventTypeTypeInfo() noexcept
+  {
+    return *reinterpret_cast<moho::EMauiEventTypeTypeInfo*>(gEMauiEventTypeTypeInfoStorage);
+  }
+
+  void cleanup_EMauiEventTypeTypeInfo()
+  {
+    if (gEMauiEventTypeTypeInfoConstructed) {
+      GetEMauiEventTypeTypeInfo().~EMauiEventTypeTypeInfo();
+      gEMauiEventTypeTypeInfoConstructed = false;
+    }
+  }
+
+  /**
+   * Constructs the static `EMauiEventType` enum descriptor. The constructor
+   * pre-registers the RTTI mapping itself, so placement-constructing it here is
+   * the whole registration.
+   *
+   * Every MAUI event delivered to a control passes through
+   * `CreateLuaEventObject`, which reflects the event type to build the Lua
+   * payload. Without this instance nothing ever calls `PreRegisterRType`, and
+   * the first mouse click aborts with "Attempting to lookup the RType for enum
+   * moho::EMauiEventType before it is registered."
+   */
+  gpg::REnumType* construct_EMauiEventTypeTypeInfo()
+  {
+    if (!gEMauiEventTypeTypeInfoConstructed) {
+      new (gEMauiEventTypeTypeInfoStorage) moho::EMauiEventTypeTypeInfo();
+      gEMauiEventTypeTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<gpg::REnumType*>(&GetEMauiEventTypeTypeInfo());
+  }
+
+  int register_EMauiEventTypeTypeInfo()
+  {
+    (void)construct_EMauiEventTypeTypeInfo();
+    return std::atexit(&cleanup_EMauiEventTypeTypeInfo);
+  }
+
+  struct EMauiEventTypeTypeInfoBootstrap
+  {
+    EMauiEventTypeTypeInfoBootstrap() { (void)register_EMauiEventTypeTypeInfo(); }
+  };
+
+  EMauiEventTypeTypeInfoBootstrap gEMauiEventTypeTypeInfoBootstrap;
+} // namespace
+
+// Phase-1 pre-registration: the descriptor has to exist before anything calls
+// gpg::LookupRType on it. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(register_EMauiEventTypeTypeInfo_00795a, register_EMauiEventTypeTypeInfo)

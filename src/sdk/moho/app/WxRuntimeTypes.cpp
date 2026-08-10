@@ -36326,6 +36326,15 @@ bool wxWindowBase::ProcessEvent(void* const event)
     return false;
   }
 
+  // Handlers pushed in front of this window get the event before the window's
+  // own tables, which is what PushEventHandler means. Without this the MAUI
+  // event mapper CUIManager pushes for each root frame is never reached, so no
+  // mouse or key event ever becomes an SMauiEventData and the whole UI is
+  // inert - it draws, but nothing responds to the pointer.
+  if (moho::WX_InvokePushedEventHandlerDispatch(this, event)) {
+    return true;
+  }
+
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
 
   if (state == nullptr || state->handlerEnabled != 0) {
@@ -39774,6 +39783,62 @@ std::int32_t moho::WX_GetWxEvtMotionType()
 std::int32_t moho::WX_GetWxEvtMouseWheelType()
 {
   return EnsureWxEvtMouseWheelRuntimeType();
+}
+
+moho::WxEventFamily moho::WX_ClassifyEventType(const std::int32_t eventType)
+{
+  // Type 0 means the lazily-assigned global has not been handed a number yet,
+  // so it must never be treated as a match - several of these are still zero
+  // until the event that raises them fires for the first time.
+  if (eventType == 0) {
+    return WxEventFamily::Other;
+  }
+
+  const std::int32_t mouseTypes[] = {
+    gWxEvtMotionRuntimeType,
+    gWxEvtLeftDownRuntimeType,
+    gWxEvtLeftUpRuntimeType,
+    gWxEvtLeftDClickRuntimeType,
+    gWxEvtRightDownRuntimeType,
+    gWxEvtRightUpRuntimeType,
+    gWxEvtRightDClickRuntimeType,
+    gWxEvtMiddleDownRuntimeType,
+    gWxEvtMiddleUpRuntimeType,
+    gWxEvtMiddleDClickRuntimeType,
+    gWxEvtMouseWheelRuntimeType,
+  };
+  for (const std::int32_t mouseType : mouseTypes) {
+    if (mouseType != 0 && mouseType == eventType) {
+      return WxEventFamily::Mouse;
+    }
+  }
+
+  if (gWxEvtKeyDownRuntimeType != 0 && eventType == gWxEvtKeyDownRuntimeType) {
+    return WxEventFamily::KeyDown;
+  }
+  if (gWxEvtKeyUpRuntimeType != 0 && eventType == gWxEvtKeyUpRuntimeType) {
+    return WxEventFamily::KeyUp;
+  }
+  if (gWxEvtCharRuntimeType != 0 && eventType == gWxEvtCharRuntimeType) {
+    return WxEventFamily::Char;
+  }
+
+  return WxEventFamily::Other;
+}
+
+namespace
+{
+  moho::WxPushedEventHandlerDispatchFn gPushedEventHandlerDispatch = nullptr;
+} // namespace
+
+void moho::WX_SetPushedEventHandlerDispatch(const WxPushedEventHandlerDispatchFn dispatch)
+{
+  gPushedEventHandlerDispatch = dispatch;
+}
+
+bool moho::WX_InvokePushedEventHandlerDispatch(wxWindowBase* const window, void* const event)
+{
+  return gPushedEventHandlerDispatch != nullptr && gPushedEventHandlerDispatch(window, event);
 }
 
 moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
