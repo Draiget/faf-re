@@ -113,7 +113,40 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Keep /Od - stepping and local-variable inspection are the whole point
+           of this configuration - but drop the three costs that buy nothing
+           here. The movie decoder is the worst case: it is built out of small
+           helpers, templates and lambdas, so with inlining off every 8-byte
+           std::memcpy and every per-row lambda becomes a real call, and /JMC
+           and /RTC1 then add their own prologue work to each of those calls.
+           Verified on moho\movie\MPVDecoder.cpp: the stock Debug flags emit
+           __CheckForDebuggerJustMyCode and _RTC_CheckStackVars throughout;
+           with these settings both are gone and the object is 26% smaller.
+           /Ob1 only expands functions already marked inline (or defined in a
+           class body), so nothing the debugger needs to step through moves. -->
+      <Optimization>Disabled</Optimization>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <!-- _ITERATOR_DEBUG_LEVEL is not set by either configuration, so it
+           defaults to 2 here (from _DEBUG) and 0 in Release. Checked iterators
+           are not worth their cost in a build whose job is to run the engine,
+           and the mismatch is a hazard in its own right: it changes the size of
+           every std container, so any binary-layout struct holding one has a
+           different layout in the two configurations. Pinning it to 0 both
+           speeds Debug up across the whole engine and makes those layouts
+           agree.
+
+           This has to match every static library linked in below. Only one of
+           them carries std containers: WildMagic's Foundation.lib. Its project
+           lives outside the repo tree (dependencies\WildMagic3p8\Foundation\
+           Foundation.vcxproj is not tracked), so if you are setting this
+           checkout up fresh, add _ITERATOR_DEBUG_LEVEL=0 to that project's
+           Debug|Win32 PreprocessorDefinitions and rebuild it. You cannot get
+           this wrong silently - MSVC records the level per object and the
+           linker rejects a mismatch with LNK2038, naming Wm3System.obj,
+           Wm3Math.obj and Wm3Vector3.obj. -->
+      <PreprocessorDefinitions>WIN32;_DEBUG;_ITERATOR_DEBUG_LEVEL=0;_WINDOWS;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -416,7 +449,23 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\particles\SWorldParticle.cpp" />
     <ClCompile Include="moho\misc\CDecoder.cpp" />
     <ClCompile Include="moho\movie\CMovie.cpp" />
-    <ClCompile Include="moho\movie\MPVDecoder.cpp" />
+    <!-- The two hottest translation units in the movie pipeline are compiled
+         optimised even in Debug. Both are numeric kernels - the MPEG decoder's
+         IDCT/motion-compensation loops and the Sofdec CFT colour converter that
+         turns every decoded 720x512 frame into ARGB8888 - and the converter's
+         fast path is written in SSE intrinsics, which /Od spills to a stack slot
+         after every single instruction. At /Od the pair cost enough per frame
+         that the renderer managed roughly one frame a second while the Sofdec
+         clock kept real time, so the picture crawled while the audio stayed
+         correct. Neither file is one you step through: they are verified
+         against the binary and their state is inspected through the probe
+         recipes in the recovery notes, not the debugger. Drop these two blocks
+         if you do need to single-step them. -->
+    <ClCompile Include="moho\movie\MPVDecoder.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MaxSpeed</Optimization>
+      <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</IntrinsicFunctions>
+    </ClCompile>
     <ClCompile Include="moho\misc\CombinedMilitaryExtractor.cpp" />
     <ClCompile Include="moho\misc\CountermeasureExtractor.cpp" />
     <ClCompile Include="moho\particles\CWorldParticles.cpp" />
@@ -1237,7 +1286,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\audio\CUserSoundManager.cpp" />
     <ClCompile Include="moho\audio\CSimSoundManager.cpp" />
     <ClCompile Include="moho\audio\ISoundManager.cpp" />
-    <ClCompile Include="moho\audio\SofdecRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecRuntime.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MaxSpeed</Optimization>
+      <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</IntrinsicFunctions>
+    </ClCompile>
     <ClCompile Include="moho\audio\SofdecAdxDecodeRuntime.cpp" />
     <ClCompile Include="moho\audio\SofdecAdxWavSpsdRuntime.cpp" />
     <ClCompile Include="moho\audio\SofdecM2aHuffmanRuntime.cpp" />
