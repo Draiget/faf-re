@@ -5057,7 +5057,15 @@ boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
         }
       }
 
-      (void)boost::AssignWeakPairFromShared(outResource, &loadedResource);
+      // Publish the freshly loaded resource into the request's cache slot
+      // while a strong reference still exists. `mResolved` is the manager's
+      // owning handle - the cache-hit path above reads it back through
+      // `BuildWeakPairFromLiveSharedVariant1`, and callers of RES_GetResource
+      // only ever receive a weak handle. Dropping `loadedResource` without
+      // storing it first destroys the resource the instant this scope ends, so
+      // every caller's `.lock()` returns null even though the factory loaded
+      // the file perfectly well.
+      (void)AssignSharedPairRetainRelease_004AEF90(&loadedResource, &request.mResolved);
       boost::ReleaseSharedControlOnly(&loadedResource);
 
       workerLock.lock();
@@ -5069,7 +5077,7 @@ boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
       request.mLoadWakePending = 0;
     }
 
-    (void)AssignSharedPairRetainRelease_004AEF90(&request.mResolved, outResource);
+    (void)BuildWeakPairFromLiveSharedVariant1(&request.mResolved, outResource);
     if (outResource->px == nullptr) {
       request.mHadLoadFailure = 1;
     }
