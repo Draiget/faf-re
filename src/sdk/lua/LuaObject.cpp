@@ -8199,8 +8199,16 @@ namespace
 				break;
 			}
 			case LUA_TUSERDATA: {
+				// `Udata::len` carries the object's `gpg::RType*` in this fork, not a
+				// byte count, so the payload size is the type's. Charging `ud->len`
+				// refunded a pointer value - tens of megabytes - on every userdata
+				// free, which underflowed `nblocks` and left it permanently above
+				// `GCthreshold`, so `luaC_checkGC` ran a full collection on every
+				// single allocation from then on. Must mirror the allocation in
+				// `CreateDefaultConstructedUserdata` exactly.
 				const auto* const ud = reinterpret_cast<const Udata*>(object);
-				const lu_mem udataByteSize = static_cast<lu_mem>(sizeof(Udata) + ud->len);
+				const auto* const type = reinterpret_cast<const gpg::RType*>(ud->len);
+				const lu_mem udataByteSize = static_cast<lu_mem>(sizeof(Udata) + type->size_);
 				(void)luaM_realloc(state, object, udataByteSize, 0u);
 				break;
 			}
