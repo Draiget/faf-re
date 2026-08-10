@@ -21151,6 +21151,14 @@ moho::CMauiControl::~CMauiControl()
     SetCurrentFocusControlLink(&Maui_CurrentFocusControl, nullptr);
   }
 
+  // And drop any input-capture entry naming this control. The capture stack is
+  // the hit-test root - ResolveTopInputCaptureControl feeds GetTopmostControl -
+  // so an entry left behind after the control dies makes the next mouse event
+  // walk a freed control tree and dispatch to whatever the reused memory looks
+  // like. The splash screen reaches this: it captures its screen group, and
+  // the group is destroyed on the click that leaves the splash.
+  func_RemoveInputCapture(this);
+
   CMauiControlHierarchyRuntimeView* const hierarchyView = CMauiControlHierarchyRuntimeView::FromControl(this);
   hierarchyView->mInvalidated = true;
 
