@@ -4099,6 +4099,13 @@ void moho::WIN_ShowCrashDialog(
     const msvc8::string callstackText =
       PLAT_FormatCallstack(static_cast<std::int32_t>(firstFrame), static_cast<std::int32_t>(frameCount), stackFrames);
     details << callstackText.c_str();
+
+    // The dialog is modal and everything it shows is gone the moment it closes,
+    // so mirror the summary and the callstack into the log as well. On an
+    // unattended run - and on a run where the dialog resource fails to load, as
+    // it does in this build - the log is the only surviving record of the crash.
+    gpg::Logf("CRASH: %s", summaryText != nullptr ? static_cast<const char*>(summaryText) : "<no summary>");
+    gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
   }
 
   details << "\n";

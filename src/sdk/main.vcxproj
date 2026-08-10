@@ -132,7 +132,8 @@
     </Link>
     <PostBuildEvent>
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
-      <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul</Command>
+      <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
+if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -165,7 +166,8 @@
     </Link>
     <PostBuildEvent>
       <Message>Staging $(TargetFileName) into $(FafRunDir) for F5</Message>
-      <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul</Command>
+      <Command>if exist "$(FafRunDir)" xcopy /D /Y /Q "$(TargetPath)" "$(FafRunDir)" &gt;nul
+if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q "$(TargetDir)$(TargetName).pdb" "$(FafRunDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
