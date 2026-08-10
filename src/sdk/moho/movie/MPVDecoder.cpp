@@ -6033,35 +6033,54 @@ namespace moho::movie
    * Address: 0x00C0CA20 (FUN_00C0CA20)
    *
    * What it does:
-   * Copies one macroblock prediction span between offset descriptors (luma and
-   * packed chroma lanes) using the provided MB spatial delta.
+   * Copies one skipped macroblock straight across from the source frame's
+   * planes into the destination frame's: the two 8x8 chroma blocks first, then
+   * the 16x16 luma block.
+   *
+   * `MPVMacroblockOffsets` is laid out chroma-first, in the same order as the
+   * plane lanes `MPVUMC_InitOutRfb` publishes at handle +0x294/+0x298/+0x29C:
+   * slots +0x00 and +0x04 are the two chroma planes and share the stride at
+   * +0x0C, while +0x08 is luma and uses the stride at +0x0E. `MPVSpatialDelta`
+   * follows the same order, so its first word is the chroma delta (8 bytes per
+   * macroblock column) and its second is the luma one (16 bytes per column).
+   * The member names in both structs still read luma-first and are therefore
+   * inverted - the locals below say which plane each lane really is.
+   *
+   * The block extents used to be transposed here: 16 rows of the chroma pair
+   * and 8 rows of luma. That wrote eight chroma rows past the bottom of every
+   * skipped macroblock - for the last macroblock row, past the end of the frame
+   * surface itself and into whatever the Sofdec arena placed next, which is the
+   * SFD workctrl - and left the bottom half of each skipped luma macroblock
+   * holding stale pixels.
    */
   int MPVUMC_CopyPredictionSpan(
     const MPVSpatialDelta& mbDelta, const MPVMacroblockOffsets& sourceOffsets, const MPVMacroblockOffsets& destinationOffsets
   )
   {
-    const int lumaStride = static_cast<int>(destinationOffsets.lumaStride);
-    const std::uint8_t* const srcLuma0 = AddressToPointer(mbDelta.luma + sourceOffsets.lumaOffset);
-    const std::uint8_t* const srcLuma1 = AddressToPointer(mbDelta.luma + sourceOffsets.chromaUOffset);
-    std::uint8_t* const dstLuma0 = AddressToMutablePointer(mbDelta.luma + destinationOffsets.lumaOffset);
-    std::uint8_t* const dstLuma1 = AddressToMutablePointer(mbDelta.luma + destinationOffsets.chromaUOffset);
-
-    for (int row = 0; row < 16; ++row) {
-      const int rowOffset = row * lumaStride;
-      std::memcpy(dstLuma0 + rowOffset, srcLuma0 + rowOffset, 8);
-      std::memcpy(dstLuma1 + rowOffset, srcLuma1 + rowOffset, 8);
-    }
-
-    const int chromaStride = static_cast<int>(destinationOffsets.chromaStride);
-    const std::uint8_t* const srcChroma = AddressToPointer(mbDelta.chroma + sourceOffsets.chromaVOffset);
-    std::uint8_t* const dstChroma = AddressToMutablePointer(mbDelta.chroma + destinationOffsets.chromaVOffset);
+    const int chromaDelta = mbDelta.luma;
+    const int chromaStride = static_cast<int>(destinationOffsets.lumaStride);
+    const std::uint8_t* const srcChromaU = AddressToPointer(chromaDelta + sourceOffsets.lumaOffset);
+    const std::uint8_t* const srcChromaV = AddressToPointer(chromaDelta + sourceOffsets.chromaUOffset);
+    std::uint8_t* const dstChromaU = AddressToMutablePointer(chromaDelta + destinationOffsets.lumaOffset);
+    std::uint8_t* const dstChromaV = AddressToMutablePointer(chromaDelta + destinationOffsets.chromaUOffset);
 
     for (int row = 0; row < 8; ++row) {
       const int rowOffset = row * chromaStride;
-      std::memcpy(dstChroma + rowOffset, srcChroma + rowOffset, 16);
+      std::memcpy(dstChromaU + rowOffset, srcChromaU + rowOffset, 8);
+      std::memcpy(dstChromaV + rowOffset, srcChromaV + rowOffset, 8);
     }
 
-    return chromaStride;
+    const int lumaDelta = mbDelta.chroma;
+    const int lumaStride = static_cast<int>(destinationOffsets.chromaStride);
+    const std::uint8_t* const srcLuma = AddressToPointer(lumaDelta + sourceOffsets.chromaVOffset);
+    std::uint8_t* const dstLuma = AddressToMutablePointer(lumaDelta + destinationOffsets.chromaVOffset);
+
+    for (int row = 0; row < 16; ++row) {
+      const int rowOffset = row * lumaStride;
+      std::memcpy(dstLuma + rowOffset, srcLuma + rowOffset, 16);
+    }
+
+    return lumaStride;
   }
 
   /**
