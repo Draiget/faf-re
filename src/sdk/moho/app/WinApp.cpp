@@ -3059,6 +3059,52 @@ namespace
   }
 
   /**
+   * Writes the fault and its symbolised callstack to the log.
+   *
+   * Not in the binary: this build has no working crash dialog resource and no
+   * reachable BugSplat endpoint, so without this a crash leaves no trace at
+   * all. Kept deliberately small and allocation-light - it runs inside an
+   * exception filter, on a process that has already faulted.
+   */
+  void LogCrashSummaryAndCallstack(_EXCEPTION_POINTERS* const exceptionInfo)
+  {
+    if (exceptionInfo == nullptr || exceptionInfo->ExceptionRecord == nullptr) {
+      return;
+    }
+
+    const EXCEPTION_RECORD& record = *exceptionInfo->ExceptionRecord;
+    const auto faultAddress =
+      static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(record.ExceptionAddress));
+
+    gpg::Logf(
+      "CRASH: %s (0x%08X) at address 0x%08X",
+      StructuredExceptionToString(record.ExceptionCode),
+      static_cast<unsigned int>(record.ExceptionCode),
+      faultAddress
+    );
+
+    if (record.ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record.NumberParameters >= 2u) {
+      gpg::Logf(
+        "CRASH: attempted to %s memory at 0x%08X",
+        record.ExceptionInformation[0] != 0u ? "write" : "read",
+        static_cast<unsigned int>(record.ExceptionInformation[1])
+      );
+    }
+
+    std::uint32_t stackFrames[64]{};
+    const std::uint32_t frameCount =
+      moho::PLAT_GetCallStack(exceptionInfo->ContextRecord, 64, stackFrames);
+    if (frameCount == 0u) {
+      gpg::Logf("CRASH callstack: unavailable.");
+      return;
+    }
+
+    const msvc8::string callstackText =
+      moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(frameCount), stackFrames);
+    gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
+  }
+
+  /**
    * Address: 0x004A2B30 (FUN_004A2B30, TopLevelExceptionFilter)
    *
    * What it does:
@@ -3070,6 +3116,15 @@ namespace
     if (exceptionInfo == nullptr || exceptionInfo->ExceptionRecord == nullptr) {
       return EXCEPTION_CONTINUE_SEARCH;
     }
+
+    // Record the fault before anything else runs. The BugSplat sender below
+    // blocks in WaitForSingleObject waiting on a report this build never
+    // completes, so a crash taken down that path presents as a freeze with an
+    // empty log - the process is alive, the window is gone, and nothing says
+    // why. Logging first means every crash leaves a symbolised record no
+    // matter which path handles it, and it costs nothing on the path that
+    // does show a dialog.
+    LogCrashSummaryAndCallstack(exceptionInfo);
 
     if (ShouldUseBugSplatPath()) {
       if (moho::sMainWindow != nullptr) {
