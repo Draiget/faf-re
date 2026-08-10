@@ -30,13 +30,12 @@ extern void* const wxRED_PEN;
 /** wx's stock cyan pen, used to highlight the selected curve key. */
 extern void* const wxCYAN_PEN;
 
-/**
- * Mouse-button event types, read from the wx library globals by FUN_00661820
- * (`cmp edx, wxEVT_LEFT_DOWN` / `cmp eax, wxEVT_MIDDLE_DOWN`). Dynamically
- * assigned in this build, same as `wxEVT_COMMAND_BUTTON_CLICKED` above.
- */
-extern const std::int32_t wxEVT_LEFT_DOWN;
-extern const std::int32_t wxEVT_MIDDLE_DOWN;
+// Mouse-button event types, read from the wx library globals by FUN_00661820
+// (`cmp edx, wxEVT_LEFT_DOWN` / `cmp eax, wxEVT_MIDDLE_DOWN`). They are
+// assigned at startup by wxNewEventType(), so they are fetched through the
+// accessors rather than declared `extern const std::int32_t` here - that
+// binds to the vendored wx library's own globals, which carry a different
+// numbering and never match anything this build raises.
 
 /**
  * Address: 0x009600E0 (FUN_009600E0, wxString::ToDouble)
@@ -1449,11 +1448,11 @@ namespace moho
     };
     mSelectedKey = FindNearestCurveKey(mCurve, curvePoint);
 
-    if (mouseEvent.mEventType == wxEVT_LEFT_DOWN) {
+    if (mouseEvent.mEventType == moho::WX_GetWxEvtLeftDownType()) {
       mActiveDragButton = kCurveDragButtonLeft;
       PostCurveChangedCommand();
     }
-    if (mouseEvent.mEventType == wxEVT_MIDDLE_DOWN) {
+    if (mouseEvent.mEventType == moho::WX_GetWxEvtMiddleDownType()) {
       mActiveDragButton = kCurveDragButtonMiddle;
       PostCurveChangedCommand();
     }
