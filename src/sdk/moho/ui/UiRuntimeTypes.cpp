@@ -10306,6 +10306,13 @@ void CMauiWxEventMapperRuntime::OnMouseMove(wxEventRuntime& mouseEventRef)
   moho::CMauiControl* const trackedControl = trackingSentinel.ResolveFocusedControl();
 
   // ---- Step 3: Emit MouseEnter/MouseExit if the hovered control changed ----
+  //
+  // Every PostEvent below runs the control's Lua HandleEvent, and script is
+  // free to destroy the control tree from inside it - the splash screen does
+  // exactly that, calling parent:Destroy() the moment a click is seen. So the
+  // tracking sentinel, not the raw pointer, is the live handle: it is an
+  // intrusive link the control's destructor unlinks, and it has to be
+  // re-resolved after anything that can re-enter script.
   moho::CMauiControl* const previousOver = gCurrentMouseOverControlLink.ResolveFocusedControl();
   if (trackedControl != previousOver) {
     if (previousOver != nullptr) {
@@ -10313,12 +10320,15 @@ void CMauiWxEventMapperRuntime::OnMouseMove(wxEventRuntime& mouseEventRef)
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(previousOver);
       previousOver->PostEvent(eventPayload);
     }
-    if (trackedControl != nullptr) {
+    if (moho::CMauiControl* const enteredControl = trackingSentinel.ResolveFocusedControl();
+        enteredControl != nullptr) {
       eventPayload.mEventType = moho::MET_MouseEnter;
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
-      trackedControl->PostEvent(eventPayload);
+      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(enteredControl);
+      enteredControl->PostEvent(eventPayload);
     }
-    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, trackedControl);
+    SetCurrentFocusControlLink(
+      &gCurrentMouseOverControlLink, trackingSentinel.ResolveFocusedControl()
+    );
   }
 
   // ---- Step 4: Dispatch the wx mouse event into typed Maui paths ----
@@ -10403,12 +10413,19 @@ void CMauiWxEventMapperRuntime::OnMouseMove(wxEventRuntime& mouseEventRef)
     moho::g_UIManager != nullptr ? moho::g_UIManager->mLuaState : nullptr;
   RunGlobalOnMouseButtonPressLuaCallback(luaState, isPress, mouseEvent->mMouseX, mouseEvent->mMouseY);
 
-  if (trackedControl != nullptr) {
+  // Both the focus notification above and the Lua callback just run can tear
+  // down the control this press was aimed at, so ask the sentinel for it again
+  // rather than trusting the pointer resolved before either ran. Skipping the
+  // last splash movie is the case that finds this: the click reaches script,
+  // script destroys the splash screen group, and the stale pointer then walks
+  // into a freed object.
+  if (moho::CMauiControl* const pressTarget = trackingSentinel.ResolveFocusedControl();
+      pressTarget != nullptr) {
     eventPayload.mEventType = isPress ? moho::MET_ButtonPress : moho::MET_ButtonDClick;
     eventPayload.mKeyCode =
       static_cast<moho::EMauiKeyCode>(wxMouseEventResolveButtonSelectorRuntime(eventVoid));
-    eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
-    trackedControl->PostEvent(eventPayload);
+    eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(pressTarget);
+    pressTarget->PostEvent(eventPayload);
   }
 
   UnlinkFocusControlSentinel(&trackingSentinel);
@@ -10537,6 +10554,30 @@ void CMauiWxEventMapperRuntime::OnKeyDown(wxEventRuntime& keyEvent)
   DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_KeyDown);
 }
 
+namespace
+{
+  /**
+   * Depth of MAUI event dispatch currently on the stack. `PurgeDeleted` skips
+   * the delete while this is non-zero, so a control cannot be freed underneath
+   * an event walk that still holds a pointer to it. Single-threaded: every
+   * dispatch runs on the wx message loop.
+   */
+  int gMauiEventDispatchDepth = 0;
+
+  struct MauiEventDispatchGuard
+  {
+    MauiEventDispatchGuard() noexcept { ++gMauiEventDispatchDepth; }
+    ~MauiEventDispatchGuard() { --gMauiEventDispatchDepth; }
+    MauiEventDispatchGuard(const MauiEventDispatchGuard&) = delete;
+    MauiEventDispatchGuard& operator=(const MauiEventDispatchGuard&) = delete;
+  };
+
+  [[nodiscard]] bool MauiEventDispatchInProgress() noexcept
+  {
+    return gMauiEventDispatchDepth > 0;
+  }
+} // namespace
+
 /**
  * Address: 0x007A50B0 (FUN_007A50B0)
  *
@@ -10561,6 +10602,17 @@ bool CMauiWxEventMapperRuntime::ProcessWxEvent(void* const event)
   if (wxEvent == nullptr) {
     return false;
   }
+
+  // Hold off control deletion for the length of this dispatch. Destroy() is
+  // already deferred - it only links the control into the root frame's deleted
+  // list - but PurgeDeleted, which does the actual delete, runs at the end of
+  // CMauiFrame::Frame, and script reached from an event can re-enter that tick.
+  // The splash screen does: a click runs LeaveSplashScreen, which destroys the
+  // screen group and then calls EngineStartFrontEndUI, and the frame update
+  // that follows frees the group while PostEvent is still walking up through
+  // it. The purge is skipped while this is held and happens on the next tick
+  // instead.
+  const MauiEventDispatchGuard dispatchGuard;
 
   switch (moho::WX_ClassifyEventType(wxEvent->mEventType)) {
   case moho::WxEventFamily::Mouse:
@@ -21084,6 +21136,21 @@ moho::CMauiControl::CMauiControl(
  */
 moho::CMauiControl::~CMauiControl()
 {
+  // Drop the two process-wide sentinels if either still names this control.
+  // They outlive any single control, and nothing else clears them: a destroyed
+  // control left in the mouse-over lane is read back on the next mouse event,
+  // and the MET_MouseExit that follows dispatches through a freed object. The
+  // splash screen finds this immediately - a click destroys the whole screen
+  // group while it is the hovered control. Resolving a sentinel only computes
+  // an address, so comparing against a dead one is safe; it is the PostEvent
+  // that follows which is not.
+  if (gCurrentMouseOverControlLink.ResolveFocusedControl() == this) {
+    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, nullptr);
+  }
+  if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
+    SetCurrentFocusControlLink(&Maui_CurrentFocusControl, nullptr);
+  }
+
   CMauiControlHierarchyRuntimeView* const hierarchyView = CMauiControlHierarchyRuntimeView::FromControl(this);
   hierarchyView->mInvalidated = true;
 
@@ -23824,6 +23891,14 @@ moho::CMauiFrame::~CMauiFrame()
  */
 void moho::CMauiFrame::PurgeDeleted()
 {
+  // Never free while an event is being dispatched: the walk in
+  // CMauiControl::PostEvent holds raw parent pointers across the script call
+  // that destroyed them. The controls stay on the deleted list and the next
+  // tick collects them.
+  if (MauiEventDispatchInProgress()) {
+    return;
+  }
+
   auto* const deletedListHead = static_cast<CMauiControlListNode*>(&CMauiFrameRuntimeView::FromFrame(this)->mDeletedControlList);
   while (deletedListHead->mNext != deletedListHead) {
     CMauiControlListNode* const deletedNode = deletedListHead->mPrev;

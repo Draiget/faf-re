@@ -6745,6 +6745,19 @@ namespace moho
   [[nodiscard]] std::int32_t WX_GetWxEvtMouseWheelType();
 
   /**
+   * The runtime-assigned `wxEVT_LEFT_DOWN` / `wxEVT_MIDDLE_DOWN` lanes.
+   *
+   * These exist because the wx 2.4.2 header constants (1100 / 1110) are not
+   * what this build raises: every event type is handed out by wxNewEventType()
+   * during startup. Code outside this translation unit must ask for the id
+   * rather than declaring `extern const std::int32_t wxEVT_LEFT_DOWN`, which
+   * binds to the vendored library's own global and compares against a
+   * different number.
+   */
+  [[nodiscard]] std::int32_t WX_GetWxEvtLeftDownType();
+  [[nodiscard]] std::int32_t WX_GetWxEvtMiddleDownType();
+
+  /**
    * Which family of wx event a runtime event type belongs to.
    *
    * Event types are not compile-time constants in this build - `wxNewEventType`

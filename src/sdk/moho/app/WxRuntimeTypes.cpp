@@ -100,15 +100,11 @@
 constexpr std::int32_t wxEVT_NULL = 0;
 constexpr std::int32_t wxEVT_ENTER_WINDOW = 1010;
 constexpr std::int32_t wxEVT_LEAVE_WINDOW = 1011;
-constexpr std::int32_t wxEVT_LEFT_DOWN = 1100;
-constexpr std::int32_t wxEVT_LEFT_UP = 1101;
-constexpr std::int32_t wxEVT_LEFT_DCLICK = 1102;
-constexpr std::int32_t wxEVT_MIDDLE_DOWN = 1110;
-constexpr std::int32_t wxEVT_MIDDLE_UP = 1111;
-constexpr std::int32_t wxEVT_MIDDLE_DCLICK = 1112;
-constexpr std::int32_t wxEVT_RIGHT_DOWN = 1120;
-constexpr std::int32_t wxEVT_RIGHT_UP = 1121;
-constexpr std::int32_t wxEVT_RIGHT_DCLICK = 1122;
+// The nine mouse-button event types deliberately have no constants here. wx
+// 2.4.2 numbers them 1100/1110/1120 at compile time, but this build assigns
+// every event type at startup through wxNewEventType(), so those numbers match
+// nothing that is ever raised. Match against the gWxEvt*RuntimeType globals -
+// or WX_GetWxEvt*Type() from another translation unit - instead.
 constexpr std::int32_t wxEVT_COMMAND_MENU_SELECTED = 2000;
 const wxSize wxDefaultSize{-1, -1};
 
@@ -11359,7 +11355,23 @@ namespace
     std::vector<wxWindowBase*> children{};
     wxWindowBase* eventHandler = nullptr;
     bool themeEnabled = false;
-    std::uint8_t bitfields = 0;
+    // Bit 0x02 is shown and bit 0x04 is enabled. Enabled starts set, the way
+    // wx initialises m_isEnabled: Enable() only reports a *change*, so a zero
+    // default leaves every window that is never explicitly enabled looking
+    // disabled forever.
+    //
+    // Shown is deliberately NOT defaulted here even though wx defaults
+    // m_isShown too - the top-level frame in this build is created hidden and
+    // relies on Show(true) reporting a change to reach ShowWindow, and
+    // defaulting the bit makes that call a no-op so the window never appears
+    // and no frame is ever painted. Child windows created WS_VISIBLE get the
+    // bit set in Create() instead, which is where it is actually true.
+    //
+    // This matters because AcceptsFocus() wants both bits: while enabled was
+    // unset, wxSetFocusToChildRuntime skipped every candidate child, keyboard
+    // focus stayed on the top-level frame, and key events never reached the
+    // MAUI mapper pushed on the input window.
+    std::uint8_t bitfields = 0x4;
     std::wstring windowName{};
     // Bit 0x10 marks the background as the caller's own choice and 0x20 the
     // foreground, which is what stops a system-colour change overwriting
@@ -22479,9 +22491,10 @@ bool wxMouseEventMatchesDoubleClickSelectorRuntime_Impl(
   }
 
   const std::int32_t eventType = eventView->eventType;
-  const std::int32_t leftDClickType = static_cast<std::int32_t>(wxEVT_LEFT_DCLICK);
-  const std::int32_t middleDClickType = static_cast<std::int32_t>(wxEVT_MIDDLE_DCLICK);
-  const std::int32_t rightDClickType = static_cast<std::int32_t>(wxEVT_RIGHT_DCLICK);
+  // Runtime-assigned ids - see the note in the press selector below.
+  const std::int32_t leftDClickType = *WxEventTypeSlot(gWxEvtLeftDClickRuntimeType);
+  const std::int32_t middleDClickType = *WxEventTypeSlot(gWxEvtMiddleDClickRuntimeType);
+  const std::int32_t rightDClickType = *WxEventTypeSlot(gWxEvtRightDClickRuntimeType);
 
   switch (selector) {
     case -1:
@@ -22525,9 +22538,16 @@ bool wxMouseEventMatchesPressSelectorRuntime_Impl(
   }
 
   const std::int32_t eventType = eventView->eventType;
-  const std::int32_t leftDownType = static_cast<std::int32_t>(wxEVT_LEFT_DOWN);
-  const std::int32_t middleDownType = static_cast<std::int32_t>(wxEVT_MIDDLE_DOWN);
-  const std::int32_t rightDownType = static_cast<std::int32_t>(wxEVT_RIGHT_DOWN);
+  // Against the runtime-assigned ids, not the wx 2.4.2 compile-time numbering:
+  // this build hands out event types from wxNewEventType() at startup, so the
+  // events actually raised here carry ids from that sequence and never the
+  // 1100/1110/1120 the header constants name. Comparing against the constants
+  // made every button test fail - the pointer still moved controls, because
+  // motion is matched through WX_GetWxEvtMotionType(), but no click ever
+  // became a press.
+  const std::int32_t leftDownType = *WxEventTypeSlot(gWxEvtLeftDownRuntimeType);
+  const std::int32_t middleDownType = *WxEventTypeSlot(gWxEvtMiddleDownRuntimeType);
+  const std::int32_t rightDownType = *WxEventTypeSlot(gWxEvtRightDownRuntimeType);
 
   switch (selector) {
     case -1:
@@ -22571,9 +22591,10 @@ bool wxMouseEventMatchesReleaseSelectorRuntime_Impl(
   }
 
   const std::int32_t eventType = eventView->eventType;
-  const std::int32_t leftUpType = static_cast<std::int32_t>(wxEVT_LEFT_UP);
-  const std::int32_t middleUpType = static_cast<std::int32_t>(wxEVT_MIDDLE_UP);
-  const std::int32_t rightUpType = static_cast<std::int32_t>(wxEVT_RIGHT_UP);
+  // Runtime-assigned ids - see the note in the press selector.
+  const std::int32_t leftUpType = *WxEventTypeSlot(gWxEvtLeftUpRuntimeType);
+  const std::int32_t middleUpType = *WxEventTypeSlot(gWxEvtMiddleUpRuntimeType);
+  const std::int32_t rightUpType = *WxEventTypeSlot(gWxEvtRightUpRuntimeType);
 
   switch (selector) {
     case -1:
@@ -22620,19 +22641,20 @@ bool wxMouseEventMatchesReleaseSelectorRuntime_Impl(
   const auto* const eventView = static_cast<const WxMouseEventTypeRuntimeView*>(mouseEventRuntime);
   const std::int32_t eventType = eventView->eventType;
 
+  // Runtime-assigned ids - see the note in the press selector.
   switch (selector) {
     case 1:
-      return eventType == static_cast<std::int32_t>(wxEVT_LEFT_DOWN)
-        || eventType == static_cast<std::int32_t>(wxEVT_LEFT_UP)
-        || eventType == static_cast<std::int32_t>(wxEVT_LEFT_DCLICK);
+      return eventType == *WxEventTypeSlot(gWxEvtLeftDownRuntimeType)
+        || eventType == *WxEventTypeSlot(gWxEvtLeftUpRuntimeType)
+        || eventType == *WxEventTypeSlot(gWxEvtLeftDClickRuntimeType);
     case 2:
-      return eventType == static_cast<std::int32_t>(wxEVT_MIDDLE_DOWN)
-        || eventType == static_cast<std::int32_t>(wxEVT_MIDDLE_UP)
-        || eventType == static_cast<std::int32_t>(wxEVT_MIDDLE_DCLICK);
+      return eventType == *WxEventTypeSlot(gWxEvtMiddleDownRuntimeType)
+        || eventType == *WxEventTypeSlot(gWxEvtMiddleUpRuntimeType)
+        || eventType == *WxEventTypeSlot(gWxEvtMiddleDClickRuntimeType);
     case 3:
-      return eventType == static_cast<std::int32_t>(wxEVT_RIGHT_DOWN)
-        || eventType == static_cast<std::int32_t>(wxEVT_RIGHT_UP)
-        || eventType == static_cast<std::int32_t>(wxEVT_RIGHT_DCLICK);
+      return eventType == *WxEventTypeSlot(gWxEvtRightDownRuntimeType)
+        || eventType == *WxEventTypeSlot(gWxEvtRightUpRuntimeType)
+        || eventType == *WxEventTypeSlot(gWxEvtRightDClickRuntimeType);
     default:
       return false;
   }
@@ -35537,6 +35559,11 @@ bool wxWindowMswRuntime::Create(
     EnsureWxWindowBaseRuntimeState(this).bitfields &= static_cast<std::uint8_t>(~0x02u);
   } else {
     nativeStyle |= static_cast<unsigned long>(WS_VISIBLE);
+    // Created visible, so record it. Without this the shown bit stays clear
+    // for every child window - nothing calls Show() on them - and AcceptsFocus
+    // then refuses them all, which is what kept the keyboard focus stuck on
+    // the frame instead of moving to the render/input window.
+    EnsureWxWindowBaseRuntimeState(this).bitfields |= 0x02u;
   }
 
   return MSWCreate(kWxCanvasClassName, nullptr, position, size, nativeStyle, extendedStyle);
@@ -39783,6 +39810,16 @@ std::int32_t moho::WX_GetWxEvtMotionType()
 std::int32_t moho::WX_GetWxEvtMouseWheelType()
 {
   return EnsureWxEvtMouseWheelRuntimeType();
+}
+
+std::int32_t moho::WX_GetWxEvtLeftDownType()
+{
+  return *WxEventTypeSlot(gWxEvtLeftDownRuntimeType);
+}
+
+std::int32_t moho::WX_GetWxEvtMiddleDownType()
+{
+  return *WxEventTypeSlot(gWxEvtMiddleDownRuntimeType);
 }
 
 moho::WxEventFamily moho::WX_ClassifyEventType(const std::int32_t eventType)
