@@ -7,6 +7,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatList.h"
+#include "moho/misc/Listener.h"
 
 namespace moho
 {
@@ -14,14 +15,6 @@ namespace moho
   class ID3DTextureSheet;
   struct MwsfdPlaybackStateSubobj;
   struct SD3DDeviceEvent;
-
-  struct DeviceEventListenerLane
-  {
-    void* mVtable = nullptr;            // +0x00
-    TDatListItem<CMovie, void> mLink{}; // +0x04
-  };
-
-  static_assert(sizeof(DeviceEventListenerLane) == 0x0C, "DeviceEventListenerLane size must be 0x0C");
 
   class IMovie
   {
@@ -40,7 +33,20 @@ namespace moho
 
   static_assert(sizeof(IMovie) == 0x04, "IMovie size must be 0x04");
 
-  class CMovie : public IMovie
+  /**
+   * The `Listener<SD3DDeviceEvent const&>` base is what the D3D device
+   * dispatches through: `CD3DDevice` is a `Broadcaster`, every live movie
+   * links itself into its ring, and a device reset (any resize, including
+   * maximise) walks that ring calling slot 0 on each node's owner. It has to
+   * be a real base with a compiler-emitted vtable - modelling it as a plain
+   * `void* mVtable` lane leaves the pointer null forever, and the first device
+   * event during playback faults reading address 0.
+   *
+   * Layout: `IMovie` is the primary base and contributes only its vptr at
+   * +0x00, so the `Listener` subobject lands at +0x04 with its own vptr there
+   * and `mListenerLink` at +0x08 - the offsets the binary uses.
+   */
+  class CMovie : public IMovie, public Listener<const SD3DDeviceEvent&>
   {
   public:
     using TextureSheetHandle = boost::SharedPtrRaw<ID3DTextureSheet>;
@@ -102,8 +108,11 @@ namespace moho
      * Handles D3D device-event lanes for movie playback texture ownership by
      * releasing texture state on exit and rebuilding/clearing texture content
      * on init.
+     *
+     * This is the `Listener<SD3DDeviceEvent const&>` virtual - slot 0 of the
+     * secondary vtable - which is how `CD3DDevice` reaches it.
      */
-    void OnDeviceEvent(const SD3DDeviceEvent& event);
+    void OnEvent(const SD3DDeviceEvent& event) override;
 
     // ---------------------------------------------------------------------
     // Virtual playback interface - slots 1..14 of ??_7CMovie@Moho@@6B@
@@ -267,7 +276,7 @@ namespace moho
     );
 
   public:
-    DeviceEventListenerLane mDeviceListener{}; // +0x04
+    // +0x04 vptr and +0x08 mListenerLink come from the Listener base above.
     std::uint8_t mPlaybackEnabled = 0;   // +0x10
     std::uint8_t mReserved11_13[0x3]{};  // +0x11
     TextureSheetHandle mTextureSheet{};  // +0x14
@@ -284,8 +293,7 @@ namespace moho
     MwsfdPlaybackStateSubobj* mPly = nullptr; // +0x80
   };
 
-  static_assert(offsetof(CMovie, mDeviceListener) == 0x04, "CMovie::mDeviceListener offset must be 0x04");
-  static_assert(offsetof(CMovie, mDeviceListener.mLink) == 0x08, "CMovie::mDeviceListener.mLink offset must be 0x08");
+  static_assert(offsetof(CMovie, mListenerLink) == 0x08, "CMovie::mListenerLink offset must be 0x08");
   static_assert(offsetof(CMovie, mTextureSheet) == 0x14, "CMovie::mTextureSheet offset must be 0x14");
   static_assert(offsetof(CMovie, mSubtitleBuffer) == 0x1C, "CMovie::mSubtitleBuffer offset must be 0x1C");
   static_assert(offsetof(CMovie, mWorkbuffer) == 0x2C, "CMovie::mWorkbuffer offset must be 0x2C");
