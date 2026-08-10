@@ -6745,6 +6745,43 @@ namespace moho
   [[nodiscard]] std::int32_t WX_GetWxEvtMouseWheelType();
 
   /**
+   * Which family of wx event a runtime event type belongs to.
+   *
+   * Event types are not compile-time constants in this build - `wxNewEventType`
+   * hands them out in static-initialisation order - so a handler outside this
+   * translation unit cannot compare against `wxEVT_*` names. This classifies a
+   * type against the same globals the event tables use, which is what lets the
+   * MAUI event mapper pick a sink without the whole `gWxEvt*` block becoming
+   * public.
+   */
+  enum class WxEventFamily
+  {
+    Other,
+    Mouse,
+    KeyDown,
+    KeyUp,
+    Char,
+  };
+
+  [[nodiscard]] WxEventFamily WX_ClassifyEventType(std::int32_t eventType);
+
+  /**
+   * Hook consulted by `wxWindowBase::ProcessEvent` before its own event tables.
+   *
+   * `WX_PushEventHandler` records handlers per window in the UI layer, and wx
+   * semantics are that a pushed handler sees the event first. The wx layer must
+   * not know what a MAUI event mapper is, so the UI layer installs the walk
+   * through this hook instead. Returns true when a pushed handler consumed the
+   * event.
+   */
+  using WxPushedEventHandlerDispatchFn = bool (*)(wxWindowBase* window, void* event);
+
+  void WX_SetPushedEventHandlerDispatch(WxPushedEventHandlerDispatchFn dispatch);
+
+  /** Runs the installed hook, if any. Returns false when none is installed. */
+  [[nodiscard]] bool WX_InvokePushedEventHandlerDispatch(wxWindowBase* window, void* event);
+
+  /**
    * Runtime line-entry record used by `CWinLogTarget` vectors.
    *
    * Evidence:

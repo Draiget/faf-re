@@ -2850,6 +2850,14 @@ namespace
      * as a typed `MET_Char` `SMauiEventData`.
      */
     void OnChar(wxEventRuntime& keyEvent);
+
+    /**
+     * Stands in for the compiler-emitted `CMauiWxEventMapper` event table at
+     * binary `0x00F5A488`, whose four rows bind the sinks above. Event types
+     * are runtime-assigned here, so the rows are matched by family rather than
+     * by a static `wxEVT_*` constant.
+     */
+    bool ProcessWxEvent(void* event) override;
   };
 
   using CMauiWxEventMapperRuntimeView = CMauiWxEventMapperRuntime;
@@ -10537,6 +10545,42 @@ void CMauiWxEventMapperRuntime::OnKeyDown(wxEventRuntime& keyEvent)
  * `MET_Char` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
+/**
+ * The four rows of the `CMauiWxEventMapper` event table at binary
+ * `0x00F5A488`, expressed as a match on the event family. wx assigns event
+ * types at static-initialisation time in this build, so there is no constant
+ * to put in a table row; `WX_ClassifyEventType` compares against the same
+ * globals the window's own tables use.
+ *
+ * One row covers every mouse event: `OnMouseMove` is the single mouse sink for
+ * the whole family and reads the specific type back out of the event itself.
+ */
+bool CMauiWxEventMapperRuntime::ProcessWxEvent(void* const event)
+{
+  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
+  if (wxEvent == nullptr) {
+    return false;
+  }
+
+  switch (moho::WX_ClassifyEventType(wxEvent->mEventType)) {
+  case moho::WxEventFamily::Mouse:
+    OnMouseMove(*wxEvent);
+    return true;
+  case moho::WxEventFamily::KeyDown:
+    OnKeyDown(*wxEvent);
+    return wxEvent->mSkipped == 0;
+  case moho::WxEventFamily::KeyUp:
+    OnKeyUp(*wxEvent);
+    return wxEvent->mSkipped == 0;
+  case moho::WxEventFamily::Char:
+    OnChar(*wxEvent);
+    return wxEvent->mSkipped == 0;
+  case moho::WxEventFamily::Other:
+  default:
+    return false;
+  }
+}
+
 void CMauiWxEventMapperRuntime::OnChar(wxEventRuntime& keyEvent)
 {
   DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_Char);
@@ -26270,9 +26314,16 @@ bool moho::IN_InitKeyHandler()
 int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
 {
   // Binary reference strings @ 0x10C1D08 / 0x10C1D24 / 0x10C1D40, compared in
-  // ALT -> CONTROL -> SHIFT order. Modeled literals (runtime-init in binary).
+  // ALT -> CTRL -> SHIFT order. Their initializer is not in the recovered
+  // evidence set, so the spellings come from the data instead: every binding
+  // the shipped keymaps write is `Alt-`, `Ctrl-` or `Shift-`
+  // (lua/keymap/defaultKeyMap.lua uses Ctrl 418 times, Shift 340, Alt 179).
+  // The compare is case-insensitive, so ALT and SHIFT matched either way, but
+  // the middle one had been modelled as "CONTROL" and so matched nothing -
+  // every Ctrl binding in the game logged "unrecognized modifier string: Ctrl"
+  // and silently lost its modifier bit, leaving it bound to the bare key.
   const msvc8::string altModifier{"ALT"};
-  const msvc8::string controlModifier{"CONTROL"};
+  const msvc8::string controlModifier{"CTRL"};
   const msvc8::string shiftModifier{"SHIFT"};
 
   // SBO scratch: 4 inline msvc8::string slots, teardown frees heap only when the
@@ -26317,11 +26368,58 @@ moho::wxEvtHandlerRuntime* moho::UI_CreateKeyHandler()
   return new CUIKeyHandlerRuntime{};
 }
 
+namespace
+{
+  /**
+   * Offers one wx event to the handlers pushed in front of `window`, most
+   * recently pushed first - the order wx itself uses, since PushEventHandler
+   * puts the new handler at the head of the chain.
+   *
+   * Installed into the wx layer as `WX_SetPushedEventHandlerDispatch` so that
+   * `wxWindowBase::ProcessEvent` consults it before its own event tables. The
+   * wx layer cannot call this directly: it has no notion of a MAUI event
+   * mapper, and the chain lives here.
+   */
+  bool DispatchPushedEventHandlersForWindow(wxWindowBase* const window, void* const event)
+  {
+    if (window == nullptr || event == nullptr) {
+      return false;
+    }
+
+    const auto chainIt = FindWindowEventHandlerChain(window);
+    if (chainIt == gWindowEventHandlerChains.end()) {
+      return false;
+    }
+
+    // Iterate a copy of the handler pointers: a sink can run Lua, and Lua can
+    // destroy the frame that owns the handler, which would rehash the chain
+    // vector under the loop.
+    const std::vector<moho::wxEvtHandlerRuntime*> handlers = chainIt->handlers;
+    for (auto it = handlers.rbegin(); it != handlers.rend(); ++it) {
+      if (*it != nullptr && (*it)->ProcessWxEvent(event)) {
+        return true;
+      }
+    }
+    return false;
+  }
+} // namespace
+
+void moho::SetMauiEventMapperWindow(wxEvtHandlerRuntime* const handler, wxWindowBase* const window)
+{
+  if (auto* const mapper = dynamic_cast<CMauiWxEventMapperRuntime*>(handler); mapper != nullptr) {
+    mapper->mWindowRuntime = reinterpret_cast<WxWindowCaptureRuntimeView*>(window);
+  }
+}
+
 void moho::WX_PushEventHandler(wxWindowBase* const window, wxEvtHandlerRuntime* const handler)
 {
   if (window == nullptr || handler == nullptr) {
     return;
   }
+
+  // Install the chain walk on first use. Until something is actually pushed
+  // there is nothing for wx to consult.
+  moho::WX_SetPushedEventHandlerDispatch(&DispatchPushedEventHandlersForWindow);
 
   auto chainIt = FindWindowEventHandlerChain(window);
   if (chainIt == gWindowEventHandlerChains.end()) {
