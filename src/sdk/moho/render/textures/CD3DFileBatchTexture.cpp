@@ -7,7 +7,9 @@
 
 #include "boost/mutex.h"
 #include "boost/weak_ptr.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/resource/ResourceManager.h"
 #include "moho/render/textures/SBatchTextureData.h"
 #include "moho/render/textures/SBatchTextureDataFactory.h"
 #include "moho/render/textures/detail/BatchTextureContainerHelpers.h"
@@ -496,12 +498,27 @@ namespace moho
      */
     [[nodiscard]] boost::shared_ptr<SBatchTextureData> GetD3DTextureData(const char* const filename)
     {
-      boost::shared_ptr<SBatchTextureData> outData;
-      SBatchTextureDataFactory* const factory = construct_SBatchTextureDataFactory();
-      if (factory != nullptr) {
-        factory->Load(outData, filename);
+      // Go through the resource manager, not straight at the factory. Calling
+      // SBatchTextureDataFactory::Load here skips two things the manager does
+      // first, and the second one is fatal: it resolves the path through the
+      // mounted VFS. Every texture request arrives as a mount-point path such
+      // as "/textures/ui/common/scx_menu/small-btn/small_btn_up.dds", while the
+      // wait-handle set keys its zip entries by the archive-qualified physical
+      // path ("...\gamedata\textures.scd\textures\ui\..."). Without the
+      // resolve, DISK_MemoryMapFile misses the zip map, falls through to
+      // CreateFileW on a path beginning with a backslash, and hands back an
+      // empty buffer - so no texture in the game ever loaded, every Bitmap
+      // control reported 0x0, and each dialog collapsed onto a single point
+      // because MAUI lays controls out relative to one another's size.
+      gpg::RType* resourceType = SBatchTextureData::sType;
+      if (resourceType == nullptr) {
+        resourceType = gpg::LookupRType(typeid(SBatchTextureData));
+        SBatchTextureData::sType = resourceType;
       }
-      return outData;
+
+      boost::weak_ptr<SBatchTextureData> weakData{};
+      (void)RES_GetResource(&weakData, filename != nullptr ? filename : "", nullptr, resourceType);
+      return weakData.lock();
     }
   } // namespace
 

@@ -270,6 +270,15 @@ namespace gpg::gal
         constexpr unsigned int kD3DSurfaceLockReadOnly = 0x10U;
         constexpr unsigned int kD3DXIFFDDS = 4U;
         constexpr unsigned int kD3DXDefault = 0xFFFFFFFFU;
+        /**
+         * `D3DX_DEFAULT_NONPOW2` - take the dimension from the file and keep it
+         * even when it is not a power of two. `D3DX_DEFAULT` (-1) would rescale
+         * such an image up to the next power of two, which silently changes the
+         * size every UI control derives its layout from.
+         */
+        constexpr unsigned int kD3DXDefaultNonPow2 = 0xFFFFFFFEU;
+        /** `D3DX_FILTER_NONE` - copy the image through unfiltered. */
+        constexpr unsigned int kD3DXFilterNone = 1U;
         constexpr unsigned int kD3DTexFilterPoint = 1U;
         constexpr unsigned int kD3DTexFilterLinear = 2U;
         constexpr unsigned int kD3DDevTypeHal = 1U;
@@ -7597,21 +7606,37 @@ namespace gpg::gal
             return;
         }
 
+        // The argument list below is read straight off the two call sites at
+        // 0x008ECD87 and 0x008ECDB7. Take the pushes, not the decompiler's
+        // labels: IDA resolves the callee to the 2D
+        // D3DXCreateTextureFromFileInMemoryEx (d3dx9_35.dll ordinal 0x62) but
+        // then applies the sixteen-parameter *volume* prototype to it, so it
+        // invents a `depth` argument and every label from `format` onwards is
+        // shifted one place left. The retry at 0x008ECDB7 settles it: it pushes
+        // exactly fifteen arguments.
+        //
+        // Getting the shift wrong is not a subtle fidelity issue - it hands
+        // D3DX a Format of 2, which is not a D3DFORMAT at all, so the call
+        // fails, the identical retry fails with it, and no texture in the game
+        // ever loads. Every Bitmap control then reports 0x0, and since the whole
+        // MAUI layout is expressed relative to control sizes, each dialog
+        // collapses onto a single point.
+        D3DXImageInfoRuntime sourceImageInfo{};
         void* sourceTexture = nullptr;
         HRESULT createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
             AsDeviceD3D9Runtime(*this).nativeDevice,
             sourceData,
             sourceBytes,
-            kD3DXDefault,
-            kD3DXDefault,
+            kD3DXDefaultNonPow2,
+            kD3DXDefaultNonPow2,
             1U,
             0U,
-            2U,
-            D3DPOOL_MANAGED,
-            1U,
+            kD3DFormatUnknown,
+            D3DPOOL_SYSTEMMEM,
+            kD3DXFilterNone,
+            kD3DXFilterNone,
             0U,
-            0U,
-            nullptr,
+            &sourceImageInfo,
             nullptr,
             &sourceTexture
         );
@@ -7621,16 +7646,16 @@ namespace gpg::gal
                 AsDeviceD3D9Runtime(*this).nativeDevice,
                 sourceData,
                 sourceBytes,
-                kD3DXDefault,
-                kD3DXDefault,
+                kD3DXDefaultNonPow2,
+                kD3DXDefaultNonPow2,
                 1U,
                 0U,
-                2U,
-                D3DPOOL_MANAGED,
-                1U,
+                kD3DFormatUnknown,
+                D3DPOOL_SYSTEMMEM,
+                kD3DXFilterNone,
+                kD3DXFilterNone,
                 0U,
-                0U,
-                nullptr,
+                &sourceImageInfo,
                 nullptr,
                 &sourceTexture
             );
