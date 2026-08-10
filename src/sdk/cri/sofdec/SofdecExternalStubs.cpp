@@ -175,7 +175,9 @@ extern "C" {
   void* SFXZ_GetZfrmRange() { return nullptr; }
   void* SFXZ_IsSetZclip() { return nullptr; }
   void* SFX_DecideTableAlph3() { return nullptr; }
-  void* SFX_GetCompoMode() { return nullptr; }
+  // SFX_GetCompoMode (0x00ACCD40): real body in SofdecAdxPlatformRuntime.cpp.
+  // It was a no-argument stub, which C linkage let satisfy the one-argument
+  // call in mwPlyFxGetCompoMode, so the composition mode always read back 0.
   void* SFX_MakeTable() { return nullptr; }
   // SFX_SetOutBufSize (0x00ACCD50): real body in SofdecSfxRuntime.cpp.
   void* SFX_SetUnitWidth() { return nullptr; }

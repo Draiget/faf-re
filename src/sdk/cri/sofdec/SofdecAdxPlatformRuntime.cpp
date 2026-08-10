@@ -19715,6 +19715,26 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   }
 
   /**
+   * Address: 0x00ACCD40 (FUN_00ACCD40, _SFX_GetCompoMode)
+   *
+   * IDA signature:
+   * int __cdecl SFX_GetCompoMode(MWPLY a1);
+   *
+   * What it does:
+   * Reads back the composition mode `SFX_SetCompoMode` latched at `+0x04`.
+   *
+   * This was a no-argument `void* SFX_GetCompoMode() { return nullptr; }`
+   * stub, which C linkage let satisfy the one-argument call in
+   * `mwPlyFxGetCompoMode`. Every query therefore answered 0, so the frame
+   * converter never learned the real composition mode and `CMovie` sized the
+   * movie as if it were never interlaced.
+   */
+  std::int32_t SFX_GetCompoMode(void* const sfxHandle)
+  {
+    return static_cast<const SfxHandleTeardownView*>(sfxHandle)->compositionMode;
+  }
+
+  /**
    * Address: 0x00ACCE60 (FUN_00ACCE60, _SFX_GetTagInf)
    *
    * IDA signature:
