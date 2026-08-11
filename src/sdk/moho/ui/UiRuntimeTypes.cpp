@@ -16516,11 +16516,18 @@ void moho::CMauiScrollbar::SetTextures(
 /**
  * Address: 0x007A0840 (FUN_007A0840, Moho::CMauiScrollbar::Draw)
  *
+ * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
+ *
  * What it does:
  * Draws the scrollbar background and textured thumb from the attached
  * scrollable control range.
+ *
+ * Declared without `override` this was not the render slot at all, so the
+ * scrollbar rendered through `CMauiControl::DoRender`, which draws nothing.
+ * The arrow buttons above and below are separate Bitmap controls and kept
+ * drawing, which is why the bar appeared as two arrows with a gap.
  */
-void moho::CMauiScrollbar::Draw(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+void moho::CMauiScrollbar::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
 {
   (void)drawMask;
   if (primBatcher == nullptr) {

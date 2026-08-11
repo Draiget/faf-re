@@ -2679,11 +2679,13 @@ namespace moho
     /**
      * Address: 0x007A0840 (FUN_007A0840, Moho::CMauiScrollbar::Draw)
      *
+     * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
+     *
      * What it does:
      * Draws the scrollbar background and textured thumb from the attached
      * scrollable control range.
      */
-    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
 
     /**
      * Address: 0x007A11C0 (FUN_007A11C0, Moho::CMauiScrollbar::HandleEvent)
