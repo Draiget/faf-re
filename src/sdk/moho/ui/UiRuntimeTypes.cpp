@@ -13174,7 +13174,7 @@ moho::CMauiGroup::CMauiGroup(LuaPlus::LuaObject* const luaObject, CMauiControl* 
  * What it does:
  * No-op draw lane used by the group control vtable.
  */
-void moho::CMauiGroup::Draw(CD3DPrimBatcher* const /*primBatcher*/, const std::int32_t /*drawMask*/)
+void moho::CMauiGroup::DoRender(CD3DPrimBatcher* const /*primBatcher*/, const std::int32_t /*drawMask*/)
 {
 }
 
@@ -13302,7 +13302,7 @@ void moho::CMauiHistogram::Dump()
  * What it does:
  * No-op draw lane used by the histogram vtable.
  */
-void moho::CMauiHistogram::Draw(CD3DPrimBatcher* const /*primBatcher*/, const std::int32_t /*drawMask*/)
+void moho::CMauiHistogram::DoRender(CD3DPrimBatcher* const /*primBatcher*/, const std::int32_t /*drawMask*/)
 {
 }
 
@@ -14532,7 +14532,7 @@ void moho::CMauiItemList::SetFont(CD3DFont* const font)
  * quads, then renders each visible item's text with the resolved foreground
  * color. All work is skipped when no font is bound.
  */
-void moho::CMauiItemList::Draw(CD3DPrimBatcher* const primBatcher, const std::int32_t /*drawMask*/)
+void moho::CMauiItemList::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t /*drawMask*/)
 {
   CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
   const CD3DFont* const font = itemListView->mFont;
@@ -15497,7 +15497,7 @@ void moho::CMauiMesh::SetMesh(const char* const meshBlueprintName)
  * Binds current mesh texture lane and draws one fullscreen quad over this
  * control rectangle with fixed UV mapping.
  */
-void moho::CMauiMesh::Draw(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+void moho::CMauiMesh::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
 {
   (void)drawMask;
   const CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
@@ -24380,7 +24380,7 @@ void moho::CMauiBorder::Dump()
  * Draws border corner quads, then optional horizontal and vertical body strips
  * using border lazy-var geometry and retained border textures.
  */
-void moho::CMauiBorder::Draw(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+void moho::CMauiBorder::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
 {
   (void)drawMask;
   if (primBatcher == nullptr) {
