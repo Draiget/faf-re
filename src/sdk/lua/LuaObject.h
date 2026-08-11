@@ -2940,6 +2940,21 @@ namespace LuaPlus
 				Ret result{ LuaStackObject(st, -1) };
 				lua_settop(L, savedTop);
 				return result;
+			} else if constexpr (std::is_same_v<Ret, bool>) {
+				// Every hand-written Call_*_Bool sibling in this class converts the
+				// single result with lua_toboolean before restoring the stack (see
+				// Call_ObjectBool_Bool, FUN_0078AF70). Returning Ret{} here instead
+				// made every LuaFunction<bool> call answer false whatever the script
+				// returned - which is how a combo box lost the ability to suppress
+				// being shown (its OnHide could never report "handled"), so every
+				// dropdown in the options dialog stood open.
+				const bool result = lua_toboolean(L, -1) != 0;
+				lua_settop(L, savedTop);
+				return result;
+			} else if constexpr (std::is_arithmetic_v<Ret>) {
+				const Ret result = static_cast<Ret>(lua_tonumber(L, -1));
+				lua_settop(L, savedTop);
+				return result;
 			} else {
 				lua_settop(L, savedTop);
 				return Ret{};
