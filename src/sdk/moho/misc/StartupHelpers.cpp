@@ -6485,7 +6485,7 @@ void moho::CMovieManager::Destroy()
  *
  * What it does:
  * Creates one fresh user-preferences runtime, resolves and ensures the
- * `%APPDATA%\\<Company>\\<App>` preference directory, attempts to load the
+ * `%LOCALAPPDATA%\\<Company>\\<App>` preference directory, attempts to load the
  * requested preference file with version validation, and falls back to
  * `../Installed.Prefs` defaults when primary loading fails.
  */
@@ -6495,7 +6495,12 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
   bool loadedPrimaryPreferences = false;
 
   wchar_t appDataPath[MAX_PATH]{};
-  if (::SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, appDataPath) < 0) {
+  // `push 1Ch` at 0x008C8A2B - CSIDL_LOCAL_APPDATA, not CSIDL_APPDATA. This is
+  // where Forged Alliance has always kept Game.prefs, and it is the directory
+  // the data-path script mounts as /preferences. Resolving the roaming folder
+  // instead made the engine ignore the player's existing preferences and start
+  // a second, empty Game.prefs beside them - no profiles, no settings.
+  if (::SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appDataPath) < 0) {
     gpg::Warnf("unable to find user's application data directory");
   } else {
     std::wstring preferenceDirectory = appDataPath;
