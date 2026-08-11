@@ -2225,8 +2225,10 @@ namespace moho
      *
      * What it does:
      * No-op draw lane used by the group control vtable.
+     *
+     * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
      */
-    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
   };
 
   class CMauiHistogram : public CMauiControl
@@ -2255,8 +2257,10 @@ namespace moho
      *
      * What it does:
      * No-op histogram draw lane retained for vtable/override compatibility.
+     *
+     * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
      */
-    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
 
     /**
      * Address: 0x00797900 (FUN_00797900, Moho::CMauiHistogram::Dump)
@@ -2300,8 +2304,10 @@ namespace moho
      * Draws the list background quad, then optional mouse-over and selection
      * highlight row quads, then renders each visible item string with the
      * resolved (normal / highlight / selected) foreground color.
+     *
+     * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
      */
-    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
 
     /**
      * Address: 0x0079A730 (FUN_0079A730, Moho::CMauiItemList::LinesVisible)
@@ -2484,8 +2490,10 @@ namespace moho
      * What it does:
      * Binds current mesh texture lane and draws one fullscreen quad over this
      * control rectangle with fixed UV mapping.
+     *
+     * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
      */
-    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
 
     /**
      * Address: 0x0079E580 (FUN_0079E580, Moho::CMauiMesh::Dump)
@@ -2879,8 +2887,10 @@ namespace moho
      * What it does:
      * Draws textured border corners plus optional horizontal/vertical body strips
      * from lazy-var geometry lanes.
+     *
+     * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
      */
-    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
   };
 
   class CUIMapPreview : public CMauiControl
