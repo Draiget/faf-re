@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`07/08/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`11/08/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
@@ -10,47 +10,47 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`97.34%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,380`*
+  - *Total amount of completed tokens: `65,381`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,742` (82.20%)
-- `skip`: `6,130` (9.38%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `recovered`: `53,744` (82.20%)
+- `skip`: `6,129` (9.37%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,508` (8.42%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `68` (0.10%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `1,790` (2.66%)**
+- **`blocked`: `1,789` (2.66%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,858`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,858`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,857`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,857`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,742 functions) — binary caller context
+### Recovered (53,744 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `15,997` | 29.77% |
+| **Recovered caller token exists** (source edge still requires verification) | `15,998` | 29.77% |
 | Vtable-anchored (virtual override of a recovered class) | `5,840` | 10.87% |
-| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,542` | 10.31% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,543` | 10.31% |
 | No recovered caller token yet (orphan risk) | `2,424` | 4.51% |
 | No callsite evidence (no recorded code/data caller in the index) | `23,718` | 44.13% |
 | Unclassified data xref (manual review) | `217` | 0.40% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (1,858 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (1,857 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `277` | 14.91% |
-| Vtable-anchored (recover with the owning class) | `179` | 9.63% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `277` | 14.92% |
+| Vtable-anchored (recover with the owning class) | `179` | 9.64% |
 | Framework dispatch (wx/EH/Lua/reflection) | `1` | 0.05% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `937` | 50.43% |
-| No indexed callsite evidence (needs investigation/evidence) | `461` | 24.81% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `936` | 50.40% |
+| No indexed callsite evidence (needs investigation/evidence) | `461` | 24.82% |
 | Unclassified data xref (manual review) | `2` | 0.11% |
 | RTTI-only | `1` | 0.05% |
 
