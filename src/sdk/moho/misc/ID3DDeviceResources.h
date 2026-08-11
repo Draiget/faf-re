@@ -20,6 +20,7 @@ namespace moho
 {
   class CD3DDynamicTextureSheet;
   class CD3DDepthStencil;
+  class CResourceWatcher;
   class CD3DEffect;
   class CD3DIndexSheet;
   class ID3DRenderTarget;
@@ -142,10 +143,16 @@ namespace moho
      * Address: 0x00A82547 (_purecall slot)
      *
      * What it does:
-     * Resolves one texture resource by path.
+     * Resolves one texture resource by path. `resourceWatcher` is forwarded to
+     * `RES_GetResource` (IDA types this slot's third parameter as `int`, but the
+     * binary passes it straight through as the watcher pointer).
      */
-    virtual TextureResourceHandle&
-      GetTexture(TextureResourceHandle& outTexture, const char* path, int allowCreate, bool allowFallback) = 0;
+    virtual TextureResourceHandle& GetTexture(
+      TextureResourceHandle& outTexture,
+      const char* path,
+      CResourceWatcher* resourceWatcher,
+      bool allowFallback
+    ) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall slot)

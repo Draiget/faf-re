@@ -24,6 +24,9 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/CD3DTextureResourceFactory.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/resource/CResourceWatcher.h"
+#include "moho/resource/ResourceManager.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 
 namespace moho
@@ -88,7 +91,48 @@ namespace moho
      * Loads one `RD3DTextureResource` handle for a path through the active
      * texture factory lane.
      */
+    /**
+     * Address: 0x00445620 (FUN_00445620, func_GetD3DTextureResource_fromPath)
+     *
+     * What it does:
+     * Resolves one texture resource by path through the resource manager,
+     * caching the `RD3DTextureResource` RType on first use.
+     *
+     * Going through `RES_GetResource` rather than straight at the factory is
+     * load-bearing: the manager resolves the path through the mounted VFS.
+     * Texture requests arrive as mount-point paths ("/textures/ui/common/game/
+     * cursors/selectable.dds") while the wait-handle set keys its zip entries by
+     * the archive-qualified physical path ("...\gamedata\textures.scd\textures\
+     * ui\..."). Skipping the resolve makes DISK_MemoryMapFile miss the zip map,
+     * fall through to CreateFileW on a path starting with a backslash, and hand
+     * back an empty buffer - which is why the cursor never got a texture and so
+     * was never uploaded to the device.
+     */
     CD3DDeviceResources::TextureResourceHandle& GetD3DTextureResourceFromPath(
+      CD3DDeviceResources::TextureResourceHandle& outTexture,
+      const char* const path,
+      CResourceWatcher* const resourceWatcher
+    )
+    {
+      gpg::RType* resourceType = RD3DTextureResource::sType;
+      if (resourceType == nullptr) {
+        resourceType = gpg::LookupRType(typeid(RD3DTextureResource));
+        RD3DTextureResource::sType = resourceType;
+      }
+
+      boost::weak_ptr<RD3DTextureResource> weakResource{};
+      (void)RES_GetResource(&weakResource, path != nullptr ? path : "", resourceWatcher, resourceType);
+      outTexture = weakResource.lock();
+      return outTexture;
+    }
+
+    /**
+     * Loads one texture resource straight from the factory, bypassing the
+     * resource manager. Only `Func7` (FUN_00441680) does this - its primary
+     * lane calls `CD3DTextureResourceFactory::LoadImpl` directly and only its
+     * fallback goes through the manager.
+     */
+    CD3DDeviceResources::TextureResourceHandle& LoadD3DTextureResourceFromFactory(
       CD3DDeviceResources::TextureResourceHandle& outTexture,
       const char* const path,
       CD3DTextureResourceFactory* const textureFactory
@@ -435,21 +479,15 @@ namespace moho
   CD3DDeviceResources::TextureResourceHandle& CD3DDeviceResources::GetTexture(
     TextureResourceHandle& outTexture,
     const char* const path,
-    const int allowCreate,
+    CResourceWatcher* const resourceWatcher,
     const bool allowFallback
   )
   {
-    (void)allowCreate;
+    GetD3DTextureResourceFromPath(outTexture, path, resourceWatcher);
 
-    if (CD3DTextureResourceFactory* const textureFactory = GetTextureFactory(); textureFactory != nullptr) {
-      GetD3DTextureResourceFromPath(outTexture, path, textureFactory);
-
-      if (!outTexture && allowFallback) {
-        gpg::Logf("Can't find texture \"%s\" -- trying fallback.", path != nullptr ? path : "");
-        GetD3DTextureResourceFromPath(outTexture, kFallbackTexturePath, textureFactory);
-      }
-    } else {
-      outTexture.reset();
+    if (!outTexture && allowFallback) {
+      gpg::Logf("Can't find texture \"%s\" -- trying fallback.", path != nullptr ? path : "");
+      GetD3DTextureResourceFromPath(outTexture, kFallbackTexturePath, nullptr);
     }
 
     TrackTextureResource(outTexture.get());
@@ -478,11 +516,11 @@ namespace moho
   CD3DDeviceResources::Func7(TextureResourceHandle& outTexture, const char* const path)
   {
     if (CD3DTextureResourceFactory* const textureFactory = GetTextureFactory(); textureFactory != nullptr) {
-      GetD3DTextureResourceFromPath(outTexture, path, textureFactory);
+      LoadD3DTextureResourceFromFactory(outTexture, path, textureFactory);
 
       if (!outTexture) {
         gpg::Logf("Can't find texture \"%s\" -- trying fallback.", path != nullptr ? path : "");
-        GetD3DTextureResourceFromPath(outTexture, kFallbackTexturePath, textureFactory);
+        GetD3DTextureResourceFromPath(outTexture, kFallbackTexturePath, nullptr);
       }
     } else {
       outTexture.reset();
