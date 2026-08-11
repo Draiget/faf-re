@@ -1752,12 +1752,14 @@ namespace moho
     [[nodiscard]] bool EscPressed();
 
     /**
-     * Address: 0x007907B0 (FUN_007907B0, Moho::CMauiEdit::ClearSelection)
+     * Address: 0x007907B0 (FUN_007907B0, IDA: Moho::CMauiEdit::ClearSelection)
      *
      * What it does:
-     * Replaces the current selection lane with an empty UTF-8 string.
+     * Types one character over the current selection. IDA's name and signature
+     * are both wrong - the function takes the character as a second stack
+     * argument and inserts it; see the definition for the evidence.
      */
-    void ClearSelection();
+    void InsertChar(wchar_t character);
 
     /**
      * Address: 0x00790830 (FUN_00790830, Moho::CMauiEdit::ReplaceSelection)

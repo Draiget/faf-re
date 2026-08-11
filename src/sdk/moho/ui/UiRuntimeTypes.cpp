@@ -4796,10 +4796,21 @@ void moho::MAUI_SetKeyboardFocus(CMauiControl* const control, const bool blocksK
   Maui_ControlHasFocus = blocksKeyDown;
 
   if (focusMarker.mFocusedControlPrevNextField != 0u) {
+    // The notification is OnKeyboardFocusChange, not LosingKeyboardFocus. The
+    // binary calls through vtable+0x44, and the CMauiControl vtable has
+    // LosingKeyboardFocus at +0x40 and OnKeyboardFocusChange at +0x44.
+    //
+    // The difference is not cosmetic. This runs unconditionally on the previous
+    // owner, including when the previous owner is the control being focused -
+    // which is the normal case, because a click on an edit box focuses it once
+    // through the Lua binding and again from CMauiEdit::HandleClickEvent.
+    // CMauiEdit overrides LosingKeyboardFocus to abandon focus, so calling that
+    // one made the second acquire immediately clear the focus it had just set,
+    // and every keystroke then found no focus control and went nowhere.
     if (CMauiControl* const previousFocusOwner =
           ResolveControlFromFocusField(focusMarker.mFocusedControlPrevNextField);
         previousFocusOwner != nullptr) {
-      previousFocusOwner->LosingKeyboardFocus();
+      previousFocusOwner->OnKeyboardFocusChange();
     }
 
     // Re-read the marker: the callback above is free to unlink the owner, and
@@ -10529,7 +10540,7 @@ namespace
     eventPayload.mModifiers = static_cast<moho::EMauiEventModifier>(modifierBits);
     eventPayload.mSource = nullptr;
 
-    if (moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.ResolveFocusedControl();
+  if (moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.ResolveFocusedControl();
         focused != nullptr) {
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(focused);
       if (focused->HandleEvent(eventPayload)) {
@@ -22992,14 +23003,28 @@ bool moho::CMauiEdit::EscPressed()
 }
 
 /**
- * Address: 0x007907B0 (FUN_007907B0, Moho::CMauiEdit::ClearSelection)
+ * Address: 0x007907B0 (FUN_007907B0, IDA: Moho::CMauiEdit::ClearSelection)
+ *
+ * IDA signature:
+ * void __usercall Moho::CMauiEdit::ClearSelection(Moho::CMauiEdit *arg0, wchar_t ch);
  *
  * What it does:
- * Replaces the active selection with one empty UTF-8 string lane.
+ * Types one character: builds the two-wide-character buffer `{ch, 0}`, converts
+ * it to UTF-8 and hands it to `ReplaceSelection`, which drops the current
+ * selection and inserts the text in its place.
+ *
+ * IDA's name is wrong and its decompile drops the character - the function
+ * `retn 8`s, and the prologue reads a 16-bit value out of the second argument
+ * slot (`mov ax, [esp+28h+a3]`) straight into the buffer it converts. The one
+ * call site, in `CMauiEdit::HandleKeyEvent`, pushes `word ptr [edi+0x14]` -
+ * the low half of `SMauiEventData::mKeyCode`. Recovered as a no-argument
+ * "clear" it inserted an empty string, so every keypress in an edit box
+ * deleted the selection and typed nothing.
  */
-void moho::CMauiEdit::ClearSelection()
+void moho::CMauiEdit::InsertChar(const wchar_t character)
 {
-  ReplaceSelection(gpg::STR_WideToUtf8(L""));
+  const wchar_t characterBuffer[2] = {character, L'\0'};
+  ReplaceSelection(gpg::STR_WideToUtf8(characterBuffer));
 }
 
 /**
@@ -23465,8 +23490,10 @@ void moho::CMauiEdit::HandleKeyEvent(SMauiEventData* const eventData)
     }
 
     if (keyCode <= MKEY_START) {
+      // Script gets first refusal on the character; returning true means it
+      // handled the key itself and nothing is typed.
       if (!RunScriptOnCharPressedThunk(reinterpret_cast<CScriptObject*>(this), keyCode)) {
-        ClearSelection();
+        InsertChar(static_cast<wchar_t>(static_cast<std::uint16_t>(keyCode)));
       }
       return;
     }

@@ -13325,16 +13325,16 @@ namespace
   public:
     WxKeyEventFactoryRuntime()
       : wxEventRuntime(0, 0)
-      , mShiftDown(0)
-      , mControlDown(0)
-      , mMetaDown(0)
-      , mAltDown(0)
-      , mKeyCode(0)
       , mX(0)
       , mY(0)
+      , mKeyCode(0)
+      , mControlDown(0)
+      , mShiftDown(0)
+      , mAltDown(0)
+      , mMetaDown(0)
+      , mScanCode(0)
       , mRawCode(0)
       , mRawFlags(0)
-      , mUniChar(0)
     {}
 
     /**
@@ -13346,16 +13346,16 @@ namespace
      */
     WxKeyEventFactoryRuntime(const WxKeyEventFactoryRuntime& source)
       : wxEventRuntime(source)
-      , mShiftDown(source.mShiftDown)
-      , mControlDown(source.mControlDown)
-      , mMetaDown(source.mMetaDown)
-      , mAltDown(source.mAltDown)
-      , mKeyCode(source.mKeyCode)
       , mX(source.mX)
       , mY(source.mY)
+      , mKeyCode(source.mKeyCode)
+      , mControlDown(source.mControlDown)
+      , mShiftDown(source.mShiftDown)
+      , mAltDown(source.mAltDown)
+      , mMetaDown(source.mMetaDown)
+      , mScanCode(source.mScanCode)
       , mRawCode(source.mRawCode)
       , mRawFlags(source.mRawFlags)
-      , mUniChar(source.mUniChar)
     {}
 
     /**
@@ -13369,18 +13369,38 @@ namespace
       return new (std::nothrow) WxKeyEventFactoryRuntime(*this);
     }
 
-    std::uint8_t mShiftDown = 0;
-    std::uint8_t mControlDown = 0;
-    std::uint8_t mMetaDown = 0;
-    std::uint8_t mAltDown = 0;
-    std::int32_t mKeyCode = 0;
-    std::int32_t mX = 0;
-    std::int32_t mY = 0;
-    std::uint32_t mRawCode = 0;
-    std::uint32_t mRawFlags = 0;
-    std::int32_t mUniChar = 0;
+    // Field order is the binary's, confirmed by the stores in
+    // wxWindow::CreateKeyEvent (FUN_0096CCC0): m_x at [esi+0x20], m_y at
+    // [esi+0x24], m_keyCode at [esi+0x28], m_controlDown at [esi+0x2C],
+    // m_shiftDown at [esi+0x2D], m_altDown at [esi+0x2E], m_rawCode at
+    // [esi+0x34], m_rawFlags at [esi+0x38].
+    //
+    // These offsets are not cosmetic: the MAUI mapper reads the event through
+    // a layout view at exactly those displacements, so declaring the members
+    // in any other order feeds it the wrong words - every keystroke arrived
+    // carrying the cursor's X coordinate as its key code, and no character
+    // ever reached an edit box.
+    std::int32_t mX = 0;           // +0x20
+    std::int32_t mY = 0;           // +0x24
+    std::int32_t mKeyCode = 0;     // +0x28
+    std::uint8_t mControlDown = 0; // +0x2C
+    std::uint8_t mShiftDown = 0;   // +0x2D
+    std::uint8_t mAltDown = 0;     // +0x2E
+    std::uint8_t mMetaDown = 0;    // +0x2F
+    std::int32_t mScanCode = 0;    // +0x30
+    std::uint32_t mRawCode = 0;    // +0x34
+    std::uint32_t mRawFlags = 0;   // +0x38
   };
   static_assert(sizeof(WxKeyEventFactoryRuntime) == 0x3C, "WxKeyEventFactoryRuntime size must be 0x3C");
+  static_assert(offsetof(WxKeyEventFactoryRuntime, mX) == 0x20, "wxKeyEvent::m_x offset must be 0x20");
+  static_assert(offsetof(WxKeyEventFactoryRuntime, mKeyCode) == 0x28, "wxKeyEvent::m_keyCode offset must be 0x28");
+  static_assert(
+    offsetof(WxKeyEventFactoryRuntime, mControlDown) == 0x2C, "wxKeyEvent::m_controlDown offset must be 0x2C"
+  );
+  static_assert(offsetof(WxKeyEventFactoryRuntime, mShiftDown) == 0x2D, "wxKeyEvent::m_shiftDown offset must be 0x2D");
+  static_assert(offsetof(WxKeyEventFactoryRuntime, mAltDown) == 0x2E, "wxKeyEvent::m_altDown offset must be 0x2E");
+  static_assert(offsetof(WxKeyEventFactoryRuntime, mRawCode) == 0x34, "wxKeyEvent::m_rawCode offset must be 0x34");
+  static_assert(offsetof(WxKeyEventFactoryRuntime, mRawFlags) == 0x38, "wxKeyEvent::m_rawFlags offset must be 0x38");
 
   class WxChildFocusEventFactoryRuntime final : public wxCommandEventRuntime
   {
