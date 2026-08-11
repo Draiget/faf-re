@@ -1790,10 +1790,16 @@ extern "C"
 	{
 		TObject* object = nullptr;
 		if (idx <= 0) {
-			object = state->top + idx;
-			if (object < state->base) {
-				return 0;
-			}
+			// `negindex`, not `top + idx` (0x0090CB31 calls it). Anything at or
+			// below LUA_REGISTRYINDEX is a pseudo-index - the registry, the globals
+			// table, or a C closure upvalue - and top-relative arithmetic sends
+			// those far below the stack base, where the guard below answers 0.
+			// `string.gfind` measures its subject through `lua_upvalueindex(1)`, so
+			// every iterator built by it saw a zero-length subject, matched
+			// nothing, and yielded no words at all: `WrapText` returned no lines
+			// and every wrapped string in the UI - dialog bodies, tooltips - came
+			// out blank.
+			object = negindex(state, idx);
 		} else {
 			object = &state->base[idx - 1];
 			if (object >= state->top) {
