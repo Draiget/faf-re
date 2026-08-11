@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <new>
+#include <vector>
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -16,6 +17,12 @@
 namespace
 {
   /**
+   * Frames whose owning reference was dropped while a MAUI event was being
+   * dispatched. Released by `ReleaseRetiredFrames` on the next UI tick.
+   */
+  std::vector<boost::shared_ptr<moho::CMauiFrame>> gRetiredFrames;
+
+  /**
    * Address: 0x0084E6F0 (FUN_0084E6F0, funcReleaseRange_WeakPtrFrame)
    *
    * What it does:
@@ -26,9 +33,40 @@ namespace
     boost::shared_ptr<moho::CMauiFrame>* end
   )
   {
+    // Dropping the last owner here runs ~CMauiFrame inline. That is safe on a
+    // tick, but not from script: `SetNewLuaState` is reached from Lua - the
+    // splash calls EngineStartFrontEndUI from a control's HandleEvent - and the
+    // event dispatch that got us there still holds raw pointers into this
+    // frame. `CMauiControl::PostEvent` reads a control's parent *before* running
+    // the handler and dispatches to it *after*, so freeing the frame here makes
+    // that dispatch a virtual call through a released object. ~CMauiFrame would
+    // also delete the wx event mapper whose method is currently on the stack.
+    //
+    // The engine already defers control deletes for exactly this reason
+    // (`Destroy` queues, `PurgeDeleted` frees on the tick); frames are the one
+    // owner that escaped it, because they are held by shared_ptr rather than the
+    // deleted-control list. Park the owning reference and drop it on the next
+    // tick. The frames are already destroyed and unhooked by then - only the
+    // `operator delete` moves.
+    const bool deferDelete = moho::MAUI_EventDispatchInProgress();
     for (boost::shared_ptr<moho::CMauiFrame>* it = begin; it != end; ++it) {
+      if (deferDelete && *it) {
+        gRetiredFrames.push_back(*it);
+      }
       it->reset();
     }
+  }
+
+  /**
+   * Drops every frame parked by `ReleaseFrameSharedPtrRange`. Called at the top
+   * of the UI tick, where no event dispatch is on the stack.
+   */
+  void ReleaseRetiredFrames()
+  {
+    // Swap first: ~CMauiFrame runs script (`OnDestroy` on any control still
+    // queued) and must not mutate the container being iterated.
+    std::vector<boost::shared_ptr<moho::CMauiFrame>> retired;
+    retired.swap(gRetiredFrames);
   }
 
   /**
@@ -110,6 +148,9 @@ void moho::CUIManager::DestroyCore()
   }
 
   mFrames.ResetStorageToInline();
+
+  // Teardown is the last safe point; nothing may stay parked past it.
+  ReleaseRetiredFrames();
 }
 
 /**
@@ -293,6 +334,8 @@ void moho::CUIManager::ClearFrames()
  */
 void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
 {
+  ReleaseRetiredFrames();
+
   for (std::size_t index = 0; index < mFrames.Size(); ++index) {
     if (mFrames[index]) {
       mFrames[index]->Frame(deltaSeconds);

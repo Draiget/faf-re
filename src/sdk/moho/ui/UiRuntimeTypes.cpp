@@ -21869,6 +21869,11 @@ moho::CMauiControl* moho::CMauiControl::GetTopmostControl(CMauiControl* const ro
  */
 void moho::CMauiControl::PostEvent(const SMauiEventData& eventData)
 {
+  // The parent is read before the handler runs, and dispatched to after it, so
+  // every control on this walk must outlive the script the handler invokes.
+  // Nothing reachable from a dispatch may be freed until it unwinds: control
+  // deletes are deferred by CMauiFrame::PurgeDeleted, frame deletes by
+  // CUIManager's retired-frame list. Both key off MAUI_EventDispatchInProgress.
   CMauiControl* parentControl = CMauiControlHierarchyRuntimeView::FromControl(this)->mParent;
   if (HandleEvent(eventData)) {
     return;
@@ -26523,6 +26528,11 @@ void moho::SetMauiEventMapperWindow(wxEvtHandlerRuntime* const handler, wxWindow
   if (auto* const mapper = dynamic_cast<CMauiWxEventMapperRuntime*>(handler); mapper != nullptr) {
     mapper->mWindowRuntime = reinterpret_cast<WxWindowCaptureRuntimeView*>(window);
   }
+}
+
+bool moho::MAUI_EventDispatchInProgress() noexcept
+{
+  return MauiEventDispatchInProgress();
 }
 
 void moho::WX_PushEventHandler(wxWindowBase* const window, wxEvtHandlerRuntime* const handler)

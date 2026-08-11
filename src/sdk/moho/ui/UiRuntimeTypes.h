@@ -8740,6 +8740,17 @@ namespace moho
    * events from. No-op for handlers that are not event mappers.
    */
   void SetMauiEventMapperWindow(wxEvtHandlerRuntime* handler, wxWindowBase* window);
+
+  /**
+   * True while a MAUI event is being dispatched on this thread.
+   *
+   * The dispatch walks raw control pointers - `CMauiControl::PostEvent` reads a
+   * control's parent before handing the event to script, then dispatches to that
+   * parent afterwards - so nothing reachable from a dispatch may be freed until
+   * it unwinds. `CMauiFrame::PurgeDeleted` already defers control deletes on
+   * this; frame owners must defer theirs the same way.
+   */
+  [[nodiscard]] bool MAUI_EventDispatchInProgress() noexcept;
   [[nodiscard]] wxEvtHandlerRuntime* WX_PopEventHandler(wxWindowBase* window, bool deleteHandler);
   void WX_GetClientSize(wxWindowBase* window, std::int32_t& outWidth, std::int32_t& outHeight);
   void WX_ScreenToClient(wxWindowBase* window, std::int32_t& inOutX, std::int32_t& inOutY);
