@@ -467,6 +467,102 @@ namespace moho
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(IMauiDragger) == 0x4, "moho::IMauiDragger size must be 0x4");
 
+  /**
+   * The dragger `Dragger()` hands back to script, and the only dragger whose
+   * drag callbacks live in Lua rather than in the engine. MAUI installs it as
+   * the active dragger through `PostDragger`, then routes every subsequent
+   * pointer motion, release and cancellation to the `OnMove` / `OnRelease` /
+   * `OnCancel` entries on its Lua table.
+   *
+   * Every front-end button click completes through here: `lua/maui/button.lua`
+   * has no `ButtonRelease` branch at all, it creates one of these on press and
+   * hangs `self:OnClick(...)` off the dragger's `OnRelease`.
+   *
+   * Layout follows the binary: `CScriptObject` at +0x00, the `IMauiDragger`
+   * sub-object at +0x34 (its own vtable), and the intrusive
+   * current-dragger link at +0x38 - the same "IMauiDragger sub-object + 4"
+   * position `UIBuildDragger::mList` occupies.
+   */
+  class CMauiLuaDragger final : public CScriptObject, public IMauiDragger
+  {
+  public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0078DE50 (FUN_0078DE50, Moho::CMauiLuaDragger::CMauiLuaDragger)
+     *
+     * IDA signature:
+     * Moho::CMauiLuaDragger *__stdcall Moho::CMauiLuaDragger::CMauiLuaDragger(
+     *     Moho::CMauiLuaDragger *this, LuaPlus::LuaObject *a2);
+     *
+     * What it does:
+     * Runs the `CScriptObject` base constructor, clears the dragger list-head
+     * lane, and binds the Lua table that owns this dragger.
+     */
+    explicit CMauiLuaDragger(const LuaPlus::LuaObject& luaObject);
+
+    /**
+     * Address: 0x0078DEF0 (FUN_0078DEF0, Moho::CMauiLuaDragger::~CMauiLuaDragger)
+     * Deleting destructor thunk: 0x0078DEC0 (FUN_0078DEC0, Moho::CMauiLuaDragger::dtr)
+     *
+     * What it does:
+     * Detaches every node still linked to this dragger before the bases run.
+     */
+    ~CMauiLuaDragger() override;
+
+    /**
+     * Address: 0x0078DBD0 (FUN_0078DBD0, Moho::CMauiLuaDragger::StaticGetClass)
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0078DBF0 (FUN_0078DBF0, Moho::CMauiLuaDragger::GetClass)
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x0078DC10 (FUN_0078DC10, Moho::CMauiLuaDragger::GetDerivedObjectRef)
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle, which is
+     * what lets `SCR_FromLua_CMauiLuaDragger` recognise the object.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /**
+     * Address: 0x0078DF30 (FUN_0078DF30, Moho::CMauiLuaDragger::OnMove)
+     *
+     * What it does:
+     * Invokes the script callback `OnMove(self, x, y)`.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x0078DF50 (FUN_0078DF50, Moho::CMauiLuaDragger::OnRelease)
+     *
+     * What it does:
+     * Invokes the script callback `OnRelease(self, x, y)` - the callback that
+     * carries `Button:OnClick`.
+     */
+    void DragRelease(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x0078DF70 (FUN_0078DF70, Moho::CMauiLuaDragger::OnCancel)
+     *
+     * What it does:
+     * Invokes the script callback `OnCancel(self)` when another dragger takes
+     * over.
+     */
+    void OnCurrentDraggerReplaced() override;
+
+    TDatListItem<IMauiDragger, void>* mList = nullptr; // +0x38
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CMauiLuaDragger, mList) == 0x38, "moho::CMauiLuaDragger::mList offset must be 0x38"
+  );
+  static_assert(sizeof(CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger size must be 0x3C");
+
   struct CUIWorldViewBuildPreviewTreeNode
   {
     CUIWorldViewBuildPreviewTreeNode* mLeft = nullptr;   // +0x00
@@ -5181,18 +5277,6 @@ namespace moho
    * color/data lanes.
    */
   int cfunc_CMauiHistogramSetDataL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: 0x0078DE50 (FUN_0078DE50, Moho::CMauiLuaDragger::CMauiLuaDragger)
-   *
-   * What it does:
-   * Initializes one Lua dragger runtime object, clears its embedded
-   * `IMauiDragger` list-head lane, and binds the incoming Lua object payload.
-   */
-  CMauiLuaDragger* func_CMauiLuaDraggerConstruct(
-    CMauiLuaDragger* luaDragger,
-    const LuaPlus::LuaObject* luaObject
-  );
 
   /**
    * Address: 0x0078DF80 (FUN_0078DF80, cfunc_CMauiLuaDraggerDestroy)

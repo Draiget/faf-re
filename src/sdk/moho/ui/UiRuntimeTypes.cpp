@@ -2652,83 +2652,24 @@ namespace
   static_assert(offsetof(IMauiDraggerRuntimeView, mList) == 0x4, "IMauiDraggerRuntimeView::mList offset must be 0x4");
   static_assert(sizeof(IMauiDraggerRuntimeView) == 0x8, "IMauiDraggerRuntimeView size must be 0x8");
 
-class MauiDraggerVtableProbe final : public moho::IMauiDragger
-{
-public:
-  void DragMove(const moho::SMauiEventData*) override
-  {
-  }
-
-  void DragRelease(const moho::SMauiEventData*) override
-  {
-  }
-
-  void OnCurrentDraggerReplaced() override
-  {
-  }
-};
-
-[[nodiscard]] static std::uint32_t ResolveMauiDraggerVtableLane() noexcept
-{
-  static MauiDraggerVtableProbe probe;
-  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(*reinterpret_cast<void**>(&probe)));
-}
-
-/**
- * Address: 0x0078DEE0 (FUN_0078DEE0)
- *
- * What it does:
- * Restores one dragger-base runtime lane with IMauiDragger vtable and clears
- * the primary list-link pointer lane.
- */
-[[maybe_unused]] static IMauiDraggerRuntimeView* func_InitMauiDraggerBase(
-  IMauiDraggerRuntimeView* const draggerView
-) noexcept
-{
-  draggerView->mList = nullptr;
-  draggerView->mVftable = ResolveMauiDraggerVtableLane();
-  return draggerView;
-}
-
-  struct CMauiLuaDraggerEmbeddedRuntimeView
-  {
-    std::uint8_t mUnknown00To33[0x34]{};
-    IMauiDraggerRuntimeView mDraggerBase{};
-  };
-  static_assert(
-    offsetof(CMauiLuaDraggerEmbeddedRuntimeView, mDraggerBase) == 0x34,
-    "CMauiLuaDraggerEmbeddedRuntimeView::mDraggerBase offset must be 0x34"
-  );
-  static_assert(
-    sizeof(CMauiLuaDraggerEmbeddedRuntimeView) == 0x3C,
-    "CMauiLuaDraggerEmbeddedRuntimeView size must be 0x3C"
-  );
-
 } // namespace
 
 /**
  * Address: 0x0078DE50 (FUN_0078DE50, Moho::CMauiLuaDragger::CMauiLuaDragger)
  *
+ * IDA signature:
+ * Moho::CMauiLuaDragger *__stdcall Moho::CMauiLuaDragger::CMauiLuaDragger(
+ *     Moho::CMauiLuaDragger *this, LuaPlus::LuaObject *a2);
+ *
  * What it does:
- * Initializes one Lua dragger script-object base lane, resets the embedded
- * dragger-base runtime fields, and binds the incoming Lua object payload.
+ * Runs the `CScriptObject` base constructor, installs both vtables (the
+ * script-object one at +0x00 and the `IMauiDragger` one at +0x34), clears the
+ * dragger list-head lane at +0x38, and binds the owning Lua table.
  */
-moho::CMauiLuaDragger* moho::func_CMauiLuaDraggerConstruct(
-  CMauiLuaDragger* const luaDragger,
-  const LuaPlus::LuaObject* const luaObject
-)
+moho::CMauiLuaDragger::CMauiLuaDragger(const LuaPlus::LuaObject& luaObject)
+  : CScriptObject(), IMauiDragger(), mList(nullptr)
 {
-  auto* const draggerView = reinterpret_cast<CMauiLuaDraggerEmbeddedRuntimeView*>(luaDragger);
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(luaDragger);
-
-  static_cast<WeakObject*>(scriptObject)->weakLinkHead_ = 0u;
-  new (&scriptObject->cObject) LuaPlus::LuaObject();
-  new (&scriptObject->mLuaObj) LuaPlus::LuaObject();
-
-  IMauiDraggerRuntimeView* const draggerBaseView = &draggerView->mDraggerBase;
-  (void)func_InitMauiDraggerBase(draggerBaseView);
-  scriptObject->SetLuaObject(*luaObject);
-  return luaDragger;
+  SetLuaObject(luaObject);
 }
 
 namespace
@@ -2951,35 +2892,98 @@ namespace
     return node;
   }
 
-  /**
-   * Address: 0x0078DEF0 (FUN_0078DEF0, Moho::CMauiLuaDragger::~CMauiLuaDragger)
-   *
-   * What it does:
-   * Restores the embedded dragger-base vtable lane, unlinks all dragger-list
-   * nodes rooted at that embedded lane, then runs `CScriptObject` base
-   * destructor behavior.
-   */
-  [[maybe_unused]] static moho::CScriptObject* func_CMauiLuaDraggerDestruct(
-    moho::CScriptObject* const scriptObject
-  ) noexcept
-  {
-    auto* const draggerView = reinterpret_cast<CMauiLuaDraggerEmbeddedRuntimeView*>(scriptObject);
-    IMauiDraggerRuntimeView* const draggerBaseView = &draggerView->mDraggerBase;
-    draggerBaseView->mVftable = ResolveMauiDraggerVtableLane();
-    (void)DetachDraggerList(draggerBaseView->mList);
-    scriptObject->moho::CScriptObject::~CScriptObject();
-    return scriptObject;
-  }
+} // namespace
 
-  [[nodiscard]] IMauiDragger* ResolveEmbeddedLuaDragger(moho::CMauiLuaDragger* const luaDragger) noexcept
-  {
-    if (luaDragger == nullptr) {
-      return nullptr;
-    }
+gpg::RType* moho::CMauiLuaDragger::sType = nullptr;
 
-    auto* const draggerView = reinterpret_cast<CMauiLuaDraggerEmbeddedRuntimeView*>(luaDragger);
-    return reinterpret_cast<IMauiDragger*>(&draggerView->mDraggerBase);
+/**
+ * Address: 0x0078DEF0 (FUN_0078DEF0, Moho::CMauiLuaDragger::~CMauiLuaDragger)
+ *
+ * What it does:
+ * Detaches every node still linked through the dragger's own list head before
+ * the `IMauiDragger` and `CScriptObject` bases run.
+ */
+moho::CMauiLuaDragger::~CMauiLuaDragger()
+{
+  (void)DetachDraggerList(mList);
+}
+
+/**
+ * Address: 0x0078DBD0 (FUN_0078DBD0, Moho::CMauiLuaDragger::StaticGetClass)
+ *
+ * What it does:
+ * Returns the cached reflection descriptor for `CMauiLuaDragger`, resolving it
+ * via RTTI on first use.
+ */
+gpg::RType* moho::CMauiLuaDragger::StaticGetClass()
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CMauiLuaDragger));
   }
+  return sType;
+}
+
+/**
+ * Address: 0x0078DBF0 (FUN_0078DBF0, Moho::CMauiLuaDragger::GetClass)
+ */
+gpg::RType* moho::CMauiLuaDragger::GetClass() const
+{
+  return StaticGetClass();
+}
+
+/**
+ * Address: 0x0078DC10 (FUN_0078DC10, Moho::CMauiLuaDragger::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef moho::CMauiLuaDragger::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x0078DF30 (FUN_0078DF30, Moho::CMauiLuaDragger::OnMove)
+ *
+ * What it does:
+ * Invokes the script callback `OnMove(self, x, y)` with the pointer position
+ * carried by the event.
+ */
+void moho::CMauiLuaDragger::DragMove(const SMauiEventData* const eventData)
+{
+  RunScriptNum2("OnMove", eventData->mMousePos.x, eventData->mMousePos.y);
+}
+
+/**
+ * Address: 0x0078DF50 (FUN_0078DF50, Moho::CMauiLuaDragger::OnRelease)
+ *
+ * What it does:
+ * Invokes the script callback `OnRelease(self, x, y)`. This is the callback
+ * `lua/maui/button.lua` installs to run `Button:OnClick`, so the whole
+ * front-end click path terminates here.
+ */
+void moho::CMauiLuaDragger::DragRelease(const SMauiEventData* const eventData)
+{
+  RunScriptNum2("OnRelease", eventData->mMousePos.x, eventData->mMousePos.y);
+}
+
+/**
+ * Address: 0x0078DF70 (FUN_0078DF70, Moho::CMauiLuaDragger::OnCancel)
+ *
+ * What it does:
+ * Invokes the script callback `OnCancel(self)` when a different dragger
+ * replaces this one as the active dragger.
+ */
+void moho::CMauiLuaDragger::OnCurrentDraggerReplaced()
+{
+  (void)RunScript("OnCancel");
+}
+
+namespace
+{
 
   [[nodiscard]] std::int32_t NormalizePostDraggerKeycode(const std::int32_t keyCode) noexcept
   {
@@ -4767,31 +4771,50 @@ moho::CMauiControl* moho::CMauiCurrentFocusControlRuntimeView::ResolveFocusedCon
  */
 void moho::MAUI_SetKeyboardFocus(CMauiControl* const control, const bool blocksKeyDown)
 {
-  std::uint32_t previousFocusField = Maui_CurrentFocusControl.mFocusedControlPrevNextField;
-  std::uint32_t previousFocusNextField = 0u;
+  // The binary parks a two-word list node on the stack (`mPrev` at ebp-0x14,
+  // `v4` at ebp-0x10) and splices it in front of the current focus owner, so
+  // that the unlink `SetCurrentFocusControlLink` performs below terminates on
+  // this stack node instead of walking the live list - and so a nested unlink
+  // from `LosingKeyboardFocus` lands here too.
+  //
+  // Those two words have to be genuinely adjacent. Written as two separate
+  // locals the compiler is free to place them anywhere, and a debug build puts
+  // runtime-check guard bytes between them: the unlink loop then failed to
+  // recognise the marker, walked off the end of the list and faulted. The
+  // typed node is the same 8 bytes the binary uses.
+  CMauiCurrentFocusControlRuntimeView focusMarker{};
+  focusMarker.mFocusedControlPrevNextField = Maui_CurrentFocusControl.mFocusedControlPrevNextField;
 
-  if (previousFocusField != 0u) {
-    std::uint32_t* const previousFocusCursor = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(previousFocusField));
-    previousFocusNextField = *previousFocusCursor;
-    *previousFocusCursor = NarrowPointerToFocusField(&previousFocusField);
+  if (focusMarker.mFocusedControlPrevNextField != 0u) {
+    std::uint32_t* const previousFocusCursor =
+      reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(focusMarker.mFocusedControlPrevNextField));
+    focusMarker.mNextPrevNextField = *previousFocusCursor;
+    *previousFocusCursor = NarrowPointerToFocusField(&focusMarker);
   }
 
   SetCurrentFocusControlLink(&Maui_CurrentFocusControl, control);
   Maui_ControlHasFocus = blocksKeyDown;
 
-  if (previousFocusField != 0u) {
-    if (CMauiControl* const previousFocusOwner = ResolveControlFromFocusField(previousFocusField); previousFocusOwner != nullptr) {
+  if (focusMarker.mFocusedControlPrevNextField != 0u) {
+    if (CMauiControl* const previousFocusOwner =
+          ResolveControlFromFocusField(focusMarker.mFocusedControlPrevNextField);
+        previousFocusOwner != nullptr) {
       previousFocusOwner->LosingKeyboardFocus();
     }
 
-    std::uint32_t* restoreCursor = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(previousFocusField));
-    const std::uint32_t markerField = NarrowPointerToFocusField(&previousFocusField);
-    while (*restoreCursor != markerField) {
-      restoreCursor = reinterpret_cast<std::uint32_t*>(
-        static_cast<std::uintptr_t>(*restoreCursor) + kCMauiControlListNodeNextOffset
-      );
+    // Re-read the marker: the callback above is free to unlink the owner, and
+    // when it does it writes through this node.
+    if (focusMarker.mFocusedControlPrevNextField != 0u) {
+      std::uint32_t* restoreCursor =
+        reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(focusMarker.mFocusedControlPrevNextField));
+      const std::uint32_t markerField = NarrowPointerToFocusField(&focusMarker);
+      while (*restoreCursor != markerField) {
+        restoreCursor = reinterpret_cast<std::uint32_t*>(
+          static_cast<std::uintptr_t>(*restoreCursor) + kCMauiControlListNodeNextOffset
+        );
+      }
+      *restoreCursor = focusMarker.mNextPrevNextField;
     }
-    *restoreCursor = previousFocusNextField;
   }
 }
 
@@ -10780,7 +10803,7 @@ int moho::cfunc_PostDraggerL(LuaPlus::LuaState* const state)
   if (lua_type(state->m_state, 3) != LUA_TNIL) {
     LuaPlus::LuaObject draggerObject(LuaPlus::LuaStackObject(state, 3));
     CMauiLuaDragger* const luaDragger = SCR_FromLua_CMauiLuaDragger(draggerObject, state);
-    dragger = ResolveEmbeddedLuaDragger(luaDragger);
+    dragger = static_cast<IMauiDragger*>(luaDragger);
   }
 
   SMauiEventData eventData{};
@@ -10838,10 +10861,7 @@ int moho::cfunc_CMauiLuaDraggerDestroyL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject draggerObject(LuaPlus::LuaStackObject(state, 1));
   CMauiLuaDragger* const dragger = ResolveCMauiLuaDraggerOptionalOrError(draggerObject, state);
-  if (dragger != nullptr) {
-    CScriptObject* const draggerObjectBase = reinterpret_cast<CScriptObject*>(dragger);
-    delete draggerObjectBase;
-  }
+  delete dragger;
 
   return 1;
 }
@@ -12900,10 +12920,11 @@ int moho::cfunc_InternalCreateDraggerL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInternalCreateDraggerHelpText, 1, argumentCount);
   }
 
-  auto* const dragger = AllocateZeroedUiObject<CMauiLuaDragger>(0x3C);
+  // Binary: `operator new(0x3C)`.
+  void* const storage = AllocateZeroedUiObject<void>(0x3C);
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  func_CMauiLuaDraggerConstruct(dragger, &luaObject);
-  reinterpret_cast<CScriptObject*>(dragger)->mLuaObj.PushStack(state);
+  auto* const dragger = new (storage) CMauiLuaDragger(luaObject);
+  dragger->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -16440,13 +16461,14 @@ moho::CMauiScrollbar::~CMauiScrollbar()
   // ---- Step 2: Unlink the bound scrollable focus sentinel ----
   UnlinkFocusControlSentinel(&scrollbarView->mScrollableLink);
 
-  // ---- Step 3: Restore the embedded IMauiDragger vtable + detach its list ----
+  // ---- Step 3: Detach the embedded IMauiDragger list ----
   // The `IMauiDragger` sub-object base begins at +0x11C (vtable) / +0x120
   // (dragger-list head); resolve it through the typed base pointer rather than
-  // raw offset arithmetic. Mirrors `func_CMauiLuaDraggerDestruct`.
+  // raw offset arithmetic. The binary also rewrites the sub-object vtable back
+  // to `IMauiDragger`'s here - the compiler emits that itself as the base
+  // destructor runs, so only the list detach belongs in this body.
   IMauiDragger* const draggerBase = static_cast<IMauiDragger*>(this);
   auto* const draggerBaseView = reinterpret_cast<IMauiDraggerRuntimeView*>(draggerBase);
-  draggerBaseView->mVftable = ResolveMauiDraggerVtableLane();
   (void)DetachDraggerList(draggerBaseView->mList);
 }
 

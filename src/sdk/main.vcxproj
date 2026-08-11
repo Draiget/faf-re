@@ -1164,6 +1164,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ui\EMauiEventTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiFrameTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiCursorTypeInfo.cpp" />
+    <ClCompile Include="moho\ui\CMauiLuaDraggerTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiBitmapTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiBorderTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiEditTypeInfo.cpp" />
@@ -2305,6 +2306,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ui\CMauiControlTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiFrameTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiCursorTypeInfo.h" />
+    <ClInclude Include="moho\ui\CMauiLuaDraggerTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiBitmapTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiBorderTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiEditTypeInfo.h" />
