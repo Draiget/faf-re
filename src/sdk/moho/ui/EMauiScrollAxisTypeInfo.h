@@ -19,6 +19,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00786530 (FUN_00786530, Moho::EMauiScrollAxisTypeInfo::ctor)
+     *
+     * What it does:
+     * Pre-registers the reflected `EMauiScrollAxis` enum metadata.
+     */
+    EMauiScrollAxisTypeInfo();
+
+    /**
      * Address: 0x007865F0 (FUN_007865F0, Moho::EMauiScrollAxisTypeInfo::dtr)
      */
     ~EMauiScrollAxisTypeInfo() override;
