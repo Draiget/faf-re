@@ -1592,7 +1592,27 @@ namespace moho
      * control under `(x,y)`.
      */
     [[nodiscard]] static CMauiControl* GetTopmostControl(CMauiControl* root, float x, float y);
+
+  protected:
+    /**
+     * The control's own state block, 0x00 (past the vtable pointer) through
+     * 0x11B. Every field in it is reached through the typed
+     * `CMauiControl*RuntimeView` overlays - `CMauiControlScriptObjectRuntimeView`
+     * for the script-object head (weak-link chain at +0x04, `cObject` at +0x0C,
+     * `mLuaObj` at +0x20), `CMauiControlHierarchyRuntimeView` for the parent /
+     * children lists and layout lazy-vars, and `CMauiControlExtendedRuntimeView`
+     * for the render lanes - so it is reserved here rather than re-declared.
+     *
+     * Reserving it is not cosmetic. Without it the class is 4 bytes wide, and a
+     * derived class that adds a second base gets that base at +0x04, straight on
+     * top of the weak-reference chain head: `CMauiScrollbar`'s `IMauiDragger`
+     * vptr landed there and every scrollbar destroyed afterwards walked a vtable
+     * address as if it were a weak-link node and faulted writing to .rdata.
+     */
+    std::uint8_t mControlStateStorage[0x118];
   };
+
+  static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
 
   class CMauiEdit : public CMauiControl
   {
@@ -2743,6 +2763,12 @@ namespace moho
      */
     ~CMauiScrollbar() override;
   };
+
+  // The `IMauiDragger` sub-object has to begin at +0x11C, where
+  // `CMauiScrollbarRuntimeView` reads its vtable and dragger-list head; that
+  // holds only while `CMauiControl` reserves its full 0x11C. The remaining
+  // lanes up to the binary's 0x158 allocation live in the overlay.
+  static_assert(sizeof(CMauiScrollbar) == 0x120, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
 
   class CMauiText : public CMauiControl
   {
