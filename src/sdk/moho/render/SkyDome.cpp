@@ -422,15 +422,13 @@ void SkyDome::Destroy()
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
 
-    const int lookupOwner = reinterpret_cast<int>(watcher);
-
     // Each texture: resolve the resource by path (with fallback), then extract
     // its base GAL texture into the destination lane. Path -> lane mapping is
     // taken verbatim from the store offsets in FUN_00817850.
     const auto loadTexture =
       [&](const msvc8::string& path, boost::shared_ptr<gpg::gal::TextureD3D9>& lane) {
         ID3DDeviceResources::TextureResourceHandle textureResource;
-        resources->GetTexture(textureResource, path.c_str(), lookupOwner, true);
+        resources->GetTexture(textureResource, path.c_str(), watcher, true);
         textureResource->GetTexture(lane);
       };
 

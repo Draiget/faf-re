@@ -144,8 +144,12 @@ namespace moho
      * Loads one texture resource by path, with optional fallback, and moves the
      * resolved resource node to the tracked texture list head.
      */
-    TextureResourceHandle&
-      GetTexture(TextureResourceHandle& outTexture, const char* path, int allowCreate, bool allowFallback) override;
+    TextureResourceHandle& GetTexture(
+      TextureResourceHandle& outTexture,
+      const char* path,
+      CResourceWatcher* resourceWatcher,
+      bool allowFallback
+    ) override;
 
     /**
      * Address: 0x00441520 (FUN_00441520)
