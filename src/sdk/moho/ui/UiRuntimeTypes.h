@@ -2991,6 +2991,99 @@ namespace moho
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
   };
 
+  /**
+   * The 3D world view: the control the game renders the world into.
+   *
+   * The binary's own vtable (`??_7CUIWorldView@Moho@@6B@`, VA 0x00E49074)
+   * overrides exactly four of `CMauiControl`'s slots - `DoRender` (+0x18),
+   * `SetHidden` (+0x1C), `HandleEvent` (+0x30) and `Frame` (+0x34) - plus the
+   * reflection pair and the deleting destructor at the head; everything else is
+   * inherited. The second vtable the constructor installs at +0x11C belongs to
+   * the `IRenderWorldView` sub-object, which is still reached through
+   * `CUIWorldViewRuntimeView::mRenderWorldView`.
+   */
+  class CUIWorldView : public CMauiControl
+  {
+  public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::StaticGetClass)
+     *
+     * What it does:
+     * Returns the cached reflection type for `CUIWorldView`, resolving it via
+     * RTTI on first use.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
+     *
+     * What it does:
+     * Constructs a world-view control in place: `CMauiControl` base, the render
+     * and command-mode lanes, the camera (promoted to world camera or minimap
+     * when asked), registration of the render-world-view with the global
+     * viewport, then the `WorldViewParams` read from
+     * `/lua/ui/controls/worldview.lua`.
+     */
+    CUIWorldView(
+      LuaPlus::LuaObject* luaObject,
+      CMauiControl* parent,
+      const char* cameraName,
+      int depth,
+      bool isMiniMap,
+      const char* cameraTrack
+    );
+
+    /**
+     * Address: 0x0086EA40 (FUN_0086EA40, Moho::CUIWorldView::~CUIWorldView)
+     * Deleting dtor: 0x0086EA20 (FUN_0086EA20, Moho::CUIWorldView::dtr)
+     *
+     * What it does:
+     * Cancels any active dragger, unregisters the render-world-view from the
+     * global viewport, unlinks the weak sentinel that tracks this view, then
+     * releases the camera-track name, build-drag sub-object, command-graph
+     * reference, both command-mode blocks and the camera.
+     */
+    ~CUIWorldView() override;
+
+    /**
+     * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::GetClass)
+     *
+     * VFTable SLOT: 0
+     */
+    [[nodiscard]] gpg::RType* GetClass() const;
+
+    /**
+     * Address: 0x0086DB90 (FUN_0086DB90, Moho::CUIWorldView::GetDerivedObjectRef)
+     *
+     * VFTable SLOT: 1
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+
+    /**
+     * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::DoRender)
+     *
+     * VFTable SLOT: 6 (+0x18)
+     *
+     * What it does:
+     * Refreshes the world-view viewport bounds from the layout lazy-vars when
+     * drawing world content, otherwise dispatches the overlay draw callback.
+     */
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
+     * Address: 0x0086EC40 (FUN_0086EC40, Moho::CUIWorldView::SetHidden)
+     *
+     * VFTable SLOT: 7 (+0x1C)
+     *
+     * What it does:
+     * Forwards the hidden state to the base and then removes (hiding) or adds
+     * (showing) the render-world-view in the global viewport.
+     */
+    void SetHidden(bool hidden) override;
+  };
+
   struct CMauiControlRuntimeView
   {
     std::uint8_t mUnknown00To33[0x34]{};
@@ -8472,29 +8565,6 @@ namespace moho
    * from underlying `MeshInstance` state.
    */
   int cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::Draw)
-   *
-   * What it does:
-   * Refreshes world-view viewport lazy-var bounds when drawing world content,
-   * otherwise dispatches optional overlay draw callback state.
-   *
-   * Notes:
-   * Exposed as a free function while `CUIWorldView` remains a forward-declared
-   * runtime-owned class in this translation unit.
-   */
-  void UIWorldViewDraw(CUIWorldView* worldView, CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
-
-  /**
-   * Address: 0x0086EC40 (FUN_0086EC40, Moho::CUIWorldView::SetHidden)
-   *
-   * What it does:
-   * Adds/removes the world view's render-world-view from the global viewport
-   * when its hidden state toggles (recovered as a free function while
-   * CUIWorldView is forward-declared).
-   */
-  void UIWorldViewSetHidden(CUIWorldView* worldView, bool hidden);
 
   /**
    * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)

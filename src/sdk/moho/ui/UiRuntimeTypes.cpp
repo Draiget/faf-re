@@ -2493,8 +2493,11 @@ namespace
     std::uint8_t mHideResources;                        // +0x276
     std::uint8_t mUnknown277To27F[0x09];                // +0x277
     msvc8::string mCameraTrack;                         // +0x280
-    std::uint32_t mOverlayDrawToken;                    // +0x29C
-    std::uint32_t mUnknown2A0;                          // +0x2A0
+    // The pair at +0x29C is a weak link to the overlay this view draws, not a
+    // token: CUIWorldView::DoRender resolves it with the same `!= 0 && != 4`
+    // test and `- 4` adjustment every other sentinel in this file uses, and the
+    // destructor unlinks it from the overlay's chain.
+    moho::CMauiCurrentFocusControlRuntimeView mOverlayLink;   // +0x29C
     std::uint8_t mHighlightEnabled;                     // +0x2A4
     std::uint8_t mIconsVisible;                         // +0x2A5
     std::uint8_t mGlobalCameraCommands;                 // +0x2A6
@@ -18825,30 +18828,31 @@ namespace
   constexpr const char* kCUIWorldViewInitHelpText =
     "moho.UIWorldView:__init(parent_control, cameraName, depth, isMiniMap, trackCamera)";
 
-  /**
-   * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
-   *
-   * What it does:
-   * Constructs a world-view UI control in place at `storage`: CMauiControl base
-   * ctor, MI vtables (installed by the class machinery), ~40 field inits (incl 2
-   * command-mode copies + the build-drag subobject), camera creation, optional
-   * world-camera/minimap promotion, viewport registration, then reads
-   * WorldViewParams from /lua/ui/controls/worldview.lua.
-   */
-  moho::CUIWorldView* ConstructCUIWorldView(
-    void* const storage,
-    LuaPlus::LuaObject* const luaObj,
-    moho::CMauiControl* const parent,
-    const char* const name,
-    const int depth,
-    const bool isMiniMap,
-    const char* const cameraTrack
-  )
-  {
-    auto* const control = reinterpret_cast<moho::CMauiControl*>(storage);
-    new (control) moho::CMauiControl(luaObj, parent, msvc8::string("World View"));
+} // namespace
 
-    auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(reinterpret_cast<moho::CUIWorldView*>(storage));
+/**
+ * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
+ *
+ * What it does:
+ * Constructs a world-view UI control: CMauiControl base ctor, ~40 field inits
+ * (incl 2 command-mode copies + the build-drag subobject), camera creation,
+ * optional world-camera/minimap promotion, viewport registration, then reads
+ * WorldViewParams from /lua/ui/controls/worldview.lua.
+ */
+moho::CUIWorldView::CUIWorldView(
+  LuaPlus::LuaObject* const luaObj,
+  moho::CMauiControl* const parent,
+  const char* const name,
+  const int depth,
+  const bool isMiniMap,
+  const char* const cameraTrack
+)
+  : CMauiControl(luaObj, parent, msvc8::string("World View"))
+{
+  {
+    auto* const control = static_cast<moho::CMauiControl*>(this);
+
+    auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(this);
 
     view->mCamera = nullptr;                              // +0x120
     view->mCachedViewLeft = -1.0f;                        // +0x124
@@ -18877,8 +18881,7 @@ namespace
 
     new (&view->mCameraTrack) msvc8::string(cameraTrack, std::strlen(cameraTrack)); // +0x280
 
-    view->mOverlayDrawToken = 0;                          // +0x29C
-    view->mUnknown2A0 = 0;                                // +0x2A0
+    view->mOverlayLink = {};                              // +0x29C
     view->mHighlightEnabled = 1;                          // +0x2A4
     view->mIconsVisible = 1;                              // +0x2A5
     view->mGlobalCameraCommands = 0;                      // +0x2A6
@@ -18930,9 +18933,94 @@ namespace
       }
     }
 
-    return reinterpret_cast<moho::CUIWorldView*>(storage);
   }
-} // namespace
+}
+
+gpg::RType* moho::CUIWorldView::sType = nullptr;
+
+/**
+ * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::StaticGetClass)
+ *
+ * What it does:
+ * Returns the cached reflection type for `CUIWorldView`, resolving it through
+ * RTTI on first use.
+ */
+gpg::RType* moho::CUIWorldView::StaticGetClass()
+{
+  if (sType == nullptr) {
+    sType = gpg::LookupRType(typeid(CUIWorldView));
+  }
+  return sType;
+}
+
+/**
+ * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::GetClass)
+ *
+ * VFTable SLOT: 0
+ */
+gpg::RType* moho::CUIWorldView::GetClass() const
+{
+  return StaticGetClass();
+}
+
+/**
+ * Address: 0x0086DB90 (FUN_0086DB90, Moho::CUIWorldView::GetDerivedObjectRef)
+ *
+ * VFTable SLOT: 1
+ *
+ * What it does:
+ * Builds the reflected reference the Lua bridge upcasts from - this pointer
+ * plus the type the slot above resolves.
+ */
+gpg::RRef moho::CUIWorldView::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
+ * Address: 0x0086EA40 (FUN_0086EA40, Moho::CUIWorldView::~CUIWorldView)
+ * Deleting dtor: 0x0086EA20 (FUN_0086EA20, Moho::CUIWorldView::dtr)
+ *
+ * What it does:
+ * Tears the world view down in the binary's order: cancel any dragger still
+ * held, unregister the render-world-view from the global viewport, unlink the
+ * overlay weak link, then release the camera-track name, the build-drag
+ * sub-object, the command-graph reference, both command-mode blocks and the
+ * camera. The `IRenderWorldView` vtable restore and the chain into
+ * `~CMauiControl` are emitted by the compiler.
+ */
+moho::CUIWorldView::~CUIWorldView()
+{
+  auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(this);
+
+  // A dragger outlives the control that posted it, so a view destroyed mid-drag
+  // leaves the global lane pointing into freed memory.
+  if (IMauiDragger* const currentDragger = func_GetCurrentDragger(); currentDragger != nullptr) {
+    currentDragger->OnCurrentDraggerReplaced();
+    (void)func_SetCurDragger(nullptr);
+    sCurrentDraggerKeycode = 0;
+  }
+
+  ren_Viewport->RemoveWorldView(reinterpret_cast<IRenderWorldView*>(&view->mRenderVftable));
+
+  UnlinkFocusControlSentinel(&view->mOverlayLink);
+
+  view->mCameraTrack = msvc8::string();
+  view->mSubobject.~CUIWorldViewBuildDragRuntimeView();
+  view->mComGraph = {};
+
+  view->mCommandData = {};
+  view->mLeftMouseCommand = {};
+
+  // Vtable slot 0 with the delete flag set - the scalar deleting destructor.
+  if (CameraImpl* const camera = view->mCamera; camera != nullptr) {
+    delete camera;
+    view->mCamera = nullptr;
+  }
+}
 
 /**
  * Address: 0x00871710 (FUN_00871710, cfunc_CUIWorldView__initL)
@@ -18986,8 +19074,7 @@ int moho::cfunc_CUIWorldView__initL(LuaPlus::LuaState* const state)
       nameArg.TypeError("string");
     }
 
-    worldView =
-      ConstructCUIWorldView(storage, &selfObject, parent, cameraName, depth, isMiniMap, trackCamera.c_str());
+    worldView = new (storage) CUIWorldView(&selfObject, parent, cameraName, depth, isMiniMap, trackCamera.c_str());
   }
 
   reinterpret_cast<CMauiControl*>(worldView)->DoInit();
@@ -20909,20 +20996,18 @@ void moho::UIWorldViewUpdateCursorEngineStats(
  * (when showing) the render-world-view into the global viewport, using the
  * root-frame event handler and the view's render depth.
  *
- * Notes:
- * Recovered as a free function while `CUIWorldView` remains forward-declared.
+ * VFTable SLOT: 7 (+0x1C)
  */
-void moho::UIWorldViewSetHidden(CUIWorldView* const worldView, const bool hidden)
+void moho::CUIWorldView::SetHidden(const bool hidden)
 {
-  reinterpret_cast<CMauiControl*>(worldView)->CMauiControl::SetHidden(hidden);
+  CMauiControl::SetHidden(hidden);
 
-  CUIWorldViewRuntimeView* const view = CUIWorldViewRuntimeView::FromWorldView(worldView);
+  CUIWorldViewRuntimeView* const view = CUIWorldViewRuntimeView::FromWorldView(this);
   auto* const renderView = reinterpret_cast<IRenderWorldView*>(&view->mRenderWorldView);
   if (hidden) {
     ren_Viewport->RemoveWorldView(renderView);
   } else {
-    CMauiControl* const rootFrame =
-      CMauiControlExtendedRuntimeView::FromControl(reinterpret_cast<CMauiControl*>(worldView))->mRootFrame;
+    CMauiControl* const rootFrame = CMauiControlExtendedRuntimeView::FromControl(this)->mRootFrame;
     // +0x130 on the root frame, which is a CMauiFrame - not a control field.
     CMauiFrameRuntimeView* const rootFrameView =
       CMauiFrameRuntimeView::FromFrame(reinterpret_cast<CMauiFrame*>(rootFrame));
@@ -20937,16 +21022,11 @@ void moho::UIWorldViewSetHidden(CUIWorldView* const worldView, const bool hidden
  * Refreshes world-view viewport lazy-var bounds when drawing world content,
  * otherwise dispatches optional overlay draw callback state.
  *
- * Notes:
- * Recovered as a free function while `CUIWorldView` remains forward-declared.
+ * VFTable SLOT: 6 (+0x18)
  */
-void moho::UIWorldViewDraw(
-  CUIWorldView* const worldView,
-  CD3DPrimBatcher* const primBatcher,
-  const std::int32_t drawMask
-)
+void moho::CUIWorldView::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
 {
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
+  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(this);
   if (drawMask == 1) {
     const float left = CScriptLazyVar_float::GetValue(&worldViewView->mViewLeft);
     const float top = CScriptLazyVar_float::GetValue(&worldViewView->mViewTop);
