@@ -1968,10 +1968,13 @@ public:
   [[nodiscard]] virtual bool GetThemeEnabled() const;
 
   /**
-   * Address: 0x00967650
+   * Address: 0x00967650 (FUN_00967650, wxWindow::SetFocus)
    * Mangled: ?SetFocus@wxWindow@@UAEXXZ
+   *
+   * What it does:
+   * Hands the Win32 keyboard focus to this window's own HWND.
    */
-  virtual void SetFocus() {}
+  virtual void SetFocus();
   /**
    * Address: 0x0042B630 (FUN_0042B630)
    * Mangled: ?SetFocusFromKbd@wxWindowBase@@UAEXXZ

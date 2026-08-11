@@ -38198,6 +38198,39 @@ bool wxWindowBase::GetThemeEnabled() const
 }
 
 /**
+ * Address: 0x00967650 (FUN_00967650, wxWindow::SetFocus)
+ * Mangled: ?SetFocus@wxWindow@@UAEXXZ
+ *
+ * IDA signature:
+ * HWND __thiscall wxWindow::SetFocus(wxWindow *this);
+ *
+ * What it does:
+ * Hands the Win32 keyboard focus to this window's own HWND, clearing the
+ * thread's last error first so the caller can tell a genuine failure from a
+ * stale code. A window with no native handle yet is left alone.
+ *
+ * This was an empty inline stub, and the consequence was that keyboard input
+ * never worked at all: WM_KEYDOWN and WM_CHAR go to whichever HWND holds the
+ * focus, the focus stayed on the top-level frame because nothing ever moved
+ * it, and the MAUI event mapper is bound to the render child. Clicking an edit
+ * box ran the click handler through the child's WM_LBUTTONDOWN - which asks
+ * for the focus right here - and then every keystroke went to the frame and
+ * was dropped.
+ */
+void wxWindowBase::SetFocus()
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  HWND const nativeWindowHandle =
+    state != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(state->nativeHandle)) : nullptr;
+  if (nativeWindowHandle == nullptr) {
+    return;
+  }
+
+  ::SetLastError(0);
+  (void)::SetFocus(nativeWindowHandle);
+}
+
+/**
  * Address: 0x0042B630 (FUN_0042B630)
  * Mangled: ?SetFocusFromKbd@wxWindowBase@@UAEXXZ
  */
