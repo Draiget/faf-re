@@ -21136,6 +21136,37 @@ moho::CMauiControl::CMauiControl(
  */
 moho::CMauiControl::~CMauiControl()
 {
+  // Detach every focus sentinel still pointing at this control.
+  //
+  // A sentinel stores the control's address and resolves by plain arithmetic -
+  // it does not and cannot notice that the control died - so any sentinel left
+  // linked here keeps handing out this pointer after the memory is freed and
+  // reused. The mouse dispatcher parks one on the stack for the duration of an
+  // event, which is exactly the window in which script can destroy the control
+  // it is tracking; the splash screen does that on the click that leaves it.
+  // Clearing the chain makes every such sentinel resolve to null instead, which
+  // is what the re-resolve in OnMouseMove is checking for.
+  //
+  // The chain head lives at `this + offsetof(TDatListItem, mNext)` and each
+  // sentinel links through mNextPrevNextField; both 0 and the bare offset mean
+  // "empty" in this encoding (see ResolveControlFromFocusField).
+  {
+    auto* const sentinelChainHead = reinterpret_cast<std::uint32_t*>(
+      reinterpret_cast<std::uintptr_t>(this) + kCMauiControlListNodeNextOffset
+    );
+    std::uint32_t sentinelCursor = *sentinelChainHead;
+    while (sentinelCursor != 0u && sentinelCursor != kCMauiControlListNodeNextOffset) {
+      auto* const sentinel = reinterpret_cast<CMauiCurrentFocusControlRuntimeView*>(
+        static_cast<std::uintptr_t>(sentinelCursor)
+      );
+      const std::uint32_t nextSentinel = sentinel->mNextPrevNextField;
+      sentinel->mFocusedControlPrevNextField = 0u;
+      sentinel->mNextPrevNextField = 0u;
+      sentinelCursor = nextSentinel;
+    }
+    *sentinelChainHead = 0u;
+  }
+
   // Drop the two process-wide sentinels if either still names this control.
   // They outlive any single control, and nothing else clears them: a destroyed
   // control left in the mouse-over lane is read back on the next mouse event,
