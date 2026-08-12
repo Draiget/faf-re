@@ -3,8 +3,29 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EScrollTypeTypeInfo> gEScrollTypeTypeInfoStorage{};
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x007771B0 (FUN_007771B0, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EScrollTypeTypeInfo()
+  {
+    return &gEScrollTypeTypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x007771B0 (FUN_007771B0, Moho::EScrollTypeTypeInfo::ctor)
    *
@@ -53,3 +74,8 @@ namespace moho
     AddEnum(StripPrefix("SCROLLTYPE_MotionDerived"), static_cast<std::int32_t>(SCROLLTYPE_MotionDerived));
   }
 } // namespace moho
+
+// Phase-1 pre-registration: CTextureScroller caches the reflected EScrollType
+// through gpg::LookupRType, so the descriptor must exist before that consumer
+// runs. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EScrollTypeTypeInfo_7771b0, moho::preregister_EScrollTypeTypeInfo)

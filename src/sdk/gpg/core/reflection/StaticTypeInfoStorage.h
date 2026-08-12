@@ -62,6 +62,22 @@ namespace gpg
       return mConstructed;
     }
 
+    /**
+     * Destroys the descriptor if it exists. Only the few descriptors whose
+     * binary registrar hands their destructor to `atexit` need this; the
+     * rest deliberately never run one. Clearing the flag is what keeps a
+     * second teardown from destroying an already-dead object.
+     */
+    void Destroy() noexcept
+    {
+      if (!mConstructed) {
+        return;
+      }
+
+      mConstructed = false;
+      Ref().~TTypeInfo();
+    }
+
   private:
     alignas(TTypeInfo) unsigned char mBytes[sizeof(TTypeInfo)]{};
     bool mConstructed{false};

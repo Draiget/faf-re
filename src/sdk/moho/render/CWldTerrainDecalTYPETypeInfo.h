@@ -75,4 +75,18 @@ namespace moho
   };
 
   static_assert(sizeof(CWldTerrainDecalTYPETypeInfo) == 0x78, "CWldTerrainDecalTYPETypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x0089C8A0 (FUN_0089C8A0, static-init lane)
+   *
+   * IDA signature:
+   * gpg::REnumType *sub_89C8A0();
+   *
+   * What it does:
+   * Constructs the static `CWldTerrainDecalTYPETypeInfo` descriptor
+   * (`stru_10C5278` in the binary) in place and returns it; construction
+   * preregisters `EWldTerrainDecalType` with the reflection registry. Called
+   * from the CRT static-initializer array via FUN_00BE7CC0.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_CWldTerrainDecalTYPETypeInfo();
 } // namespace moho
