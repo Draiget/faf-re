@@ -3,10 +3,11 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/entity/EntityCategorySetTypeInfo.h"
 
 namespace moho
 {
-  class EntityCategoryTypeInfo final : public gpg::RType
+  class EntityCategoryTypeInfo final : public BVSetRType<const RBlueprint*, EntityCategoryHelper>
   {
   public:
     /**

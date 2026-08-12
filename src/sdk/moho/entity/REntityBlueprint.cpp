@@ -72,12 +72,14 @@ namespace moho
     , mStrategicIconSelectedOver()
   {
     if (owner) {
-      const RBlueprint base(owner, resId);
-      mOwner = base.mOwner;
-      mBlueprintId = base.mBlueprintId;
-      mBlueprintLabel = base.mDescription;
-      mSource = base.mSource;
-      mCategoryBitIndex = static_cast<std::uint32_t>(base.mBlueprintOrdinal);
+      // The binary runs RBlueprint's constructor on this very object, whose
+      // prefix is the base sub-object. Building a temporary base here and
+      // copying out of it counted an extra instance and, worse, ran the base
+      // destructor on an object whose vtable word was still null.
+      std::int32_t blueprintOrdinal = 0;
+      RBlueprint::InitIdentity(owner, resId, mBlueprintId, blueprintOrdinal);
+      mOwner = owner;
+      mCategoryBitIndex = static_cast<std::uint32_t>(blueprintOrdinal);
     } else {
       mOwner = nullptr;
       mBlueprintId.clear();

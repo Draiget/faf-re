@@ -14,7 +14,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/RResId.h"
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -250,15 +250,25 @@ namespace moho
     , mSource()
     , mBlueprintOrdinal(0)
   {
+    InitIdentity(owner, resId, mBlueprintId, mBlueprintOrdinal);
+  }
+
+  void RBlueprint::InitIdentity(
+    RRuleGameRules* const owner,
+    const RResId& resId,
+    msvc8::string& outBlueprintId,
+    std::int32_t& outOrdinal
+  )
+  {
     AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), 1L);
 
     // The original ctor reads the source-id buffer with `strlen`, so a string
     // containing embedded null bytes truncates exactly the same way.
     const char* const sourceData = resId.name.c_str();
     const std::size_t sourceLen = std::strlen(sourceData);
-    mBlueprintId.assign(sourceData, sourceLen);
+    outBlueprintId.assign(sourceData, sourceLen);
 
-    mBlueprintOrdinal = owner->AssignNextOrdinal();
+    outOrdinal = owner->AssignNextOrdinal();
   }
 
   /**
@@ -277,7 +287,12 @@ namespace moho
     mBlueprintId.tidy(true, 0U);
 
     AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), -1L);
-    reinterpret_cast<gpg::RObject*>(this)->~RObject();
+
+    // The binary ends here by storing the gpg::RObject vtable into the object's
+    // first word, which is the inlined base destructor. This layout keeps that
+    // word as a plain `mVTable` field rather than inheriting RObject, so there
+    // is no base sub-object to unwind. Reaching for `~RObject()` through a cast
+    // would dispatch a virtual call on whatever `mVTable` happens to hold.
   }
 
   /**
