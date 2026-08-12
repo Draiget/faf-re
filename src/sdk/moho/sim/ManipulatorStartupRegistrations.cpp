@@ -18,7 +18,9 @@
 #include "moho/console/CConCommand.h"
 #include "moho/containers/BitStorage32.h"
 #include "legacy/containers/Vector.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -789,6 +791,16 @@ namespace moho
     return RegisterRecoveredFactoryIndex<&gRecoveredCScrLuaMetatableFactoryCFootPlantManipulatorIndex>();
   }
 
+  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
+  {
+    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+      return *set;
+    }
+
+    static CScrLuaInitFormSet fallbackSet("Sim");
+    return fallbackSet;
+  }
+
   /**
    * Address: 0x00BD2C00 (FUN_00BD2C00, register_sim_SimInits_mForms_offVariant9)
    *
@@ -798,7 +810,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant9()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B34, &gRecoveredSimLuaInitFormAnchor_off_F59B34>();
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.manipulator_methods", &CScrLuaMetatableFactory<IAniManipulator>::Instance(), "IAniManipulator", ""
+    );
+    return &binder;
   }
 
   /**

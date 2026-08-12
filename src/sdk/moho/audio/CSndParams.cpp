@@ -19,6 +19,7 @@
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/SParamKey.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
@@ -1453,6 +1454,21 @@ GPG_PREREGISTER_INIT(PreregisterCSndParamsPointerType_ce959d, moho::PreregisterC
 namespace
 {
   /**
+   * Address: 0x00BC6A90 (FUN_00BC6A90) -- record at 0x00F596F8
+   *
+   * What it does:
+   * Publishes HSound's method table as `moho.sound_methods`;
+   * Lua reaches playing sound handles through this table.
+   */
+  moho::CScrLuaInitForm* register_moho_sound_methods()
+  {
+    static moho::CScrLuaClassBinder binder(
+      CoreLuaInitSet(), "moho.sound_methods", &moho::CScrLuaMetatableFactory<moho::HSound>::Instance(), "HSound", ""
+    );
+    return &binder;
+  }
+
+  /**
    * Drives this file's Lua binder definitions.
    *
    * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
@@ -1474,6 +1490,7 @@ namespace
       (void)::moho::func_Sound_LuaFuncDef();
       (void)::moho::func_RPCSound_LuaFuncDef();
       (void)::moho::func_GetCueBank_LuaFuncDef();
+      (void)register_moho_sound_methods();
     }
   };
 

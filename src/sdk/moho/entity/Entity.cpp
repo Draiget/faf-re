@@ -5239,7 +5239,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityCreateProjectileName,
       &cfunc_EntityCreateProjectile,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityCreateProjectileHelpText
     );
@@ -5381,7 +5381,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityCreateProjectileAtBoneName,
       &cfunc_EntityCreateProjectileAtBone,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityCreateProjectileAtBoneHelpText
     );
@@ -5495,7 +5495,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityShakeCameraName,
       &cfunc_EntityShakeCamera,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityShakeCameraHelpText
     );
@@ -5733,7 +5733,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetAIBrainName,
       &cfunc_EntityGetAIBrain,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetAIBrainHelpText
     );
@@ -5804,7 +5804,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetBlueprintName,
       &cfunc_EntityGetBlueprint,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetBlueprintHelpText
     );
@@ -5859,7 +5859,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetArmyName,
       &cfunc_EntityGetArmy,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetArmyHelpText
     );
@@ -5918,7 +5918,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetBoneDirectionName,
       &cfunc_EntityGetBoneDirection,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetBoneDirectionHelpText
     );
@@ -5978,7 +5978,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityIsValidBoneName,
       &cfunc_EntityIsValidBone,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityIsValidBoneHelpText
     );
@@ -6057,7 +6057,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetBoneCountName,
       &cfunc_EntityGetBoneCount,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetBoneCountHelpText
     );
@@ -6107,7 +6107,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetBoneNameName,
       &cfunc_EntityGetBoneName,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetBoneNameHelpText
     );
@@ -6170,7 +6170,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityRequestRefreshUIName,
       &cfunc_EntityRequestRefreshUI,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityRequestRefreshUIHelpText
     );
@@ -6220,7 +6220,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAttachBoneToName,
       &cfunc_EntityAttachBoneTo,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAttachBoneToHelpText
     );
@@ -6250,7 +6250,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetParentOffsetName,
       &cfunc_EntitySetParentOffset,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetParentOffsetHelpText
     );
@@ -6313,7 +6313,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityDetachFromName,
       &cfunc_EntityDetachFrom,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityDetachFromHelpText
     );
@@ -6378,7 +6378,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetParentName,
       &cfunc_EntityGetParent,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetParentHelpText
     );
@@ -6433,7 +6433,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetCollisionExtentsName,
       &cfunc_EntityGetCollisionExtents,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetCollisionExtentsHelpText
     );
@@ -6464,7 +6464,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityPlaySoundName,
       &cfunc_EntityPlaySound,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityPlaySoundHelpText
     );
@@ -6523,7 +6523,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetAmbientSoundName,
       &cfunc_EntitySetAmbientSound,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetAmbientSoundHelpText
     );
@@ -6588,7 +6588,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetFractionCompleteName,
       &cfunc_EntityGetFractionComplete,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetFractionCompleteHelpText
     );
@@ -6638,7 +6638,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAdjustHealthName,
       &cfunc_EntityAdjustHealth,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAdjustHealthHelpText
     );
@@ -6703,7 +6703,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetHealthName,
       &cfunc_EntityGetHealth,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetHealthHelpText
     );
@@ -6753,7 +6753,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetMaxHealthName,
       &cfunc_EntityGetMaxHealth,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetMaxHealthHelpText
     );
@@ -6803,7 +6803,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetHealthName,
       &cfunc_EntitySetHealth,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetHealthHelpText
     );
@@ -6866,7 +6866,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetMaxHealthName,
       &cfunc_EntitySetMaxHealth,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetMaxHealthHelpText
     );
@@ -6921,7 +6921,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetVizToFocusPlayerName,
       &cfunc_EntitySetVizToFocusPlayer,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetVizToFocusPlayerHelpText
     );
@@ -6966,7 +6966,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetVizToEnemiesName,
       &cfunc_EntitySetVizToEnemies,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetVizToEnemiesHelpText
     );
@@ -7010,7 +7010,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetVizToAlliesName,
       &cfunc_EntitySetVizToAllies,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetVizToAlliesHelpText
     );
@@ -7053,7 +7053,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetVizToNeutralsName,
       &cfunc_EntitySetVizToNeutrals,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetVizToNeutralsHelpText
     );
@@ -7097,7 +7097,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetEntityIdName,
       &cfunc_EntityGetEntityId,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetEntityIdHelpText
     );
@@ -7148,7 +7148,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityDetachAllName,
       &cfunc_EntityDetachAll,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityDetachAllHelpText
     );
@@ -7251,7 +7251,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetCollisionShapeName,
       &cfunc_EntitySetCollisionShape,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetCollisionShapeHelpText
     );
@@ -7338,7 +7338,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityReachedMaxShootersName,
       &cfunc_EntityReachedMaxShooters,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityReachedMaxShootersHelpText
     );
@@ -7392,7 +7392,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetOrientationName,
       &cfunc_EntityGetOrientation,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetOrientationHelpText
     );
@@ -7451,7 +7451,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetHeadingName,
       &cfunc_EntityGetHeading,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetHeadingHelpText
     );
@@ -7506,7 +7506,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityGetScaleName,
       &cfunc_EntityGetScale,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityGetScaleHelpText
     );
@@ -7560,7 +7560,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAddLocalImpulseName,
       &cfunc_EntityAddLocalImpulse,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAddLocalImpulseHelpText
     );
@@ -7634,7 +7634,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAddWorldImpulseName,
       &cfunc_EntityAddWorldImpulse,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAddWorldImpulseHelpText
     );
@@ -7696,7 +7696,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetMeshName,
       &cfunc_EntitySetMesh,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetMeshHelpText
     );
@@ -7773,7 +7773,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetScaleName,
       &cfunc_EntitySetScale,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetScaleHelpText
     );
@@ -7864,7 +7864,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAddManualScrollerName,
       &cfunc_EntityAddManualScroller,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAddManualScrollerHelpText
     );
@@ -7925,7 +7925,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAddThreadScrollerName,
       &cfunc_EntityAddThreadScroller,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAddThreadScrollerHelpText
     );
@@ -7983,7 +7983,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityAddPingPongScrollerName,
       &cfunc_EntityAddPingPongScroller,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityAddPingPongScrollerHelpText
     );
@@ -8049,7 +8049,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityRemoveScrollerName,
       &cfunc_EntityRemoveScroller,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityRemoveScrollerHelpText
     );
@@ -8100,7 +8100,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityDestroyName,
       &cfunc_EntityDestroy,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityDestroyHelpText
     );
@@ -8157,7 +8157,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityBeenDestroyedName,
       &cfunc_EntityBeenDestroyed,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityBeenDestroyedHelpText
     );
@@ -8220,7 +8220,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityKillName,
       &cfunc_EntityKill,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityKillHelpText
     );
@@ -8321,7 +8321,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySetDrawScaleName,
       &cfunc_EntitySetDrawScale,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySetDrawScaleHelpText
     );
@@ -8425,7 +8425,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityFallDownName,
       &cfunc_EntityFallDown,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityFallDownHelpText
     );
@@ -8511,7 +8511,7 @@ namespace moho
       SimLuaInitSet(),
       kEntitySinkAwayName,
       &cfunc_EntitySinkAway,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntitySinkAwayHelpText
     );
@@ -8634,7 +8634,7 @@ namespace moho
       SimLuaInitSet(),
       kEntityPushOverName,
       &cfunc_EntityPushOver,
-      &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
       kEntityLuaClassName,
       kEntityPushOverHelpText
     );

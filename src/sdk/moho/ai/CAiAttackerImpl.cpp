@@ -2398,7 +2398,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplIsWithinAttackRangeName,
     &moho::cfunc_CAiAttackerImplIsWithinAttackRange,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplIsWithinAttackRangeHelpText
   );
@@ -2452,7 +2452,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetUnit_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplGetUnitName,
     &moho::cfunc_CAiAttackerImplGetUnit,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplGetUnitHelpText
   );
@@ -2471,7 +2471,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplAttackerWeaponsBusyName,
     &moho::cfunc_CAiAttackerImplAttackerWeaponsBusy,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplAttackerWeaponsBusyHelpText
   );
@@ -2490,7 +2490,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetWeaponCount_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplGetWeaponCountName,
     &moho::cfunc_CAiAttackerImplGetWeaponCount,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplGetWeaponCountHelpText
   );
@@ -2509,7 +2509,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplSetDesiredTarget_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplSetDesiredTargetName,
     &moho::cfunc_CAiAttackerImplSetDesiredTarget,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplSetDesiredTargetHelpText
   );
@@ -2528,7 +2528,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetDesiredTarget_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplGetDesiredTargetName,
     &moho::cfunc_CAiAttackerImplGetDesiredTarget,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplGetDesiredTargetHelpText
   );
@@ -2547,7 +2547,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplStop_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplStopName,
     &moho::cfunc_CAiAttackerImplStop,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplStopHelpText
   );
@@ -2566,7 +2566,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplCanAttackTarget_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplCanAttackTargetName,
     &moho::cfunc_CAiAttackerImplCanAttackTarget,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplCanAttackTargetHelpText
   );
@@ -2585,7 +2585,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplFindBestEnemy_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplFindBestEnemyName,
     &moho::cfunc_CAiAttackerImplFindBestEnemy,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplFindBestEnemyHelpText
   );
@@ -2604,7 +2604,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetTargetWeapon_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplGetTargetWeaponName,
     &moho::cfunc_CAiAttackerImplGetTargetWeapon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplGetTargetWeaponHelpText
   );
@@ -2623,7 +2623,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplGetPrimaryWeaponName,
     &moho::cfunc_CAiAttackerImplGetPrimaryWeapon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplGetPrimaryWeaponHelpText
   );
@@ -2642,7 +2642,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplGetMaxWeaponRangeName,
     &moho::cfunc_CAiAttackerImplGetMaxWeaponRange,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplGetMaxWeaponRangeHelpText
   );
@@ -2661,7 +2661,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsTooClose_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplIsTooCloseName,
     &moho::cfunc_CAiAttackerImplIsTooClose,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplIsTooCloseHelpText
   );
@@ -2717,7 +2717,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsTargetExempt_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplIsTargetExemptName,
     &moho::cfunc_CAiAttackerImplIsTargetExempt,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplIsTargetExemptHelpText
   );
@@ -2779,7 +2779,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplHasSlavedTarget_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplHasSlavedTargetName,
     &moho::cfunc_CAiAttackerImplHasSlavedTarget,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplHasSlavedTargetHelpText
   );
@@ -2832,7 +2832,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplResetReportingState_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplResetReportingStateName,
     &moho::cfunc_CAiAttackerImplResetReportingState,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplResetReportingStateHelpText
   );
@@ -2888,7 +2888,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplForceEngage_LuaFuncDef()
     SimLuaInitSet(),
     kAiAttackerImplForceEngageName,
     &moho::cfunc_CAiAttackerImplForceEngage,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
     kAiAttackerImplLuaClassName,
     kAiAttackerImplForceEngageHelpText
   );

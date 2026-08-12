@@ -11,6 +11,7 @@
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
@@ -627,6 +628,21 @@ GPG_PREREGISTER_INIT(preregister_ShieldTypeInfo_0bcbf6, moho::preregister_Shield
 namespace
 {
   /**
+   * Address: 0x00BDD4C0 (FUN_00BDD4C0) -- record at 0x00F5A1A4
+   *
+   * What it does:
+   * Publishes Shield's method table as `moho.shield_methods`;
+   * /lua/shield.lua builds its class from this table.
+   */
+  moho::CScrLuaInitForm* register_moho_shield_methods()
+  {
+    static moho::CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.shield_methods", &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(), "Shield", ""
+    );
+    return &binder;
+  }
+
+  /**
    * Drives this file's Lua binder definitions.
    *
    * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
@@ -646,6 +662,7 @@ namespace
     ShieldLuaFuncDefBootstrap()
     {
       (void)::moho::func__c_CreateShield_LuaFuncDef();
+      (void)register_moho_shield_methods();
     }
   };
 

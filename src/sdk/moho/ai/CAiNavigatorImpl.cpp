@@ -11,6 +11,7 @@
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiBrain.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
@@ -104,8 +105,6 @@ namespace
   constexpr const char* kNavigatorAtGoalMethodName = "AtGoal";
   constexpr const char* kNavigatorCanPathToGoalMethodName = "CanPathToGoal";
   constexpr const char* kNavigatorEmptyHelpText = "";
-  CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59970 = nullptr;
-  CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59960 = nullptr;
 
   template <std::uintptr_t SlotAddress>
   struct StartupEngineStatsSlot
@@ -1145,22 +1144,16 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplCanPathToGoal_LuaFuncDef()
  * Address: 0x00BCC760 (FUN_00BCC760)
  *
  * What it does:
- * Captures the current `sim` Lua-init chain head for recovery bookkeeping.
+ * Publishes CAiNavigatorImpl's method table as `moho.navigator_methods`.
+ * The record it links lives at 0x00F59960 in .data.
  */
 CScrLuaInitForm* moho::register_CAiNavigatorImplLuaInitFormAnchor()
 {
-  CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-  if (simSet == nullptr) {
-    gRecoveredSimLuaInitFormPrev_off_F59970 = nullptr;
-    gRecoveredSimLuaInitFormAnchor_off_F59960 = nullptr;
-    return nullptr;
-  }
-
-  CScrLuaInitForm* const previousHead = simSet->mForms;
-  gRecoveredSimLuaInitFormPrev_off_F59970 = previousHead;
-  gRecoveredSimLuaInitFormAnchor_off_F59960 = previousHead;
-  simSet->mForms = gRecoveredSimLuaInitFormAnchor_off_F59960;
-  return previousHead;
+  static CScrLuaClassBinder binder(
+    SimLuaInitSet(), "moho.navigator_methods", &CScrLuaMetatableFactory<CAiNavigatorImpl>::Instance(),
+    "CAiNavigatorImpl", ""
+  );
+  return &binder;
 }
 
 /**

@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 namespace moho
 {
@@ -861,6 +863,16 @@ namespace moho
     return ForwardAiBrainLuaRegistrationThunk<&func_CAiBrainGetNoRushTicks_LuaFuncDef>();
   }
 
+  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
+  {
+    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+      return *set;
+    }
+
+    static CScrLuaInitFormSet fallbackSet("Sim");
+    return fallbackSet;
+  }
+
   /**
    * Address: 0x00BCB6C0 (FUN_00BCB6C0, sub_BCB6C0)
    *
@@ -870,22 +882,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_resourceDepositFactoryAnchor()
   {
-    CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("Sim");
-    if (simSet == nullptr) {
-      gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised form
-    // object in .data with no constructor, so it patches the list by hand. Our
-    // equivalent is a real C++ object whose constructor already calls AddInit,
-    // and re-doing it here published the address of a CScrLuaInitForm* variable
-    // as the list head - a null vtable pointer that crashed
-    // RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gRecoveredSimLuaInitFormAnchor_ResourceDepositStartup);
-    return result;
+    static CScrLuaClassBinder binder(
+      ClassBinderSimLuaInitSet(), "moho.aibrain_methods", &CScrLuaMetatableFactory<CAiBrain>::Instance(), "CAiBrain", ""
+    );
+    return &binder;
   }
 
   /**
