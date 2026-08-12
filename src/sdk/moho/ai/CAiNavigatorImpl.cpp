@@ -278,27 +278,6 @@ namespace
     return goal;
   }
 
-  /**
-   * Address: 0x00409A40 (FUN_00409A40, func_CreateCTaskThread)
-   *
-   * What it does:
-   * Allocates one CTaskThread and links `dispatch` as task-top while preserving
-   * prior top in `dispatch->mSubtask`.
-   */
-  [[nodiscard]] CTaskThread* CreateTaskThreadForDispatch(CTask* const dispatch, CTaskStage* const stage, const bool autoDelete)
-  {
-    if (!dispatch) {
-      return nullptr;
-    }
-
-    auto* const taskThread = new CTaskThread(stage);
-    dispatch->mAutoDelete = autoDelete;
-    dispatch->mOwnerThread = taskThread;
-    dispatch->mSubtask = taskThread->mTaskTop;
-    taskThread->mTaskTop = dispatch;
-    return taskThread;
-  }
-
   void DispatchNavigatorEventList(TDatListItem<void, void>& listenerHead, const std::int32_t eventCode)
   {
     TDatList<void, void> pending{};
@@ -1434,7 +1413,7 @@ CAiNavigatorImpl::CAiNavigatorImpl(Unit* const unit)
   GPG_ASSERT(unit->ArmyRef != nullptr);
   CAiBrain* const brain = unit->ArmyRef->GetArmyBrain();
   GPG_ASSERT(brain != nullptr);
-  CreateTaskThreadForDispatch(static_cast<CTask*>(this), brain->mAiThreadStage, false);
+  CTask::CreateTaskThread(static_cast<CTask*>(this), brain->mAiThreadStage, false);
 }
 
 /**

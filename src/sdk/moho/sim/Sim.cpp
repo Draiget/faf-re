@@ -9930,16 +9930,8 @@ void Sim::Setup(LaunchInfoNew* const info)
 {
   mCheatsEnabled = info->mCheatsEnabled;
 
-  // Disk-watcher task, staged on the disk-watcher task stage (binary:
-  // CTask::CreateTaskThread(diskWatcher, &mDiskWatcherTaskStage, true)).
-  {
-    auto* const diskWatcher = new ScrDiskWatcherTask(mLuaState);
-    auto* const thread = new CTaskThread(&mDiskWatcherTaskStage);
-    diskWatcher->mAutoDelete = true;
-    diskWatcher->mOwnerThread = thread;
-    diskWatcher->mSubtask = thread->mTaskTop;
-    thread->mTaskTop = diskWatcher;
-  }
+  // Disk-watcher task, staged on the disk-watcher task stage.
+  (void)CTask::CreateTaskThread(new ScrDiskWatcherTask(mLuaState), &mDiskWatcherTaskStage, true);
 
   // Decal buffer.
   {

@@ -430,23 +430,6 @@ namespace
     return Wm3::Vector3fIsntNaN(&intersection) && hit.distance <= length;
   }
 
-  void AttachTaskToStage(CTask* const task, CTaskStage* const stage, const bool owning)
-  {
-    if (task == nullptr || stage == nullptr || task->mOwnerThread != nullptr) {
-      return;
-    }
-
-    CTaskThread* const thread = new CTaskThread(stage);
-    if (thread == nullptr) {
-      return;
-    }
-
-    task->mAutoDelete = owning;
-    task->mOwnerThread = thread;
-    task->mSubtask = thread->mTaskTop;
-    thread->mTaskTop = task;
-  }
-
   /**
    * Address: 0x005D9520 (FUN_005D9520, helper for CAcquireTargetTask scheduling)
    *
@@ -951,7 +934,7 @@ UnitWeapon* CAiAttackerImpl::CreateWeapon(RUnitBlueprintWeapon* const weaponBlue
 
   if (weaponBlueprint->ManualFire == 0u) {
     CAcquireTargetTask* const task = new CAcquireTargetTask(weapon, this);
-    AttachTaskToStage(task, &view->mStage, false);
+    (void)CTask::CreateTaskThread(task, &view->mStage, false);
     view->mTasks.push_back(task);
   }
 
