@@ -5,8 +5,13 @@
 
 #include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
+#include "moho/misc/WeakObject.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/sim/CIntelGrid.h"
+#include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
+#include "moho/sim/WeakEntitySet.h"
 #include "Wm3Vector3.h"
 
 namespace LuaPlus
@@ -18,8 +23,16 @@ namespace LuaPlus
 namespace moho
 {
   class CWldSession;
+  class UserEntity;
+  class UserUnit;
 
-  class UserArmy
+  /**
+   * `UserArmy` is the client-side army mirror. The shipped object embeds the
+   * serialized army payload at offset 0 (`SSTIArmyConstantData` +0x00,
+   * `SSTIArmyVariableData` +0x80) and appends the runtime-only registries the
+   * UI needs.
+   */
+  class UserArmy : public SSTIArmyConstantData
   {
   public:
     enum class EReconGridMask : std::uint8_t
@@ -29,6 +42,24 @@ namespace moho
       Fog = 0x02,
       Both = 0x03,
     };
+
+    /**
+     * Address: 0x008B1520 (FUN_008B1520)
+     * Mangled: ??0UserArmy@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::UserArmy *__stdcall Moho::UserArmy::UserArmy(
+     *     Moho::UserArmy *this, Moho::CWldSession *session, Moho::SSTIArmyConstantData *a1);
+     *
+     * What it does:
+     * Builds one client-side army mirror: constructs the serialized army
+     * payload, binds the owning session, empties the avatar/engineer/factory
+     * registries and copies the sim-supplied constant data over the payload.
+     */
+    UserArmy(CWldSession* session, const SSTIArmyConstantData& constantData);
+
+    UserArmy(const UserArmy&) = delete;
+    UserArmy& operator=(const UserArmy&) = delete;
 
     /**
      * Address: 0x008B14D0 (FUN_008B14D0, Moho::UserArmy::GetExploredReconGrid)
@@ -79,24 +110,26 @@ namespace moho
     [[nodiscard]] bool CanSeePoint(const Wm3::Vec3f& worldPos, EReconGridMask gridMask) const;
 
   public:
-    std::uint32_t mArmyIndex;  // 0x00
-    msvc8::string mArmyName;   // 0x04
-    msvc8::string mPlayerName; // 0x20
-    std::uint8_t mIsCivilian;  // 0x3C
-    std::uint8_t mConstantDataPad_003D_0040[0x03]{};
-    boost::shared_ptr<CIntelGrid> mExploredReconGrid; // 0x40
-    boost::shared_ptr<CIntelGrid> mFogReconGrid;      // 0x48
-    boost::shared_ptr<CIntelGrid> mWaterReconGrid;    // 0x50
-    boost::shared_ptr<CIntelGrid> mRadarReconGrid;    // 0x58
-    boost::shared_ptr<CIntelGrid> mSonarReconGrid;    // 0x60
-    boost::shared_ptr<CIntelGrid> mOmniReconGrid;     // 0x68
-    boost::shared_ptr<CIntelGrid> mRciReconGrid;      // 0x70
-    boost::shared_ptr<CIntelGrid> mSciReconGrid;      // 0x78
+    // 0x00..0x80 is the inherited `SSTIArmyConstantData` payload.
     SSTIArmyVariableData mVarDat; // 0x80
-    std::uint32_t mVariableDataWord_01E0; // 0x1E0 (ctor writes zero)
-    CWldSession* mSession;                // 0x1E4
-    // Runtime-only tail members (constructor/destructor touch +0x1EC..+0x20C).
-    std::uint8_t mRuntimeTail_01E8_0210[0x28]{};
+
+    /// Head of the intrusive chain of `WeakPtr<UserArmy>` nodes referencing us.
+    /// `CUserSoundManager`'s listener-army hook links itself here.
+    WeakObject mWeakRefs; // 0x1E0
+
+    CWldSession* mSession; // 0x1E4
+
+    /// Quick-select avatars: units whose blueprint `QuickSelectPriority` is
+    /// positive register here from `UserUnit::UserUnit` (FUN_008B2300).
+    msvc8::vector<WeakPtr<UserUnit>> mAvatars; // 0x1E8
+
+    /// Idle-engineer registry, populated from `UserUnit::Tick` (FUN_008B2520)
+    /// and read by `GetIdleEngineers` (FUN_008BCEF0).
+    WeakEntitySetUserEntity mEngineers; // 0x1F8
+
+    /// Idle-factory registry, populated from `UserUnit::Tick` (FUN_008B2590)
+    /// and read by `GetIdleFactories` (FUN_008BD180).
+    WeakEntitySetUserEntity mFactories; // 0x204
   };
 
   /**
@@ -110,17 +143,9 @@ namespace moho
   [[nodiscard]] UserArmy* USER_ResolveArmyFromLuaState(LuaPlus::LuaState* state, const LuaPlus::LuaObject& armyObject);
 
   static_assert(sizeof(boost::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
-  static_assert(offsetof(UserArmy, mArmyName) == 0x04, "UserArmy::mArmyName offset must be 0x04");
-  static_assert(offsetof(UserArmy, mPlayerName) == 0x20, "UserArmy::mPlayerName offset must be 0x20");
-  static_assert(offsetof(UserArmy, mIsCivilian) == 0x3C, "UserArmy::mIsCivilian offset must be 0x3C");
-  static_assert(offsetof(UserArmy, mExploredReconGrid) == 0x40, "UserArmy::mExploredReconGrid offset must be 0x40");
-  static_assert(offsetof(UserArmy, mFogReconGrid) == 0x48, "UserArmy::mFogReconGrid offset must be 0x48");
-  static_assert(offsetof(UserArmy, mWaterReconGrid) == 0x50, "UserArmy::mWaterReconGrid offset must be 0x50");
-  static_assert(offsetof(UserArmy, mRadarReconGrid) == 0x58, "UserArmy::mRadarReconGrid offset must be 0x58");
-  static_assert(offsetof(UserArmy, mSonarReconGrid) == 0x60, "UserArmy::mSonarReconGrid offset must be 0x60");
-  static_assert(offsetof(UserArmy, mOmniReconGrid) == 0x68, "UserArmy::mOmniReconGrid offset must be 0x68");
-  static_assert(offsetof(UserArmy, mRciReconGrid) == 0x70, "UserArmy::mRciReconGrid offset must be 0x70");
-  static_assert(offsetof(UserArmy, mSciReconGrid) == 0x78, "UserArmy::mSciReconGrid offset must be 0x78");
+  // The constant-data payload is the base subobject; its own field offsets are
+  // asserted in SSTIArmyConstantData.h.
+  static_assert(sizeof(SSTIArmyConstantData) == 0x80, "UserArmy constant-data base must occupy 0x00..0x80");
   static_assert(offsetof(UserArmy, mVarDat) == 0x80, "UserArmy::mVarDat offset must be 0x80");
   static_assert(
     offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) == 0xE0,
@@ -138,9 +163,11 @@ namespace moho
     offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, items_end) == 0xEC,
     "UserArmy::mVarDat.mAllies.items_end offset must be 0xEC"
   );
-  static_assert(
-    offsetof(UserArmy, mVariableDataWord_01E0) == 0x1E0, "UserArmy::mVariableDataWord_01E0 offset must be 0x1E0"
-  );
+  static_assert(offsetof(UserArmy, mWeakRefs) == 0x1E0, "UserArmy::mWeakRefs offset must be 0x1E0");
   static_assert(offsetof(UserArmy, mSession) == 0x1E4, "UserArmy::mSession offset must be 0x1E4");
+  static_assert(offsetof(UserArmy, mAvatars) == 0x1E8, "UserArmy::mAvatars offset must be 0x1E8");
+  static_assert(offsetof(UserArmy, mEngineers) == 0x1F8, "UserArmy::mEngineers offset must be 0x1F8");
+  static_assert(offsetof(UserArmy, mFactories) == 0x204, "UserArmy::mFactories offset must be 0x204");
+  static_assert(sizeof(WeakEntitySetUserEntity) == 0x0C, "WeakEntitySetUserEntity size must be 0x0C");
   static_assert(sizeof(UserArmy) == 0x210, "UserArmy size must be 0x210");
 } // namespace moho

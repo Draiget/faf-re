@@ -123,22 +123,6 @@ namespace
   }
 
   /**
-   * Address: 0x007000A0 (FUN_007000A0)
-   *
-   * What it does:
-   * Assigns one `SSTIArmyConstantData` payload from `source` into
-   * `destination` and returns the destination pointer.
-   */
-  [[maybe_unused]] moho::SSTIArmyConstantData* AssignSSTIArmyConstantData(
-    const moho::SSTIArmyConstantData* const source,
-    moho::SSTIArmyConstantData* const destination
-  )
-  {
-    *destination = *source;
-    return destination;
-  }
-
-  /**
    * Address: 0x007518A0 (FUN_007518A0)
    *
    * What it does:
@@ -156,7 +140,7 @@ namespace
     for (const moho::SSTIArmyConstantData* sourceCursor = sourceBegin;
          sourceCursor != sourceEnd;
          ++sourceCursor, ++destinationCursor) {
-      (void)AssignSSTIArmyConstantData(sourceCursor, destinationCursor);
+      (void)moho::AssignArmyConstantData(*sourceCursor, destinationCursor);
     }
 
     return destinationCursor;
@@ -178,7 +162,7 @@ namespace
   {
     moho::SSTIArmyConstantData* lastWritten = destinationBegin;
     for (moho::SSTIArmyConstantData* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
-      lastWritten = AssignSSTIArmyConstantData(source, cursor);
+      lastWritten = moho::AssignArmyConstantData(*source, cursor);
     }
 
     return lastWritten;
@@ -202,7 +186,7 @@ namespace
     while (sourceBegin != sourceEnd) {
       --sourceEnd;
       --destinationCursor;
-      (void)AssignSSTIArmyConstantData(sourceEnd, destinationCursor);
+      (void)moho::AssignArmyConstantData(*sourceEnd, destinationCursor);
     }
 
     return destinationCursor;
@@ -541,5 +525,29 @@ namespace moho
     (void)mOmniReconGrid;
     (void)mRciReconGrid;
     (void)mSciReconGrid;
+  }
+
+  /**
+   * Address: 0x007000A0 (FUN_007000A0)
+   *
+   * IDA signature:
+   * Moho::SSTIArmyConstantData *callcnv_F3 sub_7000A0@<eax>(
+   *     Moho::SSTIArmyConstantData *a1@<eax>, Moho::SSTIArmyConstantData *a2@<esi>);
+   *
+   * What it does:
+   * Assigns one `SSTIArmyConstantData` payload from `source` into
+   * `destination` — index, both names, the civilian flag and all eight tracked
+   * intel-grid shared lanes — and returns the destination pointer.
+   */
+  SSTIArmyConstantData* AssignArmyConstantData(
+    const SSTIArmyConstantData& source, SSTIArmyConstantData* const destination
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    *destination = source;
+    return destination;
   }
 } // namespace moho

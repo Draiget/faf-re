@@ -24,6 +24,41 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x008B1520 (FUN_008B1520)
+   * Mangled: ??0UserArmy@Moho@@QAE@@Z
+   *
+   * IDA signature:
+   * Moho::UserArmy *__stdcall Moho::UserArmy::UserArmy(
+   *     Moho::UserArmy *this, Moho::CWldSession *session, Moho::SSTIArmyConstantData *a1);
+   *
+   * What it does:
+   * Constructs the serialized army payload through the base subobject, clears
+   * the weak-reference chain head, binds the owning session, brings the three
+   * runtime registries up empty, and finally copies the sim-supplied constant
+   * data over the payload.
+   */
+  UserArmy::UserArmy(CWldSession* const session, const SSTIArmyConstantData& constantData)
+    : SSTIArmyConstantData()
+    , mVarDat()
+    , mWeakRefs{}
+    , mSession(session)
+    , mAvatars()
+    , mEngineers{}
+    , mFactories{}
+  {
+    InitWeakEntitySetHead(mEngineers);
+    InitWeakEntitySetHead(mFactories);
+
+    // 0x008B15DA..0x008B1624: the binary then runs `clear()` over the avatar
+    // vector and both registries before assigning the payload. All three were
+    // just brought up empty, so those calls are no-ops; they are not
+    // reproduced rather than standing up a second tree-teardown path next to
+    // `SSelectionSetUserEntity::EraseRange`.
+
+    (void)AssignArmyConstantData(constantData, this);
+  }
+
+  /**
    * Address: 0x008B14D0 (FUN_008B14D0, Moho::UserArmy::GetExploredReconGrid)
    */
   boost::shared_ptr<CIntelGrid> UserArmy::GetExploredReconGrid() const

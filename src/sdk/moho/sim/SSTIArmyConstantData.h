@@ -89,6 +89,17 @@ namespace moho
     boost::shared_ptr<CIntelGrid> mSciReconGrid;      // +0x78
   };
 
+  /**
+   * Address: 0x007000A0 (FUN_007000A0)
+   *
+   * What it does:
+   * Assigns one `SSTIArmyConstantData` payload from `source` into
+   * `destination` and returns the destination pointer. `UserArmy`'s
+   * constructor uses this to stamp the sim-supplied constant data over its
+   * payload base.
+   */
+  SSTIArmyConstantData* AssignArmyConstantData(const SSTIArmyConstantData& source, SSTIArmyConstantData* destination);
+
   static_assert(sizeof(boost::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
   static_assert(
     offsetof(SSTIArmyConstantData, mArmyName) == 0x04, "SSTIArmyConstantData::mArmyName offset must be 0x04"
