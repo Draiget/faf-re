@@ -393,6 +393,12 @@ namespace moho
       return *reinterpret_cast<RRuleGameRulesCtorPrefixRuntimeView*>(&rules.pad_0004[0]);
     }
 
+    // The rules keep their lock inline at +0x38, so it is stored as raw bytes
+    // to preserve the layout and constructed in place by the constructor.
+    static_assert(
+      sizeof(boost::mutex) <= 0x08, "boost::mutex must fit RRuleGameRulesImpl::mLockStorage at +0x38"
+    );
+
     [[nodiscard]] boost::mutex& RuleMutexView(RRuleGameRulesImpl& rules) noexcept
     {
       return *reinterpret_cast<boost::mutex*>(&rules.mLockStorage[0]);
@@ -2354,6 +2360,20 @@ namespace moho
     if (!luaState) {
       return;
     }
+
+    // The whole body runs under the rules' own mutex at +0x38 - 0x0052A3D0
+    // takes it at entry (`boost::mutex::do_lock(this + 56)`) and drops it at
+    // 0x0052A3D0+0x???: the single `boost::mutex::unlock` on the way out.
+    //
+    // This is not incidental. One `RRuleGameRulesImpl` is shared by the world
+    // session and the Sim - `WLD_DoLoading` publishes `wldSession->mRules`
+    // into the launch info and `Sim::Sim` adopts it as `mRules` - and both
+    // `CWldSession::SessionFrame` (main thread) and `Sim::AdvanceBeat` (sim
+    // thread) call this every frame/beat. Both then read and push on the
+    // rules' own `lua_State` inside `SynchronizeBlueprintTable`. Without the
+    // lock the two threads interleave inside one 5000-entry `SCR_Copy` loop
+    // over a single `lua_State`, which corrupts it and faults in `luaV_index`.
+    boost::mutex::scoped_lock rulesLock(RuleMutexView(*this));
 
     // Drain pending file-watcher notifications. Each new path that isn't
     // already enqueued for reload becomes a fresh `LuaReloadRequestNode`
