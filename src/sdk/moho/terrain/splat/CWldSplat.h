@@ -191,6 +191,54 @@ namespace moho
      */
     ~CDecalManager() override;
 
+    // ---- virtual dispatch table, declared in binary slot order ----
+    //
+    // The manager is reached through its vtable, not by direct call: the
+    // terrain resource stores it as an IDecalManager and dispatches. Slot 0 is
+    // the destructor declared above, whose scalar-deleting thunk lives at
+    // 0x00878D00; the rest follow in the order the vtable at 0x00E4982C lists
+    // them, because MSVC assigns slots in declaration order and a member moved
+    // out of order silently sends every caller to the wrong function.
+    //
+    // Slots 4 and up (GetDecalCount, GetDecal, Func5, LoadDecal, ...) are still
+    // modelled as ordinary members further down and are not part of the table
+    // yet, so nothing may dispatch them virtually until they move up here.
+
+    /**
+     * Address: 0x00877CB0 (FUN_00877CB0, Moho::CDecalManager::Func1)
+     * Slot: 1
+     *
+     * What it does:
+     * Returns one entry of the decal-area decile histogram, clamping the index
+     * into the 0..9 range the table holds.
+     */
+    [[nodiscard]] virtual float GetLodThreshold(std::int32_t lodIndex) const;
+
+    /**
+     * Address: 0x00877CD0 (FUN_00877CD0, Moho::CDecalManager::Load)
+     * Slot: 2
+     *
+     * IDA signature:
+     * void __thiscall Moho::CDecalManager::Load(CDecalManager *this, gpg::BinaryReader *reader, unsigned int version);
+     *
+     * What it does:
+     * Inverse of Save: reads decal counts, deserializes each decal (new
+     * CWldTerrainDecal + DecalLoad + LoadDecal), then each decal group (new
+     * CDecalGroup + ReadFromStream + LoadDecalGroup), reindexes the decal
+     * vector, and rebuilds the LOD decile histogram.
+     */
+    virtual void Load(gpg::BinaryReader& reader, unsigned int version);
+
+    /**
+     * Address: 0x00877E40 (FUN_00877E40, Moho::CDecalManager::Save)
+     * Slot: 3
+     *
+     * What it does:
+     * Writes manager decal counts, serializes active decals, then serializes
+     * all decal groups to the binary writer.
+     */
+    virtual void Save(gpg::BinaryWriter& writer);
+
     /**
      * Address: 0x00878D90 (FUN_00878D90, Moho::CDecalManager::operator new)
      * Mangled: ??2CDecalManager@Moho@@QAE@@Z
@@ -365,29 +413,6 @@ namespace moho
      * splat runtime state, and reports success.
      */
     bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name);
-
-    /**
-     * Address: 0x00877E40 (FUN_00877E40, Moho::CDecalManager::Save)
-     *
-     * What it does:
-     * Writes manager decal counts, serializes active decals, then serializes
-     * all decal groups to the binary writer.
-     */
-    void Save(gpg::BinaryWriter& writer);
-
-    /**
-     * Address: 0x00877CD0 (FUN_00877CD0, Moho::CDecalManager::Load)
-     *
-     * IDA signature:
-     * void __thiscall Moho::CDecalManager::Load(CDecalManager *this, gpg::BinaryReader *reader, unsigned int version);
-     *
-     * What it does:
-     * Inverse of Save: reads decal counts, deserializes each decal (new
-     * CWldTerrainDecal + DecalLoad + LoadDecal), then each decal group (new
-     * CDecalGroup + ReadFromStream + LoadDecalGroup), reindexes the decal
-     * vector, and rebuilds the LOD decile histogram.
-     */
-    void Load(gpg::BinaryReader& reader, unsigned int version);
 
     /**
      * Address: 0x008782D0 (FUN_008782D0, Moho::CDecalManager::LoadDecalGroup)
