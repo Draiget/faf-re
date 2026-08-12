@@ -483,10 +483,15 @@ namespace moho
               canStartLoad = false;
               continue;
             case EWldScenarioLoadControlState::kReadyForDestroy:
+              // The binary falls straight through into the completed case, so the
+              // assert fires once and the scenario is then marked loaded. That
+              // mark is what stops Update reconsidering it: with a `break` here
+              // the state never moves and a load that aborted reopens the assert
+              // dialog on every single frame for the rest of the session.
               gpg::HandleAssertFailure(
                 "Reached the supposably unreachable.", 320, "c:\\work\\rts\\main\\code\\src\\user\\SessionLoader.cpp"
               );
-              break;
+              [[fallthrough]];
             case EWldScenarioLoadControlState::kCompleted:
               scenario->mLoaded = true;
               break;
