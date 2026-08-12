@@ -22,7 +22,7 @@ namespace boost
 namespace moho
 {
   class CWldMap;
-  class CWaitHandleSet;
+  struct CBackgroundTaskControl;
   class IClientManager;
   class LaunchInfoBase;
   class RRuleGameRules;
@@ -154,7 +154,11 @@ namespace moho
     ~XBackgroundTaskAborted() noexcept override;
   };
 
-  using WldScenarioLoadEntryFn = void (*)(SWldScenarioInfo*, CWaitHandleSet**);
+  // The worker hands the entry point a control whose `mHandle` is the load
+  // control driving it, so progress reported from deep inside a load finds its
+  // way back. IDA types the second parameter `CWaitHandleSet**`, which is the
+  // same word seen without the one-pointer struct around it.
+  using WldScenarioLoadEntryFn = void (*)(SWldScenarioInfo*, CBackgroundTaskControl*);
 
   /**
    * Address evidence:
@@ -210,7 +214,7 @@ namespace moho
     std::uint8_t mReserved10[0x14];     // 0x10
 
     void Bind(WldScenarioLoadEntryFn entryPoint, SWldScenarioInfo* scenario);
-    void Invoke(CWaitHandleSet** waitSet) const;
+    void Invoke(CBackgroundTaskControl* loadControl) const;
   };
 
   static_assert(sizeof(SWldScenarioLoadCallbackStorage) == 0x24, "SWldScenarioLoadCallbackStorage size must be 0x24");

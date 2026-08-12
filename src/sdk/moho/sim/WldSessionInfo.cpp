@@ -6,7 +6,9 @@
 
 #include "boost/thread.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/sim/CBackgroundTaskControl.h"
 #include "lua/LuaObject.h"
 #include "moho/net/IClientManager.h"
 #include "moho/sim/CWldMap.h"
@@ -16,6 +18,9 @@ namespace moho
 {
   namespace
   {
+    // gpg::SetThreadName's "the thread calling me" id.
+    constexpr unsigned int kCurrentThreadId = 0xFFFFFFFFu;
+
     struct ScopedLoadControlLock
     {
       explicit ScopedLoadControlLock(gpg::core::Mutex& lock)
@@ -201,13 +206,13 @@ namespace moho
     }
   }
 
-  void SWldScenarioLoadCallbackStorage::Invoke(CWaitHandleSet** const waitSet) const
+  void SWldScenarioLoadCallbackStorage::Invoke(CBackgroundTaskControl* const loadControl) const
   {
     if (!mEntryPoint || !mScenario) {
       return;
     }
 
-    mEntryPoint(mScenario, waitSet);
+    mEntryPoint(mScenario, loadControl);
   }
 
   /**
@@ -303,38 +308,47 @@ namespace moho
   }
 
   /**
-   * Address: 0x004132B0 (FUN_004132b0)
+   * Address: 0x004132B0 (FUN_004132b0, func_BackgroundThread)
+   *
+   * What it does:
+   * Names the worker thread after the task, runs the bound load entry point
+   * with this control as its progress sink, then records how the task ended and
+   * disposes of itself if the requester asked it to.
    */
   void SWldScenarioLoadControl::RunWorkerThread()
   {
-    bool disposeAfterExit = false;
-    try {
-      CWaitHandleSet* waitSet = nullptr;
-      mCallback.Invoke(&waitSet);
-
-      {
-        ScopedLoadControlLock lock(mMutex);
-        mPauseRequested = false;
-        mState =
-          mStopRequested ? EWldScenarioLoadControlState::kReadyForDestroy : EWldScenarioLoadControlState::kCompleted;
-        disposeAfterExit = mDisposeAfterWorkerExit;
-      }
-    } catch (...) {
-      gpg::Warnf("CWldSessionLoaderImpl worker raised an exception; marking scenario as failed.");
-
-      {
-        ScopedLoadControlLock lock(mMutex);
-        mPauseRequested = false;
-        mState = EWldScenarioLoadControlState::kReadyForDestroy;
-        disposeAfterExit = mDisposeAfterWorkerExit;
-      }
+    {
+      ScopedLoadControlLock lock(mMutex);
+      gpg::SetThreadName(kCurrentThreadId, mThreadName.c_str());
+      gpg::Logf("Background task \"%s\" running.", mThreadName.c_str());
     }
 
-    mWakeSet.SignalOne();
-    if (!disposeAfterExit) {
+    // The entry point receives a handle to this control, not an empty one: it
+    // is what every UpdateLoadingProgress call made anywhere inside the load
+    // eventually locks and signals.
+    CBackgroundTaskControl loadControl{this};
+    EWldScenarioLoadControlState finalState = EWldScenarioLoadControlState::kCompleted;
+    try {
+      mCallback.Invoke(&loadControl);
+    } catch (const std::exception& error) {
+      gpg::Warnf("Error in background task: %s", error.what());
+      finalState = EWldScenarioLoadControlState::kReadyForDestroy;
+    } catch (...) {
+      finalState = EWldScenarioLoadControlState::kReadyForDestroy;
+    }
+
+    bool disposeAfterExit = false;
+    {
       ScopedLoadControlLock lock(mMutex);
       disposeAfterExit = mDisposeAfterWorkerExit;
+      mState = finalState;
+      gpg::Logf(
+        "Background task \"%s\" %s.",
+        mThreadName.c_str(),
+        finalState == EWldScenarioLoadControlState::kReadyForDestroy ? "aborted" : "finished"
+      );
     }
+
     if (disposeAfterExit) {
       delete this;
     }

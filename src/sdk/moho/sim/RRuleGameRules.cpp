@@ -40,6 +40,7 @@
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RTrailBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/BlueprintLoaderContext.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 
 namespace moho
@@ -387,21 +388,6 @@ namespace moho
       "RRuleGameRulesCtorPrefixRuntimeView size must be 0x34"
     );
 
-    struct LuaBlueprintTlsStateView
-    {
-      void* reserved00 = nullptr;             // +0x00
-      RRuleGameRulesImpl* rules = nullptr;    // +0x04
-      CBackgroundTaskControl* initHandler = nullptr; // +0x08
-    };
-    static_assert(
-      offsetof(LuaBlueprintTlsStateView, rules) == 0x04,
-      "LuaBlueprintTlsStateView::rules offset must be 0x04"
-    );
-    static_assert(
-      offsetof(LuaBlueprintTlsStateView, initHandler) == 0x08,
-      "LuaBlueprintTlsStateView::initHandler offset must be 0x08"
-    );
-
     [[nodiscard]] RRuleGameRulesCtorPrefixRuntimeView& RuleCtorPrefixView(RRuleGameRulesImpl& rules) noexcept
     {
       return *reinterpret_cast<RRuleGameRulesCtorPrefixRuntimeView*>(&rules.pad_0004[0]);
@@ -410,19 +396,6 @@ namespace moho
     [[nodiscard]] boost::mutex& RuleMutexView(RRuleGameRulesImpl& rules) noexcept
     {
       return *reinterpret_cast<boost::mutex*>(&rules.mLockStorage[0]);
-    }
-
-    [[nodiscard]] LuaBlueprintTlsStateView* ResolveLuaBlueprintTlsState() noexcept
-    {
-#if defined(_M_IX86)
-      void** const tlsPointerArray = reinterpret_cast<void**>(__readfsdword(0x2Cu));
-      if (tlsPointerArray == nullptr) {
-        return nullptr;
-      }
-      return static_cast<LuaBlueprintTlsStateView*>(tlsPointerArray[0]);
-#else
-      return nullptr;
-#endif
     }
 
     [[nodiscard]] SRuleFootprintNode* AllocateFootprintSentinelNode() noexcept
@@ -2035,7 +2008,7 @@ namespace moho
    * Initializes rule Lua/runtime storage, runs core Lua init forms, publishes
    * `__active_mods`, executes `/lua/RuleInit.lua`, and rebuilds category caches.
    */
-  RRuleGameRulesImpl::RRuleGameRulesImpl(const msvc8::string& activeMods, CWaitHandleSet** const initWaitSet)
+  RRuleGameRulesImpl::RRuleGameRulesImpl(const msvc8::string& activeMods, CBackgroundTaskControl* const initHandler)
     : pad_0004{}
     , mLockStorage{}
     , mLuaState(nullptr)
@@ -2119,17 +2092,11 @@ namespace moho
     globals.SetObject("__active_mods", activeModsValue);
 
     gpg::LogScopeEntry ruleMemoryScope(msvc8::string("MEM: %i bytes RULE"));
-    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
-    if (tlsState != nullptr) {
-      tlsState->rules = this;
-      tlsState->initHandler = reinterpret_cast<CBackgroundTaskControl*>(initWaitSet);
-    }
-
-    (void)SCR_LuaDoScript(mLuaState, "/lua/RuleInit.lua", nullptr);
-
-    if (tlsState != nullptr) {
-      tlsState->rules = nullptr;
-      tlsState->initHandler = nullptr;
+    {
+      // Everything /lua/RuleInit.lua registers lands on this rules object, and
+      // its progress callbacks report to the load control that asked for it.
+      const BlueprintLoaderContextScope loaderContext(this, initHandler);
+      (void)SCR_LuaDoScript(mLuaState, "/lua/RuleInit.lua", nullptr);
     }
 
     ruleMemoryScope.Emit();
@@ -2163,14 +2130,14 @@ namespace moho
    * Allocates one `RRuleGameRulesImpl` object and runs the concrete
    * constructor with active-mod payload + optional init wait-set pointer.
    */
-  RRuleGameRules* RRuleGameRules::Create(const msvc8::string& activeMods, CWaitHandleSet** const initWaitSet)
+  RRuleGameRules* RRuleGameRules::Create(const msvc8::string& activeMods, CBackgroundTaskControl* const initHandler)
   {
     auto* const storage = static_cast<RRuleGameRulesImpl*>(::operator new(sizeof(RRuleGameRulesImpl), std::nothrow));
     if (storage == nullptr) {
       return nullptr;
     }
 
-    return new (storage) RRuleGameRulesImpl(activeMods, initWaitSet);
+    return new (storage) RRuleGameRulesImpl(activeMods, initHandler);
   }
 
   /**
