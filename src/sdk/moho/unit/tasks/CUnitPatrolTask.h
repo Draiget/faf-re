@@ -231,7 +231,7 @@ namespace moho
      * `{lateral, +Y, direction}`, and extents are
      * `{guardScanRadius, 100.0, guardScanRadius + legHalfLength}` where
      * `guardScanRadius = GetBlueprint()->AI.GuardScanRadius`. The leg-start cell
-     * comes from the bound patrol command (`mFormationBinding`); the leg-end cell
+     * comes from the bound patrol command (`mBoundCommand`); the leg-end cell
      * from the queue-tail command only when it is a distinct Patrol/FormPatrol.
      */
     void RecomputePatrolSearchBox();
@@ -255,8 +255,10 @@ namespace moho
     // 0x50: dispatch owner used to issue refuel/reclaim/attack/repair sub-tasks.
     IAiCommandDispatchImpl* mDispatch;
 
-    // 0x54: formation binding lane (derived from the owner's formation cache).
-    void* mFormationBinding;
+    // 0x54: the patrol command this task is bound to - the queue-head command at
+    // construction time, and the leg-start reference every search-box rebuild
+    // resolves through `CUnitCommand::GetPosition`.
+    CUnitCommand* mBoundCommand;
 
     // 0x58: bound formation instance (null when patrolling without a formation).
     IFormationInstance* mFormationInstance;
@@ -299,7 +301,7 @@ namespace moho
   );
   static_assert(offsetof(CUnitPatrolTask, mDispatch) == 0x50, "CUnitPatrolTask::mDispatch offset must be 0x50");
   static_assert(
-    offsetof(CUnitPatrolTask, mFormationBinding) == 0x54, "CUnitPatrolTask::mFormationBinding offset must be 0x54"
+    offsetof(CUnitPatrolTask, mBoundCommand) == 0x54, "CUnitPatrolTask::mBoundCommand offset must be 0x54"
   );
   static_assert(
     offsetof(CUnitPatrolTask, mFormationInstance) == 0x58, "CUnitPatrolTask::mFormationInstance offset must be 0x58"
