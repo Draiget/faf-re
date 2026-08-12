@@ -1227,22 +1227,6 @@ namespace moho
       return object.m_state != nullptr && object.m_object.tt == LUA_TFUNCTION;
     }
 
-    [[nodiscard]] LuaPlus::LuaObject
-    CopyLuaObjectToState(const LuaPlus::LuaObject& source, LuaPlus::LuaState* const targetState)
-    {
-      if (!targetState || !targetState->GetCState()) {
-        return {};
-      }
-
-      LuaPlus::LuaObject copy{};
-      lua_State* const lstate = targetState->GetCState();
-      const int savedTop = lua_gettop(lstate);
-      const_cast<LuaPlus::LuaObject&>(source).PushStack(lstate);
-      copy = LuaPlus::LuaObject(LuaPlus::LuaStackObject(targetState, -1));
-      lua_settop(lstate, savedTop);
-      return copy;
-    }
-
     void SetGlobalCopy(
       LuaPlus::LuaState* const sourceState, LuaPlus::LuaState* const targetRootState, const char* const globalName
     )
@@ -1251,10 +1235,54 @@ namespace moho
         return;
       }
 
+      // The rules keep their own Lua universe, so a value read out of it cannot
+      // simply be pushed onto the session's stack - LuaObject::PushStack rejects
+      // that outright, which is what aborted every skirmish load. SCR_Copy is
+      // the deep cross-universe clone the binary calls here: it rebuilds tables
+      // entry by entry and re-wraps userdata through the reflected move handler.
       LuaPlus::LuaObject sourceValue = sourceState->GetGlobal(globalName);
-      LuaPlus::LuaObject copied = CopyLuaObjectToState(sourceValue, targetRootState);
+      LuaPlus::LuaObject copied = SCR_Copy(sourceValue, targetRootState);
       LuaPlus::LuaObject globals = targetRootState->GetGlobals();
       globals.SetObject(globalName, copied);
+    }
+
+    /**
+     * Rebuilds the Lua `categories` table on `targetState` from the rules'
+     * category-lookup map, publishing one freshly constructed `EntityCategory`
+     * userdata per entry.
+     *
+     * Both binary call sites build the table this way rather than copying an
+     * existing one: `SetupCategories` (0x00529C30) publishes onto the rules'
+     * own state, and `ExportToLuaState` (0x00529F70) publishes onto the root
+     * state it is exporting to. Each entry's word set is copied out of the map
+     * node first, so the userdata owns its own storage.
+     */
+    void PublishCategoriesTable(RRuleGameRulesImpl& rules, LuaPlus::LuaState* const targetState)
+    {
+      if (!targetState) {
+        return;
+      }
+
+      LuaPlus::LuaObject globals = targetState->GetGlobals();
+      LuaPlus::LuaObject categoriesTable{};
+      categoriesTable.AssignNewTable(targetState, 0, 0);
+      globals.SetObject("categories", categoriesTable);
+
+      const auto* const categoryLookup =
+        reinterpret_cast<const EntityCategoryLookupTableRuntimeView*>(rules.mEntityCategoryLookup);
+      if (categoryLookup == nullptr || categoryLookup->categoryMap.head == nullptr) {
+        return;
+      }
+
+      CategoryLookupNodeRuntimeView* node = categoryLookup->categoryMap.head->left;
+      while (node != categoryLookup->categoryMap.head) {
+        CategoryWordRangeView categoryValue = node->value;
+        LuaPlus::LuaObject categoryLuaObject{};
+        (void)func_NewEntityCategory(targetState, &categoryLuaObject, &categoryValue);
+        categoriesTable.SetObject(node->key.c_str(), categoryLuaObject);
+
+        AdvanceCategoryLookupNodeSuccessor(&node);
+      }
     }
 
     /**
@@ -1830,7 +1858,7 @@ namespace moho
 
       for (std::size_t ordinal = 0; ordinal < ordinalCount; ++ordinal) {
         LuaPlus::LuaObject sourceEntry = sourceBlueprints.GetByIndex(static_cast<int32_t>(ordinal));
-        LuaPlus::LuaObject copiedEntry = CopyLuaObjectToState(sourceEntry, rootState);
+        LuaPlus::LuaObject copiedEntry = SCR_Copy(sourceEntry, rootState);
         destinationBlueprints.SetObject(static_cast<int32_t>(ordinal), copiedEntry);
 
         RBlueprint* const blueprint = rules.mBlueprintsByOrdinal[ordinal];
@@ -2248,23 +2276,7 @@ namespace moho
    */
   void RRuleGameRulesImpl::SetupCategories()
   {
-    LuaPlus::LuaObject globals = mLuaState->GetGlobals();
-    LuaPlus::LuaObject categoriesTable{};
-    categoriesTable.AssignNewTable(mLuaState, 0, 0);
-    globals.SetObject("categories", categoriesTable);
-
-    const auto* const categoryLookup = reinterpret_cast<const EntityCategoryLookupTableRuntimeView*>(mEntityCategoryLookup);
-    if (categoryLookup != nullptr && categoryLookup->categoryMap.head != nullptr) {
-      CategoryLookupNodeRuntimeView* node = categoryLookup->categoryMap.head->left;
-      while (node != categoryLookup->categoryMap.head) {
-        CategoryWordRangeView categoryValue = node->value;
-        LuaPlus::LuaObject categoryLuaObject{};
-        (void)func_NewEntityCategory(mLuaState, &categoryLuaObject, &categoryValue);
-        categoriesTable.SetObject(node->key.c_str(), categoryLuaObject);
-
-        AdvanceCategoryLookupNodeSuccessor(&node);
-      }
-    }
+    PublishCategoriesTable(*this, mLuaState);
 
     RRuleGameRulesBlueprintNode* unitNode = mUnitBlueprints.mHead->left;
     while (unitNode != mUnitBlueprints.mHead) {
@@ -2290,6 +2302,8 @@ namespace moho
       return;
     }
 
+    const boost::mutex::scoped_lock exportLock(RuleMutexView(*this));
+
     LuaPlus::LuaState* const rootState = ResolveRootState(luaState);
     if (!rootState) {
       return;
@@ -2297,7 +2311,11 @@ namespace moho
 
     SetGlobalCopy(mLuaState, rootState, "__active_mods");
     SetGlobalCopy(mLuaState, rootState, "__blueprints");
-    SetGlobalCopy(mLuaState, rootState, "categories");
+
+    // `categories` is rebuilt rather than copied: every entry becomes a new
+    // EntityCategory userdata owned by the target state, exactly as the rules'
+    // own state got its table from SetupCategories.
+    PublishCategoriesTable(*this, rootState);
 
     (void)AddOrGetExportBinding(*this, rootState);
   }
