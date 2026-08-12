@@ -712,6 +712,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x006FB420 (FUN_006FB420)
+   *
+   * IDA signature:
+   * Moho::Prop * __cdecl Moho::PROP_Create(Moho::Sim *, Moho::VTransform const &, char const *);
+   *
+   * What it does:
+   * Normalizes the blueprint id the way every other filename lookup does,
+   * resolves the RPropBlueprint through the game rules, and creates the prop at
+   * the given transform. A blueprint the rules do not know yields no prop.
+   */
+  Prop* PROP_Create(Sim* const sim, const VTransform& transform, const char* const blueprintId)
+  {
+    if (sim == nullptr || sim->mRules == nullptr || blueprintId == nullptr) {
+      return nullptr;
+    }
+
+    msvc8::string normalizedBlueprintId;
+    normalizedBlueprintId.assign_owned(blueprintId);
+    gpg::STR_NormalizeFilenameLowerSlash(normalizedBlueprintId);
+
+    return Prop::CreateFromBlueprintResolved(sim, sim->mRules->GetPropBlueprint(normalizedBlueprintId), transform);
+  }
+
+  /**
    * Address: 0x006FB620 (FUN_006FB620, sub_6FB620)
    *
    * IDA signature:
