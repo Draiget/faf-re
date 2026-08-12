@@ -6285,47 +6285,7 @@ namespace
     return VTransform(worldPosition, orientation);
   }
 
-  /**
-   * Address: 0x006FB420 (FUN_006FB420)
-   *
-   * IDA signature:
-   * Moho::Prop * __cdecl Moho::PROP_Create(Moho::Sim *, Moho::VTransform const &, char const *);
-   *
-   * What it does:
-   * Normalizes the prop blueprint id and resolves `RPropBlueprint` from game rules.
-   */
-  RPropBlueprint* ResolvePropBlueprintById(RRuleGameRules* rules, const char* blueprintId)
-  {
-    if (!rules || !blueprintId || !*blueprintId) {
-      return nullptr;
-    }
 
-    // Binary chain:
-    // - 0x0051E2E0 func_StringInitFilename
-    // - 0x004A92A0 func_StringSetFilename
-    std::string normalizedBlueprintId = blueprintId;
-    gpg::STR_NormalizeFilenameLowerSlash(normalizedBlueprintId);
-
-    const msvc8::string normalizedArg(normalizedBlueprintId.c_str());
-    return rules->GetPropBlueprint(normalizedArg);
-  }
-
-  /**
-    * Alias of FUN_006FB3B0 (non-canonical helper lane).
-   *
-   * IDA signature:
-   * Moho::Prop * __cdecl Moho::PROP_Create(Moho::Sim *, Moho::VTransform const &, Moho::RPropBlueprint const *);
-   *
-   * What it does:
-   * Allocates `Prop` (0x288 bytes) and calls `Prop::Prop(sim, blueprint, trans)`.
-   *
-   * Recovery status:
-   * Depends on `Entity::Entity` (0x00677C90) and `Prop::Prop` (0x006F9D90) source lift.
-   */
-  Prop* CreatePropFromBlueprintResolved(Sim* sim, const VTransform& transform, const RPropBlueprint* blueprint)
-  {
-    return Prop::CreateFromBlueprintResolved(sim, blueprint, transform);
-  }
 
   /**
    * Address: 0x00748C00 (FUN_00748C00)
@@ -6352,8 +6312,7 @@ namespace
     );
     std::memcpy(&spawnXform, &words, sizeof(spawnXform));
 
-    const RPropBlueprint* blueprint = ResolvePropBlueprintById(rules, blueprintId);
-    (void)CreatePropFromBlueprintResolved(sim, spawnXform, blueprint);
+    (void)PROP_Create(sim, spawnXform, blueprintId);
   }
 
   // 0x00748D50 queues silo builds through CAiSiloBuildImpl (0=tactical, 1=nuke).
@@ -10130,8 +10089,7 @@ void Sim::Setup(LaunchInfoNew* const info)
     if (props != nullptr && props->mEntriesBegin != nullptr) {
       propCount = static_cast<int>(props->mEntriesEnd - props->mEntriesBegin);
       for (const CWldPropEntry* entry = props->mEntriesBegin; entry != props->mEntriesEnd; ++entry) {
-        const RPropBlueprint* const blueprint = ResolvePropBlueprintById(mRules, entry->mBlueprintPath.c_str());
-        (void)CreatePropFromBlueprintResolved(this, entry->mTransform, blueprint);
+        (void)PROP_Create(this, entry->mTransform, entry->mBlueprintPath.c_str());
       }
     }
     gpg::Warnf(" NUM PROPS = %d", propCount);
@@ -25804,8 +25762,7 @@ int moho::cfunc_CreatePropL(LuaPlus::LuaState* const state)
   transform.pos_ = location;
 
   Sim* const sim = ResolveGlobalSim(rawState);
-  const RPropBlueprint* const blueprint = ResolvePropBlueprintById(sim ? sim->mRules : nullptr, blueprintId);
-  Prop* const prop = CreatePropFromBlueprintResolved(sim, transform, blueprint);
+  Prop* const prop = PROP_Create(sim, transform, blueprintId);
   if (!prop) {
     LuaPlus::LuaState::Error(state, "Unable to create prop '%s'", blueprintId ? blueprintId : "");
   }
@@ -26021,8 +25978,7 @@ int moho::cfunc_EntityCreatePropAtBoneL(LuaPlus::LuaState* const state)
   const VTransform entityBoneTransform = entity->GetBoneWorldTransform(boneIndex);
 
   Sim* const sim = entity->SimulationRef;
-  const RPropBlueprint* const blueprint = ResolvePropBlueprintById(sim ? sim->mRules : nullptr, blueprintId);
-  Prop* const prop = CreatePropFromBlueprintResolved(sim, entityBoneTransform, blueprint);
+  Prop* const prop = PROP_Create(sim, entityBoneTransform, blueprintId);
   if (!prop) {
     LuaPlus::LuaState::Error(state, "Unable to create prop '%s'", blueprintId ? blueprintId : "");
   }
