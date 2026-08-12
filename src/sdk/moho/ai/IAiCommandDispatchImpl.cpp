@@ -123,27 +123,6 @@ namespace
     return type;
   }
 
-  /**
-    * Alias of FUN_00409A40 (non-canonical helper lane).
-   *
-   * What it does:
-   * Allocates one task-thread on `stage` and links `dispatch` as thread-top
-   * task while preserving prior top linkage.
-   */
-  [[nodiscard]] CTaskThread* CreateTaskThreadForDispatch(CTask* const dispatch, CTaskStage* const stage, const bool autoDelete)
-  {
-    if (!dispatch || !stage) {
-      return nullptr;
-    }
-
-    auto* const taskThread = new CTaskThread(stage);
-    dispatch->mAutoDelete = autoDelete;
-    dispatch->mOwnerThread = taskThread;
-    dispatch->mSubtask = taskThread->mTaskTop;
-    taskThread->mTaskTop = dispatch;
-    return taskThread;
-  }
-
   [[nodiscard]] gpg::RRef MakeDispatchObjectRef(IAiCommandDispatchImpl* const object)
   {
     gpg::RRef ref{};
@@ -848,7 +827,7 @@ IAiCommandDispatchImpl::IAiCommandDispatchImpl(Unit* const unit)
   , mCommandQueue(unit ? unit->CommandQueue : nullptr)
 {
   if (mSim != nullptr) {
-    (void)CreateTaskThreadForDispatch(static_cast<CTask*>(this), &mSim->mTaskStageA, false);
+    (void)CTask::CreateTaskThread(static_cast<CTask*>(this), &mSim->mTaskStageA, false);
   }
 
   if (mCommandQueue != nullptr) {

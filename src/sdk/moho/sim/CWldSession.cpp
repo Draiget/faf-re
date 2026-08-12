@@ -57,6 +57,9 @@
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/command/CommandIssueHelper.h"
+#include "moho/task/CTask.h"
+#include "moho/task/CTaskThread.h"
+#include "moho/task/ScrDiskWatcherTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -8475,6 +8478,27 @@ namespace moho
     DisplayEconomyOverlay = false;
     mTeamColorMode = false;
 
+    // Session task stage. The binary allocates it, swaps it into `mCurThread`
+    // destroying whatever was there, and then publishes it on the session Lua
+    // state: for a root state `LuaState::m_luaTask` carries the owning
+    // `CTaskStage`, not a `CLuaTask`, and `cfunc_ForkThreadL` reads it back
+    // that way. Without this, every session script calling `ForkThread` dies
+    // with "Lua state has not been set up for multiple threads".
+    {
+      auto* const sessionStage = new CTaskStage();
+      CTaskStage* const previousStage = mCurThread;
+      mCurThread = sessionStage;
+      if (previousStage != nullptr) {
+        previousStage->Teardown();
+        delete previousStage;
+      }
+    }
+    mState->m_luaTask = reinterpret_cast<CLuaTask*>(mCurThread);
+
+    // Disk-watcher task, staged on the session task stage so reloaded script
+    // files reach the session state's `__diskwatch` callbacks.
+    (void)CTask::CreateTaskThread(new ScrDiskWatcherTask(mState), mCurThread, true);
+
     ClearBuildTemplates();
     gActiveWldSession = this;
   }
@@ -8513,6 +8537,15 @@ namespace moho
     if (mWldMap) {
       delete mWldMap;
       mWldMap = nullptr;
+    }
+
+    // Tear the session task stage down before the Lua state it is published
+    // on: the stage owns the disk-watcher task and every ForkThread coroutine
+    // still parked on it, and those hold `mState`.
+    if (mCurThread) {
+      mCurThread->Teardown();
+      delete mCurThread;
+      mCurThread = nullptr;
     }
 
     if (mState) {

@@ -11,7 +11,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/StatItem.h"
+#include "moho/misc/StatItem.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -464,6 +464,31 @@ void CTask::TaskResume(const bool recursiveInterrupt, const int pendingFrames)
   if (recursiveInterrupt) {
     TaskInterruptSubtasks();
   }
+}
+
+/**
+ * Address: 0x00409A40 (FUN_00409A40, Moho::CTask::CreateTaskThread)
+ *
+ * IDA signature:
+ * Moho::CTaskThread *__userpurge Moho::CTask::CreateTaskThread@<eax>(
+ *         Moho::CTask *dispatch@<esi>, Moho::CTaskStage *stage@<edi>, bool own);
+ *
+ * What it does:
+ * Allocates one `CTaskThread` on `stage` and pushes `dispatch` onto that
+ * thread's task stack, keeping the previous top as `dispatch->mSubtask`.
+ */
+CTaskThread* CTask::CreateTaskThread(CTask* const dispatch, CTaskStage* const stage, const bool own)
+{
+  if (dispatch == nullptr) {
+    return nullptr;
+  }
+
+  auto* const taskThread = new CTaskThread(stage);
+  dispatch->mAutoDelete = own;
+  dispatch->mOwnerThread = taskThread;
+  dispatch->mSubtask = taskThread->mTaskTop;
+  taskThread->mTaskTop = dispatch;
+  return taskThread;
 }
 
 /**

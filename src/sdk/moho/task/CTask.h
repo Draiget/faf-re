@@ -25,6 +25,7 @@ namespace moho
   };
 
   class CTaskThread;
+  class CTaskStage;
 
   class MOHO_EMPTY_BASES CTask : public boost::noncopyable_::noncopyable, public InstanceCounter<CTask>
   {
@@ -73,6 +74,21 @@ namespace moho
      * interrupts subtasks recursively.
      */
     void TaskResume(bool recursiveInterrupt, int pendingFrames);
+
+    /**
+     * Address: 0x00409A40 (FUN_00409A40, Moho::CTask::CreateTaskThread)
+     *
+     * IDA signature:
+     * Moho::CTaskThread *__userpurge Moho::CTask::CreateTaskThread@<eax>(
+     *         Moho::CTask *dispatch@<esi>, Moho::CTaskStage *stage@<edi>, bool own);
+     *
+     * What it does:
+     * Allocates one `CTaskThread` on `stage` and pushes `dispatch` onto that
+     * thread's task stack, preserving the previous top in `dispatch->mSubtask`.
+     * `own` becomes the task's auto-delete flag, so the thread destroys the
+     * task when it unwinds.
+     */
+    static CTaskThread* CreateTaskThread(CTask* dispatch, CTaskStage* stage, bool own);
 
   public:
     bool* mDestroyFlag{nullptr};        // 0x08

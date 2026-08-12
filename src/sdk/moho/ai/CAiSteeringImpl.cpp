@@ -112,28 +112,6 @@ namespace
     return Wm3::Vector3f::NormalizeOrZero(forward);
   }
 
-  /**
-    * Alias of FUN_00409A40 (non-canonical helper lane).
-   *
-   * What it does:
-   * Allocates one CTaskThread and links `dispatch` as task-top while preserving
-   * prior top in `dispatch->mSubtask`.
-   */
-  [[nodiscard]] CTaskThread*
-  CreateTaskThreadForDispatch(CTask* const dispatch, CTaskStage* const stage, const bool autoDelete)
-  {
-    if (!dispatch || !stage) {
-      return nullptr;
-    }
-
-    auto* const taskThread = new CTaskThread(stage);
-    dispatch->mAutoDelete = autoDelete;
-    dispatch->mOwnerThread = taskThread;
-    dispatch->mSubtask = taskThread->mTaskTop;
-    taskThread->mTaskTop = dispatch;
-    return taskThread;
-  }
-
   [[nodiscard]] float ReadSimConVarFloat(Sim* const sim, CSimConVarBase* const conVar, const float fallback) noexcept
   {
     if (!sim || !conVar) {
@@ -1013,7 +991,7 @@ CAiSteeringImpl::CAiSteeringImpl(Unit* const unit, CUnitMotion* const motion, co
   }
 
   if (brain && brain->mAttackerThreadStage) {
-    CreateTaskThreadForDispatch(static_cast<CTask*>(this), brain->mAttackerThreadStage, false);
+    CTask::CreateTaskThread(static_cast<CTask*>(this), brain->mAttackerThreadStage, false);
   }
 }
 
