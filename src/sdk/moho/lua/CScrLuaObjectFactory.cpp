@@ -1134,7 +1134,11 @@ namespace moho
       lua_setfenv(state->m_state, -2);
     }
 
-    lua_call(state->m_state, 0, 0);
+    // Unprotected on purpose: the binary reaches the exported lua_call here,
+    // not the status-returning one. Swallowing the error leaves the module's
+    // environment holding only what import() seeded it with, and every later
+    // lookup into that module quietly takes a fallback path instead.
+    LuaCallUnprotected(state->m_state, 0, 0);
   }
 
   /**
