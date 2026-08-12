@@ -426,7 +426,17 @@ namespace moho
       return head;
     }
 
-    [[nodiscard]] EntityCategoryLookupTableRuntimeView* AllocateCategoryLookupTableRuntime() noexcept
+    /**
+     * The +0x38 lane is the table's back-reference to the rules that own it,
+     * and it is the only route back: ParseEntityCategory seeds every clause
+     * accumulator from it (0x00555323 reads [esi+38h]), each map entry it
+     * creates inherits the same handle, and EntityCategory::Add then calls
+     * GetBlueprintFromOrdinal through it to remap the clause's bits. Leaving
+     * it null meant the very first economy restriction parsed during category
+     * setup dispatched through a null rules pointer.
+     */
+    [[nodiscard]] EntityCategoryLookupTableRuntimeView*
+    AllocateCategoryLookupTableRuntime(const moho::RRuleGameRulesImpl* const owner) noexcept
     {
       auto* const lookup = new (std::nothrow) EntityCategoryLookupTableRuntimeView{};
       if (lookup == nullptr) {
@@ -442,8 +452,9 @@ namespace moho
         return nullptr;
       }
 
-      lookup->categoryFallback.ResetToEmpty(0u);
-      lookup->wordUniverseHandle = 0u;
+      const auto ownerHandle = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owner));
+      lookup->categoryFallback.ResetToEmpty(ownerHandle);
+      lookup->wordUniverseHandle = ownerHandle;
       std::memset(lookup->pad_003C_003F, 0, sizeof(lookup->pad_003C_003F));
       return lookup;
     }
@@ -2091,7 +2102,7 @@ namespace moho
     // routed through mEntityCategoryLookup. The binary's
     // EntityCategorySet ctor template emission is absorbed by this
     // typed allocator helper.
-    mEntityCategoryLookup = AllocateCategoryLookupTableRuntime();
+    mEntityCategoryLookup = AllocateCategoryLookupTableRuntime(this);
     mPendingBlueprintReloadNext = &mPendingBlueprintReloadNext;
     mPendingBlueprintReloadPrev = &mPendingBlueprintReloadNext;
 
