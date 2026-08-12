@@ -63,6 +63,13 @@ namespace moho
      */
     STransportPickUpInfo();
 
+    /**
+     * Address: 0x005E44F0 (FUN_005E44F0, Moho::STransportPickUpInfo::HasInVec)
+     *
+     * What it does:
+     * Linear-scans pickup storage for `unit`, comparing owning-unit pointers
+     * rather than binary-searching by entity id.
+     */
     [[nodiscard]] bool HasUnit(const Unit* unit) const noexcept;
 
     /**

@@ -59,9 +59,29 @@ STransportPickUpInfo::STransportPickUpInfo()
   mUnits.Clear();
 }
 
+/**
+ * Address: 0x005E44F0 (FUN_005E44F0, Moho::STransportPickUpInfo::HasInVec)
+ *
+ * IDA signature:
+ * char __usercall Moho::STransportPickUpInfo::HasInVec@<al>(
+ *     Moho::STransportPickUpInfo *this@<ecx>, Moho::Unit *unit@<esi>);
+ *
+ * What it does:
+ * Linear-scans the pickup set's contiguous storage, converting each entry to
+ * its owning unit, and reports whether `unit` is among them. This is a plain
+ * pointer scan, not `SEntitySetTemplateUnit::ContainsUnit`'s id-keyed binary
+ * search — the binary emits a separate body here and calls it from both
+ * `TransportIsUnitAssignedForPickup` and `TransportIsReadyForUnit`.
+ */
 bool STransportPickUpInfo::HasUnit(const Unit* const unit) const noexcept
 {
-  return mUnits.ContainsUnit(unit);
+  for (const Entity* const entry : mUnits.mVec) {
+    if (SEntitySetTemplateUnit::UnitFromEntry(entry) == unit) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
