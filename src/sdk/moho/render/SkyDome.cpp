@@ -4,8 +4,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <stdexcept>
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/gal/DrawContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Device.hpp"
@@ -135,7 +137,7 @@ namespace
    * Allocates one decal-upload node and initializes link lanes plus the
    * 0x28-byte packed decal-vertex payload.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadNode(
+  [[nodiscard]] moho::SkyDomeDecalUploadNode* AllocateSkyDomeDecalUploadNode(
     moho::SkyDomeDecalUploadNode* const next,
     moho::SkyDomeDecalUploadNode* const prev,
     const void* const vertexData
@@ -153,6 +155,24 @@ namespace
       std::memset(node->mVertexData, 0, sizeof(node->mVertexData));
     }
     return node;
+  }
+
+  /**
+   * Address: 0x0081A5D0 (FUN_0081A5D0)
+   *
+   * What it does:
+   * The size increment MSVC emits for the decal-upload list. The ceiling is
+   * the list's own max_size - how many 40-byte payloads a 32-bit size can
+   * address - and overflowing it is reported the way the standard library
+   * reports it.
+   */
+  [[nodiscard]] std::int32_t BumpSkyDomeDecalUploadCount(const std::int32_t currentCount)
+  {
+    constexpr std::int32_t kMaxDecalUploadRecords = 107374182;
+    if (currentCount == kMaxDecalUploadRecords) {
+      throw std::length_error("list<T> too long");
+    }
+    return currentCount + 1;
   }
 
   /**
@@ -337,6 +357,88 @@ namespace moho
     mDomeVertexCount = 0;
     mDomeIndexCount = 0;
     mNeedsRebuild = true;
+  }
+
+  /**
+   * Address: 0x00815FA0 (FUN_00815FA0, ?Load@SkyDome@Moho@@QAEXIAAVBinaryReader@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SkyDome::Load(SkyDome *this, unsigned int version, gpg::BinaryReader *reader);
+   *
+   * What it does:
+   * Reads the sky block of a `.scmap`: dome placement and shape, the horizon
+   * and sky gradient, the three cloud-texture paths, a run of packed cloud
+   * records that become the decal-upload list, and the cirrus parameters and
+   * its four 20-byte layer records. Drops every GPU resource first, so the
+   * next frame rebuilds the dome from what was just read.
+   *
+   * The version is passed but never consulted - the sky block gained no
+   * version-gated fields before the format froze, and the caller only reaches
+   * this at map version 0x3A and above.
+   */
+  void SkyDome::Load(unsigned int, gpg::BinaryReader& reader)
+  {
+    Reset();
+
+    reader.ReadExact(mDomeOrigin);
+    reader.ReadExact(mDomeShapeParams.x);
+    reader.ReadExact(mDomeShapeParams.y);
+    reader.ReadExact(mDomeShapeParams.z);
+    reader.ReadExact(mWidth);
+    reader.ReadExact(mHeight);
+    reader.ReadExact(mHorizonSize);
+    reader.ReadExact(mHorizonColor);
+    reader.ReadExact(mSkyColor);
+    reader.ReadExact(mHorizonBlend);
+
+    msvc8::string scratch;
+    reader.ReadString(&scratch);
+    mAtmosphereTexPath.assign(scratch, 0u, 0xFFFFFFFFu);
+    reader.ReadString(&scratch);
+    mAtmosphereTexPath2.assign(scratch, 0u, 0xFFFFFFFFu);
+
+    // Cumulus records, appended to the upload list in file order. The list is
+    // the sentinel-headed one the constructor built, so each record links in
+    // ahead of the sentinel and the count is the list size the decal draw
+    // reads back.
+    std::int32_t cloudRecordCount = 0;
+    reader.ReadExact(cloudRecordCount);
+    for (std::int32_t record = 0; record < cloudRecordCount; ++record) {
+      std::uint8_t vertexData[sizeof(SkyDomeDecalUploadNode::mVertexData)]{};
+      reader.Read(reinterpret_cast<char*>(vertexData), sizeof(vertexData));
+
+      SkyDomeDecalUploadNode* const tail = mDecalUploadHead->mPrev;
+      SkyDomeDecalUploadNode* const node =
+        AllocateSkyDomeDecalUploadNode(mDecalUploadHead, tail, vertexData);
+      mDecalUploadCount = BumpSkyDomeDecalUploadCount(mDecalUploadCount);
+      tail->mNext = node;
+      mDecalUploadHead->mPrev = node;
+    }
+
+    reader.ReadString(&scratch);
+    mDecalTexPath1.assign(scratch, 0u, 0xFFFFFFFFu);
+    reader.ReadString(&scratch);
+    mDecalTexPath2.assign(scratch, 0u, 0xFFFFFFFFu);
+    reader.ReadString(&scratch);
+    mDecalTexPath3.assign(scratch, 0u, 0xFFFFFFFFu);
+
+    reader.ReadExact(mCirrusMultiplier);
+    reader.ReadExact(mCirrusColor_R);
+    reader.ReadExact(mCirrusColor_G);
+    reader.ReadExact(mCirrusColor_B);
+    reader.ReadString(&scratch);
+    mCirrusTexPath.assign(scratch, 0u, 0xFFFFFFFFu);
+
+    // A layer count the reader consumes and ignores: the four cirrus layer
+    // records that follow are a fixed-size block either way.
+    std::int32_t discardedCirrusLayerCount = 0;
+    reader.ReadExact(discardedCirrusLayerCount);
+
+    constexpr std::size_t kCirrusLayerRecordSize = 20u;
+    constexpr std::size_t kCirrusLayerCount = sizeof(mCirrusData) / kCirrusLayerRecordSize;
+    for (std::size_t layer = 0; layer < kCirrusLayerCount; ++layer) {
+      reader.Read(reinterpret_cast<char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
+    }
   }
 
   /**
