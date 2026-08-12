@@ -48,6 +48,7 @@
 #include "moho/misc/SessionStartup.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/ESTITargetTypeTypeInfo.h"
 #include "moho/sim/UserArmy.h"
@@ -8467,8 +8468,25 @@ namespace moho
     IsReplay = sessionInfo.mIsReplay;
     IsBeingRecorded = sessionInfo.mIsBeingRecorded;
     IsMultiplayer = sessionInfo.mIsMultiplayer;
-    FocusArmy = -1;
     IsGameOver = 0;
+
+    // The binary also sizes `userArmies` here - one null slot per launch-info
+    // army (0x008934xx, count taken as `mArmyLaunchInfo._Mylast - _Myfirst`) -
+    // but the slots only become usable when `CWldSession::DoBeat` (0x00894530)
+    // fills them from the sim's army data, and the binary runs that *before*
+    // `CreateGameInterface` inside `WLD_DoInitializing`. `DoBeat` is not
+    // lifted yet, so sizing the vector here on its own just hands the UI a run
+    // of null armies and `cfunc_GetArmiesTableL` dereferences the first one.
+    // The resize belongs in the same pass as `DoBeat`.
+    if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
+      // Command sources and the focus army come off the same launch info.
+      (void)CopyConstructCommandSourceVector(launchInfo->mCommandSources.mSrcs, &cmdSources);
+      FocusArmy = launchInfo->mCommandSources.mOriginalSource;
+      IsCheatsEnabled = launchInfo->mCheatsEnabled;
+    } else {
+      FocusArmy = -1;
+      IsCheatsEnabled = false;
+    }
 
     mSelection.mAllocProxy = nullptr;
     mSelection.mHead = nullptr;
@@ -8482,7 +8500,6 @@ namespace moho
     CursorScreenPos.y = 0.0f;
     HighlightCommandId = -1;
 
-    IsCheatsEnabled = false;
     mShowInvalidBuildPlacementPreview = false;
     DisplayEconomyOverlay = false;
     mTeamColorMode = false;
