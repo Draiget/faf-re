@@ -427,6 +427,46 @@ namespace boost
     }
 
     /**
+     * `ResetSharedFromRaw` for a raw `(px,pi)` lane: adopts `rawPointer` into
+     * `target` behind a freshly created control block and releases whatever the
+     * lane owned before. `SharedPtrRaw` otherwise only knows how to retain a
+     * control block that already exists (`assign_retain`, `clone_retained`), so
+     * this is the single place that mints one for a lane member.
+     *
+     * Reference-count contract, identical to `boost::shared_ptr<T>::reset(T*)`
+     * (whose `CAniPose` emission is at 0x0063CA40):
+     *  - the new control block is built first, so a throw while allocating it
+     *    deletes `rawPointer` and leaves `target` untouched;
+     *  - its single strong reference is *moved* into `target` rather than
+     *    re-acquired, keeping `use_count_ == 1`;
+     *  - the previous control block is released last, which is what makes it
+     *    safe to reset a lane from a value derived from its current referent.
+     */
+    template <class T>
+    inline void ResetSharedPtrRawOwning(SharedPtrRaw<T>& target, T* const rawPointer)
+    {
+        static_assert(
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
+        );
+
+        boost::shared_ptr<T> owner(rawPointer);
+        auto* const ownerLanes = reinterpret_cast<SharedPtrLayoutView<T>*>(&owner);
+
+        detail::sp_counted_base* const previous = target.pi;
+        target.px = ownerLanes->px;
+        target.pi = ownerLanes->pi;
+
+        // Ownership has moved into `target`; keep `owner`'s destructor a no-op.
+        ownerLanes->px = nullptr;
+        ownerLanes->pi = nullptr;
+
+        if (previous != nullptr) {
+            previous->release();
+        }
+    }
+
+    /**
      * Address: 0x00446010 (FUN_00446010)
      *
      * What it does:

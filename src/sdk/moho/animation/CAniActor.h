@@ -23,6 +23,7 @@ namespace moho
   class CAniPose;
   class CAniSkel;
   class IAniManipulator;
+  class VTransform;
 
   class CAniActor
   {
@@ -113,6 +114,20 @@ namespace moho
       const boost::SharedPtrRaw<CAniPose>& pose,
       const boost::SharedPtrRaw<CAniPose>& priorPose
     ) noexcept;
+
+    /**
+     * Address: 0x0063AA80 (FUN_0063AA80, ?UpdateManipulators@CAniActor@Moho@@QAEXABVVTransform@2@@Z)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CAniActor::UpdateManipulators(Moho::CAniActor *this, struct Moho::VTransform *a2);
+     *
+     * What it does:
+     * Advances this actor one animation step: retires the current pose into
+     * `mPriorPose`, installs a fresh copy of it as `mPose`, rebuilds that copy's
+     * bone transforms under `worldTransform`, then runs every enabled
+     * manipulator in precedence order.
+     */
+    void UpdateManipulators(const VTransform& worldTransform);
 
     /**
      * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)

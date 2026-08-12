@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
+#include <utility>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
@@ -778,6 +779,50 @@ namespace moho
   {
     mPose.assign_retain(pose);
     mPriorPose.assign_retain(priorPose);
+  }
+
+  /**
+   * Address: 0x0063AA80 (FUN_0063AA80, ?UpdateManipulators@CAniActor@Moho@@QAEXABVVTransform@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CAniActor::UpdateManipulators(Moho::CAniActor *this, struct Moho::VTransform *a2);
+   *
+   * What it does:
+   * Advances this actor one animation step: retires the current pose into
+   * `mPriorPose`, installs a fresh copy of it as `mPose`, rebuilds that copy's
+   * bone transforms under `worldTransform`, then runs every enabled manipulator
+   * in precedence order.
+   */
+  void CAniActor::UpdateManipulators(const VTransform& worldTransform)
+  {
+    // 0x0063AA9C-0x0063AAB5 exchanges both `(px,pi)` pairs with no refcount
+    // traffic: last frame's pose becomes the prior pose, and the lane it
+    // vacates is about to be overwritten anyway.
+    std::swap(mPose, mPriorPose);
+
+    // 0x0063AAB0-0x0063AAE7: `mPose.reset(new CAniPose(*mPriorPose.px))`. The
+    // new frame starts as a copy of the pose just retired, under a fresh
+    // control block; the referent this lane held before the swap is released.
+    boost::ResetSharedPtrRawOwning(mPose, new CAniPose(*mPriorPose.px));
+
+    mPose.px->UpdateBones();                     // 0x0063AAEE
+    mPose.px->SetWorldTransform(worldTransform); // 0x0063AAFA
+
+    auto* const listHead = static_cast<TDatListItem<IAniManipulator, void>*>(&mManipulatorsByPrecedence);
+    for (auto* node = mManipulatorsByPrecedence.mNext; node != listHead;) {
+      IAniManipulator* const manipulator = ListNodeToManipulator(node);
+      const bool enabled = manipulator != nullptr && manipulator->mEnabled;
+
+      // 0x0063AB1F advances the cursor ahead of the callback at 0x0063AB29, so
+      // a manipulator is free to unlink or delete itself from inside its own
+      // update. That ordering is load-bearing, not a scheduling artifact.
+      node = node->mNext;
+
+      if (enabled) {
+        // Result discarded at the call site.
+        (void)manipulator->ManipulatorUpdate();
+      }
+    }
   }
 
   /**
