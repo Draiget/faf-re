@@ -1283,6 +1283,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\ISTIDriver.cpp" />
     <ClCompile Include="moho\sim\ReconBlip.cpp" />
     <ClCompile Include="moho\sim\CWldSession.cpp" />
+    <ClCompile Include="moho\sim\BlueprintLoaderContext.cpp" />
     <ClCompile Include="moho\sim\CWldSessionLoaderImpl.cpp" />
     <ClCompile Include="moho\render\CWldTerrainDecalTYPETypeInfo.cpp" />
     <ClCompile Include="moho\render\CDecalHandle.cpp" />
@@ -2583,6 +2584,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\serialization\typeinfo\ECompareTypeTypeInfo.h" />
     <ClInclude Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.h" />
     <ClInclude Include="moho\sim\ArmyUnitSet.h" />
+    <ClInclude Include="moho\sim\BlueprintLoaderContext.h" />
     <ClInclude Include="moho\sim\CBackgroundTaskControl.h" />
     <ClInclude Include="moho\sim\CSimArmyEconomyInfo.h" />
     <ClInclude Include="moho\sim\ESquadClass.h" />

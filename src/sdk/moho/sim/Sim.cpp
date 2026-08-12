@@ -114,6 +114,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/BlueprintLoaderContext.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CBackgroundTaskControl.h"
@@ -13768,40 +13769,10 @@ int moho::cfunc_SpecFootprints(lua_State* const luaContext)
 
 namespace
 {
-  struct LuaBlueprintTlsStateView
-  {
-    void* reserved00;                    // +0x00
-    moho::RRuleGameRulesImpl* rules;     // +0x04
-    moho::CBackgroundTaskControl* initHandler; // +0x08
-  };
-
-  static_assert(
-    offsetof(LuaBlueprintTlsStateView, rules) == 0x04,
-    "LuaBlueprintTlsStateView::rules offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LuaBlueprintTlsStateView, initHandler) == 0x08,
-    "LuaBlueprintTlsStateView::initHandler offset must be 0x08"
-  );
-
-  [[nodiscard]] LuaBlueprintTlsStateView* ResolveLuaBlueprintTlsState() noexcept
-  {
-#if defined(_M_IX86)
-    void** const tlsPointerArray = reinterpret_cast<void**>(__readfsdword(0x2Cu));
-    if (tlsPointerArray == nullptr) {
-      return nullptr;
-    }
-    return static_cast<LuaBlueprintTlsStateView*>(tlsPointerArray[0]);
-#else
-    return nullptr;
-#endif
-  }
-
   [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* const state) noexcept
   {
-    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
-    if (tlsState != nullptr && tlsState->rules != nullptr) {
-      return tlsState->rules;
+    if (moho::RRuleGameRulesImpl* const rules = moho::BlueprintLoaderContext().mRules; rules != nullptr) {
+      return rules;
     }
     return ResolveRulesImpl(state);
   }
@@ -14781,8 +14752,7 @@ namespace
    */
   [[maybe_unused]] int RegisterMeshBlueprintFromTlsLane(LuaPlus::LuaState* const state)
   {
-    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
-    (void)&tlsState->rules->mMeshBlueprints;
+    (void)&moho::BlueprintLoaderContext().mRules->mMeshBlueprints;
     (void)RegisterMeshBlueprintFromState(state);
     return 0;
   }
@@ -14796,8 +14766,7 @@ namespace
    */
   [[maybe_unused]] int RegisterTrailEmitterBlueprintFromTlsLane(LuaPlus::LuaState* const state)
   {
-    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
-    (void)&tlsState->rules->mTrailBlueprints;
+    (void)&moho::BlueprintLoaderContext().mRules->mTrailBlueprints;
     return RegisterTrailEmitterBlueprintFromState(state);
   }
 
@@ -14810,8 +14779,7 @@ namespace
    */
   [[maybe_unused]] int RegisterEmitterBlueprintFromTlsLane(LuaPlus::LuaState* const state)
   {
-    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
-    (void)&tlsState->rules->mEmitterBlueprints;
+    (void)&moho::BlueprintLoaderContext().mRules->mEmitterBlueprints;
     return RegisterEmitterBlueprintFromState(state);
   }
 
@@ -14824,8 +14792,7 @@ namespace
    */
   [[maybe_unused]] int RegisterBeamBlueprintFromTlsLane(LuaPlus::LuaState* const state)
   {
-    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
-    (void)&tlsState->rules->mBeamBlueprints;
+    (void)&moho::BlueprintLoaderContext().mRules->mBeamBlueprints;
     return RegisterBeamBlueprintFromState(state);
   }
 } // namespace
@@ -15075,62 +15042,32 @@ moho::CScrLuaInitForm* moho::func_RegisterBeamBlueprint_LuaFuncDef()
  */
 namespace
 {
-  void TickBlueprintLoaderProgressFromTlsLane()
+  void TickBlueprintLoaderProgressFromLoaderContext()
   {
-#if defined(_M_IX86)
-    void** const tlsPointerArray = reinterpret_cast<void**>(__readfsdword(0x2Cu));
-    if (tlsPointerArray != nullptr) {
-      const auto* const tlsState = static_cast<const LuaBlueprintTlsStateView*>(tlsPointerArray[0]);
-      if (tlsState != nullptr && tlsState->initHandler != nullptr && tlsState->initHandler->mHandle != nullptr) {
-        tlsState->initHandler->mHandle->UpdateLoadingProgress();
-      }
+    moho::CBackgroundTaskControl* const initHandler = moho::BlueprintLoaderContext().mInitHandler;
+    if (initHandler != nullptr && initHandler->mHandle != nullptr) {
+      initHandler->mHandle->UpdateLoadingProgress();
     }
-#endif
   }
 
   /**
    * Address: 0x005290C0 (FUN_005290C0)
    *
    * What it does:
-   * Ticks one background-load progress update directly from the worker TLS
-   * lane and returns the legacy success code.
+   * Ticks one background-load progress update directly from the worker's
+   * blueprint-loader context and returns the legacy success code.
    */
-  [[maybe_unused]] int BlueprintLoaderUpdateProgressFromTlsLane()
+  [[maybe_unused]] int BlueprintLoaderUpdateProgressFromLoaderContext()
   {
-    TickBlueprintLoaderProgressFromTlsLane();
+    TickBlueprintLoaderProgressFromLoaderContext();
     return 0;
-  }
-
-  /**
-   * Address: 0x005290E0 (FUN_005290E0)
-   *
-   * What it does:
-   * Seeds the current worker TLS blueprint-loader lane with the active rules
-   * pointer plus init-handler pointer, then returns one passthrough value.
-   */
-  [[maybe_unused]] int SeedBlueprintLoaderTlsStateFromCallSite(
-    moho::RRuleGameRulesImpl* const rules,
-    moho::CBackgroundTaskControl* const initHandler,
-    const int passthroughValue
-  ) noexcept
-  {
-#if defined(_M_IX86)
-    void** const tlsPointerArray = reinterpret_cast<void**>(__readfsdword(0x2Cu));
-    auto* const tlsState = static_cast<LuaBlueprintTlsStateView*>(tlsPointerArray[0]);
-    tlsState->rules = rules;
-    tlsState->initHandler = initHandler;
-#else
-    (void)rules;
-    (void)initHandler;
-#endif
-    return passthroughValue;
   }
 } // namespace
 
 int moho::cfunc_BlueprintLoaderUpdateProgress(lua_State* const luaContext)
 {
   (void)LuaPlus::LuaState::CastState(luaContext);
-  TickBlueprintLoaderProgressFromTlsLane();
+  TickBlueprintLoaderProgressFromLoaderContext();
   return 0;
 }
 

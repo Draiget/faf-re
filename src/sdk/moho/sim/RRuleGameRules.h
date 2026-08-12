@@ -22,7 +22,7 @@ namespace gpg
 
 namespace moho
 {
-  class CWaitHandleSet;
+  struct CBackgroundTaskControl;
 
   struct RResId;
 
@@ -123,9 +123,10 @@ namespace moho
      *
      * What it does:
      * Allocates one `RRuleGameRulesImpl` object and runs the concrete
-     * constructor with active-mod payload + optional init wait-set pointer.
+     * constructor with active-mod payload plus the background-task control that
+     * blueprint loading reports progress to (null when nothing is watching).
      */
-    [[nodiscard]] static RRuleGameRules* Create(const msvc8::string& activeMods, CWaitHandleSet** initWaitSet);
+    [[nodiscard]] static RRuleGameRules* Create(const msvc8::string& activeMods, CBackgroundTaskControl* initHandler);
 
     /**
      * Address: 0x00529F70
@@ -299,7 +300,7 @@ namespace moho
      * Initializes rule Lua/runtime storage, runs core Lua init forms, loads
      * `/lua/RuleInit.lua`, and rebuilds category caches.
      */
-    RRuleGameRulesImpl(const msvc8::string& activeMods, CWaitHandleSet** initWaitSet);
+    RRuleGameRulesImpl(const msvc8::string& activeMods, CBackgroundTaskControl* initHandler);
 
     /**
      * Address: 0x00529700 (FUN_00529700)

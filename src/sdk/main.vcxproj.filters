@@ -2379,6 +2379,9 @@
     <ClCompile Include="moho\sim\CWldSession.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\BlueprintLoaderContext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CWldSessionLoaderImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -6260,6 +6263,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\ArmyUnitSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\BlueprintLoaderContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CBackgroundTaskControl.h">

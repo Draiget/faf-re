@@ -88,12 +88,11 @@ namespace moho
      * "map %s failed.  aborting session." the moment the frame machine was
      * fixed enough to consult it.
      *
-     * The second parameter is the entry-point slot's `CWaitHandleSet**`, but
-     * every use here is as the background-task control the binary threads
-     * through the load - the rules constructor takes the same word as its
-     * optional init wait-set.
+     * IDA types the second parameter `CWaitHandleSet**`; it is the
+     * background-task control the worker threads through the load, which is the
+     * same word seen without the one-pointer struct around it.
      */
-    void WorldSessionUserLoad(SWldScenarioInfo* const scenario, CWaitHandleSet** const waitSet)
+    void WorldSessionUserLoad(SWldScenarioInfo* const scenario, CBackgroundTaskControl* const loadControl)
     {
       if (scenario == nullptr) {
         return;
@@ -103,14 +102,12 @@ namespace moho
       // map geometry loaded here rounds identically to the way it is simulated.
       (void)::_controlfp(_PC_24, _MCW_PC);
 
-      auto* const loadControl = reinterpret_cast<CBackgroundTaskControl*>(waitSet);
-
       {
         const std::string marker(" World Session Load 1", 21u);
         (void)marker;
       }
 
-      RRuleGameRules* const createdRules = RRuleGameRules::Create(scenario->mGameMods, waitSet);
+      RRuleGameRules* const createdRules = RRuleGameRules::Create(scenario->mGameMods, loadControl);
       if (RRuleGameRules* const previousRules = scenario->mGameRules;
           createdRules != previousRules && previousRules != nullptr) {
         delete previousRules;
@@ -498,8 +495,9 @@ namespace moho
             }
           }
         } else {
-          CWaitHandleSet* waitSet = nullptr;
-          WorldSessionUserLoad(scenario, &waitSet);
+          // No load control on this path, so nothing is watching progress.
+          CBackgroundTaskControl loadControl{nullptr};
+          WorldSessionUserLoad(scenario, &loadControl);
           scenario->mLoaded = true;
         }
       }
