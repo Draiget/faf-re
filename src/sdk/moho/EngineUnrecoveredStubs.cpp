@@ -94,14 +94,15 @@ namespace gpg
   // `gpg::Save...` lookups (SConditionTriggerReflection.cpp,
   // ProjectileStartupRegistrations.cpp) to the real bodies.
   //
-  // LoadAndBroadcastManyToOneListenerEProjectileImpactEvent and
-  // SaveBroadcasterListenerChainEUnitCommandQueueStatus remain as
-  // no-op stubs because their real bodies are not yet recovered in
-  // src/sdk/**. Save/load for those reflection lanes is still lossy.
+  // SaveBroadcasterListenerChainEUnitCommandQueueStatus is recovered in
+  // src/sdk/moho/unit/Broadcaster.cpp (FUN_006F8650) -- the no-op stub that
+  // silently dropped the whole listener chain is gone.
+  //
+  // LoadAndBroadcastManyToOneListenerEProjectileImpactEvent remains a no-op
+  // stub because its real body is not yet recovered in src/sdk/**. Load for
+  // that reflection lane is still lossy.
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
       gpg::ReadArchive*, int, int, gpg::RRef*) {}
-  void SaveBroadcasterListenerChainEUnitCommandQueueStatus(
-      gpg::WriteArchive*, int) {}
 }
 
 namespace moho

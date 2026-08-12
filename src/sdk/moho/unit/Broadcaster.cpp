@@ -7,12 +7,14 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/Listener.h"
 #include "moho/unit/ECommandEvent.h"
-#include "moho/unit/EUnitCommandQueueStatus.h"
+#include "moho/unit/EUnitCommandQueueStatus.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -889,6 +891,51 @@ namespace moho
       &cleanup_Listener_EUnitCommandQueueStatus_RType>();
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x006F8650 (FUN_006F8650, Moho::RBroadcasterRType_EUnitCommandQueueStatus::SerSave)
+   *
+   * IDA signature:
+   * void __cdecl sub_6F8650(BinaryWriteArchive *archive, int objectPtr);
+   *
+   * What it does:
+   * Serializes one intrusive `Broadcaster<EUnitCommandQueueStatus>` lane by
+   * writing each linked listener pointer as `UNOWNED` and terminating the run
+   * with one null pointer record — the exact twin of
+   * `RBroadcasterRType_ECommandEvent::SerSave` (0x006EA810) for the other
+   * broadcaster instantiation. Bound as the type's `serSaveFunc_`, which is
+   * why it takes two arguments rather than the full four-argument save
+   * signature.
+   */
+  void SaveBroadcasterListenerChainEUnitCommandQueueStatus(WriteArchive* const archive, const int objectPtr)
+  {
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(broadcaster != nullptr);
+    if (!archive || !broadcaster) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    gpg::RRef pointerRef{};
+
+    for (
+      moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
+      node != broadcaster;
+      node = static_cast<moho::Broadcaster*>(node->mNext)
+    ) {
+      (void)gpg::RRef_Listener_EUnitCommandQueueStatus(&pointerRef, ListenerFromLinkNode(node));
+      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    }
+
+    (void)gpg::RRef_Listener_EUnitCommandQueueStatus(&pointerRef, nullptr);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  }
+} // namespace gpg
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
