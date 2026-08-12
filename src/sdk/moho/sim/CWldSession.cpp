@@ -23,6 +23,7 @@
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/lua/SCR_Color.h"
+#include "moho/lua/SCR_String.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -2360,7 +2361,7 @@ namespace moho
      * reinserts each listener back into the owner list, and dispatches one
      * 4-lane selection-event payload through the listener vtable.
      */
-    [[maybe_unused]] void BroadcastSelectionEventListeners(
+    void BroadcastSelectionEventListeners(
       ListenerLinkRuntimeView& head,
       const std::uint32_t lane0,
       const std::uint32_t lane1,
@@ -2403,11 +2404,15 @@ namespace moho
       }
     }
 
-    [[nodiscard]] ListenerLinkRuntimeView& SelectionEventHeadFromSelectionSet(
-      SSelectionSetUserEntity& selection
-    ) noexcept
+    /**
+     * `Broadcaster<SSelectionEvent>` is a base subobject of `CWldSession`, so
+     * its listener-list head is the session's own first intrusive link at
+     * +0x00 - `SetSelection` (0x00896140) loads `arg_0`, the session pointer,
+     * straight into `esi` as `BroadcastEvent`'s `this`.
+     */
+    [[nodiscard]] ListenerLinkRuntimeView& SelectionEventHead(CWldSession& session) noexcept
     {
-      return *reinterpret_cast<ListenerLinkRuntimeView*>(&selection);
+      return *reinterpret_cast<ListenerLinkRuntimeView*>(&session.head0);
     }
 
     [[nodiscard]] std::uint32_t SelectionEventLaneFromPointer(const void* const pointer) noexcept
@@ -8457,7 +8462,6 @@ namespace moho
     IsReplay = sessionInfo.mIsReplay;
     IsBeingRecorded = sessionInfo.mIsBeingRecorded;
     IsMultiplayer = sessionInfo.mIsMultiplayer;
-    IsObservingAllowed = sessionInfo.mIsReplay;
     FocusArmy = -1;
     IsGameOver = 0;
 
@@ -8500,6 +8504,31 @@ namespace moho
     (void)CTask::CreateTaskThread(new ScrDiskWatcherTask(mState), mCurThread, true);
 
     ClearBuildTemplates();
+
+    // Scenario table. The lobby hands the session its scenario as a serialized
+    // Lua value on the launch info (`LaunchInfoBase::mScenarioInfo`, +0x28) and
+    // the session parses it into its own Lua universe. Leaving `mScenarioInfo`
+    // default-constructed gives it a null owning state, so every
+    // `SessionGetScenarioInfo` call from the in-game UI throws inside
+    // `LuaObject::PushStack` before it can even compare global states.
+    if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
+      LuaPlus::LuaObject parsedScenario;
+      (void)SCR_FromString(&parsedScenario, launchInfo->mScenarioInfo, mState);
+      mScenarioInfo = parsedScenario;
+    }
+
+    // Observers are unconditionally allowed while watching a replay; otherwise
+    // the scenario's own Options table decides, and a scenario without one
+    // means no observers.
+    if (IsReplay) {
+      IsObservingAllowed = true;
+    } else if (mScenarioInfo.IsTable()) {
+      const LuaPlus::LuaObject options = mScenarioInfo["Options"];
+      IsObservingAllowed = options.IsTable() && options["AllowObservers"].GetBoolean();
+    } else {
+      IsObservingAllowed = false;
+    }
+
     gActiveWldSession = this;
   }
 
@@ -10056,7 +10085,7 @@ namespace moho
     }
 
     BroadcastSelectionEventListeners(
-      SelectionEventHeadFromSelectionSet(mSelection),
+      SelectionEventHead(*this),
       SelectionEventLaneFromPointer(&mSelection),
       SelectionEventLaneFromPointer(incomingSelection),
       SelectionEventLaneFromPointer(&addedEntities),
