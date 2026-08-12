@@ -9,6 +9,7 @@
 #include "legacy/containers/List.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/sim/VisibilityRect.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector2.h"
@@ -51,10 +52,10 @@ namespace moho
   struct CWldPropEntry
   {
     msvc8::string mBlueprintPath; // +0x00
-    float mTransformData[7];      // +0x1C
+    VTransform mTransform;        // +0x1C
   };
   static_assert(offsetof(CWldPropEntry, mBlueprintPath) == 0x00, "CWldPropEntry::mBlueprintPath offset must be 0x00");
-  static_assert(offsetof(CWldPropEntry, mTransformData) == 0x1C, "CWldPropEntry::mTransformData offset must be 0x1C");
+  static_assert(offsetof(CWldPropEntry, mTransform) == 0x1C, "CWldPropEntry::mTransform offset must be 0x1C");
   static_assert(sizeof(CWldPropEntry) == 0x38, "CWldPropEntry size must be 0x38");
 
   struct CWldProps

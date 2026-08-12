@@ -2361,9 +2361,7 @@ namespace
   )
   {
     destination->mBlueprintPath.assign(source->mBlueprintPath, 0u, msvc8::string::npos);
-    for (std::size_t lane = 0; lane < 7u; ++lane) {
-      destination->mTransformData[lane] = source->mTransformData[lane];
-    }
+    destination->mTransform = source->mTransform;
     return destination;
   }
 
@@ -2512,10 +2510,8 @@ namespace
   {
     moho::CWldPropEntry defaultEntry{};
     defaultEntry.mBlueprintPath.tidy(false, 0U);
-    defaultEntry.mTransformData[0] = 1.0f;
-    for (std::size_t lane = 1; lane < 7; ++lane) {
-      defaultEntry.mTransformData[lane] = 0.0f;
-    }
+    defaultEntry.mTransform.orient_ = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
+    defaultEntry.mTransform.pos_ = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
     return defaultEntry;
   }
 
@@ -2571,12 +2567,10 @@ namespace
    * storage record.
    */
   moho::CWldPropEntry*
-  PackWldPropEntry(moho::CWldPropEntry& outEntry, const float packedTransformLanes[7], const msvc8::string& path)
+  PackWldPropEntry(moho::CWldPropEntry& outEntry, const moho::VTransform& transform, const msvc8::string& path)
   {
     outEntry.mBlueprintPath.assign_owned(path.c_str());
-    for (std::size_t i = 0; i < 7; ++i) {
-      outEntry.mTransformData[i] = packedTransformLanes[i];
-    }
+    outEntry.mTransform = transform;
     return &outEntry;
   }
 
@@ -2696,10 +2690,10 @@ namespace moho
       blueprintPath.tidy(false, 0U);
       reader.ReadString(&blueprintPath);
 
-      float packedTransformLanes[7]{};
-      reader.ReadExact(packedTransformLanes[4]);
-      reader.ReadExact(packedTransformLanes[5]);
-      reader.ReadExact(packedTransformLanes[6]);
+      VTransform transform{};
+      reader.ReadExact(transform.pos_.x);
+      reader.ReadExact(transform.pos_.y);
+      reader.ReadExact(transform.pos_.z);
 
       float matrix[3][3]{};
       matrix[0][0] = 1.0f;
@@ -2725,13 +2719,9 @@ namespace moho
 
       QuaternionLanes orientation = QuaternionFromMatrixRows(matrix);
       NormalizeQuaternionLanes(orientation);
+      transform.orient_ = Wm3::Quatf{orientation.w, orientation.x, orientation.y, orientation.z};
 
-      packedTransformLanes[0] = orientation.w;
-      packedTransformLanes[1] = orientation.x;
-      packedTransformLanes[2] = orientation.y;
-      packedTransformLanes[3] = orientation.z;
-
-      PackWldPropEntry(mEntriesBegin[index], packedTransformLanes, blueprintPath);
+      PackWldPropEntry(mEntriesBegin[index], transform, blueprintPath);
     }
 
     return true;
@@ -2754,12 +2744,12 @@ namespace moho
       const CWldPropEntry& entry = mEntriesBegin[index];
       writer.Write(entry.mBlueprintPath.c_str(), entry.mBlueprintPath.size() + 1u);
 
-      const float* const transform = entry.mTransformData;
-      writer.Write(transform[4]);
-      writer.Write(transform[5]);
-      writer.Write(transform[6]);
+      writer.Write(entry.mTransform.pos_.x);
+      writer.Write(entry.mTransform.pos_.y);
+      writer.Write(entry.mTransform.pos_.z);
 
-      const QuaternionLanes orientation{transform[0], transform[1], transform[2], transform[3]};
+      const Wm3::Quatf& orient = entry.mTransform.orient_;
+      const QuaternionLanes orientation{orient.w, orient.x, orient.y, orient.z};
       float matrix[3][3]{};
       QuaternionToRotationRows(orientation, matrix);
 

@@ -18,6 +18,7 @@ namespace gpg
 namespace moho
 {
   class RRuleGameRules;
+  struct CWldProps;
   struct SSessionSaveData;
   class STIMap;
 
@@ -170,7 +171,9 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive);
 
   public:
-    void* mProps;                                // +0x8C
+    // Borrowed from CWldMap; the session hands the loaded map's prop list
+    // straight over and Sim::Setup walks it to spawn each entry.
+    CWldProps* mProps;                           // +0x8C
     msvc8::vector<msvc8::string> mStrVec;        // +0x90
     std::int32_t mInitSeed;                      // +0xA0
   };
