@@ -1,5 +1,6 @@
 #include "CWldSessionLoaderImpl.h"
 
+#include <cfloat>
 #include <cstring>
 #include <new>
 
@@ -7,6 +8,10 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/ScrDebugHooks.h"
+#include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
 
@@ -33,16 +38,147 @@ namespace moho
     }
 
     /**
-     * Address: 0x00885DE0 (FUN_00885DE0, func_WorldSessionUserLoad)
+     * Address: 0x00412C70 (FUN_00412C70, func_UpdateLoadingProgress)
      *
      * What it does:
-     * Scenario content loading worker callback. Full source lift is still pending;
-     * this placeholder keeps typed loader scheduling/control semantics intact.
+     * Advances the loader's progress through its control handle. A load with no
+     * control attached simply has nothing to report to. This is also the abort
+     * point - the control throws `XBackgroundTaskAborted` when a stop has been
+     * requested, which unwinds the worker out of the load.
      */
-    void WorldSessionUserLoad(SWldScenarioInfo* const scenario, CWaitHandleSet** const /*waitSet*/)
+    void AdvanceLoadingProgress(CBackgroundTaskControl* const loadControl)
     {
-      if (!scenario) {
+      if (loadControl != nullptr && loadControl->mHandle != nullptr) {
+        loadControl->mHandle->UpdateLoadingProgress();
+      }
+    }
+
+    /**
+     * What it does:
+     * Runs one named Lua init-form set against a state. The binary reaches
+     * `scr_CoreInits` / `scr_UserInits` directly; the sets are registered by
+     * name here, and a missing set means nothing was linked into it.
+     */
+    void RunLuaInitFormSet(const char* const setName, LuaPlus::LuaState* const state)
+    {
+      if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet(setName); set != nullptr) {
+        set->RunInits(state);
+      }
+    }
+
+    /**
+     * Address: 0x00885DE0 (FUN_00885DE0, func_WorldSessionUserLoad)
+     *
+     * IDA signature:
+     * void __usercall func_WorldSessionUserLoad(struct_ScenarioInfo *this@<ecx>,
+     *                                           Moho::CWaitHandleSet **a2);
+     *
+     * What it does:
+     * The scenario load worker - everything a skirmish needs before a session
+     * can be built. On the loader's worker thread it builds the game rules from
+     * the scenario's mod list, stands up a fresh Lua state and runs the core
+     * and user init-form sets against it, exports the rules into that state,
+     * runs `/lua/SessionInit.lua`, and finally loads the map. Each stage bumps
+     * the loading-progress control, which is also the abort check: the control
+     * throws `XBackgroundTaskAborted` out of here when the load is cancelled.
+     *
+     * This was an empty placeholder, so `SWldScenarioInfo` came back with null
+     * rules, state and map. `WLD_DoLoading` reads exactly that to decide the
+     * scenario failed, which is why a skirmish reported
+     * "map %s failed.  aborting session." the moment the frame machine was
+     * fixed enough to consult it.
+     *
+     * The second parameter is the entry-point slot's `CWaitHandleSet**`, but
+     * every use here is as the background-task control the binary threads
+     * through the load - the rules constructor takes the same word as its
+     * optional init wait-set.
+     */
+    void WorldSessionUserLoad(SWldScenarioInfo* const scenario, CWaitHandleSet** const waitSet)
+    {
+      if (scenario == nullptr) {
         return;
+      }
+
+      // Loader threads run with the same reduced x87 precision the sim uses, so
+      // map geometry loaded here rounds identically to the way it is simulated.
+      (void)::_controlfp(_PC_24, _MCW_PC);
+
+      auto* const loadControl = reinterpret_cast<CBackgroundTaskControl*>(waitSet);
+
+      {
+        const std::string marker(" World Session Load 1", 21u);
+        (void)marker;
+      }
+
+      RRuleGameRules* const createdRules = RRuleGameRules::Create(scenario->mGameMods, waitSet);
+      if (RRuleGameRules* const previousRules = scenario->mGameRules;
+          createdRules != previousRules && previousRules != nullptr) {
+        delete previousRules;
+      }
+      scenario->mGameRules = createdRules;
+      AdvanceLoadingProgress(loadControl);
+
+      {
+        const std::string marker(" World Session Load 2", 21u);
+        (void)marker;
+      }
+
+      auto* const createdState = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+      if (LuaPlus::LuaState* const previousState = scenario->mState;
+          createdState != previousState && previousState != nullptr) {
+        delete previousState;
+      }
+      scenario->mState = createdState;
+
+      {
+        const std::string marker(" World Session Load 3", 21u);
+        (void)marker;
+      }
+
+      // The session's Lua state gets the same two binding sets the front end
+      // gets, in the same order: engine core bindings first, then user ones.
+      RunLuaInitFormSet("Core", scenario->mState);
+      RunLuaInitFormSet("User", scenario->mState);
+
+      if (SCR_IsDebugWindowActive()) {
+        lua_sethook(scenario->mState->m_state, DebugLuaHook, LUA_MASKLINE, 0);
+      }
+      AdvanceLoadingProgress(loadControl);
+
+      {
+        const std::string marker(" World Session Load 4", 21u);
+        (void)marker;
+      }
+
+      scenario->mGameRules->ExportToLuaState(scenario->mState);
+      AdvanceLoadingProgress(loadControl);
+
+      {
+        const std::string marker(" World Session Load 5", 21u);
+        (void)marker;
+      }
+
+      (void)SCR_LuaDoScript(scenario->mState, "/lua/SessionInit.lua", nullptr);
+      AdvanceLoadingProgress(loadControl);
+
+      {
+        const std::string marker(" World Session Load 6", 21u);
+        (void)marker;
+      }
+
+      msvc8::auto_ptr<CWldMap> loadedMap(new CWldMap());
+      if (loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
+        CWldMap* const acceptedMap = loadedMap.release();
+        if (CWldMap* const previousMap = scenario->mWldMap;
+            acceptedMap != previousMap && previousMap != nullptr) {
+          delete previousMap;
+        }
+        scenario->mWldMap = acceptedMap;
+      }
+
+      {
+        const std::string marker(" World Session Load 7", 21u);
+        (void)marker;
       }
     }
 
