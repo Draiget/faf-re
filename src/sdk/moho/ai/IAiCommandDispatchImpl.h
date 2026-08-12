@@ -120,9 +120,14 @@ namespace moho
      *
      * What it does:
      * Validates a carrier target, reports illegal carriers, and schedules the
-     * recovered carrier-land task lane.
+     * recovered carrier-land task lane as a child of `parentTask`.
+     *
+     * The binary passes the parent task as a plain pointer argument rather
+     * than as `this` (the dispatch task is only one of its callers —
+     * `CUnitRefuel::TaskTick` at 0x00621490 passes the refuel task instead),
+     * so the parent is an explicit parameter here too.
      */
-    void IssueCarrierLandTask(Unit* unit);
+    static void IssueCarrierLandTask(Unit* unit, CCommandTask* parentTask);
 
     /**
      * Address: 0x0061EF60 (FUN_0061EF60, Moho::IAiCommandDispatchImpl::IssueReclaimTask)
