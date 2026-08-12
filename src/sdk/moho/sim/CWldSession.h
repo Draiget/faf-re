@@ -17,6 +17,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/VisibilityRect.h"
+#include "moho/sim/WeakEntitySet.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/task/CTaskThread.h"
 #include "Wm3Vector2.h"
@@ -286,48 +287,15 @@ namespace moho
   static_assert(offsetof(SSessionSaveNodeMap, mHead) == 0x04, "SSessionSaveNodeMap::mHead offset must be 0x04");
   static_assert(offsetof(SSessionSaveNodeMap, mSize) == 0x08, "SSessionSaveNodeMap::mSize offset must be 0x08");
 
-  struct SSelectionWeakRefUserEntity
+  /**
+   * The session's selection weak-set: the shipped 12-byte
+   * `WeakSet<UserEntity>` tree header plus the extra selection lane at
+   * `+0x0C` that the session-side sets carry. `UserArmy`'s idle registries
+   * embed the bare `WeakEntitySetUserEntity` instead — they sit 12 bytes
+   * apart at +0x1F8 and +0x204.
+   */
+  struct SSelectionSetUserEntity : WeakEntitySetUserEntity
   {
-    void* mOwnerLinkSlot;                    // +0x00
-    SSelectionWeakRefUserEntity* mNextOwner; // +0x04
-  };
-
-  static_assert(sizeof(SSelectionWeakRefUserEntity) == 0x08, "SSelectionWeakRefUserEntity size must be 0x08");
-  static_assert(
-    offsetof(SSelectionWeakRefUserEntity, mOwnerLinkSlot) == 0x00,
-    "SSelectionWeakRefUserEntity::mOwnerLinkSlot offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SSelectionWeakRefUserEntity, mNextOwner) == 0x04,
-    "SSelectionWeakRefUserEntity::mNextOwner offset must be 0x04"
-  );
-
-  struct SSelectionNodeUserEntity
-  {
-    SSelectionNodeUserEntity* mLeft;   // +0x00
-    SSelectionNodeUserEntity* mParent; // +0x04
-    SSelectionNodeUserEntity* mRight;  // +0x08
-    std::uint32_t mKey;                // +0x0C
-    SSelectionWeakRefUserEntity mEnt;  // +0x10
-    std::uint8_t mColor;               // +0x18
-    std::uint8_t mIsSentinel;          // +0x19
-    std::uint8_t pad_1A[2];
-  };
-
-  static_assert(sizeof(SSelectionNodeUserEntity) == 0x1C, "SSelectionNodeUserEntity size must be 0x1C");
-  static_assert(
-    offsetof(SSelectionNodeUserEntity, mEnt) == 0x10, "SSelectionNodeUserEntity::mEnt offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SSelectionNodeUserEntity, mIsSentinel) == 0x19,
-    "SSelectionNodeUserEntity::mIsSentinel offset must be 0x19"
-  );
-
-  struct SSelectionSetUserEntity
-  {
-    void* mAllocProxy;                 // +0x00
-    SSelectionNodeUserEntity* mHead;   // +0x04
-    std::uint32_t mSize;               // +0x08
     std::uint32_t mSizeMirrorOrUnused; // +0x0C
 
     struct Index

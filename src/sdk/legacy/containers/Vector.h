@@ -1703,6 +1703,19 @@ namespace msvc8
         }
 
         /**
+         * Drops the last element without running its destructor.
+         *
+         * Intrusive-node vectors in the shipped engine shorten their run with
+         * a bare `_Mylast` decrement after having already re-seated every
+         * affected owner chain slot by hand (see the quick-select registry
+         * compaction at FUN_008B2470 @ 0x008B2513). Running `~T()` there would
+         * walk a chain the node is no longer part of.
+         */
+        void pop_back_no_destroy() noexcept {
+            --last_;
+        }
+
+        /**
          * Assign from raw pointer + count (deep copy)
          */
         void assign(const T* src, std::size_t n) {

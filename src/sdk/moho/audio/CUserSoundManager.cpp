@@ -943,7 +943,7 @@ namespace
     auto* const newOwnerAnchor = army == nullptr
       ? nullptr
       : reinterpret_cast<std::uintptr_t*>(
-          reinterpret_cast<std::uintptr_t>(army) + offsetof(moho::UserArmy, mVariableDataWord_01E0)
+          reinterpret_cast<std::uintptr_t>(army) + offsetof(moho::UserArmy, mWeakRefs)
         );
 
     if (hook.mOwnerAnchor == newOwnerAnchor) {
@@ -2283,7 +2283,7 @@ namespace moho
     UserArmy* listenerArmy = nullptr;
     if (mListenerArmyHook.mOwnerAnchor != nullptr) {
       listenerArmy = reinterpret_cast<UserArmy*>(
-        reinterpret_cast<std::uintptr_t>(mListenerArmyHook.mOwnerAnchor) - offsetof(UserArmy, mVariableDataWord_01E0)
+        reinterpret_cast<std::uintptr_t>(mListenerArmyHook.mOwnerAnchor) - offsetof(UserArmy, mWeakRefs)
       );
     }
 

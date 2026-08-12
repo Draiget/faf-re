@@ -2292,6 +2292,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\STIMap.h" />
     <ClInclude Include="moho\sim\STIMapReflection.h" />
     <ClInclude Include="moho\sim\UserArmy.h" />
+    <ClInclude Include="moho\sim\WeakEntitySet.h" />
     <ClInclude Include="moho\sim\WldSessionInfo.h" />
     <ClInclude Include="moho\task\CCommandTask.h" />
     <ClInclude Include="moho\task\CTask.h" />

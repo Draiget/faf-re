@@ -17,6 +17,7 @@
 #include "CEconomy.h"
 #include "CInfluenceMap.h"
 #include "CSimArmyEconomyInfo.h"
+#include "UserArmy.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
@@ -2256,22 +2257,14 @@ namespace moho
    */
   UserArmy* CArmyImpl::CopyConstantDataToUserArmy(UserArmy* outUserArmy)
   {
-    const SSTIArmyConstantData* const source = GetArmyConstantData(this);
-    SSTIArmyConstantData* const dest = reinterpret_cast<SSTIArmyConstantData*>(outUserArmy);
+    if (outUserArmy == nullptr) {
+      return outUserArmy;
+    }
 
-    dest->mArmyIndex = source->mArmyIndex;
-    dest->mArmyName.assign(source->mArmyName, 0, msvc8::string::npos);
-    dest->mPlayerName.assign(source->mPlayerName, 0, msvc8::string::npos);
-    dest->mIsCivilian = source->mIsCivilian;
-    dest->mExploredReconGrid = source->mExploredReconGrid;
-    dest->mFogReconGrid = source->mFogReconGrid;
-    dest->mWaterReconGrid = source->mWaterReconGrid;
-    dest->mRadarReconGrid = source->mRadarReconGrid;
-    dest->mSonarReconGrid = source->mSonarReconGrid;
-    dest->mOmniReconGrid = source->mOmniReconGrid;
-    dest->mRciReconGrid = source->mRciReconGrid;
-    dest->mSciReconGrid = source->mSciReconGrid;
-
+    // The binary is a single tail call into the shared constant-data
+    // assignment (FUN_007000A0); `UserArmy` carries the payload as its base
+    // subobject, so no cast is involved.
+    (void)AssignArmyConstantData(*GetArmyConstantData(this), outUserArmy);
     return outUserArmy;
   }
 

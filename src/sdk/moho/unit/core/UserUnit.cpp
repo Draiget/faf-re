@@ -860,22 +860,6 @@ namespace
     "UserUnitVisionRuntimeView::visionHandle offset must be 0x18"
   );
 
-  struct UserArmyIdleSetRuntimeView
-  {
-    std::uint8_t pad_0000_01F8[0x1F8];
-    SSelectionSetUserEntity engineers; // +0x1F8
-    SSelectionSetUserEntity factories; // +0x208
-  };
-  static_assert(
-    offsetof(UserArmyIdleSetRuntimeView, engineers) == 0x1F8,
-    "UserArmyIdleSetRuntimeView::engineers offset must be 0x1F8"
-  );
-  static_assert(
-    offsetof(UserArmyIdleSetRuntimeView, factories) == 0x208,
-    "UserArmyIdleSetRuntimeView::factories offset must be 0x208"
-  );
-  static_assert(sizeof(UserArmyIdleSetRuntimeView) == 0x218, "UserArmyIdleSetRuntimeView size must be 0x218");
-
 } // namespace
 
 namespace moho
@@ -1040,16 +1024,6 @@ namespace
   [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
   {
     return reinterpret_cast<const UserUnitVisionRuntimeView*>(self)->visionHandle;
-  }
-
-  [[nodiscard]] UserArmyIdleSetRuntimeView& GetUserArmyIdleSetView(UserArmy* const army) noexcept
-  {
-    return *reinterpret_cast<UserArmyIdleSetRuntimeView*>(army);
-  }
-
-  [[nodiscard]] const UserArmyIdleSetRuntimeView& GetUserArmyIdleSetView(const UserArmy* const army) noexcept
-  {
-    return *reinterpret_cast<const UserArmyIdleSetRuntimeView*>(army);
   }
 
   template <typename TNode>
@@ -1339,7 +1313,7 @@ namespace
   }
 
   [[nodiscard]] SSelectionNodeUserEntity*
-  FindWeakEntitySetNodeByKey(const SSelectionSetUserEntity& selection, const std::uint32_t key) noexcept
+  FindWeakEntitySetNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key) noexcept
   {
     SSelectionNodeUserEntity* const head = selection.mHead;
     if (head == nullptr) {
@@ -1378,7 +1352,7 @@ namespace
     return IsWeakEntitySentinelNode(node) ? head : node;
   }
 
-  void RecomputeWeakEntitySetExtrema(SSelectionSetUserEntity& selection) noexcept
+  void RecomputeWeakEntitySetExtrema(WeakEntitySetUserEntity& selection) noexcept
   {
     if (selection.mHead == nullptr) {
       return;
@@ -1398,7 +1372,7 @@ namespace
   }
 
   void ReplaceWeakEntitySubtree(
-    SSelectionSetUserEntity& selection,
+    WeakEntitySetUserEntity& selection,
     SSelectionNodeUserEntity* const oldNode,
     SSelectionNodeUserEntity* const newNode
   ) noexcept
@@ -1417,7 +1391,7 @@ namespace
     }
   }
 
-  void RotateWeakEntityLeft(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
+  void RotateWeakEntityLeft(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
   {
     SSelectionNodeUserEntity* const head = selection.mHead;
     SSelectionNodeUserEntity* const pivot = node->mRight;
@@ -1439,7 +1413,7 @@ namespace
     node->mParent = pivot;
   }
 
-  void RotateWeakEntityRight(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
+  void RotateWeakEntityRight(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
   {
     SSelectionNodeUserEntity* const head = selection.mHead;
     SSelectionNodeUserEntity* const pivot = node->mLeft;
@@ -1461,7 +1435,7 @@ namespace
     node->mParent = pivot;
   }
 
-  void FixupWeakEntityInsert(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node) noexcept
+  void FixupWeakEntityInsert(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node) noexcept
   {
     SSelectionNodeUserEntity* const head = selection.mHead;
     while (node != head->mParent && node->mParent->mColor == 0u) {
@@ -1506,7 +1480,7 @@ namespace
   }
 
   void FixupWeakEntityErase(
-    SSelectionSetUserEntity& selection,
+    WeakEntitySetUserEntity& selection,
     SSelectionNodeUserEntity* node,
     SSelectionNodeUserEntity* nodeParent
   ) noexcept
@@ -1607,7 +1581,7 @@ namespace
   }
 
   [[nodiscard]] SSelectionNodeUserEntity*
-  EraseWeakEntityNodeAndAdvance(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
+  EraseWeakEntityNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
   {
     if (selection.mHead == nullptr || IsWeakEntitySentinelNode(node)) {
       return node;
@@ -1665,7 +1639,7 @@ namespace
     return next;
   }
 
-  [[nodiscard]] bool InsertWeakEntitySet(SSelectionSetUserEntity& selection, UserEntity* const entity) noexcept
+  [[nodiscard]] bool InsertWeakEntitySet(WeakEntitySetUserEntity& selection, UserEntity* const entity) noexcept
   {
     SSelectionNodeUserEntity* const head = selection.mHead;
     if (head == nullptr || entity == nullptr) {
@@ -1711,7 +1685,7 @@ namespace
     return true;
   }
 
-  [[nodiscard]] bool EraseWeakEntitySet(SSelectionSetUserEntity& selection, UserEntity* const entity) noexcept
+  [[nodiscard]] bool EraseWeakEntitySet(WeakEntitySetUserEntity& selection, UserEntity* const entity) noexcept
   {
     if (selection.mHead == nullptr || entity == nullptr) {
       return false;
@@ -1738,8 +1712,7 @@ namespace
       return false;
     }
 
-    auto& idleSets = GetUserArmyIdleSetView(army);
-    return InsertWeakEntitySet(idleSets.engineers, reinterpret_cast<UserEntity*>(unit));
+    return InsertWeakEntitySet(army->mEngineers, reinterpret_cast<UserEntity*>(unit));
   }
 
   /**
@@ -1754,47 +1727,7 @@ namespace
       return false;
     }
 
-    auto& idleSets = GetUserArmyIdleSetView(army);
-    return InsertWeakEntitySet(idleSets.factories, reinterpret_cast<UserEntity*>(unit));
-  }
-
-  /**
-   * Typed placeholder for the `UserArmy` high-priority selection registry
-   * tail that lives just past `mSession` at `+0x1EC..+0x210`. Each active
-   * record is a two-dword pair `(backref_handle, backref_next_slot)` laid
-   * out as a contiguous buffer; removing a record requires restoring the
-   * original caller's intrusive-chain link through `*(hook - 8)` just as the
-   * binary does at `sub_8B2470`. The exact ownership of the intrusive back
-   * link is still being traced; until then the fields are kept untyped by
-   * byte span and accessed by name through the view helper below.
-   */
-  struct UserArmyPrioritySelectionRegistryView
-  {
-    std::uint8_t pad_0000_01EC[0x1EC];  //   0..0x1EB: base UserArmy header
-    /**
-     * +0x1EC: begin pointer of the priority-selection registry record run.
-     * Each record is 8 bytes; the first dword points to an intrusive hook
-     * inside the registered UserUnit and the second dword is the next-link
-     * slot used by the unit's CScriptObject/UserUnit-Manager chain.
-     */
-    std::uint32_t* mRegistryBegin;  // +0x1EC
-    std::uint32_t* mRegistryEnd;    // +0x1F0
-  };
-
-  static_assert(
-    offsetof(UserArmyPrioritySelectionRegistryView, mRegistryBegin) == 0x1EC,
-    "UserArmyPrioritySelectionRegistryView::mRegistryBegin offset must be 0x1EC"
-  );
-  static_assert(
-    offsetof(UserArmyPrioritySelectionRegistryView, mRegistryEnd) == 0x1F0,
-    "UserArmyPrioritySelectionRegistryView::mRegistryEnd offset must be 0x1F0"
-  );
-
-  [[nodiscard]] UserArmyPrioritySelectionRegistryView& GetUserArmyPrioritySelectionRegistryView(
-    UserArmy* const army
-  ) noexcept
-  {
-    return *reinterpret_cast<UserArmyPrioritySelectionRegistryView*>(army);
+    return InsertWeakEntitySet(army->mFactories, reinterpret_cast<UserEntity*>(unit));
   }
 
   /**
@@ -1875,9 +1808,12 @@ namespace
       return;
     }
 
-    auto& registry = GetUserArmyPrioritySelectionRegistryView(army);
-    std::uint32_t* const runEnd = registry.mRegistryEnd;
-    std::uint32_t* cursor = registry.mRegistryBegin;
+    // The registry run is the army's avatar vector: one 8-byte
+    // `WeakPtr<UserUnit>` record per quick-select unit.
+    msvc8::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
+    auto* const runBegin = reinterpret_cast<std::uint32_t*>(avatars.data());
+    std::uint32_t* const runEnd = runBegin + (avatars.size() * 2u);
+    std::uint32_t* cursor = runBegin;
     if (cursor == runEnd) {
       return;
     }
@@ -1920,7 +1856,7 @@ namespace
       drainCursor += 2;
     }
 
-    registry.mRegistryEnd -= 2;
+    avatars.pop_back_no_destroy();
   }
 
   /**
@@ -4298,12 +4234,11 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
       // FUN_008B2470.
       UnregisterUserArmyPrioritySelectionSlot(this, army);
     } else if (mQueueEmptyCached) {
-      auto& idleSets = GetUserArmyIdleSetView(army);
       if (mIsFactory) {
-        (void)EraseWeakEntitySet(idleSets.factories, entityView);
+        (void)EraseWeakEntitySet(army->mFactories, entityView);
       }
       if (mIsEngineer) {
-        (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+        (void)EraseWeakEntitySet(army->mEngineers, entityView);
       }
     }
   }
@@ -4419,12 +4354,11 @@ void UserUnit::Tick(const std::int32_t seqNo)
         // high-priority selection registry instead of the idle weak-sets.
         UnregisterUserArmyPrioritySelectionSlot(this, army);
       } else if (mQueueEmptyCached) {
-        auto& idleSets = GetUserArmyIdleSetView(army);
-        if (mIsFactory) {
-          (void)EraseWeakEntitySet(idleSets.factories, entityView);
+          if (mIsFactory) {
+          (void)EraseWeakEntitySet(army->mFactories, entityView);
         }
         if (mIsEngineer) {
-          (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+          (void)EraseWeakEntitySet(army->mEngineers, entityView);
         }
       }
     }
@@ -4439,19 +4373,18 @@ void UserUnit::Tick(const std::int32_t seqNo)
   const bool isQueueEmpty = GetLuaRuntimeView(this).isBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);
   if (isQueueEmpty != mQueueEmptyCached) {
     if (army != nullptr) {
-      auto& idleSets = GetUserArmyIdleSetView(army);
       if (mIsEngineer) {
         if (isQueueEmpty) {
           (void)InsertIdleEngineerWeakSetEntry(this, army);
         } else {
-          (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+          (void)EraseWeakEntitySet(army->mEngineers, entityView);
         }
       }
       if (mIsFactory) {
         if (isQueueEmpty) {
           (void)InsertIdleFactoryWeakSetEntry(this, army);
         } else {
-          (void)EraseWeakEntitySet(idleSets.factories, entityView);
+          (void)EraseWeakEntitySet(army->mFactories, entityView);
         }
       }
     }
