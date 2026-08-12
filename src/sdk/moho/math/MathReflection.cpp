@@ -325,32 +325,37 @@ namespace moho
    */
   VAxes3::VAxes3(const Wm3::Quaternionf& orientation)
   {
+    // The three columns of the rotation matrix the quaternion denotes. IDA
+    // names this function's quaternion lanes one slot low (its `.x` is the
+    // real part), so the products below are spelled from the storage order
+    // Wm3 actually uses -- w, x, y, z -- while keeping the binary's operand
+    // grouping.
+    const float twoW = orientation.w * 2.0f;
     const float twoX = orientation.x * 2.0f;
     const float twoY = orientation.y * 2.0f;
     const float twoZ = orientation.z * 2.0f;
-    const float twoW = orientation.w * 2.0f;
 
-    const float zz = twoZ * orientation.z;
     const float yy = twoY * orientation.y;
+    const float zz = twoZ * orientation.z;
+    const float xy = twoY * orientation.x;
+    const float xx = twoX * orientation.x;
+    const float xz = twoZ * orientation.x;
+    const float wx = twoW * orientation.x;
     const float yz = twoZ * orientation.y;
-    const float xz = twoX * orientation.z;
-    const float xy = twoX * orientation.y;
     const float wy = twoW * orientation.y;
     const float wz = twoW * orientation.z;
-    const float wx = twoW * orientation.x;
-    const float xx = twoX * orientation.x;
 
-    vX.x = 1.0f - (yy + zz);
-    vX.y = wz + yz;
-    vX.z = wy - xz;
+    vX.x = 1.0f - (zz + yy);
+    vX.y = wz + xy;
+    vX.z = xz - wy;
 
-    vY.x = yz - wz;
-    vY.y = 1.0f - (yy + xx);
-    vY.z = xy + wx;
+    vY.x = xy - wz;
+    vY.y = 1.0f - (zz + xx);
+    vY.z = yz + wx;
 
-    vZ.x = xz + wy;
-    vZ.y = wx - xy;
-    vZ.z = 1.0f - (zz + xx);
+    vZ.x = wy + xz;
+    vZ.y = yz - wx;
+    vZ.z = 1.0f - (yy + xx);
   }
 
   /**
