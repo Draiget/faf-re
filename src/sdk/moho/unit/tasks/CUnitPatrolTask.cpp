@@ -42,6 +42,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
+#include "moho/unit/tasks/CUnitRepairTask.h"
 
 namespace gpg
 {
@@ -848,15 +849,9 @@ namespace moho
     if (Unit* const candidateUnit = reclaimCandidate->IsUnit(); candidateUnit != nullptr) {
       CArmyImpl* const candidateArmy = reclaimCandidate->ArmyRef;
       if (unit->ArmyRef->GetAllianceWith(candidateArmy) == ALLIANCE_Ally) {
-        // Binary spawns a repair sub-task here via the CUnitRepairTask operator
-        // new `_0` allocator (0x005F8DA0 -> ctor 0x005F8C80,
-        // CUnitRepairTask(mDispatch, candidateUnit, /*isSiloBuild*/false)).
-        // CUnitRepairTask is still abstract in the recovered tree (its
-        // Listener<ECommandEvent>::OnEvent receiver is not yet recovered), so
-        // the instantiation cannot be wired in this pass; the target unit and
-        // dispatch owner are computed 1:1 and left ready for that follow-up.
-        (void)candidateUnit;
-        (void)mDispatch;
+        // Spawn the repair sub-task the binary spawns here (0x0061C130 ->
+        // CUnitRepairTask operator new `_0` at 0x005F8DA0 -> ctor 0x005F8C80).
+        (void)new (std::nothrow) CUnitRepairTask(mDispatch, candidateUnit, false);
         mMoving = false;
         return 7;
       }
