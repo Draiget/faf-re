@@ -30,24 +30,6 @@
 
 namespace
 {
-  class CUnitRepairTaskDispatchView final : public moho::CUnitRepairTask
-  {
-  public:
-    using moho::CUnitRepairTask::CUnitRepairTask;
-
-    int Execute() override
-    {
-      return -1;
-    }
-
-    void OnEvent(moho::ECommandEvent) override {}
-  };
-
-  static_assert(
-    sizeof(CUnitRepairTaskDispatchView) == sizeof(moho::CUnitRepairTask),
-    "CUnitRepairTaskDispatchView size must match CUnitRepairTask"
-  );
-
   struct CUnitPodAssistSerializerStartupNode
   {
     void* mVtable = nullptr;                    // +0x00
@@ -139,7 +121,7 @@ namespace
     const bool isSiloBuild
   )
   {
-    (void)new (std::nothrow) CUnitRepairTaskDispatchView(AsDispatchImpl(task->mDispatchTask), targetUnit, isSiloBuild);
+    (void)new (std::nothrow) moho::CUnitRepairTask(AsDispatchImpl(task->mDispatchTask), targetUnit, isSiloBuild);
   }
 
   void DispatchReclaimTask(moho::CUnitPodAssist* const task, moho::Entity* const targetEntity)
