@@ -123,15 +123,6 @@ namespace
   };
   static_assert(sizeof(TerrainNormalEncodeBlock) == 0x20, "TerrainNormalEncodeBlock size must be 0x20");
 
-  class IDecalManagerRuntimeView
-  {
-  public:
-    virtual ~IDecalManagerRuntimeView() = default;
-    virtual void Func1() = 0;
-    virtual void Load(gpg::BinaryReader& reader, std::uint32_t version) = 0;
-    virtual void Save(gpg::BinaryWriter& writer) = 0;
-  };
-
   struct TerrainEnvironmentLookupNodeRuntimeView : msvc8::Tree<TerrainEnvironmentLookupNodeRuntimeView>
   {
     TerrainEnvironmentLookupNodeRuntimeView()
@@ -202,7 +193,7 @@ namespace
     gpg::BitArray2D* mDebugDirtyTerrain;                        // +0x9D4
     TerrainDirtyRectListRuntimeView mDebugDirtyRects;           // +0x9D8
     std::uint8_t mUnknown09E4_0C2F[0x24C]{};
-    IDecalManagerRuntimeView* mDecalManager;                    // +0xC30
+    moho::CDecalManager* mDecalManager;                         // +0xC30
   };
 
   static_assert(
@@ -396,7 +387,7 @@ namespace
     TerrainDirtyRectListRuntimeView mDebugDirtyRects;               // +0x9D8
     std::uint8_t mUnknown9E4_9E7[0x04]{};                           // +0x9E4
     moho::WaveSystem mWaveSystem;                                   // +0x9E8
-    IDecalManagerRuntimeView* mDecalManager;                        // +0xC30
+    moho::CDecalManager* mDecalManager;                             // +0xC30
     std::uint8_t mUnknownC34_C37[0x04]{};                           // +0xC34
   };
 
@@ -3833,7 +3824,7 @@ namespace moho
    */
   IDecalManager* IWldTerrainRes::GetDecalManager()
   {
-    return reinterpret_cast<IDecalManager*>(AsTerrainRuntimeView(this)->mDecalManager);
+    return AsTerrainRuntimeView(this)->mDecalManager;
   }
 
   /**
@@ -4754,8 +4745,8 @@ namespace moho
 
     // Fresh decal manager (destroy the previous through its virtual dtor).
     {
-      IDecalManagerRuntimeView* const oldDecalManager = view->mDecalManager;
-      view->mDecalManager = reinterpret_cast<IDecalManagerRuntimeView*>(CDecalManager::Create(this));
+      CDecalManager* const oldDecalManager = view->mDecalManager;
+      view->mDecalManager = CDecalManager::Create(this);
       if (oldDecalManager != nullptr) {
         delete oldDecalManager;
       }

@@ -1553,6 +1553,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00877CB0 (FUN_00877CB0, Moho::CDecalManager::Func1)
+   *
+   * What it does:
+   * Reads one entry out of the decal-area decile histogram RebuildLodHistogram
+   * fills in, clamping the index to the ten entries the table actually holds.
+   */
+  float CDecalManager::GetLodThreshold(const std::int32_t lodIndex) const
+  {
+    constexpr std::int32_t kLastLodIndex = 9;
+    const std::int32_t clamped = std::clamp(lodIndex, 0, kLastLodIndex);
+    return mLodThresholds[clamped];
+  }
+
+  /**
    * Address: 0x00877CD0 (FUN_00877CD0, Moho::CDecalManager::Load)
    *
    * What it does:
