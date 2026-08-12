@@ -284,7 +284,7 @@ namespace
 
     LuaPlus::LuaObject moduleObj = SCR_ImportLuaModule(state, kAiPersonalityModulePath);
     if (!moduleObj.IsNil()) {
-      metatable = SCR_GetLuaTableField(state, moduleObj, kAiPersonalityClassName);
+      metatable = moduleObj.GetByName(kAiPersonalityClassName);
     }
 
     if (metatable.IsNil()) {
