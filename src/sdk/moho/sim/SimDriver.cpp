@@ -841,25 +841,45 @@ namespace
  */
 SSyncData::SSyncData()
   : mCurBeat(0)
-  , pad_0004_0138{}
+  , mFocusArmy(-1)
+  , mCurTick(0)
+  , mAdvanced(false)
+  , mStream(nullptr)
+  , mNewGrids()
+  , mArmyUpdates()
+  , mNewEntities()
   , mNewUnits()
-  , pad_0144_0148{}
   , mEntityUpdates()
-  , pad_0154_0158{}
   , mUnitUpdates()
-  , pad_0164_0168{}
   , mDeleteIds()
   , mEraseIds()
   , mPublishedCommandDescriptors()
   , mPublishedCommandPackets()
   , mPendingCommandEventRemovals()
   , mPendingReleasedCommandIds()
-  , pad_01C8_0250{}
+  , mParticleBuffer()
+  , mAddDecals()
+  , mRemoveDecals()
+  , mCamShakeParams()
+  , mFollowCameras()
+  , mAuxiliaryVector17()
+  , mPoseUpdates()
+  , mPlayableRectUpdates()
+  , mDesyncs()
   , mPausedBy(-1)
   , mSubmitArmyStats()
   , mGameOver(false)
-  , pad_0271_02B8{}
+  , mFogOfWar(false)
+  , mTerrainUpdate()
+  , mSimResources()
+  , mPrintField()
+  , mInlineScratchVectors()
+  , mTickDebugCanvas()
+  , mBeatDebugCanvas()
 {
+  // Every owning lane above is a real member with a real constructor now, so
+  // the teardown view no longer aliases uninitialised storage. Only the inline
+  // audio-request queue still needs its hand-built storage seeded.
   auto& runtimeView = reinterpret_cast<SSyncDataTeardownRuntimeView&>(*this);
   runtimeView.mAudioRequests.InitializeInlineStorage();
 }

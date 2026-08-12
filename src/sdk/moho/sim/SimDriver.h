@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 #include "boost/condition.h"
 #include "boost/mutex.h"
@@ -44,6 +45,11 @@ namespace moho
   class CDecoder;
   struct REntityBlueprint;
   class StatItem;
+  class CSimResources;
+  class CDebugCanvas;
+
+
+
 
   /**
    * One replicated unit-variable update record queued by the `Unit` /
@@ -143,25 +149,57 @@ namespace moho
    */
   struct SSyncData
   {
-    int32_t mCurBeat = 0;                                  // +0x000
-    std::uint8_t pad_0004_0138[0x134]{};                    // +0x004
+    int32_t mCurBeat = 0;                                   // +0x000
+    int32_t mFocusArmy = -1;                                // +0x004
+    int32_t mCurTick = 0;                                   // +0x008
+    bool mAdvanced = false;                                 // +0x00C
+    std::uint8_t pad_000D_0010[0x03]{};                     // +0x00D
+    gpg::Stream* mStream = nullptr;                         // +0x010
+    std::uint8_t pad_0014_0018[0x04]{};                     // +0x014
+    /// Inline audio-request queue handed to `IUserSoundManager::UpdateSoundRequests`.
+    std::uint8_t mAudioRequests[0xF0]{};                    // +0x018
+    msvc8::vector<std::byte> mNewGrids;                     // +0x108
+    msvc8::vector<std::byte> mArmyUpdates;                  // +0x118
+    msvc8::vector<std::byte> mNewEntities;                  // +0x128
     msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
-    std::uint8_t pad_0144_0148[0x04]{};                     // +0x144 (mNewEntities tail lane)
     msvc8::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
-    std::uint8_t pad_0154_0158[0x04]{};                     // +0x154 (mUnitUpdates head pad)
     msvc8::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
-    std::uint8_t pad_0164_0168[0x04]{};                     // +0x164 (mUnitUpdates tail pad)
     msvc8::vector<EntId> mDeleteIds;                        // +0x168
     msvc8::vector<EntId> mEraseIds;                         // +0x178
+    /// Consumed by `CWldSession::DoBeat` as the new-command run (60-byte records).
     msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
+    /// Consumed by `CWldSession::DoBeat` as the command-update run (120-byte records).
     msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
+    /// Consumed by `CWldSession::DoBeat` as the delete-command id run.
     msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
+    /// Consumed by `CWldSession::DoBeat` as the erase-command id run.
     msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
-    std::uint8_t pad_01C8_0250[0x88]{};                     // +0x1C8
+    boost::shared_ptr<void> mParticleBuffer;                // +0x1C8
+    /// Element types for the byte-typed lanes below are still unresolved;
+    /// only `CWldSession::DoBeat` reads them and it does so through the
+    /// per-lane record size, so the runs are kept untyped until it lands.
+    msvc8::vector<std::byte> mAddDecals;                    // +0x1D0
+    msvc8::vector<EntId> mRemoveDecals;                     // +0x1E0
+    msvc8::vector<std::byte> mCamShakeParams;               // +0x1F0
+    msvc8::vector<std::byte> mFollowCameras;                // +0x200
+    /// Seventeenth vector lane; untouched by `CWldSession::DoBeat`.
+    msvc8::vector<std::byte> mAuxiliaryVector17;            // +0x210
+    msvc8::vector<std::byte> mPoseUpdates;                  // +0x220
+    msvc8::vector<std::byte> mPlayableRectUpdates;          // +0x230
+    msvc8::vector<std::byte> mDesyncs;                      // +0x240
     int32_t mPausedBy = -1;                                 // +0x250
     msvc8::string mSubmitArmyStats;                         // +0x254
     bool mGameOver = false;                                 // +0x270
-    std::uint8_t pad_0271_02B8[0x47]{};                     // +0x271
+    bool mFogOfWar = false;                                 // +0x271
+    std::uint8_t pad_0272_0274[0x02]{};                     // +0x272
+    boost::shared_ptr<void> mTerrainUpdate;                 // +0x274
+    boost::shared_ptr<void> mSimResources;                  // +0x27C
+    msvc8::vector<msvc8::string> mPrintField;               // +0x284
+    /// Inline scratch-vector lane; untouched by `CWldSession::DoBeat`.
+    msvc8::vector<std::byte> mInlineScratchVectors;         // +0x294
+    boost::shared_ptr<void> mTickDebugCanvas;               // +0x2A4
+    boost::shared_ptr<void> mBeatDebugCanvas;               // +0x2AC
+    std::uint8_t pad_02B4_02B8[0x04]{};                     // +0x2B4
 
     /**
      * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
@@ -189,10 +227,75 @@ namespace moho
     offsetof(SSTICommandConstantData, unk2) == 0x20,
     "SSTICommandConstantData::unk2 offset must be 0x20"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSyncData, mNewUnits) == 0x138,
-    "SSyncData::mNewUnits offset must be 0x138"
+  // The SSyncData field map is enforced unconditionally: it was resolved from
+  // the single `ebp` binding in CWldSession::DoBeat (FUN_00894530) and the
+  // whole sim->UI handoff depends on it. See
+  // decomp/recovery/reports/by-source/src/sdk/moho/sim/SSyncData.reconstruction.md
+  static_assert(offsetof(SSyncData, mFocusArmy) == 0x004, "SSyncData::mFocusArmy offset must be 0x004");
+  static_assert(offsetof(SSyncData, mCurTick) == 0x008, "SSyncData::mCurTick offset must be 0x008");
+  static_assert(offsetof(SSyncData, mAdvanced) == 0x00C, "SSyncData::mAdvanced offset must be 0x00C");
+  static_assert(offsetof(SSyncData, mStream) == 0x010, "SSyncData::mStream offset must be 0x010");
+  static_assert(offsetof(SSyncData, mAudioRequests) == 0x018, "SSyncData::mAudioRequests offset must be 0x018");
+  static_assert(offsetof(SSyncData, mNewGrids) == 0x108, "SSyncData::mNewGrids offset must be 0x108");
+  static_assert(offsetof(SSyncData, mArmyUpdates) == 0x118, "SSyncData::mArmyUpdates offset must be 0x118");
+  static_assert(offsetof(SSyncData, mNewEntities) == 0x128, "SSyncData::mNewEntities offset must be 0x128");
+  static_assert(offsetof(SSyncData, mNewUnits) == 0x138, "SSyncData::mNewUnits offset must be 0x138");
+  static_assert(offsetof(SSyncData, mEntityUpdates) == 0x148, "SSyncData::mEntityUpdates offset must be 0x148");
+  static_assert(offsetof(SSyncData, mUnitUpdates) == 0x158, "SSyncData::mUnitUpdates offset must be 0x158");
+  static_assert(offsetof(SSyncData, mDeleteIds) == 0x168, "SSyncData::mDeleteIds offset must be 0x168");
+  static_assert(offsetof(SSyncData, mEraseIds) == 0x178, "SSyncData::mEraseIds offset must be 0x178");
+  static_assert(
+    offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
+    "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
   );
+  static_assert(
+    offsetof(SSyncData, mPublishedCommandPackets) == 0x198,
+    "SSyncData::mPublishedCommandPackets offset must be 0x198"
+  );
+  static_assert(
+    offsetof(SSyncData, mPendingCommandEventRemovals) == 0x1A8,
+    "SSyncData::mPendingCommandEventRemovals offset must be 0x1A8"
+  );
+  static_assert(
+    offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
+    "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
+  );
+  static_assert(
+    offsetof(SSyncData, mParticleBuffer) == 0x1C8, "SSyncData::mParticleBuffer offset must be 0x1C8"
+  );
+  static_assert(offsetof(SSyncData, mAddDecals) == 0x1D0, "SSyncData::mAddDecals offset must be 0x1D0");
+  static_assert(offsetof(SSyncData, mRemoveDecals) == 0x1E0, "SSyncData::mRemoveDecals offset must be 0x1E0");
+  static_assert(
+    offsetof(SSyncData, mCamShakeParams) == 0x1F0, "SSyncData::mCamShakeParams offset must be 0x1F0"
+  );
+  static_assert(
+    offsetof(SSyncData, mFollowCameras) == 0x200, "SSyncData::mFollowCameras offset must be 0x200"
+  );
+  static_assert(offsetof(SSyncData, mPoseUpdates) == 0x220, "SSyncData::mPoseUpdates offset must be 0x220");
+  static_assert(
+    offsetof(SSyncData, mPlayableRectUpdates) == 0x230, "SSyncData::mPlayableRectUpdates offset must be 0x230"
+  );
+  static_assert(offsetof(SSyncData, mDesyncs) == 0x240, "SSyncData::mDesyncs offset must be 0x240");
+  static_assert(offsetof(SSyncData, mPausedBy) == 0x250, "SSyncData::mPausedBy offset must be 0x250");
+  static_assert(
+    offsetof(SSyncData, mSubmitArmyStats) == 0x254, "SSyncData::mSubmitArmyStats offset must be 0x254"
+  );
+  static_assert(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
+  static_assert(offsetof(SSyncData, mFogOfWar) == 0x271, "SSyncData::mFogOfWar offset must be 0x271");
+  static_assert(
+    offsetof(SSyncData, mTerrainUpdate) == 0x274, "SSyncData::mTerrainUpdate offset must be 0x274"
+  );
+  static_assert(
+    offsetof(SSyncData, mSimResources) == 0x27C, "SSyncData::mSimResources offset must be 0x27C"
+  );
+  static_assert(offsetof(SSyncData, mPrintField) == 0x284, "SSyncData::mPrintField offset must be 0x284");
+  static_assert(
+    offsetof(SSyncData, mTickDebugCanvas) == 0x2A4, "SSyncData::mTickDebugCanvas offset must be 0x2A4"
+  );
+  static_assert(
+    offsetof(SSyncData, mBeatDebugCanvas) == 0x2AC, "SSyncData::mBeatDebugCanvas offset must be 0x2AC"
+  );
+  static_assert(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mEntityUpdates) == 0x148,
     "SSyncData::mEntityUpdates offset must be 0x148"
