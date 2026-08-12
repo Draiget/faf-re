@@ -18,6 +18,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
@@ -7869,6 +7870,21 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BDAD90 (FUN_00BDAD90) -- record at 0x00F5A060
+   *
+   * What it does:
+   * Publishes CPlatoon's method table as `moho.platoon_methods`;
+   * /lua/sim/Platoon.lua builds its class from this table.
+   */
+  moho::CScrLuaInitForm* register_moho_platoon_methods()
+  {
+    static moho::CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.platoon_methods", &moho::CScrLuaMetatableFactory<moho::CPlatoon>::Instance(), "CPlatoon", ""
+    );
+    return &binder;
+  }
+
+  /**
    * Address: 0x007331E0 (FUN_007331E0, func_CPlatoonPlatoonCategoryCount_LuaFuncDef)
    *
    * What it does:
@@ -7941,6 +7957,7 @@ namespace
       (void)moho::func_CPlatoonCalculatePlatoonThreatAroundPosition_LuaFuncDef();
       (void)moho::func_CPlatoonPlatoonCategoryCountAroundPosition_LuaFuncDef();
       (void)moho::func_CPlatoonPlatoonCategoryCount_LuaFuncDef();
+      (void)::moho::register_moho_platoon_methods();
     }
   };
 

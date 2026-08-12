@@ -27,6 +27,7 @@
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -3542,6 +3543,21 @@ uint32_t CLobby::AssignCommandSource(
 namespace
 {
   /**
+   * Address: 0x00BDFE10 (FUN_00BDFE10) -- record at 0x00F5A798
+   *
+   * What it does:
+   * Publishes CLobby's method table as `moho.lobby_methods`;
+   * the front end reaches lobby objects through this table.
+   */
+  moho::CScrLuaInitForm* register_moho_lobby_methods()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(), "moho.lobby_methods", &moho::CScrLuaMetatableFactory<moho::CLobby>::Instance(), "CLobby", ""
+    );
+    return &binder;
+  }
+
+  /**
    * Drives this file's Lua binder registrations.
    *
    * In the shipped binary each `register_*_LuaFuncDef` thunk is a
@@ -3561,6 +3577,7 @@ namespace
     {
       (void)::moho::register_InternalCreateDiscoveryService_LuaFuncDef();
       (void)::moho::register_InternalCreateLobby_LuaFuncDef();
+      (void)register_moho_lobby_methods();
     }
   };
 

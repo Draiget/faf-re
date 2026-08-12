@@ -24753,7 +24753,7 @@ moho::CScrLuaInitForm* moho::func_EntityAttachTo_LuaFuncDef()
     SimLuaInitSet(),
     "AttachTo",
     &moho::cfunc_EntityAttachTo,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityAttachToHelpText
   );
@@ -24822,7 +24822,7 @@ moho::CScrLuaInitForm* moho::func_EntitySetOrientation_LuaFuncDef()
     SimLuaInitSet(),
     "SetOrientation",
     &moho::cfunc_EntitySetOrientation,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntitySetOrientationHelpText
   );
@@ -24894,7 +24894,7 @@ moho::CScrLuaInitForm* moho::func_EntitySetPosition_LuaFuncDef()
     SimLuaInitSet(),
     "SetPosition",
     &moho::cfunc_EntitySetPosition,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntitySetPositionHelpText
   );
@@ -24983,7 +24983,7 @@ moho::CScrLuaInitForm* moho::func_EntityGetPosition_LuaFuncDef()
     SimLuaInitSet(),
     "GetPosition",
     &moho::cfunc_EntityGetPosition,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityGetPositionHelpText
   );
@@ -25058,7 +25058,7 @@ moho::CScrLuaInitForm* moho::func_EntityGetPositionXYZ_LuaFuncDef()
     SimLuaInitSet(),
     "GetPositionXYZ",
     &moho::cfunc_EntityGetPositionXYZ,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityGetPositionXYZHelpText
   );
@@ -25138,7 +25138,7 @@ moho::CScrLuaInitForm* moho::func_EntityIsIntelEnabled_LuaFuncDef()
     SimLuaInitSet(),
     "IsIntelEnabled",
     &moho::cfunc_EntityIsIntelEnabled,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityIsIntelEnabledHelpText
   );
@@ -25209,7 +25209,7 @@ moho::CScrLuaInitForm* moho::func_EntityEnableIntel_LuaFuncDef()
     SimLuaInitSet(),
     "EnableIntel",
     &moho::cfunc_EntityEnableIntel,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityEnableIntelHelpText
   );
@@ -25292,7 +25292,7 @@ moho::CScrLuaInitForm* moho::func_EntityDisableIntel_LuaFuncDef()
     SimLuaInitSet(),
     "DisableIntel",
     &moho::cfunc_EntityDisableIntel,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityDisableIntelHelpText
   );
@@ -25375,7 +25375,7 @@ moho::CScrLuaInitForm* moho::func_EntitySetIntelRadius_LuaFuncDef()
     SimLuaInitSet(),
     "SetIntelRadius",
     &moho::cfunc_EntitySetIntelRadius,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntitySetIntelRadiusHelpText
   );
@@ -25466,7 +25466,7 @@ moho::CScrLuaInitForm* moho::func_EntityGetIntelRadius_LuaFuncDef()
     SimLuaInitSet(),
     "GetIntelRadius",
     &moho::cfunc_EntityGetIntelRadius,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityGetIntelRadiusHelpText
   );
@@ -25543,7 +25543,7 @@ moho::CScrLuaInitForm* moho::func_EntityInitIntel_LuaFuncDef()
     SimLuaInitSet(),
     "InitIntel",
     &moho::cfunc_EntityInitIntel,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityInitIntelHelpText
   );
@@ -25664,7 +25664,7 @@ moho::CScrLuaInitForm* moho::func_EntityAddShooter_LuaFuncDef()
     SimLuaInitSet(),
     "AddShooter",
     &moho::cfunc_EntityAddShooter,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityAddShooterHelpText
   );
@@ -25724,7 +25724,7 @@ moho::CScrLuaInitForm* moho::func_EntityRemoveShooter_LuaFuncDef()
     SimLuaInitSet(),
     "RemoveShooter",
     &moho::cfunc_EntityRemoveShooter,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityRemoveShooterHelpText
   );
@@ -26047,7 +26047,7 @@ moho::CScrLuaInitForm* moho::func_EntityCreatePropAtBone_LuaFuncDef()
     SimLuaInitSet(),
     "CreatePropAtBone",
     &moho::cfunc_EntityCreatePropAtBone,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<Entity>::Instance(),
     "Entity",
     kEntityCreatePropAtBoneHelpText
   );

@@ -6,6 +6,7 @@
 #include <new>
 
 #include "moho/console/CConAlias.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/CSimConFunc.h"
@@ -14,28 +15,26 @@
 
 namespace
 {
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("Sim");
+    return fallbackSet;
+  }
+
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane21 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane21 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane22 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane22 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane23 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane23 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane24 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane24 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane25 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane25 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane26 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane26 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane27 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane27 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane28 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane28 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevMohoWeaponMethodsFactory = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorMohoWeaponMethodsFactory = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane30 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane30 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevReconBlipAnchorA = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorReconBlipAnchorA = nullptr;
 
   struct SimLuaInitReconBlipAnchorB
   {
@@ -832,22 +831,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane23()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane23 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane23 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane23);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.entity_methods", &CScrLuaMetatableFactory<Entity>::Instance(), "Entity", ""
+    );
+    return &binder;
   }
 
   /**
@@ -886,22 +873,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane25()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane25 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane25 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane25);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.projectile_methods", &CScrLuaMetatableFactory<Projectile>::Instance(), "Projectile", ""
+    );
+    return &binder;
   }
 
   /**
@@ -940,22 +915,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane27()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane27 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane27 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane27);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.unit_methods", &CScrLuaMetatableFactory<Unit>::Instance(), "Unit", ""
+    );
+    return &binder;
   }
 
   /**
@@ -1016,22 +979,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevMohoWeaponMethodsFactory = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevMohoWeaponMethodsFactory = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorMohoWeaponMethodsFactory);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.weapon_methods", &CScrLuaMetatableFactory<UnitWeapon>::Instance(), "UnitWeapon", ""
+    );
+    return &binder;
   }
 
   /**
@@ -1043,22 +994,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane30()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane30 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane30 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane30);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.prop_methods", &CScrLuaMetatableFactory<Prop>::Instance(), "Prop", ""
+    );
+    return &binder;
   }
 
   /**
@@ -1704,22 +1643,10 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorA()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (!simSet) {
-      gSimLuaInitFormPrevReconBlipAnchorA = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevReconBlipAnchorA = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorReconBlipAnchorA);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.blip_methods", &CScrLuaMetatableFactory<ReconBlip>::Instance(), "ReconBlip", ""
+    );
+    return &binder;
   }
 
   /**
@@ -2080,6 +2007,18 @@ namespace
       (void)::moho::register_SetArmyStatsSyncArmy_LuaFuncDef();
       (void)::moho::register_DrawLine_LuaFuncDef();
       (void)::moho::register_DrawCircle_LuaFuncDef();
+
+      // The class binders. Each publishes one `moho.<x>_methods` table, which
+      // is what the matching Lua module builds its class from - without them
+      // /lua/sim/Unit.lua and friends fail on their first line and every
+      // engine-side fallback ("Can't find AIBrain, using CAiBrain directly")
+      // fires for the rest of the session.
+      (void)::moho::register_sim_SimInits_mForms_prependStartupLane23();
+      (void)::moho::register_sim_SimInits_mForms_prependStartupLane25();
+      (void)::moho::register_sim_SimInits_mForms_prependStartupLane27();
+      (void)::moho::register_sim_SimInits_mForms_prependStartupLane30();
+      (void)::moho::register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane();
+      (void)::moho::register_sim_SimInits_mForms_reconBlipAnchorA();
     }
   };
 

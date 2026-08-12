@@ -3017,7 +3017,7 @@ CScrLuaInitForm* moho::func_CAiBrainIsOpponentAIRunning_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainIsOpponentAIRunningName,
     &moho::cfunc_CAiBrainIsOpponentAIRunning,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainIsOpponentAIRunningHelpText
   );
@@ -3083,7 +3083,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetArmyIndex_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetArmyIndexName,
     &moho::cfunc_CAiBrainGetArmyIndex,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetArmyIndexHelpText
   );
@@ -3135,7 +3135,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetFactionIndex_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetFactionIndexName,
     &moho::cfunc_CAiBrainGetFactionIndex,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetFactionIndexHelpText
   );
@@ -3187,7 +3187,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetCurrentPlan_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetCurrentPlanName,
     &moho::cfunc_CAiBrainSetCurrentPlan,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetCurrentPlanHelpText
   );
@@ -3243,7 +3243,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetPersonality_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetPersonalityName,
     &moho::cfunc_CAiBrainGetPersonality,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetPersonalityHelpText
   );
@@ -3300,7 +3300,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetCurrentEnemy_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetCurrentEnemyName,
     &moho::cfunc_CAiBrainSetCurrentEnemy,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetCurrentEnemyHelpText
   );
@@ -3358,7 +3358,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetCurrentEnemy_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetCurrentEnemyName,
     &moho::cfunc_CAiBrainGetCurrentEnemy,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetCurrentEnemyHelpText
   );
@@ -3421,7 +3421,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetUnitBlueprint_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetUnitBlueprintName,
     &moho::cfunc_CAiBrainGetUnitBlueprint,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetUnitBlueprintHelpText
   );
@@ -3496,7 +3496,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetArmyStat_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetArmyStatName,
     &moho::cfunc_CAiBrainGetArmyStat,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetArmyStatHelpText
   );
@@ -3576,7 +3576,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetArmyStat_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetArmyStatName,
     &moho::cfunc_CAiBrainSetArmyStat,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetArmyStatHelpText
   );
@@ -3660,7 +3660,7 @@ CScrLuaInitForm* moho::func_CAiBrainAddArmyStat_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainAddArmyStatName,
     &moho::cfunc_CAiBrainAddArmyStat,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainAddArmyStatHelpText
   );
@@ -3744,7 +3744,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetGreaterOf_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetGreaterOfName,
     &moho::cfunc_CAiBrainSetGreaterOf,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetGreaterOfHelpText
   );
@@ -3820,7 +3820,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetBlueprintStat_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetBlueprintStatName,
     &moho::cfunc_CAiBrainGetBlueprintStat,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetBlueprintStatHelpText
   );
@@ -3892,7 +3892,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetCurrentUnits_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetCurrentUnitsName,
     &moho::cfunc_CAiBrainGetCurrentUnits,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetCurrentUnitsHelpText
   );
@@ -3960,7 +3960,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetArmyStatsTrigger_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetArmyStatsTriggerName,
     &moho::cfunc_CAiBrainSetArmyStatsTrigger,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetArmyStatsTriggerHelpText
   );
@@ -4065,7 +4065,7 @@ CScrLuaInitForm* moho::func_CAiBrainRemoveArmyStatsTrigger_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainRemoveArmyStatsTriggerName,
     &moho::cfunc_CAiBrainRemoveArmyStatsTrigger,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainRemoveArmyStatsTriggerHelpText
   );
@@ -4136,7 +4136,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetListOfUnits_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetListOfUnitsName,
     &moho::cfunc_CAiBrainGetListOfUnits,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetListOfUnitsHelpText
   );
@@ -4233,7 +4233,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetResourceSharing_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetResourceSharingName,
     &moho::cfunc_CAiBrainSetResourceSharing,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetResourceSharingHelpText
   );
@@ -4285,7 +4285,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetArmyStartPos_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetArmyStartPosName,
     &moho::cfunc_CAiBrainGetArmyStartPos,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetArmyStartPosHelpText
   );
@@ -4431,7 +4431,7 @@ CScrLuaInitForm* moho::func_CAiBrainCreateUnitNearSpot_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainCreateUnitNearSpotName,
     &moho::cfunc_CAiBrainCreateUnitNearSpot,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainCreateUnitNearSpotHelpText
   );
@@ -4599,7 +4599,7 @@ void moho::func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainCreateResourceBuildingNearestName,
     &moho::cfunc_CAiBrainCreateResourceBuildingNearest,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainCreateResourceBuildingNearestHelpText
   );
@@ -4966,7 +4966,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindPlaceToBuild_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainFindPlaceToBuildName,
     &moho::cfunc_CAiBrainFindPlaceToBuild,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainFindPlaceToBuildHelpText
   );
@@ -4997,7 +4997,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetAttackVectors_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetAttackVectorsName,
     &moho::cfunc_CAiBrainGetAttackVectors,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetAttackVectorsHelpText
   );
@@ -5058,7 +5058,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyStored_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetEconomyStoredName,
     &moho::cfunc_CAiBrainGetEconomyStored,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetEconomyStoredHelpText
   );
@@ -5113,7 +5113,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyIncome_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetEconomyIncomeName,
     &moho::cfunc_CAiBrainGetEconomyIncome,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetEconomyIncomeHelpText
   );
@@ -5168,7 +5168,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyUsage_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetEconomyUsageName,
     &moho::cfunc_CAiBrainGetEconomyUsage,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetEconomyUsageHelpText
   );
@@ -5222,7 +5222,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyRequested_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetEconomyRequestedName,
     &moho::cfunc_CAiBrainGetEconomyRequested,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetEconomyRequestedHelpText
   );
@@ -5278,7 +5278,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyTrend_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetEconomyTrendName,
     &moho::cfunc_CAiBrainGetEconomyTrend,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetEconomyTrendHelpText
   );
@@ -5343,7 +5343,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetMapWaterRatio_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetMapWaterRatioName,
     &moho::cfunc_CAiBrainGetMapWaterRatio,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetMapWaterRatioHelpText
   );
@@ -5399,7 +5399,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyStoredRatio_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetEconomyStoredRatioName,
     &moho::cfunc_CAiBrainGetEconomyStoredRatio,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetEconomyStoredRatioHelpText
   );
@@ -5470,7 +5470,7 @@ CScrLuaInitForm* moho::func_CAiBrainGiveResource_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGiveResourceName,
     &moho::cfunc_CAiBrainGiveResource,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGiveResourceHelpText
   );
@@ -5543,7 +5543,7 @@ CScrLuaInitForm* moho::func_CAiBrainGiveStorage_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGiveStorageName,
     &moho::cfunc_CAiBrainGiveStorage,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGiveStorageHelpText
   );
@@ -5618,7 +5618,7 @@ CScrLuaInitForm* moho::func_CAiBrainTakeResource_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainTakeResourceName,
     &moho::cfunc_CAiBrainTakeResource,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainTakeResourceHelpText
   );
@@ -5750,7 +5750,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindUnit_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainFindUnitName,
     &moho::cfunc_CAiBrainFindUnit,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainFindUnitHelpText
   );
@@ -5780,7 +5780,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindUpgradeBP_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainFindUpgradeBPName,
     &moho::cfunc_CAiBrainFindUpgradeBP,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainFindUpgradeBPHelpText
   );
@@ -5921,7 +5921,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindUnitToUpgrade_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainFindUnitToUpgradeName,
     &moho::cfunc_CAiBrainFindUnitToUpgrade,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainFindUnitToUpgradeHelpText
   );
@@ -6005,7 +6005,7 @@ CScrLuaInitForm* moho::func_CAiBrainDecideWhatToBuild_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainDecideWhatToBuildName,
     &moho::cfunc_CAiBrainDecideWhatToBuild,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainDecideWhatToBuildHelpText
   );
@@ -6135,7 +6135,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetAvailableFactories_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetAvailableFactoriesName,
     &moho::cfunc_CAiBrainGetAvailableFactories,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetAvailableFactoriesHelpText
   );
@@ -6254,7 +6254,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatAtPosition_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetThreatAtPositionName,
     &moho::cfunc_CAiBrainGetThreatAtPosition,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetThreatAtPositionHelpText
   );
@@ -6367,7 +6367,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatBetweenPositions_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetThreatBetweenPositionsName,
     &moho::cfunc_CAiBrainGetThreatBetweenPositions,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetThreatBetweenPositionsHelpText
   );
@@ -6398,7 +6398,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatsAroundPosition_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetThreatsAroundPositionName,
     &moho::cfunc_CAiBrainGetThreatsAroundPosition,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetThreatsAroundPositionHelpText
   );
@@ -6522,7 +6522,7 @@ CScrLuaInitForm* moho::func_CAiBrainPickBestAttackVector_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainPickBestAttackVectorName,
     &moho::cfunc_CAiBrainPickBestAttackVector,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainPickBestAttackVectorHelpText
   );
@@ -6728,7 +6728,7 @@ CScrLuaInitForm* moho::func_CAiBrainCanBuildStructureAt_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainCanBuildStructureAtName,
     &moho::cfunc_CAiBrainCanBuildStructureAt,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainCanBuildStructureAtHelpText
   );
@@ -6983,7 +6983,7 @@ CScrLuaInitForm* moho::func_CAiBrainAssignThreatAtPosition_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainAssignThreatAtPositionName,
     &moho::cfunc_CAiBrainAssignThreatAtPosition,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainAssignThreatAtPositionHelpText
   );
@@ -7092,7 +7092,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetHighestThreatPosition_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetHighestThreatPositionName,
     &moho::cfunc_CAiBrainGetHighestThreatPosition,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetHighestThreatPositionHelpText
   );
@@ -7188,7 +7188,7 @@ CScrLuaInitForm* moho::func_CAiBrainBuildStructure_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainBuildStructureName,
     &moho::cfunc_CAiBrainBuildStructure,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainBuildStructureHelpText
   );
@@ -7219,7 +7219,7 @@ CScrLuaInitForm* moho::func_CAiBrainNumCurrentlyBuilding_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainNumCurrentlyBuildingName,
     &moho::cfunc_CAiBrainNumCurrentlyBuilding,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainNumCurrentlyBuildingHelpText
   );
@@ -7305,7 +7305,7 @@ CScrLuaInitForm* moho::func_CAiBrainBuildUnit_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainBuildUnitName,
     &moho::cfunc_CAiBrainBuildUnit,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainBuildUnitHelpText
   );
@@ -7422,7 +7422,7 @@ CScrLuaInitForm* moho::func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainIsAnyEngineerBuildingName,
     &moho::cfunc_CAiBrainIsAnyEngineerBuilding,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainIsAnyEngineerBuildingHelpText
   );
@@ -7453,7 +7453,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetNumPlatoonsWithAI_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetNumPlatoonsWithAIName,
     &moho::cfunc_CAiBrainGetNumPlatoonsWithAI,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetNumPlatoonsWithAIHelpText
   );
@@ -7513,7 +7513,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetNumPlatoonsTemplateNamedName,
     &moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamed,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetNumPlatoonsTemplateNamedHelpText
   );
@@ -7577,7 +7577,7 @@ CScrLuaInitForm* moho::func_CAiBrainPlatoonExists_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainPlatoonExistsName,
     &moho::cfunc_CAiBrainPlatoonExists,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainPlatoonExistsHelpText
   );
@@ -7631,7 +7631,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetPlatoonsList_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetPlatoonsListName,
     &moho::cfunc_CAiBrainGetPlatoonsList,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetPlatoonsListHelpText
   );
@@ -7709,7 +7709,7 @@ CScrLuaInitForm* moho::func_CAiBrainDisbandPlatoon_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainDisbandPlatoonName,
     &moho::cfunc_CAiBrainDisbandPlatoon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainDisbandPlatoonHelpText
   );
@@ -7764,7 +7764,7 @@ CScrLuaInitForm* moho::func_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainDisbandPlatoonUniquelyNamedName,
     &moho::cfunc_CAiBrainDisbandPlatoonUniquelyNamed,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainDisbandPlatoonUniquelyNamedHelpText
   );
@@ -7825,7 +7825,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetPlatoonUniquelyNamedName,
     &moho::cfunc_CAiBrainGetPlatoonUniquelyNamed,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetPlatoonUniquelyNamedHelpText
   );
@@ -7887,7 +7887,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetNoRushTicks_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetNoRushTicksName,
     &moho::cfunc_CAiBrainGetNoRushTicks,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetNoRushTicksHelpText
   );
@@ -7993,7 +7993,7 @@ CScrLuaInitForm* moho::func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainSetUpAttackVectorsToArmyName,
     &moho::cfunc_CAiBrainSetUpAttackVectorsToArmy,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainSetUpAttackVectorsToArmyHelpText
   );
@@ -8068,7 +8068,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindClosestArmyWithBase_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainFindClosestArmyWithBaseName,
     &moho::cfunc_CAiBrainFindClosestArmyWithBase,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainFindClosestArmyWithBaseHelpText
   );
@@ -8267,7 +8267,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetUnitsAroundPoint_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetUnitsAroundPointName,
     &moho::cfunc_CAiBrainGetUnitsAroundPoint,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetUnitsAroundPointHelpText
   );
@@ -8298,7 +8298,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainGetNumUnitsAroundPointName,
     &moho::cfunc_CAiBrainGetNumUnitsAroundPoint,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainGetNumUnitsAroundPointHelpText
   );
@@ -8386,7 +8386,7 @@ CScrLuaInitForm* moho::func_CAiBrainCheckBlockingTerrain_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainCheckBlockingTerrainName,
     &moho::cfunc_CAiBrainCheckBlockingTerrain,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainCheckBlockingTerrainHelpText
   );
@@ -8537,7 +8537,7 @@ CScrLuaInitForm* moho::func_CAiBrainBuildPlatoon_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainBuildPlatoonName,
     &moho::cfunc_CAiBrainBuildPlatoon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainBuildPlatoonHelpText
   );
@@ -8634,7 +8634,7 @@ CScrLuaInitForm* moho::func_CAiBrainAssignUnitsToPlatoon_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainAssignUnitsToPlatoonName,
     &moho::cfunc_CAiBrainAssignUnitsToPlatoon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainAssignUnitsToPlatoonHelpText
   );
@@ -8736,7 +8736,7 @@ CScrLuaInitForm* moho::func_CAiBrainMakePlatoon_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainMakePlatoonName,
     &moho::cfunc_CAiBrainMakePlatoon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainMakePlatoonHelpText
   );
@@ -8874,7 +8874,7 @@ CScrLuaInitForm* moho::func_CAiBrainCanBuildPlatoon_LuaFuncDef()
     SimLuaInitSet(),
     kAiBrainCanBuildPlatoonName,
     &moho::cfunc_CAiBrainCanBuildPlatoon,
-    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    &CScrLuaMetatableFactory<CAiBrain>::Instance(),
     kAiBrainLuaClassName,
     kAiBrainCanBuildPlatoonHelpText
   );

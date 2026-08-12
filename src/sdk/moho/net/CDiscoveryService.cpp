@@ -7,6 +7,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/CWaitHandleSet.h"
+#include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/net/CMessage.h"
@@ -589,6 +590,21 @@ moho::CScrLuaInitForm* moho::register_CDiscoveryServiceDestroy_LuaFuncDef()
 namespace
 {
   /**
+   * Address: 0x00BDFDB0 (FUN_00BDFDB0) -- record at 0x00F5A780
+   *
+   * What it does:
+   * Publishes CDiscoveryService's method table as `moho.discovery_service_methods`;
+   * the front end reaches discovery-service objects through this table.
+   */
+  moho::CScrLuaInitForm* register_moho_discovery_service_methods()
+  {
+    static moho::CScrLuaClassBinder binder(
+      UserLuaInitSet(), "moho.discovery_service_methods", &moho::CScrLuaMetatableFactory<moho::CDiscoveryService>::Instance(), "CDiscoveryService", ""
+    );
+    return &binder;
+  }
+
+  /**
    * Drives this file's Lua binder registrations.
    *
    * In the shipped binary each `register_*_LuaFuncDef` thunk is a
@@ -609,6 +625,7 @@ namespace
       (void)::moho::register_CDiscoveryServiceGetGameCount_LuaFuncDef();
       (void)::moho::register_CDiscoveryServiceReset_LuaFuncDef();
       (void)::moho::register_CDiscoveryServiceDestroy_LuaFuncDef();
+      (void)register_moho_discovery_service_methods();
     }
   };
 
