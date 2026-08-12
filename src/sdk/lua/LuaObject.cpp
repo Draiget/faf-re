@@ -5522,17 +5522,6 @@ namespace
 		return callResult;
 	}
 
-	[[nodiscard]] static const TObject*
-	LookupTagMethodByObject(lua_State* const state, const TObject* const object, const int event)
-	{
-		Table* const metatable = luaT_getmetatable(state, object);
-		if (metatable == nullptr) {
-			return &luaO_nilobject;
-		}
-
-		return luaT_gettm(metatable, event, state->l_G->tmname[event]);
-	}
-
 	/**
 	 * Address: 0x00929530 (FUN_00929530)
 	 *
@@ -5549,9 +5538,9 @@ namespace
 	)
 	{
 		const auto resultStackOffset = resultSlot - state->stack;
-		const TObject* metamethodFunction = LookupTagMethodByObject(state, firstOperand, event);
+		const TObject* metamethodFunction = luaT_gettmbyobj(state, firstOperand, event);
 		if (metamethodFunction->tt == LUA_TNIL) {
-			metamethodFunction = LookupTagMethodByObject(state, secondOperand, event);
+			metamethodFunction = luaT_gettmbyobj(state, secondOperand, event);
 		}
 
 		if ((metamethodFunction->tt | 1) != 7) {
@@ -5599,12 +5588,12 @@ namespace
 		const int event
 	)
 	{
-		const TObject* const rightMetamethod = LookupTagMethodByObject(state, rightOperand, event);
+		const TObject* const rightMetamethod = luaT_gettmbyobj(state, rightOperand, event);
 		if (rightMetamethod->tt == LUA_TNIL) {
 			return -1;
 		}
 
-		const TObject* const leftMetamethod = LookupTagMethodByObject(state, leftOperand, event);
+		const TObject* const leftMetamethod = luaT_gettmbyobj(state, leftOperand, event);
 		if (luaO_rawequalObj(rightMetamethod, leftMetamethod) == 0) {
 			return -1;
 		}
