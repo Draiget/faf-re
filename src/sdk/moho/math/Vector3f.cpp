@@ -19,6 +19,32 @@ namespace moho
   }
 
   /**
+   * Address: 0x005D1E70 (FUN_005D1E70, func_VecLimitLengthTo)
+   *
+   * What it does:
+   * Clamps a 3D vector in place to at most `maxLength`, preserving direction.
+   * The binary compares squared lengths first and returns without touching the
+   * vector when it is already short enough, so a zero vector never divides.
+   */
+  [[nodiscard]] bool VecLimitLengthTo(Wm3::Vector3f* const vector, const float maxLength) noexcept
+  {
+    if (vector == nullptr) {
+      return false;
+    }
+
+    const float lengthSq = (vector->x * vector->x) + (vector->y * vector->y) + (vector->z * vector->z);
+    if ((maxLength * maxLength) >= lengthSq) {
+      return false;
+    }
+
+    const float scale = maxLength / std::sqrt(lengthSq);
+    vector->x *= scale;
+    vector->y *= scale;
+    vector->z *= scale;
+    return true;
+  }
+
+  /**
    * Address: 0x0069A1D0 (FUN_0069A1D0, sub_69A1D0)
    *
    * What it does:

@@ -347,26 +347,11 @@ namespace
   // Terrain-bounce velocity retention on each ground hit (ds:dword_E4F99C == 0.95f).
   constexpr float kProjectileBounceInterpDamp = 0.94999999f;
 
-  // Re-derivation of the file-static FUN_005D1E70 (LimitVectorLengthTo, canonical
-  // body lives in CSlideManipulator.cpp as `LimitVectorLengthTo`, not cross-TU
-  // linkable). Clamps `vec` to `maxLen` in place, preserving direction; leaves
-  // zero-length / already-short vectors untouched. MotionTick's max-speed cap.
+  // FUN_005D1E70 (func_VecLimitLengthTo); canonical body in
+  // moho/math/Vector3f.cpp. MotionTick's max-speed cap.
   void ClampVectorToMaxLength(Wm3::Vector3f& vec, const float maxLength) noexcept
   {
-    if (maxLength <= 0.0f) {
-      return;
-    }
-    const float lengthSq = (vec.x * vec.x) + (vec.y * vec.y) + (vec.z * vec.z);
-    if (lengthSq <= maxLength * maxLength) {
-      return;
-    }
-    const float length = std::sqrt(lengthSq);
-    if (length > 0.0f) {
-      const float scale = maxLength / length;
-      vec.x *= scale;
-      vec.y *= scale;
-      vec.z *= scale;
-    }
+    (void)moho::VecLimitLengthTo(&vec, maxLength);
   }
 
   // Re-derivation of the file-static FUN_0069A2A0 (canonical
