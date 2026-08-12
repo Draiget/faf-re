@@ -223,7 +223,7 @@ namespace moho
     , mReserved40(0)
     , mFormationStatusListener()
     , mDispatch(nullptr)
-    , mFormationBinding(nullptr)
+    , mBoundCommand(nullptr)
     , mFormationInstance(nullptr)
     , mGoal{}
     , mMoving(false)
@@ -270,7 +270,7 @@ namespace moho
     , mReserved40(0)
     , mFormationStatusListener()
     , mDispatch(static_cast<IAiCommandDispatchImpl*>(dispatchTask))
-    , mFormationBinding(nullptr)
+    , mBoundCommand(nullptr)
     , mFormationInstance(formationInstance)
     , mGoal{}
     , mMoving(false)
@@ -297,12 +297,12 @@ namespace moho
     unit->UnitStateMask |= static_cast<std::uint64_t>(0x1000u);
 
     // Resolve the queue-head command and store it as the bound patrol command
-    // (binary `this + 0x54` = mFormationBinding, the CUnitCommand* the search-box
-    // builder later reads as the leg-start command). The binary leaves
-    // `mFirstCommand` (+0x30) untouched here; we initialized it to null above.
+    // (binary `this + 0x54`, the command the search-box builder later reads as
+    // the leg-start). The binary leaves `mFirstCommand` (+0x30) untouched here;
+    // we initialized it to null above.
     CUnitCommandQueue* const commandQueue = unit->CommandQueue;
     CUnitCommand* const frontCommand = ResolvePatrolQueueCommand(commandQueue, /*front=*/true);
-    mFormationBinding = frontCommand;
+    mBoundCommand = frontCommand;
 
     // Splice the command-event listener node into the front command's
     // broadcaster ring (the command derives Broadcaster at offset 0). When the
@@ -702,10 +702,9 @@ namespace moho
 
     STIMap* const map = unit->SimulationRef->mMapData;
 
-    // Leg-start world position: the patrol's bound command (`mFormationBinding`,
-    // binary `this + 0x54`, a CUnitCommand*) resolved to a cell then converted
-    // via the owner footprint's layer/size.
-    auto* const legStartCommand = static_cast<CUnitCommand*>(mFormationBinding);
+    // Leg-start world position: the patrol's bound command (binary `this + 0x54`)
+    // resolved to a cell then converted via the owner footprint's layer/size.
+    CUnitCommand* const legStartCommand = mBoundCommand;
     const SFootprint& startFootprint = unit->GetFootprint();
     SOCellPos startCell{};
     const SOCellPos* const startPosCell = CUnitCommand::GetPosition(legStartCommand, unit, &startCell);
@@ -876,7 +875,7 @@ namespace moho
    *   1. base `CCommandTask` sub-object (by reflected type).
    *   2. `mDispatch` via `ReadPointer_CCommandTask` (IAiCommandDispatchImpl is a
    *      CCommandTask).
-   *   3. `mFormationBinding` via `ReadPointer_CUnitCommand`.
+   *   3. `mBoundCommand` via `ReadPointer_CUnitCommand`.
    *   4. `mFormationInstance` via `ReadPointer_IFormationInstance`.
    *   5. `mGoal` (`SNavGoal`) by reflected type.
    *   6. `mMoving` / `mNavStalled` / `mInFormation` via the virtual `ReadBool`
@@ -899,9 +898,7 @@ namespace moho
     archive->ReadPointer_CCommandTask(&dispatchTask, &ownerRef);
     mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchTask);
 
-    CUnitCommand* formationBinding = static_cast<CUnitCommand*>(mFormationBinding);
-    archive->ReadPointer_CUnitCommand(&formationBinding, &ownerRef);
-    mFormationBinding = formationBinding;
+    archive->ReadPointer_CUnitCommand(&mBoundCommand, &ownerRef);
 
     archive->ReadPointer_IFormationInstance(&mFormationInstance, &ownerRef);
 
@@ -944,7 +941,7 @@ namespace moho
     (void)gpg::RRef_CCommandTask(&pointerRef, static_cast<CCommandTask*>(mDispatch));
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_CUnitCommand(&pointerRef, static_cast<CUnitCommand*>(mFormationBinding));
+    (void)gpg::RRef_CUnitCommand(&pointerRef, mBoundCommand);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     (void)gpg::RRef_IFormationInstance(&pointerRef, mFormationInstance);
