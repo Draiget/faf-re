@@ -6,30 +6,32 @@
 
 #include "moho/unit/core/UnitWeapon.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 namespace
 {
   using TypeInfo = moho::UnitWeaponTypeInfo;
 
-  alignas(TypeInfo) unsigned char gUnitWeaponTypeInfoStorage[sizeof(TypeInfo)];
-  bool gUnitWeaponTypeInfoConstructed = false;
+  gpg::StaticTypeInfoStorage<TypeInfo> gUnitWeaponTypeInfoStorage{};
 
   [[nodiscard]] TypeInfo& AcquireUnitWeaponTypeInfo()
   {
-    if (!gUnitWeaponTypeInfoConstructed) {
-      new (gUnitWeaponTypeInfoStorage) TypeInfo();
-      gUnitWeaponTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gUnitWeaponTypeInfoStorage);
+    return gUnitWeaponTypeInfoStorage.Ensure();
   }
 
+  /**
+   * Returns the descriptor only if the static-init lane already built it.
+   * The atexit cleanup below can run in a process that never touched
+   * reflection, so it must not construct one on the way out.
+   */
   [[nodiscard]] TypeInfo* PeekUnitWeaponTypeInfo() noexcept
   {
-    if (!gUnitWeaponTypeInfoConstructed) {
+    if (!gUnitWeaponTypeInfoStorage.IsConstructed()) {
       return nullptr;
     }
 
-    return reinterpret_cast<TypeInfo*>(gUnitWeaponTypeInfoStorage);
+    return &gUnitWeaponTypeInfoStorage.Ref();
   }
 
   template <class TTypeInfo>
@@ -71,17 +73,23 @@ namespace
     (void)AcquireUnitWeaponTypeInfo();
     return std::atexit(&cleanup_UnitWeaponTypeInfo_AtExit);
   }
-
-  struct UnitWeaponTypeInfoBootstrap
-  {
-    UnitWeaponTypeInfoBootstrap()
-    {
-      (void)register_UnitWeaponTypeInfo_00BD88D0_Impl();
-    }
-  };
-
-  UnitWeaponTypeInfoBootstrap gUnitWeaponTypeInfoBootstrap;
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BD88D0 (FUN_00BD88D0, startup registration + atexit cleanup)
+   *
+   * What it does:
+   * Provider entry point for the phase-1 initializer walk: builds the
+   * `UnitWeapon` descriptor and schedules its exit cleanup.
+   */
+  gpg::RType* preregister_UnitWeaponTypeInfo()
+  {
+    (void)register_UnitWeaponTypeInfo_00BD88D0_Impl();
+    return &AcquireUnitWeaponTypeInfo();
+  }
+} // namespace moho
 
 namespace moho
 {
@@ -143,3 +151,8 @@ namespace moho
   }
 
 } // namespace moho
+
+// Phase-1 pre-registration: this descriptor was previously built by an
+// ordinary namespace-scope bootstrap object, which the CRT runs in .CRT$XCU
+// alongside the consumers that look it up. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_UnitWeaponTypeInfo_bd88d0, moho::preregister_UnitWeaponTypeInfo)

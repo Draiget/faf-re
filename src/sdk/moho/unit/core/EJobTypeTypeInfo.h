@@ -101,4 +101,14 @@ namespace moho
   static_assert(sizeof(EJobTypePrimitiveSerializer) == 0x14, "EJobTypePrimitiveSerializer size must be 0x14");
 
   static_assert(sizeof(EJobTypeTypeInfo) == 0x78, "EJobTypeTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x0055B810 (FUN_0055B810, static-init lane)
+   *
+   * What it does:
+   * Constructs the static `EJobTypeTypeInfo` descriptor in place and returns
+   * it; construction preregisters `EJobType` with the reflection registry.
+   * Called from the CRT static-initializer array via FUN_00BCA440.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EJobTypeTypeInfo();
 } // namespace moho

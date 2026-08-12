@@ -101,4 +101,14 @@ namespace moho
   static_assert(sizeof(EFireStatePrimitiveSerializer) == 0x14, "EFireStatePrimitiveSerializer size must be 0x14");
 
   static_assert(sizeof(EFireStateTypeInfo) == 0x78, "EFireStateTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x0055B990 (FUN_0055B990, static-init lane)
+   *
+   * What it does:
+   * Constructs the static `EFireStateTypeInfo` descriptor in place and
+   * returns it; construction preregisters `EFireState` with the reflection
+   * registry. Called from the CRT static-initializer array via FUN_00BCA4A0.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EFireStateTypeInfo();
 } // namespace moho
