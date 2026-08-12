@@ -2524,6 +2524,38 @@
     }
   }
 
+  constexpr std::int32_t kMwsfcreErrCodeDestroySfd = -306;
+  constexpr char kMwsfcreErrDestroySfdFailed[] = "E20010703E MWSFCRE_DestroySfd: ";
+
+  /**
+   * Address: 0x00AC7F40 (FUN_00AC7F40, _MWSFCRE_DestroySfd)
+   * Mangled: _MWSFCRE_DestroySfd
+   *
+   * IDA signature:
+   * void __cdecl MWSFCRE_DestroySfd(char *a1);
+   *
+   * What it does:
+   * Releases the SFD work control a playback handle owns. This is the only
+   * caller of `SFD_Destroy`, so it is the only thing that returns the handle's
+   * slot in `gSflibLibWork.objectHandles` and, through the transfer-teardown
+   * lane, the MPS parser handle underneath it.
+   *
+   * It was a no-argument `nullptr` stub, and C linkage let that satisfy
+   * `mwply_Destroy`'s properly-declared call. Closing a movie therefore freed
+   * the playback handle but nothing inside it, so each open consumed one MPS
+   * handle permanently. The pool holds 32: the loading screen reopens its movie
+   * every time it loops, so the 33rd open failed `SFMPS_Create` with
+   * `SFD ERROR(FF000D08)` -> "E2012 mwPlyCreate:can't create SFD", and from
+   * there the loading screen had no movie to parent its text to.
+   */
+  void MWSFCRE_DestroySfd(char* const sfdHandleAddress)
+  {
+    if (SFD_Destroy(sfdHandleAddress) != 0) {
+      (void)MWSFLIB_SetErrCode(kMwsfcreErrCodeDestroySfd);
+      (void)MWSFSVM_Error(kMwsfcreErrDestroySfdFailed);
+    }
+  }
+
   /**
    * Address: 0x00AC7F70 (FUN_00AC7F70, _MWSFCRE_SetCondSfd)
    *

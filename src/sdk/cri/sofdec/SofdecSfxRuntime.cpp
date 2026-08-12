@@ -779,6 +779,30 @@ moho_cri_sfx_internal::SfxzHandle* SFXZ_Create()
 }
 
 /**
+ * Address: 0x00ACD670 (FUN_00ACD670, _SFXZ_Destroy)
+ *
+ * IDA signature:
+ * void __cdecl SFXZ_Destroy(struct_sofdec_sfxz_hn *a1);
+ *
+ * What it does:
+ * Returns one SFXZ handle to the pool. `SFX_Destroy` is its only caller.
+ *
+ * It was a no-argument `nullptr` stub, so the pool's 32 slots were claimed once
+ * and never released: the 33rd `SFX_Create` of a session failed at `SFXZ_Create`
+ * and reported "E201185: can't create SfxHn". The parameter is `void*` to match
+ * the declaration `SFX_Destroy` calls through.
+ */
+void SFXZ_Destroy(void* const sfxzHandle)
+{
+  if (sfxzHandle == nullptr) {
+    return;
+  }
+
+  static_cast<moho_cri_sfx_internal::SfxzHandle*>(sfxzHandle)->used = 0;
+  --sfxz_work.head.cur;
+}
+
+/**
  * Address: 0x00ACC860 (FUN_00ACC860, _SFX_Create)
  *
  * IDA signature:

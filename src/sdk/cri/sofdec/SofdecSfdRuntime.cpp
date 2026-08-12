@@ -19910,6 +19910,227 @@
   }
 
   /**
+   * Address: 0x011F9150 (`_SFPLY_ResetPtsm`)
+   *
+   * Optional "the handle was rebuilt, re-seed your PTS map" hook. Defined in
+   * cri/sofdec/SofdecExternalStubs.cpp next to `SFPLY_SetPtsInfo`; nothing in
+   * this binary installs one, so `sfply_ResetHn` never calls through it.
+   */
+  extern "C" void(__cdecl * SFPLY_ResetPtsm)(std::int32_t* ptsInfoLaneWords);
+
+  /**
+   * The three-word PTS-info record at `+0x12E0`. `sfmps_CopyDstBuft` hands its
+   * address to `SFPLY_SetPtsInfo` when a packet lands on the audio lane, and
+   * `sfply_ResetHn` carries it across a handle rebuild.
+   */
+  struct SfplyPtsInfoLaneView
+  {
+    std::int32_t presentationTimeLow = 0;  // +0x00
+    std::int32_t presentationTimeHigh = 0; // +0x04
+    std::int32_t payloadBytes = 0;         // +0x08
+  };
+  static_assert(sizeof(SfplyPtsInfoLaneView) == 0x0C, "SfplyPtsInfoLaneView size must be 0x0C");
+
+  struct SfplyPtsInfoOwnerRuntimeView
+  {
+    std::uint8_t reserved0000[0x12E0]{};
+    SfplyPtsInfoLaneView ptsInfoLane{}; // +0x12E0
+  };
+  static_assert(
+    offsetof(SfplyPtsInfoOwnerRuntimeView, ptsInfoLane) == 0x12E0,
+    "SfplyPtsInfoOwnerRuntimeView::ptsInfoLane offset must be 0x12E0"
+  );
+
+  [[nodiscard]] SfplyPtsInfoLaneView* SfplyPtsInfoLaneOf(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj) noexcept
+  {
+    return &reinterpret_cast<SfplyPtsInfoOwnerRuntimeView*>(workctrlSubobj)->ptsInfoLane;
+  }
+
+  /// Timer-callback table slot `SFD_SetUsrTimeFn` writes (`SFTIM_SetTimeFn(.., 4)`).
+  constexpr std::size_t kSftimUserTimeFunctionSlot = 4;
+  /// `sfpts_SetupPtsQue` stores `capacity` in 16-byte entries but takes the
+  /// figure in bytes, so a round trip has to scale back up.
+  constexpr std::int32_t kSfptsQueueEntryBytes = 16;
+
+  /**
+   * Address: 0x00AD7FF0 (FUN_00AD7FF0, _sfply_ResetHn)
+   *
+   * IDA signature:
+   * int __cdecl sfply_ResetHn(_DWORD *a1);
+   *
+   * What it does:
+   * Rebuilds one SFPLY handle in place. `SFPLY_Stop` zeroes the handle's state
+   * and phase lanes and then calls this, which is what puts the handle back
+   * into the STOP state: it snapshots everything the caller configured, tears
+   * the transfer lanes down, re-runs `sfply_InitHn` over the same work-control
+   * buffer, and re-applies the snapshot.
+   *
+   * While this was a no-argument `nullptr` stub - and C linkage let that
+   * satisfy the properly-declared call - a stopped handle stayed at state 0
+   * forever. `SFLIB_CheckHn` rejects that, so `SFD_Destroy` answered
+   * `SFD ERROR(FF000131)` and the handle's MPS parser was never returned to
+   * `MPSLIB_libwork`. That pool holds 32 entries, so the 33rd movie of a
+   * session failed `SFMPS_Create` with `SFD ERROR(FF000D08)` -> "E2012
+   * mwPlyCreate:can't create SFD". The loading screen reopens its movie on
+   * every loop, so a skirmish load reached the limit within seconds and then
+   * had no movie to parent its status text to.
+   *
+   * The conditions block is deliberately restored from the handle's *default*
+   * set, not from the live set: the binary saves `defaultConditions` and copies
+   * it over both lanes, so a rebuild also resets any per-run condition changes.
+   */
+  std::int32_t sfply_ResetHn(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    /// `kSfdCondReserved08` on the create side: non-zero when the application
+    /// feeds the SFD through `SFD_GetWritePtr`/`SFD_AddWritePtr` rather than a
+    /// streamer, in which case the supply window has to survive the rebuild.
+    constexpr std::int32_t kSfsetCondUserWriteSupply = 8;
+    constexpr std::int32_t kSfplySpeedRationalUnity = 1000;
+    constexpr std::int32_t kSflibErrResetInitFailed = static_cast<std::int32_t>(0xFF000202u);
+    /// `SFMPV_SaveCond` writes at most this many bytes of MPV condition state.
+    constexpr std::uint32_t kSfmpvSavedConditionBytes = 0x40;
+
+    const std::int32_t userWriteSupply = SFSET_GetCond(workctrlSubobj, kSfsetCondUserWriteSupply);
+
+    // Snapshot everything the rebuild has to put back. The create template is
+    // the handle's own copy, so it has to be taken before `sfply_InitHn`
+    // overwrites the work-control buffer with a fresh one.
+    const moho::SfplyCreateParams savedCreateParams = workctrlSubobj->createTemplate;
+
+    SfbufRingCursorSnapshotView writeCursor{};
+    std::int32_t savedWriteCommit = 0;
+    if (userWriteSupply != 0) {
+      (void)SFD_GetWritePtr(SfdWorkctrlToAddress(workctrlSubobj), reinterpret_cast<SfdTransferWriteCursor*>(&writeCursor));
+      savedWriteCommit = writeCursor.reservedWords[1];
+    }
+
+    (void)SFHDS_FinishFhd(SfplyFileHeaderOf(workctrlSubobj));
+    SFBUF_DestroySj(workctrlSubobj);
+
+    const SflibErrorInfo* const errorInfo = SfplyErrorInfoOf(workctrlSubobj);
+    const std::int32_t savedErrorCallback = reinterpret_cast<std::int32_t>(errorInfo->callback);
+    const std::int32_t savedErrorCallbackObject = errorInfo->callbackObject;
+
+    auto* const timerLane = reinterpret_cast<SftimVblankCounterLaneView*>(
+      reinterpret_cast<std::uint8_t*>(workctrlSubobj) + kSftimVblankCounterLaneOffset
+    );
+    const std::int32_t savedUserTimeCallback =
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(timerLane->nowTimeFunctions[kSftimUserTimeFunctionSlot]));
+
+    const auto* const externalClock = reinterpret_cast<const SfdExternalClockRuntimeView*>(workctrlSubobj);
+    const std::int32_t savedExternalClockCallback = externalClock->externalClockCallbackAddress;
+    const std::int32_t savedExternalClockParam0 = externalClock->externalClockParam0;
+    const std::int32_t savedExternalClockParam1 = externalClock->externalClockParam1;
+
+    const std::int32_t savedUserSkipCallback =
+      reinterpret_cast<const SfdUserSkipCallbackRuntimeView*>(workctrlSubobj)->userSkipCallbackAddress;
+
+    SfseeRuntimeView* const sfseeHandle =
+      reinterpret_cast<SfdSfseeOwnerRuntimeView*>(workctrlSubobj)->sfseeHandle;
+
+    const std::int32_t savedSpeedRational =
+      reinterpret_cast<const SftimWorkctrlRuntimeView*>(workctrlSubobj)->timeBaseScale;
+
+    auto* const ptsInfoLane = SfplyPtsInfoLaneOf(workctrlSubobj);
+    SfplyPtsInfoLaneView savedPtsInfo = *ptsInfoLane;
+
+    std::int32_t savedFileSizeBytes = 0;
+    std::int32_t savedTotalTimeMajor = 0;
+    std::int32_t savedTotalTimeMinor = 0;
+    std::int32_t savedByteRate = 0;
+    std::int32_t savedSeekPositionBytes = 0;
+    if (sfseeHandle != nullptr) {
+      savedByteRate = sfseeHandle->configuredByteRate;
+      savedFileSizeBytes = sfseeHandle->fileSizeBytes;
+      savedTotalTimeMajor = sfseeHandle->configuredTotalTimeMajor;
+      savedTotalTimeMinor = sfseeHandle->configuredTotalTimeMinor;
+      savedSeekPositionBytes = sfseeHandle->seekBaseReadTotalBytes;
+    }
+
+    const SfptsQueueRuntimeView& videoPtsQueue =
+      reinterpret_cast<const SfdPtsQueueOwnerRuntimeView*>(workctrlSubobj)->videoPtsQueue;
+    const std::int32_t savedVideoPtsSource = videoPtsQueue.entriesAddress;
+    // `sfpts_SetupPtsQue` stores a capacity in entries; `SFD_SetVideoPts` takes
+    // the same figure in bytes, hence the 16-byte entry stride.
+    const std::int32_t savedVideoPtsBytes = videoPtsQueue.capacity * kSfptsQueueEntryBytes;
+
+    std::array<std::int32_t, kSfmpvSavedConditionBytes / sizeof(std::int32_t)> savedMpvConditions{};
+    const std::int32_t savedMpvConditionCount = SFMPV_SaveCond(
+      SfdWorkctrlToAddress(workctrlSubobj),
+      savedMpvConditions.data(),
+      kSfmpvSavedConditionBytes
+    );
+
+    const std::int32_t destroyResult = sfply_TrDestroy(workctrlSubobj);
+    if (destroyResult != 0) {
+      return destroyResult;
+    }
+
+    std::uint8_t savedDefaultConditions[sizeof(workctrlSubobj->defaultConditions)]{};
+    (void)MEM_Copy(savedDefaultConditions, workctrlSubobj->defaultConditions, sizeof(savedDefaultConditions));
+
+    moho::SfplyCreateParams rebuildParams = savedCreateParams;
+    moho::SofdecSfdWorkctrlSubobj* const rebuilt = sfply_InitHn(&rebuildParams, 0);
+    if (rebuilt == nullptr) {
+      return SFLIB_SetErr(0, kSflibErrResetInitFailed);
+    }
+
+    (void)MEM_Copy(rebuilt->conditions, savedDefaultConditions, sizeof(savedDefaultConditions));
+    (void)MEM_Copy(rebuilt->defaultConditions, savedDefaultConditions, sizeof(savedDefaultConditions));
+    (void)SFMPV_RestoreCond(SfdWorkctrlToAddress(rebuilt), savedMpvConditions.data(), savedMpvConditionCount);
+
+    if (userWriteSupply != 0) {
+      const std::int32_t getResult =
+        SFD_GetWritePtr(SfdWorkctrlToAddress(rebuilt), reinterpret_cast<SfdTransferWriteCursor*>(&writeCursor));
+      if (getResult != 0) {
+        return getResult;
+      }
+      const std::int32_t addResult = SFD_AddWritePtr(rebuilt, savedWriteCommit, writeCursor.reservedWords[1]);
+      if (addResult != 0) {
+        return addResult;
+      }
+      (void)sfply_TermSupply(SfdWorkctrlToAddress(rebuilt));
+    }
+
+    if (savedErrorCallback != 0) {
+      (void)SFD_SetErrFn(SfdWorkctrlToAddress(rebuilt), savedErrorCallback, savedErrorCallbackObject);
+    }
+    if (savedUserTimeCallback != 0) {
+      (void)SFD_SetUsrTimeFn(rebuilt, savedUserTimeCallback);
+    }
+    if (savedExternalClockCallback != 0) {
+      (void)SFD_SetExtClockFn(rebuilt, savedExternalClockCallback, savedExternalClockParam0, savedExternalClockParam1);
+    }
+    if (savedUserSkipCallback != 0) {
+      (void)SFD_SetUsrIsSkipFn(rebuilt, savedUserSkipCallback);
+    }
+    if (savedSpeedRational != kSfplySpeedRationalUnity) {
+      (void)SFD_SetSpeedRational(rebuilt, savedSpeedRational);
+    }
+
+    if (savedPtsInfo.presentationTimeLow != 0) {
+      *SfplyPtsInfoLaneOf(rebuilt) = savedPtsInfo;
+      if (SFPLY_ResetPtsm != nullptr) {
+        SFPLY_ResetPtsm(&savedPtsInfo.presentationTimeLow);
+      }
+    }
+
+    if (sfseeHandle != nullptr) {
+      (void)SFD_EntrySeek(rebuilt, static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sfseeHandle)));
+      (void)SFD_SetByteRate(rebuilt, savedByteRate);
+      (void)SFD_SetFileSize(rebuilt, savedFileSizeBytes);
+      (void)SFD_SetTotTime(rebuilt, savedTotalTimeMajor, savedTotalTimeMinor);
+      (void)SFD_SetSeekPos(rebuilt, savedSeekPositionBytes);
+    }
+
+    if (savedVideoPtsSource != 0) {
+      (void)SFD_SetVideoPts(rebuilt, savedVideoPtsSource, savedVideoPtsBytes);
+    }
+
+    return 0;
+  }
+
+  /**
    * Address: 0x00AD8EB0 (FUN_00AD8EB0, _sflib_InitBaseLib)
    *
    * What it does:
