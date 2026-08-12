@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator> // reverse_iterator
+#include <memory>
 #include <new>
 #include <type_traits>
 
@@ -1111,7 +1112,7 @@ namespace gpg::core
      * Copies `[copyBegin, copyEnd)` forward into `dest` and returns the
      * advanced destination pointer. If `dest == nullptr`, only advances.
      */
-    static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd) noexcept
+    static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd)
     {
       if constexpr (std::is_trivially_copyable_v<T> && ElemSize == sizeof(std::uint32_t)) {
         auto* const destWords = reinterpret_cast<std::uint32_t*>(dest);
@@ -1229,35 +1230,42 @@ namespace gpg::core
      * `[start, pos) + [insStart, insEnd) + [pos, end)` into it, so each element's
      * owned storage is deep-copied (never aliased). The binary emits raw
      * `operator new` + `_Ucopy` (construct) + `_Destroy_range`; in this typed
-     * reconstruction the `new T[]` slots are default-constructed and then
-     * copy-assigned, and the old live range is released by the buffer's own
-     * destruction (inline origin via the enclosing object's `inlineVec_[N]`
-     * lifetime; heap via `delete[]`), which is behaviorally equivalent — each
-     * source element is destroyed exactly once. No inline-capacity sentinel is
-     * stamped here: for a value type the inline slots are live objects, not raw
-     * bytes, so the sentinel write of the trivially-relocatable lanes must not
-     * run.
+      * reconstruction the `new T[]` slots are default-constructed and then
+      * copy-assigned. The old live range is destroyed immediately after the
+      * copies succeed (including inline-origin elements), matching the binary's
+      * `_Destroy_range`; inline C++ subobjects are reconstructed empty so the
+      * enclosing array remains safely destructible. A `unique_ptr` owns the
+      * replacement through every throwing copy, preserving unwind cleanup and
+      * leaving the vector unchanged until all copies complete.
      */
     void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
       T* const oldStart = this->start_;
       T* const oldEnd = this->end_;
 
-      T* const newBuffer = new T[newCapacity];
+      std::unique_ptr<T[]> replacement{new T[newCapacity]};
+      T* const newBuffer = replacement.get();
       T* write = CopyRangeForward(newBuffer, oldStart, pos);
       write = CopyRangeForward(write, insStart, insEnd);
       write = CopyRangeForward(write, pos, oldEnd);
 
-      if (oldStart != originalVec_) {
+      if (oldStart == originalVec_) {
+        // The inline array remains a live C++ subobject after switching to heap
+        // storage. Destroy the displaced values now, exactly where the binary's
+        // `_Destroy_range` runs, then reconstruct empty slots so the enclosing
+        // array can still be destroyed safely at scope exit.
+        for (T* value = oldStart; value != oldEnd; ++value) {
+          value->~T();
+          ::new (static_cast<void*>(value)) T();
+        }
+      } else {
         delete[] oldStart;
       }
-      // Inline-origin case: the old elements remain in inlineVec_[] and are
-      // destroyed once when this fastvector_n is destroyed (RAII), matching the
-      // binary's single _Destroy_range over the old range.
 
       this->start_ = newBuffer;
       this->end_ = write;
       this->capacity_ = newBuffer + newCapacity;
+      (void)replacement.release();
     }
 
     /**
@@ -1881,17 +1889,27 @@ namespace gpg
    * emitted transitively via InsertRange<SCondition> from CArmyStats trigger-condition append)
    *
    * What it does:
-   * Copies [sourceBegin, sourceEnd) into `destination` and returns the first
-   * element after the copied range.
+   * Copy-constructs [sourceBegin, sourceEnd) into `destination` and returns the
+   * first element after the copied range.
+   *
+   * This is the *uninitialised*-copy lane: every call site writes past the
+   * view's `end`, or into storage `FastVectorRuntimeReallocateInsert` has just
+   * allocated. The destination has therefore never run a constructor, so the
+   * elements must be constructed here and never assigned. The `SCondition`
+   * emission (FUN_00710F70) shows this explicitly - it self-links the
+   * destination's inline `FastVectorN` sentinel (`[dst+0x18..0x24] = dst+0x28`)
+   * before calling `fastvector_uint::cpy` into it. Assigning instead would run
+   * `BVIntSet::operator=` over garbage and `delete[]` an uninitialised pointer.
+   *
+   * For trivially-copyable `T` this collapses to the same plain element store
+   * the generic 4-byte emission (FUN_00402C20) performs.
    */
   template <class T>
   [[nodiscard]] inline T* FastVectorRuntimeCopyRange(T* destination, const T* sourceBegin, const T* sourceEnd) noexcept
   {
     for (; sourceBegin != sourceEnd; ++destination) {
       if (destination) {
-        if constexpr (std::is_copy_assignable_v<T>) {
-          *destination = *sourceBegin;
-        } else if constexpr (std::is_copy_constructible_v<T>) {
+        if constexpr (std::is_copy_constructible_v<T>) {
           ::new (static_cast<void*>(destination)) T(*sourceBegin);
         } else {
           ::new (static_cast<void*>(destination)) T();
@@ -2008,7 +2026,17 @@ namespace gpg
 
       const std::ptrdiff_t prefixCount = sourceTailBegin - sourceBegin;
       if (prefixCount > 0) {
-        std::memmove(oldFinish - prefixCount, sourceBegin, static_cast<std::size_t>(prefixCount) * sizeof(T));
+        // This window is inside the *old* constructed range, so the elements
+        // there are live: assign over them rather than byte-copying, which
+        // would duplicate owning members (see the backward-shift note below).
+        if constexpr (std::is_trivially_copyable_v<T>) {
+          std::memmove(oldFinish - prefixCount, sourceBegin, static_cast<std::size_t>(prefixCount) * sizeof(T));
+        } else {
+          T* write = oldFinish - prefixCount;
+          for (std::ptrdiff_t index = 0; index < prefixCount; ++index) {
+            write[index] = sourceBegin[index];
+          }
+        }
       }
       return view.end;
     }
@@ -2039,7 +2067,15 @@ namespace gpg
       }
     }
 
-    std::memmove(insertPos, sourceBegin, insertCount * sizeof(T));
+    // The gap now holds live elements shifted out of the way, so the source
+    // goes in by assignment for the same reason as the backward shift above.
+    if constexpr (std::is_trivially_copyable_v<T>) {
+      std::memmove(insertPos, sourceBegin, insertCount * sizeof(T));
+    } else {
+      for (std::size_t index = 0; index < insertCount; ++index) {
+        insertPos[index] = sourceBegin[index];
+      }
+    }
     return view.end;
   }
 
