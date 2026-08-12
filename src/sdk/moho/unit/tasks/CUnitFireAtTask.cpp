@@ -1,17 +1,32 @@
 #include "moho/unit/tasks/CUnitFireAtTask.h"
 
+#include <cmath>
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
+#include "moho/ai/IAiNavigator.h"
+#include "moho/ai/IAiSiloBuild.h"
+#include "moho/math/Vector3f.h"
+#include "moho/path/SNavGoal.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 
 namespace
 {
+  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  {
+    return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
+  }
+
   [[nodiscard]] bool MatchesManualFireProfile(const moho::RUnitBlueprintWeapon* const weaponBlueprint, const std::int32_t isNuclearMode)
   {
     if (weaponBlueprint == nullptr) {
@@ -163,20 +178,160 @@ namespace moho
   }
 
   /**
-   * Address: 0x0060B380 (FUN_0060B380, Moho::CUnitFireAtTask::TaskTick) — placeholder
+   * Address: 0x0060B380 (FUN_0060B380, Moho::CUnitFireAtTask::TaskTick)
    *
-   * What it does (placeholder):
-   * Provides a non-pure CTask::Execute override so this class is
-   * instantiable from `Create`. The real body is the 373-instruction
-   * weapon/target acquisition state machine at `0x0060B380`; recovery
-   * of that body is tracked as `needs_evidence` for `FUN_0060B380` in
-   * `recovered_progress.json`. Returning -1 (engine-style "no result"
-   * sentinel) keeps any accidental dispatch inert until the real body
-   * lands.
+   * IDA signature:
+   * int __thiscall Moho::CUnitFireAtTask::TaskTick(Moho::CUnitFireAtTask *this);
+   *
+   * What it does:
+   * Drives one manual-fire order: closes to (or backs off to) the chosen
+   * weapon's firing band, waits for the silo to hold a round, fires once, and
+   * ends when the unit stops being busy.
    */
   int CUnitFireAtTask::Execute()
   {
-    return -1;
+    UnitWeapon* const weapon = mWeapon;
+    if (!weapon || weapon->mEnabled == 0u) {
+      // No usable weapon was matched at construction: report the order as
+      // rejected rather than sitting on it.
+      *mDispatchResult = static_cast<EAiResult>(3);
+      return -1;
+    }
+
+    Unit* const unit = mUnit;
+    IAiNavigator* const navigator = unit->AiNavigator;
+
+    // A negative per-instance radius means "inherit the blueprint's".
+    float minRadius = weapon->mAttributes.mMinRadius;
+    if (minRadius < 0.0f) {
+      minRadius = weapon->mAttributes.mBlueprint->MinRadius;
+    }
+    float maxRadius = weapon->mAttributes.mMaxRadius;
+    if (maxRadius < 0.0f) {
+      maxRadius = weapon->mAttributes.mBlueprint->MaxRadius;
+    }
+
+    // Range is measured on the ground plane only; height difference does not
+    // count against a weapon's firing band.
+    const Wm3::Vec3f targetPos = mTarget.GetTargetPosGun(false);
+    const Wm3::Vec3f unitPos = unit->GetPosition();
+    const float groundDistance = std::sqrt(
+      ((unitPos.x - targetPos.x) * (unitPos.x - targetPos.x))
+      + ((unitPos.z - targetPos.z) * (unitPos.z - targetPos.z))
+    );
+
+    switch (mTaskState) {
+    case TASKSTATE_Preparing: {
+      if (minRadius > groundDistance) {
+        // Too close to fire. Immobile units simply cannot comply.
+        if (!unit->IsMobile() || !navigator) {
+          return -1;
+        }
+
+        if (navigator->GetStatus() == AINAVSTATUS_Idle) {
+          // Back off along the target-to-unit direction to 110% of the
+          // minimum range, so arriving inside the band again is unlikely.
+          const Wm3::Vec3f gunPos = mTarget.GetTargetPosGun(false);
+          const Wm3::Vec3f here = unit->GetPosition();
+          Wm3::Vec3f backOff{here.x - gunPos.x, here.y - gunPos.y, here.z - gunPos.z};
+          (void)VecSetLength(&backOff, minRadius * 1.1f);
+
+          const Wm3::Vec3f anchor = mTarget.GetTargetPosGun(false);
+          Wm3::Vec3f destination{anchor.x + backOff.x, anchor.y + backOff.y, anchor.z + backOff.z};
+
+          gpg::Rect2f skirt{};
+          (void)unit->PrepareMove(0, &destination, &skirt, unit->ArmyRef->UseWholeMap());
+          navigator->SetGoal(SNavGoal{unit->GetFootprint().ToCellPos(destination)});
+        }
+        return 1;
+      }
+
+      if (groundDistance <= maxRadius) {
+        // In the band: stop moving and make sure a round is loaded.
+        if (unit->IsMobile() && navigator) {
+          navigator->AbortMove();
+        }
+
+        if (!mWeapon->CheckSilo()) {
+          CAiSiloBuildImpl* const silo = unit->AiSiloBuild;
+          if (!silo) {
+            return -1;
+          }
+
+          const auto siloType = static_cast<ESiloType>(mIsNuclear);
+          if (!silo->SiloIsBusy(siloType)) {
+            if (!silo->SiloIsFull(siloType)) {
+              // Nothing loaded and nothing building: queue a round, and give
+              // up if the silo will not take the order.
+              if (!unit->AiSiloBuild->SiloAddBuild(siloType)) {
+                return -1;
+              }
+            } else {
+              // Full but CheckSilo said no: fall through to firing.
+              mTaskState = TASKSTATE_Starting;
+              return 0;
+            }
+          }
+
+          mTaskState = NextTaskState(mTaskState);
+          return 1;
+        }
+
+        mTaskState = TASKSTATE_Starting;
+        return 0;
+      }
+
+      // Out of range: close on the target.
+      if (!unit->IsMobile() || !navigator) {
+        return -1;
+      }
+
+      if (navigator->GetStatus() == AINAVSTATUS_Idle) {
+        Wm3::Vec3f destination = mTarget.GetTargetPosGun(false);
+        gpg::Rect2f skirt{};
+        (void)unit->PrepareMove(0, &destination, &skirt, unit->ArmyRef->UseWholeMap());
+        navigator->SetGoal(SNavGoal{unit->GetFootprint().ToCellPos(destination)});
+      }
+      return 1;
+    }
+
+    case TASKSTATE_Waiting:
+      // Waiting on the silo to finish building the round.
+      if (mWeapon->CheckSilo()) {
+        mTaskState = NextTaskState(mTaskState);
+      }
+      return 10;
+
+    case TASKSTATE_Starting:
+      // Fire once, as soon as the unit is free.
+      if (!unit->IsUnitState(UNITSTATE_Busy)) {
+        if (mIsNuclear == 1) {
+          (void)unit->RunScript("OnNukeLaunched");
+        }
+        mWeapon->SetTarget(&mTarget);
+        mWeapon->Fire();
+        mTaskState = NextTaskState(mTaskState);
+      }
+      return 3;
+
+    case TASKSTATE_Processing:
+      // The shot marks the unit busy; that transition ends the firing step.
+      if (unit->IsUnitState(UNITSTATE_Busy)) {
+        mTaskState = NextTaskState(mTaskState);
+      }
+      return 3;
+
+    case TASKSTATE_Complete:
+      return unit->IsUnitState(UNITSTATE_Busy) ? 3 : -1;
+
+    default:
+      gpg::HandleAssertFailure(
+        "Reached the supposably unreachable.",
+        910,
+        "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitCommands.cpp"
+      );
+      return -1;
+    }
   }
 } // namespace moho
 

@@ -55,12 +55,17 @@ namespace moho
     CUnitFireAtTask(CCommandTask* dispatchTask, CAiTarget* target, std::int32_t isNuclear);
 
     /**
-     * Execute override placeholder. The actual body lives at
-     * 0x0060B380 (Moho::CUnitFireAtTask::TaskTick, 373 instructions —
-     * extensive weapon/target acquisition state machine that needs
-     * dedicated recovery). Provided here as a non-pure stub so the
-     * class is instantiable from `Create` until the real body is
-     * lifted; tracked as needs_evidence in `recovered_progress.json`.
+     * Address: 0x0060B380 (FUN_0060B380, Moho::CUnitFireAtTask::TaskTick)
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitFireAtTask::TaskTick(Moho::CUnitFireAtTask *this);
+     *
+     * What it does:
+     * Manual-fire state machine. Moves the unit into the chosen weapon's
+     * firing band (backing off to 110% of the minimum range when too close),
+     * loads a silo round if one is needed, fires once, and finishes when the
+     * unit stops being busy. Reports the order rejected when the constructor
+     * matched no enabled weapon.
      */
     int Execute() override;
 
