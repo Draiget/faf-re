@@ -672,7 +672,7 @@ namespace
         if (target != nullptr) {
           if (target->IsInCategory("CARRIER")) {
             if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
-              dispatch->IssueCarrierLandTask(target);
+              IAiCommandDispatchImpl::IssueCarrierLandTask(target, dispatch);
             } else {
               dispatch->IssueRefuelTask(target);
             }
@@ -720,7 +720,7 @@ namespace
           return;
         }
         if (first->IsInCategory("CARRIER")) {
-          dispatch->IssueCarrierLandTask(first);
+          IAiCommandDispatchImpl::IssueCarrierLandTask(first, dispatch);
         } else if (first->IsInCategory("AIRSTAGINGPLATFORM")) {
           dispatch->IssueCallAirStagingPlatformTask(first);
         } else if (first->IsInCategory("TELEPORTATION")) {
@@ -1045,7 +1045,7 @@ void IAiCommandDispatchImpl::SetNewTargetLayer(const SNavGoal& goal)
  * Validates a carrier target, warns on illegal carriers, and schedules the
  * recovered carrier-land task lane.
  */
-void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit)
+void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit, CCommandTask* const parentTask)
 {
   if (!unit || unit->IsDead()) {
     return;
@@ -1055,7 +1055,7 @@ void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit)
     gpg::Die("Attepted to load on illegal carrier %s", BlueprintIdOrUnknown(unit));
   }
 
-  (void)new (std::nothrow) CUnitCarrierLandDispatchTask(this, unit);
+  (void)new (std::nothrow) CUnitCarrierLandDispatchTask(parentTask, unit);
 }
 
 /**

@@ -72,6 +72,21 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /**
+     * Address: 0x00621490 (FUN_00621490, ?TaskTick@CUnitRefuel@Moho@@UAE?AW4ETaskStatus@2@XZ)
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitRefuel::TaskTick(Moho::CUnitRefuel *this);
+     *
+     * What it does:
+     * Runs the refuel/rearm state machine that flies the owning unit onto an
+     * air staging platform (or into a carrier's storage bay), holds it there
+     * while fuel and health refill, and releases it again. Aborts (returns -1)
+     * whenever the owner or the platform dies, the platform is moving up or
+     * down, the platform stops being idle, or the platform submerges — the
+     * submerged case being the only abort that detaches an already-attached
+     * unit first.
+     */
     int Execute() override;
 
   public:
