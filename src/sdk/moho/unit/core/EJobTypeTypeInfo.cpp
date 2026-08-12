@@ -3,8 +3,29 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EJobTypeTypeInfo> gEJobTypeTypeInfoStorage{};
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x0055B810 (FUN_0055B810, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EJobTypeTypeInfo()
+  {
+    return &gEJobTypeTypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x0055B810 (FUN_0055B810, Moho::EJobTypeTypeInfo::EJobTypeTypeInfo)
    *
@@ -92,3 +113,8 @@ namespace moho
     type->serSaveFunc_ = mSerialize;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: RegisterSerializeFunctions above is a consumer
+// that calls gpg::LookupRType, so the descriptor must exist first. See
+// StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EJobTypeTypeInfo_55b810, moho::preregister_EJobTypeTypeInfo)
