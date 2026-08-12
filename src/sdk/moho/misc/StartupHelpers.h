@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gpg/core/utils/BoostWrappers.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -71,6 +73,20 @@ namespace moho
    * Tries prefixed command-line options formed as:
    * `prefix + leftAlias + rightAlias`.
    */
+  class Sim;
+  class LaunchInfoBase;
+
+  /**
+   * Address: 0x0128E4AC (FUN_0128E4AC, Moho::Sim::Create_exxt)
+   *
+   * What it does:
+   * The launch-patch wrapper around `Sim::Create`: builds the simulation, then
+   * derives the map height lanes from the loaded heightfield and primes the
+   * active viewport's range and vision renderers. This is what the sim
+   * driver's bootstrap thread calls.
+   */
+  [[nodiscard]] Sim* Sim_Create_exxt(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo);
+
   bool CFG_GetArgOptionComposedAliases(
     const CfgAliasSet& leftAliases,
     const CfgAliasSet& rightAliases,

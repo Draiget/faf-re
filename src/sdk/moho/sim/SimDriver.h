@@ -695,6 +695,34 @@ namespace moho
      * verifies historical checksums when available, and enqueues the sync packet.
      */
     void FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock);
+
+    /**
+     * Address: 0x0073BDF0 (FUN_0073BDF0, Moho::CSimDriver::ThreadRun)
+     *
+     * IDA signature:
+     * void __fastcall Moho::CSimDriver::ThreadRun(Moho::CSimDriver *this);
+     *
+     * What it does:
+     * Body of the driver's "Issue" thread. Beats the client manager, works out
+     * how far ahead of the executed beat it may issue - from the negotiated sim
+     * rate, or from what the other clients have queued when the sim is blocked -
+     * hands that many beats to the marshaller, promotes the driver to
+     * Dispatching once a beat is available, and sleeps on the connection event
+     * until the next one is due.
+     */
+    void ThreadRun();
+
+    /**
+     * Address: 0x0073D260 (FUN_0073D260, Moho::CSimDrive::ThreadCreateSim)
+     *
+     * What it does:
+     * Body of the bootstrap thread. Builds the simulation from the launch info,
+     * wires the command stream through a fresh decoder, starts the issue
+     * thread, publishes the opening sync the frame machine waits on, then runs
+     * the dispatch loop until shutdown.
+     */
+    void ThreadCreateSim();
+
     // Shared tail lifted from FUN_0073B1B0/FUN_0073BBF0 and command wrappers.
     void MarkFirstConnectionActivityLocked();
     /**
@@ -737,7 +765,10 @@ namespace moho
     uint32_t mCommandSourceId = 0;                 // +0x18
     int32_t mLastDequeuedBeat = -1;                // +0x1C
     int32_t mDispatchBeat = 1;                     // +0x20
-    int32_t mCommandCookie = 1;                    // +0x24
+    // The next beat the issue thread will hand to the marshaller. The command
+    // methods hand this same number back to their caller as the "cookie" for
+    // the command they just issued - it is the beat that command lands on.
+    int32_t mNextIssueBeat = 1;                    // +0x24
     CMarshaller* mMarshaller = nullptr;            // +0x28
     CDecoder* mDecoder = nullptr;                  // +0x2C
     SDriverMutex mLock;                            // +0x30

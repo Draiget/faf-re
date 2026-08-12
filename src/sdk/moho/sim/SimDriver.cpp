@@ -21,6 +21,8 @@
 #include "moho/audio/SAudioRequest.h"
 #include "moho/entity/EntityId.h"
 #include "moho/entity/SSTIEntityVariableData.h"
+#include "moho/console/CConCommand.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/TimeBar.h"
@@ -38,6 +40,110 @@ namespace
 {
   bool gSimInterlocked = false;
   ISTIDriver* gActiveSimDriver = nullptr;
+
+  // Issue-thread pacing, from CSimDriver::ThreadRun (0x0073BDF0).
+  constexpr unsigned int kCurrentThreadId = 0xFFFFFFFFu;
+  constexpr std::uint32_t kIssueThreadTimeBarColor = 0xFF00FF00u;
+  constexpr int kIssueThreadIdleWaitMs = 1000;
+  constexpr std::uint32_t kMaxQueuedSyncPacketsBeforeStalling = 10u;
+  constexpr int kMaxBeatsAheadOfExecuted = 98;
+  constexpr int kMaxCatchUpBeats = 99;
+  constexpr float kBlockedIssueGraceMs = 250.0f;
+
+  // Sim bootstrap, from CSimDriver::ThreadCreateSim (0x0073D260).
+  constexpr std::uint32_t kSimThreadTimeBarColor = 0xFFFF0000u;
+  constexpr unsigned int kSimCommandMessageUpperBound = 0x32u;
+
+  /**
+   * Address: 0x0073D260 (FUN_0073D260, opening block)
+   *
+   * What it does:
+   * Confines the sim thread to a single NUMA node when `/NUMA` is on, so its
+   * working set stays on one memory controller. Only meaningful on the
+   * platforms that report node topology - Windows Server 2003, XP SP2 and
+   * later - which is what the version gate below checks. `/NUMAbad` picks the
+   * complement of the node instead, which the original used to measure what
+   * the pinning was worth.
+   */
+  void PinThisThreadToOneNumaNodeIfRequested()
+  {
+    if (!moho::CFG_GetArgOption("/NUMA", 0, nullptr)) {
+      return;
+    }
+
+    OSVERSIONINFOW versionInfo{};
+    versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
+    if (!GetVersionExW(&versionInfo) || versionInfo.dwPlatformId != VER_PLATFORM_WIN32_NT) {
+      return;
+    }
+    if (versionInfo.dwMajorVersion < 5) {
+      return;
+    }
+    if (versionInfo.dwMajorVersion == 5 && versionInfo.dwMinorVersion == 0) {
+      return;
+    }
+    if (versionInfo.dwMajorVersion == 5 && versionInfo.dwMinorVersion == 1) {
+      // XP needs Service Pack 2 or later for the NUMA queries.
+      const wchar_t* const servicePack = std::wcsstr(versionInfo.szCSDVersion, L"Service Pack ");
+      if (servicePack == nullptr || servicePack[13] < L'2') {
+        return;
+      }
+    }
+
+    DWORD_PTR processAffinity = 0;
+    DWORD_PTR systemAffinity = 0;
+    if (!GetProcessAffinityMask(GetCurrentProcess(), &processAffinity, &systemAffinity)) {
+      return;
+    }
+
+    SYSTEM_INFO systemInfo{};
+    GetSystemInfo(&systemInfo);
+
+    // Walk processors until one reports a node whose mask overlaps the first
+    // core this process is allowed to use; that node is the one to sit on.
+    ULONGLONG nodeMask = 0;
+    bool foundNode = false;
+    for (UCHAR processor = 0; processor < systemInfo.dwNumberOfProcessors && !foundNode; ++processor) {
+      UCHAR node = 0;
+      if (!GetNumaProcessorNode(processor, &node) || node == 0xFF) {
+        continue;
+      }
+      if (!GetNumaNodeProcessorMask(node, &nodeMask)) {
+        continue;
+      }
+
+      nodeMask &= static_cast<ULONGLONG>(processAffinity);
+
+      int firstAllowed = 0;
+      while (firstAllowed < 32 && ((static_cast<DWORD_PTR>(1) << firstAllowed) & processAffinity) == 0) {
+        ++firstAllowed;
+      }
+      if (firstAllowed < 32 && (nodeMask & (1ull << firstAllowed)) != 0) {
+        foundNode = true;
+      } else {
+        nodeMask = 0;
+      }
+    }
+
+    ULONGLONG chosenMask = nodeMask;
+    if (moho::CFG_GetArgOption("/NUMAbad", 0, nullptr)) {
+      chosenMask = ~nodeMask & static_cast<ULONGLONG>(processAffinity);
+    }
+
+    // Pin to the second core of that node when it has one, which keeps the sim
+    // off whichever core the main thread already owns.
+    int seen = 0;
+    for (int processor = 0; processor < 32; ++processor) {
+      if ((chosenMask & (1ull << processor)) == 0) {
+        continue;
+      }
+      if (seen == 1) {
+        (void)SetThreadAffinityMask(GetCurrentThread(), static_cast<DWORD_PTR>(1) << processor);
+        return;
+      }
+      ++seen;
+    }
+  }
   StatItem* gEngineStatSimSync = nullptr;
 
   template <class T>
@@ -1236,7 +1342,7 @@ CSimDriver::CSimDriver(
   , mCommandSourceId(commandSourceId)
   , mLastDequeuedBeat(-1)
   , mDispatchBeat(1)
-  , mCommandCookie(1)
+  , mNextIssueBeat(1)
   , mMarshaller(nullptr)
   , mDecoder(nullptr)
   , mSimThread(nullptr)
@@ -1275,19 +1381,7 @@ CSimDriver::CSimDriver(
   mMarshaller = new CMarshaller(mClientManager);
   mMarshaller->SetCommandSource(commandSourceId);
 
-  // 0x0073D260 creates the simulation bootstrap thread. The full function
-  // still depends on additional lifted classes; for now we preserve state flow.
-  const auto createSimBootstrapProc = [](CSimDriver* const driver) {
-    boost::mutex::scoped_lock lock(DriverMutexRef(driver->mLock));
-    if (driver->mStopCreateSimThread) {
-      driver->mState = EDriverState::Stopped;
-      driver->mStateChanged.notify_all();
-      return;
-    }
-
-    driver->mState = EDriverState::Ready;
-    driver->mStateChanged.notify_all();
-  };
+  const auto createSimBootstrapProc = [](CSimDriver* const driver) { driver->ThreadCreateSim(); };
   mCreateSimThread = new boost::thread(BuildDeferredDriverCallback(createSimBootstrapProc, this));
 }
 
@@ -1422,10 +1516,10 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
   }
 }
 
-// Source-only adapter: binary wrappers write mCommandCookie to caller-provided out pointers.
+// Source-only adapter: binary wrappers write mNextIssueBeat to caller-provided out pointers.
 void CSimDriver::ForwardCommandResultLocked()
 {
-  // The original methods return mCommandCookie via an out pointer.
+  // The original methods return mNextIssueBeat via an out pointer.
   // The reconstructed ISTIDriver interface models those methods as void.
 }
 
@@ -1666,6 +1760,230 @@ void CSimDriver::ShutDown()
 }
 
 /**
+ * Address: 0x0073D260 (FUN_0073D260, Moho::CSimDrive::ThreadCreateSim)
+ *
+ * What it does:
+ * Body of the bootstrap thread the constructor starts. Builds the simulation
+ * from the launch info, hands the command stream to a fresh decoder and
+ * registers it with the client manager, starts the issue thread, publishes an
+ * opening sync, and then runs the driver's dispatch loop until shutdown. If
+ * the simulation cannot be built it parks the driver in Stopped so callers
+ * waiting on the state give up instead of hanging.
+ *
+ * The whole loop lives on this thread in the binary; `Dispatch` (slot 5) only
+ * duplicates it for interlocked mode, where the caller drives beats itself.
+ */
+void CSimDriver::ThreadCreateSim()
+{
+  PinThisThreadToOneNumaNodeIfRequested();
+
+  // The sim runs at reduced x87 precision so its arithmetic is bit-identical
+  // on every machine in the game.
+  (void)::_controlfp(_PC_24, _MCW_PC);
+  gpg::SetThreadName(kCurrentThreadId, "Sim");
+  TIME_SetTimeBarColor(kSimThreadTimeBarColor);
+
+  {
+    Sim* const previousSim = mSim;
+    mSim = Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo));
+    if (previousSim != nullptr && previousSim != mSim) {
+      delete previousSim;
+    }
+  }
+
+  // The launch info was only needed to build the sim; the sim owns whatever it
+  // kept from it.
+  mLaunchInfo = boost::shared_ptr<LaunchInfoBase>{};
+
+  if (mSim == nullptr) {
+    boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
+    SetStateAndNotify(EDriverState::Failed);
+    return;
+  }
+
+  // The decoder takes the command stream and replays it into the sim.
+  {
+    msvc8::auto_ptr<gpg::Stream> commandStream(mStream);
+    mStream = nullptr;
+
+    CDecoder* const previousDecoder = mDecoder;
+    mDecoder = new CDecoder(commandStream, mSim, mSim->mRules, mSim->mLuaState);
+    delete previousDecoder;
+  }
+  mClientManager->PushReceiver(0u, kSimCommandMessageUpperBound, mDecoder);
+
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
+
+  mSimThread = new boost::thread(
+    BuildDeferredDriverCallback([](CSimDriver* const driver) { driver->ThreadRun(); }, this)
+  );
+
+  // The opening sync: the frame machine waits on it before it will leave
+  // Initialize.
+  FinalizeSyncDispatchLocked(lock);
+  SetStateAndNotify(EDriverState::Ready);
+
+  while (!mStopCreateSimThread) {
+    if (mInterlockedMode) {
+      // Interlocked mode drives beats from Dispatch() on the caller's thread.
+      mStateChanged.wait(lock);
+      continue;
+    }
+
+    if (mSaveGameRequest != nullptr && !mWantsToSave
+        && (mState == EDriverState::Dispatching || mState == EDriverState::Ready)) {
+      PreparePendingSaveRequestLocked(lock);
+      continue;
+    }
+
+    if (mState != EDriverState::Dispatching) {
+      mStateChanged.wait(lock);
+      continue;
+    }
+
+    SetStateAndNotify(EDriverState::WaitingForMainThread);
+    ExecuteDispatchStepLocked(lock);
+    SetStateAndNotify(EDriverState::Ready);
+
+    if (mState == EDriverState::Ready) {
+      PromoteToDispatchingWhenBeatAvailable(0);
+    }
+  }
+
+  SetStateAndNotify(EDriverState::Stopped);
+}
+
+/**
+ * Address: 0x0073BDF0 (FUN_0073BDF0, Moho::CSimDriver::ThreadRun)
+ *
+ * What it does:
+ * The "Issue" thread. Each pass beats the client manager, decides the last
+ * beat it may issue, hands the marshaller the difference, promotes the driver
+ * to Dispatching once the clients have supplied a beat, then sleeps on the
+ * connection event until the next beat is due.
+ *
+ * Two pacing regimes, exactly as the binary splits them: while the sim is
+ * blocked (`mSimBusy`) the thread follows what the other clients have already
+ * partially queued, capped 98 beats ahead of the last executed one, and falls
+ * back to a 250ms grace window measured from the first command it saw. Running
+ * normally it paces off the negotiated sim rate, running `net_Lag`
+ * milliseconds ahead of where the executed beat says it should be, and when it
+ * has fallen behind it catches up by whole beats rather than waiting.
+ */
+void CSimDriver::ThreadRun()
+{
+  gpg::SetThreadName(kCurrentThreadId, "Issue");
+  (void)SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+  TIME_SetTimeBarColor(kIssueThreadTimeBarColor);
+
+  CTimeBarSection runningSection("IssueThread -- running");
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
+
+  if (sim_IssueThreadDebugLevel >= 1) {
+    gpg::Debugf("ISSUE: thread running.");
+  }
+
+  while (!mStopSimThread) {
+    mClientManager->DoBeat();
+
+    int waitMilliseconds = kIssueThreadIdleWaitMs;
+    const std::int64_t now = mTimer.ElapsedCycles();
+
+    // Nothing is issued until the sim has published at least one sync, every
+    // outstanding request has been answered, and the sync queue has room.
+    if (mLastSyncCycleTime != 0 && mOutstandingRequests == 0
+        && mSyncDataQueue.size < kMaxQueuedSyncPacketsBeforeStalling) {
+      int lastBeatToIssue = mNextIssueBeat - 1;
+      const int beatCeiling = mLastDequeuedBeat + kMaxBeatsAheadOfExecuted;
+
+      if (mSimBusy) {
+        int partiallyQueuedBeat = 0;
+        mClientManager->GetPartiallyQueuedBeat(partiallyQueuedBeat);
+
+        if (partiallyQueuedBeat < mNextIssueBeat) {
+          // Nobody has queued the beat we are about to issue. Hold it back for
+          // the grace window, then issue anyway so a quiet client cannot stall
+          // everyone else indefinitely.
+          if (mFirstCommandCycleTime != 0 && mNextIssueBeat <= beatCeiling) {
+            const std::int64_t deadline =
+              mFirstCommandCycleTime + gpg::time::MillisecondsToCycles(kBlockedIssueGraceMs);
+            if (deadline >= now) {
+              waitMilliseconds = static_cast<int>(gpg::time::CyclesToMilliseconds(deadline - now));
+            } else {
+              lastBeatToIssue = mNextIssueBeat;
+            }
+          }
+        } else {
+          lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
+        }
+      } else {
+        const float simRateScale = std::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
+        const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
+        const float leadMilliseconds =
+          static_cast<float>(mNextIssueBeat - mLastDequeuedBeat) * millisecondsPerBeat - net_Lag;
+        const std::int64_t dueAt = mLastSyncCycleTime + gpg::time::MillisecondsToCycles(leadMilliseconds);
+
+        if (dueAt >= now) {
+          const float remaining = gpg::time::CyclesToMilliseconds(dueAt - now);
+          waitMilliseconds = static_cast<int>(std::ceil(remaining));
+        } else {
+          // Behind schedule: issue however many whole beats have come due, but
+          // never further ahead of the executed beat than two seconds' worth.
+          const float lateMilliseconds = gpg::time::CyclesToMilliseconds(now - dueAt);
+          const float lateBeats = (1.0f / millisecondsPerBeat) * lateMilliseconds;
+          lastBeatToIssue = static_cast<int>(std::floor(lateBeats)) + mNextIssueBeat;
+
+          int catchUpCeiling = static_cast<int>((1.0f / millisecondsPerBeat) * 2000.0f);
+          if (catchUpCeiling > kMaxCatchUpBeats) {
+            catchUpCeiling = kMaxCatchUpBeats;
+          }
+          if (lastBeatToIssue <= mLastDequeuedBeat + catchUpCeiling) {
+            waitMilliseconds = 0;
+          } else {
+            lastBeatToIssue = mLastDequeuedBeat + catchUpCeiling;
+          }
+        }
+      }
+
+      if (lastBeatToIssue >= mNextIssueBeat) {
+        mMarshaller->AdvanceBeat(lastBeatToIssue - mNextIssueBeat + 1);
+        mNextIssueBeat = lastBeatToIssue + 1;
+        mFirstCommandCycleTime = 0;
+      }
+    }
+
+    if (mState == EDriverState::Ready) {
+      PromoteToDispatchingWhenBeatAvailable(0);
+    }
+
+    if (waitMilliseconds != 0) {
+      lock.unlock();
+      if (sim_IssueThreadDebugLevel >= 2) {
+        gpg::Debugf("ISSUE: thread waiting, timeout=%d.", waitMilliseconds);
+      }
+      {
+        CTimeBarSection waitingSection("IssueThread -- waiting");
+        (void)WaitForSingleObject(mConnectionEvent, static_cast<DWORD>(waitMilliseconds));
+      }
+      if (sim_IssueThreadDebugLevel >= 2) {
+        const std::int64_t elapsedMicroseconds =
+          gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles() - now);
+        gpg::Debugf(
+          "ISSUE: thread awaking, elapsed=%d.%03dms.",
+          static_cast<int>(elapsedMicroseconds / 1000),
+          static_cast<int>(elapsedMicroseconds % 1000)
+        );
+      }
+      lock.lock();
+    }
+  }
+
+  if (sim_IssueThreadDebugLevel >= 1) {
+    gpg::Debugf("ISSUE: thread exiting.");
+  }
+}
+
+/**
  * Address: 0x0073BDE0 (FUN_0073BDE0), ISTIDriver slot 4
  * Intentional no-op extension slot (nullsub in retail binary).
  */
@@ -1815,7 +2133,7 @@ std::int32_t* CSimDriver::SignalConnectionAndWriteCommandCookie(std::int32_t* co
   }
 
   if (outCommandCookie != nullptr) {
-    *outCommandCookie = mCommandCookie;
+    *outCommandCookie = mNextIssueBeat;
   }
 
   return outCommandCookie;
@@ -1860,7 +2178,7 @@ void CSimDriver::RequestPause(std::int32_t* const outCommandCookie)
   mMarshaller->RequestPause();
   MarkFirstConnectionActivityLocked();
   if (outCommandCookie != nullptr) {
-    *outCommandCookie = mCommandCookie;
+    *outCommandCookie = mNextIssueBeat;
   }
 }
 
@@ -1874,7 +2192,7 @@ void CSimDriver::Resume(std::int32_t* const outCommandCookie)
   mMarshaller->Resume();
   MarkFirstConnectionActivityLocked();
   if (outCommandCookie != nullptr) {
-    *outCommandCookie = mCommandCookie;
+    *outCommandCookie = mNextIssueBeat;
   }
 }
 
@@ -1992,14 +2310,14 @@ void CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
 /**
  * Address: 0x0073CD50 (FUN_0073CD50), ISTIDriver slot 28
  * Marshals CMDST_DecreaseCommandCount and returns the resulting command cookie
- * (the binary writes `mCommandCookie` into a caller-provided out pointer).
+ * (the binary writes `mNextIssueBeat` into a caller-provided out pointer).
  */
 CmdId CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->DecreaseCommandCount(id, count);
   MarkFirstConnectionActivityLocked();
-  return mCommandCookie;
+  return mNextIssueBeat;
 }
 
 /**
@@ -2258,7 +2576,7 @@ void CSimDriver::DrawNetworkStats(
     int availableBeat = 0;
     mClientManager->GetAvailableBeat(availableBeat); // 0x0073E6BA (mgr slot 21)
 
-    const int inflight = (mCommandCookie - 1) - availableBeat;   // 0x0073E6D1..0x0073E6D8
+    const int inflight = (mNextIssueBeat - 1) - availableBeat;   // 0x0073E6D1..0x0073E6D8
     const int available = availableBeat - (mDispatchBeat - 1);   // 0x0073E6BC..0x0073E6CF
     const int queued = static_cast<int>(mSyncDataQueue.size);    // 0x0073E6C6 (mSyncDataQueue.size @ CSimDriver+0xA0)
     summary.push_back(
