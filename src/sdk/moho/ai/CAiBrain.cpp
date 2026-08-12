@@ -1282,7 +1282,7 @@ namespace
   {
     LuaPlus::LuaObject moduleObj = SCR_ImportLuaModule(state, kAiBrainModulePath);
     if (moduleObj) {
-      LuaPlus::LuaObject classObj = SCR_GetLuaTableField(state, moduleObj, kAiBrainClassName);
+      LuaPlus::LuaObject classObj = moduleObj.GetByName(kAiBrainClassName);
       if (!classObj.IsNil()) {
         return classObj;
       }

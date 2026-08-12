@@ -20430,21 +20430,23 @@ LuaObject LuaObject::GetByObject(const LuaStackObject& obj) const
 	return LuaObject(m_state, const_cast<TObject*>(rawValue));
 }
 
+/**
+ * Address: 0x0090A160 (FUN_0090A160, LuaPlus::LuaObject::GetByName)
+ * Mangled: ?GetByName@LuaObject@LuaPlus@@QBE?AV12@PBD@Z
+ *
+ * IDA signature:
+ * LuaPlus::LuaObject *__userpurge LuaPlus::LuaObject::GetByName@<eax>(
+ *     LuaPlus::LuaObject *this@<ecx>, LuaPlus::LuaObject *dest, const char *name);
+ *
+ * What it does:
+ * Forwards straight to operator[](const char*), which reads the table slot
+ * with luaH_get. The lookup is therefore raw: no __index metamethod runs, and
+ * a key the table does not hold itself comes back nil rather than escalating
+ * to whatever the module's environment chain would do with it.
+ */
 LuaObject LuaObject::GetByName(const char* name) const
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(name != nullptr, "name");
-
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
-
-	const int oldTop = lua_gettop(lstate);
-	const_cast<LuaObject*>(this)->PushStack(lstate);
-	lua_pushstring(lstate, name);
-	lua_gettable(lstate, -2);
-	LuaObject value{LuaStackObject(m_state, -1)};
-	lua_settop(lstate, oldTop);
-	return value;
+	return (*this)[name];
 }
 
 /**
