@@ -107,6 +107,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/ScrDebugHooks.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/task/CLuaTask.h"
 #include "moho/task/ScrDiskWatcherTask.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
@@ -6646,18 +6647,6 @@ namespace
     return tableObject;
   }
 
-  // One scenario prop-spawn record as stored in LaunchInfoNew::mProps (a
-  // msvc8::vector<SPropInfo>, exposed as void* in LaunchInfoBase.h). The stride
-  // is 0x38 bytes: a 0x1C-byte VTransform plus a 0x1C-byte msvc8::string
-  // blueprint. The Sim::Setup props loop passes `transform` to PROP_Create and
-  // `blueprint` as the blueprint id.
-  struct SPropInfo
-  {
-    VTransform transform;    // +0x00
-    msvc8::string blueprint; // +0x1C
-  };
-  static_assert(sizeof(SPropInfo) == 0x38, "SPropInfo size must be 0x38");
-
   struct Rect2iVectorRuntimeView
   {
     void* allocatorProxy;
@@ -9240,40 +9229,6 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
 }
 
 /**
- * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)
- *
- * Shared quaternion-vector rotation helper with 67+ callsites. Builds the
- * quaternion's row-major 3x3 rotation matrix via `moho::QuatToMatrix`
- * (FUN_00452FD0) and rotates `vec` through it, exactly as the binary does
- * (zeroed matrix scratch, QuatToMatrix, then a row-major matrix-vector product).
- *
- * The orphan thunk at 0x0044F9B0 (FUN_0044F9B0) forwards here with its
- * argument order rotated; it has zero callers in the shipping binary and
- * is therefore covered by the skip classification, not by a separate body.
- */
-Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat)
-{
-  if (!dest || !vec || !quat) {
-    return dest;
-  }
-
-  Wm3::Vector3f rows[3]{};
-  moho::QuatToMatrix(quat, rows);
-  dest->x = vec->x * rows[0].x + vec->y * rows[0].y + vec->z * rows[0].z;
-  dest->y = vec->x * rows[1].x + vec->y * rows[1].y + vec->z * rows[1].z;
-  dest->z = vec->x * rows[2].x + vec->y * rows[2].y + vec->z * rows[2].z;
-  return dest;
-}
-
-namespace moho
-{
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat)
-  {
-    return ::MultQuadVec(dest, vec, quat);
-  }
-} // namespace moho
-
-/**
  * Address: 0x00450030 (FUN_00450030, ?AddWireCircle@CDebugCanvas@Moho@@QAEXABV?$Vector3@M@Wm3@@0MII@Z)
  */
 void CDebugCanvas::AddWireCircle(
@@ -10170,14 +10125,14 @@ void Sim::Setup(LaunchInfoNew* const info)
   // Spawn scenario props unless /noprops was requested. Each record's blueprint
   // id is resolved through the rules and instantiated at its stored transform.
   if (!CFG_GetArgOption("/noprops", 0u, nullptr)) {
-    auto* const props = static_cast<msvc8::vector<SPropInfo>*>(info->mProps);
+    CWldProps* const props = info->mProps;
     int propCount = 0;
-    if (props != nullptr) {
-      for (SPropInfo& prop : *props) {
-        const RPropBlueprint* const blueprint = ResolvePropBlueprintById(mRules, prop.blueprint.c_str());
-        (void)CreatePropFromBlueprintResolved(this, prop.transform, blueprint);
+    if (props != nullptr && props->mEntriesBegin != nullptr) {
+      propCount = static_cast<int>(props->mEntriesEnd - props->mEntriesBegin);
+      for (const CWldPropEntry* entry = props->mEntriesBegin; entry != props->mEntriesEnd; ++entry) {
+        const RPropBlueprint* const blueprint = ResolvePropBlueprintById(mRules, entry->mBlueprintPath.c_str());
+        (void)CreatePropFromBlueprintResolved(this, entry->mTransform, blueprint);
       }
-      propCount = static_cast<int>(props->size());
     }
     gpg::Warnf(" NUM PROPS = %d", propCount);
   }
