@@ -1485,6 +1485,16 @@ namespace moho
   [[nodiscard]] WldTeardownCallbackVector* WLD_GetOnTeardownCallbacks();
 
   /**
+   * Address: 0x008699A0 (FUN_008699A0)
+   *
+   * What it does:
+   * Resolves the process-global teardown-callback vector and dispatches each
+   * registered callback against the active world session. Called during the
+   * loading-to-playing handover in `WLD_DoInitializing` (0x0088C3F0).
+   */
+  [[nodiscard]] std::int32_t WLD_DispatchOnTeardownCallbacksCoreFromGlobalList();
+
+  /**
    * Address: 0x00869950 (FUN_00869950)
    *
    * What it does:

@@ -8435,7 +8435,12 @@ namespace moho
     //   modeled in the recovered tree; the field is set null and
     //   the binary's ctor is absorbed by this initialization.
     mSessionRes1 = nullptr;
-    mCurFormation = nullptr;
+
+    // Current build/move formation (0x00893529: `new CFormation` @0x64). The
+    // session frame calls into it unconditionally through
+    // `CFormation::UpdateOrientation`, so leaving it null faults on the first
+    // frame after the session starts playing.
+    mCurFormation = new CFormation();
     mUICommandGraphPx = nullptr;
     mUICommandGraphControl = nullptr;
     mUnknownShared40C = {};
@@ -10845,25 +10850,87 @@ namespace moho
       ReleaseWldGameDataHandles(&gameData);
     }
 
+    /**
+     * Address: 0x0088C3F0 (FUN_0088C3F0, func_DoInitializing)
+     *
+     * What it does:
+     * Waits for the sim to publish its first sync data, then performs the whole
+     * loading-to-playing handover: starts the game Lua UI, takes down the
+     * loading dialog, builds the in-game interface, drops the now-consumed
+     * session info, runs the loader's teardown callbacks, and finally tells the
+     * client manager that this client has finished loading.
+     */
     void WLD_DoInitializing(bool* const outContinue)
     {
-      if (outContinue != nullptr) {
-        *outContinue = false;
-      }
-
       ISTIDriver* const simDriver = SIM_GetActiveDriver();
       if (simDriver == nullptr) {
+        if (outContinue != nullptr) {
+          *outContinue = false;
+        }
         gWldFrameAction = EWldFrameAction::Exit;
         return;
       }
 
       simDriver->Dispatch();
-      if (simDriver->HasSyncData()) {
-        if (gActiveWldSession != nullptr && gActiveWldSession->mState != nullptr) {
-          (void)UI_StartGameUI(gActiveWldSession->mState);
-        }
-        gWldFrameAction = EWldFrameAction::PostInitialize;
+      if (!simDriver->HasSyncData()) {
+        return;
       }
+
+      CWldSession* const session = gActiveWldSession;
+      if (session != nullptr && session->mState != nullptr) {
+        (void)UI_StartGameUI(session->mState);
+      }
+
+      // Dequeue the first sync payload. The call matters for its side effects
+      // even before the payload can be applied: it advances the driver's
+      // last-dequeued beat, signals the connection event and clears the
+      // sync-available event.
+      //
+      // The binary hands the payload straight to `CWldSession::DoBeat`
+      // (0x00894530), the per-frame sim-state consumer, which owns and
+      // destroys it. That keystone is not lifted here yet - `SessionFrame`
+      // (0x00895B40) is missing the same call - and `~SSyncData` is not sound
+      // on a live payload either (its teardown view reads a `mTerrainUpdate`
+      // lane the constructor never initialises, SimDriver.cpp:887). So this
+      // one startup packet is deliberately left undestroyed rather than run
+      // through a destructor that faults; it is a single block per session.
+      {
+        SSyncData* syncData = nullptr;
+        simDriver->GetSyncData(syncData);
+        (void)syncData;
+      }
+
+      IWldUIProvider* const wldUIProvider = ResolveWldUIProvider();
+      if (wldUIProvider != nullptr) {
+        wldUIProvider->StopLoadingDialog();
+      }
+
+      if (wldUIProvider != nullptr) {
+        wldUIProvider->CreateGameInterface(gPendingWldSessionInfo != nullptr && gPendingWldSessionInfo->mIsReplay);
+      }
+
+      // The session info existed only to carry launch parameters into the
+      // session; the session owns everything it needed by now.
+      if (SWldSessionInfo* const consumedSessionInfo = gPendingWldSessionInfo; consumedSessionInfo != nullptr) {
+        consumedSessionInfo->~SWldSessionInfo();
+        ::operator delete(consumedSessionInfo);
+      }
+      gPendingWldSessionInfo = nullptr;
+
+      (void)WLD_DispatchOnTeardownCallbacksCoreFromGlobalList();
+
+      // Declare this client ready. `CClientManagerImpl::Cleanup` is the only
+      // writer of `mWeAreReady`, which `DoBeat` needs before it will ever set
+      // `mEveryoneIsReady` - so without this the session sits in Waiting
+      // forever showing "waiting for other players", local game or not.
+      if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
+        clientManager->Cleanup();
+      }
+
+      if (outContinue != nullptr) {
+        *outContinue = false;
+      }
+      gWldFrameAction = EWldFrameAction::PostInitialize;
     }
 
     /**
@@ -11191,7 +11258,7 @@ namespace moho
    * Resolves the process-global teardown-callback vector and dispatches its
    * core callback lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t WLD_DispatchOnTeardownCallbacksCoreFromGlobalList()
+  std::int32_t WLD_DispatchOnTeardownCallbacksCoreFromGlobalList()
   {
     WldTeardownCallbackVector* const callbacks = WLD_GetOnTeardownCallbacks();
     return static_cast<std::int32_t>(DispatchTeardownCallbacksCoreAndReturnLastResult(callbacks));
