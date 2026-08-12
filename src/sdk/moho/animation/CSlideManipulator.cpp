@@ -1,5 +1,7 @@
 #include "moho/animation/CSlideManipulator.h"
 
+#include "moho/math/Vector3f.h"
+
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -325,35 +327,14 @@ namespace
   }
 
   /**
-   * Address: 0x005D1E70 (FUN_005D1E70)
+   * Address: 0x005D1E70 (FUN_005D1E70, func_VecLimitLengthTo)
    *
-   * What it does:
-   * Clamps a 3D vector to `maxLength` when its squared length exceeds the
-   * allowed maximum, preserving direction and returning whether scaling
-   * occurred.
+   * Canonical body lives in moho/math/Vector3f.cpp; this alias keeps the
+   * slide-manipulator call sites reading the same as the binary's.
    */
   [[nodiscard]] bool LimitVectorLengthTo(Wm3::Vector3f* const vector, const float maxLength)
   {
-    if (vector == nullptr || maxLength <= 0.0f) {
-      return false;
-    }
-
-    const float lengthSq = vector->x * vector->x + vector->y * vector->y + vector->z * vector->z;
-    const float maxLengthSq = maxLength * maxLength;
-    if (lengthSq <= maxLengthSq) {
-      return false;
-    }
-
-    const float length = std::sqrt(lengthSq);
-    if (length <= 1e-6f) {
-      return false;
-    }
-
-    const float scale = maxLength / length;
-    vector->x *= scale;
-    vector->y *= scale;
-    vector->z *= scale;
-    return true;
+    return moho::VecLimitLengthTo(vector, maxLength);
   }
 
   /**

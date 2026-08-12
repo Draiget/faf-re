@@ -23,6 +23,16 @@ namespace moho
   [[nodiscard]] bool VecSetLength(Wm3::Vector3f* vector, float targetLength);
 
   /**
+   * Address: 0x005D1E70 (FUN_005D1E70, func_VecLimitLengthTo)
+   *
+   * What it does:
+   * Clamps a 3D vector in place to at most `maxLength`, preserving direction.
+   * Vectors already within the limit are left untouched. Returns whether the
+   * vector was scaled.
+   */
+  [[nodiscard]] bool VecLimitLengthTo(Wm3::Vector3f* vector, float maxLength) noexcept;
+
+  /**
    * Address: 0x004ED810 (FUN_004ED810)
    *
    * What it does:
