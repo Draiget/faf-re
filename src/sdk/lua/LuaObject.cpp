@@ -20721,6 +20721,17 @@ void LuaObject::Register(const char* const key, CFunction const value, const int
 	SetTableHelper(key, &closureObject);
 }
 
+namespace
+{
+	// Wire tags of the SCR byte-stream format, written by LuaObject::ToByteStream.
+	constexpr int8_t kScrTagNumber = 0;
+	constexpr int8_t kScrTagString = 1;
+	constexpr int8_t kScrTagNil = 2;
+	constexpr int8_t kScrTagBoolean = 3;
+	constexpr int8_t kScrTagTableBegin = 4;
+	constexpr int8_t kScrTagTableEnd = 5;
+} // namespace
+
 /**
  * Address: 0x004D2A40 (FUN_004D2A40, Moho::SCR_FromByteStream)
  *
@@ -20738,50 +20749,36 @@ void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::B
 	reader->ReadExact(luaType);
 
 	switch (luaType) {
-		case 0: {
+		case kScrTagNumber: {
 			float number = 0.0f;
 			reader->ReadExact(number);
 			result.AssignNumber(state, number);
 			break;
 		}
-		case 1: {
+		case kScrTagString: {
 			msvc8::string string;
 			reader->ReadString(&string);
 			result.AssignString(state, string.c_str());
 			break;
 		}
-		case 2:
+		case kScrTagNil:
 			result.AssignNil(state);
 			break;
-		case 3: {
+		case kScrTagBoolean: {
 			int8_t byteValue = 0;
 			reader->ReadExact(byteValue);
 			result.AssignBoolean(state, byteValue != 0);
 			break;
 		}
-		case 4: {
+		case kScrTagTableBegin: {
 			result.AssignNewTable(state, 0, 0);
-			gpg::Stream* stream = const_cast<gpg::Stream*>(reader->stream());
-			if (!stream) {
-				gpg::Warnf("Error deserializing lua table: no stream.");
-				result.AssignNil(state);
-				break;
-			}
 
-			while (true) {
-				const int nextType = stream->GetByte();
-				if (nextType == -1) {
-					gpg::Warnf("Error deserializing lua table: unexpected EOF.");
-					result.AssignNil(state);
-					break;
-				}
-
-				stream->VirtUnGetByte(nextType);
-				if (nextType == 5) {
-					(void)stream->GetByte();
-					break;
-				}
-
+			// Peek the next tag through Stream::CheckByte: it reads one byte and
+			// rewinds the read window by one. Reaching for the virtual unget
+			// directly instead skips that rewind, and MemBufferStream's override
+			// throws unconditionally - which made every table fail to load.
+			gpg::Stream& stream = *const_cast<gpg::Stream*>(reader->stream());
+			while (stream.CheckByte() != kScrTagTableEnd) {
 				LuaObject key;
 				SCR_FromByteStream(key, state, reader);
 				if (key.IsNil()) {
@@ -20796,9 +20793,12 @@ void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::B
 
 				result.SetObject(key, value);
 			}
+
+			// Consume the end-of-table tag the peek left in place.
+			(void)reader->ReadChar();
 			break;
 		}
-		case 5:
+		case kScrTagTableEnd:
 			gpg::Warnf("Error deseralizing lua object: unexpected end-of-table marker encountered.");
 			result.AssignNil(state);
 			break;
