@@ -46,4 +46,16 @@ namespace LuaPlus
 		void Init() override;
 	};
 	static_assert(sizeof(LuaObjectTypeInfo) == 0x64, "LuaObjectTypeInfo must be 0x64");
+
+	/**
+	 * Address: 0x00BE9EF0 (FUN_00BE9EF0, register_LuaObjectTypeInfo)
+	 *
+	 * IDA signature:
+	 * void __cdecl register_LuaObjectTypeInfo();
+	 *
+	 * What it does:
+	 * Constructs the static `LuaObjectTypeInfo` descriptor in place, which
+	 * preregisters `LuaObject`, and hands its destructor to `atexit`.
+	 */
+	gpg::RType* register_LuaObjectTypeInfo();
 }
