@@ -1096,6 +1096,31 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x00924050 (FUN_00924050, lua_getglobaluserdata)
+	 *
+	 * IDA signature:
+	 * Moho::Sim *__usercall lua_getglobaluserdata@<eax>(lua_State *L);
+	 *
+	 * What it does:
+	 * Reads back what lua_setglobaluserdata stored - the Sim every sim-side
+	 * Lua binding starts from.
+	 *
+	 * The setter above was recovered but this half never was, so it resolved
+	 * to the prebuilt LuaPlus library's copy, which reads the field at stock
+	 * global_State's offset rather than this fork's +0x148. Every binding that
+	 * asked for the Sim got a null back, and the first one to do so - the
+	 * initial-unit spawn - reported the ACU blueprint as unknown.
+	 */
+// LuaPrimitives.h macros the name onto the typed inline wrapper for call
+// sites; the definition itself has to be spelled without it.
+#undef lua_getglobaluserdata
+	void* lua_getglobaluserdata(lua_State* const state)
+	{
+		return state->l_G->globalUserData;
+	}
+#define lua_getglobaluserdata lua_getglobaluserdata_typed
+
+	/**
 	 * Address: 0x009240A0 (FUN_009240A0, lua_getstateuserdata)
 	 *
 	 * What it does:
