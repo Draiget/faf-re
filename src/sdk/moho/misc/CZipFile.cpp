@@ -811,16 +811,28 @@ namespace moho
     }
 
     if (entry.mCompressionMethod == kZipCompressionDeflated) {
+      // zlib wants to read one byte past a raw deflate stream before it will
+      // call that stream finished. The engine linked zlib 1.2.3, which copes
+      // with input ending exactly on the last compressed byte. This build ends
+      // up on the zlib 1.1.4 bundled inside wxWindows - the Win32 link resolves
+      // `zlib.lib` out of dependencies\wxWindows-2.4.2\lib because the tree
+      // carries no 32-bit 1.2.3 - and 1.1.4 answers Z_BUF_ERROR after producing
+      // every byte of correct output, on whichever entries happen to end on an
+      // unlucky bit boundary. One spare byte satisfies both versions: a valid
+      // raw stream stops at its own end-of-stream marker and never reads it.
+      constexpr std::size_t kInflateLookaheadSlack = 1u;
+
       gpg::MemBuffer<char> compressedBytes = gpg::AllocMemBuffer(
-        static_cast<std::size_t>(entry.mCompressedSize)
+        static_cast<std::size_t>(entry.mCompressedSize) + kInflateLookaheadSlack
       );
-      if (entry.mCompressedSize != 0 && compressedBytes.data() == nullptr) {
+      if (compressedBytes.data() == nullptr) {
         return {};
       }
 
       if (entry.mCompressedSize != 0) {
         (void)zipStream->Read(compressedBytes.data(), static_cast<std::size_t>(entry.mCompressedSize));
       }
+      compressedBytes.data()[entry.mCompressedSize] = '\0';
 
       gpg::MemBuffer<char> uncompressedBytes = gpg::AllocMemBuffer(
         static_cast<std::size_t>(entry.mUncompressedSize)
@@ -831,7 +843,7 @@ namespace moho
 
       z_stream inflateState{};
       inflateState.next_in = reinterpret_cast<Bytef*>(compressedBytes.data());
-      inflateState.avail_in = static_cast<uInt>(entry.mCompressedSize);
+      inflateState.avail_in = static_cast<uInt>(entry.mCompressedSize + kInflateLookaheadSlack);
       inflateState.next_out = reinterpret_cast<Bytef*>(uncompressedBytes.data());
       inflateState.avail_out = static_cast<uInt>(entry.mUncompressedSize);
 
