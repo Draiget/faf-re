@@ -1724,7 +1724,19 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
   }
 }
 
-// 0x006F1650
+/**
+ * Address: 0x006F1650 (FUN_006F1650, Moho::CUnitCommand::IncreaseCount)
+ *
+ * IDA signature:
+ * void __usercall Moho::CUnitCommand::IncreaseCount(
+ *     Moho::CUnitCommand *this@<eax>, int amount@<edx>);
+ *
+ * What it does:
+ * Adds `amount` to a factory build command's repeat count, raising the
+ * high-water `mMaxCount` when the new total exceeds it, and flags the command
+ * for republication. Only `UNITCOMMAND_BuildFactory` commands carry a count,
+ * so every other command type is ignored outright.
+ */
 void CUnitCommand::IncreaseCount(const int amount)
 {
   if (amount <= 0 || mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_BuildFactory) {
