@@ -104,7 +104,13 @@ extern "C" {
   // REAL BODIES now live in cri/sofdec/SofdecMpvRuntime.cpp (ClCompile):
   // MPVCMC_InitMcOiRt, MPVCMC_SetCcnt, MPVUMC_EndOfFrame, MPVUMC_Finish,
   // MPVUMC_InitOutRfb.
-  void* MWSFCRE_DestroySfd() { return nullptr; }
+  // MWSFCRE_DestroySfd (0x00AC7F40): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp. As a no-argument stub C linkage
+  // let it stand in for the real one-parameter function, so `mwply_Destroy`
+  // released a playback handle without ever destroying the SFD work control
+  // inside it. Every movie open then leaked one MPS parser handle out of a pool
+  // of 32, and the loading screen - which reopens its movie on every loop - ran
+  // the pool dry and drew "E2012 mwPlyCreate:can't create SFD" from then on.
   // MWSFCRE_SetSupplySj (0x00AC7D80): real body in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp. As a no-arg stub it silently
   // satisfied every `MWSFCRE_SetSupplySj(ply)` call, so the SFD's input lane
@@ -171,7 +177,10 @@ extern "C" {
   // SFPLY_DecideSvrStat: real body now in SofdecSfdRuntime.cpp (was named lowercase `sfply_DecideSvrStat`; renamed to match callers).
   // SFTIM_InitTcode, SFTIM_InitTtu: real bodies in SofdecMpvRuntime.cpp.
   void* SFXLIB_Error() { return nullptr; }
-  void* SFXZ_Destroy() { return nullptr; }
+  // SFXZ_Destroy (0x00ACD670): real body in SofdecSfxRuntime.cpp next to
+  // SFXZ_Create. As a no-argument stub it left every SFXZ pool slot marked
+  // live, so the 33rd SFX composition handle of a session could not be built
+  // and every movie past that point failed with "E201185: can't create SfxHn".
   void* SFXZ_GetZfrmRange() { return nullptr; }
   void* SFXZ_IsSetZclip() { return nullptr; }
   void* SFX_DecideTableAlph3() { return nullptr; }
@@ -264,7 +273,13 @@ extern "C" {
   // sfply_InitHn: real body in SofdecSfdRuntime.cpp (0x00AD7AE0). While this
   // stub stood, sfply_Create always returned null and every movie failed with
   // "E2012 mwPlyCreate:can't create SFD".
-  void* sfply_ResetHn() { return nullptr; }
+  // sfply_ResetHn (0x00AD7FF0): real body in SofdecSfdRuntime.cpp. `SFPLY_Stop`
+  // zeroes the handle's state lane and then calls this to rebuild the handle in
+  // place; while it was a no-argument stub the rebuild never happened, so every
+  // stopped SFD handle stayed at state 0 and `SFLIB_CheckHn` rejected it from
+  // then on. `SFD_Destroy` refused with `SFD ERROR(FF000131)`, which meant the
+  // handle's MPS parser was never returned to its 32-entry pool: the 33rd movie
+  // in a session - the loading screen reopens one every loop - failed to create.
   // sfxcnv_ExecCnvFrmByCbFunc (0x00ACEB10): real body in SofdecSfxRuntime.cpp.
   // This is where a decoded frame becomes pixels. While it stood as a stub the
   // whole conversion path completed and reported success without ever writing
@@ -327,6 +342,11 @@ extern "C" {
   void(*ahxsetdecsmplfunc)(void*, std::int32_t) = nullptr;
   void(*ahxsetextfunc)(void*, const std::int16_t*) = nullptr;
   std::int32_t(*SFPLY_SetPtsInfo)(std::int32_t, std::int32_t*) = nullptr;
+  // SFPLY_ResetPtsm (0x011F9150) is the library's optional "handle was rebuilt,
+  // re-seed your PTS map" hook. `sfply_ResetHn` is its only reader and nothing
+  // in this binary ever installs one, so it stays null - the guard there is kept
+  // because the binary keeps it.
+  void(*SFPLY_ResetPtsm)(std::int32_t*) = nullptr;
   // conceal_fn_tbl (0x00D7FFFC) is a real four-entry dispatch table, not a
   // zeroed buffer. MPVCONCEAL_StartFrame installs one of its slots as the
   // handle's macroblock-discontinuity handler, so a null slot meant the first
