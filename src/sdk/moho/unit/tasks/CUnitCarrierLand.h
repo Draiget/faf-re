@@ -24,6 +24,47 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00607B50 (FUN_00607B50, Moho::CUnitCarrierLandTypeInfo::NewRef)
+     * Address: 0x00607C30 (FUN_00607C30, Moho::CUnitCarrierLandTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Default-constructs an unbound carrier-land task for the reflection /
+     * deserialization path. The binary inlines this constructor into both
+     * `NewRef` and `CtrRef`, which is why it carries their addresses rather
+     * than one of its own.
+     */
+    CUnitCarrierLand();
+
+    /**
+     * Address: 0x00606500 (FUN_00606500, ??0CUnitCarrierLand@Moho@@QAE@@Z)
+     *
+     * IDA signature:
+     * Moho::CUnitCarrierLand *__thiscall Moho::CUnitCarrierLand::CUnitCarrierLand(
+     *     Moho::CCommandTask *parentTask, Moho::CUnitCarrierLand *this, int carrier);
+     *
+     * What it does:
+     * Starts a carrier landing for `parentTask`'s unit: links the target
+     * carrier weak pointer, zeroes the reservation payload, raises
+     * `UNITSTATE_TransportLoading` on the unit, and points the unit's focus
+     * entity at the carrier (which fires `OnAssignedFocusEntity`).
+     */
+    CUnitCarrierLand(CCommandTask* parentTask, Unit* carrier);
+
+    /**
+     * Address: 0x006067A0 (FUN_006067A0, ?TaskTick@CUnitCarrierLand@Moho@@UAE?AW4ETaskStatus@2@XZ)
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitCarrierLand::TaskTick(Moho::CUnitCarrierLand *this);
+     *
+     * What it does:
+     * Runs the carrier-landing state machine: reserve a bay, fly to the
+     * standoff point the reservation names, wait out the carrier's surfacing,
+     * descend onto the attach point, and hand the unit to the carrier's
+     * storage.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x00606610 (FUN_00606610, Moho::CUnitCarrierLand::~CUnitCarrierLand)
      *
      * What it does:

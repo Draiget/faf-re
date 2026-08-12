@@ -17,7 +17,8 @@
 #include "moho/unit/tasks/CUnitCarrierLand.h"
 #include "Wm3Vector3.h"
 
-#include <limits>
+#include <limits>
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -26,34 +27,6 @@ namespace
 
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
-
-  struct CUnitCarrierLandRuntimeView final : moho::CCommandTask
-  {
-    std::uint32_t mUnknownWord0 = 0; // +0x30
-    std::uint32_t mUnknownWord1 = 0; // +0x34
-    std::uint8_t mUnknownByte0 = 0;  // +0x38
-    std::uint8_t mPad39_3B[3] = {0, 0, 0};
-    std::uint32_t mUnknownWord2 = 0;  // +0x3C
-    std::uint32_t mUnknownWord3 = 0;  // +0x40
-    std::uint32_t mUnknownWord4 = 0;  // +0x44
-    std::uint32_t mUnknownWord5 = 0;  // +0x48
-    std::uint32_t mUnknownWord6 = 0;  // +0x4C
-    std::uint32_t mUnknownWord7 = 0;  // +0x50
-    std::uint32_t mUnknownWord8 = 0;  // +0x54
-    std::uint32_t mUnknownWord9 = 0;  // +0x58
-    std::uint32_t mUnknownWord10 = 0; // +0x5C
-    std::uint32_t mUnknownWord11 = 0; // +0x60
-    std::uint32_t mUnknownWord12 = 0; // +0x64
-
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(sizeof(CUnitCarrierLandRuntimeView) == sizeof(moho::CUnitCarrierLand), "CUnitCarrierLandRuntimeView size must match CUnitCarrierLand");
-  static_assert(offsetof(CUnitCarrierLandRuntimeView, mUnknownWord0) == 0x30, "CUnitCarrierLandRuntimeView::mUnknownWord0 offset must be 0x30");
-  static_assert(offsetof(CUnitCarrierLandRuntimeView, mUnknownWord12) == 0x64, "CUnitCarrierLandRuntimeView::mUnknownWord12 offset must be 0x64");
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -112,9 +85,9 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitCarrierLandRef(CUnitCarrierLandRuntimeView* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitCarrierLandRef(moho::CUnitCarrierLand* const object)
   {
-    return gpg::RRef{reinterpret_cast<moho::CUnitCarrierLand*>(object), CachedCUnitCarrierLandType()};
+    return gpg::RRef{object, CachedCUnitCarrierLandType()};
   }
 } // namespace
 
@@ -181,7 +154,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierLandTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitCarrierLandRuntimeView();
+    auto* const object = new (std::nothrow) moho::CUnitCarrierLand();
     return MakeCUnitCarrierLandRef(object);
   }
 
@@ -194,9 +167,9 @@ namespace moho
    */
   gpg::RRef CUnitCarrierLandTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitCarrierLandRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitCarrierLand*>(objectStorage);
     if (object) {
-      new (object) CUnitCarrierLandRuntimeView();
+      new (object) moho::CUnitCarrierLand();
     }
     return MakeCUnitCarrierLandRef(object);
   }
@@ -206,7 +179,7 @@ namespace moho
    */
   void CUnitCarrierLandTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitCarrierLandRuntimeView*>(objectStorage);
+    delete static_cast<moho::CUnitCarrierLand*>(objectStorage);
   }
 
   /**
@@ -214,12 +187,12 @@ namespace moho
    */
   void CUnitCarrierLandTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitCarrierLandRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitCarrierLand*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitCarrierLandRuntimeView();
+    object->~CUnitCarrierLand();
   }
 
   /**
