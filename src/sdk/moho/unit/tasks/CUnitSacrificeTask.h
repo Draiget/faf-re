@@ -87,6 +87,24 @@ namespace moho
     [[nodiscard]] static CUnitSacrificeTask* Create(CCommandTask* parentTask, Unit* targetUnit);
 
     /**
+     * Address: 0x005FB180 (FUN_005FB180, Moho::CUnitSacrificeTask::TaskTick)
+     * VFTable SLOT: 1 (CTask::Execute), ??_7CUnitSacrificeTask@Moho@@6B@ + 0x04
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitSacrificeTask::TaskTick(Moho::CUnitSacrificeTask *this);
+     *
+     * What it does:
+     * Runs the three-phase sacrifice state machine. `Preparing` walks the
+     * owning unit to the recipient (redirecting to the recipient's factory
+     * while it is still being built, or to its upgrade successor), `Waiting`
+     * holds until the unit is inside build range and the recipient can
+     * actually absorb the donation, and `Starting` pays the owner's scaled
+     * build cost into the recipient and ends the task. Aborts (-1) whenever
+     * the recipient is gone, dead, or has become an air unit.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x005FB830 (FUN_005FB830, Moho::CUnitSacrificeTask::OnEvent)
      *
      * What it does:
