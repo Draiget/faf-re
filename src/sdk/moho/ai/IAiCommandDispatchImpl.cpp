@@ -56,6 +56,7 @@
 #include "moho/unit/tasks/CUnitMoveTask.h"
 #include "moho/unit/tasks/CUnitPatrolTask.h"
 #include "moho/unit/tasks/CUnitPodAssist.h"
+#include "moho/unit/tasks/CUnitReclaimTask.h"
 #include "moho/unit/tasks/CUnitRepairTask.h"
 #include "moho/unit/tasks/CUnitSacrificeTask.h"
 #include "moho/unit/tasks/CUnitUnloadUnits.h"
@@ -322,54 +323,6 @@ namespace
 
     return transportAi->TransportDetachUnit(unit) ? 1 : 0;
   }
-
-  /**
-   * Recovered runtime reclaim-task object used by IssueReclaimTask.
-   *
-   * This mirrors constructor-side target snapshot and economy/request lane
-   * zero-initialization observed in `FUN_0061EB60`.
-   */
-  class CUnitReclaimDispatchTask final : public CCommandTask
-  {
-  public:
-    CUnitReclaimDispatchTask(
-      CCommandTask* const parentTask,
-      Entity* const targetEntity,
-      const Wm3::Vec3f& targetPos
-    )
-      : CCommandTask(parentTask)
-      , mListenerRuntimePad{}
-      , mCurrentCommand(nullptr)
-      , mTargetEntity()
-      , mTargetPos(targetPos)
-      , mHasStarted(false)
-      , mPad5D_5F{}
-      , mConsumptionData(nullptr)
-      , mReclaimRate(0.0f)
-      , mReclaimEnergyPerSecond(0.0f)
-      , mReclaimMassPerSecond(0.0f)
-    {
-      mTargetEntity.ResetFromObject(targetEntity);
-    }
-
-    int Execute() override
-    {
-      return -1;
-    }
-
-  private:
-    std::uint8_t mListenerRuntimePad[0x10]; // +0x30
-    CUnitCommand* mCurrentCommand; // +0x40
-    WeakPtr<Entity> mTargetEntity; // +0x44
-    Wm3::Vec3f mTargetPos; // +0x4C
-    bool mHasStarted; // +0x58
-    std::uint8_t mPad5D_5F[3];
-    void* mConsumptionData; // +0x5C
-    float mReclaimRate; // +0x60
-    float mReclaimEnergyPerSecond; // +0x64
-    float mReclaimMassPerSecond; // +0x68
-  };
-  static_assert(sizeof(CUnitReclaimDispatchTask) == 0x6C, "CUnitReclaimDispatchTask size must be 0x6C");
 
   /**
    * Address: 0x00608EF0 (FUN_00608EF0, Moho::IAiCommandDispatchImpl::DispatchTask)
@@ -1025,7 +978,7 @@ void IAiCommandDispatchImpl::IssueReclaimTask(const CAiTarget& target)
   }
 
   const Wm3::Vec3f targetPos = const_cast<CAiTarget&>(target).GetTargetPosGun(false);
-  (void)new (std::nothrow) CUnitReclaimDispatchTask(this, targetEntity, targetPos);
+  (void)new (std::nothrow) CUnitReclaimTask(this, targetEntity, targetPos);
 }
 
 /**
