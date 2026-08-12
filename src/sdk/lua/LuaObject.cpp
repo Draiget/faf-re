@@ -10465,6 +10465,394 @@ namespace
 	};
 
 	/**
+	 * Address: 0x00927B10 (FUN_00927B10, luaB_foreachi)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_foreachi(lua_State *L);
+	 *
+	 * What it does:
+	 * Calls f(i, t[i]) for 1..getn(t), stopping at and returning the first
+	 * non-nil result.
+	 */
+	int LuaTableForEachIndexed(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+		const int count = luaL_getn(state, 1);
+
+		for (int index = 1; index <= count; ++index) {
+			lua_pushvalue(state, 2);
+			lua_pushnumber(state, static_cast<lua_Number>(index));
+			lua_rawgeti(state, 1, index);
+			LuaCallUnprotected(state, 2, 1);
+			if (lua_type(state, -1) != LUA_TNIL) {
+				return 1;
+			}
+			lua_settop(state, -2);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Address: 0x00927BA0 (FUN_00927BA0, luaB_foreach)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_foreach(lua_State *L);
+	 *
+	 * What it does:
+	 * Calls f(k, v) for every pair, stopping at and returning the first non-nil
+	 * result.
+	 */
+	int LuaTableForEach(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+
+		lua_pushnil(state);
+		while (lua_next(state, 1) != 0) {
+			lua_pushvalue(state, 2);
+			lua_pushvalue(state, -3);
+			lua_pushvalue(state, -3);
+			LuaCallUnprotected(state, 2, 1);
+			if (lua_type(state, -1) != LUA_TNIL) {
+				return 1;
+			}
+			lua_settop(state, -3);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Address: 0x00927C20 (FUN_00927C20, luaB_getn)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_getn(lua_State *L);
+	 */
+	int LuaTableGetN(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+		lua_pushnumber(state, static_cast<lua_Number>(luaL_getn(state, 1)));
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00927C60 (FUN_00927C60, luaB_setn)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_setn(lua_State *L);
+	 */
+	int LuaTableSetN(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+		const auto count = static_cast<int>(luaL_checknumber(state, 2));
+		luaL_setn(state, 1, count);
+		return 0;
+	}
+
+	/**
+	 * Address: 0x00927C90 (FUN_00927C90, luaB_tinsert)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_tinsert(lua_State *L);
+	 *
+	 * What it does:
+	 * table.insert(t, v) appends; table.insert(t, pos, v) shifts everything from
+	 * pos up one and writes v there. Inserting past the end grows n to the given
+	 * position.
+	 */
+	int LuaTableInsert(lua_State* const state)
+	{
+		int valueIndex = lua_gettop(state);
+		luaL_checktype(state, 1, LUA_TTABLE);
+
+		const int currentCount = luaL_getn(state, 1);
+		int newCount = currentCount + 1;
+		int position = 0;
+
+		if (valueIndex == 2) {
+			position = currentCount + 1;
+		} else {
+			position = static_cast<int>(luaL_checknumber(state, 2));
+			if (position > newCount) {
+				newCount = position;
+			}
+			valueIndex = 3;
+		}
+
+		luaL_setn(state, 1, newCount);
+		for (int slot = newCount - 1; slot >= position; --slot) {
+			lua_rawgeti(state, 1, slot);
+			lua_rawseti(state, 1, slot + 1);
+		}
+
+		lua_pushvalue(state, valueIndex);
+		lua_rawseti(state, 1, position);
+		return 0;
+	}
+
+	/**
+	 * Address: 0x00927D30 (FUN_00927D30, luaB_tremove)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_tremove(lua_State *L);
+	 *
+	 * What it does:
+	 * Removes t[pos] (default n), shifts the tail down, and returns the removed
+	 * value. An empty table returns nothing at all.
+	 */
+	int LuaTableRemove(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+
+		const int count = luaL_getn(state, 1);
+		const auto position = static_cast<int>(luaL_optnumber(state, 2, static_cast<lua_Number>(count)));
+		if (count <= 0) {
+			return 0;
+		}
+
+		luaL_setn(state, 1, count - 1);
+		lua_rawgeti(state, 1, position);
+		for (int slot = position; slot < count; ++slot) {
+			lua_rawgeti(state, 1, slot + 1);
+			lua_rawseti(state, 1, slot);
+		}
+
+		lua_pushnil(state);
+		lua_rawseti(state, 1, count);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00927DD0 (FUN_00927DD0, str_concat)
+	 *
+	 * IDA signature:
+	 * int __cdecl str_concat(lua_State *L);
+	 *
+	 * What it does:
+	 * table.concat(t, sep, i, j) - joins t[i..j] with sep, defaulting to the
+	 * whole array part and an empty separator.
+	 */
+	int LuaTableConcat(lua_State* const state)
+	{
+		std::size_t separatorLength = 0;
+		const char* const separator = luaL_optlstring(state, 2, "", &separatorLength);
+		int first = static_cast<int>(luaL_optnumber(state, 3, 1.0));
+		int last = static_cast<int>(luaL_optnumber(state, 4, 0.0));
+
+		luaL_checktype(state, 1, LUA_TTABLE);
+		if (last == 0) {
+			last = luaL_getn(state, 1);
+		}
+
+		luaL_Buffer buffer;
+		luaL_buffinit(state, &buffer);
+		for (; first <= last; ++first) {
+			lua_rawgeti(state, 1, first);
+			if (lua_isstring(state, -1) == 0) {
+				luaL_argerror(state, 1, "table contains non-strings");
+			}
+			luaL_addvalue(&buffer);
+			if (first != last) {
+				luaL_addlstring(&buffer, separator, separatorLength);
+			}
+		}
+
+		luaL_pushresult(&buffer);
+		return 1;
+	}
+
+	/**
+	 * Compares two stack slots the way the sort was asked to: through the
+	 * comparator parked at index 2 when there is one, and with lua_lessthan when
+	 * index 2 is nil. The comparator path pushes the function first, so the two
+	 * operand indices shift by one and two respectively.
+	 */
+	[[nodiscard]] bool LuaSortCompare(lua_State* const state, const int leftIndex, const int rightIndex)
+	{
+		if (lua_type(state, 2) == LUA_TNIL) {
+			return lua_lessthan(state, leftIndex, rightIndex) != 0;
+		}
+
+		lua_pushvalue(state, 2);
+		lua_pushvalue(state, leftIndex < 0 ? leftIndex - 1 : leftIndex);
+		lua_pushvalue(state, rightIndex < 0 ? rightIndex - 2 : rightIndex);
+		LuaCallUnprotected(state, 2, 1);
+		const bool result = lua_toboolean(state, -1) != 0;
+		lua_settop(state, -2);
+		return result;
+	}
+
+	/**
+	 * Writes the two values on top of the stack into t[i] and t[j].
+	 */
+	void LuaSortSet2(lua_State* const state, const int i, const int j)
+	{
+		lua_rawseti(state, 1, i);
+		lua_rawseti(state, 1, j);
+	}
+
+	/**
+	 * Address: 0x00927F60 (FUN_00927F60, auxsort)
+	 *
+	 * IDA signature:
+	 * void __cdecl auxsort(lua_State *L, int l, int u);
+	 *
+	 * What it does:
+	 * Quicksort over t[l..u]: orders the ends, medians the middle into u-1 as the
+	 * pivot, partitions around it, then recurses into the smaller half and loops
+	 * on the larger one. A comparator that never settles walks an index off the
+	 * range, which is the "invalid order function for sorting" case.
+	 */
+	void LuaTableAuxSort(lua_State* const state, int lower, int upper)
+	{
+		while (lower < upper) {
+			lua_rawgeti(state, 1, lower);
+			lua_rawgeti(state, 1, upper);
+			if (LuaSortCompare(state, -1, -2)) {
+				LuaSortSet2(state, lower, upper);
+			} else {
+				lua_settop(state, -3);
+			}
+
+			if (upper - lower == 1) {
+				break;
+			}
+
+			const int middle = (lower + upper) / 2;
+			lua_rawgeti(state, 1, middle);
+			lua_rawgeti(state, 1, lower);
+			if (LuaSortCompare(state, -2, -1)) {
+				LuaSortSet2(state, middle, lower);
+			} else {
+				lua_settop(state, -2);
+				lua_rawgeti(state, 1, upper);
+				if (LuaSortCompare(state, -1, -2)) {
+					LuaSortSet2(state, middle, upper);
+				} else {
+					lua_settop(state, -3);
+				}
+			}
+
+			if (upper - lower == 2) {
+				break;
+			}
+
+			lua_rawgeti(state, 1, middle);
+			lua_pushvalue(state, -1);
+			const int pivotSlot = upper - 1;
+			lua_rawgeti(state, 1, pivotSlot);
+			LuaSortSet2(state, middle, pivotSlot);
+
+			int i = lower;
+			int j = pivotSlot;
+			for (;;) {
+				lua_rawgeti(state, 1, ++i);
+				while (LuaSortCompare(state, -1, -2)) {
+					if (i > upper) {
+						luaL_error(state, "invalid order function for sorting");
+					}
+					lua_settop(state, -2);
+					lua_rawgeti(state, 1, ++i);
+				}
+
+				lua_rawgeti(state, 1, --j);
+				while (LuaSortCompare(state, -3, -1)) {
+					if (j < lower) {
+						luaL_error(state, "invalid order function for sorting");
+					}
+					lua_settop(state, -2);
+					lua_rawgeti(state, 1, --j);
+				}
+
+				if (j < i) {
+					break;
+				}
+				LuaSortSet2(state, i, j);
+			}
+
+			lua_settop(state, -4);
+			lua_rawgeti(state, 1, pivotSlot);
+			lua_rawgeti(state, 1, i);
+			LuaSortSet2(state, pivotSlot, i);
+
+			int recurseLower = 0;
+			int recurseUpper = 0;
+			if (i - lower >= upper - i) {
+				recurseLower = i + 1;
+				recurseUpper = upper;
+				upper = i - 1;
+			} else {
+				recurseLower = lower;
+				recurseUpper = i - 1;
+				lower = i + 1;
+			}
+			LuaTableAuxSort(state, recurseLower, recurseUpper);
+		}
+	}
+
+	/**
+	 * Address: 0x00928360 (FUN_00928360, luaB_sort)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaB_sort(lua_State *L);
+	 *
+	 * What it does:
+	 * table.sort(t [, comp]). Note there is no type check on the comparator: the
+	 * fork accepts any callable and LuaSortCompare only asks whether index 2 is
+	 * nil. Stock ltablib checks it against LUA_TFUNCTION, which is 6 in stock
+	 * numbering but the *C* function tag in this fork, so the vendored copy of
+	 * this function rejects every Lua comparator with "cfunction expected, got
+	 * function".
+	 */
+	int LuaTableSort(lua_State* const state)
+	{
+		luaL_checktype(state, 1, LUA_TTABLE);
+		const int count = luaL_getn(state, 1);
+		luaL_checkstack(state, 40, "");
+		lua_settop(state, 2);
+		LuaTableAuxSort(state, 1, count);
+		return 0;
+	}
+
+	/**
+	 * Address: 0x00D47418 (tab_funcs)
+	 *
+	 * The "table" library registration array, read out of the shipped image:
+	 * eight rows in this order, terminated by the null row. This table is the
+	 * source-level invocation for every function in it.
+	 */
+	const luaL_reg kLuaTableLibrary[] = {
+		{"concat", &LuaTableConcat},
+		{"foreach", &LuaTableForEach},
+		{"foreachi", &LuaTableForEachIndexed},
+		{"getn", &LuaTableGetN},
+		{"setn", &LuaTableSetN},
+		{"sort", &LuaTableSort},
+		{"insert", &LuaTableInsert},
+		{"remove", &LuaTableRemove},
+		{nullptr, nullptr}
+	};
+
+	/**
+	 * Address: 0x009283A0 (FUN_009283A0, luaopen_table)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaopen_table(lua_State *L);
+	 *
+	 * What it does:
+	 * Opens the "table" library.
+	 *
+	 * Named apart from the binary's symbol for the same reason LuaOpenString is:
+	 * the prebuilt LuaPlus library exports its own luaopen_table, and that copy
+	 * was compiled against stock tag numbering.
+	 */
+	int LuaOpenTable(lua_State* const state)
+	{
+		luaL_openlib(state, "table", kLuaTableLibrary, 0);
+		return 1;
+	}
+
+	/**
 	 * Address: 0x00926EF0 (FUN_00926EF0, luaopen_string)
 	 *
 	 * IDA signature:
@@ -12105,17 +12493,26 @@ int lua_getstack(lua_State* const state, const int level, ::lua_Debug* const act
 	CallInfo* ci = state->ci;
 
 	if (level > 0) {
-		for (; ci > state->base_ci; --ci) {
+		bool landed = false;
+		while (ci > state->base_ci) {
 			--remaining;
 			if (ci->state < kFrameCFunction) {
 				remaining -= ci->tailcalls;
 			}
+			// Step down first, then check: level 1 has to end up on the
+			// caller of the running function, not on the running function
+			// itself. Testing before the step made every level report one
+			// frame too shallow, so debug.getinfo(1) described the C
+			// function it was called from instead of the Lua one that
+			// called it.
+			--ci;
 			if (remaining <= 0) {
+				landed = true;
 				break;
 			}
 		}
 
-		if (ci <= state->base_ci && remaining > 0) {
+		if (!landed && remaining > 0) {
 			return 0;
 		}
 	}
@@ -15612,6 +16009,22 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090D400 (FUN_0090D400, lua_call)
+	 * Mangled: ?lua_call@@YAXPAUlua_State@@HH@Z
+	 *
+	 * IDA signature:
+	 * void __cdecl lua_call(lua_State *L, int nargs, int nresults);
+	 *
+	 * What it does:
+	 * Calls with no handler, so an error unwinds to the caller's own protected
+	 * boundary instead of being turned into a status nobody reads.
+	 */
+	void LuaCallUnprotected(lua_State* const state, const int nargs, const int nresults)
+	{
+		(void)luaD_call(state, state->top - (nargs + 1), nresults);
+	}
+
+	/**
 	 * Address: 0x00913C30 (FUN_00913C30, tryFuncTM)
 	 *
 	 * IDA signature:
@@ -17262,7 +17675,12 @@ void LuaState::Init(const StandardLibraries initStandardLibrary)
 		const int previousTop = lua_gettop(state);
 
 		luaopen_base(state);
-		luaopen_table(state);
+		// Ours, not the prebuilt lib's - same reason as LuaOpenIo below. The
+		// vendored ltablib was compiled with stock tag numbering, where
+		// LUA_TFUNCTION is 6; in this fork 6 is the C-function tag, so its
+		// table.sort turned away every Lua comparator with "cfunction
+		// expected, got function".
+		LuaOpenTable(state);
 		if (initStandardLibrary == LIB_OSIO) {
 			// Ours, not the prebuilt lib's. The vendored liolib walks a
 			// lua_State this tree builds and asserts in its debug

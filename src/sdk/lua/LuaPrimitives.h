@@ -201,11 +201,26 @@ inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
  * The macro is how every call site gets to see the real signature without
  * editing the vendored lua.h, the same shape lua_getglobaluserdata uses above.
  */
+/**
+ * Address: 0x0090D400 (FUN_0090D400, lua_call)
+ * Mangled: ?lua_call@@YAXPAUlua_State@@HH@Z
+ *
+ * IDA signature:
+ * void __cdecl lua_call(lua_State *L, int nargs, int nresults);
+ *
+ * What it does:
+ * The other half of the pair, and the one the LuaPlus surface exports: a bare
+ * luaD_call with no handler at all, so an error keeps unwinding to whatever
+ * protected boundary the caller sits inside. Engine code that wants a script
+ * error to reach the caller - `doscript` above all - calls this one; only the
+ * sites that genuinely want to inspect a status code call the protected form.
+ */
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 int LuaCallProtected(lua_State* L, int nargs, int nresults);
+void LuaCallUnprotected(lua_State* L, int nargs, int nresults);
 #ifdef __cplusplus
 }
 #endif
