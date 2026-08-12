@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "boost/shared_ptr.h"
 
 struct lua_State;
 
@@ -381,10 +382,22 @@ namespace moho
     [[nodiscard]] bool IsRepeatQueueEnabled() const;
 
   public:
-    // RTTI for UserUnit shows secondary subobjects:
-    // +0x148: IUnit subobject (22-slot vtable), +0x150: CScriptObject-style 4-slot subobject.
-    std::uint8_t mIUnitAndScriptBridge[0x190 - 0x148]{};
-    bool mIsFake; // 0x0190
+    // RTTI for UserUnit shows two secondary subobjects. Offsets below come
+    // from the constructor (FUN_008BF420): it stores the IUnit vtable at
+    // +0x148, zeroes that subobject's weak-link head at +0x14C, runs
+    // CScriptObject's constructor on +0x150, and then copies
+    // SCreateUnitParams::mConstDat over +0x184..+0x194.
+
+    /// The IUnit subobject: vtable pointer then its `WeakObject` head.
+    std::uint8_t mIUnitAndScriptBridge[0x150 - 0x148]{}; // 0x0148
+    /// The CScriptObject subobject; `sizeof(CScriptObject) == 0x34`, so it
+    /// ends exactly where the constant-data payload starts.
+    std::uint8_t mScriptObjectStorage[0x34]{};           // 0x0150
+    std::uint8_t mBuildStateTag{};                       // 0x0184
+    std::uint8_t pad_0185_0188[0x0188 - 0x0185]{};
+    /// `SCreateUnitConstantData::mStatsRoot`, retained by the constructor.
+    boost::shared_ptr<void> mStatsRoot;                  // 0x0188
+    bool mIsFake; // 0x0190 (also `SCreateUnitConstantData::mFake`)
     std::uint8_t pad_0191_019C[0x19C - 0x191]{};
     std::int32_t mBuildTemplateOrderLane; // 0x019C
     bool mAutoMode;           // 0x01A0
@@ -461,6 +474,12 @@ namespace moho
     offsetof(UserUnit, mFactoryManager) == 0x03CC,
     "UserUnit::mFactoryManager offset must be 0x03CC"
   );
+  static_assert(
+    offsetof(UserUnit, mScriptObjectStorage) == 0x0150, "UserUnit::mScriptObjectStorage offset must be 0x0150"
+  );
+  static_assert(offsetof(UserUnit, mBuildStateTag) == 0x0184, "UserUnit::mBuildStateTag offset must be 0x0184");
+  static_assert(offsetof(UserUnit, mStatsRoot) == 0x0188, "UserUnit::mStatsRoot offset must be 0x0188");
+  static_assert(offsetof(UserUnit, mIsFake) == 0x0190, "UserUnit::mIsFake offset must be 0x0190");
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(
