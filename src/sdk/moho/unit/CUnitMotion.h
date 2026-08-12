@@ -390,6 +390,22 @@ namespace moho
     void TransitionBetweenLayers(VTransform& transform);
 
     /**
+     * Address: 0x006C35C0 (FUN_006C35C0, ?UpdateCurrentLayer@CUnitMotion@Moho@@AAEXXZ)
+     *
+     * IDA signature:
+     * void __usercall Moho::CUnitMotion::UpdateCurrentLayer(Moho::CUnitMotion *this@<eax>);
+     *
+     * What it does:
+     * Re-evaluates which layer the unit belongs in now that it has moved, by
+     * comparing the terrain elevation under it against the water surface, and
+     * moves it between Land, Seabed and Water accordingly. Hover and floating
+     * amphibious units entering water get snapped onto the surface; the
+     * reverse transition leads their position by ten ticks of velocity before
+     * snapping to ground.
+     */
+    void UpdateCurrentLayer();
+
+    /**
      * Address: 0x006C1E20 (FUN_006C1E20, ?CalcMoveCommon@CUnitMotion@Moho@@AAE_NAAVVTransform@2@PAM@Z)
      *
      * What it does:
@@ -415,6 +431,21 @@ namespace moho
      * transitions and water snap, and updates common horizontal motion events.
      */
     void CalcMoveWater(VTransform& transform);
+
+    /**
+     * Address: 0x006C2BC0 (FUN_006C2BC0, ?CalcMoveHover@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CUnitMotion::CalcMoveHover(
+     *     Moho::CUnitMotion *this@<esi>, Moho::VTransform *transform, float *outMoveDistance);
+     *
+     * What it does:
+     * Runs one hover move step through `CalcMoveCommon`, then drives the two
+     * cosmetic lean lanes a hovering unit rides on — an acceleration-driven
+     * body tilt and a wandering wobble whose target is re-rolled every fifth
+     * tick — before snapping the hull back down onto the terrain.
+     */
+    void CalcMoveHover(VTransform& transform, float* outMoveDistance);
 
     /**
      * Address: 0x006C2A40 (FUN_006C2A40, ?ProcessCommonMotionState@CUnitMotion@Moho@@AAEX_N@Z)
@@ -525,15 +556,22 @@ namespace moho
     std::int32_t mPreparationTick;        // +0xAC
     std::int32_t mStateWordB0;            // +0xB0
     Wm3::Vector3f mPreviousVelocity;      // +0xB4
-    Wm3::Vector3f mVectorC0;              // +0xC0
+    // Body tilt applied on top of the terrain normal: a low-passed lean from
+    // acceleration plus weapon recoil roll.
+    Wm3::Vector3f mBodyTiltOffset;        // +0xC0
     Wm3::Vector3f mRecoilImpulse;         // +0xCC
-    Wm3::Vector3f mVectorD8;              // +0xD8
-    Wm3::Vector3f mVectorE4;              // +0xE4
-    Wm3::Vector3f mVectorF0;              // +0xF0
+    // Hover wobble, a critically-damped chase of a periodically re-rolled
+    // random target; the offset is added to the terrain normal like the tilt.
+    Wm3::Vector3f mWobbleOffset;          // +0xD8
+    Wm3::Vector3f mWobbleVelocity;        // +0xE4
+    Wm3::Vector3f mWobbleTarget;          // +0xF0
     Wm3::Vector3f mForce;                 // +0xFC
     Wm3::Vector3f mVector108;             // +0x108
     WeakPtr<Unit> mRaisedPlatformUnit;    // +0x114
-    float mUnknownFloat11C;               // +0x11C
+    // Elapsed ticks of the in-progress layer transition; TransitionBetweenLayers
+    // divides it by Physics.LayerTransitionDuration for the blend factor,
+    // steps it once per tick, and clears it when the transition completes.
+    float mLayerTransitionTicks;          // +0x11C
     VTransform mLastTrans;                // +0x120
     VTransform mCurTrans;                 // +0x13C
     union

@@ -78,7 +78,37 @@ namespace moho
     constexpr EUnitMotionHorzEvent kUnitMotionHorzEventTopSpeed = static_cast<EUnitMotionHorzEvent>(1);
     constexpr EUnitMotionHorzEvent kUnitMotionHorzEventStopping = static_cast<EUnitMotionHorzEvent>(2);
     constexpr EUnitMotionHorzEvent kUnitMotionHorzEventStopped = static_cast<EUnitMotionHorzEvent>(3);
-    constexpr EUnitMotionCarrierEvent kUnitMotionCarrierEventRelativeHeight = static_cast<EUnitMotionCarrierEvent>(1);
+    // Hover body-tilt low-pass: 80% of the previous lean is kept and 20% of the
+  // new target blended in each tick, with the acceleration lane read ten ticks
+  // ahead.
+  constexpr float kHoverTiltRetain = 0.80000001f;
+  constexpr float kHoverTiltBlend = 0.2f;
+  constexpr float kHoverTiltLeadTicks = 10.0f;
+  // The wobble target is re-rolled once every five ticks.
+  constexpr std::uint32_t kHoverWobbleReRollPeriodTicks = 5u;
+  // Per-tick wobble acceleration is capped at a tenth of the wobble speed.
+  constexpr float kHoverWobbleAccelFraction = 0.1f;
+  // Wobble offset damping per tick.
+  constexpr float kHoverWobbleRetain = 0.98000002f;
+
+  /**
+   * Uniform sample in `[lower, upper)` drawn straight from the simulation's
+   * Mersenne twister, matching the binary's `IRand() * 2^-32` scaling (which is
+   * what keeps hover wobble deterministic across a replay).
+   */
+  [[nodiscard]] float RandomInRange(moho::CMersenneTwister& twister, const float lower, const float upper) noexcept
+  {
+    constexpr double kUInt32ToUnit = 2.3283064e-10;
+    return static_cast<float>(lower + ((upper - lower) * static_cast<double>(twister.NextUInt32()) * kUInt32ToUnit));
+  }
+
+  // Water surface used on maps that have no water at all: far enough below any
+  // real terrain that nothing is ever classified as submerged.
+  constexpr float kNoWaterSurfaceElevation = -10000.0f;
+  // Ticks of current velocity the water-exit transition endpoint is led by.
+  constexpr float kLayerExitLeadTicks = 10.0f;
+
+  constexpr EUnitMotionCarrierEvent kUnitMotionCarrierEventRelativeHeight = static_cast<EUnitMotionCarrierEvent>(1);
     constexpr Wm3::Quaternionf kWingedOrientationQuarterTurnRotation{0.0f, 0.70710677f, 0.0f, 0.70710677f};
     constexpr const char* kUnitMotionScriptStateNames[] = {
       "None",
@@ -785,15 +815,15 @@ namespace moho
     , mPreparationTick(0)
     , mStateWordB0(0)
     , mPreviousVelocity{}
-    , mVectorC0{}
+    , mBodyTiltOffset{}
     , mRecoilImpulse{}
-    , mVectorD8{}
-    , mVectorE4{}
-    , mVectorF0{}
+    , mWobbleOffset{}
+    , mWobbleVelocity{}
+    , mWobbleTarget{}
     , mForce{}
     , mVector108{}
     , mRaisedPlatformUnit{}
-    , mUnknownFloat11C(0.0f)
+    , mLayerTransitionTicks(0.0f)
     , mLastTrans{}
     , mCurTrans{}
     , mReservation{}
@@ -915,16 +945,16 @@ namespace moho
     archive->ReadInt(&motion->mStateWordB0);
 
     ReadTypedValue(*archive, motion->mPreviousVelocity, ownerRef);
-    ReadTypedValue(*archive, motion->mVectorC0, ownerRef);
+    ReadTypedValue(*archive, motion->mBodyTiltOffset, ownerRef);
     ReadTypedValue(*archive, motion->mRecoilImpulse, ownerRef);
-    ReadTypedValue(*archive, motion->mVectorD8, ownerRef);
-    ReadTypedValue(*archive, motion->mVectorE4, ownerRef);
-    ReadTypedValue(*archive, motion->mVectorF0, ownerRef);
+    ReadTypedValue(*archive, motion->mWobbleOffset, ownerRef);
+    ReadTypedValue(*archive, motion->mWobbleVelocity, ownerRef);
+    ReadTypedValue(*archive, motion->mWobbleTarget, ownerRef);
     ReadTypedValue(*archive, motion->mForce, ownerRef);
     ReadTypedValue(*archive, motion->mVector108, ownerRef);
     ReadTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
 
-    archive->ReadFloat(&motion->mUnknownFloat11C);
+    archive->ReadFloat(&motion->mLayerTransitionTicks);
 
     ReadTypedValue(*archive, motion->mLastTrans, ownerRef);
     ReadTypedValue(*archive, motion->mCurTrans, ownerRef);
@@ -1001,16 +1031,16 @@ namespace moho
     archive->WriteInt(motion->mStateWordB0);
 
     WriteTypedValue(*archive, motion->mPreviousVelocity, ownerRef);
-    WriteTypedValue(*archive, motion->mVectorC0, ownerRef);
+    WriteTypedValue(*archive, motion->mBodyTiltOffset, ownerRef);
     WriteTypedValue(*archive, motion->mRecoilImpulse, ownerRef);
-    WriteTypedValue(*archive, motion->mVectorD8, ownerRef);
-    WriteTypedValue(*archive, motion->mVectorE4, ownerRef);
-    WriteTypedValue(*archive, motion->mVectorF0, ownerRef);
+    WriteTypedValue(*archive, motion->mWobbleOffset, ownerRef);
+    WriteTypedValue(*archive, motion->mWobbleVelocity, ownerRef);
+    WriteTypedValue(*archive, motion->mWobbleTarget, ownerRef);
     WriteTypedValue(*archive, motion->mForce, ownerRef);
     WriteTypedValue(*archive, motion->mVector108, ownerRef);
     WriteTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
 
-    archive->WriteFloat(motion->mUnknownFloat11C);
+    archive->WriteFloat(motion->mLayerTransitionTicks);
 
     WriteTypedValue(*archive, motion->mLastTrans, ownerRef);
     WriteTypedValue(*archive, motion->mCurTrans, ownerRef);
@@ -1805,6 +1835,73 @@ namespace moho
   }
 
   /**
+   * Address: 0x006C2BC0 (FUN_006C2BC0, ?CalcMoveHover@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
+   *
+   * What it does:
+   * See the header.
+   */
+  void CUnitMotion::CalcMoveHover(VTransform& transform, float* const outMoveDistance)
+  {
+    const bool moveSucceeded = mUnit->IsDead() ? false : CalcMoveCommon(transform, outMoveDistance);
+
+    const RUnitBlueprintPhysics& physics = mUnit->GetBlueprint()->Physics;
+
+    if (moveSucceeded || mProcessSurfaceCollision) {
+      FindIntersectingRaisedPlatform();
+    }
+
+    // Lean into acceleration. The lean is a low-pass of the current
+    // acceleration lane scaled by how much bank the blueprint asks for per
+    // unit of thrust; the y lane is deliberately driven to zero, so a hovering
+    // hull pitches and rolls but never bobs from this term.
+    const float bankPerAcceleration = physics.BankingSlope / physics.MaxAcceleration;
+    const Wm3::Vec3f bankTarget{
+      mVector44.x * kHoverTiltLeadTicks * bankPerAcceleration,
+      0.0f,
+      mVector44.z * kHoverTiltLeadTicks * bankPerAcceleration
+    };
+    mBodyTiltOffset.x = (mBodyTiltOffset.x * kHoverTiltRetain) + (bankTarget.x * kHoverTiltBlend);
+    mBodyTiltOffset.y = (mBodyTiltOffset.y * kHoverTiltRetain) + (bankTarget.y * kHoverTiltBlend);
+    mBodyTiltOffset.z = (mBodyTiltOffset.z * kHoverTiltRetain) + (bankTarget.z * kHoverTiltBlend);
+
+    // Re-roll the wobble target every fifth tick, in the horizontal plane only.
+    Sim* const sim = mUnit->SimulationRef;
+    if ((sim->mCurTick % kHoverWobbleReRollPeriodTicks) == 0u) {
+      CMersenneTwister& twister = sim->mRngState->twister;
+      const float wobbleAmplitude = physics.WobbleFactor;
+      mWobbleTarget.x = RandomInRange(twister, -wobbleAmplitude, wobbleAmplitude);
+      mWobbleTarget.z = RandomInRange(twister, -wobbleAmplitude, wobbleAmplitude);
+    }
+
+    // Chase the target: accelerate toward it (capped per tick), cap the
+    // resulting velocity, then integrate with a little damping.
+    Wm3::Vec3f wobbleAccel{
+      mWobbleTarget.x - mWobbleOffset.x,
+      mWobbleTarget.y - mWobbleOffset.y,
+      mWobbleTarget.z - mWobbleOffset.z
+    };
+    (void)VecLimitLengthTo(&wobbleAccel, physics.WobbleSpeed * kHoverWobbleAccelFraction);
+
+    mWobbleVelocity.x += wobbleAccel.x;
+    mWobbleVelocity.y += wobbleAccel.y;
+    mWobbleVelocity.z += wobbleAccel.z;
+    (void)VecLimitLengthTo(&mWobbleVelocity, physics.WobbleSpeed);
+
+    mWobbleOffset.x = (mWobbleOffset.x * kHoverWobbleRetain) + mWobbleVelocity.x;
+    mWobbleOffset.y = (mWobbleOffset.y * kHoverWobbleRetain) + mWobbleVelocity.y;
+    mWobbleOffset.z = (mWobbleOffset.z * kHoverWobbleRetain) + mWobbleVelocity.z;
+
+    // A teleporting hull keeps whatever height the teleport gave it unless a
+    // surface collision still has to be resolved.
+    if (!mUnit->IsUnitState(UNITSTATE_Teleporting) || mProcessSurfaceCollision) {
+      transform = SnapToGround(transform);
+    }
+
+    mProcessSurfaceCollision = false;
+    ProcessCommonMotionState(moveSucceeded);
+  }
+
+  /**
    * Address: 0x006C3180 (FUN_006C3180, ?CalcMoveLand@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
    * Mangled: ?CalcMoveLand@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z
    *
@@ -2130,6 +2227,84 @@ namespace moho
   }
 
   /**
+   * Address: 0x006C35C0 (FUN_006C35C0, ?UpdateCurrentLayer@CUnitMotion@Moho@@AAEXXZ)
+   *
+   * What it does:
+   * See the header. Called once per motion tick after the move integrator has
+   * written the new transform.
+   */
+  void CUnitMotion::UpdateCurrentLayer()
+  {
+    Unit* const unit = mUnit;
+    const VTransform currentTransform = unit->GetTransform();
+    const ELayer currentLayer = unit->mCurrentLayer;
+    const RUnitBlueprintPhysics& physics = unit->GetBlueprint()->Physics;
+    const ERuleBPUnitMovementType motionType = physics.MotionType;
+
+    STIMap* const mapData = unit->SimulationRef->mMapData;
+    const float groundElevation =
+      mapData->GetHeightField()->GetElevation(currentTransform.pos_.x, currentTransform.pos_.z);
+
+    // Maps without water are modelled as having their surface infinitely far
+    // below, so nothing ever counts as submerged.
+    float waterSurface = mapData->mWaterEnabled ? mapData->mWaterElevation : kNoWaterSurfaceElevation;
+
+    // Land-capable footprints sit on top of shallow water rather than in it,
+    // so their effective surface is raised by the blueprint's layer-change
+    // offset.
+    if ((static_cast<std::uint8_t>(unit->GetFootprint().mOccupancyCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)) != 0) {
+      waterSurface += physics.LayerChangeOffsetHeight;
+    }
+
+    if (groundElevation <= waterSurface) {
+      // Now under water. Only a land unit needs reclassifying.
+      if (waterSurface > groundElevation && currentLayer == LAYER_Land) {
+        if (motionType == RULEUMT_Amphibious || motionType == RULEUMT_Land) {
+          // Walks the bottom.
+          unit->SetCurrentLayer(LAYER_Seabed);
+        } else if (motionType == RULEUMT_Hover || motionType == RULEUMT_AmphibiousFloating) {
+          // Floats. Start a layer transition that lifts it to the surface.
+          if (physics.LayerTransitionDuration != 0.0f) {
+            mLayerTransitionTicks = 1.0f;
+            mLastTrans = currentTransform;
+            mCurTrans = SnapToWater(currentTransform);
+          }
+          unit->SetCurrentLayer(LAYER_Water);
+        }
+      }
+      return;
+    }
+
+    // Now above water.
+    if (currentLayer == LAYER_Seabed) {
+      if (motionType == RULEUMT_Amphibious || motionType == RULEUMT_Land) {
+        unit->SetCurrentLayer(LAYER_Land);
+      }
+      return;
+    }
+
+    if (currentLayer == LAYER_Water) {
+      if (motionType == RULEUMT_Hover || motionType == RULEUMT_AmphibiousFloating
+          || motionType == RULEUMT_Water) {
+        if (physics.LayerTransitionDuration != 0.0f) {
+          mLayerTransitionTicks = 1.0f;
+          mLastTrans = currentTransform;
+
+          // Snap to the ground the unit is heading for, not the one it is
+          // leaving: the endpoint is led by ten ticks of current velocity so
+          // the blend does not drag it backwards up the shoreline.
+          VTransform leadTransform = currentTransform;
+          leadTransform.pos_.x += mVelocity.x * kLayerExitLeadTicks;
+          leadTransform.pos_.y += mVelocity.y * kLayerExitLeadTicks;
+          leadTransform.pos_.z += mVelocity.z * kLayerExitLeadTicks;
+          mCurTrans = SnapToGround(leadTransform);
+        }
+        unit->SetCurrentLayer(LAYER_Land);
+      }
+    }
+  }
+
+  /**
    * Address: 0x006C3070 (FUN_006C3070, ?TransitionBetweenLayers@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
    * Mangled: ?TransitionBetweenLayers@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z
    *
@@ -2140,17 +2315,17 @@ namespace moho
   void CUnitMotion::TransitionBetweenLayers(VTransform& transform)
   {
     const float transitionDurationTicks = mUnit->GetBlueprint()->Physics.LayerTransitionDuration * kLayerTransitionTickScale;
-    const float transitionProgress = mUnknownFloat11C / transitionDurationTicks;
+    const float transitionProgress = mLayerTransitionTicks / transitionDurationTicks;
 
     transform.pos_.x = mLastTrans.pos_.x + ((mCurTrans.pos_.x - mLastTrans.pos_.x) * transitionProgress);
     transform.pos_.y = mLastTrans.pos_.y + ((mCurTrans.pos_.y - mLastTrans.pos_.y) * transitionProgress);
     transform.pos_.z = mLastTrans.pos_.z + ((mCurTrans.pos_.z - mLastTrans.pos_.z) * transitionProgress);
     transform.orient_ = Wm3::Quaternionf::Nlerp(mLastTrans.orient_, mCurTrans.orient_, transitionProgress);
 
-    mUnknownFloat11C += 1.0f;
+    mLayerTransitionTicks += 1.0f;
     mProcessSurfaceCollision = false;
-    if (mUnknownFloat11C >= transitionDurationTicks) {
-      mUnknownFloat11C = 0.0f;
+    if (mLayerTransitionTicks >= transitionDurationTicks) {
+      mLayerTransitionTicks = 0.0f;
     }
   }
 
@@ -2171,7 +2346,7 @@ namespace moho
       return false;
     }
 
-    if (mUnknownFloat11C != 0.0f) {
+    if (mLayerTransitionTicks != 0.0f) {
       TransitionBetweenLayers(transform);
       return false;
     }
@@ -2707,7 +2882,7 @@ namespace moho
   {
     const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
 
-    mVectorC0.y = 0.0f;
+    mBodyTiltOffset.y = 0.0f;
     mRecoilImpulse.y = 0.0f;
 
     const float rollDampingScale = 1.0f - blueprint->Physics.RollDamping;
@@ -2715,14 +2890,14 @@ namespace moho
     mRecoilImpulse.y *= rollDampingScale;
     mRecoilImpulse.z *= rollDampingScale;
 
-    mVectorC0.x += mRecoilImpulse.x;
-    mVectorC0.y += mRecoilImpulse.y;
-    mVectorC0.z += mRecoilImpulse.z;
+    mBodyTiltOffset.x += mRecoilImpulse.x;
+    mBodyTiltOffset.y += mRecoilImpulse.y;
+    mBodyTiltOffset.z += mRecoilImpulse.z;
 
     const float rollStability = blueprint->Physics.RollStability;
-    mRecoilImpulse.x -= mVectorC0.x * rollStability;
-    mRecoilImpulse.y -= mVectorC0.y * rollStability;
-    mRecoilImpulse.z -= mVectorC0.z * rollStability;
+    mRecoilImpulse.x -= mBodyTiltOffset.x * rollStability;
+    mRecoilImpulse.y -= mBodyTiltOffset.y * rollStability;
+    mRecoilImpulse.z -= mBodyTiltOffset.z * rollStability;
 
     float rollTargetX = 0.0f;
     float rollTargetY = 0.0f;
@@ -2749,9 +2924,9 @@ namespace moho
     mVector68.z = (rollTargetZ * kRollHackBlend) + (mVector68.z * kRollHackRetention);
 
     Wm3::Vector3f rollNormal{};
-    rollNormal.x = mVector68.x + mVectorC0.x;
-    rollNormal.y = mVector68.y + (mVectorC0.y + 1.0f);
-    rollNormal.z = mVector68.z + mVectorC0.z;
+    rollNormal.x = mVector68.x + mBodyTiltOffset.x;
+    rollNormal.y = mVector68.y + (mBodyTiltOffset.y + 1.0f);
+    rollNormal.z = mVector68.z + mBodyTiltOffset.z;
     Wm3::Vector3f::Normalize(&rollNormal);
     return rollNormal;
   }
@@ -2880,9 +3055,9 @@ namespace moho
       snapped.pos_.y += unit->GetAttributes().spawnElevationOffset;
       CUnitMotion* const unitMotion = unit->UnitMotion;
       if (unitMotion != nullptr) {
-        surfaceNormal.x += unitMotion->mVectorC0.x + unitMotion->mVectorD8.x;
-        surfaceNormal.y += unitMotion->mVectorC0.y + unitMotion->mVectorD8.y;
-        surfaceNormal.z += unitMotion->mVectorC0.z + unitMotion->mVectorD8.z;
+        surfaceNormal.x += unitMotion->mBodyTiltOffset.x + unitMotion->mWobbleOffset.x;
+        surfaceNormal.y += unitMotion->mBodyTiltOffset.y + unitMotion->mWobbleOffset.y;
+        surfaceNormal.z += unitMotion->mBodyTiltOffset.z + unitMotion->mWobbleOffset.z;
       }
     }
 
