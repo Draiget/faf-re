@@ -7,6 +7,7 @@
 #include "../../gpg/core/containers/Set.h"
 #include "../../legacy/containers/String.h"
 #include "../../legacy/containers/Vector.h"
+#include "../entity/EntityCategoryReflection.h"
 #include "ESquadClass.h"
 #include "SimArmy.h"
 #include "STIMap.h"
@@ -52,16 +53,6 @@ namespace moho
   );
   static_assert(offsetof(ArmyPool, platoons.inlineVec_) == 0x10, "ArmyPool::platoons.inlineVec_ offset must be 0x10");
   static_assert(offsetof(ArmyPool, unknown30) == 0x30, "ArmyPool::unknown30 offset must be 0x30");
-
-  struct SArmyWordVector
-  {
-    std::int32_t baseWordIndex;           // +0x00
-    std::int32_t meta;                    // +0x04
-    gpg::fastvector<std::uint32_t> words; // +0x08
-  };
-
-  static_assert(sizeof(SArmyWordVector) == 0x14, "SArmyWordVector size must be 0x14");
-  static_assert(offsetof(SArmyWordVector, words) == 0x08, "SArmyWordVector::words offset must be 0x08");
 
   class CArmyImpl : public SimArmy
   {
@@ -344,10 +335,12 @@ namespace moho
     std::uint32_t UnknownVar98;                          // 0x0190 (FUN_00700280 / mVarDat.v98)
     std::uint8_t ShowScoreFlag;                          // 0x0194 (FUN_00700280 / mVarDat.mShowScore)
     char pad_0195[3];                                    // 0x0195
-    SArmyWordVector AllUnitsWordSet;                     // 0x0198 (FUN_006FE690, FUN_00700280 / mVarDat.v101-v105)
-    char pad_01AC[0x0C];                                 // 0x01AC
-    void* OutOfGameContext;                              // 0x01B8
-    char pad_01BC[4];                                    // 0x01BC
+    // The set of blueprints this army is still allowed to build. Seeded from
+    // the rules' "ALLUNITS" category in the constructor, then narrowed by
+    // AddBuildRestriction (0x006FE1B0, reads the bitset at +0x1A0) and widened
+    // again by RemoveBuildRestriction (0x006FE220, reads the whole set at
+    // +0x198). The 0x28-byte payload runs to 0x1C0, where IsOutOfGame starts.
+    EntityCategorySet BuildCategoryFilterSet;            // 0x0198 (FUN_006FE690, FUN_00700280 / mVarDat.v101-v105)
     std::uint8_t IsOutOfGame;                            // 0x01C0
     char pad_01C1[3];                                    // 0x01C1
     Wm3::Vector2f StartPosition;                         // 0x01C4
@@ -391,7 +384,10 @@ namespace moho
   );
   static_assert(offsetof(CArmyImpl, UnknownVar98) == 0x190, "CArmyImpl::UnknownVar98 offset must be 0x190");
   static_assert(offsetof(CArmyImpl, ShowScoreFlag) == 0x194, "CArmyImpl::ShowScoreFlag offset must be 0x194");
-  static_assert(offsetof(CArmyImpl, AllUnitsWordSet) == 0x198, "CArmyImpl::AllUnitsWordSet offset must be 0x198");
+  static_assert(
+    offsetof(CArmyImpl, BuildCategoryFilterSet) == 0x198, "CArmyImpl::BuildCategoryFilterSet offset must be 0x198"
+  );
+  static_assert(offsetof(CArmyImpl, IsOutOfGame) == 0x1C0, "CArmyImpl::IsOutOfGame offset must be 0x1C0");
   static_assert(offsetof(CArmyImpl, NoRushTicks) == 0x1CC, "CArmyImpl::NoRushTicks offset must be 0x1CC");
   static_assert(offsetof(CArmyImpl, HasHandicap) == 0x1DC, "CArmyImpl::HasHandicap offset must be 0x1DC");
   static_assert(offsetof(CArmyImpl, ArmyPlans) == 0x1F8, "CArmyImpl::ArmyPlans offset must be 0x1F8");
