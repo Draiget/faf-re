@@ -154,6 +154,14 @@ namespace
       return false;
     }
 
+    // A neighbour that is already being reclaimed is not a candidate at all in
+    // the binary -- the whole selection block sits inside its `!BeingReclaimed`
+    // guard. Such a unit can still become the chosen target indirectly, by
+    // being some other candidate's focus entity.
+    if (candidateUnit->IsUnitState(moho::UNITSTATE_BeingReclaimed)) {
+      return false;
+    }
+
     if (ownerUnit->ArmyRef == nullptr || candidateUnit->SimulationRef == nullptr || candidateUnit->SimulationRef->mMapData == nullptr) {
       return false;
     }
@@ -193,9 +201,13 @@ namespace
     return candidateUnit;
   }
 
-  void GatherNearbyAssistEntities(moho::Unit* const ownerUnit, moho::EntityGatherVector& outEntities)
+  /**
+   * Sphere query over the owner's guard-scan radius, matching the binary's
+   * `COGrid::ForAllEntitiesIterator` call rather than an axis-aligned
+   * approximation of it.
+   */
+  void GatherNearbyAssistUnits(moho::Unit* const ownerUnit, moho::CollisionResultFastVectorN10& outHits)
   {
-    outEntities.ResetStorageToInline();
     if (ownerUnit == nullptr || ownerUnit->SimulationRef == nullptr || ownerUnit->SimulationRef->mOGrid == nullptr) {
       return;
     }
@@ -205,22 +217,11 @@ namespace
       return;
     }
 
-    const Wm3::Vec3f& ownerPosition = ownerUnit->GetPosition();
-    const float scanRadius = blueprint->AI.GuardScanRadius;
-    const gpg::Rect2f worldRect{
-      ownerPosition.x - scanRadius,
-      ownerPosition.z - scanRadius,
-      ownerPosition.x + scanRadius,
-      ownerPosition.z + scanRadius
-    };
+    Wm3::Sphere3f scanSphere{};
+    scanSphere.Center = ownerUnit->GetPosition();
+    scanSphere.Radius = blueprint->AI.GuardScanRadius;
 
-    moho::CollisionDBRect cellRect{};
-    (void)moho::func_Rect2fToInt16(&cellRect, worldRect);
-    (void)ownerUnit->SimulationRef->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
-      outEntities,
-      cellRect,
-      moho::ENTITYTYPE_Unit
-    );
+    ownerUnit->SimulationRef->mOGrid->ForAllEntitiesIterator(outHits, moho::ENTITYTYPE_Unit, scanSphere);
   }
 
   template <class TObject>
@@ -414,13 +415,13 @@ namespace moho
       return false;
     }
 
-    EntityGatherVector nearbyEntities{};
-    GatherNearbyAssistEntities(mUnit, nearbyEntities);
+    CollisionResultFastVectorN10 nearbyHits{};
+    GatherNearbyAssistUnits(mUnit, nearbyHits);
 
     Unit* bestTargetUnit = nullptr;
     float bestDistanceSquared = std::numeric_limits<float>::infinity();
-    for (Entity* const nearbyEntity : nearbyEntities) {
-      Unit* const nearbyUnit = (nearbyEntity != nullptr) ? nearbyEntity->IsUnit() : nullptr;
+    for (const CollisionResult* hit = nearbyHits.start_; hit != nearbyHits.end_; ++hit) {
+      Unit* const nearbyUnit = (hit->sourceEntity != nullptr) ? hit->sourceEntity->IsUnit() : nullptr;
       if (!IsEligibleNearbyAssistCandidate(mUnit, nearbyUnit)) {
         continue;
       }
