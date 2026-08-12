@@ -19,16 +19,19 @@
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/CountedObject.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/CUnitCommandWeakPtrReflection.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/core/UnitWeakPtrReflection.h"
 #include "moho/unit/core/Unit.h"
@@ -64,6 +67,149 @@ namespace
   using CommandOwnerSlotNode = WeakPtr<CUnitCommand>;
   using BroadcasterOwnerSlotNode = WeakPtr<Broadcaster>;
   using EntityOwnerSlotNode = WeakPtr<Entity>;
+
+  // RUnitBlueprintEconomyCategoryCache is a flat-field spelling of the same
+  // 0x28-byte object EntityCategorySet models; Unit.cpp carries the same
+  // observation for its own word-range view. Reunifying the two declarations
+  // is a separate pass, so this file goes through one named view instead of
+  // casting at each use.
+  static_assert(
+    sizeof(RUnitBlueprintEconomyCategoryCache) == sizeof(EntityCategorySet),
+    "RUnitBlueprintEconomyCategoryCache must match EntityCategorySet size"
+  );
+
+  [[nodiscard]] const EntityCategorySet& AsEntityCategorySet(
+    const RUnitBlueprintEconomyCategoryCache& categoryCache
+  ) noexcept
+  {
+    return reinterpret_cast<const EntityCategorySet&>(categoryCache);
+  }
+
+  gpg::RType* gUnitBlueprintType = nullptr;
+
+  [[nodiscard]] gpg::RType* CachedRUnitBlueprintType()
+  {
+    if (gUnitBlueprintType == nullptr) {
+      gUnitBlueprintType = gpg::LookupRType(typeid(RUnitBlueprint));
+    }
+    return gUnitBlueprintType;
+  }
+
+  /**
+   * Reflection-mediated downcast of a blueprint reference to `RUnitBlueprint`,
+   * matching the `RRef_REntityBlueprint` + `REF_UpcastPtr` pair the binary
+   * performs at 0x006EE5E6. Returns null when the blueprint is not a unit
+   * blueprint.
+   */
+  [[nodiscard]] const RUnitBlueprint* AsUnitBlueprint(REntityBlueprint* const blueprint)
+  {
+    gpg::RRef blueprintRef{};
+    (void)gpg::RRef_REntityBlueprint(&blueprintRef, blueprint);
+
+    const gpg::RRef unitRef = gpg::REF_UpcastPtr(blueprintRef, CachedRUnitBlueprintType());
+    return static_cast<const RUnitBlueprint*>(unitRef.mObj);
+  }
+
+  /**
+   * True when `queued` is the blueprint the unit currently described by
+   * `current` upgrades into. The binary tests this two ways: a queued
+   * blueprint that names a seed unit must name *this* unit, otherwise the
+   * queued blueprint's own id must be what the current blueprint upgrades to.
+   */
+  [[nodiscard]] bool ContinuesUpgradeChain(const RUnitBlueprint& current, const RUnitBlueprint& queued)
+  {
+    if (!queued.General.SeedUnit.name.empty()) {
+      return _stricmp(current.mBlueprintId.c_str(), queued.General.SeedUnit.name.c_str()) == 0;
+    }
+
+    return _stricmp(current.General.UpgradesTo.name.c_str(), queued.mBlueprintId.c_str()) == 0;
+  }
+
+  /**
+   * Categories the unit can still build once it has become `blueprint`: the
+   * army's buildable filter narrowed to that blueprint's build categories,
+   * minus whatever the unit's own attributes restrict.
+   */
+  [[nodiscard]] EntityCategorySet BuildableAfterBecoming(
+    const RUnitBlueprint& blueprint,
+    const EntityCategorySet& armyBuildable,
+    const EntityCategorySet& restrictions
+  )
+  {
+    EntityCategorySet narrowed{};
+    (void)EntityCategory::Mul(&narrowed, &armyBuildable, &AsEntityCategorySet(blueprint.Economy.CategoryCache));
+
+    EntityCategorySet reachable{};
+    (void)EntityCategory::Sub(&reachable, &narrowed, &restrictions);
+    return reachable;
+  }
+
+  /**
+   * Address: 0x006EE4F0 (FUN_006EE4F0, sub_6EE4F0)
+   *
+   * IDA signature:
+   * void __stdcall sub_6EE4F0(Moho::CUnitCommandQueue *queue);
+   *
+   * What it does:
+   * Revalidates a unit's queued build and upgrade orders after its upgrade
+   * chain changed, and drops the ones that are no longer reachable.
+   *
+   * It walks the queue front to back carrying two pieces of state: the
+   * blueprint the unit will be by the time each order runs, and the set of
+   * categories it can build by then. Build orders survive only while their
+   * blueprint is still inside that set; upgrade orders survive only while they
+   * continue the chain, and each surviving upgrade advances the blueprint and
+   * widens the buildable set with whatever that upgrade unlocks. Everything
+   * else is unlinked from the queue, which is then flagged for refresh.
+   */
+  void PruneQueuedCommandsInvalidatedByUpgradeChange(CUnitCommandQueue& queue)
+  {
+    Unit* const unit = queue.mUnit;
+    const RUnitBlueprint* blueprint = unit->GetBlueprint();
+    const EntityCategorySet& armyBuildable = unit->ArmyRef->BuildCategoryFilterSet;
+    const EntityCategorySet& restrictions = unit->GetAttributes().restrictionCategory;
+
+    EntityCategorySet reachable = BuildableAfterBecoming(*blueprint, armyBuildable, restrictions);
+
+    msvc8::vector<CUnitCommand*> unreachableCommands{};
+
+    for (const CommandOwnerSlotNode& slot : queue.mCommandVec) {
+      CUnitCommand* const command = slot.GetObjectPtr();
+      const EUnitCommandType commandType = command->mVarDat.mCmdType;
+
+      if (commandType < EUnitCommandType::UNITCOMMAND_BuildFactory) {
+        continue;
+      }
+
+      if (commandType <= EUnitCommandType::UNITCOMMAND_BuildMobile) {
+        if (!EntityCategory::HasBlueprint(command->mConstDat.blueprint, &reachable)) {
+          unreachableCommands.push_back(command);
+        }
+        continue;
+      }
+
+      if (commandType != EUnitCommandType::UNITCOMMAND_Upgrade) {
+        continue;
+      }
+
+      const RUnitBlueprint* const queued = AsUnitBlueprint(command->mConstDat.blueprint);
+      if (queued == nullptr || !ContinuesUpgradeChain(*blueprint, *queued)) {
+        unreachableCommands.push_back(command);
+        continue;
+      }
+
+      // This upgrade still applies, so the rest of the queue is judged against
+      // what the unit becomes here.
+      blueprint = queued;
+      const EntityCategorySet unlocked = BuildableAfterBecoming(*queued, armyBuildable, restrictions);
+      (void)EntityCategory::Add(&reachable, &unlocked);
+    }
+
+    for (CUnitCommand* const command : unreachableCommands) {
+      command->RemoveUnit(queue.mUnit, queue.mCommandVec);
+      queue.mNeedsRefresh = true;
+    }
+  }
 
   /**
    * Address: 0x006EB6C0 (FUN_006EB6C0)
@@ -1753,20 +1899,67 @@ void CUnitCommand::IncreaseCount(const int amount)
   mNeedsUpdate = true;
 }
 
-// 0x006F16A0
+/**
+ * Address: 0x006F16A0 (FUN_006F16A0, Moho::CUnitCommand::DecreaseCount)
+ *
+ * IDA signature:
+ * void __fastcall Moho::CUnitCommand::DecreaseCount(int amount, Moho::CUnitCommand *this);
+ *
+ * What it does:
+ * Takes `amount` off the command's repeat count and retires the command when
+ * nothing is left to repeat. Unlike `IncreaseCount` this runs for every
+ * command type, not just factory builds, and a negative `amount` retires the
+ * command outright rather than being rejected.
+ *
+ * Retiring means unlinking the command from each assigned unit's queue. For
+ * an upgrade command that also invalidates whatever the rest of that unit's
+ * queue assumed about its upgrade chain, so the queue is re-pruned.
+ */
 void CUnitCommand::DecreaseCount(const int amount)
 {
-  if (amount <= 0 || mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_BuildFactory) {
-    return;
-  }
+  // Captured before the teardown below can run: the type is what decides
+  // whether the queue needs re-pruning, and callers may free this command.
+  const EUnitCommandType commandType = mVarDat.mCmdType;
 
-  int newCount = mVarDat.mCount - amount;
-  if (newCount < 0) {
-    newCount = 0;
+  int newCount = 0;
+  if (amount >= 0) {
+    newCount = mVarDat.mCount - amount;
+    if (newCount < 0) {
+      newCount = 0;
+    }
   }
 
   mVarDat.mCount = newCount;
   mNeedsUpdate = true;
+
+  if (newCount != 0) {
+    return;
+  }
+
+  // Iterate a copy: RemoveCommandFromQueue mutates the command's own unit set.
+  msvc8::vector<CScriptObject*> assignedUnits{};
+  assignedUnits.reserve(mUnitSet.mVec.size());
+  for (CScriptObject* const entry : mUnitSet.mVec) {
+    assignedUnits.push_back(entry);
+  }
+
+  for (CScriptObject* const entry : assignedUnits) {
+    // The binary dereferences straight through here; the tombstone tag this
+    // set uses for erased slots would make that a null read, so skip those.
+    if (!SCommandUnitSet::IsUsableEntry(entry)) {
+      continue;
+    }
+
+    Unit* const unit = SCommandUnitSet::UnitFromEntry(entry);
+    if (unit == nullptr || !unit->CommandQueue->RemoveCommandFromQueue(this)) {
+      continue;
+    }
+
+    if (commandType == EUnitCommandType::UNITCOMMAND_Upgrade) {
+      PruneQueuedCommandsInvalidatedByUpgradeChange(*unit->CommandQueue);
+      unit->DirtySyncState = 1;
+    }
+  }
 }
 
 /**
