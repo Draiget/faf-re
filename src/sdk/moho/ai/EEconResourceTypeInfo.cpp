@@ -3,8 +3,29 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EEconResourceTypeInfo> gEEconResourceTypeInfoStorage{};
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x00563980 (FUN_00563980, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EEconResourceTypeInfo()
+  {
+    return &gEEconResourceTypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x00563980 (FUN_00563980, Moho::EEconResourceTypeInfo::EEconResourceTypeInfo)
    *
@@ -87,3 +108,8 @@ namespace moho
     type->serSaveFunc_ = mSerialize;
   }
 } // namespace moho
+
+// Phase-1 pre-registration: RegisterSerializeFunctions above is a consumer
+// that calls gpg::LookupRType, so the descriptor must exist first. See
+// StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EEconResourceTypeInfo_563980, moho::preregister_EEconResourceTypeInfo)

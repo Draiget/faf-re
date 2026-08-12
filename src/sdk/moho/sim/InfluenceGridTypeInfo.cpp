@@ -2,8 +2,29 @@
 
 #include "moho/sim/CInfluenceMap.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::InfluenceGridTypeInfo> gInfluenceGridTypeInfoStorage{};
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x00717BB0 (FUN_00717BB0, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::RType* preregister_InfluenceGridTypeInfo()
+  {
+    return &gInfluenceGridTypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x00717BB0 (FUN_00717BB0, Moho::InfluenceGridTypeInfo::InfluenceGridTypeInfo)
    */
@@ -39,3 +60,8 @@ namespace moho
     Finish();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: InfluenceGridSerializer and CInfluenceMap resolve
+// InfluenceGrid through gpg::LookupRType, so the descriptor must exist before
+// those consumers run. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_InfluenceGridTypeInfo_717bb0, moho::preregister_InfluenceGridTypeInfo)

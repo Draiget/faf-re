@@ -48,4 +48,18 @@ namespace moho
   };
 
   static_assert(sizeof(ETrailParamTypeInfo) == 0x78, "ETrailParamTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x00770DD0 (FUN_00770DD0, static-init lane)
+   *
+   * IDA signature:
+   * gpg::REnumType *sub_770DD0();
+   *
+   * What it does:
+   * Constructs the static `ETrailParamTypeInfo` descriptor (`stru_10BB670` in
+   * the binary) in place and returns it; construction preregisters
+   * `ETrailParam` with the reflection registry. Called from the CRT
+   * static-initializer array via FUN_00BDCEA0.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_ETrailParamTypeInfo();
 } // namespace moho

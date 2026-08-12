@@ -2,8 +2,29 @@
 
 #include <typeinfo>
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EGenericIconTypeTypeInfo> gEGenericIconTypeTypeInfoStorage{};
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x0085B120 (FUN_0085B120, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EGenericIconTypeTypeInfo()
+  {
+    return &gEGenericIconTypeTypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x0085B120 (FUN_0085B120, Moho::EGenericIconTypeTypeInfo::EGenericIconTypeTypeInfo)
    *
@@ -56,3 +77,8 @@ namespace moho
     AddEnum(StripPrefix("GIT_StructureHL"), static_cast<std::int32_t>(GIT_StructureHL));
   }
 } // namespace moho
+
+// Phase-1 pre-registration: gpg::RRef_EGenericIconType resolves the enum
+// through gpg::LookupRType when it builds a reflected reference, so the
+// descriptor must exist before that consumer runs. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EGenericIconTypeTypeInfo_85b120, moho::preregister_EGenericIconTypeTypeInfo)

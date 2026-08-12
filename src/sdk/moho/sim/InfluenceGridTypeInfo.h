@@ -44,4 +44,18 @@ namespace moho
   };
 
   static_assert(sizeof(InfluenceGridTypeInfo) == 0x64, "InfluenceGridTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00717BB0 (FUN_00717BB0, static-init lane)
+   *
+   * IDA signature:
+   * gpg::RType *sub_717BB0();
+   *
+   * What it does:
+   * Constructs the static `InfluenceGridTypeInfo` descriptor (`stru_10B93D0`
+   * in the binary) in place and returns it; construction preregisters
+   * `InfluenceGrid` with the reflection registry. Called from the CRT
+   * static-initializer array via FUN_00BDA7C0.
+   */
+  [[nodiscard]] gpg::RType* preregister_InfluenceGridTypeInfo();
 } // namespace moho

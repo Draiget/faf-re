@@ -5,7 +5,31 @@
 
 #include "moho/render/ETrailParam.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 using namespace moho;
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::ETrailParamTypeInfo> gETrailParamTypeInfoStorage{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00770DD0 (FUN_00770DD0, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_ETrailParamTypeInfo()
+  {
+    return &gETrailParamTypeInfoStorage.Ensure();
+  }
+} // namespace moho
 
 /**
  * Address: 0x00770DD0 (FUN_00770DD0)
@@ -66,3 +90,9 @@ void ETrailParamTypeInfo::Init()
   AddEnums();
   Finish();
 }
+
+// Phase-1 pre-registration: no recovered consumer resolves ETrailParam through
+// gpg::LookupRType yet. The binary builds it from the same registrar block as
+// the beam/emitter param enums (FUN_00BDCEA0), so it is pre-registered with
+// them rather than left absent from the type map. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_ETrailParamTypeInfo_770dd0, moho::preregister_ETrailParamTypeInfo)

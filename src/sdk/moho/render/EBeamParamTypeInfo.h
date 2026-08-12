@@ -48,4 +48,18 @@ namespace moho
   };
 
   static_assert(sizeof(EBeamParamTypeInfo) == 0x78, "EBeamParamTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x00770AC0 (FUN_00770AC0, static-init lane)
+   *
+   * IDA signature:
+   * gpg::REnumType *sub_770AC0();
+   *
+   * What it does:
+   * Constructs the static `EBeamParamTypeInfo` descriptor (`stru_10BB5F8` in
+   * the binary) in place and returns it; construction preregisters
+   * `EBeamParam` with the reflection registry. Called from the CRT
+   * static-initializer array via FUN_00BDCE80.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EBeamParamTypeInfo();
 } // namespace moho

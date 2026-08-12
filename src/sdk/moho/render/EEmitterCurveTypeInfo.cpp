@@ -5,7 +5,31 @@
 
 #include "moho/render/EEmitterCurve.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 using namespace moho;
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EEmitterCurveTypeInfo> gEEmitterCurveTypeInfoStorage{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x007704E0 (FUN_007704E0, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EEmitterCurveTypeInfo()
+  {
+    return &gEEmitterCurveTypeInfoStorage.Ensure();
+  }
+} // namespace moho
 
 /**
  * Address: 0x007704E0 (FUN_007704E0)
@@ -80,3 +104,9 @@ void EEmitterCurveTypeInfo::Init()
   AddEnums();
   Finish();
 }
+
+// Phase-1 pre-registration: the emitter Lua bindings resolve EEmitterCurve
+// through gpg::LookupRType (ResolveEEmitterCurveType) to translate curve
+// names, so the descriptor must exist before that consumer runs. See
+// StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EEmitterCurveTypeInfo_7704e0, moho::preregister_EEmitterCurveTypeInfo)

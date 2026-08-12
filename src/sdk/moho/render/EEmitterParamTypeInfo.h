@@ -48,4 +48,18 @@ namespace moho
   };
 
   static_assert(sizeof(EEmitterParamTypeInfo) == 0x78, "EEmitterParamTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x00770790 (FUN_00770790, static-init lane)
+   *
+   * IDA signature:
+   * gpg::REnumType *sub_770790();
+   *
+   * What it does:
+   * Constructs the static `EEmitterParamTypeInfo` descriptor (`stru_10BB6E8`
+   * in the binary) in place and returns it; construction preregisters
+   * `EEmitterParam` with the reflection registry. Called from the CRT
+   * static-initializer array via FUN_00BDCE60.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EEmitterParamTypeInfo();
 } // namespace moho

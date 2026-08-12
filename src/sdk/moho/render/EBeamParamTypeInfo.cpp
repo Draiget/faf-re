@@ -5,7 +5,31 @@
 
 #include "moho/render/EBeamParam.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 using namespace moho;
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EBeamParamTypeInfo> gEBeamParamTypeInfoStorage{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00770AC0 (FUN_00770AC0, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EBeamParamTypeInfo()
+  {
+    return &gEBeamParamTypeInfoStorage.Ensure();
+  }
+} // namespace moho
 
 /**
  * Address: 0x00770AC0 (FUN_00770AC0)
@@ -84,3 +108,8 @@ void EBeamParamTypeInfo::Init()
   AddEnums();
   Finish();
 }
+
+// Phase-1 pre-registration: the beam Lua bindings resolve EBeamParam through
+// gpg::LookupRType (ResolveEBeamParamType) to translate parameter names, so
+// the descriptor must exist before that consumer runs. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EBeamParamTypeInfo_770ac0, moho::preregister_EBeamParamTypeInfo)

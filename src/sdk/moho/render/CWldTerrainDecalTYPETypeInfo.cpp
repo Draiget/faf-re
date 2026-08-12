@@ -2,8 +2,29 @@
 
 #include <typeinfo>
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::CWldTerrainDecalTYPETypeInfo> gCWldTerrainDecalTYPETypeInfoStorage{};
+} // namespace
+
 namespace moho
 {
+  /**
+   * Address: 0x0089C8A0 (FUN_0089C8A0, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_CWldTerrainDecalTYPETypeInfo()
+  {
+    return &gCWldTerrainDecalTYPETypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x0089C8A0 (FUN_0089C8A0, Moho::CWldTerrainDecalTYPETypeInfo::ctor)
    *
@@ -59,3 +80,14 @@ namespace moho
     AddEnum(StripPrefix("CWldTerrainDecal::TYPE_FORCE_DWORD"), static_cast<int>(WldTerrainDecalType_ForceDword));
   }
 } // namespace moho
+
+// Phase-1 pre-registration: no recovered consumer resolves
+// `CWldTerrainDecal::TYPE` through gpg::LookupRType yet - CWldTerrainDecal
+// itself maps type names via its own sTypeDesc table. The binary still
+// pre-registers the enum (registrar FUN_00BE7CC0), so the descriptor is
+// published here rather than left absent from the type map. See
+// StaticInitPhase.h.
+GPG_PREREGISTER_INIT(
+  preregister_CWldTerrainDecalTYPETypeInfo_89c8a0,
+  moho::preregister_CWldTerrainDecalTYPETypeInfo
+)

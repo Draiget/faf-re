@@ -7,37 +7,32 @@
 #include "moho/serialization/CWeaponAttributesSerializer.h"
 #include "moho/unit/core/CWeaponAttributes.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 namespace
 {
   using TypeInfo = moho::CWeaponAttributesTypeInfo;
 
-  alignas(TypeInfo) unsigned char gCWeaponAttributesTypeInfoStorage[sizeof(TypeInfo)];
-  bool gCWeaponAttributesTypeInfoConstructed = false;
+  gpg::StaticTypeInfoStorage<TypeInfo> gCWeaponAttributesTypeInfoStorage{};
 
   [[nodiscard]] TypeInfo& AcquireCWeaponAttributesTypeInfo()
   {
-    if (!gCWeaponAttributesTypeInfoConstructed) {
-      new (gCWeaponAttributesTypeInfoStorage) TypeInfo();
-      gCWeaponAttributesTypeInfoConstructed = true;
-    }
-
-    return *reinterpret_cast<TypeInfo*>(gCWeaponAttributesTypeInfoStorage);
+    return gCWeaponAttributesTypeInfoStorage.Ensure();
   }
 
   /**
    * Address: 0x00BFE590 (FUN_00BFE590, typeinfo cleanup)
    *
    * What it does:
-   * Releases cached `CWeaponAttributesTypeInfo` vector storage at exit.
+   * Destroys the static descriptor, releasing its reflected field/base vector
+   * storage. FUN_00BD87B0 hands this to `atexit` as the descriptor's own
+   * destructor. A process that never reached the static-init lane has nothing
+   * to tear down, so this must not construct one on the way out.
    */
   void cleanup_CWeaponAttributesTypeInfo_00BFE590_Impl()
   {
-    if (!gCWeaponAttributesTypeInfoConstructed) {
-      return;
-    }
-
-    AcquireCWeaponAttributesTypeInfo().~TypeInfo();
-    gCWeaponAttributesTypeInfoConstructed = false;
+    gCWeaponAttributesTypeInfoStorage.Destroy();
   }
 
   /**
@@ -52,20 +47,40 @@ namespace
     return std::atexit(&cleanup_CWeaponAttributesTypeInfo_00BFE590_Impl);
   }
 
-  struct CWeaponAttributesTypeInfoBootstrap
+  /**
+   * Ordinary `.CRT$XCU` initializer carrying only the serializer registration.
+   * That call is a `gpg::LookupRType` consumer, so it has to stay in phase 2;
+   * the descriptor it resolves is published from phase 1 by
+   * `moho::preregister_CWeaponAttributesTypeInfo` below.
+   */
+  struct CWeaponAttributesSerializerBootstrap
   {
-    CWeaponAttributesTypeInfoBootstrap()
+    CWeaponAttributesSerializerBootstrap()
     {
-      (void)register_CWeaponAttributesTypeInfo_00BD87B0_Impl();
       (void)moho::register_CWeaponAttributesSerializer();
     }
   };
 
-  CWeaponAttributesTypeInfoBootstrap gCWeaponAttributesTypeInfoBootstrap;
+  CWeaponAttributesSerializerBootstrap gCWeaponAttributesSerializerBootstrap;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BD87B0 (FUN_00BD87B0, startup registration + atexit cleanup)
+   *
+   * What it does:
+   * Provider entry point for the phase-1 initializer walk: builds the
+   * `CWeaponAttributes` descriptor through the FUN_006D3640 constructor -
+   * which is what performs the `PreRegisterRType` - and schedules its exit
+   * cleanup.
+   */
+  gpg::RType* preregister_CWeaponAttributesTypeInfo()
+  {
+    (void)register_CWeaponAttributesTypeInfo_00BD87B0_Impl();
+    return &AcquireCWeaponAttributesTypeInfo();
+  }
+
   /**
    * Address: 0x006D3640 (FUN_006D3640, ??0CWeaponAttributesTypeInfo@Moho@@QAE@@Z)
    */
@@ -83,7 +98,7 @@ namespace moho
    * `CWeaponAttributesTypeInfo` instance while preserving outer storage
    * ownership.
    */
-  [[maybe_unused]] void DestroyCWeaponAttributesTypeInfoBody(CWeaponAttributesTypeInfo* const typeInfo) noexcept
+  void DestroyCWeaponAttributesTypeInfoBody(CWeaponAttributesTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -120,3 +135,9 @@ namespace moho
   }
 
 } // namespace moho
+
+// Phase-1 pre-registration: this descriptor was previously built by an
+// ordinary namespace-scope bootstrap object, which the CRT runs in .CRT$XCU
+// alongside register_CWeaponAttributesSerializer - the gpg::LookupRType
+// consumer that depends on it. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CWeaponAttributesTypeInfo_bd87b0, moho::preregister_CWeaponAttributesTypeInfo)

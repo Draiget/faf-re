@@ -48,4 +48,18 @@ namespace moho
 
   static_assert(sizeof(CWeaponAttributesTypeInfo) == 0x64, "CWeaponAttributesTypeInfo size must be 0x64");
 
+  /**
+   * Address: 0x00BD87B0 (FUN_00BD87B0, static-init lane)
+   *
+   * IDA signature:
+   * void __cdecl func_CWeaponAttributesTypeInfoRegister();
+   *
+   * What it does:
+   * Constructs the static `CWeaponAttributesTypeInfo` descriptor in place via
+   * the FUN_006D3640 constructor - which preregisters `CWeaponAttributes` with
+   * the reflection registry - schedules the FUN_00BFE590 exit cleanup, and
+   * returns the descriptor.
+   */
+  [[nodiscard]] gpg::RType* preregister_CWeaponAttributesTypeInfo();
+
 } // namespace moho

@@ -51,4 +51,18 @@ namespace moho
   };
 
   static_assert(sizeof(EScrollTypeTypeInfo) == 0x78, "EScrollTypeTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x007771B0 (FUN_007771B0, static-init lane)
+   *
+   * IDA signature:
+   * gpg::REnumType *sub_7771B0();
+   *
+   * What it does:
+   * Constructs the static `EScrollTypeTypeInfo` descriptor (`stru_10BBC78` in
+   * the binary) in place and returns it; construction preregisters
+   * `EScrollType` with the reflection registry. Called from the CRT
+   * static-initializer array via FUN_00BDD670.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EScrollTypeTypeInfo();
 } // namespace moho

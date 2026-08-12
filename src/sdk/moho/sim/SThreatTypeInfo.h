@@ -44,4 +44,18 @@ namespace moho
   };
 
   static_assert(sizeof(SThreatTypeInfo) == 0x64, "SThreatTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x007179B0 (FUN_007179B0, static-init lane)
+   *
+   * IDA signature:
+   * gpg::RType *sub_7179B0();
+   *
+   * What it does:
+   * Constructs the static `SThreatTypeInfo` descriptor (`stru_10B9358` in the
+   * binary) in place and returns it; construction preregisters `SThreat` with
+   * the reflection registry. Called from the CRT static-initializer array via
+   * FUN_00BDA760.
+   */
+  [[nodiscard]] gpg::RType* preregister_SThreatTypeInfo();
 } // namespace moho

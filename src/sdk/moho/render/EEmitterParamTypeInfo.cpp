@@ -5,7 +5,31 @@
 
 #include "moho/render/EEmitterParam.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 using namespace moho;
+
+namespace
+{
+  gpg::StaticTypeInfoStorage<moho::EEmitterParamTypeInfo> gEEmitterParamTypeInfoStorage{};
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00770790 (FUN_00770790, static-init lane)
+   *
+   * What it does:
+   * Constructs the static descriptor on first call; the constructor is what
+   * performs the `PreRegisterRType`, so one construction is the whole
+   * registration.
+   */
+  gpg::REnumType* preregister_EEmitterParamTypeInfo()
+  {
+    return &gEEmitterParamTypeInfoStorage.Ensure();
+  }
+} // namespace moho
 
 /**
  * Address: 0x00770790 (FUN_00770790)
@@ -86,3 +110,9 @@ void EEmitterParamTypeInfo::Init()
   AddEnums();
   Finish();
 }
+
+// Phase-1 pre-registration: the emitter Lua bindings resolve EEmitterParam
+// through gpg::LookupRType (ResolveEEmitterParamType) to translate parameter
+// names, so the descriptor must exist before that consumer runs. See
+// StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_EEmitterParamTypeInfo_770790, moho::preregister_EEmitterParamTypeInfo)

@@ -100,4 +100,18 @@ namespace moho
   );
 
   static_assert(sizeof(EEconResourceTypeInfo) == 0x78, "EEconResourceTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x00563980 (FUN_00563980, static-init lane)
+   *
+   * IDA signature:
+   * gpg::REnumType *sub_563980();
+   *
+   * What it does:
+   * Constructs the static `EEconResourceTypeInfo` descriptor (`stru_10ACEF8`
+   * in the binary) in place and returns it; construction preregisters
+   * `EEconResource` with the reflection registry. Called from the CRT
+   * static-initializer array via FUN_00BCA7F0.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EEconResourceTypeInfo();
 } // namespace moho
