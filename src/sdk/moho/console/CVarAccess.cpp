@@ -11,53 +11,78 @@ namespace moho
   {
     namespace
     {
-      constexpr std::uintptr_t kPathBackgroundUpdateConVarEa = 0x010BA530u;
-      constexpr std::uintptr_t kPathBackgroundBudgetConVarEa = 0x010BA404u;
-      constexpr std::uintptr_t kPathTimeoutPreviewConVarEa = 0x010BB0ACu;
-      constexpr std::uintptr_t kChecksumPeriodConVarEa = 0x010BA5E0u;
-      constexpr std::uintptr_t kSteeringAirToleranceConVarEa = 0x010AFE14u;
+      // Two adjacent bytes at 0x010A63EC/0x010A63ED, both .bss so both start
+      // false in the shipped image.
+      bool gSimDebugCheats = false;
+      bool gSimReportCheats = false;
 
-      constexpr std::uintptr_t kSimDebugCheatsEa = 0x010A63ECu;
-      constexpr std::uintptr_t kSimReportCheatsEa = 0x010A63EDu;
-
-      constexpr std::uintptr_t kRenderFogOfWarEa = 0x00F57DC3u;
+      // 0x00F57DC3, a .data byte whose stored value is 1.
+      bool gRenderFogOfWar = true;
     } // namespace
 
+    // These are the engine's sim console variables. Each is a dynamically
+    // initialised static in the binary's .bss - `path_BackgroundUpdate` at
+    // 0x010BA530, `path_BackgroundBudget` at 0x010BA404, `path_TimeoutPreview`
+    // at 0x010BB0AC, `sim_ChecksumPeriod` at 0x010BA5E0 and
+    // `ai_SteeringAirTolerance` at 0x010AFE14 (IDA names the last one
+    // `SimConVar_ai_SteeringAirTolerance` at its `Sim::GetSimVar` call site in
+    // CAiSteeringImpl::FlyToNextWaypoint). The names come from the image's
+    // string table; the `DoSimCommand path_BackgroundUpdate` /
+    // `DoSimCommand sim_ChecksumPeriod` literals confirm the console spelling.
+    //
+    // They used to be handed out as raw addresses cast to `CSimConVarBase*`.
+    // Those addresses are uninitialised storage in this build, so
+    // `Sim::GetSimVar` read a garbage `mIndex` and resized `mSimVars` to it -
+    // which threw out of the sim thread and terminated the process on the
+    // first beat. Constructing them here as ordinary sim convars gives them
+    // real indices from the shared counter.
+    //
+    // The defaults are the fallbacks the recovered readers already apply when
+    // an instance is missing, not values read out of the binary's static
+    // initialisers - those initialisers are not in the export set, so the
+    // stored defaults remain unconfirmed.
     CSimConVarBase* SimPathBackgroundUpdateConVar()
     {
-      return reinterpret_cast<CSimConVarBase*>(kPathBackgroundUpdateConVarEa);
+      static TSimConVar<bool> sVar(false, "path_BackgroundUpdate", false);
+      return &sVar;
     }
 
     CSimConVarBase* SimPathBackgroundBudgetConVar()
     {
-      return reinterpret_cast<CSimConVarBase*>(kPathBackgroundBudgetConVarEa);
+      static TSimConVar<int> sVar(false, "path_BackgroundBudget", 0);
+      return &sVar;
     }
 
     CSimConVarBase* SimPathTimeoutPreviewConVar()
     {
-      return reinterpret_cast<CSimConVarBase*>(kPathTimeoutPreviewConVarEa);
+      static TSimConVar<int> sVar(false, "path_TimeoutPreview", 0);
+      return &sVar;
     }
 
     CSimConVarBase* SimChecksumPeriodConVar()
     {
-      return reinterpret_cast<CSimConVarBase*>(kChecksumPeriodConVarEa);
+      static TSimConVar<int> sVar(false, "sim_ChecksumPeriod", 1);
+      return &sVar;
     }
 
     CSimConVarBase* SimSteeringAirToleranceConVar()
     {
-      return reinterpret_cast<CSimConVarBase*>(kSteeringAirToleranceConVarEa);
+      static TSimConVar<float> sVar(false, "ai_SteeringAirTolerance", 1.0f);
+      return &sVar;
     }
 
+    // 0x010A63EC and 0x010A63ED are two adjacent single bytes, so they are
+    // plain global flags rather than convar objects (a `TSimConVar` is 0x14
+    // bytes). Both live in .bss, so the image's initial value for each is
+    // false.
     bool SimDebugCheatsEnabled()
     {
-      const auto* const flag = reinterpret_cast<const std::uint8_t*>(kSimDebugCheatsEa);
-      return flag && (*flag != 0u);
+      return gSimDebugCheats;
     }
 
     bool SimReportCheatsEnabled()
     {
-      const auto* const flag = reinterpret_cast<const std::uint8_t*>(kSimReportCheatsEa);
-      return flag && (*flag != 0u);
+      return gSimReportCheats;
     }
 
     int PlatformGetCallStack(unsigned int* outFrames, unsigned int maxFrames)
@@ -86,8 +111,7 @@ namespace moho
 
     bool RenderFogOfWarEnabled()
     {
-      const auto* const flag = reinterpret_cast<const std::uint8_t*>(kRenderFogOfWarEa);
-      return flag && (*flag != 0u);
+      return gRenderFogOfWar;
     }
   } // namespace console
 } // namespace moho
