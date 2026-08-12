@@ -321,4 +321,13 @@ namespace moho
   );
   static_assert(sizeof(SSTIArmyVariableDataSerializer) == 0x14, "SSTIArmyVariableDataSerializer size must be 0x14");
   static_assert(sizeof(SSTIArmyVariableDataTypeInfo) == 0x64, "SSTIArmyVariableDataTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00700280 (FUN_00700280, func_CopyArmyData)
+   *
+   * What it does:
+   * Assigns one `SSTIArmyVariableData` payload from `source` into
+   * `destination` and returns the destination pointer.
+   */
+  SSTIArmyVariableData* AssignArmyVariableData(const SSTIArmyVariableData& source, SSTIArmyVariableData* destination);
 } // namespace moho
