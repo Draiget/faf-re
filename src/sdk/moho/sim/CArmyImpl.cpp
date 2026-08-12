@@ -554,22 +554,6 @@ namespace
     return *reinterpret_cast<const UnitCategorySetVectorView*>(&army.UnitCategorySetsBegin);
   }
 
-  struct CArmyBuildCategoryFilterRuntimeView
-  {
-    std::uint8_t unresolved0000_0198[0x198];
-    moho::CategoryWordRangeView mBuildCategoryFilterSet; // +0x198
-  };
-
-  static_assert(
-    offsetof(CArmyBuildCategoryFilterRuntimeView, mBuildCategoryFilterSet) == 0x198,
-    "CArmyBuildCategoryFilterRuntimeView::mBuildCategoryFilterSet offset must be 0x198"
-  );
-
-  [[nodiscard]] moho::CategoryWordRangeView& ArmyBuildCategoryFilterWords(moho::CArmyImpl& army) noexcept
-  {
-    return reinterpret_cast<CArmyBuildCategoryFilterRuntimeView&>(army).mBuildCategoryFilterSet;
-  }
-
   [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::CategoryWordRangeView& range) noexcept
   {
     return range.mBits;
@@ -1193,15 +1177,14 @@ namespace
 
   void AssignAllUnitsCategoryFilter(moho::CArmyImpl& army)
   {
-    moho::CategoryWordRangeView& target = ArmyBuildCategoryFilterWords(army);
     if (army.Simulation == nullptr || army.Simulation->mRules == nullptr) {
-      target.ResetToEmpty(0u);
+      army.BuildCategoryFilterSet.ResetToEmpty(0u);
       return;
     }
 
     if (const moho::CategoryWordRangeView* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
         allUnits != nullptr) {
-      target = *allUnits;
+      army.BuildCategoryFilterSet = *allUnits;
     }
   }
 
@@ -2770,7 +2753,7 @@ namespace moho
     }
 
     auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
-    CategoryWordRangeAsBitset(ArmyBuildCategoryFilterWords(*this)).RemoveAllFrom(&categorySet->Bits());
+    CategoryWordRangeAsBitset(BuildCategoryFilterSet).RemoveAllFrom(&categorySet->Bits());
     MarkAllArmyUnitsNeedSyncGameData(*this);
   }
 
@@ -2788,7 +2771,7 @@ namespace moho
     }
 
     auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
-    (void)EntityCategory::Add(&ArmyBuildCategoryFilterWords(*this), categorySet);
+    (void)EntityCategory::Add(&BuildCategoryFilterSet, categorySet);
     MarkAllArmyUnitsNeedSyncGameData(*this);
   }
 
