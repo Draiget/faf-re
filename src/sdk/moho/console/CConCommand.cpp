@@ -73,6 +73,13 @@ bool moho::sPathDebuggerEnabled = false;
 int moho::rule_Paranoid = 0;
 float moho::rule_BlueprintReloadDelay = 0.0f;
 
+// Issue-thread pacing convars, read by `CSimDriver::ThreadRun`. `net_Lag` is
+// subtracted from how far ahead of the last executed beat the thread is
+// willing to run, so raising it issues beats earlier; the debug level gates
+// the thread's running/waiting/exiting trace.
+int moho::sim_IssueThreadDebugLevel = 0;
+float moho::net_Lag = 0.0f;
+
 // AI economy tuning convars referenced by `moho::CEconomy::Reset`. The
 // console-startup registration (FUN_00BC8DC0 / FUN_00BC8DE0 family) wires
 // these up as `TConVar<float>` instances at static-init time; the storage

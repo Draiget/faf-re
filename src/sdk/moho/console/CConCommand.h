@@ -76,6 +76,12 @@ namespace moho
   extern int recon_debug;
   extern int rule_Paranoid;
   extern float rule_BlueprintReloadDelay;
+
+  /** Trace level for the sim driver's issue thread (0 = silent). */
+  extern int sim_IssueThreadDebugLevel;
+
+  /** Milliseconds of beat lead the issue thread runs with. */
+  extern float net_Lag;
   extern float ai_InitialEnergyCurrency;
   extern float ai_InitialMassCurrency;
   extern float ai_InitialEnergyCurrencyMax;

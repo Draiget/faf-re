@@ -815,58 +815,6 @@ namespace
   static_assert(offsetof(WRenViewportRenderersView, mVisionRenderer) == 0x410,
     "WRenViewport::mVisionRenderer offset must be 0x410");
 
-  /**
-   * Address: 0x0128E4AC (FUN_0128E4AC, Moho::Sim::Create_exxt)
-   *
-   * IDA signature:
-   * Moho::Sim *__thiscall Moho::Sim::Create_exxt(boost::shared_ptr<LaunchInfoBase> *launchInfo);
-   *
-   * What it does:
-   * FAForever launch-patch wrapper around `Sim::Create`. After the sim is built,
-   * it scans the terrain heightfield for its min/max 16-bit samples, publishes
-   * the derived map-height lanes (`patch_maxMapHeight`/`patch_minMapHeight`,
-   * preserving the binary's min-sample -> max-height / max-sample -> min-height
-   * mapping and 1/128 scale), and initializes the active viewport's range and
-   * vision renderers. This is the runtime dispatch root that reaches
-   * `Sim::Create`.
-   */
-  [[nodiscard]] moho::Sim* Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>& launchInfo)
-  {
-    moho::Sim* const sim = moho::Sim::Create(launchInfo);
-
-    // Scan the terrain heightfield for its extreme 16-bit samples.
-    moho::CHeightField* const heightField = sim->mMapData->mHeightField.get();
-    const std::int32_t sampleCount = heightField->height * heightField->width;
-    const std::uint16_t* const samples = heightField->data;
-
-    std::uint16_t minSample = 0xFFFFu;
-    std::uint16_t maxSample = 0u;
-    for (std::int32_t i = 0; i < sampleCount; ++i) {
-      const std::uint16_t sample = samples[i];
-      if (minSample > sample) {
-        minSample = sample;
-      }
-      if (maxSample < sample) {
-        maxSample = sample;
-      }
-    }
-
-    // Binary mapping: the max-height lane is derived from the smallest sample
-    // (minus a 5-unit offset) and the min-height lane from the largest sample.
-    moho::patch_maxMapHeight = (static_cast<float>(minSample) * 0.0078125f) - 5.0f;
-    moho::patch_minMapHeight = static_cast<float>(maxSample) * 0.0078125f;
-
-    // Initialize the active viewport's range/vision renderers.
-    if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
-      if (moho::WRenViewport* const viewport = device->GetViewport(); viewport != nullptr) {
-        auto* const renderers = reinterpret_cast<WRenViewportRenderersView*>(viewport);
-        renderers->mRangeRenderer.Init();
-        renderers->mVisionRenderer.Init();
-      }
-    }
-
-    return sim;
-  }
 
   [[nodiscard]] const msvc8::string& SaveGameDirName()
   {
@@ -2432,6 +2380,59 @@ namespace
 
   static_assert(sizeof(CUserPrefsRuntime) == 0x84, "CUserPrefsRuntime size must be 0x84");
 } // namespace
+
+/**
+ * Address: 0x0128E4AC (FUN_0128E4AC, Moho::Sim::Create_exxt)
+ *
+ * IDA signature:
+ * Moho::Sim *__thiscall Moho::Sim::Create_exxt(boost::shared_ptr<LaunchInfoBase> *launchInfo);
+ *
+ * What it does:
+ * FAForever launch-patch wrapper around `Sim::Create`. After the sim is built,
+ * it scans the terrain heightfield for its min/max 16-bit samples, publishes
+ * the derived map-height lanes (`patch_maxMapHeight`/`patch_minMapHeight`,
+ * preserving the binary's min-sample -> max-height / max-sample -> min-height
+ * mapping and 1/128 scale), and initializes the active viewport's range and
+ * vision renderers. This is the runtime dispatch root that reaches
+ * `Sim::Create`.
+ */
+moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>& launchInfo)
+{
+  moho::Sim* const sim = moho::Sim::Create(launchInfo);
+
+  // Scan the terrain heightfield for its extreme 16-bit samples.
+  moho::CHeightField* const heightField = sim->mMapData->mHeightField.get();
+  const std::int32_t sampleCount = heightField->height * heightField->width;
+  const std::uint16_t* const samples = heightField->data;
+
+  std::uint16_t minSample = 0xFFFFu;
+  std::uint16_t maxSample = 0u;
+  for (std::int32_t i = 0; i < sampleCount; ++i) {
+    const std::uint16_t sample = samples[i];
+    if (minSample > sample) {
+      minSample = sample;
+    }
+    if (maxSample < sample) {
+      maxSample = sample;
+    }
+  }
+
+  // Binary mapping: the max-height lane is derived from the smallest sample
+  // (minus a 5-unit offset) and the min-height lane from the largest sample.
+  moho::patch_maxMapHeight = (static_cast<float>(minSample) * 0.0078125f) - 5.0f;
+  moho::patch_minMapHeight = static_cast<float>(maxSample) * 0.0078125f;
+
+  // Initialize the active viewport's range/vision renderers.
+  if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
+    if (moho::WRenViewport* const viewport = device->GetViewport(); viewport != nullptr) {
+      auto* const renderers = reinterpret_cast<WRenViewportRenderersView*>(viewport);
+      renderers->mRangeRenderer.Init();
+      renderers->mVisionRenderer.Init();
+    }
+  }
+
+  return sim;
+}
 
 /**
  * Address: 0x008C7400 (FUN_008C7400, ??0IUserPrefs@Moho@@QAE@XZ)
