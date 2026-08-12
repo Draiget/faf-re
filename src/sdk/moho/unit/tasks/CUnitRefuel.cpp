@@ -11,6 +11,7 @@
 #include "moho/ai/IAiTransport.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/ai/IAiNavigator.h"
+#include "moho/math/MathReflection.h"
 #include "moho/math/Vector3f.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/render/camera/VTransform.h"
@@ -39,19 +40,14 @@ namespace
   }
 
   /**
-   * Third basis vector (local +Z, i.e. "forward") of an orientation
-   * quaternion, expanded inline exactly as the binary does at 0x00621CC1 and
-   * 0x0062189B. `VAxes3` builds all three axes from the same quaternion but
-   * spells its `vZ` lane differently, so the axis is derived here rather than
-   * routed through that type.
+   * Local +Z ("forward") of an orientation, in world space. The binary
+   * expands just this column of the rotation matrix inline at 0x00621CC1 and
+   * 0x0062189B; `VAxes3` builds the same basis and is used here so the
+   * expansion is not spelled out a second time.
    */
   [[nodiscard]] Wm3::Vec3f OrientationForwardAxis(const Wm3::Quatf& orientation) noexcept
   {
-    return Wm3::Vec3f{
-      2.0f * ((orientation.x * orientation.z) + (orientation.w * orientation.y)),
-      2.0f * ((orientation.y * orientation.z) - (orientation.w * orientation.x)),
-      1.0f - (2.0f * ((orientation.x * orientation.x) + (orientation.y * orientation.y)))
-    };
+    return moho::VAxes3{orientation}.vZ;
   }
 
   [[nodiscard]] float DotProduct(const Wm3::Vec3f& lhs, const Wm3::Vec3f& rhs) noexcept
