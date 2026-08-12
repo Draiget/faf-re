@@ -26,8 +26,23 @@ namespace moho
    * use site is `FUN_0088BEE0` (`Moho::func_DoPreload`) which installs this
    * default interface on `sSessionInfo->mClientManager` via virtual slot 10.
    */
+  void InitializeClientMgrUiInterfaceBootstrapLaneA();
+
   IClientMgrUIInterface* GetClientMgrUiInterfaceBootstrap() noexcept
   {
+    // The binary's `sCWldUiInterface` is a static object with a real
+    // constructor, so its vtable is in place before `func_DoPreload` installs
+    // it. Ours was raw zeroed storage that nothing ever ran a constructor over,
+    // which left the vptr null: the first `ReportBottleneckCleared()` that
+    // `CClientManagerImpl::DoBeat` dispatches through it read slot 5 off
+    // address 0 and took the session down as soon as loading started beating
+    // the client manager.
+    static const bool constructed = [] {
+      InitializeClientMgrUiInterfaceBootstrapLaneA();
+      return true;
+    }();
+    (void)constructed;
+
     return ClientMgrUiInterfaceBootstrapObject();
   }
 
@@ -38,7 +53,7 @@ namespace moho
    * Re-initializes the static client-manager UI interface bootstrap storage so
    * the base-interface vtable lane is restored.
    */
-  [[maybe_unused]] void InitializeClientMgrUiInterfaceBootstrapLaneA()
+  void InitializeClientMgrUiInterfaceBootstrapLaneA()
   {
     ::new (ClientMgrUiInterfaceBootstrapObject()) IClientMgrUIInterface();
   }

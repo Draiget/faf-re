@@ -43,6 +43,8 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/CFormation.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/client/Localization.h"
+#include "moho/misc/SessionStartup.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/STIMap.h"
@@ -54,7 +56,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
-#include "moho/command/CommandIssueHelper.h"
+#include "moho/command/CommandIssueHelper.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -10625,24 +10627,160 @@ namespace moho
       }
     }
 
+    /**
+     * Address: 0x0088C000 (FUN_0088C000, func_DoLoading)
+     *
+     * IDA signature:
+     * void __cdecl func_DoLoading(bool *outContinue);
+     *
+     * What it does:
+     * Drives the world-session `Loading` frame action. Every frame it beats the
+     * client manager; once the loader reports the scenario in hand it takes
+     * ownership of the loaded Lua state / game rules / map, builds the session,
+     * gives the launch info its own copy of the playable map and the player's
+     * language, opens the replay sink when the session is recorded, creates the
+     * sim driver, and hands the frame machine on to `Initialize`.
+     *
+     * This transition is the whole point of the function. Until it was
+     * recovered, `Loading` fell through to `CreateSession` - a state that in
+     * the binary only exists for an explicit restart request - and
+     * `WLD_CreateSessionInfo` bounced straight back to `Preload`, so a skirmish
+     * cycled Preload -> Loading -> CreateSession forever, restarting the
+     * in-game UI and reopening the loading movie on every lap.
+     *
+     * The bracketing ` DoLoading N` `std::string` temporaries are the binary's
+     * profiler markers: built and immediately discarded, kept for the identical
+     * allocation side effects.
+     */
     void WLD_DoLoading(bool* const outContinue)
     {
-      if (outContinue != nullptr) {
-        *outContinue = false;
+      {
+        const std::string marker(" DoLoading 1", 12u);
+        (void)marker;
+      }
+
+      SWldSessionInfo* const sessionInfo = gPendingWldSessionInfo;
+      if (sessionInfo != nullptr && sessionInfo->mClientManager != nullptr) {
+        sessionInfo->mClientManager->DoBeat();
       }
 
       CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
-      if (loader == nullptr) {
-        gWldFrameAction = EWldFrameAction::Exit;
+      if (loader == nullptr || !loader->IsLoaded()) {
         return;
       }
 
-      if (loader->IsLoaded()) {
-        gWldFrameAction = EWldFrameAction::CreateSession;
+      {
+        const std::string marker(" DoLoading 2", 12u);
+        (void)marker;
+      }
+
+      SWldGameData gameData{};
+      (void)loader->LoadGameData(&gameData);
+
+      if (gameData.mGameRules == nullptr) {
+        gpg::Warnf("map %s failed.  aborting session.", sessionInfo->mMapName.c_str());
+        if (gWldFrameAction != EWldFrameAction::Inactive) {
+          gWldFrameAction = EWldFrameAction::Exit;
+        }
         if (outContinue != nullptr) {
           *outContinue = true;
         }
+        ReleaseWldGameDataHandles(&gameData);
+        return;
       }
+
+      // The replay sink, when this session records one. A sink that cannot be
+      // opened is not fatal - the session simply stops being a recorded one.
+      msvc8::auto_ptr<gpg::Stream> replayStream(nullptr);
+      if (sessionInfo->mIsBeingRecorded) {
+        const msvc8::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+        replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
+        if (replayStream.get() == nullptr) {
+          sessionInfo->mIsBeingRecorded = false;
+        }
+      }
+
+      {
+        const std::string marker(" DoLoading 3");
+        (void)marker;
+      }
+
+      msvc8::auto_ptr<LuaPlus::LuaState> stateOwner(gameData.mState);
+      msvc8::auto_ptr<RRuleGameRules> rulesOwner(gameData.mGameRules);
+      msvc8::auto_ptr<CWldMap> mapOwner(gameData.mWldMap);
+      gameData = SWldGameData{};
+      CWldSession* const wldSession = WLD_CreateSession(stateOwner, rulesOwner, mapOwner, *sessionInfo);
+
+      // The launch info keeps its own copy of the playable map so a restart can
+      // rebuild the session without the terrain resource still being alive.
+      auto* const playableMap =
+        reinterpret_cast<STIMap*>(wldSession->mWldMap->mTerrainRes->mPlayableRectSource);
+      STIMap* const launchMap = new STIMap(playableMap);
+
+      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+      launchInfo->mGameRules = wldSession->mRules;
+      if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
+        delete launchInfo->mMap;
+      }
+      launchInfo->mMap = launchMap;
+
+      launchInfo->mLanguage.assign_owned(wldSession->mState->GetGlobal("__language").ToString());
+
+      if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
+        // Single player: the session takes a shared owner on a fresh clone of
+        // the launch info, which is what a mid-game save serializes.
+        boost::SharedPtrRaw<void> createdLaunchInfo{};
+        launchInfo->Create(createdLaunchInfo);
+
+        boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
+        createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
+        createdTyped.pi = createdLaunchInfo.pi;
+        wldSession->mLaunchInfo = boost::SharedPtrFromRawRetained(createdTyped);
+        createdLaunchInfo.release();
+      }
+
+      {
+        const std::string marker(" DoLoading 4");
+        (void)marker;
+      }
+
+      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+        newLaunchInfo->mProps = wldSession->mWldMap->mProps;
+      }
+
+      {
+        const std::string marker(" DoLoading 5");
+        (void)marker;
+      }
+
+      // Ownership of both the client manager and the replay sink moves into the
+      // driver; the session info gives its client manager up here.
+      IClientManager* const clientManager = sessionInfo->mClientManager;
+      sessionInfo->mClientManager = nullptr;
+      ISTIDriver* const previousDriver = SIM_GetActiveDriver();
+      // `SIM_CreateDriver` publishes the new driver into the same global lane
+      // the binary assigns here, so the previous one is released afterwards.
+      (void)SIM_CreateDriver(
+        static_cast<CClientManagerImpl*>(clientManager),
+        replayStream.release(),
+        sessionInfo->mLaunchInfo,
+        sessionInfo->mSourceId
+      );
+      if (previousDriver != nullptr) {
+        delete previousDriver;
+      }
+
+      gWldFrameAction = EWldFrameAction::Initialize;
+      if (outContinue != nullptr) {
+        *outContinue = true;
+      }
+
+      {
+        const std::string marker(" DoLoading 6");
+        (void)marker;
+      }
+
+      ReleaseWldGameDataHandles(&gameData);
     }
 
     void WLD_DoInitializing(bool* const outContinue)

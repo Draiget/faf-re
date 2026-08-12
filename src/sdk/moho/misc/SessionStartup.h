@@ -12,6 +12,7 @@ struct lua_State;
 namespace gpg
 {
   class ReadArchive;
+  class Stream;
 } // namespace gpg
 
 namespace LuaPlus
@@ -67,6 +68,19 @@ namespace moho
   };
 
   static_assert(sizeof(CSavedGame) == 0x78, "CSavedGame size must be 0x78");
+
+  /**
+   * Address: 0x00875B60 (FUN_00875B60)
+   * Mangled:
+   * ?VCR_CreateReplay@Moho@@YA?AV?$auto_ptr@VStream@gpg@@@std@@PBUSWldSessionInfo@1@VStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Opens the replay sink for one session, writes the replay header, and hands
+   * the stream back for `SIM_CreateDriver` to record into. Returns an empty
+   * owner when the session carries no `LaunchInfoNew` or the sink cannot be
+   * opened; `WLD_DoLoading` treats that as "this session is not recorded".
+   */
+  [[nodiscard]] msvc8::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* sessionInfo, gpg::StrArg name);
 
   /**
    * Address: 0x008765E0 (FUN_008765E0)
