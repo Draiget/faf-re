@@ -2294,8 +2294,9 @@ namespace moho
       return nullptr;
     }
 
-    *outBuffer = *GetArmyVariableData(this);
-    return outBuffer;
+    // The binary tail-calls the shared variable-data assignment
+    // (FUN_00700280) with the army's own payload.
+    return AssignArmyVariableData(*GetArmyVariableData(this), outBuffer);
   }
 
   /**

@@ -253,22 +253,6 @@ namespace
     data->SerializeSaveBody(archive, nullptr);
   }
 
-  /**
-   * Address: 0x00700280 (FUN_00700280)
-   *
-   * What it does:
-   * Assigns one `SSTIArmyVariableData` payload from `source` into
-   * `destination` and returns the destination pointer.
-   */
-  [[maybe_unused]] moho::SSTIArmyVariableData* AssignSSTIArmyVariableData(
-    const moho::SSTIArmyVariableData* const source,
-    moho::SSTIArmyVariableData* const destination
-  )
-  {
-    *destination = *source;
-    return destination;
-  }
-
   struct SSTIArmyVariableDataOwnerSlotRuntime
   {
     std::uint8_t reserved00_7F[0x80]{};
@@ -291,7 +275,7 @@ namespace
     SSTIArmyVariableDataOwnerSlotRuntime* const owner
   )
   {
-    return AssignSSTIArmyVariableData(source, &owner->variableData);
+    return moho::AssignArmyVariableData(*source, &owner->variableData);
   }
 
   /**
@@ -312,7 +296,7 @@ namespace
     for (const moho::SSTIArmyVariableData* sourceCursor = sourceBegin;
          sourceCursor != sourceEnd;
          ++sourceCursor, ++destinationCursor) {
-      (void)AssignSSTIArmyVariableData(sourceCursor, destinationCursor);
+      (void)moho::AssignArmyVariableData(*sourceCursor, destinationCursor);
     }
 
     return destinationCursor;
@@ -351,7 +335,7 @@ namespace
   {
     moho::SSTIArmyVariableData* lastWritten = destinationBegin;
     for (moho::SSTIArmyVariableData* cursor = destinationBegin; cursor != destinationEnd; ++cursor) {
-      lastWritten = AssignSSTIArmyVariableData(source, cursor);
+      lastWritten = moho::AssignArmyVariableData(*source, cursor);
     }
 
     return lastWritten;
@@ -392,7 +376,7 @@ namespace
     while (sourceBegin != sourceEnd) {
       --sourceEnd;
       --destinationCursor;
-      (void)AssignSSTIArmyVariableData(sourceEnd, destinationCursor);
+      (void)moho::AssignArmyVariableData(*sourceEnd, destinationCursor);
     }
 
     return destinationCursor;
@@ -1075,6 +1059,31 @@ namespace moho
   {
     (void)AcquireSSTIArmyVariableDataTypeInfo();
     (void)std::atexit(&CleanupSSTIArmyVariableDataTypeInfoAtexit);
+  }
+
+  /**
+   * Address: 0x00700280 (FUN_00700280, func_CopyArmyData)
+   *
+   * IDA signature:
+   * Moho::SSTIArmyVariableData *callcnv_E3 func_CopyArmyData@<eax>(
+   *     Moho::SSTIArmyVariableData *a1@<ebx>, Moho::SSTIArmyVariableData *a2);
+   *
+   * What it does:
+   * Assigns one `SSTIArmyVariableData` payload from `source` into
+   * `destination` and returns the destination pointer. Used by
+   * `CArmyImpl::CopyArmyVariableData` to publish the sim army state, and by
+   * `CWldSession::DoBeat` to fold each army update into its `UserArmy`.
+   */
+  SSTIArmyVariableData* AssignArmyVariableData(
+    const SSTIArmyVariableData& source, SSTIArmyVariableData* const destination
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    *destination = source;
+    return destination;
   }
 } // namespace moho
 
