@@ -1215,6 +1215,9 @@
     <ClCompile Include="moho\unit\tasks\CUnitCarrierRetrieveTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCarrierLand.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCarrierLandTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

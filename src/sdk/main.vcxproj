@@ -841,6 +841,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskSerializer.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCarrierRetrieveTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitCarrierLand.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCarrierLandTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCarrierLaunch.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCarrierLaunchTypeInfo.cpp" />

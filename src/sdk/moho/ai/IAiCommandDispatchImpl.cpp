@@ -44,6 +44,7 @@
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
 #include "moho/unit/tasks/CUnitCallTransport.h"
 #include "moho/unit/tasks/CUnitCaptureTask.h"
+#include "moho/unit/tasks/CUnitCarrierLand.h"
 #include "moho/unit/tasks/CUnitCarrierLaunch.h"
 #include "moho/unit/tasks/CUnitCarrierRetrieve.h"
 #include "moho/unit/tasks/CUnitFerryTask.h"
@@ -321,56 +322,6 @@ namespace
 
     return transportAi->TransportDetachUnit(unit) ? 1 : 0;
   }
-
-  /**
-   * Recovered runtime carrier-land task object used by IssueCarrierLandTask.
-   *
-   * This models the observed constructor-side state writes in
-   * `FUN_00606500` (weak carrier link, focus/entity-state priming, and
-   * zero-initialized movement lanes).
-   */
-  class CUnitCarrierLandDispatchTask final : public CCommandTask
-  {
-  public:
-    CUnitCarrierLandDispatchTask(CCommandTask* const parentTask, Unit* const carrierUnit)
-      : CCommandTask(parentTask)
-      , mCarrierUnit()
-      , mHasLandingOrder(false)
-      , mPad39_3B{}
-      , mPendingLandingTicks(0)
-      , mHeight(0.0f)
-      , mPos{0.0f, 0.0f, 0.0f}
-      , mDir{0.0f, 0.0f, 0.0f}
-      , mLastPos{0.0f, 0.0f, 0.0f}
-    {
-      mCarrierUnit.ResetFromObject(carrierUnit);
-
-      if (mUnit != nullptr) {
-        mUnit->UnitStateMask |= 0x100ull;
-        mUnit->FocusEntityRef.ResetObjectPtr<Entity>(carrierUnit);
-        if (carrierUnit != nullptr) {
-          (void)mUnit->RunScript("OnAssignedFocusEntity");
-        }
-        mUnit->NeedSyncGameData = true;
-      }
-    }
-
-    int Execute() override
-    {
-      return -1;
-    }
-
-  private:
-    WeakPtr<Unit> mCarrierUnit; // +0x30
-    bool mHasLandingOrder; // +0x38
-    std::uint8_t mPad39_3B[3];
-    std::int32_t mPendingLandingTicks; // +0x3C
-    float mHeight; // +0x40
-    Wm3::Vec3f mPos; // +0x44
-    Wm3::Vec3f mDir; // +0x50
-    Wm3::Vec3f mLastPos; // +0x5C
-  };
-  static_assert(sizeof(CUnitCarrierLandDispatchTask) == 0x68, "CUnitCarrierLandDispatchTask size must be 0x68");
 
   /**
    * Recovered runtime reclaim-task object used by IssueReclaimTask.
@@ -1055,7 +1006,7 @@ void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit, CCommandTask
     gpg::Die("Attepted to load on illegal carrier %s", BlueprintIdOrUnknown(unit));
   }
 
-  (void)new (std::nothrow) CUnitCarrierLandDispatchTask(parentTask, unit);
+  (void)new (std::nothrow) CUnitCarrierLand(parentTask, unit);
 }
 
 /**
