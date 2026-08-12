@@ -65,29 +65,6 @@ namespace
     return cached;
   }
 
-  class CUnitReclaimTaskReflectionView final : public moho::CUnitReclaimTask
-  {
-  public:
-    CUnitReclaimTaskReflectionView()
-      : CUnitReclaimTask()
-    {
-    }
-
-    ~CUnitReclaimTaskReflectionView() override = default;
-
-    int Execute() override
-    {
-      return -1;
-    }
-
-    void OnEvent(moho::ECommandEvent) override {}
-  };
-
-  static_assert(
-    sizeof(CUnitReclaimTaskReflectionView) == sizeof(moho::CUnitReclaimTask),
-    "CUnitReclaimTaskReflectionView size must match CUnitReclaimTask"
-  );
-
   [[nodiscard]] gpg::RRef MakeCUnitReclaimTaskRef(moho::CUnitReclaimTask* const object)
   {
     gpg::RRef out{};
@@ -201,7 +178,7 @@ namespace moho
    */
   gpg::RRef CUnitReclaimTaskTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitReclaimTaskReflectionView();
+    auto* const object = new (std::nothrow) moho::CUnitReclaimTask();
     return MakeCUnitReclaimTaskRef(static_cast<CUnitReclaimTask*>(object));
   }
 
@@ -210,9 +187,9 @@ namespace moho
    */
   gpg::RRef CUnitReclaimTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitReclaimTaskReflectionView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitReclaimTask*>(objectStorage);
     if (object) {
-      new (object) CUnitReclaimTaskReflectionView();
+      new (object) moho::CUnitReclaimTask();
     }
 
     return MakeCUnitReclaimTaskRef(reinterpret_cast<CUnitReclaimTask*>(object));
@@ -223,7 +200,7 @@ namespace moho
    */
   void CUnitReclaimTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitReclaimTaskReflectionView*>(objectStorage);
+    delete static_cast<moho::CUnitReclaimTask*>(objectStorage);
   }
 
   /**
@@ -231,12 +208,12 @@ namespace moho
    */
   void CUnitReclaimTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitReclaimTaskReflectionView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitReclaimTask*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitReclaimTaskReflectionView();
+    object->~CUnitReclaimTask();
   }
 } // namespace moho
 

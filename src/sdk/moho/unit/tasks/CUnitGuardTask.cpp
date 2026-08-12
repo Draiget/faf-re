@@ -131,24 +131,6 @@ namespace
     return outGoalTail;
   }
 
-  class CUnitRepairTaskDispatchView final : public moho::CUnitRepairTask
-  {
-  public:
-    using moho::CUnitRepairTask::CUnitRepairTask;
-
-    int Execute() override
-    {
-      return -1;
-    }
-
-    void OnEvent(moho::ECommandEvent) override {}
-  };
-
-  static_assert(
-    sizeof(CUnitRepairTaskDispatchView) == sizeof(moho::CUnitRepairTask),
-    "CUnitRepairTaskDispatchView size must match CUnitRepairTask"
-  );
-
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -1621,9 +1603,9 @@ namespace moho
       }
 
       if (shouldIssueRepairTask) {
-        (void)new (std::nothrow) CUnitRepairTaskDispatchView(dispatchTask, targetUnit, false);
+        (void)new (std::nothrow) moho::CUnitRepairTask(dispatchTask, targetUnit, false);
       } else if (targetUnit->AiBuilder != nullptr && targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
-        (void)new (std::nothrow) CUnitRepairTaskDispatchView(dispatchTask, targetUnit, true);
+        (void)new (std::nothrow) moho::CUnitRepairTask(dispatchTask, targetUnit, true);
       }
       return;
     }
