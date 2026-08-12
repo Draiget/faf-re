@@ -15,7 +15,9 @@ namespace gpg
 
 namespace moho
 {
+  class CUnitCommand;
   class IAiCommandDispatchImpl;
+  struct SEntitySetTemplateUnit;
   class Unit;
 
   /**
@@ -75,13 +77,158 @@ namespace moho
      */
     [[nodiscard]] static CUnitFerryTask* Create(CCommandTask* parentTask, Unit* targetUnit);
 
+    /**
+     * Address: 0x0060E3A0 (FUN_0060E3A0, Moho::CUnitFerryTask::FilterTransportableUnits)
+     *
+     * IDA signature:
+     * Moho::EntitySetTemplate_Entity *__stdcall
+     * Moho::CUnitFerryTask::FilterTransportableUnits(
+     *   Moho::CUnitFerryTask *a1, Moho::EntitySetTemplate_Entity *set);
+     *
+     * What it does:
+     * Collects the owner army's LAND units that are waiting for a ferry
+     * (`UNITSTATE_WaitForFerry`, no assigned transport, not attached/loading),
+     * that this ferry can carry and has space for, and whose focus entity
+     * matches this task's beacon (or ferry factory when no beacon is bound).
+     */
+    void FilterTransportableUnits(SEntitySetTemplateUnit& outUnits);
+
+    /**
+     * Address: 0x0060E7E0 (FUN_0060E7E0, Moho::CUnitFerryTask::HasNewUnit)
+     *
+     * IDA signature:
+     * bool __stdcall Moho::CUnitFerryTask::HasNewUnit(Moho::CUnitFerryTask *arg0);
+     *
+     * What it does:
+     * Returns true when an upcoming transportable unit is headed to this
+     * ferry: either the ferry factory's head build command produces a
+     * blueprint the transport has space for, or a live army LAND unit created
+     * by the ferry factory queues a `UNITCOMMAND_TransportLoadUnits` command
+     * next. Caller contract: `mFerryUnit` resolves to a live unit.
+     */
+    [[nodiscard]] bool HasNewUnit();
+
+    /**
+     * Address: 0x0060E9F0 (FUN_0060E9F0, Moho::CUnitFerryTask::HasNextUnitToLoad)
+     *
+     * IDA signature:
+     * bool __thiscall Moho::CUnitFerryTask::HasNextUnitToLoad(Moho::CUnitFerryTask *this);
+     *
+     * What it does:
+     * When transportable units are waiting, spawns a `CUnitLoadUnits` child
+     * task and reports true. Otherwise reports true only when units are
+     * already loaded (and no new unit is inbound from the ferry factory),
+     * rewinding `mCommandIndex` and entering `TASKSTATE_Waiting`.
+     */
+    [[nodiscard]] bool HasNextUnitToLoad();
+
+    /**
+     * Address: 0x0060EB50 (FUN_0060EB50, Moho::CUnitFerryTask::GetUnitCommands)
+     *
+     * IDA signature:
+     * void __stdcall sub_60EB50(Moho::CUnitFerryTask *a1, std::vector_WeakPtr_CUnitCommand *a2);
+     *
+     * What it does:
+     * Copies the owner unit's queued commands into `outCommands`, then
+     * replaces them with the route source when one exists: the ferry
+     * factory's builder queue, the route unit's own command queue, or the
+     * queue of an army TRANSPORTATION unit currently ferrying to the same
+     * beacon. An empty route source leaves the own-queue copy in place.
+     */
+    void GetUnitCommands(msvc8::vector<WeakPtr<CUnitCommand>>& outCommands);
+
+    /**
+     * Address: 0x0060F400 (FUN_0060F400, Moho::CUnitFerryTask::TaskTick)
+     * VFTable SLOT: 1 (CTask::Execute), ??_7CUnitFerryTask@Moho@@6B@ + 0x04
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitFerryTask::TaskTick(Moho::CUnitFerryTask *this);
+     *
+     * What it does:
+     * Per-tick ferry state machine. Aborts (-1) when the route/ferry/beacon
+     * liveness guards fail; warps the beacon onto the current command target
+     * when it drifted more than 1.0 world unit; snapshots `mPos` from the
+     * beacon; then dispatches on `mTaskState` (load-next / move-next /
+     * unload / move-back / resume) while toggling the owner unit's
+     * `UNITSTATE_ForceSpeedThrough` state bit per phase.
+     */
+    int Execute() override;
+
+  private:
+    /**
+     * Address: 0x0060ED70 (FUN_0060ED70, sub_60ED70)
+     *
+     * IDA signature:
+     * void __stdcall sub_60ED70(Moho::CUnitFerryTask *arg0);
+     *
+     * What it does:
+     * Waiting-phase worker. Reads route commands, and when the pair at
+     * `mCommandIndex` (pickup) / `mCommandIndex + 1` (dropoff) matches the
+     * route shape (`UNITCOMMAND_Move` dropoff with a ferry unit bound,
+     * `UNITCOMMAND_Ferry` dropoff without one) issues a move to the pickup
+     * target cell and advances the index; otherwise enters
+     * `TASKSTATE_Starting`.
+     */
+    void MoveToNextRoutePoint();
+
+    /**
+     * Address: 0x0060EED0 (FUN_0060EED0, sub_60EED0)
+     *
+     * IDA signature:
+     * void __usercall sub_60EED0(int a1@<esi>);
+     *
+     * What it does:
+     * Starting-phase worker. Clamps `mCommandIndex` into the route range,
+     * builds a one-cell unload goal at that command's target (offset by half
+     * the owner footprint), spawns a `CUnitUnloadUnits` child task, and
+     * enters `TASKSTATE_Processing`.
+     */
+    void IssueUnloadAtRoutePoint();
+
+    /**
+     * Address: 0x0060F0B0 (FUN_0060F0B0, sub_60F0B0)
+     *
+     * IDA signature:
+     * void __stdcall sub_60F0B0(Moho::CUnitFerryTask *arg0);
+     *
+     * What it does:
+     * Processing-phase worker. Steps `mCommandIndex` back one route point and
+     * issues a move to that command's target cell; with no previous point (or
+     * a dead command link) enters `TASKSTATE_Complete`.
+     */
+    void MoveToPreviousRoutePoint();
+
+    /**
+     * Address: 0x0060F240 (FUN_0060F240, sub_60F240)
+     *
+     * IDA signature:
+     * Moho::TDatListItem_EntitySetTemplate_Entity *__usercall sub_60F240@<eax>(int ebx0@<ebx>);
+     *
+     * What it does:
+     * Complete-phase worker. When the owner unit is grounded (`LAYER_Land`)
+     * within `RUnitBlueprintAir::StartTurnDistance` of `mPos`, simply
+     * restarts the cycle; otherwise issues a move back to `mPos` (flagging
+     * the goal layer when no transportable unit is waiting) and restarts at
+     * `TASKSTATE_Preparing`.
+     */
+    void ResumeFerryRoute();
+
   public:
     IAiCommandDispatchImpl* mDispatch; // 0x30
     std::int32_t mCommandIndex;        // 0x34
-    bool mHasResolvedFerryTarget;      // 0x38
+    // 0x38: set only by the (parentTask, targetUnit) constructor when the
+    // target already belongs to a ferry route (an attached rider or a
+    // FERRYBEACON). When set, route commands come from `mRouteUnit` (or the
+    // transport ferrying to the same beacon) instead of the owner queue.
+    // Asm evidence: byte tests `[this+38h]` at 0x0060E6F6 / 0x0060EBDB /
+    // 0x0060F40F.
+    bool mFollowsExistingRoute;        // 0x38
     std::uint8_t mPadding39[3];        // 0x39
     Wm3::Vector3f mPos;                // 0x3C
-    WeakPtr<Unit> mCommandUnit;        // 0x48
+    // 0x48: the unit the ferry command targeted; when
+    // `mFollowsExistingRoute` is set its command queue defines the route
+    // (asm: dword loads `[this+48h]` at 0x0060EBFB / 0x0060F421-0x0060F456).
+    WeakPtr<Unit> mRouteUnit;          // 0x48
     WeakPtr<Unit> mFerryUnit;          // 0x50
     WeakPtr<Unit> mBeacon;             // 0x58
   };
@@ -93,11 +240,11 @@ namespace moho
     "CUnitFerryTask::mCommandIndex offset must be 0x34"
   );
   static_assert(
-    offsetof(CUnitFerryTask, mHasResolvedFerryTarget) == 0x38,
-    "CUnitFerryTask::mHasResolvedFerryTarget offset must be 0x38"
+    offsetof(CUnitFerryTask, mFollowsExistingRoute) == 0x38,
+    "CUnitFerryTask::mFollowsExistingRoute offset must be 0x38"
   );
   static_assert(offsetof(CUnitFerryTask, mPos) == 0x3C, "CUnitFerryTask::mPos offset must be 0x3C");
-  static_assert(offsetof(CUnitFerryTask, mCommandUnit) == 0x48, "CUnitFerryTask::mCommandUnit offset must be 0x48");
+  static_assert(offsetof(CUnitFerryTask, mRouteUnit) == 0x48, "CUnitFerryTask::mRouteUnit offset must be 0x48");
   static_assert(offsetof(CUnitFerryTask, mFerryUnit) == 0x50, "CUnitFerryTask::mFerryUnit offset must be 0x50");
   static_assert(offsetof(CUnitFerryTask, mBeacon) == 0x58, "CUnitFerryTask::mBeacon offset must be 0x58");
 } // namespace moho
