@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/BadRefCast.h"
-#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -21,7 +21,12 @@ namespace
    */
   void preregister_EntityCategoryTypeInfoCtorLane(gpg::RType* const typeInfo)
   {
-    gpg::PreRegisterRType(typeid(moho::EntityCategory), typeInfo);
+    // Register under the type category sets actually are. `EntityCategory` is
+    // a holder for static helpers - Add/Sub/Mul/SerLoad/SerSave - and nothing
+    // is ever an instance of it, so claiming that typeid left every
+    // LookupRType(typeid(EntityCategorySet)) to find a type with no
+    // reference-lifecycle callbacks on it.
+    gpg::PreRegisterRType(typeid(moho::EntityCategorySet), typeInfo);
   }
 
   [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
@@ -143,7 +148,7 @@ namespace
  * RTTI into the reflection lookup table.
  */
 EntityCategoryTypeInfo::EntityCategoryTypeInfo()
-  : gpg::RType()
+  : BVSetRType<const RBlueprint*, EntityCategoryHelper>()
 {
   preregister_EntityCategoryTypeInfoCtorLane(this);
 }

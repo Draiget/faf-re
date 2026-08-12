@@ -59,12 +59,31 @@ namespace moho
     RBlueprint(RRuleGameRules* owner, const RResId& resId);
 
     /**
+     * Address: 0x0050DD60 (FUN_0050DD60, the shared body of the base ctor)
+     *
+     * What it does:
+     * Performs the base-blueprint construction every blueprint receives: counts
+     * the instance, copies the resource id into the id string, and claims the
+     * next blueprint ordinal from the owning rules.
+     *
+     * Derived blueprints in this tree mirror the base layout inline instead of
+     * inheriting it, so they call this on their own fields. That is what the
+     * binary's derived constructors do when they invoke the base constructor on
+     * themselves - there is no temporary base object anywhere in this chain.
+     */
+    static void InitIdentity(
+      RRuleGameRules* owner, const RResId& resId, msvc8::string& outBlueprintId, std::int32_t& outOrdinal
+    );
+
+    /**
      * Address: 0x0050DE60 (FUN_0050DE60)
      * Mangled: ??1RBlueprint@Moho@@QAE@@Z
      *
      * What it does:
-     * Releases base blueprint string lanes, decrements the shared instance
-     * counter stat slot, and restores the base `gpg::RObject` vtable lane.
+     * Releases base blueprint string lanes and decrements the shared instance
+     * counter stat slot. The binary closes with a store of the `gpg::RObject`
+     * vtable into the object's first word - the inlined base destructor - which
+     * this layout models as a plain `mVTable` field and so has nothing to undo.
      */
     ~RBlueprint();
 

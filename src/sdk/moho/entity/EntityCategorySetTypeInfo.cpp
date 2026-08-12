@@ -7,18 +7,10 @@
 
 namespace
 {
-  moho::BVSetRType<const moho::RBlueprint*, moho::EntityCategoryHelper> gBlueprintCategorySetRType;
-
-  struct BlueprintCategorySetTypeRegistration
-  {
-    BlueprintCategorySetTypeRegistration()
-    {
-      gpg::PreRegisterRType(typeid(moho::EntityCategorySet), &gBlueprintCategorySetRType);
-      moho::EntityCategorySet::sType = &gBlueprintCategorySetRType;
-    }
-  };
-
-  BlueprintCategorySetTypeRegistration gBlueprintCategorySetTypeRegistration;
+  // No standalone instance of this base is registered. Registering one for
+  // typeid(EntityCategorySet) shadowed EntityCategoryTypeInfo - the only type
+  // that installs the reference-lifecycle callbacks - so every category set
+  // handed to Lua came back "not copy constructible".
 
   [[nodiscard]] gpg::RType* CachedRBlueprintPointerType()
   {

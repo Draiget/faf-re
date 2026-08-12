@@ -17,8 +17,14 @@ namespace moho
    * VFTABLE: 0x00E17CE0
    * COL: 0x00E6C898
    */
+  /**
+   * `EntityCategoryTypeInfo` derives from this and is the type actually
+   * registered for `EntityCategorySet`. This half supplies the composed type
+   * name and the size/version/serializer half of Init; the derived half adds
+   * the reference-lifecycle callbacks and finishes registration.
+   */
   template <>
-  class BVSetRType<const RBlueprint*, EntityCategoryHelper> final : public gpg::RType
+  class BVSetRType<const RBlueprint*, EntityCategoryHelper> : public gpg::RType
   {
   public:
     /**
