@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitPodAssist.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -14,6 +15,7 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/ai/IAiTransport.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityFastVectorReflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
@@ -105,6 +107,17 @@ namespace
   [[nodiscard]] moho::IAiCommandDispatchImpl* AsDispatchImpl(moho::CCommandTask* const dispatchTask) noexcept
   {
     return static_cast<moho::IAiCommandDispatchImpl*>(dispatchTask);
+  }
+
+  // The attach approach aims ten ticks of host motion ahead of the bone, so a
+  // pod chasing a moving host converges instead of trailing it.
+  constexpr float kAttachApproachLeadTicks = 10.0f;
+  // Distance at which the pod counts as having reached the bone.
+  constexpr float kAttachContactDistance = 0.5f;
+
+  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  {
+    return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
   [[nodiscard]] float DistanceSquared(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
@@ -333,9 +346,118 @@ namespace moho
     mAssistTarget.UnlinkFromOwnerChain();
   }
 
+  /**
+   * Address: 0x0061E020 (FUN_0061E020, Moho::CUnitPodAssist::TaskTick)
+   *
+   * IDA signature:
+   * int __thiscall Moho::CUnitPodAssist::TaskTick(Moho::CUnitPodAssist *this);
+   *
+   * What it does:
+   * Each tick, first tries to hand the pod some assist work; failing that,
+   * runs the four-step docking sequence that returns the pod to its host —
+   * claim a pickup slot, fly to the attach bone (leading the host's motion),
+   * and attach.
+   */
   int CUnitPodAssist::Execute()
   {
-    return 1;
+    Unit* const unit = mUnit;
+    if (unit->IsDead() || unit->DestroyQueued()) {
+      return -1;
+    }
+
+    // A mobile pod needs a live host with transport AI to dock into; a static
+    // one (a build pod welded to its factory) has no host to check.
+    Unit* host = nullptr;
+    if (unit->IsMobile()) {
+      host = mAssistTarget.GetObjectPtr();
+      if (host == nullptr || host->IsDead() || host->AiTransport == nullptr) {
+        return -1;
+      }
+    }
+
+    // Another command is already queued behind this one: let it through.
+    if (HasNextCommand()) {
+      return -1;
+    }
+
+    if (unit->IsInCategory("STATIONASSISTPOD")) {
+      if (!unit->IsMobile()) {
+        // Welded pods never dock; they only ever look for work.
+        (void)TryIssueNearbyAssistTask();
+        return 1;
+      }
+
+      if (mTaskState != TASKSTATE_Preparing && TryIssueNearbyAssistTask()) {
+        return 1;
+      }
+    } else if (mTaskState != TASKSTATE_Preparing && TryIssueFocusedAssistTask()) {
+      return 1;
+    }
+
+    switch (mTaskState) {
+    case TASKSTATE_Preparing:
+      mTaskState = NextTaskState(mTaskState);
+      return 3;
+
+    case TASKSTATE_Waiting: {
+      // Ask the host for a pickup slot for this one pod.
+      EntitySetTemplate<Unit> pickupSet{};
+      (void)pickupSet.Add(unit);
+
+      if (!host->AiTransport->TransportAssignSlot(unit, -1)) {
+        mAssistTarget.UnlinkFromOwnerChain();
+        return -1;
+      }
+
+      const Wm3::Vec3f& hostPos = host->GetPosition();
+      host->AiTransport->TransportAddPickupUnits(pickupSet, SCoordsVec2{hostPos.x, hostPos.z});
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Starting: {
+      IAiTransport* const transport = host->AiTransport;
+
+      // Steer at where the attach bone will be, not where it is: the host may
+      // be moving, so the bone position is led by ten ticks of its velocity.
+      const Wm3::Vec3f attachPos = transport->TransportGetAttachBonePosition(unit);
+      const Wm3::Vec3f hostVelocity = host->GetVelocity();
+      const Wm3::Vec3f leadPos{
+        attachPos.x + (hostVelocity.x * kAttachApproachLeadTicks),
+        attachPos.y + (hostVelocity.y * kAttachApproachLeadTicks),
+        attachPos.z + (hostVelocity.z * kAttachApproachLeadTicks)
+      };
+      const Wm3::Vec3f attachFacing = transport->TransportGetAttachFacing(unit);
+
+      unit->UnitMotion->SetTarget(leadPos, attachFacing, LAYER_Land);
+      unit->UnitMotion->mHeight = attachPos.y;
+
+      // Keep flying until the pod is on the bone (or has settled onto land).
+      const Wm3::Vec3f& unitPos = unit->GetPosition();
+      const float distanceToBone = std::sqrt(DistanceSquared(attachPos, unitPos));
+      if (distanceToBone >= kAttachContactDistance && unit->mCurrentLayer != LAYER_Land) {
+        return 1;
+      }
+
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Processing:
+      // On the bone: hand the pod to the host and release the height hold.
+      host->AiTransport->TransportAttachUnit(unit);
+      unit->UnitMotion->SetFacing(Wm3::Vec3f{0.0f, 0.0f, 0.0f});
+      unit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+      mTaskState = NextTaskState(mTaskState);
+      return 1;
+
+    case TASKSTATE_Complete:
+      // Docked. Idle here until something gives the pod new work.
+      return 10;
+
+    default:
+      return 1;
+    }
   }
 
   /**

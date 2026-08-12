@@ -53,6 +53,18 @@ namespace moho
      */
     ~CUnitPodAssist() override;
 
+    /**
+     * Address: 0x0061E020 (FUN_0061E020, Moho::CUnitPodAssist::TaskTick)
+     *
+     * IDA signature:
+     * int __thiscall Moho::CUnitPodAssist::TaskTick(Moho::CUnitPodAssist *this);
+     *
+     * What it does:
+     * Looks for assist work first; when there is none, runs the docking
+     * sequence that returns the pod to its host — claim a pickup slot, fly to
+     * the attach bone while leading the host's motion, attach, then idle.
+     * Welded (immobile) station pods only ever look for work.
+     */
     int Execute() override;
 
     /**
