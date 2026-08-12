@@ -548,25 +548,23 @@ namespace moho
     return moduleObject;
   }
 
+  /**
+   * Every engine call site this stands in for reads the field with
+   * LuaPlus::LuaObject::GetByName, behind an IsTable check where the receiver
+   * could be anything else (see the "_c_object" unwrapping in FUN_004209D0 and
+   * FUN_004A7DD0, and the module lookups in FUN_0057A350 / FUN_005B7220). That
+   * is a raw table read: no __index metamethod runs, so a key the table does
+   * not hold itself is simply nil instead of being escalated to the module
+   * environment chain, which in the shipped Lua ends at a handler that raises.
+   */
   LuaPlus::LuaObject
   SCR_GetLuaTableField(LuaPlus::LuaState* const state, const LuaPlus::LuaObject& tableObj, const char* const fieldName)
   {
-    if (!state || !fieldName || !*fieldName || tableObj.IsNil()) {
+    if (!state || !fieldName || !*fieldName || !tableObj.IsTable()) {
       return {};
     }
 
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return {};
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObj).PushStack(lstate);
-    lua_pushstring(lstate, fieldName);
-    lua_gettable(lstate, -2);
-    LuaPlus::LuaObject result{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(lstate, savedTop);
-    return result;
+    return tableObj.GetByName(fieldName);
   }
 
   LuaPlus::LuaObject SCR_GetLuaTableFieldOrThrow(
