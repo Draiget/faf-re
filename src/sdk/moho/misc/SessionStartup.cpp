@@ -339,6 +339,131 @@ namespace
 
 namespace moho
 {
+  namespace
+  {
+    /// Header magic the replay reader checks; written verbatim, without the
+    /// terminator the string overloads would add.
+    constexpr char kReplayFormatBanner[] = "Replay v1.9\r\n";
+    constexpr std::size_t kReplayFormatBannerBytes = sizeof(kReplayFormatBanner) - 1u;
+    /// The build the retail replay header advertises.
+    constexpr double kReplayEngineVersion = 1.5;
+    constexpr int kReplayEngineBuild = 3764;
+    /// Terminates one army's unit-source list; no source index can reach it.
+    constexpr std::uint8_t kReplayUnitSourceListEnd = 0xFFu;
+  } // namespace
+
+  /**
+   * Address: 0x00875B60 (FUN_00875B60)
+   * Mangled:
+   * ?VCR_CreateReplay@Moho@@YA?AV?$auto_ptr@VStream@gpg@@@std@@PBUSWldSessionInfo@1@VStrArg@gpg@@@Z
+   *
+   * IDA signature:
+   * gpg::Stream **__cdecl Moho::VCR_CreateReplay(gpg::Stream **arg0,
+   *                                              Moho::SWldSessionInfo *arg4,
+   *                                              char *Str1);
+   *
+   * What it does:
+   * Opens the replay sink for one session and writes the replay header, then
+   * hands the stream to the caller, which passes it into `SIM_CreateDriver` so
+   * every dispatched command is mirrored into it.
+   *
+   * The destination is either the explicit `/savereplay <path>` argument or
+   * `<replay dir>/<profile>/<name>`, with the replay extension applied by
+   * `FILE_SuggestedExt` in both cases. Only the derived path creates
+   * directories, and only when `name` carries no separator of its own.
+   *
+   * Header layout, in write order:
+   *   "Supreme Commander v1.50.3764" NUL, "\r\n" NUL, "Replay v1.9\r\n" (raw),
+   *   map name NUL, "\r\n" NUL,
+   *   u32 game-mods length + those bytes,
+   *   u32 scenario-info length + those bytes,
+   *   u8 command-source count, then per source its name (with NUL) and u32 lane,
+   *   u8 cheats-enabled,
+   *   u8 army count, then per army a u32-prefixed name, every set unit-source
+   *   index as one byte, and 0xFF to close the list,
+   *   u32 init seed.
+   */
+  msvc8::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* const sessionInfo, const gpg::StrArg name)
+  {
+    LaunchInfoBase* const launchInfoBase = sessionInfo != nullptr ? sessionInfo->mLaunchInfo.get() : nullptr;
+    LaunchInfoNew* const launchInfo = launchInfoBase != nullptr ? launchInfoBase->GetNew() : nullptr;
+    if (launchInfo == nullptr) {
+      return msvc8::auto_ptr<gpg::Stream>(nullptr);
+    }
+
+    msvc8::string replayPath{};
+    msvc8::vector<msvc8::string> savedReplayArgs{};
+    if (CFG_GetArgOption("/savereplay", 1u, &savedReplayArgs)) {
+      replayPath = FILE_SuggestedExt(savedReplayArgs[0].c_str(), USER_GetReplayExt().c_str());
+    } else {
+      msvc8::string replayDirectory{};
+      // A name that already carries a separator is taken as a path and used
+      // as-is; only a bare name goes under the per-profile replay directory.
+      if (std::strchr(name, '/') == nullptr && std::strchr(name, '\\') == nullptr) {
+        const msvc8::string replayRoot = USER_GetReplayDir();
+        EnsureDirectoryExistsOrThrow(replayRoot);
+        replayDirectory = replayRoot + OPTIONS_GetCurrentProfileName() + "\\";
+        EnsureDirectoryExistsOrThrow(replayDirectory);
+      }
+      replayPath = FILE_SuggestedExt((replayDirectory + name).c_str(), USER_GetReplayExt().c_str());
+    }
+
+    std::unique_ptr<gpg::Stream> replayStream = OpenGPGNetURI(replayPath.c_str(), EGpgNetOpenMode::Write);
+    gpg::Stream* const stream = replayStream.get();
+    if (stream == nullptr) {
+      return msvc8::auto_ptr<gpg::Stream>(nullptr);
+    }
+
+    gpg::Logf("Saving replay to \"%s\"", replayPath.c_str());
+
+    stream->Write(gpg::STR_Printf("Supreme Commander v%1.2f.%4i", kReplayEngineVersion, kReplayEngineBuild));
+    stream->Write("\r\n");
+    stream->Write(kReplayFormatBanner, kReplayFormatBannerBytes);
+    stream->Write(sessionInfo->mMapName);
+    stream->Write("\r\n");
+
+    const std::int32_t gameModsBytes = static_cast<std::int32_t>(launchInfo->mGameMods.size());
+    stream->Write(gameModsBytes);
+    stream->Write(launchInfo->mGameMods.c_str(), static_cast<std::size_t>(gameModsBytes));
+
+    const std::int32_t scenarioInfoBytes = static_cast<std::int32_t>(launchInfo->mScenarioInfo.size());
+    stream->Write(scenarioInfoBytes);
+    stream->Write(launchInfo->mScenarioInfo.c_str(), static_cast<std::size_t>(scenarioInfoBytes));
+
+    const msvc8::vector<SSTICommandSource>& commandSources = launchInfo->mCommandSources.mSrcs;
+    const auto commandSourceCount = static_cast<std::uint8_t>(commandSources.size());
+    stream->Write(commandSourceCount);
+    for (const SSTICommandSource& commandSource : commandSources) {
+      // Names go out with their terminator - the reader scans for it.
+      stream->Write(commandSource.mName.c_str(), commandSource.mName.size() + 1u);
+      stream->Write(commandSource.mTimeouts);
+    }
+
+    stream->Write(static_cast<std::uint8_t>(launchInfo->mCheatsEnabled ? 1 : 0));
+
+    const msvc8::vector<msvc8::string>& armyNames = launchInfo->mStrVec;
+    const auto armyCount = static_cast<std::uint8_t>(armyNames.size());
+    stream->Write(armyCount);
+    for (std::size_t armyIndex = 0; armyIndex < armyNames.size(); ++armyIndex) {
+      const msvc8::string& armyName = armyNames[armyIndex];
+      const std::int32_t armyNameBytes = static_cast<std::int32_t>(armyName.size());
+      stream->Write(armyNameBytes);
+      stream->Write(armyName.c_str(), static_cast<std::size_t>(armyNameBytes));
+
+      const BVIntSet& unitSources = launchInfo->mArmyLaunchInfo[armyIndex].mUnitSources;
+      const unsigned int endOfSet = unitSources.Max();
+      for (unsigned int source = unitSources.GetNext(~0u); source != endOfSet;
+           source = unitSources.GetNext(source)) {
+        stream->Write(static_cast<std::uint8_t>(source));
+      }
+      stream->Write(kReplayUnitSourceListEnd);
+    }
+
+    stream->Write(launchInfo->mInitSeed);
+
+    return msvc8::auto_ptr<gpg::Stream>(replayStream.release());
+  }
+
   /**
    * Address: 0x008765E0 (FUN_008765E0)
    * Mangled:
