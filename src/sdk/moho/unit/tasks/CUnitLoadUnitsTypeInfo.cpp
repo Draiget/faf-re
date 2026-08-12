@@ -10,8 +10,13 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitLoadUnits.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 namespace
 {
+  gpg::StaticTypeInfoStorage<moho::CUnitLoadUnitsTypeInfo> gCUnitLoadUnitsTypeInfoStorage{};
+
   [[nodiscard]] gpg::RType* CachedCUnitLoadUnitsType()
   {
     static gpg::RType* cached = nullptr;
@@ -69,6 +74,31 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00624E90 (FUN_00624E90, preregister lane, inlined ctor part)
+   *
+   * What it does:
+   * Chains `gpg::RType()` and preregisters the `CUnitLoadUnits` descriptor,
+   * mirroring the binary's `RType::RType` + `PreRegisterRType` pair.
+   */
+  CUnitLoadUnitsTypeInfo::CUnitLoadUnitsTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CUnitLoadUnits), this);
+  }
+
+  /**
+   * Address: 0x00624E90 (FUN_00624E90, sub_624E90)
+   *
+   * What it does:
+   * Constructs the static descriptor in place on first call and returns it,
+   * exactly as the binary's static-init lane does for `stru_10B1EB8`.
+   */
+  gpg::RType* preregister_CUnitLoadUnitsTypeInfo()
+  {
+    return &gCUnitLoadUnitsTypeInfoStorage.Ensure();
+  }
+
   /**
    * Address: 0x00624F40 (FUN_00624F40, scalar deleting destructor thunk)
    */
@@ -214,3 +244,7 @@ namespace gpg
     return outRef;
   }
 } // namespace gpg
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(preregister_CUnitLoadUnitsTypeInfo_624e90, moho::preregister_CUnitLoadUnitsTypeInfo)

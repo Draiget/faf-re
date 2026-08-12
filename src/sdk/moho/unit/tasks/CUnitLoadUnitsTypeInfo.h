@@ -14,6 +14,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00624E90 (FUN_00624E90, preregister lane, inlined ctor part)
+     *
+     * What it does:
+     * Chains the `gpg::RType` base constructor and preregisters
+     * `CUnitLoadUnits` into the reflection lookup table.
+     */
+    CUnitLoadUnitsTypeInfo();
+
+    /**
      * Address: 0x00624F40 (FUN_00624F40, scalar deleting destructor thunk)
      */
     ~CUnitLoadUnitsTypeInfo() override;
@@ -62,6 +71,19 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitLoadUnitsTypeInfo) == 0x64, "CUnitLoadUnitsTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00624E90 (FUN_00624E90, sub_624E90)
+   *
+   * IDA signature:
+   * gpg::RType *sub_624E90();
+   *
+   * What it does:
+   * Constructs the static `CUnitLoadUnitsTypeInfo` descriptor
+   * (`stru_10B1EB8` in the binary) in place and returns it. Called from the
+   * CRT static-initializer array via FUN_00BD1C90.
+   */
+  [[nodiscard]] gpg::RType* preregister_CUnitLoadUnitsTypeInfo();
 } // namespace moho
 
 namespace gpg

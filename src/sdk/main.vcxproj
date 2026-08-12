@@ -1429,6 +1429,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\core\reflection\BadRefCast.h" />
     <ClInclude Include="gpg\core\reflection\RMapStringFloatTypeInfo.h" />
     <ClInclude Include="gpg\core\reflection\Reflection.h" />
+    <ClInclude Include="gpg\core\reflection\StaticTypeInfoStorage.h" />
     <ClInclude Include="gpg\core\containers\FastVectorUIntReflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorInsertLanes.h" />
     <ClInclude Include="gpg\core\containers\CheckedArrayAllocationLanes.h" />

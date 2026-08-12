@@ -108,4 +108,17 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitMeleeAttackTargetTaskTypeInfo) == 0x64, "CUnitMeleeAttackTargetTaskTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00615270 (FUN_00615270, sub_615270)
+   *
+   * IDA signature:
+   * gpg::RType *sub_615270();
+   *
+   * What it does:
+   * Constructs the static `CUnitMeleeAttackTargetTaskTypeInfo` descriptor
+   * (`stru_10B17C8` in the binary) in place and returns it. Called from the
+   * CRT static-initializer array via FUN_00BD0DE0.
+   */
+  [[nodiscard]] gpg::RType* preregister_CUnitMeleeAttackTargetTaskTypeInfo();
 } // namespace moho

@@ -9,8 +9,14 @@
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitMeleeAttackTargetTask.h"
 
+#include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/reflection/StaticTypeInfoStorage.h"
+
 namespace
 {
+  gpg::StaticTypeInfoStorage<moho::CUnitMeleeAttackTargetTaskTypeInfo>
+    gCUnitMeleeAttackTargetTaskTypeInfoStorage{};
+
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -62,6 +68,18 @@ namespace moho
     : gpg::RType()
   {
     gpg::PreRegisterRType(typeid(CUnitMeleeAttackTargetTask), this);
+  }
+
+  /**
+   * Address: 0x00615270 (FUN_00615270, sub_615270)
+   *
+   * What it does:
+   * Constructs the static descriptor in place on first call and returns it,
+   * exactly as the binary's static-init lane does for `stru_10B17C8`.
+   */
+  gpg::RType* preregister_CUnitMeleeAttackTargetTaskTypeInfo()
+  {
+    return &gCUnitMeleeAttackTargetTaskTypeInfoStorage.Ensure();
   }
 
   /**
@@ -217,3 +235,10 @@ namespace moho
     task->~CUnitMeleeAttackTargetTask();
   }
 } // namespace moho
+
+// Phase-1 pre-registration: run this descriptor registration ahead of every
+// consumer that calls gpg::LookupRType. See StaticInitPhase.h.
+GPG_PREREGISTER_INIT(
+  preregister_CUnitMeleeAttackTargetTaskTypeInfo_615270,
+  moho::preregister_CUnitMeleeAttackTargetTaskTypeInfo
+)
