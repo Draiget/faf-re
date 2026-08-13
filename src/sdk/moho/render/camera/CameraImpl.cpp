@@ -832,87 +832,9 @@ namespace
     *ownerLinkSlot = &weakRef;
   }
 
-  [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateSelectionSetHead()
-  {
-    auto* const head = static_cast<moho::SSelectionNodeUserEntity*>(::operator new(sizeof(moho::SSelectionNodeUserEntity)));
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mKey = 0u;
-    head->mEnt.mOwnerLinkSlot = nullptr;
-    head->mEnt.mNextOwner = nullptr;
-    head->mColor = 1u;
-    head->mIsSentinel = 1u;
-    head->pad_1A[0] = 0u;
-    head->pad_1A[1] = 0u;
-    return head;
-  }
-
-  void InitializeTemporarySelectionSet(moho::SSelectionSetUserEntity& set)
-  {
-    set.mAllocProxy = nullptr;
-    set.mHead = AllocateSelectionSetHead();
-    set.mSize = 0u;
-    set.mSizeMirrorOrUnused = 0u;
-  }
-
-  void DestroyTemporarySelectionSet(moho::SSelectionSetUserEntity& set) noexcept
-  {
-    moho::SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    msvc8::vector<moho::SSelectionNodeUserEntity*> nodes{};
-    moho::SSelectionNodeUserEntity* cursor = nullptr;
-    moho::SSelectionNodeUserEntity* node = moho::SSelectionSetUserEntity::find(&set, head->mLeft, &cursor);
-    while (node != head) {
-      nodes.push_back(node);
-      moho::SSelectionSetUserEntity::Iterator_inc(&cursor);
-      node = moho::SSelectionSetUserEntity::find(&set, cursor, &cursor);
-    }
-
-    for (moho::SSelectionNodeUserEntity* const liveNode : nodes) {
-      UnlinkSelectionWeakOwnerRef(liveNode->mEnt);
-      ::operator delete(liveNode);
-    }
-
-    ::operator delete(head);
-    set.mAllocProxy = nullptr;
-    set.mHead = nullptr;
-    set.mSize = 0u;
-    set.mSizeMirrorOrUnused = 0u;
-  }
-
-  class ScopedTemporarySelectionSet final
-  {
-  public:
-    ScopedTemporarySelectionSet()
-    {
-      InitializeTemporarySelectionSet(mSet);
-    }
-
-    ~ScopedTemporarySelectionSet()
-    {
-      DestroyTemporarySelectionSet(mSet);
-    }
-
-    ScopedTemporarySelectionSet(const ScopedTemporarySelectionSet&) = delete;
-    ScopedTemporarySelectionSet& operator=(const ScopedTemporarySelectionSet&) = delete;
-
-    [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept
-    {
-      return mSet;
-    }
-
-    [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept
-    {
-      return mSet;
-    }
-
-  private:
-    moho::SSelectionSetUserEntity mSet{};
-  };
+  // The selection weak-set lifetime helpers live with the type they manage,
+  // in `moho/sim/CWldSession.h`: `moho::ScopedLocalSelectionSet` owns the head
+  // sentinel and tears the set down through the engine's own `EraseRange`.
 
   struct SessionEntityMapNodeView
   {
@@ -4610,7 +4532,7 @@ int moho::cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* const state)
   }
   const float zoom = static_cast<float>(lua_tonumber(rawState, 3));
 
-  ScopedTemporarySelectionSet entitySetGuard{};
+  moho::ScopedLocalSelectionSet entitySetGuard{};
   SSelectionSetUserEntity& entitySet = entitySetGuard.get();
   AppendLuaEntityIdArrayToSelectionSet(state, 2, entitySet);
 
@@ -4661,7 +4583,7 @@ int moho::cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* const state)
   }
   const float zoom = static_cast<float>(lua_tonumber(rawState, 3));
 
-  ScopedTemporarySelectionSet entitySetGuard{};
+  moho::ScopedLocalSelectionSet entitySetGuard{};
   SSelectionSetUserEntity& entitySet = entitySetGuard.get();
   AppendLuaEntityIdArrayToSelectionSet(state, 2, entitySet);
 
@@ -4705,7 +4627,7 @@ int moho::cfunc_CameraImplNoseCamL(LuaPlus::LuaState* const state)
     entityIdArg.TypeError("string");
   }
 
-  ScopedTemporarySelectionSet entitySetGuard{};
+  moho::ScopedLocalSelectionSet entitySetGuard{};
   SSelectionSetUserEntity& entitySet = entitySetGuard.get();
   const int entityId = entityIdText != nullptr ? std::atoi(entityIdText) : 0;
   if (UserEntity* const entity = FindSessionEntityById(moho::WLD_GetActiveSession(), entityId); entity != nullptr) {
