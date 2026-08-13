@@ -398,7 +398,15 @@ namespace moho
     /// `SCreateUnitConstantData::mStatsRoot`, retained by the constructor.
     boost::shared_ptr<void> mStatsRoot;                  // 0x0188
     bool mIsFake; // 0x0190 (also `SCreateUnitConstantData::mFake`)
-    std::uint8_t pad_0191_019C[0x19C - 0x191]{};
+    std::uint8_t pad_0191_0194[0x0194 - 0x0191]{};
+    /// Zeroed by the constructor at 0x008BF590, just before the replicated
+    /// variable-data payload is constructed.
+    std::uint8_t mReserved0194{}; // 0x0194
+    std::uint8_t pad_0195_0198[0x0198 - 0x0195]{};
+    /// First field of the replicated `SSTIUnitVariableData` payload, which the
+    /// constructor builds at +0x198: the entity id of whatever created this
+    /// unit, or 0xF0000000 when it had no creator.
+    std::uint32_t mReplicatedCreatorId{}; // 0x0198 (EntId)
     std::int32_t mBuildTemplateOrderLane; // 0x019C
     bool mAutoMode;           // 0x01A0
     bool mAutoSurfaceMode;    // 0x01A1
@@ -480,6 +488,10 @@ namespace moho
   static_assert(offsetof(UserUnit, mBuildStateTag) == 0x0184, "UserUnit::mBuildStateTag offset must be 0x0184");
   static_assert(offsetof(UserUnit, mStatsRoot) == 0x0188, "UserUnit::mStatsRoot offset must be 0x0188");
   static_assert(offsetof(UserUnit, mIsFake) == 0x0190, "UserUnit::mIsFake offset must be 0x0190");
+  static_assert(offsetof(UserUnit, mReserved0194) == 0x0194, "UserUnit::mReserved0194 offset must be 0x0194");
+  static_assert(
+    offsetof(UserUnit, mReplicatedCreatorId) == 0x0198, "UserUnit::mReplicatedCreatorId offset must be 0x0198"
+  );
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(
