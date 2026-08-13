@@ -13026,7 +13026,7 @@ void SSTIUnitVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadInt(&mNukeSiloStorageCount);
   archive->ReadInt(&mNukeSiloMaxStorageCount);
 
-  archive->Read(CachedEntIdType(), &mUnknown40, ownerRef);
+  archive->Read(CachedEntIdType(), &mSelectionInheritorId, ownerRef);
   archive->ReadString(&mCustomName);
 
   archive->Read(CachedSEconValueType(), &mProduced, ownerRef);
@@ -13101,7 +13101,7 @@ void SSTIUnitVariableData::MemberSerialize(gpg::WriteArchive* const archive)
   archive->WriteInt(mNukeSiloStorageCount);
   archive->WriteInt(mNukeSiloMaxStorageCount);
 
-  archive->Write(CachedEntIdType(), &mUnknown40, ownerRef);
+  archive->Write(CachedEntIdType(), &mSelectionInheritorId, ownerRef);
   archive->WriteString(&mCustomName);
 
   archive->Write(CachedSEconValueType(), &mProduced, ownerRef);
@@ -13203,7 +13203,7 @@ SSTIUnitVariableData::SSTIUnitVariableData()
   , mNukeSiloStorageCount(0)
   , mTacticalSiloMaxStorageCount(0)
   , mNukeSiloMaxStorageCount(0)
-  , mUnknown40(static_cast<EntId>(0xF0000000u))
+  , mSelectionInheritorId(static_cast<EntId>(0xF0000000u))
   , mCustomName()
   , mProduced{0.0f, 0.0f}
   , mResourcesSpent{0.0f, 0.0f}
@@ -13356,7 +13356,7 @@ SSTIUnitVariableData& SSTIUnitVariableData::AssignFrom(const SSTIUnitVariableDat
   mNukeSiloStorageCount = other.mNukeSiloStorageCount;
   mTacticalSiloMaxStorageCount = other.mTacticalSiloMaxStorageCount;
   mNukeSiloMaxStorageCount = other.mNukeSiloMaxStorageCount;
-  mUnknown40 = other.mUnknown40;
+  mSelectionInheritorId = other.mSelectionInheritorId;
   mCustomName = other.mCustomName;
   mProduced = other.mProduced;
   mResourcesSpent = other.mResourcesSpent;
