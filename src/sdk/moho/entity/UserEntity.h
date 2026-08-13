@@ -25,14 +25,6 @@ namespace moho
   struct HSndEntityLoop;
   struct REntityBlueprint;
 
-  struct SCreateEntityParams
-  {
-    std::uint32_t mEntityId;            // 0x00
-    const REntityBlueprint* mBlueprint; // 0x04
-    std::uint32_t mUnknown08;           // 0x08
-  };
-  static_assert(sizeof(SCreateEntityParams) == 0x0C, "SCreateEntityParams size must be 0x0C");
-
   using UserEntityLinkNode = TDatListItem<void, void>;
   static_assert(sizeof(UserEntityLinkNode) == 0x08, "UserEntityLinkNode size must be 0x08");
 

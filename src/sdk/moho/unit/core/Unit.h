@@ -677,6 +677,33 @@ namespace moho
   );
 
   /**
+   * One replicated unit-variable update record, queued onto
+   * `SSyncData::mUnitUpdates` by the `Unit` / `ReconBlip` overrides of
+   * `SyncInterface` (FUN_006AC3A0 / FUN_005BEFB0) and drained by
+   * `CWldSession::DoBeat`, which hands the payload and the recon flags to
+   * `UserUnit::UpdateUnitData`. It lives here rather than in SimDriver.h
+   * because it embeds a whole `SSTIUnitVariableData` by value.
+   */
+  struct SUnitVariableUpdateEntry
+  {
+    EntId mEntityId = 0;                    // +0x000
+    std::uint32_t mReserved04 = 0;          // +0x004
+    SSTIUnitVariableData mVariableData{};   // +0x008
+    std::int32_t mReconFlags = 0;           // +0x230
+    std::uint32_t mReserved234 = 0;         // +0x234
+  };
+  static_assert(
+    offsetof(SUnitVariableUpdateEntry, mVariableData) == 0x08,
+    "SUnitVariableUpdateEntry::mVariableData offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SUnitVariableUpdateEntry, mReconFlags) == 0x230,
+    "SUnitVariableUpdateEntry::mReconFlags offset must be 0x230"
+  );
+  static_assert(
+    sizeof(SUnitVariableUpdateEntry) == 0x238, "SUnitVariableUpdateEntry size must be 0x238"
+  );
+  /**
    * Address: 0x0055C620 (FUN_0055C620, preregister_SSTIUnitVariableDataTypeInfo)
    *
    * What it does:

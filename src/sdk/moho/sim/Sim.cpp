@@ -3818,23 +3818,14 @@ namespace
     "CommandIssueHelperRuntimeView::localQueue offset must be 0xB8"
   );
 
-  struct SessionCommandManagerRuntimeView
+  /// `moho::CommandManager` owns this layout; the only thing this file adds
+  /// is a typed view of the command map, whose nodes it walks directly
+  /// rather than through `msvc8::map`.
+  [[nodiscard]] inline CommandDbMapStorageView& CommandIssueMapOf(CommandManager& manager) noexcept
   {
-    IdPool idPool;                                // +0x0000
-    std::uint8_t sourceId;                        // +0x0CB0
-    std::uint8_t pad_0CB1_0CB3[0x03];             // +0x0CB1
-    CommandDbMapStorageView commandIssueMap; // +0x0CB4
-  };
-  static_assert(offsetof(SessionCommandManagerRuntimeView, idPool) == 0x0000, "SessionCommandManagerRuntimeView::idPool offset must be 0x0000");
-  static_assert(
-    offsetof(SessionCommandManagerRuntimeView, sourceId) == 0x0CB0,
-    "SessionCommandManagerRuntimeView::sourceId offset must be 0x0CB0"
-  );
-  static_assert(
-    offsetof(SessionCommandManagerRuntimeView, commandIssueMap) == 0xCB4,
-    "SessionCommandManagerRuntimeView::commandIssueMap offset must be 0xCB4"
-  );
-  static_assert(sizeof(SessionCommandManagerRuntimeView) == 0xCC0, "SessionCommandManagerRuntimeView size must be 0xCC0");
+    return *reinterpret_cast<CommandDbMapStorageView*>(&manager.mCommands);
+  }
+  static_assert(sizeof(CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
 
   static_assert(
     offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex), "SimSubRes3/BVIntSet offset mismatch"
@@ -4410,7 +4401,7 @@ namespace
    * map and returns the mapped helper pointer, or `nullptr` when absent.
    */
   [[maybe_unused]] [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelperInManager(
-    SessionCommandManagerRuntimeView* const commandManager,
+    CommandManager* const commandManager,
     const CmdId cmdId
   ) noexcept
   {
@@ -4418,7 +4409,7 @@ namespace
       return nullptr;
     }
 
-    CommandDbMapStorageView& commandIssueMap = commandManager->commandIssueMap;
+    CommandDbMapStorageView& commandIssueMap = CommandIssueMapOf(*commandManager);
     CommandDbMapNodeView* const node = FindCommandNode(commandIssueMap, cmdId);
     if (node == nullptr || node == commandIssueMap.head) {
       return nullptr;
@@ -4433,7 +4424,7 @@ namespace
       return nullptr;
     }
 
-    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
+    CommandManager* const commandManager = session->mCommandManager;
     return FindCommandIssueHelperInManager(commandManager, cmdId);
   }
 
@@ -4446,24 +4437,24 @@ namespace
    * and writes the resulting command id to `outCommandId`.
    */
   [[maybe_unused]] [[nodiscard]] std::uint32_t* AllocatePackedCommandIdFromManager(
-    SessionCommandManagerRuntimeView* const commandManager,
+    CommandManager* const commandManager,
     std::uint32_t* const outCommandId
   ) noexcept
   {
-    if (commandManager->sourceId == 0xFFu) {
+    if (commandManager->mSourceId == 0xFFu) {
       *outCommandId = std::numeric_limits<std::uint32_t>::max();
       return outCommandId;
     }
 
     std::uint32_t nextLowId = 0u;
-    if (commandManager->idPool.mReleasedLows.mWords.begin() == commandManager->idPool.mReleasedLows.mWords.end()) {
-      nextLowId = static_cast<std::uint32_t>(commandManager->idPool.mNextLowId++);
+    if (commandManager->mIdPool.mReleasedLows.mWords.begin() == commandManager->mIdPool.mReleasedLows.mWords.end()) {
+      nextLowId = static_cast<std::uint32_t>(commandManager->mIdPool.mNextLowId++);
     } else {
-      nextLowId = commandManager->idPool.mReleasedLows.GetNext(std::numeric_limits<std::uint32_t>::max());
-      (void)commandManager->idPool.mReleasedLows.Remove(nextLowId);
+      nextLowId = commandManager->mIdPool.mReleasedLows.GetNext(std::numeric_limits<std::uint32_t>::max());
+      (void)commandManager->mIdPool.mReleasedLows.Remove(nextLowId);
     }
 
-    *outCommandId = nextLowId | (static_cast<std::uint32_t>(commandManager->sourceId) << 24u);
+    *outCommandId = nextLowId | (static_cast<std::uint32_t>(commandManager->mSourceId) << 24u);
     return outCommandId;
   }
 
@@ -5377,18 +5368,22 @@ namespace
    * Finds an existing helper for one command id or constructs and inserts a
    * new command-issue helper, then marks reused helper variable data dirty.
    */
-  [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindOrCreateCommandIssueHelper(
-    SessionCommandManagerRuntimeView& commandManager,
+} // namespace
+
+namespace moho
+{
+  [[nodiscard]] UserCommandIssueHelper* FindOrCreateCommandIssueHelper(
+    CommandManager& commandManager,
     const SSTICommandConstantData& constantData,
     const std::uint8_t deleteWhenDue,
     const std::int32_t dueSeqNo
   )
   {
     const CmdId commandId = static_cast<CmdId>(constantData.cmd);
-    CommandDbMapNodeView* const node = FindCommandNode(commandManager.commandIssueMap, commandId);
-    if (node == nullptr || node == commandManager.commandIssueMap.head) {
+    CommandDbMapNodeView* const node = FindCommandNode(CommandIssueMapOf(commandManager), commandId);
+    if (node == nullptr || node == CommandIssueMapOf(commandManager).head) {
       auto* const helper = new UserCommandIssueHelper(constantData, deleteWhenDue, dueSeqNo);
-      InsertCommandNode(commandManager.commandIssueMap, commandId, CommandIssueHelperAsCommandNodeValue(helper));
+      InsertCommandNode(CommandIssueMapOf(commandManager), commandId, CommandIssueHelperAsCommandNodeValue(helper));
       return helper;
     }
 
@@ -5405,21 +5400,21 @@ namespace
    * Deletes command-issue helpers for each supplied command id and recycles
    * ids that belong to the manager's active source byte.
    */
-  [[maybe_unused]] void DeleteCommandIssueHelpers(
-    SessionCommandManagerRuntimeView& commandManager,
+  void DeleteCommandIssueHelpers(
+    CommandManager& commandManager,
     const msvc8::vector<CmdId>& commandIds
   ) noexcept
   {
     for (const CmdId* cursor = commandIds.begin(); cursor != commandIds.end(); ++cursor) {
       const CmdId commandId = *cursor;
-      CommandDbMapNodeView* const node = FindCommandNode(commandManager.commandIssueMap, commandId);
-      if (node != nullptr && node != commandManager.commandIssueMap.head) {
+      CommandDbMapNodeView* const node = FindCommandNode(CommandIssueMapOf(commandManager), commandId);
+      if (node != nullptr && node != CommandIssueMapOf(commandManager).head) {
         delete CommandIssueHelperFromCommandNode(node);
       }
 
       const std::uint32_t rawCommandId = static_cast<std::uint32_t>(commandId);
-      if (static_cast<std::uint8_t>(rawCommandId >> 24u) == commandManager.sourceId) {
-        commandManager.idPool.QueueReleasedLowId(rawCommandId & 0x00FFFFFFu);
+      if (static_cast<std::uint8_t>(rawCommandId >> 24u) == commandManager.mSourceId) {
+        commandManager.mIdPool.QueueReleasedLowId(rawCommandId & 0x00FFFFFFu);
       }
     }
   }
@@ -5431,12 +5426,12 @@ namespace
    * Advances every command-issue helper to the current beat and then ticks
    * the manager id-pool recycle history.
    */
-  [[maybe_unused]] void AdvanceCommandIssueHelpersToBeat(
-    SessionCommandManagerRuntimeView& commandManager,
+  void AdvanceCommandIssueHelpersToBeat(
+    CommandManager& commandManager,
     const std::int32_t beat
   ) noexcept
   {
-    CommandDbMapNodeView* const head = commandManager.commandIssueMap.head;
+    CommandDbMapNodeView* const head = CommandIssueMapOf(commandManager).head;
     if (head != nullptr) {
       CommandDbMapNodeView* node = head->left;
       while (node != head) {
@@ -5447,9 +5442,12 @@ namespace
       }
     }
 
-    commandManager.idPool.Update();
+    commandManager.mIdPool.Update();
   }
+} // namespace moho
 
+namespace
+{
   [[nodiscard]] CUnitCommand* AddIssueDataToCommandDb(
     CCommandDb* const commandDb,
     const SSTICommandIssueData& issueData
@@ -28876,7 +28874,7 @@ namespace moho
     CWldSession* const session = WLD_GetActiveSession();
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
-    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
+    CommandManager* const commandManager = session->mCommandManager;
 
     // The playable-rect source at terrain-res +0x04 is the live STIMap in this
     // build; STIMap::IsPlayable is the concrete method dispatched at 0x008B030F.

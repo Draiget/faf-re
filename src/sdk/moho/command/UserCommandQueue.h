@@ -27,6 +27,10 @@ namespace moho
   };
   static_assert(sizeof(UserCommandQueueLinkVector) == 0x10, "UserCommandQueueLinkVector size must be 0x10");
 
+  /// Both link runs start on a two-entry small buffer (0x10 bytes each), the
+  /// capacity the constructor seeds at 0x008BF620 and 0x008BF635.
+  inline constexpr std::size_t kUserCommandQueueInlineEntries = 2;
+
   /** The manager's pending-issue ring: block table, block count, start, size. */
   struct UserManagerIssueQueue
   {
