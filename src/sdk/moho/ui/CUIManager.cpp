@@ -93,21 +93,29 @@ namespace
     return frameIdx >= 0 && static_cast<std::size_t>(frameIdx) < manager.mFrames.Size();
   }
 
+  /**
+   * Republishes the whole engine-statistics tree as the `__EngineStats` global.
+   *
+   * `STAT_GetLuaTable` is the recursive serializer: it assigns the node's own
+   * table, fills in `Name`/`Value` through `StatItem::ToLua`, and then emits a
+   * `Children` array holding one such table per child. Calling `ToLua` directly
+   * here instead produced a root node with no `Children` at all, which is what
+   * `/lua/system/performance.lua:711` walks - `for k, stat in
+   * engineStats.Children do` raised "attempt to loop over field `Children' (a
+   * nil value)" on every UI tick.
+   */
   void PublishEngineStatsToLua(LuaPlus::LuaState* const state)
   {
     if (state == nullptr) {
       return;
     }
 
+    // Built before the globals lookup, as the binary does: the serializer takes
+    // the stat tree's lock and can run script-visible allocation.
+    LuaPlus::LuaObject engineStatsTable{};
+    moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem, engineStatsTable);
+
     LuaPlus::LuaObject globals = state->GetGlobals();
-    LuaPlus::LuaObject engineStatsTable(state);
-    engineStatsTable.AssignNewTable(state, 0, 0);
-
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    if (engineStats != nullptr && engineStats->mItem != nullptr) {
-      engineStats->mItem->ToLua(state, &engineStatsTable);
-    }
-
     globals.SetObject("__EngineStats", engineStatsTable);
   }
 } // namespace
@@ -238,7 +246,11 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
     return true;
   }
 
-  PublishEngineStatsToLua(mLuaState);
+  // A fresh state only gets the empty placeholder; the tree itself is published
+  // per tick from `UpdateFrameRate`. Doing the full serialize here would walk
+  // the stat tree before any frame exists.
+  LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+  (void)globals.CreateTable("__EngineStats", 0, 0);
 
   const std::size_t headCount = std::min(mInputWindows.Size(), mHostWindows.Size());
   for (std::size_t head = 0; head < headCount; ++head) {
