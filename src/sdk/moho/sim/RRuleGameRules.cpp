@@ -1858,12 +1858,30 @@ namespace moho
       }
 
       LuaPlus::LuaObject destinationBlueprints = rootState->GetGlobal("__blueprints");
-      if (!destinationBlueprints.IsTable()) {
+
+      // 0x0052A3D0 walks a std::set of *pending* blueprint ordinals hanging off
+      // the export binding (`_Myhead` at binding+0x08, `_Mysize` at +0x0C) and
+      // skips the whole body when that set is empty - the loop is entered only
+      // by `if (head->_Left != head)`, and its tail clears the set. So in the
+      // steady state the binary copies nothing at all.
+      //
+      // The producer that fills that set is not recovered yet, so the set here
+      // is always empty and this pass cannot be gated on it. What it must not
+      // do is what it did before: deep-copy every blueprint through `SCR_Copy`
+      // on every single frame, for both the world session and the sim. On a
+      // normal map that is thousands of table copies per frame, and all of it
+      // is interning strings and allocating tables in two `lua_State`s from two
+      // threads. Publish once, which is what the first pass has to do anyway,
+      // and then behave like the binary does with nothing pending.
+      const bool firstPublish = !destinationBlueprints.IsTable();
+      if (firstPublish) {
         LuaPlus::LuaObject globals = rootState->GetGlobals();
         LuaPlus::LuaObject replacementTable{};
         replacementTable.AssignNewTable(rootState, 0, 0);
         globals.SetObject("__blueprints", replacementTable);
         destinationBlueprints = rootState->GetGlobal("__blueprints");
+      } else {
+        return;
       }
 
       LuaPlus::LuaObject sourceBlueprints = rules.mLuaState->GetGlobal("__blueprints");
