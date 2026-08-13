@@ -4179,13 +4179,19 @@ LuaPlus::LuaObject CScrLuaMetatableFactory<UserUnit>::Create(LuaPlus::LuaState* 
 }
 
 /**
- * Address: 0x008BF990 (FUN_008BF990)
+ * Address: 0x008BF990 (FUN_008BF990, ??_GUserUnit@Moho@@UAEPAXI@Z)
+ * Address: 0x008BF9B0 (FUN_008BF9B0, ??1UserUnit@Moho@@UAE@XZ)
  *
  * std::uint8_t deleteFlags
  *
  * What it does:
- * Performs deleting-style user-unit teardown, clears user-unit-local runtime
- * ownership lanes, and conditionally releases object memory.
+ * The deleting destructor and the destructor body it tail-calls, merged: drops
+ * the unit from its army's registries, hands its selection to the successor
+ * named by `mUnitVarDat.mSelectionInheritorId`, tears down the per-unit command
+ * managers, and conditionally releases the object memory.
+ *
+ * The two are one function here because 0x008BF990 is the three-instruction
+ * MSVC deleting-destructor thunk over 0x008BF9B0; C++ emits that thunk itself.
  */
 UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
 {
