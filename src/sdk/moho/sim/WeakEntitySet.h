@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 namespace moho
 {
@@ -85,24 +86,36 @@ namespace moho
   );
 
   /**
-   * Brings one weak-entity set up empty: allocates the head sentinel through
-   * the shared 28-byte node allocator (FUN_007B4640), marks it as the
-   * sentinel and self-links all three child pointers, exactly as every
-   * weak-set initializer in the binary does.
+   * Builds one weak-set head sentinel through the shared 28-byte node
+   * allocator (FUN_007B4640), marking it as the sentinel and self-linking all
+   * three child pointers, exactly as every weak-set initializer in the binary
+   * does.
+   *
+   * This is the single head-builder for every weak-entity set in the engine —
+   * the session selection, the per-army idle registries and every transient
+   * local set alike. Do not open-code a second copy of it.
    */
-  inline void InitWeakEntitySetHead(WeakEntitySetUserEntity& set)
+  [[nodiscard]] inline SSelectionNodeUserEntity* AllocateWeakEntitySetHead()
   {
     auto* const head = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
-    head->mColor = 1u;
-    head->mIsSentinel = 1u;
+    head->mLeft = head;
+    head->mParent = head;
+    head->mRight = head;
     head->mKey = 0u;
     head->mEnt.mOwnerLinkSlot = nullptr;
     head->mEnt.mNextOwner = nullptr;
-    head->mParent = head;
-    head->mLeft = head;
-    head->mRight = head;
+    head->mColor = 1u;
+    head->mIsSentinel = 1u;
+    head->pad_1A[0] = 0u;
+    head->pad_1A[1] = 0u;
+    return head;
+  }
 
-    set.mHead = head;
+  /** Brings one weak-entity set up empty, head sentinel included. */
+  inline void InitWeakEntitySetHead(WeakEntitySetUserEntity& set)
+  {
+    set.mAllocProxy = nullptr;
+    set.mHead = AllocateWeakEntitySetHead();
     set.mSize = 0u;
   }
 } // namespace moho

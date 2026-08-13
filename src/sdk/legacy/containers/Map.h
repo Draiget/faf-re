@@ -57,8 +57,16 @@ namespace msvc8
         map() noexcept {}
         explicit map(const key_compare& comp) : tree_(comp) {}
 
-        map(const map&) = delete;
-        map& operator=(const map&) = delete;
+        /**
+         * MSVC8 `_Tree::_Tree(const _Myt&)`: a fresh empty tree plus a `_Copy`
+         * walk of the source, shared with `msvc8::set` through `rb_tree`.
+         */
+        map(const map& o) : tree_(o.tree_) {}
+        map& operator=(const map& o)
+        {
+            tree_ = o.tree_;
+            return *this;
+        }
         map(map&& o) noexcept : tree_(std::move(o.tree_)) {}
         map& operator=(map&& o) noexcept
         {
