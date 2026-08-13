@@ -3962,7 +3962,7 @@ extern "C" const std::uint16_t* __cdecl __pctype_func()
 
 namespace
 {
-  // Address: 0x00FB82B0 (`unk_FB82B0` in `getSystemCP` callers).
+  // Address: 0x00A97C75 (FUN_00A97C75, getSystemCP)
   std::int32_t gSetMbcpUsedSystemCodePage = 0;
 }
 

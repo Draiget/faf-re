@@ -3467,7 +3467,7 @@ namespace
   }
 
   /**
-   * Address: 0x00B867B0 (FUN_00B867B0, cleanup_EntityDbEntityListTypeName)
+   * Address: 0x00685DF0 (FUN_00685DF0, gpg::RListType_EntityP::GetName)
    *
    * What it does:
    * Releases cached lexical storage for `gpg::RListType_EntityP::GetName`.
