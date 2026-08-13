@@ -396,7 +396,7 @@ namespace moho
     , mTransform()
     , mLastInterpAmt(-1.0f)
     , mHasInitialUpdate(0)
-    , mHasRuntimePose(0)
+    , mMarkedForDeletion(0)
     , pad_0146_0147{0, 0}
   {
     mTransform.orient_.w = 1.0f;

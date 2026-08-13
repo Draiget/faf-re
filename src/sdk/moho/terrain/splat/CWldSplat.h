@@ -20,6 +20,7 @@ namespace moho
   class CDecalGroup;
   class UserEntity;
   struct GeomCamera3;
+  struct SDecalInfo;
 
   struct DecalGroupLookupNode
   {
@@ -288,7 +289,25 @@ namespace moho
     [[nodiscard]] std::int32_t FindGroupBySplatIndex(std::uint32_t splatIndex) const;
 
     /**
+     * Address: 0x00878650 (FUN_00878650, Moho::CDecalManager::AddDecals)
+     * Slot: 22 (`??_7CDecalManager@Moho@@6B@` + 0x58)
+     *
+     * IDA signature:
+     * std::vector *__thiscall Moho::CDecalManager::Func20(Moho::CDecalManager *this, std::vector *a2);
+     *
+     * What it does:
+     * Materializes one sync packet's worth of sim-authored decals. Splat
+     * records become `CWldSplat` overlays; the rest resolve their type name
+     * against `CWldTerrainDecal::sTypeDesc` and become plain terrain decals.
+     * Both paths copy the transform, apply the resolved texture names, carry
+     * the handle / fade deadline / army / fidelity lanes across, and settle the
+     * cutoff LOD.
+     */
+    void AddDecals(const msvc8::vector<SDecalInfo>& decals);
+
+    /**
      * Address: 0x00878A40 (FUN_00878A40, Moho::CDecalManager::RemoveDecals)
+     * Slot: 23 (`??_7CDecalManager@Moho@@6B@` + 0x5C)
      *
      * What it does:
      * Scans all active decals for each requested runtime handle and marks

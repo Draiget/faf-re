@@ -5372,6 +5372,21 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x008B58A0 (FUN_008B58A0, struct_CommandManager::struct_CommandManager)
+   *
+   * What it does:
+   * Stands up an empty manager for one command source. Both sub-objects build
+   * themselves: `IdPool` seeds its recycle history and the command map stands
+   * up its own head sentinel.
+   */
+  CommandManager::CommandManager(const std::uint32_t sourceId)
+    : mIdPool()
+    , mSourceId(static_cast<std::uint8_t>(sourceId))
+    , pad_0CB1_0CB4{}
+    , mCommands()
+  {}
+
   [[nodiscard]] UserCommandIssueHelper* FindOrCreateCommandIssueHelper(
     CommandManager& commandManager,
     const SSTICommandConstantData& constantData,

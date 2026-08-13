@@ -30,6 +30,15 @@ namespace moho
    */
   struct CommandManager
   {
+    /**
+     * Address: 0x008B58A0 (FUN_008B58A0, struct_CommandManager::struct_CommandManager)
+     *
+     * What it does:
+     * Stands up an empty manager for one command source: a fresh id pool, the
+     * source byte ids get stamped with, and an empty command map.
+     */
+    explicit CommandManager(std::uint32_t sourceId);
+
     /// Recycling pool the manager draws command ids from.
     IdPool mIdPool;              // +0x0000
     /// Command-source byte; ids whose source matches are recycled locally.

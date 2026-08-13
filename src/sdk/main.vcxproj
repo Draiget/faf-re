@@ -1874,6 +1874,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SPhysConstants.h" />
     <ClInclude Include="moho\sim\SSTIArmyVariableData.h" />
     <ClInclude Include="moho\sim\SSTICommandSource.h" />
+    <ClInclude Include="moho\sim\SyncInlineVector.h" />
     <ClInclude Include="moho\task\CLuaTask.h" />
     <ClInclude Include="lua\LuaDebug.h" />
     <ClInclude Include="lua\LuaObject.h" />

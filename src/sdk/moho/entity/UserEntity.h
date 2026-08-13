@@ -308,7 +308,9 @@ namespace moho
     VTransform mTransform;          // 0x124
     float mLastInterpAmt;           // 0x140
     std::uint8_t mHasInitialUpdate; // 0x144
-    std::uint8_t mHasRuntimePose;   // 0x145
+    /// Set by `CWldSession::OrphanEntity` (0x008941ED) when the sim is done
+    /// with the entity but the client still has it on screen.
+    std::uint8_t mMarkedForDeletion; // 0x145
     std::uint8_t pad_0146_0147[0x02]{};
   };
 
@@ -340,5 +342,5 @@ namespace moho
   static_assert(offsetof(UserEntity, mTransform) == 0x124, "UserEntity::mTransform offset must be 0x124");
   static_assert(offsetof(UserEntity, mLastInterpAmt) == 0x140, "UserEntity::mLastInterpAmt offset must be 0x140");
   static_assert(offsetof(UserEntity, mHasInitialUpdate) == 0x144, "UserEntity::mHasInitialUpdate offset must be 0x144");
-  static_assert(offsetof(UserEntity, mHasRuntimePose) == 0x145, "UserEntity::mHasRuntimePose offset must be 0x145");
+  static_assert(offsetof(UserEntity, mMarkedForDeletion) == 0x145, "UserEntity::mMarkedForDeletion offset must be 0x145");
 } // namespace moho

@@ -38,7 +38,17 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/COGrid.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
+#include "moho/net/CGpgNetInterface.h"
+#include "moho/sim/SDesyncInfo.h"
+#include "moho/misc/TimeBar.h"
+#include "moho/particles/CWorldParticles.h"
 #include "moho/render/RCamManager.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -846,6 +856,16 @@ namespace
 
 namespace moho
 {
+  // Beat-scoped console toggles, defined in `moho/misc/RuntimeTuningGlobals.cpp`.
+  extern bool ren_FogOfWar;
+  extern bool dbg_Metronome;
+  extern bool wld_RunWithTheWind;
+
+  /// Lazily-bound engine-stat handles. `DoBeat` publishes how many units it
+  /// ticked; `SessionFrame` publishes how many beats the drain consumed.
+  StatItem* sEngineStat_UserSync_SessionTick_NumTickers = nullptr;
+  StatItem* sEngineStat_Sync_Count = nullptr;
+
   /**
    * Address: 0x0089AEC0 (FUN_0089AEC0, boost::shared_ptr_SSessionSaveData::shared_ptr_SSessionSaveData)
    *
@@ -3373,6 +3393,19 @@ namespace moho
     static_assert(
       offsetof(CWldSessionOrphanRuntimeView, mPendingOrphanSet) == 0x42C,
       "CWldSessionOrphanRuntimeView::mPendingOrphanSet offset must be 0x42C"
+    );
+    /// The visibility lane is the same weak-entity set shape as the orphan
+    /// lane, but it starts 12 bytes later - only the shared base is really
+    /// there - so it needs its own overlay rather than a second member.
+    struct CWldSessionVizUpdateRuntimeView
+    {
+      std::uint8_t pad_0000_0437[0x438];
+      SSelectionSetUserEntity mVizUpdateSet;      // +0x438
+    };
+
+    static_assert(
+      offsetof(CWldSessionVizUpdateRuntimeView, mVizUpdateSet) == 0x438,
+      "CWldSessionVizUpdateRuntimeView::mVizUpdateSet offset must be 0x438"
     );
 
     struct UserEntityWeakLinkSlotRuntimeView
@@ -8429,7 +8462,9 @@ namespace moho
     //   command-map head sentinel allocation). The manager type is modeled
     //   now (moho/command/CommandManager.h) but its constructor is not lifted
     //   yet, so the field is still left null here.
-    mCommandManager = nullptr;
+    // 0x008932C0: the session owns one command manager, stamped with the
+    // command source it issues under.
+    mCommandManager = new CommandManager(sessionInfo.mSourceId);
 
     // Current build/move formation (0x00893529: `new CFormation` @0x64). The
     // session frame calls into it unconditionally through
@@ -8440,13 +8475,17 @@ namespace moho
     mUICommandGraphControl = nullptr;
     mUnknownShared40C = {};
     mDebugCanvas = {};
-    mUnknownShared41C = {};
+    mBeatDebugCanvas = {};
     mSimResources = {};
+    // Both weak-entity sets get their head sentinel here, exactly as the
+    // binary does at 0x00893358 / 0x0089338C. Leaving them null is not a
+    // harmless deferral: every insert path checks the head first and silently
+    // does nothing without it, which is why visibility updates never ran.
     mAuxUpdateRoot = nullptr;
-    mAuxUpdateHead = nullptr;
+    mAuxUpdateHead = AllocateWeakEntitySetHead();
     mAuxUpdateSize = 0;
     mVizUpdateRoot = nullptr;
-    mVizUpdateHead = nullptr;
+    mVizUpdateHead = AllocateWeakEntitySetHead();
     mVizUpdateSize = 0;
 
     mGameTick = 0;
@@ -8464,15 +8503,15 @@ namespace moho
     IsMultiplayer = sessionInfo.mIsMultiplayer;
     IsGameOver = 0;
 
-    // The binary also sizes `userArmies` here - one null slot per launch-info
-    // army (0x008934xx, count taken as `mArmyLaunchInfo._Mylast - _Myfirst`) -
-    // but the slots only become usable when `CWldSession::DoBeat` (0x00894530)
-    // fills them from the sim's army data, and the binary runs that *before*
-    // `CreateGameInterface` inside `WLD_DoInitializing`. `DoBeat` is not
-    // lifted yet, so sizing the vector here on its own just hands the UI a run
-    // of null armies and `cfunc_GetArmiesTableL` dereferences the first one.
-    // The resize belongs in the same pass as `DoBeat`.
     if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
+      // The binary sizes `userArmies` here - one null slot per launch-info army
+      // (0x008932A7) - because `DoBeat` fills every slot from the packet's
+      // `mNewGrids` before `CreateGameInterface` builds the in-game UI. Our
+      // `Sim::Sync` (0x007474B0) is still a partial lift that publishes no
+      // armies, so sizing the run here hands `cfunc_GetArmiesTableL` a null
+      // army to dereference. The resize belongs in the same pass as the rest
+      // of `Sim::Sync`.
+
       // Command sources and the focus army come off the same launch info.
       (void)CopyConstructCommandSourceVector(launchInfo->mCommandSources.mSrcs, &cmdSources);
       FocusArmy = launchInfo->mCommandSources.mOriginalSource;
@@ -8556,7 +8595,7 @@ namespace moho
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
     ReleaseWeakCommandGraph(mUICommandGraphPx, mUICommandGraphControl);
     mSimResources.release();
-    mUnknownShared41C.release();
+    mBeatDebugCanvas.release();
     mDebugCanvas.release();
     mUnknownShared40C.release();
     ClearBuildTemplates();
@@ -9052,6 +9091,11 @@ namespace moho
     if (mapNode != nullptr && mapNode != entityMap.mHead) {
       EraseSessionEntityMapNode(entityMap, mapNode);
     }
+
+    // The flag is what keeps the render side from treating the entity as live
+    // while it finishes its death animation; 0x008941FA writes it right before
+    // the weak-set insert.
+    entity->mMarkedForDeletion = 1;
 
     SSelectionSetUserEntity::AddResult addResult{};
     (void)SSelectionSetUserEntity::Add(&addResult, &runtimeView->mPendingOrphanSet, entity);
@@ -9562,34 +9606,448 @@ namespace moho
     mPendingSaveData.reset();
   }
 
+  namespace
+  {
+    /**
+     * Address: 0x008945C1..0x008945D8 (inside FUN_00894530)
+     *
+     * What it does:
+     * Resolves one army slot for the sound listener, treating a negative focus
+     * army (observer, or not yet assigned) as "no listener".
+     */
+    [[nodiscard]] UserArmy* ArmyAtIndexOrNull(const msvc8::vector<UserArmy*>& armies, const std::int32_t index)
+    {
+      if (index < 0) {
+        return nullptr;
+      }
+      return armies[static_cast<std::size_t>(index)];
+    }
+
+    /**
+     * Address: 0x00894E11..0x00894E45 (inside FUN_00894530)
+     *
+     * What it does:
+     * Looks one live command-issue helper up by id, returning null when the
+     * manager's map has no entry (the walk lands on the sentinel head).
+     */
+    [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CommandManager& manager, const CmdId commandId)
+    {
+      const auto found = manager.mCommands.find(commandId);
+      return found == manager.mCommands.end() ? nullptr : found->second;
+    }
+
+    /**
+     * Address: 0x008955F2..0x00895617 / 0x0089564A..0x00895667 (inside FUN_00894530)
+     *
+     * What it does:
+     * Opens a pruning cursor on one weak-entity set. `find` drops entries whose
+     * owner died since the last beat instead of handing them out, so the first
+     * position has to come through it rather than straight off `mHead->mLeft`.
+     */
+    /**
+     * Address: 0x00895097..0x0089511F and three siblings (inside FUN_00894530)
+     *
+     * What it does:
+     * Re-seats one raw shared-pointer lane onto the beat payload's owner. The
+     * raw pointer is copied unconditionally; the control block is only swapped
+     * when it actually changes, taking the new reference before dropping the
+     * old one so a self-assignment cannot free what it is about to keep.
+     */
+    template <typename TLane, typename TSource>
+    void ReseatSharedLane(boost::SharedPtrRaw<TLane>& lane, const boost::SharedPtrRaw<TSource>& source)
+    {
+      lane.px = source.px;
+      if (lane.pi == source.pi) {
+        return;
+      }
+
+      if (source.pi != nullptr) {
+        source.pi->add_ref_copy();
+      }
+      boost::detail::sp_counted_base* const previous = lane.pi;
+      lane.pi = source.pi;
+      if (previous != nullptr) {
+        previous->release();
+      }
+    }
+
+    /**
+     * Address: 0x00895214 -> FUN_007530C0 (inside FUN_00894530)
+     *
+     * What it does:
+     * Replaces the session's scratch run with the beat payload's, one element
+     * at a time. Each element owns a small inline buffer, so the run cannot be
+     * copied wholesale - the binary's vector assignment reaches the same
+     * per-element copy lane.
+     */
+    void AssignSyncInlineVectors(msvc8::vector<SyncInlineVector>& destination, const msvc8::vector<SyncInlineVector>& source)
+    {
+      destination.resize(source.size());
+
+      auto destinationIt = destination.begin();
+      for (const SyncInlineVector& run : source) {
+        destinationIt->clear();
+        destinationIt->Reserve(run.size());
+        for (const std::int32_t value : run) {
+          destinationIt->push_back(value);
+        }
+        ++destinationIt;
+      }
+    }
+
+    [[nodiscard]] SSelectionSetUserEntity::Index OpenLiveWeakSetCursor(SSelectionSetUserEntity& set)
+    {
+      SSelectionNodeUserEntity* firstLive = nullptr;
+      (void)SSelectionSetUserEntity::find(&set, set.mHead->mLeft, &firstLive);
+      return SSelectionSetUserEntity::Index{&set, firstLive};
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00894530 (FUN_00894530,
+   * ?DoBeat@CWldSession@Moho@@QAEXV?$auto_ptr@USSyncData@Moho@@@std@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CWldSession::DoBeat(Moho::CWldSession *this, std::auto_ptr<SSyncData> sdata);
+   *
+   * What it does:
+   * Applies one sim beat to the client world, in the packet's own lane order.
+   * This is the sole consumer of the driver's sync queue - without it the queue
+   * fills, the issue thread stops issuing, and the game clock never advances.
+   */
+  void CWldSession::DoBeat(msvc8::auto_ptr<SSyncData> syncData)
+  {
+    const CTimeBarSection beatSection("Sync");
+
+    RCamManager* const cameraManager = CAM_GetManager();
+    CameraImpl* const worldCamera = cameraManager->GetCamera("WorldCamera");
+    IWldTerrainRes* const terrainRes = mWldMap->mTerrainRes;
+
+    const SSyncData& beat = *syncData;
+
+    mGameTick = beat.mCurTick;
+    mLastBeatWasTick = beat.mAdvanced;
+
+    // A focus-army change moves the listener, and the outgoing selection belongs
+    // to an army we may no longer be allowed to see - so it is dropped wholesale.
+    if (beat.mFocusArmy != FocusArmy) {
+      FocusArmy = beat.mFocusArmy;
+      USER_GetSound()->SetListenerArmy(ArmyAtIndexOrNull(userArmies, FocusArmy));
+
+      ScopedLocalSelectionSet clearedSelection;
+      SetSelection(clearedSelection.get());
+    }
+
+    USER_GetSound()->UpdateSoundRequests(beat.mAudioRequests);
+
+    if (beat.mAdvanced) {
+      sWorldParticles.AdvancementBeat();
+    }
+    if (beat.mParticleBuffer) {
+      sWorldParticles.AddParticles(*static_cast<const SParticleBuffer*>(beat.mParticleBuffer.get()));
+    }
+
+    auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
+    decalManager->AddDecals(beat.mAddDecals);
+    decalManager->RemoveDecals(beat.mRemoveDecals);
+    decalManager->ProcessRemovals(beat.mCurTick);
+
+    // Camera shakes reach every live camera, not just the world one.
+    {
+      const msvc8::vector<CameraImpl*> allCameras = CAM_GetAllRCamCameras();
+      for (const SCamShakeParams& shake : beat.mCamShakeParams) {
+        for (CameraImpl* const camera : allCameras) {
+          if (camera != nullptr) {
+            camera->CameraShake(shake);
+          }
+        }
+      }
+    }
+
+    if (worldCamera != nullptr) {
+      terrainRes->UpdateWaveSystem(worldCamera->CameraGetView(), worldCamera->CameraGetTargetZoom(), mGameTick);
+    }
+
+    for (const gpg::Rect2i& playableRect : beat.mPlayableRectUpdates) {
+      terrainRes->NotifyMapChange(playableRect);
+    }
+
+    // A new army grid means new armies; each lands in its own index slot, and
+    // the listener is re-seated afterwards because the focus army may now exist.
+    if (!beat.mNewGrids.empty()) {
+      for (const SSTIArmyConstantData& armyConstantData : beat.mNewGrids) {
+        UserArmy* const army = new UserArmy(this, armyConstantData);
+        userArmies[static_cast<std::size_t>(army->mArmyIndex)] = army;
+      }
+      USER_GetSound()->SetListenerArmy(ArmyAtIndexOrNull(userArmies, FocusArmy));
+    }
+
+    // Army updates are positional: the Nth record belongs to the Nth army.
+    {
+      std::size_t armyIndex = 0;
+      for (const SSTIArmyVariableData& armyUpdate : beat.mArmyUpdates) {
+        (void)AssignArmyVariableData(armyUpdate, &userArmies[armyIndex]->mVarDat);
+        ++armyIndex;
+      }
+    }
+
+    for (const SCreateEntityParams& createParams : beat.mNewEntities) {
+      AddEntity(new UserEntity(*this, createParams));
+    }
+
+    for (const SCreateUnitParams& createParams : beat.mNewUnits) {
+      AddEntity(new UserUnit(this, createParams));
+    }
+
+    for (const SSTICommandConstantData& commandConstantData : beat.mPublishedCommandDescriptors) {
+      (void)FindOrCreateCommandIssueHelper(*mCommandManager, commandConstantData, 0u, 0);
+    }
+
+    for (const SUnitVariableUpdateEntry& unitUpdate : beat.mUnitUpdates) {
+      auto* const unit = static_cast<UserUnit*>(LookupEntityId(unitUpdate.mEntityId));
+      unit->UpdateUnitData(unitUpdate.mVariableData, unitUpdate.mReconFlags);
+    }
+
+    for (const SEntityVariableUpdateEntry& entityUpdate : beat.mEntityUpdates) {
+      LookupEntityId(entityUpdate.mEntityId)->UpdateEntityData(entityUpdate.mVariableData);
+    }
+
+    // Erase means "the sim is done with this entity but the client may still be
+    // animating it": drop it from the id map and park it in the orphan set.
+    for (const EntId erasedId : beat.mEraseIds) {
+      OrphanEntity(LookupEntityId(erasedId));
+    }
+
+    for (const SEntityPoseUpdateEntry& poseUpdate : beat.mPoseUpdates) {
+      UserEntity* const entity = LookupEntityId(poseUpdate.mEntityId);
+      if (entity == nullptr) {
+        gpg::Logf("CWldSession::DoBeat() unknown entity id (0x%08x) supplied in a pose update.", poseUpdate.mEntityId);
+        continue;
+      }
+      entity->SetPose(poseUpdate.mPose);
+    }
+
+    // Delete means gone for good.
+    for (const EntId deletedId : beat.mDeleteIds) {
+      UserEntity* const entity = LookupEntityId(deletedId);
+      RemoveEntity(entity);
+      delete entity;
+    }
+
+    for (const SSyncPublishedCommandPacket& commandPacket : beat.mPublishedCommandPackets) {
+      UserCommandIssueHelper* const helper = FindCommandIssueHelper(*mCommandManager, commandPacket.commandId);
+      helper->mVariableData = commandPacket.variableData;
+      helper->mVariableDataDirty = 1u;
+    }
+
+    for (const CmdId removedCommandId : beat.mPendingCommandEventRemovals) {
+      delete FindCommandIssueHelper(*mCommandManager, removedCommandId);
+    }
+
+    DeleteCommandIssueHelpers(*mCommandManager, beat.mPendingReleasedCommandIds);
+
+    // The command graph only gets marked here; the mesh rebuild it implies runs
+    // back in `SessionFrame`.
+    if (const boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false); commandGraph.px != nullptr) {
+      commandGraph.px->MarkDirty();
+    }
+
+    if (worldCamera != nullptr) {
+      for (const SCamFollowParams& follow : beat.mFollowCameras) {
+        worldCamera->CameraFollow(follow);
+      }
+    }
+
+    // Hand the sim's Lua payload to the UI: last beat's table becomes
+    // `PreviousSync`, this beat's stream becomes `Sync`, then `OnSync()` runs.
+    {
+      const LuaPlus::LuaObject previousSync = SCR_Copy(mState->GetGlobal("Sync"), mState);
+      mState->GetGlobals().SetObject("PreviousSync", previousSync);
+
+      // The binary takes the stream by reference and never checks it, because
+      // its `Sim::Sync` always publishes one. Ours is still a partial lift that
+      // leaves `mStream` null, so the deserialize is skipped until it does -
+      // otherwise every beat faults in `BinaryReader::Read`.
+      if (beat.mStream != nullptr) {
+        gpg::BinaryReader syncReader(beat.mStream);
+        LuaPlus::LuaObject currentSync;
+        currentSync.SCR_FromByteStream(currentSync, mState, &syncReader);
+        mState->GetGlobals().SetObject("Sync", currentSync);
+      }
+    }
+    (void)SCR_LuaDoString("OnSync()", mState);
+
+    mSessionPauseStateA = static_cast<std::uint8_t>(beat.mPausedBy != -1);
+    ReseatSharedLane(mDebugCanvas, beat.mTickDebugCanvas);
+    ReseatSharedLane(mBeatDebugCanvas, beat.mBeatDebugCanvas);
+    ren_FogOfWar = beat.mFogOfWar;
+    terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
+    ReseatSharedLane(mSimResources, beat.mSimResources);
+    AssignSyncInlineVectors(mSyncInlineVectors, beat.mInlineScratchVectors);
+
+    for (const msvc8::string& printLine : beat.mPrintField) {
+      CON_Printf("%s", printLine.c_str());
+    }
+
+    if (!beat.mDesyncs.empty()) {
+      msvc8::vector<msvc8::string> desyncArmyNames(beat.mDesyncs.size());
+
+      std::size_t desyncIndex = 0;
+      for (const SDesyncInfo& desync : beat.mDesyncs) {
+        desyncArmyNames[desyncIndex].assign(
+          cmdSources[static_cast<std::size_t>(desync.army)].mName, 0, msvc8::string::npos
+        );
+        GPGNET_ReportDesync(desync.beat, desync.army, desync.hash2.ToString(), desync.hash1.ToString());
+        ++desyncIndex;
+      }
+
+      UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
+    }
+
+    if (beat.mGameOver && IsGameOver == 0u) {
+      IsGameOver = 1u;
+      UI_NoteGameOver();
+      if (CFG_GetArgOption("/exitongameover", 0u, nullptr)) {
+        wxTheApp->ExitMainLoop();
+      }
+    }
+
+    if (mPendingSaveData) {
+      ApplyPendingSaveData();
+    }
+
+    // Every registered unit gets its beat. The stat is what the profiler reads
+    // as "how much work is one beat", so it is published even for an empty list.
+    {
+      gpg::core::FastVectorN<UserEntity*, 81> tickers;
+      auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
+      (void)spatialDb->Collect(tickers, ENTITYTYPE_Unit);
+
+      const auto tickerCount = static_cast<std::int32_t>(tickers.size());
+      if (sEngineStat_UserSync_SessionTick_NumTickers == nullptr) {
+        sEngineStat_UserSync_SessionTick_NumTickers =
+          GetEngineStats()->GetItem("UserSync_SessionTick_NumTickers", true);
+        (void)sEngineStat_UserSync_SessionTick_NumTickers->Release(0);
+      }
+      (void)sEngineStat_UserSync_SessionTick_NumTickers->SetInt(&tickerCount);
+
+      for (std::int32_t i = 0; i < tickerCount; ++i) {
+        tickers[static_cast<std::size_t>(i)]->Tick(beat.mCurBeat);
+      }
+    }
+
+    // Both weak-set drains prune as they go. The orphan walk steps the cursor
+    // before it calls out, because `OrphanUpdate` can unlink the entity it was
+    // just handed; the visibility walk steps after, because `UpdateVisibility`
+    // leaves the set alone.
+    {
+      auto* const runtimeView = reinterpret_cast<CWldSessionOrphanRuntimeView*>(this);
+
+      SSelectionSetUserEntity& orphanSet = runtimeView->mPendingOrphanSet;
+      for (auto cursor = OpenLiveWeakSetCursor(orphanSet); cursor.mNode != orphanSet.mHead;) {
+        UserEntity* const entity = DecodeSelectionIndexOwner(&cursor);
+        (void)cursor.Next();
+        if (entity != nullptr) {
+          entity->OrphanUpdate();
+        }
+      }
+
+      SSelectionSetUserEntity& vizSet =
+        reinterpret_cast<CWldSessionVizUpdateRuntimeView*>(this)->mVizUpdateSet;
+      for (auto cursor = OpenLiveWeakSetCursor(vizSet); cursor.mNode != vizSet.mHead;) {
+        if (UserEntity* const entity = DecodeSelectionIndexOwner(&cursor); entity != nullptr) {
+          entity->UpdateVisibility();
+        }
+        (void)cursor.Next();
+      }
+    }
+
+    AdvanceCommandIssueHelpersToBeat(*mCommandManager, beat.mCurBeat);
+
+    if (mRequestingPauseState != 0u && beat.mCurBeat - mPauseRequester >= 0) {
+      mRequestingPauseState = 0u;
+    }
+
+    CheckForNecessaryUIRefresh();
+
+    if (IUIManager* const uiManager = UI_GetManager(); uiManager != nullptr) {
+      (void)uiManager->DoBeat();
+    }
+
+    if (!beat.mSubmitArmyStats.empty()) {
+      GPGNET_SubmitArmyStats(beat.mSubmitArmyStats);
+    }
+
+    if (dbg_Metronome && USER_GetSound() != nullptr) {
+      USER_GetSound()->Play(msvc8::string("Tick", 4u), msvc8::string("TestBank", 8u));
+    }
+  }
+
   /**
    * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)
    */
   void CWldSession::SessionFrame(const float deltaSeconds)
   {
-    if (mRules && mState) {
-      static_cast<RRuleGameRules*>(mRules)->UpdateLuaState(mState);
-    }
+    static_cast<RRuleGameRules*>(mRules)->UpdateLuaState(mState);
 
-    if (mLastBeatWasTick == 0) {
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+
+    // Interpolation between ticks. Running with the wind means "do not
+    // interpolate, just consume beats", so the fraction is pinned at a whole
+    // tick and the drain below never waits for the clock.
+    if (mLastBeatWasTick == 0 || wld_RunWithTheWind) {
       mTimeSinceLastTick = 1.0f;
     } else {
-      mTimeSinceLastTick += deltaSeconds * 10.0f;
+      mTimeSinceLastTick += WLD_GetSimRate() * deltaSeconds * 10.0f;
     }
 
     CFormation::UpdateOrientation(AccessCursorInfo(*this).mMouseWorldPos, mCurFormation);
 
-    mTimeSinceLastTick = std::max(0.0f, std::min(mTimeSinceLastTick, 1.0f));
-
+    const std::int32_t tickAtFrameStart = mGameTick;
     const std::int32_t targetTick = mGameTick + static_cast<std::int32_t>(std::floor(mTimeSinceLastTick));
-    (void)targetTick; // Full sync-driver beat drain still depends on recovered `sSimDriver` ownership path.
 
-    boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false);
-    commandGraph.release();
+    // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
+    // stall cannot make one frame arbitrarily long.
+    std::int32_t beatsApplied = 0;
+    for (; beatsApplied < 100; ++beatsApplied) {
+      if (mReplayIsPaused) {
+        // A paused replay still applies beats until it lands on a tick.
+        if (mLastBeatWasTick != 0) {
+          break;
+        }
+      } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
+        break;
+      }
 
-    if (mCurThread) {
-      mCurThread->UserFrame();
+      if (!simDriver->HasSyncData()) {
+        break;
+      }
+
+      SSyncData* packet = nullptr;
+      simDriver->GetSyncData(packet);
+      DoBeat(msvc8::auto_ptr<SSyncData>(packet));
     }
+
+    if (sEngineStat_Sync_Count == nullptr) {
+      sEngineStat_Sync_Count = GetEngineStats()->GetItem("Sync_Count", true);
+      (void)sEngineStat_Sync_Count->Release(0);
+    }
+    (void)sEngineStat_Sync_Count->SetInt(&beatsApplied);
+
+    // Whatever the drain consumed comes back off the interpolation fraction, so
+    // the render clock does not run ahead of the sim clock.
+    if (!wld_RunWithTheWind) {
+      const float remainder = mTimeSinceLastTick - static_cast<float>(mGameTick - tickAtFrameStart);
+      mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
+    }
+
+    if (const boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false); commandGraph.px != nullptr) {
+      commandGraph.px->CreateMeshes();
+    }
+
+    // 0x00409AC0 - the binary names this `CTaskStage::DoFrame`; it is the same
+    // body the rest of the tree already calls `UserFrame`.
+    mCurThread->UserFrame();
   }
 
   /**
@@ -10892,23 +11350,13 @@ namespace moho
         (void)UI_StartGameUI(session->mState);
       }
 
-      // Dequeue the first sync payload. The call matters for its side effects
-      // even before the payload can be applied: it advances the driver's
-      // last-dequeued beat, signals the connection event and clears the
-      // sync-available event.
-      //
-      // The binary hands the payload straight to `CWldSession::DoBeat`
-      // (0x00894530), the per-frame sim-state consumer, which owns and
-      // destroys it. That keystone is not lifted here yet - `SessionFrame`
-      // (0x00895B40) is missing the same call - and `~SSyncData` is not sound
-      // on a live payload either (its teardown view reads a `mTerrainUpdate`
-      // lane the constructor never initialises, SimDriver.cpp:887). So this
-      // one startup packet is deliberately left undestroyed rather than run
-      // through a destructor that faults; it is a single block per session.
-      {
+      // Apply the first sync payload. This has to happen before
+      // `CreateGameInterface` below: the packet carries the initial armies and
+      // entities, and the in-game UI reads them as it builds.
+      if (session != nullptr) {
         SSyncData* syncData = nullptr;
         simDriver->GetSyncData(syncData);
-        (void)syncData;
+        session->DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
       }
 
       IWldUIProvider* const wldUIProvider = ResolveWldUIProvider();
