@@ -204,17 +204,6 @@ namespace
 #endif
   }
 
-  void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const taskType = CachedCTaskType();
-    gpg::RField baseField{};
-    baseField.mName = taskType->GetName();
-    baseField.mType = taskType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   template <class TObject>
   gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* const baseType)
@@ -712,8 +701,29 @@ void CCommandTaskTypeInfo::Init()
 {
   size_ = sizeof(CCommandTask);
   gpg::RType::Init();
-  AddCTaskBaseToTypeInfo(this);
+  AddBase_CTask(this);
   Finish();
+}
+
+/**
+ * Address: 0x0060C210 (FUN_0060C210, Moho::CCommandTaskTypeInfo::AddBase_CTask)
+ *
+ * IDA signature:
+ * void __stdcall Moho::CCommandTaskTypeInfo::AddBase_CTask(gpg::RType *typeInfo);
+ *
+ * What it does:
+ * Registers `CTask` as the primary base at offset 0.
+ */
+void CCommandTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+{
+  gpg::RType* const taskType = CachedCTaskType();
+  gpg::RField baseField{};
+  baseField.mName = taskType->GetName();
+  baseField.mType = taskType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
 }
 
 namespace gpg

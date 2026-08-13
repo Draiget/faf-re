@@ -29,6 +29,30 @@ namespace moho
     const char* GetName() const override;
 
     /**
+     * Address: 0x00623DD0 (FUN_00623DD0, Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask)
+     *
+     * What it does:
+     * Registers `CCommandTask` as the primary base at offset 0.
+     */
+    static void AddBase_CCommandTask(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00623E30 (FUN_00623E30, Moho::CUnitScriptTaskTypeInfo::AddBase_CScriptObject)
+     *
+     * What it does:
+     * Registers the `CScriptObject` sub-object base at +0x30.
+     */
+    static void AddBase_CScriptObject(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00623E90 (FUN_00623E90, Moho::CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent)
+     *
+     * What it does:
+     * Registers the `Listener<ECommandEvent>` sub-object base at +0x64.
+     */
+    static void AddBase_Listener_ECommandEvent(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x00622D80 (FUN_00622D80, ?Init@CUnitScriptTaskTypeInfo@Moho@@UAEXXZ)
      *
      * VFTable SLOT: 9

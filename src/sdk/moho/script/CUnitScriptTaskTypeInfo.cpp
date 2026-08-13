@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/script/CUnitScriptTask.h"
+#include "moho/script/CUnitScriptTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -166,11 +166,48 @@ void CUnitScriptTaskTypeInfo::Init()
   gpg::RType::Init();
   version_ = 1;
 
-  AddBaseIfPresent(this, CachedCCommandTaskType(), 0x00);
-  AddBaseIfPresent(this, CachedCScriptObjectType(), 0x30);
-  AddBaseIfPresent(this, CachedCommandEventListenerType(), 0x64);
+  AddBase_CCommandTask(this);
+  AddBase_CScriptObject(this);
+  AddBase_Listener_ECommandEvent(this);
 
   Finish();
+}
+
+/**
+ * Address: 0x00623DD0 (FUN_00623DD0, Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask)
+ *
+ * IDA signature:
+ * void __stdcall Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType *typeInfo);
+ *
+ * What it does:
+ * Registers `CCommandTask` as the primary base at offset 0. The binary emits
+ * one such function per base rather than a shared offset-taking helper.
+ */
+void CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+{
+  AddBaseIfPresent(typeInfo, CachedCCommandTaskType(), 0x00);
+}
+
+/**
+ * Address: 0x00623E30 (FUN_00623E30, Moho::CUnitScriptTaskTypeInfo::AddBase_CScriptObject)
+ *
+ * What it does:
+ * Registers the `CScriptObject` sub-object base at +0x30.
+ */
+void CUnitScriptTaskTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+{
+  AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), 0x30);
+}
+
+/**
+ * Address: 0x00623E90 (FUN_00623E90, Moho::CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent)
+ *
+ * What it does:
+ * Registers the `Listener<ECommandEvent>` sub-object base at +0x64.
+ */
+void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+{
+  AddBaseIfPresent(typeInfo, CachedCommandEventListenerType(), 0x64);
 }
 
 /**
