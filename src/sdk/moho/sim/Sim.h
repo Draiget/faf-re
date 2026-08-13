@@ -196,13 +196,13 @@ namespace moho
     static void DoCollisionsFor(Sim* sim, Unit* unit, CollisionResultFastVectorN10* collisions);
 
     /**
-     * Address: 0x00748650
+     * Address: 0x00748650 (FUN_00748650)
      * @param sourceId
      */
     void SetCommandSource(CommandSourceId sourceId) override;
 
     /**
-     * Address:0x007486B0
+     * Address:0x007486B0 (FUN_007486B0)
      */
     void OnCommandSourceTerminated() override;
 
@@ -225,17 +225,17 @@ namespace moho
     bool GetBeatChecksum(gpg::MD5Digest* outChecksum, CSeqNo beat) const;
 
     /**
-     * Address: 0x00748960
+     * Address: 0x00748960 (FUN_00748960)
      */
     void RequestPause() override;
 
     /**
-     * Address: 0x007489A0
+     * Address: 0x007489A0 (FUN_007489A0)
      */
     void Resume() override;
 
     /**
-     * Address: 0x007489C0
+     * Address: 0x007489C0 (FUN_007489C0)
      */
     void SingleStep() override;
 
@@ -274,7 +274,7 @@ namespace moho
     void DestroyEntity(EntId) override;
 
     /**
-     * Address: 0x00748CD0
+     * Address: 0x00748CD0 (FUN_00748CD0)
      */
     void WarpEntity(EntId, const VTransform&) override;
 
@@ -314,37 +314,37 @@ namespace moho
     ) override;
 
     /**
-     * Address: 0x00749680
+     * Address: 0x00749680 (FUN_00749680)
      */
     void IncreaseCommandCount(CmdId, int) override;
 
     /**
-     * Address: 0x007496E0
+     * Address: 0x007496E0 (FUN_007496E0)
      */
     void DecreaseCommandCount(CmdId, int) override;
 
     /**
-     * Address: 0x00749740
+     * Address: 0x00749740 (FUN_00749740)
      */
     void SetCommandTarget(CmdId, const SSTITarget&) override;
 
     /**
-     * Address: 0x00749800
+     * Address: 0x00749800 (FUN_00749800)
      */
     void SetCommandType(CmdId, EUnitCommandType) override;
 
     /**
-     * Address: 0x00749860
+     * Address: 0x00749860 (FUN_00749860)
      */
     void SetCommandCells(CmdId, gpg::core::FastVector<SOCellPos> const&, Wm3::Vector3<float> const&) override;
 
     /**
-     * Address: 0x00749970
+     * Address: 0x00749970 (FUN_00749970)
      */
     void RemoveCommandFromUnitQueue(CmdId, EntId) override;
 
     /**
-     * Address: 0x00749A70
+     * Address: 0x00749A70 (FUN_00749A70)
      */
     void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override;
 
@@ -836,7 +836,7 @@ namespace moho
     );
 
     /**
-     * Address: 0x00749F40
+     * Address: 0x00749F40 (FUN_00749F40)
      */
     void AdvanceBeat(int) override;
 
@@ -1059,7 +1059,7 @@ namespace moho
     [[nodiscard]] Unit* TransferUnit(Unit* unit, CArmyImpl* newArmy);
 
     /**
-     * Address: 0x00747180
+     * Address: 0x00747180 (FUN_00747180)
      */
     bool CheatsEnabled();
 
@@ -1091,7 +1091,7 @@ namespace moho
 
   private:
     /**
-     * Address: 0x007491C0
+     * Address: 0x007491C0 (FUN_007491C0)
      */
     bool ValidateNewCommandId(CmdId cmdId, const char* callsiteName) const;
 

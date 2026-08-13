@@ -680,14 +680,14 @@ namespace moho
     inline static gpg::RType* sPointerType = nullptr;
 
     /**
-     * Address: 0x00676C40
+     * Address: 0x00676C40 (FUN_00676C40)
      * VFTable SLOT: 0
      */
     [[nodiscard]]
     virtual gpg::RType* GetClass() const override;
 
     /**
-     * Address: 0x00676C60
+     * Address: 0x00676C60 (FUN_00676C60)
      * VFTable SLOT: 1
      */
     virtual gpg::RRef GetDerivedObjectRef() override;
@@ -820,49 +820,49 @@ namespace moho
     int Execute() override;
 
     /**
-     * Address: 0x00678D40
+     * Address: 0x00678D40 (FUN_00678D40)
      * VFTable SLOT: 3
      */
     virtual msvc8::string GetErrorDescription() override;
 
     /**
-     * Address: 0x005BDB10
+     * Address: 0x005BDB10 (FUN_005BDB10)
      * VFTable SLOT: 4
      */
     virtual Unit* IsUnit();
 
     /**
-     * Address: 0x005BDB20
+     * Address: 0x005BDB20 (FUN_005BDB20)
      * VFTable SLOT: 5
      */
     virtual Prop* IsProp();
 
     /**
-     * Address: 0x005BDB30
+     * Address: 0x005BDB30 (FUN_005BDB30)
      * VFTable SLOT: 6
      */
     virtual Projectile* IsProjectile();
 
     /**
-     * Address: 0x00672BB0
+     * Address: 0x00672BB0 (FUN_00672BB0)
      * VFTable SLOT: 7
      */
     virtual ReconBlip* IsReconBlip();
 
     /**
-     * Address: 0x005BDB40
+     * Address: 0x005BDB40 (FUN_005BDB40)
      * VFTable SLOT: 8
      */
     virtual CollisionBeamEntity* IsCollisionBeam();
 
     /**
-     * Address: 0x005BDB50
+     * Address: 0x005BDB50 (FUN_005BDB50)
      * VFTable SLOT: 9
      */
     virtual Shield* IsShield();
 
     /**
-     * Address: 0x00678BB0
+     * Address: 0x00678BB0 (FUN_00678BB0)
      * VFTable SLOT: 10
      */
     virtual int GetBoneCount() const;
@@ -913,13 +913,13 @@ namespace moho
     [[nodiscard]] boost::SharedPtrRaw<RScmResource> GetMesh() const;
 
     /**
-     * Address: 0x005BDB60
+     * Address: 0x005BDB60 (FUN_005BDB60)
      * VFTable SLOT: 11
      */
     virtual bool IsBeingBuilt() const;
 
     /**
-     * Address: 0x0067A0A0
+     * Address: 0x0067A0A0 (FUN_0067A0A0)
      * VFTable SLOT: 12
      */
     virtual void Sync(SSyncData*);
@@ -985,25 +985,25 @@ namespace moho
     void SetAmbientSound(CSndParams* detailSound, CSndParams* rumbleSound);
 
     /**
-     * Address: 0x005BDBD0
+     * Address: 0x005BDBD0 (FUN_005BDBD0)
      * VFTable SLOT: 14
      */
     virtual float GetUniformScale() const;
 
     /**
-     * Address: 0x00678DC0
+     * Address: 0x00678DC0 (FUN_00678DC0)
      * VFTable SLOT: 15
      */
     virtual Wm3::Vec3f GetVelocity() const;
 
     /**
-     * Address: 0x005BDBF0
+     * Address: 0x005BDBF0 (FUN_005BDBF0)
      * VFTable SLOT: 16
      */
     virtual bool IsMobile() const;
 
     /**
-     * Address: 0x00679210
+     * Address: 0x00679210 (FUN_00679210)
      * VFTable SLOT: 17
      */
     virtual void Warp(const VTransform&);
@@ -1097,10 +1097,10 @@ namespace moho
      */
     void AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint);
 
-    /** Address: 0x00679CE0, VFTable SLOT: 18 */
+    /** Address: 0x00679CE0 (FUN_00679CE0), VFTable SLOT: 18 */
     virtual VTransform GetBoneWorldTransform(int) const;
 
-    /** Address: 0x00679E20, VFTable SLOT: 19 */
+    /** Address: 0x00679E20 (FUN_00679E20), VFTable SLOT: 19 */
     virtual VTransform GetBoneLocalTransform(int) const;
 
     /** Alias of FUN_00679F70 (non-canonical helper lane). */
@@ -1115,7 +1115,7 @@ namespace moho
     virtual void SetMotor(msvc8::auto_ptr<EntityMotor>&);
 
     /**
-     * Address: 0x005BDC10
+     * Address: 0x005BDC10 (FUN_005BDC10)
      * VFTable SLOT: 22
      */
     virtual msvc8::vector<Entity*>& GetAttachedEntities();
@@ -1139,28 +1139,28 @@ namespace moho
      */
     virtual bool DetachFrom(Entity*, bool);
 
-    /** Address: 0x006797E0, VFTable SLOT: 25 */
+    /** Address: 0x006797E0 (FUN_006797E0), VFTable SLOT: 25 */
     virtual void AttachedEntityDestroyed(Entity*);
 
-    /** Address: 0x00679800, VFTable SLOT: 26 */
+    /** Address: 0x00679800 (FUN_00679800), VFTable SLOT: 26 */
     virtual void AttachedEntityKilled(Entity*);
 
-    /** Address: 0x00679820, VFTable SLOT: 27 */
+    /** Address: 0x00679820 (FUN_00679820), VFTable SLOT: 27 */
     virtual void ParentEntityDestroyed(Entity*);
 
-    /** Address: 0x00679840, VFTable SLOT: 28 */
+    /** Address: 0x00679840 (FUN_00679840), VFTable SLOT: 28 */
     virtual void ParentEntityKilled(Entity*);
 
     /**
-     * Address: 0x005BDC20
+     * Address: 0x005BDC20 (FUN_005BDC20)
      * VFTable SLOT: 29
      */
     virtual float Materialize(float);
 
-    /** Address: 0x00679860, VFTable SLOT: 30 */
+    /** Address: 0x00679860 (FUN_00679860), VFTable SLOT: 30 */
     virtual void AdjustHealth(Entity*, float);
 
-    /** Address: 0x00679A80, VFTable SLOT: 31 */
+    /** Address: 0x00679A80 (FUN_00679A80), VFTable SLOT: 31 */
     virtual void Kill(Entity*, gpg::StrArg, float);
 
     /**
@@ -1282,13 +1282,13 @@ namespace moho
      */
     virtual void CreateInterface(SSyncData*);
 
-    /** Address: 0x0067A260, VFTable SLOT: 35 */
+    /** Address: 0x0067A260 (FUN_0067A260), VFTable SLOT: 35 */
     virtual void DestroyInterface(SSyncData*);
 
-    /** Address: 0x0067A290, VFTable SLOT: 36 */
+    /** Address: 0x0067A290 (FUN_0067A290), VFTable SLOT: 36 */
     virtual void SyncInterface(SSyncData*);
 
-    /** Address: 0x00678A70, VFTable SLOT: 37 */
+    /** Address: 0x00678A70 (FUN_00678A70), VFTable SLOT: 37 */
     virtual void UpdateVisibility();
 
     /**
@@ -1324,7 +1324,7 @@ namespace moho
     void SetVizToNeutrals(EVisibilityMode mode);
 
     /**
-     * Address: 0x00679940
+     * Address: 0x00679940 (FUN_00679940)
      *
      * What it does:
      * Applies absolute health with 0.25-quantized callback thresholding.
@@ -1442,7 +1442,7 @@ namespace moho
     void StandardInit(Sim* sim, EntId entityId);
 
     /**
-     * Address: 0x0062AD30 / 0x00678880 (FUN_0062AD30/FUN_00678880)
+     * Address: 0x0062AD30 (FUN_0062AD30) / 0x00678880 (FUN_0062AD30/FUN_00678880)
      *
      * What it does:
      * Chooses initial simulation layer from footprint occupancy, category hints,

@@ -288,7 +288,7 @@ namespace moho
     CTaskEvent();
 
     /**
-     * Address: 0x00406C30 (scalar deleting thunk)
+     * Address: 0x00406C30 (FUN_00406C30, scalar deleting thunk)
      * Address: 0x00406C70 (FUN_00406C70, ??1CTaskEvent@Moho@@UAE@XZ)
      *
      * VFTable SLOT: 0

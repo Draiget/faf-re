@@ -102,154 +102,154 @@ namespace moho
     IUnit() noexcept;
 
     /**
-     * Address: 0x006A48C0
+     * Address: 0x006A48C0 (FUN_006A48C0)
      * Slot: 0
      * Demangled: public: virtual class Unit const near * __thiscall IUnit::IsUnit(void)const
      */
     virtual Unit const* IsUnit() const;
 
     /**
-     * Address: 0x006A48B0
+     * Address: 0x006A48B0 (FUN_006A48B0)
      * Slot: 1
      * Demangled: public: virtual class Unit near * __thiscall IUnit::IsUnit(void)
      */
     virtual Unit* IsUnit();
 
     /**
-     * Address: 0x006A48E0
+     * Address: 0x006A48E0 (FUN_006A48E0)
      * Slot: 2
      * Demangled: public: virtual class UserUnit const near * __thiscall IUnit::IsUserUnit(void)const
      */
     virtual UserUnit const* IsUserUnit() const;
 
     /**
-     * Address: 0x006A48D0
+     * Address: 0x006A48D0 (FUN_006A48D0)
      * Slot: 3
      * Demangled: public: virtual class UserUnit near * __thiscall IUnit::IsUserUnit(void)
      */
     virtual UserUnit* IsUserUnit();
 
     /**
-     * Address: 0x006A49A0
+     * Address: 0x006A49A0 (FUN_006A49A0)
      * Slot: 4
      * Demangled: public: virtual class EntId __thiscall Unit::GetEntityId(void)const
      */
     virtual EntId GetEntityId() const = 0;
 
     /**
-     * Address: 0x006A49B0
+     * Address: 0x006A49B0 (FUN_006A49B0)
      * Slot: 5
      * Demangled: public: virtual class Wm3::Vec3f const near & __thiscall Unit::GetPosition(void)const
      */
     virtual Wm3::Vec3f const& GetPosition() const = 0;
 
     /**
-     * Address: 0x006A49C0
+     * Address: 0x006A49C0 (FUN_006A49C0)
      * Slot: 6
      * Demangled: public: virtual class VTransform const near & __thiscall Unit::GetTransform(void)const
      */
     virtual VTransform const& GetTransform() const = 0;
 
     /**
-     * Address: 0x006A8B20
+     * Address: 0x006A8B20 (FUN_006A8B20)
      * Slot: 7
      * Demangled: public: virtual class RUnitBlueprint const near * __thiscall Unit::GetBlueprint(void)const
      */
     virtual RUnitBlueprint const* GetBlueprint() const = 0;
 
     /**
-     * Address: 0x006A49D0
+     * Address: 0x006A49D0 (FUN_006A49D0)
      * Slot: 8
      * Demangled: public: virtual class LuaPlus::LuaObject __thiscall Unit::GetLuaObject(void)
      */
     virtual LuaPlus::LuaObject GetLuaObject() = 0;
 
     /**
-     * Address: 0x006A8B30
+     * Address: 0x006A8B30 (FUN_006A8B30)
      * Slot: 9
      * Demangled: public: virtual float __thiscall Unit::CalcTransportLoadFactor(void)const
      */
     virtual float CalcTransportLoadFactor() const = 0;
 
     /**
-     * Address: 0x006A49F0
+     * Address: 0x006A49F0 (FUN_006A49F0)
      * Slot: 10
      * Demangled: public: virtual bool __thiscall Unit::IsDead(void)const
      */
     virtual bool IsDead() const = 0;
 
     /**
-     * Address: 0x006A4A00
+     * Address: 0x006A4A00 (FUN_006A4A00)
      * Slot: 11
      * Demangled: public: virtual bool __thiscall Unit::DestroyQueued(void)const
      */
     virtual bool DestroyQueued() const = 0;
 
     /**
-     * Address: 0x006A4A10
+     * Address: 0x006A4A10 (FUN_006A4A10)
      * Slot: 12
      * Demangled: public: virtual bool __thiscall Unit::IsMobile(void)const
      */
     virtual bool IsMobile() const = 0;
 
     /**
-     * Address: 0x006A4A20
+     * Address: 0x006A4A20 (FUN_006A4A20)
      * Slot: 13
      * Demangled: public: virtual bool __thiscall Unit::IsBeingBuilt(void)const
      */
     virtual bool IsBeingBuilt() const = 0;
 
     /**
-     * Address: 0x006A7DC0
+     * Address: 0x006A7DC0 (FUN_006A7DC0)
      * Slot: 14
      * Demangled: public: virtual bool __thiscall Unit::IsNavigatorIdle(void)const
      */
     virtual bool IsNavigatorIdle() const = 0;
 
     /**
-     * Address: 0x006A4AF0
+     * Address: 0x006A4AF0 (FUN_006A4AF0)
      * Slot: 15
      * Demangled: public: virtual bool __thiscall Unit::IsUnitState(enum EUnitState)const
      */
     virtual bool IsUnitState(EUnitState) const = 0;
 
     /**
-     * Address: 0x006A4990
+     * Address: 0x006A4990 (FUN_006A4990)
      * Slot: 16
      * Demangled: public: virtual struct UnitAttributes near & __thiscall Unit::GetAttributes(void)
      */
     virtual UnitAttributes& GetAttributes() = 0;
 
     /**
-     * Address: 0x006A4980
+     * Address: 0x006A4980 (FUN_006A4980)
      * Slot: 17
      * Demangled: public: virtual struct UnitAttributes const near & __thiscall Unit::GetAttributes(void)const
      */
     virtual UnitAttributes const& GetAttributes() const = 0;
 
     /**
-     * Address: 0x006A4B90
+     * Address: 0x006A4B90 (FUN_006A4B90)
      * Slot: 18
      * Demangled: public: virtual class StatItem near * __thiscall Unit::GetStat(gpg::StrArg,std::string const&)
      */
     virtual StatItem* GetStat(gpg::StrArg, std::string const&) = 0;
 
     /**
-     * Address: 0x006A4B70
+     * Address: 0x006A4B70 (FUN_006A4B70)
      * Slot: 19
      * Demangled: public: virtual class StatItem near * __thiscall Unit::GetStat(gpg::StrArg,float const&)
      */
     virtual StatItem* GetStat(gpg::StrArg, float const&) = 0;
 
     /**
-     * Address: 0x006A4B50
+     * Address: 0x006A4B50 (FUN_006A4B50)
      * Slot: 20
      * Demangled: public: virtual class StatItem near * __thiscall Unit::GetStat(gpg::StrArg,int const&)
      */
     virtual StatItem* GetStat(gpg::StrArg, int const&) = 0;
 
     /**
-     * Address: 0x006A4B30
+     * Address: 0x006A4B30 (FUN_006A4B30)
      * Slot: 21
      * Demangled: public: virtual class StatItem near * __thiscall Unit::GetStat(gpg::StrArg)
      */

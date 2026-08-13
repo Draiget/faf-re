@@ -24,7 +24,7 @@ namespace moho
     static gpg::RType* sType;
 
     /**
-     * Address: 0x00545DC0 (??0CSimResources@Moho@@QAE@@Z)
+     * Address: 0x00545DC0 (FUN_00545DC0, ??0CSimResources@Moho@@QAE@@Z)
      *
      * What it does:
      * Initializes the resource mutex and clears the deposit vector.
@@ -42,7 +42,7 @@ namespace moho
 
     /**
      * Address: 0x00545E10 (FUN_00545E10, core dtor body)
-     * Address: 0x00546A00 (Moho::CSimResources::dtr)
+     * Address: 0x00546A00 (FUN_00546A00, Moho::CSimResources::dtr)
      *
      * What it does:
      * Releases mutex/vector storage and optionally deletes `this` via deleting
@@ -51,59 +51,59 @@ namespace moho
     ~CSimResources() override;
 
     /**
-     * Address: 0x00545F10 (Moho::CSimResources::AddDeposit)
+     * Address: 0x00545F10 (FUN_00545F10, Moho::CSimResources::AddDeposit)
      */
     void AddDeposit(EDepositType type, gpg::Rect2i* pos) override;
 
     /**
-     * Address: 0x00545E80 (Moho::CSimResources::AddDepositPoint)
+     * Address: 0x00545E80 (FUN_00545E80, Moho::CSimResources::AddDepositPoint)
      */
     void AddDepositPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) override;
 
     /**
-     * Address: 0x00545FC0 (Moho::CSimResources::GetDeposits1)
+     * Address: 0x00545FC0 (FUN_00545FC0, Moho::CSimResources::GetDeposits1)
      */
     const msvc8::vector<ResourceDeposit>& GetDeposits() const override;
 
     /**
-     * Address: 0x00545FB0 (Moho::CSimResources::GetDeposits2)
+     * Address: 0x00545FB0 (FUN_00545FB0, Moho::CSimResources::GetDeposits2)
      */
     msvc8::vector<ResourceDeposit>& GetDeposits() override;
 
     /**
-     * Address: 0x00546060 (Moho::CSimResources::IsDepositAt)
+     * Address: 0x00546060 (FUN_00546060, Moho::CSimResources::IsDepositAt)
      */
     bool IsDepositAt(gpg::Rect2i* pos, EDepositType type) override;
 
     /**
-     * Address: 0x00545FD0 (Moho::CSimResources::IsDepositAtPoint)
+     * Address: 0x00545FD0 (FUN_00545FD0, Moho::CSimResources::IsDepositAtPoint)
      */
     bool IsDepositAtPoint(Wm3::Vec3f* pos, Wm3::Vec2i* size, EDepositType type) override;
 
     /**
-     * Address: 0x00546470 (Moho::CSimResources::DepositCollides)
+     * Address: 0x00546470 (FUN_00546470, Moho::CSimResources::DepositCollides)
      */
     void DepositCollides(
       CGeomSolid3* solid, CHeightField* field, gpg::fastvector<ResourceDeposit>* outDeposits, EDepositType type
     ) override;
 
     /**
-     * Address: 0x00546650 (Moho::CSimResources::DepositIsInArea)
+     * Address: 0x00546650 (FUN_00546650, Moho::CSimResources::DepositIsInArea)
      */
     bool DepositIsInArea(EDepositType type, gpg::Rect2i* area) override;
 
     /**
-     * Address: 0x005465C0 (Moho::CSimResources::DepositIsInAreaPoint)
+     * Address: 0x005465C0 (FUN_005465C0, Moho::CSimResources::DepositIsInAreaPoint)
      */
     bool DepositIsInAreaPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) override;
 
     /**
-     * Address: 0x00546760 (Moho::CSimResources::FindClosestDespoit)
+     * Address: 0x00546760 (FUN_00546760, Moho::CSimResources::FindClosestDespoit)
      */
     bool FindClosestDeposit(GridPos* from, GridPos* outPos, float radius, EDepositType type) override;
 
     /**
-     * Address: 0x00546860 (Moho::CSimResources::AreaHasDeposit)
+     * Address: 0x00546860 (FUN_00546860, Moho::CSimResources::AreaHasDeposit)
      */
     bool AreaHasDeposit(EDepositType type, gpg::Rect2f* area) override;
 

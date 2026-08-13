@@ -3664,7 +3664,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006D6B00 sub-flow (inline init inside CreateCollisionBeamHelper)
+   * Address: 0x006D6B00 (FUN_006D6B00) sub-flow (inline init inside CreateCollisionBeamHelper)
    *
    * What it does:
    * Zero-initializes the impact lane, the bound source target, and the resolved
@@ -3766,7 +3766,7 @@ namespace moho
     }
 
     /**
-     * Address: 0x006D5F30 sub-flow (inline block inside SetTarget).
+     * Address: 0x006D5F30 (FUN_006D5F30) sub-flow (inline block inside SetTarget).
      *
      * What it does:
      * When `weapon` is the unit's controlling weapon for its current target,
@@ -3819,7 +3819,7 @@ namespace moho
     }
 
     /**
-     * Address: 0x006D61F0 sub-flow (inline block inside Fire).
+     * Address: 0x006D61F0 (FUN_006D61F0) sub-flow (inline block inside Fire).
      *
      * What it does:
      * Records this weapon's realtime fire statistics for the owning unit:

@@ -42,7 +42,7 @@ namespace moho
     virtual ~CSimConCommand();
 
     /**
-     * Address: 0x00A82547 (_purecall in base CSimConCommand vtable)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall in base CSimConCommand vtable)
      *
      * IDA signature:
      * int __thiscall Moho::CSimConCommand::Run(
@@ -82,7 +82,7 @@ namespace moho
   static_assert(offsetof(CSimConCommand, mRequiresCheat) == 0x08, "CSimConCommand::mRequiresCheat offset must be 0x08");
 
   /**
-   * Address: 0x00735110/FUN_00735110-family lookup path.
+   * Address: 0x00735110 (FUN_00735110)/FUN_00735110-family lookup path.
    *
    * What it does:
    * Resolves one registered sim command by case-insensitive name.

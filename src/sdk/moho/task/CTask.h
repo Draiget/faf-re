@@ -39,7 +39,7 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
-     * Address: 0x00408C90 (scalar deleting thunk)
+     * Address: 0x00408C90 (FUN_00408C90, scalar deleting thunk)
      * Address: 0x00408CB0 (FUN_00408CB0, non-deleting body)
      *
      * VFTable SLOT: 0
@@ -47,7 +47,7 @@ namespace moho
     virtual ~CTask();
 
     /**
-     * Address: 0x00A82547 (_purecall in base)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall in base)
      *
      * VFTable SLOT: 1
      */

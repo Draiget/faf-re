@@ -13,11 +13,11 @@ namespace moho
   public:
     /** Address: 0x00564490 (FUN_00564490, sub_564490) */
     EReconFlagsTypeInfo();
-    /** Address: 0x00564520 (deleting thunk) */
+    /** Address: 0x00564520 (FUN_00564520, deleting thunk) */
     ~EReconFlagsTypeInfo() override;
-    /** Address: 0x00564510 (GetName) */
+    /** Address: 0x00564510 (FUN_00564510, GetName) */
     [[nodiscard]] const char* GetName() const override;
-    /** Address: 0x005644F0 (Init) */
+    /** Address: 0x005644F0 (FUN_005644F0, Init) */
     void Init() override;
 
   private:

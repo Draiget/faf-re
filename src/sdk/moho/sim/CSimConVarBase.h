@@ -48,7 +48,7 @@ namespace moho
     CSimConVarBase* Identity() override;
 
     /**
-     * Address: 0x00A82547 (_purecall in base)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall in base)
      *
      * What it does:
      * Allocates and initializes a typed `CSimConVarInstanceBase` for this convar definition.

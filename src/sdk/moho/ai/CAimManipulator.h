@@ -137,7 +137,7 @@ namespace moho
     virtual void operator_delete(std::int32_t deleteFlags);
 
     /**
-     * Address: 0x00630DB0
+     * Address: 0x00630DB0 (FUN_00630DB0)
      * Slot: 1
      * Demangled: Moho::CAimManipulator::AimManip
      *

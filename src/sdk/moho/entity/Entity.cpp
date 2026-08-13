@@ -1837,7 +1837,7 @@ namespace
   );
 
   /**
-   * Address: 0x00679550 (inlined block)
+   * Address: 0x00679550 (FUN_00679550, inlined block)
    *
    * What it does:
    * Relinks an attached runtime node back to its owner list when it is marked queued.
@@ -2048,7 +2048,7 @@ namespace
   );
 
   /**
-   * Address: 0x00679B80 (Moho::Entity::OnDestroy destroy-queue lane)
+   * Address: 0x00679B80 (FUN_00679B80, Moho::Entity::OnDestroy destroy-queue lane)
    * Address: 0x0067DE00 (FUN_0067DE00, MSVC8 `std::list<Entity*>::_Buynode`
    *                      allocator+init — allocates one 12-byte `{prev, next,
    *                      value}` list node and initializes all three words)
@@ -2349,7 +2349,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00676C40
+   * Address: 0x00676C40 (FUN_00676C40)
    *
    * What it does:
    * Returns cached reflection descriptor for Entity.
@@ -2665,7 +2665,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00676C60
+   * Address: 0x00676C60 (FUN_00676C60)
    *
    * What it does:
    * Packs {this, GetClass()} as a reflection reference handle.
@@ -3245,7 +3245,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0062AD30 / 0x00678880 (FUN_0062AD30/FUN_00678880)
+   * Address: 0x0062AD30 (FUN_0062AD30) / 0x00678880 (FUN_0062AD30/FUN_00678880)
    *
    * What it does:
    * Chooses initial simulation layer from footprint occupancy, category hints,
@@ -3290,7 +3290,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678D40
+   * Address: 0x00678D40 (FUN_00678D40)
    *
    * What it does:
    * Base error text provider for script/runtime diagnostics.
@@ -3301,7 +3301,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDB10
+   * Address: 0x005BDB10 (FUN_005BDB10)
    */
   Unit* Entity::IsUnit()
   {
@@ -3309,7 +3309,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDB20
+   * Address: 0x005BDB20 (FUN_005BDB20)
    */
   Prop* Entity::IsProp()
   {
@@ -3317,7 +3317,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDB30
+   * Address: 0x005BDB30 (FUN_005BDB30)
    */
   Projectile* Entity::IsProjectile()
   {
@@ -3325,7 +3325,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00672BB0
+   * Address: 0x00672BB0 (FUN_00672BB0)
    */
   ReconBlip* Entity::IsReconBlip()
   {
@@ -3333,7 +3333,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDB40
+   * Address: 0x005BDB40 (FUN_005BDB40)
    */
   CollisionBeamEntity* Entity::IsCollisionBeam()
   {
@@ -3341,7 +3341,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDB50
+   * Address: 0x005BDB50 (FUN_005BDB50)
    */
   Shield* Entity::IsShield()
   {
@@ -3349,7 +3349,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678BB0
+   * Address: 0x00678BB0 (FUN_00678BB0)
    *
    * What it does:
    * Returns mesh bone count from the loaded mesh skeleton block.
@@ -3460,7 +3460,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDB60
+   * Address: 0x005BDB60 (FUN_005BDB60)
    */
   bool Entity::IsBeingBuilt() const
   {
@@ -3468,7 +3468,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067A0A0
+   * Address: 0x0067A0A0 (FUN_0067A0A0)
    *
    * What it does:
    * Updates visibility + interface sync state and clears dirty-sync marker.
@@ -3657,7 +3657,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDBD0
+   * Address: 0x005BDBD0 (FUN_005BDBD0)
    */
   float Entity::GetUniformScale() const
   {
@@ -3665,7 +3665,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678DC0
+   * Address: 0x00678DC0 (FUN_00678DC0)
    *
    * What it does:
    * Returns frame velocity from current/previous positions scaled by mVelocityScale.
@@ -3680,7 +3680,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDBF0
+   * Address: 0x005BDBF0 (FUN_005BDBF0)
    */
   bool Entity::IsMobile() const
   {
@@ -3688,7 +3688,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679F70
+   * Address: 0x00679F70 (FUN_00679F70)
    *
    * What it does:
    * CTask execution entry point, forwarding to full entity task-tick logic.
@@ -3726,7 +3726,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679CE0
+   * Address: 0x00679CE0 (FUN_00679CE0)
    *
    * What it does:
    * Returns world transform for the requested bone (or entity/world-anchor fallback).
@@ -3752,7 +3752,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679E20
+   * Address: 0x00679E20 (FUN_00679E20)
    *
    * What it does:
    * Returns local-space transform for a bone index, with `-1` fallback to blueprint anchor.
@@ -4048,7 +4048,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDC10
+   * Address: 0x005BDC10 (FUN_005BDC10)
    */
   msvc8::vector<Entity*>& Entity::GetAttachedEntities()
   {
@@ -4252,7 +4252,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x006797E0
+   * Address: 0x006797E0 (FUN_006797E0)
    */
   void Entity::AttachedEntityDestroyed(Entity*)
   {
@@ -4260,7 +4260,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679800
+   * Address: 0x00679800 (FUN_00679800)
    */
   void Entity::AttachedEntityKilled(Entity*)
   {
@@ -4268,7 +4268,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679820
+   * Address: 0x00679820 (FUN_00679820)
    */
   void Entity::ParentEntityDestroyed(Entity*)
   {
@@ -4276,7 +4276,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679840
+   * Address: 0x00679840 (FUN_00679840)
    */
   void Entity::ParentEntityKilled(Entity*)
   {
@@ -4284,7 +4284,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005BDC20
+   * Address: 0x005BDC20 (FUN_005BDC20)
    */
   float Entity::Materialize(float)
   {
@@ -4423,7 +4423,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00679A80
+   * Address: 0x00679A80 (FUN_00679A80)
    *
    * What it does:
    * Dispatches attached/parent killed notifications and marks entity dead/dirty.

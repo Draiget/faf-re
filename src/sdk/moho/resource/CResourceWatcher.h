@@ -29,7 +29,7 @@ namespace moho
     CResourceWatcher() noexcept;
 
     /**
-     * Address: 0x00A82547 (_purecall slot in base vtable)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall slot in base vtable)
      *
      * What it does:
      * Implemented by concrete watchers to reload when one watched path changes.

@@ -26,7 +26,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BF57F0 (sub_BF57F0, atexit teardown for the descriptor)
+   * Address: 0x00BF57F0 (FUN_00BF57F0, sub_BF57F0, atexit teardown for the descriptor)
    */
   void cleanup_EFormationdStatusTypeInfo()
   {

@@ -394,7 +394,7 @@ namespace moho
   SCreateUnitParams* QueueCreateUnitParams(SSyncData* syncData, const SCreateUnitParams& params);
 
   /**
-   * Address: 0x0067A290 tail (inlined push lane of Moho::Entity::SyncInterface)
+   * Address: 0x0067A290 (FUN_0067A290) tail (inlined push lane of Moho::Entity::SyncInterface)
    *
    * What it does:
    * Appends one default `SEntityVariableUpdateEntry` to

@@ -72,7 +72,7 @@ namespace
     const std::int32_t spatialDbMask
   )
   {
-    // Address: 0x00501A80 (sub_501A80)
+    // Address: 0x00501A80 (FUN_00501A80, sub_501A80)
     auto* const meshEntry = reinterpret_cast<moho::SpatialDB_MeshInstance*>(&entry);
     meshEntry->Register(sessionSpatialDbStorage, owner, spatialDbMask);
   }

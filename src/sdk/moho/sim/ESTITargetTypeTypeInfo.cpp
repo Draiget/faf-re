@@ -49,7 +49,7 @@ ESTITargetTypeTypeInfo::ESTITargetTypeTypeInfo()
 
 ESTITargetTypeTypeInfo::~ESTITargetTypeTypeInfo() = default;
 
-/** Address: 0x0055AEF0 */
+/** Address: 0x0055AEF0 (FUN_0055AEF0) */
 const char* ESTITargetTypeTypeInfo::GetName() const { return "ESTITargetType"; }
 
 /**

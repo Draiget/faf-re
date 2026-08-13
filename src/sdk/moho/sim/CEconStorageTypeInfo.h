@@ -10,22 +10,22 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00773320 (Moho::CEconStorageTypeInfo::CEconStorageTypeInfo)
+     * Address: 0x00773320 (FUN_00773320, Moho::CEconStorageTypeInfo::CEconStorageTypeInfo)
      */
     CEconStorageTypeInfo();
 
     /**
-     * Address: 0x007733B0 (scalar deleting thunk)
+     * Address: 0x007733B0 (FUN_007733B0, scalar deleting thunk)
      */
     ~CEconStorageTypeInfo() override;
 
     /**
-     * Address: 0x007733A0 (Moho::CEconStorageTypeInfo::GetName)
+     * Address: 0x007733A0 (FUN_007733A0, Moho::CEconStorageTypeInfo::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
 
     /**
-     * Address: 0x00773380 (Moho::CEconStorageTypeInfo::Init)
+     * Address: 0x00773380 (FUN_00773380, Moho::CEconStorageTypeInfo::Init)
      */
     void Init() override;
   };
@@ -33,7 +33,7 @@ namespace moho
   static_assert(sizeof(CEconStorageTypeInfo) == 0x64, "CEconStorageTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BDD150 (register_CEconStorageTypeInfo)
+   * Address: 0x00BDD150 (FUN_00BDD150, register_CEconStorageTypeInfo)
    */
   void register_CEconStorageTypeInfoStartup();
 } // namespace moho

@@ -37,7 +37,7 @@ namespace moho
   gpg::RType* CSimResources::sType = nullptr;
 
   /**
-   * Address: 0x00545DC0 (??0CSimResources@Moho@@QAE@@Z)
+   * Address: 0x00545DC0 (FUN_00545DC0, ??0CSimResources@Moho@@QAE@@Z)
    *
    * What it does:
    * Constructs mutex/vector members for resource deposit bookkeeping.
@@ -67,7 +67,7 @@ namespace moho
 
   /**
    * Address: 0x00545E10 (FUN_00545E10, core dtor body)
-   * Address: 0x00546A00 (Moho::CSimResources::dtr)
+   * Address: 0x00546A00 (FUN_00546A00, Moho::CSimResources::dtr)
    *
    * What it does:
    * Destructs mutex/vector members (deleting-thunk behavior is compiler
@@ -76,7 +76,7 @@ namespace moho
   CSimResources::~CSimResources() = default;
 
   /**
-   * Address: 0x00545F10 (Moho::CSimResources::AddDeposit)
+   * Address: 0x00545F10 (FUN_00545F10, Moho::CSimResources::AddDeposit)
    *
    * What it does:
    * Adds one deposit rectangle and type under the resource lock.
@@ -92,7 +92,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00545E80 (Moho::CSimResources::AddDepositPoint)
+   * Address: 0x00545E80 (FUN_00545E80, Moho::CSimResources::AddDepositPoint)
    *
    * What it does:
    * Converts center+size to grid rect and forwards to AddDeposit.
@@ -104,7 +104,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00545FC0 (Moho::CSimResources::GetDeposits1)
+   * Address: 0x00545FC0 (FUN_00545FC0, Moho::CSimResources::GetDeposits1)
    */
   const msvc8::vector<ResourceDeposit>& CSimResources::GetDeposits() const
   {
@@ -112,7 +112,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00545FB0 (Moho::CSimResources::GetDeposits2)
+   * Address: 0x00545FB0 (FUN_00545FB0, Moho::CSimResources::GetDeposits2)
    */
   msvc8::vector<ResourceDeposit>& CSimResources::GetDeposits()
   {
@@ -120,7 +120,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546060 (Moho::CSimResources::IsDepositAt)
+   * Address: 0x00546060 (FUN_00546060, Moho::CSimResources::IsDepositAt)
    *
    * What it does:
    * Tests strict rectangle overlap against deposits of the requested type.
@@ -137,7 +137,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00545FD0 (Moho::CSimResources::IsDepositAtPoint)
+   * Address: 0x00545FD0 (FUN_00545FD0, Moho::CSimResources::IsDepositAtPoint)
    *
    * What it does:
    * Converts center+size to grid rect and reuses IsDepositAt.
@@ -149,7 +149,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546470 (Moho::CSimResources::DepositCollides)
+   * Address: 0x00546470 (FUN_00546470, Moho::CSimResources::DepositCollides)
    *
    * What it does:
    * Emits deposits whose terrain AABB intersects the provided solid, optionally
@@ -170,7 +170,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546650 (Moho::CSimResources::DepositIsInArea)
+   * Address: 0x00546650 (FUN_00546650, Moho::CSimResources::DepositIsInArea)
    *
    * What it does:
    * Tests containment relation used by original placement logic for typed
@@ -207,7 +207,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005465C0 (Moho::CSimResources::DepositIsInAreaPoint)
+   * Address: 0x005465C0 (FUN_005465C0, Moho::CSimResources::DepositIsInAreaPoint)
    *
    * What it does:
    * Converts center+size to grid rect and reuses DepositIsInArea.
@@ -219,7 +219,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546760 (Moho::CSimResources::FindClosestDespoit)
+   * Address: 0x00546760 (FUN_00546760, Moho::CSimResources::FindClosestDespoit)
    *
    * What it does:
    * Finds the closest deposit center of matching type within radius.
@@ -259,7 +259,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546860 (Moho::CSimResources::AreaHasDeposit)
+   * Address: 0x00546860 (FUN_00546860, Moho::CSimResources::AreaHasDeposit)
    *
    * What it does:
    * Checks area/deposit overlap with type-specific footprint expansion.

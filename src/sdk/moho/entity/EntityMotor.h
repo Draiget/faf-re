@@ -36,7 +36,7 @@ namespace moho
     virtual void BindEntity(Entity*);
 
     /**
-     * Address: 0x00A82547 in base (`_purecall`), overridden in derived motor classes.
+     * Address: 0x00A82547 (FUN_00A82547) in base (`_purecall`), overridden in derived motor classes.
      *
      * What it does:
      * Advances motor state for one entity tick.

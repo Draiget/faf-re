@@ -71,7 +71,7 @@ namespace moho
   gpg::SerHelperBase* ResetRResIdSerializerLinksVariant2();
 
   /**
-   * Address: 0x00BC5A80 (register_RResIdSerializer)
+   * Address: 0x00BC5A80 (FUN_00BC5A80, register_RResIdSerializer)
    */
   int register_RResIdSerializer();
 } // namespace moho

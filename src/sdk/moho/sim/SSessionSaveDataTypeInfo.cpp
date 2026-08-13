@@ -63,7 +63,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00897300 (Moho::SSessionSaveDataTypeInfo::SSessionSaveDataTypeInfo)
+ * Address: 0x00897300 (FUN_00897300, Moho::SSessionSaveDataTypeInfo::SSessionSaveDataTypeInfo)
  */
 SSessionSaveDataTypeInfo::SSessionSaveDataTypeInfo()
   : gpg::RType()
@@ -72,12 +72,12 @@ SSessionSaveDataTypeInfo::SSessionSaveDataTypeInfo()
 }
 
 /**
- * Address: 0x008973B0
+ * Address: 0x008973B0 (FUN_008973B0)
  */
 SSessionSaveDataTypeInfo::~SSessionSaveDataTypeInfo() = default;
 
 /**
- * Address: 0x008973A0
+ * Address: 0x008973A0 (FUN_008973A0)
  */
 const char* SSessionSaveDataTypeInfo::GetName() const
 {
@@ -85,7 +85,7 @@ const char* SSessionSaveDataTypeInfo::GetName() const
 }
 
 /**
- * Address: 0x00897360
+ * Address: 0x00897360 (FUN_00897360)
  */
 void SSessionSaveDataTypeInfo::Init()
 {
@@ -145,7 +145,7 @@ void SSessionSaveDataTypeInfo::Destruct(void* const objectStorage)
 }
 
 /**
- * Address: 0x00BE7770
+ * Address: 0x00BE7770 (FUN_00BE7770)
  */
 void moho::register_SSessionSaveDataTypeInfoStartup()
 {

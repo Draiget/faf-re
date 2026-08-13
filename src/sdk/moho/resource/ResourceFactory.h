@@ -22,7 +22,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00A82547 (_purecall slot)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall slot)
      *
      * What it does:
      * Optional startup hook consumed by `ResourceManager::AttachFactory`.

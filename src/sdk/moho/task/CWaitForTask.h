@@ -30,7 +30,7 @@ namespace moho
     explicit CWaitForTask(const LuaPlus::LuaObject& payload);
 
     /**
-     * Address: 0x004CA500 (scalar deleting thunk)
+     * Address: 0x004CA500 (FUN_004CA500, scalar deleting thunk)
      * Address: 0x004CA5B0 (FUN_004CA5B0, sub_4CA5B0)
      *
      * VFTable SLOT: 0

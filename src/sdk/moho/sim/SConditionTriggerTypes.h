@@ -61,7 +61,7 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
-     * Address: 0x00711030 / 0x007110F0 (FUN_00711030 / FUN_007110F0)
+     * Address: 0x00711030 (FUN_00711030) / 0x007110F0 (FUN_00711030 / FUN_007110F0)
      *
      * What it does:
      * Initializes trigger string state and binds inline fastvector storage for two SCondition lanes.

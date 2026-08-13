@@ -39,7 +39,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00772DE0 (Moho::CEconomyTypeInfo::CEconomyTypeInfo)
+ * Address: 0x00772DE0 (FUN_00772DE0, Moho::CEconomyTypeInfo::CEconomyTypeInfo)
  */
 CEconomyTypeInfo::CEconomyTypeInfo()
   : gpg::RType()
@@ -48,12 +48,12 @@ CEconomyTypeInfo::CEconomyTypeInfo()
 }
 
 /**
- * Address: 0x00772E70
+ * Address: 0x00772E70 (FUN_00772E70)
  */
 CEconomyTypeInfo::~CEconomyTypeInfo() = default;
 
 /**
- * Address: 0x00772E60
+ * Address: 0x00772E60 (FUN_00772E60)
  */
 const char* CEconomyTypeInfo::GetName() const
 {
@@ -61,7 +61,7 @@ const char* CEconomyTypeInfo::GetName() const
 }
 
 /**
- * Address: 0x00772E40
+ * Address: 0x00772E40 (FUN_00772E40)
  */
 void CEconomyTypeInfo::Init()
 {
@@ -71,7 +71,7 @@ void CEconomyTypeInfo::Init()
 }
 
 /**
- * Address: 0x00BDD0B0
+ * Address: 0x00BDD0B0 (FUN_00BDD0B0)
  */
 void moho::register_CEconomyTypeInfoStartup()
 {

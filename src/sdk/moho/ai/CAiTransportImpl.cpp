@@ -999,7 +999,7 @@ namespace
   }
 
   /**
-   * Address: 0x005E8A30 (sub_5E8A30)
+   * Address: 0x005E8A30 (FUN_005E8A30, sub_5E8A30)
    *
    * What it does:
    * Broadcasts one transport event to intrusive listeners while preserving

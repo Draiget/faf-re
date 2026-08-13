@@ -800,84 +800,84 @@ namespace moho
     virtual Unit* IsUnit();
 
     /**
-     * Address: 0x006A48E0
+     * Address: 0x006A48E0 (FUN_006A48E0)
      * Slot: 2
      * Demangled: public: virtual class moho::UserUnit const near * __thiscall moho::IUnit::IsUserUnit(void)const
      */
     virtual UserUnit const* IsUserUnit() const;
 
     /**
-     * Address: 0x006A48D0
+     * Address: 0x006A48D0 (FUN_006A48D0)
      * Slot: 3
      * Demangled: public: virtual class moho::UserUnit near * __thiscall moho::IUnit::IsUserUnit(void)
      */
     virtual UserUnit* IsUserUnit();
 
     /**
-     * Address: 0x006A49A0
+     * Address: 0x006A49A0 (FUN_006A49A0)
      * Slot: 4
      * Demangled: public: virtual class moho::EntId __thiscall moho::Unit::GetEntityId(void)const
      */
     virtual EntId GetEntityId() const;
 
     /**
-     * Address: 0x006A49B0
+     * Address: 0x006A49B0 (FUN_006A49B0)
      * Slot: 5
      * Demangled: public: virtual class Wm3::Vec3f const near & __thiscall moho::Unit::GetPosition(void)const
      */
     virtual Wm3::Vec3f const& GetPosition() const;
 
     /**
-     * Address: 0x006A49C0
+     * Address: 0x006A49C0 (FUN_006A49C0)
      * Slot: 6
      * Demangled: public: virtual class moho::VTransform const near & __thiscall moho::Unit::GetTransform(void)const
      */
     virtual VTransform const& GetTransform() const;
 
     /**
-     * Address: 0x006A8B20
+     * Address: 0x006A8B20 (FUN_006A8B20)
      * Slot: 7
      * Demangled: public: virtual class moho::RUnitBlueprint const near * __thiscall moho::Unit::GetBlueprint(void)const
      */
     virtual RUnitBlueprint const* GetBlueprint() const;
 
     /**
-     * Address: 0x006A49D0
+     * Address: 0x006A49D0 (FUN_006A49D0)
      * Slot: 8
      * Demangled: public: virtual class LuaPlus::LuaObject __thiscall moho::Unit::GetLuaObject(void)
      */
     virtual LuaPlus::LuaObject GetLuaObject();
 
     /**
-     * Address: 0x006A8B30
+     * Address: 0x006A8B30 (FUN_006A8B30)
      * Slot: 9
      * Demangled: public: virtual float __thiscall moho::Unit::CalcTransportLoadFactor(void)const
      */
     virtual float CalcTransportLoadFactor() const;
 
     /**
-     * Address: 0x006A49F0
+     * Address: 0x006A49F0 (FUN_006A49F0)
      * Slot: 10
      * Demangled: public: virtual bool __thiscall moho::Unit::IsDead(void)const
      */
     virtual bool IsDead() const;
 
     /**
-     * Address: 0x006A4A00
+     * Address: 0x006A4A00 (FUN_006A4A00)
      * Slot: 11
      * Demangled: public: virtual bool __thiscall moho::Unit::DestroyQueued(void)const
      */
     virtual bool DestroyQueued() const;
 
     /**
-     * Address: 0x006A4A10
+     * Address: 0x006A4A10 (FUN_006A4A10)
      * Slot: 12
      * Demangled: public: virtual bool __thiscall moho::Unit::IsMobile(void)const
      */
     virtual bool IsMobile() const;
 
     /**
-     * Address: 0x006A4A20
+     * Address: 0x006A4A20 (FUN_006A4A20)
      * Slot: 13
      * Demangled: public: virtual bool __thiscall moho::Unit::IsBeingBuilt(void)const
      */
@@ -1043,7 +1043,7 @@ namespace moho
     void LookForStructureRebuilder();
 
     /**
-     * Address: 0x006A7DC0
+     * Address: 0x006A7DC0 (FUN_006A7DC0)
      * Slot: 14
      * Demangled: public: virtual bool __thiscall moho::Unit::IsNavigatorIdle(void)const
      */
@@ -1134,21 +1134,21 @@ namespace moho
     void SyncInterface(SSyncData* syncData) override;
 
     /**
-     * Address: 0x006A4AF0
+     * Address: 0x006A4AF0 (FUN_006A4AF0)
      * Slot: 15
      * Demangled: public: virtual bool __thiscall moho::Unit::IsUnitState(enum moho::EUnitState)const
      */
     virtual bool IsUnitState(EUnitState) const;
 
     /**
-     * Address: 0x006A4990
+     * Address: 0x006A4990 (FUN_006A4990)
      * Slot: 16
      * Demangled: public: virtual struct moho::UnitAttributes near & __thiscall moho::Unit::GetAttributes(void)
      */
     virtual UnitAttributes& GetAttributes();
 
     /**
-     * Address: 0x006A4980
+     * Address: 0x006A4980 (FUN_006A4980)
      * Slot: 17
      * Demangled: public: virtual struct moho::UnitAttributes const near & __thiscall
      * moho::Unit::GetAttributes(void)const
@@ -1156,7 +1156,7 @@ namespace moho
     virtual UnitAttributes const& GetAttributes() const;
 
     /**
-     * Address: 0x006A4B90
+     * Address: 0x006A4B90 (FUN_006A4B90)
      * Slot: 18
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,class
      * std::basic_string<char,struct std::char_traits<char>,class std::allocator<char>> const near &)
@@ -1165,7 +1165,7 @@ namespace moho
     GetStat(gpg::StrArg, std::basic_string<char, std::char_traits<char>, std::allocator<char>> const&);
 
     /**
-     * Address: 0x006A4B70
+     * Address: 0x006A4B70 (FUN_006A4B70)
      * Slot: 19
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,float
      * const near &)
@@ -1173,7 +1173,7 @@ namespace moho
     virtual StatItem* GetStat(gpg::StrArg, float const&);
 
     /**
-     * Address: 0x006A4B50
+     * Address: 0x006A4B50 (FUN_006A4B50)
      * Slot: 20
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,int const
      * near &)
@@ -1181,7 +1181,7 @@ namespace moho
     virtual StatItem* GetStat(gpg::StrArg, int const&);
 
     /**
-     * Address: 0x006A4B30
+     * Address: 0x006A4B30 (FUN_006A4B30)
      * Slot: 21
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg)
      */
@@ -1562,7 +1562,7 @@ namespace moho
     void SetFireState(std::int32_t fireState);
 
     /**
-     * Address: 0x006AAF50 (?PickTargetPoint@Unit@Moho@@QBE_NAAH@Z)
+     * Address: 0x006AAF50 (FUN_006AAF50, ?PickTargetPoint@Unit@Moho@@QBE_NAAH@Z)
      *
      * What it does:
      * Picks a random index in `Blueprint->AI.TargetBones`; writes `-1` when

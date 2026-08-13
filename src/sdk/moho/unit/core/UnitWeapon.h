@@ -95,7 +95,7 @@ namespace moho
   struct CollisionBeamHelper
   {
     /**
-     * Address: 0x006D6B00 sub-flow (inline init inside CreateCollisionBeamHelper)
+     * Address: 0x006D6B00 (FUN_006D6B00) sub-flow (inline init inside CreateCollisionBeamHelper)
      *
      * What it does:
      * Zero-initializes the impact lane, copy-binds the source target, and resets
