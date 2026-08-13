@@ -2443,6 +2443,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\core\WeaponExtractor.h" />
     <ClInclude Include="moho\unit\core\UnitWeaponRuntimeView.h" />
     <ClInclude Include="moho\unit\core\UserUnit.h" />
+    <ClInclude Include="moho\unit\core\UserUnitManager.h" />
     <ClInclude Include="moho\unit\CUnitCommand.h" />
     <ClInclude Include="moho\unit\CUnitCommandQueue.h" />
     <ClInclude Include="moho\unit\CUnitCommandQueueReflection.h" />

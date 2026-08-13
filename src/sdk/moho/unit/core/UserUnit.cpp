@@ -42,6 +42,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/core/UserUnitManager.h"
 #include "moho/unit/core/UnitAttributes.h"
 #include "moho/vision/VisionDB.h"
 
@@ -469,17 +470,25 @@ namespace
     "UserCommandIssueHelper cursor weak-set lane must stay at +0xCC"
   );
 
-  struct UserCommandQueueEntryView
+} // namespace
+
+namespace moho
+{
+  struct UserCommandQueueEntry
   {
     UserCommandIssueHelperRuntimeView* helper;   // +0x00
     void* link;                                  // +0x04
   };
-  static_assert(sizeof(UserCommandQueueEntryView) == 0x08, "UserCommandQueueEntryView size must be 0x08");
+  static_assert(sizeof(UserCommandQueueEntry) == 0x08, "UserCommandQueueEntry size must be 0x08");
+} // namespace moho
+
+namespace
+{
 
   struct UserCommandQueueRangeView
   {
-    UserCommandQueueEntryView* begin;            // +0x00
-    UserCommandQueueEntryView* end;              // +0x04
+    UserCommandQueueEntry* begin;            // +0x00
+    UserCommandQueueEntry* end;              // +0x04
   };
   static_assert(sizeof(UserCommandQueueRangeView) == 0x08, "UserCommandQueueRangeView size must be 0x08");
 
@@ -538,8 +547,8 @@ namespace
     std::uint32_t pendingIssueCount;             // +0x38
     std::uint8_t pad_003C_0040[0x04];
     UserCommandQueueRangeView resolvedRange;     // +0x40
-    UserCommandQueueEntryView* resolvedRangeEndStorage; // +0x48
-    UserCommandQueueEntryView** resolvedRangeInlineStorage; // +0x4C
+    UserCommandQueueEntry* resolvedRangeEndStorage; // +0x48
+    UserCommandQueueEntry** resolvedRangeInlineStorage; // +0x4C
     std::uint8_t pad_0050_0060[0x10];
     std::uint8_t resolvedRangeDirty; // +0x60
   };
@@ -740,6 +749,10 @@ namespace
     "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntitySet offset must be 0xCC"
   );
 
+} // namespace
+
+namespace moho
+{
   struct UserManagerHelperEntry
   {
     std::int32_t commandType;     // +0x00
@@ -748,60 +761,14 @@ namespace
     std::int32_t sequenceOrCount; // +0x0C
   };
   static_assert(sizeof(UserManagerHelperEntry) == 0x10, "UserManagerHelperEntry size must be 0x10");
+} // namespace moho
 
-  struct UserCommandQueueLinkVectorView
-  {
-    UserCommandQueueEntryView* begin;       // +0x00
-    UserCommandQueueEntryView* end;         // +0x04
-    UserCommandQueueEntryView* capacityEnd; // +0x08
-    UserCommandQueueEntryView** inlineBase; // +0x0C
-  };
-  static_assert(sizeof(UserCommandQueueLinkVectorView) == 0x10, "UserCommandQueueLinkVectorView size must be 0x10");
+namespace
+{
 
-  struct UserManagerIssueQueueRuntimeView
-  {
-    std::uint32_t pad_00;                // +0x00
-    UserManagerHelperEntry** blocks;     // +0x04
-    std::uint32_t blockCount;            // +0x08
-    std::uint32_t startOffset;           // +0x0C
-    std::uint32_t size;                  // +0x10
-    std::uint32_t pad_14;                // +0x14
-  };
-  static_assert(offsetof(UserManagerIssueQueueRuntimeView, blocks) == 0x04, "UserManagerIssueQueueRuntimeView::blocks offset must be 0x04");
-  static_assert(
-    offsetof(UserManagerIssueQueueRuntimeView, blockCount) == 0x08,
-    "UserManagerIssueQueueRuntimeView::blockCount offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserManagerIssueQueueRuntimeView, startOffset) == 0x0C,
-    "UserManagerIssueQueueRuntimeView::startOffset offset must be 0x0C"
-  );
-  static_assert(offsetof(UserManagerIssueQueueRuntimeView, size) == 0x10, "UserManagerIssueQueueRuntimeView::size offset must be 0x10");
-  static_assert(sizeof(UserManagerIssueQueueRuntimeView) == 0x18, "UserManagerIssueQueueRuntimeView size must be 0x18");
-
-  struct UserUnitManagerRuntimeView
-  {
-    UserUnit* ownerUnit;                          // +0x00
-    std::uint8_t pad_0004_0008[0x04];
-    UserCommandQueueLinkVectorView primaryLinks;  // +0x08
-    std::uint8_t pad_0018_0028[0x10];
-    UserManagerIssueQueueRuntimeView issueQueue;  // +0x28
-    UserCommandQueueLinkVectorView resolvedLinks; // +0x40
-    std::uint8_t pad_0050_0060[0x10];
-    std::uint8_t resolvedLinksDirty;              // +0x60
-    std::uint8_t pad_0061_0068[0x07];
-  };
-  static_assert(offsetof(UserUnitManagerRuntimeView, primaryLinks) == 0x08, "UserUnitManagerRuntimeView::primaryLinks offset must be 0x08");
-  static_assert(offsetof(UserUnitManagerRuntimeView, issueQueue) == 0x28, "UserUnitManagerRuntimeView::issueQueue offset must be 0x28");
-  static_assert(
-    offsetof(UserUnitManagerRuntimeView, resolvedLinks) == 0x40,
-    "UserUnitManagerRuntimeView::resolvedLinks offset must be 0x40"
-  );
-  static_assert(
-    offsetof(UserUnitManagerRuntimeView, resolvedLinksDirty) == 0x60,
-    "UserUnitManagerRuntimeView::resolvedLinksDirty offset must be 0x60"
-  );
-  static_assert(sizeof(UserUnitManagerRuntimeView) == 0x68, "UserUnitManagerRuntimeView size must be 0x68");
+  // UserUnitManager and its two sub-runs are real types now, declared in
+  // moho/unit/core/UserUnitManager.h so the layout is stated once instead of
+  // living as a reinterpret view over an opaque forward declaration.
 
   struct SessionCommandIssueMapNodeView
   {
@@ -1004,7 +971,7 @@ namespace
     return reinterpret_cast<UserCommandManagerRuntimeView*>(managerAddress);
   }
 
-  [[nodiscard]] UserCommandQueueLinkVectorView* RebuildAndGetUserUnitManagerQueue(UserUnitManager* managerPtr) noexcept;
+  [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(UserUnitManager* managerPtr) noexcept;
 
   [[nodiscard]] const UserCommandQueueRangeView* ResolveUserCommandQueueRange(const std::int32_t managerHandle) noexcept
   {
@@ -1013,7 +980,7 @@ namespace
       return nullptr;
     }
 
-    const UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    const UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
     return reinterpret_cast<const UserCommandQueueRangeView*>(queueVector);
   }
 
@@ -1882,15 +1849,15 @@ namespace
     UserUnitManager* const managerPtr
   ) noexcept
   {
-    UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
-    UserCommandQueueEntryView* const begin = queueVector->begin;
+    UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
+    UserCommandQueueEntry* const begin = queueVector->begin;
 
     std::ptrdiff_t index = static_cast<std::ptrdiff_t>(queueVector->end - begin) - 1;
     if (index < 0) {
       return nullptr;
     }
 
-    UserCommandQueueEntryView* cursor = begin + index;
+    UserCommandQueueEntry* cursor = begin + index;
     while (cursor->helper == nullptr) {
       --index;
       --cursor;
@@ -1989,56 +1956,56 @@ namespace
    * Unlinks one command-queue entry from its helper-owned intrusive owner
    * chain and returns the final owner-link cursor slot.
    */
-  [[nodiscard]] UserCommandQueueEntryView** UnlinkCommandQueueOwnerEntry(
-    UserCommandQueueEntryView* const entry
+  [[nodiscard]] UserCommandQueueEntry** UnlinkCommandQueueOwnerEntry(
+    UserCommandQueueEntry* const entry
   ) noexcept
   {
-    auto* ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(entry != nullptr ? entry->helper : nullptr);
+    auto* ownerLink = reinterpret_cast<UserCommandQueueEntry**>(entry != nullptr ? entry->helper : nullptr);
     if (ownerLink == nullptr) {
       return ownerLink;
     }
 
     while (*ownerLink != nullptr && *ownerLink != entry) {
-      ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(&(*ownerLink)->link);
+      ownerLink = reinterpret_cast<UserCommandQueueEntry**>(&(*ownerLink)->link);
     }
 
     if (*ownerLink == entry) {
-      *ownerLink = reinterpret_cast<UserCommandQueueEntryView*>(entry->link);
+      *ownerLink = reinterpret_cast<UserCommandQueueEntry*>(entry->link);
     }
 
     return ownerLink;
   }
 
   void UnlinkResolvedQueueOwnerLinks(
-    UserCommandQueueEntryView* const begin, UserCommandQueueEntryView* const end
+    UserCommandQueueEntry* const begin, UserCommandQueueEntry* const end
   ) noexcept
   {
-    for (UserCommandQueueEntryView* cursor = begin; cursor != end; ++cursor) {
+    for (UserCommandQueueEntry* cursor = begin; cursor != end; ++cursor) {
       (void)UnlinkCommandQueueOwnerEntry(cursor);
     }
   }
 
   [[nodiscard]] inline WeakPtr<void>* AsWeakLane(
-    UserCommandQueueEntryView* const lane
+    UserCommandQueueEntry* const lane
   ) noexcept
   {
     return reinterpret_cast<WeakPtr<void>*>(lane);
   }
 
   [[nodiscard]] inline const WeakPtr<void>* AsWeakLane(
-    const UserCommandQueueEntryView* const lane
+    const UserCommandQueueEntry* const lane
   ) noexcept
   {
     return reinterpret_cast<const WeakPtr<void>*>(lane);
   }
 
-  [[nodiscard]] UserCommandQueueEntryView* CopyQueueLinkRangeWithOwnerRelink(
-    UserCommandQueueEntryView* const destination,
-    const UserCommandQueueEntryView* const sourceBegin,
-    const UserCommandQueueEntryView* const sourceEnd
+  [[nodiscard]] UserCommandQueueEntry* CopyQueueLinkRangeWithOwnerRelink(
+    UserCommandQueueEntry* const destination,
+    const UserCommandQueueEntry* const sourceBegin,
+    const UserCommandQueueEntry* const sourceEnd
   ) noexcept
   {
-    return reinterpret_cast<UserCommandQueueEntryView*>(
+    return reinterpret_cast<UserCommandQueueEntry*>(
       CopyWeakPtrRangeStdOrder(
         AsWeakLane(destination),
         AsWeakLane(sourceBegin),
@@ -2047,13 +2014,13 @@ namespace
     );
   }
 
-  [[nodiscard]] UserCommandQueueEntryView* AssignQueueLinkRangeWithOwnerRelink(
-    UserCommandQueueEntryView* const destination,
-    const UserCommandQueueEntryView* const sourceBegin,
-    const UserCommandQueueEntryView* const sourceEnd
+  [[nodiscard]] UserCommandQueueEntry* AssignQueueLinkRangeWithOwnerRelink(
+    UserCommandQueueEntry* const destination,
+    const UserCommandQueueEntry* const sourceBegin,
+    const UserCommandQueueEntry* const sourceEnd
   ) noexcept
   {
-    return reinterpret_cast<UserCommandQueueEntryView*>(
+    return reinterpret_cast<UserCommandQueueEntry*>(
       AssignWeakPtrRangeForward(
         AsWeakLane(destination),
         AsWeakLane(sourceBegin),
@@ -2062,13 +2029,13 @@ namespace
     );
   }
 
-  [[nodiscard]] UserCommandQueueEntryView* AssignQueueLinkRangeBackwardWithOwnerRelink(
-    UserCommandQueueEntryView* const destinationEnd,
-    const UserCommandQueueEntryView* const sourceBegin,
-    const UserCommandQueueEntryView* const sourceEnd
+  [[nodiscard]] UserCommandQueueEntry* AssignQueueLinkRangeBackwardWithOwnerRelink(
+    UserCommandQueueEntry* const destinationEnd,
+    const UserCommandQueueEntry* const sourceBegin,
+    const UserCommandQueueEntry* const sourceEnd
   ) noexcept
   {
-    return reinterpret_cast<UserCommandQueueEntryView*>(
+    return reinterpret_cast<UserCommandQueueEntry*>(
       AssignWeakPtrRangeBackward(
         AsWeakLane(destinationEnd),
         AsWeakLane(sourceBegin),
@@ -2084,21 +2051,21 @@ namespace
    * Unlinks one queue-link vector range, then restores inline storage ownership
    * when the active storage pointer differs from the inline lane.
    */
-  [[maybe_unused]] UserCommandQueueEntryView* ResetQueueLinkVectorToInlineStorage(
-    UserCommandQueueLinkVectorView* const linkVector
+  [[maybe_unused]] UserCommandQueueEntry* ResetQueueLinkVectorToInlineStorage(
+    UserCommandQueueLinkVector* const linkVector
   ) noexcept
   {
     UnlinkResolvedQueueOwnerLinks(linkVector->begin, linkVector->end);
 
-    UserCommandQueueEntryView* result = linkVector->begin;
-    if (linkVector->begin == reinterpret_cast<UserCommandQueueEntryView*>(linkVector->inlineBase))
+    UserCommandQueueEntry* result = linkVector->begin;
+    if (linkVector->begin == reinterpret_cast<UserCommandQueueEntry*>(linkVector->inlineBase))
     {
       linkVector->end = result;
       return result;
     }
 
     ::operator delete[](linkVector->begin);
-    linkVector->begin = reinterpret_cast<UserCommandQueueEntryView*>(linkVector->inlineBase);
+    linkVector->begin = reinterpret_cast<UserCommandQueueEntry*>(linkVector->inlineBase);
     result = (linkVector->inlineBase != nullptr) ? *linkVector->inlineBase : nullptr;
     linkVector->capacityEnd = result;
     linkVector->end = linkVector->begin;
@@ -2112,15 +2079,15 @@ namespace
    * Erases one queue-link entry by shift-assigning `[erase+1,end)` over the
    * erased slot, then unlinks the trailing stale owner-link lane.
    */
-  [[maybe_unused]] UserCommandQueueEntryView* EraseQueueLinkEntryAndShrinkRange(
-    UserCommandQueueEntryView* const eraseAt,
-    UserCommandQueueLinkVectorView* const linkVector
+  [[maybe_unused]] UserCommandQueueEntry* EraseQueueLinkEntryAndShrinkRange(
+    UserCommandQueueEntry* const eraseAt,
+    UserCommandQueueLinkVector* const linkVector
   ) noexcept
   {
-    UserCommandQueueEntryView* const oldEnd = linkVector->end;
+    UserCommandQueueEntry* const oldEnd = linkVector->end;
     if (eraseAt != oldEnd)
     {
-      UserCommandQueueEntryView* const newEnd = AssignQueueLinkRangeWithOwnerRelink(
+      UserCommandQueueEntry* const newEnd = AssignQueueLinkRangeWithOwnerRelink(
         eraseAt,
         eraseAt + 1,
         oldEnd
@@ -2140,19 +2107,19 @@ namespace
    * `{prefix,insertRange,suffix}` in order, unlinks old owner links, then swaps
    * storage and updates `{begin,end,capacity}` lanes.
    */
-  [[maybe_unused]] UserCommandQueueEntryView* GrowQueueLinkVectorAndInsertRange(
-    UserCommandQueueLinkVectorView* const linkVector,
+  [[maybe_unused]] UserCommandQueueEntry* GrowQueueLinkVectorAndInsertRange(
+    UserCommandQueueLinkVector* const linkVector,
     const std::uint32_t targetElementCapacity,
-    UserCommandQueueEntryView* const insertionPoint,
-    const UserCommandQueueEntryView* const sourceBegin,
-    const UserCommandQueueEntryView* const sourceEnd
+    UserCommandQueueEntry* const insertionPoint,
+    const UserCommandQueueEntry* const sourceBegin,
+    const UserCommandQueueEntry* const sourceEnd
   )
   {
     const std::size_t byteCount =
-      static_cast<std::size_t>(targetElementCapacity) * sizeof(UserCommandQueueEntryView);
-    auto* const newStorage = static_cast<UserCommandQueueEntryView*>(::operator new(byteCount));
+      static_cast<std::size_t>(targetElementCapacity) * sizeof(UserCommandQueueEntry);
+    auto* const newStorage = static_cast<UserCommandQueueEntry*>(::operator new(byteCount));
 
-    UserCommandQueueEntryView* writeCursor = CopyQueueLinkRangeWithOwnerRelink(
+    UserCommandQueueEntry* writeCursor = CopyQueueLinkRangeWithOwnerRelink(
       newStorage,
       linkVector->begin,
       insertionPoint
@@ -2162,14 +2129,14 @@ namespace
       sourceBegin,
       sourceEnd
     );
-    UserCommandQueueEntryView* const newEnd = CopyQueueLinkRangeWithOwnerRelink(
+    UserCommandQueueEntry* const newEnd = CopyQueueLinkRangeWithOwnerRelink(
       writeCursor,
       insertionPoint,
       linkVector->end
     );
 
     UnlinkResolvedQueueOwnerLinks(linkVector->begin, linkVector->end);
-    if (linkVector->begin == reinterpret_cast<UserCommandQueueEntryView*>(linkVector->inlineBase))
+    if (linkVector->begin == reinterpret_cast<UserCommandQueueEntry*>(linkVector->inlineBase))
     {
       if (linkVector->inlineBase != nullptr)
       {
@@ -2195,11 +2162,11 @@ namespace
    * when capacity is sufficient, otherwise grows storage through `FUN_008B7CC0`.
    * Preserves intrusive weak-owner relink semantics for all shifted/copied lanes.
    */
-  [[maybe_unused]] UserCommandQueueEntryView* InsertQueueLinkRangeWithGrowth(
-    UserCommandQueueLinkVectorView* const linkVector,
-    UserCommandQueueEntryView* const insertionPoint,
-    const UserCommandQueueEntryView* const sourceBegin,
-    const UserCommandQueueEntryView* const sourceEnd
+  [[maybe_unused]] UserCommandQueueEntry* InsertQueueLinkRangeWithGrowth(
+    UserCommandQueueLinkVector* const linkVector,
+    UserCommandQueueEntry* const insertionPoint,
+    const UserCommandQueueEntry* const sourceBegin,
+    const UserCommandQueueEntry* const sourceEnd
   )
   {
     const std::ptrdiff_t insertCount = sourceEnd - sourceBegin;
@@ -2225,13 +2192,13 @@ namespace
       );
     }
 
-    UserCommandQueueEntryView* const oldEnd = linkVector->end;
-    UserCommandQueueEntryView* const insertionEnd = insertionPoint + insertCount;
+    UserCommandQueueEntry* const oldEnd = linkVector->end;
+    UserCommandQueueEntry* const insertionEnd = insertionPoint + insertCount;
 
     if (insertionEnd > oldEnd)
     {
       const std::ptrdiff_t tailCount = oldEnd - insertionPoint;
-      const UserCommandQueueEntryView* const sourceMiddle = sourceBegin + tailCount;
+      const UserCommandQueueEntry* const sourceMiddle = sourceBegin + tailCount;
 
       linkVector->end = CopyQueueLinkRangeWithOwnerRelink(
         oldEnd,
@@ -2250,7 +2217,7 @@ namespace
       );
     }
 
-    UserCommandQueueEntryView* const tailStart = oldEnd - insertCount;
+    UserCommandQueueEntry* const tailStart = oldEnd - insertCount;
     linkVector->end = CopyQueueLinkRangeWithOwnerRelink(
       oldEnd,
       tailStart,
@@ -2632,11 +2599,11 @@ namespace
   }
 
   void AppendQueueLinkStagedEntry(
-    UserCommandQueueLinkVectorView* const linkVector,
-    UserCommandQueueEntryView* const stagedEntry
+    UserCommandQueueLinkVector* const linkVector,
+    UserCommandQueueEntry* const stagedEntry
   )
   {
-    UserCommandQueueEntryView* const appendAt = linkVector->end;
+    UserCommandQueueEntry* const appendAt = linkVector->end;
     if (appendAt == linkVector->capacityEnd) {
       (void)InsertQueueLinkRangeWithGrowth(linkVector, appendAt, stagedEntry, stagedEntry + 1);
       return;
@@ -2646,7 +2613,7 @@ namespace
       appendAt->helper = stagedEntry->helper;
       if (stagedEntry->helper != nullptr) {
         appendAt->link = stagedEntry->link;
-        *reinterpret_cast<UserCommandQueueEntryView**>(stagedEntry->helper) = appendAt;
+        *reinterpret_cast<UserCommandQueueEntry**>(stagedEntry->helper) = appendAt;
       } else {
         appendAt->link = nullptr;
       }
@@ -2662,7 +2629,7 @@ namespace
    * issue operations when the resolved view is dirty, then returns the active
    * queue vector (`primary` when no pending issues, otherwise `resolved`).
    */
-  [[nodiscard]] UserCommandQueueLinkVectorView* RebuildAndGetUserUnitManagerQueue(
+  [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(
     UserUnitManager* const managerPtr
   ) noexcept
   {
@@ -2670,7 +2637,7 @@ namespace
       return nullptr;
     }
 
-    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+    auto& manager = *managerPtr;
     if (manager.issueQueue.size == 0u) {
       return &manager.primaryLinks;
     }
@@ -2682,7 +2649,7 @@ namespace
     manager.resolvedLinksDirty = 0u;
     (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
 
-    for (UserCommandQueueEntryView* entry = manager.primaryLinks.begin;
+    for (UserCommandQueueEntry* entry = manager.primaryLinks.begin;
          entry != manager.primaryLinks.end;
          ++entry) {
       UserCommandIssueHelperRuntimeView* const helper = entry->helper;
@@ -2690,8 +2657,8 @@ namespace
         continue;
       }
 
-      UserCommandQueueEntryView staged{};
-      auto** const ownerHead = reinterpret_cast<UserCommandQueueEntryView**>(helper);
+      UserCommandQueueEntry staged{};
+      auto** const ownerHead = reinterpret_cast<UserCommandQueueEntry**>(helper);
       staged.helper = helper;
       staged.link = *ownerHead;
       *ownerHead = &staged;
@@ -2728,7 +2695,7 @@ namespace
           continue;
         }
 
-        UserCommandQueueEntryView* found = manager.resolvedLinks.begin;
+        UserCommandQueueEntry* found = manager.resolvedLinks.begin;
         while (found != manager.resolvedLinks.end && found->helper != helperToRemove) {
           ++found;
         }
@@ -2751,7 +2718,7 @@ namespace
           continue;
         }
 
-        UserCommandQueueEntryView* insertionPoint = manager.resolvedLinks.begin;
+        UserCommandQueueEntry* insertionPoint = manager.resolvedLinks.begin;
         while (insertionPoint != manager.resolvedLinks.end && insertionPoint->helper != helperToInsert) {
           ++insertionPoint;
         }
@@ -2759,8 +2726,8 @@ namespace
           continue;
         }
 
-        UserCommandQueueEntryView staged{};
-        auto** const ownerHead = reinterpret_cast<UserCommandQueueEntryView**>(helperToInsert);
+        UserCommandQueueEntry staged{};
+        auto** const ownerHead = reinterpret_cast<UserCommandQueueEntry**>(helperToInsert);
         staged.helper = helperToInsert;
         staged.link = *ownerHead;
         *ownerHead = &staged;
@@ -2781,8 +2748,8 @@ namespace
         continue;
       }
 
-      UserCommandQueueEntryView staged{};
-      auto** const ownerHead = reinterpret_cast<UserCommandQueueEntryView**>(helperToAppend);
+      UserCommandQueueEntry staged{};
+      auto** const ownerHead = reinterpret_cast<UserCommandQueueEntry**>(helperToAppend);
       staged.helper = helperToAppend;
       staged.link = *ownerHead;
       *ownerHead = &staged;
@@ -2810,7 +2777,7 @@ namespace moho
     UserUnitManager* const managerPtr
   ) noexcept
   {
-    const UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
+    const UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
     return static_cast<std::int32_t>(queueVector->end - queueVector->begin);
   }
 } // namespace moho
@@ -2837,7 +2804,7 @@ namespace
    * block pointers into the freshly-allocated map by modulo-reindex. Behaviorally
    * identical to the binary's 3-part memmove recentering (verified vs .asm).
    */
-  void GrowUserManagerIssueQueueMap(UserManagerIssueQueueRuntimeView& queue)
+  void GrowUserManagerIssueQueueMap(UserManagerIssueQueue& queue)
   {
     constexpr std::uint32_t kMaxMapSlots = 0x0FFFFFFFu;
 
@@ -2882,7 +2849,7 @@ namespace
     queue.blocks = newBlocks;
   }
 
-  void ClearUserManagerIssueQueue(UserManagerIssueQueueRuntimeView& queue) noexcept
+  void ClearUserManagerIssueQueue(UserManagerIssueQueue& queue) noexcept
   {
     while (queue.size != 0u) {
       queue.size -= 1u;
@@ -2917,7 +2884,7 @@ namespace
    * and allocating a fresh block (AllocateUserManagerHelperSlots) when the tail
    * block is full.
    */
-  void PushUserManagerIssue(UserManagerIssueQueueRuntimeView& queue, const UserManagerHelperEntry& entry)
+  void PushUserManagerIssue(UserManagerIssueQueue& queue, const UserManagerHelperEntry& entry)
   {
     if (queue.blockCount <= (queue.size + 1u)) {
       GrowUserManagerIssueQueueMap(queue);
@@ -2987,7 +2954,7 @@ namespace
       return;
     }
 
-    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+    auto& manager = *managerPtr;
 
     (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
 
@@ -3036,9 +3003,9 @@ namespace
     }
 
     UnlinkResolvedQueueOwnerLinks(manager->resolvedRange.begin, manager->resolvedRange.end);
-    if (manager->resolvedRange.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager->resolvedRangeInlineStorage)) {
+    if (manager->resolvedRange.begin != reinterpret_cast<UserCommandQueueEntry*>(manager->resolvedRangeInlineStorage)) {
       ::operator delete[](manager->resolvedRange.begin);
-      manager->resolvedRange.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager->resolvedRangeInlineStorage);
+      manager->resolvedRange.begin = reinterpret_cast<UserCommandQueueEntry*>(manager->resolvedRangeInlineStorage);
       manager->resolvedRangeEndStorage = manager->resolvedRangeInlineStorage != nullptr
         ? *manager->resolvedRangeInlineStorage
         : nullptr;
@@ -3360,7 +3327,7 @@ namespace
       return;
     }
 
-    for (UserCommandQueueEntryView* entry = commandRange->begin; entry != commandRange->end; ++entry) {
+    for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
       const UserCommandIssueHelperRuntimeView* const helper = entry->helper;
       if (helper == nullptr) {
         continue;
@@ -3842,12 +3809,12 @@ namespace moho
    */
   void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, msvc8::set<const RUnitBlueprint*>& out)
   {
-    UserCommandQueueLinkVectorView* const queue = RebuildAndGetUserUnitManagerQueue(unit->mManager);
+    UserCommandQueueLinkVector* const queue = RebuildAndGetUserUnitManagerQueue(unit->mManager);
     if (queue == nullptr) {
       return;
     }
 
-    for (UserCommandQueueEntryView* entry = queue->begin; entry != queue->end; ++entry) {
+    for (UserCommandQueueEntry* entry = queue->begin; entry != queue->end; ++entry) {
       UserCommandIssueHelperRuntimeView* const helper = entry->helper;
       if (helper == nullptr) {
         continue;
@@ -3924,7 +3891,7 @@ namespace moho
     const CmdId cmdId,
     const bool clearFlag)
   {
-    auto& view = *reinterpret_cast<UserUnitManagerRuntimeView*>(manager);
+    auto& view = *reinterpret_cast<UserUnitManager*>(manager);
 
     UserManagerHelperEntry entry{};
     entry.commandType = static_cast<std::int32_t>(cmdId);
@@ -3953,7 +3920,7 @@ namespace moho
       return;
     }
 
-    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+    auto& manager = *managerPtr;
     ClearUserManagerIssueQueue(manager.issueQueue);
 
     UserManagerHelperEntry resetHelper{};
@@ -4157,13 +4124,13 @@ namespace moho
       return false;
     }
 
-    const UserCommandQueueLinkVectorView* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    const UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr) {
       return false;
     }
 
     const auto* const helperView = reinterpret_cast<const UserCommandIssueHelperRuntimeView*>(helper);
-    for (const UserCommandQueueEntryView* entry = queueVector->begin; entry != queueVector->end; ++entry) {
+    for (const UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
       if (entry->helper == helperView) {
         return true;
       }
@@ -7545,7 +7512,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
   CWldSession* const session = userEntity ? userEntity->mSession : nullptr;
 
   int tableIndex = 1;
-  for (UserCommandQueueEntryView* entry = commandRange->begin; entry != commandRange->end; ++entry) {
+  for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
     UserCommandIssueHelperRuntimeView* const helper = entry->helper;
     if (helper == nullptr) {
       continue;
