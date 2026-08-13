@@ -273,13 +273,19 @@ void CClientBase::Process(CMessage& msg)
       mManager->ProcessClients(ackMessage);
     }
 
-    const size_t wireBytes = msg.mBuff.Size();
-    if (wireBytes > static_cast<size_t>(mPipe.mWriteEnd - mPipe.mWriteHead)) {
-      mPipe.VirtWrite(msg.mBuff.start_, wireBytes);
-    } else {
-      std::memcpy(mPipe.mWriteHead, msg.mBuff.start_, wireBytes);
-      mPipe.mWriteHead += wireBytes;
-    }
+    // The whole append goes through `VirtWrite`, which takes the pipe's own
+    // lock. The tempting shortcut - test `mWriteEnd - mWriteHead` and memcpy
+    // straight into the window when the message fits - is the inlined shape of
+    // `Stream::Write`, and it is safe for every stream that belongs to one
+    // thread. `mPipe` does not: the issue thread appends here while the
+    // dispatch thread drains it, and an append that grows the pipe swaps in a
+    // fresh 4KB chunk. A writer that already loaded the old `mWriteHead` then
+    // stores `head + wireBytes` back over the new one, leaving `mWriteHead` in
+    // the retired chunk and `mWriteEnd` in the current one. Every later append
+    // measures the window across two chunks, believes it has megabytes of room,
+    // and runs off the end of the retired chunk into whatever the allocator
+    // handed out next.
+    mPipe.VirtWrite(msg.mBuff.start_, msg.mBuff.Size());
     return;
   }
 
