@@ -38,3 +38,6 @@ skills/
 .github/instructions/**/*
 
 build_sdk.bat
+
+# Unpacked game data (extracted from C:\ProgramData\FAForever\gamedata)
+gamedata/
