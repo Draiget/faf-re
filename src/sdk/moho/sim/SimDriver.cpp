@@ -12,6 +12,7 @@
 #include "boost/function.hpp"
 #include <boost/ptr_container/exception.hpp>
 #include "gpg/core/utils/BoostWrappers.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/app/WxAppRuntime.h"
 #include "moho/net/CClientBase.h"
 #include "moho/net/IClient.h"
@@ -1022,25 +1023,6 @@ namespace moho
    * `SSyncData` teardown lane; it is the public, named-field owner of that layout
    * (the trailing word is `mReconFlags`, not opaque tail bytes).
    */
-  struct SUnitVariableUpdateEntry
-  {
-    EntId mEntityId = 0;                    // +0x000
-    std::uint32_t mReserved04 = 0;          // +0x004
-    SSTIUnitVariableData mVariableData{};   // +0x008
-    std::int32_t mReconFlags = 0;           // +0x230
-    std::uint32_t mReserved234 = 0;         // +0x234
-  };
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SUnitVariableUpdateEntry, mVariableData) == 0x08,
-    "SUnitVariableUpdateEntry::mVariableData offset must be 0x08"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SUnitVariableUpdateEntry, mReconFlags) == 0x230,
-    "SUnitVariableUpdateEntry::mReconFlags offset must be 0x230"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(SUnitVariableUpdateEntry) == 0x238, "SUnitVariableUpdateEntry size must be 0x238"
-  );
 } // namespace moho
 
 /**

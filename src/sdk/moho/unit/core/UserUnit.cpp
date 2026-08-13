@@ -807,16 +807,13 @@ namespace
     "SessionCommandIssueMapView::head offset must be 0x04"
   );
 
-  struct SessionCommandManagerRuntimeView
+  /// `moho::CommandManager` owns the layout; this file only needs the
+  /// command map as raw tree nodes, which it walks itself.
+  [[nodiscard]] inline SessionCommandIssueMapView& CommandIssueMapOf(moho::CommandManager& manager) noexcept
   {
-    std::uint8_t pad_0000_0CB4[0xCB4];
-    SessionCommandIssueMapView commandIssueMap; // +0xCB4
-  };
-  static_assert(
-    offsetof(SessionCommandManagerRuntimeView, commandIssueMap) == 0xCB4,
-    "SessionCommandManagerRuntimeView::commandIssueMap offset must be 0xCB4"
-  );
-  static_assert(sizeof(SessionCommandManagerRuntimeView) == 0xCC0, "SessionCommandManagerRuntimeView size must be 0xCC0");
+    return *reinterpret_cast<SessionCommandIssueMapView*>(&manager.mCommands);
+  }
+  static_assert(sizeof(moho::CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
 
   struct UserUnitVisionRuntimeView
   {
@@ -2255,8 +2252,8 @@ namespace
     }
 
     auto* const commandManager =
-      reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
-    SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
+      session->mCommandManager;
+    SessionCommandIssueMapView& issueMap = CommandIssueMapOf(*commandManager);
     SessionCommandIssueMapNodeView* const node = FindSessionCommandIssueNode(issueMap, commandId);
     if (node == nullptr || node == issueMap.head) {
       return nullptr;
@@ -2570,8 +2567,8 @@ namespace
       return;
     }
 
-    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
-    SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
+    auto* const commandManager = session->mCommandManager;
+    SessionCommandIssueMapView& issueMap = CommandIssueMapOf(*commandManager);
     SessionCommandIssueMapNodeView* const node =
       FindSessionCommandIssueNode(issueMap, static_cast<CmdId>(helper.mConstantData.cmd));
     if (node == nullptr || node == issueMap.head) {
@@ -5180,12 +5177,12 @@ bool moho::USERUNIT_CanBeBuiltAt(
     }
   }
 
-  auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session.mCommandManager);
-  if (commandManager == nullptr || commandManager->commandIssueMap.head == nullptr) {
+  auto* const commandManager = session.mCommandManager;
+  if (commandManager == nullptr || CommandIssueMapOf(*commandManager).head == nullptr) {
     return true;
   }
 
-  SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
+  SessionCommandIssueMapView& issueMap = CommandIssueMapOf(*commandManager);
   SessionCommandIssueMapNodeView* const mapHead = issueMap.head;
   for (SessionCommandIssueMapNodeView* node = mapHead->left;
        node != nullptr && node != mapHead;

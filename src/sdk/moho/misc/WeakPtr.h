@@ -26,6 +26,8 @@ namespace moho
   class Unit;
   class IUnit;
   class UnitWeapon;
+  class UserEntity;
+  class UserUnit;
 
   template <class T>
   struct WeakPtrOwnerLinkOffset
@@ -41,6 +43,28 @@ namespace moho
     static constexpr std::uintptr_t value = 0x14;
   };
 #endif
+
+  /**
+   * `UserEntity`'s weak-link head is its `WeakObject` base's `weakLinkHead_`,
+   * which sits at +0x08 because the class carries a vtable at +0x00 and the
+   * IUnit-chain head at +0x04. Every avatar/creator lane in the binary decodes
+   * these nodes with a literal `lea reg, [slot-8]` (0x008B2340 in the army
+   * avatar scan, 0x008C0870 in `UserUnit::UpdateUnitData`).
+   *
+   * `UserUnit` derives from `UserEntity` at offset zero, so it shares the
+   * offset.
+   */
+  template <>
+  struct WeakPtrOwnerLinkOffset<UserEntity>
+  {
+    static constexpr std::uintptr_t value = 0x08;
+  };
+
+  template <>
+  struct WeakPtrOwnerLinkOffset<UserUnit>
+  {
+    static constexpr std::uintptr_t value = 0x08;
+  };
 
   /**
    * Recovered intrusive weak-pointer node layout used by Moho reflection helpers.

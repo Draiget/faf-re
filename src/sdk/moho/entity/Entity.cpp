@@ -4067,7 +4067,7 @@ namespace moho
     SCreateEntityParams createParams{};
     createParams.mEntityId = id_;
     createParams.mBlueprint = BluePrint;
-    createParams.mUnknown08 = static_cast<std::uint32_t>(mTickCreated);
+    createParams.mTickCreated = static_cast<std::uint32_t>(mTickCreated);
     (void)QueueCreateEntityParams(syncData, createParams);
     mInterfaceCreated = 1u;
   }

@@ -9,6 +9,7 @@
 #include "boost/shared_ptr.h"
 #include "boost/thread.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/time/Timer.h"
 #include "ISTIDriver.h"
@@ -65,6 +66,23 @@ namespace moho
   struct SUnitVariableUpdateEntry;
   struct SSTIUnitVariableData;
   struct RMeshBlueprint;
+  struct SSTIArmyConstantData;
+  struct SSTIArmyVariableData;
+  struct SCamShakeParams;
+  struct SCamFollowParams;
+  struct SDesyncInfo;
+  class CAniPose;
+
+  /**
+   * One replicated pose hand-off: `CWldSession::DoBeat` looks the entity up
+   * and passes the shared pose to `UserEntity::SetPose`. The 12-byte stride
+   * comes from the drain loop at 0x00894F1C.
+   */
+  struct SEntityPoseUpdateEntry
+  {
+    EntId mEntityId = 0;                  // +0x00
+    boost::shared_ptr<CAniPose> mPose;    // +0x04
+  };
 
   struct SSyncPublishedCommandPacket
   {
@@ -103,11 +121,8 @@ namespace moho
   /**
    * One unit/recon create packet queued by `Entity::CreateInterface` overrides.
    */
-  struct SCreateUnitParams
+  struct SCreateUnitParams : SCreateEntityParams
   {
-    EntId mEntityId = 0;                          // +0x00
-    REntityBlueprint* mBlueprint = nullptr;       // +0x04
-    std::uint32_t mTickCreated = 0;               // +0x08
     SCreateUnitConstantData mConstDat{};          // +0x0C
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitParams) == 0x1C, "SCreateUnitParams size must be 0x1C");
@@ -158,9 +173,9 @@ namespace moho
     std::uint8_t pad_0014_0018[0x04]{};                     // +0x014
     /// Inline audio-request queue handed to `IUserSoundManager::UpdateSoundRequests`.
     std::uint8_t mAudioRequests[0xF0]{};                    // +0x018
-    msvc8::vector<std::byte> mNewGrids;                     // +0x108
-    msvc8::vector<std::byte> mArmyUpdates;                  // +0x118
-    msvc8::vector<std::byte> mNewEntities;                  // +0x128
+    msvc8::vector<SSTIArmyConstantData> mNewGrids;          // +0x108
+    msvc8::vector<SSTIArmyVariableData> mArmyUpdates;       // +0x118
+    msvc8::vector<SCreateEntityParams> mNewEntities;        // +0x128
     msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
     msvc8::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
     msvc8::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
@@ -180,13 +195,13 @@ namespace moho
     /// per-lane record size, so the runs are kept untyped until it lands.
     msvc8::vector<std::byte> mAddDecals;                    // +0x1D0
     msvc8::vector<EntId> mRemoveDecals;                     // +0x1E0
-    msvc8::vector<std::byte> mCamShakeParams;               // +0x1F0
-    msvc8::vector<std::byte> mFollowCameras;                // +0x200
+    msvc8::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
+    msvc8::vector<SCamFollowParams> mFollowCameras;         // +0x200
     /// Seventeenth vector lane; untouched by `CWldSession::DoBeat`.
     msvc8::vector<std::byte> mAuxiliaryVector17;            // +0x210
-    msvc8::vector<std::byte> mPoseUpdates;                  // +0x220
-    msvc8::vector<std::byte> mPlayableRectUpdates;          // +0x230
-    msvc8::vector<std::byte> mDesyncs;                      // +0x240
+    msvc8::vector<SEntityPoseUpdateEntry> mPoseUpdates;     // +0x220
+    msvc8::vector<gpg::Rect2i> mPlayableRectUpdates;        // +0x230
+    msvc8::vector<SDesyncInfo> mDesyncs;                    // +0x240
     int32_t mPausedBy = -1;                                 // +0x250
     msvc8::string mSubmitArmyStats;                         // +0x254
     bool mGameOver = false;                                 // +0x270

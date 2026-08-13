@@ -12,7 +12,23 @@ namespace moho
 {
   class CSndParams;
   struct RMeshBlueprint;
+  struct REntityBlueprint;
   class RScmResource;
+
+  /**
+   * The create packet the sim hands to every UI-side entity constructor.
+   * `SCreateUnitParams` (SimDriver.h) extends it with the unit constant
+   * data, which is why this lives here rather than next to `UserEntity`:
+   * both headers already include this one.
+   */
+  struct SCreateEntityParams
+  {
+    std::uint32_t mEntityId = 0;                  // 0x00
+    const REntityBlueprint* mBlueprint = nullptr; // 0x04
+    std::uint32_t mTickCreated = 0;               // 0x08
+  };
+  static_assert(sizeof(SCreateEntityParams) == 0x0C, "SCreateEntityParams size must be 0x0C");
+
 
   /**
    * Recovered placeholder for `Moho::SSTIEntityAttachInfo` — used by
