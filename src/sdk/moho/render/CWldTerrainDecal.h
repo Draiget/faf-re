@@ -308,8 +308,11 @@ namespace moho
     std::uint32_t mVecIndex;                   // +0x14
     std::int32_t mIndex;                       // +0x18
     EWldTerrainDecalType mType;                // +0x1C
-    std::uint8_t mRuntimeActive;               // +0x20
-    std::uint8_t mPad21_23[0x03];              // +0x21
+    /// Graphics-fidelity band this decal belongs to. A full dword, not a flag:
+    /// the constructor stores `1` with `mov dword ptr [edi+20h], 1` (0x0089CABB)
+    /// and `CDecalManager::AddDecals` copies `SDecalInfo::mFidelity` into it
+    /// with a dword move (0x00878822), whose default is likewise 1.
+    std::int32_t mFidelity;                    // +0x20
     msvc8::string mNames[2];                   // +0x24
     Wm3::Vec3f mScale;                         // +0x5C
     Wm3::Vec3f mPosition;                      // +0x68
@@ -321,7 +324,10 @@ namespace moho
     float mFadeDistance;                       // +0x90
     float mUnknown94;                          // +0x94
     std::int32_t mRuntimeHandle;               // +0x98
-    std::int32_t mUnknown9C;                   // +0x9C
+    /// Owning army, or -1 for a decal that came off the map rather than out of
+    /// the sim. `CDecalManager::AddDecals` copies `SDecalInfo::mArmy` here
+    /// (0x0087899B), and the constructor seeds -1 (0x0089CB5D).
+    std::int32_t mArmy;                        // +0x9C
     std::uint8_t mUnknownA0;                   // +0xA0
     std::uint8_t mPadA1_A3[0x03];              // +0xA1
     CountedPtr<CountedObject> mResourceRefs[2]; // +0xA4
@@ -344,7 +350,7 @@ namespace moho
   static_assert(offsetof(CWldTerrainDecal, mVecIndex) == 0x14, "CWldTerrainDecal::mVecIndex offset must be 0x14");
   static_assert(offsetof(CWldTerrainDecal, mIndex) == 0x18, "CWldTerrainDecal::mIndex offset must be 0x18");
   static_assert(offsetof(CWldTerrainDecal, mType) == 0x1C, "CWldTerrainDecal::mType offset must be 0x1C");
-  static_assert(offsetof(CWldTerrainDecal, mRuntimeActive) == 0x20, "CWldTerrainDecal::mRuntimeActive offset must be 0x20");
+  static_assert(offsetof(CWldTerrainDecal, mFidelity) == 0x20, "CWldTerrainDecal::mFidelity offset must be 0x20");
   static_assert(offsetof(CWldTerrainDecal, mNames) == 0x24, "CWldTerrainDecal::mNames offset must be 0x24");
   static_assert(offsetof(CWldTerrainDecal, mScale) == 0x5C, "CWldTerrainDecal::mScale offset must be 0x5C");
   static_assert(offsetof(CWldTerrainDecal, mPosition) == 0x68, "CWldTerrainDecal::mPosition offset must be 0x68");
@@ -358,7 +364,7 @@ namespace moho
   static_assert(offsetof(CWldTerrainDecal, mFadeDistance) == 0x90, "CWldTerrainDecal::mFadeDistance offset must be 0x90");
   static_assert(offsetof(CWldTerrainDecal, mUnknown94) == 0x94, "CWldTerrainDecal::mUnknown94 offset must be 0x94");
   static_assert(offsetof(CWldTerrainDecal, mRuntimeHandle) == 0x98, "CWldTerrainDecal::mRuntimeHandle offset must be 0x98");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown9C) == 0x9C, "CWldTerrainDecal::mUnknown9C offset must be 0x9C");
+  static_assert(offsetof(CWldTerrainDecal, mArmy) == 0x9C, "CWldTerrainDecal::mArmy offset must be 0x9C");
   static_assert(offsetof(CWldTerrainDecal, mUnknownA0) == 0xA0, "CWldTerrainDecal::mUnknownA0 offset must be 0xA0");
   static_assert(offsetof(CWldTerrainDecal, mResourceRefs) == 0xA4, "CWldTerrainDecal::mResourceRefs offset must be 0xA4");
   static_assert(offsetof(CWldTerrainDecal, mTexMatrix) == 0xAC, "CWldTerrainDecal::mTexMatrix offset must be 0xAC");

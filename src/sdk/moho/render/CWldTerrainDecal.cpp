@@ -252,8 +252,7 @@ namespace moho
     , mVecIndex(0)
     , mIndex(0)
     , mType(WldTerrainDecalType_Undefined)
-    , mRuntimeActive(1)
-    , mPad21_23{0, 0, 0}
+    , mFidelity(1)
     , mNames{}
     , mScale{8.0f, 8.0f, 8.0f}
     , mPosition{}
@@ -265,7 +264,7 @@ namespace moho
     , mFadeDistance(5.0f)
     , mUnknown94(0.0f)
     , mRuntimeHandle(0)
-    , mUnknown9C(-1)
+    , mArmy(-1)
     , mUnknownA0(0)
     , mPadA1_A3{0, 0, 0}
     , mResourceRefs{}
@@ -350,7 +349,7 @@ namespace moho
     writer.Write(reinterpret_cast<const char*>(&mOrientation), sizeof(mOrientation));
     writer.Write(mCutoffLOD);
     writer.Write(mNearCutoff);
-    writer.Write(mUnknown9C);
+    writer.Write(mArmy);
   }
 
   /**
@@ -377,7 +376,7 @@ namespace moho
     reader.Read(reinterpret_cast<char*>(&typeValue), sizeof(typeValue));
     mType = static_cast<EWldTerrainDecalType>(typeValue);
 
-    mRuntimeActive = 1;
+    mFidelity = 1;
 
     std::int32_t nameCount = 0;
     reader.Read(reinterpret_cast<char*>(&nameCount), sizeof(nameCount));
@@ -417,9 +416,9 @@ namespace moho
     reader.Read(reinterpret_cast<char*>(&nearCutoff), sizeof(nearCutoff));
     mNearCutoff = nearCutoff;
 
-    std::int32_t runtimeToken = 0;
-    reader.Read(reinterpret_cast<char*>(&runtimeToken), sizeof(runtimeToken));
-    mUnknown9C = runtimeToken;
+    std::int32_t armyIndex = 0;
+    reader.Read(reinterpret_cast<char*>(&armyIndex), sizeof(armyIndex));
+    mArmy = armyIndex;
 
     Update();
   }
