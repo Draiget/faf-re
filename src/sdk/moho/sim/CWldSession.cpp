@@ -3253,7 +3253,7 @@ namespace moho
     , pad_0001{0, 0, 0}
     , mNodes{}
     , mSession(session)
-    , mSessionRes1(session ? session->mSessionRes1 : nullptr)
+    , mSessionRes1(session ? session->mCommandManager : nullptr)
     , mDebugFont(nullptr)
     , mMapAB0{}
     , mMapAB1{}
@@ -7518,7 +7518,7 @@ namespace moho
     // reuse (DecodeSelectedUserEntity / ResolveIUnitBridge / IsSentinelNode).
 
     // Session command-manager runtime views. The session's command manager
-    // lives behind `CWldSession::mSessionRes1`; its command-issue map (keyed by
+    // lives behind `CWldSession::mCommandManager`; its command-issue map (keyed by
     // CmdId) starts at manager offset +0xCB4 with the RB-tree head at +0xCB8.
     // Same per-TU view shape used by Sim.cpp / UserUnit.cpp.
     struct RightClickCommandIssueMapNodeView
@@ -7577,11 +7577,11 @@ namespace moho
     [[nodiscard]] RightClickCommandIssueHelperView*
       FindRightClickCommandIssueHelper(CWldSession* const session, const std::uint32_t commandId) noexcept
     {
-      if (session == nullptr || session->mSessionRes1 == nullptr) {
+      if (session == nullptr || session->mCommandManager == nullptr) {
         return nullptr;
       }
 
-      auto* const manager = reinterpret_cast<RightClickCommandManagerView*>(session->mSessionRes1);
+      auto* const manager = reinterpret_cast<RightClickCommandManagerView*>(session->mCommandManager);
       RightClickCommandIssueMapView& issueMap = manager->commandIssueMap;
       RightClickCommandIssueMapNodeView* const head = issueMap.head;
       if (head == nullptr) {
@@ -8427,13 +8427,11 @@ namespace moho
     mBuildTemplateArg1 = 0.0f;
     mBuildTemplateArg2 = 0.0f;
 
-    // Address: 0x008B58A0 (FUN_008B58A0, struct_session_res1 ctor —
-    //   CommandManager init with IdPool + std::map<id, command> head
-    //   sentinel allocation). Elided here because the typed
-    //   struct_session_res1 (CommandManager) layout is not yet
-    //   modeled in the recovered tree; the field is set null and
-    //   the binary's ctor is absorbed by this initialization.
-    mSessionRes1 = nullptr;
+    // Address: 0x008B58A0 (FUN_008B58A0, CommandManager ctor - IdPool +
+    //   command-map head sentinel allocation). The manager type is modeled
+    //   now (moho/command/CommandManager.h) but its constructor is not lifted
+    //   yet, so the field is still left null here.
+    mCommandManager = nullptr;
 
     // Current build/move formation (0x00893529: `new CFormation` @0x64). The
     // session frame calls into it unconditionally through

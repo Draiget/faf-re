@@ -17,6 +17,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/VisibilityRect.h"
+#include "moho/command/CommandManager.h"
 #include "moho/sim/WeakEntitySet.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/task/CTaskThread.h"
@@ -1173,7 +1174,10 @@ namespace moho
     float mBuildTemplateArg2;                               // 0x03C4
     VisionDb mVisionDb;                                     // 0x03C8
     msvc8::vector<UserArmy*> userArmies;                    // 0x03EC
-    void* mSessionRes1;                                     // 0x03FC
+    /// The session-wide command manager. `DoBeat`, the right-click dispatcher
+    /// and `UserUnit`'s manager resync all reach its `mCommands` map through
+    /// this pointer.
+    CommandManager* mCommandManager;                        // 0x03FC
     CFormation* mCurFormation;                              // 0x0400
     UICommandGraph* mUICommandGraphPx;                      // 0x0404
     boost::detail::sp_counted_base* mUICommandGraphControl; // 0x0408 (weak control block for mUICommandGraphPx)
