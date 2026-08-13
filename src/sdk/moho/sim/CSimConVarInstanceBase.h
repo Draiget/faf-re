@@ -157,7 +157,7 @@ namespace moho
     virtual ~CSimConVarInstanceBase();
 
     /**
-     * Address: 0x00A82547 (_purecall in base)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall in base)
      *
      * What it does:
      * Handles console command args for this typed convar instance.
@@ -165,7 +165,7 @@ namespace moho
     virtual int HandleConsoleCommand(void* commandArgs) = 0;
 
     /**
-     * Address: 0x00A82547 (_purecall in base)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall in base)
      *
      * What it does:
      * Returns pointer to underlying typed value storage used by Sim convar readers.
@@ -173,7 +173,7 @@ namespace moho
     virtual void* GetValueStorage() = 0;
 
     /**
-     * Address: 0x00A82547 (_purecall in base)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall in base)
      *
      * What it does:
      * Exports the typed value as a reflection `gpg::RRef`.

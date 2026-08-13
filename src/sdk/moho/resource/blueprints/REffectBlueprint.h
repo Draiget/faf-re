@@ -39,13 +39,13 @@ namespace moho
     REffectBlueprint();
 
     /**
-     * Address: 0x00A82547 (`_purecall`)
+     * Address: 0x00A82547 (FUN_00A82547, `_purecall`)
      * Slot: 0
      */
     [[nodiscard]] gpg::RType* GetClass() const override = 0;
 
     /**
-     * Address: 0x00A82547 (`_purecall`)
+     * Address: 0x00A82547 (FUN_00A82547, `_purecall`)
      * Slot: 1
      */
     gpg::RRef GetDerivedObjectRef() override = 0;

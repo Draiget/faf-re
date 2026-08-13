@@ -238,7 +238,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00412F00 path (FUN_00412f00)
+   * Address: 0x00412F00 (FUN_00412F00) path (FUN_00412f00)
    */
   SWldScenarioLoadControl::~SWldScenarioLoadControl()
   {

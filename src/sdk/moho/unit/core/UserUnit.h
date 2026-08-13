@@ -54,7 +54,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x008BF990
+     * Address: 0x008BF990 (FUN_008BF990)
      * Slot: 0
      * Demangled: DestroyUserUnit
      *
@@ -66,7 +66,7 @@ namespace moho
     virtual UserUnit* DestroyUserUnit(std::uint8_t deleteFlags);
 
     /**
-     * Address: 0x008C0A30
+     * Address: 0x008C0A30 (FUN_008C0A30)
      * Slot: 1
      * Demangled: moho::UserUnit::Tick
      *
@@ -76,7 +76,7 @@ namespace moho
     virtual void Tick(std::int32_t seqNo);
 
     /**
-     * Address: 0x008BF120
+     * Address: 0x008BF120 (FUN_008BF120)
      * Slot: 2
      * Demangled: moho::UserUnit::IsUserUnit1
      *
@@ -86,7 +86,7 @@ namespace moho
     virtual UserUnit const* IsUserUnit1() const;
 
     /**
-     * Address: 0x008BF110
+     * Address: 0x008BF110 (FUN_008BF110)
      * Slot: 3
      * Demangled: moho::UserUnit::IsUserUnit2
      *
@@ -96,7 +96,7 @@ namespace moho
     virtual UserUnit* IsUserUnit2();
 
     /**
-     * Address: 0x008BF170
+     * Address: 0x008BF170 (FUN_008BF170)
      * Slot: 4
      * Demangled: moho::UserUnit::GetUnitformScale
      *
@@ -106,7 +106,7 @@ namespace moho
     virtual float GetUnitformScale() const;
 
     /**
-     * Address: 0x008BF150
+     * Address: 0x008BF150 (FUN_008BF150)
      * Slot: 5
      * Demangled: moho::UserUnit::GetCommandQueue1
      *
@@ -116,7 +116,7 @@ namespace moho
     virtual std::int32_t GetCommandQueue1();
 
     /**
-     * Address: 0x008BF130
+     * Address: 0x008BF130 (FUN_008BF130)
      * Slot: 6
      * Demangled: moho::UserUnit::GetCommandQueue2
      *
@@ -126,7 +126,7 @@ namespace moho
     virtual std::int32_t GetCommandQueue2() const;
 
     /**
-     * Address: 0x008BF160
+     * Address: 0x008BF160 (FUN_008BF160)
      * Slot: 7
      * Demangled: moho::UserUnit::GetFactoryCommandQueue1
      *
@@ -136,7 +136,7 @@ namespace moho
     virtual std::int32_t GetFactoryCommandQueue1();
 
     /**
-     * Address: 0x008BF140
+     * Address: 0x008BF140 (FUN_008BF140)
      * Slot: 8
      * Demangled: moho::UserUnit::GetFactoryCommandQueue2
      *
@@ -146,7 +146,7 @@ namespace moho
     virtual std::int32_t GetFactoryCommandQueue2() const;
 
     /**
-     * Address: 0x008B8EB0
+     * Address: 0x008B8EB0 (FUN_008B8EB0)
      * Slot: 9
      * Demangled: public: virtual void __thiscall moho::UserEntity::UpdateEntityData(struct moho::SSTIEntityVariableData
      * const near &)
@@ -154,14 +154,14 @@ namespace moho
     virtual void UpdateEntityData(moho::SSTIEntityVariableData const&);
 
     /**
-     * Address: 0x008C09B0
+     * Address: 0x008C09B0 (FUN_008C09B0)
      * Slot: 10
      * Demangled: moho::UserUnit::UpdateVisibility
      */
     virtual void UpdateVisibility();
 
     /**
-     * Address: 0x008B8530
+     * Address: 0x008B8530 (FUN_008B8530)
      * Slot: 11
      * Demangled: public: virtual bool __thiscall moho::UserEntity::RequiresUIRefresh(void)const
      *
@@ -171,7 +171,7 @@ namespace moho
     virtual bool RequiresUIRefresh() const;
 
     /**
-     * Address: 0x008C0500
+     * Address: 0x008C0500 (FUN_008C0500)
      * Slot: 12
      * Demangled: moho::UserUnit::Select
      *
@@ -181,7 +181,7 @@ namespace moho
     virtual bool Select();
 
     /**
-     * Address: 0x008BEFB0
+     * Address: 0x008BEFB0 (FUN_008BEFB0)
      * Slot: 13
      * Demangled: moho::UserUnit::IsBeingBuilt
      *
@@ -191,7 +191,7 @@ namespace moho
     virtual bool IsBeingBuilt() const;
 
     /**
-     * Address: 0x008C1350
+     * Address: 0x008C1350 (FUN_008C1350)
      * Slot: 14
      * Demangled: moho::UserUnit::NotifyFocusArmyUnitDamaged
      *
@@ -202,7 +202,7 @@ namespace moho
     virtual void NotifyFocusArmyUnitDamaged();
 
     /**
-     * Address: 0x008C00E0
+     * Address: 0x008C00E0 (FUN_008C00E0)
      * Slot: 15
      * Demangled: moho::UserUnit::CreateMeshInstance
      *
@@ -213,14 +213,14 @@ namespace moho
     virtual void CreateMeshInstance();
 
     /**
-     * Address: 0x008C04D0
+     * Address: 0x008C04D0 (FUN_008C04D0)
      * Slot: 16
      * Demangled: protected: virtual void __thiscall moho::UserEntity::DestroyMeshInstance(void)
      */
     virtual void DestroyMeshInstance();
 
     /**
-     * Address: 0x008BFC50
+     * Address: 0x008BFC50 (FUN_008BFC50)
      * Slot: 17
      * Demangled: moho::UserUnit::FindWeaponBy
      *
@@ -231,7 +231,7 @@ namespace moho
     virtual bool FindWeaponBy(std::int32_t rangeCategoryFilter, float* outMinRange, float* outMaxRange) const;
 
     /**
-     * Address: 0x008BFD70
+     * Address: 0x008BFD70 (FUN_008BFD70)
      * Slot: 18
      * Demangled: moho::UserUnit::GetWaterIntel
      *
@@ -246,7 +246,7 @@ namespace moho
     virtual bool GetIntelRanges(float* outOmniRange, float* outRadarRange, float* outSonarRange) const;
 
     /**
-     * Address: 0x008BFE50
+     * Address: 0x008BFE50 (FUN_008BFE50)
      * Slot: 19
      * Demangled: moho::UserUnit::GetMaxCounterIntel
      *
@@ -257,7 +257,7 @@ namespace moho
     virtual bool GetMaxCounterIntel(float* outMaxCounterIntelRange) const;
 
     /**
-     * Address: 0x008BEFD0
+     * Address: 0x008BEFD0 (FUN_008BEFD0)
      * Slot: 20
      * Demangled: moho::UserUnit::GetAutoMode
      *
@@ -267,7 +267,7 @@ namespace moho
     virtual bool GetAutoMode() const;
 
     /**
-     * Address: 0x008BEFE0
+     * Address: 0x008BEFE0 (FUN_008BEFE0)
      * Slot: 21
      * Demangled: moho::UserUnit::IsAutoSurfaceMode
      *
@@ -277,7 +277,7 @@ namespace moho
     virtual bool IsAutoSurfaceMode() const;
 
     /**
-     * Address: 0x008BEFF0
+     * Address: 0x008BEFF0 (FUN_008BEFF0)
      * Slot: 22
      * Demangled: moho::UserUnit::Func1
      *
@@ -287,7 +287,7 @@ namespace moho
     virtual bool Func1() const;
 
     /**
-     * Address: 0x008BF000
+     * Address: 0x008BF000 (FUN_008BF000)
      * Slot: 23
      * Demangled: moho::UserUnit::IsOverchargePaused
      *
@@ -297,7 +297,7 @@ namespace moho
     virtual bool IsOverchargePaused() const;
 
     /**
-     * Address: 0x008BF010
+     * Address: 0x008BF010 (FUN_008BF010)
      * Slot: 24
      * Demangled: moho::UserUnit::GetCustomName
      *
@@ -307,7 +307,7 @@ namespace moho
     virtual char* GetCustomName();
 
     /**
-     * Address: 0x008BF060
+     * Address: 0x008BF060 (FUN_008BF060)
      * Slot: 25
      * Demangled: moho::UserUnit::GetFuel
      *
@@ -317,7 +317,7 @@ namespace moho
     virtual float GetFuel() const;
 
     /**
-     * Address: 0x008BF070
+     * Address: 0x008BF070 (FUN_008BF070)
      * Slot: 26
      * Demangled: moho::UserUnit::GetShield
      *

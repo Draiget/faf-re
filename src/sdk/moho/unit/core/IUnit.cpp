@@ -42,7 +42,7 @@ IUnit::IUnit() noexcept
 }
 
 /**
- * Address: 0x006A48C0 (?IsUnit@IUnit@Moho@@UBEPBVUnit@2@XZ)
+ * Address: 0x006A48C0 (FUN_006A48C0, ?IsUnit@IUnit@Moho@@UBEPBVUnit@2@XZ)
  *
  * Moho::Unit const *
  *
@@ -58,7 +58,7 @@ Unit const* IUnit::IsUnit() const
 }
 
 /**
- * Address: 0x006A48B0 (?IsUnit@IUnit@Moho@@UAEPAVUnit@2@XZ)
+ * Address: 0x006A48B0 (FUN_006A48B0, ?IsUnit@IUnit@Moho@@UAEPAVUnit@2@XZ)
  *
  * Moho::Unit *
  *
@@ -74,7 +74,7 @@ Unit* IUnit::IsUnit()
 }
 
 /**
- * Address: 0x006A48E0 (?IsUserUnit@IUnit@Moho@@UBEPBVUserUnit@2@XZ)
+ * Address: 0x006A48E0 (FUN_006A48E0, ?IsUserUnit@IUnit@Moho@@UBEPBVUserUnit@2@XZ)
  *
  * Moho::UserUnit const *
  *
@@ -90,7 +90,7 @@ UserUnit const* IUnit::IsUserUnit() const
 }
 
 /**
- * Address: 0x006A48D0 (?IsUserUnit@IUnit@Moho@@UAEPAVUserUnit@2@XZ)
+ * Address: 0x006A48D0 (FUN_006A48D0, ?IsUserUnit@IUnit@Moho@@UAEPAVUserUnit@2@XZ)
  *
  * Moho::UserUnit *
  *

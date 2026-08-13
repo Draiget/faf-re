@@ -39,7 +39,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x007737B0 (Moho::CEconRequestTypeInfo::CEconRequestTypeInfo)
+ * Address: 0x007737B0 (FUN_007737B0, Moho::CEconRequestTypeInfo::CEconRequestTypeInfo)
  */
 CEconRequestTypeInfo::CEconRequestTypeInfo()
   : gpg::RType()
@@ -48,12 +48,12 @@ CEconRequestTypeInfo::CEconRequestTypeInfo()
 }
 
 /**
- * Address: 0x00773840
+ * Address: 0x00773840 (FUN_00773840)
  */
 CEconRequestTypeInfo::~CEconRequestTypeInfo() = default;
 
 /**
- * Address: 0x00773830
+ * Address: 0x00773830 (FUN_00773830)
  */
 const char* CEconRequestTypeInfo::GetName() const
 {
@@ -61,7 +61,7 @@ const char* CEconRequestTypeInfo::GetName() const
 }
 
 /**
- * Address: 0x00773810
+ * Address: 0x00773810 (FUN_00773810)
  */
 void CEconRequestTypeInfo::Init()
 {
@@ -71,7 +71,7 @@ void CEconRequestTypeInfo::Init()
 }
 
 /**
- * Address: 0x00BDD1F0
+ * Address: 0x00BDD1F0 (FUN_00BDD1F0)
  */
 void moho::register_CEconRequestTypeInfoStartup()
 {

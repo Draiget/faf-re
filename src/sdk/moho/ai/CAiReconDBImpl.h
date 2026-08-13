@@ -112,7 +112,7 @@ namespace moho
     ~CAiReconDBImpl() override;
 
     /**
-     * Address: 0x005C0C40
+     * Address: 0x005C0C40 (FUN_005C0C40)
      * VFTable SLOT: 1
      */
     void ReconTick(int dTicks) override;
@@ -183,95 +183,95 @@ namespace moho
     [[nodiscard]] bool BeamIsVisible(const SWorldBeam& beam) const;
 
     /**
-     * Address: 0x005C1720
+     * Address: 0x005C1720 (FUN_005C1720)
      * VFTable SLOT: 5
      */
     void ReconGetBlips(const Wm3::Box3<float>& box, gpg::core::FastVector<Entity*>* outBlips) const override;
 
     /**
-     * Address: 0x005C1640
+     * Address: 0x005C1640 (FUN_005C1640)
      * VFTable SLOT: 6
      */
     void ReconGetBlips(const Wm3::Vec3f& center, float radius, gpg::core::FastVector<Entity*>* outBlips) const override;
 
     /**
-     * Address: 0x005C1590
+     * Address: 0x005C1590 (FUN_005C1590)
      * VFTable SLOT: 7
      */
     [[nodiscard]]
     const msvc8::vector<ReconBlip*>& ReconGetBlips() const override;
 
     /**
-     * Address: 0x005C1A10
+     * Address: 0x005C1A10 (FUN_005C1A10)
      * VFTable SLOT: 8
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetVisionGrid() const override;
 
     /**
-     * Address: 0x005C1A40
+     * Address: 0x005C1A40 (FUN_005C1A40)
      * VFTable SLOT: 9
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetWaterGrid() const override;
 
     /**
-     * Address: 0x005C1A70
+     * Address: 0x005C1A70 (FUN_005C1A70)
      * VFTable SLOT: 10
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetRadarGrid() const override;
 
     /**
-     * Address: 0x005C1AA0
+     * Address: 0x005C1AA0 (FUN_005C1AA0)
      * VFTable SLOT: 11
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetSonarGrid() const override;
 
     /**
-     * Address: 0x005C1AD0
+     * Address: 0x005C1AD0 (FUN_005C1AD0)
      * VFTable SLOT: 12
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetOmniGrid() const override;
 
     /**
-     * Address: 0x005C1B00
+     * Address: 0x005C1B00 (FUN_005C1B00)
      * VFTable SLOT: 13
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetRCIGrid() const override;
 
     /**
-     * Address: 0x005C1B30
+     * Address: 0x005C1B30 (FUN_005C1B30)
      * VFTable SLOT: 14
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetSCIGrid() const override;
 
     /**
-     * Address: 0x005C1B60
+     * Address: 0x005C1B60 (FUN_005C1B60)
      * VFTable SLOT: 15
      */
     [[nodiscard]]
     boost::SharedPtrRaw<CIntelGrid> ReconGetVCIGrid() const override;
 
     /**
-     * Address: 0x005C08F0
+     * Address: 0x005C08F0 (FUN_005C08F0)
      * VFTable SLOT: 16
      */
     void ReconSetFogOfWar(bool enabled) override;
 
     /**
-     * Address: 0x005C0910
+     * Address: 0x005C0910 (FUN_005C0910)
      * VFTable SLOT: 17
      */
     [[nodiscard]]
     bool ReconGetFogOfWar() const override;
 
     /**
-     * Address: 0x005C29C0 (nullsub_1553)
+     * Address: 0x005C29C0 (FUN_005C29C0, nullsub_1553)
      *
      * What it does:
      * No-op checksum hook in this implementation.
@@ -280,21 +280,21 @@ namespace moho
     void UpdateSimChecksum() override;
 
     /**
-     * Address: 0x005C15A0
+     * Address: 0x005C15A0 (FUN_005C15A0)
      * VFTable SLOT: 19
      */
     [[nodiscard]]
     ReconBlip* ReconGetBlip(Unit* unit) const override;
 
     /**
-     * Address: 0x005C20C0
+     * Address: 0x005C20C0 (FUN_005C20C0)
      * VFTable SLOT: 20
      */
     [[nodiscard]]
     EntitySetTemplate<Entity> ReconGetJamingBlips(Unit* unit) override;
 
     /**
-     * Address: 0x005C05A0
+     * Address: 0x005C05A0 (FUN_005C05A0)
      * VFTable SLOT: 21
      */
     void ReconFlushBlipsInRect(const moho::Rect2<int>& rect) override;

@@ -121,7 +121,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x004FE7A0 / 0x004FE860 / 0x004FF150 / 0x004FF260
+   * Address: 0x004FE7A0 (FUN_004FE7A0) / 0x004FE860 / 0x004FF150 / 0x004FF260
    *
    * What it does:
    * Common pair-shape collision output.
@@ -141,7 +141,7 @@ namespace moho
   );
 
   /**
-   * Address: 0x004FE9D0 / 0x004FF2D0
+   * Address: 0x004FE9D0 (FUN_004FE9D0) / 0x004FF2D0
    *
    * What it does:
    * Segment-shape collision output. `Entity::Intersects(lineStart, lineEnd, ...)`
@@ -254,7 +254,7 @@ namespace moho
     EntityCollisionUpdater();
 
     /**
-     * Address: 0x004FFC20 / 0x004FF9A0
+     * Address: 0x004FFC20 (FUN_004FFC20) / 0x004FF9A0
      *
      * EntityCollisionBoundsScratch*
      *
@@ -267,7 +267,7 @@ namespace moho
     virtual const EntityCollisionBoundsView* GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const;
 
     /**
-     * Address: 0x004FF130 / 0x004FE780
+     * Address: 0x004FF130 (FUN_004FF130) / 0x004FE780
      *
      * What it does:
      * Returns a typed view to sphere payload for sphere primitive or null for box primitive.
@@ -275,7 +275,7 @@ namespace moho
     virtual const Wm3::Sphere3f* GetSphere() const;
 
     /**
-     * Address: 0x004FF140 / 0x004FE790
+     * Address: 0x004FF140 (FUN_004FF140) / 0x004FE790
      *
      * What it does:
      * Returns a typed view to box payload for box primitive or null for sphere primitive.
@@ -283,7 +283,7 @@ namespace moho
     virtual const Wm3::Box3f* GetBox() const;
 
     /**
-     * Address: 0x004FF470 / 0x004FEBC0
+     * Address: 0x004FF470 (FUN_004FF470) / 0x004FEBC0
      *
      * EntityTransformPayload const&
      *
@@ -296,7 +296,7 @@ namespace moho
     virtual void SetTransform(const EntityTransformPayload& transform);
 
     /**
-     * Address: 0x004FFBE0 / 0x004FF960
+     * Address: 0x004FFBE0 (FUN_004FFBE0) / 0x004FF960
      *
      * Wm3::Vector3<float>*
      *
@@ -309,7 +309,7 @@ namespace moho
     virtual Wm3::Vec3f* GetCenter(Wm3::Vec3f* outCenter) const;
 
     /**
-     * Address: 0x004FFC00 / 0x004FF980
+     * Address: 0x004FFC00 (FUN_004FFC00) / 0x004FF980
      *
      * Wm3::Vector3<float> const*
      *
@@ -322,7 +322,7 @@ namespace moho
     virtual const Wm3::Vec3f* SetCenter(const Wm3::Vec3f* center);
 
     /**
-     * Address: 0x004FF2D0 / 0x004FE9D0
+     * Address: 0x004FF2D0 (FUN_004FF2D0) / 0x004FE9D0
      *
      * Wm3::Vector3<float> const*, Wm3::Vector3<float> const*, CollisionLineResult*
      *
@@ -337,7 +337,7 @@ namespace moho
     CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult) const;
 
     /**
-     * Address: 0x004FF260 / 0x004FE860
+     * Address: 0x004FF260 (FUN_004FF260) / 0x004FE860
      *
      * Wm3::Box3<float> const*, CollisionPairResult*
      *
@@ -347,7 +347,7 @@ namespace moho
     virtual bool CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const;
 
     /**
-     * Address: 0x004FF150 / 0x004FE7A0
+     * Address: 0x004FF150 (FUN_004FF150) / 0x004FE7A0
      *
      * Wm3::Sphere3<float> const*, CollisionPairResult*
      *
@@ -357,7 +357,7 @@ namespace moho
     virtual bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const;
 
     /**
-     * Address: 0x004FF450 / 0x004FEB60
+     * Address: 0x004FF450 (FUN_004FF450) / 0x004FEB60
      *
      * Wm3::Vector3<float> const*
      *

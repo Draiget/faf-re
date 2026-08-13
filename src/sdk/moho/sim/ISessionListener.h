@@ -7,7 +7,7 @@ namespace moho
     // Primary vftable (2 entries)
   public:
     /**
-     * Address: 0x00A82547 (_purecall)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall)
      * Slot: 0
      *
      * What it does:
@@ -16,7 +16,7 @@ namespace moho
     virtual void AttachToSessionListenerLane(void* laneContext) = 0;
 
     /**
-     * Address: 0x00A82547 (_purecall)
+     * Address: 0x00A82547 (FUN_00A82547, _purecall)
      * Slot: 1
      *
      * What it does:

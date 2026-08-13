@@ -251,7 +251,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546170 (Moho::ResourceDeposit::Intersects)
+   * Address: 0x00546170 (FUN_00546170, Moho::ResourceDeposit::Intersects)
    *
    * Moho::CGeomSolid3 const&, Moho::CHeightField const&
    *

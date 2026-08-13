@@ -765,7 +765,7 @@ namespace moho
   void register_ShowRaisedPlatforms_SimConVar();
 
   /**
-   * Address: 0x00BD6A20 startup lane dependency
+   * Address: 0x00BD6A20 (FUN_00BD6A20) startup lane dependency
    *
    * What it does:
    * Returns the recovered `ShowRaisedPlatforms` sim-convar definition used by

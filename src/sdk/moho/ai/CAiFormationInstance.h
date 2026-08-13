@@ -384,112 +384,112 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
-     * Address: 0x00569A10
+     * Address: 0x00569A10 (FUN_00569A10)
      * Slot: 1
      * Demangled: Moho::CFormationInstance::Func2 (GetCenter)
      */
     virtual SCoordsVec2* Func2(SCoordsVec2* outCenter) const;
 
     /**
-     * Address: 0x00569A30
+     * Address: 0x00569A30 (FUN_00569A30)
      * Slot: 2
      * Demangled: Moho::CFormationInstance::Func3 (SetCenter)
      */
     virtual void Func3(const SCoordsVec2& center);
 
     /**
-     * Address: 0x0056A210
+     * Address: 0x0056A210 (FUN_0056A210)
      * Slot: 3
      * Demangled: Moho::CFormationInstance::UnitCount
      */
     virtual int UnitCount() const;
 
     /**
-     * Address: 0x00569BD0
+     * Address: 0x00569BD0 (FUN_00569BD0)
      * Slot: 4
      * Demangled: Moho::CFormationInstance::Func5
      */
     virtual bool Func5(Unit* unit) const;
 
     /**
-     * Address: 0x005669A0
+     * Address: 0x005669A0 (FUN_005669A0)
      * Slot: 5
      * Demangled: Moho::CFormationInstance::Func6
      */
     virtual SFormationLaneEntry* Func6(Unit* unit);
 
     /**
-     * Address: 0x00569CB0
+     * Address: 0x00569CB0 (FUN_00569CB0)
      * Slot: 6
      * Demangled: Moho::CFormationInstance::GetFormationPosition
      */
     virtual SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x00569EA0
+     * Address: 0x00569EA0 (FUN_00569EA0)
      * Slot: 7
      * Demangled: Moho::CFormationInstance::GetAdjustedFormationPosition
      */
     virtual SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x00569F70
+     * Address: 0x00569F70 (FUN_00569F70)
      * Slot: 8
      * Demangled: Moho::CFormationInstance::Func9
      */
     virtual SCoordsVec2* Func9(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x0056A150
+     * Address: 0x0056A150 (FUN_0056A150)
      * Slot: 9
      * Demangled: Moho::CFormationInstance::Func10
      */
     virtual Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x0059A790
+     * Address: 0x0059A790 (FUN_0059A790)
      * Slot: 10
      * Demangled: Moho::CAiFormationInstance::Func11
      */
     virtual float Func11(Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x0059A7D0
+     * Address: 0x0059A7D0 (FUN_0059A7D0)
      * Slot: 11
      * Demangled: Moho::CAiFormationInstance::Func12
      */
     virtual std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x0059A620
+     * Address: 0x0059A620 (FUN_0059A620)
      * Slot: 12
      * Demangled: Moho::CAiFormationInstance::CalcFormationSpeed
      */
     virtual float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x0059A870
+     * Address: 0x0059A870 (FUN_0059A870)
      * Slot: 13
      * Demangled: Moho::CAiFormationInstance::Func14
      */
     virtual Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
-     * Address: 0x0056A220
+     * Address: 0x0056A220 (FUN_0056A220)
      * Slot: 14
      * Demangled: Moho::CFormationInstance::AddUnit
      */
     virtual void AddUnit(Unit* unit);
 
     /**
-     * Address: 0x0056A300
+     * Address: 0x0056A300 (FUN_0056A300)
      * Slot: 15
      * Demangled: Moho::CFormationInstance::RemoveUnit
      */
     virtual void RemoveUnit(Unit* unit);
 
     /**
-     * Address: 0x0056A440
+     * Address: 0x0056A440 (FUN_0056A440)
      * Slot: 16
      * Demangled: Moho::CFormationInstance::Func17
      */
@@ -508,56 +508,56 @@ namespace moho
     virtual void Update();
 
     /**
-     * Address: 0x00569B60
+     * Address: 0x00569B60 (FUN_00569B60)
      * Slot: 18
      * Demangled: Moho::CFormationInstance::Func19
      */
     virtual Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit* unit) const;
 
     /**
-     * Address: 0x00569BF0
+     * Address: 0x00569BF0 (FUN_00569BF0)
      * Slot: 19
      * Demangled: Moho::CFormationInstance::CommandIsForm
      */
     virtual bool CommandIsForm() const;
 
     /**
-     * Address: 0x00569C20
+     * Address: 0x00569C20 (FUN_00569C20)
      * Slot: 20
      * Demangled: Moho::CFormationInstance::Func21
      */
     virtual bool Func21(Unit* unit) const;
 
     /**
-     * Address: 0x0056A4F0
+     * Address: 0x0056A4F0 (FUN_0056A4F0)
      * Slot: 21
      * Demangled: Moho::CFormationInstance::Func22
      */
     virtual void Func22(float scale);
 
     /**
-     * Address: 0x0056A520
+     * Address: 0x0056A520 (FUN_0056A520)
      * Slot: 22
      * Demangled: Moho::CFormationInstance::SetOrientation
      */
     virtual void SetOrientation(const Wm3::Quatf& orientation);
 
     /**
-     * Address: 0x0056A680
+     * Address: 0x0056A680 (FUN_0056A680)
      * Slot: 23
      * Demangled: Moho::CFormationInstance::GetOrientation
      */
     virtual Wm3::Quatf* GetOrientation(Wm3::Quatf* outOrientation) const;
 
     /**
-     * Address: 0x00569A00
+     * Address: 0x00569A00 (FUN_00569A00)
      * Slot: 24
      * Demangled: Moho::CFormationInstance::GetCommandType
      */
     virtual EUnitCommandType GetCommandType() const;
 
     /**
-     * Address: 0x0059AA20
+     * Address: 0x0059AA20 (FUN_0059AA20)
      * Slot: 25
      * Demangled: Moho::CAiFormationInstance::FindSlotFor
      *
@@ -569,7 +569,7 @@ namespace moho
     virtual SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit);
 
     /**
-     * Address: 0x0059A570
+     * Address: 0x0059A570 (FUN_0059A570)
      * Slot: 26
      * Demangled: Moho::CAiFormationInstance::Func27
      */

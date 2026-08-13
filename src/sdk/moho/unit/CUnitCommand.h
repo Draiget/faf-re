@@ -232,19 +232,19 @@ namespace moho
     [[nodiscard]] bool IsDone() const;
 
     /**
-     * Address: 0x006F1650
+     * Address: 0x006F1650 (FUN_006F1650)
      * @param amount
      */
     void IncreaseCount(int amount);
 
     /**
-     * Address: 0x006F16A0
+     * Address: 0x006F16A0 (FUN_006F16A0)
      * @param amount
      */
     void DecreaseCount(int amount);
 
     /**
-     * Address: 0x006E8820
+     * Address: 0x006E8820 (FUN_006E8820)
      */
     void SetTarget(const CAiTarget& target);
 

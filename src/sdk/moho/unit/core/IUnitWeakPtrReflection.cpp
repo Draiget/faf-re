@@ -155,7 +155,7 @@ namespace
   }
 
   /**
-   * Address: 0x00541900 (FA), 0x1012F280 (MohoEngine)
+   * Address: 0x00541900 (FUN_00541900, FA), 0x1012F280 (MohoEngine)
    *
    * What it does:
    * Loads tracked pointer payload and assigns the weak pointer from the upcast IUnit object.
@@ -193,7 +193,7 @@ namespace
   }
 
   /**
-   * Address: 0x00541930 (FA), 0x1012F2B0 (MohoEngine)
+   * Address: 0x00541930 (FUN_00541930, FA), 0x1012F2B0 (MohoEngine)
    *
    * What it does:
    * Converts the weak pointer payload into `RRef` and writes it as an unowned raw pointer.
@@ -254,7 +254,7 @@ namespace
   }
 
   /**
-   * Address: 0x0056DD80 (FA), 0x1015C0F0 (MohoEngine)
+   * Address: 0x0056DD80 (FUN_0056DD80, FA), 0x1015C0F0 (MohoEngine)
    */
   void LoadFastVectorWeakPtrIUnit(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -277,7 +277,7 @@ namespace
   }
 
   /**
-   * Address: 0x0056DE50 (FA), 0x1015C1C0 (MohoEngine)
+   * Address: 0x0056DE50 (FUN_0056DE50, FA), 0x1015C1C0 (MohoEngine)
    */
   void SaveFastVectorWeakPtrIUnit(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {

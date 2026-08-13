@@ -29,7 +29,7 @@ namespace moho
   static_assert(sizeof(CUnitRepairTaskListenerPad) == 0x04, "CUnitRepairTaskListenerPad size must be 0x04");
 
   /**
-   * Address: 0x005F8C80 (??0CUnitRepairTask@Moho@@QAE@@Z)
+   * Address: 0x005F8C80 (FUN_005F8C80, ??0CUnitRepairTask@Moho@@QAE@@Z)
    *
    * What it does:
    * Builds the repair-task command/listener subobjects, initializes the shared
@@ -57,7 +57,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
-     * Address: 0x005F8C80 (??0CUnitRepairTask@Moho@@QAE@@Z)
+     * Address: 0x005F8C80 (FUN_005F8C80, ??0CUnitRepairTask@Moho@@QAE@@Z)
      *
      * What it does:
      * Builds the repair-task command/listener subobjects, initializes the shared

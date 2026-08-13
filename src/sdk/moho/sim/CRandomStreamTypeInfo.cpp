@@ -65,7 +65,7 @@ namespace
   }
 
   /**
-   * Address: 0x0040F500 (nullsub_89)
+   * Address: 0x0040F500 (FUN_0040F500, nullsub_89)
    *
    * What it does:
    * No-op destroy hook used by CRandomStream reflection metadata.

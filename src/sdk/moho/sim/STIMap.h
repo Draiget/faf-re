@@ -112,7 +112,7 @@ namespace moho
     void InitField(std::int32_t width, std::int32_t height);
 
     /**
-     * Address: 0x00478490
+     * Address: 0x00478490 (FUN_00478490)
      *
      * What it does:
      * Returns a clamped sample from the base 16-bit height grid.
@@ -722,7 +722,7 @@ namespace moho
     LuaPlus::LuaObject GetTerrainType(std::uint8_t typeIndex) const;
 
     /**
-     * Address: 0x00758E90 (FIND_GetTerrainTypeOffset_exe)
+     * Address: 0x00758E90 (FUN_00758E90, FIND_GetTerrainTypeOffset_exe)
      *
      * float x, float z
      *

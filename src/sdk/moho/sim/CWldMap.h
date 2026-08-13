@@ -303,7 +303,7 @@ namespace moho
     virtual ~IWldTerrainRes() = default;
 
     /**
-     * Address: 0x008A1700 (CWldTerrainRes::Load implementation path)
+     * Address: 0x008A1700 (FUN_008A1700, CWldTerrainRes::Load implementation path)
      *
      * What it does:
      * Loads terrain map data from stream payload and initializes runtime
@@ -394,7 +394,7 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetSkycube() const;
 
     /**
-     * Address: 0x008A1300
+     * Address: 0x008A1300 (FUN_008A1300)
      * (FUN_008A1300, ?AddEnvLookup@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0@Z)
      *
      * What it does:
@@ -404,7 +404,7 @@ namespace moho
     virtual void AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath);
 
     /**
-     * Address: 0x008A13F0
+     * Address: 0x008A13F0 (FUN_008A13F0)
      * (FUN_008A13F0, ?RemoveEnvLookup@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
      *
      * What it does:
@@ -413,7 +413,7 @@ namespace moho
     virtual void RemoveEnvLookup(const msvc8::string& environmentKey);
 
     /**
-     * Address: 0x008A1430
+     * Address: 0x008A1430 (FUN_008A1430)
      * (FUN_008A1430, ?GetEnvLookup@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
      *
      * What it does:
@@ -422,7 +422,7 @@ namespace moho
     [[nodiscard]] virtual boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const msvc8::string& environmentKey) const;
 
     /**
-     * Address: 0x008A1500
+     * Address: 0x008A1500 (FUN_008A1500)
      * (FUN_008A1500, ?EnumerateEnvLookup@CWldTerrainRes@Moho@@UBEXAAV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@@Z)
      *
      * What it does:
@@ -431,7 +431,7 @@ namespace moho
     virtual void EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const;
 
     /**
-     * Address: 0x008A1640
+     * Address: 0x008A1640 (FUN_008A1640)
      * (FUN_008A1640, ?ClearEnvLookup@CWldTerrainRes@Moho@@UAEXXZ)
      *
      * What it does:
@@ -496,7 +496,7 @@ namespace moho
     [[nodiscard]] std::int32_t GetTopographicSamples() const;
 
     /**
-     * Address: 0x008A16A0
+     * Address: 0x008A16A0 (FUN_008A16A0)
      * (FUN_008A16A0, ?SetHypsometricColor@CWldTerrainRes@Moho@@UAEXW4HYPSOMETRIC_COLOR@IWldTerrainRes@2@I@Z)
      *
      * What it does:
@@ -505,7 +505,7 @@ namespace moho
     void SetHypsometricColor(std::int32_t colorIndex, std::uint32_t colorValue);
 
     /**
-     * Address: 0x008A16C0
+     * Address: 0x008A16C0 (FUN_008A16C0)
      * (FUN_008A16C0, ?GetHypsometricColor@CWldTerrainRes@Moho@@UBEIW4HYPSOMETRIC_COLOR@IWldTerrainRes@2@@Z)
      *
      * What it does:
@@ -1052,7 +1052,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00890C70 (??1CWldMap@Moho@@QAE@XZ)
+     * Address: 0x00890C70 (FUN_00890C70, ??1CWldMap@Moho@@QAE@XZ)
      *
      * What it does:
      * Resets owned map resources, then performs guarded teardown of any
@@ -1061,7 +1061,7 @@ namespace moho
     ~CWldMap();
 
     /**
-     * Address: 0x00890D40 (?MapNew@CWldMap@Moho@@QAE_NHHPAVLuaState@LuaPlus@@@Z)
+     * Address: 0x00890D40 (FUN_00890D40, ?MapNew@CWldMap@Moho@@QAE_NHHPAVLuaState@LuaPlus@@@Z)
      *
      * What it does:
      * Creates fresh terrain/props resources for a new map and resets prior
@@ -1070,7 +1070,7 @@ namespace moho
     [[nodiscard]] bool MapNew(std::int32_t width, std::int32_t height, LuaPlus::LuaState* state);
 
     /**
-     * Address: 0x00890DA0
+     * Address: 0x00890DA0 (FUN_00890DA0)
      * (?MapLoad@CWldMap@Moho@@QAE_NVStrArg@gpg@@PAVLuaState@LuaPlus@@_NAAVCBackgroundTaskControl@2@@Z)
      *
      * What it does:
@@ -1092,7 +1092,7 @@ namespace moho
 
   private:
     /**
-     * Address: 0x00890CF0 (?Reset@CWldMap@Moho@@AAEXXZ)
+     * Address: 0x00890CF0 (FUN_00890CF0, ?Reset@CWldMap@Moho@@AAEXXZ)
      *
      * What it does:
      * Releases and clears all owned preview/terrain/props resources.

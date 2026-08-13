@@ -199,7 +199,7 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x008855B0 init path (FUN_008855B0, func_GetWldSessionLoader)
+   * Address: 0x008855B0 (FUN_008855B0) init path (FUN_008855B0, func_GetWldSessionLoader)
    */
   CWldSessionLoaderImpl::CWldSessionLoaderImpl()
     : mCreated(false)

@@ -5158,7 +5158,7 @@ bool moho::ResourceManager::AreFactoriesActivated() const
 }
 
 /**
- * Address: 0x004A9BA0 (func_EnsureResourceManager)
+ * Address: 0x004A9BA0 (FUN_004A9BA0, func_EnsureResourceManager)
  *
  * What it does:
  * Ensures singleton creation for startup paths that require a live manager.

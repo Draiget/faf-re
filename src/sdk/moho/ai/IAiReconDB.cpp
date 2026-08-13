@@ -10,7 +10,7 @@ gpg::RType* IAiReconDB::sType = nullptr;
 IAiReconDB::IAiReconDB() = default;
 
 /**
- * Address: 0x005BE010 (??1IAiReconDB@Moho@@UAE@XZ)
+ * Address: 0x005BE010 (FUN_005BE010, ??1IAiReconDB@Moho@@UAE@XZ)
  * Address: 0x005BE020 (FUN_005BE020, scalar deleting thunk)
  *
  * What it does:

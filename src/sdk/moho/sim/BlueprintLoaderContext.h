@@ -39,7 +39,7 @@ namespace moho
   [[nodiscard]] SBlueprintLoaderContext& BlueprintLoaderContext() noexcept;
 
   /**
-   * Address: 0x005290E0 (seed) / 0x00529100 (clear)
+   * Address: 0x005290E0 (FUN_005290E0, seed) / 0x00529100 (clear)
    *
    * What it does:
    * Publishes a blueprint-loader context for the calling thread and withdraws it

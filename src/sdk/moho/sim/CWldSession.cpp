@@ -6809,7 +6809,7 @@ namespace moho
     }
 
     /**
-     * Address: 0x0089A970 allocation path (FUN_0089A970) for insert-node creation.
+     * Address: 0x0089A970 (FUN_0089A970) allocation path (FUN_0089A970) for insert-node creation.
      *
      * Source-side typed helper used to keep node allocation/layout explicit.
      */
@@ -6823,7 +6823,7 @@ namespace moho
     }
 
     /**
-     * Address: 0x0089AC40 cleanup chain (FUN_008971A0 -> FUN_0089AC40 call path).
+     * Address: 0x0089AC40 (FUN_0089AC40) cleanup chain (FUN_008971A0 -> FUN_0089AC40 call path).
      */
     void DestroySaveDataMapNode(SSessionSaveNodeMapNode* const node)
     {
@@ -8359,7 +8359,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00896F00 init path (FUN_00896F00 -> sub_89A930).
+   * Address: 0x00896F00 (FUN_00896F00) init path (FUN_00896F00 -> sub_89A930).
    */
   SSessionSaveData::SSessionSaveData()
   {
@@ -8380,7 +8380,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008992D0/0x00899DC0/0x0089A970 helper chain.
+   * Address: 0x008992D0 (FUN_008992D0)/0x00899DC0/0x0089A970 helper chain.
    */
   void SSessionSaveData::InsertNodeLabel(const std::uint32_t commandSourceId, const msvc8::string& saveNodeName)
   {

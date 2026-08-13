@@ -801,7 +801,7 @@ namespace
   std::uint32_t gStatsCArmyStatItemTypeNameInitGuard = 0u;
 
   /**
-   * Address: 0x00BFF940 (sub_BFF940)
+   * Address: 0x00BFF940 (FUN_00BFF940, sub_BFF940)
    *
    * What it does:
    * Releases cached lexical storage for

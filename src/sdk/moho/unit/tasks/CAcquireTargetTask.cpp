@@ -374,7 +374,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x005D8A20 (??0CAcquireTargetTask@Moho@@QAE@@Z)
+   * Address: 0x005D8A20 (FUN_005D8A20, ??0CAcquireTargetTask@Moho@@QAE@@Z)
    *
    * What it does:
    * Initializes the task, both listener lanes, and the weapon/attacker state

@@ -38,7 +38,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00541600 (FA), 0x1012EFC0 (MohoEngine)
+     * Address: 0x00541600 (FUN_00541600, FA), 0x1012EFC0 (MohoEngine)
      *
      * What it does:
      * Builds/caches lexical type name `"WeakPtr<%s>"` from `IUnit` reflection type.
@@ -46,7 +46,7 @@ namespace moho
     const char* GetName() const override;
 
     /**
-     * Address: 0x005416C0 (FA), 0x1012F080 (MohoEngine)
+     * Address: 0x005416C0 (FUN_005416C0, FA), 0x1012F080 (MohoEngine)
      *
      * What it does:
      * Returns `"NULL"` for empty weak pointers, otherwise wraps pointee lexical with brackets.
@@ -54,17 +54,17 @@ namespace moho
     msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
-     * Address: 0x00541850 (FA), 0x1012F1D0 (MohoEngine)
+     * Address: 0x00541850 (FUN_00541850, FA), 0x1012F1D0 (MohoEngine)
      */
     const gpg::RIndexed* IsIndexed() const override;
 
     /**
-     * Address: 0x00541860 (FA), 0x1012F1E0 (MohoEngine)
+     * Address: 0x00541860 (FUN_00541860, FA), 0x1012F1E0 (MohoEngine)
      */
     const gpg::RIndexed* IsPointer() const override;
 
     /**
-     * Address: 0x005416A0 (FA), 0x1012F060 (MohoEngine)
+     * Address: 0x005416A0 (FUN_005416A0, FA), 0x1012F060 (MohoEngine)
      *
      * What it does:
      * Initializes size/version and weak-pointer serialization callbacks.
@@ -110,7 +110,7 @@ namespace gpg
   {
   public:
     /**
-     * Address: 0x0056BDF0 (FA), 0x1015A110 (MohoEngine)
+     * Address: 0x0056BDF0 (FUN_0056BDF0, FA), 0x1015A110 (MohoEngine)
      *
      * What it does:
      * Builds/caches lexical type name `"fastvector<%s>"` from `WeakPtr<IUnit>` reflection type.
@@ -118,7 +118,7 @@ namespace gpg
     const char* GetName() const override;
 
     /**
-     * Address: 0x0056BEB0 (FA), 0x1015A1D0 (MohoEngine)
+     * Address: 0x0056BEB0 (FUN_0056BEB0, FA), 0x1015A1D0 (MohoEngine)
      *
      * What it does:
      * Appends vector size info to the base lexical string.
@@ -126,12 +126,12 @@ namespace gpg
     msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
-     * Address: 0x0056BF40 (FA), 0x1015A270 (MohoEngine)
+     * Address: 0x0056BF40 (FUN_0056BF40, FA), 0x1015A270 (MohoEngine)
      */
     const gpg::RIndexed* IsIndexed() const override;
 
     /**
-     * Address: 0x0056BE90 (FA), 0x1015A1B0 (MohoEngine)
+     * Address: 0x0056BE90 (FUN_0056BE90, FA), 0x1015A1B0 (MohoEngine)
      *
      * What it does:
      * Initializes size/version and vector serialization callbacks.

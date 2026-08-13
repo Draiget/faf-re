@@ -43,7 +43,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00769560 / 0x0076AC60 / 0x007692F0 (inlined `stdext::hash_value`)
+   * Address: 0x00769560 (FUN_00769560) / 0x0076AC60 / 0x007692F0 (inlined `stdext::hash_value`)
    *
    * What it does:
    * Hashes one cell for `msvc8::hash_map`. Found by argument-dependent lookup,

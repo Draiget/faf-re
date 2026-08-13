@@ -49,7 +49,7 @@ namespace moho
     ~ResourceManager() override;
 
     /**
-     * Address: 0x00461DC0 (?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)
+     * Address: 0x00461DC0 (FUN_00461DC0, ?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)
      */
     void OnEvent(const SDiskWatchEvent& event) override;
 
@@ -192,7 +192,7 @@ namespace moho
   };
 
   /**
-   * Address: 0x004A9BA0 (func_EnsureResourceManager)
+   * Address: 0x004A9BA0 (FUN_004A9BA0, func_EnsureResourceManager)
    *
    * What it does:
    * Ensures singleton creation for startup paths that require a live manager.

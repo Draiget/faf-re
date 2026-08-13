@@ -44,7 +44,7 @@ EReconFlagsTypeInfo::EReconFlagsTypeInfo()
 
 EReconFlagsTypeInfo::~EReconFlagsTypeInfo() = default;
 
-/** Address: 0x00564510 */
+/** Address: 0x00564510 (FUN_00564510) */
 const char* EReconFlagsTypeInfo::GetName() const { return "EReconFlags"; }
 
 /**

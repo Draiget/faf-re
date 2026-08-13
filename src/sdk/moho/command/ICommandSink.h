@@ -39,49 +39,49 @@ namespace moho
     ICommandSink();
 
     /**
-     * Address: 0x00748650
+     * Address: 0x00748650 (FUN_00748650)
      *
      * VFTable SLOT: 0
      */
     virtual void SetCommandSource(CommandSourceId sourceId) = 0;
 
     /**
-     * Address:0x007486B0
+     * Address:0x007486B0 (FUN_007486B0)
      *
      * VFTable SLOT: 1
      */
     virtual void OnCommandSourceTerminated() = 0;
 
     /**
-     * Address: 0x007487C0
+     * Address: 0x007487C0 (FUN_007487C0)
      *
      * VFTable SLOT: 2
      */
     virtual void VerifyChecksum(gpg::MD5Digest const&, CSeqNo) = 0;
 
     /**
-     * Address: 0x00748960
+     * Address: 0x00748960 (FUN_00748960)
      *
      * VFTable SLOT: 3
      */
     virtual void RequestPause() = 0;
 
     /**
-     * Address: 0x007489A0
+     * Address: 0x007489A0 (FUN_007489A0)
      *
      * VFTable SLOT: 4
      */
     virtual void Resume() = 0;
 
     /**
-     * Address: 0x007489C0
+     * Address: 0x007489C0 (FUN_007489C0)
      *
      * VFTable SLOT: 5
      */
     virtual void SingleStep() = 0;
 
     /**
-     * Address: 0x00748AA0
+     * Address: 0x00748AA0 (FUN_00748AA0)
      *
      * VFTable SLOT: 6
      */
@@ -95,21 +95,21 @@ namespace moho
     virtual void CreateProp(const char*, Wm3::Vec3f const&) = 0;
 
     /**
-     * Address: 0x00748C80
+     * Address: 0x00748C80 (FUN_00748C80)
      *
      * VFTable SLOT: 8
      */
     virtual void DestroyEntity(EntId) = 0;
 
     /**
-     * Address: 0x00748CD0
+     * Address: 0x00748CD0 (FUN_00748CD0)
      *
      * VFTable SLOT: 9
      */
     virtual void WarpEntity(EntId, VTransform const&) = 0;
 
     /**
-     * Address: 0x00748D50
+     * Address: 0x00748D50 (FUN_00748D50)
      * #STRs:
      *  "SetFireState", "SetAutoMode", "CustomName",
      *  "SetAutoSurfaceMode", "SetRepeatQueue", "SetPaused",
@@ -121,7 +121,7 @@ namespace moho
     virtual void ProcessInfoPair(void* id, const char* key, const char* val) = 0;
 
     /**
-     * Address: 0x00749290
+     * Address: 0x00749290 (FUN_00749290)
      *
      * Moho::BVSet<Moho::EntId,Moho::EntIdUniverse> const &,Moho::SSTICommandIssueData const &,bool
      *
@@ -135,7 +135,7 @@ namespace moho
     IssueCommand(BVSet<EntId, EntIdUniverse> const&, SSTICommandIssueData const& commandIssueData, bool flag) = 0;
 
     /**
-     * Address: 0x007494B0
+     * Address: 0x007494B0 (FUN_007494B0)
      *
      * VFTable SLOT: 12
      */
@@ -143,63 +143,63 @@ namespace moho
     IssueFactoryCommand(BVSet<EntId, EntIdUniverse> const&, SSTICommandIssueData const& commandIssueData, bool) = 0;
 
     /**
-     * Address: 0x00749680
+     * Address: 0x00749680 (FUN_00749680)
      *
      * VFTable SLOT: 13
      */
     virtual void IncreaseCommandCount(CmdId, int) = 0;
 
     /**
-     * Address: 0x007496E0
+     * Address: 0x007496E0 (FUN_007496E0)
      *
      * VFTable SLOT: 14
      */
     virtual void DecreaseCommandCount(CmdId, int) = 0;
 
     /**
-     * Address: 0x00749740
+     * Address: 0x00749740 (FUN_00749740)
      *
      * VFTable SLOT: 15
      */
     virtual void SetCommandTarget(CmdId, SSTITarget const&) = 0;
 
     /**
-     * Address: 0x00749800
+     * Address: 0x00749800 (FUN_00749800)
      *
      * VFTable SLOT: 16
      */
     virtual void SetCommandType(CmdId, EUnitCommandType) = 0;
 
     /**
-     * Address: 0x00749860
+     * Address: 0x00749860 (FUN_00749860)
      *
      * VFTable SLOT: 17
      */
     virtual void SetCommandCells(CmdId, gpg::core::FastVector<SOCellPos> const&, Wm3::Vector3<float> const&) = 0;
 
     /**
-     * Address: 0x00749970
+     * Address: 0x00749970 (FUN_00749970)
      *
      * VFTable SLOT: 18
      */
     virtual void RemoveCommandFromUnitQueue(CmdId, EntId) = 0;
 
     /**
-     * Address: 0x00749A70
+     * Address: 0x00749A70 (FUN_00749A70)
      *
      * VFTable SLOT: 19
      */
     virtual void ExecuteLuaInSim(const char*, LuaPlus::LuaObject const&) = 0;
 
     /**
-     * Address: 0x00749B60
+     * Address: 0x00749B60 (FUN_00749B60)
      *
      * VFTable SLOT: 20
      */
     virtual void LuaSimCallback(const char*, LuaPlus::LuaObject const&, BVSet<EntId, EntIdUniverse> const&) = 0;
 
     /**
-     * Address: 0x00749DA0
+     * Address: 0x00749DA0 (FUN_00749DA0)
      *
      * VFTable SLOT: 21
      */
@@ -207,14 +207,14 @@ namespace moho
     ExecuteDebugCommand(const char*, Wm3::Vector3<float> const&, uint32_t, BVSet<EntId, EntIdUniverse> const&) = 0;
 
     /**
-     * Address: 0x00749F40
+     * Address: 0x00749F40 (FUN_00749F40)
      *
      * VFTable SLOT: 22
      */
     virtual void AdvanceBeat(int);
 
     /**
-     * Address: 0x0074B100
+     * Address: 0x0074B100 (FUN_0074B100)
      *
      * VFTable SLOT: 23
      */

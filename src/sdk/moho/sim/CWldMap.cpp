@@ -3068,7 +3068,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A1300
+   * Address: 0x008A1300 (FUN_008A1300)
    * (FUN_008A1300, ?AddEnvLookup@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0@Z)
    *
    * What it does:
@@ -3097,7 +3097,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A13F0
+   * Address: 0x008A13F0 (FUN_008A13F0)
    * (FUN_008A13F0, ?RemoveEnvLookup@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    *
    * What it does:
@@ -3115,7 +3115,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A1430
+   * Address: 0x008A1430 (FUN_008A1430)
    * (FUN_008A1430, ?GetEnvLookup@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    *
    * What it does:
@@ -3155,7 +3155,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A1500
+   * Address: 0x008A1500 (FUN_008A1500)
    * (FUN_008A1500, ?EnumerateEnvLookup@CWldTerrainRes@Moho@@UBEXAAV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@@Z)
    *
    * What it does:
@@ -3186,7 +3186,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A1640
+   * Address: 0x008A1640 (FUN_008A1640)
    * (FUN_008A1640, ?ClearEnvLookup@CWldTerrainRes@Moho@@UAEXXZ)
    *
    * What it does:
@@ -3284,7 +3284,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A16A0
+   * Address: 0x008A16A0 (FUN_008A16A0)
    * (FUN_008A16A0, ?SetHypsometricColor@CWldTerrainRes@Moho@@UAEXW4HYPSOMETRIC_COLOR@IWldTerrainRes@2@I@Z)
    *
    * What it does:
@@ -3296,7 +3296,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A16C0
+   * Address: 0x008A16C0 (FUN_008A16C0)
    * (FUN_008A16C0, ?GetHypsometricColor@CWldTerrainRes@Moho@@UBEIW4HYPSOMETRIC_COLOR@IWldTerrainRes@2@@Z)
    *
    * What it does:
@@ -5127,7 +5127,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00890CF0 (?Reset@CWldMap@Moho@@AAEXXZ)
+   * Address: 0x00890CF0 (FUN_00890CF0, ?Reset@CWldMap@Moho@@AAEXXZ)
    *
    * What it does:
    * Releases preview chunk, terrain resource, and world props in-place and
@@ -5149,7 +5149,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00890C70 (??1CWldMap@Moho@@QAE@XZ)
+   * Address: 0x00890C70 (FUN_00890C70, ??1CWldMap@Moho@@QAE@XZ)
    *
    * What it does:
    * Performs standard map reset, then repeats guarded teardown checks matching

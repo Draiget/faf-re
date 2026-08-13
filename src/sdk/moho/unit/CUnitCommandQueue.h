@@ -97,7 +97,7 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
-     * Address: 0x006EDD30
+     * Address: 0x006EDD30 (FUN_006EDD30)
      */
     int FindCommandIndex(CmdId cmdId) const;
 
@@ -200,12 +200,12 @@ namespace moho
     bool MoveCommandToBackOfQueue(const CUnitCommand* command);
 
     /**
-     * Address: 0x006EDF80
+     * Address: 0x006EDF80 (FUN_006EDF80)
      */
     bool RemoveCommandFromQueue(const CUnitCommand* command);
 
     /**
-     * Address: 0x006EDEF0
+     * Address: 0x006EDEF0 (FUN_006EDEF0)
      */
     bool RemoveCommandFromQueue(unsigned int index);
 

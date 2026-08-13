@@ -10,22 +10,22 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x007737B0 (Moho::CEconRequestTypeInfo::CEconRequestTypeInfo)
+     * Address: 0x007737B0 (FUN_007737B0, Moho::CEconRequestTypeInfo::CEconRequestTypeInfo)
      */
     CEconRequestTypeInfo();
 
     /**
-     * Address: 0x00773840 (scalar deleting thunk)
+     * Address: 0x00773840 (FUN_00773840, scalar deleting thunk)
      */
     ~CEconRequestTypeInfo() override;
 
     /**
-     * Address: 0x00773830 (Moho::CEconRequestTypeInfo::GetName)
+     * Address: 0x00773830 (FUN_00773830, Moho::CEconRequestTypeInfo::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
 
     /**
-     * Address: 0x00773810 (Moho::CEconRequestTypeInfo::Init)
+     * Address: 0x00773810 (FUN_00773810, Moho::CEconRequestTypeInfo::Init)
      */
     void Init() override;
   };
@@ -33,7 +33,7 @@ namespace moho
   static_assert(sizeof(CEconRequestTypeInfo) == 0x64, "CEconRequestTypeInfo size must be 0x64");
 
   /**
-   * Address: 0x00BDD1F0 (register_CEconRequestTypeInfo)
+   * Address: 0x00BDD1F0 (FUN_00BDD1F0, register_CEconRequestTypeInfo)
    */
   void register_CEconRequestTypeInfoStartup();
 } // namespace moho

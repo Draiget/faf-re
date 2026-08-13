@@ -240,7 +240,7 @@ namespace
   }
 
   /**
-   * Address: 0x00694380 family (serializer load lane)
+   * Address: 0x00694380 (FUN_00694380) family (serializer load lane)
    *
    * What it does:
    * Deserializes tracked `Entity*` pointer lanes into `fastvector<Entity*>` storage.
@@ -394,7 +394,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BFC8D0 family (cleanup_WeakPtrEntityTypeName_00BFC8D0)
+   * Address: 0x00BFC8D0 (FUN_00BFC8D0) family (cleanup_WeakPtrEntityTypeName_00BFC8D0)
    */
   void cleanup_WeakPtrEntityTypeName()
   {
@@ -403,7 +403,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BFC8A0 family (cleanup_VectorEntityPtrTypeName_00BFC8A0)
+   * Address: 0x00BFC8A0 (FUN_00BFC8A0) family (cleanup_VectorEntityPtrTypeName_00BFC8A0)
    */
   void cleanup_EntityPtrVectorTypeName()
   {
@@ -412,7 +412,7 @@ namespace
   }
 
   /**
-   * Address: 0x00BFCEA0 family (cleanup_type_name_00BFCEA0)
+   * Address: 0x00BFCEA0 (FUN_00BFCEA0) family (cleanup_type_name_00BFCEA0)
    */
   void cleanup_EntityPtrFastVectorTypeName()
   {

@@ -36,7 +36,7 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00773320 (Moho::CEconStorageTypeInfo::CEconStorageTypeInfo)
+ * Address: 0x00773320 (FUN_00773320, Moho::CEconStorageTypeInfo::CEconStorageTypeInfo)
  */
 CEconStorageTypeInfo::CEconStorageTypeInfo() : gpg::RType()
 {
