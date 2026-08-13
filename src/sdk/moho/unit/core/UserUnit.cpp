@@ -5759,7 +5759,10 @@ bool moho::USERUNIT_CanBeBuiltAt(
   overlapQuery.Max.z = candidateSkirt.z1 + 8.0f;
 
   constexpr std::uint32_t kIntelVisibleMask = 0x08u;
-  gpg::fastvector_n<UserEntity*, 100> nearbyUnits{};
+  // Heap-backed: `CollectInBox`/`Collect` take the base `gpg::fastvector<T>&`,
+  // whose grow path frees `start_` without an `originalVec_` test. See the
+  // note in CWldSession::DoBeat.
+  gpg::fastvector<UserEntity*> nearbyUnits{};
   auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(session.GetEntitySpatialDbStorage());
   spatialStorage->CollectInBox(nearbyUnits, overlapQuery);
 
@@ -5891,7 +5894,10 @@ bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint,
   constexpr EEntityType kSpatialTypeUnit = static_cast<EEntityType>(0x00000100u);
   constexpr std::uint32_t kIntelVisibleMask = 0x08u;
 
-  gpg::fastvector_n<UserEntity*, 100> nearbyUnits{};
+  // Heap-backed: `CollectInBox`/`Collect` take the base `gpg::fastvector<T>&`,
+  // whose grow path frees `start_` without an `originalVec_` test. See the
+  // note in CWldSession::DoBeat.
+  gpg::fastvector<UserEntity*> nearbyUnits{};
   auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(session.GetEntitySpatialDbStorage());
   spatialStorage->Collect(nearbyUnits, kSpatialTypeUnit);
 
