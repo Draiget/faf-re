@@ -16,7 +16,7 @@ namespace
     {
     }
 
-    void DrainRequests(gpg::fastvector_n<moho::SAudioRequest, 64>&) override
+    void DrainRequests(gpg::fastvector_n<moho::SAudioRequest, 8>&) override
     {
     }
 

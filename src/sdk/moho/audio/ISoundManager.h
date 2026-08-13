@@ -30,7 +30,7 @@ namespace moho
      * Address: 0x00A82547 (_purecall)
      * Slot: 1
      */
-    virtual void DrainRequests(gpg::fastvector_n<SAudioRequest, 64>& outRequests) = 0;
+    virtual void DrainRequests(gpg::fastvector_n<SAudioRequest, 8>& outRequests) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)

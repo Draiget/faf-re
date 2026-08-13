@@ -42,11 +42,13 @@ namespace
    * Assigns one `fastvector_n<SAudioRequest, 64>` into another while reusing
    * destination storage when capacity is sufficient.
    */
-  [[nodiscard]] gpg::fastvector_n<moho::SAudioRequest, 64>* CopyRequests(
-    gpg::fastvector_n<moho::SAudioRequest, 64>& destination, const gpg::fastvector_n<moho::SAudioRequest, 64>& source
+  [[nodiscard]] gpg::fastvector_n<moho::SAudioRequest, 8>* CopyRequests(
+    gpg::fastvector_n<moho::SAudioRequest, 8>& destination, const gpg::fastvector_n<moho::SAudioRequest, 64>& source
   )
   {
-    if (&destination == &source) {
+    // Source and destination carry different inline capacities, so the
+    // identity guard compares addresses rather than references.
+    if (static_cast<const void*>(&destination) == static_cast<const void*>(&source)) {
       return &destination;
     }
 
@@ -141,22 +143,23 @@ namespace moho
   /**
    * Address: 0x00760EB0 (FUN_00760EB0)
    *
-   * gpg::fastvector_n<Moho::SAudioRequest, 64>& outRequests
+   * gpg::fastvector_n<Moho::SAudioRequest, 8>& outRequests
    *
    * IDA signature:
-   * Moho::SAudioRequest *__thiscall sub_760EB0(Moho::CSimSoundManager *this, gpg::fastvector_n64_SAudioRequest
-   * *outRequests);
+   * Moho::SAudioRequest *__thiscall Moho::CSimSoundManager::GetRequests(Moho::CSimSoundManager *this,
+   * gpg::fastvector_n8_SAudioRequest *outRequests);
    *
    * What it does:
    * Copies pending requests into caller-owned vector and resets local queue
-   * to inline storage.
+   * to inline storage. `Sim::Sync` hands in the sync packet's eight-slot lane,
+   * so the copy grows the destination onto the heap whenever a beat produced
+   * more than eight requests.
    */
-  void CSimSoundManager::DrainRequests(gpg::fastvector_n<SAudioRequest, 64>& outRequests)
+  void CSimSoundManager::DrainRequests(gpg::fastvector_n<SAudioRequest, 8>& outRequests)
   {
-    if (&outRequests != &mRequests) {
-      CopyRequests(outRequests, mRequests);
-    }
-
+    // The binary calls the copy helper unconditionally; the same-lane guard
+    // lives inside it.
+    (void)CopyRequests(outRequests, mRequests);
     ResetRequestQueueInline(*this);
   }
 
