@@ -8,6 +8,7 @@
 #include "moho/command/CmdDefs.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
+#include "moho/unit/core/Unit.h"
 #include "Wm3AxisAlignedBox3.h"
 
 #include <cstddef>
@@ -416,56 +417,21 @@ namespace moho
     /// variable-data payload is constructed.
     std::uint8_t mReserved0194{}; // 0x0194
     std::uint8_t pad_0195_0198[0x0198 - 0x0195]{};
-    /// First field of the replicated `SSTIUnitVariableData` payload, which the
-    /// constructor builds at +0x198: the entity id of whatever created this
-    /// unit, or 0xF0000000 when it had no creator.
-    std::uint32_t mReplicatedCreatorId{}; // 0x0198 (EntId)
-    std::int32_t mBuildTemplateOrderLane; // 0x019C
-    bool mAutoMode;           // 0x01A0
-    bool mAutoSurfaceMode;    // 0x01A1
-    bool mSelectableOverride; // 0x01A2
-    std::uint8_t pad_01A3_01A4[0x1A4 - 0x1A3]{};
-    float mFuelRatio;   // 0x01A4
-    float mShieldRatio; // 0x01A8
-    std::uint8_t pad_01AC_01B0[0x1B0 - 0x1AC]{};
+    /// The replicated per-beat payload the sim publishes for this unit.
+    /// `CWldSession::DoBeat` hands one of these to `UserUnit::UpdateUnitData`,
+    /// which assigns it over this member, so every live-state field the UI
+    /// reads about a unit lives inside it.
+    ///
+    /// This region used to be flattened into ad-hoc fields and padding here,
+    /// which restated the sim-side layout a second time and got three names
+    /// wrong: +0x1A2 is `mIsBusy` (not a selectable override), +0x3A8 is the
+    /// low byte of `mScriptbits`, and +0x290/+0x294 are the weapon-info
+    /// fastvector's begin/end. The bytes are unchanged.
+    SSTIUnitVariableData mUnitVarDat; // 0x0198
 
-    // 0x1B0
-    bool mPaused;
-
-    // 0x1B1..0x1BB - pad to float alignment
-    std::uint8_t pad_01B1_01B2[0x1B2 - 0x1B1]{};
-    bool mRepeatQueueEnabled; // 0x01B2
-    std::uint8_t pad_01B3_01B8[0x1B8 - 0x1B3]{};
-    std::int32_t mFireState; // 0x01B8
-
-    // 0x1BC
-    float mWorkProgress; // normalized work/build progress for UI
-
-    // 0x1C0..0x1D7 - unknown
-    std::uint8_t pad_01C0_01D8[0x1D8 - 0x1C0]{};
-    /// Replicated id of the entity that takes over this unit's selection when
-    /// this one is destroyed, or `0xF0000000` when there is none. `~UserUnit`
-    /// tests it at 0x008BFA49 and, at 0x008BFA8A, feeds it to
-    /// `CWldSession::LookupEntityId` so the resolved entity joins the current
-    /// selection and inherits this unit's selection-set names. Distinct from
-    /// `mReplicatedCreatorId` at +0x198, which points the other way.
-    std::uint32_t mSelectionInheritorId{}; // 0x01D8 (EntId)
-
-    // 0x1DC
-    char mCustomNameStorage[0x04]; // getter returns this + 0x1DC
-
-    // 0x1E0..0x28F - unknown
-    std::uint8_t pad_01E0_0290[0x290 - 0x1E0]{};
-
-    // 0x290
-    UserUnitWeapon* mWeaponTable;    // 0x0290 (begin pointer)
-    UserUnitWeapon* mWeaponTableEnd; // 0x0294 (end pointer, one-past-last)
-
-    std::uint8_t pad_0298_03A8[0x3A8 - 0x298]{};
-    std::uint8_t mIntelToggleStateMask; // 0x03A8 (INTEL/JAM/STEALTH toggle-state bits)
-    std::uint8_t pad_03A9_03B9[0x3B9 - 0x3A9]{};
-    bool mOverchargePaused; // 0x03B9
-    std::uint8_t pad_03BA_03C8[0x3C8 - 0x3BA]{};
+    /// `mUnitVarDat.mCreator` resolved to a live entity and held weakly;
+    /// `UpdateUnitData` re-points it whenever the replicated id changes.
+    std::uint8_t pad_03C0_03C8[0x3C8 - 0x3C0]{};
     UserUnitManager* mManager;        // 0x03C8
     UserUnitManager* mFactoryManager; // 0x03CC
     msvc8::set<msvc8::string> mSelectionSets; // 0x03D0
@@ -478,23 +444,7 @@ namespace moho
   };
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
   static_assert(sizeof(UserUnit) == 0x3E8, "UserUnit size must be 0x3E8");
-  static_assert(
-    offsetof(UserUnit, mBuildTemplateOrderLane) == 0x019C,
-    "UserUnit::mBuildTemplateOrderLane offset must be 0x019C"
-  );
-  static_assert(offsetof(UserUnit, mAutoMode) == 0x01A0, "UserUnit::mAutoMode offset must be 0x01A0");
-  static_assert(offsetof(UserUnit, mAutoSurfaceMode) == 0x01A1, "UserUnit::mAutoSurfaceMode offset must be 0x01A1");
-  static_assert(
-    offsetof(UserUnit, mRepeatQueueEnabled) == 0x01B2, "UserUnit::mRepeatQueueEnabled offset must be 0x01B2"
-  );
-  static_assert(offsetof(UserUnit, mFireState) == 0x01B8, "UserUnit::mFireState offset must be 0x01B8");
-  static_assert(offsetof(UserUnit, mCustomNameStorage) == 0x01DC, "UserUnit::mCustomNameStorage offset must be 0x01DC");
-  static_assert(offsetof(UserUnit, mWeaponTable) == 0x0290, "UserUnit::mWeaponTable offset must be 0x0290");
-  static_assert(offsetof(UserUnit, mWeaponTableEnd) == 0x0294, "UserUnit::mWeaponTableEnd offset must be 0x0294");
-  static_assert(
-    offsetof(UserUnit, mIntelToggleStateMask) == 0x03A8, "UserUnit::mIntelToggleStateMask offset must be 0x03A8"
-  );
-  static_assert(offsetof(UserUnit, mOverchargePaused) == 0x03B9, "UserUnit::mOverchargePaused offset must be 0x03B9");
+  static_assert(offsetof(UserUnit, mUnitVarDat) == 0x0198, "UserUnit::mUnitVarDat offset must be 0x0198");
   static_assert(
     offsetof(UserUnit, mManager) == 0x03C8, "UserUnit::mManager offset must be 0x03C8"
   );
@@ -508,13 +458,6 @@ namespace moho
   static_assert(offsetof(UserUnit, mBuildStateTag) == 0x0184, "UserUnit::mBuildStateTag offset must be 0x0184");
   static_assert(offsetof(UserUnit, mStatsRoot) == 0x0188, "UserUnit::mStatsRoot offset must be 0x0188");
   static_assert(offsetof(UserUnit, mIsFake) == 0x0190, "UserUnit::mIsFake offset must be 0x0190");
-  static_assert(offsetof(UserUnit, mReserved0194) == 0x0194, "UserUnit::mReserved0194 offset must be 0x0194");
-  static_assert(
-    offsetof(UserUnit, mReplicatedCreatorId) == 0x0198, "UserUnit::mReplicatedCreatorId offset must be 0x0198"
-  );
-  static_assert(
-    offsetof(UserUnit, mSelectionInheritorId) == 0x01D8, "UserUnit::mSelectionInheritorId offset must be 0x01D8"
-  );
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(

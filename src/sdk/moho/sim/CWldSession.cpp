@@ -9283,7 +9283,7 @@ namespace moho
         templateInfo.mPos.x = position.x;
         templateInfo.mPos.y = 0.0f;
         templateInfo.mPos.z = position.z;
-        templateInfo.mBuildOrder = selectedUnit->mBuildTemplateOrderLane;
+        templateInfo.mBuildOrder = selectedUnit->mUnitVarDat.mCreationTick;
 
         const RUnitBlueprint* const blueprint = selectedBridge->GetBlueprint();
         templateInfo.mBlueprintId.assign(blueprint->mBlueprintId, 0u, 0xFFFFFFFFu);
@@ -11745,10 +11745,9 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   bool mCapturable = false;
   if (UserUnit* const hoverUnitForCaps = hoverEntity->IsUserUnit()) {
     mCapturable = ResolveIUnitBridge(hoverUnitForCaps)->GetAttributes().mCapturable;
-    // UserUnit+0x1A2 (mSelectableOverride) is the modeled field at the offset the
-    // decompiler labels `mUnitVarDat.mIsBusy`; when set, this target is neither
-    // reclaimable nor capturable via right-click.
-    if (hoverEntity->IsUserUnit()->mSelectableOverride) {
+    // When the unit is busy it is neither reclaimable nor capturable via
+    // right-click.
+    if (hoverEntity->IsUserUnit()->mUnitVarDat.mIsBusy) {
       reclaimTargetValid = false;
       mCapturable = false;
     }

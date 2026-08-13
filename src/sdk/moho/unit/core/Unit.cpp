@@ -4292,7 +4292,7 @@ int moho::cfunc_GetIsPausedL(LuaPlus::LuaState* const state)
       const LuaPlus::LuaObject unitObject = unitsObject[unitIndex];
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
       Unit* const unit = ResolveUnitBridge(userUnit);
-      if (userUnit != nullptr && unit != nullptr && !unit->IsDead() && userUnit->mPaused) {
+      if (userUnit != nullptr && unit != nullptr && !unit->IsDead() && userUnit->mUnitVarDat.mIsPaused) {
         lua_pushboolean(rawState, 1);
         (void)lua_gettop(rawState);
         return 1;
@@ -4621,8 +4621,8 @@ int moho::cfunc_GetFireStateL(LuaPlus::LuaState* const state)
       }
 
       if (fireState == 3) {
-        fireState = userUnit->mFireState;
-      } else if (fireState != userUnit->mFireState) {
+        fireState = userUnit->mUnitVarDat.mFireState;
+      } else if (fireState != userUnit->mUnitVarDat.mFireState) {
         fireState = -1;
       }
     }
