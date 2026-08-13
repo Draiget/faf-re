@@ -15168,6 +15168,23 @@ extern "C"
 	{
 		global_State* const G = L->l_G;
 		lua_State* const previousActiveThread = G->lstate;
+
+		// The binary restores `lstate` at each of its returns (FUN_00929C60
+		// saves it at +0x44 on entry and writes it back before every exit). It
+		// has no way to restore on the error path because errors there are a
+		// longjmp; ours are C++ exceptions, and an unwind past this frame would
+		// leave `lstate` pointing at the thread that raised - typically a
+		// coroutine, whose `stateUserData` is null by construction
+		// (`luaE_newthread`). Every later `LuaObject::GetActiveState()` then
+		// hands back null, and the first UI event to build a Lua event table
+		// dies on it. A guard keeps the binary's intent on all exits.
+		struct ActiveThreadGuard
+		{
+			global_State* g;
+			lua_State* previous;
+			~ActiveThreadGuard() { g->lstate = previous; }
+		} const activeThreadGuard{G, previousActiveThread};
+
 		G->lstate = L;
 
 		LClosure* cl = nullptr;
