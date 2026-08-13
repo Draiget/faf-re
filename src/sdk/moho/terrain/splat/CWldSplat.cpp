@@ -10,7 +10,9 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/render/CDecalGroup.h"
+#include "moho/render/CDecalTypes.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
@@ -34,6 +36,60 @@ namespace
   AsCWldTerrainResRuntimeView(const moho::IWldTerrainRes* const terrainRes) noexcept
   {
     return reinterpret_cast<const CWldTerrainResRuntimeView*>(terrainRes);
+  }
+
+  /// True when a decal texture reference already names an absolute location -
+  /// a UNC share, a drive-qualified path, or a rooted one - and so must be used
+  /// exactly as the sim spelled it.
+  [[nodiscard]] bool IsAbsoluteTextureReference(const char* const path) noexcept
+  {
+    if (path == nullptr || *path == '\0') {
+      return false;
+    }
+    if (moho::FILE_HasUNC(path)) {
+      return true;
+    }
+
+    const char root = moho::FILE_HasDrive(path) ? path[2] : path[0];
+    return root == '/' || root == '\\';
+  }
+
+  /**
+   * Address: 0x008786BF..0x00878786 (inside FUN_00878650)
+   *
+   * What it does:
+   * Expands one `SDecalInfo` texture lane into the resource path the decal
+   * loads from. Absolute references are taken verbatim; a bare name is looked
+   * up as a `.dds` under the shared splat or decal folder. An empty lane stays
+   * empty, which is how the decal path tells "leave this slot alone" apart from
+   * "load this texture".
+   */
+  [[nodiscard]] msvc8::string ResolveDecalTexturePath(const msvc8::string& texture, const bool isSplat)
+  {
+    msvc8::string resolved;
+    if (texture.empty()) {
+      return resolved;
+    }
+
+    if (IsAbsoluteTextureReference(texture.c_str())) {
+      resolved.assign(texture, 0, msvc8::string::npos);
+      return resolved;
+    }
+
+    const char* const folder = isSplat ? "/env/common/splats/" : "/env/common/decals/";
+    resolved.assign(folder, std::strlen(folder));
+    (void)resolved.append(texture.view());
+    (void)resolved.append(".dds", 4);
+    return resolved;
+  }
+
+  /// The transform lanes every incoming decal record carries, in the order the
+  /// binary writes them (0x008787AA..0x008787E5).
+  void ApplyDecalRecordTransform(moho::CWldTerrainDecal& decal, const moho::SDecalInfo& record) noexcept
+  {
+    decal.mScale = record.mSize;
+    decal.mPosition = record.mPos;
+    decal.mOrientation = record.mRot;
   }
 
   [[nodiscard]] const moho::DecalGroupLookupNode* FindLookupNodeByKey(
@@ -788,7 +844,74 @@ namespace moho
   }
 
   /**
+   * Address: 0x00878650 (FUN_00878650, Moho::CDecalManager::AddDecals)
+   * Slot: 22 (`??_7CDecalManager@Moho@@6B@` + 0x58)
+   *
+   * IDA signature:
+   * std::vector *__thiscall Moho::CDecalManager::Func20(Moho::CDecalManager *this, std::vector *a2);
+   *
+   * What it does:
+   * Materializes one sync packet's worth of sim-authored decals. A splat record
+   * gets a fresh `CWldSplat` and is always albedo; any other record resolves its
+   * type name against `CWldTerrainDecal::sTypeDesc` first and is dropped (with a
+   * warning) when the name is unknown, or silently when it resolves to the
+   * undefined slot. Both paths copy the transform, refresh the decal, apply the
+   * resolved texture names, carry the handle / fade deadline / army / fidelity
+   * lanes across, and settle the cutoff LOD - taking the record's when it is
+   * positive and asking the decal to compute one otherwise.
+   */
+  void CDecalManager::AddDecals(const msvc8::vector<SDecalInfo>& decals)
+  {
+    const auto& decalsView = msvc8::AsVectorRuntimeView(decals);
+    for (const SDecalInfo* record = decalsView.begin; record != decalsView.end; ++record) {
+      const bool isSplat = record->mIsSplat != 0u;
+
+      // Both name lanes are resolved up front, exactly as the binary does, so a
+      // record dropped by the type lookup below still pays for the expansion.
+      const msvc8::string resolvedNames[2] = {
+        ResolveDecalTexturePath(record->mTexName1, isSplat),
+        ResolveDecalTexturePath(record->mTexName2, isSplat),
+      };
+
+      CWldTerrainDecal* decal = nullptr;
+      if (isSplat) {
+        decal = NewSplat();
+        ApplyDecalRecordTransform(*decal, *record);
+        decal->Update();
+        decal->mType = WldTerrainDecalType_Albedo;
+        decal->SetName(resolvedNames[0], 0);
+      } else {
+        const EWldTerrainDecalType type = CWldTerrainDecal::LookupDecalType(record->mType);
+        if (type == WldTerrainDecalType_Undefined) {
+          continue;
+        }
+
+        decal = LoadDecal(nullptr);
+        ApplyDecalRecordTransform(*decal, *record);
+        decal->Update();
+        decal->mType = type;
+        for (int slot = 0; slot < 2; ++slot) {
+          if (!resolvedNames[slot].empty()) {
+            decal->SetName(resolvedNames[slot], slot);
+          }
+        }
+      }
+
+      decal->mRuntimeHandle = static_cast<std::int32_t>(record->mObj);
+      decal->mRemoveTick = static_cast<std::int32_t>(record->mStartTick);
+      decal->mArmy = static_cast<std::int32_t>(record->mArmy);
+      decal->mFidelity = static_cast<std::int32_t>(record->mFidelity);
+
+      // A record that carries its own cutoff wins; otherwise the decal works one
+      // out from its own footprint. Either way the spatial-db dissolve key is
+      // rekeyed, which is what `SetCutoffLOD` exists for.
+      decal->SetCutoffLOD(record->mLODParam > 0.0f ? record->mLODParam : decal->ComputeCutoffLOD(-1.0f));
+    }
+  }
+
+  /**
    * Address: 0x00878A40 (FUN_00878A40, Moho::CDecalManager::RemoveDecals)
+   * Slot: 23 (`??_7CDecalManager@Moho@@6B@` + 0x5C)
    *
    * What it does:
    * Scans all active decals for each requested runtime handle and marks

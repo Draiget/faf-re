@@ -21,7 +21,9 @@
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/audio/SAudioRequest.h"
 #include "moho/net/Common.h"
+#include "moho/sim/SyncInlineVector.h"
 #include "platform/Platform.h"
 #include "SSyncFilter.h"
 
@@ -69,6 +71,10 @@ namespace moho
   struct SSTIArmyConstantData;
   struct SSTIArmyVariableData;
   struct SCamShakeParams;
+  struct SDecalInfo;
+  class CDebugCanvas;
+  class CHeightField;
+  class CSimResources;
   struct SCamFollowParams;
   struct SDesyncInfo;
   class CAniPose;
@@ -171,8 +177,10 @@ namespace moho
     std::uint8_t pad_000D_0010[0x03]{};                     // +0x00D
     gpg::Stream* mStream = nullptr;                         // +0x010
     std::uint8_t pad_0014_0018[0x04]{};                     // +0x014
-    /// Inline audio-request queue handed to `IUserSoundManager::UpdateSoundRequests`.
-    std::uint8_t mAudioRequests[0xF0]{};                    // +0x018
+    /// Inline audio-request queue handed straight to
+    /// `IUserSoundManager::UpdateSoundRequests`. 0x10 of vector head plus
+    /// eight inline 0x1C-byte requests is the whole 0xF0.
+    gpg::core::FastVectorN<SAudioRequest, 8> mAudioRequests; // +0x018
     msvc8::vector<SSTIArmyConstantData> mNewGrids;          // +0x108
     msvc8::vector<SSTIArmyVariableData> mArmyUpdates;       // +0x118
     msvc8::vector<SCreateEntityParams> mNewEntities;        // +0x128
@@ -190,11 +198,11 @@ namespace moho
     /// Consumed by `CWldSession::DoBeat` as the erase-command id run.
     msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
     boost::shared_ptr<void> mParticleBuffer;                // +0x1C8
-    /// Element types for the byte-typed lanes below are still unresolved;
-    /// only `CWldSession::DoBeat` reads them and it does so through the
-    /// per-lane record size, so the runs are kept untyped until it lands.
-    msvc8::vector<std::byte> mAddDecals;                    // +0x1D0
-    msvc8::vector<EntId> mRemoveDecals;                     // +0x1E0
+    /// Handed straight to `CDecalManager::AddDecals` / `RemoveDecals` by
+    /// `CWldSession::DoBeat`; the removal run carries decal handles, not
+    /// entity ids.
+    msvc8::vector<SDecalInfo> mAddDecals;                   // +0x1D0
+    msvc8::vector<std::int32_t> mRemoveDecals;              // +0x1E0
     msvc8::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
     msvc8::vector<SCamFollowParams> mFollowCameras;         // +0x200
     /// Seventeenth vector lane; untouched by `CWldSession::DoBeat`.
@@ -207,13 +215,14 @@ namespace moho
     bool mGameOver = false;                                 // +0x270
     bool mFogOfWar = false;                                 // +0x271
     std::uint8_t pad_0272_0274[0x02]{};                     // +0x272
-    boost::shared_ptr<void> mTerrainUpdate;                 // +0x274
-    boost::shared_ptr<void> mSimResources;                  // +0x27C
+    boost::SharedPtrRaw<CHeightField> mTerrainUpdate;       // +0x274
+    boost::SharedPtrRaw<CSimResources> mSimResources;       // +0x27C
     msvc8::vector<msvc8::string> mPrintField;               // +0x284
-    /// Inline scratch-vector lane; untouched by `CWldSession::DoBeat`.
-    msvc8::vector<std::byte> mInlineScratchVectors;         // +0x294
-    boost::shared_ptr<void> mTickDebugCanvas;               // +0x2A4
-    boost::shared_ptr<void> mBeatDebugCanvas;               // +0x2AC
+    /// Copied wholesale onto `CWldSession::mSyncInlineVectors` by
+    /// `CWldSession::DoBeat` (0x00895214).
+    msvc8::vector<SyncInlineVector> mInlineScratchVectors;  // +0x294
+    boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas;     // +0x2A4
+    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // +0x2AC
     std::uint8_t pad_02B4_02B8[0x04]{};                     // +0x2B4
 
     /**

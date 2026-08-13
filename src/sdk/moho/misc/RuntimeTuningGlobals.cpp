@@ -54,6 +54,15 @@ namespace moho
   float ren_BandwidthDisplaySeconds = 10.0f; // 0x00F57E84 = 10.0f
   float ren_BandwidthDisplayKernel = 1.0f;   // 0x00F57E88 = 1.0f
 
+  // Session-beat toggles read by `CWldSession::DoBeat` / `SessionFrame`.
+  // `ren_FogOfWar` is the only one with a byte in the image (0x00F57DC3 = 1);
+  // the other two sit in the zero-fill tail of .data and therefore start false.
+  bool ren_FogOfWar = true;               // 0x00F57DC3 = 0x01
+  bool dbg_Metronome = false;             // 0x010A6466, zero-fill
+  /// Free-runs the beat drain: the frame loop stops waiting for the tick clock
+  /// and consumes every packet the sim has queued.
+  bool wld_RunWithTheWind = false;        // 0x010A6467, zero-fill
+
   int snd_index = 0;
 
   float cam_NearZoom = 10.0f;

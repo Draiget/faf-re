@@ -16,6 +16,7 @@
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/SSTICommandSource.h"
+#include "moho/sim/SyncInlineVector.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/command/CommandManager.h"
 #include "moho/sim/WeakEntitySet.h"
@@ -30,6 +31,7 @@ namespace moho
 
   class UserArmy;
   class UserUnit;
+  struct SSyncData;
   struct UserCommandIssueHelper;
   // Opaque cross-TU handle to the runtime command-graph anchor-history object
   // (see UserUnit.h). Only used as an incomplete pointer by the dock worker bridge.
@@ -833,6 +835,24 @@ namespace moho
     void CheckForNecessaryUIRefresh();
 
     /**
+     * Address: 0x00894530 (FUN_00894530,
+     * ?DoBeat@CWldSession@Moho@@QAEXV?$auto_ptr@USSyncData@Moho@@@std@@@Z)
+     *
+     * IDA signature:
+     * void __stdcall Moho::CWldSession::DoBeat(Moho::CWldSession *this, std::auto_ptr<SSyncData> sdata);
+     *
+     * What it does:
+     * Applies one sim beat to the client world. This is the sole consumer of
+     * the sync queue: it adopts the packet, walks its ~25 lanes in order
+     * (armies, entities, units, commands, decals, cameras, poses, deletions,
+     * Lua sync, desyncs), ticks every registered unit, drains the orphan and
+     * visibility sets, and destroys the packet on the way out.
+     *
+     * The parameter is by-value ownership; nothing else may free the packet.
+     */
+    void DoBeat(msvc8::auto_ptr<SSyncData> syncData);
+
+    /**
      * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)
      *
      * What it does:
@@ -1183,7 +1203,8 @@ namespace moho
     boost::detail::sp_counted_base* mUICommandGraphControl; // 0x0408 (weak control block for mUICommandGraphPx)
     boost::SharedPtrRaw<void> mUnknownShared40C;            // 0x040C
     boost::SharedPtrRaw<CDebugCanvas> mDebugCanvas;         // 0x0414
-    boost::SharedPtrRaw<void> mUnknownShared41C;            // 0x041C
+    /// The beat-scoped debug canvas; `DoBeat` re-seats it from the packet.
+    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // 0x041C
     boost::SharedPtrRaw<CSimResources> mSimResources;       // 0x0424
     void* mAuxUpdateRoot;                                   // 0x042C
     void* mAuxUpdateHead;                                   // 0x0430
@@ -1210,7 +1231,12 @@ namespace moho
     bool IsObservingAllowed;                                // 0x0487
     int32_t FocusArmy;                                      // 0x0488
     uint8_t IsGameOver;                                     // 0x048C
-    char pad_048D[19];                                      // 0x048D
+    char pad_048D[3];                                       // 0x048D
+    /// Per-beat copy of `SSyncData::mInlineScratchVectors`. `CWldSession::DoBeat`
+    /// assigns the whole run over (0x00895214, the 32-byte-stride vector
+    /// assignment); it is the lane's only writer, and no reader has been
+    /// identified in the binary yet.
+    msvc8::vector<SyncInlineVector> mSyncInlineVectors;      // 0x0490
     SSelectionSetUserEntity mSelection;                     // 0x04A0
     std::uint8_t mCursorWorldState[4];                      // 0x04B0
     Wm3::Vector3f CursorWorldPos;                           // 0x04B4

@@ -1649,6 +1649,82 @@ namespace
   }
 
   /**
+   * Address: 0x008C06A0 (FUN_008C06A0)
+   *
+   * IDA signature:
+   * void __usercall sub_8C06A0(Moho::UserEntity *unit@<esi>);
+   *
+   * What it does:
+   * Takes one entity out of the player's current selection. Works on a copy of
+   * the session selection and only republishes when the entity really was
+   * selected, so a unit going busy off-screen never disturbs the selection.
+   */
+  void DeselectFromSessionSelection(UserEntity* const entity) noexcept
+  {
+    if (entity == nullptr || entity->mSession == nullptr) {
+      return;
+    }
+
+    ScopedCopiedSelectionSet selection{};
+    (void)CopySessionSelectionSet(&selection.get(), &entity->mSession->mSelection);
+
+    SSelectionSetUserEntity::FindResult found{};
+    (void)SSelectionSetUserEntity::Find(&found, &selection.get(), entity);
+    if (found.mRes == selection.get().mHead) {
+      return;
+    }
+
+    (void)SSelectionSetUserEntity::Erase(selection.get(), entity);
+    entity->mSession->SetSelection(selection.get());
+  }
+
+  /**
+   * Address: 0x008B2300 (FUN_008B2300)
+   *
+   * IDA signature:
+   * struct _EXCEPTION_REGISTRATION_RECORD *__stdcall sub_8B2300(
+   *   Moho::UserArmy *army, Moho::UserUnit *unit);
+   *
+   * What it does:
+   * Files one unit into its army's quick-select avatar run, which the binary
+   * keeps sorted by ascending blueprint `QuickSelectPriority`. The scan skips
+   * lanes whose weak reference has already gone stale and inserts before the
+   * first surviving avatar that outranks the new unit, appending when none
+   * does.
+   */
+  void AddArmyAvatar(UserArmy* const army, UserUnit* const unit)
+  {
+    if (unit == nullptr || army == nullptr) {
+      return;
+    }
+
+    const IUnit* const unitBridge = unit;
+    const RUnitBlueprint* const unitBlueprint = unitBridge->GetBlueprint();
+    if (unitBlueprint == nullptr) {
+      return;
+    }
+    const std::int32_t unitPriority = unitBlueprint->General.QuickSelectPriority;
+
+    msvc8::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
+    std::size_t insertIndex = avatars.size();
+    for (std::size_t index = 0; index < avatars.size(); ++index) {
+      UserUnit* const avatar = avatars[index].GetObjectPtr();
+      if (avatar == nullptr) {
+        continue;
+      }
+
+      const IUnit* const avatarBridge = avatar;
+      const RUnitBlueprint* const avatarBlueprint = avatarBridge->GetBlueprint();
+      if (avatarBlueprint != nullptr && avatarBlueprint->General.QuickSelectPriority > unitPriority) {
+        insertIndex = index;
+        break;
+      }
+    }
+
+    InsertWeakPtrVectorObjectAt(avatars, unit, insertIndex);
+  }
+
+  /**
    * Address: 0x008B2520 (FUN_008B2520, idle engineer weak-set insert helper)
    *
    * What it does:
@@ -2089,7 +2165,7 @@ namespace
    * `{prefix,insertRange,suffix}` in order, unlinks old owner links, then swaps
    * storage and updates `{begin,end,capacity}` lanes.
    */
-  [[maybe_unused]] UserCommandQueueEntry* GrowQueueLinkVectorAndInsertRange(
+  UserCommandQueueEntry* GrowQueueLinkVectorAndInsertRange(
     UserCommandQueueLinkVector* const linkVector,
     const std::uint32_t targetElementCapacity,
     UserCommandQueueEntry* const insertionPoint,
@@ -2134,6 +2210,87 @@ namespace
     linkVector->end = newEnd;
     linkVector->capacityEnd = newStorage + targetElementCapacity;
     return linkVector->capacityEnd;
+  }
+
+  /**
+   * Address: 0x008B7900 (FUN_008B7900)
+   *
+   * IDA signature:
+   * int __userpurge sub_8B7900@<eax>(int newEnd@<edx>, int linkVector@<ebx>, int a3);
+   *
+   * What it does:
+   * Drops the tail `[newEnd, end)` of one queue-link run. The binary reaches
+   * the shared assign-range helper first, but its only caller hands that call
+   * an empty source range, so the whole effect is the unlink of the dropped
+   * lanes followed by the shortened end.
+   */
+  UserCommandQueueEntry* ShrinkQueueLinkVectorTo(
+    UserCommandQueueLinkVector* const linkVector,
+    UserCommandQueueEntry* const newEnd
+  ) noexcept
+  {
+    if (newEnd != linkVector->end) {
+      (void)AssignQueueLinkRangeWithOwnerRelink(newEnd, linkVector->end, linkVector->end);
+      UnlinkResolvedQueueOwnerLinks(newEnd, linkVector->end);
+      linkVector->end = newEnd;
+    }
+    return newEnd;
+  }
+
+  /**
+   * Address: 0x008B7590 (FUN_008B7590)
+   *
+   * IDA signature:
+   * unsigned int __usercall sub_8B7590@<eax>(unsigned int count@<eax>,
+   *   unsigned int *linkVector@<ecx>, unsigned int **fillEntry@<edi>);
+   *
+   * What it does:
+   * Resizes one queue-link run to `elementCount`. Shrinking drops the tail;
+   * growing reallocates when the request outruns capacity and then appends
+   * copies of `fillEntry`, each linked into whatever owner chain that template
+   * entry names. `UserUnit`'s command resync passes a cleared template, so the
+   * appended lanes come out unbound.
+   */
+  void ResizeQueueLinkVector(
+    UserCommandQueueLinkVector* const linkVector,
+    const std::size_t elementCount,
+    const UserCommandQueueEntry& fillEntry
+  )
+  {
+    const std::size_t size = static_cast<std::size_t>(linkVector->end - linkVector->begin);
+    if (elementCount < size) {
+      (void)ShrinkQueueLinkVectorTo(linkVector, linkVector->begin + elementCount);
+      return;
+    }
+    if (elementCount == size) {
+      return;
+    }
+
+    const std::size_t capacity = static_cast<std::size_t>(linkVector->capacityEnd - linkVector->begin);
+    if (elementCount > capacity) {
+      (void)GrowQueueLinkVectorAndInsertRange(
+        linkVector,
+        static_cast<std::uint32_t>(elementCount),
+        linkVector->begin,
+        linkVector->begin,
+        linkVector->begin
+      );
+    }
+
+    UserCommandQueueEntry* const target = linkVector->begin + elementCount;
+    while (linkVector->end != target) {
+      UserCommandQueueEntry* const slot = linkVector->end;
+      linkVector->end = slot + 1;
+
+      slot->helper = fillEntry.helper;
+      if (fillEntry.helper != nullptr) {
+        auto** const ownerHead = reinterpret_cast<UserCommandQueueEntry**>(fillEntry.helper);
+        slot->link = *ownerHead;
+        *ownerHead = slot;
+      } else {
+        slot->link = nullptr;
+      }
+    }
   }
 
   /**
@@ -2946,6 +3103,68 @@ namespace
   }
 
   /**
+   * Address: 0x008B6C50 (FUN_008B6C50)
+   *
+   * IDA signature:
+   * _DWORD *__stdcall sub_8B6C50(int queue, _DWORD *commandIdRun);
+   *
+   * What it does:
+   * Rebinds one command queue's primary link run to the command ids the sim
+   * just replicated. The run is resized to the id count with cleared lanes,
+   * then each lane is pointed at the live `UserCommandIssueHelper` the session
+   * command manager holds for that id - unbinding first when the lane already
+   * named a different helper, and left null when the id is unknown. The
+   * resolved run is then invalidated back onto its inline storage and marked
+   * dirty so the next reader rebuilds it.
+   */
+  void ResyncUserCommandQueueLinks(UserCommandQueue* const queue, const CmdId* const idBegin, const CmdId* const idEnd)
+  {
+    if (queue == nullptr) {
+      return;
+    }
+
+    CommandManager* const commandManager = WLD_GetActiveSession()->mCommandManager;
+    const std::size_t idCount = static_cast<std::size_t>(idEnd - idBegin);
+
+    // The template entry is a plain unbound lane; it is a local in the binary
+    // too (0x008B6C8A), unlinked again right after the resize.
+    const UserCommandQueueEntry unboundEntry{nullptr, nullptr};
+    ResizeQueueLinkVector(&queue->primaryLinks, idCount, unboundEntry);
+
+    for (std::size_t index = 0; index < idCount; ++index) {
+      UserCommandIssueHelper* liveHelper = nullptr;
+      if (commandManager != nullptr) {
+        const auto found = commandManager->mCommands.find(idBegin[index]);
+        if (found != commandManager->mCommands.end()) {
+          liveHelper = found->second;
+        }
+      }
+
+      auto* const helperView = reinterpret_cast<UserCommandIssueHelperRuntimeView*>(liveHelper);
+      UserCommandQueueEntry* const lane = queue->primaryLinks.begin + index;
+      if (lane->helper == helperView) {
+        continue;
+      }
+
+      (void)UnlinkCommandQueueOwnerEntry(lane);
+
+      lane->helper = helperView;
+      if (helperView != nullptr) {
+        // A helper's own observer chain head is its first word, so the helper
+        // pointer doubles as the owner-link slot.
+        auto** const ownerHead = reinterpret_cast<UserCommandQueueEntry**>(helperView);
+        lane->link = *ownerHead;
+        *ownerHead = lane;
+      } else {
+        lane->link = nullptr;
+      }
+    }
+
+    queue->resolvedLinksDirty = 1u;
+    (void)ResetQueueLinkVectorToInlineStorage(&queue->resolvedLinks);
+  }
+
+  /**
    * Address: 0x008B7350 (FUN_008B7350)
    *
    * What it does:
@@ -3717,13 +3936,19 @@ namespace
     return false;
   }
 
+  /**
+   * Address: 0x008BEEC0 (the caching half of `UserUnit::GetClass`)
+   *
+   * What it does:
+   * Resolves the reflected `UserUnit` type once into the static the binary
+   * caches at 0x010C77AC.
+   */
   [[nodiscard]] gpg::RType* CachedUserUnitType()
   {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(UserUnit));
+    if (UserUnit::sType == nullptr) {
+      UserUnit::sType = gpg::LookupRType(typeid(UserUnit));
     }
-    return cached;
+    return UserUnit::sType;
   }
 
 } // namespace
@@ -4126,7 +4351,7 @@ namespace moho
    * Returns cached `UserUnit` metatable object from Lua object-factory
    * storage.
    */
-  [[maybe_unused]] LuaPlus::LuaObject* func_GetUserUnitFactory(
+  LuaPlus::LuaObject* func_GetUserUnitFactory(
     LuaPlus::LuaObject* const object,
     LuaPlus::LuaState* const state
   )
@@ -4156,6 +4381,116 @@ namespace moho
 LuaPlus::LuaObject CScrLuaMetatableFactory<UserUnit>::Create(LuaPlus::LuaState* const state)
 {
   return SCR_CreateSimpleMetatable(state);
+}
+
+namespace
+{
+  /// The metatable the `CScriptObject` sub-object is built against, fetched
+  /// through the recovered factory accessor at 0x008C60F0.
+  [[nodiscard]] LuaPlus::LuaObject MakeUserUnitScriptMetatable(moho::CWldSession* const session)
+  {
+    LuaPlus::LuaObject metatable;
+    (void)moho::func_GetUserUnitFactory(&metatable, session != nullptr ? session->mState : nullptr);
+    return metatable;
+  }
+
+  /**
+   * Address: 0x008BF612 (inside FUN_008BF420)
+   *
+   * What it does:
+   * Stands up one per-unit command queue: owner back-pointer, both link runs
+   * seeded onto their own inline storage, the pending-issue ring cleared and
+   * the resolved-run dirty flag down. The constructor open-codes this twice,
+   * once per queue.
+   */
+  [[nodiscard]] moho::UserCommandQueue* CreateUserCommandQueue(moho::UserUnit* const owner)
+  {
+    auto* const queue = static_cast<moho::UserCommandQueue*>(::operator new(sizeof(moho::UserCommandQueue)));
+
+    queue->ownerUnit = owner;
+
+    auto* const primaryInline = reinterpret_cast<moho::UserCommandQueueEntry*>(queue->primaryInlineStorage);
+    queue->primaryLinks.begin = primaryInline;
+    queue->primaryLinks.end = primaryInline;
+    queue->primaryLinks.inlineBase = reinterpret_cast<moho::UserCommandQueueEntry**>(primaryInline);
+    queue->primaryLinks.capacityEnd = primaryInline + moho::kUserCommandQueueInlineEntries;
+
+    queue->issueQueue.blocks = nullptr;
+    queue->issueQueue.blockCount = 0u;
+    queue->issueQueue.startOffset = 0u;
+    queue->issueQueue.size = 0u;
+
+    auto* const resolvedInline = reinterpret_cast<moho::UserCommandQueueEntry*>(queue->resolvedInlineStorage);
+    queue->resolvedLinks.begin = resolvedInline;
+    queue->resolvedLinks.end = resolvedInline;
+    queue->resolvedLinks.capacityEnd = resolvedInline + moho::kUserCommandQueueInlineEntries;
+    queue->resolvedLinks.inlineBase = reinterpret_cast<moho::UserCommandQueueEntry**>(resolvedInline);
+
+    queue->resolvedLinksDirty = 0u;
+    return queue;
+  }
+} // namespace
+
+/**
+ * Address: 0x008BF420 (FUN_008BF420, ??0UserUnit@Moho@@QAE@@Z)
+ *
+ * IDA signature:
+ * Moho::UserUnit *__thiscall Moho::UserUnit::UserUnit(
+ *   Moho::CWldSession *session, Moho::UserUnit *this, Moho::SCreateUnitParams *params);
+ *
+ * What it does:
+ * Builds one client-side unit from a sim create packet: runs the UserEntity,
+ * IUnit and CScriptObject sub-objects, copies the constant data, allocates the
+ * primary command queue (and a second one for factories), then files the unit
+ * either into its army's quick-select avatar run or into the engineer
+ * classification.
+ */
+UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
+  : UserEntity(*session, params)
+  , IUnit()
+  , CScriptObject(
+      MakeUserUnitScriptMetatable(session),
+      LuaPlus::LuaObject(),
+      LuaPlus::LuaObject(),
+      LuaPlus::LuaObject()
+    )
+  , mUnitConstDat(params.mConstDat)
+  , mReserved0194(0u)
+  , mUnitVarDat()
+  , mCreator()
+  , mManager(nullptr)
+  , mFactoryManager(nullptr)
+  , mSelectionSets()
+  , mQueueEmptyCached(false)
+  , mIsEngineer(false)
+  , mIsFactory(false)
+{
+  mManager = CreateUserCommandQueue(this);
+
+  // 0x008BF66F: factories carry a second queue for what they are building.
+  if (IsInCategory(msvc8::string("FACTORY", 7u))) {
+    mFactoryManager = CreateUserCommandQueue(this);
+
+    // 0x008BF745: only a factory that is also a structure counts as one for
+    // the idle-factory registry; mobile factories are handled as engineers.
+    if (IsInCategory(msvc8::string("STRUCTURE", 9u))) {
+      mIsFactory = true;
+    }
+  }
+
+  // 0x008BF7B7: a unit the blueprint gives a quick-select priority goes into
+  // the army's avatar run; everything else is a candidate for the idle
+  // engineer registry instead. The two are exclusive in the binary.
+  const auto* const unitBlueprint = static_cast<const RUnitBlueprint*>(mParams.mBlueprint);
+  if (mArmy != nullptr && unitBlueprint != nullptr && unitBlueprint->General.QuickSelectPriority > 0) {
+    AddArmyAvatar(mArmy, this);
+    return;
+  }
+
+  mIsEngineer = IsInCategory(msvc8::string("ENGINEER", 8u))
+    && !IsInCategory(msvc8::string("COMMAND", 7u))
+    && !IsInCategory(msvc8::string("SCOUT", 5u))
+    && !IsInCategory(msvc8::string("UNTARGETABLE", 12u));
 }
 
 /**
@@ -4293,6 +4628,273 @@ void UserUnit::UpdateVisibility()
     }
     break;
   }
+}
+
+/**
+ * Address: 0x008C0750 (FUN_008C0750, Moho::UserUnit::UpdateUnitData)
+ *
+ * IDA signature:
+ * void __thiscall Moho::UserUnit::UpdateUnitData(
+ *   Moho::UserUnit *this, Moho::SSTIUnitVariableData *payload, int *mask);
+ *
+ * What it does:
+ * Applies one replicated variable-data payload from a sync beat: assigns the
+ * payload wholesale, records the intel mask, re-seats both shared poses,
+ * re-resolves the creator weak reference (inheriting the creator's selection
+ * sets when a factory built this unit), and resyncs both command queues when
+ * the payload says the sim refreshed them. A unit that has just gone busy
+ * drops out of the current selection.
+ */
+void UserUnit::UpdateUnitData(const SSTIUnitVariableData& payload, const std::uint32_t intelStateFlags)
+{
+  const bool wasBusy = mUnitVarDat.mIsBusy;
+  mUnitVarDat.AssignFrom(payload);
+  mIntelStateFlags = intelStateFlags;
+
+  if (!wasBusy && mUnitVarDat.mIsBusy) {
+    DeselectFromSessionSelection(this);
+  }
+
+  mPosePrimary = mUnitVarDat.mPriorSharedPose;
+  mPoseSecondary = mUnitVarDat.mSharedPose;
+
+  const EntId replicatedCreator = mUnitVarDat.mCreator;
+  if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {
+    // 0x008C0823: the sentinel id means "no creator"; drop whatever we held.
+    mCreator.UnlinkFromOwnerChain();
+  } else {
+    const UserEntity* const heldCreator = mCreator.GetObjectPtr();
+    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != replicatedCreator) {
+      mCreator.ResetFromObject(WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator)));
+
+      UserEntity* const creator = mCreator.GetObjectPtr();
+      if (creator != nullptr && creator->IsInCategory(msvc8::string("FACTORY", 7u))) {
+        // 0x008C0949: a unit rolling off a factory inherits that factory's
+        // selection-set membership. The binary decodes the weak lane straight
+        // to a `UserUnit` here; the category test is what makes that safe.
+        UserUnit::AddToSelectionSet(this, static_cast<UserUnit*>(creator));
+      }
+    }
+  }
+
+  if (mUnitVarDat.mDidRefresh) {
+    if (mManager != nullptr) {
+      ResyncUserCommandQueueLinks(mManager, mUnitVarDat.mCommands.start_, mUnitVarDat.mCommands.end_);
+    }
+    if (mFactoryManager != nullptr) {
+      ResyncUserCommandQueueLinks(mFactoryManager, mUnitVarDat.mBuildQueue.start_, mUnitVarDat.mBuildQueue.end_);
+    }
+  }
+}
+
+gpg::RType* UserUnit::sType = nullptr;
+
+/**
+ * Address: 0x008BEF00 (FUN_008BEF00, Moho::IUnit_UserUnit::GetEntityId)
+ * IUnit slot 4.
+ */
+EntId UserUnit::GetEntityId() const
+{
+  return static_cast<EntId>(mParams.mEntityId);
+}
+
+/**
+ * Address: 0x008BEF10 (FUN_008BEF10, Moho::IUnit_UserUnit::GetPosition)
+ * IUnit slot 5.
+ */
+const Wm3::Vec3f& UserUnit::GetPosition() const
+{
+  return mVariableData.mCurTransform.pos_;
+}
+
+/**
+ * Address: 0x008BEF20 (FUN_008BEF20, Moho::IUnit_UserUnit::GetTransform)
+ * IUnit slot 6.
+ */
+const VTransform& UserUnit::GetTransform() const
+{
+  return mVariableData.mCurTransform;
+}
+
+/**
+ * Address: 0x008BEF30 (FUN_008BEF30, Moho::IUnit_UserUnit::GetBlueprint)
+ * IUnit slot 7.
+ *
+ * What it does:
+ * Hands back the entity blueprint the unit was created with, narrowed to the
+ * unit blueprint it is known to be - `SCreateUnitParams` only ever carries one.
+ */
+const RUnitBlueprint* UserUnit::GetBlueprint() const
+{
+  return static_cast<const RUnitBlueprint*>(mParams.mBlueprint);
+}
+
+/**
+ * Address: 0x008BEF60 (FUN_008BEF60, Moho::IUnit_UserUnit::GetLuaObject)
+ * IUnit slot 8.
+ */
+LuaPlus::LuaObject UserUnit::GetLuaObject()
+{
+  return mLuaObj;
+}
+
+/**
+ * Address: 0x008BEF80 (FUN_008BEF80, Moho::IUnit_UserUnit::CalcTransportLoadFactor)
+ * IUnit slot 9.
+ */
+float UserUnit::CalcTransportLoadFactor() const
+{
+  return 1.0f;
+}
+
+/**
+ * Address: 0x008BEF90 (FUN_008BEF90, Moho::IUnit_UserUnit::IsDead)
+ * IUnit slot 10.
+ */
+bool UserUnit::IsDead() const
+{
+  return mVariableData.mIsDead != 0u;
+}
+
+/**
+ * Address: 0x008BEFA0 (FUN_008BEFA0, Moho::IUnit_UserUnit::DestroyQueued)
+ * IUnit slot 11.
+ */
+bool UserUnit::DestroyQueued() const
+{
+  return false;
+}
+
+/**
+ * Address: 0x008C04E0 (FUN_008C04E0, Moho::IUnit_UserUnit::IsMobile)
+ * IUnit slot 12.
+ *
+ * What it does:
+ * One unsigned range test over the blueprint's motion type: everything from
+ * `Land` through `AmphibiousFloating` moves, `None` and `Special` do not.
+ */
+bool UserUnit::IsMobile() const
+{
+  const auto motionType = static_cast<std::uint32_t>(GetBlueprint()->Physics.MotionType);
+  return (motionType - 1u) <= (static_cast<std::uint32_t>(RULEUMT_AmphibiousFloating) - 1u);
+}
+
+/**
+ * Address: 0x008BEFC0 (FUN_008BEFC0, Moho::IUnit_UserUnit::IsNavigatorIdle)
+ * IUnit slot 14.
+ */
+bool UserUnit::IsNavigatorIdle() const
+{
+  return false;
+}
+
+/**
+ * Address: 0x008BF020 (FUN_008BF020, Moho::IUnit_UserUnit::IsUnitState)
+ * IUnit slot 15.
+ *
+ * What it does:
+ * Tests one bit of the replicated state mask. The binary shifts through
+ * `__allshl`, which yields zero once the count reaches 64; the explicit bound
+ * keeps that same answer without the shift being undefined.
+ */
+bool UserUnit::IsUnitState(const EUnitState state) const
+{
+  const auto stateIndex = static_cast<std::uint32_t>(state);
+  if (stateIndex >= 64u) {
+    return false;
+  }
+  return (mUnitVarDat.mUnitStates & (std::uint64_t{1} << stateIndex)) != 0u;
+}
+
+/**
+ * Address: 0x008BEF50 (FUN_008BEF50, Moho::IUnit_UserUnit::GetAttributes)
+ * IUnit slot 16.
+ */
+UnitAttributes& UserUnit::GetAttributes()
+{
+  return mUnitVarDat.mAttributes;
+}
+
+/**
+ * Address: 0x008BEF40 (FUN_008BEF40, Moho::IUnit_UserUnit::GetAttributes)
+ * IUnit slot 17.
+ */
+const UnitAttributes& UserUnit::GetAttributes() const
+{
+  return mUnitVarDat.mAttributes;
+}
+
+/**
+ * Address: 0x008BF0C0 (FUN_008BF0C0, Moho::IUnit_UserUnit::GetStat)
+ * IUnit slot 18.
+ *
+ * What it does:
+ * The default value only picks the lane: a string default routes to the
+ * string-typed stat under this unit's stats root.
+ */
+StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const std::string& defaultValue)
+{
+  (void)defaultValue;
+  return mUnitConstDat.mStatsRoot->GetStringItem(statPath);
+}
+
+/**
+ * Address: 0x008BF0B0 (FUN_008BF0B0, Moho::IUnit_UserUnit::GetStat)
+ * IUnit slot 19.
+ */
+StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const float& defaultValue)
+{
+  (void)defaultValue;
+  return mUnitConstDat.mStatsRoot->GetFloatItem(statPath);
+}
+
+/**
+ * Address: 0x008BF0A0 (FUN_008BF0A0, Moho::IUnit_UserUnit::GetStat)
+ * IUnit slot 20.
+ *
+ * What it does:
+ * The int-defaulted lane is the only one that creates the stat when it is
+ * missing - the binary rewrites the second argument to `true` and tail-calls
+ * the same lookup slot 21 uses.
+ */
+StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const int& defaultValue)
+{
+  (void)defaultValue;
+  return mUnitConstDat.mStatsRoot->GetItem(statPath, true);
+}
+
+/**
+ * Address: 0x008BF080 (FUN_008BF080, Moho::IUnit_UserUnit::GetStat)
+ * IUnit slot 21.
+ */
+StatItem* UserUnit::GetStat(const gpg::StrArg statPath)
+{
+  return mUnitConstDat.mStatsRoot->GetItem(statPath, false);
+}
+
+/**
+ * Address: 0x008BEEC0 (FUN_008BEEC0, Moho::CScriptObject_UserUnit::GetClass)
+ * CScriptObject slot 0.
+ */
+gpg::RType* UserUnit::GetClass() const
+{
+  return CachedUserUnitType();
+}
+
+/**
+ * Address: 0x008BEEE0 (FUN_008BEEE0, Moho::CScriptObject_UserUnit::GetDerivedObjectRef)
+ * CScriptObject slot 1.
+ *
+ * What it does:
+ * Pairs the whole-object pointer with the reflected type. There is no dynamic
+ * walk here - `UserUnit` is the most-derived type by construction.
+ */
+gpg::RRef UserUnit::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
 }
 
 /**

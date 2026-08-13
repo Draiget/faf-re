@@ -224,6 +224,92 @@ namespace moho
      */
     void DestroyMeshInstance() override;
 
+    // ---- IUnit sub-object ----
+    //
+    // Slot order is the one the binary's secondary vtable
+    // `??_7UserUnit@Moho@@6BIUnit@Moho@@@` (0x00E4D9AC) lists, which matches
+    // `IUnit`'s declaration order exactly. Slots 0/1 (`IsUnit`) keep `IUnit`'s
+    // own bodies - they are not overridden here - and slots 2/3/13
+    // (`IsUserUnit` x2, `IsBeingBuilt`) are adjustor thunks onto the overrides
+    // already declared above for the primary vtable.
+
+    /** Address: 0x008BEF00 - IUnit slot 4. Returns `mParams.mEntityId`. */
+    [[nodiscard]] EntId GetEntityId() const override;
+
+    /** Address: 0x008BEF10 - IUnit slot 5. Returns the live transform's translation. */
+    [[nodiscard]] const Wm3::Vec3f& GetPosition() const override;
+
+    /** Address: 0x008BEF20 - IUnit slot 6. Returns the live replicated transform. */
+    [[nodiscard]] const VTransform& GetTransform() const override;
+
+    /** Address: 0x008BEF30 - IUnit slot 7. Returns `mParams.mBlueprint` as a unit blueprint. */
+    [[nodiscard]] const RUnitBlueprint* GetBlueprint() const override;
+
+    /** Address: 0x008BEF60 - IUnit slot 8. Copies out the script object's Lua handle. */
+    [[nodiscard]] LuaPlus::LuaObject GetLuaObject() override;
+
+    /** Address: 0x008BEF80 - IUnit slot 9. The UI never scales transport load; always 1. */
+    [[nodiscard]] float CalcTransportLoadFactor() const override;
+
+    /** Address: 0x008BEF90 - IUnit slot 10. Returns the replicated death flag. */
+    [[nodiscard]] bool IsDead() const override;
+
+    /**
+     * Address: 0x008BEFA0 - IUnit slot 11.
+     *
+     * Always false: destruction is queued on the sim side, and the UI copy has
+     * no queue of its own to report.
+     */
+    [[nodiscard]] bool DestroyQueued() const override;
+
+    /**
+     * Address: 0x008C04E0 - IUnit slot 12.
+     *
+     * True for every motion type between `Land` and `AmphibiousFloating`; only
+     * `None` and `Special` are immobile.
+     */
+    [[nodiscard]] bool IsMobile() const override;
+
+    /**
+     * Address: 0x008BEFC0 - IUnit slot 14.
+     *
+     * Always false: the UI unit has no navigator, so nothing can report it idle.
+     */
+    [[nodiscard]] bool IsNavigatorIdle() const override;
+
+    /** Address: 0x008BF020 - IUnit slot 15. Tests one bit of the replicated state mask. */
+    [[nodiscard]] bool IsUnitState(EUnitState state) const override;
+
+    /** Address: 0x008BEF50 - IUnit slot 16. */
+    [[nodiscard]] UnitAttributes& GetAttributes() override;
+
+    /** Address: 0x008BEF40 - IUnit slot 17. */
+    [[nodiscard]] const UnitAttributes& GetAttributes() const override;
+
+    /** Address: 0x008BF0C0 - IUnit slot 18. Named string stat under this unit's stats root. */
+    [[nodiscard]] StatItem* GetStat(gpg::StrArg statPath, const std::string& defaultValue) override;
+
+    /** Address: 0x008BF0B0 - IUnit slot 19. Named float stat under this unit's stats root. */
+    [[nodiscard]] StatItem* GetStat(gpg::StrArg statPath, const float& defaultValue) override;
+
+    /** Address: 0x008BF0A0 - IUnit slot 20. Named stat, created when absent. */
+    [[nodiscard]] StatItem* GetStat(gpg::StrArg statPath, const int& defaultValue) override;
+
+    /** Address: 0x008BF080 - IUnit slot 21. Named stat, null when absent. */
+    [[nodiscard]] StatItem* GetStat(gpg::StrArg statPath) override;
+
+    // ---- CScriptObject sub-object ----
+    // `??_7UserUnit@Moho@@6BCScriptObject@Moho@@@` (0x00E4DA08).
+
+    /** Address: 0x008BEEC0 - CScriptObject slot 0. */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /** Address: 0x008BEEE0 - CScriptObject slot 1. */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
+
+    /// Reflected type handle, cached on first use at 0x010C77AC.
+    static gpg::RType* sType;
+
     /**
      * Address: 0x008BFC50 (FUN_008BFC50)
      * Slot: 17
@@ -413,7 +499,7 @@ namespace moho
      * factory built this unit), and refreshes the command managers on a refresh
      * flag.
      */
-    void UpdateUnitData(const SSTIUnitVariableData& payload, std::uint32_t syncMask);
+    void UpdateUnitData(const SSTIUnitVariableData& payload, std::uint32_t intelStateFlags);
 
     /**
      * Address: 0x008BF190 (FUN_008BF190, Moho::UserUnit::RemoveSelectionSet)
