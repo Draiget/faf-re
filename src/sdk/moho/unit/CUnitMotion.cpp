@@ -27,6 +27,7 @@
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/SPhysBody.h"
+#include "moho/sim/SimConVarAccess.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -848,6 +849,98 @@ namespace moho
     candidates.mEnd = inlineBegin;
     candidates.mCapacityEnd = reinterpret_cast<WeakPtr<Unit>*>(mPad178 + 0x60);
     candidates.mInlineBegin = inlineBegin;
+  }
+
+  /**
+   * Address: 0x006B7B60 (FUN_006B7B60, ??0CUnitMotion@Moho@@QAE@PAVUnit@1@@Z)
+   * Mangled: ??0CUnitMotion@Moho@@QAE@PAVUnit@1@@Z
+   *
+   * IDA signature:
+   * Moho::CUnitMotion *__stdcall Moho::CUnitMotion::CUnitMotion(
+   *     Moho::CUnitMotion *this, Moho::Unit *unit);
+   *
+   * What it does:
+   * The gameplay constructor, used by `Unit`'s own gameplay constructor for any
+   * blueprint with a real motion type. Starts from the same defaults as the
+   * deserialization constructor, then binds the unit, seeds the target position
+   * and facing from its spawn pose, sizes its physics body from the blueprint's
+   * density and inertia tensor, primes fuel, samples ground/water elevation
+   * under the spawn point, and gives aircraft a small random cruise offset so a
+   * formation does not fly at one exact altitude.
+   */
+  CUnitMotion::CUnitMotion(Unit* const unit)
+    : CUnitMotion()
+  {
+    mUnit = unit;
+    mFollowingWaypoint = nullptr;
+    mTargetPosition = unit->GetPosition();
+
+    // Facing: the world-space forward axis of the spawn orientation, i.e. (0,0,1)
+    // rotated by the quaternion, written out in the expanded form the binary uses.
+    const VTransform& spawnTransform = unit->GetTransform();
+    const float qx = spawnTransform.orient_.X();
+    const float qy = spawnTransform.orient_.Y();
+    const float qz = spawnTransform.orient_.Z();
+    const float qw = spawnTransform.orient_.W();
+    mFormationVec.x = ((qx * qz) + (qw * qy)) * 2.0f;
+    mFormationVec.y = ((qw * qz) - (qx * qy)) * 2.0f;
+    mFormationVec.z = 1.0f - (((qz * qz) + (qy * qy)) * 2.0f);
+
+    // Physics body: mass is the blueprint's density over its bounding volume,
+    // and the stored tensor is the reciprocal of mass-scaled inertia.
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    SPhysBody* const physBody = unit->GetPhysBody();
+    const float mass = blueprint->mAverageDensity * blueprint->mSizeZ * blueprint->mSizeY * blueprint->mSizeX;
+    physBody->mMass = mass;
+    physBody->mInvInertiaTensor.x = 1.0f / (blueprint->mInertiaTensorX * mass);
+    physBody->mInvInertiaTensor.y = 1.0f / (blueprint->mInertiaTensorY * physBody->mMass);
+    physBody->mInvInertiaTensor.z = 1.0f / (blueprint->mInertiaTensorZ * physBody->mMass);
+
+    physBody->mOrientation = spawnTransform.orient_;
+    Wm3::Vector3f rotatedCollisionOffset{};
+    (void)MultQuadVec(&rotatedCollisionOffset, &physBody->mCollisionOffset, &spawnTransform.orient_);
+    physBody->mPos.x = rotatedCollisionOffset.x + spawnTransform.pos_.x;
+    physBody->mPos.y = rotatedCollisionOffset.y + spawnTransform.pos_.y;
+    physBody->mPos.z = rotatedCollisionOffset.z + spawnTransform.pos_.z;
+
+    mFuelUseTime = blueprint->Physics.FuelUseTime;
+    if (mFuelUseTime > 0.0f) {
+      mUnit->VarDat().mFuelRatio = 1.0f;
+    }
+
+    mNextWaypoint = nullptr;
+    mPos = unit->GetPosition();
+    mCurTrans = unit->GetTransform();
+    mLastTrans = mCurTrans;
+    mPreviousVelocity = Wm3::Vector3f{};
+    mVelocity = Wm3::Vector3f{};
+
+    // Only aircraft keep a facing vector at rest; everything else starts unset.
+    if (!unit->GetBlueprint()->Air.CanFly) {
+      mFormationVec = Wm3::Vector3f{};
+    }
+
+    const STIMap* const map = mUnit->SimulationRef->mMapData;
+    float surfaceElevation = map->mHeightField.get()->GetElevation(mPos.x, mPos.z);
+    if (map->mWaterEnabled != 0 && map->mWaterElevation > surfaceElevation) {
+      surfaceElevation = map->mWaterElevation;
+    }
+    mTargetElevation = surfaceElevation;
+
+    if (mUnit->mCurrentLayer == LAYER_Sub) {
+      mSubElevation = mUnit->GetAttributes().spawnElevationOffset;
+      SetMotionVertEvent(UMVE_Top);
+    }
+
+    // Aircraft - but not pods, which dock rather than cruise - get a random
+    // offset inside +/- the RandomElevationOffset con-var so a group of them
+    // does not stack at one altitude.
+    if (mUnit->mIsAir && !mUnit->IsInCategory("POD")) {
+      float elevationOffset = 0.0f;
+      if (ReadSimConVarValue<float>(mUnit->SimulationRef, "RandomElevationOffset", elevationOffset)) {
+        mRandomElevation = mUnit->SimulationRef->mRngState->FRand(-elevationOffset, elevationOffset);
+      }
+    }
   }
 
   /**
