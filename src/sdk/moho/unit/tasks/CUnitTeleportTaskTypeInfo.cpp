@@ -8,6 +8,7 @@
 
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitCallTeleport.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -126,18 +127,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitTeleportTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitTeleportTask));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitTeleportTaskRef(CUnitTeleportTaskRuntimeView* const object)
   {
-    return gpg::RRef{reinterpret_cast<moho::CUnitTeleportTask*>(object), CachedCUnitTeleportTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitTeleportTask(&ref, reinterpret_cast<moho::CUnitTeleportTask*>(object));
+    return ref;
   }
 } // namespace
 

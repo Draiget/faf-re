@@ -8,6 +8,7 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitMobileBuildTask.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -42,15 +43,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitMobileBuildTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitMobileBuildTask));
     }
     return cached;
   }
@@ -164,7 +156,9 @@ namespace moho
   gpg::RRef CUnitMobileBuildTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitMobileBuildTask();
-    return gpg::RRef{task, CachedCUnitMobileBuildTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitMobileBuildTask(&ref, task);
+    return ref;
   }
 
   /**
@@ -180,7 +174,9 @@ namespace moho
     if (task) {
       new (task) CUnitMobileBuildTask();
     }
-    return gpg::RRef{task, CachedCUnitMobileBuildTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitMobileBuildTask(&ref, task);
+    return ref;
   }
 
   /**

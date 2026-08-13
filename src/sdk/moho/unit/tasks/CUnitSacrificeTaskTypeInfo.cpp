@@ -9,6 +9,7 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitSacrificeTask.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -43,15 +44,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitSacrificeTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitSacrificeTask));
     }
     return cached;
   }
@@ -166,11 +158,10 @@ namespace moho
   gpg::RRef CUnitSacrificeTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitSacrificeTask(nullptr, nullptr);
-    if (!task) {
-      return gpg::RRef{nullptr, CachedCUnitSacrificeTaskType()};
-    }
 
-    return gpg::RRef{task, CachedCUnitSacrificeTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitSacrificeTask(&ref, task);
+    return ref;
   }
 
   /**
@@ -187,7 +178,9 @@ namespace moho
       new (task) CUnitSacrificeTask(nullptr, nullptr);
     }
 
-    return gpg::RRef{task, CachedCUnitSacrificeTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitSacrificeTask(&ref, task);
+    return ref;
   }
 
   /**

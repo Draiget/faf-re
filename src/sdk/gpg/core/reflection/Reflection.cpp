@@ -152,9 +152,15 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
+#include "moho/unit/tasks/CFactoryBuildTask.h"
 #include "moho/unit/tasks/CUnitAssistMoveTask.h"
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
 #include "moho/unit/tasks/CUnitCallLandTransport.h"
+#include "moho/unit/tasks/CUnitCarrierLand.h"
+#include "moho/unit/tasks/CUnitCarrierLaunch.h"
+#include "moho/unit/tasks/CUnitCarrierRetrieve.h"
+#include "moho/unit/tasks/CUnitRepairTask.h"
+#include "moho/unit/tasks/CUnitSacrificeTask.h"
 #include "moho/unit/tasks/CUnitCallTeleport.h"
 #include "moho/unit/tasks/CUnitCallTransport.h"
 #include "moho/unit/tasks/CUnitCaptureTask.h"
@@ -1083,6 +1089,24 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gCUnitGuardTaskRRefCache{false, {}};
   gpg::RType* gCUnitUnloadUnitsRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitUnloadUnitsRRefCache{false, {}};
+  gpg::RType* gCFactoryBuildTaskRRefType = nullptr;
+  thread_local TypeInfoCache3 gCFactoryBuildTaskRRefCache{false, {}};
+  gpg::RType* gCUnitCarrierLandRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitCarrierLandRRefCache{false, {}};
+  gpg::RType* gCUnitCarrierLaunchRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitCarrierLaunchRRefCache{false, {}};
+  gpg::RType* gCUnitCarrierRetrieveRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitCarrierRetrieveRRefCache{false, {}};
+  gpg::RType* gCUnitMobileBuildTaskRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitMobileBuildTaskRRefCache{false, {}};
+  gpg::RType* gCUnitRepairTaskRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitRepairTaskRRefCache{false, {}};
+  gpg::RType* gCUnitSacrificeTaskRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitSacrificeTaskRRefCache{false, {}};
+  gpg::RType* gCUnitTeleportTaskRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitTeleportTaskRRefCache{false, {}};
+  gpg::RType* gCUnitUpgradeTaskRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitUpgradeTaskRRefCache{false, {}};
   thread_local TypeInfoCache3 gManyToOneListenerEProjectileImpactEventRRefCache{false, {}};
   gpg::RType* gCAiAttackerImplRRefType = nullptr;
   thread_local TypeInfoCache3 gCAiAttackerImplRRefCache{false, {}};
@@ -5164,6 +5188,17 @@ gpg::RRef* RRef_CFireWeaponTask(RRef* const out, moho::CFireWeaponTask* const va
   );
 }
 
+/**
+ * Address: 0x006058B0 (FUN_006058B0, gpg::RRef_CUnitCaptureTask)
+ * Mangled: ?RRef_CUnitCaptureTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitCaptureTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitCaptureTask(gpg::RRef *out, Moho::CUnitCaptureTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitCaptureTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
 gpg::RRef* RRef_CUnitCaptureTask(RRef* const out, moho::CUnitCaptureTask* const value)
 {
   return BuildTypedRefWithCache<moho::CUnitCaptureTask>(
@@ -5201,6 +5236,17 @@ gpg::RRef* RRef_CUnitGetBuiltTask(RRef* const out, moho::CUnitGetBuiltTask* cons
   );
 }
 
+/**
+ * Address: 0x00614BA0 (FUN_00614BA0, gpg::RRef_CUnitGuardTask)
+ * Mangled: ?RRef_CUnitGuardTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitGuardTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitGuardTask(gpg::RRef *out, Moho::CUnitGuardTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitGuardTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
 gpg::RRef* RRef_CUnitGuardTask(RRef* const out, moho::CUnitGuardTask* const value)
 {
   return BuildTypedRefWithCache<moho::CUnitGuardTask>(
@@ -5209,6 +5255,204 @@ gpg::RRef* RRef_CUnitGuardTask(RRef* const out, moho::CUnitGuardTask* const valu
     typeid(moho::CUnitGuardTask),
     gCUnitGuardTaskRRefType,
     gCUnitGuardTaskRRefCache
+  );
+}
+
+/**
+ * Address: 0x005FE1E0 (FUN_005FE1E0, gpg::RRef_CFactoryBuildTask)
+ * Mangled: ?RRef_CFactoryBuildTask@gpg@@YAPAURRef@1@AAU21@PAVCFactoryBuildTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CFactoryBuildTask(gpg::RRef *out, Moho::CFactoryBuildTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CFactoryBuildTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CFactoryBuildTask(RRef* const out, moho::CFactoryBuildTask* const value)
+{
+  return BuildTypedRefWithCache<moho::CFactoryBuildTask>(
+    out,
+    value,
+    typeid(moho::CFactoryBuildTask),
+    gCFactoryBuildTaskRRefType,
+    gCFactoryBuildTaskRRefCache
+  );
+}
+
+/**
+ * Address: 0x00608240 (FUN_00608240, gpg::RRef_CUnitCarrierLand)
+ * Mangled: ?RRef_CUnitCarrierLand@gpg@@YAPAURRef@1@AAU21@PAVCUnitCarrierLand@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitCarrierLand(gpg::RRef *out, Moho::CUnitCarrierLand *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitCarrierLand*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitCarrierLand(RRef* const out, moho::CUnitCarrierLand* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitCarrierLand>(
+    out,
+    value,
+    typeid(moho::CUnitCarrierLand),
+    gCUnitCarrierLandRRefType,
+    gCUnitCarrierLandRRefCache
+  );
+}
+
+/**
+ * Address: 0x006083F0 (FUN_006083F0, gpg::RRef_CUnitCarrierLaunch)
+ * Mangled: ?RRef_CUnitCarrierLaunch@gpg@@YAPAURRef@1@AAU21@PAVCUnitCarrierLaunch@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitCarrierLaunch(gpg::RRef *out, Moho::CUnitCarrierLaunch *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitCarrierLaunch*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitCarrierLaunch(RRef* const out, moho::CUnitCarrierLaunch* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitCarrierLaunch>(
+    out,
+    value,
+    typeid(moho::CUnitCarrierLaunch),
+    gCUnitCarrierLaunchRRefType,
+    gCUnitCarrierLaunchRRefCache
+  );
+}
+
+/**
+ * Address: 0x00608090 (FUN_00608090, gpg::RRef_CUnitCarrierRetrieve)
+ * Mangled: ?RRef_CUnitCarrierRetrieve@gpg@@YAPAURRef@1@AAU21@PAVCUnitCarrierRetrieve@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitCarrierRetrieve(gpg::RRef *out, Moho::CUnitCarrierRetrieve *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitCarrierRetrieve*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitCarrierRetrieve(RRef* const out, moho::CUnitCarrierRetrieve* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitCarrierRetrieve>(
+    out,
+    value,
+    typeid(moho::CUnitCarrierRetrieve),
+    gCUnitCarrierRetrieveRRefType,
+    gCUnitCarrierRetrieveRRefCache
+  );
+}
+
+/**
+ * Address: 0x005FDCD0 (FUN_005FDCD0, gpg::RRef_CUnitMobileBuildTask)
+ * Mangled: ?RRef_CUnitMobileBuildTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitMobileBuildTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitMobileBuildTask(gpg::RRef *out, Moho::CUnitMobileBuildTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitMobileBuildTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitMobileBuildTask(RRef* const out, moho::CUnitMobileBuildTask* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitMobileBuildTask>(
+    out,
+    value,
+    typeid(moho::CUnitMobileBuildTask),
+    gCUnitMobileBuildTaskRRefType,
+    gCUnitMobileBuildTaskRRefCache
+  );
+}
+
+/**
+ * Address: 0x005FE030 (FUN_005FE030, gpg::RRef_CUnitRepairTask)
+ * Mangled: ?RRef_CUnitRepairTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitRepairTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitRepairTask(gpg::RRef *out, Moho::CUnitRepairTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitRepairTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitRepairTask(RRef* const out, moho::CUnitRepairTask* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitRepairTask>(
+    out,
+    value,
+    typeid(moho::CUnitRepairTask),
+    gCUnitRepairTaskRRefType,
+    gCUnitRepairTaskRRefCache
+  );
+}
+
+/**
+ * Address: 0x005FE390 (FUN_005FE390, gpg::RRef_CUnitSacrificeTask)
+ * Mangled: ?RRef_CUnitSacrificeTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitSacrificeTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitSacrificeTask(gpg::RRef *out, Moho::CUnitSacrificeTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitSacrificeTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitSacrificeTask(RRef* const out, moho::CUnitSacrificeTask* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitSacrificeTask>(
+    out,
+    value,
+    typeid(moho::CUnitSacrificeTask),
+    gCUnitSacrificeTaskRRefType,
+    gCUnitSacrificeTaskRRefCache
+  );
+}
+
+/**
+ * Address: 0x0060CC60 (FUN_0060CC60, gpg::RRef_CUnitTeleportTask)
+ * Mangled: ?RRef_CUnitTeleportTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitTeleportTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitTeleportTask(gpg::RRef *out, Moho::CUnitTeleportTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitTeleportTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitTeleportTask(RRef* const out, moho::CUnitTeleportTask* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitTeleportTask>(
+    out,
+    value,
+    typeid(moho::CUnitTeleportTask),
+    gCUnitTeleportTaskRRefType,
+    gCUnitTeleportTaskRRefCache
+  );
+}
+
+/**
+ * Address: 0x005FDE80 (FUN_005FDE80, gpg::RRef_CUnitUpgradeTask)
+ * Mangled: ?RRef_CUnitUpgradeTask@gpg@@YAPAURRef@1@AAU21@PAVCUnitUpgradeTask@Moho@@@Z
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_CUnitUpgradeTask(gpg::RRef *out, Moho::CUnitUpgradeTask *value);
+ *
+ * What it does:
+ * Builds one typed reflection reference for `moho::CUnitUpgradeTask*`,
+ * preserving dynamic-derived ownership and base-offset adjustment.
+ */
+gpg::RRef* RRef_CUnitUpgradeTask(RRef* const out, moho::CUnitUpgradeTask* const value)
+{
+  return BuildTypedRefWithCache<moho::CUnitUpgradeTask>(
+    out,
+    value,
+    typeid(moho::CUnitUpgradeTask),
+    gCUnitUpgradeTaskRRefType,
+    gCUnitUpgradeTaskRRefCache
   );
 }
 

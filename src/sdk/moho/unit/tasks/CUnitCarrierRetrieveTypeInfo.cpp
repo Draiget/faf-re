@@ -8,6 +8,7 @@
 
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitCarrierRetrieve.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -72,18 +73,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitCarrierRetrieveType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitCarrierRetrieve));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitCarrierRetrieveRef(CUnitCarrierRetrieveRuntimeView* const object)
   {
-    return gpg::RRef{reinterpret_cast<moho::CUnitCarrierRetrieve*>(object), CachedCUnitCarrierRetrieveType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitCarrierRetrieve(&ref, reinterpret_cast<moho::CUnitCarrierRetrieve*>(object));
+    return ref;
   }
 } // namespace
 

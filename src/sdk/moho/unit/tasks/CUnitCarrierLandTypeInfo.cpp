@@ -19,6 +19,7 @@
 
 #include <limits>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -76,18 +77,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitCarrierLandType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitCarrierLand));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitCarrierLandRef(moho::CUnitCarrierLand* const object)
   {
-    return gpg::RRef{object, CachedCUnitCarrierLandType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitCarrierLand(&ref, object);
+    return ref;
   }
 } // namespace
 

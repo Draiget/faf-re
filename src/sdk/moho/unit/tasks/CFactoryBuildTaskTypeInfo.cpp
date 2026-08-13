@@ -4,6 +4,7 @@
 #include <typeinfo>
 
 #include "moho/unit/tasks/CFactoryBuildTask.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -15,15 +16,6 @@ namespace
   [[nodiscard]] moho::CFactoryBuildTaskTypeInfo& CFactoryBuildTaskTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::CFactoryBuildTaskTypeInfo*>(gCFactoryBuildTaskTypeInfoStorage);
-  }
-
-  [[nodiscard]] gpg::RType* CachedCFactoryBuildTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CFactoryBuildTask));
-    }
-    return cached;
   }
 
   /**
@@ -100,7 +92,9 @@ namespace moho
   gpg::RRef CFactoryBuildTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CFactoryBuildTask();
-    return gpg::RRef{task, CachedCFactoryBuildTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CFactoryBuildTask(&ref, task);
+    return ref;
   }
 
   /**
@@ -117,7 +111,9 @@ namespace moho
       new (task) CFactoryBuildTask();
     }
 
-    return gpg::RRef{task, CachedCFactoryBuildTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CFactoryBuildTask(&ref, task);
+    return ref;
   }
 } // namespace moho
 
