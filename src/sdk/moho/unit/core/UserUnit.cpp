@@ -42,7 +42,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
-#include "moho/unit/core/UserUnitManager.h"
+#include "moho/command/UserCommandQueue.h"
 #include "moho/unit/core/UnitAttributes.h"
 #include "moho/vision/VisionDB.h"
 
@@ -766,8 +766,8 @@ namespace moho
 namespace
 {
 
-  // UserUnitManager and its two sub-runs are real types now, declared in
-  // moho/unit/core/UserUnitManager.h so the layout is stated once instead of
+  // UserCommandQueue and its two sub-runs are real types now, declared in
+  // moho/command/UserCommandQueue.h so the layout is stated once instead of
   // living as a reinterpret view over an opaque forward declaration.
 
   struct SessionCommandIssueMapNodeView
@@ -834,12 +834,12 @@ namespace moho
 {
   const IUnit* GetIUnitBridge(const UserUnit* const self) noexcept
   {
-    return reinterpret_cast<const IUnit*>(self->mIUnitAndScriptBridge);
+    return self;
   }
 
   IUnit* GetIUnitBridge(UserUnit* const self) noexcept
   {
-    return reinterpret_cast<IUnit*>(self->mIUnitAndScriptBridge);
+    return self;
   }
 } // namespace moho
 
@@ -956,26 +956,11 @@ namespace
     return *reinterpret_cast<const UserUnitLuaObjectRuntimeView*>(self);
   }
 
-  [[nodiscard]] std::int32_t EncodeUserCommandManagerHandle(const UserUnitManager* const manager) noexcept
+  [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(UserCommandQueue* managerPtr) noexcept;
+
+  [[nodiscard]] const UserCommandQueueRangeView* ResolveUserCommandQueueRange(const UserCommandQueue* const queue) noexcept
   {
-    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(manager));
-  }
-
-  [[nodiscard]] UserCommandManagerRuntimeView* DecodeUserCommandManagerHandle(const std::int32_t managerHandle) noexcept
-  {
-    if (managerHandle == 0) {
-      return nullptr;
-    }
-
-    const std::uintptr_t managerAddress = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(managerHandle));
-    return reinterpret_cast<UserCommandManagerRuntimeView*>(managerAddress);
-  }
-
-  [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(UserUnitManager* managerPtr) noexcept;
-
-  [[nodiscard]] const UserCommandQueueRangeView* ResolveUserCommandQueueRange(const std::int32_t managerHandle) noexcept
-  {
-    UserUnitManager* const manager = reinterpret_cast<UserUnitManager*>(DecodeUserCommandManagerHandle(managerHandle));
+    UserCommandQueue* const manager = const_cast<UserCommandQueue*>(queue);
     if (manager == nullptr) {
       return nullptr;
     }
@@ -1831,10 +1816,10 @@ namespace
    * What it does:
    * Resolves one command-manager active range and returns whether it is empty.
    */
-  [[nodiscard]] bool IsUserCommandManagerQueueEmpty(const UserUnitManager* const manager) noexcept
+  [[nodiscard]] bool IsUserCommandManagerQueueEmpty(const UserCommandQueue* const manager) noexcept
   {
     const UserCommandQueueRangeView* const queueRange =
-      ResolveUserCommandQueueRange(EncodeUserCommandManagerHandle(manager));
+      ResolveUserCommandQueueRange(manager);
     return queueRange == nullptr || queueRange->begin == queueRange->end;
   }
 
@@ -1846,7 +1831,7 @@ namespace
    * non-null helper entry, scanning backward from the logical tail.
    */
   [[maybe_unused]] [[nodiscard]] UserCommandIssueHelperRuntimeView* GetLastQueuedUserCommandHelper(
-    UserUnitManager* const managerPtr
+    UserCommandQueue* const managerPtr
   ) noexcept
   {
     UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
@@ -1882,7 +1867,7 @@ namespace
       return false;
     }
 
-    const UserCommandQueueRangeView* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue2());
+    const UserCommandQueueRangeView* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue());
     return queueRange != nullptr && queueRange->begin == queueRange->end;
   }
 
@@ -2630,7 +2615,7 @@ namespace
    * queue vector (`primary` when no pending issues, otherwise `resolved`).
    */
   [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(
-    UserUnitManager* const managerPtr
+    UserCommandQueue* const managerPtr
   ) noexcept
   {
     if (managerPtr == nullptr) {
@@ -2774,7 +2759,7 @@ namespace moho
    * `ISSUE_Command` keystone (Sim.cpp) can enforce the 500-entry depth cap.
    */
   [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(
-    UserUnitManager* const managerPtr
+    UserCommandQueue* const managerPtr
   ) noexcept
   {
     const UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
@@ -2905,16 +2890,16 @@ namespace
     queue.size += 1u;
   }
 
-  void DestroyUserUnitManagerState(UserUnitManager* managerPtr) noexcept;
+  void DestroyUserUnitManagerState(UserCommandQueue* managerPtr) noexcept;
 
   /**
    * Address: 0x008C5D00 (FUN_008C5D00)
    *
    * What it does:
-   * Runs one deleting teardown path for `UserUnitManager` and returns the
+   * Runs one deleting teardown path for `UserCommandQueue` and returns the
    * original pointer lane.
    */
-  [[maybe_unused]] UserUnitManager* DeleteUserUnitManagerAndReturn(UserUnitManager* const managerPtr) noexcept
+  [[maybe_unused]] UserCommandQueue* DeleteUserUnitManagerAndReturn(UserCommandQueue* const managerPtr) noexcept
   {
     DestroyUserUnitManagerState(managerPtr);
     ::operator delete(managerPtr);
@@ -2925,15 +2910,15 @@ namespace
    * Address: 0x008C5AF0 (FUN_008C5AF0)
    *
    * What it does:
-   * Replaces one `UserUnitManager*` owner slot and deletes the previous manager
+   * Replaces one `UserCommandQueue*` owner slot and deletes the previous manager
    * when it is distinct from the replacement pointer.
    */
   [[maybe_unused]] void ReplaceOwnedUserUnitManager(
-    UserUnitManager** const slot,
-    UserUnitManager* const replacement
+    UserCommandQueue** const slot,
+    UserCommandQueue* const replacement
   ) noexcept
   {
-    UserUnitManager* const previous = *slot;
+    UserCommandQueue* const previous = *slot;
     if (previous != nullptr && previous != replacement) {
       DestroyUserUnitManagerState(previous);
       ::operator delete(previous);
@@ -2948,7 +2933,7 @@ namespace
    * Releases owner-link lanes for resolved/primary vectors, clears pending
    * issue queue blocks, and restores both vectors to inline storage.
    */
-  void DestroyUserUnitManagerState(UserUnitManager* const managerPtr) noexcept
+  void DestroyUserUnitManagerState(UserCommandQueue* const managerPtr) noexcept
   {
     if (managerPtr == nullptr) {
       return;
@@ -2971,7 +2956,7 @@ namespace
    * marks resolved links dirty, then rebuilds resolved-link storage back to
    * inline mode when any slot was consumed.
    */
-  void AdvanceUserCommandManagerBySeq(UserUnitManager* const managerPtr, const std::int32_t seqNo) noexcept
+  void AdvanceUserCommandManagerBySeq(UserCommandQueue* const managerPtr, const std::int32_t seqNo) noexcept
   {
     auto* const manager = reinterpret_cast<UserCommandManagerRuntimeView*>(managerPtr);
 
@@ -3322,7 +3307,7 @@ namespace
       return;
     }
 
-    const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetFactoryCommandQueue2());
+    const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetFactoryCommandQueue());
     if (commandRange == nullptr) {
       return;
     }
@@ -3390,14 +3375,14 @@ namespace
     return tableIndex;
   }
 
-  [[nodiscard]] std::int32_t SelectActiveQueueHandle(UserUnit* const userUnit) noexcept
+  [[nodiscard]] const UserCommandQueue* SelectActiveQueue(const UserUnit* const userUnit) noexcept
   {
-    const std::int32_t factoryQueueHandle = userUnit->GetFactoryCommandQueue2();
-    if (factoryQueueHandle != 0) {
-      return userUnit->GetFactoryCommandQueue2();
+    if (const UserCommandQueue* const factoryQueue = userUnit->GetFactoryCommandQueue();
+        factoryQueue != nullptr) {
+      return factoryQueue;
     }
 
-    return userUnit->GetCommandQueue2();
+    return userUnit->GetCommandQueue();
   }
 
   [[nodiscard]] const UserUnitIntelRangeView& GetIntelRangeView(const UserUnit* const self) noexcept
@@ -3774,7 +3759,7 @@ namespace moho
   /**
    * Bridge exposing the file-local `GetLastQueuedUserCommandHelper` (FUN_008B7320)
    * to the recovered `cfunc_IssueDockCommandL` worker. Resolves the unit's
-   * command-manager handle (`UserUnit::GetCommandQueue2`, slot 6) and returns the
+   * command-manager handle (`UserUnit::GetCommandQueue`, slot 6) and returns the
    * most recent queued command-issue helper as an opaque cross-TU handle. The
    * dock worker reinterprets this handle as the command-graph anchor history the
    * binary walks to seed its centroid (identical binary object).
@@ -3785,9 +3770,7 @@ namespace moho
       return nullptr;
     }
 
-    UserUnitManager* const manager = reinterpret_cast<UserUnitManager*>(
-      DecodeUserCommandManagerHandle(unit->GetCommandQueue2())
-    );
+    UserCommandQueue* const manager = const_cast<UserUnit*>(unit)->GetCommandQueue();
     if (manager == nullptr) {
       return nullptr;
     }
@@ -3886,12 +3869,12 @@ namespace moho
    * inline storage.
    */
   void UserUnitManagerAdd(
-    UserUnitManager* const manager,
+    UserCommandQueue* const manager,
     UserCommandIssueHelper* const helper,
     const CmdId cmdId,
     const bool clearFlag)
   {
-    auto& view = *reinterpret_cast<UserUnitManager*>(manager);
+    auto& view = *reinterpret_cast<UserCommandQueue*>(manager);
 
     UserManagerHelperEntry entry{};
     entry.commandType = static_cast<std::int32_t>(cmdId);
@@ -3914,7 +3897,7 @@ namespace moho
    * {commandType, isResetCommand=1, subject=null, sequenceOrCount=-1}, marks the
    * resolved-link range dirty, and restores it to inline storage.
    */
-  void ResetUserUnitManagerState(UserUnitManager* const managerPtr, const std::int32_t commandType)
+  void ResetUserUnitManagerState(UserCommandQueue* const managerPtr, const std::int32_t commandType)
   {
     if (managerPtr == nullptr) {
       return;
@@ -4116,7 +4099,7 @@ namespace moho
    * currently contains the supplied command-issue helper.
    */
   bool UserUnitManagerContainsCommandIssueHelper(
-    UserUnitManager* const manager,
+    UserCommandQueue* const manager,
     const UserCommandIssueHelper* const helper
   ) noexcept
   {
@@ -4179,23 +4162,19 @@ LuaPlus::LuaObject CScrLuaMetatableFactory<UserUnit>::Create(LuaPlus::LuaState* 
 }
 
 /**
- * Address: 0x008BF990 (FUN_008BF990, ??_GUserUnit@Moho@@UAEPAXI@Z)
  * Address: 0x008BF9B0 (FUN_008BF9B0, ??1UserUnit@Moho@@UAE@XZ)
- *
- * std::uint8_t deleteFlags
+ * Deleting-destructor thunk: 0x008BF990 (FUN_008BF990, ??_GUserUnit@Moho@@UAEPAXI@Z)
  *
  * What it does:
- * The deleting destructor and the destructor body it tail-calls, merged: drops
- * the unit from its army's registries, hands its selection to the successor
- * named by `mUnitVarDat.mSelectionInheritorId`, tears down the per-unit command
- * managers, and conditionally releases the object memory.
- *
- * The two are one function here because 0x008BF990 is the three-instruction
- * MSVC deleting-destructor thunk over 0x008BF9B0; C++ emits that thunk itself.
+ * Drops the unit from its army's registries, hands its selection to the
+ * successor named by `mUnitVarDat.mSelectionInheritorId`, and tears down the
+ * per-unit command queues. The three-instruction thunk at 0x008BF990 that
+ * forwards here and conditionally frees the storage is what C++ emits for a
+ * virtual destructor, so it has no separate body.
  */
-UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
+UserUnit::~UserUnit()
 {
-  UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
+  UserEntity* const entityView = this;
   UserArmy* const army = GetLuaRuntimeView(this).army;
   const IUnit* const iunitBridge = GetIUnitBridge(this);
 
@@ -4260,12 +4239,6 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
     delete handle;
     GetUserUnitVisionHandle(this) = nullptr;
   }
-
-  entityView->UserEntity::~UserEntity();
-  if ((deleteFlags & 1u) != 0u) {
-    ::operator delete(this);
-  }
-  return this;
 }
 
 /**
@@ -4454,7 +4427,7 @@ void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
  * What it does:
  * Returns this object as the const UserUnit identity view.
  */
-UserUnit const* UserUnit::IsUserUnit1() const
+const UserUnit* UserUnit::IsUserUnit() const
 {
   return this;
 }
@@ -4465,7 +4438,7 @@ UserUnit const* UserUnit::IsUserUnit1() const
  * What it does:
  * Returns this object as the mutable UserUnit identity view.
  */
-UserUnit* UserUnit::IsUserUnit2()
+UserUnit* UserUnit::IsUserUnit()
 {
   return this;
 }
@@ -4477,7 +4450,7 @@ UserUnit* UserUnit::IsUserUnit2()
  * Calls IUnit::GetBlueprint through the embedded +0x148 subobject and reads
  * blueprint uniform scale at +0x270.
  */
-float UserUnit::GetUnitformScale() const
+float UserUnit::GetUniformScale() const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
@@ -4490,9 +4463,9 @@ float UserUnit::GetUnitformScale() const
  * What it does:
  * Returns the current user command-queue handle (mutable view slot).
  */
-std::int32_t UserUnit::GetCommandQueue1()
+const UserCommandQueue* UserUnit::GetCommandQueue() const
 {
-  return EncodeUserCommandManagerHandle(mManager);
+  return mManager;
 }
 
 /**
@@ -4501,9 +4474,9 @@ std::int32_t UserUnit::GetCommandQueue1()
  * What it does:
  * Returns the current user command-queue handle (const view slot).
  */
-std::int32_t UserUnit::GetCommandQueue2() const
+UserCommandQueue* UserUnit::GetCommandQueue()
 {
-  return EncodeUserCommandManagerHandle(mManager);
+  return mManager;
 }
 
 /**
@@ -4512,9 +4485,9 @@ std::int32_t UserUnit::GetCommandQueue2() const
  * What it does:
  * Returns the current factory command-queue handle (mutable view slot).
  */
-std::int32_t UserUnit::GetFactoryCommandQueue1()
+const UserCommandQueue* UserUnit::GetFactoryCommandQueue() const
 {
-  return EncodeUserCommandManagerHandle(mFactoryManager);
+  return mFactoryManager;
 }
 
 /**
@@ -4523,9 +4496,9 @@ std::int32_t UserUnit::GetFactoryCommandQueue1()
  * What it does:
  * Returns the current factory command-queue handle (const view slot).
  */
-std::int32_t UserUnit::GetFactoryCommandQueue2() const
+UserCommandQueue* UserUnit::GetFactoryCommandQueue()
 {
-  return EncodeUserCommandManagerHandle(mFactoryManager);
+  return mFactoryManager;
 }
 
 /**
@@ -4551,12 +4524,12 @@ bool UserUnit::IsBeingBuilt() const
 }
 
 /**
- * Address: 0x008C0500 (FUN_008C0500, moho::UserUnit::Select)
+ * Address: 0x008C0500 (FUN_008C0500, moho::UserUnit::IsSelectable)
  *
  * What it does:
  * Evaluates whether this user unit is currently selectable by UI selectors.
  */
-bool UserUnit::Select()
+bool UserUnit::IsSelectable() const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   if (iunitBridge == nullptr || !mUnitVarDat.mIsBusy || !iunitBridge->IsMobile()) {
@@ -4665,7 +4638,7 @@ bool UserUnit::DoOnDetectAdjacencyBonusFor(const RUnitBlueprint* const blueprint
  * Creates the unit mesh instance, applies team-color lookup parameter, and
  * wires animation poses from shared unit pose lanes when skeletons match.
  */
-void UserUnit::CreateMeshInstance()
+void UserUnit::CreateMeshInstance(const bool forUnitPose)
 {
   UserEntity* const entityView = ResolveUserEntityView(this);
   if (entityView == nullptr || entityView->mSession == nullptr) {
@@ -4680,7 +4653,7 @@ void UserUnit::CreateMeshInstance()
   const std::int32_t playerColor = army ? static_cast<std::int32_t>(army->mVarDat.mPlayerColorBgra) : -1;
   const std::int32_t colorIndex = army ? func_GetColorIndex(playerColor) : 0;
 
-  const float uniformScale = GetUnitformScale();
+  const float uniformScale = GetUniformScale();
   const Wm3::Vec3f uniformMeshScale{uniformScale, uniformScale, uniformScale};
 
   entityView->mMeshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
@@ -7069,7 +7042,7 @@ int moho::cfunc_UserUnitIsIdleL(LuaPlus::LuaState* const state)
 
   bool isIdle = false;
   if (userUnit != nullptr && GetLuaRuntimeView(userUnit).isBusy == 0u) {
-    const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetCommandQueue2());
+    const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetCommandQueue());
     if (commandRange == nullptr || commandRange->begin == commandRange->end) {
       isIdle = true;
     }
@@ -7504,7 +7477,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(SelectActiveQueueHandle(userUnit));
+  const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(SelectActiveQueue(userUnit));
   if (commandRange == nullptr) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);

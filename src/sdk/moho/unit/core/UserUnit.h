@@ -6,11 +6,16 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/command/CmdDefs.h"
+#include "moho/command/UserCommandQueue.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
+#include "moho/script/CScriptObject.h"
+#include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/SimDriver.h"
+#include "platform/Platform.h"
 #include "Wm3AxisAlignedBox3.h"
 
 #include <cstddef>
@@ -31,7 +36,7 @@ namespace moho
   enum class EUnitCommandType : std::int32_t;
   class UserEntity;
   struct UserCommandIssueHelper;
-  struct UserUnitManager;
+  struct UserCommandQueue;
   // Opaque cross-TU handle to the runtime user command-issue helper / command-graph
   // anchor-history object (same binary object surfaced under two names). Used only as
   // an incomplete pointer by the IssueDockCommand worker.
@@ -53,20 +58,24 @@ namespace moho
    * VFTABLE: 0x00E4D93C
    * COL:  0x00E9F48C
    */
-  class UserUnit
+  class MOHO_EMPTY_BASES UserUnit
+    : public UserEntity
+    , public IUnit
+    , public CScriptObject
   {
   public:
     /**
-     * Address: 0x008BF990 (FUN_008BF990)
+     * Address: 0x008BF9B0 (FUN_008BF9B0, Moho::UserUnit::~UserUnit)
+     * Deleting-destructor thunk: 0x008BF990 (FUN_008BF990)
      * Slot: 0
-     * Demangled: DestroyUserUnit
      *
-     * std::uint8_t deleteFlags
-     *
-     * IDA signature:
-     * void* __thiscall sub_8BF990(void* this, char deleteFlags);
+     * What it does:
+     * Unfiles the unit from every registry that can still name it - the army's
+     * quick-select avatar run, the idle engineer/factory sets, the session
+     * selection - hands its selection over to the recorded inheritor, and drops
+     * both command queues.
      */
-    virtual UserUnit* DestroyUserUnit(std::uint8_t deleteFlags);
+    ~UserUnit() override;
 
     /**
      * Address: 0x008C0A30 (FUN_008C0A30)
@@ -76,77 +85,70 @@ namespace moho
      * What it does:
      * Per-beat update hook for UI unit state.
      */
-    virtual void Tick(std::int32_t seqNo);
+    void Tick(std::int32_t seqNo) override;
 
     /**
      * Address: 0x008BF120 (FUN_008BF120)
      * Slot: 2
-     * Demangled: moho::UserUnit::IsUserUnit1
      *
      * What it does:
      * Returns this object as the const UserUnit identity view.
      */
-    virtual UserUnit const* IsUserUnit1() const;
+    [[nodiscard]] const UserUnit* IsUserUnit() const override;
 
     /**
      * Address: 0x008BF110 (FUN_008BF110)
      * Slot: 3
-     * Demangled: moho::UserUnit::IsUserUnit2
      *
      * What it does:
      * Returns this object as the mutable UserUnit identity view.
      */
-    virtual UserUnit* IsUserUnit2();
+    [[nodiscard]] UserUnit* IsUserUnit() override;
 
     /**
      * Address: 0x008BF170 (FUN_008BF170)
      * Slot: 4
-     * Demangled: moho::UserUnit::GetUnitformScale
      *
      * What it does:
      * Reads uniform render scale from the unit blueprint through the embedded IUnit bridge.
      */
-    virtual float GetUnitformScale() const;
+    [[nodiscard]] float GetUniformScale() const override;
 
     /**
      * Address: 0x008BF150 (FUN_008BF150)
      * Slot: 5
-     * Demangled: moho::UserUnit::GetCommandQueue1
      *
      * What it does:
-     * Returns the current user command-queue handle (mutable view slot).
+     * Returns this unit's primary command queue (const slot).
      */
-    virtual std::int32_t GetCommandQueue1();
+    [[nodiscard]] const UserCommandQueue* GetCommandQueue() const override;
 
     /**
      * Address: 0x008BF130 (FUN_008BF130)
      * Slot: 6
-     * Demangled: moho::UserUnit::GetCommandQueue2
      *
      * What it does:
-     * Returns the current user command-queue handle (const view slot).
+     * Returns this unit's primary command queue (mutable slot).
      */
-    virtual std::int32_t GetCommandQueue2() const;
+    [[nodiscard]] UserCommandQueue* GetCommandQueue() override;
 
     /**
      * Address: 0x008BF160 (FUN_008BF160)
      * Slot: 7
-     * Demangled: moho::UserUnit::GetFactoryCommandQueue1
      *
      * What it does:
-     * Returns the current factory command-queue handle (mutable view slot).
+     * Returns this unit's factory command queue (const slot).
      */
-    virtual std::int32_t GetFactoryCommandQueue1();
+    [[nodiscard]] const UserCommandQueue* GetFactoryCommandQueue() const override;
 
     /**
      * Address: 0x008BF140 (FUN_008BF140)
      * Slot: 8
-     * Demangled: moho::UserUnit::GetFactoryCommandQueue2
      *
      * What it does:
-     * Returns the current factory command-queue handle (const view slot).
+     * Returns this unit's factory command queue (mutable slot).
      */
-    virtual std::int32_t GetFactoryCommandQueue2() const;
+    [[nodiscard]] UserCommandQueue* GetFactoryCommandQueue() override;
 
     /**
      * Address: 0x008B8EB0 (FUN_008B8EB0)
@@ -154,14 +156,14 @@ namespace moho
      * Demangled: public: virtual void __thiscall moho::UserEntity::UpdateEntityData(struct moho::SSTIEntityVariableData
      * const near &)
      */
-    virtual void UpdateEntityData(moho::SSTIEntityVariableData const&);
+    void UpdateEntityData(const SSTIEntityVariableData& variableData) override;
 
     /**
      * Address: 0x008C09B0 (FUN_008C09B0)
      * Slot: 10
      * Demangled: moho::UserUnit::UpdateVisibility
      */
-    virtual void UpdateVisibility();
+    void UpdateVisibility() override;
 
     /**
      * Address: 0x008B8530 (FUN_008B8530)
@@ -171,17 +173,17 @@ namespace moho
      * What it does:
      * Returns replicated UI-dirty state from the UserEntity variable-data block.
      */
-    virtual bool RequiresUIRefresh() const;
+    [[nodiscard]] bool RequiresUIRefresh() const override;
 
     /**
      * Address: 0x008C0500 (FUN_008C0500)
      * Slot: 12
-     * Demangled: moho::UserUnit::Select
+     * Demangled: moho::UserUnit::IsSelectable
      *
      * What it does:
      * Returns whether this unit should be selectable in user UI state.
      */
-    virtual bool Select();
+    [[nodiscard]] bool IsSelectable() const override;
 
     /**
      * Address: 0x008BEFB0 (FUN_008BEFB0)
@@ -191,7 +193,7 @@ namespace moho
      * What it does:
      * Returns replicated "being built" state from the UserEntity variable-data block.
      */
-    virtual bool IsBeingBuilt() const;
+    [[nodiscard]] bool IsBeingBuilt() const override;
 
     /**
      * Address: 0x008C1350 (FUN_008C1350)
@@ -202,7 +204,7 @@ namespace moho
      * Imports the UI game-main module and calls
      * `OnFocusArmyUnitDamaged(thisLuaObject)`.
      */
-    virtual void NotifyFocusArmyUnitDamaged();
+    void NotifyFocusArmyUnitDamaged() override;
 
     /**
      * Address: 0x008C00E0 (FUN_008C00E0)
@@ -213,14 +215,14 @@ namespace moho
      * Creates one unit mesh-instance with team-color setup and pose reuse from
      * unit variable-data shared-pose lanes.
      */
-    virtual void CreateMeshInstance();
+    void CreateMeshInstance(bool forUnitPose) override;
 
     /**
      * Address: 0x008C04D0 (FUN_008C04D0)
      * Slot: 16
      * Demangled: protected: virtual void __thiscall moho::UserEntity::DestroyMeshInstance(void)
      */
-    virtual void DestroyMeshInstance();
+    void DestroyMeshInstance() override;
 
     /**
      * Address: 0x008BFC50 (FUN_008BFC50)
@@ -433,17 +435,14 @@ namespace moho
     [[nodiscard]] bool IsRepeatQueueEnabled() const;
 
   public:
-    // RTTI for UserUnit shows two secondary subobjects. Offsets below come
-    // from the constructor (FUN_008BF420): it stores the IUnit vtable at
-    // +0x148, zeroes that subobject's weak-link head at +0x14C, runs
-    // CScriptObject's constructor on +0x150, and then copies
-    // SCreateUnitParams::mConstDat over +0x184..+0x194.
+    // The three RTTI base records are real base classes: `UserEntity` is the
+    // primary at +0x00 (0x148 bytes), `IUnit` the sub-object at +0x148
+    // (0x08 bytes) and `CScriptObject` the one at +0x150 (0x34 bytes). The
+    // constructor (FUN_008BF420) walks them in exactly that order and the
+    // class-hierarchy descriptor records the same two secondary offsets
+    // (0x148 / 0x150), so the members below start where it copies
+    // `SCreateUnitParams::mConstDat`.
 
-    /// The IUnit subobject: vtable pointer then its `WeakObject` head.
-    std::uint8_t mIUnitAndScriptBridge[0x150 - 0x148]{}; // 0x0148
-    /// The CScriptObject subobject; `sizeof(CScriptObject) == 0x34`, so it
-    /// ends exactly where the constant-data payload starts.
-    std::uint8_t mScriptObjectStorage[0x34]{};           // 0x0150
     /// The create packet's constant data, copied wholesale by the constructor
     /// at 0x008BF4B4..0x008BF4E1. Same 0x10-byte layout the sim publishes.
     SCreateUnitConstantData mUnitConstDat;               // 0x0184
@@ -468,8 +467,8 @@ namespace moho
     /// `mUnitVarDat.mCreator` resolved to a live entity and held weakly;
     /// `UpdateUnitData` re-points it whenever the replicated id changes.
     WeakPtr<UserEntity> mCreator;                        // 0x03C0
-    UserUnitManager* mManager;        // 0x03C8
-    UserUnitManager* mFactoryManager; // 0x03CC
+    UserCommandQueue* mManager;        // 0x03C8
+    UserCommandQueue* mFactoryManager; // 0x03CC
     msvc8::set<msvc8::string> mSelectionSets; // 0x03D0
     bool mQueueEmptyCached;          // 0x03DC
     bool mIsEngineer; // 0x03DD
@@ -478,8 +477,14 @@ namespace moho
     std::uint32_t mIntelStateFlags; // 0x03E0
     std::uint8_t pad_03E4_03E8[0x3E8 - 0x03E4]{};
   };
-#if defined(MOHO_STRICT_LAYOUT_ASSERTS)
+  // Enforced unconditionally: the whole sim->UI unit handoff writes through
+  // these offsets, and the class only reaches them because `UserEntity`,
+  // `IUnit` and `CScriptObject` are real bases. If one of those three ever
+  // changes size the asserts below are what catches it.
   static_assert(sizeof(UserUnit) == 0x3E8, "UserUnit size must be 0x3E8");
+  static_assert(
+    sizeof(UserEntity) == 0x148, "UserUnit's primary base must occupy 0x000..0x148"
+  );
   static_assert(offsetof(UserUnit, mUnitVarDat) == 0x0198, "UserUnit::mUnitVarDat offset must be 0x0198");
   static_assert(offsetof(UserUnit, mUnitConstDat) == 0x0184, "UserUnit::mUnitConstDat offset must be 0x0184");
   static_assert(offsetof(UserUnit, mCreator) == 0x03C0, "UserUnit::mCreator offset must be 0x03C0");
@@ -490,9 +495,6 @@ namespace moho
     offsetof(UserUnit, mFactoryManager) == 0x03CC,
     "UserUnit::mFactoryManager offset must be 0x03CC"
   );
-  static_assert(
-    offsetof(UserUnit, mScriptObjectStorage) == 0x0150, "UserUnit::mScriptObjectStorage offset must be 0x0150"
-  );
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(
@@ -500,7 +502,6 @@ namespace moho
   );
   static_assert(offsetof(UserUnit, mIsFactory) == 0x03DE, "UserUnit::mIsFactory offset must be 0x03DE");
   static_assert(offsetof(UserUnit, mIntelStateFlags) == 0x03E0, "UserUnit::mIntelStateFlags offset must be 0x03E0");
-#endif
 
   /**
    * VFTABLE: 0x00E4DA4C
@@ -720,7 +721,7 @@ namespace moho
    * currently contains the supplied command-issue helper.
    */
   [[nodiscard]] bool UserUnitManagerContainsCommandIssueHelper(
-    UserUnitManager* manager,
+    UserCommandQueue* manager,
     const UserCommandIssueHelper* helper
   ) noexcept;
 
@@ -748,7 +749,7 @@ namespace moho
    * `ISSUE_Command` keystone (Sim.cpp) can reset a unit queue on a clearing
    * command.
    */
-  void ResetUserUnitManagerState(UserUnitManager* manager, std::int32_t commandType);
+  void ResetUserUnitManagerState(UserCommandQueue* manager, std::int32_t commandType);
 
   /**
    * Address: 0x008B6DE0 (FUN_008B6DE0, struct_UserUnitManager::add)
@@ -758,7 +759,7 @@ namespace moho
    * enqueues the matching select-unit update event. Exposed so the client-side
    * `ISSUE_Command` keystone (Sim.cpp) can enqueue an issued command per unit.
    */
-  void UserUnitManagerAdd(UserUnitManager* manager, UserCommandIssueHelper* helper, CmdId cmdId, bool clearFlag);
+  void UserUnitManagerAdd(UserCommandQueue* manager, UserCommandIssueHelper* helper, CmdId cmdId, bool clearFlag);
 
   /**
    * Address: 0x0081D030 (FUN_0081D030, struct_UserUnitManager queue-length accessor)
@@ -768,7 +769,7 @@ namespace moho
    * one user-unit command manager (the depth the client-side `ISSUE_Command`
    * keystone caps at 500 before enqueuing).
    */
-  [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(UserUnitManager* managerPtr) noexcept;
+  [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(UserCommandQueue* managerPtr) noexcept;
 
   /**
    * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
@@ -885,7 +886,7 @@ namespace moho
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves one
-   * unit's most recent queued command-issue helper (via `GetCommandQueue2` +
+   * unit's most recent queued command-issue helper (via `GetCommandQueue` +
    * FUN_008B7320) as an opaque cross-TU anchor-history handle, or `nullptr` when
    * the unit has no queued command.
    */

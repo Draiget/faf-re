@@ -377,7 +377,7 @@ namespace moho
    * Address: 0x008B85E0 (FUN_008B85E0, ??0UserEntity@Moho@@QAE@AAVCWldSession@1@ABUSCreateEntityParams@1@@Z)
    */
   UserEntity::UserEntity(CWldSession& session, const SCreateEntityParams& createParams)
-    : mWeakObjectRuntimeHead(nullptr)
+    : WeakObject()
     , mIUnitChainHead(nullptr)
     , mSession(&session)
     , mSpatialDbEntry{nullptr, 0}

@@ -1650,7 +1650,7 @@ namespace moho
         continue;
       }
 
-      IUnit* const iunitBridge = reinterpret_cast<IUnit*>(&userUnit->mIUnitAndScriptBridge[0]);
+      IUnit* const iunitBridge = static_cast<IUnit*>(userUnit);
       if (iunitBridge->IsDead() || iunitBridge->DestroyQueued()) {
         continue;
       }

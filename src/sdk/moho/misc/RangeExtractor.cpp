@@ -722,14 +722,13 @@ namespace moho
       return false;
     }
 
-    const auto commandQueueWord = static_cast<std::uint32_t>(userUnit->GetFactoryCommandQueue2());
-    if (commandQueueWord == 0u) {
+    const UserCommandQueue* const factoryQueue = userUnit->GetFactoryCommandQueue();
+    if (factoryQueue == nullptr) {
       *outRadius = 0.0f;
       return false;
     }
 
-    const auto* const commandQueue =
-      reinterpret_cast<const FactoryCommandQueueRangeView*>(static_cast<std::uintptr_t>(commandQueueWord));
+    const auto* const commandQueue = reinterpret_cast<const FactoryCommandQueueRangeView*>(factoryQueue);
     const float radius = ResolvePositiveRadius(commandQueue->stagingPlatformScanRadius, commandQueue->guardScanRadius);
     *outRadius = radius;
     return radius > 0.0f;

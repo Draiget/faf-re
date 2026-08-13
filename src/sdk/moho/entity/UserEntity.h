@@ -294,7 +294,10 @@ namespace moho
     [[nodiscard]] UserEntity* GetAttachmentParent();
 
   public:
-    void* mWeakObjectRuntimeHead;               // 0x04
+    // 0x04 is the `WeakObject` base's `weakLinkHead_`: the head of the
+    // intrusive chain of `WeakPtr<UserEntity>` nodes that name this entity.
+    // It used to be restated here as a second field, which pushed every
+    // offset below it four bytes past the binary.
     UserEntityLinkNode* mIUnitChainHead;        // 0x08
     CWldSession* mSession;                      // 0x0C
     UserEntitySpatialDbEntry mSpatialDbEntry;   // 0x10
@@ -317,7 +320,10 @@ namespace moho
     std::uint8_t pad_0146_0147[0x02]{};
   };
 
-#if defined(MOHO_STRICT_LAYOUT_ASSERTS)
+  // Enforced unconditionally: `UserUnit` derives from this class and its own
+  // members only land on the binary offsets while the base is exactly 0x148
+  // bytes, so a regression here has to fail loudly rather than silently
+  // shifting every unit field.
   static_assert(sizeof(UserEntity) == 0x148, "UserEntity size must be 0x148");
   static_assert(offsetof(UserEntity, mSession) == 0x0C, "UserEntity::mSession offset must be 0x0C");
   static_assert(offsetof(UserEntity, mIUnitChainHead) == 0x08, "UserEntity::mIUnitChainHead offset must be 0x08");
@@ -343,5 +349,4 @@ namespace moho
   static_assert(offsetof(UserEntity, mLastInterpAmt) == 0x140, "UserEntity::mLastInterpAmt offset must be 0x140");
   static_assert(offsetof(UserEntity, mHasInitialUpdate) == 0x144, "UserEntity::mHasInitialUpdate offset must be 0x144");
   static_assert(offsetof(UserEntity, mHasRuntimePose) == 0x145, "UserEntity::mHasRuntimePose offset must be 0x145");
-#endif
 } // namespace moho

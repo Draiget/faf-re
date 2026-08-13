@@ -1939,7 +1939,7 @@ namespace
 
   [[nodiscard]] Unit* ResolveUnitBridge(UserUnit* const userUnit) noexcept
   {
-    return userUnit ? reinterpret_cast<Unit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+    return userUnit ? reinterpret_cast<Unit*>(static_cast<IUnit*>(userUnit)) : nullptr;
   }
 
   /**
