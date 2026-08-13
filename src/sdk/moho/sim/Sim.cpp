@@ -8811,6 +8811,15 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   outSyncData->mCurTick = static_cast<int32_t>(mCurTick);
   outSyncData->mAdvanced = mAdvancedThisTick;
   outSyncData->mFocusArmy = mSyncFilter.focusArmy;
+
+  // 0x00747635..0x0074764C: hand the beat's queued audio requests to the
+  // packet and reset the sim-side queue back to its inline storage. Without
+  // this the packet's audio lane stayed empty for every beat, so nothing the
+  // sim played ever reached `CUserSoundManager::UpdateSoundRequests`.
+  if (mSoundManager != nullptr) {
+    mSoundManager->DrainRequests(outSyncData->mAudioRequests);
+  }
+
   SnapshotSyncReserveCounts(
     *outSyncData,
     *reinterpret_cast<SyncReserveCountsRuntimeView*>(mSyncReserveCounts)

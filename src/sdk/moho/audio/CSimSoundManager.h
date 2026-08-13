@@ -51,17 +51,19 @@ namespace moho
      * Address: 0x00760EB0 (FUN_00760EB0)
      * Slot: 1
      *
-     * gpg::fastvector_n<Moho::SAudioRequest, 64>& outRequests
+     * gpg::fastvector_n<Moho::SAudioRequest, 8>& outRequests
      *
      * IDA signature:
-     * Moho::SAudioRequest *__thiscall sub_760EB0(Moho::CSimSoundManager *this, gpg::fastvector_n64_SAudioRequest
-     * *outRequests);
+     * Moho::SAudioRequest *__thiscall Moho::CSimSoundManager::GetRequests(Moho::CSimSoundManager *this,
+     * gpg::fastvector_n8_SAudioRequest *outRequests);
      *
      * What it does:
      * Copies pending requests into caller storage, then resets local queue
-     * back to inline storage.
+     * back to inline storage. The destination is the sync packet's own
+     * eight-slot inline lane (`SSyncData::mAudioRequests`), which is why the
+     * parameter's inline capacity differs from `mRequests`.
      */
-    void DrainRequests(gpg::fastvector_n<SAudioRequest, 64>& outRequests) override;
+    void DrainRequests(gpg::fastvector_n<SAudioRequest, 8>& outRequests) override;
 
     /**
      * Address: 0x00760D20 (FUN_00760D20)
