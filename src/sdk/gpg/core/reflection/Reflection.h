@@ -124,6 +124,18 @@ namespace moho
   struct SPhysBody;
   class SimArmy;
   class CAcquireTargetTask;
+  class CFactoryBuildTask;
+  class CUnitCaptureTask;
+  class CUnitCarrierLand;
+  class CUnitCarrierLaunch;
+  class CUnitCarrierRetrieve;
+  class CUnitGetBuiltTask;
+  class CUnitGuardTask;
+  class CUnitMobileBuildTask;
+  class CUnitRepairTask;
+  class CUnitSacrificeTask;
+  class CUnitTeleportTask;
+  class CUnitUpgradeTask;
   class CArmyStats;
   class CArmyImpl;
   class CArmyStatItem;
@@ -1578,6 +1590,114 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_CFireWeaponTask(RRef* out, moho::CFireWeaponTask* value);
+
+  /**
+   * Address: 0x005FE1E0 (FUN_005FE1E0, gpg::RRef_CFactoryBuildTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CFactoryBuildTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CFactoryBuildTask(RRef* out, moho::CFactoryBuildTask* value);
+
+  /**
+   * Address: 0x006058B0 (FUN_006058B0, gpg::RRef_CUnitCaptureTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitCaptureTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitCaptureTask(RRef* out, moho::CUnitCaptureTask* value);
+
+  /**
+   * Address: 0x00608240 (FUN_00608240, gpg::RRef_CUnitCarrierLand)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitCarrierLand` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitCarrierLand(RRef* out, moho::CUnitCarrierLand* value);
+
+  /**
+   * Address: 0x006083F0 (FUN_006083F0, gpg::RRef_CUnitCarrierLaunch)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitCarrierLaunch` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CUnitCarrierLaunch(RRef* out, moho::CUnitCarrierLaunch* value);
+
+  /**
+   * Address: 0x00608090 (FUN_00608090, gpg::RRef_CUnitCarrierRetrieve)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitCarrierRetrieve` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CUnitCarrierRetrieve(RRef* out, moho::CUnitCarrierRetrieve* value);
+
+  /**
+   * Address: 0x0060CAB0 (FUN_0060CAB0, gpg::RRef_CUnitGetBuiltTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitGetBuiltTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitGetBuiltTask(RRef* out, moho::CUnitGetBuiltTask* value);
+
+  /**
+   * Address: 0x00614BA0 (FUN_00614BA0, gpg::RRef_CUnitGuardTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitGuardTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitGuardTask(RRef* out, moho::CUnitGuardTask* value);
+
+  /**
+   * Address: 0x005FDCD0 (FUN_005FDCD0, gpg::RRef_CUnitMobileBuildTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitMobileBuildTask` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CUnitMobileBuildTask(RRef* out, moho::CUnitMobileBuildTask* value);
+
+  /**
+   * Address: 0x005FE030 (FUN_005FE030, gpg::RRef_CUnitRepairTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitRepairTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitRepairTask(RRef* out, moho::CUnitRepairTask* value);
+
+  /**
+   * Address: 0x005FE390 (FUN_005FE390, gpg::RRef_CUnitSacrificeTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitSacrificeTask` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CUnitSacrificeTask(RRef* out, moho::CUnitSacrificeTask* value);
+
+  /**
+   * Address: 0x0060CC60 (FUN_0060CC60, gpg::RRef_CUnitTeleportTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitTeleportTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitTeleportTask(RRef* out, moho::CUnitTeleportTask* value);
+
+  /**
+   * Address: 0x005FDE80 (FUN_005FDE80, gpg::RRef_CUnitUpgradeTask)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitUpgradeTask` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitUpgradeTask(RRef* out, moho::CUnitUpgradeTask* value);
 
   /**
    * Address: 0x006A00F0 (FUN_006A00F0, gpg::RRef_ManyToOneListener_EProjectileImpactEvent)

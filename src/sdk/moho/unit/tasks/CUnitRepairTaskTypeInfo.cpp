@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -39,15 +40,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitRepairTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitRepairTask));
     }
     return cached;
   }
@@ -255,7 +247,10 @@ namespace moho
   gpg::RRef CUnitRepairTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitRepairTaskReflectionView();
-    return gpg::RRef{reinterpret_cast<CUnitRepairTask*>(task), CachedCUnitRepairTaskType()};
+
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitRepairTask(&ref, reinterpret_cast<CUnitRepairTask*>(task));
+    return ref;
   }
 
   /**
@@ -271,7 +266,10 @@ namespace moho
     if (task) {
       new (task) CUnitRepairTaskReflectionView();
     }
-    return gpg::RRef{reinterpret_cast<CUnitRepairTask*>(task), CachedCUnitRepairTaskType()};
+
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitRepairTask(&ref, reinterpret_cast<CUnitRepairTask*>(task));
+    return ref;
   }
 
   /**

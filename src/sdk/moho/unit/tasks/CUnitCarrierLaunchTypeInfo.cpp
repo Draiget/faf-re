@@ -4,6 +4,7 @@
 #include <typeinfo>
 
 #include "moho/unit/tasks/CUnitCarrierLaunch.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -15,15 +16,6 @@ namespace
   [[nodiscard]] moho::CUnitCarrierLaunchTypeInfo& CUnitCarrierLaunchTypeInfoStorageRef() noexcept
   {
     return *reinterpret_cast<moho::CUnitCarrierLaunchTypeInfo*>(gCUnitCarrierLaunchTypeInfoStorage);
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitCarrierLaunchType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitCarrierLaunch));
-    }
-    return cached;
   }
 
   /**
@@ -100,7 +92,9 @@ namespace moho
   gpg::RRef CUnitCarrierLaunchTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitCarrierLaunch();
-    return gpg::RRef{task, CachedCUnitCarrierLaunchType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitCarrierLaunch(&ref, task);
+    return ref;
   }
 
   /**
@@ -117,7 +111,9 @@ namespace moho
       new (task) CUnitCarrierLaunch();
     }
 
-    return gpg::RRef{task, CachedCUnitCarrierLaunchType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitCarrierLaunch(&ref, task);
+    return ref;
   }
 } // namespace moho
 

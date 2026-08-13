@@ -7,6 +7,7 @@
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitGuardTask.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -35,15 +36,6 @@ namespace
     static gpg::RType* cached = nullptr;
     if (!cached) {
       cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitGuardTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitGuardTask));
     }
     return cached;
   }
@@ -145,7 +137,9 @@ namespace moho
   gpg::RRef CUnitGuardTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitGuardTask();
-    return gpg::RRef{task, CachedCUnitGuardTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitGuardTask(&ref, task);
+    return ref;
   }
 
   /**
@@ -162,7 +156,9 @@ namespace moho
       task = new (objectStorage) CUnitGuardTask();
     }
 
-    return gpg::RRef{task, CachedCUnitGuardTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitGuardTask(&ref, task);
+    return ref;
   }
 
   /**

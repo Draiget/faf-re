@@ -6,6 +6,7 @@
 
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitUpgradeTask.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -35,18 +36,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitUpgradeTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitUpgradeTask));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitUpgradeTaskRef(moho::CUnitUpgradeTask* const task)
   {
-    return gpg::RRef{task, CachedCUnitUpgradeTaskType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitUpgradeTask(&ref, task);
+    return ref;
   }
 } // namespace
 
