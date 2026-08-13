@@ -253,7 +253,7 @@ namespace
 
   [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const userUnit) noexcept
   {
-    return userUnit ? reinterpret_cast<IUnit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+    return userUnit ? static_cast<IUnit*>(userUnit) : nullptr;
   }
 
   [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept

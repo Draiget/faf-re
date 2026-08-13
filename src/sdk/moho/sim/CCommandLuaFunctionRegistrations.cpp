@@ -586,7 +586,7 @@ namespace
       }
 
       // Selectable AND (owned by focus army OR cheat-select).
-      if (!unit->Select()) {
+      if (!unit->IsSelectable()) {
         continue;
       }
       const bool ownedByFocusArmy = (focusArmy == candidate->mArmy);

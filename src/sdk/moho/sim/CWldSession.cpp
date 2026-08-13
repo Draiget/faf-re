@@ -3584,12 +3584,12 @@ namespace moho
 
     [[nodiscard]] const IUnit* ResolveIUnitBridge(const UserUnit* const userUnit) noexcept
     {
-      return userUnit ? reinterpret_cast<const IUnit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+      return userUnit ? static_cast<const IUnit*>(userUnit) : nullptr;
     }
 
     [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const userUnit) noexcept
     {
-      return userUnit ? reinterpret_cast<IUnit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+      return userUnit ? static_cast<IUnit*>(userUnit) : nullptr;
     }
 
     [[nodiscard]] bool ContainsUnitPtr(const msvc8::vector<UserUnit*>& units, const UserUnit* const unit)
@@ -3703,9 +3703,7 @@ namespace moho
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
         IUnit* const iunit = ResolveIUnitBridge(userUnit);
         if (userUnit != nullptr && iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
-          auto* const manager = reinterpret_cast<UserUnitManager*>(
-            static_cast<std::uintptr_t>(static_cast<std::uint32_t>(userUnit->GetCommandQueue2()))
-          );
+          UserCommandQueue* const manager = userUnit->GetCommandQueue();
           if (UserUnitManagerContainsCommandIssueHelper(manager, helper)) {
             return false;
           }

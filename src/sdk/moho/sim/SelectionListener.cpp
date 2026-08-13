@@ -42,12 +42,12 @@ namespace
 
   /**
    * Resolves a UserUnit's embedded IUnit subobject (at `+0x148`, the
-   * `mIUnitAndScriptBridge` lane), matching the `ResolveIUnitBridge` helper
+   * `IUnit` base sub-object), matching the `ResolveIUnitBridge` helper
    * in CWldSession.cpp.
    */
   [[nodiscard]] moho::IUnit* ResolveUserUnitBridge(moho::UserUnit* const userUnit) noexcept
   {
-    return userUnit ? reinterpret_cast<moho::IUnit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+    return userUnit ? static_cast<moho::IUnit*>(userUnit) : nullptr;
   }
 
   /**

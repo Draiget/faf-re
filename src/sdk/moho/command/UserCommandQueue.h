@@ -48,31 +48,50 @@ namespace moho
   static_assert(sizeof(UserManagerIssueQueue) == 0x18, "UserManagerIssueQueue size must be 0x18");
 
   /**
-   * The per-unit command manager hanging off `UserUnit::mManager` and
+   * The per-unit command queue hanging off `UserUnit::mManager` and
    * `UserUnit::mFactoryManager` (0x3C8 / 0x3CC).
    *
-   * Layout evidence: FUN_008B6C50 resizes `primaryLinks` at +0x08 through
-   * FUN_008B7590, walks the 8-byte `resolvedLinks` run at +0x40..+0x44 with its
-   * capacity/inline lanes at +0x48/+0x4C, and raises `resolvedLinksDirty` at
-   * +0x60. FUN_008B6DE0 (`add`) and FUN_008B6E60 (`reset`) agree.
+   * The class name comes from the mangled signature of the accessors that
+   * hand it out - `?GetCommandQueue@UserEntity@Moho@@UAEPAVUserCommandQueue@2@XZ`
+   * returns exactly this object, and `UserUnit`'s override of that slot
+   * (FUN_008BF150 / FUN_008BF130) returns `mManager`. There is no vtable: the
+   * first word is the owning unit, not a vptr.
+   *
+   * Layout evidence: the `UserUnit` constructor (FUN_008BF420 at 0x008BF612)
+   * stands one up field by field - owner at +0x00, both link runs seeded onto
+   * their own inline storage, the issue ring's four words zeroed, and the
+   * dirty flag cleared. FUN_008B6C50 then resizes `primaryLinks` through
+   * FUN_008B7590, walks `resolvedLinks` and raises `resolvedLinksDirty`.
    */
-  struct UserUnitManager
+  struct UserCommandQueue
   {
     UserUnit* ownerUnit;                      // +0x00
     std::uint8_t pad_0004_0008[0x04];
     UserCommandQueueLinkVector primaryLinks;  // +0x08
-    std::uint8_t pad_0018_0028[0x10];
+    /// Two-entry small-buffer store `primaryLinks` starts out pointing at.
+    /// While the run lives here the first word doubles as the saved inline
+    /// capacity end (FUN_008B7CC0 stashes it there on the way to the heap).
+    std::uint8_t primaryInlineStorage[0x10];  // +0x18
     UserManagerIssueQueue issueQueue;         // +0x28
     UserCommandQueueLinkVector resolvedLinks; // +0x40
-    std::uint8_t pad_0050_0060[0x10];
+    /// The matching two-entry small-buffer store for `resolvedLinks`.
+    std::uint8_t resolvedInlineStorage[0x10]; // +0x50
     std::uint8_t resolvedLinksDirty;          // +0x60
     std::uint8_t pad_0061_0068[0x07];
   };
-  static_assert(offsetof(UserUnitManager, primaryLinks) == 0x08, "UserUnitManager::primaryLinks offset must be 0x08");
-  static_assert(offsetof(UserUnitManager, issueQueue) == 0x28, "UserUnitManager::issueQueue offset must be 0x28");
-  static_assert(offsetof(UserUnitManager, resolvedLinks) == 0x40, "UserUnitManager::resolvedLinks offset must be 0x40");
+  static_assert(offsetof(UserCommandQueue, primaryLinks) == 0x08, "UserCommandQueue::primaryLinks offset must be 0x08");
   static_assert(
-    offsetof(UserUnitManager, resolvedLinksDirty) == 0x60, "UserUnitManager::resolvedLinksDirty offset must be 0x60"
+    offsetof(UserCommandQueue, primaryInlineStorage) == 0x18,
+    "UserCommandQueue::primaryInlineStorage offset must be 0x18"
   );
-  static_assert(sizeof(UserUnitManager) == 0x68, "UserUnitManager size must be 0x68");
+  static_assert(offsetof(UserCommandQueue, issueQueue) == 0x28, "UserCommandQueue::issueQueue offset must be 0x28");
+  static_assert(offsetof(UserCommandQueue, resolvedLinks) == 0x40, "UserCommandQueue::resolvedLinks offset must be 0x40");
+  static_assert(
+    offsetof(UserCommandQueue, resolvedInlineStorage) == 0x50,
+    "UserCommandQueue::resolvedInlineStorage offset must be 0x50"
+  );
+  static_assert(
+    offsetof(UserCommandQueue, resolvedLinksDirty) == 0x60, "UserCommandQueue::resolvedLinksDirty offset must be 0x60"
+  );
+  static_assert(sizeof(UserCommandQueue) == 0x68, "UserCommandQueue size must be 0x68");
 } // namespace moho

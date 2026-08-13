@@ -1775,12 +1775,12 @@ namespace
 
   [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const unit) noexcept
   {
-    return unit ? reinterpret_cast<IUnit*>(unit->mIUnitAndScriptBridge) : nullptr;
+    return unit ? static_cast<IUnit*>(unit) : nullptr;
   }
 
   [[nodiscard]] const IUnit* ResolveIUnitBridge(const UserUnit* const unit) noexcept
   {
-    return unit ? reinterpret_cast<const IUnit*>(unit->mIUnitAndScriptBridge) : nullptr;
+    return unit ? static_cast<const IUnit*>(unit) : nullptr;
   }
 
   struct UserEntityWeakRefRuntimeView
@@ -28962,7 +28962,7 @@ namespace moho
     // UserUnitManagerAdd's flag; UI_OnCommandIssued's bool arg is the issued
     // latch, i.e. true.
     for (UserUnit* const unit : units) {
-      auto* const unitManager = reinterpret_cast<UserUnitManager*>(unit->GetCommandQueue2());
+      UserCommandQueue* const unitManager = unit->GetCommandQueue();
       if (unitManager == nullptr) {
         continue;
       }
