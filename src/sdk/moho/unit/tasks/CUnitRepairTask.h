@@ -66,6 +66,17 @@ namespace moho
     CUnitRepairTask(IAiCommandDispatchImpl* dispatchTask, Unit* targetUnit, bool isSiloBuild);
 
     /**
+     * Address: 0x005F9E50 (FUN_005F9E50, Moho::CUnitRepairTask::operator new)
+     *
+     * What it does:
+     * Allocates one repair task and constructs it in place, returning null if
+     * the allocation failed. The binary shares a single out-of-line copy of
+     * this allocate-then-construct sequence across all five creation sites, so
+     * it is recovered as a named factory rather than open-coded `new`.
+     */
+    static CUnitRepairTask* Allocate(IAiCommandDispatchImpl* dispatchTask, Unit* targetUnit, bool isSiloBuild);
+
+    /**
      * Address: 0x005F8E20 (FUN_005F8E20, ??1CUnitRepairTask@Moho@@QAE@@Z body)
      * Scalar deleting dtor thunk: 0x005F8FE0 (FUN_005F8FE0, vtable slot 0)
      *

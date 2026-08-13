@@ -483,7 +483,7 @@ namespace
           return;
         }
         if (creator) {
-          (void)new (std::nothrow) CUnitRepairTask(dispatch, creator, false);
+          (void)CUnitRepairTask::Allocate(dispatch, creator, false);
         }
         return;
       }
