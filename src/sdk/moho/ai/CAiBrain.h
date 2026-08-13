@@ -335,6 +335,19 @@ namespace moho
     EAlliance alliance);
 
   /**
+   * Address: 0x006934E0 (FUN_006934E0, func_FillLuaTableWithEntities)
+   *
+   * What it does:
+   * Initializes `outTable` as a Lua array sized to `entities` and fills slots
+   * `1..N` with each entity's script object lane in storage order. Shared by
+   * `CAiBrain:GetAvailableFactories()` and `CSquad::GetUnits`.
+   */
+  LuaPlus::LuaObject* FillLuaTableWithEntities(
+    const SEntitySetTemplateUnit& entities,
+    LuaPlus::LuaObject* outTable,
+    LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0057B480 (FUN_0057B480, func_GetNumUnitsAroundPoint)
    *
    * What it does:

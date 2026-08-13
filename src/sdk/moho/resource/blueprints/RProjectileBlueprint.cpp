@@ -217,7 +217,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0051C680 (?GetRandomInitialSpeed@RProjectileBlueprint@Moho@@QBEMPAVCRandomStream@2@@Z)
+   * Address: 0x0051C680 (FUN_0051C680, Moho::RProjectileBlueprint::GetRandomInitialSpeed)
    * Mangled: ?GetRandomInitialSpeed@RProjectileBlueprint@Moho@@QBEMPAVCRandomStream@2@@Z
    *
    * What it does:

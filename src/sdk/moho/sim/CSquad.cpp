@@ -8,6 +8,7 @@
 
 #include "moho/containers/TDatList.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiBrain.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -485,5 +486,22 @@ namespace moho
       return;
     }
     mCats = categorySource;
+  }
+
+  /**
+   * Address: 0x0072B700 (FUN_0072B700, Moho::CSquad::GetUnits)
+   *
+   * IDA signature:
+   * LuaPlus::LuaObject *__usercall Moho::CSquad::GetUnits@<eax>(
+   *     LuaPlus::LuaState *state@<eax>, LuaPlus::LuaObject *outTable@<esi>,
+   *     Moho::CSquad *this@<ecx>);
+   *
+   * What it does:
+   * Publishes this squad's member set as a Lua array. The whole body is the
+   * shared entity-table fill, which is why the binary keeps it out of line.
+   */
+  LuaPlus::LuaObject* CSquad::GetUnits(LuaPlus::LuaObject* const outTable, LuaPlus::LuaState* const state) const
+  {
+    return FillLuaTableWithEntities(mUnits, outTable, state);
   }
 } // namespace moho

@@ -10,6 +10,12 @@
 #include "moho/sim/ESquadClass.h"
 #include "Wm3Vector3.h"
 
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
 namespace gpg
 {
   class RType;
@@ -109,6 +115,15 @@ namespace moho
      * unit-state lane.
      */
     [[nodiscard]] bool HasUnitWithState(EUnitState state) const;
+
+    /**
+     * Address: 0x0072B700 (FUN_0072B700, Moho::CSquad::GetUnits)
+     *
+     * What it does:
+     * Fills `outTable` with this squad's member units as a Lua array, in
+     * storage order. Returns `outTable`.
+     */
+    LuaPlus::LuaObject* GetUnits(LuaPlus::LuaObject* outTable, LuaPlus::LuaState* state) const;
 
     /**
      * Address: 0x00724350 (FUN_00724350, Moho::CSquad::AppendUnitsWithBP)
