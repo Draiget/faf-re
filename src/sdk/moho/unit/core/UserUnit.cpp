@@ -1686,19 +1686,17 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
+   *
+   * The erase itself lives on the type, in CWldSession.cpp, so the session
+   * selection, the extra-select list and the army idle registries all remove
+   * entries the same way — including the weak-owner guard the binary holds
+   * across the erase, which this file's open-coded version was missing.
+   */
   [[nodiscard]] bool EraseWeakEntitySet(WeakEntitySetUserEntity& selection, UserEntity* const entity) noexcept
   {
-    if (selection.mHead == nullptr || entity == nullptr) {
-      return false;
-    }
-
-    SSelectionNodeUserEntity* const node = FindWeakEntitySetNodeByKey(selection, WeakEntitySetKey(entity));
-    if (node == nullptr || node == selection.mHead) {
-      return false;
-    }
-
-    (void)EraseWeakEntityNodeAndAdvance(selection, node);
-    return true;
+    return SSelectionSetUserEntity::Erase(selection, entity);
   }
 
   /**

@@ -347,6 +347,22 @@ namespace moho
       Find(FindResult* outResult, SSelectionSetUserEntity* set, UserEntity* entity);
 
     /**
+     * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
+     *
+     * IDA signature:
+     * int __stdcall sub_8676E0(int a1, int a2);
+     *
+     * What it does:
+     * Removes one user-entity key from a weak set, holding the transient
+     * weak-link guard across the erase exactly as the binary does, and reports
+     * whether a live node was actually removed.
+     *
+     * Takes the 12-byte base so the session selection, the extra-select list
+     * and the per-army idle registries all share one erase.
+     */
+    static bool Erase(WeakEntitySetUserEntity& set, UserEntity* entity);
+
+    /**
      * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
      *
      * What it does:

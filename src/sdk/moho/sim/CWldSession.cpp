@@ -3735,7 +3735,7 @@ namespace moho
     }
 
     [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
-    EraseSelectionNodeAndAdvance(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node);
+    EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node);
 
     void ClearSelectionSet(SSelectionSetUserEntity& selection)
     {
@@ -3803,7 +3803,7 @@ namespace moho
       return IsSelectionNil(node) ? head : node;
     }
 
-    void RecomputeSelectionExtrema(SSelectionSetUserEntity& selection)
+    void RecomputeSelectionExtrema(WeakEntitySetUserEntity& selection)
     {
       if (selection.mHead == nullptr) {
         return;
@@ -3823,7 +3823,7 @@ namespace moho
     }
 
     void ReplaceSelectionSubtree(
-      SSelectionSetUserEntity& selection,
+      WeakEntitySetUserEntity& selection,
       SSelectionNodeUserEntity* const oldNode,
       SSelectionNodeUserEntity* const newNode
     )
@@ -3842,7 +3842,7 @@ namespace moho
       }
     }
 
-    void RotateSelectionLeft(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node)
+    void RotateSelectionLeft(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
       SSelectionNodeUserEntity* const pivot = node->mRight;
@@ -3864,7 +3864,7 @@ namespace moho
       node->mParent = pivot;
     }
 
-    void RotateSelectionRight(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node)
+    void RotateSelectionRight(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
       SSelectionNodeUserEntity* const pivot = node->mLeft;
@@ -3892,7 +3892,7 @@ namespace moho
     }
 
     [[nodiscard]] SSelectionNodeUserEntity*
-    FindSelectionNodeByKey(const SSelectionSetUserEntity& selection, const std::uint32_t key)
+    FindSelectionNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key)
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
       if (head == nullptr) {
@@ -4143,7 +4143,7 @@ namespace moho
       return outResult;
     }
 
-    void FixupAfterSelectionInsert(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node)
+    void FixupAfterSelectionInsert(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node)
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
       while (node != head->mParent && node->mParent->mColor == 0u) {
@@ -5726,24 +5726,8 @@ namespace moho
       return destination;
     }
 
-    [[nodiscard]] bool EraseSelectionEntity(SSelectionSetUserEntity& selection, UserEntity* const entity)
-    {
-      const SSelectionNodeUserEntity* const head = selection.mHead;
-      if (head == nullptr || entity == nullptr) {
-        return false;
-      }
-
-      SSelectionNodeUserEntity* const node = FindSelectionNodeByKey(selection, SelectionKeyFromEntity(entity));
-      if (node == nullptr || node == head) {
-        return false;
-      }
-
-      (void)EraseSelectionNodeAndAdvance(selection, node);
-      return true;
-    }
-
     void FixupAfterSelectionErase(
-      SSelectionSetUserEntity& selection,
+      WeakEntitySetUserEntity& selection,
       SSelectionNodeUserEntity* node,
       SSelectionNodeUserEntity* nodeParent
     )
@@ -6192,7 +6176,7 @@ namespace moho
      * its intrusive weak-owner chain lane, and returns the next in-order node.
      */
     [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
-    EraseSelectionNodeAndAdvance(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node)
+    EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
     {
       if (selection.mHead == nullptr || IsSelectionNil(node)) {
         throw std::out_of_range("invalid map/set<T> iterator");
@@ -7975,6 +7959,32 @@ namespace moho
    * Resolves one weak-set tree node for `entity` and writes one `{set,node}`
    * cursor pair to `outResult`.
    */
+  /**
+   * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
+   *
+   * What it does:
+   * Removes one user-entity key from a weak set. The binary parks a marker in
+   * the entity's weak-owner chain for the duration of the erase and unwinds it
+   * afterwards, so the node teardown cannot lose the chain; that guard is what
+   * `ScopedSelectionOwnerLinkGuard` reproduces.
+   */
+  bool SSelectionSetUserEntity::Erase(WeakEntitySetUserEntity& set, UserEntity* const entity)
+  {
+    const SSelectionNodeUserEntity* const head = set.mHead;
+    if (head == nullptr || entity == nullptr) {
+      return false;
+    }
+
+    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
+    SSelectionNodeUserEntity* const node = FindSelectionNodeByKey(set, SelectionKeyFromEntity(entity));
+    if (node == nullptr || node == head) {
+      return false;
+    }
+
+    (void)EraseSelectionNodeAndAdvance(set, node);
+    return true;
+  }
+
   SSelectionSetUserEntity::FindResult* SSelectionSetUserEntity::Find(
     FindResult* const outResult,
     SSelectionSetUserEntity* const set,
@@ -8902,7 +8912,7 @@ namespace moho
   void CWldSession::RemoveFromExtraSelectList(UserEntity* const entity)
   {
     SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
-    if (!EraseSelectionEntity(extraSelection, entity)) {
+    if (!SSelectionSetUserEntity::Erase(extraSelection, entity)) {
       return;
     }
 
