@@ -630,7 +630,12 @@ namespace moho
     std::int32_t mNukeSiloStorageCount;        // +0x034
     std::int32_t mTacticalSiloMaxStorageCount; // +0x038
     std::int32_t mNukeSiloMaxStorageCount;     // +0x03C
-    EntId mUnknown40;             // +0x040
+    /// Id of the entity that takes this unit's selection over when it dies, or
+    /// the `0xF0000000` sentinel when there is none. `~UserUnit` (0x008BFA49,
+    /// reading this field at UserUnit+0x1D8) is its only known consumer: it
+    /// resolves the id, adds that entity to the current selection and hands it
+    /// this unit's selection-set names. Points the opposite way from `mCreator`.
+    EntId mSelectionInheritorId;  // +0x040
     msvc8::string mCustomName;    // +0x044
     SSTIUnitEconomyPair mProduced;         // +0x060
     SSTIUnitEconomyPair mResourcesSpent;   // +0x068
