@@ -13876,6 +13876,20 @@ extern "C"
 	 */
 	void luaE_freethread(lua_State* const state, lua_State* const thread)
 	{
+		// `lstate` names the currently-executing thread and is only ever the
+		// main thread or one that is live: `luaV_execute` sets it on entry and
+		// puts the previous one back on exit. Collecting the thread it happens
+		// to name breaks that, and every later `GetActiveCState()` then hands
+		// out a freed `lua_State` whose `top` points into whatever the
+		// allocator did with the block - the observed fault was a push through
+		// a `top` sitting in the uncommitted tail of a heap segment. The binary
+		// does not need this because it cannot reach here with `lstate` stale;
+		// dropping back to the main thread restores its invariant.
+		global_State* const globalState = state->l_G;
+		if (globalState != nullptr && globalState->lstate == thread) {
+			globalState->lstate = globalState->mainthread;
+		}
+
 		luaF_close(thread, thread->stack);
 		(void)luaM_realloc(state, thread->base_ci, sizeof(CallInfo) * thread->size_ci, 0u);
 		(void)luaM_realloc(state, thread->stack, sizeof(TObject) * thread->stacksize, 0u);
