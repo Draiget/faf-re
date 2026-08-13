@@ -9919,7 +9919,17 @@ namespace moho
     // Every registered unit gets its beat. The stat is what the profiler reads
     // as "how much work is one beat", so it is published even for an empty list.
     {
-      gpg::core::FastVectorN<UserEntity*, 81> tickers;
+      // Heap-backed on purpose. `Collect` takes the vector by its
+      // `gpg::fastvector<T>` base, and the base's grow path frees `start_`
+      // unconditionally - it has no `originalVec_` word to test against. Hand
+      // it an inline `FastVectorN` and the first push past the inline capacity
+      // calls `delete[]` on the inline buffer, which here would be a stack
+      // address. The binary gets away with an inline lane because its collect
+      // family is templated on the concrete vector type, so the grow helper it
+      // emits (sub_505BA0) reads `originalVec_` at +0x0C and skips the free.
+      // Until that template is restored, the base-typed API must be handed a
+      // vector that really does own its storage.
+      gpg::fastvector<UserEntity*> tickers;
       auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
       (void)spatialDb->Collect(tickers, ENTITYTYPE_Unit);
 

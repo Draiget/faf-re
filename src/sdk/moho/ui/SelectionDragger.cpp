@@ -331,7 +331,10 @@ namespace moho
     }
 
     CGeomSolid3 selectionSolid = dragger.BuildSelectionSolid();
-    gpg::fastvector_n<UserEntity*, 20> collectedEntities;
+    // Heap-backed: `CollectInVolume` takes the base `gpg::fastvector<T>&`,
+    // whose grow path frees `start_` without an `originalVec_` test. See the
+    // note in CWldSession::DoBeat.
+    gpg::fastvector<UserEntity*> collectedEntities;
 
     auto* const spatialDb = reinterpret_cast<SpatialDB_MeshInstance*>(dragger.mSess->GetEntitySpatialDbStorage());
     (void)spatialDb->CollectInVolume(collectedEntities, ENTITYTYPE_Unit, &selectionSolid);
