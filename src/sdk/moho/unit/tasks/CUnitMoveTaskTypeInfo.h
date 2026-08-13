@@ -69,6 +69,38 @@ namespace moho
      * move-task type descriptor.
      */
     static void AssignDtorCallbacks(CUnitMoveTaskTypeInfo& typeInfo);
+
+    /**
+     * Address: 0x0061A010 (FUN_0061A010, Moho::CUnitMoveTaskTypeInfo::AddBase_CCommandTask)
+     *
+     * What it does:
+     * Registers the `CCommandTask` primary base at offset 0.
+     */
+    static void AddBase_CCommandTask(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0061A070 (FUN_0061A070, Moho::CUnitMoveTaskTypeInfo::AddBase_Listener_EAiNavigatorEvent)
+     *
+     * What it does:
+     * Registers the `Listener<EAiNavigatorEvent>` sub-object base at +0x34.
+     */
+    static void AddBase_Listener_EAiNavigatorEvent(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0061A0D0 (FUN_0061A0D0, Moho::CUnitMoveTaskTypeInfo::AddBase_Listener_EFormationdStatus)
+     *
+     * What it does:
+     * Registers the `Listener<EFormationdStatus>` sub-object base at +0x44.
+     */
+    static void AddBase_Listener_EFormationdStatus(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0061A130 (FUN_0061A130, Moho::CUnitMoveTaskTypeInfo::AddBase_Listener_ECommandEvent)
+     *
+     * What it does:
+     * Registers the `Listener<ECommandEvent>` sub-object base at +0x54.
+     */
+    static void AddBase_Listener_ECommandEvent(gpg::RType* typeInfo);
   };
 
   /**

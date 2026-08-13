@@ -145,6 +145,14 @@ namespace moho
     ~CCommandTaskTypeInfo() override;
 
     /**
+     * Address: 0x0060C210 (FUN_0060C210, Moho::CCommandTaskTypeInfo::AddBase_CTask)
+     *
+     * What it does:
+     * Registers `CTask` as the primary base at offset 0.
+     */
+    static void AddBase_CTask(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x00608D20 (FUN_00608D20, ?GetName@CCommandTaskTypeInfo@Moho@@UBEPBDXZ)
      * Slot: 3
      */

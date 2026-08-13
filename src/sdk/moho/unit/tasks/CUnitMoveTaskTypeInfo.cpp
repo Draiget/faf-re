@@ -132,10 +132,10 @@ namespace moho
     size_ = sizeof(CUnitMoveTask);
     AssignAllLifecycleCallbacks(*this);
     gpg::RType::Init();
-    AddBaseField(this, CachedCCommandTaskType(), 0);
-    AddBaseField(this, CachedListenerEAiNavigatorEventType(), 0x34);
-    AddBaseField(this, CachedListenerEFormationdStatusType(), 0x44);
-    AddBaseField(this, CachedListenerECommandEventType(), 0x54);
+    AddBase_CCommandTask(this);
+    AddBase_Listener_EAiNavigatorEvent(this);
+    AddBase_Listener_EFormationdStatus(this);
+    AddBase_Listener_ECommandEvent(this);
     Finish();
   }
 
@@ -176,6 +176,55 @@ namespace moho
   {
     typeInfo.deleteFunc_ = &Delete_CUnitMoveTask;
     typeInfo.dtrFunc_ = &Destruct_CUnitMoveTask;
+  }
+
+  /**
+   * Address: 0x0061A010 (FUN_0061A010, Moho::CUnitMoveTaskTypeInfo::AddBase_CCommandTask)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CUnitMoveTaskTypeInfo::AddBase_CCommandTask(gpg::RType *typeInfo);
+   *
+   * What it does:
+   * Registers `CCommandTask` as the primary base at offset 0. The binary emits
+   * one of these per base rather than a shared offset-taking helper, so each
+   * base gets its own cached `sType` lookup.
+   */
+  void CUnitMoveTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  {
+    AddBaseField(typeInfo, CachedCCommandTaskType(), 0);
+  }
+
+  /**
+   * Address: 0x0061A070 (FUN_0061A070, Moho::CUnitMoveTaskTypeInfo::AddBase_Listener_EAiNavigatorEvent)
+   *
+   * What it does:
+   * Registers the `Listener<EAiNavigatorEvent>` sub-object base at +0x34.
+   */
+  void CUnitMoveTaskTypeInfo::AddBase_Listener_EAiNavigatorEvent(gpg::RType* const typeInfo)
+  {
+    AddBaseField(typeInfo, CachedListenerEAiNavigatorEventType(), 0x34);
+  }
+
+  /**
+   * Address: 0x0061A0D0 (FUN_0061A0D0, Moho::CUnitMoveTaskTypeInfo::AddBase_Listener_EFormationdStatus)
+   *
+   * What it does:
+   * Registers the `Listener<EFormationdStatus>` sub-object base at +0x44.
+   */
+  void CUnitMoveTaskTypeInfo::AddBase_Listener_EFormationdStatus(gpg::RType* const typeInfo)
+  {
+    AddBaseField(typeInfo, CachedListenerEFormationdStatusType(), 0x44);
+  }
+
+  /**
+   * Address: 0x0061A130 (FUN_0061A130, Moho::CUnitMoveTaskTypeInfo::AddBase_Listener_ECommandEvent)
+   *
+   * What it does:
+   * Registers the `Listener<ECommandEvent>` sub-object base at +0x54.
+   */
+  void CUnitMoveTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  {
+    AddBaseField(typeInfo, CachedListenerECommandEventType(), 0x54);
   }
 
   /**
