@@ -4258,18 +4258,6 @@ namespace moho
       bool found;
     };
 
-    [[nodiscard]] SSelectionNodeUserEntity* CreateSelectionSetHeadNode()
-    {
-      auto* const head = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
-      std::memset(head, 0, sizeof(SSelectionNodeUserEntity));
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      head->mColor = 1u;
-      head->mIsSentinel = 1u;
-      return head;
-    }
-
     /**
      * Address: 0x007B25C0 (FUN_007B25C0)
      *
@@ -4281,7 +4269,7 @@ namespace moho
       SSelectionSetUserEntity* const set
     )
     {
-      SSelectionNodeUserEntity* const head = CreateSelectionSetHeadNode();
+      SSelectionNodeUserEntity* const head = AllocateWeakEntitySetHead();
       set->mHead = head;
       head->mIsSentinel = 1u;
       head->mParent = head;
@@ -10061,13 +10049,13 @@ namespace moho
   {
     SSelectionSetUserEntity addedEntities{};
     addedEntities.mAllocProxy = nullptr;
-    addedEntities.mHead = CreateSelectionSetHeadNode();
+    addedEntities.mHead = AllocateWeakEntitySetHead();
     addedEntities.mSize = 0u;
     addedEntities.mSizeMirrorOrUnused = 0u;
 
     SSelectionSetUserEntity removedEntities{};
     removedEntities.mAllocProxy = nullptr;
-    removedEntities.mHead = CreateSelectionSetHeadNode();
+    removedEntities.mHead = AllocateWeakEntitySetHead();
     removedEntities.mSize = 0u;
     removedEntities.mSizeMirrorOrUnused = 0u;
 
@@ -10141,7 +10129,7 @@ namespace moho
   {
     SSelectionSetUserEntity nextSelection{};
     nextSelection.mAllocProxy = nullptr;
-    nextSelection.mHead = CreateSelectionSetHeadNode();
+    nextSelection.mHead = AllocateWeakEntitySetHead();
     nextSelection.mSize = 0u;
     nextSelection.mSizeMirrorOrUnused = 0u;
 
