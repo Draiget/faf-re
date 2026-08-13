@@ -8805,7 +8805,12 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 
   delete outSyncData;
   outSyncData = new SSyncData{};
+  // The four scalars the client reads its clocks off. Without `mCurTick` the
+  // session's `mGameTick` never moves, which is what froze the game clock.
   outSyncData->mCurBeat = static_cast<int32_t>(mCurBeat);
+  outSyncData->mCurTick = static_cast<int32_t>(mCurTick);
+  outSyncData->mAdvanced = mAdvancedThisTick;
+  outSyncData->mFocusArmy = mSyncFilter.focusArmy;
   SnapshotSyncReserveCounts(
     *outSyncData,
     *reinterpret_cast<SyncReserveCountsRuntimeView*>(mSyncReserveCounts)
@@ -8831,8 +8836,14 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     outSyncData->mSubmitArmyStats.assign_owned(std::string_view(armyStatsXml.data(), armyStatsXml.size()));
   }
 
-  // +0x08FC latch: cleared by Sync after one beat is fully published.
+  // 0x00748311..0x00748336: the beat is published, so retire it. The
+  // advanced-this-tick latch is consumed with it, and the game-over flag the
+  // rules layer raised becomes the one the client is told about.
   mDidProcess = false;
+  ++mCurBeat;
+  FlushLog();
+  mAdvancedThisTick = false;
+  mGameOver = mGameEnded;
 }
 
 /**
