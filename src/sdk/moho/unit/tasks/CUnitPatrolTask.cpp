@@ -850,7 +850,7 @@ namespace moho
       if (unit->ArmyRef->GetAllianceWith(candidateArmy) == ALLIANCE_Ally) {
         // Spawn the repair sub-task the binary spawns here (0x0061C130 ->
         // CUnitRepairTask operator new `_0` at 0x005F8DA0 -> ctor 0x005F8C80).
-        (void)new (std::nothrow) CUnitRepairTask(mDispatch, candidateUnit, false);
+        (void)CUnitRepairTask::Allocate(mDispatch, candidateUnit, false);
         mMoving = false;
         return 7;
       }

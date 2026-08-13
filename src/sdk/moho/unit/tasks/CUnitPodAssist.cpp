@@ -134,7 +134,7 @@ namespace
     const bool isSiloBuild
   )
   {
-    (void)new (std::nothrow) moho::CUnitRepairTask(AsDispatchImpl(task->mDispatchTask), targetUnit, isSiloBuild);
+    (void)moho::CUnitRepairTask::Allocate(AsDispatchImpl(task->mDispatchTask), targetUnit, isSiloBuild);
   }
 
   void DispatchReclaimTask(moho::CUnitPodAssist* const task, moho::Entity* const targetEntity)

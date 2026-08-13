@@ -1603,9 +1603,9 @@ namespace moho
       }
 
       if (shouldIssueRepairTask) {
-        (void)new (std::nothrow) moho::CUnitRepairTask(dispatchTask, targetUnit, false);
+        (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, false);
       } else if (targetUnit->AiBuilder != nullptr && targetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
-        (void)new (std::nothrow) moho::CUnitRepairTask(dispatchTask, targetUnit, true);
+        (void)moho::CUnitRepairTask::Allocate(dispatchTask, targetUnit, true);
       }
       return;
     }

@@ -164,6 +164,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x005F9E50 (FUN_005F9E50, Moho::CUnitRepairTask::operator new)
+   *
+   * IDA signature:
+   * int *__cdecl Moho::CUnitRepairTask::operator new(
+   *     Moho::IAiCommandDispatchImpl *dispatch, Moho::Unit *target, bool isSilo);
+   *
+   * What it does:
+   * Allocates 0x9C bytes through the plain global `operator new`, constructs a
+   * repair task in that storage when the allocation succeeded, and returns it.
+   *
+   * Note this is the throwing `operator new` with an explicit null check, not
+   * the `std::nothrow` overload: the binary calls `??2@YAPAXI@Z` and branches
+   * on the result. All five creation sites share this one out-of-line copy.
+   */
+  CUnitRepairTask* CUnitRepairTask::Allocate(
+    IAiCommandDispatchImpl* const dispatchTask,
+    Unit* const targetUnit,
+    const bool isSiloBuild
+  )
+  {
+    void* const storage = ::operator new(sizeof(CUnitRepairTask));
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (storage) CUnitRepairTask(dispatchTask, targetUnit, isSiloBuild);
+  }
+
+  /**
    * Address: 0x005F8E20 (FUN_005F8E20, ??1CUnitRepairTask@Moho@@QAE@@Z body)
    * Scalar deleting dtor thunk: 0x005F8FE0 (FUN_005F8FE0, vtable slot 0)
    *
