@@ -2,15 +2,14 @@
 
 #include <algorithm>
 #include <cstring>
-#include <filesystem>
 #include <limits>
 #include <new>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <typeinfo>
 
 #include "boost/weak_ptr.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/ResourceManager.h"
@@ -333,14 +332,38 @@ namespace moho
       return std::string{sourcePath.substr(0, markerPos)};
     }
 
+    /**
+     * Does `resourceName` resolve to a real file?
+     *
+     * These are VFS paths - `/env/evergreen/props/trees/groups/Pine06_GroupA_lod0.scm`
+     * lives inside `env.scd`, not on the host filesystem - so this has to go
+     * through the mount table the way 0x00518870 does: `boost::call_once` on
+     * the file-wait-handle set, then `FindFile`, treating a non-empty resolved
+     * path as "exists". A `std::filesystem::exists` here answered false for
+     * every archived file, which left every LOD's fallback mesh *and* its four
+     * fallback texture names empty. `RMeshBlueprint::GetMesh` then found no
+     * non-empty `mMeshName` to look up and returned an empty handle, and
+     * `Entity::SetMesh` logged "Failed to load mesh for blueprint …" - 5298
+     * times in one skirmish, against zero for the shipped binary.
+     */
     [[nodiscard]] bool ResourceFileExists(const std::string_view resourceName)
     {
       if (resourceName.empty()) {
         return false;
       }
 
-      std::error_code ec;
-      return std::filesystem::exists(std::filesystem::path{resourceName}, ec) && !ec;
+      FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+      if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
+        return false;
+      }
+
+      msvc8::string requestedPath{};
+      requestedPath.assign_owned(resourceName);
+
+      msvc8::string resolvedPath{};
+      const msvc8::string* const resolved =
+        waitHandleSet->mHandle->FindFile(&resolvedPath, requestedPath.c_str(), nullptr);
+      return resolved != nullptr && !resolved->empty();
     }
 
     void ResolveExplicitOrFallbackPath(
