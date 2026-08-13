@@ -13934,7 +13934,7 @@ void Unit::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& loc
 }
 
 /**
- * Address: 0x006AAF50 (?PickTargetPoint@Unit@Moho@@QBE_NAAH@Z)
+ * Address: 0x006AAF50 (FUN_006AAF50, ?PickTargetPoint@Unit@Moho@@QBE_NAAH@Z)
  *
  * What it does:
  * Picks a random index in `Blueprint->AI.TargetBones`; writes `-1` when

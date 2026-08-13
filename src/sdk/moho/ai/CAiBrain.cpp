@@ -1832,6 +1832,11 @@ namespace
     }
   }
 
+  constexpr int kAiBrainAllianceAnySentinel = 3;
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x006934E0 (FUN_006934E0, func_FillLuaTableWithEntities)
    *
@@ -1856,11 +1861,6 @@ namespace
     return outTable;
   }
 
-  constexpr int kAiBrainAllianceAnySentinel = 3;
-} // namespace
-
-namespace moho
-{
   /**
    * Address: 0x0057B290 (FUN_0057B290, func_GetUnitsAroundPoint)
    *

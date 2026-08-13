@@ -3342,20 +3342,12 @@ namespace moho
       return 1;
     }
 
+    // CSquadRuntimeView is a flat-field spelling of CSquad: its
+    // mUnitSlotBegin/mUnitSlotEnd at +0x10/+0x14 are mUnits.mVec's begin/end,
+    // and mSquadClass lands at +0x30 right past mUnits. The binary calls
+    // CSquad::GetUnits out of line here rather than open-coding the fill.
     LuaPlus::LuaObject unitTable{};
-    unitTable.AssignNewTable(state, 0, 0u);
-
-    int unitIndex = 1;
-    for (void** unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
-      Unit* const unit = DecodeSquadUnit(*unitSlot);
-      if (!unit) {
-        continue;
-      }
-
-      LuaPlus::LuaObject unitObject = unit->GetLuaObject();
-      unitTable.Insert(unitIndex, unitObject);
-      ++unitIndex;
-    }
+    (void)reinterpret_cast<const CSquad*>(squad)->GetUnits(&unitTable, state);
 
     unitTable.PushStack(state);
     return 1;

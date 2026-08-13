@@ -18,7 +18,7 @@
 #include "moho/resource/RResId.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/RRuleGameRules.h"
-#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -1169,7 +1169,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x1010E150 (FUN_1010E150)
+   * Address: 0x0051F710 (FUN_0051F710, Moho::RUnitBlueprintWeapon::GetMuzzleVelocity)
    * Mangled: ?GetMuzzleVelocity@RUnitBlueprintWeapon@Moho@@QBEMMPAVCRandomStream@2@@Z
    *
    * What it does:
