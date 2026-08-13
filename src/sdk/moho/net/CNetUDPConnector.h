@@ -167,7 +167,7 @@ namespace moho
 
     /**
       * Alias of FUN_0048B7F0 (non-canonical helper lane).
-     * Address: 0x100851A0 (sub_100851A0)
+     * Address: 0x0048B7F0 (FUN_0048B7F0, Moho::CNetUDPConnector::Push)
      * Slot: 9
      * Demangled: Moho::CNetUDPConnector::Push
      */

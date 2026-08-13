@@ -636,7 +636,7 @@ namespace moho
     void PostInit(RUnitBlueprint* ownerBlueprint, std::uint32_t weaponIndex) noexcept;
 
     /**
-     * Address: 0x1010E150 (FUN_1010E150)
+     * Address: 0x0051F710 (FUN_0051F710, Moho::RUnitBlueprintWeapon::GetMuzzleVelocity)
      * Mangled: ?GetMuzzleVelocity@RUnitBlueprintWeapon@Moho@@QBEMMPAVCRandomStream@2@@Z
      *
      * What it does:
