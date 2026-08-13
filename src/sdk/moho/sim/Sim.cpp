@@ -4429,11 +4429,11 @@ namespace
 
   [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelper(CWldSession* const session, const CmdId cmdId)
   {
-    if (!session || !session->mSessionRes1) {
+    if (!session || !session->mCommandManager) {
       return nullptr;
     }
 
-    auto* const commandManager = static_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
     return FindCommandIssueHelperInManager(commandManager, cmdId);
   }
 
@@ -28876,7 +28876,7 @@ namespace moho
     CWldSession* const session = WLD_GetActiveSession();
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
-    auto* const commandManager = static_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
 
     // The playable-rect source at terrain-res +0x04 is the live STIMap in this
     // build; STIMap::IsPlayable is the concrete method dispatched at 0x008B030F.

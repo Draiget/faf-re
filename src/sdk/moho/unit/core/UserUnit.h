@@ -9,6 +9,8 @@
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/misc/WeakPtr.h"
+#include "moho/sim/SimDriver.h"
 #include "Wm3AxisAlignedBox3.h"
 
 #include <cstddef>
@@ -375,6 +377,41 @@ namespace moho
      * the UI-side set membership follows the engine-side one.
      */
     static void AddToSelectionSet(UserUnit* target, UserUnit* source);
+    /**
+     * Address: 0x008BF420 (FUN_008BF420, ??0UserUnit@Moho@@QAE@@Z)
+     * Mangled: ??0UserUnit@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::UserUnit *__thiscall Moho::UserUnit::UserUnit(
+     *   Moho::CWldSession *session, Moho::UserUnit *this, Moho::SCreateUnitParams *params);
+     *
+     * What it does:
+     * Builds one client-side unit from a sim create packet: runs the UserEntity,
+     * IUnit and CScriptObject subobjects, copies the constant data, allocates the
+     * primary command manager (plus a second one for factories), and files the
+     * unit either into its army's quick-select avatar run or, failing that, into
+     * the engineer classification.
+     */
+    UserUnit(CWldSession* session, const SCreateUnitParams& params);
+
+    UserUnit(const UserUnit&) = delete;
+    UserUnit& operator=(const UserUnit&) = delete;
+
+    /**
+     * Address: 0x008C0750 (FUN_008C0750, Moho::UserUnit::UpdateUnitData)
+     *
+     * IDA signature:
+     * void __thiscall Moho::UserUnit::UpdateUnitData(
+     *   Moho::UserUnit *this, Moho::SSTIUnitVariableData *a2, int *result);
+     *
+     * What it does:
+     * Applies one replicated variable-data payload from a sync beat: assigns the
+     * payload, records the sync mask, re-seats both shared poses, re-resolves the
+     * creator weak reference (inheriting the creator's selection sets when a
+     * factory built this unit), and refreshes the command managers on a refresh
+     * flag.
+     */
+    void UpdateUnitData(const SSTIUnitVariableData& payload, std::uint32_t syncMask);
 
     /**
      * Address: 0x008BF190 (FUN_008BF190, Moho::UserUnit::RemoveSelectionSet)
@@ -407,12 +444,9 @@ namespace moho
     /// The CScriptObject subobject; `sizeof(CScriptObject) == 0x34`, so it
     /// ends exactly where the constant-data payload starts.
     std::uint8_t mScriptObjectStorage[0x34]{};           // 0x0150
-    std::uint8_t mBuildStateTag{};                       // 0x0184
-    std::uint8_t pad_0185_0188[0x0188 - 0x0185]{};
-    /// `SCreateUnitConstantData::mStatsRoot`, retained by the constructor.
-    boost::shared_ptr<void> mStatsRoot;                  // 0x0188
-    bool mIsFake; // 0x0190 (also `SCreateUnitConstantData::mFake`)
-    std::uint8_t pad_0191_0194[0x0194 - 0x0191]{};
+    /// The create packet's constant data, copied wholesale by the constructor
+    /// at 0x008BF4B4..0x008BF4E1. Same 0x10-byte layout the sim publishes.
+    SCreateUnitConstantData mUnitConstDat;               // 0x0184
     /// Zeroed by the constructor at 0x008BF590, just before the replicated
     /// variable-data payload is constructed.
     std::uint8_t mReserved0194{}; // 0x0194
@@ -431,7 +465,9 @@ namespace moho
 
     /// `mUnitVarDat.mCreator` resolved to a live entity and held weakly;
     /// `UpdateUnitData` re-points it whenever the replicated id changes.
-    std::uint8_t pad_03C0_03C8[0x3C8 - 0x3C0]{};
+    /// `mUnitVarDat.mCreator` resolved to a live entity and held weakly;
+    /// `UpdateUnitData` re-points it whenever the replicated id changes.
+    WeakPtr<UserEntity> mCreator;                        // 0x03C0
     UserUnitManager* mManager;        // 0x03C8
     UserUnitManager* mFactoryManager; // 0x03CC
     msvc8::set<msvc8::string> mSelectionSets; // 0x03D0
@@ -445,6 +481,8 @@ namespace moho
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
   static_assert(sizeof(UserUnit) == 0x3E8, "UserUnit size must be 0x3E8");
   static_assert(offsetof(UserUnit, mUnitVarDat) == 0x0198, "UserUnit::mUnitVarDat offset must be 0x0198");
+  static_assert(offsetof(UserUnit, mUnitConstDat) == 0x0184, "UserUnit::mUnitConstDat offset must be 0x0184");
+  static_assert(offsetof(UserUnit, mCreator) == 0x03C0, "UserUnit::mCreator offset must be 0x03C0");
   static_assert(
     offsetof(UserUnit, mManager) == 0x03C8, "UserUnit::mManager offset must be 0x03C8"
   );
@@ -455,9 +493,6 @@ namespace moho
   static_assert(
     offsetof(UserUnit, mScriptObjectStorage) == 0x0150, "UserUnit::mScriptObjectStorage offset must be 0x0150"
   );
-  static_assert(offsetof(UserUnit, mBuildStateTag) == 0x0184, "UserUnit::mBuildStateTag offset must be 0x0184");
-  static_assert(offsetof(UserUnit, mStatsRoot) == 0x0188, "UserUnit::mStatsRoot offset must be 0x0188");
-  static_assert(offsetof(UserUnit, mIsFake) == 0x0190, "UserUnit::mIsFake offset must be 0x0190");
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(

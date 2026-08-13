@@ -2265,12 +2265,12 @@ namespace
   [[nodiscard]] UserCommandIssueHelperRuntimeView*
   FindSessionCommandIssueHelperById(CWldSession* const session, const CmdId commandId) noexcept
   {
-    if (session == nullptr || session->mSessionRes1 == nullptr) {
+    if (session == nullptr || session->mCommandManager == nullptr) {
       return nullptr;
     }
 
     auto* const commandManager =
-      reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+      reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
     SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
     SessionCommandIssueMapNodeView* const node = FindSessionCommandIssueNode(issueMap, commandId);
     if (node == nullptr || node == issueMap.head) {
@@ -2581,11 +2581,11 @@ namespace
   void RemoveCommandIssueHelperFromActiveSessionMap(const UserCommandIssueHelper& helper) noexcept
   {
     CWldSession* const session = WLD_GetActiveSession();
-    if (session == nullptr || session->mSessionRes1 == nullptr) {
+    if (session == nullptr || session->mCommandManager == nullptr) {
       return;
     }
 
-    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+    auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session->mCommandManager);
     SessionCommandIssueMapView& issueMap = commandManager->commandIssueMap;
     SessionCommandIssueMapNodeView* const node =
       FindSessionCommandIssueNode(issueMap, static_cast<CmdId>(helper.mConstantData.cmd));
@@ -4398,7 +4398,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
 
   const std::uint32_t visionRange = GetIntelRangeMagnitude(this, UserUnitIntelLane::None);
   VisionDB::Handle*& visionHandle = GetUserUnitVisionHandle(this);
-  if (visionRange != 0u && visionHandle == nullptr && !mIsFake) {
+  if (visionRange != 0u && visionHandle == nullptr && !mUnitConstDat.mFake) {
     const Wm3::Vector2f zero(0.0f, 0.0f);
     struct SessionVisionRuntimeView
     {
@@ -4417,7 +4417,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
     return;
   }
 
-  if (mIsFake) {
+  if (mUnitConstDat.mFake) {
     delete visionHandle;
     visionHandle = nullptr;
     return;
@@ -5207,7 +5207,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
     }
   }
 
-  auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session.mSessionRes1);
+  auto* const commandManager = reinterpret_cast<SessionCommandManagerRuntimeView*>(session.mCommandManager);
   if (commandManager == nullptr || commandManager->commandIssueMap.head == nullptr) {
     return true;
   }

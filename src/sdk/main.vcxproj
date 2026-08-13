@@ -1610,6 +1610,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\command\CCommandDbTypeInfo.h" />
     <ClInclude Include="moho\command\CmdDefs.h" />
     <ClInclude Include="moho\command\CommandIssueHelper.h" />
+    <ClInclude Include="moho\command\CommandManager.h" />
     <ClInclude Include="moho\command\EUnitCommandTypeTypeInfo.h" />
     <ClInclude Include="moho\command\SSTICommandConstantData.h" />
     <ClInclude Include="moho\command\SSTICommandIssueData.h" />
