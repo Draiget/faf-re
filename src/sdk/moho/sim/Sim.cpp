@@ -11014,14 +11014,7 @@ Unit* Sim::CreateUnit(const SUnitConstructionParams& params, const bool doCallba
     }
   }
 
-  // The constructor body at 0x006A53F0 is still pending reconstruction.
-  // Keep the cap-gate behavior exact, but avoid a partial/incorrect Unit object.
-  Logf(
-    "CreateUnit(params: bp=%s, army=%d): Unit constructor path (0x006A53F0) pending lift.\n",
-    params.mBlueprint->mBlueprintId.raw_data_unsafe(),
-    params.mArmy->ArmyId
-  );
-  return nullptr;
+  return new Unit(params);
 }
 
 Unit* Sim::CreateUnitForScript(const SUnitConstructionParams& params, const bool doCallback)

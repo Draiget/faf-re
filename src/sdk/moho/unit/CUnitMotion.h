@@ -64,6 +64,19 @@ namespace moho
     CUnitMotion();
 
     /**
+     * Address: 0x006B7B60 (FUN_006B7B60, ??0CUnitMotion@Moho@@QAE@PAVUnit@1@@Z)
+     * Mangled: ??0CUnitMotion@Moho@@QAE@PAVUnit@1@@Z
+     *
+     * What it does:
+     * Gameplay constructor used by `Unit`'s gameplay constructor for any
+     * blueprint with a real motion type: binds the unit, seeds target
+     * position and facing from its spawn pose, sizes the physics body from
+     * the blueprint, primes fuel, samples the ground/water elevation under
+     * the spawn point, and gives aircraft a random cruise offset.
+     */
+    explicit CUnitMotion(Unit* unit);
+
+    /**
      * Address: 0x006B8320 (FUN_006B8320, Moho::CUnitMotion::~CUnitMotion)
      * Mangled: ??1CUnitMotion@Moho@@QAE@XZ
      *

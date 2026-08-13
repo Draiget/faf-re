@@ -2841,7 +2841,7 @@ namespace moho
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(pad_0128, 0, sizeof(pad_0128));
+    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -2934,7 +2934,7 @@ namespace moho
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(pad_0128, 0, sizeof(pad_0128));
+    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -3024,7 +3024,7 @@ namespace moho
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(pad_0128, 0, sizeof(pad_0128));
+    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -3126,7 +3126,7 @@ namespace moho
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(pad_0128, 0, sizeof(pad_0128));
+    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;

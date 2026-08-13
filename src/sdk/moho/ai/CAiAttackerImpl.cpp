@@ -23,6 +23,11 @@
 #include "moho/sim/STIMap.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/task/CTaskThread.h"
+#include "moho/task/CTask.h"
+#include "moho/task/CTaskThreadWeakPtrReflection.h"
+#include "moho/ai/CAiBrain.h"
+#include "moho/ai/LAiAttackerImpl.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -817,6 +822,41 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
   // mReportingState at +0xA0 — zero is the binary's default "no
   // event in flight" sentinel value for EAiAttackerEvent.
   view->mReportingState = static_cast<EAiAttackerEvent>(0);
+}
+
+/**
+ * Address: 0x005D6AA0 (FUN_005D6AA0, Moho::CAiAttackerImpl::CAiAttackerImpl)
+ *
+ * What it does:
+ * Gameplay constructor: same lane initialization as the deserialization ctor,
+ * then binds the owning unit and starts the attacker's task thread.
+ */
+CAiAttackerImpl::CAiAttackerImpl(Unit* const unit)
+  : CAiAttackerImpl()
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  view->mUnit = unit;
+  view->mReportingState = static_cast<EAiAttackerEvent>(State::AAS_CannotTarget);
+
+  // 0x005D6B81 reads the brain's *third* task stage (+0xB0) - the one our
+  // header still calls `mReservedThreadStage` - not the second. The dispatch
+  // is owned by the thread (`own = true`), so the thread deletes it.
+  CAiBrain* const brain = unit->ArmyRef->GetArmyBrain();
+  auto* const dispatch = new LAiAttackerImpl(this);
+  CTaskThread* const thread = CTask::CreateTaskThread(dispatch, brain->mReservedThreadStage, true);
+  (void)RelinkWeakPtrCTaskThread(&view->mThread, thread);
+}
+
+/**
+ * Address: 0x005D62B0 (FUN_005D62B0, ?AI_CreateAttacker@Moho@@YAPAVIAiAttacker@1@PAVUnit@1@@Z)
+ *
+ * What it does:
+ * Allocates one `CAiAttackerImpl` (0xA4 bytes) bound to `unit`, or returns
+ * null when the allocation fails.
+ */
+moho::CAiAttackerImpl* moho::AI_CreateAttacker(Unit* const unit)
+{
+  return new CAiAttackerImpl(unit);
 }
 
 bool CAiAttackerImpl::TryGetWeaponExtraData(const int index, WeaponExtraData& out) const

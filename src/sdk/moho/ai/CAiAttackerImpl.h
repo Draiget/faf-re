@@ -96,6 +96,26 @@ namespace moho
     CAiAttackerImpl() noexcept;
 
     /**
+     * Address: 0x005D6AA0 (FUN_005D6AA0, Moho::CAiAttackerImpl::CAiAttackerImpl)
+     *
+     * IDA signature:
+     * Moho::CAiAttackerImpl *__stdcall Moho::CAiAttackerImpl::CAiAttackerImpl(
+     *     Moho::CAiAttackerImpl *this, Moho::Unit *unit);
+     *
+     * What it does:
+     * Gameplay constructor. Runs the same lane initialization as the
+     * deserialization ctor above, binds `mUnit`, reports `AAS_CannotTarget`,
+     * and starts the attacker's own task thread on the owning brain's third
+     * task stage, driven by a freshly allocated `LAiAttackerImpl` dispatch.
+     *
+     * Note: the call site at 0x005D62E8 is labelled with the *no-arg*
+     * mangling `??0CAiAttackerImpl@Moho@@QAE@@Z` by IDA, but it pushes two
+     * stack arguments and its target is 0x005D6AA0, not the 0x005D69A0
+     * default ctor.
+     */
+    explicit CAiAttackerImpl(Unit* unit);
+
+    /**
      * Address: 0x005D6A60 (FUN_005D6A60)
      * Slot: 0
      * Demangled: public: __thiscall Moho::CAiAttackerImpl::~CAiAttackerImpl()
@@ -401,6 +421,16 @@ namespace moho
     std::uint8_t mLayoutPadding[0xA4 - sizeof(void*)] = {};
   };
   static_assert(sizeof(CAiAttackerImpl) == 0xA4, "CAiAttackerImpl size must be 0xA4");
+
+  /**
+   * Address: 0x005D62B0 (FUN_005D62B0, ?AI_CreateAttacker@Moho@@YAPAVIAiAttacker@1@PAVUnit@1@@Z)
+   *
+   * What it does:
+   * Allocates one attacker sidecar bound to `unit`. The sibling of
+   * `AI_CreateBuilder` / `AI_CreateSiloBuilder` / `AI_CreateTransport`, and the
+   * only way `Unit`'s gameplay constructor obtains one.
+   */
+  [[nodiscard]] CAiAttackerImpl* AI_CreateAttacker(Unit* unit);
 
   // Underlying Lua function-definition publishers referenced by this thunk pack.
   /**

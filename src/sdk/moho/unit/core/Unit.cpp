@@ -53,6 +53,9 @@
 #include "moho/resource/RResId.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/ai/CAiSteeringImpl.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
@@ -13694,6 +13697,355 @@ Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
   NeedSyncGameData = true;
 }
 
+namespace
+{
+  /** Half the yaw spread a randomly-facing spawn gets, in radians (~30 degrees). */
+  constexpr float kRandomSpawnYawLimit = 0.52359879f;
+
+  /** `SSTIUnitVariableData::mCreator` when the unit was not built by anything. */
+  constexpr moho::EntId kNoCreatorEntityId = static_cast<moho::EntId>(0xF0000000);
+
+  /** `UnitStateMask` bit set while a unit is still under construction. */
+  constexpr std::uint64_t kUnitStateBeingBuilt = 1ULL << 39;
+
+  /**
+   * Floor the two minima and ceil the two maxima of a skirt rectangle onto the
+   * occupancy grid, which is what the binary's four `frndint`s plus sign
+   * fixups come out to.
+   */
+  [[nodiscard]] gpg::Rect2i SkirtRectToOgridRect(const gpg::Rect2f& skirt) noexcept
+  {
+    return gpg::Rect2i{
+      static_cast<std::int32_t>(std::floor(skirt.x0)),
+      static_cast<std::int32_t>(std::floor(skirt.z0)),
+      static_cast<std::int32_t>(std::ceil(skirt.x1)),
+      static_cast<std::int32_t>(std::ceil(skirt.z1)),
+    };
+  }
+} // namespace
+
+/**
+ * Address: 0x006A53F0 (FUN_006A53F0, ??0Unit@Moho@@AAE@ABUSUnitConstructionParams@1@@Z)
+ * Mangled: ??0Unit@Moho@@AAE@ABUSUnitConstructionParams@1@@Z
+ *
+ * IDA signature:
+ * Moho::Unit *__stdcall Moho::Unit::Unit(Moho::Unit *unit,
+ *     const Moho::SUnitConstructionParams *params);
+ *
+ * What it does:
+ * The gameplay constructor - what `Sim::CreateUnit` calls, and the only way a
+ * unit comes into existence outside a savegame load. Reserves an entity id out
+ * of the owning army's id family, runs the blueprint-aware `Entity` base
+ * constructor, seeds health and attributes from the blueprint, resolves the
+ * spawn orientation and elevation, builds the intel manager, attaches every AI
+ * sidecar the blueprint calls for (motion/navigator/steering, weapons, builder,
+ * silo builder, transport, command queue, command dispatch), publishes the unit
+ * into `ArmyPool`, and runs `OnCreate` plus either `OnStartBeingBuilt` or
+ * `OnStopBeingBuilt`.
+ */
+Unit::Unit(const SUnitConstructionParams& params)
+  : IUnit()
+  , Entity(
+      const_cast<REntityBlueprint*>(static_cast<const REntityBlueprint*>(params.mBlueprint)),
+      params.mArmy->GetSim(),
+      static_cast<EntId>(params.mArmy->GetSim()->mEntityDB->DoReserveId(
+        static_cast<std::uint32_t>(params.mArmy->ArmyId) << 20
+      )),
+      ENTITYTYPE_Unit
+    )
+{
+  StatItem* const instanceStat = InstanceCounter<Unit>::GetStatItem();
+  InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&instanceStat->mPrimaryValueBits), 1L);
+
+  new (&VarDat()) SSTIUnitVariableData();
+
+  Sim* const sim = SimulationRef;
+  const RUnitBlueprint& blueprint = *params.mBlueprint;
+
+  // --- runtime lanes: the same zeroing the deserialization ctor above does --
+  UnitMotion = nullptr;
+  CommandQueue = nullptr;
+  CreatorRef = {};
+  CreatorRef.AsWeakPtr<Unit>().Set(params.mLinkSourceUnit);
+  TransportedByRef = {};
+  AssignedTransportRef = {};
+  FocusEntityRef = {};
+  TargetBlipEntityRef = {};
+  GuardedUnitRef = {};
+  GuardedPos.x = 0.0f;
+  GuardedPos.y = 0.0f;
+  GuardedPos.z = 0.0f;
+
+  GuardedByList.mSlots.begin = GuardedByList.mInlineSlots;
+  GuardedByList.mSlots.end = GuardedByList.mInlineSlots;
+  GuardedByList.mSlots.capacityEnd = GuardedByList.mInlineSlots + 4;
+  GuardedByList.mSlots.metadata = GuardedByList.mInlineSlots;
+
+  GuardFormation = nullptr;
+  mNeedsKillCleanup = false;
+  mCreationTick = sim->mCurTick;
+  mExtraStorage = nullptr;
+  PriorityBoost = 1;
+  mConsumptionData = nullptr;
+  ConsumptionActive = false;
+  ProductionActive = false;
+  ResourceConsumed = 0.0f;
+  AniActor = nullptr;
+  AiAttacker = nullptr;
+  AiCommandDispatch = nullptr;
+  AiNavigator = nullptr;
+  AiSteering = nullptr;
+  AiBuilder = nullptr;
+  AiSiloBuild = nullptr;
+  AiTransport = nullptr;
+  FootprintDown = false;
+  TransportLoadFactor = -1.0f;
+
+  SArmorMultiplierMapNode* const armorHead = AllocateArmorMultiplierMapNodeRaw();
+  ArmorMultipliers.head = armorHead;
+  armorHead->isNil = 1;
+  armorHead->parent = armorHead;
+  armorHead->left = armorHead;
+  armorHead->right = armorHead;
+  ArmorMultipliers.size = 0;
+
+  CurrentTerrainType = 0;
+  mDebugAIStates = false;
+
+  mInfoCache.mFormationLayer = nullptr;
+  mInfoCache.mFormationLeadRef = {};
+  mInfoCache.mFormationPriorityOrder = 0;
+  mInfoCache.mHasFormationSpeedData = false;
+  mInfoCache.mFormationTopSpeed = 0.0f;
+  mInfoCache.mFormationDistanceMetric = 0.0f;
+  mInfoCache.mFormationHeadingHint.x = 0.0f;
+  mInfoCache.mFormationHeadingHint.y = 0.0f;
+  mInfoCache.mFormationHeadingHint.z = 0.0f;
+
+  ReservedOgridRectMinX = 0;
+  ReservedOgridRectMinZ = 0;
+  ReservedOgridRectMaxX = 0;
+  ReservedOgridRectMaxZ = 0;
+
+  mBlipLastUpdateTick = 0;
+
+  mIsNotPod = false;
+  mIsEngineer = false;
+  mIsNaval = false;
+  mIsAir = false;
+  mUsesGridBasedMotion = false;
+  mIsMelee = false;
+  NeedSyncGameData = true;
+  CaptorCount = 0;
+
+  // --- blueprint-derived health and attributes ---------------------------
+  MaxHealth = blueprint.Defense.MaxHealth;
+  Health = params.mComplete != 0 ? blueprint.Defense.Health : 1.0f;
+  FractionCompleted = static_cast<float>(params.mComplete);
+  BeingBuilt = 0;
+  IntelAttributes.Initialize(&blueprint);
+
+  VarDat().mCreator = params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->id_ : kNoCreatorEntityId;
+  // Constructed in place over the unit's own attribute lane (unit+0x428),
+  // which is VarDat().mAttributes.
+  new (&Attributes) UnitAttributes(&blueprint, static_cast<const RRuleGameRulesImpl*>(sim->mRules));
+  VarDat().mCreationTick = sim->mCurTick;
+
+  SetAutoMode(blueprint.AI.InitialAutoMode != 0);
+  RunScript("OnPreCreate");
+
+  // --- intel manager -----------------------------------------------------
+  // The slot was nulled by the Entity base a moment ago, so the binary's
+  // release-the-previous-manager branch cannot be taken here.
+  mIntelManager = new CIntel(&blueprint.Intel, sim, ArmyRef->GetReconDB());
+
+  // --- spawn transform ---------------------------------------------------
+  VTransform spawnTransform = params.mTransform;
+  if (params.mUseLayerOverride == 0) {
+    // No caller-supplied orientation. Mobile units whose blueprint asks for it
+    // get a facing within +/-30 degrees of default so a batch of them does not
+    // spawn perfectly aligned; everything else faces the default direction.
+    if (blueprint.Display.SpawnRandomRotation != 0 && blueprint.IsMobile()) {
+      const float yaw = sim->mRngState->FRand(-kRandomSpawnYawLimit, kRandomSpawnYawLimit);
+      const Wm3::Vector3f yawAxis{0.0f, 1.0f, 0.0f};
+      Wm3::Quatf spawnRotation{};
+      (void)EulerRollToQuat(&yawAxis, &spawnRotation, yaw);
+      spawnTransform.orient_ = spawnRotation;
+    } else {
+      spawnTransform.orient_.x = 1.0f;
+      spawnTransform.orient_.y = 0.0f;
+      spawnTransform.orient_.z = 0.0f;
+      spawnTransform.orient_.w = 0.0f;
+    }
+  }
+
+  // --- placeholder mesh --------------------------------------------------
+  RMeshBlueprint* placeholderMesh = nullptr;
+  const msvc8::string placeholderName = gpg::STR_ToLower(blueprint.Display.PlaceholderMeshName.c_str());
+  if (!placeholderName.empty()) {
+    const msvc8::string meshPath =
+      gpg::STR_Printf("/units/%s/%s_mesh", placeholderName.c_str(), placeholderName.c_str());
+    msvc8::string meshFileName{};
+    (void)gpg::STR_CopyFilename(&meshFileName, &meshPath);
+
+    RResId placeholderId{};
+    placeholderId.name.assign_owned(meshFileName.view());
+    placeholderMesh = sim->mRules->GetMeshBlueprint(placeholderId);
+  }
+
+  // `mMeshRef` aliases the entity's borrowed RScmResource handle; a null object
+  // word means nothing has claimed the mesh lane yet.
+  if (mMeshRef.mObj == nullptr) {
+    SetMesh(blueprint.Display.MeshBlueprint, placeholderMesh, true);
+  }
+
+  // --- layer, terrain type and spawn elevation ---------------------------
+  SetCurrentLayer(GetStartingLayer(spawnTransform.pos_, static_cast<ELayer>(params.mLayer)));
+  UpdateTerrainType(spawnTransform.pos_);
+  if (params.mFixElevation == 0) {
+    spawnTransform.pos_.y =
+      IUnit::CalcSpawnElevation(sim->mMapData, mCurrentLayer, spawnTransform, VarDat().mAttributes);
+  }
+
+  PendingOrientation.x = spawnTransform.orient_.X();
+  PendingOrientation.y = spawnTransform.orient_.Y();
+  PendingOrientation.z = spawnTransform.orient_.Z();
+  PendingOrientation.w = spawnTransform.orient_.W();
+  PendingPosition = spawnTransform.pos_;
+  // Twice, as the binary does: the first call publishes the spawn pose into the
+  // current lane and the second copies it into the previous-frame lane, so the
+  // unit does not interpolate in from wherever that lane happened to point.
+  AdvanceCoords();
+  AdvanceCoords();
+
+  AniActor->GetPriorPoseShared()->SetWorldTransform(GetTransformWm3());
+  AniActor->GetPoseShared()->SetWorldTransform(GetTransformWm3());
+  VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
+  VarDat().mSharedPose = AniActor->GetPoseShared();
+
+  // --- motion, navigator, steering ---------------------------------------
+  // RULEUMT_None and RULEUMT_Special both leave the unit immobile; every value
+  // between them gets a navigator, and only RULEUMT_Air gets the air one.
+  const ERuleBPUnitMovementType motionType = blueprint.Physics.MotionType;
+  if (motionType >= RULEUMT_Land && motionType <= RULEUMT_AmphibiousFloating) {
+    UnitMotion = new CUnitMotion(this);
+    AiNavigator =
+      motionType == RULEUMT_Air ? AI_CreateAirNavigator(this) : AI_CreatePathingNavigator(this);
+    AiSteering = AI_CreateSteering(this, UnitMotion, mCurrentLayer);
+  } else {
+    // Immobile units claim their footprint at spawn. Ferry beacons and in-place
+    // upgrades are the exceptions: both sit on ground another unit already owns.
+    if (!IsInCategory("FERRYBEACON") && !IsInCategory("UPGRADE")) {
+      ExecuteOccupyGround();
+      FootprintDown = true;
+    }
+  }
+
+  // --- weapons -----------------------------------------------------------
+  for (const RUnitBlueprintWeapon& weaponBlueprint : blueprint.Weapons.WeaponBlueprints) {
+    if (weaponBlueprint.DummyWeapon != 0) {
+      continue;
+    }
+
+    if (AiAttacker == nullptr) {
+      AiAttacker = AI_CreateAttacker(this);
+      mConstDat.mBuildStateTag = 1;
+    }
+    AiAttacker->CreateWeapon(const_cast<RUnitBlueprintWeapon*>(&weaponBlueprint));
+  }
+
+  // --- builder -----------------------------------------------------------
+  if (!blueprint.Economy.BuildableCategories.empty() || IsInCategory("REBUILDER")) {
+    AiBuilder = AI_CreateBuilder(this);
+
+    if (IsInCategory("FACTORY")) {
+      AiBuilder->BuilderSetIsFactory(true);
+      if (UnitMotion == nullptr) {
+        const Wm3::Vector3f& position = GetPosition();
+        const SCoordsVec2 origin{position.x, position.z};
+        ReserveOgridRect(SkirtRectToOgridRect(GetBlueprint()->GetSkirtRect(origin)));
+      }
+    }
+  }
+
+  // --- silo builder and transport ----------------------------------------
+  if (IsInCategory("SILO")) {
+    AiSiloBuild = static_cast<CAiSiloBuildImpl*>(AI_CreateSiloBuilder(this));
+  }
+
+  if ((VarDat().mAttributes.commandCapsMask & RULEUCC_Transport) != 0 || IsInCategory("PODSTAGINGPLATFORM")) {
+    AiTransport = AI_CreateTransport(this);
+  }
+
+  // --- command plumbing --------------------------------------------------
+  CommandQueue = new CUnitCommandQueue(this);
+  AiCommandDispatch = static_cast<IAiCommandDispatchImpl*>(AI_CreateCommandDispatch(this));
+
+  // --- publish into the army pool ----------------------------------------
+  {
+    SEntitySetTemplateUnit spawnedSet{};
+    (void)spawnedSet.AddUnit(this);
+    ArmyRef->AssignUnitsToPlatoon(&spawnedSet, "ArmyPool");
+  }
+
+  if (AiBuilder != nullptr && AiBuilder->BuilderIsFactory()) {
+    AiBuilder->BuilderSetUpInitialRally();
+  }
+
+  InitializeArmor();
+  RunScript("OnCreate");
+
+  // --- being-built vs finished -------------------------------------------
+  CArmyStats* const armyStats = ArmyRef->GetArmyStats();
+  const char* const layerName = LayerToString(mCurrentLayer);
+  const LuaPlus::LuaObject creatorObject =
+    params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->GetLuaObject() : GetLuaObject();
+
+  if (params.mComplete == 0) {
+    UnitStateMask |= kUnitStateBeingBuilt;
+    BeingBuilt = 1;
+    if (armyStats != nullptr) {
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", &blueprint, 1.0f);
+    }
+    RunScript("OnStartBeingBuilt", creatorObject, layerName);
+  } else {
+    if (UnitMotion == nullptr) {
+      SEntitySetTemplateUnit overlapping{};
+      (void)CollectAllOverlapping(&overlapping, this);
+      for (Entity* const entry : overlapping.mVec) {
+        Unit* const neighbour = SEntitySetTemplateUnit::UnitFromEntry(entry);
+        if (neighbour == nullptr) {
+          continue;
+        }
+        RunScript("OnAdjacentTo", neighbour, this);
+        neighbour->RunScript("OnAdjacentTo", this, neighbour);
+      }
+    }
+
+    RunScript("OnStopBeingBuilt", creatorObject, layerName);
+
+    if (blueprint.General.CapCost > 0.0f && armyStats != nullptr) {
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", &blueprint, 1.0f);
+      const std::int32_t delta = 1;
+      (void)armyStats->UpdateUnitStat("Units_Active", &delta);
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_History", &blueprint, 1.0f);
+      (void)armyStats->UpdateUnitStat("Units_History", &delta);
+    }
+  }
+
+  if (ArmyRef != nullptr) {
+    ArmyRef->AddUnitToCategorySet(this);
+  }
+
+  // --- cached category flags ---------------------------------------------
+  mIsNotPod = IsInCategory("POD") || IsInCategory("STATIONASSISTPOD");
+  mIsEngineer = IsInCategory("ENGINEER");
+  mIsNaval = IsInCategory("NAVAL");
+  mIsAir = IsInCategory("AIR");
+  mIsMelee = IsInCategory("MELEE");
+  mUsesGridBasedMotion = IsInCategory("GRIDBASEDMOTION");
+}
+
 /**
  * Address: 0x006AD3C0 (FUN_006AD3C0,
  * ?MemberConstruct@Unit@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
@@ -13827,8 +14179,13 @@ VTransform const& Unit::GetTransform() const
 // 0x006A8B20
 RUnitBlueprint const* Unit::GetBlueprint() const
 {
-  const REntityBlueprint* const blueprint = BluePrint;
-  return blueprint ? blueprint->IsUnitBlueprint() : nullptr;
+  // The binary reaches this through the blueprint's virtual `IsUnitBlueprint`
+  // (slot 5). Blueprints here are modelled with an opaque vtable word that
+  // nothing populates, so that test always answered "not a unit blueprint" and
+  // this returned null for every unit. A `Unit` is only ever constructed from a
+  // `RUnitBlueprint` - both constructors take one, and `Entity::BluePrint` is
+  // the same pointer - so the cast is sound without the dispatch.
+  return static_cast<const RUnitBlueprint*>(BluePrint);
 }
 
 /**

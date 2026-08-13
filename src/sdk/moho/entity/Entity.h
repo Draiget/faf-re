@@ -1525,7 +1525,10 @@ namespace moho
     std::uint8_t mUseAltFootprintSecondary;    // 0x011D
     char pad_011E[2];                          // 0x011E
     boost::shared_ptr<CD3DBatchTexture> mStrategicUnderlayTexture; // 0x0120
-    char pad_0128[0x20];                                         // 0x0128
+    // 0x006A46A0 (`EntityAttributes::Initialize`) is called on this lane from
+    // the Unit gameplay ctor at entity+0x128, and it runs to +0x148 where
+    // SimulationRef starts - exactly one EntityAttributes.
+    EntityAttributes IntelAttributes;                            // 0x0128
     Sim* SimulationRef;                        // 0x0148
     // +0x014C is the owning army pointer in constructor/init and callsite evidence.
     // Attachment parent linkage is represented by mAttachInfo (+0x018C).

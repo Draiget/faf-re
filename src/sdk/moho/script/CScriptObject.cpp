@@ -745,7 +745,13 @@ void CScriptObject::CreateLuaObject(
   const LuaPlus::LuaObject& arg3
 )
 {
-  LuaPlus::LuaState* state = metaOrFactory.GetActiveState();
+  // 0x004C70D0 opens with a plain `fn->m_state` read and puts the whole body
+  // behind it. `GetActiveState()` is a different accessor - it walks
+  // m_state->m_state->l_G->lstate->stateUserData with no null checks - so
+  // asking it first crashed on every unbound factory object. Callers pass one
+  // routinely: `UnitWeapon` hands `CScriptEvent` a default-constructed
+  // LuaObject, exactly as the binary does at 0x006D4310.
+  LuaPlus::LuaState* const state = metaOrFactory.m_state;
   if (!state) {
     return;
   }

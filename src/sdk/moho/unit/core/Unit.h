@@ -34,6 +34,7 @@ namespace moho
   class CEconStorage;
   class CIntel;
   struct RUnitBlueprint;
+  struct SUnitConstructionParams;
   class ReconBlip;
   class StatItem;
   class UserUnit;
@@ -764,6 +765,22 @@ namespace moho
      * runtime lane on `sim`; invoked only by Unit::MemberConstruct.
      */
     explicit Unit(Sim* sim);
+
+    /**
+     * Address: 0x006A53F0 (FUN_006A53F0, ??0Unit@Moho@@AAE@ABUSUnitConstructionParams@1@@Z)
+     * Mangled: ??0Unit@Moho@@AAE@ABUSUnitConstructionParams@1@@Z
+     *
+     * What it does:
+     * Private gameplay constructor - the one `Sim::CreateUnit` uses, and the
+     * only way a unit is built outside a savegame load. Reserves an entity id
+     * from the army's id family, seeds health/attributes from the blueprint,
+     * resolves spawn orientation and elevation, attaches the AI sidecars the
+     * blueprint asks for, publishes the unit into `ArmyPool` and runs
+     * `OnCreate` plus `OnStartBeingBuilt`/`OnStopBeingBuilt`.
+     */
+    explicit Unit(const SUnitConstructionParams& params);
+
+    friend class Sim;
 
   public:
 

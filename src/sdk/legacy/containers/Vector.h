@@ -3032,6 +3032,62 @@ namespace msvc8
             _Init();
         }
 
+        // A destructor without copy operations leaves the compiler generating
+        // shallow ones, and a shallow copy hands two lists the same sentinel
+        // node: the first destructor frees the nodes and the head, the second
+        // walks freed memory. `ARMOR_GetArmorDefinations` returns one of these
+        // by value and hit exactly that as soon as units started being built.
+        list(const list& other)
+            : _Myhead(0)
+            , _Mysize(0)
+        {
+            _Init();
+            for (const_iterator it = other.begin(); it != other.end(); ++it) {
+                push_back(*it);
+            }
+        }
+
+        list& operator=(const list& other)
+        {
+            if (this != &other) {
+                clear();
+                for (const_iterator it = other.begin(); it != other.end(); ++it) {
+                    push_back(*it);
+                }
+            }
+            return *this;
+        }
+
+        // Moving hands over the whole node chain and leaves the source as a
+        // fresh empty list, so its destructor stays valid.
+        list(list&& other) noexcept
+            : _Myhead(other._Myhead)
+            , _Mysize(other._Mysize)
+        {
+            this->_Myproxy = other._Myproxy;
+            other._Myhead = 0;
+            other._Mysize = 0;
+            other._Myproxy = 0;
+            other._Init();
+        }
+
+        list& operator=(list&& other) noexcept
+        {
+            if (this != &other) {
+                _Tidy();
+                _Free_head();
+                _Free_proxy();
+                _Myhead = other._Myhead;
+                _Mysize = other._Mysize;
+                this->_Myproxy = other._Myproxy;
+                other._Myhead = 0;
+                other._Mysize = 0;
+                other._Myproxy = 0;
+                other._Init();
+            }
+            return *this;
+        }
+
         ~list()
         {
             _Tidy();
