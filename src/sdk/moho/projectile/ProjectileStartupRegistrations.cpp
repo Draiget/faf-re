@@ -30,7 +30,7 @@ namespace gpg
 {
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
     gpg::ReadArchive* archive,
-    int objectPtr,
+    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* broadcaster,
     int version,
     gpg::RRef* ownerRef
   );
@@ -3382,3 +3382,35 @@ namespace
 
   const ProjectileStartupRegistrationsLuaFuncDefBootstrap gProjectileStartupRegistrationsLuaFuncDefBootstrap{};
 } // namespace
+
+namespace gpg
+{
+  /**
+   * Address: 0x0069EF30 (FUN_0069EF30)
+   * Mangled: ?LoadAndBroadcastManyToOneListenerEProjectileImpactEvent@gpg@@YAXPAVReadArchive@1@PAV?$ManyToOneBroadcaster@W4EProjectileImpactEvent@Moho@@@Moho@@HPAVRRef@1@@Z
+   *
+   * IDA signature:
+   * void __cdecl sub_69EF30(gpg::ReadArchive *a1,
+   *     Moho::ManyToOneBroadcaster_EProjectileImpactEvent *result, int a3, struct gpg::RRef *a4);
+   *
+   * What it does:
+   * The `serLoadFunc_` lane `RManyToOneBroadcasterProjectileImpactTypeInfo::Init`
+   * (FUN_0069EA10) binds at +0x1C. Reads the archive's tracked pointer back as a
+   * `ManyToOneListener<EProjectileImpactEvent>` and hands it to the broadcaster,
+   * which re-points its owner-link slot at the restored node. The version word is
+   * not consulted - the lane has only ever had one layout.
+   */
+  void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
+    ReadArchive* const archive,
+    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* const broadcaster,
+    const int version,
+    RRef* const ownerRef
+  )
+  {
+    (void)version;
+
+    moho::ManyToOneListener<moho::EProjectileImpactEvent>* listener = nullptr;
+    (void)archive->ReadPointer_ManyToOneListener_EProjectileImpactEvent(&listener, ownerRef);
+    broadcaster->BroadcastEvent(listener);
+  }
+} // namespace gpg

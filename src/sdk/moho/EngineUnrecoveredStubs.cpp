@@ -98,11 +98,10 @@ namespace gpg
   // src/sdk/moho/unit/Broadcaster.cpp (FUN_006F8650) -- the no-op stub that
   // silently dropped the whole listener chain is gone.
   //
-  // LoadAndBroadcastManyToOneListenerEProjectileImpactEvent remains a no-op
-  // stub because its real body is not yet recovered in src/sdk/**. Load for
-  // that reflection lane is still lossy.
-  void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
-      gpg::ReadArchive*, int, int, gpg::RRef*) {}
+  // LoadAndBroadcastManyToOneListenerEProjectileImpactEvent is recovered in
+  // src/sdk/moho/projectile/ProjectileStartupRegistrations.cpp (FUN_0069EF30) --
+  // the no-op stub that silently dropped every deserialized impact listener is
+  // gone.
 }
 
 namespace moho
