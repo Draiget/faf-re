@@ -39,7 +39,12 @@ namespace moho
    */
   struct REntityBlueprint
   {
-    void* mVTable;                                            // +0x00
+    // +0x00 is the vtable word. It is a real vptr rather than an opaque pointer
+    // field, because the type tests below are virtuals in the binary
+    // (`??_7RUnitBlueprint@Moho@@6B@` slots 4 and 5) and nothing here ever
+    // fills in a hand-rolled table. Being polymorphic is also what lets the
+    // blueprint-kind test work: 0x00677360 asks the reflection system to
+    // upcast the blueprint to RUnitBlueprint, which needs a dynamic type.
     RRuleGameRules* mOwner;                                   // +0x04 (owner game-rules pointer)
     msvc8::string mBlueprintId;                               // +0x08
     msvc8::string mBlueprintLabel;                            // +0x24 (optional label used by unique-name formatting)
@@ -113,7 +118,7 @@ namespace moho
      * Releases strategic-icon weak-pointer lanes, destroys derived entity
      * string/vector fields, then tears down base blueprint ownership lanes.
      */
-    ~REntityBlueprint();
+    virtual ~REntityBlueprint();
 
     /**
      * Address: 0x00512060 (FUN_00512060)
@@ -130,7 +135,7 @@ namespace moho
      * What it does:
      * Base entity-blueprint mobility query. Returns false for the base type.
      */
-    [[nodiscard]] bool IsMobile() const;
+    [[nodiscard]] virtual bool IsMobile() const;
 
     /**
      * Address: 0x00511B70 (FUN_00511B70)
@@ -138,7 +143,7 @@ namespace moho
      * What it does:
      * Base entity-blueprint unit cast hook. Returns nullptr for the base type.
      */
-    [[nodiscard]] const RUnitBlueprint* IsUnitBlueprint() const;
+    [[nodiscard]] virtual const RUnitBlueprint* IsUnitBlueprint() const;
 
     /**
      * Address: 0x0050DF90 (FUN_0050DF90, Moho::RBlueprint::GetLuaBlueprint)

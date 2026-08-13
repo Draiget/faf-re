@@ -850,7 +850,7 @@ namespace moho
      * What it does:
      * Returns true when unit physics motion type is not `RULEUMT_None`.
      */
-    [[nodiscard]] bool IsMobile() const;
+    [[nodiscard]] bool IsMobile() const override;
 
     /**
      * Address: 0x0051E470 (FUN_0051E470)
@@ -859,7 +859,7 @@ namespace moho
      * What it does:
      * Returns `this` to mark the entity blueprint as a unit blueprint.
      */
-    [[nodiscard]] const RUnitBlueprint* IsUnitBlueprint() const;
+    [[nodiscard]] const RUnitBlueprint* IsUnitBlueprint() const override;
 
     /**
      * Address: 0x0051ED80 (FUN_0051ED80)

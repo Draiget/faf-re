@@ -1147,6 +1147,25 @@ namespace
       return BlueprintKind::Unknown;
     }
 
+    // 0x00677360 asks the reflection system to upcast the blueprint to each
+    // concrete type in turn (`REF_UpcastPtr` against `RUnitBlueprint::sType2`
+    // and friends) and takes the first that succeeds. `dynamic_cast` is the
+    // same question. The name-sniffing below is a fallback for blueprints whose
+    // concrete type is not one of the three - it used to be the *only* test,
+    // which meant a unit whose blueprint named neither "unit" nor its script
+    // class exactly "Unit" fell through to "can't tell the type of blueprint
+    // id '<x>'. No scripts for you", and then every GetWeaponClass on it
+    // returned nil.
+    if (dynamic_cast<const moho::RUnitBlueprint*>(blueprint) != nullptr) {
+      return BlueprintKind::Unit;
+    }
+    if (dynamic_cast<const moho::RProjectileBlueprint*>(blueprint) != nullptr) {
+      return BlueprintKind::Projectile;
+    }
+    if (dynamic_cast<const moho::RPropBlueprint*>(blueprint) != nullptr) {
+      return BlueprintKind::Prop;
+    }
+
     const std::string scriptModule = blueprint->mScriptModule.to_std();
     if (gpg::STR_ContainsNoCase(scriptModule.c_str(), "projectile")) {
       return BlueprintKind::Projectile;

@@ -23,8 +23,7 @@ namespace moho
    * footprint, life-bar, selection, and strategic-icon defaults.
    */
   REntityBlueprint::REntityBlueprint(RRuleGameRules* const owner, const RResId& resId)
-    : mVTable(nullptr)
-    , mOwner(nullptr)
+    : mOwner(nullptr)
     , mBlueprintId()
     , mBlueprintLabel()
     , mSource()
@@ -163,7 +162,8 @@ namespace moho
    * Address: 0x00511B70 (FUN_00511B70)
    *
    * What it does:
-   * Base entity-blueprint unit cast hook. Returns nullptr for the base type.
+   * Base entity-blueprint unit cast hook. Returns nullptr for the base type;
+   * `RUnitBlueprint` overrides it to return itself.
    */
   const RUnitBlueprint* REntityBlueprint::IsUnitBlueprint() const
   {
