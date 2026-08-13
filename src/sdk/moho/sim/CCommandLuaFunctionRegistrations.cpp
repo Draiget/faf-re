@@ -417,94 +417,10 @@ namespace
     return selectedUnits;
   }
 
-  /**
-   * Local mirror of `CameraImpl.cpp`'s anonymous helper: build one MSVC RB-tree
-   * head sentinel for `Moho::SSelectionSetUserEntity` and pre-link its
-   * Left/Right/Parent lanes back to itself, matching the engine layout used by
-   * the FUN_007AE1B0 (`WeakSet_UserEntity::Add`) insertion path.
-   */
-  [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateLocalSelectionSetHead()
-  {
-    auto* const head =
-      static_cast<moho::SSelectionNodeUserEntity*>(::operator new(sizeof(moho::SSelectionNodeUserEntity)));
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mKey = 0u;
-    head->mEnt.mOwnerLinkSlot = nullptr;
-    head->mEnt.mNextOwner = nullptr;
-    head->mColor = 1u;
-    head->mIsSentinel = 1u;
-    head->pad_1A[0] = 0u;
-    head->pad_1A[1] = 0u;
-    return head;
-  }
-
-  void InitializeLocalSelectionSet(moho::SSelectionSetUserEntity& set)
-  {
-    set.mAllocProxy = nullptr;
-    set.mHead = AllocateLocalSelectionSetHead();
-    set.mSize = 0u;
-    set.mSizeMirrorOrUnused = 0u;
-  }
-
-  /**
-   * Mirrors the engine teardown chain at FUN_007AF740 (`sub_7AF740` —
-   * `EraseRange` over the full tree) followed by `operator delete` on the head
-   * sentinel.
-   */
-  void DestroyLocalSelectionSet(moho::SSelectionSetUserEntity& set) noexcept
-  {
-    moho::SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr) {
-      return;
-    }
-
-    moho::SSelectionNodeUserEntity* outNode = nullptr;
-    (void)set.EraseRange(&outNode, head->mLeft, head);
-    ::operator delete(head);
-    set.mAllocProxy = nullptr;
-    set.mHead = nullptr;
-    set.mSize = 0u;
-    set.mSizeMirrorOrUnused = 0u;
-  }
-
-  class ScopedLocalSelectionSet final
-  {
-  public:
-    ScopedLocalSelectionSet() { InitializeLocalSelectionSet(mSet); }
-    ~ScopedLocalSelectionSet() { DestroyLocalSelectionSet(mSet); }
-
-    ScopedLocalSelectionSet(const ScopedLocalSelectionSet&) = delete;
-    ScopedLocalSelectionSet& operator=(const ScopedLocalSelectionSet&) = delete;
-
-    [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept { return mSet; }
-    [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept { return mSet; }
-
-  private:
-    moho::SSelectionSetUserEntity mSet{};
-  };
-
-  // Like ScopedLocalSelectionSet, but leaves the head storage uninitialized so a
-  // copy routine (e.g. `CopySessionSelectionSet`) allocates + populates it in one
-  // pass, matching the binary's raw-weak-set + `CopySelectionSetFromOther` idiom.
-  // The value-initialized `mHead` is null, and `DestroyLocalSelectionSet` tolerates
-  // a null head, so an empty/never-copied instance still tears down cleanly.
-  class ScopedCopiedSelectionSet final
-  {
-  public:
-    ScopedCopiedSelectionSet() = default;
-    ~ScopedCopiedSelectionSet() { DestroyLocalSelectionSet(mSet); }
-
-    ScopedCopiedSelectionSet(const ScopedCopiedSelectionSet&) = delete;
-    ScopedCopiedSelectionSet& operator=(const ScopedCopiedSelectionSet&) = delete;
-
-    [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept { return mSet; }
-    [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept { return mSet; }
-
-  private:
-    moho::SSelectionSetUserEntity mSet{};
-  };
+  // The selection weak-set lifetime helpers (`InitializeLocalSelectionSet`,
+  // `DestroyLocalSelectionSet`, `ScopedLocalSelectionSet`,
+  // `ScopedCopiedSelectionSet`) live with the type they manage, in
+  // `moho/sim/CWldSession.h`.
 
   // ---- UISelectionByCategory support (FUN_008662B0 / FUN_00865590) ----
 
@@ -642,7 +558,7 @@ namespace
     const moho::CategoryWordRangeView parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
 
     // Result set: start empty, optionally seed with the current selection.
-    ScopedLocalSelectionSet resultGuard{};
+    moho::ScopedLocalSelectionSet resultGuard{};
     moho::SSelectionSetUserEntity& resultSet = resultGuard.get();
     if (addToSelection && &resultSet != &session->mSelection) {
       for (moho::SSelectionNodeUserEntity* seedNode =

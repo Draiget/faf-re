@@ -357,8 +357,32 @@ namespace msvc8
 
             explicit rb_tree(const key_compare& comp) : carrier(comp), proxy_(nullptr), head_(buy_head()), size_(0) {}
 
-            rb_tree(const rb_tree&) = delete;
-            rb_tree& operator=(const rb_tree&) = delete;
+            /**
+             * MSVC8 `_Tree::_Tree(const _Myt&)`: stands a fresh head sentinel up
+             * and then runs `_Copy` over `other`. Observed for
+             * `msvc8::set<msvc8::string>` at 0x008C5B10, whose `_Copy` walk is
+             * FUN_008C5D50.
+             *
+             * `_Copy` clones the source's tree shape node for node; inserting the
+             * source in ascending order lands the same ordered contents through
+             * the rebalancing path already used by every other insert, so no
+             * second tree-building mechanic is introduced here.
+             */
+            rb_tree(const rb_tree& other)
+                : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
+            {
+                copy_from(other);
+            }
+
+            rb_tree& operator=(const rb_tree& other)
+            {
+                if (this != &other) {
+                    clear();
+                    static_cast<carrier&>(*this) = static_cast<const carrier&>(other);
+                    copy_from(other);
+                }
+                return *this;
+            }
 
             rb_tree(rb_tree&& other) noexcept
                 : carrier(static_cast<carrier&&>(other)), proxy_(nullptr), head_(nullptr), size_(0)
@@ -757,6 +781,21 @@ namespace msvc8
                 destroy_subtree(n->left);
                 destroy_subtree(n->right);
                 free_node(n);
+            }
+
+            /**
+             * MSVC8 `_Tree::_Copy`. Observed for `msvc8::set<msvc8::string>` at
+             * FUN_008C5D50, reached from the copy constructor at 0x008C5B10.
+             *
+             * Walks `other` in ascending key order and re-inserts each value, so
+             * the destination ends up with the same ordered contents. Assumes the
+             * destination is empty, which both callers guarantee.
+             */
+            void copy_from(const rb_tree& other)
+            {
+                for (node_type* n = other.leftmost(); !rb_is_nil(n); n = rb_increment(n)) {
+                    (void)insert_unique(n->value);
+                }
             }
 
             void adopt_from(rb_tree& other) noexcept

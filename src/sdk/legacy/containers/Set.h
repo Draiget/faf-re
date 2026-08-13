@@ -49,8 +49,20 @@ namespace msvc8
         set() MSVC8_SET_NOEXCEPT {}
         explicit set(const key_compare& comp) : tree_(comp) {}
 
-        set(const set&) = delete;
-        set& operator=(const set&) = delete;
+        /**
+         * Address: 0x008C5B10 (FUN_008C5B10, msvc8::set<msvc8::string>::set(const set&))
+         *
+         * What it does:
+         * Stands a fresh empty tree up and copies every key across through
+         * `_Copy` (FUN_008C5D50). `UserUnit::AddToSelectionSet` uses it to
+         * snapshot a unit's selection-set names before mutating the target's.
+         */
+        set(const set& o) : tree_(o.tree_) {}
+        set& operator=(const set& o)
+        {
+            tree_ = o.tree_;
+            return *this;
+        }
         set(set&& o) MSVC8_SET_NOEXCEPT : tree_(std::move(o.tree_)) {}
         set& operator=(set&& o) MSVC8_SET_NOEXCEPT
         {

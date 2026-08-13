@@ -19,6 +19,7 @@
 #include "moho/sim/BuildQueueCommandDecrement.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/EntityId.h"
 #include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/mesh/Mesh.h"
@@ -4243,6 +4244,32 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
     }
   }
 
+  // 0x008BFA49..0x008BFB1A: a unit that names a successor hands its selection
+  // over on the way out. The successor only joins the selection if this unit
+  // was itself selected, so an off-screen death never steals the player's
+  // current selection.
+  if (mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
+    ScopedCopiedSelectionSet selectionSnapshot{};
+    (void)CopySessionSelectionSet(&selectionSnapshot.get(), &entityView->mSession->mSelection);
+
+    SSelectionSetUserEntity::FindResult selfInSelection{};
+    (void)SSelectionSetUserEntity::Find(&selfInSelection, &selectionSnapshot.get(), entityView);
+
+    if (selfInSelection.mRes != selectionSnapshot.get().mHead) {
+      UserEntity* const inheritor =
+        entityView->mSession->LookupEntityId(static_cast<EntId>(mSelectionInheritorId));
+      if (inheritor != nullptr) {
+        SSelectionSetUserEntity::AddResult inserted{};
+        (void)SSelectionSetUserEntity::Add(&inserted, &selectionSnapshot.get(), inheritor);
+        entityView->mSession->SetSelection(selectionSnapshot.get());
+
+        if (UserUnit* const inheritorUnit = inheritor->IsUserUnit(); inheritorUnit != nullptr) {
+          UserUnit::AddToSelectionSet(inheritorUnit, this);
+        }
+      }
+    }
+  }
+
   mSelectionSets.clear();
 
   if (mFactoryManager != nullptr) {
@@ -4952,6 +4979,44 @@ void UserUnit::AddSelectionSet(const char* const selectionSetName)
   msvc8::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
   (void)mSelectionSets.insert(selectionSet);
+}
+
+/**
+ * Address: 0x008BFF30 (FUN_008BFF30, Moho::UserUnit::AddToSelectionSet)
+ *
+ * IDA signature:
+ * void __stdcall Moho::UserUnit::AddToSelectionSet(Moho::UserUnit *a1, Moho::UserUnit *a2);
+ *
+ * What it does:
+ * Hands every selection-set name owned by `source` to `target`, and tells the UI
+ * about each one through `/lua/ui/game/selection.lua:AddUnitToSelectionSet`.
+ * Called when a unit leaves play and its successor takes over its named sets
+ * (0x008BFAEE), and when a freshly replicated unit inherits them from the
+ * factory that built it (0x008C0956).
+ */
+void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
+{
+  if (source == nullptr) {
+    return;
+  }
+
+  // 0x008BFF41: the source's names are snapshotted before anything is added to
+  // the target, so the walk is stable even when `target == source`.
+  const msvc8::set<msvc8::string> inheritedNames = source->mSelectionSets;
+
+  LuaPlus::LuaObject selectionModule =
+    SCR_Import(WLD_GetActiveSession()->mState, "/lua/ui/game/selection.lua");
+  LuaPlus::LuaObject addUnitToSelectionSet = selectionModule["AddUnitToSelectionSet"];
+  LuaPlus::LuaFunction callback(addUnitToSelectionSet);
+
+  // 0x008BFF9E: the bridge is resolved once, but `GetLuaObject` is dispatched
+  // per name because the call below consumes the object.
+  IUnit* const targetBridge = GetIUnitBridge(target);
+  for (const msvc8::string& selectionSetName : inheritedNames) {
+    target->AddSelectionSet(selectionSetName.c_str());
+    const LuaPlus::LuaObject targetObject = targetBridge->GetLuaObject();
+    callback.Call_StringObject(std::string(selectionSetName.c_str(), selectionSetName.size()), targetObject);
+  }
 }
 
 /**

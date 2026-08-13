@@ -481,6 +481,81 @@ namespace moho
   static_assert(sizeof(SSelectionSetUserEntity::AddResult) == 0x0C, "SSelectionSetUserEntity::AddResult size must be 0x0C");
   static_assert(sizeof(SSelectionSetUserEntity::FindResult) == 0x08, "SSelectionSetUserEntity::FindResult size must be 0x08");
 
+  /** Brings one selection weak-set up empty, head sentinel included. */
+  inline void InitializeLocalSelectionSet(SSelectionSetUserEntity& set)
+  {
+    InitWeakEntitySetHead(set);
+    set.mSizeMirrorOrUnused = 0u;
+  }
+
+  /**
+   * Mirrors the engine teardown chain: `EraseRange` over the whole tree
+   * (FUN_007AF740) followed by `operator delete` on the head sentinel.
+   * Tolerates a null head so a never-populated set still tears down cleanly.
+   */
+  inline void DestroyLocalSelectionSet(SSelectionSetUserEntity& set) noexcept
+  {
+    SSelectionNodeUserEntity* const head = set.mHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* outNode = nullptr;
+    (void)set.EraseRange(&outNode, head->mLeft, head);
+    ::operator delete(head);
+    set.mAllocProxy = nullptr;
+    set.mHead = nullptr;
+    set.mSize = 0u;
+    set.mSizeMirrorOrUnused = 0u;
+  }
+
+  /**
+   * A transient selection weak-set that owns its head sentinel: the shape the
+   * binary builds on the stack whenever it needs to stage a selection before
+   * handing it to `CWldSession::SetSelection`.
+   *
+   * `SSelectionSetUserEntity` itself stays a raw ABI aggregate (it is embedded
+   * by value in `CWldSession` at +0x4A0, whose lifetime the engine drives), so
+   * the ownership lives here rather than in a destructor on the layout type.
+   */
+  class ScopedLocalSelectionSet final
+  {
+  public:
+    ScopedLocalSelectionSet() { InitializeLocalSelectionSet(mSet); }
+    ~ScopedLocalSelectionSet() { DestroyLocalSelectionSet(mSet); }
+
+    ScopedLocalSelectionSet(const ScopedLocalSelectionSet&) = delete;
+    ScopedLocalSelectionSet& operator=(const ScopedLocalSelectionSet&) = delete;
+
+    [[nodiscard]] SSelectionSetUserEntity& get() noexcept { return mSet; }
+    [[nodiscard]] const SSelectionSetUserEntity& get() const noexcept { return mSet; }
+
+  private:
+    SSelectionSetUserEntity mSet{};
+  };
+
+  /**
+   * Like `ScopedLocalSelectionSet`, but leaves the head storage unallocated so
+   * a copy routine (`CopySessionSelectionSet`) allocates and populates it in
+   * one pass, matching the binary's raw-weak-set + `CopySelectionSetFromOther`
+   * idiom.
+   */
+  class ScopedCopiedSelectionSet final
+  {
+  public:
+    ScopedCopiedSelectionSet() = default;
+    ~ScopedCopiedSelectionSet() { DestroyLocalSelectionSet(mSet); }
+
+    ScopedCopiedSelectionSet(const ScopedCopiedSelectionSet&) = delete;
+    ScopedCopiedSelectionSet& operator=(const ScopedCopiedSelectionSet&) = delete;
+
+    [[nodiscard]] SSelectionSetUserEntity& get() noexcept { return mSet; }
+    [[nodiscard]] const SSelectionSetUserEntity& get() const noexcept { return mSet; }
+
+  private:
+    SSelectionSetUserEntity mSet{};
+  };
+
   struct SSessionSaveData
   {
     SSessionSaveNodeMap mNodeMap; // +0x00

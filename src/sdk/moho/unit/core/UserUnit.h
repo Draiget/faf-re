@@ -363,6 +363,19 @@ namespace moho
     void AddSelectionSet(const char* selectionSetName);
 
     /**
+     * Address: 0x008BFF30 (FUN_008BFF30, Moho::UserUnit::AddToSelectionSet)
+     *
+     * IDA signature:
+     * void __stdcall Moho::UserUnit::AddToSelectionSet(Moho::UserUnit *a1, Moho::UserUnit *a2);
+     *
+     * What it does:
+     * Copies every selection-set name owned by `source` onto `target`, calling
+     * `/lua/ui/game/selection.lua:AddUnitToSelectionSet(name, unit)` for each so
+     * the UI-side set membership follows the engine-side one.
+     */
+    static void AddToSelectionSet(UserUnit* target, UserUnit* source);
+
+    /**
      * Address: 0x008BF190 (FUN_008BF190, Moho::UserUnit::RemoveSelectionSet)
      *
      * What it does:
@@ -428,8 +441,15 @@ namespace moho
     // 0x1BC
     float mWorkProgress; // normalized work/build progress for UI
 
-    // 0x1C0..0x1DB - unknown
-    std::uint8_t pad_01C0_01DC[0x1DC - 0x1C0]{};
+    // 0x1C0..0x1D7 - unknown
+    std::uint8_t pad_01C0_01D8[0x1D8 - 0x1C0]{};
+    /// Replicated id of the entity that takes over this unit's selection when
+    /// this one is destroyed, or `0xF0000000` when there is none. `~UserUnit`
+    /// tests it at 0x008BFA49 and, at 0x008BFA8A, feeds it to
+    /// `CWldSession::LookupEntityId` so the resolved entity joins the current
+    /// selection and inherits this unit's selection-set names. Distinct from
+    /// `mReplicatedCreatorId` at +0x198, which points the other way.
+    std::uint32_t mSelectionInheritorId{}; // 0x01D8 (EntId)
 
     // 0x1DC
     char mCustomNameStorage[0x04]; // getter returns this + 0x1DC
@@ -491,6 +511,9 @@ namespace moho
   static_assert(offsetof(UserUnit, mReserved0194) == 0x0194, "UserUnit::mReserved0194 offset must be 0x0194");
   static_assert(
     offsetof(UserUnit, mReplicatedCreatorId) == 0x0198, "UserUnit::mReplicatedCreatorId offset must be 0x0198"
+  );
+  static_assert(
+    offsetof(UserUnit, mSelectionInheritorId) == 0x01D8, "UserUnit::mSelectionInheritorId offset must be 0x01D8"
   );
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
