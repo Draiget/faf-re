@@ -14179,13 +14179,8 @@ VTransform const& Unit::GetTransform() const
 // 0x006A8B20
 RUnitBlueprint const* Unit::GetBlueprint() const
 {
-  // The binary reaches this through the blueprint's virtual `IsUnitBlueprint`
-  // (slot 5). Blueprints here are modelled with an opaque vtable word that
-  // nothing populates, so that test always answered "not a unit blueprint" and
-  // this returned null for every unit. A `Unit` is only ever constructed from a
-  // `RUnitBlueprint` - both constructors take one, and `Entity::BluePrint` is
-  // the same pointer - so the cast is sound without the dispatch.
-  return static_cast<const RUnitBlueprint*>(BluePrint);
+  const REntityBlueprint* const blueprint = BluePrint;
+  return blueprint ? blueprint->IsUnitBlueprint() : nullptr;
 }
 
 /**
