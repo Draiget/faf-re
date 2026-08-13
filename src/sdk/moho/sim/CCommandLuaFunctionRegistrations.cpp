@@ -596,7 +596,7 @@ namespace
 
       // Optional idle filter: not busy AND no queued commands.
       if (mustBeIdle) {
-        if (unit->mSelectableOverride /* +0x1A2: UI busy/not-idle gate */) {
+        if (unit->mUnitVarDat.mIsBusy) {
           continue;
         }
         if (moho::GetUserUnitManagerQueueSize(unit->mManager) != 0) {

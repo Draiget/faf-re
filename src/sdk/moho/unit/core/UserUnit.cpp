@@ -3484,12 +3484,14 @@ namespace
 
   [[nodiscard]] const UserUnitWeaponRuntimeView* GetWeaponInfoBegin(const UserUnit* const self) noexcept
   {
-    return reinterpret_cast<const UserUnitWeaponRuntimeView*>(self->mWeaponTable);
+    return reinterpret_cast<const UserUnitWeaponRuntimeView*>(self->mUnitVarDat.mWeaponInfo.data());
   }
 
   [[nodiscard]] const UserUnitWeaponRuntimeView* GetWeaponInfoEnd(const UserUnit* const self) noexcept
   {
-    return reinterpret_cast<const UserUnitWeaponRuntimeView*>(self->mWeaponTableEnd);
+    return reinterpret_cast<const UserUnitWeaponRuntimeView*>(
+      self->mUnitVarDat.mWeaponInfo.data() + self->mUnitVarDat.mWeaponInfo.size()
+    );
   }
 
   [[nodiscard]] bool ContainsBlueprintCategory(
@@ -4246,7 +4248,7 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
   // over on the way out. The successor only joins the selection if this unit
   // was itself selected, so an off-screen death never steals the player's
   // current selection.
-  if (mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
+  if (mUnitVarDat.mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
     ScopedCopiedSelectionSet selectionSnapshot{};
     (void)CopySessionSelectionSet(&selectionSnapshot.get(), &entityView->mSession->mSelection);
 
@@ -4255,7 +4257,7 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
 
     if (selfInSelection.mRes != selectionSnapshot.get().mHead) {
       UserEntity* const inheritor =
-        entityView->mSession->LookupEntityId(static_cast<EntId>(mSelectionInheritorId));
+        entityView->mSession->LookupEntityId(static_cast<EntId>(mUnitVarDat.mSelectionInheritorId));
       if (inheritor != nullptr) {
         SSelectionSetUserEntity::AddResult inserted{};
         (void)SSelectionSetUserEntity::Add(&inserted, &selectionSnapshot.get(), inheritor);
@@ -4584,7 +4586,7 @@ bool UserUnit::IsBeingBuilt() const
 bool UserUnit::Select()
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
-  if (iunitBridge == nullptr || !mSelectableOverride || !iunitBridge->IsMobile()) {
+  if (iunitBridge == nullptr || !mUnitVarDat.mIsBusy || !iunitBridge->IsMobile()) {
     return false;
   }
 
@@ -4797,7 +4799,7 @@ bool UserUnit::FindWeaponBy(
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
   const auto& weaponBlueprints = blueprint->Weapons.WeaponBlueprints;
-  const auto* const weaponRuntime = reinterpret_cast<const UserUnitWeaponRuntimeView*>(mWeaponTable);
+  const auto* const weaponRuntime = reinterpret_cast<const UserUnitWeaponRuntimeView*>(mUnitVarDat.mWeaponInfo.data());
 
   for (std::size_t i = 0; i < weaponBlueprints.size(); ++i) {
     const auto& weaponBlueprint = weaponBlueprints[i];
@@ -4836,7 +4838,7 @@ bool UserUnit::GetIntelRanges(float* const outOmniRange, float* const outRadarRa
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const std::uint32_t toggleCaps = iunitBridge->GetAttributes().toggleCapsMask;
-  if ((toggleCaps & kToggleCapIntel) != 0u && (mIntelToggleStateMask & kToggleCapIntel) != 0u) {
+  if ((toggleCaps & kToggleCapIntel) != 0u && (mUnitVarDat.mScriptbits & kToggleCapIntel) != 0u) {
     return false;
   }
 
@@ -4858,8 +4860,8 @@ bool UserUnit::GetMaxCounterIntel(float* const outMaxCounterIntelRange) const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const std::uint32_t toggleCaps = iunitBridge->GetAttributes().toggleCapsMask;
-  if (((toggleCaps & kToggleCapJamming) != 0u && (mIntelToggleStateMask & kToggleCapJamming) != 0u) ||
-      ((toggleCaps & kToggleCapStealth) != 0u && (mIntelToggleStateMask & kToggleCapStealth) != 0u)) {
+  if (((toggleCaps & kToggleCapJamming) != 0u && (mUnitVarDat.mScriptbits & kToggleCapJamming) != 0u) ||
+      ((toggleCaps & kToggleCapStealth) != 0u && (mUnitVarDat.mScriptbits & kToggleCapStealth) != 0u)) {
     return false;
   }
 
@@ -4896,7 +4898,7 @@ bool UserUnit::GetMaxCounterIntel(float* const outMaxCounterIntelRange) const
  */
 bool UserUnit::GetAutoMode() const
 {
-  return mAutoMode;
+  return mUnitVarDat.mAutoMode;
 }
 
 /**
@@ -4907,7 +4909,7 @@ bool UserUnit::GetAutoMode() const
  */
 bool UserUnit::IsAutoSurfaceMode() const
 {
-  return mAutoSurfaceMode;
+  return mUnitVarDat.mAutoSurfaceMode;
 }
 
 /**
@@ -4918,7 +4920,7 @@ bool UserUnit::IsAutoSurfaceMode() const
  */
 bool UserUnit::Func1() const
 {
-  return mRepeatQueueEnabled;
+  return mUnitVarDat.mRepeatQueue;
 }
 
 /**
@@ -4929,7 +4931,7 @@ bool UserUnit::Func1() const
  */
 bool UserUnit::IsOverchargePaused() const
 {
-  return mOverchargePaused;
+  return mUnitVarDat.mOverchargePaused;
 }
 
 /**
@@ -4940,7 +4942,7 @@ bool UserUnit::IsOverchargePaused() const
  */
 char* UserUnit::GetCustomName()
 {
-  return mCustomNameStorage;
+  return reinterpret_cast<char*>(&mUnitVarDat.mCustomName);
 }
 
 /**
@@ -4951,7 +4953,7 @@ char* UserUnit::GetCustomName()
  */
 float UserUnit::GetFuel() const
 {
-  return mFuelRatio;
+  return mUnitVarDat.mFuelRatio;
 }
 
 /**
@@ -4962,7 +4964,7 @@ float UserUnit::GetFuel() const
  */
 float UserUnit::GetShield() const
 {
-  return mShieldRatio;
+  return mUnitVarDat.mShieldRatio;
 }
 
 /**
@@ -5090,7 +5092,7 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
     if (iunitBridge->IsMobile() && targetEntity != nullptr) {
       const std::uint32_t targetLayerMask = targetEntity->mVariableData.mLayerMask;
 
-      if (mAutoSurfaceMode) {
+      if (mUnitVarDat.mAutoSurfaceMode) {
         if ((targetLayerMask & static_cast<std::uint32_t>(LAYER_Air)) != 0u
             && IsUnitInOverlayCategory(this, kOverlayCategoryAntiAir)) {
           return true;
@@ -6763,7 +6765,7 @@ int moho::cfunc_UserUnitGetWorkProgressL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   const UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  lua_pushnumber(rawState, userUnit->mWorkProgress);
+  lua_pushnumber(rawState, userUnit->mUnitVarDat.mWorkProgress);
   (void)lua_gettop(rawState);
   return 1;
 }
