@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "RDebugCollision.h"
 
 #include <cstdlib>
@@ -98,18 +99,6 @@ namespace
 
     auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
     node->ListUnlinkSelf();
-  }
-
-  void AddRDebugOverlayBase(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const baseType = CachedRDebugOverlayType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
   }
 
   /**
@@ -227,6 +216,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x0064C8D0 (FUN_0064C8D0)
+   *
+   * What it does:
+   * Registers `RDebugOverlay` as this type's reflected base at offset 0.
+   */
+  void RDebugCollisionTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
+  {
+    gpg::AddBaseIfPresent(typeInfo, CachedRDebugOverlayType(), 0);
+  }
+
+  /**
    * Address: 0x0064C340 (FUN_0064C340)
    */
   void RDebugCollisionTypeInfo::Init()
@@ -236,7 +236,7 @@ namespace moho
     deleteFunc_ = &DeleteRDebugCollisionOwned;
     ctorRefFunc_ = &ConstructRDebugCollisionRefInPlace;
     dtrFunc_ = &DestroyRDebugCollisionInPlace;
-    AddRDebugOverlayBase(this);
+    AddBase_RDebugOverlay(this);
     gpg::RType::Init();
     RegisterRDebugCollisionOverlayClass(this);
     Finish();
