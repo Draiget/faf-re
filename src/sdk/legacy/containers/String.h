@@ -221,6 +221,14 @@ namespace msvc8
         void assign_owned(const char* value);
 
         /**
+         * Strong-guarantee owning assignment for recovered MSVC8 paths whose
+         * original `basic_string::assign` allocates before releasing the old
+         * buffer and propagates allocation/length failures.
+         */
+        void assign_owned_strong(std::string_view value);
+        void assign_owned_strong(const char* value);
+
+        /**
          * Grows capacity to hold at least `need` characters, reallocating when
          * the current buffer is too small. Mirrors MSVC8's
          * `basic_string::_Copy`: the request is rounded up with `| 15`, and a
@@ -583,6 +591,33 @@ namespace msvc8
     };
 #pragma pack(pop)
     static_assert(sizeof(string) == 28, "MSVC8 string must be 28 bytes on x86");
+
+#pragma pack(push, 4)
+    /**
+     * Scope-owning form of the legacy string layout.
+     *
+     * The ABI-facing `msvc8::string` intentionally has no destructor because
+     * much of the reconstruction still performs explicit `_Tidy` calls. Local
+     * strings and value-container elements from the original binary did have
+     * ordinary RAII, so this same-size adapter restores that lifetime without
+     * changing the layout or globally double-freeing explicit-cleanup lanes.
+     */
+    class scoped_string final : public string
+    {
+    public:
+        scoped_string() noexcept = default;
+        explicit scoped_string(const char* value);
+        explicit scoped_string(std::string_view value);
+        scoped_string(const string& other);
+        scoped_string(const scoped_string& other);
+        scoped_string(scoped_string&& other) noexcept;
+        scoped_string& operator=(const string& other);
+        scoped_string& operator=(const scoped_string& other);
+        scoped_string& operator=(scoped_string&& other) noexcept;
+        ~scoped_string();
+    };
+#pragma pack(pop)
+    static_assert(sizeof(scoped_string) == 28, "MSVC8 scoped string must be 28 bytes on x86");
 
 
     /** std::string_view + msvc8::string */

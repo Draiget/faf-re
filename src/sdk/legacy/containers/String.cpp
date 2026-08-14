@@ -4,6 +4,8 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <stdexcept>
+#include <utility>
 
 // All three converting constructors copy, which is what MSVC8's
 // `std::basic_string` does: short input goes in the inline buffer, anything
@@ -214,6 +216,93 @@ void msvc8::string::assign_owned(const std::string_view value) {
 
 void msvc8::string::assign_owned(const char* const value) {
     assign_owned(std::string_view(value ? value : ""));
+}
+
+void msvc8::string::assign_owned_strong(const std::string_view value) {
+    if (value.size() > maxCapGuard) {
+        throw std::length_error("legacy string too long");
+    }
+
+    if (value.size() <= 15U) {
+        char inlineCopy[16]{};
+        if (!value.empty()) {
+            std::memcpy(inlineCopy, value.data(), value.size());
+        }
+
+        tidy(true, 0U);
+        if (!value.empty()) {
+            std::memcpy(bx.buf, inlineCopy, value.size());
+        }
+        mySize = static_cast<uint32_t>(value.size());
+        myRes = 15U;
+        bx.buf[mySize] = '\0';
+        return;
+    }
+
+    auto* const replacement = static_cast<char*>(::operator new(value.size() + 1U));
+    std::memcpy(replacement, value.data(), value.size());
+    replacement[value.size()] = '\0';
+
+    tidy(true, 0U);
+    bx.ptr = replacement;
+    mySize = static_cast<uint32_t>(value.size());
+    myRes = static_cast<uint32_t>(value.size());
+}
+
+void msvc8::string::assign_owned_strong(const char* const value) {
+    assign_owned_strong(std::string_view(value ? value : ""));
+}
+
+msvc8::scoped_string::scoped_string(const char* const value)
+  : string()
+{
+    assign_owned_strong(value);
+}
+
+msvc8::scoped_string::scoped_string(const std::string_view value)
+  : string()
+{
+    assign_owned_strong(value);
+}
+
+msvc8::scoped_string::scoped_string(const string& other)
+  : string()
+{
+    assign_owned_strong(other.basic_sanity() ? other.view() : std::string_view{});
+}
+
+msvc8::scoped_string::scoped_string(const scoped_string& other)
+  : scoped_string(static_cast<const string&>(other))
+{
+}
+
+msvc8::scoped_string::scoped_string(scoped_string&& other) noexcept
+  : string(std::move(static_cast<string&>(other)))
+{
+}
+
+msvc8::scoped_string& msvc8::scoped_string::operator=(const string& other)
+{
+    if (this != &other) {
+        assign_owned_strong(other.basic_sanity() ? other.view() : std::string_view{});
+    }
+    return *this;
+}
+
+msvc8::scoped_string& msvc8::scoped_string::operator=(const scoped_string& other)
+{
+    return operator=(static_cast<const string&>(other));
+}
+
+msvc8::scoped_string& msvc8::scoped_string::operator=(scoped_string&& other) noexcept
+{
+    string::operator=(std::move(static_cast<string&>(other)));
+    return *this;
+}
+
+msvc8::scoped_string::~scoped_string()
+{
+    tidy(true, 0U);
 }
 
 bool msvc8::string::equals_no_case(const std::string_view rhs) const noexcept {
