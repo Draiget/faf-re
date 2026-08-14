@@ -1,4 +1,5 @@
 #include "moho/ai/CAiSteeringImplTypeInfo.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdlib>
 #include <cstdint>
@@ -131,29 +132,7 @@ namespace
     return typeInfo;
   }
 
-  void AddIAiSteeringBase(gpg::RType* typeInfo)
-  {
-    gpg::RType* const baseType = CachedIAiSteeringType();
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = 0;
-    field.v4 = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
-  }
 
-  void AddCTaskBase(gpg::RType* typeInfo)
-  {
-    gpg::RType* const baseType = CachedCTaskType();
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = 4;
-    field.v4 = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
-  }
 
   /**
    * Address: 0x00BF8130 (FUN_00BF8130, cleanup_CAiSteeringImplTypeInfo)
@@ -208,6 +187,24 @@ const char* CAiSteeringImplTypeInfo::GetName() const
 }
 
 /**
+ * Address: 0x005D44D0 (FUN_005D44D0, Moho::CAiSteeringImplTypeInfo::AddBase_IAiSteering)
+ */
+void CAiSteeringImplTypeInfo::AddBase_IAiSteering(gpg::RType* const typeInfo)
+{
+  gpg::AddBaseIfPresent(typeInfo, CachedIAiSteeringType(), 0);
+}
+
+/**
+ * Address: 0x005D4530 (FUN_005D4530, Moho::CAiSteeringImplTypeInfo::AddBase_CTask)
+ *
+ * Offset 4: CTask is the second base, after IAiSteering at 0.
+ */
+void CAiSteeringImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+{
+  gpg::AddBaseIfPresent(typeInfo, CachedCTaskType(), 4);
+}
+
+/**
  * Address: 0x005D2240 (FUN_005D2240, ?Init@CAiSteeringImplTypeInfo@Moho@@UAEXXZ)
  */
 void CAiSteeringImplTypeInfo::Init()
@@ -215,8 +212,8 @@ void CAiSteeringImplTypeInfo::Init()
   size_ = sizeof(CAiSteeringImpl);
   (void)AssignCAiSteeringImplLifecycleCallbacks(this);
   gpg::RType::Init();
-  AddIAiSteeringBase(this);
-  AddCTaskBase(this);
+  AddBase_IAiSteering(this);
+  AddBase_CTask(this);
   Finish();
 }
 
