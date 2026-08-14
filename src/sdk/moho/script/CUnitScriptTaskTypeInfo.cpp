@@ -61,20 +61,6 @@ namespace
     return type;
   }
 
-  void AddBaseIfPresent(gpg::RType* const typeInfo, gpg::RType* const baseType, const int offset)
-  {
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = offset;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   [[nodiscard]] gpg::RRef MakeCUnitScriptTaskRef(CUnitScriptTask* object)
   {

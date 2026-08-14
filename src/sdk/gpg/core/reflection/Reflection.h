@@ -3410,6 +3410,16 @@ namespace gpg
   RRef* RRef_Listener_EAiTransportEvent(RRef* out, moho::Listener<moho::EAiTransportEvent>* value);
 
   /**
+   * Registers one reflected base on `typeInfo`, skipping silently when the
+   * base type has not been looked up yet.
+   *
+   * The binary emits a distinct `AddBase_*` member per base on each type info;
+   * they all reduce to this. Hoisted here because two TUs had already grown
+   * their own file-private copy.
+   */
+  void AddBaseIfPresent(RType* typeInfo, RType* baseType, std::int32_t offset);
+
+  /**
    * Address: 0x00572C90 (FUN_00572C90, gpg::RRef_Listener_EFormationdStatus)
    *
    * What it does:
