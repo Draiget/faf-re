@@ -1450,6 +1450,11 @@ namespace moho
  * Removes one runtime camera from manager ownership and restores the base
  * broadcaster node to its self-linked idle state.
  */
+[[nodiscard]] moho::Broadcaster* moho::CameraBroadcasterLink(moho::CameraImpl* const camera) noexcept
+{
+  return &AsRuntimeCameraBaseView(camera)->mBroadcaster;
+}
+
 [[nodiscard]] moho::Broadcaster* moho::DetachRuntimeCameraBase(moho::CameraImpl* const camera)
 {
   RuntimeCameraBaseView* const base = AsRuntimeCameraBaseView(camera);

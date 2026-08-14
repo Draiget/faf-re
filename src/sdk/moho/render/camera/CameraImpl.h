@@ -112,6 +112,19 @@ namespace moho
     "SCamFollowParams::mTargetTimeLeft offset must be 0x08"
   );
 
+  /**
+   * Byte size of a live `CameraImpl`.
+   *
+   * The class is declared thin - `sizeof(CameraImpl)` is one pointer, the
+   * vtable - while its state is reached through the runtime views in
+   * `CameraImpl.cpp` (base broadcaster at +0x04, `CScriptEvent` at +0x0C,
+   * frustum lanes at +0x460..+0x850). Anything allocating a camera must use
+   * this size, not `sizeof(CameraImpl)`: `RCamManager::CreateCamera`
+   * (0x007AA9C0) calls `operator new(0x858u)`, and the constructor writes the
+   * whole block.
+   */
+  inline constexpr std::size_t kCameraImplRuntimeSize = 0x858u;
+
   class CameraImpl
   {
   public:
@@ -772,6 +785,13 @@ namespace moho
    * broadcaster node to a self-linked idle state.
    */
   [[nodiscard]] Broadcaster* DetachRuntimeCameraBase(CameraImpl* camera);
+
+  /**
+   * The camera's own broadcaster ring node, at `camera+0x04` - the lane every
+   * `CameraImpl` tracking broadcast walks and the one `func_SetWorldCamera`
+   * splices the global tracking listener into.
+   */
+  [[nodiscard]] Broadcaster* CameraBroadcasterLink(CameraImpl* camera) noexcept;
 
   template <>
   class CScrLuaMetatableFactory<CameraImpl> final : public CScrLuaObjectFactory

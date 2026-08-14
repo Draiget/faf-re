@@ -84331,24 +84331,6 @@ namespace moho::runtime
   }
 
   /**
-   * Address: 0x00871640 (FUN_00871640, func_SetWorldCamera)
-   *
-   * What it does:
-   * Unlinks and resets the camera-tracking listener registry to self-sentinel,
-   * then splices the camera broadcaster subobject (`camera+0x04`) into the
-   * registry head/tail lanes and returns the new head lane.
-   */
-  LegacyIntrusiveNodeRuntimeView* LegacySetWorldCameraTrackingListenerRegistryRuntimeLane(
-    LegacyCameraWithBroadcasterNodeRuntimeView* const camera
-  )
-  {
-    return LegacySpliceExternalNodeIntoListenerRegistry(
-      LegacyCameraTrackingListenerState(),
-      &camera->broadcasterNode
-    );
-  }
-
-  /**
    * Address: 0x00797060 (FUN_00797060)
    *
    * What it does:
@@ -85397,22 +85379,7 @@ namespace moho::runtime
 
 } // namespace moho::runtime
 
-namespace moho
-{
-  /**
-   * Address: 0x00871640 (FUN_00871640, func_SetWorldCamera)
-   *
-   * What it does:
-   * Registers `camera` as the world camera by splicing its Broadcaster subobject
-   * (camera+0x04) into the process-global camera-tracking-listener registry.
-   * Callable interface over the file-local registry-splice lane.
-   */
-  void func_SetWorldCamera(CameraImpl* const camera)
-  {
-    (void)runtime::LegacySetWorldCameraTrackingListenerRegistryRuntimeLane(
-      reinterpret_cast<runtime::LegacyCameraWithBroadcasterNodeRuntimeView*>(camera));
-  }
-} // namespace moho
+
 
 
 

@@ -7,6 +7,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/sim/CWldSession.h"
 
 namespace moho
@@ -114,4 +115,33 @@ namespace moho
       return true;
     }();
   } // namespace
+
+  /**
+   * Address: 0x00871640 (FUN_00871640, func_SetWorldCamera)
+   *
+   * IDA signature:
+   * void *__usercall func_SetWorldCamera@<eax>(Moho::CameraImpl *camera@<eax>);
+   *
+   * What it does:
+   * Makes `camera` the world camera by moving the process-global tracking
+   * listener's broadcaster node out of whichever camera ring it currently sits
+   * in and re-inserting it directly before `camera`'s own node. The listener
+   * only ever belongs to one camera's ring at a time, which is what "the world
+   * camera" means here - `CameraImpl`'s target/reset/move paths broadcast
+   * around their own ring, so the tracking events reach
+   * `/lua/ui/game/tracking.lua:OnTrackUnit` for exactly one camera.
+   *
+   * 0x00871640 open-codes `TDatList::ListLinkBefore` on the singleton's link:
+   * the unlink pair, the self-link reset, then the four-store insert ahead of
+   * the node at `camera+0x04`.
+   */
+  void func_SetWorldCamera(CameraImpl* const camera)
+  {
+    if (camera == nullptr) {
+      return;
+    }
+
+    Broadcaster& listenerLink = GlobalCameraTrackingListener().mListenerLink;
+    (void)listenerLink.ListLinkBefore(CameraBroadcasterLink(camera));
+  }
 } // namespace moho
