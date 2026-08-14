@@ -267,7 +267,11 @@ namespace moho
   )
   {
     CameraImpl* camera = nullptr;
-    CameraImpl* const storage = static_cast<CameraImpl*>(::operator new(sizeof(CameraImpl), std::nothrow));
+    // 0x007AA9C0 allocates `operator new(0x858u)`. `sizeof(CameraImpl)` is one
+    // pointer - the class is thin and its state lives behind runtime views - so
+    // sizing the block by it hands the constructor four bytes and lets it write
+    // 0x854 past the end, straight through whatever the allocator placed next.
+    CameraImpl* const storage = static_cast<CameraImpl*>(::operator new(kCameraImplRuntimeSize, std::nothrow));
     if (storage != nullptr) {
       try {
         camera = new (storage) CameraImpl(name, map, luaState);
