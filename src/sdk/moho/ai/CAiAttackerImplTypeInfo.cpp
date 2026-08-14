@@ -107,6 +107,24 @@ const char* CAiAttackerImplTypeInfo::GetName() const
 }
 
 /**
+ * Address: 0x005DE970 (FUN_005DE970, Moho::CAiAttackerImplTypeInfo::AddBase_IAiAttacker)
+ */
+void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(gpg::RType* const typeInfo)
+{
+  gpg::AddBaseIfPresent(typeInfo, CachedIAiAttackerType(), 0x00);
+}
+
+/**
+ * Address: 0x005DE9D0 (FUN_005DE9D0, Moho::CAiAttackerImplTypeInfo::AddBase_CScriptObject)
+ *
+ * Offset 0x0C: CScriptObject is the second base, after IAiAttacker at 0.
+ */
+void CAiAttackerImplTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+{
+  gpg::AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), 0x0C);
+}
+
+/**
  * Address: 0x005D5E40 (FUN_005D5E40, Moho::CAiAttackerImplTypeInfo::Init)
  */
 void CAiAttackerImplTypeInfo::Init()
@@ -114,21 +132,8 @@ void CAiAttackerImplTypeInfo::Init()
   size_ = 0xA4;
   gpg::RType::Init();
 
-  gpg::RField baseField{};
-
-  baseField.mName = CachedIAiAttackerType()->GetName();
-  baseField.mType = CachedIAiAttackerType();
-  baseField.mOffset = 0x00;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
-
-  baseField.mName = CachedCScriptObjectType()->GetName();
-  baseField.mType = CachedCScriptObjectType();
-  baseField.mOffset = 0x0C;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
+  AddBase_IAiAttacker(this);
+  AddBase_CScriptObject(this);
 
   Finish();
 }
