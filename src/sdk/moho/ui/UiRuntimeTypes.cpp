@@ -9127,78 +9127,6 @@ namespace
 {
   constexpr std::int32_t kBuildPreviewMeshColor = static_cast<std::int32_t>(0xFF00FF00u);
 
-  /**
-   * Address: 0x00856D60 (FUN_00856D60)
-   *
-   * IDA signature:
-   * int sub_856D60()
-   *
-   * What it does:
-   * Allocates one fresh build-preview red-black tree node and returns it
-   * pre-initialized as a non-nil leaf in the canonical "red link, no
-   * children, no parent" shape. This is the bare allocator that every
-   * tree mutator routes through; sentinel promotion (`mIsNil=1`, self
-   * links, `_Mysize=0`) and proper red-black insertion bookkeeping happen
-   * in the caller after the bare node is in hand.
-   */
-  [[nodiscard]] moho::CUIWorldViewBuildPreviewTreeNode* AllocateBuildPreviewTreeNode()
-  {
-    auto* const node = new moho::CUIWorldViewBuildPreviewTreeNode();
-    node->mLeft = nullptr;
-    node->mParent = nullptr;
-    node->mRight = nullptr;
-    node->mColor = 1;
-    node->mIsNil = 0;
-    return node;
-  }
-
-  [[nodiscard]] moho::CUIWorldViewBuildPreviewTreeNode* NewBuildPreviewPositionTreeSentinel()
-  {
-    // The binary first calls AllocateBuildPreviewTreeNode (FUN_00856D60) to
-    // get a non-nil red leaf, then promotes that leaf to a self-linked
-    // sentinel with mIsNil=1. Keep the two phases separate so the linker
-    // emits the bare allocator out-of-line.
-    moho::CUIWorldViewBuildPreviewTreeNode* const node = AllocateBuildPreviewTreeNode();
-    node->mIsNil = 1;
-    node->mLeft = node;
-    node->mParent = node;
-    node->mRight = node;
-    return node;
-  }
-
-  void DestroyBuildPreviewPositionTreeNodes(moho::CUIWorldViewBuildPreviewTreeNode* const node) noexcept
-  {
-    if (node == nullptr || node->mIsNil != 0) {
-      return;
-    }
-
-    DestroyBuildPreviewPositionTreeNodes(node->mRight);
-    moho::CUIWorldViewBuildPreviewTreeNode* const left = node->mLeft;
-    node->mPreviewPayload.release();
-    delete node;
-    DestroyBuildPreviewPositionTreeNodes(left);
-  }
-
-  void DestroyBuildPreviewPositionTree(moho::CUIWorldViewBuildPreviewTree& tree) noexcept
-  {
-    moho::CUIWorldViewBuildPreviewTreeNode* const head = tree.mHead;
-    if (head == nullptr) {
-      tree.mSize = 0;
-      return;
-    }
-
-    DestroyBuildPreviewPositionTreeNodes(head->mParent);
-    delete head;
-    tree.mHead = nullptr;
-    tree.mSize = 0;
-  }
-
-  void EnsureBuildPreviewPositionTreeSentinel(moho::CUIWorldViewBuildPreviewTree& tree)
-  {
-    moho::CUIWorldViewBuildPreviewTreeNode* const head = NewBuildPreviewPositionTreeSentinel();
-    tree.mHead = head;
-    tree.mSize = 0;
-  }
 } // namespace
 
 /**
@@ -9227,7 +9155,6 @@ moho::CUIWorldViewBuildDragRuntimeView::CUIWorldViewBuildDragRuntimeView()
   , mUnknown5D(false)
   , mPad5E{}
 {
-  EnsureBuildPreviewPositionTreeSentinel(mPreviewPositions);
 }
 
 /**
@@ -9241,7 +9168,6 @@ moho::CUIWorldViewBuildDragRuntimeView::~CUIWorldViewBuildDragRuntimeView()
 {
   ClearBuildPreviewCache();
   mUnitPlaceMaterial.reset();
-  DestroyBuildPreviewPositionTree(mPreviewPositions);
 }
 
 /**
