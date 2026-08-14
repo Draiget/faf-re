@@ -14,8 +14,10 @@
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/math/VMatrix4.h"
+#include "moho/render/IRenderWorldView.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptObject.h"
 #include "Wm3Quaternion.h"
@@ -349,6 +351,16 @@ namespace moho
    */
   extern float ui_ExtractSnapTolerance;
   /**
+   * Address: 0x00F57BD0 (?ui_FootprintMinThickness@Moho@@3MA)
+   *
+   * Minimum on-screen thickness (in the prim batcher's post-perspective units)
+   * of the footprint outline `DrawUnitSkirt` emits, so a skirt stays visible
+   * when the camera is far away. Registered as the `ui_FootprintMinThickness`
+   * console variable by the `TConVar<float>` block at 0x00BE5370; the shipped
+   * image seeds the storage with 2.0.
+   */
+  extern float ui_FootprintMinThickness;
+  /**
    * Address: 0x00F57A88 (?cam_DefaultMiniLOD@Moho@@3MA)
    *
    * Default LOD scale (1.8) applied to a minimap CUIWorldView's camera.
@@ -565,7 +577,6 @@ namespace moho
   );
   static_assert(sizeof(CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger size must be 0x3C");
 
-
   struct CUIWorldViewBuildDragRuntimeView
   {
     /**
@@ -615,19 +626,42 @@ namespace moho
      */
     void ReplaceBuildPreviewMesh(std::size_t index, RUnitBlueprint* blueprint);
 
+    /**
+     * Address: 0x008534F0 (FUN_008534F0, sub_8534F0)
+     *
+     * IDA signature:
+     * void __stdcall sub_8534F0(int arg0);
+     *
+     * What it does:
+     * Rebuilds the translucent "ghost" mesh shown at every queued mobile-build
+     * order. Walks the session's command map, skips orders a unit under their
+     * own cursor is already building, reuses the ghost already cached for an
+     * order (un-hiding it) or creates a fresh `UnitPlace`-shaded one from the
+     * order's blueprint, and stances each at the order's anchor. The rebuilt
+     * lane is swapped into `mPreviewPositions`, so ghosts for orders that no
+     * longer exist die with the map that is swapped out.
+     */
+    void RefreshQueuedBuildGhosts();
+
     CWldSession* mSession = nullptr;                       // +0x00
-    RUnitBlueprint* mActiveBuildBlueprint = nullptr;        // +0x04
+    // The binary stores the *mesh* blueprint here, not the unit one:
+    // FUN_00852C10 fills it from `mRules->GetMeshBlueprint(...)` at
+    // 0x00852C75 and then divides `[+0x64,+0x68)` by 204 (0x00852CD4,
+    // sizeof(RMeshBlueprintLOD)) to test whether the LOD chain is empty.
+    RMeshBlueprint* mActiveBuildMesh = nullptr;             // +0x04
     msvc8::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
     msvc8::vector<RUnitBlueprint*> mBlueprints;             // +0x18
     // The binary's "preview positions" lane is an ordinary MSVC8 std::map
-    // keyed by the order's command id, not a bespoke tree: the node carries
-    // {left,parent,right} at 0x00..0x0B, pair<const CmdId,
-    // shared_ptr<MeshInstance>> at 0x0C, _Color at 0x18 and _Isnil at 0x19 -
-    // exactly msvc8::map's node shape.
+    // keyed by the order's command id: node {left,parent,right} at 0x00..0x0B,
+    // pair<const CmdId, shared_ptr<MeshInstance>> at 0x0C, _Color at 0x18 and
+    // _Isnil at 0x19 - exactly msvc8::map's node shape.
     msvc8::map<CmdId, boost::shared_ptr<MeshInstance>> mPreviewPositions; // +0x28
     boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;     // +0x34
     CWldTerrainDecal* mDecal = nullptr;                     // +0x3C
-    ERuleBPUnitCommandCaps mCommandCaps = RULEUCC_None;     // +0x40
+    // Command *mode*, not caps: FUN_00852C10 copies `CommandModeData::mMode`
+    // (its +0x00 lane) here at 0x00852C9C and gates the whole preview on it
+    // being COMMOD_Build (2) or COMMOD_BuildAnchored (3) at 0x00852CAB.
+    ECommandMode mActiveCommandMode = COMMOD_None;          // +0x40
     Wm3::Vector3f mStart{};                                 // +0x44
     Wm3::Vector3f mEnd{};                                   // +0x50
     bool mPreviewInvalid = false;                           // +0x5C
@@ -639,8 +673,8 @@ namespace moho
     "moho::CUIWorldViewBuildDragRuntimeView::mSession offset must be 0x00"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mActiveBuildBlueprint) == 0x04,
-    "moho::CUIWorldViewBuildDragRuntimeView::mActiveBuildBlueprint offset must be 0x04"
+    offsetof(CUIWorldViewBuildDragRuntimeView, mActiveBuildMesh) == 0x04,
+    "moho::CUIWorldViewBuildDragRuntimeView::mActiveBuildMesh offset must be 0x04"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CUIWorldViewBuildDragRuntimeView, mMeshes) == 0x08,
@@ -663,8 +697,8 @@ namespace moho
     "moho::CUIWorldViewBuildDragRuntimeView::mDecal offset must be 0x3C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mCommandCaps) == 0x40,
-    "moho::CUIWorldViewBuildDragRuntimeView::mCommandCaps offset must be 0x40"
+    offsetof(CUIWorldViewBuildDragRuntimeView, mActiveCommandMode) == 0x40,
+    "moho::CUIWorldViewBuildDragRuntimeView::mActiveCommandMode offset must be 0x40"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CUIWorldViewBuildDragRuntimeView, mStart) == 0x44,
@@ -2975,99 +3009,6 @@ namespace moho
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
   };
 
-  /**
-   * The 3D world view: the control the game renders the world into.
-   *
-   * The binary's own vtable (`??_7CUIWorldView@Moho@@6B@`, VA 0x00E49074)
-   * overrides exactly four of `CMauiControl`'s slots - `DoRender` (+0x18),
-   * `SetHidden` (+0x1C), `HandleEvent` (+0x30) and `Frame` (+0x34) - plus the
-   * reflection pair and the deleting destructor at the head; everything else is
-   * inherited. The second vtable the constructor installs at +0x11C belongs to
-   * the `IRenderWorldView` sub-object, which is still reached through
-   * `CUIWorldViewRuntimeView::mRenderWorldView`.
-   */
-  class CUIWorldView : public CMauiControl
-  {
-  public:
-    static gpg::RType* sType;
-
-    /**
-     * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::StaticGetClass)
-     *
-     * What it does:
-     * Returns the cached reflection type for `CUIWorldView`, resolving it via
-     * RTTI on first use.
-     */
-    [[nodiscard]] static gpg::RType* StaticGetClass();
-
-    /**
-     * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
-     *
-     * What it does:
-     * Constructs a world-view control in place: `CMauiControl` base, the render
-     * and command-mode lanes, the camera (promoted to world camera or minimap
-     * when asked), registration of the render-world-view with the global
-     * viewport, then the `WorldViewParams` read from
-     * `/lua/ui/controls/worldview.lua`.
-     */
-    CUIWorldView(
-      LuaPlus::LuaObject* luaObject,
-      CMauiControl* parent,
-      const char* cameraName,
-      int depth,
-      bool isMiniMap,
-      const char* cameraTrack
-    );
-
-    /**
-     * Address: 0x0086EA40 (FUN_0086EA40, Moho::CUIWorldView::~CUIWorldView)
-     * Deleting dtor: 0x0086EA20 (FUN_0086EA20, Moho::CUIWorldView::dtr)
-     *
-     * What it does:
-     * Cancels any active dragger, unregisters the render-world-view from the
-     * global viewport, unlinks the weak sentinel that tracks this view, then
-     * releases the camera-track name, build-drag sub-object, command-graph
-     * reference, both command-mode blocks and the camera.
-     */
-    ~CUIWorldView() override;
-
-    /**
-     * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::GetClass)
-     *
-     * VFTable SLOT: 0
-     */
-    [[nodiscard]] gpg::RType* GetClass() const;
-
-    /**
-     * Address: 0x0086DB90 (FUN_0086DB90, Moho::CUIWorldView::GetDerivedObjectRef)
-     *
-     * VFTable SLOT: 1
-     */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
-
-    /**
-     * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::DoRender)
-     *
-     * VFTable SLOT: 6 (+0x18)
-     *
-     * What it does:
-     * Refreshes the world-view viewport bounds from the layout lazy-vars when
-     * drawing world content, otherwise dispatches the overlay draw callback.
-     */
-    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
-
-    /**
-     * Address: 0x0086EC40 (FUN_0086EC40, Moho::CUIWorldView::SetHidden)
-     *
-     * VFTable SLOT: 7 (+0x1C)
-     *
-     * What it does:
-     * Forwards the hidden state to the base and then removes (hiding) or adds
-     * (showing) the render-world-view in the global viewport.
-     */
-    void SetHidden(bool hidden) override;
-  };
-
   struct CMauiControlRuntimeView
   {
     std::uint8_t mUnknown00To33[0x34]{};
@@ -3240,6 +3181,326 @@ namespace moho
 
     [[nodiscard]] CMauiControl* ResolveFocusedControl() const noexcept;
   };
+
+
+  /**
+   * `Moho::CRenderWorldView` - the `IRenderWorldView` half of `CUIWorldView`.
+   *
+   * `CUIWorldView` is a two-base class: `CMauiControl` at offset 0 (0x11C
+   * bytes) and this one at offset 0x11C, which is where the constructor at
+   * 0x0086E480 installs the second vtable (the store at 0x0086E4EF). Every
+   * method the render vtable dispatches - `Render` at 0x0086EE00, `Func1` at
+   * 0x0086ECB0, `RenderCommandGraph` at 0x0086ECD0, `GetCamera` at 0x0086EBF0
+   * and the rest - is compiled against *this* sub-object pointer, not the
+   * complete object: `GetCamera` reads `[this+4]`, `Func1` tests `[this+0x19]`
+   * and hands `this+0xF8` to the build-drag update, `Render` reads the session
+   * from `[this+0xEC]` and the hide-resources flag from `[this+0x15A]`. Those
+   * are all fields of this class, which is why every field `CUIWorldView`
+   * carries past `CMauiControl` lives here rather than on the derived class.
+   *
+   * Sub-object offset + 0x11C gives the complete-object offset, e.g. the
+   * session at +0xEC here is +0x208 of a `CUIWorldView`.
+   */
+  class CRenderWorldView : public IRenderWorldView
+  {
+  public:
+    CRenderWorldView() noexcept = default;
+    // IRenderWorldView declares no virtual destructor - the render vtable is
+    // exactly the 13 render slots - so this one is not virtual either.
+    ~CRenderWorldView() noexcept = default;
+
+    CRenderWorldView(const CRenderWorldView&) = delete;
+    CRenderWorldView& operator=(const CRenderWorldView&) = delete;
+
+    /**
+     * Address: 0x0086EE00 (FUN_0086EE00, Moho::CRenderWorldView::Render)
+     * Slot: 0
+     *
+     * IDA signature:
+     * void __thiscall Moho::CRenderWorldView::Render(
+     *   CRenderWorldView* this, CD3DPrimBatcher* batcher, int a4,
+     *   CWldMap* map, float deltaT);
+     *
+     * What it does:
+     * Draws every world-space overlay this view owns for one frame: resource
+     * icons, strategic icons, projectile icons and arcs, mesh previews,
+     * command splats and the economy overlay, then the command graph.
+     */
+    void Render(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
+
+    /**
+     * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CRenderWorldView::Func1)
+     * Slot: 1
+     *
+     * What it does:
+     * Per-frame pre-render hook: refreshes the build-drag ghost placement for
+     * this view. Minimap views skip it.
+     */
+    void Func1() override;
+
+    /**
+     * Address: 0x0086ECD0 (FUN_0086ECD0, Moho::CRenderWorldView::RenderCommandGraph)
+     * Slot: 2
+     *
+     * What it does:
+     * With SHIFT held on a non-minimap view, draws the queued-order graph plus
+     * the footprint skirts of every pending mobile-build order; otherwise drops
+     * the cached graph handle. Always draws the local build-drag graph.
+     */
+    void RenderCommandGraph(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
+
+    /**
+     * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CRenderWorldView::GetCamera)
+     * Slot: 3
+     */
+    [[nodiscard]] CameraImpl* GetCamera() override;
+
+    /**
+     * Address: 0x0086EBE0 (FUN_0086EBE0, Moho::CRenderWorldView::GetCameraView)
+     * Slot: 4
+     */
+    [[nodiscard]] GeomCamera3* GetCameraView() override;
+
+    /**
+     * Address: 0x0086EC00 (FUN_0086EC00, Moho::CRenderWorldView::GetCameraOffset)
+     * Slot: 5
+     */
+    [[nodiscard]] Wm3::Vector3f* GetCameraOffset() override;
+
+    /**
+     * Address: 0x0086EC10 (FUN_0086EC10, Moho::CRenderWorldView::CameraGetTargetZoom)
+     * Slot: 6
+     */
+    [[nodiscard]] float CameraGetTargetZoom() override;
+
+    /**
+     * Address: 0x0086EC20 (FUN_0086EC20, Moho::CRenderWorldView::GetMaxZoom)
+     * Slot: 7
+     */
+    [[nodiscard]] float GetMaxZoom() override;
+
+    /**
+     * Address: 0x0086EC30 (FUN_0086EC30, Moho::CRenderWorldView::CameraGetZoom)
+     * Slot: 8
+     */
+    [[nodiscard]] float CameraGetZoom() override;
+
+    /**
+     * Address: 0x0086DC90 (FUN_0086DC90, Moho::CRenderWorldView::IsMiniMap)
+     * Slot: 10
+     */
+    [[nodiscard]] bool IsMiniMap() override;
+
+    /**
+     * Address: 0x0086DC00 (FUN_0086DC00, Moho::CRenderWorldView::SetOrthographic)
+     * Slot: 11
+     *
+     * What it does:
+     * Stores the orthographic toggle and mirrors it to the camera: going
+     * orthographic disables camera shake, leaving it re-enables shake.
+     */
+    void SetOrthographic(bool orthographicEnabled) override;
+
+    /**
+     * Address: 0x0086DC60 (FUN_0086DC60, Moho::CRenderWorldView::CanShake)
+     * Slot: 12
+     */
+    [[nodiscard]] bool CanShake() override;
+
+    CameraImpl* mCamera = nullptr;              // +0x04
+    float mCachedViewLeft = 0.0f;               // +0x08
+    float mCachedViewTop = 0.0f;                // +0x0C
+    float mCachedViewRight = 0.0f;              // +0x10
+    float mCachedViewBottom = 0.0f;             // +0x14
+    bool mOrthographic = false;                 // +0x18
+    bool mIsMiniMap = false;                    // +0x19
+    bool mEnableResourceRendering = false;      // +0x1A
+    std::uint8_t mPad1B = 0;                    // +0x1B
+    std::int32_t mInputLocks = 0;               // +0x1C
+    std::int32_t mWorldViewDepth = 0;           // +0x20
+    std::int32_t mState = 0;                    // +0x24
+    std::uint8_t mPad28[0x04]{};                // +0x28
+    CommandModeData mLeftMouseCommand;          // +0x2C
+    CommandModeData mCommandData;               // +0x8C
+    CWldSession* mWldSession = nullptr;         // +0xEC
+    boost::SharedPtrRaw<UICommandGraph> mComGraph; // +0xF0
+    CUIWorldViewBuildDragRuntimeView mBuildDrag; // +0xF8
+    bool mConvertToPatrolCursor = false;        // +0x158
+    std::uint8_t mUnknown159 = 0;               // +0x159
+    bool mHideResources = false;                // +0x15A
+    std::uint8_t mPad15B[0x09]{};               // +0x15B
+    msvc8::string mCameraTrack;                 // +0x164
+    CMauiCurrentFocusControlRuntimeView mOverlayLink; // +0x180
+    bool mHighlightEnabled = true;              // +0x188
+    bool mIconsVisible = true;                  // +0x189
+    bool mGlobalCameraCommands = false;         // +0x18A
+    std::uint8_t mPad18B = 0;                   // +0x18B
+  };
+
+  static_assert(offsetof(CRenderWorldView, mCamera) == 0x04, "CRenderWorldView::mCamera offset must be 0x04");
+  static_assert(
+    offsetof(CRenderWorldView, mCachedViewLeft) == 0x08,
+    "CRenderWorldView::mCachedViewLeft offset must be 0x08"
+  );
+  static_assert(offsetof(CRenderWorldView, mOrthographic) == 0x18, "CRenderWorldView::mOrthographic offset must be 0x18");
+  static_assert(offsetof(CRenderWorldView, mIsMiniMap) == 0x19, "CRenderWorldView::mIsMiniMap offset must be 0x19");
+  static_assert(
+    offsetof(CRenderWorldView, mEnableResourceRendering) == 0x1A,
+    "CRenderWorldView::mEnableResourceRendering offset must be 0x1A"
+  );
+  static_assert(offsetof(CRenderWorldView, mInputLocks) == 0x1C, "CRenderWorldView::mInputLocks offset must be 0x1C");
+  static_assert(
+    offsetof(CRenderWorldView, mWorldViewDepth) == 0x20,
+    "CRenderWorldView::mWorldViewDepth offset must be 0x20"
+  );
+  static_assert(offsetof(CRenderWorldView, mState) == 0x24, "CRenderWorldView::mState offset must be 0x24");
+  static_assert(
+    offsetof(CRenderWorldView, mLeftMouseCommand) == 0x2C,
+    "CRenderWorldView::mLeftMouseCommand offset must be 0x2C"
+  );
+  static_assert(offsetof(CRenderWorldView, mCommandData) == 0x8C, "CRenderWorldView::mCommandData offset must be 0x8C");
+  static_assert(offsetof(CRenderWorldView, mWldSession) == 0xEC, "CRenderWorldView::mWldSession offset must be 0xEC");
+  static_assert(offsetof(CRenderWorldView, mComGraph) == 0xF0, "CRenderWorldView::mComGraph offset must be 0xF0");
+  static_assert(offsetof(CRenderWorldView, mBuildDrag) == 0xF8, "CRenderWorldView::mBuildDrag offset must be 0xF8");
+  static_assert(
+    offsetof(CRenderWorldView, mConvertToPatrolCursor) == 0x158,
+    "CRenderWorldView::mConvertToPatrolCursor offset must be 0x158"
+  );
+  static_assert(offsetof(CRenderWorldView, mHideResources) == 0x15A, "CRenderWorldView::mHideResources offset must be 0x15A");
+  static_assert(offsetof(CRenderWorldView, mCameraTrack) == 0x164, "CRenderWorldView::mCameraTrack offset must be 0x164");
+  static_assert(offsetof(CRenderWorldView, mOverlayLink) == 0x180, "CRenderWorldView::mOverlayLink offset must be 0x180");
+  static_assert(
+    offsetof(CRenderWorldView, mHighlightEnabled) == 0x188,
+    "CRenderWorldView::mHighlightEnabled offset must be 0x188"
+  );
+  static_assert(
+    offsetof(CRenderWorldView, mGlobalCameraCommands) == 0x18A,
+    "CRenderWorldView::mGlobalCameraCommands offset must be 0x18A"
+  );
+  static_assert(sizeof(CRenderWorldView) == 0x18C, "CRenderWorldView size must be 0x18C");
+
+  /**
+   * Address: 0x0085ABD0 (FUN_0085ABD0, Moho::DrawUnitSkirt)
+   *
+   * What it does:
+   * Draws one unit footprint skirt outline: takes the blueprint's skirt rect
+   * around `position`, lifts it to whichever is highest of the requested Y, the
+   * terrain elevation + 0.1 and the map's water plane, then emits the outline
+   * at a screen-space thickness that never falls below `ui_FootprintMinThickness`.
+   */
+  void DrawUnitSkirt(
+    const CHeightField* heightField,
+    const RUnitBlueprint* blueprint,
+    const GeomCamera3& camera,
+    const Wm3::Vector3f& position,
+    CWldSession* session,
+    CD3DPrimBatcher* batcher,
+    std::uint32_t color
+  );
+
+  /**
+   * Address: 0x0085AD80 (FUN_0085AD80, Moho::DrawAllUnitSkirts)
+   *
+   * What it does:
+   * Draws a translucent magenta footprint skirt for every mobile-build order
+   * currently queued in the session's command manager, so a shift-queued build
+   * chain shows where each structure will land.
+   */
+  void DrawAllUnitSkirts(CD3DPrimBatcher* batcher, CWldSession* session, const GeomCamera3& camera);
+
+  /**
+   * The 3D world view: the control the game renders the world into.
+   *
+   * The binary's own vtable (`??_7CUIWorldView@Moho@@6B@`, VA 0x00E49074)
+   * overrides exactly four of `CMauiControl`'s slots - `DoRender` (+0x18),
+   * `SetHidden` (+0x1C), `HandleEvent` (+0x30) and `Frame` (+0x34) - plus the
+   * reflection pair and the deleting destructor at the head; everything else is
+   * inherited. The second vtable the constructor installs at +0x11C belongs to
+   * the `IRenderWorldView` sub-object, which is still reached through
+   * `CUIWorldViewRuntimeView::mRenderWorldView`.
+   */
+  class CUIWorldView : public CMauiControl
+  {
+  public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::StaticGetClass)
+     *
+     * What it does:
+     * Returns the cached reflection type for `CUIWorldView`, resolving it via
+     * RTTI on first use.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
+     *
+     * What it does:
+     * Constructs a world-view control in place: `CMauiControl` base, the render
+     * and command-mode lanes, the camera (promoted to world camera or minimap
+     * when asked), registration of the render-world-view with the global
+     * viewport, then the `WorldViewParams` read from
+     * `/lua/ui/controls/worldview.lua`.
+     */
+    CUIWorldView(
+      LuaPlus::LuaObject* luaObject,
+      CMauiControl* parent,
+      const char* cameraName,
+      int depth,
+      bool isMiniMap,
+      const char* cameraTrack
+    );
+
+    /**
+     * Address: 0x0086EA40 (FUN_0086EA40, Moho::CUIWorldView::~CUIWorldView)
+     * Deleting dtor: 0x0086EA20 (FUN_0086EA20, Moho::CUIWorldView::dtr)
+     *
+     * What it does:
+     * Cancels any active dragger, unregisters the render-world-view from the
+     * global viewport, unlinks the weak sentinel that tracks this view, then
+     * releases the camera-track name, build-drag sub-object, command-graph
+     * reference, both command-mode blocks and the camera.
+     */
+    ~CUIWorldView() override;
+
+    /**
+     * Address: 0x0086DB70 (FUN_0086DB70, Moho::CUIWorldView::GetClass)
+     *
+     * VFTable SLOT: 0
+     */
+    [[nodiscard]] gpg::RType* GetClass() const;
+
+    /**
+     * Address: 0x0086DB90 (FUN_0086DB90, Moho::CUIWorldView::GetDerivedObjectRef)
+     *
+     * VFTable SLOT: 1
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+
+    /**
+     * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::DoRender)
+     *
+     * VFTable SLOT: 6 (+0x18)
+     *
+     * What it does:
+     * Refreshes the world-view viewport bounds from the layout lazy-vars when
+     * drawing world content, otherwise dispatches the overlay draw callback.
+     */
+    void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
+     * Address: 0x0086EC40 (FUN_0086EC40, Moho::CUIWorldView::SetHidden)
+     *
+     * VFTable SLOT: 7 (+0x1C)
+     *
+     * What it does:
+     * Forwards the hidden state to the base and then removes (hiding) or adds
+     * (showing) the render-world-view in the global viewport.
+     */
+    void SetHidden(bool hidden) override;
+  };
+
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiCurrentFocusControlRuntimeView) == 0x8, "CMauiCurrentFocusControlRuntimeView size must be 0x8");
   FAF_RUNTIME_LAYOUT_ASSERT(

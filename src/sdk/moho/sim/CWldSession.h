@@ -1474,6 +1474,14 @@ namespace moho
   [[nodiscard]] Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* record);
 
   /**
+   * Bridge for `Moho::DrawAllUnitSkirts` (FUN_0085AD80): resolves the world
+   * position a pending command-issue helper is anchored at, by running the
+   * helper's own issue-event ring through the command-graph anchor resolver
+   * (FUN_008B4080 + FUN_008BED50) and unlinking the transient weak-owner lane.
+   */
+  [[nodiscard]] Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(UserCommandIssueHelper& helper);
+
+  /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: walks the whole
    * session entity map in id order and appends every live `UserUnit*` into
    * `outUnits`. Wraps the CWldSession.cpp-local `CollectSessionUserUnits`.

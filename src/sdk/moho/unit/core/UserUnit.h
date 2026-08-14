@@ -826,6 +826,26 @@ namespace moho
   [[nodiscard]] SSelectionSetUserEntity*
     ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept;
 
+  struct SSelectionNodeUserEntity;
+
+  // Exposes the file-local weak-owner decode - the `slot - 8` adjust every
+  // weak-set walk in the binary open-codes - so other TUs iterating a shared
+  // cursor-entity set resolve nodes to entities without restating it. Returns
+  // null for both the null and the `(void*)8` tombstone slot.
+  [[nodiscard]] UserEntity* ResolveWeakEntitySetNodeEntity(const SSelectionNodeUserEntity& node) noexcept;
+
+  /**
+   * Address: 0x008B6F60 (struct_UserUnitManager::Get) plus the first-live scan
+   * its callers open-code around it - twice per iteration in the queued-build
+   * ghost refresh at FUN_008534F0 (0x008535F8 and 0x00853634).
+   *
+   * What it does:
+   * Rebuilds one user-unit command queue and returns the first live
+   * command-issue helper in it, or null when the queue holds none. This is the
+   * unit's *current* order.
+   */
+  [[nodiscard]] UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(UserCommandQueue* manager) noexcept;
+
   /**
    * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
    *
