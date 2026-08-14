@@ -643,6 +643,24 @@ namespace moho
      */
     void RefreshQueuedBuildGhosts();
 
+    /**
+     * Address: 0x00852C10 (FUN_00852C10, sub_852C10)
+     *
+     * IDA signature:
+     * void __stdcall sub_852C10(struct_WorldView_object *arg0);
+     *
+     * What it does:
+     * Drives the whole build-drag preview for one frame. Re-reads what the
+     * left mouse button would currently do, drops the cached preview meshes
+     * whenever the build target or the command mode changed, refreshes the
+     * queued-order ghosts, and - while a build mode is active and the drag
+     * endpoints are valid - stamps one preview mesh per cell along the drag,
+     * either once per active build-template entry or once for the single
+     * blueprint being placed. Any preview meshes left over from a longer
+     * previous drag are trimmed off the end.
+     */
+    void UpdateDragPreview();
+
     CWldSession* mSession = nullptr;                       // +0x00
     // The binary stores the *mesh* blueprint here, not the unit one:
     // FUN_00852C10 fills it from `mRules->GetMeshBlueprint(...)` at

@@ -769,6 +769,13 @@ namespace moho
     [[nodiscard]] STIMap* GetSTIMap() const;
 
     /**
+     * Typed view over the flattened cursor snapshot at `+0x4B0` (see the
+     * member comment there). `FUN_00852C10` passes exactly this to
+     * `GetLeftMouseButtonAction`.
+     */
+    [[nodiscard]] MouseInfo& CursorInfo() noexcept;
+
+    /**
      * Address: 0x00894140 (FUN_00894140, ?AddEntity@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
      *
      * What it does:
@@ -1238,6 +1245,15 @@ namespace moho
     /// identified in the binary yet.
     msvc8::vector<SyncInlineVector> mSyncInlineVectors;      // 0x0490
     SSelectionSetUserEntity mSelection;                     // 0x04A0
+    /// These five members are one flattened `MouseInfo` - the cursor snapshot
+    /// the session keeps. `FUN_00852C10` hands `this + 0x4B0` straight to
+    /// `GetLeftMouseButtonAction(out, const MouseInfo*, int)` at 0x00852C39,
+    /// and the bytes line up exactly: `mHitValid`+pad, `mMouseWorldPos`,
+    /// `{mUnitHover, mPrevious}`, `mIsDragger` (which is what
+    /// `HighlightCommandId` really is) and `mMouseScreenPos`, ending at
+    /// 0x4B0 + sizeof(MouseInfo) == 0x4D4. Use `CursorInfo()` below rather
+    /// than these lanes; folding them into a real member is a separate pass
+    /// because 31 call sites still name them individually.
     std::uint8_t mCursorWorldState[4];                      // 0x04B0
     Wm3::Vector3f CursorWorldPos;                           // 0x04B4
     char pad_04C0[8];                                       // 0x04C0
@@ -1480,6 +1496,36 @@ namespace moho
    * (FUN_008B4080 + FUN_008BED50) and unlinking the transient weak-owner lane.
    */
   [[nodiscard]] Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(UserCommandIssueHelper& helper);
+
+  /**
+   * Address: 0x00854930 (FUN_00854930) - bridge for `UpdateDragPreview`.
+   *
+   * What it does:
+   * Evaluates build placement for one build-template stamp, snaps the preview
+   * transform to the occupation result and returns the preview tint. The
+   * binary reaches the session through the drag object's `+0x00` lane
+   * (`mov ecx, [esi]` at 0x00854937); callers here pass it directly.
+   */
+  [[nodiscard]] std::uint32_t EvaluateBuildTemplatePlacementPreview(
+    const Wm3::Vector3f& worldPosition,
+    const RUnitBlueprint* buildBlueprint,
+    CWldSession& session,
+    VTransform& previewTransform
+  );
+
+  /**
+   * Address: 0x00854860 (FUN_00854860) - bridge for `UpdateDragPreview`.
+   *
+   * What it does:
+   * Same evaluation for the single-blueprint drag, including the
+   * `COMMOD_BuildAnchored` build-distance test (`cmp [edi], 3` at 0x00854863).
+   */
+  [[nodiscard]] std::uint32_t EvaluateCommandModeBuildPlacementPreview(
+    const CommandModeData& commandMode,
+    const Wm3::Vector3f& worldPosition,
+    CWldSession& session,
+    VTransform& previewTransform
+  );
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: walks the whole

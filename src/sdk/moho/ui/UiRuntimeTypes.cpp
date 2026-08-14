@@ -9517,6 +9517,222 @@ static_assert(
   InitBuildDragStepState(state, stepLength, startX, startZ, endX, endZ);
   return state;
 }
+
+/**
+ * Address: 0x00852C10 (FUN_00852C10, sub_852C10)
+ *
+ * What it does:
+ * Drives the build-drag preview for one frame; see the header for the full
+ * description.
+ */
+void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
+{
+  moho::CommandModeData mode;
+  (void)mSession->GetLeftMouseButtonAction(&mode, &mSession->CursorInfo(), 0);
+
+  const auto* const buildBlueprint = static_cast<const moho::RUnitBlueprint*>(mode.mBlueprint);
+
+  moho::RMeshBlueprint* activeMesh = nullptr;
+  if (buildBlueprint != nullptr) {
+    activeMesh = mSession->mRules->GetMeshBlueprint(buildBlueprint->Display.MeshBlueprint);
+  }
+
+  // Anything that changes what is being placed invalidates the whole cached
+  // preview run, meshes and blueprints alike.
+  if (mActiveBuildMesh != activeMesh || mode.mMode != mActiveCommandMode) {
+    ClearBuildPreviewCache();
+  }
+  mActiveBuildMesh = activeMesh;
+  mActiveCommandMode = mode.mMode;
+
+  RefreshQueuedBuildGhosts();
+
+  if ((mode.mMode != moho::COMMOD_Build && mode.mMode != moho::COMMOD_BuildAnchored)
+      || mActiveBuildMesh == nullptr || mActiveBuildMesh->mLods.empty()) {
+    mPreviewInvalid = true;
+    return;
+  }
+
+  // An invalid drag start means "no drag yet" - the preview collapses onto the
+  // cursor cell.
+  Wm3::Vector3f dragStart = mStart;
+  Wm3::Vector3f dragEnd = mEnd;
+  if (!moho::IsValidVector3f(dragStart)) {
+    dragStart = mode.mMouseDragStart.mMouseWorldPos;
+    dragEnd = dragStart;
+  }
+
+  if (!moho::IsValidVector3f(dragStart) || !moho::IsValidVector3f(dragEnd)) {
+    mPreviewInvalid = true;
+    return;
+  }
+
+  mPreviewInvalid = false;
+
+  const moho::STIMap* const map = mSession->GetSTIMap();
+  const gpg::Rect2i playable = map->mPlayableRect;
+  const moho::SFootprint& footprint = buildBlueprint->mFootprint;
+  const moho::SOCellPos startCell = footprint.ToCellPos(dragStart);
+  const moho::SOCellPos endCell = footprint.ToCellPos(dragEnd);
+
+  std::int32_t cachedMeshCount = static_cast<std::int32_t>(mMeshes.size());
+  std::int32_t placedCount = 0;
+
+  float templateSpanZ = 0.0f;
+  float templateSpanX = 0.0f;
+  moho::SBuildTemplateBuffer buildTemplate{};
+  (void)mSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &buildTemplate);
+
+  // Whichever axis the drag runs along picks the stamp pitch.
+  const std::int32_t spanCellsX = std::abs(endCell.x - startCell.x);
+  const std::int32_t spanCellsZ = std::abs(endCell.z - startCell.z);
+
+  const auto placeOne =
+    [this, &cachedMeshCount, &placedCount](moho::RUnitBlueprint* const blueprint,
+                                           const moho::VTransform& stance,
+                                           const std::uint32_t previewColor) {
+      const std::int32_t slot = placedCount;
+      if (slot >= cachedMeshCount) {
+        AppendBuildPreviewMesh(blueprint);
+        ++cachedMeshCount;
+      } else {
+        ReplaceBuildPreviewMesh(static_cast<std::size_t>(slot), blueprint);
+      }
+
+      if (const boost::shared_ptr<moho::MeshInstance>& preview = mMeshes[static_cast<std::size_t>(slot)]; preview) {
+        preview->color = static_cast<std::int32_t>(previewColor);
+        preview->SetStance(stance, stance);
+      }
+      ++placedCount;
+    };
+
+  if (!buildTemplate.Empty()) {
+    const float stepLength = spanCellsX > spanCellsZ ? templateSpanX : templateSpanZ;
+
+    BuildDragStepStateRuntimeView step{};
+    (void)InitBuildDragStepStateAndReturnState(
+      &step,
+      stepLength,
+      static_cast<float>(startCell.x),
+      static_cast<float>(startCell.z),
+      static_cast<float>(endCell.x),
+      static_cast<float>(endCell.z)
+    );
+
+    for (; step.mStepCount > 0; --step.mStepCount) {
+      const moho::SOCellPos cell{
+        static_cast<std::int16_t>(static_cast<std::int32_t>(step.mX)),
+        static_cast<std::int16_t>(static_cast<std::int32_t>(step.mZ))
+      };
+      // A template stamp is placed relative to a plain 1x1 cell origin; each
+      // entry carries its own offset and its own blueprint.
+      const Wm3::Vector3f stampOrigin =
+        moho::COORDS_ToWorldPos(map, cell, moho::LAYER_None, 1, 1);
+
+      for (const moho::SBuildTemplateInfo* entry = buildTemplate.mStart; entry != buildTemplate.mFinish; ++entry) {
+        const Wm3::Vector3f entryPosition{
+          stampOrigin.x + entry->mPos.x,
+          stampOrigin.y + entry->mPos.y,
+          stampOrigin.z + entry->mPos.z
+        };
+
+        // `RResId` is a bare `msvc8::string` wrapper, which is why the binary
+        // hands the canonicalised path buffer straight to the rules lookup.
+        moho::RResId blueprintPath;
+        (void)gpg::STR_InitFilename(&blueprintPath.name, entry->mBlueprintId.c_str());
+        auto* const entryBlueprint = mSession->mRules->GetUnitBlueprint(blueprintPath);
+
+        const auto cellX = static_cast<std::int32_t>(entryPosition.x);
+        const auto cellZ = static_cast<std::int32_t>(entryPosition.z);
+        if (cellX < playable.x0 || cellX >= playable.x1 || cellZ < playable.z0 || cellZ >= playable.z1) {
+          continue;
+        }
+
+        moho::VTransform stance;
+        stance.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
+        stance.pos_ = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
+        const std::uint32_t previewColor = moho::EvaluateBuildTemplatePlacementPreview(
+          entryPosition, entryBlueprint, *mSession, stance
+        );
+
+        placeOne(entryBlueprint, stance, previewColor);
+      }
+
+      step.mX += step.mXStep;
+      step.mZ += step.mZStep;
+    }
+  } else {
+    // No template: one preview per cell, stepping by the blueprint's own
+    // skirt extent along the dominant drag axis.
+    const float stepLength = std::max(buildBlueprint->Physics.SkirtSizeX, buildBlueprint->Physics.SkirtSizeZ);
+
+    BuildDragStepStateRuntimeView step{};
+    (void)InitBuildDragStepStateAndReturnState(
+      &step,
+      stepLength,
+      static_cast<float>(startCell.x),
+      static_cast<float>(startCell.z),
+      static_cast<float>(endCell.x),
+      static_cast<float>(endCell.z)
+    );
+
+    for (; step.mStepCount > 0; --step.mStepCount) {
+      const moho::SOCellPos cell{
+        static_cast<std::int16_t>(static_cast<std::int32_t>(step.mX)),
+        static_cast<std::int16_t>(static_cast<std::int32_t>(step.mZ))
+      };
+      const Wm3::Vector3f cellPosition = moho::COORDS_ToWorldPos(
+        map,
+        cell,
+        static_cast<moho::ELayer>(footprint.mOccupancyCaps),
+        footprint.mSizeX,
+        footprint.mSizeZ
+      );
+
+      // Unlike the template branch this one stops at the first cell that
+      // leaves the playable area rather than skipping it.
+      const auto cellX = static_cast<std::int32_t>(cellPosition.x);
+      const auto cellZ = static_cast<std::int32_t>(cellPosition.z);
+      if (cellX < playable.x0 || cellX >= playable.x1 || cellZ < playable.z0 || cellZ >= playable.z1) {
+        break;
+      }
+
+      moho::VTransform stance;
+      stance.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
+      stance.pos_ = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
+      const std::uint32_t previewColor =
+        moho::EvaluateCommandModeBuildPlacementPreview(mode, cellPosition, *mSession, stance);
+
+      // The single-blueprint lane reuses the cached slot in place rather than
+      // recreating its mesh, so it only overwrites the blueprint entry.
+      const std::int32_t slot = placedCount;
+      if (slot >= cachedMeshCount) {
+        AppendBuildPreviewMesh(const_cast<moho::RUnitBlueprint*>(buildBlueprint));
+        ++cachedMeshCount;
+      } else if (mBlueprints[static_cast<std::size_t>(slot)] != nullptr) {
+        mBlueprints[static_cast<std::size_t>(slot)] = const_cast<moho::RUnitBlueprint*>(buildBlueprint);
+      }
+
+      if (const boost::shared_ptr<moho::MeshInstance>& preview = mMeshes[static_cast<std::size_t>(slot)]; preview) {
+        preview->color = static_cast<std::int32_t>(previewColor);
+        preview->SetStance(stance, stance);
+      }
+
+      ++placedCount;
+      step.mX += step.mXStep;
+      step.mZ += step.mZStep;
+    }
+  }
+
+  // Trim whatever a longer previous drag left behind.
+  if (cachedMeshCount > placedCount) {
+    mMeshes.resize(static_cast<std::size_t>(placedCount));
+    mBlueprints.resize(static_cast<std::size_t>(placedCount));
+  }
+
+  buildTemplate.DestroyStorage();
+}
+
 /**
  * Address: 0x0078DDC0 (FUN_0078DDC0, sub_78DDC0)
  *
