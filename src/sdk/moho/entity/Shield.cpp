@@ -11,6 +11,7 @@
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/lua/CScrLuaBaseClassSpec.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/InstanceCounter.h"
@@ -643,6 +644,26 @@ namespace
   }
 
   /**
+   * Address: 0x00BDD4E0 (FUN_00BDD4E0) -- record at 0x00F5A1BC
+   *
+   * What it does:
+   * Declares `Shield` as deriving from `Entity` for the Lua class system, so
+   * `moho.shield_methods` carries `moho.entity_methods` in its array part and
+   * /lua/shield.lua's class picks up the inherited entity methods.
+   */
+  moho::CScrLuaInitForm* register_ShieldLuaBaseClass()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      SimLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::Entity>::Instance(),
+      "Shield",
+      "derived from Entity"
+    );
+    return &spec;
+  }
+
+  /**
    * Drives this file's Lua binder definitions.
    *
    * Each `func_*_LuaFuncDef` builds a function-local `CScrLuaBinder` and
@@ -663,6 +684,7 @@ namespace
     {
       (void)::moho::func__c_CreateShield_LuaFuncDef();
       (void)register_moho_shield_methods();
+      (void)register_ShieldLuaBaseClass();
     }
   };
 

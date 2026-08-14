@@ -314,13 +314,13 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane21();
 
   /**
-   * Address: 0x00BD4C00 (FUN_00BD4C00, register_sim_SimInits_mForms_prependStartupLane22)
+   * Address: 0x00BD4C00 (FUN_00BD4C00, sub_BD4C00) -- record at 0x00F59F34
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane22`.
+   * Declares `CollisionBeamEntity` as deriving from `Entity` for the Lua class
+   * system.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane22();
+  CScrLuaInitForm* register_CollisionBeamEntityLuaBaseClass();
 
   /**
    * Address: 0x00BD5300 (FUN_00BD5300, register_sim_SimInits_mForms_prependStartupLane23)
@@ -332,13 +332,12 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane23();
 
   /**
-   * Address: 0x00BD5C90 (FUN_00BD5C90, register_sim_SimInits_mForms_prependStartupLane24)
+   * Address: 0x00BD5C90 (FUN_00BD5C90, sub_BD5C90) -- record at 0x00F59F68
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane24`.
+   * Publishes `MotorFallDown`'s method table as `moho.MotorFallDown`.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane24();
+  CScrLuaInitForm* register_moho_MotorFallDown();
 
   /**
    * Address: 0x00BD65E0 (FUN_00BD65E0, register_sim_SimInits_mForms_prependStartupLane25)
@@ -350,13 +349,12 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane25();
 
   /**
-   * Address: 0x00BD6600 (FUN_00BD6600, register_sim_SimInits_mForms_prependStartupLane26)
+   * Address: 0x00BD6600 (FUN_00BD6600, sub_BD6600) -- record at 0x00F59FA8
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane26`.
+   * Declares `Projectile` as deriving from `Entity` for the Lua class system.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane26();
+  CScrLuaInitForm* register_ProjectileLuaBaseClass();
 
   /**
    * Address: 0x00BD7910 (FUN_00BD7910, sub_BD7910)
@@ -368,22 +366,21 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane27();
 
   /**
-   * Address: 0x00BD7930 (FUN_00BD7930, sub_BD7930)
+   * Address: 0x00BD7930 (FUN_00BD7930, sub_BD7930) -- record at 0x00F59FDC
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane28`.
+   * Declares `Unit` as deriving from `Entity` for the Lua class system, which
+   * is what makes inherited entity methods resolve on a unit.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane28();
+  CScrLuaInitForm* register_UnitLuaBaseClass();
 
   /**
-   * Address: 0x00BD9800 (FUN_00BD9800, sub_BD9800)
+   * Address: 0x00BD9800 (FUN_00BD9800, sub_BD9800) -- record at 0x00F5A010
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered `moho_weapon_methods.mFactory` startup lane anchor.
+   * Declares `Prop` as deriving from `Entity` for the Lua class system.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane();
+  CScrLuaInitForm* register_PropLuaBaseClass();
 
   /**
    * Address: 0x00BC8E40 (FUN_00BC8E40, register_SpecFootprints_LuaFUncDef)
@@ -857,13 +854,12 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorA();
 
   /**
-   * Address: 0x00BCDC30 (FUN_00BCDC30, register_sim_SimInits_mForms_reconBlipAnchorB)
+   * Address: 0x00BCDC30 (FUN_00BCDC30, sub_BCDC30) -- record at 0x00F599BC
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the chain to the
-   * recovered recon-blip anchor-B lane.
+   * Declares `ReconBlip` as deriving from `Entity` for the Lua class system.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorB();
+  CScrLuaInitForm* register_ReconBlipLuaBaseClass();
 
   /**
    * Address: 0x00BCDF20 (FUN_00BCDF20, register_CScrLuaMetatableFactory_ReconBlip_Index)

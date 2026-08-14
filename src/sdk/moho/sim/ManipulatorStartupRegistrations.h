@@ -23,13 +23,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant2();
 
   /**
-   * Address: 0x00BD2210 (FUN_00BD2210, register_sim_SimInits_mForms_offVariant3)
+   * Address: 0x00BD2210 (FUN_00BD2210, sub_BD2210) -- record at 0x00F59A38
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A38`.
+   * Declares `CAimManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.AimManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant3();
+  CScrLuaInitForm* register_CAimManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD2230 (FUN_00BD2230, register_TConVar_dbg_Ballistics)
@@ -94,13 +95,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant4();
 
   /**
-   * Address: 0x00BD2420 (FUN_00BD2420, register_sim_SimInits_mForms_offVariant5)
+   * Address: 0x00BD2420 (FUN_00BD2420, sub_BD2420) -- record at 0x00F59A7C
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A7C`.
+   * Declares `CBoneEntityManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.BoneEntityManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant5();
+  CScrLuaInitForm* register_CBoneEntityManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD24C0 (FUN_00BD24C0, register_CScrLuaMetatableFactory_CBoneEntityManipulator_Index)
@@ -120,13 +122,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant6();
 
   /**
-   * Address: 0x00BD2570 (FUN_00BD2570, register_sim_SimInits_mForms_off_F59A98_mFactory)
+   * Address: 0x00BD2570 (FUN_00BD2570, sub_BD2570) -- record at 0x00F59AB0
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane
-   * `off_F59A98.mFactory`.
+   * Declares `CBuilderArmManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.BuilderArmManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_off_F59A98_mFactory();
+  CScrLuaInitForm* register_CBuilderArmManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD29C0 (FUN_00BD29C0, register_sim_SimInits_mForms_offVariant8)
@@ -137,13 +140,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant8();
 
   /**
-   * Address: 0x00BD29E0 (FUN_00BD29E0, register_sim_SimInits_mForms_off_F59B00_mFactory)
+   * Address: 0x00BD29E0 (FUN_00BD29E0, sub_BD29E0) -- record at 0x00F59B18
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane
-   * `off_F59B00.mFactory`.
+   * Declares `CFootPlantManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.FootPlantManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_off_F59B00_mFactory();
+  CScrLuaInitForm* register_CFootPlantManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD2630 (FUN_00BD2630, register_CScrLuaMetatableFactory_CBuilderArmManipulator_Index)
@@ -190,12 +194,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_off_F59B34_mFactory();
 
   /**
-   * Address: 0x00BD2D70 (FUN_00BD2D70, register_sim_SimInits_mForms_offVariant10)
+   * Address: 0x00BD2D70 (FUN_00BD2D70, sub_BD2D70) -- record at 0x00F59B64
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane `off_F59B64`.
+   * Declares `CAnimationManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.AnimationManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant10();
+  CScrLuaInitForm* register_CAnimationManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD2F00 (FUN_00BD2F00, register_RVectorType_bool)
@@ -269,12 +275,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant11();
 
   /**
-   * Address: 0x00BD2FD0 (FUN_00BD2FD0, sub_BD2FD0)
+   * Address: 0x00BD2FD0 (FUN_00BD2FD0, sub_BD2FD0) -- record at 0x00F59B98
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane `off_F59B98`.
+   * Declares `CRotateManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.RotateManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant12();
+  CScrLuaInitForm* register_CRotateManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD3190 (FUN_00BD3190, sub_BD3190)
@@ -285,12 +293,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant13();
 
   /**
-   * Address: 0x00BD31B0 (FUN_00BD31B0, sub_BD31B0)
+   * Address: 0x00BD31B0 (FUN_00BD31B0, sub_BD31B0) -- record at 0x00F59BCC
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane `off_F59BCC`.
+   * Declares `CSlaveManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.SlaveManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant14();
+  CScrLuaInitForm* register_CSlaveManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD3460 (FUN_00BD3460, sub_BD3460)
@@ -301,12 +311,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant15();
 
   /**
-   * Address: 0x00BD3480 (FUN_00BD3480, sub_BD3480)
+   * Address: 0x00BD3480 (FUN_00BD3480, sub_BD3480) -- record at 0x00F59C00
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane `off_F59C00`.
+   * Declares `CSlideManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.SlideManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant16();
+  CScrLuaInitForm* register_CSlideManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD3600 (FUN_00BD3600, sub_BD3600)
@@ -317,12 +329,14 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant17();
 
   /**
-   * Address: 0x00BD3620 (FUN_00BD3620, sub_BD3620)
+   * Address: 0x00BD3620 (FUN_00BD3620, sub_BD3620) -- record at 0x00F59C34
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane `off_F59C34`.
+   * Declares `CStorageManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.StorageManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant18();
+  CScrLuaInitForm* register_CStorageManipulatorLuaBaseClass();
 
   /**
    * Address: 0x00BD3740 (FUN_00BD3740, sub_BD3740)
@@ -333,10 +347,12 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant19();
 
   /**
-   * Address: 0x00BD3760 (FUN_00BD3760, sub_BD3760)
+   * Address: 0x00BD3760 (FUN_00BD3760, sub_BD3760) -- record at 0x00F59C68
    *
    * What it does:
-   * Re-links `sim` startup Lua-init chain head to recovered lane `off_F59C68`.
+   * Declares `CThrustManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.ThrustManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant20();
+  CScrLuaInitForm* register_CThrustManipulatorLuaBaseClass();
 } // namespace moho
