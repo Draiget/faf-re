@@ -817,14 +817,13 @@ namespace
     return out;
   }
 
+  // Dispatches to the reflection layer's own `PositionHistory` upcast
+  // (0x0067FBA0) rather than repeating the lookup-and-throw. That also restores
+  // the binary's diagnostic: it reports the source and target type names, where
+  // the local copy raised a bare "type error".
   [[nodiscard]] moho::PositionHistory* UpcastPositionHistoryOrThrow(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolvePositionHistoryType());
-    auto* const history = static_cast<moho::PositionHistory*>(upcast.mObj);
-    if (history == nullptr) {
-      throw gpg::BadRefCast("type error");
-    }
-    return history;
+    return source.TryUpcastPositionHistory();
   }
 
   /**

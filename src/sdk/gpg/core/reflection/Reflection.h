@@ -851,6 +851,24 @@ namespace gpg
     [[nodiscard]] moho::Prop* TryUpcastProp() const;
 
     /**
+     * Address: 0x0054E230 (FUN_0054E230, gpg::RRef::TryUpcast_CAniPose)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `CAniPose` object lane and
+     * throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::CAniPose* TryUpcastCAniPose() const;
+
+    /**
+     * Address: 0x0067FBA0 (FUN_0067FBA0, gpg::RRef::TryUpcast_PositionHistory)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `PositionHistory` object lane
+     * and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::PositionHistory* TryUpcastPositionHistory() const;
+
+    /**
      * Address: 0x006E3E10 (FUN_006E3E10, gpg::RRef::TryUpcast_CUnitCommand_P)
      *
      * What it does:
