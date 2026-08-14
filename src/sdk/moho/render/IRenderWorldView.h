@@ -7,8 +7,10 @@
 
 namespace moho
 {
-  struct RenderCameraRuntime;
-  struct RenderCameraViewRuntime;
+  class CameraImpl;
+  class CD3DPrimBatcher;
+  class CWldMap;
+  class GeomCamera3;
 
   /**
    * VFTABLE: 0x00E4054C
@@ -32,12 +34,7 @@ namespace moho
      * What it does:
      * Abstract world-view render callback.
      */
-    virtual void Render(
-      std::int32_t renderParam0,
-      std::int32_t renderParam1,
-      std::int32_t renderParam2,
-      std::int32_t renderParam3
-    ) = 0;
+    virtual void Render(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) = 0;
 
     /**
      * Address: 0x007F6250 (FUN_007F6250, Moho::SimpleRenderWorldView::Func1)
@@ -55,12 +52,7 @@ namespace moho
      * What it does:
      * Abstract command-graph render callback.
      */
-    virtual void RenderCommandGraph(
-      std::int32_t graphParam0,
-      std::int32_t graphParam1,
-      std::int32_t graphParam2,
-      std::int32_t graphParam3
-    ) = 0;
+    virtual void RenderCommandGraph(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -69,7 +61,7 @@ namespace moho
      * What it does:
      * Returns active camera object for this world-view lane.
      */
-    [[nodiscard]] virtual RenderCameraRuntime* GetCamera() = 0;
+    [[nodiscard]] virtual CameraImpl* GetCamera() = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -78,7 +70,7 @@ namespace moho
      * What it does:
      * Returns active camera-view payload for this world-view lane.
      */
-    [[nodiscard]] virtual RenderCameraViewRuntime* GetCameraView() = 0;
+    [[nodiscard]] virtual GeomCamera3* GetCameraView() = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -141,7 +133,7 @@ namespace moho
      * What it does:
      * Updates orthographic/behavior toggle for this view and returns stored state.
      */
-    virtual bool SetOrthographic(bool enabled) = 0;
+    virtual void SetOrthographic(bool enabled) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)

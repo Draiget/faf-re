@@ -21,12 +21,7 @@ namespace moho
      * What it does:
      * Default world-view render callback; intentionally no-op.
      */
-    void Render(
-      std::int32_t renderParam0,
-      std::int32_t renderParam1,
-      std::int32_t renderParam2,
-      std::int32_t renderParam3
-    ) override;
+    void Render(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
 
     /**
      * Address: 0x007F62B0 (FUN_007F62B0, Moho::SimpleRenderWorldView::RenderCommandGraph)
@@ -35,12 +30,7 @@ namespace moho
      * What it does:
      * Default command-graph render callback; intentionally no-op.
      */
-    void RenderCommandGraph(
-      std::int32_t graphParam0,
-      std::int32_t graphParam1,
-      std::int32_t graphParam2,
-      std::int32_t graphParam3
-    ) override;
+    void RenderCommandGraph(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
 
     /**
      * Address: 0x007F62C0 (FUN_007F62C0, Moho::SimpleRenderWorldView::GetCamera)
@@ -49,7 +39,7 @@ namespace moho
      * What it does:
      * Returns null camera handle for the simple world-view lane.
      */
-    [[nodiscard]] RenderCameraRuntime* GetCamera() override;
+    [[nodiscard]] CameraImpl* GetCamera() override;
 
     /**
      * Address: 0x007F62D0 (FUN_007F62D0, Moho::SimpleRenderWorldView::GetCameraView)
@@ -58,7 +48,7 @@ namespace moho
      * What it does:
      * Returns stored camera-view payload pointer.
      */
-    [[nodiscard]] RenderCameraViewRuntime* GetCameraView() override;
+    [[nodiscard]] GeomCamera3* GetCameraView() override;
 
     /**
      * Address: 0x007F62E0 (FUN_007F62E0, Moho::SimpleRenderWorldView::GetCameraOffset)
@@ -103,7 +93,7 @@ namespace moho
      * What it does:
      * Stores toggle byte and returns written state.
      */
-    bool SetOrthographic(bool enabled) override;
+    void SetOrthographic(bool enabled) override;
 
     /**
      * Address: 0x007F6360 (FUN_007F6360, Moho::SimpleRenderWorldView::CanShake)
@@ -117,7 +107,7 @@ namespace moho
   public:
     bool mCanShake = false;                        // +0x04
     std::uint8_t mPadding05_07[3] = {0, 0, 0};    // +0x05
-    RenderCameraViewRuntime* mCameraView = nullptr; // +0x08
+    GeomCamera3* mCameraView = nullptr; // +0x08
   };
 
   static_assert(offsetof(SimpleRenderWorldView, mCanShake) == 0x04, "SimpleRenderWorldView::mCanShake offset must be 0x04");
