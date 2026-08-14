@@ -36,6 +36,23 @@ namespace moho
     void Init() override;
 
     /**
+     * Address: 0x005AB9F0 (FUN_005AB9F0, Moho::CAiPathFinderTypeInfo::AddBase_IPathTraveler)
+     *
+     * What it does:
+     * Registers `IPathTraveler` as a reflected base at offset 0.
+     */
+    static void AddBase_IPathTraveler(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005ABA50 (FUN_005ABA50, Moho::CAiPathFinderTypeInfo::Addbase_Broadcaster_NavPath)
+     *
+     * What it does:
+     * Registers the NavPath broadcaster as a reflected base at offset 0x0C.
+     * Named to match the binary, lowercase `b` and all.
+     */
+    static void Addbase_Broadcaster_NavPath(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x005AB870 (FUN_005AB870, Moho::CAiPathFinderTypeInfo::NewRef)
      *
      * What it does:
