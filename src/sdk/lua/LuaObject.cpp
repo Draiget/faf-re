@@ -8212,9 +8212,16 @@ namespace
 				luaE_freethread(state, reinterpret_cast<lua_State*>(object));
 				break;
 			case LUA_TSTRING: {
+				// `len + 21` in the binary (0x00915950), which is exactly what
+				// `newlstr` asks for: a 20-byte header plus the NUL. Charging
+				// `sizeof(TString)` instead adds the four bytes C++ pads the
+				// `char str[1]` tail to, so every string free refunded four
+				// bytes that were never allocated and `nblocks` drifted below
+				// the true total - eventually underflowing and leaving the
+				// collector running against a bogus threshold.
 				const auto* const ts = reinterpret_cast<const TString*>(object);
 				const lu_mem stringByteSize =
-					static_cast<lu_mem>(sizeof(TString) + (ts->len + 1u) * sizeof(char));
+					static_cast<lu_mem>(offsetof(TString, str) + (ts->len + 1u) * sizeof(char));
 				(void)luaM_realloc(state, object, stringByteSize, 0u);
 				break;
 			}
@@ -8258,7 +8265,13 @@ namespace
 
 		while (current != tail) {
 			const lu_byte markByte = current->gch.marked;
-			const int colorClass = static_cast<int>(markByte & 0xF9u);
+			// The whole byte, unmasked. Stock 5.0 clears the two weak-table bits
+			// before this comparison, but the shipped sweeplist does not - it is
+			// `mov cl, [eax+5]; movzx edx, cl; cmp edx, limit` at 0x00915A11 with
+			// nothing in between. Carrying stock's mask over (as `& 0xF9`) cleared
+			// bits 1 and 2, so any object marked only in those bits compared equal
+			// to zero and was freed while still live.
+			const int colorClass = static_cast<int>(markByte);
 
 			if (colorClass > limit) {
 				current->gch.marked = static_cast<lu_byte>(markByte & 0xFEu);
