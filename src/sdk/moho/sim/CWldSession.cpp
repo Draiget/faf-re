@@ -40,6 +40,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/COGrid.h"
@@ -1294,6 +1295,28 @@ namespace moho
   // for the per-symbol addresses. All seven are zero at image load and stay so
   // until `UICommandGraph::LoadWaypointParams` imports them.
   std::int32_t ui_CurveSegments = 0;           // 0x00F57CC0
+
+  // Projectile strategic-icon CVars. None of these existed in the tree; the
+  // addresses come from the store/compare operands in FUN_008621B0.
+  float UI_StrategicProjectileLOD = 0.0f;   // 0x00F57B20
+  bool UI_RenProjectileIcons = false;       // 0x00F57A8F
+  bool UI_RenProjectileGlow = false;        // 0x00F57B24
+  bool UI_forceWeaponsToYellow = false;     // 0x00F57B25
+  float UI_RenProjectileGlowMin = 0.0f;     // 0x00F57B28
+  float UI_RenProjectileGlowMax = 0.0f;     // 0x00F57B2C
+  float UI_RenProjectileGlowPeriod = 0.0f;  // 0x00F57B30
+  float UI_CurGlowTime = 0.0f;              // 0x010A6460
+
+  // Entity ids carry their family in the top nibble; 0x1_______ is a projectile.
+  constexpr std::uint32_t kEntityFamilyMask = 0xF0000000u;
+  constexpr std::uint32_t kEntityFamilyProjectile = 0x10000000u;
+  constexpr std::uint32_t kProjectileIconColor = 0xFFFFFFFFu;
+  constexpr std::uint32_t kProjectileForcedColor = 0xFFFFFF00u;
+  constexpr const char* kProjectileIconTechnique = "TAlphaBlendLinearSampleNoDepth";
+  // 0x008624F2 masks the layer with 6 - seabed | sub - to pick the recon grid.
+  constexpr std::int32_t kLayerUnderwaterMask = LAYER_Seabed | LAYER_Sub;
+
+
   float ui_CurveSmoothness = 0.0f;             // 0x00F57CC4
   float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
   std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
@@ -11417,23 +11440,163 @@ namespace moho
    * ?RenderProjectileIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCRenderWorldView@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@M@Z)
    */
   void CWldSession::RenderProjectileIcons(
-    CameraImpl* const /*camera*/,
+    CameraImpl* const camera,
     CRenderWorldView* const /*worldView*/,
-    CD3DPrimBatcher* const /*primBatcher*/,
+    CD3DPrimBatcher* const primBatcher,
     CWldMap* const /*map*/,
-    const float /*deltaSeconds*/
+    const float deltaSeconds
   )
   {
-    // Recovered 0x008621B0 high-level flow:
-    // 1) Build strategic projection matrix from camera viewport.
-    // 2) Resolve PROJECTILE category from rule resolver.
-    // 3) Iterate POI entities, filter by projectile nibble/category bitset and visibility.
-    // 4) Resolve icon texture (blueprint icon or army color fallback).
-    // 5) Draw billboard quad (+ optional glow pulse pass), then flush.
-    //
-    // Deep lift blockers:
-    // CameraImpl/CRenderWorldView typed query API, CD3DPrimBatcher texture setup API,
-    // and projectile UI CVars/glow state ownership.
+    const GeomCamera3& view = camera->CameraGetView();
+
+    // Zoomed in past the strategic threshold the projectiles are drawn as real
+    // meshes, so the icon pass is skipped entirely.
+    if (camera->CameraGetTargetZoom() < UI_StrategicProjectileLOD) {
+      return;
+    }
+
+    const float viewportWidth = static_cast<float>(static_cast<std::int32_t>(view.viewport.r[3].z));
+    const float viewportHeight = static_cast<float>(static_cast<std::int32_t>(view.viewport.r[3].w));
+
+    primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
+    primBatcher->SetViewMatrix(VMatrix4::Identity());
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("primbatcher");
+    device->SelectTechnique(kProjectileIconTechnique);
+    CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+
+    const CategoryWordRangeView* const projectileCategory = mRules->GetEntityCategory("PROJECTILE");
+    UserArmy* const focusArmy = GetFocusArmy();
+
+    // The binary collects into a stack fastvector with a large inline buffer;
+    // the heap-backed lane is behaviourally identical for a scratch list.
+    gpg::fastvector<UserEntity*> visibleEntities{};
+    auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
+    (void)spatialStorage->CollectInView(const_cast<GeomCamera3*>(&view), visibleEntities, ENTITYTYPE_Entity);
+
+    for (UserEntity* const entity : visibleEntities) {
+      if (entity == nullptr || entity->mVariableData.mIsDead) {
+        continue;
+      }
+
+      // Entity ids are family-tagged in their top nibble; only the projectile
+      // family gets an icon, which is cheaper than a category test per entity.
+      if ((entity->mParams.mEntityId & kEntityFamilyMask) != kEntityFamilyProjectile) {
+        continue;
+      }
+
+      const auto* const blueprint = reinterpret_cast<const RProjectileBlueprint*>(entity->mParams.mBlueprint);
+      if (blueprint == nullptr) {
+        continue;
+      }
+      if (projectileCategory == nullptr || !projectileCategory->mBits.Contains(blueprint->mCategoryBitIndex)) {
+        continue;
+      }
+
+      const Wm3::Vec3f worldPosition = entity->GetInterpolatedTransform(deltaSeconds).pos_;
+
+      // Own and allied projectiles are always drawn; everyone else's have to be
+      // under recon cover, and an underwater projectile is checked against the
+      // fog grid rather than the explored grid.
+      if (focusArmy != nullptr && !focusArmy->IsAlly(static_cast<std::uint32_t>(entity->mArmy->mArmyIndex))
+          && !focusArmy->CanSeePoint(
+               worldPosition,
+               (entity->mVariableData.mLayerMask & kLayerUnderwaterMask) != 0 ? UserArmy::EReconGridMask::Fog
+                                                                 : UserArmy::EReconGridMask::Explored
+             )) {
+        continue;
+      }
+
+      boost::shared_ptr<CD3DBatchTexture> icon{};
+      float halfWidth = 0.0f;
+      float halfHeight = 0.0f;
+      bool usesIconTexture = false;
+
+      if (!blueprint->mStrategicIconName.empty()) {
+        if (!UI_RenProjectileIcons) {
+          continue;
+        }
+        icon = CD3DBatchTexture::FromFile(blueprint->mStrategicIconName.c_str(), 0u);
+        if (!icon) {
+          continue;
+        }
+        // Sized from the texture itself, so an icon is drawn at its authored
+        // pixel size regardless of zoom.
+        halfWidth = static_cast<float>(icon->mWidth >> 1u);
+        halfHeight = static_cast<float>(icon->mHeight >> 1u);
+        usesIconTexture = true;
+        if (UI_RenProjectileGlow) {
+          primBatcher->Flush();
+          (void)primBatcher->Setup(kProjectileIconTechnique);
+        }
+      } else {
+        UserArmy* const owningArmy = entity->mArmy;
+        if (owningArmy == nullptr) {
+          continue;
+        }
+        icon = CD3DBatchTexture::FromSolidColor(
+          UI_forceWeaponsToYellow ? kProjectileForcedColor : owningArmy->mVarDat.mPlayerColorBgra
+        );
+        if (!icon) {
+          continue;
+        }
+        halfWidth = blueprint->Display.StrategicIconSize * 0.5f;
+        halfHeight = halfWidth;
+      }
+
+      primBatcher->SetTexture(icon);
+
+      const Wm3::Vector2f projected = view.Project(worldPosition, 0.0f, viewportWidth, viewportHeight, 0.0f);
+      // Snapped to whole pixels so the icon samples its texels 1:1.
+      const float centerX = std::floor(projected.x);
+      const float centerY = std::floor(projected.y);
+
+      const float left = centerX - halfWidth;
+      const float right = centerX + halfWidth;
+      const float top = centerY - halfHeight;
+      const float bottom = centerY + halfHeight;
+
+      const CD3DPrimBatcher::Vertex topLeft{left, top, 1.0f, kProjectileIconColor, 0.0f, 1.0f};
+      const CD3DPrimBatcher::Vertex topRight{left, bottom, 1.0f, kProjectileIconColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex bottomRight{right, bottom, 1.0f, kProjectileIconColor, 1.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex bottomLeft{right, top, 1.0f, kProjectileIconColor, 1.0f, 1.0f};
+      primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+
+      if (!usesIconTexture || !UI_RenProjectileGlow) {
+        continue;
+      }
+
+      // Glow pass: a second quad over the icon whose alpha pulses on a shared
+      // global timer, so every projectile icon on screen pulses in step.
+      primBatcher->Flush();
+      (void)primBatcher->Setup("TCommandGlow");
+
+      UI_CurGlowTime =
+        (UI_CurGlowTime <= UI_RenProjectileGlowPeriod) ? UI_CurGlowTime + deltaSeconds : 0.0f;
+
+      const float halfPeriod = UI_RenProjectileGlowPeriod * 0.5f;
+      float glowFrom = UI_RenProjectileGlowMax;
+      float glowTo = UI_RenProjectileGlowMin;
+      float glowElapsed = UI_CurGlowTime;
+      if (glowElapsed > halfPeriod) {
+        glowFrom = UI_RenProjectileGlowMin;
+        glowTo = UI_RenProjectileGlowMax;
+        glowElapsed -= halfPeriod;
+      }
+
+      const float glow = (((glowFrom - glowTo) / halfPeriod) * glowElapsed) + glowTo;
+      const std::uint32_t glowColor = static_cast<std::uint32_t>(static_cast<std::uint8_t>(glow * 255.0f)) << 24u;
+
+      const CD3DPrimBatcher::Vertex glowTopLeft{right, top, 1.0f, glowColor, 1.0f, 1.0f};
+      const CD3DPrimBatcher::Vertex glowTopRight{left, top, 1.0f, glowColor, 0.0f, 1.0f};
+      const CD3DPrimBatcher::Vertex glowBottomRight{left, bottom, 1.0f, glowColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex glowBottomLeft{right, bottom, 1.0f, glowColor, 1.0f, 0.0f};
+      primBatcher->DrawQuad(glowTopLeft, glowTopRight, glowBottomRight, glowBottomLeft);
+      primBatcher->Flush();
+    }
+
+    primBatcher->Flush();
   }
 
   /**
