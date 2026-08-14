@@ -797,7 +797,7 @@ namespace
    * Acquires contiguous `UserArmy*` vector storage for `count` lanes and
    * fills each lane with one caller-supplied pointer value.
    */
-  [[maybe_unused]] bool InitializeUserArmyPointerVector(
+  bool InitializeUserArmyPointerVector(
     msvc8::vector<moho::UserArmy*>& target,
     const std::uint32_t count,
     moho::UserArmy* const* const fillValueSlot
@@ -839,7 +839,7 @@ namespace
    * `count` entries and a null fill value, then returns the destination vector
    * pointer for chaining.
    */
-  [[maybe_unused]] [[nodiscard]] msvc8::vector<moho::UserArmy*>* InitializeUserArmyPointerVectorNullFillAdapter(
+  [[nodiscard]] msvc8::vector<moho::UserArmy*>* InitializeUserArmyPointerVectorNullFillAdapter(
     msvc8::vector<moho::UserArmy*>* const target,
     const std::uint32_t count
   )
@@ -8504,13 +8504,16 @@ namespace moho
     IsGameOver = 0;
 
     if (const LaunchInfoBase* const launchInfo = mLaunchInfo.get(); launchInfo != nullptr) {
-      // The binary sizes `userArmies` here - one null slot per launch-info army
-      // (0x008932A7) - because `DoBeat` fills every slot from the packet's
-      // `mNewGrids` before `CreateGameInterface` builds the in-game UI. Our
-      // `Sim::Sync` (0x007474B0) is still a partial lift that publishes no
-      // armies, so sizing the run here hands `cfunc_GetArmiesTableL` a null
-      // army to dereference. The resize belongs in the same pass as the rest
-      // of `Sim::Sync`.
+      // One null army slot per launch-info army (0x008932A7): the run has to
+      // exist before the first beat, because `DoBeat` addresses it by army
+      // index (`userArmies[army->mArmyIndex] = army`) rather than appending,
+      // and every consumer indexes it the same way - `cfunc_IsObserverL`
+      // dereferences `userArmies[FocusArmy]` the moment the in-game UI asks
+      // whether the local player is an observer.
+      (void)InitializeUserArmyPointerVectorNullFillAdapter(
+        &userArmies,
+        static_cast<std::uint32_t>(launchInfo->mArmyLaunchInfo.size())
+      );
 
       // Command sources and the focus army come off the same launch info.
       (void)CopyConstructCommandSourceVector(launchInfo->mCommandSources.mSrcs, &cmdSources);
