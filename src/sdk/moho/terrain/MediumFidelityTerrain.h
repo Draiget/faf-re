@@ -311,6 +311,49 @@ namespace moho
      */
     virtual void DrawTerrainSkirt();
 
+    /**
+     * Draw parameters for one terrain technique pass.
+     *
+     * Derived from FUN_00805B50's operands, which all normalise to the same
+     * stack argument: the technique name is an `msvc8::string` at +0x00 whose
+     * `_Myres` the binary tests at +0x18 and whose SSO buffer it reads at
+     * +0x04; the two matrices sit at +0x1C and +0x5C. Those tile exactly:
+     * a 28-byte msvc8::string ends at 0x1C, and 0x1C + 0x40 == 0x5C.
+     *
+     * Note the offsets coincide with `GeomCamera3` (projection +0x1C, view
+     * +0x5C), because a `VTransform` is also 0x1C bytes. It is not a camera:
+     * +0x18 there is `pos_.z`, and the binary tests that slot as an integer
+     * string length.
+     */
+    struct STerrainTechniqueDrawParams
+    {
+      msvc8::string mTechniqueName;  // +0x00
+      VMatrix4 mProjection;          // +0x1C
+      VMatrix4 mView;                // +0x5C
+    };
+
+    /**
+     * Address: 0x00805B50 (FUN_00805B50, Moho::MediumFidelityTerrain::CondDrawTerrainTechnique)
+     *
+     * What it does:
+     * Draws one terrain pass under a caller-chosen technique, gated on
+     * `ren_Terrain`.
+     */
+    void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+
+    static_assert(
+      offsetof(STerrainTechniqueDrawParams, mTechniqueName) == 0x00,
+      "STerrainTechniqueDrawParams::mTechniqueName offset must be 0x00"
+    );
+    static_assert(
+      offsetof(STerrainTechniqueDrawParams, mProjection) == 0x1C,
+      "STerrainTechniqueDrawParams::mProjection offset must be 0x1C"
+    );
+    static_assert(
+      offsetof(STerrainTechniqueDrawParams, mView) == 0x5C,
+      "STerrainTechniqueDrawParams::mView offset must be 0x5C"
+    );
+
   private:
     /**
      * Address: 0x008065E0 (FUN_008065E0, sub_8065E0)
