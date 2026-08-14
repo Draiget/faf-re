@@ -5496,8 +5496,7 @@ namespace
       return nullptr;
     }
 
-    boost::shared_ptr<Unit> ferryBeacon = currentCommand->mUnit.lock();
-    return ferryBeacon ? ferryBeacon.get() : nullptr;
+    return currentCommand->mUnit.GetObjectPtr();
   }
 
   [[nodiscard]] bool HasCommandCap(const Unit* const unit, const ERuleBPUnitCommandCaps commandCap) noexcept

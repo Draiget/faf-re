@@ -265,6 +265,28 @@ namespace moho
      */
     void CoordinateWith(CUnitCommand* other);
 
+    /**
+     * Address: 0x006E8720 (FUN_006E8720)
+     *
+     * IDA signature:
+     * Moho::WeakObject_IUnit *__thiscall sub_6E8720(
+     *   Moho::RUnitBlueprint *blueprint, Moho::WeakPtr_Unit *command,
+     *   Moho::CArmyImpl *army, float x, float y, float z);
+     *
+     * What it does:
+     * Spawns this command's ferry beacon: builds a complete, unlinked unit of
+     * `blueprint` at `(x, y, z)` with identity orientation, stores it in the
+     * command's beacon weak lane, and returns it back out of that lane.
+     */
+    [[nodiscard]] static Unit* CreateFerryBeacon(
+      const RUnitBlueprint* blueprint,
+      CUnitCommand& command,
+      CArmyImpl* army,
+      float x,
+      float y,
+      float z
+    );
+
   private:
     /**
      * Address: 0x006E7FF0 (FUN_006E7FF0, ??0CUnitCommand@Moho@@AAE@XZ)
@@ -319,7 +341,15 @@ namespace moho
     bool mUnknownFlag143;
     msvc8::vector<WeakPtr<CUnitCommand>> mCoordinatingOrders;
     bool mUnknownFlag154;
-    boost::weak_ptr<Unit> mUnit;
+    /**
+     * The ferry beacon this command spawned, held by the engine's intrusive
+     * weak pointer - not `boost::weak_ptr`. Two independent readings agree:
+     * `CreateFerryBeaconUnit` (0x006E87D2) calls `WeakPtr<Unit>::Set` on
+     * `this + 0x158` and then decodes the object back out with the `-4`
+     * owner-slot adjustment, and `MemberSerialize`/`MemberDeserialize` already
+     * reflect the field through `WeakPtr<Unit>::sType`.
+     */
+    WeakPtr<Unit> mUnit;
     LuaPlus::LuaObject mArgs;
     int32_t mUnknownTailInt;
   };

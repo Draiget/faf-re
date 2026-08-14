@@ -199,6 +199,23 @@ namespace
     return std::memcmp(&lhs, &rhs, sizeof(Wm3::Vector3f)) == 0;
   }
 
+  /**
+   * Address: 0x006D77B0 (FUN_006D77B0)
+   *
+   * IDA signature:
+   * _DWORD *__usercall sub_6D77B0@<eax>(int weapon@<edi>, int entity@<esi>);
+   *
+   * What it does:
+   * Refreshes this entity's entry in the weapon's blacklist, appending one if
+   * it is not already listed. The scan strides `mBlacklist` by 12 bytes and
+   * recovers each stored entity from its weak-ref owner slot, which is why the
+   * binary reads `*entry ? *entry - 4 : 0` rather than dereferencing directly.
+   *
+   * The binary hardcodes the value 10 because its single call site
+   * (`HandleRetargetProbeOnListenerTick`, 0x005D9630) passes that constant;
+   * it stays a parameter here and the caller supplies
+   * `kAcquireTargetBlacklistTicks`.
+   */
   void AddWeaponBlacklistEntry(UnitWeapon& weapon, Entity* const entity, const std::int32_t value)
   {
     if (entity == nullptr) {

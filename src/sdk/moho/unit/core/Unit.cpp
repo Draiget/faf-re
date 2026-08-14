@@ -15742,8 +15742,7 @@ Unit* Unit::GetTransportFerryBeacon() const
     return nullptr;
   }
 
-  boost::shared_ptr<Unit> ferryBeacon = command->mUnit.lock();
-  return ferryBeacon.get();
+  return command->mUnit.GetObjectPtr();
 }
 
 /**

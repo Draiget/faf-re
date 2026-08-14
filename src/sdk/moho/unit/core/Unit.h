@@ -781,6 +781,10 @@ namespace moho
     explicit Unit(const SUnitConstructionParams& params);
 
     friend class Sim;
+    // CUnitCommand::CreateFerryBeacon (0x006E8720) constructs its beacon with
+    // this same private constructor - `operator new(0x6A8)` followed by a
+    // direct call at 0x006E87C5, not through Sim::CreateUnit.
+    friend class CUnitCommand;
 
   public:
 
