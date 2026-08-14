@@ -133,7 +133,15 @@ namespace moho
   gpg::RType* preregister_EntIdTypeInfo()
   {
     static EntIdTypeInfo typeInfo;
-    gpg::PreRegisterRType(typeid(std::int32_t), &typeInfo);
+    // 0x00557DE4 pushes `??_R0?AVEntId@Moho@@@8` — the descriptor for the
+    // *class* `Moho::EntId`, which is a different `type_info` from `int`'s.
+    // Keying this on `typeid(std::int32_t)` instead made it race `intTypeInfo`
+    // (RIntegerTypes.cpp) for the one `typeid(int)` slot in the first-wins
+    // preregistration map, and win it: every reflected `int` field in the
+    // engine then resolved to this descriptor, which has no `SetLexical`, so
+    // `SCR_LuaBuildObject` rejected every integer blueprint value with
+    // "Invalid value for EntId at 0x…" and left the field at its default.
+    gpg::PreRegisterRType(typeid(EntIdValue), &typeInfo);
     return &typeInfo;
   }
 
