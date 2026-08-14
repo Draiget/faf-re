@@ -6,6 +6,7 @@
 //
 // Lives outside dependencies/WildMagic3p8/ because they're FAF SDK glue, not
 // Wild Magic library code. Used to live at src/sdk/wm3/Distance3.h.
+#include "Wm3AxisAlignedBox3.h"
 #include "Wm3Box3.h"
 #include "Wm3Box2.h"
 #include "Wm3Line3.h"
@@ -967,5 +968,24 @@ namespace Wm3
     float* contactTime,
     Vector3<float>* contactPoint,
     int* intrType
+  ) noexcept;
+
+  /**
+   * Address: 0x00506010 (FUN_00506010, Wm3::AxisAlignedBox3f::Intersects)
+   *
+   * IDA signature:
+   * char __usercall sub_506010@<al>(
+   *     Wm3::AxisAlignedBox3f *this@<edx>, Wm3::AxisAlignedBox3f *other@<edi>);
+   *
+   * What it does:
+   * Tests whether two axis-aligned boxes overlap on all three axes.
+   *
+   * The binary emits this as a member of `AxisAlignedBox3f`, but that type is
+   * vendored WildMagic; FAF's additions to Wm3 live here as free functions
+   * instead, so the dependency stays untouched.
+   */
+  [[nodiscard]] bool AxisAlignedBox3fIntersects(
+    const AxisAlignedBox3f& box,
+    const AxisAlignedBox3f& other
   ) noexcept;
 } // namespace Wm3
