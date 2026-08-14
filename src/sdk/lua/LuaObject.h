@@ -1324,10 +1324,18 @@ namespace LuaPlus
 		 * Address: 0x0052C950 (FUN_0052C950, ??0LuaFunction@LuaPlus@@QAE@@Z_2)
 		 * Address: 0x0057E950 (FUN_0057E950, ??0LuaFunction@LuaPlus@@QAE@@Z_4)
 		 * Address: 0x005D0B60 (FUN_005D0B60, ??0LuaFunction@LuaPlus@@QAE@@Z_3)
+		 * Address: 0x00624130 (FUN_00624130, func_LuaObjectFunction03)
 		 *
 		 * What it does:
 		 * Wraps a Lua object as callable function and throws a Lua type error
 		 * when the source object is not a function.
+		 *
+		 * The five addresses are five instantiations, not ICF twins - each is
+		 * 29 instructions with the same shape (copy-construct the base, test
+		 * `IsFunction`, raise `TypeError("call")`) but its own relocations, so
+		 * their hashes differ. 0x00624130 is the `LuaFunction<int>` copy: its
+		 * only caller is `CScriptObject::TaskTick` (0x00623F10), which is what
+		 * `LuaPlus::LuaFunction<int> taskTick{taskTickCallback}` emits.
 		 */
 		explicit LuaFunction(const LuaObject& obj)
 			: LuaObject(obj) {
