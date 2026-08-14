@@ -220,4 +220,17 @@ namespace moho
    * typed `gpg::RRef`, and releases the temporary weak-pointer count.
    */
   gpg::RRef* GetScaResource(gpg::RRef* outRef, const char* path);
+
+  /**
+   * Address: 0x00BC9280 (FUN_00BC9280)
+   *
+   * IDA signature:
+   * void __cdecl sub_BC9280();
+   *
+   * What it does:
+   * Resolves `RScaResource`'s reflected type and registers it as the `"anims"`
+   * prefetch kind, the sibling of the `"models"`, `"d3d_textures"` and
+   * `"batch_textures"` registrations.
+   */
+  void register_RScaResourceAnimPrefetchType();
 } // namespace moho
