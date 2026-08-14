@@ -12,7 +12,7 @@ namespace
     void* vtable = nullptr;                    // +0x00
     std::uint8_t canShake = 0;                 // +0x04
     std::uint8_t padding05_07[3] = {0, 0, 0};  // +0x05
-    moho::RenderCameraViewRuntime* cameraView = nullptr; // +0x08
+    moho::GeomCamera3* cameraView = nullptr; // +0x08
   };
   static_assert(
     offsetof(SimpleRenderWorldViewCtorRuntimeView, canShake) == 0x04,
@@ -33,7 +33,7 @@ namespace
    */
   [[maybe_unused]] SimpleRenderWorldViewCtorRuntimeView* InitializeSimpleRenderWorldViewRuntimeLane(
     SimpleRenderWorldViewCtorRuntimeView* const runtimeView,
-    moho::RenderCameraViewRuntime* const cameraView
+    moho::GeomCamera3* const cameraView
   ) noexcept
   {
     static std::uint8_t sSimpleRenderWorldViewVtableTag = 0;
@@ -51,24 +51,19 @@ namespace moho
   /**
    * Address: 0x007F62A0 (FUN_007F62A0, nullsub_56)
    */
-  void SimpleRenderWorldView::Render(const std::int32_t, const std::int32_t, const std::int32_t, const std::int32_t)
+  void SimpleRenderWorldView::Render(CD3DPrimBatcher*, int, CWldMap*, float)
   {}
 
   /**
    * Address: 0x007F62B0 (FUN_007F62B0, Moho::SimpleRenderWorldView::RenderCommandGraph)
    */
-  void SimpleRenderWorldView::RenderCommandGraph(
-    const std::int32_t,
-    const std::int32_t,
-    const std::int32_t,
-    const std::int32_t
-  )
+  void SimpleRenderWorldView::RenderCommandGraph(CD3DPrimBatcher*, int, CWldMap*, float)
   {}
 
   /**
    * Address: 0x007F62C0 (FUN_007F62C0, Moho::SimpleRenderWorldView::GetCamera)
    */
-  RenderCameraRuntime* SimpleRenderWorldView::GetCamera()
+  CameraImpl* SimpleRenderWorldView::GetCamera()
   {
     return nullptr;
   }
@@ -76,7 +71,7 @@ namespace moho
   /**
    * Address: 0x007F62D0 (FUN_007F62D0, Moho::SimpleRenderWorldView::GetCameraView)
    */
-  RenderCameraViewRuntime* SimpleRenderWorldView::GetCameraView()
+  GeomCamera3* SimpleRenderWorldView::GetCameraView()
   {
     return mCameraView;
   }
@@ -120,10 +115,12 @@ namespace moho
   /**
    * Address: 0x007F6350 (FUN_007F6350, Moho::SimpleRenderWorldView::SetOrthographic)
    */
-  bool SimpleRenderWorldView::SetOrthographic(const bool enabled)
+  void SimpleRenderWorldView::SetOrthographic(const bool enabled)
   {
+    // 0x007F6350 is `mov al,[arg]; mov [ecx+4],al; ret 4` - the AL load feeds
+    // the store, so the slot returns nothing. IDA types it `bool` only because
+    // AL is still live at the return.
     mCanShake = enabled;
-    return enabled;
   }
 
   /**
