@@ -152,9 +152,16 @@ namespace moho
     const CategoryWordRangeView* const emptyCategory = rules->GetEntityCategory("");
     restrictionCategory.mUniverse = emptyCategory->mUniverse;
     restrictionCategory.mBits.mFirstWordIndex = emptyCategory->mBits.mFirstWordIndex;
-    restrictionCategory.mBits.mWords.start_ = emptyCategory->mBits.mWords.start_;
-    restrictionCategory.mBits.mWords.end_ = emptyCategory->mBits.mWords.end_;
-    restrictionCategory.mBits.mWords.capacity_ = emptyCategory->mBits.mWords.capacity_;
+
+    // `gpg::fastvector_uint::cpy` in the binary - a real copy into our own
+    // storage. Assigning the three pointer lanes instead aliased the empty
+    // category's buffer while `originalVec_` still pointed at our inline one,
+    // so the `ResetStorageToInline` below saw `start_ != originalVec_` and
+    // `delete[]`-ed memory this vector never owned. Every unit constructed
+    // handed one live block back to the allocator; the ones that landed on
+    // interned Lua strings unlinked them from the string table and eventually
+    // crashed the sim in the next collection.
+    restrictionCategory.mBits.mWords.ResetFrom(emptyCategory->mBits.mWords);
 
     (void)RestoreSpawnElevationFromBlueprint(this);
 
