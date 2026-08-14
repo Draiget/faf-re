@@ -20154,6 +20154,18 @@ void LuaObject::AssignNumber(LuaState* state, const double number)
 	m_object.tt = LUA_TNUMBER;
 }
 
+/**
+ * Address: 0x009095C0 (FUN_009095C0, LuaPlus::LuaObject::AssignNil)
+ *
+ * IDA signature:
+ * void __thiscall LuaPlus::LuaObject::AssignNil(
+ *     LuaPlus::LuaObject *this, LuaPlus::LuaState *state);
+ *
+ * What it does:
+ * Rebinds this object to `state` and sets its payload to nil. The unlink from
+ * the previous state's used-object chain lives in RebindToState, which is what
+ * the binary open-codes here before writing the tag.
+ */
 void LuaObject::AssignNil(LuaState* state)
 {
 	RebindToState(*this, state);
