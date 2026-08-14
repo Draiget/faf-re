@@ -28,6 +28,14 @@ namespace moho
      * `CAniSkel` as base metadata.
      */
     void Init() override;
+
+    /**
+     * Address: 0x0054DDF0 (FUN_0054DDF0, Moho::CAniDefaultSkelTypeInfo::AddBase_CAniSkel)
+     *
+     * What it does:
+     * Registers `CAniSkel` as this type's reflected base at offset 0.
+     */
+    static void AddBase_CAniSkel(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(CAniDefaultSkelTypeInfo) == 0x64, "CAniDefaultSkelTypeInfo size must be 0x64");

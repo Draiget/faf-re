@@ -91,7 +91,10 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_0052B640 (non-canonical helper lane).
+   * Address: 0x00533250 (FUN_00533250, Moho::RRuleGameRulesImplTypeInfo::AddBase_RRuleGameRules)
+   *
+   * What it does:
+   * Registers `RRuleGameRules` as this type's reflected base at offset 0.
    */
   void RRuleGameRulesImplTypeInfo::AddBase_RRuleGameRules(gpg::RType* const typeInfo)
   {
