@@ -488,6 +488,51 @@ namespace moho
   }
 
   /**
+   * Address: 0x00805B50 (FUN_00805B50, Moho::MediumFidelityTerrain::CondDrawTerrainTechnique)
+   *
+   * IDA signature:
+   * void __userpurge Moho::MediumFidelityTerrain::CondDrawTerrainTechnique(
+   *     int this@<ecx>, int@<esi>, float, int params);
+   *
+   * What it does:
+   * Draws one terrain pass under a caller-chosen technique. Gated on
+   * `ren_Terrain` like the rest of the class: selects the `terrain` effect and
+   * the named technique, binds the pass's view/projection matrices and the
+   * tesselator height scale, then issues the terrain triangle list.
+   *
+   * Unlike LowFidelityTerrain::DrawTerrainDepth the technique is not a
+   * literal - it comes from the params block, which is what makes this the
+   * `Cond` variant.
+   */
+  void MediumFidelityTerrain::CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique(params.mTechniqueName.c_str());
+
+    auto& shaderVars = GetTerrainShaderVars();
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&params.mView);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&params.mProjection);
+    }
+
+    // The height scale is read before the Exists() guard in the binary, so the
+    // tesselator call happens whether or not the var is bound.
+    const float heightScale = mTesselator->GetHeightScale();
+    if (shaderVars.heightScale.Exists()) {
+      shaderVars.heightScale.SetFloat(heightScale);
+    }
+
+    DrawTriangles();
+  }
+
+  /**
    * Address: 0x00805490 (FUN_00805490, sub_805490)
    *
    * IDA signature:
