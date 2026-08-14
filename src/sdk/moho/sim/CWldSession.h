@@ -1792,6 +1792,16 @@ namespace moho
    */
   extern bool UI_SelectAnything;
 
+  extern float UI_StrategicProjectileLOD;  // 0x00F57B20
+  extern bool UI_RenProjectileIcons;       // 0x00F57A8F
+  extern bool UI_RenProjectileGlow;        // 0x00F57B24
+  extern bool UI_forceWeaponsToYellow;     // 0x00F57B25
+  extern float UI_RenProjectileGlowMin;    // 0x00F57B28
+  extern float UI_RenProjectileGlowMax;    // 0x00F57B2C
+  extern float UI_RenProjectileGlowPeriod; // 0x00F57B30
+  extern float UI_CurGlowTime;             // 0x010A6460
+
+
   /**
    * Command-waypoint drawing parameters, imported from
    * `/lua/ui/game/commandwaypoint.lua` by `UICommandGraph::LoadWaypointParams`
