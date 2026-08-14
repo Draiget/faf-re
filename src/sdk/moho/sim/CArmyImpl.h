@@ -156,8 +156,8 @@ namespace moho
      * debug/stat refresh lanes).
      */
     void OnTick() override;
-    /** Address: 0x00700080 (FUN_00700080, Moho::CArmyImpl::CopyConstantDataToUserArmy) */
-    UserArmy* CopyConstantDataToUserArmy(UserArmy* outUserArmy) override;
+    /** Address: 0x00700080 (FUN_00700080, Moho::CArmyImpl::GetConstDat) */
+    SSTIArmyConstantData* CopyArmyConstantData(SSTIArmyConstantData* outBuffer) override;
     /** Address: 0x00700240 (FUN_00700240, Moho::CArmyImpl::CopyArmyVariableData) */
     SSTIArmyVariableData* CopyArmyVariableData(SSTIArmyVariableData* outBuffer) override;
     /** Address: 0x006FDD50 (FUN_006FDD50, Moho::CArmyImpl::GetArmyStats) */

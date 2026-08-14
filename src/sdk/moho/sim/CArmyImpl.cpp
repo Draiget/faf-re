@@ -2253,19 +2253,20 @@ namespace moho
   }
 
   /**
-   * Address: 0x00700080 (FUN_00700080, Moho::CArmyImpl::CopyConstantDataToUserArmy)
+   * Address: 0x00700080 (FUN_00700080, Moho::CArmyImpl::GetConstDat)
    */
-  UserArmy* CArmyImpl::CopyConstantDataToUserArmy(UserArmy* outUserArmy)
+  SSTIArmyConstantData* CArmyImpl::CopyArmyConstantData(SSTIArmyConstantData* outBuffer)
   {
-    if (outUserArmy == nullptr) {
-      return outUserArmy;
+    if (outBuffer == nullptr) {
+      return outBuffer;
     }
 
     // The binary is a single tail call into the shared constant-data
-    // assignment (FUN_007000A0); `UserArmy` carries the payload as its base
-    // subobject, so no cast is involved.
-    (void)AssignArmyConstantData(*GetArmyConstantData(this), outUserArmy);
-    return outUserArmy;
+    // assignment (FUN_007000A0). The destination is the sync packet's
+    // per-army `mNewGrids` slot; `UserArmy` reaches the same lane through its
+    // `SSTIArmyConstantData` base when the client rebuilds an army from it.
+    (void)AssignArmyConstantData(*GetArmyConstantData(this), outBuffer);
+    return outBuffer;
   }
 
   /**
