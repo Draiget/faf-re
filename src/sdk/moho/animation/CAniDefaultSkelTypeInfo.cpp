@@ -24,18 +24,6 @@ namespace
     return reinterpret_cast<moho::CAniDefaultSkelTypeInfo*>(gCAniDefaultSkelTypeInfoStorage);
   }
 
-  void AddCAniSkelBase(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const baseType = gpg::LookupRType(typeid(moho::CAniSkel));
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   struct CAniDefaultSkelTypeInfoBootstrap
   {
@@ -64,6 +52,25 @@ namespace moho
   }
 
   /**
+ * Address: 0x0054DDF0 (FUN_0054DDF0, Moho::CAniDefaultSkelTypeInfo::AddBase_CAniSkel)
+ *
+ * What it does:
+ * Registers `CAniSkel` as this type's reflected base at offset 0.
+ */
+void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
+{
+  gpg::RType* const baseType = gpg::LookupRType(typeid(moho::CAniSkel));
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x0054A990 (FUN_0054A990)
    *
    * What it does:
@@ -74,7 +81,7 @@ namespace moho
   {
     size_ = sizeof(CAniDefaultSkel);
     gpg::RType::Init();
-    AddCAniSkelBase(this);
+    AddBase_CAniSkel(this);
     Finish();
   }
 
