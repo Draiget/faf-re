@@ -45,6 +45,22 @@ namespace moho
     void Init() override;
 
     /**
+     * Address: 0x005D44D0 (FUN_005D44D0, Moho::CAiSteeringImplTypeInfo::AddBase_IAiSteering)
+     *
+     * What it does:
+     * Registers `IAiSteering` as a reflected base at offset 0.
+     */
+    static void AddBase_IAiSteering(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005D4530 (FUN_005D4530, Moho::CAiSteeringImplTypeInfo::AddBase_CTask)
+     *
+     * What it does:
+     * Registers `CTask` as a reflected base at offset 4.
+     */
+    static void AddBase_CTask(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x005D4310 (FUN_005D4310, Moho::CAiSteeringImplTypeInfo::CtrRef)
      *
      * What it does:
