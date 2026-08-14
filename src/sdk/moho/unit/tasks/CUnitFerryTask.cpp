@@ -26,6 +26,7 @@
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitCommandWeakPtrReflection.h"
+#include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitLoadUnits.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
@@ -160,24 +161,6 @@ namespace
     (void)moho::CopyWeakPtrCUnitCommandVector(source, destination);
   }
 
-  [[nodiscard]] moho::Unit* ResolveHeadCommandFerryBeacon(moho::Unit* const ownerUnit)
-  {
-    if (ownerUnit == nullptr || ownerUnit->CommandQueue == nullptr || ownerUnit->CommandQueue->mCommandVec.empty()) {
-      return nullptr;
-    }
-
-    moho::CUnitCommand* const headCommand = ownerUnit->CommandQueue->mCommandVec.front().GetObjectPtr();
-    if (headCommand == nullptr) {
-      return nullptr;
-    }
-
-    if (boost::shared_ptr<moho::Unit> beaconFromWeak = headCommand->mUnit.lock(); beaconFromWeak != nullptr) {
-      return beaconFromWeak.get();
-    }
-
-    moho::Entity* const targetEntity = headCommand->mTarget.GetEntity();
-    return (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
-  }
 
   /**
    * Fills `outUnits` with the owner army's units matching a named entity
@@ -229,10 +212,42 @@ namespace moho
     }
     mTaskState = hasLoadedUnits ? TASKSTATE_Waiting : TASKSTATE_Complete;
 
-    if (Unit* const ferryBeacon = ResolveHeadCommandFerryBeacon(mUnit); ferryBeacon != nullptr) {
-      mBeacon.Set(ferryBeacon);
-      RunOwnerFerryPointSetScript(mUnit);
+    if (mUnit == nullptr || mUnit->CommandQueue == nullptr || mUnit->CommandQueue->mCommandVec.empty()) {
+      return;
     }
+
+    CUnitCommand* const headCommand = mUnit->CommandQueue->mCommandVec.front().GetObjectPtr();
+    if (headCommand == nullptr) {
+      return;
+    }
+
+    if (Unit* const existingBeacon = headCommand->mUnit.GetObjectPtr(); existingBeacon != nullptr) {
+      // The command already carries a beacon (a second ferry task on the same
+      // order), so adopt it rather than spawning a duplicate.
+      mBeacon.Set(existingBeacon);
+      return;
+    }
+
+    const RUnitBlueprint* const ownerBlueprint = mUnit->GetBlueprint();
+    if (ownerBlueprint == nullptr || ownerBlueprint->AI.BeaconName.empty()) {
+      return;
+    }
+
+    RResId beaconResId{};
+    (void)gpg::STR_CopyFilename(&beaconResId.name, &ownerBlueprint->AI.BeaconName);
+
+    RUnitBlueprint* const beaconBlueprint = mUnit->SimulationRef->mRules->GetUnitBlueprint(beaconResId);
+    if (beaconBlueprint == nullptr) {
+      return;
+    }
+
+    const Wm3::Vec3f beaconPos = headCommand->mTarget.GetTargetPosGun(false);
+    mBeacon.Set(
+      CUnitCommand::CreateFerryBeacon(
+        beaconBlueprint, *headCommand, mUnit->ArmyRef, beaconPos.x, beaconPos.y, beaconPos.z
+      )
+    );
+    RunOwnerFerryPointSetScript(mUnit);
   }
 
   /**
@@ -654,8 +669,7 @@ namespace moho
 
       // CUnitCommand::GetFerryBeacon (FUN_0060DAE0): the command's beacon
       // weak lane resolved to a unit.
-      boost::shared_ptr<Unit> commandBeacon = currentCommand->mUnit.lock();
-      if ((commandBeacon ? commandBeacon.get() : nullptr) != mBeacon.GetObjectPtr()) {
+      if (currentCommand->mUnit.GetObjectPtr() != mBeacon.GetObjectPtr()) {
         continue;
       }
 

@@ -34,6 +34,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/core/UnitWeakPtrReflection.h"
+#include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
@@ -2138,6 +2139,40 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
  * Adds a one-way coordinating-order link from this command to `other` when
  * command types are compatible.
  */
+/**
+ * Address: 0x006E8720 (FUN_006E8720)
+ *
+ * What it does: see the declaration.
+ *
+ * The construction payload comes from the layer-0 `SUnitConstructionParams`
+ * constructor, which yields identity orientation, the caller position, no link
+ * source, `mComplete = 1` and `mFixElevation = 0` - every value the binary
+ * writes inline at 0x006E8738-0x006E87A7 except the layer-override flag, which
+ * 0x006E8797 sets and that constructor leaves clear.
+ *
+ * The unit is built with `operator new(0x6A8)` plus a direct constructor call
+ * rather than through `Sim::CreateUnit`, and a failed allocation yields a null
+ * beacon instead of throwing - both as the binary has it at 0x006E87AB.
+ */
+Unit* CUnitCommand::CreateFerryBeacon(
+  const RUnitBlueprint* const blueprint,
+  CUnitCommand& command,
+  CArmyImpl* const army,
+  const float x,
+  const float y,
+  const float z
+)
+{
+  SUnitConstructionParams params(0, Wm3::Vector3f{x, y, z}, army, blueprint, nullptr, true);
+  params.mUseLayerOverride = 1u;
+
+  void* const storage = ::operator new(sizeof(Unit), std::nothrow);
+  Unit* const beacon = (storage != nullptr) ? new (storage) Unit(params) : nullptr;
+
+  command.mUnit.Set(beacon);
+  return command.mUnit.GetObjectPtr();
+}
+
 void CUnitCommand::CoordinateWith(CUnitCommand* const other)
 {
   if (!other) {
