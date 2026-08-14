@@ -108,17 +108,6 @@ namespace
     return self;
   }
 
-  void AddRObjectBase(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const rObjectType = CachedRObjectType();
-    gpg::RField baseField{};
-    baseField.mName = rObjectType->GetName();
-    baseField.mType = rObjectType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   struct RBlueprintVTableView
   {
@@ -446,6 +435,25 @@ namespace moho
   }
 
   /**
+ * Address: 0x0050E190 (FUN_0050E190, Moho::RBlueprintTypeInfo::AddBase_RObject)
+ *
+ * What it does:
+ * Registers `gpg::RObject` as this type's reflected base at offset 0 -
+ * RBlueprint derives from it singly.
+*/
+void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
+{
+  gpg::RType* const rObjectType = CachedRObjectType();
+  gpg::RField baseField{};
+  baseField.mName = rObjectType->GetName();
+  baseField.mType = rObjectType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x0050DC10 (FUN_0050DC10, Moho::RBlueprintTypeInfo::Init)
    *
    * What it does:
@@ -455,7 +463,7 @@ namespace moho
   void RBlueprintTypeInfo::Init()
   {
     size_ = sizeof(RBlueprint);
-    AddRObjectBase(this);
+    AddBase_RObject(this);
     gpg::RType::Init();
     AddFields(this);
     Finish();
