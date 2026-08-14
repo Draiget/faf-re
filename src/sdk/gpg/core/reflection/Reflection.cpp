@@ -10464,6 +10464,27 @@ long* RRef::TryUpcastLong() const
 }
 
 /**
+ * Registers one reflected base on `typeInfo`, skipping when `baseType` is null.
+ *
+ * Every per-type-info `AddBase_*` member the binary emits reduces to this; the
+ * only thing that varies is the base type and the sub-object offset.
+ */
+void AddBaseIfPresent(RType* const typeInfo, RType* const baseType, const std::int32_t offset)
+{
+  if (baseType == nullptr) {
+    return;
+  }
+
+  RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = offset;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
  * Address: 0x008E15B0 (FUN_008E15B0, gpg::RRef::TryUpcast_char)
  *
  * What it does:
