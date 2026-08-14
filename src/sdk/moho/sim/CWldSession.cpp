@@ -11378,28 +11378,12 @@ namespace moho
 
     const GeomCamera3& view = camera->CameraGetView();
 
-    // Pixel-exact 2D projection: an off-centre orthographic matrix over
-    // (0,0)-(width,height) with the D3D half-texel shift folded into the
-    // translation row. The viewport extents are truncated to whole pixels
-    // first, and the `-0.0f` left/top edges and the `height/height` term are
-    // the binary's own operand shapes (0x00858EA1..0x00858FD8).
+    // The binary inlines the same pixel-exact screen projection here that
+    // RenderProjectileArcs inlines at 0x0086010B; it lives on GeomCamera3 now.
     const float viewportWidth = static_cast<float>(static_cast<std::int32_t>(view.viewport.r[3].z));
     const float viewportHeight = static_cast<float>(static_cast<std::int32_t>(view.viewport.r[3].w));
-    constexpr float kLeftEdge = -0.0f;
-    constexpr float kTopEdge = -0.0f;
 
-    VMatrix4 projection{};
-    projection.r[0] = Vector4f{2.0f / viewportWidth, 0.0f, 0.0f, 0.0f};
-    projection.r[1] = Vector4f{0.0f, 2.0f / (kTopEdge - viewportHeight), 0.0f, 0.0f};
-    projection.r[2] = Vector4f{0.0f, 0.0f, -0.5f, 0.0f};
-    projection.r[3] = Vector4f{
-      (viewportWidth / (kLeftEdge - viewportWidth)) - (1.0f / viewportWidth),
-      (viewportHeight / viewportHeight) + (1.0f / viewportHeight),
-      0.5f,
-      1.0f
-    };
-
-    primBatcher->SetProjectionMatrix(projection);
+    primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
     primBatcher->SetViewMatrix(VMatrix4::Identity()); // 0x00858FE6 (sIdentity)
 
     CameraFrustumUserEntityList* const frustumUnits = camera->GetArmyUnitsInFrustum();

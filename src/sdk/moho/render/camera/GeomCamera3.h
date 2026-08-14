@@ -253,6 +253,41 @@ namespace moho
     const Wm3::Vector3f& up
   );
 
+  /**
+   * Address: 0x00858EA1..0x00858FD8 (inlined into Moho::CWldSession::DrawEconomyOverlay)
+   * Address: 0x0086010B..0x008601F0 (inlined into Moho::CRenderWorldView::RenderProjectileArcs)
+   *
+   * What it does:
+   * Builds the pixel-exact screen-space projection both world-space overlays
+   * push before they draw: an off-centre orthographic matrix over
+   * (0,0)-(width,height) with the D3D half-texel shift folded into the
+   * translation row. The viewport extents are truncated to whole pixels first.
+   *
+   * The `-0.0f` left/top edges and the `height / height` term are the binary's
+   * own operand shapes, kept rather than folded to constants: both call sites
+   * emit exactly this sequence of divides, so the original was one shared
+   * helper the compiler inlined twice.
+   */
+  [[nodiscard]] inline VMatrix4 MakeViewportPixelProjection(const GeomCamera3& camera) noexcept
+  {
+    const float width = static_cast<float>(static_cast<std::int32_t>(camera.viewport.r[3].z));
+    const float height = static_cast<float>(static_cast<std::int32_t>(camera.viewport.r[3].w));
+    constexpr float kLeftEdge = -0.0f;
+    constexpr float kTopEdge = -0.0f;
+
+    VMatrix4 projection{};
+    projection.r[0] = Vector4f{2.0f / width, 0.0f, 0.0f, 0.0f};
+    projection.r[1] = Vector4f{0.0f, 2.0f / (kTopEdge - height), 0.0f, 0.0f};
+    projection.r[2] = Vector4f{0.0f, 0.0f, -0.5f, 0.0f};
+    projection.r[3] = Vector4f{
+      (width / (kLeftEdge - width)) - (1.0f / width),
+      (height / height) + (1.0f / height),
+      0.5f,
+      1.0f
+    };
+    return projection;
+  }
+
   static_assert(offsetof(GeomCamera3, solid1) == 0x1A0, "GeomCamera3::solid1 offset must be 0x1A0");
   static_assert(offsetof(GeomCamera3, solid2) == 0x210, "GeomCamera3::solid2 offset must be 0x210");
   static_assert(offsetof(GeomCamera3, lodScale) == 0x280, "GeomCamera3::lodScale offset must be 0x280");
