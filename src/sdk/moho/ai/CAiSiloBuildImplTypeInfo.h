@@ -34,6 +34,14 @@ namespace moho
      * VFTable SLOT: 9
      */
     void Init() override;
+
+    /**
+     * Address: 0x005D0810 (FUN_005D0810, Moho::CAiSiloBuildImplTypeInfo::AddBase_IAiSiloBuild)
+     *
+     * What it does:
+     * Registers `IAiSiloBuild` as this type's reflected base at offset 0.
+     */
+    static void AddBase_IAiSiloBuild(gpg::RType* typeInfo);
   };
 
   /**

@@ -1,3 +1,5 @@
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitUnloadUnitsTypeInfo.h"
 
 #include <new>
@@ -54,7 +56,22 @@ namespace
 
 namespace moho
 {
-  /**
+    /**
+   * Address: 0x00628010 (FUN_00628010, Moho::CUnitUnloadUnitsTypeInfo::AddBase_CCommandTask)
+   *
+   * What it does:
+   * Registers `CCommandTask` as this type's reflected base at offset 0.
+   */
+  void CUnitUnloadUnitsTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CCommandTask));
+    }
+    gpg::AddBaseIfPresent(typeInfo, sType, 0);
+  }
+
+/**
    * Address: 0x00626120 (FUN_00626120, preregister_CUnitUnloadUnitsTypeInfo)
    *
    * What it does:
@@ -88,6 +105,7 @@ namespace moho
       &DestroyCUnitUnloadUnitsInPlace
     );
     gpg::RType::Init();
+    AddBase_CCommandTask(this);
     Finish();
   }
 

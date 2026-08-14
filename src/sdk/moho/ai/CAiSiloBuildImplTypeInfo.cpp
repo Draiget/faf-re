@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiSiloBuildImplTypeInfo.h"
 
 #include <cstdlib>
@@ -232,6 +233,17 @@ const char* CAiSiloBuildImplTypeInfo::GetName() const
 }
 
 /**
+ * Address: 0x005D0810 (FUN_005D0810, Moho::CAiSiloBuildImplTypeInfo::AddBase_IAiSiloBuild)
+ *
+ * What it does:
+ * Registers `IAiSiloBuild` as this type's reflected base at offset 0.
+ */
+void CAiSiloBuildImplTypeInfo::AddBase_IAiSiloBuild(gpg::RType* const typeInfo)
+{
+  gpg::AddBaseIfPresent(typeInfo, CachedIAiSiloBuildType(), 0);
+}
+
+/**
  * Address: 0x005CF6D0 (FUN_005CF6D0, ?Init@CAiSiloBuildImplTypeInfo@Moho@@UAEXXZ)
  */
 void CAiSiloBuildImplTypeInfo::Init()
@@ -250,6 +262,7 @@ void CAiSiloBuildImplTypeInfo::Init()
     AddBase(baseField);
   }
 
+  AddBase_IAiSiloBuild(this);
   Finish();
 }
 

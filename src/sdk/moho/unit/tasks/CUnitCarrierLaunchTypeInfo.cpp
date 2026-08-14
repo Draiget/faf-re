@@ -1,3 +1,4 @@
+#include "moho/task/CCommandTask.h"
 #include "moho/unit/tasks/CUnitCarrierLaunchTypeInfo.h"
 
 #include <new>
@@ -46,7 +47,22 @@ namespace
 
 namespace moho
 {
-  /**
+    /**
+   * Address: 0x00607F20 (FUN_00607F20, Moho::CUnitCarrierLaunchTypeInfo::AddBase_CCommandTask)
+   *
+   * What it does:
+   * Registers `CCommandTask` as this type's reflected base at offset 0.
+   */
+  void CUnitCarrierLaunchTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CCommandTask));
+    }
+    gpg::AddBaseIfPresent(typeInfo, sType, 0);
+  }
+
+/**
    * Address: 0x00607470 (FUN_00607470, preregister_CUnitCarrierLaunchTypeInfo)
    *
    * What it does:
@@ -80,6 +96,7 @@ namespace moho
       &DestroyCUnitCarrierLaunchInPlace
     );
     gpg::RType::Init();
+    AddBase_CCommandTask(this);
     Finish();
   }
 
