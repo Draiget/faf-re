@@ -1793,6 +1793,27 @@ namespace moho
   extern bool UI_SelectAnything;
 
   /**
+   * Command-waypoint drawing parameters, imported from
+   * `/lua/ui/game/commandwaypoint.lua` by `UICommandGraph::LoadWaypointParams`
+   * and read by the command-graph draw pass.
+   *
+   * Addresses: `?ui_CurveSegments@Moho@@3HA` 0x00F57CC0,
+   * `?ui_CurveSmoothness@Moho@@3MA` 0x00F57CC4,
+   * `?ui_PathSmoothness@Moho@@3MA` 0x00F57CC8,
+   * `?ui_CommandGraphMaxNodeUnits@Moho@@3HA` 0x00F57CD0,
+   * `?ui_MinWaypointSize@Moho@@3MA` 0x00F57CD4,
+   * `?ui_MaxWaypointSize@Moho@@3MA` 0x00F57CD8,
+   * `?ui_WaypointLineScale@Moho@@3MA` 0x00F57CDC.
+   */
+  extern std::int32_t ui_CurveSegments;
+  extern float ui_CurveSmoothness;
+  extern float ui_PathSmoothness;
+  extern std::int32_t ui_CommandGraphMaxNodeUnits;
+  extern float ui_MinWaypointSize;
+  extern float ui_MaxWaypointSize;
+  extern float ui_WaypointLineScale;
+
+  /**
    * Address context:
    * - global `Moho::sWldSession` consumed by save/load request paths.
    *

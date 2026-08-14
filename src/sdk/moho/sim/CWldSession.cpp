@@ -1290,6 +1290,17 @@ namespace moho
   bool ui_DebugAltClick = false;
   bool UI_SelectAnything = false;
 
+  // Command-waypoint drawing parameters; see the declarations in CWldSession.h
+  // for the per-symbol addresses. All seven are zero at image load and stay so
+  // until `UICommandGraph::LoadWaypointParams` imports them.
+  std::int32_t ui_CurveSegments = 0;           // 0x00F57CC0
+  float ui_CurveSmoothness = 0.0f;             // 0x00F57CC4
+  float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
+  std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
+  float ui_MinWaypointSize = 0.0f;             // 0x00F57CD4
+  float ui_MaxWaypointSize = 0.0f;             // 0x00F57CD8
+  float ui_WaypointLineScale = 0.0f;           // 0x00F57CDC
+
   struct UICommandGraphNode
   {
     boost::SharedPtrRaw<void> mOrderlineTexture{}; // +0x00 (shared `(px,pi)` pair)
@@ -3212,18 +3223,110 @@ namespace moho
 
   /**
    * Address: 0x00824D50 (FUN_00824D50, Moho::UICommandGraph::LoadPathParams)
+   *
+   * IDA signature:
+   * void __stdcall Moho::UICommandGraph::LoadPathParams(Moho::UICommandGraph *a1);
+   *
+   * What it does:
+   * Imports `/lua/ui/game/commandgraphparams.lua` on the UI Lua state, builds
+   * one node from its `default` entry, then gives every command type its own
+   * node: the default is copied in first, and the per-type entry (keyed
+   * `<enum prefix><lexical name>`, e.g. `UNITCOMMAND_Attack`) is layered over
+   * it. A command type with no entry in the table keeps the default.
    */
   void UICommandGraph::LoadPathParams()
   {
-    // Remaining parameter-table merge chain (0x00825570) is pending deep lift.
+    LuaPlus::LuaState* const state = g_UIManager != nullptr ? g_UIManager->mLuaState : nullptr;
+    const LuaPlus::LuaObject module = SCR_Import(state, "/lua/ui/game/commandgraphparams.lua");
+    if (module.IsNil()) {
+      return;
+    }
+
+    const LuaPlus::LuaObject params = module["CommandGraphParams"];
+    if (!params.IsTable()) {
+      return;
+    }
+
+    // 0x00824DE9 open-codes the node constructor here rather than calling it.
+    UICommandGraphNode defaults{};
+    defaults.LoadTextures(params, "default", state);
+
+    for (std::int32_t index = 0; index < static_cast<std::int32_t>(std::size(mNodes)); ++index) {
+      (void)mNodes[index].CopyFrom(defaults);
+
+      auto commandType = static_cast<EUnitCommandType>(index);
+      gpg::RRef commandTypeRef{};
+      (void)gpg::RRef_EUnitCommandType(&commandTypeRef, &commandType);
+
+      // The reflected type is always the EUnitCommandType enum descriptor, so
+      // the binary reads `mPrefix` straight off it at 0x00824F3E rather than
+      // going through the IsEnumType() virtual.
+      const auto* const enumType = static_cast<const gpg::REnumType*>(commandTypeRef.mType);
+      const msvc8::string lexicalName = commandTypeRef.GetLexical();
+      const msvc8::string key = gpg::STR_Printf("%s%s", enumType->mPrefix, lexicalName.c_str());
+
+      mNodes[index].LoadTextures(params, key.c_str(), state);
+    }
   }
 
   /**
    * Address: 0x00825150 (FUN_00825150, func_LoadCommandGraphWaypointParams)
+   *
+   * IDA signature:
+   * LuaPlus::LuaObject *sub_825150();
+   *
+   * What it does:
+   * Imports `/lua/ui/game/commandwaypoint.lua` on the UI Lua state and copies
+   * its `CommandWaypointParams` table into the seven command-waypoint globals.
+   * Each key is optional: a missing or nil entry leaves the global at whatever
+   * the previous import (or image load) left there.
    */
   void UICommandGraph::LoadWaypointParams()
   {
-    // Remaining waypoint cvar/Lua sync chain is pending deep lift.
+    LuaPlus::LuaState* const state = g_UIManager != nullptr ? g_UIManager->mLuaState : nullptr;
+    const LuaPlus::LuaObject module = SCR_Import(state, "/lua/ui/game/commandwaypoint.lua");
+    if (module.IsNil()) {
+      return;
+    }
+
+    const LuaPlus::LuaObject params = module["CommandWaypointParams"];
+    if (!params.IsTable()) {
+      return;
+    }
+
+    // The binary re-reads each key after the nil test rather than reusing the
+    // probe object, and tests every key even once one is missing.
+    if (!params["ui_CurveSegments"].IsNil()) {
+      ui_CurveSegments = static_cast<std::int32_t>(params["ui_CurveSegments"].GetNumber());
+    }
+    if (!params["ui_CurveSmoothness"].IsNil()) {
+      ui_CurveSmoothness = static_cast<float>(params["ui_CurveSmoothness"].GetNumber());
+    }
+    if (!params["ui_PathSmoothness"].IsNil()) {
+      ui_PathSmoothness = static_cast<float>(params["ui_PathSmoothness"].GetNumber());
+    }
+    if (!params["ui_CommandGraphMaxNodeUnits"].IsNil()) {
+      ui_CommandGraphMaxNodeUnits =
+        static_cast<std::int32_t>(params["ui_CommandGraphMaxNodeUnits"].GetNumber());
+    }
+    if (!params["ui_MinWaypointSize"].IsNil()) {
+      ui_MinWaypointSize = static_cast<float>(params["ui_MinWaypointSize"].GetNumber());
+    }
+    if (!params["ui_MaxWaypointSize"].IsNil()) {
+      ui_MaxWaypointSize = static_cast<float>(params["ui_MaxWaypointSize"].GetNumber());
+    }
+    if (!params["ui_WaypointLineScale"].IsNil()) {
+      ui_WaypointLineScale = static_cast<float>(params["ui_WaypointLineScale"].GetNumber());
+    }
+
+    // Not a transcription slip: 0x00825524 stores the `ui_CommandClickScale`
+    // value into `ui_WaypointLineScale` (0x00F57CDC), the same global the
+    // block above writes. There is no `ui_CommandClickScale` symbol in the
+    // image at all, so whichever of the two keys the Lua table defines last
+    // wins the line scale. Preserved because the original does it.
+    if (!params["ui_CommandClickScale"].IsNil()) {
+      ui_WaypointLineScale = static_cast<float>(params["ui_CommandClickScale"].GetNumber());
+    }
   }
 
   /**
