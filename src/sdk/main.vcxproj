@@ -420,6 +420,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
     <ClCompile Include="moho\render\RCamManager.cpp" />
     <ClCompile Include="moho\render\RangeRenderer.cpp" />
+    <ClCompile Include="moho\render\ProjectileArcRenderer.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\Sphere3fTypeInfo.cpp" />
     <ClCompile Include="moho\collision\CColPrimitiveSphere3f.cpp" />
     <ClCompile Include="moho\collision\CounterIntelExtractor.cpp" />
@@ -1717,6 +1718,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\render\ScreenQuadVertexSheet.h" />
     <ClInclude Include="moho\render\Silhouette.h" />
     <ClInclude Include="moho\render\RangeRenderer.h" />
+    <ClInclude Include="moho\render\ProjectileArcRenderer.h" />
     <ClInclude Include="moho\render\RangeRendererStartupRegistrations.h" />
     <ClInclude Include="moho\render\SelectionBracketParams.h" />
     <ClInclude Include="moho\render\RenderGeometryBuffers.h" />
