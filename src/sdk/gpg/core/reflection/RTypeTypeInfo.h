@@ -16,6 +16,14 @@ namespace gpg
     [[nodiscard]] const char* GetName() const override;
     /** Address: 0x008E1560 */
     void Init() override;
+
+    /**
+     * Address: 0x008E09C0 (FUN_008E09C0, gpg::RTypeTypeInfo::AddBase_RObject)
+     *
+     * What it does:
+     * Registers `RObject` as `RType`'s reflected base at offset 0.
+     */
+    static void AddBase_RObject(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(RTypeTypeInfo) == 0x64, "RTypeTypeInfo size must be 0x64");

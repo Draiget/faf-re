@@ -1,4 +1,5 @@
 #include "gpg/core/reflection/RTypeTypeInfo.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdlib>
 #include <new>
@@ -42,10 +43,26 @@ gpg::RTypeTypeInfo::~RTypeTypeInfo() = default;
 const char* gpg::RTypeTypeInfo::GetName() const { return "RType"; }
 
 /** Address: 0x008E1560 */
+/**
+ * Address: 0x008E09C0 (FUN_008E09C0, gpg::RTypeTypeInfo::AddBase_RObject)
+ *
+ * What it does:
+ * Registers `RObject` as `RType`'s reflected base at offset 0.
+ */
+void gpg::RTypeTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
+{
+  static gpg::RType* sRObjectType = nullptr;
+  if (!sRObjectType) {
+    sRObjectType = gpg::LookupRType(typeid(gpg::RObject));
+  }
+  gpg::AddBaseIfPresent(typeInfo, sRObjectType, 0);
+}
+
 void gpg::RTypeTypeInfo::Init()
 {
   size_ = 0x64;
   gpg::RType::Init();
+  AddBase_RObject(this);
   Finish();
 }
 
