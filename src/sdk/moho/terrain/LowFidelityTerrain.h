@@ -104,6 +104,16 @@ namespace moho
     virtual void DrawTerrainSkirt();
 
     /**
+     * Address: 0x00808F90 (FUN_00808F90, Moho::LowFidelityTerrain::DrawTerrainDepth)
+     *
+     * What it does:
+     * Renders the terrain depth-only pass: selects the `TTerrainDepth`
+     * technique, binds the camera matrices and tesselator height scale, then
+     * issues the single low-fidelity terrain batch.
+     */
+    void DrawTerrainDepth(const GeomCamera3& camera);
+
+    /**
      * Address: 0x00809B20 (FUN_00809B20, Moho::LowFidelityTerrain::DrawTerrainNormal)
      *
      * What it does:
