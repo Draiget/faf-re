@@ -6,11 +6,12 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/ResourceManager.h"
+#include "moho/serialization/PrefetchHandleBase.h"
 
 #include <cstddef>
 #include <cstring>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -544,6 +545,48 @@ gpg::RRef* GetScaResource(gpg::RRef* const outRef, const char* const path)
   outRef->mType = resourceType;
   return outRef;
 }
+
+/**
+ * Address: 0x00BC9280 (FUN_00BC9280)
+ *
+ * IDA signature:
+ * void __cdecl sub_BC9280();
+ *
+ * What it does:
+ * Resolves `RScaResource`'s reflected type and publishes it under the `"anims"`
+ * prefetch key.
+ *
+ * Without it `Prefetcher:Update` rejects the `anims` lane of the prefetch table
+ * the in-game UI builds, and `CScrLuaInitFormSet`'s error raise unwinds
+ * `CreateUI` at its first statement past the prefetch - so the border control,
+ * the world view and every panel after it are never built. The help string the
+ * binary attaches to the binder names all four keys:
+ * `CPrefetchSet:Update({d3d_textures=..., batch_textures=..., models=...,
+ * anims=...})`.
+ */
+void register_RScaResourceAnimPrefetchType()
+{
+  gpg::RType* resourceType = RScaResource::sType;
+  if (resourceType == nullptr) {
+    resourceType = gpg::LookupRType(typeid(RScaResource));
+    RScaResource::sType = resourceType;
+  }
+
+  RES_RegisterPrefetchType("anims", resourceType);
+}
+
+namespace
+{
+  struct RScaResourcePrefetchBootstrap
+  {
+    RScaResourcePrefetchBootstrap()
+    {
+      moho::register_RScaResourceAnimPrefetchType();
+    }
+  };
+
+  RScaResourcePrefetchBootstrap gRScaResourcePrefetchBootstrap;
+} // namespace
 
 } // namespace moho
 
