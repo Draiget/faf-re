@@ -7,6 +7,7 @@
 #include "../../legacy/containers/Vector.h"
 #include "ArmyUnitSet.h"
 #include "ESquadClass.h"
+#include "SSTIArmyConstantData.h"
 #include "SSTIArmyVariableData.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -179,7 +180,7 @@ namespace moho
     // Address: 0x006FFD70 (FUN_006FFD70)
     virtual void OnTick() = 0;
     // Address: 0x00700080 (FUN_00700080)
-    virtual UserArmy* CopyConstantDataToUserArmy(UserArmy* outUserArmy) = 0;
+    virtual SSTIArmyConstantData* CopyArmyConstantData(SSTIArmyConstantData* outBuffer) = 0;
     // Address: 0x00700240 (FUN_00700240)
     virtual SSTIArmyVariableData* CopyArmyVariableData(SSTIArmyVariableData* outBuffer) = 0;
     // Address: 0x006FDD50 (FUN_006FDD50)

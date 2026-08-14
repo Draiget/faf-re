@@ -8825,6 +8825,30 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     *reinterpret_cast<SyncReserveCountsRuntimeView*>(mSyncReserveCounts)
   );
 
+  // 0x00747A54: the army roster is published exactly once, on the first sync.
+  // `CWldSession::DoBeat` turns each entry into a `UserArmy` and files it by
+  // army index, so until this runs the client's army run stays all-null and
+  // anything reading it - `GetArmiesTable`, `IsObserver`, the score and
+  // diplomacy panels - has nothing to read.
+  if (!mDidSync) {
+    const std::size_t armyCount = mArmiesList.size();
+    outSyncData->mNewGrids.resize(armyCount);
+    for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
+      (void)mArmiesList[armyIndex]->CopyArmyConstantData(&outSyncData->mNewGrids[armyIndex]);
+    }
+    mDidSync = true;
+  }
+
+  // 0x00747AE9: the variable half goes out every beat, positionally - the Nth
+  // record belongs to the Nth army, which is how `DoBeat` reads it back.
+  {
+    const std::size_t armyCount = mArmiesList.size();
+    outSyncData->mArmyUpdates.resize(armyCount);
+    for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
+      (void)mArmiesList[armyIndex]->CopyArmyVariableData(&outSyncData->mArmyUpdates[armyIndex]);
+    }
+  }
+
   if (mRequestXMLArmyStatsSubmit) {
     mRequestXMLArmyStatsSubmit = false;
 
