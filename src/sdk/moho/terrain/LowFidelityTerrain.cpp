@@ -345,6 +345,45 @@ namespace moho
   }
 
   /**
+   * Address: 0x00808F90 (FUN_00808F90, Moho::LowFidelityTerrain::DrawTerrainDepth)
+   *
+   * IDA signature:
+   * void __thiscall sub_808F90(_DWORD **this, int camera);
+   *
+   * What it does:
+   * Depth-only terrain pass. Gated on `ren_Terrain` like every other draw in
+   * this class, it selects the `terrain` effect's `TTerrainDepth` technique,
+   * binds the camera view/projection matrices and the tesselator's height
+   * scale, then issues the one prebuilt low-fidelity batch.
+   *
+   * Each shader-var write is guarded by `Exists()`, as in the binary - the
+   * technique does not necessarily declare all three.
+   */
+  void LowFidelityTerrain::DrawTerrainDepth(const GeomCamera3& camera)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique("TTerrainDepth");
+
+    auto& shaderVars = GetTerrainShaderVars();
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+    if (shaderVars.heightScale.Exists()) {
+      shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
+    }
+
+    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
+  }
+
+  /**
    * Address: 0x00809C80 (FUN_00809C80, Moho::LowFidelityTerrain::DrawTerrainSkirt)
    *
    * What it does:
