@@ -46,6 +46,14 @@ namespace moho
     void Init() override;
 
     /**
+     * Address: 0x00510CF0 (FUN_00510CF0, Moho::REffectBlueprintTypeInfo::AddBase_RObject)
+     *
+     * What it does:
+     * Registers `gpg::RObject` as this type's reflected base at offset 0.
+     */
+    static void AddBase_RObject(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x0050F160 (FUN_0050F160, Moho::REffectBlueprintTypeInfo::AddFields)
      *
      * What it does:

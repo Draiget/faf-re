@@ -69,12 +69,6 @@ namespace
     typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
   }
 
-  void AddRObjectBase(gpg::RType* typeInfo)
-  {
-    gpg::RType* const rObjectType = CachedRObjectType();
-    gpg::RField baseField(rObjectType->GetName(), rObjectType, 0);
-    typeInfo->AddBase(baseField);
-  }
 
   /**
    * Address: 0x0050F120 (FUN_0050F120)
@@ -129,6 +123,20 @@ namespace moho
   }
 
   /**
+ * Address: 0x00510CF0 (FUN_00510CF0, Moho::REffectBlueprintTypeInfo::AddBase_RObject)
+ *
+ * What it does:
+ * Registers `gpg::RObject` as this type's reflected base at offset 0 - single
+ * inheritance, so the sub-object starts where the object does.
+ */
+void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
+{
+  gpg::RType* const rObjectType = CachedRObjectType();
+  gpg::RField baseField(rObjectType->GetName(), rObjectType, 0);
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x0050F080 (FUN_0050F080)
    *
    * What it does:
@@ -138,7 +146,7 @@ namespace moho
   void REffectBlueprintTypeInfo::Init()
   {
     size_ = sizeof(REffectBlueprint);
-    AddRObjectBase(this);
+    AddBase_RObject(this);
     gpg::RType::Init();
     AddFields();
     Finish();

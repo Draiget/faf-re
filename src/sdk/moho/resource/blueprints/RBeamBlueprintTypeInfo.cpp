@@ -93,17 +93,6 @@ namespace
     return &typeInfo->fields_.back();
   }
 
-  void AddEffectBase(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const effectType = CachedEffectBlueprintType();
-    gpg::RField baseField{};
-    baseField.mName = effectType->GetName();
-    baseField.mType = effectType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   [[nodiscard]] gpg::RRef MakeBeamBlueprintRef(moho::RBeamBlueprint* object)
   {
@@ -194,13 +183,32 @@ namespace moho
   }
 
   /**
+ * Address: 0x00510F90 (FUN_00510F90, Moho::RBeamBlueprintTypeInfo::AddBase_REffectBlueprint)
+ *
+ * What it does:
+ * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
+ * inheritance, so the sub-object starts where the object does.
+ */
+void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
+{
+  gpg::RType* const effectType = CachedEffectBlueprintType();
+  gpg::RField baseField{};
+  baseField.mName = effectType->GetName();
+  baseField.mType = effectType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x0050FA90 (FUN_0050FA90, Moho::RBeamBlueprintTypeInfo::Init)
    */
   void RBeamBlueprintTypeInfo::Init()
   {
     size_ = sizeof(RBeamBlueprint);
     (void)BindBeamBlueprintTypeInfoHookLanes(this);
-    AddEffectBase(this);
+    AddBase_REffectBlueprint(this);
     gpg::RType::Init();
     AddFields(this);
     Finish();

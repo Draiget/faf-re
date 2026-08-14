@@ -28,6 +28,14 @@ namespace moho
     void Init() override;
 
     /**
+     * Address: 0x00510F90 (FUN_00510F90, Moho::RBeamBlueprintTypeInfo::AddBase_REffectBlueprint)
+     *
+     * What it does:
+     * Registers `REffectBlueprint` as this type's reflected base at offset 0.
+     */
+    static void AddBase_REffectBlueprint(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x0050FB90 (FUN_0050FB90, Moho::RBeamBlueprintTypeInfo::AddFields)
      */
     static void AddFields(gpg::RType* typeInfo);

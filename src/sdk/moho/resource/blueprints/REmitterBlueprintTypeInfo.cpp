@@ -132,17 +132,6 @@ namespace
     return field;
   }
 
-  void AddEffectBase(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const effectType = CachedEffectBlueprintType();
-    gpg::RField baseField{};
-    baseField.mName = effectType->GetName();
-    baseField.mType = effectType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   [[nodiscard]] gpg::RRef MakeEmitterBlueprintRef(moho::REmitterBlueprint* object)
   {
@@ -230,13 +219,32 @@ namespace moho
   }
 
   /**
+ * Address: 0x00510EB0 (FUN_00510EB0, Moho::REmitterBlueprintTypeInfo::AddBase_REffectBlueprint)
+ *
+ * What it does:
+ * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
+ * inheritance, so the sub-object starts where the object does.
+ */
+void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
+{
+  gpg::RType* const effectType = CachedEffectBlueprintType();
+  gpg::RField baseField{};
+  baseField.mName = effectType->GetName();
+  baseField.mType = effectType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x0050F4C0 (FUN_0050F4C0, Moho::REmitterBlueprintTypeInfo::Init)
    */
   void REmitterBlueprintTypeInfo::Init()
   {
     size_ = sizeof(REmitterBlueprint);
     (void)BindEmitterBlueprintTypeInfoHookLanes(this);
-    AddEffectBase(this);
+    AddBase_REffectBlueprint(this);
     gpg::RType::Init();
     AddFields(this);
     Finish();
