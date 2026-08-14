@@ -1397,9 +1397,128 @@ namespace moho
       std::uint8_t mPayload[kNodeSize - 8];
     };
 
-    using HashListNode88 = HashListNode<0x88>;
     using HashListNode2C = HashListNode<0x2C>;
     using HashListNode10 = HashListNode<0x10>;
+
+    /**
+     * Head of the intrusive chain of graph nodes that reference one command.
+     * This is a view onto the first field of the engine's per-command issue
+     * helper: 0x00826140 stores `&node.mHelperLink` straight into the helper's
+     * leading pointer, and every walk of the chain starts by dereferencing it.
+     */
+    struct CommandGraphHelperHead;
+
+    /**
+     * One node's membership in a command's chain. The chain is threaded
+     * pointer-to-pointer: the helper's head points at a link, and each link's
+     * `mNext` points at the following link, so unlinking only ever needs the
+     * slot that currently refers to this link.
+     */
+    struct CommandGraphHelperLink
+    {
+      CommandGraphHelperHead* mHead; // +0x00
+      CommandGraphHelperLink* mNext; // +0x04
+    };
+
+    struct CommandGraphHelperHead
+    {
+      CommandGraphHelperLink* mFirst; // +0x00
+    };
+
+    /**
+     * One dword lane in the engine's four-pointer `gpg::fastvector` shape, with
+     * inline storage for a single element.
+     *
+     * `mCapacity` points one past `mInline[0]` while the lane is inline. When
+     * the grow helper spills the lane to the heap it stashes that inline
+     * capacity-end *into* `mInline[0]` before overwriting `mBegin`
+     * (0x0082E708: `if (begin == inlineOrigin) *inlineOrigin = capacity;`),
+     * which is exactly what lets `ReleaseToInline` below restore the capacity
+     * with one indirect load rather than recomputing it. `mInline[1]` is
+     * reserved storage the constructor deliberately keeps outside the capacity.
+     */
+    struct CommandGraphDwordLane
+    {
+      std::uint32_t* mBegin;        // +0x00
+      std::uint32_t* mEnd;          // +0x04
+      std::uint32_t* mCapacity;     // +0x08
+      std::uint32_t* mInlineOrigin; // +0x0C
+      std::uint32_t mInline[2];     // +0x10
+
+      void ReleaseToInline() noexcept
+      {
+        if (mBegin != mInlineOrigin) {
+          ::operator delete[](mBegin);
+          mBegin = mInlineOrigin;
+          mCapacity = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*mInlineOrigin));
+        }
+        mEnd = mBegin;
+      }
+    };
+
+    /**
+     * Payload of one command-graph hash node — the drawable record for a single
+     * command. `mMapAB0` keys these by the issuing command, `mMapAB1` by the
+     * head command of a queue, in which case `mPositionSum`/`mWeight` accumulate
+     * across every unit sharing that queue so the graph can draw one node at
+     * their centroid.
+     *
+     * This payload is *not* trivially destructible: it owns two heap-capable
+     * dword lanes and one weak reference, which is why the binary's map-erase
+     * paths call the destructor below before freeing the node.
+     */
+    struct UICommandGraphDrawNode
+    {
+      CmdId mCommandId;                    // +0x00
+      CommandGraphHelperLink mHelperLink;  // +0x04
+      Wm3::Vector3f mPositionSum;          // +0x0C
+      float mWeight;                       // +0x18
+      std::uint8_t mHasResolvedPosition;   // +0x1C
+      std::uint8_t mIsChainBoundary;       // +0x1D
+      std::uint8_t mIsVisible;             // +0x1E
+      std::uint8_t pad_1F;                 // +0x1F
+      void* mOwnerPx;                      // +0x20
+      boost::detail::sp_counted_base* mOwnerControl; // +0x24
+      std::uint32_t field_0x28;            // +0x28
+      float field_0x2C;                    // +0x2C
+      float field_0x30;                    // +0x30
+      Wm3::Vector3f mPreviousCentroid;     // +0x34
+      float field_0x40;                    // +0x40
+      std::uint32_t field_0x44;            // +0x44
+      CommandGraphDwordLane mLaneA;        // +0x48
+      CommandGraphDwordLane mLaneB;        // +0x60
+
+      /**
+       * Address: 0x00826550 (FUN_00826550, sub_826550)
+       *
+       * What it does:
+       * Releases both dword lanes back to inline storage (freeing any spilled
+       * heap block), drops the weak owner reference, and unlinks the node from
+       * its command's intrusive chain.
+       */
+      ~UICommandGraphDrawNode();
+    };
+
+    /**
+     * The AB tables' node. Unlike the 0x2C and 0x10 tables this one carries a
+     * non-trivial payload, so `ClearHashListNodes` runs `DestroyPayload` before
+     * releasing the allocation — mirroring the binary's list-erase helper at
+     * 0x0082EF80, which calls the payload destructor on `node + 0x10` and only
+     * then frees the node.
+     */
+    struct HashListNode88
+    {
+      HashListNode88* mNext;          // +0x00
+      HashListNode88* mPrev;          // +0x04
+      std::uint32_t mKey;             // +0x08
+      std::uint32_t mKeyHigh;         // +0x0C
+      UICommandGraphDrawNode mDraw;   // +0x10
+
+      static void DestroyPayload(HashListNode88* const node) noexcept
+      {
+        node->mDraw.~UICommandGraphDrawNode();
+      }
+    };
 
     struct HashBucketVector
     {
@@ -1560,6 +1679,46 @@ namespace moho
 
   static_assert(sizeof(UICommandGraph::CommandGraphNode) == 0x54, "UICommandGraph::CommandGraphNode size must be 0x54");
   static_assert(sizeof(UICommandGraph::HashListNode88) == 0x88, "UICommandGraph::HashListNode88 size must be 0x88");
+  static_assert(
+    sizeof(UICommandGraph::CommandGraphDwordLane) == 0x18,
+    "UICommandGraph::CommandGraphDwordLane size must be 0x18"
+  );
+  static_assert(
+    sizeof(UICommandGraph::UICommandGraphDrawNode) == 0x78,
+    "UICommandGraph::UICommandGraphDrawNode size must be 0x78"
+  );
+  static_assert(
+    offsetof(UICommandGraph::HashListNode88, mDraw) == 0x10,
+    "UICommandGraph::HashListNode88::mDraw offset must be 0x10"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mHelperLink) == 0x04,
+    "UICommandGraphDrawNode::mHelperLink offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mPositionSum) == 0x0C,
+    "UICommandGraphDrawNode::mPositionSum offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mWeight) == 0x18,
+    "UICommandGraphDrawNode::mWeight offset must be 0x18"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mOwnerControl) == 0x24,
+    "UICommandGraphDrawNode::mOwnerControl offset must be 0x24"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mPreviousCentroid) == 0x34,
+    "UICommandGraphDrawNode::mPreviousCentroid offset must be 0x34"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mLaneA) == 0x48,
+    "UICommandGraphDrawNode::mLaneA offset must be 0x48"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mLaneB) == 0x60,
+    "UICommandGraphDrawNode::mLaneB offset must be 0x60"
+  );
   static_assert(sizeof(UICommandGraph::HashListNode2C) == 0x2C, "UICommandGraph::HashListNode2C size must be 0x2C");
   static_assert(sizeof(UICommandGraph::HashListNode10) == 0x10, "UICommandGraph::HashListNode10 size must be 0x10");
   static_assert(sizeof(UICommandGraph::HashBucketVector) == 0x10, "UICommandGraph::HashBucketVector size must be 0x10");
@@ -2985,6 +3144,44 @@ namespace moho
   }
 
   /**
+   * Address: 0x00826550 (FUN_00826550, sub_826550)
+   *
+   * IDA signature:
+   * _DWORD *__stdcall sub_826550(int a1);
+   *
+   * What it does:
+   * Tears one draw node down: both dword lanes are released back to their
+   * inline storage (freeing the spilled heap block if there is one), the weak
+   * owner reference is dropped, and the node is spliced out of its command's
+   * intrusive chain.
+   *
+   * The binary releases lane B before lane A; the order is preserved because
+   * `operator delete[]` is observable.
+   */
+  UICommandGraph::UICommandGraphDrawNode::~UICommandGraphDrawNode()
+  {
+    mLaneB.ReleaseToInline();
+    mLaneA.ReleaseToInline();
+
+    if (mOwnerControl != nullptr) {
+      mOwnerControl->weak_release();
+    }
+
+    if (mHelperLink.mHead == nullptr) {
+      return;
+    }
+
+    // Pointer-to-pointer walk: start at the command's chain head and advance
+    // through each link's `mNext` until the slot that refers to this link is
+    // found, then splice this link out of it.
+    CommandGraphHelperLink** slot = &mHelperLink.mHead->mFirst;
+    while (*slot != &mHelperLink) {
+      slot = &(*slot)->mNext;
+    }
+    *slot = mHelperLink.mNext;
+  }
+
+  /**
    * Address: 0x0082F030 (FUN_0082F030)
    */
   UICommandGraph::HashListNode88* UICommandGraph::AllocateMapABListSentinel()
@@ -3081,10 +3278,14 @@ namespace moho
    * What it does:
    * Clears one sentinel-headed doubly-linked list in place. Resets the sentinel
    * head's next/prev to itself, zeroes the size lane, then walks each former
-   * payload node and frees its allocation. Does not destruct payload bytes —
-   * the hash-list nodes in UICommandGraph hold trivially-destructible payloads
-   * (pointer triplets and small inline buffers) so the binary elides per-element
-   * destructor calls.
+   * payload node, destroys its payload and frees its allocation.
+   *
+   * 0x0082FAB0 is the 0x10-node table's clear and frees without destroying,
+   * because that table's payload really is trivially destructible. The AB
+   * tables are not: their list-erase helper at 0x0082EF80 calls the draw-node
+   * destructor on `node + 0x10` before `operator delete(node)`, so `TNode`
+   * opts in through `DestroyPayload`. Without that call each cleared node
+   * leaks both spilled dword lanes and one weak reference.
    */
   template <typename TNode>
   void UICommandGraph::ClearHashListNodes(HashTable<TNode>& table) noexcept
@@ -3103,6 +3304,11 @@ namespace moho
 
     while (current != head) {
       TNode* const next = current->mNext;
+      // The sentinel head is deliberately excluded from this walk: the binary
+      // never constructs its payload, and neither does AllocateSelfLinkedNode.
+      if constexpr (requires(TNode* node) { TNode::DestroyPayload(node); }) {
+        TNode::DestroyPayload(current);
+      }
       ::operator delete(current);
       current = next;
     }
