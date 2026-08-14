@@ -34,6 +34,14 @@ namespace moho
      */
     void Init() override;
 
+    /**
+     * Address: 0x0059DB80 (FUN_0059DB80, Moho::CAiFormationDBImplTypeInfo::AddBase_IAiFormationDB)
+     *
+     * What it does:
+     * Registers `IAiFormationDB` as this type's reflected base at offset 0.
+     */
+    static void AddBase_IAiFormationDB(gpg::RType* typeInfo);
+
   private:
     /**
      * Address: 0x0059CB50 (FUN_0059CB50)
