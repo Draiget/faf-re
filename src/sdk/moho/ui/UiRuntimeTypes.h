@@ -8,9 +8,11 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/BoostWrappers.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/command/CmdDefs.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
@@ -563,44 +565,6 @@ namespace moho
   );
   static_assert(sizeof(CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger size must be 0x3C");
 
-  struct CUIWorldViewBuildPreviewTreeNode
-  {
-    CUIWorldViewBuildPreviewTreeNode* mLeft = nullptr;   // +0x00
-    CUIWorldViewBuildPreviewTreeNode* mParent = nullptr; // +0x04
-    CUIWorldViewBuildPreviewTreeNode* mRight = nullptr;  // +0x08
-    std::uint32_t mSortKey = 0;                          // +0x0C
-    boost::SharedPtrRaw<void> mPreviewPayload{};          // +0x10
-    std::uint8_t mColor = 0;                              // +0x18
-    std::uint8_t mIsNil = 0;                              // +0x19
-    std::uint8_t mPad1A[0x02]{};
-  };
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildPreviewTreeNode, mPreviewPayload) == 0x10,
-    "moho::CUIWorldViewBuildPreviewTreeNode::mPreviewPayload offset must be 0x10"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildPreviewTreeNode, mIsNil) == 0x19,
-    "moho::CUIWorldViewBuildPreviewTreeNode::mIsNil offset must be 0x19"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(CUIWorldViewBuildPreviewTreeNode) == 0x1C,
-    "moho::CUIWorldViewBuildPreviewTreeNode size must be 0x1C"
-  );
-
-  struct CUIWorldViewBuildPreviewTree
-  {
-    std::uintptr_t mAllocatorCookie = 0;               // +0x00
-    CUIWorldViewBuildPreviewTreeNode* mHead = nullptr; // +0x04
-    std::uint32_t mSize = 0;                           // +0x08
-  };
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(CUIWorldViewBuildPreviewTree) == 0x0C,
-    "moho::CUIWorldViewBuildPreviewTree size must be 0x0C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildPreviewTree, mHead) == 0x04,
-    "moho::CUIWorldViewBuildPreviewTree::mHead offset must be 0x04"
-  );
 
   struct CUIWorldViewBuildDragRuntimeView
   {
@@ -655,7 +619,12 @@ namespace moho
     RUnitBlueprint* mActiveBuildBlueprint = nullptr;        // +0x04
     msvc8::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
     msvc8::vector<RUnitBlueprint*> mBlueprints;             // +0x18
-    CUIWorldViewBuildPreviewTree mPreviewPositions;         // +0x28
+    // The binary's "preview positions" lane is an ordinary MSVC8 std::map
+    // keyed by the order's command id, not a bespoke tree: the node carries
+    // {left,parent,right} at 0x00..0x0B, pair<const CmdId,
+    // shared_ptr<MeshInstance>> at 0x0C, _Color at 0x18 and _Isnil at 0x19 -
+    // exactly msvc8::map's node shape.
+    msvc8::map<CmdId, boost::shared_ptr<MeshInstance>> mPreviewPositions; // +0x28
     boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;     // +0x34
     CWldTerrainDecal* mDecal = nullptr;                     // +0x3C
     ERuleBPUnitCommandCaps mCommandCaps = RULEUCC_None;     // +0x40
