@@ -18,6 +18,14 @@ namespace moho
     void Init() override;
 
     /**
+     * Address: 0x00607F20 (FUN_00607F20, Moho::CUnitCarrierLaunchTypeInfo::AddBase_CCommandTask)
+     *
+     * What it does:
+     * Registers `CCommandTask` as this type's reflected base at offset 0.
+     */
+    static void AddBase_CCommandTask(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x00607D00 (FUN_00607D00, Moho::CUnitCarrierLaunchTypeInfo::NewRef)
      *
      * What it does:
