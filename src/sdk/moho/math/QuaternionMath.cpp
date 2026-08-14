@@ -1,16 +1,40 @@
 #include "QuaternionMath.h"
 
+#include <cstddef>
 #include <cmath>
 
 // Forward declaration of QuatCrossAdd (defined in Sim.cpp at global scope)
 Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2);
-namespace moho
-{
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
-}
 
 namespace moho
 {
+  /**
+   * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)
+   *
+   * What it does:
+   * Expands `quat` into a row-major rotation matrix and multiplies `vec` by
+   * its three rows, storing the rotated vector in `dest`.
+   */
+  Wm3::Vector3f* MultQuadVec(
+    Wm3::Vector3f* const dest, const Wm3::Vector3f* const vec, const Wm3::Quaternionf* const quat
+  )
+  {
+    Wm3::Vector3f rows[3]{};
+    QuatToMatrix(quat, rows);
+
+    float* const output = &dest->x;
+    const float* const input = &vec->x;
+    const float* matrixLane = &rows[0].x;
+    for (std::size_t row = 0; row < 3; ++row) {
+      output[row] = 0.0f;
+      for (std::size_t column = 0; column < 3; ++column) {
+        output[row] = (input[column] * *matrixLane++) + output[row];
+      }
+    }
+
+    return dest;
+  }
+
   namespace
   {
     /**
