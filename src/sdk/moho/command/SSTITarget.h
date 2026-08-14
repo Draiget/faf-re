@@ -49,6 +49,36 @@ namespace moho
   static_assert(sizeof(SSTITarget) == 0x14, "SSTITarget size must be 0x14");
 
   /**
+   * The binary's `class Moho::EntId`, kept here purely as the distinct RTTI key
+   * the reflected entity-id descriptor registers under.
+   *
+   * `preregister_EntIdTypeInfo` (0x00557DB0) pushes `??_R0?AVEntId@Moho@@@8` at
+   * 0x00557DE4 — a `?AV` *class* type descriptor, not `int`'s. `EntId` is
+   * therefore its own C++ type in the original source, which is what keeps the
+   * reflected `EntId` descriptor from colliding with `int`'s in the
+   * type_info-keyed preregistration map. `EntIdTypeInfo::Init` sets
+   * `size_ = 4`, so the class holds exactly one 32-bit id.
+   *
+   * The engine-wide `typedef int32_t EntId` in Entity.h / Sim.h / IUnit.h is an
+   * interim model of the same 4-byte value; converting those 324 call sites to
+   * this class is separate work. Until then this type exists so the descriptor
+   * has somewhere correct to register.
+   */
+  class EntIdValue final
+  {
+  public:
+    constexpr EntIdValue() noexcept = default;
+    constexpr explicit EntIdValue(std::int32_t value) noexcept : mValue(value) {}
+
+    [[nodiscard]] constexpr std::int32_t Value() const noexcept { return mValue; }
+
+  private:
+    std::int32_t mValue = 0; // +0x00
+  };
+
+  static_assert(sizeof(EntIdValue) == 0x04, "moho::EntIdValue size must be 0x04");
+
+  /**
    * Address: 0x00557DB0 (FUN_00557DB0, preregister_EntIdTypeInfo)
    *
    * What it does:
