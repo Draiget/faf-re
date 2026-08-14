@@ -1077,6 +1077,19 @@ namespace moho
     [[nodiscard]] float ProcessArmorOnDamage(float amount, msvc8::string damageType) const;
 
     /**
+     * Address: 0x006A9E10 (FUN_006A9E10, Moho::Unit::GetArmorMult)
+     *
+     * IDA signature:
+     * float __usercall Moho::Unit::GetArmorMult@<xmm0>(
+     *     Moho::Unit *this@<edi>, std::string *damageType@<eax>);
+     *
+     * What it does:
+     * Returns this unit's armor multiplier for one damage type, or 1.0 when
+     * the type has no entry - i.e. an unlisted damage type is unmodified.
+     */
+    [[nodiscard]] float GetArmorMult(const msvc8::string& damageType) const;
+
+    /**
      * Address: 0x0062D460 (FUN_0062D460, Moho::Unit::CollectAllOverlapping)
      *
      * What it does:

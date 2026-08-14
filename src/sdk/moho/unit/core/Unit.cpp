@@ -2320,15 +2320,6 @@ namespace
     return &inserted->armorMultiplier;
   }
 
-  [[nodiscard]] float LookupArmorMultiplier(const Unit& unit, const std::string_view damageTypeName) noexcept
-  {
-    if (const SArmorMultiplierMapNode* const match = FindArmorMultiplierNode(unit.ArmorMultipliers, damageTypeName);
-        match != nullptr) {
-      return match->armorMultiplier;
-    }
-
-    return 1.0f;
-  }
 
   struct UnitAttributesBuildRestrictionRuntimeView
   {
@@ -3424,7 +3415,7 @@ int moho::cfunc_UnitGetArmorMultL(LuaPlus::LuaState* const state)
     damageTypeName = "";
   }
 
-  const float armorMultiplier = LookupArmorMultiplier(*unit, std::string_view(damageTypeName));
+  const float armorMultiplier = unit->GetArmorMult(msvc8::string(damageTypeName));
   lua_pushnumber(rawState, armorMultiplier);
   (void)lua_gettop(rawState);
   return 1;
@@ -15157,6 +15148,24 @@ float Unit::ProcessArmorOnDamage(const float amount, const msvc8::string damageT
   }
 
   return scaledAmount;
+}
+
+/**
+ * Address: 0x006A9E10 (FUN_006A9E10, Moho::Unit::GetArmorMult)
+ *
+ * What it does:
+ * Returns this unit's armor multiplier for one damage type. A damage type the
+ * blueprint never listed returns 1.0, so it passes through unmodified.
+ */
+float Unit::GetArmorMult(const msvc8::string& damageType) const
+{
+  if (const SArmorMultiplierMapNode* const match =
+        FindArmorMultiplierNode(ArmorMultipliers, std::string_view(damageType.c_str()));
+      match != nullptr) {
+    return match->armorMultiplier;
+  }
+
+  return 1.0f;
 }
 
 /**
