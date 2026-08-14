@@ -457,6 +457,29 @@ void CAiPathFinderTypeInfo::Destruct(void* const objectStorage)
 }
 
 /**
+ * Address: 0x005AB9F0 (FUN_005AB9F0, Moho::CAiPathFinderTypeInfo::AddBase_IPathTraveler)
+ *
+ * What it does:
+ * Registers `IPathTraveler` as a reflected base at offset 0.
+ */
+void CAiPathFinderTypeInfo::AddBase_IPathTraveler(gpg::RType* const typeInfo)
+{
+  AddBaseByTypeInfo(typeInfo, typeid(IPathTraveler), 0x00);
+}
+
+/**
+ * Address: 0x005ABA50 (FUN_005ABA50, Moho::CAiPathFinderTypeInfo::Addbase_Broadcaster_NavPath)
+ *
+ * What it does:
+ * Registers the NavPath broadcaster as a reflected base at offset 0x0C - the
+ * path finder's second base, after IPathTraveler at 0.
+ */
+void CAiPathFinderTypeInfo::Addbase_Broadcaster_NavPath(gpg::RType* const typeInfo)
+{
+  AddBaseByTypeInfo(typeInfo, typeid(Broadcaster), 0x0C);
+}
+
+/**
  * Address: 0x005AAB00 (FUN_005AAB00, ?Init@CAiPathFinderTypeInfo@Moho@@UAEXXZ)
  */
 void CAiPathFinderTypeInfo::Init()
@@ -466,8 +489,8 @@ void CAiPathFinderTypeInfo::Init()
 
   gpg::RType::Init();
 
-  AddBaseByTypeInfo(this, typeid(IPathTraveler), 0x00);
-  AddBaseByTypeInfo(this, typeid(Broadcaster), 0x0C);
+  AddBase_IPathTraveler(this);
+  Addbase_Broadcaster_NavPath(this);
 
   Finish();
 }
