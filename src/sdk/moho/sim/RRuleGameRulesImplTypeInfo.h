@@ -50,7 +50,7 @@ namespace moho
 
   private:
     /**
-      * Alias of FUN_0052B640 (non-canonical helper lane).
+     * Address: 0x00533250 (FUN_00533250, Moho::RRuleGameRulesImplTypeInfo::AddBase_RRuleGameRules)
      *
      * What it does:
      * Registers RRuleGameRules as reflected base at subobject offset +0x00.
