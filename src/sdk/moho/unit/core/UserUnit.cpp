@@ -4344,6 +4344,33 @@ namespace moho
     return false;
   }
 
+  UserEntity* ResolveWeakEntitySetNodeEntity(const SSelectionNodeUserEntity& node) noexcept
+  {
+    return DecodeWeakOwnerUserEntity(*reinterpret_cast<const UserEntityWeakLinkView*>(&node.mEnt));
+  }
+
+  UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(UserCommandQueue* const manager) noexcept
+  {
+    if (manager == nullptr) {
+      return nullptr;
+    }
+
+    const UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    if (queueVector == nullptr) {
+      return nullptr;
+    }
+
+    // The binary walks the resolved range until the first non-null slot; a
+    // retired order leaves its slot behind rather than compacting the range.
+    for (const UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
+      if (entry->helper != nullptr) {
+        return reinterpret_cast<UserCommandIssueHelper*>(entry->helper);
+      }
+    }
+
+    return nullptr;
+  }
+
   /**
    * Address: 0x008C60F0 (FUN_008C60F0)
    *

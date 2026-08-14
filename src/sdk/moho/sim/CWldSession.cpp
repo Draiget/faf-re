@@ -7935,6 +7935,27 @@ namespace moho
   }
 
   /**
+   * Bridge for `Moho::DrawAllUnitSkirts` (FUN_0085AD80): resolves the world
+   * position a pending command-issue helper is anchored at.
+   *
+   * A `UserCommandIssueHelper` *is* the command-graph anchor history - its
+   * local issue-event ring at +0xB8 is the entry ring
+   * `CommandGraphAnchorHistoryRuntimeView` models at +0xBC..+0xC8 - so the
+   * binary reaches the same code path by inlining FUN_0081CFD0's
+   * resolve-sample / sample-to-position / unlink-weak-lane trio straight into
+   * the skirt loop (asm 0x0085AE88..0x0085AEB7).
+   */
+  Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(UserCommandIssueHelper& helper)
+  {
+    Wm3::Vector3f out{};
+    (void)ResolveCommandGraphAnchorHistoryWorldPosition(
+      &out,
+      reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
+    );
+    return out;
+  }
+
+  /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
    * walks the whole session entity map in id order and appends every live
    * `UserUnit*`. Wraps the CWldSession.cpp-local `CollectSessionUserUnits`,

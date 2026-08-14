@@ -56,6 +56,7 @@
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
@@ -4765,6 +4766,7 @@ bool moho::cam_Free = false;
 bool moho::ui_DisableCursorFixing = false;
 float moho::ui_SelectTolerance = 4.0f;
 float moho::ui_ExtractSnapTolerance = 20.0f;
+float moho::ui_FootprintMinThickness = 2.0f;
 float moho::cam_DefaultMiniLOD = 1.8f;
 bool moho::ui_WindowedAlwaysShowsCursor = false;
 moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
@@ -9138,13 +9140,13 @@ namespace
  */
 moho::CUIWorldViewBuildDragRuntimeView::CUIWorldViewBuildDragRuntimeView()
   : mSession(moho::WLD_GetActiveSession())
-  , mActiveBuildBlueprint(nullptr)
+  , mActiveBuildMesh(nullptr)
   , mMeshes()
   , mBlueprints()
   , mPreviewPositions()
   , mUnitPlaceMaterial()
   , mDecal(nullptr)
-  , mCommandCaps(moho::RULEUCC_None)
+  , mActiveCommandMode(moho::COMMOD_None)
   , mStart(
       std::numeric_limits<float>::quiet_NaN(),
       std::numeric_limits<float>::quiet_NaN(),
@@ -9286,6 +9288,152 @@ void moho::CUIWorldViewBuildDragRuntimeView::ReplaceBuildPreviewMesh(
   boost::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
   mMeshes[index] = meshInstance;
   mBlueprints[index] = blueprint;
+}
+
+namespace
+{
+  /// 0x00853A38 / 0x00853B43: the translucent tint every queued-build ghost is
+  /// created with and stamped with (0xAARRGGBB).
+  constexpr std::int32_t kQueuedBuildGhostColor = static_cast<std::int32_t>(0xD800D800u);
+
+  /**
+   * Inlined block from FUN_008534F0 (0x00853586..0x008536EB).
+   *
+   * What it does:
+   * Reports whether a unit under this order's own cursor is already building
+   * it. Walks the helper's cached cursor-entity weak-set - pruning tombstones
+   * as it goes, exactly as the binary does - and for every unit that has work
+   * in progress and reports `UNITSTATE_Building`, compares the front of that
+   * unit's command queue against this order.
+   *
+   * The binary reads the unit-only lanes (`mWorkProgress`, the `IUnit`
+   * sub-object) without an `IsUserUnit` check first: a mobile-build order's
+   * cursor set only ever holds units, so the static downcast below is the same
+   * assumption expressed in source.
+   */
+  [[nodiscard]] bool IsQueuedBuildAlreadyUnderway(moho::UserCommandIssueHelper& helper)
+  {
+    moho::SSelectionSetUserEntity* const cursorEntities = moho::ResolveCommandIssueCursorEntities(helper);
+    if (cursorEntities == nullptr || cursorEntities->mHead == nullptr) {
+      return false;
+    }
+
+    const moho::CmdId orderId = helper.mConstantData.cmd;
+
+    moho::SSelectionNodeUserEntity* node = nullptr;
+    (void)cursorEntities->PruneTombstonesAndFindLive(&node, cursorEntities->mHead->mLeft);
+
+    while (node != cursorEntities->mHead) {
+      if (moho::UserEntity* const entity = moho::ResolveWeakEntitySetNodeEntity(*node); entity != nullptr) {
+        auto* const unit = static_cast<moho::UserUnit*>(entity);
+        if (unit->mUnitVarDat.mWorkProgress > 0.0f && unit->IsUnitState(moho::UNITSTATE_Building)) {
+          const moho::UserCommandIssueHelper* const currentOrder =
+            moho::ResolveUserUnitFrontCommandIssueHelper(entity->GetCommandQueue());
+          if (currentOrder != nullptr && currentOrder->mConstantData.cmd == orderId) {
+            return true;
+          }
+        }
+      }
+
+      moho::SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)cursorEntities->PruneTombstonesAndFindLive(&node, node);
+    }
+
+    return false;
+  }
+} // namespace
+
+/**
+ * Address: 0x008534F0 (FUN_008534F0, sub_8534F0)
+ *
+ * What it does:
+ * Rebuilds the queued mobile-build ghost meshes into a fresh lane and swaps it
+ * over `mPreviewPositions`; see the header for the full description.
+ */
+void moho::CUIWorldViewBuildDragRuntimeView::RefreshQueuedBuildGhosts()
+{
+  // Built from scratch every pass. Whatever stays behind in the map this one
+  // displaces belongs to orders that are gone, and dies with it below.
+  msvc8::map<moho::CmdId, boost::shared_ptr<moho::MeshInstance>> refreshed;
+
+  moho::CWldSession* const session = moho::WLD_GetActiveSession();
+  for (const auto& [commandId, helper] : session->mCommandManager->mCommands) {
+    static_cast<void>(commandId);
+    if (helper == nullptr) {
+      continue;
+    }
+
+    if (moho::ResolveCommandIssueHelperCommandType(*helper) != moho::EUnitCommandType::UNITCOMMAND_BuildMobile) {
+      continue;
+    }
+
+    if (IsQueuedBuildAlreadyUnderway(*helper)) {
+      continue;
+    }
+
+    const moho::CmdId orderId = helper->mConstantData.cmd;
+
+    boost::shared_ptr<moho::MeshInstance> ghost;
+    if (const auto cached = mPreviewPositions.find(orderId); cached != mPreviewPositions.end()) {
+      ghost = cached->second;
+      ghost->isHidden = 0;
+      refreshed[orderId] = ghost;
+    } else {
+      gpg::RRef blueprintRef{};
+      (void)gpg::RRef_REntityBlueprint(&blueprintRef, helper->mConstantData.blueprint);
+      const gpg::RRef unitBlueprintRef =
+        gpg::REF_UpcastPtr(blueprintRef, moho::RUnitBlueprint::StaticGetClass());
+      if (unitBlueprintRef.mObj == nullptr) {
+        continue;
+      }
+
+      auto* const unitBlueprint = static_cast<moho::RUnitBlueprint*>(unitBlueprintRef.mObj);
+      moho::RMeshBlueprint* const meshBlueprint =
+        session->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
+      if (meshBlueprint == nullptr) {
+        continue;
+      }
+
+      // The ghost takes the top LOD's own albedo/normals/specular sheets so it
+      // reads as the unit it previews, but through the `UnitPlace` shader; the
+      // lookup and secondary lanes stay empty.
+      const moho::RMeshBlueprintLOD& topLod = *meshBlueprint->mLods.begin();
+      const msvc8::string shaderName("UnitPlace");
+      const msvc8::string emptyTextureName;
+      boost::shared_ptr<moho::MeshMaterial> ghostMaterial = moho::MeshMaterial::Create(
+        shaderName,
+        topLod.mAlbedoName,
+        topLod.mNormalsName,
+        topLod.mSpecularName,
+        emptyTextureName,
+        emptyTextureName,
+        nullptr
+      );
+
+      const float uniformScale = unitBlueprint->Display.UniformScale;
+      const Wm3::Vector3f ghostScale(uniformScale, uniformScale, uniformScale);
+      ghost.reset(moho::MeshRenderer::GetInstance()->CreateMeshInstance(
+        session->mGameTick,
+        kQueuedBuildGhostColor,
+        meshBlueprint,
+        ghostScale,
+        false,
+        ghostMaterial
+      ));
+
+      refreshed[orderId] = ghost;
+      ghost->color = kQueuedBuildGhostColor;
+    }
+
+    // Ghosts never rotate - the stance is the identity orientation at the
+    // order's own anchor, and start == end so nothing interpolates.
+    moho::VTransform stance;
+    stance.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
+    stance.pos_ = moho::ResolveCommandIssueHelperAnchorPosition(*helper);
+    ghost->SetStance(stance, stance);
+  }
+
+  mPreviewPositions.swap(refreshed);
 }
 
 struct BuildDragStepStateRuntimeView
