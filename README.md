@@ -14,9 +14,9 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,672` (82.21%)
+- `recovered`: `53,675` (82.22%)
 - `skip`: `6,115` (9.37%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,497` (8.42%) — proven third-party/import-boundary code
+- `external_dependency`: `5,494` (8.42%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `67` (0.10%)
 - `in_progress`: `14` (0.02%)
@@ -30,15 +30,15 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,672 functions) — binary caller context
+### Recovered (53,675 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `15,997` | 29.81% |
+| **Recovered caller token exists** (source edge still requires verification) | `15,999` | 29.81% |
 | Vtable-anchored (virtual override of a recovered class) | `5,829` | 10.86% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,502` | 10.25% |
 | No recovered caller token yet (orphan risk) | `2,407` | 4.48% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,717` | 44.19% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,718` | 44.19% |
 | Unclassified data xref (manual review) | `216` | 0.40% |
 | RTTI-only | `4` | 0.01% |
 
