@@ -104,6 +104,19 @@ namespace moho
      * (`sizeof = 0x0C`) and registers the `RDebugOverlay` base.
      */
     void Init() override;
+
+    /**
+     * Address: 0x0064C8D0 (FUN_0064C8D0)
+     *
+     * What it does:
+     * Registers `RDebugOverlay` as this type's reflected base at offset 0.
+     *
+     * IDA labels the symbol `RDebugOverlayTypeInfo::AddBase_RDebugOverlay`,
+     * which cannot be right - a type info does not register itself as its own
+     * base. Its sole caller is RDebugCollisionTypeInfo::Init, and the base it
+     * adds is RDebugOverlay, so it belongs here.
+     */
+    static void AddBase_RDebugOverlay(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(RDebugCollision) == 0x0C, "RDebugCollision size must be 0x0C");
