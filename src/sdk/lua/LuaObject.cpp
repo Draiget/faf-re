@@ -682,21 +682,25 @@ void UdataSerializer::Serialize(
 
 namespace
 {
-	struct LuaGlobalStateUserdataRuntimeView
+	/**
+	 * The metatable every fresh userdata starts with.
+	 *
+	 * `luaS_newudata` (0x00924A10) reads it as `mov edx, [ecx+118h]` off the
+	 * `global_State`, and 0x118 is `_defaultmetatypes[LUA_TUSERDATA].value`:
+	 * the array sits at G+0xD4 with an 8-byte stride (`lea eax, [ecx+eax*8+0D4h]`
+	 * in `luaT_gettmbyobj`, 0x00928450), and `TObject` is `{int tt; Value value;}`
+	 * - tt first - so slot 8's value half lands at 0xD4 + 8*8 + 4 = 0x118.
+	 */
+	[[nodiscard]] inline Table* DefaultUserdataMetatable(global_State* const globalState) noexcept
 	{
-		std::uint8_t reserved00[0x14];
-		GCObject* rootUserdata;
-		std::uint8_t reserved18To117[0x100];
-		Table* userdataMetatable;
-	};
+		return static_cast<Table*>(globalState->_defaultmetatypes[LUA_TUSERDATA].value.p);
+	}
 	static_assert(
-		offsetof(LuaGlobalStateUserdataRuntimeView, rootUserdata) == 0x14,
-		"LuaGlobalStateUserdataRuntimeView::rootUserdata offset must be 0x14"
+		offsetof(global_State, _defaultmetatypes) + LUA_TUSERDATA * sizeof(LuaPlus::TObject)
+			+ offsetof(LuaPlus::TObject, value) == 0x118,
+		"default userdata metatable must live at global_State+0x118"
 	);
-	static_assert(
-		offsetof(LuaGlobalStateUserdataRuntimeView, userdataMetatable) == 0x118,
-		"LuaGlobalStateUserdataRuntimeView::userdataMetatable offset must be 0x118"
-	);
+	static_assert(offsetof(global_State, rootudata) == 0x14, "global_State::rootudata must be at +0x14");
 
 	struct LuaFuncStateCodegenRuntimeView
 	{
@@ -4688,11 +4692,10 @@ namespace
 			userdata->tt = LUA_TUSERDATA;
 			userdata->marked = 0u;
 
-			auto* const globalStateRuntime =
-				reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
-			userdata->metatable = globalStateRuntime->userdataMetatable;
-			userdata->next = globalStateRuntime->rootUserdata;
-			globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
+			global_State* const globalState = state->l_G;
+			userdata->metatable = DefaultUserdataMetatable(globalState);
+			userdata->next = globalState->rootudata;
+			globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
 		}
 
 		state->top->tt = static_cast<int>(userdata->tt);
@@ -4734,10 +4737,10 @@ namespace
 		userdata->tt = LUA_TUSERDATA;
 		userdata->marked = (type->dtrFunc_ != nullptr) ? 2u : 0u;
 
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
-		userdata->metatable = globalStateRuntime->userdataMetatable;
-		userdata->next = globalStateRuntime->rootUserdata;
-		globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
+		global_State* const globalState = state->l_G;
+		userdata->metatable = DefaultUserdataMetatable(globalState);
+		userdata->next = globalState->rootudata;
+		globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
 		return userdata;
 	}
 
@@ -4770,10 +4773,10 @@ namespace
 		userdata->tt = LUA_TUSERDATA;
 		userdata->marked = (sourceType->dtrFunc_ != nullptr) ? 2u : 0u;
 
-		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
-		userdata->metatable = globalStateRuntime->userdataMetatable;
-		userdata->next = globalStateRuntime->rootUserdata;
-		globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
+		global_State* const globalState = state->l_G;
+		userdata->metatable = DefaultUserdataMetatable(globalState);
+		userdata->next = globalState->rootudata;
+		globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
 		return userdata;
 	}
 
