@@ -266,38 +266,6 @@ namespace
     return (*heightField)->GetElevation(position->x, position->z);
   }
 
-  [[nodiscard]] bool
-  DoScriptIntoEnv(LuaPlus::LuaState* state, const char* scriptPath, const LuaPlus::LuaObject& envTable)
-  {
-    if (!state || !scriptPath || !*scriptPath || !envTable) {
-      return false;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return false;
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    lua_getglobal(lstate, "doscript");
-    if (!lua_isfunction(lstate, -1)) {
-      lua_settop(lstate, savedTop);
-      return false;
-    }
-
-    lua_pushstring(lstate, scriptPath);
-    const_cast<LuaPlus::LuaObject&>(envTable).PushStack(lstate);
-
-    if (lua_call(lstate, 2, 1) != 0) {
-      lua_settop(lstate, savedTop);
-      return false;
-    }
-
-    const bool ok = lua_toboolean(lstate, -1) != 0;
-    lua_settop(lstate, savedTop);
-    return ok;
-  }
-
   /**
    * Address: 0x00478D00 (FUN_00478D00, sub_478D00)
    *
@@ -3563,16 +3531,10 @@ namespace moho
     LuaPlus::LuaObject scriptEnv{};
     scriptEnv.AssignNewTable(state, 0, 0);
 
-    bool loaded = DoScriptIntoEnv(state, "/lua/TerrainTypes.lua", scriptEnv);
-    if (!loaded) {
-      LuaPlus::LuaObject imported = moho::SCR_ImportLuaModule(state, "/lua/TerrainTypes.lua");
-      if (imported) {
-        scriptEnv = imported;
-        loaded = true;
-      }
-    }
-
-    if (!loaded) {
+    // 0x00577FA3: the engine loader, with `scriptEnv` as the script's globals
+    // table, so `TerrainTypes` is read back out of a table private to this
+    // load rather than out of the shared module cache.
+    if (!moho::SCR_LuaDoScript(state, "/lua/TerrainTypes.lua", &scriptEnv)) {
       gpg::Warnf("No terrain types found.");
       return;
     }

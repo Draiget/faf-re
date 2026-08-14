@@ -2217,39 +2217,6 @@ namespace moho
       return DispatchTeardownCallbacksCoreAndReturnLastResult(callbacks);
     }
 
-    [[nodiscard]] bool RunLuaScriptWithEnv(
-      LuaPlus::LuaState* const state, const char* const scriptPath, const LuaPlus::LuaObject& environment
-    )
-    {
-      if (!state || !scriptPath || !*scriptPath) {
-        return false;
-      }
-
-      lua_State* const lstate = state->GetCState();
-      if (!lstate) {
-        return false;
-      }
-
-      const int savedTop = lua_gettop(lstate);
-      lua_getglobal(lstate, "doscript");
-      if (!lua_isfunction(lstate, -1)) {
-        lua_settop(lstate, savedTop);
-        return false;
-      }
-
-      lua_pushstring(lstate, scriptPath);
-      const_cast<LuaPlus::LuaObject&>(environment).PushStack(lstate);
-      if (lua_call(lstate, 2, 0) != 0) {
-        const char* const errorText = lua_tostring(lstate, -1);
-        gpg::Warnf("WLD_LoadScenarioInfo: doscript(%s) failed: %s", scriptPath, errorText ? errorText : "<unknown>");
-        lua_settop(lstate, savedTop);
-        return false;
-      }
-
-      lua_settop(lstate, savedTop);
-      return true;
-    }
-
     struct VizUpdateNode
     {
       VizUpdateNode* left;          // +0x00
@@ -12230,9 +12197,14 @@ namespace moho
 
     LuaPlus::LuaObject scenarioEnv(state);
     if (FILE_GetFileInfo(scenarioFile.c_str(), nullptr, false)) {
+      // Both scripts run with `scenarioEnv` as their globals table, so the
+      // scenario file's top-level `ScenarioInfo = {...}` lands in it rather
+      // than in _G. This is the engine's own loader (VFS resolution + hook
+      // concatenation + setfenv); routing it through the Lua-level `doscript`
+      // binding instead loses the C++ error propagation the caller relies on.
       scenarioEnv.AssignNewTable(state, 0, 0);
-      (void)RunLuaScriptWithEnv(state, "/lua/dataInit.lua", scenarioEnv);
-      (void)RunLuaScriptWithEnv(state, scenarioFile.c_str(), scenarioEnv);
+      (void)SCR_LuaDoScript(state, "/lua/dataInit.lua", &scenarioEnv);
+      (void)SCR_LuaDoScript(state, scenarioFile.c_str(), &scenarioEnv);
     }
 
     if (scenarioEnv.IsNil()) {
