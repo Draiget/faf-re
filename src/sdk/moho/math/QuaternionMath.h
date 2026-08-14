@@ -225,4 +225,15 @@ namespace moho
    */
   Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* quat, Wm3::Vector3f* outMatrix) noexcept;
 
+  /**
+   * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)
+   *
+   * What it does:
+   * Expands `quat` into a row-major rotation matrix and multiplies `vec` by
+   * its three rows, storing the rotated vector in `dest`.
+   */
+  Wm3::Vector3f* MultQuadVec(
+    Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat
+  );
+
 } // namespace moho
