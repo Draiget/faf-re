@@ -243,7 +243,13 @@ std::wstring gpg::STR_Utf8ToWide(
   return builder;
 }
 
-// 0x00938CB0
+/**
+ * Address: 0x00938CB0 (FUN_00938CB0, gpg::STR_GetToken)
+ *
+ * What it does:
+ * Skips delimiter characters, strongly assigns the next token to `dest`, and
+ * advances the scan pointer past one trailing delimiter.
+ */
 bool gpg::STR_GetToken(
   StrArg& find,
   const char* str,
@@ -263,7 +269,7 @@ bool gpg::STR_GetToken(
     while (c && strchr(str, c) == nullptr) {
       c = *++find;
     }
-    dest = msvc8::string{start, find};
+    dest.assign_owned_strong(std::string_view(start, static_cast<std::size_t>(find - start)));
     if (c) {
       ++find;
     }

@@ -63,7 +63,14 @@ namespace gpg
   msvc8::string STR_WideToUtf8(const wchar_t*);                         // 0x00938680
   std::wstring STR_Utf8ToWide(StrArg str);                              // 0x00938720
 
-  bool STR_GetToken(const char*& find, const char* str, msvc8::string& dest);           // 0x00938CB0
+  /**
+   * Address: 0x00938CB0 (FUN_00938CB0, gpg::STR_GetToken)
+   *
+   * What it does:
+   * Skips delimiter characters, copies the next token into `dest`, and advances
+   * the scan pointer past one trailing delimiter. Clears `dest` at end of input.
+   */
+  bool STR_GetToken(const char*& find, const char* str, msvc8::string& dest);
   /**
    * Address: 0x00938F40 (FUN_00938F40, gpg::STR_GetTokens)
    *
