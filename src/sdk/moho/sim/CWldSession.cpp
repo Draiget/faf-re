@@ -7945,6 +7945,21 @@ namespace moho
    * resolve-sample / sample-to-position / unlink-weak-lane trio straight into
    * the skirt loop (asm 0x0085AE88..0x0085AEB7).
    */
+  MouseInfo& CWldSession::CursorInfo() noexcept
+  {
+    static_assert(
+      offsetof(CWldSession, CursorWorldPos) - offsetof(CWldSession, mCursorWorldState)
+        == offsetof(MouseInfo, mMouseWorldPos),
+      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
+    );
+    static_assert(
+      offsetof(CWldSession, CursorScreenPos) - offsetof(CWldSession, mCursorWorldState)
+        == offsetof(MouseInfo, mMouseScreenPos),
+      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
+    );
+    return *reinterpret_cast<MouseInfo*>(&mCursorWorldState[0]);
+  }
+
   Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(UserCommandIssueHelper& helper)
   {
     Wm3::Vector3f out{};
@@ -7953,6 +7968,41 @@ namespace moho
       reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
     );
     return out;
+  }
+
+  std::uint32_t EvaluateBuildTemplatePlacementPreview(
+    const Wm3::Vector3f& worldPosition,
+    const RUnitBlueprint* const buildBlueprint,
+    CWldSession& session,
+    VTransform& previewTransform
+  )
+  {
+    std::uint32_t previewColor = 0u;
+    return ApplyBuildTemplatePlacementPreviewStatus(
+      worldPosition,
+      buildBlueprint,
+      previewTransform,
+      session,
+      previewColor
+    );
+  }
+
+  std::uint32_t EvaluateCommandModeBuildPlacementPreview(
+    const CommandModeData& commandMode,
+    const Wm3::Vector3f& worldPosition,
+    CWldSession& session,
+    VTransform& previewTransform
+  )
+  {
+    std::uint32_t previewColor = 0u;
+    (void)ApplyCommandModeBuildPlacementPreviewStatus(
+      commandMode,
+      worldPosition,
+      session,
+      previewTransform,
+      previewColor
+    );
+    return previewColor;
   }
 
   /**
