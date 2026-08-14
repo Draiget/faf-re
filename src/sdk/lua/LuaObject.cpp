@@ -10991,7 +10991,7 @@ namespace
 	 * Computes `abs(arg1)` after Lua numeric argument validation and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_abs(lua_State* const state)
+	int math_abs(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::fabs(static_cast<double>(value))));
@@ -11005,7 +11005,7 @@ namespace
 	 * Computes `sin(arg1)` after Lua numeric argument validation and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_sin(lua_State* const state)
+	int math_sin(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::sin(static_cast<double>(value))));
@@ -11019,7 +11019,7 @@ namespace
 	 * Computes `cos(arg1)` after Lua numeric argument validation and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_cos(lua_State* const state)
+	int math_cos(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::cos(static_cast<double>(value))));
@@ -11033,7 +11033,7 @@ namespace
 	 * Computes `tan(arg1)` after Lua numeric argument validation and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_tan(lua_State* const state)
+	int math_tan(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::tan(static_cast<double>(value))));
@@ -11047,7 +11047,7 @@ namespace
 	 * Computes `acos(arg1)` after Lua numeric argument validation and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_acos(lua_State* const state)
+	int math_acos(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::acos(static_cast<double>(value))));
@@ -11061,7 +11061,7 @@ namespace
 	 * Computes `atan(arg1)` (x87 `fpatan` lane with denominator `1.0`) and
 	 * pushes one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_atan(lua_State* const state)
+	int math_atan(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(
@@ -11078,7 +11078,7 @@ namespace
 	 * Computes `atan2(arg1, arg2)` with Lua numeric argument validation and
 	 * pushes one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_atan2(lua_State* const state)
+	int math_atan2(lua_State* const state)
 	{
 		const lua_Number numerator = luaL_checknumber(state, 1);
 		const lua_Number denominator = luaL_checknumber(state, 2);
@@ -11096,7 +11096,7 @@ namespace
 	 * Computes `ceil(arg1)` with Lua numeric argument validation and pushes one
 	 * resulting Lua number.
 	 */
-	[[maybe_unused]] int math_ceil(lua_State* const state)
+	int math_ceil(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(LuaCeilBridge(value)));
@@ -11110,7 +11110,7 @@ namespace
 	 * Computes `floor(arg1)` with Lua numeric argument validation and pushes
 	 * one resulting Lua number.
 	 */
-	[[maybe_unused]] int math_floor(lua_State* const state)
+	int math_floor(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::floor(static_cast<double>(value))));
@@ -11124,7 +11124,7 @@ namespace
 	 * Computes `fmod(arg1, arg2)` with Lua numeric argument checks and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_mod(lua_State* const state)
+	int math_mod(lua_State* const state)
 	{
 		const lua_Number left = luaL_checknumber(state, 1);
 		const lua_Number right = luaL_checknumber(state, 2);
@@ -11142,7 +11142,7 @@ namespace
 	 * Computes `sqrt(arg1)` with Lua numeric argument validation and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_sqrt(lua_State* const state)
+	int math_sqrt(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::sqrt(static_cast<double>(value))));
@@ -11156,7 +11156,7 @@ namespace
 	 * Computes `pow(arg1, arg2)` with Lua numeric argument checks and pushes
 	 * one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_pow(lua_State* const state)
+	int math_pow(lua_State* const state)
 	{
 		const lua_Number base = luaL_checknumber(state, 1);
 		const lua_Number exponent = luaL_checknumber(state, 2);
@@ -11174,7 +11174,7 @@ namespace
 	 * Computes natural logarithm for arg-1 (`ln`) and pushes one Lua numeric
 	 * result.
 	 */
-	[[maybe_unused]] int math_log(lua_State* const state)
+	int math_log(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::log(static_cast<double>(value))));
@@ -11187,7 +11187,7 @@ namespace
 	 * What it does:
 	 * Computes base-10 logarithm for arg-1 and pushes one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_log10(lua_State* const state)
+	int math_log10(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::log10(static_cast<double>(value))));
@@ -11200,7 +11200,7 @@ namespace
 	 * What it does:
 	 * Computes exponential (`e^arg1`) and pushes one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_exp(lua_State* const state)
+	int math_exp(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, static_cast<lua_Number>(std::exp(static_cast<double>(value))));
@@ -11213,7 +11213,7 @@ namespace
 	 * What it does:
 	 * Converts radians (arg-1) to degrees and pushes one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_deg(lua_State* const state)
+	int math_deg(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, value * static_cast<lua_Number>(57.29578f));
@@ -11226,7 +11226,7 @@ namespace
 	 * What it does:
 	 * Converts degrees (arg-1) to radians and pushes one Lua numeric result.
 	 */
-	[[maybe_unused]] int math_rad(lua_State* const state)
+	int math_rad(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		lua_pushnumber(state, value * static_cast<lua_Number>(0.017453292f));
@@ -11240,7 +11240,7 @@ namespace
 	 * Computes `frexp(arg1, &exp)` and pushes both mantissa and exponent as Lua
 	 * numeric results.
 	 */
-	[[maybe_unused]] int math_frexp(lua_State* const state)
+	int math_frexp(lua_State* const state)
 	{
 		int exponent = 0;
 		const lua_Number value = luaL_checknumber(state, 1);
@@ -11257,7 +11257,7 @@ namespace
 	 * Computes `ldexp(arg1, int(arg2))` with Lua numeric argument checks and
 	 * returns the result as one Lua number.
 	 */
-	[[maybe_unused]] int math_ldexp(lua_State* const state)
+	int math_ldexp(lua_State* const state)
 	{
 		const int exponent = static_cast<int>(luaL_checknumber(state, 2));
 		const lua_Number value = luaL_checknumber(state, 1);
@@ -11271,7 +11271,7 @@ namespace
 	 * What it does:
 	 * Returns the minimum numeric value across all Lua arguments.
 	 */
-	[[maybe_unused]] int math_min(lua_State* const state)
+	int math_min(lua_State* const state)
 	{
 		const int valueCount = lua_gettop(state);
 		lua_Number currentMinimum = luaL_checknumber(state, 1);
@@ -11293,7 +11293,7 @@ namespace
 	 * What it does:
 	 * Returns the maximum numeric value across all Lua arguments.
 	 */
-	[[maybe_unused]] int math_max(lua_State* const state)
+	int math_max(lua_State* const state)
 	{
 		const int valueCount = lua_gettop(state);
 		lua_Number currentMaximum = luaL_checknumber(state, 1);
@@ -11316,11 +11316,130 @@ namespace
 	 * Reads one numeric seed argument, truncates it to integer seed lane, and
 	 * re-seeds the C runtime RNG.
 	 */
-	[[maybe_unused]] int math_randomseed(lua_State* const state)
+	int math_randomseed(lua_State* const state)
 	{
 		const auto seed = static_cast<unsigned int>(luaL_checknumber(state, 1));
 		std::srand(seed);
 		return 0;
+	}
+
+	/**
+	 * Address: 0x00919B10 (FUN_00919B10, math_asin)
+	 *
+	 * What it does:
+	 * Computes `asin(arg1)` after Lua numeric argument validation and pushes
+	 * one Lua numeric result.
+	 */
+	int math_asin(lua_State* const state)
+	{
+		const lua_Number value = luaL_checknumber(state, 1);
+		lua_pushnumber(state, static_cast<lua_Number>(std::asin(static_cast<double>(value))));
+		return 1;
+	}
+
+	/**
+	 * The scale the engine applies to `rand()` to reach [0,1).
+	 *
+	 * This is 0x38000100, which is NOT 1/32768 (that would be 0x38000000) - the
+	 * fork's constant is a hair larger. Kept bit-exact rather than "corrected",
+	 * because `math.random` feeds simulation code and any drift here desyncs.
+	 */
+	constexpr float kLuaRandomScale = 3.0518509447574615e-05f;
+
+	/**
+	 * Address: 0x00919F90 (FUN_00919F90, math_random)
+	 *
+	 * IDA signature:
+	 * int __usercall math_random@<eax>(__m128i a1@<xmm0>, lua_State *L);
+	 *
+	 * What it does:
+	 * Lua's three-form `math.random`: no argument yields the raw [0,1) sample,
+	 * one argument `u` yields an integer in [1,u], and two arguments `l,u` yield
+	 * an integer in [l,u]. The sample is drawn once up front, before the
+	 * argument count is even read, so the RNG advances on every call regardless
+	 * of form.
+	 */
+	int math_random(lua_State* const state)
+	{
+		const float sample = static_cast<float>(std::rand() % 0x7FFF) * kLuaRandomScale;
+
+		const int argumentCount = lua_gettop(state);
+		if (argumentCount == 0) {
+			lua_pushnumber(state, sample);
+			return 1;
+		}
+
+		if (argumentCount == 1) {
+			const int upper = static_cast<int>(luaL_checknumber(state, 1));
+			if (upper < 1) {
+				luaL_argerror(state, 1, "interval is empty");
+			}
+			lua_pushnumber(
+				state, static_cast<lua_Number>(std::floor(sample * static_cast<double>(upper)) + 1.0)
+			);
+			return 1;
+		}
+
+		if (argumentCount != 2) {
+			luaL_error(state, "wrong number of arguments");
+		}
+
+		const int lower = static_cast<int>(luaL_checknumber(state, 1));
+		const int upper = static_cast<int>(luaL_checknumber(state, 2));
+		if (lower > upper) {
+			luaL_argerror(state, 2, "interval is empty");
+		}
+		lua_pushnumber(
+			state,
+			static_cast<lua_Number>(
+				std::floor(sample * static_cast<double>(upper - lower + 1)) + static_cast<double>(lower)
+			)
+		);
+		return 1;
+	}
+
+	/**
+	 * The `math` library registration table at 0x00D46278.
+	 *
+	 * Order is taken from the binary's .rdata, not from stock Lua 5.0: this fork
+	 * lists `pow` between `deg` and `rad` rather than after `randomseed`.
+	 */
+	const luaL_reg kLuaMathLib[] = {
+		{"abs", math_abs},          {"sin", math_sin},     {"cos", math_cos},
+		{"tan", math_tan},          {"asin", math_asin},   {"acos", math_acos},
+		{"atan", math_atan},        {"atan2", math_atan2}, {"ceil", math_ceil},
+		{"floor", math_floor},      {"mod", math_mod},     {"frexp", math_frexp},
+		{"ldexp", math_ldexp},      {"sqrt", math_sqrt},   {"min", math_min},
+		{"max", math_max},          {"log", math_log},     {"log10", math_log10},
+		{"exp", math_exp},          {"deg", math_deg},     {"pow", math_pow},
+		{"rad", math_rad},          {"random", math_random},
+		{"randomseed", math_randomseed},
+		{nullptr, nullptr},
+	};
+
+	/**
+	 * Address: 0x0091A110 (FUN_0091A110, luaopen_math)
+	 *
+	 * What it does:
+	 * Registers the `math` library, then adds two entries the registration table
+	 * cannot express: the `pi` constant, and `__pow` installed into the *globals*
+	 * table rather than into `math`, which is what makes the `^` operator work.
+	 *
+	 * The `__pow` write targets pseudo-index -10001 (LUA_GLOBALSINDEX); only the
+	 * `pi` write lands on the `math` table left on the stack by luaL_openlib.
+	 */
+	int LuaOpenMath(lua_State* const state)
+	{
+		luaL_openlib(state, "math", kLuaMathLib, 0);
+
+		lua_pushlstring(state, "pi", 2u);
+		lua_pushnumber(state, 3.1415927410125732f);
+		lua_settable(state, -3);
+
+		lua_pushlstring(state, "__pow", 5u);
+		lua_pushcclosure(state, math_pow, 0);
+		lua_settable(state, LUA_GLOBALSINDEX);
+		return 1;
 	}
 
 	/**
@@ -17762,7 +17881,8 @@ void LuaState::Init(const StandardLibraries initStandardLibrary)
 		luaopen_serialize(state);
 		// Ours, not the prebuilt lib's - same reason as LuaOpenIo above.
 		LuaOpenString(state);
-		luaopen_math(state);
+		// Ours, not the prebuilt lib's - same reason as LuaOpenIo above.
+		LuaOpenMath(state);
 		luaopen_debug(state);
 		if (initStandardLibrary == LIB_OSIO) {
 			luaopen_loadlib(state);
