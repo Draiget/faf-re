@@ -300,18 +300,6 @@ namespace
     return cached;
   }
 
-  void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
-  {
-    gpg::RType* const taskType = CachedCTaskType();
-    gpg::RField baseField{};
-    baseField.mName = taskType->GetName();
-    baseField.mType = taskType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
-
   const char* LuaErrorString(LuaPlus::LuaState* const state)
   {
     if (!state || !state->m_state) {
@@ -1212,13 +1200,33 @@ const char* CLuaTaskTypeInfo::GetName() const
 }
 
 /**
+ * Address: 0x004CB680 (FUN_004CB680, Moho::CLuaTaskTypeInfo::AddBase_CTask)
+ *
+ * What it does:
+ * Registers `CTask` as this type's reflected base at offset 0 - CLuaTask
+ * derives from it singly, so the sub-object starts where the object does.
+ */
+void CLuaTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+{
+  gpg::RType* const taskType = CachedCTaskType();
+
+  gpg::RField baseField{};
+  baseField.mName = taskType->GetName();
+  baseField.mType = taskType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
  * Address: 0x004C9A30 (FUN_004C9A30, ?Init@CLuaTaskTypeInfo@Moho@@UAEXXZ)
  */
 void CLuaTaskTypeInfo::Init()
 {
   size_ = sizeof(CLuaTask);
   gpg::RType::Init();
-  AddCTaskBaseToTypeInfo(this);
+  AddBase_CTask(this);
   Finish();
 }
 
