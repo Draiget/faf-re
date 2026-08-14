@@ -1801,27 +1801,6 @@ namespace
     return blueprint ? blueprint->mCategoryBitIndex : 0u;
   }
 
-  struct MeshBoneEntryView
-  {
-    std::uint8_t bytes[0x58];
-  };
-
-  static_assert(sizeof(MeshBoneEntryView) == 0x58, "MeshBoneEntryView size must be 0x58");
-
-  struct MeshObjectBoneSpanView
-  {
-    std::uint8_t pad_00_10[0x10];
-    const MeshBoneEntryView* boneBegin; // +0x10
-    const MeshBoneEntryView* boneEnd;   // +0x14
-  };
-
-  static_assert(
-    offsetof(MeshObjectBoneSpanView, boneBegin) == 0x10, "MeshObjectBoneSpanView::boneBegin offset must be 0x10"
-  );
-  static_assert(
-    offsetof(MeshObjectBoneSpanView, boneEnd) == 0x14, "MeshObjectBoneSpanView::boneEnd offset must be 0x14"
-  );
-
   [[nodiscard]] LuaPlus::LuaObject GetBlueprintLuaObject(
     const moho::REntityBlueprint* const blueprint,
     LuaPlus::LuaState* const state
@@ -3368,25 +3347,32 @@ namespace moho
   }
 
   /**
-   * Address: 0x00678BB0 (FUN_00678BB0)
+   * Address: 0x00678BB0 (FUN_00678BB0, ?GetBoneCount@Entity@Moho@@UBEHXZ)
+   *
+   * IDA signature:
+   * int __thiscall Moho::Entity::GetBoneCount(Moho::Entity *this);
    *
    * What it does:
-   * Returns mesh bone count from the loaded mesh skeleton block.
+   * Resolves the mesh resource's skeleton and returns its bone count, or 0
+   * when either is absent. The bone vector belongs to `CAniSkel`, reached
+   * through `RScmResource::GetSkeleton` - it is not a span hanging off the
+   * resource itself, which is what this used to read and why every unit
+   * reported zero bones.
    */
   int Entity::GetBoneCount() const
   {
-    if (!mMeshRef.mObj) {
+    auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj);
+    if (scmResource == nullptr) {
       return 0;
     }
 
-    const auto* const meshObject = static_cast<const MeshObjectBoneSpanView*>(mMeshRef.mObj);
-    const MeshBoneEntryView* const begin = meshObject->boneBegin;
-    const MeshBoneEntryView* const end = meshObject->boneEnd;
-    if (!begin || !end || end < begin) {
+    const boost::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
+    const CAniSkel* const skel = skeleton.get();
+    if (skel == nullptr) {
       return 0;
     }
 
-    return static_cast<int>(end - begin);
+    return static_cast<int>(skel->mBones.size());
   }
 
   /**
