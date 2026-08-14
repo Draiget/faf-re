@@ -878,7 +878,22 @@ namespace moho
    * table; modifier tokens ("ALT", "CTRL"/"CONTROL", "SHIFT") OR their
    * corresponding high-bit flags into the result.
    */
-  int IN_ParseKeyModifiers(const std::string& keyBindingSpec);
+  int IN_ParseKeyModifiers(const msvc8::string& keyBindingSpec);
+
+  /**
+   * Address: 0x00839F20 (FUN_00839F20, Moho::IN_BindKey)
+   *
+   * IDA signature:
+   * void __cdecl Moho::IN_BindKey(std::vector<std::string>* commandArgs);
+   *
+   * What it does:
+   * The `IN_BindKey` console command. Validates the token vector, parses token
+   * 1 as a key mask, joins every token from index 2 with a trailing space, and
+   * assigns the result to the key-action map. `register_CConFunc_IN_BindKey`
+   * (0x00BE4850) takes this function's address when it registers the command,
+   * which is why the declaration has to be visible from `CConCommand.cpp`.
+   */
+  void IN_BindKey(void* commandArgs);
 
   /**
    * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
