@@ -7273,4 +7273,19 @@ namespace Wm3
     runtime->lane00 = 0;
     return runtime;
   }
+
+  /**
+   * Address: 0x00506010 (FUN_00506010, Wm3::AxisAlignedBox3f::Intersects)
+   *
+   * What it does:
+   * Tests whether two axis-aligned boxes overlap on all three axes. The
+   * binary walks the axes in a loop and bails on the first separating one;
+   * the short-circuiting `&&` chain below has the same evaluation order and
+   * the same early exit.
+   */
+  bool AxisAlignedBox3fIntersects(const AxisAlignedBox3f& box, const AxisAlignedBox3f& other) noexcept
+  {
+    return box.Min.x <= other.Max.x && other.Min.x <= box.Max.x && box.Min.y <= other.Max.y &&
+      other.Min.y <= box.Max.y && box.Min.z <= other.Max.z && other.Min.z <= box.Max.z;
+  }
 } // namespace Wm3

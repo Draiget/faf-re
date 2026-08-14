@@ -1,3 +1,4 @@
+#include "moho/math/Wm3DistanceFafExtras.h"
 #include "Mesh.h"
 
 #include <algorithm>
@@ -660,12 +661,6 @@ namespace
   ) noexcept
   {
     return moho::SpatialShardData::HasType(&data, type);
-  }
-
-  [[nodiscard]] bool AxisAlignedBoxesIntersect(const Wm3::AxisAlignedBox3f& lhs, const Wm3::AxisAlignedBox3f& rhs) noexcept
-  {
-    return lhs.Min.x <= rhs.Max.x && rhs.Min.x <= lhs.Max.x && lhs.Min.y <= rhs.Max.y && rhs.Min.y <= lhs.Max.y &&
-      lhs.Min.z <= rhs.Max.z && rhs.Min.z <= lhs.Max.z;
   }
 
   [[nodiscard]] bool AxisAlignedBoxContains(
@@ -2212,7 +2207,7 @@ namespace
     gpg::fastvector<moho::UserEntity*>& destination
   )
   {
-    if (SpatialShardDataHasNoRequestedType(data, type) || !AxisAlignedBoxesIntersect(bounds, data.mBounds)) {
+    if (SpatialShardDataHasNoRequestedType(data, type) || !Wm3::AxisAlignedBox3fIntersects(bounds, data.mBounds)) {
       return;
     }
 
@@ -2223,7 +2218,7 @@ namespace
     const std::uint32_t typeBits = EntityTypeBits(type);
 
     const auto intersectsQuery = [&bounds](const Wm3::AxisAlignedBox3f& nodeBox) {
-      return AxisAlignedBoxesIntersect(nodeBox, bounds);
+      return Wm3::AxisAlignedBox3fIntersects(nodeBox, bounds);
     };
 
     if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
@@ -3862,7 +3857,7 @@ namespace moho
     gpg::fastvector<UserEntity*>& destination
   )
   {
-    if (SpatialShardHasNoRequestedType(*shard, type) || !AxisAlignedBoxesIntersect(shard->mBounds, bounds)) {
+    if (SpatialShardHasNoRequestedType(*shard, type) || !Wm3::AxisAlignedBox3fIntersects(shard->mBounds, bounds)) {
       return;
     }
 
