@@ -44,6 +44,14 @@ namespace moho
      * `CAniSkel` as the single base type.
      */
     void Init() override;
+
+    /**
+     * Address: 0x00539B20 (FUN_00539B20, Moho::CAniResourceSkelTypeInfo::AddBase_CAniSkel)
+     *
+     * What it does:
+     * Registers `CAniSkel` as this type's reflected base at offset 0.
+     */
+    static void AddBase_CAniSkel(gpg::RType* typeInfo);
   };
 
   /**
