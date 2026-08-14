@@ -1077,6 +1077,28 @@ namespace moho
      */
     void RenderResources(GeomCamera3* camera, CD3DPrimBatcher* primBatcher);
 
+    /**
+     * Address: 0x00858D80 (FUN_00858D80, Moho::CWldSession::DrawEconomyOverlay)
+     *
+     * IDA signature:
+     * void __usercall Moho::CWldSession::DrawEconomyOverlay(
+     *   CWldSession *session, CD3DPrimBatcher *batcher, float interpolant,
+     *   CameraImpl *camera@<ecx>);
+     *
+     * What it does:
+     * Draws the net energy/mass rate readout over every army unit in the
+     * camera frustum. Per unit: a three-slice textured bar sized to the wider
+     * of the two numbers, then each number twice - a one-pixel black drop
+     * shadow, then the value in the positive or negative colour. Units that
+     * are dead, queued for destruction, past their mesh's icon-fade-in
+     * distance, or exactly break-even on both resources are skipped.
+     *
+     * `camera` arrives in `ecx` at the call site (0x0086EF07) while the
+     * session is the first stack argument, so this is a `__usercall` in the
+     * binary and a method here, matching the sibling render overlays.
+     */
+    void DrawEconomyOverlay(CameraImpl* camera, CD3DPrimBatcher* primBatcher, float interpolant);
+
   public:
     /**
      * Address: 0x00896A40 (FUN_00896A40, ?GetActiveBuildTemplate@CWldSession@Moho@@QBE?AV?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@AAH0@Z)

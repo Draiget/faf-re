@@ -38,6 +38,8 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/COGrid.h"
@@ -11170,6 +11172,349 @@ namespace moho
     // Deep lift blockers:
     // IResources::DepositCollides typed contract, CD3DBatchTexture/CD3DPrimBatcher full API,
     // and transient fastvector wrappers used by collision query output.
+  }
+
+  namespace
+  {
+    // The economy lanes below are per-tick rates and the overlay shows them per
+    // second; the sim runs ten ticks a second (0x00DFF31C).
+    constexpr float kEconOverlayTicksPerSecond = 10.0f;
+
+    // Inside this magnitude the rate is printed with one decimal, outside it as
+    // a whole number (0x008591FA / 0x0085927B against 0x00DFF31C / 0x00E4F910).
+    constexpr float kEconOverlayDecimalCutoff = 10.0f;
+
+    // Opaque black - the drop-shadow pass (pushed at 0x008597B9 / 0x008598A8).
+    constexpr std::uint32_t kEconOverlayShadowColor = 0xFF000000u;
+
+    // Unmodulated white - the bar slices carry their own texture colour.
+    constexpr std::uint32_t kEconOverlayBarColor = 0xFFFFFFFFu;
+
+    // The shadow pass is offset one pixel right and down (0x00DFEC20 == 1.0f).
+    constexpr float kEconOverlayShadowOffset = 1.0f;
+
+    // `/lua/ui/game/econoverlayparams.lua` lanes, in the order the import reads
+    // them. Each is left at its previous value when the key is absent.
+    std::uint32_t gEconOverlayPositiveColor = 0;                    // 0x00F57C00
+    std::uint32_t gEconOverlayNegativeColor = 0;                    // 0x00F57BFC
+    boost::shared_ptr<CD3DBatchTexture> gEconOverlayLeftTexture{};  // 0x010C4230
+    boost::shared_ptr<CD3DBatchTexture> gEconOverlayRightTexture{}; // 0x010C4238
+    boost::shared_ptr<CD3DBatchTexture> gEconOverlayMidTexture{};   // 0x010C4244
+    msvc8::string gEconOverlayFontName{};                           // 0x00F5B210
+    std::int32_t gEconOverlayFontSize = 0;                          // 0x00F57C04
+    float gEconOverlayEnergyTopOffset = 0.0f;                       // 0x010A6458
+    float gEconOverlayMassTopOffset = 0.0f;                         // 0x00F57C08
+
+    bool gEconOverlayParamsImported = false;                        // 0x010A6449
+    CD3DFont* gEconOverlayFont = nullptr;                           // 0x010C4228
+
+    /**
+     * Address: 0x00858850 (FUN_00858850, Moho::func_ImportEconOverlayParams)
+     *
+     * IDA signature:
+     * void __cdecl func_ImportEconOverlayParams();
+     *
+     * What it does:
+     * Imports `/lua/ui/game/econoverlayparams.lua` and copies the nine optional
+     * `EconOverlayParams` fields into the lanes above. Every field is looked up
+     * twice exactly as the binary does it: once for an `IsNil` probe on a
+     * throwaway object, and again to read the value, so a missing key leaves
+     * the previous value untouched.
+     */
+    void ImportEconOverlayParams()
+    {
+      LuaPlus::LuaState* const state = static_cast<CUIManager*>(UI_GetManager())->mLuaState;
+
+      LuaPlus::LuaObject module = SCR_Import(state, "/lua/ui/game/econoverlayparams.lua");
+      if (module.IsNil()) {
+        return;
+      }
+
+      LuaPlus::LuaObject params = module["EconOverlayParams"];
+      if (!params.IsTable()) {
+        return;
+      }
+
+      if (!params["positiveColor"].IsNil()) {
+        gEconOverlayPositiveColor = SCR_DecodeColor(state, params["positiveColor"]);
+      }
+      if (!params["negativeColor"].IsNil()) {
+        gEconOverlayNegativeColor = SCR_DecodeColor(state, params["negativeColor"]);
+      }
+      if (!params["leftTexture"].IsNil()) {
+        gEconOverlayLeftTexture = CD3DBatchTexture::FromFile(params["leftTexture"].GetString(), 1u);
+      }
+      if (!params["midTexture"].IsNil()) {
+        gEconOverlayMidTexture = CD3DBatchTexture::FromFile(params["midTexture"].GetString(), 1u);
+      }
+      if (!params["rightTexture"].IsNil()) {
+        gEconOverlayRightTexture =
+          CD3DBatchTexture::FromFile(params["rightTexture"].GetString(), 1u);
+      }
+      if (!params["fontName"].IsNil()) {
+        const char* const fontName = params["fontName"].GetString();
+        (void)gEconOverlayFontName.assign(fontName, std::strlen(fontName));
+      }
+      if (!params["fontSize"].IsNil()) {
+        gEconOverlayFontSize = static_cast<std::int32_t>(params["fontSize"].GetNumber());
+      }
+      if (!params["energyTopOffset"].IsNil()) {
+        gEconOverlayEnergyTopOffset = static_cast<float>(params["energyTopOffset"].GetNumber());
+      }
+      if (!params["massTopOffset"].IsNil()) {
+        gEconOverlayMassTopOffset = static_cast<float>(params["massTopOffset"].GetNumber());
+      }
+    }
+
+    /**
+     * What it does:
+     * Formats one per-second resource rate into `out` the way the overlay does
+     * it at 0x008591E3 and 0x00859275: one decimal while the magnitude stays
+     * inside +/-10, a whole number outside it. NaN takes the whole-number path,
+     * because the binary branches on an unordered `comiss`.
+     *
+     * The binary prints into a temporary and then assigns that temporary into
+     * the caller's string; kept in that shape so the temporary's storage is
+     * released before the draw, as in the binary.
+     */
+    void FormatEconomyRateInto(
+      msvc8::string& out,
+      const float ratePerSecond,
+      const char* const wholeFormat,
+      const char* const decimalFormat
+    )
+    {
+      const bool useDecimals =
+        kEconOverlayDecimalCutoff > ratePerSecond && ratePerSecond > -kEconOverlayDecimalCutoff;
+      const msvc8::string formatted =
+        useDecimals ? gpg::STR_Printf(decimalFormat, static_cast<double>(ratePerSecond))
+                    : gpg::STR_Printf(wholeFormat, static_cast<std::int32_t>(ratePerSecond));
+      (void)out.assign(formatted, 0, msvc8::string::npos);
+    }
+
+    /**
+     * What it does:
+     * Emits one axis-aligned, fully-mapped quad of the economy bar. The three
+     * slice draws at 0x0085952E, 0x00859659 and 0x0085977F write byte-identical
+     * vertex blocks apart from the x range, so they share this helper.
+     */
+    void DrawEconomyOverlaySlice(
+      CD3DPrimBatcher& primBatcher, const float x0, const float y0, const float x1, const float y1
+    )
+    {
+      const CD3DPrimBatcher::Vertex topLeft{x0, y0, 0.0f, kEconOverlayBarColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex topRight{x1, y0, 0.0f, kEconOverlayBarColor, 1.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex bottomRight{x1, y1, 0.0f, kEconOverlayBarColor, 1.0f, 1.0f};
+      const CD3DPrimBatcher::Vertex bottomLeft{x0, y1, 0.0f, kEconOverlayBarColor, 0.0f, 1.0f};
+      primBatcher.DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+    }
+
+    /**
+     * What it does:
+     * Draws one economy number. `Render2D`'s two trailing floats are not
+     * materialised at the binary's call sites (0x008597FB, 0x00859877,
+     * 0x008598E5 and 0x00859961 push only this/text/colour and hand the origin
+     * over in `eax`), and the recovered `Render2D` ignores `maxAdvance` while
+     * `Render` ignores `glyphScale`, so both are passed as zero here.
+     */
+    void DrawEconomyOverlayLabel(
+      CD3DFont& font,
+      CD3DPrimBatcher& primBatcher,
+      const msvc8::string& text,
+      const float x,
+      const float y,
+      const std::uint32_t color
+    )
+    {
+      const Wm3::Vector2f origin{x, y};
+      font.Render2D(text.c_str(), &primBatcher, origin, color, 0.0f, 0.0f);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00858D80 (FUN_00858D80, Moho::CWldSession::DrawEconomyOverlay)
+   *
+   * IDA signature:
+   * void __usercall Moho::CWldSession::DrawEconomyOverlay(
+   *   CWldSession *session, CD3DPrimBatcher *batcher, float interpolant,
+   *   CameraImpl *camera@<ecx>);
+   *
+   * What it does:
+   * Draws the net energy/mass rate readout over every army unit in the camera
+   * frustum - see the header for the full description.
+   */
+  void CWldSession::DrawEconomyOverlay(
+    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, const float interpolant
+  )
+  {
+    if (!DisplayEconomyOverlay) {
+      return;
+    }
+
+    if (!gEconOverlayParamsImported) {
+      ImportEconOverlayParams();
+      gEconOverlayParamsImported = true;
+    }
+
+    if (gEconOverlayFont == nullptr) {
+      // `Create` hands back a borrowed shared lane; the overlay keeps its own
+      // intrusive reference on the font and releases the lane straight away.
+      boost::SharedPtrRaw<CD3DFont> created =
+        CD3DFont::Create(gEconOverlayFontSize, gEconOverlayFontName.c_str());
+      CD3DFont* const font = created.px;
+      if (gEconOverlayFont != font) {
+        if (gEconOverlayFont != nullptr) {
+          (void)gEconOverlayFont->ReleaseReference();
+        }
+        gEconOverlayFont = font;
+        if (font != nullptr) {
+          font->AddReference();
+        }
+      }
+      created.release();
+    }
+
+    (void)primBatcher->Setup("TAlphaBlendLinearSampleNoDepth");
+
+    const GeomCamera3& view = camera->CameraGetView();
+
+    // Pixel-exact 2D projection: an off-centre orthographic matrix over
+    // (0,0)-(width,height) with the D3D half-texel shift folded into the
+    // translation row. The viewport extents are truncated to whole pixels
+    // first, and the `-0.0f` left/top edges and the `height/height` term are
+    // the binary's own operand shapes (0x00858EA1..0x00858FD8).
+    const float viewportWidth = static_cast<float>(static_cast<std::int32_t>(view.viewport.r[3].z));
+    const float viewportHeight = static_cast<float>(static_cast<std::int32_t>(view.viewport.r[3].w));
+    constexpr float kLeftEdge = -0.0f;
+    constexpr float kTopEdge = -0.0f;
+
+    VMatrix4 projection{};
+    projection.r[0] = Vector4f{2.0f / viewportWidth, 0.0f, 0.0f, 0.0f};
+    projection.r[1] = Vector4f{0.0f, 2.0f / (kTopEdge - viewportHeight), 0.0f, 0.0f};
+    projection.r[2] = Vector4f{0.0f, 0.0f, -0.5f, 0.0f};
+    projection.r[3] = Vector4f{
+      (viewportWidth / (kLeftEdge - viewportWidth)) - (1.0f / viewportWidth),
+      (viewportHeight / viewportHeight) + (1.0f / viewportHeight),
+      0.5f,
+      1.0f
+    };
+
+    primBatcher->SetProjectionMatrix(projection);
+    primBatcher->SetViewMatrix(VMatrix4::Identity()); // 0x00858FE6 (sIdentity)
+
+    CameraFrustumUserEntityList* const frustumUnits = camera->GetArmyUnitsInFrustum();
+    for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart; weakRef != frustumUnits->mFinish;
+         ++weakRef) {
+      UserEntity* const entity = DecodeUserEntityWeakRef(*weakRef);
+      if (entity == nullptr) {
+        continue;
+      }
+
+      UserUnit* const unit = entity->IsUserUnit();
+      if (unit == nullptr) {
+        continue;
+      }
+
+      IUnit* const unitBridge = ResolveIUnitBridge(unit);
+      if (unitBridge->IsDead() || unitBridge->DestroyQueued()) {
+        continue;
+      }
+
+      // Only units still drawn as meshes get the readout: past the mesh's
+      // icon-fade-in depth the unit is a strategic icon and the bar would
+      // clutter the map.
+      const RMeshBlueprint* const meshBlueprint = unit->mVariableData.mMeshBlueprint;
+      if (meshBlueprint == nullptr) {
+        continue;
+      }
+      if (view.viewport.ProjectViewportDepthRow1(unitBridge->GetPosition())
+          >= meshBlueprint->mIconFadeInZoom) {
+        continue;
+      }
+
+      // The binary dispatches through the blueprint accessor here and discards
+      // the result (0x008590CF); kept because the virtual call is observable.
+      (void)unitBridge->GetBlueprint();
+
+      const SSTIUnitEconomyPair& produced = unit->mUnitVarDat.mProduced;
+      const SSTIUnitEconomyPair& upkeep = unit->mUnitVarDat.mMaintainenceCost;
+      const float energyRate = produced.ENERGY - upkeep.ENERGY;
+      const float massRate = produced.MASS - upkeep.MASS;
+      if (energyRate == 0.0f && massRate == 0.0f) {
+        continue;
+      }
+
+      const float energyPerSecond = energyRate * kEconOverlayTicksPerSecond;
+      const float massPerSecond = massRate * kEconOverlayTicksPerSecond;
+
+      const Wm3::Vector3f worldPosition = entity->GetInterpolatedPosition(interpolant);
+      const Wm3::Vector2f screenPosition =
+        view.Project(worldPosition, 0.0f, viewportWidth, viewportHeight, 0.0f);
+
+      msvc8::string energyText{};
+      msvc8::string massText{};
+      FormatEconomyRateInto(energyText, energyPerSecond, "%+4i ", "%+4.1f ");
+      FormatEconomyRateInto(massText, massPerSecond, "%+4i", "%+4.1f");
+
+      // The bar is as wide as the wider of the two numbers and as tall as the
+      // middle slice, centred on the projected position and snapped to whole
+      // pixels.
+      const float energyAdvance = gEconOverlayFont->GetAdvance(energyText.c_str(), 0);
+      const float massAdvance = gEconOverlayFont->GetAdvance(massText.c_str(), 0);
+      const float barWidth = massAdvance > energyAdvance ? massAdvance : energyAdvance;
+      const float barHeight = static_cast<float>(gEconOverlayMidTexture->mHeight);
+
+      const float barLeft = std::floor(screenPosition.x - (barWidth * 0.5f));
+      const float barTop = std::floor(screenPosition.y - (barHeight * 0.5f));
+      const float barRight = barLeft + barWidth;
+      const float barBottom = barTop + barHeight;
+
+      primBatcher->SetTexture(gEconOverlayMidTexture);
+      DrawEconomyOverlaySlice(*primBatcher, barLeft, barTop, barRight, barBottom);
+
+      primBatcher->SetTexture(gEconOverlayLeftTexture);
+      const float leftCapWidth = static_cast<float>(gEconOverlayLeftTexture->mWidth);
+      DrawEconomyOverlaySlice(*primBatcher, barLeft - leftCapWidth, barTop, barLeft, barBottom);
+
+      primBatcher->SetTexture(gEconOverlayRightTexture);
+      const float rightCapWidth = static_cast<float>(gEconOverlayRightTexture->mWidth);
+      DrawEconomyOverlaySlice(*primBatcher, barRight, barTop, barRight + rightCapWidth, barBottom);
+
+      // Each number is drawn twice: an opaque black shadow one pixel down and
+      // right, then the value itself in the sign colour.
+      const float fontHeight = gEconOverlayFont->mHeight;
+      const float energyBaseline = std::floor(gEconOverlayEnergyTopOffset) + fontHeight + barTop;
+      const float massBaseline = std::floor(gEconOverlayMassTopOffset) + fontHeight + barTop;
+      const std::uint32_t energyColor =
+        energyPerSecond < 0.0f ? gEconOverlayNegativeColor : gEconOverlayPositiveColor;
+      const std::uint32_t massColor =
+        massPerSecond < 0.0f ? gEconOverlayNegativeColor : gEconOverlayPositiveColor;
+
+      DrawEconomyOverlayLabel(
+        *gEconOverlayFont,
+        *primBatcher,
+        energyText,
+        barLeft + kEconOverlayShadowOffset,
+        energyBaseline + kEconOverlayShadowOffset,
+        kEconOverlayShadowColor
+      );
+      DrawEconomyOverlayLabel(
+        *gEconOverlayFont, *primBatcher, energyText, barLeft, energyBaseline, energyColor
+      );
+      DrawEconomyOverlayLabel(
+        *gEconOverlayFont,
+        *primBatcher,
+        massText,
+        barLeft + kEconOverlayShadowOffset,
+        massBaseline + kEconOverlayShadowOffset,
+        kEconOverlayShadowColor
+      );
+      DrawEconomyOverlayLabel(
+        *gEconOverlayFont, *primBatcher, massText, barLeft, massBaseline, massColor
+      );
+    }
+
+    primBatcher->Flush();
   }
 
   namespace
