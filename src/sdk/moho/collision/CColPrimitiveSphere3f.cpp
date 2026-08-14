@@ -309,19 +309,6 @@ namespace
     return ref;
   }
 
-  void AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(!typeInfo->initFinished_);
-
-    gpg::RField baseField{};
-    baseField.mName = CachedCColPrimitiveBaseType()->GetName();
-    baseField.mType = CachedCColPrimitiveBaseType();
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   void CleanupDColPrimSphereTypeInfoAtExit()
   {
@@ -464,6 +451,27 @@ namespace moho
   }
 
   /**
+ * Address: 0x00500390 (FUN_00500390, Moho::DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase)
+ *
+ * What it does:
+ * Registers `CColPrimitiveBase` as this type's reflected base at offset 0 -
+ * the primitive derives from it singly.
+ */
+void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
+{
+  GPG_ASSERT(typeInfo != nullptr);
+  GPG_ASSERT(!typeInfo->initFinished_);
+
+  gpg::RField baseField{};
+  baseField.mName = CachedCColPrimitiveBaseType()->GetName();
+  baseField.mType = CachedCColPrimitiveBaseType();
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x004FE6A0 (FUN_004FE6A0, Moho::DColPrimSphereTypeInfo::Init)
    */
   void DColPrimSphereTypeInfo::Init()

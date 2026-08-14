@@ -100,6 +100,14 @@ namespace moho
      * (`sizeof = 0x20`) and adds the `CColPrimitiveBase` base lane.
      */
     void Init() override;
+
+    /**
+     * Address: 0x00500390 (FUN_00500390, Moho::DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase)
+     *
+     * What it does:
+     * Registers `CColPrimitiveBase` as this type's reflected base at offset 0.
+     */
+    static void AddBase_CColPrimitiveBase(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(DColPrimSphereTypeInfo) == 0x64, "DColPrimSphereTypeInfo size must be 0x64");
