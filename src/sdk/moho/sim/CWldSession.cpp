@@ -1477,8 +1477,15 @@ namespace moho
       std::uint8_t mIsChainBoundary;       // +0x1D
       std::uint8_t mIsVisible;             // +0x1E
       std::uint8_t pad_1F;                 // +0x1F
-      void* mOwnerPx;                      // +0x20
-      boost::detail::sp_counted_base* mOwnerControl; // +0x24
+      /**
+       * The node's drawable mesh, owned strongly. `sub_826550` decrements the
+       * control block's *use* count at +0x04 and calls vtable slot 1 (dispose)
+       * on last release, which is `release()` and not `weak_release()` — the
+       * two differ by which counter they touch, so getting it wrong either
+       * leaks the mesh or frees it early. 0x008282B0 / 0x00828DD0 read the same
+       * lane back as a `MeshInstance*` to stance it at the node's anchor.
+       */
+      boost::SharedPtrRaw<MeshInstance> mMeshInstance; // +0x20
       std::uint32_t field_0x28;            // +0x28
       float field_0x2C;                    // +0x2C
       float field_0x30;                    // +0x30
@@ -1704,8 +1711,8 @@ namespace moho
     "UICommandGraphDrawNode::mWeight offset must be 0x18"
   );
   static_assert(
-    offsetof(UICommandGraph::UICommandGraphDrawNode, mOwnerControl) == 0x24,
-    "UICommandGraphDrawNode::mOwnerControl offset must be 0x24"
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mMeshInstance) == 0x20,
+    "UICommandGraphDrawNode::mMeshInstance offset must be 0x20"
   );
   static_assert(
     offsetof(UICommandGraph::UICommandGraphDrawNode, mPreviousCentroid) == 0x34,
@@ -3163,9 +3170,7 @@ namespace moho
     mLaneB.ReleaseToInline();
     mLaneA.ReleaseToInline();
 
-    if (mOwnerControl != nullptr) {
-      mOwnerControl->weak_release();
-    }
+    mMeshInstance.release();
 
     if (mHelperLink.mHead == nullptr) {
       return;
