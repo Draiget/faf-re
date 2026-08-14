@@ -24,6 +24,23 @@ namespace moho
     Vector4f r[4]; // rows
 
     /**
+     * What it does:
+     * Projects one world point through row 1 - the lane a `GeomCamera3`'s
+     * viewport matrix carries the renderer's LOD/fade depth in. Callers test
+     * it against a blueprint cutoff (`RMeshBlueprint::mIconFadeInZoom`,
+     * `mLodCutoff`, an emitter's LOD distance) to decide whether an object is
+     * close enough to draw at full detail.
+     *
+     * Canonical home for the dot product that CEfxBeam.cpp, CEfxEmitter.cpp
+     * and CEfxTrailEmitter.cpp each carry an identical file-private copy of;
+     * those three should migrate onto this member.
+     */
+    [[nodiscard]] float ProjectViewportDepthRow1(const Wm3::Vector3f& point) const noexcept
+    {
+      return (point.x * r[1].x) + (point.y * r[1].y) + (point.z * r[1].z) + r[1].w;
+    }
+
+    /**
      * Address: 0x004F0390 (FUN_004F0390, Moho::VMatrix4::MemberDeserialize)
      *
      * What it does:
