@@ -508,8 +508,15 @@ namespace moho
   }
 
   /**
+   * Address: 0x007AE270 (FUN_007AE270)
+   *
    * Mirrors the engine teardown chain: `EraseRange` over the whole tree
    * (FUN_007AF740) followed by `operator delete` on the head sentinel.
+   *
+   * IDA labels the symbol `Broadcaster<SCameraTracking>::RemoveListener`
+   * because it types the set header as a broadcaster; the two callers are
+   * `CWldSession::DoBeat` and 0x00822C50, both tearing down a local selection
+   * set, which is what the body actually does.
    * Tolerates a null head so a never-populated set still tears down cleanly.
    */
   inline void DestroyLocalSelectionSet(SSelectionSetUserEntity& set) noexcept
