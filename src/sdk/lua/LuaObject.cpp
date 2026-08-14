@@ -20853,24 +20853,36 @@ void LuaObject::Sort() const
  * Address: 0x10007360 (?GetByIndex@LuaObject@LuaPlus@@QBE?AV12@H@Z)
  * Address: 0x00908DF0 (FUN_00908DF0, __imp_?GetByIndex@LuaObject@LuaPlus@@QBE?AV12@H@Z)
  *
+ * IDA signature:
+ * LuaPlus::LuaObject *__thiscall GetByIndex(LuaObject *this, LuaObject *dest, int index);
+ *
  * What it does:
- * Reads one table slot by numeric index and returns the value as a bound
- * `LuaObject` while restoring the caller stack top.
+ * Reads one entry out of this object's own tagged value by numeric key. The
+ * lookup runs straight through `luaV_gettable` on `m_object` - the sibling of
+ * `GetByObject` - and the resolved slot is bound into a fresh LuaObject on the
+ * same root state.
+ *
+ * The Lua stack is deliberately not involved. Routing this through
+ * `PushStack`/`lua_gettable` and then reading slot -1 back through a
+ * `LuaStackObject` bound to `m_state` mixes two different threads: the push
+ * lands on `l_G->lstate` (whichever coroutine is running) while the read
+ * indexes `m_state->m_state` (the root). Inside a sim coroutine those are
+ * different stacks, so every lookup returned whatever the root happened to
+ * have on top - typically a stale error string. That is how class metatables
+ * fetched out of `__factory_objects` turned into `TString`s.
  */
 LuaObject LuaObject::GetByIndex(const int32_t index) const
 {
 	Ensure(m_state != nullptr, "m_state");
 
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+	lua_State* const lstate = GetActiveCState();
 
-	const int oldTop = lua_gettop(lstate);
-	const_cast<LuaObject*>(this)->PushStack(lstate);
-	lua_pushnumber(lstate, static_cast<lua_Number>(index));
-	lua_gettable(lstate, -2);
-	LuaObject value{ LuaStackObject(m_state, -1) };
-	lua_settop(lstate, oldTop);
-	return value;
+	TObject key{};
+	key.value.n = static_cast<lua_Number>(index);
+	key.tt = LUA_TNUMBER;
+
+	const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key, 0);
+	return LuaObject(m_state, const_cast<TObject*>(rawValue));
 }
 
 /**
