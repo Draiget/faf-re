@@ -1090,6 +1090,18 @@ namespace moho
     [[nodiscard]] float GetArmorMult(const msvc8::string& damageType) const;
 
     /**
+     * Address: 0x006A9F40 (FUN_006A9F40, Moho::Unit::Materialize)
+     * Slot: 29 of ??_7Unit@Moho@@6BEntity@Moho@@@ (0x00E2A5EC)
+     *
+     * What it does:
+     * Advances (or reverses) construction by one fraction step and scales
+     * health to match. Reaching fully-built clears the being-built flag, fires
+     * OnStopBeingBuilt, books the unit into the army's stats, and - for
+     * immobile units only - runs OnAdjacentTo against everything it overlaps.
+     */
+    float Materialize(float delta) override;
+
+    /**
      * Address: 0x0062D460 (FUN_0062D460, Moho::Unit::CollectAllOverlapping)
      *
      * What it does:

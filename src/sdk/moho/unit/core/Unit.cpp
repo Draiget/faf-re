@@ -15168,6 +15168,102 @@ float Unit::GetArmorMult(const msvc8::string& damageType) const
   return 1.0f;
 }
 
+
+/**
+ * Address: 0x006A9F40 (FUN_006A9F40, Moho::Unit::Materialize)
+ * Slot: 29 of ??_7Unit@Moho@@6BEntity@Moho@@@ (0x00E2A5EC)
+ *
+ * What it does:
+ * Advances construction by `delta` and scales health to match. See the header
+ * for the completion side effects.
+ *
+ * The declared float result is never produced: the epilogue at 0x006AA2F2
+ * loads a frame slot the body never writes, and every call site discards it.
+ * `Entity` declares this slot as returning float so the signature keeps it;
+ * 0.0f is returned to keep the function well-defined.
+ */
+float Unit::Materialize(const float delta)
+{
+  SimulationRef->Logf(
+    "Unit[0x%08x]->Materialize(%.5f [0x%08x])\n", static_cast<std::uint32_t>(id_), delta, delta
+  );
+
+  // Any non-reversing step restamps the creation tick, so a unit dates from
+  // when it finished rather than when it was placed.
+  if (delta >= 0.0f) {
+    mCreationTick = static_cast<std::int32_t>(SimulationRef->mCurTick);
+  }
+
+  if (delta == 0.0f) {
+    return 0.0f;
+  }
+
+  const float stepped = FractionCompleted + delta;
+  if (delta <= 0.0f) {
+    FractionCompleted = std::clamp(stepped, 0.0f, 1.0f);
+  } else {
+    float progressed = (stepped < 1.0f) ? stepped : 1.0f;
+    if (progressed < 0.0f) {
+      progressed = 0.0f;
+    }
+    // Never report less complete than the health already implies - health runs
+    // ahead of the fraction when a part-built unit is repaired.
+    const float healthRatio = Health / MaxHealth;
+    FractionCompleted = (healthRatio > progressed) ? healthRatio : progressed;
+  }
+
+  AdjustHealth(nullptr, MaxHealth * delta);
+
+  if (BeingBuilt == 0u || FractionCompleted != 1.0f) {
+    return 0.0f;
+  }
+
+  VarDat().mUnitStates &= ~(1ull << UNITSTATE_BeingBuilt);
+  BeingBuilt = 0u;
+
+  const char* const layerName = (static_cast<unsigned int>(mCurrentLayer) > LAYER_Orbit)
+                                  ? ""
+                                  : Entity::LayerToString(mCurrentLayer);
+  RunScriptOnStopBeingBuilt(CreatorRef.AsWeakPtr<Unit>(), layerName);
+
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  if (blueprint != nullptr && blueprint->General.CapCost > 0.0f) {
+    if (CArmyStats* const armyStats = (ArmyRef != nullptr) ? ArmyRef->GetArmyStats() : nullptr;
+        armyStats != nullptr) {
+      const std::int32_t one = 1;
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", blueprint, 1.0f);
+      (void)armyStats->UpdateUnitStat("Units_Active", &one);
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_History", blueprint, 1.0f);
+      (void)armyStats->UpdateUnitStat("Units_History", &one);
+
+      // Booked at blueprint cost, not at what the builder actually spent.
+      float massCost = blueprint->Economy.BuildCostMass;
+      float energyCost = blueprint->Economy.BuildCostEnergy;
+      (void)AddArmyStatFloatByName(armyStats, &massCost, "Units_MassValue_Built");
+      (void)AddArmyStatFloatByName(armyStats, &energyCost, "Units_EnergyValue_Built");
+
+      IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", blueprint, -1.0f);
+    }
+  }
+
+  // Adjacency is a structure concept; mobile units never bond to neighbours.
+  if (!IsMobile()) {
+    SEntitySetTemplateUnit overlapping{};
+    (void)CollectAllOverlapping(&overlapping, this);
+    for (Entity* const entry : overlapping.mVec) {
+      Unit* const neighbour = SEntitySetTemplateUnit::UnitFromEntry(entry);
+      if (neighbour == nullptr) {
+        continue;
+      }
+      // Both directions: each side gets told about the other.
+      RunScriptOnAdjacentTo(neighbour, this);
+      neighbour->RunScriptOnAdjacentTo(this, this);
+    }
+  }
+
+  return 0.0f;
+}
+
 /**
  * Address: 0x006A7D10 (FUN_006A7D10, Moho::Unit::IsBusy)
  *
