@@ -1292,35 +1292,6 @@ namespace
     return CreateCAiBrainLuaObject(state);
   }
 
-  [[nodiscard]] SBuildStructurePositionNode* AllocateBuildStructureNode()
-  {
-    auto* const node = static_cast<SBuildStructurePositionNode*>(::operator new(sizeof(SBuildStructurePositionNode)));
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->mGridPosition = {};
-    node->mBuildInfo.mPlacementLink.mOwnerSlot = nullptr;
-    node->mBuildInfo.mPlacementLink.mNext = nullptr;
-    node->mBuildInfo.mResourceLink.mOwnerSlot = nullptr;
-    node->mBuildInfo.mResourceLink.mNext = nullptr;
-    node->mColor = 1;
-    node->mIsNil = 0;
-    node->mPad26[0] = 0;
-    node->mPad26[1] = 0;
-    return node;
-  }
-
-  void InitializeBuildStructureMap(SBuildStructurePositionMap& map)
-  {
-    map.mMeta00 = 0;
-    map.mHead = AllocateBuildStructureNode();
-    map.mHead->mIsNil = 1;
-    map.mHead->parent = map.mHead;
-    map.mHead->left = map.mHead;
-    map.mHead->right = map.mHead;
-    map.mSize = 0;
-  }
-
   [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinkNoReset(SBuildResourceInfoLink& link) noexcept
   {
     SBuildResourceInfoLink** cursor = link.mOwnerSlot;
@@ -1354,7 +1325,7 @@ namespace
    * (resource lane first, placement lane second) without rewriting local
    * link fields.
    */
-  [[maybe_unused]] [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinksNoReset(
+  [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinksNoReset(
     SBuildResourceInfo& info
   ) noexcept
   {
@@ -1396,7 +1367,7 @@ namespace
    * owner-slot heads from another link-pair, preserving list-head insertion
    * and unlink ordering for each lane.
    */
-  [[maybe_unused]] void RebindBuildResourceInfoLinks(
+  void RebindBuildResourceInfoLinks(
     SBuildResourceInfo& destination,
     const SBuildResourceInfo& source
   ) noexcept
@@ -1405,93 +1376,39 @@ namespace
     RebindBuildResourceInfoLinkToOwnerSlot(destination.mResourceLink, source.mResourceLink.mOwnerSlot);
   }
 
-  struct SBuildResourceInfoOwnerSlots
-  {
-    SBuildResourceInfoLink** mPlacementOwnerSlot; // +0x00
-    SBuildResourceInfoLink** mResourceOwnerSlot;  // +0x04
-  };
-  static_assert(sizeof(SBuildResourceInfoOwnerSlots) == 0x08, "SBuildResourceInfoOwnerSlots size must be 0x08");
-
-  struct SBuildStructurePositionValue
-  {
-    Wm3::Vector2i mGridPosition;      // +0x00
-    SBuildResourceInfo mBuildInfo;    // +0x08
-  };
-  static_assert(sizeof(SBuildStructurePositionValue) == 0x18, "SBuildStructurePositionValue size must be 0x18");
-  static_assert(
-    offsetof(SBuildStructurePositionValue, mGridPosition) == 0x00,
-    "SBuildStructurePositionValue::mGridPosition offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SBuildStructurePositionValue, mBuildInfo) == 0x08,
-    "SBuildStructurePositionValue::mBuildInfo offset must be 0x08"
-  );
-
   /**
-   * Address: 0x0057FBF0 (FUN_0057FBF0)
+   * Address: 0x0057CAF0 (FUN_0057CAF0, sub_57CAF0) - the tail of `sub_5812C0`.
    *
    * What it does:
-   * Copies one `(gridPosition, buildInfo)` value lane and relinks both
-   * intrusive build-resource links at the head of caller-supplied owner slots.
+   * Drops one reservation out of both owner weak-link chains and then erases it
+   * from the map, returning a cursor on the following element. `msvc8::map`
+   * frees the node itself; the two intrusive lanes have to leave their owners'
+   * chains first or the owner keeps a link into freed storage.
    */
-  [[maybe_unused]] [[nodiscard]] SBuildStructurePositionValue* CopyBuildStructurePositionValueWithRelink(
-    SBuildStructurePositionValue* const destination,
-    const SBuildResourceInfoOwnerSlots& ownerSlots,
-    const SBuildStructurePositionValue& source
+  SBuildStructurePositionMap::iterator EraseBuildReservation(
+    SBuildStructurePositionMap& map,
+    const SBuildStructurePositionMap::iterator position
   ) noexcept
   {
-    destination->mGridPosition = source.mGridPosition;
-
-    destination->mBuildInfo.mPlacementLink.mOwnerSlot = ownerSlots.mPlacementOwnerSlot;
-    if (ownerSlots.mPlacementOwnerSlot != nullptr) {
-      destination->mBuildInfo.mPlacementLink.mNext = *ownerSlots.mPlacementOwnerSlot;
-      *ownerSlots.mPlacementOwnerSlot = &destination->mBuildInfo.mPlacementLink;
-    } else {
-      destination->mBuildInfo.mPlacementLink.mNext = nullptr;
-    }
-
-    destination->mBuildInfo.mResourceLink.mOwnerSlot = ownerSlots.mResourceOwnerSlot;
-    if (ownerSlots.mResourceOwnerSlot != nullptr) {
-      destination->mBuildInfo.mResourceLink.mNext = *ownerSlots.mResourceOwnerSlot;
-      *ownerSlots.mResourceOwnerSlot = &destination->mBuildInfo.mResourceLink;
-    } else {
-      destination->mBuildInfo.mResourceLink.mNext = nullptr;
-    }
-
-    return destination;
-  }
-
-  void DestroyBuildStructureTree(SBuildStructurePositionNode* node)
-  {
-    while (node && node->mIsNil == 0u) {
-      DestroyBuildStructureTree(node->right);
-      SBuildStructurePositionNode* const left = node->left;
-
-      // Matches sub_5812C0 unlink order (+0x1C link first, then +0x14 link).
-      (void)UnlinkBuildResourceInfoLinksNoReset(node->mBuildInfo);
-      ::operator delete(node);
-
-      node = left;
-    }
+    (void)UnlinkBuildResourceInfoLinksNoReset(reinterpret_cast<SBuildResourceInfo&>(position->second));
+    return map.erase(position);
   }
 
   /**
    * Address: 0x00579F50 (FUN_00579F50)
    *
    * What it does:
-   * Clears and releases one build-structure reservation map by deleting all
-   * owned tree nodes, deleting the sentinel node, and zeroing map lanes.
+   * Empties one build-structure reservation map. The binary walks the tree and
+   * frees node by node with `sub_5812C0`, which unlinks both weak lanes before
+   * releasing the storage; `msvc8::map::clear` owns the node walk, so only the
+   * unlink half is written out here.
    */
-  void DestroyBuildStructureMap(SBuildStructurePositionMap& map)
+  void DestroyBuildStructureMap(SBuildStructurePositionMap& map) noexcept
   {
-    if (!map.mHead) {
-      return;
+    for (auto& entry : map) {
+      (void)UnlinkBuildResourceInfoLinksNoReset(reinterpret_cast<SBuildResourceInfo&>(entry.second));
     }
-
-    DestroyBuildStructureTree(map.mHead->parent);
-    ::operator delete(map.mHead);
-    map.mHead = nullptr;
-    map.mSize = 0;
+    map.clear();
   }
 
   [[nodiscard]] CTaskStage* AllocateTaskStage()
@@ -1536,7 +1453,7 @@ namespace
     return nullptr;
   }
 
-  using BuildReserveMapStorage = std::map<Wm3::Vector2i, moho::SBuildReserveInfo>;
+  using BuildReserveMapStorage = moho::SBuildStructurePositionMap;
 
   struct LegacyMapRuntimeView
   {
@@ -1621,7 +1538,16 @@ namespace
         moho::SBuildReserveInfo value{};
         archive->Read(keyType, &key, owner);
         archive->Read(valueType, &value, owner);
-        (*mapObject)[key] = value;
+
+        // The deserialized value's two weak lanes are already linked into their
+        // owners' chains, so the map entry takes them over by rebinding rather
+        // than by copying the raw link fields - the same hand-off
+        // `func_ScheduleBuildStructure` performs from its staging pair.
+        auto& entryLinks = reinterpret_cast<SBuildResourceInfo&>((*mapObject)[key]);
+        auto& readLinks = reinterpret_cast<SBuildResourceInfo&>(value);
+        RebindBuildResourceInfoLinks(entryLinks, readLinks);
+        UnlinkBuildResourceInfoLink(readLinks.mResourceLink);
+        UnlinkBuildResourceInfoLink(readLinks.mPlacementLink);
       }
     }
 
@@ -2407,7 +2333,6 @@ CAiBrain::CAiBrain()
     reinterpret_cast<volatile long*>(&InstanceCounter<CAiBrain>::GetStatItem()->mPrimaryValueBits), 1L);
 
   mCurrentPlan.assign("", 0);
-  InitializeBuildStructureMap(mBuildStructureMap);
 }
 
 /**
@@ -6031,8 +5956,7 @@ void moho::func_ScheduleBuildStructure(
   reinterpret_cast<WeakPtr<Unit>&>(pendingReservation.mPlacementLink).Set(builder);
   reinterpret_cast<WeakPtr<CUnitCommand>&>(pendingReservation.mResourceLink).Set(command);
 
-  auto& reserveMap = reinterpret_cast<BuildReserveMapStorage&>(brain->mBuildStructureMap);
-  SBuildReserveInfo& reserveEntry = reserveMap[where];
+  SBuildReserveInfo& reserveEntry = brain->mBuildStructureMap[where];
   auto& reserveEntryLinks = reinterpret_cast<SBuildResourceInfo&>(reserveEntry);
 
   RebindBuildResourceInfoLinks(reserveEntryLinks, pendingReservation);
@@ -6667,10 +6591,9 @@ bool moho::CAiBrain::CanBuildStructureAt(
   // reservation's reserved structure skirt overlaps the requested skirt.
   // (The reserved structure blueprint is the command's build blueprint,
   // mConstDat.blueprint; the binary reaches it via the command's target lane.)
-  auto& reserveMap = reinterpret_cast<BuildReserveMapStorage&>(mBuildStructureMap);
   const gpg::Rect2f requestedSkirt = (structureBp != nullptr) ? structureBp->GetSkirtRect(worldXZ) : gpg::Rect2f{};
 
-  for (auto it = reserveMap.begin(); it != reserveMap.end();) {
+  for (auto it = mBuildStructureMap.begin(); it != mBuildStructureMap.end();) {
     SBuildReserveInfo& reservation = it->second;
     Unit* const builder = reservation.mUnit.GetObjectPtr();
     CUnitCommand* const command = reservation.mCom.GetObjectPtr();
@@ -6678,7 +6601,7 @@ bool moho::CAiBrain::CanBuildStructureAt(
     // A reservation with no live command lane, no live builder, or a dead
     // builder is stale and is dropped from the map.
     if (command == nullptr || builder == nullptr || builder->IsDead()) {
-      it = reserveMap.erase(it);
+      it = EraseBuildReservation(mBuildStructureMap, it);
       continue;
     }
 

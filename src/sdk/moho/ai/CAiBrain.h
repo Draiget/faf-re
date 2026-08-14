@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ai/ECompareType.h"
@@ -11,6 +12,7 @@
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/serialization/SBuildReserveInfo.h"
 #include "moho/sim/ESquadClass.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -49,42 +51,22 @@ namespace moho
   };
   static_assert(sizeof(SBuildResourceInfo) == 0x10, "SBuildResourceInfo size must be 0x10");
 
-  struct SBuildStructurePositionNode
-  {
-    SBuildStructurePositionNode* left;      // +0x00
-    SBuildStructurePositionNode* parent;    // +0x04
-    SBuildStructurePositionNode* right;     // +0x08
-    Wm3::Vector2i mGridPosition;            // +0x0C
-    SBuildResourceInfo mBuildInfo;          // +0x14
-    std::uint8_t mColor;                    // +0x24
-    std::uint8_t mIsNil;                    // +0x25
-    std::uint8_t mPad26[2];                 // +0x26
-  };
-  static_assert(sizeof(SBuildStructurePositionNode) == 0x28, "SBuildStructurePositionNode size must be 0x28");
-  static_assert(
-    offsetof(SBuildStructurePositionNode, mGridPosition) == 0x0C,
-    "SBuildStructurePositionNode::mGridPosition offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SBuildStructurePositionNode, mBuildInfo) == 0x14,
-    "SBuildStructurePositionNode::mBuildInfo offset must be 0x14"
-  );
-  static_assert(offsetof(SBuildStructurePositionNode, mColor) == 0x24, "SBuildStructurePositionNode::mColor");
-  static_assert(offsetof(SBuildStructurePositionNode, mIsNil) == 0x25, "SBuildStructurePositionNode::mIsNil");
-
-  struct SBuildStructurePositionMap
-  {
-    std::uint32_t mMeta00;                   // +0x00
-    SBuildStructurePositionNode* mHead;      // +0x04
-    std::uint32_t mSize;                     // +0x08
-  };
+  /**
+   * `CAiBrain`'s outstanding build reservations, keyed by grid cell.
+   *
+   * The shipped type is `std::map<Wm3::IVector2<int>, Moho::SBuildReserveInfo>`
+   * - reflection registers it under exactly that name and `Init()` declares
+   * `size_ = 0x0C`, the MSVC8 `{proxy, _Myhead, _Mysize}` triplet. `msvc8::map`
+   * is that layout, so the field is the container itself rather than a
+   * hand-rolled node/header pair with the red-black mechanics duplicated
+   * alongside the ones in `RbTree.h`.
+   *
+   * Node footprint lines up with the tree walker in `sub_5812C0`:
+   * `{left@0x00, parent@0x04, right@0x08, pair@0x0C, color@0x24, isnil@0x25}`,
+   * 0x28 bytes, with the mapped `SBuildReserveInfo` at +0x14.
+   */
+  using SBuildStructurePositionMap = msvc8::map<Wm3::Vector2i, SBuildReserveInfo>;
   static_assert(sizeof(SBuildStructurePositionMap) == 0x0C, "SBuildStructurePositionMap size must be 0x0C");
-  static_assert(
-    offsetof(SBuildStructurePositionMap, mHead) == 0x04, "SBuildStructurePositionMap::mHead offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SBuildStructurePositionMap, mSize) == 0x08, "SBuildStructurePositionMap::mSize offset must be 0x08"
-  );
 
   struct SAiAttackVectorDebug
   {
