@@ -18,6 +18,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/containers/BitStorage32.h"
 #include "legacy/containers/Vector.h"
+#include "moho/lua/CScrLuaBaseClassSpec.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -44,50 +45,26 @@ namespace
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A08 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A20 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A20 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A38 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A38 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A64 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A64 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A7C = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A7C = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A98 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A98 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A98_mFactory = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59A98_mFactory = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B00 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B00_mFactory = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B00_mFactory = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59ACC = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59ACC = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59ACC_mFactory = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59ACC_mFactory = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B80 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B80 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B98 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B98 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B34 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B34 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B34_mFactory = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B34_mFactory = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B64 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B64 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59BB4 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59BB4 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59BCC = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59BCC = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59BE8 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59BE8 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C00 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C1C = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C1C = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C34 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C34 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C50 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C50 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59C68 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59C68 = nullptr;
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
   {
@@ -563,6 +540,16 @@ namespace
 
 namespace moho
 {
+  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
+  {
+    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+      return *set;
+    }
+
+    static CScrLuaInitFormSet fallbackSet("Sim");
+    return fallbackSet;
+  }
+
   /**
    * Address: 0x00BD1980 (FUN_00BD1980, register_sim_SimInits_mForms_offVariant1)
    *
@@ -588,15 +575,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2210 (FUN_00BD2210, register_sim_SimInits_mForms_offVariant3)
+   * Address: 0x00BD2210 (FUN_00BD2210, sub_BD2210) -- record at 0x00F59A38
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A38`.
+   * Declares `CAimManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.AimManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant3()
+  CScrLuaInitForm* register_CAimManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A38, &gRecoveredSimLuaInitFormAnchor_off_F59A38>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CAimManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -660,15 +655,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2420 (FUN_00BD2420, register_sim_SimInits_mForms_offVariant5)
+   * Address: 0x00BD2420 (FUN_00BD2420, sub_BD2420) -- record at 0x00F59A7C
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to
-   * `off_F59A7C`.
+   * Declares `CBoneEntityManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.BoneEntityManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant5()
+  CScrLuaInitForm* register_CBoneEntityManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A7C, &gRecoveredSimLuaInitFormAnchor_off_F59A7C>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CBoneEntityManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -696,15 +699,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2570 (FUN_00BD2570, register_sim_SimInits_mForms_off_F59A98_mFactory)
+   * Address: 0x00BD2570 (FUN_00BD2570, sub_BD2570) -- record at 0x00F59AB0
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to the
-   * `off_F59A98.mFactory` lane.
+   * Declares `CBuilderArmManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.BuilderArmManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_off_F59A98_mFactory()
+  CScrLuaInitForm* register_CBuilderArmManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59A98_mFactory, &gRecoveredSimLuaInitFormAnchor_off_F59A98_mFactory>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CBuilderArmManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -732,15 +743,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD26E0 (FUN_00BD26E0, register_sim_SimInits_mForms_off_F59ACC_mFactory)
+   * Address: 0x00BD26E0 (FUN_00BD26E0, sub_BD26E0) -- record at 0x00F59AE4
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the list to the
-   * `off_F59ACC.mFactory` lane.
+   * Declares `CCollisionManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.CollisionManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_off_F59ACC_mFactory()
+  CScrLuaInitForm* register_CCollisionManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59ACC_mFactory, &gRecoveredSimLuaInitFormAnchor_off_F59ACC_mFactory>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CCollisionManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -768,15 +787,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD29E0 (FUN_00BD29E0, register_sim_SimInits_mForms_off_F59B00_mFactory)
+   * Address: 0x00BD29E0 (FUN_00BD29E0, sub_BD29E0) -- record at 0x00F59B18
    *
    * What it does:
-   * Saves the current `sim` init-form head and relinks the list to the
-   * `off_F59B00.mFactory` lane.
+   * Declares `CFootPlantManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.FootPlantManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_off_F59B00_mFactory()
+  CScrLuaInitForm* register_CFootPlantManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B00_mFactory, &gRecoveredSimLuaInitFormAnchor_off_F59B00_mFactory>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CFootPlantManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -789,16 +816,6 @@ namespace moho
   int register_CScrLuaMetatableFactory_CFootPlantManipulator_Index()
   {
     return RegisterRecoveredFactoryIndex<&gRecoveredCScrLuaMetatableFactoryCFootPlantManipulatorIndex>();
-  }
-
-  [[nodiscard]] CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
-  {
-    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
   }
 
   /**
@@ -829,15 +846,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2D70 (FUN_00BD2D70, register_sim_SimInits_mForms_offVariant10)
+   * Address: 0x00BD2D70 (FUN_00BD2D70, sub_BD2D70) -- record at 0x00F59B64
    *
    * What it does:
-   * Saves the current `sim` init-form head and relinks the list to
-   * `off_F59B64`.
+   * Declares `CAnimationManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.AnimationManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant10()
+  CScrLuaInitForm* register_CAnimationManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B64, &gRecoveredSimLuaInitFormAnchor_off_F59B64>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CAnimationManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -878,15 +903,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2FD0 (FUN_00BD2FD0, sub_BD2FD0)
+   * Address: 0x00BD2FD0 (FUN_00BD2FD0, sub_BD2FD0) -- record at 0x00F59B98
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59B98`.
+   * Declares `CRotateManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.RotateManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant12()
+  CScrLuaInitForm* register_CRotateManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B98, &gRecoveredSimLuaInitFormAnchor_off_F59B98>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CRotateManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -914,15 +947,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD31B0 (FUN_00BD31B0, sub_BD31B0)
+   * Address: 0x00BD31B0 (FUN_00BD31B0, sub_BD31B0) -- record at 0x00F59BCC
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59BCC`.
+   * Declares `CSlaveManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.SlaveManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant14()
+  CScrLuaInitForm* register_CSlaveManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59BCC, &gRecoveredSimLuaInitFormAnchor_off_F59BCC>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CSlaveManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -950,15 +991,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3480 (FUN_00BD3480, sub_BD3480)
+   * Address: 0x00BD3480 (FUN_00BD3480, sub_BD3480) -- record at 0x00F59C00
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59C00`.
+   * Declares `CSlideManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.SlideManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant16()
+  CScrLuaInitForm* register_CSlideManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59C00, &gRecoveredSimLuaInitFormAnchor_off_F59C00>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CSlideManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -988,15 +1037,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3620 (FUN_00BD3620, sub_BD3620)
+   * Address: 0x00BD3620 (FUN_00BD3620, sub_BD3620) -- record at 0x00F59C34
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59C34`.
+   * Declares `CStorageManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.StorageManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant18()
+  CScrLuaInitForm* register_CStorageManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59C34, &gRecoveredSimLuaInitFormAnchor_off_F59C34>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CStorageManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CStorageManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -1024,15 +1081,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3760 (FUN_00BD3760, sub_BD3760)
+   * Address: 0x00BD3760 (FUN_00BD3760, sub_BD3760) -- record at 0x00F59C68
    *
    * What it does:
-   * Saves current `sim` Lua-init form head and re-links to recovered startup
-   * lane anchor `off_F59C68`.
+   * Declares `CThrustManipulator` as deriving from `IAniManipulator` for the Lua
+   * class system, so `moho.ThrustManipulator` carries
+   * `moho.manipulator_methods` in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_offVariant20()
+  CScrLuaInitForm* register_CThrustManipulatorLuaBaseClass()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59C68, &gRecoveredSimLuaInitFormAnchor_off_F59C68>();
+    static CScrLuaBaseClassSpec spec(
+      ClassBinderSimLuaInitSet(),
+      &CScrLuaMetatableFactory<CThrustManipulator>::Instance(),
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "CThrustManipulator",
+      "derived from IAniManipulator"
+    );
+    return &spec;
   }
 
   /**
@@ -1056,43 +1121,43 @@ namespace
     {
       (void)moho::register_sim_SimInits_mForms_offVariant1();
       (void)moho::register_sim_SimInits_mForms_offVariant2();
-      (void)moho::register_sim_SimInits_mForms_offVariant3();
+      (void)moho::register_CAimManipulatorLuaBaseClass();
       (void)moho::register_TConVar_dbg_Ballistics();
       moho::register_CAimManipulatorTypeInfo();
       moho::register_CAimManipulatorSerializer();
       (void)moho::register_CScrLuaMetatableFactory_CAimManipulator_Index();
       (void)moho::register_CScrLuaMetatableFactory_IAniManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant4();
-      (void)moho::register_sim_SimInits_mForms_offVariant5();
+      (void)moho::register_CBoneEntityManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CBoneEntityManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant6();
-      (void)moho::register_sim_SimInits_mForms_off_F59A98_mFactory();
+      (void)moho::register_CBuilderArmManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CBuilderArmManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant7();
-      (void)moho::register_sim_SimInits_mForms_off_F59ACC_mFactory();
+      (void)moho::register_CCollisionManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CCollisionManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant8();
-      (void)moho::register_sim_SimInits_mForms_off_F59B00_mFactory();
+      (void)moho::register_CFootPlantManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CFootPlantManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant9();
       (void)moho::register_sim_SimInits_mForms_off_F59B34_mFactory();
-      (void)moho::register_sim_SimInits_mForms_offVariant10();
+      (void)moho::register_CAnimationManipulatorLuaBaseClass();
       (void)moho::register_RVectorType_bool();
       (void)moho::register_CScrLuaMetatableFactory_CAnimationManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant11();
-      (void)moho::register_sim_SimInits_mForms_offVariant12();
+      (void)moho::register_CRotateManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CRotateManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant13();
-      (void)moho::register_sim_SimInits_mForms_offVariant14();
+      (void)moho::register_CSlaveManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CSlaveManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant15();
-      (void)moho::register_sim_SimInits_mForms_offVariant16();
+      (void)moho::register_CSlideManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CSlideManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant17();
-      (void)moho::register_sim_SimInits_mForms_offVariant18();
+      (void)moho::register_CStorageManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CStorageManipulator_Index();
       (void)moho::register_sim_SimInits_mForms_offVariant19();
-      (void)moho::register_sim_SimInits_mForms_offVariant20();
+      (void)moho::register_CThrustManipulatorLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_CThrustManipulator_Index();
     }
   };

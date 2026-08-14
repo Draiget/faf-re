@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "legacy/containers/Vector.h"
+#include "legacy/containers/Map.h"
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -32,6 +33,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaBaseClassSpec.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -1312,62 +1314,83 @@ namespace
     "IN_RemoveKeyMapTable(keyMapTable) - removes the keys from the key map";
   constexpr const char* kINClearKeyMapHelpText = "IN_ClearKeyMap() - clears all key mappings";
 
-  [[nodiscard]] std::map<int, std::string>& UiKeyActionMap() noexcept
-  {
-    static std::map<int, std::string> keyActionMap{};
-    return keyActionMap;
-  }
-
-  [[nodiscard]] std::map<int, bool>& UiKeyRepeatMap() noexcept
-  {
-    static std::map<int, bool> keyRepeatMap{};
-    return keyRepeatMap;
-  }
+  using UiKeyMask = std::uint32_t;
+  using UiKeyActionMapBase = msvc8::map<UiKeyMask, msvc8::string>;
+  using UiKeyRepeatMap = msvc8::map<UiKeyMask, bool>;
 
   /**
-   * Address: 0x0083A4F0 (FUN_0083A4F0, sub_83A4F0)
-   *
-   * What it does:
-   * Returns mutable action-string storage lane for one parsed key mask,
-   * creating the lane when it is not present.
+   * Owns the legacy action map while compensating for `msvc8::string`'s
+   * intentionally destructor-less compatibility wrapper. The shipped map
+   * destroys each mapped string before freeing its node; this same-size owner
+   * performs that release before delegating node destruction to `msvc8::map`.
    */
-  [[nodiscard]] std::string* EnsureUiKeyActionEntry(const int keyMask) noexcept
+  class UiKeyActionMap final : public UiKeyActionMapBase
   {
-    return &UiKeyActionMap()[keyMask];
+  public:
+    ~UiKeyActionMap();
+
+    size_type erase(const key_type& key);
+    void clear() noexcept;
+
+  private:
+    void ReleaseStrings() noexcept;
+  };
+
+  UiKeyActionMap::~UiKeyActionMap()
+  {
+    ReleaseStrings();
   }
 
-  /**
-   * Address: 0x0083A640 (FUN_0083A640, sub_83A640)
-   *
-   * What it does:
-   * Erases one parsed key mask from action-string storage.
-   */
-  void RemoveUiKeyActionEntry(const int keyMask) noexcept
+  UiKeyActionMap::size_type UiKeyActionMap::erase(const key_type& key)
   {
-    UiKeyActionMap().erase(keyMask);
+    const iterator found = find(key);
+    if (found == end()) {
+      return 0u;
+    }
+
+    found->second.tidy(true, 0u);
+    (void)UiKeyActionMapBase::erase(found);
+    return 1u;
   }
 
-  /**
-   * Address: 0x0083A9D0 (FUN_0083A9D0, sub_83A9D0)
-   *
-   * What it does:
-   * Returns mutable key-repeat storage lane for one parsed key mask, creating
-   * the lane when it is not present.
-   */
-  [[nodiscard]] bool* EnsureUiKeyRepeatEntry(const int keyMask) noexcept
+  void UiKeyActionMap::clear() noexcept
   {
-    return &UiKeyRepeatMap()[keyMask];
+    ReleaseStrings();
+    UiKeyActionMapBase::clear();
   }
 
-  /**
-   * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70)
-   *
-   * What it does:
-   * Erases one parsed key mask from key-repeat storage.
-   */
-  void RemoveUiKeyRepeatEntry(const int keyMask) noexcept
+  void UiKeyActionMap::ReleaseStrings() noexcept
   {
-    UiKeyRepeatMap().erase(keyMask);
+    for (auto& entry : *this) {
+      entry.second.tidy(true, 0u);
+    }
+  }
+
+  static_assert(sizeof(UiKeyActionMapBase) == 0x0C, "UI key action map base size must be 0x0C");
+  static_assert(sizeof(UiKeyActionMap) == 0x0C, "UI key action map size must be 0x0C");
+  static_assert(sizeof(UiKeyRepeatMap) == 0x0C, "UI key repeat map size must be 0x0C");
+
+  UiKeyActionMap gUiKeyActionMap{};
+  UiKeyRepeatMap gUiKeyRepeatMap{};
+
+  void AppendLegacyStringOrThrow(msvc8::string& destination, const char* const text, const std::size_t length)
+  {
+    if (length > msvc8::string::maxCapGuard - destination.size()) {
+      throw std::length_error("legacy string too long");
+    }
+    if (!destination.append(text, length)) {
+      throw std::bad_alloc{};
+    }
+  }
+
+  void AppendLegacyStringOrThrow(msvc8::string& destination, const std::size_t count, const char value)
+  {
+    if (count > msvc8::string::maxCapGuard - destination.size()) {
+      throw std::length_error("legacy string too long");
+    }
+    if (!destination.append(count, value)) {
+      throw std::bad_alloc{};
+    }
   }
 
   /**
@@ -1386,16 +1409,16 @@ namespace
 
     for (LuaPlus::LuaTableIterator iter(keyMapTable, 1); !iter.m_isDone; iter.Next()) {
       const char* const keyBindingSpecText = iter.m_keyObj.GetString();
-      const std::string keyBindingSpec = keyBindingSpecText != nullptr ? keyBindingSpecText : "";
-      const int keyMask = moho::IN_ParseKeyModifiers(keyBindingSpec);
+      msvc8::scoped_string keyBindingSpec{keyBindingSpecText != nullptr ? keyBindingSpecText : ""};
+      const UiKeyMask keyMask = static_cast<UiKeyMask>(moho::IN_ParseKeyModifiers(keyBindingSpec));
 
       const LuaPlus::LuaObject actionObject = iter.m_valueObj["action"];
       const char* const actionText = actionObject.GetString();
-      *EnsureUiKeyActionEntry(keyMask) = actionText != nullptr ? actionText : "";
+      gUiKeyActionMap[keyMask].assign_owned_strong(actionText != nullptr ? actionText : "");
 
       const LuaPlus::LuaObject keyRepeatObject = iter.m_valueObj["keyRepeat"];
       if (!keyRepeatObject.IsNil() && keyRepeatObject.GetBoolean()) {
-        *EnsureUiKeyRepeatEntry(keyMask) = true;
+        gUiKeyRepeatMap[keyMask] = true;
       }
     }
   }
@@ -1416,10 +1439,10 @@ namespace
 
     for (LuaPlus::LuaTableIterator iter(keyMapTable, 1); !iter.m_isDone; iter.Next()) {
       const char* const keyBindingSpecText = iter.m_keyObj.GetString();
-      const std::string keyBindingSpec = keyBindingSpecText != nullptr ? keyBindingSpecText : "";
-      const int keyMask = moho::IN_ParseKeyModifiers(keyBindingSpec);
-      RemoveUiKeyActionEntry(keyMask);
-      RemoveUiKeyRepeatEntry(keyMask);
+      msvc8::scoped_string keyBindingSpec{keyBindingSpecText != nullptr ? keyBindingSpecText : ""};
+      const UiKeyMask keyMask = static_cast<UiKeyMask>(moho::IN_ParseKeyModifiers(keyBindingSpec));
+      gUiKeyActionMap.erase(keyMask);
+      gUiKeyRepeatMap.erase(keyMask);
     }
   }
 
@@ -1431,8 +1454,8 @@ namespace
    */
   int ClearUiKeyMaps() noexcept
   {
-    UiKeyActionMap().clear();
-    UiKeyRepeatMap().clear();
+    gUiKeyActionMap.clear();
+    gUiKeyRepeatMap.clear();
     return 0;
   }
   constexpr const char* kAddBlinkyBoxHelpText = "AddBlinkyBox(entityId, onTime, offTime, totalTime)";
@@ -26543,7 +26566,7 @@ bool moho::IN_InitKeyHandler()
 
 /**
  * Address: 0x00839920 (FUN_00839920, Moho::IN_ParseKeyModifiers)
- * Mangled: ?IN_ParseKeyModifiers@Moho@@... (thiscall on the spec std::string)
+ * Mangled: ?IN_ParseKeyModifiers@Moho@@... (thiscall on the spec legacy string)
  *
  * IDA signature:
  * int __thiscall Moho::IN_ParseKeyModifiers(std::string *this);
@@ -26566,7 +26589,7 @@ bool moho::IN_InitKeyHandler()
  * is not in the recovered evidence set, so the literal spellings are modeled
  * here. See the reconstruction note for the CTRL-vs-CONTROL open item.
  */
-int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
+int moho::IN_ParseKeyModifiers(const msvc8::string& keyBindingSpec)
 {
   // Binary reference strings @ 0x10C1D08 / 0x10C1D24 / 0x10C1D40, compared in
   // ALT -> CTRL -> SHIFT order. Their initializer is not in the recovered
@@ -26577,14 +26600,14 @@ int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
   // the middle one had been modelled as "CONTROL" and so matched nothing -
   // every Ctrl binding in the game logged "unrecognized modifier string: Ctrl"
   // and silently lost its modifier bit, leaving it bound to the bare key.
-  const msvc8::string altModifier{"ALT"};
-  const msvc8::string controlModifier{"CTRL"};
-  const msvc8::string shiftModifier{"SHIFT"};
+  const msvc8::scoped_string altModifier{"ALT"};
+  const msvc8::scoped_string controlModifier{"CTRL"};
+  const msvc8::scoped_string shiftModifier{"SHIFT"};
 
   // SBO scratch: 4 inline msvc8::string slots, teardown frees heap only when the
   // token count spilled past the inline window (start != inline origin).
-  gpg::fastvector_n<msvc8::string, 4> tokens{};
-  msvc8::string token{};
+  gpg::fastvector_n<msvc8::scoped_string, 4> tokens{};
+  msvc8::scoped_string token{};
 
   // Tokenize the spec, inserting each token at begin() so the final slot 0 is
   // the last (key) token and the modifiers follow in reverse token order.
@@ -26603,7 +26626,7 @@ int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
 
   const std::size_t tokenCount = tokens.Size();
   for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
-    const msvc8::string& modifier = tokens.Data()[tokenIndex];
+    const msvc8::scoped_string& modifier = tokens.Data()[tokenIndex];
     if (_stricmp(modifier.c_str(), altModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x80000000u);
     } else if (_stricmp(modifier.c_str(), controlModifier.c_str()) == 0) {
@@ -26616,6 +26639,43 @@ int moho::IN_ParseKeyModifiers(const std::string& keyBindingSpec)
   }
 
   return keyMask;
+}
+
+/**
+ * Address: 0x00839F20 (FUN_00839F20, Moho::IN_BindKey)
+ *
+ * IDA signature:
+ * void __cdecl Moho::IN_BindKey(std::vector<std::string>* commandArgs);
+ *
+ * What it does:
+ * Validates the console-command token vector, parses token 1 as a key mask,
+ * joins every command token from index 2 with one trailing space apiece, and
+ * assigns the completed legacy string to the key-action map. A zero parse
+ * result reports the original key token and leaves the map unchanged.
+ */
+void moho::IN_BindKey(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 3u) {
+    CON_Printf("Syntax: IN_BindKey [key sequence] [console command]");
+    return;
+  }
+
+  const msvc8::string* const keyBindingSpec = args.At(1u);
+  const int parsedKeyMask = IN_ParseKeyModifiers(*keyBindingSpec);
+  if (parsedKeyMask == 0) {
+    CON_Printf("Unrecognized key sequence: %s", keyBindingSpec->c_str());
+    return;
+  }
+
+  msvc8::scoped_string actionText{};
+  for (std::size_t argumentIndex = 2u; argumentIndex < args.Count(); ++argumentIndex) {
+    const msvc8::string* const argument = args.At(argumentIndex);
+    AppendLegacyStringOrThrow(actionText, argument->c_str(), argument->size());
+    AppendLegacyStringOrThrow(actionText, 1u, ' ');
+  }
+
+  gUiKeyActionMap[static_cast<UiKeyMask>(parsedKeyMask)].assign_owned_strong(actionText.view());
 }
 
 moho::wxEvtHandlerRuntime* moho::UI_CreateKeyHandler()
@@ -27182,6 +27242,253 @@ namespace
   }
 
   /**
+   * Address: 0x00BDDA10 (FUN_00BDDA10) -- record at 0x00F5A208
+   *
+   * Declares CMauiBitmap as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiBitmap()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiBitmap>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiBitmap",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDDC60 (FUN_00BDDC60) -- record at 0x00F5A23C
+   *
+   * Declares CMauiBorder as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiBorder()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiBorder>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiBorder",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDE270 (FUN_00BDE270) -- record at 0x00F5A2C8
+   *
+   * Declares CMauiEdit as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiEdit()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiEdit>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiEdit",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDE5F0 (FUN_00BDE5F0) -- record at 0x00F5A2FC
+   *
+   * Declares CMauiFrame as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiFrame()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiFrame>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiFrame",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDE720 (FUN_00BDE720) -- record at 0x00F5A330
+   *
+   * Declares CMauiGroup as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiGroup()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiGroup>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiGroup",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDE820 (FUN_00BDE820) -- record at 0x00F5A364
+   *
+   * Declares CMauiHistogram as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiHistogram()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiHistogram>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiHistogram",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDE950 (FUN_00BDE950) -- record at 0x00F5A398
+   *
+   * Declares CMauiItemList as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiItemList()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiItemList>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiItemList",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDEC50 (FUN_00BDEC50) -- record at 0x00F5A3CC
+   *
+   * Declares CMauiMesh as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiMesh()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiMesh>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiMesh",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDED70 (FUN_00BDED70) -- record at 0x00F5A400
+   *
+   * Declares CMauiMovie as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiMovie()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiMovie>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiMovie",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDEEE0 (FUN_00BDEEE0) -- record at 0x00F5A434
+   *
+   * Declares CMauiScrollbar as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiScrollbar()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiScrollbar>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiScrollbar",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BDF020 (FUN_00BDF020) -- record at 0x00F5A468
+   *
+   * Declares CMauiText as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCMauiText()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiText>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CMauiText",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BE4F80 (FUN_00BE4F80) -- record at 0x00F5B1E4
+   *
+   * Declares CUIMapPreview as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCUIMapPreview()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CUIMapPreview>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CUIMapPreview",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
+   * Address: 0x00BE6A70 (FUN_00BE6A70) -- record at 0x00F5B68C
+   *
+   * Declares CUIWorldView as deriving from CMauiControl for the Lua class
+   * system, so `class.lua`'s `Flatten` reaches the control methods when it
+   * converts the C class.
+   */
+  moho::CScrLuaInitForm* RegisterLuaBaseClassCUIWorldView()
+  {
+    static moho::CScrLuaBaseClassSpec spec(
+      UserLuaInitSet(),
+      &moho::CScrLuaMetatableFactory<moho::CUIWorldView>::Instance(),
+      &moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance(),
+      "CUIWorldView",
+      "derived from CMauiControl"
+    );
+    return &spec;
+  }
+
+  /**
    * Drives the class binders above. In the binary the CRT static-init array
    * runs each record's linking thunk before main; this object is that pass,
    * and the source-level invocation that keeps them linked in.
@@ -27208,6 +27515,22 @@ namespace
       (void)RegisterLuaClassCLuaWldUIProvider();
       (void)RegisterLuaClassCUIWorldMesh();
       (void)RegisterLuaClassCUIWorldView();
+
+      // The base-class specs: each appends the control method table into
+      // its derived class table's array part.
+      (void)RegisterLuaBaseClassCMauiBitmap();
+      (void)RegisterLuaBaseClassCMauiBorder();
+      (void)RegisterLuaBaseClassCMauiEdit();
+      (void)RegisterLuaBaseClassCMauiFrame();
+      (void)RegisterLuaBaseClassCMauiGroup();
+      (void)RegisterLuaBaseClassCMauiHistogram();
+      (void)RegisterLuaBaseClassCMauiItemList();
+      (void)RegisterLuaBaseClassCMauiMesh();
+      (void)RegisterLuaBaseClassCMauiMovie();
+      (void)RegisterLuaBaseClassCMauiScrollbar();
+      (void)RegisterLuaBaseClassCMauiText();
+      (void)RegisterLuaBaseClassCUIMapPreview();
+      (void)RegisterLuaBaseClassCUIWorldView();
     }
   };
 

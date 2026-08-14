@@ -6,6 +6,9 @@
 #include <new>
 
 #include "moho/console/CConAlias.h"
+#include "moho/entity/CollisionBeamEntity.h"
+#include "moho/entity/MotorFallDown.h"
+#include "moho/lua/CScrLuaBaseClassSpec.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -27,22 +30,6 @@ namespace
 
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane21 = nullptr;
   moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane21 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane22 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane22 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane24 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane24 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane26 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane26 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane28 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane28 = nullptr;
-
-  struct SimLuaInitReconBlipAnchorB
-  {
-    std::uint8_t pad_00_0F[0x10]{};
-    moho::CScrLuaInitForm* mPrevDef = nullptr;
-  };
-
-  SimLuaInitReconBlipAnchorB gSimLuaInitReconBlipAnchorB{};
 
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;
@@ -357,7 +344,7 @@ namespace
       moho::register_path_UnreachableTimeoutSearchSteps_ConAliasDef();
       moho::register_path_UnreachableTimeoutSearchSteps_SimConVarDef();
       (void)moho::register_sim_SimInits_mForms_reconBlipAnchorA();
-      (void)moho::register_sim_SimInits_mForms_reconBlipAnchorB();
+      (void)moho::register_ReconBlipLuaBaseClass();
       (void)moho::register_CScrLuaMetatableFactory_ReconBlip_Index();
       (void)moho::register_CScrLuaMetatableFactory_Entity_Index();
       (void)moho::register_ReconBlipGetBlueprint_LuaFuncDef();
@@ -796,30 +783,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4C00 (FUN_00BD4C00, register_sim_SimInits_mForms_prependStartupLane22)
+   * Address: 0x00BD4C00 (FUN_00BD4C00, sub_BD4C00) -- record at 0x00F59F34
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane22`.
+   * Declares `CollisionBeamEntity` as deriving from `Entity` for the Lua
+   * class system, so `moho.CollisionBeamEntity` carries `moho.entity_methods`
+   * in its array part.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane22()
+  CScrLuaInitForm* register_CollisionBeamEntityLuaBaseClass()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane22 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane22 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane22);
-    return result;
+    static CScrLuaBaseClassSpec spec(
+      SimLuaInitSet(),
+      &CScrLuaMetatableFactory<CollisionBeamEntity>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
+      "CollisionBeamEntity",
+      "derived from Entity"
+    );
+    return &spec;
   }
 
   /**
@@ -838,30 +818,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD5C90 (FUN_00BD5C90, register_sim_SimInits_mForms_prependStartupLane24)
+   * Address: 0x00BD5C90 (FUN_00BD5C90, sub_BD5C90) -- record at 0x00F59F68
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane24`.
+   * Publishes `MotorFallDown`'s method table as `moho.MotorFallDown`.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane24()
+  CScrLuaInitForm* register_moho_MotorFallDown()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane24 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane24 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane24);
-    return result;
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(),
+      "moho.MotorFallDown",
+      &CScrLuaMetatableFactory<MotorFallDown>::Instance(),
+      "MotorFallDown",
+      ""
+    );
+    return &binder;
   }
 
   /**
@@ -880,30 +851,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD6600 (FUN_00BD6600, register_sim_SimInits_mForms_prependStartupLane26)
+   * Address: 0x00BD6600 (FUN_00BD6600, sub_BD6600) -- record at 0x00F59FA8
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane26`.
+   * Declares `Projectile` as deriving from `Entity` for the Lua class system.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane26()
+  CScrLuaInitForm* register_ProjectileLuaBaseClass()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane26 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane26 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane26);
-    return result;
+    static CScrLuaBaseClassSpec spec(
+      SimLuaInitSet(),
+      &CScrLuaMetatableFactory<Projectile>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
+      "Projectile",
+      "derived from Entity"
+    );
+    return &spec;
   }
 
   /**
@@ -922,30 +884,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD7930 (FUN_00BD7930, sub_BD7930)
+   * Address: 0x00BD7930 (FUN_00BD7930, sub_BD7930) -- record at 0x00F59FDC
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane28`.
+   * Declares `Unit` as deriving from `Entity` for the Lua class system.
+   * Without it `moho.unit_methods` is a flat table, `class.lua`'s `Flatten`
+   * has no base to walk, and every inherited entity method - `DisableIntel`
+   * first among them - is nil on a unit.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane28()
+  CScrLuaInitForm* register_UnitLuaBaseClass()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane28 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane28 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane28);
-    return result;
+    static CScrLuaBaseClassSpec spec(
+      SimLuaInitSet(),
+      &CScrLuaMetatableFactory<Unit>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
+      "Unit",
+      "derived from Entity"
+    );
+    return &spec;
   }
 
   /**
@@ -971,18 +927,25 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9800 (FUN_00BD9800, sub_BD9800)
+   * Address: 0x00BD9800 (FUN_00BD9800, sub_BD9800) -- record at 0x00F5A010
    *
    * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered `moho_weapon_methods.mFactory` startup lane anchor.
+   * Declares `Prop` as deriving from `Entity` for the Lua class system.
+   *
+   * IDA names the record `moho_weapon_methods.mFactory` because it sits one
+   * object past the `moho.weapon_methods` binder at 0x00F59FF8; the record's
+   * own fields say `base` / `Prop` / "derived from Entity".
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane()
+  CScrLuaInitForm* register_PropLuaBaseClass()
   {
-    static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.weapon_methods", &CScrLuaMetatableFactory<UnitWeapon>::Instance(), "UnitWeapon", ""
+    static CScrLuaBaseClassSpec spec(
+      SimLuaInitSet(),
+      &CScrLuaMetatableFactory<Prop>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
+      "Prop",
+      "derived from Entity"
     );
-    return &binder;
+    return &spec;
   }
 
   /**
@@ -1623,15 +1586,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8790 (FUN_00BD8790, register_moho_weapon_methods)
+   * Address: 0x00BD8790 (FUN_00BD8790, register_moho_weapon_methods) -- record at 0x00F59FF8
    *
    * What it does:
-   * Prepends recovered moho-weapon Lua-init anchor to the active `sim` init
-   * chain and returns the previous chain head.
+   * Publishes `UnitWeapon`'s method table as `moho.weapon_methods`.
+   * `UnitWeapon` has no base spec of its own - it is not an entity.
    */
   CScrLuaInitForm* register_moho_weapon_methods()
   {
-    return register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane();
+    static CScrLuaClassBinder binder(
+      SimLuaInitSet(), "moho.weapon_methods", &CScrLuaMetatableFactory<UnitWeapon>::Instance(), "UnitWeapon", ""
+    );
+    return &binder;
   }
 
   /**
@@ -1650,30 +1616,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCDC30 (FUN_00BCDC30, register_sim_SimInits_mForms_reconBlipAnchorB)
+   * Address: 0x00BCDC30 (FUN_00BCDC30, sub_BCDC30) -- record at 0x00F599BC
    *
    * What it does:
-   * Saves the current `sim` Lua-init form head and relinks the chain to the
-   * recovered recon-blip anchor-B lane.
+   * Declares `ReconBlip` as deriving from `Entity` for the Lua class system.
    */
-  CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorB()
+  CScrLuaInitForm* register_ReconBlipLuaBaseClass()
   {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (!simSet) {
-      gSimLuaInitReconBlipAnchorB.mPrevDef = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitReconBlipAnchorB.mPrevDef = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitReconBlipAnchorB);
-    return result;
+    static CScrLuaBaseClassSpec spec(
+      SimLuaInitSet(),
+      &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+      &CScrLuaMetatableFactory<Entity>::Instance(),
+      "ReconBlip",
+      "derived from Entity"
+    );
+    return &spec;
   }
 
   /**
@@ -2017,8 +1974,20 @@ namespace
       (void)::moho::register_sim_SimInits_mForms_prependStartupLane25();
       (void)::moho::register_sim_SimInits_mForms_prependStartupLane27();
       (void)::moho::register_sim_SimInits_mForms_prependStartupLane30();
-      (void)::moho::register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane();
+      (void)::moho::register_moho_weapon_methods();
+      (void)::moho::register_moho_MotorFallDown();
       (void)::moho::register_sim_SimInits_mForms_reconBlipAnchorA();
+
+      // The base-class specs. Each appends one base method table into the
+      // array part of its derived class table; `/lua/system/class.lua`'s
+      // `Flatten` is what walks that array when `globalInit.lua` converts the
+      // C classes. Without them a unit has no entity method - `DisableIntel`
+      // is nil and `InitializeArmies` dies on the first army.
+      (void)::moho::register_ReconBlipLuaBaseClass();
+      (void)::moho::register_CollisionBeamEntityLuaBaseClass();
+      (void)::moho::register_ProjectileLuaBaseClass();
+      (void)::moho::register_UnitLuaBaseClass();
+      (void)::moho::register_PropLuaBaseClass();
     }
   };
 
