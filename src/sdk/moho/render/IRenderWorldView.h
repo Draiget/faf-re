@@ -10,7 +10,7 @@ namespace moho
   class CameraImpl;
   class CD3DPrimBatcher;
   class CWldMap;
-  class GeomCamera3;
+  struct GeomCamera3; // defined as a struct in GeomCamera3.h - the class-key must match or MSVC mangles calls with V instead of U
 
   /**
    * VFTABLE: 0x00E4054C

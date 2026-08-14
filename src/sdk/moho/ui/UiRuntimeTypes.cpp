@@ -77,6 +77,10 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "moho/command/CommandManager.h"
+#include "moho/command/CommandIssueHelper.h"
+#include "gpg/core/containers/Rect2.h"
 #include "moho/task/CTask.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/task/ScrDiskWatcherTask.h"
@@ -28052,3 +28056,152 @@ namespace
 
   const UiRuntimeTypesLuaFuncDefBootstrap gUiRuntimeTypesLuaFuncDefBootstrap{};
 } // namespace
+
+
+namespace moho
+{
+  namespace
+  {
+    // 0x00E4F6E4: the "no water plane" sentinel elevation the skirt lift falls
+    // back to when the map has water disabled - low enough that the max() below
+    // always picks the terrain instead.
+    constexpr float kNoWaterElevation = -10000.0f;
+
+    // 0x00E4F714: the terrain clearance a skirt outline is lifted by so it does
+    // not z-fight the ground it is drawn on.
+    constexpr float kSkirtTerrainClearance = 0.1f;
+
+    // 0x00E4F84C: the outline's world thickness at unit view depth; divided by
+    // the point's post-projection W to keep the on-screen width constant.
+    constexpr float kSkirtThicknessAtUnitDepth = 0.15000001f;
+  } // namespace
+
+  /**
+   * Address: 0x0085ABD0 (FUN_0085ABD0, Moho::DrawUnitSkirt)
+   * Mangled: ?DrawUnitSkirt@Moho@@YAXPBVCHeightField@1@PBVRUnitBlueprint@1@ABVGeomCamera3@1@ABV?$Vector3@M@Wm3@@PAVCWldSession@1@PAVCD3DPrimBatcher@1@I@Z
+   *
+   * IDA signature:
+   * _WORD *__usercall Moho::DrawUnitSkirt@<eax>(
+   *   CHeightField *a1@<eax>, RUnitBlueprint *a2@<edx>, GeomCamera3 *a3@<ebx>,
+   *   Wm3::Vector3f *a4@<esi>, CWldSession *a5, CD3DPrimBatcher *a6, int col);
+   *
+   * What it does:
+   * Draws one unit footprint skirt outline at `position`. The rectangle comes
+   * from the blueprint's skirt extent; its height is lifted to whichever is
+   * greatest of the caller's Y, the sampled terrain elevation plus a small
+   * clearance, and the map's water plane. The outline thickness is scaled by
+   * the point's post-projection depth so it keeps a constant on-screen width,
+   * but never drops below `ui_FootprintMinThickness`.
+   */
+  void DrawUnitSkirt(
+    const CHeightField* const heightField,
+    const RUnitBlueprint* const blueprint,
+    const GeomCamera3& camera,
+    const Wm3::Vector3f& position,
+    CWldSession* const session,
+    CD3DPrimBatcher* const batcher,
+    const std::uint32_t color
+  )
+  {
+    const SCoordsVec2 groundPosition{position.x, position.z};
+    const gpg::Rect2f skirt = blueprint->GetSkirtRect(groundPosition);
+
+    const STIMap* const map = session->GetSTIMap();
+    const float waterElevation = map->mWaterEnabled != 0 ? map->mWaterElevation : kNoWaterElevation;
+
+    float skirtY = position.y;
+    if (heightField != nullptr) {
+      const float terrainY = heightField->GetElevation(position.x, position.z) + kSkirtTerrainClearance;
+      skirtY = position.y > terrainY ? position.y : terrainY;
+      if (waterElevation > skirtY) {
+        skirtY = waterElevation;
+      }
+    }
+
+    // Row 2 of the camera's viewport matrix dotted with the anchor point is the
+    // post-projection W the binary divides the constant thickness by.
+    const Vector4f& depthRow = camera.viewport.r[2];
+    const float viewDepth =
+      depthRow.x * position.x + depthRow.y * skirtY + depthRow.z * position.z + depthRow.w;
+
+    float thicknessScale = kSkirtThicknessAtUnitDepth / viewDepth;
+    if (ui_FootprintMinThickness > thicknessScale) {
+      thicknessScale = ui_FootprintMinThickness;
+    }
+
+    const Wm3::Vector3f topLeft{skirt.x0, skirtY, skirt.z0};
+    const Wm3::Vector3f widthAxis{skirt.x1 - skirt.x0, 0.0f, 0.0f};
+    const Wm3::Vector3f depthAxis{0.0f, 0.0f, skirt.z1 - skirt.z0};
+
+    DRAW_Rect(
+      batcher,
+      viewDepth * thicknessScale,
+      depthAxis,
+      widthAxis,
+      topLeft,
+      color,
+      heightField,
+      waterElevation
+    );
+  }
+
+  /**
+   * Address: 0x0085AD80 (FUN_0085AD80, Moho::DrawAllUnitSkirts)
+   *
+   * IDA signature:
+   * void __thiscall Moho::DrawAllUnitSkirts(
+   *   CD3DPrimBatcher *ka, CWldSession *a1, GeomCamera3 *j);
+   *
+   * What it does:
+   * Draws a translucent magenta footprint skirt for every mobile-build order
+   * still queued in the session's command manager, so a shift-queued build
+   * chain shows where each structure will land. Each order's anchor comes from
+   * its own issue-event history, and its blueprint from the order's constant
+   * data - upcast through reflection because the order carries the generic
+   * entity blueprint, not the unit one.
+   */
+  void DrawAllUnitSkirts(CD3DPrimBatcher* const batcher, CWldSession* const session, const GeomCamera3& camera)
+  {
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("primbatcher");
+    device->SelectTechnique("TAlphaBlendLinearSampleNoDepth");
+
+    // Clear the composite-rebuild flag so the pass reuses the view/projection
+    // set immediately below rather than rebuilding it per primitive.
+    CD3DPrimBatcherRuntimeView::FromBatcher(batcher)->mRebuildComposite = 0;
+    batcher->SetViewProjMatrix(camera);
+    batcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+
+    // Translucent magenta - the "planned build" tint (0xAARRGGBB).
+    constexpr std::uint32_t kPlannedBuildSkirtColor = 0xC00080FFu;
+
+    for (const auto& [commandId, helper] : session->mCommandManager->mCommands) {
+      static_cast<void>(commandId);
+      if (helper == nullptr) {
+        continue;
+      }
+
+      if (ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
+        continue;
+      }
+
+      gpg::RRef blueprintRef{};
+      (void)RRef_REntityBlueprint(&blueprintRef, helper->mConstantData.blueprint);
+
+      const Wm3::Vector3f position = ResolveCommandIssueHelperAnchorPosition(*helper);
+
+      const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(blueprintRef, RUnitBlueprint::StaticGetClass());
+      DrawUnitSkirt(
+        nullptr,
+        static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj),
+        camera,
+        position,
+        session,
+        batcher,
+        kPlannedBuildSkirtColor
+      );
+    }
+
+    batcher->Flush();
+  }
+} // namespace moho
