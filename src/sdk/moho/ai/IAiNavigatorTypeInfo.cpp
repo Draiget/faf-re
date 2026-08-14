@@ -1,3 +1,5 @@
+#include "moho/unit/Broadcaster.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiNavigatorTypeInfo.h"
 
 #include <cstdlib>
@@ -68,10 +70,32 @@ const char* IAiNavigatorTypeInfo::GetName() const
 /**
  * Address: 0x005A31F0 (FUN_005A31F0, ?Init@IAiNavigatorTypeInfo@Moho@@UAEXXZ)
  */
+/**
+ * Address: 0x005A7B00 (FUN_005A7B00,
+ *   Moho::IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent)
+ *
+ * What it does:
+ * Registers the navigator-event broadcaster as a reflected base at offset 4.
+ *
+ * Our `IAiNavigator` models that sub-object as the `mListenerNode` member
+ * rather than as a base class, but the layout is the one the binary has -
+ * vptr at 0, the 8-byte broadcaster at 4, sizeof 0xC - so the reflected base
+ * lands on the right bytes either way.
+ */
+void IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent(gpg::RType* const typeInfo)
+{
+  static gpg::RType* sBroadcasterType = nullptr;
+  if (!sBroadcasterType) {
+    sBroadcasterType = gpg::LookupRType(typeid(BroadcasterEventTag<EAiNavigatorEvent>));
+  }
+  gpg::AddBaseIfPresent(typeInfo, sBroadcasterType, 4);
+}
+
 void IAiNavigatorTypeInfo::Init()
 {
   size_ = sizeof(IAiNavigator);
   gpg::RType::Init();
+  AddBase_Broadcaster_EAiNavigatorEvent(this);
   Finish();
 }
 

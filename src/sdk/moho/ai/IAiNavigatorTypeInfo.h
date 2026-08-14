@@ -42,6 +42,16 @@ namespace moho
      * VFTable SLOT: 9
      */
     void Init() override;
+
+    /**
+     * Address: 0x005A7B00 (FUN_005A7B00,
+     *   Moho::IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent)
+     *
+     * What it does:
+     * Registers the navigator-event broadcaster as a reflected base at
+     * offset 4 - the only non-zero base offset in this family.
+     */
+    static void AddBase_Broadcaster_EAiNavigatorEvent(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(IAiNavigatorTypeInfo) == 0x64, "IAiNavigatorTypeInfo size must be 0x64");
