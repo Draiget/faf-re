@@ -767,7 +767,7 @@ namespace moho
   CMauiControl* SCR_FromLua_CMauiControl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
-   * Address: 0x0078F560 (FUN_0078F560, Moho::SCR_FromLua_CMauiEdit)
+   * Address: 0x00795540 (FUN_00795540, Moho::SCR_FromLua_CMauiEdit)
    *
    * What it does:
    * Converts one Lua `_c_object` payload to `CMauiEdit*` and raises Lua
