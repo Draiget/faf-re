@@ -433,6 +433,36 @@ const char* CAiFormationDBImplTypeInfo::GetName() const
 }
 
 /**
+ * Address: 0x0059DB80 (FUN_0059DB80, Moho::CAiFormationDBImplTypeInfo::AddBase_IAiFormationDB)
+ *
+ * What it does:
+ * Registers `IAiFormationDB` as this type's reflected base at offset 0.
+ *
+ * The null guard on the looked-up type is ours; the binary dereferences
+ * unconditionally. Kept because a failed lookup would otherwise crash here.
+ */
+void CAiFormationDBImplTypeInfo::AddBase_IAiFormationDB(gpg::RType* const typeInfo)
+{
+  static gpg::RType* sCachedIAiFormationDBType = nullptr;
+  if (!sCachedIAiFormationDBType) {
+    sCachedIAiFormationDBType = gpg::LookupRType(typeid(IAiFormationDB));
+  }
+
+  gpg::RType* const baseType = sCachedIAiFormationDBType;
+  if (baseType == nullptr) {
+    return;
+  }
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
  * Address: 0x0059C570 (FUN_0059C570, ?Init@CAiFormationDBImplTypeInfo@Moho@@UAEXXZ)
  */
 void CAiFormationDBImplTypeInfo::Init()
@@ -441,21 +471,7 @@ void CAiFormationDBImplTypeInfo::Init()
   (void)InitializeAllocationCallbacks(this);
   gpg::RType::Init();
 
-  static gpg::RType* sCachedIAiFormationDBType = nullptr;
-  if (!sCachedIAiFormationDBType) {
-    sCachedIAiFormationDBType = gpg::LookupRType(typeid(IAiFormationDB));
-  }
-
-  gpg::RType* const baseType = sCachedIAiFormationDBType;
-  if (baseType) {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    AddBase(baseField);
-  }
+  AddBase_IAiFormationDB(this);
 
   Finish();
 }
