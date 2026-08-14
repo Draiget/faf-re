@@ -11465,6 +11465,81 @@ namespace
 	}
 
 	/**
+	 * Address: 0x0091A3B0 (FUN_0091A3B0, sub_91A3B0)
+	 *
+	 * What it does:
+	 * Pushes the last Win32 error as a Lua string. Falls back to a formatted
+	 * numeric message when FormatMessage itself fails, so the caller always ends
+	 * up with exactly one string on the stack.
+	 */
+	void PushLastSystemError(lua_State* const state)
+	{
+		const DWORD lastError = ::GetLastError();
+		CHAR buffer[128];
+		if (::FormatMessageA(
+				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, lastError, 0, buffer,
+				static_cast<DWORD>(sizeof(buffer)), nullptr
+			) != 0) {
+			lua_pushstring(state, buffer);
+		} else {
+			lua_pushfstring(state, "system error %d\n", lastError);
+		}
+	}
+
+	/**
+	 * Address: 0x0091A410 (FUN_0091A410, loadlib)
+	 *
+	 * What it does:
+	 * `loadlib(path, symbol)` - loads a DLL and wraps the named export as a Lua
+	 * C closure carrying the module handle as its one upvalue, so the module
+	 * stays alive as long as the closure does.
+	 *
+	 * On failure it returns three values (nil, message, "open"/"init") rather
+	 * than raising, and it frees the library when the load succeeded but the
+	 * symbol did not resolve.
+	 */
+	int LuaLoadLib(lua_State* const state)
+	{
+		const char* const path = luaL_checklstring(state, 1, nullptr);
+		const char* const symbol = luaL_checklstring(state, 2, nullptr);
+
+		const HMODULE module = ::LoadLibraryA(path);
+		if (module != nullptr) {
+			if (auto* const entry =
+					reinterpret_cast<lua_CFunction>(::GetProcAddress(module, symbol));
+				entry != nullptr) {
+				lua_pushlightuserdata(state, module);
+				lua_pushcclosure(state, entry, 1);
+				return 1;
+			}
+		}
+
+		lua_pushnil(state);
+		PushLastSystemError(state);
+		lua_pushstring(state, (module != nullptr) ? "init" : "open");
+		if (module != nullptr) {
+			::FreeLibrary(module);
+		}
+		return 3;
+	}
+
+	/**
+	 * Address: 0x0091A4B0 (FUN_0091A4B0, luaopen_loadlib)
+	 *
+	 * What it does:
+	 * Installs `loadlib` straight into the globals table. Unlike the other
+	 * openers there is no library table and no return value - it pushes nothing
+	 * and reports zero results.
+	 */
+	int LuaOpenLoadLib(lua_State* const state)
+	{
+		lua_pushstring(state, "loadlib");
+		lua_pushcclosure(state, LuaLoadLib, 0);
+		lua_settable(state, LUA_GLOBALSINDEX);
+		return 0;
+	}
+
+	/**
 	 * Address: 0x0090EEA0 (FUN_0090EEA0, luaB_getmetatable)
 	 *
 	 * What it does:
@@ -17885,7 +17960,8 @@ void LuaState::Init(const StandardLibraries initStandardLibrary)
 		LuaOpenMath(state);
 		luaopen_debug(state);
 		if (initStandardLibrary == LIB_OSIO) {
-			luaopen_loadlib(state);
+			// Ours, not the prebuilt lib's - same reason as LuaOpenIo above.
+			LuaOpenLoadLib(state);
 		}
 
 		ScriptFunctionsRegister(this);
