@@ -10722,6 +10722,34 @@ moho::Listener<moho::EUnitCommandQueueStatus>* RRef::TryUpcastListenerEUnitComma
 }
 
 /**
+ * Address: 0x0054E230 (FUN_0054E230, gpg::RRef::TryUpcast_CAniPose)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `CAniPose` object lane and throws
+ * `BadRefCast` with source/target names on mismatch.
+ */
+moho::CAniPose* RRef::TryUpcastCAniPose() const
+{
+  static RType* sCAniPoseType = nullptr;
+  return TryUpcastValueOrThrow<moho::CAniPose>(*this, typeid(moho::CAniPose), sCAniPoseType);
+}
+
+/**
+ * Address: 0x0067FBA0 (FUN_0067FBA0, gpg::RRef::TryUpcast_PositionHistory)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `PositionHistory` object lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::PositionHistory* RRef::TryUpcastPositionHistory() const
+{
+  static RType* sPositionHistoryType = nullptr;
+  return TryUpcastValueOrThrow<moho::PositionHistory>(
+    *this, typeid(moho::PositionHistory), sPositionHistoryType
+  );
+}
+
+/**
  * Address: 0x006FD290 (FUN_006FD290, gpg::RRef::TryUpcast_Prop)
  *
  * What it does:

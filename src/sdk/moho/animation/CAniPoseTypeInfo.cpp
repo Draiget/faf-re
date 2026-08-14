@@ -28,18 +28,12 @@ namespace
     return type;
   }
 
+  // Dispatches to the reflection layer's own `CAniPose` upcast (0x0054E230)
+  // rather than repeating the lookup-and-throw: the binary emits that function
+  // and CpyRef/MovRef are its only two callers.
   [[nodiscard]] CAniPose* TryUpcastCAniPoseOrThrow(const gpg::RRef& sourceRef)
   {
-    gpg::RType* const targetType = CachedCAniPoseType();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, targetType);
-    auto* const pose = static_cast<CAniPose*>(upcast.mObj);
-    if (!pose) {
-      const char* const sourceName = sourceRef.mType ? sourceRef.mType->GetName() : "null";
-      const char* const targetName = targetType ? targetType->GetName() : "null";
-      throw gpg::BadRefCast(nullptr, sourceName, targetName);
-    }
-
-    return pose;
+    return sourceRef.TryUpcastCAniPose();
   }
 
   [[nodiscard]] gpg::RRef MakePoseRef(CAniPose* const pose)
