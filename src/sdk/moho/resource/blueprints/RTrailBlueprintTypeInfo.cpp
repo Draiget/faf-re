@@ -114,17 +114,6 @@ namespace
     typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
   }
 
-  void AddEffectBase(gpg::RType* typeInfo)
-  {
-    gpg::RType* const effectType = CachedEffectBlueprintType();
-    gpg::RField baseField{};
-    baseField.mName = effectType->GetName();
-    baseField.mType = effectType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 
   gpg::RRef MakeTrailBlueprintRef(moho::RTrailBlueprint* object)
   {
@@ -215,6 +204,25 @@ namespace moho
   }
 
   /**
+ * Address: 0x00510E50 (FUN_00510E50, Moho::RTrailBlueprintTypeInfo::AddBase_REffectBlueprint)
+ *
+ * What it does:
+ * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
+ * inheritance, so the sub-object starts where the object does.
+ */
+void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
+{
+  gpg::RType* const effectType = CachedEffectBlueprintType();
+  gpg::RField baseField{};
+  baseField.mName = effectType->GetName();
+  baseField.mType = effectType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
    * Address: 0x0050F230 (FUN_0050F230)
    *
    * What it does:
@@ -225,7 +233,7 @@ namespace moho
   {
     size_ = sizeof(RTrailBlueprint);
     (void)BindTrailBlueprintTypeInfoHookLanes(this);
-    AddEffectBase(this);
+    AddBase_REffectBlueprint(this);
     gpg::RType::Init();
     AddFields(this);
     Finish();
