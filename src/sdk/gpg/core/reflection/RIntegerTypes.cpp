@@ -14,21 +14,48 @@ namespace
   template <class TValue>
   using IntegerMakeRefFunc = gpg::RRef* (*)(gpg::RRef*, TValue*);
 
+  // The binary emits one upcast function per reflected integer type
+  // (0x008E15B0 char .. 0x008E1AD0 uint) and every Copy/Construct/Move lane
+  // below funnels through it, so dispatch to those rather than re-deriving
+  // the lookup-and-throw here - a private copy would leave nine recovered
+  // `RRef::TryUpcast*` bodies with no caller.
+  [[nodiscard]] inline char* UpcastIntegerLane(gpg::RRef& ref, char*) { return ref.TryUpcastChar(); }
+
+  [[nodiscard]] inline signed char* UpcastIntegerLane(gpg::RRef& ref, signed char*)
+  {
+    return ref.TryUpcastSignedChar();
+  }
+
+  [[nodiscard]] inline unsigned char* UpcastIntegerLane(gpg::RRef& ref, unsigned char*)
+  {
+    return ref.TryUpcastUnsignedChar();
+  }
+
+  [[nodiscard]] inline short* UpcastIntegerLane(gpg::RRef& ref, short*) { return ref.TryUpcastShort(); }
+
+  [[nodiscard]] inline unsigned short* UpcastIntegerLane(gpg::RRef& ref, unsigned short*)
+  {
+    return ref.TryUpcastUnsignedShort();
+  }
+
+  [[nodiscard]] inline int* UpcastIntegerLane(gpg::RRef& ref, int*) { return ref.TryUpcastInt(); }
+
+  [[nodiscard]] inline unsigned int* UpcastIntegerLane(gpg::RRef& ref, unsigned int*)
+  {
+    return ref.TryUpcastUnsignedInt();
+  }
+
+  [[nodiscard]] inline long* UpcastIntegerLane(gpg::RRef& ref, long*) { return ref.TryUpcastLong(); }
+
+  [[nodiscard]] inline unsigned long* UpcastIntegerLane(gpg::RRef& ref, unsigned long*)
+  {
+    return ref.TryUpcastUnsignedLong();
+  }
+
   template <class TValue>
   [[nodiscard]] TValue* TryUpcastIntegerValue(gpg::RRef* const sourceRef)
   {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(TValue));
-    }
-
-    const gpg::RRef upcastRef = gpg::REF_UpcastPtr(*sourceRef, sType);
-    if (!upcastRef.mObj) {
-      const char* const sourceName = sourceRef->mType ? sourceRef->mType->GetName() : "null";
-      const char* const targetName = sType ? sType->GetName() : typeid(TValue).name();
-      throw gpg::BadRefCast(nullptr, sourceName, targetName);
-    }
-    return static_cast<TValue*>(upcastRef.mObj);
+    return UpcastIntegerLane(*sourceRef, static_cast<TValue*>(nullptr));
   }
 
   template <class TValue>

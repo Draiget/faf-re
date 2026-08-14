@@ -660,6 +660,34 @@ namespace gpg
     [[nodiscard]] long* TryUpcastLong() const;
 
     /**
+     * Address: 0x008E15B0 (FUN_008E15B0, gpg::RRef::TryUpcast_char)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one plain `char*` lane and throws
+     * `gpg::BadRefCast` when the runtime type is incompatible. Plain `char` is
+     * a distinct reflected type from both `signed char` and `unsigned char`.
+     */
+    [[nodiscard]] char* TryUpcastChar() const;
+
+    /**
+     * Address: 0x008E1680 (FUN_008E1680, gpg::RRef::TryUpcast_short)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `short*` lane and throws
+     * `gpg::BadRefCast` when the runtime type is incompatible.
+     */
+    [[nodiscard]] short* TryUpcastShort() const;
+
+    /**
+     * Address: 0x008E1720 (FUN_008E1720, gpg::RRef::TryUpcast_int)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `int*` lane and throws
+     * `gpg::BadRefCast` when the runtime type is incompatible.
+     */
+    [[nodiscard]] int* TryUpcastInt() const;
+
+    /**
      * Address: 0x008E18C0 (FUN_008E18C0, gpg::RRef::TryUpcast_schar)
      *
      * What it does:
