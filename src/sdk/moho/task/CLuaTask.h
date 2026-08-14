@@ -136,6 +136,14 @@ namespace moho
      * Slot: 9
      */
     void Init() override;
+
+    /**
+     * Address: 0x004CB680 (FUN_004CB680, Moho::CLuaTaskTypeInfo::AddBase_CTask)
+     *
+     * What it does:
+     * Registers `CTask` as this type's reflected base at offset 0.
+     */
+    static void AddBase_CTask(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(CLuaTask) == 0x28, "CLuaTask size must be 0x28");
