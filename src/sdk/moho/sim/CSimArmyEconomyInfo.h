@@ -14,6 +14,7 @@ namespace gpg
 namespace moho
 {
   class CEconStorage;
+  class Sim;
   enum EEconResource : std::int32_t;
   using IntrusiveNode = TDatListItem<void, void>;
 
@@ -73,10 +74,24 @@ namespace moho
     [[nodiscard]] double MaxStorageOf(EEconResource resource) const noexcept;
   };
 
+  /**
+   * Per-army economy state.
+   *
+   * This models the same binary object as `moho::CEconomy` (`moho/sim/CEconomy.h`)
+   * - `CArmyImpl` allocates a `CEconomy` and hands it out through
+   * `GetEconomy()` as a `CSimArmyEconomyInfo*` (`CArmyImpl.cpp:1445`). The two
+   * declarations agree field for field; keep them in step until one can be made
+   * a thin alias of the other.
+   */
   class CSimArmyEconomyInfo
   {
   public:
-    std::uint8_t _pad_00[0x18];
+    Sim* mSim;                             // +0x00 (CEconomy::mSim)
+    std::int32_t mIndex;                   // +0x04 (CEconomy::mIndex)
+    /// Resources banked this tick. `Unit::HandleResourceManagement` adds each
+    /// producing unit's per-tick output here and to `mPendingResources`.
+    SEconPair mResources;                  // +0x08 (CEconomy::mResources)
+    SEconPair mPendingResources;           // +0x10 (CEconomy::mPendingResources)
     SEconTotals economy;                   // +0x18
     CEconStorage* storageDelta;            // +0x50
     std::uint8_t isResourceSharingEnabled; // +0x54
@@ -89,6 +104,11 @@ namespace moho
   static_assert(sizeof(SEconStoragePair) == 0x10, "SEconStoragePair size must be 0x10");
   static_assert(offsetof(SEconTotals, mMaxStorage) == 0x28, "SEconTotals::mMaxStorage offset must be 0x28");
   static_assert(sizeof(SEconTotals) == 0x38, "SEconTotals size must be 0x38");
+  static_assert(offsetof(CSimArmyEconomyInfo, mResources) == 0x08, "CSimArmyEconomyInfo::mResources offset must be 0x08");
+  static_assert(
+    offsetof(CSimArmyEconomyInfo, mPendingResources) == 0x10,
+    "CSimArmyEconomyInfo::mPendingResources offset must be 0x10"
+  );
   static_assert(offsetof(CSimArmyEconomyInfo, economy) == 0x18, "CSimArmyEconomyInfo::economy offset must be 0x18");
   static_assert(
     offsetof(CSimArmyEconomyInfo, storageDelta) == 0x50, "CSimArmyEconomyInfo::storageDelta offset must be 0x50"
