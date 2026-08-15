@@ -1787,6 +1787,47 @@ void CScriptObject::RunScriptStringNum3(
   }
 }
 
+namespace
+{
+  /**
+   * Address: 0x005ED7D0 (FUN_005ED7D0, LuaPlus::LuaFunction::Call_ObjectStrUnit)
+   *
+   * IDA signature:
+   * void __userpurge LuaPlus::LuaFunction::Call_ObjectStrUnit(
+   *     LuaPlus::LuaFunction *fn@<edi>, LuaPlus::LuaObject self, char *text,
+   *     Moho::Unit *unit);
+   *
+   * What it does:
+   * The out-of-line emission of `LuaFunction<void>::operator()` for the
+   * `(LuaObject, const char*, Unit*)` argument list - calls `fn(self, text,
+   * unit)` and restores the stack afterwards. A null unit is passed to Lua as
+   * `nil` rather than being skipped, so the script always sees three
+   * arguments.
+   *
+   * `self` is taken by value because the binary destroys its own copy on the
+   * way out.
+   */
+  void CallLuaFunctionObjectStringUnit(
+    const LuaPlus::LuaFunction<void>& fn, LuaPlus::LuaObject self, const char* const text, Unit* const unit
+  )
+  {
+    lua_State* const state = fn.GetActiveCState();
+    const int restoreTop = lua_gettop(state);
+
+    fn.PushStack(state);
+    self.PushStack(state);
+    lua_pushstring(state, text);
+    if (unit != nullptr) {
+      unit->mLuaObj.PushStack(state);
+    } else {
+      lua_pushnil(state);
+    }
+
+    lua_call(state, 3, 1);
+    lua_settop(state, restoreTop);
+  }
+} // namespace
+
 /**
  * Address: 0x005EBD60 (FUN_005EBD60, Moho::CScriptObject::RunScript_StrUnit)
  *
@@ -1812,7 +1853,7 @@ void CScriptObject::RunScriptStringUnit(const char* const scriptName, const char
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    fn(mLuaObj, text ? text : "", unit);
+    CallLuaFunctionObjectStringUnit(fn, mLuaObj, text ? text : "", unit);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
