@@ -1189,6 +1189,26 @@ namespace moho
     void Warp(const VTransform& transform) override;
 
     /**
+     * Address: 0x006ABCC0 (FUN_006ABCC0, ?Sync@Unit@Moho@@UAEXPAUSSyncData@2@@Z)
+     * Mangled: ?Sync@Unit@Moho@@UAEXPAUSSyncData@2@@Z
+     * VFTable SLOT: 12 (over `Entity::Sync`)
+     *
+     * IDA signature:
+     * void __thiscall Moho::Unit::Sync(Moho::Unit* this, Moho::SSyncData* syncData);
+     *
+     * What it does:
+     * Republishes the parts of `VarDat()` that only change on demand, then
+     * chains into `Entity::Sync`. The expensive half runs only while
+     * `NeedSyncGameData` is set, and clears the flag on the way out: weak
+     * creator / focus / guard / target-blip references collapse to entity ids,
+     * the six silo counters are re-read, and - unless the unit is dead or
+     * queued for destruction - the weapon-info snapshot lane is regrown and
+     * refilled from the live weapons. The two shared animation poses are
+     * refreshed unconditionally, every sync.
+     */
+    void Sync(SSyncData* syncData) override;
+
+    /**
      * Address: 0x006AC2C0 (FUN_006AC2C0, ?CreateInterface@Unit@Moho@@MAEXPAUSSyncData@2@@Z)
      *
      * What it does:
