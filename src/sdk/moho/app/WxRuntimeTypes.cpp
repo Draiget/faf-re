@@ -65131,6 +65131,14 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     if (moho::ren_Terrain && terrain != nullptr) {
       RenderTerrainNormals(terrain);
       TransformTerrainNormals();
+
+      // Between the normal transform and the composite the binary also runs
+      // the shadow pass:
+      //   0x007F93DF  mov edx, [eax+18h]  ; slot 6 CameraGetTargetZoom
+      //   0x007F93F1  call RenderShadows(IRenTerrain *, float)
+      // RenderShadows (0x007F7D10) has no body yet and its own chain runs to
+      // ~3100 instructions, so that call is still absent.
+      FogOn(worldView->view->CameraGetZoom());
       RenderCompositeTerrain(terrain);
     }
 
@@ -65158,7 +65166,10 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     if (terrain != nullptr) {
       RenderWaterMask(terrain);
       RenderCopyForRefraction(false);
-      FogOn(1.0f);
+      // Fog density tracks the camera zoom - the binary dispatches
+      // IRenderWorldView slot 8 (CameraGetZoom) straight into FogOn at
+      // 0x007F94B8..0x007F94C8, it is not a constant.
+      FogOn(worldView->view->CameraGetZoom());
       RenderWater(terrain);
     }
 
