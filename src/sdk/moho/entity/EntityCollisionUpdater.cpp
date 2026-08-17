@@ -116,6 +116,24 @@ namespace
     return {box.Axis[axisIndex][0], box.Axis[axisIndex][1], box.Axis[axisIndex][2]};
   }
 
+  /**
+   * Address: 0x00475550 (FUN_00475550, sub_475550)
+   *
+   * IDA signature:
+   * float* __usercall sub_475550@<eax>(float* box@<eax>, float* axis@<ecx>,
+   *     float* outMin, float* outMax);
+   *
+   * What it does:
+   * Projects one oriented box onto a direction and returns the interval it
+   * covers - the centre's projection, give or take the box's radius along that
+   * direction. This is the per-axis half of the separating-axis test:
+   * ComputeBoxBoxContactManifold calls it once per box for each of the fifteen
+   * candidate axes and declares a miss as soon as two intervals fail to meet.
+   *
+   * The axis is not required to be unit length. Callers that need a real
+   * distance divide by its length afterwards, which is what the manifold's
+   * overlap normalisation does.
+   */
   void ProjectBoxOntoAxis(const Wm3::Box3f& box, const Wm3::Vec3f& axis, float* outMin, float* outMax) noexcept
   {
     const Wm3::Vec3f center = BuildBoxCenter(box);
@@ -124,9 +142,12 @@ namespace
     const Wm3::Vec3f axis2 = BoxAxis(box, 2);
 
     const float centerProjection = Wm3::Vector3f::Dot(axis, center);
-    const float radius = std::fabs(Wm3::Vector3f::Dot(axis, axis0)) * box.Extent[0] +
-      std::fabs(Wm3::Vector3f::Dot(axis, axis1)) * box.Extent[1] +
-      std::fabs(Wm3::Vector3f::Dot(axis, axis2)) * box.Extent[2];
+
+    // Summed third-axis first, then second, then first, because that is the
+    // order the binary accumulates in and float addition does not associate.
+    const float radius = (std::fabs(Wm3::Vector3f::Dot(axis, axis2)) * box.Extent[2] +
+                           std::fabs(Wm3::Vector3f::Dot(axis, axis1)) * box.Extent[1]) +
+      std::fabs(Wm3::Vector3f::Dot(axis, axis0)) * box.Extent[0];
 
     *outMin = centerProjection - radius;
     *outMax = centerProjection + radius;
