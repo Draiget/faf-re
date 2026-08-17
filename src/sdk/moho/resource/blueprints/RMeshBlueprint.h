@@ -54,6 +54,22 @@ namespace moho
     RMeshBlueprintLOD(const RMeshBlueprintLOD& other);
 
     /**
+     * Address: 0x00519800 (FUN_00519800)
+     * Mangled: ??1RMeshBlueprintLOD@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Releases the seven path-name lanes. Compiler-generated: the binary
+     * tears the strings down in reverse declaration order, from mShaderName
+     * back to mMeshName, and touches nothing else - the trailing float and
+     * flag bytes need no cleanup.
+     *
+     * Declared out of line so the emitted symbol matches the binary's; every
+     * LOD destruction, including each element of
+     * `msvc8::vector<RMeshBlueprintLOD>`, goes through it.
+     */
+    ~RMeshBlueprintLOD();
+
+    /**
      * Address: 0x0051B080 (FUN_0051B080)
      * Mangled: ??4RMeshBlueprintLOD@Moho@@QAEAAV01@ABV01@@Z
      *

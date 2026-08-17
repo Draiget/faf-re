@@ -485,6 +485,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x00519800 (FUN_00519800)
+   * Mangled: ??1RMeshBlueprintLOD@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Releases the seven path-name lanes. The body is empty because the
+   * members do the work: the compiler destroys them in reverse declaration
+   * order, which is exactly the order the binary tears them down in, from
+   * mShaderName back to mMeshName.
+   */
+  RMeshBlueprintLOD::~RMeshBlueprintLOD() = default;
+
+  /**
    * Address: 0x0051B080 (FUN_0051B080)
    * Mangled: ??4RMeshBlueprintLOD@Moho@@QAEAAV01@ABV01@@Z
    *
