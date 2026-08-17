@@ -385,6 +385,46 @@ namespace moho
   }
 
   /**
+   * Address: 0x00809B50 (FUN_00809B50, Moho::LowFidelityTerrain::DrawWaterTerrain)
+   * Primary vtable slot 11 (vftable @0x00E41A94).
+   *
+   * IDA signature:
+   * volatile signed __int32 *__thiscall sub_809B50(
+   *     int this, int a2, int a3, int a4, volatile signed __int32 *a5,
+   *     int a6, volatile signed __int32 *a7);
+   * (`a4`+`a5` and `a6`+`a7` are the split halves of two by-value
+   * boost::shared_ptr<ID3DRenderTarget> arguments.)
+   *
+   * What it does:
+   * Hands the frame's water surface to the active WaterSurface fidelity.
+   * Low fidelity adds no viewport setup of its own - it fetches the terrain's
+   * water shader properties and issues the one surface pass.
+   *
+   * The argument mapping was taken from the .asm rather than the decompiler,
+   * which normalises `[esp+24h+arg_10]` and `[esp+2Ch+arg_10]` to one name
+   * across three `sub esp, 8` adjustments and so prints the tick and the frame
+   * delta as if they were the shared_ptr halves. At the slot-4 call the stack
+   * holds, low to high: tick, tickLerp, camera, shaderProperties, then the two
+   * retained shared_ptr pairs.
+   */
+  void LowFidelityTerrain::DrawWaterTerrain(
+    const std::int32_t tick,
+    const float tickLerp,
+    const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
+    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture)
+  {
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    (void)sTerrainWaterSurface->RenderWaterSurface(
+      tick,
+      tickLerp,
+      mCamera,
+      terrainRes->GetWaterShaderProperties(),
+      refractionTexture,
+      reflectionTexture);
+  }
+
+  /**
    * Address: 0x00809C80 (FUN_00809C80, Moho::LowFidelityTerrain::DrawTerrainSkirt)
    *
    * What it does:

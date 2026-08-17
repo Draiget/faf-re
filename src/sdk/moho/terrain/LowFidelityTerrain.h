@@ -101,6 +101,20 @@ namespace moho
      * Issues one terrain-skirt indexed draw for the low-fidelity terrain path
      * when terrain/skirt flags are enabled and skirt index lanes are valid.
      */
+    /**
+     * Address: 0x00809B50 (FUN_00809B50, Moho::LowFidelityTerrain::DrawWaterTerrain)
+     * Primary vtable slot 11 (vftable @0x00E41A94).
+     *
+     * What it does:
+     * Issues the water surface pass for this frame through the active
+     * WaterSurface fidelity.
+     */
+    void DrawWaterTerrain(
+      std::int32_t tick,
+      float tickLerp,
+      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
+      boost::shared_ptr<ID3DRenderTarget> reflectionTexture) override;
+
     void DrawTerrainSkirt() override;
 
     /**

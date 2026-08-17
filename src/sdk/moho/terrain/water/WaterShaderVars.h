@@ -39,6 +39,16 @@ namespace moho
   [[nodiscard]] ShaderVar& GetWater2TerrainScaleShaderVar();
 
   /**
+   * Shader var `water2/ViewportScaleOffset` (0x010C0FA8).
+   *
+   * What it does:
+   * Carries the 4-float viewport scale/offset the medium and high fidelity
+   * terrain water passes derive from the terrain grid dimensions before
+   * handing the frame to the water surface.
+   */
+  [[nodiscard]] ShaderVar& GetWater2ViewportScaleOffsetShaderVar();
+
+  /**
    * Address: 0x008111E0 (FUN_008111E0)
    *
    * What it does:

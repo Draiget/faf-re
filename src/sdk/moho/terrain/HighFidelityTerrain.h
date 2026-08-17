@@ -152,6 +152,28 @@ namespace moho
     void DrawGlowingDecals(std::int32_t gameTick, float deltaSeconds);
 
     /**
+     * Address: 0x00802340 (FUN_00802340, sub_802340)
+     *
+     * What it does:
+     * Composites the water-albedo decals over the water surface.
+     */
+    void DrawWaterAlbedoDecals(std::int32_t gameTick, float deltaSeconds);
+
+    /**
+     * Address: 0x00803410 (FUN_00803410, Moho::HighFidelityTerrain::DrawWaterTerrain)
+     * Primary vtable slot 11 (vftable @0x00E41A14).
+     *
+     * What it does:
+     * Binds the water2 viewport scale/offset, issues the water surface
+     * pass, then composites the water-albedo decals.
+     */
+    void DrawWaterTerrain(
+      std::int32_t tick,
+      float tickLerp,
+      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
+      boost::shared_ptr<ID3DRenderTarget> reflectionTexture) override;
+
+    /**
      * Address: 0x00801BE0 (FUN_00801BE0, Moho::HighFidelityTerrain::DrawNormals)
      * Primary vtable slot 8 (vftable @0x00E41A14).
      *

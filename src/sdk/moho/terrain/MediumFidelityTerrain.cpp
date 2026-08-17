@@ -27,6 +27,7 @@
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaterFactory.h"
+#include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 
 namespace
@@ -1049,6 +1050,104 @@ namespace moho
 
       (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
     }
+  }
+
+  /**
+   * Address: 0x00806370 (FUN_00806370, sub_806370)
+   *
+   * What it does:
+   * The water-albedo decal pass. Re-selects the `terrain` effect and the
+   * `TDecalsWaterAlbedo` technique (or `TDecalOverDraw`), rebinds the camera
+   * matrices and the base shader vars, then draws every decal command of type
+   * `WldTerrainDecalType_WaterAlbedo`.
+   *
+   * Low fidelity runs this as one more DrawDecalPass inside DrawNormals; the
+   * medium and high paths defer it to the water pass so it composites over the
+   * water surface.
+   */
+  void MediumFidelityTerrain::DrawWaterAlbedoDecals(const std::int32_t gameTick, const float deltaSeconds)
+  {
+    if (!ren_Decals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : "TDecalsWaterAlbedo");
+
+    const GeomCamera3& camera = *mCamera;
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    LoadShaderVars({});
+
+    for (const TerrainDecalDrawCommand& command : mDecalDrawCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (decal.mType != WldTerrainDecalType_WaterAlbedo) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, deltaSeconds, gameTick);
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      SubmitDecalCommandDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
+    }
+  }
+
+  /**
+   * Address: 0x00807430 (FUN_00807430, Moho::MediumFidelityTerrain::DrawWaterTerrain)
+   * Primary vtable slot 11 (vftable @0x00E41A54).
+   *
+   * What it does:
+   * Derives the `water2/ViewportScaleOffset` constant from the terrain grid
+   * dimensions, hands the frame to the active WaterSurface fidelity, then
+   * composites the water-albedo decals over the result.
+   */
+  void MediumFidelityTerrain::DrawWaterTerrain(
+    const std::int32_t tick,
+    const float tickLerp,
+    const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
+    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture)
+  {
+    const float inverseRenderWidth = 1.0F / static_cast<float>(mViewportRenderWidth);
+    const float inverseRenderHeight = 1.0F / static_cast<float>(mViewportRenderHeight);
+
+    const float halfWidthScale = (inverseRenderWidth * static_cast<float>(mViewportWidth)) * 0.5F;
+    const float heightScale = inverseRenderHeight * static_cast<float>(mViewportHeight);
+
+    const float viewportScaleOffset[4] = {
+      halfWidthScale,
+      heightScale * -0.5F,
+      (halfWidthScale + (inverseRenderWidth * static_cast<float>(mViewportOriginX)))
+        + (inverseRenderWidth * 0.5F),
+      (inverseRenderHeight * 0.5F)
+        + ((inverseRenderHeight * static_cast<float>(mViewportOriginY)) + (heightScale * 0.5F))
+    };
+    SetShaderVarMem(GetWater2ViewportScaleOffsetShaderVar(), 4U, viewportScaleOffset);
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    (void)sMediumFidelityWaterSurface->RenderWaterSurface(
+      tick,
+      tickLerp,
+      mCamera,
+      terrainRes->GetWaterShaderProperties(),
+      refractionTexture,
+      reflectionTexture);
+
+    DrawWaterAlbedoDecals(tick, tickLerp);
   }
 
   /**

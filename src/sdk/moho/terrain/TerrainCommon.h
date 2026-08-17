@@ -127,6 +127,23 @@ namespace moho
      * which tail-jumps through this slot: `mov edx, [eax+30h]` / `jmp edx`
      * at 0x007F8285.
      */
+    /**
+     * Primary vtable slot 11.
+     *
+     * What it does:
+     * Issues the frame's water surface pass through the active WaterSurface
+     * fidelity, after whatever per-fidelity viewport setup that path needs.
+     *
+     * Dispatched from `WRenViewport::RenderWater` (0x007F86F0). The two
+     * render targets arrive as by-value shared_ptrs - refraction from
+     * mPrimaryTargetLocks[mHead], reflection from mSecondaryTargetLocks[mHead].
+     */
+    virtual void DrawWaterTerrain(
+      std::int32_t tick,
+      float tickLerp,
+      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
+      boost::shared_ptr<ID3DRenderTarget> reflectionTexture) = 0;
+
     virtual void DrawTerrainSkirt() = 0;
 
     boost::shared_ptr<RD3DTextureResource> mDecalMask{}; // +0x04

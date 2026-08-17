@@ -65410,7 +65410,18 @@ void moho::WRenViewport::RenderWater(TerrainCommon* const terrain)
   SetViewportToLocalScreen();
   device->SetColorWriteState(true, true);
 
-  (void)terrain;
+  // Slot 11. The two render targets are retained by value across the call
+  // (0x007F86F0 builds both shared_ptr temporaries before the dispatch):
+  // refraction from mPrimaryTargetLocks[head], reflection from
+  // mSecondaryTargetLocks[head].
+  WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
+  const std::int32_t head = runtime->mHead;
+  terrain->DrawWaterTerrain(
+    moho::REN_GetGameTick(),
+    moho::REN_GetSimDeltaSeconds(),
+    passView->mPrimaryTargetLocks[head],
+    passView->mSecondaryTargetLocks[head]
+  );
 }
 
 /**
