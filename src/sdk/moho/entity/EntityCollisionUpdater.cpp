@@ -132,6 +132,19 @@ namespace
     *outMax = centerProjection + radius;
   }
 
+  /**
+   * Address: 0x004752F0 (FUN_004752F0, sub_4752F0)
+   *
+   * IDA signature:
+   * float* __usercall sub_4752F0@<eax>(float* box@<eax>, float* direction@<edx>, float* out@<ecx>);
+   *
+   * What it does:
+   * Returns the corner of the box lying furthest against `direction`. Starts
+   * at the centre and steps one extent along each axis, subtracting where the
+   * axis projects positively and adding where it projects negatively. An axis
+   * inside the dead band contributes nothing, so a direction parallel to a
+   * face yields a point on that face rather than an arbitrary corner.
+   */
   [[nodiscard]] Wm3::Vec3f
   ComputeSupportPointAgainstDirection(const Wm3::Box3f& box, const Wm3::Vec3f& direction) noexcept
   {
