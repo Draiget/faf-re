@@ -126,6 +126,7 @@ namespace moho
   extern bool ren_ShowNormals;
   extern bool ren_DecalOverDraw;
   extern bool ren_glowingDecals;
+  extern bool ren_bicubicnormals;
 
   /**
    * Address: 0x00803A10 (FUN_00803A10, ??0MediumFidelityTerrain@Moho@@QAE@@Z)
@@ -934,6 +935,118 @@ namespace moho
       if (type == WldTerrainDecalType_Normals) {
         drawDecalCommand(command);
       }
+    }
+  }
+
+  /**
+   * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormals)
+   * Primary vtable slot 9 (vftable @0x00E41A54).
+   *
+   * IDA signature:
+   * void __fastcall Moho::MediumFidelityTerrain::DrawTerrainNormals(
+   *     int ecx0, int edx0, int a3, float arg4);
+   *
+   * What it does:
+   * Fills the off-screen terrain-normal buffer that
+   * `WRenViewport::TransformTerrainNormals` samples one call later for its
+   * `TCreateBasis` pass.
+   *
+   * Selects the `terrain` effect and resolves the pass technique from the
+   * active stratum material's `normals` string annotation, falling back to
+   * `TTerrainNormals`. Binds terrain lighting with no shadow context and the
+   * base shader vars with no scratch handle, draws the terrain triangles and -
+   * unless decal over-draw is on - the normal-mapped decals. Then switches to
+   * the basis technique and walks every normal-map tile, binding that tile's
+   * scale/offset and the E_X / E_Y / Size_Source basis constants before
+   * drawing its tesselated geometry.
+   *
+   * Unlike the low-fidelity tile loop this one additionally requires the
+   * tesselated index count to be a whole number of triangles (`% 3 == 0`)
+   * before issuing the draw.
+   */
+  void MediumFidelityTerrain::DrawTerrainNormals(MeshRenderer* const renderer, const float lod)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+
+    // The technique name is an annotation on the stratum material's shader
+    // rather than a literal, so a map can override the normal pass.
+    CD3DEffect* const effect = device->GetCurEffect();
+    const msvc8::string technique = effect->GetStringAnnotation(
+      terrainRes->GetStratumMaterial().mShaderName,
+      msvc8::string{"normals"},
+      msvc8::string{"TTerrainNormals"});
+    device->SelectTechnique(technique.c_str());
+
+    LoadTerrainLighting(nullptr);
+    LoadShaderVars({});
+    DrawTriangles();
+    if (!ren_DecalOverDraw) {
+      DrawNormalMappedDecals(renderer, lod);
+    }
+
+    device->SelectTechnique(ren_bicubicnormals ? "TTerrainBasisBiCubic" : "TTerrainBasis");
+
+    const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
+    for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
+      const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
+
+      shaderVars.utilityTextureA.GetTexture(info.mTexture);
+
+      SetShaderVarMem(shaderVars.normalMapScale, 4U, &info.mXResolution);
+      SetShaderVarMem(shaderVars.normalMapOffset, 4U, &info.mOffsetScaleX);
+
+      const float basisEX[2] = {1.0F / info.mWidth, 0.0F};
+      SetShaderVarMem(shaderVars.normalBasisEX, 2U, basisEX);
+      const float basisEY[2] = {0.0F, 1.0F / info.mHeight};
+      SetShaderVarMem(shaderVars.normalBasisEY, 2U, basisEY);
+      SetShaderVarMem(shaderVars.normalBasisSizeSource, 2U, &info.mWidth);
+
+      const std::int32_t querySize = (static_cast<std::int32_t>(info.mWidth) < static_cast<std::int32_t>(info.mHeight))
+                                       ? static_cast<std::int32_t>(info.mHeight)
+                                       : static_cast<std::int32_t>(info.mWidth);
+
+      std::int32_t rangeStart = 0;
+      std::uint32_t rangeCount = 0;
+      std::int32_t minValue = 0;
+      std::int32_t maxValue = 0;
+      (void)mTesselator->Tesselate(
+        static_cast<std::int32_t>(info.mTileOriginX),
+        static_cast<std::int32_t>(info.mTileOriginY),
+        querySize,
+        &rangeStart,
+        &rangeCount,
+        &minValue,
+        &maxValue);
+
+      if (rangeStart + static_cast<std::int32_t>(rangeCount) >= kSkirtMaxIndexCount) {
+        continue;
+      }
+      if (rangeCount == 0U || (rangeCount % 3U) != 0U) {
+        continue;
+      }
+
+      std::int32_t primitiveType = kTriangleListPrimitiveType;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = mTerrainIndexSheet;
+      indexView.startIndex = rangeStart;
+      indexView.indexCount = static_cast<std::int32_t>(rangeCount);
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = mTerrainVertexSheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = minValue;
+      vertexView.endVertex = maxValue;
+
+      (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
     }
   }
 
