@@ -287,6 +287,18 @@ namespace moho
       float z
     );
 
+    /**
+     * Address: 0x0060DAE0 (FUN_0060DAE0, Moho::CUnitCommand::GetFerryBeacon)
+     *
+     * IDA signature:
+     * Moho::Unit *__usercall GetFerryBeacon@<eax>(CUnitCommand *a1@<eax>);
+     *
+     * What it does:
+     * Resolves the ferry beacon this command spawned, or null once the
+     * beacon has gone away.
+     */
+    [[nodiscard]] Unit* GetFerryBeacon() const;
+
   private:
     /**
      * Address: 0x006E7FF0 (FUN_006E7FF0, ??0CUnitCommand@Moho@@AAE@XZ)
