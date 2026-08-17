@@ -345,6 +345,26 @@ namespace moho
   class CFormationInstance : public IFormationInstance
   {
   public:
+    /**
+     * Address: 0x005741D0 (FUN_005741D0, Moho::CFormationInstance::MemberDeserialize)
+     *
+     * What it does:
+     * Reads the eighteen reflected lanes back in the order MemberSerialize
+     * wrote them. The Lua state and game-rules lanes come back through typed
+     * pointer readers rather than a raw form.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005744E0 (FUN_005744E0, Moho::CFormationInstance::MemberSerialize)
+     *
+     * What it does:
+     * Writes the reflected base payload, the two owning pointers as unowned
+     * tracked references, then every formation lane. mSim and the trailing
+     * word are runtime-only and deliberately not written.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     std::int32_t mUnitCount;                      // +0x04
     TDatListItem<void, void> mUnitLinkListHead;   // +0x08
     LuaPlus::LuaState* mLuaState;                 // +0x10
