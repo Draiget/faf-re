@@ -2150,7 +2150,7 @@ namespace boost
    * Validates one ptr-container `push_back` input pointer and throws
    * `boost::bad_pointer` when the pointer is null.
    */
-  [[maybe_unused]] void EnsurePtrContainerPushBackInputNotNull(
+  void EnsurePtrContainerPushBackInputNotNull(
     const void* const inputPointer
   )
   {
