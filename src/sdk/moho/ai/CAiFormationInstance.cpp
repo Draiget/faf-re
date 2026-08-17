@@ -674,6 +674,89 @@ namespace
     return type;
   }
 
+  // Reflected-type caches for the lanes CFormationInstance serializes. The
+  // binary keeps one global per type in a single .data cluster; these mirror
+  // them, following the gXxxType convention in Reflection.cpp. They are not
+  // function-local statics on purpose - see the descriptor-cache defects fixed
+  // in 39bd696 / 322b105 / b20cc03.
+  gpg::RType* gEUnitCommandTypeType = nullptr;          // binary 0x010C6EDC
+  gpg::RType* gMapEntIdSCoordsVec2Type = nullptr;       // binary 0x010C6F90
+  gpg::RType* gFastVectorWeakPtrIUnitType = nullptr;    // binary 0x010C6F94
+  gpg::RType* gFastVectorSOffsetInfoType = nullptr;     // binary 0x010C6F98
+  gpg::RType* gFastVectorSAssignedLocInfoType = nullptr;
+  gpg::RType* gQuaternionfType = nullptr;
+
+  /// One reflected lane, skipped when its descriptor has not resolved. The
+  /// binary emits the same null-guarded Write/Read at every lane; lifting it
+  /// keeps the eighteen call sites readable.
+  void WriteFormationLane(
+    gpg::WriteArchive* const archive, gpg::RType* const type, const void* const field, const gpg::RRef& ownerRef
+  )
+  {
+    GPG_ASSERT(type != nullptr);
+    if (type != nullptr) {
+      archive->Write(type, field, ownerRef);
+    }
+  }
+
+  void ReadFormationLane(
+    gpg::ReadArchive* const archive, gpg::RType* const type, void* const field, const gpg::RRef& ownerRef
+  )
+  {
+    GPG_ASSERT(type != nullptr);
+    if (type != nullptr) {
+      archive->Read(type, field, ownerRef);
+    }
+  }
+
+  [[nodiscard]] gpg::RType* CachedEUnitCommandTypeType()
+  {
+    if (!gEUnitCommandTypeType) {
+      gEUnitCommandTypeType = gpg::LookupRType(typeid(moho::EUnitCommandType));
+    }
+    return gEUnitCommandTypeType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedMapEntIdSCoordsVec2Type()
+  {
+    if (!gMapEntIdSCoordsVec2Type) {
+      gMapEntIdSCoordsVec2Type = gpg::LookupRType(typeid(moho::SFormationCoordCacheMap));
+    }
+    return gMapEntIdSCoordsVec2Type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFastVectorWeakPtrIUnitType()
+  {
+    if (!gFastVectorWeakPtrIUnitType) {
+      gFastVectorWeakPtrIUnitType = gpg::LookupRType(typeid(moho::SFormationLinkedUnitRefVec));
+    }
+    return gFastVectorWeakPtrIUnitType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFastVectorSOffsetInfoType()
+  {
+    if (!gFastVectorSOffsetInfoType) {
+      gFastVectorSOffsetInfoType = gpg::LookupRType(typeid(moho::SFormationLaneVec));
+    }
+    return gFastVectorSOffsetInfoType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFastVectorSAssignedLocInfoType()
+  {
+    if (!gFastVectorSAssignedLocInfoType) {
+      gFastVectorSAssignedLocInfoType = gpg::LookupRType(typeid(moho::SFormationOccupiedSlotVec));
+    }
+    return gFastVectorSAssignedLocInfoType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedQuaternionfType()
+  {
+    if (!gQuaternionfType) {
+      gQuaternionfType = gpg::LookupRType(typeid(Wm3::Quatf));
+    }
+    return gQuaternionfType;
+  }
+
   [[nodiscard]] gpg::RType* CachedMapEntIdSUnitOffsetInfoType()
   {
     gpg::RType* type = moho::SOffsetInfo::sType;
@@ -3397,6 +3480,103 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005744E0 (FUN_005744E0, Moho::CFormationInstance::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall Moho::CFormationInstance::MemberSerialize(
+   *     Moho::CFormationInstance* this@<edi>, BinaryWriteArchive* archive@<esi>);
+   *
+   * What it does:
+   * Writes the reflected base payload, then the owning Lua-state and game-rules
+   * references as unowned tracked pointers, then every formation lane in a
+   * fixed order. `mSim` and the trailing word are runtime-only and deliberately
+   * not written - a loaded formation re-binds them from its owner.
+   */
+  void CFormationInstance::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (archive == nullptr) {
+      return;
+    }
+
+    auto* const self = const_cast<CFormationInstance*>(this);
+    const gpg::RRef ownerRef{};
+
+    if (gpg::RType* const baseType = CachedCFormationInstanceType(); baseType != nullptr) {
+      archive->Write(baseType, self, ownerRef);
+    }
+
+    gpg::RRef pointerRef{};
+    (void)gpg::RRef_LuaState(&pointerRef, mLuaState);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+    (void)gpg::RRef_RRuleGameRules(&pointerRef, mGameRules);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    WriteFormationLane(archive, CachedEUnitCommandTypeType(), &self->mCommandType, ownerRef);
+    WriteFormationLane(archive, CachedFastVectorWeakPtrIUnitType(), &self->mUnits, ownerRef);
+    WriteFormationLane(archive, CachedFastVectorSOffsetInfoType(), &self->mLanes[0], ownerRef);
+    WriteFormationLane(archive, CachedFastVectorSOffsetInfoType(), &self->mLanes[1], ownerRef);
+    WriteFormationLane(archive, CachedFastVectorSAssignedLocInfoType(), &self->mOccupiedSlots, ownerRef);
+    WriteFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &self->mCoordCachePrimary, ownerRef);
+    WriteFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &self->mCoordCacheSecondary, ownerRef);
+    WriteFormationLane(archive, CachedVector3fType(), &self->mForwardVector, ownerRef);
+    WriteFormationLane(archive, CachedQuaternionfType(), &self->mOrientation, ownerRef);
+    WriteFormationLane(archive, CachedQuaternionfType(), &self->mOrientationBaseline, ownerRef);
+
+    archive->WriteString(&self->mScriptName);
+    WriteFormationLane(archive, CachedSCoordsVec2Type(), &self->mFormationCenter, ownerRef);
+    archive->WriteFloat(mFormationUpdateScale);
+    archive->WriteBool(mPlanUpdateRequested != 0u);
+    archive->WriteInt(mMaxUnitSlotCount);
+  }
+
+  /**
+   * Address: 0x005741D0 (FUN_005741D0, Moho::CFormationInstance::MemberDeserialize)
+   *
+   * What it does:
+   * Reads the eighteen lanes back in the order `MemberSerialize` wrote them.
+   * The two owning references come back through typed pointer readers, which
+   * is what re-establishes tracking for the Lua state and the game rules.
+   */
+  void CFormationInstance::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    if (gpg::RType* const baseType = CachedCFormationInstanceType(); baseType != nullptr) {
+      archive->Read(baseType, this, ownerRef);
+    }
+
+    (void)archive->ReadPointer_LuaState(&mLuaState, &ownerRef);
+    (void)archive->ReadPointer_RRuleGameRules(&mGameRules, &ownerRef);
+
+    ReadFormationLane(archive, CachedEUnitCommandTypeType(), &mCommandType, ownerRef);
+    ReadFormationLane(archive, CachedFastVectorWeakPtrIUnitType(), &mUnits, ownerRef);
+    ReadFormationLane(archive, CachedFastVectorSOffsetInfoType(), &mLanes[0], ownerRef);
+    ReadFormationLane(archive, CachedFastVectorSOffsetInfoType(), &mLanes[1], ownerRef);
+    ReadFormationLane(archive, CachedFastVectorSAssignedLocInfoType(), &mOccupiedSlots, ownerRef);
+    ReadFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &mCoordCachePrimary, ownerRef);
+    ReadFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &mCoordCacheSecondary, ownerRef);
+    ReadFormationLane(archive, CachedVector3fType(), &mForwardVector, ownerRef);
+    ReadFormationLane(archive, CachedQuaternionfType(), &mOrientation, ownerRef);
+    ReadFormationLane(archive, CachedQuaternionfType(), &mOrientationBaseline, ownerRef);
+
+    archive->ReadString(&mScriptName);
+    ReadFormationLane(archive, CachedSCoordsVec2Type(), &mFormationCenter, ownerRef);
+    archive->ReadFloat(&mFormationUpdateScale);
+
+    bool planUpdateRequested = false;
+    archive->ReadBool(&planUpdateRequested);
+    mPlanUpdateRequested = planUpdateRequested ? 1u : 0u;
+
+    archive->ReadInt(&mMaxUnitSlotCount);
+  }
+
   /**
    * Address: 0x005661C0 (FUN_005661C0, preregister_SUnitOffsetInfoTypeInfo)
    *
