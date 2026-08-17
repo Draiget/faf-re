@@ -199,17 +199,33 @@ namespace
    * Clears one intrusive sky-decal upload list by unlinking all payload nodes,
    * preserving the head sentinel, and releasing removed nodes.
    */
-  [[maybe_unused]] void ClearSkyDomeDecalUploadList(
-    moho::SkyDomeDecalUploadNode* const listHead
+  /**
+   * Address: 0x0081A550 (FUN_0081A550)
+   *
+   * What it does:
+   * Empties one decal upload list: re-self-links the head sentinel, resets the
+   * count, then frees every detached payload node. The sentinel itself is kept
+   * -- callers that are tearing the owner down free it separately.
+   *
+   * Takes the head *and* the count because the emission does: it reads the
+   * head from `[arg+4]` and stores zero to `[arg+8]`, which on `SkyDome` are
+   * `mDecalUploadHead` (+0xB8) and `mDecalUploadCount` (+0xBC). An earlier
+   * version took only the node and left the count stale.
+   */
+  void ClearSkyDomeDecalUploadList(
+    moho::SkyDomeDecalUploadNode* const listHead,
+    std::int32_t& uploadCount
   ) noexcept
   {
     if (listHead == nullptr) {
+      uploadCount = 0;
       return;
     }
 
     moho::SkyDomeDecalUploadNode* node = listHead->mNext;
     listHead->mNext = listHead;
     listHead->mPrev = listHead;
+    uploadCount = 0;
 
     while (node != listHead) {
       moho::SkyDomeDecalUploadNode* const next = node->mNext;
@@ -449,7 +465,7 @@ namespace moho
    */
 void SkyDome::Destroy()
 {
-    ClearSkyDomeDecalUploadList(mDecalUploadHead);
+    ClearSkyDomeDecalUploadList(mDecalUploadHead, mDecalUploadCount);
     mHorizonLookupTex = {};
     mCirrusTex = {};
     mDecalTex3 = {};
