@@ -391,6 +391,32 @@ namespace moho
     std::uint8_t mPad_0x31D[3];                   // +0x31D
     std::int32_t mMaxUnitSlotCount;               // +0x320
     float mFormationUnitSpacingMultiplier;        // +0x324
+
+  public:
+    /**
+     * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
+     *
+     * IDA signature:
+     * void __usercall Moho::CFormationInstance::CleanupFormation@<eax>(
+     *     Moho::CFormationInstance *this@<eax>);
+     *
+     * What it does:
+     * Resets transient formation-plan state: clears the occupied-slot vector to
+     * its inline buffer, resets both coord-cache RB-trees in place (keeping the
+     * head sentinel), zeroes the orientation-baseline quaternion, and tears down
+     * each of the two lane vectors (destroying every lane entry's unit map and
+     * unlinking its weak back-link words) before resetting them to inline.
+     */
+    void CleanupFormation();
+
+    /**
+     * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)
+     *
+     * What it does:
+     * Resets the transient formation plan, then lets the members and the
+     * IFormationInstance base tear themselves down.
+     */
+    ~CFormationInstance();
   };
 
   static_assert(sizeof(CFormationInstance) == 0x328, "CFormationInstance size must be 0x328");
@@ -651,21 +677,6 @@ namespace moho
      */
     bool RemoveDeadUnits(Unit* checkForUnit);
 
-    /**
-     * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
-     *
-     * IDA signature:
-     * void __usercall Moho::CFormationInstance::CleanupFormation@<eax>(
-     *     Moho::CFormationInstance *this@<eax>);
-     *
-     * What it does:
-     * Resets transient formation-plan state: clears the occupied-slot vector to
-     * its inline buffer, resets both coord-cache RB-trees in place (keeping the
-     * head sentinel), zeroes the orientation-baseline quaternion, and tears down
-     * each of the two lane vectors (destroying every lane entry's unit map and
-     * unlinking its weak back-link words) before resetting them to inline.
-     */
-    void CleanupFormation();
 
     /**
      * Address: 0x00566A30 (FUN_00566A30, Moho::CAiFormationInstance::ComputeRunScriptOffset)

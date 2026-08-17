@@ -4188,6 +4188,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CFormationInstance::~CFormationInstance(Moho::CFormationInstance *a1);
+   *
+   * What it does:
+   * Resets the transient formation plan. Everything after that in the binary
+   * is the compiler's own teardown, emitted inline: the script name, both
+   * coord caches, the occupied-slot vector, the two lane vectors and the unit
+   * ref vector are destroyed in reverse declaration order, and the trailing
+   * broadcaster unlink belongs to ~IFormationInstance.
+   */
+  CFormationInstance::~CFormationInstance()
+  {
+    CleanupFormation();
+  }
+
+  /**
    * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
    *
    * IDA signature:
@@ -4202,7 +4220,7 @@ namespace moho
    * lane vectors destroys every entry's unit map + unlinks its weak back-link
    * words, then resets the lane vector to inline storage.
    */
-  void CAiFormationInstance::CleanupFormation()
+  void CFormationInstance::CleanupFormation()
   {
     mOccupiedSlots.ResetStorageToInline();
     ResetCoordCacheMap(mCoordCachePrimary);
