@@ -139,17 +139,17 @@ namespace gpg
     void Init() override;
 
     /**
-     * Address: 0x0056BF20 (FA), 0x1015A310 (MohoEngine)
+     * Address: 0x0056BFE0 (FUN_0056BFE0, FA), 0x1015A310 (MohoEngine)
      */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
 
     /**
-     * Address: 0x0056BF10 (FA), 0x1015A280 (MohoEngine)
+     * Address: 0x0056BF50 (FUN_0056BF50, FA), 0x1015A280 (MohoEngine)
      */
     size_t GetCount(void* obj) const override;
 
     /**
-     * Address: 0x0056BF00 (FA), 0x1015A290 (MohoEngine)
+     * Address: 0x0056BF60 (FUN_0056BF60, FA), 0x1015A290 (MohoEngine)
      */
     void SetCount(void* obj, int count) const override;
   };
