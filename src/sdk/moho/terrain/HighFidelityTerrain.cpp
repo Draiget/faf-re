@@ -8,10 +8,14 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
+#include "moho/render/CWldTerrainDecal.h"
+#include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/tess/CTesselator.h"
+#include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
@@ -93,6 +97,14 @@ namespace moho
 {
   extern bool ren_Terrain;
   extern bool ren_Skirt;
+
+  // The primary patch lane is reinterpreted as the decal command lane by
+  // the decal passes, exactly as low fidelity does: 0x10 header + 500 * 0x18
+  // == 0x2EF0, the same span as FastVectorN<uint32_t, 3000>.
+  using HighFidelityDecalCommandLane = gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>;
+  extern bool ren_Decals;
+  extern bool ren_DecalOverDraw;
+  extern bool ren_bicubicnormals;
 
   /**
    * Address: 0x007FF940 (??0HighFidelityTerrain@Moho@@QAE@@Z)
@@ -319,6 +331,341 @@ namespace moho
 
     SetShaderVarMem(shaderVars.viewportScale, 2U, viewportScale);
     SetShaderVarMem(shaderVars.viewportOffset, 2U, viewportOffset);
+  }
+
+  /**
+   * Address: 0x008015C0 (FUN_008015C0, func_SetTerrainVariables)
+   *
+   * IDA signature:
+   * struct_ShaderVar *__thiscall func_SetTerrainVariables(
+   *     HighFidelityTerrain *this, int a2);
+   *
+   * What it does:
+   * Selects the `terrain` effect and binds every terrain-lighting shader var
+   * for one pass. Camera lanes come from `mCamera`: view, projection, the
+   * half-angle between the sun direction and the camera forward axis, the
+   * camera forward direction, and the camera world position. Lighting lanes
+   * come from the terrain resource: lighting multiplier, sun direction /
+   * ambience / colour, specular colour and shadow-fill colour. A supplied
+   * shadow context binds its enabled flag, shadow matrix and active shadow
+   * texture; otherwise the shadows lane is written disabled. Finally the
+   * noise, decal-mask and bi-cubic-lookup sheets are bound.
+   *
+   * This is the high-fidelity twin of MediumFidelityTerrain::
+   * LoadTerrainLighting (0x00805600); the two differ only in which
+   * per-fidelity noise / bi-cubic sheet globals they bind.
+   */
+  void HighFidelityTerrain::LoadTerrainLighting(TerrainShadowContext* const shadowContext)
+  {
+    auto& shaderVars = GetTerrainShaderVars();
+
+    D3D_GetDevice()->SelectFxFile("terrain");
+
+    const GeomCamera3& camera = *mCamera;
+
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    const float lightingMultiplier = terrainRes->GetLightingMultiplier();
+    if (shaderVars.lightingMultiplier.Exists()) {
+      shaderVars.lightingMultiplier.SetFloat(lightingMultiplier);
+    }
+
+    const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
+    SetShaderVarMem(shaderVars.sunDirection, 3U, &sunDirection.x);
+
+    const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
+    SetShaderVarMem(shaderVars.sunAmbience, 3U, &sunAmbience.x);
+
+    const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
+    SetShaderVarMem(shaderVars.sunColor, 3U, &sunColor.x);
+
+    // Half-angle vector: normalize(sunDirection + inverseView.r[2]). The binary
+    // spells each component `sunDir - (-0.0 - invView.r[2].c)`, which is an
+    // addition because the constant is -0.0.
+    const Vector4f& cameraBasisZ = camera.inverseView.r[2];
+    float halfAngle[3] = {
+      sunDirection.x + cameraBasisZ.x,
+      sunDirection.y + cameraBasisZ.y,
+      sunDirection.z + cameraBasisZ.z
+    };
+    const float halfAngleLength =
+      std::sqrt((halfAngle[0] * halfAngle[0]) + (halfAngle[1] * halfAngle[1]) + (halfAngle[2] * halfAngle[2]));
+    if (halfAngleLength > 0.0f) {
+      const float inverseLength = 1.0f / halfAngleLength;
+      halfAngle[0] *= inverseLength;
+      halfAngle[1] *= inverseLength;
+      halfAngle[2] *= inverseLength;
+    } else {
+      halfAngle[0] = 0.0f;
+      halfAngle[1] = 0.0f;
+      halfAngle[2] = 0.0f;
+    }
+    SetShaderVarMem(shaderVars.halfAngle, 3U, halfAngle);
+
+    // Camera forward direction: -inverseView.r[2].
+    const float cameraDirection[3] = {
+      -cameraBasisZ.x,
+      -cameraBasisZ.y,
+      -cameraBasisZ.z
+    };
+    SetShaderVarMem(shaderVars.cameraDirection, 3U, cameraDirection);
+
+    // Camera world position: inverseView.r[3] (translation row).
+    const Vector4f& cameraTranslation = camera.inverseView.r[3];
+    const float cameraPosition[3] = {
+      cameraTranslation.x,
+      cameraTranslation.y,
+      cameraTranslation.z
+    };
+    SetShaderVarMem(shaderVars.cameraPosition, 3U, cameraPosition);
+
+    const Vector4f specularColor = terrainRes->GetSpecularColor();
+    SetShaderVarMem(shaderVars.specularColor, 4U, &specularColor.x);
+
+    const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
+    SetShaderVarMem(shaderVars.shadowFillColor, 3U, &shadowFillColor.x);
+
+    if (shadowContext != nullptr) {
+      // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
+      const std::uint32_t shadowsEnabledBlob =
+        static_cast<std::uint32_t>(static_cast<std::uint8_t>(shadowContext->shadowsEnabled));
+      SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsEnabledBlob, 4U);
+
+      if (shaderVars.shadowMatrix.Exists()) {
+        shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->shadowMatrix);
+      }
+
+      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = GetActiveShadowTexture(*shadowContext);
+      shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
+    } else {
+      const std::uint32_t shadowsDisabledBlob = 0U;
+      SetShaderVarPtr(shaderVars.shadowsEnabled, &shadowsDisabledBlob, 4U);
+    }
+
+    shaderVars.noiseTexture.GetTexture(sHighFidelityNoiseFillTexture);
+    shaderVars.decalMaskTexture.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
+    );
+    shaderVars.biCubicLookup.GetTexture(sHighFidelityCubicBlendLookupTexture);
+  }
+
+  /**
+   * Address: 0x00802C30 (FUN_00802C30, Moho::HighFidelityTerrain::OverDrawDecals)
+   *
+   * IDA signature:
+   * void callcnv_53 sub_802C30(HighFidelityTerrain *a1, MeshRenderer *a4, float a3);
+   * (`a4` is the game tick, which IDA types as a pointer because it arrives in
+   * a register - see the note on the frame seed below.)
+   *
+   * What it does:
+   * Draws the normal-mapped terrain decals. Walks the decal command lane once,
+   * drawing every `Normals` and `NormalsAlpha` command, and re-selects the
+   * technique only when the run switches between the two types. Under
+   * `ren_DecalOverDraw` both runs use `TDecalOverDraw` instead.
+   *
+   * Note this differs from MediumFidelityTerrain::DrawNormalMappedDecals as
+   * currently recovered, which stops at the first `NormalsAlpha` command. Here
+   * the alpha command is drawn and the walk continues; the binary tracks the
+   * active technique in a flag rather than terminating.
+   */
+  void HighFidelityTerrain::OverDrawDecals(const std::int32_t gameTick, const float deltaSeconds)
+  {
+    if (!ren_Decals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : "TDecalsNormals");
+
+    const GeomCamera3& camera = *mCamera;
+
+    // Every render-state bind + indexed draw for one decal command. Shared by
+    // both the normals run and the alpha run, which is why the binary reaches
+    // it from two places.
+    const auto drawDecalCommand = [&](const TerrainDecalDrawCommand& command) {
+      CWldTerrainDecal& decal = *command.decal;
+
+      if (shaderVars.viewMatrix.Exists()) {
+        shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+      }
+      if (shaderVars.projMatrix.Exists()) {
+        shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+      }
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+      if (shaderVars.tangentMatrix.Exists()) {
+        shaderVars.tangentMatrix.SetMatrix4x4(&decal.mTangentMatrix);
+      }
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      // GetTexture(slot, phaseOffset, frameSeed): the float is the frame delta
+      // and the int seed is the game tick, which is the only type-consistent
+      // reading of the two values the caller threads through.
+      const boost::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(0, deltaSeconds, gameTick);
+      shaderVars.decalNormalTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+
+      std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = mTerrainIndexSheet;
+      indexView.startIndex = command.startIndex;
+      indexView.indexCount = command.indexCount;
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = mTerrainVertexSheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = command.baseVertex;
+      vertexView.endVertex = command.endVertex;
+
+      (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+    };
+
+    bool alphaTechniqueActive = false;
+    const auto& decalCommands = reinterpret_cast<const HighFidelityDecalCommandLane&>(mPrimaryPatchData);
+
+    for (const TerrainDecalDrawCommand& command : decalCommands) {
+      const EWldTerrainDecalType type = command.decal->mType;
+
+      if (type == WldTerrainDecalType_NormalsAlpha) {
+        if (!alphaTechniqueActive) {
+          alphaTechniqueActive = true;
+          D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : "TDecalsNormalsAlpha");
+        }
+        drawDecalCommand(command);
+        continue;
+      }
+
+      if (type == WldTerrainDecalType_Normals) {
+        if (alphaTechniqueActive) {
+          alphaTechniqueActive = false;
+          D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : "TDecalsNormals");
+        }
+        drawDecalCommand(command);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00802F20 (FUN_00802F20, Moho::HighFidelityTerrain::DrawTerrainNormal)
+   * Primary vtable slot 9 (vftable @0x00E41A14).
+   *
+   * IDA signature:
+   * void __thiscall Moho::HighFidelityTerrain::DrawTerrainNormal(
+   *     HighFidelityTerrain *this, MeshRenderer *a2, float a3);
+   *
+   * What it does:
+   * Fills the off-screen terrain-normal buffer that
+   * `WRenViewport::TransformTerrainNormals` samples one call later for its
+   * `TCreateBasis` pass.
+   *
+   * Selects the `terrain` effect and resolves the pass technique from the
+   * active stratum material's `normals` string annotation, falling back to
+   * `TTerrainNormals`. Binds terrain lighting with no shadow context and the
+   * base shader vars with no scratch handle, draws the terrain triangles and -
+   * unless decal over-draw is on - the normal-mapped decals. Then switches to
+   * the basis technique and walks every normal-map tile, binding that tile's
+   * scale/offset and the E_X / E_Y / Size_Source basis constants before
+   * drawing its tesselated geometry.
+   *
+   * This is the high-fidelity twin of MediumFidelityTerrain::DrawTerrainNormal
+   * (0x00806F50); the two differ only in which lighting helper they call.
+   */
+  void HighFidelityTerrain::DrawTerrainNormal(const std::int32_t gameTick, const float deltaSeconds)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+
+    // The technique name is an annotation on the stratum material's shader
+    // rather than a literal, so a map can override the normal pass.
+    CD3DEffect* const effect = device->GetCurEffect();
+    const msvc8::string technique = effect->GetStringAnnotation(
+      terrainRes->GetStratumMaterial().mShaderName,
+      msvc8::string{"normals"},
+      msvc8::string{"TTerrainNormals"});
+    device->SelectTechnique(technique.c_str());
+
+    LoadTerrainLighting(nullptr);
+    LoadShaderVars({});
+    DrawTriangles();
+    if (!ren_DecalOverDraw) {
+      OverDrawDecals(gameTick, deltaSeconds);
+    }
+
+    device->SelectTechnique(ren_bicubicnormals ? "TTerrainBasisBiCubic" : "TTerrainBasis");
+
+    const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
+    for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
+      const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
+
+      shaderVars.utilityTextureA.GetTexture(info.mTexture);
+
+      SetShaderVarMem(shaderVars.normalMapScale, 4U, &info.mXResolution);
+      SetShaderVarMem(shaderVars.normalMapOffset, 4U, &info.mOffsetScaleX);
+
+      const float basisEX[2] = {1.0F / info.mWidth, 0.0F};
+      SetShaderVarMem(shaderVars.normalBasisEX, 2U, basisEX);
+      const float basisEY[2] = {0.0F, 1.0F / info.mHeight};
+      SetShaderVarMem(shaderVars.normalBasisEY, 2U, basisEY);
+      SetShaderVarMem(shaderVars.normalBasisSizeSource, 2U, &info.mWidth);
+
+      const std::int32_t querySize = (static_cast<std::int32_t>(info.mWidth) < static_cast<std::int32_t>(info.mHeight))
+                                       ? static_cast<std::int32_t>(info.mHeight)
+                                       : static_cast<std::int32_t>(info.mWidth);
+
+      std::int32_t rangeStart = 0;
+      std::uint32_t rangeCount = 0;
+      std::int32_t minValue = 0;
+      std::int32_t maxValue = 0;
+      (void)mTesselator->Tesselate(
+        static_cast<std::int32_t>(info.mTileOriginX),
+        static_cast<std::int32_t>(info.mTileOriginY),
+        querySize,
+        &rangeStart,
+        &rangeCount,
+        &minValue,
+        &maxValue);
+
+      if (rangeStart + static_cast<std::int32_t>(rangeCount) >= kSkirtMaxIndexCount) {
+        continue;
+      }
+      if (rangeCount == 0U || (rangeCount % 3U) != 0U) {
+        continue;
+      }
+
+      std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = mTerrainIndexSheet;
+      indexView.startIndex = rangeStart;
+      indexView.indexCount = static_cast<std::int32_t>(rangeCount);
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = mTerrainVertexSheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = minValue;
+      vertexView.endVertex = maxValue;
+
+      (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+    }
   }
 
   /**

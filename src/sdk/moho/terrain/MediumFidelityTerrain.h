@@ -110,6 +110,18 @@ namespace moho
     offsetof(TerrainShadowContext, useSecondaryShadowTexture) == 0x0C,
     "TerrainShadowContext::useSecondaryShadowTexture offset must be 0x0C"
   );
+
+  /**
+   * Address: 0x007FEE70 (FUN_007FEE70, sub_7FEE70)
+   *
+   * What it does:
+   * Returns the active retained shadow texture for a cast-shadow terrain
+   * pass. Shared by every fidelity class's LoadTerrainLighting, so it lives
+   * beside TerrainShadowContext rather than being copied per TU.
+   */
+  [[nodiscard]] boost::shared_ptr<CD3DRenderTarget> GetActiveShadowTexture(
+    const TerrainShadowContext& shadowContext
+  );
   static_assert(
     offsetof(TerrainShadowContext, shadowsEnabled) == 0x14,
     "TerrainShadowContext::shadowsEnabled offset must be 0x14"
@@ -270,18 +282,18 @@ namespace moho
      * rendering is enabled, 0 otherwise.
      */
     virtual bool DrawNormals(
-      MeshRenderer* renderer,
+      std::int32_t gameTick,
       float lod,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       TerrainShadowContext* shadowContext
     );
 
     /**
-     * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormals)
+     * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormal)
      * Primary vtable slot 9 (vftable @0x00E41A54; RTTI dump slot 9).
      *
      * IDA signature:
-     * void __fastcall Moho::MediumFidelityTerrain::DrawTerrainNormals(
+     * void __fastcall Moho::MediumFidelityTerrain::DrawTerrainNormal(
      *     MediumFidelityTerrain *this, MeshRenderer *renderer, float lod);
      *
      * What it does:
@@ -299,7 +311,7 @@ namespace moho
      * normal-map iteration slots. It is declared here so the vtable slot and the
      * DrawNormals dispatch are modeled 1:1; recover the body before linking.
      */
-    virtual void DrawTerrainNormals(MeshRenderer* renderer, float lod);
+    void DrawTerrainNormal(std::int32_t gameTick, float deltaSeconds) override;
 
     /**
      * Address: 0x00805530 (FUN_00805530, Moho::MediumFidelityTerrain::DrawTerrainSkirt)
@@ -370,7 +382,7 @@ namespace moho
      * triangle-list draw over the terrain vertex/index sheets. No-op unless
      * `ren_Decals` is enabled.
      */
-    void DrawDecalPass(MeshRenderer* renderer, float lod, std::int32_t decalType, const char* techniqueName);
+    void DrawDecalPass(std::int32_t gameTick, float lod, std::int32_t decalType, const char* techniqueName);
 
     /**
      * Address: 0x00806860 (FUN_00806860, sub_806860)
@@ -399,7 +411,7 @@ namespace moho
      * one indexed triangle-list draw per glowing decal. No-op unless both
      * `ren_Decals` and `ren_glowingDecals` are enabled.
      */
-    void DrawGlowingDecals(MeshRenderer* renderer, float lod);
+    void DrawGlowingDecals(std::int32_t gameTick, float lod);
 
     /**
      * Address: 0x00806C60 (FUN_00806C60, sub_806C60)
@@ -415,7 +427,7 @@ namespace moho
      * decal alpha, and the slot-0 normal texture, then submits one indexed
      * triangle-list draw per matching decal. No-op unless `ren_Decals` is enabled.
      */
-    void DrawNormalMappedDecals(MeshRenderer* renderer, float lod);
+    void DrawNormalMappedDecals(std::int32_t gameTick, float lod);
 
   public:
     TerrainWaterResourceView* mTerrainResource;                        // +0x0C

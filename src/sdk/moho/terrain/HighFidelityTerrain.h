@@ -22,6 +22,7 @@ namespace moho
   class CTesselator;
   struct GeomCamera3;
   struct TerrainWaterResourceView;
+  struct TerrainShadowContext;
 
   /**
    * High-fidelity terrain renderer and shoreline-sheet owner runtime.
@@ -105,6 +106,37 @@ namespace moho
      * Dispatches the shared high-fidelity water alpha-mask lane, then draws
      * shoreline overlays for the active terrain camera.
      */
+    /**
+     * Address: 0x008015C0 (FUN_008015C0, func_SetTerrainVariables)
+     *
+     * What it does:
+     * Binds every terrain-lighting shader var for one pass: camera
+     * matrices, sun direction/ambience/colour, half-angle, camera
+     * direction and position, specular and shadow-fill colour, the
+     * optional shadow context, and the noise / decal-mask / bi-cubic
+     * lookup sheets.
+     */
+    void LoadTerrainLighting(TerrainShadowContext* shadowContext);
+
+    /**
+     * Address: 0x00802C30 (FUN_00802C30, Moho::HighFidelityTerrain::OverDrawDecals)
+     *
+     * What it does:
+     * Draws the normal-mapped terrain decals, re-selecting the technique
+     * only when the walk switches between Normals and NormalsAlpha runs.
+     */
+    void OverDrawDecals(std::int32_t gameTick, float deltaSeconds);
+
+    /**
+     * Address: 0x00802F20 (FUN_00802F20, Moho::HighFidelityTerrain::DrawTerrainNormal)
+     * Primary vtable slot 9 (vftable @0x00E41A14).
+     *
+     * What it does:
+     * Fills the off-screen terrain-normal buffer sampled by
+     * WRenViewport::TransformTerrainNormals for its TCreateBasis pass.
+     */
+    void DrawTerrainNormal(std::int32_t gameTick, float deltaSeconds) override;
+
     void DrawWaterline(std::int32_t arg0, std::int32_t arg1);
 
     /**
