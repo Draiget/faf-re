@@ -7,6 +7,7 @@
 
 namespace moho
 {
+  class GeomCamera3;
   class ID3DVertexSheet;
 
   /**
@@ -78,6 +79,15 @@ namespace moho
     // The quad itself. `Init` assigns through boost::shared_ptr's operator=,
     // which IDA names `boost::shared_ptr_ID3DVertexSheet::operator=` - that
     // label is what pins the pointee type.
+    /**
+     * Address: 0x00814820 (FUN_00814820, Moho::Silhouette::Render)
+     *
+     * What it does:
+     * Draws the silhouette overlay into one render target and composites it
+     * with the frame effect's `TSilhouette` technique.
+     */
+    void Render(const GeomCamera3& camera, std::int32_t renderTargetIndex);
+
     boost::shared_ptr<ID3DVertexSheet> mQuadVertexSheet; // +0x04..+0x0B
   };
 

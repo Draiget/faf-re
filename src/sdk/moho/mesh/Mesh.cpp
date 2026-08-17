@@ -6955,6 +6955,78 @@ namespace moho
   }
 
   /**
+   * Address: 0x007E0830 (FUN_007E0830, ?RenderSilhouette@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@@Z)
+   *
+   * IDA signature:
+   * void __thiscall Moho::MeshRenderer::RenderSilhouette(
+   *     Moho::MeshRenderer *this, const struct Moho::GeomCamera3 *a2);
+   *
+   * What it does:
+   * Draws the silhouette overlay in two passes over the same batch tree: the
+   * `Occlude` technique writes the occluders that hide silhouettes, then the
+   * `Silhouette` technique draws the outlines themselves. Each pass has its
+   * own per-LOD opt-in flag and binds only the albedo sampler.
+   *
+   * Note IDA prints `this` and `a2` swapped here, as it does in
+   * Silhouette::Render: the body reads camera fields off `this`
+   * (`(int)this + 660` is GeomCamera3::viewport.r[1] at 0x294) and the batch
+   * tree off `a2`.
+   */
+  void MeshRenderer::RenderSilhouette(const GeomCamera3& camera)
+  {
+    CD3DDevice* const device = D3D_GetDevice();
+
+    // Same pass head as RenderCartographic/RenderDepth, minus the time and
+    // elevation lanes: LOD basis from the viewport matrix row 1, then the two
+    // camera matrices.
+    MeshShaderVarSet& sv = GetMeshShaderVars();
+    if (sv.lodBasis.Exists()) {
+      SetShaderVarMem(sv.lodBasis, 4, &camera.viewport.r[1].x);
+    }
+    if (sv.viewMatrix.Exists()) {
+      sv.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (sv.projMatrix.Exists()) {
+      sv.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+
+    device->SelectFxFile("mesh");
+
+    MeshTextureShaderVarSet& tv = GetMeshTextureShaderVars();
+    MeshBatchBucketNode* const headNode = meshes.head;
+
+    // The two passes walk the same tree but gate on different per-LOD bytes
+    // (0x007E0913 reads MeshLOD+0xAD, 0x007E0A93 reads +0xAE), so a mesh can
+    // occlude without being outlined and vice versa.
+    const auto drawPass =
+      [&](const char* const technique, std::uint8_t MeshLOD::* const gate) {
+        device->SelectTechnique(technique);
+        for (MeshBatchBucketNode* node = headNode->left; node != headNode;
+             node = MeshBatchTreeSuccessor(node)) {
+          MeshLOD* const lod = MeshBatchEntryLod(node);
+          if (!(lod->*gate)) {
+            continue;
+          }
+
+          tv.albedoTexture.GetTexture(lod->mat.mAlbedoSheet);
+
+          boost::shared_ptr<MeshBatch> batchHandle;
+          if (MeshBatchEntryIsSkinned(node)) {
+            lod->GetSkinnedBatch(batchHandle);
+          } else {
+            lod->GetStaticBatch(batchHandle);
+          }
+          if (batchHandle) {
+            batchHandle->Render(MeshBatchEntryInstances(node), false);
+          }
+        }
+      };
+
+    drawPass("Occlude", &MeshLOD::occlude);
+    drawPass("Silhouette", &MeshLOD::silhouette);
+  }
+
+  /**
    * Address: 0x007E03B0 (FUN_007E03B0, ?RenderDepth@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@AAV?$map@...@Z)
    *
    * What it does:

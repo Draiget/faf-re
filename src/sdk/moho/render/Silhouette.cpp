@@ -7,9 +7,17 @@
 #include "moho/render/ScreenQuadVertexSheet.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/mesh/Mesh.h"
+#include "moho/render/camera/GeomCamera3.h"
 
 namespace moho
 {
+  namespace
+  {
+    constexpr std::int32_t kSilhouetteQuadPrimitiveToken = 5;   // D3DPT_TRIANGLESTRIP
+    constexpr std::int32_t kSilhouetteQuadLastVertexIndex = 3;  // four-vertex quad
+  } // namespace
+
   /**
    * Address: 0x008144E0 (FUN_008144E0, ??1Silhouette@Moho@@UAE@XZ)
    * Mangled: ??1Silhouette@Moho@@UAE@XZ
@@ -87,5 +95,52 @@ namespace moho
       ::operator delete(this);
     }
     return this;
+  }
+} // namespace moho
+namespace moho
+{
+  /**
+   * Address: 0x00814820 (FUN_00814820, ?Render@Silhouette@Moho@@QAEXABVGeomCamera3@2@H@Z)
+   *
+   * IDA signature:
+   * int __userpurge Moho::Silhouette::Render@<eax>(
+   *     Moho::GeomCamera3 *a1@<edi>, Moho::Silohouette *a2, int a3);
+   *
+   * What it does:
+   * Renders the silhouette overlay into `renderTargetIndex`: binds the target
+   * and the camera's viewport rectangle, lets the mesh renderer lay down the
+   * occluder and outline passes, then composites the result with the frame
+   * effect's `TSilhouette` technique over a fullscreen quad.
+   *
+   * IDA names `a2` as the instance and puts the camera in `edi`, so `this` is
+   * the stack argument here.
+   */
+  void Silhouette::Render(const GeomCamera3& camera, const std::int32_t renderTargetIndex)
+  {
+    MeshRenderer* const renderer = MeshRenderer::GetInstance();
+    CD3DDevice* const device = D3D_GetDevice();
+
+    // Row 3 of the camera's viewport matrix carries (x, y, width, height).
+    const auto& viewportRect = camera.viewport.r[3];
+
+    device->SetRenderTarget2(renderTargetIndex, false, 0, 1.0f, 0);
+
+    Wm3::Vector2i viewportPos{static_cast<int>(viewportRect.x), static_cast<int>(viewportRect.y)};
+    Wm3::Vector2i viewportSize{static_cast<int>(viewportRect.z), static_cast<int>(viewportRect.w)};
+    device->SetViewport(&viewportPos, &viewportSize, 0.0f, 1.0f);
+
+    renderer->RenderSilhouette(camera);
+
+    device->SelectFxFile("frame");
+    device->SelectTechnique("TSilhouette");
+
+    CD3DVertexSheetViewRuntime quadView{};
+    quadView.sheet = mQuadVertexSheet.get();
+    quadView.startVertex = 0;
+    quadView.baseVertex = 0;
+    quadView.endVertex = kSilhouetteQuadLastVertexIndex;
+
+    std::int32_t primitiveType = kSilhouetteQuadPrimitiveToken;
+    (void)device->DrawPrimitiveList(&quadView, &primitiveType);
   }
 } // namespace moho

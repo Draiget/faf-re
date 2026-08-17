@@ -64021,6 +64021,7 @@ namespace moho
   // defined in the unrecovered console-vars TU; extern-declared here per the
   // established frontier pattern. Types byte-verified from the referencing .asm.
   extern bool ren_Ui;                        // ?ren_Ui@Moho@@3_NA (1-byte bool)
+  extern bool ren_UnitSilhouette;            // ?ren_UnitSilhouette@Moho@@3_NA (1-byte bool)
   extern bool ren_ShowFrameTimes;            // ?ren_ShowFrameTimes@Moho@@3_NA
   extern bool ren_ShowNetworkStats;          // ?ren_ShowNetworkStats@Moho@@3_NA
   extern bool ren_ShowBandwidthUsage;        // ?ren_ShowBandwidthUsage@Moho@@3_NA
@@ -65041,6 +65042,25 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       auto* const uiHost = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
       uiManager->DrawUI(uiHost->mHead, uiHost->mPrimBatcher.get());
     }
+  }
+
+  // Unit-silhouette overlay. Binary (WRenViewport::Render @0x007F90D0,
+  // 0x007F95EC..0x007F9614) calls it right after the UI prim-batcher pass:
+  //   lea ecx, [ebp+2134h]   -> &mSilhouetteRenderer
+  //   mov edi, [ebp+219Ch]   -> the camera
+  //   push eax               -> the render-target index
+  //
+  // The binary additionally requires `var_80 == [anonymous_4 + 4]` - a
+  // session-identity check between the world view being drawn and its STI map
+  // (the decompiler spells it `v72 == v74->mSTImap`). Both operands are
+  // per-iteration locals of the binary's world-view loop, and this pass sits
+  // at outer scope here, so that half of the guard is NOT modelled yet: the
+  // overlay currently draws whenever the tuning flag is on, which is a
+  // superset of the binary's condition. Resolve the two locals and tighten
+  // this before relying on the pass for anything but bring-up.
+  if (moho::ren_UnitSilhouette) {
+    auto* const silhouetteHost = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+    silhouetteHost->mSilhouetteRenderer.Render(*silhouetteHost->mCam, silhouetteHost->mHead);
   }
 
   // Bloom post-process pass. Binary (WRenViewport::Render @0x007F90D0, the
