@@ -1304,6 +1304,15 @@ namespace moho
     void RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap);
 
     /**
+     * Address: 0x007E0830 (FUN_007E0830, ?RenderSilhouette@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@@Z)
+     *
+     * What it does:
+     * Draws the silhouette overlay: an `Occlude` pass over the batch tree
+     * followed by a `Silhouette` pass, each gated on its own per-LOD flag.
+     */
+    void RenderSilhouette(const GeomCamera3& camera);
+
+    /**
      * Address: 0x007E0C30 (FUN_007E0C30, Moho::MeshRenderer::Render)
      *
      * What it does:
