@@ -167,13 +167,18 @@ namespace
     return upcast.mObj;
   }
 
+  /**
+   * Resolves `IAniManipulator`'s descriptor for the base registration at
+   * 0x006388D0. The cache lives on `IAniManipulator::sType`, not in a
+   * function-local static: that class static is what the other manipulator
+   * reflection paths read first, so a local cache leaves them resolving null.
+   */
   gpg::RType* CachedIAniManipulatorType()
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::IAniManipulator));
+    if (moho::IAniManipulator::sType == nullptr) {
+      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
     }
-    return cached;
+    return moho::IAniManipulator::sType;
   }
 
   gpg::RType* CachedIUnitType()
