@@ -6,6 +6,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "moho/containers/SCoordsVec2.h"
+#include "moho/containers/TDatList.h"
 
 namespace LuaPlus
 {
@@ -43,9 +44,59 @@ namespace moho
     [[nodiscard]] static SFormationUnitWeakRef FromUnit(Unit* unit) noexcept;
     [[nodiscard]] std::uint32_t* DecodeOwnerChainHead() const noexcept;
   };
-  using SFormationUnitWeakRefSet = gpg::fastvector_n<SFormationUnitWeakRef, 10>;
   static_assert(sizeof(SFormationUnitWeakRef) == 0x04, "SFormationUnitWeakRef size must be 0x04");
+
+  /**
+   * The capacity-independent head of a weak-unit reference set: an owner-chain
+   * node followed by the slot lane. `CAiFormationDBImpl::NewFormation`
+   * (0x0059C120) takes one of these by pointer and reads the lane at +0x08
+   * (`mov esi,[edi+8]` / `mov eax,[edi+0Ch]`), which is why the lane cannot sit
+   * at offset 0 the way a plain `fastvector_n` would put it.
+   *
+   * `Unit::GuardedByList` (`SGuardedByRuntimeList`) is the same shape with four
+   * inline slots instead of eight; the two should eventually share this head.
+   */
+  struct SWeakUnitRefList
+  {
+    TDatListItem<void, void> mOwnerNode;                        // +0x00
+    gpg::fastvector_runtime_view<SFormationUnitWeakRef> mSlots; // +0x08
+
+    [[nodiscard]] const SFormationUnitWeakRef* begin() const noexcept { return mSlots.begin; }
+    [[nodiscard]] const SFormationUnitWeakRef* end() const noexcept { return mSlots.end; }
+    [[nodiscard]] bool empty() const noexcept { return mSlots.begin == mSlots.end; }
+  };
+  static_assert(sizeof(SWeakUnitRefList) == 0x18, "SWeakUnitRefList size must be 0x18");
+  static_assert(offsetof(SWeakUnitRefList, mSlots) == 0x08, "SWeakUnitRefList::mSlots offset must be 0x08");
+
+  /**
+   * A weak-unit reference set with room for eight slots before it has to reach
+   * the heap. Sized from the binary: the lane starts at +0x18 and the whole
+   * object is 0x38 bytes, so the inline run is exactly eight entries.
+   */
+  struct SFormationUnitWeakRefSet : SWeakUnitRefList
+  {
+    SFormationUnitWeakRef mInlineSlots[8]; // +0x18
+
+    SFormationUnitWeakRefSet() noexcept
+    {
+      mSlots.begin = mInlineSlots;
+      mSlots.end = mInlineSlots;
+      mSlots.capacityEnd = mInlineSlots + 8;
+      mSlots.metadata = mInlineSlots;
+    }
+
+    /// Append one reference, spilling to the heap once the inline run is full.
+    void Append(const SFormationUnitWeakRef& ref)
+    {
+      // Returns the insertion point, which a plain append has no use for.
+      (void)gpg::FastVectorRuntimeInsertRange(mSlots, mSlots.end, &ref, &ref + 1);
+    }
+  };
   static_assert(sizeof(SFormationUnitWeakRefSet) == 0x38, "SFormationUnitWeakRefSet size must be 0x38");
+  static_assert(
+    offsetof(SFormationUnitWeakRefSet, mInlineSlots) == 0x18,
+    "SFormationUnitWeakRefSet::mInlineSlots offset must be 0x18"
+  );
 
   /**
    * Address: 0x00575A30 (FUN_00575A30, ?FORMATION_GetNumScripts@Moho@@YAIPAVLuaState@LuaPlus@@W4EFormationType@1@@Z)
@@ -158,7 +209,7 @@ namespace moho
      * instance, then appends it to this DB.
      */
     virtual CAiFormationInstance* NewFormation(
-      const SFormationUnitWeakRefSet* unitWeakSet,
+      const SWeakUnitRefList* unitWeakSet,
       const char* scriptName,
       const SCoordsVec2* formationCenter,
       float orientX,
