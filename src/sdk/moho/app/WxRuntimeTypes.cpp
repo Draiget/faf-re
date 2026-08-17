@@ -55228,6 +55228,21 @@ namespace
     ) = 0;
   };
 
+  /**
+   * Address: 0x009627D0 (FUN_009627D0, wxClassInfo::IsKindOf)
+   * Mangled: ?IsKindOf@wxClassInfo@@QBE_NPBV1@@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxClassInfo::IsKindOf(wxClassInfo *this, wxClassInfo *info);
+   *
+   * What it does:
+   * Walks the class-info base chain looking for `target`. Both base slots are
+   * followed because wx records multiple inheritance as two parents.
+   *
+   * This is the descriptor-side half of wxObject::IsKindOf; the window-side
+   * half (`wxWindowBase::IsKindOf`) resolves its own class info and then
+   * calls straight into here.
+   */
   [[nodiscard]] bool WxClassInfoDerivesFromRuntime(
     const wxClassInfo* const classInfo,
     const wxClassInfo* const target
