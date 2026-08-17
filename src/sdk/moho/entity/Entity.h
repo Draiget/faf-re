@@ -702,6 +702,16 @@ namespace moho
     [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
+     * Address: 0x00681220 (FUN_00681220, sub_681220)
+     *
+     * What it does:
+     * Reflection LOAD serializer - the exact mirror of `MemberSerialize`,
+     * reading every persisted lane back in the same order and restoring each
+     * tracked pointer's OWNED/UNOWNED state.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x00681720 (FUN_00681720, Moho::Entity::MemberSerialize)
      * Mangled: ?MemberSerialize@Entity@Moho@@QBEXPAVWriteArchive@gpg@@@Z
      *
