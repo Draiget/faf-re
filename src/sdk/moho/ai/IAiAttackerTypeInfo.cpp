@@ -76,23 +76,44 @@ void IAiAttackerTypeInfo::Init()
   size_ = sizeof(IAiAttacker);
   gpg::RType::Init();
 
+  AddBase_Broadcaster_EAiAttackerEvent(this);
+
+  Finish();
+}
+
+/**
+ * Address: 0x005DE870 (FUN_005DE870,
+ *   Moho::IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent)
+ *
+ * IDA signature:
+ * void __stdcall Moho::IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(
+ *     gpg::RType *a1);
+ *
+ * What it does:
+ * Resolves and caches the `Broadcaster<EAiAttackerEvent>` reflected type,
+ * then adds it as a base field of `typeInfo` at the subobject's offset.
+ * Unlike the offset-0 AddBase helpers this base lives at +4 inside
+ * `IAiAttacker`, which the emission spells as `a2.mOffset = 4`.
+ */
+void IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(gpg::RType* const typeInfo)
+{
   gpg::RType* baseType = Broadcaster_EAiAttackerEvent::sType;
   if (!baseType) {
     baseType = gpg::LookupRType(typeid(Broadcaster_EAiAttackerEvent));
     Broadcaster_EAiAttackerEvent::sType = baseType;
   }
 
-  if (baseType) {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = offsetof(IAiAttacker, mListeners);
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    AddBase(baseField);
+  if (typeInfo == nullptr || baseType == nullptr) {
+    return;
   }
 
-  Finish();
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = offsetof(IAiAttacker, mListeners);
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
 }
 
 /**
