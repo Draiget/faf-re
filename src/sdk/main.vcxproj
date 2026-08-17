@@ -690,6 +690,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\CAiBrainTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiBrainConstruct.cpp" />
     <ClCompile Include="moho\ai\CAiBrainSerializer.cpp" />
+    <ClCompile Include="moho\ai\CFormationInstanceSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiBrain.cpp" />
     <ClCompile Include="moho\ai\CAiBrainLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\ai\CAiBuilderImpl.cpp" />
@@ -1892,6 +1893,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\EFormationdStatusTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiBrainConstruct.h" />
     <ClInclude Include="moho\ai\CAiBrainSerializer.h" />
+    <ClInclude Include="moho\ai\CFormationInstanceSerializer.h" />
     <ClInclude Include="moho\ai\CAiBrainTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiBuilderImpl.h" />
     <ClInclude Include="moho\ai\CAiBuilderImplConstruct.h" />

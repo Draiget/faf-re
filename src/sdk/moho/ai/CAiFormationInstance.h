@@ -345,6 +345,11 @@ namespace moho
   class CFormationInstance : public IFormationInstance
   {
   public:
+    /// Cached reflection descriptor, mirroring the binary's
+    /// `Moho::CFormationInstance::sType` global. The serializer helper and
+    /// the base registration both read it.
+    inline static gpg::RType* sType = nullptr;
+
     /**
      * Address: 0x005741D0 (FUN_005741D0, Moho::CFormationInstance::MemberDeserialize)
      *
