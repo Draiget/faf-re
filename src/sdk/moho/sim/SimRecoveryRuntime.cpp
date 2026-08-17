@@ -2339,10 +2339,14 @@ namespace
    *   +0x0C  nextInChain     the entry this one forwards to
    *   +0x10  id              index into the queue's position map
    *
-   * `backLinkSlot` and `nextInChain` are pointers, not counters: the swap
+   * The +0x08/+0x0C pair is a `WeakPtr` node, not two counters. The swap
    * dereferences `[entry+8]` and writes its own stack temporary into it
-   * (`mov edx,[eax]` / `mov [eax],ecx` at 0x0068756B), which only makes sense
-   * for an intrusive link that has to keep pointing at the entry as it moves.
+   * (`mov edx,[eax]` / `mov [eax],ecx` at 0x0068756B) - the owner-chain
+   * relink an intrusive weak link performs when the object it observes moves.
+   * The move-assign the swap calls twice, 0x00687A70, is already recovered as
+   * `CopyPrefixedWeakPtrDwordPayloadLane` in `moho/misc/WeakPtr.h`, and this
+   * slot is the same 20-byte shape as its `PrefixedWeakPtrDwordPayloadLane`:
+   * two leading dwords, an embedded weak node, one trailing dword.
    *
    * `id` is the stable identity. The queue holds a position map at +0x14 and
    * the swap rewrites `map[id] = heapIndex` for both entries
@@ -2351,18 +2355,20 @@ namespace
    */
   struct PriorityQueueEntry20Runtime
   {
-    std::int32_t priority = 0;           // +0x00
-    std::int32_t boundedTick = 0;        // +0x04
-    void* backLinkSlot = nullptr;        // +0x08
-    void* nextInChain = nullptr;         // +0x0C
-    std::uint32_t id = 0;                // +0x10
+    std::int32_t priority = 0;             // +0x00
+    std::int32_t boundedTick = 0;          // +0x04
+    moho::WeakPtr<void> ownerLink;         // +0x08 (slot +0x08, next +0x0C)
+    std::uint32_t id = 0;                  // +0x10
   };
   static_assert(sizeof(PriorityQueueEntry20Runtime) == 0x14, "PriorityQueueEntry20Runtime size must be 0x14");
   static_assert(offsetof(PriorityQueueEntry20Runtime, priority) == 0x00, "priority offset must be 0x00");
   static_assert(offsetof(PriorityQueueEntry20Runtime, boundedTick) == 0x04, "boundedTick offset must be 0x04");
-  static_assert(offsetof(PriorityQueueEntry20Runtime, backLinkSlot) == 0x08, "backLinkSlot offset must be 0x08");
-  static_assert(offsetof(PriorityQueueEntry20Runtime, nextInChain) == 0x0C, "nextInChain offset must be 0x0C");
+  static_assert(offsetof(PriorityQueueEntry20Runtime, ownerLink) == 0x08, "ownerLink offset must be 0x08");
   static_assert(offsetof(PriorityQueueEntry20Runtime, id) == 0x10, "id offset must be 0x10");
+  static_assert(
+    sizeof(PriorityQueueEntry20Runtime) == sizeof(moho::PrefixedWeakPtrDwordPayloadLane),
+    "priority-queue slot must stay the same shape as the weak-payload lane it shares with 0x00687A70"
+  );
 
   struct PriorityQueueNode24Runtime
   {
