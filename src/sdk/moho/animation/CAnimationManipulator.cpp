@@ -277,9 +277,27 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x006422E0 (FUN_006422E0,
+   *   ?AddBase_IAniManipulator@CAnimationManipulatorTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CAnimationManipulatorTypeInfo::AddBase_IAniManipulator(
+   *     gpg::RType* typeInfo);
+   *
+   * What it does:
+   * Registers `IAniManipulator` as the zero-offset base of the animation
+   * manipulator type, caching the descriptor in `IAniManipulator::sType` on
+   * first lookup - that static is what the other manipulator reflection paths
+   * read, so dropping the store leaves them resolving null.
+   */
   void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = gpg::LookupRType(typeid(moho::IAniManipulator));
+    if (moho::IAniManipulator::sType == nullptr) {
+      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
+    }
+
+    gpg::RType* const baseType = moho::IAniManipulator::sType;
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
