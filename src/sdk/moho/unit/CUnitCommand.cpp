@@ -842,6 +842,21 @@ namespace moho
     destination->unk2 = SCR_ToString(issueData->mObject);
     return destination;
   }
+  /**
+   * Address: 0x0060DAE0 (FUN_0060DAE0, Moho::CUnitCommand::GetFerryBeacon)
+   *
+   * What it does:
+   * Resolves the ferry beacon this command spawned.
+   *
+   * The binary decodes the weak lane, null-checks it and then applies the
+   * IUnit -> Unit base adjustment; in C++ both the null case and the
+   * adjustment fall out of the typed accessor.
+   */
+  Unit* CUnitCommand::GetFerryBeacon() const
+  {
+    return mUnit.GetObjectPtr();
+  }
+
 } // namespace moho
 
 namespace

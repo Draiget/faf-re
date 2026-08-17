@@ -667,9 +667,7 @@ namespace moho
         continue;
       }
 
-      // CUnitCommand::GetFerryBeacon (FUN_0060DAE0): the command's beacon
-      // weak lane resolved to a unit.
-      if (currentCommand->mUnit.GetObjectPtr() != mBeacon.GetObjectPtr()) {
+      if (currentCommand->GetFerryBeacon() != mBeacon.GetObjectPtr()) {
         continue;
       }
 
