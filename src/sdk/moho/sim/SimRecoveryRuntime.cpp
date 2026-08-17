@@ -2955,31 +2955,35 @@ namespace
   return node;
 }
 
+void SwapPriorityQueueEntries(PriorityQueue20Runtime& queue, std::uint32_t lhs, std::uint32_t rhs) noexcept;
+
 /**
  * Address: 0x00686740 (FUN_00686740)
  *
  * What it does:
  * Sifts one priority-queue entry up toward the root using
  * `(priority,boundedTick)` ordering and returns the final index.
+ *
+ * Takes the queue rather than the bare entry array because the exchange has to
+ * rewrite the position map, which lives on the queue - this is one of the
+ * three callers of the swap at 0x00687530.
  */
 [[maybe_unused]] std::uint32_t SiftPriorityQueueEntryUpRuntime(
-  std::uint32_t index,
-  PriorityQueueEntry20Runtime* const entries
+  PriorityQueue20Runtime& queue,
+  std::uint32_t index
 )
 {
-  if (entries == nullptr) {
+  if (queue.heap.empty()) {
     return index;
   }
 
   while (index != 0u) {
     const std::uint32_t parentIndex = (index - 1u) >> 1u;
-    PriorityQueueEntry20Runtime& node = entries[index];
-    PriorityQueueEntry20Runtime& parent = entries[parentIndex];
-    if (IsLowerPriorityEntry(parent, node)) {
+    if (IsLowerPriorityEntry(queue.heap[parentIndex], queue.heap[index])) {
       break;
     }
 
-    std::swap(parent, node);
+    SwapPriorityQueueEntries(queue, parentIndex, index);
     index = parentIndex;
   }
   return index;
@@ -3072,6 +3076,81 @@ namespace
 }
 
 /**
+ * The relinking move the swap performs on each slot.
+ *
+ * A queue slot and `PrefixedWeakPtrDwordPayloadLane` are the same twenty
+ * bytes - the queue just names the three dwords - so this forwards to the one
+ * recovered implementation (0x00687A70) instead of restating the owner-chain
+ * surgery. The size assert on the slot type is what makes the cast safe.
+ */
+PriorityQueueEntry20Runtime* MovePriorityQueueEntryRelinking(
+  PriorityQueueEntry20Runtime* const destination,
+  const PriorityQueueEntry20Runtime* const source
+) noexcept
+{
+  return reinterpret_cast<PriorityQueueEntry20Runtime*>(
+    moho::CopyPrefixedWeakPtrDwordPayloadLane(
+      reinterpret_cast<moho::PrefixedWeakPtrDwordPayloadLane*>(destination),
+      reinterpret_cast<const moho::PrefixedWeakPtrDwordPayloadLane*>(source)
+    )
+  );
+}
+
+/**
+ * Address: 0x00687530 (FUN_00687530)
+ *
+ * IDA signature:
+ * void __stdcall sub_687530(gpg::PriorityQueue *queue, int lhs, int rhs);
+ *
+ * What it does:
+ * Exchanges two heap slots and keeps everything that refers to them correct.
+ *
+ * The slots are exchanged through a temporary, because each carries a weak
+ * node whose owner chain has to follow it: the temporary first adopts the
+ * left slot's chain position, then the two relinking moves hand the
+ * membership across, and finally the temporary drops out of the chain.
+ *
+ * The position map is then rewritten for both slots. That is the step a plain
+ * byte swap misses - without it the map still points at where each entry used
+ * to be, and every later lookup by id lands on the wrong entry.
+ */
+void SwapPriorityQueueEntries(
+  PriorityQueue20Runtime& queue,
+  const std::uint32_t lhs,
+  const std::uint32_t rhs
+) noexcept
+{
+  if (lhs == rhs || lhs >= queue.heap.size() || rhs >= queue.heap.size()) {
+    return;
+  }
+
+  PriorityQueueEntry20Runtime& left = queue.heap[lhs];
+  PriorityQueueEntry20Runtime& right = queue.heap[rhs];
+
+  // The temporary takes over the left slot's place in the owner chain, so the
+  // moves below have a live node to hand it off from.
+  PriorityQueueEntry20Runtime staged{};
+  staged.priority = left.priority;
+  staged.boundedTick = left.boundedTick;
+  staged.id = left.id;
+  staged.ownerLink.ownerLinkSlot = left.ownerLink.ownerLinkSlot;
+  staged.ownerLink.nextInOwner = nullptr;
+  (void)staged.ownerLink.LinkIntoOwnerChainHeadUnlinked();
+
+  (void)MovePriorityQueueEntryRelinking(&left, &right);
+  (void)MovePriorityQueueEntryRelinking(&right, &staged);
+
+  if (left.id < queue.positionMap.size()) {
+    queue.positionMap[left.id] = lhs;
+  }
+  if (right.id < queue.positionMap.size()) {
+    queue.positionMap[right.id] = rhs;
+  }
+
+  staged.ownerLink.UnlinkFromOwnerChain();
+}
+
+/**
  * Address: 0x006875F0 (FUN_006875F0)
  *
  * What it does:
@@ -3079,11 +3158,12 @@ namespace
  * `(priority,boundedTick)` ordering.
  */
 [[maybe_unused]] std::uint32_t SiftPriorityQueueEntryDownRuntime(
-  std::uint32_t index,
-  PriorityQueueEntry20Runtime* const entries,
-  const std::uint32_t count
+  PriorityQueue20Runtime& queue,
+  std::uint32_t index
 )
 {
+  PriorityQueueEntry20Runtime* const entries = queue.heap.empty() ? nullptr : &queue.heap[0];
+  const std::uint32_t count = static_cast<std::uint32_t>(queue.heap.size());
   if (entries == nullptr) {
     return index;
   }
@@ -3104,16 +3184,7 @@ namespace
       break;
     }
 
-    // INCOMPLETE vs the binary. 0x006875F0 does not swap the slots itself; it
-    // calls the queue's swap at 0x00687530, which additionally rewrites
-    // `positionMap[id]` for both entries and repairs the intrusive chain that
-    // pointed at the moved slot. Neither is reachable from here, because this
-    // helper receives only the entry array - the real one receives the queue.
-    //
-    // Left as a plain swap rather than a wrong approximation of the other two
-    // steps. Fixing it means recovering 0x00687A70 (the entry move-and-relink)
-    // and the queue type, then taking the queue as the parameter.
-    std::swap(entries[index], entries[best]);
+    SwapPriorityQueueEntries(queue, index, best);
     index = best;
     nextChild = 2u * index + 1u;
   }
