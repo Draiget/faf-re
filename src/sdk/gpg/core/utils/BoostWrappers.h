@@ -3531,6 +3531,15 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
+     *
+     * What it does:
+     * Raises `boost::bad_weak_ptr`; the binary factors this throw out of the
+     * weak-construct path into one no-return helper.
+     */
+    [[noreturn]] void ThrowBadWeakPtr();
+
+    /**
      * Address: 0x00447030 (FUN_00447030)
      *
      * What it does:
