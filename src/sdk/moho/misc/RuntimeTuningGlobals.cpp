@@ -27,6 +27,14 @@ namespace moho
   bool ren_ShadowBlur = true;
   int ren_ShadowSize = 1024;
 
+  // Two more of the same never-defined kind, and the worst placed of the lot.
+  // `ren_Shadows` is the first thing WRenViewport::RenderShadows tests
+  // (0x007F7D13), and `ren_UnitSilhouette` gates the silhouette pass inside
+  // WRenViewport::Render (0x007F95EC) - so every frame read both of them
+  // through a /FORCE'd null and faulted before drawing anything.
+  bool ren_Shadows = true;                // 0x00F57E53 = 0x01
+  bool ren_UnitSilhouette = false;        // 0x010A6422, zero-fill
+
   // Render/UI/editor toggles that were declared extern all over the tree but
   // never defined anywhere. The link runs with /FORCE, so each one resolved to
   // the image base instead of failing - and the first byte there is 'M' from

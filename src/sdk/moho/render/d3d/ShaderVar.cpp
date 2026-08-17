@@ -374,4 +374,17 @@ namespace moho
   {
     RegisterPrimBatcherShaderVar<0x010A7888u>("AlphaMultiplier", &cleanup_ShaderVarPrimBatcherAlphaMultiplier);
   }
+  /**
+   * Address: 0x010BF4E0 (?shaderVarFrameGlowCopyAdd@Moho@@3UstructShaderVar@@A)
+   *
+   * What it does:
+   * The glow-copy strength CBloomRenderer::DoBloom binds (0x007F526A, then
+   * reads .effectVar.var at +0x40). It sits in the zero-fill tail of .data,
+   * so the shipped image starts it default-constructed.
+   *
+   * Declared extern where it is used but defined nowhere, so the /FORCE link
+   * bound it to a null and DoBloom faulted calling Exists() on it.
+   */
+  ShaderVar shaderVarFrameGlowCopyAdd;
+
 } // namespace moho
