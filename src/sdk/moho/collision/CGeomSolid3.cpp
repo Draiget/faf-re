@@ -19,6 +19,20 @@ namespace
     return std::signbit(planeAxis) ? minValue : maxValue;
   }
 
+  /**
+   * Address: 0x00472380 (FUN_00472380, sub_472380)
+   *
+   * IDA signature:
+   * BOOL __fastcall sub_472380(Wm3::Plane3f *a1, Wm3::AxisAlignedBox3f *a2);
+   *
+   * What it does:
+   * Answers whether any part of the box is on the plane's negative side, by
+   * testing only the corner that minimises the signed distance.
+   *
+   * The binary picks that corner branchlessly - it packs the three normal
+   * sign bits into one word and shifts each out as an index - which is the
+   * `signbit ? max : min` the helper above spells out.
+   */
   [[nodiscard]] bool IsAabbNotOutsidePlane(const Wm3::Plane3f& plane, const Wm3::AxisAlignedBox3f& bounds) noexcept
   {
     const float rejectX = SelectRejectCoordinate(plane.Normal.x, bounds.Min.x, bounds.Max.x);
@@ -32,6 +46,8 @@ namespace
 
   /**
    * Address: 0x00472430 (FUN_00472430)
+   *
+   * Address: 0x00472430 (FUN_00472430, sub_472430)
    *
    * What it does:
    * Tests whether an AABB is fully on the negative (inside) side of a plane by
