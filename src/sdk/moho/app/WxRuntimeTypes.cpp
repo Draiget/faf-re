@@ -65579,19 +65579,46 @@ void moho::WRenViewport::FogOff()
  */
 void moho::WRenViewport::RenderTerrainNormals(TerrainCommon* const terrain)
 {
-  if (terrain == nullptr) {
+  // Guard is ren_Terrain, not a null-terrain test: 0x007F7F11
+  // `cmp ren_Terrain, 0 / jz loc_7F7FB5`. The caller checks both.
+  if (!moho::ren_Terrain) {
     return;
   }
 
   WRenViewportRenderView* const runtime = AsRenderView(this);
+  WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
   gpg::gal::DeviceD3D9* const d3dDevice = device->GetDeviceD3D9();
   if (d3dDevice != nullptr) {
     (void)d3dDevice->ClearTextures();
   }
 
-  device->SetRenderTarget2(runtime->mHead, true, 0, 1.0f, 0);
+  // This pass fills the off-screen terrain-normal buffer, which
+  // TransformTerrainNormals then samples as mSecondaryTargetLocks[head]
+  // for its TCreateBasis pass - it must not draw into the head's
+  // backbuffer. The binary loads the pair through one scaled base:
+  //   0x007F7F42  mov ecx, [esi+320h]        ; mHead
+  //   0x007F7F58  lea eax, [esi+ecx*8]       ; 8-byte shared_ptr stride
+  //   0x007F7F5B  mov ecx, [eax+2184h]       ; mDepthStencilTargets[head]
+  //   0x007F7F61  mov eax, [eax+2174h]       ; mSecondaryTargetLocks[head]
+  // and dispatches SetRenderTarget1 through vtable slot 32 ([edx+80h]).
+  const std::int32_t head = runtime->mHead;
+  device->SetRenderTarget1(
+    passView->mSecondaryTargetLocks[head].get(),
+    passView->mDepthStencilTargets[head].get(),
+    true,
+    0,
+    1.0f,
+    0
+  );
   SetViewportToLocalScreen();
+
+  // The binary then dispatches slot 9, terrain->DrawTerrainNormal(
+  // sCurGameTick, sDeltaFrame), which is what actually fills the buffer.
+  // MediumFidelityTerrain (0x00806F50) and HighFidelityTerrain
+  // (0x00802F20) have no body yet, so the slot cannot move onto
+  // TerrainCommon without forcing a stub in those classes.
+  (void)terrain;
 }
 
 /**
