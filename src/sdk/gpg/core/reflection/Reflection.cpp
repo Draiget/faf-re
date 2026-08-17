@@ -1088,6 +1088,7 @@ RType* CachedRBlueprintType()
   gpg::RType* gCUnitGuardTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCUnitGuardTaskRRefCache{false, {}};
   gpg::RType* gCUnitUnloadUnitsRRefType = nullptr;
+  thread_local TypeInfoCache3 gCUnitUnloadUnitsRRefCache{false, {}};
   gpg::RType* gCFactoryBuildTaskRRefType = nullptr;
   thread_local TypeInfoCache3 gCFactoryBuildTaskRRefCache{false, {}};
   gpg::RType* gCUnitCarrierLandRRefType = nullptr;
@@ -1306,7 +1307,6 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gCEconomyEventRRefCache{false, {}};
   thread_local TypeInfoCache3 gCDecalBufferRRefCache{false, {}};
   thread_local TypeInfoCache3 gCDecalHandleRRefCache{false, {}};
-  thread_local TypeInfoCache3 gCUnitUnloadUnitsRRefCache{false, {}};
   thread_local TypeInfoCache3 gCInfluenceMapRRefCache{false, {}};
   thread_local TypeInfoCache3 gRDebugCollisionRRefCache{false, {}};
   thread_local TypeInfoCache3 gRDebugGridRRefCache{false, {}};
@@ -8506,6 +8506,13 @@ gpg::RRef* PackRRef_CDecalHandle_P(RRef* const out, moho::CDecalHandle** const v
 // transcriptions (BuildCDecalHandlePointerLexical / BuildCDecalHandlePointerTypeName)
 // were the same two addresses and have been re-homed into the specialization.
 
+/**
+ * Address: 0x0077E390 (FUN_0077E390, gpg::RRef_CDecalHandle)
+ *
+ * What it does:
+ * Builds a reflection reference for `moho::CDecalHandle` using
+ * `CDecalHandle::sType` cache and derived-type normalization.
+ */
 gpg::RRef* RRef_CDecalHandle(RRef* const out, moho::CDecalHandle* const value)
 {
   return BuildTypedRefWithCache<moho::CDecalHandle>(
