@@ -146,6 +146,7 @@ namespace moho
   class CEconomyEvent;
   class CDecalBuffer;
   class CDecalHandle;
+  class CUnitUnloadUnits;
   class CIntelCounterHandle;
   class CIntelPosHandle;
   class Prop;
@@ -3179,6 +3180,14 @@ namespace gpg
    * with derived-type normalization.
    */
   RRef* RRef_CDecalHandle(RRef* out, moho::CDecalHandle* value);
+
+  /**
+   * Address: 0x00628DB0 (FUN_00628DB0, gpg::RRef_CUnitUnloadUnits)
+   *
+   * What it does:
+   * Builds a typed reflection ref for one `CUnitUnloadUnits`.
+   */
+  RRef* RRef_CUnitUnloadUnits(RRef* out, moho::CUnitUnloadUnits* value);
 
   /**
    * Address: 0x0077DB30 (FUN_0077DB30)
