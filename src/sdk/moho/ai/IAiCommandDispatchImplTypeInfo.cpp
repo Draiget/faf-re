@@ -104,6 +104,49 @@ const char* IAiCommandDispatchImplTypeInfo::GetName() const
   return "IAiCommandDispatchImpl";
 }
 
+namespace
+{
+  /**
+   * Address: 0x005998B0 (FUN_005998B0,
+   *   Moho::IAiCommandDispatchImplTypeInfo::AddBase_CCommandTask)
+   *
+   * What it does:
+   * Registers `Moho::CCommandTask` as a reflected base of `typeInfo`
+   * at subobject offset 0x00.
+   */
+  void AddBase_CCommandTask(gpg::RType* const typeInfo)
+  {
+    AddBaseIfPresent(typeInfo, CachedCCommandTaskType(), 0x00);
+  }
+
+  /**
+   * Address: 0x00599910 (FUN_00599910,
+   *   Moho::IAiCommandDispatchImplTypeInfo::AddBase_IAiCommandDispatch)
+   *
+   * What it does:
+   * Registers `Moho::IAiCommandDispatch` as a reflected base of `typeInfo`
+   * at subobject offset 0x30.
+   */
+  void AddBase_IAiCommandDispatch(gpg::RType* const typeInfo)
+  {
+    AddBaseIfPresent(typeInfo, CachedIAiCommandDispatchType(), 0x30);
+  }
+
+  /**
+   * Address: 0x00599970 (FUN_00599970,
+   *   Moho::IAiCommandDispatchImplTypeInfo::AddBase_Listener_EUnitCommandQueueStatus)
+   *
+   * What it does:
+   * Registers `Moho::Listener<EUnitCommandQueueStatus>` as a reflected base of `typeInfo`
+   * at subobject offset 0x34.
+   */
+  void AddBase_Listener_EUnitCommandQueueStatus(gpg::RType* const typeInfo)
+  {
+    AddBaseIfPresent(typeInfo, CachedQueueStatusListenerType(), 0x34);
+  }
+
+} // namespace
+
 /**
  * Address: 0x00599190 (FUN_00599190, ?Init@IAiCommandDispatchImplTypeInfo@Moho@@UAEXXZ)
  */
@@ -112,9 +155,9 @@ void IAiCommandDispatchImplTypeInfo::Init()
   size_ = sizeof(IAiCommandDispatchImpl);
   gpg::RType::Init();
 
-  AddBaseIfPresent(this, CachedCCommandTaskType(), 0x00);
-  AddBaseIfPresent(this, CachedIAiCommandDispatchType(), 0x30);
-  AddBaseIfPresent(this, CachedQueueStatusListenerType(), 0x34);
+  AddBase_CCommandTask(this);
+  AddBase_IAiCommandDispatch(this);
+  AddBase_Listener_EUnitCommandQueueStatus(this);
 
   Finish();
 }
