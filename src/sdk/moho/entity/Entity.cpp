@@ -2474,6 +2474,90 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x00681220 (FUN_00681220, sub_681220)
+   *
+   * IDA signature:
+   * void __usercall sub_681220(gpg::ReadArchive* archive@<eax>, Entity* this@<esi>);
+   *
+   * What it does:
+   * Reflection LOAD serializer, the exact mirror of `MemberSerialize`: reads
+   * every persisted lane back in the same order, restoring each tracked
+   * pointer's OWNED/UNOWNED state. Without this the base of every entity could
+   * be written to a save but never read back.
+   */
+  void Entity::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+
+    archive->Read(CachedConstantDataType(), &id_, owner);
+    archive->Read(CachedScriptObjectTypeForEntity(), static_cast<CScriptObject*>(this), owner);
+    archive->Read(CachedTaskType(), static_cast<CTask*>(this), owner);
+    archive->Read(CachedVariableDataType(), &mMeshRef, owner);
+
+    // Owning army (UNOWNED).
+    auto* army = static_cast<SimArmy*>(ArmyRef);
+    (void)archive->ReadPointer_SimArmy(&army, &owner);
+    ArmyRef = static_cast<CArmyImpl*>(army);
+
+    archive->Read(CachedVTransformType(), &PendingOrientation, owner);
+
+    (void)archive->ReadPointerOwned_PositionHistory(&mPositionHistory, &owner);
+
+    archive->ReadFloat(&mPendingVelocityScale);
+
+    int lastTickProcessed = 0;
+    archive->ReadInt(&lastTickProcessed);
+    mLastTickProcessed = static_cast<std::uint32_t>(lastTickProcessed);
+
+    auto* collisionExtents = static_cast<CColPrimitiveBase*>(CollisionExtents);
+    (void)archive->ReadPointerOwned_CColPrimitiveBase(&collisionExtents, &owner);
+    CollisionExtents = static_cast<EntityCollisionUpdater*>(collisionExtents);
+
+    archive->Read(CachedAttachedEntitiesType(), &mAttachedEntities, owner);
+    archive->Read(CachedAttachInfoType(), &mAttachInfo, owner);
+
+    bool queueRelinkBlocked = false;
+    bool destroyQueued = false;
+    bool onDestroyDispatched = false;
+    archive->ReadBool(&queueRelinkBlocked);
+    archive->ReadBool(&destroyQueued);
+    archive->ReadBool(&onDestroyDispatched);
+    mQueueRelinkBlocked = queueRelinkBlocked ? 1u : 0u;
+    DestroyQueuedFlag = destroyQueued ? 1u : 0u;
+    mOnDestroyDispatched = onDestroyDispatched ? 1u : 0u;
+
+    archive->Read(CachedResIdType(), &mResId, owner);
+
+    (void)archive->ReadPointerOwned_CIntel(&mIntelManager, &owner);
+
+    gpg::RType* const visibilityType = CachedVisibilityModeTypeForSerialize();
+    archive->Read(visibilityType, &mVizToFocusPlayer, owner);
+    archive->Read(visibilityType, &mVizToAllies, owner);
+    archive->Read(visibilityType, &mVizToEnemies, owner);
+    archive->Read(visibilityType, &mVizToNeutrals, owner);
+
+    (void)archive->ReadPointerOwned_CTextureScroller(&mScroller, &owner);
+    (void)archive->ReadPointerOwned_SPhysBody(&mPhysBody, &owner);
+
+    bool realtimeStatsEnabled = false;
+    archive->ReadBool(&realtimeStatsEnabled);
+    RealtimeStatsEnabled = realtimeStatsEnabled ? 1u : 0u;
+
+    archive->ReadString(&mUniqueName);
+
+    archive->Read(CachedShooterSetType(), &mShooters, owner);
+
+    (void)archive->ReadPointerOwned_Motor(&mMotor, &owner);
+
+    archive->Read(CachedCollisionBoxType(), &mCollisionBoundsMin, owner);
+  }
+
+  /**
    * Address: 0x00681720 (FUN_00681720, Moho::Entity::MemberSerialize)
    * Mangled: ?MemberSerialize@Entity@Moho@@QBEXPAVWriteArchive@gpg@@@Z
    *
