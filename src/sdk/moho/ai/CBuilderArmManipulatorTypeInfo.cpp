@@ -93,6 +93,14 @@ namespace
     return ResolveCBuilderArmManipulatorTypeCachePrimary();
   }
 
+  /**
+   * Address: 0x00637130 (FUN_00637130,
+   *   ?AddBase_IAniManipulator@CBuilderArmManipulatorTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
+   *
+   * What it does:
+   * Resolves `IAniManipulator`'s descriptor for the base registration, caching
+   * it in `IAniManipulator::sType` the way the emission does.
+   */
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
     gpg::RType* type = moho::IAniManipulator::sType;

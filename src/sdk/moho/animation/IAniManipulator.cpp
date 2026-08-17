@@ -771,6 +771,10 @@ namespace
    *
    * What it does:
    * Resolves and caches the reflected runtime type for `IAniManipulator`.
+   *
+   * Serves both per-TypeInfo emissions of this registration:
+   * 0x00635310 (CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator) and
+   * 0x0063A150 (CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator).
    */
   gpg::RType* CachedIAniManipulatorType()
   {
