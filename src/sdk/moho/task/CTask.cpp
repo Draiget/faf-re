@@ -26,6 +26,15 @@ namespace
     return *reinterpret_cast<moho::CTaskTypeInfo*>(gCTaskTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x00408B00 (FUN_00408B00, sub_408B00)
+   *
+   * What it does:
+   * Constructs the process-wide CTaskTypeInfo in its static storage and
+   * pre-registers it as the reflected type for CTask. The binary spells the
+   * construction as an RType base ctor plus an explicit vftable store; the
+   * placement-new here is the same thing expressed in C++.
+   */
   [[nodiscard]] gpg::RType* InitializeCTaskTypeInfoStorage()
   {
     if (!gCTaskTypeInfoConstructed) {
