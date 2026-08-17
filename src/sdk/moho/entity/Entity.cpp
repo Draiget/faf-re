@@ -2666,25 +2666,6 @@ namespace moho
     archive->Write(CachedCollisionBoxType(), &mCollisionBoundsMin, owner);
   }
 
-  /**
-   * Address: 0x006807A0 (FUN_006807A0)
-   *
-   * What it does:
-   * Reflection SAVE adapter (mSaveCallback) that forwards one entity save lane
-   * into `Entity::MemberSerialize`. Registered into the entity reflection type
-   * so the archive framework invokes `MemberSerialize` by name through this
-   * thunk. Two sibling thunks (0x0067F640, 0x0067B640) share this body.
-   */
-  [[maybe_unused]] void SerializeEntityThunk(
-    const Entity* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (object != nullptr) {
-      object->MemberSerialize(archive);
-    }
-  }
-
   namespace
   {
     /**

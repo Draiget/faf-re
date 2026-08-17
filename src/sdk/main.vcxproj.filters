@@ -66,6 +66,9 @@
     <ClCompile Include="moho\entity\Entity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\entity\EntitySerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\entity\SSTIEntityConstantData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3196,6 +3199,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\Entity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\EntitySerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\SSTIEntityConstantData.h">
