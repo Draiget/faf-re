@@ -1390,6 +1390,530 @@ namespace
     }
     return cached;
   }
+  // Reflected per-type upcasts. Each of these is its own function in the
+  // binary that the corresponding reader calls, rather than open-coding the
+  // REF_UpcastPtr sequence at the call site.
+
+  /**
+   * Address: 0x00585270 (FUN_00585270, gpg::RRef::Upcast_SimArmy)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::SimArmy`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::SimArmy* UpcastToSimArmy(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSimArmyType());
+    return static_cast<moho::SimArmy*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00585460 (FUN_00585460, gpg::RRef::Upcast_CAiPersonality)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAiPersonality`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAiPersonality* UpcastToCAiPersonality(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPersonalityType());
+    return static_cast<moho::CAiPersonality*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005943C0 (FUN_005943C0, gpg::RRef::Upcast_CAiBrain)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAiBrain`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAiBrain* UpcastToCAiBrain(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiBrainType());
+    return static_cast<moho::CAiBrain*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0059EB00 (FUN_0059EB00, gpg::RRef::Upcast_IFormationInstance)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IFormationInstance`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IFormationInstance* UpcastToIFormationInstance(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIFormationInstanceType());
+    return static_cast<moho::IFormationInstance*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005A89B0 (FUN_005A89B0, gpg::RRef::Upcast_Entity)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::Entity`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::Entity* UpcastToEntity(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityType());
+    return static_cast<moho::Entity*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005A9A00 (FUN_005A9A00, gpg::RRef::Upcast_CAiPathNavigator)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAiPathNavigator`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAiPathNavigator* UpcastToCAiPathNavigator(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPathNavigatorType());
+    return static_cast<moho::CAiPathNavigator*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005ACC60 (FUN_005ACC60, gpg::RRef::Upcast_PathQueue)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::PathQueue`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::PathQueue* UpcastToPathQueue(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPathQueueType());
+    return static_cast<moho::PathQueue*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005B1B90 (FUN_005B1B90, gpg::RRef::Upcast_CAiPathFinder)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAiPathFinder`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAiPathFinder* UpcastToCAiPathFinder(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPathFinderType());
+    return static_cast<moho::CAiPathFinder*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005CE500 (FUN_005CE500, gpg::RRef::Upcast_CInfluenceMap)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CInfluenceMap`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CInfluenceMap* UpcastToCInfluenceMap(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCInfluenceMapType());
+    return static_cast<moho::CInfluenceMap*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005D1710 (FUN_005D1710, gpg::RRef::Upcast_UnitWeapon)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::UnitWeapon`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::UnitWeapon* UpcastToUnitWeapon(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedUnitWeaponType());
+    return static_cast<moho::UnitWeapon*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005D1C30 (FUN_005D1C30, gpg::RRef::Upcast_CEconRequest)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CEconRequest`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CEconRequest* UpcastToCEconRequest(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconRequestType());
+    return static_cast<moho::CEconRequest*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005D5280 (FUN_005D5280, gpg::RRef::Upcast_CAiPathSpline)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAiPathSpline`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAiPathSpline* UpcastToCAiPathSpline(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPathSplineType());
+    return static_cast<moho::CAiPathSpline*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005D52C0 (FUN_005D52C0, gpg::RRef::Upcast_CUnitMotion)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CUnitMotion`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CUnitMotion* UpcastToCUnitMotion(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCUnitMotionType());
+    return static_cast<moho::CUnitMotion*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005E0680 (FUN_005E0680, gpg::RRef::Upcast_CAcquireTargetTask)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAcquireTargetTask`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAcquireTargetTask* UpcastToCAcquireTargetTask(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAcquireTargetTaskType());
+    return static_cast<moho::CAcquireTargetTask*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005F5240 (FUN_005F5240, gpg::RRef::Upcast_CUnitCommand)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CUnitCommand`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CUnitCommand* UpcastToCUnitCommand(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCUnitCommandType());
+    return static_cast<moho::CUnitCommand*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0063D720 (FUN_0063D720, gpg::RRef::Upcast_IAniManipulator)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAniManipulator`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAniManipulator* UpcastToIAniManipulator(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAniManipulatorType());
+    return static_cast<moho::IAniManipulator*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0063EDD0 (FUN_0063EDD0, gpg::RRef::Upcast_CAniActor)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAniActor`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAniActor* UpcastToCAniActor(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAniActorType());
+    return static_cast<moho::CAniActor*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006587A0 (FUN_006587A0, gpg::RRef::Upcast_IEffect)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IEffect`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IEffect* UpcastToIEffect(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectType());
+    return static_cast<moho::IEffect*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0065AF60 (FUN_0065AF60, gpg::RRef::Upcast_CParticleTexture)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CParticleTexture`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CParticleTexture* UpcastToCParticleTexture(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCParticleTextureType());
+    return static_cast<moho::CParticleTexture*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00671140 (FUN_00671140, gpg::RRef::Upcast_CDecalHandle)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CDecalHandle`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CDecalHandle* UpcastToCDecalHandle(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCDecalHandleType());
+    return static_cast<moho::CDecalHandle*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00680F10 (FUN_00680F10, gpg::RRef::Upcast_PositionHistory)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::PositionHistory`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::PositionHistory* UpcastToPositionHistory(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPositionHistoryType());
+    return static_cast<moho::PositionHistory*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006831F0 (FUN_006831F0, gpg::RRef::Upcast_CColPrimitiveBase)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CColPrimitiveBase`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CColPrimitiveBase* UpcastToCColPrimitiveBase(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCColPrimitiveBaseType());
+    return static_cast<moho::CColPrimitiveBase*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006833E0 (FUN_006833E0, gpg::RRef::Upcast_CIntel)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CIntel`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CIntel* UpcastToCIntel(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelType());
+    return static_cast<moho::CIntel*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006835C0 (FUN_006835C0, gpg::RRef::Upcast_CTextureScroller)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CTextureScroller`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CTextureScroller* UpcastToCTextureScroller(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTextureScrollerType());
+    return static_cast<moho::CTextureScroller*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006837A0 (FUN_006837A0, gpg::RRef::Upcast_SPhysBody)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::SPhysBody`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::SPhysBody* UpcastToSPhysBody(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSPhysBodyType());
+    return static_cast<moho::SPhysBody*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00683980 (FUN_00683980, gpg::RRef::Upcast_Motor)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::Motor`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::Motor* UpcastToMotor(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedMotorType());
+    return static_cast<moho::Motor*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006E07A0 (FUN_006E07A0, gpg::RRef::Upcast_CFireWeaponTask)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CFireWeaponTask`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CFireWeaponTask* UpcastToCFireWeaponTask(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCFireWeaponTaskType());
+    return static_cast<moho::CFireWeaponTask*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00707600 (FUN_00707600, gpg::RRef::Upcast_IAiReconDB)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiReconDB`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiReconDB* UpcastToIAiReconDB(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiReconDBType());
+    return static_cast<moho::IAiReconDB*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007077F0 (FUN_007077F0, gpg::RRef::Upcast_CEconomy)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CEconomy`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CEconomy* UpcastToCEconomy(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconomyType());
+    return static_cast<moho::CEconomy*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007079D0 (FUN_007079D0, gpg::RRef::Upcast_CArmyStats)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CArmyStats`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CArmyStats* UpcastToCArmyStats(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCArmyStatsType());
+    return static_cast<moho::CArmyStats*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007149D0 (FUN_007149D0, gpg::RRef::Upcast_CArmyStatItem)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CArmyStatItem`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CArmyStatItem* UpcastToCArmyStatItem(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCArmyStatItemType());
+    return static_cast<moho::CArmyStatItem*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0072B0E0 (FUN_0072B0E0, gpg::RRef::Upcast_CSquad)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CSquad`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CSquad* UpcastToCSquad(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCSquadType());
+    return static_cast<moho::CSquad*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00758230 (FUN_00758230, gpg::RRef::Upcast_CRandomStream)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CRandomStream`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CRandomStream* UpcastToCRandomStream(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCRandomStreamType());
+    return static_cast<moho::CRandomStream*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007582B0 (FUN_007582B0, gpg::RRef::Upcast_IAiFormationDB)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiFormationDB`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiFormationDB* UpcastToIAiFormationDB(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiFormationDBType());
+    return static_cast<moho::IAiFormationDB*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007586B0 (FUN_007586B0, gpg::RRef::Upcast_CCommandDB)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CCommandDB`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CCommandDb* UpcastToCCommandDb(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCCommandDBType());
+    return static_cast<moho::CCommandDb*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007586F0 (FUN_007586F0, gpg::RRef::Upcast_CDecalBuffer)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CDecalBuffer`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CDecalBuffer* UpcastToCDecalBuffer(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCDecalBufferType());
+    return static_cast<moho::CDecalBuffer*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x007588D0 (FUN_007588D0, gpg::RRef::Upcast_IEffectManager)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IEffectManager`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IEffectManager* UpcastToIEffectManager(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectManagerType());
+    return static_cast<moho::IEffectManager*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00758AC0 (FUN_00758AC0, gpg::RRef::Upcast_ISoundManager)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::ISoundManager`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::ISoundManager* UpcastToISoundManager(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedISoundManagerType());
+    return static_cast<moho::ISoundManager*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00758CB0 (FUN_00758CB0, gpg::RRef::Upcast_EntityDB)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::EntityDB`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CEntityDb* UpcastToCEntityDb(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityDBType());
+    return static_cast<moho::CEntityDb*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0076ED90 (FUN_0076ED90, gpg::RRef::Upcast_CIntelPosHandle)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CIntelPosHandle`, returning null when
+   * the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CIntelPosHandle* UpcastToCIntelPosHandle(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelPosHandleType());
+    return static_cast<moho::CIntelPosHandle*>(upcast.mObj);
+  }
+
 
   [[nodiscard]] gpg::RType* CachedCPlatoonType()
   {
@@ -2311,8 +2835,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CSquad(moho::CSquad** const outValue,
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCSquadType());
-  *outValue = static_cast<moho::CSquad*>(upcast.mObj);
+  *outValue = UpcastToCSquad(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCSquadType());
     const char* const actualName = source.GetTypeName();
@@ -3650,8 +4173,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_SimArmy(moho::SimArmy** const outValu
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSimArmyType());
-  *outValue = static_cast<moho::SimArmy*>(upcast.mObj);
+  *outValue = UpcastToSimArmy(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedSimArmyType());
     const char* const actualName = source.GetTypeName();
@@ -3697,8 +4219,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAiPersonality(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPersonalityType());
-  *outValue = static_cast<moho::CAiPersonality*>(upcast.mObj);
+  *outValue = UpcastToCAiPersonality(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAiPersonalityType());
     const char* const actualName = source.GetTypeName();
@@ -4003,8 +4524,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_PathQueue(moho::PathQueue** const out
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPathQueueType());
-  *outValue = static_cast<moho::PathQueue*>(upcast.mObj);
+  *outValue = UpcastToPathQueue(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedPathQueueType());
     const char* const actualName = source.GetTypeName();
@@ -4159,8 +4679,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CTextureScroller(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTextureScrollerType());
-  *outValue = static_cast<moho::CTextureScroller*>(upcast.mObj);
+  *outValue = UpcastToCTextureScroller(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCTextureScrollerType());
     const char* const actualName = source.GetTypeName();
@@ -4290,8 +4809,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAiPathNavigator(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPathNavigatorType());
-  *outValue = static_cast<moho::CAiPathNavigator*>(upcast.mObj);
+  *outValue = UpcastToCAiPathNavigator(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAiPathNavigatorType());
     const char* const actualName = source.GetTypeName();
@@ -4337,8 +4855,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAiPathFinder(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPathFinderType());
-  *outValue = static_cast<moho::CAiPathFinder*>(upcast.mObj);
+  *outValue = UpcastToCAiPathFinder(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAiPathFinderType());
     const char* const actualName = source.GetTypeName();
@@ -4509,8 +5026,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_UnitWeapon(moho::UnitWeapon** const o
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedUnitWeaponType());
-  *outValue = static_cast<moho::UnitWeapon*>(upcast.mObj);
+  *outValue = UpcastToUnitWeapon(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedUnitWeaponType());
     const char* const actualName = source.GetTypeName();
@@ -4557,8 +5073,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAcquireTargetTask(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAcquireTargetTaskType());
-  *outValue = static_cast<moho::CAcquireTargetTask*>(upcast.mObj);
+  *outValue = UpcastToCAcquireTargetTask(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAcquireTargetTaskType());
     const char* const actualName = source.GetTypeName();
@@ -4604,8 +5119,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAiPathSpline(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiPathSplineType());
-  *outValue = static_cast<moho::CAiPathSpline*>(upcast.mObj);
+  *outValue = UpcastToCAiPathSpline(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAiPathSplineType());
     const char* const actualName = source.GetTypeName();
@@ -5139,8 +5653,7 @@ ReadArchive* ReadArchive::ReadPointer_CParticleTexture(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCParticleTextureType());
-  *outValue = static_cast<moho::CParticleTexture*>(upcast.mObj);
+  *outValue = UpcastToCParticleTexture(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCParticleTextureType());
     const char* const actualName = source.GetTypeName();
@@ -6049,8 +6562,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CEconRequest(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconRequestType());
-  *outValue = static_cast<moho::CEconRequest*>(upcast.mObj);
+  *outValue = UpcastToCEconRequest(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCEconRequestType());
     const char* const actualName = source.GetTypeName();
@@ -6136,8 +6648,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CEconomy(moho::CEconomy** const outVa
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconomyType());
-  *outValue = static_cast<moho::CEconomy*>(upcast.mObj);
+  *outValue = UpcastToCEconomy(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCEconomyType());
     const char* const actualName = source.GetTypeName();
@@ -6274,8 +6785,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CUnitCommand(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCUnitCommandType());
-  *outValue = static_cast<moho::CUnitCommand*>(upcast.mObj);
+  *outValue = UpcastToCUnitCommand(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCUnitCommandType());
     const char* const actualName = source.GetTypeName();
@@ -6321,8 +6831,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAniManipulator(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAniManipulatorType());
-  *outValue = static_cast<moho::IAniManipulator*>(upcast.mObj);
+  *outValue = UpcastToIAniManipulator(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAniManipulatorType());
     const char* const actualName = source.GetTypeName();
@@ -6366,8 +6875,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IEffect(moho::IEffect** const outValu
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectType());
-  *outValue = static_cast<moho::IEffect*>(upcast.mObj);
+  *outValue = UpcastToIEffect(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIEffectType());
     const char* const actualName = source.GetTypeName();
@@ -6413,8 +6921,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_PositionHistory(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPositionHistoryType());
-  *outValue = static_cast<moho::PositionHistory*>(upcast.mObj);
+  *outValue = UpcastToPositionHistory(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedPositionHistoryType());
     const char* const actualName = source.GetTypeName();
@@ -6460,8 +6967,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CColPrimitiveBase(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCColPrimitiveBaseType());
-  *outValue = static_cast<moho::CColPrimitiveBase*>(upcast.mObj);
+  *outValue = UpcastToCColPrimitiveBase(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCColPrimitiveBaseType());
     const char* const actualName = source.GetTypeName();
@@ -6505,8 +7011,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CIntel(moho::CIntel** const outValue,
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelType());
-  *outValue = static_cast<moho::CIntel*>(upcast.mObj);
+  *outValue = UpcastToCIntel(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCIntelType());
     const char* const actualName = source.GetTypeName();
@@ -6550,8 +7055,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_SPhysBody(moho::SPhysBody** const out
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSPhysBodyType());
-  *outValue = static_cast<moho::SPhysBody*>(upcast.mObj);
+  *outValue = UpcastToSPhysBody(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedSPhysBodyType());
     const char* const actualName = source.GetTypeName();
@@ -6595,8 +7099,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_Motor(moho::EntityMotor** const outVa
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedMotorType());
-  *outValue = static_cast<moho::EntityMotor*>(upcast.mObj);
+  *outValue = UpcastToMotor(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedMotorType());
     const char* const actualName = source.GetTypeName();
@@ -6681,8 +7184,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_Entity(moho::Entity** const outValue,
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityType());
-  *outValue = static_cast<moho::Entity*>(upcast.mObj);
+  *outValue = UpcastToEntity(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedEntityType());
     const char* const actualName = source.GetTypeName();
@@ -6774,8 +7276,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CUnitMotion(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCUnitMotionType());
-  *outValue = static_cast<moho::CUnitMotion*>(upcast.mObj);
+  *outValue = UpcastToCUnitMotion(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCUnitMotionType());
     const char* const actualName = source.GetTypeName();
@@ -6867,8 +7368,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IFormationInstance(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIFormationInstanceType());
-  *outValue = static_cast<moho::IFormationInstance*>(upcast.mObj);
+  *outValue = UpcastToIFormationInstance(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIFormationInstanceType());
     const char* const actualName = source.GetTypeName();
@@ -6912,8 +7412,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAniActor(moho::CAniActor** const out
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAniActorType());
-  *outValue = static_cast<moho::CAniActor*>(upcast.mObj);
+  *outValue = UpcastToCAniActor(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAniActorType());
     const char* const actualName = source.GetTypeName();
@@ -7231,8 +7730,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CFireWeaponTask(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCFireWeaponTaskType());
-  *outValue = static_cast<moho::CFireWeaponTask*>(upcast.mObj);
+  *outValue = UpcastToCFireWeaponTask(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCFireWeaponTaskType());
     const char* const actualName = source.GetTypeName();
@@ -7325,8 +7823,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CArmyStats(moho::CArmyStats** const o
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCArmyStatsType());
-  *outValue = static_cast<moho::CArmyStats*>(upcast.mObj);
+  *outValue = UpcastToCArmyStats(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCArmyStatsType());
     const char* const actualName = source.GetTypeName();
@@ -7372,8 +7869,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CInfluenceMap(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCInfluenceMapType());
-  *outValue = static_cast<moho::CInfluenceMap*>(upcast.mObj);
+  *outValue = UpcastToCInfluenceMap(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCInfluenceMapType());
     const char* const actualName = source.GetTypeName();
@@ -7417,8 +7913,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CAiBrain(moho::CAiBrain** const outVa
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiBrainType());
-  *outValue = static_cast<moho::CAiBrain*>(upcast.mObj);
+  *outValue = UpcastToCAiBrain(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCAiBrainType());
     const char* const actualName = source.GetTypeName();
@@ -7464,8 +7959,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiReconDB(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiReconDBType());
-  *outValue = static_cast<moho::IAiReconDB*>(upcast.mObj);
+  *outValue = UpcastToIAiReconDB(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiReconDBType());
     const char* const actualName = source.GetTypeName();
@@ -7511,8 +8005,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CArmyStatItem(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCArmyStatItemType());
-  *outValue = static_cast<moho::CArmyStatItem*>(upcast.mObj);
+  *outValue = UpcastToCArmyStatItem(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCArmyStatItemType());
     const char* const actualName = source.GetTypeName();
@@ -7602,8 +8095,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CRandomStream(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCRandomStreamType());
-  *outValue = static_cast<moho::CRandomStream*>(upcast.mObj);
+  *outValue = UpcastToCRandomStream(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCRandomStreamType());
     const char* const actualName = source.GetTypeName();
@@ -7696,8 +8188,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiFormationDB(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiFormationDBType());
-  *outValue = static_cast<moho::IAiFormationDB*>(upcast.mObj);
+  *outValue = UpcastToIAiFormationDB(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiFormationDBType());
     const char* const actualName = source.GetTypeName();
@@ -7743,8 +8234,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CCommandDB(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCCommandDBType());
-  *outValue = static_cast<moho::CCommandDb*>(upcast.mObj);
+  *outValue = UpcastToCCommandDb(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCCommandDBType());
     const char* const actualName = source.GetTypeName();
@@ -7790,8 +8280,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CDecalBuffer(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCDecalBufferType());
-  *outValue = static_cast<moho::CDecalBuffer*>(upcast.mObj);
+  *outValue = UpcastToCDecalBuffer(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCDecalBufferType());
     const char* const actualName = source.GetTypeName();
@@ -7837,8 +8326,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IEffectManager(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIEffectManagerType());
-  *outValue = static_cast<moho::IEffectManager*>(upcast.mObj);
+  *outValue = UpcastToIEffectManager(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIEffectManagerType());
     const char* const actualName = source.GetTypeName();
@@ -7884,8 +8372,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_ISoundManager(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedISoundManagerType());
-  *outValue = static_cast<moho::ISoundManager*>(upcast.mObj);
+  *outValue = UpcastToISoundManager(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedISoundManagerType());
     const char* const actualName = source.GetTypeName();
@@ -7929,8 +8416,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_EntityDB(moho::CEntityDb** const outV
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityDBType());
-  *outValue = static_cast<moho::CEntityDb*>(upcast.mObj);
+  *outValue = UpcastToCEntityDb(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedEntityDBType());
     const char* const actualName = source.GetTypeName();
@@ -7976,8 +8462,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CIntelPosHandle(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelPosHandleType());
-  *outValue = static_cast<moho::CIntelPosHandle*>(upcast.mObj);
+  *outValue = UpcastToCIntelPosHandle(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCIntelPosHandleType());
     const char* const actualName = source.GetTypeName();
@@ -8023,8 +8508,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CDecalHandle(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCDecalHandleType());
-  *outValue = static_cast<moho::CDecalHandle*>(upcast.mObj);
+  *outValue = UpcastToCDecalHandle(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCDecalHandleType());
     const char* const actualName = source.GetTypeName();
