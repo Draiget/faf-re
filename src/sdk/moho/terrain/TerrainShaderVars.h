@@ -80,6 +80,7 @@ namespace moho
     ShaderVar shadowsEnabled;
     ShaderVar shadowMatrix;
     ShaderVar shadowTexture;
+    ShaderVar shadowSize;
     ShaderVar noiseTexture;
     ShaderVar decalMaskTexture;
     ShaderVar biCubicLookup;

@@ -125,7 +125,7 @@ namespace moho
      * technique, binds the camera matrices and tesselator height scale, then
      * issues the single low-fidelity terrain batch.
      */
-    void DrawTerrainDepth(const GeomCamera3& camera);
+    void DrawTerrainDepth(const GeomCamera3& camera) override;
 
     /**
      * Address: 0x00809B20 (FUN_00809B20, Moho::LowFidelityTerrain::DrawTerrainNormal)

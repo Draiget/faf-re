@@ -343,6 +343,15 @@ namespace moho
       boost::shared_ptr<ID3DRenderTarget> refractionTexture,
       boost::shared_ptr<ID3DRenderTarget> reflectionTexture) override;
 
+    /**
+     * Address: 0x00805A90 (FUN_00805A90)
+     * Primary vtable slot 6.
+     *
+     * What it does:
+     * Depth-only terrain pass through the `TTerrainDepth` technique.
+     */
+    void DrawTerrainDepth(const GeomCamera3& camera) override;
+
     void DrawTerrainSkirt() override;
 
     /**

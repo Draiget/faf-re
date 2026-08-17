@@ -206,6 +206,15 @@ namespace moho
      * path when terrain/skirt flags are enabled and skirt index lanes are
      * valid for triangle-list submission.
      */
+    /**
+     * Address: 0x00801A50 (FUN_00801A50)
+     * Primary vtable slot 6.
+     *
+     * What it does:
+     * Depth-only terrain pass through the `TTerrainDepth` technique.
+     */
+    void DrawTerrainDepth(const GeomCamera3& camera) override;
+
     void DrawTerrainSkirt() override;
 
     /**
