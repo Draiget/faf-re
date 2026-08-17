@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/Vector.h"
+#include "moho/containers/BVIntSet.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "platform/Platform.h"
 
@@ -13,35 +14,26 @@ namespace moho
   /**
    * Compact sync mask payload used in CSimDriver::SetSyncFilterMaskA/SetSyncFilterMaskB.
    *
+   * This is not a distinct type: the payload the binary stores here is a plain
+   * `BVIntSet` (base word index +0x00, metadata word +0x04, packed word vector
+   * +0x08, size 0x20). `Sim::AdvanceBeat` proves it by calling
+   * `BVIntSet::GetNext` directly on `mSyncFilter.maskA` (0x0074A26C, with
+   * `this` = Sim+0x0AA8), and `CWldSession` builds the payload as a `BVIntSet`
+   * before storing it.
+   *
    * Layout reconstructed from 0x0073B3F0, 0x0073B4B0, and 0x0073DD10.
    */
-  struct SSyncFilterMaskBlock
-  {
-    uint32_t rawWord = 0; // +0x00
-    // +0x04 is preserved per-instance and intentionally not copied by FUN_0073DD10.
-    uint32_t maskVectorAuxWord = 0;            // +0x04
-    gpg::core::FastVectorN<uint32_t, 2> masks; // +0x08
+  using SSyncFilterMaskBlock = BVIntSet;
 
-    /**
-     * Address: 0x00401C50 (FUN_00401C50)
-     *
-     * What it does:
-     * Compares the binary-significant mask payload (`rawWord` + full vector data).
-     */
-    static bool Equals(const SSyncFilterMaskBlock& lhs, const SSyncFilterMaskBlock& rhs);
-
-    /**
-     * Address: 0x004028E0 (FUN_004028E0 helper usage in FUN_0073DD10)
-     *
-     * What it does:
-     * Copies the binary-significant mask payload (`rawWord` + vector data).
-     */
-    void CopyFrom(const SSyncFilterMaskBlock& source);
-  };
-  static_assert(sizeof(SSyncFilterMaskBlock) == 0x20, "SSyncFilterMaskBlock size must be 0x20");
-  static_assert(offsetof(SSyncFilterMaskBlock, rawWord) == 0x00, "rawWord offset mismatch");
-  static_assert(offsetof(SSyncFilterMaskBlock, maskVectorAuxWord) == 0x04, "maskVectorAuxWord offset mismatch");
-  static_assert(offsetof(SSyncFilterMaskBlock, masks) == 0x08, "masks offset mismatch");
+  /**
+   * Address: 0x004028E0 (FUN_004028E0, helper lane used by FUN_0073DD10)
+   *
+   * What it does:
+   * Copies only the binary-significant mask payload (base word index and the
+   * packed word vector). `BVIntSet::operator=` would additionally copy the
+   * per-instance metadata word, which the binary deliberately leaves alone.
+   */
+  void CopySyncFilterMaskPayload(SSyncFilterMaskBlock& target, const SSyncFilterMaskBlock& source);
 
   /**
    * Sim sync filter state.

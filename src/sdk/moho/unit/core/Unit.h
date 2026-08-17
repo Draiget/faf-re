@@ -248,19 +248,20 @@ namespace moho
    */
   struct SExtraUnitData
   {
-    SExtraUnitDataPair* pairsBegin;       // +0x00
-    SExtraUnitDataPair* pairsEnd;         // +0x04
-    SExtraUnitDataPair* pairsCapacityEnd; // +0x08
-    SExtraUnitDataPair* pairsInlineBegin; // +0x0C (inline storage anchor used by reset/copy helpers)
-    SExtraUnitDataPair inlinePair;        // +0x10 (single inline pair storage)
-    EntId unitEntityId;                   // +0x18
-    std::int32_t syncAuxWord1C;           // +0x1C (seen zero-initialized in Sim::AdvanceBeat; semantic use unresolved)
+    /**
+     * Inline-storage pair vector (+0x00..+0x17).
+     *
+     * `Sim::AdvanceBeat` constructs one of these per synced unit and the four
+     * stores it emits at 0x0074A2F6-0x0074A302 are exactly
+     * `FastVectorN<SExtraUnitDataPair, 1>`'s default ctor: begin, end and the
+     * inline anchor all point at the inline pair, and the capacity end points
+     * one pair past it.
+     */
+    gpg::core::FastVectorN<SExtraUnitDataPair, 1> pairs; // +0x00 (+0x10 inline pair)
+    EntId unitEntityId;                                  // +0x18
+    std::int32_t syncAuxWord1C;                          // +0x1C (not written by Sim::AdvanceBeat)
   };
   static_assert(sizeof(SExtraUnitData) == 0x20, "SExtraUnitData size must be 0x20");
-  static_assert(
-    offsetof(SExtraUnitData, pairsInlineBegin) == 0x0C, "SExtraUnitData::pairsInlineBegin offset must be 0x0C"
-  );
-  static_assert(offsetof(SExtraUnitData, inlinePair) == 0x10, "SExtraUnitData::inlinePair offset must be 0x10");
   static_assert(offsetof(SExtraUnitData, unitEntityId) == 0x18, "SExtraUnitData::unitEntityId offset must be 0x18");
 
   /**

@@ -655,6 +655,28 @@ namespace gpg::core
      * For `FastVectorN<unsigned int, 2>`, releases heap storage when active and
      * rebinds lanes back to inline storage metadata.
      */
+    /**
+     * Copies another vector's elements into this one's own storage.
+     *
+     * The implicitly-generated copy would duplicate the raw pointer lanes and
+     * leave the copy aliasing the source's inline buffer, which dangles as
+     * soon as the source dies or is relocated. Every inline-storage vector in
+     * the binary rebinds to its own buffer instead (`ResetFrom`).
+     */
+    FastVectorN(const FastVectorN& other)
+      : FastVectorN()
+    {
+      this->ResetFrom(other);
+    }
+
+    FastVectorN& operator=(const FastVectorN& other)
+    {
+      if (this != &other) {
+        this->ResetFrom(other);
+      }
+      return *this;
+    }
+
     ~FastVectorN()
     {
       // Free heap only; inline buffer must not be freed

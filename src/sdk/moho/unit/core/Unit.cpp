@@ -2763,101 +2763,6 @@ namespace
     return (a2Alignment <= a1Alignment) ? a2 : a1;
   }
 
-  class ExtraDataPairBuffer
-  {
-  public:
-    explicit ExtraDataPairBuffer(SExtraUnitData* out) noexcept
-      : out_(out)
-    {}
-
-    [[nodiscard]] SExtraUnitDataPair* begin() const noexcept
-    {
-      return out_ ? out_->pairsBegin : nullptr;
-    }
-
-    [[nodiscard]] SExtraUnitDataPair* end() const noexcept
-    {
-      return out_ ? out_->pairsEnd : nullptr;
-    }
-
-    /**
-     * Address: 0x006AD6E0 (FUN_006AD6E0)
-     *
-     * What it does:
-     * Appends one `SExtraUnitDataPair` lane into output storage, expanding
-     * capacity when the cursor reaches `pairsCapacityEnd`.
-     */
-    [[nodiscard]] bool push_back(const SExtraUnitDataPair& pair) noexcept
-    {
-      if (!out_) {
-        return false;
-      }
-
-      if (out_->pairsEnd == out_->pairsCapacityEnd) {
-        const std::size_t nextCount = count() + 1u;
-        if (!reserve(nextCount)) {
-          return false;
-        }
-      }
-
-      *out_->pairsEnd++ = pair;
-      return true;
-    }
-
-  private:
-    [[nodiscard]] std::size_t count() const noexcept
-    {
-      if (!out_ || !out_->pairsBegin || !out_->pairsEnd) {
-        return 0u;
-      }
-      return static_cast<std::size_t>(out_->pairsEnd - out_->pairsBegin);
-    }
-
-    [[nodiscard]] std::size_t capacity() const noexcept
-    {
-      if (!out_ || !out_->pairsBegin || !out_->pairsCapacityEnd) {
-        return 0u;
-      }
-      return static_cast<std::size_t>(out_->pairsCapacityEnd - out_->pairsBegin);
-    }
-
-    [[nodiscard]] bool reserve(const std::size_t requiredCapacity) noexcept
-    {
-      const std::size_t oldCapacity = capacity();
-      if (oldCapacity >= requiredCapacity) {
-        return true;
-      }
-
-      std::size_t newCapacity = oldCapacity == 0u ? 4u : oldCapacity;
-      while (newCapacity < requiredCapacity) {
-        newCapacity *= 2u;
-      }
-
-      const std::size_t oldCount = count();
-      auto* const newStorage =
-        static_cast<SExtraUnitDataPair*>(::operator new(newCapacity * sizeof(SExtraUnitDataPair), std::nothrow));
-      if (!newStorage) {
-        return false;
-      }
-
-      if (oldCount != 0u) {
-        std::copy_n(out_->pairsBegin, oldCount, newStorage);
-      }
-
-      auto* const oldStorage = out_->pairsBegin;
-      auto* const inlineStorage = out_->pairsInlineBegin ? out_->pairsInlineBegin : &out_->inlinePair;
-      if (oldStorage && oldStorage != inlineStorage) {
-        ::operator delete(oldStorage);
-      }
-      out_->pairsBegin = newStorage;
-      out_->pairsEnd = newStorage + oldCount;
-      out_->pairsCapacityEnd = newStorage + newCapacity;
-      return true;
-    }
-
-  private:
-    SExtraUnitData* out_;
-  };
 } // namespace
 
 /**
@@ -17187,7 +17092,6 @@ void Unit::GetExtraData(SExtraUnitData* out) const
   if (!out) {
     return;
   }
-  ExtraDataPairBuffer pairBuffer{out};
 
   if (AiAttacker) {
     const int count = AiAttacker->GetWeaponCount();
@@ -17200,7 +17104,7 @@ void Unit::GetExtraData(SExtraUnitData* out) const
       SExtraUnitDataPair pair{};
       pair.key = weaponExtra.key;
       pair.value = CAiAttackerImpl::ReadExtraDataValue(weaponExtra.ref);
-      (void)pairBuffer.push_back(pair);
+      out->pairs.PushBack(pair);
     }
   } else if (AiTransport) {
     const Unit* teleportBeacon = AiTransport->TransportGetTeleportBeaconForSync();
@@ -17208,7 +17112,7 @@ void Unit::GetExtraData(SExtraUnitData* out) const
       SExtraUnitDataPair pair{};
       pair.key = -1;
       pair.value = teleportBeacon->id_;
-      (void)pairBuffer.push_back(pair);
+      out->pairs.PushBack(pair);
     }
   }
 

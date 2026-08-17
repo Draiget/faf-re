@@ -231,6 +231,21 @@ namespace moho
     [[nodiscard]]
     static Unit* UnitFromAllUnitsNode(const CEntityDbAllUnitsNode* node) noexcept;
 
+    /**
+     * Address: 0x006856C0 (FUN_006856C0)
+     * Mangled: ?find@?$map@VEntId@Moho@@PAVEntity@2@@std@@QAE?AViterator@12@ABVEntId@Moho@@@Z
+     *
+     * IDA signature:
+     * std::map_EntId_Entity::_Node **__usercall find@<eax>(
+     *     _Node **result@<eax>, std::map_EntId_Entity *this@<ecx>, unsigned int *id@<ebx>);
+     *
+     * What it does:
+     * Looks one entity id up in the all-units tree and returns the entity
+     * stored in that node, or `nullptr` when the id is absent (the binary
+     * returns the head node, i.e. `end()`, in that case).
+     */
+    [[nodiscard]] Entity* FindEntityById(std::uint32_t entityId) const noexcept;
+
     [[nodiscard]] msvc8::list<Entity*>& Entities() noexcept;
     [[nodiscard]] const msvc8::list<Entity*>& Entities() const noexcept;
 

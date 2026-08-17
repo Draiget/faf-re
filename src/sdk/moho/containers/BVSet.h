@@ -93,11 +93,7 @@ namespace moho
     template <class F>
     void ForEachValue(F&& fn) const
     {
-      const unsigned int sentinel = mBits.Max();
-      for (unsigned int value = mBits.GetNext(std::numeric_limits<unsigned int>::max()); value != sentinel;
-           value = mBits.GetNext(value)) {
-        fn(value);
-      }
+      mBits.ForEachValue(std::forward<F>(fn));
     }
 
     // ---- legacy CategoryWordRangeView API surface (delegated to mBits) ----

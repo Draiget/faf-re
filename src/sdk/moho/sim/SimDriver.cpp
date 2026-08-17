@@ -1730,7 +1730,7 @@ void CSimDriver::SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams)
 void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
-  (void)SSyncFilterMaskBlock::Equals(mPendingSyncFilter.maskA, block);
+  (void)mPendingSyncFilter.maskA.Equals(&block);
 }
 
 /**
@@ -1740,11 +1740,11 @@ void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
 void CSimDriver::SetSyncFilterMaskB(const SSyncFilterMaskBlock& block)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
-  if (SSyncFilterMaskBlock::Equals(mPendingSyncFilter.maskB, block)) {
+  if (mPendingSyncFilter.maskB.Equals(&block)) {
     return;
   }
 
-  mPendingSyncFilter.maskB.CopyFrom(block);
+  CopySyncFilterMaskPayload(mPendingSyncFilter.maskB, block);
 }
 
 /**

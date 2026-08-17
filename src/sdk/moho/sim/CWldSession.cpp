@@ -4112,9 +4112,7 @@ namespace moho
         }
       }
 
-      outMask.rawWord = selectionIds.mFirstWordIndex;
-      outMask.maskVectorAuxWord = selectionIds.mReservedMetaWord;
-      outMask.masks.ResetFrom(selectionIds.mWords);
+      outMask = selectionIds;
     }
 
     [[nodiscard]] bool IsSelectionNil(const SSelectionNodeUserEntity* const node)
