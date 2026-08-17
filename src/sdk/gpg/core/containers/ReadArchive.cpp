@@ -238,6 +238,23 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::RType* CachedPathQueueImplType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      constexpr const char* kTypeNames[] = {
+        "Moho::PathQueue::Impl", "PathQueue::Impl", "struct Moho::PathQueue::Impl"
+      };
+      for (const char* const typeName : kTypeNames) {
+        cached = gpg::REF_FindTypeNamed(typeName);
+        if (cached) {
+          break;
+        }
+      }
+    }
+    return cached;
+  }
+
   [[nodiscard]] gpg::RType* CachedCEconStorageType()
   {
     static gpg::RType* cached = nullptr;
@@ -3845,6 +3862,59 @@ ReadArchive* ReadArchive::ReadPointerOwned_PathQueue(moho::PathQueue** const out
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expectedName ? expectedName : "PathQueue",
+      actualName ? actualName : "null"
+    ));
+  }
+
+  tracked.state = TrackedPointerState::Owned;
+  return this;
+}
+
+/**
+ * Address: 0x0076B570 (FUN_0076B570, gpg::ReadArchive::ReadPointerOwned_PathQueue_Impl)
+ *
+ * IDA signature:
+ * gpg::ReadArchive* __userpurge gpg::ReadArchive::ReadPointerOwned_PathQueue_Impl@<eax>(
+ *     Moho::PathQueue::Impl** outValue@<ecx>, gpg::ReadArchive* this@<ebx>, gpg::RRef* ownerRef);
+ *
+ * What it does:
+ * Reads one tracked pointer lane, requires it to arrive UNOWNED and claims it,
+ * upcasts to `PathQueue::Impl`, and throws a serialization error if the archive
+ * held a different type. Same shape as the `PathQueue` reader above.
+ */
+ReadArchive* ReadArchive::ReadPointerOwned_PathQueue_Impl(
+  moho::PathQueue::Impl** const outValue,
+  const RRef* const ownerRef
+)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+  if (!tracked.object) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  if (tracked.state != TrackedPointerState::Unowned) {
+    ThrowSerializationError("Ownership conflict while loading archive");
+  }
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPathQueueImplType());
+  *outValue = static_cast<moho::PathQueue::Impl*>(upcast.mObj);
+  if (!*outValue) {
+    const char* const expectedName = SafeTypeName(CachedPathQueueImplType());
+    const char* const actualName = source.GetTypeName();
+    ThrowSerializationError(STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expectedName ? expectedName : "PathQueue::Impl",
       actualName ? actualName : "null"
     ));
   }
