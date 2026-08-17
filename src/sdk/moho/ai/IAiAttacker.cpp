@@ -126,6 +126,15 @@ namespace gpg
      */
     static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x005DC5F0 (FUN_005DC5F0, gpg::RVectorType_UnitWeapon_P::SerSave)
+     *
+     * What it does:
+     * Save mirror of `SerLoad`: writes the element count, then each weapon as
+     * an unowned tracked pointer.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -656,6 +665,7 @@ void gpg::RVectorType_UnitWeaponPtr::Init()
   size_ = sizeof(UnitWeaponPtrVector);
   version_ = 1;
   serLoadFunc_ = &RVectorType_UnitWeaponPtr::SerLoad;
+  serSaveFunc_ = &RVectorType_UnitWeaponPtr::SerSave;
 }
 
 /**
@@ -695,6 +705,42 @@ void gpg::RVectorType_UnitWeaponPtr::SerLoad(
   }
 
   *storage = loaded;
+}
+
+/**
+ * Address: 0x005DC5F0 (FUN_005DC5F0, gpg::RVectorType_UnitWeapon_P::SerSave)
+ *
+ * IDA signature:
+ * void __cdecl sub_5DC5F0(BinaryWriteArchive* archive, int storage);
+ *
+ * What it does:
+ * Save mirror of `SerLoad`: writes the element count, then each weapon as an
+ * unowned tracked pointer. Without this the type could read a weapon-pointer
+ * vector back but had no way to write one.
+ */
+void gpg::RVectorType_UnitWeaponPtr::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const
+)
+{
+  const auto* const storage = PointerFromArchiveInt<const UnitWeaponPtrVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  const auto count = static_cast<unsigned int>(storage->size());
+  archive->WriteUInt(count);
+
+  const gpg::RRef ownerRef{};
+  gpg::RRef pointerRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    (void)gpg::RRef_UnitWeapon(&pointerRef, (*storage)[i]);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
 }
 
 gpg::RRef gpg::RVectorType_UnitWeaponPtr::SubscriptIndex(void* const obj, const int ind) const
