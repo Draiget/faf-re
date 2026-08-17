@@ -187,6 +187,18 @@ namespace
     return false;
   }
 
+  /**
+   * Address: 0x004637D0 (FUN_004637D0, sub_4637D0)
+   *
+   * IDA signature:
+   * int __usercall sub_4637D0@<eax>(const SDiskWatchEvent* event@<edi>, TDatListItem* listeners@<esi>);
+   *
+   * What it does:
+   * Delivers one watch event to every listener. The whole list is spliced onto
+   * a local head first and each node is relinked into the real list just
+   * before its callback runs, so a listener may unlink itself or register
+   * another during dispatch without the walk losing its place.
+   */
   void DispatchEventToListeners(CDiskWatch& owner, const SDiskWatchEvent& event)
   {
     using ListenerNode = TDatListItem<CDiskWatchListener, void>;
