@@ -10,7 +10,7 @@ using namespace moho;
 namespace
 {
   /**
-   * Address: 0x0087F180 (FUN_0087F180, ScriptedDecalTypeInfo::AddBase_CScriptObject)
+   * Address: 0x0087FAD0 (FUN_0087FAD0, Moho::ScriptedDecalTypeInfo::AddBase_CScriptObject)
    *
    * What it does:
    * Registers CScriptObject as reflected base at zero offset.
