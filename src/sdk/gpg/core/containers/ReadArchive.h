@@ -9,6 +9,7 @@
 #include "ArchiveSerialization.h"
 #include "boost/shared_ptr.h"
 #include "legacy/containers/Vector.h"
+#include "moho/path/PathTables.h"  // PathQueue::Impl is nested, so the enclosing class must be complete
 
 namespace msvc8
 {
@@ -662,6 +663,15 @@ namespace gpg
      * transition, and upcasts the pointee to `moho::PathQueue`.
      */
     ReadArchive* ReadPointerOwned_PathQueue(moho::PathQueue** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0076B570 (FUN_0076B570, gpg::ReadArchive::ReadPointerOwned_PathQueue_Impl)
+     *
+     * What it does:
+     * Reads one tracked pointer lane, requires it UNOWNED and claims it, then
+     * upcasts to `PathQueue::Impl`.
+     */
+    ReadArchive* ReadPointerOwned_PathQueue_Impl(moho::PathQueue::Impl** outValue, const gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006B4F70 (FUN_006B4F70, gpg::ReadArchive::ReadPointerOwned_CEconStorage)
