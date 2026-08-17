@@ -3001,6 +3001,28 @@ void moho::FWaitHandleSet::NotifyAll()
 }
 
 /**
+ * Address: 0x00458CC0 (FUN_00458CC0, ??1FWHSZipFile@Moho@@QAE@XZ)
+ * Mangled: ??1FWHSZipFile@Moho@@QAE@XZ
+ *
+ * IDA signature:
+ * void __stdcall Moho::FWHSZipFile::~FWHSZipFile(Moho::SFileWaitHandle* this);
+ *
+ * What it does:
+ * Closes the owned zip file, then unlinks this handle from the active-handle
+ * ring and re-points both of its links at itself so the detached node stays a
+ * valid one-element ring.
+ */
+moho::SFileWaitHandle::~SFileWaitHandle()
+{
+  delete mZipFile;
+
+  mNext->mPrev = mPrev;
+  mPrev->mNext = mNext;
+  mNext = this;
+  mPrev = this;
+}
+
+/**
  * Address: 0x00458BC0 (FUN_00458BC0, Moho::FWaitHandleSet::RemoveEntry)
  *
  * What it does:
@@ -3021,11 +3043,9 @@ void moho::FWaitHandleSet::RemoveEntry(
     return;
   }
 
-  handle->mPrev->mNext = handle->mNext;
-  handle->mNext->mPrev = handle->mPrev;
-  handle->mNext = handle;
-  handle->mPrev = handle;
-
+  // The handle stays linked into the ring until `delete handle` below runs
+  // `~SFileWaitHandle`, which is what unlinks it. Anything woken by the
+  // NotifyAll at the end of this function still sees it on the ring.
   while (true) {
     FWHSZipEntryMapNode* const nodeToErase = FindZipNodeByHandle(mZipEntries, handle);
     if (IsZipMapSentinel(nodeToErase)) {
