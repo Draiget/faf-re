@@ -2101,6 +2101,105 @@ TrackedPointerInfo& gpg::ReadRawPointer(ReadArchive* const archive, const RRef& 
   return trackedRef;
 }
 
+namespace
+{
+  // Reflected per-type upcasts used by the shared-pointer readers below.
+  // Each is a distinct function in the binary; the readers call it and treat
+  // a null result as the type mismatch they then report.
+
+  /**
+   * Address: 0x0054EBC0 (FUN_0054EBC0, gpg::RRef::Upcast_CAniPose)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAniPose`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAniPose* UpcastToCAniPose(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAniPoseType());
+    return static_cast<moho::CAniPose*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x005503B0 (FUN_005503B0, gpg::RRef::Upcast_CAniSkel)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CAniSkel`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CAniSkel* UpcastToCAniSkel(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAniSkelType());
+    return static_cast<moho::CAniSkel*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0055FD70 (FUN_0055FD70, gpg::RRef::Upcast_StatsStatItem)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::Stats<moho::StatItem>`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::Stats<moho::StatItem>* UpcastToStatsStatItem(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedStatsStatItemType());
+    return static_cast<moho::Stats<moho::StatItem>*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00551FA0 (FUN_00551FA0, gpg::RRef::Upcast_CIntelGrid)
+   * Address: 0x005CE6E0 (FUN_005CE6E0, gpg::RRef::Upcast_CIntelGrid)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CIntelGrid`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CIntelGrid* UpcastToCIntelGrid(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCIntelGridType());
+    return static_cast<moho::CIntelGrid*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006431A0 (FUN_006431A0, gpg::RRef::Upcast_RScaResource)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::RScaResource`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::RScaResource* UpcastToRScaResource(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCompatRType<moho::RScaResource>());
+    return static_cast<moho::RScaResource*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0055AB30 (FUN_0055AB30, gpg::RRef::Upcast_RScmResource)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::RScmResource`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::RScmResource* UpcastToRScmResource(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedRScmResourceType());
+    return static_cast<moho::RScmResource*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x00714A10 (FUN_00714A10, gpg::RRef::Upcast_STrigger)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::STrigger`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::STrigger* UpcastToSTrigger(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSTriggerType());
+    return static_cast<moho::STrigger*>(upcast.mObj);
+  }
+} // namespace
+
 /**
  * Address: 0x00884C90 (FUN_00884C90)
  *
@@ -2194,7 +2293,10 @@ void gpg::ReadPointerShared_CAniPose(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedCAniPoseType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToCAniPose(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2225,7 +2327,10 @@ void gpg::ReadPointerShared_CAniSkel(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedCAniSkelType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToCAniSkel(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2256,7 +2361,10 @@ void gpg::ReadPointerShared_Stats_StatItem(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedStatsStatItemType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToStatsStatItem(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2322,7 +2430,10 @@ void gpg::ReadPointerShared_CIntelGrid(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedCIntelGridType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToCIntelGrid(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2353,7 +2464,10 @@ void gpg::ReadPointerShared_CIntelGrid2(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedCIntelGridType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToCIntelGrid(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2384,7 +2498,10 @@ void gpg::ReadPointerShared_RScaResource(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedCompatRType<moho::RScaResource>();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToRScaResource(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2415,7 +2532,10 @@ void gpg::ReadPointerShared_RScmResource(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedRScmResourceType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToRScmResource(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -2446,7 +2566,10 @@ void gpg::ReadPointerShared_STrigger(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedSTriggerType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+  if (UpcastToSTrigger(source) == nullptr) {
     ThrowTypeMismatch(tracked, expectedType);
   }
 
