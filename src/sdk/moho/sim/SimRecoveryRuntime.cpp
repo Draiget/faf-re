@@ -2326,15 +2326,43 @@ namespace
 
 namespace
 {
+  /**
+   * One slot of the sim's indexed priority queue.
+   *
+   * Layout read off the swap helper at 0x00687530, which strides the array by
+   * 20 bytes (`lea ecx,[ecx+ecx*4]` then `lea edi,[eax+ecx*4]`) and touches
+   * every lane below:
+   *
+   *   +0x00  priority        ordering key
+   *   +0x04  boundedTick     tie-break, compared only when priorities match
+   *   +0x08  backLinkSlot    address of the pointer that refers to this entry
+   *   +0x0C  nextInChain     the entry this one forwards to
+   *   +0x10  id              index into the queue's position map
+   *
+   * `backLinkSlot` and `nextInChain` are pointers, not counters: the swap
+   * dereferences `[entry+8]` and writes its own stack temporary into it
+   * (`mov edx,[eax]` / `mov [eax],ecx` at 0x0068756B), which only makes sense
+   * for an intrusive link that has to keep pointing at the entry as it moves.
+   *
+   * `id` is the stable identity. The queue holds a position map at +0x14 and
+   * the swap rewrites `map[id] = heapIndex` for both entries
+   * (0x006875A0-0x006875B4), so an entry can be found again after the heap
+   * reorders it.
+   */
   struct PriorityQueueEntry20Runtime
   {
     std::int32_t priority = 0;           // +0x00
     std::int32_t boundedTick = 0;        // +0x04
-    std::uint32_t ownerLinkSlot = 0;     // +0x08
-    std::uint32_t nextInOwner = 0;       // +0x0C
-    std::uint32_t lane10 = 0;            // +0x10
+    void* backLinkSlot = nullptr;        // +0x08
+    void* nextInChain = nullptr;         // +0x0C
+    std::uint32_t id = 0;                // +0x10
   };
   static_assert(sizeof(PriorityQueueEntry20Runtime) == 0x14, "PriorityQueueEntry20Runtime size must be 0x14");
+  static_assert(offsetof(PriorityQueueEntry20Runtime, priority) == 0x00, "priority offset must be 0x00");
+  static_assert(offsetof(PriorityQueueEntry20Runtime, boundedTick) == 0x04, "boundedTick offset must be 0x04");
+  static_assert(offsetof(PriorityQueueEntry20Runtime, backLinkSlot) == 0x08, "backLinkSlot offset must be 0x08");
+  static_assert(offsetof(PriorityQueueEntry20Runtime, nextInChain) == 0x0C, "nextInChain offset must be 0x0C");
+  static_assert(offsetof(PriorityQueueEntry20Runtime, id) == 0x10, "id offset must be 0x10");
 
   struct PriorityQueueNode24Runtime
   {
@@ -3046,6 +3074,15 @@ namespace
       break;
     }
 
+    // INCOMPLETE vs the binary. 0x006875F0 does not swap the slots itself; it
+    // calls the queue's swap at 0x00687530, which additionally rewrites
+    // `positionMap[id]` for both entries and repairs the intrusive chain that
+    // pointed at the moved slot. Neither is reachable from here, because this
+    // helper receives only the entry array - the real one receives the queue.
+    //
+    // Left as a plain swap rather than a wrong approximation of the other two
+    // steps. Fixing it means recovering 0x00687A70 (the entry move-and-relink)
+    // and the queue type, then taking the queue as the parameter.
     std::swap(entries[index], entries[best]);
     index = best;
     nextChild = 2u * index + 1u;
