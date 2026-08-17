@@ -7,7 +7,11 @@
 
 namespace moho
 {
-  class GeomCamera3;
+  // GeomCamera3 is a struct everywhere else, including its own definition.
+  // Declaring it `class` here changed the mangled name of every function in
+  // this header that takes one, so Silhouette::Render and
+  // MeshRenderer::RenderSilhouette linked as unresolved externals.
+  struct GeomCamera3;
   class ID3DVertexSheet;
 
   /**
