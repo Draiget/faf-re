@@ -300,6 +300,13 @@ namespace
       }
     }
 
+    /**
+     * Address: 0x00523D00 (FUN_00523D00, gpg::RVectorType_float::SerSave)
+     *
+     * What it does:
+     * Writes the reflected float vector as an element count followed by each
+     * float.
+     */
     static void SerSave(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
     {
       if (!archive) {

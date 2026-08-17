@@ -81,6 +81,13 @@ namespace moho::debug_reflection
     AddBase(owner, CachedRObjectType());
   }
 
+  /**
+   * Address: 0x0086D7E0 (FUN_0086D7E0, gpg::RType::AddBase_CScriptObject)
+   *
+   * What it does:
+   * Registers `moho::CScriptObject` as a reflected base of `owner`, naming the
+   * base field after the base type.
+   */
   void AddBaseCScriptObject(gpg::RType* const owner)
   {
     AddBase(owner, moho::CScriptObject::StaticGetClass());
