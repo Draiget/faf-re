@@ -15,6 +15,16 @@ namespace moho
     ~IAiAttackerTypeInfo() override;
 
     /**
+     * Address: 0x005DE870 (FUN_005DE870,
+     *   Moho::IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent)
+     *
+     * What it does:
+     * Registers `Broadcaster<EAiAttackerEvent>` as a reflected base of
+     * `typeInfo`, at the subobject's offset inside `IAiAttacker`.
+     */
+    static void AddBase_Broadcaster_EAiAttackerEvent(gpg::RType* typeInfo);
+
+    /**
      * Address: 0x005D5B90 (FUN_005D5B90, ?GetName@IAiAttackerTypeInfo@Moho@@UBEPBDXZ)
      */
     [[nodiscard]]
