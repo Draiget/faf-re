@@ -64,6 +64,22 @@ namespace
     return type;
   }
 
+  /// Recovers the owning listener from its ring link node; the binary spells
+  /// this as `node - 4`, which is `offsetof(Listener<EFormationdStatus>, mListenerLink)`.
+  [[nodiscard]] moho::Listener<moho::EFormationdStatus>* ListenerFromEFormationdStatusLinkNode(
+    moho::Broadcaster* const node
+  ) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
+    return reinterpret_cast<moho::Listener<moho::EFormationdStatus>*>(
+      bytePtr - offsetof(moho::Listener<moho::EFormationdStatus>, mListenerLink)
+    );
+  }
+
   /**
    * Address: 0x0056DCA0 (FUN_0056DCA0, Moho::RBroadcasterRType_EFormationdStatus::SerLoad)
    *
@@ -95,6 +111,49 @@ namespace
       listener->mListenerLink.ListLinkBefore(broadcaster);
       archive->ReadPointer_Listener_EFormationdStatus(&listener, ownerRef);
     }
+  }
+
+  /**
+   * Address: 0x0056DD10 (FUN_0056DD10, sub_56DD10)
+   *
+   * IDA signature:
+   * void __cdecl sub_56DD10(BinaryWriteArchive* archive, int broadcaster);
+   *
+   * What it does:
+   * Save mirror of `LoadBroadcasterEFormationdStatusListeners`: walks the
+   * broadcaster ring writing each listener as an unowned tracked pointer,
+   * then writes a null pointer as the terminator the loader reads for.
+   */
+  void SaveBroadcasterEFormationdStatusListeners(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(broadcaster != nullptr);
+    if (archive == nullptr || broadcaster == nullptr) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    gpg::RRef pointerRef{};
+
+    for (
+      moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
+      node != broadcaster;
+      node = static_cast<moho::Broadcaster*>(node->mNext)
+    ) {
+      (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, ListenerFromEFormationdStatusLinkNode(node));
+      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    }
+
+    (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, nullptr);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
   /**
@@ -358,7 +417,9 @@ namespace
     void Init() override
     {
       size_ = sizeof(moho::BroadcasterEventTag<moho::EFormationdStatus>);
+      version_ = 1;
       serLoadFunc_ = &LoadBroadcasterEFormationdStatusListeners;
+      serSaveFunc_ = &SaveBroadcasterEFormationdStatusListeners;
       gpg::RType::Init();
       Finish();
     }

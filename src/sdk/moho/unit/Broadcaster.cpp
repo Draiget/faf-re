@@ -129,6 +129,7 @@ namespace
     void Init() override
     {
       size_ = sizeof(moho::Broadcaster);
+      version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_ECommandEvent::SerLoad;
       serSaveFunc_ = &RBroadcasterRType_ECommandEvent::SerSave;
       Finish();
