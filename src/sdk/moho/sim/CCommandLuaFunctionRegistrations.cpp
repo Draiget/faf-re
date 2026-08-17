@@ -744,7 +744,7 @@ namespace
    * Filters one source unit set by required command-cap mask, and applies the
    * factory mobility gate used by move/guard/patrol/ferry command lanes.
    */
-  [[maybe_unused]] [[nodiscard]] bool ValidateIssueCommandUnits(
+  [[nodiscard]] bool ValidateIssueCommandUnits(
     const moho::UnitSet& sourceUnits,
     moho::UnitSet& outUnits,
     const moho::ERuleBPUnitCommandCaps requiredCaps
