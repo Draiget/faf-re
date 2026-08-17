@@ -4222,6 +4222,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050ACC0 (FUN_0050ACC0, Moho::WeakPtr_CHeightField::GetElevation)
+   *
+   * IDA signature:
+   * void __userpurge Moho::WeakPtr_CHeightField::GetElevation(
+   *     boost::shared_ptr_CHeightField *heightField@<eax>, float x, float z);
+   *
+   * What it does:
+   * Samples terrain elevation through the shared-pointer wrapper. The binary
+   * emits this dereference once out of line and calls it, rather than inlining
+   * it at each site, so it needs a named source equivalent to survive.
+   */
+  float GetHeightFieldElevation(const boost::shared_ptr<CHeightField>& heightField, const float x, const float z)
+  {
+    return heightField->GetElevation(x, z);
+  }
+
+  /**
    * Address: 0x0089E5C0 (FUN_0089E5C0)
    *
    * What it does:
