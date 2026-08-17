@@ -118,7 +118,9 @@ namespace moho
   gpg::RRef CUnitUnloadUnitsTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitUnloadUnits();
-    return gpg::RRef{task, CachedCUnitUnloadUnitsType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitUnloadUnits(&ref, task);
+    return ref;
   }
 
   /**
@@ -135,7 +137,9 @@ namespace moho
       task = new (objectStorage) CUnitUnloadUnits();
     }
 
-    return gpg::RRef{task, CachedCUnitUnloadUnitsType()};
+    gpg::RRef ref{};
+    (void)gpg::RRef_CUnitUnloadUnits(&ref, task);
+    return ref;
   }
 } // namespace moho
 
