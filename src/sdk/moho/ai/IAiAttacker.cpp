@@ -52,9 +52,18 @@ namespace moho
 
     [[nodiscard]] const char* GetName() const override;
 
+    /**
+     * Address: 0x005DB830 (sub_5DB830, ?Init@RBroadcasterRType_EAiAttackerEvent@Moho@@UAEXXZ)
+     *
+     * What it does:
+     * Sizes the reflected broadcaster lane and installs its serializer pair.
+     * The version stamp is part of the emission, not decoration - the archive
+     * reads it back to pick a load path.
+     */
     void Init() override
     {
       size_ = sizeof(Broadcaster);
+      version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EAiAttackerEvent::SerLoad;
       serSaveFunc_ = &RBroadcasterRType_EAiAttackerEvent::SerSave;
       Finish();
