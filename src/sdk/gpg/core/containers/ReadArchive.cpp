@@ -1914,6 +1914,32 @@ namespace
     return static_cast<moho::CIntelPosHandle*>(upcast.mObj);
   }
 
+  /**
+   * Address: 0x00758270 (FUN_00758270, gpg::RRef::Upcast_SPhysConstants)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::SPhysConstants`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::SPhysConstants* UpcastToSPhysConstants(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedOwnedSPhysConstantsType());
+    return static_cast<moho::SPhysConstants*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0076B6E0 (FUN_0076B6E0, gpg::RRef::Upcast_PathQueueImpl)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::PathQueue::Impl`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::PathQueue::Impl* UpcastToPathQueueImpl(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPathQueueImplType());
+    return static_cast<moho::PathQueue::Impl*>(upcast.mObj);
+  }
+
 
   [[nodiscard]] gpg::RType* CachedCPlatoonType()
   {
@@ -4576,8 +4602,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_PathQueue_Impl(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedPathQueueImplType());
-  *outValue = static_cast<moho::PathQueue::Impl*>(upcast.mObj);
+  *outValue = UpcastToPathQueueImpl(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedPathQueueImplType());
     const char* const actualName = source.GetTypeName();
@@ -8141,8 +8166,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_SPhysConstants(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedOwnedSPhysConstantsType());
-  *outValue = static_cast<moho::SPhysConstants*>(upcast.mObj);
+  *outValue = UpcastToSPhysConstants(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedOwnedSPhysConstantsType());
     const char* const actualName = source.GetTypeName();
