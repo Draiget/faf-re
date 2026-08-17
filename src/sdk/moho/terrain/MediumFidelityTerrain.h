@@ -309,7 +309,7 @@ namespace moho
      * terrain path when skirt rendering is enabled and index-lane constraints
      * are valid.
      */
-    virtual void DrawTerrainSkirt();
+    void DrawTerrainSkirt() override;
 
     /**
      * Draw parameters for one terrain technique pass.

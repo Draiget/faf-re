@@ -101,7 +101,7 @@ namespace moho
      * Issues one terrain-skirt indexed draw for the low-fidelity terrain path
      * when terrain/skirt flags are enabled and skirt index lanes are valid.
      */
-    virtual void DrawTerrainSkirt();
+    void DrawTerrainSkirt() override;
 
     /**
      * Address: 0x00808F90 (FUN_00808F90, Moho::LowFidelityTerrain::DrawTerrainDepth)
