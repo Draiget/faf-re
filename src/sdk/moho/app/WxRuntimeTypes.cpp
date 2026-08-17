@@ -11523,6 +11523,8 @@ namespace
   std::int32_t gWxEvtUpdateUiRuntimeType = 0;
   std::int32_t gWxEvtCommandMenuSelectedRuntimeType = 0;
   std::int32_t gWxEvtMenuHighlightRuntimeType = 0;
+  std::int32_t gWxEvtMenuOpenRuntimeType = 0;
+  std::int32_t gWxEvtMenuCloseRuntimeType = 0;
   std::int32_t gWxEvtSizeRuntimeType = 0;
   std::int32_t gWxEvtPaintRuntimeType = 0;
   std::int32_t gWxEvtNcPaintRuntimeType = 0;
@@ -11634,6 +11636,22 @@ namespace
       gWxEvtMenuHighlightRuntimeType = wxNewEventType();
     }
     return gWxEvtMenuHighlightRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtMenuOpenRuntimeType()
+  {
+    if (gWxEvtMenuOpenRuntimeType == 0) {
+      gWxEvtMenuOpenRuntimeType = wxNewEventType();
+    }
+    return gWxEvtMenuOpenRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtMenuCloseRuntimeType()
+  {
+    if (gWxEvtMenuCloseRuntimeType == 0) {
+      gWxEvtMenuCloseRuntimeType = wxNewEventType();
+    }
+    return gWxEvtMenuCloseRuntimeType;
   }
 
   [[nodiscard]] std::int32_t EnsureWxEvtSizeRuntimeType()
@@ -60788,6 +60806,34 @@ WSupComFrame* WSupComFrame::DeleteWithFlag(
 }
 
 /**
+ * Address: 0x0099F410 (FUN_0099F410)
+ *
+ * IDA signature:
+ * char __thiscall sub_99F410(wxObject *this, wxEventType *a2, __int16 a3);
+ *
+ * What it does:
+ * Raises wxEVT_MENU_OPEN or wxEVT_MENU_CLOSE at the window's event handler
+ * when Windows enters or leaves a menu loop, and reports whether the handler
+ * took it.
+ *
+ * Both the event id and the menu-id lane are the same value: the binary
+ * computes `-(isPopup != 0)` once and stores it in each, so a popup menu
+ * reports -1 and a menu-bar menu reports 0.
+ */
+bool wxTopLevelWindowRuntime::DoSendMenuOpenCloseEvent(
+  const std::int32_t eventType,
+  const bool isPopup
+)
+{
+  const std::int32_t menuId = isPopup ? -1 : 0;
+
+  WxMenuEventFactoryRuntime event{eventType, menuId};
+  event.mEventObject = this;
+
+  return GetEventHandler()->ProcessEvent(&event);
+}
+
+/**
  * Address: 0x0099F4B0 (FUN_0099F4B0)
  * Mangled: ?MSWWindowProc@wxFrame@@UAEJIIJ@Z
  *
@@ -60818,6 +60864,15 @@ long wxTopLevelWindowRuntime::MSWWindowProc(
     if (!Close(false)) {
       return 0;
     }
+  }
+
+  // The menu loop bookends. wParam is TRUE for a popup menu, which is the
+  // only thing that distinguishes the two ids the event carries.
+  if (message == WM_ENTERMENULOOP) {
+    return DoSendMenuOpenCloseEvent(EnsureWxEvtMenuOpenRuntimeType(), wParam != 0) ? 1 : 0;
+  }
+  if (message == WM_EXITMENULOOP) {
+    return DoSendMenuOpenCloseEvent(EnsureWxEvtMenuCloseRuntimeType(), wParam != 0) ? 1 : 0;
   }
 
   return wxWindowMswRuntime::MSWWindowProc(message, wParam, lParam);
