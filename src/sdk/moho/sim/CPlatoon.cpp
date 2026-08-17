@@ -1475,6 +1475,19 @@ namespace moho
     result->SetUnowned(objectRef, 0u);
   }
 
+  /**
+   * Address: 0x00724920 (FUN_00724920, sub_724920)
+   *
+   * IDA signature:
+   * void __cdecl sub_724920(gpg::SerConstructResult *a1);
+   *
+   * What it does:
+   * Serializer construct callback for CSquad: allocates one 0x60-byte squad
+   * (sizeof(CSquad)), builds a reflected RRef for it and stores that as the
+   * unowned result. The ctor call the binary makes on the fresh storage is
+   * folded with an identity thunk (0x00723E00), so the allocation carries no
+   * separate construction step.
+   */
   void ConstructCSquadForSerializer(
     gpg::ReadArchive* const,
     const int,
@@ -1519,6 +1532,14 @@ namespace moho
     return 0;
   }
 
+  /**
+   * Address: 0x00724910 (FUN_00724910, sub_724910)
+   *
+   * What it does:
+   * Four-argument reflection-construct adapter: discards the archive and
+   * version operands and forwards the result slot to the CSquad construct
+   * callback.
+   */
   int ConstructCSquadForSerializerThunk(const int, const int, const int, gpg::SerConstructResult* const result)
   {
     return ConstructCSquadForSerializerAlias(result);
