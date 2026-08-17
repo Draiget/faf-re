@@ -474,6 +474,30 @@ void STaskEventLinkageTypeInfo::Destruct(void* const objectStorage)
 }
 
 /**
+ * Address: 0x00407E10 (FUN_00407E10,
+ *          Moho::RWeakPtrType_STaskEventLinkage::RWeakPtrType_STaskEventLinkage)
+ *
+ * IDA signature:
+ * void __cdecl Moho::RWeakPtrType_STaskEventLinkage::RWeakPtrType_STaskEventLinkage();
+ *
+ * What it does:
+ * Runs the `gpg::RType` base construction, installs both vftable lanes
+ * (`gpg::RType` and `gpg::RIndexed` - this type inherits from both), then
+ * pre-registers itself as the reflected type for
+ * `WeakPtr<STaskEventLinkage>`.
+ *
+ * The vftable stores the binary makes are what the C++ base initialisers
+ * emit, so the only behaviour to express here is the registration call -
+ * exactly as `STaskEventLinkageTypeInfo` does for the non-weak type.
+ */
+RWeakPtrType<STaskEventLinkage>::RWeakPtrType()
+  : gpg::RType()
+  , gpg::RIndexed()
+{
+  gpg::PreRegisterRType(typeid(WeakPtr_STaskEventLinkage), this);
+}
+
+/**
  * Address: 0x00407EC0 (FUN_00407EC0, Moho::RWeakPtrType_STaskEventLinkage::dtr)
  */
 RWeakPtrType<STaskEventLinkage>::~RWeakPtrType() = default;

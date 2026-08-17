@@ -215,6 +215,19 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00407E10 (FUN_00407E10,
+     *          Moho::RWeakPtrType_STaskEventLinkage::RWeakPtrType_STaskEventLinkage)
+     *
+     * What it does:
+     * Pre-registers this instance as the reflected type for
+     * `WeakPtr<STaskEventLinkage>`. Without it the global
+     * `gRWeakPtrTypeSTaskEventLinkage` is default-constructed and never
+     * reaches `gpg::PreRegisterRType`, so a later lookup of that type id
+     * throws.
+     */
+    RWeakPtrType();
+
+    /**
      * Address: 0x00407EC0 (FUN_00407EC0, Moho::RWeakPtrType_STaskEventLinkage::dtr)
      * Slot: 2
      */
