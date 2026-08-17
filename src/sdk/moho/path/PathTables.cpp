@@ -709,6 +709,154 @@ namespace moho
     }
 
     /**
+     * Address: 0x0076AD40 (FUN_0076AD40, sub_76AD40)
+     *
+     * IDA signature:
+     * void __usercall sub_76AD40(int* slot@<eax>, gpg::ReadArchive* archive@<ebx>);
+     *
+     * What it does:
+     * Loads the owned `PathQueue::Impl` payload, installs it, and tears down
+     * whatever the queue was holding. The old payload's search structures and
+     * traveler ring go first, then its height sentinel leaves the queue's ring,
+     * then the block itself is freed -- the same order the typeinfo delete lane
+     * below uses.
+     */
+    void LoadPathQueueImplPayload(gpg::ReadArchive* const archive, PathQueueRuntimeView* const runtime)
+    {
+      GPG_ASSERT(archive != nullptr);
+      GPG_ASSERT(runtime != nullptr);
+      if (archive == nullptr || runtime == nullptr) {
+        return;
+      }
+
+      moho::PathQueue::Impl* loaded = nullptr;
+      const gpg::RRef owner{};
+      (void)archive->ReadPointerOwned_PathQueue_Impl(&loaded, &owner);
+
+      moho::PathQueue::Impl* const prior = runtime->mImpl;
+      runtime->mImpl = loaded;
+
+      if (prior != nullptr) {
+        DestroyPathQueueImpl(prior->mBase);
+        UnlinkAndResetPathQueueNode(prior->mHeightSentinel);
+        ::operator delete(prior);
+      }
+    }
+
+    /**
+     * Address: 0x00766970 (FUN_00766970, Moho::PathQueueSerializer::Deserialize)
+     *
+     * What it does:
+     * Reflection LOAD adapter: forwards one archive lane into
+     * `LoadPathQueueImplPayload`.
+     */
+    void PathQueueSerializerDeserialize(
+      gpg::ReadArchive* const archive,
+      const int objectPtr,
+      const int,
+      gpg::RRef* const
+    )
+    {
+      LoadPathQueueImplPayload(
+        archive,
+        reinterpret_cast<PathQueueRuntimeView*>(static_cast<std::uintptr_t>(objectPtr))
+      );
+    }
+
+    /**
+     * Address: 0x00766980 (FUN_00766980, Moho::PathQueueSerializer::Serialize)
+     *
+     * What it does:
+     * Reflection SAVE adapter. The save side writes the owned `Impl` payload as
+     * a tracked pointer; the load adapter above is its mirror.
+     */
+    void PathQueueSerializerSerialize(
+      gpg::WriteArchive* const archive,
+      const int objectPtr,
+      const int,
+      gpg::RRef* const
+    )
+    {
+      auto* const runtime = reinterpret_cast<PathQueueRuntimeView*>(static_cast<std::uintptr_t>(objectPtr));
+      GPG_ASSERT(archive != nullptr);
+      if (archive == nullptr || runtime == nullptr) {
+        return;
+      }
+
+      gpg::RRef payloadRef{};
+      payloadRef.mObj = runtime->mImpl;
+      payloadRef.mType = ResolvePathQueueImplType();
+      const gpg::RRef owner{};
+      gpg::WriteRawPointer(archive, payloadRef, gpg::TrackedPointerState::Owned, owner);
+    }
+
+    /**
+     * Serializer helper for `PathQueue`. Same `gpg::SerHelperBase` shape as
+     * `EntitySerializer` and `CFormationInstanceSerializer`: an intrusive node
+     * plus the two callbacks installed into the reflected type.
+     */
+    struct PathQueueSerializerHelper
+    {
+      gpg::SerHelperBase* mHelperNext = nullptr;
+      gpg::SerHelperBase* mHelperPrev = nullptr;
+      gpg::RType::load_func_t mLoadCallback = nullptr;
+      gpg::RType::save_func_t mSaveCallback = nullptr;
+    };
+
+    PathQueueSerializerHelper gPathQueueSerializerHelper{};
+
+    void cleanup_PathQueueSerializer()
+    {
+      auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&gPathQueueSerializerHelper.mHelperNext);
+      if (gPathQueueSerializerHelper.mHelperNext != nullptr && gPathQueueSerializerHelper.mHelperPrev != nullptr) {
+        gPathQueueSerializerHelper.mHelperNext->mPrev = gPathQueueSerializerHelper.mHelperPrev;
+        gPathQueueSerializerHelper.mHelperPrev->mNext = gPathQueueSerializerHelper.mHelperNext;
+      }
+      gPathQueueSerializerHelper.mHelperPrev = self;
+      gPathQueueSerializerHelper.mHelperNext = self;
+    }
+
+    /**
+     * Address: 0x00BDC920 (FUN_00BDC920, register_PathQueueSerializer)
+     *
+     * What it does:
+     * Initializes the `PathQueue` serializer helper, binds its load/save
+     * callbacks, and installs them into the reflected `PathQueue` type.
+     *
+     * The emission binds the callbacks and leaves the descriptor install to
+     * the helper chain; this does both here, because nothing in the recovered
+     * tree walks that chain yet.
+     */
+    void register_PathQueueSerializer()
+    {
+      auto* const self = reinterpret_cast<gpg::SerHelperBase*>(&gPathQueueSerializerHelper.mHelperNext);
+      gPathQueueSerializerHelper.mHelperNext = self;
+      gPathQueueSerializerHelper.mHelperPrev = self;
+      gPathQueueSerializerHelper.mLoadCallback = &PathQueueSerializerDeserialize;
+      gPathQueueSerializerHelper.mSaveCallback = &PathQueueSerializerSerialize;
+
+      if (moho::PathQueue::sType == nullptr) {
+        moho::PathQueue::sType = gpg::LookupRType(typeid(moho::PathQueue));
+      }
+      if (moho::PathQueue::sType != nullptr) {
+        moho::PathQueue::sType->serLoadFunc_ = gPathQueueSerializerHelper.mLoadCallback;
+        moho::PathQueue::sType->serSaveFunc_ = gPathQueueSerializerHelper.mSaveCallback;
+      }
+
+      (void)std::atexit(&cleanup_PathQueueSerializer);
+    }
+
+    struct PathQueueSerializerBootstrap
+    {
+      PathQueueSerializerBootstrap()
+      {
+        register_PathQueueSerializer();
+      }
+    };
+
+    [[maybe_unused]] PathQueueSerializerBootstrap gPathQueueSerializerBootstrap;
+
+    /**
      * Address: 0x00767900 (FUN_00767900, Moho::PathQueueTypeInfo::Delete)
      *
      * What it does:
