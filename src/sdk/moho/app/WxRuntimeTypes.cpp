@@ -62178,7 +62178,18 @@ namespace
     moho::Shadow mShadowRenderer;                                         // +0x04F0
     moho::Clutter mClutter;                                               // +0x0808
     moho::Silhouette mSilhouetteRenderer;                                 // +0x2134
-    std::uint32_t mWorldViewState = 0;                                    // +0x2140
+    // The session being drawn this frame, cached on the viewport for the
+    // duration of Render. Typed uint32 here originally, which was wrong:
+    // Render stores a CWldSession* into it (0x007F9379), reads it back at
+    // 0x007F95CE and clears it at 0x007F9709. The same register it is
+    // written from is the one the fog-of-war guard dereferences as
+    // [ebx+488h] == CWldSession::FocusArmy, which is what pins the type.
+    //
+    // Populating it is still open - the value arrives through a frame
+    // argument whose stack analysis IDA gets wrong - so it stays null and
+    // the passes that read it (fog of war, playable boundary, the two
+    // debug canvases) remain unwired.
+    moho::CWldSession* mSession = nullptr;                                 // +0x2140
     WRenViewportWorldViewStorageRuntime mWorldViewStorage;                // +0x2144
     boost::shared_ptr<moho::CD3DTextureBatcher> mTexBatcher;              // +0x2154
     boost::shared_ptr<moho::CD3DPrimBatcher> mPrimBatcher;                // +0x215C
@@ -62451,7 +62462,7 @@ namespace
     // it to obtain identical layout without raw vtable offset arithmetic.
     std::construct_at(&runtime->mSilhouetteRenderer);
 
-    runtime->mWorldViewState = 0u;
+    runtime->mSession = nullptr;
     runtime->mWorldViewStorage.mUnknown00 = 0u;
     runtime->mWorldViewStorage.mViews = {nullptr, nullptr, nullptr};
 
