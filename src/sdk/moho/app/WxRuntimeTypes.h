@@ -5405,6 +5405,16 @@ public:
   long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam) override;
 
   /**
+   * Address: 0x0099F410 (FUN_0099F410)
+   *
+   * What it does:
+   * Raises wxEVT_MENU_OPEN / wxEVT_MENU_CLOSE at the window's event handler
+   * for the WM_ENTERMENULOOP / WM_EXITMENULOOP bookends, and reports whether
+   * the handler took the event.
+   */
+  bool DoSendMenuOpenCloseEvent(std::int32_t eventType, bool isPopup);
+
+  /**
    * Address: 0x004A3780 (FUN_004A3780)
    *
    * What it does:
