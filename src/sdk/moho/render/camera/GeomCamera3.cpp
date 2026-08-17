@@ -754,6 +754,9 @@ namespace
 
 namespace moho
 {
+  // A box has eight corners; the projection carries every one of them.
+  constexpr int kProjectedCornerCount = 8;
+
   /**
    * Address: 0x0046FE30 (FUN_0046FE30, Moho::GeomCamera3::GeomCamera3)
    *
@@ -1284,4 +1287,84 @@ namespace moho
     );
     Init(tranform, perspectiveProjection);
   }
+  /**
+   * Address: 0x007E9A10 (FUN_007E9A10, sub_7E9A10)
+   *
+   * IDA signature:
+   * int __usercall sub_7E9A10@<eax>(int result@<eax>, int a2@<ecx>);
+   *
+   * What it does:
+   * Encloses eight points in one axis-aligned box.
+   */
+  Wm3::AxisAlignedBox3f* EncloseCornerSet(
+    Wm3::AxisAlignedBox3f* const outBox,
+    const Wm3::Vector3f* const corners
+  )
+  {
+    // Seeded from corner 0, exactly as the binary does - there is no
+    // infinity sentinel, so an empty set is not representable here.
+    outBox->Min = corners[0];
+    outBox->Max = corners[0];
+
+    for (int index = 1; index < kProjectedCornerCount; ++index) {
+      const Wm3::Vector3f& corner = corners[index];
+      outBox->Min.X() = std::min(outBox->Min.X(), corner.X());
+      outBox->Min.Y() = std::min(outBox->Min.Y(), corner.Y());
+      outBox->Min.Z() = std::min(outBox->Min.Z(), corner.Z());
+      outBox->Max.X() = std::max(outBox->Max.X(), corner.X());
+      outBox->Max.Y() = std::max(outBox->Max.Y(), corner.Y());
+      outBox->Max.Z() = std::max(outBox->Max.Z(), corner.Z());
+    }
+
+    return outBox;
+  }
+
+  /**
+   * Address: 0x007E9AD0 (FUN_007E9AD0, sub_7E9AD0)
+   *
+   * IDA signature:
+   * int __usercall sub_7E9AD0@<eax>(float *a1@<eax>, float *a2@<ecx>, int a3@<esi>);
+   *
+   * What it does:
+   * Projects an axis-aligned box through a 4x4 matrix and encloses the
+   * result.
+   *
+   * The binary unrolls all eight corners; the loop here is the same
+   * arithmetic, and the enclosing min/max is order-independent so the
+   * corner ordering does not have to match. Element indexing is taken from
+   * the decompiled reads: component c uses matrix elements c, c+4, c+8 and
+   * c+12, so the fourth component is the perspective divisor.
+   */
+  Wm3::AxisAlignedBox3f* ProjectBoxByMatrix(
+    const VMatrix4* const matrix,
+    const Wm3::AxisAlignedBox3f* const box,
+    Wm3::AxisAlignedBox3f* const outBox
+  )
+  {
+    const auto* const m = reinterpret_cast<const float*>(matrix);
+
+    Wm3::Vector3f corners[kProjectedCornerCount]{};
+    for (int index = 0; index < kProjectedCornerCount; ++index) {
+      const float x = ((index & 1) != 0) ? box->Max.X() : box->Min.X();
+      const float y = ((index & 2) != 0) ? box->Max.Y() : box->Min.Y();
+      const float z = ((index & 4) != 0) ? box->Max.Z() : box->Min.Z();
+
+      const float projected[4] = {
+        (m[0] * x) + (m[4] * y) + (m[8] * z) + m[12],
+        (m[1] * x) + (m[5] * y) + (m[9] * z) + m[13],
+        (m[2] * x) + (m[6] * y) + (m[10] * z) + m[14],
+        (m[3] * x) + (m[7] * y) + (m[11] * z) + m[15]
+      };
+
+      const float inverseW = 1.0f / projected[3];
+      corners[index] = Wm3::Vector3f(
+        projected[0] * inverseW,
+        projected[1] * inverseW,
+        projected[2] * inverseW
+      );
+    }
+
+    return EncloseCornerSet(outBox, corners);
+  }
+
 } // namespace moho

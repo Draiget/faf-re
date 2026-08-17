@@ -141,51 +141,83 @@ namespace
     IncrementQueueSizeOrThrow(queue.size);
   }
 
-  [[nodiscard]] moho::GeomCamera3 BuildApproximateThumbnailCamera(
+  /**
+   * The camera derivation inside MeshThumbnailRenderer::PushRequest
+   * (0x007EB150, 0x007EB1F0..0x007EB2C6).
+   *
+   * What it does:
+   * Frames the mesh for a thumbnail. Looks at the bounds centre from ten
+   * bounding-sphere radii away along the caller's hint direction, then
+   * projects the bounds through the resulting view to size an orthographic
+   * volume that just contains them.
+   *
+   * The near and far planes are the smaller and larger of the two projected
+   * Z magnitudes, and the ortho extent is the larger of the projected width
+   * and height - so the mesh is framed by whichever axis needs more room.
+   * Both ortho extents get that one value, which is why thumbnails come out
+   * square regardless of the mesh's aspect.
+   *
+   * This replaces an approximation that left every camera matrix as identity
+   * and only positioned the transform, which meant the projection step never
+   * ran and ProjectBoxByMatrix (0x007E9AD0) had no caller.
+   */
+  [[nodiscard]] moho::GeomCamera3 BuildThumbnailCamera(
     const moho::MeshInstance* const meshInstance, const Wm3::Vec3f& viewOffsetHint
-  ) noexcept
+  )
   {
     moho::GeomCamera3 camera{};
-    camera.tranform.orient_ = Wm3::Quatf::Identity();
-    camera.projection = moho::VMatrix4::Identity();
-    camera.view = moho::VMatrix4::Identity();
-    camera.viewProjection = moho::VMatrix4::Identity();
-    camera.inverseProjection = moho::VMatrix4::Identity();
-    camera.inverseView = moho::VMatrix4::Identity();
-    camera.inverseViewProjection = moho::VMatrix4::Identity();
-    camera.viewport = moho::VMatrix4::Identity();
 
-    Wm3::Vec3f boundsMin{-0.5f, -0.5f, -0.5f};
-    Wm3::Vec3f boundsMax{0.5f, 0.5f, 0.5f};
-    if (meshInstance && HasFiniteBounds(*meshInstance)) {
-      boundsMin = {meshInstance->xMin, meshInstance->yMin, meshInstance->zMin};
-      boundsMax = {meshInstance->xMax, meshInstance->yMax, meshInstance->zMax};
+    // A missing or non-finite instance has no bounds to frame; the unit box
+    // keeps the derivation below well-defined. The binary reaches this only
+    // with a live instance.
+    Wm3::AxisAlignedBox3f bounds{};
+    bounds.Min = Wm3::Vector3f(-0.5f, -0.5f, -0.5f);
+    bounds.Max = Wm3::Vector3f(0.5f, 0.5f, 0.5f);
+    if (meshInstance != nullptr && HasFiniteBounds(*meshInstance)) {
+      bounds.Min = Wm3::Vector3f(meshInstance->xMin, meshInstance->yMin, meshInstance->zMin);
+      bounds.Max = Wm3::Vector3f(meshInstance->xMax, meshInstance->yMax, meshInstance->zMax);
     }
 
-    const Wm3::Vec3f center{
-      (boundsMin.x + boundsMax.x) * 0.5f, (boundsMin.y + boundsMax.y) * 0.5f, (boundsMin.z + boundsMax.z) * 0.5f
-    };
-    const Wm3::Vec3f halfExtents{
-      (boundsMax.x - boundsMin.x) * 0.5f, (boundsMax.y - boundsMin.y) * 0.5f, (boundsMax.z - boundsMin.z) * 0.5f
-    };
+    const Wm3::Vector3f center(
+      (bounds.Min.X() + bounds.Max.X()) * 0.5f,
+      (bounds.Min.Y() + bounds.Max.Y()) * 0.5f,
+      (bounds.Min.Z() + bounds.Max.Z()) * 0.5f
+    );
 
-    float halfDiagonal = std::sqrt(VectorLengthSq(halfExtents));
-    if (!Finite(halfDiagonal) || halfDiagonal < 0.001f) {
-      halfDiagonal = 1.0f;
-    }
+    // Bounding-sphere radius: the distance from the centre to the max corner.
+    const float dx = bounds.Max.X() - center.X();
+    const float dy = bounds.Max.Y() - center.Y();
+    const float dz = bounds.Max.Z() - center.Z();
+    const float radius = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
 
-    Wm3::Vec3f viewDir = viewOffsetHint;
-    if (!Finite(viewDir.x) || !Finite(viewDir.y) || !Finite(viewDir.z) || VectorLengthSq(viewDir) <= 1.0e-6f) {
-      viewDir = {1.0f, 1.0f, 1.0f};
-    }
+    const float eyeDistance = radius * 10.0f;
+    const Wm3::Vector3f eye(
+      viewOffsetHint.x * eyeDistance,
+      viewOffsetHint.y * eyeDistance,
+      viewOffsetHint.z * eyeDistance
+    );
+    const Wm3::Vector3f up(0.0f, 1.0f, 0.0f);
 
-    const float cameraDistance = halfDiagonal * 10.0f;
-    camera.tranform.pos_ = {
-      center.x + viewDir.x * cameraDistance,
-      center.y + viewDir.y * cameraDistance,
-      center.z + viewDir.z * cameraDistance
-    };
-    camera.lodScale = halfDiagonal;
+    camera.LookAt(eye, center, up);
+
+    Wm3::AxisAlignedBox3f projected{};
+    (void)moho::ProjectBoxByMatrix(&camera.view, &bounds, &projected);
+
+    const float nearMagnitude = std::fabs(projected.Max.Z());
+    const float farMagnitude = std::fabs(projected.Min.Z());
+    const float nearDepth = std::min(nearMagnitude, farMagnitude);
+    const float farDepth = std::max(nearMagnitude, farMagnitude);
+
+    const float projectedWidth = projected.Max.X() - projected.Min.X();
+    const float projectedHeight = projected.Max.Y() - projected.Min.Y();
+    const float extent = std::max(projectedWidth, projectedHeight);
+
+    camera.ViewInitOrtho(
+      static_cast<std::int32_t>(extent),
+      static_cast<std::int32_t>(extent),
+      nearDepth,
+      farDepth
+    );
     return camera;
   }
 
@@ -379,7 +411,7 @@ namespace moho
       meshInstance->UpdateInterpolatedFields();
     }
 
-    const GeomCamera3 camera = BuildApproximateThumbnailCamera(meshInstance, viewOffsetHint);
+    const GeomCamera3 camera = BuildThumbnailCamera(meshInstance, viewOffsetHint);
     return EnqueuePreparedRequest(meshInstance, camera, orientation, color, outputRect, outputSheet);
   }
 
