@@ -39,6 +39,7 @@ namespace moho
   // and therefore start at zero.
   bool ren_Ui = true;                     // 0x00F57DE7 = 0x01
   bool ren_Decals = true;                 // 0x00F57DDD = 0x01
+  bool ren_bicubicnormals = true;         // 0x00F57DC1 = 0x01
   bool ren_glowingDecals = true;          // 0x00F57DE1 = 0x01
   bool ren_Bloom = true;                  // 0x00F57E51 = 0x01
   bool ed_EnableHook = true;              // 0x00F57E55 = 0x01
