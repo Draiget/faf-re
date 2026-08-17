@@ -1926,7 +1926,55 @@ namespace
    * Serializes one reflected `vector<SThreat>` payload by writing count and
    * then each threat-element lane.
    */
-  [[maybe_unused]] void SaveSThreatVectorArchive(
+  /**
+   * Address: 0x0071A6F0 (FUN_0071A6F0, sub_71A6F0)
+   *
+   * IDA signature:
+   * void __cdecl sub_71A6F0(gpg::ReadArchive* archive, _DWORD* storage);
+   *
+   * What it does:
+   * Load mirror of `SaveSThreatVectorArchive`: reads the element count,
+   * reserves, then reads that many reflected `SThreat` values and replaces the
+   * destination vector's contents. Each element is read against a fresh empty
+   * owner reference rather than the caller's.
+   */
+  void LoadSThreatVectorArchive(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const vectorObject = PointerFromArchiveInt<SThreatVector>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(vectorObject != nullptr);
+    if (!archive || !vectorObject) {
+      return;
+    }
+
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+
+    SThreatVector loaded{};
+    loaded.reserve(static_cast<std::size_t>(count));
+
+    gpg::RType* const valueType = CachedSThreatType();
+    GPG_ASSERT(valueType != nullptr);
+    if (!valueType) {
+      return;
+    }
+
+    for (unsigned int i = 0u; i < count; ++i) {
+      moho::SThreat value{};
+      const gpg::RRef elementOwner{};
+      archive->Read(valueType, &value, elementOwner);
+      loaded.push_back(value);
+    }
+
+    *vectorObject = loaded;
+  }
+
+  void SaveSThreatVectorArchive(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
@@ -2647,8 +2695,9 @@ msvc8::string gpg::RVectorType_SThreat::GetLexical(const gpg::RRef& ref) const
 
 void gpg::RVectorType_SThreat::Init()
 {
-  size_ = 0x0C;
+  size_ = sizeof(SThreatVector);
   version_ = 1;
+  serLoadFunc_ = &LoadSThreatVectorArchive;
   serSaveFunc_ = &SaveSThreatVectorArchive;
 }
 
