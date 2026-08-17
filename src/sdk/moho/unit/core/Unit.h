@@ -20,6 +20,7 @@
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/command/CmdDefs.h"
+#include "moho/ai/IAiFormationDB.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryReflection.h"
@@ -188,15 +189,11 @@ namespace moho
    * - `cfunc_UnitGetGuardsL` (0x006CD4E0) iterates dword slots and decodes
    *   each non-null value as `(slot - 0x8)` before calling `Entity::GetLuaObject`.
    */
-  struct SGuardedByWeakOwnerSlot
-  {
-    void* ownerLinkSlot; // encoded weak owner-link slot pointer
-  };
+  /// The guard ring and the formation weak-ref set store the same 4-byte
+  /// encoded owner-link slot, so they share one type; `ownerLinkSlot` is the
+  /// pointer spelling of `SFormationUnitWeakRef::ownerLinkSlotWord`.
+  using SGuardedByWeakOwnerSlot = SFormationUnitWeakRef;
   static_assert(sizeof(SGuardedByWeakOwnerSlot) == 0x04, "SGuardedByWeakOwnerSlot size must be 0x04");
-  static_assert(
-    offsetof(SGuardedByWeakOwnerSlot, ownerLinkSlot) == 0x00,
-    "SGuardedByWeakOwnerSlot::ownerLinkSlot offset must be 0x00"
-  );
 
   /**
    * Runtime guarded-by list lane stored in `Unit` at +0x4F8.
@@ -211,11 +208,12 @@ namespace moho
    *   That window was previously mismodeled as a phantom `OccupyGroundToken`
    *   (zero real uses) + padding; it is `mSlots`' inline storage.
    */
-  struct SGuardedByRuntimeList
+  struct SGuardedByRuntimeList : SWeakUnitRefList
   {
-    TDatListItem<void, void> mOwnerNode;                  // +0x00
-    gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> mSlots; // +0x08
-    SGuardedByWeakOwnerSlot mInlineSlots[4];              // +0x18 (small-buffer storage backing mSlots)
+    // mOwnerNode +0x00 and mSlots +0x08 come from SWeakUnitRefList, which is
+    // the shape CAiFormationDBImpl::NewFormation takes - so the guard ring can
+    // be handed to it directly.
+    SGuardedByWeakOwnerSlot mInlineSlots[4]; // +0x18 (small-buffer storage backing mSlots)
   };
   static_assert(sizeof(SGuardedByRuntimeList) == 0x28, "SGuardedByRuntimeList size must be 0x28");
   static_assert(

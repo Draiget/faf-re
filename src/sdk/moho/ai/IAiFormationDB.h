@@ -39,7 +39,13 @@ namespace moho
    */
   struct SFormationUnitWeakRef
   {
-    std::uint32_t ownerLinkSlotWord;
+    /// The same word spelled two ways: guard-ring code handles it as the
+    /// encoded owner-link slot pointer, formation code as a raw word.
+    union
+    {
+      std::uint32_t ownerLinkSlotWord;
+      void* ownerLinkSlot;
+    };
 
     [[nodiscard]] static SFormationUnitWeakRef FromUnit(Unit* unit) noexcept;
     [[nodiscard]] std::uint32_t* DecodeOwnerChainHead() const noexcept;
