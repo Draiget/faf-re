@@ -655,6 +655,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\EntityCollisionUpdater.cpp" />
     <ClCompile Include="moho\entity\CTextureScroller.cpp" />
     <ClCompile Include="moho\entity\Entity.cpp" />
+    <ClCompile Include="moho\entity\EntitySerializer.cpp" />
     <ClCompile Include="moho\command\SSTITarget.cpp" />
     <ClCompile Include="moho\entity\SSTIEntityConstantData.cpp" />
     <ClCompile Include="moho\entity\SSTIEntityVariableData.cpp" />
@@ -2046,6 +2047,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\core\Thread.h" />
     <ClInclude Include="moho\entity\CTextureScroller.h" />
     <ClInclude Include="moho\entity\Entity.h" />
+    <ClInclude Include="moho\entity\EntitySerializer.h" />
     <ClInclude Include="moho\entity\ELayerTypeInfo.h" />
     <ClInclude Include="moho\entity\SSTIEntityConstantData.h" />
     <ClInclude Include="moho\entity\EVisibilityModeTypeInfo.h" />
