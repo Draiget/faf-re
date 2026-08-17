@@ -65613,12 +65613,10 @@ void moho::WRenViewport::RenderTerrainNormals(TerrainCommon* const terrain)
   );
   SetViewportToLocalScreen();
 
-  // The binary then dispatches slot 9, terrain->DrawTerrainNormal(
-  // sCurGameTick, sDeltaFrame), which is what actually fills the buffer.
-  // MediumFidelityTerrain (0x00806F50) and HighFidelityTerrain
-  // (0x00802F20) have no body yet, so the slot cannot move onto
-  // TerrainCommon without forcing a stub in those classes.
-  (void)terrain;
+  // Slot 9 fills the buffer bound above (0x007F7FA5, call through the
+  // terrain vtable). Low fidelity keeps it an empty hook; medium and high
+  // walk the normal-map tiles.
+  terrain->DrawTerrainNormal(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds());
 }
 
 /**

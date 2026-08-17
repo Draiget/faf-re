@@ -120,7 +120,7 @@ namespace moho
      * Preserves the low-fidelity terrain normal pass as an intentional no-op
      * hook for this terrain fidelity lane.
      */
-    virtual void DrawTerrainNormal(std::int32_t arg0, std::int32_t arg1);
+    void DrawTerrainNormal(std::int32_t gameTick, float deltaSeconds) override;
 
     /**
      * Address: 0x00809D30 (FUN_00809D30, Moho::LowFidelityTerrain::DrawTerrain)

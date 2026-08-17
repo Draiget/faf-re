@@ -79,6 +79,22 @@ namespace moho
     [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
 
     /**
+     * Primary vtable slot 9.
+     *
+     * What it does:
+     * Fills the off-screen terrain-normal buffer that
+     * `WRenViewport::TransformTerrainNormals` samples for its `TCreateBasis`
+     * pass. Low fidelity does not need the buffer and keeps this an empty hook.
+     *
+     * Dispatched from `WRenViewport::RenderTerrainNormals` (0x007F7F10).
+     * Parameter 1 is the game tick, not a `MeshRenderer*`: the binary pushes
+     * `sCurGameTick` last at 0x007F827E for the sibling slot-8 dispatch, and
+     * the decal texture lookups thread it straight into
+     * `CWldTerrainDecal::GetTexture`'s `int frameSeed`.
+     */
+    virtual void DrawTerrainNormal(std::int32_t gameTick, float deltaSeconds) = 0;
+
+    /**
      * Primary vtable slot 12.
      *
      * What it does:

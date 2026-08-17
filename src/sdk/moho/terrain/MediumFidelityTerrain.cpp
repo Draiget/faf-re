@@ -97,6 +97,10 @@ namespace
     indexSheet->Unlock();
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x007FEE70 (FUN_007FEE70, sub_7FEE70)
    *
@@ -109,17 +113,13 @@ namespace
    * otherwise the primary texture at +0x2E0, and returns a retained (strong-ref)
    * copy of that `boost::shared_ptr<gpg::gal::TextureD3D9>`.
    */
-  [[nodiscard]] boost::shared_ptr<moho::CD3DRenderTarget> GetActiveShadowTexture(
-    const moho::TerrainShadowContext& shadowContext
+  [[nodiscard]] boost::shared_ptr<CD3DRenderTarget> GetActiveShadowTexture(
+    const TerrainShadowContext& shadowContext
   )
   {
     return shadowContext.useSecondaryShadowTexture ? shadowContext.secondaryShadowTexture
                                                    : shadowContext.primaryShadowTexture;
   }
-} // namespace
-
-namespace moho
-{
   extern bool ren_Terrain;
   extern bool ren_Skirt;
   extern bool ren_Decals;
@@ -693,17 +693,18 @@ namespace moho
     /// Resolves one animated decal texture slot and binds it into `target`.
     /// Mirrors the binary's `CWldTerrainDecal::GetTexture(slot, lod, frameSeed)`
     /// call followed by `struct_ShaderVar::GetTexture`. The frame seed is the raw
-    /// mesh-renderer pointer value, exactly as the shipped code passes it.
+    /// game tick, which IDA mistypes as a MeshRenderer* because it arrives
+    /// in a register (see WRenViewport::RenderCompositeTerrain @0x007F827E).
     void BindDecalTexture(
       ShaderVar& target,
       CWldTerrainDecal& decal,
       const int slot,
       const float lod,
-      MeshRenderer* const renderer
+      const std::int32_t gameTick
     )
     {
       const boost::shared_ptr<ID3DTextureSheet> texture =
-        decal.GetTexture(slot, lod, static_cast<int>(reinterpret_cast<std::uintptr_t>(renderer)));
+        decal.GetTexture(slot, lod, gameTick);
       target.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
     }
   } // namespace
@@ -722,7 +723,7 @@ namespace moho
    * and the decal alpha, then submits one indexed triangle-list draw per match.
    */
   void MediumFidelityTerrain::DrawDecalPass(
-    MeshRenderer* const renderer,
+    const std::int32_t gameTick,
     const float lod,
     const std::int32_t decalType,
     const char* const techniqueName
@@ -750,8 +751,8 @@ namespace moho
         shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
       }
 
-      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
-      BindDecalTexture(shaderVars.decalSpecTexture, decal, 1, lod, renderer);
+      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, gameTick);
+      BindDecalTexture(shaderVars.decalSpecTexture, decal, 1, lod, gameTick);
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -822,7 +823,7 @@ namespace moho
    * triangle-list draw per glowing decal. No-op unless both `ren_Decals` and
    * `ren_glowingDecals` are enabled.
    */
-  void MediumFidelityTerrain::DrawGlowingDecals(MeshRenderer* const renderer, const float lod)
+  void MediumFidelityTerrain::DrawGlowingDecals(const std::int32_t gameTick, const float lod)
   {
     if (!ren_Decals || !ren_glowingDecals) {
       return;
@@ -846,7 +847,7 @@ namespace moho
         shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
       }
 
-      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
+      BindDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, gameTick);
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -876,7 +877,7 @@ namespace moho
    * only ever becomes set on the terminal alpha sentinel (which returns), so the
    * reselect never fires during forward iteration and is omitted here for clarity.
    */
-  void MediumFidelityTerrain::DrawNormalMappedDecals(MeshRenderer* const renderer, const float lod)
+  void MediumFidelityTerrain::DrawNormalMappedDecals(const std::int32_t gameTick, const float lod)
   {
     if (!ren_Decals) {
       return;
@@ -913,7 +914,7 @@ namespace moho
         shaderVars.decalAlpha.SetFloat(command.alpha);
       }
 
-      BindDecalTexture(shaderVars.decalNormalTexture, decal, 0, lod, renderer);
+      BindDecalTexture(shaderVars.decalNormalTexture, decal, 0, lod, gameTick);
 
       SubmitDecalCommandDraw(mTerrainVertexSheet, mTerrainIndexSheet, command);
     };
@@ -939,11 +940,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormals)
+   * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormal)
    * Primary vtable slot 9 (vftable @0x00E41A54).
    *
    * IDA signature:
-   * void __fastcall Moho::MediumFidelityTerrain::DrawTerrainNormals(
+   * void __fastcall Moho::MediumFidelityTerrain::DrawTerrainNormal(
    *     int ecx0, int edx0, int a3, float arg4);
    *
    * What it does:
@@ -964,7 +965,7 @@ namespace moho
    * tesselated index count to be a whole number of triangles (`% 3 == 0`)
    * before issuing the draw.
    */
-  void MediumFidelityTerrain::DrawTerrainNormals(MeshRenderer* const renderer, const float lod)
+  void MediumFidelityTerrain::DrawTerrainNormal(const std::int32_t gameTick, const float deltaSeconds)
   {
     if (!ren_Terrain) {
       return;
@@ -989,7 +990,7 @@ namespace moho
     LoadShaderVars({});
     DrawTriangles();
     if (!ren_DecalOverDraw) {
-      DrawNormalMappedDecals(renderer, lod);
+      DrawNormalMappedDecals(gameTick, deltaSeconds);
     }
 
     device->SelectTechnique(ren_bicubicnormals ? "TTerrainBasisBiCubic" : "TTerrainBasis");
@@ -1071,7 +1072,7 @@ namespace moho
    * the normal-mapped decals. Returns 1.
    */
   bool MediumFidelityTerrain::DrawNormals(
-    MeshRenderer* const renderer,
+    const std::int32_t gameTick,
     const float lod,
     const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
     TerrainShadowContext* const shadowContext
@@ -1086,7 +1087,7 @@ namespace moho
     LoadTerrainLighting(shadowContext);
 
     if (ren_ShowNormals) {
-      DrawTerrainNormals(renderer, lod);
+      DrawTerrainNormal(gameTick, lod);
       return true;
     }
 
@@ -1130,13 +1131,13 @@ namespace moho
 
     DrawTriangles();
 
-    DrawDecalPass(renderer, lod, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
-    DrawDecalPass(renderer, lod, WldTerrainDecalType_Albedo, "TDecals");
+    DrawDecalPass(gameTick, lod, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
+    DrawDecalPass(gameTick, lod, WldTerrainDecalType_Albedo, "TDecals");
     DrawSplatComposite();
-    DrawGlowingDecals(renderer, lod);
+    DrawGlowingDecals(gameTick, lod);
 
     if (ren_DecalOverDraw) {
-      DrawNormalMappedDecals(renderer, lod);
+      DrawNormalMappedDecals(gameTick, lod);
     }
 
     return true;
