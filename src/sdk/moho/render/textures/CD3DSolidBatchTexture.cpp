@@ -72,11 +72,6 @@ namespace moho
       return map.lower_bound(key);
     }
 
-    [[nodiscard]] SolidTextureMap::iterator LowerBoundSolidTextureEntry(const std::uint32_t color)
-    {
-      return GetMapLowerBound(GetSolidTextureMap(), color);
-    }
-
     /**
      * Address: 0x0044D920 (FUN_0044D920)
      * Address: 0x0044DC20 (FUN_0044DC20, clone lane)
@@ -133,17 +128,6 @@ namespace moho
       }
 
       --iterator;
-    }
-
-    /**
-     * Address: 0x0044B070 (FUN_0044B070)
-     *
-     * What it does:
-     * Computes insertion hint lane for one solid-color cache key.
-     */
-    [[nodiscard]] SolidTextureMap::iterator FindSolidTextureInsertHint(const std::uint32_t color)
-    {
-      return CopyIteratorResult(LowerBoundSolidTextureEntry(color));
     }
 
     /**
@@ -407,12 +391,14 @@ namespace moho
 
     if (!outTexture) {
       const SolidTextureHandle createdTexture = BuildSolidTextureSharedHandle(new CD3DSolidBatchTexture(rgba));
-      const SolidTextureMap::iterator hint = FindSolidTextureInsertHint(rgba);
-      if (hint != SolidTextureMapEnd() && hint->first == rgba) {
-        hint->second = createdTexture;
-      } else {
-        solidTextureMap.insert(hint, SolidTextureMap::value_type(rgba, createdTexture));
-      }
+
+      // Subscripting is what the binary does here: one call to the map's
+      // operator[] (0x004496E0), which lower-bounds the key (0x0044B1A0) and
+      // default-constructs the slot through _Insert (0x0044B070) on a miss,
+      // then the weak handle is assigned into whichever slot came back. An
+      // open-coded find-then-insert would leave all three emissions with no
+      // source origin.
+      solidTextureMap[rgba] = createdTexture;
       outTexture = createdTexture;
     }
 
