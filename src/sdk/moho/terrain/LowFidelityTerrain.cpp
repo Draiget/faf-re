@@ -144,16 +144,17 @@ namespace
   }
 
   /// Resolves one animated decal texture slot and binds it into `target`. Frame
-  /// seed is the raw mesh-renderer pointer, exactly as the shipped code passes it.
+  /// seed is the game tick, which IDA mistypes as a MeshRenderer* because it
+  /// arrives in a register (see WRenViewport::RenderCompositeTerrain @0x007F827E).
   void BindLowFidelityDecalTexture(
     moho::ShaderVar& target,
     moho::CWldTerrainDecal& decal,
     const int slot,
     const float lod,
-    moho::MeshRenderer* const renderer)
+    const std::int32_t gameTick)
   {
     const boost::shared_ptr<moho::ID3DTextureSheet> texture =
-      decal.GetTexture(slot, lod, static_cast<int>(reinterpret_cast<std::uintptr_t>(renderer)));
+      decal.GetTexture(slot, lod, gameTick);
     target.GetTexture(boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(texture));
   }
 } // namespace
@@ -586,7 +587,7 @@ namespace moho
    * Draws every queued decal command whose type equals `decalType`.
    */
   void LowFidelityTerrain::DrawDecalPass(
-    MeshRenderer* const renderer, const float lod, const std::int32_t decalType, const char* const techniqueName)
+    const std::int32_t gameTick, const float lod, const std::int32_t decalType, const char* const techniqueName)
   {
     if (!ren_Decals) {
       return;
@@ -611,8 +612,8 @@ namespace moho
         shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
       }
 
-      BindLowFidelityDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
-      BindLowFidelityDecalTexture(shaderVars.decalSpecTexture, decal, 1, lod, renderer);
+      BindLowFidelityDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, gameTick);
+      BindLowFidelityDecalTexture(shaderVars.decalSpecTexture, decal, 1, lod, gameTick);
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -629,7 +630,7 @@ namespace moho
    * Draws every glowing decal command (mType == WldTerrainDecalType_Glow) with the
    * `TDecalsGlow` technique.
    */
-  void LowFidelityTerrain::DrawGlowingDecals(MeshRenderer* const renderer, const float lod)
+  void LowFidelityTerrain::DrawGlowingDecals(const std::int32_t gameTick, const float lod)
   {
     if (!ren_Decals || !ren_glowingDecals) {
       return;
@@ -654,7 +655,7 @@ namespace moho
         shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
       }
 
-      BindLowFidelityDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, renderer);
+      BindLowFidelityDecalTexture(shaderVars.decalAlbedoTexture, decal, 0, lod, gameTick);
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -715,9 +716,9 @@ namespace moho
    * The low-fidelity terrain normal/decal render pass (see header).
    */
   bool LowFidelityTerrain::DrawNormals(
-    MeshRenderer* const renderer,
-    const float lod,
-    boost::weak_ptr<gpg::gal::TextureD3D9> /*terrainNormalTexture*/,
+    const std::int32_t gameTick,
+    const float deltaSeconds,
+    const boost::shared_ptr<ID3DRenderTarget>& /*terrainNormalTexture*/,
     TerrainShadowContext* const shadowContext)
   {
     if (!ren_Terrain) {
@@ -783,10 +784,10 @@ namespace moho
       }
     }
 
-    DrawDecalPass(renderer, lod, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
-    DrawDecalPass(renderer, lod, WldTerrainDecalType_Albedo, "TDecals");
-    DrawDecalPass(renderer, lod, WldTerrainDecalType_WaterAlbedo, "TDecalsWaterAlbedo");
-    DrawGlowingDecals(renderer, lod);
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_Albedo, "TDecals");
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_WaterAlbedo, "TDecalsWaterAlbedo");
+    DrawGlowingDecals(gameTick, deltaSeconds);
     DrawSplatComposite();
 
     return true;

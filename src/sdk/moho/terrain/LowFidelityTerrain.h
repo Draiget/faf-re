@@ -173,12 +173,12 @@ namespace moho
      * albedo / water-albedo decal passes, the glowing decals, and the splat
      * composite. Returns true.
      */
-    virtual bool DrawNormals(
-      MeshRenderer* renderer,
-      float lod,
-      boost::weak_ptr<gpg::gal::TextureD3D9> terrainNormalTexture,
+    bool DrawNormals(
+      std::int32_t gameTick,
+      float deltaSeconds,
+      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       TerrainShadowContext* shadowContext
-    );
+    ) override;
 
     /**
      * Address: 0x008079B0 (FUN_008079B0, Moho::LowFidelityTerrain::LoadShaderVars)
@@ -234,7 +234,7 @@ namespace moho
      * submits one indexed triangle-list draw per matching command. No-op unless
      * ren_Decals.
      */
-    void DrawDecalPass(MeshRenderer* renderer, float lod, std::int32_t decalType, const char* techniqueName);
+    void DrawDecalPass(std::int32_t gameTick, float lod, std::int32_t decalType, const char* techniqueName);
 
     /**
      * Address: 0x00809730 (FUN_00809730, sub_809730)
@@ -245,7 +245,7 @@ namespace moho
      * slot-0 albedo + decal alpha, one indexed draw per command. No-op unless
      * ren_Decals && ren_glowingDecals.
      */
-    void DrawGlowingDecals(MeshRenderer* renderer, float lod);
+    void DrawGlowingDecals(std::int32_t gameTick, float lod);
 
     /**
      * Address: 0x00809930 (FUN_00809930, sub_809930)

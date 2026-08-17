@@ -9,6 +9,8 @@ namespace moho
 {
   class RD3DTextureResource;
   struct TerrainWaterResourceView;
+  class ID3DRenderTarget;
+  struct TerrainShadowContext;
 
   /**
    * VFTABLE: 0x00E419D4
@@ -77,6 +79,25 @@ namespace moho
      * terrain runtime state.
      */
     [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
+
+    /**
+     * Primary vtable slot 8.
+     *
+     * What it does:
+     * The terrain normal/decal render pass - the one that actually draws the
+     * terrain surface. Binds terrain lighting for the shadow context, then
+     * either forwards to the debug normal-visualization path
+     * (`ren_ShowNormals`) or runs the full decal/splat pass.
+     *
+     * Dispatched from `WRenViewport::RenderCompositeTerrain` (0x007F81C0):
+     * `mov edx, [edx+20h]` / `call edx` at 0x007F8277, with `sCurGameTick`
+     * pushed last at 0x007F827E.
+     */
+    virtual bool DrawNormals(
+      std::int32_t gameTick,
+      float deltaSeconds,
+      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+      TerrainShadowContext* shadowContext) = 0;
 
     /**
      * Primary vtable slot 9.

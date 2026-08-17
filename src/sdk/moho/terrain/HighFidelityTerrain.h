@@ -128,6 +128,43 @@ namespace moho
     void OverDrawDecals(std::int32_t gameTick, float deltaSeconds);
 
     /**
+     * Address: 0x008025B0 (FUN_008025B0, sub_8025B0)
+     *
+     * What it does:
+     * Draws every queued decal command whose type equals `decalType`.
+     */
+    void DrawDecalPass(std::int32_t gameTick, float deltaSeconds, std::int32_t decalType, const char* techniqueName);
+
+    /**
+     * Address: 0x00802830 (FUN_00802830, sub_802830)
+     *
+     * What it does:
+     * Draws the splat vertex lane as one `TSplats` quad list.
+     */
+    void DrawSplatComposite();
+
+    /**
+     * Address: 0x00802A20 (FUN_00802A20, sub_802A20)
+     *
+     * What it does:
+     * Draws every glowing decal command with the `TDecalsGlow` technique.
+     */
+    void DrawGlowingDecals(std::int32_t gameTick, float deltaSeconds);
+
+    /**
+     * Address: 0x00801BE0 (FUN_00801BE0, Moho::HighFidelityTerrain::DrawNormals)
+     * Primary vtable slot 8 (vftable @0x00E41A14).
+     *
+     * What it does:
+     * The high-fidelity terrain normal/decal render pass.
+     */
+    bool DrawNormals(
+      std::int32_t gameTick,
+      float deltaSeconds,
+      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+      TerrainShadowContext* shadowContext) override;
+
+    /**
      * Address: 0x00802F20 (FUN_00802F20, Moho::HighFidelityTerrain::DrawTerrainNormal)
      * Primary vtable slot 9 (vftable @0x00E41A14).
      *

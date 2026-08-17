@@ -1073,7 +1073,7 @@ namespace moho
    */
   bool MediumFidelityTerrain::DrawNormals(
     const std::int32_t gameTick,
-    const float lod,
+    const float deltaSeconds,
     const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
     TerrainShadowContext* const shadowContext
   )
@@ -1087,7 +1087,7 @@ namespace moho
     LoadTerrainLighting(shadowContext);
 
     if (ren_ShowNormals) {
-      DrawTerrainNormal(gameTick, lod);
+      DrawTerrainNormal(gameTick, deltaSeconds);
       return true;
     }
 
@@ -1131,13 +1131,13 @@ namespace moho
 
     DrawTriangles();
 
-    DrawDecalPass(gameTick, lod, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
-    DrawDecalPass(gameTick, lod, WldTerrainDecalType_Albedo, "TDecals");
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_Albedo, "TDecals");
     DrawSplatComposite();
-    DrawGlowingDecals(gameTick, lod);
+    DrawGlowingDecals(gameTick, deltaSeconds);
 
     if (ren_DecalOverDraw) {
-      DrawNormalMappedDecals(gameTick, lod);
+      DrawNormalMappedDecals(gameTick, deltaSeconds);
     }
 
     return true;

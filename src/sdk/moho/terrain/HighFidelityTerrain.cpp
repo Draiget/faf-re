@@ -15,6 +15,9 @@
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/tess/CTesselator.h"
+#include "moho/render/ID3DVertexStream.h"
+#include "moho/sim/STIMap.h"
+#include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
@@ -102,9 +105,16 @@ namespace moho
   // the decal passes, exactly as low fidelity does: 0x10 header + 500 * 0x18
   // == 0x2EF0, the same span as FastVectorN<uint32_t, 3000>.
   using HighFidelityDecalCommandLane = gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>;
+
+  // The secondary patch lane is the splat vertex lane for the splat pass:
+  // 0x10 header + 10000 * 0x1C == the same span as
+  // FastVectorN<uint32_t, 70000>.
+  using HighFidelitySplatVertexLane = gpg::core::FastVectorN<TerrainSplatVertex, 10000>;
   extern bool ren_Decals;
   extern bool ren_DecalOverDraw;
   extern bool ren_bicubicnormals;
+  extern bool ren_glowingDecals;
+  extern bool ren_ShowNormals;
 
   /**
    * Address: 0x007FF940 (??0HighFidelityTerrain@Moho@@QAE@@Z)
@@ -666,6 +676,246 @@ namespace moho
 
       (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
     }
+  }
+
+  /**
+   * Address: 0x008025B0 (FUN_008025B0, sub_8025B0)
+   *
+   * What it does:
+   * Draws every queued decal command whose type equals `decalType`, under the
+   * caller's technique (or `TDecalOverDraw` when `ren_DecalOverDraw` is set),
+   * binding each decal's texture matrix, albedo + specular sheets and alpha.
+   */
+  void HighFidelityTerrain::DrawDecalPass(
+    const std::int32_t gameTick, const float deltaSeconds,
+    const std::int32_t decalType, const char* const techniqueName)
+  {
+    if (!ren_Decals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : techniqueName);
+
+    const auto& decalCommands = reinterpret_cast<const HighFidelityDecalCommandLane&>(mPrimaryPatchData);
+    for (const TerrainDecalDrawCommand& command : decalCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (static_cast<std::int32_t>(decal.mType) != decalType) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      shaderVars.decalAlbedoTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick)));
+      shaderVars.decalSpecTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(1, deltaSeconds, gameTick)));
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = mTerrainIndexSheet;
+      indexView.startIndex = command.startIndex;
+      indexView.indexCount = command.indexCount;
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = mTerrainVertexSheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = command.baseVertex;
+      vertexView.endVertex = command.endVertex;
+
+      (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+    }
+  }
+
+  /**
+   * Address: 0x00802830 (FUN_00802830, sub_802830)
+   *
+   * What it does:
+   * Copies the whole splat vertex lane into the dynamic vertex sheet's stream
+   * and draws it as one `TSplats` quad list against the texture batcher's
+   * composite texture. Four vertices per quad, six indices per quad.
+   */
+  void HighFidelityTerrain::DrawSplatComposite()
+  {
+    const auto& splatVertices = reinterpret_cast<const HighFidelitySplatVertexLane&>(mSecondaryPatchData);
+    const std::size_t splatVertexCount = splatVertices.size();
+    if (splatVertexCount == 0) {
+      return;
+    }
+
+    void* const lockedVertices =
+      mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
+    std::memcpy(lockedVertices, splatVertices.data(), sizeof(TerrainSplatVertex) * splatVertexCount);
+    mDynamicVertexSheet->GetVertStream(0U)->Unlock();
+
+    D3D_GetDevice()->SelectTechnique("TSplats");
+
+    auto& shaderVars = GetTerrainShaderVars();
+    shaderVars.decalAlbedoTexture.GetTexture(
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
+    );
+
+    std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+    CD3DIndexSheetViewRuntime indexView{};
+    indexView.sheet = mDynamicIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = 6 * (static_cast<std::int32_t>(splatVertexCount) / 4);
+
+    CD3DVertexSheetViewRuntime vertexView{};
+    vertexView.sheet = mDynamicVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(splatVertexCount) - 1;
+
+    (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
+   * Address: 0x00802A20 (FUN_00802A20, sub_802A20)
+   *
+   * What it does:
+   * Draws every glowing decal command (`mType == WldTerrainDecalType_Glow`)
+   * with the `TDecalsGlow` technique. Gated on `ren_Decals` and
+   * `ren_glowingDecals` together.
+   */
+  void HighFidelityTerrain::DrawGlowingDecals(const std::int32_t gameTick, const float deltaSeconds)
+  {
+    if (!ren_Decals || !ren_glowingDecals) {
+      return;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+
+    D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : "TDecalsGlow");
+
+    const auto& decalCommands = reinterpret_cast<const HighFidelityDecalCommandLane&>(mPrimaryPatchData);
+    for (const TerrainDecalDrawCommand& command : decalCommands) {
+      CWldTerrainDecal& decal = *command.decal;
+      if (decal.mType != WldTerrainDecalType_Glow) {
+        continue;
+      }
+
+      if (shaderVars.decalMatrix.Exists()) {
+        shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
+      }
+
+      shaderVars.decalAlbedoTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick)));
+
+      if (shaderVars.decalAlpha.Exists()) {
+        shaderVars.decalAlpha.SetFloat(command.alpha);
+      }
+
+      std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = mTerrainIndexSheet;
+      indexView.startIndex = command.startIndex;
+      indexView.indexCount = command.indexCount;
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = mTerrainVertexSheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = command.baseVertex;
+      vertexView.endVertex = command.endVertex;
+
+      (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+    }
+  }
+
+  /**
+   * Address: 0x00801BE0 (FUN_00801BE0, Moho::HighFidelityTerrain::DrawNormals)
+   * Primary vtable slot 8 (vftable @0x00E41A14).
+   *
+   * IDA signature:
+   * int __thiscall Moho::HighFidelityTerrain::DrawNormals(
+   *     HighFidelityTerrain *this, MeshRenderer *a4, float a5,
+   *     boost::weak_ptr arg8, int arg10);
+   *
+   * What it does:
+   * The high-fidelity terrain normal/decal render pass. Binds terrain lighting
+   * for the shadow context, then either forwards to the debug
+   * normal-visualization path (`ren_ShowNormals`) or runs the full decal pass:
+   * binds the water ramp and the three water-elevation constants, selects the
+   * active stratum-material technique, loads the base shader vars, draws the
+   * terrain triangles, then the glow-mask / albedo / XP decal passes, the splat
+   * composite, the glowing decals, and - under `ren_DecalOverDraw` - the
+   * normal-mapped decals. Returns true when terrain rendering is enabled.
+   *
+   * The water elevations fall back to -10000.0f (the decompiler's
+   * -971227136 = 0xC61C4000) when the map has no water, putting every
+   * elevation test safely below the terrain.
+   */
+  bool HighFidelityTerrain::DrawNormals(
+    const std::int32_t gameTick,
+    const float deltaSeconds,
+    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+    TerrainShadowContext* const shadowContext)
+  {
+    if (!ren_Terrain) {
+      return false;
+    }
+
+    LoadTerrainLighting(shadowContext);
+
+    if (ren_ShowNormals) {
+      DrawTerrainNormal(gameTick, deltaSeconds);
+      return true;
+    }
+
+    auto& shaderVars = GetTerrainShaderVars();
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    // Water ramp texture from the terrain's water shader properties.
+    CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
+    shaderVars.waterRamp.GetTexture(waterProperties->GetWaterRamp());
+
+    StratumMaterial& strata = terrainRes->GetStratumMaterial();
+    D3D_GetDevice()->SelectTechnique(strata.mShaderName.c_str());
+
+    // Absent water puts every elevation below the terrain so the shader's
+    // depth tests never trigger.
+    constexpr float kNoWaterElevation = -10000.0F;
+    const TerrainMapRuntimeView& map = *mTerrainResource->mMap;
+
+    if (shaderVars.waterElevation.Exists()) {
+      shaderVars.waterElevation.SetFloat(
+        map.mWaterEnabled ? map.mWaterElevation : kNoWaterElevation);
+    }
+    if (shaderVars.waterElevationDeep.Exists()) {
+      shaderVars.waterElevationDeep.SetFloat(
+        map.mWaterEnabled ? map.mWaterElevationDeep : kNoWaterElevation);
+    }
+    if (shaderVars.waterElevationAbyss.Exists()) {
+      shaderVars.waterElevationAbyss.SetFloat(
+        map.mWaterEnabled ? map.mWaterElevationAbyss : kNoWaterElevation);
+    }
+
+    (void)terrainRes->IsInEditMode();
+
+    LoadShaderVars(terrainNormalTexture);
+    DrawTriangles();
+
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_GlowMask, "TDecalGlowMask");
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_Albedo, "TDecals");
+    DrawDecalPass(gameTick, deltaSeconds, WldTerrainDecalType_AlbedoXp, "TDecalsXP");
+    DrawSplatComposite();
+    DrawGlowingDecals(gameTick, deltaSeconds);
+
+    if (ren_DecalOverDraw) {
+      OverDrawDecals(gameTick, deltaSeconds);
+    }
+
+    return true;
   }
 
   /**

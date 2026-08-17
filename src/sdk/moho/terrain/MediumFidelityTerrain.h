@@ -281,12 +281,12 @@ namespace moho
      * `ren_DecalOverDraw`) the normal-mapped decals. Returns 1 when terrain
      * rendering is enabled, 0 otherwise.
      */
-    virtual bool DrawNormals(
+    bool DrawNormals(
       std::int32_t gameTick,
-      float lod,
+      float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       TerrainShadowContext* shadowContext
-    );
+    ) override;
 
     /**
      * Address: 0x00806F50 (FUN_00806F50, Moho::MediumFidelityTerrain::DrawTerrainNormal)
