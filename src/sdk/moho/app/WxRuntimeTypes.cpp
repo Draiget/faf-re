@@ -11523,6 +11523,14 @@ namespace
   std::int32_t gWxEvtUpdateUiRuntimeType = 0;
   std::int32_t gWxEvtCommandMenuSelectedRuntimeType = 0;
   std::int32_t gWxEvtMenuHighlightRuntimeType = 0;
+  // Stock frame icons. Both read 0x00000000 in the shipped image - they are
+  // filled in by the wx stock-object init lane, which is not recovered yet,
+  // so GetDefaultIcon answers with no icon until that lands.
+  constexpr std::int32_t kWxFrameIconExtent = 32;
+
+  HICON gWxStdFrameIcon = nullptr;     // 0x00F8F810
+  HICON gWxDefaultFrameIcon = nullptr; // 0x00F8F81C
+
   std::int32_t gWxEvtMenuOpenRuntimeType = 0;
   std::int32_t gWxEvtMenuCloseRuntimeType = 0;
   std::int32_t gWxEvtSizeRuntimeType = 0;
@@ -60806,6 +60814,80 @@ WSupComFrame* WSupComFrame::DeleteWithFlag(
 }
 
 /**
+ * Address: 0x0099F040 (FUN_0099F040)
+ * Mangled: ?GetDefaultIcon@wxFrame@@MBEKXZ
+ *
+ * What it does:
+ * The icon a frame falls back to when its own bundle has nothing usable:
+ * the standard frame icon, or the default one when that is unset.
+ */
+unsigned long wxTopLevelWindowRuntime::GetDefaultIcon() const
+{
+  if (gWxStdFrameIcon != nullptr) {
+    return reinterpret_cast<unsigned long>(gWxStdFrameIcon);
+  }
+  return reinterpret_cast<unsigned long>(gWxDefaultFrameIcon);
+}
+
+/**
+ * Address: 0x0099F0A0 (FUN_0099F0A0)
+ * Mangled: ?HandlePaint@wxFrame@@IAE_NXZ
+ *
+ * IDA signature:
+ * char __thiscall wxFrame::HandlePaint(wxFrame *this);
+ *
+ * What it does:
+ * Answers WM_PAINT for a frame. A frame that is not minimised paints the
+ * normal way through wxWindow. A minimised one draws its icon centred in the
+ * client area instead, because that is all a minimised frame shows.
+ *
+ * An empty update region is reported handled without painting at all.
+ *
+ * The 39 the binary passes to MSWDefWindowProc is WM_ICONERASEBKGND: the
+ * frame asks DefWindowProc to paint the minimised background before the icon
+ * goes on top of it.
+ */
+bool wxTopLevelWindowRuntime::HandlePaint()
+{
+  const HWND handle = GetWxWindowNativeHandle(this);
+
+  RECT updateRect{};
+  if (handle == nullptr || ::GetUpdateRect(handle, &updateRect, FALSE) == FALSE) {
+    return true;
+  }
+
+  if (!IsIconized()) {
+    return wxWindowMswRuntime::HandlePaint();
+  }
+
+  // The bundle is asked for any size at all; only a usable icon counts,
+  // otherwise the frame falls back to the stock one.
+  const wxIcon frameIcon = EnsureWxTopLevelWindowRuntimeState(this).icons.GetIcon(-1, -1);
+  HICON icon = frameIcon.Ok() ? reinterpret_cast<HICON>(frameIcon.GetNativeIcon()) : nullptr;
+  if (icon == nullptr) {
+    icon = reinterpret_cast<HICON>(GetDefaultIcon());
+  }
+
+  PAINTSTRUCT paint{};
+  const HDC deviceContext = ::BeginPaint(handle, &paint);
+  (void)MSWDefWindowProc(WM_ICONERASEBKGND, reinterpret_cast<unsigned int>(paint.hdc), 0);
+
+  if (icon != nullptr) {
+    RECT clientRect{};
+    ::GetClientRect(handle, &clientRect);
+    ::DrawIcon(
+      deviceContext,
+      (clientRect.right - kWxFrameIconExtent) / 2,
+      (clientRect.bottom - kWxFrameIconExtent) / 2,
+      icon
+    );
+  }
+
+  ::EndPaint(handle, &paint);
+  return true;
+}
+
+/**
  * Address: 0x0099F410 (FUN_0099F410)
  *
  * IDA signature:
@@ -60871,6 +60953,10 @@ long wxTopLevelWindowRuntime::MSWWindowProc(
   if (message == WM_ENTERMENULOOP) {
     return DoSendMenuOpenCloseEvent(EnsureWxEvtMenuOpenRuntimeType(), wParam != 0) ? 1 : 0;
   }
+  if (message == WM_PAINT) {
+    return HandlePaint() ? 1 : 0;
+  }
+
   if (message == WM_EXITMENULOOP) {
     return DoSendMenuOpenCloseEvent(EnsureWxEvtMenuCloseRuntimeType(), wParam != 0) ? 1 : 0;
   }

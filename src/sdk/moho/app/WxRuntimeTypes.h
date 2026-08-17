@@ -5415,6 +5415,26 @@ public:
   bool DoSendMenuOpenCloseEvent(std::int32_t eventType, bool isPopup);
 
   /**
+   * Address: 0x0099F0A0 (FUN_0099F0A0)
+   * Mangled: ?HandlePaint@wxFrame@@IAE_NXZ
+   *
+   * What it does:
+   * Answers WM_PAINT. A frame that is not minimised paints through
+   * wxWindow; a minimised one draws its icon centred in the client area.
+   */
+  bool HandlePaint();
+
+  /**
+   * Address: 0x0099F040 (FUN_0099F040)
+   * Mangled: ?GetDefaultIcon@wxFrame@@MBEKXZ
+   *
+   * What it does:
+   * The icon a frame falls back to when its own bundle has nothing
+   * usable: the standard frame icon, or the default one when unset.
+   */
+  [[nodiscard]] virtual unsigned long GetDefaultIcon() const;
+
+  /**
    * Address: 0x004A3780 (FUN_004A3780)
    *
    * What it does:
