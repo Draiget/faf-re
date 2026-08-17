@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -58,9 +58,25 @@ namespace moho
     Finish();
   }
 
+  /**
+   * Address: 0x00675510 (FUN_00675510, ?AddBase_Entity@CollisionBeamEntityTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CollisionBeamEntityTypeInfo::AddBase_Entity(gpg::RType* typeInfo);
+   *
+   * What it does:
+   * Registers `Entity` as a zero-offset base of the collision-beam entity type.
+   * The lookup populates `Entity::sType` on first use - that static is the
+   * cache the rest of the `Entity` reflection paths read, so the store is not
+   * incidental.
+   */
   void CollisionBeamEntityTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = gpg::LookupRType(typeid(Entity));
+    if (Entity::sType == nullptr) {
+      Entity::sType = gpg::LookupRType(typeid(Entity));
+    }
+
+    gpg::RType* const baseType = Entity::sType;
 
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
