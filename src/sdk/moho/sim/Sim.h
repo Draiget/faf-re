@@ -1360,7 +1360,11 @@ namespace moho
     msvc8::vector<gpg::Rect2i> mCachedMapRects; // 0x09F8
     msvc8::vector<gpg::Rect2i> mLoadedMapRects; // 0x0A08
     msvc8::vector<msvc8::string> mPrintField;
-    msvc8::vector<void*> mSyncSerializeGroup2;
+    /// Per-beat extra-unit-data records packed by `Sim::AdvanceBeat`'s
+    /// sync-filter pass. The element is `SExtraUnitData` (0x20), not a
+    /// pointer: the emission strides `add ebx, 20h` over this vector at
+    /// Sim+0x0A28 (0x00749F40, around 0x0074A363).
+    msvc8::vector<SExtraUnitData> mSyncSerializeGroup2; // 0x0A28
     SPhysConstants* mPhysConstants;
     msvc8::list<Shield*> mShields;
     msvc8::deque<void*> mDeletionQueue;
