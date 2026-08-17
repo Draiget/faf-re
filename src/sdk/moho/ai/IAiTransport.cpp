@@ -110,6 +110,14 @@ namespace moho
 
     [[nodiscard]] const char* GetName() const override;
 
+    /**
+     * Address: 0x005E8D60 (?Init@RListenerRType_EAiTransportEvent@Moho@@UAEXXZ)
+     *
+     * What it does:
+     * Sizes the reflected listener lane. Unlike the broadcaster side this
+     * type carries no serializers and no version stamp - the emission sets
+     * size only.
+     */
     void Init() override
     {
       size_ = sizeof(Listener<EAiTransportEvent>);

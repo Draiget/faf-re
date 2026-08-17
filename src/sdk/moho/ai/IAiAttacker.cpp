@@ -83,6 +83,14 @@ namespace moho
 
     [[nodiscard]] const char* GetName() const override;
 
+    /**
+     * Address: 0x005DB8F0 (?Init@RListenerRType_EAiAttackerEvent@Moho@@UAEXXZ)
+     *
+     * What it does:
+     * Sizes the reflected listener lane. Unlike the broadcaster side this
+     * type carries no serializers and no version stamp - the emission sets
+     * size only.
+     */
     void Init() override
     {
       size_ = sizeof(Listener<EAiAttackerEvent>);
