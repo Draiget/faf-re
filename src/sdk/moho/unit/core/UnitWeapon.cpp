@@ -3509,7 +3509,8 @@ namespace moho
     if (mapData == nullptr || mapData->mHeightField == nullptr) {
       return false;
     }
-    const float terrainElevation = mapData->mHeightField->GetElevation(targetPosition.x, targetPosition.z);
+    const float terrainElevation =
+      GetHeightFieldElevation(mapData->mHeightField, targetPosition.x, targetPosition.z);
     const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
 
     if (terrainElevation > waterElevation) {

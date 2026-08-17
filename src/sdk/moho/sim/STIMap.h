@@ -453,6 +453,20 @@ namespace moho
   static_assert(sizeof(CHeightField) == 0x1C, "CHeightField size must be 0x1C");
 
   /**
+   * Address: 0x0050ACC0 (FUN_0050ACC0, Moho::WeakPtr_CHeightField::GetElevation)
+   *
+   * IDA signature:
+   * void __userpurge Moho::WeakPtr_CHeightField::GetElevation(
+   *     boost::shared_ptr_CHeightField *heightField@<eax>, float x, float z);
+   *
+   * What it does:
+   * Samples terrain elevation through the shared-pointer wrapper - the
+   * out-of-line copy of `heightField->GetElevation(x, z)` that the binary emits
+   * once and calls from several places rather than inlining the dereference.
+   */
+  [[nodiscard]] float GetHeightFieldElevation(const boost::shared_ptr<CHeightField>& heightField, float x, float z);
+
+  /**
    * Address context:
    * - 0x005783E0 (FUN_005783E0)
    * - 0x00578460 (FUN_00578460, func_ConstructTerrainTypes)
