@@ -1596,7 +1596,7 @@ void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySet
     }
 
     const SFormationUnitWeakRef ref = SFormationUnitWeakRef::FromUnit(unit);
-    weakSet.push_back(ref);
+    weakSet.Append(ref);
   }
 
   SCoordsVec2 center{};

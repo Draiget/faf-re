@@ -1840,15 +1840,16 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
   SCoordsVec2 formationCenter{};
   formationCenter.x = targetPos.x;
   formationCenter.z = targetPos.z;
+  // Eight slots live inline; Append spills to the heap past that, so the set
+  // needs no up-front reserve.
   SFormationUnitWeakRefSet weakSet{};
-  weakSet.reserve(command->mUnitSet.mVec.size());
   for (CScriptObject* const entry : command->mUnitSet.mVec) {
     Unit* const queuedUnit = SCommandUnitSet::UnitFromEntry(entry);
     if (!queuedUnit) {
       continue;
     }
 
-    weakSet.push_back(SFormationUnitWeakRef::FromUnit(queuedUnit));
+    weakSet.Append(SFormationUnitWeakRef::FromUnit(queuedUnit));
   }
 
   CAiFormationInstance* const newFormation = formationDb->NewFormation(

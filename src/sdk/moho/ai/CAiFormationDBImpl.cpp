@@ -226,7 +226,7 @@ namespace
   class ScopedLinkedIUnitRefs final
   {
   public:
-    explicit ScopedLinkedIUnitRefs(const SFormationUnitWeakRefSet* const unitWeakSet)
+    explicit ScopedLinkedIUnitRefs(const SWeakUnitRefList* const unitWeakSet)
     {
       if (!unitWeakSet) {
         return;
@@ -615,7 +615,7 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const void*
  * Address: 0x0059C120 (FUN_0059C120)
  */
 CAiFormationInstance* CAiFormationDBImpl::NewFormation(
-  const SFormationUnitWeakRefSet* const unitWeakSet,
+  const SWeakUnitRefList* const unitWeakSet,
   const char* const scriptName,
   const SCoordsVec2* const formationCenter,
   const float orientX,

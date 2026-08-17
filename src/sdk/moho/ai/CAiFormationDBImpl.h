@@ -65,7 +65,7 @@ namespace moho
      * Address: 0x0059C120 (FUN_0059C120)
      */
     CAiFormationInstance* NewFormation(
-      const SFormationUnitWeakRefSet* unitWeakSet,
+      const SWeakUnitRefList* unitWeakSet,
       const char* scriptName,
       const SCoordsVec2* formationCenter,
       float orientX,
