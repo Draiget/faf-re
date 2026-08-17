@@ -34,12 +34,32 @@ namespace
     gCAiTransportImplTypeInfoConstructed = false;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAiTransportType()
+  /**
+   * Address: 0x005EC320 (FUN_005EC320,
+   *   ?AddBase_IAiTransport@CAiTransportImplTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CAiTransportImplTypeInfo::AddBase_IAiTransport(gpg::RType* typeInfo);
+   *
+   * What it does:
+   * Registers `IAiTransport` as the zero-offset base of the transport
+   * implementation type, caching the descriptor in `IAiTransport::sType` on
+   * first lookup.
+   */
+  void AddBaseIAiTransportToCAiTransportImplTypeInfo(gpg::RType* const typeInfo)
   {
-    if (!IAiTransport::sType) {
+    if (IAiTransport::sType == nullptr) {
       IAiTransport::sType = gpg::LookupRType(typeid(IAiTransport));
     }
-    return IAiTransport::sType;
+
+    gpg::RType* const baseType = IAiTransport::sType;
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
   }
 } // namespace
 
@@ -77,14 +97,7 @@ void CAiTransportImplTypeInfo::Init()
   size_ = sizeof(CAiTransportImpl);
   gpg::RType::Init();
 
-  gpg::RField baseField{};
-  gpg::RType* const baseType = CachedIAiTransportType();
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  AddBase(baseField);
+  AddBaseIAiTransportToCAiTransportImplTypeInfo(this);
 
   Finish();
 }

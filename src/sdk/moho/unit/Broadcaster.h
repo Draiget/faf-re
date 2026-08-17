@@ -59,7 +59,14 @@ namespace moho
 
   template <class TEvent>
   class BroadcasterEventTag : public Broadcaster
-  {};
+  {
+  public:
+    /// Cached reflection descriptor for this instantiation. The binary keeps
+    /// one static per `Broadcaster<TEvent>`, populated by the base-registration
+    /// helpers on first lookup, so later reflection paths find it resolved
+    /// rather than re-resolving or reading null.
+    inline static gpg::RType* sType = nullptr;
+  };
 
   static_assert(
     sizeof(BroadcasterEventTag<ECommandEvent>) == sizeof(Broadcaster),
