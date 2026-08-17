@@ -3573,6 +3573,19 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x004DBBC0 (FUN_004DBBC0)
+     *
+     * What it does:
+     * The null guard boost's pointer containers put in front of `push_back`.
+     * Throws `boost::bad_pointer` carrying "Null pointer in 'push_back()'"
+     * rather than letting a null element into the container.
+     *
+     * Declared here because callers live in other translation units - the sim
+     * driver's sync queue reaches it from `SSyncDataQueue::PushBack`.
+     */
+    void EnsurePtrContainerPushBackInputNotNull(const void* inputPointer);
+
+    /**
      * Address: 0x00491350 (FUN_00491350)
      *
      * What it does:

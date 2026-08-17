@@ -1251,27 +1251,19 @@ bool SSyncDataQueue::Empty() const
  * Appends one sync-data payload. `CSimDriver::Sync` reaches this at
  * 0x0073DAD0's tail, immediately before it signals the availability event.
  *
- * DIVERGES from the binary on the null case. 0x0073F940 throws
- * `boost::bad_pointer` carrying "Null pointer in 'push_back()'" - it is the
- * guard boost's ptr_vector puts in front of the real insert at 0x007408F0.
- * This returns quietly instead, so a null payload is dropped and the waiter is
- * still woken with nothing queued.
+ * A null payload throws rather than being dropped. 0x0073F940 is boost's
+ * ptr_vector guard in front of the real insert at 0x007408F0, and it raises
+ * `boost::bad_pointer` carrying "Null pointer in 'push_back()'". Returning
+ * quietly would drop the payload and still wake the waiter with nothing
+ * queued.
  *
- * Not fixed here because `boost::bad_pointer` is only forward-declared in
- * `gpg/core/utils/BoostWrappers.h`. Its helpers are recovered
- * (`ConstructBadPointerFromCopy` 0x0049C140, `DestructBadPointer` 0x004913B0,
- * `GetBadPtrContainerMessage`), but the class itself has no definition to
- * throw. Define it there first, then make this throw.
- *
- * Note also that this queue is a hand-rolled ring buffer while the binary uses
- * a boost ptr_vector - the two are not the same container, so do not annotate
- * the insert half of this body with 0x007408F0.
+ * Note the container mismatch: this queue is a hand-rolled ring buffer while
+ * the binary uses a ptr_vector, so do not annotate the insert half of this
+ * body with 0x007408F0.
  */
 void SSyncDataQueue::PushBack(SSyncData* data)
 {
-  if (!data) {
-    return;
-  }
+  boost::EnsurePtrContainerPushBackInputNotNull(data);
 
   if (size >= mapSize) {
     const uint32_t newCap = (mapSize == 0) ? 8u : mapSize * 2u;
