@@ -75,11 +75,18 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x00582EB0 (FUN_00582EB0, func_GetUnitIdPosInVec_BinarySearch)
+   * Address: 0x00582EB0 (FUN_00582EB0 / FUN_005EDCE0,
+   *          func_GetUnitIdPosInVec_BinarySearch)
    *
    * What it does:
    * Returns the lower-bound insertion cursor for one unit pointer in a sorted
    * `Entity*` span keyed by `Entity::id_`.
+   *
+   * The binary carries this body twice, byte for byte (same 35 instructions,
+   * same SHA-256), once at each address above. `ContainsUnit` calls the copy at
+   * 0x005EDCE0 while `AddUnit` and `RemoveUnit` reach 0x00582EB0; both are this
+   * one source function, so the second address is recorded here rather than
+   * recovered again.
    */
   Entity** LowerBoundUnitEntityById(Unit* const unit, Entity** vecStart, Entity** vecEnd) noexcept
   {
