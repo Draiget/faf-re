@@ -329,10 +329,52 @@ namespace moho
   static_assert(sizeof(SFormationOccupiedSlotVec) == 0x110, "SFormationOccupiedSlotVec size must be 0x110");
 
   /**
+   * The formation-instance state the binary keeps on `CFormationInstance`,
+   * which `CAiFormationInstance` derives from and
+   * `CAiFormationInstanceTypeInfo::Init` registers as its base.
+   *
+   * Sizes pin the split exactly: `CFormationInstanceTypeInfo::Init`
+   * (0x0056A780) sets 808 = 0x328, and `CAiFormationInstanceTypeInfo::Init`
+   * (0x0059BDE0) sets 816 = 0x330 - the 8-byte delta is `mSim` plus the
+   * trailing word, which stay on the derived class.
+   *
+   * `CFormationInstance::MemberSerialize` (0x005744E0) and
+   * `MemberDeserialize` (0x005741D0) are methods on this class and touch
+   * only the fields below.
+   */
+  class CFormationInstance : public IFormationInstance
+  {
+  public:
+    std::int32_t mUnitCount;                      // +0x04
+    TDatListItem<void, void> mUnitLinkListHead;   // +0x08
+    LuaPlus::LuaState* mLuaState;                 // +0x10
+    RRuleGameRules* mGameRules;                   // +0x14
+    EUnitCommandType mCommandType;                // +0x18
+    std::uint32_t mUnknown_0x01C;                 // +0x1C
+    SFormationLinkedUnitRefVec mUnits;            // +0x20
+    SFormationLaneVec mLanes[2];                  // +0x50
+    SFormationOccupiedSlotVec mOccupiedSlots;     // +0x1A0
+    SFormationCoordCacheMap mCoordCachePrimary;   // +0x2B0
+    SFormationCoordCacheMap mCoordCacheSecondary; // +0x2BC
+    Wm3::Vec3f mForwardVector;                    // +0x2C8
+    Wm3::Quatf mOrientation;                      // +0x2D4
+    Wm3::Quatf mOrientationBaseline;              // +0x2E4
+    msvc8::string mScriptName;                    // +0x2F4
+    SCoordsVec2 mFormationCenter;                 // +0x310
+    float mFormationUpdateScale;                  // +0x318
+    std::uint8_t mPlanUpdateRequested;            // +0x31C
+    std::uint8_t mPad_0x31D[3];                   // +0x31D
+    std::int32_t mMaxUnitSlotCount;               // +0x320
+    float mFormationUnitSpacingMultiplier;        // +0x324
+  };
+
+  static_assert(sizeof(CFormationInstance) == 0x328, "CFormationInstance size must be 0x328");
+
+  /**
    * VFTABLE: 0x00E1B47C
    * COL:  0x00E70B80
    */
-  class CAiFormationInstance : public IFormationInstance
+  class CAiFormationInstance : public CFormationInstance
   {
   public:
     /**
@@ -610,27 +652,6 @@ namespace moho
     SCoordsVec2* ComputeRunScriptOffset(const SCoordsVec2* sourceOffset, SCoordsVec2* dest) const;
 
   public:
-    std::int32_t mUnitCount;                      // +0x04
-    TDatListItem<void, void> mUnitLinkListHead;   // +0x08
-    LuaPlus::LuaState* mLuaState;                 // +0x10
-    RRuleGameRules* mGameRules;                   // +0x14
-    EUnitCommandType mCommandType;                // +0x18
-    std::uint32_t mUnknown_0x01C;                 // +0x1C
-    SFormationLinkedUnitRefVec mUnits;            // +0x20
-    SFormationLaneVec mLanes[2];                  // +0x50
-    SFormationOccupiedSlotVec mOccupiedSlots;     // +0x1A0
-    SFormationCoordCacheMap mCoordCachePrimary;   // +0x2B0
-    SFormationCoordCacheMap mCoordCacheSecondary; // +0x2BC
-    Wm3::Vec3f mForwardVector;                    // +0x2C8
-    Wm3::Quatf mOrientation;                      // +0x2D4
-    Wm3::Quatf mOrientationBaseline;              // +0x2E4
-    msvc8::string mScriptName;                    // +0x2F4
-    SCoordsVec2 mFormationCenter;                 // +0x310
-    float mFormationUpdateScale;                  // +0x318
-    std::uint8_t mPlanUpdateRequested;            // +0x31C
-    std::uint8_t mPad_0x31D[3];                   // +0x31D
-    std::int32_t mMaxUnitSlotCount;               // +0x320
-    float mFormationUnitSpacingMultiplier;        // +0x324
     Sim* mSim;                                    // +0x328
     std::uint32_t mUnknown_0x32C;                 // +0x32C
   };
