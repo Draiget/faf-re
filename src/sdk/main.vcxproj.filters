@@ -927,6 +927,9 @@
     <ClCompile Include="moho\ai\CAiBrainSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\CFormationInstanceSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\CAiBrainTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4009,6 +4012,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiBrainSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\CFormationInstanceSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiBrainTypeInfo.h">

@@ -609,13 +609,16 @@ namespace
     return nullptr;
   }
 
+  /// Caches into `CFormationInstance::sType`, which is where the binary keeps
+  /// it - a function-local cache leaves the class static null for every other
+  /// reader.
   [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
   {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = ResolveTypeByAnyName({"CFormationInstance", "Moho::CFormationInstance"});
+    if (!moho::CFormationInstance::sType) {
+      moho::CFormationInstance::sType =
+        ResolveTypeByAnyName({"CFormationInstance", "Moho::CFormationInstance"});
     }
-    return type;
+    return moho::CFormationInstance::sType;
   }
 
   [[nodiscard]] gpg::RType* CachedSimType()
