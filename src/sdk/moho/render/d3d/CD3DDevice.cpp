@@ -783,17 +783,24 @@ namespace moho
       context->mHWBasedInstancing = false;
     }
 
+    // Every head must carry both formats. The first gates the high shadow
+    // fidelity step, the second gates the advanced path outright.
+    constexpr std::int32_t kShadowFidelityFormat = 7;
+    constexpr std::int32_t kAdvancedFidelityFormat = 17;
     const int headCount = context->GetHeadCount();
     bool supportsAdvancedShadowFidelity = true;
+    bool supportsAdvancedFidelity = true;
     if (headCount > 0) {
       for (int headIndex = 0; headIndex < headCount; ++headIndex) {
         const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
-        const bool headSupportsShadow = context->mSupportsFloat16 || head.antialiasingHigh != 0u || head.antialiasingLow != 0u;
-        supportsAdvancedShadowFidelity = supportsAdvancedShadowFidelity && headSupportsShadow;
+        supportsAdvancedShadowFidelity =
+          supportsAdvancedShadowFidelity && head.HasCapability1(kShadowFidelityFormat);
+        supportsAdvancedFidelity = supportsAdvancedFidelity && head.HasCapability2(kAdvancedFidelityFormat);
       }
     }
 
-    if (context->mPixelShaderProfile > 5) {
+    // A head missing the advanced format drops straight to the low branch.
+    if (supportsAdvancedFidelity && context->mPixelShaderProfile > 5) {
       moho::graphics_FidelitySupported = 2;
       moho::shadow_FidelitySupported = supportsAdvancedShadowFidelity ? 3 : 1;
     } else {

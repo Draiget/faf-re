@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "Class.hpp"
 #include "CursorContext.hpp"
 #include "DrawIndexedContext.hpp"
@@ -5792,6 +5793,34 @@ namespace gpg::gal
    * `0x00436990` is the scalar-deleting thunk that dispatches here and
    * conditionally frees `this`.
    */
+  /**
+   * Address: 0x008E68E0 (FUN_008E68E0, gpg::gal::Head::HasCapability1)
+   *
+   * IDA signature:
+   * bool __thiscall gpg::gal::Head::HasCapability1(gpg::gal::Head *this, int a2);
+   *
+   * What it does:
+   * Linear scan of the first valid-format list for `format`.
+   */
+  bool Head::HasCapability1(const std::int32_t format) const
+  {
+    return std::ranges::find(validFormats1, format) != validFormats1.end();
+  }
+
+  /**
+   * Address: 0x008E6910 (FUN_008E6910, gpg::gal::Head::HasCapability2)
+   *
+   * IDA signature:
+   * bool __thiscall gpg::gal::Head::HasCapability2(gpg::gal::Head *this, int a2);
+   *
+   * What it does:
+   * Linear scan of the second valid-format list for `format`.
+   */
+  bool Head::HasCapability2(const std::int32_t format) const
+  {
+    return std::ranges::find(validFormats2, format) != validFormats2.end();
+  }
+
   Head::~Head()
   {
     ReleaseVectorStorage(validFormats1);
