@@ -812,9 +812,25 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x0063CD60 (FUN_0063CD60, ?AddBase_CScriptEvent@IAniManipulatorTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::IAniManipulatorTypeInfo::AddBase_CScriptEvent(gpg::RType* typeInfo);
+   *
+   * What it does:
+   * Registers `CScriptEvent` as a zero-offset base of the manipulator type.
+   * The descriptor lookup populates `CScriptEvent::sType` on first use - that
+   * static is the cache every other `CScriptEvent` reflection path reads, so
+   * skipping the store leaves them resolving null.
+   */
   void AddCScriptEventBase(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = gpg::LookupRType(typeid(moho::CScriptEvent));
+    if (moho::CScriptEvent::sType == nullptr) {
+      moho::CScriptEvent::sType = gpg::LookupRType(typeid(moho::CScriptEvent));
+    }
+
+    gpg::RType* const baseType = moho::CScriptEvent::sType;
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;

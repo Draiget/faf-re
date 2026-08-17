@@ -824,7 +824,18 @@ namespace moho
     return out;
   }
 
-  [[maybe_unused]] void AddBaseIAniManipulatorToCThrustManipulatorTypeInfo(gpg::RType* const typeInfo)
+  /**
+   * Address: 0x0064B300 (FUN_0064B300, ?AddBase_IAniManipulator@CThrustManipulatorTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CThrustManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* typeInfo);
+   *
+   * What it does:
+   * Registers `IAniManipulator` as a zero-offset base of the thrust-manipulator
+   * type, resolving the base descriptor through the cached RTTI lookup on first
+   * use. Called from `CThrustManipulatorTypeInfo::Init` (0x0064A230).
+   */
+  void AddBaseIAniManipulatorToCThrustManipulatorTypeInfo(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedIAniManipulatorTypeForThrustManipulatorTypeInfo();
     if (baseType == nullptr) {
