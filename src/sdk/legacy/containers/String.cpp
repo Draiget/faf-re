@@ -88,6 +88,22 @@ msvc8::string& msvc8::string::operator=(string&& other) noexcept {
     return *this;
 }
 
+/**
+ * Address: 0x00405550 (FUN_00405550, ??0string@std@@QAE@PBD@Z)
+ * Mangled: ??0string@std@@QAE@PBD@Z
+ *
+ * IDA signature:
+ * std::string *__thiscall std::string::string(std::string *this, const char *str);
+ *
+ * What it does:
+ * Puts the string in the empty small-buffer state, then assigns the source
+ * measured with strlen. The binary delegates to the (pointer, length) ctor
+ * for that second step; assign_owned takes the same path here.
+ *
+ * The binary does not null-check the source - strlen would fault. This
+ * reconstruction keeps the guard, which only turns a crash into an empty
+ * string and cannot change behaviour on any input the original survived.
+ */
 msvc8::string::string(const char* s) noexcept {
     alVal = nullptr;
     bx.buf[0] = '\0';
