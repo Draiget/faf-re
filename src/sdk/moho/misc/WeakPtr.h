@@ -254,6 +254,12 @@ namespace moho
      * Address: 0x005419A0 (FUN_005419A0)
      * Address: 0x005DB430 (FUN_005DB430)
      * Address: 0x0057D4B0 (FUN_0057D4B0)
+     * Address: 0x005A6E00 (FUN_005A6E00, Moho::WeakPtr_Entity::Set)
+     *
+     * The compiler emits this body once per instantiation and the linker
+     * leaves the copies distinct; all of the addresses above are byte-identical
+     * emissions of this one function, so they resolve here rather than to
+     * separate recoveries.
      *
      * What it does:
      * Rebinds this weak-pointer node to a new owner-link slot, detaches the
