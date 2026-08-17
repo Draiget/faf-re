@@ -65167,7 +65167,14 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
   device->SetColorWriteState(true, false);
   SetViewportToLocalScreen();
 
-  (void)terrain;
+  // The binary finishes with two virtual dispatches on the terrain:
+  //   0x007F8277  mov edx, [edx+20h] / call edx   -> slot  8 DrawNormals
+  //   0x007F8285  mov edx, [eax+30h] / jmp edx    -> slot 12 DrawTerrainSkirt
+  // Slot 8 takes (sCurGameTick, sDeltaFrame, mPrimaryTargetLocks[mHead],
+  // mShadowRenderer-when-enabled); it stays unwired until
+  // HighFidelityTerrain::DrawNormals (0x00801BE0) and its decal chain are
+  // recovered, because a base declaration would force a stub in that class.
+  terrain->DrawTerrainSkirt();
 }
 
 namespace

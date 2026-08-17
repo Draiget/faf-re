@@ -115,7 +115,7 @@ namespace moho
      * path when terrain/skirt flags are enabled and skirt index lanes are
      * valid for triangle-list submission.
      */
-    void DrawTerrainSkirt();
+    void DrawTerrainSkirt() override;
 
     /**
      * Address: 0x00801460 (FUN_00801460, Moho::HighFidelityTerrain::DrawTriangles)
