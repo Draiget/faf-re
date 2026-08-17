@@ -182,7 +182,27 @@ namespace moho
     void EndBatch() override;
     /** Address: 0x007E89E0 (FUN_007E89E0, slot 8). */
     void DrawBatch(std::int32_t packedCount) override;
-    /** Address: 0x007E7EA0 (FUN_007E7EA0, slot 9). */
+    /**
+     * Address: 0x007E7EA0 (FUN_007E7EA0, slot 9).
+     *
+     * UNRESOLVED EXTERNAL - the only slot of this vtable with no body. The
+     * other four above are defined in HardwareMeshBatch.cpp; this one is not,
+     * so the link leaves slot 9 pointing at whatever /FORCE put there and any
+     * dispatch through it jumps into garbage. MeshBatch::Render calls it
+     * (MeshBatch.cpp:147), so it is on the live path, not dead weight.
+     *
+     * Everything it needs already exists: the bone palettes it clears are the
+     * registered `GetMeshShaderVarTransPalette()` / `GetMeshShaderVarRotPalette()`
+     * accessors (IDA prints them as bare globals), and its unrecovered closure
+     * is four trivial leaves - _fmod, WeakPtr<CAniSkel>::release,
+     * shared_ptr::lock and a 33-instruction helper.
+     *
+     * What is left is the body itself: 634 instructions, 443 decompiled lines
+     * of per-instance skinning and vertex packing, with ~118 locals and heavy
+     * stack-slot reuse in the decompile (it stores an int count into
+     * `VTransform::orient.y`, for one). That needs disentangling carefully
+     * rather than transcribing.
+     */
     std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool includeHidden) override;
 
     /**
