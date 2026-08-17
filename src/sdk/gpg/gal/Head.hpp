@@ -99,6 +99,24 @@ namespace gpg::gal
          */
         virtual ~Head();
 
+        /**
+         * Address: 0x008E68E0 (FUN_008E68E0, gpg::gal::Head::HasCapability1)
+         *
+         * What it does:
+         * Reports whether `format` appears in this head's first valid-format
+         * list.
+         */
+        [[nodiscard]] bool HasCapability1(std::int32_t format) const;
+
+        /**
+         * Address: 0x008E6910 (FUN_008E6910, gpg::gal::Head::HasCapability2)
+         *
+         * What it does:
+         * Reports whether `format` appears in this head's second valid-format
+         * list.
+         */
+        [[nodiscard]] bool HasCapability2(std::int32_t format) const;
+
     public:
         void* mHandle = nullptr;                             // +0x04
         void* mWindow = nullptr;                             // +0x08
