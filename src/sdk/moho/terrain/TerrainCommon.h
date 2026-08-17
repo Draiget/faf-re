@@ -9,6 +9,7 @@ namespace moho
 {
   class RD3DTextureResource;
   struct TerrainWaterResourceView;
+  struct GeomCamera3;
   class ID3DRenderTarget;
   struct TerrainShadowContext;
 
@@ -79,6 +80,18 @@ namespace moho
      * terrain runtime state.
      */
     [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
+
+    /**
+     * Primary vtable slot 6.
+     *
+     * What it does:
+     * Depth-only terrain pass, drawn into the shadow map's depth target.
+     *
+     * Dispatched from `Shadow::RenderShadowMap` (0x007FEEA0), which calls
+     * it through this slot with the light camera before the mesh depth
+     * pass - the terrain has to be in the shadow map too.
+     */
+    virtual void DrawTerrainDepth(const GeomCamera3& camera) = 0;
 
     /**
      * Primary vtable slot 8.

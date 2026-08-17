@@ -65132,12 +65132,11 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       RenderTerrainNormals(terrain);
       TransformTerrainNormals();
 
-      // Between the normal transform and the composite the binary also runs
-      // the shadow pass:
-      //   0x007F93DF  mov edx, [eax+18h]  ; slot 6 CameraGetTargetZoom
-      //   0x007F93F1  call RenderShadows(IRenTerrain *, float)
-      // RenderShadows (0x007F7D10) has no body yet and its own chain runs to
-      // ~3100 instructions, so that call is still absent.
+      // The shadow pass, between the normal transform and the composite
+      // (0x007F93DF slot 6 CameraGetTargetZoom, then 0x007F93F1).
+      reinterpret_cast<moho::Shadow*>(&runtime->mShadowRenderer)->RenderFrameShadows(
+        terrain, *runtime->mCam, worldView->view->CameraGetTargetZoom());
+
       FogOn(worldView->view->CameraGetZoom());
       RenderCompositeTerrain(terrain);
     }

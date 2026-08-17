@@ -9,6 +9,8 @@
 
 namespace moho
 {
+  class TerrainCommon;
+
   class CD3DDepthStencil;
   class CD3DRenderTarget;
   class ID3DVertexSheet;
@@ -63,6 +65,44 @@ namespace moho
      * be created (after warning), 1 otherwise.
      */
     int Init(int fidelity);
+
+    /**
+     * Address: 0x007FE940 (FUN_007FE940, sub_7FE940)
+     *
+     * IDA signature:
+     * int __usercall sub_7FE940(float *this, Shadow *a2,
+     *     Wm3::Vector3f *a3, float arg8);
+     *
+     * What it does:
+     * Builds the light-space camera the shadow map is rendered with, and
+     * reports whether there is anything to render.
+     *
+     * Clips the view frustum against the terrain, fits an orthographic
+     * light volume to whatever survives, and leaves mShadowCameraValid set
+     * when that volume is non-empty. Answers false without touching the
+     * camera when shadows are off for this fidelity or the view is zoomed
+     * out past ren_ShadowLOD.
+     */
+    bool PrepareLightCamera(const GeomCamera3& viewCamera, const Wm3::Vector3f& sunDirection, float zoom);
+
+    /**
+     * Address: 0x007FEEA0 (FUN_007FEEA0, sub_7FEEA0)
+     *
+     * What it does:
+     * Draws the shadow map: terrain depth then meshes, from the light
+     * camera, followed by the separable variance blur when it is enabled.
+     */
+    void RenderShadowMap(TerrainCommon* terrain, const GeomCamera3& viewCamera);
+
+    /**
+     * Address: 0x007F7D10 (FUN_007F7D10,
+     *          ?RenderShadows@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@M@Z)
+     *
+     * What it does:
+     * The frame's shadow pass: rebuild on a tuning change, derive the light
+     * camera, draw the map.
+     */
+    void RenderFrameShadows(TerrainCommon* terrain, const GeomCamera3& viewCamera, float zoom);
 
     /**
      * Address: 0x007FE760 (FUN_007FE760)

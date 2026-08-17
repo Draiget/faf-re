@@ -1051,6 +1051,42 @@ namespace moho
   }
 
   /**
+   * Address: 0x00801A50 (FUN_00801A50, Moho::HighFidelityTerrain::DrawTerrainDepth)
+   * Primary vtable slot 6.
+   *
+   * What it does:
+   * Depth-only terrain pass. Selects the `terrain` effect's `TTerrainDepth`
+   * technique, binds the camera view/projection and the tesselator height
+   * scale, then issues the one prebuilt terrain batch.
+   *
+   * Each shader-var write is guarded by Exists() as in the binary - the
+   * technique does not necessarily declare all three.
+   */
+  void HighFidelityTerrain::DrawTerrainDepth(const GeomCamera3& camera)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique("TTerrainDepth");
+
+    auto& shaderVars = GetTerrainShaderVars();
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&camera.view);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
+    }
+    if (shaderVars.heightScale.Exists()) {
+      shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
+    }
+
+    DrawTriangles();
+  }
+
+  /**
    * Address: 0x008014F0 (FUN_008014F0, Moho::HighFidelityTerrain::DrawTerrainSkirt)
    *
    * What it does:
