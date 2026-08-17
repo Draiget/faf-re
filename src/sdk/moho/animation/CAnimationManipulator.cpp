@@ -1521,12 +1521,18 @@ namespace moho
     mGoal.BindObjectUnlinked(goalMotionScaleUnit);
     (void)mGoal.LinkIntoOwnerChainHeadUnlinked();
 
-    // Pre-size the bone mask backing storage based on the owner actor skeleton
-    // bone count, matching the binary's `sub_641B70(&mBoneMask, boneCount)` lane.
-    // The current `SBitStorage32::Reset()` produces the same zero-state the
-    // binary helper leaves the mask in for an uninitialized manipulator.
+    // Size the bone mask to the owner skeleton and set every bit, so a fresh
+    // manipulator starts out affecting all bones. sub_641B70 computes the
+    // word count as (boneCount + 31) >> 5 and fills with -1; Resize is that
+    // same operation.
+    //
+    // The previous stand-in only fetched the skeleton and dropped it, so the
+    // mask was left at its default size regardless of the skeleton.
     if (CAniActor* const actor = ownerActor) {
-      (void)actor->GetSkeleton(); // matches binary skeleton release semantics
+      const boost::shared_ptr<const CAniSkel> skeleton = actor->GetSkeleton();
+      if (skeleton) {
+        mBoneMask.Resize(static_cast<std::uint32_t>(skeleton->mBones.size()), true);
+      }
     }
 
     // Materialize the Lua userdata + script binding for this manipulator. The
