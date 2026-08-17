@@ -24,7 +24,7 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/IdPool.h"
 #include "moho/sim/Sim.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -1438,6 +1438,21 @@ namespace
     queue.handleToHeapIndex[handle] = static_cast<std::int32_t>(heapIndex);
   }
 
+  /**
+   * The semantic counterpart of the queue swap at 0x00687530, which is
+   * recovered as `SwapPriorityQueueEntries` in `moho/sim/SimRecoveryRuntime.cpp`
+   * against the binary's own layout.
+   *
+   * Deliberately NOT annotated with that address: this is not a 1:1 recovery of
+   * it. The binary stores entries by value in a 20-byte array and physically
+   * moves them, which is why it has to carry each entry's weak node across the
+   * exchange. This model stores owning pointers and swaps those, so nothing
+   * moves and no relink is needed. Same observable behaviour, different layout.
+   *
+   * Two models of one queue is debt. If they are ever unified, the sim-side one
+   * is the binary's layout and this one is the safer abstraction - pick
+   * deliberately, and do not add a third.
+   */
   void SwapBoundedPropHeapEntries(BoundedPropQueueRuntime& queue, const std::size_t lhs, const std::size_t rhs)
   {
     if (lhs == rhs) {
