@@ -333,6 +333,13 @@ namespace moho
 
   /**
    * Address: 0x00621060 (FUN_00621060, ??1CUnitRefuel@Moho@@QAE@@Z)
+   * Address: 0x00621250 (FUN_00621250, Moho::CUnitRefuel::dtr)
+   *
+   * The second address is the deleting-destructor thunk MSVC emits for the
+   * vtable slot of any class with a virtual destructor: it runs the body
+   * above, then calls operator delete when bit 0 of its flag argument is
+   * set. Declaring this destructor is what produces it, so there is nothing
+   * separate to write - only the address to record.
    */
   CUnitRefuel::~CUnitRefuel()
   {
