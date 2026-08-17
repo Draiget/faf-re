@@ -1340,8 +1340,8 @@ namespace moho
     boost::shared_ptr<CDebugCanvas> mDebugCanvas2;
     PathTables* mPathTables;
     CAiFormationDBImpl* mFormationDB; // 0x0980
-    CCommandDb* mCommandDB;           // 0x0984
-    CEntityDb* mEntityDB;             // 0x0988
+    CEntityDb* mEntityDB;             // 0x0984
+    CCommandDb* mCommandDB;           // 0x0988
     uint32_t mReserved98C;
     uint32_t mReserved990;
     boost::shared_ptr<SParticleBuffer> mParticleBuffer;
@@ -7023,6 +7023,9 @@ namespace moho
   static_assert(offsetof(Sim, mSyncReserveCounts) == 0x0A70, "Sim::mSyncReserveCounts offset must be 0x0A70");
   static_assert(offsetof(Sim, mSyncReserveUnused) == 0x0A84, "Sim::mSyncReserveUnused offset must be 0x0A84");
   static_assert(offsetof(Sim, mSyncFilter) == 0x0A88, "Sim::mSyncFilter offset must be 0x0A88");
+  static_assert(offsetof(Sim, mFormationDB) == 0x0980, "Sim::mFormationDB offset must be 0x0980");
+  static_assert(offsetof(Sim, mEntityDB) == 0x0984, "Sim::mEntityDB offset must be 0x0984");
+  static_assert(offsetof(Sim, mCommandDB) == 0x0988, "Sim::mCommandDB offset must be 0x0988");
   static_assert(sizeof(Sim) == 0xAF8, "Sim size must be 0xAF8");
 #endif
 } // namespace moho

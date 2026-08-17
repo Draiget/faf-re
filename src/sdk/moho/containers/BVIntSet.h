@@ -1,6 +1,8 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <utility>
 
 #include "gpg/core/containers/FastVector.h"
 #include "platform/Platform.h"
@@ -161,6 +163,24 @@ namespace moho
      * Find the next present value strictly greater than 'val', or Max() if none.
      */
     [[nodiscard]] unsigned int GetNext(unsigned int val) const;
+
+    /**
+     * Invokes `fn(value)` for every value present in the set, in ascending
+     * order.
+     *
+     * This is the canonical walk the binary open-codes at each iteration site
+     * as `GetNext(0xFFFFFFFF)` followed by `GetNext(value)` until `Max()` is
+     * reached (e.g. `Sim::AdvanceBeat` at 0x0074A261).
+     */
+    template <class F>
+    void ForEachValue(F&& fn) const
+    {
+      const unsigned int sentinel = Max();
+      for (unsigned int value = GetNext(std::numeric_limits<unsigned int>::max()); value != sentinel;
+           value = GetNext(value)) {
+        fn(value);
+      }
+    }
 
     /**
      * Address: 0x00401830 (FUN_00401830)

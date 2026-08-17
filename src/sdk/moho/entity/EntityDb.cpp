@@ -3752,6 +3752,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x006856C0 (FUN_006856C0)
+   *
+   * What it does:
+   * Resolves one entity id against the all-units tree. The binary is the
+   * `std::map<EntId, Entity*>::find` emission: it lower-bounds the tree and
+   * collapses "no such key" onto the head node (`end()`), which this returns
+   * as `nullptr`.
+   */
+  Entity* CEntityDb::FindEntityById(const std::uint32_t entityId) const noexcept
+  {
+    CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(mAllUnits, entityId);
+    if (node == nullptr || node == mAllUnits) {
+      return nullptr;
+    }
+    return static_cast<Entity*>(node->unitListNode);
+  }
+
+  /**
    * Address: 0x00684480 (FUN_00684480, ?DoReserveId@EntityDB@Moho@@AAE?AVEntId@2@I@Z)
    *
    * What it does:

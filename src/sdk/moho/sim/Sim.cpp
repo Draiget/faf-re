@@ -937,6 +937,9 @@ void moho::REF_UpdateMD5(
 namespace
 {
   constexpr CommandSourceId kInvalidCommandSource = 0xFF;
+  // Placeholder owner id stamped into a freshly appended extra-data record
+  // before the unit fills it in; the engine-wide "no entity" EntId marker.
+  constexpr EntId kUnsetExtraUnitDataOwnerId = static_cast<EntId>(0xF0000000u);
   constexpr const char* kEndGameHelpText = "Signal the end of the game.  Acts like a permanent pause.";
   constexpr const char* kIsGameOverHelpText = "Return true if the game is over (i.e. EndGame() has been called).";
   constexpr const char* kEntityAttachToHelpText = "Entity:AttachTo(entity, bone)";
@@ -2842,8 +2845,8 @@ namespace
   void CopyDebugSelectionMaskB(const Sim& sim, BVIntSet& outSelectionIds)
   {
     outSelectionIds.mReservedMetaWord = 0u;
-    outSelectionIds.mFirstWordIndex = sim.mSyncFilter.maskB.rawWord;
-    outSelectionIds.mWords.ResetFrom(sim.mSyncFilter.maskB.masks);
+    outSelectionIds.mFirstWordIndex = sim.mSyncFilter.maskB.mFirstWordIndex;
+    outSelectionIds.mWords.ResetFrom(sim.mSyncFilter.maskB.mWords);
   }
 
   [[nodiscard]] Entity* ResolveRequiredEntityLuaArg(
@@ -13391,11 +13394,29 @@ void Sim::AdvanceBeat(const int amt)
       }
     });
 
-    // Binary 0x00749F40 still has an additional sync-filter packing pass here
-    // (EntityDB lookup + serialization vector push helpers).
     for (auto* entity : mCoordEntities.owners_member<Entity, &Entity::mCoordNode>()) {
       AdvanceCoords(entity);
     }
+
+    // Sync-filter extra-data packing pass. Every id in the outgoing sync
+    // filter that still resolves to a live unit contributes one record; the
+    // record is appended first and then filled in place, so its inline pair
+    // storage is anchored inside the vector element rather than a temporary.
+    mSyncFilter.maskA.ForEachValue([this](const unsigned int entityId) {
+      Entity* const entity = mEntityDB->FindEntityById(entityId);
+      if (entity == nullptr) {
+        return;
+      }
+
+      Unit* const unit = entity->IsUnit();
+      if (unit == nullptr) {
+        return;
+      }
+
+      SExtraUnitData& record = mSyncSerializeGroup2.emplace_back();
+      record.unitEntityId = kUnsetExtraUnitDataOwnerId;
+      unit->GetExtraData(&record);
+    });
 
     mDebugCanvas2 = mDebugCanvas1;
     mDebugCanvas1.reset();
