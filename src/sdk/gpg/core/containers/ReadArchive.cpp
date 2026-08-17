@@ -1170,6 +1170,156 @@ namespace
     return type;
   }
 
+  // Per-type reflected upcasts. Each of these is a distinct function in the
+  // binary that the ReadPointerOwned_* readers call rather than open-coding
+  // the REF_UpcastPtr sequence; they lazily resolve the target RType, upcast
+  // the reference, and hand back the pointee (null when the runtime type does
+  // not derive from the requested one, which the caller turns into an error).
+
+  /**
+   * Address: 0x006B5990 (FUN_006B5990, gpg::RRef::Upcast_IAiSteering)
+   *
+   * IDA signature:
+   * Moho::IAiSteering *__usercall gpg::RRef::Upcast_IAiSteering@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiSteering`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiSteering* UpcastToIAiSteering(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiSteeringType());
+    return static_cast<moho::IAiSteering*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B5D60 (FUN_006B5D60, gpg::RRef::Upcast_IAiAttacker)
+   *
+   * IDA signature:
+   * Moho::IAiAttacker *__usercall gpg::RRef::Upcast_IAiAttacker@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiAttacker`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiAttacker* UpcastToIAiAttacker(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiAttackerType());
+    return static_cast<moho::IAiAttacker*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B6140 (FUN_006B6140, gpg::RRef::Upcast_IAiNavigator)
+   *
+   * IDA signature:
+   * Moho::IAiNavigator *__usercall gpg::RRef::Upcast_IAiNavigator@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiNavigator`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiNavigator* UpcastToIAiNavigator(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiNavigatorType());
+    return static_cast<moho::IAiNavigator*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B6330 (FUN_006B6330, gpg::RRef::Upcast_IAiBuilder)
+   *
+   * IDA signature:
+   * Moho::IAiBuilder *__usercall gpg::RRef::Upcast_IAiBuilder@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiBuilder`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiBuilder* UpcastToIAiBuilder(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiBuilderType());
+    return static_cast<moho::IAiBuilder*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B6520 (FUN_006B6520, gpg::RRef::Upcast_IAiSiloBuild)
+   *
+   * IDA signature:
+   * Moho::IAiSiloBuild *__usercall gpg::RRef::Upcast_IAiSiloBuild@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiSiloBuild`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiSiloBuild* UpcastToIAiSiloBuild(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiSiloBuildType());
+    return static_cast<moho::IAiSiloBuild*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B6710 (FUN_006B6710, gpg::RRef::Upcast_IAiTransport)
+   *
+   * IDA signature:
+   * Moho::IAiTransport *__usercall gpg::RRef::Upcast_IAiTransport@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiTransport`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiTransport* UpcastToIAiTransport(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiTransportType());
+    return static_cast<moho::IAiTransport*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B5F50 (FUN_006B5F50, gpg::RRef::Upcast_IAiCommandDispatch)
+   *
+   * IDA signature:
+   * Moho::IAiCommandDispatch *__usercall gpg::RRef::Upcast_IAiCommandDispatch@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::IAiCommandDispatch`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::IAiCommandDispatch* UpcastToIAiCommandDispatch(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiCommandDispatchType());
+    return static_cast<moho::IAiCommandDispatch*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B5B80 (FUN_006B5B80, gpg::RRef::Upcast_CEconStorage)
+   *
+   * IDA signature:
+   * Moho::CEconStorage *__usercall gpg::RRef::Upcast_CEconStorage@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CEconStorage`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CEconStorage* UpcastToCEconStorage(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconStorageType());
+    return static_cast<moho::CEconStorage*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x006B21A0 (FUN_006B21A0, gpg::RRef::Upcast_CEconomyEvent)
+   *
+   * IDA signature:
+   * Moho::CEconomyEvent *__usercall gpg::RRef::Upcast_CEconomyEvent@<eax>(gpg::RRef *a1);
+   *
+   * What it does:
+   * Upcasts one reflected reference to `moho::CEconomyEvent`, returning null
+   * when the reference does not denote that type.
+   */
+  [[nodiscard]] moho::CEconomyEvent* UpcastToCEconomyEvent(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconomyEventType());
+    return static_cast<moho::CEconomyEvent*>(upcast.mObj);
+  }
+
   [[nodiscard]] gpg::RType* CachedShieldType()
   {
     static gpg::RType* cached = nullptr;
@@ -3955,8 +4105,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CEconStorage(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconStorageType());
-  *outValue = static_cast<moho::CEconStorage*>(upcast.mObj);
+  *outValue = UpcastToCEconStorage(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCEconStorageType());
     const char* const actualName = source.GetTypeName();
@@ -6079,8 +6228,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_CEconomyEvent(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCEconomyEventType());
-  *outValue = static_cast<moho::CEconomyEvent*>(upcast.mObj);
+  *outValue = UpcastToCEconomyEvent(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedCEconomyEventType());
     const char* const actualName = source.GetTypeName();
@@ -6580,8 +6728,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiSteering(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiSteeringType());
-  *outValue = static_cast<moho::IAiSteering*>(upcast.mObj);
+  *outValue = UpcastToIAiSteering(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiSteeringType());
     const char* const actualName = source.GetTypeName();
@@ -6810,8 +6957,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiAttacker(moho::IAiAttacker** const
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiAttackerType());
-  *outValue = static_cast<moho::IAiAttacker*>(upcast.mObj);
+  *outValue = UpcastToIAiAttacker(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiAttackerType());
     const char* const actualName = source.GetTypeName();
@@ -6857,8 +7003,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiCommandDispatch(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiCommandDispatchType());
-  *outValue = static_cast<moho::IAiCommandDispatch*>(upcast.mObj);
+  *outValue = UpcastToIAiCommandDispatch(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiCommandDispatchType());
     const char* const actualName = source.GetTypeName();
@@ -6904,8 +7049,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiNavigator(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiNavigatorType());
-  *outValue = static_cast<moho::IAiNavigator*>(upcast.mObj);
+  *outValue = UpcastToIAiNavigator(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiNavigatorType());
     const char* const actualName = source.GetTypeName();
@@ -6949,8 +7093,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiBuilder(moho::IAiBuilder** const o
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiBuilderType());
-  *outValue = static_cast<moho::IAiBuilder*>(upcast.mObj);
+  *outValue = UpcastToIAiBuilder(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiBuilderType());
     const char* const actualName = source.GetTypeName();
@@ -6996,8 +7139,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiSiloBuild(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiSiloBuildType());
-  *outValue = static_cast<moho::IAiSiloBuild*>(upcast.mObj);
+  *outValue = UpcastToIAiSiloBuild(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiSiloBuildType());
     const char* const actualName = source.GetTypeName();
@@ -7043,8 +7185,7 @@ ReadArchive* ReadArchive::ReadPointerOwned_IAiTransport(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIAiTransportType());
-  *outValue = static_cast<moho::IAiTransport*>(upcast.mObj);
+  *outValue = UpcastToIAiTransport(source);
   if (!*outValue) {
     const char* const expectedName = SafeTypeName(CachedIAiTransportType());
     const char* const actualName = source.GetTypeName();
