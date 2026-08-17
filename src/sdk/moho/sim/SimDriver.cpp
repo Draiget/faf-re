@@ -745,6 +745,40 @@ namespace
     return *lockCell.lock;
   }
 
+  /**
+   * Address: 0x0073AEF0 (FUN_0073AEF0, sub_73AEF0)
+   *
+   * IDA signature:
+   * BOOL __fastcall sub_73AEF0(float* lhs, float* rhs);
+   *
+   * What it does:
+   * Compares two 4x4 matrices element by element. Float `==`, not a bit
+   * compare: -0.0f and +0.0f count as equal, and a NaN anywhere makes the
+   * matrices unequal even against itself.
+   */
+  [[nodiscard]] bool AreGalMatricesEqual(const gpg::gal::Matrix& lhs, const gpg::gal::Matrix& rhs) noexcept
+  {
+    for (int row = 0; row < 4; ++row) {
+      for (int column = 0; column < 4; ++column) {
+        if (lhs.r[row][column] != rhs.r[row][column]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Compares the camera lanes that `CSimDriver::SetGeomCams` (0x0073B270)
+   * actually tests: transform orientation and position, then the projection and
+   * view matrices. It deliberately ignores `viewProjection`, the three inverse
+   * matrices, the solids and `lodScale` - those are derived or unused by the
+   * sync filter, and the binary does not look at them.
+   *
+   * Previously a `memcmp` over all 0x2C8 bytes, which differed twice over: it
+   * compared fields the binary ignores, and compared bit patterns rather than
+   * float values, inverting the NaN case.
+   */
   bool AreGeomCameraVectorsEqual(const msvc8::vector<GeomCamera3>& lhs, const msvc8::vector<GeomCamera3>& rhs)
   {
     if (lhs.size() != rhs.size()) {
@@ -752,7 +786,13 @@ namespace
     }
 
     for (std::size_t i = 0; i < lhs.size(); ++i) {
-      if (std::memcmp(&lhs[i], &rhs[i], sizeof(GeomCamera3)) != 0) {
+      const GeomCamera3& a = lhs[i];
+      const GeomCamera3& b = rhs[i];
+
+      if (!(a.tranform.orient_ == b.tranform.orient_) || !(a.tranform.pos_ == b.tranform.pos_)) {
+        return false;
+      }
+      if (!AreGalMatricesEqual(a.projection, b.projection) || !AreGalMatricesEqual(a.view, b.view)) {
         return false;
       }
     }
