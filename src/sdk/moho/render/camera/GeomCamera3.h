@@ -293,4 +293,30 @@ namespace moho
   static_assert(offsetof(GeomCamera3, lodScale) == 0x280, "GeomCamera3::lodScale offset must be 0x280");
   static_assert(offsetof(GeomCamera3, viewport) == 0x284, "GeomCamera3::viewport offset must be 0x284");
   static_assert(sizeof(GeomCamera3) == 0x2C8, "GeomCamera3 size must be 0x2C8");
+  /**
+   * Address: 0x007E9A10 (FUN_007E9A10, sub_7E9A10)
+   *
+   * What it does:
+   * Encloses eight points in one axis-aligned box. Seeds min and max from
+   * the first point rather than from infinities, which is why the caller
+   * always hands it a full set.
+   */
+  Wm3::AxisAlignedBox3f* EncloseCornerSet(Wm3::AxisAlignedBox3f* outBox, const Wm3::Vector3f* corners);
+
+  /**
+   * Address: 0x007E9AD0 (FUN_007E9AD0, sub_7E9AD0)
+   *
+   * What it does:
+   * Projects an axis-aligned box through a 4x4 matrix and returns the box
+   * that encloses the result. All eight corners are carried through
+   * individually, each with its own perspective divide, because a projected
+   * box is not a box - transforming only min and max would be wrong for any
+   * matrix with rotation or perspective.
+   */
+  Wm3::AxisAlignedBox3f* ProjectBoxByMatrix(
+    const VMatrix4* matrix,
+    const Wm3::AxisAlignedBox3f* box,
+    Wm3::AxisAlignedBox3f* outBox
+  );
+
 } // namespace moho
