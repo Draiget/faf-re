@@ -2370,6 +2370,30 @@ namespace
     "priority-queue slot must stay the same shape as the weak-payload lane it shares with 0x00687A70"
   );
 
+  /**
+   * The queue those slots live in.
+   *
+   * The swap at 0x00687530 reaches exactly two lanes off the queue pointer:
+   * `mov eax,[eax+4]` for the entry array and `mov edx,[eax+14h]` for the map
+   * it rewrites. Those are the `_Myfirst` of two legacy vectors - the layout is
+   * `{proxy, _Myfirst, _Mylast, _Myend}` at 0x10 bytes each, so a vector based
+   * at +0x00 puts its first element pointer at +0x04, and one based at +0x10
+   * puts its own at +0x14. Both observed offsets fall out of that with nothing
+   * left over.
+   *
+   * `positionMap` is indexed by an entry's `id` and holds the entry's current
+   * heap index, which is what lets a caller find an entry again after the heap
+   * reorders it - and what the sift helpers below fail to maintain.
+   */
+  struct PriorityQueue20Runtime
+  {
+    msvc8::vector<PriorityQueueEntry20Runtime> heap;  // +0x00 (_Myfirst +0x04)
+    msvc8::vector<std::uint32_t> positionMap;         // +0x10 (_Myfirst +0x14)
+  };
+  static_assert(sizeof(PriorityQueue20Runtime) == 0x20, "PriorityQueue20Runtime size must be 0x20");
+  static_assert(offsetof(PriorityQueue20Runtime, heap) == 0x00, "heap offset must be 0x00");
+  static_assert(offsetof(PriorityQueue20Runtime, positionMap) == 0x10, "positionMap offset must be 0x10");
+
   struct PriorityQueueNode24Runtime
   {
     std::uint32_t lane00 = 0;
