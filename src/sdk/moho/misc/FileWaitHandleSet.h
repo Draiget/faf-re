@@ -44,6 +44,20 @@ namespace moho
 
   struct SFileWaitHandle
   {
+    /**
+     * Address: 0x00458CC0 (FUN_00458CC0, ??1FWHSZipFile@Moho@@QAE@XZ)
+     * Mangled: ??1FWHSZipFile@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Closes the owned zip file, then unlinks this handle from the
+     * active-handle ring and re-points both links at itself.
+     *
+     * The unlink lives here rather than in the callers, which is what keeps a
+     * handle visible on the ring for as long as it is being torn down - see
+     * `FWaitHandleSet::RemoveEntry`.
+     */
+    ~SFileWaitHandle();
+
     SFileWaitHandle* mNext = this; // +0x00
     SFileWaitHandle* mPrev = this; // +0x04
     volatile long mLock = 0;       // +0x08
