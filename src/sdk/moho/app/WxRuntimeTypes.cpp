@@ -65170,10 +65170,20 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
   // The binary finishes with two virtual dispatches on the terrain:
   //   0x007F8277  mov edx, [edx+20h] / call edx   -> slot  8 DrawNormals
   //   0x007F8285  mov edx, [eax+30h] / jmp edx    -> slot 12 DrawTerrainSkirt
-  // Slot 8 takes (sCurGameTick, sDeltaFrame, mPrimaryTargetLocks[mHead],
-  // mShadowRenderer-when-enabled); it stays unwired until
-  // HighFidelityTerrain::DrawNormals (0x00801BE0) and its decal chain are
-  // recovered, because a base declaration would force a stub in that class.
+  // The shadow renderer is passed only when a fidelity is selected
+  // (0x007F8221: cmp [esi+4F8h], 0), and the normal target is
+  // mPrimaryTargetLocks[mHead], retained across the call.
+  moho::TerrainShadowContext* const shadowContext =
+    runtime->mShadowRenderer.shadow_Fidelity != 0
+      ? reinterpret_cast<moho::TerrainShadowContext*>(&runtime->mShadowRenderer)
+      : nullptr;
+
+  (void)terrain->DrawNormals(
+    moho::REN_GetGameTick(),
+    moho::REN_GetSimDeltaSeconds(),
+    AsRenderPassView(this)->mPrimaryTargetLocks[runtime->mHead],
+    shadowContext
+  );
   terrain->DrawTerrainSkirt();
 }
 
