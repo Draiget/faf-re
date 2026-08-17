@@ -321,6 +321,28 @@ namespace moho
      * terrain path when skirt rendering is enabled and index-lane constraints
      * are valid.
      */
+    /**
+     * Address: 0x00806370 (FUN_00806370, sub_806370)
+     *
+     * What it does:
+     * Composites the water-albedo decals over the water surface.
+     */
+    void DrawWaterAlbedoDecals(std::int32_t gameTick, float deltaSeconds);
+
+    /**
+     * Address: 0x00807430 (FUN_00807430, Moho::MediumFidelityTerrain::DrawWaterTerrain)
+     * Primary vtable slot 11 (vftable @0x00E41A54).
+     *
+     * What it does:
+     * Binds the water2 viewport scale/offset, issues the water surface
+     * pass, then composites the water-albedo decals.
+     */
+    void DrawWaterTerrain(
+      std::int32_t tick,
+      float tickLerp,
+      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
+      boost::shared_ptr<ID3DRenderTarget> reflectionTexture) override;
+
     void DrawTerrainSkirt() override;
 
     /**

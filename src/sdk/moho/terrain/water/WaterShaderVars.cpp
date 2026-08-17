@@ -65,6 +65,7 @@ namespace moho
     return &shaderVar;
   }
 
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2ViewportScaleOffsetShaderVar, "ViewportScaleOffset")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WorldToViewShorelineShaderVar, "WorldToView")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2ProjectionShorelineShaderVar, "Projection")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WaterElevationTShorelineShaderVar, "WaterElevation")
