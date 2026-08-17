@@ -84,7 +84,9 @@ void CMauiMesh::Frame(float) {}
 // CAiAttackerImpl::~CAiAttackerImpl is recovered in CAiAttackerImpl.cpp
 // (matches FUN_005D6BC0); see the typed dtor body there for the real
 // teardown sequence that pairs with the recovered default ctor.
-SkyDome::~SkyDome() {}
+// SkyDome::~SkyDome is recovered 1:1 in src/sdk/moho/render/SkyDome.cpp
+// (matches FUN_00814CD0). The empty stub that stood here skipped Reset(),
+// the decal upload list teardown and the sentinel free.
 
 // ===== Virtual Execute() returning int =====
 // CFactoryBuildTask::Execute is recovered 1:1 in

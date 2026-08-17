@@ -345,6 +345,32 @@ namespace moho
   }
 
   /**
+   * Address: 0x00814CD0 (FUN_00814CD0, ??1SkyDome@Moho@@UAE@XZ)
+   * Mangled: ??1SkyDome@Moho@@UAE@XZ
+   *
+   * What it does:
+   * Tears the dome down: releases the sky resources through `Reset`, empties
+   * the decal upload list and frees its sentinel, then lets the shared_ptr
+   * members and the `CResourceWatcher` base unwind on their own.
+   *
+   * The emission runs to 601 instructions, but roughly 190 of those are the
+   * compiler's own `boost::shared_ptr` member releases, which C++ performs
+   * implicitly in reverse declaration order. What is left is the three steps
+   * above.
+   */
+  SkyDome::~SkyDome()
+  {
+    Reset();
+
+    ClearSkyDomeDecalUploadList(mDecalUploadHead, mDecalUploadCount);
+
+    // The list head is a sentinel the constructor allocated; clearing the list
+    // deliberately keeps it, so the owner frees it here.
+    ::operator delete(mDecalUploadHead);
+    mDecalUploadHead = nullptr;
+  }
+
+  /**
    * Address: 0x00817160 (FUN_00817160, ?Reset@SkyDome@Moho@@QAEXXZ)
    *
    * What it does:
