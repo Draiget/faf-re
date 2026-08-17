@@ -3543,12 +3543,34 @@ namespace gpg::gal
             return ComputePrimitiveCountForTopology(context.topologyToken, context.primitiveCountInput);
         }
 
+        /**
+         * Address: 0x008F3950 (FUN_008F3950,
+         *   Moho::WeakPtr_EffectD3D9::WeakPtr_EffectD3D9)
+         *
+         * IDA signature:
+         * _DWORD *__thiscall Moho::WeakPtr_EffectD3D9::WeakPtr_EffectD3D9(
+         *     boost::shared_ptr_EffectD3D9 *this, boost::shared_ptr_EffectD3D9 *a2);
+         *
+         * What it does:
+         * `boost::weak_ptr<EffectD3D9>::lock()` - hands back a retained shared
+         * pointer when the control block still has live owners, and an empty
+         * one otherwise. The binary emits this out of line for EffectD3D9 and
+         * calls it from all twenty-four EffectTechniqueD3D9/EffectVariableD3D9
+         * entry points, by way of the two Lock*OrThrow helpers below.
+         */
+        [[nodiscard]] boost::shared_ptr<EffectD3D9> LockWeakEffectD3D9(
+            const boost::weak_ptr<EffectD3D9>& weakEffect
+        )
+        {
+            return weakEffect.lock();
+        }
+
         boost::shared_ptr<EffectD3D9> LockEffectOrThrow(
             const boost::weak_ptr<EffectD3D9>& weakEffect,
             const int line
         )
         {
-            boost::shared_ptr<EffectD3D9> effect = weakEffect.lock();
+            boost::shared_ptr<EffectD3D9> effect = LockWeakEffectD3D9(weakEffect);
             if (!effect)
             {
                 ThrowGalError("EffectTechniqueD3D9.cpp", line, "attempt to use invalid effect");
@@ -3562,7 +3584,7 @@ namespace gpg::gal
             const int line
         )
         {
-            boost::shared_ptr<EffectD3D9> effect = weakEffect.lock();
+            boost::shared_ptr<EffectD3D9> effect = LockWeakEffectD3D9(weakEffect);
             if (!effect)
             {
                 ThrowGalError("EffectVariableD3D9.cpp", line, "attempt to use invalid effect");
