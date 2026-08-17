@@ -2002,6 +2002,22 @@ namespace boost
   }
 
   /**
+   * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
+   *
+   * IDA signature:
+   * void __cdecl __noreturn throw_BadWeakPtrException(std::exception *a1);
+   *
+   * What it does:
+   * Raises `boost::bad_weak_ptr`. The binary factors the throw out of the
+   * weak-construct path into this one no-return helper, which builds the
+   * exception object and hands it to _CxxThrowException.
+   */
+  [[noreturn]] void ThrowBadWeakPtr()
+  {
+    throw boost::bad_weak_ptr();
+  }
+
+  /**
    * Address: 0x00447030 (FUN_00447030)
    *
    * What it does:
@@ -2014,7 +2030,7 @@ namespace boost
   )
   {
     if (outWeakControlSlot == nullptr) {
-      throw boost::bad_weak_ptr();
+      ThrowBadWeakPtr();
     }
 
     detail::sp_counted_base* const sourceControl =
@@ -2022,7 +2038,7 @@ namespace boost
     *outWeakControlSlot = sourceControl;
 
     if (sourceControl == nullptr || !SpCountedBaseAddRefLock(sourceControl)) {
-      throw boost::bad_weak_ptr();
+      ThrowBadWeakPtr();
     }
 
     return outWeakControlSlot;
