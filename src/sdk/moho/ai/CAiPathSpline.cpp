@@ -18,6 +18,10 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/math/Vector3f.h"
+#include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
 
 using namespace moho;
 
@@ -1335,38 +1339,202 @@ const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
 
 /**
  * Address: 0x005B26C0 (FUN_005B26C0, Moho::CAiPathSpline::Update)
+ *
+ * IDA signature:
+ * int __userpurge Moho::CAiPathSpline::Update@<eax>(Moho::Unit *a1@<eax>,
+ *     Moho::CAiPathSpline *a2@<edi>, int a3);
+ *
+ * What it does:
+ * Predicts where the unit comes to rest if it brakes from here, and records
+ * that path as spline nodes. Each iteration applies full reverse thrust to
+ * the current velocity, clamps the result to the blueprint's brake and speed
+ * limits, steps the position by the surviving velocity, and drops the node
+ * onto the terrain (or the water line for water/amphibious/hover hulls).
+ *
+ * The whole simulation runs in the (x, -z) plane - y is never integrated,
+ * only sampled from the height field - which is why a unit driving off a
+ * cliff still produces a path that follows the ground.
+ *
+ * Because the braking acceleration is exactly the negated velocity, the
+ * acceleration-vs-brake test below always resolves to the brake limit. The
+ * binary evaluates it anyway; it is kept so the limit selection still reads
+ * the way the original expressed it.
+ *
+ * Termination is driven entirely by the caller's mode: only modes 3 and 4
+ * can set the terminal state, and mode 4 additionally requires more than
+ * five nodes. A caller passing any other mode would not terminate, so the
+ * binary is only ever reached with 3 or 4.
+ *
+ * Returns the number of nodes produced.
  */
 int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 {
-  // TODO(binary-fidelity): current body is a provisional typed lift. Exact FA behavior
-  // depends on sub_6990E0/sub_6992C0/sub_699760 math and additional physics helpers.
   ResetNodesToInline();
+  nodes.Clear();
+  mPathType = static_cast<EPathType>(updateMode);
   mCurrentNodeIndex = 0;
   mNodeCount = 0;
-  mPathType = static_cast<EPathType>(updateMode);
 
-  if (!unit) {
-    return 0;
+  // The hull's facing, straight from the orientation - not flattened and not
+  // renormalised, so a pitched or rolled hull contributes its real heading.
+  const Wm3::Vector3f forward =
+    unit->GetTransform().orient_.Rotate(Wm3::Vector3f{0.0f, 0.0f, 1.0f});
+
+  CPathPoint point{};
+  point.mPosition = unit->GetPosition();
+  point.mDirection = forward;
+  point.mState = PPS_1;
+
+  const float speedLimit = unit->mInfoCache.mFormationTopSpeed;
+
+  const Wm3::Vector3f velocity = unit->GetVelocity();
+  const float speed = std::sqrt(
+    (velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
+
+  // Momentum carried into the simulation: the facing scaled to the current
+  // speed, so a unit that is stationary but pointed somewhere contributes no
+  // travel.
+  Wm3::Vector3f step = forward;
+  (void)VecSetLength(&step, speed);
+
+  // A stopped unit has no travel direction; the binary marks that with a
+  // saturated vector rather than a flag, and every later use is a dot product
+  // whose sign is all that matters.
+  Wm3::Vector3f travelDirection{
+    std::numeric_limits<float>::max(),
+    std::numeric_limits<float>::max(),
+    std::numeric_limits<float>::max()
+  };
+  if (speed != 0.0f) {
+    const float inverseSpeed = 1.0f / speed;
+    travelDirection = Wm3::Vector3f{
+      velocity.x * inverseSpeed, velocity.y * inverseSpeed, velocity.z * inverseSpeed};
   }
 
-  const Wm3::Vector3f start = unit->GetPosition();
-  const Wm3::Vector3f forward = UnitForwardXZ(unit);
+  const RUnitBlueprintPhysics& physics = unit->GetBlueprint()->Physics;
+  STIMap* const map = unit->SimulationRef->mMapData;
+  CHeightField* const heightField = map->mHeightField.get();
 
-  const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-  const float maxSpeed = blueprint ? blueprint->Physics.MaxSpeed : 0.0f;
-  const float stepLen = std::max(0.1f, maxSpeed * 0.1f);
-  const int nodeCount = (updateMode == 3 || updateMode == 4) ? 6 : 4;
-
-  Wm3::Vector3f cursor = start;
-  for (int i = 0; i < nodeCount; ++i) {
-    cursor = cursor + forward * stepLen;
-    PushPathPoint(nodes, cursor, forward, i + 1 == nodeCount ? PPS_8 : PPS_1);
+  // Reversing: the hull is travelling against its facing, so the momentum
+  // that gets braked points backwards too.
+  const float facingAlignment = (travelDirection.y * forward.y)
+    + (travelDirection.z * forward.z)
+    + (travelDirection.x * forward.x);
+  if (facingAlignment < 0.0f) {
+    step = Wm3::Vector3f{-step.x, -step.y, -step.z};
+    point.mState = PPS_2;
   }
 
-  mContinuation.mOldPosition = start;
-  mContinuation.mOldDirection = forward;
-  mContinuation.mOldVelocity = forward * stepLen;
-  mContinuation.mState = PPS_0;
+  do {
+    // Snapshot for whoever regenerates this spline next tick.
+    mContinuation.mOldDirection = forward;
+    mContinuation.mOldPosition = point.mPosition;
+    mContinuation.mOldVelocity = step;
+    mContinuation.mState = PPS_0;
+
+    // One unit further along the current heading - enough for the steering
+    // build to derive a direction, which is all it is used for here.
+    const Wm3::Vector3f target{
+      point.mPosition.x + travelDirection.x,
+      point.mPosition.y + travelDirection.y,
+      point.mPosition.z + travelDirection.z
+    };
+
+    SteeringParams steering(unit, point.mPosition, target, travelDirection, speedLimit, false);
+    if (mPathType == PT_4) {
+      steering.mMaxAcceleration = steering.mMaxAcceleration * 2.0f;
+      steering.mMaxBrake = steering.mMaxBrake * 2.0f;
+    }
+
+    // Planar frame: x as-is, z negated. The negation is undone when the
+    // result is written back to the position and the stored velocity.
+    const float planarX = step.x;
+    const float planarZ = -step.z;
+    float brakeX = -step.x;
+    float brakeZ = step.z;
+
+    float planarSpeedSq = (planarZ * planarZ) + (planarX * planarX);
+    float newVelocityX = planarX;
+    float newVelocityZ = planarZ;
+
+    if (planarSpeedSq > 0.0f) {
+      const bool opposingTravel = ((brakeZ * planarZ) + (brakeX * planarX)) <= 0.0f;
+      const float thrustLimit = opposingTravel ? steering.mMaxBrake : steering.mMaxAcceleration;
+
+      const float brakeMagnitudeSq = (brakeZ * brakeZ) + (brakeX * brakeX);
+      if (brakeMagnitudeSq > (thrustLimit * thrustLimit)) {
+        const float scale = thrustLimit / std::sqrt(brakeMagnitudeSq);
+        brakeX = brakeX * scale;
+        brakeZ = brakeZ * scale;
+      }
+
+      newVelocityX = brakeX + planarX;
+      newVelocityZ = brakeZ + planarZ;
+
+      const float newSpeedSq = (newVelocityZ * newVelocityZ) + (newVelocityX * newVelocityX);
+      if (newSpeedSq > (steering.mMaxSpeed * steering.mMaxSpeed)) {
+        const float scale = steering.mMaxSpeed / std::sqrt(newSpeedSq);
+        newVelocityX = newVelocityX * scale;
+        newVelocityZ = newVelocityZ * scale;
+      }
+
+      if (((newVelocityZ * newVelocityZ) + (newVelocityX * newVelocityX)) <= 1.0e-6f) {
+        // Braked to a standstill - stop advancing, and let the terminal test
+        // below decide whether the path ends here.
+        step = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+        planarSpeedSq = 0.0f;
+      } else {
+        point.mPosition.x = newVelocityX + point.mPosition.x;
+        point.mPosition.z = -newVelocityZ + point.mPosition.z;
+        step = Wm3::Vector3f{newVelocityX, 0.0f, -newVelocityZ};
+      }
+    }
+
+    if (std::isnan(point.mPosition.x) || std::isnan(point.mPosition.y)
+      || std::isnan(point.mPosition.z)) {
+      // Diagnostic dump kept as the original wrote it - the operands that
+      // produced the NaN are what makes this reproducible.
+      const Wm3::Vector3f& currentPosition = unit->GetPosition();
+      gpg::Logf("unit = %s\n", unit->GetBlueprint()->mBlueprintId.c_str());
+      gpg::Logf("curPos = %f, %f, %f\n",
+        currentPosition.x, currentPosition.y, currentPosition.z);
+      gpg::Logf("oldVel = %f, %f\n", step.x, -step.z);
+      gpg::Logf("v = %f, %f\n", newVelocityX, newVelocityZ);
+      const Wm3::Vector3f& previousVelocity = mContinuation.mOldVelocity;
+      gpg::Logf("prevSpeed = %f\n", std::sqrt(
+        (previousVelocity.x * previousVelocity.x)
+        + (previousVelocity.y * previousVelocity.y)
+        + (previousVelocity.z * previousVelocity.z)));
+      gpg::Logf("prevPos = %f, %f, %f\n",
+        mContinuation.mOldPosition.x,
+        mContinuation.mOldPosition.y,
+        mContinuation.mOldPosition.z);
+      gpg::Logf("acc = %f, %f\n", brakeX, brakeZ);
+    }
+
+    if (planarSpeedSq <= 1.0e-6f
+      && (updateMode == 3 || (updateMode == 4 && nodes.size() > 5))) {
+      point.mState = PPS_8;
+    }
+
+    // Nodes sit on the surface the hull actually rides.
+    const float groundElevation =
+      heightField->GetElevation(point.mPosition.x, point.mPosition.z);
+    const ERuleBPUnitMovementType motionType = physics.MotionType;
+    if (motionType == RULEUMT_Water
+      || motionType == RULEUMT_AmphibiousFloating
+      || motionType == RULEUMT_Hover) {
+      float surface = groundElevation;
+      if (map->mWaterEnabled && map->mWaterElevation > surface) {
+        surface = map->mWaterElevation;
+      }
+      point.mPosition.y = surface;
+    } else {
+      point.mPosition.y = groundElevation;
+    }
+
+    nodes.PushBack(point);
+  } while (point.mState != PPS_8);
 
   mNodeCount = static_cast<std::uint32_t>(nodes.size());
   return static_cast<int>(mNodeCount);
