@@ -524,6 +524,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\terrain\water\WaterShaderVars.cpp" />
     <ClCompile Include="moho\terrain\water\WaveSystem.cpp" />
     <ClCompile Include="moho\terrain\water\Shoreline.cpp" />
+    <ClCompile Include="moho\ui\CRenderWorldView.cpp" />
     <ClCompile Include="moho\ui\CUIManager.cpp" />
     <ClCompile Include="moho\lua\SCR_Math.cpp" />
     <ClCompile Include="moho\lua\SCR_String.cpp" />
