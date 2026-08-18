@@ -2078,7 +2078,7 @@ namespace
    * Destroys the `Unit::ArmorMultipliers` tree, releases its sentinel head
    * node, then clears the map head/count lanes.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t DestroyArmorMultiplierMapStorage(
+  [[nodiscard]] std::int32_t DestroyArmorMultiplierMapStorage(
     SArmorMultiplierMap& armorMap
   ) noexcept
   {
@@ -2400,7 +2400,7 @@ namespace
     return Wm3::Vector3f::NormalizeOrZero(forward);
   }
 
-  [[nodiscard]] [[maybe_unused]] const Wm3::Vector3f& InvalidBombDropSolutionLane() noexcept
+  [[nodiscard]] const Wm3::Vector3f& InvalidBombDropSolutionLane() noexcept
   {
     static bool initialized = false;
     static Wm3::Vector3f invalidVector{};
@@ -2421,7 +2421,7 @@ namespace
    * velocity, and gravity; writes NaN-vector lanes when no valid time root
    * exists.
    */
-  [[nodiscard]] [[maybe_unused]] Wm3::Vector3f* ComputeBombDropAimPoint(
+  [[nodiscard]] Wm3::Vector3f* ComputeBombDropAimPoint(
     const Wm3::Vector3f& velocity,
     Wm3::Vector3f* const out,
     const Wm3::Vector3f& gravity,
@@ -3101,7 +3101,7 @@ CScrLuaInitForm* moho::func_UnitSetCreator_LuaFuncDef()
  * Rebinds this unit's creator weak-reference lane and marks game-data sync
  * dirty for replication.
  */
-[[maybe_unused]] void moho::AssignCreatorWeakRefAndMarkSyncDirty(Unit* const unit, Unit* const creator)
+void moho::AssignCreatorWeakRefAndMarkSyncDirty(Unit* const unit, Unit* const creator)
 {
   unit->CreatorRef.AsWeakPtr<Unit>().Set(creator);
   unit->NeedSyncGameData = true;
@@ -7396,7 +7396,7 @@ CScrLuaInitForm* moho::func_UnitSetStat_LuaFuncDef()
  * Atomically stores one primary stat-value lane and returns the previously
  * observed lane.
  */
-[[maybe_unused]] std::int32_t StorePrimaryStatBitsAtomic(
+std::int32_t StorePrimaryStatBitsAtomic(
   StatItem* const statItem,
   const std::int32_t* const newValueBits
 ) noexcept
@@ -11424,7 +11424,7 @@ namespace
    * `SSTIUnitVariableData::AssignFrom` (intentionally excluding reserved tail
    * bytes and non-copied metadata lanes).
    */
-  [[maybe_unused]] moho::UnitAttributes* CopyUnitAttributesSnapshot(
+  moho::UnitAttributes* CopyUnitAttributesSnapshot(
     moho::UnitAttributes* const destination,
     const moho::UnitAttributes* const source
   )
@@ -11641,7 +11641,7 @@ namespace
    * Unlinks `SSTIUnitVariableData` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIUnitVariableDataSerializerLaneA() noexcept
   {
     return gpg::UnlinkSerSaveLoadHelperNode(gSSTIUnitVariableDataSerializer.mListLinks);
   }
@@ -12457,7 +12457,7 @@ namespace
    * tail dword`) into destination storage and destroys already-constructed
    * payload lanes before rethrowing if a copy step throws.
    */
-  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollback(
+  SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollback(
     const SSTIUnitVariableDataSlotRuntime* sourceBegin,
     const SSTIUnitVariableDataSlotRuntime* sourceEnd,
     SSTIUnitVariableDataSlotRuntime* destinationBegin
