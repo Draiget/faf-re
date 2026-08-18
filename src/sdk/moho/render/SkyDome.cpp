@@ -243,12 +243,28 @@ namespace moho
    * What it does:
    * Initializes all sky dome rendering state to defaults — horizon/sky colors,
    * texture paths, zero-initialized shared_ptr resource handles, and copies
-   * static cirrus data.
+   * static cirrus data. Also inlines `CResourceWatcher::CResourceWatcher`
+   * (0x007DD660) to set up the watched-resource small-vector in inline mode
+   * (`mWatchedBegin`/`mWatchedEnd` pointing at `mWatchedInline`, empty range) -
+   * previously left uninitialized here, which made `CreateTextures`'s
+   * `mWatchedBegin != mWatchedEnd` guard read garbage stack/heap bytes and
+   * crash inside `ManageWatchedResources` the first time a sky dome rendered.
    */
   SkyDome::SkyDome()
-    : mHorizonLookupPath("/textures/environment/horizonLookup.dds")
+    : mWatcherFlags(0)
+    , mWatchedBegin(mWatchedInline)
+    , mWatchedEnd(mWatchedInline)
+    , mWatchedStorageEnd(mWatchedInline + sizeof(mWatchedInline))
+    , mWatchedStorageOrigin(mWatchedInline)
+    , mWatchedInline{}
+    , mHorizonLookupPath("/textures/environment/horizonLookup.dds")
     , mCirrusTexPath("/textures/environment/cirrus000.dds")
   {
+    // Legacy small-vector reset path reads `*(origin)` as fallback storage
+    // end - see CResourceWatcher::CResourceWatcher for the same idiom.
+    auto** const inlineSlots = reinterpret_cast<void**>(mWatchedInline);
+    inlineSlots[0] = mWatchedStorageEnd;
+
     mDecalUploadHead = AllocateSkyDomeDecalUploadListSentinel();
   }
 
@@ -350,13 +366,17 @@ namespace moho
    *
    * What it does:
    * Tears the dome down: releases the sky resources through `Reset`, empties
-   * the decal upload list and frees its sentinel, then lets the shared_ptr
-   * members and the `CResourceWatcher` base unwind on their own.
+   * the decal upload list and frees its sentinel, then inlines
+   * `CResourceWatcher::~CResourceWatcher` (0x007DA8D0) - flush any pending
+   * watched-resource nodes through the resource manager, then free
+   * non-inline watched storage - since `SkyDome` doesn't C++-inherit
+   * `CResourceWatcher` (see the field comment above) so there is no real
+   * base dtor to do this automatically. Every other member (the shared_ptr
+   * lanes) unwinds on its own in reverse declaration order.
    *
    * The emission runs to 601 instructions, but roughly 190 of those are the
    * compiler's own `boost::shared_ptr` member releases, which C++ performs
-   * implicitly in reverse declaration order. What is left is the three steps
-   * above.
+   * implicitly. What is left is the steps above.
    */
   SkyDome::~SkyDome()
   {
@@ -368,6 +388,18 @@ namespace moho
     // deliberately keeps it, so the owner frees it here.
     ::operator delete(mDecalUploadHead);
     mDecalUploadHead = nullptr;
+
+    if (mWatchedBegin != mWatchedEnd) {
+      if (ResourceManager* const manager = RES_GetResourceManager(); manager != nullptr) {
+        manager->ManageWatchedResources(reinterpret_cast<CResourceWatcher*>(this));
+      }
+    }
+
+    if (mWatchedBegin != mWatchedStorageOrigin) {
+      ::operator delete[](mWatchedBegin);
+      mWatchedBegin = mWatchedStorageOrigin;
+      mWatchedStorageEnd = *reinterpret_cast<void**>(mWatchedStorageOrigin);
+    }
   }
 
   /**

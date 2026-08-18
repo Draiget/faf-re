@@ -324,8 +324,18 @@ namespace moho
 
   public:
     // --- Layout from constructor ASM evidence ---
-    std::uint8_t mPad04[0x04];                                    // +0x04
-    std::uint8_t mInlineVectorStorage[0x18];                      // +0x08 (vector with inline buf)
+    // `SkyDome` doesn't C++-inherit `CResourceWatcher` (its own vtable at
+    // 0x00E422A0 shows no evidence of a stacked base-class slot region) but
+    // lays out these bytes identically - `CreateTextures` reinterpret_casts
+    // `this` to `CResourceWatcher*` to reuse `ResourceManager::
+    // ManageWatchedResources`. Named/typed to match, rather than left as an
+    // opaque byte blob the constructor can silently leave uninitialized.
+    std::uint32_t mWatcherFlags = 0;                              // +0x04
+    void* mWatchedBegin = nullptr;                                // +0x08
+    void* mWatchedEnd = nullptr;                                  // +0x0C
+    void* mWatchedStorageEnd = nullptr;                           // +0x10
+    void* mWatchedStorageOrigin = nullptr;                        // +0x14
+    std::uint8_t mWatchedInline[0x08]{};                          // +0x18
     Wm3::Vector3f mDomeOrigin{0.0f, 0.0f, 0.0f};                 // +0x20
     Wm3::Vector3f mDomeShapeParams{0.0f, 512.0f, 1.2566371f};    // +0x2C (height/radius/start-angle)
     std::int32_t mWidth = 16;                                     // +0x38
@@ -378,6 +388,12 @@ namespace moho
     boost::shared_ptr<gpg::gal::TextureD3D9> mCloudsTexture;       // +0x21C
   };
 
+  static_assert(offsetof(SkyDome, mWatcherFlags) == 0x04, "SkyDome::mWatcherFlags offset must be 0x04");
+  static_assert(offsetof(SkyDome, mWatchedBegin) == 0x08, "SkyDome::mWatchedBegin offset must be 0x08");
+  static_assert(offsetof(SkyDome, mWatchedEnd) == 0x0C, "SkyDome::mWatchedEnd offset must be 0x0C");
+  static_assert(offsetof(SkyDome, mWatchedStorageEnd) == 0x10, "SkyDome::mWatchedStorageEnd offset must be 0x10");
+  static_assert(offsetof(SkyDome, mWatchedStorageOrigin) == 0x14, "SkyDome::mWatchedStorageOrigin offset must be 0x14");
+  static_assert(offsetof(SkyDome, mWatchedInline) == 0x18, "SkyDome::mWatchedInline offset must be 0x18");
   static_assert(offsetof(SkyDome, mDomeOrigin) == 0x20, "SkyDome::mDomeOrigin offset must be 0x20");
   static_assert(offsetof(SkyDome, mDomeShapeParams) == 0x2C, "SkyDome::mDomeShapeParams offset must be 0x2C");
   static_assert(offsetof(SkyDome, mWidth) == 0x38, "SkyDome::mWidth offset must be 0x38");
