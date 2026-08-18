@@ -63,7 +63,7 @@ namespace moho
     CWldSession* const session,
     GeomCamera3* const camera,
     CD3DPrimBatcher* const primBatcher,
-    const float interpolant
+    [[maybe_unused]] CWldMap* const map
   )
   {
     const float viewportWidth = static_cast<float>(static_cast<std::int32_t>(camera->viewport.r[3].z));
@@ -108,7 +108,10 @@ namespace moho
         continue;
       }
 
-      const VTransform transform = entity->GetInterpolatedTransform(interpolant);
+      // Interpolant 0: the arc pass samples projectiles at the start of the
+      // tick. See the header for why the binary's `movss` off the fourth
+      // argument amounts to the same thing.
+      const VTransform transform = entity->GetInterpolatedTransform(0.0f);
       const bool visible =
         meshBlueprint->mIconFadeInZoom <= camera->viewport.ProjectViewportDepthRow1(transform.pos_);
 

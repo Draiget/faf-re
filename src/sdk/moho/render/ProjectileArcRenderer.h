@@ -10,7 +10,16 @@
 namespace moho
 {
   class CD3DPrimBatcher;
+  class CWldMap;
   class CWldSession;
+
+  /**
+   * Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3HA)
+   *
+   * Gates the whole arc pass from `CRenderWorldView::Render` (0x0086EEA3).
+   * Zero-fill in the shipped image, so trails are off by default.
+   */
+  extern std::int32_t UI_RenProjectileArcs;
   struct GeomCamera3;
 
   /**
@@ -145,8 +154,24 @@ namespace moho
    * the world view but is overwritten with `cam` at 0x00860113 before any read,
    * and the four real arguments are all on the stack. Recovered as a free
    * function accordingly.
+   *
+   * The fourth argument is the map, not a `float interpolant`. Its sole caller
+   * `CRenderWorldView::Render` (0x0086EE00) stages `[ebp+10h]` into that slot at
+   * 0x0086EEAC (`D9 45 10`) - the same parameter it hands to
+   * `CWldSession::RenderProjectileIcons`, whose mangled name
+   * (`...PAVCWldMap@2@M@Z`) types it `CWldMap*`. Every `fld` in `Render` reads
+   * `[ebp+10h]`; `[ebp+14h]`, the real `float deltaSeconds`, is only ever loaded
+   * for `RenderProjectileIcons` and `RenderCommandGraph`.
+   *
+   * The body then reads that argument back with `movss` at 0x0086044B and feeds
+   * it to `UserEntity::GetInterpolatedTransform(float)`, so the shipped engine
+   * interpolates arc samples at whatever a heap pointer's bit pattern denotes as
+   * a float - around 1e-13 for any real allocation, i.e. zero. Recovered as an
+   * explicit `0.0f`, which is bit-for-bit the same sample and does not pretend a
+   * pointer is a fraction. `CWldSession::DrawEconomyOverlay` had the identical
+   * defect and was corrected the same way in 0652678.
    */
   void RenderProjectileArcs(
-    CWldSession* session, GeomCamera3* camera, CD3DPrimBatcher* primBatcher, float interpolant
+    CWldSession* session, GeomCamera3* camera, CD3DPrimBatcher* primBatcher, CWldMap* map
   );
 } // namespace moho

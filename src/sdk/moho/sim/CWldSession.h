@@ -1815,6 +1815,9 @@ namespace moho
   extern bool UI_SelectAnything;
 
   extern float UI_StrategicProjectileLOD;  // 0x00F57B20
+  // Gates the mass/hydro resource splats CRenderWorldView::Render draws through
+  // CWldSession::RenderResources (tested at 0x0086EE31). Ships enabled.
+  extern bool UI_RenResources;             // 0x00F57A8E
   extern bool UI_RenProjectileIcons;       // 0x00F57A8F
   extern bool UI_RenProjectileGlow;        // 0x00F57B24
   extern bool UI_forceWeaponsToYellow;     // 0x00F57B25

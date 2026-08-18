@@ -1299,6 +1299,9 @@ namespace moho
   // Projectile strategic-icon CVars. None of these existed in the tree; the
   // addresses come from the store/compare operands in FUN_008621B0.
   float UI_StrategicProjectileLOD = 0.0f;   // 0x00F57B20
+  // 0x00F57A8E holds 0x01 in bin/2025.7.1/ForgedAlliance.exe's .data, so the
+  // resource splats are on unless a console command turns them off.
+  bool UI_RenResources = true;              // 0x00F57A8E
   bool UI_RenProjectileIcons = false;       // 0x00F57A8F
   bool UI_RenProjectileGlow = false;        // 0x00F57B24
   bool UI_forceWeaponsToYellow = false;     // 0x00F57B25
