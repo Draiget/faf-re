@@ -1568,11 +1568,34 @@ namespace moho
    *
    * What it does:
    * Builds rotated inner/outer oval axes around `normal` and delegates to `DRAW_Oval`.
+   *
+   * The mangled name declares 10 parameters (CD3DPrimBatcher*, float, const Vector3f&,
+   * const Vector3f&, float, uint, uint, const CHeightField*, bool, float) but the sole
+   * caller in this binary (`Moho::DrawCommandGraph`, 0x00853DC0) was compiled under
+   * whole-program optimization against this single call site: it only pushes/loads real
+   * values for `primBatcher` (stack), `center` (stack), `normal` (ECX register — a custom
+   * `__usercall` promotion, confirmed by the raw .asm) and `radius` (a pre-filled stack
+   * slot). The remaining six parameters have no computed values at the call site (one
+   * stack slot is written with a leftover register value that is immediately overwritten
+   * before use — dead space reservation, not a real argument) and this function's own
+   * disassembly never reads them. They are kept in the signature, in mangled-name order,
+   * for ABI/name fidelity, and are `[[maybe_unused]]` rather than given invented names.
+   *
+   * `normal` is rotated with a hardcoded +Z axis (0,0,1) via `QuatCrossAdd`, then four
+   * points at `radius` +/- `kOvalBandHalfWidth` along the local X/Y axes are rotated by
+   * that quaternion (`RotateByQuaternion`, i.e. `MultQuadVec` in the binary) to form the
+   * inner/outer cosine/sine axes handed to `DRAW_Oval`.
    */
   void DRAW_Circle(
     CD3DPrimBatcher* const primBatcher,
+    [[maybe_unused]] const float unusedFloat0,
     const Vector3f& center,
     const Vector3f& normal,
+    [[maybe_unused]] const float unusedFloat1,
+    [[maybe_unused]] const std::uint32_t unusedUInt0,
+    [[maybe_unused]] const std::uint32_t unusedUInt1,
+    [[maybe_unused]] const CHeightField* const heightField,
+    [[maybe_unused]] const bool unusedBool0,
     const float radius
   )
   {

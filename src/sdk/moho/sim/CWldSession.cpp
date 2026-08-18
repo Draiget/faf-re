@@ -19,6 +19,7 @@
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/containers/SCoordsVec2.h"
+#include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/mesh/Mesh.h"
@@ -61,6 +62,8 @@
 #include "moho/misc/SessionStartup.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
+#include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/ESTITargetTypeTypeInfo.h"
@@ -1282,6 +1285,13 @@ msvc8::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) 
   return &typeInfo;
 }
 
+// Forward declaration: this symbol is referenced by the linker at global
+// scope (not inside namespace moho), so its definition stays at global scope
+// near the end of this file - but `DrawPathPreview` (namespace moho, below)
+// needs to call it ahead of that point.
+moho::CommandModeData* func_GetRightMouseButtonAction(
+  moho::CommandModeData* out, moho::MouseInfo* mouseInfo, int modifiers, moho::CWldSession* wldSession);
+
 namespace moho
 {
   // Address lanes:
@@ -1309,6 +1319,10 @@ namespace moho
   float UI_RenProjectileGlowMax = 0.0f;     // 0x00F57B2C
   float UI_RenProjectileGlowPeriod = 0.0f;  // 0x00F57B30
   float UI_CurGlowTime = 0.0f;              // 0x010A6460
+  // 0x010A6443 lies past ForgedAlliance.exe's raw .data (zero-filled BSS tail),
+  // so the path-preview overlay ships off.
+  bool ui_DrawPathPreview = false;          // 0x010A6443
+  bool ui_PathPreview = false;              // 0x010A6448
 
   // Entity ids carry their family in the top nibble; 0x1_______ is a projectile.
   constexpr std::uint32_t kEntityFamilyMask = 0xF0000000u;
@@ -1322,6 +1336,7 @@ namespace moho
 
   float ui_CurveSmoothness = 0.0f;             // 0x00F57CC4
   float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
+  float ui_MaxTextLOD = 0.0f;                  // 0x00F57CCC
   std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
   float ui_MinWaypointSize = 0.0f;             // 0x00F57CD4
   float ui_MaxWaypointSize = 0.0f;             // 0x00F57CD8
@@ -1397,6 +1412,16 @@ namespace moho
   {
   public:
     friend class CWldSession;
+
+    /**
+     * Its real caller (`sub_829190`) always passes `this` explicitly - see
+     * `DrawPathPreview`'s own doc comment in CWldSession.h for why the IDA
+     * decompile's declared first parameter is misleading here.
+     */
+    friend void DrawPathPreview(
+      UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick,
+      float tickFraction
+    );
 
     /**
      * Address: 0x00824810 (FUN_00824810, ??0UICommandGraph@Moho@@QAE@@Z)
@@ -1512,9 +1537,14 @@ namespace moho
        * lane back as a `MeshInstance*` to stance it at the node's anchor.
        */
       boost::SharedPtrRaw<MeshInstance> mMeshInstance; // +0x20
-      std::uint32_t field_0x28;            // +0x28
-      float field_0x2C;                    // +0x2C
-      float field_0x30;                    // +0x30
+      /**
+       * Orderline tangent override: 0x008288D0 reads this as one `Vector3f`
+       * (previously mis-split as `field_0x28`(uint32)/`field_0x2C`/
+       * `field_0x30`, three separate scalars - it is one 12-byte vector) and
+       * uses it in place of the computed from/to tangent whenever it's
+       * non-zero.
+       */
+      Wm3::Vector3f mOrientationHint;      // +0x28
       Wm3::Vector3f mPreviousCentroid;     // +0x34
       float field_0x40;                    // +0x40
       std::uint32_t field_0x44;            // +0x44
@@ -1590,6 +1620,103 @@ namespace moho
       CommandGraphTreeNode* mHead; // +0x04
       std::uint32_t mSize;         // +0x08
     };
+
+    /**
+     * One drawn segment of a queued-order "orderline" - the ribbon connecting
+     * two command-graph draw nodes. `mGraphRuntimeTree` buckets these by
+     * texture: each tree node's `mPayload` holds a
+     * `{boost::SharedPtrRaw<CD3DBatchTexture>, msvc8::vector<CommandGraphEdge*>}`
+     * pair, and the render pass walks the bucket's vector once per texture.
+     *
+     * Only the fields actually read by the render pass (0x00829190,
+     * 0x008288D0, 0x0082A380) are modeled; `sub_826140` (0x00826140, the
+     * edge-list rebuild that publishes these) would pin the remaining bytes
+     * but hasn't been recovered yet, so no full `sizeof` is asserted.
+     */
+    struct CommandGraphEdge
+    {
+      std::uint8_t mUnknown00_03[0x04]{};  // +0x00, unconfirmed - needs sub_826140
+      float mBaseWidth;                    // +0x04, confirmed by FUN_008288D0.c:85
+      UICommandGraphDrawNode* mFromNode;   // +0x08
+      UICommandGraphDrawNode* mToNode;     // +0x0C
+      std::uint8_t mUnknown10_17[0x08]{};  // +0x10, unconfirmed - needs sub_826140
+      /**
+       * When set, 0x008288D0 skips `ResolveDrawNodeHighlightState` entirely
+       * and draws this edge with the owning `CommandGraphNode`'s
+       * mOrderlineHighlightColor/mOrderlineHighlightGlow directly - i.e. this
+       * forces the "highlighted" style, it does not carry a per-edge custom
+       * color (an earlier read of this struct assumed `+0x1C`/`+0x28` held a
+       * per-edge override color/alpha; neither offset is actually read
+       * anywhere in 0x008288D0, so that guess has been dropped).
+       */
+      bool mForceHighlightStyle;            // +0x18
+      std::uint8_t mUnknown19_27[0x0F]{};   // +0x19, unconfirmed - needs sub_826140
+    };
+
+    static_assert(offsetof(CommandGraphEdge, mBaseWidth) == 0x04, "CommandGraphEdge::mBaseWidth offset must be 0x04");
+    static_assert(offsetof(CommandGraphEdge, mFromNode) == 0x08, "CommandGraphEdge::mFromNode offset must be 0x08");
+    static_assert(offsetof(CommandGraphEdge, mToNode) == 0x0C, "CommandGraphEdge::mToNode offset must be 0x0C");
+    static_assert(offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18, "CommandGraphEdge::mForceHighlightStyle offset must be 0x18");
+
+    /**
+     * Typed view over `CommandGraphTreeNode::mPayload` - a texture-keyed
+     * bucket of orderline edges. `mGraphRuntimeTree` is a real msvc8-shaped
+     * red-black tree (matching `mColorOrAllocated`/`mIsSentinel` at the same
+     * offsets a real `_Tree` node uses), so this reinterprets the 24-byte
+     * payload rather than modeling the tree as a distinct container type.
+     */
+    struct CommandGraphTreeBucket
+    {
+      boost::SharedPtrRaw<CD3DBatchTexture> mTexture;   // +0x00
+      msvc8::vector<CommandGraphEdge*> mEdges;          // +0x08
+    };
+    static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
+
+    [[nodiscard]] static CommandGraphTreeBucket& BucketOf(CommandGraphTreeNode& node) noexcept
+    {
+      return *reinterpret_cast<CommandGraphTreeBucket*>(node.mPayload);
+    }
+
+    /**
+     * Tri-state highlight the render pass picks a waypoint/orderline style
+     * color and scale from - see `ResolveDrawNodeHighlightState`.
+     */
+    enum class ECommandNodeHighlightState : std::int32_t
+    {
+      Normal = 0,
+      Highlighted = 1,
+      Selected = 2,
+    };
+
+    /**
+     * Address: 0x008281E0 (FUN_008281E0, sub_8281E0)
+     * Address: 0x00828280 (FUN_00828280, sub_828280) - folded in, see below
+     * Address: 0x00831110 (FUN_00831110, sub_831110) - now
+     * `SSelectionSetUserEntity::HasCommonLiveEntityWith`
+     *
+     * What it does:
+     * Picks the style state a command-graph draw node renders with this
+     * frame: `Highlighted` when the cursor is hovering a unit the node's
+     * command affects, or when the node's command is the session's
+     * currently-interacting one; `Selected` when the node's affected-entity
+     * set shares any live entity with the current selection; `Normal`
+     * otherwise, and always `Normal` for a node with no owning command.
+     *
+     * `sub_828280` (the "selected" check) is folded directly into this
+     * function rather than kept as a separate one-call helper - its own body
+     * was just "resolve the command's cursor-entity set, then ask whether it
+     * intersects the session selection", both of which are already named
+     * operations here.
+     *
+     * The binary's `mIsDragger` comparison (0x00828249: `cmp ebx,[esi+18h]`)
+     * reads `MouseInfo::mIsDragger` as a `CmdId`, not a boolean "currently
+     * dragging" flag - it is genuinely the id of whichever command the
+     * session is presently interacting with. Preserved as a raw field read
+     * with this comment rather than renaming the widely-shared `MouseInfo`
+     * field.
+     */
+    [[nodiscard]] ECommandNodeHighlightState
+      ResolveDrawNodeHighlightState(const UICommandGraphDrawNode& drawNode) const;
 
   private:
     static void ReleaseIntrusive(CD3DFont*& font);
@@ -1696,6 +1823,72 @@ namespace moho
       mNeedsRebuild = 1u;
     }
 
+    /**
+     * Address: 0x008282B0 (FUN_008282B0, sub_8282B0)
+     *
+     * What it does:
+     * Draws one command node's waypoint marker quad: a flat square centered
+     * on the node's averaged position, sized to a roughly-constant apparent
+     * screen size via the camera's viewport perspective-width row, colored
+     * and scaled by `ResolveDrawNodeHighlightState`.
+     */
+    void DrawWaypointMarker(const GeomCamera3& camera, CD3DPrimBatcher& batcher, UICommandGraphDrawNode& drawNode) const;
+
+    /**
+     * Address: 0x00828DD0 (FUN_00828DD0, sub_828DD0)
+     *
+     * What it does:
+     * Poses the node's owned mesh instance at its resolved (or history-
+     * resolved fallback) anchor and, when that anchor came from a real unit
+     * blueprint, draws the unit's footprint skirt there too.
+     */
+    void DrawPositionNodeMesh(UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher) const;
+
+    /**
+     * Address: 0x00828610 (FUN_00828610, Moho::DisplayCommandNode)
+     *
+     * What it does:
+     * Draws the "ETA: mm:ss" text label above one command-graph draw node.
+     */
+    void DisplayCommandNode(const GeomCamera3& camera, const UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher) const;
+
+    /**
+     * Address: 0x008288D0 (FUN_008288D0, sub_8288D0)
+     *
+     * What it does:
+     * Draws one command-graph "orderline" ribbon segment between two draw
+     * nodes' averaged positions.
+     */
+    void DrawCommandOrderline(
+      const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction,
+      const CommandGraphEdge& edge, bool isGlow
+    ) const;
+
+  public:
+    /**
+     * Address: 0x00829190 (FUN_00829190, sub_829190)
+     *
+     * What it does:
+     * The per-frame command-graph render pass: draws every queued-order
+     * orderline (opaque then glow, grouped by texture), every waypoint
+     * marker, positions each node's anchored mesh/skirt, the path-preview
+     * overlay, then switches to a screen-space projection and draws every
+     * node's ETA text label.
+     *
+     * The `__userpurge` signature carries two more register arguments
+     * (`CRenderWorldView*`, `boost::shared_ptr<UICommandGraph>&`) that its
+     * caller (`sub_85AF40`) always supplies, but this function's own body
+     * never dereferences either - confirmed against every callsite in its
+     * disassembly. Dropped from this signature rather than kept unused.
+     *
+     * Public (unlike its `DrawWaypointMarker`/`DrawCommandOrderline`/etc.
+     * siblings above, which are only ever called from here): its real caller
+     * is `sub_85AF40`, outside this class - reached via
+     * `DrawCommandGraphMeshIfPresent` (CWldSession.h) from
+     * `CRenderWorldView::RenderCommandGraph`.
+     */
+    void DrawCommandGraphMesh(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
+
   private:
     std::uint8_t mNeedsRebuild; // +0x0000
     std::uint8_t pad_0001[3];
@@ -1739,6 +1932,10 @@ namespace moho
   static_assert(
     offsetof(UICommandGraph::UICommandGraphDrawNode, mMeshInstance) == 0x20,
     "UICommandGraphDrawNode::mMeshInstance offset must be 0x20"
+  );
+  static_assert(
+    offsetof(UICommandGraph::UICommandGraphDrawNode, mOrientationHint) == 0x28,
+    "UICommandGraphDrawNode::mOrientationHint offset must be 0x28"
   );
   static_assert(
     offsetof(UICommandGraph::UICommandGraphDrawNode, mPreviousCentroid) == 0x34,
@@ -3575,6 +3772,768 @@ namespace moho
   }
 
   /**
+   * What it does: see the header.
+   */
+  UICommandGraph::ECommandNodeHighlightState UICommandGraph::ResolveDrawNodeHighlightState(
+    const UICommandGraphDrawNode& drawNode
+  ) const
+  {
+    auto* const ownerHelper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (ownerHelper == nullptr) {
+      return ECommandNodeHighlightState::Normal;
+    }
+
+    if (UserEntity* const hoveredEntity = mSession->GetHoveredUserEntity(); hoveredEntity != nullptr) {
+      if (UserUnit* const hoveredUnit = hoveredEntity->IsUserUnit(); hoveredUnit != nullptr) {
+        SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
+        SSelectionSetUserEntity::FindResult found{};
+        (void)SSelectionSetUserEntity::Find(&found, cursorEntities, hoveredUnit);
+        if (found.mRes != cursorEntities->mHead) {
+          return ECommandNodeHighlightState::Highlighted;
+        }
+      }
+    }
+
+    if (ownerHelper->mConstantData.cmd == mSession->GetCursorInfo().mIsDragger) {
+      return ECommandNodeHighlightState::Highlighted;
+    }
+
+    SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
+    if (cursorEntities->HasCommonLiveEntityWith(mSession->GetSelection())) {
+      return ECommandNodeHighlightState::Selected;
+    }
+
+    return ECommandNodeHighlightState::Normal;
+  }
+
+  /**
+   * Address: 0x008282B0 (FUN_008282B0, sub_8282B0)
+   *
+   * IDA signature:
+   * void __thiscall sub_8282B0(UICommandGraph *this, GeomCamera3 *camera,
+   *   CD3DPrimBatcher *batcher, UICommandGraphDrawNode *drawNode);
+   *
+   * What it does:
+   * Draws one command node's waypoint marker: a flat quad centered on the
+   * node's averaged position, colored/scaled by
+   * `ResolveDrawNodeHighlightState`, sized to a roughly-constant apparent
+   * screen size via the camera viewport's perspective-width row
+   * (`ProjectViewportWidthRow2`, the same shape as the already-recovered
+   * `ProjectViewportDepthRow1`, one row over) and clamped to
+   * `[ui_MinWaypointSize, ui_MaxWaypointSize]`.
+   */
+  void UICommandGraph::DrawWaypointMarker(
+    const GeomCamera3& camera, CD3DPrimBatcher& batcher, UICommandGraphDrawNode& drawNode
+  ) const
+  {
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (helper == nullptr) {
+      return;
+    }
+
+    const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
+    const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
+
+    boost::shared_ptr<CD3DBatchTexture> texture = boost::SharedPtrFromRawRetained(
+      reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(node.mWaypointTexture)
+    );
+
+    std::uint32_t color = 0;
+    float styleScale = 0.0f;
+    switch (ResolveDrawNodeHighlightState(drawNode)) {
+    case ECommandNodeHighlightState::Normal:
+      color = node.mWaypointColor;
+      styleScale = node.mWaypointScale;
+      break;
+    case ECommandNodeHighlightState::Highlighted:
+      color = node.mWaypointHighlightColor;
+      styleScale = node.mWaypointHighlightScale;
+      break;
+    case ECommandNodeHighlightState::Selected:
+      color = node.mWaypointSelectedColor;
+      styleScale = node.mWaypointSelectedScale;
+      break;
+    }
+
+    if (!texture) {
+      texture = CD3DBatchTexture::FromSolidColor(0xFF30F030u);
+    }
+
+    const float invWeight = 1.0f / drawNode.mWeight;
+    const Wm3::Vector3f avg{
+      drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
+    };
+
+    const float depthW = camera.viewport.ProjectViewportWidthRow2(avg);
+
+    float size = (drawNode.field_0x40 * styleScale) / depthW;
+    size = std::clamp(size, ui_MinWaypointSize, ui_MaxWaypointSize);
+
+    batcher.SetTexture(texture);
+
+    const CD3DPrimBatcher::Vertex topLeft{avg.x - size, avg.y, avg.z + size, color, 0.0f, 1.0f};
+    const CD3DPrimBatcher::Vertex topRight{avg.x - size, avg.y, avg.z - size, color, 0.0f, 0.0f};
+    const CD3DPrimBatcher::Vertex bottomRight{avg.x + size, avg.y, avg.z - size, color, 1.0f, 0.0f};
+    const CD3DPrimBatcher::Vertex bottomLeft{avg.x + size, avg.y, avg.z + size, color, 1.0f, 1.0f};
+    batcher.DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+  }
+
+  /**
+   * Address: 0x00828DD0 (FUN_00828DD0, sub_828DD0)
+   *
+   * IDA signature:
+   * void __usercall sub_828DD0(UICommandGraphDrawNode *drawNode@<?>,
+   *   UICommandGraph *graph, CD3DPrimBatcher *batcher);
+   *
+   * What it does:
+   * Poses the node's owned mesh instance at its resolved position (the
+   * averaged `mPositionSum/mWeight` anchor when `mHasResolvedPosition`,
+   * otherwise the anchor `ResolveCommandGraphAnchorWorldPosition` resolves
+   * from the owning command's history) with identity orientation (a snap,
+   * not an interpolated move - `SetStance` is called with the same
+   * transform as both its start and end). When the anchor came from a real
+   * unit blueprint, additionally draws that unit's footprint skirt there.
+   *
+   * The decompile carries the documented "positive sp value has been
+   * detected" reliability warning; the temporary `VTransform` construction
+   * it mis-attributes to a stack slot 24 bytes off was re-derived from the
+   * raw x86 (0x00828E19..0x00828E3A) instead. The observable geometry
+   * (position = averaged anchor, orientation = identity,
+   * `SetStance(anchor, anchor)`) matches for both branches regardless.
+   */
+  void UICommandGraph::DrawPositionNodeMesh(UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher) const
+  {
+    if (!drawNode.mMeshInstance.px) {
+      return;
+    }
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (helper == nullptr) {
+      return;
+    }
+
+    Wm3::Vector3f anchor{};
+    const RUnitBlueprint* unitBlueprint = nullptr;
+
+    if (drawNode.mHasResolvedPosition) {
+      const REntityBlueprint* const blueprint = helper->mConstantData.blueprint;
+      if (blueprint == nullptr || !blueprint->IsUnitBlueprint()) {
+        return;
+      }
+      unitBlueprint = static_cast<const RUnitBlueprint*>(blueprint);
+
+      const float invWeight = 1.0f / drawNode.mWeight;
+      anchor = {
+        drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
+      };
+    } else {
+      anchor = ResolveCommandGraphAnchorWorldPosition(*helper);
+    }
+
+    const VTransform transform{anchor, Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f}};
+    drawNode.mMeshInstance.px->SetStance(transform, transform);
+
+    if (unitBlueprint == nullptr) {
+      return;
+    }
+
+    CHeightField* const heightField = mSession->mWldMap->mTerrainRes->GetHeightField();
+    CameraImpl* const camera = CAM_GetCamera(gpg::StrArg("WorldCamera"));
+    const std::uint32_t color = drawNode.mIsVisible ? 0xD8000000u : 0xD8280000u;
+    DrawUnitSkirt(heightField, unitBlueprint, camera->CameraGetView(), anchor, mSession, &batcher, color);
+  }
+
+  /**
+   * Address: 0x00828610 (FUN_00828610, Moho::DisplayCommandNode)
+   *
+   * IDA signature:
+   * void __userpurge Moho::DisplayCommandNode(UICommandGraph *this@<ecx>,
+   *   GeomCamera3 *camera@<ebx>, UICommandGraphDrawNode *drawNode@<esi>,
+   *   CD3DPrimBatcher *batcher);
+   *
+   * What it does:
+   * Draws the "ETA: mm:ss" text label above one command-graph draw node,
+   * gated by the "display_eta" option, the command not yet being due
+   * (`drawNode.field_0x44 - mSession->mGameTick < 0` skips), and - only for
+   * the non-highlighted/non-selected state - an LOD distance test against
+   * `ui_MaxTextLOD` using the camera viewport's depth row (the same
+   * `ProjectViewportDepthRow1` shape used throughout this file).
+   *
+   * Glyph size is `field_0x40 * (style scale for the resolved highlight
+   * state)`; the label anchors at the node's averaged position offset by
+   * that glyph size in X/-Z, then is projected to screen space and nudged
+   * by `mDebugFont->mDescent + 1` pixels vertically.
+   */
+  void UICommandGraph::DisplayCommandNode(
+    const GeomCamera3& camera, const UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher
+  ) const
+  {
+    if (drawNode.mHelperLink.mHead == nullptr) {
+      return;
+    }
+
+    const std::int32_t beatsUntilDue = static_cast<std::int32_t>(drawNode.field_0x44) - mSession->mGameTick;
+    if (beatsUntilDue < 0) {
+      return;
+    }
+
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
+    const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
+
+    const float invWeight = 1.0f / drawNode.mWeight;
+    const Wm3::Vector3f avg{
+      drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
+    };
+
+    float styleScale = 0.0f;
+    switch (ResolveDrawNodeHighlightState(const_cast<UICommandGraphDrawNode&>(drawNode))) {
+    case ECommandNodeHighlightState::Normal:
+      if (camera.viewport.ProjectViewportDepthRow1(avg) >= ui_MaxTextLOD) {
+        return;
+      }
+      styleScale = node.mWaypointScale;
+      break;
+    case ECommandNodeHighlightState::Highlighted:
+      styleScale = node.mWaypointHighlightScale;
+      break;
+    case ECommandNodeHighlightState::Selected:
+      styleScale = node.mWaypointSelectedScale;
+      break;
+    }
+
+    const float glyphScale = drawNode.field_0x40 * styleScale;
+
+    if (!OPTIONS_GetBool("display_eta")) {
+      return;
+    }
+
+    const float seconds = static_cast<float>(beatsUntilDue) * 0.1f;
+    const auto truncSeconds = static_cast<std::int32_t>(std::trunc(seconds));
+    const msvc8::string label = gpg::STR_Printf("ETA: %d.%02d", truncSeconds / 60, truncSeconds % 60);
+
+    const Wm3::Vector3f textAnchor{avg.x + glyphScale, avg.y, avg.z - glyphScale};
+    const Wm3::Vector2f projected = camera.Project(textAnchor);
+    const Wm3::Vector2f screenPos{
+      static_cast<float>(static_cast<std::int32_t>(projected.x + 1.0f)),
+      static_cast<float>(static_cast<std::int32_t>(projected.y - (mDebugFont->mDescent + 1.0f)))
+    };
+
+    // Color/scale/maxAdvance are elided register args at this callsite the
+    // decompile doesn't show explicitly; `NAN` for maxAdvance is the one
+    // value the raw decompile states literally, preserved as-is (an
+    // unclipped label). Color/scale use this file's other text-draw
+    // defaults (opaque white, unscaled) pending a dedicated re-verification.
+    mDebugFont->Render2D(gpg::StrArg(label.c_str()), &batcher, screenPos, 0xFFFFFFFFu, 1.0f, std::numeric_limits<float>::quiet_NaN());
+  }
+
+  /**
+   * Address: 0x008288D0 (FUN_008288D0, sub_8288D0)
+   *
+   * IDA signature:
+   * void __thiscall sub_8288D0(GeomCamera3 *this, UICommandGraph *graph,
+   *   CD3DPrimBatcher *batcher, int tick, float tickFraction,
+   *   CommandGraphEdge *edge, char isGlow);
+   *
+   * What it does:
+   * Draws one command-graph "orderline" ribbon segment between two draw
+   * nodes' averaged positions via `EmitHermiteRibbonSegments`.
+   *
+   * Verified against the raw x86 (every `*0.0` term in the endpoint-offset
+   * block resolves to a hardware-confirmed zero, exactly the pattern
+   * already documented on `EmitHermiteRibbonSegments`): the spline's two
+   * control points are the *unmodified* averaged from/to positions, and the
+   * two tangents fed to the Hermite blend are each endpoint's own tangent
+   * (its `mOrientationHint` when non-zero, else the normalized from-to
+   * direction) scaled by a smoothness radius
+   * (`min(segmentLength * 0.25, ui_CurveSmoothness * width)`).
+   *
+   * Color/glow selection: when `edge.mForceHighlightStyle` is set, this
+   * skips `ResolveDrawNodeHighlightState` entirely and uses the owning
+   * node's `mOrderlineHighlightColor`/`mOrderlineHighlightGlow` directly -
+   * i.e. the flag forces the "highlighted" appearance, it does not carry a
+   * per-edge custom color (see the field's own doc comment). Otherwise the
+   * usual 0/1/2 dispatch picks Normal/Highlighted/Selected colors. For the
+   * glow pass (`isGlow`), the color's alpha byte is replaced by the style's
+   * glow scalar.
+   */
+  void UICommandGraph::DrawCommandOrderline(
+    const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction,
+    const CommandGraphEdge& edge, const bool isGlow
+  ) const
+  {
+    UICommandGraphDrawNode* const fromNode = edge.mFromNode;
+    if (fromNode == nullptr) {
+      return;
+    }
+    UICommandGraphDrawNode* const toNode = edge.mToNode;
+    if (toNode == nullptr) {
+      return;
+    }
+    auto* const ownerHelper = reinterpret_cast<UserCommandIssueHelper*>(toNode->mHelperLink.mHead);
+    if (ownerHelper == nullptr) {
+      return;
+    }
+
+    const float fromInvWeight = 1.0f / fromNode->mWeight;
+    const Wm3::Vector3f fromPos{
+      fromNode->mPositionSum.x * fromInvWeight, fromNode->mPositionSum.y * fromInvWeight,
+      fromNode->mPositionSum.z * fromInvWeight
+    };
+    const float toInvWeight = 1.0f / toNode->mWeight;
+    const Wm3::Vector3f toPos{
+      toNode->mPositionSum.x * toInvWeight, toNode->mPositionSum.y * toInvWeight, toNode->mPositionSum.z * toInvWeight
+    };
+
+    const float widthFromDepth = camera.viewport.ProjectViewportWidthRow2(fromPos) * 2.0f;
+    const float widthToDepth = camera.viewport.ProjectViewportWidthRow2(toPos) * 2.0f;
+    const float width = (edge.mBaseWidth + std::max(widthFromDepth, widthToDepth)) * ui_WaypointLineScale;
+
+    Wm3::Vector3f direction{toPos.x - fromPos.x, toPos.y - fromPos.y, toPos.z - fromPos.z};
+    direction.Normalize();
+
+    Wm3::Vector3f fromTangent = direction;
+    if (fromNode->mOrientationHint.x != 0.0f || fromNode->mOrientationHint.y != 0.0f
+        || fromNode->mOrientationHint.z != 0.0f) {
+      fromTangent = fromNode->mOrientationHint;
+    }
+    Wm3::Vector3f toTangent = direction;
+    if (toNode->mOrientationHint.x != 0.0f || toNode->mOrientationHint.y != 0.0f
+        || toNode->mOrientationHint.z != 0.0f) {
+      toTangent = toNode->mOrientationHint;
+    }
+
+    const float segmentLength = std::sqrt(
+      ((toPos.x - fromPos.x) * (toPos.x - fromPos.x) + (toPos.y - fromPos.y) * (toPos.y - fromPos.y))
+      + (toPos.z - fromPos.z) * (toPos.z - fromPos.z)
+    );
+    const float smoothRadius = std::min(segmentLength * 0.25f, ui_CurveSmoothness * width);
+
+    const auto commandType = ResolveCommandIssueHelperCommandType(*ownerHelper);
+    const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
+
+    std::uint32_t color;
+    float glow;
+    if (edge.mForceHighlightStyle) {
+      color = node.mOrderlineHighlightColor;
+      glow = node.mOrderlineHighlightGlow;
+    } else {
+      switch (ResolveDrawNodeHighlightState(*toNode)) {
+      case ECommandNodeHighlightState::Selected:
+        color = node.mOrderlineSelectedColor;
+        glow = node.mOrderlineSelectedGlow;
+        break;
+      case ECommandNodeHighlightState::Highlighted:
+        color = node.mOrderlineHighlightColor;
+        glow = node.mOrderlineHighlightGlow;
+        break;
+      case ECommandNodeHighlightState::Normal:
+      default:
+        color = node.mOrderlineColor;
+        glow = node.mOrderlineGlow;
+        break;
+      }
+    }
+    if (isGlow) {
+      color &= static_cast<std::uint32_t>(static_cast<std::uint8_t>(glow * 255.0f)) << 24;
+    }
+
+    const float uStart = 1.0f - std::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+
+    EmitHermiteRibbonSegments(
+      batcher, fromPos, toPos, Wm3::Vector3f{fromTangent.x * smoothRadius, fromTangent.y * smoothRadius, fromTangent.z * smoothRadius},
+      Wm3::Vector3f{toTangent.x * smoothRadius, toTangent.y * smoothRadius, toTangent.z * smoothRadius}, width, color,
+      uStart, node.mOrderlineAspectRatio
+    );
+  }
+
+  // Forward declarations: reopens the same file-scope anonymous namespace
+  // that defines these two sentinel-headed RB-tree walkers further below (by
+  // the selection/save-tree helpers), so `DrawCommandGraphMesh` below - the
+  // only command-graph draw method that needs them - can call them here,
+  // ahead of their point of definition.
+  namespace
+  {
+    template <typename TNode>
+    [[nodiscard]] bool IsSentinelNode(const TNode* node);
+    template <typename TNode>
+    [[nodiscard]] TNode* NextTreeNode(TNode* node);
+  }
+
+  /**
+   * Address: 0x00829190 (FUN_00829190, sub_829190)
+   *
+   * What it does:
+   * The per-frame command-graph render pass. Six sub-passes, each under its
+   * own primbatcher technique:
+   *   A) "TCommand"        - opaque orderlines, walking `mGraphRuntimeTree`
+   *      (a texture-bucketed red-black tree; each node's payload is a
+   *      `{texture, msvc8::vector<CommandGraphEdge*>}` pair) and drawing
+   *      every edge in every bucket with `isGlow=false`.
+   *   B) "TCommandGlow"    - the same tree walk again with `isGlow=true`.
+   *   C) "TAlphaBlendLinearSampleNoDepth" - waypoint marker billboards,
+   *      walking `mMapAB0` (the sentinel-headed draw-node list).
+   *   D) "TAlphaBlendLinearSample" - position-node meshes/skirts, same
+   *      `mMapAB0` walk, with a flat white texture bound first.
+   *   E) "TCommandOther"   - the optional path-preview overlay (gated on
+   *      `ui_DrawPathPreview`), then a screen-space pixel projection.
+   *   F) (still under TCommandOther) - per-node ETA text labels, a third
+   *      `mMapAB0` walk.
+   *
+   * The two tree walks and three list walks are the decompiler's
+   * `boost::shared_ptr`-shaped traversal of `mGraphRuntimeTree`/`mMapAB0`
+   * respectively (IDA mistyped both containers as chains of
+   * `boost::detail::sp_counted_base_vtbl`/`CD3DBatchTexture` because their
+   * node layouts happen to alias those types' field shapes at the read
+   * offsets) - recovered here as the same typed RB-tree/list walks every
+   * sibling command-graph function already uses.
+   *
+   * The `__userpurge` signature carries two more register arguments
+   * (`CRenderWorldView*`, `boost::shared_ptr<UICommandGraph>&`) that its
+   * caller (`sub_85AF40`) always supplies, but this function's own body
+   * never dereferences either - confirmed against every callsite in its
+   * disassembly. Dropped from this signature rather than kept unused.
+   */
+  void UICommandGraph::DrawCommandGraphMesh(
+    const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction
+  )
+  {
+    batcher.Flush();
+
+    // Pass A: opaque orderlines, bucketed by texture.
+    (void)batcher.Setup("TCommand");
+    batcher.SetViewProjMatrix(camera);
+    for (CommandGraphTreeNode* node = mGraphRuntimeTree.mHead->mLeft;
+         node != nullptr && node != mGraphRuntimeTree.mHead; node = NextTreeNode(node)) {
+      CommandGraphTreeBucket& bucket = BucketOf(*node);
+      batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
+      for (CommandGraphEdge* const edge : bucket.mEdges) {
+        DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/false);
+      }
+    }
+    batcher.Flush();
+
+    // Pass B: glow overlay for the same orderlines.
+    (void)batcher.Setup("TCommandGlow");
+    batcher.SetViewProjMatrix(camera);
+    for (CommandGraphTreeNode* node = mGraphRuntimeTree.mHead->mLeft;
+         node != nullptr && node != mGraphRuntimeTree.mHead; node = NextTreeNode(node)) {
+      CommandGraphTreeBucket& bucket = BucketOf(*node);
+      batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
+      for (CommandGraphEdge* const edge : bucket.mEdges) {
+        DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/true);
+      }
+    }
+    batcher.Flush();
+
+    // Pass C: waypoint marker billboards.
+    (void)batcher.Setup("TAlphaBlendLinearSampleNoDepth");
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      DrawWaypointMarker(camera, batcher, node->mDraw);
+    }
+    batcher.Flush();
+
+    // Pass D: position-node meshes/skirts, over a flat white texture.
+    (void)batcher.Setup("TAlphaBlendLinearSample");
+    batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      DrawPositionNodeMesh(node->mDraw, batcher);
+    }
+    batcher.Flush();
+
+    // Pass E: optional path-preview overlay, then switch to a screen-space
+    // pixel projection for the ETA text pass below.
+    (void)batcher.Setup("TCommandOther");
+    if (ui_DrawPathPreview) {
+      DrawPathPreview(*this, camera, batcher, tick, tickFraction);
+    }
+
+    batcher.SetProjectionMatrix(MakeViewportPixelProjection(camera));
+    batcher.SetViewMatrix(VMatrix4::Identity());
+
+    // Pass F: per-node ETA text labels, in the screen-space projection just set.
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      DisplayCommandNode(camera, node->mDraw, batcher);
+    }
+    batcher.Flush();
+  }
+
+  void DrawCommandGraphMeshIfPresent(
+    UICommandGraph* const graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick,
+    const float tickFraction
+  )
+  {
+    if (graph != nullptr) {
+      graph->DrawCommandGraphMesh(camera, batcher, tick, tickFraction);
+    }
+  }
+
+  // Forward declarations for functions `DrawPathPreview` below needs whose
+  // own out-of-line definitions live later in this TU (`func_
+  // GetRightMouseButtonAction`, at global scope, is referenced by the linker
+  // at global scope so its definition stays there) or that this codebase
+  // conventionally forward-declares per-TU rather than sharing a header for
+  // (`MultQuadVec`, matching the same one-line declaration already repeated
+  // in a dozen other .cpp files that call it).
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
+
+  /**
+   * Address: 0x00821F50 (FUN_00821F50, Moho::UnitCommandCapToCommandType)
+   *
+   * Defined in Sim.cpp; declared here rather than pulling in Sim.h for one
+   * symbol.
+   */
+  [[nodiscard]] EUnitCommandType UnitCommandCapToCommandType(ERuleBPUnitCommandCaps commandCap);
+
+  /**
+   * Address: 0x0082A380 (FUN_0082A380, sub_82A380)
+   *
+   * What it does:
+   * Draws the active move-command's path-preview ribbon: either the
+   * Ramer-Douglas-Peucker-simplified world-space path sampled from the
+   * previewed army's runtime cell-position scratch buffer
+   * (`ui_PathPreview` on), or a straight two-point line from the cursor to
+   * the deepest selected unit's current/queued anchor position
+   * (`ui_PathPreview` off). Both converge on the same ribbon-emission walk
+   * used by `UICommandGraph::DrawCommandOrderline`, styled from the
+   * command-graph node matching the pending right-click command, with an
+   * arrowhead billboard capping the last segment when the node has one.
+   *
+   * `arg0`, the IDA-declared first parameter, is not a real argument - see
+   * this function's declaration in CWldSession.h.
+   *
+   * The runtime cell-position buffer's trailing "meta" dword
+   * (`SArmyVectorWithMeta::mMetaWord`, modeled as a plain `uint32_t` because
+   * different consumers reuse the same four bytes differently) is read here
+   * as a pointer to a 3-byte `{sizeX, sizeZ, layer}` footprint descriptor -
+   * confirmed against the raw disassembly, not just the decompile, so the
+   * reinterpret is applied at this call site rather than changing the
+   * field's canonical type.
+   */
+  void DrawPathPreview(
+    UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick,
+    const float tickFraction
+  )
+  {
+    CWldSession* const session = graph.mSession;
+
+    const std::int32_t focusArmy = session->FocusArmy;
+    if (focusArmy < 0) {
+      return;
+    }
+    UserArmy* const army = session->userArmies[focusArmy];
+    if (army == nullptr) {
+      return;
+    }
+
+    SArmyVectorWithMeta& scratch = army->mVarDat.mRuntimeWordVectorWithMeta;
+    const std::size_t cellCount = scratch.mWords.size();
+    // The meta dword is only ever a real descriptor pointer once the army's
+    // scratch buffer has been populated for STI/path-preview display; a
+    // fresh/never-populated army leaves it null.
+    const std::uint8_t* const footprintDescriptor = *reinterpret_cast<const std::uint8_t* const*>(&scratch.mMetaWord);
+
+    msvc8::list<Wm3::Vector3f> simplifiedPath{};
+    float capWidthSeed = 0.0f;
+
+    if (ui_PathPreview) {
+      if (footprintDescriptor == nullptr || cellCount < 2) {
+        return;
+      }
+
+      capWidthSeed = static_cast<float>(footprintDescriptor[0]);
+
+      STIMap* const stiMap = session->GetSTIMap();
+      const auto* const cellPositions = reinterpret_cast<const SOCellPos*>(scratch.mWords.begin());
+
+      msvc8::vector<Wm3::Vector3f> worldPts(cellCount);
+      for (std::size_t i = 0; i < cellCount; ++i) {
+        worldPts[i] = COORDS_ToWorldPos(
+          stiMap, cellPositions[i], static_cast<ELayer>(footprintDescriptor[2]), footprintDescriptor[0],
+          footprintDescriptor[1]
+        );
+      }
+
+      simplifiedPath.push_back(worldPts.front());
+      simplifiedPath.push_back(worldPts.back());
+      SimplifyPathSpan(
+        worldPts, 0, static_cast<std::int32_t>(cellCount) - 1, simplifiedPath, --simplifiedPath.end(),
+        ui_PathSmoothness
+      );
+    } else {
+      if (!session->CursorInfo().mHitValid) {
+        return;
+      }
+
+      UserUnit* const subject = PickPathPreviewSubject(const_cast<SSelectionSetUserEntity&>(session->GetSelection()));
+      if (subject == nullptr) {
+        return;
+      }
+
+      IUnit* const subjectBridge = GetIUnitBridge(subject);
+      // The blueprint byte this reads (its own footprint-size lane, same
+      // family as the sizeX byte the ui_PathPreview branch above reads from
+      // the descriptor) was not independently re-derived against
+      // RUnitBlueprint's layout - kept as a raw byte read rather than
+      // guessing a named field.
+      capWidthSeed = static_cast<float>(reinterpret_cast<const std::uint8_t*>(subjectBridge->GetBlueprint())[216]);
+
+      Wm3::Vector3f endPos = subjectBridge->GetPosition();
+      if (MAUI_KeyIsDown(MKEY_SHIFT)) {
+        // `GetLastQueuedUserCommandAnchor` and `ResolveCommandGraphAnchorWorldPosition`
+        // both ultimately view the same binary object (the unit's most
+        // recently queued command-issue helper) through different recovered
+        // type lanes - see the former's doc comment in UserUnit.cpp.
+        const auto* const anchorHelper =
+          reinterpret_cast<const UserCommandIssueHelper*>(GetLastQueuedUserCommandAnchor(subject));
+        if (anchorHelper != nullptr) {
+          endPos = ResolveCommandGraphAnchorWorldPosition(const_cast<UserCommandIssueHelper&>(*anchorHelper));
+        }
+      }
+
+      simplifiedPath.push_back(session->CursorInfo().mMouseWorldPos);
+      simplifiedPath.push_back(endPos);
+    }
+
+    // Two distinct distance-based scale terms, both read off the camera's
+    // world/view-matrix row via the front preview point - confirmed distinct
+    // (not the same term reused) by their different scale constants and by
+    // `capDivisor` alone folding in `capWidthSeed` as a floor:
+    //   capDivisor - denominator for the arrowhead cap offset below.
+    //   maxWidthTerm - the ribbon half-width term, maxed against the back
+    //     point too (matching `DrawCommandOrderline`'s sibling formula)
+    //     rather than the single-point read the raw decompile's redundant
+    //     reloads collapse to.
+    const float frontProjected = camera.viewport.ProjectViewportWidthRow2(simplifiedPath.front());
+    const float capDivisor = std::max(capWidthSeed, frontProjected * 3.0f) * 0.2f;
+
+    float maxWidthTerm = frontProjected * 2.0f;
+    const float backProjected = camera.viewport.ProjectViewportWidthRow2(simplifiedPath.back()) * 2.0f;
+    if (backProjected > maxWidthTerm) {
+      maxWidthTerm = backProjected;
+    }
+
+    const LuaPlus::LuaObject waypointModule = SCR_Import(g_UIManager->mLuaState, "/lua/ui/game/commandwaypoint.lua");
+    LuaPlus::LuaFunction<float> calculateWaypointLineWidth{waypointModule["CalculateWaypointLineWidth"]};
+    const float luaWidth = calculateWaypointLineWidth(static_cast<unsigned int>(session->GetSelection().size()));
+
+    const float finalWidth = (maxWidthTerm + luaWidth) * ui_WaypointLineScale;
+
+    // Side-effect-only: the binary re-fills a scratch SCommandModeData via
+    // GetLeftMouseButtonAction, then immediately overwrites it with a copy of
+    // the resolved commandData and destroys it - net zero data effect, since
+    // neither commandData nor anything outside this scratch's own lifetime is
+    // touched. No named ECommandMode value 7 exists (this isn't a real
+    // COMMOD_Ping|COMMOD_Order union - plain sequential enum, not flag bits);
+    // kept as the raw literal the binary compares against.
+    CommandModeData commandData{};
+    (void)func_GetRightMouseButtonAction(&commandData, &session->CursorInfo(), 0, session);
+    if (commandData.mMode == static_cast<ECommandMode>(7)) {
+      CommandModeData scratch{};
+      (void)session->GetLeftMouseButtonAction(&scratch, &session->CursorInfo(), 0);
+    }
+
+    const ERuleBPUnitCommandCaps caps =
+      (commandData.mMode == COMMOD_Order) ? commandData.mCommandCaps : RULEUCC_Move;
+    UICommandGraph::CommandGraphNode& node = graph.mNodes[static_cast<std::size_t>(UnitCommandCapToCommandType(caps))];
+
+    if (node.mOrderlineTexture.px != nullptr) {
+      batcher.SetTexture(boost::SharedPtrFromRawRetained(reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(
+        node.mOrderlineTexture
+      )));
+    } else {
+      batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+    }
+
+    const bool hasArrowhead = node.mArrowheadTexture.px != nullptr;
+    const float uStart = 1.0f - std::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+
+    for (auto it = simplifiedPath.begin(); it != simplifiedPath.end(); ++it) {
+      auto next = it;
+      ++next;
+      if (next == simplifiedPath.end()) {
+        break;
+      }
+
+      Wm3::Vector3f p0 = *it;
+      Wm3::Vector3f p1 = *next;
+      const bool isLastSegment = [&] {
+        auto afterNext = next;
+        ++afterNext;
+        return afterNext == simplifiedPath.end();
+      }();
+
+      if (isLastSegment && hasArrowhead) {
+        Wm3::Vector3f direction{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
+        direction.Normalize();
+        p1 = Wm3::Vector3f{p1.x + direction.x * finalWidth, p1.y + direction.y * finalWidth, p1.z + direction.z * finalWidth};
+      }
+
+      auto prevOfIt = it;
+      const bool hasPrevOfIt = (it != simplifiedPath.begin());
+      if (hasPrevOfIt) {
+        --prevOfIt;
+      }
+      auto afterNext = next;
+      ++afterNext;
+      const bool hasAfterNext = (afterNext != simplifiedPath.end());
+
+      Wm3::Vector3f t0{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
+      if (hasPrevOfIt) {
+        t0 = Wm3::Vector3f{p1.x - prevOfIt->x, p1.y - prevOfIt->y, p1.z - prevOfIt->z};
+      }
+      const float t0Len = std::sqrt(t0.x * t0.x + t0.y * t0.y + t0.z * t0.z);
+      if (t0Len > ui_PathSmoothness && t0Len > 0.0f) {
+        const float scale = ui_PathSmoothness / t0Len;
+        t0 = Wm3::Vector3f{t0.x * scale, t0.y * scale, t0.z * scale};
+      }
+
+      Wm3::Vector3f t1{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
+      if (hasAfterNext) {
+        t1 = Wm3::Vector3f{afterNext->x - p0.x, afterNext->y - p0.y, afterNext->z - p0.z};
+      }
+      const float t1Len = std::sqrt(t1.x * t1.x + t1.y * t1.y + t1.z * t1.z);
+      if (t1Len > ui_PathSmoothness && t1Len > 0.0f) {
+        const float scale = ui_PathSmoothness / t1Len;
+        t1 = Wm3::Vector3f{t1.x * scale, t1.y * scale, t1.z * scale};
+      }
+
+      EmitHermiteRibbonSegments(
+        batcher, p0, p1, t0, t1, finalWidth, node.mOrderlineSelectedColor, uStart, node.mOrderlineAspectRatio
+      );
+
+      if (isLastSegment && hasArrowhead) {
+        const float capOffset = (finalWidth / capDivisor) * node.mArrowheadCapOffset;
+        batcher.Flush();
+        batcher.SetTexture(boost::SharedPtrFromRawRetained(reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(
+          node.mArrowheadTexture
+        )));
+
+        Wm3::Vector3f direction{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
+        direction.Normalize();
+        const Wm3::Vector3f capCenter{
+          p1.x + direction.x * capOffset, p1.y + direction.y * capOffset, p1.z + direction.z * capOffset};
+        const Wm3::Quaternionf orient = COORDS_Orient(direction);
+
+        Wm3::Vector3f corners[4] = {
+          {-finalWidth, 0.0f, -finalWidth}, {-finalWidth, 0.0f, finalWidth}, {finalWidth, 0.0f, finalWidth},
+          {finalWidth, 0.0f, -finalWidth}};
+        for (Wm3::Vector3f& corner : corners) {
+          Wm3::Vector3f rotated{};
+          (void)MultQuadVec(&rotated, &corner, &orient);
+          corner = Wm3::Vector3f{capCenter.x + rotated.x, capCenter.y + rotated.y, capCenter.z + rotated.z};
+        }
+
+        batcher.DrawQuad(
+          CD3DPrimBatcher::Vertex{corners[0].x, corners[0].y, corners[0].z, 0xFFFFFFFFu, 0.0f, 1.0f},
+          CD3DPrimBatcher::Vertex{corners[1].x, corners[1].y, corners[1].z, 0xFFFFFFFFu, 0.0f, 0.0f},
+          CD3DPrimBatcher::Vertex{corners[2].x, corners[2].y, corners[2].z, 0xFFFFFFFFu, 1.0f, 0.0f},
+          CD3DPrimBatcher::Vertex{corners[3].x, corners[3].y, corners[3].z, 0xFFFFFFFFu, 1.0f, 1.0f}
+        );
+      }
+    }
+  }
+
+  /**
    * Address: 0x00824810 (FUN_00824810, ??0UICommandGraph@Moho@@QAE@@Z)
    */
   UICommandGraph::UICommandGraph(CWldSession* const session)
@@ -3884,20 +4843,9 @@ namespace moho
       return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
     }
 
-    [[nodiscard]] UserEntity* DecodeUserEntityWeakRef(const CameraUserEntityWeakRef& weakRef)
-    {
-      constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-      static_assert(kUserEntityWeakOwnerOffset == 0x08, "UserEntity weak-ref owner offset must stay 0x08");
-#endif
-
-      const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
-      if (raw == 0u || raw == kUserEntityWeakOwnerOffset || raw < kUserEntityWeakOwnerOffset) {
-        return nullptr;
-      }
-
-      return reinterpret_cast<UserEntity*>(raw - kUserEntityWeakOwnerOffset);
-    }
+    // DecodeUserEntityWeakRef(const CameraUserEntityWeakRef&) lives in
+    // CameraImpl.h/.cpp now - it decodes the same GetArmyUnitsInFrustum()
+    // lanes and CRenderWorldView's build-drag adjacency pass needs it too.
 
     [[nodiscard]] UserEntity* DecodeUserEntityWeakLinkSlot(const UserEntityWeakLinkSlotRuntimeView& weakSlot)
     {
@@ -3914,25 +4862,12 @@ namespace moho
       return reinterpret_cast<UserEntity*>(raw - kUserEntityWeakOwnerOffset);
     }
 
-    [[nodiscard]] UserEntity* GetHoveredUserEntity(const CWldSession* const session) noexcept
-    {
-      if (session == nullptr) {
-        return nullptr;
-      }
+    // GetHoveredUserEntity is now CWldSession::GetHoveredUserEntity, a public
+    // member (declared near GetCursorInfo() in the header) - promoted so the
+    // command-graph render pass in CRenderWorldView.cpp can call it too.
 
-      const auto* const sessionView = reinterpret_cast<const CWldSessionCursorRuntimeView*>(session);
-      return DecodeUserEntityWeakLinkSlot(sessionView->mCursorInfo.mUnitHover);
-    }
-
-    [[nodiscard]] const IUnit* ResolveIUnitBridge(const UserUnit* const userUnit) noexcept
-    {
-      return userUnit ? static_cast<const IUnit*>(userUnit) : nullptr;
-    }
-
-    [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const userUnit) noexcept
-    {
-      return userUnit ? static_cast<IUnit*>(userUnit) : nullptr;
-    }
+    // ResolveIUnitBridge was a duplicate of UserUnit.h's GetIUnitBridge -
+    // callers below now use that instead.
 
     [[nodiscard]] bool ContainsUnitPtr(const msvc8::vector<UserUnit*>& units, const UserUnit* const unit)
     {
@@ -4043,7 +4978,7 @@ namespace moho
       while (node != head) {
         UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
-        IUnit* const iunit = ResolveIUnitBridge(userUnit);
+        IUnit* const iunit = GetIUnitBridge(userUnit);
         if (userUnit != nullptr && iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
           UserCommandQueue* const manager = userUnit->GetCommandQueue();
           if (UserUnitManagerContainsCommandIssueHelper(manager, helper)) {
@@ -6303,7 +7238,7 @@ namespace moho
      * Copies one command-graph anchor sample and rebinds its weak-owner lane
      * into the destination slot.
      */
-    [[maybe_unused]] [[nodiscard]] CommandGraphAnchorSampleRuntimeView* CopyCommandGraphAnchorSampleWithRelink(
+    [[nodiscard]] CommandGraphAnchorSampleRuntimeView* CopyCommandGraphAnchorSampleWithRelink(
       CommandGraphAnchorSampleRuntimeView* const destination,
       const CommandGraphAnchorSampleRuntimeView* const source
     ) noexcept
@@ -6335,7 +7270,7 @@ namespace moho
      * Builds one fallback anchor sample: for entity samples, resolves and links
      * the entity weak-owner lane; for literal samples, copies inline position.
      */
-    [[maybe_unused]] [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveFallbackCommandGraphAnchorSample(
+    [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveFallbackCommandGraphAnchorSample(
       CommandGraphAnchorSampleRuntimeView* const outSample,
       const CommandGraphAnchorSampleRuntimeView* const fallbackSample
     ) noexcept
@@ -6383,7 +7318,7 @@ namespace moho
      * build-position sample (`type==4`), otherwise falls back to the cached
      * default sample lane.
      */
-    [[maybe_unused]] [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveCommandGraphAnchorSampleFromHistory(
+    [[nodiscard]] CommandGraphAnchorSampleRuntimeView* ResolveCommandGraphAnchorSampleFromHistory(
       CommandGraphAnchorSampleRuntimeView* const outSample,
       CommandGraphAnchorHistoryRuntimeView* const history
     ) noexcept
@@ -6420,7 +7355,7 @@ namespace moho
      * Resolves one anchor sample to world position: owner-linked entity
      * position for kind `1`, inline position for kind `2`, otherwise invalid.
      */
-    [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ResolveCommandGraphAnchorSamplePositionAlias(
+    [[nodiscard]] Wm3::Vector3f* ResolveCommandGraphAnchorSamplePositionAlias(
       const CommandGraphAnchorSampleRuntimeView* const sample,
       Wm3::Vector3f* const outPosition
     ) noexcept
@@ -6462,7 +7397,7 @@ namespace moho
      * Resolves one command-graph anchor sample from history into world space
      * and then unlinks temporary weak-owner lanes from the owner chain.
      */
-    [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ResolveCommandGraphAnchorHistoryWorldPosition(
+    [[nodiscard]] Wm3::Vector3f* ResolveCommandGraphAnchorHistoryWorldPosition(
       Wm3::Vector3f* const outPosition,
       CommandGraphAnchorHistoryRuntimeView* const history
     ) noexcept
@@ -7966,7 +8901,7 @@ namespace moho
       }
 
       if (UserUnit* const hoverUnit = hoverEntity->IsUserUnit(); hoverUnit != nullptr) {
-        IUnit* const hoverBridge = ResolveIUnitBridge(hoverUnit);
+        IUnit* const hoverBridge = GetIUnitBridge(hoverUnit);
         if (hoverBridge != nullptr && hoverBridge->DestroyQueued()) { // IUnit subobject slot +0x2C
           return false;
         }
@@ -8027,7 +8962,7 @@ namespace moho
         UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
         UserUnit* const transporter = selectedEntity ? selectedEntity->IsUserUnit() : nullptr;
         if (transporter != nullptr) {
-          IUnit* const transporterBridge = ResolveIUnitBridge(transporter);
+          IUnit* const transporterBridge = GetIUnitBridge(transporter);
           if (transporterBridge != nullptr && !transporterBridge->IsDead() // slot +0x28
               && !transporter->IsBeingBuilt()                              // v6 vtable slot +0x34
               && !transporterBridge->DestroyQueued())                      // slot +0x2C
@@ -8108,7 +9043,7 @@ namespace moho
       if (hoverUnit == nullptr) {
         return false;
       }
-      IUnit* const hoverBridge = ResolveIUnitBridge(hoverUnit);
+      IUnit* const hoverBridge = GetIUnitBridge(hoverUnit);
       if (hoverBridge == nullptr) {
         return false;
       }
@@ -8553,6 +9488,36 @@ namespace moho
     }
 
     return (CountEntitiesMissingFrom(other) == 0) && (other.CountEntitiesMissingFrom(*this) == 0);
+  }
+
+  /**
+   * Address: 0x00831110 (FUN_00831110, sub_831110)
+   *
+   * What it does: see the header.
+   */
+  bool SSelectionSetUserEntity::HasCommonLiveEntityWith(const SSelectionSetUserEntity& other) const
+  {
+    auto* const thisMutable = const_cast<SSelectionSetUserEntity*>(this);
+    auto* const otherMutable = const_cast<SSelectionSetUserEntity*>(&other);
+    if (thisMutable->mHead == nullptr || otherMutable->mHead == nullptr) {
+      return false;
+    }
+
+    SSelectionNodeUserEntity* node = thisMutable->mHead->mLeft;
+    node = SSelectionSetUserEntity::find(thisMutable, node, &node);
+    while (node != thisMutable->mHead) {
+      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      SSelectionSetUserEntity::FindResult foundInOther{};
+      (void)FindSelectionNodeByEntityGuarded(&foundInOther, otherMutable, selectedEntity);
+      if (foundInOther.mRes != otherMutable->mHead) {
+        return true;
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(thisMutable, node, &node);
+    }
+
+    return false;
   }
 
   /**
@@ -9134,6 +10099,42 @@ namespace moho
   }
 
   /**
+   * Not a distinct binary function - every caller inlines the same
+   * `mCursorInfo.mUnitHover` weak-link decode (0x0086ECE8's own body plus
+   * three call sites already in this file). Promoted to a public accessor
+   * so callers outside this TU (`sub_8281E0`'s recovered form in the
+   * command-graph render pass) don't need their own copy.
+   *
+   * `MouseInfo::mUnitHover` (the public struct) is declared as a raw
+   * `UserEntity*`, but the binary stores an intrusive weak-link slot there,
+   * not a live pointer - `CursorInfoRuntimeView::mUnitHover` already models
+   * it correctly as `UserEntityWeakLinkSlotRuntimeView`. Decode through that
+   * view rather than reading `MouseInfo::mUnitHover` directly.
+   */
+  UserEntity* CWldSession::GetHoveredUserEntity() const noexcept
+  {
+    return DecodeUserEntityWeakLinkSlot(AccessCursorInfoRuntime(*this).mUnitHover);
+  }
+
+  /**
+   * Not a distinct binary function - promotes the file-private
+   * `ResolveCommandGraphAnchorHistoryWorldPosition` (= FUN_0081CFD0) so
+   * `UICommandGraph::DrawPositionNodeMesh` (a different TU) can resolve a
+   * command's fallback world-space anchor without its own copy of the
+   * `CommandGraphAnchorHistoryRuntimeView` reinterpret, which - like the
+   * event-slot view it shares every offset with - reads the whole
+   * `UserCommandIssueHelper` from its own base, not a sub-object.
+   */
+  Wm3::Vector3f ResolveCommandGraphAnchorWorldPosition(UserCommandIssueHelper& helper) noexcept
+  {
+    Wm3::Vector3f position{};
+    (void)ResolveCommandGraphAnchorHistoryWorldPosition(
+      &position, reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(&helper)
+    );
+    return position;
+  }
+
+  /**
    * Address: 0x008965C0 (FUN_008965C0, ?BecomeObserver@CWldSession@Moho@@QAEXXZ)
    *
    * What it does:
@@ -9672,7 +10673,7 @@ namespace moho
     while (cursor.mRes != mSelection.mHead) {
       UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
-      const IUnit* const selectedBridge = ResolveIUnitBridge(selectedUnit);
+      const IUnit* const selectedBridge = GetIUnitBridge(selectedUnit);
       if (selectedBridge != nullptr && !selectedBridge->IsMobile() && !selectedBridge->IsDead()) {
         ++selectableTemplateUnitCount;
       }
@@ -9696,7 +10697,7 @@ namespace moho
     while (cursor.mRes != mSelection.mHead) {
       UserEntity* const selectedEntity = DecodeSelectedUserEntity(cursor.mRes->mEnt);
       UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
-      IUnit* const selectedBridge = ResolveIUnitBridge(selectedUnit);
+      IUnit* const selectedBridge = GetIUnitBridge(selectedUnit);
       if (selectedBridge != nullptr && !selectedBridge->IsMobile() && !selectedBridge->IsDead()) {
         SBuildTemplateInfo templateInfo{};
 
@@ -9968,7 +10969,7 @@ namespace moho
         selectionSetsByName.SetObject(selectionSetName, setUnits);
       }
 
-      IUnit* const iunitBridge = ResolveIUnitBridge(unit);
+      IUnit* const iunitBridge = GetIUnitBridge(unit);
       LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
       setUnits.Insert(setUnits.GetN() + 1, unitObject);
     }
@@ -10481,7 +11482,7 @@ namespace moho
   {
     outUnits.clear();
 
-    const UserEntity* const hoveredTarget = GetHoveredUserEntity(this);
+    const UserEntity* const hoveredTarget = this->GetHoveredUserEntity();
     const SSelectionNodeUserEntity* const head = mSelection.mHead;
     if (!head) {
       return;
@@ -10591,7 +11592,7 @@ namespace moho
         continue;
       }
 
-      IUnit* const iunitBridge = ResolveIUnitBridge(unit);
+      IUnit* const iunitBridge = GetIUnitBridge(unit);
       if (iunitBridge == nullptr) {
         ++unitIndex;
         continue;
@@ -11025,7 +12026,7 @@ namespace moho
     const std::uint32_t modifierBits = static_cast<std::uint32_t>(modifiers);
     msvc8::vector<UserUnit*> nextSelection{};
 
-    UserEntity* const hoveredEntity = GetHoveredUserEntity(this);
+    UserEntity* const hoveredEntity = this->GetHoveredUserEntity();
     UserUnit* const hoveredUnit = hoveredEntity != nullptr ? hoveredEntity->IsUserUnit() : nullptr;
 
     if (ui_DebugAltClick && (modifierBits & kAltMask) != 0u && hoveredEntity != nullptr) {
@@ -11048,13 +12049,13 @@ namespace moho
       msvc8::vector<UserUnit*> currentSelection{};
       GetSelectionUnits(currentSelection);
 
-      const IUnit* const hoveredBridge = ResolveIUnitBridge(hoveredUnit);
+      const IUnit* const hoveredBridge = GetIUnitBridge(hoveredUnit);
       const RUnitBlueprint* const targetBlueprint = hoveredBridge != nullptr ? hoveredBridge->GetBlueprint() : nullptr;
 
       if ((modifierBits & kShiftMask) != 0u) {
         if (ContainsUnitPtr(currentSelection, hoveredUnit)) {
           for (UserUnit* const selectedUnit : currentSelection) {
-            const IUnit* const selectedBridge = ResolveIUnitBridge(selectedUnit);
+            const IUnit* const selectedBridge = GetIUnitBridge(selectedUnit);
             if (selectedBridge == nullptr || selectedBridge->GetBlueprint() != targetBlueprint) {
               AppendUnitUnique(nextSelection, selectedUnit);
             }
@@ -11075,7 +12076,7 @@ namespace moho
           continue;
         }
 
-        const IUnit* const sessionBridge = ResolveIUnitBridge(sessionUnit);
+        const IUnit* const sessionBridge = GetIUnitBridge(sessionUnit);
         if (sessionBridge == nullptr || sessionBridge->IsDead()) {
           continue;
         }
@@ -11115,7 +12116,7 @@ namespace moho
    */
   void CWldSession::HandleDoubleClickSelection(CameraImpl* const camera)
   {
-    UserEntity* const hoveredEntity = GetHoveredUserEntity(this);
+    UserEntity* const hoveredEntity = this->GetHoveredUserEntity();
     if (hoveredEntity == nullptr) {
       return;
     }
@@ -11133,7 +12134,7 @@ namespace moho
       return;
     }
 
-    const IUnit* const hoveredBridge = ResolveIUnitBridge(hoveredUnit);
+    const IUnit* const hoveredBridge = GetIUnitBridge(hoveredUnit);
     if (hoveredBridge == nullptr) {
       return;
     }
@@ -11147,7 +12148,7 @@ namespace moho
       for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart;
            weakRef != nullptr && weakRef != frustumUnits->mFinish;
            ++weakRef) {
-        UserEntity* const entity = DecodeUserEntityWeakRef(*weakRef);
+        UserEntity* const entity = DecodeCameraFrustumWeakRef(*weakRef);
         if (entity == nullptr) {
           continue;
         }
@@ -11157,7 +12158,7 @@ namespace moho
           continue;
         }
 
-        IUnit* const unitBridge = ResolveIUnitBridge(unit);
+        IUnit* const unitBridge = GetIUnitBridge(unit);
         if (unitBridge == nullptr || unitBridge->IsDead() || unitBridge->DestroyQueued()) {
           continue;
         }
@@ -11834,7 +12835,7 @@ namespace moho
     CameraFrustumUserEntityList* const frustumUnits = camera->GetArmyUnitsInFrustum();
     for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart; weakRef != frustumUnits->mFinish;
          ++weakRef) {
-      UserEntity* const entity = DecodeUserEntityWeakRef(*weakRef);
+      UserEntity* const entity = DecodeCameraFrustumWeakRef(*weakRef);
       if (entity == nullptr) {
         continue;
       }
@@ -11844,7 +12845,7 @@ namespace moho
         continue;
       }
 
-      IUnit* const unitBridge = ResolveIUnitBridge(unit);
+      IUnit* const unitBridge = GetIUnitBridge(unit);
       if (unitBridge->IsDead() || unitBridge->DestroyQueued()) {
         continue;
       }
@@ -13003,7 +14004,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
       (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
       if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
         selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
-          selectionCommandCaps | ResolveIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
+          selectionCommandCaps | GetIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask
         );
       }
       SSelectionSetUserEntity::Iterator_inc(&node);
@@ -13054,7 +14055,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
 
   bool mCapturable = false;
   if (UserUnit* const hoverUnitForCaps = hoverEntity->IsUserUnit()) {
-    mCapturable = ResolveIUnitBridge(hoverUnitForCaps)->GetAttributes().mCapturable;
+    mCapturable = GetIUnitBridge(hoverUnitForCaps)->GetAttributes().mCapturable;
     // When the unit is busy it is neither reclaimable nor capturable via
     // right-click.
     if (hoverEntity->IsUserUnit()->mUnitVarDat.mIsBusy) {
@@ -13108,7 +14109,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
         commandModeData.mCommandCaps = RULEUCC_CallTransport;
         resolved = true;
       } else if (hoverUnit != nullptr
-                 && (ResolveIUnitBridge(hoverUnit)->GetAttributes().commandCapsMask & RULEUCC_CallTransport) != 0
+                 && (GetIUnitBridge(hoverUnit)->GetAttributes().commandCapsMask & RULEUCC_CallTransport) != 0
                  && HoverTransportAcceptsSelection(&wldSession->mSelection, hoverEntity)) {
         commandModeData.mMode = COMMOD_Order;
         commandModeData.mCommandCaps = RULEUCC_Transport;
@@ -13145,7 +14146,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
           bool repairUnderConstruction = false;
           if (repairCap != 0 && hoverEntity->IsBeingBuilt()) {
             if (UserUnit* const builtUnit = hoverEntity->IsUserUnit()) {
-              if (ResolveIUnitBridge(builtUnit)->IsMobile()
+              if (GetIUnitBridge(builtUnit)->IsMobile()
                   || (!hoverEntity->IsInCategory(msvc8::string("FACTORY"))
                       && !hoverEntity->IsInCategory(msvc8::string("SILO")))) {
                 repairUnderConstruction = true;
@@ -13173,7 +14174,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
           if (!resolved && repairCap != 0
               && ((isAlly && hoverEntity->mVariableData.mMaxHealth > hoverEntity->mVariableData.mHealth)
                   || (hoverUnit != nullptr
-                      && ResolveIUnitBridge(hoverUnit)->IsUnitState(UNITSTATE_Upgrading)))) {
+                      && GetIUnitBridge(hoverUnit)->IsUnitState(UNITSTATE_Upgrading)))) {
             commandModeData.mMode = COMMOD_Order;
             commandModeData.mCommandCaps = RULEUCC_Repair;
             resolved = true;
@@ -13184,7 +14185,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
           if ((selectionCommandCapsTail & RULEUCC_Repair) != 0
               && ((isAlly && hoverEntity->mVariableData.mMaxHealth > hoverEntity->mVariableData.mHealth)
                   || (hoverUnit != nullptr
-                      && ResolveIUnitBridge(hoverUnit)->IsUnitState(UNITSTATE_Upgrading)))) {
+                      && GetIUnitBridge(hoverUnit)->IsUnitState(UNITSTATE_Upgrading)))) {
             commandModeData.mMode = COMMOD_Order;
             commandModeData.mCommandCaps = RULEUCC_Repair;
             resolved = true;

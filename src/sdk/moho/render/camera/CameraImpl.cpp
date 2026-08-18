@@ -2229,6 +2229,25 @@ moho::CameraFrustumUserEntityList* moho::CameraImpl::GetArmyUnitsInFrustum()
 }
 
 /**
+ * What it does: see the header - decodes one `GetArmyUnitsInFrustum()` lane
+ * back to the `UserEntity` it tracks.
+ */
+moho::UserEntity* moho::DecodeCameraFrustumWeakRef(const moho::CameraUserEntityWeakRef& weakRef) noexcept
+{
+  constexpr std::uintptr_t kUserEntityWeakOwnerOffset = 0x08;
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+  static_assert(kUserEntityWeakOwnerOffset == offsetof(UserEntity, mIUnitChainHead));
+#endif
+
+  const auto raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+  if (raw <= kUserEntityWeakOwnerOffset) {
+    return nullptr;
+  }
+
+  return reinterpret_cast<moho::UserEntity*>(raw - kUserEntityWeakOwnerOffset);
+}
+
+/**
  * Address: 0x007A6C80 (FUN_007A6C80, Moho::CameraImpl::CameraGetOffset)
  *
  * What it does:

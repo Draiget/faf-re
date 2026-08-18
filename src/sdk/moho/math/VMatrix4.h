@@ -41,6 +41,18 @@ namespace moho
     }
 
     /**
+     * Same "row dot + w" shape as `ProjectViewportDepthRow1`, one row over:
+     * a `GeomCamera3`'s viewport matrix carries a perspective-correct width
+     * factor in row 2. The command-graph waypoint/orderline draws
+     * (0x008282B0, 0x008288D0) both divide a style size/width by this to
+     * keep on-screen size roughly constant with distance.
+     */
+    [[nodiscard]] float ProjectViewportWidthRow2(const Wm3::Vector3f& point) const noexcept
+    {
+      return (point.x * r[2].x) + (point.y * r[2].y) + (point.z * r[2].z) + r[2].w;
+    }
+
+    /**
      * Address: 0x004F0390 (FUN_004F0390, Moho::VMatrix4::MemberDeserialize)
      *
      * What it does:
