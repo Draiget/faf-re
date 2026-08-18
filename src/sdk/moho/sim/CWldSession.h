@@ -8,6 +8,7 @@
 #include "gpg/core/containers/IntrusiveLink.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/AutoPtr.h"
+#include "legacy/containers/List.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "gpg/core/streams/MemBufferStream.h"
@@ -409,6 +410,19 @@ namespace moho
     [[nodiscard]] bool HasSameLiveEntitySet(const SSelectionSetUserEntity& other) const;
 
     /**
+     * Address: 0x00831110 (FUN_00831110, sub_831110)
+     *
+     * What it does:
+     * Returns true when this set and `other` share at least one live entity.
+     * The binary walks both trees as a sorted merge (both are ordered by the
+     * same `UserEntity*` key); this is expressed as a per-element membership
+     * test against `other` instead, which returns the identical boolean for
+     * every input - the merge's only externally observable effect is the
+     * early-exit on first match, which the membership-test loop preserves.
+     */
+    [[nodiscard]] bool HasCommonLiveEntityWith(const SSelectionSetUserEntity& other) const;
+
+    /**
      * Address: 0x0066A330 (FUN_0066A330, Moho::WeakSet_UserEntity::find)
      *
      * What it does:
@@ -713,6 +727,19 @@ namespace moho
      * Returns the current cursor-info payload stored by this world session.
      */
     [[nodiscard]] const MouseInfo& GetCursorInfo() const;
+
+    /**
+     * Not a distinct binary function - every caller inlines the same
+     * `mCursorInfo.mUnitHover` weak-link decode. Promoted to a public
+     * accessor so callers outside this TU can resolve the hovered entity
+     * without their own copy of the decode.
+     *
+     * `MouseInfo::mUnitHover` is declared as a raw `UserEntity*`, but the
+     * binary stores an intrusive weak-link slot there, not a live pointer -
+     * this accessor decodes it correctly; reading `GetCursorInfo().mUnitHover`
+     * directly does not.
+     */
+    [[nodiscard]] UserEntity* GetHoveredUserEntity() const noexcept;
 
     /**
      * Address: 0x008965C0 (FUN_008965C0, ?BecomeObserver@CWldSession@Moho@@QAEXXZ)
@@ -1179,16 +1206,20 @@ namespace moho
      */
     void DirtyCommandGraph();
 
-  private:
     /**
      * Address: 0x00895EB0 (FUN_00895EB0,
      * ?GetCommandGraph@CWldSession@Moho@@QAE?AV?$shared_ptr@VUICommandGraph@Moho@@@boost@@_N@Z)
      *
      * What it does:
      * Locks/returns cached command-graph weak handle and optionally creates it.
+     *
+     * Callers outside `CWldSession`: `Moho::DrawCommandGraph` (0x00853DC0) and
+     * `sub_85AF40` (0x0085AF40) both call this directly, so it can't stay
+     * private.
      */
     [[nodiscard]] boost::SharedPtrRaw<UICommandGraph> GetCommandGraph(bool allowCreate);
 
+  private:
     /**
      * Address: 0x008958B0 (FUN_008958B0, ?ApplyPendingSaveData@CWldSession@Moho@@AAEXXZ)
      *
@@ -1826,6 +1857,24 @@ namespace moho
   extern float UI_RenProjectileGlowPeriod; // 0x00F57B30
   extern float UI_CurGlowTime;             // 0x010A6460
 
+  /**
+   * Debug toggle gating `UICommandGraph::DrawCommandGraphMesh`'s path-preview
+   * pass (`?ui_DrawPathPreview@Moho@@3_NA` 0x010A6443). Lies in the same
+   * zero-filled `.data` tail as `UI_SelectAnything`/`UI_CurGlowTime` with no
+   * file-backed initializer, so it ships off.
+   */
+  extern bool ui_DrawPathPreview;          // 0x010A6443
+
+  /**
+   * Switches `DrawPathPreview` between its two source paths: the
+   * RDP-simplified world path sampled from the previewed army's runtime
+   * cell-position scratch buffer (on) versus a straight two-point line from
+   * the cursor to the deepest selected unit (off). A distinct global from
+   * `ui_DrawPathPreview` above - same zero-filled `.data` tail, same
+   * ships-off default (`?ui_PathPreview@Moho@@3_NA` 0x010A6448).
+   */
+  extern bool ui_PathPreview;              // 0x010A6448
+
 
   /**
    * Command-waypoint drawing parameters, imported from
@@ -1835,6 +1884,7 @@ namespace moho
    * Addresses: `?ui_CurveSegments@Moho@@3HA` 0x00F57CC0,
    * `?ui_CurveSmoothness@Moho@@3MA` 0x00F57CC4,
    * `?ui_PathSmoothness@Moho@@3MA` 0x00F57CC8,
+   * `?ui_MaxTextLOD@Moho@@3MA` 0x00F57CCC,
    * `?ui_CommandGraphMaxNodeUnits@Moho@@3HA` 0x00F57CD0,
    * `?ui_MinWaypointSize@Moho@@3MA` 0x00F57CD4,
    * `?ui_MaxWaypointSize@Moho@@3MA` 0x00F57CD8,
@@ -1843,10 +1893,87 @@ namespace moho
   extern std::int32_t ui_CurveSegments;
   extern float ui_CurveSmoothness;
   extern float ui_PathSmoothness;
+  extern float ui_MaxTextLOD;
   extern std::int32_t ui_CommandGraphMaxNodeUnits;
   extern float ui_MinWaypointSize;
   extern float ui_MaxWaypointSize;
   extern float ui_WaypointLineScale;
+
+  /**
+   * Not a distinct binary function - promotes the file-private
+   * `ResolveCommandGraphAnchorHistoryWorldPosition` (= FUN_0081CFD0) for
+   * cross-TU callers (the command-graph render pass in
+   * `CRenderWorldView.cpp`). Resolves one command's fallback world-space
+   * anchor: the latest build-position sample in its command-graph history,
+   * or the history's cached default sample when none exists.
+   */
+  [[nodiscard]] Wm3::Vector3f ResolveCommandGraphAnchorWorldPosition(UserCommandIssueHelper& helper) noexcept;
+
+  /**
+   * Address: 0x00827A00 (FUN_00827A00, sub_827A00)
+   *
+   * Defined in CRenderWorldView.cpp (a free function, not a UICommandGraph
+   * member - it has two independent callers, `UICommandGraph::
+   * DrawCommandOrderline` and `Moho::DrawPathPreview`). See that definition
+   * for the full doc comment.
+   */
+  void EmitHermiteRibbonSegments(
+    CD3DPrimBatcher& batcher, const Wm3::Vector3f& p0, const Wm3::Vector3f& p1, const Wm3::Vector3f& t0,
+    const Wm3::Vector3f& t1, float width, std::uint32_t color, float uStart, float aspectRatio
+  );
+
+  /**
+   * Address: 0x0082A380 (FUN_0082A380, Moho::DrawPathPreview)
+   *
+   * Defined in CWldSession.cpp, not CRenderWorldView.cpp: it reads
+   * `UICommandGraph::mSession`/`mNodes` directly, and `UICommandGraph` is
+   * only a complete type here (see `ResolveCommandGraphAnchorWorldPosition`
+   * above) - a free function, `__stdcall`, no `this` in the strict sense,
+   * but the IDA-declared first parameter, shown as a literal `-1` at the
+   * sole call site, is a decompiler artifact: every real read of it inside
+   * the body is `this->mSession`/`this->mNodes[...]` at the exact offsets
+   * `UICommandGraph::mSession`/`mNodes` already occupy, so it is genuinely
+   * `UICommandGraph* this` passed as an explicit reference here (declared a
+   * `friend` of `UICommandGraph` for that access). Sole caller is
+   * `UICommandGraph::DrawCommandGraphMesh`, gated by `ui_DrawPathPreview`.
+   * Draws the active move-command's path-preview ribbon overlay.
+   */
+  void DrawPathPreview(
+    UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction
+  );
+
+  /**
+   * Address: 0x0082A120 (FUN_0082A120, sub_82A120)
+   *
+   * Defined in CRenderWorldView.cpp (a free function, not a UICommandGraph
+   * member). Sole caller is `DrawPathPreview` above. See that definition for
+   * the full doc comment.
+   */
+  void SimplifyPathSpan(
+    const msvc8::vector<Wm3::Vector3f>& points, std::int32_t first, std::int32_t last,
+    msvc8::list<Wm3::Vector3f>& simplified, msvc8::list<Wm3::Vector3f>::iterator insertBefore, float tolerance
+  );
+
+  /**
+   * Address: 0x0082A2B0 (FUN_0082A2B0, sub_82A2B0)
+   *
+   * Defined in CRenderWorldView.cpp (a free function, not a UICommandGraph
+   * member). Sole caller is `DrawPathPreview` above. See that definition for
+   * the full doc comment.
+   */
+  [[nodiscard]] UserUnit* PickPathPreviewSubject(SSelectionSetUserEntity& selection);
+
+  /**
+   * Not a distinct binary function - `UICommandGraph` is only a complete
+   * type in CWldSession.cpp (see `ResolveCommandGraphAnchorWorldPosition`
+   * above), so `CRenderWorldView::RenderCommandGraph` (CRenderWorldView.cpp)
+   * calls `UICommandGraph::DrawCommandGraphMesh` through this wrapper rather
+   * than on the bare `UICommandGraph*` it holds, which is incomplete there.
+   * No-ops when `graph` is null.
+   */
+  void DrawCommandGraphMeshIfPresent(
+    UICommandGraph* graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction
+  );
 
   /**
    * Address context:

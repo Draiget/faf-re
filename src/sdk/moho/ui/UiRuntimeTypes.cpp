@@ -19171,6 +19171,19 @@ moho::CUIWorldView::CUIWorldView(
 
     auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(this);
 
+    // Installs the CRenderWorldView vtable at +0x11C (the binary's ctor writes
+    // it twice: the plain IRenderWorldView vtable, then this class's own -
+    // both folded into one placement-construction here). Every field this
+    // struct owns (mCamera, mIsMiniMap, mLeftMouseCommand, mComGraph,
+    // mBuildDrag, mCameraTrack, ...) occupies the exact same bytes as the
+    // CUIWorldViewCtorRuntimeView fields the rest of this constructor writes
+    // below, so those writes are unchanged - this only adds the vtable
+    // pointer and default-constructs the class members that need real ctors
+    // (mBuildDrag, mCameraTrack, mComGraph, both CommandModeData blocks).
+    // Must run before any of those writes, or it would stomp them back to
+    // their default-constructed values.
+    (void)new (&view->mRenderVftable) moho::CRenderWorldView();
+
     view->mCamera = nullptr;                              // +0x120
     view->mCachedViewLeft = -1.0f;                        // +0x124
     view->mCachedViewTop = -1.0f;                         // +0x128
@@ -19190,13 +19203,18 @@ moho::CUIWorldView::CUIWorldView(
     view->mComGraph.mGraph = nullptr;                     // +0x20C
     view->mComGraph.mControl = nullptr;                   // +0x210
 
-    new (&view->mSubobject) moho::CUIWorldViewBuildDragRuntimeView(); // +0x214
+    // mSubobject (+0x214) is CRenderWorldView::mBuildDrag - already
+    // constructed by the placement-new above, via CUIWorldViewBuildDragRuntimeView's
+    // own default ctor as a member of CRenderWorldView. Re-placement-new'ing
+    // it here would construct a second live object over the first.
 
     view->mConvertToPatrolCursor = 0;                     // +0x274
     view->mUnknown275 = 0;                                // +0x275
     view->mHideResources = 0;                             // +0x276
 
-    new (&view->mCameraTrack) msvc8::string(cameraTrack, std::strlen(cameraTrack)); // +0x280
+    // mCameraTrack (+0x280) is likewise already default-constructed (empty)
+    // by the placement-new above; assign rather than placement-new over it.
+    view->mCameraTrack = msvc8::string(cameraTrack, std::strlen(cameraTrack));
 
     view->mOverlayLink = {};                              // +0x29C
     view->mHighlightEnabled = 1;                          // +0x2A4

@@ -528,8 +528,28 @@ namespace moho
    *
    * What it does:
    * Builds rotated inner/outer circle axes from `normal` and delegates to `DRAW_Oval`.
+   *
+   * The mangled name declares 10 parameters; parameter order below follows the mangled
+   * signature exactly (`float`/`unsigned int`/`bool` are never back-referenced, so the
+   * two `Vector3f` reference parameters are the only compressible/reused type). Only
+   * `primBatcher`, `center`, `normal` and `radius` are actually read by this compiled
+   * instantiation — the sole caller (`Moho::DrawCommandGraph`, 0x00853DC0) never computes
+   * values for the other six, and this function's own compiled body never dereferences or
+   * branches on them either. They are kept in the signature for ABI/name fidelity and are
+   * marked `[[maybe_unused]]` rather than given invented semantic names.
    */
-  void DRAW_Circle(CD3DPrimBatcher* primBatcher, const Vector3f& center, const Vector3f& normal, float radius);
+  void DRAW_Circle(
+    CD3DPrimBatcher* primBatcher,
+    [[maybe_unused]] float unusedFloat0,
+    const Vector3f& center,
+    const Vector3f& normal,
+    [[maybe_unused]] float unusedFloat1,
+    [[maybe_unused]] std::uint32_t unusedUInt0,
+    [[maybe_unused]] std::uint32_t unusedUInt1,
+    [[maybe_unused]] const CHeightField* heightField,
+    [[maybe_unused]] bool unusedBool0,
+    float radius
+  );
 
   /**
    * Address: 0x00454E20 (?DRAW_ClippedQuad@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Rect2@M@gpg@@11I@Z)

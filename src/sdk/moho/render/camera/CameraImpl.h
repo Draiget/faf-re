@@ -69,6 +69,24 @@ namespace moho
     "CameraFrustumUserEntityList::mInlineOrigin offset must be 0x0C"
   );
 
+  /**
+   * Decodes one `CameraFrustumUserEntityList` lane back to the `UserEntity`
+   * it tracks. `mOwnerLinkSlot` points at the entity's `mIUnitChainHead`
+   * slot (`offsetof(UserEntity, mIUnitChainHead) == 0x08`), so the entity
+   * itself sits `0x08` bytes before it; an unlinked or self-pointing lane
+   * (`raw <= kUserEntityWeakOwnerOffset`) decodes to null.
+   *
+   * Named distinctly from `CameraImpl.cpp`'s file-private
+   * `DecodeUserEntityWeakRef(const SSelectionWeakRefUserEntity&)` - that one
+   * decodes a selection weak-ref, this one a frustum weak-ref; the two types
+   * are unrelated despite the coincidentally similar source names.
+   *
+   * Shared by every walk of `CameraImpl::GetArmyUnitsInFrustum()` - promoted
+   * here from a file-private duplicate in `CWldSession.cpp` so
+   * `CRenderWorldView`'s build-drag adjacency highlighter can use it too.
+   */
+  [[nodiscard]] UserEntity* DecodeCameraFrustumWeakRef(const CameraUserEntityWeakRef& weakRef) noexcept;
+
   struct SCamShakeParams
   {
     Wm3::Vec3f mCenter{};         // +0x00

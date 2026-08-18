@@ -448,6 +448,16 @@ namespace moho
     [[nodiscard]] bool GetBool() const;
 
     /**
+     * Not a distinct binary function - every caller below inlines the same
+     * `mMap->mHeightField.get()` chase through the terrain runtime view
+     * (`IWldTerrainRes+0x04` -> `STIMap+0x00`). Promoted to a public accessor
+     * so callers outside this TU (`CRenderWorldView`'s build-drag adjacency
+     * pass, `sub_854B70`) don't need their own copy of the file-private
+     * `TerrainRuntimeView` reinterpret-cast.
+     */
+    [[nodiscard]] CHeightField* GetHeightField() const;
+
+    /**
      * Address: 0x008A1040 (FUN_008A1040, ?GetCartographic@CWldTerrainRes@Moho@@UAEAAVCartographic@2@XZ)
      *
      * What it does:

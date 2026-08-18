@@ -3207,6 +3207,15 @@ namespace moho
   }
 
   /**
+   * What it does: see the header - resolves the active map's heightfield
+   * through the terrain runtime view's `mMap` lane.
+   */
+  CHeightField* IWldTerrainRes::GetHeightField() const
+  {
+    return AsTerrainRuntimeView(this)->mMap->mHeightField.get();
+  }
+
+  /**
    * Address: 0x008A1030 (FUN_008A1030, Moho::CWldTerrainRes::GetBool)
    *
    * What it does:
