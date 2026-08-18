@@ -77,8 +77,11 @@ namespace moho
      *
      * What it does:
      * Dispatches instance rendering in derived-defined batch slices.
+     *
+     * `reflectedOnly` is the reflection pass: when set, `FillBatch` packs only
+     * instances whose `MeshInstance::isReflected` flag is still on.
      */
-    virtual void Render(const msvc8::vector<MeshInstance*>& meshInstances, bool includeHidden);
+    virtual void Render(const msvc8::vector<MeshInstance*>& meshInstances, bool reflectedOnly);
 
   protected:
     // Slots 5-9 in MeshBatch vtable (implemented by concrete batchers).
@@ -86,7 +89,7 @@ namespace moho
     virtual void BindBuffers() = 0;
     virtual void EndBatch() = 0;
     virtual void DrawBatch(std::int32_t packedCount) = 0;
-    virtual std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool includeHidden) = 0;
+    virtual std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool reflectedOnly) = 0;
 
   public:
     std::uint8_t mUseBoneRemap; // +0x04
@@ -185,25 +188,12 @@ namespace moho
     /**
      * Address: 0x007E7EA0 (FUN_007E7EA0, slot 9).
      *
-     * UNRESOLVED EXTERNAL - the only slot of this vtable with no body. The
-     * other four above are defined in HardwareMeshBatch.cpp; this one is not,
-     * so the link leaves slot 9 pointing at whatever /FORCE put there and any
-     * dispatch through it jumps into garbage. MeshBatch::Render calls it
-     * (MeshBatch.cpp:147), so it is on the live path, not dead weight.
-     *
-     * Everything it needs already exists: the bone palettes it clears are the
-     * registered `GetMeshShaderVarTransPalette()` / `GetMeshShaderVarRotPalette()`
-     * accessors (IDA prints them as bare globals), and its unrecovered closure
-     * is four trivial leaves - _fmod, WeakPtr<CAniSkel>::release,
-     * shared_ptr::lock and a 33-instruction helper.
-     *
-     * What is left is the body itself: 634 instructions, 443 decompiled lines
-     * of per-instance skinning and vertex packing, with ~118 locals and heavy
-     * stack-slot reuse in the decompile (it stores an int count into
-     * `VTransform::orient.y`, for one). That needs disentangling carefully
-     * rather than transcribing.
+     * Packs one draw call's worth of per-instance vertex records out of
+     * `[current, end)`, fills the global GPU skinning palettes for skinned
+     * batches, uploads the run into the dynamic vertex buffer and returns how
+     * many instances it packed. See the definition for the full behaviour.
      */
-    std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool includeHidden) override;
+    std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool reflectedOnly) override;
 
     /**
      * Typed view of the base `mVertexDeclarationHandle` slot (+0x44).

@@ -160,6 +160,31 @@ namespace moho
     return outPose;
   }
 
+  /**
+   * Address: 0x007E6D20 (FUN_007E6D20, sub_7E6D20)
+   *
+   * IDA signature:
+   * float *__usercall sub_7E6D20@<eax>(float *result@<eax>, float *a2@<ecx>);
+   *
+   * What it does:
+   * Copies one whole 4x4 transform, element by element, and returns the
+   * destination. MSVC emitted the `VMatrix4` copy assignment out of line for the
+   * two batch-fill call sites (`HardwareMeshBatch::FillBatch`, 0x007E7EA0), which
+   * stage a per-instance transform into an unaligned vertex record; the sixteen
+   * scalar stores are what that emission looks like.
+   */
+  VMatrix4* CopyTransform4x4(VMatrix4* const destination, const VMatrix4& source)
+  {
+    for (std::size_t row = 0; row < 4; ++row) {
+      destination->r[row].x = source.r[row].x;
+      destination->r[row].y = source.r[row].y;
+      destination->r[row].z = source.r[row].z;
+      destination->r[row].w = source.r[row].w;
+    }
+
+    return destination;
+  }
+
   struct MeshInstanceOwnerRuntimeView
   {
     std::uint8_t reserved00_33[0x34];

@@ -133,7 +133,7 @@ namespace moho
    * What it does:
    * Dispatches instance rendering in derived-defined batch slices.
    */
-  void MeshBatch::Render(const msvc8::vector<MeshInstance*>& meshInstances, const bool includeHidden)
+  void MeshBatch::Render(const msvc8::vector<MeshInstance*>& meshInstances, const bool reflectedOnly)
   {
     MeshInstance** const begin = meshInstances.begin();
     MeshInstance** const end = meshInstances.end();
@@ -144,7 +144,7 @@ namespace moho
 
     MeshInstance** current = begin;
     while (current != end) {
-      const std::int32_t packedCount = FillBatch(current, end, includeHidden);
+      const std::int32_t packedCount = FillBatch(current, end, reflectedOnly);
       DrawBatch(packedCount);
     }
 
