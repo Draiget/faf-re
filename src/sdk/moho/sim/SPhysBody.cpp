@@ -10,7 +10,8 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/render/camera/VTransform.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/render/camera/VTransform.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -351,32 +352,6 @@ namespace
     archive->Write(CachedVector3fType(), &object->mWorldImpulse, nullOwner);
   }
 
-  /**
-   * Address: 0x00697750 (FUN_00697750, SPhysBody world-transform export helper)
-   *
-   * What it does:
-   * Writes one `VTransform` view from body state by copying orientation and
-   * backing out world position from rotated collision-offset.
-   */
-  [[maybe_unused]] moho::VTransform* BuildTransformFromSPhysBody(
-    moho::VTransform* const outTransform,
-    const moho::SPhysBody* const body
-  )
-  {
-    if (!outTransform || !body) {
-      return outTransform;
-    }
-
-    Wm3::Vec3f rotatedOffset{};
-    Wm3::MultiplyQuaternionVector(&rotatedOffset, body->mCollisionOffset, body->mOrientation);
-
-    outTransform->orient_ = body->mOrientation;
-    outTransform->pos_.x = body->mPos.x - rotatedOffset.x;
-    outTransform->pos_.y = body->mPos.y - rotatedOffset.y;
-    outTransform->pos_.z = body->mPos.z - rotatedOffset.z;
-    return outTransform;
-  }
-
   void cleanup_SPhysBodySaveConstruct_atexit()
   {
     (void)moho::cleanup_SPhysBodySaveConstruct();
@@ -396,6 +371,29 @@ namespace
 namespace moho
 {
   gpg::RType* SPhysBody::sType = nullptr;
+
+  /**
+   * Address: 0x00697750 (FUN_00697750, SPhysBody world-transform export helper)
+   *
+   * What it does:
+   * Writes one `VTransform` view from body state by copying orientation and
+   * backing out world position from rotated collision-offset.
+   */
+  VTransform* BuildTransformFromSPhysBody(VTransform* const outTransform, const SPhysBody* const body)
+  {
+    if (!outTransform || !body) {
+      return outTransform;
+    }
+
+    Wm3::Vec3f rotatedOffset{};
+    Wm3::MultiplyQuaternionVector(&rotatedOffset, body->mCollisionOffset, body->mOrientation);
+
+    outTransform->orient_ = body->mOrientation;
+    outTransform->pos_.x = body->mPos.x - rotatedOffset.x;
+    outTransform->pos_.y = body->mPos.y - rotatedOffset.y;
+    outTransform->pos_.z = body->mPos.z - rotatedOffset.z;
+    return outTransform;
+  }
 
   /**
    * Address: 0x006831B0 (FUN_006831B0)
@@ -712,6 +710,146 @@ namespace moho
 
     const Wm3::Vec3f worldImpulse = mOrientation.Rotate(localImpulse);
     (void)ApplyWorldImpulseAtWorldPoint(this, worldImpulse, worldPoint);
+  }
+
+  /**
+   * Address: 0x00697B00 (FUN_00697B00, sub_697B00)
+   *
+   * IDA signature:
+   * void __userpurge sub_697B00(
+   *     Moho::SPhysBody *a1@<eax>, Wm3::Vector3f *a2@<ecx>, float a3, Wm3::Vector3f *a4);
+   *
+   * What it does:
+   * Explicit-Euler free-fall step: accumulates `force/mass + mConstants->
+   * mGravity` into `mVelocity` over `dt`, midpoint-integrates `mPos` from the
+   * old/new velocity average, then tail-calls `IntegrateAngularImpulse`.
+   */
+  void SPhysBody::IntegrateFreefallStep(const Wm3::Vec3f& force, const float dt, const Wm3::Vec3f& angularImpulse)
+  {
+    const Wm3::Vec3f oldVelocity = mVelocity;
+    const float dtOverMass = dt / mMass;
+
+    mVelocity.x += (force.x * dtOverMass) + (mConstants->mGravity.x * dt);
+    mVelocity.y += (force.y * dtOverMass) + (mConstants->mGravity.y * dt);
+    mVelocity.z += (force.z * dtOverMass) + (mConstants->mGravity.z * dt);
+
+    const float halfDt = dt * 0.5f;
+    mPos.x += (mVelocity.x + oldVelocity.x) * halfDt;
+    mPos.y += (mVelocity.y + oldVelocity.y) * halfDt;
+    mPos.z += (mVelocity.z + oldVelocity.z) * halfDt;
+
+    IntegrateAngularImpulse(angularImpulse, dt);
+  }
+
+  /**
+   * Address: 0x006978D0 (FUN_006978D0, sub_6978D0)
+   *
+   * IDA signature:
+   * void __usercall sub_6978D0(Wm3::Vector3f *a1@<eax>, Moho::SPhysBody *a2@<edi>, float a3@<xmm0>);
+   *
+   * What it does:
+   * Accumulates `angularImpulse * dt` into `mWorldImpulse`, rotates the
+   * midpoint-averaged accumulated impulse into body-local space, scales it by
+   * `mInvInertiaTensor`, converts the result to a delta rotation via
+   * `QuatFromAxisAngleVector`, left-multiplies it onto `mOrientation`, and
+   * renormalizes in place.
+   */
+  void SPhysBody::IntegrateAngularImpulse(const Wm3::Vec3f& angularImpulse, const float dt)
+  {
+    const Wm3::Vec3f oldWorldImpulse = mWorldImpulse;
+    mWorldImpulse.x += angularImpulse.x * dt;
+    mWorldImpulse.y += angularImpulse.y * dt;
+    mWorldImpulse.z += angularImpulse.z * dt;
+
+    const float halfDt = dt * 0.5f;
+    const Wm3::Vec3f avgWorldImpulse{
+      (mWorldImpulse.x + oldWorldImpulse.x) * halfDt,
+      (mWorldImpulse.y + oldWorldImpulse.y) * halfDt,
+      (mWorldImpulse.z + oldWorldImpulse.z) * halfDt
+    };
+
+    const Wm3::Vec3f localImpulse = mOrientation.Conjugate().Rotate(avgWorldImpulse);
+    const Wm3::Vec3f scaledImpulse{
+      mInvInertiaTensor.x * localImpulse.x,
+      mInvInertiaTensor.y * localImpulse.y,
+      mInvInertiaTensor.z * localImpulse.z
+    };
+
+    Wm3::Quaternionf deltaOrientation{};
+    QuatFromAxisAngleVector(&deltaOrientation, scaledImpulse);
+
+    mOrientation = deltaOrientation * mOrientation;
+    NormalizeQuatInPlace(&mOrientation);
+  }
+
+  /**
+   * Address: 0x00698350 (FUN_00698350, sub_698350)
+   *
+   * IDA signature:
+   * int __usercall sub_698350@<eax>(Moho::SPhysBody *a1@<edx>, int edi0@<edi>);
+   *
+   * What it does: see header.
+   */
+  void SPhysBody::ApplyGroundCollisionResponse(const gpg::fastvector_n<GroundPenetrationSample, 8>& samples)
+  {
+    Wm3::Vec3f angularVelocity{};
+    GetImpulse(&angularVelocity);
+
+    float maxPenetrationDepth = 0.0f;
+    std::int32_t downwardPointCount = 0;
+    Wm3::Vec3f impulseAccum{};
+    Wm3::Vec3f angularImpulseAccum{};
+
+    for (const GroundPenetrationSample& sample : samples) {
+      if (sample.y > sample.terrainElevation) {
+        continue;
+      }
+
+      const Wm3::Vec3f relative{sample.x - mPos.x, sample.y - mPos.y, sample.z - mPos.z};
+      const float penetrationDepth = sample.terrainElevation - sample.y;
+      if (penetrationDepth > maxPenetrationDepth) {
+        maxPenetrationDepth = penetrationDepth;
+      }
+
+      const Wm3::Vec3f pointVelocity{
+        mVelocity.x + ((angularVelocity.y * relative.z) - (angularVelocity.z * relative.y)),
+        mVelocity.y + ((angularVelocity.z * relative.x) - (relative.z * angularVelocity.x)),
+        mVelocity.z + ((relative.y * angularVelocity.x) - (angularVelocity.y * relative.x))
+      };
+
+      if (pointVelocity.y < 0.0f) {
+        impulseAccum.x -= pointVelocity.x;
+        impulseAccum.y -= pointVelocity.y;
+        impulseAccum.z -= pointVelocity.z;
+
+        angularImpulseAccum.x -= (pointVelocity.z * relative.y) - (pointVelocity.y * relative.z);
+        angularImpulseAccum.y -= (relative.z * pointVelocity.x) - (pointVelocity.z * relative.x);
+        angularImpulseAccum.z -= (pointVelocity.y * relative.x) - (relative.y * pointVelocity.x);
+
+        ++downwardPointCount;
+      }
+    }
+
+    if (downwardPointCount <= 0) {
+      return;
+    }
+
+    constexpr float kResponseDamping = 0.89999998f;
+
+    const float invCount = 1.0f / static_cast<float>(downwardPointCount);
+    const float angularScale = mMass * invCount * 0.5f;
+
+    mWorldImpulse.x = (mWorldImpulse.x + (angularScale * angularImpulseAccum.x)) * kResponseDamping;
+    mWorldImpulse.y = (mWorldImpulse.y + (angularImpulseAccum.y * angularScale)) * kResponseDamping;
+    mWorldImpulse.z = (mWorldImpulse.z + (angularImpulseAccum.z * angularScale)) * kResponseDamping;
+
+    const float linearScale = invCount * 0.5f;
+
+    mVelocity.x = (mVelocity.x + (linearScale * impulseAccum.x)) * kResponseDamping;
+    mVelocity.y = (mVelocity.y + (impulseAccum.y * linearScale)) * kResponseDamping;
+    mVelocity.z = (mVelocity.z + (impulseAccum.z * linearScale)) * kResponseDamping;
+
+    mPos.y += maxPenetrationDepth;
   }
 
   /**

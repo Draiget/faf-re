@@ -495,7 +495,7 @@ bool CAiTarget::NoTarget() const
  * Returns whether this target currently resolves to a live entity in
  * `LAYER_Air`.
  */
-[[maybe_unused]] bool CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept
+bool moho::CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept
 {
   Entity* const entity = target.GetEntity();
   return entity != nullptr && entity->mCurrentLayer == LAYER_Air;

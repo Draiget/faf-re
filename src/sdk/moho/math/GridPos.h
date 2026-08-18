@@ -19,4 +19,13 @@ namespace moho
      */
     GridPos(Wm3::Vec3f* wldPos, int gridSize) noexcept;
   };
+
+  /**
+   * Address: 0x0066D1D0 (FUN_0066D1D0)
+   *
+   * What it does:
+   * Multiplies one seconds value by `10.0f`, applies the legacy x87
+   * `frndint` floor adjustment lane, and returns the integer tick count.
+   */
+  [[nodiscard]] int FloorSecondsToTicks(float seconds) noexcept;
 } // namespace moho

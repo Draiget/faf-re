@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/sim/SPhysConstants.h"
 #include "Wm3Quaternion.h"
@@ -15,6 +16,21 @@ namespace gpg
 namespace moho
 {
   class VTransform;
+
+  /**
+   * One world-space ground-penetration sample: the contact point plus the
+   * terrain elevation sampled under it. Produced by
+   * `CUnitMotion::HandleGroundCollision` (per-sphere terrain overlap check)
+   * and consumed by `SPhysBody::ApplyGroundCollisionResponse`.
+   */
+  struct GroundPenetrationSample
+  {
+    float x;                 // +0x00
+    float y;                 // +0x04
+    float z;                 // +0x08
+    float terrainElevation;  // +0x0C
+  };
+  static_assert(sizeof(GroundPenetrationSample) == 0x10, "GroundPenetrationSample size must be 0x10");
 
   /**
    * Address owner:
@@ -106,7 +122,57 @@ namespace moho
      * stores world-space position as `rotatedOffset + transform.pos_`.
      */
     void SetTransform(const VTransform& transform);
+
+    /**
+     * Address: 0x00697B00 (FUN_00697B00, sub_697B00)
+     *
+     * What it does:
+     * One explicit-Euler free-fall step: accumulates `force/mass + mConstants
+     * ->mGravity` into `mVelocity` over `dt`, midpoint-integrates `mPos` from
+     * the old/new velocity average, then applies `angularImpulse` via
+     * `IntegrateAngularImpulse`.
+     */
+    void IntegrateFreefallStep(const Wm3::Vec3f& force, float dt, const Wm3::Vec3f& angularImpulse);
+
+    /**
+     * Address: 0x006978D0 (FUN_006978D0, sub_6978D0)
+     *
+     * What it does:
+     * Accumulates `angularImpulse * dt` into `mWorldImpulse`, rotates the
+     * midpoint-averaged accumulated impulse into body-local space, scales it
+     * by `mInvInertiaTensor`, converts the result to a delta rotation, and
+     * left-multiplies it onto `mOrientation` (renormalizing in place).
+     */
+    void IntegrateAngularImpulse(const Wm3::Vec3f& angularImpulse, float dt);
+
+    /**
+     * Address: 0x00698350 (FUN_00698350, sub_698350)
+     *
+     * IDA signature:
+     * int __usercall sub_698350@<eax>(Moho::SPhysBody *a1@<edx>, int edi0@<edi>);
+     *
+     * What it does:
+     * Ground-collision impulse response. For each sample still penetrating
+     * (`sample.y <= sample.terrainElevation`), computes the point velocity
+     * (`mVelocity + Cross(angularVelocity, sample - mPos)`, where
+     * `angularVelocity` comes from `GetImpulse`) and, for points still
+     * moving downward, accumulates a cancelling linear/angular impulse and
+     * the maximum penetration depth. Averages the accumulated impulses
+     * across all downward-moving points, applies them to `mVelocity`/
+     * `mWorldImpulse` (each damped by 0.9), and pushes `mPos.y` up by the
+     * maximum penetration depth.
+     */
+    void ApplyGroundCollisionResponse(const gpg::fastvector_n<GroundPenetrationSample, 8>& samples);
   };
+
+  /**
+   * Address: 0x00697750 (FUN_00697750, SPhysBody world-transform export helper)
+   *
+   * What it does:
+   * Writes one `VTransform` view from body state by copying orientation and
+   * backing out world position from rotated collision-offset.
+   */
+  VTransform* BuildTransformFromSPhysBody(VTransform* outTransform, const SPhysBody* body);
 
   static_assert(offsetof(SPhysBody, mConstants) == 0x00, "SPhysBody::mConstants offset must be 0x00");
   static_assert(offsetof(SPhysBody, mMass) == 0x04, "SPhysBody::mMass offset must be 0x04");
