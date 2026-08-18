@@ -2028,13 +2028,73 @@ namespace moho
     [[nodiscard]] SSTIUnitVariableData& VarDat() noexcept;
     [[nodiscard]] SSTIUnitVariableData const& VarDat() const noexcept;
 
+    /**
+     * Address: 0x006AD750 (FUN_006AD750, func_SetExtraStorage)
+     *
+     * IDA signature:
+     * void callcnv_F3 func_SetExtraStorage(Moho::CEconStorage **a1@<eax>, Moho::CEconStorage *a2@<ecx>);
+     *
+     * What it does:
+     * Replaces `mExtraStorage` with `newStorage`. If a prior storage lane was
+     * owned, rolls back its max-storage contribution (`CEconStorage::Chng(-1)`)
+     * when it still has an owning economy, then deletes it.
+     */
+    void SetExtraStorage(CEconStorage* newStorage);
+
+    /**
+     * Address: 0x006AAAC0 (FUN_006AAAC0, ?HandleResourceManagement@Unit@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Per-tick economy step invoked from `MotionTick`. Consumes this unit's
+     * request lane (throttling its own production by the consumption
+     * fulfillment ratio when it is not a natural producer), then - while
+     * alive, not under construction, and production-active - contributes
+     * production output into the owning army's economy and this unit's own
+     * beat accumulators, maintaining the extra max-storage lane the
+     * blueprint's storage economy requires.
+     */
+    void HandleResourceManagement();
+
+    /**
+     * Address: 0x006AA7A0 (FUN_006AA7A0, ?UpdateGuardFormation@Unit@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * When this unit has no guard formation yet but has guarded units and a
+     * blueprint-defined guard-formation script, builds a new
+     * `CAiFormationInstance` centered on this unit (oriented along this
+     * unit's own transform when mobile, or a zero orientation otherwise),
+     * disbands any prior formation, and primes the new one.
+     */
+    void UpdateGuardFormation();
+
+    /**
+     * Address: 0x006A9010 (FUN_006A9010, Moho::Unit::MotionTick)
+     * Primary vtable slot 20 (`??_7Unit@Moho@@6BEntity@Moho@@@`, Entity subobject).
+     *
+     * What it does:
+     * Per-tick motion driver: refreshes animation manipulators, updates the
+     * guard formation and resource-management economy step, then dispatches
+     * to the owned `CUnitMotion`'s own per-tick motion update.
+     */
+    int MotionTick() override;
+
   public:
     SSTIUnitConstantData mConstDat; // 0x0278
     // Leading bytes of SSTIUnitVariableData (starts at 0x0288).
     std::uint8_t mVarDatHead[8]; // 0x0288
     bool AutoMode;               // 0x0290
     bool AutoSurfaceMode;        // 0x0291
-    char pad_0292[2];            // 0x0292
+    // Whether this unit is currently attached to something (e.g. docked on a
+    // transport/pad). Confirmed by Unit::MotionTick (0x006A9010, 0x006A90DA-
+    // 0x006A90FD): `mIsBusy = mAttachInfo.HasAttachTarget()`, written every
+    // tick. SSTIUnitVariableData's own declaration already names the mirrored
+    // relative field `mIsBusy` (+0x00A) - this byte was previously mismodeled
+    // as padding in this flattened view. Named with the `m` prefix (unlike
+    // sibling flattened fields) because the unprefixed `IsBusy` name is
+    // already taken by the unrelated computed accessor `Unit::IsBusy() const`
+    // (0x006A7D10, "movement navigation active or builder busy").
+    bool mIsBusy;                 // 0x0292
+    char pad_0293[1];            // 0x0293
     float FuelRatio;             // 0x0294
     float ShieldRatio;           // 0x0298
     std::int32_t StunnedState;   // 0x029C
@@ -2131,6 +2191,7 @@ namespace moho
     char pad_0694[0x14];                               // 0x0694
   };
 
+  static_assert(offsetof(Unit, mIsBusy) == 0x0292, "Unit::mIsBusy offset must be 0x0292");
   static_assert(offsetof(Unit, GuardedByList) == 0x04F8, "Unit::GuardedByList offset must be 0x04F8");
   static_assert(offsetof(Unit, mCreationTick) == 0x0528, "Unit::mCreationTick offset must be 0x0528");
   static_assert(offsetof(Unit, mExtraStorage) == 0x052C, "Unit::mExtraStorage offset must be 0x052C");

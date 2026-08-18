@@ -10,6 +10,7 @@
 #include "moho/misc/CEconomyEvent.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/task/ETaskStatus.h"
 #include "moho/unit/EUnitMotionEnums.h"
 #include "Wm3Quaternion.h"
 
@@ -38,6 +39,22 @@ namespace moho
   };
   class Unit;
   struct VAxes3;
+
+  /**
+   * Address owner: 0x006BE6B0 (FUN_006BE6B0, Moho::CUnitMotion::ComputeAirControl)
+   *
+   * What it does:
+   * One tick's air-steering control output - linear force and torque, both
+   * in world space, ready for the physics-body integrator.
+   */
+  struct SControlOutput
+  {
+    Wm3::Vector3f force;   // +0x00
+    Wm3::Vector3f torque;  // +0x0C
+  };
+  static_assert(sizeof(SControlOutput) == 0x18, "SControlOutput size must be 0x18");
+  static_assert(offsetof(SControlOutput, force) == 0x00, "SControlOutput::force offset must be 0x00");
+  static_assert(offsetof(SControlOutput, torque) == 0x0C, "SControlOutput::torque offset must be 0x0C");
 
   /**
    * Steering-facing ABI surface used by CAiSteeringImpl.
@@ -277,6 +294,19 @@ namespace moho
      */
     void ProcessFuelLevels();
 
+    /**
+     * Address: 0x006B9D10 (FUN_006B9D10, Moho::CUnitMotion::MotionTick)
+     * Mangled: ?MotionTick@CUnitMotion@Moho@@QAE?AW4ETaskStatus@2@XZ
+     *
+     * What it does:
+     * Per-tick motion driver called from `Unit::MotionTick`. Handles the
+     * being-built/submerged vertical-event special case, refreshes surface
+     * collision/fuel/command-queue bookkeeping, then dispatches on
+     * `mMotionState` (attached / ballistic / crashed / normal) to the
+     * appropriate `CalcMove*` step and commits the result via `MoveTo`.
+     */
+    [[nodiscard]] ETaskStatus MotionTick();
+
   private:
     /**
      * Address: 0x006C1350 (FUN_006C1350, ?CalcRollHack@CUnitMotion@Moho@@AAE?AV?$Vector3@M@Wm3@@XZ)
@@ -437,13 +467,13 @@ namespace moho
     void CalcMoveLand(VTransform& transform, float* outMoveDistance);
 
     /**
-     * Address: 0x006C3480 (FUN_006C3480, ?CalcMoveWater@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+     * Address: 0x006C3480 (FUN_006C3480, ?CalcMoveWater@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
      *
      * What it does:
      * Runs one water move step through `CalcMoveCommon`, applies dive/surface
      * transitions and water snap, and updates common horizontal motion events.
      */
-    void CalcMoveWater(VTransform& transform);
+    void CalcMoveWater(VTransform& transform, float* outMoveDistance);
 
     /**
      * Address: 0x006C2BC0 (FUN_006C2BC0, ?CalcMoveHover@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
@@ -459,6 +489,25 @@ namespace moho
      * tick — before snapping the hull back down onto the terrain.
      */
     void CalcMoveHover(VTransform& transform, float* outMoveDistance);
+
+    /**
+     * Address: 0x006C0290 (FUN_006C0290, ?CalcMoveBallistic@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z)
+     *
+     * What it does:
+     * Runs one ballistic (free-fall) motion step. Integrates gravity into the
+     * owner's velocity and predicts a new position; if a stored angular
+     * impulse (`mVector108`) is non-zero, also steps the physics body's
+     * linear/angular state and copies the result into `transform.orient_`.
+     * Ray-casts the predicted move segment against terrain (amphibious
+     * units) or the water surface (everyone else) and reclassifies the
+     * owner's current layer from the hit (or, absent a valid hit, from a
+     * same-tick ground/water-vs-current-height comparison). Only on the tick
+     * the layer actually changes does it run the out-of-bounds/upright/
+     * occupancy legality check (`Kill()`ing the unit if it fails) and emit
+     * the `OnImpact`/`OnMotionStateChange` callbacks that end ballistic
+     * motion.
+     */
+    void CalcMoveBallistic(VTransform& transform, float* outMoveDistance);
 
     /**
      * Address: 0x006C2A40 (FUN_006C2A40, ?ProcessCommonMotionState@CUnitMotion@Moho@@AAEX_N@Z)
@@ -494,6 +543,23 @@ namespace moho
     void ProcessSurfaceCollisionFromLastMove();
 
     /**
+     * Address: 0x006BC460 (FUN_006BC460, ?HandleGroundCollision@CUnitMotion@Moho@@AAE_NXZ)
+     * Mangled: ?HandleGroundCollision@CUnitMotion@Moho@@AAE_NXZ
+     *
+     * What it does:
+     * Early-outs when the unit is well above its own footprint size.
+     * Otherwise pulls the unit's terrain-collision spheres, transforms each
+     * into world space using the physics body's collision transform, and for
+     * each sphere checks whether it has penetrated the terrain (accounting
+     * for the blueprint's ground-collision clearance) and/or sunk below the
+     * map's water floor. Ground-penetration points are collected and, if any
+     * were found, fed to `SPhysBody::ApplyGroundCollisionResponse`. Returns
+     * true if the unit is touching ground, or (for units that can't fly in
+     * water) at/below water.
+     */
+    [[nodiscard]] bool HandleGroundCollision();
+
+    /**
      * Address: 0x006C3220 (FUN_006C3220, ?HandleDivingAndSurfacing@CUnitMotion@Moho@@AAE_NXZ)
      *
      * What it does:
@@ -527,6 +593,96 @@ namespace moho
      * elevation ratio, and hover-bank blueprint lanes.
      */
     void CalcHoverOrientation(const SPhysBody& body, const Wm3::Vector3f& referenceVector, VAxes3& outAxes);
+
+    /**
+     * Address: 0x006BDEE0 (FUN_006BDEE0, Moho::CUnitMotion::CalcCirclingOrientation)
+     *
+     * What it does:
+     * Picks (and, on a randomized timer, re-rolls) a circling radius/
+     * elevation/direction around the unit's focus (while building/repairing)
+     * or attack target (otherwise, using the target weapon's max radius),
+     * computes a tangential aim point offset by a fixed +-45 degree yaw from
+     * the direct-to-target heading, clamps it to the chosen radius, samples
+     * terrain (or shallow water-surface) elevation under that point, and
+     * writes the resulting desired-velocity direction/elevation-seeking
+     * vector plus hover control axes (via `CalcHoverOrientation`).
+     */
+    void CalcCirclingOrientation(
+      const SPhysBody& body,
+      VAxes3& outAxes,
+      Wm3::Vector3f& outDesiredVelocity,
+      CAiTarget& target
+    );
+
+    /**
+     * Address: 0x006BE6B0 (FUN_006BE6B0, Moho::CUnitMotion::ComputeAirControl)
+     * Mangled: ?ComputeAirControl@CUnitMotion@Moho@@AAEXABUSPhysBody@2@ABV?$Vector3@M@Wm3@@111PAUSControlOutput@2@AAVCAiTarget@2@@Z
+     *
+     * What it does:
+     * Selects an air-steering axis set for the current tick - winged flight,
+     * circling-around-focus-target, or plain hover - based on unit/combat/
+     * carrier state, builds a relative-orientation quaternion (desired axes
+     * vs. current physics-body orientation), converts it to an axis-angle
+     * rotation-error vector, and runs a PD control law (proportional on
+     * rotation/velocity error, derivative on body-local angular impulse) to
+     * produce a world-space steering force and torque. Near a carrier during
+     * deck-descend, blends in a tighter velocity-cancelling term instead of
+     * the normal movement-damping factor. Caches the output force into
+     * `mForce` and the pre-inertia-scaled body-local torque into
+     * `mVector108` for `CalcMoveBallistic`'s later impulse step.
+     */
+    void ComputeAirControl(
+      const SPhysBody& body,
+      const Wm3::Vector3f& fallbackVector,
+      const Wm3::Vector3f& controlVector,
+      const Wm3::Vector3f& primaryVector,
+      const Wm3::Vector3f& referenceVector,
+      SControlOutput* out,
+      CAiTarget& target
+    );
+
+    /**
+     * Address: 0x006BCDB0 (FUN_006BCDB0, Moho::CUnitMotion::ComputeAirCombatTactics)
+     * Mangled: ?ComputeAirCombatTactics@CUnitMotion@Moho@@AAEXABV?$Vector3@M@Wm3@@ABVCAiTarget@2@AAV34@@Z
+     *
+     * What it does:
+     * Air-unit combat-state machine ("dogfighting" AI). Advances
+     * `mCombatState` (Combat / NormalTurn / CombatTurn / break-off / return-
+     * to-map-center) from target distance/heading/layer/mobility evidence,
+     * then fills `outDesiredVelocity` with the desired world-space velocity
+     * for the current state and rescales it to the state's target speed.
+     */
+    void ComputeAirCombatTactics(
+      const Wm3::Vector3f& currentHeading,
+      const CAiTarget& target,
+      Wm3::Vector3f& outDesiredVelocity
+    );
+
+    /**
+     * Address: 0x006BEE50 (FUN_006BEE50, Moho::CUnitMotion::CalcMoveAir)
+     * Mangled: ?CalcMoveAir@CUnitMotion@Moho@@AAEXAAVVTransform@2@PAM@Z
+     *
+     * What it does:
+     * Per-tick air-motion update. Computes the desired steering direction
+     * and top speed toward `mTargetPosition`, runs the (rare) land/water/
+     * hover transition search, shapes target elevation against terrain/
+     * water look-ahead and combat state, steers via `ComputeAirControl`/
+     * `ComputeAirCombatTactics`, fires vertical/horizontal/turn motion-event
+     * script callbacks, integrates the linked `SPhysBody` (linear+angular),
+     * resolves ground collision/layer transition, and writes the resulting
+     * world transform back through `outTransform`. If the unit is dead and
+     * not already flying (or shouldn't hover), instead forces `LAYER_Air`/
+     * `UMS_Ballistic` and seeds a random tumble torque before falling into
+     * the same physics-integration tail.
+     *
+     * The second (`float*`) parameter is present in the mangled signature
+     * for ABI parity with the sibling `CalcMove*` overloads but is never
+     * read or written anywhere in this function's body (confirmed both by
+     * the callee never touching `arg_8`, and by `MotionTick`'s own call
+     * site never supplying a value for it) - kept as an unused parameter
+     * rather than dropped, matching `CalcMoveHover`/`CalcMoveLand`'s shape.
+     */
+    void CalcMoveAir(VTransform& outTransform, float* outMoveDistance);
 
   public:
     Unit* mUnit;                    // +0x00
@@ -564,8 +720,8 @@ namespace moho
     float mUnknownFloat98;                // +0x98
     float mRandomElevation;               // +0x9C
     EAirCombatState mCombatState;         // +0xA0
-    std::uint32_t mUnknownA4;             // +0xA4
-    std::int32_t mUnknownA8;              // +0xA8
+    std::uint32_t mCombatStateTimeoutTick; // +0xA4
+    std::int32_t mSustainedTurnTicks;      // +0xA8
     std::int32_t mPreparationTick;        // +0xAC
     std::int32_t mStateWordB0;            // +0xB0
     Wm3::Vector3f mPreviousVelocity;      // +0xB4

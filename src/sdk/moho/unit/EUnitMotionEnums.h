@@ -32,8 +32,19 @@ namespace moho
    * Address: 0x006B7540 (FUN_006B7540)
    *
    * What it does:
-   * Opaque reflected enum lane for turn-event CUnitMotion state.
+   * Turn-direction hint computed by `CUnitMotion::CalcMoveAir` from the dot
+   * product between the current heading and desired-velocity vectors.
+   * `CUnitMotion::SetMotionTurnEvent` (0x006B8FB0) is a confirmed no-op in
+   * this binary, so these three values (asm-confirmed literals 0/1/2 at the
+   * three `CalcMoveAir` call sites, 0x6BFEFF/0x6BFF11/0x6BFF1D) have no
+   * observable effect regardless of name; named by likely turn-direction
+   * intent only.
    */
-  enum EUnitMotionTurnEvent : std::int32_t;
+  enum EUnitMotionTurnEvent : std::int32_t
+  {
+    UMTE_Left = 0,
+    UMTE_Right = 1,
+    UMTE_Straight = 2,
+  };
 } // namespace moho
 

@@ -212,6 +212,15 @@ namespace moho
   static_assert(sizeof(CAiTarget) == 0x20, "CAiTarget size must be 0x20");
 
   /**
+   * Address: 0x005E2DE0 (FUN_005E2DE0)
+   *
+   * What it does:
+   * Returns whether this target currently resolves to a live entity in
+   * `LAYER_Air`.
+   */
+  [[nodiscard]] bool CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept;
+
+  /**
    * Address: 0x005E2EC0 (FUN_005E2EC0, Moho::SCR_ToLua<Moho::CAiTarget>)
    *
    * What it does:

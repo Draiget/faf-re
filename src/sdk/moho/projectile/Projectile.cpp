@@ -13,6 +13,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityId.h"
+#include "moho/math/GridPos.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/math/Wm3DistanceFafExtras.h"
@@ -371,17 +372,6 @@ namespace
     const float scale =
       ((vector.x * axis.x) + (vector.y * axis.y) + (vector.z * axis.z)) / axisLengthSq;
     return Wm3::Vector3f{axis.x * scale, axis.y * scale, axis.z * scale};
-  }
-
-  // Re-derivation of the file-static FUN_0066D1D0 (canonical
-  // `FloorScaledByTenFrndintAdjustDown` in GridPos.cpp, file-static, not cross-TU
-  // linkable). Converts a seconds interval into a floored per-tick count; used by
-  // UpdateTracking's zig-zag re-schedule (asm 0x0069CD5E: call sub_66D1D0).
-  [[nodiscard]] int FloorSecondsToTicks(const float seconds) noexcept
-  {
-    const float scaled = seconds * 10.0f;
-    const double rounded = std::nearbyint(static_cast<double>(scaled));
-    return static_cast<int>(rounded) + ((static_cast<double>(scaled) < rounded) ? -1 : 0);
   }
 
   /**

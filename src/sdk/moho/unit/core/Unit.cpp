@@ -22,6 +22,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiTarget.h"
@@ -59,7 +60,10 @@
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/task/ETaskStatus.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/path/PathTables.h"
+#include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CPlatoon.h"
@@ -13481,6 +13485,240 @@ namespace
     DeleteAndNull(unit.AniActor);
   }
 } // namespace
+
+namespace
+{
+  /**
+   * Address: 0x007736A0 (FUN_007736A0, sub_7736A0)
+   *
+   * IDA signature:
+   * float *__userpurge sub_7736A0(
+   *     Moho::SEconValue *dest@<eax>, Moho::CEconRequest *request@<edx>, Moho::SEconValue *desired);
+   *
+   * What it does:
+   * Clamps `desired` to what remains in `request.mGranted` (component-wise
+   * min), writes the clamped amount into `dest`, then reduces
+   * `request.mGranted` by that withdrawn amount (floored at zero).
+   */
+  SEconValue& WithdrawFromGrantedEconValue(SEconValue& dest, CEconRequest& request, const SEconValue& desired)
+  {
+    dest.energy = std::min(desired.energy, request.mGranted.energy);
+    dest.mass = std::min(desired.mass, request.mGranted.mass);
+
+    request.mGranted.energy = std::max(0.0f, request.mGranted.energy - dest.energy);
+    request.mGranted.mass = std::max(0.0f, request.mGranted.mass - dest.mass);
+
+    return dest;
+  }
+} // namespace
+
+/**
+ * Address: 0x006AD750 (FUN_006AD750, func_SetExtraStorage)
+ *
+ * IDA signature:
+ * void callcnv_F3 func_SetExtraStorage(Moho::CEconStorage **a1@<eax>, Moho::CEconStorage *a2@<ecx>);
+ */
+void Unit::SetExtraStorage(CEconStorage* const newStorage)
+{
+  DestroyUnitExtraStorage(mExtraStorage);
+  mExtraStorage = newStorage;
+}
+
+/**
+ * Address: 0x006AAAC0 (FUN_006AAAC0, ?HandleResourceManagement@Unit@Moho@@AAEXXZ)
+ *
+ * What it does:
+ * Per-tick economy step. Consumes this unit's request lane (throttling its
+ * own production by the consumption fulfillment ratio when it is not a
+ * natural producer), then - while alive, not under construction, and
+ * production-active - maintains the extra max-storage lane the blueprint's
+ * storage economy requires and contributes production output into the
+ * owning army's economy and this unit's own beat accumulators. Otherwise
+ * (not producing), tears down any owned extra-storage lane.
+ */
+void Unit::HandleResourceManagement()
+{
+  ResourceConsumed = 0.0f;
+  float productionRate = 1.0f;
+
+  if (!GetBlueprint()->Economy.NaturalProducer && mConsumptionData != nullptr) {
+    productionRate = mConsumptionData->LimitingRate();
+  }
+
+  if (!IsDead() && ConsumptionActive && mConsumptionData != nullptr) {
+    ResourceConsumed = mConsumptionData->LimitingRate();
+
+    SEconValue desiredConsumption = mConsumptionData->mRequested;
+    desiredConsumption.energy *= ResourceConsumed;
+    desiredConsumption.mass *= ResourceConsumed;
+
+    SEconValue withdrawn{};
+    WithdrawFromGrantedEconValue(withdrawn, *mConsumptionData, desiredConsumption);
+
+    mBeatResourceAccumulators.resourcesSpentEnergy += withdrawn.energy;
+    mBeatResourceAccumulators.resourcesSpentMass += withdrawn.mass;
+  }
+
+  if (BeingBuilt || IsDead() || !ProductionActive) {
+    DestroyUnitExtraStorage(mExtraStorage);
+    return;
+  }
+
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+
+  if (blueprint->Economy.StorageEnergy == 0.0f && blueprint->Economy.StorageMass == 0.0f) {
+    DestroyUnitExtraStorage(mExtraStorage);
+  } else {
+    const SEconValue storageAmount{blueprint->Economy.StorageEnergy, blueprint->Economy.StorageMass};
+
+    if (mExtraStorage != nullptr) {
+      mExtraStorage->ChangeAmt(storageAmount);
+    } else {
+      CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy();
+      SetExtraStorage(new (std::nothrow) CEconStorage(storageAmount, reinterpret_cast<CEconomy*>(economyInfo)));
+    }
+  }
+
+  SEconValue producedThisTick{
+    Attributes.productionPerSecondEnergy * productionRate, Attributes.productionPerSecondMass * productionRate
+  };
+  producedThisTick.energy *= 0.1f;
+  producedThisTick.mass *= 0.1f;
+
+  CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy();
+  economyInfo->mResources.ENERGY += producedThisTick.energy;
+  economyInfo->mResources.MASS += producedThisTick.mass;
+  economyInfo->mPendingResources.ENERGY += producedThisTick.energy;
+  economyInfo->mPendingResources.MASS += producedThisTick.mass;
+  mBeatResourceAccumulators.maintenanceEnergy += producedThisTick.energy;
+  mBeatResourceAccumulators.maintenanceMass += producedThisTick.mass;
+}
+
+/**
+ * Address: 0x006AA7A0 (FUN_006AA7A0, ?UpdateGuardFormation@Unit@Moho@@AAEXXZ)
+ *
+ * What it does:
+ * When this unit has no guard formation yet but has guarded units and a
+ * blueprint-defined guard-formation script, builds a new
+ * `CAiFormationInstance` centered on this unit (oriented along this unit's
+ * own transform when mobile, or a zero orientation otherwise), disbands any
+ * prior formation, and primes the new one.
+ */
+void Unit::UpdateGuardFormation()
+{
+  if (GuardFormation != nullptr || GuardedByList.empty()) {
+    return;
+  }
+
+  CAiFormationDBImpl* const formationDB = SimulationRef->mFormationDB;
+  const char* const guardFormationScript = GetBlueprint()->AI.GuardFormationName.c_str();
+  if (guardFormationScript == nullptr || *guardFormationScript == '\0') {
+    return;
+  }
+
+  const Wm3::Vec3f& position = GetPosition();
+  SCoordsVec2 formationCenter{};
+  formationCenter.x = position.x;
+  formationCenter.z = position.z;
+
+  const Wm3::Quatf formationOrientation = IsMobile() ? GetTransform().orient_ : Zeroed<Wm3::Quaternionf>();
+
+  CAiFormationInstance* const newFormation = formationDB->NewFormation(
+    &GuardedByList,
+    guardFormationScript,
+    &formationCenter,
+    formationOrientation.x,
+    formationOrientation.y,
+    formationOrientation.z,
+    formationOrientation.w,
+    15
+  );
+
+  IFormationInstance* const previousFormation = GuardFormation;
+  GuardFormation = newFormation;
+  if (previousFormation != nullptr) {
+    previousFormation->operator_delete(1);
+  }
+
+  newFormation->Func22(1.0f);
+}
+
+/**
+ * Address: 0x006A9010 (FUN_006A9010, Moho::Unit::MotionTick)
+ * Primary vtable slot 20 (`??_7Unit@Moho@@6BEntity@Moho@@@`, Entity subobject).
+ *
+ * What it does:
+ * Per-tick motion driver. Logs the tick, advances the silo-build sidecar,
+ * refreshes the guard formation and info cache, counts down the stun timer,
+ * dispatches to the owned `CUnitMotion`'s own per-tick update, ticks every
+ * pending economy event, refreshes animation manipulators from the pending
+ * transform, recomputes whether this unit is currently attached to
+ * something, then - while alive - either regenerates health (when not under
+ * construction and the regen rate is positive) or applies build decay (when
+ * still under construction, past the first tick after creation), then runs
+ * the resource-management economy step. Finally, if this unit is not a POD
+ * and its command queue is empty, issues an `AssistCommander` command to
+ * itself; and if a builder sidecar is present, validates its factory queue.
+ */
+int Unit::MotionTick()
+{
+  SimulationRef->Logf("0x%08x's motion tick.\n", id_);
+
+  if (AiSiloBuild != nullptr) {
+    AiSiloBuild->SiloTick();
+  }
+
+  UpdateGuardFormation();
+  UpdateInfoCache();
+
+  if (StunnedState > 0) {
+    --StunnedState;
+  }
+
+  const int motionResult =
+    (UnitMotion != nullptr) ? static_cast<int>(UnitMotion->MotionTick()) : static_cast<int>(TASKSTATUS_Wait);
+
+  const TDatListItem<void, void>* const econEventsHead = &mEconomyEventListHead;
+  for (TDatListItem<void, void>* node = mEconomyEventListHead.mNext; node != econEventsHead; node = node->mNext) {
+    EconomyEventFromNode(node)->ProcessTick();
+  }
+
+  AniActor->UpdateManipulators(reinterpret_cast<const VTransform&>(PendingOrientation));
+
+  mIsBusy = mAttachInfo.HasAttachTarget();
+
+  if (!BeingBuilt) {
+    if (MaxHealth > Health && GetAttributes().regenRate > 0.0f) {
+      AdjustHealth(this, GetAttributes().regenRate * 0.1f);
+    }
+  } else if (static_cast<std::int32_t>(SimulationRef->mCurTick - mCreationTick) > 1) {
+    const RUnitBlueprintEconomy& economy = GetBlueprint()->Economy;
+    float buildTime = std::max(economy.BuildCostEnergy, economy.BuildCostMass);
+    buildTime = std::max(buildTime, economy.BuildTime);
+
+    if (buildTime > 0.0f) {
+      Materialize(-0.1f / buildTime);
+      if (Health <= 0.0f) {
+        RunScript("OnDecayed");
+      }
+    }
+  }
+
+  HandleResourceManagement();
+
+  if (mIsNotPod && (CommandQueue == nullptr || CommandQueue->mCommandVec.empty())) {
+    SEntitySetTemplateUnit selectedUnits{};
+    (void)selectedUnits.AddUnit(this);
+    SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_AssistCommander);
+    (void)IssueCommandToSelectedUnits(SimulationRef, selectedUnits, commandData, false);
+  }
+
+  if (AiBuilder != nullptr) {
+    AiBuilder->BuilderValidateFactoryCommandQueue();
+  }
+
+  return motionResult;
+}
 
 /**
  * Address: 0x006A5050 (FUN_006A5050, ??0Unit@Moho@@AAE@PAVSim@1@@Z)

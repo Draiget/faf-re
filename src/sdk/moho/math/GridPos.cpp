@@ -14,19 +14,6 @@ namespace
     return static_cast<int>(rounded) + ((scaled < rounded) ? -1 : 0);
   }
 
-  /**
-   * Address: 0x0066D1D0 (FUN_0066D1D0)
-   *
-   * What it does:
-   * Multiplies one scalar by `10.0f`, applies the legacy x87 `frndint` floor
-   * adjustment lane, and returns the integer tick-style result.
-   */
-  [[maybe_unused]] int FloorScaledByTenFrndintAdjustDown(const float value) noexcept
-  {
-    const float scaled = value * 10.0f;
-    const double rounded = std::nearbyint(static_cast<double>(scaled));
-    return static_cast<int>(rounded) + ((scaled < rounded) ? -1 : 0);
-  }
 } // namespace
 
 namespace moho
@@ -44,5 +31,12 @@ namespace moho
     : x(ComputeGridCellCoordinate(wldPos->x, gridSize))
     , z(ComputeGridCellCoordinate(wldPos->z, gridSize))
   {
+  }
+
+  int FloorSecondsToTicks(const float seconds) noexcept
+  {
+    const float scaled = seconds * 10.0f;
+    const double rounded = std::nearbyint(static_cast<double>(scaled));
+    return static_cast<int>(rounded) + ((static_cast<double>(scaled) < rounded) ? -1 : 0);
   }
 } // namespace moho
