@@ -1,5 +1,6 @@
 #include "MeshBatch.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -7,6 +8,11 @@
 
 #include "Mesh.h"
 
+#include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/math/VMatrix4.h"
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
@@ -48,7 +54,15 @@ namespace moho
      */
     struct MeshBatchSourceVertex final
     {
-      std::uint8_t pad00_50[0x51]{};
+      // --- Stream class 1 lanes (per-instance), written by FillBatch. --------
+      std::uint8_t instanceIndex = 0; // +0x00
+      std::uint8_t pad01_03[3]{};
+      float meshColor = 0.0f;         // +0x04
+      std::int32_t color = 0;         // +0x08
+      float shaderTime = 0.0f;        // +0x0C
+      VMatrix4 transform{};           // +0x10 (0x40 bytes)
+      std::uint8_t bonePaletteBase = 0; // +0x50
+      // --- Stream class 0 lanes (per-vertex), written by Initialize. --------
       std::uint8_t boneIndex0 = 0; // +0x51
       std::uint8_t boneIndex1 = 0; // +0x52
       std::uint8_t boneIndex2 = 0; // +0x53
@@ -61,9 +75,24 @@ namespace moho
       float vec88[3]{}; // +0x88
       float texCoord0[2]{}; // +0x94 (streamScalar94/98)
       float texCoord1[2]{}; // +0x9C (streamScalar9C/A0)
-      std::uint8_t padA4_B7[0x14]{};
+      // --- Stream class 1 tail lanes (per-instance), written by FillBatch. ---
+      std::uint8_t useSecondaryData = 0; // +0xA4
+      std::uint8_t padA5_A7[3]{};
+      float scroll[2]{};                 // +0xA8, +0xAC
+      std::uint8_t dissolve = 0;         // +0xB0
+      std::uint8_t padB1_B3[3]{};
+      float parameter = 0.0f;            // +0xB4
     };
 
+    static_assert(offsetof(MeshBatchSourceVertex, meshColor) == 0x04, "MeshBatchSourceVertex::meshColor offset must be 0x04");
+    static_assert(offsetof(MeshBatchSourceVertex, color) == 0x08, "MeshBatchSourceVertex::color offset must be 0x08");
+    static_assert(offsetof(MeshBatchSourceVertex, shaderTime) == 0x0C, "MeshBatchSourceVertex::shaderTime offset must be 0x0C");
+    static_assert(offsetof(MeshBatchSourceVertex, transform) == 0x10, "MeshBatchSourceVertex::transform offset must be 0x10");
+    static_assert(offsetof(MeshBatchSourceVertex, bonePaletteBase) == 0x50, "MeshBatchSourceVertex::bonePaletteBase offset must be 0x50");
+    static_assert(offsetof(MeshBatchSourceVertex, useSecondaryData) == 0xA4, "MeshBatchSourceVertex::useSecondaryData offset must be 0xA4");
+    static_assert(offsetof(MeshBatchSourceVertex, scroll) == 0xA8, "MeshBatchSourceVertex::scroll offset must be 0xA8");
+    static_assert(offsetof(MeshBatchSourceVertex, dissolve) == 0xB0, "MeshBatchSourceVertex::dissolve offset must be 0xB0");
+    static_assert(offsetof(MeshBatchSourceVertex, parameter) == 0xB4, "MeshBatchSourceVertex::parameter offset must be 0xB4");
     static_assert(offsetof(MeshBatchSourceVertex, boneIndex0) == 0x51, "MeshBatchSourceVertex::boneIndex0 offset must be 0x51");
     static_assert(offsetof(MeshBatchSourceVertex, position) == 0x58, "MeshBatchSourceVertex::position offset must be 0x58");
     static_assert(offsetof(MeshBatchSourceVertex, vec70) == 0x70, "MeshBatchSourceVertex::vec70 offset must be 0x70");
@@ -72,6 +101,117 @@ namespace moho
     static_assert(offsetof(MeshBatchSourceVertex, texCoord0) == 0x94, "MeshBatchSourceVertex::texCoord0 offset must be 0x94");
     static_assert(offsetof(MeshBatchSourceVertex, texCoord1) == 0x9C, "MeshBatchSourceVertex::texCoord1 offset must be 0x9C");
     static_assert(sizeof(MeshBatchSourceVertex) == 0xB8, "MeshBatchSourceVertex size must be 0xB8");
+
+    /// Wrap period the mesh shader's animated-time lane is reduced modulo
+    /// (flt_F57F08); shared with the frame/effect shader-time lanes in Mesh.cpp.
+    constexpr float kMeshShaderTimeWrapSeconds = 36000.0f;
+
+    /// Normalized dissolve is handed to the shader as a byte (dword_E4F7B8).
+    constexpr float kDissolveToByteScale = 255.0f;
+
+    /// Y a bone is parked at when the pose hides it or its remap index is out of
+    /// range; combined with a zero scale it collapses the bone's geometry.
+    constexpr float kHiddenBoneDepth = -1000.0f;
+
+    /**
+     * Scales the three basis rows of a row-major transform in place, leaving the
+     * translation row untouched. Inlined into `HardwareMeshBatch::FillBatch` in
+     * the binary (the twelve `mulss` at 0x007E8730..0x007E884F).
+     */
+    void ScaleTransformRows(VMatrix4& transform, const Wm3::Vec3f& scale)
+    {
+      const float axisScale[3] = {scale.x, scale.y, scale.z};
+
+      for (std::size_t row = 0; row < 3; ++row) {
+        transform.r[row].x *= axisScale[row];
+        transform.r[row].y *= axisScale[row];
+        transform.r[row].z *= axisScale[row];
+        transform.r[row].w *= axisScale[row];
+      }
+    }
+
+    /**
+     * Writes one instance's slice of the two global GPU skinning palettes.
+     *
+     * Each bone's world placement is the pose's composite transform applied to
+     * the skeleton's rest offset (scaled by the instance), and its rotation is
+     * the composite rotation composed with the rest rotation. Bones the pose
+     * hides - and bones whose remap index falls outside the pose - are parked
+     * below the world with a zero scale instead.
+     *
+     * Inlined into `HardwareMeshBatch::FillBatch` in the binary
+     * (0x007E8312..0x007E86AC).
+     */
+    void FillInstanceBonePalettes(
+      const MeshInstance& meshInstance,
+      const CAniPose& pose,
+      const CAniSkel& skeleton,
+      const msvc8::vector<std::int32_t>& boneRemapIndices,
+      const std::int32_t boneCount,
+      const std::uint8_t paletteBase
+    )
+    {
+      SkinPaletteEntry* const transPalette = GetMeshShaderVarTransPalette().mPalette.mBegin;
+      SkinPaletteEntry* const rotPalette = GetMeshShaderVarRotPalette().mPalette.mBegin;
+
+      const auto poseBoneCount = static_cast<std::uint32_t>(pose.mBones.end() - pose.mBones.begin());
+      const float instanceScale = meshInstance.scale.x;
+
+      for (std::int32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
+        const auto slot = static_cast<std::size_t>(paletteBase) + static_cast<std::size_t>(boneIndex);
+        const auto remapIndex = static_cast<std::uint32_t>(boneRemapIndices[static_cast<std::size_t>(boneIndex)]);
+
+        const CAniPoseBone* const poseBone =
+          remapIndex < poseBoneCount ? &pose.mBones.begin()[remapIndex] : nullptr;
+
+        if (poseBone == nullptr || poseBone->mVisible == 0) {
+          transPalette[slot] = SkinPaletteEntry{0.0f, kHiddenBoneDepth, 0.0f, 0.0f};
+          rotPalette[slot] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
+          continue;
+        }
+
+        // The binary reads the skeleton bone unconditionally once the pose bone
+        // is visible: pose and skeleton always carry the same bone count, so the
+        // bounds test inlined from CAniSkel::GetBone never fails here.
+        const SAniSkelBone* const restBone = skeleton.GetBone(remapIndex);
+        const Wm3::Quatf restRotation = restBone->mBoneTransform.orient_;
+        const Wm3::Vec3f restOffset = restBone->mBoneTransform.pos_;
+
+        const VTransform composite = poseBone->GetCompositeTransform();
+
+        Wm3::Vec3f scaledOffset{
+          restOffset.x * instanceScale,
+          restOffset.y * instanceScale,
+          restOffset.z * instanceScale,
+        };
+
+        Wm3::Vec3f rotatedOffset{};
+        MultQuadVec(&rotatedOffset, &scaledOffset, &composite.orient_);
+
+        transPalette[slot] = SkinPaletteEntry{
+          composite.pos_.x + rotatedOffset.x,
+          rotatedOffset.y + composite.pos_.y,
+          rotatedOffset.z + composite.pos_.z,
+          instanceScale,
+        };
+
+        // Hamilton product `composite.orient_ * restRotation`, written in the
+        // binary's exact grouping - float addition does not associate, so the
+        // parenthesisation is part of the behaviour.
+        const Wm3::Quatf& c = composite.orient_;
+        const Wm3::Quatf& b = restRotation;
+        Wm3::Quatf composed{
+          ((c.w * b.w - c.x * b.x) - c.y * b.y) - c.z * b.z,
+          ((b.x * c.w + c.y * b.z) + c.x * b.w) - c.z * b.y,
+          ((b.y * c.w + c.z * b.x) + c.y * b.w) - c.x * b.z,
+          ((c.x * b.y + b.z * c.w) + c.z * b.w) - c.y * b.x,
+        };
+        NormalizeQuatInPlace(&composed);
+
+        // The palette hands the shader xyzw; the engine stores wxyz.
+        rotPalette[slot] = SkinPaletteEntry{composed.x, composed.y, composed.z, composed.w};
+      }
+    }
   } // namespace
 
   /**
@@ -310,6 +450,167 @@ namespace moho
    */
   void HardwareMeshBatch::EndBatch()
   {
+  }
+
+  /**
+   * Address: 0x007E7EA0 (FUN_007E7EA0, slot 9 override; IDA: HardwareMeshBatch::Func9)
+   * Mangled slot: ??_7HardwareMeshBatch@Moho@@6B@ +0x24
+   *
+   * IDA signature:
+   * int __thiscall Moho::HardwareMeshBatch::Func9(HardwareMeshBatch* this,
+   *   int** current, int* end, char reflectedOnly);
+   *
+   * What it does:
+   * Packs one draw call's worth of per-instance vertex records. It walks
+   * `[*current, end)` - advancing `*current` as it goes, so the caller's loop
+   * resumes where this one stopped - and for every instance that still has a
+   * live pose it stages one instance vertex into the CPU scratch buffer through
+   * the hardware vertex formatter's stream-class-1 packer, then uploads the
+   * whole run into the dynamic per-instance vertex buffer in one lock.
+   *
+   * Skinned batches (`mUseBoneRemap`) additionally fill this instance's slice of
+   * the two global GPU skinning palettes: `transPalette` takes the bone's world
+   * position with the instance's scale in `w`, `rotPalette` takes the composite
+   * bone rotation as `xyzw`. A bone the pose hides - or one whose remap index
+   * falls outside either the pose or the skeleton - is pushed to y = -1000 with
+   * zero scale, which is how the shipped shader makes it disappear. Unskinned
+   * batches instead carry the instance transform itself in the vertex record and
+   * leave the palettes at the identity this function seeds them to on entry.
+   *
+   * Both palettes are uploaded to the mesh effect once, after the run.
+   *
+   * Returns the number of instances actually packed, which is what
+   * `MeshBatch::Render` hands to `DrawBatch`.
+   */
+  std::int32_t HardwareMeshBatch::FillBatch(
+    MeshInstance**& current,
+    MeshInstance** const end,
+    const bool reflectedOnly
+  )
+  {
+    MeshShaderPaletteVar& transPaletteVar = GetMeshShaderVarTransPalette();
+    MeshShaderPaletteVar& rotPaletteVar = GetMeshShaderVarRotPalette();
+    SkinPaletteEntry* const transPalette = transPaletteVar.mPalette.mBegin;
+    SkinPaletteEntry* const rotPalette = rotPaletteVar.mPalette.mBegin;
+
+    gpg::gal::Float16HardwareVertexFormatterD3D9* const formatter = gpg::gal::GetHardwareVertexFormatter();
+
+    // Seed every bone slot this batch owns with an identity transform, so a
+    // batch that packs fewer instances than the palette holds leaves no stale
+    // bones behind.
+    for (std::int32_t boneIndex = 0; boneIndex < mBoneCount; ++boneIndex) {
+      transPalette[boneIndex] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
+      rotPalette[boneIndex] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
+    }
+
+    // One draw is capped by the dynamic buffer's instance budget; the caller
+    // re-enters for whatever is left over.
+    const std::int32_t remaining = static_cast<std::int32_t>(end - current);
+    const std::int32_t instanceBudget = (remaining < mActiveInstanceBudget) ? remaining : mActiveInstanceBudget;
+    if (instanceBudget == 0) {
+      return 0;
+    }
+
+    // The binary zeroes the staging record once, ahead of the run, and only
+    // rewrites the lanes that vary per instance.
+    MeshBatchSourceVertex staging{};
+
+    const std::uint32_t instanceStride = formatter->GetVertexStride(1, 0);
+
+    std::int32_t packedCount = 0;
+    std::uint32_t scratchOffset = 0;
+
+    while (current != end) {
+      MeshInstance* const meshInstance = *current;
+
+      // The reflection pass only draws instances that are flagged reflectable.
+      if (!reflectedOnly || meshInstance->isReflected != 0) {
+        boost::shared_ptr<CAniPose> pose;
+        CaptureMeshInstanceCurrentPose(&pose, meshInstance);
+
+        // An instance whose pose (or whose pose's skeleton) has gone away is
+        // skipped without consuming a slot in the draw.
+        const boost::shared_ptr<const CAniSkel> skeleton =
+          pose.get() != nullptr ? pose->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+
+        if (pose.get() != nullptr && skeleton.get() != nullptr) {
+          staging.instanceIndex = static_cast<std::uint8_t>(packedCount);
+          staging.color = meshInstance->color;
+          staging.meshColor = meshInstance->meshColor;
+          staging.shaderTime =
+            std::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds);
+          staging.useSecondaryData = mUseSecondaryData;
+          staging.parameter = (&meshInstance->parameters)[mParameterAnnotation];
+          staging.scroll[0] = meshInstance->scroll1.x
+            + ((meshInstance->scroll2.x - meshInstance->scroll1.x) * MeshInstance::sCurrentInterpolant);
+          staging.scroll[1] = meshInstance->scroll1.y
+            + ((meshInstance->scroll2.y - meshInstance->scroll1.y) * MeshInstance::sCurrentInterpolant);
+          staging.dissolve = static_cast<std::uint8_t>(
+            static_cast<std::int32_t>(meshInstance->dissolve * kDissolveToByteScale)
+          );
+
+          if (mUseBoneRemap != 0) {
+            // Skinned: the vertex record carries no transform of its own - every
+            // vertex is placed by the bone palette entries filled below.
+            staging.bonePaletteBase =
+              static_cast<std::uint8_t>(static_cast<std::int8_t>(packedCount) * static_cast<std::int8_t>(mBoneCount));
+            CopyTransform4x4(&staging.transform, VMatrix4::sIdentity);
+
+            FillInstanceBonePalettes(
+              *meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount, staging.bonePaletteBase
+            );
+          } else {
+            // Unskinned: one instance transform, scaled per axis, in the record.
+            staging.bonePaletteBase = 0;
+
+            meshInstance->UpdateInterpolatedFields();
+
+            VMatrix4 instanceTransform;
+            instanceTransform.Set(meshInstance->curOrientation, meshInstance->interpolatedPosition);
+            ScaleTransformRows(instanceTransform, meshInstance->scale);
+
+            CopyTransform4x4(&staging.transform, instanceTransform);
+          }
+
+          formatter->WriteFormattedVertex(
+            1,
+            static_cast<std::uint8_t*>(mScratchVertexData) + scratchOffset,
+            &staging,
+            0
+          );
+
+          scratchOffset += instanceStride;
+          ++packedCount;
+        }
+      }
+
+      ++current;
+      if (packedCount >= instanceBudget) {
+        break;
+      }
+    }
+
+    // Upload the packed run in one discard lock, then publish both palettes to
+    // the mesh effect.
+    const std::uint32_t packedBytes = static_cast<std::uint32_t>(packedCount) * instanceStride;
+    void* const mapped = mDynamicVertexBuffer->Lock(0U, packedBytes, gpg::gal::MohoD3DLockFlags::Discard);
+    std::memcpy(mapped, mScratchVertexData, packedBytes);
+    mDynamicVertexBuffer->Unlock();
+
+    if (transPaletteVar.Exists()) {
+      transPaletteVar.mEffectVariable->SetPtr(
+        transPaletteVar.mPalette.mBegin,
+        transPaletteVar.mPalette.Count() * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+      );
+    }
+    if (rotPaletteVar.Exists()) {
+      rotPaletteVar.mEffectVariable->SetPtr(
+        rotPaletteVar.mPalette.mBegin,
+        rotPaletteVar.mPalette.Count() * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+      );
+    }
+
+    return packedCount;
   }
 
   /**

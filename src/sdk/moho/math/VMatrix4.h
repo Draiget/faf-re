@@ -133,6 +133,16 @@ namespace moho
     }
 
     /**
+     * Address: 0x00F59714 (?sIdentity@VMatrix4@Moho@@2ABU12@B)
+     *
+     * Shared identity transform. The binary keeps one constant instance and
+     * hands its address to the paths that copy an identity in - the skinned
+     * branch of `HardwareMeshBatch::FillBatch` is the hot one - rather than
+     * materialising a fresh identity per call.
+     */
+    static const VMatrix4 sIdentity;
+
+    /**
      * Set from unit quaternion (x,y,z,w) and translation (tx,ty,tz).
      */
     static VMatrix4 FromQuatPos(const Vector4f& qXyzw, float tx, float ty, float tz)
@@ -281,6 +291,8 @@ namespace moho
       return r;
     }
   };
+
+  inline const VMatrix4 VMatrix4::sIdentity = VMatrix4::Identity();
 
   static_assert(sizeof(VMatrix4) == 0x40, "VMatrix4 size must be 0x40");
   static_assert(alignof(VMatrix4) == 0x4, "VMatrix4 alignment must be 4");

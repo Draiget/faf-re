@@ -117,6 +117,16 @@ namespace moho
   );
 
   /**
+   * Address: 0x007E6D20 (FUN_007E6D20, sub_7E6D20)
+   *
+   * What it does:
+   * Copies one whole 4x4 transform element by element and returns the
+   * destination - the out-of-line `VMatrix4` copy MSVC emitted for
+   * `HardwareMeshBatch::FillBatch`'s two per-instance staging writes.
+   */
+  VMatrix4* CopyTransform4x4(VMatrix4* destination, const VMatrix4& source);
+
+  /**
    * Address: 0x0082BA50 (FUN_0082BA50)
    *
    * What it does:
