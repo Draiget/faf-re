@@ -3510,7 +3510,14 @@ namespace
   }
 
   /**
-   * Address: 0x00835DF0 (FUN_00835DF0)
+   * Address: unverified - previously cited as 0x00835DF0, but that address's
+   * real disassembly (FUN_00835DF0.asm) is an unrelated ~588-byte function
+   * referencing Moho::sWldSession and the "SHOWQUEUE" console command, not
+   * this logic. Mis-attribution found 2026-08-19; the address citation was
+   * removed rather than left wrong. This function's own behavior (coalesce
+   * a UserUnit's factory command queue into blueprint/count display rows)
+   * is still real and wired from its caller below - only the binary address
+   * pairing needs new evidence.
    *
    * What it does:
    * Rebuilds the current factory queue-display snapshot from a unit's command
