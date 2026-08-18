@@ -5,6 +5,7 @@
 
 #include "boost/weak_ptr.h"
 #include "gpg/core/containers/FastVector.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/water/WaterSurface.h"
 
@@ -225,13 +226,30 @@ namespace moho
     std::uint32_t mSkirtEndIndex = 0u;                              // +0x28
     std::int32_t mSkirtEndVertex = 0;                               // +0x2C
     std::int32_t mSkirtBaseVertex = 0;                              // +0x30
-    float mTerrainScale = 1.0F;                                     // +0x34
-    float mUnknown38 = 0.0F;                                        // +0x38
-    float mUnknown3C = 0.0F;                                        // +0x3C
-    float mUnknown40 = 0.0F;                                        // +0x40
-    float mUnknown44 = 0.0F;                                        // +0x44
-    float mUnknown48 = 0.0F;                                        // +0x48
-    float mUnknown4C = 0.0F;                                        // +0x4C
+    /**
+     * Cached copy of `mCamera->tranform`, refreshed unconditionally every
+     * call to the still-unrecovered vtable slot 5 ("Func3",
+     * TerrainCommon.h's slot table). Confirmed against the raw
+     * disassembly of `LowFidelityTerrain::Func3` (0x00808640):
+     *
+     *   0x00808680  lea edi, [ebx+34h]            ; &this->mCachedCameraTransform
+     *   0x0080868A  call Wm3::Vector3::Compare     ; [ebx+44h] vs [camera+10h] - position
+     *   0x00808697  call Wm3::Quaternion::Compare  ; [ebx+34h] vs [camera+00h] - orientation
+     *   0x008086AD..0x008086D8  seven fld/fstp pairs copying camera+0x00..+0x1C
+     *                            into this+0x34..+0x50 unconditionally
+     *
+     * `camera+0x00`/`+0x10` are exactly `GeomCamera3::tranform`'s own
+     * `orient_`/`pos_` sub-fields (`VTransform.h:25-26`,
+     * `GeomCamera3.h:20`) - i.e. this field is byte-for-byte
+     * `mCamera->tranform`, and the dirty check the asm performs
+     * (position-then-orientation, short-circuit) is exactly what the
+     * already-recovered `VTransform::Compare` implements
+     * (`VTransform.h:92`, "matching the binary short-circuit comparison
+     * order"). Was previously modelled as `mTerrainScale` (an unread,
+     * always-1.0-default float) plus six `mUnknownXX` floats - that
+     * guess is now superseded by this confirmed single typed field.
+     */
+    VTransform mCachedCameraTransform;                              // +0x34
     gpg::core::FastVectorN<std::uint32_t, 3000> mPrimaryPatchData; // +0x50
     gpg::core::FastVectorN<std::uint32_t, 7000> mSecondaryPatchData; // +0x2F40
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;                 // +0x9CB0
@@ -275,6 +293,10 @@ namespace moho
 
   static_assert(offsetof(LowFidelityTerrain, mTerrainResource) == 0x0C, "LowFidelityTerrain::mTerrainResource offset must be 0x0C");
   static_assert(offsetof(LowFidelityTerrain, mTesselator) == 0x10, "LowFidelityTerrain::mTesselator offset must be 0x10");
+  static_assert(
+    offsetof(LowFidelityTerrain, mCachedCameraTransform) == 0x34,
+    "LowFidelityTerrain::mCachedCameraTransform offset must be 0x34"
+  );
   static_assert(
     offsetof(LowFidelityTerrain, mSkirtStartIndex) == 0x20,
     "LowFidelityTerrain::mSkirtStartIndex offset must be 0x20"
