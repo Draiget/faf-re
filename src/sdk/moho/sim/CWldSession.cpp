@@ -11778,7 +11778,7 @@ namespace moho
    *
    * IDA signature:
    * void __usercall Moho::CWldSession::DrawEconomyOverlay(
-   *   CWldSession *session, CD3DPrimBatcher *batcher, float interpolant,
+   *   CWldSession *session, CD3DPrimBatcher *batcher, CWldMap *map,
    *   CameraImpl *camera@<ecx>);
    *
    * What it does:
@@ -11786,7 +11786,7 @@ namespace moho
    * frustum - see the header for the full description.
    */
   void CWldSession::DrawEconomyOverlay(
-    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, const float interpolant
+    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, [[maybe_unused]] CWldMap* const map
   )
   {
     if (!DisplayEconomyOverlay) {
@@ -11873,7 +11873,10 @@ namespace moho
       const float energyPerSecond = energyRate * kEconOverlayTicksPerSecond;
       const float massPerSecond = massRate * kEconOverlayTicksPerSecond;
 
-      const Wm3::Vector3f worldPosition = entity->GetInterpolatedPosition(interpolant);
+      // Not a parameter: the binary reads a frame local at -4 that is stored
+      // once from a zeroed ebx (0x00858DAF -> 0x00858E0E) and never rewritten,
+      // so the overlay always samples the untick-interpolated position.
+      const Wm3::Vector3f worldPosition = entity->GetInterpolatedPosition(0.0f);
       const Wm3::Vector2f screenPosition =
         view.Project(worldPosition, 0.0f, viewportWidth, viewportHeight, 0.0f);
 

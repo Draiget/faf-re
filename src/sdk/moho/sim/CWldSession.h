@@ -1089,7 +1089,7 @@ namespace moho
      *
      * IDA signature:
      * void __usercall Moho::CWldSession::DrawEconomyOverlay(
-     *   CWldSession *session, CD3DPrimBatcher *batcher, float interpolant,
+     *   CWldSession *session, CD3DPrimBatcher *batcher, CWldMap *map,
      *   CameraImpl *camera@<ecx>);
      *
      * What it does:
@@ -1103,8 +1103,23 @@ namespace moho
      * `camera` arrives in `ecx` at the call site (0x0086EF07) while the
      * session is the first stack argument, so this is a `__usercall` in the
      * binary and a method here, matching the sibling render overlays.
+     *
+     * `map` is passed by the caller and never read by the body: the only reads
+     * of incoming stack slots are +4 (session, `mov eax, [esp+0Ch+a1]`) and +8
+     * (batcher, `mov ebp, [esp+198h+a6]` = `[esp+1A0h]`). Slot +0xC is dead.
+     * It is kept in the signature because `Render` (0x0086EF07) does push it,
+     * and because the sibling overlay
+     * `RenderStrategicIcons(CameraImpl*, CD3DPrimBatcher*, CWldMap*)` - whose
+     * mangled name types that slot outright - takes the same triple.
+     *
+     * There is no `float interpolant` parameter. The value this passes to
+     * `UserEntity::GetInterpolatedPosition` is a frame LOCAL at -4, stored once
+     * from a zeroed `ebx` (`xor ebx, ebx` 0x00858DAF ->
+     * `mov [esp+1A0h+interpolant], ebx` 0x00858E0E, raw `89 9C 24 9C 01 00 00`
+     * = `[esp+19Ch]`, i.e. 0x19C - 0x1A0 = -4) and never rewritten. So the
+     * overlay always samples entity positions at interpolant 0.
      */
-    void DrawEconomyOverlay(CameraImpl* camera, CD3DPrimBatcher* primBatcher, float interpolant);
+    void DrawEconomyOverlay(CameraImpl* camera, CD3DPrimBatcher* primBatcher, CWldMap* map);
 
   public:
     /**
