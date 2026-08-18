@@ -7,6 +7,7 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "legacy/containers/List.h"
 #include "moho/math/Wm3DistanceFafExtras.h"
+#include "moho/render/ProjectileArcRenderer.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
@@ -22,6 +23,73 @@
 
 namespace moho
 {
+
+  /**
+   * Address: 0x0086EE00 (FUN_0086EE00, Moho::CRenderWorldView::Render)
+   * Slot: 0
+   *
+   * IDA signature:
+   * void __thiscall Moho::CRenderWorldView::Render(CRenderWorldView* this,
+   *   CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaT);
+   *
+   * What it does:
+   * Draws every world-space overlay this view owns for one frame, in the
+   * binary's order: resource splats, strategic icons, projectile icons and
+   * arcs, mesh previews, command splats, the economy readout, and finally the
+   * command graph through slot 2.
+   *
+   * Resource splats and strategic icons are suppressed together whenever the
+   * view hides resources or the free camera is active. `IsMiniMap` is
+   * dispatched and its result dropped - the binary calls the slot and never
+   * reads eax (0x0086EE4E..0x0086EE56).
+   *
+   * Argument note: every `fld` in this function reads `[ebp+10h]`, the `map`
+   * parameter (`D9 45 10` at 0x0086EE58/EE84/EEAC/EED4/EEF2/EF16);
+   * `[ebp+14h]`, `deltaSeconds`, is loaded only for `RenderProjectileIcons`
+   * and the slot-2 tail. That is why `RenderProjectileArcs` and
+   * `DrawEconomyOverlay` take the map as their trailing argument rather than
+   * the `float interpolant` both were first recovered with.
+   */
+  void CRenderWorldView::Render(
+    CD3DPrimBatcher* const batcher,
+    const int renderPass,
+    CWldMap* const map,
+    const float deltaSeconds
+  )
+  {
+    if (!mHideResources && !cam_Free) {
+      if (mEnableResourceRendering) {
+        GeomCamera3* const resourceView = const_cast<GeomCamera3*>(&mCamera->CameraGetView());
+        if (UI_RenResources) {
+          mWldSession->RenderResources(resourceView, batcher);
+        }
+      }
+
+      // Dispatched for its side effects only - the binary drops the result.
+      (void)IsMiniMap();
+      mWldSession->RenderStrategicIcons(mCamera, batcher, map);
+    }
+
+    mWldSession->RenderProjectileIcons(mCamera, this, batcher, map, deltaSeconds);
+
+    if (UI_RenProjectileArcs) {
+      RenderProjectileArcs(
+        mWldSession, const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher, map
+      );
+    }
+
+    // The binary re-fetches the camera view before each of the next two passes
+    // and discards it; neither takes a camera argument.
+    (void)mCamera->CameraGetView();
+    mWldSession->RenderMeshPreviews();
+
+    (void)mCamera->CameraGetView();
+    mWldSession->DrawCommandSplats();
+
+    mWldSession->DrawEconomyOverlay(mCamera, batcher, map);
+
+    RenderCommandGraph(batcher, renderPass, map, deltaSeconds);
+  }
 
   /**
    * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CRenderWorldView::Func1)
