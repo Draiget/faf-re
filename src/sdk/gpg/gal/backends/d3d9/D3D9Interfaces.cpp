@@ -1912,7 +1912,7 @@ namespace gpg::gal
          * Copies one half-open 12-byte lane range backward from
          * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
          */
-        [[maybe_unused]] [[nodiscard]] DwordTripleRuntime* CopyDwordTripleRangeBackwardD3D9(
+        [[nodiscard]] DwordTripleRuntime* CopyDwordTripleRangeBackwardD3D9(
             const DwordTripleRuntime* const sourceBegin,
             const DwordTripleRuntime* sourceEnd,
             DwordTripleRuntime* destinationEnd
@@ -1935,7 +1935,7 @@ namespace gpg::gal
          * Copies one half-open dword range backward from `[sourceBegin,
          * sourceEnd)` into storage ending at `destinationEnd`.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9A(
+        [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9A(
             const std::uint32_t* const sourceBegin,
             const std::uint32_t* sourceEnd,
             std::uint32_t* destinationEnd
@@ -1957,7 +1957,7 @@ namespace gpg::gal
          * What it does:
          * Alias lane of `CopyDwordRangeBackwardD3D9A`.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9B(
+        [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9B(
             const std::uint32_t* const sourceBegin,
             const std::uint32_t* const sourceEnd,
             std::uint32_t* const destinationEnd
@@ -1973,7 +1973,7 @@ namespace gpg::gal
          * Copies one half-open 28-byte lane range backward from
          * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
          */
-        [[maybe_unused]] [[nodiscard]] DwordHeptRuntime* CopyDwordHeptRangeBackwardD3D9(
+        [[nodiscard]] DwordHeptRuntime* CopyDwordHeptRangeBackwardD3D9(
             const DwordHeptRuntime* const sourceBegin,
             const DwordHeptRuntime* sourceEnd,
             DwordHeptRuntime* destinationEnd
@@ -2012,7 +2012,7 @@ namespace gpg::gal
          * Writes one repeated dword source lane into `count` consecutive dword
          * destination slots.
          */
-        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchA(
+        void FillDwordRangeWithSourceLaneDispatchA(
             std::uint32_t* const destination,
             const int count,
             const std::uint32_t* const sourceLane
@@ -2028,7 +2028,7 @@ namespace gpg::gal
          * Adapter lane forwarding one repeated dword fill request to
          * `FillDwordRangeWithSourceLaneDispatchA`.
          */
-        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchAAdapter(
+        void FillDwordRangeWithSourceLaneDispatchAAdapter(
             std::uint32_t* const destination,
             const int count,
             const std::uint32_t* const sourceLane
@@ -2045,7 +2045,7 @@ namespace gpg::gal
          * `FillDwordRangeWithSourceLaneDispatchA` and returns one-past-end
          * destination cursor.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchAAndReturnEnd(
+        [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchAAndReturnEnd(
             std::uint32_t* const destination,
             const int count,
             const std::uint32_t* const sourceLane
@@ -2064,7 +2064,7 @@ namespace gpg::gal
          * Dispatch alias for the repeated dword fill lane used by adjacent D3D9
          * capability/setup helper chains.
          */
-        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchB(
+        void FillDwordRangeWithSourceLaneDispatchB(
             std::uint32_t* const destination,
             const int count,
             const std::uint32_t* const sourceLane
@@ -2080,7 +2080,7 @@ namespace gpg::gal
          * Adapter lane forwarding one repeated dword fill request to
          * `FillDwordRangeWithSourceLaneDispatchB`.
          */
-        [[maybe_unused]] void FillDwordRangeWithSourceLaneDispatchBAdapter(
+        void FillDwordRangeWithSourceLaneDispatchBAdapter(
             std::uint32_t* const destination,
             const int count,
             const std::uint32_t* const sourceLane
@@ -2097,7 +2097,7 @@ namespace gpg::gal
          * `FillDwordRangeWithSourceLaneDispatchB` and returns one-past-end
          * destination cursor.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchBAndReturnEnd(
+        [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchBAndReturnEnd(
             std::uint32_t* const destination,
             const int count,
             const std::uint32_t* const sourceLane
@@ -2127,7 +2127,7 @@ namespace gpg::gal
          * over `[sourceFirst, sourceLast)` into destination slots and returns
          * one-past the final destination element.
          */
-        [[maybe_unused]] PackedAdapterModeRuntime* CopyPackedAdapterModeTailRange(
+        PackedAdapterModeRuntime* CopyPackedAdapterModeTailRange(
             const PackedAdapterModeRuntime* sourceFirst,
             const PackedAdapterModeRuntime* sourceLast,
             PackedAdapterModeRuntime* destinationFirst
@@ -2155,7 +2155,7 @@ namespace gpg::gal
          * backward from `[sourceBegin, sourceEnd)` into storage ending at
          * `destinationEnd`, then returns the updated destination begin lane.
          */
-        [[maybe_unused]] [[nodiscard]] PackedAdapterModeRuntime* CopyPackedAdapterModeTailRangeBackward(
+        [[nodiscard]] PackedAdapterModeRuntime* CopyPackedAdapterModeTailRangeBackward(
             const PackedAdapterModeRuntime* const sourceBegin,
             const PackedAdapterModeRuntime* sourceEnd,
             PackedAdapterModeRuntime* destinationEnd
@@ -2261,7 +2261,7 @@ namespace gpg::gal
          * Copy-constructs one half-open `AdapterModeD3D9` range into caller
          * storage and returns one-past-last destination slot.
          */
-        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRange(
+        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRange(
             AdapterModeD3D9* const destinationBegin,
             const AdapterModeD3D9* sourceBegin,
             const AdapterModeD3D9* sourceEnd
@@ -2295,7 +2295,7 @@ namespace gpg::gal
          * Adapter lane forwarding one `AdapterModeD3D9` copy-range request to
          * `CopyAdapterModeRange`.
          */
-        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeAdapter(
+        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeAdapter(
             AdapterModeD3D9* const destinationBegin,
             const AdapterModeD3D9* sourceBegin,
             const AdapterModeD3D9* sourceEnd
@@ -2310,7 +2310,7 @@ namespace gpg::gal
          * What it does:
          * Dispatch alias lane for `CopyAdapterModeRange`.
          */
-        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatch(
+        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatch(
             AdapterModeD3D9* const destinationBegin,
             const AdapterModeD3D9* sourceBegin,
             const AdapterModeD3D9* sourceEnd
@@ -2325,7 +2325,7 @@ namespace gpg::gal
          * What it does:
          * Dispatch alias lane for `CopyAdapterModeRange`.
          */
-        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchB(
+        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchB(
             AdapterModeD3D9* const destinationBegin,
             const AdapterModeD3D9* sourceBegin,
             const AdapterModeD3D9* sourceEnd
@@ -2341,7 +2341,7 @@ namespace gpg::gal
          * Legacy cdecl adapter lane that forwards one adapter-mode range copy
          * request to `CopyAdapterModeRange`.
          */
-        [[maybe_unused]] [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchLegacyLaneA(
+        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchLegacyLaneA(
             AdapterModeD3D9* const destinationBegin,
             const AdapterModeD3D9* sourceBegin,
             const AdapterModeD3D9* sourceEnd
@@ -2357,7 +2357,7 @@ namespace gpg::gal
          * Copies one packed adapter-mode range (`4 dwords` stride) into
          * destination storage and rebinds `AdapterModeD3D9` vtable ownership.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntime(
+        [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntime(
             const std::uint32_t* sourceBegin,
             const std::uint32_t* sourceEnd,
             std::uint32_t* destinationBegin
@@ -2392,7 +2392,7 @@ namespace gpg::gal
          * Cdecl adapter lane forwarding one packed adapter-mode copy-range
          * request to `CopyPackedAdapterModeRangeRuntime`.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterA(
+        [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterA(
             const std::uint32_t* sourceBegin,
             const std::uint32_t* sourceEnd,
             std::uint32_t* destinationBegin
@@ -2408,7 +2408,7 @@ namespace gpg::gal
          * Stdcall adapter lane forwarding one packed adapter-mode copy-range
          * request to `CopyPackedAdapterModeRangeRuntime`.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterB(
+        [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterB(
             const std::uint32_t* sourceBegin,
             const std::uint32_t* sourceEnd,
             std::uint32_t* destinationBegin
@@ -2424,7 +2424,7 @@ namespace gpg::gal
          * Writes one packed adapter-mode payload range (`+0x04/+0x08/+0x0C`
          * dwords per 16-byte lane) from one fixed source mode.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedAdapterModePayloadRangeRuntime(
+        [[nodiscard]] std::uint32_t* CopyPackedAdapterModePayloadRangeRuntime(
             std::uint32_t* destinationBegin,
             std::uint32_t* const destinationEnd,
             const std::uint32_t* const sourceMode
@@ -2452,7 +2452,7 @@ namespace gpg::gal
          * Fills `count` packed adapter-mode slots (`4 dwords` stride) from one
          * source mode payload and rebinds `AdapterModeD3D9` vtable ownership.
          */
-        [[maybe_unused]] void FillPackedAdapterModeRangeRuntime(
+        void FillPackedAdapterModeRangeRuntime(
             std::uint32_t* destinationBegin,
             std::uint32_t count,
             const std::uint32_t* const sourceMode
@@ -2477,7 +2477,7 @@ namespace gpg::gal
          * What it does:
          * Dispatch alias lane for packed adapter-mode fill behavior.
          */
-        [[maybe_unused]] void FillPackedAdapterModeRangeRuntimeDispatchA(
+        void FillPackedAdapterModeRangeRuntimeDispatchA(
             std::uint32_t* const destinationBegin,
             const std::uint32_t count,
             const std::uint32_t* const sourceMode
@@ -2493,7 +2493,7 @@ namespace gpg::gal
          * Fills `count` packed adapter-mode slots from one source payload and
          * returns the one-past-end destination cursor lane.
          */
-        [[maybe_unused]] [[nodiscard]] std::uint32_t* FillPackedAdapterModeRangeAndReturnEnd(
+        [[nodiscard]] std::uint32_t* FillPackedAdapterModeRangeAndReturnEnd(
             std::uint32_t* const destinationBegin,
             const std::uint32_t count,
             const std::uint32_t* const sourceMode
@@ -2569,7 +2569,7 @@ namespace gpg::gal
          * Returns element count from one adapter-vector lane (`_Mylast -
          * _Myfirst`) with 0x70-byte element stride, or zero when uninitialized.
          */
-        [[maybe_unused]] [[nodiscard]] int CountAdapterVectorElements(const AdapterVectorCountRuntime* const vectorLane) noexcept
+        [[nodiscard]] int CountAdapterVectorElements(const AdapterVectorCountRuntime* const vectorLane) noexcept
         {
             const AdapterD3D9* const first = vectorLane->first;
             if (first == nullptr)
@@ -3241,7 +3241,7 @@ namespace gpg::gal
          * Validates setup adapter selection against the requested device-context
          * head configuration.
          */
-        [[maybe_unused]] void CheckAdapterSelectionForSetup(DeviceD3D9& device, const DeviceContext& context)
+        void CheckAdapterSelectionForSetup(DeviceD3D9& device, const DeviceContext& context)
         {
             device.Func1();
 
@@ -3802,7 +3802,7 @@ namespace gpg::gal
          * What it does:
          * Maps gal texture-format token to D3D9 format via `sGalFormatToD3D`.
          */
-        [[maybe_unused]] std::uint32_t GetD3DFormat(const std::uint32_t formatToken)
+        std::uint32_t GetD3DFormat(const std::uint32_t formatToken)
         {
             return (formatToken < static_cast<std::uint32_t>(sizeof(kGalFormatToD3D) / sizeof(kGalFormatToD3D[0])))
                      ? kGalFormatToD3D[formatToken]
@@ -3817,7 +3817,7 @@ namespace gpg::gal
          * What it does:
          * Maps depth-stencil format token to D3D9 depth format via `D3DFormats`.
          */
-        [[maybe_unused]] std::uint32_t FormatToD3DFormat(const std::uint32_t formatToken)
+        std::uint32_t FormatToD3DFormat(const std::uint32_t formatToken)
         {
             return (formatToken <
                     static_cast<std::uint32_t>(sizeof(kDepthStencilFormatToD3D) / sizeof(kDepthStencilFormatToD3D[0])))
@@ -3832,7 +3832,7 @@ namespace gpg::gal
          * Converts a D3D9 format token to the legacy Moho format enum via the
          * static pair table at `DAT_00D47FF0`.
          */
-        [[maybe_unused]] std::uint32_t FormatD3D9ToMoho(const std::uint32_t d3dFormat)
+        std::uint32_t FormatD3D9ToMoho(const std::uint32_t d3dFormat)
         {
             for (const D3D9FormatToMohoPair& pair : kD3D9FormatToMohoPairs)
             {
@@ -3851,7 +3851,7 @@ namespace gpg::gal
          * What it does:
          * Converts a legacy Moho format token back to its paired D3D9 format value.
          */
-        [[maybe_unused]] std::uint32_t FormatGalToD3D(const std::uint32_t mohoFormat)
+        std::uint32_t FormatGalToD3D(const std::uint32_t mohoFormat)
         {
             for (const D3D9FormatToMohoPair& pair : kD3D9FormatToMohoPairs)
             {
@@ -4222,7 +4222,7 @@ namespace gpg::gal
          * Jump-only adapter lane that forwards one initialized raw
          * effect-technique shared-ref range copy to the canonical retain helper.
          */
-        [[maybe_unused]] EffectTechniqueSharedRefRawRuntime* CopyAssignEffectTechniqueSharedRefRawRangeRetainDispatchLaneA(
+        EffectTechniqueSharedRefRawRuntime* CopyAssignEffectTechniqueSharedRefRawRangeRetainDispatchLaneA(
             EffectTechniqueSharedRefRawRuntime* const destinationFirst,
             EffectTechniqueSharedRefRawRuntime* const destinationLast,
             const EffectTechniqueSharedRefRawRuntime* const sourceFirst
@@ -4260,7 +4260,7 @@ namespace gpg::gal
          * Adapter lane forwarding one `EffectTechnique` shared-pointer range
          * copy-assignment to the canonical helper.
          */
-        [[maybe_unused]] EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneA(
+        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneA(
             const EffectTechniqueSharedRef* const sourceFirst,
             const EffectTechniqueSharedRef* const sourceLast,
             EffectTechniqueSharedRef* const destinationFirst
@@ -4276,7 +4276,7 @@ namespace gpg::gal
          * Secondary adapter lane forwarding one `EffectTechnique`
          * shared-pointer range copy-assignment.
          */
-        [[maybe_unused]] EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneB(
+        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneB(
             const EffectTechniqueSharedRef* const sourceFirst,
             const EffectTechniqueSharedRef* const sourceLast,
             EffectTechniqueSharedRef* const destinationFirst
@@ -4292,7 +4292,7 @@ namespace gpg::gal
          * Copies `repeatCount` raw shared-ref lanes from one fixed source lane
          * into destination storage and retains each copied shared-control block.
          */
-        [[maybe_unused]] EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCount(
+        EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCount(
             EffectTechniqueSharedRefRawRuntime* destination,
             const std::int32_t repeatCount,
             const EffectTechniqueSharedRefRawRuntime* const source
@@ -4328,7 +4328,7 @@ namespace gpg::gal
          * Adapter lane forwarding one counted raw shared-ref copy loop to the
          * canonical helper.
          */
-        [[maybe_unused]] EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCountDispatchLaneA(
+        EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCountDispatchLaneA(
             EffectTechniqueSharedRefRawRuntime* const destination,
             const std::int32_t repeatCount,
             const EffectTechniqueSharedRefRawRuntime* const source
@@ -4344,7 +4344,7 @@ namespace gpg::gal
          * Tertiary adapter lane forwarding one `EffectTechnique` shared-pointer
          * range copy-assignment.
          */
-        [[maybe_unused]] EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneC(
+        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneC(
             const EffectTechniqueSharedRef* const sourceFirst,
             const EffectTechniqueSharedRef* const sourceLast,
             EffectTechniqueSharedRef* const destinationFirst
@@ -4869,7 +4869,7 @@ namespace gpg::gal
          * `streambuf::pubseekoff(0, cur, in)` when stream state is valid, or
          * `-1` when fail/bad flags are set.
          */
-        [[maybe_unused]] std::streampos QueryCurrentInputPosition(
+        std::streampos QueryCurrentInputPosition(
             std::istream& inputStream
         ) noexcept
         {
@@ -5076,7 +5076,7 @@ namespace gpg::gal
          * one D3D9 surface descriptor, and copies descriptor width/height into
          * the embedded render-target context lane.
          */
-        [[maybe_unused]] int InitializeRenderTargetD3D9FromSurface(
+        int InitializeRenderTargetD3D9FromSurface(
             RenderTargetD3D9* const renderTarget,
             void* const surface
         ) noexcept
@@ -5388,7 +5388,7 @@ namespace gpg::gal
      * What it does:
      * Writes one 4x4 identity matrix (`float[16]`) into caller storage.
      */
-    [[maybe_unused]] float* InitializeIdentityMatrix4x4Lane(float* const matrix4x4) noexcept
+    float* InitializeIdentityMatrix4x4Lane(float* const matrix4x4) noexcept
     {
         matrix4x4[14] = 0.0f;
         matrix4x4[13] = 0.0f;
@@ -5435,7 +5435,7 @@ namespace gpg::gal
      * `HardwareVertexFormatterD3D9::~HardwareVertexFormatterD3D9`
      * (`FUN_009451D0`).
      */
-    [[maybe_unused]] void ShutdownHardwareVertexFormatterD3D9Adapter()
+    void ShutdownHardwareVertexFormatterD3D9Adapter()
     {
         alignas(HardwareVertexFormatterD3D9) unsigned char formatterStorage[sizeof(HardwareVertexFormatterD3D9)]{};
         auto* const formatter = new (static_cast<void*>(formatterStorage)) HardwareVertexFormatterD3D9();
@@ -5531,7 +5531,7 @@ namespace gpg::gal
      * `Float16HardwareVertexFormatterD3D9::~Float16HardwareVertexFormatterD3D9`
      * (`FUN_00945390`).
      */
-    [[maybe_unused]] void ShutdownFloat16HardwareVertexFormatterD3D9Adapter()
+    void ShutdownFloat16HardwareVertexFormatterD3D9Adapter()
     {
         alignas(Float16HardwareVertexFormatterD3D9)
             unsigned char formatterStorage[sizeof(Float16HardwareVertexFormatterD3D9)]{};
@@ -9586,7 +9586,7 @@ namespace gpg::gal
      * Initializes one D3D9 depth-stencil target object to default context
      * values and a null retained surface lane.
      */
-    [[maybe_unused]] [[nodiscard]] DepthStencilTargetD3D9* InitializeDepthStencilTargetD3D9DefaultState(
+    [[nodiscard]] DepthStencilTargetD3D9* InitializeDepthStencilTargetD3D9DefaultState(
         DepthStencilTargetD3D9* const target
     )
     {
@@ -10587,7 +10587,7 @@ namespace gpg::gal
      * Initializes one `VertexFormatD3D9` runtime lane with default format code
      * (`0x17`), empty per-stream stride storage, and null declaration handle.
      */
-    [[maybe_unused]] VertexFormatD3D9* InitializeVertexFormatD3D9DefaultState(VertexFormatD3D9* const vertexFormat) noexcept
+    VertexFormatD3D9* InitializeVertexFormatD3D9DefaultState(VertexFormatD3D9* const vertexFormat) noexcept
     {
         vertexFormat->formatCode_ = 0x17U;
         vertexFormat->elementStrideByStream_ = msvc8::vector<std::uint32_t>{};
