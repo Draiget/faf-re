@@ -23,6 +23,7 @@
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/client/Localization.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConFunc.h"
 #include "moho/core/Thread.h"
 #include "moho/entity/UserEntity.h"
@@ -1808,6 +1809,62 @@ void moho::UI_ApplySelectionSet(void* const commandArgs)
 }
 
 /**
+ * Address: 0x008335F0 (FUN_008335F0, Moho::CON_IssueCommand)
+ *
+ * What it does:
+ * Console debug command that issues one fixed unit command
+ * (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) against the active
+ * session's current selection. Stop/Pause additionally rebroadcast the
+ * selection afterward; the other three do not (matches the binary's own
+ * asymmetry - not a recovery oversight).
+ */
+void moho::CON_IssueCommand(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    CON_Printf("%s", noSessionText.c_str());
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 2u) {
+    return;
+  }
+
+  const msvc8::string* const subCommand = args.At(1);
+  const char* const subCommandText = subCommand != nullptr ? subCommand->c_str() : "";
+
+  if (_stricmp(subCommandText, "Stop") == 0) {
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Stop);
+    ISSUE_Command(session->mSelection, commandIssueData, true);
+    session->SetSelection(session->mSelection);
+    return;
+  }
+  if (_stricmp(subCommandText, "Pause") == 0) {
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Pause);
+    ISSUE_Command(session->mSelection, commandIssueData, true);
+    session->SetSelection(session->mSelection);
+    return;
+  }
+  if (_stricmp(subCommandText, "Dive") == 0) {
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Dive);
+    ISSUE_Command(session->mSelection, commandIssueData, true);
+    return;
+  }
+  if (_stricmp(subCommandText, "SiloBuildTactical") == 0) {
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_BuildSiloTactical);
+    ISSUE_Command(session->mSelection, commandIssueData, false);
+    return;
+  }
+  if (_stricmp(subCommandText, "SiloBuildNuke") == 0) {
+    SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_BuildSiloNuke);
+    ISSUE_Command(session->mSelection, commandIssueData, false);
+    return;
+  }
+}
+
+/**
  * Address: 0x00834DA0 (FUN_00834DA0, Moho::CON_UI_CreateHead1Map)
  *
  * What it does:
@@ -2883,6 +2940,8 @@ namespace
   constexpr const char* kConsoleStartupConExecutePasteBufferDescription =
     "Execute UTF-8 clipboard text as a Lua chunk.";
   constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset one or more named cameras.";
+  constexpr const char* kConsoleStartupConInBindKeyDescription =
+    "Specify a key combo and a console command, binds console command to key";
   constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
   constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
@@ -2906,6 +2965,8 @@ namespace
   constexpr const char* kConsoleStartupConDebugClearBuildTemplatesDescription =
     "Clear all generated build templates.";
   constexpr const char* kConsoleStartupConCreatePropDescription = "Spawn one prop at cursor world position.";
+  constexpr const char* kConsoleStartupConIssueCommandDescription =
+    "Issue a fixed unit command (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) to the current selection.";
   constexpr const char* kConsoleStartupConP4EditDescription = "Perforce edit bridge command (unsupported in this build).";
   constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
     "Perforce opened-for-edit query command (unsupported in this build).";
@@ -2929,6 +2990,7 @@ namespace
   CConFunc gCConFunc_LUA{};
   CConFunc gCConFunc_ExecutePasteBuffer{};
   CConFunc gCConFunc_UI_ResetView{};
+  CConFunc gCConFunc_IN_BindKey{};
   CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
   CConFunc gCConFunc_d3d_AntiAliasingSamples{};
@@ -2944,6 +3006,7 @@ namespace
   CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection{};
   CConFunc gCConFunc_DebugClearBuildTemplates{};
   CConFunc gCConFunc_CreateProp{};
+  CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_p4_Edit{};
   CConFunc gCConFunc_p4_IsOpenedForEdit{};
   CConFunc gCConFunc_exit{};
@@ -3487,6 +3550,32 @@ namespace moho
       "UI_ResetView",
       &moho::UI_ResetView,
       &cleanup_CConFunc_UI_ResetView
+    );
+  }
+
+  // Compiler-generated global cleanup lane for FUN_00C06760. The owning
+  // source construct is the typed CConFunc object registered below; no
+  // standalone engine behavior is attached to that artifact address.
+  void cleanup_CConFunc_IN_BindKey()
+  {
+    CleanupStartupConCommand(gCConFunc_IN_BindKey);
+  }
+
+  /**
+   * Address: 0x00BE4850 (FUN_00BE4850, register_CConFunc_IN_BindKey)
+   *
+   * What it does:
+   * Registers the `IN_BindKey` console name and exact description, stores the
+   * recovered callback at CConFunc +0x0C, and schedules its cleanup at exit.
+   */
+  void register_CConFunc_IN_BindKey()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_IN_BindKey,
+      kConsoleStartupConInBindKeyDescription,
+      "IN_BindKey",
+      &moho::IN_BindKey,
+      &cleanup_CConFunc_IN_BindKey
     );
   }
 
@@ -4100,6 +4189,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C06130 (FUN_00C06130, ??1CConFunc_IssueCommand@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `IssueCommand`.
+   */
+  void cleanup_CConFunc_IssueCommand()
+  {
+    CleanupStartupConCommand(gCConFunc_IssueCommand);
+  }
+
+  /**
+   * Address: 0x00BE3FB0 (FUN_00BE3FB0, register_CConFunc_IssueCommand)
+   *
+   * What it does:
+   * Registers startup console callback for `IssueCommand`.
+   */
+  void register_CConFunc_IssueCommand()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_IssueCommand,
+      kConsoleStartupConIssueCommandDescription,
+      "IssueCommand",
+      &CON_IssueCommand,
+      &cleanup_CConFunc_IssueCommand
+    );
+  }
+
+  /**
    * Address: 0x00BEF8C0 (FUN_00BEF8C0, ??1CConFunc_Log@Moho@@QAE@@Z)
    *
    * What it does:
@@ -4342,6 +4459,7 @@ namespace
       moho::register_CConFunc_CON_ListCommands();
       moho::register_CConFunc_GetVersion();
       moho::register_CConFunc_CON_ExecuteLastCommand();
+      moho::register_CConFunc_IN_BindKey();
       moho::register_console_command_buffer();
       moho::register_sConsoleOutputHandlers();
       moho::register_TConVar_con_TestVarBool();
@@ -4384,6 +4502,7 @@ namespace
       moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();
       moho::register_CConFunc_CreateProp();
+      moho::register_CConFunc_IssueCommand();
       moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
       moho::register_CConFunc_DebugClearBuildTemplates();

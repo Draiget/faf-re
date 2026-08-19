@@ -469,6 +469,15 @@ namespace moho
   void register_CConFunc_UI_ResetView();
 
   /**
+   * Address: 0x00BE4850 (FUN_00BE4850, register_CConFunc_IN_BindKey)
+   *
+   * What it does:
+   * Registers the `IN_BindKey` startup console callback with its exact command
+   * metadata and schedules the generated command-object cleanup lane.
+   */
+  void register_CConFunc_IN_BindKey();
+
+  /**
    * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
    *
    * What it does:
@@ -717,6 +726,18 @@ namespace moho
    * `/lua/ui/game/selection.lua:ApplySelectionSet(name)`.
    */
   void UI_ApplySelectionSet(void* commandArgs);
+
+  /**
+   * Address: 0x008335F0 (FUN_008335F0, Moho::CON_IssueCommand)
+   *
+   * What it does:
+   * Console debug command that issues one fixed unit command
+   * (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) against the active
+   * session's current selection. Stop/Pause additionally rebroadcast the
+   * selection afterward; the other three do not (matches the binary's own
+   * asymmetry - not a recovery oversight).
+   */
+  void CON_IssueCommand(void* commandArgs);
 
   /**
    * Address: 0x00834DA0 (FUN_00834DA0, Moho::CON_UI_CreateHead1Map)
