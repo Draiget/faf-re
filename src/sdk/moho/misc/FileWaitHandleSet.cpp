@@ -732,7 +732,7 @@ namespace
    * What it does:
    * Moves one file-info iterator node to its in-order predecessor.
    */
-  [[nodiscard]] [[maybe_unused]]
+  [[nodiscard]] 
   moho::FWHSFileInfoMapNode* FileInfoTreePreviousNode(
     moho::FWHSFileInfoMapNode* node,
     moho::FWHSFileInfoMapNode* const head
@@ -1365,7 +1365,7 @@ namespace
    * What it does:
    * Moves one zip-map iterator node to its in-order predecessor.
    */
-  [[nodiscard]] [[maybe_unused]]
+  [[nodiscard]] 
   moho::FWHSZipEntryMapNode* ZipTreePreviousNode(
     moho::FWHSZipEntryMapNode* node,
     moho::FWHSZipEntryMapNode* const head
