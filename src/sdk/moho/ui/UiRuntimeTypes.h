@@ -452,34 +452,100 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mModifiers) == 0x1C, "SMauiEventData::mModifiers offset must be 0x1C");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mSource) == 0x20, "SMauiEventData::mSource offset must be 0x20");
 
+  /**
+   * Base of every MAUI pointer-drag handler.
+   *
+   * None of the three drag entry points is pure. The shipped
+   * `??_7IMauiDragger@Moho@@6B@` at 0x00E38DC0 carries a real body in every
+   * slot (dwords read out of `.rdata` in the shipped image):
+   *   +0x00  0x0078DB90  scalar deleting destructor
+   *   +0x04  0x0078DB50  `DragMove`                  (empty body, `retn 4`)
+   *   +0x08  0x0078DB60  `DragRelease`               (`delete this`)
+   *   +0x0C  0x0078DB80  `OnCurrentDraggerReplaced`  (`delete this`)
+   * `_purecall` is 0x00A82547 in this image (it is what fills the genuinely
+   * pure `SelectionDragger` slots +0x10/+0x14/+0x18), and it appears in none
+   * of these four slots.
+   *
+   * The vtable is destructor-anchored: `~IMauiDragger` at 0x0078DB20 opens
+   * with `mov dword ptr [ecx], offset ??_7IMauiDragger@Moho@@6B@`, and
+   * `~UICommandDragger` restores the same address at 0x0082411A when it
+   * unwinds its own sub-object.
+   *
+   * Because the default bodies are inherited rather than pure, a derived
+   * dragger that leaves a slot alone gets the base behavior. That is what the
+   * shipped vtables show: `SelectionDragger` and `SelectionDragger2D` both
+   * keep 0x0078DB50 in +0x04 / 0x0078DB80 in +0x0C.
+   */
   class IMauiDragger
   {
   public:
+    /**
+     * Address: 0x0078DB20 (FUN_0078DB20, ??1IMauiDragger@Moho@@UAE@XZ)
+     * Scalar deleting destructor: 0x0078DB90 (slot +0x00)
+     * Mangled: ??1IMauiDragger@Moho@@UAE@XZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::IMauiDragger::~IMauiDragger(Moho::IMauiDragger *this@<ecx>);
+     *
+     * What it does:
+     * Restores the base vtable and drains the intrusive current-dragger link
+     * lane that lives directly behind the vptr, zeroing each node as it is
+     * unlinked.
+     */
     virtual ~IMauiDragger() = default;
 
     /**
-     * Address: 0x00A82547 (_purecall slot)
+     * Address: 0x0078DB50 (slot +0x04 of ??_7IMauiDragger@Moho@@6B@)
+     * Mangled: ?DragMove@IMauiDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::IMauiDragger::DragMove(
+     *     Moho::IMauiDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
      *
      * What it does:
-     * Receives one pointer-drag move event while this dragger is active.
+     * Nothing. The shipped body is a bare `retn 4` - a dragger that does not
+     * care about intermediate motion simply inherits this.
+     *
+     * Dispatched through slot +0x04 by `func_OnMouseMove` (FUN_007A4970):
+     * `0x007A4C8D: mov edx, [edx+4]` / `0x007A4C96: call edx`.
      */
-    virtual void DragMove(const SMauiEventData* eventData) = 0;
+    virtual void DragMove(const SMauiEventData* eventData);
 
     /**
-     * Address: 0x00A82547 (_purecall slot)
+     * Address: 0x0078DB60 (slot +0x08 of ??_7IMauiDragger@Moho@@6B@)
+     * Mangled: ?DragRelease@IMauiDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::IMauiDragger::DragRelease(
+     *     Moho::IMauiDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
      *
      * What it does:
-     * Receives one pointer release event for the active drag operation.
+     * Destroys the dragger. The body is MSVC's `delete this` shape - a null
+     * test on `this`, then a tail jump through vtable slot +0x00 with the
+     * scalar-delete flag forced to 1 over the incoming event argument.
+     *
+     * Dispatched through slot +0x08 by `func_OnMouseMove` (FUN_007A4970):
+     * `0x007A4C40: mov edx, [edx+8]` / `0x007A4C47: call edx`.
      */
-    virtual void DragRelease(const SMauiEventData* eventData) = 0;
+    virtual void DragRelease(const SMauiEventData* eventData);
 
     /**
-     * Address: 0x00A82547 (_purecall slot)
+     * Address: 0x0078DB80 (slot +0x0C of ??_7IMauiDragger@Moho@@6B@)
+     * Mangled: ?OnCurrentDraggerReplaced@IMauiDragger@Moho@@UAEXXZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::IMauiDragger::OnCurrentDraggerReplaced(
+     *     Moho::IMauiDragger *this@<ecx>);
      *
      * What it does:
-     * Notifies this dragger when a different current dragger replaces it.
+     * Destroys the dragger. A dragger that is displaced as the current one is
+     * dropped on the spot unless it overrides this; the body is again MSVC's
+     * `delete this` shape (null test, `push 1`, call through slot +0x00).
+     *
+     * Dispatched through slot +0x0C by `func_PostDragger` (FUN_0078DDE0):
+     * `0x0078DE01: mov edx, [eax+0Ch]` / `0x0078DE04: call edx`.
      */
-    virtual void OnCurrentDraggerReplaced() = 0;
+    virtual void OnCurrentDraggerReplaced();
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(IMauiDragger) == 0x4, "moho::IMauiDragger size must be 0x4");
 
@@ -737,6 +803,29 @@ namespace moho
     "moho::CUIWorldViewBuildDragRuntimeView size must be 0x60"
   );
 
+  /**
+   * Drag-build dragger: the one MAUI installs while the player sweeps out a
+   * run of buildings with the left button held.
+   *
+   * Slot map of `??_7UIBuildDragger@Moho@@6B@` (VA 0x00E42514, dwords read out
+   * of the shipped image):
+   *   +0x00  0x00823030  scalar deleting destructor (base teardown inlined -
+   *                      the derived class adds no destructor work of its own,
+   *                      the body is byte-identical to `IMauiDragger`'s
+   *                      0x0078DB90 apart from the `operator delete` rel32)
+   *   +0x04  0x00823BB0  `DragMove`                 (override)
+   *   +0x08  0x00823BD0  `DragRelease`              (override, NOT YET
+   *                      RECOVERED - see the note below)
+   *   +0x0C  0x00823CA0  `OnCurrentDraggerReplaced` (override)
+   *
+   * Slot +0x08 (0x00823BD0) runs `ReleaseDrag`, then the build-order issuing
+   * worker at 0x00823220, then resets both world-view preview lanes to the
+   * shared invalid-vector sentinel, then `delete this`. 0x00823220 is a
+   * ~400-line command-queue worker with no recovered owner anywhere in
+   * `src/sdk/**`, so the override stays unrecovered and the slot inherits
+   * `IMauiDragger::DragRelease` (0x0078DB60), whose `delete this` is the tail
+   * the real override also ends on.
+   */
   class UIBuildDragger : public IMauiDragger
   {
   public:
@@ -748,6 +837,38 @@ namespace moho
      * cursor world position and mirrors those lanes into the world-view state.
      */
     UIBuildDragger(CWldSession* session, CUIWorldViewBuildDragRuntimeView* worldView, CameraImpl* camera);
+
+    /**
+     * Address: 0x00823BB0 (FUN_00823BB0, slot +0x04 of ??_7UIBuildDragger@Moho@@6B@)
+     * Mangled: ?DragMove@UIBuildDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::UIBuildDragger::DragMove(
+     *     Moho::UIBuildDragger *this@<ecx>, Moho::SMauiEventData *eventData);
+     *
+     * What it does:
+     * Forwards one drag-move tick to the shared `ReleaseDrag` helper, which
+     * re-resolves the active build blueprint and snaps `mEnd` to the cursor's
+     * current world-surface intersection when the blueprint is a DRAGBUILD.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x00823CA0 (FUN_00823CA0, slot +0x0C of ??_7UIBuildDragger@Moho@@6B@)
+     * Mangled: ?OnCurrentDraggerReplaced@UIBuildDragger@Moho@@UAEXXZ
+     *
+     * IDA signature:
+     * void __thiscall Moho::UIBuildDragger::OnCurrentDraggerReplaced(
+     *     Moho::UIBuildDragger *this@<ecx>);
+     *
+     * What it does:
+     * Drops the dragger when something else becomes the current dragger. The
+     * body is MSVC's `delete this` shape and is byte-for-byte the same as the
+     * inherited `IMauiDragger::OnCurrentDraggerReplaced` at 0x0078DB80; the
+     * linker kept both because this translation unit declared its own
+     * override.
+     */
+    void OnCurrentDraggerReplaced() override;
 
     /**
      * Address: 0x008230A0 (FUN_008230A0, Moho::UIBuildDragger::ReleaseDrag)

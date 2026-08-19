@@ -9047,6 +9047,59 @@ int moho::cfunc_CMauiFrameSetTargetHeadL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0078DB50 (slot +0x04 of ??_7IMauiDragger@Moho@@6B@, VA 0x00E38DC0)
+ * Mangled: ?DragMove@IMauiDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::IMauiDragger::DragMove(
+ *     Moho::IMauiDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
+ *
+ * What it does:
+ * Nothing - the shipped body is a bare `retn 4`. Draggers that only care about
+ * the release edge (`SelectionDragger`, and every dragger whose vtable keeps
+ * 0x0078DB50 in slot +0x04) inherit this.
+ */
+void moho::IMauiDragger::DragMove(const moho::SMauiEventData* const /*eventData*/)
+{
+}
+
+/**
+ * Address: 0x0078DB60 (slot +0x08 of ??_7IMauiDragger@Moho@@6B@, VA 0x00E38DC0)
+ * Mangled: ?DragRelease@IMauiDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::IMauiDragger::DragRelease(
+ *     Moho::IMauiDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
+ *
+ * What it does:
+ * Destroys the dragger. The shipped body is MSVC's `delete this`: a null test
+ * on `this`, the scalar-delete flag written over the incoming event argument
+ * slot (`mov [esp+4], 1`), then a tail jump through vtable slot +0x00.
+ */
+void moho::IMauiDragger::DragRelease(const moho::SMauiEventData* const /*eventData*/)
+{
+  delete this;
+}
+
+/**
+ * Address: 0x0078DB80 (slot +0x0C of ??_7IMauiDragger@Moho@@6B@, VA 0x00E38DC0)
+ * Mangled: ?OnCurrentDraggerReplaced@IMauiDragger@Moho@@UAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall Moho::IMauiDragger::OnCurrentDraggerReplaced(
+ *     Moho::IMauiDragger *this@<ecx>);
+ *
+ * What it does:
+ * Destroys the dragger. A dragger displaced as the current one is dropped on
+ * the spot unless it overrides this; the body is again `delete this`
+ * (`test ecx, ecx` / `push 1` / call through slot +0x00).
+ */
+void moho::IMauiDragger::OnCurrentDraggerReplaced()
+{
+  delete this;
+}
+
+/**
  * Address: 0x00822FA0 (FUN_00822FA0, ??0UIBuildDragger@Moho@@QAE@@Z)
  *
  * What it does:
@@ -9128,6 +9181,42 @@ void moho::UIBuildDragger::ReleaseDrag(const moho::SMauiEventData* const eventDa
       }
     }
   }
+}
+
+/**
+ * Address: 0x00823BB0 (FUN_00823BB0, slot +0x04 of ??_7UIBuildDragger@Moho@@6B@)
+ * Mangled: ?DragMove@UIBuildDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::UIBuildDragger::DragMove(
+ *     Moho::UIBuildDragger *this@<ecx>, Moho::SMauiEventData *eventData);
+ *
+ * What it does:
+ * Forwards one drag-move tick to the shared `ReleaseDrag` helper, which
+ * re-resolves the active build blueprint and snaps `mEnd` to the cursor's
+ * current world-surface intersection when the blueprint is a DRAGBUILD.
+ */
+void moho::UIBuildDragger::DragMove(const moho::SMauiEventData* const eventData)
+{
+  ReleaseDrag(eventData);
+}
+
+/**
+ * Address: 0x00823CA0 (FUN_00823CA0, slot +0x0C of ??_7UIBuildDragger@Moho@@6B@)
+ * Mangled: ?OnCurrentDraggerReplaced@UIBuildDragger@Moho@@UAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall Moho::UIBuildDragger::OnCurrentDraggerReplaced(
+ *     Moho::UIBuildDragger *this@<ecx>);
+ *
+ * What it does:
+ * Drops the build dragger when a different dragger takes over. `delete this`,
+ * emitted as the usual null test plus a call through vtable slot +0x00 with
+ * the scalar-delete flag set.
+ */
+void moho::UIBuildDragger::OnCurrentDraggerReplaced()
+{
+  delete this;
 }
 
 namespace
@@ -10368,45 +10457,6 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
   }
 }
 
-class UIBuildDraggerRuntimeConcrete final : public moho::UIBuildDragger
-{
-public:
-  UIBuildDraggerRuntimeConcrete(
-    moho::CWldSession* const session,
-    moho::CUIWorldViewBuildDragRuntimeView* const worldView,
-    moho::CameraImpl* const camera
-  )
-    : moho::UIBuildDragger(session, worldView, camera)
-  {
-  }
-
-  /**
-   * Address: 0x00823BB0 (FUN_00823BB0, Moho::UIBuildDragger::DragMove)
-   *
-   * What it does:
-   * Forwards one drag-move tick to the shared `ReleaseDrag` helper, which
-   * re-resolves the active build blueprint and snaps `mEnd` to the cursor's
-   * current world-surface intersection when the blueprint is a DRAGBUILD.
-   */
-  void DragMove(const moho::SMauiEventData* const eventData) override
-  {
-    ReleaseDrag(eventData);
-  }
-
-  void DragRelease(const moho::SMauiEventData* const /*eventData*/) override
-  {
-  }
-
-  void OnCurrentDraggerReplaced() override
-  {
-  }
-};
-
-static_assert(
-  sizeof(UIBuildDraggerRuntimeConcrete) == sizeof(moho::UIBuildDragger),
-  "UIBuildDraggerRuntimeConcrete size must match moho::UIBuildDragger"
-);
-
 /**
  * Address: 0x00823CB0 (FUN_00823CB0, func_NewUIBuildDragger)
  *
@@ -10423,11 +10473,10 @@ static_assert(
   moho::CUIWorldViewBuildDragRuntimeView* const worldView
 )
 {
-  auto* const storage = static_cast<UIBuildDraggerRuntimeConcrete*>(
-    ::operator new(sizeof(UIBuildDraggerRuntimeConcrete), std::nothrow)
-  );
+  auto* const storage =
+    static_cast<moho::UIBuildDragger*>(::operator new(sizeof(moho::UIBuildDragger), std::nothrow));
   if (storage != nullptr) {
-    auto* const dragger = new (storage) UIBuildDraggerRuntimeConcrete(session, worldView, camera);
+    auto* const dragger = new (storage) moho::UIBuildDragger(session, worldView, camera);
     func_PostDragger(originFrame, dragger, eventData);
     return;
   }
