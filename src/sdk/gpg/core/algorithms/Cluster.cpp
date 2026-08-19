@@ -2081,19 +2081,18 @@ namespace
         return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(HashSubclusterKey(key))));
     }
 
-    struct OccupationKeyHash
+    /**
+     * Strict weak ordering half of the occupation cache's
+     * `stdext::hash_compare` traits. `OccupationKeyLess` (0x00931460) is the
+     * predicate the binary passes to every window scan in this instantiation:
+     * `find` (0x00932B9B) and both halves of `equal_range` (0x00933F16 for the
+     * lower bound, 0x00933F48 with the arguments swapped for the upper one).
+     */
+    struct OccupationKeyOrder
     {
-        [[nodiscard]] std::size_t operator()(const OccupationCacheKey& key) const noexcept
+        [[nodiscard]] bool operator()(const OccupationCacheKey& lhs, const OccupationCacheKey& rhs) const
         {
-            return hash_value(key);
-        }
-    };
-
-    struct OccupationKeyEq
-    {
-        [[nodiscard]] bool operator()(const OccupationCacheKey& lhs, const OccupationCacheKey& rhs) const noexcept
-        {
-            return !OccupationKeyLess(lhs, rhs) && !OccupationKeyLess(rhs, lhs);
+            return OccupationKeyLess(lhs, rhs);
         }
     };
 
@@ -3779,8 +3778,32 @@ namespace
         return result;
     }
 
+    /**
+     * The occupation half of `ClusterCache`, built from the same MSVC8
+     * `stdext::hash_map` template as the subcluster half below. The whole
+     * member family the binary emits for this key type reads the container
+     * through the layout `msvc8::hash_map` already models:
+     *
+     *   `mov ecx,[edi+14h]` / `[ecx+eax*4]` / `[ecx+eax*4+4]`
+     *                       -> `mVec._Myfirst[bucket]` and `[bucket + 1]`,
+     *                          i.e. the window `[mVec[b], mVec[b + 1])`
+     *                          (0x00932B81, 0x00933F00, 0x00933F92)
+     *   `mov ebx,[ebx+8]`   -> `mList._Myhead`, the `end()` sentinel the miss
+     *                          paths return (0x00933F28, 0x0093528D)
+     *   `add [edi+0Ch],-1`  -> `mList._Mysize` (0x00933FD5)
+     *   `[esi+20h]`/`[esi+24h]`
+     *                       -> `mMask` / `mMaxidx` (0x009320B8, 0x009320BF)
+     *
+     * and each list node is `{_Next, _Prev, pair<const key, Data*>}` - every
+     * key access in those bodies is `node + 8` (0x00933F11, 0x00933F87), and
+     * `ClusterInternalCache<OccupationData>::Fetch` publishes `node + 8` as the
+     * eviction key at 0x0093506A.
+     */
     using OccupationCacheRuntimeMap =
-        std::unordered_map<OccupationCacheKey, gpg::HaStar::Cluster::Data*, OccupationKeyHash, OccupationKeyEq>;
+        msvc8::hash_map<
+            OccupationCacheKey,
+            gpg::HaStar::Cluster::Data*,
+            msvc8::hash_compare<OccupationCacheKey, OccupationKeyOrder>>;
 
     /**
      * The subcluster half of `ClusterCache` as the binary actually builds it:
@@ -3796,8 +3819,9 @@ namespace
      *
      * and the load-factor test at 0x00934BE8 (`[esi+0Ch] >> 2` against
      * `[esi+24h]`) is `mMaxidx <= size() / bucket_size` with the MSVC8
-     * `bucket_size = 4`. `kInitialOccupationBucketSlotCount` (9) is the same
-     * `min_buckets + 1` this container seeds `mVec` with.
+     * `bucket_size = 4`. The nine bucket slots the occupation table re-arms in
+     * `clear()` (`push 9` at 0x00934EDB) are the same `min_buckets + 1` this
+     * container seeds `mVec` with.
      */
     using SubclusterCacheRuntimeMap =
         msvc8::hash_map<
@@ -3917,12 +3941,6 @@ namespace
         return key;
     }
 
-    struct OccupationCacheIteratorRange
-    {
-        OccupationCacheRuntimeMap::iterator mFirst{};
-        OccupationCacheRuntimeMap::iterator mLast{};
-    };
-
     /**
      * Address: 0x00933EB0 (FUN_00933EB0)
      *
@@ -3958,114 +3976,48 @@ namespace
       return destination;
     }
 
-    constexpr std::size_t kInitialOccupationBucketSlotCount = 9u;
-
     /**
-     * Address: 0x00933EF0 (FUN_00933EF0, sub_933EF0)
+     * Address: 0x009355F0 (gpg::HaStar::ClusterInternalCache_OccupationData::Func)
+     * Mangled: ??_7?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@6B@, slot 0
+     *
+     * IDA signature:
+     * void __thiscall gpg__HaStar__ClusterInternalCache_OccupationData__Func(
+     *     ClusterInternalCache<OccupationData> *this, const OccupationData *key);
      *
      * What it does:
-     * Resolves the iterator range matching one occupation cache key.
-     */
-    [[maybe_unused]] OccupationCacheIteratorRange* FindOccupationCacheEquivalentRange(
-        RuntimeClusterCacheStore& store,
-        OccupationCacheIteratorRange& outRange,
-        const gpg::HaStar::OccupationData& occupationData
-    )
-    {
-        const OccupationCacheKey key = MakeOccupationCacheKey(occupationData);
-        const auto range = store.mOccupation.equal_range(key);
-        outRange.mFirst = range.first;
-        outRange.mLast = range.second;
-        return &outRange;
-    }
-
-    /**
-     * Address: 0x00933F80 (FUN_00933F80, sub_933F80)
+     * Drops the cache entry whose payload just lost its last handle. This is
+     * slot 0 of `ClusterInternalCache<OccupationData>`'s vtable (0x00D47884)
+     * and the concrete override of the single virtual `gpg::HaStar::Cluster::
+     * ICache` declares; the body is two instructions, `add ecx, 4` to step from
+     * the `ICache` sub-object onto the `stdext::hash_map` the cache holds at
+     * +0x04, then a tail `jmp` into `hash_map::erase(const key_type&)`
+     * (0x00935480).
      *
-     * What it does:
-     * Erases one occupation-cache map node and returns its successor iterator.
-     */
-    [[maybe_unused]] OccupationCacheRuntimeMap::iterator* EraseOccupationCacheNode(
-        RuntimeClusterCacheStore& store,
-        OccupationCacheRuntimeMap::iterator& outNext,
-        const OccupationCacheRuntimeMap::iterator nodeIt
-    )
-    {
-        if (nodeIt == store.mOccupation.end()) {
-            outNext = nodeIt;
-            return &outNext;
-        }
-
-        outNext = store.mOccupation.erase(nodeIt);
-        return &outNext;
-    }
-
-    /**
-     * Address: 0x00934EA0 (FUN_00934EA0, sub_934EA0)
+     * `ClusterInternalCache<OccupationData>::Fetch` is what arms this: once its
+     * insert reports success it stores the owning cache into
+     * `Cluster::Data::mReleaseObject` and the address of the key inside the
+     * freshly linked node into `Cluster::Data::mReleaseArg`
+     * (`mov [ecx+4], edi` / `add edx, 8; mov [eax+8], edx` at 0x00935063 and
+     * 0x0093506A), so that `ReleaseClusterData` can dispatch back through slot
+     * 0 when the refcount reaches zero (`mov edx,[ecx]; mov edx,[edx];
+     * call edx` at 0x009350A0..0x009350AB).
      *
-     * What it does:
-     * Clears occupation-cache nodes and restores default bucket-lane state.
+     * Not yet reachable from recovered source, and deliberately left that way:
+     * `ReleaseClusterData` reads `Cluster::Data::mReleaseObject`, which
+     * `gpg/core/algorithms/Cluster.h` still types as `void*`, and `ICache`
+     * still declares its slot-0 virtual with no parameters. Naming this
+     * function from that dispatch needs both retyped - an `ICache*` field and a
+     * `virtual void Evict(const OccupationData&)` slot - which is a `Cluster.h`
+     * change, not a `Cluster.cpp` one. Until then nothing in `src/sdk/**`
+     * populates `mReleaseObject`, so the eviction lane is inert rather than
+     * wrong.
      */
-    [[maybe_unused]] int ResetOccupationCacheEntryStorage(RuntimeClusterCacheStore& store)
-    {
-        store.mOccupation.clear();
-        store.mOccupation.rehash(kInitialOccupationBucketSlotCount);
-        return 1;
-    }
-
-    /**
-     * Address: 0x00935280 (FUN_00935280, sub_935280)
-     *
-     * What it does:
-     * Erases one occupation-cache iterator range and returns the next iterator.
-     */
-    [[maybe_unused]] OccupationCacheRuntimeMap::iterator* EraseOccupationCacheRange(
-        RuntimeClusterCacheStore& store,
-        OccupationCacheRuntimeMap::iterator& outNext,
-        OccupationCacheRuntimeMap::iterator first,
-        const OccupationCacheRuntimeMap::iterator last
-    )
-    {
-        if (first == store.mOccupation.begin() && last == store.mOccupation.end()) {
-            (void)ResetOccupationCacheEntryStorage(store);
-            outNext = store.mOccupation.begin();
-            return &outNext;
-        }
-
-        while (first != last) {
-            const OccupationCacheRuntimeMap::iterator eraseNode = first;
-            ++first;
-            OccupationCacheRuntimeMap::iterator erasedNext{};
-            (void)EraseOccupationCacheNode(store, erasedNext, eraseNode);
-        }
-
-        outNext = first;
-        return &outNext;
-    }
-
-    /**
-     * Address: 0x00935480 (FUN_00935480, sub_935480)
-     *
-     * What it does:
-     * Removes all occupation-cache entries matching one key and returns the
-     * number of removed nodes.
-     */
-    [[maybe_unused]] int EraseOccupationCacheEntriesForKey(
+    [[maybe_unused]] void EvictOccupationCacheEntry(
         RuntimeClusterCacheStore& store,
         const gpg::HaStar::OccupationData& occupationData
     )
     {
-        OccupationCacheIteratorRange range{};
-        (void)FindOccupationCacheEquivalentRange(store, range, occupationData);
-
-        int removedCount = 0;
-        for (auto it = range.mFirst; it != range.mLast; ++it) {
-            ++removedCount;
-        }
-
-        OccupationCacheRuntimeMap::iterator outNext{};
-        (void)EraseOccupationCacheRange(store, outNext, range.mFirst, range.mLast);
-        return removedCount;
+        store.mOccupation.erase(MakeOccupationCacheKey(occupationData));
     }
 
     [[nodiscard]] SubclusterCacheKey MakeSubclusterCacheKey(const gpg::HaStar::SubclusterData& subclusterData)
@@ -4160,19 +4112,32 @@ namespace
 
     /**
      * Address: 0x009348A0 (FUN_009348A0, sub_9348A0)
-     * Address: 0x00934080 (FUN_00934080, occupation-cache bucket-vector
-     *   resize template emission absorbed by std::map::emplace rewrite)
      *
      * What it does:
      * Inserts an occupation-key cache entry and reports insertion status.
      *
-     * The binary used a hash-table-backed cache (bucket vector +
-     * intrusive node lists) whose grow path called the per-T
-     * `vector<bucket_ptr>::resize(n, default)` template emission
-     * (FUN_00934080, 4-byte stride). The recovered cache uses
-     * `std::map<OccupationCacheKey, ClusterData*>::emplace` (RB-tree),
-     * so the bucket-vector resize helper is never invoked; its role
-     * is absorbed by the modern map-backed insert path.
+     * 0x009348A0 is the occupation-key emission of
+     * `msvc8::hash_map::insert(const value_type&)` - the same body the
+     * subcluster key gets at 0x00934BE0. Calling it by name here is what emits
+     * the rest of this instantiation's out-of-line bodies:
+     *
+     *   0x009328C0 - `msvc8::list<value_type>::_Buynode`
+     *                (`operator new(0x20)` = 8 link bytes + a 0x18-byte
+     *                `pair<const key, Cluster::Data*>`, copied as six dwords;
+     *                0x18 fits both readings of the key - an 18-byte key
+     *                padded to 20, or `OccupationData` itself at 20 bytes with
+     *                only its first 18 hashed and compared - so the node size
+     *                does not settle which one the original template was
+     *                instantiated on),
+     *   0x009332E0 - `msvc8::list::_Incsize`, with the `0AAAAAAAh` max_size
+     *                check and its "list<T> too long" `length_error`,
+     *   0x00934080 - `msvc8::vector<iterator>::resize(n, end())` from `_Grow`,
+     *                itself reaching `vector::insert(pos, n, value)`
+     *                (0x00933640).
+     *
+     * The bucket fold is inlined into this body rather than shared with
+     * 0x00932080: `gpg::HashBytes` is called directly at the top and
+     * `OccupationKeyLess` (0x00931460) drives the backwards window scan.
      */
     [[nodiscard]] CacheInsertResult InsertOccupationCacheEntry(
         void* const cacheTreeBase,
@@ -4182,7 +4147,8 @@ namespace
     {
         RuntimeClusterCacheStore& store = RuntimeClusterCacheForBase(cacheTreeBase);
         const OccupationCacheKey key = MakeOccupationCacheKey(occupationData);
-        const auto insertResult = store.mOccupation.emplace(key, clusterData);
+        const auto insertResult =
+          store.mOccupation.insert(OccupationCacheRuntimeMap::value_type(key, clusterData));
         const auto it = insertResult.first;
         const bool inserted = insertResult.second;
         if (inserted) {
