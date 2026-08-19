@@ -3546,6 +3546,7 @@ namespace gpg::gal
         /**
          * Address: 0x008F3950 (FUN_008F3950,
          *   Moho::WeakPtr_EffectD3D9::WeakPtr_EffectD3D9)
+         * Address: 0x008F38E0 (FUN_008F38E0, Moho::WeakPtr_EffectD3D9::~WeakPtr_EffectD3D9)
          *
          * IDA signature:
          * _DWORD *__thiscall Moho::WeakPtr_EffectD3D9::WeakPtr_EffectD3D9(
@@ -3557,6 +3558,14 @@ namespace gpg::gal
          * one otherwise. The binary emits this out of line for EffectD3D9 and
          * calls it from all twenty-four EffectTechniqueD3D9/EffectVariableD3D9
          * entry points, by way of the two Lock*OrThrow helpers below.
+         *
+         * `0x008F38E0` is the matching `~shared_ptr<EffectD3D9>()` release body
+         * (decrement `use_count_`, `dispose()` at zero, decrement
+         * `weak_count_`, `destroy()` at zero) - a template-emission lane
+         * reached wherever a `boost::shared_ptr<EffectD3D9>` local/temporary
+         * (e.g. the `effect` locals in `LockEffectOrThrow`/
+         * `LockEffectVariableOrThrow` below) goes out of scope, not called
+         * directly.
          */
         [[nodiscard]] boost::shared_ptr<EffectD3D9> LockWeakEffectD3D9(
             const boost::weak_ptr<EffectD3D9>& weakEffect
