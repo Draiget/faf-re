@@ -23,7 +23,9 @@
 #include "moho/ai/EFormationdStatusTypeInfo.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/math/Vector3f.h"
 #include "moho/misc/Listener.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
@@ -849,6 +851,13 @@ namespace
   constexpr Wm3::Vec3f kZeroForwardVector{0.0f, 0.0f, 0.0f};
   constexpr Wm3::Quatf kZeroQuaternion{0.0f, 0.0f, 0.0f, 0.0f};
 
+  /// Formation layer indices into `CAiFormationInstance::mLanes`. `GetLayer`
+  /// (0x00569BD0) returns exactly one of these, and `UpdateFormation`
+  /// (0x00568CA0) drives its rebuild loop over `[0, kFormationLayerCount)`.
+  constexpr std::int32_t kGroundFormationLayer = 0;
+  constexpr std::int32_t kAirFormationLayer = 1;
+  constexpr std::int32_t kFormationLayerCount = 2;
+
   /**
    * Address: 0x0059A420 (FUN_0059A420)
    *
@@ -1507,6 +1516,26 @@ namespace
     delete map.head;
     map.head = nullptr;
     map.size = 0u;
+  }
+
+  /**
+   * Address: 0x00568AE9 (inside FUN_00568AC0), 0x005690C3 (inside FUN_00568CA0)
+   *
+   * What it does:
+   * Tears one formation layer back down to empty: every lane entry drops its
+   * cached leader back-link and frees its unit map, then the lane vector itself
+   * returns to inline storage. `CleanupFormation` runs this over both layers;
+   * `UpdateFormation` runs it per layer immediately before rebuilding that
+   * layer from the formation script.
+   */
+  void ReleaseFormationLaneEntries(moho::SFormationLaneVec& lane)
+  {
+    for (moho::SFormationLaneEntry& entry : lane) {
+      UnlinkWeakWordNode(entry.linkedUnitBackLinkHeadWord, entry.linkedUnitBackLinkNextWord);
+      DestroyLaneMapStorage(entry.unitMap);
+    }
+
+    lane.ResetStorageToInline();
   }
 
   void DestroyCoordCacheMapStorage(moho::SFormationCoordCacheMap& cache)
@@ -3329,6 +3358,18 @@ namespace
     return runtimeLeader->GuardedUnitRef.ResolveObjectPtr<moho::Unit>();
   }
 
+  /**
+   * Address: 0x00569CC2 (inside FUN_00569CB0), 0x00569F82 (inside FUN_00569F70),
+   *          0x0059AE90 (inside FUN_0059AE80), 0x005692A5 (inside FUN_005692A0),
+   *          0x0056A6B5 (inside FUN_0056A6B0)
+   *
+   * What it does:
+   * The lazy formation-plan rebuild the binary inlines at the head of every
+   * entry point that reads plan state. When `mPlanUpdateRequested` is set it
+   * clears the flag, drops dead units, tears the current plan down and rebuilds
+   * it: `RemoveDeadUnits` -> `CleanupFormation` -> `UpdateFormation`, in that
+   * order (see 0x0059AEA8 / 0x0059AEAF / 0x0059AEB5).
+   */
   void RefreshFormationPlanIfRequested(moho::CAiFormationInstance& formation)
   {
     if (formation.mPlanUpdateRequested == 0u) {
@@ -3339,9 +3380,10 @@ namespace
     (void)formation.RemoveDeadUnits(nullptr);
     formation.CleanupFormation();
 
-    // Binary also executes CAiFormationInstance::UpdateFormation (0x00568CA0)
-    // here immediately after CleanupFormation; that dependency is tracked
-    // separately.
+    // The binary executes CAiFormationInstance::UpdateFormation (0x00568CA0)
+    // here, immediately after CleanupFormation. It is not wired up yet: its
+    // callee CAiFormationInstance::RunScript (0x00567300) bottoms out in
+    // Moho::FORMATION_RunScript (0x00576690), which is still unrecovered.
   }
 
   [[nodiscard]] bool IsBusyFormationQueueCommand(const moho::EUnitCommandType commandType) noexcept
@@ -4163,16 +4205,8 @@ namespace moho
     ResetCoordCacheMap(mCoordCacheSecondary);
     mOrientationBaseline = kZeroQuaternion;
 
-    for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
-      SFormationLaneEntry* lane = mLanes[laneIndex].begin();
-      const SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
-      while (lane != laneEnd) {
-        UnlinkWeakWordNode(lane->linkedUnitBackLinkHeadWord, lane->linkedUnitBackLinkNextWord);
-        DestroyLaneMapStorage(lane->unitMap);
-        ++lane;
-      }
-
-      mLanes[laneIndex].ResetStorageToInline();
+    for (std::int32_t laneIndex = 0; laneIndex < kFormationLayerCount; ++laneIndex) {
+      ReleaseFormationLaneEntries(mLanes[laneIndex]);
     }
   }
 
@@ -4190,19 +4224,22 @@ namespace moho
   /**
    * Address: 0x00569BD0 (FUN_00569BD0)
    *
-   * Moho::Unit*
+   * IDA signature:
+   * int __stdcall Moho::CFormationInstance::GetLayer(Moho::Unit *unit);
    *
    * What it does:
-   * Classifies the unit into the air-motion bucket.
+   * Classifies the unit into its formation layer: air-motion blueprints get
+   * layer 1, everything else layer 0. The value indexes `mLanes`.
    */
-  bool CAiFormationInstance::Func5(Unit* const unit) const
+  std::int32_t CAiFormationInstance::GetLayer(Unit* const unit) const
   {
     if (unit == nullptr) {
-      return false;
+      return kGroundFormationLayer;
     }
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-    return blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_Air;
+    const bool isAirLayer = blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_Air;
+    return isAirLayer ? kAirFormationLayer : kGroundFormationLayer;
   }
 
   /**
@@ -4217,7 +4254,7 @@ namespace moho
       return nullptr;
     }
 
-    const std::int32_t laneIndex = Func5(unit) ? 1 : 0;
+    const std::int32_t laneIndex = GetLayer(unit);
     SFormationLaneEntry* lane = mLanes[laneIndex].begin();
     SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
     const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
@@ -4520,7 +4557,7 @@ namespace moho
     }
 
     const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    const std::int32_t laneIndex = Func5(unit) ? 1 : 0;
+    const std::int32_t laneIndex = GetLayer(unit);
     SFormationLaneEntry* lane = mLanes[laneIndex].begin();
     SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
     while (lane != laneEnd) {
@@ -4560,7 +4597,7 @@ namespace moho
     }
 
     const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    const std::int32_t laneIndex = Func5(unit) ? 1 : 0;
+    const std::int32_t laneIndex = GetLayer(unit);
     const SFormationLaneEntry* lane = mLanes[laneIndex].begin();
     const SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
     while (lane != laneEnd) {
@@ -4793,7 +4830,7 @@ namespace moho
       return nullptr;
     }
 
-    const std::int32_t laneIndex = Func5(unit) ? 1 : 0;
+    const std::int32_t laneIndex = GetLayer(unit);
     return ResolveUpdateLaneLeader(laneIndex, *this, *laneEntry);
   }
 
@@ -4807,10 +4844,11 @@ namespace moho
    */
   void CAiFormationInstance::Update()
   {
-    if (mPlanUpdateRequested != 0u) {
-      mPlanUpdateRequested = 0u;
-      (void)RemoveDeadUnits(nullptr);
-    }
+    // 0x0059AE90..0x0059AEAF: the same lazy rebuild every other plan reader
+    // performs. The binary drops dead units *and* tears the current plan down
+    // through CleanupFormation before rebuilding; this call site previously
+    // ran only the RemoveDeadUnits half.
+    RefreshFormationPlanIfRequested(*this);
 
     if (!CommandIsForm() || UnitCount() == 0) {
       return;
@@ -5027,7 +5065,7 @@ namespace moho
       || runtimeUnit->CommandQueue == nullptr
       || mCommandType == EUnitCommandType::UNITCOMMAND_Guard
       || mFormationUpdateScale < 1.0f
-      || Func5(runtimeUnit);
+      || GetLayer(runtimeUnit) == kAirFormationLayer;
     if (fallbackToInputPos) {
       dest->x = pos->x;
       dest->z = pos->z;
@@ -5043,7 +5081,7 @@ namespace moho
 
     const SFootprint footprint = blueprint->mFootprint;
     const std::int32_t footprintSize = std::max<int>(footprint.mSizeX, footprint.mSizeZ);
-    const std::int32_t laneToken = Func5(runtimeUnit) ? 1 : 0;
+    const std::int32_t laneToken = GetLayer(runtimeUnit);
     const bool useWholeMap = (runtimeUnit->ArmyRef != nullptr) ? runtimeUnit->ArmyRef->UseWholeMap() : false;
 
     auto reserveSlot = [this, footprintSize, laneToken](const SCoordsVec2& slotPos) {

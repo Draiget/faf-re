@@ -504,10 +504,21 @@ namespace moho
 
     /**
      * Address: 0x00569BD0 (FUN_00569BD0)
+     *
+     * IDA signature:
+     * int __stdcall Moho::CFormationInstance::GetLayer(Moho::Unit *unit);
+     *
+     * What it does:
+     * Returns the formation layer this unit belongs to: `1` for air-motion
+     * blueprints, `0` for everything else. The result indexes `mLanes`.
+     * `PreRunScript` (0x00566B10) dispatches this through slot 4 and compares
+     * the result against the layer being built, which is where the name comes
+     * from.
+     *
      * Slot: 4
-     * Demangled: Moho::CFormationInstance::Func5
+     * Demangled: Moho::CFormationInstance::GetLayer
      */
-    virtual bool Func5(Unit* unit) const;
+    virtual std::int32_t GetLayer(Unit* unit) const;
 
     /**
      * Address: 0x005669A0 (FUN_005669A0)
@@ -681,7 +692,6 @@ namespace moho
      * and reports whether `checkForUnit` remains live in the set.
      */
     bool RemoveDeadUnits(Unit* checkForUnit);
-
 
     /**
      * Address: 0x00566A30 (FUN_00566A30, Moho::CAiFormationInstance::ComputeRunScriptOffset)
