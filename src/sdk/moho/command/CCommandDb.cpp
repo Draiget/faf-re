@@ -178,6 +178,18 @@ namespace
     return cursor ? cursor : head;
   }
 
+  /**
+   * Address: 0x006E2220 (FUN_006E2220, std::map<uint,CUnitCommand*>::Iterator::inc)
+   *
+   * What it does:
+   * In-order successor step for the command-id map's RB-tree (MSVC8
+   * `_Tree::_Inc`, in/out iterator-slot form): with a real right subtree the
+   * successor is that subtree's leftmost node; otherwise it is the nearest
+   * ancestor whose left subtree contains the node. Expressed here as a
+   * return-value helper (`LeftmostNode` for the has-right-subtree case, an
+   * ancestor walk otherwise) rather than the binary's in-place iterator
+   * mutation - same traversal, cleaner call sites.
+   */
   [[nodiscard]] const CommandDbMapNodeRuntime* TreeSuccessor(
     const CommandDbMapNodeRuntime* node, const CommandDbMapNodeRuntime* head
   ) noexcept
