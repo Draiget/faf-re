@@ -1689,8 +1689,25 @@ namespace moho
     };
 
     /**
+     * Address: 0x00828280 (FUN_00828280, sub_828280)
+     *
+     * IDA signature:
+     * bool __userpurge sub_828280@<al>(int a1@<eax>, int a2);
+     *
+     * What it does:
+     * The "selected" test `ResolveDrawNodeHighlightState` ends on: resolves the
+     * draw node's owning command-issue helper, asks that helper for the entity
+     * set the command is aimed at, and reports whether that set shares any live
+     * entity with the session's current selection. A node with no owning helper
+     * is never selected.
+     *
+     * Its own null-helper guard is kept even though the only caller has already
+     * checked the same field - the binary re-tests it here.
+     */
+    [[nodiscard]] bool DrawNodeSharesLiveEntityWithSelection(const UICommandGraphDrawNode& drawNode) const;
+
+    /**
      * Address: 0x008281E0 (FUN_008281E0, sub_8281E0)
-     * Address: 0x00828280 (FUN_00828280, sub_828280) - folded in, see below
      * Address: 0x00831110 (FUN_00831110, sub_831110) - now
      * `SSelectionSetUserEntity::HasCommonLiveEntityWith`
      *
@@ -1701,12 +1718,6 @@ namespace moho
      * currently-interacting one; `Selected` when the node's affected-entity
      * set shares any live entity with the current selection; `Normal`
      * otherwise, and always `Normal` for a node with no owning command.
-     *
-     * `sub_828280` (the "selected" check) is folded directly into this
-     * function rather than kept as a separate one-call helper - its own body
-     * was just "resolve the command's cursor-entity set, then ask whether it
-     * intersects the session selection", both of which are already named
-     * operations here.
      *
      * The binary's `mIsDragger` comparison (0x00828249: `cmp ebx,[esi+18h]`)
      * reads `MouseInfo::mIsDragger` as a `CmdId`, not a boolean "currently
@@ -3798,12 +3809,35 @@ namespace moho
       return ECommandNodeHighlightState::Highlighted;
     }
 
-    SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
-    if (cursorEntities->HasCommonLiveEntityWith(mSession->GetSelection())) {
+    if (DrawNodeSharesLiveEntityWithSelection(drawNode)) {
       return ECommandNodeHighlightState::Selected;
     }
 
     return ECommandNodeHighlightState::Normal;
+  }
+
+  /**
+   * Address: 0x00828280 (FUN_00828280, sub_828280)
+   *
+   * IDA signature:
+   * bool __userpurge sub_828280@<al>(int a1@<eax>, int a2);
+   *
+   * What it does:
+   * Reports whether the draw node's command is aimed at anything the player
+   * currently has selected. See the declaration for why the null-helper guard
+   * is repeated here.
+   */
+  bool UICommandGraph::DrawNodeSharesLiveEntityWithSelection(
+    const UICommandGraphDrawNode& drawNode
+  ) const
+  {
+    auto* const ownerHelper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (ownerHelper == nullptr) {
+      return false;
+    }
+
+    SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*ownerHelper);
+    return cursorEntities->HasCommonLiveEntityWith(mSession->GetSelection());
   }
 
   /**
