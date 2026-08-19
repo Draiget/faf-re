@@ -179,6 +179,23 @@ namespace moho
   }
 
   /**
+   * Part of 0x00809E80 (the device-teardown sweep). Declared in the header
+   * because these statics are private to this translation unit.
+   *
+   * Binary order at 0x00809F60..0x0080A050: batcher (0x010BF724) deleted, water
+   * surface (0x010BF734) through its scalar deleting destructor, then the three
+   * shared textures dropped.
+   */
+  void ReleaseMediumFidelityTerrainSharedResources() noexcept
+  {
+    DeleteOwned(sMediumFidelityTextureBatcher);
+    DeleteOwned(sMediumFidelityWaterSurface);
+    sMediumFidelityNoiseFillTexture.reset();
+    sMediumFidelityCubicBlendLookupTexture.reset();
+    sMediumFidelityGridTexture.reset();
+  }
+
+  /**
    * Address: 0x00803C00 (FUN_00803C00, Moho::MediumFidelityTerrain::Create)
    *
    * What it does:

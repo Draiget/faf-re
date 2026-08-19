@@ -364,4 +364,27 @@ namespace moho
   static_assert(sizeof(LowFidelityTerrain) == 0x9CB8, "LowFidelityTerrain size must be 0x9CB8");
 
   extern CD3DTextureBatcher* texture_batcher;
+
+  /**
+   * Releases the low-fidelity terrain's process-wide shared resources: the
+   * texture batcher, the water surface, and the grid texture. Unlike the other
+   * two fidelities this lane owns a single texture, matching the binary.
+   *
+   * The binary inlines this into the device-teardown sweep at 0x00809E80.
+   */
+  void ReleaseLowFidelityTerrainSharedResources() noexcept;
+
+  /**
+   * Address: 0x00809E80 (FUN_00809E80, sub_809E80)
+   *
+   * IDA signature:
+   * void sub_809E80();
+   *
+   * What it does:
+   * Drops every process-wide terrain resource, high fidelity first, then
+   * medium, then low. Each group deletes its texture batcher, runs the water
+   * surface's scalar deleting destructor, and drops its shared texture
+   * references. Called when the D3D device goes away.
+   */
+  void REN_ReleaseTerrainSharedResources() noexcept;
 } // namespace moho

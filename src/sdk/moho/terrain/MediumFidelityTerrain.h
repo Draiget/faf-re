@@ -602,4 +602,15 @@ namespace moho
     "MediumFidelityTerrain::mUnknown47534 offset must be 0x47534"
   );
   static_assert(sizeof(MediumFidelityTerrain) == 0x47538, "MediumFidelityTerrain size must be 0x47538");
+
+  /**
+   * Releases the medium-fidelity terrain's process-wide shared resources: the
+   * texture batcher, the water surface, and the noise-fill / cubic-blend /
+   * grid textures.
+   *
+   * The binary inlines this into the device-teardown sweep at 0x00809E80; it is
+   * a named helper here because those statics are private to
+   * MediumFidelityTerrain.cpp. See REN_ReleaseTerrainSharedResources.
+   */
+  void ReleaseMediumFidelityTerrainSharedResources() noexcept;
 } // namespace moho
