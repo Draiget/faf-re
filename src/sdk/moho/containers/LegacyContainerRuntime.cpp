@@ -275,7 +275,7 @@ namespace
    * Initializes one 20-byte-element vector lane and optionally allocates
    * backing storage for `elementCount` entries.
    */
-  [[maybe_unused]] bool InitializeElement20VectorStorage(
+  bool InitializeElement20VectorStorage(
     LegacyVectorElement20RuntimeView* const vectorView,
     const std::uint32_t elementCount
   )
@@ -306,7 +306,7 @@ namespace
    * Initializes one dword-vector lane and optionally allocates backing storage
    * for `elementCount` entries.
    */
-  [[maybe_unused]] bool InitializeDwordVectorStorage(
+  bool InitializeDwordVectorStorage(
     LegacyVectorDwordRuntimeView* const vectorView,
     const std::size_t elementCount
   )
@@ -709,7 +709,7 @@ namespace
    * What it does:
    * Returns the byte lane at offset `+0x2A0` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint8_t ReadSparseLane2A0(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
+  std::uint8_t ReadSparseLane2A0(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane2A0;
   }
@@ -720,7 +720,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x544` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane544(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane544(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane544;
   }
@@ -731,7 +731,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x48` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane48(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane48(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane48;
   }
@@ -742,7 +742,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x4C` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane4C(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane4C(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane4C;
   }
@@ -753,7 +753,7 @@ namespace
    * What it does:
    * Returns the byte lane at offset `+0xAC` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint8_t ReadSparseLaneAC(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
+  std::uint8_t ReadSparseLaneAC(const SparseRuntimeSmallLaneAccessorView* const runtime) noexcept
   {
     return runtime->laneAC;
   }
@@ -764,7 +764,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x900` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane900(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane900(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane900;
   }
@@ -775,7 +775,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x904` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane904(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane904(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane904;
   }
@@ -786,7 +786,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x148` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane148(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane148(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane148;
   }
@@ -797,7 +797,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x550` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane550(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane550(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane550;
   }
@@ -808,7 +808,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x55C` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane55C(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane55C(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane55C;
   }
@@ -819,7 +819,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x4B0` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane4B0(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane4B0(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane4B0;
   }
@@ -830,7 +830,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x4B4` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane4B4(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane4B4(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane4B4;
   }
@@ -841,7 +841,7 @@ namespace
    * What it does:
    * Returns the byte lane at offset `+0x68A` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint8_t ReadSparseLane68A(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint8_t ReadSparseLane68A(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane68A;
   }
@@ -852,7 +852,7 @@ namespace
    * What it does:
    * Returns the byte lane at offset `+0x68B` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint8_t ReadSparseLane68B(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint8_t ReadSparseLane68B(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane68B;
   }
@@ -863,7 +863,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x240` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane240(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane240(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane240;
   }
@@ -874,7 +874,7 @@ namespace
    * What it does:
    * Returns the byte lane at offset `+0x2A2` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint8_t ReadSparseLane2A2(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint8_t ReadSparseLane2A2(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane2A2;
   }
@@ -885,7 +885,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x0E0` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane0E0(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane0E0(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane0E0;
   }
@@ -896,7 +896,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x0E4` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane0E4(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane0E4(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane0E4;
   }
@@ -907,7 +907,7 @@ namespace
    * What it does:
    * Writes one dword into lane `+0x0E4` and marks lane `+0x141` as dirty.
    */
-  [[maybe_unused]] SparseRuntimeLaneAccessorView* WriteSparseLane0E4AndMarkLane141(
+  SparseRuntimeLaneAccessorView* WriteSparseLane0E4AndMarkLane141(
     SparseRuntimeLaneAccessorView* const runtime,
     const std::uint32_t value
   ) noexcept
@@ -923,7 +923,7 @@ namespace
    * What it does:
    * Returns the dword lane at offset `+0x980` from one sparse runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadSparseLane980(const SparseRuntimeLaneAccessorView* const runtime) noexcept
+  std::uint32_t ReadSparseLane980(const SparseRuntimeLaneAccessorView* const runtime) noexcept
   {
     return runtime->lane980;
   }
@@ -935,7 +935,7 @@ namespace
    * What it does:
    * Returns element count for one `[begin,end)` lane with 136-byte entries.
    */
-  [[maybe_unused]] std::int32_t CountElement136RangeEntries(const LegacyRangeRuntimeView& runtime) noexcept
+  std::int32_t CountElement136RangeEntries(const LegacyRangeRuntimeView& runtime) noexcept
   {
     return CountRangeEntries<136u>(runtime);
   }
@@ -946,7 +946,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0xB9 sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffsetB9RuntimeView** AscendLink0ToOffsetB9Sentinel(
+  SentinelNodeOffsetB9RuntimeView** AscendLink0ToOffsetB9Sentinel(
     SentinelNodeOffsetB9RuntimeView** linkSlot
   ) noexcept
   {
@@ -959,7 +959,7 @@ namespace
    * What it does:
    * Walks one tree branch via `link8` until the 0xB9 sentinel lane is reached.
    */
-  [[maybe_unused]] SentinelNodeOffsetB9RuntimeView* WalkLink8ToOffsetB9Sentinel(
+  SentinelNodeOffsetB9RuntimeView* WalkLink8ToOffsetB9Sentinel(
     SentinelNodeOffsetB9RuntimeView* node
   ) noexcept
   {
@@ -972,7 +972,7 @@ namespace
    * What it does:
    * Walks one tree branch via `link8` until the 0x2D sentinel lane is reached.
    */
-  [[maybe_unused]] SentinelNodeOffset2DRuntimeView* WalkLink8ToOffset2DSentinel(
+  SentinelNodeOffset2DRuntimeView* WalkLink8ToOffset2DSentinel(
     SentinelNodeOffset2DRuntimeView* node
   ) noexcept
   {
@@ -985,7 +985,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0x2D sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffset2DRuntimeView** AscendLink0ToOffset2DSentinel(
+  SentinelNodeOffset2DRuntimeView** AscendLink0ToOffset2DSentinel(
     SentinelNodeOffset2DRuntimeView** linkSlot
   ) noexcept
   {
@@ -998,7 +998,7 @@ namespace
    * What it does:
    * Fills one `[destination,end)` range with repeated 16-byte payload blocks.
    */
-  [[maybe_unused]] QuadWordBlockRuntimeView* FillQuadWordBlocks(
+  QuadWordBlockRuntimeView* FillQuadWordBlocks(
     QuadWordBlockRuntimeView* destination,
     QuadWordBlockRuntimeView* end,
     const QuadWordBlockRuntimeView& fillValue
@@ -1014,7 +1014,7 @@ namespace
    * Copies 16-byte payload blocks backward from `[sourceBegin,sourceEnd)` into
    * destination tail storage.
    */
-  [[maybe_unused]] QuadWordBlockRuntimeView* CopyQuadWordBlocksBackward(
+  QuadWordBlockRuntimeView* CopyQuadWordBlocksBackward(
     QuadWordBlockRuntimeView* destinationEnd,
     const QuadWordBlockRuntimeView* sourceBegin,
     const QuadWordBlockRuntimeView* sourceEnd
@@ -1029,7 +1029,7 @@ namespace
    * What it does:
    * Clears one shared-ownership pair and releases one retained control block.
    */
-  [[maybe_unused]] std::intptr_t ClearSharedOwnershipPairLaneA(SharedOwnershipPairRuntimeView* pair) noexcept
+  std::intptr_t ClearSharedOwnershipPairLaneA(SharedOwnershipPairRuntimeView* pair) noexcept
   {
     pair->object = nullptr;
     SharedControlBlockRuntimeView* const owner = pair->owner;
@@ -1043,7 +1043,7 @@ namespace
    * What it does:
    * Alias lane of shared-ownership pair clear/release behavior.
    */
-  [[maybe_unused]] std::intptr_t ClearSharedOwnershipPairLaneB(SharedOwnershipPairRuntimeView* pair) noexcept
+  std::intptr_t ClearSharedOwnershipPairLaneB(SharedOwnershipPairRuntimeView* pair) noexcept
   {
     pair->object = nullptr;
     SharedControlBlockRuntimeView* const owner = pair->owner;
@@ -1057,7 +1057,7 @@ namespace
    * What it does:
    * Returns element count for one `[begin,end)` lane with 20-byte entries.
    */
-  [[maybe_unused]] std::int32_t CountElement20RangeEntries(const LegacyRangeRuntimeView& runtime) noexcept
+  std::int32_t CountElement20RangeEntries(const LegacyRangeRuntimeView& runtime) noexcept
   {
     return CountRangeEntries<20u>(runtime);
   }
@@ -1069,7 +1069,7 @@ namespace
    * Clears one retained shared-owner lane and writes command/vector lanes into
    * one terrain-transfer runtime view.
    */
-  [[maybe_unused]] std::intptr_t ResetTerrainTransferRuntime(
+  std::intptr_t ResetTerrainTransferRuntime(
     const Float3RuntimeView* arg1Vector,
     TerrainTransferRuntimeView* runtime,
     const std::int32_t commandLane,
@@ -1094,7 +1094,7 @@ namespace
    * Reserves one contiguous 12-byte-per-vertex window in one lockable buffer
    * with 0x3000-vertex wrap semantics.
    */
-  [[maybe_unused]] bool ReserveVertexTripletWindow(
+  bool ReserveVertexTripletWindow(
     std::uint32_t** outMappedVertexData,
     VertexReservationRuntimeView* reservation,
     const std::uint32_t requestedVertexCount,
@@ -1131,7 +1131,7 @@ namespace
    * What it does:
    * Slides one tail dword range over a gap and commits the new end pointer.
    */
-  [[maybe_unused]] std::uint32_t** MoveDwordTailLaneA(
+  std::uint32_t** MoveDwordTailLaneA(
     std::uint32_t** outResult,
     LegacyDwordSpanRuntimeView* span,
     std::uint32_t* destination,
@@ -1148,7 +1148,7 @@ namespace
    * What it does:
    * Alias lane of dword tail slide/commit behavior.
    */
-  [[maybe_unused]] std::uint32_t** MoveDwordTailLaneB(
+  std::uint32_t** MoveDwordTailLaneB(
     std::uint32_t** outResult,
     LegacyDwordSpanRuntimeView* span,
     std::uint32_t* destination,
@@ -1165,7 +1165,7 @@ namespace
    * What it does:
    * Alias lane of dword tail slide/commit behavior.
    */
-  [[maybe_unused]] std::uint32_t** MoveDwordTailLaneC(
+  std::uint32_t** MoveDwordTailLaneC(
     std::uint32_t** outResult,
     LegacyDwordSpanRuntimeView* span,
     std::uint32_t* destination,
@@ -1182,7 +1182,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0x25 sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffset25RuntimeView** AscendLink0ToOffset25Sentinel(
+  SentinelNodeOffset25RuntimeView** AscendLink0ToOffset25Sentinel(
     SentinelNodeOffset25RuntimeView** linkSlot
   ) noexcept
   {
@@ -1195,7 +1195,7 @@ namespace
    * What it does:
    * Walks one tree branch via `link8` until the 0x25 sentinel lane is reached.
    */
-  [[maybe_unused]] SentinelNodeOffset25RuntimeView* WalkLink8ToOffset25Sentinel(
+  SentinelNodeOffset25RuntimeView* WalkLink8ToOffset25Sentinel(
     SentinelNodeOffset25RuntimeView* node
   ) noexcept
   {
@@ -1208,7 +1208,7 @@ namespace
    * What it does:
    * Copies one dword range backward from source tail to destination tail.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardLaneA(
+  std::uint32_t* CopyDwordRangeBackwardLaneA(
     std::uint32_t* destinationEnd,
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd
@@ -1223,7 +1223,7 @@ namespace
    * What it does:
    * Alias lane of backward dword range copy behavior.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardLaneB(
+  std::uint32_t* CopyDwordRangeBackwardLaneB(
     std::uint32_t* destinationEnd,
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd
@@ -1238,7 +1238,7 @@ namespace
    * What it does:
    * Alias lane of backward dword range copy behavior.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardLaneC(
+  std::uint32_t* CopyDwordRangeBackwardLaneC(
     std::uint32_t* destinationEnd,
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd
@@ -1253,7 +1253,7 @@ namespace
    * What it does:
    * Relinks one intrusive node to a caller-provided owner-slot pointer lane.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView* RelinkIntrusiveNodeViaIndirectOwner(
+  IntrusiveLinkRuntimeView* RelinkIntrusiveNodeViaIndirectOwner(
     IntrusiveLinkRuntimeView* node,
     IntrusiveLinkRuntimeView*** ownerSlotAddress
   ) noexcept
@@ -1268,7 +1268,7 @@ namespace
    * What it does:
    * Relinks one intrusive node to owner storage located at `owner+0x08`.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView* RelinkIntrusiveNodeViaOwnerOffset08(
+  IntrusiveLinkRuntimeView* RelinkIntrusiveNodeViaOwnerOffset08(
     IntrusiveLinkRuntimeView* node,
     IntrusiveOwnerAtOffset08RuntimeView* owner
   ) noexcept
@@ -1283,7 +1283,7 @@ namespace
    * What it does:
    * Reports whether one 48-byte-entry range is empty.
    */
-  [[maybe_unused]] bool IsElement48RangeEmpty(const LegacyRangeRuntimeView& runtime) noexcept
+  bool IsElement48RangeEmpty(const LegacyRangeRuntimeView& runtime) noexcept
   {
     return runtime.begin == nullptr || CountRangeEntries<48u>(runtime) == 0;
   }
@@ -1295,7 +1295,7 @@ namespace
    * Loads one pointer lane from the primary global storage, dereferences it,
    * and writes the pointed dword value to `outResult`.
    */
-  [[maybe_unused]] std::uint32_t* LoadPrimaryGlobalPointerPointee(std::uint32_t* outResult) noexcept
+  std::uint32_t* LoadPrimaryGlobalPointerPointee(std::uint32_t* outResult) noexcept
   {
     return WriteGlobalPointerLanePointee(outResult, gPrimaryGlobalAccessorStorage);
   }
@@ -1306,7 +1306,7 @@ namespace
    * What it does:
    * Writes the primary global pointer-lane value to `outResult`.
    */
-  [[maybe_unused]] std::uint32_t* LoadPrimaryGlobalPointerValue(std::uint32_t* outResult) noexcept
+  std::uint32_t* LoadPrimaryGlobalPointerValue(std::uint32_t* outResult) noexcept
   {
     return WriteGlobalPointerLaneValue(outResult, gPrimaryGlobalAccessorStorage);
   }
@@ -1317,7 +1317,7 @@ namespace
    * What it does:
    * Writes the secondary global pointer-lane value to `outResult`.
    */
-  [[maybe_unused]] std::uint32_t* LoadSecondaryGlobalPointerValue(std::uint32_t* outResult) noexcept
+  std::uint32_t* LoadSecondaryGlobalPointerValue(std::uint32_t* outResult) noexcept
   {
     return WriteGlobalPointerLaneValue(outResult, gSecondaryGlobalAccessorStorage);
   }
@@ -1328,7 +1328,7 @@ namespace
    * What it does:
    * Returns the primary global pointer-lane value.
    */
-  [[maybe_unused]] std::uint32_t ReadPrimaryGlobalPointerValue() noexcept
+  std::uint32_t ReadPrimaryGlobalPointerValue() noexcept
   {
     return ReadGlobalPointerLaneValue(gPrimaryGlobalAccessorStorage);
   }
@@ -1339,7 +1339,7 @@ namespace
    * What it does:
    * Returns the secondary global pointer-lane value.
    */
-  [[maybe_unused]] std::uint32_t ReadSecondaryGlobalPointerValue() noexcept
+  std::uint32_t ReadSecondaryGlobalPointerValue() noexcept
   {
     return ReadGlobalPointerLaneValue(gSecondaryGlobalAccessorStorage);
   }
@@ -1350,7 +1350,7 @@ namespace
    * What it does:
    * Returns the scalar lane stored in primary global storage.
    */
-  [[maybe_unused]] std::uint32_t ReadPrimaryGlobalScalarValue() noexcept
+  std::uint32_t ReadPrimaryGlobalScalarValue() noexcept
   {
     return ReadGlobalScalarLaneValue(gPrimaryGlobalAccessorStorage);
   }
@@ -1362,7 +1362,7 @@ namespace
    * Returns the address of primary global storage (stdcall lane with one unused
    * stack argument).
    */
-  [[maybe_unused]] GlobalAccessorStorageRuntimeView* ReadPrimaryGlobalStorageAddressLaneA(
+  GlobalAccessorStorageRuntimeView* ReadPrimaryGlobalStorageAddressLaneA(
     const std::int32_t /*unused*/
   ) noexcept
   {
@@ -1376,7 +1376,7 @@ namespace
    * Loads one pointer lane from secondary global storage, dereferences it, and
    * writes the pointed dword value to `outResult`.
    */
-  [[maybe_unused]] std::uint32_t* LoadSecondaryGlobalPointerPointee(std::uint32_t* outResult) noexcept
+  std::uint32_t* LoadSecondaryGlobalPointerPointee(std::uint32_t* outResult) noexcept
   {
     return WriteGlobalPointerLanePointee(outResult, gSecondaryGlobalAccessorStorage);
   }
@@ -1387,7 +1387,7 @@ namespace
    * What it does:
    * Returns the scalar lane stored in secondary global storage.
    */
-  [[maybe_unused]] std::uint32_t ReadSecondaryGlobalScalarValue() noexcept
+  std::uint32_t ReadSecondaryGlobalScalarValue() noexcept
   {
     return ReadGlobalScalarLaneValue(gSecondaryGlobalAccessorStorage);
   }
@@ -1399,7 +1399,7 @@ namespace
    * Returns the address of secondary global storage (stdcall lane with one
    * unused stack argument).
    */
-  [[maybe_unused]] GlobalAccessorStorageRuntimeView* ReadSecondaryGlobalStorageAddress(
+  GlobalAccessorStorageRuntimeView* ReadSecondaryGlobalStorageAddress(
     const std::int32_t /*unused*/
   ) noexcept
   {
@@ -1413,7 +1413,7 @@ namespace
    * Alias lane that returns the address of primary global storage (stdcall
    * shape with one unused stack argument).
    */
-  [[maybe_unused]] GlobalAccessorStorageRuntimeView* ReadPrimaryGlobalStorageAddressLaneB(
+  GlobalAccessorStorageRuntimeView* ReadPrimaryGlobalStorageAddressLaneB(
     const std::int32_t /*unused*/
   ) noexcept
   {
@@ -1427,7 +1427,7 @@ namespace
    * Writes the lower-bound node address for one dword key in the primary
    * nil-`0x2D` tree lane to `outNode`.
    */
-  [[maybe_unused]] OrderedSentinelNodeOffset2DRuntimeView** FindPrimaryOffset2DTreeLowerBoundNode(
+  OrderedSentinelNodeOffset2DRuntimeView** FindPrimaryOffset2DTreeLowerBoundNode(
     OrderedSentinelNodeOffset2DRuntimeView** outNode,
     const std::uint32_t* const keyAddress
   ) noexcept
@@ -1445,7 +1445,7 @@ namespace
    * Writes the lower-bound node address for one dword key in the secondary
    * nil-`0x15` tree lane to `outNode`.
    */
-  [[maybe_unused]] OrderedSentinelNodeOffset15RuntimeView** FindSecondaryOffset15TreeLowerBoundNode(
+  OrderedSentinelNodeOffset15RuntimeView** FindSecondaryOffset15TreeLowerBoundNode(
     OrderedSentinelNodeOffset15RuntimeView** outNode,
     const std::uint32_t* const keyAddress
   ) noexcept
@@ -1521,7 +1521,7 @@ namespace
    * Performs one left rotation in the nil-`0x2D` key-action map tree rooted
    * by the primary global head node lane.
    */
-  [[maybe_unused]] SentinelNodeOffset2DRuntimeView* RotateOffset2DTreeLeftViaPrimaryGlobalHead(
+  SentinelNodeOffset2DRuntimeView* RotateOffset2DTreeLeftViaPrimaryGlobalHead(
     SentinelNodeOffset2DRuntimeView* const pivot
   ) noexcept
   {
@@ -1537,7 +1537,7 @@ namespace
    * Performs one right rotation in the nil-`0x2D` key-action map tree rooted
    * by the primary global head node lane.
    */
-  [[maybe_unused]] SentinelNodeOffset2DRuntimeView* RotateOffset2DTreeRightViaPrimaryGlobalHead(
+  SentinelNodeOffset2DRuntimeView* RotateOffset2DTreeRightViaPrimaryGlobalHead(
     SentinelNodeOffset2DRuntimeView* const pivot
   ) noexcept
   {
@@ -1553,7 +1553,7 @@ namespace
    * Performs one left rotation in the nil-`0x15` key-repeat map tree rooted by
    * the secondary global head node lane.
    */
-  [[maybe_unused]] SentinelNodeOffset15RuntimeView* RotateOffset15TreeLeftViaSecondaryGlobalHead(
+  SentinelNodeOffset15RuntimeView* RotateOffset15TreeLeftViaSecondaryGlobalHead(
     SentinelNodeOffset15RuntimeView* const pivot
   ) noexcept
   {
@@ -1569,7 +1569,7 @@ namespace
    * Performs one right rotation in the nil-`0x15` key-repeat map tree rooted
    * by the secondary global head node lane.
    */
-  [[maybe_unused]] SentinelNodeOffset15RuntimeView* RotateOffset15TreeRightViaSecondaryGlobalHead(
+  SentinelNodeOffset15RuntimeView* RotateOffset15TreeRightViaSecondaryGlobalHead(
     SentinelNodeOffset15RuntimeView* const pivot
   ) noexcept
   {
@@ -1584,7 +1584,7 @@ namespace
    * What it does:
    * Walks one tree branch via `link8` until the 0x2D sentinel lane is reached.
    */
-  [[maybe_unused]] SentinelNodeOffset2DRuntimeView* WalkLink8ToOffset2DSentinelLaneB(
+  SentinelNodeOffset2DRuntimeView* WalkLink8ToOffset2DSentinelLaneB(
     SentinelNodeOffset2DRuntimeView* node
   ) noexcept
   {
@@ -1597,7 +1597,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0x2D sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffset2DRuntimeView** AscendLink0ToOffset2DSentinelLaneB(
+  SentinelNodeOffset2DRuntimeView** AscendLink0ToOffset2DSentinelLaneB(
     SentinelNodeOffset2DRuntimeView** linkSlot
   ) noexcept
   {
@@ -1610,7 +1610,7 @@ namespace
    * What it does:
    * Walks one tree branch via `link8` until the 0x15 sentinel lane is reached.
    */
-  [[maybe_unused]] SentinelNodeOffset15RuntimeView* WalkLink8ToOffset15Sentinel(
+  SentinelNodeOffset15RuntimeView* WalkLink8ToOffset15Sentinel(
     SentinelNodeOffset15RuntimeView* node
   ) noexcept
   {
@@ -1623,7 +1623,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0x15 sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffset15RuntimeView** AscendLink0ToOffset15Sentinel(
+  SentinelNodeOffset15RuntimeView** AscendLink0ToOffset15Sentinel(
     SentinelNodeOffset15RuntimeView** linkSlot
   ) noexcept
   {
@@ -1636,7 +1636,7 @@ namespace
    * What it does:
    * Returns element count for one `[begin,end)` lane with 12-byte entries.
    */
-  [[maybe_unused]] std::int32_t CountElement12RangeEntries(const LegacyRangeRuntimeView& runtime) noexcept
+  std::int32_t CountElement12RangeEntries(const LegacyRangeRuntimeView& runtime) noexcept
   {
     return CountRangeEntries<12u>(runtime);
   }
@@ -1647,7 +1647,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0x15 sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffset15RuntimeView** AscendLink0ToOffset15SentinelLaneB(
+  SentinelNodeOffset15RuntimeView** AscendLink0ToOffset15SentinelLaneB(
     SentinelNodeOffset15RuntimeView** linkSlot
   ) noexcept
   {
@@ -1660,7 +1660,7 @@ namespace
    * What it does:
    * Walks one tree-link lane via `link0` until the 0x39 sentinel byte is set.
    */
-  [[maybe_unused]] SentinelNodeOffset39RuntimeView** AscendLink0ToOffset39Sentinel(
+  SentinelNodeOffset39RuntimeView** AscendLink0ToOffset39Sentinel(
     SentinelNodeOffset39RuntimeView** linkSlot
   ) noexcept
   {
