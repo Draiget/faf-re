@@ -34,6 +34,17 @@ namespace gpg
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
 
+    /**
+     * Address: 0x00701850 (FUN_00701850, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::SubscriptIndex)
+     * VFTABLE: `??_7?$RVectorType@V?$EntitySetTemplate@VUnit@Moho@@@Moho@@@gpg@@6BRIndexed@gpg@@@`
+     * (`gpg::RIndexed` sub-vtable), confirmed via data xref.
+     *
+     * What it does:
+     * Builds one reflected reference for the `ind`-th element of the
+     * `msvc8::vector<SEntitySetTemplateUnit>` storage at `obj`
+     * (`&(*storage)[ind]`, matching the binary's own `base + 0x28*ind`
+     * stride), via `gpg::RRef_EntitySetTemplate_Unit`.
+     */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -45,6 +56,17 @@ namespace gpg
   );
 
   gpg::RRef* RRef_SEntitySetTemplateUnit(gpg::RRef* outRef, moho::SEntitySetTemplateUnit* value);
+
+  /**
+   * Address: 0x00705320 (FUN_00705320, gpg::RRef_EntitySetTemplate_Unit)
+   *
+   * What it does:
+   * Builds one reflected, dynamically-typed reference for
+   * `EntitySetTemplate<Unit>`, adjusting for multiple inheritance via
+   * `IsDerivedFrom` when the dynamic type differs from the base. Called
+   * per-element by `RVectorType<SEntitySetTemplateUnit>::SubscriptIndex`.
+   */
+  gpg::RRef* RRef_EntitySetTemplate_Unit(gpg::RRef* outRef, moho::SEntitySetTemplateUnit* value);
 
   [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitVectorType();
 } // namespace gpg
