@@ -1359,6 +1359,25 @@ namespace moho
     std::uint32_t instanceListStateFlags;                            // +0x9C
     MeshBatchBucketTree meshes;                                      // +0xA0
     SpatialDB_MeshInstance meshSpatialDb;                            // +0xAC
+
+    /**
+     * Tail of the inline spatial database that starts at `meshSpatialDb`.
+     *
+     * `SpatialDB_MeshInstance` names only the first two words because it is
+     * also used as an 8-byte per-object entry handle (`WaveGenerator::
+     * mSpatialEntry`). When it is a *database* it is 0x90 bytes: the
+     * constructor 0x00501D80 writes as far as `[esi+8Ch]`, and
+     * `CollectAllInVolume` 0x00504180 reads the shard vector off `this+4` /
+     * `this+8`. Mesh.cpp's `SpatialDbMeshCollectView` is the typed view over
+     * the whole 0x90 bytes, and `WaveSystem` models the same tail the same way
+     * (`mRuntimeBlock10`).
+     *
+     * Without this, `meshSpatialDb` was the last member of the singleton and
+     * `shardEnd` (+0x08) read past the end of the object: the first
+     * world-view frame walked from a null `shardBegin` to a garbage
+     * `shardEnd` and faulted dereferencing `*shard`.
+     */
+    std::uint8_t meshSpatialDbStorage[0x88];                         // +0xB4
   };
 
   static_assert(sizeof(SpatialDB_MeshInstance) == 0x08, "SpatialDB_MeshInstance size must be 0x08");
@@ -1468,7 +1487,12 @@ namespace moho
   );
   static_assert(offsetof(MeshRenderer, meshes) == 0xA0, "MeshRenderer::meshes offset must be 0xA0");
   static_assert(offsetof(MeshRenderer, meshSpatialDb) == 0xAC, "MeshRenderer::meshSpatialDb offset must be 0xAC");
-  static_assert(sizeof(MeshRenderer) == 0xB4, "MeshRenderer size must be 0xB4");
+  static_assert(
+    offsetof(MeshRenderer, meshSpatialDbStorage) == 0xB4,
+    "MeshRenderer::meshSpatialDbStorage offset must be 0xB4"
+  );
+  // 0xAC + 0x90 (the inline spatial database) = 0x13C.
+  static_assert(sizeof(MeshRenderer) == 0x13C, "MeshRenderer size must be 0x13C");
 
   /**
    * Address: 0x007E6650 (FUN_007E6650, boost::shared_ptr<Moho::RMeshBlueprintLOD>::shared_ptr(RMeshBlueprintLOD*))
