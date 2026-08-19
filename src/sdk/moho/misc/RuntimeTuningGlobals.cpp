@@ -77,6 +77,9 @@ namespace moho
   // `ren_FogOfWar` is the only one with a byte in the image (0x00F57DC3 = 1);
   // the other two sit in the zero-fill tail of .data and therefore start false.
   bool ren_FogOfWar = true;               // 0x00F57DC3 = 0x01
+  /// Gates the playable-boundary pass in WRenViewport::Render, read at
+  /// 0x007F94D2 (`cmp ?ren_PlayableBoundary@Moho@@3_NA, 0`).
+  bool ren_PlayableBoundary = true;       // 0x00F57E4E = 0x01
   bool dbg_Metronome = false;             // 0x010A6466, zero-fill
   /// Free-runs the beat drain: the frame loop stops waiting for the tick clock
   /// and consumes every packet the sim has queued.
