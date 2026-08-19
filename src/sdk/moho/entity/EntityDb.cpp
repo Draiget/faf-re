@@ -262,7 +262,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two pointers and returns the first pointer.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLanePrimary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLanePrimary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -273,7 +273,7 @@ namespace
    * What it does:
    * Secondary swap lane for one dword pointer pair.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLaneSecondary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLaneSecondary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -284,7 +284,7 @@ namespace
    * What it does:
    * Tertiary swap lane for one dword pointer pair.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLaneTertiary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLaneTertiary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -295,7 +295,7 @@ namespace
    * What it does:
    * Mirror swap lane for one dword pointer pair.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLaneMirrorA(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLaneMirrorA(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -306,7 +306,7 @@ namespace
    * What it does:
    * Mirror swap lane for one dword pointer pair.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLaneMirrorB(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLaneMirrorB(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -317,7 +317,7 @@ namespace
    * What it does:
    * Mirror swap lane for one dword pointer pair.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLaneMirrorC(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLaneMirrorC(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -328,7 +328,7 @@ namespace
    * What it does:
    * Stores `base + index * 4` into output address storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride4AddressPrimary(
+  std::uint32_t* StoreStride4AddressPrimary(
     std::uint32_t* const outAddress,
     const PointerBaseLaneView* const baseLane,
     const std::uint32_t index
@@ -343,7 +343,7 @@ namespace
    * What it does:
    * Stores `base + index * 12` into output address storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride12AddressPrimary(
+  std::uint32_t* StoreStride12AddressPrimary(
     std::uint32_t* const outAddress,
     const PointerBaseLaneView* const baseLane,
     const std::uint32_t index
@@ -358,7 +358,7 @@ namespace
    * What it does:
    * Mirror lane that stores `base + index * 4` into output address storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride4AddressSecondary(
+  std::uint32_t* StoreStride4AddressSecondary(
     std::uint32_t* const outAddress,
     const PointerBaseLaneView* const baseLane,
     const std::uint32_t index
@@ -373,7 +373,7 @@ namespace
    * What it does:
    * Swaps tail dword lanes (`+0x4/+0x8/+0xC`) between two 16-byte records.
    */
-  [[maybe_unused]] DwordQuadLaneView* SwapTailThreeWordLanesPrimary(
+  DwordQuadLaneView* SwapTailThreeWordLanesPrimary(
     DwordQuadLaneView* const lhs, DwordQuadLaneView* const rhs
   ) noexcept
   {
@@ -386,7 +386,7 @@ namespace
    * What it does:
    * Mirror lane that swaps tail dword lanes (`+0x4/+0x8/+0xC`) between two 16-byte records.
    */
-  [[maybe_unused]] DwordQuadLaneView* SwapTailThreeWordLanesSecondary(
+  DwordQuadLaneView* SwapTailThreeWordLanesSecondary(
     DwordQuadLaneView* const lhs, DwordQuadLaneView* const rhs
   ) noexcept
   {
@@ -399,7 +399,7 @@ namespace
    * What it does:
    * Additional dword-lane swap adapter.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordLaneAdapter(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
+  std::uint32_t* SwapWordLaneAdapter(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
   {
     return SwapWordLane(lhs, rhs);
   }
@@ -410,7 +410,7 @@ namespace
    * What it does:
    * Returns true when the entity-id family nibble is zero (`0x0`).
    */
-  [[maybe_unused]] bool IsUnitFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
+  bool IsUnitFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
   {
     return (id->value & kEntityIdFamilyNibbleMask) == 0u;
   }
@@ -421,7 +421,7 @@ namespace
    * What it does:
    * Returns true when the entity-id family nibble is `0x1`.
    */
-  [[maybe_unused]] bool IsPropFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
+  bool IsPropFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
   {
     return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsUnitTypeBoundaryKey;
   }
@@ -432,7 +432,7 @@ namespace
    * What it does:
    * Returns true when the entity-id family nibble is `0x2`.
    */
-  [[maybe_unused]] bool IsProjectileFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
+  bool IsProjectileFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
   {
     return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsHighFamilyBoundaryKey;
   }
@@ -443,7 +443,7 @@ namespace
    * What it does:
    * Returns true when the entity-id family nibble is `0x3`.
    */
-  [[maybe_unused]] bool IsShieldFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
+  bool IsShieldFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
   {
     return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsMidFamilyBoundaryKey;
   }
@@ -454,7 +454,7 @@ namespace
    * What it does:
    * Returns true when the entity-id family nibble is `0x5`.
    */
-  [[maybe_unused]] bool IsOtherFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
+  bool IsOtherFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
   {
     return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsOtherFamilyBoundaryKey;
   }
@@ -466,7 +466,7 @@ namespace
    * Lexicographically compares two `(high, low)` key pairs and returns true
    * when `second` sorts before `first`.
    */
-  [[maybe_unused]] bool IsSecondEntityIdPairBeforeFirst(
+  bool IsSecondEntityIdPairBeforeFirst(
     const EntityIdPairWordLaneView* const first,
     const EntityIdPairWordLaneView* const second
   ) noexcept
@@ -480,7 +480,7 @@ namespace
    * What it does:
    * Copies a two-word window range (`+0x27C/+0x280`) into output storage.
    */
-  [[maybe_unused]] WindowPairLaneView* StoreWindowPairFromRuntime(
+  WindowPairLaneView* StoreWindowPairFromRuntime(
     WindowPairLaneView* const outPair, const EntityDbWindowLaneView* const runtime
   ) noexcept
   {
@@ -495,7 +495,7 @@ namespace
    * What it does:
    * Writes the window cursor lane at offset `+0x284`.
    */
-  [[maybe_unused]] EntityDbWindowLaneView* SetWindowCursorLane(
+  EntityDbWindowLaneView* SetWindowCursorLane(
     EntityDbWindowLaneView* const runtime, const std::uint32_t value
   ) noexcept
   {
@@ -510,7 +510,7 @@ namespace
    * Unlinks one intrusive set-node and inserts it at the front of
    * `CEntityDb::mRegisteredEntitySets`.
    */
-  [[maybe_unused]] moho::CEntityDbListHead* RelinkNodeIntoRegisteredEntitySetFront(
+  moho::CEntityDbListHead* RelinkNodeIntoRegisteredEntitySetFront(
     moho::CEntityDbListHead* const node,
     moho::CEntityDb* const entityDb
   ) noexcept
@@ -535,7 +535,7 @@ namespace
    * What it does:
    * Returns true when the lane at offset `+0x8` is null.
    */
-  [[maybe_unused]] bool IsOffset8LaneNull(const Offset8WordLaneView* const runtime) noexcept
+  bool IsOffset8LaneNull(const Offset8WordLaneView* const runtime) noexcept
   {
     return runtime->lane8 == 0u;
   }
@@ -546,7 +546,7 @@ namespace
    * What it does:
    * Stores `head->next` from one `(+0x4)` list-head proxy lane.
    */
-  [[maybe_unused]] moho::CEntityDbListHead** StoreListHeadNextPrimary(
+  moho::CEntityDbListHead** StoreListHeadNextPrimary(
     moho::CEntityDbListHead** const outNode,
     const ListHeadProxyLaneView* const runtime
   ) noexcept
@@ -561,7 +561,7 @@ namespace
    * What it does:
    * Resets one intrusive node to self-links.
    */
-  [[maybe_unused]] moho::CEntityDbListHead* ResetListNodeSelfLinks(moho::CEntityDbListHead* const node) noexcept
+  moho::CEntityDbListHead* ResetListNodeSelfLinks(moho::CEntityDbListHead* const node) noexcept
   {
     node->prev = node;
     node->next = node;
@@ -575,7 +575,7 @@ namespace
    * Unlinks one intrusive node, restores self-links, then inserts it at the
    * front of the provided list head.
    */
-  [[maybe_unused]] moho::CEntityDbListHead* RelinkNodeIntoListHeadFront(
+  moho::CEntityDbListHead* RelinkNodeIntoListHeadFront(
     moho::CEntityDbListHead* const node,
     moho::CEntityDbListHead* const head
   ) noexcept
@@ -599,7 +599,7 @@ namespace
    * What it does:
    * Secondary lane that stores `head->next` from one `(+0x4)` list-head proxy lane.
    */
-  [[maybe_unused]] moho::CEntityDbListHead** StoreListHeadNextSecondary(
+  moho::CEntityDbListHead** StoreListHeadNextSecondary(
     moho::CEntityDbListHead** const outNode,
     const ListHeadProxyLaneView* const runtime
   ) noexcept
@@ -615,7 +615,7 @@ namespace
    * Returns the node-count lane from `[begin,end)` queue storage where each
    * element is `CEntityDbBoundedPropQueueNode` (`0x14` bytes).
    */
-  [[maybe_unused]] int CountQueueNodeRangeEntries(const QueueNodeRangeLaneView* const queue) noexcept
+  int CountQueueNodeRangeEntries(const QueueNodeRangeLaneView* const queue) noexcept
   {
     if (queue->begin == nullptr) {
       return 0;
@@ -630,7 +630,7 @@ namespace
    * Decodes current all-armies iterator payload (`node->unitListNode - 0x8`)
    * into `Unit*`, or returns null when payload is null.
    */
-  [[maybe_unused]] moho::Unit* DecodeCurrentAllArmiesIteratorUnit(
+  moho::Unit* DecodeCurrentAllArmiesIteratorUnit(
     const moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -647,7 +647,7 @@ namespace
    * What it does:
    * Returns current raw all-armies iterator payload pointer (`node->unitListNode`).
    */
-  [[maybe_unused]] void* GetCurrentAllArmiesIteratorRawPayloadPrimary(
+  void* GetCurrentAllArmiesIteratorRawPayloadPrimary(
     const moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -660,7 +660,7 @@ namespace
    * What it does:
    * Secondary lane that returns current raw all-armies iterator payload pointer.
    */
-  [[maybe_unused]] void* GetCurrentAllArmiesIteratorRawPayloadSecondary(
+  void* GetCurrentAllArmiesIteratorRawPayloadSecondary(
     const moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -674,7 +674,7 @@ namespace
    * Returns one id-pool tree node key lane (`node->key`) from an indirect
    * node-slot pointer.
    */
-  [[maybe_unused]] std::uint32_t LoadIdPoolNodeKeyFromSlot(
+  std::uint32_t LoadIdPoolNodeKeyFromSlot(
     const moho::CEntityDbIdPoolNode* const* const nodeSlot
   ) noexcept
   {
@@ -687,7 +687,7 @@ namespace
    * What it does:
    * Copies one dword from each source slot into a 2-lane output record.
    */
-  [[maybe_unused]] DualWordLaneView* CopyDualWordLaneFromSeparateSlots(
+  DualWordLaneView* CopyDualWordLaneFromSeparateSlots(
     DualWordLaneView* const outValue,
     const std::uint32_t* const firstSlot,
     const std::uint32_t* const secondSlot
@@ -704,7 +704,7 @@ namespace
    * What it does:
    * Loads one indirect base lane and returns `base + 0x8`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndirectBasePlus8Primary(const PointerBaseLaneView* const baseLane) noexcept
+  std::uint32_t LoadIndirectBasePlus8Primary(const PointerBaseLaneView* const baseLane) noexcept
   {
     return LoadIndirectBaseWithOffset(baseLane, 0x8u);
   }
@@ -715,7 +715,7 @@ namespace
    * What it does:
    * Loads one indirect base lane and returns `base + 0x10`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndirectBasePlus16Primary(const PointerBaseLaneView* const baseLane) noexcept
+  std::uint32_t LoadIndirectBasePlus16Primary(const PointerBaseLaneView* const baseLane) noexcept
   {
     return LoadIndirectBaseWithOffset(baseLane, 0x10u);
   }
@@ -772,7 +772,7 @@ namespace
    * Binds one `EntityDB` type-info lifecycle callback set (`newRef`,
    * `ctorRef`, `delete`, `destruct`) into one destination `RType` lane.
    */
-  [[maybe_unused]] gpg::RType* BindEntityDbTypeLifecycleCallbacks(gpg::RType* const typeInfo) noexcept
+  gpg::RType* BindEntityDbTypeLifecycleCallbacks(gpg::RType* const typeInfo) noexcept
   {
     typeInfo->newRefFunc_ = &NewEntityDbTypeLaneRef;
     typeInfo->ctorRefFunc_ = &CtorEntityDbTypeLaneRef;
@@ -788,7 +788,7 @@ namespace
    * Initializes one back-link node from one owner lane (`owner + 0x4`) and
    * inserts it at the owner head slot.
    */
-  [[maybe_unused]] BackLinkNodeRuntime* LinkBackLinkNodeFromOwnerLane(
+  BackLinkNodeRuntime* LinkBackLinkNodeFromOwnerLane(
     BackLinkNodeRuntime* const node,
     BackLinkOwnerLaneView* const owner
   ) noexcept
@@ -811,7 +811,7 @@ namespace
    * Returns owner base pointer (`backRef - 0x4`) for one linked node, or
    * null when node is unlinked.
    */
-  [[maybe_unused]] BackLinkOwnerLaneView* ResolveBackLinkNodeOwner(const BackLinkNodeRuntime* const node) noexcept
+  BackLinkOwnerLaneView* ResolveBackLinkNodeOwner(const BackLinkNodeRuntime* const node) noexcept
   {
     BackLinkNodeRuntime** const backRef = node->backRef;
     if (backRef == nullptr) {
@@ -836,7 +836,7 @@ namespace
    * Unlinks one `(next, backRef)` intrusive node from its current list,
    * rewires it to self-links, then inserts it at one target head slot.
    */
-  [[maybe_unused]] NextBackRefNodeRuntime* RelinkNextBackRefNodeToHead(
+  NextBackRefNodeRuntime* RelinkNextBackRefNodeToHead(
     NextBackRefNodeRuntime* const node,
     NextBackRefNodeRuntime** const headSlot
   ) noexcept
@@ -860,7 +860,7 @@ namespace
    * What it does:
    * Clears bounded-prop queue range lanes (`start/end/capacity`) to null.
    */
-  [[maybe_unused]] moho::CEntityDbBoundedPropQueueRuntime* ClearBoundedPropQueueRangeLanes(
+  moho::CEntityDbBoundedPropQueueRuntime* ClearBoundedPropQueueRangeLanes(
     moho::CEntityDbBoundedPropQueueRuntime* const queue
   ) noexcept
   {
@@ -876,7 +876,7 @@ namespace
    * What it does:
    * Returns element pointer at one bounded-prop queue index (`start + index`).
    */
-  [[maybe_unused]] moho::CEntityDbBoundedPropQueueNode* ResolveBoundedPropQueueNodeAtIndex(
+  moho::CEntityDbBoundedPropQueueNode* ResolveBoundedPropQueueNodeAtIndex(
     const std::int32_t index,
     const moho::CEntityDbBoundedPropQueueRuntime* const queue
   ) noexcept
@@ -891,7 +891,7 @@ namespace
    * What it does:
    * Copies one dword lane and one byte lane into output storage.
    */
-  [[maybe_unused]] WordAndByteLaneView* CopyWordAndByteLane(
+  WordAndByteLaneView* CopyWordAndByteLane(
     WordAndByteLaneView* const outValue,
     const std::uint32_t* const wordSlot,
     const std::uint8_t* const byteSlot
@@ -908,7 +908,7 @@ namespace
    * What it does:
    * Pops one singly-linked forward node from head storage into output lane.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntime** PopForwardLinkNode(
+  ForwardLinkNodeRuntime** PopForwardLinkNode(
     ForwardLinkNodeRuntime** const outNode,
     ForwardLinkNodeRuntime** const headSlot
   ) noexcept
@@ -925,7 +925,7 @@ namespace
    * What it does:
    * Loads one indirect base lane and returns `base + 0x8`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndirectBasePlus8Secondary(const PointerBaseLaneView* const baseLane) noexcept
+  std::uint32_t LoadIndirectBasePlus8Secondary(const PointerBaseLaneView* const baseLane) noexcept
   {
     return LoadIndirectBaseWithOffset(baseLane, 0x8u);
   }
@@ -936,7 +936,7 @@ namespace
    * What it does:
    * Loads one indirect base lane and returns `base + 0x10`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndirectBasePlus16Secondary(const PointerBaseLaneView* const baseLane) noexcept
+  std::uint32_t LoadIndirectBasePlus16Secondary(const PointerBaseLaneView* const baseLane) noexcept
   {
     return LoadIndirectBaseWithOffset(baseLane, 0x10u);
   }
@@ -948,7 +948,7 @@ namespace
    * Initializes one back-link node from one externally provided back-ref slot
    * lane and inserts it at that slot head.
    */
-  [[maybe_unused]] BackLinkNodeRuntime* LinkBackLinkNodeFromBackRefOwner(
+  BackLinkNodeRuntime* LinkBackLinkNodeFromBackRefOwner(
     BackLinkNodeRuntime* const node,
     BackLinkNodeRuntime** const* const backRefOwner
   ) noexcept
@@ -970,7 +970,7 @@ namespace
    * What it does:
    * Stores one id-pool tree head-left lane (`head->left`) into output storage.
    */
-  [[maybe_unused]] moho::CEntityDbIdPoolNode** StoreIdPoolHeadLeftNodePrimary(
+  moho::CEntityDbIdPoolNode** StoreIdPoolHeadLeftNodePrimary(
     moho::CEntityDbIdPoolNode** const outNode,
     const moho::CEntityDbIdPoolTreeRuntime* const tree
   ) noexcept
@@ -986,7 +986,7 @@ namespace
    * Runs lower-bound search on one id-pool sentinel tree and returns the first
    * node with `node->key >= key` (or sentinel head when none).
    */
-  [[maybe_unused]] moho::CEntityDbIdPoolNode* LowerBoundIdPoolNodeByKey(
+  moho::CEntityDbIdPoolNode* LowerBoundIdPoolNodeByKey(
     const moho::CEntityDbIdPoolTreeRuntime* const tree,
     const std::uint32_t* const keySlot
   ) noexcept
@@ -1013,7 +1013,7 @@ namespace
    * What it does:
    * Secondary lane that stores id-pool `head->left` into output storage.
    */
-  [[maybe_unused]] moho::CEntityDbIdPoolNode** StoreIdPoolHeadLeftNodeSecondary(
+  moho::CEntityDbIdPoolNode** StoreIdPoolHeadLeftNodeSecondary(
     moho::CEntityDbIdPoolNode** const outNode,
     const moho::CEntityDbIdPoolTreeRuntime* const tree
   ) noexcept
@@ -1029,7 +1029,7 @@ namespace
    * Pushes one released bounded-prop handle index into the freelist lane and
    * updates queue `lastHandle`.
    */
-  [[maybe_unused]] moho::CEntityDbBoundedPropQueueRuntime* PushBoundedPropHandleFreeList(
+  moho::CEntityDbBoundedPropQueueRuntime* PushBoundedPropHandleFreeList(
     moho::CEntityDbBoundedPropQueueRuntime* const queue,
     const std::int32_t releasedHandle
   ) noexcept
@@ -1047,7 +1047,7 @@ namespace
    * Returns bounded-prop queue capacity-count lane (`capacity - start`) in
    * node units, or zero when start is null.
    */
-  [[maybe_unused]] std::int32_t CountBoundedPropQueueCapacityNodes(
+  std::int32_t CountBoundedPropQueueCapacityNodes(
     const moho::CEntityDbBoundedPropQueueRuntime* const queue
   ) noexcept
   {
@@ -1063,7 +1063,7 @@ namespace
    * What it does:
    * Returns pointer to the previous bounded-prop queue slot (`end - 1`).
    */
-  [[maybe_unused]] moho::CEntityDbBoundedPropQueueNode* GetBoundedPropQueuePreviousEndSlot(
+  moho::CEntityDbBoundedPropQueueNode* GetBoundedPropQueuePreviousEndSlot(
     const moho::CEntityDbBoundedPropQueueRuntime* const queue
   ) noexcept
   {
@@ -1076,7 +1076,7 @@ namespace
    * What it does:
    * Advances one forward-link slot to `slot->next`.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntime** AdvanceForwardLinkSlotPrimary(
+  ForwardLinkNodeRuntime** AdvanceForwardLinkSlotPrimary(
     ForwardLinkNodeRuntime** const slot
   ) noexcept
   {
@@ -1089,7 +1089,7 @@ namespace
    * What it does:
    * Secondary lane that advances one forward-link slot to `slot->next`.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntime** AdvanceForwardLinkSlotSecondary(
+  ForwardLinkNodeRuntime** AdvanceForwardLinkSlotSecondary(
     ForwardLinkNodeRuntime** const slot
   ) noexcept
   {
@@ -1102,7 +1102,7 @@ namespace
    * What it does:
    * Clears one forward-link slot to null.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntime** ClearForwardLinkSlotPrimary(
+  ForwardLinkNodeRuntime** ClearForwardLinkSlotPrimary(
     ForwardLinkNodeRuntime** const slot
   ) noexcept
   {
@@ -1115,7 +1115,7 @@ namespace
    * What it does:
    * Tertiary lane that loads one indirect base and returns `base + 0x10`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndirectBasePlus16Tertiary(const PointerBaseLaneView* const baseLane) noexcept
+  std::uint32_t LoadIndirectBasePlus16Tertiary(const PointerBaseLaneView* const baseLane) noexcept
   {
     return LoadIndirectBaseWithOffset(baseLane, 0x10u);
   }
@@ -1126,7 +1126,7 @@ namespace
    * What it does:
    * Mirror lane that loads one indirect base and returns `base + 0x10`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndirectBasePlus16Mirror(const PointerBaseLaneView* const baseLane) noexcept
+  std::uint32_t LoadIndirectBasePlus16Mirror(const PointerBaseLaneView* const baseLane) noexcept
   {
     return LoadIndirectBaseWithOffset(baseLane, 0x10u);
   }
@@ -1140,7 +1140,7 @@ namespace
    * Copies one embedded back-link runtime lane and relinks the copied hook
    * into the same intrusive back-ref slot chain.
    */
-  [[maybe_unused]] EmbeddedBackLinkLaneView* CopyEmbeddedBackLinkLane(
+  EmbeddedBackLinkLaneView* CopyEmbeddedBackLinkLane(
     EmbeddedBackLinkLaneView* const outValue,
     const EmbeddedBackLinkLaneView* const source
   ) noexcept
@@ -1173,7 +1173,7 @@ namespace
    * Unlinks one embedded back-link hook (`+0x08`) from its current owner-slot
    * chain and returns the slot that previously referenced that hook.
    */
-  [[maybe_unused]] BackLinkNodeRuntime** UnlinkEmbeddedBackLinkHookOwnerSlot(
+  BackLinkNodeRuntime** UnlinkEmbeddedBackLinkHookOwnerSlot(
     EmbeddedBackLinkLaneView* const value
   ) noexcept
   {
@@ -1195,7 +1195,7 @@ namespace
    * Unlinks one embedded back-link hook (`+0x08`) from its owner-slot chain
    * and returns the original lane pointer.
    */
-  [[maybe_unused]] EmbeddedBackLinkLaneView* UnlinkEmbeddedBackLinkLaneAndReturnSelf(
+  EmbeddedBackLinkLaneView* UnlinkEmbeddedBackLinkLaneAndReturnSelf(
     EmbeddedBackLinkLaneView* const value
   ) noexcept
   {
@@ -1210,7 +1210,7 @@ namespace
    * Returns true when bounded-prop queue occupancy lane is empty (`start` is
    * null or `end == start`).
    */
-  [[maybe_unused]] bool IsBoundedPropQueueEmpty(const moho::CEntityDbBoundedPropQueueRuntime* const queue) noexcept
+  bool IsBoundedPropQueueEmpty(const moho::CEntityDbBoundedPropQueueRuntime* const queue) noexcept
   {
     return (queue->start == nullptr) || ((queue->end - queue->start) == 0);
   }
@@ -1221,7 +1221,7 @@ namespace
    * What it does:
    * Secondary lane that clears one forward-link slot to null.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntime** ClearForwardLinkSlotSecondary(
+  ForwardLinkNodeRuntime** ClearForwardLinkSlotSecondary(
     ForwardLinkNodeRuntime** const slot
   ) noexcept
   {
@@ -1235,7 +1235,7 @@ namespace
    * Rebinds one back-link node from its current back-ref slot chain to a new
    * target back-ref slot owner.
    */
-  [[maybe_unused]] BackLinkNodeRuntime* RebindBackLinkNode(
+  BackLinkNodeRuntime* RebindBackLinkNode(
     BackLinkNodeRuntime* const node,
     BackLinkNodeRuntime** const* const backRefOwner
   ) noexcept
@@ -1272,7 +1272,7 @@ namespace
    * bits (`[31..28]` family, `[27..20]` source), reserves an id through
    * `EntityDB::DoReserveId`, and writes the result into `outEntityId`.
    */
-  [[maybe_unused]] std::uint32_t* ReserveEntityIdFromFamilyAndSourceLanes(
+  std::uint32_t* ReserveEntityIdFromFamilyAndSourceLanes(
     const std::uint32_t familyNibble,
     std::uint32_t* const outEntityId,
     moho::CEntityDb* const entityDb,
@@ -1294,7 +1294,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `EntityDB` object lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyEntityDbType()
+  [[nodiscard]] gpg::RType* ResolveLegacyEntityDbType()
   {
     gpg::RType* type = gLegacyEntityDbType;
     if (!type) {
@@ -1310,7 +1310,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `map<unsigned int, IdPool>` lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyEntityDbIdPoolMapType()
+  [[nodiscard]] gpg::RType* ResolveLegacyEntityDbIdPoolMapType()
   {
     gpg::RType* type = gLegacyEntityDbIdPoolMapType;
     if (!type) {
@@ -1326,7 +1326,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `list<Entity*>` lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyEntityDbEntityListType()
+  [[nodiscard]] gpg::RType* ResolveLegacyEntityDbEntityListType()
   {
     gpg::RType* type = gLegacyEntityDbEntityListType;
     if (!type) {
@@ -1852,7 +1852,7 @@ namespace
    * Resets one intrusive list-head lane to the empty self-linked sentinel
    * shape (`next=this`, `prev=this`) and returns the same head pointer.
    */
-  [[maybe_unused]] moho::CEntityDbListHead* ResetEntityDbListHeadToSelf(moho::CEntityDbListHead* const head) noexcept
+  moho::CEntityDbListHead* ResetEntityDbListHeadToSelf(moho::CEntityDbListHead* const head) noexcept
   {
     if (head != nullptr) {
       head->next = head;
@@ -1918,7 +1918,7 @@ namespace
    * Initializes callback lanes for global `EntityDBSerializer` helper storage
    * and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] moho::EntityDBSerializer* InitializeEntityDBSerializerStartupThunk() noexcept
+  [[nodiscard]] moho::EntityDBSerializer* InitializeEntityDBSerializerStartupThunk() noexcept
   {
     InitializeHelperNode(gEntityDBSerializer);
     gEntityDBSerializer.mDeserialize = reinterpret_cast<gpg::RType::load_func_t>(&moho::EntityDBSerializer::Deserialize);
@@ -1933,7 +1933,7 @@ namespace
    * Initializes callback lanes for global `EntityDBSerializer` helper storage
    * and returns the serializer helper pointer.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* InitializeEntityDBSerializerStartupLeaf() noexcept
+  [[nodiscard]] gpg::SerHelperBase* InitializeEntityDBSerializerStartupLeaf() noexcept
   {
     (void)InitializeEntityDBSerializerStartupThunk();
     return HelperSelfNode(gEntityDBSerializer);
@@ -1985,7 +1985,7 @@ namespace
    * Stores the first all-units node at/after one source upper-bound key
    * `((sourceIndex + 1) << 20)` into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t sourceIndex,
     const moho::CEntityDb* const entityDb
@@ -2006,7 +2006,7 @@ namespace
    * What it does:
    * Stores the left-most all-units tree node (minimum key) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
+  moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2055,7 +2055,7 @@ namespace
    * Finds one all-units tree node for `entityId` and stores `entity` in that
    * node payload lane.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode* AssignEntityPayloadAtIdNode(
+  moho::CEntityDbAllUnitsNode* AssignEntityPayloadAtIdNode(
     moho::CEntityDb* const entityDb,
     const std::uint32_t entityId,
     moho::Entity* const entity
@@ -2079,7 +2079,7 @@ namespace
    * Returns the exact all-units payload pointer for one `entityId`, or `nullptr`
    * when lookup resolves to the map head/sentinel lane.
    */
-  [[maybe_unused]] moho::Entity* FindEntityPayloadByIdNode(
+  moho::Entity* FindEntityPayloadByIdNode(
     moho::CEntityDb* const entityDb,
     const std::uint32_t entityId
   ) noexcept
@@ -2103,7 +2103,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary key
    * (`0x20000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2123,7 +2123,7 @@ namespace
    * Stores the first all-units node at/after the mid-family boundary key
    * (`0x30000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2143,7 +2143,7 @@ namespace
    * Stores the first all-units node at/after the shield-family boundary key
    * (`0x40000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2164,7 +2164,7 @@ namespace
    * Stores the first all-units node at/after the other-family boundary key
    * (`0x50000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2184,7 +2184,7 @@ namespace
    * Stores the first all-units node at/after the late-family boundary key
    * (`0x60000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2204,7 +2204,7 @@ namespace
    * Stores the first all-units node at/after one prop-family purge key
    * `((armyIndex | 0x200) << 20)` into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgePropFamilyLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgePropFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2226,7 +2226,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` prop-family
    * purge lower-bound query.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2242,7 +2242,7 @@ namespace
    * Stores the first all-units node at/after one projectile-family purge key
    * `((armyIndex | 0x100) << 20)` into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2264,7 +2264,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` projectile-family
    * purge lower-bound query.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2280,7 +2280,7 @@ namespace
    * Stores the first all-units node at/after one shield-family purge key
    * `((armyIndex | 0x400) << 20)` into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2302,7 +2302,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` shield-family
    * purge lower-bound query.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2318,7 +2318,7 @@ namespace
    * Stores the first all-units node at/after one other-family purge key
    * `((armyIndex | 0x500) << 20)` into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2340,7 +2340,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` other-family
    * purge lower-bound query.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
+  moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::CEntityDb* const entityDb
@@ -2356,7 +2356,7 @@ namespace
    * Stores the first all-units node at/after the non-unit family boundary
    * (`0x10000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2376,7 +2376,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary
    * (`0x20000000`) into `outNode`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
+  moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::CEntityDb* const entityDb
   ) noexcept
@@ -2472,7 +2472,7 @@ namespace
    * Advances one id-pool map node cursor to the next in-order sentinel-tree
    * node and mirrors the advanced node back to the caller cursor lane.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CEntityDbIdPoolNode*
+  [[nodiscard]] moho::CEntityDbIdPoolNode*
   AdvanceIdPoolNodeCursor(moho::CEntityDbIdPoolNode*& cursor) noexcept
   {
     cursor = NextNodeInSentinelTree(cursor);
@@ -2487,7 +2487,7 @@ namespace
    * Register-shape adapter that advances one id-pool cursor slot in-place and
    * returns the original slot pointer.
    */
-  [[maybe_unused]] moho::CEntityDbIdPoolNode** AdvanceIdPoolNodeCursorSlot(
+  moho::CEntityDbIdPoolNode** AdvanceIdPoolNodeCursorSlot(
     moho::CEntityDbIdPoolNode** const cursorSlot
   ) noexcept
   {
@@ -2504,7 +2504,7 @@ namespace
    * Copies one id-pool tree cursor lane into output storage and advances the
    * source cursor to the next in-order sentinel-tree node.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CEntityDbIdPoolNode** SnapshotAndAdvanceIdPoolNodeCursor(
+  [[nodiscard]] moho::CEntityDbIdPoolNode** SnapshotAndAdvanceIdPoolNodeCursor(
     moho::CEntityDbIdPoolNode** const sourceCursorSlot,
     moho::CEntityDbIdPoolNode** const outCursorSlot
   ) noexcept
@@ -2642,7 +2642,7 @@ namespace
    * Allocates one all-units tree head node, marks it sentinel/self-linked, and
    * clears the tree-size lane.
    */
-  [[maybe_unused]] CEntityDbAllUnitsTreeRuntime* InitializeAllUnitsTreeHeadLane(
+  CEntityDbAllUnitsTreeRuntime* InitializeAllUnitsTreeHeadLane(
     CEntityDbAllUnitsTreeRuntime* const tree
   ) noexcept
   {
@@ -2666,7 +2666,7 @@ namespace
    * Initializes one all-units tree head lane and returns the allocated
    * sentinel-head node pointer.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode* InitializeAllUnitsTreeHeadLaneReturnHead(
+  moho::CEntityDbAllUnitsNode* InitializeAllUnitsTreeHeadLaneReturnHead(
     CEntityDbAllUnitsTreeRuntime* const tree
   ) noexcept
   {
@@ -2693,7 +2693,7 @@ namespace
    * Allocates one id-pool tree head node, marks it sentinel/self-linked, and
    * clears the tree-size lane.
    */
-  [[maybe_unused]] moho::CEntityDbIdPoolTreeRuntime* InitializeIdPoolTreeHeadLane(
+  moho::CEntityDbIdPoolTreeRuntime* InitializeIdPoolTreeHeadLane(
     moho::CEntityDbIdPoolTreeRuntime* const tree
   ) noexcept
   {
@@ -2716,7 +2716,7 @@ namespace
    * What it does:
    * Releases one id-pool tree node storage lane.
    */
-  [[maybe_unused]] void DeleteIdPoolTreeNodeStoragePrimary(void* const nodeStorage) noexcept
+  void DeleteIdPoolTreeNodeStoragePrimary(void* const nodeStorage) noexcept
   {
     ::operator delete(nodeStorage);
   }
@@ -2727,7 +2727,7 @@ namespace
    * What it does:
    * Secondary lane that releases one id-pool tree node storage allocation.
    */
-  [[maybe_unused]] void DeleteIdPoolTreeNodeStorageSecondary(void* const nodeStorage) noexcept
+  void DeleteIdPoolTreeNodeStorageSecondary(void* const nodeStorage) noexcept
   {
     ::operator delete(nodeStorage);
   }
@@ -2739,7 +2739,7 @@ namespace
    * Initializes one id-pool sentinel tree runtime lane with a fresh nil head
    * node and zero node-count.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CEntityDbIdPoolNode* InitializeIdPoolTreeRuntimeSentinel(
+  [[nodiscard]] moho::CEntityDbIdPoolNode* InitializeIdPoolTreeRuntimeSentinel(
     moho::CEntityDbIdPoolTreeRuntime* const treeRuntime
   )
   {
@@ -2764,7 +2764,7 @@ namespace
    * Clears one id-pool sentinel tree runtime, then rewires the head node back
    * to self-linked sentinel form with zero node-count.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CEntityDbIdPoolNode* ResetIdPoolTreeRuntimePrimary(
+  [[nodiscard]] moho::CEntityDbIdPoolNode* ResetIdPoolTreeRuntimePrimary(
     moho::CEntityDbIdPoolTreeRuntime* const treeRuntime
   ) noexcept
   {
@@ -2784,7 +2784,7 @@ namespace
    * Mirror lane of `FUN_00687220` that clears one id-pool sentinel tree
    * runtime and restores self-linked sentinel head links.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CEntityDbIdPoolNode* ResetIdPoolTreeRuntimeSecondary(
+  [[nodiscard]] moho::CEntityDbIdPoolNode* ResetIdPoolTreeRuntimeSecondary(
     moho::CEntityDbIdPoolTreeRuntime* const treeRuntime
   ) noexcept
   {
@@ -2860,7 +2860,7 @@ namespace
    * Unlinks one back-reference node lane from owner storage, optionally frees
    * the removed node, and returns the next node lane through `outNextNode`.
    */
-  [[maybe_unused]] BackRefListNodeRuntime** EraseBackRefListNodeAndStoreNext(
+  BackRefListNodeRuntime** EraseBackRefListNodeAndStoreNext(
     BackRefListNodeRuntime** const outNextNode,
     BackRefListOwnerRuntime* const owner,
     BackRefListNodeRuntime* const node
@@ -2940,7 +2940,7 @@ namespace
    * Register-shape adapter that advances one all-armies iterator object and
    * returns the same iterator pointer.
    */
-  [[maybe_unused]] moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
+  moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
     moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -2957,7 +2957,7 @@ namespace
    * Stores the current all-armies iterator node lane into `outIterator`, then
    * advances the iterator with `Next()` and returns `outIterator`.
    */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
+  moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
     moho::CUnitIterAllArmies* const iterator,
     moho::CEntityDbAllUnitsNode** const outIterator
   ) noexcept
@@ -3171,7 +3171,7 @@ namespace
    * Clears reflected base/field vector lanes for one `EntityDB` type-info
    * object while preserving outer ownership of the instance storage.
    */
-  [[maybe_unused]] void DestroyEntityDbTypeInfoBody(EntityDbTypeInfo* const typeInfo) noexcept
+  void DestroyEntityDbTypeInfoBody(EntityDbTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -3296,7 +3296,7 @@ namespace
    * Clears reflected base/field vector lanes for one `map<uint, IdPool>`
    * type-info object while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyEntityDbIdPoolMapTypeInfoBody(EntityDbIdPoolMapTypeInfo* const typeInfo) noexcept
+  void DestroyEntityDbIdPoolMapTypeInfoBody(EntityDbIdPoolMapTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -3378,7 +3378,7 @@ namespace
    * Clears reflected base/field vector lanes for one `list<Entity*>`
    * type-info object while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyEntityDbEntityListTypeInfoBody(EntityDbEntityListTypeInfo* const typeInfo) noexcept
+  void DestroyEntityDbEntityListTypeInfoBody(EntityDbEntityListTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -3600,7 +3600,7 @@ namespace moho
    * Runs the `EntityDB` destructor and conditionally releases object storage
    * when scalar-delete flag bit 0 is set.
    */
-  [[maybe_unused]] CEntityDb* DestroyEntityDbAndMaybeDelete(CEntityDb* const entityDb, const std::uint8_t deleteFlags)
+  CEntityDb* DestroyEntityDbAndMaybeDelete(CEntityDb* const entityDb, const std::uint8_t deleteFlags)
   {
     entityDb->~CEntityDb();
     if ((deleteFlags & 1u) != 0u) {
@@ -4117,7 +4117,7 @@ namespace moho
    * Tail-thunk alias that forwards one read-archive member load lane into
    * `CEntityDb::MemberSerialize`.
    */
-  [[maybe_unused]] void LoadEntityDbMembersThunkPrimary(gpg::ReadArchive* const archive, CEntityDb* const entityDb)
+  void LoadEntityDbMembersThunkPrimary(gpg::ReadArchive* const archive, CEntityDb* const entityDb)
   {
     entityDb->MemberSerialize(archive);
   }
@@ -4129,7 +4129,7 @@ namespace moho
    * Tail-thunk alias that forwards one write-archive member save lane into
    * `CEntityDb::MemberDeserialize`.
    */
-  [[maybe_unused]] void SaveEntityDbMembersThunkPrimary(gpg::WriteArchive* const archive, CEntityDb* const entityDb)
+  void SaveEntityDbMembersThunkPrimary(gpg::WriteArchive* const archive, CEntityDb* const entityDb)
   {
     entityDb->MemberDeserialize(archive);
   }
@@ -4141,7 +4141,7 @@ namespace moho
    * Secondary tail-thunk alias that forwards one read-archive member load lane
    * into `CEntityDb::MemberSerialize`.
    */
-  [[maybe_unused]] void LoadEntityDbMembersThunkSecondary(gpg::ReadArchive* const archive, CEntityDb* const entityDb)
+  void LoadEntityDbMembersThunkSecondary(gpg::ReadArchive* const archive, CEntityDb* const entityDb)
   {
     entityDb->MemberSerialize(archive);
   }
@@ -4153,7 +4153,7 @@ namespace moho
    * Secondary tail-thunk alias that forwards one write-archive member save
    * lane into `CEntityDb::MemberDeserialize`.
    */
-  [[maybe_unused]] void SaveEntityDbMembersThunkSecondary(gpg::WriteArchive* const archive, CEntityDb* const entityDb)
+  void SaveEntityDbMembersThunkSecondary(gpg::WriteArchive* const archive, CEntityDb* const entityDb)
   {
     entityDb->MemberDeserialize(archive);
   }
@@ -4360,7 +4360,7 @@ namespace
     }
   };
 
-  [[maybe_unused]] EntityDbReflectionBootstrap gEntityDbReflectionBootstrap;
+  EntityDbReflectionBootstrap gEntityDbReflectionBootstrap;
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

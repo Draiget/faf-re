@@ -92,7 +92,7 @@ namespace
    * Copies one fixed 0x24-byte lane from `source` into `destination` and
    * returns `destination`.
    */
-  [[maybe_unused]] void* CopyFixed36ByteLane(const void* const source, void* const destination) noexcept
+  void* CopyFixed36ByteLane(const void* const source, void* const destination) noexcept
   {
     std::memcpy(destination, source, 0x24u);
     return destination;
@@ -105,7 +105,7 @@ namespace
    * Invokes serializer virtual slot `+0x24` with a by-reference temporary and
    * writes the updated 32-bit value back to `valueSlot`.
    */
-  [[maybe_unused]] int InvokePrimitiveSerializerWordByPointerLane(
+  int InvokePrimitiveSerializerWordByPointerLane(
     void* const helperObject,
     SerializerWord* const valueSlot
   )
@@ -124,7 +124,7 @@ namespace
    * Forwards one 32-bit primitive value lane through serializer virtual slot
    * `+0x24`.
    */
-  [[maybe_unused]] int InvokePrimitiveSerializerWordByValueLane(
+  int InvokePrimitiveSerializerWordByValueLane(
     void* const helperObject,
     SerializerWord* const valueSlot
   )
@@ -140,7 +140,7 @@ namespace
    * Calls the deleting-destructor virtual lane (`+0x08`) when
    * `objectStorage` is non-null.
    */
-  [[maybe_unused]] void DeleteConstructedRuntimeObjectStorage(void* const objectStorage)
+  void DeleteConstructedRuntimeObjectStorage(void* const objectStorage)
   {
     if (objectStorage == nullptr) {
       return;
@@ -157,7 +157,7 @@ namespace
    * Unlinks one intrusive list node from its current ring and releases the
    * node storage.
    */
-  [[maybe_unused]] void FreeIntrusiveListNodeRuntime(IntrusiveListNodeRuntimeView* const node) noexcept
+  void FreeIntrusiveListNodeRuntime(IntrusiveListNodeRuntimeView* const node) noexcept
   {
     if (node == nullptr) {
       return;
@@ -387,7 +387,7 @@ namespace gpg::core::legacy
    * What it does:
    * Register-shape adapter that forwards one forward 28-byte range copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneRegisterAdapterA(
+  std::byte* CopyForward28ByteLaneRegisterAdapterA(
     const std::byte* const sourceBegin,
     std::byte* const destination,
     const std::byte* const sourceEnd
@@ -403,7 +403,7 @@ namespace gpg::core::legacy
    * Secondary register-shape adapter that forwards one forward 28-byte range
    * copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneRegisterAdapterB(
+  std::byte* CopyForward28ByteLaneRegisterAdapterB(
     const std::byte* const sourceBegin,
     std::byte* const destination,
     const std::byte* const sourceEnd
@@ -420,7 +420,7 @@ namespace gpg::core::legacy
    * Third register-shape adapter that forwards one forward 28-byte range copy
    * lane.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneRegisterAdapterC(
+  std::byte* CopyForward28ByteLaneRegisterAdapterC(
     const std::byte* const sourceBegin,
     std::byte* const destination,
     const std::byte* const sourceEnd
@@ -459,7 +459,7 @@ namespace gpg::core::legacy
    * What it does:
    * Register-shape adapter that forwards one backward 28-byte range copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward28ByteLaneRegisterAdapterA(
+  std::byte* CopyBackward28ByteLaneRegisterAdapterA(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -475,7 +475,7 @@ namespace gpg::core::legacy
    * Register-shape adapter that forwards one source-first backward 28-byte
    * lane copy through `FUN_005B5C50`.
    */
-  [[maybe_unused]] std::byte* CopyBackward28ByteLaneSourceFirstDelegatePrimary(
+  std::byte* CopyBackward28ByteLaneSourceFirstDelegatePrimary(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destinationEnd
@@ -491,7 +491,7 @@ namespace gpg::core::legacy
    * Secondary register-shape adapter for source-first backward 28-byte lane
    * copy, forwarding to `FUN_005B5CC0`.
    */
-  [[maybe_unused]] std::byte* CopyBackward28ByteLaneSourceFirstDelegateSecondary(
+  std::byte* CopyBackward28ByteLaneSourceFirstDelegateSecondary(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destinationEnd
@@ -506,7 +506,7 @@ namespace gpg::core::legacy
    * What it does:
    * Tertiary source-first delegate for one backward 28-byte range-copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward28ByteLaneSourceFirstDelegateTertiary(
+  std::byte* CopyBackward28ByteLaneSourceFirstDelegateTertiary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -521,7 +521,7 @@ namespace gpg::core::legacy
    * What it does:
    * Quaternary source-first delegate for one backward 28-byte range-copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward28ByteLaneSourceFirstDelegateQuaternary(
+  std::byte* CopyBackward28ByteLaneSourceFirstDelegateQuaternary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -631,7 +631,7 @@ namespace gpg::core::legacy
    * Alias lane of `CopyBackward24ByteLane` used by one adjacent VC8 vector
    * helper instantiation.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneAlias(
+  std::byte* CopyBackward24ByteLaneAlias(
     std::byte* destination,
     const std::byte* sourceEnd,
     const std::byte* sourceBegin
@@ -647,7 +647,7 @@ namespace gpg::core::legacy
    * Adapts one register-lane caller shape into the canonical
    * backward 24-byte range-copy helper.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneRegisterAdapterA(
+  std::byte* CopyBackward24ByteLaneRegisterAdapterA(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -662,7 +662,7 @@ namespace gpg::core::legacy
    * What it does:
    * Second register-lane adapter for backward 24-byte range-copy dispatch.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneRegisterAdapterB(
+  std::byte* CopyBackward24ByteLaneRegisterAdapterB(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -678,7 +678,7 @@ namespace gpg::core::legacy
    * What it does:
    * Third register-shape adapter for backward 24-byte range-copy dispatch.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneRegisterAdapterC(
+  std::byte* CopyBackward24ByteLaneRegisterAdapterC(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -694,7 +694,7 @@ namespace gpg::core::legacy
    * Forwards one source-first backward 24-byte range-copy lane through the
    * shared canonical helper.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneSourceFirstDelegatePrimary(
+  std::byte* CopyBackward24ByteLaneSourceFirstDelegatePrimary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -709,7 +709,7 @@ namespace gpg::core::legacy
    * What it does:
    * Secondary source-first delegate for one backward 24-byte range-copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneSourceFirstDelegateSecondary(
+  std::byte* CopyBackward24ByteLaneSourceFirstDelegateSecondary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -724,7 +724,7 @@ namespace gpg::core::legacy
    * What it does:
    * Tertiary source-first delegate for one backward 24-byte range-copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneSourceFirstDelegateTertiary(
+  std::byte* CopyBackward24ByteLaneSourceFirstDelegateTertiary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -740,7 +740,7 @@ namespace gpg::core::legacy
    * Quaternary source-first delegate for one backward 24-byte range-copy
    * lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneSourceFirstDelegateQuaternary(
+  std::byte* CopyBackward24ByteLaneSourceFirstDelegateQuaternary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -755,7 +755,7 @@ namespace gpg::core::legacy
    * What it does:
    * Quinary source-first delegate for one backward 24-byte range-copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneSourceFirstDelegateQuinary(
+  std::byte* CopyBackward24ByteLaneSourceFirstDelegateQuinary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -770,7 +770,7 @@ namespace gpg::core::legacy
    * What it does:
    * Senary source-first delegate for one backward 24-byte range-copy lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward24ByteLaneSourceFirstDelegateSenary(
+  std::byte* CopyBackward24ByteLaneSourceFirstDelegateSenary(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -802,7 +802,7 @@ namespace gpg::core::legacy
    * Register-shape adapter that forwards one repeated 24-byte fill lane into
    * the canonical range-fill helper.
    */
-  [[maybe_unused]] void Fill24ByteLaneRangeFromSingleRegisterAdapter(
+  void Fill24ByteLaneRangeFromSingleRegisterAdapter(
     std::byte* const destinationBegin,
     std::byte* const destinationEnd,
     const std::byte* const sourceElement
@@ -900,7 +900,7 @@ namespace gpg::core::legacy
    * Appends one 24-byte element lane, delegating to range-insert growth when
    * the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBack24ByteElementLaneA(
+  std::byte* PushBack24ByteElementLaneA(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -915,7 +915,7 @@ namespace gpg::core::legacy
    * Appends one 24-byte element lane, delegating to range-insert growth when
    * the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBack24ByteElementLaneB(
+  std::byte* PushBack24ByteElementLaneB(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -930,7 +930,7 @@ namespace gpg::core::legacy
    * Appends one 24-byte element lane, delegating to range-insert growth when
    * the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBack24ByteElementLaneC(
+  std::byte* PushBack24ByteElementLaneC(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -945,7 +945,7 @@ namespace gpg::core::legacy
    * Appends one 24-byte element into a collision-result style fastvector lane
    * and grows storage through `AppendRange24ByteLane` when full.
    */
-  [[maybe_unused]] std::byte* PushBack24ByteElementLaneCollisionResult(
+  std::byte* PushBack24ByteElementLaneCollisionResult(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -976,7 +976,7 @@ namespace gpg::core::legacy
    * Resets one 24-byte fastvector lane to its inline origin storage, releasing
    * heap storage when the active lane is not already inline.
    */
-  [[maybe_unused]] std::byte* Reset24ByteVectorToInlineOrigin(FastVectorInsertRuntimeView& vectorView) noexcept
+  std::byte* Reset24ByteVectorToInlineOrigin(FastVectorInsertRuntimeView& vectorView) noexcept
   {
     return ResetInlineBackedVectorStorageCommon(vectorView);
   }
@@ -988,7 +988,7 @@ namespace gpg::core::legacy
    * Appends one 24-byte element into the destination fastvector lane and
    * delegates to range-grow insertion when capacity is exhausted.
    */
-  [[maybe_unused]] std::byte* PushBack24ByteElementLaneLegacy(
+  std::byte* PushBack24ByteElementLaneLegacy(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -1073,7 +1073,7 @@ namespace gpg::core::legacy
    * Appends one 20-byte element lane and delegates to range-insert growth when
    * the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBack20ByteElementLaneResourceDeposit(
+  std::byte* PushBack20ByteElementLaneResourceDeposit(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -1139,7 +1139,7 @@ namespace gpg::core::legacy
    * Resets one inline-backed fastvector lane to inline storage and releases
    * heap storage when the active lane is not already inline.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLaneA(FastVectorInsertRuntimeView& vectorView) noexcept
+  std::byte* ResetInlineBackedVectorStorageLaneA(FastVectorInsertRuntimeView& vectorView) noexcept
   {
     return ResetInlineBackedVectorStorageCommon(vectorView);
   }
@@ -1150,7 +1150,7 @@ namespace gpg::core::legacy
    * What it does:
    * Alias reset lane for the same inline-backed fastvector storage contract.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLaneB(FastVectorInsertRuntimeView& vectorView) noexcept
+  std::byte* ResetInlineBackedVectorStorageLaneB(FastVectorInsertRuntimeView& vectorView) noexcept
   {
     return ResetInlineBackedVectorStorageCommon(vectorView);
   }
@@ -1162,7 +1162,7 @@ namespace gpg::core::legacy
    * Resets one inline-backed fastvector lane to inline storage and releases
    * heap storage when the active lane is not already inline.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLaneC(FastVectorInsertRuntimeView& vectorView) noexcept
+  std::byte* ResetInlineBackedVectorStorageLaneC(FastVectorInsertRuntimeView& vectorView) noexcept
   {
     return ResetInlineBackedVectorStorageCommon(vectorView);
   }
@@ -1173,7 +1173,7 @@ namespace gpg::core::legacy
    * What it does:
    * Alias reset lane for the same inline-backed fastvector storage contract.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLaneD(FastVectorInsertRuntimeView& vectorView) noexcept
+  std::byte* ResetInlineBackedVectorStorageLaneD(FastVectorInsertRuntimeView& vectorView) noexcept
   {
     return ResetInlineBackedVectorStorageCommon(vectorView);
   }
@@ -1185,7 +1185,7 @@ namespace gpg::core::legacy
    * Resets one inline-backed fastvector lane to inline storage and frees heap
    * storage when the active lane is not already inline.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLanePlatoonA(
+  std::byte* ResetInlineBackedVectorStorageLanePlatoonA(
     FastVectorInsertRuntimeView& vectorView
   ) noexcept
   {
@@ -1198,7 +1198,7 @@ namespace gpg::core::legacy
    * What it does:
    * Alias reset lane for the same inline-backed fastvector storage contract.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLanePlatoonB(
+  std::byte* ResetInlineBackedVectorStorageLanePlatoonB(
     FastVectorInsertRuntimeView& vectorView
   ) noexcept
   {
@@ -1211,7 +1211,7 @@ namespace gpg::core::legacy
    * What it does:
    * Alias reset lane for the same inline-backed fastvector storage contract.
    */
-  [[maybe_unused]] std::byte* ResetInlineBackedVectorStorageLaneGameplay(
+  std::byte* ResetInlineBackedVectorStorageLaneGameplay(
     FastVectorInsertRuntimeView& vectorView
   ) noexcept
   {
@@ -1248,7 +1248,7 @@ namespace gpg::core::legacy
    * Register-shape adapter that forwards one 8-byte forward range copy lane
    * into the canonical null-tolerant copy helper.
    */
-  [[maybe_unused]] std::byte* CopyForward8ByteLaneRegisterAdapterAllowNullDestination(
+  std::byte* CopyForward8ByteLaneRegisterAdapterAllowNullDestination(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destination
@@ -1264,7 +1264,7 @@ namespace gpg::core::legacy
    * Bridges one 8-byte source-first copy lane where the source-end bound was
    * supplied through a hidden register lane in the original call shape.
    */
-  [[maybe_unused]] std::byte* CopyForward8ByteLaneSourceFirstHiddenEndRegisterAdapter(
+  std::byte* CopyForward8ByteLaneSourceFirstHiddenEndRegisterAdapter(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destination
@@ -1347,7 +1347,7 @@ namespace gpg::core::legacy
    * Returns 8-byte element capacity count from one begin/capacity span at
    * offsets `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountQwordElementsBeginAt4CapacityAtC(
+  std::int32_t CountQwordElementsBeginAt4CapacityAtC(
     const QwordVectorBeginEndCapacityAt4RuntimeView* const vectorLane
   ) noexcept
   {
@@ -1364,7 +1364,7 @@ namespace gpg::core::legacy
    * Returns 8-byte element count from one begin/end span at offsets
    * `(+0x04,+0x08)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountQwordElementsBeginAt4EndAt8(
+  std::int32_t CountQwordElementsBeginAt4EndAt8(
     const QwordVectorBeginEndCapacityAt4RuntimeView* const vectorLane
   ) noexcept
   {
@@ -1380,7 +1380,7 @@ namespace gpg::core::legacy
    * What it does:
    * Stores one computed address lane `*baseAddress + index * 8`.
    */
-  [[maybe_unused]] std::uintptr_t* StoreAddressFromBaseAndQwordIndex(
+  std::uintptr_t* StoreAddressFromBaseAndQwordIndex(
     std::uintptr_t* const outAddress,
     const std::uintptr_t* const baseAddress,
     const std::int32_t index
@@ -1397,7 +1397,7 @@ namespace gpg::core::legacy
    * What it does:
    * Returns one 8-byte index distance between two stored address lanes.
    */
-  [[maybe_unused]] std::int32_t AddressDistanceInQwordElements(
+  std::int32_t AddressDistanceInQwordElements(
     const std::uintptr_t* const lhsAddress,
     const std::uintptr_t* const rhsAddress
   ) noexcept
@@ -1415,7 +1415,7 @@ namespace gpg::core::legacy
    * What it does:
    * Advances one stored address lane by `index * 8` bytes.
    */
-  [[maybe_unused]] std::uintptr_t* AdvanceStoredAddressByQwordIndex(
+  std::uintptr_t* AdvanceStoredAddressByQwordIndex(
     std::uintptr_t* const addressSlot,
     const std::int32_t index
   ) noexcept
@@ -1430,7 +1430,7 @@ namespace gpg::core::legacy
    * What it does:
    * Initializes one fixed 0x24-byte lane from nine scalar float inputs.
    */
-  [[maybe_unused]] NineFloatLaneRuntimeView* InitializeNineFloatLane(
+  NineFloatLaneRuntimeView* InitializeNineFloatLane(
     NineFloatLaneRuntimeView* const outLane,
     const float lane00,
     const float lane04,
@@ -1462,7 +1462,7 @@ namespace gpg::core::legacy
    * Fills one 8-byte destination range with a repeated single 8-byte source
    * lane and returns the destination end pointer.
    */
-  [[maybe_unused]] std::byte* Fill8ByteLaneRangeFromSingleAndReturnEndAlias(
+  std::byte* Fill8ByteLaneRangeFromSingleAndReturnEndAlias(
     std::byte* const destinationBegin,
     std::byte* const destinationEnd,
     const std::byte* const sourceElement
@@ -1479,7 +1479,7 @@ namespace gpg::core::legacy
    * What it does:
    * Alias lane for backward 8-byte range copy.
    */
-  [[maybe_unused]] std::byte* CopyBackward8ByteLaneAlias(
+  std::byte* CopyBackward8ByteLaneAlias(
     std::byte* const destinationEnd,
     const std::byte* const sourceEnd,
     const std::byte* const sourceBegin
@@ -1495,7 +1495,7 @@ namespace gpg::core::legacy
    * What it does:
    * Copies one 8-byte source lane when destination storage is non-null.
    */
-  [[maybe_unused]] std::byte* CopyOptionalSingle8ByteLane(
+  std::byte* CopyOptionalSingle8ByteLane(
     std::byte* const destination,
     const std::byte* const source
   ) noexcept
@@ -1603,7 +1603,7 @@ namespace gpg::core::legacy
    * Adapts one source-first 32-byte backward copy lane through
    * `FUN_00572F20`.
    */
-  [[maybe_unused]] std::byte* CopyBackward32ByteLaneRegisterAdapterA(
+  std::byte* CopyBackward32ByteLaneRegisterAdapterA(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -1619,7 +1619,7 @@ namespace gpg::core::legacy
    * Secondary source-first adapter lane for the 32-byte backward copy
    * dispatcher via `FUN_00572F80`.
    */
-  [[maybe_unused]] std::byte* CopyBackward32ByteLaneRegisterAdapterB(
+  std::byte* CopyBackward32ByteLaneRegisterAdapterB(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -1635,7 +1635,7 @@ namespace gpg::core::legacy
    * Tiny adapter lane that forwards destination-only dispatch to the canonical
    * backward 32-byte copy helper with an empty source range.
    */
-  [[maybe_unused]] std::byte* CopyBackward32ByteLaneEmptyRangeAdapterA(
+  std::byte* CopyBackward32ByteLaneEmptyRangeAdapterA(
     std::byte* const destinationEnd,
     const std::byte* const unusedRangeToken
   ) noexcept
@@ -1652,7 +1652,7 @@ namespace gpg::core::legacy
    * Secondary destination-only adapter that forwards an empty source range to
    * the canonical backward 32-byte copy helper.
    */
-  [[maybe_unused]] std::byte* CopyBackward32ByteLaneEmptyRangeAdapterB(
+  std::byte* CopyBackward32ByteLaneEmptyRangeAdapterB(
     std::byte* const destinationEnd,
     const std::byte* const unusedRangeToken
   ) noexcept
@@ -1721,7 +1721,7 @@ namespace gpg::core::legacy
    * Appends one 32-byte element lane and delegates to range growth insertion
    * when the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBack32ByteElementLane(
+  std::byte* PushBack32ByteElementLane(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -1775,7 +1775,7 @@ namespace gpg::core::legacy
    * Register-shape adapter that forwards one 12-byte forward range copy lane
    * into the canonical null-tolerant copy helper.
    */
-  [[maybe_unused]] std::byte* CopyForward12ByteLaneRegisterAdapterAllowNullDestination(
+  std::byte* CopyForward12ByteLaneRegisterAdapterAllowNullDestination(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destination
@@ -1868,7 +1868,7 @@ namespace gpg::core::legacy
    * Appends one 12-byte element lane and delegates to range growth insertion
    * when the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBack12ByteElementLane(
+  std::byte* PushBack12ByteElementLane(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -2069,7 +2069,7 @@ namespace gpg::core::legacy
    * Tail-thunk alias that forwards 28-byte repeated-fill lanes into the shared
    * fill body.
    */
-  [[maybe_unused]] void Fill28ByteLaneRangeFromSingleThunk(
+  void Fill28ByteLaneRangeFromSingleThunk(
     std::byte* const destinationBegin,
     std::byte* const destinationEnd,
     const std::byte* const sourceElement
@@ -2085,7 +2085,7 @@ namespace gpg::core::legacy
    * Tail-thunk alias that forwards 52-byte repeated-fill lanes into the shared
    * fill body.
    */
-  [[maybe_unused]] void Fill52ByteLaneRangeFromSingleThunk(
+  void Fill52ByteLaneRangeFromSingleThunk(
     std::byte* const destinationBegin,
     std::byte* const destinationEnd,
     const std::byte* const sourceElement
@@ -2117,7 +2117,7 @@ namespace gpg::core::legacy
    * Debug-trap adapter lane that breaks into debugger and then forwards to the
    * shared 52-byte backward-copy helper.
    */
-  [[maybe_unused]] std::byte* CopyBackward52ByteLaneDebugTrapAdapter(
+  std::byte* CopyBackward52ByteLaneDebugTrapAdapter(
     std::byte* const destination,
     const std::byte* const sourceEnd,
     const std::byte* const sourceBegin
@@ -2152,7 +2152,7 @@ namespace gpg::core::legacy
    * Adapts one legacy register/stack caller shape into the canonical
    * backward 52-byte range-copy helper.
    */
-  [[maybe_unused]] std::byte* CopyBackward52ByteLaneRegisterAdapter(
+  std::byte* CopyBackward52ByteLaneRegisterAdapter(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destinationEnd
@@ -2245,7 +2245,7 @@ namespace gpg::core::legacy
    * growing storage through `AppendRangeWordLane` when the tail reaches
    * capacity.
    */
-  [[maybe_unused]] std::int16_t* AppendSingleWordLaneFromPointerAtTail(
+  std::int16_t* AppendSingleWordLaneFromPointerAtTail(
     FastVectorWordLaneRuntimeView* const vector,
     const std::int16_t* const sourceValue
   )
@@ -2311,7 +2311,7 @@ namespace gpg::core::legacy
    * Register-order adapter that forwards one 4-byte range copy lane to
    * `CopyForwardDwordLane`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneRegisterOrderAdapter(
+  std::byte* CopyForwardDwordLaneRegisterOrderAdapter(
     const std::byte* sourceEnd,
     const std::byte* sourceBegin,
     std::byte* destination
@@ -2327,7 +2327,7 @@ namespace gpg::core::legacy
    * Register-order adapter that forwards one 4-byte range copy lane to
    * `CopyForwardDwordLane`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantA(
+  std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantA(
     const std::byte* sourceEnd,
     const std::byte* sourceBegin,
     std::byte* destination
@@ -2343,7 +2343,7 @@ namespace gpg::core::legacy
    * Register-order adapter that forwards one 4-byte range copy lane to
    * `CopyForwardDwordLane`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantB(
+  std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantB(
     const std::byte* sourceEnd,
     const std::byte* sourceBegin,
     std::byte* destination
@@ -2359,7 +2359,7 @@ namespace gpg::core::legacy
    * Register-shape forwarding lane for one dword copy range into
    * `CopyForwardDwordLane`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantC(
+  std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantC(
     const std::byte* sourceEnd,
     const std::byte* sourceBegin,
     std::byte* destination
@@ -2375,7 +2375,7 @@ namespace gpg::core::legacy
    * Mirrored register-shape forwarding lane for one dword copy range into
    * `CopyForwardDwordLane`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantD(
+  std::byte* CopyForwardDwordLaneRegisterOrderAdapterVariantD(
     const std::byte* sourceEnd,
     const std::byte* sourceBegin,
     std::byte* destination
@@ -2484,7 +2484,7 @@ namespace gpg::core::legacy
    * Appends one 4-byte element lane and delegates to range growth insertion
    * when the destination fastvector has no spare capacity.
    */
-  [[maybe_unused]] std::byte* PushBackDwordElementLane(
+  std::byte* PushBackDwordElementLane(
     FastVectorInsertRuntimeView& vectorView,
     const std::byte* const sourceElement
   )
@@ -2526,7 +2526,7 @@ namespace gpg::core::legacy
    * Forwards one source-first 4-byte lane copy through the shared
    * `FUN_008D8190` dword source-first copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstDelegatePrimary(
+  std::byte* CopyForwardDwordLaneSourceFirstDelegatePrimary(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2542,7 +2542,7 @@ namespace gpg::core::legacy
    * Forwards one source-first 4-byte lane copy through the shared
    * `FUN_008D81C0` dword source-first copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstDelegateSecondary(
+  std::byte* CopyForwardDwordLaneSourceFirstDelegateSecondary(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2558,7 +2558,7 @@ namespace gpg::core::legacy
    * Forwards one source-first 4-byte lane copy through the shared
    * `FUN_008D8190` dword source-first copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstDelegateTertiary(
+  std::byte* CopyForwardDwordLaneSourceFirstDelegateTertiary(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2574,7 +2574,7 @@ namespace gpg::core::legacy
    * Forwards one source-first 4-byte lane copy through the shared
    * `FUN_008D81C0` dword source-first copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstDelegateQuaternary(
+  std::byte* CopyForwardDwordLaneSourceFirstDelegateQuaternary(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2590,7 +2590,7 @@ namespace gpg::core::legacy
    * Adapter lane forwarding one source-first 4-byte copy range through
    * `CopyForwardDwordLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstAdapterA(
+  std::byte* CopyForwardDwordLaneSourceFirstAdapterA(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2606,7 +2606,7 @@ namespace gpg::core::legacy
    * Secondary adapter lane forwarding one source-first 4-byte copy range
    * through `CopyForwardDwordLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstAdapterB(
+  std::byte* CopyForwardDwordLaneSourceFirstAdapterB(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2622,7 +2622,7 @@ namespace gpg::core::legacy
    * Third adapter lane forwarding one source-first 4-byte copy range through
    * `CopyForwardDwordLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstAdapterC(
+  std::byte* CopyForwardDwordLaneSourceFirstAdapterC(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2638,7 +2638,7 @@ namespace gpg::core::legacy
    * Fourth adapter lane forwarding one source-first 4-byte copy range through
    * `CopyForwardDwordLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForwardDwordLaneSourceFirstAdapterD(
+  std::byte* CopyForwardDwordLaneSourceFirstAdapterD(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2702,7 +2702,7 @@ namespace gpg::core::legacy
    * Moves one dword range `[sourceBegin, sourceEnd)` into a destination tail
    * ending at `destinationEnd` and returns the destination begin pointer.
    */
-  [[maybe_unused]] std::byte* MoveDwordRangeToTail(
+  std::byte* MoveDwordRangeToTail(
     std::byte* const sourceEnd,
     std::byte* const destinationEnd,
     const std::byte* const sourceBegin
@@ -2740,7 +2740,7 @@ namespace gpg::core::legacy
    * Bridges one 12-byte source-first copy lane where the source-end bound was
    * supplied through a hidden register lane in the original call shape.
    */
-  [[maybe_unused]] std::byte* CopyForward12ByteLaneSourceFirstHiddenEndRegisterAdapter(
+  std::byte* CopyForward12ByteLaneSourceFirstHiddenEndRegisterAdapter(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destination
@@ -2756,7 +2756,7 @@ namespace gpg::core::legacy
    * Forwards one source-first 12-byte lane copy through the shared
    * `FUN_008D8150` 12-byte source-first copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForward12ByteLaneSourceFirstDelegate(
+  std::byte* CopyForward12ByteLaneSourceFirstDelegate(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2772,7 +2772,7 @@ namespace gpg::core::legacy
    * Adapter lane forwarding one source-first 12-byte copy range through
    * `CopyForward12ByteLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForward12ByteLaneSourceFirstAdapterA(
+  std::byte* CopyForward12ByteLaneSourceFirstAdapterA(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2788,7 +2788,7 @@ namespace gpg::core::legacy
    * Secondary adapter lane forwarding one source-first 12-byte copy range
    * through `CopyForward12ByteLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForward12ByteLaneSourceFirstAdapterB(
+  std::byte* CopyForward12ByteLaneSourceFirstAdapterB(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2822,7 +2822,7 @@ namespace gpg::core::legacy
    * Forwarding lane that routes one source-first 28-byte range copy into
    * `FUN_008F64D0`.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneSourceFirstAdapterA(
+  std::byte* CopyForward28ByteLaneSourceFirstAdapterA(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2838,7 +2838,7 @@ namespace gpg::core::legacy
    * Secondary forwarding lane that routes one source-first 28-byte range
    * copy into `FUN_008F64D0`.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneSourceFirstAdapterB(
+  std::byte* CopyForward28ByteLaneSourceFirstAdapterB(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2854,7 +2854,7 @@ namespace gpg::core::legacy
    * Tertiary forwarding lane that routes one source-first 28-byte range copy
    * into `FUN_008F64D0`.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneSourceFirstAdapterC(
+  std::byte* CopyForward28ByteLaneSourceFirstAdapterC(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2870,7 +2870,7 @@ namespace gpg::core::legacy
    * Forwards one source-first 28-byte lane copy through the shared
    * `FUN_008F64D0` 28-byte source-first copy lane.
    */
-  [[maybe_unused]] std::byte* CopyForward28ByteLaneSourceFirstDelegate(
+  std::byte* CopyForward28ByteLaneSourceFirstDelegate(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2903,7 +2903,7 @@ namespace gpg::core::legacy
    * Tail-jump adapter lane that forwards one 40-byte source-first copy range
    * into `FUN_00753D60`.
    */
-  [[maybe_unused]] std::byte* CopyForward40ByteLaneSourceFirstJumpAdapter(
+  std::byte* CopyForward40ByteLaneSourceFirstJumpAdapter(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2919,7 +2919,7 @@ namespace gpg::core::legacy
    * Source-first forwarding adapter lane that routes one 40-byte range copy
    * into `FUN_00756990` while discarding one zero scratch lane.
    */
-  [[maybe_unused]] std::byte* CopyForward40ByteLaneSourceFirstNullScratchAdapterA(
+  std::byte* CopyForward40ByteLaneSourceFirstNullScratchAdapterA(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2935,7 +2935,7 @@ namespace gpg::core::legacy
    * Duplicate source-first forwarding adapter lane for one 40-byte range copy
    * into `FUN_00756990`.
    */
-  [[maybe_unused]] std::byte* CopyForward40ByteLaneSourceFirstNullScratchAdapterB(
+  std::byte* CopyForward40ByteLaneSourceFirstNullScratchAdapterB(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2951,7 +2951,7 @@ namespace gpg::core::legacy
    * Third source-first forwarding adapter lane for one 40-byte range copy
    * into `FUN_00756990`.
    */
-  [[maybe_unused]] std::byte* CopyForward40ByteLaneSourceFirstNullScratchAdapterC(
+  std::byte* CopyForward40ByteLaneSourceFirstNullScratchAdapterC(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destination
@@ -2983,7 +2983,7 @@ namespace gpg::core::legacy
    * Source-first forwarding adapter lane that routes one 40-byte backward copy
    * into `FUN_00755970` while discarding one zero scratch lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward40ByteLaneSourceFirstNullScratchAdapter(
+  std::byte* CopyBackward40ByteLaneSourceFirstNullScratchAdapter(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destinationEnd
@@ -2999,7 +2999,7 @@ namespace gpg::core::legacy
    * Duplicate source-first forwarding adapter lane that routes one 40-byte
    * backward copy into `FUN_00755970` while discarding one zero scratch lane.
    */
-  [[maybe_unused]] std::byte* CopyBackward40ByteLaneSourceFirstNullScratchAdapterB(
+  std::byte* CopyBackward40ByteLaneSourceFirstNullScratchAdapterB(
     const std::byte* sourceBegin,
     const std::byte* sourceEnd,
     std::byte* destinationEnd
@@ -3035,7 +3035,7 @@ namespace gpg::core::legacy
    * Register-shape adapter lane that forwards one 56-byte source-first copy
    * into `CopyForward56ByteLaneSourceFirst`.
    */
-  [[maybe_unused]] std::byte* CopyForward56ByteLaneSourceFirstAdapterA(
+  std::byte* CopyForward56ByteLaneSourceFirstAdapterA(
     const std::byte* const sourceBegin,
     const std::byte* const sourceEnd,
     std::byte* const destination
@@ -3051,7 +3051,7 @@ namespace gpg::core::legacy
    * Copies `rangeCount` trailing 56-byte lanes ending at `destinationEnd`
    * into uninitialized storage starting at `destinationEnd`.
    */
-  [[maybe_unused]] std::byte* CopyForward56ByteTailRangeByCountAdapter(
+  std::byte* CopyForward56ByteTailRangeByCountAdapter(
     const std::int32_t rangeCount,
     std::byte* const destinationEnd
   ) noexcept
@@ -3073,7 +3073,7 @@ namespace gpg::core::legacy
    * Copies one 40-byte lane range `[sourceBegin, sourceEnd)` into destination
    * storage starting at `sourceEnd`.
    */
-  [[maybe_unused]] std::byte* CopyForward40ByteTailRangeAdapter(
+  std::byte* CopyForward40ByteTailRangeAdapter(
     const std::byte* const sourceBegin,
     std::byte* const sourceEnd
   ) noexcept
@@ -3089,7 +3089,7 @@ namespace gpg::core::legacy
    * `destinationBegin`, updates `owner.finish`, and stores `destinationBegin`
    * through `outBegin`.
    */
-  [[maybe_unused]] std::byte** CopyForward12ByteTailRangeUpdateFinishAndStoreBegin(
+  std::byte** CopyForward12ByteTailRangeUpdateFinishAndStoreBegin(
     std::byte** const outBegin,
     FastVectorInsertRuntimeView& owner,
     std::byte* const destinationBegin,
@@ -3116,7 +3116,7 @@ namespace gpg::core::legacy
    * `destinationBegin`, updates `owner.finish`, and stores `destinationBegin`
    * through `outBegin`.
    */
-  [[maybe_unused]] std::byte** CopyForward40ByteTailRangeUpdateFinishAndStoreBegin(
+  std::byte** CopyForward40ByteTailRangeUpdateFinishAndStoreBegin(
     std::byte** const outBegin,
     FastVectorInsertRuntimeView& owner,
     std::byte* const destinationBegin,
@@ -3139,7 +3139,7 @@ namespace gpg::core::legacy
    * reusing storage when possible and reacquiring storage when capacity is
    * insufficient.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView& Assign12ByteVectorRangeExactCapacity(
+  FastVectorInsertRuntimeView& Assign12ByteVectorRangeExactCapacity(
     FastVectorInsertRuntimeView& destination,
     const FastVectorInsertRuntimeView& source
   )
@@ -3200,7 +3200,7 @@ namespace gpg::core::legacy
    * reusing storage when possible and reacquiring storage when capacity is
    * insufficient.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView& Assign8ByteVectorRangeExactCapacity(
+  FastVectorInsertRuntimeView& Assign8ByteVectorRangeExactCapacity(
     FastVectorInsertRuntimeView& destination,
     const FastVectorInsertRuntimeView& source
   )
@@ -3257,7 +3257,7 @@ namespace gpg::core::legacy
    * prefix/insert/suffix slices into the replacement storage, returning the
    * requested element count lane.
    */
-  [[maybe_unused]] std::size_t GrowInsert8ByteLaneAndReturnRequestedCapacity(
+  std::size_t GrowInsert8ByteLaneAndReturnRequestedCapacity(
     const std::size_t requestedCapacity,
     FastVectorInsertRuntimeView& vectorView,
     std::byte* const splitPosition,
@@ -3276,7 +3276,7 @@ namespace gpg::core::legacy
    * Inserts one 8-byte source range before `insertPosition`, growing storage
    * when required and preserving overlap-safe lane movement semantics.
    */
-  [[maybe_unused]] std::byte* InsertRange8ByteLaneReuseOrGrow(
+  std::byte* InsertRange8ByteLaneReuseOrGrow(
     FastVectorInsertRuntimeView& vectorView,
     std::byte* const insertPosition,
     const std::byte* const sourceBegin,
@@ -3446,7 +3446,7 @@ namespace gpg::core::legacy
    * Resets one inline-backed 8-byte fastvector lane to inline storage,
    * releasing dynamic storage when present.
    */
-  [[maybe_unused]] std::byte* ResetInlineQwordVectorStorage(
+  std::byte* ResetInlineQwordVectorStorage(
     InlineQwordVectorWithTagRuntimeView& value
   ) noexcept
   {
@@ -3555,7 +3555,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed 8-byte vector-with-tag lane from `source`
    * by wiring inline storage and assigning the vector payload.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* InitializeInlineQwordVectorWithTagFromSource(
+  InlineQwordVectorWithTagRuntimeView* InitializeInlineQwordVectorWithTagFromSource(
     InlineQwordVectorWithTagRuntimeView* const destination,
     const InlineQwordVectorWithTagRuntimeView* const source
   )
@@ -3572,7 +3572,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed 8-byte vector-with-tag lane from `source`
    * and copies the scalar tag lane at `+0x18`.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* InitializeInlineQwordVectorWithTagFromSourceAndCopyTag(
+  InlineQwordVectorWithTagRuntimeView* InitializeInlineQwordVectorWithTagFromSourceAndCopyTag(
     InlineQwordVectorWithTagRuntimeView* const destination,
     const InlineQwordVectorWithTagRuntimeView* const source
   )
@@ -3594,7 +3594,7 @@ namespace gpg::core::legacy
    * Fills `[destinationBegin, destinationEnd)` by assigning each entry from
    * one shared source vector-with-tag lane.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* FillAssignInlineQwordVectorWithTagRange(
+  InlineQwordVectorWithTagRuntimeView* FillAssignInlineQwordVectorWithTagRange(
     InlineQwordVectorWithTagRuntimeView* destinationBegin,
     InlineQwordVectorWithTagRuntimeView* destinationEnd,
     const InlineQwordVectorWithTagRuntimeView* const source
@@ -3619,7 +3619,7 @@ namespace gpg::core::legacy
    * `[sourceBegin, sourceEnd)` into destination lanes ending at
    * `destinationEnd`.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* CopyAssignInlineQwordVectorWithTagRangeBackward(
+  InlineQwordVectorWithTagRuntimeView* CopyAssignInlineQwordVectorWithTagRangeBackward(
     const InlineQwordVectorWithTagRuntimeView* sourceBegin,
     const InlineQwordVectorWithTagRuntimeView* sourceEnd,
     InlineQwordVectorWithTagRuntimeView* destinationEnd
@@ -3644,7 +3644,7 @@ namespace gpg::core::legacy
    * Copies one vector-with-tag range forward from `[sourceBegin, sourceEnd)`
    * into destination lanes beginning at `destinationBegin`.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* CopyAssignInlineQwordVectorWithTagRangeForward(
+  InlineQwordVectorWithTagRuntimeView* CopyAssignInlineQwordVectorWithTagRangeForward(
     const InlineQwordVectorWithTagRuntimeView* sourceBegin,
     const InlineQwordVectorWithTagRuntimeView* sourceEnd,
     InlineQwordVectorWithTagRuntimeView* destinationBegin
@@ -3671,7 +3671,7 @@ namespace gpg::core::legacy
    * source vector-with-tag lane; unwinds partially constructed entries on
    * exceptions.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* UninitializedFillInlineQwordVectorWithTagByCount(
+  InlineQwordVectorWithTagRuntimeView* UninitializedFillInlineQwordVectorWithTagByCount(
     const InlineQwordVectorWithTagRuntimeView* const source,
     std::size_t count,
     InlineQwordVectorWithTagRuntimeView* const destination
@@ -3705,7 +3705,7 @@ namespace gpg::core::legacy
    * `[sourceBegin, sourceEnd)` into destination lanes, unwinding partially
    * constructed entries on exceptions.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* UninitializedCopyInlineQwordVectorWithTagRange(
+  InlineQwordVectorWithTagRuntimeView* UninitializedCopyInlineQwordVectorWithTagRange(
     const InlineQwordVectorWithTagRuntimeView* sourceBegin,
     const InlineQwordVectorWithTagRuntimeView* sourceEnd,
     InlineQwordVectorWithTagRuntimeView* destination
@@ -3742,7 +3742,7 @@ namespace gpg::core::legacy
    * Alternate call-shape lane for uninitialized-copy of one vector-with-tag
    * range.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagRuntimeView* UninitializedCopyInlineQwordVectorWithTagRangeAlias(
+  InlineQwordVectorWithTagRuntimeView* UninitializedCopyInlineQwordVectorWithTagRangeAlias(
     const InlineQwordVectorWithTagRuntimeView* sourceBegin,
     const InlineQwordVectorWithTagRuntimeView* sourceEnd,
     InlineQwordVectorWithTagRuntimeView* destination
@@ -3758,7 +3758,7 @@ namespace gpg::core::legacy
    * Inserts one vector-with-tag value at `insertPosition`, growing storage and
    * shifting tail lanes as needed.
    */
-  [[maybe_unused]] void InsertInlineQwordVectorWithTagSlowPath(
+  void InsertInlineQwordVectorWithTagSlowPath(
     const InlineQwordVectorWithTagRuntimeView* const sourceValue,
     InlineQwordVectorWithTagStorageRuntimeView* const destination,
     InlineQwordVectorWithTagRuntimeView* const insertPosition
@@ -3826,7 +3826,7 @@ namespace gpg::core::legacy
    * Appends one vector-with-tag element to the destination storage, using the
    * in-place fast path when capacity is available.
    */
-  [[maybe_unused]] void PushBackInlineQwordVectorWithTag(
+  void PushBackInlineQwordVectorWithTag(
     const InlineQwordVectorWithTagRuntimeView* const sourceValue,
     InlineQwordVectorWithTagStorageRuntimeView* const destination
   )
@@ -3846,7 +3846,7 @@ namespace gpg::core::legacy
    * What it does:
    * Copy-constructs one vector-with-tag storage owner from `source`.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagStorageRuntimeView* CopyConstructInlineQwordVectorWithTagStorage(
+  InlineQwordVectorWithTagStorageRuntimeView* CopyConstructInlineQwordVectorWithTagStorage(
     const InlineQwordVectorWithTagStorageRuntimeView* const source,
     InlineQwordVectorWithTagStorageRuntimeView* const destination
   )
@@ -3879,7 +3879,7 @@ namespace gpg::core::legacy
    * Assigns one vector-with-tag storage owner from `source`, reusing capacity
    * when possible and reallocating when required.
    */
-  [[maybe_unused]] InlineQwordVectorWithTagStorageRuntimeView* AssignInlineQwordVectorWithTagStorage(
+  InlineQwordVectorWithTagStorageRuntimeView* AssignInlineQwordVectorWithTagStorage(
     InlineQwordVectorWithTagStorageRuntimeView* const destination,
     const InlineQwordVectorWithTagStorageRuntimeView* const source
   )
@@ -3927,7 +3927,7 @@ namespace gpg::core::legacy
    * Copies one dword lane range `[sourceBegin, sourceEnd)` into destination
    * storage starting at `sourceEnd`.
    */
-  [[maybe_unused]] std::uint32_t* CopyForwardDwordTailRangeAdapter(
+  std::uint32_t* CopyForwardDwordTailRangeAdapter(
     const std::uint32_t* const sourceBegin,
     std::uint32_t* const sourceEnd
   ) noexcept
@@ -3948,7 +3948,7 @@ namespace gpg::core::legacy
    * Replaces destination 12-byte fastvector content with source content,
    * reusing capacity when possible and growing when required.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView&
+  FastVectorInsertRuntimeView&
   Assign12ByteVectorRange(FastVectorInsertRuntimeView& destination, const FastVectorInsertRuntimeView& source)
   {
     if (&destination == &source) {
@@ -4055,7 +4055,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x445C0 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane280000(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane280000(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4075,7 +4075,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x7EF40 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane520000(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane520000(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4095,7 +4095,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x4E200 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane320000(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane320000(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4115,7 +4115,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x100 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane256(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane256(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4131,7 +4131,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x80 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane128(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane128(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4147,7 +4147,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x200 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane512(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane512(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4163,7 +4163,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x480 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane1152(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane1152(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4179,7 +4179,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x460 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane1120(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane1120(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4195,7 +4195,7 @@ namespace gpg::core::legacy
    * Initializes one inline-backed fastvector runtime view where the inline
    * origin is embedded at `result+0x10` and capacity spans 0x4 bytes.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane4(
+  FastVectorInsertRuntimeView* InitializeInlineBackedFastVectorLane4(
     FastVectorInsertRuntimeView* const result
   ) noexcept
   {
@@ -4211,7 +4211,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x4`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane4FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane4FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4228,7 +4228,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x20`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane32FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane32FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4245,7 +4245,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x98`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane152FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane152FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4261,7 +4261,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x100`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane256FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane256FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4277,7 +4277,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x80`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane128FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane128FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4293,7 +4293,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x200`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane512FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane512FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4309,7 +4309,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x480`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane1152FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane1152FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4325,7 +4325,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x460`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane1120FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane1120FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4341,7 +4341,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x7EF40`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane520000FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane520000FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
@@ -4357,7 +4357,7 @@ namespace gpg::core::legacy
    * Initializes one fastvector runtime view from caller-provided inline origin
    * storage and sets capacity to `inlineOrigin+0x4E200`.
    */
-  [[maybe_unused]] FastVectorInsertRuntimeView* InitializeFastVectorLane320000FromInlineOrigin(
+  FastVectorInsertRuntimeView* InitializeFastVectorLane320000FromInlineOrigin(
     FastVectorInsertRuntimeView* const result,
     std::byte* const inlineOrigin
   ) noexcept
