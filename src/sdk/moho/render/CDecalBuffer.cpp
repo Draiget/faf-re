@@ -1809,22 +1809,27 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
  * Removes one handle from its start-tick bucket, queues object-id
  * retirement, and deletes the handle. `FindOrCreateStartTickBucket` +
  * `EraseBucketNodesByKey` reproduce the binary's `sub_77A250`/`sub_77A9F0`
- * call pair; CreateHandle's own insert-side wiring into the same
- * start-tick bucket tree is deferred (needs `FUN_0077A930` and its own
- * dependency closure).
+ * call pair, gated on `mStartTick != 0` exactly as the binary gates it
+ * (decals with no start tick were never inserted into the bucket tree by
+ * `CreateHandle` in the first place). CreateHandle's own insert-side wiring
+ * into the same start-tick bucket tree is deferred (needs `FUN_0077A930`
+ * and its own dependency closure).
  */
 void CDecalBuffer::DestroyHandle(CDecalHandle* const handleOpaque)
 {
   if (!handleOpaque) {
     return;
   }
+
+  if (handleOpaque->mInfo.mStartTick != 0u) {
+    DecalBucketTreeStorage* const bucket =
+      FindOrCreateStartTickBucket(&mStartTickBuckets, handleOpaque->mInfo.mStartTick);
+    (void)EraseBucketNodesByKey(bucket, handleOpaque);
+  }
+
   if (handleOpaque->mVisibleInFocus != 0u) {
     mPendingHideObjectIds.push_back(handleOpaque->mInfo.mObj);
   }
-
-  DecalBucketTreeStorage* const bucket =
-    FindOrCreateStartTickBucket(&mStartTickBuckets, handleOpaque->mInfo.mStartTick);
-  (void)EraseBucketNodesByKey(bucket, handleOpaque);
 
   mPool.QueueReleasedLowId(handleOpaque->mInfo.mObj);
 
