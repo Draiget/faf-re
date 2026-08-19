@@ -62912,6 +62912,8 @@ namespace moho
   extern bool ren_ShowNormals;
   extern bool fog_DistanceFog;
   extern float fog_OffsetMultiplier;
+  extern bool ren_PlayableBoundary;
+  extern bool ren_FogOfWar;
 } // namespace moho
 
 /**
@@ -65264,12 +65266,15 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     //               0x007F9509..0x007F952D has five dwords and the callee
     //               cleanup is `add esp, 14h` at 0x007F9533.
     //
-    // Both bodies live in TUs this file does not own: func_RenBoundary needs
-    // sub_7D08D0 (0x007D08D0), which calls the "vision" effect accessor that
-    // is a file-static of moho/render/VisionRenderer.cpp; func_RenUI needs the
-    // sBlinkyBoxes list head, a file-static of moho/ui/UiRuntimeTypes.cpp.
-    // Both also need `mSession` (+0x2140) to actually be populated - see the
-    // note on that field - so wiring them here alone would still no-op.
+    // The UI selection pass (func_RenUI, 0x007FD490) is still unwired: it needs
+    // the sBlinkyBoxes list head, a file-static of moho/ui/UiRuntimeTypes.cpp.
+    auto* const sessionView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+    if (moho::ren_PlayableBoundary && sessionView->mSession != nullptr && worldView->view != nullptr) {
+      moho::RenderPlayableBoundary(
+        static_cast<unsigned int>(head), sessionView->mBoundaryRenderer, *sessionView->mSession,
+        *runtime->mCam
+      );
+    }
 
     RenderMeshes(0x24, false);
     RenderEffects(false);
@@ -65294,9 +65299,16 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     //               sDeltaFrame)
     //   0x007F958E  <stencil clear through device slot +0x98>
     //
-    // Body lives in the moho/render/VisionRenderer.cpp TU: it needs both that
-    // file's static "vision" effect accessor and VisionDB::Entry::TryAdd
-    // (0x0081B490), which is not recovered yet.
+    //   0x007F958E  <stencil clear through device slot +0x98>
+    //
+    // The stencil clear that follows the call is still unwired.
+    if (moho::ren_FogOfWar && sessionView->mSession != nullptr &&
+        sessionView->mSession->FocusArmy != -1) {
+      moho::RenderFogOfWar(
+        *sessionView->mSession, sessionView->mVisionRenderer, static_cast<unsigned int>(head),
+        *runtime->mCam, moho::REN_GetSimDeltaSeconds()
+      );
+    }
 
     RenderRefractingEffects();
 

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "Wm3IntrBox2Circle2.h"
 
 using namespace moho;
 
@@ -70,7 +71,7 @@ namespace
    * Allocates one 12-byte intrusive-list sentinel lane and self-links its
    * `prev/next` pointers.
    */
-  [[maybe_unused]] [[nodiscard]] VisionDbIntrusiveListNodeRuntime* VisionDbAllocateSelfLinkedListSentinel12()
+  [[nodiscard]] VisionDbIntrusiveListNodeRuntime* VisionDbAllocateSelfLinkedListSentinel12()
   {
     auto* const rawNode = static_cast<std::uint8_t*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
     if (rawNode == nullptr) {
@@ -653,7 +654,7 @@ VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::V
     return nullptr;
   }
 
-  EntryPutInChain(entry, reinterpret_cast<Pool::PooledNode*>(rootNode_));
+  EntryPutInChain(entry, rootNode_);
 
   Handle* const handle = new Handle();
   handle->mDB = reinterpret_cast<std::uintptr_t>(this);
@@ -707,5 +708,59 @@ void VisionDB::Handle::Update(
   }
 
   EntryRemoveFromChain(parent, node);
-  EntryPutInChain(node, reinterpret_cast<Pool::PooledNode*>(db->rootNode_));
+  EntryPutInChain(node, db->rootNode_);
+}
+
+/**
+ * Address: 0x0081B490 (FUN_0081B490, Moho::VisionDB::Entry::TryAdd)
+ *
+ * IDA signature:
+ * void __stdcall Moho::VisionDB::struct1::TryAdd(gpg::fastvector_Circle2f *accum,
+ *         Moho::VisionDB::Entry *a2, const Wm3::Box3f *box, float amt);
+ *
+ * What it does:
+ * Interpolates one vision entry's circle between its previous and current
+ * samples, tests the result against the query box, and either accumulates the
+ * circle (real + visible leaf) or walks the entry's contained sibling chain.
+ *
+ * Field displacements taken from the shipped body:
+ *   +0x04 mContained (0x0081B585), +0x08 mNext (0x0081B5A2),
+ *   +0x0C mIsReal (0x0081B546),    +0x0D mVis (0x0081B54C),
+ *   +0x10/+0x14/+0x18 mPrevCircle  (0x0081B4BC/0x0081B4C1/0x0081B4ED),
+ *   +0x1C/+0x20/+0x24 mCurCircle   (0x0081B4C6/0x0081B4CB/0x0081B4DC).
+ */
+void VisionDB::TryAdd(
+  gpg::fastvector<Wm3::Circle2f>& accumulator,
+  Pool::Entry* const entry,
+  const Wm3::Box2f& box,
+  const float interpolant
+) const
+{
+  const Pool::EntryCircle& previous = entry->mPrevCircle;
+  const Pool::EntryCircle& current = entry->mCurCircle;
+
+  const Wm3::Circle2f sampled{
+    Wm3::Vector2f{
+      previous.x + ((current.x - previous.x) * interpolant),
+      previous.y + ((current.y - previous.y) * interpolant)
+    },
+    ((current.radius - previous.radius) * interpolant) + previous.radius
+  };
+
+  // `Wm3::IntrBox2Circle2f` keeps references to both operands, so `box` and
+  // `sampled` must outlive it - matching the two stack temporaries the binary
+  // builds at 0x0081B4F2/0x0081B504 before the ctor call at 0x0081B52C.
+  Wm3::IntrBox2Circle2f overlap{box, sampled};
+  if (!overlap.Test()) {
+    return;
+  }
+
+  if (entry->mIsReal != 0u && entry->mVis != 0u) {
+    accumulator.push_back(sampled);
+    return;
+  }
+
+  for (Pool::Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
+    TryAdd(accumulator, child, box, interpolant);
+  }
 }

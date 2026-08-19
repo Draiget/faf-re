@@ -3,7 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
 #include "moho/containers/TDatList.h"
+#include "Wm3Box2.h"
+#include "Wm3Circle2.h"
 #include "Wm3Vector2.h"
 
 namespace moho
@@ -285,6 +288,37 @@ namespace moho
     [[nodiscard]] Handle* NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous);
 
     /**
+     * Address: 0x0081B490 (FUN_0081B490, Moho::VisionDB::Entry::TryAdd)
+     *
+     * IDA signature:
+     * void __stdcall Moho::VisionDB::struct1::TryAdd(gpg::fastvector_Circle2f *accum,
+     *         Moho::VisionDB::Entry *a2, const Wm3::Box3f *box, float amt);
+     *
+     * IDA's prototype drops the register argument and mis-widens the box. The
+     * shipped body is `__thiscall` with four stack arguments (`retn 10h` at
+     * 0x0081B5CC): `mov ebx, ecx` at 0x0081B4AC parks the `this` pointer and
+     * `mov ecx, ebx` at 0x0081B59B feeds it straight back into the recursive
+     * call, and both external call sites load `ecx` with the object whose
+     * `+0x20` lane is `VisionDB::rootNode_` (0x0081B065 and 0x0081C815), so
+     * `this` is the `VisionDB`, not the entry. The box is a `Wm3::Box2f`: it is
+     * forwarded unchanged to `Wm3::IntrBox2Circle2f::IntrBox2Circle2f` at
+     * 0x0081B52C, and the caller at 0x0081C660 fills exactly the eight floats
+     * of a `Box2f` (center, two unit axes, two extents).
+     *
+     * What it does:
+     * Interpolates `entry`'s vision circle between its previous and current
+     * samples by `interpolant` and tests it against `box`. On overlap it either
+     * appends that interpolated circle to `accumulator` (real, currently
+     * visible emitter) or recurses over the entry's `mContained` sibling chain.
+     */
+    void TryAdd(
+      gpg::fastvector<Wm3::Circle2f>& accumulator,
+      Pool::Entry* entry,
+      const Wm3::Box2f& box,
+      float interpolant
+    ) const;
+
+    /**
      * Address: 0x0081AEB0 (FUN_0081AEB0)
      * Address: 0x103E3E30
      * Slot: 0
@@ -295,11 +329,11 @@ namespace moho
      */
     virtual ~VisionDB();
 
-  private:
+  public:
     friend struct VisionDBLayoutAsserts;
 
-    Pool pool_;               // +0x04
-    void* rootNode_{nullptr}; // +0x20
+    Pool pool_;                      // +0x04
+    Pool::Entry* rootNode_{nullptr}; // +0x20
   };
 
   struct VisionDBLayoutAsserts
