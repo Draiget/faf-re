@@ -659,7 +659,11 @@ namespace
    * the modern hand-coded RB-tree insert path. Observable behavior
    * is identical (existing key updates blueprint in place; new key
    * allocates a node, links left/right under the parent walk, and
-   * refreshes head leftmost/rightmost extrema).
+   * refreshes head leftmost/rightmost extrema). The inner allocate-
+   * and-link helper `FUN_005A08B0` (116 instr, RB-tree node insert +
+   * parent-walk + leftmost/rightmost update) corresponds to the
+   * node-allocation and parent-walk block below, expressed through
+   * `CreateRebuildMapNode`/the explicit parent walk in this function.
    */
   void AddOrUpdateRebuildNode(SBuilderRebuildMap& map, const std::uint32_t key, const RUnitBlueprint* blueprint)
   {
