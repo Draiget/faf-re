@@ -134,6 +134,8 @@ namespace moho
   }
 
   /**
+   * Address: 0x00699ED0 (FUN_00699ED0, Moho::SPhysConstantsSerializer::RegisterSerializeFunctions)
+   *
    * What it does:
    * Binds `SPhysConstants` RTTI load/save callbacks.
    */
