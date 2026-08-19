@@ -9,6 +9,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/entity/Entity.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
@@ -44,6 +45,55 @@ namespace
     // nothing ever registers it - and since LookupRType throws on a miss, the
     // name-based candidate search that used to follow was unreachable.
     return gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
+  }
+
+  /**
+   * Cached lookup of the same `EntitySetTemplate<Unit>` RTTI descriptor,
+   * mirroring the binary's own `sType`-style cache (confirmed against
+   * FUN_00705320's disassembly: a static slot checked before falling back to
+   * `LookupRType`). `ResolveEntitySetTemplateUnitType()` above re-resolves on
+   * every call and is kept as-is for its own existing callers; this cached
+   * accessor is for the `MakeDerivedRef` path below, which the binary calls
+   * far more often (every vector-subscript access).
+   */
+  [[nodiscard]] gpg::RType* CachedEntitySetTemplateUnitReflType()
+  {
+    gpg::RType* type = moho::EntitySetTemplate<moho::Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
+      moho::EntitySetTemplate<moho::Unit>::sType = type;
+    }
+    return type;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
   }
 
   /**
@@ -89,6 +139,29 @@ gpg::RRef* gpg::RRef_SEntitySetTemplateUnit(gpg::RRef* const outRef, moho::SEnti
 
   outRef->mObj = value;
   outRef->mType = ResolveEntitySetTemplateUnitType();
+  return outRef;
+}
+
+/**
+ * Address: 0x00705320 (FUN_00705320, gpg::RRef_EntitySetTemplate_Unit)
+ *
+ * What it does:
+ * Builds one reflected reference for `EntitySetTemplate<Unit>`, resolving
+ * the value's dynamic type and adjusting the object pointer to the base
+ * offset `IsDerivedFrom` reports (the general derived-ref pattern used
+ * throughout this codebase's reflection glue, `MakeDerivedRef`). This is
+ * the version `RVectorType<SEntitySetTemplateUnit>::SubscriptIndex`
+ * (0x00701850) actually calls per-element on every vector subscript;
+ * `RRef_SEntitySetTemplateUnit` above is a separate, simpler binary
+ * function used by other callers.
+ */
+gpg::RRef* gpg::RRef_EntitySetTemplate_Unit(gpg::RRef* const outRef, moho::SEntitySetTemplateUnit* const value)
+{
+  if (outRef == nullptr) {
+    return nullptr;
+  }
+
+  *outRef = MakeDerivedRef(value, CachedEntitySetTemplateUnitReflType());
   return outRef;
 }
 
@@ -142,12 +215,12 @@ gpg::RRef gpg::RVectorType<moho::SEntitySetTemplateUnit>::SubscriptIndex(void* c
   GPG_ASSERT(static_cast<std::size_t>(ind) < storage->size());
 
   gpg::RRef out{};
-  gpg::RRef_SEntitySetTemplateUnit(&out, nullptr);
+  gpg::RRef_EntitySetTemplate_Unit(&out, nullptr);
   if (storage == nullptr || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
     return out;
   }
 
-  gpg::RRef_SEntitySetTemplateUnit(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  gpg::RRef_EntitySetTemplate_Unit(&out, &(*storage)[static_cast<std::size_t>(ind)]);
   return out;
 }
 
