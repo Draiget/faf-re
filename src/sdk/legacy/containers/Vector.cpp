@@ -6607,21 +6607,6 @@ void CopyAssignReservedTransportBoneLane(
   destination.reservedBones = source.reservedBones;
 }
 
-[[nodiscard]] moho::SAiReservedTransportBone* CopyAssignReservedTransportBoneRange(
-  moho::SAiReservedTransportBone* destination,
-  const moho::SAiReservedTransportBone* sourceBegin,
-  const moho::SAiReservedTransportBone* sourceEnd
-)
-{
-  while (sourceBegin != sourceEnd) {
-    CopyAssignReservedTransportBoneLane(*destination, *sourceBegin);
-    ++destination;
-    ++sourceBegin;
-  }
-
-  return destination;
-}
-
 /**
  * Address: 0x005EFF70 (FUN_005EFF70, sub_5EFF70)
  *
@@ -7173,71 +7158,6 @@ void ReleaseRefcountedLaneRange(
   }
 
   (void)CopyAssignObjectRange(destinationBegin, sourceBegin, sourceEnd);
-  destination.last = reinterpret_cast<void**>(destinationBegin + sourceCount);
-  return &destination;
-}
-
-/**
- * Address: 0x005ED370 (FUN_005ED370)
- *
- * What it does:
- * Copy-assigns one `vector<SAiReservedTransportBone>` lane while preserving
- * weak-link relink behavior and reserved-bones subvector ownership rules.
- */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignReservedTransportBoneVectorStorage(
-  VectorVoidStorageView& destination,
-  const VectorVoidStorageView& source
-)
-{
-  if (&destination == &source) {
-    return &destination;
-  }
-
-  const auto* const sourceBegin = reinterpret_cast<const moho::SAiReservedTransportBone*>(source.first);
-  const auto* const sourceEnd = reinterpret_cast<const moho::SAiReservedTransportBone*>(source.last);
-  const std::uint32_t sourceCount = VectorElementCount<moho::SAiReservedTransportBone>(source);
-  auto* destinationBegin = reinterpret_cast<moho::SAiReservedTransportBone*>(destination.first);
-  auto* destinationEnd = reinterpret_cast<moho::SAiReservedTransportBone*>(destination.last);
-
-  if (sourceCount == 0u) {
-    if (destinationBegin != destinationEnd) {
-      (void)moho::DestroyReservedTransportBoneRange(destinationBegin, destinationEnd);
-      destination.last = reinterpret_cast<void**>(destinationBegin);
-    }
-    return &destination;
-  }
-
-  const std::uint32_t destinationCount = VectorElementCount<moho::SAiReservedTransportBone>(destination);
-  if (sourceCount > destinationCount) {
-    const std::uint32_t destinationCapacity = VectorElementCapacity<moho::SAiReservedTransportBone>(destination);
-    if (sourceCount <= destinationCapacity) {
-      const auto* const sourceMiddle = sourceBegin + destinationCount;
-      (void)CopyAssignReservedTransportBoneRange(destinationBegin, sourceBegin, sourceMiddle);
-      destinationEnd = UninitializedCopyReservedTransportBoneRange(destinationEnd, sourceMiddle, sourceEnd);
-      destination.last = reinterpret_cast<void**>(destinationEnd);
-      return &destination;
-    }
-
-    if (destinationBegin != nullptr) {
-      (void)moho::DestroyReservedTransportBoneRange(destinationBegin, destinationEnd);
-      ::operator delete(destinationBegin);
-    }
-
-    destination.first = nullptr;
-    destination.last = nullptr;
-    destination.end = nullptr;
-    if (sourceCount != 0u && BuyVectorStorage32Byte(destination, sourceCount)) {
-      destinationBegin = reinterpret_cast<moho::SAiReservedTransportBone*>(destination.first);
-      destinationEnd = UninitializedCopyReservedTransportBoneRange(destinationBegin, sourceBegin, sourceEnd);
-      destination.last = reinterpret_cast<void**>(destinationEnd);
-    }
-    return &destination;
-  }
-
-  const auto* const sourceBound = sourceBegin + sourceCount;
-  moho::SAiReservedTransportBone* const copiedEnd =
-    CopyAssignReservedTransportBoneRange(destinationBegin, sourceBegin, sourceBound);
-  (void)moho::DestroyReservedTransportBoneRange(copiedEnd, destinationEnd);
   destination.last = reinterpret_cast<void**>(destinationBegin + sourceCount);
   return &destination;
 }
