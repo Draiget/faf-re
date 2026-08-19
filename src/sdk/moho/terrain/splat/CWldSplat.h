@@ -414,6 +414,18 @@ namespace moho
      */
     std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod);
 
+    /**
+     * Address: 0x00878CB0 (FUN_00878CB0, Moho::CDecalManager::Func26)
+     * Slot: 28 (`??_7CDecalManager@Moho@@6B@` + 0x70)
+     *
+     * What it does:
+     * Returns whether this manager has pending decal/splat changes since the
+     * flag was last cleared elsewhere (e.g. `AddDecals`/`RemoveDecals`/
+     * `ProcessRemovals` setting `mDidSomething`). Read-only - does not clear
+     * the flag itself.
+     */
+    [[nodiscard]] bool HasPendingChanges() const;
+
   public:
     /**
      * Address: 0x00878190 (FUN_00878190, Moho::CDecalManager::NewSplat)

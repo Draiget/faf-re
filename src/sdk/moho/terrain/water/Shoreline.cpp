@@ -9,6 +9,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/ID3DVertexSheet.h"
+#include "moho/render/ID3DVertexStream.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/terrain/water/ShoreCell.h"
@@ -58,6 +59,10 @@ namespace
 
   moho::StatItem* sEngineStatShorelineTotalCellsStage1 = nullptr;
   moho::StatItem* sEngineStatShorelineTotalCellsStage2 = nullptr;
+  moho::StatItem* sEngineStatShorelineVertices = nullptr;
+  moho::StatItem* sEngineStatShorelineTriangles = nullptr;
+  moho::StatItem* sEngineStatShorelineVerticesFinal = nullptr;
+  moho::StatItem* sEngineStatShorelineTrianglesFinal = nullptr;
 
   struct ShorelineSpatialDbRuntimeView
   {
@@ -82,7 +87,7 @@ namespace
     return *reinterpret_cast<ShorelineSpatialDbRuntimeView*>(&shoreline.mSpatialDbEntry);
   }
 
-  void EnsureShorelineTotalCellsStat(moho::StatItem*& slot)
+  void EnsureNamedStat(moho::StatItem*& slot, const char* const name)
   {
     if (slot != nullptr) {
       return;
@@ -93,10 +98,42 @@ namespace
       return;
     }
 
-    slot = stats->GetItem("Shoreline_TotalCells", true);
+    slot = stats->GetItem(name, true);
     if (slot != nullptr) {
       (void)slot->Release(0);
     }
+  }
+
+  /**
+   * One raw shoreline mesh record, recovered from `Shoreline::Update`
+   * (0x00812E80). Vertex format token 0 (`kShorelineVertexFormatToken`) is
+   * an external GPU vertex-format declaration this recovery does not
+   * resolve; the confirmed binary behavior is a 24-byte record built from
+   * three `ShoreCellPoint2` values (6 consecutive floats), so the record is
+   * kept as an opaque byte blob rather than guessed field names.
+   */
+  struct ShorelineMeshRecord
+  {
+    std::uint8_t bytes[0x18]; // +0x00 opaque 24-byte shoreline mesh record
+  };
+  static_assert(sizeof(ShorelineMeshRecord) == 0x18, "ShorelineMeshRecord size must be 0x18");
+
+  constexpr std::int32_t kMaxShorelineTriangles = 4094;
+
+  void WriteShorelineMeshRecord(
+    ShorelineMeshRecord& dest,
+    const moho::ShoreCellPoint2& a,
+    const moho::ShoreCellPoint2& b,
+    const moho::ShoreCellPoint2& c
+  )
+  {
+    auto* const out = reinterpret_cast<float*>(dest.bytes);
+    out[0] = a.x;
+    out[1] = a.z;
+    out[2] = b.x;
+    out[3] = b.z;
+    out[4] = c.x;
+    out[5] = c.z;
   }
 
   void StoreStatCounter(moho::StatItem* const slot, const std::int32_t value)
@@ -828,7 +865,7 @@ namespace moho
   {
     Destroy();
 
-    EnsureShorelineTotalCellsStat(sEngineStatShorelineTotalCellsStage1);
+    EnsureNamedStat(sEngineStatShorelineTotalCellsStage1, "Shoreline_TotalCells");
     StoreStatCounter(sEngineStatShorelineTotalCellsStage1, 0);
 
     TerrainMapRuntimeView* const map = (terrainResource != nullptr) ? terrainResource->mMap : nullptr;
@@ -888,9 +925,84 @@ namespace moho
       }
     }
 
-    EnsureShorelineTotalCellsStat(sEngineStatShorelineTotalCellsStage2);
+    EnsureNamedStat(sEngineStatShorelineTotalCellsStage2, "Shoreline_TotalCells");
     StoreStatCounter(sEngineStatShorelineTotalCellsStage2, static_cast<std::int32_t>(mCells.size()));
     ren_Shoreline = true;
+  }
+
+  /**
+   * Address: 0x00812E80 (FUN_00812E80, Moho::Shoreline::Update)
+   *
+   * What it does:
+   * Refreshes shoreline mesh geometry for the current camera view; see the
+   * header declaration for the full behavioral summary.
+   */
+  void Shoreline::Update(const GeomCamera3& camera)
+  {
+    EnsureNamedStat(sEngineStatShorelineVertices, "Shoreline_Vertices");
+    StoreStatCounter(sEngineStatShorelineVertices, 0);
+
+    EnsureNamedStat(sEngineStatShorelineTriangles, "Shoreline_Triangles");
+    StoreStatCounter(sEngineStatShorelineTriangles, 0);
+
+    mShorelineTris = 0;
+
+    if (mCells.empty()) {
+      return;
+    }
+
+    gpg::fastvector<UserEntity*> visibleCells;
+    (void)mSpatialDbEntry.CollectInView(
+      const_cast<GeomCamera3*>(&camera), visibleCells, static_cast<EEntityType>(kSpatialRoutingMask)
+    );
+
+    if (visibleCells.empty()) {
+      return;
+    }
+
+    auto* const vertexStream = mVertexSheet->GetVertStream(0U);
+    auto* writeCursor =
+      static_cast<ShorelineMeshRecord*>(vertexStream->Lock(0, kShorelineVertexSheetVertexCount, false, true));
+
+    std::int32_t vertexCount = 0;
+    for (UserEntity* const entity : visibleCells) {
+      if (mShorelineTris >= kMaxShorelineTriangles) {
+        break;
+      }
+
+      auto* const cell = reinterpret_cast<ShoreCell*>(entity);
+      const ShoreCellPoint2* const points = cell->mPoints;
+
+      WriteShorelineMeshRecord(*writeCursor, points[0], points[1], points[2]);
+      ++writeCursor;
+      ++mShorelineTris;
+      vertexCount += 3;
+
+      if (cell->mType > 1) {
+        WriteShorelineMeshRecord(*writeCursor, points[2], points[1], points[3]);
+        ++writeCursor;
+        ++mShorelineTris;
+        vertexCount += 3;
+      }
+
+      if (cell->mType > 2) {
+        WriteShorelineMeshRecord(*writeCursor, points[2], points[3], points[4]);
+        ++writeCursor;
+        ++mShorelineTris;
+        vertexCount += 3;
+      }
+    }
+
+    vertexStream->Unlock();
+
+    EnsureNamedStat(sEngineStatShorelineVerticesFinal, "Shoreline_Vertices");
+    if (sEngineStatShorelineVerticesFinal != nullptr) {
+      sEngineStatShorelineVerticesFinal->mUseRealtimeSlot = 0;
+    }
+    StoreStatCounter(sEngineStatShorelineVerticesFinal, vertexCount);
+
+    EnsureNamedStat(sEngineStatShorelineTrianglesFinal, "Shoreline_Triangles");
+    StoreStatCounter(sEngineStatShorelineTrianglesFinal, mShorelineTris);
   }
 
   /**

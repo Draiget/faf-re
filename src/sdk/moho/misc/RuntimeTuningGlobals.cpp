@@ -46,11 +46,19 @@ namespace moho
   // given. Addresses in the zero-fill tail of .data carry no bytes in the image
   // and therefore start at zero.
   bool ren_Ui = true;                     // 0x00F57DE7 = 0x01
+  bool ren_NormalDecals = true;           // 0x00F57DDE = 0x01
+  bool ren_Splats = true;                 // 0x00F57DDF = 0x01
+  bool ren_GenerateMesh = true;           // 0x00F57DE0 = 0x01
   bool ren_Decals = true;                 // 0x00F57DDD = 0x01
+  bool ren_ClipDecals = true;             // 0x00F57B7F = 0x01
+  int ren_ClipDecalLevel = 2;             // 0x00F57DB4 = 2
+  bool ren_IgnoreDecalLOD = false;        // 0x010A643F, zero-fill
+  int ren_DecalFidelity = 0;              // 0x010A6444, zero-fill
   bool ren_bicubicnormals = true;         // 0x00F57DC1 = 0x01
   float ren_ShadowCoeff = 3.0f;           // 0x00F57E00 = 3.0f
   float ren_ShadowLOD = 250.0f;           // 0x00F57E04 = 250.0f
   bool ren_glowingDecals = true;          // 0x00F57DE1 = 0x01
+  bool ren_ForceUpdateMinimapTerrain = true; // 0x00F57DE2 = 0x01
   bool ren_Bloom = true;                  // 0x00F57E51 = 0x01
   bool ed_EnableHook = true;              // 0x00F57E55 = 0x01
   bool ren_Oblivion = false;              // 0x010A6417, zero-fill

@@ -82,6 +82,33 @@ namespace moho
     [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
 
     /**
+     * Primary vtable slot 5 (unnamed in the binary; `Func3` in per-class
+     * recovery notes).
+     *
+     * What it does:
+     * Per-frame render-context update: stores the camera and 6-int viewport
+     * block, derives a dirty flag from edit-mode/camera-transform changes,
+     * and - when dirty (or forced) and not a minimap pass - rebuilds
+     * tessellation, gathers on-screen decals/splats, and re-uploads the
+     * tesselator's rect-cache/collision-index lanes into the terrain
+     * vertex/index sheets. Behavior differs across the three fidelity
+     * classes in which fields exist (only high fidelity has a shoreline)
+     * and in a handful of gating details - see each override's own
+     * documentation.
+     *
+     * Dispatched from `WRenViewport::Render` (0x007F90D0): `mov edx,
+     * [edx+14h]` / `call edx` at 0x007F93A6-0x007F93C7, immediately before
+     * the slot-9 (`DrawTerrainNormal`) dispatch.
+     */
+    virtual void UpdateRenderContext(
+      std::int32_t gameTick,
+      float deltaSeconds,
+      GeomCamera3* camera,
+      const std::int32_t* viewportBlock,
+      bool minimapPass,
+      std::int32_t forceRegenerate) = 0;
+
+    /**
      * Primary vtable slot 6.
      *
      * What it does:

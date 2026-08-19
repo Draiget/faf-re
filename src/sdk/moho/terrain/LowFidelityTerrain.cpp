@@ -1,12 +1,17 @@
 #include "moho/terrain/LowFidelityTerrain.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 #include <boost/detail/sp_counted_base.hpp>
 
 #include "Wm3Vector3.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/Stats.h"
+#include "moho/misc/StatItem.h"
 #include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
 #include "moho/render/ID3DTextureSheet.h"
@@ -20,9 +25,11 @@
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/tess/CTesselator.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainShaderVars.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 
@@ -30,6 +37,19 @@ namespace
 {
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
+  constexpr float kMinDecalAlpha = 0.0039215689f; // 1/255
+  constexpr std::int32_t kMaxSplatsPerFrame = 250;
+
+  /**
+   * x87 "frndint" (round-to-nearest) + correction is the binary's idiom for
+   * floor-toward-negative-infinity float-to-int conversion, used repeatedly
+   * in the decal-rect-query bounds below. std::floor + truncating cast is
+   * the identical IEEE-754 result for every finite input.
+   */
+  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
+  {
+    return static_cast<std::int32_t>(std::floor(value));
+  }
 
   template <typename T>
   void DeleteOwned(T*& lane) noexcept
@@ -166,6 +186,12 @@ namespace moho
   extern bool ren_Decals;
   extern bool ren_DecalOverDraw;
   extern bool ren_glowingDecals;
+  extern bool ren_GenerateMesh;
+  extern bool ren_IgnoreDecalLOD;
+  extern int ren_DecalFidelity;
+  extern bool ren_NormalDecals;
+  extern bool ren_Splats;
+  extern float ren_DecalFadeFraction;
 
   boost::shared_ptr<RD3DTextureResource> sTerrainGridTexture;
   WaterSurface* sTerrainWaterSurface = nullptr;
@@ -831,5 +857,243 @@ namespace moho
     DrawSplatComposite();
 
     return true;
+  }
+
+  /**
+   * Address: 0x00808640 (FUN_00808640, Moho::LowFidelityTerrain::Func3)
+   *
+   * What it does: see the header - per-frame render-context update. See the
+   * header's own Doxygen block for the full behavioural summary; this is the
+   * simplest of the three fidelity classes' overrides - no viewport-block
+   * fields, no shoreline, and (unlike High/Medium) the vertex/index-sheet
+   * re-upload and splat pass run every call, not gated behind the dirty
+   * check (confirmed via the binary's own jump targets: both "skip
+   * tessellation" paths land directly at the unconditional tail).
+   */
+  void LowFidelityTerrain::UpdateRenderContext(
+    const std::int32_t gameTick,
+    const float deltaSeconds,
+    GeomCamera3* const camera,
+    const std::int32_t* const /*viewportBlock*/,
+    const bool minimapPass,
+    const std::int32_t /*forceRegenerate*/)
+  {
+    mCamera = camera;
+
+    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+
+    bool dirty = terrainRes->IsInEditMode();
+    if (!dirty) {
+      dirty = mCamera->tranform.Compare(mCachedCameraTransform);
+    }
+
+    mCachedCameraTransform = mCamera->tranform;
+
+    bool decalsDirty = false;
+    if (!minimapPass) {
+      auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
+      decalsDirty = decalManager->HasPendingChanges();
+    }
+
+    if (ren_GenerateMesh && (dirty || decalsDirty)) {
+      mTesselator->Rebuild(mCamera, terrainRes);
+
+      auto& shaderVars = GetTerrainShaderVars();
+      if (shaderVars.heightScale.Exists()) {
+        shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
+      }
+
+      ShaderVar& terrainHeightScale = GetTerrainHeightScaleShaderVar();
+      if (terrainHeightScale.Exists()) {
+        terrainHeightScale.SetFloat(mTesselator->GetHeightScale());
+      }
+      ShaderVar& terrainTime = GetTerrainTimeShaderVar();
+      if (terrainTime.Exists()) {
+        terrainTime.SetFloat(static_cast<float>(gameTick) + deltaSeconds);
+      }
+
+      mSkirtStartIndex = static_cast<std::uint32_t>(mTesselator->GetSkirtIndexStart());
+      mUnknown24 = static_cast<std::uint32_t>(mTesselator->GetSkirtVertexStart() - 1);
+      mSkirtEndIndex = static_cast<std::uint32_t>(mTesselator->GetCollisionIndexCount());
+      mSkirtEndVertex = mTesselator->GetRectCacheCount() - 1;
+
+      mSkirtBaseVertex = std::numeric_limits<std::int32_t>::max();
+      const std::uint16_t* const collisionIndexData = mTesselator->GetCollisionIndexData();
+      for (std::uint32_t i = mSkirtStartIndex; i < mSkirtEndIndex; ++i) {
+        mSkirtBaseVertex = std::min(mSkirtBaseVertex, static_cast<std::int32_t>(collisionIndexData[i]));
+      }
+
+      mPrimaryPatchData.ResetStorageToInline();
+
+      if (!minimapPass && ren_Decals) {
+        auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
+
+        gpg::fastvector<UserEntity*> visibleDecals;
+        (void)decalManager->EntitiesInView(mCamera, visibleDecals, ren_IgnoreDecalLOD);
+        const float lodAreaThreshold = decalManager->GetLodThreshold(ren_DecalFidelity);
+
+        static StatItem* sEngineStatRenderFlatDecals = nullptr;
+        static StatItem* sEngineStatRenderDecals = nullptr;
+
+        for (UserEntity* const entity : visibleDecals) {
+          auto* const decal = reinterpret_cast<CWldTerrainDecal*>(entity);
+
+          if (decal->mFidelity > 0) {
+            continue;
+          }
+          if (!ren_NormalDecals
+              && (decal->mType == WldTerrainDecalType_NormalsAlpha || decal->mType == WldTerrainDecalType_Normals)) {
+            continue;
+          }
+          if (lodAreaThreshold > (decal->mScale.z * decal->mScale.x)) {
+            continue;
+          }
+
+          const float midX = (decal->mBoundsMaxX + decal->mBoundsMinX) * 0.5f;
+          const float midZ = (decal->mBoundsMaxZ + decal->mBoundsMinZ) * 0.5f;
+
+          auto* const heightField = reinterpret_cast<CHeightField*>(mTerrainResource->mMap->mHeightFieldObject);
+          const float elevation = heightField->GetElevation(midX, midZ);
+
+          const Vector4f& row1 = mCamera->viewport.r[1];
+          const float worldDistance = (midZ * row1.z) + (elevation * row1.y) + (midX * row1.x) + row1.w;
+
+          float alpha;
+          if (ren_IgnoreDecalLOD) {
+            alpha = 1.0f;
+          } else {
+            alpha = decal->GetLODAlpha(worldDistance) * decal->mCurrentAlpha;
+            if (alpha < kMinDecalAlpha) {
+              continue;
+            }
+          }
+
+          CWldTerrainDecal::Quad flatnessQuad{};
+          const bool isFlat = decal->ComputeFlatness(flatnessQuad);
+
+          TerrainDecalDrawCommand command{};
+          command.alpha = alpha;
+          command.decal = decal;
+
+          if (isFlat) {
+            std::uint32_t addedIndexCount = 0;
+            (void)mTesselator->EmitCollisionQuad(
+              reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0), &command.startIndex, &addedIndexCount,
+              &command.baseVertex, reinterpret_cast<std::uint32_t*>(&command.endVertex));
+            command.indexCount = static_cast<std::int32_t>(addedIndexCount);
+
+            if (command.indexCount > 0 && (command.startIndex + command.indexCount) < kSkirtMaxIndexCount) {
+              reinterpret_cast<LowFidelityDecalCommandLane&>(mPrimaryPatchData).PushBack(command);
+
+              if (sEngineStatRenderFlatDecals == nullptr) {
+                EngineStats* const engineStats = GetEngineStats();
+                sEngineStatRenderFlatDecals = engineStats->GetItem("Render_FlatDecals", true);
+                (void)sEngineStatRenderFlatDecals->Release(0);
+              }
+              _InterlockedExchangeAdd(
+                reinterpret_cast<volatile long*>(&sEngineStatRenderFlatDecals->mPrimaryValueBits), 1);
+            }
+          } else {
+            std::int32_t baselineIndexCount = 0;
+            std::uint32_t addedIndexCount = 0;
+            std::int32_t minRectIndex = 0;
+            std::int32_t maxRectIndex = 0;
+            (void)mTesselator->CollectClippedCollisionIndicesInRect(
+              FloorToInt(decal->mBoundsMinX), FloorToInt(decal->mBoundsMinZ), FloorToInt(decal->mBoundsMaxX),
+              FloorToInt(decal->mBoundsMaxZ), &baselineIndexCount, &addedIndexCount, &minRectIndex, &maxRectIndex);
+
+            if (addedIndexCount > 0
+                && (baselineIndexCount + static_cast<std::int32_t>(addedIndexCount)) < kSkirtMaxIndexCount) {
+              command.startIndex = baselineIndexCount;
+              command.indexCount = static_cast<std::int32_t>(addedIndexCount);
+              command.baseVertex = minRectIndex;
+              command.endVertex = maxRectIndex;
+              reinterpret_cast<LowFidelityDecalCommandLane&>(mPrimaryPatchData).PushBack(command);
+
+              if (sEngineStatRenderDecals == nullptr) {
+                EngineStats* const engineStats = GetEngineStats();
+                sEngineStatRenderDecals = engineStats->GetItem("Render_Decals", true);
+                (void)sEngineStatRenderDecals->Release(0);
+              }
+              _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sEngineStatRenderDecals->mPrimaryValueBits), 1);
+            }
+          }
+        }
+      }
+    }
+
+    mSecondaryPatchData.ResetStorageToInline();
+
+    if (!minimapPass && ren_Splats) {
+      auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
+
+      gpg::fastvector<UserEntity*> visibleSplats;
+      (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
+
+      std::int32_t splatBudget = 0;
+      for (UserEntity* const entity : visibleSplats) {
+        auto* const splat = reinterpret_cast<CWldSplat*>(entity);
+
+        if (splat->mFidelity > 0) {
+          continue;
+        }
+
+        const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
+        const Vector4f& row1 = mCamera->viewport.r[1];
+        const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
+          + (firstVertex.mPosition.x * row1.x) + row1.w;
+
+        if (worldDistance > splat->mCutoffLOD) {
+          continue;
+        }
+        if (++splatBudget >= kMaxSplatsPerFrame) {
+          break;
+        }
+
+        float fadeAlpha;
+        if (splat->mNearCutoff <= 0.0f) {
+          const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
+          const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
+          const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
+          fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+        } else {
+          const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
+          const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
+          const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
+          fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
+        }
+        const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+
+        splat->UpdateBatchTexture(texture_batcher);
+
+        auto& splatVertexLane = reinterpret_cast<LowFidelitySplatVertexLane&>(mSecondaryPatchData);
+        const std::size_t countBeforeAppend = splatVertexLane.Size();
+        for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
+          splatVertexLane.PushBack(reinterpret_cast<const LowFidelitySplatVertex&>(sourceVertex));
+        }
+
+        for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {
+          *reinterpret_cast<float*>(splatVertexLane[v].bytes + 0x14) = bakedAlpha;
+        }
+      }
+    }
+
+    const std::int32_t rectCacheCount = mTesselator->GetRectCacheCount();
+    std::int32_t collisionIndexCount = mTesselator->GetCollisionIndexCount();
+    if (collisionIndexCount > kSkirtMaxIndexCount) {
+      collisionIndexCount = kSkirtMaxIndexCount;
+    }
+
+    if (rectCacheCount > 0) {
+      void* const lockedVertices = mTerrainVertexSheet->GetVertStream(0U)->Lock(0, rectCacheCount, false, true);
+      std::memcpy(lockedVertices, mTesselator->GetRectCacheData(), sizeof(CTesselator::Rect16) * rectCacheCount);
+      mTerrainVertexSheet->GetVertStream(0U)->Unlock();
+    }
+
+    if (collisionIndexCount > 0) {
+      std::int16_t* const lockedIndices = mTerrainIndexSheet->Lock(0, collisionIndexCount, false, true);
+      std::memcpy(lockedIndices, mTesselator->GetCollisionIndexData(), sizeof(std::uint16_t) * collisionIndexCount);
+      mTerrainIndexSheet->Unlock();
+    }
   }
 } // namespace moho

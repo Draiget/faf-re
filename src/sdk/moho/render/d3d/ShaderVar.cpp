@@ -32,6 +32,8 @@ namespace
   DEFINE_SHADER_VAR_SLOT(0x010A7840u);
   DEFINE_SHADER_VAR_SLOT(0x010A78D0u);
   DEFINE_SHADER_VAR_SLOT(0x010A7888u);
+  DEFINE_SHADER_VAR_SLOT(0x010C0630u);
+  DEFINE_SHADER_VAR_SLOT(0x010C02D0u);
 
 #undef DEFINE_SHADER_VAR_SLOT
 
@@ -112,6 +114,17 @@ namespace
   };
 
   [[maybe_unused]] PrimBatcherShaderVarBootstrap gPrimBatcherShaderVarBootstrap;
+
+  struct TerrainCommonShaderVarBootstrap
+  {
+    TerrainCommonShaderVarBootstrap()
+    {
+      moho::register_ShaderVarTerrainHeightScale();
+      moho::register_ShaderVarTerrainTime();
+    }
+  };
+
+  [[maybe_unused]] TerrainCommonShaderVarBootstrap gTerrainCommonShaderVarBootstrap;
 } // namespace
 
 namespace moho
@@ -129,6 +142,24 @@ namespace moho
   [[nodiscard]] ShaderVar& GetPrimBatcherAlphaMultiplierShaderVar()
   {
     return AccessShaderVarSlot<0x010A7888u>();
+  }
+
+  /**
+   * Standalone terrain shader-var globals bound by every TerrainCommon
+   * fidelity class's Func3 override (`shaderVarTerrainHeightScale`/
+   * `shaderVarTerrainTime` in the binary - direct symbol references, not
+   * members of `TerrainShaderVarSet`, confirmed via `mov esi, offset
+   * shaderVarTerrainHeightScale` at 0x00800550/0x0080057D in
+   * HighFidelityTerrain::Func3's disassembly).
+   */
+  [[nodiscard]] ShaderVar& GetTerrainHeightScaleShaderVar()
+  {
+    return AccessShaderVarSlot<0x010C0630u>();
+  }
+
+  [[nodiscard]] ShaderVar& GetTerrainTimeShaderVar()
+  {
+    return AccessShaderVarSlot<0x010C02D0u>();
   }
 
   /**
@@ -374,6 +405,45 @@ namespace moho
   {
     RegisterPrimBatcherShaderVar<0x010A7888u>("AlphaMultiplier", &cleanup_ShaderVarPrimBatcherAlphaMultiplier);
   }
+
+  /**
+   * What it does:
+   * Runs the terrain `TerrainHeightScale` shader-var destructor at process
+   * exit. Registrar thunk address not independently traced (reached only
+   * through the CRT static-init/atexit chain); the slot address and
+   * "TerrainHeightScale" registration name are confirmed directly from
+   * HighFidelityTerrain::Func3's disassembly (0x00800550-0x0080056E).
+   */
+  void cleanup_ShaderVarTerrainHeightScale()
+  {
+    DestroyShaderVarSlot<0x010C0630u>();
+  }
+
+  void register_ShaderVarTerrainHeightScale()
+  {
+    ShaderVar& slot = AccessShaderVarSlot<0x010C0630u>();
+    RegisterShaderVar("TerrainHeightScale", &slot, "terrain");
+    (void)std::atexit(&cleanup_ShaderVarTerrainHeightScale);
+  }
+
+  /**
+   * What it does:
+   * Runs the terrain `TerrainTime` shader-var destructor at process exit.
+   * Same evidence basis as `cleanup_ShaderVarTerrainHeightScale`, confirmed
+   * at 0x0080057D-0x0080059F.
+   */
+  void cleanup_ShaderVarTerrainTime()
+  {
+    DestroyShaderVarSlot<0x010C02D0u>();
+  }
+
+  void register_ShaderVarTerrainTime()
+  {
+    ShaderVar& slot = AccessShaderVarSlot<0x010C02D0u>();
+    RegisterShaderVar("TerrainTime", &slot, "terrain");
+    (void)std::atexit(&cleanup_ShaderVarTerrainTime);
+  }
+
   /**
    * Address: 0x010BF4E0 (?shaderVarFrameGlowCopyAdd@Moho@@3UstructShaderVar@@A)
    *

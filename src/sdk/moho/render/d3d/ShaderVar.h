@@ -163,6 +163,15 @@ namespace moho
   void register_ShaderVarPrimBatcherAlphaMultiplier();
 
   /**
+   * What it does:
+   * Registers the terrain `TerrainHeightScale`/`TerrainTime` shader-vars.
+   * See `ShaderVar.cpp` for the evidence basis (slot addresses confirmed
+   * directly from HighFidelityTerrain::Func3's disassembly).
+   */
+  void register_ShaderVarTerrainHeightScale();
+  void register_ShaderVarTerrainTime();
+
+  /**
    * Address: 0x00BEF140 (FUN_00BEF140, sub_BEF140)
    *
    * What it does:
@@ -188,7 +197,21 @@ namespace moho
    */
   void cleanup_ShaderVarPrimBatcherAlphaMultiplier();
 
+  void cleanup_ShaderVarTerrainHeightScale();
+  void cleanup_ShaderVarTerrainTime();
+
   [[nodiscard]] ShaderVar& GetPrimBatcherCompositeMatrixShaderVar();
   [[nodiscard]] ShaderVar& GetPrimBatcherTexture1ShaderVar();
   [[nodiscard]] ShaderVar& GetPrimBatcherAlphaMultiplierShaderVar();
+
+  /**
+   * Standalone terrain shader-var globals bound by every TerrainCommon
+   * fidelity class's per-frame tessellation-rebuild entry point ("Func3").
+   * Confirmed as direct standalone symbol references (not
+   * `TerrainShaderVarSet` members) via `mov esi, offset
+   * shaderVarTerrainHeightScale`/`shaderVarTerrainTime` in
+   * HighFidelityTerrain::Func3's disassembly (0x00800550, 0x0080057D).
+   */
+  [[nodiscard]] ShaderVar& GetTerrainHeightScaleShaderVar();
+  [[nodiscard]] ShaderVar& GetTerrainTimeShaderVar();
 } // namespace moho
