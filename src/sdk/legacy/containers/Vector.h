@@ -1679,6 +1679,10 @@ namespace msvc8
          * globalUserdata->mAllyUpgradeNotifications.push_back(pair) in
          * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner lane is
          * Moho::Sim::mAllyUpgradeNotifications at Sim+0x9D8)
+         * Address: 0x0057E6A0 (FUN_0057E6A0, msvc8::vector<Moho::Unit*>::push_back
+         * — fast path only (no grow-core citation found); emitted via
+         * storedCargo.push_back(storedUnit) in Sim::TransferUnit (Sim.cpp:11097),
+         * one of several local msvc8::vector<Unit*> scratch lists in that function)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
