@@ -106,7 +106,7 @@ namespace
    * Clears one `REmitterCurveKey` payload lane (`X/Y/Z`) while preserving the
    * base-object lane at offset `+0x00`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* ClearEmitterCurveKeyPayloadLanes(
+  [[nodiscard]] moho::REmitterCurveKey* ClearEmitterCurveKeyPayloadLanes(
     moho::REmitterCurveKey* const result
   ) noexcept
   {
@@ -148,7 +148,7 @@ namespace
    * What it does:
    * Returns the indexed `X/Y/Z` triplet slot from one payload-lane base.
    */
-  [[maybe_unused]] [[nodiscard]] EmitterCurveValueTriplet* IndexEmitterCurveValueTripletLaneAdapterA(
+  [[nodiscard]] EmitterCurveValueTriplet* IndexEmitterCurveValueTripletLaneAdapterA(
     const int index,
     EmitterCurveValueTriplet* const* const laneBase
   ) noexcept
@@ -162,7 +162,7 @@ namespace
    * What it does:
    * Secondary adapter lane for indexed `X/Y/Z` triplet slot selection.
    */
-  [[maybe_unused]] [[nodiscard]] EmitterCurveValueTriplet* IndexEmitterCurveValueTripletLaneAdapterB(
+  [[nodiscard]] EmitterCurveValueTriplet* IndexEmitterCurveValueTripletLaneAdapterB(
     const int index,
     EmitterCurveValueTriplet* const* const laneBase
   ) noexcept
@@ -185,7 +185,7 @@ namespace
    * What it does:
    * Writes one curve-key `X` lane bit pattern to caller storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyXBitsAdapterLaneA(
+  [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyXBitsAdapterLaneA(
     std::uint32_t* const destination,
     const moho::REmitterCurveKey* const source
   ) noexcept
@@ -199,7 +199,7 @@ namespace
    * What it does:
    * Writes one curve-key `Y` lane bit pattern to caller storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyYBitsAdapterLaneA(
+  [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyYBitsAdapterLaneA(
     std::uint32_t* const destination,
     const moho::REmitterCurveKey* const source
   ) noexcept
@@ -222,7 +222,7 @@ namespace
    * What it does:
    * Stores one 32-bit lane value from the source register into output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreWordLaneAdapterA(
+  [[nodiscard]] std::uint32_t* StoreWordLaneAdapterA(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -236,7 +236,7 @@ namespace
    * What it does:
    * Secondary adapter lane for writing one 32-bit scalar value.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreWordLaneAdapterB(
+  [[nodiscard]] std::uint32_t* StoreWordLaneAdapterB(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -250,7 +250,7 @@ namespace
    * What it does:
    * Advances one float-lane pointer by a scalar-lane index.
    */
-  [[maybe_unused]] [[nodiscard]] float* OffsetFloatLanePointerByIndex(
+  [[nodiscard]] float* OffsetFloatLanePointerByIndex(
     float* const laneBase,
     const int index
   ) noexcept
@@ -284,7 +284,7 @@ namespace
    * What it does:
    * Swaps `X/Y/Z` payload lanes between two curve keys and returns left key.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* SwapEmitterCurveKeyPayloadLanesAdapterA(
+  [[nodiscard]] moho::REmitterCurveKey* SwapEmitterCurveKeyPayloadLanesAdapterA(
     moho::REmitterCurveKey* const left,
     moho::REmitterCurveKey* const right
   ) noexcept
@@ -298,7 +298,7 @@ namespace
    * What it does:
    * Secondary adapter lane for swapping curve-key payload components.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* SwapEmitterCurveKeyPayloadLanesAdapterB(
+  [[nodiscard]] moho::REmitterCurveKey* SwapEmitterCurveKeyPayloadLanesAdapterB(
     moho::REmitterCurveKey* const left,
     moho::REmitterCurveKey* const right
   ) noexcept
@@ -312,7 +312,7 @@ namespace
    * What it does:
    * Adapter lane that writes one curve-key `X` bit pattern to output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyXBitsAdapterLaneB(
+  [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyXBitsAdapterLaneB(
     std::uint32_t* const destination,
     const moho::REmitterCurveKey* const source
   ) noexcept
@@ -326,7 +326,7 @@ namespace
    * What it does:
    * Adapter lane that writes one curve-key `Y` bit pattern to output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyYBitsAdapterLaneB(
+  [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyYBitsAdapterLaneB(
     std::uint32_t* const destination,
     const moho::REmitterCurveKey* const source
   ) noexcept
@@ -351,7 +351,7 @@ namespace
    * What it does:
    * Swaps one 32-bit lane value between two scalar slots and returns left slot.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* SwapWordLaneAdapter(
+  [[nodiscard]] std::uint32_t* SwapWordLaneAdapter(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -365,7 +365,7 @@ namespace
    * What it does:
    * Third adapter lane that writes one curve-key `X` bit pattern.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyXBitsAdapterLaneC(
+  [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyXBitsAdapterLaneC(
     std::uint32_t* const destination,
     const moho::REmitterCurveKey* const source
   ) noexcept
@@ -379,7 +379,7 @@ namespace
    * What it does:
    * Third adapter lane that writes one curve-key `Y` bit pattern.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyYBitsAdapterLaneC(
+  [[nodiscard]] std::uint32_t* StoreEmitterCurveKeyYBitsAdapterLaneC(
     std::uint32_t* const destination,
     const moho::REmitterCurveKey* const source
   ) noexcept
@@ -393,7 +393,7 @@ namespace
    * What it does:
    * Third adapter lane for writing one 32-bit scalar value.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreWordLaneAdapterC(
+  [[nodiscard]] std::uint32_t* StoreWordLaneAdapterC(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -407,7 +407,7 @@ namespace
    * What it does:
    * Fourth adapter lane for writing one 32-bit scalar value.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreWordLaneAdapterD(
+  [[nodiscard]] std::uint32_t* StoreWordLaneAdapterD(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -422,7 +422,7 @@ namespace
    * Compares absolute values of two float lanes and returns whether the
    * second lane magnitude is greater than the first.
    */
-  [[maybe_unused]] bool IsSecondAbsoluteValueGreater(
+  bool IsSecondAbsoluteValueGreater(
     const float* const first,
     const float* const second
   ) noexcept
@@ -439,7 +439,7 @@ namespace
    * Models the tiny in-place `gpg::RObject` base-lane initializer used by
    * emitter-curve key construction/unwind codegen lanes.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RObject* InitializeEmitterCurveRObjectLane(
+  [[nodiscard]] gpg::RObject* InitializeEmitterCurveRObjectLane(
     gpg::RObject* const objectStorage
   ) noexcept
   {
@@ -455,7 +455,7 @@ namespace
    * Secondary in-place `gpg::RObject` vtable initializer used by emitter-curve
    * constructor/unwind helper lanes.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RObject* InitializeEmitterCurveRObjectLaneSecondary(
+  [[nodiscard]] gpg::RObject* InitializeEmitterCurveRObjectLaneSecondary(
     gpg::RObject* const objectStorage
   ) noexcept
   {
@@ -470,7 +470,7 @@ namespace
    * contiguous `REmitterCurveKey` destination storage, reading each source
    * element at a stride of 4 floats and writing destination `vtable/X/Y/Z`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeFromLaneArray(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeFromLaneArray(
     moho::REmitterCurveKey* destinationBegin,
     const float* sourceBegin,
     const float* sourceEnd
@@ -503,7 +503,7 @@ namespace
    * Stdcall adapter lane that forwards one source-lane range into the
    * canonical emitter-curve key range copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeStdcallAdapterLaneA(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeStdcallAdapterLaneA(
     const float* const sourceBegin,
     const float* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -519,7 +519,7 @@ namespace
    * Cdecl adapter lane that forwards one source-lane range into the canonical
    * emitter-curve key range copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneA(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneA(
     const float* const sourceBegin,
     const float* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -535,7 +535,7 @@ namespace
    * Stdcall adapter lane that forwards one source-lane range into the
    * canonical emitter-curve key range copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeStdcallAdapterLaneB(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeStdcallAdapterLaneB(
     const float* const sourceBegin,
     const float* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -551,7 +551,7 @@ namespace
    * Cdecl adapter lane that forwards one source-lane range into the canonical
    * emitter-curve key range copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneB(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneB(
     const float* const sourceBegin,
     const float* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -567,7 +567,7 @@ namespace
    * Cdecl adapter lane that forwards one source-lane range into the canonical
    * emitter-curve key range copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneC(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneC(
     const float* const sourceBegin,
     const float* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -583,7 +583,7 @@ namespace
    * Cdecl adapter lane that forwards one source-lane range into the canonical
    * emitter-curve key range copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneD(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeCdeclAdapterLaneD(
     const float* const sourceBegin,
     const float* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -599,7 +599,7 @@ namespace
    * Initializes `count` contiguous `REmitterCurveKey` records from one source
    * lane tuple, writing vtable/X/Y/Z for each 0x10-byte element stride.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* InitializeEmitterCurveKeyRangeFromLaneTuple(
+  [[nodiscard]] moho::REmitterCurveKey* InitializeEmitterCurveKeyRangeFromLaneTuple(
     moho::REmitterCurveKey* destinationBegin,
     const float* sourceLanes,
     int count
@@ -632,7 +632,7 @@ namespace
    * Thunk lane used by emitter-curve vector deserialization to clear one key
    * storage payload by forwarding to the canonical storage reset helper.
    */
-  [[maybe_unused]] void ClearEmitterCurveKeyStorageThunk(moho::REmitterCurveKeyListStorage* const storage)
+  void ClearEmitterCurveKeyStorageThunk(moho::REmitterCurveKeyListStorage* const storage)
   {
     moho::ResetEmitterCurveKeyStorageRuntime(storage);
   }
@@ -644,7 +644,7 @@ namespace
    * Initializes `count` contiguous `REmitterCurveKey` records with zero
    * coordinate lanes and returns one-past-last destination element.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* InitializeEmitterCurveKeyRangeWithZeroTuple(
+  [[nodiscard]] moho::REmitterCurveKey* InitializeEmitterCurveKeyRangeWithZeroTuple(
     moho::REmitterCurveKey* const destinationBegin,
     const int count
   )
@@ -659,7 +659,7 @@ namespace
    * Copy-constructs one half-open `REmitterCurveKey` range into caller
    * storage and returns one-past-last destination slot.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRange(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRange(
     moho::REmitterCurveKey* const destinationBegin,
     const moho::REmitterCurveKey* sourceBegin,
     const moho::REmitterCurveKey* sourceEnd
@@ -690,7 +690,7 @@ namespace
    * Assigns one source key payload (`X/Y/Z`) into every destination key in the
    * half-open range `[destinationBegin, destinationEnd)`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* FillEmitterCurveKeyPayloadRange(
+  [[nodiscard]] moho::REmitterCurveKey* FillEmitterCurveKeyPayloadRange(
     moho::REmitterCurveKey* const destinationBegin,
     moho::REmitterCurveKey* const destinationEnd,
     const moho::REmitterCurveKey* const sourceKey
@@ -717,7 +717,7 @@ namespace
    * `[sourceBegin, sourceEnd)` into destination storage ending at
    * `destinationEnd`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyPayloadRangeBackward(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyPayloadRangeBackward(
     moho::REmitterCurveKey* const destinationEnd,
     const moho::REmitterCurveKey* const sourceEnd,
     const moho::REmitterCurveKey* const sourceBegin
@@ -746,7 +746,7 @@ namespace
    * Adapts one register-lane caller shape into the canonical emitter-curve key
    * range-copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeRegisterAdapterLaneA(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeRegisterAdapterLaneA(
     const moho::REmitterCurveKey* const sourceBegin,
     const moho::REmitterCurveKey* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -762,7 +762,7 @@ namespace
    * Adapts one register-lane caller shape into the canonical emitter-curve key
    * range-copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeRegisterAdapterLaneB(
+  [[nodiscard]] moho::REmitterCurveKey* CopyEmitterCurveKeyRangeRegisterAdapterLaneB(
     const moho::REmitterCurveKey* const sourceBegin,
     const moho::REmitterCurveKey* const sourceEnd,
     moho::REmitterCurveKey* const destinationBegin
@@ -1038,7 +1038,7 @@ namespace
    * Builds one default `REmitterCurveKey` fill lane (`X/Y/Z = 0`) and forwards
    * to the canonical vector-resize helper.
    */
-  [[maybe_unused]] [[nodiscard]] std::size_t ResizeEmitterCurveKeyVectorWithDefaultFillAdapter(
+  [[nodiscard]] std::size_t ResizeEmitterCurveKeyVectorWithDefaultFillAdapter(
     CurveKeyVector& storage,
     const std::size_t requestedCount
   )
