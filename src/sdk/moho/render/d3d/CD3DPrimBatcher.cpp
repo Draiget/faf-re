@@ -194,43 +194,45 @@ namespace
 
   template <typename TPointee>
   [[nodiscard]] boost::SharedCountPair* AsSharedCountPair(
-    moho::CD3DPrimBatcherRuntimeView::LegacyWeakHandle<TPointee>* const weakHandle
+    moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>* const sharedHandle
   ) noexcept
   {
-    return reinterpret_cast<boost::SharedCountPair*>(weakHandle);
+    return reinterpret_cast<boost::SharedCountPair*>(sharedHandle);
   }
 
+  // The batcher's texture/sheet members are genuine `boost::shared_ptr<T>`
+  // objects; `LegacySharedHandle<T>` only exists so the runtime view stays a
+  // trivially-initialisable layout overlay with `offsetof` guards. Bridging
+  // through this accessor keeps every refcount transition inside boost instead
+  // of open-coding `use_count_` / `weak_count_` arithmetic here.
   template <typename TPointee>
-  [[nodiscard]] const boost::SharedCountPair* AsSharedCountPair(
-    const boost::shared_ptr<TPointee>& sharedHandle
+  [[nodiscard]] boost::shared_ptr<TPointee>& AsSharedPtr(
+    moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>& handle
   ) noexcept
   {
     static_assert(
-      sizeof(boost::shared_ptr<TPointee>) == sizeof(boost::SharedCountPair),
-      "boost::shared_ptr<T> layout must match SharedCountPair"
+      sizeof(boost::shared_ptr<TPointee>) ==
+        sizeof(moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>),
+      "boost::shared_ptr<T> layout must match LegacySharedHandle<T>"
     );
-    return reinterpret_cast<const boost::SharedCountPair*>(&sharedHandle);
+    return reinterpret_cast<boost::shared_ptr<TPointee>&>(handle);
   }
 
+  /**
+   * Rebinds one batcher-owned `shared_ptr<T>` lane, matching the binary's
+   * inlined `shared_count::operator=` at 0x004387A5-0x004387CC and
+   * 0x00438903-0x00438927: store `px` unconditionally, then - only when the
+   * incoming control block differs - `add_ref_copy()` the new one and
+   * `release()` the previous one. Boost 1.34.1's `shared_ptr::operator=` is
+   * literally `px = r.px; pn = r.pn;`, so this is the same instruction shape.
+   */
   template <typename TPointee>
-  void AssignLegacyWeakFromShared(
-    moho::CD3DPrimBatcherRuntimeView::LegacyWeakHandle<TPointee>& weakHandle,
+  void AssignSharedHandle(
+    moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>& handle,
     const boost::shared_ptr<TPointee>& sharedHandle
   ) noexcept
   {
-    (void)boost::AssignWeakPairFromShared(AsSharedCountPair(&weakHandle), AsSharedCountPair(sharedHandle));
-  }
-
-  template <typename TPointee>
-  void ResetLegacyWeakHandle(
-    moho::CD3DPrimBatcherRuntimeView::LegacyWeakHandle<TPointee>& weakHandle
-  ) noexcept
-  {
-    weakHandle.px = nullptr;
-    if (weakHandle.pi != nullptr) {
-      weakHandle.pi->weak_release();
-      weakHandle.pi = nullptr;
-    }
+    AsSharedPtr(handle) = sharedHandle;
   }
 
   /**
@@ -412,8 +414,12 @@ namespace moho
       runtime->mIndexSheet->Destroy();
     }
 
-    boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mDynamicTexSheet));
+    // Binary order is +0x48 first (0x004384A8 `mov edi, [esi+48h]`, the batch
+    // texture's control block) and +0x40 second (0x004384DE), each dropping a
+    // strong reference: `lock xadd [pi+4], -1` -> dispose -> `lock xadd
+    // [pi+8], -1` -> destroy.
     boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mTexture));
+    boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mDynamicTexSheet));
 
     if (runtime->mPrimitives.mFirst != nullptr) {
       ::operator delete(static_cast<void*>(runtime->mPrimitives.mFirst));
@@ -503,6 +509,58 @@ namespace moho
   }
 
   /**
+   * Address: 0x0043A8B0 (FUN_0043A8B0)
+   * Mangled: ??1WeakPtr_CD3DBatchTexture@Moho@@QAE@@Z
+   *          (analyst label; the emitted body is the out-of-line
+   *           `boost::shared_ptr<Moho::CD3DBatchTexture>::reset()` instantiation)
+   *
+   * IDA signature:
+   * void __usercall Moho::WeakPtr_CD3DBatchTexture::~WeakPtr_CD3DBatchTexture(
+   *     boost::shared_ptr_CD3DBatchTexture *result@<eax>);
+   *
+   * What it does:
+   * Empties one `shared_ptr<CD3DBatchTexture>` lane in place and drops one
+   * strong owner reference from the detached control block.
+   *
+   * The 25-instruction body is `reset()`, not `~shared_ptr()`: it *stores*
+   * null into `px` (+0x00) and `pn.pi_` (+0x04) before touching the counters,
+   * which is the optimiser's rendering of boost 1.34.1's
+   * `this_type().swap(*this)`. A destructor would have no reason to write the
+   * lanes at all. The release path (`lock xadd [pi+4], -1` -> vslot +0x04
+   * `dispose()` -> `lock xadd [pi+8], -1` -> vslot +0x08 `destroy()`) is
+   * `sp_counted_base::release()` with `weak_release()` inlined into it.
+   */
+  void ResetSharedBatchTextureHandle(boost::shared_ptr<CD3DBatchTexture>& handle) noexcept
+  {
+    handle.reset();
+  }
+
+  /**
+   * Address: 0x0043A860 (FUN_0043A860)
+   * Mangled: ??1WeakPtr_CD3DDynamicTextureSheet@Moho@@QAE@@Z
+   *          (analyst label; the emitted body is the out-of-line
+   *           `boost::shared_ptr<Moho::CD3DDynamicTextureSheet>::reset()`
+   *           instantiation)
+   *
+   * IDA signature:
+   * void __usercall Moho::WeakPtr_CD3DDynamicTextureSheet::~WeakPtr_CD3DDynamicTextureSheet(
+   *     boost::shared_ptr_CD3DDynamicTextureSheet *result@<eax>);
+   *
+   * What it does:
+   * Empties one `shared_ptr<CD3DDynamicTextureSheet>` lane in place and drops
+   * one strong owner reference from the detached control block.
+   *
+   * Byte-identical to `ResetSharedBatchTextureHandle` above (both hash to
+   * 597fd943...); the two remain distinct functions because they are distinct
+   * template instantiations, and the caller picks them per lane - +0x44 for
+   * the batch texture, +0x3C for the sheet.
+   */
+  void ResetSharedDynamicTextureSheetHandle(boost::shared_ptr<CD3DDynamicTextureSheet>& handle) noexcept
+  {
+    handle.reset();
+  }
+
+  /**
    * Address: 0x004386A0 (?SetTexture@CD3DPrimBatcher@Moho@@QAEXABV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
    *
    * What it does:
@@ -522,14 +580,14 @@ namespace moho
         Flush();
       }
 
-      AssignLegacyWeakFromShared(runtime->mTexture, texture);
+      AssignSharedHandle(runtime->mTexture, texture);
 
       CD3DBatchTexture::TextureSheetHandle textureSheet{};
       Wm3::Vector2f uvScale{};
       Wm3::Vector2f uvBorder{};
       texture->GetTextureSheet(textureSheet, uvScale, uvBorder);
 
-      AssignLegacyWeakFromShared(runtime->mDynamicTexSheet, texture->mTextureSheet);
+      AssignSharedHandle(runtime->mDynamicTexSheet, texture->mTextureSheet);
       runtime->mP1x = uvScale.x;
       runtime->mP1y = uvScale.y;
       runtime->mP2x = uvBorder.x;
@@ -550,8 +608,12 @@ namespace moho
       uvRect = runtime->mTextureBatcher->AddTexture(texture);
     }
 
-    ResetLegacyWeakHandle(runtime->mTexture);
-    ResetLegacyWeakHandle(runtime->mDynamicTexSheet);
+    // Binary order: 0x00438728 `lea eax, [edi+44h]` -> call 0x0043A8B0 (batch
+    // texture lane), then 0x00438730 `lea eax, [edi+3Ch]` -> call 0x0043A860
+    // (dynamic sheet lane). Both lanes are dropped before the atlas UV rect is
+    // published, so a subsequent Flush takes the composite-atlas branch.
+    ResetSharedBatchTextureHandle(AsSharedPtr(runtime->mTexture));
+    ResetSharedDynamicTextureSheetHandle(AsSharedPtr(runtime->mDynamicTexSheet));
 
     runtime->mP2x = uvRect->x0;
     runtime->mP2y = uvRect->z0;
@@ -585,8 +647,11 @@ namespace moho
       Flush();
     }
 
-    ResetLegacyWeakHandle(runtime->mTexture);
-    AssignLegacyWeakFromShared(runtime->mDynamicTexSheet, derivedSheet);
+    // 0x004388C0-0x004388E8 inlines the very same lane reset the atlas path
+    // reaches through 0x0043A8B0; expressed here through the named recovery so
+    // both emissions share one source body.
+    ResetSharedBatchTextureHandle(AsSharedPtr(runtime->mTexture));
+    AssignSharedHandle(runtime->mDynamicTexSheet, derivedSheet);
 
     runtime->mP2x = 0.0f;
     runtime->mP2y = 0.0f;
