@@ -162,15 +162,12 @@ namespace moho
    */
   CUnitFormAndMoveTask::CUnitFormAndMoveTask()
     : CCommandTask()
-    , mUnknown0030(0)
-    , mNavigatorListenerVftable(0)
-    , mNavigatorListenerLink{}
-    , mUnknown0040(0)
-    , mFormationStatusListenerVftable(0)
-    , mFormationStatusListenerLink{}
-    , mUnknown0050(0)
-    , mCommandEventListenerVftable(0)
-    , mCommandEventListenerLink{}
+    , CUnitFormAndMoveTaskReservedSlot30()
+    , Listener<EAiNavigatorEvent>()
+    , CUnitFormAndMoveTaskReservedSlot40()
+    , Listener<EFormationdStatus>()
+    , CUnitFormAndMoveTaskReservedSlot50()
+    , Listener<ECommandEvent>()
     , mFormation(nullptr)
     , mFormationArrivalSatisfied(0)
     , mPad0065_0068{0, 0, 0}
@@ -212,15 +209,12 @@ namespace moho
     CAiFormationInstance* const formation
   )
     : CCommandTask(dispatchTask)
-    , mUnknown0030(0)
-    , mNavigatorListenerVftable(0)
-    , mNavigatorListenerLink{}
-    , mUnknown0040(0)
-    , mFormationStatusListenerVftable(0)
-    , mFormationStatusListenerLink{}
-    , mUnknown0050(0)
-    , mCommandEventListenerVftable(0)
-    , mCommandEventListenerLink{}
+    , CUnitFormAndMoveTaskReservedSlot30()
+    , Listener<EAiNavigatorEvent>()
+    , CUnitFormAndMoveTaskReservedSlot40()
+    , Listener<EFormationdStatus>()
+    , CUnitFormAndMoveTaskReservedSlot50()
+    , Listener<ECommandEvent>()
     , mFormation(formation)
     , mFormationArrivalSatisfied(0)
     , mPad0065_0068{0, 0, 0}
@@ -234,13 +228,13 @@ namespace moho
     if (CUnitCommandQueue* const queue = mUnit->CommandQueue; queue != nullptr) {
       if (CUnitCommand* const currentCommand = queue->GetCurrentCommand(); currentCommand != nullptr) {
         if (Broadcaster* const commandListenerHead = CommandEventListenerHead(currentCommand); commandListenerHead != nullptr) {
-          mCommandEventListenerLink.ListLinkBefore(commandListenerHead);
+          Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
         }
       }
     }
 
     if (Broadcaster* const formationListenerHead = FormationStatusListenerHead(mFormation); formationListenerHead != nullptr) {
-      mFormationStatusListenerLink.ListLinkBefore(formationListenerHead);
+      Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(formationListenerHead);
     }
 
     ApplyFormationGoalFromCurrentUnit();
@@ -260,7 +254,7 @@ namespace moho
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
       if (Broadcaster* const navigatorListenerHead = NavigatorListenerHead(navigator); navigatorListenerHead != nullptr) {
-        mNavigatorListenerLink.ListLinkBefore(navigatorListenerHead);
+        Listener<EAiNavigatorEvent>::mListenerLink.ListLinkBefore(navigatorListenerHead);
       }
     }
 
@@ -283,23 +277,23 @@ namespace moho
     }
 
     if (mUnit != nullptr && mUnit->CommandQueue != nullptr && mUnit->CommandQueue->GetCurrentCommand() != nullptr) {
-      mCommandEventListenerLink.ListUnlink();
+      Listener<ECommandEvent>::mListenerLink.ListUnlink();
     }
 
     if (mFormation != nullptr) {
-      mFormationStatusListenerLink.ListUnlink();
+      Listener<EFormationdStatus>::mListenerLink.ListUnlink();
     }
 
     if (mUnit != nullptr) {
       if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-        mNavigatorListenerLink.ListUnlink();
+        Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
         navigator->AbortMove();
       }
     }
 
-    mCommandEventListenerLink.ListResetLinks();
-    mFormationStatusListenerLink.ListResetLinks();
-    mNavigatorListenerLink.ListResetLinks();
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
+    Listener<EFormationdStatus>::mListenerLink.ListResetLinks();
+    Listener<EAiNavigatorEvent>::mListenerLink.ListResetLinks();
   }
 
   /**
@@ -400,13 +394,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00619680 (FUN_00619680, listener callback lane)
+   * Address: 0x00619680 (FUN_00619680, Moho::CUnitFormAndMoveTask::OnEvent)
+   * Primary vtable: `Listener<EAiNavigatorEvent>` secondary slot 0
+   * (`??_7CUnitFormAndMoveTask@Moho@@6B?$Listener@W4EAiNavigatorEvent@Moho@@@Moho@@@`).
    *
    * What it does:
    * Applies navigator event state transitions and resumes owner thread
    * processing.
    */
-  void CUnitFormAndMoveTask::HandleNavigatorEvent(const EAiNavigatorEvent event)
+  void CUnitFormAndMoveTask::OnEvent(const EAiNavigatorEvent event)
   {
     if (event == AINAVEVENT_Failed || event == AINAVEVENT_Aborted) {
       mTaskState = TASKSTATE_Starting;
@@ -418,25 +414,29 @@ namespace moho
   }
 
   /**
-   * Address: 0x006196F0 (FUN_006196F0, listener callback lane)
+   * Address: 0x006196F0 (FUN_006196F0, Moho::CUnitFormAndMoveTask::OnEvent)
+   * Primary vtable: `Listener<ECommandEvent>` secondary slot 0
+   * (`??_7CUnitFormAndMoveTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@`).
    *
    * What it does:
    * Re-applies current formation-adjusted navigator goal when command
    * dispatch payload changes.
    */
-  void CUnitFormAndMoveTask::HandleCommandEvent(const ECommandEvent)
+  void CUnitFormAndMoveTask::OnEvent(const ECommandEvent)
   {
     ApplyFormationGoalFromCurrentUnit();
   }
 
   /**
-   * Address: 0x00619770 (FUN_00619770, listener callback lane)
+   * Address: 0x00619770 (FUN_00619770, Moho::CUnitFormAndMoveTask::OnEvent)
+   * Primary vtable: `Listener<EFormationdStatus>` secondary slot 0
+   * (`??_7CUnitFormAndMoveTask@Moho@@6B?$Listener@W4EFormationdStatus@Moho@@@Moho@@@`).
    *
    * What it does:
    * Handles formation status transitions by refreshing current formation goal
    * or marking form-move completion when the unit reaches valid formation lane.
    */
-  void CUnitFormAndMoveTask::HandleFormationStatusEvent(const EFormationdStatus status)
+  void CUnitFormAndMoveTask::OnEvent(const EFormationdStatus status)
   {
     if (status == FORMATIONSTATUS_FormationUpdated) {
       ApplyFormationGoalFromCurrentUnit();
