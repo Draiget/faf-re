@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
+#include <utility>
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Global.h"
@@ -179,8 +181,220 @@ namespace
     return node;
   }
 
+  /**
+   * Address: 0x0077B0B0 (FUN_0077B0B0)
+   *
+   * What it does:
+   * Rotates one start-tick map node's right child up into its slot,
+   * re-parenting the moved subtree and patching the header's root link when
+   * `node` was the root. Sentinel-backed RB-tree layout (`isNil` at
+   * `+0x1D`).
+   */
+  DecalMapNode* RotateMapNodeLeft(DecalMapNode* const node, CDecalStartTickMapStorage* const tree) noexcept
+  {
+    DecalMapNode* const pivot = node->right;
+    node->right = pivot->left;
+    if (pivot->left->isNil == 0u) {
+      pivot->left->parent = node;
+    }
+    pivot->parent = node->parent;
+
+    auto* const head = static_cast<DecalMapNode*>(tree->head);
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else if (node == node->parent->left) {
+      node->parent->left = pivot;
+    } else {
+      node->parent->right = pivot;
+    }
+
+    pivot->left = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x0077B160 (FUN_0077B160)
+   *
+   * What it does:
+   * Mirror of `RotateMapNodeLeft`: rotates one start-tick map node's left
+   * child up into its slot.
+   */
+  DecalMapNode* RotateMapNodeRight(DecalMapNode* const node, CDecalStartTickMapStorage* const tree) noexcept
+  {
+    DecalMapNode* const pivot = node->left;
+    node->left = pivot->right;
+    if (pivot->right->isNil == 0u) {
+      pivot->right->parent = node;
+    }
+    pivot->parent = node->parent;
+
+    auto* const head = static_cast<DecalMapNode*>(tree->head);
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else if (node == node->parent->right) {
+      node->parent->right = pivot;
+    } else {
+      node->parent->left = pivot;
+    }
+
+    pivot->right = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x0077CAE0 (FUN_0077CAE0)
+   * Address: 0x0077DC40 (FUN_0077DC40, the single-element
+   *   `allocator<DecalMapNode>::allocate` lane it calls with count=1)
+   *
+   * What it does:
+   * Allocates one start-tick map value node, links it with both children
+   * pointing at the sentinel `head` and `parent` set to the attach point,
+   * marks it red/non-nil, and default-constructs its embedded bucket-tree
+   * storage as a fresh empty tree via `InitializeDecalBucketTreeHeadNode`.
+   *
+   * The binary builds this node's embedded bucket by copy-constructing from
+   * a temporary empty `DecalBucketTreeStorage` that its caller (`FUN_0077A250`)
+   * builds and tears down around the insert - 2005-era unoptimized-debug-STL
+   * codegen for materializing the `value_type` before linking. This recovery
+   * reaches the same observable end state (a freshly allocated, empty,
+   * correctly self-linked bucket tree) directly, without replicating the
+   * redundant temporary. `FUN_0077DC40`'s overflow-checked array-new guard
+   * (`0xFFFFFFFF / count < 0x20`) is unreachable at its only call site
+   * (`count` is always 1) and is not reproduced here, matching the sibling
+   * `AllocateDecalBucketNode`/`AllocateMapHeadNode` allocators in this file.
+   */
+  [[nodiscard]] DecalMapNode* AllocateDecalMapValueNode(
+    const std::uint32_t startTick, DecalMapNode* const head, DecalMapNode* const parent
+  )
+  {
+    auto* const node = static_cast<DecalMapNode*>(::operator new(sizeof(DecalMapNode)));
+    node->left = head;
+    node->parent = parent;
+    node->right = head;
+    node->startTick = startTick;
+    node->bucketAllocatorCookie = nullptr;
+    node->bucketHead = nullptr;
+    node->bucketSize = 0u;
+    (void)InitializeDecalBucketTreeHeadNode(reinterpret_cast<DecalBucketTreeStorage*>(&node->bucketAllocatorCookie));
+    node->color = 0u;
+    node->isNil = 0u;
+    node->reserved1E[0] = 0u;
+    node->reserved1E[1] = 0u;
+    return node;
+  }
+
+  /**
+   * Address: 0x0077BE80 (FUN_0077BE80)
+   *
+   * What it does:
+   * Links a freshly constructed start-tick map value node under `where`
+   * (updating the header's cached leftmost/rightmost/root links) then
+   * repairs the red-red violation upwards and reblackens the root - MSVC8
+   * `_Tree::_Insert` specialized for the sentinel-backed DecalMapNode layout
+   * (`isNil` at `+0x1D`, `color` at `+0x1C`). Rejects the insert when the
+   * tree already holds the MSVC8 `_Tree::max_size() - 1` element count.
+   */
+  [[nodiscard]] DecalMapNode* LinkMapNodeAndRebalance(
+    DecalMapNode* const where, CDecalStartTickMapStorage* const mapThis, const bool addLeft, const std::uint32_t startTick
+  )
+  {
+    if (mapThis->size >= 0xFFFFFFEu) {
+      throw std::length_error("map/set<T> too long");
+    }
+
+    auto* const head = static_cast<DecalMapNode*>(mapThis->head);
+    DecalMapNode* const fresh = AllocateDecalMapValueNode(startTick, head, where);
+    ++mapThis->size;
+
+    if (where == head) {
+      head->parent = fresh;
+      head->left = fresh;
+      head->right = fresh;
+    } else if (addLeft) {
+      where->left = fresh;
+      if (where == head->left) {
+        head->left = fresh;
+      }
+    } else {
+      where->right = fresh;
+      if (where == head->right) {
+        head->right = fresh;
+      }
+    }
+
+    for (DecalMapNode* n = fresh; n->parent->color == 0u;) {
+      DecalMapNode* const parent = n->parent;
+      DecalMapNode* const grand = parent->parent;
+
+      if (parent == grand->left) {
+        DecalMapNode* const uncle = grand->right;
+        if (uncle->color == 0u) {
+          parent->color = 1u;
+          uncle->color = 1u;
+          grand->color = 0u;
+          n = grand;
+        } else {
+          if (n == parent->right) {
+            n = parent;
+            (void)RotateMapNodeLeft(n, mapThis);
+          }
+          n->parent->color = 1u;
+          n->parent->parent->color = 0u;
+          (void)RotateMapNodeRight(n->parent->parent, mapThis);
+        }
+      } else {
+        DecalMapNode* const uncle = grand->left;
+        if (uncle->color == 0u) {
+          parent->color = 1u;
+          uncle->color = 1u;
+          grand->color = 0u;
+          n = grand;
+        } else {
+          if (n == parent->left) {
+            n = parent;
+            (void)RotateMapNodeRight(n, mapThis);
+          }
+          n->parent->color = 1u;
+          n->parent->parent->color = 0u;
+          (void)RotateMapNodeLeft(n->parent->parent, mapThis);
+        }
+      }
+    }
+
+    head->parent->color = 1u;
+    return fresh;
+  }
+
   void DestroyBucketTreeNodes(DecalBucketNode* node, const DecalBucketNode* const head);
   void DestroyMapNodes(DecalMapNode* node, const DecalMapNode* const head);
+
+  struct DecalMapFindOrInsertResult
+  {
+    DecalMapNode* node;
+    bool inserted;
+  };
+
+  // Forward declarations for the start-tick map / decal-bucket RB-tree
+  // rotate, successor-advance, insert and erase family (mutually referenced
+  // across the map/bucket tree split below).
+  DecalMapNode* RetreatStartTickMapIterator(
+    const std::uint32_t /*unused*/, DecalMapNode** const iteratorLane
+  ) noexcept;
+  DecalMapNode* AdvanceMapNodeToSuccessor(
+    const std::uint32_t /*unused*/, DecalMapNode** const iteratorLane
+  ) noexcept;
+  [[nodiscard]] DecalMapNode* LinkMapNodeAndRebalance(
+    DecalMapNode* const where, CDecalStartTickMapStorage* const mapThis, const bool addLeft, const std::uint32_t startTick
+  );
+  [[nodiscard]] DecalMapFindOrInsertResult FindStartTickBucketNode(
+    CDecalStartTickMapStorage* const mapThis, const std::uint32_t startTick
+  );
+  [[nodiscard]] DecalBucketNode* DescendBucketLeftChainRuntime(DecalBucketNode* node) noexcept;
+  [[nodiscard]] DecalBucketNode* DescendBucketRightChainRuntime(DecalBucketNode* node) noexcept;
+  DecalBucketNode* AdvanceBucketNodeToSuccessor(DecalBucketNode** const iteratorLane) noexcept;
+  DecalBucketNode* EraseBucketNode(DecalBucketTreeStorage* const tree, DecalBucketNode* const erased);
 
   /**
    * Address: 0x0077C690 (FUN_0077C690)
@@ -345,28 +559,43 @@ namespace
    * Address: 0x0077BCD0 (FUN_0077BCD0)
    *
    * What it does:
-   * Finds the lower-bound start-tick bucket node for a given decal start tick
-   * using the sentinel-backed RB-tree layout.
+   * Finds the start-tick map node keyed by `startTick`, inserting a fresh
+   * node (with an empty bucket-tree storage payload) when no exact match
+   * exists. MSVC8 `_Tree::insert_unique` specialized for the sentinel-backed
+   * DecalMapNode layout (`isNil` at `+0x1D`): descends recording the last
+   * left-branch taken, then confirms uniqueness against the in-order
+   * predecessor before linking a fresh node via `LinkMapNodeAndRebalance`.
    */
-  [[maybe_unused]] [[nodiscard]] DecalMapNode* FindStartTickBucketNode(
-    DecalMapNode* const head, const std::uint32_t startTick
-  ) noexcept
+  [[nodiscard]] DecalMapFindOrInsertResult FindStartTickBucketNode(
+    CDecalStartTickMapStorage* const mapThis, const std::uint32_t startTick
+  )
   {
-    if (head == nullptr) {
-      return nullptr;
+    auto* const head = static_cast<DecalMapNode*>(mapThis->head);
+
+    DecalMapNode* where = head;
+    bool addLeft = true;
+    for (DecalMapNode* node = head->parent; node->isNil == 0u;) {
+      where = node;
+      addLeft = startTick < node->startTick;
+      node = addLeft ? node->left : node->right;
     }
 
-    DecalMapNode* candidate = head;
-    for (DecalMapNode* node = head->parent; node != nullptr && node->isNil == 0u;) {
-      candidate = node;
-      if (startTick < node->startTick) {
-        node = node->left;
-      } else {
-        node = node->right;
+    DecalMapNode* probe = where;
+    if (addLeft) {
+      if (where == head->left) {
+        DecalMapNode* const inserted = LinkMapNodeAndRebalance(where, mapThis, true, startTick);
+        return {inserted, true};
       }
+      DecalMapNode* iteratorSlot = where;
+      (void)RetreatStartTickMapIterator(0u, &iteratorSlot);
+      probe = iteratorSlot;
     }
 
-    return candidate;
+    if (probe->startTick >= startTick) {
+      return {probe, false};
+    }
+    DecalMapNode* const inserted = LinkMapNodeAndRebalance(where, mapThis, addLeft, startTick);
+    return {inserted, true};
   }
 
   /**
@@ -376,7 +605,7 @@ namespace
    * Moves one start-tick map iterator lane backward in the sentinel-backed
    * RB-tree (`isNil` at `+0x1D`).
    */
-  [[maybe_unused]] DecalMapNode* RetreatStartTickMapIterator(
+  DecalMapNode* RetreatStartTickMapIterator(
     const std::uint32_t /*unused*/,
     DecalMapNode** const iteratorLane
   ) noexcept
@@ -448,6 +677,93 @@ namespace
   {
     (void)RetreatStartTickMapIterator(laneTag, iteratorLane);
     return iteratorLane;
+  }
+
+  /**
+   * Address: 0x0077CE50 (FUN_0077CE50)
+   *
+   * What it does:
+   * Moves one start-tick map iterator lane forward to its in-order
+   * successor in the sentinel-backed RB-tree (`isNil` at `+0x1D`) - the
+   * successor-direction mirror of `RetreatStartTickMapIterator`.
+   */
+  DecalMapNode* AdvanceMapNodeToSuccessor(
+    const std::uint32_t /*unused*/, DecalMapNode** const iteratorLane
+  ) noexcept
+  {
+    DecalMapNode* result = *iteratorLane;
+    if (result->isNil != 0u) {
+      return result;
+    }
+
+    DecalMapNode* const right = result->right;
+    if (right->isNil != 0u) {
+      for (result = result->parent; result->isNil == 0u; result = result->parent) {
+        if (*iteratorLane != result->right) {
+          break;
+        }
+        *iteratorLane = result;
+      }
+      *iteratorLane = result;
+    } else {
+      DecalMapNode* cursor = right->left;
+      result = cursor;
+      DecalMapNode* lastNonNil = right;
+      while (cursor->isNil == 0u) {
+        lastNonNil = cursor;
+        cursor = cursor->left;
+        result = cursor;
+      }
+      *iteratorLane = lastNonNil;
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x0077AF40 (FUN_0077AF40)
+   *
+   * What it does:
+   * Hinted unique insert (MSVC8 `_Tree::insert(const_iterator, const
+   * value_type&)`) for the start-tick map: checks whether `hint` is
+   * adjacent to `begin()`/`end()`/its immediate neighbor for an O(1)
+   * hint-based insert, falling back to the full descend-based find-or-insert
+   * (`FindStartTickBucketNode`) only on a hint miss.
+   */
+  [[nodiscard]] DecalMapNode* ResolveStartTickInsertPosition(
+    CDecalStartTickMapStorage* const mapThis, const std::uint32_t startTick, DecalMapNode* const hint
+  )
+  {
+    auto* const head = static_cast<DecalMapNode*>(mapThis->head);
+
+    if (mapThis->size == 0u) {
+      return LinkMapNodeAndRebalance(head, mapThis, true, startTick);
+    }
+
+    if (hint == head->left) {
+      if (startTick < hint->startTick) {
+        return LinkMapNodeAndRebalance(hint, mapThis, true, startTick);
+      }
+    } else if (hint == head) {
+      if (head->right->startTick < startTick) {
+        return LinkMapNodeAndRebalance(head->right, mapThis, false, startTick);
+      }
+    } else if (startTick < hint->startTick) {
+      DecalMapNode* before = hint;
+      (void)RetreatStartTickMapIterator(0u, &before);
+      if (before->startTick < startTick) {
+        return before->right->isNil != 0u ? LinkMapNodeAndRebalance(before, mapThis, false, startTick)
+                                           : LinkMapNodeAndRebalance(hint, mapThis, true, startTick);
+      }
+    } else if (hint->startTick < startTick) {
+      DecalMapNode* after = hint;
+      (void)AdvanceMapNodeToSuccessor(0u, &after);
+      if (after->isNil != 0u || startTick < after->startTick) {
+        return hint->right->isNil != 0u ? LinkMapNodeAndRebalance(hint, mapThis, false, startTick)
+                                         : LinkMapNodeAndRebalance(after, mapThis, true, startTick);
+      }
+    }
+
+    return FindStartTickBucketNode(mapThis, startTick).node;
   }
 
   /**
@@ -549,6 +865,30 @@ namespace
     }
 
     return candidate;
+  }
+
+  /**
+   * Address: 0x0077A250 (FUN_0077A250, Moho::CDecalBuffer start-tick
+   *   `operator[]`-equivalent)
+   *
+   * What it does:
+   * Finds the bucket-tree storage for `startTick`, default-constructing an
+   * empty one and inserting it when no exact match exists - MSVC8
+   * `std::map<uint32_t, DecalBucketTreeStorage>::operator[]`.
+   */
+  [[nodiscard]] DecalBucketTreeStorage* FindOrCreateStartTickBucket(
+    CDecalStartTickMapStorage* const mapThis, const std::uint32_t startTick
+  )
+  {
+    auto* const head = static_cast<DecalMapNode*>(mapThis->head);
+    const DecalMapTreeRuntimeView view{0u, head};
+    DecalMapNode* candidate = FindStartTickLowerBoundNode(&view, &startTick);
+
+    if (candidate == head || startTick < candidate->startTick) {
+      candidate = ResolveStartTickInsertPosition(mapThis, startTick, candidate);
+    }
+
+    return reinterpret_cast<DecalBucketTreeStorage*>(&candidate->bucketAllocatorCookie);
   }
 
   struct DecalBucketTreeRuntimeView
@@ -674,7 +1014,7 @@ namespace
    * Walks one bucket-node right chain from `node->right` and returns the last
    * non-sentinel lane reached.
    */
-  [[maybe_unused]] [[nodiscard]] DecalBucketNode* DescendBucketRightChainRuntime(DecalBucketNode* node) noexcept
+  [[nodiscard]] DecalBucketNode* DescendBucketRightChainRuntime(DecalBucketNode* node) noexcept
   {
     if (node == nullptr) {
       return nullptr;
@@ -693,7 +1033,7 @@ namespace
    * Walks one bucket-node left chain from `node->left` and returns the last
    * non-sentinel lane reached.
    */
-  [[maybe_unused]] [[nodiscard]] DecalBucketNode* DescendBucketLeftChainRuntime(DecalBucketNode* node) noexcept
+  [[nodiscard]] DecalBucketNode* DescendBucketLeftChainRuntime(DecalBucketNode* node) noexcept
   {
     if (node == nullptr) {
       return nullptr;
@@ -707,6 +1047,334 @@ namespace
       } while (cursor->isNil == 0u);
     }
     return node;
+  }
+
+  /**
+   * Address: 0x0077C5E0 (FUN_0077C5E0)
+   *
+   * What it does:
+   * Rotates one decal-bucket node's right child up into its slot,
+   * re-parenting the moved subtree and patching the header's root link when
+   * `node` was the root. Sentinel-backed RB-tree layout (`isNil` at
+   * `+0x11`).
+   */
+  DecalBucketNode* RotateBucketNodeLeft(DecalBucketNode* const node, DecalBucketTreeStorage* const tree) noexcept
+  {
+    DecalBucketNode* const pivot = node->right;
+    node->right = pivot->left;
+    if (pivot->left->isNil == 0u) {
+      pivot->left->parent = node;
+    }
+    pivot->parent = node->parent;
+
+    DecalBucketNode* const head = tree->head;
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else if (node == node->parent->left) {
+      node->parent->left = pivot;
+    } else {
+      node->parent->right = pivot;
+    }
+
+    pivot->left = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x0077C640 (FUN_0077C640)
+   *
+   * What it does:
+   * Mirror of `RotateBucketNodeLeft`: rotates one decal-bucket node's left
+   * child up into its slot.
+   */
+  DecalBucketNode* RotateBucketNodeRight(DecalBucketNode* const node, DecalBucketTreeStorage* const tree) noexcept
+  {
+    DecalBucketNode* const pivot = node->left;
+    node->left = pivot->right;
+    if (pivot->right->isNil == 0u) {
+      pivot->right->parent = node;
+    }
+    pivot->parent = node->parent;
+
+    DecalBucketNode* const head = tree->head;
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else if (node == node->parent->right) {
+      node->parent->right = pivot;
+    } else {
+      node->parent->left = pivot;
+    }
+
+    pivot->right = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x0077C740 (FUN_0077C740)
+   *
+   * What it does:
+   * Moves one decal-bucket iterator lane forward to its in-order successor
+   * in the sentinel-backed RB-tree (`isNil` at `+0x11`).
+   */
+  DecalBucketNode* AdvanceBucketNodeToSuccessor(DecalBucketNode** const iteratorLane) noexcept
+  {
+    DecalBucketNode* result = *iteratorLane;
+    if (result->isNil != 0u) {
+      return result;
+    }
+
+    DecalBucketNode* const right = result->right;
+    if (right->isNil != 0u) {
+      for (result = result->parent; result->isNil == 0u; result = result->parent) {
+        if (*iteratorLane != result->right) {
+          break;
+        }
+        *iteratorLane = result;
+      }
+      *iteratorLane = result;
+    } else {
+      DecalBucketNode* cursor = right->left;
+      result = cursor;
+      DecalBucketNode* lastNonNil = right;
+      while (cursor->isNil == 0u) {
+        lastNonNil = cursor;
+        cursor = cursor->left;
+        result = cursor;
+      }
+      *iteratorLane = lastNonNil;
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x0077C270 (FUN_0077C270)
+   *
+   * What it does:
+   * Unlinks and destroys `erased` from the decal-bucket RB-tree, returning
+   * its in-order successor. Transplants the successor into the erased
+   * node's slot when both subtrees exist, then repairs the black-height
+   * deficit from the stitched-up child upwards - MSVC8 `_Tree::erase`
+   * specialized for the sentinel-backed DecalBucketNode layout (`isNil` at
+   * `+0x11`, `color` at `+0x10`).
+   *
+   * Throws `std::out_of_range` when `erased` is the header sentinel
+   * (matches the binary's "invalid map/set<T> iterator" guard).
+   */
+  DecalBucketNode* EraseBucketNode(DecalBucketTreeStorage* const tree, DecalBucketNode* const erased)
+  {
+    if (erased->isNil != 0u) {
+      throw std::out_of_range("invalid map/set<T> iterator");
+    }
+
+    DecalBucketNode* iteratorSlot = erased;
+    DecalBucketNode* const next = AdvanceBucketNodeToSuccessor(&iteratorSlot);
+
+    DecalBucketNode* lifted = erased;
+    DecalBucketNode* fix = nullptr;
+    DecalBucketNode* fixParent = nullptr;
+
+    if (erased->left->isNil != 0u) {
+      fix = erased->right;
+    } else if (erased->right->isNil != 0u) {
+      fix = erased->left;
+    } else {
+      lifted = next;
+      fix = lifted->right;
+    }
+
+    DecalBucketNode* const head = tree->head;
+
+    if (lifted == erased) {
+      fixParent = erased->parent;
+      if (fix->isNil == 0u) {
+        fix->parent = fixParent;
+      }
+
+      if (head->parent == erased) {
+        head->parent = fix;
+      } else if (fixParent->left == erased) {
+        fixParent->left = fix;
+      } else {
+        fixParent->right = fix;
+      }
+
+      if (head->left == erased) {
+        head->left = fix->isNil != 0u ? fixParent : DescendBucketLeftChainRuntime(fix);
+      }
+      if (head->right == erased) {
+        head->right = fix->isNil != 0u ? fixParent : DescendBucketRightChainRuntime(fix);
+      }
+    } else {
+      erased->left->parent = lifted;
+      lifted->left = erased->left;
+
+      if (lifted == erased->right) {
+        fixParent = lifted;
+      } else {
+        fixParent = lifted->parent;
+        if (fix->isNil == 0u) {
+          fix->parent = fixParent;
+        }
+        fixParent->left = fix;
+        lifted->right = erased->right;
+        erased->right->parent = lifted;
+      }
+
+      if (head->parent == erased) {
+        head->parent = lifted;
+      } else if (erased->parent->left == erased) {
+        erased->parent->left = lifted;
+      } else {
+        erased->parent->right = lifted;
+      }
+
+      lifted->parent = erased->parent;
+      std::swap(lifted->color, erased->color);
+    }
+
+    if (erased->color == 1u) {
+      DecalBucketNode* fixCursor = fix;
+      DecalBucketNode* fixParentCursor = fixParent;
+      while (fixCursor != head->parent && fixCursor->color == 1u) {
+        if (fixCursor == fixParentCursor->left) {
+          DecalBucketNode* sibling = fixParentCursor->right;
+          if (sibling->color == 0u) {
+            sibling->color = 1u;
+            fixParentCursor->color = 0u;
+            (void)RotateBucketNodeLeft(fixParentCursor, tree);
+            sibling = fixParentCursor->right;
+          }
+
+          if (sibling->isNil != 0u) {
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else if (sibling->left->color == 1u && sibling->right->color == 1u) {
+            sibling->color = 0u;
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else {
+            if (sibling->right->color == 1u) {
+              sibling->left->color = 1u;
+              sibling->color = 0u;
+              (void)RotateBucketNodeRight(sibling, tree);
+              sibling = fixParentCursor->right;
+            }
+            sibling->color = fixParentCursor->color;
+            fixParentCursor->color = 1u;
+            sibling->right->color = 1u;
+            (void)RotateBucketNodeLeft(fixParentCursor, tree);
+            fixCursor = head->parent;
+            break;
+          }
+        } else {
+          DecalBucketNode* sibling = fixParentCursor->left;
+          if (sibling->color == 0u) {
+            sibling->color = 1u;
+            fixParentCursor->color = 0u;
+            (void)RotateBucketNodeRight(fixParentCursor, tree);
+            sibling = fixParentCursor->left;
+          }
+
+          if (sibling->isNil != 0u) {
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else if (sibling->right->color == 1u && sibling->left->color == 1u) {
+            sibling->color = 0u;
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else {
+            if (sibling->left->color == 1u) {
+              sibling->right->color = 1u;
+              sibling->color = 0u;
+              (void)RotateBucketNodeLeft(sibling, tree);
+              sibling = fixParentCursor->left;
+            }
+            sibling->color = fixParentCursor->color;
+            fixParentCursor->color = 1u;
+            sibling->left->color = 1u;
+            (void)RotateBucketNodeRight(fixParentCursor, tree);
+            fixCursor = head->parent;
+            break;
+          }
+        }
+      }
+      fixCursor->color = 1u;
+    }
+
+    ::operator delete(erased);
+    if (tree->size != 0u) {
+      --tree->size;
+    }
+    return next;
+  }
+
+  /**
+   * Address: 0x0077B4F0 (FUN_0077B4F0)
+   *
+   * What it does:
+   * Erases `[first, last)` from the decal-bucket RB-tree. Takes the O(1)
+   * whole-tree fast path (recursive subtree destroy + sentinel reset) when
+   * erasing the full range; otherwise advances to each node's successor
+   * before erasing it, so the walk stays valid across the erase.
+   */
+  DecalBucketNode* EraseBucketNodeRange(
+    DecalBucketTreeStorage* const tree,
+    DecalBucketNode** const outPosition,
+    DecalBucketNode* const first,
+    DecalBucketNode* const last
+  )
+  {
+    DecalBucketNode* const head = tree->head;
+    DecalBucketNode* cursor = first;
+
+    if (first == head->left && last == head) {
+      DestroyBucketTreeNodes(head->parent, head);
+      head->parent = head;
+      tree->size = 0u;
+      head->left = head;
+      head->right = head;
+      *outPosition = head;
+      return *outPosition;
+    }
+
+    if (first != last) {
+      do {
+        DecalBucketNode* const erasing = cursor;
+        (void)AdvanceBucketNodeToSuccessor(&cursor);
+        (void)EraseBucketNode(tree, erasing);
+      } while (cursor != last);
+    }
+
+    *outPosition = cursor;
+    return *outPosition;
+  }
+
+  /**
+   * Address: 0x0077A9F0 (FUN_0077A9F0)
+   *
+   * What it does:
+   * Erases every decal-bucket node keyed by `key` (`equal_range` then
+   * range-erase) and returns the number of nodes removed.
+   */
+  [[nodiscard]] std::uint32_t EraseBucketNodesByKey(DecalBucketTreeStorage* const tree, const CDecalHandle* const key)
+  {
+    const DecalBucketTreeRuntimeView view{0u, tree->head};
+    const std::uint32_t keyValue = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(key));
+
+    DecalBucketBoundPairRuntime bounds{};
+    (void)FindDecalBucketBoundsByKeyRuntime(&bounds, &view, &keyValue);
+
+    std::uint32_t erasedCount = 0u;
+    DecalBucketNode* cursor = bounds.lowerBound;
+    for (; cursor != bounds.upperBound; (void)AdvanceBucketNodeToSuccessor(&cursor)) {
+      ++erasedCount;
+    }
+
+    DecalBucketNode* outPosition = nullptr;
+    (void)EraseBucketNodeRange(tree, &outPosition, bounds.lowerBound, bounds.upperBound);
+    return erasedCount;
   }
 
   struct DwordByteLanePairRuntimeView
@@ -1138,7 +1806,12 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
  * Address: 0x00779680 (FUN_00779680, sub_779680)
  *
  * What it does:
- * Removes one handle from active tracking, queues object-id retirement, and deletes the handle.
+ * Removes one handle from its start-tick bucket, queues object-id
+ * retirement, and deletes the handle. `FindOrCreateStartTickBucket` +
+ * `EraseBucketNodesByKey` reproduce the binary's `sub_77A250`/`sub_77A9F0`
+ * call pair; CreateHandle's own insert-side wiring into the same
+ * start-tick bucket tree is deferred (needs `FUN_0077A930` and its own
+ * dependency closure).
  */
 void CDecalBuffer::DestroyHandle(CDecalHandle* const handleOpaque)
 {
@@ -1148,6 +1821,10 @@ void CDecalBuffer::DestroyHandle(CDecalHandle* const handleOpaque)
   if (handleOpaque->mVisibleInFocus != 0u) {
     mPendingHideObjectIds.push_back(handleOpaque->mInfo.mObj);
   }
+
+  DecalBucketTreeStorage* const bucket =
+    FindOrCreateStartTickBucket(&mStartTickBuckets, handleOpaque->mInfo.mStartTick);
+  (void)EraseBucketNodesByKey(bucket, handleOpaque);
 
   mPool.QueueReleasedLowId(handleOpaque->mInfo.mObj);
 
