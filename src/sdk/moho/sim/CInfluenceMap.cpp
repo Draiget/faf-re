@@ -234,7 +234,7 @@ namespace
    * Resizes one `vector<InfluenceGrid>` to `requestedCount` using one default-
    * constructed `InfluenceGrid` fill value for growth lanes.
    */
-  [[maybe_unused]] void ResizeInfluenceGridVectorWithDefaultFill(
+  void ResizeInfluenceGridVectorWithDefaultFill(
     InfluenceGridVector& storage,
     const unsigned int requestedCount
   )
@@ -338,7 +338,7 @@ namespace
    * Invokes serializer virtual slot `+0x24` with a by-reference temporary and
    * writes the updated 32-bit value back to `valueSlot`.
    */
-  [[maybe_unused]] int InvokePrimitiveSerializerWordByPointerLane(
+  int InvokePrimitiveSerializerWordByPointerLane(
     void* const helperObject,
     SerializerWord* const valueSlot
   )
@@ -357,7 +357,7 @@ namespace
    * Forwards one 32-bit primitive value lane through serializer virtual slot
    * `+0x24`.
    */
-  [[maybe_unused]] int InvokePrimitiveSerializerWordByValueLane(
+  int InvokePrimitiveSerializerWordByValueLane(
     void* const helperObject,
     SerializerWord* const valueSlot
   )
@@ -431,7 +431,7 @@ namespace
    * Updates the embedded MD5 context at owner offset `+0x50` with one 32-bit
    * word lane from caller-provided storage.
    */
-  [[maybe_unused]] void UpdateMd5ContextWordAtOffset50(
+  void UpdateMd5ContextWordAtOffset50(
     const void* const wordLane,
     InfluenceMapMd5UpdateOwnerRuntime* const owner
   )
@@ -790,7 +790,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `map<unsigned int, int>` lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedUIntIntMapTypeLegacyLane()
+  [[nodiscard]] gpg::RType* CachedUIntIntMapTypeLegacyLane()
   {
     static gpg::RType* type = nullptr;
     if (!type) {
@@ -805,7 +805,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `vector<InfluenceGrid>` lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedInfluenceGridVectorTypeLegacyLane()
+  [[nodiscard]] gpg::RType* CachedInfluenceGridVectorTypeLegacyLane()
   {
     static gpg::RType* type = nullptr;
     if (!type) {
@@ -965,7 +965,7 @@ namespace
    * Deserializes one `InfluenceGrid` payload in archive field order:
    * `entries`, `threats`, aggregate threat, and decay lanes.
    */
-  [[maybe_unused]] void DeserializeInfluenceGridRecord(
+  void DeserializeInfluenceGridRecord(
     gpg::ReadArchive* const archive,
     moho::InfluenceGrid* const grid,
     gpg::RRef* const ownerRef
@@ -1007,7 +1007,7 @@ namespace
    * Serializes one `InfluenceGrid` payload in archive field order:
    * `entries`, `threats`, aggregate threat, and decay lanes.
    */
-  [[maybe_unused]] void SerializeInfluenceGridRecord(
+  void SerializeInfluenceGridRecord(
     gpg::WriteArchive* const archive,
     const moho::InfluenceGrid* const grid,
     gpg::RRef* const ownerRef
@@ -1049,7 +1049,7 @@ namespace
    * Read-callback thunk for `InfluenceGrid` archive lanes that forwards to
    * `DeserializeInfluenceGridRecord` (`FUN_0071CF30`).
    */
-  [[maybe_unused]] void DeserializeInfluenceGridRecordCallbackThunk(
+  void DeserializeInfluenceGridRecordCallbackThunk(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int,
@@ -1070,7 +1070,7 @@ namespace
    * Write-callback thunk for `InfluenceGrid` archive lanes that forwards to
    * `SerializeInfluenceGridRecord` (`FUN_0071D010`).
    */
-  [[maybe_unused]] void SerializeInfluenceGridRecordCallbackThunk(
+  void SerializeInfluenceGridRecordCallbackThunk(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
@@ -1208,7 +1208,7 @@ namespace
    * Builds one reflected `RRef` pair for `CInfluenceMap` and writes
    * `{mObj,mType}` lanes into caller-owned output storage.
    */
-  [[maybe_unused]] RRefPairRuntime* BuildCInfluenceMapRRefPair(
+  RRefPairRuntime* BuildCInfluenceMapRRefPair(
     moho::CInfluenceMap* const object,
     RRefPairRuntime* const outRefPair
   )
@@ -1227,7 +1227,7 @@ namespace
    * Builds one reflected `RRef` pair for `InfluenceGrid` and writes
    * `{mObj,mType}` lanes into caller-owned output storage.
    */
-  [[maybe_unused]] RRefPairRuntime* BuildInfluenceGridRRefPair(
+  RRefPairRuntime* BuildInfluenceGridRRefPair(
     moho::InfluenceGrid* const object,
     RRefPairRuntime* const outRefPair
   )
@@ -1246,7 +1246,7 @@ namespace
    * Builds one reflected `RRef` pair for `SThreat` and writes
    * `{mObj,mType}` lanes into caller-owned output storage.
    */
-  [[maybe_unused]] RRefPairRuntime* BuildSThreatRRefPair(
+  RRefPairRuntime* BuildSThreatRRefPair(
     moho::SThreat* const object,
     RRefPairRuntime* const outRefPair
   )
@@ -1265,7 +1265,7 @@ namespace
    * Read-callback thunk for `InfluenceMapEntry` archive lanes that forwards to
    * `DeserializeInfluenceMapEntryRecord` (`FUN_0071CB20`).
    */
-  [[maybe_unused]] void DeserializeInfluenceMapEntryRecordCallbackThunk(
+  void DeserializeInfluenceMapEntryRecordCallbackThunk(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int version,
@@ -1282,7 +1282,7 @@ namespace
    * Write-callback thunk for `InfluenceMapEntry` archive lanes that forwards
    * to `SerializeInfluenceMapEntryRecord` (`FUN_0071CC30`).
    */
-  [[maybe_unused]] void SerializeInfluenceMapEntryRecordCallbackThunk(
+  void SerializeInfluenceMapEntryRecordCallbackThunk(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int version,
@@ -1312,7 +1312,7 @@ namespace
    * Thunk lane that advances one `InfluenceGrid::entries` iterator and returns
    * the same iterator-slot pointer.
    */
-  [[maybe_unused]] InfluenceEntryIterator* AdvanceInfluenceEntryIteratorThunkA(
+  InfluenceEntryIterator* AdvanceInfluenceEntryIteratorThunkA(
     const InfluenceEntryIterator end,
     InfluenceEntryIterator* const iteratorSlot
   ) noexcept
@@ -1330,7 +1330,7 @@ namespace
    * Secondary thunk lane that advances one `InfluenceGrid::entries` iterator
    * and returns the same iterator-slot pointer.
    */
-  [[maybe_unused]] InfluenceEntryIterator* AdvanceInfluenceEntryIteratorThunkB(
+  InfluenceEntryIterator* AdvanceInfluenceEntryIteratorThunkB(
     const InfluenceEntryIterator end,
     InfluenceEntryIterator* const iteratorSlot
   ) noexcept
@@ -1401,7 +1401,7 @@ namespace
    * Thunk lane that advances one `mBlipCells` iterator and returns the same
    * iterator-slot pointer.
    */
-  [[maybe_unused]] InfluenceMapCellIterator* AdvanceBlipCellIteratorThunkA(
+  InfluenceMapCellIterator* AdvanceBlipCellIteratorThunkA(
     const InfluenceMapCellIterator end,
     InfluenceMapCellIterator* const iteratorSlot
   ) noexcept
@@ -1446,7 +1446,7 @@ namespace
    * Allocates legacy red-black-tree node storage for blip-cell set lanes with
    * VC8-style overflow guard semantics (`0x18` bytes per node).
    */
-  [[maybe_unused]] void* AllocateBlipCellNodeBlock(const unsigned int count)
+  void* AllocateBlipCellNodeBlock(const unsigned int count)
   {
     constexpr unsigned int kNodeBytes = 0x18u;
     if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < kNodeBytes) {
@@ -1462,7 +1462,7 @@ namespace
    * What it does:
    * Allocates one legacy `mBlipCells` tree-node lane (`0x18` bytes).
    */
-  [[maybe_unused]] void* AllocateSingleBlipCellNode() { return AllocateBlipCellNodeBlock(1u); }
+  void* AllocateSingleBlipCellNode() { return AllocateBlipCellNodeBlock(1u); }
 
   /**
    * Address: 0x0071C750 (FUN_0071C750)
@@ -1470,7 +1470,7 @@ namespace
    * What it does:
    * Allocates one fixed `0x40`-byte runtime node lane.
    */
-  [[maybe_unused]] void* AllocateSingle64ByteNode() { return ::operator new(0x40u); }
+  void* AllocateSingle64ByteNode() { return ::operator new(0x40u); }
 
   struct BlipCellTreeNodeRuntime
   {
@@ -1578,7 +1578,7 @@ namespace
    * Seeds one legacy set runtime header with a self-linked sentinel node and
    * zero element count.
    */
-  [[maybe_unused]] void* ConstructBlipCellSetHeaderFromSentinel(
+  void* ConstructBlipCellSetHeaderFromSentinel(
     LegacySetStorageRuntimeView<InfluenceMapCellSet>& setStorage
   )
   {
@@ -1605,7 +1605,7 @@ namespace
    * Advances one nil-21 red-black iterator slot in place and returns the
    * same slot pointer.
    */
-  [[maybe_unused]] InfluenceNodeFlag21Runtime** AdvanceRbIteratorNil21InPlaceLaneA(
+  InfluenceNodeFlag21Runtime** AdvanceRbIteratorNil21InPlaceLaneA(
     InfluenceNodeFlag21Runtime** const iteratorSlot
   ) noexcept
   {
@@ -1622,7 +1622,7 @@ namespace
    * What it does:
    * Copies one nil-21 iterator slot into destination, then advances source.
    */
-  [[maybe_unused]] InfluenceNodeFlag21Runtime** PostAdvanceRbIteratorNil21CopyLaneA(
+  InfluenceNodeFlag21Runtime** PostAdvanceRbIteratorNil21CopyLaneA(
     InfluenceNodeFlag21Runtime** const sourceSlot,
     InfluenceNodeFlag21Runtime** const destinationSlot
   ) noexcept
@@ -1638,7 +1638,7 @@ namespace
    * What it does:
    * Copies one nil-61 iterator slot into destination, then advances source.
    */
-  [[maybe_unused]] InfluenceNodeFlag61Runtime** PostAdvanceRbIteratorNil61CopyLaneA(
+  InfluenceNodeFlag61Runtime** PostAdvanceRbIteratorNil61CopyLaneA(
     InfluenceNodeFlag61Runtime** const sourceSlot,
     InfluenceNodeFlag61Runtime** const destinationSlot
   ) noexcept
@@ -1657,7 +1657,7 @@ namespace
    * Steps one nil-21 red-black iterator slot backward and returns the input
    * slot pointer.
    */
-  [[maybe_unused]] InfluenceNodeFlag21Runtime** StepRbIteratorNil21BackwardLaneA(
+  InfluenceNodeFlag21Runtime** StepRbIteratorNil21BackwardLaneA(
     void* const,
     InfluenceNodeFlag21Runtime** const iteratorSlot
   ) noexcept
@@ -1675,7 +1675,7 @@ namespace
    * Secondary adapter lane that steps one nil-21 red-black iterator slot
    * backward.
    */
-  [[maybe_unused]] InfluenceNodeFlag21Runtime** StepRbIteratorNil21BackwardLaneB(
+  InfluenceNodeFlag21Runtime** StepRbIteratorNil21BackwardLaneB(
     void* const context,
     InfluenceNodeFlag21Runtime** const iteratorSlot
   ) noexcept
@@ -1690,7 +1690,7 @@ namespace
    * Steps one nil-61 red-black iterator slot backward and returns the input
    * slot pointer.
    */
-  [[maybe_unused]] InfluenceNodeFlag61Runtime** StepRbIteratorNil61BackwardLaneA(
+  InfluenceNodeFlag61Runtime** StepRbIteratorNil61BackwardLaneA(
     void* const,
     InfluenceNodeFlag61Runtime** const iteratorSlot
   ) noexcept
@@ -1708,7 +1708,7 @@ namespace
    * Secondary adapter lane that steps one nil-61 red-black iterator slot
    * backward.
    */
-  [[maybe_unused]] InfluenceNodeFlag61Runtime** StepRbIteratorNil61BackwardLaneB(
+  InfluenceNodeFlag61Runtime** StepRbIteratorNil61BackwardLaneB(
     void* const context,
     InfluenceNodeFlag61Runtime** const iteratorSlot
   ) noexcept
@@ -1722,7 +1722,7 @@ namespace
    * What it does:
    * Returns the rightmost node reachable from a flag-61 RB-tree head.
    */
-  [[maybe_unused]] InfluenceNodeFlag61Runtime* FindInfluenceTreeRightmostNodeFlag61(
+  InfluenceNodeFlag61Runtime* FindInfluenceTreeRightmostNodeFlag61(
     InfluenceNodeFlag61Runtime* head
   ) noexcept
   {
@@ -1740,7 +1740,7 @@ namespace
    * What it does:
    * Returns the leftmost node reachable from a flag-61 RB-tree head.
    */
-  [[maybe_unused]] InfluenceNodeFlag61Runtime* FindInfluenceTreeLeftmostNodeFlag61(
+  InfluenceNodeFlag61Runtime* FindInfluenceTreeLeftmostNodeFlag61(
     InfluenceNodeFlag61Runtime* head
   ) noexcept
   {
@@ -1762,7 +1762,7 @@ namespace
    * What it does:
    * Returns the rightmost node reachable from a flag-21 RB-tree head.
    */
-  [[maybe_unused]] InfluenceNodeFlag21Runtime* FindInfluenceTreeRightmostNodeFlag21(
+  InfluenceNodeFlag21Runtime* FindInfluenceTreeRightmostNodeFlag21(
     InfluenceNodeFlag21Runtime* head
   ) noexcept
   {
@@ -1780,7 +1780,7 @@ namespace
    * What it does:
    * Returns the leftmost node reachable from a flag-21 RB-tree head.
    */
-  [[maybe_unused]] InfluenceNodeFlag21Runtime* FindInfluenceTreeLeftmostNodeFlag21(
+  InfluenceNodeFlag21Runtime* FindInfluenceTreeLeftmostNodeFlag21(
     InfluenceNodeFlag21Runtime* head
   ) noexcept
   {
@@ -1803,7 +1803,7 @@ namespace
    * Allocates one blip-cell tree node and seeds links, key lanes, and
    * red-black marker bytes.
    */
-  [[maybe_unused]] BlipCellTreeNodeRuntime* AllocateBlipCellTreeNode(
+  BlipCellTreeNodeRuntime* AllocateBlipCellTreeNode(
     const moho::InfluenceMapCellIndex& key,
     BlipCellTreeNodeRuntime* const left,
     BlipCellTreeNodeRuntime* const parent,
@@ -1888,7 +1888,7 @@ namespace
    * Serializes one reflected `vector<InfluenceGrid>` payload by writing count
    * and then each `InfluenceGrid` element lane.
    */
-  [[maybe_unused]] void SaveInfluenceGridVectorArchive(
+  void SaveInfluenceGridVectorArchive(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
@@ -2037,7 +2037,7 @@ namespace
    * Resizes one `vector<SThreat>` lane to `requestedCount` using a zeroed
    * default fill value.
    */
-  [[maybe_unused]] std::size_t ResizeSThreatVectorWithZeroFill(
+  std::size_t ResizeSThreatVectorWithZeroFill(
     SThreatVector& storage,
     const std::size_t requestedCount
   )
@@ -2114,7 +2114,7 @@ namespace
    * directly instead (calling this helper would leak the freshly allocated set
    * header). No other source-level caller exists.
    */
-  [[maybe_unused]] moho::InfluenceGrid* CopyConstructInfluenceGridEntries(
+  moho::InfluenceGrid* CopyConstructInfluenceGridEntries(
     moho::InfluenceGrid* const destination,
     const moho::InfluenceGrid* const source
   )
@@ -2143,7 +2143,7 @@ namespace
    * The binary treats `this` as source and `a2` as destination (copy-construct
    * convention); mirrored here with modern names.
    */
-  [[maybe_unused]] SThreatVector* CopyConstructSThreatVector(
+  SThreatVector* CopyConstructSThreatVector(
     SThreatVector* const destination,
     const SThreatVector* const source
   )
@@ -2189,7 +2189,7 @@ namespace
    * `56` = `sizeof(SThreat)` (0x38). `0x4924924` is the msvc8 legacy vector
    * max-size bound for this element size.
    */
-  [[maybe_unused]] SThreatVector& AssignSThreatVector(
+  SThreatVector& AssignSThreatVector(
     SThreatVector& destination,
     const SThreatVector& source
   )
@@ -2234,7 +2234,7 @@ namespace
    * What it does:
    * Returns one lower-bound iterator in `grid.entries` for `entityId`.
    */
-  [[maybe_unused]] [[nodiscard]] InfluenceEntryIterator FindInfluenceEntryLowerBoundByEntityId(
+  [[nodiscard]] InfluenceEntryIterator FindInfluenceEntryLowerBoundByEntityId(
     moho::InfluenceGrid& grid,
     const std::uint32_t entityId
   )
@@ -2283,7 +2283,7 @@ namespace
    * Destroys one `InfluenceGrid::entries` tree payload, releases its legacy
    * set-header sentinel storage, and zeros `{head,size}` lanes.
    */
-  [[maybe_unused]] int ReleaseInfluenceEntrySetStorage(moho::InfluenceGrid& grid) noexcept
+  int ReleaseInfluenceEntrySetStorage(moho::InfluenceGrid& grid) noexcept
   {
     ClearInfluenceGridEntryTree(grid.entries);
 
@@ -2303,7 +2303,7 @@ namespace
    * Releases one `mBlipCells` set payload, deletes the legacy set-header
    * sentinel storage, and zeros `{head,size}` lanes.
    */
-  [[maybe_unused]] int ReleaseBlipCellSetStorageLaneA(InfluenceMapCellSet& blipCells) noexcept
+  int ReleaseBlipCellSetStorageLaneA(InfluenceMapCellSet& blipCells) noexcept
   {
     blipCells.clear();
 
@@ -2323,7 +2323,7 @@ namespace
    * Duplicate release lane for one `mBlipCells` set payload: clears tree
    * nodes, frees set-header sentinel storage, and zeros `{head,size}`.
    */
-  [[maybe_unused]] int ReleaseBlipCellSetStorageLaneB(InfluenceMapCellSet& blipCells) noexcept
+  int ReleaseBlipCellSetStorageLaneB(InfluenceMapCellSet& blipCells) noexcept
   {
     return ReleaseBlipCellSetStorageLaneA(blipCells);
   }
@@ -2358,7 +2358,7 @@ namespace
    * Adapts one linear cell index into `(x, z)` and forwards to
    * `CInfluenceMap::GetThreatRect`.
    */
-  [[maybe_unused]] float GetThreatRectByLinearCellIndex(
+  float GetThreatRectByLinearCellIndex(
     const moho::CInfluenceMap* const influenceMap,
     const int linearIndex,
     const int radius,
@@ -2379,7 +2379,7 @@ namespace
    * Releases one influence-map runtime storage lane through global
    * `operator delete`.
    */
-  [[maybe_unused]] void DeleteInfluenceMapRuntimeStoragePrimary(void* const storage) noexcept
+  void DeleteInfluenceMapRuntimeStoragePrimary(void* const storage) noexcept
   {
     ::operator delete(storage);
   }
@@ -2390,7 +2390,7 @@ namespace
    * What it does:
    * Secondary delete-thunk lane for influence-map runtime storage.
    */
-  [[maybe_unused]] void DeleteInfluenceMapRuntimeStorageSecondary(void* const storage) noexcept
+  void DeleteInfluenceMapRuntimeStorageSecondary(void* const storage) noexcept
   {
     ::operator delete(storage);
   }
@@ -3005,7 +3005,7 @@ namespace moho
    * Adapts one repeated-threat copy lane into `CopySThreatValueRange` and
    * returns one-past the last written destination slot.
    */
-  [[maybe_unused]] SThreat* CopySThreatValueRangeAndReturnEnd(
+  SThreat* CopySThreatValueRangeAndReturnEnd(
     const SThreat* const source,
     SThreat* const destination,
     const std::uint32_t count
@@ -3022,7 +3022,7 @@ namespace moho
    * Adapts one register-lane caller shape into the canonical repeated-value
    * threat copy helper.
    */
-  [[maybe_unused]] SThreat* CopySThreatValueRangeRegisterAdapter(
+  SThreat* CopySThreatValueRangeRegisterAdapter(
     const std::uint32_t count,
     const SThreat* const sourceValue,
     SThreat* const destination
@@ -3041,7 +3041,7 @@ namespace moho
    * Copies one contiguous `SThreat` source range `[sourceBegin, sourceEnd)`
    * into destination storage and returns one-past the last destination slot.
    */
-  [[maybe_unused]] SThreat* CopySThreatRangeRawNullable(
+  SThreat* CopySThreatRangeRawNullable(
     SThreat* destination,
     const SThreat* const sourceBegin,
     const SThreat* const sourceEnd
@@ -3064,7 +3064,7 @@ namespace moho
    * What it does:
    * Thin call-shape adapter into `CopySThreatRangeRawNullable`.
    */
-  [[maybe_unused]] SThreat* CopySThreatRangeRawNullableAdapter(
+  SThreat* CopySThreatRangeRawNullableAdapter(
     SThreat* const destination,
     const SThreat* const sourceBegin,
     const SThreat* const sourceEnd
@@ -3079,7 +3079,7 @@ namespace moho
    * What it does:
    * Thin stdcall adapter into `CopySThreatRangeNullable`.
    */
-  [[maybe_unused]] SThreat* CopySThreatRangeNullableStdcallAdapter(
+  SThreat* CopySThreatRangeNullableStdcallAdapter(
     SThreat* const destination,
     const SThreat* const sourceBegin,
     const SThreat* const sourceEnd
@@ -3103,7 +3103,7 @@ namespace moho
    * Moves one tail `[moveSourceBegin,activeEnd)` `SThreat` range down to
    * `moveDestinationBegin` and updates owner end to the compacted tail.
    */
-  [[maybe_unused]] SThreat* MoveSThreatTailRangeAndUpdateOwnerEnd(SThreatMoveOwnerRuntime& owner) noexcept
+  SThreat* MoveSThreatTailRangeAndUpdateOwnerEnd(SThreatMoveOwnerRuntime& owner) noexcept
   {
     SThreat* destination = owner.moveDestinationBegin;
     SThreat* source = owner.moveSourceBegin;
@@ -3125,7 +3125,7 @@ namespace moho
    * What it does:
    * Serializes the 14 contiguous `float` lanes of one `SThreat` record.
    */
-  [[maybe_unused]] void SerializeSThreatFloatLanesRaw(gpg::WriteArchive* const archive, const SThreat* const threat)
+  void SerializeSThreatFloatLanesRaw(gpg::WriteArchive* const archive, const SThreat* const threat)
   {
     if (archive == nullptr || threat == nullptr) {
       return;
@@ -3143,7 +3143,7 @@ namespace moho
    * What it does:
    * Serializes one `SThreat` record in named field order.
    */
-  [[maybe_unused]] void SerializeSThreatFields(gpg::WriteArchive* const archive, const SThreat& threat)
+  void SerializeSThreatFields(gpg::WriteArchive* const archive, const SThreat& threat)
   {
     if (archive == nullptr) {
       return;
@@ -3172,7 +3172,7 @@ namespace moho
    * Fills one `[destinationBegin, destinationEnd)` threat range from one
    * source record.
    */
-  [[maybe_unused]] SThreat* FillSThreatRange(
+  SThreat* FillSThreatRange(
     SThreat* destinationBegin,
     SThreat* const destinationEnd,
     const SThreat& source
@@ -3191,7 +3191,7 @@ namespace moho
    * What it does:
    * Copies one threat range backward into destination storage.
    */
-  [[maybe_unused]] SThreat* CopySThreatRangeBackward(
+  SThreat* CopySThreatRangeBackward(
     SThreat* destinationEnd,
     const SThreat* const sourceBegin,
     const SThreat* sourceEnd
@@ -3221,7 +3221,7 @@ namespace moho
    * Fills one `[destinationBegin, destinationEnd)` 16-byte lane range from one
    * source lane.
    */
-  [[maybe_unused]] Float4LaneRuntime* FillFloat4LaneRange(
+  Float4LaneRuntime* FillFloat4LaneRange(
     Float4LaneRuntime* destinationBegin,
     Float4LaneRuntime* const destinationEnd,
     const Float4LaneRuntime& source
@@ -3240,7 +3240,7 @@ namespace moho
    * What it does:
    * Copies one 16-byte lane range backward into destination storage.
    */
-  [[maybe_unused]] Float4LaneRuntime* CopyFloat4LaneRangeBackward(
+  Float4LaneRuntime* CopyFloat4LaneRangeBackward(
     Float4LaneRuntime* destinationEnd,
     const Float4LaneRuntime* const sourceBegin,
     const Float4LaneRuntime* sourceEnd
@@ -3261,7 +3261,7 @@ namespace moho
    * Copies `count` contiguous float4 lanes from one fixed source lane into
    * destination storage and returns one-past-end destination.
    */
-  [[maybe_unused]] float* CopyFloatQuadCountLaneAdapter(
+  float* CopyFloatQuadCountLaneAdapter(
     float* destination,
     const float* const sourceQuad,
     const std::uint32_t count
@@ -3279,7 +3279,7 @@ namespace moho
     return reinterpret_cast<float*>(destinationAddress);
   }
 
-  [[maybe_unused]] void SwapFloat4LaneValues(Float4LaneRuntime& left, Float4LaneRuntime& right) noexcept
+  void SwapFloat4LaneValues(Float4LaneRuntime& left, Float4LaneRuntime& right) noexcept
   {
     std::swap(left, right);
   }
@@ -3298,7 +3298,7 @@ namespace moho
     return 0;
   }
 
-  [[maybe_unused]] Float4LaneRuntime* SortThreeFloat4ByLane3DescendingLocal(
+  Float4LaneRuntime* SortThreeFloat4ByLane3DescendingLocal(
     Float4LaneRuntime* const lane0,
     Float4LaneRuntime* const lane1,
     Float4LaneRuntime* const lane2
@@ -3324,7 +3324,7 @@ namespace moho
    * 4-step median-of-three sampling schedule, otherwise it sorts the direct
    * `(first, middle, last)` trio.
    */
-  [[maybe_unused]] Float4LaneRuntime* SelectPivotSamplesForFloat4Sort(
+  Float4LaneRuntime* SelectPivotSamplesForFloat4Sort(
     Float4LaneRuntime* const first,
     Float4LaneRuntime* const middle,
     Float4LaneRuntime* const last,
@@ -3357,7 +3357,7 @@ namespace moho
    * threat-sample sorter, rotating contiguous lane blocks to insert each
    * element into descending `w` order.
    */
-  [[maybe_unused]] void InsertionSortFloat4LaneRangeByDescendingW(
+  void InsertionSortFloat4LaneRangeByDescendingW(
     Float4LaneRuntime* const begin,
     Float4LaneRuntime* const end
   ) noexcept
@@ -3393,7 +3393,7 @@ namespace moho
    * Partitions one float4 lane range around a sampled pivot and writes the
    * resulting two partition cursors into `outBounds[0..1]`.
    */
-  [[maybe_unused]] Float4LaneRuntime** PartitionFloat4LaneRangeAroundPivot(
+  Float4LaneRuntime** PartitionFloat4LaneRangeAroundPivot(
     Float4LaneRuntime** const outBounds,
     Float4LaneRuntime* const begin,
     Float4LaneRuntime* const end,
@@ -3523,7 +3523,7 @@ namespace moho
    * deep budget remains, otherwise falls back to heapify+tail-pop, and uses
    * insertion sort for short spans.
    */
-  [[maybe_unused]] std::int32_t SortFloat4LaneRangeDispatcher(
+  std::int32_t SortFloat4LaneRangeDispatcher(
     Float4LaneRuntime* begin,
     Float4LaneRuntime* end,
     std::int32_t depthBudget,
@@ -3583,7 +3583,7 @@ namespace moho
    * Computes one float4 lane-count budget from `[begin, end)` span and forwards
    * to the canonical sort dispatcher.
    */
-  [[maybe_unused]] std::int32_t SortFloat4LaneRangeDispatcherWithSpanBudget(
+  std::int32_t SortFloat4LaneRangeDispatcherWithSpanBudget(
     Float4LaneRuntime* const begin,
     Float4LaneRuntime* const end,
     const std::int32_t finalizeLane
@@ -3771,7 +3771,7 @@ namespace moho
    * Heapifies one 16-byte lane range only when the aligned range span exceeds
    * one element.
    */
-  [[maybe_unused]] std::intptr_t BuildFloat4HeapIfRangeHasMultipleElements(
+  std::intptr_t BuildFloat4HeapIfRangeHasMultipleElements(
     Float4LaneRuntime* const rangeBegin,
     Float4LaneRuntime* const rangeEnd,
     const std::int32_t finalizeLane
@@ -3794,7 +3794,7 @@ namespace moho
    * Adapts one forwarder lane into the full tail-pop heap pass used by
    * contiguous 16-byte lane sorting helpers.
    */
-  [[maybe_unused]] std::int32_t PopFloat4HeapToTailAdapter(
+  std::int32_t PopFloat4HeapToTailAdapter(
     Float4LaneRuntime* const rangeBegin,
     Float4LaneRuntime* const rangeEnd,
     const std::int32_t finalizeLane
@@ -3810,7 +3810,7 @@ namespace moho
    * Performs one root-pop heap step when the aligned range span exceeds one
    * element; otherwise returns the end pointer lane unchanged.
    */
-  [[maybe_unused]] std::intptr_t PopFloat4HeapRootIfRangeHasMultipleElements(
+  std::intptr_t PopFloat4HeapRootIfRangeHasMultipleElements(
     Float4LaneRuntime* const rangeBegin,
     Float4LaneRuntime* const rangeEnd,
     const std::int32_t finalizeLane
@@ -3833,7 +3833,7 @@ namespace moho
    * Copies the current root lane into `outRoot` and then pushes one caller
    * provided replacement lane through the heap-root sift path.
    */
-  [[maybe_unused]] std::int32_t CopyRootAndSiftFloat4HeapWithReplacement(
+  std::int32_t CopyRootAndSiftFloat4HeapWithReplacement(
     Float4LaneRuntime* const rangeBegin,
     Float4LaneRuntime* const rangeEnd,
     Float4LaneRuntime* const outRoot,
@@ -3911,7 +3911,7 @@ namespace moho
    * Runs one `InfluenceGrid` destructor lane and returns the same object
    * pointer for caller chaining.
    */
-  [[maybe_unused]] InfluenceGrid* DestroyInfluenceGridAndReturnSelf(InfluenceGrid* const grid)
+  InfluenceGrid* DestroyInfluenceGridAndReturnSelf(InfluenceGrid* const grid)
   {
     grid->~InfluenceGrid();
     return grid;
@@ -3924,7 +3924,7 @@ namespace moho
    * Destroys one contiguous range of `InfluenceGrid` elements by releasing
    * per-grid threat vectors and entry maps.
    */
-  [[maybe_unused]] static void DestroyInfluenceGridRange(InfluenceGrid* const start, InfluenceGrid* const end)
+  static void DestroyInfluenceGridRange(InfluenceGrid* const start, InfluenceGrid* const end)
   {
     for (InfluenceGrid* cursor = start; cursor != end; ++cursor) {
       cursor->threats.clear();
@@ -3938,8 +3938,8 @@ namespace moho
    * What it does:
    * Adapts one thiscall range-destroy lane into the canonical
    * `DestroyInfluenceGridRange(begin, end)` helper.
-   */
-  [[maybe_unused]] static void DestroyInfluenceGridRangeThiscallAdapter(
+   [[maybe_unused]] */
+  static void DestroyInfluenceGridRangeThiscallAdapter(
     InfluenceGrid* const rangeEnd,
     InfluenceGrid* const rangeBegin
   )
@@ -3953,8 +3953,8 @@ namespace moho
    * What it does:
    * Adapts one scalar-delete caller lane into
    * `DestroyInfluenceGridRange(begin, end)`.
-   */
-  [[maybe_unused]] static void DestroyInfluenceGridRangeDeleteAdapter(
+   [[maybe_unused]] */
+  static void DestroyInfluenceGridRangeDeleteAdapter(
     InfluenceGrid* const rangeBegin,
     InfluenceGrid* const rangeEnd
   ) noexcept
@@ -3970,7 +3970,7 @@ namespace moho
    * and per-army threat-vector contents, then copying aggregate threat and decay
    * lanes. Preserves self-assignment semantics.
    */
-  [[maybe_unused]] InfluenceGrid& AssignInfluenceGridValue(InfluenceGrid& destination, const InfluenceGrid& source)
+  InfluenceGrid& AssignInfluenceGridValue(InfluenceGrid& destination, const InfluenceGrid& source)
   {
     if (&destination != &source) {
       CopyInfluenceEntryTreeStorage(destination.entries, source.entries);
@@ -3993,7 +3993,7 @@ namespace moho
    * Assigns one `InfluenceGrid` payload into `destination` and returns the
    * destination pointer (primary adapter lane).
    */
-  [[maybe_unused]] moho::InfluenceGrid* AssignInfluenceGridAndReturnDestinationPrimary(
+  moho::InfluenceGrid* AssignInfluenceGridAndReturnDestinationPrimary(
     const moho::InfluenceGrid* const source,
     moho::InfluenceGrid* const destination
   )
@@ -4011,7 +4011,7 @@ namespace moho
    * Assigns one `InfluenceGrid` payload into `destination` and returns the
    * destination pointer (secondary adapter lane).
    */
-  [[maybe_unused]] moho::InfluenceGrid* AssignInfluenceGridAndReturnDestinationSecondary(
+  moho::InfluenceGrid* AssignInfluenceGridAndReturnDestinationSecondary(
     const moho::InfluenceGrid* const source,
     moho::InfluenceGrid* const destination
   )
@@ -4027,7 +4027,7 @@ namespace moho
    * destinationEnd)` by cloning entries, per-army threats, and aggregate/decay
    * threat lanes into each destination element.
    */
-  [[maybe_unused]] static void FillInfluenceGridRange(
+  static void FillInfluenceGridRange(
     InfluenceGrid* const destinationBegin,
     InfluenceGrid* const destinationEnd,
     const InfluenceGrid& fillValue
@@ -4044,8 +4044,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane caller shape into
    * `FillInfluenceGridRange(destinationBegin, destinationEnd, fillValue)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* FillInfluenceGridRangeRegisterAdapter(
+   [[maybe_unused]] */
+  static InfluenceGrid* FillInfluenceGridRangeRegisterAdapter(
     const InfluenceGrid& fillValue,
     InfluenceGrid* const destinationBegin,
     InfluenceGrid* const destinationEnd
@@ -4064,7 +4064,7 @@ namespace moho
    * into the destination range ending at `destinationEnd`, preserving overlap
    * semantics used by legacy vector insert/shift lanes.
    */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeBackward(
+  static InfluenceGrid* CopyInfluenceGridRangeBackward(
     InfluenceGrid* const sourceEnd,
     InfluenceGrid* const sourceBegin,
     InfluenceGrid* const destinationEnd
@@ -4088,8 +4088,8 @@ namespace moho
    * What it does:
    * Adapts one legacy call-convention lane into
    * `CopyInfluenceGridRangeBackward`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeBackwardAdapter(
+   [[maybe_unused]] */
+  static InfluenceGrid* CopyInfluenceGridRangeBackwardAdapter(
     InfluenceGrid* const sourceEnd,
     InfluenceGrid* const sourceBegin,
     InfluenceGrid* const destinationEnd
@@ -4106,7 +4106,7 @@ namespace moho
    * vector relocation/copy lanes, preserving per-grid entry map, threat vector,
    * aggregate threat, and decay state.
    */
-  [[maybe_unused]] static InfluenceGrid*
+  static InfluenceGrid*
   CopyInfluenceGridRange(const InfluenceGrid* start, const InfluenceGrid* end, InfluenceGrid* dest)
   {
     for (const InfluenceGrid* source = start; source != end; ++source, ++dest) {
@@ -4129,8 +4129,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane caller shape into
    * `CopyInfluenceGridRange(sourceBegin, sourceEnd, destinationBegin)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeRegisterAdapter(
+   [[maybe_unused]] */
+  static InfluenceGrid* CopyInfluenceGridRangeRegisterAdapter(
     const InfluenceGrid* const sourceBegin,
     const InfluenceGrid* const sourceEnd,
     InfluenceGrid* const destinationBegin
@@ -4150,7 +4150,7 @@ namespace moho
    * storage and destroys already-constructed grids before rethrowing if a copy
    * step throws.
    */
-  [[maybe_unused]] static InfluenceGrid*
+  static InfluenceGrid*
   CopyInfluenceGridRangeWithRollback(const InfluenceGrid* start, const InfluenceGrid* end, InfluenceGrid* dest)
   {
     InfluenceGrid* cursor = dest;
@@ -4181,8 +4181,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane call shape into
    * `CopyInfluenceGridRangeWithRollback(sourceBegin, sourceEnd, destination)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeWithRollbackRegisterAdapter(
+   [[maybe_unused]] */
+  static InfluenceGrid* CopyInfluenceGridRangeWithRollbackRegisterAdapter(
     const InfluenceGrid* const sourceBegin,
     const InfluenceGrid* const sourceEnd,
     InfluenceGrid* const destination
@@ -4199,7 +4199,7 @@ namespace moho
    * into destination storage and destroys already-constructed lanes before
    * rethrowing if a copy step throws.
    */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollback(
+  static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollback(
     const std::uint32_t count,
     InfluenceGrid* const destination,
     const InfluenceGrid* const source
@@ -4222,8 +4222,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane call shape into
    * `CopyInfluenceGridCountedRangeWithRollback(count, destination, source)`.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackRegisterAdapter(
+   [[maybe_unused]] */
+  static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackRegisterAdapter(
     const std::uint32_t count,
     InfluenceGrid* const destination,
     const InfluenceGrid* const source
@@ -4238,8 +4238,8 @@ namespace moho
    * What it does:
    * Adapts one counted rollback-copy lane and returns one-past the last copied
    * `InfluenceGrid` destination slot.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackAdapter(
+   [[maybe_unused]] */
+  static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackAdapter(
     const InfluenceGrid* const sourceBegin,
     InfluenceGrid* const destinationBegin,
     const std::uint32_t count
@@ -4258,8 +4258,8 @@ namespace moho
    * Alternate guarded contiguous `InfluenceGrid` range-copy lane that copies
    * `[sourceBegin, sourceEnd)` into destination storage and destroys already
    * constructed grids before rethrowing on copy failure.
-   */
-  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeWithRollbackAlt(
+   [[maybe_unused]] */
+  static InfluenceGrid* CopyInfluenceGridRangeWithRollbackAlt(
     const InfluenceGrid* const sourceBegin,
     const InfluenceGrid* const sourceEnd,
     InfluenceGrid* const destinationBegin
@@ -4315,8 +4315,8 @@ namespace moho
    * Adapts one fastcall register lane into `CopyInfluenceGridCountedRange`
    * using the register-provided element count and pointer arguments.
    */
-  [[maybe_unused]] void CopyInfluenceGridCountedRangeFastcallAdapter(
-    [[maybe_unused]] InfluenceGrid* const unusedThisLane,
+  void CopyInfluenceGridCountedRangeFastcallAdapter(
+    InfluenceGrid* const unusedThisLane,
     const int count,
     InfluenceGrid* const destination,
     const InfluenceGrid* const source
@@ -4382,7 +4382,7 @@ namespace moho
    * capacity reuse and destruction order, including rollback-safe
    * copy-construction for growth and full-reallocation paths.
    */
-  [[maybe_unused]] [[nodiscard]] InfluenceGridVector& AssignInfluenceGridVector(
+  [[nodiscard]] InfluenceGridVector& AssignInfluenceGridVector(
     InfluenceGridVector& destination,
     const InfluenceGridVector& source
   )
@@ -4473,7 +4473,7 @@ namespace moho
    * Primary adapter lane for nullable `InfluenceGrid` copy-construction into
    * caller-provided storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresentPrimary(
+  [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresentPrimary(
     moho::InfluenceGrid* const destination,
     const moho::InfluenceGrid* const source
   )
@@ -4488,7 +4488,7 @@ namespace moho
    * Secondary adapter lane for nullable `InfluenceGrid` copy-construction into
    * caller-provided storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresentSecondary(
+  [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresentSecondary(
     moho::InfluenceGrid* const destination,
     const moho::InfluenceGrid* const source
   )
@@ -4503,7 +4503,7 @@ namespace moho
    * Allocates contiguous storage for `count` `SThreat` elements with the same
    * overflow guard semantics as the original VC8 array-allocation helper.
    */
-  [[maybe_unused]] static SThreat* func_NewArray_SThreat(const unsigned int count)
+  static SThreat* func_NewArray_SThreat(const unsigned int count)
   {
     if (count != 0u && (0xFFFFFFFFu / count) < sizeof(SThreat)) {
       throw std::bad_alloc{};
@@ -4519,7 +4519,7 @@ namespace moho
    * Allocates contiguous storage for `count` `InfluenceGrid` elements with the
    * same overflow guard semantics as the original VC8 array-allocation helper.
    */
-  [[maybe_unused]] static InfluenceGrid* func_NewArray_InfluenceMap(const unsigned int count)
+  static InfluenceGrid* func_NewArray_InfluenceMap(const unsigned int count)
   {
     if (count != 0u && (0xFFFFFFFFu / count) < sizeof(InfluenceGrid)) {
       throw std::bad_alloc{};
@@ -4534,7 +4534,7 @@ namespace moho
    * What it does:
    * Releases one raw allocation lane with `operator delete`.
    */
-  [[maybe_unused]] void DeleteSThreatArrayOrZeroSizeBlockThunk(void* const allocation) noexcept
+  void DeleteSThreatArrayOrZeroSizeBlockThunk(void* const allocation) noexcept
   {
     ::operator delete(allocation);
   }
@@ -4545,7 +4545,7 @@ namespace moho
    * What it does:
    * Releases one raw allocation lane with `operator delete`.
    */
-  [[maybe_unused]] void DeleteInfluenceGridArrayOrZeroSizeBlockThunk(void* const allocation) noexcept
+  void DeleteInfluenceGridArrayOrZeroSizeBlockThunk(void* const allocation) noexcept
   {
     ::operator delete(allocation);
   }
@@ -4557,7 +4557,7 @@ namespace moho
    * Allocates one checked `SThreat[count]` raw lane when `count != 0`; falls
    * back to `operator new(0)` for zero-count call sites.
    */
-  [[maybe_unused]] SThreat* AllocateSThreatArrayOrZeroSizeBlock(const unsigned int count)
+  SThreat* AllocateSThreatArrayOrZeroSizeBlock(const unsigned int count)
   {
     if (count != 0u) {
       return func_NewArray_SThreat(count);
@@ -4573,7 +4573,7 @@ namespace moho
    * Allocates one checked `InfluenceGrid[count]` raw lane when `count != 0`;
    * falls back to `operator new(0)` for zero-count call sites.
    */
-  [[maybe_unused]] moho::InfluenceGrid* AllocateInfluenceGridArrayOrZeroSizeBlock(const unsigned int count)
+  moho::InfluenceGrid* AllocateInfluenceGridArrayOrZeroSizeBlock(const unsigned int count)
   {
     if (count != 0u) {
       return func_NewArray_InfluenceMap(count);
