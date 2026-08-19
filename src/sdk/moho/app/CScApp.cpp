@@ -643,7 +643,17 @@ namespace
     return value.equals_no_case("windowed");
   }
 
-  void ClampPositionToMonitor(wxPoint* const inOutPosition)
+  /**
+   * Pulls a saved window origin back onto the monitor nearest to it.
+   *
+   * The bound is the far edge minus the window extent, not the far edge
+   * itself. Clamping the origin to rcMonitor.right/bottom is the degenerate
+   * case: it places the top-left corner exactly on the edge the window is
+   * meant to stay inside, so the whole frame ends up past it. A saved
+   * y of 5978 came back as 1440 on a 2560x1440 monitor - technically clamped,
+   * entirely invisible - which read as the engine having drawn nothing.
+   */
+  void ClampPositionToMonitor(wxPoint* const inOutPosition, const std::uint32_t width, const std::uint32_t height)
   {
     if (inOutPosition == nullptr) {
       return;
@@ -657,10 +667,15 @@ namespace
       return;
     }
 
+    // A window wider or taller than the monitor cannot fit; the max() then
+    // wins and the origin sits on the near edge, which is the best available.
+    const LONG rightBound = monitorInfo.rcMonitor.right - static_cast<LONG>(width);
+    const LONG bottomBound = monitorInfo.rcMonitor.bottom - static_cast<LONG>(height);
+
     const LONG clampedX =
-      (std::max)(monitorInfo.rcMonitor.left, (std::min)(static_cast<LONG>(inOutPosition->x), monitorInfo.rcMonitor.right));
+      (std::max)(monitorInfo.rcMonitor.left, (std::min)(static_cast<LONG>(inOutPosition->x), rightBound));
     const LONG clampedY =
-      (std::max)(monitorInfo.rcMonitor.top, (std::min)(static_cast<LONG>(inOutPosition->y), monitorInfo.rcMonitor.bottom));
+      (std::max)(monitorInfo.rcMonitor.top, (std::min)(static_cast<LONG>(inOutPosition->y), bottomBound));
 
     inOutPosition->x = static_cast<std::int32_t>(clampedX);
     inOutPosition->y = static_cast<std::int32_t>(clampedY);
@@ -1291,7 +1306,7 @@ bool CScApp::CreateDevice()
       position.y = preferences->GetInteger(msvc8::string("Windows.Main.y"), position.y);
     }
 
-    ClampPositionToMonitor(&position);
+    ClampPositionToMonitor(&position, primaryHead.mWidth, primaryHead.mHeight);
   }
 
   const std::int32_t packedAntiAliasing = moho::OPTIONS_GetInt("antialiasing");
