@@ -359,7 +359,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Copies one half-open range of 0x28-byte elements with `{dword,dword,dword,
  * string}` layout and returns one-past-last destination slot.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement40StringLane* CopyVectorElement40StringRange(
+[[nodiscard]] VectorElement40StringLane* CopyVectorElement40StringRange(
   VectorElement40StringLane* destinationBegin,
   const VectorElement40StringLane* sourceBegin,
   const VectorElement40StringLane* sourceEnd
@@ -384,7 +384,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Adapts one register-lane caller shape into the canonical
  * `CopyVectorElement40StringRange(destination, begin, end)` helper.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement40StringLane* CopyVectorElement40StringRangeRegisterAdapter(
+[[nodiscard]] VectorElement40StringLane* CopyVectorElement40StringRangeRegisterAdapter(
   const VectorElement40StringLane* const sourceBegin,
   const VectorElement40StringLane* const sourceEnd,
   VectorElement40StringLane* const destinationBegin
@@ -401,7 +401,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * destinationEnd)` by assigning all three `msvc8::string` lanes from
  * `sourceTriple`.
  */
-[[maybe_unused]] [[nodiscard]] msvc8::string* FillStringTripleRangeFromSingle(
+[[nodiscard]] msvc8::string* FillStringTripleRangeFromSingle(
   VectorElement84StringTripleLane* destinationBegin,
   VectorElement84StringTripleLane* const destinationEnd,
   const VectorElement84StringTripleLane* const sourceTriple
@@ -427,7 +427,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * `[sourceBegin,sourceEnd)` into the destination tail ending at
  * `destinationEnd` and returns the resulting destination-begin lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement84StringTripleLane* CopyStringTripleRangeBackward(
+[[nodiscard]] VectorElement84StringTripleLane* CopyStringTripleRangeBackward(
   const VectorElement84StringTripleLane* sourceBegin,
   const VectorElement84StringTripleLane* sourceEnd,
   VectorElement84StringTripleLane* destinationEnd
@@ -458,7 +458,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Bridges legacy masked-register wrapper lanes into the canonical
  * triple-string reverse-copy helper.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement84StringTripleLane* CopyStringTripleRangeBackwardRegisterAdapter(
+[[nodiscard]] VectorElement84StringTripleLane* CopyStringTripleRangeBackwardRegisterAdapter(
   const VectorElement84StringTripleLane* const sourceBegin,
   const VectorElement84StringTripleLane* const sourceEnd,
   const std::uint32_t /*unusedMaskedLane*/,
@@ -476,7 +476,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * sourceEnd)` into destination storage and returns the advanced destination
  * cursor.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugWorldText* CopyDebugWorldTextRangeForward(
+[[nodiscard]] moho::SDebugWorldText* CopyDebugWorldTextRangeForward(
   moho::SDebugWorldText* destinationBegin,
   const moho::SDebugWorldText* sourceBegin,
   const moho::SDebugWorldText* sourceEnd
@@ -504,7 +504,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * What it does:
  * Forwarding adapter lane into `CopyDebugWorldTextRangeForward`.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugWorldText* CopyDebugWorldTextRangeForwardAdapterA(
+[[nodiscard]] moho::SDebugWorldText* CopyDebugWorldTextRangeForwardAdapterA(
   moho::SDebugWorldText* const destinationBegin,
   const moho::SDebugWorldText* const sourceBegin,
   const moho::SDebugWorldText* const sourceEnd
@@ -521,7 +521,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * `(sourceBegin, sourceEnd]` into `(destinationBegin, destinationEnd]` and
  * returns the rewound destination cursor.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugWorldText* CopyDebugWorldTextRangeBackward(
+[[nodiscard]] moho::SDebugWorldText* CopyDebugWorldTextRangeBackward(
   moho::SDebugWorldText* destinationEnd,
   const moho::SDebugWorldText* sourceEnd,
   const moho::SDebugWorldText* sourceBegin
@@ -551,7 +551,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * sourceEnd)` into destination storage and returns the advanced destination
  * cursor.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeForward(
+[[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeForward(
   moho::SDebugScreenText* destinationBegin,
   const moho::SDebugScreenText* sourceBegin,
   const moho::SDebugScreenText* sourceEnd
@@ -585,7 +585,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * What it does:
  * Forwarding adapter lane into `CopyDebugScreenTextRangeForward`.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeForwardAdapterA(
+[[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeForwardAdapterA(
   moho::SDebugScreenText* const destinationBegin,
   const moho::SDebugScreenText* const sourceBegin,
   const moho::SDebugScreenText* const sourceEnd
@@ -602,7 +602,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * `(sourceBegin, sourceEnd]` into `(destinationBegin, destinationEnd]` and
  * returns the rewound destination cursor.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeBackward(
+[[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeBackward(
   moho::SDebugScreenText* destinationEnd,
   const moho::SDebugScreenText* sourceEnd,
   const moho::SDebugScreenText* sourceBegin
@@ -637,7 +637,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Register-order adapter lane that forwards one backward screen-text copy
  * range into `CopyDebugScreenTextRangeBackward`.
  */
-[[maybe_unused]] [[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeBackwardAdapterA(
+[[nodiscard]] moho::SDebugScreenText* CopyDebugScreenTextRangeBackwardAdapterA(
   const moho::SDebugScreenText* const sourceBegin,
   const moho::SDebugScreenText* const sourceEnd,
   moho::SDebugScreenText* const destinationEnd
@@ -655,7 +655,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * `destinationEnd`, stores the resulting destination-begin lane in
  * `outDestinationBegin`, and returns the output slot.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement84StringTripleLane** CopyStringTripleRangeBackwardAndStoreBegin(
+[[nodiscard]] VectorElement84StringTripleLane** CopyStringTripleRangeBackwardAndStoreBegin(
   VectorElement84StringTripleLane** const outDestinationBegin,
   const VectorElement84StringTripleLane* const sourceBegin,
   const VectorElement84StringTripleLane* sourceEnd,
@@ -688,7 +688,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Register-shape adapter for one triple-string fill lane dispatch into
  * `FillStringTripleRangeFromSingle`.
  */
-[[maybe_unused]] [[nodiscard]] msvc8::string* FillStringTripleRangeFromSingleRegisterAdapter(
+[[nodiscard]] msvc8::string* FillStringTripleRangeFromSingleRegisterAdapter(
   const VectorElement84StringTripleLane* const sourceTriple,
   VectorElement84StringTripleLane* const destinationBegin,
   VectorElement84StringTripleLane* const destinationEnd
@@ -704,7 +704,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Register-shape adapter that forwards one triple-string reverse-copy lane and
  * returns the caller output-slot pointer.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement84StringTripleLane** CopyStringTripleRangeBackwardAndStoreBeginRegisterAdapter(
+[[nodiscard]] VectorElement84StringTripleLane** CopyStringTripleRangeBackwardAndStoreBeginRegisterAdapter(
   VectorElement84StringTripleLane** const outDestinationBegin,
   const VectorElement84StringTripleLane* const sourceBegin,
   const VectorElement84StringTripleLane* const sourceEnd,
@@ -728,7 +728,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Reinitializes one legacy string lane to empty SSO state, copy-assigns text
  * from `sourceText`, and stores one caller-provided tail pointer lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementStringTailLane* InitializeVectorElementStringTailLane(
+[[nodiscard]] VectorElementStringTailLane* InitializeVectorElementStringTailLane(
   VectorElementStringTailLane* const destination,
   const msvc8::string* const sourceText,
   void* const* const tailLaneSlot
@@ -755,7 +755,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * scalar header lanes, assigning text from `sourceText`, inheriting the source
  * tail lane at `+0x1C`, and zeroing trailing flags.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementTripleWordStringTailFlagsLane* InitializeVectorElementTripleWordStringTailFlagsLane(
+[[nodiscard]] VectorElementTripleWordStringTailFlagsLane* InitializeVectorElementTripleWordStringTailFlagsLane(
   const std::uint32_t lane0,
   const std::uint32_t lane8,
   const std::uint32_t lane4,
@@ -783,7 +783,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Initializes one 20-byte `{dword x5}` lane by copying four source dwords and
  * writing one explicit caller-provided tail dword.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement20DwordQuintLane* InitializeDwordQuintLaneWithTailWord(
+[[nodiscard]] VectorElement20DwordQuintLane* InitializeDwordQuintLaneWithTailWord(
   VectorElement20DwordQuintLane* const destination,
   const VectorElement16DwordQuadLane* const sourceHead,
   const std::uint32_t tailWord
@@ -803,7 +803,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * What it does:
  * Copies one source float triple lane into an `{x,z}` destination pair lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementFloatPairXZLane* CopyFloatPairXZLane(
+[[nodiscard]] VectorElementFloatPairXZLane* CopyFloatPairXZLane(
   VectorElementFloatPairXZLane* const destination,
   const VectorElementFloatTripleLane* const source
 ) noexcept
@@ -820,7 +820,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Appends one pointer lane from `valueSlot` to `destination`, using the
  * existing vector growth path when capacity is exhausted.
  */
-[[maybe_unused]] [[nodiscard]] int* PushBackPointerLaneWithGrowth(
+[[nodiscard]] int* PushBackPointerLaneWithGrowth(
   int* const* const valueSlot,
   msvc8::vector<int*>& destination
 )
@@ -837,7 +837,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * What it does:
  * Stores one vector `_Mylast` lane pointer into caller output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::byte** StoreVectorLastPointerLane(
+[[nodiscard]] std::byte** StoreVectorLastPointerLane(
   std::byte** const outPointer,
   const VectorElementCountRuntimeView* const storage
 ) noexcept
@@ -853,7 +853,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * What it does:
  * Stores one vector `_Myfirst` lane pointer into caller output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::byte** StoreVectorFirstPointerLane(
+[[nodiscard]] std::byte** StoreVectorFirstPointerLane(
   std::byte** const outPointer,
   const VectorElementCountRuntimeView* const storage
 ) noexcept
@@ -869,7 +869,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * What it does:
  * Initializes one `[dword,byte]` pair lane from source scalar lanes.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementDwordBytePairLane* InitializeDwordBytePairLane(
+[[nodiscard]] VectorElementDwordBytePairLane* InitializeDwordBytePairLane(
   VectorElementDwordBytePairLane* const outPair,
   const std::uint32_t* const dwordLane,
   const std::uint8_t* const byteLane
@@ -888,7 +888,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Initializes one `[dword,byte]` pair lane from caller-provided scalar
  * value lanes.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementDwordBytePairLane* InitializeDwordBytePairLaneFromValues(
+[[nodiscard]] VectorElementDwordBytePairLane* InitializeDwordBytePairLaneFromValues(
   VectorElementDwordBytePairLane* const outPair,
   const std::uint32_t dwordLane,
   const std::uint8_t byteLane
@@ -910,7 +910,7 @@ inline void ReportVectorInvalidParameter() noexcept
  * Pass-through adapter that stores one caller pointer lane into output
  * storage.
  */
-[[maybe_unused]] [[nodiscard]] void** StorePointerLanePassthroughA(
+[[nodiscard]] void** StorePointerLanePassthroughA(
   void** const outPointer,
   void* const value
 ) noexcept
@@ -932,7 +932,7 @@ static_assert(sizeof(VectorDwordBeginLaneRuntimeView) == 0x04, "VectorDwordBegin
  * Stores one dword-lane pointer computed as `begin + index` into caller output
  * storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t** StoreDwordPointerAtIndexLane(
+[[nodiscard]] std::uint32_t** StoreDwordPointerAtIndexLane(
   std::uint32_t** const outPointer,
   const VectorDwordBeginLaneRuntimeView* const lane,
   const std::int32_t index
@@ -952,7 +952,7 @@ static_assert(sizeof(VectorDwordBeginLaneRuntimeView) == 0x04, "VectorDwordBegin
  * Computes one 20-byte-stride element address from vector `_Myfirst` and
  * returns the resulting x86 dword lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeVectorFirstWordAddressAtIndexStride20(
+[[nodiscard]] std::uint32_t ComputeVectorFirstWordAddressAtIndexStride20(
   const int index,
   const VectorDwordStorageView* const storage
 ) noexcept
@@ -969,7 +969,7 @@ static_assert(sizeof(VectorDwordBeginLaneRuntimeView) == 0x04, "VectorDwordBegin
  * Computes one 8-byte-stride lane address from a base dword lane and index,
  * then stores the resulting dword lane into caller-provided output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordLaneAddressAtIndexStride8(
+[[nodiscard]] std::uint32_t* StoreDwordLaneAddressAtIndexStride8(
   std::uint32_t* const outWord,
   const std::uint32_t* const baseWord,
   const int index
@@ -986,7 +986,7 @@ static_assert(sizeof(VectorDwordBeginLaneRuntimeView) == 0x04, "VectorDwordBegin
  * Secondary pass-through adapter that stores one caller pointer lane into
  * output storage.
  */
-[[maybe_unused]] [[nodiscard]] void** StorePointerLanePassthroughB(
+[[nodiscard]] void** StorePointerLanePassthroughB(
   void** const outPointer,
   void* const value
 ) noexcept
@@ -1000,7 +1000,7 @@ static_assert(sizeof(VectorDwordBeginLaneRuntimeView) == 0x04, "VectorDwordBegin
  * What it does:
  * Moves one dword lane from source to destination and clears the source slot.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* MoveDwordLaneAndClearSource(
+[[nodiscard]] std::uint32_t* MoveDwordLaneAndClearSource(
   std::uint32_t* const outWord,
   std::uint32_t* const sourceLane
 ) noexcept
@@ -1059,7 +1059,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * Initializes one legacy tree-header lane with copied seed word, zero count,
  * and self-linked sentinel/root pointers.
  */
-[[maybe_unused]] [[nodiscard]] TreeBootstrapWordHeaderView* InitializeTreeBootstrapWordHeader(
+[[nodiscard]] TreeBootstrapWordHeaderView* InitializeTreeBootstrapWordHeader(
   TreeBootstrapWordHeaderView* const outHeader,
   const LaneWordSeedView* const source
 ) noexcept
@@ -1086,7 +1086,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Zeros one two-dword output lane and returns the destination.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* ZeroTwoWordOutputLane(std::uint32_t* const outWords) noexcept
+[[nodiscard]] std::uint32_t* ZeroTwoWordOutputLane(std::uint32_t* const outWords) noexcept
 {
   outWords[0] = 0u;
   outWords[1] = 0u;
@@ -1104,7 +1104,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Stores source lane `+0x04` into one caller-provided output dword slot.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreVtableAccessorLane04Word(
+[[nodiscard]] std::uint32_t* StoreVtableAccessorLane04Word(
   std::uint32_t* const outWord,
   const VtableWordPairAccessorView* const source
 ) noexcept
@@ -1124,7 +1124,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Stores source lane `+0x08` into one caller-provided output dword slot.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreVtableAccessorLane08Word(
+[[nodiscard]] std::uint32_t* StoreVtableAccessorLane08Word(
   std::uint32_t* const outWord,
   const VtableWordPairAccessorView* const source
 ) noexcept
@@ -1143,7 +1143,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * Stores one raw pointer lane (truncated to x86 dword width) into caller
  * output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreRawPointerLaneAsWord(
+[[nodiscard]] std::uint32_t* StoreRawPointerLaneAsWord(
   std::uint32_t* const outWord,
   const void* const value
 ) noexcept
@@ -1167,7 +1167,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Stores the dword at source lane `+0x04` into caller-provided output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordLaneOffset4(
+[[nodiscard]] std::uint32_t* StoreDwordLaneOffset4(
   std::uint32_t* const outWord,
   const std::uint32_t* const sourceLane
 ) noexcept
@@ -1192,7 +1192,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Stores the dword at source lane `+0x08` into caller-provided output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordLaneOffset8(
+[[nodiscard]] std::uint32_t* StoreDwordLaneOffset8(
   std::uint32_t* const outWord,
   const std::uint32_t* const sourceLane
 ) noexcept
@@ -1209,7 +1209,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * Stores one dword loaded from `*sourceLane[1]` into caller-provided output
  * storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordFromIndirectOffset4(
+[[nodiscard]] std::uint32_t* StoreDwordFromIndirectOffset4(
   std::uint32_t* const outWord,
   const std::uint32_t* const sourceLane
 ) noexcept
@@ -1227,7 +1227,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * Writes one base dword lane plus `index * 4` byte-stride contribution into
  * caller output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreWordOffsetByIndexStride4(
+[[nodiscard]] std::uint32_t* StoreWordOffsetByIndexStride4(
   std::uint32_t* const outWord,
   const std::uint32_t* const baseWord,
   const int index
@@ -1243,7 +1243,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Returns one dword lane offset by `index * 4` bytes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride4(
+[[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride4(
   const std::uint32_t baseWord,
   const int index
 ) noexcept
@@ -1257,7 +1257,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Returns source lane `+0x04` plus `index * 12` byte-stride contribution.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride12FromOffset4(
+[[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride12FromOffset4(
   const int index,
   const VtableWordPairAccessorView* const source
 ) noexcept
@@ -1273,7 +1273,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * Writes one base dword lane plus `index * 20` byte-stride contribution into
  * caller output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreWordOffsetByIndexStride20(
+[[nodiscard]] std::uint32_t* StoreWordOffsetByIndexStride20(
   std::uint32_t* const outWord,
   const std::uint32_t* const baseWord,
   const int index
@@ -1289,7 +1289,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Returns the dword lane at `baseWord[0]` plus `index * 20` bytes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride20(
+[[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride20(
   const std::uint32_t* const baseWord,
   const int index
 ) noexcept
@@ -1303,7 +1303,7 @@ static_assert(offsetof(TreeBootstrapWordHeaderView, sentinelLane08) == 0x28, "se
  * What it does:
  * Returns the dword lane at `baseWord[1]` plus `index * 20` bytes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride20FromOffset4(
+[[nodiscard]] std::uint32_t ComputeWordOffsetByIndexStride20FromOffset4(
   const std::uint32_t* const baseWord,
   const int index
 ) noexcept
@@ -1371,7 +1371,7 @@ static_assert(
  * What it does:
  * Returns one dword loaded from lane `+0x16C`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseLane16C(
+[[nodiscard]] std::uint32_t ReadSparseLane16C(
   const SparseWordByteAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1384,7 +1384,7 @@ static_assert(
  * What it does:
  * Returns one dword loaded from lane `+0x1C4`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseLane1C4(
+[[nodiscard]] std::uint32_t ReadSparseLane1C4(
   const SparseWordByteAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1397,7 +1397,7 @@ static_assert(
  * What it does:
  * Stores one dword value into lane `+0x38` and returns the destination view.
  */
-[[maybe_unused]] [[nodiscard]] SparseWordByteAccessorRuntimeView* WriteSparseLane38(
+[[nodiscard]] SparseWordByteAccessorRuntimeView* WriteSparseLane38(
   SparseWordByteAccessorRuntimeView* const value,
   const std::uint32_t laneValue
 ) noexcept
@@ -1412,7 +1412,7 @@ static_assert(
  * What it does:
  * Returns one dword loaded from lane `+0x38`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseLane38(
+[[nodiscard]] std::uint32_t ReadSparseLane38(
   const SparseWordByteAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1425,7 +1425,7 @@ static_assert(
  * What it does:
  * Returns one dword loaded from lane `+0x34`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseLane34(
+[[nodiscard]] std::uint32_t ReadSparseLane34(
   const SparseWordByteAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1438,7 +1438,7 @@ static_assert(
  * What it does:
  * Returns one dword loaded from lane `+0x3C`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseLane3C(
+[[nodiscard]] std::uint32_t ReadSparseLane3C(
   const SparseWordByteAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1451,7 +1451,7 @@ static_assert(
  * What it does:
  * Returns one dword loaded from lane `+0xA4`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseLaneA4(
+[[nodiscard]] std::uint32_t ReadSparseLaneA4(
   const SparseWordByteAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1464,7 +1464,7 @@ static_assert(
  * What it does:
  * Stores one byte value into lane `+0x54` and returns the destination view.
  */
-[[maybe_unused]] [[nodiscard]] SparseWordByteAccessorRuntimeView* WriteSparseLane54Byte(
+[[nodiscard]] SparseWordByteAccessorRuntimeView* WriteSparseLane54Byte(
   SparseWordByteAccessorRuntimeView* const value,
   const std::uint8_t laneValue
 ) noexcept
@@ -1730,7 +1730,7 @@ static_assert(
  * Projects one input float-pair lane onto one basis float-pair lane and
  * stores the projected lane in `outLane`.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementFloatPairXZLane* ProjectFloatPairOntoBasisLane(
+[[nodiscard]] VectorElementFloatPairXZLane* ProjectFloatPairOntoBasisLane(
   VectorElementFloatPairXZLane* const outLane,
   const VectorElementFloatPairXZLane* const inputLane,
   const VectorElementFloatPairXZLane* const basisLane
@@ -1756,7 +1756,7 @@ static_assert(
  * Removes the basis-parallel component from one input float-pair lane and
  * stores the rejection lane in `outLane`.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementFloatPairXZLane* RejectFloatPairFromBasisLane(
+[[nodiscard]] VectorElementFloatPairXZLane* RejectFloatPairFromBasisLane(
   VectorElementFloatPairXZLane* const outLane,
   const VectorElementFloatPairXZLane* const basisLane,
   const VectorElementFloatPairXZLane* const inputLane
@@ -1776,7 +1776,7 @@ static_assert(
  * Initializes one 4-lane pointer window from the destination object's
  * `+0x10` embedded base lane and fixed `+0x230` span.
  */
-[[maybe_unused]] [[nodiscard]] Span560PointerQuadRuntimeView* InitializeSpan560PointerQuadFromSelfOffset10(
+[[nodiscard]] Span560PointerQuadRuntimeView* InitializeSpan560PointerQuadFromSelfOffset10(
   Span560PointerQuadRuntimeView* const outLane
 ) noexcept
 {
@@ -1798,7 +1798,7 @@ static_assert(
  * Initializes one 4-lane pointer window from one explicit base lane and fixed
  * `+0x230` span.
  */
-[[maybe_unused]] [[nodiscard]] Span560PointerQuadRuntimeView* InitializeSpan560PointerQuadFromBaseLane(
+[[nodiscard]] Span560PointerQuadRuntimeView* InitializeSpan560PointerQuadFromBaseLane(
   Span560PointerQuadRuntimeView* const outLane,
   const std::uint32_t baseLane
 ) noexcept
@@ -1816,7 +1816,7 @@ static_assert(
  * What it does:
  * Clears one 24-byte six-word lane record to zero.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement6WordLane* ZeroSixWordLane(
+[[nodiscard]] VectorElement6WordLane* ZeroSixWordLane(
   VectorElement6WordLane* const outLane
 ) noexcept
 {
@@ -1835,7 +1835,7 @@ static_assert(
  * What it does:
  * Stores one scalar dword lane into caller output storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreSingleWordLaneValue(
+[[nodiscard]] std::uint32_t* StoreSingleWordLaneValue(
   std::uint32_t* const outWord,
   const std::uint32_t value
 ) noexcept
@@ -1850,7 +1850,7 @@ static_assert(
  * What it does:
  * Copies one 12-byte `{dword,dword,dword}` lane record.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement12DwordTripleLane* CopyDwordTripleLane(
+[[nodiscard]] VectorElement12DwordTripleLane* CopyDwordTripleLane(
   VectorElement12DwordTripleLane* const destination,
   const VectorElement12DwordTripleLane* const source
 ) noexcept
@@ -1867,7 +1867,7 @@ static_assert(
  * What it does:
  * Clears one two-word lane record to zero.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* ZeroTwoWordLane(
+[[nodiscard]] std::uint32_t* ZeroTwoWordLane(
   std::uint32_t* const outWords
 ) noexcept
 {
@@ -1883,7 +1883,7 @@ static_assert(
  * Returns the character-data pointer for the first embedded legacy string
  * lane.
  */
-[[maybe_unused]] [[nodiscard]] const char* GetPrimaryEmbeddedLegacyStringDataPointer(
+[[nodiscard]] const char* GetPrimaryEmbeddedLegacyStringDataPointer(
   const DualEmbeddedLegacyStringRuntimeView* const value
 ) noexcept
 {
@@ -1897,7 +1897,7 @@ static_assert(
  * Returns the character-data pointer for the second embedded legacy string
  * lane.
  */
-[[maybe_unused]] [[nodiscard]] const char* GetSecondaryEmbeddedLegacyStringDataPointer(
+[[nodiscard]] const char* GetSecondaryEmbeddedLegacyStringDataPointer(
   const DualEmbeddedLegacyStringRuntimeView* const value
 ) noexcept
 {
@@ -1911,7 +1911,7 @@ static_assert(
  * Initializes one 28-byte `{triple-word,flags,shared-control}` lane by copying
  * payload lanes and retaining one shared-control reference when present.
  */
-[[maybe_unused]] [[nodiscard]] TripleWordFlaggedSharedControlRuntimeView* InitializeTripleWordFlaggedSharedControlLane(
+[[nodiscard]] TripleWordFlaggedSharedControlRuntimeView* InitializeTripleWordFlaggedSharedControlLane(
   TripleWordFlaggedSharedControlRuntimeView* const destination,
   const VectorElement12DwordTripleLane* const tripleSource,
   const FlaggedSharedControlSourceRuntimeView* const sharedSource
@@ -1938,7 +1938,7 @@ static_assert(
  * Copies one `{word,shared-control}` lane and retains the shared-control
  * reference when present.
  */
-[[maybe_unused]] [[nodiscard]] WordSharedControlPairRuntimeView* CopyWordSharedControlPairRetain(
+[[nodiscard]] WordSharedControlPairRuntimeView* CopyWordSharedControlPairRetain(
   WordSharedControlPairRuntimeView* const destination,
   const WordSharedControlPairRuntimeView* const source
 ) noexcept
@@ -1958,7 +1958,7 @@ static_assert(
  * Returns one indexed dword from sparse table lanes `+0x910/+0x914`, or zero
  * when the table is absent/out-of-range.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadIndexedSparseWordTableLane910(
+[[nodiscard]] std::uint32_t ReadIndexedSparseWordTableLane910(
   const SparseIndexedWordTableRuntimeView* const table,
   const std::uint32_t index
 ) noexcept
@@ -1986,7 +1986,7 @@ static_assert(
  * What it does:
  * Returns one dword lane loaded from offset `+0x984`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseWord984(
+[[nodiscard]] std::uint32_t ReadSparseWord984(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -1999,7 +1999,7 @@ static_assert(
  * What it does:
  * Returns one dword lane loaded from offset `+0xA88`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseWordA88(
+[[nodiscard]] std::uint32_t ReadSparseWordA88(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2012,7 +2012,7 @@ static_assert(
  * What it does:
  * Returns one dword lane loaded from offset `+0x80`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseWord80(
+[[nodiscard]] std::uint32_t ReadSparseWord80(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2025,7 +2025,7 @@ static_assert(
  * What it does:
  * Returns one float lane loaded from offset `+0xD8`.
  */
-[[maybe_unused]] [[nodiscard]] float ReadSparseFloatD8(
+[[nodiscard]] float ReadSparseFloatD8(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2038,7 +2038,7 @@ static_assert(
  * What it does:
  * Returns one float lane loaded from offset `+0x90`.
  */
-[[maybe_unused]] [[nodiscard]] float ReadSparseFloat90(
+[[nodiscard]] float ReadSparseFloat90(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2051,7 +2051,7 @@ static_assert(
  * What it does:
  * Returns one float lane loaded from offset `+0x94`.
  */
-[[maybe_unused]] [[nodiscard]] float ReadSparseFloat94(
+[[nodiscard]] float ReadSparseFloat94(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2064,7 +2064,7 @@ static_assert(
  * What it does:
  * Returns true when sparse dword lane `+0x29C` is non-zero.
  */
-[[maybe_unused]] [[nodiscard]] bool HasSparseWord29C(
+[[nodiscard]] bool HasSparseWord29C(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2077,7 +2077,7 @@ static_assert(
  * What it does:
  * Returns one dword lane loaded from offset `+0x540`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadSparseWord540(
+[[nodiscard]] std::uint32_t ReadSparseWord540(
   const SparseScalarAccessorRuntimeView* const value
 ) noexcept
 {
@@ -2109,7 +2109,7 @@ static_assert(
  * What it does:
  * Stores one lower-bound tree-node candidate for threshold `0x30000000`.
  */
-[[maybe_unused]] [[nodiscard]] ThresholdTreeNodeRuntimeView** StoreLowerBoundThresholdNode30000000(
+[[nodiscard]] ThresholdTreeNodeRuntimeView** StoreLowerBoundThresholdNode30000000(
   ThresholdTreeNodeRuntimeView** const outNode,
   const ThresholdTreeAccessorRuntimeView* const treeAccessor
 ) noexcept
@@ -2124,7 +2124,7 @@ static_assert(
  * What it does:
  * Stores one lower-bound tree-node candidate for threshold `0x40000000`.
  */
-[[maybe_unused]] [[nodiscard]] ThresholdTreeNodeRuntimeView** StoreLowerBoundThresholdNode40000000(
+[[nodiscard]] ThresholdTreeNodeRuntimeView** StoreLowerBoundThresholdNode40000000(
   ThresholdTreeNodeRuntimeView** const outNode,
   const ThresholdTreeAccessorRuntimeView* const treeAccessor
 ) noexcept
@@ -2139,7 +2139,7 @@ static_assert(
  * What it does:
  * Initializes one `{dword,byte,dword}` lane record from scalar input lanes.
  */
-[[maybe_unused]] [[nodiscard]] VectorElementWordByteWordLane* InitializeWordByteWordLane(
+[[nodiscard]] VectorElementWordByteWordLane* InitializeWordByteWordLane(
   VectorElementWordByteWordLane* const outLane,
   const std::uint32_t lane00,
   const std::uint8_t lane04,
@@ -2158,7 +2158,7 @@ static_assert(
  * What it does:
  * Returns lane `+0x08` adjusted back by `0xD8` bytes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeBaseLaneFromBacklinkMinusD8(
+[[nodiscard]] std::uint32_t ComputeBaseLaneFromBacklinkMinusD8(
   const BacklinkedNodeRuntimeView* const value
 ) noexcept
 {
@@ -2171,7 +2171,7 @@ static_assert(
  * What it does:
  * Returns lane `+0x08` adjusted back by `0x238` bytes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ComputeBaseLaneFromBacklinkMinus238(
+[[nodiscard]] std::uint32_t ComputeBaseLaneFromBacklinkMinus238(
   const BacklinkedNodeRuntimeView* const value
 ) noexcept
 {
@@ -2185,7 +2185,7 @@ static_assert(
  * Initializes one 6-lane pointer-sentinel block with self and two embedded
  * sentinel anchors.
  */
-[[maybe_unused]] [[nodiscard]] PointerSentinelLaneBlockRuntimeView* InitializePointerSentinelLaneBlock(
+[[nodiscard]] PointerSentinelLaneBlockRuntimeView* InitializePointerSentinelLaneBlock(
   PointerSentinelLaneBlockRuntimeView* const outBlock
 ) noexcept
 {
@@ -2207,7 +2207,7 @@ static_assert(
  * What it does:
  * Swaps one dword payload lane between two caller-provided storage lanes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneLegacyAdapterA(
+[[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneLegacyAdapterA(
   std::uint32_t* const left,
   std::uint32_t* const right
 ) noexcept
@@ -2224,7 +2224,7 @@ static_assert(
  * What it does:
  * Initializes a four-lane word record from a base pointer and element count.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement20WordLane* InitializeVectorElement20WordLane(
+[[nodiscard]] VectorElement20WordLane* InitializeVectorElement20WordLane(
   VectorElement20WordLane* const outLane,
   const int count,
   const std::uint32_t* const baseWord
@@ -2245,7 +2245,7 @@ static_assert(
  * What it does:
  * Returns one dword lane loaded from `baseLane[index]`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t ReadIndexedDwordLane(
+[[nodiscard]] std::uint32_t ReadIndexedDwordLane(
   const std::uint32_t* const baseLane,
   const int index
 ) noexcept
@@ -2259,7 +2259,7 @@ static_assert(
  * What it does:
  * Adds one `index * 8` byte-stride contribution into an existing dword lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* AccumulateWordOffsetByIndexStride8(
+[[nodiscard]] std::uint32_t* AccumulateWordOffsetByIndexStride8(
   std::uint32_t* const inOutWord,
   const int index
 ) noexcept
@@ -2282,7 +2282,7 @@ static_assert(
  * What it does:
  * Stores one signed scalar index lane into caller-provided dword storage.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* StoreIndexScalarLane(
+[[nodiscard]] std::uint32_t* StoreIndexScalarLane(
   std::uint32_t* const outWord,
   const int index
 ) noexcept
@@ -2298,7 +2298,7 @@ static_assert(
  * Adds one `index * 0x58` byte-stride contribution into an existing dword
  * lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* AccumulateWordOffsetByIndexStride88(
+[[nodiscard]] std::uint32_t* AccumulateWordOffsetByIndexStride88(
   std::uint32_t* const inOutWord,
   const int index
 ) noexcept
@@ -2314,7 +2314,7 @@ static_assert(
  * Copies one half-open 8-byte lane range `[sourceBegin, sourceEnd)` into
  * destination storage and returns one-past-last destination lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* CopyDwordPairRangeForward(
+[[nodiscard]] VectorElement8DwordPairLane* CopyDwordPairRangeForward(
   VectorElement8DwordPairLane* destinationBegin,
   const VectorElement8DwordPairLane* const sourceEnd,
   const VectorElement8DwordPairLane* sourceBegin
@@ -2335,7 +2335,7 @@ static_assert(
  * What it does:
  * Initializes one 8-byte dword-pair lane from two scalar source-word slots.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* InitializeDwordPairLaneFromWordSlots(
+[[nodiscard]] VectorElement8DwordPairLane* InitializeDwordPairLaneFromWordSlots(
   VectorElement8DwordPairLane* const outLane,
   const std::uint32_t* const lane0Source,
   const std::uint32_t* const lane1Source
@@ -2353,7 +2353,7 @@ static_assert(
  * Initializes one 8-byte dword-pair lane from two independent scalar source
  * slots.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* InitializeDwordPairLaneFromSplitScalarSlots(
+[[nodiscard]] VectorElement8DwordPairLane* InitializeDwordPairLaneFromSplitScalarSlots(
   VectorElement8DwordPairLane* const outLane,
   const std::uint32_t* const lane0Source,
   const std::uint32_t* const lane1Source
@@ -2373,7 +2373,7 @@ static_assert(
  * What it does:
  * Swaps both dword payload lanes between two 8-byte lane records.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanes(
+[[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanes(
   VectorElement8DwordPairLane* const left,
   VectorElement8DwordPairLane* const right
 ) noexcept
@@ -2394,7 +2394,7 @@ static_assert(
  * What it does:
  * Register-shape swap adapter for one 8-byte dword-pair lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterA(
+[[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterA(
   VectorElement8DwordPairLane* const left,
   VectorElement8DwordPairLane* const right
 ) noexcept
@@ -2408,7 +2408,7 @@ static_assert(
  * What it does:
  * Secondary register-shape swap adapter for one 8-byte dword-pair lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterB(
+[[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterB(
   VectorElement8DwordPairLane* const left,
   VectorElement8DwordPairLane* const right
 ) noexcept
@@ -2422,7 +2422,7 @@ static_assert(
  * What it does:
  * Tertiary register-shape swap adapter for one 8-byte dword-pair lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterC(
+[[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterC(
   VectorElement8DwordPairLane* const left,
   VectorElement8DwordPairLane* const right
 ) noexcept
@@ -2436,7 +2436,7 @@ static_assert(
  * What it does:
  * Quaternary register-shape swap adapter for one 8-byte dword-pair lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterD(
+[[nodiscard]] VectorElement8DwordPairLane* SwapDwordPairPayloadLanesRegisterAdapterD(
   VectorElement8DwordPairLane* const left,
   VectorElement8DwordPairLane* const right
 ) noexcept
@@ -2456,7 +2456,7 @@ static_assert(
  * What it does:
  * Swaps one dword payload lane between two caller-provided lanes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterA(
+[[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterA(
   std::uint32_t* const left,
   std::uint32_t* const right
 ) noexcept
@@ -2473,7 +2473,7 @@ static_assert(
  * What it does:
  * Secondary register-shape swap adapter for one dword payload lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterB(
+[[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterB(
   std::uint32_t* const left,
   std::uint32_t* const right
 ) noexcept
@@ -2487,7 +2487,7 @@ static_assert(
  * What it does:
  * Tertiary register-shape swap adapter for one dword payload lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterC(
+[[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterC(
   std::uint32_t* const left,
   std::uint32_t* const right
 ) noexcept
@@ -2501,7 +2501,7 @@ static_assert(
  * What it does:
  * Quaternary register-shape swap adapter for one dword payload lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterD(
+[[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLaneRegisterAdapterD(
   std::uint32_t* const left,
   std::uint32_t* const right
 ) noexcept
@@ -2517,7 +2517,7 @@ static_assert(
  * What it does:
  * Clears one 8-byte dword-pair lane to zero.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* ZeroDwordPairLane(
+[[nodiscard]] VectorElement8DwordPairLane* ZeroDwordPairLane(
   VectorElement8DwordPairLane* const outLane
 ) noexcept
 {
@@ -2546,7 +2546,7 @@ static_assert(
  * Swaps three payload dword lanes (`+0x04,+0x08,+0x0C`) between two
  * vtable-backed runtime views.
  */
-[[maybe_unused]] [[nodiscard]] VtableTripleWordSwapView* SwapVtableTripleWordPayloadLanes(
+[[nodiscard]] VtableTripleWordSwapView* SwapVtableTripleWordPayloadLanes(
   VtableTripleWordSwapView* const left,
   VtableTripleWordSwapView* const right
 ) noexcept
@@ -2588,7 +2588,7 @@ static_assert(
  * What it does:
  * Swaps one dword payload lane between two caller-provided storage lanes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLane(
+[[nodiscard]] std::uint32_t* SwapSingleDwordPayloadLane(
   std::uint32_t* const left,
   std::uint32_t* const right
 ) noexcept
@@ -2642,7 +2642,7 @@ static_assert(
  * Rewinds one vector storage lane to empty by setting `_Mylast` to `_Myfirst`
  * without touching allocation ownership.
  */
-[[maybe_unused]] void ResetVectorWordStorageLogicalEnd(VectorVoidStorageView& storage) noexcept
+void ResetVectorWordStorageLogicalEnd(VectorVoidStorageView& storage) noexcept
 {
   if (storage.first != storage.last) {
     storage.last = storage.first;
@@ -2656,7 +2656,7 @@ static_assert(
  * Alias lane of `ResetVectorWordStorageLogicalEnd` used by one vector
  * assignment fast-path when the source range is empty.
  */
-[[maybe_unused]] void ResetVectorWordStorageLogicalEndAliasA(VectorVoidStorageView& storage) noexcept
+void ResetVectorWordStorageLogicalEndAliasA(VectorVoidStorageView& storage) noexcept
 {
   ResetVectorWordStorageLogicalEnd(storage);
 }
@@ -2668,7 +2668,7 @@ static_assert(
  * Alias lane of `ResetVectorWordStorageLogicalEnd` used by one adjacent
  * vector assignment fast-path when the source range is empty.
  */
-[[maybe_unused]] void ResetVectorWordStorageLogicalEndAliasB(VectorVoidStorageView& storage) noexcept
+void ResetVectorWordStorageLogicalEndAliasB(VectorVoidStorageView& storage) noexcept
 {
   ResetVectorWordStorageLogicalEnd(storage);
 }
@@ -2682,7 +2682,7 @@ static_assert(
  * What it does:
  * Releases one vector backing allocation and clears begin/end/capacity lanes.
  */
-[[maybe_unused]] void ReleaseVectorWordStorageAndNullAllLanes(VectorVoidStorageView& storage) noexcept
+void ReleaseVectorWordStorageAndNullAllLanes(VectorVoidStorageView& storage) noexcept
 {
   if (storage.first != nullptr) {
     ::operator delete(storage.first);
@@ -2700,7 +2700,7 @@ static_assert(
  * Clears one header dword lane, releases the owned storage pointer at `+0x08`
  * when present, and nulls the `{first,last,end}` lanes.
  */
-[[maybe_unused]] void ReleaseHeaderedVectorStorageAndReset(VectorHeaderedStorageLaneView& storage) noexcept
+void ReleaseHeaderedVectorStorageAndReset(VectorHeaderedStorageLaneView& storage) noexcept
 {
   storage.lane00 = 0u;
   if (storage.first != nullptr) {
@@ -2718,7 +2718,7 @@ static_assert(
  * What it does:
  * Deletes one heap allocation lane through global `operator delete`.
  */
-[[maybe_unused]] void DeleteAllocationLane(void* const allocation) noexcept
+void DeleteAllocationLane(void* const allocation) noexcept
 {
   ::operator delete(allocation);
 }
@@ -2731,7 +2731,7 @@ static_assert(
  * Fills `tripleCount` contiguous 12-byte lanes with zero dwords and returns
  * one-past the last written lane.
  */
-[[maybe_unused]] std::uint32_t* FillZeroDwordTripleLanesAndReturnEnd(
+std::uint32_t* FillZeroDwordTripleLanesAndReturnEnd(
   std::uint32_t* const destinationBegin,
   const std::uint32_t tripleCount
 ) noexcept
@@ -2755,7 +2755,7 @@ static_assert(
  * `[destinationBegin, destinationEnd)` from `*valuePtr` and returns
  * one-past-last destination lane.
  */
-[[maybe_unused]] VectorElement12DwordTripleLane* FillDwordTripleRangeFromValueLane(
+VectorElement12DwordTripleLane* FillDwordTripleRangeFromValueLane(
   VectorElement12DwordTripleLane* destinationBegin,
   const VectorElement12DwordTripleLane* const destinationEnd,
   const VectorElement12DwordTripleLane* const valuePtr
@@ -2799,7 +2799,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 20 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count20ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count20ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 20);
 }
@@ -2811,7 +2811,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 204 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count204ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count204ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 204);
 }
@@ -2823,7 +2823,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 24 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count24ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count24ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 24);
 }
@@ -2835,7 +2835,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 52 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count52ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count52ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 52);
 }
@@ -2853,7 +2853,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 12 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count12ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count12ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 12);
 }
@@ -2866,7 +2866,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 28 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count28ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count28ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 28);
 }
@@ -2879,7 +2879,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 40 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count40ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count40ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 40);
 }
@@ -2892,7 +2892,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 56 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count56ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count56ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 56);
 }
@@ -2904,7 +2904,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 36 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count36ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count36ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 36);
 }
@@ -2916,7 +2916,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 388 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count388ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count388ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 388);
 }
@@ -2928,7 +2928,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 88 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count88ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count88ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 88);
 }
@@ -2940,7 +2940,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 352 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count352ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count352ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 352);
 }
@@ -2952,7 +2952,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 216 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count216ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count216ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 216);
 }
@@ -2964,7 +2964,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 568 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count568ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count568ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 568);
 }
@@ -2976,7 +2976,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 120 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count120ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count120ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 120);
 }
@@ -2988,7 +2988,7 @@ static_assert(
  * Returns element count from one legacy vector lane whose element stride is
  * 48 bytes (`_Mylast - _Myfirst`), or zero when uninitialized.
  */
-[[maybe_unused]] int Count48ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
+int Count48ByteElementVectorLanes(const VectorElementCountRuntimeView* const view) noexcept
 {
   return CountElementVectorLanesByStride(view, 48);
 }
@@ -3030,7 +3030,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Register-lane adapter that forwards one dword-span fill into the canonical
  * nullable-destination helper.
  */
-[[maybe_unused]] std::uint32_t FillDwordArrayFromValuePointerNullableRegisterAdapter(
+std::uint32_t FillDwordArrayFromValuePointerNullableRegisterAdapter(
   const std::uint32_t* const valuePtr,
   std::uint32_t* const destination,
   const std::uint32_t count
@@ -3046,7 +3046,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Returns checked iterator-distance in 8-byte element lanes after validating
  * that both iterators belong to the same owner vector.
  */
-[[maybe_unused]] int Distance8ByteVectorIteratorsCheckedLaneA(
+int Distance8ByteVectorIteratorsCheckedLaneA(
   const VectorElementIteratorRuntimeView* const left,
   const VectorElementIteratorRuntimeView* const right
 ) noexcept
@@ -3061,7 +3061,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Returns checked iterator-distance in 16-byte element lanes after validating
  * that both iterators belong to the same owner vector.
  */
-[[maybe_unused]] int Distance16ByteVectorIteratorsCheckedLaneA(
+int Distance16ByteVectorIteratorsCheckedLaneA(
   const VectorElementIteratorRuntimeView* const left,
   const VectorElementIteratorRuntimeView* const right
 ) noexcept
@@ -3075,7 +3075,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * What it does:
  * Resolves one checked element pointer for an 8-byte element vector by index.
  */
-[[maybe_unused]] VectorElement8DwordPairLane* Resolve8ByteVectorElementAtChecked(
+VectorElement8DwordPairLane* Resolve8ByteVectorElementAtChecked(
   const VectorElementCountRuntimeView* const storage,
   const std::uint32_t index
 ) noexcept
@@ -3091,7 +3091,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * What it does:
  * Resolves one checked element pointer for a 16-byte element vector by index.
  */
-[[maybe_unused]] VectorElement16DwordQuadLane* Resolve16ByteVectorElementAtChecked(
+VectorElement16DwordQuadLane* Resolve16ByteVectorElementAtChecked(
   const VectorElementCountRuntimeView* const storage,
   const std::uint32_t index
 ) noexcept
@@ -3107,7 +3107,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * What it does:
  * Initializes one checked iterator for an 8-byte element vector at `position`.
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* Initialize8ByteVectorIteratorCheckedLaneA(
+VectorElementIteratorRuntimeView* Initialize8ByteVectorIteratorCheckedLaneA(
   VectorElementIteratorRuntimeView* const iterator,
   const VectorElement8DwordPairLane* const position,
   VectorElementCountRuntimeView* const owner
@@ -3126,7 +3126,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * What it does:
  * Initializes one checked iterator for a 16-byte element vector at `position`.
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* Initialize16ByteVectorIteratorCheckedLaneA(
+VectorElementIteratorRuntimeView* Initialize16ByteVectorIteratorCheckedLaneA(
   VectorElementIteratorRuntimeView* const iterator,
   const VectorElement16DwordQuadLane* const position,
   VectorElementCountRuntimeView* const owner
@@ -3146,7 +3146,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Returns checked iterator-distance in 8-byte element lanes after validating
  * that both iterators belong to the same owner vector.
  */
-[[maybe_unused]] int Distance8ByteVectorIteratorsCheckedLaneB(
+int Distance8ByteVectorIteratorsCheckedLaneB(
   const VectorElementIteratorRuntimeView* const left,
   const VectorElementIteratorRuntimeView* const right
 ) noexcept
@@ -3161,7 +3161,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Returns checked iterator-distance in 16-byte element lanes after validating
  * that both iterators belong to the same owner vector.
  */
-[[maybe_unused]] int Distance16ByteVectorIteratorsCheckedLaneB(
+int Distance16ByteVectorIteratorsCheckedLaneB(
   const VectorElementIteratorRuntimeView* const left,
   const VectorElementIteratorRuntimeView* const right
 ) noexcept
@@ -3176,7 +3176,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Secondary lane that initializes one checked iterator for an 8-byte element
  * vector at `position`.
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* Initialize8ByteVectorIteratorCheckedLaneB(
+VectorElementIteratorRuntimeView* Initialize8ByteVectorIteratorCheckedLaneB(
   VectorElementIteratorRuntimeView* const iterator,
   const VectorElement8DwordPairLane* const position,
   VectorElementCountRuntimeView* const owner
@@ -3196,7 +3196,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Secondary lane that initializes one checked iterator for a 16-byte element
  * vector at `position`.
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* Initialize16ByteVectorIteratorCheckedLaneB(
+VectorElementIteratorRuntimeView* Initialize16ByteVectorIteratorCheckedLaneB(
   VectorElementIteratorRuntimeView* const iterator,
   const VectorElement16DwordQuadLane* const position,
   VectorElementCountRuntimeView* const owner
@@ -3215,7 +3215,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * What it does:
  * Initializes one checked iterator to the begin lane of the owner vector.
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* InitializeVectorIteratorAtBeginCheckedLane(
+VectorElementIteratorRuntimeView* InitializeVectorIteratorAtBeginCheckedLane(
   VectorElementCountRuntimeView* const owner,
   VectorElementIteratorRuntimeView* const iterator
 ) noexcept
@@ -3229,7 +3229,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * What it does:
  * Initializes one checked iterator to the end lane of the owner vector.
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* InitializeVectorIteratorAtEndCheckedLane(
+VectorElementIteratorRuntimeView* InitializeVectorIteratorAtEndCheckedLane(
   VectorElementCountRuntimeView* const owner,
   VectorElementIteratorRuntimeView* const iterator
 ) noexcept
@@ -3244,7 +3244,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Initializes one checked iterator to the begin lane of the owner vector
  * (alias lane with explicit iterator-zeroing before validation).
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* InitializeVectorIteratorAtBeginCheckedLaneAlias(
+VectorElementIteratorRuntimeView* InitializeVectorIteratorAtBeginCheckedLaneAlias(
   VectorElementCountRuntimeView* const owner,
   VectorElementIteratorRuntimeView* const iterator
 ) noexcept
@@ -3260,7 +3260,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Initializes one checked iterator to the end lane of the owner vector
  * (alias lane with explicit iterator-zeroing before validation).
  */
-[[maybe_unused]] VectorElementIteratorRuntimeView* InitializeVectorIteratorAtEndCheckedLaneAlias(
+VectorElementIteratorRuntimeView* InitializeVectorIteratorAtEndCheckedLaneAlias(
   VectorElementCountRuntimeView* const owner,
   VectorElementIteratorRuntimeView* const iterator
 ) noexcept
@@ -3278,7 +3278,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * into destination storage using backwards iteration and returns the
  * destination-begin lane.
  */
-[[maybe_unused]] VectorElement16DwordQuadLane* CopyDwordQuadRangeBackward(
+VectorElement16DwordQuadLane* CopyDwordQuadRangeBackward(
   const VectorElement16DwordQuadLane* const sourceBegin,
   const VectorElement16DwordQuadLane* const sourceEnd,
   VectorElement16DwordQuadLane* const destinationEnd
@@ -3303,7 +3303,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Register-shape adapter lane that forwards to
  * `CopyDwordQuadRangeBackward(begin, end, destinationEnd)`.
  */
-[[maybe_unused]] VectorElement16DwordQuadLane* CopyDwordQuadRangeBackwardRegisterAdapterLane(
+VectorElement16DwordQuadLane* CopyDwordQuadRangeBackwardRegisterAdapterLane(
   const VectorElement16DwordQuadLane* const sourceBegin,
   const VectorElement16DwordQuadLane* const sourceEnd,
   VectorElement16DwordQuadLane* const destinationEnd
@@ -3321,7 +3321,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * from `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`,
  * and returns the resulting destination-begin lane.
  */
-[[maybe_unused]] VectorElement12DwordTripleLane* CopyDwordTripleRangeBackward(
+VectorElement12DwordTripleLane* CopyDwordTripleRangeBackward(
   const VectorElement12DwordTripleLane* const sourceBegin,
   const VectorElement12DwordTripleLane* sourceEnd,
   VectorElement12DwordTripleLane* destinationEnd
@@ -3343,7 +3343,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Copies one half-open 8-byte `{dword,dword}` lane range backward from
  * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
  */
-[[maybe_unused]] VectorElement8DwordPairLane* CopyDwordPairRangeBackward(
+VectorElement8DwordPairLane* CopyDwordPairRangeBackward(
   const VectorElement8DwordPairLane* const sourceBegin,
   const VectorElement8DwordPairLane* sourceEnd,
   VectorElement8DwordPairLane* destinationEnd
@@ -3365,7 +3365,7 @@ std::uint32_t FillDwordArrayFromValuePointerNullable(
  * Copies one half-open dword lane range backward from `[sourceBegin, sourceEnd)`
  * into storage ending at `destinationEnd`.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackward(
+std::uint32_t* CopyDwordRangeBackward(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* sourceEnd,
   std::uint32_t* destinationEnd
@@ -3534,7 +3534,7 @@ void RestoreHeapElement72Partial(
  * Copies one 72-byte heap lane into destination using the binary's partial
  * write profile and fastvector_n2 copy lane.
  */
-[[maybe_unused]] [[nodiscard]] HeapElement72FloatKeyFastVectorN2Lane* CopyHeapElement72PartialLane(
+[[nodiscard]] HeapElement72FloatKeyFastVectorN2Lane* CopyHeapElement72PartialLane(
   const HeapElement72FloatKeyFastVectorN2Lane* const source,
   HeapElement72FloatKeyFastVectorN2Lane* const destination
 )
@@ -3550,7 +3550,7 @@ void RestoreHeapElement72Partial(
  * Copies one lane72 payload from source to destination and applies the
  * fastvector-n2 rebind+copy lane (`0x00402220`) for the trailing vector data.
  */
-[[maybe_unused]] [[nodiscard]] HeapElement72FloatKeyFastVectorN2Lane* CopyHeapElement72WithResizeLane(
+[[nodiscard]] HeapElement72FloatKeyFastVectorN2Lane* CopyHeapElement72WithResizeLane(
   const HeapElement72FloatKeyFastVectorN2Lane* const source,
   HeapElement72FloatKeyFastVectorN2Lane* const destination
 )
@@ -3577,7 +3577,7 @@ void RestoreHeapElement72Partial(
  * temporary storage, moves `right` into `left`, then restores temporary into
  * `right`.
  */
-[[maybe_unused]] void SwapHeapElement72WithTemporary(
+void SwapHeapElement72WithTemporary(
   HeapElement72FloatKeyFastVectorN2Lane* const left,
   HeapElement72FloatKeyFastVectorN2Lane* const right
 )
@@ -3605,7 +3605,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Applies the recovered three-lane compare/swap network over
  * `(first, second, third)` using `lane18` as key.
  */
-[[maybe_unused]] void CompareSwapLane72Triple(
+void CompareSwapLane72Triple(
   HeapElement72FloatKeyFastVectorN2Lane* const first,
   HeapElement72FloatKeyFastVectorN2Lane* const second,
   HeapElement72FloatKeyFastVectorN2Lane* const third
@@ -3623,7 +3623,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Applies the recovered small/large compare-swap sampling network for lane72
  * entries around `begin`, `middle`, and `end`.
  */
-[[maybe_unused]] void CompareSwapLane72PivotNetwork(
+void CompareSwapLane72PivotNetwork(
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   HeapElement72FloatKeyFastVectorN2Lane* const middle,
   HeapElement72FloatKeyFastVectorN2Lane* const end
@@ -3668,7 +3668,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Rotates one 72-byte heap-lane range left around `middle` using the original
  * gcd-cycle move strategy and preserving binary partial-copy semantics.
  */
-[[maybe_unused]] int RotateHeapElement72RangeByGcdCycles(
+int RotateHeapElement72RangeByGcdCycles(
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   HeapElement72FloatKeyFastVectorN2Lane* const middle,
   HeapElement72FloatKeyFastVectorN2Lane* const end
@@ -3732,7 +3732,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Register-shape adapter that forwards one heap-lane rotation into
  * `RotateHeapElement72RangeByGcdCycles`.
  */
-[[maybe_unused]] int RotateHeapElement72RangeRegisterAdapter(
+int RotateHeapElement72RangeRegisterAdapter(
   HeapElement72FloatKeyFastVectorN2Lane* const end,
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   HeapElement72FloatKeyFastVectorN2Lane* const middle
@@ -3748,7 +3748,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Performs insertion-style key ordering over one contiguous 72-byte heap-lane
  * range by rotating each out-of-order lane into its insertion window.
  */
-[[maybe_unused]] void StableInsertSortHeapElement72ByKey(
+void StableInsertSortHeapElement72ByKey(
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   HeapElement72FloatKeyFastVectorN2Lane* const end
 )
@@ -3803,7 +3803,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * ascending key order (`lane18`), then writes the displaced partial lane into
  * the final heap hole.
  */
-[[maybe_unused]] void SiftUpHeapElement72ByKeyWithDisplacedPartialLane(
+void SiftUpHeapElement72ByKeyWithDisplacedPartialLane(
   HeapElement72FloatKeyFastVectorN2Lane* const heapBase,
   const int rootFloorIndex,
   const int insertIndex,
@@ -3856,7 +3856,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * case, then reinserts the displaced partial lane with the recovered sift-up
  * helper.
  */
-[[maybe_unused]] void SiftDownThenInsertHeapElement72ByKey(
+void SiftDownThenInsertHeapElement72ByKey(
   HeapElement72FloatKeyFastVectorN2Lane* const heapBase,
   const int rootFloorIndex,
   const int heapCount,
@@ -3906,7 +3906,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Copies the current heap root into `destinationSlot`, then restores heap
  * order for `[heapBegin, destinationSlot)` using one prepared displaced lane.
  */
-[[maybe_unused]] void PromoteHeapElement72RootAndRepairPrefix(
+void PromoteHeapElement72RootAndRepairPrefix(
   HeapElement72FloatKeyFastVectorN2Lane* const destinationSlot,
   HeapElement72FloatKeyFastVectorN2Lane* const heapBegin,
   const HeapElement72FloatKeyFastVectorN2Lane& displacedLane
@@ -3928,7 +3928,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Performs one lane72 heap-pop pass for `[begin, end)`: captures the
  * predecessor lane as displaced payload and repairs the remaining heap prefix.
  */
-[[maybe_unused]] int PopHeapElement72RootFromRange(
+int PopHeapElement72RootFromRange(
   HeapElement72FloatKeyFastVectorN2Lane* const end,
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   const std::uint32_t
@@ -3951,7 +3951,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Register-shape adapter that forwards one lane72 root-pop repair using
  * `cursorAfterPredecessor - 1` as displaced lane source.
  */
-[[maybe_unused]] int PopHeapElement72RootRegisterAdapter(
+int PopHeapElement72RootRegisterAdapter(
   HeapElement72FloatKeyFastVectorN2Lane* const cursorAfterPredecessor,
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   const std::uint32_t
@@ -3971,7 +3971,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Builds one lane72 min-heap over `[begin, end)` by walking parent roots from
  * the last internal node to root and applying recovered sift-down insertion.
  */
-[[maybe_unused]] int BuildHeapElement72RangeByKey(
+int BuildHeapElement72RangeByKey(
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   HeapElement72FloatKeyFastVectorN2Lane* const end,
   const std::uint32_t
@@ -4001,7 +4001,7 @@ void SwapHeapElement72IfLeftKeyGreater(
  * Repeatedly pops one lane72 heap root into the tail lane and repairs the
  * remaining prefix until the heap window shrinks to one element.
  */
-[[maybe_unused]] int SortHeapElement72RangeByKey(
+int SortHeapElement72RangeByKey(
   HeapElement72FloatKeyFastVectorN2Lane* const end,
   HeapElement72FloatKeyFastVectorN2Lane* const begin,
   const std::uint32_t
@@ -4035,7 +4035,7 @@ static_assert(sizeof(FloatDwordPairSortLane) == 0x08, "FloatDwordPairSortLane si
  * Performs in-place insertion sort over one contiguous `[begin, end)` range
  * of `{float key, dword payload}` records using ascending key order.
  */
-[[maybe_unused]] void SortFloatDwordPairRangeByKey(
+void SortFloatDwordPairRangeByKey(
   FloatDwordPairSortLane* const begin,
   FloatDwordPairSortLane* const end
 ) noexcept
@@ -4079,7 +4079,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Sifts one `{const char* key, int value}` lane up a binary max-heap ordered
  * by `(key, value)` and stores the insertion lane at its final position.
  */
-[[maybe_unused]] const char* SiftUpStringIntHeapLane(
+const char* SiftUpStringIntHeapLane(
   StringIntHeapLane* const heapBase,
   const std::int32_t insertIndex,
   const std::int32_t rootFloorIndex,
@@ -4114,7 +4114,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Sifts one string/int heap hole down through the max-heap child lanes, then
  * reinserts the displaced lane with the standard sift-up step.
  */
-[[maybe_unused]] const char* SiftDownThenInsertStringIntHeapLane(
+const char* SiftDownThenInsertStringIntHeapLane(
   StringIntHeapLane* const heapBase,
   const std::int32_t rootFloorIndex,
   const std::int32_t heapCount,
@@ -4163,7 +4163,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * the last sift-down's `displacedKey` result (the wrapper merely forwards
  * the inner helper's `EAX`).
  */
-[[maybe_unused]] const char* MakeHeapOverStringIntHeapLaneRange(
+const char* MakeHeapOverStringIntHeapLaneRange(
   StringIntHeapLane* const first,
   StringIntHeapLane* const last,
   const int userTagArg
@@ -4213,7 +4213,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * heap-element count (i.e. `1`) computed by the loop's terminating
  * shift-right.
  */
-[[maybe_unused]] std::int32_t SortHeapStringIntHeapLaneRange(
+std::int32_t SortHeapStringIntHeapLaneRange(
   StringIntHeapLane* const first,
   StringIntHeapLane* const last,
   const int userTagArg
@@ -4253,7 +4253,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Rotates one contiguous string/int heap lane range left around `middle`
  * using the binary's gcd-cycle move strategy.
  */
-[[maybe_unused]] int RotateStringIntHeapRangeByGcdCycles(
+int RotateStringIntHeapRangeByGcdCycles(
   StringIntHeapLane* const begin,
   StringIntHeapLane* const middle,
   StringIntHeapLane* const end
@@ -4300,7 +4300,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * What it does:
  * Register-shape adapter for string/int heap range rotation.
  */
-[[maybe_unused]] int RotateStringIntHeapRangeRegisterAdapter(
+int RotateStringIntHeapRangeRegisterAdapter(
   StringIntHeapLane* const begin,
   StringIntHeapLane* const middle,
   StringIntHeapLane* const end
@@ -4330,7 +4330,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * as a faithful pass-through of the legacy return shape; the value is
  * not consumed by callers.
  */
-[[maybe_unused]] char InsertionSortStringIntHeapLaneRangeAscending(
+char InsertionSortStringIntHeapLaneRangeAscending(
   StringIntHeapLane* const first,
   StringIntHeapLane* const last
 ) noexcept
@@ -4380,7 +4380,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Promotes one predecessor lane into the root hole and restores heap order
  * through the binary sift-down/sift-up lane.
  */
-[[maybe_unused]] const char* PromoteStringIntHeapRootFromPreviousLane(
+const char* PromoteStringIntHeapRootFromPreviousLane(
   StringIntHeapLane* const heapBase,
   StringIntHeapLane* const cursorAfterPredecessor,
   const std::int32_t
@@ -4400,7 +4400,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Writes one source lane to `destination`, then reorders the leading heap
  * range with one displaced `(key,value)` lane.
  */
-[[maybe_unused]] const char* PromoteStringIntHeapRootWithExplicitDisplacedLane(
+const char* PromoteStringIntHeapRootWithExplicitDisplacedLane(
   const StringIntHeapLane* const heapBase,
   const StringIntHeapLane* const heapCursor,
   StringIntHeapLane* const destination,
@@ -4427,7 +4427,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Sifts one 20-byte `{const char* x5}` lane up a binary max-heap ordered by
  * lexical `key` and stores that lane at its final heap position.
  */
-[[maybe_unused]] StringPointerQuintHeapLane* SiftUpStringPointerQuintHeapLane(
+StringPointerQuintHeapLane* SiftUpStringPointerQuintHeapLane(
   StringPointerQuintHeapLane* const heapBase,
   const std::int32_t insertIndex,
   const std::int32_t rootFloorIndex,
@@ -4468,7 +4468,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * ordered by floating-point key and stores the insertion lane at its final
  * position.
  */
-[[maybe_unused]] HeapElement12FloatKeyLane* SiftUpFloatKeyHeapElement12Lane(
+HeapElement12FloatKeyLane* SiftUpFloatKeyHeapElement12Lane(
   HeapElement12FloatKeyLane* const heapBase,
   const std::int32_t insertIndex,
   const std::int32_t rootFloorIndex,
@@ -4506,7 +4506,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * consecutive destination lanes and returns one-past-last destination lane,
  * preserving legacy null-destination guard semantics.
  */
-[[maybe_unused]] VectorElement8DwordPairLane* FillDwordPairArrayFromValuePointerNullable(
+VectorElement8DwordPairLane* FillDwordPairArrayFromValuePointerNullable(
   std::uint32_t count,
   const VectorElement8DwordPairLane* const valuePtr,
   VectorElement8DwordPairLane* destination
@@ -4532,7 +4532,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Register-shape adapter that fills one dword-pair lane range from a single
  * source value and returns the destination end lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* FillDwordPairArrayFromValueRegisterAdapterLaneA(
+[[nodiscard]] VectorElement8DwordPairLane* FillDwordPairArrayFromValueRegisterAdapterLaneA(
   const VectorElement8DwordPairLane* const valuePtr,
   VectorElement8DwordPairLane* const destination,
   const std::uint32_t count
@@ -4547,7 +4547,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * What it does:
  * Secondary register-shape adapter for the same dword-pair range fill helper.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane* FillDwordPairArrayFromValueRegisterAdapterLaneB(
+[[nodiscard]] VectorElement8DwordPairLane* FillDwordPairArrayFromValueRegisterAdapterLaneB(
   const VectorElement8DwordPairLane* const valuePtr,
   VectorElement8DwordPairLane* const destination,
   const std::uint32_t count
@@ -4564,7 +4564,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * `count` consecutive destination lanes and returns one-past-last destination
  * lane, preserving legacy null-destination guard semantics.
  */
-[[maybe_unused]] VectorElement16DwordQuadLane* FillDwordQuadArrayFromValuePointerNullable(
+VectorElement16DwordQuadLane* FillDwordQuadArrayFromValuePointerNullable(
   std::uint32_t count,
   const VectorElement16DwordQuadLane* const valuePtr,
   VectorElement16DwordQuadLane* destination
@@ -4590,7 +4590,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Cdecl-lane adapter that forwards one dword-pair range fill request to the
  * canonical nullable destination helper.
  */
-[[maybe_unused]] int FillDwordPairArrayFromValuePointerNullableCdeclAdapterLaneA(
+int FillDwordPairArrayFromValuePointerNullableCdeclAdapterLaneA(
   const int destinationAddress,
   const int count,
   const int valueAddress
@@ -4612,7 +4612,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Cdecl-lane adapter that forwards one dword-quad range fill request to the
  * canonical nullable destination helper.
  */
-[[maybe_unused]] int FillDwordQuadArrayFromValuePointerNullableCdeclAdapterLaneA(
+int FillDwordQuadArrayFromValuePointerNullableCdeclAdapterLaneA(
   const int destinationAddress,
   const int count,
   const int valueAddress
@@ -4634,7 +4634,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Stdcall-lane adapter that fills one dword-pair range and returns the
  * destination end-address lane.
  */
-[[maybe_unused]] int FillDwordPairArrayFromValuePointerNullableStdcallAdapterLaneA(
+int FillDwordPairArrayFromValuePointerNullableStdcallAdapterLaneA(
   const int destinationAddress,
   const int count,
   const int valueAddress
@@ -4655,7 +4655,7 @@ static_assert(sizeof(StringPointerQuintHeapLane) == 0x14, "StringPointerQuintHea
  * Stdcall-lane adapter that fills one dword-quad range and returns the
  * destination end-address lane.
  */
-[[maybe_unused]] int FillDwordQuadArrayFromValuePointerNullableStdcallAdapterLaneA(
+int FillDwordQuadArrayFromValuePointerNullableStdcallAdapterLaneA(
   const int destinationAddress,
   const int count,
   const int valueAddress
@@ -4830,7 +4830,7 @@ static_assert(sizeof(HeapEntryDoublePayloadLane) == 0x10, "HeapEntryDoublePayloa
  * Repeatedly removes one max-heap root from a `{float key, dword payload}`
  * lane range and repairs heap order for the remaining prefix.
  */
-[[maybe_unused]] int PopHeapRootFloatPayloadRange(
+int PopHeapRootFloatPayloadRange(
   VectorElement8DwordPairLane* const begin,
   VectorElement8DwordPairLane* const end
 ) noexcept
@@ -4865,7 +4865,7 @@ static_assert(sizeof(HeapEntryDoublePayloadLane) == 0x10, "HeapEntryDoublePayloa
  * `{double key, dword, dword}` lane range and repairs heap order for the
  * remaining prefix.
  */
-[[maybe_unused]] int PopHeapRootDoublePayloadRange(
+int PopHeapRootDoublePayloadRange(
   VectorElement16DwordQuadLane* const begin,
   VectorElement16DwordQuadLane* const end
 ) noexcept
@@ -4901,7 +4901,7 @@ static_assert(sizeof(HeapEntryDoublePayloadLane) == 0x10, "HeapEntryDoublePayloa
  * Thunk lane that forwards one 8-byte heap pop/repair pass to the canonical
  * helper.
  */
-[[maybe_unused]] int PopHeapRootFloatPayloadRangeThunk(
+int PopHeapRootFloatPayloadRangeThunk(
   std::uint32_t* const begin,
   const int endAddress
 ) noexcept
@@ -4919,7 +4919,7 @@ static_assert(sizeof(HeapEntryDoublePayloadLane) == 0x10, "HeapEntryDoublePayloa
  * Thunk lane that forwards one 16-byte heap pop/repair pass to the canonical
  * helper.
  */
-[[maybe_unused]] int PopHeapRootDoublePayloadRangeThunk(
+int PopHeapRootDoublePayloadRangeThunk(
   std::uint32_t* const begin,
   const int endAddress
 ) noexcept
@@ -4975,7 +4975,7 @@ static_assert(
  * Swaps the three active storage lanes (`first/last/end`) between two 16-byte
  * vector storage views while preserving each side's reserved proxy lane.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement16StorageRuntimeView* SwapVectorElement16StorageTailLanes(
+[[nodiscard]] VectorElement16StorageRuntimeView* SwapVectorElement16StorageTailLanes(
   VectorElement16StorageRuntimeView* const left,
   VectorElement16StorageRuntimeView* const right
 ) noexcept
@@ -5041,7 +5041,7 @@ template <std::size_t kInlineDwordCount>
  * Initializes one 5-dword embedded inline span lane to empty begin/cursor
  * with `end` pointed at the inline-storage limit.
  */
-[[maybe_unused]] [[nodiscard]] EmbeddedInlineDwordSpan5RuntimeView* InitializeEmbeddedInlineDwordSpan5(
+[[nodiscard]] EmbeddedInlineDwordSpan5RuntimeView* InitializeEmbeddedInlineDwordSpan5(
   EmbeddedInlineDwordSpan5RuntimeView* const span
 ) noexcept
 {
@@ -5055,7 +5055,7 @@ template <std::size_t kInlineDwordCount>
  * Initializes one 15-dword embedded inline span lane to empty begin/cursor
  * with `end` pointed at the inline-storage limit.
  */
-[[maybe_unused]] [[nodiscard]] EmbeddedInlineDwordSpan15RuntimeView* InitializeEmbeddedInlineDwordSpan15(
+[[nodiscard]] EmbeddedInlineDwordSpan15RuntimeView* InitializeEmbeddedInlineDwordSpan15(
   EmbeddedInlineDwordSpan15RuntimeView* const span
 ) noexcept
 {
@@ -5070,7 +5070,7 @@ template <std::size_t kInlineDwordCount>
  * `*fillValue`, throwing the VC8 vector-overflow diagnostic on oversize
  * counts.
  */
-[[maybe_unused]] int InitializeFilled8ByteVectorStorageLane(
+int InitializeFilled8ByteVectorStorageLane(
   VectorElement8StorageRuntimeView* const storage,
   const unsigned int count,
   const VectorElement8DwordPairLane* const fillValue
@@ -5108,7 +5108,7 @@ template <std::size_t kInlineDwordCount>
  * `*fillValue`, throwing the VC8 vector-overflow diagnostic on oversize
  * counts.
  */
-[[maybe_unused]] int InitializeFilled16ByteVectorStorageLane(
+int InitializeFilled16ByteVectorStorageLane(
   VectorElement16StorageRuntimeView* const storage,
   const unsigned int count,
   const VectorElement16DwordQuadLane* const fillValue
@@ -5144,7 +5144,7 @@ template <std::size_t kInlineDwordCount>
  * What it does:
  * Initializes one 8-byte vector storage lane to `count` zeroed elements.
  */
-[[maybe_unused]] VectorElement8StorageRuntimeView* InitializeZeroFilled8ByteVectorStorageLane(
+VectorElement8StorageRuntimeView* InitializeZeroFilled8ByteVectorStorageLane(
   VectorElement8StorageRuntimeView* const storage,
   const unsigned int count
 )
@@ -5160,7 +5160,7 @@ template <std::size_t kInlineDwordCount>
  * What it does:
  * Initializes one 16-byte vector storage lane to `count` zeroed elements.
  */
-[[maybe_unused]] VectorElement16StorageRuntimeView* InitializeZeroFilled16ByteVectorStorageLane(
+VectorElement16StorageRuntimeView* InitializeZeroFilled16ByteVectorStorageLane(
   VectorElement16StorageRuntimeView* const storage,
   const unsigned int count
 )
@@ -5204,7 +5204,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * What it does:
  * Stdcall-lane adapter for nullable dword range copy.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableStdcallAdapter(
+[[nodiscard]] std::uint32_t* CopyDwordRangeNullableStdcallAdapter(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destination
@@ -5219,7 +5219,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * What it does:
  * Cdecl-lane adapter for nullable dword range copy.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableCdeclAdapter(
+[[nodiscard]] std::uint32_t* CopyDwordRangeNullableCdeclAdapter(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destination
@@ -5236,7 +5236,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * `storage._Mylast`, writes the new `_Mylast`, and stores `destinationBegin`
  * into `*outDestinationBegin`.
  */
-[[maybe_unused]] VectorElement8DwordPairLane** CopyDwordPairTailRangeAndUpdateLast(
+VectorElement8DwordPairLane** CopyDwordPairTailRangeAndUpdateLast(
   VectorElement8DwordPairLane** const outDestinationBegin,
   VectorVoidStorageView& storage,
   VectorElement8DwordPairLane* const destinationBegin,
@@ -5266,7 +5266,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Copies one 8-byte pair tail left by one slot, shrinks `_Mylast` by one
  * element, and returns the erased destination-begin slot.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement8DwordPairLane** EraseDwordPairTailAndReturnBegin(
+[[nodiscard]] VectorElement8DwordPairLane** EraseDwordPairTailAndReturnBegin(
   VectorElement8DwordPairLane** const outDestinationBegin,
   VectorVoidStorageView& storage,
   VectorElement8DwordPairLane* const destinationBegin
@@ -5297,7 +5297,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * `[sourceBegin, sourceEnd)` into `destinationBegin` and returns one-past-last
  * written destination lane.
  */
-[[maybe_unused]] VectorElement12DwordTripleLane* CopyDwordTripleRangeAndReturnEnd(
+VectorElement12DwordTripleLane* CopyDwordTripleRangeAndReturnEnd(
   const VectorElement12DwordTripleLane* sourceBegin,
   const VectorElement12DwordTripleLane* const sourceEnd,
   VectorElement12DwordTripleLane* destinationBegin
@@ -5319,7 +5319,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Relocates one 12-byte lane tail range from `sourceBegin` to `destinationBegin`,
  * updates `_Mylast`, and returns `outDestinationBegin`.
  */
-[[maybe_unused]] VectorElement12DwordTripleLane** RelocateDwordTripleTailAndReturnBegin(
+VectorElement12DwordTripleLane** RelocateDwordTripleTailAndReturnBegin(
   VectorElementCountRuntimeView& storage,
   VectorElement12DwordTripleLane** const outDestinationBegin,
   VectorElement12DwordTripleLane* const destinationBegin,
@@ -5343,7 +5343,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Swaps one reverse-walk range of 20-byte `{dword x5}` lanes with another
  * reverse-walk range and returns the resulting left-range begin lane.
  */
-[[maybe_unused]] VectorElement20DwordQuintLane* SwapDwordQuintLaneReverseRanges(
+VectorElement20DwordQuintLane* SwapDwordQuintLaneReverseRanges(
   VectorElement20DwordQuintLane* leftRangeEnd,
   VectorElement20DwordQuintLane* rightRangeEnd,
   VectorElement20DwordQuintLane* const rightRangeBegin
@@ -5367,7 +5367,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Bridges one legacy register/stack wrapper lane into
  * `SwapDwordQuintLaneReverseRanges`.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement20DwordQuintLane* SwapDwordQuintLaneReverseRangesRegisterAdapter(
+[[nodiscard]] VectorElement20DwordQuintLane* SwapDwordQuintLaneReverseRangesRegisterAdapter(
   VectorElement20DwordQuintLane* const leftRangeEnd,
   VectorElement20DwordQuintLane* const rightRangeEnd,
   VectorElement20DwordQuintLane* const rightRangeBegin
@@ -5387,7 +5387,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 4-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked4ByteElements(const std::uint32_t count)
+void* AllocateChecked4ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 4u);
 }
@@ -5399,7 +5399,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked 4-byte-element block for non-zero `count` and
  * preserves VC8 zero-count behavior by returning `operator new(0)`.
  */
-[[maybe_unused]] void* AllocateChecked4ByteElementsZeroAware(const std::uint32_t count)
+void* AllocateChecked4ByteElementsZeroAware(const std::uint32_t count)
 {
   return count != 0u ? AllocateChecked4ByteElements(count) : ::operator new(0);
 }
@@ -5411,7 +5411,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 8-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked8ByteElements(const std::uint32_t count)
+void* AllocateChecked8ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 8u);
 }
@@ -5423,7 +5423,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked 8-byte-element block for non-zero `count` and
  * preserves VC8 zero-count behavior by returning `operator new(0)`.
  */
-[[maybe_unused]] void* AllocateChecked8ByteElementsZeroAware(const std::uint32_t count)
+void* AllocateChecked8ByteElementsZeroAware(const std::uint32_t count)
 {
   return count != 0u ? AllocateChecked8ByteElements(count) : ::operator new(0);
 }
@@ -5436,7 +5436,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 12-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked12ByteElements(const std::uint32_t count)
+void* AllocateChecked12ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 12u);
 }
@@ -5448,7 +5448,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Preserves VC8 zero-count allocation semantics for 12-byte vector storage
  * lanes by returning `operator new(0)` when `count == 0`.
  */
-[[maybe_unused]] void* AllocateChecked12ByteElementsZeroAware(const std::uint32_t count)
+void* AllocateChecked12ByteElementsZeroAware(const std::uint32_t count)
 {
   return count != 0u ? AllocateChecked12ByteElements(count) : ::operator new(0);
 }
@@ -5460,7 +5460,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 16-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked16ByteElements(const std::uint32_t count)
+void* AllocateChecked16ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 16u);
 }
@@ -5472,7 +5472,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 20-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked20ByteElements(const std::uint32_t count)
+void* AllocateChecked20ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 20u);
 }
@@ -5484,7 +5484,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 24-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked24ByteElements(const std::uint32_t count)
+void* AllocateChecked24ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 24u);
 }
@@ -5496,7 +5496,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 28-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked28ByteElements(const std::uint32_t count)
+void* AllocateChecked28ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 28u);
 }
@@ -5508,7 +5508,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Preserves VC8 zero-count allocation semantics for 28-byte vector storage
  * lanes by returning `operator new(0)` when `count == 0`.
  */
-[[maybe_unused]] void* AllocateChecked28ByteElementsZeroAware(const std::uint32_t count)
+void* AllocateChecked28ByteElementsZeroAware(const std::uint32_t count)
 {
   return count != 0u ? AllocateChecked28ByteElements(count) : ::operator new(0);
 }
@@ -5521,7 +5521,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 32-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked32ByteElements(const std::uint32_t count)
+void* AllocateChecked32ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 32u);
 }
@@ -5535,7 +5535,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 40-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked40ByteElements(const std::uint32_t count)
+void* AllocateChecked40ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 40u);
 }
@@ -5547,7 +5547,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked 40-byte-element block for non-zero `count` and
  * preserves VC8 zero-count behavior by returning `operator new(0)`.
  */
-[[maybe_unused]] void* AllocateChecked40ByteElementsZeroAware(const std::uint32_t count)
+void* AllocateChecked40ByteElementsZeroAware(const std::uint32_t count)
 {
   return count != 0u ? AllocateChecked40ByteElements(count) : ::operator new(0);
 }
@@ -5560,7 +5560,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * What it does:
  * Releases one vector-runtime storage block through global `operator delete`.
  */
-[[maybe_unused]] void DeleteVectorRuntimeStorage(void* const storage) noexcept
+void DeleteVectorRuntimeStorage(void* const storage) noexcept
 {
   ::operator delete(storage);
 }
@@ -5572,7 +5572,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 52-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked52ByteElements(const std::uint32_t count)
+void* AllocateChecked52ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 52u);
 }
@@ -5584,7 +5584,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 120-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked120ByteElements(const std::uint32_t count)
+void* AllocateChecked120ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 120u);
 }
@@ -5596,7 +5596,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 216-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked216ByteElements(const std::uint32_t count)
+void* AllocateChecked216ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 216u);
 }
@@ -5608,7 +5608,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 352-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked352ByteElements(const std::uint32_t count)
+void* AllocateChecked352ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 352u);
 }
@@ -5620,7 +5620,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 568-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked568ByteElements(const std::uint32_t count)
+void* AllocateChecked568ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 568u);
 }
@@ -5632,7 +5632,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one checked raw block for 712-byte elements using the VC8
  * `_Allocate(count, element*)` overflow guard semantics.
  */
-[[maybe_unused]] void* AllocateChecked712ByteElements(const std::uint32_t count)
+void* AllocateChecked712ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 712u);
 }
@@ -5674,7 +5674,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Allocates one float-vector storage lane of `count` elements, fills every
  * element with `fillValue`, and marks `_Mylast` as fully initialized.
  */
-[[maybe_unused]] void FillFloatVectorStorage(
+void FillFloatVectorStorage(
   VectorVoidStorageView& storage,
   const float fillValue,
   const std::uint32_t count
@@ -5709,7 +5709,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 20-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage20Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage20Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 20u);
 }
@@ -5740,7 +5740,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Releases one owned vector backing block and resets all three runtime
  * storage lanes (`_Myfirst/_Mylast/_Myend`) to null.
  */
-[[maybe_unused]] void ReleaseAndResetVectorStorage(VectorVoidStorageView& storage) noexcept
+void ReleaseAndResetVectorStorage(VectorVoidStorageView& storage) noexcept
 {
   if (storage.first != nullptr) {
     ::operator delete(storage.first);
@@ -5778,7 +5778,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Moves one dword range `[sourceBegin, sourceEnd)` so that it ends at
  * `destinationEnd`, returning the begin pointer of the copied block.
  */
-[[maybe_unused]] std::uint32_t* MoveDwordRangeToEnd(
+std::uint32_t* MoveDwordRangeToEnd(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const sourceBegin
@@ -5828,7 +5828,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Copies one dword range `[sourceBegin, sourceEnd)` into `destinationBegin`
  * and returns one-past the last copied destination lane.
  */
-[[maybe_unused]] std::uint32_t* MoveDwordRangeAndReturnEnd(
+std::uint32_t* MoveDwordRangeAndReturnEnd(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationBegin,
   const std::uint32_t* const sourceBegin
@@ -5851,7 +5851,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * What it does:
  * Fills one dword range `[begin,end)` from one fixed source dword lane.
  */
-[[maybe_unused]] std::uint32_t* FillDwordRangeFromSingleSource(
+std::uint32_t* FillDwordRangeFromSingleSource(
   std::uint32_t* begin,
   std::uint32_t* const end,
   const std::uint32_t* const sourceWord
@@ -5870,7 +5870,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * What it does:
  * Writes `count` dwords from one fixed source lane and returns one-past-end.
  */
-[[maybe_unused]] std::uint32_t* FillDwordCountFromSingleSource(
+std::uint32_t* FillDwordCountFromSingleSource(
   std::uint32_t* const begin,
   const std::int32_t count,
   const std::uint32_t* const sourceWord
@@ -5894,7 +5894,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Copies one source-first dword range `[sourceBegin, sourceEnd)` into byte
  * destination storage and returns one-past-end destination lane.
  */
-[[maybe_unused]] std::uint8_t* MoveDwordRangeSourceFirstAndReturnEnd(
+std::uint8_t* MoveDwordRangeSourceFirstAndReturnEnd(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint8_t* const destinationBegin
@@ -5916,7 +5916,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Moves exactly `dwordCount` 32-bit lanes from `sourceBegin` into
  * `destinationBegin` and returns the destination begin lane.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* MoveFixedDwordCountAndReturnDestination(
+[[nodiscard]] std::uint32_t* MoveFixedDwordCountAndReturnDestination(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t dwordCount,
   std::uint32_t* const destinationBegin
@@ -5934,7 +5934,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Moves exactly `dwordCount` 32-bit lanes from `sourceBegin` into
  * `destinationBegin` and returns `passthroughTag` unchanged.
  */
-[[maybe_unused]] [[nodiscard]] std::uintptr_t MoveFixedDwordCountAndReturnPassthroughTag(
+[[nodiscard]] std::uintptr_t MoveFixedDwordCountAndReturnPassthroughTag(
   const std::uint32_t* const sourceBegin,
   std::uint32_t* const destinationBegin,
   const std::uint32_t dwordCount,
@@ -5958,7 +5958,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Relocates one dword tail segment from `sourceBegin` to `destinationBegin`,
  * updates `_Mylast`, and returns `outDestinationBegin`.
  */
-[[maybe_unused]] std::uint32_t** RelocateDwordTailAndReturnBegin(
+std::uint32_t** RelocateDwordTailAndReturnBegin(
   VectorDwordStorageView& storage,
   std::uint32_t** const outDestinationBegin,
   std::uint32_t* const destinationBegin,
@@ -5985,7 +5985,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Forward-copies one dword tail segment from `sourceBegin` to `destinationBegin`,
  * updates `_Mylast`, and stores the destination begin lane in output storage.
  */
-[[maybe_unused]] std::uint32_t** RelocateDwordTailForwardAndReturnBegin(
+std::uint32_t** RelocateDwordTailForwardAndReturnBegin(
   std::uint32_t** const outDestinationBegin,
   VectorDwordStorageView& storage,
   std::uint32_t* const destinationBegin,
@@ -6015,7 +6015,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Source-first register adapter that relocates one dword tail segment,
  * updates `_Mylast`, and returns the destination begin pointer.
  */
-[[maybe_unused]] std::uint32_t* RelocateDwordTailAndReturnDestinationBegin(
+std::uint32_t* RelocateDwordTailAndReturnDestinationBegin(
   std::uint32_t* const sourceBegin,
   VectorDwordStorageView& storage,
   std::uint32_t* const destinationBegin
@@ -6036,7 +6036,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Clears one dword-vector logical used range by rebinding `_Mylast` to
  * `_Myfirst` while preserving storage allocation.
  */
-[[maybe_unused]] void ResetVectorUsedRangeToBegin(VectorDwordStorageView& storage) noexcept
+void ResetVectorUsedRangeToBegin(VectorDwordStorageView& storage) noexcept
 {
   if (storage.first != storage.last) {
     storage.last = storage.first;
@@ -6050,7 +6050,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 36-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage36Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage36Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 36u);
 }
@@ -6062,7 +6062,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 144-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage144Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage144Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 144u);
 }
@@ -6074,7 +6074,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 16-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage16Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage16Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 16u);
 }
@@ -6088,7 +6088,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 32-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage32Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage32Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 32u);
 }
@@ -6100,7 +6100,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 24-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage24Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage24Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 24u);
 }
@@ -6112,7 +6112,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 52-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage52Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage52Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 52u);
 }
@@ -6127,7 +6127,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 12-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage12Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage12Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 12u);
 }
@@ -6141,7 +6141,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 40-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage40Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage40Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 40u);
 }
@@ -6153,7 +6153,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 56-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage56Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage56Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 56u);
 }
@@ -6165,7 +6165,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 8-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage8Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage8Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 8u);
 }
@@ -6177,7 +6177,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 140-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage140Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage140Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 140u);
 }
@@ -6189,7 +6189,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 712-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage712Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage712Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 712u);
 }
@@ -6208,7 +6208,7 @@ std::uint32_t* CopyDwordRangeNullable(
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 4-byte element vector
  * lane and initializes the logical range to empty.
  */
-[[maybe_unused]] bool BuyVectorStorage4Byte(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage4Byte(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageByElementWidth(storage, count, 4u);
 }
@@ -6260,7 +6260,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * lane with legacy max-count guard `0x3FFFFFFF`, preserving the caller's
  * overflow context lanes.
  */
-[[maybe_unused]] bool BuyVectorStorage4ByteGuardedWithOverflowContext(
+bool BuyVectorStorage4ByteGuardedWithOverflowContext(
   const std::uint32_t overflowContextA,
   const std::uint32_t overflowContextB,
   VectorVoidStorageView& storage,
@@ -6280,7 +6280,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * lane with legacy max-count guard `0x1FFFFFFF`, preserving the caller's
  * overflow context lane.
  */
-[[maybe_unused]] bool BuyVectorStorage8ByteGuardedWithOverflowContext(
+bool BuyVectorStorage8ByteGuardedWithOverflowContext(
   const std::uint32_t overflowContext,
   VectorVoidStorageView& storage,
   const std::uint32_t count
@@ -6297,7 +6297,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 352-byte element vector
  * lane with legacy max-count guard `0x00BA2E8B`.
  */
-[[maybe_unused]] bool BuyVectorStorage352ByteGuarded(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage352ByteGuarded(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(
     storage,
@@ -6315,7 +6315,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 12-byte element vector
  * lane with legacy max-count guard `0x15555555`.
  */
-[[maybe_unused]] bool BuyVectorStorage12ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage12ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x15555555u, 12u, &AllocateChecked12ByteElements);
 }
@@ -6327,7 +6327,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 28-byte element vector
  * lane with legacy max-count guard `0x09249249`.
  */
-[[maybe_unused]] bool BuyVectorStorage28ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage28ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x09249249u, 28u, &AllocateChecked28ByteElements);
 }
@@ -6339,7 +6339,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 216-byte element vector
  * lane with legacy max-count guard `0x012F684B`.
  */
-[[maybe_unused]] bool BuyVectorStorage216ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage216ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x012F684Bu, 216u, &AllocateChecked216ByteElements);
 }
@@ -6351,7 +6351,7 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 568-byte element vector
  * lane with legacy max-count guard `0x0073615A`.
  */
-[[maybe_unused]] bool BuyVectorStorage568ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage568ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(
     storage,
@@ -6383,7 +6383,7 @@ bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const s
  * lane with legacy max-count guard `0x04444444`, preserving the caller's
  * overflow context lane.
  */
-[[maybe_unused]] bool BuyVectorStorage60ByteGuardedWithOverflowContext(
+bool BuyVectorStorage60ByteGuardedWithOverflowContext(
   const std::uint32_t overflowContext,
   VectorVoidStorageView& storage,
   const std::uint32_t count
@@ -6400,7 +6400,7 @@ bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const s
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 120-byte element vector
  * lane with legacy max-count guard `0x02222222`.
  */
-[[maybe_unused]] bool BuyVectorStorage120ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage120ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x02222222u, 120u, &AllocateChecked120ByteElements);
 }
@@ -6412,7 +6412,7 @@ bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const s
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 8-byte element vector
  * lane with legacy max-count guard `0x1FFFFFFF`.
  */
-[[maybe_unused]] bool BuyVectorStorage8ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage8ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x1FFFFFFFu, 8u, &AllocateChecked8ByteElements);
 }
@@ -6424,7 +6424,7 @@ bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const s
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 20-byte element vector
  * lane with legacy max-count guard `0x0CCCCCCC`.
  */
-[[maybe_unused]] bool BuyVectorStorage20ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage20ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x0CCCCCCCu, 20u, &AllocateChecked20ByteElements);
 }
@@ -6436,7 +6436,7 @@ bool BuyVectorStorage4ByteGuardedVariant(VectorVoidStorageView& storage, const s
  * Acquires `_Myfirst/_Mylast/_Myend` storage for one 16-byte element vector
  * lane with legacy max-count guard `0x0FFFFFFF`.
  */
-[[maybe_unused]] bool BuyVectorStorage16ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
+bool BuyVectorStorage16ByteGuardedVariant(VectorVoidStorageView& storage, const std::uint32_t count)
 {
   return BuyVectorStorageGuardedByMaxCount(storage, count, 0x0FFFFFFFu, 16u, &AllocateChecked16ByteElements);
 }
@@ -6649,7 +6649,7 @@ void CopyAssignReservedTransportBoneLane(
  * Bridges legacy EH/register-shaped caller lanes into the canonical
  * `UninitializedCopyReservedTransportBoneRange` helper.
  */
-[[maybe_unused]] [[nodiscard]] moho::SAiReservedTransportBone* UninitializedCopyReservedTransportBoneRangeRegisterAdapter(
+[[nodiscard]] moho::SAiReservedTransportBone* UninitializedCopyReservedTransportBoneRangeRegisterAdapter(
   moho::SAiReservedTransportBone* const destinationBegin,
   const moho::SAiReservedTransportBone* const sourceBegin,
   const std::uint32_t /*unusedEhStateLane*/,
@@ -6731,7 +6731,7 @@ void DestroyEntitySetRange(
  * Bridges one legacy register-lane unwind adapter into the canonical
  * `UninitializedCopyEntitySetRange` helper.
  */
-[[maybe_unused]] [[nodiscard]] moho::SEntitySetTemplateUnit* UninitializedCopyEntitySetRangeRegisterAdapter(
+[[nodiscard]] moho::SEntitySetTemplateUnit* UninitializedCopyEntitySetRangeRegisterAdapter(
   moho::SEntitySetTemplateUnit* const destinationBegin,
   const moho::SEntitySetTemplateUnit* const sourceBegin,
   const std::uint32_t /*unusedEhStateLane*/,
@@ -6855,7 +6855,7 @@ void ReleaseRefcountedLaneRange(
  * Adapter lane that forwards one refcounted 12-byte copy-assign range
  * `[sourceBegin, sourceEnd)` into the shared range copy helper.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement12RefcountedLane* CopyAssignRefcountedLaneRangeAdapter(
+[[nodiscard]] VectorElement12RefcountedLane* CopyAssignRefcountedLaneRangeAdapter(
   const VectorElement12RefcountedLane* sourceBegin,
   const VectorElement12RefcountedLane* sourceEnd,
   VectorElement12RefcountedLane* destination
@@ -6871,7 +6871,7 @@ void ReleaseRefcountedLaneRange(
  * Adapter lane that forwards one refcounted 12-byte uninitialized copy range
  * `[sourceBegin, sourceEnd)` into the shared copy-construction helper.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement12RefcountedLane* CopyConstructRefcountedLaneRangeAdapter(
+[[nodiscard]] VectorElement12RefcountedLane* CopyConstructRefcountedLaneRangeAdapter(
   const VectorElement12RefcountedLane* sourceBegin,
   const VectorElement12RefcountedLane* sourceEnd,
   VectorElement12RefcountedLane* destination
@@ -6887,7 +6887,7 @@ void ReleaseRefcountedLaneRange(
  * Adapter lane that forwards one trivial 40-byte copy range
  * `[sourceBegin, sourceEnd)` into the decuple-dword range copy helper.
  */
-[[maybe_unused]] [[nodiscard]] VectorElement40DwordDecupleLane* CopyDwordDecupleLaneRangeAdapter(
+[[nodiscard]] VectorElement40DwordDecupleLane* CopyDwordDecupleLaneRangeAdapter(
   const VectorElement40DwordDecupleLane* sourceBegin,
   const VectorElement40DwordDecupleLane* sourceEnd,
   VectorElement40DwordDecupleLane* destination
@@ -6904,7 +6904,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-constructs one half-open `RMeshBlueprintLOD` range and destroys the
  * partially-constructed destination prefix on failure before rethrowing.
  */
-[[maybe_unused]] [[nodiscard]] moho::RMeshBlueprintLOD* CopyConstructRMeshBlueprintLodRange(
+[[nodiscard]] moho::RMeshBlueprintLOD* CopyConstructRMeshBlueprintLodRange(
   moho::RMeshBlueprintLOD* destination,
   const moho::RMeshBlueprintLOD* sourceBegin,
   const moho::RMeshBlueprintLOD* sourceEnd
@@ -6924,7 +6924,7 @@ void ReleaseRefcountedLaneRange(
  * Bridges legacy EH/register-shaped wrapper lanes into the canonical
  * `CopyConstructRMeshBlueprintLodRange` helper.
  */
-[[maybe_unused]] [[nodiscard]] moho::RMeshBlueprintLOD* CopyConstructRMeshBlueprintLodRangeRegisterAdapter(
+[[nodiscard]] moho::RMeshBlueprintLOD* CopyConstructRMeshBlueprintLodRangeRegisterAdapter(
   moho::RMeshBlueprintLOD* const destinationBegin,
   const moho::RMeshBlueprintLOD* const sourceBegin,
   const std::uint32_t /*unusedEhStateLane*/,
@@ -6942,7 +6942,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-constructs one half-open `RUnitBlueprintWeapon` range and destroys the
  * partially-constructed destination prefix on failure before rethrowing.
  */
-[[maybe_unused]] [[nodiscard]] moho::RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponRange(
+[[nodiscard]] moho::RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponRange(
   moho::RUnitBlueprintWeapon* destination,
   const moho::RUnitBlueprintWeapon* sourceBegin,
   const moho::RUnitBlueprintWeapon* sourceEnd
@@ -6966,7 +6966,7 @@ void ReleaseRefcountedLaneRange(
  * Bridges legacy EH/register-shaped wrapper lanes into the canonical
  * `CopyConstructRUnitBlueprintWeaponRange` helper.
  */
-[[maybe_unused]] [[nodiscard]] moho::RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponRangeRegisterAdapter(
+[[nodiscard]] moho::RUnitBlueprintWeapon* CopyConstructRUnitBlueprintWeaponRangeRegisterAdapter(
   moho::RUnitBlueprintWeapon* const destinationBegin,
   const moho::RUnitBlueprintWeapon* const sourceBegin,
   const std::uint32_t /*unusedEhStateLane*/,
@@ -6983,7 +6983,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one `vector<RMeshBlueprintLOD>` lane with full VC8
  * size/capacity split behavior and string-aware element lifetime management.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignRMeshBlueprintLodVectorStorage(
+VectorVoidStorageView* CopyAssignRMeshBlueprintLodVectorStorage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7047,7 +7047,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one `vector<RUnitBlueprintWeapon>` lane with destructor-aware
  * trim/reallocate paths matching VC8 vector assignment semantics.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignRUnitBlueprintWeaponVectorStorage(
+VectorVoidStorageView* CopyAssignRUnitBlueprintWeaponVectorStorage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7111,7 +7111,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one `vector<SPointVector>` lane with the original split between
  * in-place overwrite, append-construct tail, and full reallocate.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignSPointVectorStorage(
+VectorVoidStorageView* CopyAssignSPointVectorStorage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7169,7 +7169,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one `vector<SEntitySetTemplateUnit>` lane, copying only per-set
  * fastvector payload for existing nodes and preserving intrusive list lanes.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignEntitySetTemplateUnitVectorStorage(
+VectorVoidStorageView* CopyAssignEntitySetTemplateUnitVectorStorage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7233,7 +7233,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one 12-byte refcounted lane vector, preserving intrusive
  * shared-control retain/release semantics on every overwrite and trim path.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignRefcountedLaneVector12Storage(
+VectorVoidStorageView* CopyAssignRefcountedLaneVector12Storage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7298,7 +7298,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one 40-byte decuple-dword vector lane with VC8-style
  * overwrite/append/reallocate branching and trivial-element clear semantics.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignDwordDecupleVectorStorage(
+VectorVoidStorageView* CopyAssignDwordDecupleVectorStorage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7356,7 +7356,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one 28-byte float-septuple vector storage lane with the
  * legacy overwrite/append/reallocate split.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignFloatSeptupleVector28Storage(
+VectorVoidStorageView* CopyAssignFloatSeptupleVector28Storage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7414,7 +7414,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-constructs one 8-byte dword-pair vector storage lane and replays the
  * legacy overflow-guarded allocation path before copying source lanes.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyConstructDwordPairVector8Storage(
+VectorVoidStorageView* CopyConstructDwordPairVector8Storage(
   const VectorVoidStorageView& source,
   VectorVoidStorageView& destination
 )
@@ -7460,7 +7460,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-constructs one 12-byte refcounted vector lane, preserving shared
  * control retain/release behavior while constructing destination entries.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyConstructRefcountedLaneVector12Storage(
+VectorVoidStorageView* CopyConstructRefcountedLaneVector12Storage(
   const VectorVoidStorageView& source,
   VectorVoidStorageView& destination
 )
@@ -7496,7 +7496,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-constructs one 40-byte decuple-dword vector lane from source storage
  * after allocating destination capacity through the legacy vector allocator.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyConstructDwordDecupleVector40Storage(
+VectorVoidStorageView* CopyConstructDwordDecupleVector40Storage(
   const VectorVoidStorageView& source,
   VectorVoidStorageView& destination
 )
@@ -7531,7 +7531,7 @@ void ReleaseRefcountedLaneRange(
  * Copy-assigns one 4-byte dword vector storage lane using the legacy
  * overwrite/append/reallocate split and updates `_Mylast` accordingly.
  */
-[[maybe_unused]] VectorVoidStorageView* CopyAssignDwordVectorStorage(
+VectorVoidStorageView* CopyAssignDwordVectorStorage(
   VectorVoidStorageView& destination,
   const VectorVoidStorageView& source
 )
@@ -7630,7 +7630,7 @@ void ReleaseRefcountedLaneRange(
  * `count == 0`, matching the legacy callsites that treat empty input as
  * a no-op without allocation.
  */
-[[maybe_unused]] bool BuyVectorStorage4ByteRequireNonZero(
+bool BuyVectorStorage4ByteRequireNonZero(
   VectorVoidStorageView& storage,
   const std::uint32_t count
 )
@@ -7645,7 +7645,7 @@ void ReleaseRefcountedLaneRange(
  * Initializes one 4-byte vector storage lane to `count` elements filled from
  * `*fillValue`, returning false for zero-count inputs without allocating.
  */
-[[maybe_unused]] bool InitializeFilled4ByteVectorStorage(
+bool InitializeFilled4ByteVectorStorage(
   const std::uint32_t count,
   VectorVoidStorageView& storage,
   const std::uint32_t* const fillValue
@@ -7671,7 +7671,7 @@ void ReleaseRefcountedLaneRange(
  * Initializes one 4-byte vector storage lane to `count` elements filled with
  * zero and returns the caller-owned storage lane pointer.
  */
-[[maybe_unused]] VectorVoidStorageView* InitializeZeroFilled4ByteVectorStorageLane(
+VectorVoidStorageView* InitializeZeroFilled4ByteVectorStorageLane(
   const std::uint32_t count,
   VectorVoidStorageView* const outStorage
 )
@@ -7689,7 +7689,7 @@ void ReleaseRefcountedLaneRange(
  * `count == 0`, matching the legacy callsites that treat empty input as
  * a no-op without allocation.
  */
-[[maybe_unused]] bool BuyVectorStorage16ByteRequireNonZero(
+bool BuyVectorStorage16ByteRequireNonZero(
   VectorVoidStorageView& storage,
   const std::uint32_t count
 )
@@ -7704,7 +7704,7 @@ void ReleaseRefcountedLaneRange(
  * What it does:
  * Returns the legacy max-count guard for 352-byte vector storage lanes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t GetLegacyVectorStorageGuard352ByteValue() noexcept
+[[nodiscard]] std::uint32_t GetLegacyVectorStorageGuard352ByteValue() noexcept
 {
   return kLegacyVectorStorageGuard352Byte;
 }
@@ -7716,7 +7716,7 @@ void ReleaseRefcountedLaneRange(
  * What it does:
  * Returns the legacy max-count guard for 568-byte vector storage lanes.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t GetLegacyVectorStorageGuard568ByteValue() noexcept
+[[nodiscard]] std::uint32_t GetLegacyVectorStorageGuard568ByteValue() noexcept
 {
   return kLegacyVectorStorageGuard568Byte;
 }
