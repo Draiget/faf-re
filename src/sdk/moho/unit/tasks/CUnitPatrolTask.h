@@ -5,9 +5,11 @@
 
 #include "Wm3Box3.h"
 #include "moho/entity/Entity.h"
+#include "moho/misc/Listener.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/Broadcaster.h"
+#include "moho/unit/ECommandEvent.h"
 
 namespace gpg
 {
@@ -24,25 +26,28 @@ namespace moho
   class IFormationInstance;
 
   /**
-   * Layout-compatible embedded listener sub-object slot.
-   *
-   * In the binary `CUnitPatrolTask` multiply-inherits `Listener<ECommandEvent>`
-   * and `Listener<EFormationdStatus>` and overrides their `OnEvent` receivers.
-   * The abstract `Listener<T>` template cannot be a concrete member, so the two
-   * intrusive slots are modeled here as a byte-for-byte-identical concrete
-   * struct (secondary vtable pointer + self-linked `Broadcaster` node). The
-   * default ctor self-links the node exactly like the binary
-   * (`a1+56/60`, `a1+72/76`).
+   * Layout-only carrier for the `CUnitCommand*` slot that sits between
+   * `CCommandTask` and the first `Listener<T>` base (complete-object +0x30).
+   * Multiple inheritance lays out non-virtual bases back-to-back in
+   * declaration order, so this 4-byte base positions
+   * `Listener<ECommandEvent>` at exactly +0x34.
    */
-  struct CUnitPatrolListenerSlot
+  struct CUnitPatrolTaskCommandSlot
   {
-    void* mVftable = nullptr; // +0x00 secondary Listener<T> vtable pointer
-    Broadcaster mListenerLink; // +0x04 self-linked broadcaster node
+    CUnitCommand* mFirstCommand = nullptr; // +0x00 (complete-object +0x30)
   };
-  static_assert(sizeof(CUnitPatrolListenerSlot) == 0x0C, "CUnitPatrolListenerSlot size must be 0x0C");
-  static_assert(
-    offsetof(CUnitPatrolListenerSlot, mListenerLink) == 0x04, "CUnitPatrolListenerSlot::mListenerLink offset must be 0x04"
-  );
+  static_assert(sizeof(CUnitPatrolTaskCommandSlot) == 0x04, "CUnitPatrolTaskCommandSlot size must be 0x04");
+
+  /**
+   * Layout-only carrier for the reserved dword between the two `Listener<T>`
+   * bases (complete-object +0x40), positioning `Listener<EFormationdStatus>`
+   * at exactly +0x44.
+   */
+  struct CUnitPatrolTaskReservedSlot
+  {
+    std::uint32_t mReserved40 = 0u; // +0x00 (complete-object +0x40)
+  };
+  static_assert(sizeof(CUnitPatrolTaskReservedSlot) == 0x04, "CUnitPatrolTaskReservedSlot size must be 0x04");
 
   /**
    * Runtime owner for the patrol/target command task.
@@ -50,13 +55,20 @@ namespace moho
    * Layout recovered from the two constructors (default `FUN_0061B0B0`,
    * arg `FUN_0061AE50`) and the four behavior bodies (`FUN_0061B610`,
    * `FindTarget` `FUN_0061B710`, `FUN_0061B9C0`, `TaskTick` `FUN_0061C130`).
-   * The binary object derives `CCommandTask` and embeds two intrusive
-   * `Listener<...>` sub-objects plus a per-army `EntitySetTemplate<Entity>`
+   * The binary object derives `CCommandTask` and multiply-inherits
+   * `Listener<ECommandEvent>` (+0x34) and `Listener<EFormationdStatus>`
+   * (+0x44), each real secondary vtables dispatched through their own
+   * `OnEvent` override, plus a per-army `EntitySetTemplate<Entity>`
    * membership node. Complete-object size stays 0xF0.
    *
    * VFTABLE: `CUnitPatrolTask` primary vtable (TaskTick == CTask::Execute slot 1).
    */
-  class CUnitPatrolTask : public CCommandTask
+  class CUnitPatrolTask
+    : public CCommandTask
+    , public CUnitPatrolTaskCommandSlot
+    , public Listener<ECommandEvent>
+    , public CUnitPatrolTaskReservedSlot
+    , public Listener<EFormationdStatus>
   {
   public:
     static gpg::RType* sType;
@@ -162,6 +174,34 @@ namespace moho
     int Execute() override;
 
     /**
+     * Address: 0x0061C3E0 (FUN_0061C3E0, Moho::CUnitPatrolTask::OnEvent)
+     * Primary vtable: `Listener<ECommandEvent>` secondary slot 1
+     * (`??_7CUnitPatrolTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@` + 0x04).
+     *
+     * What it does:
+     * Rebuilds `mGoal` as a 1-cell rect around the bound command's resolved
+     * cell position (`CUnitCommand::GetPosition(mBoundCommand, mUnit, ...)`):
+     * `{minX=cellX, minZ=cellZ, maxX=cellX+1, maxZ=cellZ+1}` with the
+     * remaining five aux dwords zeroed. When the owner unit still has a
+     * navigator and the task is mid-move, pushes the new goal
+     * (`AiNavigator->SetGoal(mGoal)`). Always finishes by rebuilding the
+     * search box (`RecomputePatrolSearchBox`).
+     */
+    void OnEvent(ECommandEvent event) override;
+
+    /**
+     * Address: 0x0061C470 (FUN_0061C470, Moho::CUnitPatrolTask::OnEvent)
+     * Primary vtable: `Listener<EFormationdStatus>` secondary slot 1
+     * (`??_7CUnitPatrolTask@Moho@@6B?$Listener@W4EFormationdStatus@Moho@@@Moho@@@` + 0x04).
+     *
+     * What it does:
+     * Sets `mNavStalled` when the formation reports it has reached its goal
+     * (`event == FORMATIONSTATUS_FormationAtGoal`); ignores every other
+     * status.
+     */
+    void OnEvent(EFormationdStatus event) override;
+
+    /**
      * Address: 0x0061CF50 (FUN_0061CF50, Moho::CUnitPatrolTask::MemberDeserialize)
      *
      * IDA signature:
@@ -238,19 +278,11 @@ namespace moho
 
   public:
     // --- Derived fields (replace the former opaque mPadding[0xF0]) ---
-
-    // 0x30: first live command lane resolved from the unit command queue
-    // (`v0` in the ctor: mCommandQueue front command, or null).
-    CUnitCommand* mFirstCommand;
-
-    // 0x34: intrusive command-event listener sub-object (vtable + broadcaster node).
-    CUnitPatrolListenerSlot mCommandEventListener;
-
-    // 0x40: reserved dword between the two listener sub-objects.
-    std::uint32_t mReserved40;
-
-    // 0x44: intrusive formation-status listener sub-object.
-    CUnitPatrolListenerSlot mFormationStatusListener;
+    //
+    // 0x30 (mFirstCommand), 0x34 (Listener<ECommandEvent>), 0x40 (reserved),
+    // and 0x44 (Listener<EFormationdStatus>) now come from the base-class
+    // chain declared above - see CUnitPatrolTaskCommandSlot,
+    // CUnitPatrolTaskReservedSlot, and the two Listener<T> bases.
 
     // 0x50: dispatch owner used to issue refuel/reclaim/attack/repair sub-tasks.
     IAiCommandDispatchImpl* mDispatch;
@@ -290,14 +322,16 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitPatrolTask) == 0xF0, "CUnitPatrolTask size must be 0xF0");
-  static_assert(offsetof(CUnitPatrolTask, mFirstCommand) == 0x30, "CUnitPatrolTask::mFirstCommand offset must be 0x30");
+  // The four-base chain (CCommandTask + CommandSlot + Listener<ECommandEvent>
+  // + ReservedSlot + Listener<EFormationdStatus>) must land mDispatch, the
+  // first genuinely non-standard-layout member, at exactly +0x50 - offsetof
+  // on a member from a non-first base is not portable, so this checks the
+  // running byte total the same way instead.
   static_assert(
-    offsetof(CUnitPatrolTask, mCommandEventListener) == 0x34,
-    "CUnitPatrolTask::mCommandEventListener offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CUnitPatrolTask, mFormationStatusListener) == 0x44,
-    "CUnitPatrolTask::mFormationStatusListener offset must be 0x44"
+    sizeof(CCommandTask) + sizeof(CUnitPatrolTaskCommandSlot) + sizeof(Listener<ECommandEvent>)
+        + sizeof(CUnitPatrolTaskReservedSlot) + sizeof(Listener<EFormationdStatus>)
+      == 0x50,
+    "CUnitPatrolTask base-class chain must total 0x50 bytes"
   );
   static_assert(offsetof(CUnitPatrolTask, mDispatch) == 0x50, "CUnitPatrolTask::mDispatch offset must be 0x50");
   static_assert(
