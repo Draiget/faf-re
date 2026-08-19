@@ -262,28 +262,28 @@ wxStringRuntime* wxCopySharedWxStringRuntime(
   wxStringRuntime* outValue
 );
 bool wxFileExists(const wxStringRuntime* fileName);
-[[maybe_unused]] bool wxListKeyMatchesStoredNodeKeyRuntime(
+bool wxListKeyMatchesStoredNodeKeyRuntime(
   const wxListKeyRuntime* keyRuntime,
   const wchar_t* storedNodeKeyLane
 ) noexcept;
 extern wxListRuntime gWxImageHandlerRegistryRuntimeList;
-[[maybe_unused]] char** wxConvertWideTextToAllocatedMultiByteRuntimeAdapter(
+char** wxConvertWideTextToAllocatedMultiByteRuntimeAdapter(
   void* converterRuntime,
   char** outTextStorage,
   const void* sourceWideText
 );
-[[maybe_unused]] void wxArrayDcInfoAppendCopies(
+void wxArrayDcInfoAppendCopies(
   wxArrayDCInfo* const array,
   wxPaintDCInfo* const value,
   std::int32_t copyCount
 );
-[[maybe_unused]] void* wxConstructDateTimeWorkDaysRuntime(
+void* wxConstructDateTimeWorkDaysRuntime(
   void* const dateTimeWorkDaysRuntime
 ) noexcept;
-[[maybe_unused]] void wxDestroyOwnedFindDataStringPairInPointerSlotRuntime(
+void wxDestroyOwnedFindDataStringPairInPointerSlotRuntime(
   void* const* runtimeStorageSlot
 ) noexcept;
-[[maybe_unused]] void** wxConstructOwnedFindDataStringPairPointerSlotRuntime(
+void** wxConstructOwnedFindDataStringPairPointerSlotRuntime(
   void** runtimeStorageSlot,
   const wxStringRuntime* sourceText
 ) noexcept;
@@ -312,7 +312,7 @@ struct WxStringRuntimeOps
   );
 };
 
-[[maybe_unused]] bool wxAssignWideSpanToRuntimeString(
+bool wxAssignWideSpanToRuntimeString(
   wxStringRuntime* outText,
   std::size_t charCount,
   const wchar_t* sourceText
@@ -332,7 +332,7 @@ std::int64_t* wxDateTimeAssignCalendarClockMilliseconds(
   std::uint16_t seconds,
   std::uint16_t milliseconds
 );
-[[maybe_unused]] std::uint32_t wxComputeGregorianDayNumber(
+std::uint32_t wxComputeGregorianDayNumber(
   std::int32_t monthIndex,
   std::int32_t year,
   std::uint16_t dayOfMonth
@@ -366,7 +366,7 @@ void wxRemoveHandleAssociation(void* windowRuntime);
  * Probes whether one optional registry subkey exists under `rootKey`; empty
  * subkey text is treated as success.
  */
-[[maybe_unused]] bool wxRegistrySubKeyExistsRuntime(
+bool wxRegistrySubKeyExistsRuntime(
   const wchar_t* const subKeyPath,
   const HKEY rootKey,
   HKEY openedKeyHint
@@ -392,7 +392,7 @@ void wxRemoveHandleAssociation(void* windowRuntime);
  * Resolves the active Win32 window handle and maps it to one wx runtime
  * window object.
  */
-[[maybe_unused]] wxWindowMswRuntime* wxGetActiveWindowRuntime()
+wxWindowMswRuntime* wxGetActiveWindowRuntime()
 {
   const HWND activeWindow = ::GetActiveWindow();
   if (activeWindow == nullptr) {
@@ -409,7 +409,7 @@ void wxRemoveHandleAssociation(void* windowRuntime);
  * Dispatches one nested runtime virtual callback at object sub-lane `+0x138`
  * via vtable slot `+0x34`.
  */
-[[maybe_unused]] int wxDispatchNestedClassInfoSlot34Runtime(
+int wxDispatchNestedClassInfoSlot34Runtime(
   void* const runtimeObject
 ) noexcept
 {
@@ -532,7 +532,7 @@ namespace
  * Returns true when holder->owner exists and owner flag bit0 at `+0x4C` is
  * clear.
  */
-[[maybe_unused]] bool wxIsPointerOwnerFlagBit0Clear(
+bool wxIsPointerOwnerFlagBit0Clear(
   const PointerOwnerRuntimeFlagQueryView* const holder
 ) noexcept
 {
@@ -551,7 +551,7 @@ namespace
  * Returns entry value lane `+0x1C` for one indexed table at owner `+0x130`,
  * or `-1` when index is outside entry-count lane `+0x144`.
  */
-[[maybe_unused]] std::int32_t wxGetIndexedNodeValueOrMinusOne(
+std::int32_t wxGetIndexedNodeValueOrMinusOne(
   const IndexedNodeValueRuntimeOwnerView* const owner,
   const std::uint32_t index
 ) noexcept
@@ -572,7 +572,7 @@ namespace
  * What it does:
  * Stores one 32-bit lane at offset `+0x10` and returns the stored value.
  */
-[[maybe_unused]] std::int32_t wxStoreIntLane10AndReturn(
+std::int32_t wxStoreIntLane10AndReturn(
   IntLane10RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -588,7 +588,7 @@ namespace
  * Stores one 32-bit lane at `+0x78` and tail-dispatches runtime vtable slot
  * `+0x11C` using argument lane `+0xFC`.
  */
-[[maybe_unused]] std::int32_t wxStoreLane78AndDispatchVirtualSlot11C(
+std::int32_t wxStoreLane78AndDispatchVirtualSlot11C(
   VirtualSlot11CRuntimeOwnerView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -714,7 +714,7 @@ namespace
    * What it does:
    * Resets one wx hash-table iterator cursor lane to pre-iteration state.
    */
-  [[maybe_unused]] void wxHashTableResetIterationCursorRuntime(
+  void wxHashTableResetIterationCursorRuntime(
     void* const hashTableRuntime
   ) noexcept
   {
@@ -771,7 +771,7 @@ namespace
    * Advances one wx hash-table iteration cursor and returns the next payload
    * lane, or null when iteration reaches the end.
    */
-  [[maybe_unused]] void* wxHashTableAdvanceIterationCursorRuntime(
+  void* wxHashTableAdvanceIterationCursorRuntime(
     void* const hashTableRuntime
   ) noexcept
   {
@@ -872,7 +872,7 @@ namespace
  * Initializes one `wxHashTableBase` payload by clearing all pointer lanes,
  * clearing key-type metadata, and binding the base hash-table vtable lane.
  */
-[[maybe_unused]] WxHashTableBaseCtorRuntimeView* wxConstructHashTableBaseRuntime(
+WxHashTableBaseCtorRuntimeView* wxConstructHashTableBaseRuntime(
   WxHashTableBaseCtorRuntimeView* const hashTableBaseRuntime
 ) noexcept
 {
@@ -929,7 +929,7 @@ namespace
  * secondary bucket-head arrays for `bucketCount` lanes, and zero-primes both
  * arrays.
  */
-[[maybe_unused]] WxStringHashTableCtorRuntimeView* wxConstructStringHashTableRuntime(
+WxStringHashTableCtorRuntimeView* wxConstructStringHashTableRuntime(
   WxStringHashTableCtorRuntimeView* const hashTableRuntime,
   const std::uint32_t bucketCount
 )
@@ -963,7 +963,7 @@ namespace
  * Hashes one wide-string key lane and maps it into the owning hash-table
  * bucket range via modulo on bucket-count lane `+0x04`.
  */
-[[maybe_unused]] std::uint32_t wxHashTableWideKeyBucketRuntime(
+std::uint32_t wxHashTableWideKeyBucketRuntime(
   const void* const tableRuntime,
   const void* const keyRuntime
 ) noexcept
@@ -980,7 +980,7 @@ namespace
  * Computes one wide-key hash bucket index using the same legacy hash/mapping
  * lane as the base wx hash-table callback.
  */
-[[maybe_unused]] std::uint32_t wxHashTableWideKeyBucketRuntimeLaneB(
+std::uint32_t wxHashTableWideKeyBucketRuntimeLaneB(
   const void* const tableRuntime,
   const void* const keyRuntime
 ) noexcept
@@ -995,7 +995,7 @@ namespace
  * Third hash-bucket callback lane for wide-string keys; forwards to the same
  * legacy hash/modulo mapper used by the other wx hash-table bucket callbacks.
  */
-[[maybe_unused]] std::uint32_t wxHashTableWideKeyBucketRuntimeLaneC(
+std::uint32_t wxHashTableWideKeyBucketRuntimeLaneC(
   const void* const tableRuntime,
   const void* const keyRuntime
 ) noexcept
@@ -1317,7 +1317,7 @@ void wxWinHashTableDestroyBucketArraysRuntime(
  * Walks each singly-linked node chain from one hash-bucket array, destroys
  * every node through `destroyNode`, then clears all bucket-head lanes.
  */
-[[maybe_unused]] void* wxDestroyHashBucketChainsAndClearArrayRuntime(
+void* wxDestroyHashBucketChainsAndClearArrayRuntime(
   const std::uint32_t bucketCount,
   void** const bucketHeads,
   void(__cdecl* const destroyNode)(void*)
@@ -1973,7 +1973,7 @@ namespace
    * Initializes one `wxArtProviderModule` runtime base object by clearing
    * ref-data and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructArtProviderModuleRuntimeBase(
+  WxObjectRuntimeView* wxConstructArtProviderModuleRuntimeBase(
     WxObjectRuntimeView* const moduleRuntime
   ) noexcept
   {
@@ -1988,7 +1988,7 @@ namespace
    * Initializes one `wxSocketState` runtime base object by clearing ref-data
    * and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructSocketStateRuntimeBase(
+  WxObjectRuntimeView* wxConstructSocketStateRuntimeBase(
     WxObjectRuntimeView* const socketStateRuntime
   ) noexcept
   {
@@ -2003,7 +2003,7 @@ namespace
    * Initializes one `wxSocketModule` runtime base object by clearing ref-data
    * and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructSocketModuleRuntimeBase(
+  WxObjectRuntimeView* wxConstructSocketModuleRuntimeBase(
     WxObjectRuntimeView* const socketModuleRuntime
   ) noexcept
   {
@@ -2018,7 +2018,7 @@ namespace
    * Initializes one `wxServerBase` runtime base object by clearing ref-data
    * and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructServerBaseRuntime(
+  WxObjectRuntimeView* wxConstructServerBaseRuntime(
     WxObjectRuntimeView* const serverRuntime
   ) noexcept
   {
@@ -2033,7 +2033,7 @@ namespace
    * Initializes one `wxClientBase` runtime base object by clearing ref-data
    * and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructClientBaseRuntime(
+  WxObjectRuntimeView* wxConstructClientBaseRuntime(
     WxObjectRuntimeView* const clientRuntime
   ) noexcept
   {
@@ -2048,7 +2048,7 @@ namespace
    * Initializes one `wxDDEModule` runtime base object by clearing ref-data and
    * binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructDdeModuleRuntimeBase(
+  WxObjectRuntimeView* wxConstructDdeModuleRuntimeBase(
     WxObjectRuntimeView* const ddeModuleRuntime
   ) noexcept
   {
@@ -2063,7 +2063,7 @@ namespace
    * Initializes one `wxPrintPaperModule` runtime base object by clearing
    * ref-data and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructPrintPaperModuleRuntimeBase(
+  WxObjectRuntimeView* wxConstructPrintPaperModuleRuntimeBase(
     WxObjectRuntimeView* const moduleRuntime
   ) noexcept
   {
@@ -2078,7 +2078,7 @@ namespace
    * Initializes one `wxArtProvider` runtime base object by clearing ref-data
    * and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructArtProviderRuntimeBase(
+  WxObjectRuntimeView* wxConstructArtProviderRuntimeBase(
     WxObjectRuntimeView* const artProviderRuntime
   ) noexcept
   {
@@ -2093,7 +2093,7 @@ namespace
    * Initializes one `wxDefaultArtProvider` runtime base object by clearing
    * ref-data and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructDefaultArtProviderRuntimeBase(
+  WxObjectRuntimeView* wxConstructDefaultArtProviderRuntimeBase(
     WxObjectRuntimeView* const artProviderRuntime
   ) noexcept
   {
@@ -2108,7 +2108,7 @@ namespace
    * Initializes one `wxClipboardModule` runtime base object by clearing
    * ref-data and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructClipboardModuleRuntimeBase(
+  WxObjectRuntimeView* wxConstructClipboardModuleRuntimeBase(
     WxObjectRuntimeView* const clipboardModuleRuntime
   ) noexcept
   {
@@ -2123,7 +2123,7 @@ namespace
    * Initializes one `wxClipboardBase` runtime base object by clearing ref-data
    * and binding its vtable lane.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxConstructClipboardBaseRuntime(
+  WxObjectRuntimeView* wxConstructClipboardBaseRuntime(
     WxObjectRuntimeView* const clipboardRuntime
   ) noexcept
   {
@@ -2334,7 +2334,7 @@ namespace
    * Runs one wx GDI ref-data base-construction lane by rebinding the base
    * object payload and restoring shared refcount to `1`.
    */
-  [[maybe_unused]] WxGdiImageRefDataRuntimeView* wxInitializeGdiRefDataRuntime(
+  WxGdiImageRefDataRuntimeView* wxInitializeGdiRefDataRuntime(
     WxGdiImageRefDataRuntimeView* const runtime
   ) noexcept
   {
@@ -2354,7 +2354,7 @@ namespace
    * Initializes one wx GDI image ref-data payload with refcount `1` and
    * zeroed image-storage lanes.
    */
-  [[maybe_unused]] WxGdiImageRefDataRuntimeView* wxInitializeGdiImageRefDataRuntime(
+  WxGdiImageRefDataRuntimeView* wxInitializeGdiImageRefDataRuntime(
     WxGdiImageRefDataRuntimeView* const runtime
   ) noexcept
   {
@@ -2377,7 +2377,7 @@ namespace
    * Initializes one icon-refdata payload by running the shared wx GDI image
    * ref-data initialization lane.
    */
-  [[maybe_unused]] WxIconRefDataRuntimeView* wxInitializeIconRefDataRuntime(
+  WxIconRefDataRuntimeView* wxInitializeIconRefDataRuntime(
     WxIconRefDataRuntimeView* const runtime
   ) noexcept
   {
@@ -2413,7 +2413,7 @@ namespace
    * Runs one wx-object base-destruction tail by preserving C++ base-vtable
    * transition semantics and clearing shared ref-data ownership lanes.
    */
-  [[maybe_unused]] void DestroyWxObjectRuntimeBase(
+  void DestroyWxObjectRuntimeBase(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2431,7 +2431,7 @@ namespace
    * Thunk lane that forwards one wx-object base-teardown request into
    * `FUN_00974AB0`.
    */
-  [[maybe_unused]] void wxDestroyWxObjectRuntimeBaseAdapter(
+  void wxDestroyWxObjectRuntimeBaseAdapter(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2583,7 +2583,7 @@ namespace
    * Rebinds one event payload to the `wxObject` base vtable lane and
    * forwards to the shared wx-event unref tail.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingTransitionLanePreA(
+  void wxDestroyEventObjectUnrefNonDeletingTransitionLanePreA(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2598,7 +2598,7 @@ namespace
    * Alias lane of `FUN_00962A00`: rebinds one event payload to `wxObject`
    * base vtable and forwards to the shared wx-event unref tail.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingTransitionLanePreB(
+  void wxDestroyEventObjectUnrefNonDeletingTransitionLanePreB(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2613,7 +2613,7 @@ namespace
    * Rebinds one event payload to the wxObject base vtable lane and releases
    * shared ref-data ownership through `wxEvent::UnRef`.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingTransitionLaneA(
+  void wxDestroyEventObjectUnrefNonDeletingTransitionLaneA(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2627,7 +2627,7 @@ namespace
    * Rebinds one event payload to the wxObject base vtable lane and releases
    * shared ref-data ownership through `wxEvent::UnRef` (alias lane).
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingTransitionLaneB(
+  void wxDestroyEventObjectUnrefNonDeletingTransitionLaneB(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2641,7 +2641,7 @@ namespace
    * Runs the wx move-event destruction tail by restoring `wxObject` vtable
    * ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxMoveEventRuntime(
+  void DestroyWxMoveEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2655,7 +2655,7 @@ namespace
    * Runs the wx paint-event destruction tail by restoring `wxObject` vtable
    * ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxPaintEventRuntime(
+  void DestroyWxPaintEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2669,7 +2669,7 @@ namespace
    * Runs the wx erase-background event destruction tail by restoring
    * `wxObject` vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxEraseBackgroundEventRuntime(
+  void DestroyWxEraseBackgroundEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2683,7 +2683,7 @@ namespace
    * Runs the wx show-event destruction tail by restoring `wxObject` vtable
    * ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxShowEventRuntime(
+  void DestroyWxShowEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2697,7 +2697,7 @@ namespace
    * Runs the wx maximize-event destruction tail by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxMaximizeEventRuntime(
+  void DestroyWxMaximizeEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2711,7 +2711,7 @@ namespace
    * Runs the wx joystick-event destruction tail by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxJoystickEventRuntime(
+  void DestroyWxJoystickEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2725,7 +2725,7 @@ namespace
    * Runs the wx capture-changed event destruction tail by restoring
    * `wxObject` vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxCaptureChangedEventRuntime(
+  void DestroyWxCaptureChangedEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2739,7 +2739,7 @@ namespace
    * Runs the wx display-changed event destruction tail by restoring
    * `wxObject` vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxDisplayChangedEventRuntime(
+  void DestroyWxDisplayChangedEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2753,7 +2753,7 @@ namespace
    * Runs the wx palette-changed event destruction tail by restoring
    * `wxObject` vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxPaletteChangedEventRuntime(
+  void DestroyWxPaletteChangedEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2767,7 +2767,7 @@ namespace
    * Runs the wx query-new-palette event destruction tail by restoring
    * `wxObject` vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void DestroyWxQueryNewPaletteEventRuntime(
+  void DestroyWxQueryNewPaletteEventRuntime(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2793,7 +2793,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneA(
+  void wxDestroyEventObjectUnrefNonDeletingLaneA(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2807,7 +2807,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneB(
+  void wxDestroyEventObjectUnrefNonDeletingLaneB(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2821,7 +2821,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneC(
+  void wxDestroyEventObjectUnrefNonDeletingLaneC(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2835,7 +2835,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneD(
+  void wxDestroyEventObjectUnrefNonDeletingLaneD(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2849,7 +2849,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneE(
+  void wxDestroyEventObjectUnrefNonDeletingLaneE(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2863,7 +2863,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLegacyThunkA(
+  void wxDestroyEventObjectUnrefNonDeletingLegacyThunkA(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2877,7 +2877,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLegacyThunkB(
+  void wxDestroyEventObjectUnrefNonDeletingLegacyThunkB(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2891,7 +2891,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLegacyThunkC(
+  void wxDestroyEventObjectUnrefNonDeletingLegacyThunkC(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2905,7 +2905,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLegacyThunkD(
+  void wxDestroyEventObjectUnrefNonDeletingLegacyThunkD(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2919,7 +2919,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLegacyThunkE(
+  void wxDestroyEventObjectUnrefNonDeletingLegacyThunkE(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2933,7 +2933,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLegacyThunkF(
+  void wxDestroyEventObjectUnrefNonDeletingLegacyThunkF(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2947,7 +2947,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneF(
+  void wxDestroyEventObjectUnrefNonDeletingLaneF(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2961,7 +2961,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneG(
+  void wxDestroyEventObjectUnrefNonDeletingLaneG(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2975,7 +2975,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneH(
+  void wxDestroyEventObjectUnrefNonDeletingLaneH(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -2989,7 +2989,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneI(
+  void wxDestroyEventObjectUnrefNonDeletingLaneI(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3003,7 +3003,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneJ(
+  void wxDestroyEventObjectUnrefNonDeletingLaneJ(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3017,7 +3017,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneK(
+  void wxDestroyEventObjectUnrefNonDeletingLaneK(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3031,7 +3031,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneL(
+  void wxDestroyEventObjectUnrefNonDeletingLaneL(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3045,7 +3045,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneM(
+  void wxDestroyEventObjectUnrefNonDeletingLaneM(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3059,7 +3059,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneN(
+  void wxDestroyEventObjectUnrefNonDeletingLaneN(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3073,7 +3073,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneO(
+  void wxDestroyEventObjectUnrefNonDeletingLaneO(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3087,7 +3087,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneP(
+  void wxDestroyEventObjectUnrefNonDeletingLaneP(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3101,7 +3101,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneQ(
+  void wxDestroyEventObjectUnrefNonDeletingLaneQ(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3115,7 +3115,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneR(
+  void wxDestroyEventObjectUnrefNonDeletingLaneR(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3129,7 +3129,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneS(
+  void wxDestroyEventObjectUnrefNonDeletingLaneS(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3143,7 +3143,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneT(
+  void wxDestroyEventObjectUnrefNonDeletingLaneT(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3157,7 +3157,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneU(
+  void wxDestroyEventObjectUnrefNonDeletingLaneU(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3171,7 +3171,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneV(
+  void wxDestroyEventObjectUnrefNonDeletingLaneV(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3185,7 +3185,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneW(
+  void wxDestroyEventObjectUnrefNonDeletingLaneW(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3199,7 +3199,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneX(
+  void wxDestroyEventObjectUnrefNonDeletingLaneX(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3213,7 +3213,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneY(
+  void wxDestroyEventObjectUnrefNonDeletingLaneY(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3227,7 +3227,7 @@ namespace
    * Runs one non-deleting wx-event teardown lane by restoring `wxObject`
    * vtable ownership and releasing shared ref-data.
    */
-  [[maybe_unused]] void wxDestroyEventObjectUnrefNonDeletingLaneZ(
+  void wxDestroyEventObjectUnrefNonDeletingLaneZ(
     WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -3241,7 +3241,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneA(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneA(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3256,7 +3256,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneB(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneB(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3271,7 +3271,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneC(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneC(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3286,7 +3286,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneD(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneD(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3301,7 +3301,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneE(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneE(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3316,7 +3316,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneF(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneF(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3331,7 +3331,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneG(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneG(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3346,7 +3346,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneH(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneH(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3361,7 +3361,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneI(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneI(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3376,7 +3376,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneJ(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneJ(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3391,7 +3391,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneK(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneK(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3406,7 +3406,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneL(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneL(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3421,7 +3421,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneM(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneM(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3436,7 +3436,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneN(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneN(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3451,7 +3451,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneO(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneO(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3466,7 +3466,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneP(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneP(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3481,7 +3481,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneQ(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneQ(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3496,7 +3496,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneR(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneR(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3511,7 +3511,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneS(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneS(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3526,7 +3526,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneT(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneT(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3541,7 +3541,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneU(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneU(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3556,7 +3556,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneV(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneV(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3571,7 +3571,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneW(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneW(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3586,7 +3586,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneX(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneX(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3601,7 +3601,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneY(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneY(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3616,7 +3616,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneZ(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneZ(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3631,7 +3631,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAA(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAA(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3646,7 +3646,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAB(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAB(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3661,7 +3661,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAC(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAC(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3676,7 +3676,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAD(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAD(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3691,7 +3691,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAE(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAE(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3706,7 +3706,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAF(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAF(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3721,7 +3721,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAG(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAG(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3736,7 +3736,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAH(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAH(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3751,7 +3751,7 @@ namespace
    * Runs one deleting wx-event teardown lane (`wxObject` vtable reset +
    * ref-data unref) and frees storage when flag bit `0x1` is set.
    */
-  [[maybe_unused]] [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAI(
+  [[nodiscard]] WxObjectRuntimeView* wxDestroyEventObjectUnrefDeletingLaneAI(
     WxObjectRuntimeView* const object,
     const char deleteFlags
   ) noexcept
@@ -3766,7 +3766,7 @@ namespace
    * Runs non-deleting teardown for one `wxMask` runtime lane by destroying the
    * owned Win32 bitmap handle and releasing shared wx ref-data ownership.
    */
-  [[maybe_unused]] void wxDestroyMaskRuntimeNoDelete(
+  void wxDestroyMaskRuntimeNoDelete(
     WxMaskRuntimeView* const maskRuntime
   ) noexcept
   {
@@ -3824,7 +3824,7 @@ namespace
    * Rebuilds one `wxMask` native monochrome bitmap from a 1-bit source bitmap
    * ref-data payload.
    */
-  [[maybe_unused]] bool wxMaskCreateFromMonochromeBitmapRuntime(
+  bool wxMaskCreateFromMonochromeBitmapRuntime(
     WxMaskRuntimeView* const maskRuntime,
     const void* const bitmapRuntime
   ) noexcept
@@ -3866,7 +3866,7 @@ namespace
    * Rebuilds one `wxMask` native monochrome bitmap by applying a color-key
    * background and `NOTSRCCOPY` blit from the source bitmap payload.
    */
-  [[maybe_unused]] bool wxMaskCreateFromColorKeyedBitmapRuntime(
+  bool wxMaskCreateFromColorKeyedBitmapRuntime(
     WxMaskRuntimeView* const maskRuntime,
     const void* const bitmapRuntime,
     const std::uint8_t* const colorRuntime
@@ -3926,7 +3926,7 @@ namespace
    * Initializes one `wxMask` payload (clear ref-data/native handle, bind mask
    * vtable) and then builds the mask from a source bitmap plus color-key lane.
    */
-  [[maybe_unused]] WxMaskRuntimeView* wxConstructMaskRuntimeFromColorKeyedBitmap(
+  WxMaskRuntimeView* wxConstructMaskRuntimeFromColorKeyedBitmap(
     WxMaskRuntimeView* const maskRuntime,
     const void* const bitmapRuntime,
     const std::uint8_t* const colorRuntime
@@ -4048,7 +4048,7 @@ namespace
    * Verifies that `bitmapRuntime` resolves to wx class `wxBitmap` (or derives
    * from it), then dispatches slot `+0x1C` on `dispatchOwner`.
    */
-  [[maybe_unused]] bool wxMaskDispatchBitmapCheckedSlot1CRuntime(
+  bool wxMaskDispatchBitmapCheckedSlot1CRuntime(
     WxMaskBitmapGuardDispatchRuntime* const dispatchOwner,
     WxClassInfoProviderRuntime* const bitmapRuntime,
     const int arg3,
@@ -4072,7 +4072,7 @@ namespace
    * Verifies that `bitmapRuntime` resolves to wx class `wxBitmap` (or derives
    * from it), then dispatches slot `+0x20` on `dispatchOwner`.
    */
-  [[maybe_unused]] bool wxMaskDispatchBitmapCheckedSlot20Runtime(
+  bool wxMaskDispatchBitmapCheckedSlot20Runtime(
     WxMaskBitmapGuardDispatchRuntime* const dispatchOwner,
     WxClassInfoProviderRuntime* const bitmapRuntime,
     const int arg3,
@@ -4096,7 +4096,7 @@ namespace
    * from it), then dispatches slot `+0x24` on `dispatchOwner` with trailing
    * argument `0`.
    */
-  [[maybe_unused]] bool wxMaskDispatchBitmapCheckedSlot24WithZeroTailRuntime(
+  bool wxMaskDispatchBitmapCheckedSlot24WithZeroTailRuntime(
     WxMaskBitmapGuardDispatchRuntime* const dispatchOwner,
     WxClassInfoProviderRuntime* const bitmapRuntime,
     const int arg3,
@@ -4117,7 +4117,7 @@ namespace
    * Creates one 1-bpp destination bitmap from `sourceBitmap` using `NOTSRCCOPY`
    * blit semantics, with optional width/height autodetection from `GetObjectW`.
    */
-  [[maybe_unused]] HBITMAP wxCreateMonochromeBitmapFromSourceRuntime(
+  HBITMAP wxCreateMonochromeBitmapFromSourceRuntime(
     HBITMAP sourceBitmap,
     int width,
     int height
@@ -4156,7 +4156,7 @@ namespace
    * destroying the owned Win32 image-list handle and releasing shared wx
    * ref-data ownership.
    */
-  [[maybe_unused]] void wxDestroyImageListRuntimeNoDelete(
+  void wxDestroyImageListRuntimeNoDelete(
     WxImageListRuntimeView* const imageListRuntime
   ) noexcept
   {
@@ -4180,7 +4180,7 @@ namespace
    * Returns one native image-list entry count from the embedded Win32
    * image-list handle lane.
    */
-  [[maybe_unused]] int wxImageListGetImageCountRuntime(
+  int wxImageListGetImageCountRuntime(
     const WxImageListRuntimeView* const imageListRuntime
   ) noexcept
   {
@@ -4197,7 +4197,7 @@ namespace
    * What it does:
    * Releases one owned Win32 cursor-handle lane from `wxCursorRefData`.
    */
-  [[maybe_unused]] int wxDestroyCursorRefDataHandleRuntime(
+  int wxDestroyCursorRefDataHandleRuntime(
     WxCursorRefDataRuntimeView* const cursorRefData
   ) noexcept
   {
@@ -4221,7 +4221,7 @@ namespace
    * Initializes one `wxCursorRefData` payload with default 32x32 metrics,
    * null native-handle lanes, and owned-cursor flag enabled.
    */
-  [[maybe_unused]] void* wxConstructCursorRefDataRuntime(
+  void* wxConstructCursorRefDataRuntime(
     void* const cursorRefDataRuntime
   ) noexcept
   {
@@ -4268,7 +4268,7 @@ namespace
    * Runs non-deleting/deleting teardown semantics for one `wxCursorRefData`
    * payload by releasing its cursor handle and rebasing to `wxObjectRefData`.
    */
-  [[maybe_unused]] void* wxDestroyCursorRefDataWithFlag(
+  void* wxDestroyCursorRefDataWithFlag(
     void* const cursorRefDataRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -4324,7 +4324,7 @@ namespace
    * Constructs one DC-cache entry lane from a compatible bitmap payload,
    * recording requested bitmap dimensions and cache-format key metadata.
    */
-  [[maybe_unused]] WxDCCacheEntryRuntimeView* wxConstructDCCacheEntryFromBitmapRuntime(
+  WxDCCacheEntryRuntimeView* wxConstructDCCacheEntryFromBitmapRuntime(
     WxDCCacheEntryRuntimeView* const entryRuntime,
     const HGDIOBJ cachedBitmap,
     const std::int32_t bitmapWidth,
@@ -4355,7 +4355,7 @@ namespace
    * Constructs one DC-cache entry lane from a compatible device-context
    * payload, leaving bitmap/dimension lanes empty and setting format metadata.
    */
-  [[maybe_unused]] WxDCCacheEntryRuntimeView* wxConstructDCCacheEntryFromDeviceContextRuntime(
+  WxDCCacheEntryRuntimeView* wxConstructDCCacheEntryFromDeviceContextRuntime(
     WxDCCacheEntryRuntimeView* const entryRuntime,
     const HDC cachedDeviceContext,
     const std::int32_t cacheFormatKey
@@ -4411,7 +4411,7 @@ namespace
    * Runs one deleting-dtor thunk lane for a wx DC-cache entry by releasing
    * cached bitmap/DC handles and scalar-deleting storage when requested.
    */
-  [[maybe_unused]] void* wxDestroyDCCacheEntryWithFlagRuntime(
+  void* wxDestroyDCCacheEntryWithFlagRuntime(
     void* const cacheEntryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -4471,7 +4471,7 @@ namespace
    * Reads one owner list lane at `+0xC0` and deletes one matching object lane
    * when that list pointer is non-null.
    */
-  [[maybe_unused]] std::uint8_t wxDeleteObjectFromOwnerListLaneC0Runtime(
+  std::uint8_t wxDeleteObjectFromOwnerListLaneC0Runtime(
     void* const ownerRuntime,
     wxObject* const objectRuntime
   ) noexcept
@@ -4494,7 +4494,7 @@ namespace
    * Returns whether the provided object lane is present in the process-global
    * modal-dialog tracking list.
    */
-  [[maybe_unused]] BOOL wxIsObjectTrackedAsModalDialogRuntime(
+  BOOL wxIsObjectTrackedAsModalDialogRuntime(
     wxObject* const objectRuntime
   ) noexcept
   {
@@ -4508,7 +4508,7 @@ namespace
    * Appends one DC-cache bitmap entry lane to the process-global bitmap-cache
    * list.
    */
-  [[maybe_unused]] wxNodeBase* wxAppendDCCacheBitmapEntryRuntime(
+  wxNodeBase* wxAppendDCCacheBitmapEntryRuntime(
     wxObject* const cacheEntryRuntime
   )
   {
@@ -4522,7 +4522,7 @@ namespace
    * Appends one DC-cache device-context entry lane to the process-global
    * device-context cache list.
    */
-  [[maybe_unused]] wxNodeBase* wxAppendDCCacheDeviceContextEntryRuntime(
+  wxNodeBase* wxAppendDCCacheDeviceContextEntryRuntime(
     wxObject* const cacheEntryRuntime
   )
   {
@@ -4572,7 +4572,7 @@ namespace
    * Forwards wx-object shared ref-data assignment only when `object` and
    * `clone` currently reference different ref-data lanes.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxAssignSharedRefDataIfDifferentRuntime(
+  WxObjectRuntimeView* wxAssignSharedRefDataIfDifferentRuntime(
     WxObjectRuntimeView* const object,
     WxObjectRuntimeView* const clone
   ) noexcept
@@ -4620,7 +4620,7 @@ namespace
    * Rebinds one region-refdata payload to region/object vtable lanes, destroys
    * its owned HRGN handle, and applies deleting-thunk semantics when requested.
    */
-  [[maybe_unused]] void* wxDestroyRegionRefDataRuntimeWithFlag(
+  void* wxDestroyRegionRefDataRuntimeWithFlag(
     void* const regionRefDataRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -4665,7 +4665,7 @@ namespace
    * Initializes one region runtime lane, clears ref-data/dtor bytes, and
    * shares object ref-data ownership from `clone`.
    */
-  [[maybe_unused]] WxRegionRectCtorRuntimeView* wxConstructRegionFromCloneRuntime(
+  WxRegionRectCtorRuntimeView* wxConstructRegionFromCloneRuntime(
     WxRegionRectCtorRuntimeView* const region,
     WxObjectRuntimeView* const clone
   )
@@ -4695,7 +4695,7 @@ namespace
    * Initializes one wx region runtime object from a rectangle and assigns a
    * freshly allocated region-refdata payload owning the `CreateRectRgn` handle.
    */
-  [[maybe_unused]] [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromRectRuntime(
+  [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromRectRuntime(
     WxRegionRectCtorRuntimeView* const region,
     const int x1,
     const int y1,
@@ -4740,7 +4740,7 @@ namespace
    * ref-data storage and creating one Win32 rectangle region handle from
    * `(leftTop.x,leftTop.y)` to `(rightBottom.x,rightBottom.y)`.
    */
-  [[maybe_unused]] [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromPointBoundsRuntime(
+  [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromPointBoundsRuntime(
     WxRegionRectCtorRuntimeView* const region,
     const wxPoint* const leftTop,
     const wxPoint* const rightBottom
@@ -4776,7 +4776,7 @@ namespace
    * allocating region ref-data storage and creating the corresponding Win32
    * rectangle region handle.
    */
-  [[maybe_unused]] [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromXywhRuntime(
+  [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromXywhRuntime(
     WxRegionRectCtorRuntimeView* const region,
     const WxRegionRectXywhCtorRuntimeView* const rect
   )
@@ -4810,7 +4810,7 @@ namespace
    * Initializes one polygon-backed region by allocating region ref-data
    * storage and creating one Win32 polygon region from the provided point lane.
    */
-  [[maybe_unused]] [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromPolygonRuntime(
+  [[nodiscard]] WxRegionRectCtorRuntimeView* wxConstructRegionFromPolygonRuntime(
     WxRegionRectCtorRuntimeView* const region,
     const std::int32_t pointCount,
     const POINT* const polygonPoints,
@@ -4916,7 +4916,7 @@ namespace
    * What it does:
    * Resolves one region bounding box into left/top/width/height output lanes.
    */
-  [[maybe_unused]] LONG* wxRegionGetBoxRuntime(
+  LONG* wxRegionGetBoxRuntime(
     WxRegionRectCtorRuntimeView* const region,
     LONG* const outLeft,
     LONG* const outTop,
@@ -4968,7 +4968,7 @@ namespace
    * Writes one region bounding box as `{left, top, width, height}` into the
    * caller-provided four-int lane.
    */
-  [[maybe_unused]] std::int32_t* wxRegionWriteBoundingBoxIntLanesRuntime(
+  std::int32_t* wxRegionWriteBoundingBoxIntLanesRuntime(
     WxRegionRectCtorRuntimeView* const region,
     std::int32_t* const outBounds
   ) noexcept
@@ -4995,7 +4995,7 @@ namespace
    * What it does:
    * Returns true when the resolved region bounding box has zero width/height.
    */
-  [[maybe_unused]] BOOL wxRegionIsEmptyRuntime(
+  BOOL wxRegionIsEmptyRuntime(
     WxRegionRectCtorRuntimeView* const region
   ) noexcept
   {
@@ -5014,7 +5014,7 @@ namespace
    * Classifies one point against the current region-handle lane, returning the
    * wx region-inside token (`2`) when contained and `0` otherwise.
    */
-  [[maybe_unused]] int wxRegionClassifyPointContainmentRuntime(
+  int wxRegionClassifyPointContainmentRuntime(
     const WxRegionRectCtorRuntimeView* const region,
     const int x,
     const int y
@@ -5045,7 +5045,7 @@ namespace
    * Tests whether one rectangle intersects the owner's embedded region lane at
    * `+0xA4`; returns Win32 `BOOL` true/false.
    */
-  [[maybe_unused]] BOOL wxRegionOwnerIntersectsRectangleAtOffsetA4Runtime(
+  BOOL wxRegionOwnerIntersectsRectangleAtOffsetA4Runtime(
     void* const regionOwner,
     const LONG left,
     const LONG top,
@@ -5115,7 +5115,7 @@ namespace
    * Releases one shared wx-string payload when owned and rebinds the storage
    * to the process-wide empty-string lane.
    */
-  [[maybe_unused]] const wchar_t* wxStringReleaseAndResetToEmpty(
+  const wchar_t* wxStringReleaseAndResetToEmpty(
     wxStringRuntime* const value
   ) noexcept
   {
@@ -6993,7 +6993,7 @@ namespace
     "WxArrayStringStorageRuntimeView::itemStorage offset must be 0x08"
   );
 
-  [[maybe_unused]] void wxArrayStringReleaseSharedItems(
+  void wxArrayStringReleaseSharedItems(
     WxArrayStringStorageRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -7069,7 +7069,7 @@ namespace
    * Reads one wx-array-string entry when the optional owner pointer lane is
    * non-null; otherwise initializes `outValue` with the empty wx-string lane.
    */
-  [[maybe_unused]] wxStringRuntime* wxArrayStringGetAtOrDefaultRuntime(
+  wxStringRuntime* wxArrayStringGetAtOrDefaultRuntime(
     wxStringRuntime* const outValue,
     const WxArrayStringOptionalOwnerRuntimeView* const sourceRuntime,
     const std::uint32_t index
@@ -7094,7 +7094,7 @@ namespace
    * What it does:
    * Pure forwarding wrapper lane into `FUN_00987810`, returning `outValue`.
    */
-  [[maybe_unused]] wxStringRuntime* wxArrayStringGetAtOrDefaultRuntimeThunk(
+  wxStringRuntime* wxArrayStringGetAtOrDefaultRuntimeThunk(
     wxStringRuntime* const outValue,
     const WxArrayStringOptionalOwnerRuntimeView* const sourceRuntime,
     const std::uint32_t index
@@ -7121,7 +7121,7 @@ namespace
    * Loads one optional wx-array-string owner pointer from owner lane `+0x19C`,
    * forwards to `FUN_00987810`, and returns `outValue`.
    */
-  [[maybe_unused]] wxStringRuntime* wxArrayStringGetAtOrDefaultFromOwnerLaneRuntime(
+  wxStringRuntime* wxArrayStringGetAtOrDefaultFromOwnerLaneRuntime(
     const WxArrayStringOwnerPointerAt19CRuntimeView* const ownerRuntime,
     wxStringRuntime* const outValue,
     const std::uint32_t index
@@ -7140,7 +7140,7 @@ namespace
    * Releases one wx-array-string shared item lane set, then deletes the item
    * pointer storage buffer and clears lane `+0x08`.
    */
-  [[maybe_unused]] void wxArrayStringReleaseItemsAndDeleteStorageRuntime(
+  void wxArrayStringReleaseItemsAndDeleteStorageRuntime(
     WxArrayStringStorageRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -7159,7 +7159,7 @@ namespace
    * string storage lane, releasing removed shared-string payloads first and
    * then shifting the trailing pointer range left.
    */
-  [[maybe_unused]] wchar_t** wxArrayStringEraseRangeAtIndexRuntime(
+  wchar_t** wxArrayStringEraseRangeAtIndexRuntime(
     WxArrayStringStorageRuntimeView* const arrayRuntime,
     const std::uint32_t firstIndex,
     const int eraseCount
@@ -7235,7 +7235,7 @@ namespace
    * string lanes, destroying the embedded `wxArrayString` storage lane, then
    * releasing the primary string lane.
    */
-  [[maybe_unused]] void wxDestroyTripleStringArrayStorageRuntime(
+  void wxDestroyTripleStringArrayStorageRuntime(
     WxTripleStringArrayStorageRuntimeView* const runtime
   ) noexcept
   {
@@ -7369,7 +7369,7 @@ namespace
    * Returns true when a wide-string pointer lane differs from the provided
    * comparison text.
    */
-  [[maybe_unused]] [[nodiscard]] bool WxWideTextLaneDiffersFromText(
+  [[nodiscard]] bool WxWideTextLaneDiffersFromText(
     const wchar_t* const* const left,
     const wchar_t* const right
   ) noexcept
@@ -7398,7 +7398,7 @@ namespace
    * Swaps one process-global transient byte lane, storing `nextValue` and
    * returning the previous value.
    */
-  [[maybe_unused]] std::uint8_t wxSwapTransientByteFlagRuntime(
+  std::uint8_t wxSwapTransientByteFlagRuntime(
     const std::uint8_t nextValue
   ) noexcept
   {
@@ -7414,7 +7414,7 @@ namespace
    * Writes the current transient-byte lane into `outValue`, then clears the
    * stored lane to zero.
    */
-  [[maybe_unused]] std::uint8_t* wxConsumeTransientByteFlagRuntime(
+  std::uint8_t* wxConsumeTransientByteFlagRuntime(
     std::uint8_t* const outValue
   ) noexcept
   {
@@ -7434,7 +7434,7 @@ namespace
    * Loads one byte from `sourceValue`, stores it into the transient-byte
    * process-global lane, and returns the stored byte.
    */
-  [[maybe_unused]] std::uint8_t wxStoreTransientByteFlagFromPointerRuntime(
+  std::uint8_t wxStoreTransientByteFlagFromPointerRuntime(
     const std::uint8_t* const sourceValue
   ) noexcept
   {
@@ -7453,7 +7453,7 @@ namespace
     "WxOwnedPointerLane8RuntimeView::ownedPointer offset must be 0x08"
   );
 
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntime(
+  void wxDeleteOwnedPointerLane8AndClearRuntime(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7470,7 +7470,7 @@ namespace
    * Deletes one owned pointer lane at `+0x08` when present and clears that
    * lane to `nullptr`.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneA(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneA(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7484,7 +7484,7 @@ namespace
    * Deletes one owned pointer lane at `+0x08` when present and clears that
    * lane to `nullptr` (alternate caller lane).
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneB(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneB(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7497,7 +7497,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to alternate delete/clear lane-B helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneBThunkA(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneBThunkA(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7510,7 +7510,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to alternate delete/clear lane-B helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneBThunkB(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneBThunkB(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7523,7 +7523,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkA(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkA(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7536,7 +7536,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkB(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkB(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7549,7 +7549,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkH(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkH(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7562,7 +7562,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkC(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkC(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7575,7 +7575,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkD(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkD(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7588,7 +7588,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkE(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkE(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7601,7 +7601,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkF(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkF(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7614,7 +7614,7 @@ namespace
    * What it does:
    * Jump-thunk lane that forwards to delete/clear lane-A helper.
    */
-  [[maybe_unused]] void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkG(
+  void wxDeleteOwnedPointerLane8AndClearRuntimeLaneAThunkG(
     WxOwnedPointerLane8RuntimeView* const runtime
   ) noexcept
   {
@@ -7628,7 +7628,7 @@ namespace
    * Swaps one process-global 32-bit runtime lane and returns the previous
    * value.
    */
-  [[maybe_unused]] std::int32_t wxSwapRuntimeIntegerLane(
+  std::int32_t wxSwapRuntimeIntegerLane(
     const std::int32_t nextValue
   ) noexcept
   {
@@ -7939,7 +7939,7 @@ namespace
    * What it does:
    * Thunk adapter preserving `WxTextBufferDestroy(...)` behavior.
    */
-  [[maybe_unused]] void WxTextBufferDestroyThunk(
+  void WxTextBufferDestroyThunk(
     WxTextBufferRuntimeView* const textBuffer
   )
   {
@@ -7952,7 +7952,7 @@ namespace
    * What it does:
    * Runs deleting-dtor thunk semantics for one `wxTextBuffer` runtime lane.
    */
-  [[maybe_unused]] void* wxDestroyTextBufferDeletingThunkLaneA(
+  void* wxDestroyTextBufferDeletingThunkLaneA(
     void* const textBufferRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -8106,7 +8106,7 @@ namespace
    * Returns whether the current wxTextFile path lane references an existing
    * filesystem entry.
    */
-  [[maybe_unused]] bool WxTextFilePathExistsRuntime(
+  bool WxTextFilePathExistsRuntime(
     const WxTextFileRuntimeView* const textFile
   )
   {
@@ -8120,7 +8120,7 @@ namespace
    * Opens the embedded wxFile lane from an indirect wide-path pointer and
    * uses binary-compatible mode mapping (`a3 == 1` => write, else read).
    */
-  [[maybe_unused]] bool WxTextFileOpenEmbeddedFileRuntime(
+  bool WxTextFileOpenEmbeddedFileRuntime(
     WxTextFileRuntimeView* const textFile,
     const wchar_t* const* const fileNameStorage,
     const int openModeSelector
@@ -8139,7 +8139,7 @@ namespace
    * What it does:
    * Closes/resets the embedded wxFile descriptor lane via `wxFile::Attach`.
    */
-  [[maybe_unused]] bool WxTextFileAttachEmbeddedFileRuntime(
+  bool WxTextFileAttachEmbeddedFileRuntime(
     WxTextFileRuntimeView* const textFile
   )
   {
@@ -8724,7 +8724,7 @@ namespace
    * Initializes one wx-string lane to shared empty storage, then formats one
    * varargs string into owned runtime text storage.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringInitializeFromEmptyAndPrintfV(
+  wxStringRuntime* wxStringInitializeFromEmptyAndPrintfV(
     wxStringRuntime* const outValue,
     const wchar_t* const formatText,
     va_list argumentList
@@ -8790,7 +8790,7 @@ namespace
    * Clones one source wx-string lane (or empty string when source length is
    * zero) and appends exactly one UTF-16 code unit from `characterCode`.
    */
-  [[maybe_unused]] wxStringRuntime* wxCopySharedTextAndAppendLowByte(
+  wxStringRuntime* wxCopySharedTextAndAppendLowByte(
     wxStringRuntime* const outValue,
     const wchar_t** const sourceTextStorage,
     int characterCode
@@ -8823,7 +8823,7 @@ namespace
    * widening each byte to one UTF-16 code unit; null input resets to
    * `wxEmptyString` through `wxString::InitWith`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignAnsiCStringAsWideRuntimeString(
+  wxStringRuntime* wxAssignAnsiCStringAsWideRuntimeString(
     wxStringRuntime* const outValue,
     const char* const sourceText
   )
@@ -8861,7 +8861,7 @@ namespace
    * Resets one wx-string lane to empty and appends exactly one low-byte code
    * unit from `characterCode`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignSingleByteAsWideString(
+  wxStringRuntime* wxAssignSingleByteAsWideString(
     wxStringRuntime* const outValue,
     const int characterCode
   )
@@ -8887,7 +8887,7 @@ namespace
    * IDA signature:
    * wxString* __cdecl sub_9C8520(wxString* a1, HWND hWnd);
    */
-  [[maybe_unused]] wxStringRuntime* wxCopyClassNameFromHwndRuntime(
+  wxStringRuntime* wxCopyClassNameFromHwndRuntime(
     wxStringRuntime* const outValue,
     const HWND hWnd
   )
@@ -8941,7 +8941,7 @@ namespace
    * dispatches it through sink vtable slot `+0x08`, then releases the temporary
    * shared-string payload lane.
    */
-  [[maybe_unused]] void* wxSubmitSingleByteStringToSinkRuntime(
+  void* wxSubmitSingleByteStringToSinkRuntime(
     void* const sinkRuntime,
     const int characterCode
   )
@@ -8980,7 +8980,7 @@ namespace
    * Formats one local-time timestamp with the provided wx format mask into a
    * reusable wx string lane.
    */
-  [[maybe_unused]] wxStringRuntime* FormatWxLogTimestampRuntime(
+  wxStringRuntime* FormatWxLogTimestampRuntime(
     const wchar_t* const formatMask,
     wxStringRuntime* const outText,
     const __time64_t timestamp
@@ -9234,7 +9234,7 @@ namespace
    * known European/US abbreviations, and caching the resulting bucket in the
    * process-global `Time` lane.
    */
-  [[maybe_unused]] int wxDateTimeGetTimeZoneBucketRuntime()
+  int wxDateTimeGetTimeZoneBucketRuntime()
   {
     const std::intptr_t cachedBucket = reinterpret_cast<std::intptr_t>(gWxDateTimeZoneBucketRuntime);
     if (cachedBucket != 0) {
@@ -9289,7 +9289,7 @@ namespace
    * Resolves timezone bucket when input sentinel equals `1`, then returns
    * whether resulting bucket is in inclusive range `[2,5]`.
    */
-  [[maybe_unused]] BOOL wxDateTimeIsBucketInRange02To05Runtime(
+  BOOL wxDateTimeIsBucketInRange02To05Runtime(
     const int bucketOrSentinel
   ) noexcept
   {
@@ -9339,7 +9339,7 @@ namespace
    * carrying whole 12-month cycles into the year lane and storing the residual
    * month delta back into offset `+0x0C`.
    */
-  [[maybe_unused]] std::int32_t wxDateTimeNormalizeMonthDeltaIntoYear(
+  std::int32_t wxDateTimeNormalizeMonthDeltaIntoYear(
     WxDateTimeTmMonthYearRuntimeView* const tmRuntime,
     std::int32_t monthDelta
   ) noexcept
@@ -9366,7 +9366,7 @@ namespace
    * Walks the process-global `wxDateTime` callback list and returns true once
    * any callback vtable slot 0 accepts the provided selector lane.
    */
-  [[maybe_unused]] std::uint8_t wxDateTimeInvokeAnyCallbackPredicate(
+  std::uint8_t wxDateTimeInvokeAnyCallbackPredicate(
     const std::int32_t selector
   )
   {
@@ -9396,7 +9396,7 @@ namespace
    * `0x00FAF940` by forwarding to the wx pointer-array add lane with
    * `copyCount=1`.
    */
-  [[maybe_unused]] void wxAppendWorkDaysPointerToGlobalRuntimeArray(
+  void wxAppendWorkDaysPointerToGlobalRuntimeArray(
     void* const workDaysPointer
   )
   {
@@ -9421,7 +9421,7 @@ namespace
    * and appends the pointer (or null on alloc failure) to the process-global
    * pointer-array lane.
    */
-  [[maybe_unused]] std::uint8_t wxRegisterDateTimeWorkDaysRuntimeLane()
+  std::uint8_t wxRegisterDateTimeWorkDaysRuntimeLane()
   {
     auto* const workDays = static_cast<WxDateTimeWorkDaysRuntimeView*>(::operator new(4u));
 
@@ -9442,7 +9442,7 @@ namespace
    * Zero-initializes one date-time 64-bit payload lane and forwards calendar
    * clock fields into the shared assign helper (`FUN_009B6B50`).
    */
-  [[maybe_unused]] std::int64_t* wxDateTimeConstructFromCalendarClockRuntime(
+  std::int64_t* wxDateTimeConstructFromCalendarClockRuntime(
     std::int64_t* const millisecondsStorage,
     const std::int32_t dayOfMonth,
     const std::int32_t monthIndex,
@@ -9480,7 +9480,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * year field.
    */
-  [[maybe_unused]] std::int32_t wxDateTimeGetYearFieldRuntime(
+  std::int32_t wxDateTimeGetYearFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9499,7 +9499,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * month field.
    */
-  [[maybe_unused]] std::int32_t wxDateTimeGetMonthFieldRuntime(
+  std::int32_t wxDateTimeGetMonthFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9518,7 +9518,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * millisecond field.
    */
-  [[maybe_unused]] std::uint16_t wxDateTimeGetMillisecondFieldRuntime(
+  std::uint16_t wxDateTimeGetMillisecondFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9537,7 +9537,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * day-of-month field.
    */
-  [[maybe_unused]] std::uint16_t wxDateTimeGetDayOfMonthFieldRuntime(
+  std::uint16_t wxDateTimeGetDayOfMonthFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9556,7 +9556,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * hour field.
    */
-  [[maybe_unused]] std::uint16_t wxDateTimeGetHourFieldRuntime(
+  std::uint16_t wxDateTimeGetHourFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9575,7 +9575,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * minute field.
    */
-  [[maybe_unused]] std::uint16_t wxDateTimeGetMinuteFieldRuntime(
+  std::uint16_t wxDateTimeGetMinuteFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9594,7 +9594,7 @@ namespace
    * Decodes one `wxDateTime` value into calendar-clock lanes and returns the
    * second field.
    */
-  [[maybe_unused]] std::uint16_t wxDateTimeGetSecondFieldRuntime(
+  std::uint16_t wxDateTimeGetSecondFieldRuntime(
     const void* const dateTimeRuntime,
     const void* const timeZoneRuntime
   ) noexcept
@@ -9613,7 +9613,7 @@ namespace
    * Initializes one pointer-array header lane to `{capacity=0,count=0,items=0}`
    * and returns the same owner pointer.
    */
-  [[maybe_unused]] WxDateTimeCallbackArrayRuntimeView* wxArrayPtrVoidConstructRuntime(
+  WxDateTimeCallbackArrayRuntimeView* wxArrayPtrVoidConstructRuntime(
     WxDateTimeCallbackArrayRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -9630,7 +9630,7 @@ namespace
    * Clears one pointer-array header lane and releases its item-buffer storage
    * when the buffer pointer is non-null.
    */
-  [[maybe_unused]] void wxArrayPtrVoidDoEmptyRuntime(
+  void wxArrayPtrVoidDoEmptyRuntime(
     WxDateTimeCallbackArrayRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -9650,7 +9650,7 @@ namespace
    * Deletes each pointer stored in one pointer-array lane without resetting
    * the live-count lane.
    */
-  [[maybe_unused]] void wxDeletePointerArrayEntriesWithoutCountResetRuntime(
+  void wxDeletePointerArrayEntriesWithoutCountResetRuntime(
     WxDateTimeCallbackArrayRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -9666,7 +9666,7 @@ namespace
    * Deletes each callback object currently stored in the global date-time
    * callback array and resets the live-count lane to zero.
    */
-  [[maybe_unused]] void wxDateTimeDeleteAllCallbackObjects()
+  void wxDateTimeDeleteAllCallbackObjects()
   {
     const std::uint32_t callbackCount = gWxDateTimeCallbackArrayRuntime.count;
     std::uint32_t callbackIndex = 0u;
@@ -9687,7 +9687,7 @@ namespace
    * Clears the global date-time callback array by deleting callback objects
    * first, then emptying the pointer-array storage header and item buffer.
    */
-  [[maybe_unused]] void wxDateTimeResetCallbackArrayStorage()
+  void wxDateTimeResetCallbackArrayStorage()
   {
     wxDateTimeDeleteAllCallbackObjects();
     wxArrayPtrVoidDoEmptyRuntime(&gWxDateTimeCallbackArrayRuntime);
@@ -9700,7 +9700,7 @@ namespace
    * Applies one signed day delta to a `wxDateTime::Tm` payload by carrying
    * across month boundaries and normalizing month/year via `FUN_009B4E50`.
    */
-  [[maybe_unused]] std::int32_t wxDateTimeApplyDayDeltaWithMonthCarry(
+  std::int32_t wxDateTimeApplyDayDeltaWithMonthCarry(
     WxDateTimeTmMonthYearRuntimeView* const tmRuntime,
     std::int32_t dayDelta
   )
@@ -9782,7 +9782,7 @@ namespace
    * Stores one process-global date-time timezone-bucket token lane and
    * returns the stored token.
    */
-  [[maybe_unused]] __time64_t* wxSetDateTimeZoneBucketRuntime(
+  __time64_t* wxSetDateTimeZoneBucketRuntime(
     __time64_t* const timezoneBucketToken
   ) noexcept
   {
@@ -9978,7 +9978,7 @@ namespace
    * decoding local calendar lanes, normalizing month/year rollover, clamping
    * day-of-month to the destination month, then rebuilding milliseconds.
    */
-  [[maybe_unused]] std::int64_t* wxDateTimeApplyDateSpanToMilliseconds(
+  std::int64_t* wxDateTimeApplyDateSpanToMilliseconds(
     std::int64_t* const millisecondsStorage,
     const WxDateSpanRuntimeView* const dateSpan
   )
@@ -10022,7 +10022,7 @@ namespace
    * Tail-forward thunk that aliases the canonical date-span apply lane
    * (`FUN_009B7160`) for date-time millisecond payload updates.
    */
-  [[maybe_unused]] std::int64_t* wxDateTimeApplyDateSpanToMillisecondsThunk(
+  std::int64_t* wxDateTimeApplyDateSpanToMillisecondsThunk(
     std::int64_t* const millisecondsStorage,
     const WxDateSpanRuntimeView* const dateSpan
   )
@@ -10037,7 +10037,7 @@ namespace
    * Negates all date-span delta lanes and forwards the transformed span into
    * canonical date-time millisecond update lane.
    */
-  [[maybe_unused]] std::int64_t* wxDateTimeApplyNegatedDateSpanToMillisecondsRuntime(
+  std::int64_t* wxDateTimeApplyNegatedDateSpanToMillisecondsRuntime(
     std::int64_t* const millisecondsStorage,
     const WxDateSpanRuntimeView* const dateSpan
   )
@@ -10086,7 +10086,7 @@ namespace
    * Returns UTF-16 text length for one null-terminated lane, or zero when the
    * lane pointer is null.
    */
-  [[maybe_unused]] std::int32_t wxWideStringLengthOrZero(
+  std::int32_t wxWideStringLengthOrZero(
     const wchar_t* const text
   ) noexcept
   {
@@ -10128,7 +10128,7 @@ namespace
    * Commits one `wxString` write-buffer lane by storing the finalized UTF-16
    * length into the shared header and restoring a single-owner refcount.
    */
-  [[maybe_unused]] [[nodiscard]] wchar_t* wxStringCommitWriteBufferLength(
+  [[nodiscard]] wchar_t* wxStringCommitWriteBufferLength(
     wxStringRuntime* const value,
     const std::int32_t finalizedLength
   ) noexcept
@@ -10203,7 +10203,7 @@ namespace
    * Compares two UTF-16 pointer lanes for qsort and optionally dispatches
    * through one runtime override comparator lane.
    */
-  [[maybe_unused]] int __cdecl wxCompareStringArrayPointerLanesRuntime(
+  int __cdecl wxCompareStringArrayPointerLanesRuntime(
     const wchar_t* const* const leftEntryPointerLane,
     const wchar_t* const* const rightEntryPointerLane
   ) noexcept
@@ -10236,7 +10236,7 @@ namespace
    * Sorts one wx string-array lane with `CompareFunction` only when the lane
    * is currently marked unsorted.
    */
-  [[maybe_unused]] void wxSortStringArrayWhenUnsortedRuntime(
+  void wxSortStringArrayWhenUnsortedRuntime(
     WxStringArrayRuntimeView* const stringArray
   ) noexcept
   {
@@ -10284,7 +10284,7 @@ namespace
    * What it does:
    * Returns the process-global text-validator silent-mode flag.
    */
-  [[maybe_unused]] std::uint8_t wxTextValidatorGetSilentFlagRuntime() noexcept
+  std::uint8_t wxTextValidatorGetSilentFlagRuntime() noexcept
   {
     return gWxTextValidatorSilentFlag;
   }
@@ -10296,7 +10296,7 @@ namespace
    * Returns true when every UTF-16 code unit in one shared wide-string lane is
    * 7-bit ASCII (`< 0x80`), or when the lane is empty.
    */
-  [[maybe_unused]] bool wxSharedWideStringIsAsciiOnlyRuntime(
+  bool wxSharedWideStringIsAsciiOnlyRuntime(
     const wchar_t** const sharedTextLane
   ) noexcept
   {
@@ -10324,7 +10324,7 @@ namespace
    * Returns true when all UTF-16 code units in one shared wx-string lane are
    * alphabetic.
    */
-  [[maybe_unused]] bool wxSharedWideStringIsAlphaOnlyRuntime(
+  bool wxSharedWideStringIsAlphaOnlyRuntime(
     const wchar_t** const sharedTextLane
   ) noexcept
   {
@@ -10354,7 +10354,7 @@ namespace
    * Returns true when all UTF-16 code units in one shared wx-string lane are
    * alphanumeric.
    */
-  [[maybe_unused]] bool wxSharedWideStringIsAlnumOnlyRuntime(
+  bool wxSharedWideStringIsAlnumOnlyRuntime(
     const wchar_t** const sharedTextLane
   ) noexcept
   {
@@ -10566,7 +10566,7 @@ namespace
    * Maps one wx encoding id to a Win32 LOGFONT charset id and writes both
    * resolved encoding/charset lanes into the output payload.
    */
-  [[maybe_unused]] bool wxMapEncodingIdToCharsetRuntime(
+  bool wxMapEncodingIdToCharsetRuntime(
     const std::int32_t encodingId,
     WxEncodingToCharsetRuntime* const outInfo
   )
@@ -10825,7 +10825,7 @@ namespace
    * `vector<ManagedWindowSlot>::insert` emission for the `managedWindows`
    * global (FUN_004F8CA0) is forced out-of-line.
    */
-  [[maybe_unused]] [[nodiscard]] moho::ManagedWindowSlot** InsertManagedWindowSlotWithGrowth(
+  [[nodiscard]] moho::ManagedWindowSlot** InsertManagedWindowSlotWithGrowth(
     moho::ManagedWindowSlot** const outIterator,
     moho::ManagedWindowSlot* const insertAt,
     const moho::ManagedWindowSlot* const value
@@ -10857,7 +10857,7 @@ namespace
    * `vector<ManagedWindowSlot>::insert` emission for the `managedFrames`
    * global (FUN_004F9050) is forced out-of-line.
    */
-  [[maybe_unused]] [[nodiscard]] moho::ManagedWindowSlot** InsertManagedWindowSlotIntoFramesWithGrowth(
+  [[nodiscard]] moho::ManagedWindowSlot** InsertManagedWindowSlotIntoFramesWithGrowth(
     moho::ManagedWindowSlot** const outIterator,
     moho::ManagedWindowSlot* const insertAt,
     const moho::ManagedWindowSlot* const value
@@ -11180,7 +11180,7 @@ namespace
    * Runs one idle-phase cleanup pulse across both global wx module lists by
    * toggling their destroy lanes around list clearing.
    */
-  [[maybe_unused]] void RunWxModuleListIdleCleanupPulse()
+  void RunWxModuleListIdleCleanupPulse()
   {
     gWxLoadedModuleListRuntime.mDestroy = 1;
     gWxLoadedModuleListRuntime.Clear();
@@ -11198,7 +11198,7 @@ namespace
    * Secondary idle-cleanup thunk lane for wx module-lists; forwards to the
    * canonical cleanup pulse implementation.
    */
-  [[maybe_unused]] void wxRunModuleListIdleCleanupPulseThunk() noexcept
+  void wxRunModuleListIdleCleanupPulseThunk() noexcept
   {
     RunWxModuleListIdleCleanupPulse();
   }
@@ -11240,7 +11240,7 @@ namespace
    * What it does:
    * Clears one module-list bucket-array pointer lane at offset `+0x12C`.
    */
-  [[maybe_unused]] void wxClearModuleListBucketArrayPointerRuntime(
+  void wxClearModuleListBucketArrayPointerRuntime(
     WxModuleListBucketArrayOwnerRuntimeView* const owner
   ) noexcept
   {
@@ -11424,7 +11424,7 @@ namespace
    * Releases both cached RichEdit runtime module handles, clearing each slot
    * after `FreeLibrary`.
    */
-  [[maybe_unused]] int wxUnloadRichEditRuntimeModules() noexcept
+  int wxUnloadRichEditRuntimeModules() noexcept
   {
     int result = 0;
     for (HMODULE& moduleHandle : gWxRichEditModuleHandles) {
@@ -12399,7 +12399,7 @@ namespace
    * Sets one close-event runtime logging flag lane (`+0x22`) and returns the
    * assigned flag value.
    */
-  [[maybe_unused]] std::uint8_t wxCloseEventSetLoggingOffFlagRuntime(
+  std::uint8_t wxCloseEventSetLoggingOffFlagRuntime(
     WxCloseEventFactoryRuntime* const closeEvent,
     const std::uint8_t loggingOff
   ) noexcept
@@ -13055,7 +13055,7 @@ namespace
    * What it does:
    * Returns the update-UI "set checked" flag lane.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetCheckedValueRuntime(
+  std::uint8_t wxUpdateUiEventGetCheckedValueRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13068,7 +13068,7 @@ namespace
    * What it does:
    * Returns the update-UI "set enabled" flag lane.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetEnabledValueRuntime(
+  std::uint8_t wxUpdateUiEventGetEnabledValueRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13081,7 +13081,7 @@ namespace
    * What it does:
    * Returns the update-UI "set text" flag lane.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetTextFlagRuntime(
+  std::uint8_t wxUpdateUiEventGetSetTextFlagRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13095,7 +13095,7 @@ namespace
    * Returns whether the event set a checked value. The byte at +0x38 is that
    * flag, not a text-colour one - see the field comments.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetCheckedFlagRuntime(
+  std::uint8_t wxUpdateUiEventGetSetCheckedFlagRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13109,7 +13109,7 @@ namespace
    * Returns whether the event set an enabled value. The byte at +0x36 is that
    * flag, not a shown one.
    */
-  [[maybe_unused]] std::uint8_t wxUpdateUiEventGetSetEnabledFlagRuntime(
+  std::uint8_t wxUpdateUiEventGetSetEnabledFlagRuntime(
     const WxUpdateUIEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13292,7 +13292,7 @@ namespace
    * Returns whether one mouse event is a motion event with any mouse button
    * lane currently pressed.
    */
-  [[maybe_unused]] BOOL wxMouseEventIsDraggingRuntime(
+  BOOL wxMouseEventIsDraggingRuntime(
     const void* const mouseEventRuntime
   ) noexcept
   {
@@ -13326,7 +13326,7 @@ namespace
    * What it does:
    * Returns whether one wx event has runtime type `wxEVT_ENTER_WINDOW`.
    */
-  [[maybe_unused]] BOOL wxEventIsEnterWindowRuntimeType(
+  BOOL wxEventIsEnterWindowRuntimeType(
     const wxEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13339,7 +13339,7 @@ namespace
    * What it does:
    * Returns whether one wx event has runtime type `wxEVT_LEAVE_WINDOW`.
    */
-  [[maybe_unused]] BOOL wxEventIsLeaveWindowRuntimeType(
+  BOOL wxEventIsLeaveWindowRuntimeType(
     const wxEventRuntime* const eventRuntime
   ) noexcept
   {
@@ -13682,7 +13682,7 @@ namespace
    * Allocates one wx event-handler runtime payload and seeds its core handler
    * chain/enable lanes with an empty lock pointer.
    */
-  [[maybe_unused]] [[nodiscard]] void* wxConstructorForwxEvtHandler()
+  [[nodiscard]] void* wxConstructorForwxEvtHandler()
   {
     auto* const handler = new (std::nothrow) WxEvtHandlerFactoryRuntime();
     if (handler == nullptr) {
@@ -13700,7 +13700,7 @@ namespace
    * Allocates one scroll-window event payload with null type and zeroed
    * command/extra lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxScrollWinEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxScrollWinEvent()
   {
     return new (std::nothrow) WxScrollWinEventFactoryRuntime();
   }
@@ -13711,7 +13711,7 @@ namespace
    * What it does:
    * Allocates one mouse-event payload with zeroed modifier/button/wheel lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMouseEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxMouseEvent()
   {
     return new (std::nothrow) WxMouseEventFactoryRuntime();
   }
@@ -13723,7 +13723,7 @@ namespace
    * Allocates one key-event payload with zeroed modifier/keycode/scancode
    * lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxKeyEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxKeyEvent()
   {
     return new (std::nothrow) WxKeyEventFactoryRuntime();
   }
@@ -13734,7 +13734,7 @@ namespace
    * What it does:
    * Allocates one child-focus command event payload and clears its event-object lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxChildFocusEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxChildFocusEvent()
   {
     return new (std::nothrow) WxChildFocusEventFactoryRuntime();
   }
@@ -13745,7 +13745,7 @@ namespace
    * What it does:
    * Allocates one set-cursor event payload with zeroed coordinates and cursor storage.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSetCursorEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxSetCursorEvent()
   {
     return new (std::nothrow) WxSetCursorEventFactoryRuntime();
   }
@@ -13756,7 +13756,7 @@ namespace
    * What it does:
    * Allocates one window-create command event payload and clears its source object.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxWindowCreateEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxWindowCreateEvent()
   {
     return new (std::nothrow) WxWindowCreateEventFactoryRuntime();
   }
@@ -13767,7 +13767,7 @@ namespace
    * What it does:
    * Allocates one window-destroy command event payload and clears its source object.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxWindowDestroyEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxWindowDestroyEvent()
   {
     return new (std::nothrow) WxWindowDestroyEventFactoryRuntime();
   }
@@ -13779,7 +13779,7 @@ namespace
    * Allocates one splitter command-event payload and sets the internal
    * dispatch-enabled flag lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSplitterEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxSplitterEvent()
   {
     return new (std::nothrow) WxSplitterEventFactoryRuntime();
   }
@@ -13791,7 +13791,7 @@ namespace
    * Allocates one spin command-event payload and sets the internal
    * dispatch-enabled flag lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSpinEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxSpinEvent()
   {
     return new (std::nothrow) WxSpinEventFactoryRuntime();
   }
@@ -13802,7 +13802,7 @@ namespace
    * What it does:
    * Allocates one socket event payload and seeds the event-type lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSocketEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxSocketEvent()
   {
     return new (std::nothrow) WxSocketEventFactoryRuntime();
   }
@@ -13814,7 +13814,7 @@ namespace
    * Allocates one `wxArtProviderModule` runtime payload and initializes base
    * module lanes (`vtable`, `refData=null`).
    */
-  [[maybe_unused]] [[nodiscard]] void* wxConstructorForwxArtProviderModule()
+  [[nodiscard]] void* wxConstructorForwxArtProviderModule()
   {
     struct WxModuleFactoryRuntimeView
     {
@@ -13843,7 +13843,7 @@ namespace
    * Allocates one `wxDDEModule` runtime payload and initializes base module
    * lanes (`vtable`, `refData=null`).
    */
-  [[maybe_unused]] [[nodiscard]] void* wxConstructorForwxDDEModule()
+  [[nodiscard]] void* wxConstructorForwxDDEModule()
   {
     struct WxModuleFactoryRuntimeView
     {
@@ -13872,7 +13872,7 @@ namespace
    * Forwards one `wxConnectionBase` text payload lane through virtual slot
    * `+0x14` with fixed flags `(-1, 1)`.
    */
-  [[maybe_unused]] int wxConnectionBaseExecuteTextPayloadRuntime(
+  int wxConnectionBaseExecuteTextPayloadRuntime(
     void* const connectionRuntime,
     const wxStringRuntime* const textPayload
   ) noexcept
@@ -13904,7 +13904,7 @@ namespace
    * Allocates one `wxPrintPaperModule` runtime payload and initializes base
    * module lanes (`vtable`, `refData=null`).
    */
-  [[maybe_unused]] [[nodiscard]] void* wxConstructorForwxPrintPaperModule()
+  [[nodiscard]] void* wxConstructorForwxPrintPaperModule()
   {
     struct WxModuleFactoryRuntimeView
     {
@@ -13933,7 +13933,7 @@ namespace
    * Allocates one `wxClipboardModule` runtime payload and initializes base
    * module lanes (`vtable`, `refData=null`).
    */
-  [[maybe_unused]] [[nodiscard]] void* wxConstructorForwxClipboardModule()
+  [[nodiscard]] void* wxConstructorForwxClipboardModule()
   {
     struct WxModuleFactoryRuntimeView
     {
@@ -13962,7 +13962,7 @@ namespace
    * Allocates one single-choice dialog payload and initializes selection state
    * to no-selection (`-1`) with empty prompt text storage.
    */
-  [[maybe_unused]] [[nodiscard]] wxDialogRuntime* wxConstructorForwxSingleChoiceDialog()
+  [[nodiscard]] wxDialogRuntime* wxConstructorForwxSingleChoiceDialog()
   {
     return new (std::nothrow) WxSingleChoiceDialogFactoryRuntime();
   }
@@ -13974,7 +13974,7 @@ namespace
    * Allocates one idle-event payload and initializes the request-more lane to
    * false.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxIdleEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxIdleEvent()
   {
     return new (std::nothrow) WxIdleEventRuntime();
   }
@@ -13985,7 +13985,7 @@ namespace
    * What it does:
    * Allocates one command-event payload with default null type/id lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxCommandEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxCommandEvent()
   {
     return new (std::nothrow) wxCommandEventRuntime(0, 0);
   }
@@ -13997,7 +13997,7 @@ namespace
    * Allocates one scroll-event payload using command-event base initialization
    * and zeroed scroll lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxScrollEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxScrollEvent()
   {
     return new (std::nothrow) WxScrollEventFactoryRuntime();
   }
@@ -14008,7 +14008,7 @@ namespace
    * What it does:
    * Allocates one size-event payload and clears the width/height lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSizeEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxSizeEvent()
   {
     return new (std::nothrow) WxSizeEventFactoryRuntime();
   }
@@ -14019,7 +14019,7 @@ namespace
    * What it does:
    * Allocates one paint-event payload with base wx event runtime lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxPaintEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxPaintEvent()
   {
     return new (std::nothrow) WxPaintEventFactoryRuntime();
   }
@@ -14030,7 +14030,7 @@ namespace
    * What it does:
    * Allocates one non-client paint-event payload with base wx event lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxNcPaintEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxNcPaintEvent()
   {
     return new (std::nothrow) WxNcPaintEventFactoryRuntime();
   }
@@ -14042,7 +14042,7 @@ namespace
    * Allocates one erase-background event payload and clears the device-context
    * lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxEraseEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxEraseEvent()
   {
     return new (std::nothrow) WxEraseEventFactoryRuntime();
   }
@@ -14053,7 +14053,7 @@ namespace
    * What it does:
    * Allocates one move-event payload and clears cached move-position lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMoveEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxMoveEvent()
   {
     return new (std::nothrow) WxMoveEventFactoryRuntime();
   }
@@ -14064,7 +14064,7 @@ namespace
    * What it does:
    * Allocates one focus-event payload and clears the focused-window lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxFocusEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxFocusEvent()
   {
     return new (std::nothrow) WxFocusEventFactoryRuntime();
   }
@@ -14076,7 +14076,7 @@ namespace
    * Allocates one close-event payload and seeds veto/logging flags to
    * `(canVeto=true, veto=false, loggingOff=true)`.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxCloseEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxCloseEvent()
   {
     return new (std::nothrow) WxCloseEventFactoryRuntime();
   }
@@ -14087,7 +14087,7 @@ namespace
    * What it does:
    * Allocates one show-event payload and seeds the shown-state lane to false.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxShowEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxShowEvent()
   {
     return new (std::nothrow) WxShowEventFactoryRuntime();
   }
@@ -14098,7 +14098,7 @@ namespace
    * What it does:
    * Allocates one maximize-event payload with base wx event lanes only.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMaximizeEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxMaximizeEvent()
   {
     return new (std::nothrow) WxMaximizeEventFactoryRuntime();
   }
@@ -14110,7 +14110,7 @@ namespace
    * Allocates one iconize-event payload and seeds the iconized-state lane to
    * true.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxIconizeEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxIconizeEvent()
   {
     return new (std::nothrow) WxIconizeEventFactoryRuntime();
   }
@@ -14121,7 +14121,7 @@ namespace
    * What it does:
    * Allocates one menu-event payload and clears the selected menu-id lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMenuEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxMenuEvent()
   {
     return new (std::nothrow) WxMenuEventFactoryRuntime();
   }
@@ -14133,7 +14133,7 @@ namespace
    * Allocates one joystick-event payload and clears all position/button
    * lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxJoystickEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxJoystickEvent()
   {
     return new (std::nothrow) WxJoystickEventFactoryRuntime();
   }
@@ -14145,7 +14145,7 @@ namespace
    * Allocates one drop-files event payload and clears file-count, drop-point,
    * and file-array lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxDropFilesEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxDropFilesEvent()
   {
     auto* const dropFilesEvent = new (std::nothrow) WxDropFilesEventRuntime();
     if (dropFilesEvent == nullptr) {
@@ -14166,7 +14166,7 @@ namespace
    * What it does:
    * Allocates one activate-event payload and marks it active by default.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxActivateEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxActivateEvent()
   {
     return new (std::nothrow) WxActivateEventFactoryRuntime();
   }
@@ -14177,7 +14177,7 @@ namespace
    * What it does:
    * Allocates one init-dialog event payload with base wx-event lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxInitDialogEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxInitDialogEvent()
   {
     return new (std::nothrow) WxInitDialogEventFactoryRuntime();
   }
@@ -14189,7 +14189,7 @@ namespace
    * Allocates one system-colour-changed event payload with base wx-event
    * lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSysColourChangedEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxSysColourChangedEvent()
   {
     return new (std::nothrow) WxSysColourChangedEventFactoryRuntime();
   }
@@ -14200,7 +14200,7 @@ namespace
    * What it does:
    * Allocates one display-changed event payload with base wx-event lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxDisplayChangedEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxDisplayChangedEvent()
   {
     return new (std::nothrow) WxDisplayChangedEventFactoryRuntime();
   }
@@ -14224,7 +14224,7 @@ namespace
    * Allocates one navigation-key event payload and seeds default
    * `navigation-flags/current-focus` lanes.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxNavigationKeyEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxNavigationKeyEvent()
   {
     return new (std::nothrow) WxNavigationKeyEventFactoryRuntime();
   }
@@ -14236,7 +14236,7 @@ namespace
    * Allocates one palette-changed event payload and clears changed-window
    * ownership lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxPaletteChangedEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxPaletteChangedEvent()
   {
     return new (std::nothrow) WxPaletteChangedEventFactoryRuntime();
   }
@@ -14248,7 +14248,7 @@ namespace
    * Allocates one query-new-palette event payload and clears realized-state
    * lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxQueryNewPaletteEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxQueryNewPaletteEvent()
   {
     return new (std::nothrow) WxQueryNewPaletteEventFactoryRuntime();
   }
@@ -14273,7 +14273,7 @@ namespace
    * Allocates one mouse-capture-changed event payload and clears the previous
    * capture window lane.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMouseCaptureChangedEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxMouseCaptureChangedEvent()
   {
     return new (std::nothrow)
       WxMouseCaptureChangedEventRuntime(0, EnsureWxEvtMouseCaptureChangedRuntimeType(), nullptr);
@@ -14286,7 +14286,7 @@ namespace
    * Allocates one notify-event payload lane, runs command-event base
    * initialization, and marks the event as allowed by default.
    */
-  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxNotifyEvent()
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxNotifyEvent()
   {
     return new (std::nothrow) WxNotifyEventRuntime();
   }
@@ -14502,7 +14502,7 @@ namespace
    * What it does:
    * Returns the leading 32-bit lane from one unknown runtime pod view.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneA(
+  [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneA(
     const DwordLaneRuntimeView* const view
   ) noexcept
   {
@@ -14515,7 +14515,7 @@ namespace
    * What it does:
    * Returns the leading 32-bit lane from one unknown runtime pod view.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneB(
+  [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneB(
     const DwordLaneRuntimeView* const view
   ) noexcept
   {
@@ -14538,7 +14538,7 @@ namespace
    * What it does:
    * Clears one four-dword runtime block used by wx region rectangle vectors.
    */
-  [[maybe_unused]] void ClearFourDwordBlock(
+  void ClearFourDwordBlock(
     FourDwordBlockRuntimeView* const view
   ) noexcept
   {
@@ -14617,7 +14617,7 @@ namespace
  * Reads one critical-section pointer from holder lane `+0x00` and forwards
  * to `wxLEAVE_CRIT_SECT`.
  */
-[[maybe_unused]] void wxLeaveCritSectFromPointerLane(
+void wxLeaveCritSectFromPointerLane(
   WxCriticalSectionPointerLane* const criticalSectionLane
 ) noexcept
 {
@@ -14654,7 +14654,7 @@ bool wxWakeUpMainThread()
  * Yields the caller thread's remaining timeslice by sleeping for zero
  * milliseconds.
  */
-[[maybe_unused]] void wxThreadYieldCurrentTimesliceRuntime()
+void wxThreadYieldCurrentTimesliceRuntime()
 {
   ::Sleep(0u);
 }
@@ -14788,7 +14788,7 @@ bool wxThreadHasSingleSuspendState(
  * Reads the guarded thread suspend-state lane and returns true when the state
  * is either `1` or `2`.
  */
-[[maybe_unused]] bool wxThreadHasAnySuspendState(
+bool wxThreadHasAnySuspendState(
   WxThreadSuspendControllerRuntime* const controller
 )
 {
@@ -14887,7 +14887,7 @@ static_assert(sizeof(WxNativeHandleStorageRuntimeView) == 0x4, "WxNativeHandleSt
  * Creates one unnamed Win32 mutex and stores the native handle in the caller
  * storage lane.
  */
-[[maybe_unused]] HANDLE* wxCreateUnnamedMutexHandleRuntime(
+HANDLE* wxCreateUnnamedMutexHandleRuntime(
   HANDLE* const nativeHandleStorage,
   const int reserved
 )
@@ -14909,7 +14909,7 @@ static_assert(sizeof(WxNativeHandleStorageRuntimeView) == 0x4, "WxNativeHandleSt
  * caller storage lane, using `INT_MAX` when the requested maximum count is
  * zero.
  */
-[[maybe_unused]] HANDLE* wxCreateUnnamedSemaphoreHandleRuntime(
+HANDLE* wxCreateUnnamedSemaphoreHandleRuntime(
   HANDLE* const nativeHandleStorage,
   const LONG initialCount,
   const LONG maximumCount
@@ -14987,7 +14987,7 @@ void* wxFreeLoadedModuleIfPresentRuntime(
  * Tail-forwards one loaded-module free thunk lane into
  * `wxFreeLoadedModuleIfPresentRuntime`.
  */
-[[maybe_unused]] void* wxFreeLoadedModuleIfPresentRuntimeThunk(
+void* wxFreeLoadedModuleIfPresentRuntimeThunk(
   void* const moduleHandleStorage
 ) noexcept
 {
@@ -15082,7 +15082,7 @@ int wxMutexTimedWaitIfInitialized(
  * Returns whether one mutex handle-storage lane currently owns a native
  * synchronization handle.
  */
-[[maybe_unused]] BOOL wxMutexHandleStorageHasNativeHandleRuntime(
+BOOL wxMutexHandleStorageHasNativeHandleRuntime(
   const WxMutexHandleStorageRuntime* const mutexHandleStorage
 ) noexcept
 {
@@ -15096,7 +15096,7 @@ int wxMutexTimedWaitIfInitialized(
  * Returns whether one semaphore handle-storage lane currently owns a native
  * synchronization handle.
  */
-[[maybe_unused]] BOOL wxSemaphoreHandleStorageHasNativeHandleRuntime(
+BOOL wxSemaphoreHandleStorageHasNativeHandleRuntime(
   const WxMutexHandleStorageRuntime* const semaphoreHandleStorage
 ) noexcept
 {
@@ -15282,7 +15282,7 @@ namespace
  * What it does:
  * Dispatches the default Win32 message-beep lane (`uType = 0xFFFFFFFF`).
  */
-[[maybe_unused]] BOOL wxMessageBeepDefaultRuntime()
+BOOL wxMessageBeepDefaultRuntime()
 {
   return ::MessageBeep(0xFFFFFFFFu);
 }
@@ -15441,7 +15441,7 @@ bool wxURLInitializeDefaultProxyFromEnvironment()
  * Deletes the global default wxURL proxy runtime object (if present), then
  * clears the singleton proxy pointer lane.
  */
-[[maybe_unused]] int wxURLDestroyDefaultProxyRuntime()
+int wxURLDestroyDefaultProxyRuntime()
 {
   int deleteResult = 0;
   if (gWxUrlDefaultProxyRuntime != nullptr) {
@@ -15484,7 +15484,7 @@ namespace
  * Deletes one deferred wxURL-owned payload lane when parse-guard lane
  * `+0x34` is clear and deferred-object lane `+0x10` is present.
  */
-[[maybe_unused]] int wxURLDeleteDeferredObjectIfParseGuardClearRuntime(
+int wxURLDeleteDeferredObjectIfParseGuardClearRuntime(
   void* const urlRuntime
 ) noexcept
 {
@@ -15626,7 +15626,7 @@ namespace
    * Seeds one event-id lane and resets one selection-index sentinel lane to
    * `-1`.
    */
-  [[maybe_unused]] void wxInitializeEventSelectionStateRuntime(
+  void wxInitializeEventSelectionStateRuntime(
     void* const eventRuntime,
     const std::int32_t eventId
   ) noexcept
@@ -15647,7 +15647,7 @@ namespace
    * Copies one selection-entry pointer table into a contiguous packed 16-byte
    * entry range and returns the copied entry count.
    */
-  [[maybe_unused]] std::uint32_t wxCopyMenuSelectionPackedEntryRangeRuntime(
+  std::uint32_t wxCopyMenuSelectionPackedEntryRangeRuntime(
     const WxEventSelectionStateRuntimeView* const selectionStateRuntime,
     WxMenuSelectionPackedEntryRuntimeView* outEntries
   ) noexcept
@@ -15677,7 +15677,7 @@ namespace
    * Linearly scans menu-selection entries for one command id and returns the
    * matching index, or `-1` when no entry matches.
    */
-  [[maybe_unused]] std::int32_t wxFindMenuSelectionIndexByCommandIdRuntime(
+  std::int32_t wxFindMenuSelectionIndexByCommandIdRuntime(
     const void* const selectionStateRuntime,
     const std::int32_t commandId
   ) noexcept
@@ -15704,7 +15704,7 @@ namespace
    * What it does:
    * Clears the active menu-selection sentinel lane to `-1`.
    */
-  [[maybe_unused]] void wxResetMenuSelectionSentinelRuntime(
+  void wxResetMenuSelectionSentinelRuntime(
     void* const selectionStateRuntime
   ) noexcept
   {
@@ -15796,7 +15796,7 @@ namespace
    * clears internal menu-node pointers, stores owner-lane argument, and writes
    * self-reference lane used by downstream menu dispatch.
    */
-  [[maybe_unused]] int wxInitializeMenuBaseRuntimeLanes(
+  int wxInitializeMenuBaseRuntimeLanes(
     void* const menuBaseRuntime,
     void* const ownerLaneRuntime
   ) noexcept
@@ -15879,7 +15879,7 @@ namespace
    * Attaches one submenu runtime to its parent menu: forwards the invoking
    * window lane when present and writes back parent-menu ownership.
    */
-  [[maybe_unused]] int wxMenuAttachSubMenuRuntime(
+  int wxMenuAttachSubMenuRuntime(
     const void* const parentMenuRuntime,
     void* const subMenuRuntime
   ) noexcept
@@ -15903,7 +15903,7 @@ namespace
    * What it does:
    * Stores one owner-frame lane into the menu-bar runtime attachment slot.
    */
-  [[maybe_unused]] void* wxMenuBarAttachOwnerFrameRuntime(
+  void* wxMenuBarAttachOwnerFrameRuntime(
     void* const menuBarRuntime,
     void* const ownerFrameRuntime
   ) noexcept
@@ -15921,7 +15921,7 @@ namespace
    * What it does:
    * Clears the menu-bar owner-frame attachment slot.
    */
-  [[maybe_unused]] void wxMenuBarDetachOwnerFrameRuntime(
+  void wxMenuBarDetachOwnerFrameRuntime(
     void* const menuBarRuntime
   ) noexcept
   {
@@ -15938,7 +15938,7 @@ namespace
    * Thunk lane that forwards one menu-bar owner-detach request into
    * `FUN_009A0E80`.
    */
-  [[maybe_unused]] void wxMenuBarDetachRuntimeAdapter(
+  void wxMenuBarDetachRuntimeAdapter(
     void* const menuBarRuntime
   ) noexcept
   {
@@ -16480,7 +16480,7 @@ namespace
    * whose command-id lane matches `commandId`; optionally writes the owning menu
    * object through `outOwnerMenuRuntime`.
    */
-  [[maybe_unused]] WxMenuItemRuntimeView* wxMenuFindItemRecursiveByCommandIdRuntime(
+  WxMenuItemRuntimeView* wxMenuFindItemRecursiveByCommandIdRuntime(
     WxMenuRuntimeView* const menuRuntime,
     const std::int32_t commandId,
     WxMenuRuntimeView** const outOwnerMenuRuntime
@@ -16523,7 +16523,7 @@ namespace
    * Resolves one menu item by command id using the recursive lookup lane and
    * returns the item's `IsCheckable` virtual-state query.
    */
-  [[maybe_unused]] bool wxMenuItemIsCheckableByCommandIdRuntime(
+  bool wxMenuItemIsCheckableByCommandIdRuntime(
     WxMenuRuntimeView* const menuRuntime,
     const std::int32_t commandId
   ) noexcept
@@ -16544,7 +16544,7 @@ namespace
    * Resolves one menu item at command-id lane `0` and returns the item's
    * checked-state query result.
    */
-  [[maybe_unused]] bool wxMenuLookupDefaultItemCheckedRuntime(
+  bool wxMenuLookupDefaultItemCheckedRuntime(
     void* const menuLookupHostRuntime
   ) noexcept
   {
@@ -16564,7 +16564,7 @@ namespace
    * (`1.0f`/`0.0f`) through the emitter-param sink callback at vtable lane
    * `+0x30`.
    */
-  [[maybe_unused]] int wxForwardMenuCheckedStateAsEmitterFloatLaneRuntime(
+  int wxForwardMenuCheckedStateAsEmitterFloatLaneRuntime(
     void* const menuLookupHostRuntime,
     const std::int32_t parameterLane,
     void* const emitterDispatchOwnerRuntime
@@ -16615,7 +16615,7 @@ namespace
    * Resolves one menu item by command id through recursive lookup and forwards
    * one integer payload to the menu-item virtual lane at offset `+0x18`.
    */
-  [[maybe_unused]] int wxMenuItemInvokeAction18ByCommandIdRecursiveRuntime(
+  int wxMenuItemInvokeAction18ByCommandIdRecursiveRuntime(
     WxMenuRuntimeView* const menuRuntime,
     const std::int32_t commandId,
     const int payloadValue
@@ -16650,7 +16650,7 @@ namespace
    * Resolves one menu item by command id through recursive lookup and forwards
    * one integer payload to the menu-item virtual lane at offset `+0x10`.
    */
-  [[maybe_unused]] int wxMenuItemInvokeAction10ByCommandIdRecursiveRuntime(
+  int wxMenuItemInvokeAction10ByCommandIdRecursiveRuntime(
     WxMenuRuntimeView* const menuRuntime,
     const std::int32_t commandId,
     const int payloadValue
@@ -16685,7 +16685,7 @@ namespace
    * Resolves one menu item by command id through recursive lookup and copies
    * one source wx-string lane into the item label lane at offset `+0x18`.
    */
-  [[maybe_unused]] wxStringRuntime* wxMenuAssignLabelByCommandIdRecursiveRuntime(
+  wxStringRuntime* wxMenuAssignLabelByCommandIdRecursiveRuntime(
     WxMenuRuntimeView* const menuRuntime,
     const std::int32_t commandId,
     const wxStringRuntime* const sourceLabel
@@ -16839,7 +16839,7 @@ namespace
    * Binds tooltip shared-text payload into one notify structure only for the
    * tooltip text notifications (`-520` / `-530`) with non-empty shared text.
    */
-  [[maybe_unused]] char __stdcall wxTryBindTooltipNotifyTextRuntime(
+  char __stdcall wxTryBindTooltipNotifyTextRuntime(
     const int notificationCode,
     void* const notifyPayloadRuntime,
     void** const sharedTextLane
@@ -17032,7 +17032,7 @@ namespace
    * Returns the menu payload pointer for one zero-based menu-bar index, or
    * `nullptr` when the index falls outside the linked menu-node lane.
    */
-  [[maybe_unused]] void* wxMenuBarGetMenuAtIndexRuntime(
+  void* wxMenuBarGetMenuAtIndexRuntime(
     WxMenuBarEnsureNativeMenuRuntimeView* const menuBarRuntime,
     const std::int32_t index
   ) noexcept
@@ -17055,7 +17055,7 @@ namespace
    * Lazily creates one native menu handle for a wx menu-bar runtime lane and
    * appends each top-level popup menu/title pair into that Win32 menu.
    */
-  [[maybe_unused]] HMENU wxMenuBarEnsureNativeMenuHandle(
+  HMENU wxMenuBarEnsureNativeMenuHandle(
     void* const menuBarRuntime
   )
   {
@@ -17099,7 +17099,7 @@ namespace
    * Resolves a suitable top-level owner window for dialog/show paths from the
    * foreground HWND first, then falls back to `wxTheApp->GetTopWindow()`.
    */
-  [[maybe_unused]] wxWindowBase* wxResolveTopLevelOwnerWindow(
+  wxWindowBase* wxResolveTopLevelOwnerWindow(
     wxWindowBase* const requester
   )
   {
@@ -17175,7 +17175,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Validates one status-bar pane index and forwards `SB_SETTEXTW` with the
  * caller-provided wide-text payload lane.
  */
-[[maybe_unused]] LRESULT wxStatusBarSetPaneTextWideRuntime(
+LRESULT wxStatusBarSetPaneTextWideRuntime(
   const void* const statusBarRuntime,
   const LPARAM* const paneTextPayload,
   const std::int32_t paneIndex
@@ -17207,7 +17207,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Queries one status-bar border metrics block (`SB_GETBORDERS`) and returns
  * the horizontal border width lane.
  */
-[[maybe_unused]] LPARAM wxStatusBarGetHorizontalBorderMetricRuntime(
+LPARAM wxStatusBarGetHorizontalBorderMetricRuntime(
   const void* const statusBarRuntime
 ) noexcept
 {
@@ -17233,7 +17233,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Queries one status-bar border metrics block (`SB_GETBORDERS`) and returns
  * the vertical border width lane.
  */
-[[maybe_unused]] LPARAM wxStatusBarGetVerticalBorderMetricRuntime(
+LPARAM wxStatusBarGetVerticalBorderMetricRuntime(
   const void* const statusBarRuntime
 ) noexcept
 {
@@ -17259,7 +17259,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Validates one status-bar pane index, queries `SB_GETRECT`, and writes
  * `(left, top, width, height)` to the caller output lane.
  */
-[[maybe_unused]] bool wxStatusBarGetPaneRectRuntime(
+bool wxStatusBarGetPaneRectRuntime(
   const void* const statusBarRuntime,
   const std::int32_t paneIndex,
   std::int32_t* const outRectLane
@@ -17298,7 +17298,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Applies one status-bar minimum-height update (`SB_SETMINHEIGHT`) using the
  * runtime vertical-border metric lane and immediately requests relayout.
  */
-[[maybe_unused]] LRESULT wxStatusBarSetMinimumHeightAndRelayout(
+LRESULT wxStatusBarSetMinimumHeightAndRelayout(
   void* const statusBarRuntime,
   const std::int32_t minimumHeight
 )
@@ -17342,7 +17342,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Replaces one indexed shared-string lane in runtime-owned text storage, then
  * builds and dispatches one command payload for that index.
  */
-[[maybe_unused]] int wxSetIndexedRuntimeTextAndDispatchUpdate(
+int wxSetIndexedRuntimeTextAndDispatchUpdate(
   void* const ownerRuntime,
   const wxStringRuntime* const updatedText,
   const std::int32_t index
@@ -17401,7 +17401,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Draws one status-bar field text lane with a 2-pixel left inset and vertical
  * center alignment, clipped to the field rectangle.
  */
-[[maybe_unused]] void wxDrawStatusBarFieldTextRuntime(
+void wxDrawStatusBarFieldTextRuntime(
   void* const statusBarRuntime,
   void* const deviceContextRuntime,
   const std::int32_t fieldIndex
@@ -17463,7 +17463,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Draws one beveled status-bar field frame using the runtime light/dark pen
  * lanes, then forwards to the control text-draw virtual lane.
  */
-[[maybe_unused]] int wxDrawStatusBarFieldBevelAndTextRuntime(
+int wxDrawStatusBarFieldBevelAndTextRuntime(
   void* const statusBarRuntime,
   void* const deviceContextRuntime,
   const int fieldIndex
@@ -17536,7 +17536,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Returns one `(width,height)` pair from cached lanes when `cachedWidth` is
  * non-zero, otherwise queries fallback owner slot `+0x198`.
  */
-[[maybe_unused]] std::int32_t* wxResolveCachedSizePairOrQueryFallbackRuntime(
+std::int32_t* wxResolveCachedSizePairOrQueryFallbackRuntime(
   const void* const sizeProviderRuntime,
   std::int32_t* const outSizePair
 )
@@ -17597,7 +17597,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Resolves one cached `(width,height)` pair and writes each lane into optional
  * output pointers.
  */
-[[maybe_unused]] std::int32_t* wxResolveCachedSizePairToOptionalOutputsRuntime(
+std::int32_t* wxResolveCachedSizePairToOptionalOutputsRuntime(
   const void* const sizeProviderRuntime,
   std::int32_t* const outWidth,
   std::int32_t* const outHeight
@@ -17622,7 +17622,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Dispatches one scroll-window event lane, updates accumulated scroll units,
  * and scrolls or refreshes the target window according to axis-enable flags.
  */
-[[maybe_unused]] std::int32_t wxScrollHelperHandleScrollWindowEventRuntime(
+std::int32_t wxScrollHelperHandleScrollWindowEventRuntime(
   void* const scrollHelperRuntime,
   void* const scrollEventRuntime
 )
@@ -17711,7 +17711,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * clamps them to visible-page bounds, updates native scrollbar lanes, and
  * scrolls the target window by pixel deltas.
  */
-[[maybe_unused]] void wxScrollHelperApplyRuntimeScrollPositions(
+void wxScrollHelperApplyRuntimeScrollPositions(
   void* const scrollHelperRuntime,
   const std::int32_t xPosition,
   const std::int32_t yPosition
@@ -17835,7 +17835,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Returns whether the scroll owner carries the orientation-specific window
  * style bit (`wxHSCROLL` for orientation `4`, otherwise `wxVSCROLL`).
  */
-[[maybe_unused]] BOOL wxScrollEventOwnerHasOrientationStyleRuntime(
+BOOL wxScrollEventOwnerHasOrientationStyleRuntime(
   const void* const scrollEventRuntime
 )
 {
@@ -17884,7 +17884,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Releases one optional owned runtime object at lane `+0x20` via deleting
  * virtual slot `+0x04`, then clears that lane.
  */
-[[maybe_unused]] std::int32_t wxScrollHelperReleaseOwnedLane20Runtime(
+std::int32_t wxScrollHelperReleaseOwnedLane20Runtime(
   void* const scrollHelperRuntime
 )
 {
@@ -17915,7 +17915,7 @@ wxStringRuntime* wxGetStatusBarPaneText(
  * Releases one optional owned lane at `+0x20`, then marks the helper state
  * byte at offset `+0x1C` as active.
  */
-[[maybe_unused]] void* wxScrollHelperReleaseOwnedLane20AndMarkRuntime(
+void* wxScrollHelperReleaseOwnedLane20AndMarkRuntime(
   void* const scrollHelperRuntime
 ) noexcept
 {
@@ -17990,7 +17990,7 @@ namespace
  * Stops one running timer lane, updates optional period and one-shot mode
  * lanes, and reports success.
  */
-[[maybe_unused]] bool wxTimerConfigurePeriodAndModeRuntime(
+bool wxTimerConfigurePeriodAndModeRuntime(
   void* const timerRuntime,
   const std::int32_t milliseconds,
   const bool oneShot
@@ -18885,7 +18885,7 @@ long wxHandleMdiChildWindowProc(
  * Seeds one status-bar runtime lane with uniform border metrics (`2,2`) and
  * returns the written default width.
  */
-[[maybe_unused]] std::int32_t wxStatusBarGenericSetUniformBorderMetricsRuntime(
+std::int32_t wxStatusBarGenericSetUniformBorderMetricsRuntime(
   void* const statusBarRuntime
 ) noexcept
 {
@@ -19266,7 +19266,7 @@ long wxMdiChildGetClientOrigin(
  * Returns the configured MDI parent-frame icon handle, falling back to the
  * default icon lane when the standard icon lane is unset.
  */
-[[maybe_unused]] void* wxGetMdiParentFrameIconHandle()
+void* wxGetMdiParentFrameIconHandle()
 {
   return gWxStdMdiParentFrameIcon != nullptr ? static_cast<void*>(gWxStdMdiParentFrameIcon)
                                              : static_cast<void*>(gWxDefaultMdiParentFrameIcon);
@@ -19278,7 +19278,7 @@ long wxMdiChildGetClientOrigin(
  * What it does:
  * Sends one `WM_MDICASCADE` command through the parent-frame MDI client lane.
  */
-[[maybe_unused]] LRESULT wxMdiParentCascadeChildrenRuntime(
+LRESULT wxMdiParentCascadeChildrenRuntime(
   const void* const mdiParentRuntime
 )
 {
@@ -19297,7 +19297,7 @@ long wxMdiChildGetClientOrigin(
  * Sends one horizontal-tile command (`WM_MDITILE`, `wParam=1`) through the
  * parent-frame MDI client lane.
  */
-[[maybe_unused]] LRESULT wxMdiParentTileChildrenHorizontallyRuntime(
+LRESULT wxMdiParentTileChildrenHorizontallyRuntime(
   const void* const mdiParentRuntime
 )
 {
@@ -19316,7 +19316,7 @@ long wxMdiChildGetClientOrigin(
  * Sends one `WM_MDIICONARRANGE` command through the parent-frame MDI client
  * lane.
  */
-[[maybe_unused]] LRESULT wxMdiParentArrangeChildIconsRuntime(
+LRESULT wxMdiParentArrangeChildIconsRuntime(
   const void* const mdiParentRuntime
 )
 {
@@ -19334,7 +19334,7 @@ long wxMdiChildGetClientOrigin(
  * What it does:
  * Sends one `WM_MDINEXT` command selecting the next child window.
  */
-[[maybe_unused]] LRESULT wxMdiParentActivateNextChildRuntime(
+LRESULT wxMdiParentActivateNextChildRuntime(
   const void* const mdiParentRuntime
 )
 {
@@ -19353,7 +19353,7 @@ long wxMdiChildGetClientOrigin(
  * Sends one `WM_MDINEXT` command selecting the previous child window
  * (`lParam=1`).
  */
-[[maybe_unused]] LRESULT wxMdiParentActivatePreviousChildRuntime(
+LRESULT wxMdiParentActivatePreviousChildRuntime(
   const void* const mdiParentRuntime
 )
 {
@@ -19511,7 +19511,7 @@ void* wxGetMdiClientWindowClassInfo() noexcept
  * What it does:
  * Returns the static class-info lane for wxIcon runtime RTTI checks.
  */
-[[maybe_unused]] void* wxIconGetClassInfoRuntime() noexcept
+void* wxIconGetClassInfoRuntime() noexcept
 {
   return gWxIconClassInfoTable;
 }
@@ -19532,7 +19532,7 @@ static_assert(
  * What it does:
  * Clears byte lane `+0x0C` in one runtime payload and returns that payload.
  */
-[[maybe_unused]] WxRuntimeByteFlagAt0CRuntimeView* ClearRuntimeByteFlagLane0C(
+WxRuntimeByteFlagAt0CRuntimeView* ClearRuntimeByteFlagLane0C(
   WxRuntimeByteFlagAt0CRuntimeView* const runtime
 ) noexcept
 {
@@ -19547,7 +19547,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for wxChoice runtime RTTI checks.
  */
-[[maybe_unused]] void* wxChoiceGetClassInfoRuntime() noexcept
+void* wxChoiceGetClassInfoRuntime() noexcept
 {
   return gWxChoiceClassInfoTable;
 }
@@ -19559,7 +19559,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for wxSlider runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSliderGetClassInfoRuntime() noexcept
+void* wxSliderGetClassInfoRuntime() noexcept
 {
   return gWxSliderClassInfoTable;
 }
@@ -19809,7 +19809,7 @@ namespace
  * shape — the `wxArrayPtrVoid` ctor touches `+0x140..+0x14B` and can
  * leave untouched data in `+0x138/+0x13C`).
  */
-[[maybe_unused]] void* wxListBoxConstructRuntime(
+void* wxListBoxConstructRuntime(
   void* const listBoxRuntime
 ) noexcept
 {
@@ -19839,7 +19839,7 @@ namespace
  * cache lanes and the three auxiliary lanes at `+0x130/+0x134/+0x138`, seeds
  * `pageStep`/`lineStep` to `1`, and binds the wxSlider95 vtable lane.
  */
-[[maybe_unused]] void* wxSlider95ConstructRuntime(
+void* wxSlider95ConstructRuntime(
   void* const sliderRuntime
 ) noexcept
 {
@@ -19864,7 +19864,7 @@ namespace
  * What it does:
  * Forwards one wxSlider95 runtime query through the vtable lane at `+0x224`.
  */
-[[maybe_unused]] std::int32_t wxSlider95QueryLowerRangeRuntime(
+std::int32_t wxSlider95QueryLowerRangeRuntime(
   void* const sliderRuntime
 ) noexcept
 {
@@ -19878,7 +19878,7 @@ namespace
  * What it does:
  * Forwards one wxSlider95 runtime query through the vtable lane at `+0x228`.
  */
-[[maybe_unused]] std::int32_t wxSlider95QueryUpperRangeRuntime(
+std::int32_t wxSlider95QueryUpperRangeRuntime(
   void* const sliderRuntime
 ) noexcept
 {
@@ -19892,7 +19892,7 @@ namespace
  * What it does:
  * Returns the cached lower range lane from one wxSlider95 runtime object.
  */
-[[maybe_unused]] std::int32_t wxSlider95GetLowerRangeCacheRuntime(
+std::int32_t wxSlider95GetLowerRangeCacheRuntime(
   const void* const sliderRuntime
 ) noexcept
 {
@@ -19906,7 +19906,7 @@ namespace
  * What it does:
  * Returns the cached upper range lane from one wxSlider95 runtime object.
  */
-[[maybe_unused]] std::int32_t wxSlider95GetUpperRangeCacheRuntime(
+std::int32_t wxSlider95GetUpperRangeCacheRuntime(
   const void* const sliderRuntime
 ) noexcept
 {
@@ -19920,7 +19920,7 @@ namespace
  * What it does:
  * Returns one cached slider increment lane from one wxSlider95 runtime object.
  */
-[[maybe_unused]] std::int32_t wxSlider95GetIncrementCacheRuntime(
+std::int32_t wxSlider95GetIncrementCacheRuntime(
   const void* const sliderRuntime
 ) noexcept
 {
@@ -19938,7 +19938,7 @@ namespace
  * - returns inline storage when capacity < 16,
  * - otherwise returns the heap-pointer lane stored at `+0x224`.
  */
-[[maybe_unused]] void* wxInlinePayloadLane224PointerOrNullRuntime(
+void* wxInlinePayloadLane224PointerOrNullRuntime(
   void* const runtimeObject
 ) noexcept
 {
@@ -19994,7 +19994,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * rescales embedded curve keys at runtime lane `+0x138`, then notifies owner
  * virtual lane `+0xF0` with selector `(1, 0)`.
  */
-[[maybe_unused]] int wxUpdateEmitterCurveRangeAndNotifyRuntime(
+int wxUpdateEmitterCurveRangeAndNotifyRuntime(
   void* const emitterCurveOwnerRuntime,
   const float rangeMax
 ) noexcept
@@ -20015,7 +20015,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * floating-point text (`full-consume`), and forwards the parsed value through
  * the emitter float-sink callback lane (`+0x30`) with the provided selector.
  */
-[[maybe_unused]] int wxReadTextSourceDoubleAndApplyEmitterLaneRuntime(
+int wxReadTextSourceDoubleAndApplyEmitterLaneRuntime(
   void* const textSourceRuntime,
   void* const emitterDispatchOwnerRuntime,
   const std::int32_t parameterLane
@@ -20046,7 +20046,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * `1.0f/0.0f`, and forwards that value to emitter parameter lane `6` through
  * the float-sink callback at vtable lane `+0x30`.
  */
-[[maybe_unused]] int wxApplyToggleSourceToEmitterLane6Runtime(
+int wxApplyToggleSourceToEmitterLane6Runtime(
   void* const emitterDispatchOwnerRuntime,
   int
 ) noexcept
@@ -20075,7 +20075,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Reads one integer lane from the slider value-source runtime, converts it to
  * float, and forwards it to the float-sink callback lane with selector `3`.
  */
-[[maybe_unused]] int wxSlider95ApplyFloatSinkFromSourceValueRuntime(
+int wxSlider95ApplyFloatSinkFromSourceValueRuntime(
   void* const sliderRuntime,
   int
 ) noexcept
@@ -20103,7 +20103,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane shared by wxDC and wxDCTemp.
  */
-[[maybe_unused]] void* wxDcGetClassInfoRuntime() noexcept
+void* wxDcGetClassInfoRuntime() noexcept
 {
   return gWxDcClassInfoTable;
 }
@@ -20115,7 +20115,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxScrollBar runtime RTTI checks.
  */
-[[maybe_unused]] void* wxScrollBarGetClassInfoRuntime() noexcept
+void* wxScrollBarGetClassInfoRuntime() noexcept
 {
   return gWxScrollBarClassInfoTable;
 }
@@ -20127,7 +20127,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxStaticBitmap runtime RTTI checks.
  */
-[[maybe_unused]] void* wxStaticBitmapGetClassInfoRuntime() noexcept
+void* wxStaticBitmapGetClassInfoRuntime() noexcept
 {
   return gWxStaticBitmapClassInfoTable;
 }
@@ -20139,7 +20139,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxSpinButton runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSpinButtonGetClassInfoRuntime() noexcept
+void* wxSpinButtonGetClassInfoRuntime() noexcept
 {
   return gWxSpinButtonClassInfoTable;
 }
@@ -20151,7 +20151,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the current minimum value lane from one wx spin-button runtime
  * object.
  */
-[[maybe_unused]] std::int32_t wxSpinButtonGetMinimumRuntime(
+std::int32_t wxSpinButtonGetMinimumRuntime(
   const void* const spinButtonRuntime
 ) noexcept
 {
@@ -20173,7 +20173,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the current thumb-position lane from one wx scroll-bar runtime
  * object.
  */
-[[maybe_unused]] std::int32_t wxScrollBarGetThumbPositionRuntime(
+std::int32_t wxScrollBarGetThumbPositionRuntime(
   const void* const scrollBarRuntime
 ) noexcept
 {
@@ -20195,7 +20195,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the current thumb-range lane from one wx scroll-bar runtime object.
  */
-[[maybe_unused]] std::int32_t wxScrollBarGetThumbRangeRuntime(
+std::int32_t wxScrollBarGetThumbRangeRuntime(
   const void* const scrollBarRuntime
 ) noexcept
 {
@@ -20217,7 +20217,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the current page-size lane from one wx scroll-bar runtime object.
  */
-[[maybe_unused]] std::int32_t wxScrollBarGetPageSizeRuntime(
+std::int32_t wxScrollBarGetPageSizeRuntime(
   const void* const scrollBarRuntime
 ) noexcept
 {
@@ -20240,7 +20240,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the current maximum value lane from one wx spin-button runtime
  * object.
  */
-[[maybe_unused]] std::int32_t wxSpinButtonGetMaximumRuntime(
+std::int32_t wxSpinButtonGetMaximumRuntime(
   const void* const spinButtonRuntime
 ) noexcept
 {
@@ -20262,7 +20262,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Writes one spin-button minimum/maximum range pair and returns the written
  * minimum lane.
  */
-[[maybe_unused]] std::int32_t wxSpinButtonSetRangeRuntime(
+std::int32_t wxSpinButtonSetRangeRuntime(
   void* const spinButtonRuntime,
   const std::int32_t minimumValue,
   const std::int32_t maximumValue
@@ -20289,7 +20289,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the event-table lane for wxTreeListTextCtrl runtime dispatch.
  */
-[[maybe_unused]] const void* wxTreeListTextCtrlGetEventTableRuntime() noexcept
+const void* wxTreeListTextCtrlGetEventTableRuntime() noexcept
 {
   return &gWxTreeListTextCtrlEventTableRuntime;
 }
@@ -20300,7 +20300,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the event-table lane for wxTreeListHeaderWindow runtime dispatch.
  */
-[[maybe_unused]] const void* wxTreeListHeaderWindowGetEventTableRuntime() noexcept
+const void* wxTreeListHeaderWindowGetEventTableRuntime() noexcept
 {
   return &gWxTreeListHeaderWindowEventTableRuntime;
 }
@@ -20312,7 +20312,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the inherited scrolled-window event-table lane for
  * wxTreeListMainWindow runtime dispatch.
  */
-[[maybe_unused]] const void* wxTreeListMainWindowGetEventTableRuntime() noexcept
+const void* wxTreeListMainWindowGetEventTableRuntime() noexcept
 {
   return &gWxTreeListMainWindowEventTableRuntime;
 }
@@ -20324,7 +20324,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane shared by wxTimer-derived runtime types.
  */
-[[maybe_unused]] void* wxTimerGetClassInfoRuntime() noexcept
+void* wxTimerGetClassInfoRuntime() noexcept
 {
   return gWxTimerClassInfoTable;
 }
@@ -20337,7 +20337,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the static class-info lane for wxGenericScrolledWindow runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxGenericScrolledWindowGetClassInfoRuntime() noexcept
+void* wxGenericScrolledWindowGetClassInfoRuntime() noexcept
 {
   return gWxGenericScrolledWindowClassInfoTable;
 }
@@ -20349,7 +20349,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxScrolledWindow runtime RTTI checks.
  */
-[[maybe_unused]] void* wxScrolledWindowGetClassInfoRuntime() noexcept
+void* wxScrolledWindowGetClassInfoRuntime() noexcept
 {
   return gWxScrolledWindowClassInfoTable;
 }
@@ -20361,7 +20361,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the shared scrolled-window event-table lane used by
  * `wxGenericScrolledWindow` and `wxScrolledWindow`.
  */
-[[maybe_unused]] const void* wxScrolledWindowGetEventTableRuntime() noexcept
+const void* wxScrolledWindowGetEventTableRuntime() noexcept
 {
   return &gWxScrolledWindowEventTableRuntime;
 }
@@ -20374,7 +20374,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the static class-info lane for wxTreeListHeaderWindow runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxTreeListHeaderWindowGetClassInfoRuntime() noexcept
+void* wxTreeListHeaderWindowGetClassInfoRuntime() noexcept
 {
   return gWxTreeListHeaderWindowClassInfoTable;
 }
@@ -20386,7 +20386,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxListEvent runtime RTTI checks.
  */
-[[maybe_unused]] void* wxListEventGetClassInfoRuntime() noexcept
+void* wxListEventGetClassInfoRuntime() noexcept
 {
   return gWxListEventClassInfoTable;
 }
@@ -20399,7 +20399,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the static class-info lane for wxTreeListMainWindow runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxTreeListMainWindowGetClassInfoRuntime() noexcept
+void* wxTreeListMainWindowGetClassInfoRuntime() noexcept
 {
   return gWxTreeListMainWindowClassInfoTable;
 }
@@ -20411,7 +20411,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns one column-info lane by index from a direct tree-list column-owner
  * payload (`+0x144/+0x148`), or the global invalid-column sentinel.
  */
-[[maybe_unused]] void** wxTreeListColumnOwnerGetColumnInfoRuntime(
+void** wxTreeListColumnOwnerGetColumnInfoRuntime(
   const void* const columnOwnerRuntime,
   const std::uint32_t columnIndex
 ) noexcept
@@ -20446,7 +20446,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns one column-info lane by index from the owning tree-list main-window
  * column table, or the global invalid-column sentinel when out of range.
  */
-[[maybe_unused]] void** wxTreeListMainWindowGetColumnInfoRuntime(
+void** wxTreeListMainWindowGetColumnInfoRuntime(
   const void* const treeListMainWindowRuntime,
   const std::uint32_t columnIndex
 ) noexcept
@@ -20496,7 +20496,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Resolves one tree-list column-info lane by first dereferencing owner pointer
  * at `+0x130`, then applying the owner-column lookup path (`+0x144/+0x148`).
  */
-[[maybe_unused]] void** wxTreeListControlGetColumnInfoRuntime(
+void** wxTreeListControlGetColumnInfoRuntime(
   const void* const treeListControlRuntime,
   const std::uint32_t columnIndex
 ) noexcept
@@ -20525,7 +20525,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns one tree-list column width lane (`+0x14`) for `columnIndex`, or the
  * invalid-column sentinel width when out of range.
  */
-[[maybe_unused]] std::int32_t wxTreeListControlGetColumnWidthRuntime(
+std::int32_t wxTreeListControlGetColumnWidthRuntime(
   const void* const treeListControlRuntime,
   const std::uint32_t columnIndex
 ) noexcept
@@ -20542,7 +20542,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns one tree-list column visible-flag lane (`+0x08`) for `columnIndex`,
  * or the invalid-column sentinel flag when out of range.
  */
-[[maybe_unused]] std::uint8_t wxTreeListControlGetColumnShownFlagRuntime(
+std::uint8_t wxTreeListControlGetColumnShownFlagRuntime(
   const void* const treeListControlRuntime,
   const std::uint32_t columnIndex
 ) noexcept
@@ -20559,7 +20559,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns one tree-list column user-data lane (`+0x0C`) for `columnIndex`, or
  * the invalid-column sentinel user-data when out of range.
  */
-[[maybe_unused]] std::int32_t wxTreeListControlGetColumnUserDataRuntime(
+std::int32_t wxTreeListControlGetColumnUserDataRuntime(
   const void* const treeListControlRuntime,
   const std::uint32_t columnIndex
 ) noexcept
@@ -20576,7 +20576,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxTLWHiddenParentModule RTTI checks.
  */
-[[maybe_unused]] void* wxTlwHiddenParentModuleGetClassInfoRuntime() noexcept
+void* wxTlwHiddenParentModuleGetClassInfoRuntime() noexcept
 {
   return gWxTlwHiddenParentModuleClassInfoTable;
 }
@@ -20588,7 +20588,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxSizerItem runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSizerItemGetClassInfoRuntime() noexcept
+void* wxSizerItemGetClassInfoRuntime() noexcept
 {
   return gWxSizerItemClassInfoTable;
 }
@@ -20600,7 +20600,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxStatusBar runtime RTTI checks.
  */
-[[maybe_unused]] void* wxStatusBarGetClassInfoRuntime() noexcept
+void* wxStatusBarGetClassInfoRuntime() noexcept
 {
   return gWxStatusBarClassInfoTable;
 }
@@ -20611,7 +20611,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the process-global status-bar implementation selection flag.
  */
-[[maybe_unused]] std::uint8_t wxGetCompactStatusBarRuntimeFlag() noexcept
+std::uint8_t wxGetCompactStatusBarRuntimeFlag() noexcept
 {
   return gWxUseCompactStatusBarRuntimeFlag;
 }
@@ -20624,7 +20624,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * Returns the static class-info lane for wxStatusBarGeneric runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxStatusBarGenericGetClassInfoRuntime() noexcept
+void* wxStatusBarGenericGetClassInfoRuntime() noexcept
 {
   return gWxStatusBarGenericClassInfoTable;
 }
@@ -20635,7 +20635,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static event-table lane for wxGenericDirCtrl runtime dispatch.
  */
-[[maybe_unused]] const void* wxGenericDirCtrlGetEventTableRuntime() noexcept
+const void* wxGenericDirCtrlGetEventTableRuntime() noexcept
 {
   return &gWxGenericDirCtrlEventTableRuntime;
 }
@@ -20646,7 +20646,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Clears the owned directory-control pointer lane during constructor setup.
  */
-[[maybe_unused]] void wxDirFilterListCtrlResetOwnerRuntime(
+void wxDirFilterListCtrlResetOwnerRuntime(
   void* const dirFilterListCtrlRuntime
 ) noexcept
 {
@@ -20671,7 +20671,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * forwards that selection/path update sequence into the owned directory-control
  * virtual lanes.
  */
-[[maybe_unused]] void wxDirFilterListCtrlApplyFilterSelectionRuntime(
+void wxDirFilterListCtrlApplyFilterSelectionRuntime(
   void* const dirFilterListCtrlRuntime,
   const std::int32_t eventArg
 ) noexcept
@@ -20745,7 +20745,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns whether one wx-menu-item runtime lane is flagged as checkable.
  */
-[[maybe_unused]] bool wxMenuItemIsCheckableRuntime(
+bool wxMenuItemIsCheckableRuntime(
   const void* const menuItemRuntime
 ) noexcept
 {
@@ -20759,7 +20759,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Clears the attached menu-bar ownership lane on one wx-menu runtime object.
  */
-[[maybe_unused]] void wxMenuClearAttachedMenuBarRuntime(
+void wxMenuClearAttachedMenuBarRuntime(
   void* const menuRuntime
 ) noexcept
 {
@@ -20778,7 +20778,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxMenuItem runtime RTTI checks.
  */
-[[maybe_unused]] void* wxMenuItemGetClassInfoRuntime() noexcept
+void* wxMenuItemGetClassInfoRuntime() noexcept
 {
   return gWxMenuItemClassInfoTable;
 }
@@ -20790,7 +20790,7 @@ void wxReleaseLegacySharedWideStringLaneRuntime(
  * What it does:
  * Returns the static class-info lane for wxNotebookEvent runtime RTTI checks.
  */
-[[maybe_unused]] void* wxNotebookEventGetClassInfoRuntime() noexcept
+void* wxNotebookEventGetClassInfoRuntime() noexcept
 {
   return gWxNotebookEventClassInfoTable;
 }
@@ -20811,7 +20811,7 @@ static_assert(
  * What it does:
  * Returns one notebook native tab-handle lane from offset `+0x134`.
  */
-[[maybe_unused]] HWND wxNotebookGetNativeTabHandleRuntime(
+HWND wxNotebookGetNativeTabHandleRuntime(
   const void* const notebookRuntime
 ) noexcept
 {
@@ -20842,7 +20842,7 @@ static_assert(
  * Initializes notebook selection lanes: resets current selection to `0` and
  * marks previous selection as `-1`.
  */
-[[maybe_unused]] void wxNotebookInitializeSelectionStateRuntime(
+void wxNotebookInitializeSelectionStateRuntime(
   void* const notebookRuntime
 ) noexcept
 {
@@ -20858,7 +20858,7 @@ static_assert(
  * Returns the shared class-info lane used by wx tip/popup transient window
  * runtime RTTI checks.
  */
-[[maybe_unused]] void* wxPopupTransientWindowGetClassInfoRuntime() noexcept
+void* wxPopupTransientWindowGetClassInfoRuntime() noexcept
 {
   return gWxPopupTransientWindowClassInfoTable;
 }
@@ -20869,7 +20869,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for wxHTTP runtime RTTI checks.
  */
-[[maybe_unused]] void* wxHttpGetClassInfoRuntime() noexcept
+void* wxHttpGetClassInfoRuntime() noexcept
 {
   return gWxHttpClassInfoTable;
 }
@@ -20880,7 +20880,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for wxFTP runtime RTTI checks.
  */
-[[maybe_unused]] void* wxFtpGetClassInfoRuntime() noexcept
+void* wxFtpGetClassInfoRuntime() noexcept
 {
   return gWxFtpClassInfoTable;
 }
@@ -20891,7 +20891,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for wxSockAddress runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSockAddressGetClassInfoRuntime() noexcept
+void* wxSockAddressGetClassInfoRuntime() noexcept
 {
   return gWxSockAddressClassInfoTable;
 }
@@ -20902,7 +20902,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for wxIPV4address runtime RTTI checks.
  */
-[[maybe_unused]] void* wxIpv4AddressGetClassInfoRuntime() noexcept
+void* wxIpv4AddressGetClassInfoRuntime() noexcept
 {
   return gWxIpv4AddressClassInfoTable;
 }
@@ -20913,7 +20913,7 @@ static_assert(
  * What it does:
  * Returns the static event-table lane for wxTipWindow runtime dispatch.
  */
-[[maybe_unused]] const void* wxTipWindowGetEventTableRuntime() noexcept
+const void* wxTipWindowGetEventTableRuntime() noexcept
 {
   return &gWxTipWindowEventTableRuntime;
 }
@@ -20924,7 +20924,7 @@ static_assert(
  * What it does:
  * Returns the static event-table lane for wxTipWindowView runtime dispatch.
  */
-[[maybe_unused]] const void* wxTipWindowViewGetEventTableRuntime() noexcept
+const void* wxTipWindowViewGetEventTableRuntime() noexcept
 {
   return &gWxTipWindowViewEventTableRuntime;
 }
@@ -20994,7 +20994,7 @@ namespace
  * Clears one optional owner back-reference lane (`+0x14C`), hides the tip
  * window, then dispatches window-destroy teardown.
  */
-[[maybe_unused]] bool wxTipWindowHideAndDestroyRuntime(
+bool wxTipWindowHideAndDestroyRuntime(
   WxTipWindowCloseRuntimeView* const tipWindowRuntime
 )
 {
@@ -21019,7 +21019,7 @@ namespace
  * Forwards one host runtime active-tip lane (`+0x124`) into
  * `wxTipWindowHideAndDestroyRuntime`.
  */
-[[maybe_unused]] bool wxTipWindowHostCloseActiveTipRuntime(
+bool wxTipWindowHostCloseActiveTipRuntime(
   WxTipWindowHostRuntimeView* const hostRuntime,
   const int unusedArg
 )
@@ -21034,7 +21034,7 @@ namespace
  * What it does:
  * Stdcall thunk lane that forwards directly to tip-window hide/destroy helper.
  */
-[[maybe_unused]] bool wxTipWindowHideAndDestroyStdcallThunk(
+bool wxTipWindowHideAndDestroyStdcallThunk(
   WxTipWindowCloseRuntimeView* const tipWindowRuntime
 )
 {
@@ -21048,7 +21048,7 @@ namespace
  * Thiscall thunk lane that forwards directly to tip-window hide/destroy
  * helper.
  */
-[[maybe_unused]] bool wxTipWindowHideAndDestroyThiscallThunk(
+bool wxTipWindowHideAndDestroyThiscallThunk(
   WxTipWindowCloseRuntimeView* const tipWindowRuntime
 )
 {
@@ -21063,7 +21063,7 @@ namespace
  * visible when no bounds are active or when the point remains inside the
  * bounds lane at `+0x150`; otherwise closes the active tip window.
  */
-[[maybe_unused]] void wxTipWindowHostHandleMouseDismissRuntime(
+void wxTipWindowHostHandleMouseDismissRuntime(
   WxTipWindowHostRuntimeView* const hostRuntime,
   WxTipWindowMouseEventRuntimeView* const mouseEvent
 )
@@ -21094,7 +21094,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxColourData runtime RTTI checks.
  */
-[[maybe_unused]] void* wxColourDataGetClassInfoRuntime() noexcept
+void* wxColourDataGetClassInfoRuntime() noexcept
 {
   return gWxColourDataClassInfoTable;
 }
@@ -21105,7 +21105,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxPrintData runtime RTTI checks.
  */
-[[maybe_unused]] void* wxPrintDataGetClassInfoRuntime() noexcept
+void* wxPrintDataGetClassInfoRuntime() noexcept
 {
   return gWxPrintDataClassInfoTable;
 }
@@ -21117,7 +21117,7 @@ namespace
  * Returns the static class-info lane for wxPrintDialogData runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxPrintDialogDataGetClassInfoRuntime() noexcept
+void* wxPrintDialogDataGetClassInfoRuntime() noexcept
 {
   return gWxPrintDialogDataClassInfoTable;
 }
@@ -21129,7 +21129,7 @@ namespace
  * Returns the static class-info lane for wxPageSetupDialogData runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxPageSetupDialogDataGetClassInfoRuntime() noexcept
+void* wxPageSetupDialogDataGetClassInfoRuntime() noexcept
 {
   return gWxPageSetupDialogDataClassInfoTable;
 }
@@ -21140,7 +21140,7 @@ namespace
  * What it does:
  * Returns the static event-table lane for wxTextEntryDialog runtime dispatch.
  */
-[[maybe_unused]] const void* wxTextEntryDialogGetEventTableRuntime() noexcept
+const void* wxTextEntryDialogGetEventTableRuntime() noexcept
 {
   return &gWxTextEntryDialogEventTableRuntime;
 }
@@ -21152,7 +21152,7 @@ namespace
  * Returns the static class-info lane for wxTextEntryDialog runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxTextEntryDialogGetClassInfoRuntime() noexcept
+void* wxTextEntryDialogGetClassInfoRuntime() noexcept
 {
   return gWxTextEntryDialogClassInfoTable;
 }
@@ -21163,7 +21163,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxColourDialog runtime RTTI checks.
  */
-[[maybe_unused]] void* wxColourDialogGetClassInfoRuntime() noexcept
+void* wxColourDialogGetClassInfoRuntime() noexcept
 {
   return gWxColourDialogClassInfoTable;
 }
@@ -21175,7 +21175,7 @@ namespace
  * Returns the static class-info lane for wxSingleChoiceDialog runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxSingleChoiceDialogGetClassInfoRuntime() noexcept
+void* wxSingleChoiceDialogGetClassInfoRuntime() noexcept
 {
   return gWxSingleChoiceDialogClassInfoTable;
 }
@@ -21187,7 +21187,7 @@ namespace
  * Returns the static class-info lane for wxMultiChoiceDialog runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxMultiChoiceDialogGetClassInfoRuntime() noexcept
+void* wxMultiChoiceDialogGetClassInfoRuntime() noexcept
 {
   return gWxMultiChoiceDialogClassInfoTable;
 }
@@ -21199,7 +21199,7 @@ namespace
  * Returns the static event-table lane for wxSingleChoiceDialog runtime
  * dispatch.
  */
-[[maybe_unused]] const void* wxSingleChoiceDialogGetEventTableRuntime() noexcept
+const void* wxSingleChoiceDialogGetEventTableRuntime() noexcept
 {
   return &gWxSingleChoiceDialogEventTableRuntime;
 }
@@ -21210,7 +21210,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxQuantize runtime RTTI checks.
  */
-[[maybe_unused]] void* wxQuantizeGetClassInfoRuntime() noexcept
+void* wxQuantizeGetClassInfoRuntime() noexcept
 {
   return gWxQuantizeClassInfoTable;
 }
@@ -21222,7 +21222,7 @@ namespace
  * Returns the static class-info lane for wxPluginLibraryModule runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxPluginLibraryModuleGetClassInfoRuntime() noexcept
+void* wxPluginLibraryModuleGetClassInfoRuntime() noexcept
 {
   return gWxPluginLibraryModuleClassInfoTable;
 }
@@ -21234,7 +21234,7 @@ namespace
  * Returns the static class-info lane for wxArtProviderModule runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxArtProviderModuleGetClassInfoRuntime() noexcept
+void* wxArtProviderModuleGetClassInfoRuntime() noexcept
 {
   return gWxArtProviderModuleClassInfoTable;
 }
@@ -21245,7 +21245,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxEnhMetaFileDC runtime RTTI checks.
  */
-[[maybe_unused]] void* wxEnhMetaFileDcGetClassInfoRuntime() noexcept
+void* wxEnhMetaFileDcGetClassInfoRuntime() noexcept
 {
   return gWxEnhMetaFileDcClassInfoTable;
 }
@@ -21256,7 +21256,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxSocketEvent runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSocketEventGetClassInfoRuntime() noexcept
+void* wxSocketEventGetClassInfoRuntime() noexcept
 {
   return gWxSocketEventClassInfoTable;
 }
@@ -21267,7 +21267,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxSocketBase runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSocketBaseGetClassInfoRuntime() noexcept
+void* wxSocketBaseGetClassInfoRuntime() noexcept
 {
   return gWxSocketBaseClassInfoTable;
 }
@@ -21278,7 +21278,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxSocketModule runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSocketModuleGetClassInfoRuntime() noexcept
+void* wxSocketModuleGetClassInfoRuntime() noexcept
 {
   return gWxSocketModuleClassInfoTable;
 }
@@ -21289,7 +21289,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxSocketServer runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSocketServerGetClassInfoRuntime() noexcept
+void* wxSocketServerGetClassInfoRuntime() noexcept
 {
   return gWxSocketServerClassInfoTable;
 }
@@ -21300,7 +21300,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxSocketClient runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSocketClientGetClassInfoRuntime() noexcept
+void* wxSocketClientGetClassInfoRuntime() noexcept
 {
   return gWxSocketClientClassInfoTable;
 }
@@ -21312,7 +21312,7 @@ namespace
  * Returns the static class-info lane for wxDatagramSocket runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxDatagramSocketGetClassInfoRuntime() noexcept
+void* wxDatagramSocketGetClassInfoRuntime() noexcept
 {
   return gWxDatagramSocketClassInfoTable;
 }
@@ -21323,7 +21323,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxProtoInfo runtime RTTI checks.
  */
-[[maybe_unused]] void* wxProtoInfoGetClassInfoRuntime() noexcept
+void* wxProtoInfoGetClassInfoRuntime() noexcept
 {
   return gWxProtoInfoClassInfoTable;
 }
@@ -21334,7 +21334,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxProtocol runtime RTTI checks.
  */
-[[maybe_unused]] void* wxProtocolGetClassInfoRuntime() noexcept
+void* wxProtocolGetClassInfoRuntime() noexcept
 {
   return gWxProtocolClassInfoTable;
 }
@@ -21346,7 +21346,7 @@ namespace
  * Returns the shared class-info lane used by wx art-provider runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxArtProviderGetClassInfoRuntime() noexcept
+void* wxArtProviderGetClassInfoRuntime() noexcept
 {
   return gWxArtProviderClassInfoTable;
 }
@@ -21357,7 +21357,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxBMPFileHandler runtime RTTI checks.
  */
-[[maybe_unused]] void* wxBmpFileHandlerGetClassInfoRuntime() noexcept
+void* wxBmpFileHandlerGetClassInfoRuntime() noexcept
 {
   return gWxBmpFileHandlerClassInfoTable;
 }
@@ -21369,7 +21369,7 @@ namespace
  * Returns the static class-info lane for wxBMPResourceHandler runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxBmpResourceHandlerGetClassInfoRuntime() noexcept
+void* wxBmpResourceHandlerGetClassInfoRuntime() noexcept
 {
   return gWxBmpResourceHandlerClassInfoTable;
 }
@@ -21380,7 +21380,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxICOFileHandler runtime RTTI checks.
  */
-[[maybe_unused]] void* wxIcoFileHandlerGetClassInfoRuntime() noexcept
+void* wxIcoFileHandlerGetClassInfoRuntime() noexcept
 {
   return gWxIcoFileHandlerClassInfoTable;
 }
@@ -21392,7 +21392,7 @@ namespace
  * Returns the static class-info lane for wxICOResourceHandler runtime RTTI
  * checks.
  */
-[[maybe_unused]] void* wxIcoResourceHandlerGetClassInfoRuntime() noexcept
+void* wxIcoResourceHandlerGetClassInfoRuntime() noexcept
 {
   return gWxIcoResourceHandlerClassInfoTable;
 }
@@ -21403,7 +21403,7 @@ namespace
  * What it does:
  * Returns the event-table lane for wxSplashScreen runtime event dispatch.
  */
-[[maybe_unused]] const void* wxSplashScreenGetEventTableRuntime() noexcept
+const void* wxSplashScreenGetEventTableRuntime() noexcept
 {
   return &gWxSplashScreenEventTableRuntime;
 }
@@ -21414,7 +21414,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxSplashScreen runtime RTTI checks.
  */
-[[maybe_unused]] void* wxSplashScreenGetClassInfoRuntime() noexcept
+void* wxSplashScreenGetClassInfoRuntime() noexcept
 {
   return gWxSplashScreenClassInfoTable;
 }
@@ -21426,7 +21426,7 @@ namespace
  * Returns the event-table lane for wxSplashScreenWindow runtime event
  * dispatch.
  */
-[[maybe_unused]] const void* wxSplashScreenWindowGetEventTableRuntime() noexcept
+const void* wxSplashScreenWindowGetEventTableRuntime() noexcept
 {
   return &gWxSplashScreenWindowEventTableRuntime;
 }
@@ -21437,7 +21437,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxThreadModule runtime RTTI checks.
  */
-[[maybe_unused]] void* wxThreadModuleGetClassInfoRuntime() noexcept
+void* wxThreadModuleGetClassInfoRuntime() noexcept
 {
   return gWxThreadModuleClassInfoTable;
 }
@@ -21449,7 +21449,7 @@ namespace
  * Returns the panel event-table lane used as one base-event source for
  * scrolled-window runtime event dispatch.
  */
-[[maybe_unused]] const void* wxPanelGetEventTableRuntime() noexcept
+const void* wxPanelGetEventTableRuntime() noexcept
 {
   return &gWxPanelEventTableRuntime;
 }
@@ -21460,7 +21460,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxFileDialog runtime RTTI checks.
  */
-[[maybe_unused]] void* wxFileDialogGetClassInfoRuntime() noexcept
+void* wxFileDialogGetClassInfoRuntime() noexcept
 {
   return gWxFileDialogClassInfoTable;
 }
@@ -21471,7 +21471,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxMessageDialog runtime RTTI checks.
  */
-[[maybe_unused]] void* wxMessageDialogGetClassInfoRuntime() noexcept
+void* wxMessageDialogGetClassInfoRuntime() noexcept
 {
   return gWxMessageDialogClassInfoTable;
 }
@@ -21482,7 +21482,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxDirDialog runtime RTTI checks.
  */
-[[maybe_unused]] void* wxDirDialogGetClassInfoRuntime() noexcept
+void* wxDirDialogGetClassInfoRuntime() noexcept
 {
   return gWxDirDialogClassInfoTable;
 }
@@ -21494,7 +21494,7 @@ namespace
  * Frees one shell item-list allocation through `SHGetMalloc` and releases the
  * acquired allocator interface lane.
  */
-[[maybe_unused]] IMalloc* wxShellFreeItemListRuntime(
+IMalloc* wxShellFreeItemListRuntime(
   void* const itemList,
   IMalloc* allocatorSeed
 ) noexcept
@@ -21518,7 +21518,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxURL runtime RTTI checks.
  */
-[[maybe_unused]] void* wxURLGetClassInfoRuntime() noexcept
+void* wxURLGetClassInfoRuntime() noexcept
 {
   return gWxUrlClassInfoTable;
 }
@@ -21529,7 +21529,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxURLModule runtime RTTI checks.
  */
-[[maybe_unused]] void* wxURLModuleGetClassInfoRuntime() noexcept
+void* wxURLModuleGetClassInfoRuntime() noexcept
 {
   return gWxUrlModuleClassInfoTable;
 }
@@ -21540,7 +21540,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxPenList runtime RTTI checks.
  */
-[[maybe_unused]] void* wxPenListGetClassInfoRuntime() noexcept
+void* wxPenListGetClassInfoRuntime() noexcept
 {
   return gWxPenListClassInfoTable;
 }
@@ -21551,7 +21551,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for wxBrushList runtime RTTI checks.
  */
-[[maybe_unused]] void* wxBrushListGetClassInfoRuntime() noexcept
+void* wxBrushListGetClassInfoRuntime() noexcept
 {
   return gWxBrushListClassInfoTable;
 }
@@ -21562,7 +21562,7 @@ namespace
  * What it does:
  * Returns one mutable pointer to the active config-path wxString lane.
  */
-[[maybe_unused]] wxStringRuntime* wxConfigGetCurrentPathRuntime(
+wxStringRuntime* wxConfigGetCurrentPathRuntime(
   void* const configRuntime
 ) noexcept
 {
@@ -21577,7 +21577,7 @@ namespace
  * Dispatches virtual slot `+0x28` with one integer argument and normalizes
  * the returned byte lane to Win32 `BOOL`.
  */
-[[maybe_unused]] BOOL wxDispatchVirtualSlot28AsBoolRuntime(
+BOOL wxDispatchVirtualSlot28AsBoolRuntime(
   void* const runtimeObject,
   const int slotArg
 ) noexcept
@@ -21742,7 +21742,7 @@ namespace
  * What it does:
  * Writes one byte flag into runtime lane `+0x0C` and returns that byte.
  */
-[[maybe_unused]] std::uint8_t wxSetRuntimeByteFlag0C(
+std::uint8_t wxSetRuntimeByteFlag0C(
   WxFlagAndObjectSlotRuntimeView* const runtime,
   const std::uint8_t value
 ) noexcept
@@ -21758,7 +21758,7 @@ namespace
  * Returns localized text for `sourceText` through active `wxLocale` when
  * present, otherwise returns `sourceText` unchanged.
  */
-[[maybe_unused]] const wchar_t* wxLocaleGetStringOrIdentityRuntime(
+const wchar_t* wxLocaleGetStringOrIdentityRuntime(
   const wchar_t* const sourceText
 ) noexcept
 {
@@ -21775,7 +21775,7 @@ namespace
  * What it does:
  * Reads one byte flag from runtime lane `+0x04`.
  */
-[[maybe_unused]] std::uint8_t wxGetRuntimeByteFlag04(
+std::uint8_t wxGetRuntimeByteFlag04(
   const WxFlagAndObjectSlotRuntimeView* const runtime
 ) noexcept
 {
@@ -21788,7 +21788,7 @@ namespace
  * What it does:
  * Reads one byte flag from runtime lane `+0x0C`.
  */
-[[maybe_unused]] std::uint8_t wxGetRuntimeByteFlag0C(
+std::uint8_t wxGetRuntimeByteFlag0C(
   const WxFlagAndObjectSlotRuntimeView* const runtime
 ) noexcept
 {
@@ -21802,7 +21802,7 @@ namespace
  * Stores one pointer/integer lane at runtime offset `+0x08` and returns the
  * assigned value.
  */
-[[maybe_unused]] std::uintptr_t wxSetRuntimeObjectLane08(
+std::uintptr_t wxSetRuntimeObjectLane08(
   WxFlagAndObjectSlotRuntimeView* const runtime,
   const std::uintptr_t laneValue
 ) noexcept
@@ -21945,7 +21945,7 @@ namespace
    * returns consumed unit count; malformed surrogate pairs return `-1` while
    * preserving the lead-unit scalar fallback.
    */
-  [[maybe_unused]] [[nodiscard]] int wxConvertUtf16CodeUnitsToCodePointRuntime(
+  [[nodiscard]] int wxConvertUtf16CodeUnitsToCodePointRuntime(
     const std::uint16_t* const inputWideText,
     std::uint32_t* const outCodePoint
   ) noexcept
@@ -22096,7 +22096,7 @@ namespace
  * What it does:
  * Rebinds one `wxMBConvUTF8` payload to its constructor vtable lane.
  */
-[[maybe_unused]] void* wxConstructMbConvUtf8RuntimeVTable(
+void* wxConstructMbConvUtf8RuntimeVTable(
   void* const mbConvRuntime
 ) noexcept
 {
@@ -22120,7 +22120,7 @@ namespace
  * Initializes one `wxCharacterSet` base payload by binding the constructor
  * vtable lane and storing one runtime lane pointer at `+0x04`.
  */
-[[maybe_unused]] WxCharacterSetForwardRuntimeView* wxConstructCharacterSetRuntime(
+WxCharacterSetForwardRuntimeView* wxConstructCharacterSetRuntime(
   WxCharacterSetForwardRuntimeView* const characterSetRuntime,
   void* const runtimeLane04
 ) noexcept
@@ -22142,7 +22142,7 @@ namespace
  * Initializes one `ID_CharSet` payload by binding the derived vtable lane and
  * storing runtime lanes at `+0x04` and `+0x08`.
  */
-[[maybe_unused]] WxCharacterSetForwardRuntimeView* wxConstructIdCharacterSetRuntime(
+WxCharacterSetForwardRuntimeView* wxConstructIdCharacterSetRuntime(
   WxCharacterSetForwardRuntimeView* const characterSetRuntime,
   void* const runtimeLane04,
   WxCharacterSetForwardRuntimeInterface* const forwardConverter
@@ -22166,7 +22166,7 @@ namespace
  * Rebinds one `wxCharacterSet` payload back to the base constructor vtable
  * lane.
  */
-[[maybe_unused]] void wxResetCharacterSetRuntimeVTableLaneA(
+void wxResetCharacterSetRuntimeVTableLaneA(
   WxCharacterSetForwardRuntimeView* const characterSetRuntime
 ) noexcept
 {
@@ -22183,7 +22183,7 @@ namespace
  * Secondary lane that rebinds one `wxCharacterSet` payload to the base
  * constructor vtable lane.
  */
-[[maybe_unused]] void wxResetCharacterSetRuntimeVTableLaneB(
+void wxResetCharacterSetRuntimeVTableLaneB(
   WxCharacterSetForwardRuntimeView* const characterSetRuntime
 ) noexcept
 {
@@ -22201,7 +22201,7 @@ namespace
  * mode when `outputWideText` is null, and returns `-1` for malformed or
  * overlong input lanes.
  */
-[[maybe_unused]] int __stdcall wxMBConvUTF8DecodeToWideCharsRuntime(
+int __stdcall wxMBConvUTF8DecodeToWideCharsRuntime(
   std::uint16_t* outputWideText,
   const std::uint8_t* utf8Text,
   const unsigned int outputCapacity
@@ -22297,7 +22297,7 @@ decode_next_byte:
  * Forwards one multibyte-to-wide conversion call through the delegated
  * character-set lane at `+0x08`; returns `-1` when no delegate is bound.
  */
-[[maybe_unused]] int wxCharacterSetForwardConvertMultiByteToWideRuntime(
+int wxCharacterSetForwardConvertMultiByteToWideRuntime(
   void* const characterSetRuntime,
   void* const outputWideText,
   const void* const sourceText,
@@ -22318,7 +22318,7 @@ decode_next_byte:
  * Forwards one wide-to-multibyte conversion call through the delegated
  * character-set lane at `+0x08`; returns `-1` when no delegate is bound.
  */
-[[maybe_unused]] int wxCharacterSetForwardConvertWideToMultiByteRuntime(
+int wxCharacterSetForwardConvertWideToMultiByteRuntime(
   void* const characterSetRuntime,
   void* const outputText,
   const void* const sourceWideText,
@@ -22339,7 +22339,7 @@ decode_next_byte:
  * Returns whether one delegated character-set conversion lane is currently
  * bound at `+0x08`.
  */
-[[maybe_unused]] bool wxCharacterSetHasForwardConverterRuntime(
+bool wxCharacterSetHasForwardConverterRuntime(
   const void* const characterSetRuntime
 ) noexcept
 {
@@ -22354,7 +22354,7 @@ decode_next_byte:
  * Returns source multibyte-string length and, when output is requested, writes
  * one terminating UTF-16 sequence through the character-set lane at `this+0x0C`.
  */
-[[maybe_unused]] unsigned int wxCharacterSetConvertMultiByteToWideRuntime(
+unsigned int wxCharacterSetConvertMultiByteToWideRuntime(
   void* const characterSetRuntime,
   wchar_t* const outputWideText,
   const char* const sourceText,
@@ -22378,7 +22378,7 @@ decode_next_byte:
  * Returns source wide-string length and, when output is requested, writes one
  * terminating multibyte sequence through the character-set lane at `this+0x1C`.
  */
-[[maybe_unused]] unsigned int wxCharacterSetConvertWideToMultiByteRuntime(
+unsigned int wxCharacterSetConvertWideToMultiByteRuntime(
   void* const characterSetRuntime,
   char* const outputText,
   const wchar_t* const sourceWideText,
@@ -22414,7 +22414,7 @@ namespace
  * What it does:
  * Returns the cached encoding round-trip capability flag at `+0x2C`.
  */
-[[maybe_unused]] char wxEncodingCharacterSetHasBidirectionalMappingRuntime(
+char wxEncodingCharacterSetHasBidirectionalMappingRuntime(
   const void* const encodingRuntime
 ) noexcept
 {
@@ -22430,7 +22430,7 @@ namespace
  * lane at `+0x08`; returns `-1` on conversion failure and supports count-only
  * mode when `outputWideText` is null.
  */
-[[maybe_unused]] int wxCharacterSetConvertCodePageMultiByteToWideRuntime(
+int wxCharacterSetConvertCodePageMultiByteToWideRuntime(
   void* const converterRuntime,
   wchar_t* const outputWideText,
   const char* const sourceText,
@@ -22465,7 +22465,7 @@ namespace
  * code-page lane at `+0x08`; returns `-1` on conversion failure and supports
  * count-only mode when `outputText` is null.
  */
-[[maybe_unused]] int wxCharacterSetConvertCodePageWideToMultiByteRuntime(
+int wxCharacterSetConvertCodePageWideToMultiByteRuntime(
   void* const converterRuntime,
   char* const outputText,
   const wchar_t* const sourceWideText,
@@ -22501,7 +22501,7 @@ namespace
  * Returns whether the runtime code-page lane at `+0x08` is initialized to a
  * non-`-1` value.
  */
-[[maybe_unused]] bool wxCharacterSetHasAssignedCodePageRuntime(
+bool wxCharacterSetHasAssignedCodePageRuntime(
   const void* const converterRuntime
 ) noexcept
 {
@@ -22663,7 +22663,7 @@ bool wxMouseEventMatchesReleaseSelectorRuntime_Impl(
  * Matches one mouse-event button selector lane (`-1/1/2/3`) against event
  * type lane `+0x0C` using the left/middle/right press-release-dclick triples.
  */
-[[maybe_unused]] bool wxMouseEventMatchesButtonSelectorRuntime(
+bool wxMouseEventMatchesButtonSelectorRuntime(
   const void* const mouseEventRuntime,
   const std::int32_t selector
 ) noexcept
@@ -22795,7 +22795,7 @@ INT_PTR __stdcall wxNoOpNativeDialogProc(
  * What it does:
  * Clears both hidden top-level-parent singleton lanes and returns success.
  */
-[[maybe_unused]] int wxResetTopLevelWindowParentSingletonsRuntime() noexcept
+int wxResetTopLevelWindowParentSingletonsRuntime() noexcept
 {
   gWxHiddenTopLevelParentWindow = nullptr;
   gWxHiddenTopLevelParentClassName = nullptr;
@@ -22869,7 +22869,7 @@ BOOL wxMenuMarkItemAsDefault(
  * (`+0x108`), with optional toolbar-button enable forwarding through ancestor
  * chain lane `+0x2C` when `enable != 0`.
  */
-[[maybe_unused]] void wxToggleWindowStyleBit0AndToolbarStateRuntime(
+void wxToggleWindowStyleBit0AndToolbarStateRuntime(
   void* const windowRuntime,
   const std::uint8_t enable
 )
@@ -22982,7 +22982,7 @@ BOOL wxDrawRectangleOutlineFromBounds(
  * Draws one themed button-style frame into `sourceRect` using four system-color
  * pens, with optional inset passes controlled by the two flag lanes.
  */
-[[maybe_unused]] BOOL wxDrawButtonFrameWithSystemPensRuntime(
+BOOL wxDrawButtonFrameWithSystemPensRuntime(
   const HDC deviceContext,
   const RECT* const sourceRect,
   const bool drawInsetOutline,
@@ -23046,7 +23046,7 @@ BOOL wxDrawRectangleOutlineFromBounds(
  * Ensures the native child window style at `+0x108` has bits `0xB` set and
  * returns either the previous style or the `SetWindowLongW` result.
  */
-[[maybe_unused]] LONG wxEnsureWindowStyleBits0xB(
+LONG wxEnsureWindowStyleBits0xB(
   const void* const windowRuntime
 ) noexcept
 {
@@ -23093,7 +23093,7 @@ namespace
  * Handles slider ctl-color routing by suppressing color-id lane `5` and
  * forwarding all other lanes to the wx-control base ctl-color path.
  */
-[[maybe_unused]] unsigned long wxSlider95OnCtlColorRuntime(
+unsigned long wxSlider95OnCtlColorRuntime(
   wxControlRuntime* const sliderRuntime,
   const unsigned long hdc,
   const unsigned long hwnd,
@@ -23118,7 +23118,7 @@ namespace
  * the slider virtual lane at `vftable+0x21C`, then forwards the event into
  * wx-control command processing.
  */
-[[maybe_unused]] void wxSlider95DispatchCommandRuntime(
+void wxSlider95DispatchCommandRuntime(
   wxControlRuntime* const sliderRuntime,
   const void* const commandEvent
 )
@@ -23139,7 +23139,7 @@ namespace
  * Forwards one visibility toggle to `wxWindow::Show`, then applies the same
  * show/hide state to three slider-owned child HWND lanes.
  */
-[[maybe_unused]] bool wxSliderShowWithChildWindows(
+bool wxSliderShowWithChildWindows(
   wxWindowBase* const sliderRuntime,
   const bool show
 )
@@ -23231,7 +23231,7 @@ static_assert(
  * Populates command-event text through the combo-box virtual text-export lane
  * and returns the output string pointer.
  */
-[[maybe_unused]] wxStringRuntime* wxComboBoxBuildCommandStringRuntime(
+wxStringRuntime* wxComboBoxBuildCommandStringRuntime(
   void* const comboBoxRuntime,
   wxStringRuntime* const outText
 )
@@ -23248,7 +23248,7 @@ static_assert(
  * Forwards one selection index to the native combo-box window with
  * `CB_SETCURSEL`.
  */
-[[maybe_unused]] LRESULT wxComboBoxSetSelectionRuntime(
+LRESULT wxComboBoxSetSelectionRuntime(
   void* const comboBoxRuntime,
   const WPARAM selectionIndex
 ) noexcept
@@ -23268,7 +23268,7 @@ static_assert(
  * Thunk lane that forwards one combo-box selection-index update into
  * `FUN_009B2E30`.
  */
-[[maybe_unused]] LRESULT wxComboBoxSetSelectionRuntimeAdapter(
+LRESULT wxComboBoxSetSelectionRuntimeAdapter(
   void* const comboBoxRuntime,
   const WPARAM selectionIndex
 ) noexcept
@@ -23289,7 +23289,7 @@ static_assert(
  * Initializes one `wxItemContainer` runtime payload by rebinding the base
  * item-container vtable lane and zeroing the auxiliary lane at `+0x04`.
  */
-[[maybe_unused]] void* wxConstructItemContainerRuntime(
+void* wxConstructItemContainerRuntime(
   void* const itemContainerRuntime
 ) noexcept
 {
@@ -23316,7 +23316,7 @@ static_assert(
  * Rebinds one `wxItemContainer` runtime payload to the base item-container
  * vtable lane.
  */
-[[maybe_unused]] void* wxConstructItemContainerRuntimeVTableBase(
+void* wxConstructItemContainerRuntimeVTableBase(
   void* const itemContainerRuntime
 ) noexcept
 {
@@ -23336,7 +23336,7 @@ static_assert(
  * seeding item-container lane defaults, and rebinding both primary and
  * item-container dispatch lanes.
  */
-[[maybe_unused]] void* wxConstructComboBoxRuntime(
+void* wxConstructComboBoxRuntime(
   void* const comboBoxRuntime
 )
 {
@@ -23408,7 +23408,7 @@ void __stdcall wxNoOpRuntimeStdCall1B(const std::int32_t reservedArg0)
  * Rebinds one help-provider runtime payload to the base `wxHelpProvider`
  * vtable lane.
  */
-[[maybe_unused]] void* wxConstructHelpProviderRuntimeVTableBase(
+void* wxConstructHelpProviderRuntimeVTableBase(
   void* const helpProviderRuntime
 ) noexcept
 {
@@ -23565,7 +23565,7 @@ void __stdcall wxNoOpRuntimeStdCall1J(const std::int32_t reservedArg0)
  * Dispatches virtual slot `+0x214`, then tail-dispatches virtual slot `+0x220`
  * and returns the second dispatch result.
  */
-[[maybe_unused]] int wxDispatchVirtualSlots214Then220Runtime(
+int wxDispatchVirtualSlots214Then220Runtime(
   void* const runtimeObject
 ) noexcept
 {
@@ -23598,7 +23598,7 @@ void __stdcall wxNoOpRuntimeStdCall1J(const std::int32_t reservedArg0)
  * owner pointer lane at `runtimeObject+0x28`; on miss, falls back to the
  * `FUN_00A18D90` virtual dispatch sequence.
  */
-[[maybe_unused]] int wxFindOwnerPointerInLinkedChainOrDispatchFallbackRuntime(
+int wxFindOwnerPointerInLinkedChainOrDispatchFallbackRuntime(
   void* const runtimeObject,
   const void* const queryRuntime
 ) noexcept
@@ -23654,7 +23654,7 @@ void __stdcall wxNoOpRuntimeStdCall1J(const std::int32_t reservedArg0)
  * Dispatches owner virtual slot `+0x10` with one payload; when that dispatch
  * returns false, falls back to `FUN_00A18D90`.
  */
-[[maybe_unused]] int wxDispatchOwnerSlot10OrFallbackTo214Then220Runtime(
+int wxDispatchOwnerSlot10OrFallbackTo214Then220Runtime(
   void* const runtimeObject,
   const int dispatchArg
 ) noexcept
@@ -23715,7 +23715,7 @@ void wxNoOpRuntimeDispatchSlot()
  * What it does:
  * Frees one frame payload lane only when `shouldFree` is non-zero.
  */
-[[maybe_unused]] void wxConditionalFreeFrameRuntime(
+void wxConditionalFreeFrameRuntime(
   const int shouldFree,
   void* const frameRuntime
 ) noexcept
@@ -23766,7 +23766,7 @@ void wxNoOpFileFlushHook()
  * What it does:
  * Rebinds one wx-log runtime payload to the base `wxLog` vtable lane.
  */
-[[maybe_unused]] void* wxConstructLogRuntimeVTableBase(
+void* wxConstructLogRuntimeVTableBase(
   void* const logRuntime
 ) noexcept
 {
@@ -23786,7 +23786,7 @@ void wxNoOpFileFlushHook()
  * What it does:
  * Returns whether the process-global wx trace logging lane is enabled.
  */
-[[maybe_unused]] bool wxIsTraceLoggingEnabledRuntime() noexcept
+bool wxIsTraceLoggingEnabledRuntime() noexcept
 {
   return gWxTraceLoggingEnabledFlag != 0u;
 }
@@ -23797,7 +23797,7 @@ void wxNoOpFileFlushHook()
  * What it does:
  * Returns whether verbose wx log messages are currently enabled.
  */
-[[maybe_unused]] bool wxIsVerboseLoggingEnabledRuntime() noexcept
+bool wxIsVerboseLoggingEnabledRuntime() noexcept
 {
   return gWxVerboseLoggingEnabledFlag != 0u;
 }
@@ -23808,7 +23808,7 @@ void wxNoOpFileFlushHook()
  * What it does:
  * Rebinds one wx-log runtime payload to the base `wxLog` vtable lane.
  */
-[[maybe_unused]] void* wxConstructLogRuntimeLaneA(
+void* wxConstructLogRuntimeLaneA(
   void* const logRuntime
 ) noexcept
 {
@@ -23822,7 +23822,7 @@ void wxNoOpFileFlushHook()
  * Rebinds a second wx-log runtime payload family to the base `wxLog` vtable
  * lane.
  */
-[[maybe_unused]] void* wxConstructLogRuntimeLaneB(
+void* wxConstructLogRuntimeLaneB(
   void* const logRuntime
 ) noexcept
 {
@@ -23836,7 +23836,7 @@ void wxNoOpFileFlushHook()
  * Rebinds one help-provider runtime payload to the base `wxHelpProvider`
  * vtable lane.
  */
-[[maybe_unused]] void* wxConstructHelpProviderRuntimeLane(
+void* wxConstructHelpProviderRuntimeLane(
   void* const helpProviderRuntime
 ) noexcept
 {
@@ -23895,7 +23895,7 @@ int wxSafeShowMessage(
  * Runs one wx log-chain destruction lane by deleting owned/previous chained
  * log sinks through vtable deleting-destructor slot 1.
  */
-[[maybe_unused]] int wxDestroyLogChainRuntime(
+int wxDestroyLogChainRuntime(
   void* const logChainRuntime
 )
 {
@@ -23945,7 +23945,7 @@ int wxSafeShowMessage(
  * Dispatches one release callback on optional lane `+0x0C`, then forwards the
  * same release callback to lane `+0x08` unless that lane self-points to owner.
  */
-[[maybe_unused]] void* wxReleaseRelayTargetsRuntime(
+void* wxReleaseRelayTargetsRuntime(
   void* const relayRuntime
 ) noexcept
 {
@@ -24001,7 +24001,7 @@ namespace
  * `GetLastError()` when `0`), normalizes the first character, trims one
  * trailing carriage-return lane, and returns the shared message buffer.
  */
-[[maybe_unused]] wchar_t* wxResolveSystemErrorMessageRuntime(
+wchar_t* wxResolveSystemErrorMessageRuntime(
   const DWORD messageIdHint
 )
 {
@@ -24046,7 +24046,7 @@ namespace
  * Returns the process-global wx log-target lane, creating it lazily from
  * `wxTheApp->CreateLogTarget()` or one stderr-backed fallback sink.
  */
-[[maybe_unused]] WxLogTargetRuntime* wxEnsurePrimaryLogTargetRuntime()
+WxLogTargetRuntime* wxEnsurePrimaryLogTargetRuntime()
 {
   WxLogTargetRuntime* result = gWxPrimaryLogTargetRuntime;
   if (gWxLogAutoCreateRuntimeFlag != 0u && result == nullptr && gWxLogTargetCreationGuard == 0u) {
@@ -24081,7 +24081,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * appends it to the shared log-text buffer, and conditionally dispatches the
  * completed message at severity lane `1`.
  */
-[[maybe_unused]] int wxAppendSystemErrorSuffixAndDispatchRuntime(
+int wxAppendSystemErrorSuffixAndDispatchRuntime(
   const DWORD messageId
 )
 {
@@ -24133,7 +24133,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * Formats one variadic message into the shared wx log buffer and, for log
  * verbosity lane `>= 2`, dispatches it with the current timestamp.
  */
-[[maybe_unused]] int wxLogFormattedMessageWithTimestampRuntime(
+int wxLogFormattedMessageWithTimestampRuntime(
   const wchar_t* const formatText,
   va_list argumentList
 )
@@ -24181,7 +24181,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * (FUN_009C51F0) and dispatches `LogRecordWithTimestamp` (vtable slot
  * `+0x08`) with the caller's level / message / timestamp lanes.
  */
-[[maybe_unused]] void wxLogTargetDispatchIfEnabledRuntime(
+void wxLogTargetDispatchIfEnabledRuntime(
   const std::uint32_t logLevel,
   const wchar_t* const messageText,
   const std::uint32_t timestampLow,
@@ -24209,7 +24209,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * Opens one variadic argument lane and forwards it to the shared wx formatted
  * logging helper.
  */
-[[maybe_unused]] int wxLogFormattedMessageRuntime(
+int wxLogFormattedMessageRuntime(
   const wchar_t* const formatText,
   ...
 )
@@ -24228,7 +24228,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * Formats one variadic system-error message, captures `GetLastError()`,
  * appends the localized error suffix, and dispatches through wx log lane `1`.
  */
-[[maybe_unused]] int wxLogSystemErrorFromLastErrorRuntime(
+int wxLogSystemErrorFromLastErrorRuntime(
   const wchar_t* const formatText,
   va_list argumentList
 )
@@ -24260,7 +24260,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * Formats one variadic text payload, appends a localized suffix for explicit
  * `messageId`, and dispatches it through wx log lane `1`.
  */
-[[maybe_unused]] int wxLogSystemErrorWithMessageIdVRuntime(
+int wxLogSystemErrorWithMessageIdVRuntime(
   const DWORD messageId,
   const wchar_t* const formatText,
   va_list argumentList
@@ -24291,7 +24291,7 @@ extern "C" int __cdecl RuntimeSnwprintf(wchar_t* buffer, std::size_t count, cons
  * Opens one variadic payload lane and forwards it with explicit `messageId`
  * into the wx system-error logging helper.
  */
-[[maybe_unused]] int wxLogSystemErrorWithMessageIdRuntime(
+int wxLogSystemErrorWithMessageIdRuntime(
   const DWORD messageId,
   const wchar_t* const formatText,
   ...
@@ -24388,7 +24388,7 @@ BOOL wxColourDisplay()
  * What it does:
  * Reads current cursor position and writes optional `x/y` output lanes.
  */
-[[maybe_unused]] LONG* wxGetCursorPositionComponents(
+LONG* wxGetCursorPositionComponents(
   LONG* const outX,
   LONG* const outY
 ) noexcept
@@ -24483,7 +24483,7 @@ static_assert(sizeof(WxWordArrayRuntimeView) == 0x0C, "WxWordArrayRuntimeView si
  * Performs in-place ascending insertion sort on one UTF-16/word lane range
  * `[first, last)`.
  */
-[[maybe_unused]] void wxInsertionSortWordRangeAscending(
+void wxInsertionSortWordRangeAscending(
   std::uint16_t* const first,
   std::uint16_t* const last
 ) noexcept
@@ -24510,7 +24510,7 @@ static_assert(sizeof(WxWordArrayRuntimeView) == 0x0C, "WxWordArrayRuntimeView si
  * Adapter lane that forwards one UTF-16/word insertion-sort range request to
  * `wxInsertionSortWordRangeAscending`.
  */
-[[maybe_unused]] void wxInsertionSortWordRangeAscendingAdapterA(
+void wxInsertionSortWordRangeAscendingAdapterA(
   std::uint16_t* const first,
   std::uint16_t* const last
 ) noexcept
@@ -24571,7 +24571,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * What it does:
  * Clears one array-header lane (`capacity`, `size`, `data`) to zero.
  */
-[[maybe_unused]] WxDwordArrayRuntimeView* WxArrayHeaderInitializeEmpty(
+WxDwordArrayRuntimeView* WxArrayHeaderInitializeEmpty(
   WxDwordArrayRuntimeView* const array
 ) noexcept
 {
@@ -24589,7 +24589,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * on the transfer state, resets transfer lanes, and releases one owned heap
  * buffer pointer when non-null.
  */
-[[maybe_unused]] void* wxTransferPointerRangeIntoSinkAndResetState(
+void* wxTransferPointerRangeIntoSinkAndResetState(
   void* const transferStateRuntime,
   void** rangeBegin,
   void** const rangeEnd,
@@ -24664,7 +24664,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Merges two ascending pointer ranges into one output range using object float
  * lane `+0x0D4` as the ordering key.
  */
-[[maybe_unused]] void*** wxMergeAscendingPointerRangesByFloatLaneD4A(
+void*** wxMergeAscendingPointerRangesByFloatLaneD4A(
   void*** const outWriteEnd,
   void** leftBegin,
   void** const leftEnd,
@@ -24715,7 +24715,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Merges two ascending pointer ranges backward into one destination tail using
  * object float lane `+0x0D4` as the ordering key.
  */
-[[maybe_unused]] void*** wxMergeAscendingPointerRangesBackwardByFloatLaneD4(
+void*** wxMergeAscendingPointerRangesBackwardByFloatLaneD4(
   void** leftBegin,
   void** leftEnd,
   void*** const outWriteBegin,
@@ -24785,7 +24785,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Preserves one register-shape adapter lane that forwards pointer-range merge
  * parameters into `FUN_0078C2F0` and returns the original out-iterator lane.
  */
-[[maybe_unused]] void*** wxMergeAscendingPointerRangesBackwardByFloatLaneD4RegisterShapeAdapter(
+void*** wxMergeAscendingPointerRangesBackwardByFloatLaneD4RegisterShapeAdapter(
   void*** const outWriteBegin,
   void** const rightBegin,
   void** const rightEnd,
@@ -24814,7 +24814,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Finds one lower-bound iterator over a pointer range by comparing each
  * candidate object's float lane at `+0x0D4` against key object lane `+0x0D4`.
  */
-[[maybe_unused]] void*** wxFindPointerRangeLowerBoundByFloatLaneD4(
+void*** wxFindPointerRangeLowerBoundByFloatLaneD4(
   const void* const* const keyObjectSlot,
   void*** const outIterator,
   void** begin,
@@ -24860,7 +24860,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Finds one upper-bound iterator over a pointer range by comparing each
  * candidate object's float lane at `+0x0D4` against key object lane `+0x0D4`.
  */
-[[maybe_unused]] void*** wxFindPointerRangeUpperBoundByFloatLaneD4(
+void*** wxFindPointerRangeUpperBoundByFloatLaneD4(
   const void* const* const keyObjectSlot,
   void*** const outIterator,
   void** begin,
@@ -24906,7 +24906,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Rotates one dword range `[begin, end)` around `middle` using the legacy
  * gcd-cycle juggling lane and returns the post-loop cycle counter.
  */
-[[maybe_unused]] std::int32_t wxRotateDwordRangeByMiddleJuggleRuntime(
+std::int32_t wxRotateDwordRangeByMiddleJuggleRuntime(
   std::uint32_t* const begin,
   std::uint32_t* const middle,
   std::uint32_t* const end
@@ -24967,7 +24967,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Preserves one cdecl forwarding lane that delegates range-rotation work to
  * `FUN_0078C540`.
  */
-[[maybe_unused]] std::int32_t wxRotateDwordRangeByMiddleJuggleRuntimeThunk(
+std::int32_t wxRotateDwordRangeByMiddleJuggleRuntimeThunk(
   std::uint32_t* const begin,
   std::uint32_t* const middle,
   std::uint32_t* const end
@@ -24983,7 +24983,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Fast-path lane for dword-range rotation that returns `middle` unchanged when
  * either sub-range is empty; otherwise forwards to `FUN_0078C540`.
  */
-[[maybe_unused]] std::int32_t wxRotateDwordRangeByMiddleJuggleRuntimeGuardAdapter(
+std::int32_t wxRotateDwordRangeByMiddleJuggleRuntimeGuardAdapter(
   std::uint32_t* const begin,
   std::uint32_t* const middle,
   std::uint32_t* const end
@@ -25003,7 +25003,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Writes the pointer at the lower-bound iterator (ordered by float lane
  * `+0x0D4`) into caller storage and returns that storage pointer.
  */
-[[maybe_unused]] void** wxWriteLowerBoundPointerByFloatLaneD4Adapter(
+void** wxWriteLowerBoundPointerByFloatLaneD4Adapter(
   void** const outValue,
   const void* const* const keyObjectSlot,
   void** const begin,
@@ -25023,7 +25023,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Writes the pointer at the upper-bound iterator (ordered by float lane
  * `+0x0D4`) into caller storage and returns that storage pointer.
  */
-[[maybe_unused]] void** wxWriteUpperBoundPointerByFloatLaneD4Adapter(
+void** wxWriteUpperBoundPointerByFloatLaneD4Adapter(
   void** const outValue,
   const void* const* const keyObjectSlot,
   void** const begin,
@@ -25043,7 +25043,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Merges two ascending pointer ranges into one output range using object float
  * lane `+0x0D4` as the ordering key (alternate call-shape lane).
  */
-[[maybe_unused]] void*** wxMergeAscendingPointerRangesByFloatLaneD4B(
+void*** wxMergeAscendingPointerRangesByFloatLaneD4B(
   void** secondEnd,
   void** secondBegin,
   void** firstBegin,
@@ -25097,7 +25097,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * element at that slot does not compare equal to `key`; otherwise returns
  * the matching index.
  */
-[[maybe_unused]] std::int32_t WxDwordArrayFindExactMatchIndexRuntime(
+std::int32_t WxDwordArrayFindExactMatchIndexRuntime(
   const WxDwordArrayRuntimeView* const array,
   const int key,
   const WxDwordArrayCompareProc compare
@@ -25122,7 +25122,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Returns match-or-insertion index for one sorted dword-array lane using the
  * caller comparator callback.
  */
-[[maybe_unused]] std::uint32_t WxDwordArrayFindMatchOrInsertionIndexA(
+std::uint32_t WxDwordArrayFindMatchOrInsertionIndexA(
   const WxDwordArrayRuntimeView* const array,
   const int key,
   const WxDwordArrayCompareProc compare
@@ -25138,7 +25138,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Returns match-or-insertion index for one sorted word-array lane using the
  * caller comparator callback.
  */
-[[maybe_unused]] std::uint32_t WxWordArrayFindMatchOrInsertionIndex(
+std::uint32_t WxWordArrayFindMatchOrInsertionIndex(
   const WxWordArrayRuntimeView* const array,
   const std::int16_t key,
   const WxWordArrayCompareProc compare
@@ -25154,7 +25154,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * Finds the first matching 16-bit value index in one word-array lane, scanning
  * forward or backward depending on `searchFromBack`.
  */
-[[maybe_unused]] std::int32_t WxWordArrayFindExactValueIndexLinearRuntime(
+std::int32_t WxWordArrayFindExactValueIndexLinearRuntime(
   const WxWordArrayRuntimeView* const array,
   const std::int16_t value,
   const bool searchFromBack
@@ -25199,7 +25199,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * What it does:
  * Alias lane of dword-array match-or-insertion lookup with comparator.
  */
-[[maybe_unused]] std::uint32_t WxDwordArrayFindMatchOrInsertionIndexB(
+std::uint32_t WxDwordArrayFindMatchOrInsertionIndexB(
   const WxDwordArrayRuntimeView* const array,
   const int key,
   const WxDwordArrayCompareProc compare
@@ -25214,7 +25214,7 @@ using WxWordArrayCompareProc = int(__cdecl*)(int key, std::int16_t value);
  * What it does:
  * Second alias lane of dword-array match-or-insertion lookup with comparator.
  */
-[[maybe_unused]] std::uint32_t WxDwordArrayFindMatchOrInsertionIndexC(
+std::uint32_t WxDwordArrayFindMatchOrInsertionIndexC(
   const WxDwordArrayRuntimeView* const array,
   const int key,
   const WxDwordArrayCompareProc compare
@@ -25536,7 +25536,7 @@ std::uint32_t WxDwordArrayInsertCopiesAtIndexRuntime(
  * Finds the sorted insertion slot for one 16-bit value and inserts exactly one
  * copy at that slot.
  */
-[[maybe_unused]] std::uint32_t WxWordArrayInsertOneSortedCopy(
+std::uint32_t WxWordArrayInsertOneSortedCopy(
   WxWordArrayRuntimeView* const array,
   const std::int16_t value,
   const WxWordArrayCompareProc compare
@@ -25553,7 +25553,7 @@ std::uint32_t WxDwordArrayInsertCopiesAtIndexRuntime(
  * Alias lane of sorted one-copy insert for a 32-bit value using comparator
  * lane B.
  */
-[[maybe_unused]] std::uint32_t WxDwordArrayInsertOneSortedCopyB(
+std::uint32_t WxDwordArrayInsertOneSortedCopyB(
   WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const WxDwordArrayCompareProc compare
@@ -25570,7 +25570,7 @@ std::uint32_t WxDwordArrayInsertCopiesAtIndexRuntime(
  * Alias lane of sorted one-copy insert for a 32-bit value using comparator
  * lane C.
  */
-[[maybe_unused]] std::uint32_t WxDwordArrayInsertOneSortedCopyC(
+std::uint32_t WxDwordArrayInsertOneSortedCopyC(
   WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const WxDwordArrayCompareProc compare
@@ -25672,7 +25672,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Copies one contiguous dword record range (`[first,last)`) into optional
  * destination storage and returns the one-past-end destination cursor.
  */
-[[maybe_unused]] std::uint32_t* wxCopyDwordRecordRange(
+std::uint32_t* wxCopyDwordRecordRange(
   const std::uint32_t* first,
   const std::uint32_t* last,
   std::uint32_t* destination
@@ -25696,7 +25696,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * What it does:
  * Dispatch adapter lane for one dword-record range copy request.
  */
-[[maybe_unused]] std::uint32_t* wxCopyDwordRecordRangeDispatchA(
+std::uint32_t* wxCopyDwordRecordRangeDispatchA(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25711,7 +25711,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * What it does:
  * Dispatch adapter lane for one dword-record range copy request.
  */
-[[maybe_unused]] std::uint32_t* wxCopyDwordRecordRangeDispatchB(
+std::uint32_t* wxCopyDwordRecordRangeDispatchB(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25726,7 +25726,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * What it does:
  * Dispatch adapter lane for one dword-record range copy request.
  */
-[[maybe_unused]] std::uint32_t* wxCopyDwordRecordRangeDispatchC(
+std::uint32_t* wxCopyDwordRecordRangeDispatchC(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25743,7 +25743,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Copies one contiguous two-dword record range (`[first,last)`) into optional
  * destination storage and returns the one-past-end destination cursor.
  */
-[[maybe_unused]] std::uint32_t* wxCopyTwoDwordRecordRange(
+std::uint32_t* wxCopyTwoDwordRecordRange(
   const std::uint32_t* first,
   const std::uint32_t* last,
   std::uint32_t* destination
@@ -25769,7 +25769,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Preserves one register-adapter lane for two-dword record range copy and
  * forwards to `wxCopyTwoDwordRecordRange(...)`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* wxCopyTwoDwordRecordRangeRegisterAdapterA(
+[[nodiscard]] std::uint32_t* wxCopyTwoDwordRecordRangeRegisterAdapterA(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25785,7 +25785,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Preserves one register-adapter lane for two-dword record range copy and
  * forwards to `wxCopyTwoDwordRecordRange(...)`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* wxCopyTwoDwordRecordRangeRegisterAdapterB(
+[[nodiscard]] std::uint32_t* wxCopyTwoDwordRecordRangeRegisterAdapterB(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25801,7 +25801,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Preserves one register-adapter lane for two-dword record range copy and
  * forwards to `wxCopyTwoDwordRecordRange(...)`.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* wxCopyTwoDwordRecordRangeRegisterAdapterC(
+[[nodiscard]] std::uint32_t* wxCopyTwoDwordRecordRangeRegisterAdapterC(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25818,7 +25818,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Copies one contiguous five-dword record range (`[first,last)`) into optional
  * destination storage while retaining shared ownership for record lane `+0x0C`.
  */
-[[maybe_unused]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3(
+std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3(
   const std::uint32_t* first,
   const std::uint32_t* last,
   std::uint32_t* destination
@@ -25851,7 +25851,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Preserves one register-adapter lane for five-dword record range copy with
  * shared-lane retain semantics.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3RegisterAdapterA(
+[[nodiscard]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3RegisterAdapterA(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25867,7 +25867,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Preserves one tail-call adapter lane for five-dword record range copy with
  * shared-lane retain semantics.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3RegisterAdapterB(
+[[nodiscard]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3RegisterAdapterB(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25883,7 +25883,7 @@ std::int32_t* WxDwordArrayEraseRangeAtIndexRuntime(
  * Preserves one register-adapter lane for five-dword record range copy with
  * shared-lane retain semantics.
  */
-[[maybe_unused]] [[nodiscard]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3RegisterAdapterC(
+[[nodiscard]] std::uint32_t* wxCopyFiveDwordRecordRangeWithRetainLane3RegisterAdapterC(
   const std::uint32_t* const first,
   const std::uint32_t* const last,
   std::uint32_t* const destination
@@ -25922,7 +25922,7 @@ static_assert(
   "WxDualRefCountRuntimeView::weakRefCount offset must be 0x08"
 );
 
-[[maybe_unused]] void wxRetainDualRefCountRuntime(
+void wxRetainDualRefCountRuntime(
   WxDualRefCountRuntimeView* const objectRuntime
 ) noexcept
 {
@@ -25931,7 +25931,7 @@ static_assert(
   }
 }
 
-[[maybe_unused]] void wxReleaseDualRefCountRuntime(
+void wxReleaseDualRefCountRuntime(
   WxDualRefCountRuntimeView* const objectRuntime
 ) noexcept
 {
@@ -25965,7 +25965,7 @@ static_assert(sizeof(WxTwoDwordRecordWithSharedLaneRuntimeView) == 0x08, "WxTwoD
  * Backward-copies a two-dword record range (`[first,last)`) into destination
  * end storage while retaining/releasing the shared ownership lane.
  */
-[[maybe_unused]] WxTwoDwordRecordWithSharedLaneRuntimeView* wxCopyTwoDwordRecordRangeBackwardWithRetainLane1(
+WxTwoDwordRecordWithSharedLaneRuntimeView* wxCopyTwoDwordRecordRangeBackwardWithRetainLane1(
   const WxTwoDwordRecordWithSharedLaneRuntimeView* const first,
   const WxTwoDwordRecordWithSharedLaneRuntimeView* const last,
   WxTwoDwordRecordWithSharedLaneRuntimeView* const destinationEnd
@@ -25994,7 +25994,7 @@ static_assert(sizeof(WxTwoDwordRecordWithSharedLaneRuntimeView) == 0x08, "WxTwoD
  * Legacy adapter lane that forwards one backward range copy with shared-lane
  * retain/release semantics to the canonical `wx` helper.
  */
-[[maybe_unused]] WxTwoDwordRecordWithSharedLaneRuntimeView* wxCopyTwoDwordRecordRangeBackwardWithRetainDispatchLaneA(
+WxTwoDwordRecordWithSharedLaneRuntimeView* wxCopyTwoDwordRecordRangeBackwardWithRetainDispatchLaneA(
   const WxTwoDwordRecordWithSharedLaneRuntimeView* const first,
   const WxTwoDwordRecordWithSharedLaneRuntimeView* const last,
   WxTwoDwordRecordWithSharedLaneRuntimeView* const destinationEnd
@@ -26010,7 +26010,7 @@ static_assert(sizeof(WxTwoDwordRecordWithSharedLaneRuntimeView) == 0x08, "WxTwoD
  * Preserves one additional adapter lane for backward two-dword record copy
  * with shared-lane retain/release semantics.
  */
-[[maybe_unused]] WxTwoDwordRecordWithSharedLaneRuntimeView* wxCopyTwoDwordRecordRangeBackwardWithRetainDispatchLaneB(
+WxTwoDwordRecordWithSharedLaneRuntimeView* wxCopyTwoDwordRecordRangeBackwardWithRetainDispatchLaneB(
   const WxTwoDwordRecordWithSharedLaneRuntimeView* const first,
   const WxTwoDwordRecordWithSharedLaneRuntimeView* const last,
   WxTwoDwordRecordWithSharedLaneRuntimeView* const destinationEnd
@@ -26040,7 +26040,7 @@ static_assert(sizeof(WxFiveDwordRecordWithSharedLaneRuntimeView) == 0x14, "WxFiv
  * Backward-copies a five-dword record range (`[first,last)`) into destination
  * end storage while retaining/releasing the shared ownership lane at `+0x0C`.
  */
-[[maybe_unused]] WxFiveDwordRecordWithSharedLaneRuntimeView* wxCopyFiveDwordRecordRangeBackwardWithRetainLane3(
+WxFiveDwordRecordWithSharedLaneRuntimeView* wxCopyFiveDwordRecordRangeBackwardWithRetainLane3(
   const WxFiveDwordRecordWithSharedLaneRuntimeView* const first,
   const WxFiveDwordRecordWithSharedLaneRuntimeView* const last,
   WxFiveDwordRecordWithSharedLaneRuntimeView* const destinationEnd
@@ -26072,7 +26072,7 @@ static_assert(sizeof(WxFiveDwordRecordWithSharedLaneRuntimeView) == 0x14, "WxFiv
  * Preserves one tail-call adapter lane for backward five-dword record copy
  * with shared-lane retain/release semantics.
  */
-[[maybe_unused]] [[nodiscard]] WxFiveDwordRecordWithSharedLaneRuntimeView* wxCopyFiveDwordRecordRangeBackwardWithRetainLane3RegisterAdapterA(
+[[nodiscard]] WxFiveDwordRecordWithSharedLaneRuntimeView* wxCopyFiveDwordRecordRangeBackwardWithRetainLane3RegisterAdapterA(
   const WxFiveDwordRecordWithSharedLaneRuntimeView* const first,
   const WxFiveDwordRecordWithSharedLaneRuntimeView* const last,
   WxFiveDwordRecordWithSharedLaneRuntimeView* const destinationEnd
@@ -26088,7 +26088,7 @@ static_assert(sizeof(WxFiveDwordRecordWithSharedLaneRuntimeView) == 0x14, "WxFiv
  * Preserves one additional call-shape adapter lane for backward five-dword
  * record copy with shared-lane retain/release semantics.
  */
-[[maybe_unused]] [[nodiscard]] WxFiveDwordRecordWithSharedLaneRuntimeView* wxCopyFiveDwordRecordRangeBackwardWithRetainLane3RegisterAdapterB(
+[[nodiscard]] WxFiveDwordRecordWithSharedLaneRuntimeView* wxCopyFiveDwordRecordRangeBackwardWithRetainLane3RegisterAdapterB(
   const WxFiveDwordRecordWithSharedLaneRuntimeView* const first,
   const WxFiveDwordRecordWithSharedLaneRuntimeView* const last,
   WxFiveDwordRecordWithSharedLaneRuntimeView* const destinationEnd
@@ -26145,7 +26145,7 @@ void wxDwordArrayAppendCopies(
  * Thunk lane that forwards one dword-array append-copies request into
  * `FUN_009A8650`.
  */
-[[maybe_unused]] void wxDwordArrayAppendCopiesAdapter(
+void wxDwordArrayAppendCopiesAdapter(
   WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const std::int32_t copyCount
@@ -26160,7 +26160,7 @@ void wxDwordArrayAppendCopies(
  * What it does:
  * Preserves one append-copies adapter lane for the legacy dword-array runtime.
  */
-[[maybe_unused]] void wxDwordArrayAppendCopiesAdapterLaneB(
+void wxDwordArrayAppendCopiesAdapterLaneB(
   WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const std::int32_t copyCount
@@ -26175,7 +26175,7 @@ void wxDwordArrayAppendCopies(
  * What it does:
  * Additional append-copies adapter lane for the legacy dword-array runtime.
  */
-[[maybe_unused]] void wxDwordArrayAppendCopiesAdapterLaneC(
+void wxDwordArrayAppendCopiesAdapterLaneC(
   WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const std::int32_t copyCount
@@ -26191,7 +26191,7 @@ void wxDwordArrayAppendCopies(
  * Preserves one additional append-copies adapter lane for the legacy
  * dword-array runtime.
  */
-[[maybe_unused]] void wxDwordArrayAppendCopiesAdapterLaneD(
+void wxDwordArrayAppendCopiesAdapterLaneD(
   WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const std::int32_t copyCount
@@ -26324,7 +26324,7 @@ wxNodeBaseRuntime* wxListInsertBeforeNodeRuntime(
  * Inserts one value lane at `index` in the list, appending when `index`
  * equals the current item-count lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListInsertAtIndexOrAppendRuntime(
+wxNodeBaseRuntime* wxListInsertAtIndexOrAppendRuntime(
   WxListInsertRuntimeView* const list,
   const std::int32_t index,
   void* const value
@@ -26421,7 +26421,7 @@ namespace
  * this body for cross-TU references through alternate this/argument
  * conventions; no separate source is emitted.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListAppendIntegerKeyedValueRuntime(
+wxNodeBaseRuntime* wxListAppendIntegerKeyedValueRuntime(
   WxListAppendCommonRuntimeView* const list,
   void* const keyPayload,
   void* const value
@@ -26769,7 +26769,7 @@ HCURSOR wxEndBusyCursor()
  * What it does:
  * Returns the active busy-cursor handle lane.
  */
-[[maybe_unused]] HCURSOR wxGetBusyCursorHandleRuntime()
+HCURSOR wxGetBusyCursorHandleRuntime()
 {
   return gs_wxBusyCursor;
 }
@@ -26781,7 +26781,7 @@ HCURSOR wxEndBusyCursor()
  * Returns the process-global fallback cursor-owner lane used by
  * `wxWindow::HandleSetCursor` fallback paths.
  */
-[[maybe_unused]] void* wxGetSetCursorFallbackObjectRuntime()
+void* wxGetSetCursorFallbackObjectRuntime()
 {
   return gWxSetCursorFallbackObjectRuntime;
 }
@@ -26792,7 +26792,7 @@ HCURSOR wxEndBusyCursor()
  * What it does:
  * Returns whether busy-cursor nesting depth is currently non-zero.
  */
-[[maybe_unused]] BOOL wxIsBusyCursorActiveRuntime()
+BOOL wxIsBusyCursorActiveRuntime()
 {
   return gs_wxBusyCursorCount > 0 ? TRUE : FALSE;
 }
@@ -26804,7 +26804,7 @@ HCURSOR wxEndBusyCursor()
  * Pumps pending Win32 messages for one runtime window handle lane until the
  * queue is empty.
  */
-[[maybe_unused]] bool wxPumpWindowPendingMessages(
+bool wxPumpWindowPendingMessages(
   const WxWindowNativeHandleRuntimeView* const window
 ) noexcept
 {
@@ -26826,7 +26826,7 @@ HCURSOR wxEndBusyCursor()
  * What it does:
  * Runs one thunk lane that forwards directly to `wxEndBusyCursor`.
  */
-[[maybe_unused]] HCURSOR wxEndBusyCursorThunkLaneA()
+HCURSOR wxEndBusyCursorThunkLaneA()
 {
   return wxEndBusyCursor();
 }
@@ -26871,7 +26871,7 @@ int wxGetPrimaryDisplayPixelSize(
  * Queries the primary-display width/height pair and stores both dword lanes
  * into caller-owned output storage.
  */
-[[maybe_unused]] std::int32_t* wxGetPrimaryDisplayPixelSizePairRuntime(
+std::int32_t* wxGetPrimaryDisplayPixelSizePairRuntime(
   std::int32_t* const outWidthHeightPair
 ) noexcept
 {
@@ -26923,7 +26923,7 @@ struct WxDisplayMillimeterPairRuntime
  * Reads physical display width/height in millimeters from the cached
  * device-context lane (`+0xFC`) and writes both lanes to `outSize`.
  */
-[[maybe_unused]] WxDisplayMillimeterPairRuntime* wxGetDisplayMillimeterSizeFromCachedDc(
+WxDisplayMillimeterPairRuntime* wxGetDisplayMillimeterSizeFromCachedDc(
   const WxViewportOriginCacheRuntimeView* const runtime,
   WxDisplayMillimeterPairRuntime* const outSize
 ) noexcept
@@ -26940,7 +26940,7 @@ struct WxDisplayMillimeterPairRuntime
  * Updates one cached viewport origin pair and applies it to the cached device
  * context only when the requested origin changed.
  */
-[[maybe_unused]] int wxSetViewportOriginCachedRuntime(
+int wxSetViewportOriginCachedRuntime(
   WxViewportOriginCacheRuntimeView* const runtime,
   const int originX,
   const int originY
@@ -27032,7 +27032,7 @@ int wxDisplayTransformUnscaleY(
  * Reads display pixel width/height (`HORZRES` / `VERTRES`) from one cached
  * device-context lane (`+0xFC`) and writes optional output lanes.
  */
-[[maybe_unused]] void wxGetDisplayPixelSizeFromCachedDcRuntime(
+void wxGetDisplayPixelSizeFromCachedDcRuntime(
   const WxViewportOriginCacheRuntimeView* const runtime,
   int* const outWidthPixels,
   int* const outHeightPixels
@@ -27052,7 +27052,7 @@ int wxDisplayTransformUnscaleY(
  * What it does:
  * Pure jump-thunk alias into `wxGetDisplayPixelSizeFromCachedDcRuntime`.
  */
-[[maybe_unused]] void wxGetDisplayPixelSizeFromCachedDcRuntimeThunk(
+void wxGetDisplayPixelSizeFromCachedDcRuntimeThunk(
   const WxViewportOriginCacheRuntimeView* const runtime,
   int* const outWidthPixels,
   int* const outHeightPixels
@@ -27346,7 +27346,7 @@ bool wxReadProfileStringValue(
  * Reads one profile string lane and parses it as floating-point text into
  * `outValue`.
  */
-[[maybe_unused]] bool wxReadProfileFloatValue(
+bool wxReadProfileFloatValue(
   const wchar_t* const sectionName,
   const wchar_t* const keyName,
   float* const outValue,
@@ -27374,7 +27374,7 @@ bool wxReadProfileStringValue(
  * Reads one profile string lane and parses it as base-10 integer text into
  * `outValue`.
  */
-[[maybe_unused]] bool wxReadProfileUnsignedLongValueA(
+bool wxReadProfileUnsignedLongValueA(
   const wchar_t* const sectionName,
   const wchar_t* const keyName,
   std::uint32_t* const outValue,
@@ -27401,7 +27401,7 @@ bool wxReadProfileStringValue(
  * What it does:
  * Alternate lane of base-10 profile integer parsing into `outValue`.
  */
-[[maybe_unused]] bool wxReadProfileUnsignedLongValueB(
+bool wxReadProfileUnsignedLongValueB(
   const wchar_t* const sectionName,
   const wchar_t* const keyName,
   std::uint32_t* const outValue,
@@ -27441,7 +27441,7 @@ namespace
    * null opened handle, default root key, empty subkey string, and success
    * status code.
    */
-  [[maybe_unused]] WxRegistryKeyRuntimeView* WxRegistryInitializeClosedDefaultKeyRuntime(
+  WxRegistryKeyRuntimeView* WxRegistryInitializeClosedDefaultKeyRuntime(
     WxRegistryKeyRuntimeView* const key
   ) noexcept
   {
@@ -27495,7 +27495,7 @@ namespace
    * Resolves one root-key lane to the legacy registry root-name table index.
    * Returns index `0` when the key is not present in the known root set.
    */
-  [[maybe_unused]] int WxRegistryRootIndexFromHandle(const HKEY rootKey) noexcept
+  int WxRegistryRootIndexFromHandle(const HKEY rootKey) noexcept
   {
     static const std::array<HKEY, 7> kRootKeyTable{
       HKEY_CLASSES_ROOT,
@@ -27760,7 +27760,7 @@ namespace
    * What it does:
    * Computes one hash-bucket index from `node->key % table->bucketCount`.
    */
-  [[maybe_unused]] std::uint32_t wxSocketDispatchBucketIndexFromNodeRuntime(
+  std::uint32_t wxSocketDispatchBucketIndexFromNodeRuntime(
     const void* const callbackContext,
     const WxSocketDispatchBucketNodeRuntime* const node
   ) noexcept
@@ -27777,7 +27777,7 @@ namespace
    * one new bucket table using caller-supplied bucket-index and node-transform
    * callbacks.
    */
-  [[maybe_unused]] std::uint32_t wxRechainHashBucketsWithCallbacksRuntime(
+  std::uint32_t wxRechainHashBucketsWithCallbacksRuntime(
     WxSocketDispatchBucketNodeRuntime* const* const oldBuckets,
     const std::uint32_t oldBucketCount,
     const void* const callbackContext,
@@ -27805,7 +27805,7 @@ namespace
     return bucketIndex;
   }
 
-  [[maybe_unused]] WxSocketDispatchBucketNodeRuntime* wxIdentityHashBucketNodeRuntime(
+  WxSocketDispatchBucketNodeRuntime* wxIdentityHashBucketNodeRuntime(
     WxSocketDispatchBucketNodeRuntime* const node
   ) noexcept
   {
@@ -27820,7 +27820,7 @@ namespace
    * bucket count, allocates a new zeroed bucket array, re-chains all nodes,
    * and frees the previous bucket array.
    */
-  [[maybe_unused]] void wxSocketDispatchRehashBucketTableRuntime(
+  void wxSocketDispatchRehashBucketTableRuntime(
     WxSocketDispatchHashTableRuntime* const hashTable,
     const std::uint32_t minimumBucketCount
   )
@@ -27937,7 +27937,7 @@ namespace
  * Returns one embedded registry-key lane at owner offset `+0x24`, creating the
  * key handle on-demand when that lane is not yet opened.
  */
-[[maybe_unused]] WxRegistryKeyRuntimeView* wxRegistryEnsureCreatedKeyAtOffset24Runtime(
+WxRegistryKeyRuntimeView* wxRegistryEnsureCreatedKeyAtOffset24Runtime(
   void* const ownerRuntime
 )
 {
@@ -28098,7 +28098,7 @@ DWORD wxRegistryKeyReadValueTypeRuntime(
  * Returns whether one registry value lane is DWORD-typed (`REG_DWORD` or
  * `REG_DWORD_BIG_ENDIAN`).
  */
-[[maybe_unused]] bool wxRegistryKeyValueIsDwordTypeRuntime(
+bool wxRegistryKeyValueIsDwordTypeRuntime(
   WxRegistryKeyRuntimeView* const key,
   const wchar_t* const valueName
 ) noexcept
@@ -28157,7 +28157,7 @@ bool wxRegistryKeyReadDwordValueRuntime(
  * Reads one DWORD payload from an already-open key lane when the requested
  * value name exists, using a caller-supplied pointer-to-name lane.
  */
-[[maybe_unused]] bool wxRegistryReadOpenedDwordValueByNamePointerRuntime(
+bool wxRegistryReadOpenedDwordValueByNamePointerRuntime(
   WxRegistryKeyRuntimeView* const key,
   const wchar_t* const* const valueNamePointer,
   LPBYTE const outDataBytes
@@ -28305,7 +28305,7 @@ const wchar_t* wxRegistryKeyComposePathWithSubKeyRuntime(
  * composing `parentSubKey + '\\' + childSubKey` (with trailing slash trim),
  * copying root-key lane, and resetting open-handle/status lanes.
  */
-[[maybe_unused]] WxRegistryKeyRuntimeView* wxRegistryBuildChildKeyRuntime(
+WxRegistryKeyRuntimeView* wxRegistryBuildChildKeyRuntime(
   WxRegistryKeyRuntimeView* const outChildKey,
   const WxRegistryKeyRuntimeView* const parentKey,
   const wchar_t* const childSubKeyName
@@ -28383,7 +28383,7 @@ wxStringRuntime* wxRegistryKeyComposePathRuntime(
  * logs one localized wx system error containing the key display path on
  * failure.
  */
-[[maybe_unused]] bool wxRegistryKeyQueryInfoRuntime(
+bool wxRegistryKeyQueryInfoRuntime(
   WxRegistryKeyRuntimeView* const key,
   LPDWORD subKeyCountOut,
   LPDWORD maxSubKeyNameLengthOut,
@@ -28585,7 +28585,7 @@ bool wxRegistryKeyGetFirstSubKeyRuntime(
  * localized "Can't read value of '%s'" system-error log entry scoped to
  * the full registry-key path, and returns false. Otherwise returns true.
  */
-[[maybe_unused]] bool wxRegistryKeyQueryStringValueRuntime(
+bool wxRegistryKeyQueryStringValueRuntime(
   WxRegistryKeyRuntimeView* const key,
   const wchar_t* const valueName,
   wxStringRuntime* const outValue,
@@ -28709,7 +28709,7 @@ bool wxRegistryKeyCopyValueRuntime(
  * deletes each child subtree, then deletes this key and reports localized
  * errors; aborts for protected root-level key lanes.
  */
-[[maybe_unused]] bool wxRegistryKeyDeleteSubtreeRuntime(
+bool wxRegistryKeyDeleteSubtreeRuntime(
   WxRegistryKeyRuntimeView* const key
 )
 {
@@ -28898,7 +28898,7 @@ namespace
  * skips the global delete and reports the local result. Returns the final
  * subtree-delete success boolean.
  */
-[[maybe_unused]] bool wxRegConfigKeySetDeleteAllRuntime(
+bool wxRegConfigKeySetDeleteAllRuntime(
   WxRegConfigKeySetRuntimeView* const keys
 ) noexcept
 {
@@ -28927,7 +28927,7 @@ namespace
  * Returns whether one registry key exposes neither child subkeys nor value
  * names, using transient-diagnostics-suppressed probe lanes.
  */
-[[maybe_unused]] bool wxRegistryKeyIsEmptyQuietRuntime(
+bool wxRegistryKeyIsEmptyQuietRuntime(
   WxRegistryKeyRuntimeView* const key
 )
 {
@@ -29197,7 +29197,7 @@ BOOL wxSocketRuntimeInitialize()
  * What it does:
  * Returns whether wx socket runtime initialization refcount is non-zero.
  */
-[[maybe_unused]] BOOL wxIsSocketRuntimeInitialized()
+BOOL wxIsSocketRuntimeInitialized()
 {
   return gWxSocketRuntimeInitRefCount != 0u ? TRUE : FALSE;
 }
@@ -29371,7 +29371,7 @@ wxClientDataRuntime* wxClientDataRuntime::DeleteWithFlag(
  * Initializes one `wxObjectRefData` runtime payload with shared-refcount lane
  * seeded to `1`.
  */
-[[maybe_unused]] void* wxConstructObjectRefDataRuntimeWithRefCount(
+void* wxConstructObjectRefDataRuntimeWithRefCount(
   void* const objectRefDataRuntime
 ) noexcept
 {
@@ -29581,7 +29581,7 @@ void* wxTreeItemIndirectDataDestroyNoDelete(
  * Runs deleting-dtor thunk semantics for one `wxTreeItemIndirectData` runtime
  * payload.
  */
-[[maybe_unused]] void* wxDestroyTreeItemIndirectDataDeletingThunk(
+void* wxDestroyTreeItemIndirectDataDeletingThunk(
   void* const treeItemIndirectDataRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -29621,7 +29621,7 @@ std::int64_t* wxGetEpochMillisRuntime(std::int64_t* const outMilliseconds)
  * Samples epoch milliseconds into a temporary 64-bit lane and copies both
  * low/high dword lanes into caller-owned output storage.
  */
-[[maybe_unused]] std::uint32_t* wxGetEpochMillisPairRuntime(
+std::uint32_t* wxGetEpochMillisPairRuntime(
   std::uint32_t* const outLowHighPair
 )
 {
@@ -29647,7 +29647,7 @@ namespace
  * the process-global snapshot, and optionally commits the sampled value as the
  * new snapshot.
  */
-[[maybe_unused]] std::int32_t wxSampleEpochMillisDeltaAndOptionallyCommit(
+std::int32_t wxSampleEpochMillisDeltaAndOptionallyCommit(
   const bool commitNewSnapshot
 )
 {
@@ -29695,7 +29695,7 @@ static_assert(sizeof(WxElapsedClockRuntimeView) == 0x10, "WxElapsedClockRuntimeV
  * offset (so that later `ComputeMillis` samples report the elapsed time
  * including the prior interval). Also clears the cached-millis lanes.
  */
-[[maybe_unused]] void wxElapsedClockInitWithPriorElapsedMillis(
+void wxElapsedClockInitWithPriorElapsedMillis(
   WxElapsedClockRuntimeView* const clockRuntime,
   const std::int32_t alreadyElapsedMillis
 ) noexcept
@@ -29714,7 +29714,7 @@ static_assert(sizeof(WxElapsedClockRuntimeView) == 0x10, "WxElapsedClockRuntimeV
  * Returns elapsed milliseconds since `startMillis` using the current
  * epoch-millisecond lane.
  */
-[[maybe_unused]] std::int32_t wxElapsedClockComputeMillis(
+std::int32_t wxElapsedClockComputeMillis(
   const WxElapsedClockRuntimeView* const clockRuntime
 )
 {
@@ -29730,7 +29730,7 @@ static_assert(sizeof(WxElapsedClockRuntimeView) == 0x10, "WxElapsedClockRuntimeV
  * Returns cached elapsed milliseconds when available; otherwise computes
  * elapsed milliseconds from current epoch time.
  */
-[[maybe_unused]] std::int32_t wxElapsedClockGetMillisCachedOrCompute(
+std::int32_t wxElapsedClockGetMillisCachedOrCompute(
   const WxElapsedClockRuntimeView* const clockRuntime
 )
 {
@@ -29805,7 +29805,7 @@ void* wxSizerClientDataRuntime::DoGetClientData() const
  * deleting the owned client-object payload when the payload type is object
  * backed.
  */
-[[maybe_unused]] void wxDestroySizerClientDataNoDeleteRuntime(
+void wxDestroySizerClientDataNoDeleteRuntime(
   wxSizerClientDataRuntime* const clientDataRuntime
 ) noexcept
 {
@@ -29827,7 +29827,7 @@ void* wxSizerClientDataRuntime::DoGetClientData() const
  * What it does:
  * Runs deleting-dtor thunk semantics for one sizer client-data container lane.
  */
-[[maybe_unused]] wxSizerClientDataRuntime* wxDestroySizerClientDataDeletingThunk(
+wxSizerClientDataRuntime* wxDestroySizerClientDataDeletingThunk(
   wxSizerClientDataRuntime* const clientDataRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -29892,7 +29892,7 @@ static_assert(
  * Preserves one adapter lane that forwards to the canonical wx region-empty
  * predicate.
  */
-[[maybe_unused]] BOOL wxRegionIsEmptyRuntimeAdapter(
+BOOL wxRegionIsEmptyRuntimeAdapter(
   WxRegionRectCtorRuntimeView* const region
 )
 {
@@ -29906,7 +29906,7 @@ static_assert(
  * Queries one window position lane and one size lane, then writes the combined
  * rectangle `(x, y, width, height)` into the output structure.
  */
-[[maybe_unused]] WxWindowRectRuntimeView* wxWindowQueryRectRuntime(
+WxWindowRectRuntimeView* wxWindowQueryRectRuntime(
   void* const windowRuntime,
   WxWindowRectRuntimeView* const outRect
 ) noexcept
@@ -30294,7 +30294,7 @@ wxTextCtrlRuntime* wxLogFrameRuntime::TextCtrl() const noexcept
  * Notifies the owner `wxLogWindow` about one frame-close lane; when accepted,
  * hides the frame by dispatching virtual slot `+0x7C` with `show=0`.
  */
-[[maybe_unused]] std::int32_t wxLogFrameNotifyOwnerAndHideOnAccept(
+std::int32_t wxLogFrameNotifyOwnerAndHideOnAccept(
   wxLogFrameRuntime* const logFrameRuntime
 )
 {
@@ -30319,7 +30319,7 @@ wxTextCtrlRuntime* wxLogFrameRuntime::TextCtrl() const noexcept
  * Event-thunk lane that ignores one stack event payload and forwards the
  * owning log-frame object into `wxLogFrameNotifyOwnerAndHideOnAccept`.
  */
-[[maybe_unused]] std::int32_t wxLogFrameNotifyOwnerAndHideOnAcceptThunkA(
+std::int32_t wxLogFrameNotifyOwnerAndHideOnAcceptThunkA(
   wxLogFrameRuntime* const logFrameRuntime,
   void* const /*unusedEvent*/
 ) noexcept
@@ -30335,7 +30335,7 @@ wxTextCtrlRuntime* wxLogFrameRuntime::TextCtrl() const noexcept
  * forwards the owning log-frame object into
  * `wxLogFrameNotifyOwnerAndHideOnAccept`.
  */
-[[maybe_unused]] std::int32_t wxLogFrameNotifyOwnerAndHideOnAcceptThunkB(
+std::int32_t wxLogFrameNotifyOwnerAndHideOnAcceptThunkB(
   wxLogFrameRuntime* const logFrameRuntime,
   void* const /*unusedEvent*/
 ) noexcept
@@ -30350,7 +30350,7 @@ wxTextCtrlRuntime* wxLogFrameRuntime::TextCtrl() const noexcept
  * Forwards one log-frame command callback lane to the embedded text-control
  * virtual dispatch slot at offset `+0xF8`.
  */
-[[maybe_unused]] int wxLogFrameForwardCommandToTextControlRuntime(
+int wxLogFrameForwardCommandToTextControlRuntime(
   wxLogFrameRuntime* const logFrameRuntime,
   const int commandToken
 )
@@ -30393,7 +30393,7 @@ wxLogFrameRuntime::~wxLogFrameRuntime()
  * What it does:
  * Runs deleting-dtor thunk semantics for one `wxLogFrame` runtime payload.
  */
-[[maybe_unused]] wxLogFrameRuntime* wxDestroyLogFrameDeletingThunk(
+wxLogFrameRuntime* wxDestroyLogFrameDeletingThunk(
   wxLogFrameRuntime* const logFrameRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -30459,7 +30459,7 @@ wxLogWindowRuntime::~wxLogWindowRuntime()
  * What it does:
  * Runs deleting-dtor thunk semantics for one `wxLogWindow` runtime payload.
  */
-[[maybe_unused]] wxLogWindowRuntime* wxDestroyLogWindowDeletingThunk(
+wxLogWindowRuntime* wxDestroyLogWindowDeletingThunk(
   wxLogWindowRuntime* const logWindowRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -30482,7 +30482,7 @@ wxLogWindowRuntime::~wxLogWindowRuntime()
  * When exactly one non-bar child is present, resizes that child to fill the
  * top-level client lane; otherwise leaves layout unchanged.
  */
-[[maybe_unused]] void wxTopLevelWindowResizeSingleNonBarChildRuntime(
+void wxTopLevelWindowResizeSingleNonBarChildRuntime(
   void* const topLevelWindowRuntime,
   const int reservedArg0
 ) noexcept
@@ -31187,11 +31187,11 @@ bool wxTopLevelWindowRuntime::IsFullScreen() const
   return state != nullptr && state->flag34 != 0;
 }
 
-[[maybe_unused]] wxTopLevelWindowRuntime* wxDestroyTopLevelWindowMswWithoutDeleteRuntime(
+wxTopLevelWindowRuntime* wxDestroyTopLevelWindowMswWithoutDeleteRuntime(
   wxTopLevelWindowRuntime* topLevelWindow
 ) noexcept;
 
-[[maybe_unused]] wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteRuntime(
+wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteRuntime(
   wxDialogRuntime* dialog
 ) noexcept;
 
@@ -31392,7 +31392,7 @@ const void* wxDialogRuntime::GetEventTable() const
   return &sm_eventTable;
 }
 
-[[maybe_unused]] bool wxShouldExitMainLoopOnLastTopLevelWindowDelete(
+bool wxShouldExitMainLoopOnLastTopLevelWindowDelete(
   const wxTopLevelWindowRuntime* window
 ) noexcept;
 
@@ -31468,7 +31468,7 @@ namespace
  * Releases one pointer-array runtime lane, clears its element-count lane, then
  * deletes and nulls the owned storage pointer at `+0x08`.
  */
-[[maybe_unused]] void wxReleaseRuntimePointerArrayAndStorage(
+void wxReleaseRuntimePointerArrayAndStorage(
   void* const runtimeObject
 )
 {
@@ -31486,7 +31486,7 @@ namespace
  * first releases entries and clears count, then performs full
  * release-and-storage cleanup.
  */
-[[maybe_unused]] void wxReleaseTopLevelWindowIconBundleRuntime(
+void wxReleaseTopLevelWindowIconBundleRuntime(
   void* const iconBundleRuntime
 )
 {
@@ -31505,7 +31505,7 @@ namespace
  * exits the main loop on last-frame-delete, releases icon-bundle lanes, and
  * then dispatches base wx-window teardown.
  */
-[[maybe_unused]] wxTopLevelWindowRuntime* wxDestroyTopLevelWindowBaseWithoutDeleteRuntime(
+wxTopLevelWindowRuntime* wxDestroyTopLevelWindowBaseWithoutDeleteRuntime(
   wxTopLevelWindowRuntime* const topLevelWindow
 ) noexcept
 {
@@ -31546,7 +31546,7 @@ namespace
  * the modeless list, brings parent window to top for transient styles, then
  * delegates to base top-level-window teardown.
  */
-[[maybe_unused]] wxTopLevelWindowRuntime* wxDestroyTopLevelWindowMswWithoutDeleteRuntime(
+wxTopLevelWindowRuntime* wxDestroyTopLevelWindowMswWithoutDeleteRuntime(
   wxTopLevelWindowRuntime* const topLevelWindow
 ) noexcept
 {
@@ -31584,7 +31584,7 @@ namespace
  * dialog through the base top-level Show lane, and then executes shared
  * top-level-window-msw teardown.
  */
-[[maybe_unused]] wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteRuntime(
+wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteRuntime(
   wxDialogRuntime* const dialog
 ) noexcept
 {
@@ -31610,7 +31610,7 @@ namespace
  * Tail-forward thunk that reuses the canonical non-deleting dialog teardown
  * lane (`FUN_0098BC70`) for top-level-window runtime callers.
  */
-[[maybe_unused]] wxTopLevelWindowRuntime* wxDestroyDialogRuntimeWithoutDeleteThunk(
+wxTopLevelWindowRuntime* wxDestroyDialogRuntimeWithoutDeleteThunk(
   wxTopLevelWindowRuntime* const topLevelWindow
 ) noexcept
 {
@@ -31628,7 +31628,7 @@ namespace
  * Tail-forward thunk that aliases the canonical non-deleting dialog teardown
  * lane (`FUN_0098BC70`) for dialog-typed callers.
  */
-[[maybe_unused]] wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteForwardThunk(
+wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteForwardThunk(
   wxDialogRuntime* const dialog
 ) noexcept
 {
@@ -31642,7 +31642,7 @@ namespace
  * Runs non-deleting dialog teardown through the canonical lane and conditionally
  * releases object storage when `deleteFlags & 1`.
  */
-[[maybe_unused]] wxTopLevelWindowRuntime* wxDestroyDialogRuntimeDeletingThunkAlias(
+wxTopLevelWindowRuntime* wxDestroyDialogRuntimeDeletingThunkAlias(
   wxTopLevelWindowRuntime* const topLevelWindow,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -31695,7 +31695,7 @@ std::int32_t wxDialogRuntime::ShowModal()
   return OnOkCommand(okEvent) != 0 ? 0x13EC : 0;
 }
 
-[[maybe_unused]] int wxDispatchVirtualSlot240WithCommand5100(
+int wxDispatchVirtualSlot240WithCommand5100(
   void* runtimeObject,
   int reservedArg0
 ) noexcept;
@@ -31750,7 +31750,7 @@ std::int32_t wxDialogRuntime::OnApplyCommand(
  * Returns true only when the current top-level window candidate is the sole
  * tracked top-level window and app shutdown-on-last-frame-delete is enabled.
  */
-[[maybe_unused]] bool wxShouldExitMainLoopOnLastTopLevelWindowDelete(
+bool wxShouldExitMainLoopOnLastTopLevelWindowDelete(
   const wxTopLevelWindowRuntime* const window
 ) noexcept
 {
@@ -31930,7 +31930,7 @@ void wxTreeListColumnInfoRuntime::DestroyWithoutDelete() noexcept
  * Thunk lane that forwards one tree-list column non-deleting teardown request
  * into `FUN_004A3AC0`.
  */
-[[maybe_unused]] void wxTreeListColumnInfoDestroyWithoutDeleteRuntimeAdapter(
+void wxTreeListColumnInfoDestroyWithoutDeleteRuntimeAdapter(
   wxTreeListColumnInfoRuntime* const columnInfo
 ) noexcept
 {
@@ -32036,7 +32036,7 @@ void wxTreeListCtrlRuntime::AddColumn(
  * Composes effective tree-list style flags by OR-ing the cached style lane
  * with an optional auxiliary style-source window lane.
  */
-[[maybe_unused]] long wxTreeListComposeEffectiveStyleRuntime(
+long wxTreeListComposeEffectiveStyleRuntime(
   const WxTreeListRuntimeState* const state
 )
 {
@@ -32200,7 +32200,7 @@ static_assert(
  * Resets transient drag/header state lanes on one tree-list header-window
  * runtime object.
  */
-[[maybe_unused]] int wxTreeListHeaderWindowResetTransientStateRuntime(
+int wxTreeListHeaderWindowResetTransientStateRuntime(
   void* const headerWindowRuntime
 ) noexcept
 {
@@ -32219,7 +32219,7 @@ static_assert(
  * Resolves two owner scroll metrics and applies the negated product as device
  * origin adjustment on the target drawing context.
  */
-[[maybe_unused]] int wxTreeListHeaderApplyOwnerDeviceOriginRuntime(
+int wxTreeListHeaderApplyOwnerDeviceOriginRuntime(
   void* const headerWindowRuntime,
   void* const drawingContextRuntime
 )
@@ -32248,7 +32248,7 @@ static_assert(
  * Selects one item-image index from four runtime lanes based on two state bits
  * and `-1` sentinel fallback rules.
  */
-[[maybe_unused]] int wxTreeListItemResolveImageIndexRuntime(
+int wxTreeListItemResolveImageIndexRuntime(
   const void* const itemRuntime
 ) noexcept
 {
@@ -32287,7 +32287,7 @@ static_assert(
  * Returns the normal image-list lane owned by one tree-list main-window
  * runtime object.
  */
-[[maybe_unused]] int wxTreeListMainWindowGetNormalImageListRuntime(
+int wxTreeListMainWindowGetNormalImageListRuntime(
   const void* const mainWindowRuntime
 ) noexcept
 {
@@ -32302,7 +32302,7 @@ static_assert(
  * Assigns one tree-list state image-list lane, deleting the previous lane when
  * ownership flag `+0x20F` is set, then clears that ownership flag.
  */
-[[maybe_unused]] int wxTreeListMainWindowSetStateImageListRuntime(
+int wxTreeListMainWindowSetStateImageListRuntime(
   void* const mainWindowRuntime,
   WxDeleteWithFlagRuntimeInterface* const newStateImageList
 )
@@ -32329,7 +32329,7 @@ static_assert(
  * Returns whether one tree-list node has explicit-children flag set or any
  * linked child nodes present.
  */
-[[maybe_unused]] bool wxTreeListNodeHasChildrenRuntime(
+bool wxTreeListNodeHasChildrenRuntime(
   const WxTreeListNodeRuntimeState* const node
 ) noexcept
 {
@@ -32346,7 +32346,7 @@ static_assert(
  * Thunk-forwarder that preserves the tree-list child-presence query return
  * shape (`0` or `1`).
  */
-[[maybe_unused]] int wxTreeListNodeHasChildrenThunkRuntime(
+int wxTreeListNodeHasChildrenThunkRuntime(
   const WxTreeListNodeRuntimeState* const node
 ) noexcept
 {
@@ -32398,7 +32398,7 @@ const void* wxTreeListCtrlRuntime::GetEventTable() const
  * fixed-height top-pane and remainder-height bottom-pane layout through child
  * virtual slot `+0x1A0` at owner lanes `+0x130/+0x134`.
  */
-[[maybe_unused]] int wxTreeListControlLayoutTwoChildPanesRuntime(
+int wxTreeListControlLayoutTwoChildPanesRuntime(
   void* const controlRuntime,
   const int /*eventToken*/
 ) noexcept
@@ -32474,7 +32474,7 @@ const void* wxTreeListCtrlRuntime::GetEventTable() const
  * Applies one background-colour update through `wxWindowBase`, then requests a
  * full refresh pass when the colour lane changes.
  */
-[[maybe_unused]] bool wxWindowSetBackgroundColourAndRefreshRuntime(
+bool wxWindowSetBackgroundColourAndRefreshRuntime(
   wxWindowBase* const windowRuntime,
   const void* const colour
 )
@@ -32494,7 +32494,7 @@ const void* wxTreeListCtrlRuntime::GetEventTable() const
  * Applies one foreground-colour update through `wxWindowBase`, then requests a
  * full refresh pass when the colour lane changes.
  */
-[[maybe_unused]] bool wxWindowSetForegroundColourAndRefreshRuntime(
+bool wxWindowSetForegroundColourAndRefreshRuntime(
   wxWindowBase* const windowRuntime,
   const void* const colour
 )
@@ -32719,7 +32719,7 @@ static_assert(
  * What it does:
  * Releases and nulls three frame-owned delete-with-flag slot lanes.
  */
-[[maybe_unused]] void wxFrameReleaseOwnedDeleteSlotsRuntime(
+void wxFrameReleaseOwnedDeleteSlotsRuntime(
   wxTopLevelWindowRuntime* const frame
 ) noexcept
 {
@@ -32765,7 +32765,7 @@ wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(
  * Rebinds one frame object to the SupCom-frame vtable token and forwards into
  * shared non-deleting frame teardown.
  */
-[[maybe_unused]] wxTopLevelWindowRuntime* WSupComFrameDestroyWithoutDeleteThunk(
+wxTopLevelWindowRuntime* WSupComFrameDestroyWithoutDeleteThunk(
   wxTopLevelWindowRuntime* const frame
 ) noexcept
 {
@@ -32851,7 +32851,7 @@ namespace
  * probe object and marks the current event-entry lane as skipped when the
  * probe rejects it (or when no probe is installed).
  */
-[[maybe_unused]] int wxWindowBaseProbeEventEntryRuntime(
+int wxWindowBaseProbeEventEntryRuntime(
   void* const windowRuntime,
   void* const eventEntryRuntime
 )
@@ -32879,7 +32879,7 @@ namespace
  * Clears the global probe-guard flag and tail-calls the runtime virtual
  * dispatch lane at vtable offset `+0x14`.
  */
-[[maybe_unused]] int wxWindowBaseProbeThunkResetGuardAndDispatch(
+int wxWindowBaseProbeThunkResetGuardAndDispatch(
   void* const runtime
 )
 {
@@ -32962,7 +32962,7 @@ void* wxGetInstance()
  * What it does:
  * Stores the process module-instance handle used by wx Win32 create paths.
  */
-[[maybe_unused]] HINSTANCE wxSetInstanceHandleRuntime(
+HINSTANCE wxSetInstanceHandleRuntime(
   const HINSTANCE instanceHandle
 )
 {
@@ -35234,7 +35234,7 @@ unsigned long wxWindowMswRuntime::MSWGetStyle(
  * Calls `wxWindow::MSWGetStyle` with the style mask used by derived wx window
  * wrappers, then forces extended-style bits `0x88` when an output lane exists.
  */
-[[maybe_unused]] unsigned long wxWindowMswGetStyleWithForcedExtendedBits(
+unsigned long wxWindowMswGetStyleWithForcedExtendedBits(
   const wxWindowMswRuntime* const window,
   const long style,
   unsigned long* const extendedStyle
@@ -37863,7 +37863,7 @@ unsigned long wxTextCtrlRuntime::OnCtlColor(
  * Draws one wx string lane with transparent background into the supplied draw
  * rectangle and restores previous DC text/background state.
  */
-[[maybe_unused]] COLORREF wxDrawTextTransparentRestoreDcState(
+COLORREF wxDrawTextTransparentRestoreDcState(
   const COLORREF textColor,
   HDC const deviceContext,
   RECT* const drawRect,
@@ -38415,7 +38415,7 @@ bool wxWindowBase::ScrollPages(
  * Default `wxDropTarget*::OnDragOver` lane: preserves the incoming default
  * drag-result action and returns it unchanged.
  */
-[[maybe_unused]] std::int32_t wxDropTargetDefaultOnDragOverRuntime(
+std::int32_t wxDropTargetDefaultOnDragOverRuntime(
   void* const dropTargetRuntime,
   const std::int32_t x,
   const std::int32_t y,
@@ -38435,7 +38435,7 @@ bool wxWindowBase::ScrollPages(
  * Revokes OLE drag-drop registration for one window handle, unlocks the
  * retained COM drop-target object, and clears its registered-window lane.
  */
-[[maybe_unused]] HRESULT wxRevokeDropTargetRegistration(
+HRESULT wxRevokeDropTargetRegistration(
   void* const dropTargetRuntime,
   const HWND windowHandle
 )
@@ -38481,7 +38481,7 @@ bool wxWindowBase::ScrollPages(
  * What it does:
  * Maps one Win32 `DROPEFFECT_*` action lane into the wx drag-result enum lane.
  */
-[[maybe_unused]] std::int32_t wxDragResultFromDropEffect(
+std::int32_t wxDragResultFromDropEffect(
   const std::int32_t dropEffect
 ) noexcept
 {
@@ -38503,7 +38503,7 @@ bool wxWindowBase::ScrollPages(
  * What it does:
  * Maps one wx drag-result lane into the Win32 `DROPEFFECT_*` action lane.
  */
-[[maybe_unused]] std::int32_t wxDropEffectFromDragResult(
+std::int32_t wxDropEffectFromDragResult(
   const std::int32_t dragResult
 ) noexcept
 {
@@ -38558,7 +38558,7 @@ namespace
  * Initializes the compact `wxDropTargetBase` payload by binding the
  * dispatch-vtable lane and storing the initial data-object pointer.
  */
-[[maybe_unused]] WxDropTargetBaseSimpleCtorRuntimeView* wxConstructDropTargetBaseSimpleRuntime(
+WxDropTargetBaseSimpleCtorRuntimeView* wxConstructDropTargetBaseSimpleRuntime(
   WxDropTargetBaseSimpleCtorRuntimeView* const dropTargetBaseRuntime,
   void* const dataObject
 ) noexcept
@@ -38580,7 +38580,7 @@ namespace
  * What it does:
  * Rebinds one drop-target-base payload to the `wxIDropTarget` vtable lane.
  */
-[[maybe_unused]] WxIDropTargetCtorRuntimeView* wxConstructIDropTargetRuntimeVTable(
+WxIDropTargetCtorRuntimeView* wxConstructIDropTargetRuntimeVTable(
   WxIDropTargetCtorRuntimeView* const dropTargetRuntime
 ) noexcept
 {
@@ -38598,7 +38598,7 @@ namespace
  * Rebinds one `wxIDropTarget` runtime payload and conditionally scalar-deletes
  * it when the low delete flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyIDropTargetWithDeleteFlagRuntime(
+void* wxDestroyIDropTargetWithDeleteFlagRuntime(
   void* const dropTargetRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -38617,7 +38617,7 @@ namespace
  * Initializes one `wxDropTarget`-base payload by binding `wxIDropTarget`
  * vtable state and wiring the owner drop-target lane.
  */
-[[maybe_unused]] WxDropTargetBaseCtorRuntimeView* wxConstructDropTargetBaseRuntime(
+WxDropTargetBaseCtorRuntimeView* wxConstructDropTargetBaseRuntime(
   WxDropTargetBaseCtorRuntimeView* const dropTargetBaseRuntime,
   void* const ownerDropTarget
 ) noexcept
@@ -38679,7 +38679,7 @@ void wxApp::Dispatch()
  * Swaps the process-global message-output object lane and returns the previous
  * pointer.
  */
-[[maybe_unused]] void* wxSwapMessageOutputRuntime(
+void* wxSwapMessageOutputRuntime(
   void* const nextMessageOutputRuntime
 ) noexcept
 {
@@ -38694,7 +38694,7 @@ void wxApp::Dispatch()
  * What it does:
  * Swaps the process-global config object lane and returns the previous pointer.
  */
-[[maybe_unused]] void* wxSwapConfigRuntime(
+void* wxSwapConfigRuntime(
   void* const nextConfigRuntime
 ) noexcept
 {
@@ -38783,12 +38783,12 @@ namespace
  * retaining app/vendor shared-string payloads (or `wxEmptyString`), storing
  * style flags, and resetting base read/write control bytes.
  */
-[[maybe_unused]] WxConfigBaseCtorRuntimeView* wxConstructConfigBaseRuntime(
+WxConfigBaseCtorRuntimeView* wxConstructConfigBaseRuntime(
   WxConfigBaseCtorRuntimeView* const runtime,
   const wxStringRuntime* const appName,
   const wxStringRuntime* const vendorName,
-  [[maybe_unused]] const wxStringRuntime* const localFileName,
-  [[maybe_unused]] const wxStringRuntime* const globalFileName,
+  const wxStringRuntime* const localFileName,
+  const wxStringRuntime* const globalFileName,
   const std::uint32_t styleFlags
 ) noexcept
 {
@@ -38810,7 +38810,7 @@ namespace
  * Rebinds one `wxConfigBase` payload to base-vtable lane and releases retained
  * vendor/app shared-string headers at `+0x0C` then `+0x08`.
  */
-[[maybe_unused]] void wxDestroyConfigBaseRuntime(
+void wxDestroyConfigBaseRuntime(
   WxConfigBaseCtorRuntimeView* const runtime
 ) noexcept
 {
@@ -38884,7 +38884,7 @@ namespace
  * Tries to read one integer config lane; on read miss, optionally persists
  * `fallbackValue` and writes it to `outValue`.
  */
-[[maybe_unused]] char wxConfigReadIntWithFallbackRuntime(
+char wxConfigReadIntWithFallbackRuntime(
   WxConfigReadIntRuntimeView* const runtime,
   const int key,
   std::int32_t* const outValue,
@@ -38985,7 +38985,7 @@ namespace
  * What it does:
  * Returns one pointer to the config runtime sub-lane rooted at offset `+0x34`.
  */
-[[maybe_unused]] std::uint8_t* wxConfigGetRuntimeLane34Buffer(
+std::uint8_t* wxConfigGetRuntimeLane34Buffer(
   WxConfigReadWriteFallbackRuntimeView* const runtime
 ) noexcept
 {
@@ -38998,7 +38998,7 @@ namespace
  * What it does:
  * Reads one byte flag lane at config runtime offset `+0x04`.
  */
-[[maybe_unused]] std::uint8_t wxConfigGetReadFlagLane04(
+std::uint8_t wxConfigGetReadFlagLane04(
   const WxConfigReadWriteFallbackRuntimeView* const runtime
 ) noexcept
 {
@@ -39011,7 +39011,7 @@ namespace
  * What it does:
  * Reads one byte flag lane at config runtime offset `+0x05`.
  */
-[[maybe_unused]] std::uint8_t wxConfigGetWriteOnReadMissFlagLane05(
+std::uint8_t wxConfigGetWriteOnReadMissFlagLane05(
   const WxConfigReadWriteFallbackRuntimeView* const runtime
 ) noexcept
 {
@@ -39025,7 +39025,7 @@ namespace
  * Tries to read one integer config lane; on read miss, optionally persists
  * `fallbackValue` and writes it into `outValue`.
  */
-[[maybe_unused]] char wxConfigReadIntWithFallbackRuntimeLaneB(
+char wxConfigReadIntWithFallbackRuntimeLaneB(
   WxConfigReadWriteFallbackRuntimeView* const runtime,
   const int key,
   std::int32_t* const outValue,
@@ -39053,7 +39053,7 @@ namespace
  * Tries to read one floating-point config lane; on read miss, optionally
  * persists `fallbackValue` and writes it into `outValue`.
  */
-[[maybe_unused]] char wxConfigReadDoubleWithFallbackRuntimeLaneB(
+char wxConfigReadDoubleWithFallbackRuntimeLaneB(
   WxConfigReadWriteFallbackRuntimeView* const runtime,
   const int key,
   double* const outValue,
@@ -39081,7 +39081,7 @@ namespace
  * Tries to read one byte config lane; on read miss, optionally persists
  * `fallbackValue` and writes it into `outValue`.
  */
-[[maybe_unused]] char wxConfigReadByteWithFallbackRuntimeLaneB(
+char wxConfigReadByteWithFallbackRuntimeLaneB(
   WxConfigReadWriteFallbackRuntimeView* const runtime,
   const int key,
   std::uint8_t* const outValue,
@@ -39292,7 +39292,7 @@ bool wxEntryStart()
  * What it does:
  * Returns the current process-global wx application object lane.
  */
-[[maybe_unused]] wxApp* wxGetGlobalAppRuntime()
+wxApp* wxGetGlobalAppRuntime()
 {
   return wxTheApp;
 }
@@ -39341,7 +39341,7 @@ bool wxUnregisterWindowClasses()
  * Returns the cached wx message-output runtime lane, creating it lazily via
  * `wxTheApp->CreateMessageOutput()` on first access.
  */
-[[maybe_unused]] void* wxGetOrCreateMessageOutputRuntime()
+void* wxGetOrCreateMessageOutputRuntime()
 {
   if (gWxCachedMessageOutputRuntime == nullptr && wxTheApp != nullptr) {
     gWxCachedMessageOutputRuntime = wxTheApp->CreateMessageOutput();
@@ -39357,7 +39357,7 @@ bool wxUnregisterWindowClasses()
  * Formats one wide vararg message, expands tab lanes to 8-space runs, and
  * emits the normalized text through the wx log-output lane.
  */
-[[maybe_unused]] void wxMessageOutputDebugPrintfRuntime(
+void wxMessageOutputDebugPrintfRuntime(
   const int outputLaneToken,
   const wchar_t* const formatText,
   ...
@@ -39398,7 +39398,7 @@ bool wxUnregisterWindowClasses()
  * Builds one `COMSPEC`-driven shell command line (`%COMSPEC% /c <command>`)
  * and returns whether the spawned shell exits successfully.
  */
-[[maybe_unused]] bool wxShellExecuteViaComspecRuntime(
+bool wxShellExecuteViaComspecRuntime(
   const wxStringRuntime* const commandText
 )
 {
@@ -39434,7 +39434,7 @@ namespace
  * `<prefix>\\share\\wx\\2.4` where `<prefix>` comes from `WXPREFIX` (or `.`
  * fallback), then stores it in `outPath`.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildDataDirectoryPathRuntime(
+wxStringRuntime* wxBuildDataDirectoryPathRuntime(
   wxStringRuntime* const outPath
 )
 {
@@ -39465,7 +39465,7 @@ namespace
  * Yields the wx app-loop with `onlyIfNeeded=false` when the global app
  * pointer is available.
  */
-[[maybe_unused]] BOOL wxYieldIfAppAvailableAllowIdle()
+BOOL wxYieldIfAppAvailableAllowIdle()
 {
   return (wxTheApp != nullptr && wxTheApp->Yield(false)) ? TRUE : FALSE;
 }
@@ -39489,7 +39489,7 @@ BOOL wxYieldIfAppAvailable()
  * Runs one wx pending/idle dispatch loop until the caller-owned stop flag at
  * `+0x08` is cleared.
  */
-[[maybe_unused]] bool wxDispatchPendingOrIdleUntilStopped(
+bool wxDispatchPendingOrIdleUntilStopped(
   void* const loopRuntime
 )
 {
@@ -39517,7 +39517,7 @@ BOOL wxYieldIfAppAvailable()
  * Clears one caller-owned dispatch-loop run flag at offset `+0x08` and
  * reports success.
  */
-[[maybe_unused]] char wxStopPendingOrIdleDispatchLoopRuntime(
+char wxStopPendingOrIdleDispatchLoopRuntime(
   void* const loopRuntime
 ) noexcept
 {
@@ -39538,7 +39538,7 @@ BOOL wxYieldIfAppAvailable()
  * pending/idle dispatch loop when active (`+0x08`), then rebinds to wxObject
  * and unreferences shared event ref-data.
  */
-[[maybe_unused]] void wxContextHelpRebindStopLoopAndUnrefRuntime(
+void wxContextHelpRebindStopLoopAndUnrefRuntime(
   void* const contextHelpRuntime
 ) noexcept
 {
@@ -39575,7 +39575,7 @@ BOOL wxYieldIfAppAvailable()
  * Runs the context-help non-deleting teardown lane and scalar-deletes the
  * runtime object when the low delete-flag bit is set.
  */
-[[maybe_unused]] void* wxContextHelpRebindStopLoopAndUnrefWithDeleteFlagRuntime(
+void* wxContextHelpRebindStopLoopAndUnrefWithDeleteFlagRuntime(
   void* const contextHelpRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -39638,7 +39638,7 @@ namespace
  * Stores one active render-time game-rules owner pointer lane and returns the
  * same pointer.
  */
-[[maybe_unused]] moho::RRuleGameRulesImpl* SetActiveRenderGameRulesLane(
+moho::RRuleGameRulesImpl* SetActiveRenderGameRulesLane(
   moho::RRuleGameRulesImpl* const gameRules
 ) noexcept
 {
@@ -39652,7 +39652,7 @@ namespace
  * What it does:
  * Returns the active render-time game-rules owner pointer lane.
  */
-[[maybe_unused]] moho::RRuleGameRulesImpl* GetActiveRenderGameRulesLane() noexcept
+moho::RRuleGameRulesImpl* GetActiveRenderGameRulesLane() noexcept
 {
   return gActiveRenderGameRules;
 }
@@ -39663,7 +39663,7 @@ namespace
  * What it does:
  * Returns the active render-time world-map owner pointer lane.
  */
-[[maybe_unused]] moho::CWldMap* GetActiveRenderWorldMapLane() noexcept
+moho::CWldMap* GetActiveRenderWorldMapLane() noexcept
 {
   return gActiveRenderWorldMap;
 }
@@ -39674,7 +39674,7 @@ namespace
  * What it does:
  * Returns the active global viewport owner lane (`ren_Viewport`).
  */
-[[maybe_unused]] moho::WRenViewport* GetActiveRenderViewportLane() noexcept
+moho::WRenViewport* GetActiveRenderViewportLane() noexcept
 {
   return moho::ren_Viewport;
 }
@@ -39789,7 +39789,7 @@ moho::wxPaintDCRuntime::~wxPaintDCRuntime()
  * Scans the runtime paint-DC cache for a window handle match and returns the
  * cached device-context lane when present.
  */
-[[maybe_unused]] WXHDC wxFindPaintDcHandleForWindowRuntime(
+WXHDC wxFindPaintDcHandleForWindowRuntime(
   const void* const windowRuntime
 ) noexcept
 {
@@ -39833,7 +39833,7 @@ moho::wxPaintDCRuntime::~wxPaintDCRuntime()
  * handle is present, dispatches owner virtual slot `+0x1F4` with command id
  * `15`, payload handle, and trailing zero lane.
  */
-[[maybe_unused]] int wxDispatchCachedPaintDcHandleFromEventRuntime(
+int wxDispatchCachedPaintDcHandleFromEventRuntime(
   void* const dispatchOwnerRuntime,
   const void* const eventRuntime
 ) noexcept
@@ -40264,7 +40264,7 @@ long moho::WD3DViewport::MSWWindowProc(
  * What it does:
  * Deleting-dtor thunk lane for `WD3DViewport`.
  */
-static moho::WD3DViewport* DeleteWD3DViewportThunk(
+[[maybe_unused]] static moho::WD3DViewport* DeleteWD3DViewportThunk(
   moho::WD3DViewport* const viewport,
   const std::uint8_t deleteFlags
 )
@@ -40450,7 +40450,7 @@ namespace
    * Non-deleting `wxOutputStream` destructor lane: rebinds one runtime vtable
    * marker and forwards into `wxStreamBase` destruction.
    */
-  [[maybe_unused]] [[nodiscard]] wxStreamBase* DestroyWxOutputStreamNoDeleteRuntimeAdapterA(
+  [[nodiscard]] wxStreamBase* DestroyWxOutputStreamNoDeleteRuntimeAdapterA(
     wxStreamBase* const stream
   ) noexcept
   {
@@ -40466,7 +40466,7 @@ namespace
    * Thunk-forwarder lane into the canonical non-deleting `wxOutputStream`
    * destructor adapter.
    */
-  [[maybe_unused]] [[nodiscard]] wxStreamBase* DestroyWxOutputStreamNoDeleteRuntimeThunk(
+  [[nodiscard]] wxStreamBase* DestroyWxOutputStreamNoDeleteRuntimeThunk(
     wxStreamBase* const stream
   ) noexcept
   {
@@ -40548,7 +40548,7 @@ namespace
  * native handle lane (when valid) and tail-calling the `wxInputStream`
  * destructor path.
  */
-[[maybe_unused]] void wxDestroyPipeInputStreamNoDeleteRuntime(
+void wxDestroyPipeInputStreamNoDeleteRuntime(
   void* const pipeInputStreamRuntime
 )
 {
@@ -40575,7 +40575,7 @@ namespace
  * on probe failure it closes the owned handle, marks stream-status lane `1`,
  * and returns false.
  */
-[[maybe_unused]] bool wxPipeInputStreamCanReadRuntime(
+bool wxPipeInputStreamCanReadRuntime(
   void* const streamRuntime
 ) noexcept
 {
@@ -40603,7 +40603,7 @@ namespace
  * Reads bytes from one pipe-input native-handle lane; marks stream status
  * (`1` on invalid-handle/broken-pipe, `3` on other read failures).
  */
-[[maybe_unused]] DWORD wxPipeInputStreamReadRuntime(
+DWORD wxPipeInputStreamReadRuntime(
   void* const streamRuntime,
   LPVOID const destinationBuffer,
   const DWORD requestedByteCount
@@ -40634,7 +40634,7 @@ namespace
  * Writes bytes to one pipe-output native-handle lane; stores stream status
  * (`0` success, `1` on broken pipe, `2` on other write failures).
  */
-[[maybe_unused]] DWORD wxPipeOutputStreamWriteRuntime(
+DWORD wxPipeOutputStreamWriteRuntime(
   void* const streamRuntime,
   LPCVOID const sourceBuffer,
   const DWORD requestedByteCount
@@ -40661,7 +40661,7 @@ namespace
  * Runs one non-deleting `wxPipeOutputStream` teardown by closing the owned
  * native handle lane then forwarding into shared output-stream base teardown.
  */
-[[maybe_unused]] wxStreamBase* wxDestroyPipeOutputStreamNoDeleteRuntime(
+wxStreamBase* wxDestroyPipeOutputStreamNoDeleteRuntime(
   void* const pipeOutputStreamRuntime
 )
 {
@@ -40690,7 +40690,7 @@ namespace
  * Saves the stream input cursor, invokes the image-handler stream-load virtual
  * lane, and restores the original cursor before returning success.
  */
-[[maybe_unused]] bool wxImageHandlerLoadWithInputCheckpoint(
+bool wxImageHandlerLoadWithInputCheckpoint(
   void* const imageHandlerRuntime,
   void* const inputStreamRuntime
 )
@@ -40770,7 +40770,7 @@ namespace
  * drops that ECX assignment which is reinstated here as an explicit
  * argument.
  */
-[[maybe_unused]] char wxImageProbeAnyRegisteredHandlerLoadsFromInputRuntime(
+char wxImageProbeAnyRegisteredHandlerLoadsFromInputRuntime(
   void* const inputStreamRuntime
 ) noexcept
 {
@@ -40912,7 +40912,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * What it does:
  * Adapts one pointer-lane callback into the canonical XPM-signature probe.
  */
-[[maybe_unused]] int wxInputStreamHasXpmSignatureThunk(
+int wxInputStreamHasXpmSignatureThunk(
   wxInputStream* const inputStream
 ) noexcept
 {
@@ -40926,7 +40926,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * Walks the process-global wx image-handler list (`wxImage::sm_handlers`),
  * deleting each handler payload (when non-null), then deleting each list node.
  */
-[[maybe_unused]] int wxDestroyImageHandlerRegistryRuntimeListNodes() noexcept
+int wxDestroyImageHandlerRegistryRuntimeListNodes() noexcept
 {
   using WxDeleteWithFlagCall = int(__thiscall*)(void* objectRuntime, int deleteFlag);
 
@@ -40972,7 +40972,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * What it does:
  * Pure jump-thunk alias into `wxDestroyImageHandlerRegistryRuntimeListNodes`.
  */
-[[maybe_unused]] int wxDestroyImageHandlerRegistryRuntimeListNodesThunk() noexcept
+int wxDestroyImageHandlerRegistryRuntimeListNodesThunk() noexcept
 {
   return wxDestroyImageHandlerRegistryRuntimeListNodes();
 }
@@ -40984,7 +40984,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * Opens one file-path stream when the file exists and probes supported image
  * signatures; otherwise emits the localized "file does not exist" wx error.
  */
-[[maybe_unused]] bool wxImageCanReadFilePathRuntime(
+bool wxImageCanReadFilePathRuntime(
   wxStringRuntime* const filePath
 )
 {
@@ -41010,7 +41010,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * Advances one hash-iterator lane to the next non-empty bucket after the
  * current node hash bucket and returns that bucket head pointer (or `0`).
  */
-[[maybe_unused]] std::uintptr_t wxAdvanceHashIteratorToNextOccupiedBucketRuntime(
+std::uintptr_t wxAdvanceHashIteratorToNextOccupiedBucketRuntime(
   const void* const iteratorRuntime
 ) noexcept
 {
@@ -41059,7 +41059,7 @@ bool wxInputStreamHasXpmSignature(wxInputStream* const inputStream)
  * `outSnapshot`, then advances current node to `node->next` or the next
  * occupied bucket head.
  */
-[[maybe_unused]] void* wxHashIteratorPostIncrementRuntime(
+void* wxHashIteratorPostIncrementRuntime(
   void* const iteratorRuntime,
   void* const outSnapshot,
   const std::int32_t /*unused*/
@@ -41222,7 +41222,7 @@ namespace
    * flags for the loaded/pending lists), then uninitializes the active DDE
    * instance handle and clears it.
    */
-  [[maybe_unused]] DWORD wxShutdownDdeModuleAndClearGlobalModuleListsRuntime()
+  DWORD wxShutdownDdeModuleAndClearGlobalModuleListsRuntime()
   {
     gWxLoadedModuleListRuntime.mDestroy = 1;
     gWxLoadedModuleListRuntime.Clear();
@@ -41250,7 +41250,7 @@ namespace
    * What it does:
    * Forwards the thin thunk lane to the canonical DDE-module shutdown path.
    */
-  [[maybe_unused]] DWORD wxShutdownDdeModuleAndClearGlobalModuleListsRuntimeThunk()
+  DWORD wxShutdownDdeModuleAndClearGlobalModuleListsRuntimeThunk()
   {
     return wxShutdownDdeModuleAndClearGlobalModuleListsRuntime();
   }
@@ -41325,7 +41325,7 @@ namespace
    * Creates one DDE string handle for the pointed item-name text and appends
    * it into the process-global item-handle cache lane.
    */
-  [[maybe_unused]] HSZ wxCreateAndCacheDdeItemStringHandleRuntime(
+  HSZ wxCreateAndCacheDdeItemStringHandleRuntime(
     const wchar_t* const* const itemNameRef
   )
   {
@@ -41345,7 +41345,7 @@ namespace
    * Looks up one DDE item-name in the process-global cache and returns its
    * handle; on miss, creates+appends a new entry and re-queries the cache.
    */
-  [[maybe_unused]] HSZ wxFindOrCreateDdeItemStringHandleRuntime(
+  HSZ wxFindOrCreateDdeItemStringHandleRuntime(
     const wchar_t* const* const itemNameRef
   )
   {
@@ -41465,7 +41465,7 @@ namespace
    * Initializes one `wxConnectionBase` payload with base vtable state,
    * exchange-buffer pointer/capacity lanes, and ownership defaults.
    */
-  [[maybe_unused]] WxConnectionBaseRuntimeView* wxConstructConnectionBaseRuntime(
+  WxConnectionBaseRuntimeView* wxConstructConnectionBaseRuntime(
     WxConnectionBaseRuntimeView* const connectionRuntime,
     void* const exchangeBuffer,
     const std::uint32_t exchangeBufferChars
@@ -41497,7 +41497,7 @@ namespace
    * Initializes one `wxConnectionBase` payload with empty exchange-buffer
    * lanes and ownership enabled for deferred allocation.
    */
-  [[maybe_unused]] WxConnectionBaseRuntimeView* wxConstructConnectionBaseDefaultRuntime(
+  WxConnectionBaseRuntimeView* wxConstructConnectionBaseDefaultRuntime(
     WxConnectionBaseRuntimeView* const connectionRuntime
   ) noexcept
   {
@@ -41524,7 +41524,7 @@ namespace
    * `wxConnectionBase` lane, rebinding the DDE vtable lane, seeding
    * `itemText=wxEmptyString`, and clearing conversation/helper lanes.
    */
-  [[maybe_unused]] WxDdeConnectionCtorRuntimeView* wxConstructDdeConnectionRuntime(
+  WxDdeConnectionCtorRuntimeView* wxConstructDdeConnectionRuntime(
     WxDdeConnectionCtorRuntimeView* const connectionRuntime
   ) noexcept
   {
@@ -41550,7 +41550,7 @@ namespace
    * Allocates one `0x34`-byte `wxDDEConnection` payload and runs ctor lane
    * `FUN_00A30EB0`.
    */
-  [[maybe_unused]] [[nodiscard]] WxDdeConnectionCtorRuntimeView* wxConstructorForwxDdeConnectionLaneA(
+  [[nodiscard]] WxDdeConnectionCtorRuntimeView* wxConstructorForwxDdeConnectionLaneA(
     const std::int32_t factoryTag
   )
   {
@@ -41568,7 +41568,7 @@ namespace
    * Allocates one `0x34`-byte `wxDDEConnection` payload and runs ctor lane
    * `FUN_00A30EB0` (alias factory entry).
    */
-  [[maybe_unused]] [[nodiscard]] WxDdeConnectionCtorRuntimeView* wxConstructorForwxDdeConnectionLaneB()
+  [[nodiscard]] WxDdeConnectionCtorRuntimeView* wxConstructorForwxDdeConnectionLaneB()
   {
     void* const storage = ::operator new(sizeof(WxDdeConnectionCtorRuntimeView), std::nothrow);
     return storage != nullptr
@@ -41690,7 +41690,7 @@ static_assert(
  * shared-empty text lanes, and the two seeded text defaults (`"print"` and
  * `"c:\\windows\\system\\"`).
  */
-[[maybe_unused]] WxPrintDataRuntimeView* wxConstructPrintDataRuntimeDefaults(
+WxPrintDataRuntimeView* wxConstructPrintDataRuntimeDefaults(
   WxPrintDataRuntimeView* const runtime
 )
 {
@@ -41738,7 +41738,7 @@ static_assert(
  * Copies one `wxPrintData` payload lane-by-lane from `sourceRuntime` into
  * `destinationRuntime`, including string and numeric print settings.
  */
-[[maybe_unused]] std::int32_t wxCopyPrintDataRuntimeLanes(
+std::int32_t wxCopyPrintDataRuntimeLanes(
   WxPrintDataRuntimeView* const destinationRuntime,
   const WxPrintDataRuntimeView* const sourceRuntime
 )
@@ -41790,7 +41790,7 @@ static_assert(sizeof(WxPrintPaperTypeRuntimeView) == 0x1C, "WxPrintPaperTypeRunt
  * Initializes one `wxPrintPaperType` runtime payload with cleared numeric
  * lanes and default paper-name text `"Default"`.
  */
-[[maybe_unused]] void* wxConstructPrintPaperTypeRuntime(
+void* wxConstructPrintPaperTypeRuntime(
   void* const printPaperRuntime
 )
 {
@@ -41817,7 +41817,7 @@ static_assert(sizeof(WxPrintPaperTypeRuntimeView) == 0x1C, "WxPrintPaperTypeRunt
  * Allocates one `wxPrintPaperType` runtime class instance and runs
  * `wxConstructPrintPaperTypeRuntime` initialization lanes.
  */
-[[maybe_unused]] void* wxCreatePrintPaperTypeRuntimeClassInstance()
+void* wxCreatePrintPaperTypeRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxPrintPaperTypeRuntimeView{};
   if (runtime == nullptr) {
@@ -41834,7 +41834,7 @@ static_assert(sizeof(WxPrintPaperTypeRuntimeView) == 0x1C, "WxPrintPaperTypeRunt
  * Deletes the process-global print-paper module singleton runtime lane (when
  * present) and clears the singleton pointer.
  */
-[[maybe_unused]] int wxDestroyPrintPaperModuleRuntimeSingleton()
+int wxDestroyPrintPaperModuleRuntimeSingleton()
 {
   int deleteResult = 0;
   if (gWxPrintPaperModuleRuntimeSingleton != nullptr) {
@@ -42144,7 +42144,7 @@ namespace
  * lanes into the connection runtime, posts `DdePostAdvise`, and logs one
  * localized failure message when notification dispatch fails.
  */
-[[maybe_unused]] bool wxDdeConnectionPostAdviseNotificationRuntime(
+bool wxDdeConnectionPostAdviseNotificationRuntime(
   WxDdeConnectionPostAdviseRuntimeView* const connection,
   const wchar_t* const* const itemNameRef,
   const wchar_t* const adviseText,
@@ -42446,7 +42446,7 @@ bool wxCreateDirectoryRuntime(
  * Applies one current-directory change from a caller-owned UTF-16 path
  * pointer lane.
  */
-[[maybe_unused]] bool wxSetCurrentDirectoryFromPointerRuntime(
+bool wxSetCurrentDirectoryFromPointerRuntime(
   const wchar_t* const* const directoryPathPointer
 ) noexcept
 {
@@ -42460,7 +42460,7 @@ bool wxCreateDirectoryRuntime(
  * Thin thunk lane forwarding one UTF-16 path-pointer slot into
  * `wxSetCurrentDirectoryFromPointerRuntime`.
  */
-[[maybe_unused]] bool wxSetCurrentDirectoryFromPointerRuntimeThunk(
+bool wxSetCurrentDirectoryFromPointerRuntimeThunk(
   const wchar_t* const* const directoryPathPointer
 ) noexcept
 {
@@ -42474,7 +42474,7 @@ bool wxCreateDirectoryRuntime(
  * Loads the current Windows directory into `outDirectory` and returns that
  * same output lane.
  */
-[[maybe_unused]] wxStringRuntime* wxGetWindowsDirectoryTextRuntime(
+wxStringRuntime* wxGetWindowsDirectoryTextRuntime(
   wxStringRuntime* const outDirectory
 )
 {
@@ -42500,7 +42500,7 @@ bool wxCreateDirectoryRuntime(
  * Removes one directory path referenced by `*directoryPathPointer` and returns
  * Win32-style boolean success (`1` on success, `0` on failure).
  */
-[[maybe_unused]] BOOL wxRemoveDirectoryFromPointerWithBoolResult(
+BOOL wxRemoveDirectoryFromPointerWithBoolResult(
   const wchar_t* const* const directoryPathPointer
 ) noexcept
 {
@@ -42526,7 +42526,7 @@ bool wxCreateDirectoryRuntime(
 // Forward declaration: defined below at FUN_009DE250 (line ~38326).
 BOOL wxDeleteFileFromPointerRuntime(const wchar_t* const* fileNameStorage);
 
-[[maybe_unused]] char wxRenameFileWithCopyFallbackRuntime(
+char wxRenameFileWithCopyFallbackRuntime(
   const wchar_t* const* const sourcePathPointer,
   const wchar_t* const* const destinationPathPointer
 ) noexcept
@@ -42566,7 +42566,7 @@ static_assert(
  * Copies one 10-byte payload lane into `targetRuntime` when both gate flags
  * are enabled and marks state-flag bit `0x20`.
  */
-[[maybe_unused]] void* wxCopyTenBytePayloadAndSetStateFlag(
+void* wxCopyTenBytePayloadAndSetStateFlag(
   const int enabledFlag,
   void* const targetRuntime,
   const void* const sourcePayload
@@ -42588,7 +42588,7 @@ static_assert(
  * What it does:
  * Adapts pointer-based directory removal to integer `0/1` success semantics.
  */
-[[maybe_unused]] int wxRemoveDirectoryFromPointerAsInt(
+int wxRemoveDirectoryFromPointerAsInt(
   const wchar_t* const* const directoryPathPointer
 ) noexcept
 {
@@ -42602,7 +42602,7 @@ static_assert(
  * Returns true when `pathText` ends with one directory separator (`'\\'` or
  * `'/'`); returns false for null or empty strings.
  */
-[[maybe_unused]] bool wxPathHasTrailingDirectorySeparator(
+bool wxPathHasTrailingDirectorySeparator(
   const wchar_t* const pathText
 )
 {
@@ -42627,7 +42627,7 @@ static_assert(
  * and `\\` escape), using the original backtracking cursor semantics and an
  * optional leading-dot rejection gate.
  */
-[[maybe_unused]] bool wxWildcardMatchWithEscapeAndBacktrackingRuntime(
+bool wxWildcardMatchWithEscapeAndBacktrackingRuntime(
   const wchar_t* const* const wildcardPatternStorage,
   const wchar_t* const* const candidateTextStorage,
   const bool rejectLeadingDot
@@ -42847,7 +42847,7 @@ int wxDeleteFileWithErrnoMapping(
  * What it does:
  * Thunk lane that forwards to `wxDeleteFileWithErrnoMapping`.
  */
-[[maybe_unused]] int wxDeleteFileWithErrnoMappingThunk(const wchar_t* const fileName)
+int wxDeleteFileWithErrnoMappingThunk(const wchar_t* const fileName)
 {
   return wxDeleteFileWithErrnoMapping(fileName);
 }
@@ -42956,7 +42956,7 @@ namespace
  * EOF (`1`) when `feof()` is observed, and maps `-1` read failure to
  * wx stream status `3`.
  */
-[[maybe_unused]] int wxFFileInputStreamReadAndUpdateStatusRuntime(
+int wxFFileInputStreamReadAndUpdateStatusRuntime(
   WxFFileInputStreamReadRuntimeView* const streamRuntime,
   void* const destinationBuffer,
   const std::size_t byteCount
@@ -42984,7 +42984,7 @@ namespace
  * What it does:
  * Returns the current backing-file length lane for one `wxFileInputStream`.
  */
-[[maybe_unused]] long wxFileInputStreamGetBackingFileLengthRuntime(
+long wxFileInputStreamGetBackingFileLengthRuntime(
   const WxFileInputStreamIoRuntimeView* const streamRuntime
 ) noexcept
 {
@@ -42998,7 +42998,7 @@ namespace
  * Reads bytes from the wrapped `wxFile` lane and mirrors wx stream status
  * semantics (`0` ready, `1` eof, `3` read error with zero return).
  */
-[[maybe_unused]] int wxFileInputStreamReadAndSetStatusRuntime(
+int wxFileInputStreamReadAndSetStatusRuntime(
   WxFileInputStreamIoRuntimeView* const streamRuntime,
   void* const destinationBuffer,
   const std::uint32_t byteCount
@@ -43026,7 +43026,7 @@ namespace
  * Writes bytes through one `wxFileOutputStream` and updates stream status to
  * write-error (`2`) when the wrapped `wxFile` error lane is set.
  */
-[[maybe_unused]] int wxFileOutputStreamWriteAndSetStatusRuntime(
+int wxFileOutputStreamWriteAndSetStatusRuntime(
   WxFileOutputStreamIoRuntimeView* const streamRuntime,
   const void* const sourceBuffer,
   const std::uint32_t byteCount
@@ -43043,7 +43043,7 @@ namespace
  * What it does:
  * Returns the current backing-file length lane for one `wxFileOutputStream`.
  */
-[[maybe_unused]] long wxFileOutputStreamGetBackingFileLengthRuntime(
+long wxFileOutputStreamGetBackingFileLengthRuntime(
   const WxFileOutputStreamIoRuntimeView* const streamRuntime
 ) noexcept
 {
@@ -43056,7 +43056,7 @@ namespace
  * What it does:
  * Returns one wrapped `wxFFile` length lane for `wxFFileInputStream`.
  */
-[[maybe_unused]] int wxFFileInputStreamGetBackingFileLengthRuntime(
+int wxFFileInputStreamGetBackingFileLengthRuntime(
   WxFFileInputStreamReadRuntimeView* const streamRuntime
 ) noexcept
 {
@@ -43070,7 +43070,7 @@ namespace
  * Seeks one wrapped `wxFFile` lane for `wxFFileInputStream` and returns the
  * requested offset on success or `-1` on seek failure.
  */
-[[maybe_unused]] int wxFFileInputStreamSeekRuntime(
+int wxFFileInputStreamSeekRuntime(
   WxFFileInputStreamReadRuntimeView* const streamRuntime,
   const int distanceToMove,
   const int seekMode
@@ -43086,7 +43086,7 @@ namespace
  * Returns the current file-position lane from the wrapped `wxFFile` for
  * `wxFFileInputStream`.
  */
-[[maybe_unused]] int wxFFileInputStreamTellRuntime(
+int wxFFileInputStreamTellRuntime(
   const WxFFileInputStreamReadRuntimeView* const streamRuntime
 ) noexcept
 {
@@ -43100,7 +43100,7 @@ namespace
  * Returns the current file-position lane from the wrapped `wxFFile` for one
  * `wxFFileOutputStream`.
  */
-[[maybe_unused]] int wxFFileOutputStreamTellRuntime(
+int wxFFileOutputStreamTellRuntime(
   const WxFFileOutputStreamIoRuntimeView* const streamRuntime
 ) noexcept
 {
@@ -43114,7 +43114,7 @@ namespace
  * Seeks one wrapped `wxFFile` lane for `wxFFileOutputStream` and returns the
  * requested offset on success or `-1` on seek failure.
  */
-[[maybe_unused]] int wxFFileOutputStreamSeekRuntime(
+int wxFFileOutputStreamSeekRuntime(
   WxFFileOutputStreamIoRuntimeView* const streamRuntime,
   const int distanceToMove,
   const int seekMode
@@ -43129,7 +43129,7 @@ namespace
  * What it does:
  * Returns the backing-file length lane from one `wxFFileOutputStream`.
  */
-[[maybe_unused]] int wxFFileOutputStreamGetBackingFileLengthRuntime(
+int wxFFileOutputStreamGetBackingFileLengthRuntime(
   WxFFileOutputStreamIoRuntimeView* const streamRuntime
 ) noexcept
 {
@@ -43192,7 +43192,7 @@ namespace
  * Initializes one zlib deflate stream with DEFLATED method, 32 KiB window,
  * memory-level `8`, and default strategy `0`.
  */
-[[maybe_unused]] int wxDeflateInitWithDefaultRuntimeSettings(
+int wxDeflateInitWithDefaultRuntimeSettings(
   z_stream* const stream,
   const int compressionLevel,
   const char* const versionText,
@@ -43218,7 +43218,7 @@ namespace
  * Finds one UTF-16 substring from `startIndex` and returns the absolute
  * zero-based match index, or `-101` when absent.
  */
-[[maybe_unused]] std::int32_t wxFindWideSubstringFromIndexRuntime(
+std::int32_t wxFindWideSubstringFromIndexRuntime(
   const wchar_t** const textStorage,
   const wchar_t** const needleStorage,
   std::int32_t startIndex
@@ -43244,7 +43244,7 @@ namespace
  * Finds the first occurrence of `needle` at-or-after `startIndex` inside one
  * UTF-16 text lane and returns the absolute index, or `-101` when absent.
  */
-[[maybe_unused]] std::int32_t wxFindWideCharacterFromIndexRuntime(
+std::int32_t wxFindWideCharacterFromIndexRuntime(
   const wchar_t** const textStorage,
   const wchar_t needle,
   std::int32_t startIndex
@@ -43270,7 +43270,7 @@ namespace
  * Scans backward from `startIndex` (`-101` means logical end) and returns the
  * start index of the rightmost `needle` match; returns `-101` when absent.
  */
-[[maybe_unused]] std::int32_t wxFindLastWideSubstringEndingAtOrBeforeIndexRuntime(
+std::int32_t wxFindLastWideSubstringEndingAtOrBeforeIndexRuntime(
   const wchar_t** const textStorage,
   const wchar_t** const needleStorage,
   std::int32_t startIndex
@@ -43314,7 +43314,7 @@ namespace
  * its zero-based index when it does not exceed `maxIndex` (`-101` means
  * "search entire string"); otherwise returns `-101`.
  */
-[[maybe_unused]] std::int32_t wxFindLastWideCharWithinIndexLimit(
+std::int32_t wxFindLastWideCharWithinIndexLimit(
   const wchar_t** const textStorage,
   const wchar_t needle,
   std::int32_t maxIndex
@@ -43348,7 +43348,7 @@ namespace
  * Thunk lane that forwards one reverse wide-char search request into
  * `FUN_00960250`.
  */
-[[maybe_unused]] std::int32_t wxFindLastWideCharWithinIndexLimitAdapter(
+std::int32_t wxFindLastWideCharWithinIndexLimitAdapter(
   const wchar_t** const textStorage,
   const wchar_t needle,
   const std::int32_t maxIndex
@@ -43365,7 +43365,7 @@ namespace
  * first index whose code unit appears in `characterSet`; returns `-101` when
  * no such code unit exists.
  */
-[[maybe_unused]] std::int32_t wxFindLastWideCharFromSet(
+std::int32_t wxFindLastWideCharFromSet(
   const wchar_t** const textStorage,
   const wchar_t* const characterSet,
   std::int32_t startIndex
@@ -43407,7 +43407,7 @@ namespace
  * Unwraps one pointer-indirection lane for `textStorage`, then forwards
  * reverse character-set search into `FUN_009602C0`.
  */
-[[maybe_unused]] std::int32_t wxFindLastWideCharFromSetIndirectStorageAdapter(
+std::int32_t wxFindLastWideCharFromSetIndirectStorageAdapter(
   const wchar_t*** const textStorageStorage,
   const wchar_t* const characterSet,
   std::int32_t startIndex
@@ -43424,7 +43424,7 @@ namespace
  * to the first code unit contained in `characterSet`; returns `-101` when no
  * matching code unit exists in the scanned suffix.
  */
-[[maybe_unused]] std::int32_t wxFindFirstWideCharFromSetAfterIndex(
+std::int32_t wxFindFirstWideCharFromSetAfterIndex(
   const wchar_t** const textStorage,
   const wchar_t* const characterSet,
   std::int32_t startIndex
@@ -43463,7 +43463,7 @@ namespace
  * Adapts one wxString character-set lane (`arg0->m_pchData`) into the
  * canonical relative-offset search lane at `FUN_00960310`.
  */
-[[maybe_unused]] std::int32_t wxFindFirstWideCharFromStringSetAfterIndexRelativeOffset(
+std::int32_t wxFindFirstWideCharFromStringSetAfterIndexRelativeOffset(
   const wchar_t** const textStorage,
   const wxStringRuntime* const characterSetStorage,
   const std::int32_t startIndex
@@ -43540,7 +43540,7 @@ namespace
    * Rebinds one tokenizer source lane, resets consumed-character count, and
    * refreshes the boundary-token flag from the new source length.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringTokenizerResetPendingTextRuntime(
+  wxStringRuntime* wxStringTokenizerResetPendingTextRuntime(
     WxStringTokenizerRuntimeView* const tokenizer,
     const wxStringRuntime* const sourceText
   ) noexcept
@@ -43560,7 +43560,7 @@ namespace
    * delimiter whitespace when the caller passes mode `0`, then refreshes the
    * pending-source lane.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringTokenizerAssignSourceAndDelimitersRuntime(
+  wxStringRuntime* wxStringTokenizerAssignSourceAndDelimitersRuntime(
     WxStringTokenizerRuntimeView* const tokenizer,
     const wxStringRuntime* const sourceText,
     const wxStringRuntime* const delimiterText,
@@ -43594,7 +43594,7 @@ namespace
    * Initializes one tokenizer runtime payload (`vtable`, source/delimiter
    * lanes, mode lanes) and seeds scan state from caller-supplied inputs.
    */
-  [[maybe_unused]] WxStringTokenizerRuntimeView* wxStringTokenizerConstructRuntime(
+  WxStringTokenizerRuntimeView* wxStringTokenizerConstructRuntime(
     WxStringTokenizerRuntimeView* const tokenizer,
     const wxStringRuntime* const sourceText,
     const wxStringRuntime* const delimiterText,
@@ -43619,7 +43619,7 @@ namespace
  * Returns whether one tokenizer runtime still has a token to emit according
  * to delimiter search, mode lanes, and trailing-boundary rules.
  */
-[[maybe_unused]] bool wxStringTokenizerHasPendingToken(
+bool wxStringTokenizerHasPendingToken(
   const WxStringTokenizerRuntimeView* const tokenizer
 ) noexcept
 {
@@ -43650,7 +43650,7 @@ namespace
  * Extracts the next token from tokenizer runtime state, updates consumed/scan
  * lanes, and optionally loops past empty tokens when mode requests skip-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxStringTokenizerExtractNextToken(
+wxStringRuntime* wxStringTokenizerExtractNextToken(
   WxStringTokenizerRuntimeView* const tokenizer,
   wxStringRuntime* const outToken
 )
@@ -43725,7 +43725,7 @@ namespace
  * Thin adapter lane that forwards one tokenizer owner pointer plus output lane
  * to `wxStringTokenizerExtractNextToken` and returns `outToken`.
  */
-[[maybe_unused]] wxStringRuntime* wxStringTokenizerExtractNextTokenThunk(
+wxStringRuntime* wxStringTokenizerExtractNextTokenThunk(
   void* const tokenizerRuntime,
   wxStringRuntime* const outToken
 ) noexcept
@@ -43745,7 +43745,7 @@ namespace
  * armed, probes slot `+0x34` and releases the returned runtime object via its
  * deleting lane before dispatch.
  */
-[[maybe_unused]] std::int32_t wxDispatchRuntimeSlotWithProbeRelease(
+std::int32_t wxDispatchRuntimeSlotWithProbeRelease(
   void* const runtimeObject,
   const std::int32_t argument0,
   const std::int32_t argument1
@@ -43787,7 +43787,7 @@ namespace
  * Dispatches virtual slot `+0x28` with two integer arguments, then stores
  * runtime state lane `2` in the object header.
  */
-[[maybe_unused]] std::int32_t wxDispatchRuntimeSlotAndSetStateReady(
+std::int32_t wxDispatchRuntimeSlotAndSetStateReady(
   void* const runtimeObject,
   const std::int32_t argument0,
   const std::int32_t argument1
@@ -43824,7 +43824,7 @@ static_assert(
  * What it does:
  * Tail-dispatches one virtual slot `+0x34` on the current runtime object.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot34Runtime(
+int wxDispatchVirtualSlot34Runtime(
   void* const runtimeObject
 ) noexcept
 {
@@ -43838,7 +43838,7 @@ static_assert(
  * What it does:
  * Clears one dword runtime lane at index `74`.
  */
-[[maybe_unused]] void wxClearRuntimeDwordLane74(
+void wxClearRuntimeDwordLane74(
   void* const runtimeObject
 ) noexcept
 {
@@ -43879,7 +43879,7 @@ namespace
  * rebinds the status-bar-base vtable lane, clears pane-count lane `+0x124`,
  * then resets runtime lanes `+0x128/+0x12C` via existing helper paths.
  */
-[[maybe_unused]] void* wxConstructStatusBarBaseRuntimeInPlace(
+void* wxConstructStatusBarBaseRuntimeInPlace(
   void* const statusBarBaseRuntime
 ) noexcept
 {
@@ -43901,7 +43901,7 @@ namespace
  * Returns nested runtime payload lane `[2]` from pointer lane `[1]`, or `0`
  * when the nested lane is null.
  */
-[[maybe_unused]] std::int32_t wxGetNestedRuntimeLaneValue(
+std::int32_t wxGetNestedRuntimeLaneValue(
   const void* const runtimeObject
 ) noexcept
 {
@@ -43938,7 +43938,7 @@ static_assert(offsetof(WxPairSourceOffset08RuntimeView, lane0C) == 0x0C, "WxPair
  * Copies the runtime dword pair at offsets `+0x08/+0x0C` into caller-provided
  * output storage.
  */
-[[maybe_unused]] WxDwordPairOutputRuntimeView* wxCopyPairOffsets08And0CToOutRuntime(
+WxDwordPairOutputRuntimeView* wxCopyPairOffsets08And0CToOutRuntime(
   const WxPairSourceOffset08RuntimeView* const runtime,
   WxDwordPairOutputRuntimeView* const outPair
 ) noexcept
@@ -43965,7 +43965,7 @@ static_assert(offsetof(WxDwordOffset38RuntimeView, lane38) == 0x38, "WxDwordOffs
  * What it does:
  * Returns one cached 32-bit lane at offset `+0x38`.
  */
-[[maybe_unused]] std::int32_t wxReadDwordOffset38Runtime(
+std::int32_t wxReadDwordOffset38Runtime(
   const WxDwordOffset38RuntimeView* const runtime
 ) noexcept
 {
@@ -43994,7 +43994,7 @@ struct WxVirtualPairQueryOwnerRuntimeView
  * Queries one runtime dword pair through virtual lane `+0x10C`, then writes
  * that pair into caller-provided output storage.
  */
-[[maybe_unused]] WxDwordPairOutputRuntimeView* wxQueryVirtualPairAndCopyToOutRuntime(
+WxDwordPairOutputRuntimeView* wxQueryVirtualPairAndCopyToOutRuntime(
   WxVirtualPairQueryOwnerRuntimeView* const runtime,
   WxDwordPairOutputRuntimeView* const outPair
 ) noexcept
@@ -44024,7 +44024,7 @@ static_assert(offsetof(WxByteOffset2CRuntimeViewA, lane2C) == 0x2C, "WxByteOffse
  * What it does:
  * Clears one byte flag lane at offset `+0x2C`.
  */
-[[maybe_unused]] void wxClearByteFlagOffset2CRuntime(
+void wxClearByteFlagOffset2CRuntime(
   WxByteOffset2CRuntimeViewA* const runtime
 ) noexcept
 {
@@ -44060,7 +44060,7 @@ static_assert(offsetof(WxScrollUnitUpdateRuntimeView, verticalPixelsPerUnit) == 
  * pixel-per-unit state, applies delta scrolling through virtual lane `+0x138`,
  * then dispatches owner virtual lane `+0x20`.
  */
-[[maybe_unused]] std::int32_t wxUpdateScrollUnitsAndApplyDeltaRuntime(
+std::int32_t wxUpdateScrollUnitsAndApplyDeltaRuntime(
   WxScrollUnitUpdateRuntimeView* const runtime,
   const std::int32_t horizontalUnits,
   const std::int32_t verticalUnits
@@ -44135,7 +44135,7 @@ static_assert(offsetof(WxByteOffset1CRuntimeView, lane1C) == 0x1C, "WxByteOffset
  * Clears byte flag lane `+0x2C` on the owner object stored at `+0x194`, marks
  * the incoming event lane `+0x1C` as handled, and returns the owner pointer.
  */
-[[maybe_unused]] void* wxClearOwnerFlagAndMarkEventHandledRuntime(
+void* wxClearOwnerFlagAndMarkEventHandledRuntime(
   WxPointerOffset194RuntimeView* const runtime,
   WxByteOffset1CRuntimeView* const eventRuntime
 ) noexcept
@@ -44168,7 +44168,7 @@ static_assert(offsetof(WxByteOffset14RuntimeView, lane14) == 0x14, "WxByteOffset
  * What it does:
  * Returns one byte flag lane at offset `+0x14`.
  */
-[[maybe_unused]] std::uint8_t wxReadByteFlagOffset14Runtime(
+std::uint8_t wxReadByteFlagOffset14Runtime(
   const WxByteOffset14RuntimeView* const runtime
 ) noexcept
 {
@@ -44188,7 +44188,7 @@ static_assert(offsetof(WxPointerArrayIndexReadRuntimeView, entries) == 0x08, "Wx
  * What it does:
  * Reads one dword-array entry by index from owner lane `+0x08`.
  */
-[[maybe_unused]] std::int32_t wxReadDwordArrayEntryFromOffset08Runtime(
+std::int32_t wxReadDwordArrayEntryFromOffset08Runtime(
   const WxPointerArrayIndexReadRuntimeView* const runtime,
   const std::int32_t index
 ) noexcept
@@ -44213,7 +44213,7 @@ static_assert(offsetof(WxAddressPlus4RuntimeView, lane04) == 0x04, "WxAddressPlu
  * What it does:
  * Returns the address of runtime lane `+0x04`.
  */
-[[maybe_unused]] void* wxReturnAddressPlus4Runtime(
+void* wxReturnAddressPlus4Runtime(
   WxAddressPlus4RuntimeView* const runtime
 ) noexcept
 {
@@ -44227,7 +44227,7 @@ static_assert(offsetof(WxAddressPlus4RuntimeView, lane04) == 0x04, "WxAddressPlu
  * Iterates one pointer array and invokes virtual slot `+0x04` with delete
  * flag `1` on each non-null entry.
  */
-[[maybe_unused]] std::int32_t wxReleaseRuntimePointerArrayWithDeleteFlag(
+std::int32_t wxReleaseRuntimePointerArrayWithDeleteFlag(
   void* const runtimeObject
 )
 {
@@ -44275,7 +44275,7 @@ static_assert(
  * Releases one pointer-array lane through `FUN_009F2D40`, then clears the
  * array-count lane at `+0x04`.
  */
-[[maybe_unused]] std::int32_t wxReleaseRuntimePointerArrayAndClearCount(
+std::int32_t wxReleaseRuntimePointerArrayAndClearCount(
   void* const runtimeObject
 )
 {
@@ -44292,7 +44292,7 @@ static_assert(
  * Intersects one requested socket-event mask with the runtime state mask lane
  * stored at `+0x2C`.
  */
-[[maybe_unused]] std::int32_t wxSocketIntersectRequestedEventMaskRuntime(
+std::int32_t wxSocketIntersectRequestedEventMaskRuntime(
   const void* const socketRegistrationRuntime,
   const std::int32_t requestedMask
 ) noexcept
@@ -44318,7 +44318,7 @@ static_assert(
  * Applies one four-lane bitmask update to paired runtime dword arrays:
  * indices `12..15` receive `valueA`, indices `16..19` receive `valueB`.
  */
-[[maybe_unused]] void* wxApplyRuntimeQuadMaskValues(
+void* wxApplyRuntimeQuadMaskValues(
   void* const runtimeObject,
   const std::uint8_t laneMask,
   const std::int32_t valueA,
@@ -44354,7 +44354,7 @@ static_assert(
  * Compares up to `characterCount` UTF-16 code units and returns the first
  * unsigned difference, matching wide `strncmp` semantics.
  */
-[[maybe_unused]] std::int32_t wxCompareWidePrefixRuntime(
+std::int32_t wxCompareWidePrefixRuntime(
   const wchar_t* left,
   const wchar_t* right,
   std::int32_t characterCount
@@ -44501,7 +44501,7 @@ namespace
  * Assigns one UTF-16 span into a wx-string lane; when `charCount==0`, it
  * releases the previous shared payload and resets to `wxEmptyString`.
  */
-[[maybe_unused]] bool wxAssignWideSpanToRuntimeString(
+bool wxAssignWideSpanToRuntimeString(
   wxStringRuntime* const outText,
   const std::size_t charCount,
   const wchar_t* const sourceText
@@ -44547,7 +44547,7 @@ namespace
  * What it does:
  * Assigns one single-byte character as a UTF-16 one-code-unit string.
  */
-[[maybe_unused]] wxStringRuntime* wxAssignSingleByteCharacterToRuntimeString(
+wxStringRuntime* wxAssignSingleByteCharacterToRuntimeString(
   wxStringRuntime* const outText,
   const std::uint8_t singleByteCharacter
 ) noexcept
@@ -44636,7 +44636,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * Initializes one volume-separator token lane to empty and assigns `':'`
  * when the resolved path format is `3` or `4`.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildVolumeSeparatorTokenRuntime(
+wxStringRuntime* wxBuildVolumeSeparatorTokenRuntime(
   wxStringRuntime* const outText,
   const std::intptr_t formatHintOrToken
 ) noexcept
@@ -44656,7 +44656,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * What it does:
  * Builds the format-specific path-separator token string.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildPathSeparatorTokenRuntime(
+wxStringRuntime* wxBuildPathSeparatorTokenRuntime(
   wxStringRuntime* const outText,
   const std::intptr_t formatHintOrToken
 ) noexcept
@@ -44691,7 +44691,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * Returns the first UTF-16 code unit from the active path-separator token for
  * the resolved path format.
  */
-[[maybe_unused]] wchar_t wxGetPathSeparatorCharacterForFormatRuntime(
+wchar_t wxGetPathSeparatorCharacterForFormatRuntime(
   const std::intptr_t formatHintOrToken
 ) noexcept
 {
@@ -44717,7 +44717,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * `FindCharacterIndex` on the resulting wide string, releases the temporary
  * shared payload, and reports `true` when the search produced a match.
  */
-[[maybe_unused]] bool wxIsPathSeparatorCharacterForFormatRuntime(
+bool wxIsPathSeparatorCharacterForFormatRuntime(
   const wchar_t candidate,
   const std::intptr_t formatHintOrToken
 ) noexcept
@@ -44738,7 +44738,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * Validates that a non-relative file-name runtime payload carries a volume
  * lane when the resolved path format requires a volume-separator token.
  */
-[[maybe_unused]] bool wxFileNameHasRequiredVolumeForFormatRuntime(
+bool wxFileNameHasRequiredVolumeForFormatRuntime(
   const WxFileNameComposeRuntimeView* const fileNameRuntime,
   const std::intptr_t formatHintOrToken
 ) noexcept
@@ -44772,7 +44772,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * Composes the directory/volume portion of one file-name runtime object into
  * `outPath` according to path-format and compose flags.
  */
-[[maybe_unused]] wxStringRuntime* wxComposeFileNameDirectoryPathRuntime(
+wxStringRuntime* wxComposeFileNameDirectoryPathRuntime(
   const WxFileNameComposeRuntimeView* const fileNameRuntime,
   wxStringRuntime* const outPath,
   std::uint8_t composeFlags,
@@ -44888,7 +44888,7 @@ wxStringRuntime* WxStringRuntimeOps::append(
  * Composes one full path string (directory lane + filename/ext lane) into
  * `outText` using format-aware separator behavior.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildFileNameFullPathRuntime(
+wxStringRuntime* wxBuildFileNameFullPathRuntime(
   const WxFileNameComposeRuntimeView* const fileNameRuntime,
   wxStringRuntime* const outText,
   const std::intptr_t formatHintOrToken
@@ -45213,7 +45213,7 @@ wxStringRuntime* wxExtractLeadingIdentifierToken(
  * Extracts leading identifier token from literal `L"_?"` with no extra
  * allowed-character lane.
  */
-[[maybe_unused]] wxStringRuntime* wxExtractIdentifierTokenUnderscoreQuestionRuntime(
+wxStringRuntime* wxExtractIdentifierTokenUnderscoreQuestionRuntime(
   wxStringRuntime* const outText
 )
 {
@@ -45227,7 +45227,7 @@ wxStringRuntime* wxExtractLeadingIdentifierToken(
  * Extracts leading identifier token from literal `L"_?-"` with no extra
  * allowed-character lane.
  */
-[[maybe_unused]] wxStringRuntime* wxExtractIdentifierTokenUnderscoreQuestionDashRuntime(
+wxStringRuntime* wxExtractIdentifierTokenUnderscoreQuestionDashRuntime(
   wxStringRuntime* const outText
 )
 {
@@ -45264,7 +45264,7 @@ namespace
    * What it does:
    * Compares two UTF-16 source-code lanes and returns signed ordering.
    */
-  [[maybe_unused]] int __cdecl CompareWxEncodingSourceWords(
+  int __cdecl CompareWxEncodingSourceWords(
     const std::uint16_t* const leftSourceCode,
     const std::uint16_t* const rightSourceCode
   ) noexcept
@@ -45327,7 +45327,7 @@ namespace
    * Appends one shared wx UTF-16 lane into destination wx-string storage using
    * the source header length lane.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringAppendSharedTextLaneRuntime(
+  wxStringRuntime* wxStringAppendSharedTextLaneRuntime(
     wxStringRuntime* const outText,
     const wchar_t** const sharedTextLane
   )
@@ -45355,7 +45355,7 @@ namespace
    * Appends one null-terminated UTF-16 source lane into destination wx-string
    * storage, or executes an empty append lane when `appendText` is null.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringAppendWideNullTerminatedRuntime(
+  wxStringRuntime* wxStringAppendWideNullTerminatedRuntime(
     wxStringRuntime* const outText,
     const wchar_t* const appendText
   )
@@ -45378,7 +45378,7 @@ namespace
    * Appends one UTF-16 buffer lane into the destination string; `lengthHint`
    * uses `-101` as "append full null-terminated source" sentinel.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringAppendWideWithOptionalLengthRuntime(
+  wxStringRuntime* wxStringAppendWideWithOptionalLengthRuntime(
     wxStringRuntime* const outText,
     const wchar_t* const appendText,
     std::int32_t lengthHint
@@ -45413,7 +45413,7 @@ namespace
    * source length is zero), then appends one shared UTF-16 suffix lane using
    * the suffix header-length field.
    */
-  [[maybe_unused]] wxStringRuntime* wxStringCopySharedPrefixAndAppendSharedSuffix(
+  wxStringRuntime* wxStringCopySharedPrefixAndAppendSharedSuffix(
     wxStringRuntime* const outText,
     const wchar_t* const* const sourceTextStorage,
     const wchar_t* const* const appendTextStorage
@@ -45451,7 +45451,7 @@ namespace
    * What it does:
    * Lexicographically compares two wide-string pointer lanes using `wcscmp`.
    */
-  [[maybe_unused]] std::int32_t WxCompareWideStringPointerLanes(
+  std::int32_t WxCompareWideStringPointerLanes(
     const wchar_t* const* const left,
     const wchar_t* const* const right
   ) noexcept
@@ -45503,7 +45503,7 @@ namespace
    * Jump-thunk lane that forwards one list index lookup request to the
    * canonical node-at-index walker.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListNodeAtIndexRuntimeThunkA(
+  wxNodeBaseRuntime* WxListNodeAtIndexRuntimeThunkA(
     const WxListInsertRuntimeView* const listRuntime,
     const std::int32_t index
   ) noexcept
@@ -45518,7 +45518,7 @@ namespace
    * Walks one list-node chain from head and returns the first node whose key
    * lane matches the caller-provided list-key payload.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntime(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntime(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45547,7 +45547,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkA(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkA(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45562,7 +45562,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkB(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkB(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45577,7 +45577,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkC(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkC(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45592,7 +45592,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkD(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkD(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45607,7 +45607,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkE(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkE(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45622,7 +45622,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkF(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkF(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45637,7 +45637,7 @@ namespace
    * Jump-thunk lane that forwards one list/key lookup request to the
    * canonical key-match finder.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkG(
+  wxNodeBaseRuntime* WxListFindFirstNodeMatchingKeyRuntimeThunkG(
     const WxListInsertRuntimeView* const listRuntime,
     const wxListKeyRuntime* const keyRuntime
   ) noexcept
@@ -45679,7 +45679,7 @@ namespace
    * Sorts linked-list node value lanes with the default UTF-16 pointer-lane
    * comparator.
    */
-  [[maybe_unused]] void wxListSortDefaultWideValueLanesRuntime(
+  void wxListSortDefaultWideValueLanesRuntime(
     void* const listRuntime
   ) noexcept
   {
@@ -45697,7 +45697,7 @@ namespace
    * Sorts linked-list node value lanes with one caller-provided qsort
    * comparator.
    */
-  [[maybe_unused]] void wxListSortValueLanesWithComparatorRuntime(
+  void wxListSortValueLanesWithComparatorRuntime(
     void* const listRuntime,
     const WxQSortCompareFn compareFunction
   ) noexcept
@@ -45712,7 +45712,7 @@ namespace
    * Appends UTF-16 string copies from one source wx-list runtime into the
    * destination list.
    */
-  [[maybe_unused]] void wxListAppendCopiedWideValuesRuntime(
+  void wxListAppendCopiedWideValuesRuntime(
     WxListInsertRuntimeView* const destinationList,
     const void* const sourceListRuntime
   )
@@ -45762,7 +45762,7 @@ namespace
    * Inserts one list value lane at index `insertionIndex`, appending when the
    * index equals the current count lane.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxListInsertValueAtIndexRuntimeLaneA(
+  wxNodeBaseRuntime* wxListInsertValueAtIndexRuntimeLaneA(
     WxListInsertRuntimeView* const listRuntime,
     const std::int32_t insertionIndex,
     void* const valueRuntime
@@ -45777,7 +45777,7 @@ namespace
    * What it does:
    * Alternate insertion lane for `wxList` index insertion semantics.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxListInsertValueAtIndexRuntimeLaneB(
+  wxNodeBaseRuntime* wxListInsertValueAtIndexRuntimeLaneB(
     WxListInsertRuntimeView* const listRuntime,
     const std::int32_t insertionIndex,
     void* const valueRuntime
@@ -45793,7 +45793,7 @@ namespace
    * Returns whether one wide-string pointer lane equals the provided
    * comparison text.
    */
-  [[maybe_unused]] bool WxWideTextLaneEqualsText(
+  bool WxWideTextLaneEqualsText(
     const wchar_t* const* const left,
     const wchar_t* const right
   ) noexcept
@@ -46011,7 +46011,7 @@ namespace
  * Looks up one enabled command-line entry by short-name then long-name and,
  * on success, copies the entry value wx-string lane into `outValue`.
  */
-[[maybe_unused]] bool wxCmdLineLookupTryGetEnabledEntryValueRuntime(
+bool wxCmdLineLookupTryGetEnabledEntryValueRuntime(
   const WxCmdLineLookupRuntimeView* const lookup,
   const wchar_t** const queryText,
   wxStringRuntime* const outValue
@@ -46050,7 +46050,7 @@ namespace
  * Looks up one enabled command-line entry by short-name then long-name and,
  * on success, writes the entry dword payload lane (`+0x1C`) into `outValue`.
  */
-[[maybe_unused]] bool wxCmdLineLookupTryGetEnabledEntryDwordValueRuntime(
+bool wxCmdLineLookupTryGetEnabledEntryDwordValueRuntime(
   const WxCmdLineLookupOwnerRuntimeView* const lookupOwner,
   const wchar_t** const queryText,
   std::uint32_t* const outValue
@@ -46091,7 +46091,7 @@ namespace
  * on success, writes the two-dword payload lanes (`+0x28/+0x2C`) into
  * `outPair`.
  */
-[[maybe_unused]] bool wxCmdLineLookupTryGetEnabledEntryDwordPairRuntime(
+bool wxCmdLineLookupTryGetEnabledEntryDwordPairRuntime(
   const WxCmdLineLookupOwnerRuntimeView* const lookupOwner,
   const wchar_t** const queryText,
   std::uint32_t* const outPair
@@ -46148,7 +46148,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * What it does:
  * Returns the address of the stored wx-string value lane at offset `+0x20`.
  */
-[[maybe_unused]] wxStringRuntime* wxCmdLineOptionGetStoredTextRuntime(
+wxStringRuntime* wxCmdLineOptionGetStoredTextRuntime(
   WxCmdLineOptionStoredValueRuntimeView* const optionRuntime
 ) noexcept
 {
@@ -46161,7 +46161,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * What it does:
  * Returns the address of the stored dword-pair lane at offset `+0x28`.
  */
-[[maybe_unused]] std::int32_t* wxCmdLineOptionGetStoredPairRuntime(
+std::int32_t* wxCmdLineOptionGetStoredPairRuntime(
   WxCmdLineOptionStoredValueRuntimeView* const optionRuntime
 ) noexcept
 {
@@ -46175,7 +46175,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * Stores one scalar option value at lane `+0x1C`, marks the option as present
  * (`+0x18 = 1`), and returns the stored value.
  */
-[[maybe_unused]] std::int32_t wxCmdLineOptionStoreScalarAndMarkPresentRuntime(
+std::int32_t wxCmdLineOptionStoreScalarAndMarkPresentRuntime(
   WxCmdLineOptionStoredValueRuntimeView* const optionRuntime,
   const std::int32_t value
 ) noexcept
@@ -46196,7 +46196,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * Stores one dword pair at lanes `+0x28/+0x2C`, marks the option as present
  * (`+0x18 = 1`), and returns the first stored value.
  */
-[[maybe_unused]] std::int32_t wxCmdLineOptionStorePairAndMarkPresentRuntime(
+std::int32_t wxCmdLineOptionStorePairAndMarkPresentRuntime(
   WxCmdLineOptionStoredValueRuntimeView* const optionRuntime,
   const std::int32_t firstValue,
   const std::int32_t secondValue
@@ -46219,7 +46219,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * Stores one parsed command-line value lane into option storage and marks that
  * value lane as present.
  */
-[[maybe_unused]] wxStringRuntime* WxCmdLineOptionStoreValueAndMarkPresent(
+wxStringRuntime* WxCmdLineOptionStoreValueAndMarkPresent(
   void* const optionRuntime,
   const wxStringRuntime* const valueText
 )
@@ -46254,7 +46254,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * Reads one option-descriptor boolean lane through the parser indirection
  * pointer at offset `+0x00`.
  */
-[[maybe_unused]] std::uint8_t WxCmdLineParserReadOptionDescriptorFlag(
+std::uint8_t WxCmdLineParserReadOptionDescriptorFlag(
   const void* const parserOptionRuntime
 ) noexcept
 {
@@ -46279,7 +46279,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * Clears the `seen` flag lane (`+0x18`) for every parser option entry in the
  * option-entry pointer array.
  */
-[[maybe_unused]] void* WxCmdLineParserResetSeenFlags(
+void* WxCmdLineParserResetSeenFlags(
   void* const parserRuntime
 ) noexcept
 {
@@ -46319,7 +46319,7 @@ static_assert(offsetof(WxCmdLineOptionStoredValueRuntimeView, pairSecond) == 0x2
  * What it does:
  * Decodes `%HH` escaped UTF-16 code units from `encodedText` into `outText`.
  */
-[[maybe_unused]] wxStringRuntime* wxStringDecodePercentEscapesRuntime(
+wxStringRuntime* wxStringDecodePercentEscapesRuntime(
   wxStringRuntime* const outText,
   const wxStringRuntime* const encodedText
 )
@@ -46395,7 +46395,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstSeparatorRuntime(
  * Copies one UTF-16 slice `[offset, offset+copyLength)` from source text into
  * destination storage; writes `wxEmptyString` when `copyLength` is zero.
  */
-[[maybe_unused]] bool wxStringCopySliceByLengthAndOffsetRuntime(
+bool wxStringCopySliceByLengthAndOffsetRuntime(
   const wxStringRuntime* const source,
   wxStringRuntime* const outText,
   const std::size_t copyLength,
@@ -46433,7 +46433,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstSeparatorRuntime(
  * Copies one UTF-16 range from `source` into `outText` using `requestedOffset`
  * and `requestedLength`, where `-101` means â€œuntil end of sourceâ€.
  */
-[[maybe_unused]] wxStringRuntime* wxStringCopyRangeWithSearchNotFoundLengthRuntime(
+wxStringRuntime* wxStringCopyRangeWithSearchNotFoundLengthRuntime(
   const wxStringRuntime* const source,
   wxStringRuntime* const outText,
   const std::uint32_t requestedOffset,
@@ -46484,7 +46484,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstSeparatorRuntime(
  * Forwarding lane that copies one UTF-16 range into caller output storage and
  * returns that output pointer.
  */
-[[maybe_unused]] wxStringRuntime* wxStringCopyRangeWithSearchNotFoundLengthRuntimeAdapterA(
+wxStringRuntime* wxStringCopyRangeWithSearchNotFoundLengthRuntimeAdapterA(
   const wxStringRuntime* const source,
   wxStringRuntime* const outText,
   const std::uint32_t requestedOffset,
@@ -46507,7 +46507,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstSeparatorRuntime(
  * Alternate forwarding lane for UTF-16 range copy with `-101` length sentinel
  * semantics, returning caller output storage.
  */
-[[maybe_unused]] wxStringRuntime* wxStringCopyRangeWithSearchNotFoundLengthRuntimeAdapterB(
+wxStringRuntime* wxStringCopyRangeWithSearchNotFoundLengthRuntimeAdapterB(
   const wxStringRuntime* const source,
   wxStringRuntime* const outText,
   const std::uint32_t requestedOffset,
@@ -46530,7 +46530,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstSeparatorRuntime(
  * Copies the UTF-16 suffix of `source` starting at `requestedOffset` into
  * `outText`, clamping the offset to the source text length.
  */
-[[maybe_unused]] wxStringRuntime* wxStringCopySuffixFromOffsetClampedRuntime(
+wxStringRuntime* wxStringCopySuffixFromOffsetClampedRuntime(
   const wxStringRuntime* const source,
   wxStringRuntime* const outText,
   std::uint32_t requestedOffset
@@ -46615,7 +46615,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstCharacterRuntime(
  * Forwarding lane for suffix-copy semantics that returns caller output
  * storage after invoking `FUN_00960ED0`.
  */
-[[maybe_unused]] wxStringRuntime* wxStringCopySuffixAfterFirstCharacterRuntimeAdapter(
+wxStringRuntime* wxStringCopySuffixAfterFirstCharacterRuntimeAdapter(
   const wxStringRuntime* const source,
   wxStringRuntime* const outText,
   const wchar_t separator
@@ -46632,7 +46632,7 @@ wxStringRuntime* wxStringCopySuffixAfterFirstCharacterRuntime(
  * Resolves current user-name text through Win32 `GetUserNameW`, with
  * `GetEnvironmentVariableW(L"username",...)` fallback.
  */
-[[maybe_unused]] bool wxGetUserNameOrEnvironmentUserNameRuntime(
+bool wxGetUserNameOrEnvironmentUserNameRuntime(
   wchar_t* const buffer,
   DWORD bufferCharCount
 ) noexcept
@@ -46674,7 +46674,7 @@ wxStringRuntime* wxBuildCurrentUserNameStringRuntime(
  * Builds one timestamp string from `_time64`/`_ctime64`, trims the trailing
  * newline lane, and stores it into `outText`.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildCtimeTimestampStringRuntime(
+wxStringRuntime* wxBuildCtimeTimestampStringRuntime(
   wxStringRuntime* const outText
 )
 {
@@ -46696,7 +46696,7 @@ wxStringRuntime* wxBuildCurrentUserNameStringRuntime(
  * Reads `wxWindows/UserName` from profile storage, falls back to Win32/env
  * username probing, and writes `"Unknown User"` when all probes fail.
  */
-[[maybe_unused]] bool wxGetProfileUserNameOrUnknownRuntime(
+bool wxGetProfileUserNameOrUnknownRuntime(
   wchar_t* const returnedString,
   const DWORD bufferCharCount
 ) noexcept
@@ -46993,7 +46993,7 @@ namespace
  * Maps one legacy wx-pen style token (`'e'..'j'`) to the Win32 pen style lane
  * used by `wxPen::Create`, including platform-conditional mapping for `'i'`.
  */
-[[maybe_unused]] int wxMapLegacyPenStyleTokenToNativeStyle(
+int wxMapLegacyPenStyleTokenToNativeStyle(
   const std::int32_t styleToken
 )
 {
@@ -47070,7 +47070,7 @@ int wxDeleteCachedBrushHandleRuntime(
  * Ensures unique brush ref-data ownership, releases any cached native brush,
  * then writes the new brush-style token into the shared brush runtime lane.
  */
-[[maybe_unused]] std::int32_t wxBrushSetStyleRuntime(
+std::int32_t wxBrushSetStyleRuntime(
   void* const brushOwnerRuntime,
   const std::int32_t styleCode
 )
@@ -47247,7 +47247,7 @@ namespace
  * Initializes one tooltip runtime payload with an optional shared text lane
  * and clears the attached owner-window lane.
  */
-[[maybe_unused]] void* wxConstructToolTipRuntimeFromString(
+void* wxConstructToolTipRuntimeFromString(
   void* const toolTipRuntime,
   const wxStringRuntime* const tipText
 )
@@ -47274,7 +47274,7 @@ namespace
  * Initializes one `wxEnhMetaFile` runtime payload from a shared filename text
  * lane and clears the owned enhanced-metafile handle lane.
  */
-[[maybe_unused]] void* wxConstructEnhMetaFileRuntimeFromString(
+void* wxConstructEnhMetaFileRuntimeFromString(
   void* const enhMetaFileRuntime,
   const wxStringRuntime* const fileName
 )
@@ -47338,7 +47338,7 @@ HENHMETAFILE wxCopyEnhMetaFileHandleFromRuntime(
  * state, then clones the source enhanced-metafile handle lane into the
  * destination payload.
  */
-[[maybe_unused]] void* wxCopyConstructEnhMetaFileRuntime(
+void* wxCopyConstructEnhMetaFileRuntime(
   void* const destinationRuntime,
   const void* const sourceRuntime
 )
@@ -47398,7 +47398,7 @@ namespace
  * Clears one owned enhanced-metafile handle lane and clones handle state from
  * one source runtime into the same embedded payload lane.
  */
-[[maybe_unused]] HENHMETAFILE wxEnhMetaFileResetAndCopyRuntime(
+HENHMETAFILE wxEnhMetaFileResetAndCopyRuntime(
   WxEnhMetaFileOwnerRuntimeView* const ownerRuntime,
   const WxEnhMetaFileRuntimeView* const sourceRuntime
 )
@@ -47418,7 +47418,7 @@ namespace
  * Copy-constructs one `wxEnhMetaFile` runtime payload from the owner's
  * embedded source lane at `owner+0x08`.
  */
-[[maybe_unused]] WxEnhMetaFileRuntimeView* wxConstructEnhMetaFileFromOwnerEmbeddedRuntime(
+WxEnhMetaFileRuntimeView* wxConstructEnhMetaFileFromOwnerEmbeddedRuntime(
   const WxEnhMetaFileOwnerRuntimeView* const ownerRuntime,
   WxEnhMetaFileRuntimeView* const destinationRuntime
 )
@@ -47464,7 +47464,7 @@ void wxDestroyToolBarToolBaseRuntime(
  * Non-deleting adapter lane that forwards toolbar-tool teardown into
  * `FUN_00A06320` and returns the original runtime pointer.
  */
-[[maybe_unused]] void* wxDestroyToolBarToolBaseRuntimeAdapterLaneA(
+void* wxDestroyToolBarToolBaseRuntimeAdapterLaneA(
   void* const toolRuntime
 ) noexcept
 {
@@ -47478,7 +47478,7 @@ void wxDestroyToolBarToolBaseRuntime(
  * What it does:
  * Runs one deleting-dtor thunk lane for a `wxToolBarToolBase` runtime payload.
  */
-[[maybe_unused]] void* wxDestroyToolBarToolBaseDeletingThunkLaneA(
+void* wxDestroyToolBarToolBaseDeletingThunkLaneA(
   void* const toolRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -47497,7 +47497,7 @@ void wxDestroyToolBarToolBaseRuntime(
  * Runs one deleting-dtor thunk lane for an alternate
  * `wxToolBarToolBase` payload family.
  */
-[[maybe_unused]] void* wxDestroyToolBarToolBaseDeletingThunkLaneB(
+void* wxDestroyToolBarToolBaseDeletingThunkLaneB(
   void* const toolRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -47533,7 +47533,7 @@ void wxDestroyEnhMetaFileRuntime(
  * What it does:
  * Runs deleting-dtor thunk semantics for one `wxEnhMetaFile` runtime payload.
  */
-[[maybe_unused]] void* wxDestroyEnhMetaFileDeletingThunk(
+void* wxDestroyEnhMetaFileDeletingThunk(
   void* const enhMetaFileRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -47582,7 +47582,7 @@ namespace
  * What it does:
  * Stores one 16-bit lane value into runtime offset `+0x00`.
  */
-[[maybe_unused]] WxWordLane00RuntimeView* wxStoreWordLane00Runtime(
+WxWordLane00RuntimeView* wxStoreWordLane00Runtime(
   WxWordLane00RuntimeView* const runtime,
   const std::int16_t value
 ) noexcept
@@ -47597,7 +47597,7 @@ namespace
  * What it does:
  * Reads one 16-bit lane value from runtime offset `+0x00`.
  */
-[[maybe_unused]] std::int16_t wxReadWordLane00Runtime(
+std::int16_t wxReadWordLane00Runtime(
   const WxWordLane00RuntimeView* const runtime
 ) noexcept
 {
@@ -47610,7 +47610,7 @@ namespace
  * What it does:
  * Clears one 32-bit lane at runtime offset `+0x0C`.
  */
-[[maybe_unused]] void wxClearDwordLane0CRuntime(
+void wxClearDwordLane0CRuntime(
   WxDwordLane0CRuntimeView* const runtime
 ) noexcept
 {
@@ -47623,7 +47623,7 @@ namespace
  * What it does:
  * Stores one byte lane at runtime offset `+0x89` and returns it.
  */
-[[maybe_unused]] std::uint8_t wxStoreByteLane89Runtime(
+std::uint8_t wxStoreByteLane89Runtime(
   WxByteLane89RuntimeView* const runtime,
   const std::uint8_t value
 ) noexcept
@@ -47896,7 +47896,7 @@ namespace
  * vtable lanes, destroying the output subobject, then destroying the input
  * subobject.
  */
-[[maybe_unused]] WxSocketStreamRuntimeView* wxDestroySocketStreamNoDeleteRuntime(
+WxSocketStreamRuntimeView* wxDestroySocketStreamNoDeleteRuntime(
   WxSocketStreamRuntimeView* const streamRuntime
 )
 {
@@ -48305,7 +48305,7 @@ WxSocketBaseRuntimeView* wxProtocolConstructRuntime(
  *
  * Inlined behavior from FUN_00A2FEB0.
  */
-[[maybe_unused]] WxSocketRuntimeView* wxSocketClearSelectedEventCallbacksRuntime(
+WxSocketRuntimeView* wxSocketClearSelectedEventCallbacksRuntime(
   WxSocketRuntimeView* const socketRuntime,
   const std::uint8_t selectionMask
 ) noexcept
@@ -48336,7 +48336,7 @@ WxSocketBaseRuntimeView* wxProtocolConstructRuntime(
  * Marks one socket-base runtime as closed, clears all socket callback lanes,
  * resets live socket state, and clears the `connected/ok` status bytes.
  */
-[[maybe_unused]] bool wxSocketBaseShutdownRuntime(
+bool wxSocketBaseShutdownRuntime(
   WxSocketBaseRuntimeView* const socketBase
 ) noexcept
 {
@@ -48359,7 +48359,7 @@ WxSocketBaseRuntimeView* wxProtocolConstructRuntime(
  * resetting live socket state, freeing both optional frame lanes, then freeing
  * the socket runtime storage.
  */
-[[maybe_unused]] void wxSocketDestroyRuntimeAndFrameLanes(
+void wxSocketDestroyRuntimeAndFrameLanes(
   WxSocketRuntimeView* const socketRuntime
 ) noexcept
 {
@@ -48437,7 +48437,7 @@ int wxSocketSetAddressPortRuntime(
  * Resolves one host-name text lane into the IPv4 address dword at sockaddr
  * offset `+0x04` using `inet_addr` with `gethostbyname` fallback.
  */
-[[maybe_unused]] int wxSocketSetAddressIpv4FromHostNameRuntime(
+int wxSocketSetAddressIpv4FromHostNameRuntime(
   WxSocketPortRuntimeView* const socketPort,
   const char* const hostName
 )
@@ -48474,7 +48474,7 @@ int wxSocketSetAddressPortRuntime(
  * Resolves one socket-port IPv4 address lane into a host-name text lane via
  * `gethostbyaddr` and copies the host-name into caller buffer storage.
  */
-[[maybe_unused]] int wxSocketResolveHostNameFromAddressRuntime(
+int wxSocketResolveHostNameFromAddressRuntime(
   WxSocketPortRuntimeView* const socketPort,
   char* const outHostName,
   const std::size_t outHostNameCapacity
@@ -48510,7 +48510,7 @@ int wxSocketSetAddressPortRuntime(
  * Ensures one socket-address storage lane exists and writes a raw IPv4 dword
  * to sockaddr offset `+0x04`; stores state code `3` on invalid storage state.
  */
-[[maybe_unused]] int wxSocketSetAddressIpv4Runtime(
+int wxSocketSetAddressIpv4Runtime(
   WxSocketPortRuntimeView* const socketPort,
   const std::uint32_t networkAddress
 )
@@ -48534,7 +48534,7 @@ int wxSocketSetAddressPortRuntime(
  * What it does:
  * Writes a zero IPv4 dword to one socket-address storage lane.
  */
-[[maybe_unused]] int wxSocketClearAddressIpv4Runtime(
+int wxSocketClearAddressIpv4Runtime(
   WxSocketPortRuntimeView* const socketPort
 )
 {
@@ -48548,7 +48548,7 @@ int wxSocketSetAddressPortRuntime(
  * Releases one existing socket-address storage lane from offset `+0x08`,
  * allocates a replacement lane, then stores and returns the replacement.
  */
-[[maybe_unused]] WxSocketPortRuntimeView* wxSockAddressRecreatePortStorageRuntime(
+WxSocketPortRuntimeView* wxSockAddressRecreatePortStorageRuntime(
   WxSockAddressPortOwnerRuntimeView* const addressRuntime
 )
 {
@@ -48564,7 +48564,7 @@ int wxSocketSetAddressPortRuntime(
  * Writes one host-order port into socket-address storage lane `+0x08` and
  * reports success.
  */
-[[maybe_unused]] bool wxSockAddressSetPortRuntime(
+bool wxSockAddressSetPortRuntime(
   WxSockAddressPortOwnerRuntimeView* const addressRuntime,
   const std::uint16_t hostPort
 ) noexcept
@@ -48579,7 +48579,7 @@ int wxSocketSetAddressPortRuntime(
  * Resolves one host-name text lane from the owned socket-address lane and
  * stores it as a widened wx string in `outHostName`.
  */
-[[maybe_unused]] wxStringRuntime* wxSockAddressResolveHostNameTextRuntime(
+wxStringRuntime* wxSockAddressResolveHostNameTextRuntime(
   const WxSockAddressPortOwnerRuntimeView* const addressRuntime,
   wxStringRuntime* const outHostName
 )
@@ -48645,7 +48645,7 @@ int wxSocketCloneAddressBlobRuntime(
  * ensuring socket runtime initialization, and allocating the secondary port
  * storage lane at `+0x08`.
  */
-[[maybe_unused]] WxSockAddressPortOwnerRuntimeView* wxConstructSockAddressRuntime(
+WxSockAddressPortOwnerRuntimeView* wxConstructSockAddressRuntime(
   WxSockAddressPortOwnerRuntimeView* const runtime
 )
 {
@@ -48664,7 +48664,7 @@ int wxSocketCloneAddressBlobRuntime(
  * lanes, ensuring socket runtime initialization, and cloning the source
  * secondary frame lane at `+0x08`.
  */
-[[maybe_unused]] WxSockAddressPortOwnerRuntimeView* wxConstructSockAddressCloneRuntime(
+WxSockAddressPortOwnerRuntimeView* wxConstructSockAddressCloneRuntime(
   WxSockAddressPortOwnerRuntimeView* const destinationRuntime,
   const WxSockAddressPortOwnerRuntimeView* const sourceRuntime
 )
@@ -48685,7 +48685,7 @@ int wxSocketCloneAddressBlobRuntime(
  * Default-constructs one `wxIPV4address` runtime by constructing its
  * `wxSockAddress` base and resetting the host-name lane to `wxEmptyString`.
  */
-[[maybe_unused]] WxIpv4AddressRuntimeView* wxConstructIpv4AddressRuntime(
+WxIpv4AddressRuntimeView* wxConstructIpv4AddressRuntime(
   WxIpv4AddressRuntimeView* const runtime
 )
 {
@@ -48703,7 +48703,7 @@ int wxSocketCloneAddressBlobRuntime(
  * Copy-constructs one `wxIPV4address` runtime from one source base lane and
  * resets the host-name lane to `wxEmptyString`.
  */
-[[maybe_unused]] WxIpv4AddressRuntimeView* wxConstructIpv4AddressCloneRuntime(
+WxIpv4AddressRuntimeView* wxConstructIpv4AddressCloneRuntime(
   WxIpv4AddressRuntimeView* const destinationRuntime,
   const WxIpv4AddressRuntimeView* const sourceRuntime
 )
@@ -48722,7 +48722,7 @@ int wxSocketCloneAddressBlobRuntime(
  * Allocates and copy-constructs one `wxIPV4address` runtime, then copies the
  * trailing host-name string lane from the source object.
  */
-[[maybe_unused]] WxIpv4AddressRuntimeView* wxCloneIpv4AddressRuntime(
+WxIpv4AddressRuntimeView* wxCloneIpv4AddressRuntime(
   const WxIpv4AddressRuntimeView* const sourceRuntime
 )
 {
@@ -48739,7 +48739,7 @@ int wxSocketCloneAddressBlobRuntime(
  * Allocates one `wxIPV4address` runtime object and runs default constructor
  * initialization on success.
  */
-[[maybe_unused]] WxIpv4AddressRuntimeView* wxAllocateIpv4AddressRuntime()
+WxIpv4AddressRuntimeView* wxAllocateIpv4AddressRuntime()
 {
   auto* const runtime = static_cast<WxIpv4AddressRuntimeView*>(
     ::operator new(sizeof(WxIpv4AddressRuntimeView), std::nothrow)
@@ -48758,7 +48758,7 @@ int wxSocketCloneAddressBlobRuntime(
  * Writes one IPv4 address into socket storage, then resolves/copies the
  * associated host-name lane when write succeeds.
  */
-[[maybe_unused]] bool wxIpv4AddressSetAddressAndRefreshHostNameRuntime(
+bool wxIpv4AddressSetAddressAndRefreshHostNameRuntime(
   WxIpv4AddressRuntimeView* const addressRuntime,
   const std::uint32_t networkAddress
 )
@@ -48785,7 +48785,7 @@ int wxSocketCloneAddressBlobRuntime(
  * incoming frame metadata lane, stores the clone back to `+0x08`, and returns
  * the stored clone pointer.
  */
-[[maybe_unused]] WxSocketFrameRuntimeView* wxSocketReplaceSecondaryFrameWithCloneRuntime(
+WxSocketFrameRuntimeView* wxSocketReplaceSecondaryFrameWithCloneRuntime(
   WxSocketRuntimeView* const socketRuntime,
   const WxSocketFrameRuntimeView* const sourceFrame
 )
@@ -48802,7 +48802,7 @@ int wxSocketCloneAddressBlobRuntime(
  * Clones one optional secondary frame lane (`+0x08`) and returns the clone
  * pointer, or `nullptr` when no frame lane is present.
  */
-[[maybe_unused]] [[nodiscard]] WxSocketFrameRuntimeView* wxSocketCloneSecondaryFrameRuntime(
+[[nodiscard]] WxSocketFrameRuntimeView* wxSocketCloneSecondaryFrameRuntime(
   const WxSocketRuntimeView* const socketRuntime
 )
 {
@@ -48900,7 +48900,7 @@ int wxSocketSetAddressPortRuntime(
  * address dword at sockaddr offset `+0x04`; stores state code `3` when the
  * storage lane is not in readable state.
  */
-[[maybe_unused]] std::uint32_t wxSocketGetAddressIpv4Runtime(
+std::uint32_t wxSocketGetAddressIpv4Runtime(
   WxSocketPortRuntimeView* const socketPort
 )
 {
@@ -48951,7 +48951,7 @@ std::uint16_t wxSocketGetAddressPortRuntime(
  * What it does:
  * Receives bytes from one socket handle lane with fixed flags `0`.
  */
-[[maybe_unused]] int wxSocketReceiveRuntime(
+int wxSocketReceiveRuntime(
   SOCKET* const socketHandle,
   char* const buffer,
   const int byteCount
@@ -48966,7 +48966,7 @@ std::uint16_t wxSocketGetAddressPortRuntime(
  * What it does:
  * Sends bytes to one socket handle lane with fixed flags `0`.
  */
-[[maybe_unused]] int wxSocketSendRuntime(
+int wxSocketSendRuntime(
   SOCKET* const socketHandle,
   char* const buffer,
   const int byteCount
@@ -49031,7 +49031,7 @@ namespace
    * replaces the stored address blob with a copied source span, and reports
    * unsupported-family/allocation error codes.
    */
-  [[maybe_unused]] int wxSocketPopulatePortStorageFromSockAddrRuntime(
+  int wxSocketPopulatePortStorageFromSockAddrRuntime(
     WxSocketPortRuntimeView* const socketPort,
     const sockaddr* const sourceAddress,
     const std::size_t sourceAddressByteCount
@@ -49072,7 +49072,7 @@ namespace
    * Receives one datagram into caller storage, lazily allocates address-port
    * storage for peer metadata, then copies the source sockaddr into that lane.
    */
-  [[maybe_unused]] int wxSocketReceiveFromAndCacheAddressRuntime(
+  int wxSocketReceiveFromAndCacheAddressRuntime(
     WxSocketTransportSendRuntimeView* const transport,
     char* const buffer,
     const int byteCount
@@ -49117,7 +49117,7 @@ namespace
     return -1;
   }
 
-  [[maybe_unused]] int wxSocketReceiveWithRuntimeState(
+  int wxSocketReceiveWithRuntimeState(
     WxSocketTransportSendRuntimeView* transport,
     char* buffer,
     int byteCount
@@ -49207,7 +49207,7 @@ namespace
  * Waits for requested socket-event mask bits with timeout polling and thread
  * yielding, updating runtime event flags for close/error/timeout lanes.
  */
-[[maybe_unused]] bool wxSocketWaitForRequestedEventsRuntime(
+bool wxSocketWaitForRequestedEventsRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   const std::int32_t waitSeconds,
   const std::int32_t waitMillisRemainder,
@@ -49269,7 +49269,7 @@ namespace
  * What it does:
  * Calls `wxSocketWaitForRequestedEventsRuntime` with writable-mask bit `0x02`.
  */
-[[maybe_unused]] bool wxSocketWaitWritableMaskRuntime(
+bool wxSocketWaitWritableMaskRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   const std::int32_t waitSeconds,
   const std::int32_t waitMillisRemainder
@@ -49285,7 +49285,7 @@ namespace
  * Returns `true` immediately when bypass flag lane `+0x48` is non-zero;
  * otherwise waits on socket-event mask `0x09` using caller timeout lanes.
  */
-[[maybe_unused]] bool wxSocketWaitMask09UnlessBypassRuntime(
+bool wxSocketWaitMask09UnlessBypassRuntime(
   const void* const waitOwnerRuntime,
   WxFtpSocketIoRuntimeView* const socketIoRuntime,
   const std::int32_t waitSeconds,
@@ -49317,7 +49317,7 @@ namespace
  * Sends bytes with `sendto` using a cloned destination-address blob lane,
  * writing state code `3` or clone-failure state on address errors.
  */
-[[maybe_unused]] int wxSocketSendToAddressRuntime(
+int wxSocketSendToAddressRuntime(
   WxSocketTransportSendRuntimeView* const transport,
   char* const buffer,
   const int byteCount
@@ -49359,7 +49359,7 @@ namespace
  * Routes one socket send through connected or addressed path, updates runtime
  * state on invalid socket/would-block/error lanes, and returns send result.
  */
-[[maybe_unused]] int wxSocketSendWithRuntimeState(
+int wxSocketSendWithRuntimeState(
   WxSocketTransportSendRuntimeView* const transport,
   char* const buffer,
   const int byteCount
@@ -49396,7 +49396,7 @@ namespace
  * from the transport lane using guarded single-read mode or repeated read-loop
  * mode based on runtime mode bits.
  */
-[[maybe_unused]] int wxSocketReadBufferedRuntime(
+int wxSocketReadBufferedRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   char* const buffer,
   const int byteCount
@@ -49456,7 +49456,7 @@ namespace
  * Writes one caller buffer through the socket transport lane, optionally in
  * guarded single-send mode or repeated partial-send mode based on mode bits.
  */
-[[maybe_unused]] int wxSocketWriteBufferedRuntime(
+int wxSocketWriteBufferedRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   char* const buffer,
   const int byteCount
@@ -49511,7 +49511,7 @@ namespace
  * Runs one socket-write attempt, stores transferred-byte count, clears the
  * in-progress lane, and updates failure state according to mode-bit `0x02`.
  */
-[[maybe_unused]] WxFtpSocketIoRuntimeView* wxSocketWriteAndUpdateStatusRuntime(
+WxFtpSocketIoRuntimeView* wxSocketWriteAndUpdateStatusRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   char* const buffer,
   const int byteCount
@@ -49535,7 +49535,7 @@ namespace
  * byte count from lane `+0x20`, then stores owner state lane `+0x08` as `2`
  * when socket failure byte `+0x18` is non-zero (else `0`).
  */
-[[maybe_unused]] int wxSocketWriteUpdateOwnerStateAndReturnTransferredRuntime(
+int wxSocketWriteUpdateOwnerStateAndReturnTransferredRuntime(
   void* const ownerRuntime,
   char* const buffer,
   const int byteCount
@@ -49569,7 +49569,7 @@ namespace
  * Reads one FTP reply (including multi-line continuation), appends full reply
  * text to runtime buffer lane `+0x70`, and returns the status-code first digit.
  */
-[[maybe_unused]] char wxFtpReadReplyAndClassifyRuntime(
+char wxFtpReadReplyAndClassifyRuntime(
   WxFtpSocketIoRuntimeView* const runtime
 )
 {
@@ -49681,7 +49681,7 @@ void wxDestroyEventObjectRuntime(
  * Runs one deleting-dtor thunk lane for wx event/object payloads by invoking
  * base unref-tail destruction and scalar-deleting when requested.
  */
-[[maybe_unused]] void* wxDestroyEventObjectWithFlagRuntime(
+void* wxDestroyEventObjectWithFlagRuntime(
   void* const eventObjectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -49747,7 +49747,7 @@ namespace
  * selected GDI object into the host DC (`+0xFC`), then refreshes selection
  * from shared ref-data dispatch slot `+0x1C` and caches the replaced object.
  */
-  [[maybe_unused]] HGDIOBJ wxSyncDcSelectedObjectFromSharedRefDataRuntime(
+  HGDIOBJ wxSyncDcSelectedObjectFromSharedRefDataRuntime(
     WxDcSharedObjectSelectionRuntimeView* const runtime,
     WxObjectRuntimeView* const clone
   ) noexcept
@@ -49834,7 +49834,7 @@ namespace
   );
 
 // Forward declaration: defined below at FUN_009D2CD0 (line ~72881).
-[[maybe_unused]] void* wxBrushAssignBySharedRefDataOrRefRuntime(
+void* wxBrushAssignBySharedRefDataOrRefRuntime(
   void* brushHolderRuntime,
   const void* sourceBrushHolderRuntime) noexcept;
 
@@ -49846,7 +49846,7 @@ namespace
  * one DC object slot at `+0xFC/+0x108`, and updates brush origin using the
  * host origin lanes (`+0x14/+0x18`) when patterned brush ref-data is present.
  */
-[[maybe_unused]] HGDIOBJ wxSyncDcBrushSelectionFromSharedRefDataRuntime(
+HGDIOBJ wxSyncDcBrushSelectionFromSharedRefDataRuntime(
   WxDcBrushSelectionRuntimeView* const runtime,
   WxObjectRuntimeView* const clone
 ) noexcept
@@ -49913,7 +49913,7 @@ LONG wxGetTextMetricHeightRuntime(
  * Reads one text-metric block from the runtime device-context lane and returns
  * the average-character-width lane.
  */
-[[maybe_unused]] LONG wxGetTextMetricAverageCharWidthRuntime(
+LONG wxGetTextMetricAverageCharWidthRuntime(
   WxTextMetricHostRuntimeView* const deviceContextHost
 )
 {
@@ -49933,7 +49933,7 @@ LONG wxGetTextMetricHeightRuntime(
  * Applies one pending text/background color state onto the host DC lane and
  * switches the host DC to transparent text background mode.
  */
-[[maybe_unused]] void wxApplyPendingDcTextColorsRuntime(
+void wxApplyPendingDcTextColorsRuntime(
   void* const colorStateRuntime
 ) noexcept
 {
@@ -49989,7 +49989,7 @@ LONG wxGetTextMetricHeightRuntime(
  * Clears one active clipping region on the native device-context lane and
  * resets the clipping-active state bit.
  */
-[[maybe_unused]] void wxDCDestroyClippingRegionRuntime(
+void wxDCDestroyClippingRegionRuntime(
   void* const deviceContextRuntime
 )
 {
@@ -50120,7 +50120,7 @@ namespace
  * Normalizes one two-point bounds pair against this device-context lane and
  * updates runtime bounding-box limits for both pair endpoints.
  */
-[[maybe_unused]] int wxDeviceContextUpdateBoundsFromPairRuntime(
+int wxDeviceContextUpdateBoundsFromPairRuntime(
   void* const deviceContextRuntime,
   void* const boundsPairRuntime
 )
@@ -50140,7 +50140,7 @@ namespace
  * What it does:
  * Returns whether one device-context state flag lane has bit `0x02` set.
  */
-[[maybe_unused]] bool wxDeviceContextHasStateBit02Runtime(
+bool wxDeviceContextHasStateBit02Runtime(
   const void* const deviceContextRuntime
 )
 {
@@ -50155,7 +50155,7 @@ namespace
  * Copies one device-context double scale pair from lanes `+0x30/+0x38` into
  * optional output pointers.
  */
-[[maybe_unused]] double* wxDeviceContextCopyScalePairBRuntime(
+double* wxDeviceContextCopyScalePairBRuntime(
   const void* const deviceContextRuntime,
   double* const outScaleX,
   double* const outScaleY
@@ -50180,7 +50180,7 @@ namespace
  * Copies one device-context double scale pair from lanes `+0x20/+0x28` into
  * optional output pointers.
  */
-[[maybe_unused]] double* wxDeviceContextCopyScalePairARuntime(
+double* wxDeviceContextCopyScalePairARuntime(
   const void* const deviceContextRuntime,
   double* const outScaleX,
   double* const outScaleY
@@ -50205,7 +50205,7 @@ namespace
  * Updates the runtime device-context bounding-box lanes with one point, either
  * extending existing min/max bounds or initializing them on first update.
  */
-[[maybe_unused]] int wxDeviceContextAccumulateBoundingPointRuntime(
+int wxDeviceContextAccumulateBoundingPointRuntime(
   void* const deviceContextRuntime,
   const std::int32_t x,
   const std::int32_t y
@@ -50247,7 +50247,7 @@ namespace
  * Returns cached clipping-box origin and dimensions when clip state is active;
  * otherwise writes zero to all output lanes.
  */
-[[maybe_unused]] std::int32_t* wxDeviceContextCopyCachedClipBoxRuntime(
+std::int32_t* wxDeviceContextCopyCachedClipBoxRuntime(
   const void* const deviceContextRuntime,
   std::int32_t* const outX,
   std::int32_t* const outY,
@@ -50288,7 +50288,7 @@ namespace
  * Copies one device-context integer origin pair from lanes `+0x0C/+0x10` into
  * optional output pointers.
  */
-[[maybe_unused]] std::int32_t* wxDeviceContextCopyOriginPairARuntime(
+std::int32_t* wxDeviceContextCopyOriginPairARuntime(
   const void* const deviceContextRuntime,
   std::int32_t* const outX,
   std::int32_t* const outY
@@ -50313,7 +50313,7 @@ namespace
  * Copies one device-context integer origin pair from lanes `+0x14/+0x18` into
  * optional output pointers.
  */
-[[maybe_unused]] std::int32_t* wxDeviceContextCopyOriginPairBRuntime(
+std::int32_t* wxDeviceContextCopyOriginPairBRuntime(
   const void* const deviceContextRuntime,
   std::int32_t* const outX,
   std::int32_t* const outY
@@ -50338,7 +50338,7 @@ namespace
  * Draws one menu check-mark frame on the native device-context lane and
  * updates the runtime bounding box using the top-left and bottom-right corners.
  */
-[[maybe_unused]] int wxDCDoDrawCheckMarkRuntime(
+int wxDCDoDrawCheckMarkRuntime(
   void* const deviceContextRuntime,
   const LONG left,
   const LONG top,
@@ -50392,7 +50392,7 @@ namespace
  * Draws one line segment on the native device-context lane and updates the
  * runtime bounding-box lane for both segment endpoints.
  */
-[[maybe_unused]] int wxDCDoDrawLineRuntime(
+int wxDCDoDrawLineRuntime(
   void* const deviceContextRuntime,
   const int x1,
   const int y1,
@@ -50442,7 +50442,7 @@ namespace
  * selected brush colour lane when available, then updates the runtime
  * bounding-box lane for that point.
  */
-[[maybe_unused]] int wxDCDoDrawPointRuntime(
+int wxDCDoDrawPointRuntime(
   void* const deviceContextRuntime,
   const int x,
   const int y
@@ -50571,7 +50571,7 @@ LONG wxCacheDeviceContextClipBoxBounds(
  * `RGN_COPY`; when selection succeeds, sets runtime flag bit `0x04` at `+0x08`
  * and refreshes cached clip-box bounds.
  */
-[[maybe_unused]] void wxSelectDeviceContextClipRegionAndCacheBoundsRuntime(
+void wxSelectDeviceContextClipRegionAndCacheBoundsRuntime(
   void* const deviceContextHost,
   HRGN clipRegion
 )
@@ -50611,7 +50611,7 @@ LONG wxCacheDeviceContextClipBoxBounds(
  * Returns whether the native device context reports technology code `1` or
  * `2` from `GetDeviceCaps(TECHNOLOGY)`.
  */
-[[maybe_unused]] BOOL wxIsDeviceContextTechnology1Or2Runtime(
+BOOL wxIsDeviceContextTechnology1Or2Runtime(
   const void* const deviceContextRuntime
 )
 {
@@ -50640,7 +50640,7 @@ LONG wxCacheDeviceContextClipBoxBounds(
  * What it does:
  * Returns `GetDeviceCaps(BITSPIXEL)` from the native device-context lane.
  */
-[[maybe_unused]] int wxGetDeviceContextBitsPerPixelRuntime(
+int wxGetDeviceContextBitsPerPixelRuntime(
   const void* const deviceContextRuntime
 )
 {
@@ -50666,7 +50666,7 @@ LONG wxCacheDeviceContextClipBoxBounds(
  * Executes `ExtFloodFill` with one colour lane (`+0x08`) and fill-type flag,
  * then updates the runtime bounding-box lane for `(x, y)`.
  */
-[[maybe_unused]] bool wxDeviceContextExtFloodFillAndUpdateBoundsRuntime(
+bool wxDeviceContextExtFloodFillAndUpdateBoundsRuntime(
   void* const deviceContextRuntime,
   const int x,
   const int y,
@@ -50734,7 +50734,7 @@ LONG wxCacheDeviceContextClipBoxBounds(
  * Draws one icon payload from request lane `+0x04` and updates device-context
  * bounds for top-left and bottom-right icon corners.
  */
-[[maybe_unused]] std::intptr_t wxDeviceContextDrawIconAndUpdateBoundsRuntime(
+std::intptr_t wxDeviceContextDrawIconAndUpdateBoundsRuntime(
   void* const deviceContextRuntime,
   const void* const iconRequestRuntime,
   const int xLeft,
@@ -50822,7 +50822,7 @@ LONG wxCacheDeviceContextClipBoxBounds(
  * Updates cached window-origin lanes `(x, y)` and forwards `SetWindowOrgEx`
  * only when either lane changes.
  */
-[[maybe_unused]] std::int32_t wxSetDeviceContextWindowOriginRuntime(
+std::int32_t wxSetDeviceContextWindowOriginRuntime(
   void* const deviceContextRuntime,
   const std::int32_t x,
   const std::int32_t y
@@ -50917,7 +50917,7 @@ namespace
  * trailing null terminator, stores it in `storage`, and writes `\\0` at the
  * terminal slot.
  */
-[[maybe_unused]] char** wxAllocateAnsiBufferWithTerminator(
+char** wxAllocateAnsiBufferWithTerminator(
   char** const storage,
   const std::int32_t charCount
 )
@@ -50934,7 +50934,7 @@ namespace
  * What it does:
  * Returns one pointer lane and clears the source storage to null.
  */
-[[maybe_unused]] void* wxTakePointerAndClear(
+void* wxTakePointerAndClear(
   void** const storage
 ) noexcept
 {
@@ -50949,7 +50949,7 @@ namespace
  * What it does:
  * Moves one pointer lane from `source` into `destination`, clearing `source`.
  */
-[[maybe_unused]] void** wxMovePointerAndClearSource(
+void** wxMovePointerAndClearSource(
   void** const destination,
   void** const source
 ) noexcept
@@ -50977,7 +50977,7 @@ namespace
  * What it does:
  * Returns the address of one pointer lane stored at runtime offset `+0x0C`.
  */
-[[maybe_unused]] void** wxGetPointerSlotAt0C(
+void** wxGetPointerSlotAt0C(
   void* const runtimeObject
 ) noexcept
 {
@@ -51003,7 +51003,7 @@ namespace
  * What it does:
  * Reads one UTF-16/word lane by index from a runtime-owned word table.
  */
-[[maybe_unused]] std::uint16_t wxReadWordTableEntry(
+std::uint16_t wxReadWordTableEntry(
   const WxWordTableRuntimeView* const tableOwner,
   const std::int32_t index
 ) noexcept
@@ -51019,7 +51019,7 @@ namespace
  * first index whose UTF-16 code unit is not present in `rejectSet`; returns
  * `-101` when all scanned code units belong to `rejectSet`.
  */
-[[maybe_unused]] std::int32_t wxFindLastWideCharNotInSetBeforeIndex(
+std::int32_t wxFindLastWideCharNotInSetBeforeIndex(
   const wchar_t** const textStorage,
   const wchar_t* const rejectSet,
   std::int32_t startIndex
@@ -51056,7 +51056,7 @@ namespace
  * Thunk lane that forwards one node teardown request into
  * `FUN_00978950` non-deleting semantics.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterA(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterA(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51070,7 +51070,7 @@ namespace
  * Thunk lane that forwards one node non-deleting teardown request into
  * `FUN_00978950`.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterJ(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterJ(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51084,7 +51084,7 @@ namespace
  * Thunk lane that forwards one list-node insert-before request into
  * `FUN_00978440`.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapter(
+wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapter(
   WxListInsertRuntimeView* const list,
   wxNodeBaseRuntime* const nextNode,
   void* const value
@@ -51100,7 +51100,7 @@ namespace
  * Tertiary thunk lane that forwards one list-node insert-before request into
  * `FUN_00978440`.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterB(
+wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterB(
   WxListInsertRuntimeView* const list,
   wxNodeBaseRuntime* const nextNode,
   void* const value
@@ -51116,7 +51116,7 @@ namespace
  * Additional thunk lane that forwards node non-deleting teardown into
  * `FUN_00978950` semantics.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterI(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterI(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51130,7 +51130,7 @@ namespace
  * Additional thunk lane that forwards one node non-deleting teardown request
  * into `FUN_00978950`.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterK(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterK(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51144,7 +51144,7 @@ namespace
  * Additional thunk lane that forwards list-node insert-before requests into
  * `FUN_00978440` semantics.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterE(
+wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterE(
   WxListInsertRuntimeView* const list,
   wxNodeBaseRuntime* const nextNode,
   void* const value
@@ -51160,7 +51160,7 @@ namespace
  * Additional thunk lane that deletes one node from its owning list when
  * present and reports success as a boolean lane.
  */
-[[maybe_unused]] bool wxDeleteNodeFromOwningListRuntimeAdapterD(
+bool wxDeleteNodeFromOwningListRuntimeAdapterD(
   wxNodeBaseRuntime* const node
 ) noexcept
 {
@@ -51174,7 +51174,7 @@ namespace
  * Thunk lane that forwards one image-handler destruction request into
  * `FUN_0042B920`.
  */
-[[maybe_unused]] void wxDestroyImageHandlerRuntimeAdapter(
+void wxDestroyImageHandlerRuntimeAdapter(
   wxObject* const imageHandler
 )
 {
@@ -51189,7 +51189,7 @@ namespace
  * Secondary thunk lane that forwards one image-handler destruction request
  * into `FUN_0042B920`.
  */
-[[maybe_unused]] void wxDestroyImageHandlerRuntimeAdapterB(
+void wxDestroyImageHandlerRuntimeAdapterB(
   wxObject* const imageHandler
 )
 {
@@ -51204,7 +51204,7 @@ namespace
  * Additional thunk lane that forwards one image-handler destruction request
  * into `FUN_0042B920`.
  */
-[[maybe_unused]] void wxDestroyImageHandlerRuntimeAdapterC(
+void wxDestroyImageHandlerRuntimeAdapterC(
   wxObject* const imageHandler
 )
 {
@@ -51219,7 +51219,7 @@ namespace
  * Constructs one bitmap from one source image using default depth (`-1`) in
  * caller-provided storage and returns the destination bitmap pointer.
  */
-[[maybe_unused]] wxBitmap* wxConstructBitmapFromImageAdapter(
+wxBitmap* wxConstructBitmapFromImageAdapter(
   const wxImage* const sourceImage,
   wxBitmap* const destinationBitmap
 )
@@ -51271,7 +51271,7 @@ namespace
  * temporary `wxBitmap`, extracts the native-handle lane from bitmap ref-data,
  * writes it to `outNativeHandle`, then destroys the temporary bitmap.
  */
-[[maybe_unused]] bool wxExtractBitmapNativeHandleViaVirtualSlot34(
+bool wxExtractBitmapNativeHandleViaVirtualSlot34(
   void* const runtimeObject,
   std::uint32_t* const outNativeHandle
 ) noexcept
@@ -51300,7 +51300,7 @@ namespace
  * Deletes one list node for the supplied owner by first detaching the node
  * from owner links and then forwarding to `wxListBase::DoDeleteNode`.
  */
-[[maybe_unused]] bool wxDeleteNodeFromOwningListRuntimeAdapterA(
+bool wxDeleteNodeFromOwningListRuntimeAdapterA(
   WxListOwnerNodeDestroyRuntimeView* const listOwner,
   wxNodeBaseRuntime* const node
 ) noexcept
@@ -51321,7 +51321,7 @@ namespace
  * Preserves one direct jump-thunk lane that forwards node-delete work to
  * `FUN_009785F0`.
  */
-[[maybe_unused]] bool wxDeleteNodeFromOwningListRuntimeAdapterAThunk(
+bool wxDeleteNodeFromOwningListRuntimeAdapterAThunk(
   WxListOwnerNodeDestroyRuntimeView* const listOwner,
   wxNodeBaseRuntime* const node
 ) noexcept
@@ -51336,7 +51336,7 @@ namespace
  * Deleting-thunk lane that removes one module-list node from its owner and
  * runs node deletion semantics.
  */
-[[maybe_unused]] int wxDeleteModuleListNodeAdapterA(
+int wxDeleteModuleListNodeAdapterA(
   wxModuleListNode* const node
 ) noexcept
 {
@@ -51409,7 +51409,7 @@ namespace
  * Appends one menu runtime into owner list lane `+0x34`, writes owner
  * backlink at `menu+0x0C`, and attaches optional submenu lane `menu+0x10`.
  */
-[[maybe_unused]] bool wxMenuAppendWithOwnerAndSubMenuRuntime(
+bool wxMenuAppendWithOwnerAndSubMenuRuntime(
   void* const menuOwnerRuntime,
   WxMenuAttachOwnerRuntimeView* const menuRuntime
 ) noexcept
@@ -51436,7 +51436,7 @@ namespace
  * Appends one menu into menu-bar list lane `+0x124`, then dispatches menu
  * vtable slot `+0x40` with the owner menu-bar runtime.
  */
-[[maybe_unused]] bool wxMenuBarAppendAndNotifyMenuRuntime(
+bool wxMenuBarAppendAndNotifyMenuRuntime(
   void* const menuBarRuntime,
   WxMenuAttachOwnerRuntimeView* const menuRuntime,
   const void* const menuTitleRuntime
@@ -51465,7 +51465,7 @@ namespace
  * Removes one matching menu from owner list lane `+0x34`, clears node value,
  * clears menu owner backlink (`+0x0C`), and nulls submenu parent lane `+0x2C`.
  */
-[[maybe_unused]] void* wxMenuDetachAndClearOwnerRuntime(
+void* wxMenuDetachAndClearOwnerRuntime(
   void* const menuOwnerRuntime,
   WxMenuAttachOwnerRuntimeView* const menuRuntime
 ) noexcept
@@ -51495,7 +51495,7 @@ namespace
  * What it does:
  * Finds one list node by UTF-16 key and deletes the matched node when found.
  */
-[[maybe_unused]] bool wxDeleteListNodeByWideKey(
+bool wxDeleteListNodeByWideKey(
   WxListInsertRuntimeView* const listOwner,
   const wchar_t* const key
 ) noexcept
@@ -51521,7 +51521,7 @@ namespace
  * Secondary thunk lane that forwards one node teardown request into
  * `FUN_00978950` non-deleting semantics.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterB(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterB(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51535,7 +51535,7 @@ namespace
  * Tertiary thunk lane that forwards one node teardown request into
  * `FUN_00978950` non-deleting semantics.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterE(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterE(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51549,7 +51549,7 @@ namespace
  * Runs one node-base non-deleting teardown lane and conditionally scalar-
  * deletes the node when the low delete flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseWithDeleteFlagRuntimeAdapterA(
+void* wxDestroyNodeBaseWithDeleteFlagRuntimeAdapterA(
   void* const nodeRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -51568,7 +51568,7 @@ namespace
  * Alternate deleting-thunk lane that runs node-base non-deleting teardown
  * before optional scalar deletion when the low delete-flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseWithDeleteFlagRuntimeAdapterB(
+void* wxDestroyNodeBaseWithDeleteFlagRuntimeAdapterB(
   void* const nodeRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -51587,7 +51587,7 @@ namespace
  * Quaternary thunk lane that forwards one node teardown request into
  * `FUN_00978950` non-deleting semantics.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterF(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterF(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51601,7 +51601,7 @@ namespace
  * Additional no-delete thunk lane that forwards node teardown into
  * `FUN_00978950`.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterG(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterG(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51615,7 +51615,7 @@ namespace
  * Additional no-delete thunk lane that forwards node teardown into
  * `FUN_00978950`.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterH(
+void* wxDestroyNodeBaseNoDeleteRuntimeAdapterH(
   void* const nodeRuntime
 ) noexcept
 {
@@ -51635,7 +51635,7 @@ static_assert(offsetof(WxDwordLane138RuntimeView, lane138) == 0x138, "WxDwordLan
  * What it does:
  * Reads one 32-bit lane from runtime offset `+0x138`.
  */
-[[maybe_unused]] std::uint32_t wxReadDwordAtOffset138Runtime(
+std::uint32_t wxReadDwordAtOffset138Runtime(
   const WxDwordLane138RuntimeView* const runtime
 ) noexcept
 {
@@ -51657,7 +51657,7 @@ static_assert(sizeof(WxDwordOffset08RuntimeView) == 0x0C, "WxDwordOffset08Runtim
  * What it does:
  * Stores one 32-bit value into runtime lane `+0x08` and returns that value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset08AndReturnAdapterC(
+std::int32_t wxStoreDwordAtOffset08AndReturnAdapterC(
   WxDwordOffset08RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51672,7 +51672,7 @@ static_assert(sizeof(WxDwordOffset08RuntimeView) == 0x0C, "WxDwordOffset08Runtim
  * What it does:
  * Stores one 32-bit value into runtime lane `+0x08` and returns that value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset08AndReturnAdapterA(
+std::int32_t wxStoreDwordAtOffset08AndReturnAdapterA(
   WxDwordOffset08RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51687,7 +51687,7 @@ static_assert(sizeof(WxDwordOffset08RuntimeView) == 0x0C, "WxDwordOffset08Runtim
  * What it does:
  * Secondary lane that stores one 32-bit value into runtime slot `+0x08`.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset08AndReturnAdapterB(
+std::int32_t wxStoreDwordAtOffset08AndReturnAdapterB(
   WxDwordOffset08RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51711,7 +51711,7 @@ static_assert(sizeof(WxDwordOffset0CRuntimeView) == 0x10, "WxDwordOffset0CRuntim
  * What it does:
  * Stores one 32-bit value into runtime lane `+0x0C` and returns that value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset0CAndReturnRuntime(
+std::int32_t wxStoreDwordAtOffset0CAndReturnRuntime(
   WxDwordOffset0CRuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51736,7 +51736,7 @@ static_assert(sizeof(WxByteFlagsOffset1C1DRuntimeView) == 0x1E, "WxByteFlagsOffs
  * What it does:
  * Reads byte flag lane `+0x1C` from one runtime object.
  */
-[[maybe_unused]] char wxReadByteFlagOffset1CAdapterB(
+char wxReadByteFlagOffset1CAdapterB(
   const WxByteFlagsOffset1C1DRuntimeView* const runtime
 ) noexcept
 {
@@ -51749,7 +51749,7 @@ static_assert(sizeof(WxByteFlagsOffset1C1DRuntimeView) == 0x1E, "WxByteFlagsOffs
  * What it does:
  * Returns byte flag lane `+0x1C` from one runtime object.
  */
-[[maybe_unused]] char wxReadByteFlagOffset1CRuntime(
+char wxReadByteFlagOffset1CRuntime(
   const WxByteFlagsOffset1C1DRuntimeView* const runtime
 ) noexcept
 {
@@ -51762,7 +51762,7 @@ static_assert(sizeof(WxByteFlagsOffset1C1DRuntimeView) == 0x1E, "WxByteFlagsOffs
  * What it does:
  * Returns byte flag lane `+0x1D` from one runtime object.
  */
-[[maybe_unused]] char wxReadByteFlagOffset1DAdapterA(
+char wxReadByteFlagOffset1DAdapterA(
   const WxByteFlagsOffset1C1DRuntimeView* const runtime
 ) noexcept
 {
@@ -51786,7 +51786,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * Seeds one five-dword runtime payload from constructor input lanes and
  * returns the destination pointer.
  */
-[[maybe_unused]] WxFiveDwordRuntimeView* wxInitializeFiveDwordRuntimeLanes(
+WxFiveDwordRuntimeView* wxInitializeFiveDwordRuntimeLanes(
   WxFiveDwordRuntimeView* const runtime,
   const std::int32_t lane10Value,
   const std::int32_t lane00Value,
@@ -51809,7 +51809,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * What it does:
  * Secondary lane that returns byte flag `+0x1D`.
  */
-[[maybe_unused]] char wxReadByteFlagOffset1DAdapterB(
+char wxReadByteFlagOffset1DAdapterB(
   const WxByteFlagsOffset1C1DRuntimeView* const runtime
 ) noexcept
 {
@@ -51823,7 +51823,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * Secondary deleting-thunk lane that removes one module-list node from its
  * owner and runs node deletion semantics.
  */
-[[maybe_unused]] int wxDeleteModuleListNodeAdapterB(
+int wxDeleteModuleListNodeAdapterB(
   wxModuleListNode* const node
 ) noexcept
 {
@@ -51837,7 +51837,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * Tertiary deleting-thunk lane that removes one module-list node from its
  * owner and runs node deletion semantics.
  */
-[[maybe_unused]] int wxDeleteModuleListNodeAdapterC(
+int wxDeleteModuleListNodeAdapterC(
   wxModuleListNode* const node
 ) noexcept
 {
@@ -51850,7 +51850,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * What it does:
  * Additional thunk lane that resolves one list node by zero-based index.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterC(
+wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterC(
   WxListInsertRuntimeView* const listRuntime,
   const std::int32_t index
 ) noexcept
@@ -51864,7 +51864,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * What it does:
  * Additional thunk lane that resolves one list node by zero-based index.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterD(
+wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterD(
   WxListInsertRuntimeView* const listRuntime,
   const std::int32_t index
 ) noexcept
@@ -51879,7 +51879,7 @@ static_assert(sizeof(WxFiveDwordRuntimeView) == 0x14, "WxFiveDwordRuntimeView si
  * Thunk lane that forwards one in-place lowercase request into
  * `FUN_00960F20`.
  */
-[[maybe_unused]] wxStringRuntime* wxStringLowerInPlaceAdapter(
+wxStringRuntime* wxStringLowerInPlaceAdapter(
   wxStringRuntime* const value
 )
 {
@@ -51900,7 +51900,7 @@ static_assert(sizeof(WxDwordOffset28RuntimeView) == 0x2C, "WxDwordOffset28Runtim
  * What it does:
  * Stores one 32-bit value into runtime lane `+0x28` and returns that value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset28AndReturnRuntime(
+std::int32_t wxStoreDwordAtOffset28AndReturnRuntime(
   WxDwordOffset28RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51916,7 +51916,7 @@ static_assert(sizeof(WxDwordOffset28RuntimeView) == 0x2C, "WxDwordOffset28Runtim
  * Secondary lane storing one 32-bit value at offset `+0x28` and returning the
  * stored value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset28AndReturnRuntimeAdapterB(
+std::int32_t wxStoreDwordAtOffset28AndReturnRuntimeAdapterB(
   WxDwordOffset28RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51937,7 +51937,7 @@ static_assert(offsetof(WxDwordOffset24RuntimeViewB, lane24) == 0x24, "WxDwordOff
  * What it does:
  * Stores one 32-bit value at offset `+0x24` and returns the stored value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset24AndReturnRuntimeAdapterD(
+std::int32_t wxStoreDwordAtOffset24AndReturnRuntimeAdapterD(
   WxDwordOffset24RuntimeViewB* const runtime,
   const std::int32_t value
 ) noexcept
@@ -51963,7 +51963,7 @@ static_assert(sizeof(WxByteFlagAndPointerOffset130RuntimeView) == 0x138, "WxByte
  * What it does:
  * Sets byte flag lane `+0x130` and clears pointer lane `+0x134`.
  */
-[[maybe_unused]] void wxSetFlag130AndClearPointer134Runtime(
+void wxSetFlag130AndClearPointer134Runtime(
   WxByteFlagAndPointerOffset130RuntimeView* const runtime
 ) noexcept
 {
@@ -51987,7 +51987,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Seeds one range payload with default `min=0` and `max=100`.
  */
-[[maybe_unused]] void wxInitializeRangeDefaults0To100Runtime(
+void wxInitializeRangeDefaults0To100Runtime(
   WxDwordRangeOffset130RuntimeView* const runtime
 ) noexcept
 {
@@ -52001,7 +52001,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Resets one dword-array size lane to zero.
  */
-[[maybe_unused]] void wxResetDwordArraySizeAdapterA(
+void wxResetDwordArraySizeAdapterA(
   WxDwordArrayRuntimeView* const array
 ) noexcept
 {
@@ -52014,7 +52014,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Returns whether one dword-array lane is empty.
  */
-[[maybe_unused]] BOOL wxIsDwordArrayEmptyRuntime(
+BOOL wxIsDwordArrayEmptyRuntime(
   const WxDwordArrayRuntimeView* const array
 ) noexcept
 {
@@ -52027,7 +52027,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Initializes one pointer-array lane (`count=0`, `capacity=0`, `items=null`).
  */
-[[maybe_unused]] wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterA(
+wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterA(
   wxArrayPtrVoid* const array
 ) noexcept
 {
@@ -52044,7 +52044,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Secondary lane that initializes one pointer-array payload to empty.
  */
-[[maybe_unused]] wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterB(
+wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterB(
   wxArrayPtrVoid* const array
 ) noexcept
 {
@@ -52057,7 +52057,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Reads one indexed dword from the array payload lane.
  */
-[[maybe_unused]] std::int32_t wxReadDwordArrayValueByIndexRuntime(
+std::int32_t wxReadDwordArrayValueByIndexRuntime(
   const WxDwordArrayRuntimeView* const array,
   const std::uint32_t index
 ) noexcept
@@ -52072,7 +52072,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * Constructs one pointer-array lane by resetting count/capacity/items to the
  * canonical empty state.
  */
-[[maybe_unused]] wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterC(
+wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterC(
   wxArrayPtrVoid* const array
 ) noexcept
 {
@@ -52087,7 +52087,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * Alternate constructor adapter that initializes one pointer-array lane to
  * empty.
  */
-[[maybe_unused]] wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterD(
+wxArrayPtrVoid* wxArrayPtrVoidInitializeEmptyAdapterD(
   wxArrayPtrVoid* const array
 ) noexcept
 {
@@ -52100,7 +52100,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * What it does:
  * Initializes one integer-array lane (`count=0`, `capacity=0`, `items=null`).
  */
-[[maybe_unused]] wxArrayInt* wxArrayIntInitializeEmptyAdapterA(
+wxArrayInt* wxArrayIntInitializeEmptyAdapterA(
   wxArrayInt* const array
 ) noexcept
 {
@@ -52115,7 +52115,7 @@ static_assert(sizeof(WxDwordRangeOffset130RuntimeView) == 0x138, "WxDwordRangeOf
  * Appends `copyCount` copies of one `wxPaintDCInfo*` lane into one pointer
  * array, growing storage first when needed.
  */
-[[maybe_unused]] void wxArrayDcInfoAppendCopies(
+void wxArrayDcInfoAppendCopies(
   wxArrayDCInfo* const array,
   wxPaintDCInfo* const value,
   std::int32_t copyCount
@@ -52168,7 +52168,7 @@ static_assert(sizeof(WxDwordTripleRuntimeView) == 0x0C, "WxDwordTripleRuntimeVie
  * Builds one dword triple from source lanes `+0x108` and `+0xFC` and marks
  * the third lane as active.
  */
-[[maybe_unused]] WxDwordTripleRuntimeView* wxBuildDwordTripleFromOffset108AndFCRuntime(
+WxDwordTripleRuntimeView* wxBuildDwordTripleFromOffset108AndFCRuntime(
   WxDwordTripleRuntimeView* const destination,
   const WxDwordOffset108RuntimeView* const source108,
   const WxDwordOffsetFCRuntimeView* const sourceFC
@@ -52187,7 +52187,7 @@ static_assert(sizeof(WxDwordTripleRuntimeView) == 0x0C, "WxDwordTripleRuntimeVie
  * Finds one dword value index in forward or reverse direction and returns
  * `-1` when not found.
  */
-[[maybe_unused]] int wxFindDwordValueIndexRuntime(
+int wxFindDwordValueIndexRuntime(
   const WxDwordArrayRuntimeView* const array,
   const std::int32_t value,
   const bool searchFromBack
@@ -52234,7 +52234,7 @@ static_assert(sizeof(WxDwordTripleRuntimeView) == 0x0C, "WxDwordTripleRuntimeVie
  * Thunk lane that clears one wx-string payload by forwarding to
  * `FUN_009610B0` with `newLength=0`.
  */
-[[maybe_unused]] wxStringRuntime* wxStringEmptyAdapterA(
+wxStringRuntime* wxStringEmptyAdapterA(
   wxStringRuntime* const value
 )
 {
@@ -52248,7 +52248,7 @@ static_assert(sizeof(WxDwordTripleRuntimeView) == 0x0C, "WxDwordTripleRuntimeVie
  * Secondary thunk lane that clears one wx-string payload via
  * `FUN_009610B0`.
  */
-[[maybe_unused]] wxStringRuntime* wxStringEmptyAdapterB(
+wxStringRuntime* wxStringEmptyAdapterB(
   wxStringRuntime* const value
 )
 {
@@ -52262,7 +52262,7 @@ static_assert(sizeof(WxDwordTripleRuntimeView) == 0x0C, "WxDwordTripleRuntimeVie
  * Stores either `strdup(sourceText)` or null in `storage`, depending on
  * whether the source lane is null.
  */
-[[maybe_unused]] char** wxAssignDuplicatedAnsiString(
+char** wxAssignDuplicatedAnsiString(
   char** const storage,
   const char* const sourceText
 )
@@ -52282,7 +52282,7 @@ static_assert(sizeof(WxDwordTripleRuntimeView) == 0x0C, "WxDwordTripleRuntimeVie
  * Allocates one UTF-16 buffer with `characterCount` payload slots plus one
  * null terminator, stores it in `storage`, and writes the terminal `L'\\0'`.
  */
-[[maybe_unused]] wchar_t** wxAllocateWideBufferWithTerminator(
+wchar_t** wxAllocateWideBufferWithTerminator(
   wchar_t** const storage,
   const std::int32_t characterCount
 )
@@ -52307,7 +52307,7 @@ static_assert(sizeof(WxSingleDwordStorageRuntimeView) == 0x04, "WxSingleDwordSto
  * What it does:
  * Moves out one 32-bit lane by returning the current value and clearing it.
  */
-[[maybe_unused]] std::int32_t wxMoveOutSingleDwordAndClearRuntime(
+std::int32_t wxMoveOutSingleDwordAndClearRuntime(
   WxSingleDwordStorageRuntimeView* const storage
 ) noexcept
 {
@@ -52323,7 +52323,7 @@ static_assert(sizeof(WxSingleDwordStorageRuntimeView) == 0x04, "WxSingleDwordSto
  * Moves one 32-bit lane from source storage into destination and clears the
  * source lane.
  */
-[[maybe_unused]] WxSingleDwordStorageRuntimeView* wxMoveSingleDwordFromSourceRuntime(
+WxSingleDwordStorageRuntimeView* wxMoveSingleDwordFromSourceRuntime(
   WxSingleDwordStorageRuntimeView* const destination,
   WxSingleDwordStorageRuntimeView* const source
 ) noexcept
@@ -52349,7 +52349,7 @@ static_assert(sizeof(WxWordAddressBaseOffset08RuntimeView) == 0x0C, "WxWordAddre
  * What it does:
  * Returns the byte address for one 16-bit lane index from base slot `+0x08`.
  */
-[[maybe_unused]] std::int32_t wxComputeWordAddressAtIndexAdapterA(
+std::int32_t wxComputeWordAddressAtIndexAdapterA(
   const WxWordAddressBaseOffset08RuntimeView* const runtime,
   const std::int32_t index
 ) noexcept
@@ -52363,7 +52363,7 @@ static_assert(sizeof(WxWordAddressBaseOffset08RuntimeView) == 0x0C, "WxWordAddre
  * What it does:
  * Secondary lane that resets one array size field at offset `+0x04`.
  */
-[[maybe_unused]] void wxResetDwordArraySizeAdapterB(
+void wxResetDwordArraySizeAdapterB(
   WxDwordArrayRuntimeView* const array
 ) noexcept
 {
@@ -52377,7 +52377,7 @@ static_assert(sizeof(WxWordAddressBaseOffset08RuntimeView) == 0x0C, "WxWordAddre
  * Thunk lane that resets one dword-array header to empty via
  * `FUN_009A7D10`.
  */
-[[maybe_unused]] void* WxArrayHeaderInitializeEmptyAdapter(
+void* WxArrayHeaderInitializeEmptyAdapter(
   void* const arrayRuntime
 ) noexcept
 {
@@ -52391,7 +52391,7 @@ static_assert(sizeof(WxWordAddressBaseOffset08RuntimeView) == 0x0C, "WxWordAddre
  * What it does:
  * Secondary lane that returns the byte address of one 16-bit indexed element.
  */
-[[maybe_unused]] std::int32_t wxComputeWordAddressAtIndexAdapterB(
+std::int32_t wxComputeWordAddressAtIndexAdapterB(
   const WxWordAddressBaseOffset08RuntimeView* const runtime,
   const std::int32_t index
 ) noexcept
@@ -52406,7 +52406,7 @@ static_assert(sizeof(WxWordAddressBaseOffset08RuntimeView) == 0x0C, "WxWordAddre
  * Ensures one word-array lane has append capacity, then writes `repeatCount`
  * copies of `value` at the current tail.
  */
-[[maybe_unused]] void WxWordArrayAppendCopiesCoreRuntime(
+void WxWordArrayAppendCopiesCoreRuntime(
   WxWordArrayRuntimeView* const array,
   const std::int16_t value,
   std::int32_t repeatCount
@@ -52430,7 +52430,7 @@ static_assert(sizeof(WxWordAddressBaseOffset08RuntimeView) == 0x0C, "WxWordAddre
  * Appends `repeatCount` copies of one UTF-16 value into one word-array lane,
  * growing storage first when needed.
  */
-[[maybe_unused]] void WxWordArrayAppendCopiesAdapter(
+void WxWordArrayAppendCopiesAdapter(
   WxWordArrayRuntimeView* const array,
   const std::int16_t value,
   std::int32_t repeatCount
@@ -52453,7 +52453,7 @@ static_assert(sizeof(WxByteFlagOffset34RuntimeView) == 0x35, "WxByteFlagOffset34
  * What it does:
  * Returns one byte flag stored at runtime offset `+0x34`.
  */
-[[maybe_unused]] char wxReadByteFlagOffset34Runtime(
+char wxReadByteFlagOffset34Runtime(
   const WxByteFlagOffset34RuntimeView* const runtime
 ) noexcept
 {
@@ -52478,7 +52478,7 @@ static_assert(sizeof(WxDwordLanes20To28RuntimeView) == 0x2C, "WxDwordLanes20To28
  * What it does:
  * Reads one 32-bit lane at offset `+0x24`.
  */
-[[maybe_unused]] std::int32_t wxReadDwordOffset24Runtime(
+std::int32_t wxReadDwordOffset24Runtime(
   const WxDwordLanes20To28RuntimeView* const runtime
 ) noexcept
 {
@@ -52498,7 +52498,7 @@ static_assert(sizeof(WxDwordPairRuntimeCopyView) == 0x08, "WxDwordPairRuntimeCop
  * What it does:
  * Copies dword lanes `+0x20` and `+0x24` into one output pair.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxCopyDwordOffsets20And24ToPairRuntime(
+WxDwordPairRuntimeCopyView* wxCopyDwordOffsets20And24ToPairRuntime(
   const WxDwordLanes20To28RuntimeView* const runtime,
   WxDwordPairRuntimeCopyView* const outPair
 ) noexcept
@@ -52514,7 +52514,7 @@ static_assert(sizeof(WxDwordPairRuntimeCopyView) == 0x08, "WxDwordPairRuntimeCop
  * What it does:
  * Reads one 32-bit lane at offset `+0x28`.
  */
-[[maybe_unused]] std::int32_t wxReadDwordOffset28Runtime(
+std::int32_t wxReadDwordOffset28Runtime(
   const WxDwordLanes20To28RuntimeView* const runtime
 ) noexcept
 {
@@ -52535,7 +52535,7 @@ static_assert(sizeof(WxDwordOffset04RuntimeView) == 0x08, "WxDwordOffset04Runtim
  * What it does:
  * Compares two runtime objects by their dword lane at offset `+0x04`.
  */
-[[maybe_unused]] bool wxIsDwordOffset04EqualRuntime(
+bool wxIsDwordOffset04EqualRuntime(
   const WxDwordOffset04RuntimeView* const left,
   const WxDwordOffset04RuntimeView* const right
 ) noexcept
@@ -52557,7 +52557,7 @@ static_assert(sizeof(WxDwordOffset30RuntimeView) == 0x34, "WxDwordOffset30Runtim
  * What it does:
  * Stores one 32-bit lane at offset `+0x30` and returns the stored value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordOffset30AndReturnRuntime(
+std::int32_t wxStoreDwordOffset30AndReturnRuntime(
   WxDwordOffset30RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -52598,7 +52598,7 @@ static_assert(sizeof(WxStringRefArrayRuntimeView) == 0x0C, "WxStringRefArrayRunt
  * Iterates one string-array payload and forwards each entry reference into the
  * item-container append virtual lane (`slot +0x24`).
  */
-[[maybe_unused]] void wxItemContainerAppendStringArrayRefsRuntime(
+void wxItemContainerAppendStringArrayRefsRuntime(
   void* const itemContainerRuntime,
   const WxStringRefArrayRuntimeView* const sourceArray
 )
@@ -52626,7 +52626,7 @@ static_assert(sizeof(WxStringStorageRuntimeView) == 0x04, "WxStringStorageRuntim
  * Returns the end pointer for one shared wide-string lane using the length
  * header at `text - 8`.
  */
-[[maybe_unused]] wchar_t* wxGetSharedWideStringEndPointerRuntime(
+wchar_t* wxGetSharedWideStringEndPointerRuntime(
   const WxStringStorageRuntimeView* const stringStorage
 ) noexcept
 {
@@ -52649,7 +52649,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Stores one 32-bit lane at offset `+0x174` and returns the input value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordOffset174AndReturnRuntime(
+std::int32_t wxStoreDwordOffset174AndReturnRuntime(
   WxDwordOffset174RuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -52664,7 +52664,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Reads one 32-bit lane from runtime offset `+0x174`.
  */
-[[maybe_unused]] std::int32_t wxReadDwordOffset174Runtime(
+std::int32_t wxReadDwordOffset174Runtime(
   const WxDwordOffset174RuntimeView* const runtime
 ) noexcept
 {
@@ -52677,7 +52677,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Initializes one dword pair from two input lanes.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterA(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterA(
   WxDwordPairRuntimeCopyView* const pair,
   const std::int32_t lane00Value,
   const std::int32_t lane04Value
@@ -52694,7 +52694,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Seeds one dword pair with sentinel `(-1, -1)`.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairWithMinusOneSentinelsRuntime(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairWithMinusOneSentinelsRuntime(
   WxDwordPairRuntimeCopyView* const pair
 ) noexcept
 {
@@ -52709,7 +52709,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Clears one dword pair, then copies source pair lanes into destination.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxAssignDwordPairWithClearFirstRuntime(
+WxDwordPairRuntimeCopyView* wxAssignDwordPairWithClearFirstRuntime(
   WxDwordPairRuntimeCopyView* const destination,
   const WxDwordPairRuntimeCopyView* const source
 ) noexcept
@@ -52727,7 +52727,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Copies one dword pair into caller-provided output storage.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxCopyDwordPairToOutputAdapterA(
+WxDwordPairRuntimeCopyView* wxCopyDwordPairToOutputAdapterA(
   const WxDwordPairRuntimeCopyView* const source,
   WxDwordPairRuntimeCopyView* const outPair
 ) noexcept
@@ -52743,7 +52743,7 @@ static_assert(sizeof(WxDwordOffset174RuntimeView) == 0x178, "WxDwordOffset174Run
  * What it does:
  * Secondary lane that copies one dword pair into output storage.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxCopyDwordPairToOutputAdapterB(
+WxDwordPairRuntimeCopyView* wxCopyDwordPairToOutputAdapterB(
   const WxDwordPairRuntimeCopyView* const source,
   WxDwordPairRuntimeCopyView* const outPair
 ) noexcept
@@ -52766,7 +52766,7 @@ static_assert(sizeof(WxDwordQuadRuntimeView) == 0x10, "WxDwordQuadRuntimeView si
  * What it does:
  * Initializes one dword-quad payload from four input lanes.
  */
-[[maybe_unused]] WxDwordQuadRuntimeView* wxInitializeDwordQuadRuntime(
+WxDwordQuadRuntimeView* wxInitializeDwordQuadRuntime(
   WxDwordQuadRuntimeView* const runtime,
   const std::int32_t lane00Value,
   const std::int32_t lane04Value,
@@ -52787,7 +52787,7 @@ static_assert(sizeof(WxDwordQuadRuntimeView) == 0x10, "WxDwordQuadRuntimeView si
  * What it does:
  * Reads one dword-array entry by index.
  */
-[[maybe_unused]] std::int32_t wxReadDwordArrayValueByIndexAdapterA(
+std::int32_t wxReadDwordArrayValueByIndexAdapterA(
   const WxDwordArrayRuntimeView* const array,
   const std::uint32_t index
 ) noexcept
@@ -52801,7 +52801,7 @@ static_assert(sizeof(WxDwordQuadRuntimeView) == 0x10, "WxDwordQuadRuntimeView si
  * What it does:
  * Tertiary lane that copies one dword pair into output storage.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxCopyDwordPairToOutputAdapterC(
+WxDwordPairRuntimeCopyView* wxCopyDwordPairToOutputAdapterC(
   const WxDwordPairRuntimeCopyView* const source,
   WxDwordPairRuntimeCopyView* const outPair
 ) noexcept
@@ -52816,7 +52816,7 @@ static_assert(sizeof(WxDwordQuadRuntimeView) == 0x10, "WxDwordQuadRuntimeView si
  * Returns whether one `(lane00,lane04)` pair is inside the closed
  * lexicographic range delimited by `rangeStart` and `rangeEnd`.
  */
-[[maybe_unused]] BOOL wxIsDwordPairInClosedLexicographicRangeRuntime(
+BOOL wxIsDwordPairInClosedLexicographicRangeRuntime(
   const WxDwordPairRuntimeCopyView* const value,
   const WxDwordPairRuntimeCopyView* const rangeStart,
   const WxDwordPairRuntimeCopyView* const rangeEnd
@@ -52863,7 +52863,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * Computes one union rectangle from two `{x,y,width,height}` payloads and
  * writes the merged bounds into caller-provided output storage.
  */
-[[maybe_unused]] WxRectDeltaRuntimeView* wxComputeRectUnionRuntime(
+WxRectDeltaRuntimeView* wxComputeRectUnionRuntime(
   const WxRectDeltaRuntimeView* const firstRect,
   WxRectDeltaRuntimeView* const outRect,
   const WxRectDeltaRuntimeView* const secondRect
@@ -52898,7 +52898,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * Applies one `(dx, dy)` inset delta to `{x,y,width,height}` and clamps all
  * four lanes to non-negative values.
  */
-[[maybe_unused]] WxRectDeltaRuntimeView* wxInsetRectByDeltaClampNonNegativeRuntime(
+WxRectDeltaRuntimeView* wxInsetRectByDeltaClampNonNegativeRuntime(
   WxRectDeltaRuntimeView* const rect,
   const std::int32_t dx,
   const std::int32_t dy
@@ -52934,7 +52934,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * What it does:
  * Secondary lane that initializes one dword pair from two input values.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterB(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterB(
   WxDwordPairRuntimeCopyView* const pair,
   const std::int32_t lane00Value,
   const std::int32_t lane04Value
@@ -52949,7 +52949,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * What it does:
  * Tertiary lane that initializes one dword pair from two input values.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterC(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterC(
   WxDwordPairRuntimeCopyView* const pair,
   const std::int32_t lane00Value,
   const std::int32_t lane04Value
@@ -52964,7 +52964,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * What it does:
  * Clears one runtime dword pair to `{0, 0}` and returns the pair.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairWithZeroRuntimeAdapterD(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairWithZeroRuntimeAdapterD(
   WxDwordPairRuntimeCopyView* const pair
 ) noexcept
 {
@@ -52979,7 +52979,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * What it does:
  * Quaternary lane initializing one dword pair from two input values.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterD(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterD(
   WxDwordPairRuntimeCopyView* const pair,
   const std::int32_t lane00Value,
   const std::int32_t lane04Value
@@ -52994,7 +52994,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * What it does:
  * Secondary lane clearing one runtime dword pair to `{0, 0}`.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairWithZeroRuntimeAdapterE(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairWithZeroRuntimeAdapterE(
   WxDwordPairRuntimeCopyView* const pair
 ) noexcept
 {
@@ -53007,7 +53007,7 @@ static_assert(sizeof(WxRectDeltaRuntimeView) == 0x10, "WxRectDeltaRuntimeView si
  * What it does:
  * Quinary lane initializing one dword pair from two input values.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterE(
+WxDwordPairRuntimeCopyView* wxInitializeDwordPairRuntimeAdapterE(
   WxDwordPairRuntimeCopyView* const pair,
   const std::int32_t lane00Value,
   const std::int32_t lane04Value
@@ -53029,7 +53029,7 @@ static_assert(sizeof(WxZeroAndPointerPairRuntimeView) == 0x8, "WxZeroAndPointerP
  * What it does:
  * Writes `{0, ownerRuntime}` into caller-provided pair storage.
  */
-[[maybe_unused]] WxZeroAndPointerPairRuntimeView* wxWriteZeroAndOwnerPointerPairRuntime(
+WxZeroAndPointerPairRuntimeView* wxWriteZeroAndOwnerPointerPairRuntime(
   void* const ownerRuntime,
   WxZeroAndPointerPairRuntimeView* const outPair
 ) noexcept
@@ -53045,7 +53045,7 @@ static_assert(sizeof(WxZeroAndPointerPairRuntimeView) == 0x8, "WxZeroAndPointerP
  * What it does:
  * Secondary lane that writes `{0, ownerRuntime}` into output pair storage.
  */
-[[maybe_unused]] WxZeroAndPointerPairRuntimeView* wxWriteZeroAndOwnerPointerPairRuntimeAdapterB(
+WxZeroAndPointerPairRuntimeView* wxWriteZeroAndOwnerPointerPairRuntimeAdapterB(
   void* const ownerRuntime,
   WxZeroAndPointerPairRuntimeView* const outPair
 ) noexcept
@@ -53059,7 +53059,7 @@ static_assert(sizeof(WxZeroAndPointerPairRuntimeView) == 0x8, "WxZeroAndPointerP
  * What it does:
  * Secondary lane that reads one dword-array entry by index.
  */
-[[maybe_unused]] std::int32_t wxReadDwordArrayValueByIndexAdapterB(
+std::int32_t wxReadDwordArrayValueByIndexAdapterB(
   const WxDwordArrayRuntimeView* const array,
   const std::uint32_t index
 ) noexcept
@@ -53073,7 +53073,7 @@ static_assert(sizeof(WxZeroAndPointerPairRuntimeView) == 0x8, "WxZeroAndPointerP
  * What it does:
  * Tertiary lane that reads one dword-array entry by index.
  */
-[[maybe_unused]] std::int32_t wxReadDwordArrayValueByIndexAdapterC(
+std::int32_t wxReadDwordArrayValueByIndexAdapterC(
   const WxDwordArrayRuntimeView* const array,
   const std::uint32_t index
 ) noexcept
@@ -53095,7 +53095,7 @@ static_assert(sizeof(WxByteFlagOffset10RuntimeView) == 0x11, "WxByteFlagOffset10
  * What it does:
  * Returns one byte flag from runtime offset `+0x10`.
  */
-[[maybe_unused]] char wxReadByteFlagOffset10Runtime(
+char wxReadByteFlagOffset10Runtime(
   const WxByteFlagOffset10RuntimeView* const runtime
 ) noexcept
 {
@@ -53115,7 +53115,7 @@ static_assert(offsetof(WxOffset68RuntimeView, anchor68) == 0x68, "WxOffset68Runt
  * What it does:
  * Returns runtime subobject address at offset `+0x68`.
  */
-[[maybe_unused]] char* wxGetSubobjectAddressOffset68Runtime(
+char* wxGetSubobjectAddressOffset68Runtime(
   WxOffset68RuntimeView* const runtime
 ) noexcept
 {
@@ -53136,7 +53136,7 @@ static_assert(sizeof(WxDwordOffset14CRuntimeView) == 0x150, "WxDwordOffset14CRun
  * What it does:
  * Stores one dword lane at offset `+0x14C` and returns the stored value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordOffset14CAndReturnRuntime(
+std::int32_t wxStoreDwordOffset14CAndReturnRuntime(
   WxDwordOffset14CRuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -53159,7 +53159,7 @@ static_assert(sizeof(WxByteFlagOffset09RuntimeView) == 0x0A, "WxByteFlagOffset09
  * What it does:
  * Stores one byte lane at offset `+0x09` and returns the stored byte value.
  */
-[[maybe_unused]] char wxStoreByteOffset09AndReturnRuntime(
+char wxStoreByteOffset09AndReturnRuntime(
   WxByteFlagOffset09RuntimeView* const runtime,
   const char value
 ) noexcept
@@ -53182,7 +53182,7 @@ static_assert(sizeof(WxByteFlagOffset28RuntimeView) == 0x29, "WxByteFlagOffset28
  * What it does:
  * Returns one byte flag lane from offset `+0x28`.
  */
-[[maybe_unused]] char wxReadByteFlagOffset28Runtime(
+char wxReadByteFlagOffset28Runtime(
   const WxByteFlagOffset28RuntimeView* const runtime
 ) noexcept
 {
@@ -53195,7 +53195,7 @@ static_assert(sizeof(WxByteFlagOffset28RuntimeView) == 0x29, "WxByteFlagOffset28
  * What it does:
  * Clears one dword pair payload to `{0, 0}`.
  */
-[[maybe_unused]] WxDwordPairRuntimeCopyView* wxClearDwordPairRuntime(
+WxDwordPairRuntimeCopyView* wxClearDwordPairRuntime(
   WxDwordPairRuntimeCopyView* const pair
 ) noexcept
 {
@@ -53218,7 +53218,7 @@ static_assert(sizeof(WxDwordOffset7CRuntimeView) == 0x80, "WxDwordOffset7CRuntim
  * What it does:
  * Reads one 32-bit lane from runtime offset `+0x7C`.
  */
-[[maybe_unused]] std::int32_t wxReadDwordOffset7CRuntime(
+std::int32_t wxReadDwordOffset7CRuntime(
   const WxDwordOffset7CRuntimeView* const runtime
 ) noexcept
 {
@@ -53252,7 +53252,7 @@ static_assert(offsetof(WxOffsetB8RuntimeView, anchorB8) == 0xB8, "WxOffsetB8Runt
  * What it does:
  * Returns runtime subobject address at offset `+0x90`.
  */
-[[maybe_unused]] char* wxGetSubobjectAddressOffset90Runtime(
+char* wxGetSubobjectAddressOffset90Runtime(
   WxOffset90RuntimeView* const runtime
 ) noexcept
 {
@@ -53265,7 +53265,7 @@ static_assert(offsetof(WxOffsetB8RuntimeView, anchorB8) == 0xB8, "WxOffsetB8Runt
  * What it does:
  * Returns runtime subobject address at offset `+0xB8`.
  */
-[[maybe_unused]] char* wxGetSubobjectAddressOffsetB8Runtime(
+char* wxGetSubobjectAddressOffsetB8Runtime(
   WxOffsetB8RuntimeView* const runtime
 ) noexcept
 {
@@ -53278,7 +53278,7 @@ static_assert(offsetof(WxOffsetB8RuntimeView, anchorB8) == 0xB8, "WxOffsetB8Runt
  * What it does:
  * Returns runtime subobject address at offset `+0xA8`.
  */
-[[maybe_unused]] char* wxGetSubobjectAddressOffsetA8Runtime(
+char* wxGetSubobjectAddressOffsetA8Runtime(
   WxOffsetA8RuntimeView* const runtime
 ) noexcept
 {
@@ -53291,7 +53291,7 @@ static_assert(offsetof(WxOffsetB8RuntimeView, anchorB8) == 0xB8, "WxOffsetB8Runt
  * What it does:
  * Stores one 32-bit lane at offset `+0x0C` and returns the input value.
  */
-[[maybe_unused]] std::int32_t wxStoreDwordAtOffset0CAdapterB(
+std::int32_t wxStoreDwordAtOffset0CAdapterB(
   WxDwordOffset0CRuntimeView* const runtime,
   const std::int32_t value
 ) noexcept
@@ -53348,7 +53348,7 @@ namespace
  * What it does:
  * Implements deleting-dtor thunk semantics for one `wxDCBase` object lane.
  */
-[[maybe_unused]] wxDCBase* wxDeleteDCBaseWithFlagRuntime(
+wxDCBase* wxDeleteDCBaseWithFlagRuntime(
   wxDCBase* const dcBaseRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -53375,7 +53375,7 @@ namespace
  * What it does:
  * Implements deleting-dtor thunk semantics for one `wxDC` object lane.
  */
-[[maybe_unused]] wxDC* wxDeleteDCWithFlagRuntime(
+wxDC* wxDeleteDCWithFlagRuntime(
   wxDC* const dcRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -53527,7 +53527,7 @@ namespace
  * Runs one deleting `wxDCTemp` destruction lane by clearing owned/native-DC
  * state, tail-calling `wxDC` teardown, and scalar-deleting when requested.
  */
-[[maybe_unused]] wxDC* wxDestroyDCTempRuntime(
+wxDC* wxDestroyDCTempRuntime(
   wxDC* const dcRuntime,
   const char deleteFlags
 ) noexcept
@@ -53702,7 +53702,7 @@ std::int32_t wxStringRuntime::FindCharacterIndex(
  * token (`[+-]?[0-9]+` or empty after sign handling), matching the original
  * wide-digit classification path.
  */
-[[maybe_unused]] bool wxStringIsSignedDecimalToken(
+bool wxStringIsSignedDecimalToken(
   const wchar_t** const textStorage
 ) noexcept
 {
@@ -53746,7 +53746,7 @@ std::int32_t wxStringRuntime::FindCharacterIndex(
  * `[begin,end)`, mirroring the original `WxStringRuntimeOps::InitWith(begin,0,len)`
  * wrapper lane.
  */
-[[maybe_unused]] wxStringRuntime* wxStringAssignFromWidePointerRange(
+wxStringRuntime* wxStringAssignFromWidePointerRange(
   wxStringRuntime* const outValue,
   const wchar_t* const begin,
   const wchar_t* const end
@@ -53779,7 +53779,7 @@ std::int32_t wxStringRuntime::FindCharacterIndex(
  * Initializes one `wxString` lane to the shared process-global empty-string
  * storage.
  */
-[[maybe_unused]] wxStringRuntime* wxStringInitializeFromGlobalEmpty(
+wxStringRuntime* wxStringInitializeFromGlobalEmpty(
   wxStringRuntime* const outValue
 )
 {
@@ -54004,7 +54004,7 @@ wxStringRuntime* wxStringRuntime::TrimInPlace(
  * Shares one source wx-string lane into `outValue` with refcount bumping
  * semantics, then applies optional left/right trim passes from `trimFlags`.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedWxStringAndTrimRuntime(
+wxStringRuntime* wxCopySharedWxStringAndTrimRuntime(
   const wxStringRuntime* const source,
   wxStringRuntime* const outValue,
   const std::uint8_t trimFlags
@@ -54148,7 +54148,7 @@ namespace
    * Compares one parsed accelerator token against `expectedModifier` directly,
    * then against the locale-translated token when locale runtime is present.
    */
-  [[maybe_unused]] bool WxAccelTokenEqualsLocalizedModifier(
+  bool WxAccelTokenEqualsLocalizedModifier(
     const wchar_t** const parsedToken,
     const wchar_t* const expectedModifier
   )
@@ -54182,7 +54182,7 @@ wxStringRuntime wxStringRuntime::Borrow(
  * Releases one cached native-font GDI handle lane (`+0x24`) and clears the
  * lane after `DeleteObject` succeeds.
  */
-[[maybe_unused]] int wxFontReleaseNativeHandleLaneRuntime(
+int wxFontReleaseNativeHandleLaneRuntime(
   void* const fontRuntime
 ) noexcept
 {
@@ -54225,7 +54225,7 @@ wxNativeFontInfoRuntime::wxNativeFontInfoRuntime()
  * Copies the UTF-16 face-name lane from one native-font info storage block
  * (`+0x1C`, i.e. `+14` wide chars) into `outFaceName`.
  */
-[[maybe_unused]] wxStringRuntime* wxCopyNativeFontInfoFaceNameToString(
+wxStringRuntime* wxCopyNativeFontInfoFaceNameToString(
   const wchar_t* const nativeFontInfoStorage,
   wxStringRuntime* const outFaceName
 )
@@ -54522,7 +54522,7 @@ namespace
  * and writes `"wxDEFAULT"` when the runtime object is invalid or family is
  * outside the known token set.
  */
-[[maybe_unused]] wxStringRuntime* wxFontBaseCopyFamilyTokenRuntime(
+wxStringRuntime* wxFontBaseCopyFamilyTokenRuntime(
   void* const fontRuntime,
   wxStringRuntime* const outFamilyToken
 )
@@ -54576,7 +54576,7 @@ namespace
  * and writes `"wxDEFAULT"` when the runtime object is invalid or style is
  * outside the known token set.
  */
-[[maybe_unused]] wxStringRuntime* wxFontBaseCopyStyleTokenRuntime(
+wxStringRuntime* wxFontBaseCopyStyleTokenRuntime(
   void* const fontRuntime,
   wxStringRuntime* const outStyleToken
 )
@@ -54623,7 +54623,7 @@ namespace
  * and writes `"wxDEFAULT"` when the runtime object is invalid or weight is
  * outside the known token set.
  */
-[[maybe_unused]] wxStringRuntime* wxFontBaseCopyWeightTokenRuntime(
+wxStringRuntime* wxFontBaseCopyWeightTokenRuntime(
   void* const fontRuntime,
   wxStringRuntime* const outWeightToken
 )
@@ -55038,7 +55038,7 @@ void* wxBmpHandlerRuntime::GetClassInfo() const
  * Non-deleting destructor thunk for `wxBMPHandler` that executes the base
  * `wxImageHandler` teardown lane and returns the original object pointer.
  */
-[[maybe_unused]] wxBmpHandlerRuntime* wxBmpHandlerDestroyNonDeletingThunk(
+wxBmpHandlerRuntime* wxBmpHandlerDestroyNonDeletingThunk(
   wxBmpHandlerRuntime* const handler
 ) noexcept
 {
@@ -55124,7 +55124,7 @@ wxCurHandlerRuntime::wxCurHandlerRuntime()
  * Non-deleting destructor thunk for `wxICOHandler` that executes the base
  * `wxImageHandler` teardown lane and returns the original object pointer.
  */
-[[maybe_unused]] wxIcoHandlerRuntime* wxIcoHandlerDestroyNonDeletingThunk(
+wxIcoHandlerRuntime* wxIcoHandlerDestroyNonDeletingThunk(
   wxIcoHandlerRuntime* const handler
 ) noexcept
 {
@@ -55141,7 +55141,7 @@ wxCurHandlerRuntime::wxCurHandlerRuntime()
  * Non-deleting destructor thunk for `wxCURHandler` that executes the base
  * `wxImageHandler` teardown lane and returns the original object pointer.
  */
-[[maybe_unused]] wxCurHandlerRuntime* wxCurHandlerDestroyNonDeletingThunk(
+wxCurHandlerRuntime* wxCurHandlerDestroyNonDeletingThunk(
   wxCurHandlerRuntime* const handler
 ) noexcept
 {
@@ -55173,7 +55173,7 @@ wxAniHandlerRuntime::wxAniHandlerRuntime()
  * handler ref-data when needed, stores the native handle, and captures Win32
  * bitmap geometry lanes (width/height/planes) from `GetObjectW`.
  */
-[[maybe_unused]] BOOL wxLoadBitmapResourceIntoHandlerRuntime(
+BOOL wxLoadBitmapResourceIntoHandlerRuntime(
   WxObjectCopyOnWriteRuntimeView* const handler,
   const wchar_t* const* const resourceName,
   const int /*unusedA3*/,
@@ -55268,7 +55268,7 @@ namespace
  * (direct or through base lanes), then dispatches virtual slot `+0x1C` on
  * `dispatchOwner`; returns false when the class check fails.
  */
-[[maybe_unused]] bool wxDispatchSlot1CIfIconClassRuntime(
+bool wxDispatchSlot1CIfIconClassRuntime(
   WxClassInfoCheckedDispatchSlot1CRuntime* const dispatchOwner,
   WxClassInfoProviderRuntime* const runtimeObject,
   const int arg3,
@@ -55303,7 +55303,7 @@ namespace
    * sharing `name` and `extension` wx-string lanes while preserving the
    * default base-constructor MIME lane.
    */
-  [[maybe_unused]] wxImageHandlerRuntime* wxInitializeImageHandlerDescriptorNoMimeRuntime(
+  wxImageHandlerRuntime* wxInitializeImageHandlerDescriptorNoMimeRuntime(
     wxImageHandlerRuntime* const handler,
     const wxStringRuntime* const name,
     const wxStringRuntime* const extension,
@@ -55476,7 +55476,7 @@ wxImageRuntime::wxImageRuntime(
  * Clears one `wxImage` ref-data lane and, when `cloneObject` is present,
  * shares that ref-data ownership through the canonical `wxObject::Ref` lane.
  */
-[[maybe_unused]] WxObjectRuntimeView* wxConstructImageRuntimeFromCloneObject(
+WxObjectRuntimeView* wxConstructImageRuntimeFromCloneObject(
   WxObjectRuntimeView* const imageObject,
   WxObjectRuntimeView* const cloneObject
 ) noexcept
@@ -55697,7 +55697,7 @@ void wxImageRuntime::SetRgb(
  * Returns the embedded palette runtime lane from image ref-data when the
  * image is valid, otherwise returns a process-wide null-palette lane.
  */
-[[maybe_unused]] void* wxImageGetPaletteRuntimeLaneOrNull(
+void* wxImageGetPaletteRuntimeLaneOrNull(
   const wxImageRuntime* const image
 ) noexcept
 {
@@ -55791,7 +55791,7 @@ namespace
    * Computes the DIB color-table entry count for one bitmap-info header, using
    * `biClrUsed` when present and the `1/4/8`-bpp defaults otherwise.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint16_t ComputeDibColorEntryCount(
+  [[nodiscard]] std::uint16_t ComputeDibColorEntryCount(
     const BITMAPINFO* const dibInfo
   ) noexcept
   {
@@ -55833,7 +55833,7 @@ namespace
    * multiplying the entry count by `RGBTRIPLE` (core header) or `RGBQUAD`
    * (info-v3+ headers).
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ComputeDibColorTableBytes(
+  [[nodiscard]] std::uint32_t ComputeDibColorTableBytes(
     const BITMAPINFO* const dibInfo
   ) noexcept
   {
@@ -55855,7 +55855,7 @@ namespace
    * Writes one buffer payload in `0x8000`-byte chunks and returns the original
    * requested byte count on success, or `0` when a short-write occurs.
    */
-  [[maybe_unused]] [[nodiscard]] unsigned int WriteBitmapPayloadChunked(
+  [[nodiscard]] unsigned int WriteBitmapPayloadChunked(
     const char* buffer,
     const unsigned int bytesToWrite,
     const HFILE fileHandle
@@ -55884,7 +55884,7 @@ namespace
    * Reads one file payload in `0x8000`-byte chunks and returns the original
    * requested byte count on success, or `0` when a short-read occurs.
    */
-  [[maybe_unused]] [[nodiscard]] unsigned int ReadBitmapPayloadChunked(
+  [[nodiscard]] unsigned int ReadBitmapPayloadChunked(
     char* buffer,
     const unsigned int bytesToRead,
     const HFILE fileHandle
@@ -55913,7 +55913,7 @@ namespace
    * Returns one DIB pixel-data lane pointer computed from `biSize` plus the
    * computed color-table byte span.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* ComputeDibPixelDataPointer(
+  [[nodiscard]] std::uint8_t* ComputeDibPixelDataPointer(
     BITMAPINFO* const dibInfo
   ) noexcept
   {
@@ -56002,7 +56002,7 @@ namespace
    * Builds one `HGLOBAL` DIB payload from a source bitmap, including DIB header,
    * color-table lane, and copied pixel bits from `GetDIBits`.
    */
-  [[maybe_unused]] HGLOBAL wxCreateGlobalDibFromBitmap(
+  HGLOBAL wxCreateGlobalDibFromBitmap(
     const HBITMAP bitmapHandle,
     const HPALETTE paletteHandle
   )
@@ -56094,7 +56094,7 @@ namespace
    * system-icon-sized directory entry and optionally returning selected icon
    * dimensions.
    */
-  [[maybe_unused]] HGLOBAL wxLoadIconDibFromFileToGlobalMemory(
+  HGLOBAL wxLoadIconDibFromFileToGlobalMemory(
     const void* const sourceWideText,
     int* const outWidth,
     int* const outHeight
@@ -56170,7 +56170,7 @@ namespace
    * system-cursor-sized directory entry and optionally returning selected
    * width/height and hotspot lanes.
    */
-  [[maybe_unused]] HGLOBAL wxLoadCursorDibFromFileToGlobalMemory(
+  HGLOBAL wxLoadCursorDibFromFileToGlobalMemory(
     const void* const sourceWideText,
     int* const outHotSpotXY,
     int* const outWidth,
@@ -56260,7 +56260,7 @@ namespace
    * Writes one global DIB payload to a BMP file path produced from a wide-text
    * source lane and returns `1` on open/write path success.
    */
-  [[maybe_unused]] int wxWriteGlobalDibToBitmapFile(
+  int wxWriteGlobalDibToBitmapFile(
     const HGLOBAL dibHandle,
     const void* const sourceWideText
   )
@@ -56309,7 +56309,7 @@ namespace
    * bitmap, extracting XOR bits, restoring AND-mask rows in reverse order, and
    * calling `CreateIcon`.
    */
-  [[maybe_unused]] HICON wxCreateIconFromGlobalDibMemory(
+  HICON wxCreateIconFromGlobalDibMemory(
     const HGLOBAL dibHandle,
     const HINSTANCE instanceHandle
   )
@@ -56386,7 +56386,7 @@ namespace
    * XOR plane bytes, restoring AND-mask rows in reverse order, and calling
    * `CreateCursor` with caller-provided hotspot coordinates.
    */
-  [[maybe_unused]] HCURSOR wxCreateCursorFromGlobalDibMemory(
+  HCURSOR wxCreateCursorFromGlobalDibMemory(
     const HGLOBAL dibHandle,
     int* const hotSpotXY,
     const HINSTANCE instanceHandle
@@ -56468,7 +56468,7 @@ namespace
    * optionally returns resolved hotspot lanes, and releases temporary global
    * memory storage.
    */
-  [[maybe_unused]] HCURSOR wxCreateCursorFromCursorFileDib(
+  HCURSOR wxCreateCursorFromCursorFileDib(
     const void* const sourceWideText,
     const HINSTANCE instanceHandle,
     int* const outWidth,
@@ -56507,7 +56507,7 @@ namespace
    * coordinates, builds a Win32 cursor, and releases temporary global-memory
    * storage.
    */
-  [[maybe_unused]] HCURSOR wxCreateCursorFromIconFileDibWithHotSpot(
+  HCURSOR wxCreateCursorFromIconFileDibWithHotSpot(
     const void* const sourceWideText,
     const HINSTANCE instanceHandle,
     const int hotSpotX,
@@ -56663,7 +56663,7 @@ wxColourRuntime* wxRGBToColour(wxColourRuntime* const outColour, const std::uint
  * Reads one pixel from the device-context lane at `+0xFC` and writes it to
  * `outColour` using wx packed-RGB conversion semantics.
  */
-[[maybe_unused]] bool wxReadDeviceContextPixelToColourRuntime(
+bool wxReadDeviceContextPixelToColourRuntime(
   const void* const deviceContextRuntime,
   const int x,
   const int y,
@@ -56702,7 +56702,7 @@ namespace
    * the packed native colour dword (`+0x08`), marks initialized state
    * (`+0x0C`), and returns the red byte.
    */
-  [[maybe_unused]] std::uint8_t wxSetPackedColourRgbLaneRuntime(
+  std::uint8_t wxSetPackedColourRgbLaneRuntime(
     void* const colourRuntime,
     const std::uint8_t red,
     const std::uint8_t green,
@@ -56939,7 +56939,7 @@ void moho::WWinLogTextBuilder::WriteDecodedCodePoint(
  * What it does:
  * Stores one pointer lane into caller output storage.
  */
-[[maybe_unused]] std::uintptr_t* WritePointerLane5AA0(
+std::uintptr_t* WritePointerLane5AA0(
   std::uintptr_t* const outLane,
   const std::uintptr_t value
 ) noexcept
@@ -56973,7 +56973,7 @@ namespace
    * Rebinds one wide-ostream subobject lane to the constructor-unwind
    * `wostream::_Iosb<int>` vtable tag and returns the RTTI-adjustor lane.
    */
-  [[maybe_unused]] std::uintptr_t RebindWideOstreamIosbVtableForCtorUnwind(
+  std::uintptr_t RebindWideOstreamIosbVtableForCtorUnwind(
     std::uintptr_t* const ostreamSubobject
   ) noexcept
   {
@@ -57000,7 +57000,7 @@ namespace
    * Rebinds one wide-ios base lane to the constructor-unwind `wios` vtable
    * tag and returns the same lane pointer.
    */
-  [[maybe_unused]] std::uintptr_t* RebindWideIosVtableForCtorUnwind(
+  std::uintptr_t* RebindWideIosVtableForCtorUnwind(
     std::uintptr_t* const iosSubobject
   ) noexcept
   {
@@ -57068,7 +57068,7 @@ namespace
    * What it does:
    * Dispatches one virtual wide-word read lane.
    */
-  [[maybe_unused]] std::int32_t DispatchWideStreamReadVirtual(
+  std::int32_t DispatchWideStreamReadVirtual(
     WideStreamVirtualReadDispatch* const dispatch
   ) noexcept
   {
@@ -57082,7 +57082,7 @@ namespace
    * Writes one wide code-unit into buffered output lanes when available;
    * otherwise dispatches the same code-unit through the virtual write lane.
    */
-  [[maybe_unused]] std::int32_t WriteWideWordBufferedOrDispatchVirtual(
+  std::int32_t WriteWideWordBufferedOrDispatchVirtual(
     WideStreamWordLaneRuntimeView* const state,
     WideStreamVirtualWriteDispatch* const dispatch,
     const std::uint16_t word
@@ -57109,7 +57109,7 @@ namespace
    * What it does:
    * Returns the dword stored at the indirect lane pointer `+0x10`.
    */
-  [[maybe_unused]] std::int32_t ReadWideStreamLane10(
+  std::int32_t ReadWideStreamLane10(
     const WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57122,7 +57122,7 @@ namespace
    * What it does:
    * Returns the dword stored at the indirect lane pointer `+0x20`.
    */
-  [[maybe_unused]] std::int32_t ReadWideStreamLane20(
+  std::int32_t ReadWideStreamLane20(
     const WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57135,7 +57135,7 @@ namespace
    * What it does:
    * Returns the dword stored at the indirect lane pointer `+0x14`.
    */
-  [[maybe_unused]] std::int32_t ReadWideStreamLane14(
+  std::int32_t ReadWideStreamLane14(
     const WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57148,7 +57148,7 @@ namespace
    * What it does:
    * Returns the dword stored at the indirect lane pointer `+0x24`.
    */
-  [[maybe_unused]] std::int32_t ReadWideStreamLane24(
+  std::int32_t ReadWideStreamLane24(
     const WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57161,7 +57161,7 @@ namespace
    * What it does:
    * Returns `lane20 + (lane30 * 2)` for one wide-stream state payload.
    */
-  [[maybe_unused]] std::int32_t ComputeWideStreamCursorFromBeginAndCount(
+  std::int32_t ComputeWideStreamCursorFromBeginAndCount(
     const WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57175,7 +57175,7 @@ namespace
    * Subtracts one word-count from lane `+0x30` and advances lane `+0x20` by
    * `count * 2` bytes.
    */
-  [[maybe_unused]] std::int32_t* AdvanceWideStreamBeginLanesByWordCount(
+  std::int32_t* AdvanceWideStreamBeginLanesByWordCount(
     const std::int32_t count,
     WideStreamWordLaneRuntimeView* const state
   ) noexcept
@@ -57192,7 +57192,7 @@ namespace
    * Seeds lanes `+0x10/+0x20/+0x30` from one cursor span and returns the
    * half-distance `(endCursor - currentCursor) / 2`.
    */
-  [[maybe_unused]] std::int32_t SeedWideStreamBeginLanesFromCursorSpan(
+  std::int32_t SeedWideStreamBeginLanesFromCursorSpan(
     const std::int32_t endCursor,
     const std::int32_t currentCursor,
     WideStreamWordLaneRuntimeView* const state,
@@ -57212,7 +57212,7 @@ namespace
    * What it does:
    * Returns `lane24 + (lane34 * 2)` for one wide-stream state payload.
    */
-  [[maybe_unused]] std::int32_t ComputeWideStreamCursorFromEndAndCount(
+  std::int32_t ComputeWideStreamCursorFromEndAndCount(
     const WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57226,7 +57226,7 @@ namespace
    * Consumes one wide code-unit from begin lanes by decrementing lane `+0x30`,
    * returning lane `+0x20`, and advancing that lane by two bytes.
    */
-  [[maybe_unused]] std::int32_t PopWideStreamBeginCursorAndAdvance(
+  std::int32_t PopWideStreamBeginCursorAndAdvance(
     WideStreamWordLaneRuntimeView* const state
   ) noexcept
   {
@@ -57243,7 +57243,7 @@ namespace
    * Subtracts one word-count from lane `+0x34` and advances lane `+0x24` by
    * `count * 2` bytes.
    */
-  [[maybe_unused]] std::int32_t* AdvanceWideStreamEndLanesByWordCount(
+  std::int32_t* AdvanceWideStreamEndLanesByWordCount(
     const std::int32_t count,
     WideStreamWordLaneRuntimeView* const state
   ) noexcept
@@ -57282,7 +57282,7 @@ namespace
    * Stores one wide-stream cursor lane into state lanes `+0x14` and `+0x24`,
    * then writes half-distance `(endCursor - cursor) / 2` into lane `+0x34`.
    */
-  [[maybe_unused]] std::int32_t SyncWideStreamCursorTripletLaneA(
+  std::int32_t SyncWideStreamCursorTripletLaneA(
     const std::int32_t endCursor,
     WideStreamCursorTripletRuntimeView* const state,
     const std::int32_t cursor
@@ -57303,7 +57303,7 @@ namespace
    * `+0x24`, then writes half-distance `(endCursor - currentCursor) / 2`
    * into lane `+0x34`.
    */
-  [[maybe_unused]] std::int32_t SyncWideStreamCursorTripletLaneB(
+  std::int32_t SyncWideStreamCursorTripletLaneB(
     const std::int32_t endCursor,
     const std::int32_t currentCursor,
     WideStreamCursorTripletRuntimeView* const state,
@@ -57325,7 +57325,7 @@ namespace
    * current cursor lane `*(*(state + 0x24))`, then advances that cursor by
    * two bytes.
    */
-  [[maybe_unused]] std::int32_t PopWideStreamCursorAndAdvance(
+  std::int32_t PopWideStreamCursorAndAdvance(
     WideStreamCursorTripletRuntimeView* const state
   ) noexcept
   {
@@ -57353,7 +57353,7 @@ namespace
    * Returns logical element count for one contiguous 40-byte lane range
    * (`(last - first) / 40`) or zero when `first` is null.
    */
-  [[maybe_unused]] std::int32_t Count40ByteStreamElements(
+  std::int32_t Count40ByteStreamElements(
     const Element40CountRuntimeView* const runtime
   ) noexcept
   {
@@ -57381,7 +57381,7 @@ namespace
    * What it does:
    * Stores one pointer lane into caller output storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLane85B0(
+  std::uintptr_t* WritePointerLane85B0(
     std::uintptr_t* const outLane,
     const std::uintptr_t value
   ) noexcept
@@ -57401,7 +57401,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x04` from one runtime payload.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane04(
+  std::uint8_t ReadByteLane04(
     const ByteLane04RuntimeView* const runtime
   ) noexcept
   {
@@ -57421,7 +57421,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x2C` from one runtime payload.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLane2C(
+  std::uint32_t ReadDwordLane2C(
     const DwordLane2CRuntimeView* const runtime
   ) noexcept
   {
@@ -57434,7 +57434,7 @@ namespace
    * What it does:
    * Stores one pointer lane into caller output storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLane9490(
+  std::uintptr_t* WritePointerLane9490(
     std::uintptr_t* const outLane,
     const std::uintptr_t value
   ) noexcept
@@ -57448,7 +57448,7 @@ namespace
    * What it does:
    * Stores one pointer lane into caller output storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLane9500(
+  std::uintptr_t* WritePointerLane9500(
     std::uintptr_t* const outLane,
     const std::uintptr_t value
   ) noexcept
@@ -57463,7 +57463,7 @@ namespace
    * Stores one pointer computed as `base[0] + (index * 8)` into caller output
    * storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLaneFromStride8A(
+  std::uintptr_t* WritePointerLaneFromStride8A(
     std::uintptr_t* const outLane,
     const std::uintptr_t* const baseLane,
     const std::int32_t index
@@ -57479,7 +57479,7 @@ namespace
    * What it does:
    * Stores one pointer lane into caller output storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLane9530(
+  std::uintptr_t* WritePointerLane9530(
     std::uintptr_t* const outLane,
     const std::uintptr_t value
   ) noexcept
@@ -57494,7 +57494,7 @@ namespace
    * Stores one pointer computed as `base[0] + (index * 8)` into caller output
    * storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLaneFromStride8B(
+  std::uintptr_t* WritePointerLaneFromStride8B(
     std::uintptr_t* const outLane,
     const std::uintptr_t* const baseLane,
     const std::int32_t index
@@ -57509,7 +57509,7 @@ namespace
    * What it does:
    * Stores one pointer lane into caller output storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLane96E0(
+  std::uintptr_t* WritePointerLane96E0(
     std::uintptr_t* const outLane,
     const std::uintptr_t value
   ) noexcept
@@ -57523,7 +57523,7 @@ namespace
    * What it does:
    * Stores one pointer lane into caller output storage.
    */
-  [[maybe_unused]] std::uintptr_t* WritePointerLane9710(
+  std::uintptr_t* WritePointerLane9710(
     std::uintptr_t* const outLane,
     const std::uintptr_t value
   ) noexcept
@@ -57543,7 +57543,7 @@ namespace
    * What it does:
    * Returns word lane `+0x30` from one runtime payload.
    */
-  [[maybe_unused]] std::uint16_t ReadWordLane30(
+  std::uint16_t ReadWordLane30(
     const WordLane30RuntimeView* const runtime
   ) noexcept
   {
@@ -57557,7 +57557,7 @@ namespace
    * Rebinds one wide-istream subobject lane to the constructor-unwind
    * `wios`-vtable tag and returns the runtime RTTI-adjustor pointer lane.
    */
-  [[maybe_unused]] std::uintptr_t RebindWideIstreamWiosVtableForCtorUnwind(
+  std::uintptr_t RebindWideIstreamWiosVtableForCtorUnwind(
     std::uint32_t* const istreamSubobject
   ) noexcept
   {
@@ -57585,7 +57585,7 @@ namespace
    * Copy-fills one `[begin,end)` `CWinLogLine` range from `source` and
    * returns the final assign-return lane used by the original helper ABI.
    */
-  [[maybe_unused]] msvc8::string* CopyFillWinLogLineRangeFromTemplate(
+  msvc8::string* CopyFillWinLogLineRangeFromTemplate(
     moho::CWinLogLine* const begin,
     const moho::CWinLogLine* const source,
     moho::CWinLogLine* const end
@@ -57608,7 +57608,7 @@ namespace
    * Releases one `CWinLogLine` text heap lane when needed and resets the
    * embedded `msvc8::string` to empty SSO state.
    */
-  [[maybe_unused]] int ResetWinLogLineTextLane(
+  int ResetWinLogLineTextLane(
     moho::CWinLogLine* const line
   ) noexcept
   {
@@ -57642,7 +57642,7 @@ namespace
    * cross-TU references through alternate register conventions; no
    * separate source is emitted.
    */
-  [[maybe_unused]] [[noreturn]] void WinLogLineRangeUnwindRethrowFromEndpoints(
+  [[noreturn]] void WinLogLineRangeUnwindRethrowFromEndpoints(
     moho::CWinLogLine* const rangeBegin,
     moho::CWinLogLine* const rangeEndRelative,
     moho::CWinLogLine* const destinationCursor
@@ -57695,7 +57695,7 @@ namespace
    * cross-TU references through alternate register conventions; no
    * separate source is emitted.
    */
-  [[maybe_unused]] [[noreturn]] void WinLogLineRangeUnwindRethrowFromCount(
+  [[noreturn]] void WinLogLineRangeUnwindRethrowFromCount(
     moho::CWinLogLine* const /*templateLine*/,
     std::size_t remainingCount,
     moho::CWinLogLine* const destinationCursor
@@ -57735,7 +57735,7 @@ namespace
    * Copy-constructs one `CWinLogLine` record into `destination` from `source`,
    * including legacy in-place string SSO reset plus full text assign.
    */
-  [[maybe_unused]] moho::CWinLogLine* ConstructWinLogLineCopyAt(
+  moho::CWinLogLine* ConstructWinLogLineCopyAt(
     moho::CWinLogLine* const destination,
     const moho::CWinLogLine* const source
   )
@@ -58007,7 +58007,7 @@ wxStringRuntime* wxCommandEventRuntime::CopyCommandStringOrEmpty(
  * base `wxCommandEvent` state, copying coordinate lanes, and retaining two
  * shared string payload lanes.
  */
-[[maybe_unused]] void* wxCopyConstructHelpEventRuntime(
+void* wxCopyConstructHelpEventRuntime(
   void* const destinationRuntime,
   const void* const sourceRuntime
 )
@@ -58084,7 +58084,7 @@ wxCommandEventRuntime* wxCommandEventRuntime::Clone() const
  * What it does:
  * Resets one 8-byte runtime pair lane to zero and returns the same lane.
  */
-[[maybe_unused]] void* wxResetRuntimePairLane(
+void* wxResetRuntimePairLane(
   void* const runtimePair
 ) noexcept
 {
@@ -58194,7 +58194,7 @@ wxListItemAttrRuntime* wxListItemRuntime::EnsureAttributeStorage()
  * Ensures optional list-item attribute storage and copy-constructs the
  * primary colour lane from `sourceColour`.
  */
-[[maybe_unused]] wxColourRuntime* wxListItemEnsureAttributeAndCopyPrimaryColourRuntime(
+wxColourRuntime* wxListItemEnsureAttributeAndCopyPrimaryColourRuntime(
   wxListItemRuntime* const listItem,
   const wxColourRuntime* const sourceColour
 ) noexcept
@@ -58222,7 +58222,7 @@ wxListItemAttrRuntime* wxListItemRuntime::EnsureAttributeStorage()
  * Ensures optional list-item attribute storage and copy-constructs the
  * secondary colour lane from `sourceColour`.
  */
-[[maybe_unused]] wxColourRuntime* wxListItemEnsureAttributeAndCopySecondaryColourRuntime(
+wxColourRuntime* wxListItemEnsureAttributeAndCopySecondaryColourRuntime(
   wxListItemRuntime* const listItem,
   const wxColourRuntime* const sourceColour
 ) noexcept
@@ -58272,7 +58272,7 @@ wxListItemRuntime::wxListItemRuntime()
  * Legacy default-constructor lane that initializes one `wxListItem` object in
  * caller-provided storage.
  */
-[[maybe_unused]] wxListItemRuntime* wxListItemRuntimeConstructInPlaceLegacy(
+wxListItemRuntime* wxListItemRuntimeConstructInPlaceLegacy(
   wxListItemRuntime* const storage
 ) noexcept
 {
@@ -58289,7 +58289,7 @@ wxListItemRuntime::wxListItemRuntime()
  * Allocates one default `wxListItem` payload and runs the canonical default
  * constructor lane.
  */
-[[maybe_unused]] wxListItemRuntime* wxCreateListItemRuntimeClassInstance()
+wxListItemRuntime* wxCreateListItemRuntimeClassInstance()
 {
   return new (std::nothrow) wxListItemRuntime();
 }
@@ -58367,7 +58367,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
 
 namespace
 {
-  [[maybe_unused]] int wxListCtrlDispatchSingleItemRectangleRuntime(
+  int wxListCtrlDispatchSingleItemRectangleRuntime(
     void* listControlRuntime,
     WPARAM itemId
   );
@@ -58532,7 +58532,7 @@ namespace
    * optional per-row internal payload lane (`lParam` + attr), dispatches
    * `LVM_SETITEMW`, and refreshes the row rectangle when image/attr changed.
    */
-  [[maybe_unused]] bool wxListCtrlSetItemAndSyncInternalDataRuntime(
+  bool wxListCtrlSetItemAndSyncInternalDataRuntime(
     wxListCtrlRuntime* const listControl,
     const wxListItemRuntime* const item
   )
@@ -59133,7 +59133,7 @@ namespace
    * Allocates and initializes one default `wxTreeEvent` runtime payload
    * (`eventType=wxEVT_NULL`, `eventId=0`).
    */
-  [[maybe_unused]] WxTreeEventFactoryRuntime* wxCreateTreeEventRuntimeClassInstance()
+  WxTreeEventFactoryRuntime* wxCreateTreeEventRuntimeClassInstance()
   {
     return new (std::nothrow) WxTreeEventFactoryRuntime(0, 0);
   }
@@ -59145,7 +59145,7 @@ namespace
    * Allocates and initializes one default `wxListEvent` runtime payload
    * (`eventType=wxEVT_NULL`, `eventId=0`).
    */
-  [[maybe_unused]] WxListEventRuntime* wxCreateListEventRuntimeClassInstance()
+  WxListEventRuntime* wxCreateListEventRuntimeClassInstance()
   {
     return new (std::nothrow) WxListEventRuntime(0, 0);
   }
@@ -59195,7 +59195,7 @@ namespace
  * Compares one list-key runtime payload against one stored node key lane:
  * integer keys compare by raw value; string keys compare by UTF-16 text.
  */
-[[maybe_unused]] bool wxListKeyMatchesStoredNodeKeyRuntime(
+bool wxListKeyMatchesStoredNodeKeyRuntime(
   const wxListKeyRuntime* const keyRuntime,
   const wchar_t* const storedNodeKeyLane
 ) noexcept
@@ -59259,7 +59259,7 @@ wxNodeBaseRuntime* wxNodeBaseInit(
  * node links/key/value ownership and rebinding the node vtable to the
  * wx menu-list-node dispatch lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxConstructMenuListNodeRuntime(
+wxNodeBaseRuntime* wxConstructMenuListNodeRuntime(
   wxNodeBaseRuntime* const node,
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
@@ -59282,7 +59282,7 @@ wxNodeBaseRuntime* wxNodeBaseInit(
  * Allocates one menu-list node payload, initializes base list-link/key/value
  * lanes, and rebinds the node to the wx menu-list-node dispatch lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxCreateMenuListNodeRuntime(
+wxNodeBaseRuntime* wxCreateMenuListNodeRuntime(
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
   wxNodeBaseRuntime* const next,
@@ -59347,7 +59347,7 @@ namespace
    * Resets one contiguous `CWinLogLine` range by releasing heap-backed text
    * lanes and restoring each embedded string to empty SSO state.
    */
-  [[maybe_unused]] void ResetWinLogLineRange(
+  void ResetWinLogLineRange(
     moho::CWinLogLine* begin,
     moho::CWinLogLine* end
   ) noexcept
@@ -59370,7 +59370,7 @@ namespace
    * What it does:
    * Adapts one thiscall lane into `ResetWinLogLineRange(begin, end)`.
    */
-  [[maybe_unused]] void ResetWinLogLineRangeThiscallAdapter(
+  void ResetWinLogLineRangeThiscallAdapter(
     moho::CWinLogLine* const rangeBegin,
     moho::CWinLogLine* const rangeEnd
   ) noexcept
@@ -59416,7 +59416,7 @@ namespace
    * Returns the pending-line vector begin lane (`+0x28`) from one log-target
    * runtime payload.
    */
-  [[maybe_unused]] moho::CWinLogLine* ReadWinLogTargetPendingBeginLane(
+  moho::CWinLogLine* ReadWinLogTargetPendingBeginLane(
     const WinLogTargetPendingBeginLaneRuntimeView* const runtime
   ) noexcept
   {
@@ -59429,7 +59429,7 @@ namespace
    * What it does:
    * Stores one vector begin lane into caller output storage.
    */
-  [[maybe_unused]] moho::CWinLogLine** WriteWinLogLineVectorBeginLane(
+  moho::CWinLogLine** WriteWinLogLineVectorBeginLane(
     moho::CWinLogLine** const outLane,
     const WinLogLineVectorRuntimeView* const vectorView
   ) noexcept
@@ -59444,7 +59444,7 @@ namespace
    * What it does:
    * Stores one vector end lane into caller output storage.
    */
-  [[maybe_unused]] moho::CWinLogLine** WriteWinLogLineVectorEndLane(
+  moho::CWinLogLine** WriteWinLogLineVectorEndLane(
     moho::CWinLogLine** const outLane,
     const WinLogLineVectorRuntimeView* const vectorView
   ) noexcept
@@ -59459,7 +59459,7 @@ namespace
    * What it does:
    * Returns one indexed element lane from a 40-byte `CWinLogLine` vector.
    */
-  [[maybe_unused]] moho::CWinLogLine* GetWinLogLineVectorElementAt(
+  moho::CWinLogLine* GetWinLogLineVectorElementAt(
     const std::int32_t index,
     const WinLogLineVectorRuntimeView* const vectorView
   ) noexcept
@@ -59474,7 +59474,7 @@ namespace
    * Stores one indexed element lane from a base-pointer lane into caller
    * output storage.
    */
-  [[maybe_unused]] moho::CWinLogLine** WriteWinLogLinePointerFromBaseAndIndex(
+  moho::CWinLogLine** WriteWinLogLinePointerFromBaseAndIndex(
     moho::CWinLogLine** const outLane,
     moho::CWinLogLine* const* const baseLane,
     const std::int32_t index
@@ -59491,7 +59491,7 @@ namespace
    * Releases one contiguous `CWinLogLine` storage block after resetting each
    * live line, then clears begin/end/capacity lanes.
    */
-  [[maybe_unused]] void ResetAndReleaseWinLogLineVectorStorage(
+  void ResetAndReleaseWinLogLineVectorStorage(
     WinLogLineVectorRuntimeView* const storage
   ) noexcept
   {
@@ -59569,7 +59569,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Copies one forward half-open range of `CWinLogLine` records and returns
  * one-past the last written destination lane.
  */
-[[maybe_unused]] moho::CWinLogLine* CopyWinLogLineRangeForward(
+moho::CWinLogLine* CopyWinLogLineRangeForward(
   moho::CWinLogLine* const destinationBegin,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59592,7 +59592,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Copies one backward half-open range of `CWinLogLine` records and returns
  * the first destination lane written by the reverse walk.
  */
-[[maybe_unused]] moho::CWinLogLine* CopyWinLogLineRangeBackward(
+moho::CWinLogLine* CopyWinLogLineRangeBackward(
   moho::CWinLogLine* const destinationEnd,
   const moho::CWinLogLine* const sourceEnd,
   const moho::CWinLogLine* const sourceBegin
@@ -59617,7 +59617,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Register-lane adapter for forward `CWinLogLine` range copy.
  */
-[[maybe_unused]] moho::CWinLogLine* CopyWinLogLineRangeForwardAdapter(
+moho::CWinLogLine* CopyWinLogLineRangeForwardAdapter(
   moho::CWinLogLine* const destinationBegin,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59632,7 +59632,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Register-lane adapter for backward `CWinLogLine` range copy.
  */
-[[maybe_unused]] moho::CWinLogLine* CopyWinLogLineRangeBackwardAdapter(
+moho::CWinLogLine* CopyWinLogLineRangeBackwardAdapter(
   moho::CWinLogLine* const destinationEnd,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59647,7 +59647,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Constructs `count` `CWinLogLine` lanes from one template source line.
  */
-[[maybe_unused]] moho::CWinLogLine* ConstructWinLogLineFillRangeAdapter(
+moho::CWinLogLine* ConstructWinLogLineFillRangeAdapter(
   moho::CWinLogLine* const destinationBegin,
   const moho::CWinLogLine& source,
   const std::size_t count
@@ -59662,7 +59662,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Register-lane adapter for uninitialized `CWinLogLine` range construction.
  */
-[[maybe_unused]] moho::CWinLogLine* ConstructWinLogLineRangeAdapterA(
+moho::CWinLogLine* ConstructWinLogLineRangeAdapterA(
   moho::CWinLogLine* const destinationBegin,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59678,7 +59678,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Duplicate register-lane adapter for uninitialized `CWinLogLine` range
  * construction.
  */
-[[maybe_unused]] moho::CWinLogLine* ConstructWinLogLineRangeAdapterB(
+moho::CWinLogLine* ConstructWinLogLineRangeAdapterB(
   moho::CWinLogLine* const destinationBegin,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59694,7 +59694,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Third register-lane adapter for uninitialized `CWinLogLine` range
  * construction.
  */
-[[maybe_unused]] moho::CWinLogLine* ConstructWinLogLineRangeAdapterC(
+moho::CWinLogLine* ConstructWinLogLineRangeAdapterC(
   moho::CWinLogLine* const destinationBegin,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59709,7 +59709,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Stack-order adapter for uninitialized `CWinLogLine` range construction.
  */
-[[maybe_unused]] moho::CWinLogLine* ConstructWinLogLineRangeStackAdapter(
+moho::CWinLogLine* ConstructWinLogLineRangeStackAdapter(
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd,
   moho::CWinLogLine* const destinationBegin
@@ -59725,7 +59725,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Register-lane bridge that forwards one `CWinLogLine` backward range copy
  * request into the canonical backward copy helper.
  */
-[[maybe_unused]] moho::CWinLogLine* CopyWinLogLineRangeBackwardBridgeA(
+moho::CWinLogLine* CopyWinLogLineRangeBackwardBridgeA(
   moho::CWinLogLine* const destinationEnd,
   const moho::CWinLogLine* const sourceBegin,
   const moho::CWinLogLine* const sourceEnd
@@ -59741,7 +59741,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Bridge lane that forwards one managed-slot forward-range assignment request
  * into the canonical `FUN_004FB700` adapter path.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardBridgeA(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardBridgeA(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59757,7 +59757,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Frame-lane bridge that forwards one managed-slot forward-range assignment
  * request into the canonical `FUN_004FB730` adapter path.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardBridgeB(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardBridgeB(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59773,7 +59773,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Register-lane bridge that forwards one managed-slot backward relink range
  * assignment request into the canonical backward helper.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardBridgeA(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardBridgeA(
   moho::ManagedWindowSlot* const destinationEnd,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59789,7 +59789,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Duplicate register-lane bridge for managed-slot backward relink range
  * assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardBridgeB(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardBridgeB(
   moho::ManagedWindowSlot* const destinationEnd,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59804,7 +59804,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Register-lane adapter for forward managed-slot relink assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterA(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterA(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59819,7 +59819,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Duplicate adapter lane for forward managed-slot relink assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterB(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterB(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59834,7 +59834,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Alias lane for forward managed-slot relink assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAliasA(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAliasA(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59849,7 +59849,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Second alias lane for forward managed-slot relink assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAliasB(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAliasB(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59865,7 +59865,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Additional register-lane adapter for forward managed-slot relink
  * assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterC(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterC(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59880,7 +59880,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Frame-lane duplicate adapter for forward managed-slot relink assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterD(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeForwardAdapterD(
   moho::ManagedWindowSlot* const destinationBegin,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -59889,7 +59889,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
   return AssignManagedWindowSlotRangeForward(destinationBegin, sourceBegin, sourceEnd);
 }
 
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotFillFromTemplateCore(
+moho::ManagedWindowSlot* AssignManagedWindowSlotFillFromTemplateCore(
   moho::ManagedWindowSlot* destinationBegin,
   const std::uint32_t count,
   const moho::ManagedWindowSlot* const sourceTemplate
@@ -59915,7 +59915,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Fills `count` contiguous managed-slot lanes from one source slot while
  * preserving owner-head relink semantics.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotFillFromTemplateAdapterA(
+moho::ManagedWindowSlot* AssignManagedWindowSlotFillFromTemplateAdapterA(
   moho::ManagedWindowSlot* const destinationBegin,
   const std::uint32_t count,
   const moho::ManagedWindowSlot* const sourceTemplate
@@ -59930,7 +59930,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Duplicate frame-lane fill adapter for managed-slot template assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotFillFromTemplateAdapterB(
+moho::ManagedWindowSlot* AssignManagedWindowSlotFillFromTemplateAdapterB(
   moho::ManagedWindowSlot* const destinationBegin,
   const std::uint32_t count,
   const moho::ManagedWindowSlot* const sourceTemplate
@@ -59948,7 +59948,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Rebinds every managed slot in `[rangeBegin, rangeEnd)` to one shared owner
  * head-link lane, preserving intrusive-chain unlink/relink semantics.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* RebindManagedWindowSlotRangeToOwnerHeadLane(
+moho::ManagedWindowSlot* RebindManagedWindowSlotRangeToOwnerHeadLane(
   moho::ManagedWindowSlot* rangeBegin,
   moho::ManagedWindowSlot** const* const ownerHeadLinkLane,
   moho::ManagedWindowSlot* const rangeEnd
@@ -59984,7 +59984,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Pure jump-thunk alias into `RebindManagedWindowSlotRangeToOwnerHeadLane`.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* RebindManagedWindowSlotRangeToOwnerHeadLaneThunk(
+moho::ManagedWindowSlot* RebindManagedWindowSlotRangeToOwnerHeadLaneThunk(
   moho::ManagedWindowSlot* const rangeBegin,
   moho::ManagedWindowSlot** const* const ownerHeadLinkLane,
   moho::ManagedWindowSlot* const rangeEnd
@@ -59999,7 +59999,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Register-lane adapter for backward managed-slot relink assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardAdapterA(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardAdapterA(
   moho::ManagedWindowSlot* const destinationEnd,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -60015,7 +60015,7 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Duplicate register-lane adapter for backward managed-slot relink
  * assignment.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardAdapterB(
+moho::ManagedWindowSlot* AssignManagedWindowSlotRangeBackwardAdapterB(
   moho::ManagedWindowSlot* const destinationEnd,
   const moho::ManagedWindowSlot* const sourceBegin,
   const moho::ManagedWindowSlot* const sourceEnd
@@ -60324,7 +60324,7 @@ void moho::WWinLogWindow::OnSizePersistGeometry(
  * Persists the current log-window position lanes (`Windows.Log.x/y`) when the
  * window is not in control-initialization mode.
  */
-[[maybe_unused]] void PersistLogWindowPositionOnMoveRuntime(
+void PersistLogWindowPositionOnMoveRuntime(
   moho::WWinLogWindow* const logWindow
 )
 {
@@ -61309,7 +61309,7 @@ moho::ManagedWindowSlot** moho::WWinManagedDialog::NullManagedSlotHeadLinkSentin
  * Returns the unmanaged slot pointer lane at `slotIndex` from the global
  * dialog-managed slot vector without bounds checks.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* GetManagedDialogSlotLaneAtIndexUnchecked(
+moho::ManagedWindowSlot* GetManagedDialogSlotLaneAtIndexUnchecked(
   const int slotIndex
 ) noexcept
 {
@@ -61323,7 +61323,7 @@ moho::ManagedWindowSlot** moho::WWinManagedDialog::NullManagedSlotHeadLinkSentin
  * Returns the unmanaged slot pointer lane at `slotIndex` from the global
  * frame-managed slot vector without bounds checks.
  */
-[[maybe_unused]] moho::ManagedWindowSlot* GetManagedFrameSlotLaneAtIndexUnchecked(
+moho::ManagedWindowSlot* GetManagedFrameSlotLaneAtIndexUnchecked(
   const int slotIndex
 ) noexcept
 {
@@ -61337,7 +61337,7 @@ moho::ManagedWindowSlot** moho::WWinManagedDialog::NullManagedSlotHeadLinkSentin
  * Writes the current dialog-managed slot end pointer lane into `outEndLane`
  * and returns the same output lane.
  */
-[[maybe_unused]] moho::ManagedWindowSlot** StoreManagedDialogSlotEndLane(
+moho::ManagedWindowSlot** StoreManagedDialogSlotEndLane(
   moho::ManagedWindowSlot** const outEndLane
 ) noexcept
 {
@@ -61352,7 +61352,7 @@ moho::ManagedWindowSlot** moho::WWinManagedDialog::NullManagedSlotHeadLinkSentin
  * Returns the process-global managed-dialog registry vector storage through
  * one stdcall-compatible lane.
  */
-[[maybe_unused]] msvc8::vector<moho::ManagedWindowSlot>* __stdcall
+msvc8::vector<moho::ManagedWindowSlot>* __stdcall
 GetManagedDialogRegistryStorageStdcall(const int /*unused*/)
 {
   return &moho::managedWindows;
@@ -61365,7 +61365,7 @@ GetManagedDialogRegistryStorageStdcall(const int /*unused*/)
  * Writes the current frame-managed slot end pointer lane into `outEndLane`
  * and returns the same output lane.
  */
-[[maybe_unused]] moho::ManagedWindowSlot** StoreManagedFrameSlotEndLane(
+moho::ManagedWindowSlot** StoreManagedFrameSlotEndLane(
   moho::ManagedWindowSlot** const outEndLane
 ) noexcept
 {
@@ -61380,7 +61380,7 @@ GetManagedDialogRegistryStorageStdcall(const int /*unused*/)
  * Returns the process-global managed-frame registry vector storage through
  * one stdcall-compatible lane.
  */
-[[maybe_unused]] msvc8::vector<moho::ManagedWindowSlot>* __stdcall
+msvc8::vector<moho::ManagedWindowSlot>* __stdcall
 GetManagedFrameRegistryStorageStdcall(const int /*unused*/)
 {
   return &moho::managedFrames;
@@ -61393,7 +61393,7 @@ GetManagedFrameRegistryStorageStdcall(const int /*unused*/)
  * Writes the current dialog-managed slot begin pointer lane into
  * `outBeginLane` and returns the same output lane.
  */
-[[maybe_unused]] moho::ManagedWindowSlot** StoreManagedDialogSlotBeginLane(
+moho::ManagedWindowSlot** StoreManagedDialogSlotBeginLane(
   moho::ManagedWindowSlot** const outBeginLane
 ) noexcept
 {
@@ -61408,7 +61408,7 @@ GetManagedFrameRegistryStorageStdcall(const int /*unused*/)
  * Writes the current frame-managed slot begin pointer lane into
  * `outBeginLane` and returns the same output lane.
  */
-[[maybe_unused]] moho::ManagedWindowSlot** StoreManagedFrameSlotBeginLane(
+moho::ManagedWindowSlot** StoreManagedFrameSlotBeginLane(
   moho::ManagedWindowSlot** const outBeginLane
 ) noexcept
 {
@@ -61422,7 +61422,7 @@ GetManagedFrameRegistryStorageStdcall(const int /*unused*/)
  * What it does:
  * Returns the process-global managed-dialog registry vector storage.
  */
-[[maybe_unused]] msvc8::vector<moho::ManagedWindowSlot>* GetManagedDialogRegistryStorage()
+msvc8::vector<moho::ManagedWindowSlot>* GetManagedDialogRegistryStorage()
 {
   return &moho::managedWindows;
 }
@@ -61433,7 +61433,7 @@ GetManagedFrameRegistryStorageStdcall(const int /*unused*/)
  * What it does:
  * Returns the process-global managed-frame registry vector storage.
  */
-[[maybe_unused]] msvc8::vector<moho::ManagedWindowSlot>* GetManagedFrameRegistryStorage()
+msvc8::vector<moho::ManagedWindowSlot>* GetManagedFrameRegistryStorage()
 {
   return &moho::managedFrames;
 }
@@ -61444,7 +61444,7 @@ GetManagedFrameRegistryStorageStdcall(const int /*unused*/)
  * What it does:
  * Returns the current `managedWindows` slot count as a legacy signed int lane.
  */
-[[maybe_unused]] int GetManagedDialogSlotCountLegacy() noexcept
+int GetManagedDialogSlotCountLegacy() noexcept
 {
   if (moho::managedWindows.data() == nullptr) {
     return 0;
@@ -61861,7 +61861,7 @@ namespace
    * Constructs the two render-target lock handles and frame passes, then
    * clears bloom state lanes.
    */
-  [[maybe_unused]] CBloomRendererRuntime* ConstructBloomRendererRuntime(
+  CBloomRendererRuntime* ConstructBloomRendererRuntime(
     CBloomRendererRuntime* const bloomRenderer
   )
   {
@@ -61886,7 +61886,7 @@ namespace
    * Clears transient bloom render targets, then tears down frame-pass and
    * render-target lock storage in reverse construction order.
    */
-  [[maybe_unused]] void DestroyBloomRendererRuntime(
+  void DestroyBloomRendererRuntime(
     CBloomRendererRuntime* const bloomRenderer
   ) noexcept
   {
@@ -62405,7 +62405,7 @@ namespace
    * target / depth-stencil arrays, dynamic-texture-sheet shared_ptr slot,
    * camera pointer, font pointer, and derived head-count lane.
    */
-  [[maybe_unused]] moho::WD3DViewport* ConstructRenViewportRuntime(
+  moho::WD3DViewport* ConstructRenViewportRuntime(
     moho::WD3DViewport* const viewport,
     wxWindowBase* const parentWindow,
     const char* const title,
@@ -62569,7 +62569,7 @@ namespace
    * source declarations still model the `WRenViewport`/`WD3DViewport` base
    * relationship inversely to the binary constructor chain.
    */
-  [[maybe_unused]] void DestroyRenViewportNoDeleteRuntime(
+  void DestroyRenViewportNoDeleteRuntime(
     moho::WRenViewport* const viewport
   ) noexcept
   {
@@ -62723,7 +62723,7 @@ namespace
    * Copy-constructs one repeated world-view parameter lane into `count`
    * contiguous uninitialized destination slots.
    */
-  [[maybe_unused]] WRenViewportWorldViewParamRuntime* FillWorldViewParamConstructedSpan(
+  WRenViewportWorldViewParamRuntime* FillWorldViewParamConstructedSpan(
     WRenViewportWorldViewParamRuntime* destination,
     std::uint32_t count,
     const WRenViewportWorldViewParamRuntime* const source
@@ -62746,7 +62746,7 @@ namespace
    * Register-shape adapter that forwards destination/count/source lanes into
    * `FillWorldViewParamConstructedSpan(...)`.
    */
-  [[maybe_unused]] WRenViewportWorldViewParamRuntime* FillWorldViewParamConstructedSpanAdapterA(
+  WRenViewportWorldViewParamRuntime* FillWorldViewParamConstructedSpanAdapterA(
     WRenViewportWorldViewParamRuntime* const destination,
     const std::uint32_t count,
     const WRenViewportWorldViewParamRuntime* const source
@@ -62763,7 +62763,7 @@ namespace
    * `FillWorldViewParamConstructedSpan(...)` and returns the advanced
    * destination lane.
    */
-  [[maybe_unused]] WRenViewportWorldViewParamRuntime* FillWorldViewParamConstructedSpanCounted(
+  WRenViewportWorldViewParamRuntime* FillWorldViewParamConstructedSpanCounted(
     WRenViewportWorldViewParamRuntime* destination,
     const std::uint32_t count,
     const WRenViewportWorldViewParamRuntime* const source
@@ -62783,7 +62783,7 @@ namespace
    * Copy-assigns one half-open world-view parameter range into destination
    * storage, preserving retained terrain shared-pointer ownership lanes.
    */
-  [[maybe_unused]] WRenViewportWorldViewParamRuntime* CopyAssignWorldViewParamRange(
+  WRenViewportWorldViewParamRuntime* CopyAssignWorldViewParamRange(
     WRenViewportWorldViewParamRuntime* destinationBegin,
     WRenViewportWorldViewParamRuntime* destinationEnd,
     const WRenViewportWorldViewParamRuntime* sourceBegin
@@ -62805,7 +62805,7 @@ namespace
    * What it does:
    * Register-shape adapter lane for `CopyAssignWorldViewParamRange(...)`.
    */
-  [[maybe_unused]] WRenViewportWorldViewParamRuntime* CopyAssignWorldViewParamRangeAdapterA(
+  WRenViewportWorldViewParamRuntime* CopyAssignWorldViewParamRangeAdapterA(
     WRenViewportWorldViewParamRuntime* const destinationBegin,
     WRenViewportWorldViewParamRuntime* const destinationEnd,
     const WRenViewportWorldViewParamRuntime* const sourceBegin
@@ -62866,7 +62866,7 @@ namespace
    * Inserts one world-view parameter record and rewrites `*outIterator` to the
    * matching slot after potential vector reallocation.
    */
-  [[maybe_unused]] WRenViewportWorldViewParamRuntime** InsertWorldViewParamAtAndRefreshIterator(
+  WRenViewportWorldViewParamRuntime** InsertWorldViewParamAtAndRefreshIterator(
     msvc8::vector<WRenViewportWorldViewParamRuntime>* const worldViews,
     WRenViewportWorldViewParamRuntime** const outIterator,
     WRenViewportWorldViewParamRuntime* const insertPosition,
@@ -63255,7 +63255,7 @@ moho::MohoApp::~MohoApp()
  * EH cleanup thunk lane that forwards one `MohoApp*` payload into
  * `MohoApp::~MohoApp` without deleting object storage.
  */
-[[maybe_unused]] void __stdcall DestroyMohoAppNoDeleteThunk(
+void __stdcall DestroyMohoAppNoDeleteThunk(
   moho::MohoApp* const app
 ) noexcept
 {
@@ -63271,7 +63271,7 @@ moho::MohoApp::~MohoApp()
  * Scalar deleting-dtor thunk lane for `MohoApp`: runs non-deleting teardown
  * and conditionally frees object storage when bit0 is set.
  */
-[[maybe_unused]] moho::MohoApp* MohoAppDeleteWithFlagsThunk(
+moho::MohoApp* MohoAppDeleteWithFlagsThunk(
   moho::MohoApp* const app,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -63305,7 +63305,7 @@ bool moho::MohoApp::OnInit()
  * What it does:
  * Returns the wx keep-going loop flag lane (`+0x5C`) from one app runtime.
  */
-[[maybe_unused]] bool ReadWxAppKeepGoingFlagRuntime(
+bool ReadWxAppKeepGoingFlagRuntime(
   const wxApp* const app
 ) noexcept
 {
@@ -63398,7 +63398,7 @@ const void* moho::WCurveEditorPanel::GetEventTable() const
  * Duplicate deleting-dtor thunk lane forwarding through
  * `WCurveEditorPanel::DeleteWithFlag`.
  */
-[[maybe_unused]] moho::WCurveEditorPanel* WCurveEditorPanelDeleteWithFlagThunkA(
+moho::WCurveEditorPanel* WCurveEditorPanelDeleteWithFlagThunkA(
   moho::WCurveEditorPanel* const panel,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -63413,7 +63413,7 @@ const void* moho::WCurveEditorPanel::GetEventTable() const
  * Duplicate deleting-dtor thunk lane forwarding through
  * `WCurveEditorPanel::DeleteWithFlag`.
  */
-[[maybe_unused]] moho::WCurveEditorPanel* WCurveEditorPanelDeleteWithFlagThunkB(
+moho::WCurveEditorPanel* WCurveEditorPanelDeleteWithFlagThunkB(
   moho::WCurveEditorPanel* const panel,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -63988,7 +63988,7 @@ static_assert(
  * Reads one world-view lane and depth from owner runtime state and forwards
  * them into the embedded `WRenViewport` subobject `AddWorldView(...)` lane.
  */
-[[maybe_unused]] void AttachOwnerWorldViewToViewport(
+void AttachOwnerWorldViewToViewport(
   WorldViewAttachOwnerRuntimeView* const owner
 )
 {
@@ -66057,7 +66057,7 @@ LRESULT wxTreeCtrlSetStateBit2(
  * Runs one native tree-item hit test with explicit x/y lanes and returns the
  * selected tree item handle.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlHitTestItemRuntime(
+LRESULT wxTreeCtrlHitTestItemRuntime(
   const HWND treeWindow,
   const LPARAM x,
   const LPARAM y
@@ -66151,7 +66151,7 @@ LRESULT wxTreeCtrlSetStateImageFromBool(
  * Requests native tree visibility for one item handle lane using
  * `TVM_ENSUREVISIBLE`.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlEnsureItemVisibleRuntime(
+LRESULT wxTreeCtrlEnsureItemVisibleRuntime(
   const void* const treeOwnerRuntime,
   const LPARAM* const treeItemHandleLane
 ) noexcept
@@ -66254,7 +66254,7 @@ namespace
  * updates and mirroring client-data references through native tree-view item
  * queries.
  */
-[[maybe_unused]] bool wxTreeCtrlAssignItemDataRuntime(
+bool wxTreeCtrlAssignItemDataRuntime(
   void* const treeCtrlRuntime,
   int* const treeItemHandleLane,
   wxTreeItemDataRuntime* const itemData
@@ -66314,7 +66314,7 @@ namespace
  * text into the active in-place edit control when the edited item is currently
  * selected.
  */
-[[maybe_unused]] void wxTreeCtrlSetItemTextAndSyncEditControlRuntime(
+void wxTreeCtrlSetItemTextAndSyncEditControlRuntime(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane,
   const LPCWSTR* const textPointer
@@ -66376,7 +66376,7 @@ namespace
  * Thunk adapter that preserves `wxTreeCtrlAssignItemDataRuntime(...)`
  * argument/return lanes.
  */
-[[maybe_unused]] int wxTreeCtrlAssignItemDataRuntimeThunk(
+int wxTreeCtrlAssignItemDataRuntimeThunk(
   void* const treeCtrlRuntime,
   int* const treeItemHandleLane,
   wxTreeItemDataRuntime* const itemData
@@ -66434,7 +66434,7 @@ LRESULT* wxGenericDirCtrlGetChildItemMirror(
  * Compares two indirect UTF-16 name lanes case-insensitively for directory
  * sorting callbacks.
  */
-[[maybe_unused]] int wxCompareWideNamePointerLanesCaseInsensitive(
+int wxCompareWideNamePointerLanesCaseInsensitive(
   const wchar_t* const* const leftNameStorage,
   const wchar_t* const* const rightNameStorage
 ) noexcept
@@ -66690,7 +66690,7 @@ namespace
    * Constructs one `wxSizerItem` min-size lane by clearing geometry lanes,
    * storing min-size/border/flag fields, and precomputing user aspect ratio.
    */
-  [[maybe_unused]] WxSizerItemCtorRuntimeView* wxConstructSizerItemMinSizeRuntime(
+  WxSizerItemCtorRuntimeView* wxConstructSizerItemMinSizeRuntime(
     WxSizerItemCtorRuntimeView* const item,
     const std::int32_t minWidth,
     const std::int32_t minHeight,
@@ -66736,7 +66736,7 @@ namespace
  * Copies two sizer-item scalar lanes (`+0x24/+0x28`) into one output dword
  * pair lane.
  */
-[[maybe_unused]] void* wxSizerItemCopyLane24And28Runtime(
+void* wxSizerItemCopyLane24And28Runtime(
   const WxSizerItemCtorRuntimeView* const item,
   void* const outPairStorage
 ) noexcept
@@ -66760,7 +66760,7 @@ namespace
  * storing the contained-window pointer with proportion/flag data, querying
  * the child size through virtual slot `+0x194`, and precomputing aspect ratio.
  */
-[[maybe_unused]] WxSizerItemCtorRuntimeView* wxConstructSizerItemWindowRuntime(
+WxSizerItemCtorRuntimeView* wxConstructSizerItemWindowRuntime(
   WxSizerItemCtorRuntimeView* const item,
   wxWindowBase* const containedWindow,
   const std::int32_t proportion,
@@ -66809,7 +66809,7 @@ namespace
  * Constructs one `wxSizerItem` sizer-child lane by clearing all geometry
  * fields and storing the contained-sizer pointer with proportion/flag data.
    */
-  [[maybe_unused]] WxSizerItemCtorRuntimeView* wxConstructSizerItemSizerRuntime(
+  WxSizerItemCtorRuntimeView* wxConstructSizerItemSizerRuntime(
     WxSizerItemCtorRuntimeView* const item,
     void* const containedSizer,
     const std::int32_t proportion,
@@ -66998,7 +66998,7 @@ namespace
    * performing in-buffer cursor moves when possible and delegating overflow
    * spans to the underlying stream seek lane.
    */
-  [[maybe_unused]] int wxStreamBufferSeekWithAutoTransferRuntime(
+  int wxStreamBufferSeekWithAutoTransferRuntime(
     WxStreamBufferRuntimeView* const streamBuffer,
     const int distanceToMove,
     const int seekMode
@@ -67089,7 +67089,7 @@ namespace
    * underlying stream tell lane with in-buffer cursor offsets, including
    * auto-transfer input correction for unread buffered bytes.
    */
-  [[maybe_unused]] int wxStreamBufferTellRuntime(
+  int wxStreamBufferTellRuntime(
     WxStreamBufferRuntimeView* const streamBuffer
   ) noexcept
   {
@@ -67346,7 +67346,7 @@ bool WxStreamBufferFlushOutput(
  * Flushes one stream-buffer lane at `+0x10` and tail-dispatches virtual slot
  * `+0x20` from owner lane `+0x0C`.
  */
-[[maybe_unused]] int wxStreamBufferFlushOutputThenInvokeOwnerSlot20Runtime(
+int wxStreamBufferFlushOutputThenInvokeOwnerSlot20Runtime(
   void* const runtimeObject
 )
 {
@@ -67726,7 +67726,7 @@ BOOL WxSizerItemHasSizer(
  * Returns whether one sizer-item lane has neither a window child nor a nested
  * sizer child.
  */
-[[maybe_unused]] BOOL WxSizerItemHasNoChildRuntime(
+BOOL WxSizerItemHasNoChildRuntime(
   const WxSizerItemLayoutRuntimeView* const item
 )
 {
@@ -67767,7 +67767,7 @@ int WxSizerSetDimensionRuntime(
  * Resolves one fitting window-size lane by combining sizer minimum size with
  * non-client frame deltas (`windowSize - clientSize`).
  */
-[[maybe_unused]] wxSize* WxSizerComputeFittingWindowSizeRuntime(
+wxSize* WxSizerComputeFittingWindowSizeRuntime(
   WxSizerRuntimeInterface* const sizer,
   wxSize* const outSize,
   wxWindowBase* const window
@@ -67795,7 +67795,7 @@ int WxSizerSetDimensionRuntime(
  * What it does:
  * Returns one direct `wxSizer::GetMinSize` result lane.
  */
-[[maybe_unused]] wxSize* WxSizerGetMinSizeOutRuntime(
+wxSize* WxSizerGetMinSizeOutRuntime(
   WxSizerRuntimeInterface* const sizer,
   wxSize* const outSize,
   wxWindowBase* const window
@@ -67843,7 +67843,7 @@ wxSize* WxSizerGetMinSizeClamped(
  * Resolves grid-sizer output column/row lanes from current item count and
  * configured fixed row/column constraints.
  */
-[[maybe_unused]] int WxGridSizerResolveDimensions(
+int WxGridSizerResolveDimensions(
   const WxGridSizerRuntimeView* const gridSizer,
   int* const outColumns,
   int* const outRows
@@ -67902,7 +67902,7 @@ static_assert(
  * Resolves one aligned child rectangle from current-size and alignment flags,
  * then dispatches the final dimension update through the item runtime vtable.
  */
-[[maybe_unused]] int __stdcall wxSizerItemApplyAlignedDimensionRuntime(
+int __stdcall wxSizerItemApplyAlignedDimensionRuntime(
   void* const itemRuntime,
   int x,
   int y,
@@ -67952,7 +67952,7 @@ static_assert(
  * Queries static-box top border metric into `outTopBorder` and writes the
  * fixed horizontal border lane (`5`) into `outHorizontalBorder`.
  */
-[[maybe_unused]] int wxStaticBoxSizerResolveBorderMetricsRuntime(
+int wxStaticBoxSizerResolveBorderMetricsRuntime(
   void* const staticBoxRuntime,
   int* const outTopBorder,
   int* const outHorizontalBorder
@@ -68050,7 +68050,7 @@ static_assert(
  * Dispatches virtual slot `+0x6C` with one integer payload and returns that
  * payload unchanged.
  */
-[[maybe_unused]] int __stdcall wxDispatchVirtualSlot6CAndReturnInputRuntime(
+int __stdcall wxDispatchVirtualSlot6CAndReturnInputRuntime(
   const int value,
   void* const runtimeObject
 ) noexcept
@@ -68067,7 +68067,7 @@ static_assert(
  * Resolves one contained-window best-size lane and expands it by runtime
  * client/window origin deltas to produce sizer-item minimum dimensions.
  */
-[[maybe_unused]] int* wxSizerResolveContainedWindowBestSizeRuntime(
+int* wxSizerResolveContainedWindowBestSizeRuntime(
   int* const outSizeXY,
   int* const containedWindowRuntime
 )
@@ -68321,7 +68321,7 @@ namespace
  * (`+0x3C`, `+0x0C`) through deleting-dtor slot 1 and tail-calling wx-object
  * unref cleanup.
  */
-[[maybe_unused]] void wxDestroySizerItemNoDeleteRuntime(
+void wxDestroySizerItemNoDeleteRuntime(
   void* const sizerItemRuntime
 )
 {
@@ -68360,7 +68360,7 @@ std::uint8_t wxObjectSetDelayedDestroyFlag(
  * What it does:
  * Writes one protocol flag-word lane at `+0x64` and returns the written value.
  */
-[[maybe_unused]] std::int32_t wxProtocolSetRuntimeFlagWord64(
+std::int32_t wxProtocolSetRuntimeFlagWord64(
   void* const protocolRuntime,
   const std::int32_t flagWord
 ) noexcept
@@ -68400,7 +68400,7 @@ namespace
  * Conditionally swaps one 32-bit lane from little-endian to big-endian byte
  * order when runtime flag `+0x10` is enabled.
  */
-[[maybe_unused]] std::uint32_t wxMaybeSwapDwordEndianRuntime(
+std::uint32_t wxMaybeSwapDwordEndianRuntime(
   const WxEndianSwapRuntimeView* const runtime,
   const std::uint32_t value
 ) noexcept
@@ -68491,7 +68491,7 @@ std::size_t wxSocketConsumeStagedReadCacheRuntime(
  * `WxRuntimeTypes.cpp:61788` and the previously-fallback stub in
  * `EngineUnrecoveredStubs.cpp` now resolve to that real body.
  */
-[[maybe_unused]] void wxDestroyListNoDeleteRuntime(void* const listRuntime) noexcept;
+void wxDestroyListNoDeleteRuntime(void* const listRuntime) noexcept;
 
 /**
  * Address: 0x00A2E8A0 (FUN_00A2E8A0)
@@ -68502,7 +68502,7 @@ std::size_t wxSocketConsumeStagedReadCacheRuntime(
  * buffers, tearing down the embedded list lane at `+0x28`, then unrefing the
  * wxObject base.
  */
-[[maybe_unused]] void wxDestroySocketBaseNoDeleteRuntime(
+void wxDestroySocketBaseNoDeleteRuntime(
   WxSocketBaseRuntimeView* const socketBase
 ) noexcept
 {
@@ -68594,7 +68594,7 @@ namespace
  * Stops one running Win32 timer lane (when present), removes this wxTimer
  * object from the timer runtime list, then clears the stored native timer id.
  */
-[[maybe_unused]] std::uint8_t wxTimerStopAndUnlinkGlobalListRuntime(
+std::uint8_t wxTimerStopAndUnlinkGlobalListRuntime(
   void* const timerRuntime
 ) noexcept
 {
@@ -68618,7 +68618,7 @@ namespace
  * teardown, removes it from the timer runtime list, and finally executes the
  * shared wxEvent/wxObject unref tail lane.
  */
-[[maybe_unused]] void* wxDestroyTimerNoDeleteRuntime(
+void* wxDestroyTimerNoDeleteRuntime(
   void* const timerRuntime
 ) noexcept
 {
@@ -68638,7 +68638,7 @@ namespace
  * Tail-forward thunk that aliases the canonical non-deleting wxTimer teardown
  * lane (`FUN_009F2AA0`).
  */
-[[maybe_unused]] void* wxDestroyTimerNoDeleteThunkRuntimeAliasA(
+void* wxDestroyTimerNoDeleteThunkRuntimeAliasA(
   void* const timerRuntime
 ) noexcept
 {
@@ -68652,7 +68652,7 @@ namespace
  * Tail-forward thunk that aliases the canonical non-deleting wxTimer teardown
  * lane (`FUN_009F2AA0`).
  */
-[[maybe_unused]] void* wxDestroyTimerNoDeleteThunkRuntimeAliasB(
+void* wxDestroyTimerNoDeleteThunkRuntimeAliasB(
   void* const timerRuntime
 ) noexcept
 {
@@ -68666,7 +68666,7 @@ namespace
  * Runs non-deleting wxTimer teardown then conditionally frees object storage
  * when the deleting-thunk flag includes bit0.
  */
-[[maybe_unused]] void* wxDestroyTimerDeletingThunkRuntimeAliasA(
+void* wxDestroyTimerDeletingThunkRuntimeAliasA(
   void* const timerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -68685,7 +68685,7 @@ namespace
  * Runs non-deleting wxTimer teardown then conditionally frees object storage
  * when the deleting-thunk flag includes bit0.
  */
-[[maybe_unused]] void* wxDestroyTimerDeletingThunkRuntimeAliasB(
+void* wxDestroyTimerDeletingThunkRuntimeAliasB(
   void* const timerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -68704,7 +68704,7 @@ namespace
  * Runs non-deleting wxTimer teardown then conditionally frees object storage
  * when the deleting-thunk flag includes bit0.
  */
-[[maybe_unused]] void* wxDestroyTimerDeletingThunkRuntimeAliasC(
+void* wxDestroyTimerDeletingThunkRuntimeAliasC(
   void* const timerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -68723,7 +68723,7 @@ namespace
  * Tail-thunk lane that forwards directly to the canonical non-deleting wxTimer
  * teardown path.
  */
-[[maybe_unused]] void* wxDestroyTimerNoDeleteThunkRuntime(
+void* wxDestroyTimerNoDeleteThunkRuntime(
   void* const timerRuntime
 ) noexcept
 {
@@ -68737,7 +68737,7 @@ namespace
  * Runs non-deleting wxTimer teardown then conditionally frees object storage
  * when the deleting-thunk flag includes bit0.
  */
-[[maybe_unused]] void* wxDestroyTimerDeletingThunkRuntime(
+void* wxDestroyTimerDeletingThunkRuntime(
   void* const timerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -68805,7 +68805,7 @@ namespace
  * id payload when lookup key-kind transitions to string, then dispatches the
  * stored callback chain node when found.
  */
-[[maybe_unused]] void CALLBACK wxTimerCallbackRuntime(
+void CALLBACK wxTimerCallbackRuntime(
   HWND,
   UINT,
   const UINT_PTR timerIdPayload,
@@ -68856,7 +68856,7 @@ namespace
  * Initializes one `wxClientDataContainer` payload by binding the container
  * vtable lane and clearing both client-data pointer lanes.
  */
-[[maybe_unused]] WxClientDataContainerCtorRuntimeView* wxConstructClientDataContainerRuntime(
+WxClientDataContainerCtorRuntimeView* wxConstructClientDataContainerRuntime(
   WxClientDataContainerCtorRuntimeView* const containerRuntime
 ) noexcept
 {
@@ -68936,7 +68936,7 @@ namespace
  * semantics, then appends `'.' + extension` when the extension lane is
  * non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildFileNamePathWithOptionalExtensionRuntime(
+wxStringRuntime* wxBuildFileNamePathWithOptionalExtensionRuntime(
   const WxFileNamePathAndExtensionRuntimeView* const fileNameRuntime,
   wxStringRuntime* const outText
 ) noexcept
@@ -68987,7 +68987,7 @@ namespace
  * Selects preferred-or-fallback shared UTF-16 text lane, then writes one
  * refcounted pointer result into `outTextStorage`.
  */
-[[maybe_unused]] const wchar_t** wxSelectSharedStringChoiceLaneRuntime(
+const wchar_t** wxSelectSharedStringChoiceLaneRuntime(
   const WxSharedStringChoiceRuntimeView* const runtime,
   const wchar_t** const outTextStorage
 ) noexcept
@@ -69019,7 +69019,7 @@ namespace
  * non-empty; otherwise falls back to the global app string-choice lane, or
  * `wxEmptyString` when no fallback is available.
  */
-[[maybe_unused]] const wchar_t** wxResolveSharedStringOrAppFallbackRuntime(
+const wchar_t** wxResolveSharedStringOrAppFallbackRuntime(
   const wchar_t* const* const sourceTextStorage,
   const wchar_t** const outTextStorage
 ) noexcept
@@ -69078,7 +69078,7 @@ namespace
  * Copies one shared `wxFileDialog` selected-path lane (`mPath`, `+0x180`)
  * into `outValue`, preserving shared wx string ownership semantics.
  */
-[[maybe_unused]] wxStringRuntime* wxFileDialogGetPathRuntime(
+wxStringRuntime* wxFileDialogGetPathRuntime(
   const void* const fileDialogRuntime,
   wxStringRuntime* const outValue
 )
@@ -69094,7 +69094,7 @@ namespace
  * Copies one shared `wxFileDialog` directory lane (`mDirectory`, `+0x17C`)
  * into `outValue`, preserving shared wx string ownership semantics.
  */
-[[maybe_unused]] wxStringRuntime* wxFileDialogGetDirectoryRuntime(
+wxStringRuntime* wxFileDialogGetDirectoryRuntime(
   const void* const fileDialogRuntime,
   wxStringRuntime* const outValue
 )
@@ -69110,7 +69110,7 @@ namespace
  * Copies one shared `wxFileDialog` file-name lane (`mFileName`, `+0x184`)
  * into `outValue`, preserving shared wx string ownership semantics.
  */
-[[maybe_unused]] wxStringRuntime* wxFileDialogGetFileNameRuntime(
+wxStringRuntime* wxFileDialogGetFileNameRuntime(
   const void* const fileDialogRuntime,
   wxStringRuntime* const outValue
 )
@@ -69160,7 +69160,7 @@ namespace
  * Projects one world-space point lane to integer screen coordinates using one
  * cached affine runtime projection and anchor-mode vertical adjustment.
  */
-[[maybe_unused]] int* wxProjectWorldPointToScreenRuntime(
+int* wxProjectWorldPointToScreenRuntime(
   int* const outScreenPoint,
   const void* const projectionRuntime,
   const std::int32_t verticalAnchorMode,
@@ -69337,7 +69337,7 @@ namespace
    * timeout-bounded readability probe, then receives from connected or datagram
    * path and writes would-block/non-blocking error state lanes.
    */
-  [[maybe_unused]] int wxSocketReceiveWithRuntimeState(
+  int wxSocketReceiveWithRuntimeState(
     WxSocketTransportSendRuntimeView* const transport,
     char* const buffer,
     const int byteCount
@@ -70043,7 +70043,7 @@ namespace
  * Zeros one list-control runtime tail lane used by both `wxListCtrl` and
  * `wxListView` constructor paths.
  */
-[[maybe_unused]] int wxInitializeListCtrlRuntimeState(
+int wxInitializeListCtrlRuntimeState(
   void* const listControlRuntime
 )
 {
@@ -70072,7 +70072,7 @@ namespace
  * What it does:
  * Clears one radio-button checked-state lane during constructor initialization.
  */
-[[maybe_unused]] void wxInitializeRadioButtonRuntimeState(
+void wxInitializeRadioButtonRuntimeState(
   void* const radioButtonRuntime
 )
 {
@@ -70091,7 +70091,7 @@ namespace
  * Initializes one toolbar-base runtime tail lane by clearing tool-list storage
  * pointers and defaulting the "tool packing enabled" flag.
  */
-[[maybe_unused]] int wxInitializeToolBarBaseRuntimeState(
+int wxInitializeToolBarBaseRuntimeState(
   void* const toolBarRuntime
 )
 {
@@ -70116,7 +70116,7 @@ namespace
  * Seeds one toolbar runtime with default tool-size lanes `(16, 15)` and clears
  * supplemental metric lanes.
  */
-[[maybe_unused]] int wxInitializeToolBarRuntimeMetrics(
+int wxInitializeToolBarRuntimeMetrics(
   void* const toolBarRuntime
 )
 {
@@ -70140,7 +70140,7 @@ namespace
  * Initializes one process runtime lane by seeding process id/redirect mode and
  * clearing stream ownership lanes.
  */
-[[maybe_unused]] char wxInitializeProcessRuntimeState(
+char wxInitializeProcessRuntimeState(
   void* const processRuntime,
   const std::int32_t processData,
   const std::int32_t processId,
@@ -70171,7 +70171,7 @@ namespace
  * Clears one popup-transient-window runtime tail lane that retains popup owner
  * and transient child/parent pointers.
  */
-[[maybe_unused]] int wxInitializePopupTransientWindowRuntimeState(
+int wxInitializePopupTransientWindowRuntimeState(
   void* const popupRuntime
 )
 {
@@ -70297,7 +70297,7 @@ namespace
  * What it does:
  * Rebinds one `wxDateTimeWorkDays` payload to its vtable lane.
  */
-[[maybe_unused]] void* wxConstructDateTimeWorkDaysRuntime(
+void* wxConstructDateTimeWorkDaysRuntime(
   void* const dateTimeWorkDaysRuntime
 ) noexcept
 {
@@ -70311,7 +70311,7 @@ namespace
  * What it does:
  * Marks one date/time runtime initialization guard lane as initialized.
  */
-[[maybe_unused]] void* wxMarkDateTimeInitGuardLaneA(
+void* wxMarkDateTimeInitGuardLaneA(
   void* const runtimeObject
 ) noexcept
 {
@@ -70325,7 +70325,7 @@ namespace
  * What it does:
  * Marks a second date/time runtime initialization guard lane as initialized.
  */
-[[maybe_unused]] void* wxMarkDateTimeInitGuardLaneB(
+void* wxMarkDateTimeInitGuardLaneB(
   void* const runtimeObject
 ) noexcept
 {
@@ -70339,7 +70339,7 @@ namespace
  * What it does:
  * Marks a third date/time runtime initialization guard lane as initialized.
  */
-[[maybe_unused]] void* wxMarkDateTimeInitGuardLaneC(
+void* wxMarkDateTimeInitGuardLaneC(
   void* const runtimeObject
 ) noexcept
 {
@@ -70354,7 +70354,7 @@ namespace
  * Initializes one `wxURLModule` payload with `refData=null` and module vtable
  * dispatch.
  */
-[[maybe_unused]] void* wxConstructUrlModuleRuntime(
+void* wxConstructUrlModuleRuntime(
   void* const urlModuleRuntime
 ) noexcept
 {
@@ -70369,7 +70369,7 @@ namespace
  * Initializes one `wxLocaleModule` payload with `refData=null` and module
  * vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructLocaleModuleRuntime(
+void* wxConstructLocaleModuleRuntime(
   void* const localeModuleRuntime
 ) noexcept
 {
@@ -70384,7 +70384,7 @@ namespace
  * Initializes one `wxHelpProviderModule` payload with `refData=null` and
  * module vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructHelpProviderModuleRuntime(
+void* wxConstructHelpProviderModuleRuntime(
   void* const helpProviderModuleRuntime
 ) noexcept
 {
@@ -70402,7 +70402,7 @@ namespace
  * Initializes one `wxSystemSettingsModule` payload with `refData=null` and
  * module vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructSystemSettingsModuleRuntime(
+void* wxConstructSystemSettingsModuleRuntime(
   void* const systemSettingsModuleRuntime
 ) noexcept
 {
@@ -70420,7 +70420,7 @@ namespace
  * Initializes one `wxDCModule` payload with `refData=null` and module vtable
  * dispatch.
  */
-[[maybe_unused]] void* wxConstructDcModuleRuntime(
+void* wxConstructDcModuleRuntime(
   void* const dcModuleRuntime
 ) noexcept
 {
@@ -70435,7 +70435,7 @@ namespace
  * Returns the process-global two-wide-char prefix lane used by legacy hex
  * formatting helpers.
  */
-[[maybe_unused]] std::uint32_t wxGetHexPrefixWordPairRuntime() noexcept
+std::uint32_t wxGetHexPrefixWordPairRuntime() noexcept
 {
   return gWxHexPrefixWordPair;
 }
@@ -70447,7 +70447,7 @@ namespace
  * Returns the process-global default font-encoding lane used by font-mapper
  * fallback paths.
  */
-[[maybe_unused]] std::int32_t wxGetDefaultFontEncodingRuntime() noexcept
+std::int32_t wxGetDefaultFontEncodingRuntime() noexcept
 {
   return gWxDefaultFontEncodingRuntime;
 }
@@ -70459,7 +70459,7 @@ namespace
  * Initializes one `wxFontMapperModule` payload with `refData=null` and module
  * vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructFontMapperModuleRuntime(
+void* wxConstructFontMapperModuleRuntime(
   void* const fontMapperModuleRuntime
 ) noexcept
 {
@@ -70477,7 +70477,7 @@ namespace
  * Seeds one shared-string pair lane by storing the shared data pointer and
  * defaulting the text lane to process-global `wxEmptyString`.
  */
-[[maybe_unused]] WxSharedTextPairRuntimeView* wxInitializeSharedTextPairRuntime(
+WxSharedTextPairRuntimeView* wxInitializeSharedTextPairRuntime(
   WxSharedTextPairRuntimeView* const runtime,
   void* const sharedDataLane
 ) noexcept
@@ -70498,7 +70498,7 @@ namespace
  * Initializes one `wxTreeTraversal` payload by binding traversal dispatch and
  * storing the owner-tree lane.
  */
-[[maybe_unused]] void* wxConstructTreeTraversalRuntime(
+void* wxConstructTreeTraversalRuntime(
   void* const treeTraversalRuntime,
   void* const ownerTreeLane
 ) noexcept
@@ -70517,7 +70517,7 @@ namespace
  * What it does:
  * Rebinds one `wxDirTraverser` payload to its dispatch-vtable lane.
  */
-[[maybe_unused]] void* wxConstructDirTraverserRuntime(
+void* wxConstructDirTraverserRuntime(
   void* const dirTraverserRuntime
 ) noexcept
 {
@@ -70532,7 +70532,7 @@ namespace
  * Initializes one `wxDirTraverserSimple` payload by binding dispatch and
  * storing the source directory lane.
  */
-[[maybe_unused]] void* wxConstructDirTraverserSimpleRuntime(
+void* wxConstructDirTraverserSimpleRuntime(
   void* const dirTraverserSimpleRuntime,
   void* const sourceDirectoryLane
 ) noexcept
@@ -70551,7 +70551,7 @@ namespace
  * What it does:
  * Returns the process-global owner-drawn baseline font-height lane.
  */
-[[maybe_unused]] std::int32_t wxGetOwnerDrawnFontHeightBaselineRuntime() noexcept
+std::int32_t wxGetOwnerDrawnFontHeightBaselineRuntime() noexcept
 {
   return gWxOwnerDrawnFontHeightBaseline;
 }
@@ -70563,7 +70563,7 @@ namespace
  * Initializes one `wxMSWSystemMenuFontModule` payload with `refData=null` and
  * module vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructMswSystemMenuFontModuleRuntime(
+void* wxConstructMswSystemMenuFontModuleRuntime(
   void* const systemMenuFontModuleRuntime
 ) noexcept
 {
@@ -70580,7 +70580,7 @@ namespace
  * What it does:
  * Returns the process-global `wxLog::ms_timestamp` pointer lane.
  */
-[[maybe_unused]] wchar_t* wxGetLogTimestampStorageRuntime() noexcept
+wchar_t* wxGetLogTimestampStorageRuntime() noexcept
 {
   return gWxLogTimestampRuntime;
 }
@@ -70635,7 +70635,7 @@ namespace
  * Returns the address of the last dword entry from one count+pointer lane
  * pair (`entries + entryCount*4 - 4`).
  */
-[[maybe_unused]] std::intptr_t wxGetLastDwordEntryAddressRuntime(
+std::intptr_t wxGetLastDwordEntryAddressRuntime(
   const WxDwordArrayCursorRuntimeView* const runtime
 ) noexcept
 {
@@ -70650,7 +70650,7 @@ namespace
  * What it does:
  * Stores one byte lane at runtime offset `+0x10` and returns it.
  */
-[[maybe_unused]] std::uint8_t wxStoreByteLane10Runtime(
+std::uint8_t wxStoreByteLane10Runtime(
   WxByteLane10RuntimeView* const runtime,
   const std::uint8_t value
 ) noexcept
@@ -70665,7 +70665,7 @@ namespace
  * What it does:
  * Seeds one runtime dword lane to `-1` and returns the runtime pointer.
  */
-[[maybe_unused]] WxDwordLane00RuntimeView* wxInitializeDwordMinusOneSentinelRuntime(
+WxDwordLane00RuntimeView* wxInitializeDwordMinusOneSentinelRuntime(
   WxDwordLane00RuntimeView* const runtime
 ) noexcept
 {
@@ -70679,7 +70679,7 @@ namespace
  * What it does:
  * Reads one byte lane at runtime offset `+0x18`.
  */
-[[maybe_unused]] std::uint8_t wxReadByteLane18Runtime(
+std::uint8_t wxReadByteLane18Runtime(
   const WxByteLanes14And18RuntimeView* const runtime
 ) noexcept
 {
@@ -70692,7 +70692,7 @@ namespace
  * What it does:
  * Reads one byte lane at runtime offset `+0x14`.
  */
-[[maybe_unused]] std::uint8_t wxReadByteLane14Runtime(
+std::uint8_t wxReadByteLane14Runtime(
   const WxByteLanes14And18RuntimeView* const runtime
 ) noexcept
 {
@@ -70705,7 +70705,7 @@ namespace
  * What it does:
  * Returns one pointer to the runtime sub-lane rooted at offset `+0x70`.
  */
-[[maybe_unused]] std::uint8_t* wxGetSubLane70Runtime(
+std::uint8_t* wxGetSubLane70Runtime(
   WxByteLanes14And18RuntimeView* const runtime
 ) noexcept
 {
@@ -70718,7 +70718,7 @@ namespace
  * What it does:
  * Returns the process-global wx log-dialog runtime flag lane.
  */
-[[maybe_unused]] bool wxGetLogDialogRuntimeFlag() noexcept
+bool wxGetLogDialogRuntimeFlag() noexcept
 {
   return gWxLogDialogRuntimeFlag != 0u;
 }
@@ -70730,7 +70730,7 @@ namespace
  * Initializes one `wxQuantize` payload with `refData=null` and dispatch
  * vtable binding.
  */
-[[maybe_unused]] void* wxConstructQuantizeRuntime(
+void* wxConstructQuantizeRuntime(
   void* const quantizeRuntime
 ) noexcept
 {
@@ -70744,7 +70744,7 @@ namespace
  * What it does:
  * Returns the process-global shared-library extension suffix lane (`".dll"`).
  */
-[[maybe_unused]] const wchar_t* wxGetSharedLibrarySuffixRuntime() noexcept
+const wchar_t* wxGetSharedLibrarySuffixRuntime() noexcept
 {
   return gWxPluginLibraryExtensionSuffix;
 }
@@ -70756,7 +70756,7 @@ namespace
  * Initializes one `wxPluginLibraryModule` payload with `refData=null` and
  * module vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructPluginLibraryModuleRuntime(
+void* wxConstructPluginLibraryModuleRuntime(
   void* const pluginLibraryModuleRuntime
 ) noexcept
 {
@@ -70794,7 +70794,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * What it does:
  * Returns the process-global wx window-base event-table probe pointer lane.
  */
-[[maybe_unused]] std::intptr_t wxGetWindowBaseEventTableProbeLane() noexcept
+std::intptr_t wxGetWindowBaseEventTableProbeLane() noexcept
 {
   return reinterpret_cast<std::intptr_t>(gWxWindowBaseEventTableProbeRuntime);
 }
@@ -70806,7 +70806,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Initializes one default-encoding descriptor lane to
  * `(wxEmptyString, -1, 0)`.
  */
-[[maybe_unused]] WxDefaultEncodingDescriptorRuntimeView* wxConstructDefaultEncodingDescriptorRuntime(
+WxDefaultEncodingDescriptorRuntimeView* wxConstructDefaultEncodingDescriptorRuntime(
   WxDefaultEncodingDescriptorRuntimeView* const runtime
 ) noexcept
 {
@@ -70824,7 +70824,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Initializes one `wxModule` payload by clearing ref-data and binding the
  * module dispatch-vtable lane.
  */
-[[maybe_unused]] WxObjectRuntimeView* wxConstructModuleRuntime(
+WxObjectRuntimeView* wxConstructModuleRuntime(
   WxObjectRuntimeView* const moduleRuntime
 ) noexcept
 {
@@ -70841,7 +70841,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Returns the runtime image-handler registry list lane (`wxImage::sm_handlers`
  * equivalent).
  */
-[[maybe_unused]] wxListRuntime* wxGetImageHandlerRegistryRuntimeList() noexcept
+wxListRuntime* wxGetImageHandlerRegistryRuntimeList() noexcept
 {
   return &gWxImageHandlerRegistryRuntimeList;
 }
@@ -70853,7 +70853,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Initializes one `wxImageModule` payload by clearing ref-data and binding the
  * image-module dispatch-vtable lane.
  */
-[[maybe_unused]] WxObjectRuntimeView* wxConstructImageModuleRuntime(
+WxObjectRuntimeView* wxConstructImageModuleRuntime(
   WxObjectRuntimeView* const imageModuleRuntime
 ) noexcept
 {
@@ -70870,7 +70870,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Initializes one `wxMask` payload by clearing ref-data, binding the mask
  * vtable lane, and storing the provided native-mask handle lane.
  */
-[[maybe_unused]] WxMaskRuntimeView* wxConstructMaskRuntimeWithNativeHandle(
+WxMaskRuntimeView* wxConstructMaskRuntimeWithNativeHandle(
   WxMaskRuntimeView* const maskRuntime,
   const HBITMAP nativeMaskHandle
 ) noexcept
@@ -70888,7 +70888,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Initializes one `wxRegionRefData` payload (`refCount=1`, `regionHandle=0`)
  * and binds the region-refdata dispatch-vtable lane.
  */
-[[maybe_unused]] WxRegionRefDataRuntimeView* wxConstructRegionRefDataRuntime(
+WxRegionRefDataRuntimeView* wxConstructRegionRefDataRuntime(
   WxRegionRefDataRuntimeView* const regionRefDataRuntime
 ) noexcept
 {
@@ -70906,7 +70906,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Updates the process-global default encoding lane when `encodingId` is
  * non-zero, then returns the input value.
  */
-[[maybe_unused]] std::int32_t wxSetDefaultEncodingRuntimeIfNonZero(
+std::int32_t wxSetDefaultEncodingRuntimeIfNonZero(
   const std::int32_t encodingId
 ) noexcept
 {
@@ -70922,7 +70922,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * What it does:
  * Rebinds one `wxMBConv` payload to its dispatch-vtable lane.
  */
-[[maybe_unused]] void* wxConstructMbConvRuntime(
+void* wxConstructMbConvRuntime(
   void* const mbConvRuntime
 ) noexcept
 {
@@ -70937,7 +70937,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * Initializes one `wxStrConvModule` payload by clearing ref-data and binding
  * the str-conv-module dispatch-vtable lane.
  */
-[[maybe_unused]] WxObjectRuntimeView* wxConstructStrConvModuleRuntime(
+WxObjectRuntimeView* wxConstructStrConvModuleRuntime(
   WxObjectRuntimeView* const strConvModuleRuntime
 ) noexcept
 {
@@ -70953,7 +70953,7 @@ wxListRuntime gWxImageHandlerRegistryRuntimeList{};
  * What it does:
  * Rebinds one `wxMBConvUTF7` payload to its dispatch-vtable lane.
  */
-[[maybe_unused]] void* wxConstructMbConvUtf7Runtime(
+void* wxConstructMbConvUtf7Runtime(
   void* const mbConvUtf7Runtime
 ) noexcept
 {
@@ -70979,7 +70979,7 @@ namespace
  * allocates one NUL-terminated multi-byte buffer, writes converted bytes into
  * that buffer, and stores it in `outTextStorage`.
  */
-[[maybe_unused]] char** wxConvertWideTextToAllocatedMultiByteRuntime(
+char** wxConvertWideTextToAllocatedMultiByteRuntime(
   void* const converterRuntime,
   char** const outTextStorage,
   const void* const sourceWideText
@@ -71023,7 +71023,7 @@ namespace
  * `FUN_0097F8B0` and writes the resulting allocated multi-byte pointer into
  * `outTextStorage`.
  */
-[[maybe_unused]] char** wxConvertStoredWideTextToAllocatedMultiByteRuntime(
+char** wxConvertStoredWideTextToAllocatedMultiByteRuntime(
   const WxSourceTextLaneRuntimeView* const sourceRuntime,
   char** const outTextStorage,
   void* const converterRuntime
@@ -71044,7 +71044,7 @@ namespace
  * Converts one stored wide-text source lane using the process-global current
  * converter lane (`wxConvCurrent`) and returns caller output storage.
  */
-[[maybe_unused]] char** wxConvertStoredWideTextToAllocatedMultiByteUsingCurrentConverterRuntime(
+char** wxConvertStoredWideTextToAllocatedMultiByteUsingCurrentConverterRuntime(
   const WxSourceTextLaneRuntimeView* const sourceRuntime,
   char** const outTextStorage
 )
@@ -71065,7 +71065,7 @@ namespace
  * writes the converted byte span into one `wxFile` lane, and returns whether
  * the full byte span was written.
  */
-[[maybe_unused]] bool wxFileWriteStoredWideTextWithConverterRuntime(
+bool wxFileWriteStoredWideTextWithConverterRuntime(
   wxFile* const fileRuntime,
   const WxSourceTextLaneRuntimeView* const sourceRuntime,
   void* const converterRuntime
@@ -71092,7 +71092,7 @@ namespace
  * address port lane; writes runtime error codes `3` or `6` on invalid state
  * and service-name failures.
  */
-[[maybe_unused]] int wxSocketSetServiceNameRuntime(
+int wxSocketSetServiceNameRuntime(
   WxSocketPortRuntimeView* const socketPort,
   const char* const serviceName,
   const char* const protocolName
@@ -71135,7 +71135,7 @@ namespace
  * Rejects the `"Default"` host sentinel with one localized log message, or
  * stores the host-name string and resolves it into the owned IPv4 socket lane.
  */
-[[maybe_unused]] bool wxIpv4AddressSetHostNameFromWideTextRuntime(
+bool wxIpv4AddressSetHostNameFromWideTextRuntime(
   WxIpv4AddressRuntimeView* const addressRuntime,
   const wxStringRuntime* const hostNameText
 )
@@ -71172,7 +71172,7 @@ namespace
  * Converts one stored wide-text service lane using `wxConvLibc`, resolves it
  * as a TCP service on the owned socket-address port lane, and returns success.
  */
-[[maybe_unused]] bool wxSockAddressSetTcpServiceFromStoredWideTextRuntime(
+bool wxSockAddressSetTcpServiceFromStoredWideTextRuntime(
   WxSockAddressPortOwnerRuntimeView* const addressRuntime,
   const WxSourceTextLaneRuntimeView* const sourceRuntime
 )
@@ -71201,7 +71201,7 @@ namespace
  * it through the socket-write status lane, then returns the classified reply
  * status digit; sets status code `9`/`1` on abort/write-failure lanes.
  */
-[[maybe_unused]] char wxFtpSendCommandAndClassifyReplyRuntime(
+char wxFtpSendCommandAndClassifyReplyRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   wxStringRuntime* const commandText
 )
@@ -71255,7 +71255,7 @@ namespace
  * through the shared command/reply lane, and returns whether reply class is
  * positive completion (`'2'`); logs command text on failure.
  */
-[[maybe_unused]] bool wxFtpSendCommandExpectPositiveCompletionRuntime(
+bool wxFtpSendCommandExpectPositiveCompletionRuntime(
   WxFtpSocketIoRuntimeView* const runtime,
   const wchar_t* const commandVerb,
   const wxStringRuntime* const commandSuffix
@@ -71304,7 +71304,7 @@ namespace
  * forwards to `wxSocketBaseShutdownRuntime` for the socket-base teardown and
  * returns its result.
  */
-[[maybe_unused]] bool wxFtpCloseConnectionRuntime(
+bool wxFtpCloseConnectionRuntime(
   WxFtpSocketIoRuntimeView* const runtime
 ) noexcept
 {
@@ -71339,7 +71339,7 @@ namespace
  * Forwards one converter/source-wide-text request into
  * `FUN_0097F8B0` and returns caller output storage.
  */
-[[maybe_unused]] char** wxConvertWideTextToAllocatedMultiByteRuntimeAdapter(
+char** wxConvertWideTextToAllocatedMultiByteRuntimeAdapter(
   void* const converterRuntime,
   char** const outTextStorage,
   const void* const sourceWideText
@@ -71360,7 +71360,7 @@ namespace
  * Allocates one default `wxFont` runtime payload (`refData=null`,
  * state-flag cleared) and binds the font dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateFontObjectRuntimeClassInstance()
+void* wxCreateFontObjectRuntimeClassInstance()
 {
   static std::uint8_t sWxFontRuntimeVTableTag = 0;
   return wxCreateSimpleObjectWithFlagRuntimeClassInstance(&sWxFontRuntimeVTableTag);
@@ -71373,7 +71373,7 @@ namespace
  * Allocates one default `wxImageModule` runtime payload and binds its module
  * dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateImageModuleRuntimeClassInstance()
+void* wxCreateImageModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxImageModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxImageModuleRuntimeVTableTag);
@@ -71386,7 +71386,7 @@ namespace
  * Allocates one default `wxBitmap` runtime payload (`refData=null`,
  * state-flag cleared) and binds the bitmap dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateBitmapObjectRuntimeClassInstance()
+void* wxCreateBitmapObjectRuntimeClassInstance()
 {
   static std::uint8_t sWxBitmapRuntimeVTableTag = 0;
   return wxCreateSimpleObjectWithFlagRuntimeClassInstance(&sWxBitmapRuntimeVTableTag);
@@ -71399,7 +71399,7 @@ namespace
  * Allocates one default `wxGDIObject` runtime payload (`refData=null`,
  * state-flag cleared) and binds the base GDI-object dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateGdiObjectRuntimeClassInstance()
+void* wxCreateGdiObjectRuntimeClassInstance()
 {
   static std::uint8_t sWxGdiObjectRuntimeVTableTag = 0;
   return wxCreateSimpleObjectWithFlagRuntimeClassInstance(&sWxGdiObjectRuntimeVTableTag);
@@ -71412,7 +71412,7 @@ namespace
  * Allocates one default `wxStrConvModule` runtime payload and binds its module
  * dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateStrConvModuleRuntimeClassInstance()
+void* wxCreateStrConvModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxStrConvModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxStrConvModuleRuntimeVTableTag);
@@ -71425,7 +71425,7 @@ namespace
  * Allocates one default `wxTLWHiddenParentModule` runtime payload and binds
  * its module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateTlwHiddenParentModuleRuntimeClassInstance()
+void* wxCreateTlwHiddenParentModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxTlwHiddenParentModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxTlwHiddenParentModuleRuntimeVTableTag);
@@ -71438,7 +71438,7 @@ namespace
  * Initializes one existing `wxTLWHiddenParentModule` payload by clearing
  * ref-data and binding the module constructor vtable lane.
  */
-[[maybe_unused]] void* wxConstructTlwHiddenParentModuleRuntime(
+void* wxConstructTlwHiddenParentModuleRuntime(
   void* const moduleRuntime
 ) noexcept
 {
@@ -71453,7 +71453,7 @@ namespace
  * Allocates one default `wxRichEditModule` runtime payload and binds its
  * module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateRichEditModuleRuntimeClassInstance()
+void* wxCreateRichEditModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxRichEditModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxRichEditModuleRuntimeVTableTag);
@@ -71466,7 +71466,7 @@ namespace
  * Initializes one existing `wxRichEditModule` payload by clearing ref-data
  * and binding the module constructor vtable lane.
  */
-[[maybe_unused]] void* wxConstructRichEditModuleRuntime(
+void* wxConstructRichEditModuleRuntime(
   void* const moduleRuntime
 ) noexcept
 {
@@ -71481,7 +71481,7 @@ namespace
  * Allocates one default `wxIcon` runtime payload (`refData=null`,
  * state-flag cleared) and binds the icon dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateIconObjectRuntimeClassInstance()
+void* wxCreateIconObjectRuntimeClassInstance()
 {
   static std::uint8_t sWxIconRuntimeVTableTag = 0;
   return wxCreateSimpleObjectWithFlagRuntimeClassInstance(&sWxIconRuntimeVTableTag);
@@ -71503,7 +71503,7 @@ static_assert(offsetof(WxIconDestroyRuntimeView, nativeIconHandle) == 0x14, "WxI
  * What it does:
  * Destroys one owned Win32 icon handle lane and clears the stored handle.
  */
-[[maybe_unused]] int wxDestroyIconHandleRuntime(
+int wxDestroyIconHandleRuntime(
   WxIconDestroyRuntimeView* const iconRuntime
 ) noexcept
 {
@@ -71634,7 +71634,7 @@ namespace
  * bitmap, compositing mask/color planes with `SRCAND`, creating the icon
  * handle, and publishing size+handle lanes to icon ref-data storage.
  */
-[[maybe_unused]] BOOL wxIconCreateFromBitmapRuntime(
+BOOL wxIconCreateFromBitmapRuntime(
   WxIconObjectRuntimeView* const iconRuntime,
   const WxBitmapIconRuntimeView* const bitmapRuntime
 ) noexcept
@@ -71704,7 +71704,7 @@ namespace
  * Allocates one default `wxThreadModule` runtime payload and binds its module
  * dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateThreadModuleRuntimeClassInstance()
+void* wxCreateThreadModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxThreadModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxThreadModuleRuntimeVTableTag);
@@ -71717,7 +71717,7 @@ namespace
  * Initializes one existing `wxThreadModule` payload by clearing ref-data and
  * binding the module constructor vtable lane.
  */
-[[maybe_unused]] void* wxConstructThreadModuleRuntime(
+void* wxConstructThreadModuleRuntime(
   void* const moduleRuntime
 ) noexcept
 {
@@ -71732,7 +71732,7 @@ namespace
  * Allocates one default `wxDateTimeHolidaysModule` runtime payload and binds
  * its module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateDateTimeHolidaysModuleRuntimeClassInstance()
+void* wxCreateDateTimeHolidaysModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxDateTimeHolidaysModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxDateTimeHolidaysModuleRuntimeVTableTag);
@@ -71745,7 +71745,7 @@ namespace
  * Initializes one existing `wxDateTimeHolidaysModule` payload by clearing
  * ref-data and binding the module constructor vtable lane.
  */
-[[maybe_unused]] void* wxConstructDateTimeHolidaysModuleRuntime(
+void* wxConstructDateTimeHolidaysModuleRuntime(
   void* const moduleRuntime
 ) noexcept
 {
@@ -71760,7 +71760,7 @@ namespace
  * Rebinds one `wxDateTimeHolidayAuthority` payload to its constructor vtable
  * lane.
  */
-[[maybe_unused]] void* wxConstructDateTimeHolidayAuthorityRuntime(
+void* wxConstructDateTimeHolidayAuthorityRuntime(
   void* const authorityRuntime
 ) noexcept
 {
@@ -71775,7 +71775,7 @@ namespace
  * Allocates one default `wxURLModule` runtime payload and binds its module
  * dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateUrlModuleRuntimeClassInstance()
+void* wxCreateUrlModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxUrlModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxUrlModuleRuntimeVTableTag);
@@ -71788,7 +71788,7 @@ namespace
  * Allocates one default `wxLocaleModule` runtime payload and binds its module
  * dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateLocaleModuleRuntimeClassInstance()
+void* wxCreateLocaleModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxLocaleModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxLocaleModuleRuntimeVTableTag);
@@ -71801,7 +71801,7 @@ namespace
  * Deletes the global help-provider singleton runtime object (if present), then
  * clears that singleton pointer lane.
  */
-[[maybe_unused]] int wxHelpProviderDestroyGlobalRuntime()
+int wxHelpProviderDestroyGlobalRuntime()
 {
   int deleteResult = 0;
   if (gWxHelpProviderRuntime != nullptr) {
@@ -71818,7 +71818,7 @@ namespace
  * Allocates one default `wxHelpProviderModule` runtime payload and binds its
  * module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateHelpProviderModuleRuntimeClassInstance()
+void* wxCreateHelpProviderModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxHelpProviderModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxHelpProviderModuleRuntimeVTableTag);
@@ -71831,7 +71831,7 @@ namespace
  * Deletes the cached default-system-font runtime object (if present), then
  * clears that singleton font pointer lane.
  */
-[[maybe_unused]] int wxSystemSettingsDestroyDefaultFontRuntime()
+int wxSystemSettingsDestroyDefaultFontRuntime()
 {
   int deleteResult = 0;
   if (gWxSystemDefaultFontRuntime != nullptr) {
@@ -71848,7 +71848,7 @@ namespace
  * Deletes the process-global current-font runtime lane (when present) and
  * clears the singleton pointer.
  */
-[[maybe_unused]] int wxSystemSettingsDestroyCurrentFontRuntime()
+int wxSystemSettingsDestroyCurrentFontRuntime()
 {
   int deleteResult = 0;
   if (gWxSystemDefaultFontRuntime != nullptr) {
@@ -71865,7 +71865,7 @@ namespace
  * Allocates one default `wxSystemSettingsModule` runtime payload and binds
  * its module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateSystemSettingsModuleRuntimeClassInstance()
+void* wxCreateSystemSettingsModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxSystemSettingsModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxSystemSettingsModuleRuntimeVTableTag);
@@ -71878,7 +71878,7 @@ namespace
  * Allocates one default `wxDCModule` runtime payload and binds its module
  * dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateDcModuleRuntimeClassInstance()
+void* wxCreateDcModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxDcModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxDcModuleRuntimeVTableTag);
@@ -71891,7 +71891,7 @@ namespace
  * Allocates one default `wxFontMapperModule` runtime payload and binds its
  * module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateFontMapperModuleRuntimeClassInstance()
+void* wxCreateFontMapperModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxFontMapperModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxFontMapperModuleRuntimeVTableTag);
@@ -71914,7 +71914,7 @@ static_assert(
  * What it does:
  * Copies one byte lane into an indirect destination pointer lane.
  */
-[[maybe_unused]] std::uint8_t* wxCopyByteToIndirectLaneRuntime(
+std::uint8_t* wxCopyByteToIndirectLaneRuntime(
   void* const runtimeView
 ) noexcept
 {
@@ -71931,7 +71931,7 @@ static_assert(
  * Allocates one default `wxMSWSystemMenuFontModule` runtime payload and binds
  * its module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreateMswSystemMenuFontModuleRuntimeClassInstance()
+void* wxCreateMswSystemMenuFontModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxMswSystemMenuFontModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxMswSystemMenuFontModuleRuntimeVTableTag);
@@ -71944,7 +71944,7 @@ static_assert(
  * Allocates one default `wxQuantize` runtime payload and binds its dispatch
  * vtable lane.
  */
-[[maybe_unused]] void* wxCreateQuantizeRuntimeClassInstance()
+void* wxCreateQuantizeRuntimeClassInstance()
 {
   static std::uint8_t sWxQuantizeRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxQuantizeRuntimeVTableTag);
@@ -71980,7 +71980,7 @@ namespace
  * Accumulates RGB triplets from each input row into one 5:6:5 quantize
  * histogram cube; zero-overflow counters saturate to `0xFFFF`.
  */
-[[maybe_unused]] std::uint16_t* wxQuantizeAccumulateRgbHistogramRuntime(
+std::uint16_t* wxQuantizeAccumulateRgbHistogramRuntime(
   WxQuantizeHistogramAccumulatorRuntimeView* const accumulator,
   const std::uint8_t* const* const rowTriplets,
   const int reservedArg0,
@@ -72019,7 +72019,7 @@ namespace
  * Allocates one default `wxPluginLibraryModule` runtime payload and binds its
  * module dispatch vtable lane.
  */
-[[maybe_unused]] void* wxCreatePluginLibraryModuleRuntimeClassInstance()
+void* wxCreatePluginLibraryModuleRuntimeClassInstance()
 {
   static std::uint8_t sWxPluginLibraryModuleRuntimeVTableTag = 0;
   return wxCreateSimpleObjectRuntimeClassInstance(&sWxPluginLibraryModuleRuntimeVTableTag);
@@ -72031,7 +72031,7 @@ namespace
  * What it does:
  * Allocates one default `wxTextCtrl` class-factory instance payload.
  */
-[[maybe_unused]] void* wxCreateTextCtrlRuntimeClassInstance()
+void* wxCreateTextCtrlRuntimeClassInstance()
 {
   return new (std::nothrow) WxTextCtrlClassFactoryRuntimeView{};
 }
@@ -72043,7 +72043,7 @@ namespace
  * Runs one wx-control base construction lane and rebinds the object to the
  * wxTreeListCtrl dispatch vtable lane.
  */
-[[maybe_unused]] void* wxConstructTreeListCtrlFromControlBase(
+void* wxConstructTreeListCtrlFromControlBase(
   void* const treeListCtrlRuntime
 ) noexcept
 {
@@ -72063,7 +72063,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxTreeListCtrl` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateTreeListCtrlRuntimeClassInstance()
+void* wxCreateTreeListCtrlRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxTreeListCtrlClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72080,7 +72080,7 @@ namespace
  * Allocates one `wxDialog` runtime payload and runs the default dialog
  * constructor lane.
  */
-[[maybe_unused]] wxDialogRuntime* wxCreateDialogRuntimeClassInstance()
+wxDialogRuntime* wxCreateDialogRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(wxDialogRuntime), std::nothrow);
   if (storage == nullptr) {
@@ -72117,7 +72117,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxButton` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateButtonRuntimeClassInstance()
+void* wxCreateButtonRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxControl130ClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72133,7 +72133,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxStaticText` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateStaticTextRuntimeClassInstance()
+void* wxCreateStaticTextRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxControl130ClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72153,7 +72153,7 @@ namespace
  * Allocates one `wxBMPFileHandler` runtime payload and runs its default
  * handler-constructor lane.
  */
-[[maybe_unused]] wxBmpFileHandlerRuntime* wxCreateBmpFileHandlerRuntimeClassInstance()
+wxBmpFileHandlerRuntime* wxCreateBmpFileHandlerRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(wxBmpFileHandlerRuntime), std::nothrow);
   if (storage == nullptr) {
@@ -72170,7 +72170,7 @@ namespace
  * Allocates one `wxBMPResourceHandler` runtime payload and runs its default
  * handler-constructor lane.
  */
-[[maybe_unused]] wxBmpResourceHandlerRuntime* wxCreateBmpResourceHandlerRuntimeClassInstance()
+wxBmpResourceHandlerRuntime* wxCreateBmpResourceHandlerRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(wxBmpResourceHandlerRuntime), std::nothrow);
   if (storage == nullptr) {
@@ -72187,7 +72187,7 @@ namespace
  * Allocates one `wxICOFileHandler` runtime payload and runs its default
  * handler-constructor lane.
  */
-[[maybe_unused]] wxIcoFileHandlerRuntime* wxCreateIcoFileHandlerRuntimeClassInstance()
+wxIcoFileHandlerRuntime* wxCreateIcoFileHandlerRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(wxIcoFileHandlerRuntime), std::nothrow);
   if (storage == nullptr) {
@@ -72204,7 +72204,7 @@ namespace
  * Allocates one `wxICOResourceHandler` runtime payload and runs its default
  * handler-constructor lane.
  */
-[[maybe_unused]] wxIcoResourceHandlerRuntime* wxCreateIcoResourceHandlerRuntimeClassInstance()
+wxIcoResourceHandlerRuntime* wxCreateIcoResourceHandlerRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(wxIcoResourceHandlerRuntime), std::nothrow);
   if (storage == nullptr) {
@@ -72220,7 +72220,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxStaticBox` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateStaticBoxRuntimeClassInstance()
+void* wxCreateStaticBoxRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxControl130ClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72239,7 +72239,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxCheckBox` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateCheckBoxRuntimeClassInstance()
+void* wxCreateCheckBoxRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxControl130ClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72260,7 +72260,7 @@ namespace
  * state, clearing four embedded bitmap lanes, and zeroing bitmap-button tail
  * metrics.
  */
-[[maybe_unused]] void* wxConstructBitmapButtonBaseRuntime(
+void* wxConstructBitmapButtonBaseRuntime(
   void* const bitmapButtonRuntime
 )
 {
@@ -72298,7 +72298,7 @@ namespace
  * the bitmap-button base lanes, seeds default margins, and rebinds the
  * instance to the `wxBitmapButton` dispatch lane.
  */
-[[maybe_unused]] void* wxCreateBitmapButtonRuntimeClassInstance()
+void* wxCreateBitmapButtonRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxBitmapButtonClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72322,7 +72322,7 @@ namespace
  * bitmap lanes in reverse order, rebinding to `wxButton` vtable, then
  * tail-calling `wxControl` base destruction.
  */
-[[maybe_unused]] void* wxDestroyBitmapButtonBaseRuntimeNoDeleteThunk(
+void* wxDestroyBitmapButtonBaseRuntimeNoDeleteThunk(
   void* const bitmapButtonRuntime
 ) noexcept
 {
@@ -72349,7 +72349,7 @@ namespace
  * Runs bitmap-button base non-deleting teardown and conditionally scalar-
  * deletes storage when bit0 is set in `deleteFlags`.
  */
-[[maybe_unused]] void* wxDestroyBitmapButtonBaseRuntimeDeleteFlagThunk(
+void* wxDestroyBitmapButtonBaseRuntimeDeleteFlagThunk(
   void* const bitmapButtonRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -72368,7 +72368,7 @@ namespace
  * Jump-only adapter lane that forwards to bitmap-button base non-deleting
  * teardown thunk.
  */
-[[maybe_unused]] void* wxDestroyBitmapButtonBaseRuntimeNoDeleteAdapter(
+void* wxDestroyBitmapButtonBaseRuntimeNoDeleteAdapter(
   void* const bitmapButtonRuntime
 ) noexcept
 {
@@ -72382,7 +72382,7 @@ namespace
  * Jump-only adapter lane that forwards bitmap-button base non-deleting
  * teardown into the canonical thunk.
  */
-[[maybe_unused]] void* wxDestroyBitmapButtonBaseRuntimeNoDeleteAdapterB(
+void* wxDestroyBitmapButtonBaseRuntimeNoDeleteAdapterB(
   void* const bitmapButtonRuntime
 ) noexcept
 {
@@ -72395,7 +72395,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxFontList` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateFontListRuntimeClassInstance()
+void* wxCreateFontListRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxStockListClassFactoryRuntimeView();
   if (runtime == nullptr) {
@@ -72413,7 +72413,7 @@ namespace
  * What it does:
  * Allocates and seeds one default `wxPenList` class-factory instance.
  */
-[[maybe_unused]] void* wxCreatePenListRuntimeClassInstance()
+void* wxCreatePenListRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxStockListClassFactoryRuntimeView();
   if (runtime == nullptr) {
@@ -72432,7 +72432,7 @@ namespace
  * Allocates one `wxBitmapList` runtime payload and runs the canonical
  * `wxBitmapListInit` constructor lane.
  */
-[[maybe_unused]] wxBitmapListRuntime* wxCreateBitmapListRuntimeClassInstance()
+wxBitmapListRuntime* wxCreateBitmapListRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(wxBitmapListRuntime), std::nothrow);
   if (storage == nullptr) {
@@ -72448,7 +72448,7 @@ namespace
  * What it does:
  * Allocates and initializes one default `wxListCtrl` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateListCtrlRuntimeClassInstance()
+void* wxCreateListCtrlRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxListCtrlClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72466,7 +72466,7 @@ namespace
  * Resolves one tree-item rectangle from the native control, normalizes corner
  * ordering, and writes the result into `outRect4`.
  */
-[[maybe_unused]] bool wxTreeCtrlGetItemRectRuntime(
+bool wxTreeCtrlGetItemRectRuntime(
   const void* const treeCtrlRuntime,
   const LPARAM* const treeItemHandleLane,
   std::int32_t* const outRect4,
@@ -72528,7 +72528,7 @@ namespace
  * Releases one optional virtual-root payload lane owned by a tree control and
  * requests native deletion of all tree items.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlDeleteAllItemsRuntime(
+LRESULT wxTreeCtrlDeleteAllItemsRuntime(
   void* const treeCtrlRuntime
 )
 {
@@ -72586,7 +72586,7 @@ namespace
  * What it does:
  * Allocates and initializes one default `wxListView` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateListViewRuntimeClassInstance()
+void* wxCreateListViewRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxListCtrlClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72604,7 +72604,7 @@ namespace
  * Allocates and initializes one default `wxRadioButton` class-factory
  * instance.
  */
-[[maybe_unused]] void* wxCreateRadioButtonRuntimeClassInstance()
+void* wxCreateRadioButtonRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxRadioButtonClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72621,7 +72621,7 @@ namespace
  * What it does:
  * Allocates and initializes one default `wxToolBar` class-factory instance.
  */
-[[maybe_unused]] void* wxCreateToolBarRuntimeClassInstance()
+void* wxCreateToolBarRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxToolBarClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72640,7 +72640,7 @@ namespace
  * Allocates and initializes one default `wxProcess` class-factory instance
  * (`processData=0`, `processId=-1`, `redirectMode=0`).
  */
-[[maybe_unused]] void* wxCreateProcessRuntimeClassInstance()
+void* wxCreateProcessRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxProcessClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72658,7 +72658,7 @@ namespace
  * Allocates and initializes one default `wxPopupTransientWindow`
  * class-factory instance.
  */
-[[maybe_unused]] void* wxCreatePopupTransientWindowRuntimeClassInstance()
+void* wxCreatePopupTransientWindowRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxPopupTransientWindowClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -72676,7 +72676,7 @@ namespace
  * Initializes one `wxIndividualLayoutConstraint` lane to default
  * owner/relation/value state (`edgeKind=1` baseline).
  */
-[[maybe_unused]] void* wxInitializeIndividualLayoutConstraintRuntime(
+void* wxInitializeIndividualLayoutConstraintRuntime(
   void* const constraintRuntime
 ) noexcept
 {
@@ -72723,7 +72723,7 @@ namespace
  * Allocates one `wxIndividualLayoutConstraint` class-factory instance and
  * initializes its default runtime lanes.
  */
-[[maybe_unused]] void* wxCreateIndividualLayoutConstraintRuntimeClassInstance()
+void* wxCreateIndividualLayoutConstraintRuntimeClassInstance()
 {
   void* const runtime = ::operator new(0x28u, std::nothrow);
   if (runtime == nullptr) {
@@ -72741,7 +72741,7 @@ namespace
  * all eight embedded `wxIndividualLayoutConstraint` lanes with their default
  * relation/edge state.
  */
-[[maybe_unused]] void* wxCreateLayoutConstraintsRuntimeClassInstance()
+void* wxCreateLayoutConstraintsRuntimeClassInstance()
 {
   struct WxIndividualLayoutConstraintRuntimeView
   {
@@ -72807,7 +72807,7 @@ namespace
  * What it does:
  * Allocates one wx hash-table runtime lane (`keyType=1`, `bucketHint=1000`).
  */
-[[maybe_unused]] wxHashTableRuntime* wxCreateHashTableRuntimeClassInstance()
+wxHashTableRuntime* wxCreateHashTableRuntimeClassInstance()
 {
   return new (std::nothrow) wxHashTableRuntime(1, 1000);
 }
@@ -72818,7 +72818,7 @@ namespace
  * What it does:
  * Allocates one default `wxMemoryDC` class-factory instance.
  */
-[[maybe_unused]] wxMemoryDC* wxCreateMemoryDCRuntimeClassInstance()
+wxMemoryDC* wxCreateMemoryDCRuntimeClassInstance()
 {
   return new (std::nothrow) wxMemoryDC();
 }
@@ -72829,7 +72829,7 @@ namespace
  * What it does:
  * Allocates one default `wxBMPHandler` class-factory instance.
  */
-[[maybe_unused]] wxBmpHandlerRuntime* wxCreateBmpHandlerRuntimeClassInstanceLaneB()
+wxBmpHandlerRuntime* wxCreateBmpHandlerRuntimeClassInstanceLaneB()
 {
   return new (std::nothrow) wxBmpHandlerRuntime();
 }
@@ -72840,7 +72840,7 @@ namespace
  * What it does:
  * Allocates one default `wxICOHandler` class-factory instance.
  */
-[[maybe_unused]] wxIcoHandlerRuntime* wxCreateIcoHandlerRuntimeClassInstance()
+wxIcoHandlerRuntime* wxCreateIcoHandlerRuntimeClassInstance()
 {
   return new (std::nothrow) wxIcoHandlerRuntime();
 }
@@ -72851,7 +72851,7 @@ namespace
  * What it does:
  * Allocates one default `wxCURHandler` class-factory instance.
  */
-[[maybe_unused]] wxCurHandlerRuntime* wxCreateCurHandlerRuntimeClassInstance()
+wxCurHandlerRuntime* wxCreateCurHandlerRuntimeClassInstance()
 {
   return new (std::nothrow) wxCurHandlerRuntime();
 }
@@ -72862,7 +72862,7 @@ namespace
  * What it does:
  * Allocates one default `wxANIHandler` class-factory instance.
  */
-[[maybe_unused]] wxAniHandlerRuntime* wxCreateAniHandlerRuntimeClassInstance()
+wxAniHandlerRuntime* wxCreateAniHandlerRuntimeClassInstance()
 {
   return new (std::nothrow) wxAniHandlerRuntime();
 }
@@ -72944,7 +72944,7 @@ namespace
  * Reads two bytes from the input stream and returns true only for the BMP
  * `BM` signature with a clear stream error lane.
  */
-[[maybe_unused]] bool wxBmpHandlerCanReadSignatureRuntime(
+bool wxBmpHandlerCanReadSignatureRuntime(
   void* const inputStreamRuntime
 )
 {
@@ -72960,7 +72960,7 @@ namespace
  * Rewinds the stream, reads four bytes, and returns true only for ICO
  * signature `00 00 01 00` with a clear stream error lane.
  */
-[[maybe_unused]] bool wxIcoHandlerCanReadSignatureRuntime(
+bool wxIcoHandlerCanReadSignatureRuntime(
   void* const inputStreamRuntime
 )
 {
@@ -72978,7 +72978,7 @@ namespace
  * Rewinds the stream, reads four bytes, and returns true only for CUR
  * signature `00 00 02 00` with a clear stream error lane.
  */
-[[maybe_unused]] bool wxCurHandlerCanReadSignatureRuntime(
+bool wxCurHandlerCanReadSignatureRuntime(
   void* const inputStreamRuntime
 )
 {
@@ -72995,7 +72995,7 @@ namespace
  * What it does:
  * Allocates one default `wxXPMHandler` class-factory instance.
  */
-[[maybe_unused]] wxXpmHandlerRuntime* wxCreateXpmHandlerRuntimeClassInstance()
+wxXpmHandlerRuntime* wxCreateXpmHandlerRuntimeClassInstance()
 {
   return new (std::nothrow) wxXpmHandlerRuntime();
 }
@@ -73007,7 +73007,7 @@ namespace
  * Measures visible list-box item text widths, applies fallback width when no
  * text is present, and returns the best-size pair constrained to 3..10 rows.
  */
-[[maybe_unused]] std::int32_t* wxComputeListBoxBestSizeFromItems(
+std::int32_t* wxComputeListBoxBestSizeFromItems(
   void* const listBoxRuntime,
   std::int32_t* const outSize
 )
@@ -73144,7 +73144,7 @@ namespace
  * lanes (with fallback-node handling) and forwards them to the tree-control
  * compare virtual lane.
  */
-[[maybe_unused]] int __stdcall wxTreeCtrlSortChildrenCompareCallbackRuntime(
+int __stdcall wxTreeCtrlSortChildrenCompareCallbackRuntime(
   const void* const leftSortPayload,
   const void* const rightSortPayload,
   void* const treeCtrlRuntime
@@ -73203,7 +73203,7 @@ namespace
  * exact base tree-control class lane and otherwise uses callback sort
  * (`TVM_SORTCHILDRENCB`) through `FUN_00A00350`.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlSortChildrenDispatchRuntime(
+LRESULT wxTreeCtrlSortChildrenDispatchRuntime(
   void* const treeCtrlRuntime,
   const LPARAM parentItemLane
 )
@@ -73244,7 +73244,7 @@ namespace
  * What it does:
  * Increments one traverse-counter visit lane and returns success (`1`).
  */
-[[maybe_unused]] int wxTraverseCounterVisitRuntime(
+int wxTraverseCounterVisitRuntime(
   void* const traverseCounterRuntime,
   const int traversedNodeLane
 ) noexcept
@@ -73296,7 +73296,7 @@ static_assert(
  * an empty string when the sentinel handle 0xFFFF0000 is used or the native
  * query fails), and returns the same output pointer.
  */
-[[maybe_unused]] static wxStringRuntime* wxTreeCtrlLoadItemTextRuntime(
+static wxStringRuntime* wxTreeCtrlLoadItemTextRuntime(
   const void* const treeCtrlRuntime,
   wxStringRuntime* const outText,
   const std::int32_t* const itemHandlePtr
@@ -73332,7 +73332,7 @@ static_assert(
  * Loads two tree-item labels from the native control and performs
  * lexicographic `wcscmp` ordering for sort callbacks.
  */
-[[maybe_unused]] std::int32_t wxTreeCtrlCompareItemLabelsRuntime(
+std::int32_t wxTreeCtrlCompareItemLabelsRuntime(
   const void* const treeCtrlRuntime,
   const std::int32_t leftItemHandle,
   const std::int32_t rightItemHandle
@@ -73359,7 +73359,7 @@ static_assert(
  * Validates one indexed child-window lane, invalidates two cached metric
  * arrays for that index, and forwards one `SetWindowTextW` update.
  */
-[[maybe_unused]] BOOL wxSetIndexedChoiceWindowTextRuntime(
+BOOL wxSetIndexedChoiceWindowTextRuntime(
   void* const choiceRuntime,
   const std::int32_t itemIndex,
   const LPCWSTR* const textPointer
@@ -73409,7 +73409,7 @@ static_assert(
  * Validates one indexed child-window lane and forwards one `EnableWindow`
  * update with the caller-provided enabled flag.
  */
-[[maybe_unused]] BOOL wxEnableIndexedChoiceWindowRuntime(
+BOOL wxEnableIndexedChoiceWindowRuntime(
   void* const choiceRuntime,
   const std::int32_t itemIndex,
   const std::uint8_t enable
@@ -73447,7 +73447,7 @@ static_assert(
  * Validates one indexed child-window lane and forwards one `ShowWindow`
  * update using `SW_SHOW`/`SW_HIDE`.
  */
-[[maybe_unused]] BOOL wxShowIndexedChoiceWindowRuntime(
+BOOL wxShowIndexedChoiceWindowRuntime(
   void* const choiceRuntime,
   const std::int32_t itemIndex,
   const char show
@@ -73492,7 +73492,7 @@ static_assert(
  * buffer of `length + 1` is obtained from the wxString, and `GetWindowTextW`
  * fills it before the buffer is released.
  */
-[[maybe_unused]] wxStringRuntime* wxLoadHwndTextIntoWxStringRuntime(
+wxStringRuntime* wxLoadHwndTextIntoWxStringRuntime(
   wxStringRuntime* const outText,
   const HWND windowHandle
 )
@@ -73522,7 +73522,7 @@ static_assert(
  * Returns one radio-box item label by index; out-of-range indices yield an
  * empty string.
  */
-[[maybe_unused]] wxStringRuntime* wxGetRadioBoxItemLabelRuntime(
+wxStringRuntime* wxGetRadioBoxItemLabelRuntime(
   const void* const radioBoxRuntime,
   wxStringRuntime* const outText,
   const std::int32_t itemIndex
@@ -73564,7 +73564,7 @@ static_assert(
  * Allocates one `wxFileInputStream` class-factory instance from a source path
  * string.
  */
-[[maybe_unused]] wxFileInputStream* wxCreateFileInputStreamRuntimeClassInstance(
+wxFileInputStream* wxCreateFileInputStreamRuntimeClassInstance(
   const wxStringRuntime* const fileName
 )
 {
@@ -73604,7 +73604,7 @@ namespace
    * marks destroy-item mode enabled, and rebinds the print-paper database
    * vtable lane.
    */
-  [[maybe_unused]] WxListBaseCtorRuntimeView* wxConstructPrintPaperDatabaseRuntime(
+  WxListBaseCtorRuntimeView* wxConstructPrintPaperDatabaseRuntime(
     WxListBaseCtorRuntimeView* const databaseRuntime
   ) noexcept
   {
@@ -73624,7 +73624,7 @@ namespace
    * Allocates one `wxPrintPaperDatabase` runtime class instance and runs
    * `wxConstructPrintPaperDatabaseRuntime` initialization lanes.
    */
-  [[maybe_unused]] void* wxCreatePrintPaperDatabaseRuntimeClassInstance()
+  void* wxCreatePrintPaperDatabaseRuntimeClassInstance()
   {
     auto* const runtime = new (std::nothrow) WxListBaseCtorRuntimeView{};
     if (runtime == nullptr) {
@@ -73707,7 +73707,7 @@ namespace
    * Returns true when one wx object has attached ref-data and that payload
    * exposes a non-null native-handle lane at offset `+0x14`.
    */
-  [[maybe_unused]] bool wxHasObjectRefDataNativeHandleLane14(
+  bool wxHasObjectRefDataNativeHandleLane14(
     const WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -73726,7 +73726,7 @@ namespace
    * Reads ref-data comparison lane `+0x08` from one wx object and returns zero
    * when the object has no ref-data payload.
    */
-  [[maybe_unused]] std::int32_t wxReadObjectRefDataCompareLane08(
+  std::int32_t wxReadObjectRefDataCompareLane08(
     const WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -73745,7 +73745,7 @@ namespace
    * Reads ref-data comparison lane `+0x0C` from one wx object and returns zero
    * when the object has no ref-data payload.
    */
-  [[maybe_unused]] std::int32_t wxReadObjectRefDataCompareLane0C(
+  std::int32_t wxReadObjectRefDataCompareLane0C(
     const WxObjectRuntimeView* const object
   ) noexcept
   {
@@ -73789,7 +73789,7 @@ namespace
    * Writes one `(left,top,width,height)` span tuple into caller-provided
    * storage and returns the destination lane.
    */
-  [[maybe_unused]] WxBitmapTileSpanRuntimeView* wxWriteBitmapTileSpanLtrb(
+  WxBitmapTileSpanRuntimeView* wxWriteBitmapTileSpanLtrb(
     WxBitmapTileSpanRuntimeView* const destination,
     const std::int32_t left,
     const std::int32_t top,
@@ -73817,7 +73817,7 @@ namespace
    * What it does:
    * Stores one byte flag at lane `+0x1C` and returns the written value.
    */
-  [[maybe_unused]] std::uint8_t wxWriteByteFlagLane1C(
+  std::uint8_t wxWriteByteFlagLane1C(
     WxByteFlagLane1CRuntimeView* const runtime,
     const std::uint8_t value
   ) noexcept
@@ -73833,7 +73833,7 @@ namespace
    * Tiles one bitmap payload across the requested panel rectangle by stepping
    * x/y lanes with bitmap ref-data compare lanes `+0x08/+0x0C`.
    */
-  [[maybe_unused]] std::int32_t wxTileBitmapSpanRuntime(
+  std::int32_t wxTileBitmapSpanRuntime(
     WxBitmapTileDrawContextRuntime* const drawContext,
     const WxBitmapTileSpanRuntimeView* const tileSpan,
     const WxObjectRuntimeView* const bitmap
@@ -73871,7 +73871,7 @@ namespace
    * Copies shared wx ref-data ownership from `clone` into `object` only when
    * their ref-data lanes differ, preserving original `wxObject::Ref` behavior.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxObjectAssignFromCloneRefData(
+  WxObjectRuntimeView* wxObjectAssignFromCloneRefData(
     WxObjectRuntimeView* const object,
     const WxObjectRuntimeView* const clone
   ) noexcept
@@ -73976,7 +73976,7 @@ namespace
    * Queries one indexed record through provider virtual slot `+0x230` and
    * copies the non-empty shared string lane at `+0x14` into `outValue`.
    */
-  [[maybe_unused]] wxStringRuntime* wxCopyIndexedRecordStringSlot14Runtime(
+  wxStringRuntime* wxCopyIndexedRecordStringSlot14Runtime(
     void* const providerRuntime,
     wxStringRuntime* const outValue,
     const std::int32_t index
@@ -74014,7 +74014,7 @@ namespace
    * Queries one indexed record through provider virtual slot `+0x230` and
    * copies the non-empty shared string lane at `+0x18` into `outValue`.
    */
-  [[maybe_unused]] wxStringRuntime* wxCopyIndexedRecordStringSlot18Runtime(
+  wxStringRuntime* wxCopyIndexedRecordStringSlot18Runtime(
     void* const providerRuntime,
     wxStringRuntime* const outValue,
     const std::int32_t index
@@ -74083,7 +74083,7 @@ namespace
    * `+0x0D/+0x0E/+0x0F` from `rgbSource` and copies its name text into
    * `outValue`.
    */
-  [[maybe_unused]] wxStringRuntime* wxLookupNamedColourByRgbRuntime(
+  wxStringRuntime* wxLookupNamedColourByRgbRuntime(
     const void* const lookupOwnerRuntime,
     wxStringRuntime* const outValue,
     const std::uint8_t* const rgbSource
@@ -74152,7 +74152,7 @@ namespace
    * Samples current epoch-millisecond time into a pair buffer and mirrors that
    * pair into process-global low/high dword lanes.
    */
-  [[maybe_unused]] WxMillisecondPairRuntimeView* wxCaptureCurrentMillisecondsPairRuntime()
+  WxMillisecondPairRuntimeView* wxCaptureCurrentMillisecondsPairRuntime()
   {
     static WxMillisecondPairRuntimeView cached{};
     WxMillisecondPairRuntimeView* const result = wxBuildCurrentMillisecondsPair(&cached);
@@ -74171,7 +74171,7 @@ namespace
    * metacharacter (`*`, `?`, `[`, `{`), preserving legacy temporary retain/
    * release semantics around the scanned text.
    */
-  [[maybe_unused]] bool wxStringContainsUnescapedWildcardMeta(
+  bool wxStringContainsUnescapedWildcardMeta(
     const wxStringRuntime* const patternStorage
   )
   {
@@ -74333,7 +74333,7 @@ namespace
  * lane, initializes embedded `wxFontData` defaults, then rebinds the concrete
  * font-dialog vtable lane.
  */
-[[maybe_unused]] void* wxCreateFontDialogRuntimeClassInstance()
+void* wxCreateFontDialogRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxFontDialogClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -74354,7 +74354,7 @@ namespace
  * Allocates one `wxWindow` runtime class instance through its constructor
  * lane.
  */
-[[maybe_unused]] wxWindowBase* wxCreateWindowRuntimeClassInstance()
+wxWindowBase* wxCreateWindowRuntimeClassInstance()
 {
   return new (std::nothrow) wxWindowMswRuntime();
 }
@@ -74366,7 +74366,7 @@ namespace
  * Allocates one `wxPNGHandler` runtime class instance through its constructor
  * lane.
  */
-[[maybe_unused]] wxPngHandlerRuntime* wxCreatePngHandlerRuntimeClassInstance()
+wxPngHandlerRuntime* wxCreatePngHandlerRuntimeClassInstance()
 {
   return new (std::nothrow) wxPngHandlerRuntime();
 }
@@ -74378,7 +74378,7 @@ namespace
  * Allocates one `wxBitmapHandler` runtime class instance through its default
  * constructor lane.
  */
-[[maybe_unused]] wxBmpHandlerRuntime* wxCreateBmpHandlerRuntimeClassInstance()
+wxBmpHandlerRuntime* wxCreateBmpHandlerRuntimeClassInstance()
 {
   return new (std::nothrow) wxBmpHandlerRuntime();
 }
@@ -74398,7 +74398,7 @@ static_assert(offsetof(WxSelectObjectGuardRuntimeView, previousObject) == 0x04, 
  * Stores one device-context lane and captures the previous selected GDI object
  * while selecting the caller-provided object into the context.
  */
-[[maybe_unused]] WxSelectObjectGuardRuntimeView* wxInitSelectObjectGuardRuntime(
+WxSelectObjectGuardRuntimeView* wxInitSelectObjectGuardRuntime(
   WxSelectObjectGuardRuntimeView* const guard,
   const HDC deviceContext,
   const HGDIOBJ objectToSelect
@@ -74496,7 +74496,7 @@ static_assert(
  * Ensures one bitmap ref-data payload exists, then writes its width lane
  * (`+0x08`).
  */
-[[maybe_unused]] std::uintptr_t wxBitmapEnsureRefDataAndSetWidthRuntime(
+std::uintptr_t wxBitmapEnsureRefDataAndSetWidthRuntime(
   void* const bitmapRuntime,
   const std::int32_t pixelWidth
 ) noexcept
@@ -74520,7 +74520,7 @@ static_assert(
  * Ensures one bitmap ref-data payload exists, then writes its height lane
  * (`+0x0C`).
  */
-[[maybe_unused]] std::uintptr_t wxBitmapEnsureRefDataAndSetHeightRuntime(
+std::uintptr_t wxBitmapEnsureRefDataAndSetHeightRuntime(
   void* const bitmapRuntime,
   const std::int32_t pixelHeight
 ) noexcept
@@ -74544,7 +74544,7 @@ static_assert(
  * Ensures one bitmap ref-data payload exists, then writes its plane-count lane
  * (`+0x10`).
  */
-[[maybe_unused]] std::uintptr_t wxBitmapEnsureRefDataAndSetPlaneCountRuntime(
+std::uintptr_t wxBitmapEnsureRefDataAndSetPlaneCountRuntime(
   void* const bitmapRuntime,
   const std::int32_t planeCount
 ) noexcept
@@ -74568,7 +74568,7 @@ static_assert(
  * Ensures one bitmap ref-data payload exists, then writes its native bitmap
  * handle lane (`+0x14`).
  */
-[[maybe_unused]] std::uintptr_t wxBitmapEnsureRefDataAndSetNativeHandleRuntime(
+std::uintptr_t wxBitmapEnsureRefDataAndSetNativeHandleRuntime(
   void* const bitmapRuntime,
   const HBITMAP nativeBitmapHandle
 ) noexcept
@@ -74592,7 +74592,7 @@ static_assert(
  * Lazily allocates bitmap ref-data when missing, then replaces the owned mask
  * lane (`+0x30`) with `newMaskRuntime` using deleting-with-flag semantics.
  */
-[[maybe_unused]] void* wxBitmapAssignMaskRuntime(
+void* wxBitmapAssignMaskRuntime(
   void* const bitmapRuntime,
   WxDeleteWithFlagRuntimeInterface* const newMaskRuntime
 )
@@ -74633,7 +74633,7 @@ static_assert(offsetof(WxBitmapRefDataDestroyRuntimeView, objectRefData) == 0x30
  * Destroys one cached bitmap handle, then releases owned object-refdata using
  * the wx deleting-with-flag lane and clears the refdata pointer.
  */
-[[maybe_unused]] int wxDestroyBitmapRefDataRuntime(
+int wxDestroyBitmapRefDataRuntime(
   WxBitmapRefDataDestroyRuntimeView* const runtime
 ) noexcept
 {
@@ -74660,7 +74660,7 @@ static_assert(offsetof(WxBitmapRefDataDestroyRuntimeView, objectRefData) == 0x30
  * Allocates one `wxList` runtime class instance, initializes list-base lanes,
  * and binds the concrete list vtable.
  */
-[[maybe_unused]] void* wxCreateListRuntimeClassInstance()
+void* wxCreateListRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxListBaseCtorRuntimeView{};
   if (runtime == nullptr) {
@@ -74679,7 +74679,7 @@ static_assert(offsetof(WxBitmapRefDataDestroyRuntimeView, objectRefData) == 0x30
  * Allocates one `wxStringList` runtime class instance, initializes list-base
  * lanes, marks destroy-item mode, and binds the string-list vtable.
  */
-[[maybe_unused]] void* wxCreateStringListRuntimeClassInstance()
+void* wxCreateStringListRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxListBaseCtorRuntimeView{};
   if (runtime == nullptr) {
@@ -74698,7 +74698,7 @@ static_assert(offsetof(WxBitmapRefDataDestroyRuntimeView, objectRefData) == 0x30
  * What it does:
  * Runs deleting-destructor thunk semantics for one `wxList` runtime lane.
  */
-[[maybe_unused]] WxListBaseCtorRuntimeView* wxDestroyListRuntimeDeleting(
+WxListBaseCtorRuntimeView* wxDestroyListRuntimeDeleting(
   WxListBaseCtorRuntimeView* const listRuntime,
   const char deleteFlags
 ) noexcept
@@ -74722,7 +74722,7 @@ static_assert(offsetof(WxBitmapRefDataDestroyRuntimeView, objectRefData) == 0x30
  * Allocates one `wxResourceCache` list runtime lane, runs wx-list-base ctor
  * field initialization, and binds the resource-cache vtable.
  */
-[[maybe_unused]] void* wxCreateResourceCacheRuntimeClassInstance()
+void* wxCreateResourceCacheRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxListBaseCtorRuntimeView{};
   if (runtime == nullptr) {
@@ -74760,7 +74760,7 @@ namespace
  * Builds one inclusive `x/y/width/height` rectangle from two point lanes and
  * normalizes negative width/height by shifting origin to the min corner.
  */
-[[maybe_unused]] WxRectXywhRuntimeView* wxRectFromPointPairInclusiveNormalizedRuntime(
+WxRectXywhRuntimeView* wxRectFromPointPairInclusiveNormalizedRuntime(
   WxRectXywhRuntimeView* const outRect,
   const WxPointIntRuntimeView* const firstPoint,
   const WxPointIntRuntimeView* const secondPoint
@@ -74795,7 +74795,7 @@ namespace
  * Clamps one rectangle lane in-place to the overlap against `clipRect`; when
  * overlap is empty, clears both width/height to zero.
  */
-[[maybe_unused]] WxRectXywhRuntimeView* wxRectIntersectInPlaceInclusiveRuntime(
+WxRectXywhRuntimeView* wxRectIntersectInPlaceInclusiveRuntime(
   WxRectXywhRuntimeView* const rect,
   const WxRectXywhRuntimeView* const clipRect
 ) noexcept
@@ -74840,7 +74840,7 @@ namespace
  * Copies source rectangle lanes into `outRect`, then applies inclusive
  * in-place intersection against `clipRect`.
  */
-[[maybe_unused]] WxRectXywhRuntimeView* wxRectCopyAndIntersectInclusiveRuntime(
+WxRectXywhRuntimeView* wxRectCopyAndIntersectInclusiveRuntime(
   const WxRectXywhRuntimeView* const sourceRect,
   WxRectXywhRuntimeView* const outRect,
   const WxRectXywhRuntimeView* const clipRect
@@ -74858,7 +74858,7 @@ namespace
  * Intersects a copied rectangle with `clipRect` and returns whether resulting
  * width lane is non-zero.
  */
-[[maybe_unused]] BOOL wxRectHasNonZeroWidthAfterIntersectRuntime(
+BOOL wxRectHasNonZeroWidthAfterIntersectRuntime(
   const WxRectXywhRuntimeView* const sourceRect,
   const WxRectXywhRuntimeView* const clipRect
 ) noexcept
@@ -74875,7 +74875,7 @@ namespace
  * Allocates one `wxPathList` runtime lane, initializes base list fields, sets
  * destroy-item mode, and binds the path-list vtable.
  */
-[[maybe_unused]] void* wxCreatePathListRuntimeClassInstance()
+void* wxCreatePathListRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxListBaseCtorRuntimeView{};
   if (runtime == nullptr) {
@@ -74971,7 +74971,7 @@ namespace
  * Runs one non-deleting `wxColourDatabase` teardown by deleting all stored
  * color object payloads and finalizing the base wx-list lanes.
  */
-[[maybe_unused]] void wxDestroyColourDatabaseNoDeleteRuntime(
+void wxDestroyColourDatabaseNoDeleteRuntime(
   void* const colourDatabaseRuntime
 )
 {
@@ -74992,7 +74992,7 @@ namespace
  * Runs one non-deleting `wxBitmapList` teardown, deleting only stock objects
  * that report deletable state through virtual slot `+0x20`.
  */
-[[maybe_unused]] void wxDestroyBitmapListNoDeleteRuntime(
+void wxDestroyBitmapListNoDeleteRuntime(
   void* const bitmapListRuntime
 )
 {
@@ -75013,7 +75013,7 @@ namespace
  * Runs one non-deleting `wxPenList` teardown, deleting only stock objects
  * that report deletable state through virtual slot `+0x20`.
  */
-[[maybe_unused]] void wxDestroyPenListNoDeleteRuntime(
+void wxDestroyPenListNoDeleteRuntime(
   void* const penListRuntime
 )
 {
@@ -75034,7 +75034,7 @@ namespace
  * Runs one non-deleting `wxBrushList` teardown, deleting non-null stock
  * objects that report deletable state through virtual slot `+0x20`.
  */
-[[maybe_unused]] void wxDestroyBrushListNoDeleteRuntime(
+void wxDestroyBrushListNoDeleteRuntime(
   void* const brushListRuntime
 )
 {
@@ -75055,7 +75055,7 @@ namespace
  * Runs one non-deleting `wxFontList` teardown, deleting only stock objects
  * that report deletable state through virtual slot `+0x20`.
  */
-[[maybe_unused]] void wxDestroyFontListNoDeleteRuntime(
+void wxDestroyFontListNoDeleteRuntime(
   void* const fontListRuntime
 )
 {
@@ -75076,7 +75076,7 @@ namespace
  * Runs one non-deleting `wxResourceCache` teardown by deleting each cached
  * resource payload and finalizing the base wx-list lanes.
  */
-[[maybe_unused]] void wxDestroyResourceCacheNoDeleteRuntime(
+void wxDestroyResourceCacheNoDeleteRuntime(
   void* const resourceCacheRuntime
 )
 {
@@ -75097,7 +75097,7 @@ namespace
  * Allocates one list-string node, runs `wxNodeBase` initialization, and binds
  * the `wxListStringNode` dispatch vtable lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxCreateListStringNodeRuntime(
+wxNodeBaseRuntime* wxCreateListStringNodeRuntime(
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
   wxNodeBaseRuntime* const next,
@@ -75122,7 +75122,7 @@ namespace
  * Allocates one module-list node, runs `wxNodeBase` initialization, and binds
  * the `wxModuleListNode` dispatch vtable lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxCreateModuleListNodeRuntime(
+wxNodeBaseRuntime* wxCreateModuleListNodeRuntime(
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
   wxNodeBaseRuntime* const next,
@@ -75169,7 +75169,7 @@ namespace
  * Runs deleting-dtor slot 1 (`deleteFlag=1`) for one module-list node value
  * lane when that value pointer is present.
  */
-[[maybe_unused]] int wxModuleListNodeDeleteStoredValueRuntime(
+int wxModuleListNodeDeleteStoredValueRuntime(
   wxNodeBaseRuntime* const moduleNodeRuntime
 ) noexcept
 {
@@ -75201,7 +75201,7 @@ namespace
  * Appends one module payload pointer to the global wx-module registry list and
  * returns the created node lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxAppendModuleToGlobalModuleListRuntime(
+wxNodeBaseRuntime* wxAppendModuleToGlobalModuleListRuntime(
   void* const moduleRuntime
 )
 {
@@ -75226,7 +75226,7 @@ namespace
  * What it does:
  * Removes one module payload pointer from the global wx-module registry list.
  */
-[[maybe_unused]] bool wxRemoveModuleFromGlobalModuleListRuntime(
+bool wxRemoveModuleFromGlobalModuleListRuntime(
   void* const moduleRuntime
 ) noexcept
 {
@@ -75281,7 +75281,7 @@ namespace
  * Invokes each registered module's shutdown slot, unregisters modules from the
  * global module list, and marks shutdown completion.
  */
-[[maybe_unused]] int wxShutdownRegisteredModulesRuntime(
+int wxShutdownRegisteredModulesRuntime(
   WxModuleShutdownRuntimeView* const runtime
 ) noexcept
 {
@@ -75318,7 +75318,7 @@ namespace
  * Allocates one toolbar-tools list node, runs `wxNodeBase` initialization, and
  * binds the typed list-node vtable lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxCreateToolBarToolsListNodeRuntime(
+wxNodeBaseRuntime* wxCreateToolBarToolsListNodeRuntime(
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
   wxNodeBaseRuntime* const next,
@@ -75343,7 +75343,7 @@ namespace
  * Runs deleting-dtor slot 1 (`deleteFlag=1`) for one toolbar-tools list node
  * value lane when that value pointer is present.
  */
-[[maybe_unused]] int wxToolBarToolsListNodeDeleteStoredValueRuntime(
+int wxToolBarToolsListNodeDeleteStoredValueRuntime(
   wxNodeBaseRuntime* const toolNodeRuntime
 ) noexcept
 {
@@ -75460,7 +75460,7 @@ namespace
  * Writes byte lane `+0x1C` only when `value` differs; returns `1` on change
  * and `0` when unchanged.
  */
-[[maybe_unused]] char wxAssignByteLane1CIfChangedRuntime(
+char wxAssignByteLane1CIfChangedRuntime(
   WxByteLane1CRuntimeView* const runtime,
   const char value
 ) noexcept
@@ -75480,7 +75480,7 @@ namespace
  * Updates one normalized boolean lane at offset `+0x14` and reports whether
  * the lane changed.
  */
-[[maybe_unused]] char wxAssignBoolSlot05IfChanged(
+char wxAssignBoolSlot05IfChanged(
   WxDwordBoolSlot5RuntimeView* const runtime,
   const char value
 ) noexcept
@@ -75505,7 +75505,7 @@ namespace
  * Updates slot `+0x3C` string lane only when content differs from `value`.
  * Returns `1` when assignment occurred, otherwise `0`.
  */
-[[maybe_unused]] char wxAssignStringSlot15IfChanged(
+char wxAssignStringSlot15IfChanged(
   WxRuntimeStringPairSlotsView* const runtime,
   wxStringRuntime* const value
 )
@@ -75533,7 +75533,7 @@ namespace
  * Updates slot `+0x40` string lane only when content differs from `value`.
  * Returns `1` when assignment occurred, otherwise `0`.
  */
-[[maybe_unused]] char wxAssignStringSlot16IfChanged(
+char wxAssignStringSlot16IfChanged(
   WxRuntimeStringPairSlotsView* const runtime,
   wxStringRuntime* const value
 )
@@ -75561,7 +75561,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x10` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot04Runtime(
+wxStringRuntime* wxCopySharedStringSlot04Runtime(
   const WxRuntimeStringSlot04View* const runtime,
   wxStringRuntime* const outValue
 )
@@ -75584,7 +75584,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x174` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot5DRuntime(
+wxStringRuntime* wxCopySharedStringSlot5DRuntime(
   const WxRuntimeStringSlot174View* const runtime,
   wxStringRuntime* const outValue
 )
@@ -75648,7 +75648,7 @@ namespace
  * this body for cross-TU references with rotated argument register
  * convention; no separate source is emitted.
  */
-[[maybe_unused]] msvc8::string* wxUninitializedCopyMsvc8StringRange(
+msvc8::string* wxUninitializedCopyMsvc8StringRange(
   const msvc8::string* const sourceFirst,
   const msvc8::string* const sourceLast,
   msvc8::string* const destinationFirst
@@ -75677,7 +75677,7 @@ namespace
  * `destination`, allocating exact-sized backing storage and copy-constructing
  * each element.
  */
-[[maybe_unused]] Msvc8StringVectorCloneRuntimeView* wxCloneMsvc8StringVectorStorage(
+Msvc8StringVectorCloneRuntimeView* wxCloneMsvc8StringVectorStorage(
   const Msvc8StringVectorCloneRuntimeView* const source,
   Msvc8StringVectorCloneRuntimeView* const destination
 )
@@ -75806,7 +75806,7 @@ namespace
  * Copy-constructs one contiguous 2-lane `msvc8::string` payload by assigning
  * each lane from source into freshly initialized destination storage.
  */
-[[maybe_unused]] msvc8::string* wxConstructAssignMsvc8StringPairRuntime(
+msvc8::string* wxConstructAssignMsvc8StringPairRuntime(
   const msvc8::string* const source,
   msvc8::string* const destination
 )
@@ -75836,7 +75836,7 @@ namespace
  * `destination` by initializing each string lane to empty SSO state and
  * assigning from the matching source lane.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructAssignTripleMsvc8StringRecordRuntime(
+Msvc8TripleStringRecordRuntimeView* wxConstructAssignTripleMsvc8StringRecordRuntime(
   const Msvc8TripleStringRecordRuntimeView* const source,
   Msvc8TripleStringRecordRuntimeView* const destination
 )
@@ -75860,7 +75860,7 @@ namespace
  * `destination` from one shared source record and unwinds already-constructed
  * records on throw.
  */
-[[maybe_unused]] void wxConstructFillTripleMsvc8StringRecordRangeRuntime(
+void wxConstructFillTripleMsvc8StringRecordRangeRuntime(
   const std::uint32_t fillCount,
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const source
@@ -75902,7 +75902,7 @@ namespace
  * Register-adapter lane that forwards one triple-string fill-construct range
  * request into the canonical helper body.
  */
-[[maybe_unused]] void wxConstructFillTripleMsvc8StringRecordRangeRegisterAdapter(
+void wxConstructFillTripleMsvc8StringRecordRangeRegisterAdapter(
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const source,
   const std::uint32_t fillCount
@@ -75919,7 +75919,7 @@ namespace
  * into destination storage and returns the one-past-end destination cursor.
  * If construction throws, already-constructed destination records are reset.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRuntime(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRuntime(
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   const Msvc8TripleStringRecordRuntimeView* const sourceLast,
   Msvc8TripleStringRecordRuntimeView* const destination
@@ -75967,7 +75967,7 @@ namespace
  * returning the advanced source cursor.
  * If construction throws, already-constructed destination records are reset.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRuntime(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* const destinationFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationLast,
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst
@@ -76013,7 +76013,7 @@ namespace
  * Register-adapter lane forwarding one destination-range copy-construct
  * request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterA(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterA(
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationLast
@@ -76029,7 +76029,7 @@ namespace
  * Register-adapter lane forwarding one destination-range copy-construct
  * request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterB(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterB(
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationLast
@@ -76045,7 +76045,7 @@ namespace
  * Additional register-adapter lane forwarding one destination-range
  * copy-construct request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterC(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterC(
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationLast
@@ -76061,7 +76061,7 @@ namespace
  * Additional register-adapter lane forwarding one destination-range
  * copy-construct request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterD(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordIntoDestinationRangeRegisterAdapterD(
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationFirst,
   Msvc8TripleStringRecordRuntimeView* const destinationLast
@@ -76077,7 +76077,7 @@ namespace
  * Register-adapter lane that forwards one triple-string range copy-construct
  * request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapter(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapter(
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   const Msvc8TripleStringRecordRuntimeView* const sourceLast
@@ -76093,7 +76093,7 @@ namespace
  * Additional register-adapter lane forwarding one triple-string range
  * copy-construct request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapterB(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapterB(
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   const Msvc8TripleStringRecordRuntimeView* const sourceLast
@@ -76109,7 +76109,7 @@ namespace
  * Additional register-adapter lane forwarding one triple-string range
  * copy-construct request into the canonical helper body.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapterC(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapterC(
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
   const Msvc8TripleStringRecordRuntimeView* const sourceLast
@@ -76126,7 +76126,7 @@ namespace
  * range lanes and `edx` destination lane into the canonical range
  * copy-construct helper.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapterD(
+Msvc8TripleStringRecordRuntimeView* wxConstructCopyTripleMsvc8StringRecordRangeRegisterAdapterD(
   void* const ignoredEcxLane,
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const sourceFirst,
@@ -76145,7 +76145,7 @@ namespace
  * canonical construct-assign helper, preserving the binary null fast-path
  * return lane.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructAssignTripleMsvc8StringRecordIfSourcePresent(
+Msvc8TripleStringRecordRuntimeView* wxConstructAssignTripleMsvc8StringRecordIfSourcePresent(
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const source
 )
@@ -76164,7 +76164,7 @@ namespace
  * Alias lane of the optional-source construct-assign wrapper used by one
  * adjacent call-shape in the same triple-string runtime family.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructAssignTripleMsvc8StringRecordIfSourcePresentAlias(
+Msvc8TripleStringRecordRuntimeView* wxConstructAssignTripleMsvc8StringRecordIfSourcePresentAlias(
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const source
 )
@@ -76179,7 +76179,7 @@ namespace
  * Assigns one 3-lane contiguous `msvc8::string` record into already
  * constructed destination lanes.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxAssignTripleMsvc8StringRecordRuntime(
+Msvc8TripleStringRecordRuntimeView* wxAssignTripleMsvc8StringRecordRuntime(
   const Msvc8TripleStringRecordRuntimeView* const source,
   Msvc8TripleStringRecordRuntimeView* const destination
 )
@@ -76197,7 +76197,7 @@ namespace
  * Swaps in-place payload lanes of two 3-string records by exchanging the six
  * mutable dword slots of each `msvc8::string` lane.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxSwapTripleMsvc8StringRecordPayloadRuntime(
+Msvc8TripleStringRecordRuntimeView* wxSwapTripleMsvc8StringRecordPayloadRuntime(
   Msvc8TripleStringRecordRuntimeView* const lhs,
   Msvc8TripleStringRecordRuntimeView* const rhs
 ) noexcept
@@ -76215,7 +76215,7 @@ namespace
  * Resets every `msvc8::string` lane in `[begin, end)` to empty SSO state and
  * releases heap storage for lanes currently in long-string mode.
  */
-[[maybe_unused]] void wxResetTripleMsvc8StringRecordRangeRuntime(
+void wxResetTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* begin,
   Msvc8TripleStringRecordRuntimeView* const end
 ) noexcept
@@ -76228,10 +76228,10 @@ namespace
   }
 }
 
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxAllocateTripleMsvc8StringRecordRuntime(
+Msvc8TripleStringRecordRuntimeView* wxAllocateTripleMsvc8StringRecordRuntime(
   std::uint32_t count
 );
-[[maybe_unused]] int wxResetTripleMsvc8StringRecordRuntime(
+int wxResetTripleMsvc8StringRecordRuntime(
   Msvc8TripleStringRecordRuntimeView* const record
 ) noexcept;
 
@@ -76242,7 +76242,7 @@ namespace
  * Ensures one triple-string record vector lane has at least 100 slots of
  * capacity, growing and relocating the active range when needed.
  */
-[[maybe_unused]] void wxEnsureTripleMsvc8StringRecordVectorCapacity100Runtime(
+void wxEnsureTripleMsvc8StringRecordVectorCapacity100Runtime(
   WxTripleStringRecordVectorRuntimeView* const vectorRuntime
 )
 {
@@ -76286,7 +76286,7 @@ namespace
  * 0x54-stride vector lane, growing storage when needed and preserving
  * copy/cleanup semantics.
  */
-[[maybe_unused]] void wxInsertTripleMsvc8StringRecordAtRuntime(
+void wxInsertTripleMsvc8StringRecordAtRuntime(
   const Msvc8TripleStringRecordRuntimeView* const sourceRecord,
   WxTripleStringRecordVectorRuntimeView* const vectorRuntime,
   Msvc8TripleStringRecordRuntimeView* const insertPosition
@@ -76378,7 +76378,7 @@ namespace
  * Inserts one triple-string record, then writes the post-insert iterator lane
  * for the original insertion index into `outIterator`.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView** wxInsertTripleMsvc8StringRecordAndStoreIteratorRuntime(
+Msvc8TripleStringRecordRuntimeView** wxInsertTripleMsvc8StringRecordAndStoreIteratorRuntime(
   WxTripleStringRecordVectorRuntimeView* const vectorRuntime,
   Msvc8TripleStringRecordRuntimeView** const outIterator,
   Msvc8TripleStringRecordRuntimeView* const insertPosition,
@@ -76402,7 +76402,7 @@ namespace
  * Appends one triple-string record directly when spare capacity exists;
  * otherwise routes through the reallocation-safe insert-and-store helper.
  */
-[[maybe_unused]] void wxAppendOrInsertTripleMsvc8StringRecordRuntime(
+void wxAppendOrInsertTripleMsvc8StringRecordRuntime(
   WxTripleStringRecordVectorRuntimeView* const vectorRuntime,
   const Msvc8TripleStringRecordRuntimeView* const sourceRecord
 )
@@ -76434,7 +76434,7 @@ namespace
  * Register-adapter lane that forwards one runtime-count triple-string
  * fill-construct request into the canonical range helper.
  */
-[[maybe_unused]] void wxConstructFillTripleMsvc8StringRecordRangeRuntimeCountAdapter(
+void wxConstructFillTripleMsvc8StringRecordRangeRuntimeCountAdapter(
   const std::uint32_t fillCount,
   Msvc8TripleStringRecordRuntimeView* const destination,
   const Msvc8TripleStringRecordRuntimeView* const source
@@ -76450,7 +76450,7 @@ namespace
  * Thiscall adapter lane that forwards one reversed `(end, begin)` pair into
  * the canonical triple-string range reset helper.
  */
-[[maybe_unused]] void wxResetTripleMsvc8StringRecordRangeRuntimeThiscallAdapter(
+void wxResetTripleMsvc8StringRecordRangeRuntimeThiscallAdapter(
   Msvc8TripleStringRecordRuntimeView* const end,
   Msvc8TripleStringRecordRuntimeView* const begin
 ) noexcept
@@ -76465,7 +76465,7 @@ namespace
  * Resets one triple-string record to empty SSO state in lane order
  * `{third, second, first}` and returns zero.
  */
-[[maybe_unused]] int wxResetTripleMsvc8StringRecordRuntime(
+int wxResetTripleMsvc8StringRecordRuntime(
   Msvc8TripleStringRecordRuntimeView* const record
 ) noexcept
 {
@@ -76482,7 +76482,7 @@ namespace
  * Allocates contiguous storage for `count` triple-string records with a
  * guarded multiply overflow check matching the original allocator lane.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxAllocateTripleMsvc8StringRecordRuntime(
+Msvc8TripleStringRecordRuntimeView* wxAllocateTripleMsvc8StringRecordRuntime(
   const std::uint32_t count
 )
 {
@@ -76502,7 +76502,7 @@ namespace
  * In-place constructs one contiguous 2-lane `msvc8::string` record from two
  * source C-string lanes.
  */
-[[maybe_unused]] msvc8::string* wxConstructMsvc8StringPairFromCStringPairRuntime(
+msvc8::string* wxConstructMsvc8StringPairFromCStringPairRuntime(
   msvc8::string* const destination,
   const char* const* const source
 )
@@ -76526,7 +76526,7 @@ namespace
  * In-place constructs one contiguous 3-lane `msvc8::string` record from three
  * source C-string lanes.
  */
-[[maybe_unused]] Msvc8TripleStringRecordRuntimeView* wxConstructTripleMsvc8StringRecordFromCStringTripleRuntime(
+Msvc8TripleStringRecordRuntimeView* wxConstructTripleMsvc8StringRecordFromCStringTripleRuntime(
   const char* const* const source,
   Msvc8TripleStringRecordRuntimeView* const destination
 )
@@ -76542,7 +76542,7 @@ namespace
   return destination;
 }
 
-[[maybe_unused]] bool wxIsProbeMsvc8StringPairLessRuntime(
+bool wxIsProbeMsvc8StringPairLessRuntime(
   const Msvc8StringPairRuntimeView* const primaryPair,
   const Msvc8StringPairRuntimeView* const probePair
 ) noexcept;
@@ -76555,7 +76555,7 @@ namespace
  * one primary 3-string lane (primary compare on lane 0, then pair compare on
  * lanes 1-2).
  */
-[[maybe_unused]] bool wxIsProbeTripleMsvc8StringRecordLessRuntime(
+bool wxIsProbeTripleMsvc8StringRecordLessRuntime(
   const Msvc8TripleStringRecordRuntimeView* const primaryRecord,
   const Msvc8TripleStringRecordRuntimeView* const probeRecord
 ) noexcept
@@ -76580,7 +76580,7 @@ namespace
  * Orders three triple-string records through one compare/swap network and
  * returns whether the final edge (`middle` vs `first`) required one swap.
  */
-[[maybe_unused]] bool wxSortThreeTripleMsvc8StringRecordsRuntime(
+bool wxSortThreeTripleMsvc8StringRecordsRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const middle,
   Msvc8TripleStringRecordRuntimeView* const last
@@ -76609,7 +76609,7 @@ namespace
  * Performs one upward heap insertion step for triple-string records by moving
  * parent lanes down while `value` compares before the parent lane.
  */
-[[maybe_unused]] void wxPushHeapTripleMsvc8StringRecordRuntime(
+void wxPushHeapTripleMsvc8StringRecordRuntime(
   Msvc8TripleStringRecordRuntimeView* const base,
   std::int32_t holeIndex,
   const std::int32_t topIndex,
@@ -76638,7 +76638,7 @@ namespace
  * Performs one downward heap adjustment for triple-string records, then runs
  * the upward insertion step to place the lifted value at its final heap slot.
  */
-[[maybe_unused]] void wxAdjustHeapTripleMsvc8StringRecordRuntime(
+void wxAdjustHeapTripleMsvc8StringRecordRuntime(
   Msvc8TripleStringRecordRuntimeView* const base,
   const std::int32_t heapCount,
   std::int32_t holeIndex,
@@ -76677,7 +76677,7 @@ namespace
  * uses direct `first/middle/last` ordering for short ranges and median-of-nine
  * style sampling for longer ranges.
  */
-[[maybe_unused]] bool wxSelectPivotTripleMsvc8StringRecordRuntime(
+bool wxSelectPivotTripleMsvc8StringRecordRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const middle,
   Msvc8TripleStringRecordRuntimeView* const lastInclusive
@@ -76704,7 +76704,7 @@ namespace
  * What it does:
  * Builds one max-heap over `[first, last)` for triple-string records.
  */
-[[maybe_unused]] void wxMakeHeapTripleMsvc8StringRecordRangeRuntime(
+void wxMakeHeapTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -76728,7 +76728,7 @@ namespace
  * Returns the record count for one triple-string range and heapifies the
  * range when it contains more than one record.
  */
-[[maybe_unused]] std::int32_t wxPrepareHeapTripleMsvc8StringRecordRangeRuntime(
+std::int32_t wxPrepareHeapTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -76749,7 +76749,7 @@ namespace
     Msvc8TripleStringRecordRuntimeView* rightRangeBegin = nullptr;
   };
 
-  [[maybe_unused]] bool wxIsTripleMsvc8StringRecordGreaterRuntime(
+  bool wxIsTripleMsvc8StringRecordGreaterRuntime(
     const Msvc8TripleStringRecordRuntimeView* const lhs,
     const Msvc8TripleStringRecordRuntimeView* const rhs
   ) noexcept
@@ -76765,7 +76765,7 @@ namespace
  * Partitions one triple-string record range around a sampled pivot and
  * returns the two cut lanes that bound the pivot-equivalent middle partition.
  */
-[[maybe_unused]] WxTripleStringPartitionRuntimeResult* wxPartitionTripleMsvc8StringRecordRangeRuntime(
+WxTripleStringPartitionRuntimeResult* wxPartitionTripleMsvc8StringRecordRangeRuntime(
   WxTripleStringPartitionRuntimeResult* const outCut,
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
@@ -76831,7 +76831,7 @@ namespace
  * Runs insertion sort over one triple-string record range using lexicographic
  * compare on `(first, second, third)` lanes.
  */
-[[maybe_unused]] void wxInsertionSortTripleMsvc8StringRecordRangeRuntime(
+void wxInsertionSortTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -76866,7 +76866,7 @@ namespace
  * Drains one prepared max-heap range into sorted order by repeatedly popping
  * the heap front into the range tail.
  */
-[[maybe_unused]] std::int32_t wxSortHeapTripleMsvc8StringRecordRangeRuntime(
+std::int32_t wxSortHeapTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* last
 )
@@ -76901,7 +76901,7 @@ namespace
  * Writes the heap-front triple-string record to `popDestination`, then
  * re-adjusts the reduced heap `[first, reducedHeapEnd)` with one lifted value.
  */
-[[maybe_unused]] void wxPopHeapTripleMsvc8StringRecordRuntime(
+void wxPopHeapTripleMsvc8StringRecordRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const reducedHeapEnd,
   Msvc8TripleStringRecordRuntimeView* const popDestination,
@@ -76930,7 +76930,7 @@ namespace
  * Pops one heap-front record into the last slot when the range contains more
  * than one triple-string record and returns the current record count.
  */
-[[maybe_unused]] std::int32_t wxPopHeapTripleMsvc8StringRecordIfLargeRuntime(
+std::int32_t wxPopHeapTripleMsvc8StringRecordIfLargeRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -76960,7 +76960,7 @@ namespace
  * Pops one heap-front triple-string record into the range tail using one
  * pre-lifted tail value.
  */
-[[maybe_unused]] void wxPopHeapTripleMsvc8StringRecordUncheckedRuntime(
+void wxPopHeapTripleMsvc8StringRecordUncheckedRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -76983,7 +76983,7 @@ namespace
  * What it does:
  * Thunk lane forwarding directly to the canonical heap-drain helper.
  */
-[[maybe_unused]] std::int32_t wxSortHeapTripleMsvc8StringRecordRangeRuntimeThunk(
+std::int32_t wxSortHeapTripleMsvc8StringRecordRangeRuntimeThunk(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -76997,7 +76997,7 @@ namespace
  * What it does:
  * Thunk lane forwarding directly to the canonical insertion-sort helper.
  */
-[[maybe_unused]] void wxInsertionSortTripleMsvc8StringRecordRangeRuntimeThunk(
+void wxInsertionSortTripleMsvc8StringRecordRangeRuntimeThunk(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -77012,7 +77012,7 @@ namespace
  * Runs one introspective sort lane for triple-string records: quick-partition
  * while depth budget remains, then heap/insertion fallback by range size.
  */
-[[maybe_unused]] std::int32_t wxIntroSortTripleMsvc8StringRecordRangeRuntime(
+std::int32_t wxIntroSortTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* first,
   Msvc8TripleStringRecordRuntimeView* last,
   std::int32_t depthBudget
@@ -77060,7 +77060,7 @@ namespace
  * Top-level sort adapter that computes the range length depth budget and
  * dispatches to the introsort driver for triple-string records.
  */
-[[maybe_unused]] std::int32_t wxSortTripleMsvc8StringRecordRangeRuntime(
+std::int32_t wxSortTripleMsvc8StringRecordRangeRuntime(
   Msvc8TripleStringRecordRuntimeView* const first,
   Msvc8TripleStringRecordRuntimeView* const last
 )
@@ -77076,7 +77076,7 @@ namespace
  * Returns whether one probe 2-string lane compares lexicographically before
  * one primary 2-string lane.
  */
-[[maybe_unused]] bool wxIsProbeMsvc8StringPairLessRuntime(
+bool wxIsProbeMsvc8StringPairLessRuntime(
   const Msvc8StringPairRuntimeView* const primaryPair,
   const Msvc8StringPairRuntimeView* const probePair
 ) noexcept
@@ -77167,7 +77167,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x14` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot14Runtime(
+wxStringRuntime* wxCopySharedStringSlot14Runtime(
   const WxRuntimeStringSlot14ReadView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77190,7 +77190,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x18` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot18Runtime(
+wxStringRuntime* wxCopySharedStringSlot18Runtime(
   const WxRuntimeStringSlot18ReadView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77213,7 +77213,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x0C` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot0CRuntime(
+wxStringRuntime* wxCopySharedStringSlot0CRuntime(
   const WxRuntimeStringSlot0CReadView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77236,7 +77236,7 @@ namespace
  * Copies the wxTextDataObject shared-text lane (`+0x0C`) into `outValue`,
  * retaining payload ownership when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxTextDataObjectGetTextRuntime(
+wxStringRuntime* wxTextDataObjectGetTextRuntime(
   const WxRuntimeStringSlot0CReadView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77251,7 +77251,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x38` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot38Runtime(
+wxStringRuntime* wxCopySharedStringSlot38Runtime(
   const WxRuntimeStringSlot38ReadView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77274,7 +77274,7 @@ namespace
  * Copies one shared-string lane from runtime offset `+0x178` into `outValue`,
  * retaining the shared payload when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxCopySharedStringSlot178Runtime(
+wxStringRuntime* wxCopySharedStringSlot178Runtime(
   const WxRuntimeStringSlot178ReadView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77297,7 +77297,7 @@ namespace
  * Constructs one `(shared wx-string, dword, dword)` record by retaining the
  * source shared text lane and copying both scalar lanes.
  */
-[[maybe_unused]] WxStringDwordPairRecordRuntimeView* wxConstructStringDwordPairRecordRuntime(
+WxStringDwordPairRecordRuntimeView* wxConstructStringDwordPairRecordRuntime(
   WxStringDwordPairRecordRuntimeView* const outRecord,
   const wxStringRuntime* const sourceText,
   const std::uint32_t lane04,
@@ -77322,7 +77322,7 @@ namespace
  * Constructs one hash-node payload with cleared next-link lane, retained
  * shared key string lane, and copied 32-bit payload value.
  */
-[[maybe_unused]] WxHashStringNodeRuntimeView* wxConstructHashStringNodeRuntime(
+WxHashStringNodeRuntimeView* wxConstructHashStringNodeRuntime(
   WxHashStringNodeRuntimeView* const outNode,
   const WxStringDwordPairRecordRuntimeView* const sourcePair
 ) noexcept
@@ -77533,7 +77533,7 @@ namespace
  * What it does:
  * Assigns one shared wx-string payload into runtime slot `+0x0C`.
  */
-[[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot0CRuntime(
+wxStringRuntime* wxAssignSharedStringSlot0CRuntime(
   WxRuntimeStringSlot0CWriteView* const runtime,
   const wxStringRuntime* const value
 ) noexcept
@@ -77548,7 +77548,7 @@ namespace
  * Reads one header-count lane from pointer storage (`pointer-0x8`) and returns
  * the count plus one.
  */
-[[maybe_unused]] int wxReadHeaderCountPlusOneRuntime(
+int wxReadHeaderCountPlusOneRuntime(
   const WxPointerHeaderCountRuntimeView* const runtime
 ) noexcept
 {
@@ -77562,7 +77562,7 @@ namespace
  * What it does:
  * Dispatches one zero-argument virtual call at slot `+0x28`.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot28LaneA(
+int wxDispatchVirtualSlot28LaneA(
   void* const runtimeObject,
   const int reservedArg0
 ) noexcept
@@ -77578,7 +77578,7 @@ namespace
  * What it does:
  * Dispatches one one-argument virtual call at slot `+0x2C`.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot2CLaneA(
+int wxDispatchVirtualSlot2CLaneA(
   void* const runtimeObject,
   const int reservedArg0,
   const int slotArg
@@ -77595,7 +77595,7 @@ namespace
  * What it does:
  * Dispatches one two-argument virtual call at slot `+0x30`.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot30LaneA(
+int wxDispatchVirtualSlot30LaneA(
   void* const runtimeObject,
   const int reservedArg0,
   const int slotArg0,
@@ -77613,7 +77613,7 @@ namespace
  * What it does:
  * Assigns one shared wx-string payload into runtime slot `+0x68`.
  */
-[[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot68Runtime(
+wxStringRuntime* wxAssignSharedStringSlot68Runtime(
   WxRuntimeStringSlot68WriteView* const runtime,
   const wxStringRuntime* const value
 ) noexcept
@@ -77627,7 +77627,7 @@ namespace
  * What it does:
  * Assigns one shared wx-string payload into runtime slot `+0x6C`.
  */
-[[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot6CRuntime(
+wxStringRuntime* wxAssignSharedStringSlot6CRuntime(
   WxRuntimeStringSlot6CWriteView* const runtime,
   const wxStringRuntime* const value
 ) noexcept
@@ -77641,7 +77641,7 @@ namespace
  * What it does:
  * Reads one 32-bit runtime lane at offset `+0x68`.
  */
-[[maybe_unused]] int wxReadRuntimeDwordSlot68LaneA(
+int wxReadRuntimeDwordSlot68LaneA(
   const WxRuntimeDwordSlot68ReadView* const runtime
 ) noexcept
 {
@@ -77654,7 +77654,7 @@ namespace
  * What it does:
  * Reads one 32-bit runtime lane at offset `+0x68` (second alias lane).
  */
-[[maybe_unused]] int wxReadRuntimeDwordSlot68LaneB(
+int wxReadRuntimeDwordSlot68LaneB(
   const WxRuntimeDwordSlot68ReadView* const runtime
 ) noexcept
 {
@@ -77667,7 +77667,7 @@ namespace
  * What it does:
  * Reads one 32-bit runtime lane at offset `+0x74`.
  */
-[[maybe_unused]] int wxReadRuntimeDwordSlot74(
+int wxReadRuntimeDwordSlot74(
   const WxRuntimeDwordSlot74ReadView* const runtime
 ) noexcept
 {
@@ -77680,7 +77680,7 @@ namespace
  * What it does:
  * Clears one pointer lane at runtime offset `+0x14`.
  */
-[[maybe_unused]] void wxClearRuntimePointerSlot14(
+void wxClearRuntimePointerSlot14(
   void* const runtimeObject,
   const int reservedArg0
 ) noexcept
@@ -77695,7 +77695,7 @@ namespace
  * What it does:
  * Dispatches virtual slot `+0x240` with command id `5100`.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot240WithCommand5100(
+int wxDispatchVirtualSlot240WithCommand5100(
   void* const runtimeObject,
   const int reservedArg0
 ) noexcept
@@ -77712,7 +77712,7 @@ namespace
  * Executes a conditional deleting lane: forwards `deleteFlag` to virtual slot
  * `+0x20` when non-zero, otherwise returns success (`1`).
  */
-[[maybe_unused]] int wxDeleteWithFlagIfRequestedRuntime(
+int wxDeleteWithFlagIfRequestedRuntime(
   void* const runtimeObject,
   const int deleteFlag
 ) noexcept
@@ -77730,7 +77730,7 @@ namespace
  * What it does:
  * Assigns one shared wx-string payload into runtime slot `+0x28C`.
  */
-[[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot28CRuntime(
+wxStringRuntime* wxAssignSharedStringSlot28CRuntime(
   WxRuntimeStringSlot28CView* const runtime,
   const wxStringRuntime* const value
 ) noexcept
@@ -77745,7 +77745,7 @@ namespace
  * Copies two 32-bit lanes at offsets `+0x290` and `+0x294` into optional
  * output pointers.
  */
-[[maybe_unused]] std::int32_t* wxReadRuntimeDwordPairSlots290And294(
+std::int32_t* wxReadRuntimeDwordPairSlots290And294(
   const WxRuntimeDwordPair290View* const runtime,
   std::int32_t* const outSlot290,
   std::int32_t* const outSlot294
@@ -77769,7 +77769,7 @@ namespace
  * Updates runtime dword lanes `+0x290/+0x294` when incoming values are not
  * `-1`.
  */
-[[maybe_unused]] int wxWriteRuntimeDwordPairSlots290And294IfNotMinusOne(
+int wxWriteRuntimeDwordPairSlots290And294IfNotMinusOne(
   WxRuntimeDwordPair290View* const runtime,
   const int slot290Value,
   const int slot294Value,
@@ -77798,7 +77798,7 @@ namespace
  * What it does:
  * Writes one fixed size pair `(225, 324)` into optional output lanes.
  */
-[[maybe_unused]] std::int32_t* wxWriteFixedSizePair225x324Runtime(
+std::int32_t* wxWriteFixedSizePair225x324Runtime(
   std::int32_t* const outWidth,
   std::int32_t* const outHeight
 ) noexcept
@@ -77818,7 +77818,7 @@ namespace
  * What it does:
  * Writes one fixed size pair `(219, 299)` into optional output lanes.
  */
-[[maybe_unused]] std::int32_t* wxWriteFixedSizePair219x299Runtime(
+std::int32_t* wxWriteFixedSizePair219x299Runtime(
   std::int32_t* const outWidth,
   std::int32_t* const outHeight
 ) noexcept
@@ -77839,7 +77839,7 @@ namespace
  * Copies the wxColourDialog shared-title lane (`+0x28C`) into `outValue`,
  * retaining payload ownership when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxColourDialogGetTitleRuntime(
+wxStringRuntime* wxColourDialogGetTitleRuntime(
   const WxRuntimeStringSlot28CView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77862,7 +77862,7 @@ namespace
  * Copy-constructs one compact record containing a shared wx-string lane plus
  * one 16-bit and one 8-bit metadata lane.
  */
-[[maybe_unused]] WxStringWordByteRecordRuntimeView* wxCopyStringWordByteRecordRuntime(
+WxStringWordByteRecordRuntimeView* wxCopyStringWordByteRecordRuntime(
   WxStringWordByteRecordRuntimeView* const destination,
   const WxStringWordByteRecordRuntimeView* const source
 )
@@ -77893,7 +77893,7 @@ namespace
  * Copy-constructs one record containing a shared wx-string lane plus two
  * 32-bit metadata/value lanes.
  */
-[[maybe_unused]] WxStringDwordPairRecordRuntimeView* wxCopyStringDwordPairRecordRuntime(
+WxStringDwordPairRecordRuntimeView* wxCopyStringDwordPairRecordRuntime(
   WxStringDwordPairRecordRuntimeView* const destination,
   const WxStringDwordPairRecordRuntimeView* const source
 )
@@ -77922,7 +77922,7 @@ namespace
  * Copies the toolbar-tool long-help shared-string lane (`+0x3C`) into
  * `outValue`, retaining payload ownership when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxToolBarToolCopyLongHelpTextRuntime(
+wxStringRuntime* wxToolBarToolCopyLongHelpTextRuntime(
   const WxRuntimeStringPairSlotsView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77945,7 +77945,7 @@ namespace
  * Copies the toolbar-tool label shared-string lane (`+0x40`) into `outValue`,
  * retaining payload ownership when non-empty.
  */
-[[maybe_unused]] wxStringRuntime* wxToolBarToolCopyLabelTextRuntime(
+wxStringRuntime* wxToolBarToolCopyLabelTextRuntime(
   const WxRuntimeStringPairSlotsView* const runtime,
   wxStringRuntime* const outValue
 )
@@ -77968,7 +77968,7 @@ namespace
  * Allocates one simple-data-object list node, runs `wxNodeBase` initialization,
  * and binds the typed list-node vtable lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxCreateSimpleDataObjectListNodeRuntime(
+wxNodeBaseRuntime* wxCreateSimpleDataObjectListNodeRuntime(
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
   wxNodeBaseRuntime* const next,
@@ -78169,7 +78169,7 @@ namespace
  * Rebinds one data-object runtime payload to the base `wxDataObjectBase`
  * vtable lane.
  */
-[[maybe_unused]] void* wxConstructDataObjectBaseRuntimeVTable(
+void* wxConstructDataObjectBaseRuntimeVTable(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -78190,7 +78190,7 @@ namespace
  * Alternate lane that rebinds one data-object runtime payload to the base
  * `wxDataObjectBase` vtable.
  */
-[[maybe_unused]] void* wxConstructDataObjectBaseRuntimeVTableLaneB(
+void* wxConstructDataObjectBaseRuntimeVTableLaneB(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -78217,7 +78217,7 @@ namespace
  * Emits the OLE canonical-format trace lane, zeroes the output lane at
  * `formatEtc+0x04` when provided, and returns constant format flags `0x40130`.
  */
-[[maybe_unused]] int wxIDataObjectGetCanonicalFormatEtcRuntime(
+int wxIDataObjectGetCanonicalFormatEtcRuntime(
   const int reservedArg0,
   const int reservedArg1,
   void* const formatEtcRuntime
@@ -78251,7 +78251,7 @@ namespace
  * owned lane at `+0x04` through its virtual slot `+0x08` when present, then
  * rebinds to `wxDataObjectBase` via `FUN_00A19510`.
  */
-[[maybe_unused]] void* wxDestroyDataObjectOwnedLaneAndRebindBaseRuntime(
+void* wxDestroyDataObjectOwnedLaneAndRebindBaseRuntime(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -78276,7 +78276,7 @@ namespace
  * Preserves one direct jump-thunk lane that forwards to
  * `FUN_00A2CE00` data-object teardown/rebind logic.
  */
-[[maybe_unused]] void* wxDestroyDataObjectOwnedLaneAndRebindBaseRuntimeThunk(
+void* wxDestroyDataObjectOwnedLaneAndRebindBaseRuntimeThunk(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -78305,7 +78305,7 @@ namespace
  * Runs data-object owned-lane teardown/rebind and deletes the object when
  * low-bit delete flag lane is set.
  */
-[[maybe_unused]] void* wxDestroyDataObjectOwnedLaneAndDeleteFlagRuntimeLaneA(
+void* wxDestroyDataObjectOwnedLaneAndDeleteFlagRuntimeLaneA(
   void* const dataObjectRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -78320,7 +78320,7 @@ namespace
  * Alternate lane for data-object teardown that mirrors the low-bit conditional
  * delete behavior from `FUN_00A19BC0`.
  */
-[[maybe_unused]] void* wxDestroyDataObjectOwnedLaneAndDeleteFlagRuntimeLaneB(
+void* wxDestroyDataObjectOwnedLaneAndDeleteFlagRuntimeLaneB(
   void* const dataObjectRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -78347,7 +78347,7 @@ namespace
  * What it does:
  * Dispatches one zero-argument virtual call at slot `+0x28`.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot28LaneB(
+int wxDispatchVirtualSlot28LaneB(
   void* const runtimeObject,
   const int reservedArg0
 ) noexcept
@@ -78363,7 +78363,7 @@ namespace
  * What it does:
  * Dispatches one one-argument virtual call at slot `+0x2C`.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot2CLaneB(
+int wxDispatchVirtualSlot2CLaneB(
   void* const runtimeObject,
   const int reservedArg0,
   const int slotArg
@@ -78381,7 +78381,7 @@ namespace
  * Forwards one file-data-object dispatch lane to virtual slot `+0x28`,
  * ignoring the passthrough format lane.
  */
-[[maybe_unused]] int wxFileDataObjectDispatchDataSizeRuntime(
+int wxFileDataObjectDispatchDataSizeRuntime(
   void* const dataObjectRuntime,
   const int reservedArg0
 ) noexcept
@@ -78398,7 +78398,7 @@ namespace
  * Forwards one file-data-object dispatch lane to virtual slot `+0x2C` with
  * one payload argument.
  */
-[[maybe_unused]] int wxFileDataObjectDispatchDataHereRuntime(
+int wxFileDataObjectDispatchDataHereRuntime(
   void* const dataObjectRuntime,
   const int reservedArg0,
   const int slotArg
@@ -78416,7 +78416,7 @@ namespace
  * Dispatches one two-argument virtual call at slot `+0x30`, preserving the
  * legacy wrapper's unused second parameter lane.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot30LaneB(
+int wxDispatchVirtualSlot30LaneB(
   void* const runtimeObject,
   const int reservedArg0,
   const int slotArg0,
@@ -78435,7 +78435,7 @@ namespace
  * Releases one owned runtime pointer from lane `+0x08` via the owned vtable
  * slot `+0x00` with delete flag `1` when the lane is populated.
  */
-[[maybe_unused]] int wxDeleteOwnedRuntimeSlot08ViaSlot00(
+int wxDeleteOwnedRuntimeSlot08ViaSlot00(
   void* const runtimeObject
 ) noexcept
 {
@@ -78453,7 +78453,7 @@ namespace
  * What it does:
  * Dispatches virtual slot `+0x34` and doubles the returned lane value.
  */
-[[maybe_unused]] int wxDispatchVirtualSlot34AndDoubleResult(
+int wxDispatchVirtualSlot34AndDoubleResult(
   void* const runtimeObject
 ) noexcept
 {
@@ -78469,7 +78469,7 @@ namespace
  * `+0x18`, then dispatches slot `+0x1C` with owner key storage (`owner+0x0C`)
  * and returns `1` on any gate failure.
  */
-[[maybe_unused]] int wxDispatchGateWithOwnerKeyRuntime(
+int wxDispatchGateWithOwnerKeyRuntime(
   void* const runtimeObject,
   const int dispatchArg0,
   const int dispatchArg1,
@@ -78497,7 +78497,7 @@ namespace
  * Rebinds one `wxIDataObject` runtime payload to the base vtable lane and,
  * when ownership is set, releases the owned FORMATETC runtime object.
  */
-[[maybe_unused]] int wxDestroyIDataObjectNoDeleteRuntime(
+int wxDestroyIDataObjectNoDeleteRuntime(
   WxIDataObjectCtorRuntimeView* const dataObjectRuntime
 ) noexcept
 {
@@ -78529,7 +78529,7 @@ namespace
  * Runs `wxIDataObject` non-deleting teardown and conditionally scalar-deletes
  * the payload when the low delete flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyIDataObjectWithDeleteFlagRuntime(
+void* wxDestroyIDataObjectWithDeleteFlagRuntime(
   void* const dataObjectRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -78549,7 +78549,7 @@ namespace
  * clearing auxiliary storage, wiring owned FORMATETC runtime pointer, and
  * clearing ownership.
  */
-[[maybe_unused]] WxIDataObjectCtorRuntimeView* wxConstructIDataObjectRuntime(
+WxIDataObjectCtorRuntimeView* wxConstructIDataObjectRuntime(
   WxIDataObjectCtorRuntimeView* const dataObjectRuntime,
   void* const ownedFormatEtcRuntime
 ) noexcept
@@ -78643,7 +78643,7 @@ namespace
  * What it does:
  * Returns the embedded storage lane at offset `+0x54`.
  */
-[[maybe_unused]] char* wxGetEmbeddedLane54PointerRuntime(
+char* wxGetEmbeddedLane54PointerRuntime(
   void* const runtimeObject
 ) noexcept
 {
@@ -78656,7 +78656,7 @@ namespace
  * What it does:
  * Clears one output dword lane and dispatches virtual slot `+0x10`.
  */
-[[maybe_unused]] int wxClearOutDwordAndDispatchSlot10Runtime(
+int wxClearOutDwordAndDispatchSlot10Runtime(
   void* const runtimeObject,
   const int reservedArg0,
   std::uint32_t* const outDword
@@ -78674,7 +78674,7 @@ namespace
  * What it does:
  * Clears one output dword lane and dispatches virtual slot `+0x18`.
  */
-[[maybe_unused]] int wxClearOutDwordAndDispatchSlot18Runtime(
+int wxClearOutDwordAndDispatchSlot18Runtime(
   void* const runtimeObject,
   const int reservedArg0,
   std::uint32_t* const outDword
@@ -78693,7 +78693,7 @@ namespace
  * Releases one owned runtime pointer from lane `+0x08` via the owned vtable
  * slot `+0x04` with delete flag `1` when the lane is populated.
  */
-[[maybe_unused]] int wxDeleteOwnedRuntimeSlot08ViaSlot04(
+int wxDeleteOwnedRuntimeSlot08ViaSlot04(
   void* const runtimeObject
 ) noexcept
 {
@@ -78711,7 +78711,7 @@ namespace
  * What it does:
  * Writes format id `14` into a two-word descriptor lane.
  */
-[[maybe_unused]] std::uint16_t* wxWriteFormatId14Runtime(
+std::uint16_t* wxWriteFormatId14Runtime(
   std::uint16_t* const descriptorWords,
   const int reservedArg0
 ) noexcept
@@ -78727,7 +78727,7 @@ namespace
  * What it does:
  * Writes descriptor words `(14, 3)`.
  */
-[[maybe_unused]] std::uint16_t* wxWriteFormatDescriptor14x3Runtime(
+std::uint16_t* wxWriteFormatDescriptor14x3Runtime(
   std::uint16_t* const descriptorWords,
   const int reservedArg0
 ) noexcept
@@ -78745,7 +78745,7 @@ namespace
  * What it does:
  * Returns `0` when descriptor word-0 equals `14`; otherwise returns `0x10`.
  */
-[[maybe_unused]] int wxValidateFormatId14Runtime(
+int wxValidateFormatId14Runtime(
   const std::uint16_t* const descriptorWords
 ) noexcept
 {
@@ -78759,7 +78759,7 @@ namespace
  * Reads one signed 16-bit value from cursor storage into output lanes, then
  * advances the cursor; returns `1` when selector/cursor checks fail.
  */
-[[maybe_unused]] int wxReadNextWordCursorRecordRuntime(
+int wxReadNextWordCursorRecordRuntime(
   WxWordCursorRuntimeView* const cursorRuntime,
   const unsigned int selector,
   WxWordCursorOutputRuntimeView* const outRecord,
@@ -78794,7 +78794,7 @@ namespace
  * Attempts to advance cursor lane `+0x10` by `delta`; reverts and returns `1`
  * when that would move at/after `wordCount`.
  */
-[[maybe_unused]] int wxAdvanceWordCursorRuntime(
+int wxAdvanceWordCursorRuntime(
   WxWordCursorRuntimeView* const cursorRuntime,
   const int delta
 ) noexcept
@@ -78814,7 +78814,7 @@ namespace
  * What it does:
  * Resets cursor lane `+0x10` to zero.
  */
-[[maybe_unused]] int wxResetWordCursorRuntime(
+int wxResetWordCursorRuntime(
   WxWordCursorRuntimeView* const cursorRuntime
 ) noexcept
 {
@@ -78829,7 +78829,7 @@ namespace
  * Allocates one art-provider list node, runs `wxNodeBase` initialization, and
  * binds the typed list-node vtable lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxCreateArtProvidersListNodeRuntime(
+wxNodeBaseRuntime* wxCreateArtProvidersListNodeRuntime(
   void* const listOwner,
   wxNodeBaseRuntime* const previous,
   wxNodeBaseRuntime* const next,
@@ -78855,7 +78855,7 @@ namespace
  * requested, snapshots the pre-append item count into the preferred-insert
  * lane.
  */
-[[maybe_unused]] wxNodeBaseRuntime* wxDataObjectCompositeAddRuntime(
+wxNodeBaseRuntime* wxDataObjectCompositeAddRuntime(
   void* const compositeRuntime,
   void* const dataObjectRuntime,
   const bool preferred
@@ -78880,7 +78880,7 @@ namespace
  * Finds one child simple-data object by format id within the composite's
  * linked-list lane.
  */
-[[maybe_unused]] WxDataObjectSimpleRuntimeView* wxDataObjectCompositeGetObjectByFormatRuntime(
+WxDataObjectSimpleRuntimeView* wxDataObjectCompositeGetObjectByFormatRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   const std::uint16_t* const formatId
 ) noexcept
@@ -78906,7 +78906,7 @@ namespace
  * Routes one composite format lookup to the child object's buffer-offset
  * callback and returns `0` when no child matches the format.
  */
-[[maybe_unused]] int wxDataObjectCompositeGetBufferOffsetRuntime(
+int wxDataObjectCompositeGetBufferOffsetRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   const std::uint16_t* const formatId
 )
@@ -78931,7 +78931,7 @@ namespace
  * Routes one composite format lookup to the child object's read-from-buffer
  * callback and returns `0` when no child matches the format.
  */
-[[maybe_unused]] int wxDataObjectCompositeGetSizeFromBufferRuntime(
+int wxDataObjectCompositeGetSizeFromBufferRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   void* const sourceBuffer,
   void* const outSizeLane,
@@ -78958,7 +78958,7 @@ namespace
  * Routes one composite format lookup to the child object's write-to-buffer
  * callback and returns `0` when no child matches the format.
  */
-[[maybe_unused]] int wxDataObjectCompositeSetSizeInBufferRuntime(
+int wxDataObjectCompositeSetSizeInBufferRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   void* const destinationBuffer,
   const unsigned int sourceSize,
@@ -78985,7 +78985,7 @@ namespace
  * Writes each child data-object format id from the composite linked-list lane
  * into the caller output array in iteration order.
  */
-[[maybe_unused]] int wxDataObjectCompositeWriteChildFormatIdsRuntime(
+int wxDataObjectCompositeWriteChildFormatIdsRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   std::uint16_t* outFormatIds,
   const int reservedArg0
@@ -79009,7 +79009,7 @@ namespace
  * Routes one composite format lookup to the child object's data-size callback
  * and returns `0` when no child matches the format.
  */
-[[maybe_unused]] int wxDataObjectCompositeGetDataSizeRuntime(
+int wxDataObjectCompositeGetDataSizeRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   const std::uint16_t* const formatId
 )
@@ -79034,7 +79034,7 @@ namespace
  * Routes one composite format lookup to the child object's `GetDataHere`
  * callback and returns `false` when no child matches the format.
  */
-[[maybe_unused]] bool wxDataObjectCompositeGetDataHereRuntime(
+bool wxDataObjectCompositeGetDataHereRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   const std::uint16_t* const formatId,
   void* const destinationBuffer
@@ -79060,7 +79060,7 @@ namespace
  * Routes one composite format lookup to the child object's virtual slot
  * `+0x30` dispatch lane and returns `0` when no child matches the format.
  */
-[[maybe_unused]] std::uint8_t wxDataObjectCompositeDispatchSlot30ByFormatRuntime(
+std::uint8_t wxDataObjectCompositeDispatchSlot30ByFormatRuntime(
   const WxDataObjectCompositeRuntimeView* const compositeRuntime,
   const std::uint16_t* const formatId,
   const int slotArg0,
@@ -79097,7 +79097,7 @@ namespace
  * pointer at lane `+0x28`, and dispatches virtual slot `+0x30` with two
  * integer payload lanes.
  */
-[[maybe_unused]] std::uint8_t wxDataObjectCompositeCacheAndDispatchSlot30ByFormatRuntime(
+std::uint8_t wxDataObjectCompositeCacheAndDispatchSlot30ByFormatRuntime(
   WxDataObjectCompositeSlot30DispatchRuntimeView* const compositeRuntime,
   const std::uint16_t* const formatId,
   const int slotArg0,
@@ -79124,7 +79124,7 @@ namespace
  * Forwards one shell-url custom-data-object dispatch lane to virtual slot
  * `+0x28`, ignoring the passthrough format lane.
  */
-[[maybe_unused]] int wxShellUrlDataObjectDispatchDataSizeRuntime(
+int wxShellUrlDataObjectDispatchDataSizeRuntime(
   void* const dataObjectRuntime,
   const int reservedArg0
 ) noexcept
@@ -79141,7 +79141,7 @@ namespace
  * Forwards one shell-url custom-data-object dispatch lane to virtual slot
  * `+0x2C` with one payload argument.
  */
-[[maybe_unused]] int wxShellUrlDataObjectDispatchDataHereRuntime(
+int wxShellUrlDataObjectDispatchDataHereRuntime(
   void* const dataObjectRuntime,
   const int reservedArg0,
   const int slotArg
@@ -79159,7 +79159,7 @@ namespace
  * Forwards one shell-url custom-data-object dispatch lane to virtual slot
  * `+0x30` with two payload arguments.
  */
-[[maybe_unused]] int wxShellUrlDataObjectDispatchSetDataRuntime(
+int wxShellUrlDataObjectDispatchSetDataRuntime(
   void* const dataObjectRuntime,
   const int reservedArg0,
   const int slotArg0,
@@ -79178,7 +79178,7 @@ namespace
  * Forwards one shell-url custom-data-object dispatch lane to virtual slot
  * `+0x3C`.
  */
-[[maybe_unused]] int wxShellUrlDataObjectDispatchSlot3CRuntime(
+int wxShellUrlDataObjectDispatchSlot3CRuntime(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -79205,7 +79205,7 @@ namespace
  * Releases the owned custom-data payload buffer, then clears the size and
  * pointer lanes to their empty state.
  */
-[[maybe_unused]] int wxCustomDataObjectResetRuntime(
+int wxCustomDataObjectResetRuntime(
   void* const customDataObjectRuntime
 ) noexcept
 {
@@ -79271,7 +79271,7 @@ namespace
  * Rebinds one custom-data-object payload to its class lane, clears owned
  * payload bytes, then runs shared data-object base teardown semantics.
  */
-[[maybe_unused]] void* wxDestroyCustomDataObjectNoDeleteRuntimeAdapter(
+void* wxDestroyCustomDataObjectNoDeleteRuntimeAdapter(
   void* const customDataObjectRuntime
 ) noexcept
 {
@@ -79290,7 +79290,7 @@ namespace
  * Alternate custom-data-object teardown lane that mirrors
  * `FUN_00A2D8B0` semantics.
  */
-[[maybe_unused]] void* wxDestroyCustomDataObjectNoDeleteRuntimeAdapterLaneB(
+void* wxDestroyCustomDataObjectNoDeleteRuntimeAdapterLaneB(
   void* const customDataObjectRuntime
 ) noexcept
 {
@@ -79304,7 +79304,7 @@ namespace
  * Destroys one embedded `wxListBase` lane at offset `+0x08`, then runs shared
  * data-object base teardown semantics.
  */
-[[maybe_unused]] void* wxDestroyDataObjectWithEmbeddedListNoDeleteRuntimeAdapter(
+void* wxDestroyDataObjectWithEmbeddedListNoDeleteRuntimeAdapter(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -79318,7 +79318,7 @@ namespace
  * Destroys one embedded `wxArrayString` lane at offset `+0x0C`, then runs
  * shared data-object owned-lane teardown/rebind semantics.
  */
-[[maybe_unused]] void* wxDestroyDataObjectWithEmbeddedArrayStringNoDeleteRuntimeAdapter(
+void* wxDestroyDataObjectWithEmbeddedArrayStringNoDeleteRuntimeAdapter(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -79335,7 +79335,7 @@ namespace
  * Preserves one direct jump-thunk lane that forwards to the embedded
  * `wxArrayString` teardown adapter (`FUN_00A194A0`).
  */
-[[maybe_unused]] void* wxDestroyDataObjectWithEmbeddedArrayStringNoDeleteRuntimeAdapterThunk(
+void* wxDestroyDataObjectWithEmbeddedArrayStringNoDeleteRuntimeAdapterThunk(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -79349,7 +79349,7 @@ namespace
  * Alternate lane that destroys one embedded `wxListBase` at offset `+0x08`
  * and then runs data-object owned-lane teardown/rebind semantics.
  */
-[[maybe_unused]] void* wxDestroyDataObjectWithEmbeddedListAndOwnedLaneNoDeleteRuntimeAdapter(
+void* wxDestroyDataObjectWithEmbeddedListAndOwnedLaneNoDeleteRuntimeAdapter(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -79363,7 +79363,7 @@ namespace
  * Destroys one embedded `wxEnhMetaFile` payload lane at offset `+0x08`, then
  * runs shared data-object owned-lane teardown/rebind semantics.
  */
-[[maybe_unused]] void* wxDestroyDataObjectWithEmbeddedEnhMetaFileNoDeleteRuntimeAdapter(
+void* wxDestroyDataObjectWithEmbeddedEnhMetaFileNoDeleteRuntimeAdapter(
   void* const dataObjectRuntime
 ) noexcept
 {
@@ -79378,7 +79378,7 @@ namespace
  * What it does:
  * Allocates one custom-data payload lane via scalar `operator new`.
  */
-[[maybe_unused]] void* wxCustomDataObjectAllocatePayloadRuntime(
+void* wxCustomDataObjectAllocatePayloadRuntime(
   const std::size_t byteCount
 ) noexcept
 {
@@ -79393,7 +79393,7 @@ namespace
  * allocating a new lane, copying caller bytes, and updating size/pointer
  * metadata.
  */
-[[maybe_unused]] bool wxCustomDataObjectSetDataRuntime(
+bool wxCustomDataObjectSetDataRuntime(
   void* const customDataObjectRuntime,
   const std::size_t byteCount,
   const void* const sourceBytes
@@ -79471,7 +79471,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * Clears two owner back-link lanes (`owner+0x0C`, `owner+0x08`) and frees the
  * current node storage.
  */
-[[maybe_unused]] void* wxUnlinkAndDeleteNodeRuntimeLaneA(
+void* wxUnlinkAndDeleteNodeRuntimeLaneA(
   void* const nodeRuntime
 ) noexcept
 {
@@ -79485,7 +79485,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * Clears two owner back-link lanes (`owner+0x0C`, `owner+0x08`) and frees the
  * current node storage.
  */
-[[maybe_unused]] void* wxUnlinkAndDeleteNodeRuntimeLaneB(
+void* wxUnlinkAndDeleteNodeRuntimeLaneB(
   void* const nodeRuntime
 ) noexcept
 {
@@ -79499,7 +79499,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * Allocates one default `wxPopupWindow` runtime class-factory payload and
  * applies the popup-window vtable lane.
  */
-[[maybe_unused]] void* wxCreatePopupWindowRuntimeClassInstance()
+void* wxCreatePopupWindowRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxPopupWindowClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -79519,7 +79519,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * Allocates one `wxBrushRefData` runtime payload and seeds refcount/style/brush
  * lanes for the default null-colour brush state.
  */
-[[maybe_unused]] void* wxCreateBrushRefDataRuntimeWithNullColour()
+void* wxCreateBrushRefDataRuntimeWithNullColour()
 {
   auto* const runtime = new (std::nothrow) WxBrushRefDataRuntimeView{};
   if (runtime == nullptr) {
@@ -79539,7 +79539,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * What it does:
  * Compares selected `wxBrushRefData` style/bitmap/colour lanes for equality.
  */
-[[maybe_unused]] BOOL wxBrushRefDataEqualsStyleColourAndBitmapRuntime(
+BOOL wxBrushRefDataEqualsStyleColourAndBitmapRuntime(
   const WxBrushRefDataRuntimeView* const leftRefData,
   const WxBrushRefDataRuntimeView* const rightRefData
 ) noexcept
@@ -79565,7 +79565,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * Compares two ref-data holder lanes at offset `+0x04`; returns true when
  * both holders are null or when both are non-null and brush-ref lanes match.
  */
-[[maybe_unused]] BOOL wxBrushRefDataHolderEqualsOrBothNullRuntime(
+BOOL wxBrushRefDataHolderEqualsOrBothNullRuntime(
   const void* const leftHolderRuntime,
   const void* const rightHolderRuntime
 ) noexcept
@@ -79606,7 +79606,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * IDA signature:
  * wxObject* __thiscall sub_9D2CD0(wxObject* this, wxObject* clone);
  */
-[[maybe_unused]] void* wxBrushAssignBySharedRefDataOrRefRuntime(
+void* wxBrushAssignBySharedRefDataOrRefRuntime(
   void* const brushHolderRuntime,
   const void* const sourceBrushHolderRuntime
 ) noexcept
@@ -79631,7 +79631,7 @@ static_assert(sizeof(WxUnlinkDeleteNodeRuntimeView) == 0x10, "WxUnlinkDeleteNode
  * Allocates one default `wxSpinCtrl` runtime class-factory payload, clears min
  * lane, seeds max lane to `100`, and binds the spin-ctrl vtable.
  */
-[[maybe_unused]] void* wxCreateSpinCtrlRuntimeClassInstance()
+void* wxCreateSpinCtrlRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxSpinCtrlClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -79690,7 +79690,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Returns one vertical scroll-position lane from the runtime native window
  * handle.
  */
-[[maybe_unused]] int wxGetVerticalScrollThumbPositionRuntime(
+int wxGetVerticalScrollThumbPositionRuntime(
   const void* const scrollOwnerRuntime
 ) noexcept
 {
@@ -79705,7 +79705,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Sends one boolean probe message (`0xF0`) to the runtime native handle and
  * returns true when the native result is non-zero.
  */
-[[maybe_unused]] BOOL wxSendBooleanMessageF0Runtime(
+BOOL wxSendBooleanMessageF0Runtime(
   const void* const controlRuntime
 ) noexcept
 {
@@ -79720,7 +79720,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Forwards one embedded command-event payload through `ProcessEvent`, then
  * calls control-level command processing for the original command object.
  */
-[[maybe_unused]] void wxControlDispatchEmbeddedCommandEventRuntime(
+void wxControlDispatchEmbeddedCommandEventRuntime(
   wxControlRuntime* const controlRuntime,
   void* const commandRuntime
 )
@@ -79758,7 +79758,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one default `wxScrollBar` runtime class-factory payload, clears
  * thumb/range/page lanes, and binds the scrollbar vtable.
  */
-[[maybe_unused]] void* wxCreateScrollBarRuntimeClassInstance()
+void* wxCreateScrollBarRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxScrollBarClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -79782,7 +79782,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * offset `+0x3C`, clears that handle lane, and returns whether deletion was
  * attempted.
  */
-[[maybe_unused]] std::uint8_t wxDeleteOwnedGdiHandleAt3CLaneRuntime(
+std::uint8_t wxDeleteOwnedGdiHandleAt3CLaneRuntime(
   void* const ownerRuntime
 ) noexcept
 {
@@ -79825,7 +79825,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * What it does:
  * Returns true when one wx-pen runtime owns non-null ref-data.
  */
-[[maybe_unused]] bool wxPenHasRefDataRuntime(
+bool wxPenHasRefDataRuntime(
   const void* const penRuntime
 ) noexcept
 {
@@ -79850,7 +79850,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Returns one wx-pen ref-data cached GDI handle lane (`+0x3C`), or null when
  * no ref-data is attached.
  */
-[[maybe_unused]] HGDIOBJ wxPenGetCachedGdiHandleRuntime(
+HGDIOBJ wxPenGetCachedGdiHandleRuntime(
   const void* const penRuntime
 ) noexcept
 {
@@ -79885,7 +79885,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Returns true when one wx-pen runtime has ref-data attached but still lacks a
  * cached native GDI handle.
  */
-[[maybe_unused]] bool wxPenRefDataNeedsNativeHandleRuntime(
+bool wxPenRefDataNeedsNativeHandleRuntime(
   const void* const penRuntime
 ) noexcept
 {
@@ -79899,7 +79899,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Releases one owned runtime object lane at offset `+0x134` via deleting-dtor
  * slot 1 and clears the ownership pointer.
  */
-[[maybe_unused]] int wxReleaseOwnedRuntimeObjectAt134(
+int wxReleaseOwnedRuntimeObjectAt134(
   void* const ownerRuntime
 ) noexcept
 {
@@ -79939,7 +79939,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Queries one runtime best-size lane and stores the result into caller-provided
  * output storage.
  */
-[[maybe_unused]] wxSize* wxWindowBaseCopyBestSizeRuntime(
+wxSize* wxWindowBaseCopyBestSizeRuntime(
   const wxWindowBase* const windowRuntime,
   wxSize* const outSize
 )
@@ -79959,7 +79959,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Short-circuits non-client hit-test queries to return client hit (`1`),
  * otherwise forwards to the base `wxWindow` window-proc lane.
  */
-[[maybe_unused]] long wxWindowHandleNcHitTestAsClientRuntime(
+long wxWindowHandleNcHitTestAsClientRuntime(
   wxWindowBase* const windowRuntime,
   const unsigned int message,
   const unsigned int wParam,
@@ -79995,7 +79995,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one default `wxStaticBitmap` runtime class-factory payload, enables
  * mask usage, clears bitmap payload lane, and binds the static-bitmap vtable.
  */
-[[maybe_unused]] void* wxCreateStaticBitmapRuntimeClassInstance()
+void* wxCreateStaticBitmapRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxStaticBitmapClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -80017,7 +80017,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one default `wxSpinButton` runtime class-factory payload, seeds
  * range lanes (`min=0`, `max=100`), and binds the spin-button vtable.
  */
-[[maybe_unused]] void* wxCreateSpinButtonRuntimeClassInstance()
+void* wxCreateSpinButtonRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxSpinButtonClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -80039,7 +80039,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one default `wxStaticLine` runtime class-factory payload and binds
  * the static-line vtable lane.
  */
-[[maybe_unused]] void* wxCreateStaticLineRuntimeClassInstance()
+void* wxCreateStaticLineRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxStaticLineClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -80059,7 +80059,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one default `wxMDIClientWindow` class-factory payload, clears the
  * MDI parent/active-child lanes, and binds the MDI-client vtable.
  */
-[[maybe_unused]] void* wxCreateMdiClientWindowRuntimeClassInstance()
+void* wxCreateMdiClientWindowRuntimeClassInstance()
 {
   auto* const runtime = new (std::nothrow) WxMdiClientWindowClassFactoryRuntimeView{};
   if (runtime == nullptr) {
@@ -80081,7 +80081,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Secondary class-factory lane for `wxMDIClientWindow`; forwards to the
  * canonical MDI-client allocator.
  */
-[[maybe_unused]] void* wxCreateMdiClientWindowRuntimeClassInstanceAlias()
+void* wxCreateMdiClientWindowRuntimeClassInstanceAlias()
 {
   return wxCreateMdiClientWindowRuntimeClassInstance();
 }
@@ -80093,7 +80093,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Updates one embedded toolbar-tool label string lane only when the incoming
  * text differs from the current lane content.
  */
-[[maybe_unused]] wxStringRuntime* wxToolBarToolAssignLabelIfChangedRuntime(
+wxStringRuntime* wxToolBarToolAssignLabelIfChangedRuntime(
   void* const toolRuntime,
   const wxStringRuntime* const sourceLabel
 )
@@ -80138,7 +80138,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Returns one pointer to the toolbar-tool normal-bitmap lane at offset
  * `+0x20`.
  */
-[[maybe_unused]] WxBitmapRuntimeView* wxToolBarToolGetNormalBitmapLaneRuntime(
+WxBitmapRuntimeView* wxToolBarToolGetNormalBitmapLaneRuntime(
   WxToolBarToolRuntimeView* const toolRuntime
 ) noexcept
 {
@@ -80151,7 +80151,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * What it does:
  * Stores one scalar lane at toolbar-tool offset `+0x44` and returns it.
  */
-[[maybe_unused]] std::int32_t wxToolBarToolSetRuntimeLane44(
+std::int32_t wxToolBarToolSetRuntimeLane44(
   WxToolBarToolRuntimeView* const toolRuntime,
   const std::int32_t value
 ) noexcept
@@ -80166,7 +80166,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * What it does:
  * Reads one scalar lane from toolbar-tool offset `+0x44`.
  */
-[[maybe_unused]] std::int32_t wxToolBarToolGetRuntimeLane44(
+std::int32_t wxToolBarToolGetRuntimeLane44(
   const WxToolBarToolRuntimeView* const toolRuntime
 ) noexcept
 {
@@ -80180,7 +80180,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one `wxToolBarTool` runtime payload from toolbar + seed-tool lanes
  * and marks the constructed tool as inserted/owned by toolbar storage.
  */
-[[maybe_unused]] void* wxCreateToolBarToolRuntimeFromSeed(
+void* wxCreateToolBarToolRuntimeFromSeed(
   void* const ownerToolBarRuntime,
   const void* const seedToolRuntime
 )
@@ -80212,7 +80212,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one `wxToolBarTool` runtime payload from explicit ctor lanes
  * (owner/id/bitmaps/help strings), applies runtime flags, and returns the tool.
  */
-[[maybe_unused]] void* wxCreateToolBarToolRuntimeWithArguments(
+void* wxCreateToolBarToolRuntimeWithArguments(
   void* const ownerToolBarRuntime,
   const std::int32_t runtimeLane10,
   const wxStringRuntime* const labelText,
@@ -80258,7 +80258,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Returns the selected label text from one selection-provider runtime by
  * querying selected index then copying the associated label lane.
  */
-[[maybe_unused]] wxStringRuntime* wxGetSelectionLabelRuntime(
+wxStringRuntime* wxGetSelectionLabelRuntime(
   void* const selectionProviderRuntime,
   wxStringRuntime* const outLabel
 )
@@ -80294,7 +80294,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * falls back to process-global empty-string storage when index is out of
  * bounds.
  */
-[[maybe_unused]] wxStringRuntime* wxGetIndexedSharedSelectionLabelRuntime(
+wxStringRuntime* wxGetIndexedSharedSelectionLabelRuntime(
   const void* const selectionProviderRuntime,
   wxStringRuntime* const outText,
   const std::int32_t index
@@ -80339,7 +80339,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Builds one `wxEVT_COMMAND_MENU_SELECTED` command-event payload with command
  * state lanes and dispatches it through the owner's event-handler lane.
  */
-[[maybe_unused]] bool wxDispatchMenuSelectionCommandFromObjectRuntime(
+bool wxDispatchMenuSelectionCommandFromObjectRuntime(
   void* const objectRuntime,
   const std::int32_t commandId,
   const std::uint8_t commandState
@@ -80364,7 +80364,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Constructs one default wx-cursor runtime lane by clearing shared ref-data,
  * zeroing the cursor state byte, and binding the cursor vtable.
  */
-[[maybe_unused]] WxCursorRuntimeView* wxConstructCursorRuntimeDefault(
+WxCursorRuntimeView* wxConstructCursorRuntimeDefault(
   WxCursorRuntimeView* const cursorRuntime
 ) noexcept
 {
@@ -80384,7 +80384,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * What it does:
  * Allocates one `wxCursor` payload and runs default cursor-constructor lane.
  */
-[[maybe_unused]] WxCursorRuntimeView* wxCreateCursorRuntimeClassInstance()
+WxCursorRuntimeView* wxCreateCursorRuntimeClassInstance()
 {
   auto* const cursorRuntime = static_cast<WxCursorRuntimeView*>(::operator new(sizeof(WxCursorRuntimeView), std::nothrow));
   if (cursorRuntime == nullptr) {
@@ -80401,7 +80401,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Initializes one cursor runtime lane (`refData=null`, state flag cleared),
  * binds cursor vtable, and shares ref-data from `clone` when present.
  */
-[[maybe_unused]] void* wxConstructCursorRuntimeFromClone(
+void* wxConstructCursorRuntimeFromClone(
   void* const cursorRuntime,
   const void* const cloneRuntime
 )
@@ -80427,7 +80427,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one global-memory block that stores three UTF-16 strings in
  * sequence with 16-bit offset lanes used by drag-data/clipboard payloads.
  */
-[[maybe_unused]] HGLOBAL wxBuildGlobalWideStringTripletBlock(
+HGLOBAL wxBuildGlobalWideStringTripletBlock(
   const wchar_t* const firstText,
   const wchar_t* const secondText,
   const wchar_t* const thirdText
@@ -80481,7 +80481,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Ends drag-image tracking, releases capture/cursor state, and clears one
  * drag-active flag lane.
  */
-[[maybe_unused]] bool wxEndDragImageAndReleaseCapture(
+bool wxEndDragImageAndReleaseCapture(
   void* const dragRuntime
 )
 {
@@ -80513,7 +80513,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Resolves the drag-host window handle lane (unless suppressed by state flag)
  * and forwards `ImageList_DragLeave` to end drag feedback for that window.
  */
-[[maybe_unused]] bool wxDragImageLeaveHostWindowRuntime(
+bool wxDragImageLeaveHostWindowRuntime(
   const void* const dragRuntime
 ) noexcept
 {
@@ -80545,7 +80545,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * aliases for bitmap (`CF_BITMAP` -> `CF_DIB`) and metafile
  * (`CF_METAFILEPICT` -> `CF_ENHMETAFILE`) formats.
  */
-[[maybe_unused]] bool wxClipboardIsFormatAvailableWithNativeFallbacks(
+bool wxClipboardIsFormatAvailableWithNativeFallbacks(
   const std::uint16_t formatId
 )
 {
@@ -80571,7 +80571,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Flushes the active OLE clipboard ownership and clears this clipboard
  * runtime open-state flag lane on success.
  */
-[[maybe_unused]] char wxClipboardFlushAndCloseRuntime(
+char wxClipboardFlushAndCloseRuntime(
   void* const clipboardRuntime
 )
 {
@@ -80594,7 +80594,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Preserves a secondary clipboard-format availability lane that forwards to
  * the native-fallback probe routine.
  */
-[[maybe_unused]] bool wxClipboardIsFormatAvailableWithNativeFallbacksLaneB(
+bool wxClipboardIsFormatAvailableWithNativeFallbacksLaneB(
   const std::uint16_t formatId
 )
 {
@@ -80608,7 +80608,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Allocates one process-wide clipboard runtime singleton lane, initializes base
  * clipboard fields, stores it into global runtime state, and returns success.
  */
-[[maybe_unused]] char wxInitializeClipboardRuntimeSingleton()
+char wxInitializeClipboardRuntimeSingleton()
 {
   auto* const clipboardRuntime = new (std::nothrow) WxClipboardRuntimeView{};
   gWxClipboardRuntime = wxConstructClipboardRuntime(clipboardRuntime);
@@ -80622,7 +80622,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Deletes the process-global clipboard module singleton runtime lane (when
  * present) and clears the singleton pointer.
  */
-[[maybe_unused]] int wxDestroyClipboardModuleRuntimeSingleton()
+int wxDestroyClipboardModuleRuntimeSingleton()
 {
   int deleteResult = 0;
   if (gWxClipboardModuleRuntimeSingleton != nullptr) {
@@ -80645,7 +80645,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Reports whether runtime UX-theme support should be enabled (Windows 5.x with
  * non-zero minor version and comctl32 version `>= 6.00`).
  */
-[[maybe_unused]] BOOL wxCanUseUxThemeRuntime()
+BOOL wxCanUseUxThemeRuntime()
 {
   std::array<std::uint8_t, 284> versionInformation{};
   auto* const versionHeader = reinterpret_cast<OSVERSIONINFOW*>(versionInformation.data());
@@ -80674,7 +80674,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Clears one UX-theme API slot table payload (`+0x08 .. +0xC0`) while keeping
  * availability and module-handle lanes intact.
  */
-[[maybe_unused]] int wxResetUxThemeApiRuntimeSlots(
+int wxResetUxThemeApiRuntimeSlots(
   void* const uxThemeRuntime
 )
 {
@@ -80694,7 +80694,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Releases one loaded UX-theme module handle and resets all cached function
  * slots.
  */
-[[maybe_unused]] int wxReleaseUxThemeApiRuntime(
+int wxReleaseUxThemeApiRuntime(
   void* const uxThemeRuntime
 )
 {
@@ -80718,7 +80718,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * If UX-theme support is available, destroys and frees the process-wide
  * UX-theme API cache object when present.
  */
-[[maybe_unused]] void wxDestroyUxThemeApiRuntimeIfAvailable()
+void wxDestroyUxThemeApiRuntimeIfAvailable()
 {
   if (!wxCanUseUxThemeRuntime()) {
     return;
@@ -80739,7 +80739,7 @@ int wxSetVerticalScrollThumbPositionRuntime(
  * Looks up one key string in the runtime string-pair registry and returns a
  * shared copy of the mapped value string, or `wxEmptyString` when absent.
  */
-[[maybe_unused]] wxStringRuntime* wxLookupStringPairValueRuntime(
+wxStringRuntime* wxLookupStringPairValueRuntime(
   wxStringRuntime* const outValue,
   const wxStringRuntime* const keyValue
 )
@@ -80803,7 +80803,7 @@ namespace
  * Resolves one message-table entry offset, conditionally swaps endianness for
  * big-endian catalog payloads, and returns absolute byte-address offset.
  */
-[[maybe_unused]] std::uint32_t wxResolveMessageCatalogOffsetRuntime(
+std::uint32_t wxResolveMessageCatalogOffsetRuntime(
   const WxMessageCatalogOffsetOwnerRuntimeView* const owner,
   const WxMessageCatalogOffsetEntryRuntimeView* const table,
   const std::int32_t entryIndex
@@ -80828,7 +80828,7 @@ namespace
  * Copies one message-catalog name lane into `outValue` with shared wx string
  * ownership semantics, falling back to `wxEmptyString` when unnamed.
  */
-[[maybe_unused]] wxStringRuntime* wxMsgCatalogCopyNameOrEmptyRuntime(
+wxStringRuntime* wxMsgCatalogCopyNameOrEmptyRuntime(
   const WxMsgCatalogRuntimeView* const catalog,
   wxStringRuntime* const outValue
 )
@@ -81433,7 +81433,7 @@ namespace
  * What it does:
  * Returns the process-wide UX-theme API runtime object pointer lane.
  */
-[[maybe_unused]] void* wxGetUxThemeApiRuntimeGlobal()
+void* wxGetUxThemeApiRuntimeGlobal()
 {
   return gWxUxThemeApiRuntime;
 }
@@ -81445,7 +81445,7 @@ namespace
  * Initializes one `wxUxThemeModule` runtime lane (`refData=null`, module
  * dispatch vtable token).
  */
-[[maybe_unused]] void* wxConstructUxThemeModuleRuntime(
+void* wxConstructUxThemeModuleRuntime(
   void* const moduleRuntime
 )
 {
@@ -81466,7 +81466,7 @@ namespace
  * Returns whether this UX-theme API runtime payload is currently marked as
  * available.
  */
-[[maybe_unused]] bool wxIsUxThemeApiRuntimeAvailable(
+bool wxIsUxThemeApiRuntimeAvailable(
   const void* const uxThemeApiRuntime
 )
 {
@@ -81480,7 +81480,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for `wxUxThemeModule`.
  */
-[[maybe_unused]] void* wxGetUxThemeModuleClassInfoRuntime() noexcept
+void* wxGetUxThemeModuleClassInfoRuntime() noexcept
 {
   return gWxUxThemeModuleClassInfo;
 }
@@ -81492,7 +81492,7 @@ namespace
  * Runs non-deleting teardown for one `wxUxThemeModule` runtime lane by
  * rebinding to base wx-object dispatch and releasing shared ref-data.
  */
-[[maybe_unused]] void wxDestroyUxThemeModuleRuntimeNoDelete(
+void wxDestroyUxThemeModuleRuntimeNoDelete(
   void* const moduleRuntime
 )
 {
@@ -81511,7 +81511,7 @@ namespace
  * What it does:
  * Allocates and initializes one `wxUxThemeModule` runtime object.
  */
-[[maybe_unused]] void* wxAllocateUxThemeModuleRuntime()
+void* wxAllocateUxThemeModuleRuntime()
 {
   auto* const module = static_cast<WxModuleRuntimeView*>(::operator new(sizeof(WxModuleRuntimeView), std::nothrow));
   if (module == nullptr) {
@@ -81527,7 +81527,7 @@ namespace
  * What it does:
  * Runs the deleting-dtor thunk path for one `wxUxThemeModule` runtime object.
  */
-[[maybe_unused]] void* wxDestroyUxThemeModuleRuntimeWithFlag(
+void* wxDestroyUxThemeModuleRuntimeWithFlag(
   void* const moduleRuntime,
   const std::uint8_t deleteFlags
 )
@@ -81551,7 +81551,7 @@ namespace
  * What it does:
  * Allocates and initializes one UX-theme API runtime payload (`0xC4` bytes).
  */
-[[maybe_unused]] void* wxAllocateUxThemeApiRuntime()
+void* wxAllocateUxThemeApiRuntime()
 {
   auto* const runtime =
     static_cast<WxUxThemeApiRuntimeView*>(::operator new(sizeof(WxUxThemeApiRuntimeView), std::nothrow));
@@ -81569,7 +81569,7 @@ namespace
  * Boots process-wide UX-theme runtime support; when boot fails, invokes module
  * lifecycle slot-5 cleanup callback.
  */
-[[maybe_unused]] bool wxInitializeUxThemeRuntimeForModule(
+bool wxInitializeUxThemeRuntimeForModule(
   void* const moduleRuntime
 )
 {
@@ -81603,7 +81603,7 @@ namespace
  * Returns the cached selected-index lane from one radio-box-base runtime
  * payload.
  */
-[[maybe_unused]] std::int32_t wxGetRadioBoxBaseSelectedIndexRuntime(
+std::int32_t wxGetRadioBoxBaseSelectedIndexRuntime(
   const void* const radioBoxRuntime
 )
 {
@@ -81617,7 +81617,7 @@ namespace
  * What it does:
  * Rebinds one radio-box-base runtime payload to its base dispatch table.
  */
-[[maybe_unused]] void* wxConstructRadioBoxBaseRuntime(
+void* wxConstructRadioBoxBaseRuntime(
   void* const radioBoxRuntime
 )
 {
@@ -81637,7 +81637,7 @@ namespace
  * Returns the radio-box row count based on style bit `0x08` and the
  * major-dimension lane.
  */
-[[maybe_unused]] std::int32_t wxRadioBoxGetRuntimeRowCount(
+std::int32_t wxRadioBoxGetRuntimeRowCount(
   const void* const radioBoxRuntime
 ) noexcept
 {
@@ -81671,7 +81671,7 @@ namespace
  * Returns the radio-box column count based on style bit `0x08` and the
  * major-dimension lane.
  */
-[[maybe_unused]] std::int32_t wxRadioBoxGetRuntimeColumnCount(
+std::int32_t wxRadioBoxGetRuntimeColumnCount(
   const void* const radioBoxRuntime
 ) noexcept
 {
@@ -81705,7 +81705,7 @@ namespace
  * Re-bases one radio-box subobject `this` pointer (`+0x130`) back to the
  * complete object and forwards into `wxRadioBoxGetRuntimeRowCount`.
  */
-[[maybe_unused]] std::int32_t wxRadioBoxGetRuntimeRowCountFromSubobject(
+std::int32_t wxRadioBoxGetRuntimeRowCountFromSubobject(
   const void* const radioBoxSubobjectRuntime
 ) noexcept
 {
@@ -81725,7 +81725,7 @@ namespace
  * Re-bases one radio-box subobject `this` pointer (`+0x130`) back to the
  * complete object and forwards into `wxRadioBoxGetRuntimeColumnCount`.
  */
-[[maybe_unused]] std::int32_t wxRadioBoxGetRuntimeColumnCountFromSubobject(
+std::int32_t wxRadioBoxGetRuntimeColumnCountFromSubobject(
   const void* const radioBoxSubobjectRuntime
 ) noexcept
 {
@@ -81746,7 +81746,7 @@ namespace
  * zeroing radio-box payload lanes, rebinding primary/base dispatch lanes, and
  * seeding selected-index lane to `-1`.
  */
-[[maybe_unused]] void* wxConstructRadioBoxRuntime(
+void* wxConstructRadioBoxRuntime(
   void* const radioBoxRuntime
 )
 {
@@ -81804,7 +81804,7 @@ namespace
  * Allocates one default `wxRadioBox` class-factory instance and runs the
  * canonical radio-box constructor lane.
  */
-[[maybe_unused]] void* wxCreateRadioBoxRuntimeClassInstance()
+void* wxCreateRadioBoxRuntimeClassInstance()
 {
   struct WxRadioBoxClassFactoryRuntimeView
   {
@@ -81827,7 +81827,7 @@ namespace
  * Resolves one string token to a radio-box selection index, applies the
  * selection when found, and reports success.
  */
-[[maybe_unused]] bool wxSetRadioBoxBaseSelectionFromStringRuntime(
+bool wxSetRadioBoxBaseSelectionFromStringRuntime(
   void* const radioBoxRuntime,
   const std::int32_t stringToken
 )
@@ -81860,7 +81860,7 @@ namespace
  * Computes one wrapped next-selection index for radio-box keyboard navigation
  * commands (`page/line up/down`) using runtime stride lanes.
  */
-[[maybe_unused]] int wxComputeWrappedSelectionIndexForNavigation(
+int wxComputeWrappedSelectionIndexForNavigation(
   void* const selectionRuntime,
   const int sourceIndex,
   const int navigationCommand,
@@ -81975,7 +81975,7 @@ namespace
  * Initializes one `wxSystemOptionsModule` runtime lane (`refData=null`,
  * module dispatch token).
  */
-[[maybe_unused]] void* wxConstructSystemOptionsModuleRuntime(
+void* wxConstructSystemOptionsModuleRuntime(
   void* const moduleRuntime
 )
 {
@@ -81995,7 +81995,7 @@ namespace
  * What it does:
  * Returns the static class-info lane for `wxSystemOptionsModule`.
  */
-[[maybe_unused]] void* wxGetSystemOptionsModuleClassInfoRuntime() noexcept
+void* wxGetSystemOptionsModuleClassInfoRuntime() noexcept
 {
   return gWxSystemOptionsModuleClassInfo;
 }
@@ -82006,7 +82006,7 @@ namespace
  * What it does:
  * Runs non-deleting teardown for one `wxSystemOptionsModule` runtime lane.
  */
-[[maybe_unused]] void wxDestroySystemOptionsModuleRuntimeNoDelete(
+void wxDestroySystemOptionsModuleRuntimeNoDelete(
   void* const moduleRuntime
 )
 {
@@ -82025,7 +82025,7 @@ namespace
  * What it does:
  * Clears both system-options string arrays (keys and mapped values).
  */
-[[maybe_unused]] void wxClearSystemOptionsRuntime()
+void wxClearSystemOptionsRuntime()
 {
   wxClearStringArrayRuntime(&gWxStringPairLookup.keys);
   wxClearStringArrayRuntime(&gWxStringPairLookup.values);
@@ -82037,7 +82037,7 @@ namespace
  * What it does:
  * Inserts or updates one system-option key/value string pair.
  */
-[[maybe_unused]] wxStringRuntime* wxSetSystemOptionStringRuntime(
+wxStringRuntime* wxSetSystemOptionStringRuntime(
   const wxStringRuntime* const keyValue,
   const wxStringRuntime* const mappedValue
 )
@@ -82066,7 +82066,7 @@ namespace
  * Formats one signed integer as decimal UTF-16 text and stores it under the
  * provided system-option key.
  */
-[[maybe_unused]] void wxSetSystemOptionIntegerRuntime(
+void wxSetSystemOptionIntegerRuntime(
   const wxStringRuntime* const keyValue,
   const std::int32_t numericValue
 )
@@ -82084,7 +82084,7 @@ namespace
  * What it does:
  * Allocates and initializes one `wxSystemOptionsModule` runtime object.
  */
-[[maybe_unused]] void* wxAllocateSystemOptionsModuleRuntime()
+void* wxAllocateSystemOptionsModuleRuntime()
 {
   auto* const module = static_cast<WxModuleRuntimeView*>(::operator new(sizeof(WxModuleRuntimeView), std::nothrow));
   if (module == nullptr) {
@@ -82101,7 +82101,7 @@ namespace
  * Runs the deleting-dtor thunk path for one `wxSystemOptionsModule` runtime
  * object.
  */
-[[maybe_unused]] void* wxDestroySystemOptionsModuleRuntimeWithFlag(
+void* wxDestroySystemOptionsModuleRuntimeWithFlag(
   void* const moduleRuntime,
   const std::uint8_t deleteFlags
 )
@@ -82125,7 +82125,7 @@ namespace
  * What it does:
  * Looks up one system-option string and parses it as a signed decimal integer.
  */
-[[maybe_unused]] std::int32_t wxGetSystemOptionIntegerRuntime(
+std::int32_t wxGetSystemOptionIntegerRuntime(
   const wxStringRuntime* const keyValue
 )
 {
@@ -82145,7 +82145,7 @@ namespace
  * Constructs one `wxRadioButton` runtime lane from control-base storage and
  * clears the checked-state lane.
  */
-[[maybe_unused]] void* wxConstructRadioButtonRuntime(
+void* wxConstructRadioButtonRuntime(
   void* const radioButtonRuntime
 )
 {
@@ -82167,7 +82167,7 @@ namespace
  * Constructs one `wxListCtrl` runtime lane from control-base storage and
  * initializes list-control tail state.
  */
-[[maybe_unused]] void* wxConstructListCtrlRuntime(
+void* wxConstructListCtrlRuntime(
   void* const listControlRuntime
 )
 {
@@ -82189,7 +82189,7 @@ namespace
  * Constructs one `wxListView` runtime lane from control-base storage and
  * initializes list-control tail state.
  */
-[[maybe_unused]] void* wxConstructListViewRuntime(
+void* wxConstructListViewRuntime(
   void* const listViewRuntime
 )
 {
@@ -82211,7 +82211,7 @@ namespace
  * Constructs one `wxToolBar` runtime lane, seeds toolbar metric lanes, and
  * runs toolbar create-time visual initialization.
  */
-[[maybe_unused]] void* wxConstructToolBarRuntime(
+void* wxConstructToolBarRuntime(
   void* const toolBarRuntime,
   void* const parent,
   const std::int32_t windowId,
@@ -82248,7 +82248,7 @@ namespace
  * What it does:
  * Returns the horizontal toolbar-base margin lane.
  */
-[[maybe_unused]] std::int32_t wxToolBarBaseGetHorizontalMarginRuntime(
+std::int32_t wxToolBarBaseGetHorizontalMarginRuntime(
   const void* const toolBarRuntime
 ) noexcept
 {
@@ -82262,7 +82262,7 @@ namespace
  * What it does:
  * Returns the vertical toolbar-base margin lane.
  */
-[[maybe_unused]] std::int32_t wxToolBarBaseGetVerticalMarginRuntime(
+std::int32_t wxToolBarBaseGetVerticalMarginRuntime(
   const void* const toolBarRuntime
 ) noexcept
 {
@@ -82302,7 +82302,7 @@ static_assert(
  * What it does:
  * Sends one `WM_USER` query to the toolbar native handle lane.
  */
-[[maybe_unused]] LRESULT wxToolBarSendUserMessageRuntime(
+LRESULT wxToolBarSendUserMessageRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82317,7 +82317,7 @@ static_assert(
  * Stores one add-button count lane and forwards `TB_ADDBUTTONS` to the
  * toolbar native handle.
  */
-[[maybe_unused]] LRESULT wxToolBarAddButtonsRuntime(
+LRESULT wxToolBarAddButtonsRuntime(
   void* const toolBarRuntime,
   const WPARAM buttonCount,
   const LPARAM buttonData
@@ -82335,7 +82335,7 @@ static_assert(
  * Inserts one toolbar button at index 0 and stores the inserted button payload
  * lane.
  */
-[[maybe_unused]] LRESULT wxToolBarInsertButtonAtZeroRuntime(
+LRESULT wxToolBarInsertButtonAtZeroRuntime(
   void* const toolBarRuntime,
   const LPARAM buttonData
 ) noexcept
@@ -82352,7 +82352,7 @@ static_assert(
  * What it does:
  * Sends one `TB_ADDBITMAP` request for slot `1` to the toolbar native handle.
  */
-[[maybe_unused]] LRESULT wxToolBarAddBitmapSlotOneRuntime(
+LRESULT wxToolBarAddBitmapSlotOneRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82366,7 +82366,7 @@ static_assert(
  * What it does:
  * Returns whether toolbar button id `1` is enabled.
  */
-[[maybe_unused]] LRESULT wxToolBarIsButtonOneEnabledRuntime(
+LRESULT wxToolBarIsButtonOneEnabledRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82381,7 +82381,7 @@ static_assert(
  * Stores one output button-buffer lane and forwards `TB_GETBUTTON` for index
  * `0`.
  */
-[[maybe_unused]] LRESULT wxToolBarGetButtonAtZeroRuntime(
+LRESULT wxToolBarGetButtonAtZeroRuntime(
   void* const toolBarRuntime,
   const LPARAM outButtonData
 ) noexcept
@@ -82397,7 +82397,7 @@ static_assert(
  * What it does:
  * Returns the toolbar native button count lane.
  */
-[[maybe_unused]] LRESULT wxToolBarGetButtonCountRuntime(
+LRESULT wxToolBarGetButtonCountRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82411,7 +82411,7 @@ static_assert(
  * What it does:
  * Returns whether toolbar button id `0` is hidden.
  */
-[[maybe_unused]] LRESULT wxToolBarIsButtonZeroHiddenRuntime(
+LRESULT wxToolBarIsButtonZeroHiddenRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82425,7 +82425,7 @@ static_assert(
  * What it does:
  * Sends one `TB_SETSTATE` update for toolbar button id `0` with state `0`.
  */
-[[maybe_unused]] LRESULT wxToolBarSetButtonZeroStateRuntime(
+LRESULT wxToolBarSetButtonZeroStateRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82440,7 +82440,7 @@ static_assert(
  * Probes one toolbar checked-state lane for button id `1` using one packed
  * low/high-word payload lane.
  */
-[[maybe_unused]] LRESULT wxToolBarIsButtonOneCheckedPackedRuntime(
+LRESULT wxToolBarIsButtonOneCheckedPackedRuntime(
   void* const toolBarRuntime,
   const std::uint16_t packedLowWord,
   const std::uint16_t packedHighWord
@@ -82458,7 +82458,7 @@ static_assert(
  * What it does:
  * Forwards one customization-command token into `TB_CUSTOMIZE`.
  */
-[[maybe_unused]] LRESULT wxToolBarCustomizeRuntime(
+LRESULT wxToolBarCustomizeRuntime(
   void* const toolBarRuntime,
   const WPARAM customizeToken
 ) noexcept
@@ -82473,7 +82473,7 @@ static_assert(
  * What it does:
  * Sends one ANSI toolbar add-string request with empty payload lanes.
  */
-[[maybe_unused]] LRESULT wxToolBarAddEmptyAnsiStringRuntime(
+LRESULT wxToolBarAddEmptyAnsiStringRuntime(
   void* const toolBarRuntime
 ) noexcept
 {
@@ -82487,7 +82487,7 @@ static_assert(
  * What it does:
  * Hides or shows toolbar button id `0` using the supplied hide flag payload.
  */
-[[maybe_unused]] LRESULT wxToolBarHideButtonZeroRuntime(
+LRESULT wxToolBarHideButtonZeroRuntime(
   void* const toolBarRuntime,
   const LPARAM hideFlag
 ) noexcept
@@ -82508,7 +82508,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Copies one source wx-string into the embedded toolbar-tool label lane
  * at offset `+0x38`.
  */
-[[maybe_unused]] wxStringRuntime* wxToolBarToolAssignLabelRuntime(
+wxStringRuntime* wxToolBarToolAssignLabelRuntime(
   void* const toolRuntime,
   const wxStringRuntime* const sourceLabel
 )
@@ -82538,7 +82538,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * What it does:
  * Clears the owning toolbar lane from one toolbar-tool runtime object.
  */
-[[maybe_unused]] void wxToolBarToolClearOwnerRuntime(
+void wxToolBarToolClearOwnerRuntime(
   void* const toolRuntime
 ) noexcept
 {
@@ -82557,7 +82557,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Copies one `(width, height)` integer pair into toolbar default tool-size
  * lanes (`+0x164/+0x168`) and returns the copied height lane.
  */
-[[maybe_unused]] int wxToolBarSetDefaultToolSizePairRuntime(
+int wxToolBarSetDefaultToolSizePairRuntime(
   void* const toolBarRuntime,
   const std::int32_t* const sizePair
 ) noexcept
@@ -82579,7 +82579,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Forwards one toolbar integer payload into virtual lane `+0x290` and returns
  * the same payload value.
  */
-[[maybe_unused]] int wxToolBarForwardValueToVirtualLane290Runtime(
+int wxToolBarForwardValueToVirtualLane290Runtime(
   void* const toolBarRuntime,
   const int value
 ) noexcept
@@ -82603,7 +82603,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * What it does:
  * Returns the static class-info lane for `wxToolBar`.
  */
-[[maybe_unused]] void* wxGetToolBarClassInfoRuntime() noexcept
+void* wxGetToolBarClassInfoRuntime() noexcept
 {
   return gWxToolBarClassInfo;
 }
@@ -82615,7 +82615,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Thiscall thunk lane that forwards one toolbar message parameter into the
  * canonical versioned-toolbar message dispatcher.
  */
-[[maybe_unused]] LRESULT wxToolBarSendVersionedMessageThunk(
+LRESULT wxToolBarSendVersionedMessageThunk(
   void* const toolBarRuntime,
   const LPARAM messageParam
 )
@@ -82630,7 +82630,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Maps one wx metric selector to the Win32 `GetSystemMetrics` index table and
  * returns that metric value; selector `34` is normalized to one-bit boolean.
  */
-[[maybe_unused]] int wxSystemSettingsQueryMappedSystemMetricRuntime(const int metricSelector)
+int wxSystemSettingsQueryMappedSystemMetricRuntime(const int metricSelector)
 {
   static constexpr std::int32_t kSystemMetricIndexBySelector[0x26] = {
     -1, 43,  5,  6, 13, 14, 36, 37, 68, 69, 45, 46, 21,  3, 10, 11, 12, 38, 39,
@@ -82662,7 +82662,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * vertical lane yields `{SM_CXVSCROLL, 2*SM_CYVSCROLL}`, horizontal lane yields
  * `{2*SM_CXHSCROLL, SM_CYHSCROLL}`.
  */
-[[maybe_unused]] int* wxToolBarQueryScrollMetricPairRuntime(
+int* wxToolBarQueryScrollMetricPairRuntime(
   void* const toolBarRuntime,
   int* const outMetrics
 )
@@ -82709,7 +82709,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Dispatches the toolbar message lane selected by comctl32 version:
  * `0x467` for pre-5.80 controls, otherwise `0x471`.
  */
-[[maybe_unused]] LRESULT wxToolBarSendVersionedMessage(
+LRESULT wxToolBarSendVersionedMessage(
   void* const toolBarRuntime,
   const LPARAM messageParam
 )
@@ -82737,7 +82737,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * What it does:
  * Queries one toolbar metric lane via version-specific Unicode message ids.
  */
-[[maybe_unused]] LRESULT wxToolBarQueryVersionedMetricLane(
+LRESULT wxToolBarQueryVersionedMetricLane(
   void* const toolBarRuntime
 )
 {
@@ -82760,7 +82760,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Stores parent HWND lanes and dispatches one versioned toolbar parent-binding
  * message.
  */
-[[maybe_unused]] LRESULT wxToolBarSetVersionedParentWindows(
+LRESULT wxToolBarSetVersionedParentWindows(
   void* const toolBarRuntime,
   const HWND firstParentHandle,
   const HWND secondParentHandle
@@ -82820,7 +82820,7 @@ LRESULT wxToolBarSendVersionedMessage(
  * Splits one toolbar host width into secondary/primary child widths and moves
  * both owned HWND lanes to the requested rectangle.
  */
-[[maybe_unused]] BOOL wxToolBarLayoutPrimarySecondaryWindows(
+BOOL wxToolBarLayoutPrimarySecondaryWindows(
   void* const toolBarRuntime,
   const int x,
   const int y,
@@ -82878,7 +82878,7 @@ static_assert(
  * Computes the union rectangle of two toolbar-owned HWND lanes and writes
  * resulting width/height spans to optional output pointers.
  */
-[[maybe_unused]] int* wxGetToolBarUnionWindowExtent(
+int* wxGetToolBarUnionWindowExtent(
   const void* const toolBarRuntime,
   int* const outWidth,
   int* const outHeight
@@ -82910,7 +82910,7 @@ static_assert(
  * Temporarily swaps `m_hWnd` to one secondary handle lane (`+0x138`) while
  * querying position, then restores the original native-handle lane.
  */
-[[maybe_unused]] void wxWindowDoGetPositionViaSecondaryHandleRuntime(
+void wxWindowDoGetPositionViaSecondaryHandleRuntime(
   wxWindowBase* const windowRuntime,
   std::int32_t* const outX,
   std::int32_t* const outY
@@ -83051,7 +83051,7 @@ namespace
  * Applies one UTF-16 window-text lane to the auxiliary HWND stored at
  * offset `+0x138`.
  */
-[[maybe_unused]] BOOL wxSetAuxiliaryWindowTextFromPointerRuntime(
+BOOL wxSetAuxiliaryWindowTextFromPointerRuntime(
   const void* const windowRuntime,
   const wchar_t* const* const textPointer
 ) noexcept
@@ -83067,7 +83067,7 @@ namespace
  * Forwards visibility to base-window state, then mirrors the result to one
  * auxiliary owned HWND lane.
  */
-[[maybe_unused]] bool wxWindowShowAndSyncAuxiliaryHandleRuntime(
+bool wxWindowShowAndSyncAuxiliaryHandleRuntime(
   wxWindowBase* const windowRuntime,
   const bool show
 )
@@ -83088,7 +83088,7 @@ namespace
  * Forwards enable-state to base-window state, then mirrors the result to one
  * auxiliary owned HWND lane.
  */
-[[maybe_unused]] bool wxWindowEnableAndSyncAuxiliaryHandleRuntime(
+bool wxWindowEnableAndSyncAuxiliaryHandleRuntime(
   wxWindowBase* const windowRuntime,
   const bool enable
 )
@@ -83108,7 +83108,7 @@ namespace
  * What it does:
  * Restores keyboard focus to the auxiliary child HWND lane at `+0x138`.
  */
-[[maybe_unused]] HWND wxWindowSetFocusToAuxiliaryHandleRuntime(
+HWND wxWindowSetFocusToAuxiliaryHandleRuntime(
   const void* const windowRuntime
 ) noexcept
 {
@@ -83123,7 +83123,7 @@ namespace
  * Forwards visibility to base-window state, then applies the same show/hide
  * state to each owned child HWND lane in the runtime handle array.
  */
-[[maybe_unused]] bool wxWindowShowAndSyncHandleArrayRuntime(
+bool wxWindowShowAndSyncHandleArrayRuntime(
   wxWindowBase* const windowRuntime,
   const bool show
 )
@@ -83147,7 +83147,7 @@ namespace
  * Forwards enable-state to base-window state, then applies the same enabled
  * state to each owned child HWND lane in the runtime handle array.
  */
-[[maybe_unused]] bool wxWindowEnableAndSyncHandleArrayRuntime(
+bool wxWindowEnableAndSyncHandleArrayRuntime(
   wxWindowBase* const windowRuntime,
   const bool enable
 )
@@ -83171,7 +83171,7 @@ namespace
  * Scans one runtime-owned indexed value array at offset `+0x130` and returns
  * true when the requested value token is present.
  */
-[[maybe_unused]] bool wxWindowIndexedArrayContainsValueRuntime(
+bool wxWindowIndexedArrayContainsValueRuntime(
   const void* const windowRuntime,
   const int valueToken
 ) noexcept
@@ -83237,7 +83237,7 @@ namespace
  * `+0x130`, then forwards the original command object through control command
  * processing.
  */
-[[maybe_unused]] void wxControlDispatchAuxCommandAndProcessRuntime(
+void wxControlDispatchAuxCommandAndProcessRuntime(
   wxControlRuntime* const controlRuntime,
   const void* const commandRuntime
 )
@@ -83374,7 +83374,7 @@ static_assert(
  * Validates one selection index against the runtime selectable-item count lane
  * and forwards `0x197` to the native control when in range.
  */
-[[maybe_unused]] LRESULT wxSendIndexedSelectionTopIndexRuntime(
+LRESULT wxSendIndexedSelectionTopIndexRuntime(
   void* const selectionRuntime,
   const std::int32_t itemIndex
 ) noexcept
@@ -83394,7 +83394,7 @@ static_assert(
  * Uses one this-adjusted thunk lane (`this-0x28`) to resolve the owner native
  * handle and forwards message `0x1A2` with `wParam=-1`.
  */
-[[maybe_unused]] LRESULT wxSendSelectionThunkPayloadRuntime(
+LRESULT wxSendSelectionThunkPayloadRuntime(
   const void* const adjustedThisLane,
   const LPARAM* const payloadLane
 ) noexcept
@@ -83412,7 +83412,7 @@ static_assert(
  * Validates one selection index and forwards message `0x187`; returns true
  * when the native control reports success.
  */
-[[maybe_unused]] bool wxSendIndexedSelectionSetRuntime(
+bool wxSendIndexedSelectionSetRuntime(
   void* const selectionRuntime,
   const std::int32_t itemIndex
 ) noexcept
@@ -83430,7 +83430,7 @@ static_assert(
  * Resolves one list-box item index from the selection-lookup lane at
  * `this+0x130`, then applies selection state through virtual slot `+0x21C`.
  */
-[[maybe_unused]] char wxListBoxApplySelectionByLookupTokenRuntime(
+char wxListBoxApplySelectionByLookupTokenRuntime(
   void* const listBoxRuntime,
   const int lookupToken,
   const int selectedFlag
@@ -83454,7 +83454,7 @@ static_assert(
  * Applies one list-box command payload (`index` + nonzero-selection flag) via
  * virtual slot `+0x21C`, then forwards the command object through slot `+0x10`.
  */
-[[maybe_unused]] int wxListBoxDispatchCommandSelectionRuntime(
+int wxListBoxDispatchCommandSelectionRuntime(
   void* const listBoxRuntime,
   void* const commandRuntime
 ) noexcept
@@ -83475,7 +83475,7 @@ static_assert(
  * What it does:
  * Forwards to one list-box virtual selection query lane at offset `+0x2C`.
  */
-[[maybe_unused]] int wxListBoxQuerySelectionLaneBRuntime(
+int wxListBoxQuerySelectionLaneBRuntime(
   void* const listBoxRuntime
 ) noexcept
 {
@@ -83501,7 +83501,7 @@ static_assert(
  * Validates one indexed selection lane and forwards `0x199` to the
  * owner native handle resolved from one this-adjusted thunk lane.
  */
-[[maybe_unused]] LRESULT wxSendIndexedSelectionMessage0199Runtime(
+LRESULT wxSendIndexedSelectionMessage0199Runtime(
   const void* const adjustedThisLane,
   const std::int32_t itemIndex
 ) noexcept
@@ -83533,7 +83533,7 @@ static_assert(
  * What it does:
  * Forwards to one list-box virtual selection query lane at offset `+0x28`.
  */
-[[maybe_unused]] int wxListBoxQuerySelectionLaneARuntime(
+int wxListBoxQuerySelectionLaneARuntime(
   void* const listBoxRuntime
 ) noexcept
 {
@@ -83560,7 +83560,7 @@ static_assert(
  * payload to the owner native handle resolved from one this-adjusted thunk
  * lane.
  */
-[[maybe_unused]] LRESULT wxSendIndexedSelectionMessage019ARuntime(
+LRESULT wxSendIndexedSelectionMessage019ARuntime(
   const void* const adjustedThisLane,
   const std::int32_t itemIndex,
   const LPARAM payload
@@ -83595,7 +83595,7 @@ static_assert(
  * Returns `-1` when multi-selection state bits are set in the thunk host
  * flags lane, otherwise forwards `0x188` to query the current selection index.
  */
-[[maybe_unused]] LRESULT wxQueryCurrentSingleSelectionIndexRuntime(
+LRESULT wxQueryCurrentSingleSelectionIndexRuntime(
   const void* const adjustedThisLane
 ) noexcept
 {
@@ -83635,7 +83635,7 @@ static_assert(
  * For listbox-backed windows with child-handle arrays, validates one item
  * index and forwards keyboard-selection messages to the native control.
  */
-[[maybe_unused]] WPARAM wxWindowHandleArrayForwardSelectionKeyRuntime(
+WPARAM wxWindowHandleArrayForwardSelectionKeyRuntime(
   const void* const windowRuntime,
   const LPARAM itemIndex,
   const std::uint8_t keyState
@@ -83668,7 +83668,7 @@ static_assert(
  * Restores keyboard focus to either the selected child handle or the first
  * child handle in one window-owned handle array lane.
  */
-[[maybe_unused]] void wxWindowHandleArrayRestoreFocusRuntime(
+void wxWindowHandleArrayRestoreFocusRuntime(
   const void* const windowRuntime
 )
 {
@@ -83694,7 +83694,7 @@ static_assert(
  * Builds Win32 static-line styles by forcing the wx static-box lane bit and
  * OR-ing the fixed native style bits required by this control family.
  */
-[[maybe_unused]] unsigned long wxStaticLineBuildMswStyleRuntime(
+unsigned long wxStaticLineBuildMswStyleRuntime(
   const wxControlRuntime* const controlRuntime,
   const long style,
   unsigned long* const extendedStyle
@@ -83713,7 +83713,7 @@ static_assert(
  * Scans the toolbar tool-node chain and returns the control-window lane from
  * the first control-style tool whose window id matches `windowId`.
  */
-[[maybe_unused]] void* wxToolBarFindControlByWindowIdRuntime(
+void* wxToolBarFindControlByWindowIdRuntime(
   const void* const toolBarRuntime,
   const int windowId
 ) noexcept
@@ -83746,7 +83746,7 @@ static_assert(
  * What it does:
  * Forwards toolbar runtime lane `+0x138` through virtual slot `+0x22C`.
  */
-[[maybe_unused]] int wxToolBarDispatchSlot22CWithLane138Runtime(
+int wxToolBarDispatchSlot22CWithLane138Runtime(
   WxToolBarSlot22COwnerRuntimeView* const toolBarRuntime
 ) noexcept
 {
@@ -83760,7 +83760,7 @@ static_assert(
  * Finds one toolbar tool runtime lane by command id from the toolbar tool-list
  * chain rooted at `this+0x140`.
  */
-[[maybe_unused]] WxToolBarToolRuntimeView* wxToolBarFindToolByIdRuntime(
+WxToolBarToolRuntimeView* wxToolBarFindToolByIdRuntime(
   const void* const toolBarRuntime,
   const int toolId
 ) noexcept
@@ -83787,7 +83787,7 @@ static_assert(
  * Finds one toolbar tool by id, then updates short-help text slot `+0x3C`
  * only when the incoming shared string differs.
  */
-[[maybe_unused]] char wxToolBarSetToolShortHelpIfChangedRuntime(
+char wxToolBarSetToolShortHelpIfChangedRuntime(
   const void* const toolBarRuntime,
   const int toolId,
   wxStringRuntime* const text
@@ -83808,7 +83808,7 @@ static_assert(
  * Finds one toolbar tool by id, then updates long-help text slot `+0x40`
  * only when the incoming shared string differs.
  */
-[[maybe_unused]] char wxToolBarSetToolLongHelpIfChangedRuntime(
+char wxToolBarSetToolLongHelpIfChangedRuntime(
   const void* const toolBarRuntime,
   const int toolId,
   wxStringRuntime* const text
@@ -83829,7 +83829,7 @@ static_assert(
  * Returns client-data for one toolbar tool id, forwarding to control-window
  * client-data access for control-style tools.
  */
-[[maybe_unused]] std::intptr_t wxToolBarGetToolClientDataRuntime(
+std::intptr_t wxToolBarGetToolClientDataRuntime(
   const void* const toolBarRuntime,
   const int toolId
 )
@@ -83856,7 +83856,7 @@ static_assert(
  * Assigns client-data for one toolbar tool id, forwarding to control-window
  * client-data mutation for control-style tools.
  */
-[[maybe_unused]] WxToolBarToolRuntimeView* wxToolBarSetToolClientDataRuntime(
+WxToolBarToolRuntimeView* wxToolBarSetToolClientDataRuntime(
   void* const toolBarRuntime,
   const int toolId,
   void* const clientData
@@ -83885,7 +83885,7 @@ static_assert(
  * What it does:
  * Returns the toggled/checked flag lane for one toolbar tool id.
  */
-[[maybe_unused]] bool wxToolBarGetToolToggledRuntime(
+bool wxToolBarGetToolToggledRuntime(
   const void* const toolBarRuntime,
   const int toolId
 ) noexcept
@@ -83900,7 +83900,7 @@ static_assert(
  * What it does:
  * Returns the enabled-state flag lane for one toolbar tool id.
  */
-[[maybe_unused]] bool wxToolBarGetToolEnabledRuntime(
+bool wxToolBarGetToolEnabledRuntime(
   const void* const toolBarRuntime,
   const int toolId
 ) noexcept
@@ -83916,7 +83916,7 @@ static_assert(
  * Stores two toolbar runtime metrics in lanes `+0x14C`/`+0x150` and returns
  * the first stored lane.
  */
-[[maybe_unused]] std::uint32_t wxToolBarStoreRuntimeLanes14CAnd150(
+std::uint32_t wxToolBarStoreRuntimeLanes14CAnd150(
   WxToolBarClassFactoryRuntimeView* const toolBarRuntime,
   const std::uint32_t lane14C,
   const std::uint32_t lane150
@@ -83935,7 +83935,7 @@ static_assert(
  * component by the toolbar multiplier lane (`+0x138`), and swaps output
  * components when style bit `0x08` is set.
  */
-[[maybe_unused]] std::int32_t* wxToolBarComputeScaledSpanRuntime(
+std::int32_t* wxToolBarComputeScaledSpanRuntime(
   void* const toolBarRuntime,
   std::int32_t* const outSpan
 )
@@ -83997,7 +83997,7 @@ static_assert(
  * Forwards one toolbar traversal callback lane into collector virtual slot
  * `+0x18`, passing the current tool runtime pointer and returning success.
  */
-[[maybe_unused]] bool wxToolBarTraverseEmitCurrentToolRuntime(
+bool wxToolBarTraverseEmitCurrentToolRuntime(
   void* const toolRuntime,
   const int traversalToken,
   void* const collectorRuntime
@@ -84026,7 +84026,7 @@ static_assert(
  * tears down the removed tool runtime, and shifts peer-window x positions for
  * remaining separator-style tools.
  */
-[[maybe_unused]] bool wxToolBarDeleteToolAtButtonIndexRuntime(
+bool wxToolBarDeleteToolAtButtonIndexRuntime(
   void* const toolBarRuntime,
   const WPARAM buttonIndex,
   void* const toolRuntime
@@ -84129,7 +84129,7 @@ static_assert(
  * Caches one toolbar bitmap-size pair into default width/height lanes and
  * forwards packed `(cx, cy)` to `TB_SETBITMAPSIZE`.
  */
-[[maybe_unused]] LRESULT wxToolBarSetBitmapSizeRuntime(
+LRESULT wxToolBarSetBitmapSizeRuntime(
   void* const toolBarRuntime,
   const std::int32_t* const bitmapSize
 )
@@ -84154,7 +84154,7 @@ static_assert(
  * What it does:
  * Forwards one toolbar tool-id lane through `TB_ENABLEBUTTON`.
  */
-[[maybe_unused]] LRESULT wxToolBarEnableToolButtonRuntime(
+LRESULT wxToolBarEnableToolButtonRuntime(
   const void* const toolBarRuntime,
   const WxToolBarToolRuntimeView* const toolRuntime,
   const std::uint8_t enable
@@ -84179,7 +84179,7 @@ static_assert(
  * What it does:
  * Forwards one toolbar tool-id lane through `TB_CHECKBUTTON`.
  */
-[[maybe_unused]] LRESULT wxToolBarCheckToolButtonRuntime(
+LRESULT wxToolBarCheckToolButtonRuntime(
   const void* const toolBarRuntime,
   const WxToolBarToolRuntimeView* const toolRuntime,
   const std::uint8_t checked
@@ -84206,7 +84206,7 @@ static_assert(
  * flags, and row/column multiplier lanes, then applies `DoSetSize` when the
  * computed packed size differs from the incoming `WM_SIZE` payload.
  */
-[[maybe_unused]] bool wxToolBarHandleSizeMessageRuntime(
+bool wxToolBarHandleSizeMessageRuntime(
   void* const toolBarRuntime,
   const unsigned int packedSize
 )
@@ -84294,7 +84294,7 @@ static_assert(
  * Reports toolbar button size lanes using legacy class defaults for older
  * comctl32 versions and `TB_GETBUTTONSIZE` for modern versions.
  */
-[[maybe_unused]] std::int32_t* wxToolBarQueryButtonSizeWithLegacyFallbackRuntime(
+std::int32_t* wxToolBarQueryButtonSizeWithLegacyFallbackRuntime(
   const void* const toolBarRuntime,
   std::int32_t* const outSize
 )
@@ -84329,7 +84329,7 @@ static_assert(
  * Assigns one wx string + two-dword runtime record from `source` into
  * `destination`.
  */
-[[maybe_unused]] void* wxAssignStringAndTwoDwordRecordRuntime(
+void* wxAssignStringAndTwoDwordRecordRuntime(
   void* const destinationRuntime,
   const void* const sourceRuntime
 )
@@ -84357,7 +84357,7 @@ static_assert(
  * Constructs one `wxProcess` runtime lane from `wxEvtHandler` state and seeds
  * process id/stream lanes.
  */
-[[maybe_unused]] void* wxConstructProcessRuntime(
+void* wxConstructProcessRuntime(
   void* const processRuntime,
   const std::int32_t processData,
   const std::int32_t processId
@@ -84380,7 +84380,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for `wxProcess`.
  */
-[[maybe_unused]] void* wxGetProcessClassInfoRuntime() noexcept
+void* wxGetProcessClassInfoRuntime() noexcept
 {
   return gWxProcessClassInfo;
 }
@@ -84391,7 +84391,7 @@ static_assert(
  * What it does:
  * Returns the static class-info lane for `wxProcessEvent`.
  */
-[[maybe_unused]] void* wxGetProcessEventClassInfoRuntime() noexcept
+void* wxGetProcessEventClassInfoRuntime() noexcept
 {
   return gWxProcessEventClassInfo;
 }
@@ -84402,7 +84402,7 @@ static_assert(
  * What it does:
  * Copy-constructs one `wxProcessEvent` runtime payload from source event lanes.
  */
-[[maybe_unused]] void* wxCopyConstructProcessEventRuntime(
+void* wxCopyConstructProcessEventRuntime(
   void* const processEventRuntime,
   const void* const sourceEventRuntime
 )
@@ -84436,7 +84436,7 @@ static_assert(
  * Copy-constructs one `wxTimerEvent` payload from source event lanes, then
  * rebinds timer-event vtable dispatch and preserves timer id lane (`+0x20`).
  */
-[[maybe_unused]] void* wxCopyConstructTimerEventRuntime(
+void* wxCopyConstructTimerEventRuntime(
   void* const timerEventRuntime,
   const void* const sourceEventRuntime
 )
@@ -84460,7 +84460,7 @@ static_assert(
  * Clones one `wxTimerEvent` payload by copying base `wxEvent` lanes plus timer
  * id lane (`+0x20`) and rebinding timer-event vtable dispatch.
  */
-[[maybe_unused]] void* wxCloneTimerEventRuntime(
+void* wxCloneTimerEventRuntime(
   const void* const sourceEventRuntime
 )
 {
@@ -84484,7 +84484,7 @@ static_assert(
  * Allocates and copy-constructs one `wxProcessEvent` payload from source event
  * lanes and preserves both process payload lanes (`+0x20`, `+0x24`).
  */
-[[maybe_unused]] void* wxCloneProcessEventRuntime(
+void* wxCloneProcessEventRuntime(
   const void* const sourceEventRuntime
 )
 {
@@ -84524,7 +84524,7 @@ namespace
  * What it does:
  * Clears one dword lane at runtime offset `+0x08`.
  */
-[[maybe_unused]] void wxClearDwordLane08Runtime(
+void wxClearDwordLane08Runtime(
   WxDwordLane08RuntimeView* const runtime
 ) noexcept
 {
@@ -84537,7 +84537,7 @@ namespace
  * What it does:
  * Reads one dword lane at runtime offset `+0x2C`.
  */
-[[maybe_unused]] std::uint32_t wxReadDwordLane2CFromOwnerRuntime(
+std::uint32_t wxReadDwordLane2CFromOwnerRuntime(
   const WxDwordLane2CRuntimeView* const runtime
 ) noexcept
 {
@@ -84584,7 +84584,7 @@ void* wxConstructSocketEventRuntime(
  * Copy-constructs one `wxSocketEvent` payload from source event lanes, then
  * rebinds socket-event vtable dispatch and preserves socket payload lanes.
  */
-[[maybe_unused]] void* wxCopyConstructSocketEventRuntime(
+void* wxCopyConstructSocketEventRuntime(
   void* const socketEventRuntime,
   const void* const sourceEventRuntime
 )
@@ -84609,7 +84609,7 @@ void* wxConstructSocketEventRuntime(
  * Clones one `wxSocketEvent` payload by copying base `wxEvent` lanes and socket
  * payload lanes (`+0x20`, `+0x24`) then rebinding socket-event vtable dispatch.
  */
-[[maybe_unused]] void* wxCloneSocketEventRuntime(
+void* wxCloneSocketEventRuntime(
   const void* const sourceEventRuntime
 )
 {
@@ -84799,7 +84799,7 @@ namespace
    * Runs `wxListBase` non-deleting teardown and conditionally scalar-deletes
    * the list payload when the low delete-flag bit is set.
    */
-  [[maybe_unused]] void* wxDestroyListBaseWithDeleteFlagRuntimeAdapter(
+  void* wxDestroyListBaseWithDeleteFlagRuntimeAdapter(
     void* const listRuntime,
     const std::int32_t deleteFlags
   ) noexcept
@@ -84845,7 +84845,7 @@ namespace
    * virtual slot `+0x114` on the target runtime object, then frees pair
    * payload lanes and tears down the temporary list storage.
    */
-  [[maybe_unused]] void wxDispatchThreeIntPairsViaVirtualSlot114(
+  void wxDispatchThreeIntPairsViaVirtualSlot114(
     void* const runtimeObject,
     const int pair0First,
     const int pair0Second,
@@ -84934,7 +84934,7 @@ namespace
    * What it does:
    * Returns whether one palette runtime currently has a bound ref-data lane.
    */
-  [[maybe_unused]] bool wxPaletteHasRefDataRuntime(
+  bool wxPaletteHasRefDataRuntime(
     const void* const paletteRuntime
   ) noexcept
   {
@@ -84960,7 +84960,7 @@ namespace
    * Deletes one nested palette-handle lane (`this->refData->paletteHandle`)
    * when present and returns success.
    */
-  [[maybe_unused]] std::uint8_t wxPaletteDeleteNestedHandleRuntime(
+  std::uint8_t wxPaletteDeleteNestedHandleRuntime(
     const void* const paletteRuntime
   ) noexcept
   {
@@ -84979,7 +84979,7 @@ namespace
    * Resolves one palette entry index nearest to the supplied RGB triple using
    * the runtime palette-handle lane.
    */
-  [[maybe_unused]] std::uint32_t wxPaletteGetNearestIndexRuntime(
+  std::uint32_t wxPaletteGetNearestIndexRuntime(
     const WxObjectRuntimeView* const paletteRuntime,
     const std::uint8_t red,
     const std::uint8_t green,
@@ -85002,7 +85002,7 @@ namespace
    * What it does:
    * Reads one palette entry RGB triple from indexed native palette storage.
    */
-  [[maybe_unused]] bool wxPaletteGetEntryRgbRuntime(
+  bool wxPaletteGetEntryRgbRuntime(
     const void* const paletteRuntime,
     const std::uint32_t entryIndex,
     std::uint8_t* const outRed,
@@ -85098,7 +85098,7 @@ namespace
    * Initializes one `wxEncodingConverter` payload by binding the converter
    * vtable lane, clearing ref-data/storage pointers, and clearing state flags.
    */
-  [[maybe_unused]] WxEncodingConverterCtorRuntimeView* wxConstructEncodingConverterRuntime(
+  WxEncodingConverterCtorRuntimeView* wxConstructEncodingConverterRuntime(
     WxEncodingConverterCtorRuntimeView* const converterRuntime
   ) noexcept
   {
@@ -85219,7 +85219,7 @@ namespace
    * Tail-forwards one dual-string object teardown thunk lane into
    * `wxDestroyDualStringObjectNoDeleteRuntime`.
    */
-  [[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteRuntimeThunk(
+  void* wxDestroyDualStringObjectNoDeleteRuntimeThunk(
     void* const objectRuntime
   ) noexcept
   {
@@ -85233,7 +85233,7 @@ namespace
    * Tail-forwards one dual-string wx-event teardown lane into
    * `wxDestroyDualStringObjectNoDeleteRuntime`.
    */
-  [[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteRuntimeThunkLegacyA(
+  void* wxDestroyDualStringObjectNoDeleteRuntimeThunkLegacyA(
     void* const objectRuntime
   ) noexcept
   {
@@ -85247,7 +85247,7 @@ namespace
    * Runs dual-string object non-deleting teardown and scalar-deletes the
    * payload when the low delete-flag bit is set.
    */
-  [[maybe_unused]] void* wxDestroyDualStringObjectWithDeleteFlagRuntimeAdapter(
+  void* wxDestroyDualStringObjectWithDeleteFlagRuntimeAdapter(
     void* const objectRuntime,
     const std::int32_t deleteFlags
   ) noexcept
@@ -85545,7 +85545,7 @@ namespace
    * Runs one drop-target non-deleting teardown lane and conditionally scalar-
    * deletes the payload when the low delete flag bit is set.
    */
-  [[maybe_unused]] void* wxDestroyDropTargetWithDeleteFlagRuntime(
+  void* wxDestroyDropTargetWithDeleteFlagRuntime(
     void* const dropTargetRuntime,
     const std::int32_t deleteFlags
   ) noexcept
@@ -85619,7 +85619,7 @@ void wxDestroyListNoDeleteRuntime(void* const listRuntime) noexcept
  * What it does:
  * Runs one deleting-dtor thunk lane for a command-event payload.
  */
-[[maybe_unused]] void* wxDestroyCommandEventDeletingThunkLaneA(
+void* wxDestroyCommandEventDeletingThunkLaneA(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85633,7 +85633,7 @@ void wxDestroyListNoDeleteRuntime(void* const listRuntime) noexcept
  * What it does:
  * Runs one deleting-dtor thunk lane for an update-UI event payload.
  */
-[[maybe_unused]] void* wxDestroyUpdateUiEventDeletingThunk(
+void* wxDestroyUpdateUiEventDeletingThunk(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85674,7 +85674,7 @@ static_assert(
  * Constructs one `wxAcceleratorRefData` payload by seeding ref-count, vtable,
  * and null accelerator-handle lanes.
  */
-[[maybe_unused]] WxAcceleratorRefDataCtorRuntimeView* wxConstructAcceleratorRefDataRuntime(
+WxAcceleratorRefDataCtorRuntimeView* wxConstructAcceleratorRefDataRuntime(
   WxAcceleratorRefDataCtorRuntimeView* const refData
 ) noexcept
 {
@@ -85697,7 +85697,7 @@ static_assert(
  * Runs one non-deleting `wxAcceleratorRefData` teardown lane and returns the
  * destroyed native accelerator handle result.
  */
-[[maybe_unused]] HACCEL wxDestroyAcceleratorRefDataNoDeleteLaneRuntime(
+HACCEL wxDestroyAcceleratorRefDataNoDeleteLaneRuntime(
   WxAcceleratorRefDataCtorRuntimeView* const refData
 ) noexcept
 {
@@ -85733,7 +85733,7 @@ static_assert(
  * Constructs one `wxAcceleratorTable` runtime lane by binding the table
  * vtable and clearing its ref-data owner slot.
  */
-[[maybe_unused]] WxAcceleratorTableRuntimeView* wxConstructAcceleratorTableRuntime(
+WxAcceleratorTableRuntimeView* wxConstructAcceleratorTableRuntime(
   WxAcceleratorTableRuntimeView* const acceleratorTable
 ) noexcept
 {
@@ -85754,7 +85754,7 @@ static_assert(
  * Returns whether one accelerator-table runtime has ref-data and its
  * translator-ready flag lane (`+0x0C`) is set.
  */
-[[maybe_unused]] BOOL wxAcceleratorTableHasReadyFlagRuntime(
+BOOL wxAcceleratorTableHasReadyFlagRuntime(
   const void* const acceleratorRuntime
 ) noexcept
 {
@@ -85770,7 +85770,7 @@ static_assert(
  * Returns the native accelerator handle from one accelerator-table ref-data
  * lane, or `nullptr` when no ref-data is bound.
  */
-[[maybe_unused]] HACCEL wxAcceleratorTableGetNativeHandleRuntime(
+HACCEL wxAcceleratorTableGetNativeHandleRuntime(
   const void* const acceleratorRuntime
 ) noexcept
 {
@@ -85786,7 +85786,7 @@ static_assert(
  * Runs one non-deleting `wxPaletteRefData` teardown lane and returns the
  * destroyed native palette-handle result.
  */
-[[maybe_unused]] HPALETTE wxDestroyPaletteRefDataNoDeleteLaneRuntime(
+HPALETTE wxDestroyPaletteRefDataNoDeleteLaneRuntime(
   WxPaletteRefDataDestroyRuntimeView* const refData
 ) noexcept
 {
@@ -85812,7 +85812,7 @@ static_assert(
  * Rebinds one character-set payload to the base `wxCharacterSet` runtime
  * vtable lane.
  */
-[[maybe_unused]] void wxResetCharacterSetRuntimeVTable(
+void wxResetCharacterSetRuntimeVTable(
   WxCharacterSetDestroyRuntimeView* const characterSet
 ) noexcept
 {
@@ -85829,7 +85829,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane that only rebinds to the base
  * `wxCharacterSet` vtable lane before optional storage free.
  */
-[[maybe_unused]] void* wxDestroyCharacterSetResetOnlyDeletingThunkLaneA(
+void* wxDestroyCharacterSetResetOnlyDeletingThunkLaneA(
   void* const characterSetRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85853,7 +85853,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for a second `wxCharacterSet` payload
  * family using reset-only teardown semantics.
  */
-[[maybe_unused]] void* wxDestroyCharacterSetResetOnlyDeletingThunkLaneB(
+void* wxDestroyCharacterSetResetOnlyDeletingThunkLaneB(
   void* const characterSetRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85868,7 +85868,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for a third `wxCharacterSet` payload
  * family using reset-only teardown semantics.
  */
-[[maybe_unused]] void* wxDestroyCharacterSetResetOnlyDeletingThunkLaneC(
+void* wxDestroyCharacterSetResetOnlyDeletingThunkLaneC(
   void* const characterSetRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85882,7 +85882,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a wx-object base payload.
  */
-[[maybe_unused]] void* wxDestroyObjectBaseDeletingThunk(
+void* wxDestroyObjectBaseDeletingThunk(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85905,7 +85905,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxAcceleratorRefData`.
  */
-[[maybe_unused]] void* wxDestroyAcceleratorRefDataDeletingThunk(
+void* wxDestroyAcceleratorRefDataDeletingThunk(
   void* const refDataRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85923,7 +85923,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxNodeBase`.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseDeletingThunk(
+void* wxDestroyNodeBaseDeletingThunk(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85941,7 +85941,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a toolbar-tools list node payload.
  */
-[[maybe_unused]] void* wxDestroyToolBarToolsListNodeDeletingThunk(
+void* wxDestroyToolBarToolsListNodeDeletingThunk(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85955,7 +85955,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxStringListNode`.
  */
-[[maybe_unused]] void* wxDestroyStringListNodeDeletingThunk(
+void* wxDestroyStringListNodeDeletingThunk(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85973,7 +85973,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a list-base payload.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkA(
+void* wxDestroyListBaseDeletingThunkA(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -85991,7 +85991,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a second list-base payload family.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkB(
+void* wxDestroyListBaseDeletingThunkB(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86009,7 +86009,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a toolbar list-base payload.
  */
-[[maybe_unused]] void* wxDestroyToolBarListBaseDeletingThunk(
+void* wxDestroyToolBarListBaseDeletingThunk(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86023,7 +86023,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a command-event payload family.
  */
-[[maybe_unused]] void* wxDestroyCommandEventDeletingThunkLaneB(
+void* wxDestroyCommandEventDeletingThunkLaneB(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86037,7 +86037,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxScrollEvent`.
  */
-[[maybe_unused]] void* wxDestroyScrollEventDeletingThunk(
+void* wxDestroyScrollEventDeletingThunk(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86051,7 +86051,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxChildFocusEvent`.
  */
-[[maybe_unused]] void* wxDestroyChildFocusEventDeletingThunk(
+void* wxDestroyChildFocusEventDeletingThunk(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86065,7 +86065,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxWindowCreateEvent`.
  */
-[[maybe_unused]] void* wxDestroyWindowCreateEventDeletingThunk(
+void* wxDestroyWindowCreateEventDeletingThunk(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86079,7 +86079,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxWindowDestroyEvent`.
  */
-[[maybe_unused]] void* wxDestroyWindowDestroyEventDeletingThunk(
+void* wxDestroyWindowDestroyEventDeletingThunk(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86093,7 +86093,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxPalette`.
  */
-[[maybe_unused]] void* wxDestroyPaletteDeletingThunk(
+void* wxDestroyPaletteDeletingThunk(
   void* const paletteRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86111,7 +86111,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxPaletteRefData`.
  */
-[[maybe_unused]] void* wxDestroyPaletteRefDataDeletingThunk(
+void* wxDestroyPaletteRefDataDeletingThunk(
   void* const refDataRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86129,7 +86129,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxEncodingConverter`.
  */
-[[maybe_unused]] void* wxDestroyEncodingConverterDeletingThunk(
+void* wxDestroyEncodingConverterDeletingThunk(
   void* const converterRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86147,7 +86147,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxMBConv`.
  */
-[[maybe_unused]] void* wxDestroyMbConvDeletingThunk(
+void* wxDestroyMbConvDeletingThunk(
   void* const converterRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86166,7 +86166,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for an additional `wxMBConv` payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyMbConvDeletingThunkLaneB(
+void* wxDestroyMbConvDeletingThunkLaneB(
   void* const converterRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86180,7 +86180,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a third `wxMBConv` payload family.
  */
-[[maybe_unused]] void* wxDestroyMbConvDeletingThunkLaneC(
+void* wxDestroyMbConvDeletingThunkLaneC(
   void* const converterRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86194,7 +86194,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxCharacterSet` payload.
  */
-[[maybe_unused]] void* wxDestroyCharacterSetDeletingThunk(
+void* wxDestroyCharacterSetDeletingThunk(
   void* const characterSetRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86212,7 +86212,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxCSConv` payload.
  */
-[[maybe_unused]] void* wxDestroyCsConvDeletingThunk(
+void* wxDestroyCsConvDeletingThunk(
   void* const converterRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86230,7 +86230,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxMask`.
  */
-[[maybe_unused]] void* wxDestroyMaskDeletingThunkLaneA(
+void* wxDestroyMaskDeletingThunkLaneA(
   void* const maskRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86253,7 +86253,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneA(
+void* wxDestroyDualStringObjectDeletingThunkLaneA(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86272,7 +86272,7 @@ static_assert(
  * Runs one thunk lane that forwards to the non-deleting dual-string
  * wx-object teardown path.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteThunkLaneA(
+void* wxDestroyDualStringObjectNoDeleteThunkLaneA(
   void* const objectRuntime
 ) noexcept
 {
@@ -86286,7 +86286,7 @@ static_assert(
  * Allocates one `wxMask` payload and seeds the base object/vtable lanes for
  * class-factory construction.
  */
-[[maybe_unused]] void* wxCreateMaskRuntimeClassInstance()
+void* wxCreateMaskRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(WxMaskRuntimeView), std::nothrow);
   if (storage == nullptr) {
@@ -86303,7 +86303,7 @@ static_assert(
  * What it does:
  * Allocates one cursor ref-data payload and runs its base constructor lane.
  */
-[[maybe_unused]] void* wxCreateCursorRefDataRuntimeClassInstance()
+void* wxCreateCursorRefDataRuntimeClassInstance()
 {
   void* const storage = ::operator new(sizeof(WxCursorRefDataRuntimeView), std::nothrow);
   if (storage == nullptr) {
@@ -86319,7 +86319,7 @@ static_assert(
  * Initializes one `wxTimerBase` payload to default constructor state
  * (`owner=null`, `timerId=-1`, `running=0`, callback lane cleared).
  */
-[[maybe_unused]] void* wxConstructTimerBaseRuntimeDefaults(
+void* wxConstructTimerBaseRuntimeDefaults(
   void* const timerRuntime
 ) noexcept
 {
@@ -86365,7 +86365,7 @@ static_assert(
  * Initializes one `wxTimerBase` payload with explicit owner/id lanes while
  * clearing callback/running state.
  */
-[[maybe_unused]] void* wxConstructTimerBaseRuntimeWithOwnerAndId(
+void* wxConstructTimerBaseRuntimeWithOwnerAndId(
   void* const timerRuntime,
   void* const ownerRuntime,
   const std::int32_t timerId
@@ -86412,7 +86412,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for an event-object payload family.
  */
-[[maybe_unused]] void* wxDestroyEventObjectTailDeletingThunk(
+void* wxDestroyEventObjectTailDeletingThunk(
   void* const eventObjectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86434,7 +86434,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxSizerItem`.
  */
-[[maybe_unused]] void* wxDestroySizerItemDeletingThunk(
+void* wxDestroySizerItemDeletingThunk(
   void* const sizerItemRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86456,7 +86456,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one wx-win-hash-table payload.
  */
-[[maybe_unused]] void* wxDestroyWinHashTableDeletingThunk(
+void* wxDestroyWinHashTableDeletingThunk(
   void* const tableRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86475,7 +86475,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for an additional node-base payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseDeletingThunkLaneB(
+void* wxDestroyNodeBaseDeletingThunkLaneB(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86490,7 +86490,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for an additional list-base payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkC(
+void* wxDestroyListBaseDeletingThunkC(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86504,7 +86504,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a command-event payload family.
  */
-[[maybe_unused]] void* wxDestroyCommandEventDeletingThunkLaneC(
+void* wxDestroyCommandEventDeletingThunkLaneC(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86518,7 +86518,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxThread`.
  */
-[[maybe_unused]] void* wxDestroyThreadDeletingThunk(
+void* wxDestroyThreadDeletingThunk(
   void* const threadRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86540,7 +86540,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxPenList`.
  */
-[[maybe_unused]] void* wxDestroyPenListDeletingThunk(
+void* wxDestroyPenListDeletingThunk(
   void* const penListRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86562,7 +86562,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxBrushList`.
  */
-[[maybe_unused]] void* wxDestroyBrushListDeletingThunk(
+void* wxDestroyBrushListDeletingThunk(
   void* const brushListRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86584,7 +86584,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFontList`.
  */
-[[maybe_unused]] void* wxDestroyFontListDeletingThunk(
+void* wxDestroyFontListDeletingThunk(
   void* const fontListRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86606,7 +86606,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxResourceCache`.
  */
-[[maybe_unused]] void* wxDestroyResourceCacheDeletingThunk(
+void* wxDestroyResourceCacheDeletingThunk(
   void* const resourceCacheRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86628,7 +86628,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxColourDatabase`.
  */
-[[maybe_unused]] void* wxDestroyColourDatabaseDeletingThunk(
+void* wxDestroyColourDatabaseDeletingThunk(
   void* const colourDatabaseRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86650,7 +86650,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxBitmapList`.
  */
-[[maybe_unused]] void* wxDestroyBitmapListDeletingThunk(
+void* wxDestroyBitmapListDeletingThunk(
   void* const bitmapListRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86672,7 +86672,7 @@ static_assert(
  * What it does:
  * Releases one optional heap pointer lane and nulls the slot.
  */
-[[maybe_unused]] void wxDeletePointerAndNull(
+void wxDeletePointerAndNull(
   void** const pointerSlot
 ) noexcept
 {
@@ -86691,7 +86691,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for a `wxLog` payload by rebinding to the
  * base log vtable lane before optional storage free.
  */
-[[maybe_unused]] void* wxDestroyLogDeletingThunkLaneA(
+void* wxDestroyLogDeletingThunkLaneA(
   void* const logRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86709,7 +86709,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a second `wxLog` payload family.
  */
-[[maybe_unused]] void* wxDestroyLogDeletingThunkLaneB(
+void* wxDestroyLogDeletingThunkLaneB(
   void* const logRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86723,7 +86723,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a log-chain payload family.
  */
-[[maybe_unused]] void* wxDestroyLogChainDeletingThunkLaneA(
+void* wxDestroyLogChainDeletingThunkLaneA(
   void* const logChainRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86745,7 +86745,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a second log-chain payload family.
  */
-[[maybe_unused]] void* wxDestroyLogChainDeletingThunkLaneB(
+void* wxDestroyLogChainDeletingThunkLaneB(
   void* const logChainRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86759,7 +86759,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxHelpProvider`.
  */
-[[maybe_unused]] void* wxDestroyHelpProviderDeletingThunk(
+void* wxDestroyHelpProviderDeletingThunk(
   void* const helpProviderRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86777,7 +86777,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a `wxSockAddress` payload.
  */
-[[maybe_unused]] void* wxDestroySockAddressDeletingThunk(
+void* wxDestroySockAddressDeletingThunk(
   void* const addressRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86796,7 +86796,7 @@ static_assert(
  * Runs one non-deleting dtor lane for `wxSockAddress` by restoring the
  * `wxObject` base lane and unrefing ref-data ownership.
  */
-[[maybe_unused]] void wxDestroySockAddressNoDeleteEntryRuntime(
+void wxDestroySockAddressNoDeleteEntryRuntime(
   void* const addressRuntime
 ) noexcept
 {
@@ -86809,7 +86809,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for a `wxIPV4address` payload.
  */
-[[maybe_unused]] void* wxDestroyIpv4AddressDeletingThunk(
+void* wxDestroyIpv4AddressDeletingThunk(
   void* const addressRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86827,7 +86827,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxPipeInputStream`.
  */
-[[maybe_unused]] void* wxDestroyPipeInputStreamDeletingThunk(
+void* wxDestroyPipeInputStreamDeletingThunk(
   void* const streamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86845,7 +86845,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxPipeOutputStream`.
  */
-[[maybe_unused]] void* wxDestroyPipeOutputStreamDeletingThunk(
+void* wxDestroyPipeOutputStreamDeletingThunk(
   void* const streamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86863,7 +86863,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxTextOutputStream` payload.
  */
-[[maybe_unused]] void* wxDestroyTextOutputStreamDeletingThunk(
+void* wxDestroyTextOutputStreamDeletingThunk(
   void* const streamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86882,7 +86882,7 @@ static_assert(
  * Copies one incoming string into cached storage at `+0x174`, then dispatches
  * virtual slot `+0x21C` on the owner object stored at `+0x170`.
  */
-[[maybe_unused]] int wxAssignCachedStringAndDispatchSlot21C(
+int wxAssignCachedStringAndDispatchSlot21C(
   void* const runtimeObject,
   const wxStringRuntime* const incomingText
 ) noexcept
@@ -86938,7 +86938,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxDataObjectBase` payload.
  */
-[[maybe_unused]] void* wxDestroyDataObjectBaseDeletingThunk(
+void* wxDestroyDataObjectBaseDeletingThunk(
   void* const dataObjectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86958,7 +86958,7 @@ static_assert(
  * base vtable, releasing owned FORMATETC storage at `+0x08`, and scalar-
  * deleting the object when requested.
  */
-[[maybe_unused]] void* wxDestroyIEnumFormatEtcDeletingThunk(
+void* wxDestroyIEnumFormatEtcDeletingThunk(
   void* const enumFormatEtcRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -86996,7 +86996,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for an additional node-base payload lane.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseDeletingThunkLaneC(
+void* wxDestroyNodeBaseDeletingThunkLaneC(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87010,7 +87010,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for an additional list-base payload lane.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkD(
+void* wxDestroyListBaseDeletingThunkD(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87025,7 +87025,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for one `wxDropTargetBase` payload by
  * rebinding to the base vtable and deleting the owned COM-drop-target lane.
  */
-[[maybe_unused]] void* wxDestroyDropTargetBaseDeletingThunk(
+void* wxDestroyDropTargetBaseDeletingThunk(
   void* const dropTargetBaseRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87044,7 +87044,7 @@ static_assert(
  * Non-deleting adapter lane that forwards drop-target teardown into
  * `FUN_009D3080` semantics.
  */
-[[maybe_unused]] void* wxDestroyDropTargetNoDeleteRuntimeAdapterLaneA(
+void* wxDestroyDropTargetNoDeleteRuntimeAdapterLaneA(
   void* const dropTargetRuntime
 ) noexcept
 {
@@ -87057,7 +87057,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxDropTarget` payload lane.
  */
-[[maybe_unused]] void* wxDestroyDropTargetDeletingThunkLaneA(
+void* wxDestroyDropTargetDeletingThunkLaneA(
   void* const dropTargetRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87076,7 +87076,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for an additional `wxDropTarget` payload
  * lane.
  */
-[[maybe_unused]] void* wxDestroyDropTargetDeletingThunkLaneB(
+void* wxDestroyDropTargetDeletingThunkLaneB(
   void* const dropTargetRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87091,7 +87091,7 @@ static_assert(
  * Additional non-deleting adapter lane that forwards drop-target teardown into
  * `FUN_009D3080` semantics.
  */
-[[maybe_unused]] void* wxDestroyDropTargetNoDeleteRuntimeAdapterLaneB(
+void* wxDestroyDropTargetNoDeleteRuntimeAdapterLaneB(
   void* const dropTargetRuntime
 ) noexcept
 {
@@ -87104,7 +87104,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxTextBuffer` payload.
  */
-[[maybe_unused]] void* wxDestroyTextBufferDeletingThunk(
+void* wxDestroyTextBufferDeletingThunk(
   void* const textBufferRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87128,7 +87128,7 @@ static_assert(
  * Stores one process-global verbose-logging enable flag and returns the input
  * value.
  */
-[[maybe_unused]] char wxSetVerboseLoggingEnabledRuntime(
+char wxSetVerboseLoggingEnabledRuntime(
   const char enabledFlag
 ) noexcept
 {
@@ -87142,7 +87142,7 @@ static_assert(
  * What it does:
  * Rebinds one `wxMessageOutput` payload to the base constructor vtable lane.
  */
-[[maybe_unused]] void wxConstructMessageOutputRuntimeLaneA(
+void wxConstructMessageOutputRuntimeLaneA(
   void* const messageOutputRuntime
 ) noexcept
 {
@@ -87157,7 +87157,7 @@ static_assert(
  * Rebinds one `wxMessageOutput` payload to the base constructor vtable lane
  * and returns the runtime pointer.
  */
-[[maybe_unused]] void* wxConstructMessageOutputRuntimeLaneB(
+void* wxConstructMessageOutputRuntimeLaneB(
   void* const messageOutputRuntime
 ) noexcept
 {
@@ -87172,7 +87172,7 @@ static_assert(
  * Rebinds one `wxMessageOutputMessageBox` payload to its constructor vtable
  * lane and returns the runtime pointer.
  */
-[[maybe_unused]] void* wxConstructMessageOutputMessageBoxRuntime(
+void* wxConstructMessageOutputMessageBoxRuntime(
   void* const messageOutputRuntime
 ) noexcept
 {
@@ -87187,7 +87187,7 @@ static_assert(
  * Secondary lane that rebinds one `wxMessageOutput` payload to the base
  * constructor vtable lane.
  */
-[[maybe_unused]] void wxConstructMessageOutputRuntimeLaneC(
+void wxConstructMessageOutputRuntimeLaneC(
   void* const messageOutputRuntime
 ) noexcept
 {
@@ -87202,7 +87202,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for one `wxMessageOutput` payload by
  * rebinding to the base vtable lane before optional storage free.
  */
-[[maybe_unused]] void* wxDestroyMessageOutputDeletingThunkLaneA(
+void* wxDestroyMessageOutputDeletingThunkLaneA(
   void* const messageOutputRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87227,7 +87227,7 @@ static_assert(
  * Runs one deleting-dtor thunk lane for a second `wxMessageOutput` payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyMessageOutputDeletingThunkLaneB(
+void* wxDestroyMessageOutputDeletingThunkLaneB(
   void* const messageOutputRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87241,7 +87241,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneB(
+void* wxDestroyDualStringObjectDeletingThunkLaneB(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87256,7 +87256,7 @@ static_assert(
  * Tail-forwards one dual-string object non-deleting teardown thunk lane into
  * `FUN_00975740`.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteThunkLaneB(
+void* wxDestroyDualStringObjectNoDeleteThunkLaneB(
   void* const objectRuntime
 ) noexcept
 {
@@ -87269,7 +87269,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneC(
+void* wxDestroyDualStringObjectDeletingThunkLaneC(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87284,7 +87284,7 @@ static_assert(
  * Tail-forwards one dual-string object non-deleting teardown thunk lane into
  * `FUN_00975740`.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteThunkLaneC(
+void* wxDestroyDualStringObjectNoDeleteThunkLaneC(
   void* const objectRuntime
 ) noexcept
 {
@@ -87297,7 +87297,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneD(
+void* wxDestroyDualStringObjectDeletingThunkLaneD(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87311,7 +87311,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneE(
+void* wxDestroyDualStringObjectDeletingThunkLaneE(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87326,7 +87326,7 @@ static_assert(
  * Tail-forwards one dual-string object non-deleting teardown thunk lane into
  * `FUN_00975740`.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteThunkLaneE(
+void* wxDestroyDualStringObjectNoDeleteThunkLaneE(
   void* const objectRuntime
 ) noexcept
 {
@@ -87339,7 +87339,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneF(
+void* wxDestroyDualStringObjectDeletingThunkLaneF(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87354,7 +87354,7 @@ static_assert(
  * Tail-forwards one dual-string object non-deleting teardown thunk lane into
  * `FUN_00975740`.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectNoDeleteThunkLaneF(
+void* wxDestroyDualStringObjectNoDeleteThunkLaneF(
   void* const objectRuntime
 ) noexcept
 {
@@ -87367,7 +87367,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for one dual-string wx-object payload.
  */
-[[maybe_unused]] void* wxDestroyDualStringObjectDeletingThunkLaneG(
+void* wxDestroyDualStringObjectDeletingThunkLaneG(
   void* const objectRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87381,7 +87381,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for an additional node-base payload lane.
  */
-[[maybe_unused]] void* wxDestroyNodeBaseDeletingThunkLaneD(
+void* wxDestroyNodeBaseDeletingThunkLaneD(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87395,7 +87395,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for an additional list-base payload lane.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkE(
+void* wxDestroyListBaseDeletingThunkE(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87409,7 +87409,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxSocketOutputStream`.
  */
-[[maybe_unused]] void* wxDestroySocketOutputStreamDeletingThunk(
+void* wxDestroySocketOutputStreamDeletingThunk(
   void* const socketOutputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87432,7 +87432,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxSocketInputStream`.
  */
-[[maybe_unused]] void* wxDestroySocketInputStreamDeletingThunk(
+void* wxDestroySocketInputStreamDeletingThunk(
   void* const socketInputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87455,7 +87455,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxTextFile`.
  */
-[[maybe_unused]] void* wxDestroyTextFileDeletingThunk(
+void* wxDestroyTextFileDeletingThunk(
   void* const textFileRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87478,7 +87478,7 @@ static_assert(
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxConnectionBase`.
  */
-[[maybe_unused]] void* wxDestroyConnectionBaseDeletingThunk(
+void* wxDestroyConnectionBaseDeletingThunk(
   void* const connectionRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87900,7 +87900,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxDC`.
  */
-[[maybe_unused]] void* wxDestroyDcDeletingThunk(
+void* wxDestroyDcDeletingThunk(
   void* const dcRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87914,7 +87914,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFontMapper`.
  */
-[[maybe_unused]] void* wxDestroyFontMapperDeletingThunk(
+void* wxDestroyFontMapperDeletingThunk(
   void* const fontMapperRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87928,7 +87928,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxModuleList` node payload.
  */
-[[maybe_unused]] void* wxDestroyModuleListNodeDeletingThunk(
+void* wxDestroyModuleListNodeDeletingThunk(
   void* const nodeRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87942,7 +87942,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxListBase`.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkF(
+void* wxDestroyListBaseDeletingThunkF(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87956,7 +87956,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for one `wxImageHandler` payload family.
  */
-[[maybe_unused]] void* wxDestroyImageHandlerDeletingThunkLaneA(
+void* wxDestroyImageHandlerDeletingThunkLaneA(
   void* const imageHandlerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87971,7 +87971,7 @@ namespace
  * Runs one deleting-dtor thunk lane for a second `wxImageHandler` payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyImageHandlerDeletingThunkLaneB(
+void* wxDestroyImageHandlerDeletingThunkLaneB(
   void* const imageHandlerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -87986,7 +87986,7 @@ namespace
  * Runs one deleting-dtor thunk lane for a third `wxImageHandler` payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyImageHandlerDeletingThunkLaneC(
+void* wxDestroyImageHandlerDeletingThunkLaneC(
   void* const imageHandlerRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88000,7 +88000,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFileInputStream`.
  */
-[[maybe_unused]] void* wxDestroyFileInputStreamDeletingThunk(
+void* wxDestroyFileInputStreamDeletingThunk(
   void* const fileInputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88015,7 +88015,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFFileInputStream`.
  */
-[[maybe_unused]] void* wxDestroyFFileInputStreamDeletingThunk(
+void* wxDestroyFFileInputStreamDeletingThunk(
   void* const ffileInputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88035,7 +88035,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxStreamBuffer`.
  */
-[[maybe_unused]] void* wxDestroyStreamBufferDeletingThunk(
+void* wxDestroyStreamBufferDeletingThunk(
   void* const streamBufferRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88049,7 +88049,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxStreamBase`.
  */
-[[maybe_unused]] void* wxDestroyStreamBaseDeletingThunk(
+void* wxDestroyStreamBaseDeletingThunk(
   void* const streamBaseRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88063,7 +88063,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxInputStream`.
  */
-[[maybe_unused]] void* wxDestroyInputStreamDeletingThunk(
+void* wxDestroyInputStreamDeletingThunk(
   void* const inputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88077,7 +88077,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxOutputStream`.
  */
-[[maybe_unused]] void* wxDestroyOutputStreamDeletingThunk(
+void* wxDestroyOutputStreamDeletingThunk(
   void* const outputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88091,7 +88091,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxCountingOutputStream`.
  */
-[[maybe_unused]] void* wxDestroyCountingOutputStreamDeletingThunk(
+void* wxDestroyCountingOutputStreamDeletingThunk(
   void* const outputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88105,7 +88105,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFilterInputStream`.
  */
-[[maybe_unused]] void* wxDestroyFilterInputStreamDeletingThunk(
+void* wxDestroyFilterInputStreamDeletingThunk(
   void* const filterInputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88119,7 +88119,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxFilterOutputStream`.
  */
-[[maybe_unused]] void* wxDestroyFilterOutputStreamDeletingThunk(
+void* wxDestroyFilterOutputStreamDeletingThunk(
   void* const filterOutputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88139,7 +88139,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxBufferedInputStream`.
  */
-[[maybe_unused]] void* wxDestroyBufferedInputStreamDeletingThunk(
+void* wxDestroyBufferedInputStreamDeletingThunk(
   void* const bufferedInputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88157,7 +88157,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxBufferedOutputStream`.
  */
-[[maybe_unused]] void* wxDestroyBufferedOutputStreamDeletingThunk(
+void* wxDestroyBufferedOutputStreamDeletingThunk(
   void* const bufferedOutputStreamRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88175,7 +88175,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for one additional `wxListBase` family.
  */
-[[maybe_unused]] void* wxDestroyListBaseDeletingThunkG(
+void* wxDestroyListBaseDeletingThunkG(
   void* const listRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88189,7 +88189,7 @@ namespace
  * What it does:
  * Runs one deleting-dtor thunk lane for `wxPen`.
  */
-[[maybe_unused]] void* wxDestroyPenDeletingThunk(
+void* wxDestroyPenDeletingThunk(
   void* const penRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88204,7 +88204,7 @@ namespace
  * Runs one deleting-dtor thunk lane for one additional command-event payload
  * family.
  */
-[[maybe_unused]] void* wxDestroyCommandEventDeletingThunkLaneD(
+void* wxDestroyCommandEventDeletingThunkLaneD(
   void* const eventRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -88392,7 +88392,7 @@ namespace
  * Rebinds one text-output-stream payload to the `wxTextOutputStream` vtable
  * lane without altering owned data lanes.
  */
-[[maybe_unused]] void* wxConstructTextOutputStreamRuntimeVTable(
+void* wxConstructTextOutputStreamRuntimeVTable(
   void* const streamRuntime
 ) noexcept
 {
@@ -88410,7 +88410,7 @@ namespace
  * Initializes one temporary text-output-stream formatter payload with output
  * stream pointer, retained line-separator text, and converter lane.
  */
-[[maybe_unused]] WxTextOutputStreamCtorRuntimeView* wxConstructTextOutputStreamRuntime(
+WxTextOutputStreamCtorRuntimeView* wxConstructTextOutputStreamRuntime(
   WxTextOutputStreamCtorRuntimeView* const streamRuntime,
   void* const outputStream,
   const wxStringRuntime* const lineSeparator,
@@ -88504,7 +88504,7 @@ static_assert(
  * Dispatches virtual slot `+0x25C` with one integer payload and returns the
  * same runtime pointer.
  */
-[[maybe_unused]] void* wxDispatchIntToVirtualSlot25CAndReturnThisRuntime(
+void* wxDispatchIntToVirtualSlot25CAndReturnThisRuntime(
   void* const runtimeObject,
   const int value
 ) noexcept
@@ -88521,7 +88521,7 @@ static_assert(
  * Formats one `float` as `"%.2f"` and forwards the resulting wx string to
  * virtual slot `+0x25C`.
  */
-[[maybe_unused]] void* wxFormatFloatAndDispatchSlot25C(
+void* wxFormatFloatAndDispatchSlot25C(
   void* const objectRuntime,
   const float value
 )
@@ -88539,7 +88539,7 @@ static_assert(
  * Formats one `double` as `"%.2f"` and forwards the resulting wx string to
  * virtual slot `+0x25C`.
  */
-[[maybe_unused]] void* wxFormatDoubleAndDispatchSlot25C(
+void* wxFormatDoubleAndDispatchSlot25C(
   void* const objectRuntime,
   const double value
 )
@@ -88557,7 +88557,7 @@ static_assert(
  * Formats one signed integer as `"%d"` and forwards the resulting wx string
  * to virtual slot `+0x25C`.
  */
-[[maybe_unused]] void* wxFormatSignedIntAndDispatchSlot25C(
+void* wxFormatSignedIntAndDispatchSlot25C(
   void* const objectRuntime,
   const int value
 )
@@ -88575,7 +88575,7 @@ static_assert(
  * Formats one signed long as `"%ld"` and forwards the resulting wx string to
  * virtual slot `+0x25C`.
  */
-[[maybe_unused]] void* wxFormatSignedLongAndDispatchSlot25C(
+void* wxFormatSignedLongAndDispatchSlot25C(
   void* const objectRuntime,
   const long value
 )
@@ -88593,7 +88593,7 @@ static_assert(
  * Formats one unsigned int as `"%u"` and forwards the resulting wx string to
  * virtual slot `+0x08`.
  */
-[[maybe_unused]] void wxTextOutputWriteUnsignedIntRuntime(
+void wxTextOutputWriteUnsignedIntRuntime(
   void* const streamRuntime,
   const unsigned int value
 )
@@ -88610,7 +88610,7 @@ static_assert(
  * Formats one unsigned short as `"%u"` and forwards the resulting wx string
  * to virtual slot `+0x08`.
  */
-[[maybe_unused]] void wxTextOutputWriteUnsignedShortRuntime(
+void wxTextOutputWriteUnsignedShortRuntime(
   void* const streamRuntime,
   const unsigned short value
 )
@@ -88627,7 +88627,7 @@ static_assert(
  * Formats one unsigned byte as `"%u"` and forwards the resulting wx string
  * to virtual slot `+0x08`.
  */
-[[maybe_unused]] void wxTextOutputWriteUnsignedByteRuntime(
+void wxTextOutputWriteUnsignedByteRuntime(
   void* const streamRuntime,
   const unsigned char value
 )
@@ -88644,7 +88644,7 @@ static_assert(
  * Formats one signed short as `"%d"` and forwards the resulting wx string to
  * virtual slot `+0x08`.
  */
-[[maybe_unused]] void* wxTextOutputWriteSignedShortRuntime(
+void* wxTextOutputWriteSignedShortRuntime(
   void* const streamRuntime,
   const short value
 )
@@ -88662,7 +88662,7 @@ static_assert(
  * Formats one unsigned short as `"%u"` and forwards the resulting wx string
  * to virtual slot `+0x08`.
  */
-[[maybe_unused]] void* wxTextOutputWriteUnsignedWordRuntime(
+void* wxTextOutputWriteUnsignedWordRuntime(
   void* const streamRuntime,
   const unsigned short value
 )
@@ -88680,7 +88680,7 @@ static_assert(
  * Formats one unsigned long as `"%lu"` and forwards the resulting wx string
  * to virtual slot `+0x08`.
  */
-[[maybe_unused]] void* wxTextOutputWriteUnsignedLongRuntime(
+void* wxTextOutputWriteUnsignedLongRuntime(
   void* const streamRuntime,
   const unsigned long value
 )
@@ -88699,7 +88699,7 @@ static_assert(
  * base construction, seeding default margin lanes (`+0x160/+0x164 = 4`), and
  * binding the `wxBitmapButton` runtime vtable lane.
  */
-[[maybe_unused]] void* wxConstructBitmapButtonRuntimeInPlace(
+void* wxConstructBitmapButtonRuntimeInPlace(
   void* const bitmapButtonRuntime
 ) noexcept
 {
@@ -88725,7 +88725,7 @@ static_assert(
  * initializes control-base lanes, clears thumb/range/page fields, and binds
  * the scrollbar runtime vtable lane.
  */
-[[maybe_unused]] void* wxConstructScrollBarRuntimeInPlace(
+void* wxConstructScrollBarRuntimeInPlace(
   void* const scrollBarRuntime
 ) noexcept
 {
@@ -88750,7 +88750,7 @@ static_assert(
  * Constructs one `wxStaticText` control payload on caller-provided storage by
  * initializing control-base lanes and binding the static-text runtime vtable.
  */
-[[maybe_unused]] void* wxConstructStaticTextRuntimeInPlace(
+void* wxConstructStaticTextRuntimeInPlace(
   void* const staticTextRuntime
 ) noexcept
 {
@@ -88773,7 +88773,7 @@ static_assert(
  * enables mask usage, clears bitmap payload storage, and binds the static-
  * bitmap runtime vtable lane.
  */
-[[maybe_unused]] void* wxConstructStaticBitmapRuntimeInPlace(
+void* wxConstructStaticBitmapRuntimeInPlace(
   void* const staticBitmapRuntime
 ) noexcept
 {
@@ -88797,7 +88797,7 @@ static_assert(
  * Constructs one `wxStaticBox` control payload on caller-provided storage by
  * initializing control-base lanes and binding the static-box runtime vtable.
  */
-[[maybe_unused]] void* wxConstructStaticBoxRuntimeInPlace(
+void* wxConstructStaticBoxRuntimeInPlace(
   void* const staticBoxRuntime
 ) noexcept
 {
@@ -88820,7 +88820,7 @@ static_assert(
  * seeds default range lanes (`min=0`, `max=100`), and binds the spin-button
  * runtime vtable lane.
  */
-[[maybe_unused]] void* wxConstructSpinButtonRuntimeInPlace(
+void* wxConstructSpinButtonRuntimeInPlace(
   void* const spinButtonRuntime
 ) noexcept
 {
@@ -88845,7 +88845,7 @@ static_assert(
  * running `wxDC` base initialization, rebinding the paint-DC vtable lane, and
  * clearing the canvas link lane.
  */
-[[maybe_unused]] void* wxConstructPaintDcRuntimeInPlace(
+void* wxConstructPaintDcRuntimeInPlace(
   void* const paintDcRuntime
 ) noexcept
 {
@@ -88869,7 +88869,7 @@ static_assert(
  * Reads one owner lane at `+0x0E8` and forwards two integer arguments into
  * owner virtual slot `+0x194` when the owner is present.
  */
-[[maybe_unused]] int wxForwardTwoIntArgsToOwnerVirtualLane194Runtime(
+int wxForwardTwoIntArgsToOwnerVirtualLane194Runtime(
   void* const runtime,
   const int arg0,
   const int arg1
@@ -88915,7 +88915,7 @@ static_assert(
  * Releases one shared wide-string payload (when owned), then rebinds the
  * stored pointer to process-global `wxEmptyString`.
  */
-[[maybe_unused]] const wchar_t* wxReleaseWideStringPointerAndResetToEmpty(
+const wchar_t* wxReleaseWideStringPointerAndResetToEmpty(
   const wchar_t** const stringPointer
 ) noexcept
 {
@@ -88941,7 +88941,7 @@ static_assert(
  * lanes, clearing editor/rename pointers, storing owner runtime linkage, and
  * binding the rename-timer vtable lane.
  */
-[[maybe_unused]] void* wxConstructTreeListRenameTimerRuntimeInPlace(
+void* wxConstructTreeListRenameTimerRuntimeInPlace(
   void* const timerRuntime,
   const std::int32_t ownerTreeListRuntime
 ) noexcept
@@ -88968,7 +88968,7 @@ static_assert(
  * Copies the primary colour lane referenced by one owner runtime into
  * `outColour`, falling back to `wxNullColour` semantics when no lane exists.
  */
-[[maybe_unused]] wxColourRuntime* wxCopyPrimaryColourLaneOrNull(
+wxColourRuntime* wxCopyPrimaryColourLaneOrNull(
   const void* const ownerRuntime,
   wxColourRuntime* const outColour
 ) noexcept
@@ -88992,7 +88992,7 @@ static_assert(
  * Copies the secondary colour lane referenced by one owner runtime into
  * `outColour`, falling back to `wxNullColour` semantics when no lane exists.
  */
-[[maybe_unused]] wxColourRuntime* wxCopySecondaryColourLaneOrNull(
+wxColourRuntime* wxCopySecondaryColourLaneOrNull(
   const void* const ownerRuntime,
   wxColourRuntime* const outColour
 ) noexcept
@@ -89017,7 +89017,7 @@ static_assert(
  * stream base lanes, clearing owned-file lanes, and binding the file-output
  * vtable lane.
  */
-[[maybe_unused]] void* wxConstructFileOutputStreamRuntimeInPlace(
+void* wxConstructFileOutputStreamRuntimeInPlace(
   void* const streamRuntime
 ) noexcept
 {
@@ -89043,7 +89043,7 @@ static_assert(
  * stream base lanes, clearing owned-file lanes, and binding the ffile-output
  * vtable lane.
  */
-[[maybe_unused]] void* wxConstructFFileOutputStreamRuntimeInPlace(
+void* wxConstructFFileOutputStreamRuntimeInPlace(
   void* const streamRuntime
 ) noexcept
 {
@@ -89140,7 +89140,7 @@ namespace
  * Executes one output-stream write lane (`+0x24`) and caches the returned byte
  * count in stream lane `+0x04`.
  */
-[[maybe_unused]] void* wxOutputStreamWriteAndCacheLastCountRuntime(
+void* wxOutputStreamWriteAndCacheLastCountRuntime(
   void* const outputStreamRuntime,
   const std::int32_t arg0,
   const std::int32_t arg1
@@ -89158,7 +89158,7 @@ namespace
  * Advances one counting-output current-position lane by `writtenByteCount`,
  * updates max-position high-water mark, and returns current position.
  */
-[[maybe_unused]] std::uint32_t wxCountingOutputAdvancePositionRuntime(
+std::uint32_t wxCountingOutputAdvancePositionRuntime(
   WxCountingOutputPositionRuntimeView* const outputStreamRuntime,
   const int requestedByteCount,
   const int writtenByteCount
@@ -89184,7 +89184,7 @@ namespace
  * Seeks one counting-output current-position lane using start/current/end mode,
  * updates max-position high-water mark, and returns the resulting position.
  */
-[[maybe_unused]] std::uint32_t wxCountingOutputSeekPositionRuntime(
+std::uint32_t wxCountingOutputSeekPositionRuntime(
   WxCountingOutputPositionRuntimeView* const outputStreamRuntime,
   const std::uint32_t distance,
   const int seekMode
@@ -89221,7 +89221,7 @@ namespace
  * Forwards tell/query lane `+0x04` to the parent output stream owned by one
  * filter-output runtime payload.
  */
-[[maybe_unused]] int wxFilterOutputForwardParentTellRuntime(
+int wxFilterOutputForwardParentTellRuntime(
   WxFilterOutputForwardRuntimeView* const filterOutputRuntime
 ) noexcept
 {
@@ -89247,7 +89247,7 @@ namespace
  * Resets buffered-output last-write lane and seeds the owned stream-buffer lane
  * from constructor arguments.
  */
-[[maybe_unused]] WxBufferedOutputForwardRuntimeView* wxBufferedOutputResetAndInitBufferRuntime(
+WxBufferedOutputForwardRuntimeView* wxBufferedOutputResetAndInitBufferRuntime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime,
   const int streamRuntime,
   const int modeOrBufferSize
@@ -89277,7 +89277,7 @@ namespace
  * Runs buffered-output flush lane `+0x20`, then forwards sync/query lane
  * `+0x1C` to the owned stream-buffer payload.
  */
-[[maybe_unused]] int wxBufferedOutputFlushAndSyncBufferRuntime(
+int wxBufferedOutputFlushAndSyncBufferRuntime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime
 ) noexcept
 {
@@ -89313,7 +89313,7 @@ namespace
  * What it does:
  * Forwards one query lane `+0x18` to the owned stream-buffer payload.
  */
-[[maybe_unused]] int wxBufferedOutputQueryBufferLaneRuntime(
+int wxBufferedOutputQueryBufferLaneRuntime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime
 ) noexcept
 {
@@ -89339,7 +89339,7 @@ namespace
  * Writes through one parent output stream lane and returns the parent-reported
  * transfer count from virtual lane `+0x1C`.
  */
-[[maybe_unused]] int wxBufferedOutputWriteThroughParentRuntime(
+int wxBufferedOutputWriteThroughParentRuntime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime,
   const int sourceBytes,
   const int byteCount
@@ -89379,7 +89379,7 @@ namespace
  * Forwards parent output virtual lane `+0x14` from one buffered-output
  * runtime payload.
  */
-[[maybe_unused]] int wxBufferedOutputForwardParentLane14Runtime(
+int wxBufferedOutputForwardParentLane14Runtime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime
 ) noexcept
 {
@@ -89405,7 +89405,7 @@ namespace
  * Forwards parent output virtual lane `+0x18` from one buffered-output
  * runtime payload.
  */
-[[maybe_unused]] int wxBufferedOutputForwardParentLane18Runtime(
+int wxBufferedOutputForwardParentLane18Runtime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime
 ) noexcept
 {
@@ -89431,7 +89431,7 @@ namespace
  * Returns buffered-output logical position as parent tell-lane value plus the
  * pending byte count currently stored in the owned output buffer.
  */
-[[maybe_unused]] int wxBufferedOutputTellWithPendingBytesRuntime(
+int wxBufferedOutputTellWithPendingBytesRuntime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime
 ) noexcept
 {
@@ -89468,7 +89468,7 @@ namespace
  * incoming buffer pointer is non-null, deleting the previous buffer object
  * through virtual slot `+0x00` with delete flag `1`.
  */
-[[maybe_unused]] std::int32_t wxBufferedOutputReplaceOwnedBufferRuntime(
+std::int32_t wxBufferedOutputReplaceOwnedBufferRuntime(
   WxBufferedOutputForwardRuntimeView* const bufferedOutputRuntime,
   WxStreamBufferRuntimeView* const replacementBuffer
 ) noexcept
@@ -89500,7 +89500,7 @@ namespace
  * Executes the non-deleting `wxStreamBuffer` teardown lane by resetting
  * runtime-buffer pointers and releasing owned dynamic storage.
  */
-[[maybe_unused]] void wxDestroyStreamBufferRuntimeNoDelete(
+void wxDestroyStreamBufferRuntimeNoDelete(
   void* const streamBufferRuntime
 ) noexcept
 {
@@ -89515,7 +89515,7 @@ namespace
  * stream base lanes, clearing parent stream linkage, and binding the counting-
  * output vtable lane.
  */
-[[maybe_unused]] void* wxConstructCountingOutputStreamRuntimeInPlace(
+void* wxConstructCountingOutputStreamRuntimeInPlace(
   void* const streamRuntime
 ) noexcept
 {
@@ -89540,7 +89540,7 @@ namespace
  * lanes, binding the parent output stream lane, and setting filter-output
  * runtime vtable dispatch.
  */
-[[maybe_unused]] void* wxConstructFilterOutputStreamRuntimeInPlace(
+void* wxConstructFilterOutputStreamRuntimeInPlace(
   void* const streamRuntime,
   void* const parentOutputStream
 ) noexcept
@@ -89565,7 +89565,7 @@ namespace
  * Executes the non-deleting scrollbar teardown lane by restoring scrollbar
  * vtable ownership and tail-calling `wxControl` base destruction.
  */
-[[maybe_unused]] void* wxDestroyScrollBarRuntimeNoDelete(
+void* wxDestroyScrollBarRuntimeNoDelete(
   void* const scrollBarRuntime
 ) noexcept
 {
@@ -89586,7 +89586,7 @@ namespace
  * Runs non-deleting scrollbar teardown and conditionally scalar-deletes the
  * runtime payload when the low delete-flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyScrollBarRuntimeWithDeleteFlagAdapter(
+void* wxDestroyScrollBarRuntimeWithDeleteFlagAdapter(
   void* const scrollBarRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -89709,7 +89709,7 @@ namespace
  * refs through virtual dispose/destroy hooks) and resets one legacy SSO text
  * lane (`+0x04/+0x14/+0x18`) to empty state.
  */
-[[maybe_unused]] void wxReleaseSharedControlAndResetLegacyShortStringRuntime(
+void wxReleaseSharedControlAndResetLegacyShortStringRuntime(
   SharedRefAndStringCleanupRuntimeView* const runtime
 ) noexcept
 {
@@ -89742,7 +89742,7 @@ namespace
  * Applies shared-control + short-string reset to one embedded cleanup lane at
  * offset `+0x04` from the incoming wrapper payload.
  */
-[[maybe_unused]] void wxReleaseSharedControlAndResetLegacyShortStringOffset4ThunkA(
+void wxReleaseSharedControlAndResetLegacyShortStringOffset4ThunkA(
   void* const runtime
 ) noexcept
 {
@@ -89757,7 +89757,7 @@ namespace
  * Applies shared-control + short-string reset to one embedded cleanup lane at
  * offset `+0x04` from the incoming wrapper payload (alias lane).
  */
-[[maybe_unused]] void wxReleaseSharedControlAndResetLegacyShortStringOffset4ThunkB(
+void wxReleaseSharedControlAndResetLegacyShortStringOffset4ThunkB(
   void* const runtime
 ) noexcept
 {
@@ -89772,7 +89772,7 @@ namespace
  * Applies shared-control + short-string reset to one embedded cleanup lane at
  * offset `+0x04` and returns the original wrapper payload pointer.
  */
-[[maybe_unused]] void* wxReleaseSharedControlAndResetLegacyShortStringOffset4ReturnSelfThunk(
+void* wxReleaseSharedControlAndResetLegacyShortStringOffset4ReturnSelfThunk(
   void* const runtime
 ) noexcept
 {
@@ -89788,7 +89788,7 @@ namespace
  * Resets destination short-string storage, copies source text + shared-array
  * lanes, and acquires one strong reference on the copied control block.
  */
-[[maybe_unused]] SharedRefStringAndMemBufferRuntimeView* wxCopySharedRefStringAndMemBufferRuntime(
+SharedRefStringAndMemBufferRuntimeView* wxCopySharedRefStringAndMemBufferRuntime(
   const SharedRefStringAndMemBufferRuntimeView* const source,
   SharedRefStringAndMemBufferRuntimeView* const destination
 ) noexcept
@@ -89817,7 +89817,7 @@ namespace
  * control vtable lane, executing `wxControl` base teardown, and conditionally
  * deleting storage when bit0 is set in `deleteFlags`.
  */
-[[maybe_unused]] void* wxDestroyTreeListCtrlDeletingThunk(
+void* wxDestroyTreeListCtrlDeletingThunk(
   void* const treeListRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -89838,7 +89838,7 @@ namespace
  * Runs the non-deleting `wxStaticBitmapBase` teardown thunk by restoring the
  * static-bitmap vtable lane and tail-calling `wxControl` base destruction.
  */
-[[maybe_unused]] void* wxDestroyStaticBitmapBaseRuntimeNoDeleteThunk(
+void* wxDestroyStaticBitmapBaseRuntimeNoDeleteThunk(
   void* const staticBitmapRuntime
 ) noexcept
 {
@@ -89855,7 +89855,7 @@ namespace
  * Runs static-bitmap base non-deleting teardown and conditionally scalar-
  * deletes the runtime payload when the low delete-flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyStaticBitmapBaseRuntimeWithDeleteFlagAdapter(
+void* wxDestroyStaticBitmapBaseRuntimeWithDeleteFlagAdapter(
   void* const staticBitmapRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -89874,7 +89874,7 @@ namespace
  * Runs the non-deleting `wxPopupWindowBase` teardown thunk by restoring popup
  * vtable ownership and tail-calling `wxWindow` base destruction.
  */
-[[maybe_unused]] void* wxDestroyPopupWindowBaseRuntimeNoDeleteThunk(
+void* wxDestroyPopupWindowBaseRuntimeNoDeleteThunk(
   void* const popupWindowRuntime
 ) noexcept
 {
@@ -89891,7 +89891,7 @@ namespace
  * Preserves one direct jump-thunk lane that forwards popup-window base
  * non-deleting teardown into `FUN_00A18AE0`.
  */
-[[maybe_unused]] void* wxDestroyPopupWindowBaseRuntimeNoDeleteThunkAdapterA(
+void* wxDestroyPopupWindowBaseRuntimeNoDeleteThunkAdapterA(
   void* const popupWindowRuntime
 ) noexcept
 {
@@ -89905,7 +89905,7 @@ namespace
  * Runs popup-window base non-deleting teardown and conditionally scalar-
  * deletes the runtime object when the low delete flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyPopupWindowBaseRuntimeWithDeleteFlagAdapterA(
+void* wxDestroyPopupWindowBaseRuntimeWithDeleteFlagAdapterA(
   void* const popupWindowRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -89924,7 +89924,7 @@ namespace
  * Alternate deleting-thunk lane for popup-window base teardown with the same
  * low-bit delete-flag gate as `FUN_009D2420`.
  */
-[[maybe_unused]] void* wxDestroyPopupWindowBaseRuntimeWithDeleteFlagAdapterB(
+void* wxDestroyPopupWindowBaseRuntimeWithDeleteFlagAdapterB(
   void* const popupWindowRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -89953,7 +89953,7 @@ static_assert(
  * Releases one owned heap-allocation lane at runtime offset `+0x128` using
  * the CRT delete operator.
  */
-[[maybe_unused]] void wxDeleteOwnedHeapLane128Runtime(
+void wxDeleteOwnedHeapLane128Runtime(
   void* const runtime
 ) noexcept
 {
@@ -89968,7 +89968,7 @@ static_assert(
  * Constructs one auto-scroll timer payload by initializing timer-base lanes,
  * storing owner/target/axis state, and binding the auto-scroll timer vtable.
  */
-[[maybe_unused]] void* wxConstructAutoScrollTimerRuntimeInPlace(
+void* wxConstructAutoScrollTimerRuntimeInPlace(
   void* const timerRuntime,
   const std::int32_t ownerScrollWindow,
   const std::int32_t ownerScrollTarget,
@@ -90001,7 +90001,7 @@ static_assert(
  * Rebinds one event payload to the wxObject base vtable lane and releases
  * shared ref-data ownership through `wxEvent::UnRef`.
  */
-[[maybe_unused]] void wxDestroyEventObjectNoDeleteLaneA(
+void wxDestroyEventObjectNoDeleteLaneA(
   void* const eventRuntime
 ) noexcept
 {
@@ -90022,7 +90022,7 @@ static_assert(
  * initializing control-base lanes, clearing native-handle counters, and
  * binding the status-bar runtime vtable lane.
  */
-[[maybe_unused]] void* wxConstructStatusBarRuntimeInPlace(
+void* wxConstructStatusBarRuntimeInPlace(
   void* const statusBarRuntime
 ) noexcept
 {
@@ -90051,7 +90051,7 @@ static_assert(
  * lanes, binding the owned native-handle lane, and setting pipe-output vtable
  * dispatch.
  */
-[[maybe_unused]] void* wxConstructPipeOutputStreamRuntimeInPlace(
+void* wxConstructPipeOutputStreamRuntimeInPlace(
   void* const streamRuntime,
   void* const nativeHandle
 ) noexcept
@@ -90077,7 +90077,7 @@ static_assert(
  * Rebinds one event payload to the wxObject base vtable lane and releases
  * shared ref-data ownership through `wxEvent::UnRef`.
  */
-[[maybe_unused]] void wxDestroyEventObjectNoDeleteLaneB(
+void wxDestroyEventObjectNoDeleteLaneB(
   void* const eventRuntime
 ) noexcept
 {
@@ -90097,7 +90097,7 @@ static_assert(
  * Rebinds one event payload to the wxObject base vtable lane and releases
  * shared ref-data ownership through `wxEvent::UnRef` (third alias lane).
  */
-[[maybe_unused]] void wxDestroyEventObjectNoDeleteLaneC(
+void wxDestroyEventObjectNoDeleteLaneC(
   void* const eventRuntime
 ) noexcept
 {
@@ -90117,7 +90117,7 @@ static_assert(
  * Executes one non-deleting `wxEnhMetaFileDC` teardown lane by clearing the
  * native HDC slot and tail-calling base `wxDC` destruction.
  */
-[[maybe_unused]] void wxDestroyEnhMetaFileDcRuntimeNoDelete(
+void wxDestroyEnhMetaFileDcRuntimeNoDelete(
   void* const enhMetaFileDcRuntime
 ) noexcept
 {
@@ -90140,7 +90140,7 @@ static_assert(
  * Runs `wxEnhMetaFileDC` non-deleting teardown and conditionally scalar-
  * deletes the payload when the low delete flag bit is set.
  */
-[[maybe_unused]] void* wxDestroyEnhMetaFileDcWithDeleteFlagRuntime(
+void* wxDestroyEnhMetaFileDcWithDeleteFlagRuntime(
   void* const enhMetaFileDcRuntime,
   const std::int32_t deleteFlags
 ) noexcept
@@ -90312,7 +90312,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Queries one list-view row position (`LVM_GETITEMPOSITION`) and mirrors
  * `(x, y)` into `outPositionXy`.
  */
-[[maybe_unused]] bool wxListCtrlGetItemPositionRuntime(
+bool wxListCtrlGetItemPositionRuntime(
   const void* const listControlRuntime,
   const WPARAM itemId,
   std::int32_t* const outPositionXy
@@ -90342,7 +90342,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Packs one `(x, y)` coordinate pair into Win32 `MAKELPARAM` lane form and
  * dispatches `LVM_SETITEMPOSITION`.
  */
-[[maybe_unused]] BOOL wxListCtrlSetItemPositionRuntime(
+BOOL wxListCtrlSetItemPositionRuntime(
   const void* const listControlRuntime,
   const WPARAM itemId,
   const std::int32_t* const positionXy
@@ -90365,7 +90365,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * What it does:
  * Returns one list-view item-spacing lane through `LVM_GETITEMSPACING`.
  */
-[[maybe_unused]] LRESULT wxListCtrlGetItemSpacingRuntime(
+LRESULT wxListCtrlGetItemSpacingRuntime(
   const void* const listControlRuntime,
   const bool useSmallIconSpacing
 ) noexcept
@@ -90389,7 +90389,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * What it does:
  * Returns the current selected-row count from the native list control.
  */
-[[maybe_unused]] LRESULT wxListCtrlGetSelectedCountRuntime(
+LRESULT wxListCtrlGetSelectedCountRuntime(
   const void* const listControlRuntime
 ) noexcept
 {
@@ -90407,7 +90407,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Converts one wx-colour payload lane into the native packed color lane used
  * by this runtime path and sends `LVM_SETTEXTCOLOR`.
  */
-[[maybe_unused]] LRESULT wxListCtrlSetTextColourRuntime(
+LRESULT wxListCtrlSetTextColourRuntime(
   const void* const listControlRuntime,
   const wxColourRuntime* const colourRuntime
 ) noexcept
@@ -90433,7 +90433,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Maps one wx arrange mode into native `LVM_ARRANGE` flags and dispatches the
  * arrange request.
  */
-[[maybe_unused]] BOOL wxListCtrlArrangeRuntime(
+BOOL wxListCtrlArrangeRuntime(
   const void* const listControlRuntime,
   const WPARAM arrangeMode
 ) noexcept
@@ -90462,7 +90462,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Deletes one native list-view column and decrements the tracked runtime
  * column-count lane on success.
  */
-[[maybe_unused]] bool wxListCtrlDeleteColumnRuntime(
+bool wxListCtrlDeleteColumnRuntime(
   void* const listControlRuntime,
   const WPARAM columnIndex
 ) noexcept
@@ -90486,7 +90486,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Searches list rows by text using `LVM_FINDITEMW`; when `partialMatch` is set
  * the runtime enables partial-string matching.
  */
-[[maybe_unused]] LRESULT wxListCtrlFindItemByTextRuntime(
+LRESULT wxListCtrlFindItemByTextRuntime(
   const void* const listControlRuntime,
   const WPARAM startItem,
   const wchar_t* const text,
@@ -90522,7 +90522,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Runs one nearest-item search (`LVFI_NEARESTXY`) from `(x,y)` and maps runtime
  * direction lanes to Win32 virtual-key directions.
  */
-[[maybe_unused]] LRESULT wxListCtrlFindNearestItemRuntime(
+LRESULT wxListCtrlFindNearestItemRuntime(
   const void* const listControlRuntime,
   const WPARAM startItem,
   const std::int32_t* const pointXy,
@@ -90563,7 +90563,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Performs native list-view hit-testing and maps Win32 hit-test flags into the
  * runtime hit-test bit layout.
  */
-[[maybe_unused]] std::int32_t wxListCtrlHitTestRuntime(
+std::int32_t wxListCtrlHitTestRuntime(
   const void* const listControlRuntime,
   const std::int32_t* const pointXy,
   std::uint32_t* const outRuntimeFlags
@@ -90617,7 +90617,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * What it does:
  * Scrolls the native list control by `(dx, dy)` through `LVM_SCROLL`.
  */
-[[maybe_unused]] bool wxListCtrlScrollRuntime(
+bool wxListCtrlScrollRuntime(
   const void* const listControlRuntime,
   const WPARAM dx,
   const LPARAM dy
@@ -90637,7 +90637,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Sorts list items by dispatching `LVM_SORTITEMS` with one callback/context
  * thunk payload.
  */
-[[maybe_unused]] bool wxListCtrlSortItemsRuntime(
+bool wxListCtrlSortItemsRuntime(
   const void* const listControlRuntime,
   const WxListCtrlSortComparatorThunkFn compareFn,
   const std::uint32_t callbackContext
@@ -90666,7 +90666,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Queries current text selection bounds through the text-control virtual slot
  * and returns whether the selection range is non-empty.
  */
-[[maybe_unused]] BOOL wxTextCtrlHasSelectionRuntime(
+BOOL wxTextCtrlHasSelectionRuntime(
   void* const textCtrlRuntime
 ) noexcept
 {
@@ -90694,7 +90694,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Thunk lane that forwards one text-selection copyability query into
  * `FUN_00993A70`.
  */
-[[maybe_unused]] BOOL wxTextCtrlCanCopyRuntimeAdapter(
+BOOL wxTextCtrlCanCopyRuntimeAdapter(
   void* const textCtrlRuntime
 ) noexcept
 {
@@ -90709,7 +90709,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * requested) temporarily enables no-hide-selection behavior to scroll caret
  * visibility and restores prior option state.
  */
-[[maybe_unused]] LRESULT wxTextCtrlSetSelectionAndEnsureCaretRuntime(
+LRESULT wxTextCtrlSetSelectionAndEnsureCaretRuntime(
   void* const textCtrlRuntime,
   const WPARAM selectionStart,
   const LPARAM selectionEnd,
@@ -90788,7 +90788,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Queries one native text-control line length (`EM_LINELENGTH`) from the
  * current window handle lane.
  */
-[[maybe_unused]] LRESULT wxTextCtrlGetLineLengthFromNative(
+LRESULT wxTextCtrlGetLineLengthFromNative(
   const void* const textCtrlRuntime,
   const WPARAM lineStartCharacter
 ) noexcept
@@ -90807,7 +90807,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * What it does:
  * Returns the top visible item index from the native list-view handle lane.
  */
-[[maybe_unused]] LRESULT wxListCtrlGetTopIndexRuntime(
+LRESULT wxListCtrlGetTopIndexRuntime(
   const void* const listControlRuntime
 ) noexcept
 {
@@ -90826,7 +90826,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Queries Win32 global memory status and returns currently available physical
  * memory in bytes.
  */
-[[maybe_unused]] SIZE_T wxGetAvailablePhysicalMemoryBytesRuntime() noexcept
+SIZE_T wxGetAvailablePhysicalMemoryBytesRuntime() noexcept
 {
   MEMORYSTATUS memoryStatus{};
   memoryStatus.dwLength = sizeof(memoryStatus);
@@ -90841,7 +90841,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Deletes native list-view columns from index `0` until the tracked runtime
  * column-count lane reaches zero or `LVM_DELETECOLUMN` fails.
  */
-[[maybe_unused]] bool wxListCtrlDeleteColumnsFromFrontRuntime(
+bool wxListCtrlDeleteColumnsFromFrontRuntime(
   void* const listControlRuntime
 ) noexcept
 {
@@ -90871,7 +90871,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Raises the global delete-change guard lane, clears internal row payload
  * data, dispatches native `LVM_DELETEALLITEMS`, then drops the guard lane.
  */
-[[maybe_unused]] bool wxListCtrlDeleteAllItemsRuntime(
+bool wxListCtrlDeleteAllItemsRuntime(
   void* const listControlRuntime
 ) noexcept
 {
@@ -90890,7 +90890,7 @@ static_assert(sizeof(WxListCtrlSortThunkContextRuntime) == 0x08, "WxListCtrlSort
  * Deletes all list rows, then deletes all columns when the runtime
  * column-count lane stays positive.
  */
-[[maybe_unused]] bool wxListCtrlDeleteAllItemsAndColumnsRuntime(
+bool wxListCtrlDeleteAllItemsAndColumnsRuntime(
   void* const listControlRuntime
 ) noexcept
 {
@@ -90940,7 +90940,7 @@ static_assert(sizeof(WxListCtrlNativeItemStateRuntimeView) == 0x28, "WxListCtrlN
  * 5. If wx data/param mask is set (`mMask & 4`), add `LVIF_PARAM`.
  */
 // Forward declaration: defined below at FUN_0099BE10 (line ~84335).
-[[maybe_unused]] WxListCtrlNativeItemStateRuntimeView* wxListCtrlApplyNativeStateBitsRuntime(
+WxListCtrlNativeItemStateRuntimeView* wxListCtrlApplyNativeStateBitsRuntime(
   WxListCtrlNativeItemStateRuntimeView* nativeItem,
   std::uint8_t requestedStateBits,
   std::uint8_t requestedMaskBits) noexcept;
@@ -91000,7 +91000,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Maps one wx list-item state/mask bit-pair set into native list-view
  * `stateMask`/`state` lanes.
  */
-[[maybe_unused]] WxListCtrlNativeItemStateRuntimeView* wxListCtrlApplyNativeStateBitsRuntime(
+WxListCtrlNativeItemStateRuntimeView* wxListCtrlApplyNativeStateBitsRuntime(
   WxListCtrlNativeItemStateRuntimeView* const nativeItem,
   const std::uint8_t requestedStateBits,
   const std::uint8_t requestedMaskBits
@@ -91044,7 +91044,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Rebinds notebook image-list ownership: deletes previously-owned image list
  * when ownership flag is set, clears ownership, and stores new image-list lane.
  */
-[[maybe_unused]] void* wxNotebookAssignImageListRuntime(
+void* wxNotebookAssignImageListRuntime(
   void* const notebookRuntime,
   void* const imageListRuntime
 ) noexcept
@@ -91088,7 +91088,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * forwards the resulting layout rectangle to each page window via virtual
  * `DoSetSize` lane (`+0x1A0`).
  */
-[[maybe_unused]] int wxNotebookLayoutPagesFromAdjustedTabRectRuntime(
+int wxNotebookLayoutPagesFromAdjustedTabRectRuntime(
   void* const notebookRuntime,
   void* const ownerEventRuntime
 ) noexcept
@@ -91189,7 +91189,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Computes the next or previous notebook page index with wrap-around semantics
  * using current selection from virtual slot `+0x218`.
  */
-[[maybe_unused]] std::int32_t wxNotebookBaseComputeWrappedAdjacentPageIndexRuntime(
+std::int32_t wxNotebookBaseComputeWrappedAdjacentPageIndexRuntime(
   void* const notebookRuntime,
   const bool moveForward
 ) noexcept
@@ -91237,7 +91237,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Removes one image from the native image-list handle lane owned by the
  * caller runtime.
  */
-[[maybe_unused]] bool wxImageListRemoveByIndexRuntime(
+bool wxImageListRemoveByIndexRuntime(
   const void* const imageListRuntime,
   const int imageIndex
 ) noexcept
@@ -91254,7 +91254,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * previously-owned image-list payloads when required, and dispatches
  * `LVM_SETIMAGELIST` with the native image-list handle lane.
  */
-[[maybe_unused]] LRESULT wxListCtrlAssignImageListLane(
+LRESULT wxListCtrlAssignImageListLane(
   void* const listControlRuntime,
   void* const imageListRuntime,
   const std::int32_t imageListSlot
@@ -91304,7 +91304,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Returns one list-control image-list runtime lane selected by slot id
  * (`0=normal`, `1=small`, `2=state`).
  */
-[[maybe_unused]] void* wxListCtrlGetImageListLaneByKindRuntime(
+void* wxListCtrlGetImageListLaneByKindRuntime(
   const void* const listControlRuntime,
   const std::int32_t imageListSlot
 ) noexcept
@@ -91330,7 +91330,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * image-list handle lane and requesting a fresh drag-image handle from the
  * native list-view control.
  */
-[[maybe_unused]] bool wxListCtrlRebuildDragImageRuntime(
+bool wxListCtrlRebuildDragImageRuntime(
   void* const imageListRuntime,
   const void* const listControlRuntime,
   const WPARAM itemIndex
@@ -91362,7 +91362,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Rebinds one list-control image-list lane and marks ownership for the
  * selected lane so this control tears it down on destruction/reset paths.
  */
-[[maybe_unused]] int wxListCtrlAssignOwnedImageListLane(
+int wxListCtrlAssignOwnedImageListLane(
   void* const listControlRuntime,
   void* const imageListRuntime,
   const std::int32_t imageListSlot
@@ -91392,7 +91392,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * Updates native list-view virtual item count using `LVM_SETITEMCOUNT` with
  * the same redraw flags lane used by the original runtime (`2`).
  */
-[[maybe_unused]] LRESULT wxListCtrlSetVirtualItemCountRuntime(
+LRESULT wxListCtrlSetVirtualItemCountRuntime(
   const void* const listControlRuntime,
   const WPARAM itemCount
 ) noexcept
@@ -91411,7 +91411,7 @@ void wxListCtrlConvertToMSWListItemBaseRuntime(
  * What it does:
  * Returns one native list-view column width lane (`LVM_GETCOLUMNWIDTH`).
  */
-[[maybe_unused]] LRESULT wxListCtrlGetColumnWidthRuntime(
+LRESULT wxListCtrlGetColumnWidthRuntime(
   const void* const listControlRuntime,
   const WPARAM columnIndex
 ) noexcept
@@ -91441,7 +91441,7 @@ static_assert(
  * Returns one list-view visible item-count-per-page value from the embedded
  * native handle lane.
  */
-[[maybe_unused]] LRESULT wxListCtrlGetCountPerPageRuntime(
+LRESULT wxListCtrlGetCountPerPageRuntime(
   const WxListCtrlCountPerPageRuntimeView* const runtime
 ) noexcept
 {
@@ -91459,7 +91459,7 @@ static_assert(
  * Sets one native list-view column width lane, forcing auto-size (`-1`) when
  * the runtime style-byte carries the autosize bit (`0x10`).
  */
-[[maybe_unused]] bool wxListCtrlSetColumnWidthRuntime(
+bool wxListCtrlSetColumnWidthRuntime(
   void* const listControlRuntime,
   WPARAM columnIndex,
   const std::uint16_t columnWidth
@@ -91489,7 +91489,7 @@ static_assert(
  * Swaps one process-global locale pointer lane and returns the previous locale
  * pointer value.
  */
-[[maybe_unused]] void* wxSwapGlobalLocalePointerRuntime(
+void* wxSwapGlobalLocalePointerRuntime(
   void* const localeRuntime
 ) noexcept
 {
@@ -91506,7 +91506,7 @@ static_assert(
  * `source` when non-empty (with refcount bump), and always setting the second
  * lane to `wxEmptyString`.
  */
-[[maybe_unused]] WxLocaleNamePairRuntimeView* wxConstructLocaleNamePairFromSharedStringRuntime(
+WxLocaleNamePairRuntimeView* wxConstructLocaleNamePairFromSharedStringRuntime(
   WxLocaleNamePairRuntimeView* const outValue,
   const wxStringRuntime* const source
 ) noexcept
@@ -91545,7 +91545,7 @@ static_assert(
  * Copies two shared wx-string lanes by sharing payload ownership and bumping
  * refcounts only for non-empty source lanes.
  */
-[[maybe_unused]] WxLocaleNamePairRuntimeView* wxCopyLocaleNamePairSharedRuntime(
+WxLocaleNamePairRuntimeView* wxCopyLocaleNamePairSharedRuntime(
   WxLocaleNamePairRuntimeView* const outValue,
   const WxLocaleNamePairRuntimeView* const source
 ) noexcept
@@ -91566,7 +91566,7 @@ static_assert(
  * Copies one locale-descriptor payload with scalar lanes plus two shared
  * wx-string lanes, preserving original shared-string ownership semantics.
  */
-[[maybe_unused]] WxLocaleDescriptorRuntimeView* wxCopyLocaleDescriptorSharedRuntime(
+WxLocaleDescriptorRuntimeView* wxCopyLocaleDescriptorSharedRuntime(
   WxLocaleDescriptorRuntimeView* const outValue,
   const WxLocaleDescriptorRuntimeView* const source
 ) noexcept
@@ -91591,7 +91591,7 @@ static_assert(
  * lane by cloning the first entry, appending it `copyCount` times, then
  * replacing trailing appended slots with fresh clones.
  */
-[[maybe_unused]] void wxAppendClonedLocaleDescriptorsToPointerArray(
+void wxAppendClonedLocaleDescriptorsToPointerArray(
   wxArrayPtrVoid* const descriptorArray,
   const WxLocaleDescriptorRuntimeView* const sourceDescriptor,
   const std::uint32_t copyCount
@@ -91644,7 +91644,7 @@ static_assert(
  * Queries Win32 work-area rectangle and writes x/y/width/height lanes to the
  * provided output pointers.
  */
-[[maybe_unused]] std::int32_t* wxGetDesktopWorkAreaXywh(
+std::int32_t* wxGetDesktopWorkAreaXywh(
   std::int32_t* const outX,
   std::int32_t* const outY,
   std::int32_t* const outWidth,
@@ -91686,7 +91686,7 @@ static_assert(sizeof(WxDesktopWorkAreaRectRuntimeView) == 0x10, "WxDesktopWorkAr
  * Writes the desktop work-area rectangle as `{x, y, width, height}` into one
  * caller-owned rect payload lane.
  */
-[[maybe_unused]] WxDesktopWorkAreaRectRuntimeView* wxGetDesktopWorkAreaRectRuntime(
+WxDesktopWorkAreaRectRuntimeView* wxGetDesktopWorkAreaRectRuntime(
   WxDesktopWorkAreaRectRuntimeView* const outRect
 ) noexcept
 {
@@ -91709,7 +91709,7 @@ static_assert(sizeof(WxDesktopWorkAreaRectRuntimeView) == 0x10, "WxDesktopWorkAr
  * What it does:
  * Sends one Win32 message only when the target window handle lane is non-null.
  */
-[[maybe_unused]] HWND wxSendMessageIfWindowHandlePresent(
+HWND wxSendMessageIfWindowHandlePresent(
   const HWND targetWindow,
   const signed int message,
   const WPARAM wParam,
@@ -91732,7 +91732,7 @@ static_assert(sizeof(WxDesktopWorkAreaRectRuntimeView) == 0x10, "WxDesktopWorkAr
  * Rebinds one tree-control image-list lane by dispatching `TVM_SETIMAGELIST`
  * with the native image-list handle extracted from the runtime object lane.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlAssignImageListLane(
+LRESULT wxTreeCtrlAssignImageListLane(
   const void* const treeCtrlRuntime,
   const void* const imageListRuntime,
   const WPARAM imageListKind
@@ -91775,7 +91775,7 @@ static_assert(
  * Replaces the state-image-list lane, releases the previous owned list when
  * needed, forwards native rebinding with kind `2`, and clears ownership.
  */
-[[maybe_unused]] int wxTreeCtrlSetStateImageListRuntime(
+int wxTreeCtrlSetStateImageListRuntime(
   void* const treeCtrlRuntime,
   void* const imageListRuntime
 ) noexcept
@@ -91803,7 +91803,7 @@ static_assert(
  * image-list when required, and forwards native rebinding through
  * `TVM_SETIMAGELIST`.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlSetNormalImageListRuntime(
+LRESULT wxTreeCtrlSetNormalImageListRuntime(
   void* const treeCtrlRuntime,
   void* const imageListRuntime
 ) noexcept
@@ -91840,7 +91840,7 @@ static_assert(
  * Fetches one tree-item `lParam` payload lane and returns the indexed integer
  * lane from that payload (`+0x08 + index*4`) when query succeeds.
  */
-[[maybe_unused]] std::int32_t wxTreeCtrlGetIndexedItemParamLane(
+std::int32_t wxTreeCtrlGetIndexedItemParamLane(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane,
   const std::int32_t laneIndex
@@ -91880,7 +91880,7 @@ static_assert(
  * and mirrors fallback slot writes for index `0`/`2` when those lanes are
  * still sentinel `-1`.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlSetIndexedItemParamLane(
+LRESULT wxTreeCtrlSetIndexedItemParamLane(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane,
   const std::int32_t laneValue,
@@ -91928,7 +91928,7 @@ static_assert(
  * What it does:
  * Updates one tree-item image/selected-image pair through `TVM_SETITEMW`.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlSetItemImagePairRuntime(
+LRESULT wxTreeCtrlSetItemImagePairRuntime(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane,
   const std::int32_t imageIndex,
@@ -91955,7 +91955,7 @@ static_assert(
  * Resolves one tree item's next sibling handle and applies virtual-root
  * sentinel fallback (`-65536`) when style bit `0x800` is active.
  */
-[[maybe_unused]] LRESULT* wxTreeCtrlGetNextSiblingWithVirtualRootFallback(
+LRESULT* wxTreeCtrlGetNextSiblingWithVirtualRootFallback(
   const void* const treeCtrlRuntime,
   LRESULT* const outItemHandle,
   const LPARAM* const itemHandleLane
@@ -92039,7 +92039,7 @@ namespace
  * lanes, inserts the item, then mirrors the resulting handle into output
  * storage.
  */
-[[maybe_unused]] LRESULT* wxTreeCtrlInsertItemWithRuntimeLanes(
+LRESULT* wxTreeCtrlInsertItemWithRuntimeLanes(
   const WxWindowNativeHandleRuntimeView* const treeCtrlRuntime,
   LRESULT* const outResultLane,
   const LPARAM* const parentItemLane,
@@ -92120,7 +92120,7 @@ namespace
  * Inserts one tree item using explicit parent/after lanes and no item-data
  * mirror payload.
  */
-[[maybe_unused]] LRESULT* wxTreeCtrlInsertItemWithExplicitAfterLaneRuntime(
+LRESULT* wxTreeCtrlInsertItemWithExplicitAfterLaneRuntime(
   const WxWindowNativeHandleRuntimeView* const treeCtrlRuntime,
   LRESULT* const outResultLane,
   const LPARAM* const parentItemLane,
@@ -92150,7 +92150,7 @@ namespace
  * Inserts one tree item with the root-sentinel `hInsertAfter` lane (`-65535`)
  * and mirrors inserted-handle state into optional item-data storage.
  */
-[[maybe_unused]] LRESULT* wxTreeCtrlInsertItemAfterRootSentinelLaneRuntime(
+LRESULT* wxTreeCtrlInsertItemAfterRootSentinelLaneRuntime(
   const WxWindowNativeHandleRuntimeView* const treeCtrlRuntime,
   LRESULT* const outResultLane,
   const LPARAM* const parentItemLane,
@@ -92181,7 +92181,7 @@ namespace
  * Inserts one tree item using `*insertAfterItemLane` as the native
  * `hInsertAfter` lane and preserves output-handle mirror semantics.
  */
-[[maybe_unused]] LRESULT* wxTreeCtrlInsertItemUsingInsertAfterPointerRuntime(
+LRESULT* wxTreeCtrlInsertItemUsingInsertAfterPointerRuntime(
   const WxWindowNativeHandleRuntimeView* const treeCtrlRuntime,
   LRESULT* const outResultLane,
   const LPARAM* const parentItemLane,
@@ -92217,7 +92217,7 @@ namespace
  * `parentItemLane` up to `childIndex`, then inserts one tree item using the
  * original insert payload lanes.
  */
-[[maybe_unused]] LRESULT* wxTreeCtrlInsertItemAtChildIndexRuntime(
+LRESULT* wxTreeCtrlInsertItemAtChildIndexRuntime(
   const WxGenericDirCtrlRuntimeView* const treeCtrlRuntime,
   LRESULT* const outResultLane,
   const LPARAM* const parentItemLane,
@@ -92282,7 +92282,7 @@ namespace
  * What it does:
  * Requests native deletion of one tree item handle from the control lane.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlDeleteItemByHandleRuntime(
+LRESULT wxTreeCtrlDeleteItemByHandleRuntime(
   const void* const treeCtrlRuntime,
   const LPARAM* const treeItemHandleLane
 ) noexcept
@@ -92302,7 +92302,7 @@ namespace
  * Updates tree-item state bit `0x10` by sending one `TVM_SETITEMW` state
  * payload lane.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlSetStateBit4Runtime(
+LRESULT wxTreeCtrlSetStateBit4Runtime(
   const void* const treeCtrlRuntime,
   const LPARAM* const treeItemHandleLane,
   const bool setStateBit
@@ -92332,7 +92332,7 @@ namespace
  * Updates tree-item state bit `0x08` by sending one `TVM_SETITEMW` state
  * payload lane.
  */
-[[maybe_unused]] LRESULT wxTreeCtrlSetStateBit3Runtime(
+LRESULT wxTreeCtrlSetStateBit3Runtime(
   const void* const treeCtrlRuntime,
   const LPARAM* const treeItemHandleLane,
   const bool setStateBit
@@ -92362,7 +92362,7 @@ namespace
  * Thin wrapper that resolves one tree-item rectangle (`TVM_GETITEMRECT`) using
  * non-text mode (`textOnly = 0`).
  */
-[[maybe_unused]] bool wxTreeCtrlGetItemRectRawRuntime(
+bool wxTreeCtrlGetItemRectRawRuntime(
   const void* const treeCtrlRuntime,
   const LPARAM* const treeItemHandleLane,
   std::int32_t* const outRect4
@@ -92378,7 +92378,7 @@ namespace
  * Queries one tree item through `TVM_GETITEMW` (`TVIF_CHILDREN`) and returns
  * whether the item advertises child nodes.
  */
-[[maybe_unused]] BOOL wxTreeCtrlHasChildrenFlagRuntime(
+BOOL wxTreeCtrlHasChildrenFlagRuntime(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane
 ) noexcept
@@ -92405,7 +92405,7 @@ namespace
  * Returns tree-item state bit `0x2` as `0/1`, with the sentinel-item guard
  * used by this runtime path.
  */
-[[maybe_unused]] std::int32_t wxTreeCtrlGetStateBit1Runtime(
+std::int32_t wxTreeCtrlGetStateBit1Runtime(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane
 ) noexcept
@@ -92433,7 +92433,7 @@ namespace
  * Returns tree-item state bit `0x10` as `0/1`, with the sentinel-item guard
  * used by this runtime path.
  */
-[[maybe_unused]] std::int32_t wxTreeCtrlGetStateBit4Runtime(
+std::int32_t wxTreeCtrlGetStateBit4Runtime(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane
 ) noexcept
@@ -92461,7 +92461,7 @@ namespace
  * Queries tree-item state mask `0x20` via `TVM_GETITEMW` and returns the
  * resulting bit as `0/1`.
  */
-[[maybe_unused]] std::int32_t wxTreeCtrlGetStateBit5(
+std::int32_t wxTreeCtrlGetStateBit5(
   const void* const treeCtrlRuntime,
   const std::int32_t* const treeItemHandleLane
 ) noexcept
@@ -92490,7 +92490,7 @@ namespace
  * Closes one active Win32 find handle lane with `FindClose` and resets the
  * stored slot to `INVALID_HANDLE_VALUE`.
  */
-[[maybe_unused]] HANDLE wxFindCloseAndInvalidateHandleSlot(
+HANDLE wxFindCloseAndInvalidateHandleSlot(
   HANDLE* const findHandleSlot
 ) noexcept
 {
@@ -92513,7 +92513,7 @@ namespace
  * Thunk adapter preserving `wxFindCloseAndInvalidateHandleSlot(...)`
  * argument/return lanes.
  */
-[[maybe_unused]] HANDLE wxFindCloseAndInvalidateHandleSlotThunk(
+HANDLE wxFindCloseAndInvalidateHandleSlotThunk(
   HANDLE* const findHandleSlot
 ) noexcept
 {
@@ -92527,7 +92527,7 @@ namespace
  * Probes one wide-path lane through `FindFirstFileW`, copies access/creation/
  * write `FILETIME` lanes to caller storage, then closes the find handle.
  */
-[[maybe_unused]] bool wxQueryFileTimesFromFindFirst(
+bool wxQueryFileTimesFromFindFirst(
   const wchar_t* const* const fileNameStorage,
   FILETIME* const outLastAccessTime,
   FILETIME* const outCreationTime,
@@ -92717,7 +92717,7 @@ namespace
    * entries by releasing existing shared lanes, reallocating storage when the
    * current capacity is too small, and resetting count to zero.
    */
-  [[maybe_unused]] void wxArrayStringReserveAndResetRuntime(
+  void wxArrayStringReserveAndResetRuntime(
     WxArrayStringAddRuntimeView* const arrayRuntime,
     const std::uint32_t requestedCapacity
   )
@@ -92748,7 +92748,7 @@ namespace
    * `destinationRuntime`, pre-expanding destination capacity for larger source
    * arrays.
    */
-  [[maybe_unused]] void wxArrayStringAppendAllFromRuntime(
+  void wxArrayStringAppendAllFromRuntime(
     WxArrayStringAddRuntimeView* const destinationRuntime,
     const WxArrayStringAddRuntimeView* const sourceRuntime
   )
@@ -92772,7 +92772,7 @@ namespace
    * clearing prior storage when destination capacity is non-zero, then copies
    * the source auto-sort flag.
    */
-  [[maybe_unused]] WxArrayStringAddRuntimeView* wxArrayStringAssignFromRuntime(
+  WxArrayStringAddRuntimeView* wxArrayStringAssignFromRuntime(
     WxArrayStringAddRuntimeView* const destinationRuntime,
     const WxArrayStringAddRuntimeView* const sourceRuntime
   )
@@ -92797,7 +92797,7 @@ namespace
    * Constructs one wx-array-string lane by zero-initializing dynamic storage,
    * seeding auto-sort from the source lane, then assigning source entries.
    */
-  [[maybe_unused]] WxArrayStringAddRuntimeView* wxArrayStringCopyConstructRuntime(
+  WxArrayStringAddRuntimeView* wxArrayStringCopyConstructRuntime(
     WxArrayStringAddRuntimeView* const destinationRuntime,
     const WxArrayStringAddRuntimeView* const sourceRuntime
   )
@@ -92826,7 +92826,7 @@ namespace
    * Adds one shared wx-string lane into the embedded array-string storage at
    * owner offset `+0x0C`, preserving single-copy append semantics.
    */
-  [[maybe_unused]] std::uint32_t wxAddStringToEmbeddedArrayLane0CRuntime(
+  std::uint32_t wxAddStringToEmbeddedArrayLane0CRuntime(
     WxArrayStringOwnerLane0CRuntimeView* const ownerRuntime,
     const wxStringRuntime* const sourceText
   ) noexcept
@@ -92845,7 +92845,7 @@ namespace
    * into the first string lane at `+0x0C`; otherwise appends into the embedded
    * wx-array-string lane at `+0x04`.
    */
-  [[maybe_unused]] wxStringRuntime* wxArrayStringAssignFirstOrAppendRuntime(
+  wxStringRuntime* wxArrayStringAssignFirstOrAppendRuntime(
     WxArrayStringAssignOrAppendRuntimeView* const runtime,
     const wxStringRuntime* const sourceText
   ) noexcept
@@ -92886,7 +92886,7 @@ namespace
  * handle sentinel (`INVALID_HANDLE_VALUE`) and retaining one shared source
  * directory string into slot `+0x04`.
  */
-[[maybe_unused]] void* wxConstructFindDataStringPairRuntime(
+void* wxConstructFindDataStringPairRuntime(
   void* const runtimeStorage,
   const wxStringRuntime* const sourceText
 ) noexcept
@@ -92910,7 +92910,7 @@ namespace
  * Releases one file-enumeration runtime payload: closes the active find
  * handle and drops shared wx-string ownership for wildcard/path lanes.
  */
-[[maybe_unused]] void wxDestroyFindDataStringPairRuntime(
+void wxDestroyFindDataStringPairRuntime(
   WxFindDataStringPairRuntimeView* const runtimeStorage
 ) noexcept
 {
@@ -92930,7 +92930,7 @@ namespace
  * Advances one directory-enumeration runtime payload and returns the next
  * entry name matching wildcard and attribute flags.
  */
-[[maybe_unused]] bool wxFindDataStringPairEnumerateNextMatchingNameRuntime(
+bool wxFindDataStringPairEnumerateNextMatchingNameRuntime(
   WxFindDataStringPairRuntimeView* const runtimeStorage,
   wxStringRuntime* const outEntryName
 ) noexcept
@@ -93019,7 +93019,7 @@ namespace
  * normalizes slash separators to backslashes, and trims one trailing
  * backslash when present.
  */
-[[maybe_unused]] wxStringRuntime* wxBuildNormalizedFindDataRootDirectoryRuntime(
+wxStringRuntime* wxBuildNormalizedFindDataRootDirectoryRuntime(
   void* const* const runtimeStorageSlot,
   wxStringRuntime* const outDirectory
 ) noexcept
@@ -93069,7 +93069,7 @@ namespace
  * Validates one pointer-slot owner and output lane, then tail-dispatches to
  * the canonical next-entry enumeration helper.
  */
-[[maybe_unused]] bool wxEnumerateNextMatchingFindDataEntryFromPointerSlotRuntime(
+bool wxEnumerateNextMatchingFindDataEntryFromPointerSlotRuntime(
   void* const* const runtimeStorageSlot,
   wxStringRuntime* const outEntryName
 ) noexcept
@@ -93090,7 +93090,7 @@ namespace
  * Rebinds wildcard/flag lanes on one owned file-enumeration payload, resets
  * the active find handle, and returns the next matching entry.
  */
-[[maybe_unused]] bool wxResetFindDataPatternAndEnumerateFromPointerSlotRuntime(
+bool wxResetFindDataPatternAndEnumerateFromPointerSlotRuntime(
   void* const* const runtimeStorageSlot,
   wxStringRuntime* const outEntryName,
   const wxStringRuntime* const wildcardMask,
@@ -93116,7 +93116,7 @@ namespace
  * hidden/system entries) with the empty wildcard mask, then returns the next
  * matching entry in `outEntryName`.
  */
-[[maybe_unused]] bool wxResetFindDataToFileEnumerationRuntime(
+bool wxResetFindDataToFileEnumerationRuntime(
   void* const* const runtimeStorageSlot,
   wxStringRuntime* const outEntryName
 ) noexcept
@@ -93141,7 +93141,7 @@ namespace
  * hidden/system entries) with the empty wildcard mask, then returns the next
  * matching entry in `outEntryName`.
  */
-[[maybe_unused]] bool wxResetFindDataToDirectoryEnumerationRuntime(
+bool wxResetFindDataToDirectoryEnumerationRuntime(
   void* const* const runtimeStorageSlot,
   wxStringRuntime* const outEntryName
 ) noexcept
@@ -93181,7 +93181,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * and `OnFile` callbacks through the provided traverser and returning the
  * number of processed file callbacks.
  */
-[[maybe_unused]] int wxTraverseFindDataEntriesRecursiveRuntime(
+int wxTraverseFindDataEntriesRecursiveRuntime(
   void* const* const runtimeStorageSlot,
   WxDirTraverserRuntimeInterface* const traverser,
   const wxStringRuntime* const wildcardMask,
@@ -93306,7 +93306,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * traverses it with a simple array-appending traverser, then releases the
  * owned payload and returns the collected file count.
  */
-[[maybe_unused]] int wxCollectAllFilesFromDirectoryRuntime(
+int wxCollectAllFilesFromDirectoryRuntime(
   const wxStringRuntime* const sourceDirectory,
   void* const outputArrayRuntime,
   const wxStringRuntime* const wildcardMask,
@@ -93347,7 +93347,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * Destroys one heap-owned file-enumeration payload referenced by the caller's
  * pointer slot when present.
  */
-[[maybe_unused]] void wxDestroyOwnedFindDataStringPairInPointerSlotRuntime(
+void wxDestroyOwnedFindDataStringPairInPointerSlotRuntime(
   void* const* const runtimeStorageSlot
 ) noexcept
 {
@@ -93368,7 +93368,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * Replaces one heap-owned file-enumeration payload in place with a freshly
  * constructed payload seeded from `sourceText`; always returns success.
  */
-[[maybe_unused]] bool wxResetOwnedFindDataStringPairInPointerSlotRuntime(
+bool wxResetOwnedFindDataStringPairInPointerSlotRuntime(
   void** const runtimeStorageSlot,
   const wxStringRuntime* const sourceText
 ) noexcept
@@ -93399,7 +93399,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * Initializes one pointer-slot owner to null, then resets/rebuilds its
  * heap-owned find-data payload from `sourceText`.
  */
-[[maybe_unused]] void** wxConstructOwnedFindDataStringPairPointerSlotRuntime(
+void** wxConstructOwnedFindDataStringPairPointerSlotRuntime(
   void** const runtimeStorageSlot,
   const wxStringRuntime* const sourceText
 ) noexcept
@@ -93420,7 +93420,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * Closes two Win32 handle slots in place and marks each processed slot as
  * `INVALID_HANDLE_VALUE`.
  */
-[[maybe_unused]] std::intptr_t wxCloseHandlePairAndInvalidate(
+std::intptr_t wxCloseHandlePairAndInvalidate(
   HANDLE* const handlePair
 ) noexcept
 {
@@ -93448,7 +93448,7 @@ std::int32_t WxDirTraverserSimpleArrayRuntime::OnFile(
  * Tail-forwards one handle-pair close/invalidate thunk lane into
  * `wxCloseHandlePairAndInvalidate`.
  */
-[[maybe_unused]] std::intptr_t wxCloseHandlePairAndInvalidateThunk(
+std::intptr_t wxCloseHandlePairAndInvalidateThunk(
   HANDLE* const handlePair
 ) noexcept
 {
@@ -93485,7 +93485,7 @@ namespace
  * What it does:
  * Reads one byte lane from runtime offset `+0x38`.
  */
-[[maybe_unused]] std::uint8_t wxReadByteLane38Runtime(
+std::uint8_t wxReadByteLane38Runtime(
   const WxByteLane38RuntimeView* const runtime
 ) noexcept
 {
@@ -93498,7 +93498,7 @@ namespace
  * What it does:
  * Stores one 32-bit lane into the first anonymous-pipe handle slot.
  */
-[[maybe_unused]] std::int32_t wxSetAnonymousPipeReadHandleFromIntRuntime(
+std::int32_t wxSetAnonymousPipeReadHandleFromIntRuntime(
   WxAnonymousPipeHandles* const pipeHandles,
   const std::int32_t handleLane
 ) noexcept
@@ -93608,7 +93608,7 @@ namespace
  * Prepends one byte span into a stream pushback lane when stream status is
  * below terminal state `2`.
  */
-[[maybe_unused]] std::size_t wxInputStreamPushbackWriteRuntime(
+std::size_t wxInputStreamPushbackWriteRuntime(
   void* const inputStreamRuntime,
   const void* const sourceBytes,
   const std::size_t byteCount
@@ -93645,7 +93645,7 @@ namespace
  * Pushes one single byte back into the input-stream pushback lane and returns
  * whether exactly one byte was accepted.
  */
-[[maybe_unused]] bool wxInputStreamPushbackWriteSingleByteRuntime(
+bool wxInputStreamPushbackWriteSingleByteRuntime(
   void* const inputStreamRuntime,
   const char byteValue
 ) noexcept
@@ -93664,7 +93664,7 @@ namespace
  * Grows one staged input-byte lane in 4 KB chunks, reads from the source
  * stream, and advances staged-byte count by the stream's last-read lane.
  */
-[[maybe_unused]] void wxAccumulateInputStreamChunkRuntime(
+void wxAccumulateInputStreamChunkRuntime(
   WxAccumulatedInputStreamReadBufferRuntimeView* const accumulator
 ) noexcept
 {
@@ -93698,7 +93698,7 @@ namespace
  * Pushes one staged byte span back into the source stream pushback lane and
  * releases the temporary stage buffer.
  */
-[[maybe_unused]] void wxFlushAccumulatedInputStreamChunkRuntime(
+void wxFlushAccumulatedInputStreamChunkRuntime(
   WxAccumulatedInputStreamReadBufferRuntimeView* const accumulator
 ) noexcept
 {
@@ -93720,7 +93720,7 @@ namespace
  * What it does:
  * Marks both anonymous-pipe handle slots as `INVALID_HANDLE_VALUE`.
  */
-[[maybe_unused]] WxAnonymousPipeHandles* wxInitializeAnonymousPipeHandlePairInvalidRuntime(
+WxAnonymousPipeHandles* wxInitializeAnonymousPipeHandlePairInvalidRuntime(
   WxAnonymousPipeHandles* const pipeHandles
 ) noexcept
 {
@@ -93735,7 +93735,7 @@ namespace
  * What it does:
  * Reads one indexed 32-bit lane from the anonymous-pipe handle pair payload.
  */
-[[maybe_unused]] std::int32_t wxReadAnonymousPipeHandleByIndexRuntime(
+std::int32_t wxReadAnonymousPipeHandleByIndexRuntime(
   const WxAnonymousPipeHandles* const pipeHandles,
   const int index
 ) noexcept
@@ -93751,7 +93751,7 @@ namespace
  * Reads one indexed anonymous-pipe handle lane, then marks that lane
  * `INVALID_HANDLE_VALUE`.
  */
-[[maybe_unused]] std::int32_t wxTakeAnonymousPipeHandleByIndexRuntime(
+std::int32_t wxTakeAnonymousPipeHandleByIndexRuntime(
   WxAnonymousPipeHandles* const pipeHandles,
   const int index
 ) noexcept
@@ -93812,7 +93812,7 @@ namespace
  * Emits one double-NUL-terminated wide-string block by concatenating all
  * shared-string lanes from a source entry-array runtime into output payload.
  */
-[[maybe_unused]] bool wxBuildWideMultiStringFromSharedEntryArrayRuntime(
+bool wxBuildWideMultiStringFromSharedEntryArrayRuntime(
   const WxSharedWideEntryArrayRuntimeView* const sourceRuntime,
   void* const outputRuntime
 )
@@ -93855,7 +93855,7 @@ namespace
  * Maps wx socket event-condition flags to the matching Win32 socket notify
  * mask bits.
  */
-[[maybe_unused]] std::int32_t wxSocketMapConditionToNotifyMask(
+std::int32_t wxSocketMapConditionToNotifyMask(
   const std::int32_t conditionFlag
 ) noexcept
 {
@@ -93902,7 +93902,7 @@ namespace
  * the total byte span (`header+palette+pixel data`) after one/two `GetDIBits`
  * calls, or `0` when extraction fails.
  */
-[[maybe_unused]] DWORD wxBuildDibFromBitmapOwnerRuntime(
+DWORD wxBuildDibFromBitmapOwnerRuntime(
   LPBITMAPINFO dibInfo,
   const WxBitmapOwnerRuntimeView* const bitmapOwnerRuntime
 ) noexcept
@@ -94200,7 +94200,7 @@ namespace
    * whose shared name lane matches `*targetNameLane` by stored length and
    * UTF-16 text content.
    */
-  [[maybe_unused]] void* wxFindChildWindowByNameRecursiveRuntime(
+  void* wxFindChildWindowByNameRecursiveRuntime(
     void* const windowRuntime,
     const wchar_t* const* const targetNameLane
   ) noexcept
@@ -94232,7 +94232,7 @@ namespace
    * Compares two shared wx wide-string lanes by stored-length metadata and
    * UTF-16 content.
    */
-  [[maybe_unused]] bool wxSharedWideStringEqualsWithStoredLength(
+  bool wxSharedWideStringEqualsWithStoredLength(
     const wchar_t* const* const leftTextLane,
     const wchar_t* const* const rightTextLane
   ) noexcept
@@ -94251,7 +94251,7 @@ namespace
    * Iteratively detaches and deleting-destroys all child-window lanes linked
    * from this window's child-list head.
    */
-  [[maybe_unused]] std::uint8_t wxDestroyChildWindowListRuntime(
+  std::uint8_t wxDestroyChildWindowListRuntime(
     void* const windowRuntime
   ) noexcept
   {
@@ -94280,7 +94280,7 @@ namespace
    * Recursively scans this window-child list lane and returns the first window
    * whose id lane (`+0x28`) matches `targetWindowId`.
    */
-  [[maybe_unused]] void* wxFindChildWindowByIdRecursiveRuntimeLaneA(
+  void* wxFindChildWindowByIdRecursiveRuntimeLaneA(
     void* const windowRuntime,
     const std::int32_t targetWindowId
   ) noexcept
@@ -94363,7 +94363,7 @@ namespace
    * against the requested shared-string lane, and releases the fetched label
    * payload ownership.
    */
-  [[maybe_unused]] bool wxWindowMatchesLabelPredicateRuntime(
+  bool wxWindowMatchesLabelPredicateRuntime(
     void* const windowRuntime,
     const void* const targetLabelLane,
     const std::intptr_t /*unused*/
@@ -94381,7 +94381,7 @@ namespace
    * against the requested shared-string lane, and releases the fetched name
    * payload ownership.
    */
-  [[maybe_unused]] bool wxWindowMatchesNamePredicateRuntime(
+  bool wxWindowMatchesNamePredicateRuntime(
     void* const windowRuntime,
     const void* const targetNameLane,
     const std::intptr_t /*unused*/
@@ -94398,7 +94398,7 @@ namespace
    * Recursively scans one window and descendant-child chain, returning the
    * first window accepted by the supplied predicate.
    */
-  [[maybe_unused]] void* wxFindWindowByPredicateRecursiveRuntime(
+  void* wxFindWindowByPredicateRecursiveRuntime(
     void* const windowRuntime,
     const void* const predicateContextA,
     const std::intptr_t predicateContextB,
@@ -94435,7 +94435,7 @@ namespace
    * Runs recursive predicate search either from one provided root window or
    * across all tracked top-level windows when root is null.
    */
-  [[maybe_unused]] void* wxFindWindowByPredicateFromOptionalRootRuntime(
+  void* wxFindWindowByPredicateFromOptionalRootRuntime(
     void* const optionalRootWindowRuntime,
     const void* const predicateContextA,
     const std::intptr_t predicateContextB,
@@ -94481,7 +94481,7 @@ namespace
    * Finds the first window matching one shared label-string lane from one
    * optional root window (or all top-level windows when root is null).
    */
-  [[maybe_unused]] void* wxFindWindowByLabelFromOptionalRootRuntime(
+  void* wxFindWindowByLabelFromOptionalRootRuntime(
     const wchar_t* const* const targetLabelLane,
     void* const optionalRootWindowRuntime
   ) noexcept
@@ -94501,7 +94501,7 @@ namespace
    * Preserves one thunk lane that forwards to the canonical label-based
    * window search helper.
    */
-  [[maybe_unused]] void* wxFindWindowByLabelFromOptionalRootRuntimeThunk(
+  void* wxFindWindowByLabelFromOptionalRootRuntimeThunk(
     const wchar_t* const* const targetLabelLane,
     void* const optionalRootWindowRuntime
   ) noexcept
@@ -94516,7 +94516,7 @@ namespace
    * Finds the first window matching one shared name-string lane; when no name
    * match exists, falls back to label matching.
    */
-  [[maybe_unused]] void* wxFindWindowByNameThenLabelFromOptionalRootRuntime(
+  void* wxFindWindowByNameThenLabelFromOptionalRootRuntime(
     const wchar_t* const* const targetNameLane,
     void* const optionalRootWindowRuntime
   ) noexcept
@@ -94542,7 +94542,7 @@ namespace
    * from one optional root window (or all top-level windows when root is
    * null).
    */
-  [[maybe_unused]] void* wxFindWindowByIdFromOptionalRootRuntime(
+  void* wxFindWindowByIdFromOptionalRootRuntime(
     const std::int32_t targetWindowId,
     void* const optionalRootWindowRuntime
   )
@@ -94565,7 +94565,7 @@ namespace
    * Copies one shared-ref-data lane from `sourceRuntime` into
    * `destinationRuntime` and increments the copied refcount when non-null.
    */
-  [[maybe_unused]] std::uintptr_t wxAssignSharedRefDataAndRetain(
+  std::uintptr_t wxAssignSharedRefDataAndRetain(
     void* const destinationRuntime,
     const void* const sourceRuntime
   ) noexcept
@@ -94587,7 +94587,7 @@ namespace
    * Scans a linked string-node list and returns true when `valueText` matches
    * any node text lane by pointer or UTF-16 content equality.
    */
-  [[maybe_unused]] std::uint8_t wxLinkedStringListContainsText(
+  std::uint8_t wxLinkedStringListContainsText(
     const void* const listRuntime,
     const wchar_t* const valueText
   ) noexcept
@@ -94609,7 +94609,7 @@ namespace
    * What it does:
    * Resets region-iterator traversal lanes to null and returns zero.
    */
-  [[maybe_unused]] std::int32_t wxResetRegionIteratorTraversal(
+  std::int32_t wxResetRegionIteratorTraversal(
     void* const iteratorRuntime
   ) noexcept
   {
@@ -94627,7 +94627,7 @@ namespace
    * Recursively scans this window-child list lane and returns the first window
    * whose id lane (`+0x28`) matches `targetWindowId`.
    */
-  [[maybe_unused]] void* wxFindChildWindowByIdRecursiveRuntimeLaneB(
+  void* wxFindChildWindowByIdRecursiveRuntimeLaneB(
     void* const windowRuntime,
     const std::int32_t targetWindowId
   ) noexcept
@@ -94654,7 +94654,7 @@ namespace
    * Deleting-destroys each non-null pointer lane in the owner pointer array
    * with delete-flag `1`.
    */
-  [[maybe_unused]] std::intptr_t wxDeletePointerArrayElementsWithFlagOne(
+  std::intptr_t wxDeletePointerArrayElementsWithFlagOne(
     void* const pointerArrayRuntime
   ) noexcept
   {
@@ -94692,7 +94692,7 @@ namespace
    * Releases pointer-array elements through `FUN_00980E20` and then clears the
    * owner element-count lane at `+0x04`.
    */
-  [[maybe_unused]] std::intptr_t wxDeletePointerArrayElementsAndClearCountRuntime(
+  std::intptr_t wxDeletePointerArrayElementsAndClearCountRuntime(
     WxPointerArrayDeleteResetRuntimeView* const pointerArrayOwnerRuntime
   ) noexcept
   {
@@ -94708,7 +94708,7 @@ namespace
    * Returns direct child count, or recursive descendant count when
    * `includeNestedChildren` is true.
    */
-  [[maybe_unused]] std::uint32_t wxCountDescendantsRecursive(
+  std::uint32_t wxCountDescendantsRecursive(
     const WxChildTreeNodeRuntimeView* const nodeRuntime,
     const bool includeNestedChildren
   ) noexcept
@@ -94732,7 +94732,7 @@ namespace
    * Reads the root-node lane at `+0x1B8`, then returns recursive descendant
    * count (include nested children) or zero when no root is present.
    */
-  [[maybe_unused]] std::uint32_t wxTreeListMainWindowCountRootDescendantsRuntime(
+  std::uint32_t wxTreeListMainWindowCountRootDescendantsRuntime(
     const void* const mainWindowRuntime
   ) noexcept
   {
@@ -94755,7 +94755,7 @@ namespace
    * Reads one node lane from caller storage and forwards descendant counting to
    * `FUN_00981D40` using caller-provided recursion mode.
    */
-  [[maybe_unused]] std::uint32_t wxCountDescendantsFromNodeLaneRuntime(
+  std::uint32_t wxCountDescendantsFromNodeLaneRuntime(
     const WxChildTreeNodeRuntimeView* const* const nodeLane,
     const bool includeNestedChildren
   ) noexcept
@@ -94772,7 +94772,7 @@ namespace
    * What it does:
    * Stores one style lane and marks the runtime as dirty.
    */
-  [[maybe_unused]] std::int32_t wxSetTreeNodeStyleAndMarkDirty(
+  std::int32_t wxSetTreeNodeStyleAndMarkDirty(
     void* const nodeRuntime,
     const std::int32_t styleValue
   ) noexcept
@@ -94868,7 +94868,7 @@ namespace
    * What it does:
    * Writes one 16-bit style lane and marks the node as dirty.
    */
-  [[maybe_unused]] std::int16_t wxSetTreeNodeShortStyleAndMarkDirtyRuntime(
+  std::int16_t wxSetTreeNodeShortStyleAndMarkDirtyRuntime(
     void* const nodeRuntime,
     const std::int16_t styleValue
   ) noexcept
@@ -94886,7 +94886,7 @@ namespace
    * Returns one image lane from either inline image slots (selected-index path)
    * or indexed image array storage.
    */
-  [[maybe_unused]] int wxResolveTreeNodeImageLaneRuntime(
+  int wxResolveTreeNodeImageLaneRuntime(
     WxTreeNodeImageSelectionRuntimeView* const* const ownerLane,
     const unsigned int imageIndex,
     const int inlineLaneIndex
@@ -94915,7 +94915,7 @@ namespace
    * What it does:
    * Returns whether state-bit mask `0x08` is set on one indirect node lane.
    */
-  [[maybe_unused]] bool wxTreeNodeOwnerHasStateBit3Runtime(
+  bool wxTreeNodeOwnerHasStateBit3Runtime(
     const WxTreeNodeStateOwnerRuntimeView* const ownerRuntime
   ) noexcept
   {
@@ -94928,7 +94928,7 @@ namespace
    * What it does:
    * Returns whether state-bit mask `0x02` is set on one indirect node lane.
    */
-  [[maybe_unused]] bool wxTreeNodeOwnerHasStateBit1Runtime(
+  bool wxTreeNodeOwnerHasStateBit1Runtime(
     const WxTreeNodeStateOwnerRuntimeView* const ownerRuntime
   ) noexcept
   {
@@ -94942,7 +94942,7 @@ namespace
    * Returns whether state-bit mask `0x08` is set on one alternate indirect
    * node-owner lane.
    */
-  [[maybe_unused]] bool wxTreeNodeAlternateOwnerHasStateBit3Runtime(
+  bool wxTreeNodeAlternateOwnerHasStateBit3Runtime(
     const WxTreeNodeStateOwnerRuntimeView* const ownerRuntime
   ) noexcept
   {
@@ -94956,7 +94956,7 @@ namespace
    * Pops one child pointer from the tail of an indexed child array lane and
    * writes it to `outChildLane`.
    */
-  [[maybe_unused]] void** wxPopTreeNodeChildFromTailRuntime(
+  void** wxPopTreeNodeChildFromTailRuntime(
     void** const outChildLane,
     WxTreeNodeChildVectorRuntimeView* const* const ownerLane,
     int* const remainingChildCount
@@ -94986,7 +94986,7 @@ namespace
     );
   }
 
-  [[maybe_unused]] WxChildTreeNodeRuntimeView** wxEnumerateNextChildByIndex(
+  WxChildTreeNodeRuntimeView** wxEnumerateNextChildByIndex(
     WxChildTreeNodeRuntimeView** outChildLane,
     WxChildTreeNodeRuntimeView** ownerLane,
     std::uint32_t* childIndexLane
@@ -94999,7 +94999,7 @@ namespace
    * Reads one child-enumeration owner lane at `+0x134`, forwards the dispatch
    * to `FUN_00981FB0`, and returns `outChildLane`.
    */
-  [[maybe_unused]] void** wxForwardEnumerateNextChildByIndexRuntime(
+  void** wxForwardEnumerateNextChildByIndexRuntime(
     WxTreeNodeChildDispatchHostRuntimeView* const hostRuntime,
     void** const outChildLane,
     std::uint32_t* const childIndexLane
@@ -95021,7 +95021,7 @@ namespace
    * Reads one child-vector owner lane at `+0x134`, forwards to
    * `FUN_00981FF0`, and returns `outChildLane`.
    */
-  [[maybe_unused]] void** wxForwardPopTreeNodeChildFromTailRuntime(
+  void** wxForwardPopTreeNodeChildFromTailRuntime(
     WxTreeNodeChildDispatchHostRuntimeView* const hostRuntime,
     void** const outChildLane,
     int* const remainingChildCount
@@ -95039,7 +95039,7 @@ namespace
    * What it does:
    * Writes null to one output-child lane and returns that lane.
    */
-  [[maybe_unused]] void** wxResetTreeNodeChildOutLaneRuntime(
+  void** wxResetTreeNodeChildOutLaneRuntime(
     void** const outChildLane,
     const int reservedArg
   ) noexcept
@@ -95058,7 +95058,7 @@ namespace
    * Preserves register-shape dispatch into `FUN_009821D0` and returns
    * `outChildLane`.
    */
-  [[maybe_unused]] void** wxForwardResetTreeNodeChildOutLaneRuntime(
+  void** wxForwardResetTreeNodeChildOutLaneRuntime(
     WxTreeNodeChildDispatchHostRuntimeView* const hostRuntime,
     void** const outChildLane,
     const int reservedArg
@@ -95076,7 +95076,7 @@ namespace
    * Writes the next child pointer at `*childIndexLane` to `*outChildLane`,
    * increments index, and writes null when out of range.
    */
-  [[maybe_unused]] WxChildTreeNodeRuntimeView** wxEnumerateNextChildByIndex(
+  WxChildTreeNodeRuntimeView** wxEnumerateNextChildByIndex(
     WxChildTreeNodeRuntimeView** const outChildLane,
     WxChildTreeNodeRuntimeView** const ownerLane,
     std::uint32_t* const childIndexLane
@@ -95100,7 +95100,7 @@ namespace
    * Returns this runtime's selected-node lane only when that node has state
    * bit `0x02` set; otherwise returns null.
    */
-  [[maybe_unused]] void** wxGetSelectedNodeWithStateBit1(
+  void** wxGetSelectedNodeWithStateBit1(
     void* const selectionHostRuntime,
     void** const outSelectedLane
   ) noexcept
@@ -95141,7 +95141,7 @@ namespace
    * Sort callback adapter that forwards two tree-node lanes into the current
    * process-global tree-list comparator owner.
    */
-  [[maybe_unused]] int wxTreeListSortCompareAdapterRuntime(
+  int wxTreeListSortCompareAdapterRuntime(
     const int* const leftValueStorage,
     const int* const rightValueStorage
   ) noexcept
@@ -95163,7 +95163,7 @@ namespace
    * What it does:
    * Clears up to three cached-child lanes that match `removedChildRuntime`.
    */
-  [[maybe_unused]] std::uintptr_t wxClearRemovedChildCacheSlots(
+  std::uintptr_t wxClearRemovedChildCacheSlots(
     void* const cacheHostRuntime,
     void* const removedChildRuntime
   ) noexcept
@@ -95187,7 +95187,7 @@ namespace
    * What it does:
    * Initializes wx menu-bar event-dispatch and frame-last attachment lanes.
    */
-  [[maybe_unused]] void wxInitializeMenuBarEventDispatchLanes(
+  void wxInitializeMenuBarEventDispatchLanes(
     void* const menuBarRuntime
   ) noexcept
   {
@@ -95203,7 +95203,7 @@ namespace
    * Returns submenu command id when a submenu lane is present, otherwise
    * returns this item's own command id lane.
    */
-  [[maybe_unused]] std::int32_t wxResolveMenuItemCommandId(
+  std::int32_t wxResolveMenuItemCommandId(
     const void* const menuItemRuntime
   ) noexcept
   {
@@ -95219,7 +95219,7 @@ namespace
    * Queries one owner-menu item state and returns whether the checked-state
    * bit lane is set.
    */
-  [[maybe_unused]] UINT wxIsMenuItemCheckedByMenuStateRuntime(
+  UINT wxIsMenuItemCheckedByMenuStateRuntime(
     const void* const menuItemRuntime
   ) noexcept
   {
@@ -95234,7 +95234,7 @@ namespace
    * What it does:
    * Computes the Gregorian serial day number from `(monthIndex, year, day)`.
    */
-  [[maybe_unused]] std::uint32_t wxComputeGregorianDayNumber(
+  std::uint32_t wxComputeGregorianDayNumber(
     const std::int32_t monthIndex,
     const std::int32_t year,
     const std::uint16_t dayOfMonth
@@ -95265,7 +95265,7 @@ namespace
    * Converts forward slashes to backslashes in-place across one UTF-16 path
    * and returns the terminal cursor lane.
    */
-  [[maybe_unused]] wchar_t* wxNormalizePathSeparatorsToBackslashInPlace(
+  wchar_t* wxNormalizePathSeparatorsToBackslashInPlace(
     wchar_t* const pathText
   ) noexcept
   {
@@ -95288,7 +95288,7 @@ namespace
    * What it does:
    * Resolves the DIB color-table entry count from header size/bit-depth lanes.
    */
-  [[maybe_unused]] std::uint16_t wxResolveDibColorTableEntryCount(
+  std::uint16_t wxResolveDibColorTableEntryCount(
     const void* const dibHeaderRuntime
   ) noexcept
   {
@@ -95326,7 +95326,7 @@ namespace
    * Resolves DIB color-table entry count and returns byte size using 3-byte
    * entries for core-header (`size==12`) and 4-byte entries otherwise.
    */
-  [[maybe_unused]] std::int32_t wxResolveDibColorTableByteSize(
+  std::int32_t wxResolveDibColorTableByteSize(
     const void* const dibHeaderRuntime
   ) noexcept
   {
@@ -95389,7 +95389,7 @@ namespace
    * Dispatches one top-level window event-table lane through virtual slot
    * `+0x2C` and returns its result token.
    */
-  [[maybe_unused]] int wxTopLevelWindowEventTableDispatchRuntime(
+  int wxTopLevelWindowEventTableDispatchRuntime(
     void* const topLevelWindowRuntime,
     const int eventToken
   ) noexcept
@@ -95423,7 +95423,7 @@ namespace
    * Releases one contained-window lane (`+0x08`) through virtual slot `+0x2C`,
    * then releases one contained-sizer lane (`+0x0C`) through slot `+0x44`.
    */
-  [[maybe_unused]] int wxSizerItemReleaseContainedLanesRuntime(
+  int wxSizerItemReleaseContainedLanesRuntime(
     void* const sizerItemRuntime
   ) noexcept
   {
@@ -95492,7 +95492,7 @@ namespace
    * What it does:
    * Invokes one text-control capability lane through virtual slot `+0x234`.
    */
-  [[maybe_unused]] int wxInvokeTextCtrlCapabilityLane564Runtime(
+  int wxInvokeTextCtrlCapabilityLane564Runtime(
     void* const textCtrlRuntime
   ) noexcept
   {
@@ -95508,7 +95508,7 @@ namespace
    * What it does:
    * Sets one event-state byte lane at `+0x5C` to enabled.
    */
-  [[maybe_unused]] void wxSetEventStateByteLane5CRuntime(
+  void wxSetEventStateByteLane5CRuntime(
     void* const runtimeObject
   ) noexcept
   {
@@ -95537,7 +95537,7 @@ namespace
    * Reads current text selection bounds through virtual slot `+0x238` and
    * returns whether the range is non-empty.
    */
-  [[maybe_unused]] BOOL wxTextCtrlSelectionRangeIsNonEmptyRuntime(
+  BOOL wxTextCtrlSelectionRangeIsNonEmptyRuntime(
     void* const textCtrlRuntime
   ) noexcept
   {
@@ -95559,7 +95559,7 @@ namespace
    * Returns true when both runtime capability checks at virtual lanes
    * `+0x288` and `+0x234` succeed.
    */
-  [[maybe_unused]] BOOL wxTextCtrlCapabilityAndSelectionRuntime(
+  BOOL wxTextCtrlCapabilityAndSelectionRuntime(
     void* const textCtrlRuntime
   ) noexcept
   {
@@ -95579,7 +95579,7 @@ namespace
    * What it does:
    * Invokes one text-control capability lane through virtual slot `+0x234`.
    */
-  [[maybe_unused]] int wxTextCtrlCapabilityLane564Runtime(
+  int wxTextCtrlCapabilityLane564Runtime(
     void* const textCtrlRuntime
   ) noexcept
   {
@@ -95593,7 +95593,7 @@ namespace
    * Resolves key lanes from optional node pointers and forwards them into one
    * stdcall comparator thunk context.
    */
-  [[maybe_unused]] int __stdcall wxInvokePairComparatorThunkRuntime(
+  int __stdcall wxInvokePairComparatorThunkRuntime(
     const std::uint32_t a1,
     const std::uint32_t a2,
     const std::uint32_t callbackThunkRuntime
@@ -95647,7 +95647,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x150`.
    */
-  [[maybe_unused]] std::int32_t wxReadDwordLane150Runtime(
+  std::int32_t wxReadDwordLane150Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -95661,7 +95661,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x154`.
    */
-  [[maybe_unused]] std::int32_t wxReadDwordLane154Runtime(
+  std::int32_t wxReadDwordLane154Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -95713,7 +95713,7 @@ namespace
    * What it does:
    * Releases one owned object lane at `+0x08` using delete-flag `1`.
    */
-  [[maybe_unused]] int wxReleaseOwnedLane08RuntimeA(
+  int wxReleaseOwnedLane08RuntimeA(
     void* const ownerRuntime
   ) noexcept
   {
@@ -95726,7 +95726,7 @@ namespace
    * What it does:
    * Releases one owned object lane at `+0x08` using delete-flag `1`.
    */
-  [[maybe_unused]] int wxReleaseOwnedLane08RuntimeB(
+  int wxReleaseOwnedLane08RuntimeB(
     void* const ownerRuntime
   ) noexcept
   {
@@ -95739,7 +95739,7 @@ namespace
    * What it does:
    * Stores one boolean lane into dword field `+0x1C` and returns that value.
    */
-  [[maybe_unused]] BOOL wxStoreBooleanIntoDwordLane1CRuntime(
+  BOOL wxStoreBooleanIntoDwordLane1CRuntime(
     void* const runtimeObject,
     const bool enabled
   ) noexcept
@@ -95778,7 +95778,7 @@ namespace
    * What it does:
    * Stores one byte into lane `+0x21` and returns the stored byte.
    */
-  [[maybe_unused]] std::uint8_t wxStoreByteLane21Runtime(
+  std::uint8_t wxStoreByteLane21Runtime(
     void* const runtimeObject,
     const std::uint8_t value
   ) noexcept
@@ -95796,7 +95796,7 @@ namespace
    * What it does:
    * Stores one byte into lane `+0x20` and returns the stored byte.
    */
-  [[maybe_unused]] std::uint8_t wxStoreByteLane20Runtime(
+  std::uint8_t wxStoreByteLane20Runtime(
     void* const runtimeObject,
     const std::uint8_t value
   ) noexcept
@@ -95814,7 +95814,7 @@ namespace
    * What it does:
    * Returns one byte from lane `+0x20`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane20Runtime(
+  std::uint8_t wxReadByteLane20Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -95828,7 +95828,7 @@ namespace
    * What it does:
    * Invokes one virtual dispatch lane at `+0x264`.
    */
-  [[maybe_unused]] int wxInvokeVirtualLane612Runtime(
+  int wxInvokeVirtualLane612Runtime(
     void* const runtimeObject,
     const int reservedArg
   ) noexcept
@@ -95848,7 +95848,7 @@ namespace
    * byte to lane `+0x30` when gate byte `+0x31` is set, and returns packed
    * `(high32=bool, low8=inputByte)` result.
    */
-  [[maybe_unused]] std::uint64_t wxStoreBooleanAndOptionalByteMirrorRuntime(
+  std::uint64_t wxStoreBooleanAndOptionalByteMirrorRuntime(
     void* const runtimeObject,
     const char enabledByte
   ) noexcept
@@ -95896,7 +95896,7 @@ namespace
    * Releases each non-null object from one pointer array lane (`+0x138`) using
    * delete-flag `1`, then clears the element-count lane (`+0x134`).
    */
-  [[maybe_unused]] std::uint8_t wxReleasePointerArrayWithCountLaneRuntime(
+  std::uint8_t wxReleasePointerArrayWithCountLaneRuntime(
     void* const runtimeObject
   ) noexcept
   {
@@ -95954,7 +95954,7 @@ namespace
    * Forwards arguments to virtual lane `+0x254`, injecting dword lane
    * `+0x134` as the first payload parameter.
    */
-  [[maybe_unused]] int wxInvokeVirtualLane596WithCountRuntime(
+  int wxInvokeVirtualLane596WithCountRuntime(
     void* const runtimeObject,
     const int arg2,
     const int arg3,
@@ -95989,7 +95989,7 @@ namespace
    * `+0x170`; always marks target lane `+0x1C` as initialized and returns the
    * target pointer token.
    */
-  [[maybe_unused]] std::uintptr_t wxSetTargetInitializedWithOptionalDispatchRuntime(
+  std::uintptr_t wxSetTargetInitializedWithOptionalDispatchRuntime(
     void* const ownerRuntime,
     void* const targetRuntime
   ) noexcept
@@ -96046,7 +96046,7 @@ namespace
    * What it does:
    * Invokes one virtual lane at `+0x20C` and returns that result.
    */
-  [[maybe_unused]] int wxInvokeVirtualLane524Runtime(
+  int wxInvokeVirtualLane524Runtime(
     void* const runtimeObject
   ) noexcept
   {
@@ -96076,7 +96076,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x144`.
    */
-  [[maybe_unused]] std::int32_t wxReadDwordLane144Runtime(
+  std::int32_t wxReadDwordLane144Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -96101,7 +96101,7 @@ namespace
    * Returns whether `value` matches any of three dword lanes at
    * `+0x130/+0x134/+0x138`.
    */
-  [[maybe_unused]] BOOL wxMatchesAnyThreeDwordLanesRuntime(
+  BOOL wxMatchesAnyThreeDwordLanesRuntime(
     const void* const runtimeObject,
     const std::int32_t value
   ) noexcept
@@ -96141,7 +96141,7 @@ namespace
    * Compares two `(value, priority)` key pairs and returns `-1/0/1` in the
    * original strict-weak-order lane.
    */
-  [[maybe_unused]] int wxComparePointerPairKeysRuntime(
+  int wxComparePointerPairKeysRuntime(
     const std::uint32_t** const leftPairLane,
     const std::uint32_t** const rightPairLane
   ) noexcept
@@ -96170,7 +96170,7 @@ namespace
    * What it does:
    * Stores one X/Y display-scale pair into transform lanes `+0x20/+0x28`.
    */
-  [[maybe_unused]] void wxSetDisplayScalePairRuntime(
+  void wxSetDisplayScalePairRuntime(
     void* const displayTransformRuntime,
     const double xScale,
     const double yScale
@@ -96191,7 +96191,7 @@ namespace
    * What it does:
    * Invokes one device-context virtual lane at `+0x104`.
    */
-  [[maybe_unused]] int wxInvokeDeviceContextLane260Runtime(
+  int wxInvokeDeviceContextLane260Runtime(
     void* const deviceContextRuntime
   ) noexcept
   {
@@ -96222,7 +96222,7 @@ namespace
    * Executes one callback-cleanup context lane: destroys object `+0x0C`,
    * releases object `+0x08`, then clears the release-object lane.
    */
-  [[maybe_unused]] int __stdcall wxCleanupCallbackContextRuntime(
+  int __stdcall wxCleanupCallbackContextRuntime(
     std::uint32_t callbackContextAddress
   ) noexcept
   {
@@ -96292,7 +96292,7 @@ namespace
    * Returns true when both flag bits `0x02` and `0x04` are set in lane
    * `+0xCC`.
    */
-  [[maybe_unused]] BOOL wxHasFlagBits2And4AtCCRuntime(
+  BOOL wxHasFlagBits2And4AtCCRuntime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -96322,7 +96322,7 @@ namespace
    * native handle lane (`+0x14`), writes width/height lanes (`+0x08/+0x0C`)
    * to outputs, otherwise zeros both outputs.
    */
-  [[maybe_unused]] std::uintptr_t wxCopyOptionalPayloadExtentLaneRuntime(
+  std::uintptr_t wxCopyOptionalPayloadExtentLaneRuntime(
     const void* const ownerRuntime,
     std::uint32_t* const outWidth,
     std::uint32_t* const outHeight
@@ -96409,7 +96409,7 @@ namespace
    * Inserts `copyCount` copies of one pointer value at `insertionIndex`,
    * shifting the trailing lane right and growing storage as needed.
    */
-  [[maybe_unused]] std::size_t wxPointerArrayInsertCopiesAtIndexRuntime(
+  std::size_t wxPointerArrayInsertCopiesAtIndexRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     void* const valuePointer,
     const std::size_t insertionIndex,
@@ -96453,7 +96453,7 @@ namespace
    * What it does:
    * Forwards one pointer-array insert-copies lane to `FUN_009A7C00`.
    */
-  [[maybe_unused]] std::size_t wxPointerArrayInsertCopiesThunkARuntime(
+  std::size_t wxPointerArrayInsertCopiesThunkARuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     void* const valuePointer,
     const std::size_t insertionIndex,
@@ -96475,7 +96475,7 @@ namespace
    * Secondary forwarding lane into `FUN_009A7C00` pointer-array insert-copies
    * behavior.
    */
-  [[maybe_unused]] std::size_t wxPointerArrayInsertCopiesThunkBRuntime(
+  std::size_t wxPointerArrayInsertCopiesThunkBRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     void* const valuePointer,
     const std::size_t insertionIndex,
@@ -96497,7 +96497,7 @@ namespace
    * Finds sorted insertion slot for one pointer value using caller comparator
    * and inserts exactly one copy into the pointer-array lane.
    */
-  [[maybe_unused]] std::size_t wxPointerArrayInsertOneSortedCopyRuntime(
+  std::size_t wxPointerArrayInsertOneSortedCopyRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     void* const valuePointer,
     const WxDwordArrayCompareProc compare
@@ -96520,7 +96520,7 @@ namespace
    * Erases `eraseCount` entries starting at `firstIndex` from one pointer-array
    * lane by shifting the tail left.
    */
-  [[maybe_unused]] void* wxPointerArrayEraseRangeAtIndexRuntime(
+  void* wxPointerArrayEraseRangeAtIndexRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     const unsigned int firstIndex,
     const int eraseCount
@@ -96550,7 +96550,7 @@ namespace
    * What it does:
    * Forwards one pointer-array erase-range lane to `FUN_009A7C80`.
    */
-  [[maybe_unused]] void* wxPointerArrayEraseRangeThunkRuntime(
+  void* wxPointerArrayEraseRangeThunkRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     const unsigned int firstIndex,
     const int eraseCount
@@ -96581,7 +96581,7 @@ namespace
    * What it does:
    * Appends one or more heap-cloned `0x0C` paint-DC-info records.
    */
-  [[maybe_unused]] void wxAppendPaintDcInfo12Copies(
+  void wxAppendPaintDcInfo12Copies(
     void* const destinationArrayRuntime,
     const void* const sourceRecordRuntime,
     const unsigned int copyCount
@@ -96618,7 +96618,7 @@ namespace
    * What it does:
    * Appends one cloned `0x0C` record for each source pointer-array entry.
    */
-  [[maybe_unused]] void wxAppendArrayPaintDcInfo12FromSource(
+  void wxAppendArrayPaintDcInfo12FromSource(
     void* const destinationArrayRuntime,
     const void* const sourceArrayRuntime
   ) noexcept
@@ -96641,7 +96641,7 @@ namespace
    * Deletes all owned entries, resets count, then appends cloned `0x0C`
    * records from one source array.
    */
-  [[maybe_unused]] void* wxResetArrayAndAppendPaintDcInfo12FromSource(
+  void* wxResetArrayAndAppendPaintDcInfo12FromSource(
     void* const destinationArrayRuntime,
     const void* const sourceArrayRuntime
   ) noexcept
@@ -96666,7 +96666,7 @@ namespace
    * What it does:
    * Deletes each owned pointer lane from one pointer array.
    */
-  [[maybe_unused]] void wxDeletePointerArrayEntries(
+  void wxDeletePointerArrayEntries(
     void* const arrayRuntime
   ) noexcept
   {
@@ -96686,7 +96686,7 @@ namespace
    * What it does:
    * Appends one or more heap-cloned `0x1C` records to one pointer-array lane.
    */
-  [[maybe_unused]] void wxAppendPaintDcInfo1CCopies(
+  void wxAppendPaintDcInfo1CCopies(
     void* const destinationArrayRuntime,
     const void* const sourceRecordRuntime,
     const unsigned int copyCount
@@ -96723,7 +96723,7 @@ namespace
    * What it does:
    * Appends one cloned `0x1C` record for each source pointer-array entry.
    */
-  [[maybe_unused]] void wxAppendArrayPaintDcInfo1CFromSource(
+  void wxAppendArrayPaintDcInfo1CFromSource(
     void* const destinationArrayRuntime,
     const void* const sourceArrayRuntime
   ) noexcept
@@ -96746,7 +96746,7 @@ namespace
    * Deletes all owned entries, resets count, then appends cloned `0x1C`
    * records from one source array.
    */
-  [[maybe_unused]] void* wxResetArrayAndAppendPaintDcInfo1CFromSource(
+  void* wxResetArrayAndAppendPaintDcInfo1CFromSource(
     void* const destinationArrayRuntime,
     const void* const sourceArrayRuntime
   ) noexcept
@@ -96793,7 +96793,7 @@ namespace
    * What it does:
    * Releases owned `wxCSConv` name/charset lanes and clears ownership fields.
    */
-  [[maybe_unused]] void wxDestroyCsConvTransientState(
+  void wxDestroyCsConvTransientState(
     void* const converterRuntime
   ) noexcept
   {
@@ -96827,7 +96827,7 @@ namespace
    * Clears transient owned lanes for the process-global local and
    * ISO-8859-1 wxCSConv converter runtimes.
    */
-  [[maybe_unused]] void wxDestroyGlobalCsConvTransientState() noexcept
+  void wxDestroyGlobalCsConvTransientState() noexcept
   {
     wxDestroyCsConvTransientState(&wxConvLocal);
     wxDestroyCsConvTransientState(&wxConvISO8859_1);
@@ -96839,7 +96839,7 @@ namespace
    * What it does:
    * Duplicates one wide-text codepage name and marks deferred initialization.
    */
-  [[maybe_unused]] void wxCsConvSetNameIfPresent(
+  void wxCsConvSetNameIfPresent(
     void* const converterRuntime,
     const wchar_t* const nameText
   ) noexcept
@@ -96870,7 +96870,7 @@ namespace
    * Resets one `wxCSConv` transient state and seeds it from source name lane
    * `+0x04`.
    */
-  [[maybe_unused]] void* wxCsConvResetAndSetNameFromSource(
+  void* wxCsConvResetAndSetNameFromSource(
     void* const converterRuntime,
     const void* const sourceRuntime
   ) noexcept
@@ -96920,7 +96920,7 @@ namespace
    * Exports one linked wx-string list into a contiguous pointer array,
    * optionally deep-copying each text lane.
    */
-  [[maybe_unused]] wchar_t** wxExportLinkedStringListToArray(
+  wchar_t** wxExportLinkedStringListToArray(
     const void* const listRuntime,
     const std::uint8_t deepCopyText
   )
@@ -96975,7 +96975,7 @@ namespace
    * Projects one scalar input into paired X/Y output coordinates using this
    * runtime's transform lanes.
    */
-  [[maybe_unused]] WxProjectedPointRuntimeView* wxProjectInputToDisplayPoint(
+  WxProjectedPointRuntimeView* wxProjectInputToDisplayPoint(
     const void* const ownerRuntime,
     WxProjectedPointRuntimeView* const outPoint,
     const int inputValue
@@ -96993,7 +96993,7 @@ namespace
    * What it does:
    * Inserts one or more heap-cloned `0x0C` records at an explicit index.
    */
-  [[maybe_unused]] void wxInsertPaintDcInfo12CopiesAtIndex(
+  void wxInsertPaintDcInfo12CopiesAtIndex(
     void* const destinationArrayRuntime,
     const void* const sourceRecordRuntime,
     const int insertionIndex,
@@ -97037,7 +97037,7 @@ namespace
    * Allocates one CRT-owned UTF-16 copy of the input text, including the null
    * terminator.
    */
-  [[maybe_unused]] void* wxAllocateWideStringCopy(
+  void* wxAllocateWideStringCopy(
     const wchar_t* const text
   ) noexcept
   {
@@ -97061,7 +97061,7 @@ namespace
    * Assigns shared wx ref-data from `sourceObject` after first unrefing the
    * destination when the two objects differ.
    */
-  [[maybe_unused]] void* wxAssignSharedRefDataAfterUnref(
+  void* wxAssignSharedRefDataAfterUnref(
     void* const destinationObject,
     const void* const sourceObject
   ) noexcept
@@ -97098,7 +97098,7 @@ namespace
    * What it does:
    * Finds the first exact string match and removes one entry when found.
    */
-  [[maybe_unused]] void* wxArrayStringRemoveFirstExactMatch(
+  void* wxArrayStringRemoveFirstExactMatch(
     void* const arrayRuntime,
     const wchar_t* const text
   ) noexcept
@@ -97433,7 +97433,7 @@ namespace
   };
   static_assert(sizeof(WxTreeListNodeRectRuntimeView) == 0x10, "WxTreeListNodeRectRuntimeView size must be 0x10");
 
-  [[maybe_unused]] WxChildTreeNodeRuntimeView** wxEnumerateNextChildByIndex(
+  WxChildTreeNodeRuntimeView** wxEnumerateNextChildByIndex(
     WxChildTreeNodeRuntimeView** outChildLane,
     WxChildTreeNodeRuntimeView** ownerLane,
     std::uint32_t* childIndexLane
@@ -97516,7 +97516,7 @@ namespace
    * Returns the last child-node lane of one source node, or null when the
    * source node has no child lanes.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxGetTreeNodeLastChildRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxGetTreeNodeLastChildRuntime(
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -97545,7 +97545,7 @@ namespace
    * Returns the previous sibling lane for one source node based on its
    * parent-owned child-node array.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxGetTreeNodePreviousSiblingRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxGetTreeNodePreviousSiblingRuntime(
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -97581,7 +97581,7 @@ namespace
    * Resolves the next traversal node: first child when present, otherwise the
    * first available sibling while ascending parent lanes.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxResolveNextTreeTraversalNodeRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxResolveNextTreeTraversalNodeRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -97654,7 +97654,7 @@ namespace
     "WxDeleteWithFlagDispatchVTableRuntimeView::deleteWithFlag offset must be 0x04"
   );
 
-  [[maybe_unused]] void wxDeleteRuntimeObjectWithFlagOne(
+  void wxDeleteRuntimeObjectWithFlagOne(
     void* const runtimeObject
   ) noexcept
   {
@@ -97691,7 +97691,7 @@ namespace
    * Reads native text metrics for one window DC and writes average-char width
    * and `(height + external-leading)` into optional output lanes.
    */
-  [[maybe_unused]] LONG* wxGetWindowTextMetricCharSizeRuntime(
+  LONG* wxGetWindowTextMetricCharSizeRuntime(
     HWND const nativeWindow,
     LONG* const outAverageCharWidth,
     LONG* const outLineHeight,
@@ -97756,7 +97756,7 @@ namespace
    * Recomputes cached row height from the active font text metrics and raises
    * it to accommodate any configured normal/state image-list height.
    */
-  [[maybe_unused]] void wxRecomputeTreeListCachedRowHeightRuntime(
+  void wxRecomputeTreeListCachedRowHeightRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime
   ) noexcept
   {
@@ -97810,7 +97810,7 @@ namespace
    * Replaces the normal image-list lane, deleting the previous owned list when
    * needed, marks deferred invalidation, and recomputes cached row height.
    */
-  [[maybe_unused]] void wxSetTreeListNormalImageListRuntime(
+  void wxSetTreeListNormalImageListRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxImageListRuntimeView* const imageListRuntime
   ) noexcept
@@ -97836,7 +97836,7 @@ namespace
    * Replaces the state image-list lane, deleting the previous owned list when
    * needed, marks deferred invalidation, and recomputes cached row height.
    */
-  [[maybe_unused]] void wxSetTreeListStateImageListRuntime(
+  void wxSetTreeListStateImageListRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxImageListRuntimeView* const imageListRuntime
   ) noexcept
@@ -97862,7 +97862,7 @@ namespace
    * Assigns the normal image-list lane through `FUN_009826A0` and marks the
    * resulting assignment as owned (`+0x20E`).
    */
-  [[maybe_unused]] void wxSetTreeListOwnedNormalImageListRuntime(
+  void wxSetTreeListOwnedNormalImageListRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxImageListRuntimeView* const imageListRuntime
   ) noexcept
@@ -97878,7 +97878,7 @@ namespace
    * Assigns the alternate state image-list lane through `FUN_009826F0` and
    * marks that assigned lane as owned (`+0x20F`).
    */
-  [[maybe_unused]] void wxSetTreeListOwnedAssignedStateImageListRuntime(
+  void wxSetTreeListOwnedAssignedStateImageListRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxDeleteWithFlagRuntimeInterface* const imageListRuntime
   ) noexcept
@@ -97894,7 +97894,7 @@ namespace
    * Assigns the state image-list lane through `FUN_00982750` and marks the
    * resulting assignment as owned (`+0x210`).
    */
-  [[maybe_unused]] void wxSetTreeListOwnedStateImageListRuntime(
+  void wxSetTreeListOwnedStateImageListRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxImageListRuntimeView* const imageListRuntime
   ) noexcept
@@ -97910,7 +97910,7 @@ namespace
    * Computes one node rectangle lane in tree-list coordinates and reports
    * whether the source node lane is valid.
    */
-  [[maybe_unused]] bool wxComputeTreeNodeRectRuntime(
+  bool wxComputeTreeNodeRectRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     WxTreeListNodeRectRuntimeView* const outRect,
@@ -97955,7 +97955,7 @@ namespace
    * Invalidates one full display row for a node when deferred invalidation is
    * not active, using the current viewport width and transformed node Y lane.
    */
-  [[maybe_unused]] void wxInvalidateTreeNodeDisplayRowRuntime(
+  void wxInvalidateTreeNodeDisplayRowRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView* const nodeRuntime
   ) noexcept
@@ -97998,7 +97998,7 @@ namespace
    * Lazily allocates one node visual payload (colour/colour/font lanes) and
    * marks bit `0x10` in the node state-flags lane.
    */
-  [[maybe_unused]] WxTreeNodeColourFontPayloadRuntimeView* wxEnsureTreeNodeVisualPayloadRuntime(
+  WxTreeNodeColourFontPayloadRuntimeView* wxEnsureTreeNodeVisualPayloadRuntime(
     WxTreeListNodeTraversalRuntimeView* const nodeRuntime
   ) noexcept
   {
@@ -98023,7 +98023,7 @@ namespace
    * Walks one tree-node subtree, expanding accumulated content extents with
    * each node's right and bottom edges.
    */
-  [[maybe_unused]] int wxAccumulateTreeNodeSubtreeExtentsRuntime(
+  int wxAccumulateTreeNodeSubtreeExtentsRuntime(
     WxTreeListNodeTraversalRuntimeView* const nodeRuntime,
     int* const inOutMaxX,
     int* const inOutMaxY,
@@ -98070,7 +98070,7 @@ namespace
    * Updates row-height padding, marks deferred invalidation, and recomputes
    * cached row height for this tree-list main window lane.
    */
-  [[maybe_unused]] void wxSetTreeListRowHeightPaddingRuntime(
+  void wxSetTreeListRowHeightPaddingRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     const std::uint16_t rowHeightPadding
   ) noexcept
@@ -98091,7 +98091,7 @@ namespace
    * Copies one node primary-colour lane into `outColour`, or copies the wx
    * null-colour lane when no source node is present.
    */
-  [[maybe_unused]] wxColourRuntime* wxCopyTreeNodePrimaryColourOrNullRuntime(
+  wxColourRuntime* wxCopyTreeNodePrimaryColourOrNullRuntime(
     wxColourRuntime* const outColour,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -98118,7 +98118,7 @@ namespace
    * Copies one node secondary-colour lane into `outColour`, or copies the wx
    * null-colour lane when no source node is present.
    */
-  [[maybe_unused]] wxColourRuntime* wxCopyTreeNodeSecondaryColourOrNullRuntime(
+  wxColourRuntime* wxCopyTreeNodeSecondaryColourOrNullRuntime(
     wxColourRuntime* const outColour,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -98145,7 +98145,7 @@ namespace
    * Copies one node font lane into `outFont`, or copies the wx null-font lane
    * when no source node is present.
    */
-  [[maybe_unused]] wxFontRuntime* wxCopyTreeNodeFontOrNullRuntime(
+  wxFontRuntime* wxCopyTreeNodeFontOrNullRuntime(
     wxFontRuntime* const outFont,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -98172,7 +98172,7 @@ namespace
    * Updates the node has-children state bit (`0x08`) and invalidates that
    * node's display row when the bit value changes.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxSetTreeNodeHasChildrenFlagRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxSetTreeNodeHasChildrenFlagRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const bool hasChildren
@@ -98200,7 +98200,7 @@ namespace
    * Writes one node primary-colour lane and invalidates that node's display
    * row.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxSetTreeNodePrimaryColourRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxSetTreeNodePrimaryColourRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const wxColourRuntime* const sourceColour
@@ -98226,7 +98226,7 @@ namespace
    * Writes one node secondary-colour lane and invalidates that node's display
    * row.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxSetTreeNodeSecondaryColourRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxSetTreeNodeSecondaryColourRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const wxColourRuntime* const sourceColour
@@ -98251,7 +98251,7 @@ namespace
    * What it does:
    * Writes one node font lane and invalidates that node's display row.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxSetTreeNodeFontRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxSetTreeNodeFontRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const wxFontRuntime* const sourceFont
@@ -98277,7 +98277,7 @@ namespace
    * Checks whether one node rectangle intersects the current tree-list
    * viewport and rejects nodes hidden by parent-state gating.
    */
-  [[maybe_unused]] bool wxIsTreeNodeVisibleInViewportRuntime(
+  bool wxIsTreeNodeVisibleInViewportRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -98345,7 +98345,7 @@ namespace
    * Starts child enumeration for one non-null source node lane by resetting
    * the child-index lane to zero and forwarding to `FUN_00981FB0`.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxEnumerateFirstChildWhenSourcePresentRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxEnumerateFirstChildWhenSourcePresentRuntime(
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     int* const childIndexLane
@@ -98379,7 +98379,7 @@ namespace
    * Finds the first viewport-visible node starting from the main-window root
    * node lane.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxFindFirstVisibleTreeNodeFromRootRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxFindFirstVisibleTreeNodeFromRootRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane
   ) noexcept
@@ -98411,7 +98411,7 @@ namespace
    * Finds the first viewport-visible node after one caller-provided start node
    * lane.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxFindFirstVisibleTreeNodeAfterRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxFindFirstVisibleTreeNodeAfterRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const startNodeLane
@@ -98450,7 +98450,7 @@ namespace
    * Clears selected-node state bit `0x02` and invalidates that node's display
    * row when one selected node is currently tracked.
    */
-  [[maybe_unused]] void wxClearSelectedNodeStateBitAndInvalidateRuntime(
+  void wxClearSelectedNodeStateBitAndInvalidateRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime
   ) noexcept
   {
@@ -98483,7 +98483,7 @@ namespace
    * Recomputes tree content extents and updates projector scrollbar geometry
    * and origin lanes.
    */
-  [[maybe_unused]] int wxRecomputeTreeListProjectorScrollbarsRuntime(
+  int wxRecomputeTreeListProjectorScrollbarsRuntime(
     WxTreeListMainWindowTraversalRuntimeView* const ownerRuntime
   ) noexcept
   {
@@ -98564,7 +98564,7 @@ namespace
    * Control-lane adapter that forwards row-height padding updates to the
    * linked tree-list main-window runtime lane.
    */
-  [[maybe_unused]] void wxTreeListControlSetRowHeightPaddingRuntime(
+  void wxTreeListControlSetRowHeightPaddingRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     const std::uint16_t rowHeightPadding
   ) noexcept
@@ -98582,7 +98582,7 @@ namespace
    * Control-lane adapter that forwards primary-colour copy semantics from the
    * linked tree-list main-window runtime lane.
    */
-  [[maybe_unused]] wxColourRuntime* wxTreeListControlCopyPrimaryColourRuntime(
+  wxColourRuntime* wxTreeListControlCopyPrimaryColourRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     wxColourRuntime* const outColour,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -98599,7 +98599,7 @@ namespace
    * Control-lane adapter that forwards secondary-colour copy semantics from
    * the linked tree-list main-window runtime lane.
    */
-  [[maybe_unused]] wxColourRuntime* wxTreeListControlCopySecondaryColourRuntime(
+  wxColourRuntime* wxTreeListControlCopySecondaryColourRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     wxColourRuntime* const outColour,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -98616,7 +98616,7 @@ namespace
    * Control-lane adapter that forwards font copy semantics from the linked
    * tree-list main-window runtime lane.
    */
-  [[maybe_unused]] wxFontRuntime* wxTreeListControlCopyFontRuntime(
+  wxFontRuntime* wxTreeListControlCopyFontRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     wxFontRuntime* const outFont,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -98632,7 +98632,7 @@ namespace
    * What it does:
    * Control-lane adapter that forwards node has-children bit updates.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodeHasChildrenRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodeHasChildrenRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const bool hasChildren
@@ -98651,7 +98651,7 @@ namespace
    * What it does:
    * Control-lane adapter that forwards node primary-colour updates.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodePrimaryColourRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodePrimaryColourRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const wxColourRuntime* const sourceColour
@@ -98670,7 +98670,7 @@ namespace
    * What it does:
    * Control-lane adapter that forwards node secondary-colour updates.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodeSecondaryColourRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodeSecondaryColourRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const wxColourRuntime* const sourceColour
@@ -98689,7 +98689,7 @@ namespace
    * What it does:
    * Control-lane adapter that forwards node font updates.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodeFontRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlSetNodeFontRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     const wxFontRuntime* const sourceFont
@@ -98708,7 +98708,7 @@ namespace
    * What it does:
    * Control-lane adapter that forwards node visibility checks.
    */
-  [[maybe_unused]] bool wxTreeListControlIsNodeVisibleRuntime(
+  bool wxTreeListControlIsNodeVisibleRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
   ) noexcept
@@ -98725,7 +98725,7 @@ namespace
    * What it does:
    * Control-lane adapter that forwards first-child enumeration.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlEnumerateFirstChildRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlEnumerateFirstChildRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
@@ -98742,7 +98742,7 @@ namespace
    * What it does:
    * Control-lane adapter that finds the first visible node from root.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlFindFirstVisibleNodeFromRootRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlFindFirstVisibleNodeFromRootRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane
   ) noexcept
@@ -98760,7 +98760,7 @@ namespace
    * Control-lane adapter that finds the first visible node after one start
    * node.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlFindFirstVisibleNodeAfterRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlFindFirstVisibleNodeAfterRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const startNodeLane
@@ -98780,7 +98780,7 @@ namespace
    * Control-lane adapter that clears selected-node state bit `0x02` and
    * invalidates the selected row.
    */
-  [[maybe_unused]] void wxTreeListControlClearSelectedNodeStateBitRuntime(
+  void wxTreeListControlClearSelectedNodeStateBitRuntime(
     const WxTreeListControlMainWindowOwnerRuntimeView* const controlRuntime
   ) noexcept
   {
@@ -98989,7 +98989,7 @@ namespace
    * Invokes one virtual query lane at slot `+0x110`, then copies four produced
    * output lanes into optional caller pointers.
    */
-  [[maybe_unused]] std::int32_t* wxInvokeVirtualQuerySlot110AndCollectFourOutputsRuntime(
+  std::int32_t* wxInvokeVirtualQuerySlot110AndCollectFourOutputsRuntime(
     void* const ownerRuntime,
     const int queryValue,
     std::int32_t* const outLaneA,
@@ -99029,7 +99029,7 @@ namespace
    * Stores one dispatch target in owner lane `+0x00` and forwards four scalar
    * lanes through target virtual slot `+0xFC`.
    */
-  [[maybe_unused]] void* wxStoreDispatchTargetAndInvokeVirtualSlot0FCRuntime(
+  void* wxStoreDispatchTargetAndInvokeVirtualSlot0FCRuntime(
     void* const ownerRuntime,
     void* const dispatchTarget,
     const int laneA,
@@ -99052,7 +99052,7 @@ namespace
    * What it does:
    * Returns owner lane pointer at offset `+0x74`.
    */
-  [[maybe_unused]] std::uint32_t* wxGetOwnerLane74PointerRuntime(
+  std::uint32_t* wxGetOwnerLane74PointerRuntime(
     WxStateFlagAndTextTailOwnerRuntimeView* const owner
   ) noexcept
   {
@@ -99066,7 +99066,7 @@ namespace
    * Copies one pointer/int pair from input, dispatches virtual slot `+0x17C`
    * with in-out pair lanes, then writes the updated pair to output storage.
    */
-  [[maybe_unused]] WxPointerAndIntPairRuntimeView* wxInvokeVirtualSlot17COnPairRuntime(
+  WxPointerAndIntPairRuntimeView* wxInvokeVirtualSlot17COnPairRuntime(
     void* const ownerRuntime,
     WxPointerAndIntPairRuntimeView* const outPair,
     const WxPointerAndIntPairRuntimeView* const sourcePair
@@ -99089,7 +99089,7 @@ namespace
    * What it does:
    * Stores two scalar lanes at offsets `+0x08/+0x0C` and returns the first.
    */
-  [[maybe_unused]] int wxStoreLanes08And0CAndReturnFirstRuntime(
+  int wxStoreLanes08And0CAndReturnFirstRuntime(
     WxStateControlLanesRuntimeView* const owner,
     const int lane08Value,
     const int lane0CValue
@@ -99106,7 +99106,7 @@ namespace
    * What it does:
    * Clears byte flag lane `+0x14` and clears dword lane `+0x10`.
    */
-  [[maybe_unused]] int wxClearLane10AndFlag14Runtime(
+  int wxClearLane10AndFlag14Runtime(
     WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99121,7 +99121,7 @@ namespace
    * What it does:
    * Forwards one dispatch to virtual slot `+0x18`.
    */
-  [[maybe_unused]] int wxInvokeVirtualSlot18Runtime(
+  int wxInvokeVirtualSlot18Runtime(
     void* const ownerRuntime
   ) noexcept
   {
@@ -99135,7 +99135,7 @@ namespace
    * What it does:
    * Forwards one dispatch to virtual slot `+0x1C`.
    */
-  [[maybe_unused]] int wxInvokeVirtualSlot1CRuntime(
+  int wxInvokeVirtualSlot1CRuntime(
     void* const ownerRuntime
   ) noexcept
   {
@@ -99149,7 +99149,7 @@ namespace
    * What it does:
    * Stores one pointer lane at offset `+0x00`.
    */
-  [[maybe_unused]] WxPointerLane00RuntimeView* wxStorePointerLane00Runtime(
+  WxPointerLane00RuntimeView* wxStorePointerLane00Runtime(
     WxPointerLane00RuntimeView* const owner,
     void* const value
   ) noexcept
@@ -99164,7 +99164,7 @@ namespace
    * What it does:
    * Alias lane of storing one pointer at owner offset `+0x00`.
    */
-  [[maybe_unused]] WxPointerLane00RuntimeView* wxStorePointerLane00AliasRuntime(
+  WxPointerLane00RuntimeView* wxStorePointerLane00AliasRuntime(
     WxPointerLane00RuntimeView* const owner,
     void* const value
   ) noexcept
@@ -99179,7 +99179,7 @@ namespace
    * What it does:
    * Copies one source dword lane into owner offset `+0x04`.
    */
-  [[maybe_unused]] const WxSingleDwordRuntimeView* wxStoreSourceLane00ToOwnerOffset04Runtime(
+  const WxSingleDwordRuntimeView* wxStoreSourceLane00ToOwnerOffset04Runtime(
     WxLane04OwnerRuntimeView* const owner,
     const WxSingleDwordRuntimeView* const source
   ) noexcept
@@ -99194,7 +99194,7 @@ namespace
    * What it does:
    * Reads byte lane at offset `+0x0C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane0CRuntime(
+  std::uint8_t wxReadByteLane0CRuntime(
     const WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99207,7 +99207,7 @@ namespace
    * What it does:
    * Reads byte lane at offset `+0x1C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane1CRuntime(
+  std::uint8_t wxReadByteLane1CRuntime(
     const WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99220,7 +99220,7 @@ namespace
    * What it does:
    * Returns whether lane `+0x24` is non-zero.
    */
-  [[maybe_unused]] BOOL wxHasNonZeroLane24Runtime(
+  BOOL wxHasNonZeroLane24Runtime(
     const WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99233,7 +99233,7 @@ namespace
    * What it does:
    * Returns pointer to owner lane at offset `+0x10`.
    */
-  [[maybe_unused]] std::uint32_t* wxGetOwnerLane10PointerRuntime(
+  std::uint32_t* wxGetOwnerLane10PointerRuntime(
     WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99246,7 +99246,7 @@ namespace
    * What it does:
    * Returns pointer to owner lane at offset `+0x20`.
    */
-  [[maybe_unused]] std::uint32_t* wxGetOwnerLane20PointerRuntime(
+  std::uint32_t* wxGetOwnerLane20PointerRuntime(
     WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99259,7 +99259,7 @@ namespace
    * What it does:
    * Copies one source dword lane into owner offset `+0x74`.
    */
-  [[maybe_unused]] const WxSingleDwordRuntimeView* wxStoreSourceLane00ToOwnerOffset74Runtime(
+  const WxSingleDwordRuntimeView* wxStoreSourceLane00ToOwnerOffset74Runtime(
     WxStateFlagAndTextTailOwnerRuntimeView* const owner,
     const WxSingleDwordRuntimeView* const source
   ) noexcept
@@ -99274,7 +99274,7 @@ namespace
    * What it does:
    * Copies one source dword lane into owner offset `+0x78`.
    */
-  [[maybe_unused]] const WxSingleDwordRuntimeView* wxStoreSourceLane00ToOwnerOffset78Runtime(
+  const WxSingleDwordRuntimeView* wxStoreSourceLane00ToOwnerOffset78Runtime(
     WxStateFlagAndTextTailOwnerRuntimeView* const owner,
     const WxSingleDwordRuntimeView* const source
   ) noexcept
@@ -99290,7 +99290,7 @@ namespace
    * Copies one source dword pair into owner offsets `+0x7C/+0x80` and returns
    * the second lane value.
    */
-  [[maybe_unused]] int wxStoreDwordPairToOwnerOffsets7CAnd80Runtime(
+  int wxStoreDwordPairToOwnerOffsets7CAnd80Runtime(
     WxStateFlagAndTextTailOwnerRuntimeView* const owner,
     const WxDwordPairRuntimeView* const source
   ) noexcept
@@ -99307,7 +99307,7 @@ namespace
    * Copies one style/flag block from source offset `+0x20` into owner lanes
    * `+0x58..+0x70`.
    */
-  [[maybe_unused]] int wxCopyStateFlagBlockFromSourceOffset20Runtime(
+  int wxCopyStateFlagBlockFromSourceOffset20Runtime(
     WxStateFlagAndTextTailOwnerRuntimeView* const owner,
     const WxStateFlagCopySourceOffset20RuntimeView* const source
   ) noexcept
@@ -99331,7 +99331,7 @@ namespace
    * What it does:
    * Stores one dword lane at owner offset `+0x8C`.
    */
-  [[maybe_unused]] int wxStoreOwnerLane8CRuntime(
+  int wxStoreOwnerLane8CRuntime(
     WxStateFlagAndTextTailOwnerRuntimeView* const owner,
     const int value
   ) noexcept
@@ -99346,7 +99346,7 @@ namespace
    * What it does:
    * Resets state lanes `+0x08..+0x2C` and applies default lane `+0x28 = 2`.
    */
-  [[maybe_unused]] int wxResetStateControlLanesWithDefault28Runtime(
+  int wxResetStateControlLanesWithDefault28Runtime(
     WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99368,7 +99368,7 @@ namespace
    * What it does:
    * Reads byte lane at offset `+0x08`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane08Runtime(
+  std::uint8_t wxReadByteLane08Runtime(
     const WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99381,7 +99381,7 @@ namespace
    * What it does:
    * Reads byte lane at offset `+0x09`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane09Runtime(
+  std::uint8_t wxReadByteLane09Runtime(
     const WxStateControlLanesRuntimeView* const owner
   ) noexcept
   {
@@ -99394,7 +99394,7 @@ namespace
    * What it does:
    * Stores one byte lane at offset `+0x08`.
    */
-  [[maybe_unused]] WxStateControlLanesRuntimeView* wxStoreByteLane08Runtime(
+  WxStateControlLanesRuntimeView* wxStoreByteLane08Runtime(
     WxStateControlLanesRuntimeView* const owner,
     const std::uint8_t value
   ) noexcept
@@ -99409,7 +99409,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x0C`.
    */
-  [[maybe_unused]] WxStateControlLanesRuntimeView* wxStoreLane0CRuntime(
+  WxStateControlLanesRuntimeView* wxStoreLane0CRuntime(
     WxStateControlLanesRuntimeView* const owner,
     const int value
   ) noexcept
@@ -99424,7 +99424,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x14`.
    */
-  [[maybe_unused]] WxStateControlLanesRuntimeView* wxStoreLane14Runtime(
+  WxStateControlLanesRuntimeView* wxStoreLane14Runtime(
     WxStateControlLanesRuntimeView* const owner,
     const int value
   ) noexcept
@@ -99439,7 +99439,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x1C`.
    */
-  [[maybe_unused]] WxStateControlLanesRuntimeView* wxStoreLane1CRuntime(
+  WxStateControlLanesRuntimeView* wxStoreLane1CRuntime(
     WxStateControlLanesRuntimeView* const owner,
     const int value
   ) noexcept
@@ -99454,7 +99454,7 @@ namespace
    * What it does:
    * Reads one dword lane at owner offset `+0x130`.
    */
-  [[maybe_unused]] int wxReadOwnerLane130Runtime(
+  int wxReadOwnerLane130Runtime(
     const WxLane130OwnerRuntimeView* const owner
   ) noexcept
   {
@@ -99467,7 +99467,7 @@ namespace
    * What it does:
    * Returns the last dword value in one legacy dword-array lane.
    */
-  [[maybe_unused]] int wxDwordArrayGetLastValueRuntime(
+  int wxDwordArrayGetLastValueRuntime(
     const WxDwordArrayRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -99480,7 +99480,7 @@ namespace
    * What it does:
    * Returns one indexed dword value from one legacy dword-array lane.
    */
-  [[maybe_unused]] int wxDwordArrayGetValueAtIndexRuntime(
+  int wxDwordArrayGetValueAtIndexRuntime(
     const WxDwordArrayRuntimeView* const arrayRuntime,
     const int index
   ) noexcept
@@ -99495,7 +99495,7 @@ namespace
    * Appends `copyCount` copies of one dword value to a legacy dword-array
    * runtime lane.
    */
-  [[maybe_unused]] void wxDwordArrayAppendValueCopiesRuntime(
+  void wxDwordArrayAppendValueCopiesRuntime(
     WxDwordArrayRuntimeView* const arrayRuntime,
     const std::int32_t value,
     int copyCount
@@ -99519,7 +99519,7 @@ namespace
    * Forwards one ref-data copy request into the wx-object lane embedded at
    * offset `+0x20`.
    */
-  [[maybe_unused]] WxObjectRuntimeView* wxCopySharedRefDataFromOffset20Runtime(
+  WxObjectRuntimeView* wxCopySharedRefDataFromOffset20Runtime(
     void* const ownerRuntime,
     void* const cloneRuntime
   )
@@ -99538,7 +99538,7 @@ namespace
    * Assigns one wx-string source lane into embedded string storage at
    * offset `+0x84`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignStringAtOffset84Runtime(
+  wxStringRuntime* wxAssignStringAtOffset84Runtime(
     void* const ownerRuntime,
     const wxStringRuntime* const sourceText
   )
@@ -99555,7 +99555,7 @@ namespace
    * Assigns one wx-string source lane into embedded string storage at
    * offset `+0x10` and returns the owning runtime pointer.
    */
-  [[maybe_unused]] void* wxAssignStringAtOffset10AndReturnOwnerRuntime(
+  void* wxAssignStringAtOffset10AndReturnOwnerRuntime(
     void* const ownerRuntime,
     const wxStringRuntime* const sourceText
   )
@@ -99572,7 +99572,7 @@ namespace
    * Runs one default constructor lane for `wxArrayPtrVoid` and returns the
    * same storage pointer.
    */
-  [[maybe_unused]] wxArrayPtrVoid* wxConstructPointerArrayLaneARuntime(
+  wxArrayPtrVoid* wxConstructPointerArrayLaneARuntime(
     wxArrayPtrVoid* const arrayRuntime
   )
   {
@@ -99588,7 +99588,7 @@ namespace
    * What it does:
    * Alias lane of pointer-array insert-copies behavior.
    */
-  [[maybe_unused]] std::size_t wxPointerArrayInsertCopiesAliasRuntime(
+  std::size_t wxPointerArrayInsertCopiesAliasRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     void* const valuePointer,
     const std::size_t insertionIndex,
@@ -99609,7 +99609,7 @@ namespace
    * What it does:
    * Sorts one pointer-array lane with one caller-provided qsort comparator.
    */
-  [[maybe_unused]] void wxPointerArraySortWithComparatorCoreRuntime(
+  void wxPointerArraySortWithComparatorCoreRuntime(
     const WxPointerArrayRuntimeView* const arrayRuntime,
     const WxQsortCompareFunctionRuntime compareFunction
   ) noexcept
@@ -99628,7 +99628,7 @@ namespace
    * What it does:
    * Forwarding sort lane that dispatches into `FUN_009A7CF0`.
    */
-  [[maybe_unused]] void wxPointerArraySortWithComparatorThunkARuntime(
+  void wxPointerArraySortWithComparatorThunkARuntime(
     const WxPointerArrayRuntimeView* const arrayRuntime,
     const WxQsortCompareFunctionRuntime compareFunction
   ) noexcept
@@ -99642,7 +99642,7 @@ namespace
    * What it does:
    * Secondary forwarding sort lane into `FUN_009A7CF0`.
    */
-  [[maybe_unused]] void wxPointerArraySortWithComparatorThunkBRuntime(
+  void wxPointerArraySortWithComparatorThunkBRuntime(
     const WxPointerArrayRuntimeView* const arrayRuntime,
     const WxQsortCompareFunctionRuntime compareFunction
   ) noexcept
@@ -99657,7 +99657,7 @@ namespace
    * Thunk lane that forwards pointer-array sort requests into
    * `FUN_009A7CF0` behavior.
    */
-  [[maybe_unused]] void wxPointerArraySortWithComparatorRuntime(
+  void wxPointerArraySortWithComparatorRuntime(
     const WxPointerArrayRuntimeView* const arrayRuntime,
     const WxQsortCompareFunctionRuntime compareFunction
   ) noexcept
@@ -99671,7 +99671,7 @@ namespace
    * What it does:
    * Second constructor-forward lane for `wxArrayPtrVoid`.
    */
-  [[maybe_unused]] wxArrayPtrVoid* wxConstructPointerArrayLaneBRuntime(
+  wxArrayPtrVoid* wxConstructPointerArrayLaneBRuntime(
     wxArrayPtrVoid* const arrayRuntime
   )
   {
@@ -99710,7 +99710,7 @@ namespace
    * What it does:
    * Loads one indirect runtime lane and tail-dispatches virtual slot `+0x4C`.
    */
-  [[maybe_unused]] int wxDispatchIndirectVirtualSlot4CRuntime(
+  int wxDispatchIndirectVirtualSlot4CRuntime(
     const WxIndirectDispatchSlot4CLaneRuntimeView* const runtimeLane
   ) noexcept
   {
@@ -99751,7 +99751,7 @@ namespace
    * Returns one indexed node lane (`+0x1C`) when `index < lane144Count`;
    * otherwise returns `-1`.
    */
-  [[maybe_unused]] int wxReadIndexedNodeLane1COrMinusOneRuntime(
+  int wxReadIndexedNodeLane1COrMinusOneRuntime(
     const WxIndexedRuntimeOwnerLanes144148View* const runtime,
     const std::uint32_t index
   ) noexcept
@@ -99785,7 +99785,7 @@ namespace
    * Returns whether dword lane `+0x21C` is non-zero or bitmask `0x03` is set in
    * byte lane `+0x0D0`.
    */
-  [[maybe_unused]] BOOL wxHasLane21COrMask03At0D0Runtime(
+  BOOL wxHasLane21COrMask03At0D0Runtime(
     const WxRuntimeBoolLanes0D0And21CView* const runtime
   ) noexcept
   {
@@ -99815,7 +99815,7 @@ namespace
    * Returns whether bitmask `0x04` is set in byte lane `+0x4C` or dword lane
    * `+0x1C` is non-zero.
    */
-  [[maybe_unused]] BOOL wxHasLane1COrMask04At4CRuntime(
+  BOOL wxHasLane1COrMask04At4CRuntime(
     const WxRuntimeBoolLanes1CAnd4CView* const runtime
   ) noexcept
   {
@@ -99829,7 +99829,7 @@ namespace
    * Derives three one-byte selection lanes from style-mask bit `0x20` and two
    * modifier-key inputs, returning the final allow-select lane.
    */
-  [[maybe_unused]] std::uint8_t wxDeriveSelectionLanesFromMask20Runtime(
+  std::uint8_t wxDeriveSelectionLanesFromMask20Runtime(
     const std::uint8_t styleBits,
     std::uint8_t* const outAllowSelect,
     bool* const outMask20Enabled,
@@ -99857,7 +99857,7 @@ namespace
    * Assigns one tree-list column title text when `columnIndex` is in range.
    * Returns the source pointer unchanged when out of range.
    */
-  [[maybe_unused]] wxStringRuntime* wxTreeListAssignColumnTextByIndexRuntime(
+  wxStringRuntime* wxTreeListAssignColumnTextByIndexRuntime(
     void* const ownerRuntime,
     const std::uint32_t columnIndex,
     const wxStringRuntime* const sourceText
@@ -99878,7 +99878,7 @@ namespace
    * Inserts one copy of a pointer value into the pointer-array lane at
    * offset `+0x18`.
    */
-  [[maybe_unused]] std::size_t wxPointerArrayInsertSingleCopyAtOffset18Runtime(
+  std::size_t wxPointerArrayInsertSingleCopyAtOffset18Runtime(
     void* const ownerRuntime,
     void* const valuePointer,
     const std::size_t insertionIndex
@@ -99899,7 +99899,7 @@ namespace
    * What it does:
    * Returns state-flag bit `1` from one tree-list node payload lane.
    */
-  [[maybe_unused]] bool wxTreeListNodeHasStateBit1Runtime(
+  bool wxTreeListNodeHasStateBit1Runtime(
     const void* const nodeRuntime
   ) noexcept
   {
@@ -99913,7 +99913,7 @@ namespace
    * What it does:
    * Returns whether state-flag bit `0` is clear in one tree-list node payload.
    */
-  [[maybe_unused]] bool wxTreeListNodeIsStateBit0ClearRuntime(
+  bool wxTreeListNodeIsStateBit0ClearRuntime(
     const void* const nodeRuntime
   ) noexcept
   {
@@ -99927,7 +99927,7 @@ namespace
    * What it does:
    * Returns state-flag bit `3` from one tree-list node payload lane.
    */
-  [[maybe_unused]] bool wxTreeListNodeHasStateBit3Runtime(
+  bool wxTreeListNodeHasStateBit3Runtime(
     const void* const nodeRuntime
   ) noexcept
   {
@@ -99941,7 +99941,7 @@ namespace
    * What it does:
    * Returns the node visual payload lane at offset `+0x28`.
    */
-  [[maybe_unused]] WxTreeNodeColourFontPayloadRuntimeView* wxTreeListNodeGetVisualPayloadRuntime(
+  WxTreeNodeColourFontPayloadRuntimeView* wxTreeListNodeGetVisualPayloadRuntime(
     const void* const nodeRuntime
   ) noexcept
   {
@@ -99956,7 +99956,7 @@ namespace
    * Counts recursive descendants for the current tree-list main-window root
    * node lane and returns zero when no root is present.
    */
-  [[maybe_unused]] std::uint32_t wxTreeListControlCountDescendantsRuntime(
+  std::uint32_t wxTreeListControlCountDescendantsRuntime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -99990,7 +99990,7 @@ namespace
    * What it does:
    * Returns the 16-bit lane at `treeListMainWindow + 0x1EC`.
    */
-  [[maybe_unused]] std::uint16_t wxTreeListControlReadWordLane1ECRuntime(
+  std::uint16_t wxTreeListControlReadWordLane1ECRuntime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -100005,7 +100005,7 @@ namespace
    * What it does:
    * Returns the 16-bit lane at `treeListMainWindow + 0x1F4`.
    */
-  [[maybe_unused]] std::uint16_t wxTreeListControlReadWordLane1F4Runtime(
+  std::uint16_t wxTreeListControlReadWordLane1F4Runtime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -100021,7 +100021,7 @@ namespace
    * Writes one 16-bit style lane to the tree-list main-window node and marks
    * that node dirty.
    */
-  [[maybe_unused]] std::int16_t wxTreeListControlSetRootNodeShortStyleRuntime(
+  std::int16_t wxTreeListControlSetRootNodeShortStyleRuntime(
     const void* const controlRuntime,
     const std::int16_t styleValue
   ) noexcept
@@ -100037,7 +100037,7 @@ namespace
    * Returns the tree-list normal image-list lane from the linked main-window
    * runtime object.
    */
-  [[maybe_unused]] int wxTreeListControlGetNormalImageListRuntime(
+  int wxTreeListControlGetNormalImageListRuntime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -100052,7 +100052,7 @@ namespace
    * Returns dword lane `+0x218` from the linked tree-list main-window runtime
    * object.
    */
-  [[maybe_unused]] std::int32_t wxTreeListControlGetValueLane218Runtime(
+  std::int32_t wxTreeListControlGetValueLane218Runtime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -100068,7 +100068,7 @@ namespace
    * Returns dword lane `+0x21C` from the linked tree-list main-window runtime
    * object.
    */
-  [[maybe_unused]] std::int32_t wxTreeListControlGetValueLane21CRuntime(
+  std::int32_t wxTreeListControlGetValueLane21CRuntime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -100084,7 +100084,7 @@ namespace
    * Forwards normal image-list assignment to the linked tree-list main-window
    * runtime lane through `FUN_009826A0`.
    */
-  [[maybe_unused]] void wxTreeListControlSetNormalImageListRuntime(
+  void wxTreeListControlSetNormalImageListRuntime(
     const void* const controlRuntime,
     WxImageListRuntimeView* const normalImageList
   ) noexcept
@@ -100103,7 +100103,7 @@ namespace
    * Forwards state image-list assignment to the linked tree-list main-window
    * runtime lane through `FUN_00982750`.
    */
-  [[maybe_unused]] void wxTreeListControlSetTreeStateImageListRuntime(
+  void wxTreeListControlSetTreeStateImageListRuntime(
     const void* const controlRuntime,
     WxImageListRuntimeView* const stateImageList
   ) noexcept
@@ -100122,7 +100122,7 @@ namespace
    * Forwards state image-list assignment to the linked tree-list main-window
    * runtime lane.
    */
-  [[maybe_unused]] int wxTreeListControlSetStateImageListRuntime(
+  int wxTreeListControlSetStateImageListRuntime(
     const void* const controlRuntime,
     WxDeleteWithFlagRuntimeInterface* const stateImageList
   )
@@ -100138,7 +100138,7 @@ namespace
    * Forwards owned normal image-list assignment to the linked tree-list
    * main-window runtime lane through `FUN_009827A0`.
    */
-  [[maybe_unused]] void wxTreeListControlSetOwnedNormalImageListRuntime(
+  void wxTreeListControlSetOwnedNormalImageListRuntime(
     const void* const controlRuntime,
     WxImageListRuntimeView* const normalImageList
   ) noexcept
@@ -100157,7 +100157,7 @@ namespace
    * Forwards owned assigned-state image-list assignment to the linked
    * tree-list main-window runtime lane through `FUN_009827C0`.
    */
-  [[maybe_unused]] void wxTreeListControlSetOwnedAssignedStateImageListRuntime(
+  void wxTreeListControlSetOwnedAssignedStateImageListRuntime(
     const void* const controlRuntime,
     WxDeleteWithFlagRuntimeInterface* const stateImageList
   ) noexcept
@@ -100176,7 +100176,7 @@ namespace
    * Forwards owned state image-list assignment to the linked tree-list
    * main-window runtime lane through `FUN_009827E0`.
    */
-  [[maybe_unused]] void wxTreeListControlSetOwnedStateImageListRuntime(
+  void wxTreeListControlSetOwnedStateImageListRuntime(
     const void* const controlRuntime,
     WxImageListRuntimeView* const stateImageList
   ) noexcept
@@ -100194,7 +100194,7 @@ namespace
    * What it does:
    * Alias lane of tree-node image selection lookup behavior.
    */
-  [[maybe_unused]] int wxTreeListResolveNodeImageLaneAliasRuntime(
+  int wxTreeListResolveNodeImageLaneAliasRuntime(
     const void* const controlRuntime,
     WxTreeNodeImageSelectionRuntimeView* const* const ownerLane,
     const unsigned int imageIndex,
@@ -100211,7 +100211,7 @@ namespace
    * What it does:
    * Alias lane of state-bit `0x08` probe behavior.
    */
-  [[maybe_unused]] bool wxTreeListOwnerHasStateBit3AliasRuntime(
+  bool wxTreeListOwnerHasStateBit3AliasRuntime(
     const void* const controlRuntime,
     const WxTreeNodeStateOwnerRuntimeView* const ownerRuntime
   ) noexcept
@@ -100227,7 +100227,7 @@ namespace
    * Writes one style lane through the linked tree-list main-window node when
    * that node pointer is present.
    */
-  [[maybe_unused]] std::int32_t wxTreeListControlSetRootNodeStyleIfPresentRuntime(
+  std::int32_t wxTreeListControlSetRootNodeStyleIfPresentRuntime(
     const void* const controlRuntime,
     const std::int32_t styleValue
   ) noexcept
@@ -100245,7 +100245,7 @@ namespace
    * What it does:
    * Alias lane of state-bit `0x02` probe behavior.
    */
-  [[maybe_unused]] bool wxTreeListOwnerHasStateBit1AliasRuntime(
+  bool wxTreeListOwnerHasStateBit1AliasRuntime(
     const void* const controlRuntime,
     const WxTreeNodeStateOwnerRuntimeView* const ownerRuntime
   ) noexcept
@@ -100260,7 +100260,7 @@ namespace
    * What it does:
    * Alias lane of alternate-owner state-bit `0x08` probe behavior.
    */
-  [[maybe_unused]] bool wxTreeListAlternateOwnerHasStateBit3AliasRuntime(
+  bool wxTreeListAlternateOwnerHasStateBit3AliasRuntime(
     const void* const controlRuntime,
     const WxTreeNodeStateOwnerRuntimeView* const ownerRuntime
   ) noexcept
@@ -100276,7 +100276,7 @@ namespace
    * Counts descendants from one caller-provided node lane and returns zero
    * when that lane is null.
    */
-  [[maybe_unused]] std::uint32_t wxTreeListCountDescendantsFromNodeLaneRuntime(
+  std::uint32_t wxTreeListCountDescendantsFromNodeLaneRuntime(
     const void* const controlRuntime,
     WxChildTreeNodeRuntimeView* const* const nodeLane,
     const bool includeNestedChildren
@@ -100296,7 +100296,7 @@ namespace
    * Copies the root-node lane from one tree-list main-window into caller
    * output storage.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlCopyRootNodeLaneRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlCopyRootNodeLaneRuntime(
     const void* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outRootLane
   ) noexcept
@@ -100314,7 +100314,7 @@ namespace
    * Writes the selected-node lane (when state-bit `0x02` is set) to
    * `outSelectedLane` and returns that output lane.
    */
-  [[maybe_unused]] void** wxTreeListControlGetSelectedNodeWithStateBit1Runtime(
+  void** wxTreeListControlGetSelectedNodeWithStateBit1Runtime(
     const void* const controlRuntime,
     void** const outSelectedLane
   ) noexcept
@@ -100331,7 +100331,7 @@ namespace
    * Copies dword lane `+0x24` from one optional node lane into
    * caller-provided output storage.
    */
-  [[maybe_unused]] std::uint32_t* wxTreeListCopyNodeField24Runtime(
+  std::uint32_t* wxTreeListCopyNodeField24Runtime(
     const void* const controlRuntime,
     std::uint32_t* const outValue,
     const WxTreeNodeField24RuntimeView* const* const sourceNodeLane
@@ -100353,7 +100353,7 @@ namespace
    * Forwards last-child lookup to `FUN_00982030` using linked tree-list
    * main-window runtime and returns `outNodeLane`.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlForwardGetTreeNodeLastChildRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlForwardGetTreeNodeLastChildRuntime(
     const void* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -100376,7 +100376,7 @@ namespace
    * Forwards previous-sibling lookup to `FUN_009820F0` using linked tree-list
    * main-window runtime and returns `outNodeLane`.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlForwardGetTreeNodePreviousSiblingRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlForwardGetTreeNodePreviousSiblingRuntime(
     const void* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -100399,7 +100399,7 @@ namespace
    * Forwards next-traversal-node resolution to `FUN_00982150` using linked
    * tree-list main-window runtime and returns `outNodeLane`.
    */
-  [[maybe_unused]] WxTreeListNodeTraversalRuntimeView** wxTreeListControlForwardResolveNextTreeTraversalNodeRuntime(
+  WxTreeListNodeTraversalRuntimeView** wxTreeListControlForwardResolveNextTreeTraversalNodeRuntime(
     const void* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const outNodeLane,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane
@@ -100421,7 +100421,7 @@ namespace
    * Forwards node-rectangle computation to the linked tree-list main-window
    * runtime lane through `FUN_00982830`.
    */
-  [[maybe_unused]] bool wxTreeListControlComputeNodeRectRuntime(
+  bool wxTreeListControlComputeNodeRectRuntime(
     const void* const controlRuntime,
     WxTreeListNodeTraversalRuntimeView** const sourceNodeLane,
     WxTreeListNodeRectRuntimeView* const outRect,
@@ -100473,7 +100473,7 @@ namespace
    * What it does:
    * Returns the event-source viewport visible-row count lane.
    */
-  [[maybe_unused]] std::uint32_t wxTreeListControlGetViewportVisibleRowCountRuntime(
+  std::uint32_t wxTreeListControlGetViewportVisibleRowCountRuntime(
     const void* const controlRuntime
   ) noexcept
   {
@@ -100491,7 +100491,7 @@ namespace
    * Stores one first-visible-row lane (`+0x19C`) when the requested row index is
    * below the event-source viewport visible-row-count lane.
    */
-  [[maybe_unused]] void* wxTreeListControlSetFirstVisibleRowIfInRangeRuntime(
+  void* wxTreeListControlSetFirstVisibleRowIfInRangeRuntime(
     const void* const controlRuntime,
     const std::uint32_t firstVisibleRow
   ) noexcept
@@ -100523,7 +100523,7 @@ namespace
    * Releases shared wx ref-data lanes for one colour/colour/font payload in
    * reverse construction order.
    */
-  [[maybe_unused]] void wxDestroyColourColourFontTriple(
+  void wxDestroyColourColourFontTriple(
     void* const runtimeObject
   ) noexcept
   {
@@ -100543,7 +100543,7 @@ namespace
    * What it does:
    * Runs one deleting-dtor thunk lane for `wxListItemAttr`.
    */
-  [[maybe_unused]] void* wxDestroyListItemAttrDeletingThunk(
+  void* wxDestroyListItemAttrDeletingThunk(
     void* const attrRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -100561,7 +100561,7 @@ namespace
    * What it does:
    * Runs one deleting-dtor thunk lane for one colour/colour/font payload.
    */
-  [[maybe_unused]] void* wxDestroyColourColourFontDeletingThunk(
+  void* wxDestroyColourColourFontDeletingThunk(
     void* const runtimeObject,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -100589,7 +100589,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x30`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane30RuntimeA(
+  std::uint32_t wxReadDwordLane30RuntimeA(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100603,7 +100603,7 @@ namespace
    * What it does:
    * Returns whether dword lane `+0x30` is non-zero.
    */
-  [[maybe_unused]] bool wxHasDwordLane30RuntimeA(
+  bool wxHasDwordLane30RuntimeA(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100617,7 +100617,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x154` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane154Runtime(
+  std::uint32_t wxStoreDwordLane154Runtime(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -100633,7 +100633,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x154`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane154RuntimeC(
+  std::uint32_t wxReadDwordLane154RuntimeC(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100657,7 +100657,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x20`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane20RuntimeC(
+  std::uint8_t wxReadByteLane20RuntimeC(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100692,7 +100692,7 @@ namespace
    * Returns dword lane `+0x14` from one optional pointer lane at owner offset
    * `+0x04`; returns `0` when the optional pointer is null.
    */
-  [[maybe_unused]] std::uint32_t wxReadOptionalPointerLane14Runtime(
+  std::uint32_t wxReadOptionalPointerLane14Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100736,7 +100736,7 @@ namespace
    * What it does:
    * Returns bit `0` from byte lane `+0xCC`.
    */
-  [[maybe_unused]] bool wxReadBit0FromByteLaneCCRuntime(
+  bool wxReadBit0FromByteLaneCCRuntime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100750,7 +100750,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x40` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane40Runtime(
+  std::uint32_t wxStoreDwordLane40Runtime(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -100766,7 +100766,7 @@ namespace
    * What it does:
    * Returns whether dword lane `+0x44` equals `1`.
    */
-  [[maybe_unused]] bool wxIsDwordLane44EqualOneRuntime(
+  bool wxIsDwordLane44EqualOneRuntime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -100790,7 +100790,7 @@ namespace
    * What it does:
    * Clears dword lane `+0x04`.
    */
-  [[maybe_unused]] void wxClearDwordLane04Runtime(
+  void wxClearDwordLane04Runtime(
     void* const runtimeObject
   ) noexcept
   {
@@ -100805,7 +100805,7 @@ namespace
    * Adds one delta point into the current point and writes the result to
    * caller-provided output storage.
    */
-  [[maybe_unused]] WxPointIntRuntimeView* wxAddPointIntoOutputRuntime(
+  WxPointIntRuntimeView* wxAddPointIntoOutputRuntime(
     const WxPointIntRuntimeView* const basePoint,
     WxPointIntRuntimeView* const outPoint,
     const WxPointIntRuntimeView* const deltaPoint
@@ -100833,7 +100833,7 @@ namespace
    * Dispatches one virtual call through slot `+0x74` with `value`, then
    * returns `value`.
    */
-  [[maybe_unused]] int wxInvokeVirtualSlot74ReturnValueRuntime(
+  int wxInvokeVirtualSlot74ReturnValueRuntime(
     void* const runtimeObject,
     const int value
   ) noexcept
@@ -100849,7 +100849,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0xC8` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLaneC8Runtime(
+  std::uint32_t wxStoreDwordLaneC8Runtime(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -100887,7 +100887,7 @@ namespace
    * Stores ratio `numerator / denominator` into float lane `+0x38`, or `1.0`
    * when either operand is zero.
    */
-  [[maybe_unused]] void wxStoreRatioLane38RuntimeA(
+  void wxStoreRatioLane38RuntimeA(
     void* const runtimeObject,
     const std::int32_t numerator,
     const std::int32_t denominator
@@ -100904,7 +100904,7 @@ namespace
    * Alias lane of storing ratio `numerator / denominator` at float lane
    * `+0x38`, defaulting to `1.0` when either operand is zero.
    */
-  [[maybe_unused]] void wxStoreRatioLane38RuntimeB(
+  void wxStoreRatioLane38RuntimeB(
     void* const runtimeObject,
     const std::int32_t numerator,
     const std::int32_t denominator
@@ -100962,7 +100962,7 @@ namespace
    * What it does:
    * Stores dword lanes `+0x20/+0x24` and returns the first stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLanes20And24Runtime(
+  std::uint32_t wxStoreDwordLanes20And24Runtime(
     void* const runtimeObject,
     const std::uint32_t lane20,
     const std::uint32_t lane24
@@ -100980,7 +100980,7 @@ namespace
    * What it does:
    * Stores one byte lane at offset `+0x34`.
    */
-  [[maybe_unused]] std::uint8_t wxStoreByteLane34Runtime(
+  std::uint8_t wxStoreByteLane34Runtime(
     void* const runtimeObject,
     const std::uint8_t value
   ) noexcept
@@ -100996,7 +100996,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x28`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane28Runtime(
+  std::uint32_t wxReadDwordLane28Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -101010,7 +101010,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x30`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane30RuntimeB(
+  std::uint32_t wxReadDwordLane30RuntimeB(
     const void* const runtimeObject
   ) noexcept
   {
@@ -101024,7 +101024,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x34`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane34Runtime(
+  std::uint8_t wxReadByteLane34Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -101038,7 +101038,7 @@ namespace
    * What it does:
    * Copies dword lanes `+0x14/+0x18` to caller-provided output storage.
    */
-  [[maybe_unused]] WxPointIntRuntimeView* wxCopyDwordLanes14And18ToOutputRuntime(
+  WxPointIntRuntimeView* wxCopyDwordLanes14And18ToOutputRuntime(
     const void* const runtimeObject,
     WxPointIntRuntimeView* const outPoint
   ) noexcept
@@ -101122,7 +101122,7 @@ namespace
    * What it does:
    * Appends one state value into the window-child state-array lane at `+0x60`.
    */
-  [[maybe_unused]] void wxTreeListAppendWindowChildStateValue(
+  void wxTreeListAppendWindowChildStateValue(
     WxTreeListOwnerRuntimeView* const owner,
     const std::int32_t stateValue
   ) noexcept
@@ -101140,7 +101140,7 @@ namespace
    * What it does:
    * Appends one state value into the sizer-child state-array lane at `+0x6C`.
    */
-  [[maybe_unused]] void wxTreeListAppendSizerChildStateValue(
+  void wxTreeListAppendSizerChildStateValue(
     WxTreeListOwnerRuntimeView* const owner,
     const std::int32_t stateValue
   ) noexcept
@@ -101160,7 +101160,7 @@ namespace
    * `targetWindowRuntime`, stores one state byte, and dispatches it through
    * vtable slot `+0x7C`.
    */
-  [[maybe_unused]] void wxTreeListSetWindowChildStateAndDispatch(
+  void wxTreeListSetWindowChildStateAndDispatch(
     WxTreeListOwnerRuntimeView* const owner,
     void* const targetWindowRuntime,
     const std::uint8_t stateValue
@@ -101191,7 +101191,7 @@ namespace
    * Returns the state byte for the first window child whose dispatch-target
    * lane matches `targetWindowRuntime`; returns `0` when no match exists.
    */
-  [[maybe_unused]] std::uint8_t wxTreeListFindWindowChildStateByte(
+  std::uint8_t wxTreeListFindWindowChildStateByte(
     const WxTreeListOwnerRuntimeView* const owner,
     const void* const targetWindowRuntime
   ) noexcept
@@ -101218,7 +101218,7 @@ namespace
    * Returns the state byte for the first sizer child whose child-branch lane
    * matches `targetBranchRuntime`; returns `0` when no match exists.
    */
-  [[maybe_unused]] std::uint8_t wxTreeListFindSizerChildStateByte(
+  std::uint8_t wxTreeListFindSizerChildStateByte(
     const WxTreeListOwnerRuntimeView* const owner,
     const void* const targetBranchRuntime
   ) noexcept
@@ -101245,7 +101245,7 @@ namespace
    * Recursively dispatches one state-byte value to every reachable node under
    * one tree-list owner lane.
    */
-  [[maybe_unused]] void wxTreeListBroadcastStateByteRecursive(
+  void wxTreeListBroadcastStateByteRecursive(
     const void* const ownerRuntime,
     const int stateValue
   ) noexcept
@@ -101275,7 +101275,7 @@ namespace
    * `targetBranchRuntime`, stores the new state byte, and propagates it through
    * that branch.
    */
-  [[maybe_unused]] void wxTreeListSetBranchStateAndPropagate(
+  void wxTreeListSetBranchStateAndPropagate(
     const void* const ownerRuntime,
     const void* const targetBranchRuntime,
     const int stateValue
@@ -101304,7 +101304,7 @@ namespace
    * Deletes `deleteCount` owned entries starting at `firstIndex`, then erases
    * that range from one pointer array.
    */
-  [[maybe_unused]] void* wxDeleteOwnedRangeAndEraseFromPointerArray(
+  void* wxDeleteOwnedRangeAndEraseFromPointerArray(
     void* const arrayRuntime,
     const unsigned int firstIndex,
     int deleteCount
@@ -101338,7 +101338,7 @@ namespace
    * What it does:
    * Inserts one or more heap-cloned `0x1C` records at an explicit index.
    */
-  [[maybe_unused]] void wxInsertPaintDcInfo1CCopiesAtIndex(
+  void wxInsertPaintDcInfo1CCopiesAtIndex(
     void* const destinationArrayRuntime,
     const void* const sourceRecordRuntime,
     const int insertionIndex,
@@ -101391,7 +101391,7 @@ namespace
    * Destroys and deletes the optional critical-section lane at `+0x18`, then
    * clears that owner pointer.
    */
-  [[maybe_unused]] void wxDeleteOwnedCriticalSectionAt18(
+  void wxDeleteOwnedCriticalSectionAt18(
     void* const ownerRuntime
   ) noexcept
   {
@@ -101404,7 +101404,7 @@ namespace
     owner->criticalSectionRuntime = nullptr;
   }
 
-  [[maybe_unused]] void wxCopyColourColourFontTripleInternal(
+  void wxCopyColourColourFontTripleInternal(
     WxColourColourFontTripleRuntimeView* const destination,
     const WxColourColourFontTripleRuntimeView* const source
   ) noexcept
@@ -101437,7 +101437,7 @@ namespace
    * Copies four consecutive dword lanes (`+0x00/+0x04/+0x08/+0x0C`) from
    * source to destination and returns destination.
    */
-  [[maybe_unused]] WxDwordQuadRuntimeView* wxCopyDwordQuadRuntime(
+  WxDwordQuadRuntimeView* wxCopyDwordQuadRuntime(
     WxDwordQuadRuntimeView* const destination,
     const WxDwordQuadRuntimeView* const source
   ) noexcept
@@ -101455,7 +101455,7 @@ namespace
    * What it does:
    * Returns whether dword lane `+0x00` is non-zero.
    */
-  [[maybe_unused]] bool wxHasNonZeroLane00Runtime(
+  bool wxHasNonZeroLane00Runtime(
     const WxDwordQuadRuntimeView* const runtime
   ) noexcept
   {
@@ -101468,7 +101468,7 @@ namespace
    * What it does:
    * Copies one colour/colour/font triple payload from source to destination.
    */
-  [[maybe_unused]] void* wxCopyColourColourFontTripleLaneA(
+  void* wxCopyColourColourFontTripleLaneA(
     void* const destinationRuntime,
     const void* const sourceRuntime
   ) noexcept
@@ -101486,7 +101486,7 @@ namespace
    * Copies one second colour/colour/font triple payload family from source to
    * destination.
    */
-  [[maybe_unused]] void* wxCopyColourColourFontTripleLaneB(
+  void* wxCopyColourColourFontTripleLaneB(
     void* const destinationRuntime,
     const void* const sourceRuntime
   ) noexcept
@@ -101514,7 +101514,7 @@ namespace
    * Clears dword lane `+0x00`, stores one value in lane `+0x04`, and returns
    * the owner.
    */
-  [[maybe_unused]] WxZeroableDwordPairRuntimeView* wxInitDwordPairWithValueRuntime(
+  WxZeroableDwordPairRuntimeView* wxInitDwordPairWithValueRuntime(
     WxZeroableDwordPairRuntimeView* const runtime,
     const std::uint32_t value
   ) noexcept
@@ -101530,7 +101530,7 @@ namespace
    * What it does:
    * Clears both dword lanes `+0x00/+0x04` and returns the owner.
    */
-  [[maybe_unused]] WxZeroableDwordPairRuntimeView* wxClearDwordPairRuntime(
+  WxZeroableDwordPairRuntimeView* wxClearDwordPairRuntime(
     WxZeroableDwordPairRuntimeView* const runtime
   ) noexcept
   {
@@ -101545,7 +101545,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x130`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane130RuntimeC(
+  std::uint32_t wxReadDwordLane130RuntimeC(
     const void* const runtimeObject
   ) noexcept
   {
@@ -101565,7 +101565,7 @@ namespace
    * Frees one CRT-owned pointer lane at `+0x00` and optionally deletes the
    * owner object.
    */
-  [[maybe_unused]] void* wxFreeCrtPointerDeletingThunk(
+  void* wxFreeCrtPointerDeletingThunk(
     void* const ownerRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -101584,7 +101584,7 @@ namespace
    * What it does:
    * Destroys and deletes one optional owned `wxListItemAttr` lane at `+0x00`.
    */
-  [[maybe_unused]] void wxDestroyOwnedListItemAttrLane(
+  void wxDestroyOwnedListItemAttrLane(
     void* const ownerRuntime
   ) noexcept
   {
@@ -101603,7 +101603,7 @@ namespace
    * Destroys/deletes one owned `wxListItemAttr` lane and optionally deletes the
    * owner object.
    */
-  [[maybe_unused]] void* wxDestroyOwnedListItemAttrDeletingThunk(
+  void* wxDestroyOwnedListItemAttrDeletingThunk(
     void* const ownerRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -101622,7 +101622,7 @@ namespace
    * Ensures one wx-string payload is writable, then returns the UTF-16
    * character pointer at `charOffset`.
    */
-  [[maybe_unused]] wchar_t* wxStringWritableDataAtOffsetRuntime(
+  wchar_t* wxStringWritableDataAtOffsetRuntime(
     wxStringRuntime* const value,
     const std::int32_t charOffset
   ) noexcept
@@ -101652,7 +101652,7 @@ namespace
    * What it does:
    * Returns bit 0 from one packed-flags lane at offset `+0x20`.
    */
-  [[maybe_unused]] int wxReadPackedFlagsBit0Runtime(
+  int wxReadPackedFlagsBit0Runtime(
     const WxPackedFlagsAndValueLaneRuntimeView* const runtime
   ) noexcept
   {
@@ -101665,7 +101665,7 @@ namespace
    * What it does:
    * Returns bit 1 from one packed-flags lane at offset `+0x20`.
    */
-  [[maybe_unused]] int wxReadPackedFlagsBit1Runtime(
+  int wxReadPackedFlagsBit1Runtime(
     const WxPackedFlagsAndValueLaneRuntimeView* const runtime
   ) noexcept
   {
@@ -101678,7 +101678,7 @@ namespace
    * What it does:
    * Reads one scalar lane at offset `+0x24`.
    */
-  [[maybe_unused]] int wxReadPackedFlagsValueLaneRuntime(
+  int wxReadPackedFlagsValueLaneRuntime(
     const WxPackedFlagsAndValueLaneRuntimeView* const runtime
   ) noexcept
   {
@@ -101691,7 +101691,7 @@ namespace
    * What it does:
    * Stores one scalar lane at offset `+0x24` and returns the stored value.
    */
-  [[maybe_unused]] int wxStorePackedFlagsValueLaneRuntime(
+  int wxStorePackedFlagsValueLaneRuntime(
     WxPackedFlagsAndValueLaneRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -101712,7 +101712,7 @@ namespace
    * What it does:
    * Reads one 16-bit lane from the owner word-array pointer by index.
    */
-  [[maybe_unused]] std::int16_t wxReadWordArrayValueByIndexRuntime(
+  std::int16_t wxReadWordArrayValueByIndexRuntime(
     const WxWordArrayPointerRuntimeView* const runtime,
     const int index
   ) noexcept
@@ -101742,7 +101742,7 @@ namespace
    * What it does:
    * Stores one scalar lane at owner offset `+0x00` and returns it.
    */
-  [[maybe_unused]] int wxStoreLane00ValueRuntime(
+  int wxStoreLane00ValueRuntime(
     WxPrimaryFallbackLaneRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -101758,7 +101758,7 @@ namespace
    * Returns fallback lane `+0x0C` when non-zero, otherwise primary lane
    * `+0x08`.
    */
-  [[maybe_unused]] int wxReadPrimaryOrFallbackLaneRuntime(
+  int wxReadPrimaryOrFallbackLaneRuntime(
     const WxPrimaryFallbackLaneRuntimeView* const runtime
   ) noexcept
   {
@@ -101774,7 +101774,7 @@ namespace
    * Swaps one scalar lane into owner offset `+0x08` and returns the previous
    * value.
    */
-  [[maybe_unused]] int wxExchangePrimaryLaneRuntime(
+  int wxExchangePrimaryLaneRuntime(
     WxPrimaryFallbackLaneRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -101790,7 +101790,7 @@ namespace
    * What it does:
    * Stores one scalar lane at owner offset `+0x0C` and returns it.
    */
-  [[maybe_unused]] int wxStoreFallbackLaneRuntime(
+  int wxStoreFallbackLaneRuntime(
     WxPrimaryFallbackLaneRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -101805,7 +101805,7 @@ namespace
    * What it does:
    * Thin wrapper for Win32 `GetMessageW`.
    */
-  [[maybe_unused]] BOOL wxGetMessageWRuntime(
+  BOOL wxGetMessageWRuntime(
     LPMSG lpMsg,
     HWND hWnd,
     UINT wMsgFilterMin,
@@ -101821,7 +101821,7 @@ namespace
    * What it does:
    * Thin wrapper for Win32 `LoadBitmapW`.
    */
-  [[maybe_unused]] HBITMAP wxLoadBitmapWRuntime(
+  HBITMAP wxLoadBitmapWRuntime(
     HINSTANCE hInstance,
     LPCWSTR bitmapName
   )
@@ -101835,7 +101835,7 @@ namespace
    * What it does:
    * Invokes the CRT invalid-parameter handler with null/zero context lanes.
    */
-  [[maybe_unused]] void wxInvokeCrtInvalidParameterNoContextRuntime()
+  void wxInvokeCrtInvalidParameterNoContextRuntime()
   {
     // The 5-argument `_invalid_parameter` is declared only in debug CRTs.
     // `_invalid_parameter_noinfo` is the always-available spelling and is
@@ -101850,7 +101850,7 @@ namespace
    * What it does:
    * Increments the process-global wx yield nesting-depth lane.
    */
-  [[maybe_unused]] void wxIncrementYieldNestingDepthRuntime() noexcept
+  void wxIncrementYieldNestingDepthRuntime() noexcept
   {
     ++gWxYieldNestingDepthRuntime;
   }
@@ -101861,7 +101861,7 @@ namespace
    * What it does:
    * Decrements the process-global wx yield nesting-depth lane.
    */
-  [[maybe_unused]] void wxDecrementYieldNestingDepthRuntime() noexcept
+  void wxDecrementYieldNestingDepthRuntime() noexcept
   {
     --gWxYieldNestingDepthRuntime;
   }
@@ -101872,7 +101872,7 @@ namespace
    * What it does:
    * Stores one process-global wx log timestamp-pointer lane and returns it.
    */
-  [[maybe_unused]] wchar_t* wxSetLogTimestampStorageRuntime(
+  wchar_t* wxSetLogTimestampStorageRuntime(
     wchar_t* const timestampText
   ) noexcept
   {
@@ -101897,7 +101897,7 @@ namespace
    * What it does:
    * Stores one byte into lane `+0x21` only when gate lane `+0x22` is non-zero.
    */
-  [[maybe_unused]] void wxStoreConditionalByteLane21Runtime(
+  void wxStoreConditionalByteLane21Runtime(
     WxConditionalByteLatchRuntimeView* const runtime,
     const std::uint8_t value
   ) noexcept
@@ -101913,7 +101913,7 @@ namespace
    * What it does:
    * Reads one gate byte lane at offset `+0x22`.
    */
-  [[maybe_unused]] std::uint8_t wxReadConditionalByteGateRuntime(
+  std::uint8_t wxReadConditionalByteGateRuntime(
     const WxConditionalByteLatchRuntimeView* const runtime
   ) noexcept
   {
@@ -101926,7 +101926,7 @@ namespace
    * What it does:
    * Stores one byte lane at offset `+0x20` and returns the stored value.
    */
-  [[maybe_unused]] std::uint8_t wxStoreConditionalByteLane20Runtime(
+  std::uint8_t wxStoreConditionalByteLane20Runtime(
     WxConditionalByteLatchRuntimeView* const runtime,
     const std::uint8_t value
   ) noexcept
@@ -101941,7 +101941,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x20`.
    */
-  [[maybe_unused]] std::uint8_t wxReadConditionalByteLane20Runtime(
+  std::uint8_t wxReadConditionalByteLane20Runtime(
     const WxConditionalByteLatchRuntimeView* const runtime
   ) noexcept
   {
@@ -101961,7 +101961,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0xB8`.
    */
-  [[maybe_unused]] int wxReadLaneB8DwordRuntime(
+  int wxReadLaneB8DwordRuntime(
     const WxLaneB8DwordRuntimeView* const runtime
   ) noexcept
   {
@@ -101989,7 +101989,7 @@ namespace
    * What it does:
    * Reads one dword from the indexed-entry lane at `entries[index]`.
    */
-  [[maybe_unused]] int wxReadIndexedDwordEntryRuntime(
+  int wxReadIndexedDwordEntryRuntime(
     const WxIndexedDwordArrayRuntimeView* const runtime,
     const int index
   ) noexcept
@@ -102004,7 +102004,7 @@ namespace
    * Finds one dword value in the indexed-entry lane; supports forward scan or
    * the binary-matching reverse scan lane used by this runtime path.
    */
-  [[maybe_unused]] int wxFindIndexedDwordEntryRuntime(
+  int wxFindIndexedDwordEntryRuntime(
     const WxIndexedDwordArrayRuntimeView* const runtime,
     const int targetValue,
     const std::uint8_t searchFromBack
@@ -102054,7 +102054,7 @@ namespace
    * Reads and returns the first 32-bit machine-word at the currently bound
    * wx-app factory function entry lane.
    */
-  [[maybe_unused]] std::uint32_t wxReadAppFactoryEntryWordRuntime() noexcept
+  std::uint32_t wxReadAppFactoryEntryWordRuntime() noexcept
   {
     const auto appInitAddress = reinterpret_cast<std::uintptr_t>(gWxAppInitFactoryRuntime);
     return *reinterpret_cast<const std::uint32_t*>(appInitAddress);
@@ -102066,7 +102066,7 @@ namespace
    * What it does:
    * Thin wrapper for Win32 `LoadLibraryW`.
    */
-  [[maybe_unused]] HMODULE wxLoadLibraryWRuntime(
+  HMODULE wxLoadLibraryWRuntime(
     LPCWSTR modulePath
   )
   {
@@ -102079,7 +102079,7 @@ namespace
    * What it does:
    * Stores one critical-section pointer in caller storage and enters it.
    */
-  [[maybe_unused]] _RTL_CRITICAL_SECTION** wxCriticalSectionAssignAndEnterRuntime(
+  _RTL_CRITICAL_SECTION** wxCriticalSectionAssignAndEnterRuntime(
     _RTL_CRITICAL_SECTION** const storage,
     _RTL_CRITICAL_SECTION* const criticalSection
   )
@@ -102105,7 +102105,7 @@ namespace
    * What it does:
    * Assigns one shared wx-string payload into runtime slot `+0x38`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot38WriteRuntime(
+  wxStringRuntime* wxAssignSharedStringSlot38WriteRuntime(
     WxRuntimeStringSlot38WriteView* const runtime,
     const wxStringRuntime* const sourceValue
   )
@@ -102119,7 +102119,7 @@ namespace
    * What it does:
    * Initializes one `wxArrayPtrVoid` payload to empty-array state.
    */
-  [[maybe_unused]] wxArrayPtrVoid* wxArrayPtrVoidConstructAdapterC(
+  wxArrayPtrVoid* wxArrayPtrVoidConstructAdapterC(
     wxArrayPtrVoid* const array
   ) noexcept
   {
@@ -102133,7 +102133,7 @@ namespace
    * Deletes each owned entry from one pointer-array lane and resets count to
    * zero.
    */
-  [[maybe_unused]] void* wxPointerArrayDeleteEntriesAndResetCountRuntime(
+  void* wxPointerArrayDeleteEntriesAndResetCountRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime
   ) noexcept
   {
@@ -102158,7 +102158,7 @@ namespace
    * What it does:
    * Assigns one shared wx-string payload into runtime slot `+0x20`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot20WriteRuntime(
+  wxStringRuntime* wxAssignSharedStringSlot20WriteRuntime(
     WxRuntimeStringSlot20WriteView* const runtime,
     const wxStringRuntime* const sourceValue
   )
@@ -102280,7 +102280,7 @@ namespace
    * What it does:
    * Reads one dword lane at runtime offset `+0x2C`.
    */
-  [[maybe_unused]] int wxReadLane2CDwordRuntime(
+  int wxReadLane2CDwordRuntime(
     const WxLane2CDwordRuntimeView* const runtime
   ) noexcept
   {
@@ -102294,7 +102294,7 @@ namespace
    * Stores one update byte at lane `+0x35`, marks lane `+0x36` dirty, and
    * returns the stored update byte.
    */
-  [[maybe_unused]] std::uint8_t wxStoreUpdateByteAndMarkDirtyRuntime(
+  std::uint8_t wxStoreUpdateByteAndMarkDirtyRuntime(
     WxUpdateByteDirtyLatchRuntimeView* const runtime,
     const std::uint8_t updateByte
   ) noexcept
@@ -102310,7 +102310,7 @@ namespace
    * What it does:
    * Returns the internal dword-pair lane located at runtime offset `+0x74`.
    */
-  [[maybe_unused]] WxDwordPairRuntimeView* wxGetDwordPairLane74Runtime(
+  WxDwordPairRuntimeView* wxGetDwordPairLane74Runtime(
     WxDwordPairLane74RuntimeView* const runtime
   ) noexcept
   {
@@ -102324,7 +102324,7 @@ namespace
    * Dispatches one virtual lane at vtable slot `+0x1B0` using a lane id plus
    * one dword pair payload.
    */
-  [[maybe_unused]] int wxDispatchVirtualPairSlot1B0Runtime(
+  int wxDispatchVirtualPairSlot1B0Runtime(
     void* const runtimeObject,
     const int laneId,
     const WxDwordPairRuntimeView* const lanePair
@@ -102345,7 +102345,7 @@ namespace
    * What it does:
    * Reads one state byte lane at offset `+0x0C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadStateByte0CRuntime(
+  std::uint8_t wxReadStateByte0CRuntime(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102358,7 +102358,7 @@ namespace
    * What it does:
    * Reads one state byte lane at offset `+0x1C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadStateByte1CRuntime(
+  std::uint8_t wxReadStateByte1CRuntime(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102371,7 +102371,7 @@ namespace
    * What it does:
    * Returns whether presence lane `+0x24` is non-zero.
    */
-  [[maybe_unused]] BOOL wxHasPresenceLane24Runtime(
+  BOOL wxHasPresenceLane24Runtime(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102384,7 +102384,7 @@ namespace
    * What it does:
    * Returns one pointer to the runtime sub-lane rooted at offset `+0x10`.
    */
-  [[maybe_unused]] std::uint8_t* wxGetSegmentLane10Runtime(
+  std::uint8_t* wxGetSegmentLane10Runtime(
     WxSegmentPointerLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -102397,7 +102397,7 @@ namespace
    * What it does:
    * Returns one pointer to the runtime sub-lane rooted at offset `+0x20`.
    */
-  [[maybe_unused]] std::uint8_t* wxGetSegmentLane20Runtime(
+  std::uint8_t* wxGetSegmentLane20Runtime(
     WxSegmentPointerLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -102411,7 +102411,7 @@ namespace
    * Returns `TRUE` when state bytes `+0x0C` and `+0x1C` are clear and presence
    * lane `+0x24` is zero.
    */
-  [[maybe_unused]] BOOL wxIsTriStateClearRuntime(
+  BOOL wxIsTriStateClearRuntime(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102437,7 +102437,7 @@ namespace
    * Queries one virtual flags lane at slot `+0x88` and returns whether bit `5`
    * is clear.
    */
-  [[maybe_unused]] BOOL wxIsVirtualFlagsBit5ClearRuntime(
+  BOOL wxIsVirtualFlagsBit5ClearRuntime(
     void* const runtimeObject
   ) noexcept
   {
@@ -102452,7 +102452,7 @@ namespace
    * Queries one virtual flags lane at slot `+0x88` and returns bit `5` as
    * `0/1`.
    */
-  [[maybe_unused]] unsigned int wxReadVirtualFlagsBit5Runtime(
+  unsigned int wxReadVirtualFlagsBit5Runtime(
     void* const runtimeObject
   ) noexcept
   {
@@ -102467,7 +102467,7 @@ namespace
    * Stores the first splitter pane lane, clears the second pane lane, then
    * reapplies sash position `0`.
    */
-  [[maybe_unused]] bool wxSplitterWindowSetSinglePaneAndResetRuntime(
+  bool wxSplitterWindowSetSinglePaneAndResetRuntime(
     WxSplitterWindowRuntimeView* const splitter,
     wxWindowBase* const firstPane
   )
@@ -102483,7 +102483,7 @@ namespace
    * What it does:
    * Thunk lane that resolves one list node by zero-based index.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterA(
+  wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterA(
     WxListInsertRuntimeView* const listRuntime,
     const std::int32_t index
   ) noexcept
@@ -102498,7 +102498,7 @@ namespace
    * Returns the value payload pointer stored in the indexed list node, or
    * `nullptr` when the index is out of range.
    */
-  [[maybe_unused]] void* wxListNodeValueAtIndexRuntimeAdapterA(
+  void* wxListNodeValueAtIndexRuntimeAdapterA(
     WxListInsertRuntimeView* const listRuntime,
     const std::int32_t index
   ) noexcept
@@ -102515,7 +102515,7 @@ namespace
    * `+0x08`, writes node value-word lane `+0x08` to `outWord`, and falls back
    * to default word value `0x4040` when node lookup fails.
    */
-  [[maybe_unused]] std::uint16_t* wxReadIndexedListNodeValueWordOrDefaultRuntime(
+  std::uint16_t* wxReadIndexedListNodeValueWordOrDefaultRuntime(
     void* const lookupRuntime,
     std::uint16_t* const outWord,
     const int reservedArg
@@ -102567,7 +102567,7 @@ namespace
    * What it does:
    * Secondary thunk lane that resolves one list node by index.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterB(
+  wxNodeBaseRuntime* wxListNodeAtIndexRuntimeAdapterB(
     WxListInsertRuntimeView* const listRuntime,
     const std::int32_t index
   ) noexcept
@@ -102581,7 +102581,7 @@ namespace
    * What it does:
    * Thunk lane that erases one pointer-array subrange.
    */
-  [[maybe_unused]] void* wxPointerArrayEraseRangeAtIndexAdapterRuntime(
+  void* wxPointerArrayEraseRangeAtIndexAdapterRuntime(
     WxPointerArrayRuntimeView* const arrayRuntime,
     const unsigned int firstIndex,
     const int eraseCount
@@ -102597,7 +102597,7 @@ namespace
    * Returns pointer-array entry at `index` from owner lane `+0x130`, erases
    * that entry in-place, and returns `nullptr` when index is out of range.
    */
-  [[maybe_unused]] void* wxPointerArrayDetachEntryAtIndexRuntime(
+  void* wxPointerArrayDetachEntryAtIndexRuntime(
     void* const ownerRuntime,
     const int index
   ) noexcept
@@ -102640,7 +102640,7 @@ namespace
    * What it does:
    * Copy-constructs the secondary `wxColour` lane at runtime offset `+0x10`.
    */
-  [[maybe_unused]] wxColourRuntime* wxCopySecondaryColourLaneRuntime(
+  wxColourRuntime* wxCopySecondaryColourLaneRuntime(
     WxColourPairRuntimeView* const runtime,
     const wxColourRuntime* const sourceColour
   ) noexcept
@@ -102670,7 +102670,7 @@ namespace
    * What it does:
    * Forwards one source colour into embedded colour lane `+0xA8`.
    */
-  [[maybe_unused]] wxColourRuntime* wxCopyColourIntoEmbeddedLaneA8Runtime(
+  wxColourRuntime* wxCopyColourIntoEmbeddedLaneA8Runtime(
     WxColourPairAtA8RuntimeView* const runtime,
     const wxColourRuntime* const sourceColour
   ) noexcept
@@ -102685,7 +102685,7 @@ namespace
    * What it does:
    * Forwards one source colour into embedded colour lane `+0xB8`.
    */
-  [[maybe_unused]] wxColourRuntime* wxCopyColourIntoEmbeddedLaneB8Runtime(
+  wxColourRuntime* wxCopyColourIntoEmbeddedLaneB8Runtime(
     WxColourPairAtA8RuntimeView* const runtime,
     const wxColourRuntime* const sourceColour
   ) noexcept
@@ -102711,7 +102711,7 @@ namespace
    * Dispatches one virtual lane at slot `+0xF0` with lane kind `1` and the
    * caller payload.
    */
-  [[maybe_unused]] int wxDispatchVirtualSlotF0Lane1Runtime(
+  int wxDispatchVirtualSlotF0Lane1Runtime(
     void* const runtimeObject,
     const int payloadValue
   ) noexcept
@@ -102728,7 +102728,7 @@ namespace
    * event orientation lane `+0x24` equals `4`, dispatches owner callback slot
    * `+0xF0` on nested lane chain `+0x198 -> +0x130` with payload `0`.
    */
-  [[maybe_unused]] int wxScrollHelperHandleEventAndNotifyRuntime(
+  int wxScrollHelperHandleEventAndNotifyRuntime(
     void* const ownerRuntime,
     void* const scrollEventRuntime
   )
@@ -102787,7 +102787,7 @@ namespace
    * What it does:
    * Returns state byte lane `+0x0C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadStateByte0CRuntimeA(
+  std::uint8_t wxReadStateByte0CRuntimeA(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102800,7 +102800,7 @@ namespace
    * What it does:
    * Returns state byte lane `+0x1C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadStateByte1CRuntimeA(
+  std::uint8_t wxReadStateByte1CRuntimeA(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102813,7 +102813,7 @@ namespace
    * What it does:
    * Returns whether presence lane `+0x24` is non-zero.
    */
-  [[maybe_unused]] bool wxHasPresenceLane24RuntimeA(
+  bool wxHasPresenceLane24RuntimeA(
     const WxTriStatePresenceRuntimeView* const runtime
   ) noexcept
   {
@@ -102826,7 +102826,7 @@ namespace
    * What it does:
    * Returns one pointer to the runtime sub-lane rooted at offset `+0x10`.
    */
-  [[maybe_unused]] std::uint8_t* wxGetSegmentLane10RuntimeA(
+  std::uint8_t* wxGetSegmentLane10RuntimeA(
     WxSegmentPointerLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -102839,7 +102839,7 @@ namespace
    * What it does:
    * Returns one pointer to the runtime sub-lane rooted at offset `+0x20`.
    */
-  [[maybe_unused]] std::uint8_t* wxGetSegmentLane20RuntimeA(
+  std::uint8_t* wxGetSegmentLane20RuntimeA(
     WxSegmentPointerLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -102867,7 +102867,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x08` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane08RuntimeA(
+  std::uint32_t wxStoreDwordLane08RuntimeA(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -102883,7 +102883,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x0C` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane0CRuntimeA(
+  std::uint32_t wxStoreDwordLane0CRuntimeA(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -102909,7 +102909,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x148`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane148Runtime(
+  std::uint32_t wxReadDwordLane148Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -102933,7 +102933,7 @@ namespace
    * What it does:
    * Returns the address of pointer lane `+0x158`.
    */
-  [[maybe_unused]] void** wxGetPointerLane158AddressRuntime(
+  void** wxGetPointerLane158AddressRuntime(
     void* const runtimeObject
   ) noexcept
   {
@@ -102958,7 +102958,7 @@ namespace
    * Queries one list-item rectangle in `(x,y,width,height)` form and
    * dispatches it through list-control vtable slot `+0xF0`.
    */
-  [[maybe_unused]] int wxListCtrlDispatchSingleItemRectangleRuntime(
+  int wxListCtrlDispatchSingleItemRectangleRuntime(
     void* const listControlRuntime,
     const WPARAM itemId
   )
@@ -102998,7 +102998,7 @@ namespace
    *      that row's rect dispatch through
    *      `wxListCtrlDispatchSingleItemRectangleRuntime`.
    */
-  [[maybe_unused]] bool wxListCtrlSetItemStateRuntime(
+  bool wxListCtrlSetItemStateRuntime(
     void* const listControlRuntime,
     const WPARAM itemId,
     const std::uint8_t stateBits,
@@ -103061,7 +103061,7 @@ namespace
    * Queries first/last list-item rectangles, builds one combined
    * `(x,y,width,height)` span, and dispatches it through vtable slot `+0xF0`.
    */
-  [[maybe_unused]] int wxListCtrlDispatchItemRangeRectangleRuntime(
+  int wxListCtrlDispatchItemRangeRectangleRuntime(
     void* const listControlRuntime,
     const WPARAM firstItemId,
     const WPARAM lastItemId
@@ -103109,7 +103109,7 @@ namespace
    * What it does:
    * Assigns one shared wx-string payload into runtime slot `+0x18`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignSharedStringSlot18WriteRuntime(
+  wxStringRuntime* wxAssignSharedStringSlot18WriteRuntime(
     WxRuntimeStringSlot18WriteView* const runtime,
     const wxStringRuntime* const sourceValue
   )
@@ -103154,7 +103154,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x0C` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane0CRuntimeB(
+  std::uint32_t wxStoreDwordLane0CRuntimeB(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -103177,7 +103177,7 @@ namespace
    * What it does:
    * Returns true when lane `+0x1C` equals `1` or `2`.
    */
-  [[maybe_unused]] bool wxIsLane1CValueOneOrTwoRuntimeA(
+  bool wxIsLane1CValueOneOrTwoRuntimeA(
     const void* const runtimeObject
   ) noexcept
   {
@@ -103191,7 +103191,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x10` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane10RuntimeA(
+  std::uint32_t wxStoreDwordLane10RuntimeA(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -103207,7 +103207,7 @@ namespace
    * What it does:
    * Returns the address of dword lane `+0x18`.
    */
-  [[maybe_unused]] std::uint32_t* wxGetDwordLane18AddressRuntime(
+  std::uint32_t* wxGetDwordLane18AddressRuntime(
     void* const runtimeObject
   ) noexcept
   {
@@ -103221,7 +103221,7 @@ namespace
    * What it does:
    * Returns true when lane `+0x1C` equals `1` or `2`.
    */
-  [[maybe_unused]] bool wxIsLane1CValueOneOrTwoRuntimeB(
+  bool wxIsLane1CValueOneOrTwoRuntimeB(
     const void* const runtimeObject
   ) noexcept
   {
@@ -103235,7 +103235,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x08` and returns the stored value.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane08RuntimeB(
+  std::uint32_t wxStoreDwordLane08RuntimeB(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -103251,7 +103251,7 @@ namespace
    * What it does:
    * Alias lane of storing one dword at offset `+0x08`.
    */
-  [[maybe_unused]] std::uint32_t wxStoreDwordLane08RuntimeC(
+  std::uint32_t wxStoreDwordLane08RuntimeC(
     void* const runtimeObject,
     const std::uint32_t value
   ) noexcept
@@ -103289,7 +103289,7 @@ namespace
    * What it does:
    * Returns the address of dword lane `+0x34`.
    */
-  [[maybe_unused]] std::uint32_t* wxGetDwordLane34AddressRuntime(
+  std::uint32_t* wxGetDwordLane34AddressRuntime(
     void* const runtimeObject
   ) noexcept
   {
@@ -103303,7 +103303,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x58`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane58Runtime(
+  std::uint32_t wxReadDwordLane58Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -103317,7 +103317,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x50`.
    */
-  [[maybe_unused]] std::uint32_t wxReadDwordLane50Runtime(
+  std::uint32_t wxReadDwordLane50Runtime(
     const void* const runtimeObject
   ) noexcept
   {
@@ -103332,7 +103332,7 @@ namespace
    * Thunk lane that forwards node non-deleting teardown into
    * `FUN_00978950`.
    */
-  [[maybe_unused]] void* wxDestroyNodeBaseNoDeleteRuntimeAdapterC(
+  void* wxDestroyNodeBaseNoDeleteRuntimeAdapterC(
     void* const nodeRuntime
   ) noexcept
   {
@@ -103346,7 +103346,7 @@ namespace
    * Thunk lane that forwards list insertion-before-node semantics into
    * `FUN_00978440`.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterC(
+  wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterC(
     WxListInsertRuntimeView* const listRuntime,
     wxNodeBaseRuntime* const nextNode,
     void* const value
@@ -103361,7 +103361,7 @@ namespace
    * What it does:
    * Thunk lane that forwards one node-detach request into `FUN_009785A0`.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxDetachNodeFromListOwnerRuntimeAdapterA(
+  wxNodeBaseRuntime* wxDetachNodeFromListOwnerRuntimeAdapterA(
     WxListOwnerNodeDestroyRuntimeView* const listOwner,
     wxNodeBaseRuntime* const node
   ) noexcept
@@ -103376,7 +103376,7 @@ namespace
    * Secondary thunk lane that forwards list insertion-before-node semantics
    * into `FUN_00978440`.
    */
-  [[maybe_unused]] wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterD(
+  wxNodeBaseRuntime* wxListInsertBeforeNodeRuntimeAdapterD(
     WxListInsertRuntimeView* const listRuntime,
     wxNodeBaseRuntime* const nextNode,
     void* const value
@@ -103392,7 +103392,7 @@ namespace
    * Thunk lane that removes one list node from its owner and runs delete-node
    * semantics.
    */
-  [[maybe_unused]] bool wxDeleteNodeFromOwningListRuntimeAdapterC(
+  bool wxDeleteNodeFromOwningListRuntimeAdapterC(
     wxNodeBaseRuntime* const node
   ) noexcept
   {
@@ -103454,7 +103454,7 @@ namespace
    * `index == entryCount`, dispatches indexed insert lane `+0x4C` when
    * `index < entryCount`, and returns false otherwise.
    */
-  [[maybe_unused]] bool wxDispatchAppendOrInsertByIndexRuntime(
+  bool wxDispatchAppendOrInsertByIndexRuntime(
     void* const ownerRuntime,
     const std::uint32_t index,
     void* const valuePayload
@@ -103480,7 +103480,7 @@ namespace
    * What it does:
    * Forwards one non-null payload through virtual dispatch slot `+0x50`.
    */
-  [[maybe_unused]] void* wxDispatchSlot50IfPayloadPresentRuntime(
+  void* wxDispatchSlot50IfPayloadPresentRuntime(
     void* const ownerRuntime,
     void* const valuePayload
   ) noexcept
@@ -103498,7 +103498,7 @@ namespace
    * What it does:
    * Forwards one non-null payload through virtual dispatch slot `+0x54`.
    */
-  [[maybe_unused]] bool wxDispatchSlot54IfPayloadPresentRuntime(
+  bool wxDispatchSlot54IfPayloadPresentRuntime(
     void* const ownerRuntime,
     void* const valuePayload
   ) noexcept
@@ -103516,7 +103516,7 @@ namespace
    * What it does:
    * Forwards one non-null payload through virtual dispatch slot `+0x58`.
    */
-  [[maybe_unused]] bool wxDispatchSlot58IfPayloadPresentRuntime(
+  bool wxDispatchSlot58IfPayloadPresentRuntime(
     void* const ownerRuntime,
     void* const valuePayload
   ) noexcept
@@ -103561,7 +103561,7 @@ namespace
    * matches `keyRuntime`; returns that entry pointer and optionally writes its
    * index (or `-1` when not found).
    */
-  [[maybe_unused]] void* wxFindIndexedListEntryByKeyRuntime(
+  void* wxFindIndexedListEntryByKeyRuntime(
     const void* const ownerRuntime,
     const void* const keyRuntime,
     std::int32_t* const outIndex
@@ -103606,7 +103606,7 @@ namespace
    * Returns the indexed node value lane when `index < entryCount`; otherwise
    * returns `nullptr`.
    */
-  [[maybe_unused]] void* wxGetIndexedNodeValueRuntime(
+  void* wxGetIndexedNodeValueRuntime(
     WxIndexedListLookupOwnerRuntimeView* const owner,
     const unsigned int index
   ) noexcept
@@ -103636,7 +103636,7 @@ namespace
    * Looks up one indexed runtime payload via vtable slot `+0x230` and copies
    * shared wx-string storage into that payload's slot `+0x18`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignSharedStringFromIndexedLookupRuntime(
+  wxStringRuntime* wxAssignSharedStringFromIndexedLookupRuntime(
     void* const ownerRuntime,
     const std::int32_t index,
     const wxStringRuntime* const sourceValue
@@ -103658,7 +103658,7 @@ namespace
    * Ensures writable ownership and returns a pointer to the final UTF-16 code
    * unit in the shared wx-string payload.
    */
-  [[maybe_unused]] wchar_t* wxStringWritableLastCharacterPointerRuntime(
+  wchar_t* wxStringWritableLastCharacterPointerRuntime(
     wxStringRuntime* const value
   ) noexcept
   {
@@ -103693,7 +103693,7 @@ namespace
    * Reads one indirect wx-string lane and forwards to writable-tail pointer
    * resolution.
    */
-  [[maybe_unused]] wchar_t* wxStringUngetWriteBufIndirectRuntime(
+  wchar_t* wxStringUngetWriteBufIndirectRuntime(
     WxIndirectStringPointerRuntimeView* const runtime
   ) noexcept
   {
@@ -103706,7 +103706,7 @@ namespace
    * What it does:
    * Assigns one source shared wx-string lane into embedded lane `+0x14`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignStringIntoEmbeddedLane14Runtime(
+  wxStringRuntime* wxAssignStringIntoEmbeddedLane14Runtime(
     WxStringLane14RuntimeView* const runtime,
     const wxStringRuntime* const sourceValue
   ) noexcept
@@ -103722,7 +103722,7 @@ namespace
    * Assigns one source shared wx-string lane through an indirect string
    * pointer lane at offset `+0x00`.
    */
-  [[maybe_unused]] wxStringRuntime* wxAssignStringThroughIndirectPointerRuntime(
+  wxStringRuntime* wxAssignStringThroughIndirectPointerRuntime(
     WxIndirectStringPointerRuntimeView* const runtime,
     const wxStringRuntime* const sourceValue
   ) noexcept
@@ -103737,7 +103737,7 @@ namespace
    * What it does:
    * Begins busy-cursor scope with the supplied cursor and returns the owner.
    */
-  [[maybe_unused]] void* wxBeginBusyCursorReturnSelfRuntime(
+  void* wxBeginBusyCursorReturnSelfRuntime(
     void* const ownerRuntime,
     wxCursor* const cursor
   )
@@ -103778,7 +103778,7 @@ namespace
    * Resolves one menu item by command id and forwards one integer payload to
    * the menu-item dispatch lane at vtable offset `+0x18`.
    */
-  [[maybe_unused]] int wxMenuItemInvokeAction18ByCommandIdRuntime(
+  int wxMenuItemInvokeAction18ByCommandIdRuntime(
     void* const menuLookupHostRuntime,
     const int commandId,
     const int payloadValue
@@ -103801,7 +103801,7 @@ namespace
    * Looks up one menu item by command id and, for check/radio kinds (`1/2`),
    * forwards one checked-state payload through vtable lane `+0x20`.
    */
-  [[maybe_unused]] int wxMenuItemSetCheckedForToggleKindsByCommandIdRuntime(
+  int wxMenuItemSetCheckedForToggleKindsByCommandIdRuntime(
     void* const menuLookupHostRuntime,
     const int commandId,
     const int checkedState
@@ -103827,7 +103827,7 @@ namespace
    * Resolves one menu item by command id and returns its checked-state lane;
    * returns false when lookup fails.
    */
-  [[maybe_unused]] bool wxMenuItemIsCheckedByCommandIdRuntime(
+  bool wxMenuItemIsCheckedByCommandIdRuntime(
     void* const menuLookupHostRuntime,
     const int commandId
   ) noexcept
@@ -103844,7 +103844,7 @@ namespace
    * Resolves one menu item by command id and returns whether that item is
    * checkable; returns false when lookup fails.
    */
-  [[maybe_unused]] bool wxMenuItemIsCheckableByCommandIdRuntime(
+  bool wxMenuItemIsCheckableByCommandIdRuntime(
     void* const menuLookupHostRuntime,
     const int commandId
   ) noexcept
@@ -103861,7 +103861,7 @@ namespace
    * Resolves one menu item by command id and forwards one integer payload to
    * the menu-item dispatch lane at vtable offset `+0x10`.
    */
-  [[maybe_unused]] int wxMenuItemInvokeAction10ByCommandIdRuntime(
+  int wxMenuItemInvokeAction10ByCommandIdRuntime(
     void* const menuLookupHostRuntime,
     const int commandId,
     const int payloadValue
@@ -103889,7 +103889,7 @@ namespace
    * What it does:
    * Clears pointer lane `+0x00` and returns the owning runtime object.
    */
-  [[maybe_unused]] WxPointerLane00RuntimeViewA* wxClearPointerLane00ReturnSelfRuntime(
+  WxPointerLane00RuntimeViewA* wxClearPointerLane00ReturnSelfRuntime(
     WxPointerLane00RuntimeViewA* const runtime
   ) noexcept
   {
@@ -103912,7 +103912,7 @@ namespace
    * What it does:
    * Stores one byte payload into lane `+0x0C` and returns the stored value.
    */
-  [[maybe_unused]] std::uint8_t wxStoreByteLane0CReturnValueRuntime(
+  std::uint8_t wxStoreByteLane0CReturnValueRuntime(
     WxByteFlags0C0DRuntimeView* const runtime,
     const std::uint8_t value
   ) noexcept
@@ -103927,7 +103927,7 @@ namespace
    * What it does:
    * Clears byte lane `+0x0D`.
    */
-  [[maybe_unused]] void wxClearByteLane0DRuntime(
+  void wxClearByteLane0DRuntime(
     WxByteFlags0C0DRuntimeView* const runtime
   ) noexcept
   {
@@ -103957,7 +103957,7 @@ namespace
    * What it does:
    * Returns notebook page-count lane `+0x134`.
    */
-  [[maybe_unused]] int wxNotebookGetPageCountLaneRuntime(
+  int wxNotebookGetPageCountLaneRuntime(
     const WxNotebookStateLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -103970,7 +103970,7 @@ namespace
    * What it does:
    * Returns notebook state lane `+0x38`.
    */
-  [[maybe_unused]] int wxNotebookEventGetSelectedPageIndexRuntime(
+  int wxNotebookEventGetSelectedPageIndexRuntime(
     const WxNotebookStateLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -103983,7 +103983,7 @@ namespace
    * What it does:
    * Stores notebook state lane `+0x38` and returns the stored value.
    */
-  [[maybe_unused]] int wxNotebookEventSetSelectedPageIndexRuntime(
+  int wxNotebookEventSetSelectedPageIndexRuntime(
     WxNotebookStateLanesRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -103998,7 +103998,7 @@ namespace
    * What it does:
    * Returns notebook state lane `+0x3C`.
    */
-  [[maybe_unused]] int wxNotebookEventGetPreviousPageIndexRuntime(
+  int wxNotebookEventGetPreviousPageIndexRuntime(
     const WxNotebookStateLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -104011,7 +104011,7 @@ namespace
    * What it does:
    * Stores notebook state lane `+0x3C` and returns the stored value.
    */
-  [[maybe_unused]] int wxNotebookEventSetPreviousPageIndexRuntime(
+  int wxNotebookEventSetPreviousPageIndexRuntime(
     WxNotebookStateLanesRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104070,7 +104070,7 @@ namespace
    * Applies notebook page activation transitions for one selection event and
    * marks the event handled flag lane.
    */
-  [[maybe_unused]] void wxNotebookApplySelectionTransitionRuntime(
+  void wxNotebookApplySelectionTransitionRuntime(
     WxNotebookStateLanesRuntimeView* const notebookRuntime,
     WxNotebookSelectionEventRuntimeView* const eventRuntime
   ) noexcept
@@ -104110,7 +104110,7 @@ namespace
    * What it does:
    * Returns the address of subobject lane `+0x9C`.
    */
-  [[maybe_unused]] char* wxGetSubobjectOffset9CRuntime(
+  char* wxGetSubobjectOffset9CRuntime(
     WxOffset9CAddressRuntimeView* const runtime
   ) noexcept
   {
@@ -104133,7 +104133,7 @@ namespace
    * What it does:
    * Stores two integer payload lanes at `+0x08/+0x0C` and returns the first.
    */
-  [[maybe_unused]] int wxStoreLanes08And0CRuntime(
+  int wxStoreLanes08And0CRuntime(
     WxLane08And0CStoreRuntimeView* const runtime,
     const int value08,
     const int value0C
@@ -104157,7 +104157,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x24`.
    */
-  [[maybe_unused]] int wxReadLane24Runtime(
+  int wxReadLane24Runtime(
     const WxDwordOffset24RuntimeViewA* const runtime
   ) noexcept
   {
@@ -104177,7 +104177,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x20`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane20Runtime(
+  std::uint8_t wxReadByteLane20Runtime(
     const WxByteOffset20RuntimeView* const runtime
   ) noexcept
   {
@@ -104198,7 +104198,7 @@ namespace
    * What it does:
    * Initializes triplet lanes to `{0, 0, 50}` and returns the runtime.
    */
-  [[maybe_unused]] WxTripletRuntimeStateView* wxInitializeThreadStateDefaultsRuntime(
+  WxTripletRuntimeStateView* wxInitializeThreadStateDefaultsRuntime(
     WxTripletRuntimeStateView* const runtime
   ) noexcept
   {
@@ -104214,7 +104214,7 @@ namespace
    * What it does:
    * Stores dword lane `+0x04` as `3`.
    */
-  [[maybe_unused]] void wxThreadSetStateModeThreeRuntime(
+  void wxThreadSetStateModeThreeRuntime(
     WxTripletRuntimeStateView* const runtime
   ) noexcept
   {
@@ -104227,7 +104227,7 @@ namespace
    * What it does:
    * Stores dword lane `+0x04` and returns the stored value.
    */
-  [[maybe_unused]] int wxThreadSetStateCodeRuntime(
+  int wxThreadSetStateCodeRuntime(
     WxTripletRuntimeStateView* const runtime,
     const int value
   ) noexcept
@@ -104248,7 +104248,7 @@ namespace
    * What it does:
    * Stores one 16-bit lane at `+0x00` and returns the runtime.
    */
-  [[maybe_unused]] WxWordLane00RuntimeViewA* wxStoreWordLane00ReturnSelfRuntime(
+  WxWordLane00RuntimeViewA* wxStoreWordLane00ReturnSelfRuntime(
     WxWordLane00RuntimeViewA* const runtime,
     const std::uint16_t value
   ) noexcept
@@ -104263,7 +104263,7 @@ namespace
    * What it does:
    * Stores dword lane `+0x24` and returns the stored value.
    */
-  [[maybe_unused]] int wxStoreLane24Runtime(
+  int wxStoreLane24Runtime(
     WxDwordOffset24RuntimeViewA* const runtime,
     const int value
   ) noexcept
@@ -104289,7 +104289,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x130`.
    */
-  [[maybe_unused]] int wxSlider95GetLeftChildHandleRuntime(
+  int wxSlider95GetLeftChildHandleRuntime(
     const WxTripleDword130RuntimeView* const runtime
   ) noexcept
   {
@@ -104302,7 +104302,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x134`.
    */
-  [[maybe_unused]] int wxSlider95GetRightChildHandleRuntime(
+  int wxSlider95GetRightChildHandleRuntime(
     const WxTripleDword130RuntimeView* const runtime
   ) noexcept
   {
@@ -104315,7 +104315,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x138`.
    */
-  [[maybe_unused]] int wxSlider95GetCenterChildHandleRuntime(
+  int wxSlider95GetCenterChildHandleRuntime(
     const WxTripleDword130RuntimeView* const runtime
   ) noexcept
   {
@@ -104341,7 +104341,7 @@ namespace
    * What it does:
    * Returns the final UTF-16 code unit from one shared buffer payload.
    */
-  [[maybe_unused]] std::int16_t wxReadLastUtf16CodeUnitRuntime(
+  std::int16_t wxReadLastUtf16CodeUnitRuntime(
     const WxUtf16BufferViewRuntime* const runtime
   ) noexcept
   {
@@ -104363,7 +104363,7 @@ namespace
    * What it does:
    * Stores dword lane `+0x19C` and returns the stored value.
    */
-  [[maybe_unused]] int wxFileDialogSetFilterIndexRuntime(
+  int wxFileDialogSetFilterIndexRuntime(
     WxDwordOffset19CRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104378,7 +104378,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x19C`.
    */
-  [[maybe_unused]] int wxFileDialogGetFilterIndexRuntime(
+  int wxFileDialogGetFilterIndexRuntime(
     const WxDwordOffset19CRuntimeView* const runtime
   ) noexcept
   {
@@ -104398,7 +104398,7 @@ namespace
    * What it does:
    * Stores dword lane `+0x2C` and returns the stored value.
    */
-  [[maybe_unused]] int wxStoreDwordOffset2CAndReturnRuntime(
+  int wxStoreDwordOffset2CAndReturnRuntime(
     WxDwordOffset2CRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104435,7 +104435,7 @@ namespace
    * What it does:
    * Stores one dword value into runtime lane `+0x2C` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane2CAndReturnValueRuntime(
+  int wxStoreLane2CAndReturnValueRuntime(
     WxDwordLanes08To2CRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104450,7 +104450,7 @@ namespace
    * What it does:
    * Stores one dword value into runtime lane `+0x08` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane08AndReturnValueRuntime(
+  int wxStoreLane08AndReturnValueRuntime(
     WxDwordLanes08To2CRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104465,7 +104465,7 @@ namespace
    * What it does:
    * Stores one dword value into runtime lane `+0x0C` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane0CAndReturnValueRuntime(
+  int wxStoreLane0CAndReturnValueRuntime(
     WxDwordLanes08To2CRuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104480,7 +104480,7 @@ namespace
    * What it does:
    * Copies runtime dword lanes `+0x0C/+0x10` into one output pair.
    */
-  [[maybe_unused]] WxDwordPairWriteRuntimeView* wxReadLanes0CAnd10IntoPairRuntime(
+  WxDwordPairWriteRuntimeView* wxReadLanes0CAnd10IntoPairRuntime(
     const WxDwordLanes08To2CRuntimeView* const runtime,
     WxDwordPairWriteRuntimeView* const outPair
   ) noexcept
@@ -104513,7 +104513,7 @@ namespace
    * Forwards one double payload through virtual slot `+0x04` and returns the
    * same runtime pointer.
    */
-  [[maybe_unused]] WxVirtualDoubleDispatchSlot04RuntimeView* wxDispatchDoubleViaVirtualSlot04Runtime(
+  WxVirtualDoubleDispatchSlot04RuntimeView* wxDispatchDoubleViaVirtualSlot04Runtime(
     WxVirtualDoubleDispatchSlot04RuntimeView* const runtime,
     const double value
   ) noexcept
@@ -104529,7 +104529,7 @@ namespace
    * Promotes one float payload to double, dispatches it through virtual slot
    * `+0x04`, and returns the same runtime pointer.
    */
-  [[maybe_unused]] WxVirtualDoubleDispatchSlot04RuntimeView* wxDispatchFloatViaVirtualSlot04Runtime(
+  WxVirtualDoubleDispatchSlot04RuntimeView* wxDispatchFloatViaVirtualSlot04Runtime(
     WxVirtualDoubleDispatchSlot04RuntimeView* const runtime,
     const float value
   ) noexcept
@@ -104551,7 +104551,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x118`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane118Runtime(
+  std::uint8_t wxReadByteLane118Runtime(
     const WxByteLane118RuntimeView* const runtime
   ) noexcept
   {
@@ -104575,7 +104575,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x19`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane19Runtime(
+  std::uint8_t wxReadByteLane19Runtime(
     const WxByteLanes18To1ARuntimeView* const runtime
   ) noexcept
   {
@@ -104588,7 +104588,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x18`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane18Runtime(
+  std::uint8_t wxReadByteLane18Runtime(
     const WxByteLanes18To1ARuntimeView* const runtime
   ) noexcept
   {
@@ -104601,7 +104601,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x1A`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane1ARuntime(
+  std::uint8_t wxReadByteLane1ARuntime(
     const WxByteLanes18To1ARuntimeView* const runtime
   ) noexcept
   {
@@ -104624,7 +104624,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x08`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane08Runtime(
+  char* wxGetAddressOfLane08Runtime(
     WxOffset8AndCRuntimeView* const runtime
   ) noexcept
   {
@@ -104637,7 +104637,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x0C`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane0CRuntime(
+  char* wxGetAddressOfLane0CRuntime(
     WxOffset8AndCRuntimeView* const runtime
   ) noexcept
   {
@@ -104678,7 +104678,7 @@ namespace
    * What it does:
    * Computes one dword-offset address lane from base `+0x1C` and index.
    */
-  [[maybe_unused]] int wxComputeOffsetFromLane1CWithDwordIndexRuntime(
+  int wxComputeOffsetFromLane1CWithDwordIndexRuntime(
     const WxScalarLanes04To38RuntimeView* const runtime,
     const int index
   ) noexcept
@@ -104692,7 +104692,7 @@ namespace
    * What it does:
    * Stores one dword value into lane `+0x10` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane10AndReturnValueRuntime(
+  int wxStoreLane10AndReturnValueRuntime(
     WxScalarLanes04To38RuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104707,7 +104707,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x04`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane04RuntimeA(
+  char* wxGetAddressOfLane04RuntimeA(
     WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104720,7 +104720,7 @@ namespace
    * What it does:
    * Stores one dword value into lane `+0x04` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane04AndReturnValueRuntime(
+  int wxStoreLane04AndReturnValueRuntime(
     WxScalarLanes04To38RuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104735,7 +104735,7 @@ namespace
    * What it does:
    * Stores one dword value into lane `+0x08` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane08AndReturnValueRuntimeB(
+  int wxStoreLane08AndReturnValueRuntimeB(
     WxScalarLanes04To38RuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104750,7 +104750,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x04`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane04RuntimeB(
+  char* wxGetAddressOfLane04RuntimeB(
     WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104763,7 +104763,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x08`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane08RuntimeB(
+  char* wxGetAddressOfLane08RuntimeB(
     WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104776,7 +104776,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x28`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane28Runtime(
+  char* wxGetAddressOfLane28Runtime(
     WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104789,7 +104789,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x2C`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane2CRuntime(
+  std::uint8_t wxReadByteLane2CRuntime(
     const WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104802,7 +104802,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x08`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane08RuntimeC(
+  char* wxGetAddressOfLane08RuntimeC(
     WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104815,7 +104815,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x18`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane18Runtime(
+  char* wxGetAddressOfLane18Runtime(
     WxScalarLanes04To38RuntimeView* const runtime
   ) noexcept
   {
@@ -104828,7 +104828,7 @@ namespace
    * What it does:
    * Stores one dword value into lane `+0x38` and returns the input.
    */
-  [[maybe_unused]] int wxStoreLane38AndReturnValueRuntime(
+  int wxStoreLane38AndReturnValueRuntime(
     WxScalarLanes04To38RuntimeView* const runtime,
     const int value
   ) noexcept
@@ -104874,7 +104874,7 @@ namespace
    * What it does:
    * Returns cached selection-index lane `+0x174`.
    */
-  [[maybe_unused]] int wxReadCachedSelectionIndexRuntime(
+  int wxReadCachedSelectionIndexRuntime(
     const WxDialogSelectionOwnerRuntimeView* const runtime
   ) noexcept
   {
@@ -104888,7 +104888,7 @@ namespace
    * Dispatches one selection update through nested virtual slot `+0x21C`,
    * stores the selected index in lane `+0x174`, and returns dispatch result.
    */
-  [[maybe_unused]] int wxApplySelectionAndCacheIndexRuntime(
+  int wxApplySelectionAndCacheIndexRuntime(
     WxDialogSelectionOwnerRuntimeView* const runtime,
     const int selectionIndex
   ) noexcept
@@ -104915,7 +104915,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x244` from one caller-provided runtime pointer.
    */
-  [[maybe_unused]] int wxReadDwordOffset244FromPointerArgRuntime(
+  int wxReadDwordOffset244FromPointerArgRuntime(
     const void* const runtimePointer
   ) noexcept
   {
@@ -104973,7 +104973,7 @@ namespace
    * count-like lane, and dispatches `count-1` through owner virtual slot
    * `+0x228`.
    */
-  [[maybe_unused]] int wxApplySelectionSourceTokenAndDispatchIndexRuntime(
+  int wxApplySelectionSourceTokenAndDispatchIndexRuntime(
     WxSelectionOwnerRuntimeView* const runtime,
     const int token
   ) noexcept
@@ -104996,7 +104996,7 @@ namespace
    * What it does:
    * Initializes one two-lane dword pair with caller values and returns it.
    */
-  [[maybe_unused]] WxDwordPairCtorRuntimeView* wxConstructDwordPairLaneARuntime(
+  WxDwordPairCtorRuntimeView* wxConstructDwordPairLaneARuntime(
     WxDwordPairCtorRuntimeView* const runtime,
     const int firstValue,
     const int secondValue
@@ -105014,7 +105014,7 @@ namespace
    * Initializes one second two-lane dword pair with caller values and returns
    * it.
    */
-  [[maybe_unused]] WxDwordPairCtorRuntimeView* wxConstructDwordPairLaneBRuntime(
+  WxDwordPairCtorRuntimeView* wxConstructDwordPairLaneBRuntime(
     WxDwordPairCtorRuntimeView* const runtime,
     const int firstValue,
     const int secondValue
@@ -105033,7 +105033,7 @@ namespace
   };
   static_assert(sizeof(WxZeroPrimedTripletRuntimeView) == 0xC, "WxZeroPrimedTripletRuntimeView size must be 0xC");
 
-  [[maybe_unused]] WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingCoreRuntime(
+  WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingCoreRuntime(
     WxZeroPrimedTripletRuntimeView* const runtime,
     const WxZeroPrimedTripletRuntimeView* const sibling
   ) noexcept
@@ -105051,7 +105051,7 @@ namespace
    * Initializes one three-lane dword runtime with zero in lane `+0x00` and
    * copies lanes `+0x04/+0x08` from sibling runtime.
    */
-  [[maybe_unused]] WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingRuntimeA(
+  WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingRuntimeA(
     WxZeroPrimedTripletRuntimeView* const runtime,
     const WxZeroPrimedTripletRuntimeView* const sibling
   ) noexcept
@@ -105066,7 +105066,7 @@ namespace
    * Initializes one second three-lane dword runtime with zero in lane `+0x00`
    * and copies lanes `+0x04/+0x08` from sibling runtime.
    */
-  [[maybe_unused]] WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingRuntimeB(
+  WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingRuntimeB(
     WxZeroPrimedTripletRuntimeView* const runtime,
     const WxZeroPrimedTripletRuntimeView* const sibling
   ) noexcept
@@ -105081,7 +105081,7 @@ namespace
    * Initializes one third three-lane dword runtime with zero in lane `+0x00`
    * and copies lanes `+0x04/+0x08` from sibling runtime.
    */
-  [[maybe_unused]] WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingRuntimeC(
+  WxZeroPrimedTripletRuntimeView* wxConstructZeroPrimedTripletFromSiblingRuntimeC(
     WxZeroPrimedTripletRuntimeView* const runtime,
     const WxZeroPrimedTripletRuntimeView* const sibling
   ) noexcept
@@ -105110,7 +105110,7 @@ namespace
   };
   static_assert(offsetof(WxDirectNodeSourceRuntimeView, nodePointer) == 0x4, "WxDirectNodeSourceRuntimeView::nodePointer offset must be 0x4");
 
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeCoreRuntime(
+  WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeCoreRuntime(
     WxIndirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105120,7 +105120,7 @@ namespace
     return outCursor;
   }
 
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeCoreRuntime(
+  WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeCoreRuntime(
     WxDirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105136,7 +105136,7 @@ namespace
    * What it does:
    * Builds one iterator cursor from an indirect node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeA(
+  WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeA(
     WxIndirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105150,7 +105150,7 @@ namespace
    * What it does:
    * Builds one iterator cursor from a direct node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeA(
+  WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeA(
     WxDirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105164,7 +105164,7 @@ namespace
    * What it does:
    * Builds one second iterator cursor from an indirect node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeB(
+  WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeB(
     WxIndirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105178,7 +105178,7 @@ namespace
    * What it does:
    * Builds one second iterator cursor from a direct node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeB(
+  WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeB(
     WxDirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105186,7 +105186,7 @@ namespace
     return wxBuildCursorFromDirectNodeCoreRuntime(runtime, outCursor);
   }
 
-  [[maybe_unused]] WxCursorPairRuntimeView* wxResetCursorPairCoreRuntime(
+  WxCursorPairRuntimeView* wxResetCursorPairCoreRuntime(
     WxCursorPairRuntimeView* const runtime
   ) noexcept
   {
@@ -105201,7 +105201,7 @@ namespace
    * What it does:
    * Clears owner/node lanes in one iterator cursor pair.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxResetCursorPairRuntimeA(
+  WxCursorPairRuntimeView* wxResetCursorPairRuntimeA(
     WxCursorPairRuntimeView* const runtime
   ) noexcept
   {
@@ -105214,14 +105214,14 @@ namespace
    * What it does:
    * Clears owner/node lanes in one second iterator cursor pair.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxResetCursorPairRuntimeB(
+  WxCursorPairRuntimeView* wxResetCursorPairRuntimeB(
     WxCursorPairRuntimeView* const runtime
   ) noexcept
   {
     return wxResetCursorPairCoreRuntime(runtime);
   }
 
-  [[maybe_unused]] int wxFillDwordRangeFromScalarCoreRuntime(
+  int wxFillDwordRangeFromScalarCoreRuntime(
     std::uint32_t* destination,
     const int count,
     const std::uint32_t* const sourceValue
@@ -105243,7 +105243,7 @@ namespace
    * What it does:
    * Writes one scalar dword across `count` destination dwords.
    */
-  [[maybe_unused]] int wxFillDwordRangeFromScalarRuntimeA(
+  int wxFillDwordRangeFromScalarRuntimeA(
     std::uint32_t* const destination,
     const int count,
     const std::uint32_t* const sourceValue
@@ -105258,7 +105258,7 @@ namespace
    * What it does:
    * Writes one scalar dword across `count` destination dwords (second lane).
    */
-  [[maybe_unused]] int wxFillDwordRangeFromScalarRuntimeB(
+  int wxFillDwordRangeFromScalarRuntimeB(
     std::uint32_t* const destination,
     const int count,
     const std::uint32_t* const sourceValue
@@ -105276,7 +105276,7 @@ namespace
   static_assert(offsetof(WxTrackedOwnerRefRuntimeView, trackedOwner) == 0x0C, "WxTrackedOwnerRefRuntimeView::trackedOwner offset must be 0x0C");
   static_assert(offsetof(WxTrackedOwnerRefRuntimeView, refCount) == 0x10, "WxTrackedOwnerRefRuntimeView::refCount offset must be 0x10");
 
-  [[maybe_unused]] int wxReleaseTrackedOwnerReferenceCoreRuntime(
+  int wxReleaseTrackedOwnerReferenceCoreRuntime(
     WxTrackedOwnerRefRuntimeView* const runtime
   ) noexcept
   {
@@ -105300,7 +105300,7 @@ namespace
    * Decrements one tracked ref-count lane and clears owner lane `+0x0C` when
    * the count reaches zero.
    */
-  [[maybe_unused]] int wxReleaseTrackedOwnerReferenceRuntimeA(
+  int wxReleaseTrackedOwnerReferenceRuntimeA(
     WxTrackedOwnerRefRuntimeView* const runtime
   ) noexcept
   {
@@ -105313,7 +105313,7 @@ namespace
    * What it does:
    * Builds one third iterator cursor from an indirect node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeC(
+  WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeC(
     WxIndirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105328,7 +105328,7 @@ namespace
    * Decrements one second tracked ref-count lane and clears owner lane `+0x0C`
    * when the count reaches zero.
    */
-  [[maybe_unused]] int wxReleaseTrackedOwnerReferenceRuntimeB(
+  int wxReleaseTrackedOwnerReferenceRuntimeB(
     WxTrackedOwnerRefRuntimeView* const runtime
   ) noexcept
   {
@@ -105341,7 +105341,7 @@ namespace
    * What it does:
    * Builds one fourth iterator cursor from an indirect node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeD(
+  WxCursorPairRuntimeView* wxBuildCursorFromIndirectNodeRuntimeD(
     WxIndirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105362,7 +105362,7 @@ namespace
   static_assert(offsetof(WxTrackedResourceLanesRuntimeView, lane0C) == 0x0C, "WxTrackedResourceLanesRuntimeView::lane0C offset must be 0x0C");
   static_assert(offsetof(WxTrackedResourceLanesRuntimeView, lane10) == 0x10, "WxTrackedResourceLanesRuntimeView::lane10 offset must be 0x10");
 
-  [[maybe_unused]] WxTrackedResourceLanesRuntimeView* wxResetTrackedResourceLanesCoreRuntime(
+  WxTrackedResourceLanesRuntimeView* wxResetTrackedResourceLanesCoreRuntime(
     WxTrackedResourceLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -105379,7 +105379,7 @@ namespace
    * What it does:
    * Clears runtime lanes `+0x04/+0x08/+0x0C/+0x10`.
    */
-  [[maybe_unused]] WxTrackedResourceLanesRuntimeView* wxResetTrackedResourceLanesRuntimeA(
+  WxTrackedResourceLanesRuntimeView* wxResetTrackedResourceLanesRuntimeA(
     WxTrackedResourceLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -105392,7 +105392,7 @@ namespace
    * What it does:
    * Builds one third iterator cursor from a direct node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeC(
+  WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeC(
     WxDirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105424,7 +105424,7 @@ namespace
   };
   static_assert(offsetof(WxOrderedTreeRuntimeView, header) == 0x04, "WxOrderedTreeRuntimeView::header offset must be 0x04");
 
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildLowerBoundCursorFromTreeCoreRuntime(
+  WxCursorPairRuntimeView* wxBuildLowerBoundCursorFromTreeCoreRuntime(
     WxOrderedTreeRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor,
     const std::int32_t* const searchKey
@@ -105456,7 +105456,7 @@ namespace
    * Builds one iterator cursor at lower-bound position in ordered node tree
    * using signed key compare against caller key pointer.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildLowerBoundCursorFromTreeRuntimeA(
+  WxCursorPairRuntimeView* wxBuildLowerBoundCursorFromTreeRuntimeA(
     WxOrderedTreeRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor,
     const std::int32_t* const searchKey
@@ -105471,7 +105471,7 @@ namespace
    * What it does:
    * Clears runtime lanes `+0x04/+0x08/+0x0C/+0x10` in a second lane family.
    */
-  [[maybe_unused]] WxTrackedResourceLanesRuntimeView* wxResetTrackedResourceLanesRuntimeB(
+  WxTrackedResourceLanesRuntimeView* wxResetTrackedResourceLanesRuntimeB(
     WxTrackedResourceLanesRuntimeView* const runtime
   ) noexcept
   {
@@ -105484,7 +105484,7 @@ namespace
    * What it does:
    * Builds one fourth iterator cursor from a direct node pointer lane.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeD(
+  WxCursorPairRuntimeView* wxBuildCursorFromDirectNodeRuntimeD(
     WxDirectNodeSourceRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor
   ) noexcept
@@ -105499,7 +105499,7 @@ namespace
    * Builds one second iterator cursor at lower-bound position in ordered node
    * tree using signed key compare against caller key pointer.
    */
-  [[maybe_unused]] WxCursorPairRuntimeView* wxBuildLowerBoundCursorFromTreeRuntimeB(
+  WxCursorPairRuntimeView* wxBuildLowerBoundCursorFromTreeRuntimeB(
     WxOrderedTreeRuntimeView* const runtime,
     WxCursorPairRuntimeView* const outCursor,
     const std::int32_t* const searchKey
@@ -105520,7 +105520,7 @@ namespace
    * What it does:
    * Returns row base pointer in a 256-byte stride table.
    */
-  [[maybe_unused]] char* wxGetStride256RowRuntime(
+  char* wxGetStride256RowRuntime(
     WxStride256RowRuntimeView* const runtime,
     const int rowIndex
   ) noexcept
@@ -105540,7 +105540,7 @@ namespace
    * What it does:
    * Returns sign lane for a 64-word array using the highest bit of word 63.
    */
-  [[maybe_unused]] int wxGetWordArray64SignRuntime(
+  int wxGetWordArray64SignRuntime(
     const WxWordArray64RuntimeView* const runtime
   ) noexcept
   {
@@ -105553,7 +105553,7 @@ namespace
    * What it does:
    * Finds first non-zero word in a 64-word array and returns `-1` if none.
    */
-  [[maybe_unused]] int wxFindFirstNonZeroWord64Runtime(
+  int wxFindFirstNonZeroWord64Runtime(
     const WxWordArray64RuntimeView* const runtime
   ) noexcept
   {
@@ -105573,7 +105573,7 @@ namespace
    * What it does:
    * Stores one 16-bit lane in a 64-word array and returns the stored value.
    */
-  [[maybe_unused]] std::uint16_t wxStoreWordArray64LaneRuntime(
+  std::uint16_t wxStoreWordArray64LaneRuntime(
     WxWordArray64RuntimeView* const runtime,
     const int index,
     const std::uint16_t value
@@ -105595,7 +105595,7 @@ namespace
    * What it does:
    * Returns row base pointer in a 512-byte stride table.
    */
-  [[maybe_unused]] char* wxGetStride512RowRuntime(
+  char* wxGetStride512RowRuntime(
     WxStride512RowRuntimeView* const runtime,
     const int rowIndex
   ) noexcept
@@ -105615,7 +105615,7 @@ namespace
    * What it does:
    * Returns sign lane for a 128-word array using the highest bit of word 127.
    */
-  [[maybe_unused]] int wxGetWordArray128SignRuntime(
+  int wxGetWordArray128SignRuntime(
     const WxWordArray128RuntimeView* const runtime
   ) noexcept
   {
@@ -105628,7 +105628,7 @@ namespace
    * What it does:
    * Finds first non-zero word in a 128-word array and returns `-1` if none.
    */
-  [[maybe_unused]] int wxFindFirstNonZeroWord128Runtime(
+  int wxFindFirstNonZeroWord128Runtime(
     const WxWordArray128RuntimeView* const runtime
   ) noexcept
   {
@@ -105648,7 +105648,7 @@ namespace
    * What it does:
    * Reads one 16-bit lane from a 128-word array using caller index.
    */
-  [[maybe_unused]] int wxReadWordArray128LaneRuntime(
+  int wxReadWordArray128LaneRuntime(
     const WxWordArray128RuntimeView* const runtime,
     const int index
   ) noexcept
@@ -105662,7 +105662,7 @@ namespace
    * What it does:
    * Stores one 16-bit lane in a 128-word array and returns the stored value.
    */
-  [[maybe_unused]] std::uint16_t wxStoreWordArray128LaneRuntime(
+  std::uint16_t wxStoreWordArray128LaneRuntime(
     WxWordArray128RuntimeView* const runtime,
     const int index,
     const std::uint16_t value
@@ -105694,7 +105694,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x2C`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane2CRuntimeA(
+  char* wxGetAddressOfLane2CRuntimeA(
     WxOffset2C345040RuntimeView* const runtime
   ) noexcept
   {
@@ -105707,7 +105707,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x34`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane34RuntimeA(
+  char* wxGetAddressOfLane34RuntimeA(
     WxOffset2C345040RuntimeView* const runtime
   ) noexcept
   {
@@ -105720,7 +105720,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x40`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane40RuntimeD(
+  char* wxGetAddressOfLane40RuntimeD(
     WxOffset2C345040RuntimeView* const runtime
   ) noexcept
   {
@@ -105733,7 +105733,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x50`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane50RuntimeA(
+  char* wxGetAddressOfLane50RuntimeA(
     WxOffset2C345040RuntimeView* const runtime
   ) noexcept
   {
@@ -105753,7 +105753,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x28`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane28RuntimeA(
+  char* wxGetAddressOfLane28RuntimeA(
     WxOffset28AddressRuntimeView* const runtime
   ) noexcept
   {
@@ -105780,7 +105780,7 @@ namespace
    * What it does:
    * Returns indexed slot address from stride-8 lane starting at `+0x30`.
    */
-  [[maybe_unused]] int wxGetAddressOfStride8SlotFromLane30Runtime(
+  int wxGetAddressOfStride8SlotFromLane30Runtime(
     WxStride8Lane30TableRuntimeView* const runtime,
     const int index
   ) noexcept
@@ -105801,7 +105801,7 @@ namespace
    * What it does:
    * Returns indexed dword from lane array that starts at `+0x18`.
    */
-  [[maybe_unused]] int wxReadIndexedDwordFromLane18Runtime(
+  int wxReadIndexedDwordFromLane18Runtime(
     const WxIndexedDwordLane18RuntimeView* const runtime,
     const int index
   ) noexcept
@@ -105822,7 +105822,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x24`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane24Runtime(
+  std::uint8_t wxReadByteLane24Runtime(
     const WxOffset24ByteRuntimeView* const runtime
   ) noexcept
   {
@@ -105842,7 +105842,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x28`.
    */
-  [[maybe_unused]] int wxReadDwordLane28RuntimeA(
+  int wxReadDwordLane28RuntimeA(
     const WxOffset28DwordRuntimeView* const runtime
   ) noexcept
   {
@@ -105855,7 +105855,7 @@ namespace
    * What it does:
    * Returns the address of lane `+0x40`.
    */
-  [[maybe_unused]] char* wxGetAddressOfLane40RuntimeE(
+  char* wxGetAddressOfLane40RuntimeE(
     WxOffset2C345040RuntimeView* const runtime
   ) noexcept
   {
@@ -105875,7 +105875,7 @@ namespace
    * What it does:
    * Returns indexed dword from lane array that starts at `+0x2C`.
    */
-  [[maybe_unused]] int wxReadIndexedDwordFromLane2CRuntime(
+  int wxReadIndexedDwordFromLane2CRuntime(
     const WxIndexedDwordLane2CRuntimeView* const runtime,
     const int index
   ) noexcept
@@ -105896,7 +105896,7 @@ namespace
    * What it does:
    * Returns byte lane `+0x38`.
    */
-  [[maybe_unused]] std::uint8_t wxReadByteLane38Runtime(
+  std::uint8_t wxReadByteLane38Runtime(
     const WxOffset38ByteRuntimeView* const runtime
   ) noexcept
   {
@@ -105909,7 +105909,7 @@ namespace
   };
   static_assert(sizeof(WxWordArray32RuntimeView) == 0x40, "WxWordArray32RuntimeView size must be 0x40");
 
-  [[maybe_unused]] std::uint16_t wxStoreWordArray32LaneCoreRuntime(
+  std::uint16_t wxStoreWordArray32LaneCoreRuntime(
     WxWordArray32RuntimeView* const runtime,
     const int index,
     const std::uint16_t value
@@ -105925,7 +105925,7 @@ namespace
    * What it does:
    * Stores one 16-bit lane in a 32-word array and returns the stored value.
    */
-  [[maybe_unused]] std::uint16_t wxStoreWordArray32LaneRuntimeA(
+  std::uint16_t wxStoreWordArray32LaneRuntimeA(
     WxWordArray32RuntimeView* const runtime,
     const int index,
     const std::uint16_t value
@@ -105946,7 +105946,7 @@ namespace
    * What it does:
    * Returns row base pointer in a 128-byte stride table.
    */
-  [[maybe_unused]] char* wxGetStride128RowRuntime(
+  char* wxGetStride128RowRuntime(
     WxStride128RowRuntimeView* const runtime,
     const int rowIndex
   ) noexcept
@@ -105960,7 +105960,7 @@ namespace
    * What it does:
    * Returns sign lane for a 32-word array using the highest bit of word 31.
    */
-  [[maybe_unused]] int wxGetWordArray32SignRuntime(
+  int wxGetWordArray32SignRuntime(
     const WxWordArray32RuntimeView* const runtime
   ) noexcept
   {
@@ -105973,7 +105973,7 @@ namespace
    * What it does:
    * Finds first non-zero word in a 32-word array and returns `-1` if none.
    */
-  [[maybe_unused]] int wxFindFirstNonZeroWord32Runtime(
+  int wxFindFirstNonZeroWord32Runtime(
     const WxWordArray32RuntimeView* const runtime
   ) noexcept
   {
@@ -105994,7 +105994,7 @@ namespace
    * Stores one second 16-bit lane in a 32-word array and returns the stored
    * value.
    */
-  [[maybe_unused]] std::uint16_t wxStoreWordArray32LaneRuntimeB(
+  std::uint16_t wxStoreWordArray32LaneRuntimeB(
     WxWordArray32RuntimeView* const runtime,
     const int index,
     const std::uint16_t value
@@ -106009,7 +106009,7 @@ namespace
    * What it does:
    * Returns row base pointer in a second 256-byte stride table.
    */
-  [[maybe_unused]] char* wxGetStride256RowRuntimeB(
+  char* wxGetStride256RowRuntimeB(
     WxStride256RowRuntimeView* const runtime,
     const int rowIndex
   ) noexcept
@@ -106037,7 +106037,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x34`.
    */
-  [[maybe_unused]] int wxReadDwordLane34RuntimeA(
+  int wxReadDwordLane34RuntimeA(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106050,7 +106050,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x38`.
    */
-  [[maybe_unused]] int wxReadDwordLane38RuntimeA(
+  int wxReadDwordLane38RuntimeA(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106063,7 +106063,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x68`.
    */
-  [[maybe_unused]] int wxReadDwordLane68RuntimeA(
+  int wxReadDwordLane68RuntimeA(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106076,7 +106076,7 @@ namespace
    * What it does:
    * Returns dword lane `+0x6C`.
    */
-  [[maybe_unused]] int wxReadDwordLane6CRuntimeA(
+  int wxReadDwordLane6CRuntimeA(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106103,7 +106103,7 @@ namespace
    * Returns row base pointer in a 12-byte stride table that starts at
    * lane `+0x18`.
    */
-  [[maybe_unused]] char* wxGetStride12RowFromLane18Runtime(
+  char* wxGetStride12RowFromLane18Runtime(
     WxStride12TableLane18RuntimeView* const runtime,
     const int rowIndex
   ) noexcept
@@ -106131,7 +106131,7 @@ namespace
    * Returns row base pointer in a 24-byte stride table that starts at
    * lane `+0x28`.
    */
-  [[maybe_unused]] int wxGetAddressOfStride24RowFromLane28Runtime(
+  int wxGetAddressOfStride24RowFromLane28Runtime(
     WxStride24TableLane28RuntimeView* const runtime,
     const int rowIndex
   ) noexcept
@@ -106145,7 +106145,7 @@ namespace
    * What it does:
    * Returns one second dword lane `+0x34`.
    */
-  [[maybe_unused]] int wxReadDwordLane34RuntimeB(
+  int wxReadDwordLane34RuntimeB(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106158,7 +106158,7 @@ namespace
    * What it does:
    * Returns one second dword lane `+0x38`.
    */
-  [[maybe_unused]] int wxReadDwordLane38RuntimeB(
+  int wxReadDwordLane38RuntimeB(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106171,7 +106171,7 @@ namespace
    * What it does:
    * Returns one second dword lane `+0x68`.
    */
-  [[maybe_unused]] int wxReadDwordLane68RuntimeB(
+  int wxReadDwordLane68RuntimeB(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106184,7 +106184,7 @@ namespace
    * What it does:
    * Returns one second dword lane `+0x6C`.
    */
-  [[maybe_unused]] int wxReadDwordLane6CRuntimeB(
+  int wxReadDwordLane6CRuntimeB(
     const WxDwordLanes3438686CRuntimeView* const runtime
   ) noexcept
   {
@@ -106197,7 +106197,7 @@ namespace
    * What it does:
    * Normalizes integer sign to `-1/0/+1` while preserving zero.
    */
-  [[maybe_unused]] int wxNormalizeSignOrZeroRuntime(
+  int wxNormalizeSignOrZeroRuntime(
     const int value
   ) noexcept
   {

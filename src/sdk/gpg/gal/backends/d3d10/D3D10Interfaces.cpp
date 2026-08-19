@@ -2327,7 +2327,7 @@ namespace gpg::gal
      * Clears one swap-chain descriptor and populates presentation lanes from
      * one `Head` runtime view when a native window handle is present.
      */
-    [[maybe_unused]] DXGI_SWAP_CHAIN_DESC*
+    DXGI_SWAP_CHAIN_DESC*
     BuildSwapChainDescFromHeadRuntime(DXGI_SWAP_CHAIN_DESC* const outDesc, const void* const headRaw)
     {
       std::memset(outDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
@@ -2363,7 +2363,7 @@ namespace gpg::gal
      * Returns `(end-begin)/0x13C` for one runtime span payload when the
      * begin pointer lane is non-null.
      */
-    [[maybe_unused]] int CountEntriesStride13C(const void* const runtimeSpan) noexcept
+    int CountEntriesStride13C(const void* const runtimeSpan) noexcept
     {
       const auto* const lanes = reinterpret_cast<const std::uintptr_t*>(runtimeSpan);
       const std::uintptr_t begin = lanes[1];
@@ -2403,7 +2403,7 @@ namespace gpg::gal
      * Calls COM-like vtable slot `+0x08` (`Release`) when slot payload is
      * non-null, then clears the slot and returns the release/result lane.
      */
-    [[maybe_unused]] int ReleaseComSlotVariant0(void** const slot) noexcept
+    int ReleaseComSlotVariant0(void** const slot) noexcept
     {
       void* const object = *slot;
       int result = static_cast<int>(reinterpret_cast<std::uintptr_t>(object));
@@ -2424,7 +2424,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlotVariant1(void** const slot) noexcept
+    int ReleaseComSlotVariant1(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2437,7 +2437,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlotVariant2(void** const slot) noexcept
+    int ReleaseComSlotVariant2(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2450,7 +2450,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlotVariant3(void** const slot) noexcept
+    int ReleaseComSlotVariant3(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2463,7 +2463,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlotVariant4(void** const slot) noexcept
+    int ReleaseComSlotVariant4(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2486,7 +2486,7 @@ namespace gpg::gal
      * Allocates `count * 0x13C` bytes with overflow guard and throws
      * `std::bad_alloc` on overflow.
      */
-    [[maybe_unused]] void* AllocateStride13CArray(const std::uint32_t count)
+    void* AllocateStride13CArray(const std::uint32_t count)
     {
       return AllocateArrayOrThrow(count, 0x13CU);
     }
@@ -2500,7 +2500,7 @@ namespace gpg::gal
      * Allocates `count * 4` bytes with overflow guard and throws
      * `std::bad_alloc` on overflow.
      */
-    [[maybe_unused]] void* AllocateStride04Array(const std::uint32_t count)
+    void* AllocateStride04Array(const std::uint32_t count)
     {
       return AllocateArrayOrThrow(count, 0x04U);
     }
@@ -2708,7 +2708,7 @@ namespace gpg::gal
      * Forwarding lane that routes one adapter-mode runtime teardown range into
      * `FUN_008F7550`.
      */
-    [[maybe_unused]] void DestroyAdapterModeRuntimeRangeAdapter(
+    void DestroyAdapterModeRuntimeRangeAdapter(
       AdapterModeD3D10* const begin,
       AdapterModeD3D10* const end
     )
@@ -2723,7 +2723,7 @@ namespace gpg::gal
      * Secondary call-shape adapter that forwards one adapter-mode runtime range
      * teardown into `FUN_008F7550`.
      */
-    [[maybe_unused]] void DestroyAdapterModeRuntimeRangeAdapterSecondary(
+    void DestroyAdapterModeRuntimeRangeAdapterSecondary(
       AdapterModeD3D10* const begin,
       AdapterModeD3D10* const end
     )
@@ -3100,7 +3100,7 @@ namespace gpg::gal
      * ABI adapter lane for `PipelineState` constructor variants that return
      * `this` after the canonical base-constructor side effects (`FUN_00902230`).
      */
-    [[maybe_unused]] PipelineState* ReturnPipelineStateCtorSelfAdapter(PipelineState* const pipelineState) noexcept
+    PipelineState* ReturnPipelineStateCtorSelfAdapter(PipelineState* const pipelineState) noexcept
     {
       return pipelineState;
     }
@@ -3510,7 +3510,7 @@ namespace gpg::gal
      * Deletes one `TextureD3D10` raw-pointer lane during
      * `shared_count<TextureD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteTextureD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteTextureD3D10SharedCountCtorPointeeOnUnwind(
       TextureD3D10* const texture
     ) noexcept
     {
@@ -3524,7 +3524,7 @@ namespace gpg::gal
      * Deletes one `RenderTargetD3D10` raw-pointer lane during
      * `shared_count<RenderTargetD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteRenderTargetD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteRenderTargetD3D10SharedCountCtorPointeeOnUnwind(
       RenderTargetD3D10* const renderTarget
     ) noexcept
     {
@@ -3538,7 +3538,7 @@ namespace gpg::gal
      * Deletes one `CubeRenderTargetD3D10` raw-pointer lane during
      * `shared_count<CubeRenderTargetD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteCubeRenderTargetD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteCubeRenderTargetD3D10SharedCountCtorPointeeOnUnwind(
       CubeRenderTargetD3D10* const cubeRenderTarget
     ) noexcept
     {
@@ -3552,7 +3552,7 @@ namespace gpg::gal
      * Deletes one `DepthStencilTargetD3D10` raw-pointer lane during
      * `shared_count<DepthStencilTargetD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteDepthStencilTargetD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteDepthStencilTargetD3D10SharedCountCtorPointeeOnUnwind(
       DepthStencilTargetD3D10* const depthStencilTarget
     ) noexcept
     {
@@ -3566,7 +3566,7 @@ namespace gpg::gal
      * Deletes one `VertexFormatD3D10` raw-pointer lane during
      * `shared_count<VertexFormatD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteVertexFormatD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteVertexFormatD3D10SharedCountCtorPointeeOnUnwind(
       VertexFormatD3D10* const vertexFormat
     ) noexcept
     {
@@ -3580,7 +3580,7 @@ namespace gpg::gal
      * Deletes one `VertexBufferD3D10` raw-pointer lane during
      * `shared_count<VertexBufferD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteVertexBufferD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteVertexBufferD3D10SharedCountCtorPointeeOnUnwind(
       VertexBufferD3D10* const vertexBuffer
     ) noexcept
     {
@@ -3594,7 +3594,7 @@ namespace gpg::gal
      * Deletes one `IndexBufferD3D10` raw-pointer lane during
      * `shared_count<IndexBufferD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteIndexBufferD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteIndexBufferD3D10SharedCountCtorPointeeOnUnwind(
       IndexBufferD3D10* const indexBuffer
     ) noexcept
     {
@@ -3608,7 +3608,7 @@ namespace gpg::gal
      * Deletes one `PipelineStateD3D10` raw-pointer lane during
      * `shared_count<PipelineStateD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeletePipelineStateD3D10SharedCountCtorPointeeOnUnwind(
+    int DeletePipelineStateD3D10SharedCountCtorPointeeOnUnwind(
       PipelineStateD3D10* const pipelineState
     ) noexcept
     {
@@ -3622,7 +3622,7 @@ namespace gpg::gal
      * Deletes one `EffectTechniqueD3D10` raw-pointer lane during
      * `shared_count<EffectTechniqueD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteEffectTechniqueD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteEffectTechniqueD3D10SharedCountCtorPointeeOnUnwind(
       EffectTechniqueD3D10* const effectTechnique
     ) noexcept
     {
@@ -3636,7 +3636,7 @@ namespace gpg::gal
      * Deletes one `EffectVariableD3D10` raw-pointer lane during
      * `shared_count<EffectVariableD3D10>` constructor unwind.
      */
-    [[maybe_unused]] int DeleteEffectVariableD3D10SharedCountCtorPointeeOnUnwind(
+    int DeleteEffectVariableD3D10SharedCountCtorPointeeOnUnwind(
       EffectVariableD3D10* const effectVariable
     ) noexcept
     {
@@ -3650,7 +3650,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `CubeRenderTargetD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountCubeRenderTargetD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountCubeRenderTargetD3D10FromRaw(
       boost::detail::shared_count* const outCount, CubeRenderTargetD3D10* const cubeRenderTarget
     )
     {
@@ -3664,7 +3664,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `DepthStencilTargetD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountDepthStencilTargetD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountDepthStencilTargetD3D10FromRaw(
       boost::detail::shared_count* const outCount, DepthStencilTargetD3D10* const depthStencilTarget
     )
     {
@@ -3678,7 +3678,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `VertexFormatD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountVertexFormatD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountVertexFormatD3D10FromRaw(
       boost::detail::shared_count* const outCount, VertexFormatD3D10* const vertexFormat
     )
     {
@@ -3692,7 +3692,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `VertexBufferD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountVertexBufferD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountVertexBufferD3D10FromRaw(
       boost::detail::shared_count* const outCount, VertexBufferD3D10* const vertexBuffer
     )
     {
@@ -3706,7 +3706,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `IndexBufferD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountIndexBufferD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountIndexBufferD3D10FromRaw(
       boost::detail::shared_count* const outCount, IndexBufferD3D10* const indexBuffer
     )
     {
@@ -3720,7 +3720,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `EffectVariableD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountEffectVariableD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountEffectVariableD3D10FromRaw(
       boost::detail::shared_count* const outCount, EffectVariableD3D10* const effectVariable
     )
     {
@@ -3734,7 +3734,7 @@ namespace gpg::gal
      * Constructs one `boost::detail::shared_count` lane from one raw
      * `EffectTechniqueD3D10*` pointee.
      */
-    [[maybe_unused]] boost::detail::shared_count* ConstructSharedCountEffectTechniqueD3D10FromRaw(
+    boost::detail::shared_count* ConstructSharedCountEffectTechniqueD3D10FromRaw(
       boost::detail::shared_count* const outCount, EffectTechniqueD3D10* const effectTechnique
     )
     {
@@ -4006,7 +4006,7 @@ namespace gpg::gal
      * Returns one stable, process-lifetime zero-initialized wide-character
      * storage lane used by legacy helper paths.
      */
-    [[maybe_unused]] wchar_t* GetLegacyWideZeroStorageLane() noexcept
+    wchar_t* GetLegacyWideZeroStorageLane() noexcept
     {
       static wchar_t sLegacyWideZeroStorage = L'\0';
       return &sLegacyWideZeroStorage;
@@ -4019,7 +4019,7 @@ namespace gpg::gal
      * Clone entry that returns the same stable process-lifetime wide-zero
      * storage lane as `FUN_008F8CA0`.
      */
-    [[maybe_unused]] wchar_t* GetLegacyWideZeroStorageLaneCloneA() noexcept
+    wchar_t* GetLegacyWideZeroStorageLaneCloneA() noexcept
     {
       return GetLegacyWideZeroStorageLane();
     }
@@ -4071,7 +4071,7 @@ namespace gpg::gal
      * Clears one proxy-vector lane and reserves `count` `0x13C`-byte entries
      * with legacy VC8 vector-length overflow semantics.
      */
-    [[maybe_unused]] bool TryInitializeEffectMacroProxyVectorLane(
+    bool TryInitializeEffectMacroProxyVectorLane(
       EffectContextLane54Runtime* const lane,
       const std::uint32_t elementCount
     )
@@ -4093,7 +4093,7 @@ namespace gpg::gal
      * Clears one proxy-vector lane and reserves `count` 4-byte entries with
      * legacy VC8 vector-length overflow semantics.
      */
-    [[maybe_unused]] bool TryInitializeDwordProxyVectorLane(
+    bool TryInitializeDwordProxyVectorLane(
       RuntimeProxyVectorLane* const lane,
       const std::uint32_t elementCount
     )
@@ -4141,7 +4141,7 @@ namespace gpg::gal
      * What it does:
      * Copy-assigns both string lanes of one `EffectMacro` entry.
      */
-    [[maybe_unused]] EffectMacro* AssignEffectMacroStrings(
+    EffectMacro* AssignEffectMacroStrings(
       EffectMacro* const destination, const EffectMacro& source
     )
     {
@@ -4223,7 +4223,7 @@ namespace gpg::gal
      * Copy-constructs `count` effect-macro entries from one source entry into
      * contiguous uninitialized destination lanes.
      */
-    [[maybe_unused]] EffectMacro* UninitializedFillEffectMacroRangeCore(
+    EffectMacro* UninitializedFillEffectMacroRangeCore(
       EffectMacro* destinationFirst, std::size_t count, const EffectMacro& source
     )
     {
@@ -4249,7 +4249,7 @@ namespace gpg::gal
      * What it does:
      * Dispatch bridge into the core uninitialized `EffectMacro` fill helper.
      */
-    [[maybe_unused]] void UninitializedFillEffectMacroRangeDispatchB(
+    void UninitializedFillEffectMacroRangeDispatchB(
       EffectMacro* const destinationFirst, const std::size_t count, const EffectMacro& source
     )
     {
@@ -4270,7 +4270,7 @@ namespace gpg::gal
      * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
      * helper.
      */
-    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchA(
+    EffectMacro* UninitializedCopyEffectMacroRangeDispatchA(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
     )
     {
@@ -4284,7 +4284,7 @@ namespace gpg::gal
      * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
      * helper.
      */
-    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchB(
+    EffectMacro* UninitializedCopyEffectMacroRangeDispatchB(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
     )
     {
@@ -4302,7 +4302,7 @@ namespace gpg::gal
      * (see `moho/containers/LegacyContainerFillLanes.cpp`), not an
      * `EffectMacro` copy-range dispatch.
      */
-    [[maybe_unused]] EffectMacro* CopyAssignEffectMacroRangeDispatchA(
+    EffectMacro* CopyAssignEffectMacroRangeDispatchA(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
     )
     {
@@ -4315,7 +4315,7 @@ namespace gpg::gal
      * What it does:
      * Dispatch bridge into the core uninitialized `EffectMacro` fill helper.
      */
-    [[maybe_unused]] EffectMacro* UninitializedFillEffectMacroRangeDispatchA(
+    EffectMacro* UninitializedFillEffectMacroRangeDispatchA(
       EffectMacro* destinationFirst, const std::size_t count, const EffectMacro& source
     )
     {
@@ -4329,7 +4329,7 @@ namespace gpg::gal
      * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
      * helper.
      */
-    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchC(
+    EffectMacro* UninitializedCopyEffectMacroRangeDispatchC(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
     )
     {
@@ -4343,7 +4343,7 @@ namespace gpg::gal
      * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
      * helper.
      */
-    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchD(
+    EffectMacro* UninitializedCopyEffectMacroRangeDispatchD(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
     )
     {
@@ -4664,7 +4664,7 @@ namespace gpg::gal
      * Preserves the one-jump thunk lane into the core adapter-range
      * uninitialized fill helper.
      */
-    [[maybe_unused]] AdapterD3D10* UninitializedFillAdapterRangeDispatchB(
+    AdapterD3D10* UninitializedFillAdapterRangeDispatchB(
       AdapterD3D10* const destinationBegin,
       const std::size_t copyCount,
       const AdapterD3D10* const sourceAdapter
@@ -4680,7 +4680,7 @@ namespace gpg::gal
      * Preserves one forwarding lane into the adapter-range uninitialized-copy
      * helper for source range `[sourceFirst, sourceLast)`.
      */
-    [[maybe_unused]] AdapterD3D10* UninitializedCopyAdapterRangeDispatchA(
+    AdapterD3D10* UninitializedCopyAdapterRangeDispatchA(
       const AdapterD3D10* const sourceFirst,
       const AdapterD3D10* const sourceLast,
       AdapterD3D10* const destinationBegin
@@ -4696,7 +4696,7 @@ namespace gpg::gal
      * Preserves one forwarding lane into the adapter-range uninitialized-copy
      * helper for source range `[sourceFirst, sourceLast)`.
      */
-    [[maybe_unused]] AdapterD3D10* UninitializedCopyAdapterRangeDispatchB(
+    AdapterD3D10* UninitializedCopyAdapterRangeDispatchB(
       const AdapterD3D10* const sourceFirst,
       const AdapterD3D10* const sourceLast,
       AdapterD3D10* const destinationBegin
@@ -4712,7 +4712,7 @@ namespace gpg::gal
      * Preserves one forwarding lane into the adapter-range uninitialized-copy
      * helper for source range `[sourceFirst, sourceLast)`.
      */
-    [[maybe_unused]] AdapterD3D10* UninitializedCopyAdapterRangeDispatchC(
+    AdapterD3D10* UninitializedCopyAdapterRangeDispatchC(
       const AdapterD3D10* const sourceFirst,
       const AdapterD3D10* const sourceLast,
       AdapterD3D10* const destinationBegin
@@ -4728,7 +4728,7 @@ namespace gpg::gal
      * Preserves one dispatch lane into backward copy-assignment over adapter
      * ranges and returns the destination-begin lane.
      */
-    [[maybe_unused]] AdapterD3D10* CopyAssignAdapterRangeBackwardDispatch(
+    AdapterD3D10* CopyAssignAdapterRangeBackwardDispatch(
       const AdapterD3D10* const sourceFirst,
       const AdapterD3D10* const sourceLast,
       AdapterD3D10* const destinationLast
@@ -4744,7 +4744,7 @@ namespace gpg::gal
      * Preserves one dispatch lane into range fill-assignment for adapter
      * lanes `[destinationFirst, destinationLast)`.
      */
-    [[maybe_unused]] void FillAssignAdapterRangeDispatch(
+    void FillAssignAdapterRangeDispatch(
       AdapterD3D10* const destinationFirst,
       AdapterD3D10* const destinationLast,
       const AdapterD3D10& source
@@ -4889,7 +4889,7 @@ namespace gpg::gal
    * from `AllocateStride13CArray` (raw `operator new`) before any element has
    * been constructed.
    */
-  [[maybe_unused]] void CopyConstructAdapterD3D10ArrayOrUnwind(
+  void CopyConstructAdapterD3D10ArrayOrUnwind(
     const AdapterD3D10* const srcBegin,
     const AdapterD3D10* const srcEnd,
     AdapterD3D10* const dst)
@@ -5207,7 +5207,7 @@ namespace gpg::gal
    * `HardwareVertexFormatterD3D10::~HardwareVertexFormatterD3D10`
    * (`FUN_0094D500`).
    */
-  [[maybe_unused]] void ShutdownHardwareVertexFormatterD3D10Adapter()
+  void ShutdownHardwareVertexFormatterD3D10Adapter()
   {
     alignas(HardwareVertexFormatterD3D10) unsigned char formatterStorage[sizeof(HardwareVertexFormatterD3D10)]{};
     auto* const formatter = new (static_cast<void*>(formatterStorage)) HardwareVertexFormatterD3D10();
@@ -5361,7 +5361,7 @@ namespace gpg::gal
    * `Float16HardwareVertexFormatterD3D10::~Float16HardwareVertexFormatterD3D10`
    * (`FUN_0094D780`).
    */
-  [[maybe_unused]] void ShutdownFloat16HardwareVertexFormatterD3D10Adapter()
+  void ShutdownFloat16HardwareVertexFormatterD3D10Adapter()
   {
     alignas(Float16HardwareVertexFormatterD3D10)
       unsigned char formatterStorage[sizeof(Float16HardwareVertexFormatterD3D10)]{};
@@ -5706,7 +5706,7 @@ namespace gpg::gal
    * Initializes one D3D10 depth-stencil target object to default context
    * values and null retained texture/view lanes.
    */
-  [[maybe_unused]] [[nodiscard]] DepthStencilTargetD3D10* InitializeDepthStencilTargetD3D10DefaultState(
+  [[nodiscard]] DepthStencilTargetD3D10* InitializeDepthStencilTargetD3D10DefaultState(
     DepthStencilTargetD3D10* const target
   )
   {
@@ -6537,7 +6537,7 @@ namespace gpg::gal
    * Rebinds one cursor instance to `CursorD3D10` vtable ownership, clears the
    * icon lane, and preserves the existing retained cursor-handle lane.
    */
-  [[maybe_unused]] CursorD3D10* InitializeCursorD3D10WithRetainedCursorLane(
+  CursorD3D10* InitializeCursorD3D10WithRetainedCursorLane(
     CursorD3D10* const cursor,
     void* const reserved
   ) noexcept

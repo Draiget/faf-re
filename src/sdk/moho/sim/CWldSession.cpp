@@ -219,7 +219,7 @@ namespace
    * Stores the current formation-preview shared-pair begin pointer lane into
    * `outValue` and returns that output slot.
    */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StoreFormationPreviewSharedPairsBeginLane(
+  [[nodiscard]] std::uintptr_t* StoreFormationPreviewSharedPairsBeginLane(
     std::uintptr_t* const outValue
   ) noexcept
   {
@@ -234,7 +234,7 @@ namespace
    * Stores the current formation-preview shared-pair end pointer lane into
    * `outValue` and returns that output slot.
    */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StoreFormationPreviewSharedPairsEndLane(
+  [[nodiscard]] std::uintptr_t* StoreFormationPreviewSharedPairsEndLane(
     std::uintptr_t* const outValue
   ) noexcept
   {
@@ -249,7 +249,7 @@ namespace
    * Returns the active element count in the formation-preview shared-pair lane
    * (`end - begin`), or zero when storage has not been allocated.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t GetFormationPreviewSharedPairCountLane() noexcept
+  [[nodiscard]] std::int32_t GetFormationPreviewSharedPairCountLane() noexcept
   {
     if (gFormationPreviewSharedPairsBegin == nullptr) {
       return 0;
@@ -264,7 +264,7 @@ namespace
    * What it does:
    * Returns the formation-preview shared-pair owner lane slot.
    */
-  [[maybe_unused]] [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLanePrimary(const int /*unused*/) noexcept
+  [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLanePrimary(const int /*unused*/) noexcept
   {
     return &gFormationPreviewSharedPairsOwnerLane;
   }
@@ -275,7 +275,7 @@ namespace
    * What it does:
    * Secondary entrypoint returning the formation-preview shared-pair owner lane.
    */
-  [[maybe_unused]] [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLaneSecondary() noexcept
+  [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLaneSecondary() noexcept
   {
     return &gFormationPreviewSharedPairsOwnerLane;
   }
@@ -286,7 +286,7 @@ namespace
    * What it does:
    * Returns the global strategic-icon auxiliary object lane.
    */
-  [[maybe_unused]] [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneA() noexcept
+  [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneA() noexcept
   {
     return gStrategicIconAuxiliary;
   }
@@ -297,7 +297,7 @@ namespace
    * What it does:
    * Secondary entrypoint returning the strategic-icon auxiliary object lane.
    */
-  [[maybe_unused]] [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneB() noexcept
+  [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneB() noexcept
   {
     return gStrategicIconAuxiliary;
   }
@@ -308,7 +308,7 @@ namespace
    * What it does:
    * Third entrypoint returning the strategic-icon auxiliary object lane.
    */
-  [[maybe_unused]] [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneC() noexcept
+  [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneC() noexcept
   {
     return gStrategicIconAuxiliary;
   }
@@ -320,7 +320,7 @@ namespace
    * Reads one dword through the strategic-icon scratch data-pointer lane and
    * stores it into `outValue`.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreStrategicIconScratchValueLane(
+  [[nodiscard]] std::uint32_t* StoreStrategicIconScratchValueLane(
     std::uint32_t* const outValue
   ) noexcept
   {
@@ -334,7 +334,7 @@ namespace
    * What it does:
    * Stores the strategic-icon scratch data-pointer lane itself into `outValue`.
    */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t* StoreStrategicIconScratchDataPointerLane(
+  [[nodiscard]] std::uintptr_t* StoreStrategicIconScratchDataPointerLane(
     std::uintptr_t* const outValue
   ) noexcept
   {
@@ -348,7 +348,7 @@ namespace
    * What it does:
    * Returns the current strategic-icon scratch data-pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t GetStrategicIconScratchDataPointerLaneValue() noexcept
+  [[nodiscard]] std::uintptr_t GetStrategicIconScratchDataPointerLaneValue() noexcept
   {
     return reinterpret_cast<std::uintptr_t>(gStrategicIconScratchDataLane);
   }
@@ -360,7 +360,7 @@ namespace
    * Performs one left rotation in the strategic-icon scratch red-black tree
    * lane (nil marker at `+0x0C49`).
    */
-  [[maybe_unused]] [[nodiscard]] StrategicIconScratchTreeNodeRuntimeView* RotateStrategicIconScratchTreeLeft(
+  [[nodiscard]] StrategicIconScratchTreeNodeRuntimeView* RotateStrategicIconScratchTreeLeft(
     StrategicIconScratchTreeNodeRuntimeView* const pivot
   ) noexcept
   {
@@ -377,7 +377,7 @@ namespace
    * Performs one right rotation in the strategic-icon scratch red-black tree
    * lane (nil marker at `+0x0C49`).
    */
-  [[maybe_unused]] [[nodiscard]] StrategicIconScratchTreeNodeRuntimeView* RotateStrategicIconScratchTreeRight(
+  [[nodiscard]] StrategicIconScratchTreeNodeRuntimeView* RotateStrategicIconScratchTreeRight(
     StrategicIconScratchTreeNodeRuntimeView* const pivot
   ) noexcept
   {
@@ -393,7 +393,7 @@ namespace
    * What it does:
    * Returns the current strategic-icon scratch count lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t GetStrategicIconScratchCountLaneValue() noexcept
+  [[nodiscard]] std::uint32_t GetStrategicIconScratchCountLaneValue() noexcept
   {
     return gStrategicIconScratchCountLane;
   }
@@ -404,7 +404,7 @@ namespace
    * What it does:
    * Returns the strategic-icon scratch owner lane slot.
    */
-  [[maybe_unused]] [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryA(const int /*unused*/) noexcept
+  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryA(const int /*unused*/) noexcept
   {
     return &gStrategicIconScratchOwnerLane;
   }
@@ -415,7 +415,7 @@ namespace
    * What it does:
    * Secondary entrypoint returning the strategic-icon scratch owner lane slot.
    */
-  [[maybe_unused]] [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryB(const int /*unused*/) noexcept
+  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryB(const int /*unused*/) noexcept
   {
     return &gStrategicIconScratchOwnerLane;
   }
@@ -426,7 +426,7 @@ namespace
    * What it does:
    * Third entrypoint returning the strategic-icon scratch owner lane slot.
    */
-  [[maybe_unused]] [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryC(const int /*unused*/) noexcept
+  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryC(const int /*unused*/) noexcept
   {
     return &gStrategicIconScratchOwnerLane;
   }
@@ -437,7 +437,7 @@ namespace
    * What it does:
    * Fourth entrypoint returning the strategic-icon scratch owner lane slot.
    */
-  [[maybe_unused]] [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryD(const int /*unused*/) noexcept
+  [[nodiscard]] void* GetStrategicIconScratchOwnerLaneEntryD(const int /*unused*/) noexcept
   {
     return &gStrategicIconScratchOwnerLane;
   }
@@ -449,7 +449,7 @@ namespace
    * Initializes one selection-event listener lane by self-linking its
    * intrusive broadcaster node.
    */
-  [[maybe_unused]] [[nodiscard]] SelectionEventListenerRuntimeLane* InitializeSelectionEventListenerLane(
+  [[nodiscard]] SelectionEventListenerRuntimeLane* InitializeSelectionEventListenerLane(
     SelectionEventListenerRuntimeLane* const listener
   ) noexcept
   {
@@ -463,7 +463,7 @@ namespace
    * Initializes one pause-event listener lane by self-linking its intrusive
    * broadcaster node.
    */
-  [[maybe_unused]] [[nodiscard]] PauseEventListenerRuntimeLane* InitializePauseEventListenerLane(
+  [[nodiscard]] PauseEventListenerRuntimeLane* InitializePauseEventListenerLane(
     PauseEventListenerRuntimeLane* const listener
   ) noexcept
   {
@@ -530,7 +530,7 @@ namespace
    * What it does:
    * Deserializes one reflected `SSessionSaveNodeMap` lane from archive input.
    */
-  [[maybe_unused]] void DeserializeSessionSaveDataSerializerCallback(
+  void DeserializeSessionSaveDataSerializerCallback(
     gpg::ReadArchive* const archive,
     void* const payload,
     const int,
@@ -556,7 +556,7 @@ namespace
    * What it does:
    * Serializes one reflected `SSessionSaveNodeMap` lane to archive output.
    */
-  [[maybe_unused]] void SerializeSessionSaveDataSerializerCallback(
+  void SerializeSessionSaveDataSerializerCallback(
     gpg::WriteArchive* const archive,
     void* const payload,
     const int,
@@ -610,7 +610,7 @@ namespace
    * Unlinks `SSessionSaveDataSerializer` helper node from the intrusive helper
    * list, rewires self-links, and returns the helper self node.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperPrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperPrimary() noexcept
   {
     return UnlinkSessionSaveDataSerializerHelperNode();
   }
@@ -622,7 +622,7 @@ namespace
    * Secondary entrypoint for `SSessionSaveDataSerializer` helper-node
    * intrusive unlink + self-link reset.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperSecondary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSessionSaveDataSerializerHelperSecondary() noexcept
   {
     return UnlinkSessionSaveDataSerializerHelperNode();
   }
@@ -634,7 +634,7 @@ namespace
    * Releases one formation-preview shared-pair payload by dropping both
    * retained shared ownership lanes.
    */
-  [[maybe_unused]] void ReleaseFormationPreviewSharedPairRuntime(
+  void ReleaseFormationPreviewSharedPairRuntime(
     FormationPreviewSharedPairRuntimeView* const sharedPair
   ) noexcept
   {
@@ -653,7 +653,7 @@ namespace
    * Releases every formation-preview shared-pair payload in one contiguous
    * range `[beginPair, endPair)`.
    */
-  [[maybe_unused]] void ReleaseFormationPreviewSharedPairRangeForward(
+  void ReleaseFormationPreviewSharedPairRangeForward(
     FormationPreviewSharedPairRuntimeView* const beginPair,
     FormationPreviewSharedPairRuntimeView* const endPair
   ) noexcept
@@ -746,7 +746,7 @@ namespace
    * Releases one tail entry from the formation-preview shared-pair container
    * (`0x010C425C..0x010C4260`) and rewinds the active end pointer.
    */
-  [[maybe_unused]] std::uintptr_t ReleaseOneFormationPreviewSharedPairFromTailRuntime() noexcept
+  std::uintptr_t ReleaseOneFormationPreviewSharedPairFromTailRuntime() noexcept
   {
     std::uintptr_t result = 0u;
     if (gFormationPreviewSharedPairsBegin == nullptr) {
@@ -2357,7 +2357,7 @@ namespace moho
      * What it does:
      * Returns one first-dword lane from one command-graph helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane0(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane0(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -2371,7 +2371,7 @@ namespace moho
      * What it does:
      * Returns one dword lane at `+0x64` from one command-graph runtime payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane64(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane64(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -2385,7 +2385,7 @@ namespace moho
      * What it does:
      * Returns one dword lane at `+0x458` from one command-graph runtime payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane458(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane458(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -2400,7 +2400,7 @@ namespace moho
      * Initializes one weak-owner link node and inserts its owner-slot lane into
      * one owner link-head lane at `+0x08`.
      */
-    [[maybe_unused]] [[nodiscard]] WeakOwnerLinkNodeRuntimeView* InitWeakOwnerLinkNodeFromHead(
+    [[nodiscard]] WeakOwnerLinkNodeRuntimeView* InitWeakOwnerLinkNodeFromHead(
       WeakOwnerLinkNodeRuntimeView* const node,
       void* const owner
     ) noexcept
@@ -2431,7 +2431,7 @@ namespace moho
      * What it does:
      * Returns one first-dword lane from one command-graph helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane0Alt(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandGraphHelperLane0Alt(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -2445,7 +2445,7 @@ namespace moho
      * What it does:
      * Copies one second-dword lane from source payload into destination dword.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyRuntimeLane4ToDword(
+    [[nodiscard]] std::uint32_t* CopyRuntimeLane4ToDword(
       std::uint32_t* const destination,
       const void* const source
     ) noexcept
@@ -2467,7 +2467,7 @@ namespace moho
      * What it does:
      * Writes one two-dword pair payload (`first`,`second`) to destination.
      */
-    [[maybe_unused]] [[nodiscard]] DwordPairRuntimeView* InitDwordPairRuntimeLane(
+    [[nodiscard]] DwordPairRuntimeView* InitDwordPairRuntimeLane(
       DwordPairRuntimeView* const destination,
       const std::uint32_t second,
       const std::uint32_t first
@@ -2488,7 +2488,7 @@ namespace moho
      * Initializes one command-graph issue runtime lane with cleared scalar state
      * and two inline-backed pointer-triplet reference lanes.
      */
-    [[maybe_unused]] [[nodiscard]] CommandGraphIssueRuntimeView*
+    [[nodiscard]] CommandGraphIssueRuntimeView*
     InitCommandGraphIssueRuntimeLane(CommandGraphIssueRuntimeView* const lane) noexcept
     {
       if (lane == nullptr) {
@@ -2537,7 +2537,7 @@ namespace moho
      * What it does:
      * Sets one byte lane to `1` and returns destination.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t* SetByteLaneTrue(std::uint8_t* const destination) noexcept
+    [[nodiscard]] std::uint8_t* SetByteLaneTrue(std::uint8_t* const destination) noexcept
     {
       if (destination == nullptr) {
         return nullptr;
@@ -2990,7 +2990,7 @@ namespace moho
      * source entries in-order, allocating spill storage when source size
      * exceeds inline capacity.
      */
-    [[maybe_unused]] SBuildTemplateBuffer* RebindAndCopyBuildTemplateBufferInline(
+    SBuildTemplateBuffer* RebindAndCopyBuildTemplateBufferInline(
       SBuildTemplateBuffer* const destination,
       const SBuildTemplateBuffer& source
     )
@@ -3047,7 +3047,7 @@ namespace moho
      * What it does:
      * Returns one first-dword lane from one build-template helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -3061,7 +3061,7 @@ namespace moho
      * What it does:
      * Returns one second-dword lane from one build-template helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -3109,7 +3109,7 @@ namespace moho
      * Evaluates build placement for one template-entry preview position, writes
      * the preview color, and snaps the preview transform to the occupation result.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ApplyBuildTemplatePlacementPreviewStatus(
+    [[nodiscard]] std::uint32_t ApplyBuildTemplatePlacementPreviewStatus(
       const Wm3::Vector3f& worldPosition,
       const RUnitBlueprint* const buildBlueprint,
       VTransform& previewTransform,
@@ -3138,7 +3138,7 @@ namespace moho
      * Evaluates single-blueprint build preview placement, including anchored
      * build-distance validation, then writes preview color and snapped transform.
      */
-    [[maybe_unused]] [[nodiscard]] VTransform* ApplyCommandModeBuildPlacementPreviewStatus(
+    [[nodiscard]] VTransform* ApplyCommandModeBuildPlacementPreviewStatus(
       const CommandModeData& commandMode,
       const Wm3::Vector3f& worldPosition,
       CWldSession& session,
@@ -5070,7 +5070,7 @@ namespace moho
      * Resolves one `UserEntity*` from one weak-set index lane by loading the
      * node weak-owner slot and returning `ownerLinkSlot - 8` when linked.
      */
-    [[maybe_unused]] [[nodiscard]] UserEntity*
+    [[nodiscard]] UserEntity*
       DecodeSelectionIndexOwner(const SSelectionSetUserEntity::Index* const index) noexcept
     {
       constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
@@ -5186,7 +5186,7 @@ namespace moho
      * Returns true when at least one live entity in the current selection is in
      * the `TELEPORTATION` category.
      */
-    [[maybe_unused]] [[nodiscard]] bool SelectionContainsTeleportationUnit(SSelectionSetUserEntity& selection)
+    [[nodiscard]] bool SelectionContainsTeleportationUnit(SSelectionSetUserEntity& selection)
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
       if (head == nullptr) {
@@ -5216,7 +5216,7 @@ namespace moho
      * Returns true when the dragged command is an attack/form-attack command
      * and no live selected user-unit already has that command helper queued.
      */
-    [[maybe_unused]] [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
+    [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
     {
       UserCommandIssueHelper* const helper = FindCommandIssueHelperInSession(&session, commandId);
       if (helper == nullptr) {
@@ -5271,7 +5271,7 @@ namespace moho
       return true;
     }
 
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
+    [[nodiscard]] SSelectionNodeUserEntity*
     EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node);
 
     void ClearSelectionSet(SSelectionSetUserEntity& selection)
@@ -5527,7 +5527,7 @@ namespace moho
      * copies key + owner-link lane from `sourceNode`, relinks that owner chain,
      * and writes color/sentinel flags.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity* InitializeSelectionCloneNodeFromSource(
+    [[nodiscard]] SSelectionNodeUserEntity* InitializeSelectionCloneNodeFromSource(
       SSelectionNodeUserEntity* const destinationNode,
       SSelectionNodeUserEntity* const headNode,
       const SSelectionNodeUserEntity* const sourceNode,
@@ -5562,7 +5562,7 @@ namespace moho
      * Allocates one selection node and initializes it from one source node
      * via `InitializeSelectionCloneNodeFromSource(...)`.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity* AllocateSelectionCloneNodeFromSource(
+    [[nodiscard]] SSelectionNodeUserEntity* AllocateSelectionCloneNodeFromSource(
       SSelectionNodeUserEntity* const headNode,
       SSelectionNodeUserEntity* const parentNode,
       const SSelectionNodeUserEntity* const sourceNode,
@@ -5584,7 +5584,7 @@ namespace moho
      * Recursively clones one source selection subtree under `parentNode`,
      * preserving key/color and owner-link chain semantics.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity* CloneSelectionSubtreeIntoSet(
+    [[nodiscard]] SSelectionNodeUserEntity* CloneSelectionSubtreeIntoSet(
       SSelectionSetUserEntity* const destinationSet,
       const SSelectionNodeUserEntity* const sourceNode,
       SSelectionNodeUserEntity* const parentNode
@@ -5617,7 +5617,7 @@ namespace moho
      * Rebuilds one destination selection set from one source set by cloning
      * the source root subtree and then recomputing left/right extrema lanes.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity* CloneSelectionTreeFromStorage(
+    [[nodiscard]] SSelectionNodeUserEntity* CloneSelectionTreeFromStorage(
       SSelectionSetUserEntity* const destinationSet,
       const SSelectionSetUserEntity* const sourceSet
     )
@@ -5800,7 +5800,7 @@ namespace moho
      * Initializes one weak-set storage header with a fresh sentinel node and
      * resets its live-node count to zero.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* InitializeSelectionSetHeadStorage(
+    [[nodiscard]] SSelectionSetUserEntity* InitializeSelectionSetHeadStorage(
       SSelectionSetUserEntity* const set
     )
     {
@@ -5821,7 +5821,7 @@ namespace moho
      * Starts at the set head's left-most node, prunes tombstones, and writes
      * one `{set,node}` result pair for weak-set iteration callers.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity::FindResult* BuildSelectionFindResultFromHeadLeft(
+    [[nodiscard]] SSelectionSetUserEntity::FindResult* BuildSelectionFindResultFromHeadLeft(
       SSelectionSetUserEntity* const set,
       SSelectionSetUserEntity::FindResult* const outResult
     )
@@ -5840,7 +5840,7 @@ namespace moho
      * Advances one weak-set cursor by one RB-tree successor and writes the next
      * live-node `{set,node}` result pair after tombstone filtering.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity::FindResult* BuildSelectionFindResultFromNextCursor(
+    [[nodiscard]] SSelectionSetUserEntity::FindResult* BuildSelectionFindResultFromNextCursor(
       SSelectionSetUserEntity* const set,
       const SSelectionSetUserEntity::FindResult* const cursor,
       SSelectionSetUserEntity::FindResult* const outResult
@@ -5867,7 +5867,7 @@ namespace moho
      * What it does:
      * Decrements one weak-set RB-tree iterator cursor to its predecessor.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
+    [[nodiscard]] SSelectionNodeUserEntity*
     DecrementSelectionCursor(SSelectionSetUserEntity* const set, SSelectionNodeUserEntity* const cursor)
     {
       if (set == nullptr || set->mHead == nullptr || cursor == nullptr) {
@@ -5900,7 +5900,7 @@ namespace moho
      * Initializes one selection-tree node payload from one entity key and links
      * the embedded weak-owner lane into the entity intrusive chain.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity* InitSelectionNodeValueAndWeakLink(
+    [[nodiscard]] SSelectionNodeUserEntity* InitSelectionNodeValueAndWeakLink(
       SSelectionNodeUserEntity* const node,
       SSelectionSetUserEntity* const set,
       UserEntity* const entity
@@ -5929,7 +5929,7 @@ namespace moho
      * What it does:
      * Allocates one selection-tree node and initializes it for one entity key.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
+    [[nodiscard]] SSelectionNodeUserEntity*
     AllocateAndInitSelectionNode(SSelectionSetUserEntity* const set, UserEntity* const entity)
     {
       if (set == nullptr || set->mHead == nullptr) {
@@ -5947,7 +5947,7 @@ namespace moho
      * Inserts one entity key into the selection weak-set RB-tree and returns
      * `{node,inserted}`.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionInsertFindResult* InsertSelectionNodeAndRebalance(
+    [[nodiscard]] SelectionInsertFindResult* InsertSelectionNodeAndRebalance(
       SelectionInsertFindResult* const outResult,
       SSelectionSetUserEntity* const set,
       UserEntity* const entity
@@ -6005,7 +6005,7 @@ namespace moho
      * Performs one find-or-insert operation for the selection weak-set key lane
      * and returns `{node,inserted}`.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionInsertFindResult* FindOrInsertSelectionNodeByUserEntity(
+    [[nodiscard]] SelectionInsertFindResult* FindOrInsertSelectionNodeByUserEntity(
       SelectionInsertFindResult* const outResult,
       SSelectionSetUserEntity* const set,
       UserEntity* const entity
@@ -6139,7 +6139,7 @@ namespace moho
      * entries matching that entity pointer key, restores owner links, and
      * returns removed-count.
      */
-    [[maybe_unused]] [[nodiscard]] std::int32_t EraseSelectionEntityGuardedByOwnerLink(
+    [[nodiscard]] std::int32_t EraseSelectionEntityGuardedByOwnerLink(
       SSelectionSetUserEntity* const set,
       UserEntity* const entity
     )
@@ -6156,7 +6156,7 @@ namespace moho
      * Resolves one equal-key range in the selection weak-set, counts how many
      * nodes the range contains, erases that full range, and returns the count.
      */
-    [[maybe_unused]] [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
+    [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
       const UserEntity* const* const entityLane,
       SSelectionSetUserEntity* const set
     )
@@ -6186,7 +6186,7 @@ namespace moho
      * Guards one entity weak-owner intrusive lane, resolves one hint-aware
      * selection node for that entity key, and writes `{set,node}` output.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity::FindResult* FindSelectionNodeWithHintGuardedByOwnerLink(
+    [[nodiscard]] SSelectionSetUserEntity::FindResult* FindSelectionNodeWithHintGuardedByOwnerLink(
       SSelectionSetUserEntity::FindResult* const outResult,
       SSelectionSetUserEntity* const set,
       const SSelectionSetUserEntity::FindResult* const hintCursor,
@@ -6213,7 +6213,7 @@ namespace moho
      * when hint ordering proves a legal insertion side it inserts directly,
      * otherwise it falls back to canonical find-or-insert.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity** FindOrInsertSelectionNodeWithHint(
+    [[nodiscard]] SSelectionNodeUserEntity** FindOrInsertSelectionNodeWithHint(
       SSelectionSetUserEntity* const set,
       UserEntity* const* const entityLane,
       SSelectionNodeUserEntity** const outNode,
@@ -6287,7 +6287,7 @@ namespace moho
      * Inserts one unit key into a weak-set under a scoped weak-owner guard and
      * writes one `{set,node,found}` result payload.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionFindResBool* InsertSelectionUnitWithWeakGuard(
+    [[nodiscard]] SelectionFindResBool* InsertSelectionUnitWithWeakGuard(
       SelectionFindResBool* const outResult,
       SSelectionSetUserEntity* const set,
       UserUnit* const unit
@@ -6314,7 +6314,7 @@ namespace moho
      * Initializes one destination weak-set from one source iterator range by
      * copying live user-entity keys into a fresh RB-tree head/sentinel shape.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* InitSelectionSetFromIteratorRange(
+    [[nodiscard]] SSelectionSetUserEntity* InitSelectionSetFromIteratorRange(
       SSelectionSetUserEntity* const destination,
       SSelectionSetUserEntity* const source,
       SSelectionNodeUserEntity* first,
@@ -6352,7 +6352,7 @@ namespace moho
      * pruning source tombstone nodes (`nullptr`/`(void*)8` owner-link lanes) on
      * each iterator advance.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* InitSelectionSetFromIteratorRangePruningSourceTombstones(
+    [[nodiscard]] SSelectionSetUserEntity* InitSelectionSetFromIteratorRangePruningSourceTombstones(
       SSelectionSetUserEntity* const destination,
       SSelectionSetUserEntity* const source,
       SSelectionNodeUserEntity* first,
@@ -6389,7 +6389,7 @@ namespace moho
      * starting from the first live source node and cloning the full iterator
      * range into a fresh destination tree.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* CopySelectionSetFromOther(
+    [[nodiscard]] SSelectionSetUserEntity* CopySelectionSetFromOther(
       SSelectionSetUserEntity* const destination,
       SSelectionSetUserEntity* const source
     )
@@ -6435,7 +6435,7 @@ namespace moho
      * Releases one weak-set map storage lane by erasing all nodes, deleting
      * the head sentinel, and zeroing `{head,size}`.
      */
-    [[maybe_unused]] [[nodiscard]] std::int32_t
+    [[nodiscard]] std::int32_t
     ReleaseSelectionWeakSetStorageCompat(SelectionWeakSetStorageRuntimeView* const storage)
     {
       if (storage == nullptr) {
@@ -6461,7 +6461,7 @@ namespace moho
      * Releases one half-open weak-set storage range by erasing each set and
      * deleting each per-set tree head sentinel.
      */
-    [[maybe_unused]] void ReleaseSelectionWeakSetStorageRange(
+    void ReleaseSelectionWeakSetStorageRange(
       SelectionWeakSetStorageRuntimeView* rangeBegin,
       SelectionWeakSetStorageRuntimeView* const rangeEnd
     )
@@ -6479,7 +6479,7 @@ namespace moho
      * Assigns one selection weak-set from another by rebuilding destination
      * storage from source live entries.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromOther(
+    [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromOther(
       SelectionWeakSetStorageRuntimeView* const sourceStorage,
       SSelectionSetUserEntity* const destinationSet
     )
@@ -6514,7 +6514,7 @@ namespace moho
      * Compatibility entrypoint for selection weak-set assignment that rebuilds
      * one destination set from one source storage lane and returns destination.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromStorageLane(
+    [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromStorageLane(
       SelectionWeakSetStorageRuntimeView* const sourceStorage,
       SSelectionSetUserEntity* const destinationSet
     )
@@ -6529,7 +6529,7 @@ namespace moho
      * Alternate calling-lane entrypoint for selection weak-set assignment from
      * one source set into one destination set.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromSetLane(
+    [[nodiscard]] SSelectionSetUserEntity* AssignSelectionSetFromSetLane(
       SSelectionSetUserEntity* const destinationSet,
       SSelectionSetUserEntity* const sourceSet
     )
@@ -6547,7 +6547,7 @@ namespace moho
      * Releases vector-backed weak-set storage and resets begin/end/capacity
      * pointers to the empty state.
      */
-    [[maybe_unused]] void ReleaseSelectionWeakSetStorageVector(
+    void ReleaseSelectionWeakSetStorageVector(
       SelectionWeakSetStorageVectorRuntimeView* const storage
     )
     {
@@ -6572,7 +6572,7 @@ namespace moho
      * Compatibility entrypoint that releases vector-backed weak-set storage and
      * rewires begin/end/capacity to null.
      */
-    [[maybe_unused]] void ReleaseSelectionWeakSetStorageVectorAndReset(
+    void ReleaseSelectionWeakSetStorageVectorAndReset(
       SelectionWeakSetStorageVectorRuntimeView* const storage
     )
     {
@@ -6586,7 +6586,7 @@ namespace moho
      * Copies one half-open weak-set storage range forward, assigning each
      * destination lane from the corresponding source lane.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView* CopySelectionWeakSetStorageRangeForward(
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView* CopySelectionWeakSetStorageRangeForward(
       SelectionWeakSetStorageRuntimeView* destination,
       SelectionWeakSetStorageRuntimeView* sourceBegin,
       SelectionWeakSetStorageRuntimeView* sourceEnd
@@ -6617,7 +6617,7 @@ namespace moho
      * Compatibility adapter lane that forwards one empty weak-set storage range
      * into `ReleaseSelectionWeakSetStorageRange(...)` and returns zero status.
      */
-    [[maybe_unused]] [[nodiscard]] std::int32_t ReleaseSelectionWeakSetStorageRangeEmptyAdapter(
+    [[nodiscard]] std::int32_t ReleaseSelectionWeakSetStorageRangeEmptyAdapter(
       SelectionWeakSetStorageRuntimeView* const rangeBegin
     )
     {
@@ -6632,7 +6632,7 @@ namespace moho
      * Compatibility adapter lane that forwards one null-bounds weak-set storage
      * copy into `CopySelectionWeakSetStorageRangeForward(...)`.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView*
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView*
     CopySelectionWeakSetStorageRangeForwardNullSourceAdapter(
       SelectionWeakSetStorageRuntimeView* const destination
     )
@@ -6647,7 +6647,7 @@ namespace moho
      * Erases one half-open weak-set storage range from a vector lane by
      * shifting the tail forward and releasing trailing stale slots.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView**
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView**
     EraseSelectionWeakSetStorageVectorRange(
       SelectionWeakSetStorageVectorRuntimeView* const storage,
       SelectionWeakSetStorageRuntimeView** const outIterator,
@@ -6677,7 +6677,7 @@ namespace moho
      * Fills one destination weak-set storage range with one source value lane.
      * Returns the last copied destination lane (or `fillValue` when no copy ran).
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView* FillSelectionWeakSetStorageRange(
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView* FillSelectionWeakSetStorageRange(
       SelectionWeakSetStorageRuntimeView* destinationBegin,
       SelectionWeakSetStorageRuntimeView* fillValue,
       SelectionWeakSetStorageRuntimeView* destinationEnd
@@ -6707,7 +6707,7 @@ namespace moho
      * Copies one half-open weak-set storage range backward, assigning each
      * destination lane from the matching source lane in reverse order.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView* CopySelectionWeakSetStorageRangeBackward(
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView* CopySelectionWeakSetStorageRangeBackward(
       SelectionWeakSetStorageRuntimeView* destinationEnd,
       SelectionWeakSetStorageRuntimeView* sourceEnd,
       SelectionWeakSetStorageRuntimeView* sourceBegin
@@ -6740,7 +6740,7 @@ namespace moho
      * Compatibility adapter that forwards one weak-set storage half-open range
      * into `ReleaseSelectionWeakSetStorageRange(...)`.
      */
-    [[maybe_unused]] void ReleaseSelectionWeakSetStorageRangeAdapter(
+    void ReleaseSelectionWeakSetStorageRangeAdapter(
       SelectionWeakSetStorageRuntimeView* const rangeBegin,
       SelectionWeakSetStorageRuntimeView* const rangeEnd
     )
@@ -6754,7 +6754,7 @@ namespace moho
      * What it does:
      * Register-shape adapter for `FillSelectionWeakSetStorageRange(...)`.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView* FillSelectionWeakSetStorageRangeAdapter(
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView* FillSelectionWeakSetStorageRangeAdapter(
       SelectionWeakSetStorageRuntimeView* const destinationBegin,
       SelectionWeakSetStorageRuntimeView* const fillValue,
       SelectionWeakSetStorageRuntimeView* const destinationEnd
@@ -6770,10 +6770,10 @@ namespace moho
      * Compatibility adapter that forwards one legacy lane shape with null
      * source bounds into `CopySelectionWeakSetStorageRangeBackward(...)`.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView*
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView*
     CopySelectionWeakSetStorageRangeBackwardNullSourceAdapter(
-      [[maybe_unused]] const SelectionWeakSetStorageRuntimeView* const unusedLaneA,
-      [[maybe_unused]] const SelectionWeakSetStorageRuntimeView* const unusedLaneB,
+      const SelectionWeakSetStorageRuntimeView* const unusedLaneA,
+      const SelectionWeakSetStorageRuntimeView* const unusedLaneB,
       SelectionWeakSetStorageRuntimeView* const destinationEnd
     )
     {
@@ -6787,7 +6787,7 @@ namespace moho
      * Releases one weak-set storage lane, clears `{head,size}`, and returns
      * zero for legacy caller lanes that consume integer status.
      */
-    [[maybe_unused]] [[nodiscard]] std::int32_t ReleaseSelectionWeakSetStorageAndReturnStatus(
+    [[nodiscard]] std::int32_t ReleaseSelectionWeakSetStorageAndReturnStatus(
       SelectionWeakSetStorageRuntimeView* const storage
     )
     {
@@ -6802,7 +6802,7 @@ namespace moho
      * Releases one weak-set storage lane and returns the original storage
      * pointer for pointer-returning compatibility callers.
      */
-    [[maybe_unused]] [[nodiscard]] SelectionWeakSetStorageRuntimeView* ReleaseSelectionWeakSetStorageAndReturnStorage(
+    [[nodiscard]] SelectionWeakSetStorageRuntimeView* ReleaseSelectionWeakSetStorageAndReturnStorage(
       SelectionWeakSetStorageRuntimeView* const storage
     )
     {
@@ -6884,7 +6884,7 @@ namespace moho
      * What it does:
      * Returns one first-dword runtime lane from one selection helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadSelectionRuntimeLane0(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadSelectionRuntimeLane0(const void* const value) noexcept
     {
       return ReadRuntimeDwordAt0(value);
     }
@@ -6895,7 +6895,7 @@ namespace moho
      * What it does:
      * Returns one first-dword runtime lane from one selection helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadSelectionRuntimeLane0Alt(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadSelectionRuntimeLane0Alt(const void* const value) noexcept
     {
       return ReadRuntimeDwordAt0(value);
     }
@@ -6906,7 +6906,7 @@ namespace moho
      * What it does:
      * Returns one first-dword runtime lane from one command helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandRuntimeLane0(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandRuntimeLane0(const void* const value) noexcept
     {
       return ReadRuntimeDwordAt0(value);
     }
@@ -6917,7 +6917,7 @@ namespace moho
      * What it does:
      * Returns one second-dword runtime lane from one command helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandRuntimeLane4(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandRuntimeLane4(const void* const value) noexcept
     {
       return ReadRuntimeDwordAt4(value);
     }
@@ -6928,7 +6928,7 @@ namespace moho
      * What it does:
      * Returns one first-dword runtime lane from one command helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadCommandRuntimeLane0Alt(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadCommandRuntimeLane0Alt(const void* const value) noexcept
     {
       return ReadRuntimeDwordAt0(value);
     }
@@ -6940,7 +6940,7 @@ namespace moho
      * Appends one `UserUnit*` from source lane into one fastvector and returns
      * the pre-append end pointer lane.
      */
-    [[maybe_unused]] [[nodiscard]] UserUnit**
+    [[nodiscard]] UserUnit**
     AppendUserUnitPointerLane(gpg::fastvector<UserUnit*>& destination, UserUnit* const* const source)
     {
       UserUnit** const previousEnd = destination.end();
@@ -6955,7 +6955,7 @@ namespace moho
      * Initializes one raw pointer-triplet lane with one inline 4-byte storage
      * fallback and resets begin/end/capacity links.
      */
-    [[maybe_unused]] [[nodiscard]] RawPointerTripletRuntimeView*
+    [[nodiscard]] RawPointerTripletRuntimeView*
     InitRawPointerTripletInlineLane(RawPointerTripletRuntimeView* const view) noexcept
     {
       if (view == nullptr) {
@@ -6977,7 +6977,7 @@ namespace moho
      * Resets one raw pointer-triplet lane to inline/meta fallback storage and
      * releases heap-buffer storage when currently detached from fallback.
      */
-    [[maybe_unused]] [[nodiscard]] void* ResetRawPointerTripletToInlineLane(RawPointerTripletRuntimeView* const view)
+    [[nodiscard]] void* ResetRawPointerTripletToInlineLane(RawPointerTripletRuntimeView* const view)
     {
       if (view == nullptr) {
         return nullptr;
@@ -7005,7 +7005,7 @@ namespace moho
      * Seeds one raw pointer-triplet lane from one external buffer and element
      * count (`begin/end/capacity/meta` share the same base lane).
      */
-    [[maybe_unused]] [[nodiscard]] RawPointerTripletRuntimeView* InitRawPointerTripletFromExternalLane(
+    [[nodiscard]] RawPointerTripletRuntimeView* InitRawPointerTripletFromExternalLane(
       RawPointerTripletRuntimeView* const view,
       const std::int32_t elementCount,
       void* const begin
@@ -7029,7 +7029,7 @@ namespace moho
      * What it does:
      * No-op hook lane retained for binary parity.
      */
-    [[maybe_unused]] void NoOpSelectionHookA() noexcept
+    void NoOpSelectionHookA() noexcept
     {}
 
     /**
@@ -7038,7 +7038,7 @@ namespace moho
      * What it does:
      * Performs one selection-cursor decrement and returns the updated cursor lane.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity* StepSelectionCursorBackward(
+    [[nodiscard]] SSelectionNodeUserEntity* StepSelectionCursorBackward(
       SSelectionSetUserEntity* const set,
       SSelectionNodeUserEntity* const cursor
     )
@@ -7052,7 +7052,7 @@ namespace moho
      * What it does:
      * Copies one `{dword,flag}` payload from lane pointers to one destination.
      */
-    [[maybe_unused]] [[nodiscard]] DwordByteRuntimeView* CopyDwordByteRuntimeLane(
+    [[nodiscard]] DwordByteRuntimeView* CopyDwordByteRuntimeLane(
       DwordByteRuntimeView* const destination,
       const std::uint32_t* const valueSource,
       const std::uint8_t* const flagSource
@@ -7073,7 +7073,7 @@ namespace moho
      * What it does:
      * Returns one legacy map/set maximum-size guard constant lane.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t GetLegacyMapSetMaxSizeGuard() noexcept
+    [[nodiscard]] std::uint32_t GetLegacyMapSetMaxSizeGuard() noexcept
     {
       return 0x15555555u;
     }
@@ -7084,7 +7084,7 @@ namespace moho
      * What it does:
      * No-op hook lane retained for binary parity.
      */
-    [[maybe_unused]] void NoOpSelectionHookB() noexcept
+    void NoOpSelectionHookB() noexcept
     {}
 
     /**
@@ -7093,7 +7093,7 @@ namespace moho
      * What it does:
      * Returns one legacy map/set maximum-size guard constant lane.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t GetLegacyMapSetMaxSizeGuardAlt() noexcept
+    [[nodiscard]] std::uint32_t GetLegacyMapSetMaxSizeGuardAlt() noexcept
     {
       return 0x15555555u;
     }
@@ -7104,7 +7104,7 @@ namespace moho
      * What it does:
      * Writes one `{first,second,flag}` payload into destination runtime storage.
      */
-    [[maybe_unused]] [[nodiscard]] TwoDwordByteRuntimeView* InitTwoDwordByteRuntimeLane(
+    [[nodiscard]] TwoDwordByteRuntimeView* InitTwoDwordByteRuntimeLane(
       TwoDwordByteRuntimeView* const destination,
       const std::uint32_t first,
       const std::uint32_t second,
@@ -7127,7 +7127,7 @@ namespace moho
      * What it does:
      * Copies one `{first,second,flag}` payload from lane pointers into destination.
      */
-    [[maybe_unused]] [[nodiscard]] TwoDwordByteRuntimeView* CopyTwoDwordByteRuntimeLane(
+    [[nodiscard]] TwoDwordByteRuntimeView* CopyTwoDwordByteRuntimeLane(
       TwoDwordByteRuntimeView* const destination,
       const std::uint32_t* const pairSource,
       const std::uint8_t* const flagSource
@@ -7150,7 +7150,7 @@ namespace moho
      * Upcasts one reflected reference to `UserUnit` type lane and returns the
      * resulting object pointer payload.
      */
-    [[maybe_unused]] [[nodiscard]] void* UpcastRRefToUserUnitObject(gpg::RRef* const sourceRef)
+    [[nodiscard]] void* UpcastRRefToUserUnitObject(gpg::RRef* const sourceRef)
     {
       if (sourceRef == nullptr) {
         return nullptr;
@@ -7171,7 +7171,7 @@ namespace moho
      * What it does:
      * No-op hook lane retained for binary parity.
      */
-    [[maybe_unused]] void NoOpSelectionHookC() noexcept
+    void NoOpSelectionHookC() noexcept
     {}
 
     /**
@@ -7180,7 +7180,7 @@ namespace moho
      * What it does:
      * Returns the high-byte lane from one packed 32-bit value.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t ReadHighByteLaneA(const std::uint32_t value) noexcept
+    [[nodiscard]] std::uint8_t ReadHighByteLaneA(const std::uint32_t value) noexcept
     {
       return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
     }
@@ -7191,7 +7191,7 @@ namespace moho
      * What it does:
      * No-op hook lane retained for binary parity.
      */
-    [[maybe_unused]] void NoOpSelectionHookD() noexcept
+    void NoOpSelectionHookD() noexcept
     {}
 
     /**
@@ -7200,7 +7200,7 @@ namespace moho
      * What it does:
      * Returns the high-byte lane from one packed 32-bit value.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t ReadHighByteLaneB(const std::uint32_t value) noexcept
+    [[nodiscard]] std::uint8_t ReadHighByteLaneB(const std::uint32_t value) noexcept
     {
       return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
     }
@@ -7211,7 +7211,7 @@ namespace moho
      * What it does:
      * Returns one first-dword runtime lane from one packed payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadPackedRuntimeLane0(const void* const value) noexcept
+    [[nodiscard]] std::uint32_t ReadPackedRuntimeLane0(const void* const value) noexcept
     {
       return ReadRuntimeDwordAt0(value);
     }
@@ -7222,7 +7222,7 @@ namespace moho
      * What it does:
      * Copies one `{word0,word2}` pair from one three-word packed source lane.
      */
-    [[maybe_unused]] [[nodiscard]] PackedTwoWordRuntimeView* CopyPackedWordPairSkippingMiddle(
+    [[nodiscard]] PackedTwoWordRuntimeView* CopyPackedWordPairSkippingMiddle(
       PackedTwoWordRuntimeView* const destination,
       const PackedThreeWordRuntimeView* const source
     ) noexcept
@@ -7242,7 +7242,7 @@ namespace moho
      * What it does:
      * Copies one 2-float lane (`x`,`y`) to one destination dword payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyPackedFloat2Lane(
+    [[nodiscard]] std::uint32_t* CopyPackedFloat2Lane(
       std::uint32_t* const destination,
       const float* const source
     ) noexcept
@@ -7369,7 +7369,7 @@ namespace moho
      * Unlinks one weak-ref node from its intrusive owner chain and returns the
      * final owner-link cursor slot without resetting the weak-ref lanes.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionWeakRefUserEntity**
+    [[nodiscard]] SSelectionWeakRefUserEntity**
     UnlinkSelectionWeakOwnerRefNoReset(SSelectionWeakRefUserEntity& weakRef) noexcept
     {
       auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
@@ -7404,7 +7404,7 @@ namespace moho
      * Unlinks one owner-link node whose weak-ref lane begins at +0x04 and
      * returns the final owner-link cursor slot without resetting link fields.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionWeakRefUserEntity**
+    [[nodiscard]] SSelectionWeakRefUserEntity**
     UnlinkSelectionWeakOwnerRefAfterLeadingDword(SelectionWeakOwnerLinkNodeLane& node) noexcept
     {
       SSelectionWeakRefUserEntity* const weakRef = &node.mWeakRef;
@@ -7686,7 +7686,7 @@ namespace moho
      * Unlinks each weak-ref node in one half-open `[begin,end)` range from its
      * intrusive owner chain without resetting link fields.
      */
-    [[maybe_unused]] void UnlinkSelectionWeakOwnerRefRangeNoReset(
+    void UnlinkSelectionWeakOwnerRefRangeNoReset(
       SSelectionWeakRefUserEntity* const begin,
       SSelectionWeakRefUserEntity* const end
     ) noexcept
@@ -7710,7 +7710,7 @@ namespace moho
      * Erases one `UserEntity` weak-set node from the selection RB-tree, unlinks
      * its intrusive weak-owner chain lane, and returns the next in-order node.
      */
-    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
+    [[nodiscard]] SSelectionNodeUserEntity*
     EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
     {
       if (selection.mHead == nullptr || IsSelectionNil(node)) {
@@ -7807,7 +7807,7 @@ namespace moho
      * Reads one entity-id lane at `+0x210` from command-owner runtime storage,
      * then resolves the live `UserEntity*` through the active session entity map.
      */
-    [[maybe_unused]] [[nodiscard]] UserEntity* ResolveEntityFromCommandIssueOwner(const void* const commandOwner)
+    [[nodiscard]] UserEntity* ResolveEntityFromCommandIssueOwner(const void* const commandOwner)
     {
       CWldSession* const session = moho::WLD_GetSession();
       if (commandOwner == nullptr || session == nullptr) {
@@ -8363,7 +8363,7 @@ namespace moho
      * Initializes one session save-node map header lane (sentinel self-links)
      * and clears entry count.
      */
-    [[maybe_unused]] SSessionSaveNodeMap* InitializeSessionSaveNodeMapHeader(
+    SSessionSaveNodeMap* InitializeSessionSaveNodeMapHeader(
       SSessionSaveNodeMap* const outMap
     )
     {
@@ -13598,7 +13598,7 @@ namespace moho
      * dispatch to `Playing`, and notifies the active world-UI provider through
      * `OnStart` when present.
      */
-    [[maybe_unused]] int WLD_EnterPlayingAndNotifyUIProvider()
+    int WLD_EnterPlayingAndNotifyUIProvider()
     {
       int dispatchResult = 0;
       if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
@@ -13835,7 +13835,7 @@ namespace moho
    * What it does:
    * Tears down the current world session and then enters the front-end flow.
    */
-  [[maybe_unused]] [[nodiscard]] bool WLD_TeardownAndStartFrontEnd()
+  [[nodiscard]] bool WLD_TeardownAndStartFrontEnd()
   {
     WLD_Teardown();
     return UI_StartFrontEnd();
@@ -13928,7 +13928,7 @@ namespace moho
    * Resolves the process-global teardown-callback vector and runs the normal
    * teardown callback dispatch entry point.
    */
-  [[maybe_unused]] [[nodiscard]] std::intptr_t WLD_RunTeardownCallbacksFromGlobalList()
+  [[nodiscard]] std::intptr_t WLD_RunTeardownCallbacksFromGlobalList()
   {
     WldTeardownCallbackVector* const callbacks = WLD_GetOnTeardownCallbacks();
     return DoTeardownCallbacks(callbacks);
@@ -14071,7 +14071,7 @@ namespace moho
    * Runs one deleting teardown path for `CWldSession` and returns the original
    * pointer lane.
    */
-  [[maybe_unused]] CWldSession* DeleteWldSessionAndReturn(CWldSession* const session) noexcept
+  CWldSession* DeleteWldSessionAndReturn(CWldSession* const session) noexcept
   {
     session->~CWldSession();
     ::operator delete(session);

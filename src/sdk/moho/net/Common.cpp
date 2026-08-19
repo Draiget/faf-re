@@ -538,7 +538,7 @@ namespace
   /**
    * Address: 0x0047D2D0 (FUN_0047D2D0, CopyStampVectorOnly)
    */
-  [[maybe_unused]] void CopyStampVectorOnly(const SSendStampView& source, SSendStampView& destination)
+  void CopyStampVectorOnly(const SSendStampView& source, SSendStampView& destination)
   {
     destination.items = source.items;
   }
@@ -546,7 +546,7 @@ namespace
   /**
    * Address: 0x0047D290 (FUN_0047D290, CopyStampViewWithWindowMetadata)
    */
-  [[maybe_unused]] void CopyStampViewWithWindowMetadata(
+  void CopyStampViewWithWindowMetadata(
     const SSendStampView& source, SSendStampView& destination
   )
   {
@@ -558,7 +558,7 @@ namespace
   /**
    * Address: 0x0047D4F0 (FUN_0047D4F0, StampPointerAt)
    */
-  [[maybe_unused]] const SSendStamp* StampPointerAt(const SSendStampView& view, const uint32_t index)
+  const SSendStamp* StampPointerAt(const SSendStampView& view, const uint32_t index)
   {
     const SSendStamp* const base = VectorData(view.items);
     return base ? (base + index) : nullptr;
@@ -567,7 +567,7 @@ namespace
   /**
    * Address: 0x0047D700 (FUN_0047D700, BandwidthSamplePointerAt)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSamplePointerAt(
+  SBandwidthUsageSample* BandwidthSamplePointerAt(
     SBandwidthUsageSeries& series, const uint32_t index
   )
   {
@@ -578,7 +578,7 @@ namespace
   /**
    * Address: 0x0047D730 (FUN_0047D730, BandwidthSampleBegin)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSampleBegin(SBandwidthUsageSeries& series)
+  SBandwidthUsageSample* BandwidthSampleBegin(SBandwidthUsageSeries& series)
   {
     return VectorData(series.samples);
   }
@@ -586,7 +586,7 @@ namespace
   /**
    * Address: 0x0047D740 (FUN_0047D740, BandwidthSampleBeginAlias)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSampleBeginAlias(SBandwidthUsageSeries& series)
+  SBandwidthUsageSample* BandwidthSampleBeginAlias(SBandwidthUsageSeries& series)
   {
     return BandwidthSampleBegin(series);
   }
@@ -594,7 +594,7 @@ namespace
   /**
    * Address: 0x0047D750 (FUN_0047D750, BandwidthSampleEnd)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSampleEnd(SBandwidthUsageSeries& series)
+  SBandwidthUsageSample* BandwidthSampleEnd(SBandwidthUsageSeries& series)
   {
     SBandwidthUsageSample* const base = VectorData(series.samples);
     return base ? (base + series.samples.size()) : nullptr;
@@ -603,7 +603,7 @@ namespace
   /**
    * Address: 0x0047D760 (FUN_0047D760, BandwidthSampleEndAlias)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSampleEndAlias(SBandwidthUsageSeries& series)
+  SBandwidthUsageSample* BandwidthSampleEndAlias(SBandwidthUsageSeries& series)
   {
     return BandwidthSampleEnd(series);
   }
@@ -611,7 +611,7 @@ namespace
   /**
    * Address: 0x0047D770 (FUN_0047D770, MaxStampVectorCount)
    */
-  [[maybe_unused]] uint32_t MaxStampVectorCount()
+  uint32_t MaxStampVectorCount()
   {
     return MaxLegacyVectorCount<SSendStamp>();
   }
@@ -619,7 +619,7 @@ namespace
   /**
    * Address: 0x0047DD10 (FUN_0047DD10, MaxStampVectorCountAlias)
    */
-  [[maybe_unused]] uint32_t MaxStampVectorCountAlias()
+  uint32_t MaxStampVectorCountAlias()
   {
     return MaxStampVectorCount();
   }
@@ -627,7 +627,7 @@ namespace
   /**
    * Address: 0x0047D8A0 (FUN_0047D8A0, ThrowStampVectorTooLong)
    */
-  [[noreturn]] [[maybe_unused]] void ThrowStampVectorTooLong()
+  [[noreturn]] void ThrowStampVectorTooLong()
   {
     throw std::length_error("vector<T> too long");
   }
@@ -635,7 +635,7 @@ namespace
   /**
    * Address: 0x0047E090 (FUN_0047E090, ThrowBandwidthSampleVectorTooLong)
    */
-  [[noreturn]] [[maybe_unused]] void ThrowBandwidthSampleVectorTooLong()
+  [[noreturn]] void ThrowBandwidthSampleVectorTooLong()
   {
     throw std::length_error("vector<T> too long");
   }
@@ -643,7 +643,7 @@ namespace
   /**
    * Address: 0x0047DA70 (FUN_0047DA70, InsertStampAt)
    */
-  [[maybe_unused]] SSendStamp* InsertStampAt(
+  SSendStamp* InsertStampAt(
     SSendStampView& view, SSendStamp* const position, const SSendStamp& stamp
   )
   {
@@ -653,7 +653,7 @@ namespace
   /**
    * Address: 0x0047D780 (FUN_0047D780, InsertStampAtAlias)
    */
-  [[maybe_unused]] SSendStamp* InsertStampAtAlias(
+  SSendStamp* InsertStampAtAlias(
     SSendStampView& view, SSendStamp* const position, const SSendStamp& stamp
   )
   {
@@ -663,7 +663,7 @@ namespace
   /**
    * Address: 0x0047D7F0 (FUN_0047D7F0, AllocateStampStorage)
    */
-  [[maybe_unused]] bool AllocateStampStorage(SSendStampView& view, const uint32_t count)
+  bool AllocateStampStorage(SSendStampView& view, const uint32_t count)
   {
     if (count > MaxStampVectorCount()) {
       ThrowStampVectorTooLong();
@@ -677,7 +677,7 @@ namespace
   /**
    * Address: 0x0047D850 (FUN_0047D850, ClearStampStorage)
    */
-  [[maybe_unused]] void ClearStampStorage(SSendStampView& view)
+  void ClearStampStorage(SSendStampView& view)
   {
     view.items = msvc8::vector<SSendStamp>{};
   }
@@ -685,7 +685,7 @@ namespace
   /**
    * Address: 0x0047D880 (FUN_0047D880, CopyStampAndAdvance)
    */
-  [[maybe_unused]] SSendStamp* CopyStampAndAdvance(
+  SSendStamp* CopyStampAndAdvance(
     SSendStamp* destination, const uint32_t count, const SSendStamp& stamp
   ) noexcept
   {
@@ -695,7 +695,7 @@ namespace
   /**
    * Address: 0x0047DD20 (FUN_0047DD20, BandwidthSampleBeginAlias2)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSampleBeginAlias2(SBandwidthUsageSeries& series)
+  SBandwidthUsageSample* BandwidthSampleBeginAlias2(SBandwidthUsageSeries& series)
   {
     return BandwidthSampleBegin(series);
   }
@@ -703,7 +703,7 @@ namespace
   /**
    * Address: 0x0047DD30 (FUN_0047DD30, BandwidthSampleEndAlias2)
    */
-  [[maybe_unused]] SBandwidthUsageSample* BandwidthSampleEndAlias2(SBandwidthUsageSeries& series)
+  SBandwidthUsageSample* BandwidthSampleEndAlias2(SBandwidthUsageSeries& series)
   {
     return BandwidthSampleEnd(series);
   }
@@ -711,7 +711,7 @@ namespace
   /**
    * Address: 0x0047DD40 (FUN_0047DD40, EraseBandwidthSampleRange)
    */
-  [[maybe_unused]] SBandwidthUsageSample* EraseBandwidthSampleRange(
+  SBandwidthUsageSample* EraseBandwidthSampleRange(
     SBandwidthUsageSeries& series,
     SBandwidthUsageSample* const destination,
     const SBandwidthUsageSample* const source
@@ -723,7 +723,7 @@ namespace
   /**
    * Address: 0x0047DD80 (FUN_0047DD80, InsertBandwidthSampleCopies)
    */
-  [[maybe_unused]] SBandwidthUsageSample* InsertBandwidthSampleCopies(
+  SBandwidthUsageSample* InsertBandwidthSampleCopies(
     SBandwidthUsageSeries& series,
     SBandwidthUsageSample* const position,
     const uint32_t count,
@@ -739,7 +739,7 @@ namespace
   /**
    * Address: 0x0047DFD0 (FUN_0047DFD0, StorePointerOut)
    */
-  [[maybe_unused]] void** StorePointerOutVariant1(void** const result, void* const value) noexcept
+  void** StorePointerOutVariant1(void** const result, void* const value) noexcept
   {
     return StorePointerOut(result, value);
   }
@@ -747,7 +747,7 @@ namespace
   /**
    * Address: 0x0047DFE0 (FUN_0047DFE0, StorePointerOutAlias)
    */
-  [[maybe_unused]] void** StorePointerOutAlias(void** const result, void* const value) noexcept
+  void** StorePointerOutAlias(void** const result, void* const value) noexcept
   {
     return StorePointerOut(result, value);
   }
@@ -755,7 +755,7 @@ namespace
   /**
    * Address: 0x0047DFF0 (FUN_0047DFF0, StampPointerFromVectorBase)
    */
-  [[maybe_unused]] SSendStamp** StampPointerFromVectorBase(
+  SSendStamp** StampPointerFromVectorBase(
     SSendStamp** const result, SSendStamp* const* const base, const int index
   ) noexcept
   {
@@ -766,7 +766,7 @@ namespace
   /**
    * Address: 0x0047E020 (FUN_0047E020, BandwidthPointerFromVectorBase)
    */
-  [[maybe_unused]] SBandwidthUsageSample** BandwidthPointerFromVectorBase(
+  SBandwidthUsageSample** BandwidthPointerFromVectorBase(
     SBandwidthUsageSample** const result, SBandwidthUsageSample* const* const base, const int index
   ) noexcept
   {
@@ -777,7 +777,7 @@ namespace
   /**
    * Address: 0x0047E050 (FUN_0047E050, MaxBandwidthSampleVectorCount)
    */
-  [[maybe_unused]] uint32_t MaxBandwidthSampleVectorCount()
+  uint32_t MaxBandwidthSampleVectorCount()
   {
     return MaxLegacyVectorCount<SBandwidthUsageSample>();
   }
@@ -785,7 +785,7 @@ namespace
   /**
    * Address: 0x0047E160 (FUN_0047E160, StorePointerOutAlias2)
    */
-  [[maybe_unused]] void** StorePointerOutAlias2(void** const result, void* const value) noexcept
+  void** StorePointerOutAlias2(void** const result, void* const value) noexcept
   {
     return StorePointerOut(result, value);
   }
@@ -793,7 +793,7 @@ namespace
   /**
    * Address: 0x0047E190 (FUN_0047E190, MaxBandwidthSampleVectorCountAlias)
    */
-  [[maybe_unused]] uint32_t MaxBandwidthSampleVectorCountAlias()
+  uint32_t MaxBandwidthSampleVectorCountAlias()
   {
     return MaxBandwidthSampleVectorCount();
   }
@@ -801,7 +801,7 @@ namespace
   /**
    * Address: 0x0047E1B0 (FUN_0047E1B0, StorePointerOutAlias3)
    */
-  [[maybe_unused]] void** StorePointerOutAlias3(void** const result, void* const value) noexcept
+  void** StorePointerOutAlias3(void** const result, void* const value) noexcept
   {
     return StorePointerOut(result, value);
   }
@@ -809,7 +809,7 @@ namespace
   /**
    * Address: 0x0047E700 (FUN_0047E700, CopyStampRangeForward)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForward(
+  SSendStamp* CopyStampRangeForward(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -819,7 +819,7 @@ namespace
   /**
    * Address: 0x0047E940 (FUN_0047E940, CopyStampRangeForwardAlias)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardAlias(
+  SSendStamp* CopyStampRangeForwardAlias(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -829,7 +829,7 @@ namespace
   /**
    * Address: 0x0047E990 (FUN_0047E990, CopyStampRangeForwardFromCurrent)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardFromCurrent(
+  SSendStamp* CopyStampRangeForwardFromCurrent(
     SSendStamp* destination, const SSendStamp* sourceEnd, const SSendStamp* sourceCurrent
   ) noexcept
   {
@@ -839,7 +839,7 @@ namespace
   /**
    * Address: 0x0047E9D0 (FUN_0047E9D0, CopyBandwidthRangeForwardFromCurrent)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrent(
+  SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrent(
     SBandwidthUsageSample* destination,
     const SBandwidthUsageSample* sourceEnd,
     const SBandwidthUsageSample* sourceCurrent
@@ -851,7 +851,7 @@ namespace
   /**
    * Address: 0x0047E4D0 (FUN_0047E4D0, CopyStampCountFromValue)
    */
-  [[maybe_unused]] SSendStamp* CopyStampCountFromValue(
+  SSendStamp* CopyStampCountFromValue(
     SSendStamp* destination, const SSendStamp& value, const uint32_t count
   ) noexcept
   {
@@ -861,7 +861,7 @@ namespace
   /**
    * Address: 0x0047E670 (FUN_0047E670, CopyBandwidthCountFromValue)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthCountFromValue(
+  SBandwidthUsageSample* CopyBandwidthCountFromValue(
     SBandwidthUsageSample* destination, const SBandwidthUsageSample& value, const uint32_t count
   ) noexcept
   {
@@ -871,7 +871,7 @@ namespace
   /**
    * Address: 0x0047E530 (FUN_0047E530, FillStampRangeWithValue)
    */
-  [[maybe_unused]] SSendStamp* FillStampRangeWithValue(
+  SSendStamp* FillStampRangeWithValue(
     SSendStamp* first, SSendStamp* const last, const SSendStamp& value
   ) noexcept
   {
@@ -881,7 +881,7 @@ namespace
   /**
    * Address: 0x0047E7A0 (FUN_0047E7A0, CopyStampRangeBackward)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeBackward(
+  SSendStamp* CopyStampRangeBackward(
     SSendStamp* destinationEnd, const SSendStamp* const sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -891,7 +891,7 @@ namespace
   /**
    * Address: 0x0047E1E0 (FUN_0047E1E0, CopyStampRangeForwardThunk)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardThunk(
+  SSendStamp* CopyStampRangeForwardThunk(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -901,7 +901,7 @@ namespace
   /**
    * Address: 0x0047E210 (FUN_0047E210, CopyStampRangeForwardThunkAlias)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardThunkAlias(
+  SSendStamp* CopyStampRangeForwardThunkAlias(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -911,7 +911,7 @@ namespace
   /**
    * Address: 0x0047E250 (FUN_0047E250, CopyStampCountThunk)
    */
-  [[maybe_unused]] SSendStamp* CopyStampCountThunk(
+  SSendStamp* CopyStampCountThunk(
     SSendStamp* destination, const SSendStamp& value, const uint32_t count
   ) noexcept
   {
@@ -921,7 +921,7 @@ namespace
   /**
    * Address: 0x0047E2D0 (FUN_0047E2D0, CopyStampRangeForwardFromCurrentThunk)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardFromCurrentThunk(
+  SSendStamp* CopyStampRangeForwardFromCurrentThunk(
     SSendStamp* destination, const SSendStamp* sourceEnd, const SSendStamp* sourceCurrent
   ) noexcept
   {
@@ -935,7 +935,7 @@ namespace
    * Tail-thunk adapter that forwards one stamp-range fill lane into
    * `FUN_0047E530`.
    */
-  [[maybe_unused]] SSendStamp* FillStampRangeWithValueThunk(
+  SSendStamp* FillStampRangeWithValueThunk(
     SSendStamp* first, SSendStamp* const last, const SSendStamp& value
   ) noexcept
   {
@@ -945,7 +945,7 @@ namespace
   /**
    * Address: 0x0047E310 (FUN_0047E310, CopyStampRangeBackwardThunk)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeBackwardThunk(
+  SSendStamp* CopyStampRangeBackwardThunk(
     SSendStamp* destinationEnd, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -955,7 +955,7 @@ namespace
   /**
    * Address: 0x0047E360 (FUN_0047E360, CopyBandwidthRangeForwardFromCurrentThunk)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunk(
+  SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunk(
     SBandwidthUsageSample* destination,
     const SBandwidthUsageSample* sourceEnd,
     const SBandwidthUsageSample* sourceCurrent
@@ -967,7 +967,7 @@ namespace
   /**
    * Address: 0x0047E3E0 (FUN_0047E3E0, CopyBandwidthCountThunk)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthCountThunk(
+  SBandwidthUsageSample* CopyBandwidthCountThunk(
     SBandwidthUsageSample* destination, const SBandwidthUsageSample& value, const uint32_t count
   ) noexcept
   {
@@ -977,7 +977,7 @@ namespace
   /**
    * Address: 0x0047E450 (FUN_0047E450, CopyStampRangeForwardThunkAlias2)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardThunkAlias2(
+  SSendStamp* CopyStampRangeForwardThunkAlias2(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -987,7 +987,7 @@ namespace
   /**
    * Address: 0x0047E480 (FUN_0047E480, CopyStampRangeForwardAliasThunk)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardAliasThunk(
+  SSendStamp* CopyStampRangeForwardAliasThunk(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -997,7 +997,7 @@ namespace
   /**
    * Address: 0x0047E4B0 (FUN_0047E4B0, ExtractArgumentHighByte)
    */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByte(const uint32_t value) noexcept
+  unsigned char ExtractArgumentHighByte(const uint32_t value) noexcept
   {
     return static_cast<unsigned char>((value >> 8u) & 0xFFu);
   }
@@ -1005,7 +1005,7 @@ namespace
   /**
    * Address: 0x0047E510 (FUN_0047E510, CopyStampRangeForwardFromCurrentThunkAlias)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias(
+  SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias(
     SSendStamp* destination, const SSendStamp* sourceEnd, const SSendStamp* sourceCurrent
   ) noexcept
   {
@@ -1015,7 +1015,7 @@ namespace
   /**
    * Address: 0x0047E570 (FUN_0047E570, ExtractArgumentHighByteAlias)
    */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias(const uint32_t value) noexcept
+  unsigned char ExtractArgumentHighByteAlias(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -1023,7 +1023,7 @@ namespace
   /**
    * Address: 0x0047E580 (FUN_0047E580, CopyStampRangeBackwardThunkAlias)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeBackwardThunkAlias(
+  SSendStamp* CopyStampRangeBackwardThunkAlias(
     SSendStamp* destinationEnd, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -1033,7 +1033,7 @@ namespace
   /**
    * Address: 0x0047E5C0 (FUN_0047E5C0, ExtractArgumentHighByteAlias2)
    */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias2(const uint32_t value) noexcept
+  unsigned char ExtractArgumentHighByteAlias2(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -1041,7 +1041,7 @@ namespace
   /**
    * Address: 0x0047E5F0 (FUN_0047E5F0, CopyBandwidthRangeForwardFromCurrentThunkAlias)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias(
+  SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias(
     SBandwidthUsageSample* destination,
     const SBandwidthUsageSample* sourceEnd,
     const SBandwidthUsageSample* sourceCurrent
@@ -1053,7 +1053,7 @@ namespace
   /**
    * Address: 0x0047E630 (FUN_0047E630, ExtractArgumentHighByteAlias3)
    */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias3(const uint32_t value) noexcept
+  unsigned char ExtractArgumentHighByteAlias3(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -1061,7 +1061,7 @@ namespace
   /**
    * Address: 0x0047E6F0 (FUN_0047E6F0, ExtractArgumentHighByteAlias4)
    */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias4(const uint32_t value) noexcept
+  unsigned char ExtractArgumentHighByteAlias4(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -1069,7 +1069,7 @@ namespace
   /**
    * Address: 0x0047E750 (FUN_0047E750, CopyStampRangeForwardAliasThunk2)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardAliasThunk2(
+  SSendStamp* CopyStampRangeForwardAliasThunk2(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -1079,7 +1079,7 @@ namespace
   /**
    * Address: 0x0047E780 (FUN_0047E780, CopyStampRangeForwardFromCurrentThunkAlias2)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias2(
+  SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias2(
     SSendStamp* destination, const SSendStamp* sourceEnd, const SSendStamp* sourceCurrent
   ) noexcept
   {
@@ -1089,7 +1089,7 @@ namespace
   /**
    * Address: 0x0047E7E0 (FUN_0047E7E0, CopyBandwidthRangeForwardFromCurrentThunkAlias2)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias2(
+  SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias2(
     SBandwidthUsageSample* destination,
     const SBandwidthUsageSample* sourceEnd,
     const SBandwidthUsageSample* sourceCurrent
@@ -1101,7 +1101,7 @@ namespace
   /**
    * Address: 0x0047E880 (FUN_0047E880, DereferenceUint32)
    */
-  [[maybe_unused]] uint32_t DereferenceUint32(const uint32_t* const value)
+  uint32_t DereferenceUint32(const uint32_t* const value)
   {
     return *value;
   }
@@ -1109,7 +1109,7 @@ namespace
   /**
    * Address: 0x0047E8C0 (FUN_0047E8C0, CopyStampRangeForwardAliasThunk3)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardAliasThunk3(
+  SSendStamp* CopyStampRangeForwardAliasThunk3(
     SSendStamp* destination, const SSendStamp* sourceBegin, const SSendStamp* sourceEnd
   ) noexcept
   {
@@ -1120,7 +1120,7 @@ namespace
    * Address: 0x0047E8F0 (FUN_0047E8F0, CopyStampRangeForwardFromCurrentThunkAlias3)
    * Address: 0x005411B0 (FUN_005411B0)
    */
-  [[maybe_unused]] SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias3(
+  SSendStamp* CopyStampRangeForwardFromCurrentThunkAlias3(
     SSendStamp* destination, const SSendStamp* sourceEnd, const SSendStamp* sourceCurrent
   ) noexcept
   {
@@ -1131,7 +1131,7 @@ namespace
    * Address: 0x0047E910 (FUN_0047E910, CopyBandwidthRangeForwardFromCurrentThunkAlias3)
    * Address: 0x00518250 (FUN_00518250)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias3(
+  SBandwidthUsageSample* CopyBandwidthRangeForwardFromCurrentThunkAlias3(
     SBandwidthUsageSample* destination,
     const SBandwidthUsageSample* sourceEnd,
     const SBandwidthUsageSample* sourceCurrent
@@ -1143,7 +1143,7 @@ namespace
   /**
    * Address: 0x0047E930 (FUN_0047E930, ExtractArgumentHighByteAlias5)
    */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias5(const uint32_t value) noexcept
+  unsigned char ExtractArgumentHighByteAlias5(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -1151,7 +1151,7 @@ namespace
   /**
    * Address: 0x0047E390 (FUN_0047E390, FillBandwidthRangeWithValue)
    */
-  [[maybe_unused]] SBandwidthUsageSample* FillBandwidthRangeWithValue(
+  SBandwidthUsageSample* FillBandwidthRangeWithValue(
     SBandwidthUsageSample* first, SBandwidthUsageSample* const last, const SBandwidthUsageSample& value
   ) noexcept
   {
@@ -1161,7 +1161,7 @@ namespace
   /**
    * Address: 0x0047E3B0 (FUN_0047E3B0, CopyBandwidthRangeBackward)
    */
-  [[maybe_unused]] SBandwidthUsageSample* CopyBandwidthRangeBackward(
+  SBandwidthUsageSample* CopyBandwidthRangeBackward(
     SBandwidthUsageSample* destinationEnd,
     const SBandwidthUsageSample* const sourceBegin,
     const SBandwidthUsageSample* sourceEnd
@@ -1173,7 +1173,7 @@ namespace
   /**
    * Address: 0x0047E270 (FUN_0047E270, AllocateStampArray)
    */
-  [[maybe_unused]] void* AllocateStampArray(const uint32_t count)
+  void* AllocateStampArray(const uint32_t count)
   {
     if (count > MaxStampVectorCount()) {
       throw std::bad_alloc{};
@@ -1184,7 +1184,7 @@ namespace
   /**
    * Address: 0x0047E400 (FUN_0047E400, AllocateBandwidthSampleArray)
    */
-  [[maybe_unused]] void* AllocateBandwidthSampleArray(const uint32_t count)
+  void* AllocateBandwidthSampleArray(const uint32_t count)
   {
     if (count > MaxBandwidthSampleVectorCount()) {
       throw std::bad_alloc{};
