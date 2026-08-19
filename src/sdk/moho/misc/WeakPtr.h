@@ -1253,6 +1253,18 @@ namespace moho
     view.capacityEnd = newBegin + newCapacity;
   }
 
+  /**
+   * Address: 0x00599530 (FUN_00599530, msvc8::vector<WeakPtr<CUnitCommand>>::size)
+   *
+   * What it does:
+   * `(view.end - view.begin) / sizeof(WeakPtr<T>)` - the binary emits this
+   * out of line for `WeakPtr<CUnitCommand>` and calls it from
+   * `CUnitCommand::AddUnit` by way of this helper; the same
+   * `view.end - view.begin` computation is inlined at each of this file's
+   * other `WeakPtrVectorRuntimeView` accessors (`EnsureWeakPtrVectorCapacity`,
+   * `InsertWeakPtrVectorObjectAt`, `RemoveWeakPtrVectorObject`) rather than
+   * calling a shared helper.
+   */
   template <class T>
   [[nodiscard]] std::size_t
   NormalizeWeakPtrVectorInsertIndex(const msvc8::vector<WeakPtr<T>>& weakVector, int index) noexcept
