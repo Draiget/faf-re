@@ -1944,17 +1944,6 @@ namespace
         std::array<std::uint8_t, sizeof(gpg::HaStar::SubclusterData)> mBytes{};
     };
 
-    [[nodiscard]] std::uint32_t HashBytesSalted(const void* data, const std::size_t size, const std::uint32_t salt)
-    {
-        const auto* const bytes = static_cast<const std::uint8_t*>(data);
-        std::uint32_t hash = 2166136261u ^ salt;
-        for (std::size_t i = 0; i < size; ++i) {
-            hash ^= bytes[i];
-            hash *= 16777619u;
-        }
-        return hash;
-    }
-
     [[nodiscard]] std::uint32_t ScrambleParkMiller(const std::uint32_t input)
     {
         const std::int64_t value = static_cast<std::int64_t>(input);
@@ -2045,14 +2034,34 @@ namespace
     }
 
     /**
-     * Address: 0x00932080 (FUN_00932080, sub_932080)
+     * Address: 0x00932080 (FUN_00932080, sub_932080) - hash primitive only
+     *
+     * IDA signature:
+     * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *a2);
      *
      * What it does:
-     * Computes hash value for occupation cache keys.
+     * Hashes an 18-byte occupation key through the engine's general-purpose
+     * `gpg::HashBytes`, same as `HashSubclusterKey`'s fix (see
+     * `SubclusterData::Hash` above) - not the fake FNV-style
+     * `HashBytesSalted` this called before.
+     *
+     * The real function is a member of `vector_OccupationData`, a hand-rolled
+     * open-addressing hash table (`mMask`/`mMax`/bucket-vector fields; see
+     * `decomp/recovery/escalations/FUN_00932080.md`) that this engine's
+     * occupation cache uses instead of `std::unordered_map`. Recovering that
+     * whole container is a separate, larger task. What is fixed here is only
+     * the hash INPUT: `gpg::HashBytes(a2, 0x12u, 0x7BEF2693u)` over the raw
+     * key bytes - `0x12u` matches `OccupationCacheKey::mBytes`'s size and
+     * `0x7BEF2693u` is `kOccupationKeySalt`, both confirmed directly against
+     * the real disassembly. The bucket-index arithmetic that follows in the
+     * binary (`& this->mMask`, then a signed wrap against `this->mMax`) is
+     * that container's own indexing scheme; `std::unordered_map` manages its
+     * own buckets, so `ScrambleParkMiller(HashOccupationKey(key))` (this
+     * function's only caller) does not need to reproduce it.
      */
     [[nodiscard]] std::uint32_t HashOccupationKey(const OccupationCacheKey& key)
     {
-        return HashBytesSalted(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
+        return gpg::HashBytes(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
     }
 
     struct OccupationKeyHash
