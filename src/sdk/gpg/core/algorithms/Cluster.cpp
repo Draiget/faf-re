@@ -13,6 +13,7 @@
 
 #include <intrin.h>
 
+#include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/utils/Global.h"
 
@@ -108,7 +109,6 @@ namespace
     constexpr std::size_t kClusterSizeCount = sizeof(kClusterSizeByLevel) / sizeof(kClusterSizeByLevel[0]);
 
     constexpr std::uint32_t kOccupationKeySalt = 0x7BEF2693u;
-    constexpr std::uint32_t kSubclusterKeySalt = 0x0001F31Du;
 
     struct IOccupationSourceRuntimeView
     {
@@ -1979,14 +1979,42 @@ namespace
     }
 
     /**
-     * Address: 0x00931500 (FUN_00931500, sub_931500)
+     * Address: 0x00931500 (FUN_00931500, ?Hash@SubclusterData@HaStar@gpg@@...)
+     *
+     * IDA signature:
+     * unsigned int __cdecl gpg::HaStar::SubclusterData::Hash(const SubclusterData* data);
      *
      * What it does:
-     * Computes hash value for subcluster cache keys.
+     * Combines a Murmur-style mix of `mLevel` with `hash_value` of each of
+     * the 16 cluster handles in turn, so structurally identical subclusters
+     * hash equal regardless of which heap allocation backs each `Cluster`.
+     *
+     * This previously called `HashBytesSalted` over the raw `SubclusterData`
+     * bytes - but `Cluster::mData` is a 4-byte heap pointer, so that hashed
+     * 16 pointer values verbatim. Two structurally identical subclusters
+     * built from different allocations hashed to different buckets, so the
+     * `unordered_map<SubclusterCacheKey, ...>` dedup cache this feeds could
+     * essentially never hit. `kSubclusterKeySalt` was a placeholder that
+     * went with it; `0x7BEF2693` (kept below, matching the binary's actual
+     * `xor eax, 7BEF2693h`) is the real per-instance constant this function
+     * uses to seed the level mix - the one already named
+     * `kOccupationKeySalt` is the same bit pattern reused for an unrelated
+     * key type (0x00932080, not verified against its own binary body yet).
      */
     [[nodiscard]] std::uint32_t HashSubclusterKey(const SubclusterCacheKey& key)
     {
-        return HashBytesSalted(key.mBytes.data(), key.mBytes.size(), kSubclusterKeySalt);
+        constexpr std::uint32_t kMul = 0x106D643Du;
+        constexpr std::uint32_t kLevelXor = 0x7BEF2693u;
+
+        const auto& subclusterData = *reinterpret_cast<const gpg::HaStar::SubclusterData*>(key.mBytes.data());
+
+        std::uint32_t mixed = kMul * (static_cast<std::uint32_t>(subclusterData.mLevel) ^ kLevelXor);
+        std::uint32_t hash = mixed ^ (mixed >> 13);
+        for (const gpg::HaStar::Cluster& cluster : subclusterData.mClusters) {
+            mixed = kMul * (hash ^ gpg::HaStar::hash_value(cluster));
+            hash = mixed ^ (mixed >> 13);
+        }
+        return hash;
     }
 
     /**
@@ -4822,6 +4850,30 @@ int Cluster::cmp(const Cluster& other) const
         (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
     const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
     return (diff < 0) ? -1 : (diff > 0 ? 1 : 0);
+}
+
+/**
+ * Address: 0x009540E0 (FUN_009540E0, ?hash_value@HaStar@gpg@@YAIABVCluster@12@@Z)
+ *
+ * IDA signature:
+ * unsigned int __cdecl gpg::HaStar::hash_value(gpg::HaStar::Cluster const &cluster);
+ *
+ * What it does:
+ * Hashes one cluster handle's inline payload blob - the same
+ * `mNodeCount + Node[n] + Edge[n*(n-1)/2]` span `Cluster::cmp` compares
+ * byte-for-byte - through the engine's general-purpose `gpg::HashBytes`,
+ * salted with a fixed constant. Two handles sharing the same payload bytes
+ * hash equal regardless of which heap block backs them, which is the whole
+ * point: this is `SubclusterData::Hash`'s per-cluster mixing step, and a
+ * subcluster cache keyed on cluster identity instead of payload would never
+ * hit.
+ */
+unsigned int hash_value(const Cluster& cluster)
+{
+    const Cluster::Data* const data = cluster.mData;
+    const unsigned int nodeCount = data->mNodeCount;
+    const std::size_t payloadBytes = (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
+    return gpg::HashBytes(&data->mNodeCount, payloadBytes, 2079270547u);
 }
 
 /**

@@ -191,6 +191,16 @@ namespace gpg::HaStar
         std::int32_t mLevel;
     };
 
+    /**
+     * Address: 0x009540E0 (FUN_009540E0, ?hash_value@HaStar@gpg@@YAIABVCluster@12@@Z)
+     *
+     * What it does:
+     * Hashes one cluster handle's inline payload blob (the same span
+     * `Cluster::cmp` compares byte-for-byte) through `gpg::HashBytes`. Used
+     * as the per-cluster mixing step of `SubclusterData`'s combined hash.
+     */
+    [[nodiscard]] unsigned int hash_value(const Cluster& cluster);
+
     struct Subcluster
     {
         Cluster* mArray;
