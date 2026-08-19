@@ -102,7 +102,7 @@ namespace
    * Clears delayed-sub-viz vector begin/end/capacity lanes while preserving
    * the leading metadata lane at offset `+0x00`.
    */
-  [[maybe_unused]] [[nodiscard]] DelayedSubVizVectorLaneRuntime* ClearDelayedSubVizVectorLanes(
+  [[nodiscard]] DelayedSubVizVectorLaneRuntime* ClearDelayedSubVizVectorLanes(
     DelayedSubVizVectorLaneRuntime* const lanes
   ) noexcept
   {
@@ -119,7 +119,7 @@ namespace
    * Exports the delayed-sub-viz begin lane (`+0x04`) into one caller-owned
    * pointer slot.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo** ExportDelayedSubVizBeginLane(
+  [[nodiscard]] moho::SDelayedSubVizInfo** ExportDelayedSubVizBeginLane(
     moho::SDelayedSubVizInfo** const outBegin,
     const DelayedSubVizVectorLaneRuntime* const lanes
   ) noexcept
@@ -135,7 +135,7 @@ namespace
    * Exports the delayed-sub-viz end lane (`+0x08`) into one caller-owned
    * pointer slot.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo** ExportDelayedSubVizEndLane(
+  [[nodiscard]] moho::SDelayedSubVizInfo** ExportDelayedSubVizEndLane(
     moho::SDelayedSubVizInfo** const outEnd,
     const DelayedSubVizVectorLaneRuntime* const lanes
   ) noexcept
@@ -150,7 +150,7 @@ namespace
    * What it does:
    * Returns whether the delayed-sub-viz vector runtime lanes are empty.
    */
-  [[maybe_unused]] [[nodiscard]] bool IsDelayedSubVizLaneSpanEmpty(
+  [[nodiscard]] bool IsDelayedSubVizLaneSpanEmpty(
     const DelayedSubVizVectorLaneRuntime& lanes
   ) noexcept
   {
@@ -164,7 +164,7 @@ namespace
    * Advances one delayed-sub-viz element pointer slot by one `SDelayedSubVizInfo`
    * stride (`0x14` bytes).
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo** AdvanceDelayedSubVizPointerLane(
+  [[nodiscard]] moho::SDelayedSubVizInfo** AdvanceDelayedSubVizPointerLane(
     moho::SDelayedSubVizInfo** const pointerSlot
   ) noexcept
   {
@@ -178,7 +178,7 @@ namespace
    * What it does:
    * Returns delayed-sub-viz element capacity count from runtime lanes.
    */
-  [[maybe_unused]] [[nodiscard]] int DelayedSubVizLaneCapacityCount(
+  [[nodiscard]] int DelayedSubVizLaneCapacityCount(
     const DelayedSubVizVectorLaneRuntime& lanes
   ) noexcept
   {
@@ -195,7 +195,7 @@ namespace
    * What it does:
    * Computes delayed-sub-viz element pointer at `index` from runtime begin lane.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* DelayedSubVizLanePointerAt(
+  [[nodiscard]] moho::SDelayedSubVizInfo* DelayedSubVizLanePointerAt(
     const int index,
     const DelayedSubVizVectorLaneRuntime& lanes
   ) noexcept
@@ -210,7 +210,7 @@ namespace
    * Writes one repeated delayed-sub-viz value into `[destination, destinationEnd)`
    * and returns one-past-last written lane.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* WriteRepeatedDelayedSubVizValue(
+  [[nodiscard]] moho::SDelayedSubVizInfo* WriteRepeatedDelayedSubVizValue(
     moho::SDelayedSubVizInfo* destination,
     moho::SDelayedSubVizInfo* const destinationEnd,
     const moho::SDelayedSubVizInfo& value
@@ -229,7 +229,7 @@ namespace
    * What it does:
    * Swaps two 32-bit lane values and returns the left-hand slot.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t* SwapDelayedSubVizIntLanes(
+  [[nodiscard]] std::int32_t* SwapDelayedSubVizIntLanes(
     std::int32_t* const lhs,
     std::int32_t* const rhs
   ) noexcept
@@ -243,28 +243,28 @@ namespace
   /**
    * Address: 0x00508040 (FUN_00508040, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant1()
+  void noop_DelayedSubVizLaneVariant1()
   {
   }
 
   /**
    * Address: 0x005080A0 (FUN_005080A0, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant2(int)
+  void noop_DelayedSubVizLaneVariant2(int)
   {
   }
 
   /**
    * Address: 0x005080B0 (FUN_005080B0, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant3()
+  void noop_DelayedSubVizLaneVariant3()
   {
   }
 
   /**
    * Address: 0x005087C0 (FUN_005087C0, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant4()
+  void noop_DelayedSubVizLaneVariant4()
   {
   }
 
@@ -314,7 +314,7 @@ namespace
    * Allocates one delayed-sub-viz element buffer when `elementCount` is
    * non-zero; otherwise forwards to `operator new(0)`.
    */
-  [[maybe_unused]] [[nodiscard]] void* AllocateDelayedSubVizStorage(const std::size_t elementCount)
+  [[nodiscard]] void* AllocateDelayedSubVizStorage(const std::size_t elementCount)
   {
     if (elementCount) {
       return AllocateDelayedSubVizElementStorage(elementCount);
@@ -329,7 +329,7 @@ namespace
    * Stores one `(width,height)` pair, allocates `width * height` raw bytes,
    * clears all positive-count bytes, and returns the output allocation lane.
    */
-  [[maybe_unused]] [[nodiscard]] ByteRasterAllocation* AllocateByteRasterZeroed(
+  [[nodiscard]] ByteRasterAllocation* AllocateByteRasterZeroed(
     const std::int32_t width,
     const std::int32_t height,
     ByteRasterAllocation* const outAllocation
@@ -362,7 +362,7 @@ namespace
    * Stores one `(width,height)` pair, allocates `width * height` raw bytes,
    * and returns the raw storage pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* AllocateByteRasterUninitialized(
+  [[nodiscard]] std::uint8_t* AllocateByteRasterUninitialized(
     const std::int32_t width,
     const std::int32_t height,
     ByteRasterAllocation* const outAllocation
@@ -388,7 +388,7 @@ namespace
    * What it does:
    * Returns one-byte-raster max-X bound (`width - 1`) through an indirection slot.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t ByteRasterMaxXFromSlot(
+  [[nodiscard]] std::int32_t ByteRasterMaxXFromSlot(
     const ByteRasterAllocation* const* const rasterSlot
   ) noexcept
   {
@@ -401,7 +401,7 @@ namespace
    * What it does:
    * Returns one-byte-raster max-Y bound (`height - 1`) through an indirection slot.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t ByteRasterMaxYFromSlot(
+  [[nodiscard]] std::int32_t ByteRasterMaxYFromSlot(
     const ByteRasterAllocation* const* const rasterSlot
   ) noexcept
   {
@@ -415,7 +415,7 @@ namespace
    * Computes one raw byte-raster element address from `(x,y)` using
    * `data + x + y * width`.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* ByteRasterAddressAt(
+  [[nodiscard]] std::uint8_t* ByteRasterAddressAt(
     const ByteRasterAllocation& raster,
     const std::int32_t x,
     const std::int32_t y
@@ -430,7 +430,7 @@ namespace
   /**
    * Address: 0x005087D0 (FUN_005087D0, delayed-sub-viz delete lane)
    */
-  [[maybe_unused]] void DeleteDelayedSubVizStorage(void* const storage)
+  void DeleteDelayedSubVizStorage(void* const storage)
   {
     ::operator delete(storage);
   }
@@ -441,7 +441,7 @@ namespace
    * What it does:
    * Releases one raw delayed-sub-viz storage triplet and nulls begin/end/capacity lanes.
    */
-  [[maybe_unused]] void ReleaseDelayedSubVizVectorStorage(DelayedSubVizVector& storage)
+  void ReleaseDelayedSubVizVectorStorage(DelayedSubVizVector& storage)
   {
     auto& view = msvc8::AsVectorRuntimeView(storage);
     if (view.begin) {
@@ -488,7 +488,7 @@ namespace
   /**
    * Address: 0x00508290 (FUN_00508290, intel-grid RTTI cache resolve)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCIntelGridType()
+  [[nodiscard]] gpg::RType* ResolveCIntelGridType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
@@ -505,7 +505,7 @@ namespace
   /**
    * Address: 0x00508830 (FUN_00508830, delayed-sub-viz pointer-slot assign duplicate)
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* AssignDelayedSubVizPointerSlotVariant2(
+  DelayedSubVizPointerSlot* AssignDelayedSubVizPointerSlotVariant2(
     DelayedSubVizPointerSlot* const outSlot, moho::SDelayedSubVizInfo* const value
   )
   {
@@ -520,7 +520,7 @@ namespace
   /**
    * Address: 0x00508800 (FUN_00508800, delayed-sub-viz pointer-slot from base+index)
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* SetDelayedSubVizPointerSlotFromBaseAndIndex(
+  DelayedSubVizPointerSlot* SetDelayedSubVizPointerSlotFromBaseAndIndex(
     DelayedSubVizPointerSlot* const outSlot, const DelayedSubVizPointerSlot* const baseSlot, const int index
   )
   {
@@ -537,7 +537,7 @@ namespace
   /**
    * Address: 0x00508810 (FUN_00508810, delayed-sub-viz pointer-slot distance)
    */
-  [[maybe_unused]] [[nodiscard]] int DelayedSubVizPointerSlotDistanceVariant1(
+  [[nodiscard]] int DelayedSubVizPointerSlotDistanceVariant1(
     const DelayedSubVizPointerSlot* const lhs, const DelayedSubVizPointerSlot* const rhs
   )
   {
@@ -552,7 +552,7 @@ namespace
   /**
    * Address: 0x005088C0 (FUN_005088C0, delayed-sub-viz pointer-slot distance duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] int DelayedSubVizPointerSlotDistanceVariant2(
+  [[nodiscard]] int DelayedSubVizPointerSlotDistanceVariant2(
     const DelayedSubVizPointerSlot* const lhs, const DelayedSubVizPointerSlot* const rhs
   )
   {
@@ -562,7 +562,7 @@ namespace
   /**
    * Address: 0x005088B0 (FUN_005088B0, delayed-sub-viz pointer-slot advance by count)
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* AdvanceDelayedSubVizPointerSlotByVariant1(
+  DelayedSubVizPointerSlot* AdvanceDelayedSubVizPointerSlotByVariant1(
     DelayedSubVizPointerSlot* const slot, const int count
   )
   {
@@ -576,7 +576,7 @@ namespace
   /**
    * Address: 0x005088E0 (FUN_005088E0, delayed-sub-viz pointer-slot advance by count duplicate)
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* AdvanceDelayedSubVizPointerSlotByVariant2(
+  DelayedSubVizPointerSlot* AdvanceDelayedSubVizPointerSlotByVariant2(
     DelayedSubVizPointerSlot* const slot, const int count
   )
   {
@@ -586,7 +586,7 @@ namespace
   /**
    * Address: 0x00508840 (FUN_00508840, delayed-sub-viz element copy lane)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoVariant1(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoVariant1(
     moho::SDelayedSubVizInfo* const destination, const moho::SDelayedSubVizInfo* const source
   )
   {
@@ -605,7 +605,7 @@ namespace
    * Copies one source delayed-sub-viz element into `count` consecutive
    * destination slots and returns one-past-last destination slot.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRepeated(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRepeated(
     moho::SDelayedSubVizInfo* destination, const moho::SDelayedSubVizInfo* const source, std::size_t count
   ) noexcept
   {
@@ -623,7 +623,7 @@ namespace
   /**
    * Address: 0x00508080 (FUN_00508080, delayed-sub-viz default-fill helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* FillDefaultDelayedSubVizInfoSpan(
+  [[nodiscard]] moho::SDelayedSubVizInfo* FillDefaultDelayedSubVizInfoSpan(
     const std::size_t fillCount, moho::SDelayedSubVizInfo* const destination, const std::size_t returnAdvanceCount
   )
   {
@@ -642,7 +642,7 @@ namespace
    * Erases `[newEnd, oldEnd)` from vector storage and writes `newEnd` to
    * output pointer slot.
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* EraseDelayedSubVizVectorTail(
+  DelayedSubVizPointerSlot* EraseDelayedSubVizVectorTail(
     DelayedSubVizVector& storage, DelayedSubVizPointerSlot* const outSlot, moho::SDelayedSubVizInfo* const newEnd
   )
   {
@@ -660,7 +660,7 @@ namespace
   /**
    * Address: 0x00508230 (FUN_00508230, delayed-sub-viz pointer-slot assign)
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* AssignDelayedSubVizPointerSlotVariant1(
+  DelayedSubVizPointerSlot* AssignDelayedSubVizPointerSlotVariant1(
     DelayedSubVizPointerSlot* const outSlot, moho::SDelayedSubVizInfo* const value
   )
   {
@@ -675,7 +675,7 @@ namespace
   /**
    * Address: 0x00508240 (FUN_00508240, delayed-sub-viz pointer-slot dereference)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* ReadDelayedSubVizPointerSlot(
+  [[nodiscard]] moho::SDelayedSubVizInfo* ReadDelayedSubVizPointerSlot(
     const DelayedSubVizPointerSlot* const slot
   )
   {
@@ -686,7 +686,7 @@ namespace
   /**
    * Address: 0x00508250 (FUN_00508250, delayed-sub-viz pointer-slot increment)
    */
-  [[maybe_unused]] DelayedSubVizPointerSlot* AdvanceDelayedSubVizPointerSlot(
+  DelayedSubVizPointerSlot* AdvanceDelayedSubVizPointerSlot(
     DelayedSubVizPointerSlot* const slot
   )
   {
@@ -700,7 +700,7 @@ namespace
   /**
    * Address: 0x00508260 (FUN_00508260, delayed-sub-viz pointer-slot equality)
    */
-  [[maybe_unused]] [[nodiscard]] bool AreDelayedSubVizPointerSlotsEqual(
+  [[nodiscard]] bool AreDelayedSubVizPointerSlotsEqual(
     const DelayedSubVizPointerSlot* const lhs, const DelayedSubVizPointerSlot* const rhs
   )
   {
@@ -862,7 +862,7 @@ namespace
    * Adapts two-register call lanes into the canonical resize-with-fill helper,
    * using a default-initialized fill value.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* ResizeDelayedSubVizVectorWithDefaultFill(
+  [[nodiscard]] moho::SDelayedSubVizInfo* ResizeDelayedSubVizVectorWithDefaultFill(
     DelayedSubVizVector& storage,
     const std::size_t desiredCount
   )
@@ -874,21 +874,21 @@ namespace
   /**
    * Address: 0x00508A80 (FUN_00508A80, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant5()
+  void noop_DelayedSubVizLaneVariant5()
   {
   }
 
   /**
    * Address: 0x00508A90 (FUN_00508A90, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant6()
+  void noop_DelayedSubVizLaneVariant6()
   {
   }
 
   /**
    * Address: 0x00508B00 (FUN_00508B00, delayed-sub-viz no-op lane)
    */
-  [[maybe_unused]] void noop_DelayedSubVizLaneVariant7()
+  void noop_DelayedSubVizLaneVariant7()
   {
   }
 
@@ -898,7 +898,7 @@ namespace
    * What it does:
    * Moves one overlapping range `[first, middle)` so it ends at `last`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* MoveDelayedSubVizInfoSpanToEnd(
+  [[nodiscard]] moho::SDelayedSubVizInfo* MoveDelayedSubVizInfoSpanToEnd(
     moho::SDelayedSubVizInfo* const first,
     moho::SDelayedSubVizInfo* const middle,
     moho::SDelayedSubVizInfo* const last
@@ -916,7 +916,7 @@ namespace
   /**
    * Address: 0x00508B10 (FUN_00508B10, delayed-sub-viz element copy helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoVariant2(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoVariant2(
     moho::SDelayedSubVizInfo* const destination, const moho::SDelayedSubVizInfo* const source
   )
   {
@@ -930,7 +930,7 @@ namespace
    * Copies one source range `[sourceBegin, sourceEnd)` into destination and
    * returns one-past-last written destination.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant1(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant1(
     moho::SDelayedSubVizInfo* destination,
     const moho::SDelayedSubVizInfo* sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -950,7 +950,7 @@ namespace
    * What it does:
    * Fills `[destinationBegin, destinationEnd)` with copies of `value`.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* FillDelayedSubVizInfoRange(
+  [[nodiscard]] moho::SDelayedSubVizInfo* FillDelayedSubVizInfoRange(
     const moho::SDelayedSubVizInfo& value,
     moho::SDelayedSubVizInfo* destinationBegin,
     moho::SDelayedSubVizInfo* const destinationEnd
@@ -966,7 +966,7 @@ namespace
   /**
    * Address: 0x00508C10 (FUN_00508C10, delayed-sub-viz zero-fill range helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* ZeroFillDelayedSubVizInfoRange(
+  [[nodiscard]] moho::SDelayedSubVizInfo* ZeroFillDelayedSubVizInfoRange(
     moho::SDelayedSubVizInfo* const destinationBegin, moho::SDelayedSubVizInfo* const destinationEnd
   )
   {
@@ -980,7 +980,7 @@ namespace
    * What it does:
    * Moves `[sourceBegin, sourceEnd)` so the moved range ends at `destinationEnd`.
    */
-  [[maybe_unused]] void MoveDelayedSubVizInfoRangeToEnd(
+  void MoveDelayedSubVizInfoRangeToEnd(
     moho::SDelayedSubVizInfo* const sourceBegin,
     moho::SDelayedSubVizInfo* const sourceEnd,
     moho::SDelayedSubVizInfo* const destinationEnd
@@ -997,7 +997,7 @@ namespace
   /**
    * Address: 0x00508B70 (FUN_00508B70, delayed-sub-viz storage pointer swap)
    */
-  [[maybe_unused]] moho::SDelayedSubVizInfoVectorStorage* SwapDelayedSubVizStoragePointersVariant1(
+  moho::SDelayedSubVizInfoVectorStorage* SwapDelayedSubVizStoragePointersVariant1(
     moho::SDelayedSubVizInfoVectorStorage* const lhs, moho::SDelayedSubVizInfoVectorStorage* const rhs
   )
   {
@@ -1024,7 +1024,7 @@ namespace
   /**
    * Address: 0x00508DB0 (FUN_00508DB0, delayed-sub-viz storage pointer swap duplicate)
    */
-  [[maybe_unused]] moho::SDelayedSubVizInfoVectorStorage* SwapDelayedSubVizStoragePointersVariant2(
+  moho::SDelayedSubVizInfoVectorStorage* SwapDelayedSubVizStoragePointersVariant2(
     moho::SDelayedSubVizInfoVectorStorage* const lhs, moho::SDelayedSubVizInfoVectorStorage* const rhs
   )
   {
@@ -1037,7 +1037,7 @@ namespace
    * What it does:
    * Clears owned reflection field/bases vectors for delayed-sub-viz vector type.
    */
-  [[maybe_unused]] void ResetDelayedSubVizVectorTypeRuntime(DelayedSubVizVectorType& type)
+  void ResetDelayedSubVizVectorTypeRuntime(DelayedSubVizVectorType& type)
   {
     type.fields_ = msvc8::vector<gpg::RField>{};
     type.bases_ = msvc8::vector<gpg::RField>{};
@@ -1056,7 +1056,7 @@ namespace
   /**
    * Address: 0x00508EF0 (FUN_00508EF0, delayed-sub-viz vector-type destroy helper)
    */
-  [[maybe_unused]] DelayedSubVizVectorType* DestroyDelayedSubVizVectorType(
+  DelayedSubVizVectorType* DestroyDelayedSubVizVectorType(
     DelayedSubVizVectorType* const type, const bool deleteSelf
   )
   {
@@ -1074,7 +1074,7 @@ namespace
   /**
    * Address: 0x00508F50 (FUN_00508F50, delayed-sub-viz storage deep-copy helper)
    */
-  [[maybe_unused]] moho::SDelayedSubVizInfoVectorStorage* CopyDelayedSubVizStorageDeep(
+  moho::SDelayedSubVizInfoVectorStorage* CopyDelayedSubVizStorageDeep(
     const moho::SDelayedSubVizInfoVectorStorage& source,
     moho::SDelayedSubVizInfoVectorStorage* const destination
   )
@@ -1107,7 +1107,7 @@ namespace
   /**
    * Address: 0x00509880 (FUN_00509880, delayed-sub-viz element copy helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoUnchecked(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoUnchecked(
     moho::SDelayedSubVizInfo* const destination, const moho::SDelayedSubVizInfo* const source
   )
   {
@@ -1124,7 +1124,7 @@ namespace
   /**
    * Address: 0x005098A0 (FUN_005098A0, delayed-sub-viz nullable element copy helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoIfNotNullVariant1(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoIfNotNullVariant1(
     moho::SDelayedSubVizInfo* const destination, const moho::SDelayedSubVizInfo* const source
   )
   {
@@ -1137,7 +1137,7 @@ namespace
   /**
    * Address: 0x00509A40 (FUN_00509A40, delayed-sub-viz nullable element copy helper duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoIfNotNullVariant2(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoIfNotNullVariant2(
     moho::SDelayedSubVizInfo* const destination, const moho::SDelayedSubVizInfo* const source
   )
   {
@@ -1151,7 +1151,7 @@ namespace
    * Copies `[sourceBegin, sourceEnd)` into `destination` and returns one-past-last
    * written destination pointer.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant2(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant2(
     moho::SDelayedSubVizInfo* destination,
     const moho::SDelayedSubVizInfo* sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1176,7 +1176,7 @@ namespace
    * `[eraseAt + 1, end)` down and writing the resulting iterator into
    * `outSlot`.
    */
-  [[maybe_unused]] [[nodiscard]] DelayedSubVizPointerSlot* EraseDelayedSubVizElementAndShiftTail(
+  [[nodiscard]] DelayedSubVizPointerSlot* EraseDelayedSubVizElementAndShiftTail(
     DelayedSubVizVector& storage,
     DelayedSubVizPointerSlot* const outSlot,
     moho::SDelayedSubVizInfo* const eraseAt
@@ -1202,7 +1202,7 @@ namespace
   /**
    * Address: 0x00509C70 (FUN_00509C70, delayed-sub-viz forward range copy helper duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant7(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant7(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1214,7 +1214,7 @@ namespace
   /**
    * Address: 0x00509CB0 (FUN_00509CB0, delayed-sub-viz forward range copy helper duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant8(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant8(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1226,7 +1226,7 @@ namespace
   /**
    * Address: 0x00509D20 (FUN_00509D20, delayed-sub-viz forward range copy helper duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant9(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant9(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1238,7 +1238,7 @@ namespace
   /**
    * Address: 0x00509820 (FUN_00509820, delayed-sub-viz forward range copy wrapper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant3(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant3(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1250,7 +1250,7 @@ namespace
   /**
    * Address: 0x00509920 (FUN_00509920, delayed-sub-viz forward range copy wrapper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant4(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant4(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1262,7 +1262,7 @@ namespace
   /**
    * Address: 0x005099F0 (FUN_005099F0, delayed-sub-viz forward range copy wrapper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant5(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant5(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1274,7 +1274,7 @@ namespace
   /**
    * Address: 0x00509A80 (FUN_00509A80, delayed-sub-viz forward range copy wrapper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant6(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant6(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1286,7 +1286,7 @@ namespace
   /**
    * Address: 0x00509850 (FUN_00509850, delayed-sub-viz tail copy wrapper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoTail(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoTail(
     moho::SDelayedSubVizInfo* const destination,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd
@@ -1302,7 +1302,7 @@ namespace
    * Moves `[sourceBegin, sourceEnd)` so the moved range ends at `destinationEnd`
    * by copying from the tail backward.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeBackward(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeBackward(
     moho::SDelayedSubVizInfo* destinationEnd,
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* sourceEnd
@@ -1326,7 +1326,7 @@ namespace
    * What it does:
    * Adapts stack-lane callers into the `FUN_00509D20` copy helper shape.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant9Adapter(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant9Adapter(
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd,
     moho::SDelayedSubVizInfo* const destination
@@ -1342,7 +1342,7 @@ namespace
    * Adapts register/stack mixed caller lanes into the `FUN_00509CB0` copy
    * helper shape.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant8Adapter(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeVariant8Adapter(
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd,
     moho::SDelayedSubVizInfo* const destination
@@ -1357,7 +1357,7 @@ namespace
    * What it does:
    * Adapts wider stack-lane callers into the backward overlap copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeBackwardAdapter(
+  [[nodiscard]] moho::SDelayedSubVizInfo* CopyDelayedSubVizInfoRangeBackwardAdapter(
     const moho::SDelayedSubVizInfo* const sourceBegin,
     const moho::SDelayedSubVizInfo* const sourceEnd,
     moho::SDelayedSubVizInfo* const destinationEnd,
@@ -1370,7 +1370,7 @@ namespace
   /**
    * Address: 0x005091B0 (FUN_005091B0, delayed-sub-viz export begin pointer helper)
    */
-  [[maybe_unused]] moho::SDelayedSubVizInfo** ExportDelayedSubVizBeginPointer(
+  moho::SDelayedSubVizInfo** ExportDelayedSubVizBeginPointer(
     moho::SDelayedSubVizInfo** const outBegin, const DelayedSubVizVector& storage
   )
   {
@@ -1383,7 +1383,7 @@ namespace
   /**
    * Address: 0x005091C0 (FUN_005091C0, delayed-sub-viz export end pointer helper)
    */
-  [[maybe_unused]] moho::SDelayedSubVizInfo** ExportDelayedSubVizEndPointer(
+  moho::SDelayedSubVizInfo** ExportDelayedSubVizEndPointer(
     moho::SDelayedSubVizInfo** const outEnd, const DelayedSubVizVector& storage
   )
   {
@@ -1400,7 +1400,7 @@ namespace
    * Runs a no-op self-copy over current live span and keeps `end` synchronized
    * with the resulting one-past-last pointer.
    */
-  [[maybe_unused]] moho::SDelayedSubVizInfo* NormalizeDelayedSubVizFinish(DelayedSubVizVector& storage)
+  moho::SDelayedSubVizInfo* NormalizeDelayedSubVizFinish(DelayedSubVizVector& storage)
   {
     auto& view = msvc8::AsVectorRuntimeView(storage);
     if (view.begin != view.end && view.begin) {
@@ -1416,7 +1416,7 @@ namespace
    * Assigns one delayed-sub-viz vector storage into another while preserving
    * legacy growth/reuse behavior.
    */
-  [[maybe_unused]] DelayedSubVizVector* AssignDelayedSubVizVector(
+  DelayedSubVizVector* AssignDelayedSubVizVector(
     DelayedSubVizVector* const destination, const DelayedSubVizVector* const source
   )
   {
@@ -1462,7 +1462,7 @@ namespace
   /**
    * Address: 0x00509950 (FUN_00509950, delayed-sub-viz zero-width copy helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* ZeroWidthDelayedSubVizCopy(
+  [[nodiscard]] moho::SDelayedSubVizInfo* ZeroWidthDelayedSubVizCopy(
     moho::SDelayedSubVizInfo* const destination, const moho::SDelayedSubVizInfo* const sourceCursor
   )
   {
@@ -1472,7 +1472,7 @@ namespace
   /**
    * Address: 0x00509A20 (FUN_00509A20, delayed-sub-viz zero-width self copy helper)
    */
-  [[maybe_unused]] [[nodiscard]] moho::SDelayedSubVizInfo* ZeroWidthDelayedSubVizSelfCopy(
+  [[nodiscard]] moho::SDelayedSubVizInfo* ZeroWidthDelayedSubVizSelfCopy(
     moho::SDelayedSubVizInfo* const cursor
   )
   {
@@ -1482,7 +1482,7 @@ namespace
   /**
    * Address: 0x00509AB0 (FUN_00509AB0, delayed-sub-viz first word read helper)
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadDelayedSubVizFirstWord(
+  [[nodiscard]] std::uint32_t ReadDelayedSubVizFirstWord(
     const moho::SDelayedSubVizInfo* const value
   )
   {
@@ -1493,7 +1493,7 @@ namespace
   /**
    * Address: 0x00509C60 (FUN_00509C60, delayed-sub-viz high-byte flag read helper)
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadHighByteFlagVariant1(const std::uint32_t value) noexcept
+  [[nodiscard]] std::uint8_t ReadHighByteFlagVariant1(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -1501,7 +1501,7 @@ namespace
   /**
    * Address: 0x00509D10 (FUN_00509D10, delayed-sub-viz high-byte flag read helper duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadHighByteFlagVariant2(const std::uint32_t value) noexcept
+  [[nodiscard]] std::uint8_t ReadHighByteFlagVariant2(const std::uint32_t value) noexcept
   {
     return ReadHighByteFlagVariant1(value);
   }
@@ -1509,7 +1509,7 @@ namespace
   /**
    * Address: 0x00508B30 (FUN_00508B30, delayed-sub-viz typed read helper)
    */
-  [[maybe_unused]] gpg::ReadArchive* ReadDelayedSubVizInfoViaRTypeVariant1(
+  gpg::ReadArchive* ReadDelayedSubVizInfoViaRTypeVariant1(
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -1523,7 +1523,7 @@ namespace
   /**
    * Address: 0x00508E90 (FUN_00508E90, delayed-sub-viz typed read helper duplicate)
    */
-  [[maybe_unused]] void ReadDelayedSubVizInfoViaRTypeVariant2(
+  void ReadDelayedSubVizInfoViaRTypeVariant2(
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -1533,7 +1533,7 @@ namespace
   /**
    * Address: 0x00508BA0 (FUN_00508BA0, delayed-sub-viz typed write helper)
    */
-  [[maybe_unused]] gpg::WriteArchive* WriteDelayedSubVizInfoViaRTypeVariant1(
+  gpg::WriteArchive* WriteDelayedSubVizInfoViaRTypeVariant1(
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -1547,7 +1547,7 @@ namespace
   /**
    * Address: 0x00508EC0 (FUN_00508EC0, delayed-sub-viz typed write helper duplicate)
    */
-  [[maybe_unused]] void WriteDelayedSubVizInfoViaRTypeVariant2(
+  void WriteDelayedSubVizInfoViaRTypeVariant2(
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -1557,7 +1557,7 @@ namespace
   /**
    * Address: 0x00508AD0 (FUN_00508AD0, delayed-sub-viz RRef fill helper)
    */
-  [[maybe_unused]] gpg::RRef* FillDelayedSubVizRef(
+  gpg::RRef* FillDelayedSubVizRef(
     moho::SDelayedSubVizInfo* const value, gpg::RRef* const outRef
   )
   {
@@ -1779,7 +1779,7 @@ namespace moho
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `SDelayedSubVizInfo` reflection metadata.
    */
-  [[maybe_unused]] void cleanup_SDelayedSubVizInfoTypeInfoRTypeBase(SDelayedSubVizInfoTypeInfo* const typeInfo) noexcept
+  void cleanup_SDelayedSubVizInfoTypeInfoRTypeBase(SDelayedSubVizInfoTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -1884,7 +1884,7 @@ namespace moho
    * What it does:
    * Duplicate lane of delayed-sub-viz serializer callback initialization.
    */
-  [[maybe_unused]] SDelayedSubVizInfoSerializer* initialize_SDelayedSubVizInfoSerializerVariantLegacy()
+  SDelayedSubVizInfoSerializer* initialize_SDelayedSubVizInfoSerializerVariantLegacy()
   {
     return initialize_SDelayedSubVizInfoSerializer();
   }
