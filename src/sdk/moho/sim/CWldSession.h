@@ -522,6 +522,61 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B16A1..0x008B16F1 (inlined into `UserArmy::~UserArmy`,
+   *          FUN_008B1650, for the two army idle registries)
+   *
+   * What it does:
+   * Erases every node of one bare `WeakSet<UserEntity>` while keeping the head
+   * sentinel alive, through the shared full-range erase (FUN_007AF740). The
+   * bare 12-byte set has no `mSizeMirrorOrUnused` lane, so the operation runs
+   * on a staged `SSelectionSetUserEntity` view - the same adapter pattern the
+   * per-unit issue sets use - and the three ABI lanes are written back.
+   */
+  inline void ClearWeakEntitySet(WeakEntitySetUserEntity& set) noexcept
+  {
+    SSelectionNodeUserEntity* const head = set.mHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    SSelectionSetUserEntity view{};
+    view.mAllocProxy = set.mAllocProxy;
+    view.mHead = set.mHead;
+    view.mSize = set.mSize;
+    view.mSizeMirrorOrUnused = set.mSize;
+
+    SSelectionNodeUserEntity* outNode = nullptr;
+    (void)view.EraseRange(&outNode, head->mLeft, head);
+
+    set.mAllocProxy = view.mAllocProxy;
+    set.mHead = view.mHead;
+    set.mSize = view.mSize;
+  }
+
+  /**
+   * Address: 0x008B16F9..0x008B1743 (inlined into `UserArmy::~UserArmy`,
+   *          FUN_008B1650; the out-of-line twin is FUN_007B2530)
+   *
+   * What it does:
+   * Tears one weak-entity set down completely: full-range erase followed by
+   * `operator delete` on the head sentinel, leaving `{mHead, mSize}` zeroed.
+   * The allocator-proxy lane is deliberately left alone - the binary's
+   * `_Tidy()` emission never touches it.
+   */
+  inline void DestroyWeakEntitySet(WeakEntitySetUserEntity& set) noexcept
+  {
+    SSelectionNodeUserEntity* const head = set.mHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    ClearWeakEntitySet(set);
+    ::operator delete(head);
+    set.mHead = nullptr;
+    set.mSize = 0u;
+  }
+
+  /**
    * Address: 0x007AE270 (FUN_007AE270)
    *
    * Mirrors the engine teardown chain: `EraseRange` over the whole tree
@@ -535,17 +590,12 @@ namespace moho
    */
   inline void DestroyLocalSelectionSet(SSelectionSetUserEntity& set) noexcept
   {
-    SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr) {
+    if (set.mHead == nullptr) {
       return;
     }
 
-    SSelectionNodeUserEntity* outNode = nullptr;
-    (void)set.EraseRange(&outNode, head->mLeft, head);
-    ::operator delete(head);
+    DestroyWeakEntitySet(set);
     set.mAllocProxy = nullptr;
-    set.mHead = nullptr;
-    set.mSize = 0u;
     set.mSizeMirrorOrUnused = 0u;
   }
 

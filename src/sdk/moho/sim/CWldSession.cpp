@@ -9939,6 +9939,18 @@ namespace moho
   CWldSession::~CWldSession()
   {
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
+
+    // 0x00893A9E..0x00893AEE: the very first thing the session unwinds is its
+    // army-mirror table. Every populated slot is deleted - `~UserArmy`
+    // (0x008B1650) followed by `operator delete` (0x00893AD4) - and every slot
+    // is then blanked, occupied or not.
+    for (std::size_t armyIndex = 0; armyIndex < userArmies.size(); ++armyIndex) {
+      if (UserArmy* const army = userArmies[armyIndex]; army != nullptr) {
+        delete army;
+      }
+      userArmies[armyIndex] = nullptr;
+    }
+
     ReleaseWeakCommandGraph(mUICommandGraphPx, mUICommandGraphControl);
     mSimResources.release();
     mBeatDebugCanvas.release();
