@@ -1554,30 +1554,6 @@ namespace
     std::int32_t lane24;
   };
 
-  struct BuildQueueSnapshotRuntime
-  {
-    std::uint32_t lane00;
-    const std::byte* begin;
-    const std::byte* end;
-  };
-
-  struct BuildQueueRangeRuntime
-  {
-    const std::byte* start;
-    const std::byte* end;
-  };
-
-  struct BuildQueueCompareStateRuntime
-  {
-    std::uint8_t lane00;
-    std::uint8_t pad01[3];
-  };
-
-  struct BuildQueueCompareResultRuntime
-  {
-    const std::byte* cursor;
-  };
-
   struct OccupySourceBindingRuntime
   {
     void* vtable;
@@ -1959,7 +1935,6 @@ namespace
   using HashBucketClearFn = void* (*)(std::uint32_t bucketCount, void** bucketHeads, HashBucketDestroyFn destroyNode);
   using PairLookupFn = void (*)(std::int32_t outPair[2], std::uint32_t key);
   using NormalizePackedDoubleFn = std::int16_t (*)(std::uint16_t* words);
-  using BuildQueueCompareFn = BuildQueueCompareResultRuntime* (*)(BuildQueueCompareStateRuntime* state, const std::byte* lhsBegin, const std::byte* lhsEnd, const std::byte* rhsBegin, std::uint32_t lane4, std::uint32_t lane5);
   using IosBaseDtorFn = void (*)(void* iosBaseLane);
   using RuntimeFailureDispatchFn = void (*)(int arg0, int arg1);
   using OwnerTreeClearFn = void (*)(TreeStorageOwnerRuntime* owner);
@@ -1995,17 +1970,6 @@ namespace
   [[nodiscard]] std::uint32_t DivideBy1000Fast(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint32_t>((static_cast<std::uint64_t>(value) * 0x10624DD3ull) >> 38u);
-  }
-
-  [[nodiscard]] std::ptrdiff_t CountStride48Elements(
-    const std::byte* const begin,
-    const std::byte* const end
-  ) noexcept
-  {
-    if (begin == nullptr || end == nullptr || end < begin) {
-      return 0;
-    }
-    return (end - begin) / 48;
   }
 
   void ReleaseSharedWxStringLane(const std::uint32_t laneWord) noexcept
@@ -2166,8 +2130,6 @@ namespace
   static_assert(offsetof(TimeSplitRuntime, microseconds) == 0x28, "TimeSplitRuntime::microseconds offset must be 0x28");
   static_assert(offsetof(TimeSplitOwnerRuntime, splitTime) == 0x08, "TimeSplitOwnerRuntime::splitTime offset must be 0x08");
   static_assert(offsetof(TimeSplitOwnerRuntime, lane24) == 0x24, "TimeSplitOwnerRuntime::lane24 offset must be 0x24");
-  static_assert(offsetof(BuildQueueSnapshotRuntime, begin) == 0x04, "BuildQueueSnapshotRuntime::begin offset must be 0x04");
-  static_assert(offsetof(BuildQueueSnapshotRuntime, end) == 0x08, "BuildQueueSnapshotRuntime::end offset must be 0x08");
   static_assert(sizeof(OccupySourceBindingRuntime) == 0x0C, "OccupySourceBindingRuntime size must be 0x0C");
   static_assert(sizeof(ClutterSeedRuntime) == 0x10, "ClutterSeedRuntime size must be 0x10");
   static_assert(offsetof(MapNodeNil17Runtime, key) == 0x0C, "MapNodeNil17Runtime::key offset must be 0x0C");
@@ -10120,33 +10082,13 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
   iosBaseDtorFn(iosBaseLane);
 }
 
-/**
- * Address: 0x00837750 (FUN_00837750)
- *
- * What it does:
- * Compares one 48-byte-stride build-queue snapshot against the current queue
- * and reports equality when comparator output reaches the snapshot end.
- */
-[[maybe_unused]] BOOL CompareBuildQueueSnapshotRuntime(
-  const BuildQueueSnapshotRuntime* const snapshot,
-  const BuildQueueRangeRuntime* const currentQueue,
-  const BuildQueueCompareFn compareFn
-)
-{
-  if (snapshot == nullptr || currentQueue == nullptr || compareFn == nullptr) {
-    return FALSE;
-  }
-
-  const std::ptrdiff_t snapshotCount = CountStride48Elements(snapshot->begin, snapshot->end);
-  const std::ptrdiff_t currentCount = CountStride48Elements(currentQueue->start, currentQueue->end);
-  if (snapshotCount != currentCount) {
-    return FALSE;
-  }
-
-  BuildQueueCompareStateRuntime state{};
-  auto* const compareResult = compareFn(&state, snapshot->begin, snapshot->end, currentQueue->start, 0u, 0u);
-  return (compareResult != nullptr && compareResult->cursor == snapshot->end) ? TRUE : FALSE;
-}
+// 0x00837750 previously lived here as `CompareBuildQueueSnapshotRuntime`, an
+// abstracted stand-in that took the element comparator as a function pointer and
+// modelled the queue as an untyped 48-byte-stride range. The real function reads
+// the UI-owned `sCurrentBuildQueue` global directly and inlines the element
+// predicate (blueprint id + count), so it now lives beside that global in
+// `moho/ui/UiRuntimeTypes.cpp` as `IsBuildQueueSnapshotUnchanged`, wired from
+// `UI_FactoryCommandQueueHandlerBeat` (0x00836180).
 
 /**
  * Address: 0x007B2560 (FUN_007B2560)

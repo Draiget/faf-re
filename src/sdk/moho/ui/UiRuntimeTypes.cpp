@@ -26,6 +26,7 @@
 #include "legacy/containers/Vector.h"
 #include "legacy/containers/Map.h"
 #include "gpg/core/containers/BitArray2D.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
@@ -25701,56 +25702,160 @@ void moho::UI_ClearCurrentDragger()
   sCurrentDraggerKeycode = 0;
 }
 
+moho::FactoryQueueDisplaySnapshot moho::sCurrentBuildQueue{};
+moho::WeakPtr<moho::UserUnit> moho::sCurrentBuildFactory{};
+
+/**
+ * What it does:
+ * Language-level default construction of one empty queue row. The binary never
+ * emitted a standalone default constructor (every construction site uses the
+ * `(blueprintId, count)` form at 0x00835D50 or the copy form at 0x00837670);
+ * this exists only so the legacy vector template can name one.
+ */
+moho::FactoryQueueDisplayItem::FactoryQueueDisplayItem() noexcept
+  : blueprintId()
+  , count(0)
+  , commands()
+{
+}
+
+/**
+ * Address: 0x00835D50 (FUN_00835D50, sub_835D50)
+ *
+ * IDA signature:
+ * struct_BuildQueueItem *__usercall sub_835D50@<eax>(struct_BuildQueueItem *result,
+ *                                                    std::string *str1, int count);
+ *
+ * What it does:
+ * Seeds the blueprint-id string to empty SSO state (`myRes=0x0F` at +0x18,
+ * `mySize=0` at +0x14, `buf[0]=0` at +0x04) and assigns the source id into it,
+ * stores the queued count at +0x1C, then zeroes the command-id vector's data
+ * triple at +0x24/+0x28/+0x2C.
+ */
+moho::FactoryQueueDisplayItem::FactoryQueueDisplayItem(
+  const msvc8::string& sourceBlueprintId,
+  const std::int32_t sourceCount
+)
+  : blueprintId(sourceBlueprintId)
+  , count(sourceCount)
+  , commands()
+{
+}
+
+/**
+ * Address: 0x00837670 (FUN_00837670, sub_837670)
+ *
+ * IDA signature:
+ * struct_BuildQueueItem *__usercall sub_837670@<eax>(struct_BuildQueueItem *dest,
+ *                                                    struct_BuildQueueItem *src@<edi>);
+ *
+ * What it does:
+ * Copy-constructs one queue row in place: legacy-string assign of the blueprint
+ * id, raw copy of the count lane at +0x1C, then legacy-vector copy assignment of
+ * the command-id lane at +0x20 (`sub_6E2E60`).
+ */
+moho::FactoryQueueDisplayItem::FactoryQueueDisplayItem(const FactoryQueueDisplayItem& other)
+  : blueprintId(other.blueprintId)
+  , count(other.count)
+  , commands(other.commands)
+{
+}
+
+/**
+ * Address: 0x00837AB0 (inside FUN_00837AA0, func_CpyBuildQueueItems)
+ *
+ * What it does:
+ * Element assignment the copy loop inlines: `blueprintId.assign(src, 0, npos)`
+ * at 0x00837AB7, `count = src.count` at 0x00837AC2, then legacy-vector copy
+ * assignment of the command-id lane at 0x00837AC9. The binary carries no
+ * self-assignment guard here.
+ */
+moho::FactoryQueueDisplayItem& moho::FactoryQueueDisplayItem::operator=(const FactoryQueueDisplayItem& other)
+{
+  blueprintId.assign(other.blueprintId, 0u, msvc8::string::npos);
+  count = other.count;
+  commands = other.commands;
+  return *this;
+}
+
+/**
+ * Address: 0x00836040 (FUN_00836040, sub_836040)
+ * Address: 0x00837D20 (FUN_00837D20, sub_837D20)
+ *
+ * What it does:
+ * Releases the command-id vector buffer and clears its triple, then releases the
+ * blueprint-id string buffer when it is heap-backed (`myRes >= 0x10`) and
+ * restores empty SSO state. Both emissions are byte-identical; the legacy
+ * container destructors this defaults to perform exactly those two steps in the
+ * same order (`commands` at +0x20 first, `blueprintId` at +0x00 second).
+ */
+moho::FactoryQueueDisplayItem::~FactoryQueueDisplayItem() noexcept = default;
+
 namespace
 {
-  struct FactoryCommandQueueItemRuntimeView
-  {
-    msvc8::string blueprintId;    // +0x00
-    std::int32_t count;           // +0x1C
-    msvc8::vector<void*> commandData; // +0x20
-  };
-  static_assert(
-    offsetof(FactoryCommandQueueItemRuntimeView, commandData) == 0x20,
-    "FactoryCommandQueueItemRuntimeView::commandData offset must be 0x20"
-  );
-  static_assert(sizeof(FactoryCommandQueueItemRuntimeView) == 0x30, "FactoryCommandQueueItemRuntimeView size must be 0x30");
+  using FactoryQueueItem = moho::FactoryQueueDisplayItem;
+  using FactoryQueueLanes = msvc8::vector_runtime_view<FactoryQueueItem>;
 
-  struct CurrentBuildFactoryRuntimeView
-  {
-    std::uintptr_t* start = nullptr;  // +0x00
-    std::uintptr_t* finish = nullptr; // +0x04
-  };
-  static_assert(sizeof(CurrentBuildFactoryRuntimeView) == 0x08, "CurrentBuildFactoryRuntimeView size must be 0x08");
+  constexpr const char* kFactoryQueueChangedModule = "/lua/ui/game/gamemain.lua";
+  constexpr const char* kFactoryQueueChangedCallback = "OnQueueChanged";
+  // The binary's diagnostic literal (0x00E43810, pushed at 0x0083633F) names
+  // construction.lua even though the module it actually imports at 0x00836267 is
+  // gamemain.lua. Preserved verbatim rather than regenerated from the import path.
+  constexpr const char* kFactoryQueueChangedWarning =
+    "Error running '/lua/ui/game/construction.lua:OnQueueChanged': %s";
 
-  struct CurrentBuildQueueRuntimeView
-  {
-    FactoryCommandQueueItemRuntimeView* start = nullptr; // +0x00
-    FactoryCommandQueueItemRuntimeView* end = nullptr;   // +0x04
-  };
-  static_assert(sizeof(CurrentBuildQueueRuntimeView) == 0x08, "CurrentBuildQueueRuntimeView size must be 0x08");
+  // Legacy vector growth guard for the 0x30-stride queue element: 0x008370D0
+  // compares the requested capacity against 0x5555555 before allocating.
+  constexpr std::uint32_t kFactoryQueueMaxCapacity = 0x5555555u;
 
-  CurrentBuildFactoryRuntimeView sCurrentBuildFactory{};
-  CurrentBuildQueueRuntimeView sCurrentBuildQueue{};
+  [[nodiscard]] FactoryQueueLanes& CurrentBuildQueueLanes() noexcept
+  {
+    return msvc8::AsVectorRuntimeView(moho::sCurrentBuildQueue);
+  }
+
+  /**
+   * Address: 0x00836E60 (FUN_00836E60, sub_836E60)
+   *
+   * IDA signature:
+   * int __thiscall sub_836E60(gpg::fastvector_BuildQueueItem *this);
+   *
+   * What it does:
+   * Element count of one 0x30-stride queue lane, short-circuiting to zero when
+   * `_Myfirst` is null instead of dividing a null-based difference.
+   */
+  [[nodiscard]] std::uint32_t FactoryQueueItemCount(
+    const FactoryQueueItem* const begin,
+    const FactoryQueueItem* const end
+  ) noexcept
+  {
+    if (begin == nullptr) {
+      return 0u;
+    }
+    return static_cast<std::uint32_t>(end - begin);
+  }
 
   /**
    * Address: 0x00837AA0 (FUN_00837AA0, func_CpyBuildQueueItems)
    *
+   * IDA signature:
+   * struct_BuildQueueItem *__usercall func_CpyBuildQueueItems@<eax>(
+   *     struct_BuildQueueItem *dest@<eax>, struct_BuildQueueItem *src@<ecx>,
+   *     struct_BuildQueueItem *end@<ebx>);
+   *
    * What it does:
-   * Copies one half-open range of factory build-queue items using `msvc8`
-   * string assignment and command-data vector copy semantics.
+   * Assigns one half-open range of queue rows onto an already-constructed
+   * destination range and returns the advanced destination cursor.
    */
-  [[maybe_unused]] FactoryCommandQueueItemRuntimeView* CopyBuildQueueItems(
-    FactoryCommandQueueItemRuntimeView* destination,
-    FactoryCommandQueueItemRuntimeView* source,
-    FactoryCommandQueueItemRuntimeView* end
+  FactoryQueueItem* CopyBuildQueueItems(
+    FactoryQueueItem* const destination,
+    FactoryQueueItem* const source,
+    FactoryQueueItem* const end
   )
   {
     auto* sourceCursor = source;
     auto* destinationCursor = destination;
     while (sourceCursor != end) {
-      destinationCursor->blueprintId.assign(sourceCursor->blueprintId, 0u, msvc8::string::npos);
-      destinationCursor->count = sourceCursor->count;
-      destinationCursor->commandData = sourceCursor->commandData;
+      *destinationCursor = *sourceCursor;
       ++sourceCursor;
       ++destinationCursor;
     }
@@ -25758,16 +25863,18 @@ namespace
   }
 
   /**
-   * Address: 0x008378B0 (FUN_008378B0)
+   * Address: 0x008378B0 (FUN_008378B0, sub_8378B0)
    *
    * What it does:
-   * Adapts one thiscall lane into `CopyBuildQueueItems(destination, begin,
-   * end)` and returns the advanced destination lane.
+   * Register-shuffling bridge the compiler emitted for the `std::copy` call in
+   * the grow-in-place assignment branch: forwards `(destinationBegin,
+   * sourceBegin, sourceEnd)` to `CopyBuildQueueItems`, with `sourceEnd` arriving
+   * in `ebx` rather than on the stack.
    */
-  [[maybe_unused]] FactoryCommandQueueItemRuntimeView* CopyBuildQueueItemsThiscallAdapter(
-    FactoryCommandQueueItemRuntimeView* const sourceEnd,
-    FactoryCommandQueueItemRuntimeView* const sourceBegin,
-    FactoryCommandQueueItemRuntimeView* const destinationBegin
+  FactoryQueueItem* CopyBuildQueueItemsThiscallAdapter(
+    FactoryQueueItem* const sourceEnd,
+    FactoryQueueItem* const sourceBegin,
+    FactoryQueueItem* const destinationBegin
   )
   {
     return CopyBuildQueueItems(destinationBegin, sourceBegin, sourceEnd);
@@ -25776,24 +25883,25 @@ namespace
   /**
    * Address: 0x00837B00 (FUN_00837B00, func_DeleteRangeBuildQueueItems)
    *
+   * IDA signature:
+   * void __usercall func_DeleteRangeBuildQueueItems(struct_BuildQueueItem *begin@<eax>,
+   *                                                 struct_BuildQueueItem *end);
+   *
    * What it does:
-   * Destroys one half-open range of factory queue display items by releasing
-   * per-item command payload buffers and resetting embedded `msvc8::string`
-   * storage back to empty SSO state.
+   * Destroys one half-open range of queue rows in place: frees each row's
+   * command-id buffer (`[item+0x24]`) and clears its triple, then frees the
+   * blueprint-id string buffer when heap-backed and restores empty SSO state.
    */
-  [[maybe_unused]] void DeleteRangeBuildQueueItems(
-    FactoryCommandQueueItemRuntimeView* begin,
-    FactoryCommandQueueItemRuntimeView* end
-  )
+  void DeleteRangeBuildQueueItems(FactoryQueueItem* begin, FactoryQueueItem* const end)
   {
     while (begin != end) {
-      auto& commandDataView = msvc8::AsVectorRuntimeView(begin->commandData);
-      if (commandDataView.begin != nullptr) {
-        ::operator delete(commandDataView.begin);
+      auto& commandLanes = msvc8::AsVectorRuntimeView(begin->commands);
+      if (commandLanes.begin != nullptr) {
+        ::operator delete(commandLanes.begin);
       }
-      commandDataView.begin = nullptr;
-      commandDataView.end = nullptr;
-      commandDataView.capacityEnd = nullptr;
+      commandLanes.begin = nullptr;
+      commandLanes.end = nullptr;
+      commandLanes.capacityEnd = nullptr;
 
       if (begin->blueprintId.myRes >= 0x10u) {
         ::operator delete(begin->blueprintId.bx.ptr);
@@ -25807,48 +25915,344 @@ namespace
   }
 
   /**
-   * Address: 0x00837120 (FUN_00837120)
+   * Address: 0x00837120 (FUN_00837120, sub_837120)
    *
    * What it does:
-   * Adapts one thiscall queue-range destroy lane into
-   * `DeleteRangeBuildQueueItems(begin, end)`.
+   * Register-shuffling bridge for the destroy call in the reallocating
+   * assignment branch: the range end arrives in `ecx` and the range begin on the
+   * stack, and both are forwarded to `DeleteRangeBuildQueueItems`.
    */
-  [[maybe_unused]] void DeleteRangeBuildQueueItemsThiscallAdapter(
-    FactoryCommandQueueItemRuntimeView* const rangeEnd,
-    FactoryCommandQueueItemRuntimeView* const rangeBegin
+  void DeleteRangeBuildQueueItemsThiscallAdapter(
+    FactoryQueueItem* const rangeEnd,
+    FactoryQueueItem* const rangeBegin
   )
   {
     DeleteRangeBuildQueueItems(rangeBegin, rangeEnd);
   }
 
   /**
-   * Address: 0x00837070 (FUN_00837070, sub_837070)
+   * Address: 0x00837DC0 (FUN_00837DC0, sub_837DC0)
+   *
+   * IDA signature:
+   * struct_BuildQueueItem *__usercall sub_837DC0@<eax>(struct_BuildQueueItem *last,
+   *                                                    struct_BuildQueueItem *dest,
+   *                                                    struct_BuildQueueItem *first@<ecx>);
    *
    * What it does:
-   * Compacts one in-place factory queue window by moving the half-open tail
-   * `[sourceBegin, currentQueueEnd)` onto `destinationBegin`, destroys the
-   * vacated tail range, and updates the caller-provided queue-end lane.
+   * Copy-constructs `[first, last)` into raw storage at `destination` (rows are
+   * built one at a time by 0x00837670) and returns the advanced destination
+   * cursor. On a throw partway through, the rows already built are destroyed
+   * (0x00837E17 walks `[destinationBegin, destinationCursor)` through 0x00837D20)
+   * and the exception is rethrown.
    */
-  [[maybe_unused]] FactoryCommandQueueItemRuntimeView** RebaseFactoryQueueRangeAndTrimTail(
-    FactoryCommandQueueItemRuntimeView** const outBegin,
-    FactoryCommandQueueItemRuntimeView* const destinationBegin,
-    FactoryCommandQueueItemRuntimeView* const sourceBegin
+  FactoryQueueItem* UninitializedCopyBuildQueueItems(
+    const FactoryQueueItem* const first,
+    const FactoryQueueItem* const last,
+    FactoryQueueItem* const destination
   )
   {
-    if (destinationBegin != sourceBegin) {
-      FactoryCommandQueueItemRuntimeView* const newEnd =
-        CopyBuildQueueItems(destinationBegin, sourceBegin, sCurrentBuildQueue.end);
-      DeleteRangeBuildQueueItems(newEnd, sCurrentBuildQueue.end);
-      sCurrentBuildQueue.end = newEnd;
+    FactoryQueueItem* destinationCursor = destination;
+    try {
+      for (const FactoryQueueItem* cursor = first; cursor != last; ++cursor) {
+        if (destinationCursor != nullptr) {
+          ::new (static_cast<void*>(destinationCursor)) FactoryQueueItem(*cursor);
+        }
+        ++destinationCursor;
+      }
+    } catch (...) {
+      for (FactoryQueueItem* rollback = destination; rollback != destinationCursor; ++rollback) {
+        rollback->~FactoryQueueItem();
+      }
+      throw;
+    }
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x008378E0 (FUN_008378E0, sub_8378E0)
+   *
+   * What it does:
+   * Register-shuffling bridge for the `std::uninitialized_copy` calls in the
+   * assignment branches: `[first, last)` arrive on the stack and the destination
+   * arrives in the inherited `edx`, and all three are forwarded to
+   * `UninitializedCopyBuildQueueItems`.
+   */
+  FactoryQueueItem* UninitializedCopyBuildQueueItemsAdapter(
+    const FactoryQueueItem* const first,
+    const FactoryQueueItem* const last,
+    FactoryQueueItem* const destination
+  )
+  {
+    return UninitializedCopyBuildQueueItems(first, last, destination);
+  }
+
+  /**
+   * Address: 0x008370D0 (FUN_008370D0, sub_8370D0)
+   *
+   * IDA signature:
+   * char __usercall sub_8370D0@<al>(gpg::fastvector_BuildQueueItem *lanes@<edi>,
+   *                                 unsigned int capacity@<esi>);
+   *
+   * What it does:
+   * Installs a fresh, empty 0x30-stride buffer of `capacity` rows into the queue
+   * lane: rejects lengths past the legacy growth ceiling, allocates through the
+   * checked 48-byte lane allocator (or `operator new(0)` for the empty case),
+   * and republishes `_Myfirst`/`_Mylast`/`_Myend`.
+   */
+  bool AllocateBuildQueueStorage(FactoryQueueLanes& lanes, const std::uint32_t capacity)
+  {
+    if (capacity > kFactoryQueueMaxCapacity) {
+      // 0x008370D8 tail-calls the lane's `_Xlen` emission (0x00837540), which is
+      // the legacy MSVC8 vector length diagnostic.
+      throw std::length_error("vector<T> too long");
     }
 
-    *outBegin = destinationBegin;
-    return outBegin;
+    void* const storage = (capacity == 0u)
+      ? ::operator new(0)
+      : gpg::core::legacy::AllocateChecked48ByteLane(capacity);
+
+    auto* const first = static_cast<FactoryQueueItem*>(storage);
+    lanes.begin = first;
+    lanes.end = first;
+    lanes.capacityEnd = first + capacity;
+    return true;
+  }
+
+  struct FactoryQueueItemMismatch
+  {
+    const FactoryQueueItem* left;  // +0x00
+    const FactoryQueueItem* right; // +0x04
+  };
+
+  /**
+   * Address: 0x00837FA0 (FUN_00837FA0, sub_837FA0)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl sub_837FA0(_DWORD *outPair, struct_BuildQueueItem *first1,
+   *                            struct_BuildQueueItem *last1,
+   *                            struct_BuildQueueItem *first2, int, int);
+   *
+   * What it does:
+   * `std::mismatch` over two queue ranges. Two rows match when their blueprint
+   * ids compare equal (0x00837FDB) and their counts at +0x1C are identical
+   * (0x00837FE7); the command-id lane is deliberately not part of the test.
+   */
+  [[nodiscard]] FactoryQueueItemMismatch FindFirstBuildQueueItemMismatch(
+    const FactoryQueueItem* const first1,
+    const FactoryQueueItem* const last1,
+    const FactoryQueueItem* const first2
+  )
+  {
+    const FactoryQueueItem* leftCursor = first1;
+    const FactoryQueueItem* rightCursor = first2;
+    while (leftCursor != last1) {
+      if (!(leftCursor->blueprintId == rightCursor->blueprintId) || leftCursor->count != rightCursor->count) {
+        break;
+      }
+      ++leftCursor;
+      ++rightCursor;
+    }
+    return FactoryQueueItemMismatch{leftCursor, rightCursor};
+  }
+
+  /**
+   * Address: 0x00837750 (FUN_00837750, sub_837750)
+   *
+   * IDA signature:
+   * char __usercall sub_837750@<al>(gpg::fastvector_BuildQueueItem *snapshot@<eax>);
+   *
+   * What it does:
+   * Reports whether a freshly-built snapshot already equals the published
+   * queue: same row count, and `std::mismatch` reaching the snapshot end.
+   */
+  [[nodiscard]] bool IsBuildQueueSnapshotUnchanged(const moho::FactoryQueueDisplaySnapshot& snapshot)
+  {
+    const auto& snapshotLanes = msvc8::AsVectorRuntimeView(snapshot);
+    const FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
+
+    const std::uint32_t snapshotCount = FactoryQueueItemCount(snapshotLanes.begin, snapshotLanes.end);
+    const std::uint32_t currentCount = FactoryQueueItemCount(currentLanes.begin, currentLanes.end);
+    if (snapshotCount != currentCount) {
+      return false;
+    }
+
+    const FactoryQueueItemMismatch mismatch =
+      FindFirstBuildQueueItemMismatch(snapshotLanes.begin, snapshotLanes.end, currentLanes.begin);
+    return mismatch.left == snapshotLanes.end;
+  }
+
+  /**
+   * Address: 0x00836C80 (FUN_00836C80, sub_836C80)
+   *
+   * IDA signature:
+   * gpg::fastvector_BuildQueueItem *__stdcall sub_836C80(gpg::fastvector_BuildQueueItem *snapshot);
+   *
+   * What it does:
+   * Publishes `snapshot` into the global build queue - the legacy MSVC8
+   * `vector<T>::operator=` emission for this element type, with `this` folded to
+   * `sCurrentBuildQueue`. Three branches, exactly as the binary: assign over the
+   * live prefix and trim (source fits the current size), assign the prefix then
+   * uninitialized-copy the tail (source fits the current capacity), or destroy,
+   * free, rebuy and uninitialized-copy the whole source.
+   */
+  moho::FactoryQueueDisplaySnapshot& AssignCurrentBuildQueueFromSnapshot(
+    const moho::FactoryQueueDisplaySnapshot& snapshot
+  )
+  {
+    // 0x00836C86 compares the incoming vector against the global's own address.
+    if (&snapshot == &moho::sCurrentBuildQueue) {
+      return moho::sCurrentBuildQueue;
+    }
+
+    const auto& sourceLanes = msvc8::AsVectorRuntimeView(snapshot);
+    FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
+
+    const std::uint32_t sourceCount = FactoryQueueItemCount(sourceLanes.begin, sourceLanes.end);
+    if (sourceCount == 0u) {
+      // 0x00836CB9: erase the whole published queue and keep its buffer.
+      FactoryQueueItem* rebasedBegin = nullptr;
+      (void)moho::RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin, currentLanes.end);
+      return moho::sCurrentBuildQueue;
+    }
+
+    const std::uint32_t currentCount = FactoryQueueItemCount(currentLanes.begin, currentLanes.end);
+    if (sourceCount <= currentCount) {
+      // 0x00836D0E: assign over the live prefix, destroy the surplus tail.
+      FactoryQueueItem* const newEnd =
+        CopyBuildQueueItems(currentLanes.begin, sourceLanes.begin, sourceLanes.end);
+      DeleteRangeBuildQueueItems(newEnd, currentLanes.end);
+      currentLanes.end = currentLanes.begin + sourceCount;
+      return moho::sCurrentBuildQueue;
+    }
+
+    const std::uint32_t currentCapacity = (currentLanes.begin != nullptr)
+      ? static_cast<std::uint32_t>(currentLanes.capacityEnd - currentLanes.begin)
+      : 0u;
+    if (sourceCount <= currentCapacity) {
+      // 0x00836DBF: assign over the live rows, then build the extra tail rows
+      // into the spare capacity.
+      FactoryQueueItem* const sourceSplit = sourceLanes.begin + currentCount;
+      (void)CopyBuildQueueItemsThiscallAdapter(sourceSplit, sourceLanes.begin, currentLanes.begin);
+      currentLanes.end =
+        UninitializedCopyBuildQueueItemsAdapter(sourceSplit, sourceLanes.end, currentLanes.end);
+      return moho::sCurrentBuildQueue;
+    }
+
+    // 0x00836DEC: capacity is short - destroy, free, rebuy, rebuild.
+    if (currentLanes.begin != nullptr) {
+      DeleteRangeBuildQueueItemsThiscallAdapter(currentLanes.end, currentLanes.begin);
+      ::operator delete(currentLanes.begin);
+    }
+
+    const std::uint32_t newCount = FactoryQueueItemCount(sourceLanes.begin, sourceLanes.end);
+    currentLanes.begin = nullptr;
+    currentLanes.end = nullptr;
+    currentLanes.capacityEnd = nullptr;
+    if (newCount != 0u && AllocateBuildQueueStorage(currentLanes, newCount)) {
+      currentLanes.end =
+        UninitializedCopyBuildQueueItemsAdapter(sourceLanes.begin, sourceLanes.end, currentLanes.begin);
+    }
+    return moho::sCurrentBuildQueue;
   }
 } // namespace
 
+/**
+ * Address: 0x00837070 (FUN_00837070, sub_837070)
+ *
+ * IDA signature:
+ * struct_BuildQueueItem **__stdcall sub_837070(struct_BuildQueueItem **a1,
+ *                                              struct_BuildQueueItem *result,
+ *                                              struct_BuildQueueItem *src);
+ *
+ * What it does:
+ * Compacts the published queue window by assigning the half-open tail
+ * `[sourceBegin, sCurrentBuildQueue end)` down onto `destinationBegin`,
+ * destroying the vacated tail and republishing `_Mylast`. Callers that pass
+ * `(_Myfirst, _Mylast)` use it as the queue's erase-all lane.
+ */
+moho::FactoryQueueDisplayItem** moho::RebaseFactoryQueueRangeAndTrimTail(
+  FactoryQueueDisplayItem** const outBegin,
+  FactoryQueueDisplayItem* const destinationBegin,
+  FactoryQueueDisplayItem* const sourceBegin
+)
+{
+  FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
+  if (destinationBegin != sourceBegin) {
+    FactoryQueueDisplayItem* const newEnd =
+      CopyBuildQueueItems(destinationBegin, sourceBegin, currentLanes.end);
+    DeleteRangeBuildQueueItems(newEnd, currentLanes.end);
+    currentLanes.end = newEnd;
+  }
+
+  *outBegin = destinationBegin;
+  return outBegin;
+}
+
+/**
+ * Address: 0x00836180 (FUN_00836180)
+ * Mangled: ?UI_FactoryCommandQueueHandlerBeat@Moho@@YAXXZ
+ *
+ * IDA signature:
+ * void __cdecl Moho::UI_FactoryCommandQueueHandlerBeat();
+ *
+ * What it does:
+ * Per-beat refresh of the factory build-queue mirror. While a factory is bound,
+ * rebuilds a stack-local snapshot of its queue through a temporary weak link and
+ * - when the snapshot differs from what is published - builds the Lua queue
+ * table, republishes the snapshot, and calls
+ * `/lua/ui/game/gamemain.lua:OnQueueChanged` with it. Once the factory is gone,
+ * erases the published queue and fires the same callback with `nil`.
+ */
 void moho::UI_FactoryCommandQueueHandlerBeat()
 {
+  LuaPlus::LuaState* const state = ResolveUiManagerLuaState();
+
+  LuaPlus::LuaObject queueTable;
+  bool queueChanged = true;
+
+  if (sCurrentBuildFactory.GetObjectPtr() != nullptr) {
+    FactoryQueueDisplaySnapshot snapshot;
+
+    // 0x008361DC..0x008361F9 build a temporary weak node onto the same owner
+    // chain and hand it to the rebuild worker by value.
+    WeakPtr<UserUnit> factoryLink;
+    factoryLink.BindOwnerLinkSlotUnlinked(sCurrentBuildFactory.ownerLinkSlot);
+    (void)factoryLink.LinkIntoOwnerChainHeadUnlinked();
+
+    RebuildFactoryQueueDisplaySnapshot(snapshot, factoryLink);
+
+    if (IsBuildQueueSnapshotUnchanged(snapshot)) {
+      queueChanged = false;
+    } else {
+      BuildFactoryQueueLuaTable(snapshot, state, &queueTable);
+      (void)AssignCurrentBuildQueueFromSnapshot(snapshot);
+    }
+    // 0x0083622E tears the snapshot down: destroy the rows, free the buffer.
+  } else {
+    // 0x008362EC: no factory bound. Nothing to announce unless a queue is still
+    // published.
+    FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
+    if (currentLanes.begin == nullptr || FactoryQueueItemCount(currentLanes.begin, currentLanes.end) == 0u) {
+      return;
+    }
+
+    queueTable.AssignNil(state);
+    FactoryQueueDisplayItem* rebasedBegin = nullptr;
+    (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin, currentLanes.end);
+  }
+
+  if (!queueChanged) {
+    return;
+  }
+
+  try {
+    const LuaPlus::LuaObject moduleObject = SCR_Import(state, kFactoryQueueChangedModule);
+    const LuaPlus::LuaObject callbackObject = moduleObject[kFactoryQueueChangedCallback];
+    LuaPlus::LuaFunction<void> callbackFunction(callbackObject);
+    callbackFunction(queueTable);
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kFactoryQueueChangedWarning, exception.what() != nullptr ? exception.what() : "");
+  }
 }
 
 void moho::CurrentBuildQueueItemCommands(
@@ -25859,23 +26263,20 @@ void moho::CurrentBuildQueueItemCommands(
   *outBegin = nullptr;
   *outEnd = nullptr;
 
-  if (sCurrentBuildQueue.start == nullptr) {
+  const FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
+  if (currentLanes.begin == nullptr) {
     return;
   }
 
-  const std::ptrdiff_t itemCount = sCurrentBuildQueue.end - sCurrentBuildQueue.start;
+  const std::ptrdiff_t itemCount = currentLanes.end - currentLanes.begin;
   const std::ptrdiff_t itemIndex = static_cast<std::ptrdiff_t>(oneBasedQueueIndex) - 1;
   if (itemIndex < 0 || itemIndex >= itemCount) {
     return;
   }
 
-  // Each build-queue item owns a legacy vector of queued command ids
-  // (`commandData`, +0x20). The vector element is a 4-byte pointer slot that the
-  // binary stores command ids into, so reinterpret the contiguous range as ids.
-  const auto& commands = sCurrentBuildQueue.start[itemIndex].commandData;
-  const moho::CmdId* const begin = reinterpret_cast<const moho::CmdId*>(commands.begin());
-  *outBegin = begin;
-  *outEnd = begin + commands.size();
+  const msvc8::vector<moho::CmdId>& commands = currentLanes.begin[itemIndex].commands;
+  *outBegin = commands.begin();
+  *outEnd = commands.end();
 }
 
 /**
@@ -26551,21 +26952,14 @@ int moho::cfunc_ClearCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const sta
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kClearCurrentFactoryForQueueDisplayHelpText, 0, argumentCount);
   }
 
-  std::uintptr_t* cursor = sCurrentBuildFactory.start;
-  if (cursor != nullptr) {
-    if (*cursor != reinterpret_cast<std::uintptr_t>(&sCurrentBuildFactory)) {
-      do {
-        cursor = reinterpret_cast<std::uintptr_t*>(*cursor + 4u);
-      } while (*cursor != reinterpret_cast<std::uintptr_t>(&sCurrentBuildFactory));
-    }
+  // 0x00836495..0x008364CB walks the factory's weak-link chain to the slot that
+  // still names this node, splices the node's successor into it, and clears both
+  // node lanes.
+  sCurrentBuildFactory.UnlinkFromOwnerChain();
 
-    *cursor = reinterpret_cast<std::uintptr_t>(sCurrentBuildFactory.finish);
-    sCurrentBuildFactory.start = nullptr;
-    sCurrentBuildFactory.finish = nullptr;
-  }
-
-  FactoryCommandQueueItemRuntimeView* rebasedBegin = nullptr;
-  RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, sCurrentBuildQueue.start, sCurrentBuildQueue.end);
+  FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
+  FactoryQueueDisplayItem* rebasedBegin = nullptr;
+  (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin, currentLanes.end);
   return 0;
 }
 

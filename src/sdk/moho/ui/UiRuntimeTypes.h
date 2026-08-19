@@ -9,10 +9,12 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/Map.h"
+#include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CmdDefs.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/IRenderWorldView.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -9049,6 +9051,168 @@ namespace moho
   [[nodiscard]] bool UI_InitKeyHandler();
   void UI_ClearInputCapture();
   void UI_ClearCurrentDragger();
+
+  /**
+   * One row of the UI-side factory build-queue mirror.
+   *
+   * Layout proven from the emitted element helpers for the 0x30-stride lane at
+   * `0x010C1A10`:
+   *   +0x00 `msvc8::string blueprintId` - `0x00835D75` writes `myRes=0x0F` at
+   *         `+0x18` and `mySize=0` at `+0x14`, and `0x00836108` reads
+   *         `cmp [item+0x18], 0x10` before choosing `[item+0x04]` (heap) or
+   *         `item+0x04` (SSO buffer) as the `c_str()` lane.
+   *   +0x1C `std::int32_t count`         - `0x00835D8E` stores the ctor's count
+   *         argument, `0x00836128` reads it for the Lua `count` field, and
+   *         `0x00835F85` accumulates into it (`[itemEnd-0x14]`).
+   *   +0x20 `msvc8::vector<CmdId> commands` - `0x00835D95..0x00835D9B` zero
+   *         `+0x24/+0x28/+0x2C` (the `_Myfirst/_Mylast/_Myend` triple behind the
+   *         proxy slot at `+0x20`), and `0x00835F92` takes `itemEnd-0x10` as the
+   *         push-back target for the owning command's id.
+   * The 0x30 stride itself is the `imul 2AAAAAABh / sar 3` element-count idiom
+   * used at every queue site (e.g. `0x008362FD`, `0x00836CA6`).
+   */
+  struct FactoryQueueDisplayItem
+  {
+    /**
+     * Address: 0x00835D50 (FUN_00835D50, sub_835D50)
+     *
+     * IDA signature:
+     * struct_BuildQueueItem *__usercall sub_835D50@<eax>(struct_BuildQueueItem *result,
+     *                                                    std::string *str1, int count);
+     *
+     * What it does:
+     * Assigns the blueprint id into the embedded legacy string, stores the
+     * queued count and zeroes the command-id vector's data triple.
+     */
+    FactoryQueueDisplayItem(const msvc8::string& sourceBlueprintId, std::int32_t sourceCount);
+
+    /**
+     * Address: 0x00837670 (FUN_00837670, sub_837670)
+     *
+     * IDA signature:
+     * struct_BuildQueueItem *__usercall sub_837670@<eax>(struct_BuildQueueItem *dest,
+     *                                                    struct_BuildQueueItem *src@<edi>);
+     *
+     * What it does:
+     * Copy-constructs one queue row: legacy-string assign of the blueprint id,
+     * raw count copy, then legacy-vector copy of the command-id lane.
+     */
+    FactoryQueueDisplayItem(const FactoryQueueDisplayItem& other);
+
+    /**
+     * Address: 0x00836040 (FUN_00836040, sub_836040)
+     * Address: 0x00837D20 (FUN_00837D20, sub_837D20)
+     *
+     * What it does:
+     * Releases the command-id vector buffer, clears its triple, then releases
+     * the blueprint-id string buffer and restores empty SSO state.
+     */
+    ~FactoryQueueDisplayItem() noexcept;
+
+    FactoryQueueDisplayItem() noexcept;
+    FactoryQueueDisplayItem& operator=(const FactoryQueueDisplayItem& other);
+
+    msvc8::string blueprintId;      // +0x00
+    std::int32_t count;             // +0x1C
+    msvc8::vector<CmdId> commands;  // +0x20
+  };
+  static_assert(offsetof(FactoryQueueDisplayItem, count) == 0x1C, "FactoryQueueDisplayItem::count offset must be 0x1C");
+  static_assert(
+    offsetof(FactoryQueueDisplayItem, commands) == 0x20,
+    "FactoryQueueDisplayItem::commands offset must be 0x20"
+  );
+  static_assert(sizeof(FactoryQueueDisplayItem) == 0x30, "FactoryQueueDisplayItem size must be 0x30");
+
+  using FactoryQueueDisplaySnapshot = msvc8::vector<FactoryQueueDisplayItem>;
+
+  /**
+   * Data: 0x010C1A10 - the UI-owned factory build-queue mirror.
+   *
+   * The whole 0x10-byte legacy vector object lives here: the proxy slot the
+   * self-assignment guard compares against (`cmp ebp, offset 0x010C1A10` at
+   * `0x00836C86`, and the `this` value returned at `0x00836CD2`), then
+   * `_Myfirst` at `0x010C1A14` (`0x008362EC`), `_Mylast` at `0x010C1A18`
+   * (`0x008362F5`) and `_Myend` at `0x010C1A1C` (`0x00836DA2`). IDA labels the
+   * proxy slot `sCurrentBuildFactory._M_end_of_storage`; that is a mislabel -
+   * every reference to `0x010C1A10` in the binary takes its address as the
+   * vector object, never reads it as a `_M_end_of_storage` pointer, and the
+   * `_Myfirst/_Mylast` pair it would bound sits *above* it, not below.
+   *
+   * Defined in `UiRuntimeTypes.cpp`, which owns the queue lane; the
+   * `SetCurrentFactoryForQueueDisplay` Lua worker in `UserUnit.cpp` reads and
+   * rebuilds it exactly as `0x008363E0` does.
+   */
+  extern FactoryQueueDisplaySnapshot sCurrentBuildQueue;
+
+  /**
+   * Data: 0x010C1A08 - weak link to the factory whose queue is mirrored.
+   *
+   * `0x008361B6` loads `+0x00` (the owner-link slot) and derives the owning
+   * `UserUnit` with `lea ecx, [eax-8]`; `0x008364BD` writes `+0x04` (the
+   * next-in-owner-chain lane) back into the owner slot while unlinking. Both
+   * offsets and the `-8` owner decode are exactly `moho::WeakPtr<UserUnit>`
+   * (`WeakPtrOwnerLinkOffset<UserUnit>::value == 0x08`), and the decompiler's
+   * `sCurrentBuildFactory._M_start == (int *)8` guard at `0x008361C8` is that
+   * type's sentinel-slot test.
+   */
+  extern WeakPtr<UserUnit> sCurrentBuildFactory;
+
+  /**
+   * Address: 0x00837070 (FUN_00837070, sub_837070)
+   *
+   * IDA signature:
+   * struct_BuildQueueItem **__stdcall sub_837070(struct_BuildQueueItem **a1,
+   *                                              struct_BuildQueueItem *result,
+   *                                              struct_BuildQueueItem *src);
+   *
+   * What it does:
+   * Compacts the current build-queue window by moving the half-open tail
+   * `[sourceBegin, sCurrentBuildQueue.end)` down onto `destinationBegin`,
+   * destroying the vacated tail and republishing `_Mylast`. Callers pass
+   * `(_Myfirst, _Mylast)` to erase the whole queue.
+   */
+  FactoryQueueDisplayItem** RebaseFactoryQueueRangeAndTrimTail(
+    FactoryQueueDisplayItem** outBegin,
+    FactoryQueueDisplayItem* destinationBegin,
+    FactoryQueueDisplayItem* sourceBegin
+  );
+
+  /**
+   * Address: 0x00835DF0 (FUN_00835DF0, sub_835DF0)
+   *
+   * Defined in `UserUnit.cpp`, which owns the user command-queue and
+   * command-issue-helper layouts this walks. Declared here because the queue
+   * vector it fills is the UI-owned lane above, and because the binary passes
+   * that vector in as a parameter (`ebx`) rather than reading a global.
+   */
+  void RebuildFactoryQueueDisplaySnapshot(FactoryQueueDisplaySnapshot& queue, WeakPtr<UserUnit>& factoryLink);
+
+  /**
+   * Address: 0x00836080 (FUN_00836080, func_AddScriptUIBuildQueueItem)
+   *
+   * Defined in `UserUnit.cpp` beside the queue-rebuild worker above; the queue
+   * vector arrives in `esi` at both binary call sites (`0x0083621B` with a
+   * stack-local snapshot, `0x0083654A` with `sCurrentBuildQueue`).
+   */
+  void BuildFactoryQueueLuaTable(
+    const FactoryQueueDisplaySnapshot& queue,
+    LuaPlus::LuaState* state,
+    LuaPlus::LuaObject* outQueueTable
+  );
+
+  /**
+   * Address: 0x00836180 (FUN_00836180)
+   * Mangled: ?UI_FactoryCommandQueueHandlerBeat@Moho@@YAXXZ
+   *
+   * IDA signature:
+   * void __cdecl Moho::UI_FactoryCommandQueueHandlerBeat();
+   *
+   * What it does:
+   * Per-beat refresh of the factory build-queue mirror: rebuilds a snapshot for
+   * the currently displayed factory, and when it differs from the published
+   * queue republishes it and calls `/lua/ui/game/gamemain.lua:OnQueueChanged`
+   * with the new queue table (or `nil` once the factory is gone).
+   */
   void UI_FactoryCommandQueueHandlerBeat();
 
   /**

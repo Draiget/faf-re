@@ -36,6 +36,8 @@
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/ui/UiRuntimeTypes.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/UserArmy.h"
@@ -166,6 +168,7 @@ namespace
   constexpr const char* kCommandQueuePositionKey = "position";
   constexpr const char* kFactoryQueueItemIdKey = "id";
   constexpr const char* kFactoryQueueItemCountKey = "count";
+  constexpr const char* kShowQueueCategoryName = "SHOWQUEUE";
   constexpr const char* kEconEnergyConsumedKey = "energyConsumed";
   constexpr const char* kEconMassConsumedKey = "massConsumed";
   constexpr const char* kEconEnergyRequestedKey = "energyRequested";
@@ -492,39 +495,12 @@ namespace
   };
   static_assert(sizeof(UserCommandQueueRangeView) == 0x08, "UserCommandQueueRangeView size must be 0x08");
 
-  struct FactoryQueueDisplayItemRuntime
-  {
-    FactoryQueueDisplayItemRuntime() noexcept;
-    FactoryQueueDisplayItemRuntime(const msvc8::string& sourceBlueprintId, std::int32_t sourceCount);
-    ~FactoryQueueDisplayItemRuntime() noexcept;
-
-    msvc8::string blueprintId;         // +0x00
-    std::int32_t count;                // +0x1C
-    CmdId commandId;                   // +0x20
-    std::uint8_t* auxBufferBegin;      // +0x24
-    std::uint8_t* auxBufferEnd;        // +0x28
-    std::uint8_t* auxBufferCapacity;   // +0x2C
-  };
-  static_assert(offsetof(FactoryQueueDisplayItemRuntime, count) == 0x1C, "FactoryQueueDisplayItemRuntime::count offset must be 0x1C");
-  static_assert(
-    offsetof(FactoryQueueDisplayItemRuntime, commandId) == 0x20,
-    "FactoryQueueDisplayItemRuntime::commandId offset must be 0x20"
-  );
-  static_assert(
-    offsetof(FactoryQueueDisplayItemRuntime, auxBufferBegin) == 0x24,
-    "FactoryQueueDisplayItemRuntime::auxBufferBegin offset must be 0x24"
-  );
-  static_assert(
-    offsetof(FactoryQueueDisplayItemRuntime, auxBufferEnd) == 0x28,
-    "FactoryQueueDisplayItemRuntime::auxBufferEnd offset must be 0x28"
-  );
-  static_assert(
-    offsetof(FactoryQueueDisplayItemRuntime, auxBufferCapacity) == 0x2C,
-    "FactoryQueueDisplayItemRuntime::auxBufferCapacity offset must be 0x2C"
-  );
-  static_assert(sizeof(FactoryQueueDisplayItemRuntime) == 0x30, "FactoryQueueDisplayItemRuntime size must be 0x30");
-
-  msvc8::vector<FactoryQueueDisplayItemRuntime> sCurrentFactoryBuildQueue;
+  // The factory build-queue row type and the published queue itself are owned by
+  // `moho/ui/UiRuntimeTypes.{h,cpp}` (`moho::FactoryQueueDisplayItem`,
+  // `moho::sCurrentBuildQueue`). The queue-rebuild and Lua-table workers below
+  // take that vector as a parameter exactly as the binary does - it arrives in
+  // `ebx` at 0x00835DF0 and in `esi` at 0x00836080 - so this translation unit
+  // keeps no build-queue global of its own.
 
   struct UserCommandManagerPendingSlotView
   {
@@ -3448,154 +3424,56 @@ namespace
     return count;
   }
 
-  FactoryQueueDisplayItemRuntime::FactoryQueueDisplayItemRuntime() noexcept
-    : blueprintId()
-    , count(0)
-    , commandId{}
-    , auxBufferBegin(nullptr)
-    , auxBufferEnd(nullptr)
-    , auxBufferCapacity(nullptr)
-  {
-  }
-
   /**
-   * Address: 0x00835D50 (FUN_00835D50)
+   * Address: 0x00836EF0 (FUN_00836EF0, sub_836EF0)
+   *
+   * IDA signature:
+   * void __usercall sub_836EF0(gpg::fastvector_BuildQueueItem *queue@<eax>,
+   *                            struct_BuildQueueItem *item@<ecx>);
    *
    * What it does:
-   * Builds one queue-display item from blueprint-id and count lanes, zeroing
-   * trailing auxiliary storage pointers.
-   */
-  FactoryQueueDisplayItemRuntime::FactoryQueueDisplayItemRuntime(
-    const msvc8::string& sourceBlueprintId,
-    const std::int32_t sourceCount
-  )
-    : blueprintId(sourceBlueprintId)
-    , count(sourceCount)
-    , commandId{}
-    , auxBufferBegin(nullptr)
-    , auxBufferEnd(nullptr)
-    , auxBufferCapacity(nullptr)
-  {
-  }
-
-  /**
-   * Address: 0x00836040 (FUN_00836040)
-   *
-   * What it does:
-   * Releases one queue-display item's auxiliary buffer lane and clears pointer
-   * bounds before string teardown.
-   */
-  FactoryQueueDisplayItemRuntime::~FactoryQueueDisplayItemRuntime() noexcept
-  {
-    if (auxBufferBegin != nullptr) {
-      operator delete[](auxBufferBegin);
-    }
-    auxBufferBegin = nullptr;
-    auxBufferEnd = nullptr;
-    auxBufferCapacity = nullptr;
-  }
-
-  /**
-   * Address: 0x00836EF0 (FUN_00836EF0)
-   *
-   * What it does:
-   * Appends one queue-display item to the global factory queue snapshot.
+   * Appends one queue-display row to the caller's factory queue vector, growing
+   * the 0x30-stride buffer when the live size has reached capacity.
    */
   void AppendFactoryQueueDisplayItem(
-    msvc8::vector<FactoryQueueDisplayItemRuntime>& queueItems,
-    const FactoryQueueDisplayItemRuntime& item
+    FactoryQueueDisplaySnapshot& queueItems,
+    const FactoryQueueDisplayItem& item
   )
   {
     queueItems.push_back(item);
   }
 
   /**
-   * Address: unverified - previously cited as 0x00835DF0, but that address's
-   * real disassembly (FUN_00835DF0.asm) is an unrelated ~588-byte function
-   * referencing Moho::sWldSession and the "SHOWQUEUE" console command, not
-   * this logic. Mis-attribution found 2026-08-19; the address citation was
-   * removed rather than left wrong. This function's own behavior (coalesce
-   * a UserUnit's factory command queue into blueprint/count display rows)
-   * is still real and wired from its caller below - only the binary address
-   * pairing needs new evidence.
+   * Address: 0x0052B1E0 (FUN_0052B1E0, RRuleGameRulesImpl::GetEntityCategory)
    *
    * What it does:
-   * Rebuilds the current factory queue-display snapshot from a unit's command
-   * queue, coalescing adjacent blueprint ids and updating count/cmd-id lanes.
+   * Resolves the `SHOWQUEUE` entity category from the active session's rules and
+   * reports whether the unit's blueprint ordinal is a member. `0x00835E47` loads
+   * `sWldSession->mRules`, dispatches vtable slot 22 (+0x58) with the literal
+   * `"SHOWQUEUE"`, then `0x00835E5C` reads the unit's blueprint through the
+   * `IUnit` sub-object's slot 7 (+0x1C) and bit-tests the returned category's
+   * word range at `+0x08` (first word index) / `+0x10`..`+0x14` (word range).
    */
-  void RebuildCurrentFactoryBuildQueue(UserUnit* const userUnit)
+  [[nodiscard]] bool IsFactoryQueueDisplayEnabledForUnit(const UserUnit* const userUnit) noexcept
   {
-    sCurrentFactoryBuildQueue.clear();
-    if (userUnit == nullptr) {
-      return;
+    const CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr || session->mRules == nullptr) {
+      return false;
     }
 
-    const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetFactoryCommandQueue());
-    if (commandRange == nullptr) {
-      return;
+    const CategoryWordRangeView* const showQueueCategory =
+      session->mRules->GetEntityCategory(kShowQueueCategoryName);
+    if (showQueueCategory == nullptr) {
+      return false;
     }
 
-    for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
-      const UserCommandIssueHelperRuntimeView* const helper = entry->helper;
-      if (helper == nullptr) {
-        continue;
-      }
-
-      const EUnitCommandType commandType = ResolveHelperCommandType(*helper);
-      if (!IsFactoryQueueCommandType(commandType)) {
-        continue;
-      }
-
-      const RBlueprint* const blueprint = helper->buildBlueprint;
-      if (blueprint == nullptr || blueprint->mBlueprintId.empty()) {
-        continue;
-      }
-
-      const std::int32_t commandCount = ResolveHelperBuildCount(*helper);
-      if (commandCount <= 0) {
-        continue;
-      }
-
-      if (
-        !sCurrentFactoryBuildQueue.empty()
-        && sCurrentFactoryBuildQueue.back().blueprintId == blueprint->mBlueprintId
-      ) {
-        FactoryQueueDisplayItemRuntime& tail = sCurrentFactoryBuildQueue.back();
-        tail.count += commandCount;
-        tail.commandId = helper->commandId;
-        continue;
-      }
-
-      FactoryQueueDisplayItemRuntime item(blueprint->mBlueprintId, commandCount);
-      item.commandId = helper->commandId;
-      AppendFactoryQueueDisplayItem(sCurrentFactoryBuildQueue, item);
-    }
-  }
-
-  /**
-   * Address: 0x00836080 (FUN_00836080, func_AddScriptUIBuildQueueItem)
-   *
-   * What it does:
-   * Converts the current factory-build snapshot into one Lua array where each
-   * row contains `id` and `count`.
-   */
-  [[nodiscard]] unsigned int BuildFactoryQueueLuaTable(
-    LuaPlus::LuaState* const state,
-    LuaPlus::LuaObject* const outQueueTable
-  )
-  {
-    outQueueTable->AssignNewTable(state, static_cast<int>(sCurrentFactoryBuildQueue.size()), 0);
-
-    unsigned int tableIndex = 0;
-    for (const FactoryQueueDisplayItemRuntime& buildItem : sCurrentFactoryBuildQueue) {
-      LuaPlus::LuaObject row;
-      row.AssignNewTable(state, 2, 0);
-      row.SetString(kFactoryQueueItemIdKey, buildItem.blueprintId.c_str());
-      row.SetInteger(kFactoryQueueItemCountKey, buildItem.count);
-      outQueueTable->SetObject(static_cast<int>(++tableIndex), row);
+    const IUnit* const unitBridge = userUnit;
+    const RUnitBlueprint* const blueprint = unitBridge->GetBlueprint();
+    if (blueprint == nullptr) {
+      return false;
     }
 
-    return tableIndex;
+    return showQueueCategory->ContainsBit(blueprint->mCategoryBitIndex);
   }
 
   [[nodiscard]] const UserCommandQueue* SelectActiveQueue(const UserUnit* const userUnit) noexcept
@@ -8249,12 +8127,123 @@ CScrLuaInitForm* moho::func_SetCurrentFactoryForQueueDisplay_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00835DF0 (FUN_00835DF0, sub_835DF0)
+ *
+ * IDA signature:
+ * void __usercall sub_835DF0(gpg::fastvector_BuildQueueItem *queue@<ebx>,
+ *                            Moho::WeakPtr_UserUnit factoryLink);
+ *
+ * What it does:
+ * Appends the currently-bound factory's command queue into `queue` as
+ * blueprint/count display rows, coalescing runs of the same blueprint id and
+ * collecting each contributing command id onto the row it folded into. Gated on
+ * the unit's blueprint carrying the `SHOWQUEUE` category; when it passes, the
+ * link is also published into the global `sCurrentBuildFactory`. The by-value
+ * weak node is unlinked from the unit's owner chain before returning, which is
+ * the argument destruction the binary performs at 0x0083600C.
+ *
+ * Fidelity note: the SHOWQUEUE gate, the `sCurrentBuildFactory` publish, the
+ * command-id collection and the by-value node teardown are recovered from the
+ * disassembly. The queue walk itself reuses this TU's already-recovered
+ * command-queue resolution (0x008B6F60) and helper decoders (0x008B4140,
+ * 0x008B4220) - the binary re-invokes 0x008B6F60 once per loop test rather than
+ * hoisting the range, which is an artefact of the emitted loop, not a behaviour
+ * difference, because the resolver is idempotent for an unchanged queue.
+ */
+void moho::RebuildFactoryQueueDisplaySnapshot(
+  FactoryQueueDisplaySnapshot& queue,
+  WeakPtr<UserUnit>& factoryLink
+)
+{
+  // 0x00835E17: a null owner-link slot means the argument node never linked, so
+  // there is nothing to walk and nothing to unlink.
+  if (factoryLink.ownerLinkSlot == nullptr) {
+    return;
+  }
+
+  UserUnit* const userUnit = factoryLink.GetObjectPtr();
+  if (userUnit != nullptr && IsFactoryQueueDisplayEnabledForUnit(userUnit)) {
+    UserCommandQueue* const commandQueue = userUnit->GetCommandQueue();
+    if (commandQueue != nullptr) {
+      // 0x00835ECB republishes the current factory from the incoming link.
+      sCurrentBuildFactory.ResetFromOwnerLinkSlot(factoryLink.ownerLinkSlot);
+
+      const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(commandQueue);
+      if (commandRange != nullptr) {
+        for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
+          const UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+          if (helper == nullptr) {
+            continue;
+          }
+
+          const EUnitCommandType commandType = ResolveHelperCommandType(*helper);
+          if (!IsFactoryQueueCommandType(commandType)) {
+            continue;
+          }
+
+          const RBlueprint* const blueprint = helper->buildBlueprint;
+          if (blueprint == nullptr || blueprint->mBlueprintId.empty()) {
+            continue;
+          }
+
+          // 0x00835F5A / 0x00835F6F: fold into the tail row when the queue is
+          // non-empty and its last blueprint id matches.
+          if (!queue.empty() && queue.back().blueprintId == blueprint->mBlueprintId) {
+            FactoryQueueDisplayItem& tail = queue.back();
+            tail.count += ResolveHelperBuildCount(*helper);
+            tail.commands.push_back(helper->commandId);
+            continue;
+          }
+
+          FactoryQueueDisplayItem item(blueprint->mBlueprintId, ResolveHelperBuildCount(*helper));
+          item.commands.push_back(helper->commandId);
+          AppendFactoryQueueDisplayItem(queue, item);
+        }
+      }
+    }
+  }
+
+  factoryLink.UnlinkFromOwnerChain();
+}
+
+/**
+ * Address: 0x00836080 (FUN_00836080, func_AddScriptUIBuildQueueItem)
+ *
+ * IDA signature:
+ * void __usercall func_AddScriptUIBuildQueueItem(gpg::fastvector_BuildQueueItem *queue@<esi>,
+ *                                                LuaPlus::LuaState *state,
+ *                                                LuaPlus::LuaObject *outQueueTable);
+ *
+ * What it does:
+ * Rewrites `outQueueTable` as a fresh Lua array sized to the queue, one
+ * `{ id = <blueprint id>, count = <queued count> }` sub-table per row.
+ */
+void moho::BuildFactoryQueueLuaTable(
+  const FactoryQueueDisplaySnapshot& queue,
+  LuaPlus::LuaState* const state,
+  LuaPlus::LuaObject* const outQueueTable
+)
+{
+  outQueueTable->AssignNewTable(state, static_cast<int>(queue.size()), 0);
+
+  unsigned int tableIndex = 0;
+  for (const FactoryQueueDisplayItem& buildItem : queue) {
+    LuaPlus::LuaObject row;
+    row.AssignNewTable(state, 2, 0);
+    row.SetString(kFactoryQueueItemIdKey, buildItem.blueprintId.c_str());
+    row.SetInteger(kFactoryQueueItemCountKey, buildItem.count);
+    outQueueTable->SetObject(static_cast<int>(++tableIndex), row);
+  }
+}
+
+/**
  * Address: 0x008363E0 (FUN_008363E0, cfunc_SetCurrentFactoryForQueueDisplayL)
  *
  * What it does:
- * Resolves one optional `UserUnit` argument, rebuilds the factory build-queue
- * snapshot (`id` + `count` rows), and returns that queue table (or `nil` when
- * no factory build queue is available).
+ * Binds one optional `UserUnit` argument as the factory whose build queue the UI
+ * mirrors: takes a temporary weak link on it, releases the previously-bound
+ * factory, erases the published queue, rebuilds it for the new unit and returns
+ * the resulting `{id, count}` table (or `nil` when the rebuild produced nothing).
  */
 int moho::cfunc_SetCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const state)
 {
@@ -8264,13 +8253,26 @@ int moho::cfunc_SetCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const state
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCurrentFactoryForQueueDisplayHelpText, 1, argumentCount);
   }
 
-  const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
-  UserUnit* const userUnit = GetUserUnitOptional(userUnitObject, state);
-  RebuildCurrentFactoryBuildQueue(userUnit);
+  WeakPtr<UserUnit> factoryLink;
+  {
+    const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
+    // 0x00836458: the link slot is the unit's weak-link head at +0x08.
+    factoryLink.BindObjectUnlinked(GetUserUnitOptional(userUnitObject, state));
+    (void)factoryLink.LinkIntoOwnerChainHeadUnlinked();
+  }
 
   LuaPlus::LuaObject queueTable;
-  if (!sCurrentFactoryBuildQueue.empty()) {
-    (void)BuildFactoryQueueLuaTable(state, &queueTable);
+
+  // 0x00836495: drop the previously-bound factory, then 0x008364E3 erases the
+  // published queue before the rebuild refills it.
+  sCurrentBuildFactory.UnlinkFromOwnerChain();
+  FactoryQueueDisplayItem* rebasedBegin = nullptr;
+  (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, sCurrentBuildQueue.begin(), sCurrentBuildQueue.end());
+
+  RebuildFactoryQueueDisplaySnapshot(sCurrentBuildQueue, factoryLink);
+
+  if (!sCurrentBuildQueue.empty()) {
+    BuildFactoryQueueLuaTable(sCurrentBuildQueue, state, &queueTable);
   } else {
     queueTable.AssignNil(state);
   }
