@@ -41,7 +41,11 @@ extern "C" void __cdecl _free_crt(void* ptr);
 extern "C" int luaG_checkcode(const Proto* f);
 
 /**
- * Address: 0x004F2730 (legacy CRT compat thunk)
+ * Legacy CRT `_free_crt` compat thunk. NOT a recovered binary function - this
+ * is build-side glue, so it carries no `Address:` block. (It previously
+ * claimed 0x004F2730, which is really
+ * `?WIN_CopyToClipboard@Moho@@YA_NVStrArgW@gpg@@@Z`, recovered in
+ * moho/app/WinApp.cpp.)
  *
  * What it does:
  * Forwards to `std::free`. Provides the legacy `_free_crt` symbol expected by
