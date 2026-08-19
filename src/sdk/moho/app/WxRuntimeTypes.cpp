@@ -65219,6 +65219,36 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     RenderRefractingEffects();
     FogOff();
 
+    // Per-view debug-canvas overlay pass. Binary (WRenViewport::Render
+    // @0x007F90D0, 0x007F9639..0x007F96D3): resets the 2D draw origin to
+    // local screen space unconditionally, then - only while a world session
+    // is active - renders and releases the session's tick and beat debug
+    // canvases in turn.
+    //
+    // Not yet modelled: the unconditional tail at 0x007F96D8 that follows
+    // this (reached whether or not a session was active) additionally
+    // renders and clears the viewport's OWN debug canvas
+    // (`headView->mDebugCanvas`, +0x2C8) and runs cleanup this pass does not
+    // cover (`[ebp+2140h]` zero, `sub_7F7AC0`). Left out rather than guessed.
+    SetViewportToLocalScreen();
+    if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
+      if (boost::SharedPtrRaw<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas();
+          tickCanvas.px != nullptr) {
+        tickCanvas.px->Render(
+          runtime->mPrimBatcher.batcher, *runtime->mCam, runtime->mScreenSize.x, runtime->mScreenSize.y
+        );
+        tickCanvas.release();
+      }
+
+      if (boost::SharedPtrRaw<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas();
+          beatCanvas.px != nullptr) {
+        beatCanvas.px->Render(
+          runtime->mPrimBatcher.batcher, *runtime->mCam, runtime->mScreenSize.x, runtime->mScreenSize.y
+        );
+        beatCanvas.release();
+      }
+    }
+
     runtime->mCam = nullptr;
   }
 

@@ -11086,6 +11086,37 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x007F6390 (FUN_007F6390, Moho::CWldSession::GetTickDebugCanvas)
+   *
+   * IDA signature:
+   * boost::shared_ptr_CDebugCanvas *__usercall Moho::CWldSession::GetTickDebugCanvas(
+   *   boost::shared_ptr_CDebugCanvas *result, Moho::CWldSession *this);
+   *
+   * What it does:
+   * Returns a retained copy of `mDebugCanvas` (+0x0414/+0x0418) - the tick
+   * debug canvas `DoBeat` re-seats every beat from `beat.mTickDebugCanvas`.
+   */
+  boost::SharedPtrRaw<CDebugCanvas> CWldSession::GetTickDebugCanvas() const
+  {
+    return mDebugCanvas.clone_retained();
+  }
+
+  /**
+   * Address: 0x007F63C0 (FUN_007F63C0, Moho::CWldSession::GetBeatDebugCanvas)
+   *
+   * IDA signature:
+   * boost::shared_ptr_CDebugCanvas *__usercall Moho::CWldSession::GetBeatDebugCanvas(
+   *   boost::shared_ptr_CDebugCanvas *result, Moho::CWldSession *this);
+   *
+   * What it does:
+   * Returns a retained copy of `mBeatDebugCanvas` (+0x041C/+0x0420).
+   */
+  boost::SharedPtrRaw<CDebugCanvas> CWldSession::GetBeatDebugCanvas() const
+  {
+    return mBeatDebugCanvas.clone_retained();
+  }
+
+  /**
    * Address: 0x00894530 (FUN_00894530,
    * ?DoBeat@CWldSession@Moho@@QAEXV?$auto_ptr@USSyncData@Moho@@@std@@@Z)
    *

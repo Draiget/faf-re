@@ -678,6 +678,29 @@ namespace moho
     [[nodiscard]] bool TryGetPlayableMapRect(VisibilityRect& outRect) const;
 
     /**
+     * Address: 0x007F6390 (FUN_007F6390, Moho::CWldSession::GetTickDebugCanvas)
+     *
+     * What it does:
+     * Returns a retained shared reference to the tick-scoped debug canvas
+     * (`mDebugCanvas`, +0x0414). Despite the field's plain name, `DoBeat`
+     * re-seats it from `beat.mTickDebugCanvas` every tick, so "tick" describes
+     * what it holds, not the member name.
+     *
+     * `WRenViewport::Render` (0x007F90D0) calls this once per frame to decide
+     * whether there is a tick debug canvas to draw.
+     */
+    [[nodiscard]] boost::SharedPtrRaw<CDebugCanvas> GetTickDebugCanvas() const;
+
+    /**
+     * Address: 0x007F63C0 (FUN_007F63C0, Moho::CWldSession::GetBeatDebugCanvas)
+     *
+     * What it does:
+     * Returns a retained shared reference to the beat-scoped debug canvas
+     * (`mBeatDebugCanvas`, +0x041C).
+     */
+    [[nodiscard]] boost::SharedPtrRaw<CDebugCanvas> GetBeatDebugCanvas() const;
+
+    /**
      * Address: 0x007A6360 (FUN_007A6360, ?GetFocusArmy@CWldSession@Moho@@QBEPAVUserArmy@2@XZ)
      *
      * What it does:
