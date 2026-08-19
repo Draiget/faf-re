@@ -12,6 +12,7 @@
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/GridTraversalLine.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
@@ -522,12 +523,141 @@ namespace
     ++path.finish;
   }
 
+  // Fractional probe points inside a grid cell, used to place the endpoints of a
+  // clearance walk. A straight step only has to clear the middle of its lane; a
+  // diagonal step has to clear both cells it squeezes between, so it is walked
+  // twice with the probe pushed against opposite corners.
+  constexpr float kCellProbeLowCorner = 0.1f;
+  constexpr float kCellProbeHighCorner = 0.9f;
+  constexpr float kCellProbeCentre = 0.5f;
+
+  // The clearance walk visits every cell the segment crosses, so it steps one
+  // whole grid cell at a time.
+  constexpr std::int32_t kClearanceWalkStep = 1;
+
+  /**
+   * Address: 0x00720B50 (FUN_00720B50, sub_720B50)
+   *
+   * IDA signature:
+   * char __userpurge sub_720B50@<al>(float *a1@<eax>, __int16 *edx0@<edx>,
+   *   __int16 *a3@<ecx>, Moho::COGrid *eax0a, int v1);
+   *
+   * What it does:
+   * Walks the grid line joining `fromCell` and `toCell` - both displaced by the
+   * same fractional in-cell probe point - and returns false at the first cell
+   * along it where `unit`'s footprint does not fit. Water-layer units drop the
+   * OC_SUB cap before the fit test, matching the single-cell occupancy check.
+   *
+   * IDA types the walker state as `Moho::DebugLine`; it is really the grid
+   * walker shared with the occupancy grid and the terrain influence map, so it
+   * is recovered against `moho::GridTraversalLine`.
+   */
+  [[nodiscard]] bool IsFootprintClearAlongCellLine(
+    const Unit& unit,
+    const COGrid& grid,
+    const SOCellPos fromCell,
+    const SOCellPos toCell,
+    const float probeOffsetX,
+    const float probeOffsetZ
+  )
+  {
+    GridTraversalLine walkLine{};
+    InitGridTraversalLine(
+      walkLine,
+      kClearanceWalkStep,
+      static_cast<float>(toCell.x) + probeOffsetX,
+      static_cast<float>(fromCell.x) + probeOffsetX,
+      static_cast<float>(fromCell.z) + probeOffsetZ,
+      static_cast<float>(toCell.z) + probeOffsetZ
+    );
+
+    const ELayer unitLayer = unit.mCurrentLayer;
+    const SFootprint& footprint = unit.GetFootprint();
+
+    // Post-tested walk: the starting cell is always probed, even when the
+    // segment is already past its end, and the end test only runs after a step.
+    for (;;) {
+      std::int32_t cellX = 0;
+      std::int32_t cellZ = 0;
+      GetGridTraversalCell(walkLine, cellX, cellZ);
+
+      SOCellPos walkCell{};
+      walkCell.x = static_cast<std::int16_t>(cellX);
+      walkCell.z = static_cast<std::int16_t>(cellZ);
+
+      EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *grid.sim->mMapData, walkCell);
+      if (unitLayer == LAYER_Water) {
+        const std::uint8_t masked = static_cast<std::uint8_t>(occupancyCaps) &
+          ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+        occupancyCaps = static_cast<EOccupancyCaps>(masked);
+      }
+
+      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(grid, walkCell, footprint, occupancyCaps)) == 0u) {
+        return false;
+      }
+
+      AdvanceGridTraversalEdge(walkLine);
+      if (IsGridTraversalBeyondEnd(walkLine)) {
+        return true;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00720C90 (FUN_00720C90, sub_720C90)
+   *
+   * IDA signature:
+   * char __userpurge sub_720C90@<al>(int a1@<ebx>, __int16 *a2@<edi>,
+   *   __int16 *a3@<esi>, int a4);
+   *
+   * What it does:
+   * Clearance test for one `fromCell` -> `toCell` step. An axis-aligned step is
+   * cleared by a single walk down the centre of its lane. A diagonal step is the
+   * classic don't-cut-corners case: it is cleared only when both of the cells it
+   * squeezes between are walkable, so the segment is walked twice with the probe
+   * pushed against the two opposite corners, and the first failure short-circuits
+   * to false.
+   *
+   * IDA's pseudo-code renders all three calls with identical arguments because
+   * it drops the stack float pair; only the disassembly shows they differ.
+   */
+  [[nodiscard]] bool IsCellStepClearForUnit(
+    const Unit& unit, const COGrid& grid, const SOCellPos fromCell, const SOCellPos toCell
+  )
+  {
+    if (fromCell.x == toCell.x || fromCell.z == toCell.z) {
+      return IsFootprintClearAlongCellLine(unit, grid, fromCell, toCell, kCellProbeCentre, kCellProbeCentre);
+    }
+
+    const bool movesAlongMainDiagonal = (toCell.x > fromCell.x && toCell.z > fromCell.z) ||
+      (toCell.x < fromCell.x && toCell.z < fromCell.z);
+
+    if (movesAlongMainDiagonal) {
+      if (!IsFootprintClearAlongCellLine(
+            unit, grid, fromCell, toCell, kCellProbeLowCorner, kCellProbeHighCorner
+          )) {
+        return false;
+      }
+      return IsFootprintClearAlongCellLine(
+        unit, grid, fromCell, toCell, kCellProbeHighCorner, kCellProbeLowCorner
+      );
+    }
+
+    if (!IsFootprintClearAlongCellLine(unit, grid, fromCell, toCell, kCellProbeLowCorner, kCellProbeLowCorner)) {
+      return false;
+    }
+    return IsFootprintClearAlongCellLine(
+      unit, grid, fromCell, toCell, kCellProbeHighCorner, kCellProbeHighCorner
+    );
+  }
+
   /**
    * Address: 0x005AF4E0 (FUN_005AF4E0)
    *
    * What it does:
    * Tests whether the navigator footprint can occupy `toCell` under current
-   * occupancy caps/path-layer rules, with the binary's long-step fallback gate.
+   * occupancy caps/path-layer rules. Steps longer than one cell fall through to
+   * the swept clearance test instead of the single-cell fit.
    */
   [[nodiscard]] bool CanOccupyTargetCell(
     const CAiPathNavigator& navigator, const SOCellPos fromCell, const SOCellPos toCell
@@ -538,11 +668,17 @@ namespace
       return false;
     }
 
+    const auto* const grid = GetPathingGrid(navigator);
+
+    // A step longer than one cell cannot be answered by a single-cell fit, so
+    // the binary sweeps the whole segment instead.
     if (ManhattanDistance(fromCell, toCell) > 1) {
-      return pathFinder->CanTraverseCell(toCell);
+      if (!grid) {
+        return false;
+      }
+      return IsCellStepClearForUnit(*pathFinder->mUnit, *grid, fromCell, toCell);
     }
 
-    const auto* const grid = GetPathingGrid(navigator);
     const auto* const sim = GetPathingSim(navigator);
     if (!grid || !sim || !sim->mMapData) {
       return false;
@@ -550,7 +686,7 @@ namespace
 
     const SFootprint& footprint = pathFinder->mUnit->GetFootprint();
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *sim->mMapData, toCell);
-    if (pathFinder->mPathLayerSelector == 8) {
+    if (pathFinder->mUnit->mCurrentLayer == LAYER_Water) {
       const std::uint8_t masked = static_cast<std::uint8_t>(occupancyCaps) &
         ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
       occupancyCaps = static_cast<EOccupancyCaps>(masked);
