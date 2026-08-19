@@ -435,9 +435,8 @@ namespace moho
    */
   CUnitGuardTask::CUnitGuardTask()
     : CCommandTask()
-    , mUnknown0030(0)
-    , mCommandEventListenerVftable(0)
-    , mCommandEventListenerLink{}
+    , CUnitGuardTaskReservedSlot()
+    , Listener<ECommandEvent>()
     , mCommandTask(nullptr)
     , mPrimaryCommandRef{}
     , mCommandRef{}
@@ -520,9 +519,8 @@ namespace moho
    */
   CUnitGuardTask::CUnitGuardTask(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
     : CCommandTask(dispatch)
-    , mUnknown0030(0)
-    , mCommandEventListenerVftable(0)
-    , mCommandEventListenerLink{}
+    , CUnitGuardTaskReservedSlot()
+    , Listener<ECommandEvent>()
     , mCommandTask(dispatch)
     , mPrimaryCommandRef{}
     , mCommandRef{}
@@ -540,7 +538,7 @@ namespace moho
     , mGuardMoveAnchorPosition(Wm3::Vector3f::Zero())
     , mGuardGoal{}
   {
-    mCommandEventListenerLink.ListResetLinks();
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
     // Copy the guard target payload, link-inserting the target entity into its
     // owner chain (matches the binary's field-by-field target copy).
@@ -575,7 +573,7 @@ namespace moho
     if (CUnitCommand* const linkedCommand = mCommandRef.GetObjectPtr(); linkedCommand != nullptr) {
       if (Broadcaster* const commandListenerHead = CommandEventListenerHead(linkedCommand);
           commandListenerHead != nullptr) {
-        mCommandEventListenerLink.ListLinkBefore(commandListenerHead);
+        Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
       }
     }
 
@@ -697,7 +695,7 @@ namespace moho
     // listener from that command's broadcaster chain. The compiler inlines
     // both the unlink-from-ring and the self-link-reset.
     if (mCommandRef.GetObjectPtr() != nullptr) {
-      mCommandEventListenerLink.ListUnlink();
+      Listener<ECommandEvent>::mListenerLink.ListUnlink();
     }
 
     if (Unit* const unit = mUnit; unit != nullptr) {
@@ -741,7 +739,7 @@ namespace moho
     // Embedded Listener<ECommandEvent> sub-object teardown: detach the
     // listener-link from whatever ring it sits in (typically already
     // self-linked after the conditional unlink above) and reset to singleton.
-    mCommandEventListenerLink.ListUnlink();
+    Listener<ECommandEvent>::mListenerLink.ListUnlink();
   }
 
   /**
@@ -792,13 +790,12 @@ namespace moho
   }
 
   /**
-   * Address: 0x006147B0 (FUN_006147B0)
+   * Address: 0x006147B0 (FUN_006147B0, Moho::CUnitGuardTask::OnEvent)
    *
    * What it does:
-   * Handles command-listener refresh flow by copying the linked command target
-   * payload into this task and refreshing guarded-unit lanes.
+   * See the header declaration for the full behavior summary.
    */
-  void CUnitGuardTask::OnLinkedCommandTargetChanged()
+  void CUnitGuardTask::OnEvent(const ECommandEvent /*event*/)
   {
     CUnitCommand* const linkedCommand = mCommandRef.GetObjectPtr();
     if (linkedCommand == nullptr) {
