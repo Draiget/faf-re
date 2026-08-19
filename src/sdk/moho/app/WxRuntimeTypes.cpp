@@ -64976,16 +64976,11 @@ void moho::WRenViewport::ReleaseDeviceResources(const bool fullShutdown)
     //          0x0080A08F sTerrainWaterSurface                 @0x010BF730
     //          0x0080A0A7 sTerrainGridTexture                  @0x010BF70C
     //
-    // Every one of those objects is already modelled - the names above are the
-    // recovered ones - but ten of the thirteen have internal linkage (the
-    // anonymous namespaces at the head of HighFidelityTerrain.cpp and
-    // MediumFidelityTerrain.cpp), so the call cannot be expressed from this
-    // file. Landing it means adding a `static void ReleaseSharedResources()`
-    // to each of the three terrain classes and calling the three from here.
-    //
-    // It stays shutdown-only bookkeeping in the meantime: it runs on the
-    // `fullShutdown` path as the process exits and has no bearing on the
-    // device-rebind path below, so its absence does not affect a reset.
+    // Ten of the thirteen have internal linkage (the anonymous namespaces at
+    // the head of HighFidelityTerrain.cpp and MediumFidelityTerrain.cpp), so
+    // each group is released by a named helper in its own translation unit and
+    // REN_ReleaseTerrainSharedResources walks the three in the binary's order.
+    moho::REN_ReleaseTerrainSharedResources();
   } else {
     meshRenderer->Reset();
   }

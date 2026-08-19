@@ -27,6 +27,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/MediumFidelityTerrain.h"
+#include "moho/terrain/HighFidelityTerrain.h"
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/splat/CWldSplat.h"
@@ -196,6 +197,41 @@ namespace moho
   boost::shared_ptr<RD3DTextureResource> sTerrainGridTexture;
   WaterSurface* sTerrainWaterSurface = nullptr;
   CD3DTextureBatcher* texture_batcher = nullptr;
+
+  /**
+   * Part of 0x00809E80 (the device-teardown sweep).
+   *
+   * Binary order at 0x0080A050..0x0080A0E0: batcher (0x010C0AB8) deleted, water
+   * surface (0x010BF730) through its scalar deleting destructor, then the grid
+   * texture (0x010BF70C / count 0x010BF710) dropped. This lane owns one shared
+   * texture where the other two fidelities own three.
+   */
+  void ReleaseLowFidelityTerrainSharedResources() noexcept
+  {
+    DeleteOwned(texture_batcher);
+    DeleteOwned(sTerrainWaterSurface);
+    sTerrainGridTexture.reset();
+  }
+
+  /**
+   * Address: 0x00809E80 (FUN_00809E80, sub_809E80)
+   *
+   * IDA signature:
+   * void sub_809E80();
+   *
+   * What it does:
+   * Drops every process-wide terrain resource when the D3D device goes away,
+   * high fidelity first, then medium, then low - the order the binary walks
+   * them in. Each group is a named helper in its own translation unit because
+   * the statics it releases are private there; the binary has them all inlined
+   * into this one function.
+   */
+  void REN_ReleaseTerrainSharedResources() noexcept
+  {
+    ReleaseHighFidelityTerrainSharedResources();
+    ReleaseMediumFidelityTerrainSharedResources();
+    ReleaseLowFidelityTerrainSharedResources();
+  }
 
   /**
    * Address: 0x00807FC0 (??0LowFidelityTerrain@Moho@@QAE@@Z)

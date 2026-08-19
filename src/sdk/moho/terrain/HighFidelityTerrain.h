@@ -384,4 +384,15 @@ namespace moho
     "HighFidelityTerrain::mTerrainTransform offset must be 0x475C8"
   );
   static_assert(sizeof(HighFidelityTerrain) == 0x475E8, "HighFidelityTerrain size must be 0x475E8");
+
+  /**
+   * Releases the high-fidelity terrain's process-wide shared resources: the
+   * texture batcher, the water surface, and the noise-fill / cubic-blend /
+   * grid textures.
+   *
+   * The binary inlines this into the device-teardown sweep at 0x00809E80; it is
+   * a named helper here because those statics are private to
+   * HighFidelityTerrain.cpp. See REN_ReleaseTerrainSharedResources.
+   */
+  void ReleaseHighFidelityTerrainSharedResources() noexcept;
 } // namespace moho
