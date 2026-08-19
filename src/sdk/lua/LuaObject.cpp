@@ -845,7 +845,7 @@ namespace
 	);
 #endif
 
-	[[maybe_unused]] Table* LuaDebugGetSizesTable(lua_State* const state);
+	Table* LuaDebugGetSizesTable(lua_State* const state);
 }
 
 struct FuncState;
@@ -1757,7 +1757,7 @@ extern "C"
 	 * (`upvalue_m1[n]`) or Lua closures (`upvals[n-1]` + `proto->upvalues[n-1]`)
 	 * and returns null on type/index mismatch.
 	 */
-	[[maybe_unused]] const char* aux_upvalue(
+	const char* aux_upvalue(
 		lua_State* const state,
 		const int functionIndex,
 		TObject** const outValueSlot,
@@ -1862,7 +1862,7 @@ extern "C"
 	 * Formats one Lua type-mismatch message (`"%s expected, got %s"`) and raises
 	 * argument error for the offending stack index.
 	 */
-	[[maybe_unused]] static int tag_error(const int expectedTag, const int argumentIndex, lua_State* const state)
+	static int tag_error(const int expectedTag, const int argumentIndex, lua_State* const state)
 	{
 		const char* const expectedName = lua_typename(state, expectedTag);
 		const int gotTag = lua_type(state, argumentIndex);
@@ -2391,7 +2391,7 @@ extern "C"
 	 * Copies one Lua string value (including trailing `\0`) from stack index
 	 * `idx` into caller-provided destination storage.
 	 */
-	[[maybe_unused]] char* lua_copystring_to_buffer(lua_State* const state, const int idx, void* const destination)
+	char* lua_copystring_to_buffer(lua_State* const state, const int idx, void* const destination)
 	{
 		char* const source = const_cast<char*>(lua_tostring(state, idx));
 		const size_t length = lua_strlen(state, idx);
@@ -2539,7 +2539,7 @@ extern "C"
 	 * Interns one C-string, writes that tagged string object into caller-chosen
 	 * stack slot `slot`, and moves `L->top` to one-past that slot.
 	 */
-	[[maybe_unused]] TString* PushLuaStringAtStackSlot(
+	TString* PushLuaStringAtStackSlot(
 		lua_State* const L,
 		TObject* const slot,
 		const char* const source
@@ -2559,7 +2559,7 @@ extern "C"
 	 * Interns one Lua string, writes the tagged string object into the current
 	 * stack slot, and grows the stack if only one slot of headroom remains.
 	 */
-	[[maybe_unused]] TString* pushstr(lua_State* const state, const char* const source)
+	TString* pushstr(lua_State* const state, const char* const source)
 	{
 		TObject* const top = state->top;
 		TString* const stringObject = luaS_newlstr(state, source, std::strlen(source));
@@ -4800,7 +4800,7 @@ namespace
 	 * by subtracting `MAXSTACK`; returns `"?"` when slot is out of range or not
 	 * a Lua string constant.
 	 */
-	[[maybe_unused]] const char* kname(const int stackSlotIndex, const Proto* const proto)
+	const char* kname(const int stackSlotIndex, const Proto* const proto)
 	{
 		constexpr int kLuaParserMaxStackSlots = 0xFA;
 		constexpr const char* kUnknownName = "?";
@@ -4825,7 +4825,7 @@ namespace
 	 * Scans the global table hash nodes for a value equal to `object` and
 	 * returns the associated string-key name when found.
 	 */
-	[[maybe_unused]] const char* travglobals(lua_State* const state, const TObject* const object)
+	const char* travglobals(lua_State* const state, const TObject* const object)
 	{
 		auto* const globalsTable = static_cast<Table*>(state->_gt.value.p);
 		int remaining = 1 << globalsTable->lsizenode;
@@ -4854,7 +4854,7 @@ namespace
 	 * symbolic execution (`OP_CALL`..`OP_RETURN` with open-result flag cleared,
 	 * or `OP_SETLIST`).
 	 */
-	[[maybe_unused]] bool checkopenop(const Proto* const proto, const int pc)
+	bool checkopenop(const Proto* const proto, const int pc)
 	{
 		constexpr unsigned int kLuaOpcodeMask = 0x3Fu;
 		constexpr unsigned int kLuaOpenOperandMask = 0x00FF8000u;
@@ -4885,7 +4885,7 @@ namespace
 	 * into Lua bytecode; returns `-1` for non-Lua frames and `0` when lineinfo
 	 * is absent.
 	 */
-	[[maybe_unused]] int currentline(CallInfo* const ci)
+	int currentline(CallInfo* const ci)
 	{
 		constexpr int kCiSavedPc = 3;
 		if (ci->state >= kCiSavedPc) {
@@ -4913,7 +4913,7 @@ namespace
 	 * Validates one RK operand lane against either register space
 	 * (`< maxstacksize`) or constant-table space (`MAXSTACK + k`).
 	 */
-	[[maybe_unused]] bool checkRK(const int rkIndex, const Proto* const proto)
+	bool checkRK(const int rkIndex, const Proto* const proto)
 	{
 		constexpr int kLuaParserMaxStackSlots = 0xFA;
 		return rkIndex < static_cast<int>(proto->maxstacksize)
@@ -4928,7 +4928,7 @@ namespace
 	 * Resolves callee object-name metadata for call/tailcall opcodes in the
 	 * previous Lua frame and returns the object-class string from `getobjname`.
 	 */
-	[[maybe_unused]] const char* getfuncname(const char** const nameOut, CallInfo* const ci)
+	const char* getfuncname(const char** const nameOut, CallInfo* const ci)
 	{
 		constexpr int kCiSavedPc = 3;
 		constexpr int kOpCall = 29;
@@ -5271,7 +5271,7 @@ namespace
 	 * Prefixes one Lua error message with `chunk(line): ` when the active call
 	 * frame is a Lua function and returns the formatted string lane.
 	 */
-	[[maybe_unused]] const char* addinfo(lua_State* const state, const char* const msg)
+	const char* addinfo(lua_State* const state, const char* const msg)
 	{
 		char buff[60]{};
 		CallInfo* const ci = state->ci;
@@ -5325,7 +5325,7 @@ namespace
 	 * Selects the non-string operand lane from two concat candidates and raises
 	 * `luaG_typeerror(..., "concatenate")`.
 	 */
-	[[maybe_unused]] [[noreturn]] void luaV_concat_raise_typeerror(
+	[[noreturn]] void luaV_concat_raise_typeerror(
 		lua_State* const state,
 		TObject* const leftCandidate,
 		TObject* const rightCandidate
@@ -5347,7 +5347,7 @@ namespace
 	 * Selects the non-numeric arithmetic operand (when present) and raises
 	 * `luaG_typeerror(..., "perform arithmetic on")`.
 	 */
-	[[maybe_unused]] [[noreturn]] void luaG_aritherror(
+	[[noreturn]] void luaG_aritherror(
 		lua_State* const state,
 		TObject* const leftOperand,
 		TObject* const rightOperand
@@ -5369,7 +5369,7 @@ namespace
 	 * Doubles call-info capacity and raises runtime overflow errors for
 	 * recursive error handling and post-growth stack-limit overrun.
 	 */
-	[[maybe_unused]] void luaD_growCI(lua_State* const state)
+	void luaD_growCI(lua_State* const state)
 	{
 		const std::uint16_t currentFrameCapacity = state->size_ci;
 		if (currentFrameCapacity > kLuaMaxCallInfoFrames) {
@@ -5492,7 +5492,7 @@ namespace
 	 * Resolves one comparison metamethod from both metatables and returns it
 	 * only when both sides expose the same metamethod function.
 	 */
-	[[maybe_unused]] const TObject* get_compTM(
+	const TObject* get_compTM(
 		Table* const leftMetatable,
 		const int event,
 		lua_State* const state,
@@ -5613,7 +5613,7 @@ namespace
 	 * Resolves order metamethod on both operands, executes one shared metamethod
 	 * call when both sides match, and returns Lua-truthiness of result.
 	 */
-	[[maybe_unused]] int call_orderTM(
+	int call_orderTM(
 		lua_State* const state,
 		const TObject* const leftOperand,
 		const TObject* const rightOperand,
@@ -5642,7 +5642,7 @@ namespace
 	 * Pads missing fixed args with nil, collects extra args into one vararg
 	 * table (`1..n` plus string key `"n"`), and pushes that table.
 	 */
-	[[maybe_unused]] void adjust_varargs(lua_State* const state, int fixedArgCount, StkId base)
+	void adjust_varargs(lua_State* const state, int fixedArgCount, StkId base)
 	{
 		int actualArgCount = static_cast<int>(state->top - base);
 		if (actualArgCount < fixedArgCount) {
@@ -5939,7 +5939,7 @@ namespace
 	 * missing, attempts wrapped close, and pushes Lua `(true)` or
 	 * `(nil, strerror(errno), errno-number)` result lanes.
 	 */
-	[[maybe_unused]] int LuaIoClose(lua_State* const state)
+	int LuaIoClose(lua_State* const state)
 	{
 		if (lua_type(state, 1) == LUA_TNONE && lua_type(state, kLuaIoUpvalueEnvIndex) == LUA_TTABLE) {
 			lua_pushstring(state, "_output");
@@ -5966,7 +5966,7 @@ namespace
 	 * for null stream lane and returning standard io-library `(true)` or
 	 * `(nil, strerror(errno), errno-number)` result tuples.
 	 */
-	[[maybe_unused]] int LuaFileFlush(lua_State* const state)
+	int LuaFileFlush(lua_State* const state)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
@@ -5995,7 +5995,7 @@ namespace
 	 * Expands one wildcard expression through CRT find-first/find-next and
 	 * returns one Lua table of 1-based filename entries.
 	 */
-	[[maybe_unused]] int LuaIoDir(lua_State* const state)
+	int LuaIoDir(lua_State* const state)
 	{
 		const char* const wildcard = lua_tostring(state, 1);
 		lua_newtable(state);
@@ -6031,7 +6031,7 @@ namespace
 	 * Reads one floating-point value from `FILE*` and pushes it as Lua number;
 	 * returns zero on scan failure.
 	 */
-	[[maybe_unused]] int ReadNumberFromFile(std::FILE* const stream, lua_State* const state)
+	int ReadNumberFromFile(std::FILE* const stream, lua_State* const state)
 	{
 		double value = 0.0;
 		if (std::fscanf(stream, "%lf", &value) != 1) {
@@ -6049,7 +6049,7 @@ namespace
 	 * Reads up to `count` bytes from `FILE*` into one Lua buffer string and
 	 * returns success when full count was read or at least one byte was pushed.
 	 */
-	[[maybe_unused]] bool ReadCharsFromFile(std::size_t count, std::FILE* const stream, lua_State* const state)
+	bool ReadCharsFromFile(std::size_t count, std::FILE* const stream, lua_State* const state)
 	{
 		luaL_Buffer buffer{};
 		luaL_buffinit(state, &buffer);
@@ -6078,7 +6078,7 @@ namespace
 	 * Implements Lua IO read options (`number`, `*l`, `*n`, `*a`) over one
 	 * wrapped `FILE*`, preserving nil-on-failure stack/result semantics.
 	 */
-	[[maybe_unused]] int LuaReadFromFile(
+	int LuaReadFromFile(
 		std::FILE* const stream,
 		lua_State* const state,
 		const int firstArgumentIndex
@@ -6192,7 +6192,7 @@ namespace
 	 * EOF depending on the boolean close-flag upvalue, and returns Lua iterator
 	 * success status (`1` for value pushed, `0` for EOF).
 	 */
-	[[maybe_unused]] int LuaIoReadline(lua_State* const state)
+	int LuaIoReadline(lua_State* const state)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, kLuaIoReadlineFileUpvalueIndex);
@@ -6227,7 +6227,7 @@ namespace
 	 * Creates one line-iterator closure for a wrapped file handle with
 	 * upvalues `{FILE* metatable, file userdata, closeOnEof=false}`.
 	 */
-	[[maybe_unused]] int LuaAuxLines(lua_State* const state)
+	int LuaAuxLines(lua_State* const state)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
@@ -6270,7 +6270,7 @@ namespace
 	 * Destroys one heap-allocated WrapFile storage lane, conditionally closing
 	 * the stream when close-enabled, then frees the payload block.
 	 */
-	[[maybe_unused]] void DestroyWrapFileStorage(WrapFileRuntimeView* const wrapFile)
+	void DestroyWrapFileStorage(WrapFileRuntimeView* const wrapFile)
 	{
 		if (wrapFile == nullptr) {
 			return;
@@ -6291,7 +6291,7 @@ namespace
 	 * Performs WrapFile close-on-destruct semantics in-place and clears the
 	 * stream lane, returning the raw x86 `EAX` result payload.
 	 */
-	[[maybe_unused]] std::intptr_t FinalizeWrapFileStorage(WrapFileRuntimeView* const wrapFile)
+	std::intptr_t FinalizeWrapFileStorage(WrapFileRuntimeView* const wrapFile)
 	{
 		std::intptr_t result = reinterpret_cast<std::intptr_t>(wrapFile->stream);
 		if (wrapFile->stream != nullptr && wrapFile->closeEnabled != 0u) {
@@ -6309,7 +6309,7 @@ namespace
 	 * Allocates one heap WrapFile storage payload and returns it as reflected
 	 * `gpg::RRef` with close-enabled default state.
 	 */
-	[[maybe_unused]] gpg::RRef* NewWrapFileStorageRef(gpg::RRef* const out)
+	gpg::RRef* NewWrapFileStorageRef(gpg::RRef* const out)
 	{
 		auto* const wrapFile = static_cast<WrapFileRuntimeView*>(::operator new(sizeof(WrapFileRuntimeView), std::nothrow));
 		if (wrapFile != nullptr) {
@@ -6327,7 +6327,7 @@ namespace
 	 * Initializes caller-owned WrapFile storage and returns the reflected
 	 * `gpg::RRef` view of that payload.
 	 */
-	[[maybe_unused]] gpg::RRef* ConstructWrapFileStorageRef(
+	gpg::RRef* ConstructWrapFileStorageRef(
 		gpg::RRef* const out,
 		WrapFileRuntimeView* const wrapFile
 	)
@@ -6382,7 +6382,7 @@ namespace
 	 * Tears down one `WrapFileTypeInfo` descriptor via `gpg::RType` base
 	 * teardown and conditionally frees storage when `deleteFlag & 1`.
 	 */
-	[[maybe_unused]] gpg::RType* DestroyWrapFileTypeInfoDeleting(
+	gpg::RType* DestroyWrapFileTypeInfoDeleting(
 		WrapFileTypeInfo* const typeInfo,
 		const unsigned char deleteFlag
 	)
@@ -6401,7 +6401,7 @@ namespace
 	 * Tears down one `TObjectTypeInfo` descriptor via `gpg::RType` base teardown
 	 * and conditionally frees storage when `deleteFlag & 1`.
 	 */
-	[[maybe_unused]] gpg::RType* DestroyTObjectTypeInfoDeleting(
+	gpg::RType* DestroyTObjectTypeInfoDeleting(
 		TObjectTypeInfo* const typeInfo,
 		const unsigned char deleteFlag
 	)
@@ -6501,7 +6501,7 @@ namespace
 	 * Binds WrapFile cleanup callbacks (`delete`, `destruct`) onto one
 	 * reflection type descriptor lane.
 	 */
-	[[maybe_unused]] gpg::RType* ConfigureWrapFileCleanupCallbacks(gpg::RType* const type)
+	gpg::RType* ConfigureWrapFileCleanupCallbacks(gpg::RType* const type)
 	{
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
 		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
@@ -6515,7 +6515,7 @@ namespace
 	 * Binds WrapFile `new-ref` and `construct-ref` callbacks onto one
 	 * reflection type descriptor lane.
 	 */
-	[[maybe_unused]] gpg::RType* ConfigureWrapFileRefCallbacks(gpg::RType* const type)
+	gpg::RType* ConfigureWrapFileRefCallbacks(gpg::RType* const type)
 	{
 		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
 		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
@@ -6529,7 +6529,7 @@ namespace
 	 * Binds full WrapFile callback suite (`new/construct/delete/destruct`) onto
 	 * one reflection type descriptor lane.
 	 */
-	[[maybe_unused]] gpg::RType* ConfigureWrapFileAllCallbacks(gpg::RType* const type)
+	gpg::RType* ConfigureWrapFileAllCallbacks(gpg::RType* const type)
 	{
 		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
 		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
@@ -6545,7 +6545,7 @@ namespace
 	 * Binds the full WrapFile callback suite directly onto one reflection type
 	 * descriptor lane without returning the descriptor.
 	 */
-	[[maybe_unused]] void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
+	void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
 	{
 		type->newRefFunc_ = reinterpret_cast<gpg::RType::new_ref_func_t>(&NewWrapFileStorageRef);
 		type->ctorRefFunc_ = reinterpret_cast<gpg::RType::ctor_ref_func_t>(&ConstructWrapFileStorageRef);
@@ -6564,7 +6564,7 @@ namespace
 	 * derived-type cache branch is dead and the effective behavior is the
 	 * direct field assignment below).
 	 */
-	[[maybe_unused]] gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFileRuntimeView* const wrapFile)
+	gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFileRuntimeView* const wrapFile)
 	{
 		out->mObj = wrapFile;
 		out->mType = CachedType<WrapFile>(gWrapFileType);
@@ -6604,7 +6604,7 @@ namespace
 	 * What it does:
 	 * Validates that one userdata stack lane resolves to a WrapFile payload.
 	 */
-	[[maybe_unused]] void ValidateWrapFileUserdataAt(lua_State* const state, const int index)
+	void ValidateWrapFileUserdataAt(lua_State* const state, const int index)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, index);
@@ -6618,7 +6618,7 @@ namespace
 	 * Resolves one wrapped file userdata and returns `FILE*`, raising Lua's
 	 * closed-file error when stream lane is null.
 	 */
-	[[maybe_unused]] std::FILE* ToFile(lua_State* const state, const int index)
+	std::FILE* ToFile(lua_State* const state, const int index)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, index);
@@ -6637,7 +6637,7 @@ namespace
 	 * Looks up global io handle by key (`_input`/`_output`) and returns wrapped
 	 * `FILE*`, raising Lua closed-file error when stream lane is null.
 	 */
-	[[maybe_unused]] std::FILE* GetIoFileFromGlobal(lua_State* const state, const char* const globalKey)
+	std::FILE* GetIoFileFromGlobal(lua_State* const state, const char* const globalKey)
 	{
 		lua_pushstring(state, globalKey);
 		lua_rawget(state, LUA_GLOBALSINDEX);
@@ -6659,7 +6659,7 @@ namespace
 	 * Creates one temporary `FILE*` wrapped userdata and returns either the
 	 * handle or standard Lua io `(nil, strerror(errno), errno)` error tuple.
 	 */
-	[[maybe_unused]] int LuaIoTmpFile(lua_State* const state)
+	int LuaIoTmpFile(lua_State* const state)
 	{
 		WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
 		wrapFile->stream = std::tmpfile();
@@ -6681,7 +6681,7 @@ namespace
 	 * Converts the first two numeric arguments to a time span and pushes the
 	 * `difftime` result as one Lua number.
 	 */
-	[[maybe_unused]] int io_difftime(lua_State* const state)
+	int io_difftime(lua_State* const state)
 	{
 		const std::time_t right = static_cast<std::time_t>(luaL_optnumber(state, 2, 0.0f));
 		const std::time_t left = static_cast<std::time_t>(luaL_checknumber(state, 1));
@@ -6715,7 +6715,7 @@ namespace
 	 * Applies/query one locale category from optional arg-2 selector and pushes
 	 * the CRT `setlocale` result string.
 	 */
-	[[maybe_unused]] int io_setloc(lua_State* const state)
+	int io_setloc(lua_State* const state)
 	{
 		const char* const locale = lua_tostring(state, 1);
 		const char* const categoryName = luaL_optlstring(state, 2, "all", nullptr);
@@ -6742,7 +6742,7 @@ namespace
 	 * Formats one wrapped file userdata lane as `file (%p)` when open, or
 	 * `file (closed)` when the underlying stream lane is null.
 	 */
-	[[maybe_unused]] int LuaIoToString(lua_State* const state)
+	int LuaIoToString(lua_State* const state)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
@@ -6798,7 +6798,7 @@ namespace
 	 * Opens one file path with optional mode and returns either wrapped file
 	 * userdata or the standard Lua io error tuple.
 	 */
-	[[maybe_unused]] int LuaIoOpen(lua_State* const state)
+	int LuaIoOpen(lua_State* const state)
 	{
 		const char* const filePath = luaL_checklstring(state, 1, nullptr);
 		const char* const mode = luaL_optlstring(state, 2, "r", nullptr);
@@ -6819,7 +6819,7 @@ namespace
 	 * Opens one process pipe with optional mode and returns either wrapped file
 	 * userdata or the standard Lua io error tuple.
 	 */
-	[[maybe_unused]] int LuaIoPopen(lua_State* const state)
+	int LuaIoPopen(lua_State* const state)
 	{
 		const char* const command = luaL_checklstring(state, 1, nullptr);
 		const char* const mode = luaL_optlstring(state, 2, "r", nullptr);
@@ -6840,7 +6840,7 @@ namespace
 	 * Executes one shell command from arg-1 and returns process exit code as a
 	 * single Lua numeric result.
 	 */
-	[[maybe_unused]] int io_execute(lua_State* const state)
+	int io_execute(lua_State* const state)
 	{
 		const char* const command = luaL_checklstring(state, 1, nullptr);
 		const int resultCode = std::system(command);
@@ -6855,7 +6855,7 @@ namespace
 	 * Removes one filesystem path from Lua arg-1 and returns standard
 	 * io-library success/error tuple via `pushresult`.
 	 */
-	[[maybe_unused]] int io_remove(lua_State* const state)
+	int io_remove(lua_State* const state)
 	{
 		const char* const path = luaL_checklstring(state, 1, nullptr);
 		const int removeResult = std::remove(path);
@@ -6869,7 +6869,7 @@ namespace
 	 * Renames one filesystem path pair from Lua args 1/2 and returns standard
 	 * io-library success/error tuple via `pushresult`.
 	 */
-	[[maybe_unused]] int io_rename(lua_State* const state)
+	int io_rename(lua_State* const state)
 	{
 		const char* const sourcePath = luaL_checklstring(state, 1, nullptr);
 		const char* const destinationPath = luaL_checklstring(state, 2, nullptr);
@@ -6884,7 +6884,7 @@ namespace
 	 * Produces one temporary filename string through `tmpnam`; raises Lua error
 	 * when the CRT cannot provide a unique path.
 	 */
-	[[maybe_unused]] int io_tmpname(lua_State* const state)
+	int io_tmpname(lua_State* const state)
 	{
 		char tempName[16]{};
 		if (std::tmpnam(tempName) != tempName) {
@@ -6902,7 +6902,7 @@ namespace
 	 * Reads one environment-variable name from arg-1, pushes its value as Lua
 	 * string (or nil when not found), and returns one result.
 	 */
-	[[maybe_unused]] int io_getenv(lua_State* const state)
+	int io_getenv(lua_State* const state)
 	{
 		const char* const variableName = luaL_checklstring(state, 1, nullptr);
 		const char* const variableValue = std::getenv(variableName);
@@ -6916,7 +6916,7 @@ namespace
 	 * What it does:
 	 * Samples CRT `clock()` ticks and returns elapsed seconds as one Lua number.
 	 */
-	[[maybe_unused]] int io_clock(lua_State* const state)
+	int io_clock(lua_State* const state)
 	{
 		const int tickCount = std::clock();
 		lua_pushnumber(state, static_cast<lua_Number>(static_cast<float>(tickCount) * 0.001f));
@@ -6930,7 +6930,7 @@ namespace
 	 * Reads one optional numeric exit code from arg-1 (default zero), converts
 	 * it to process exit status, and terminates the host process.
 	 */
-	[[maybe_unused]] [[noreturn]] int io_exit(lua_State* const state)
+	[[noreturn]] int io_exit(lua_State* const state)
 	{
 		const int exitCode = static_cast<int>(luaL_optnumber(state, 1, 0.0f));
 		std::exit(exitCode);
@@ -6943,7 +6943,7 @@ namespace
 	 * Writes Lua string/number arguments to one `FILE*` lane and returns
 	 * standard io-library success or `(nil, strerror(errno), errno)` tuple.
 	 */
-	[[maybe_unused]] int LuaWriteToFile(
+	int LuaWriteToFile(
 		int firstArgumentIndex,
 		lua_State* const state,
 		std::FILE* const stream
@@ -6995,7 +6995,7 @@ namespace
 	 * Updates global io default handle (`_input`/`_output`) from path-or-file
 	 * arg-1 and returns the resolved current default handle.
 	 */
-	[[maybe_unused]] int LuaIoFile(lua_State* const state, const char* const globalKey, const char* const mode)
+	int LuaIoFile(lua_State* const state, const char* const globalKey, const char* const mode)
 	{
 		if (lua_type(state, 1) > LUA_TNONE) {
 			const char* const argument = lua_tostring(state, 1);
@@ -7028,7 +7028,7 @@ namespace
 	 * What it does:
 	 * Gets/sets Lua io default `_input` handle lane via `g_iofile`.
 	 */
-	[[maybe_unused]] int LuaIoInput(lua_State* const state)
+	int LuaIoInput(lua_State* const state)
 	{
 		return LuaIoFile(state, "_input", "r");
 	}
@@ -7039,7 +7039,7 @@ namespace
 	 * What it does:
 	 * Gets/sets Lua io default `_output` handle lane via `g_iofile`.
 	 */
-	[[maybe_unused]] int LuaIoOutput(lua_State* const state)
+	int LuaIoOutput(lua_State* const state)
 	{
 		return LuaIoFile(state, "_output", "w");
 	}
@@ -7050,7 +7050,7 @@ namespace
 	 * What it does:
 	 * Reads from global `_input` file handle using Lua io option semantics.
 	 */
-	[[maybe_unused]] int LuaIoRead(lua_State* const state)
+	int LuaIoRead(lua_State* const state)
 	{
 		std::FILE* const stream = GetIoFileFromGlobal(state, "_input");
 		return LuaReadFromFile(stream, state, 1);
@@ -7062,7 +7062,7 @@ namespace
 	 * What it does:
 	 * Reads from userdata-bound file handle using Lua io option semantics.
 	 */
-	[[maybe_unused]] int LuaFileRead(lua_State* const state)
+	int LuaFileRead(lua_State* const state)
 	{
 		return LuaReadFromFile(ToFile(state, 1), state, 2);
 	}
@@ -7095,7 +7095,7 @@ namespace
 	 * made absolute. A time the C library will not break down comes back as
 	 * nil, and a result that will not fit 256 bytes raises.
 	 */
-	[[maybe_unused]] int LuaOsDate(lua_State* const state)
+	int LuaOsDate(lua_State* const state)
 	{
 		const char* format = luaL_optlstring(state, 1, "%c", nullptr);
 
@@ -7179,7 +7179,7 @@ namespace
 	 * less, and 1900 less - and isdst is read as a plain truth value. A time
 	 * mktime cannot represent comes back as nil rather than an error.
 	 */
-	[[maybe_unused]] int LuaOsTime(lua_State* const state)
+	int LuaOsTime(lua_State* const state)
 	{
 		__time64_t when = 0;
 
@@ -7229,7 +7229,7 @@ namespace
 	 * it iterates the file bound to the global `_input` instead, which is
 	 * the shared path with `file:lines()`.
 	 */
-	[[maybe_unused]] int LuaIoLines(lua_State* const state)
+	int LuaIoLines(lua_State* const state)
 	{
 		if (lua_type(state, 1) <= LUA_TNIL) {
 			lua_pushstring(state, "_input");
@@ -7267,7 +7267,7 @@ namespace
 	 * not. No path is named in the failure, so the message carries only the
 	 * CRT's own text.
 	 */
-	[[maybe_unused]] int LuaIoFlush(lua_State* const state)
+	int LuaIoFlush(lua_State* const state)
 	{
 		std::FILE* const stream = GetIoFileFromGlobal(state, "_output");
 		return pushresult(nullptr, state, std::fflush(stream) == 0);
@@ -7279,7 +7279,7 @@ namespace
 	 * What it does:
 	 * Writes Lua args to global `_output` file handle with io tuple semantics.
 	 */
-	[[maybe_unused]] int LuaIoWrite(lua_State* const state)
+	int LuaIoWrite(lua_State* const state)
 	{
 		std::FILE* const stream = GetIoFileFromGlobal(state, "_output");
 		return LuaWriteToFile(1, state, stream);
@@ -7291,7 +7291,7 @@ namespace
 	 * What it does:
 	 * Writes Lua args to userdata-bound file handle with io tuple semantics.
 	 */
-	[[maybe_unused]] int LuaFileWrite(lua_State* const state)
+	int LuaFileWrite(lua_State* const state)
 	{
 		return LuaWriteToFile(2, state, ToFile(state, 1));
 	}
@@ -7374,7 +7374,7 @@ namespace
 	 * stays addressable from this TU, mirroring how the binary's `liolib`
 	 * open path hands the array to `luaL_openlib`.
 	 */
-	[[maybe_unused]] [[nodiscard]] const luaL_reg* ResolveLuaFileMethodRegistrations() noexcept
+	[[nodiscard]] const luaL_reg* ResolveLuaFileMethodRegistrations() noexcept
 	{
 		return kLuaFileMethods;
 	}
@@ -8043,7 +8043,7 @@ namespace
 	 * Shrinks call-info and stack allocations when the live usage window is
 	 * sparse enough to satisfy the legacy Lua GC compaction thresholds.
 	 */
-	[[maybe_unused]] void ShrinkThreadRuntimeStacksIfSparse(
+	void ShrinkThreadRuntimeStacksIfSparse(
 		TObject* const liveStackLimit,
 		lua_State* const state
 	)
@@ -8481,7 +8481,7 @@ namespace
 	 * Resolves debug info for either stack level arg-1 or function arg-1 and
 	 * returns one table populated by requested option mask (`flnSu` by default).
 	 */
-	[[maybe_unused]] int LuaDebugGetInfo(lua_State* const state)
+	int LuaDebugGetInfo(lua_State* const state)
 	{
 		const char* optionMask = luaL_optlstring(state, 2, "flnSu", nullptr);
 		::lua_Debug activationRecord{};
@@ -8571,7 +8571,7 @@ namespace
 	 * Returns local variable name/value pair for stack level arg-1 and local
 	 * index arg-2; returns `nil` when local index is unavailable.
 	 */
-	[[maybe_unused]] int LuaDebugGetLocal(lua_State* const state)
+	int LuaDebugGetLocal(lua_State* const state)
 	{
 		const int level = static_cast<int>(luaL_checknumber(state, 1));
 		::lua_Debug activationRecord{};
@@ -8598,7 +8598,7 @@ namespace
 	 * Sets one local variable for stack level arg-1/local index arg-2 using
 	 * stack arg-3 and returns assigned local name (or nil).
 	 */
-	[[maybe_unused]] int LuaDebugSetLocal(lua_State* const state)
+	int LuaDebugSetLocal(lua_State* const state)
 	{
 		const int level = static_cast<int>(luaL_checknumber(state, 1));
 		::lua_Debug activationRecord{};
@@ -8619,7 +8619,7 @@ namespace
 	 * Returns upvalue name+value for function arg-1 and upvalue index arg-2;
 	 * returns 0 when index is out of range.
 	 */
-	[[maybe_unused]] int LuaDebugGetUpvalue(lua_State* const state)
+	int LuaDebugGetUpvalue(lua_State* const state)
 	{
 		const int upvalueIndex = static_cast<int>(luaL_checknumber(state, 2));
 		luaL_checktype(state, 1, LUA_TFUNCTION);
@@ -8641,7 +8641,7 @@ namespace
 	 * Writes function upvalue from stack arg-3 for function arg-1/index arg-2
 	 * and returns upvalue name when the write succeeds.
 	 */
-	[[maybe_unused]] int LuaDebugSetUpvalue(lua_State* const state)
+	int LuaDebugSetUpvalue(lua_State* const state)
 	{
 		luaL_checkany(state, 3);
 		const int upvalueIndex = static_cast<int>(luaL_checknumber(state, 2));
@@ -8664,7 +8664,7 @@ namespace
 	 * Dispatches one debug-hook event to the registry-stored `h` callback,
 	 * passing event-name + current line (`nil` when line < 0).
 	 */
-	[[maybe_unused]] void LuaDebugHookCallback(lua_State* const state, ::lua_Debug* const activationRecord)
+	void LuaDebugHookCallback(lua_State* const state, ::lua_Debug* const activationRecord)
 	{
 		lua_pushlightuserdata(state, const_cast<char*>(kLuaDebugHookRegistryKey));
 		lua_rawget(state, LUA_REGISTRYINDEX);
@@ -8691,7 +8691,7 @@ namespace
 	 * Parses textual hook mask (`c`,`r`,`l`) plus count gate and returns packed
 	 * Lua hook mask bits.
 	 */
-	[[maybe_unused]] int LuaDebugBuildHookMask(const char* const maskSpec, const int count)
+	int LuaDebugBuildHookMask(const char* const maskSpec, const int count)
 	{
 		int mask = (std::strchr(maskSpec, 'c') != nullptr) ? LUA_MASKCALL : 0;
 		if (std::strchr(maskSpec, 'r') != nullptr) {
@@ -8713,7 +8713,7 @@ namespace
 	 * Sets or clears the active debug hook based on arg-1 (`nil` clears),
 	 * then stores callback object in registry key `h`.
 	 */
-	[[maybe_unused]] int LuaDebugSetHook(lua_State* const state)
+	int LuaDebugSetHook(lua_State* const state)
 	{
 		if (lua_type(state, 1) > LUA_TNIL) {
 			const char* const maskSpec = luaL_checklstring(state, 2, nullptr);
@@ -8738,7 +8738,7 @@ namespace
 	 * Returns the current hook callback object (`h` or `"external hook"`),
 	 * active hook mask string, and hook count.
 	 */
-	[[maybe_unused]] int LuaDebugGetHook(lua_State* const state)
+	int LuaDebugGetHook(lua_State* const state)
 	{
 		const int mask = lua_gethookmask(state);
 		const auto hook = lua_gethook(state);
@@ -8775,7 +8775,7 @@ namespace
 	 * Runs one interactive debug REPL on stdin/stderr until EOF or `cont\\n`,
 	 * executing each entered line with `lua_dostring`.
 	 */
-	[[maybe_unused]] int LuaDebugConsole(lua_State* const state)
+	int LuaDebugConsole(lua_State* const state)
 	{
 		char inputBuffer[kLuaDebugInputBufferSize]{};
 
@@ -8810,7 +8810,7 @@ namespace
 	 * Populates one `lua_Debug` function-source lane from function object type:
 	 * C closure (`=[C]`) or Lua prototype-backed closure info.
 	 */
-	[[maybe_unused]] void LuaDebugPopulateFuncInfo(
+	void LuaDebugPopulateFuncInfo(
 		::lua_Debug* const activationRecord,
 		TObject* const functionObject
 	)
@@ -8923,7 +8923,7 @@ namespace
 	 * Formats one Lua bytecode instruction into a debug line with source line,
 	 * instruction index, opcode mnemonic, and decoded operand lane values.
 	 */
-	[[maybe_unused]] const char* LuaDebugBuildOpcodeText(
+	const char* LuaDebugBuildOpcodeText(
 		const Proto* const proto,
 		const int instructionIndex,
 		char* const outputBuffer
@@ -8977,7 +8977,7 @@ namespace
 	 * Builds one Lua table describing function bytecode: fixed fields
 	 * (`maxstack`, `numparams`) plus formatted per-instruction listing lines.
 	 */
-	[[maybe_unused]] int LuaDebugListCode(lua_State* const state)
+	int LuaDebugListCode(lua_State* const state)
 	{
 		if (lua_type(state, 1) != LUA_TFUNCTION) {
 			luaL_argerror(state, 1, "Lua function expected");
@@ -9013,7 +9013,7 @@ namespace
 	 * Returns one table containing function constant slots (`proto->k`) indexed
 	 * from 1..sizek for Lua function arg-1.
 	 */
-	[[maybe_unused]] int LuaDebugListConstants(lua_State* const state)
+	int LuaDebugListConstants(lua_State* const state)
 	{
 		if (lua_type(state, 1) != LUA_TFUNCTION) {
 			luaL_argerror(state, 1, "Lua function expected");
@@ -9038,7 +9038,7 @@ namespace
 	 * Pushes all local variable names visible at the requested pc lane (arg-2)
 	 * for function arg-1 and returns pushed name count.
 	 */
-	[[maybe_unused]] int LuaDebugListLocals(lua_State* const state)
+	int LuaDebugListLocals(lua_State* const state)
 	{
 		const int pc = static_cast<int>(luaL_checknumber(state, 2)) - 1;
 
@@ -9127,7 +9127,7 @@ namespace
 	 * Returns (and lazily initializes) the registry weak-key table at numeric
 	 * key `3` used by Lua debug allocation-size bookkeeping.
 	 */
-	[[maybe_unused]] Table* LuaDebugGetSizesTable(lua_State* const state)
+	Table* LuaDebugGetSizesTable(lua_State* const state)
 	{
 		Table* const registryTable = static_cast<Table*>(state->l_G->_registry.value.p);
 		TObject* const sizesSlot = luaH_setnum(state, registryTable, kLuaRegistryAllocationSizesKey);
@@ -9152,7 +9152,7 @@ namespace
 	 * Builds and returns a flat debug table with every tracked GC object from
 	 * root GC lists and interned-string buckets.
 	 */
-	[[maybe_unused]] int LuaDebugAllObjects(lua_State* const state)
+	int LuaDebugAllObjects(lua_State* const state)
 	{
 		lua_newtable(state);
 		auto* const outputTable = static_cast<Table*>((state->top - 1)->value.p);
@@ -9196,7 +9196,7 @@ namespace
 	 * Pushes the debug allocation-info table returned by `lua::getsizes` onto
 	 * the Lua stack as a raw internal `TObject`.
 	 */
-	[[maybe_unused]] int LuaDebugAllocInfo(lua_State* const state)
+	int LuaDebugAllocInfo(lua_State* const state)
 	{
 		lua_setgcthreshold(state, 0);
 		Table* const sizesTable = LuaDebugGetSizesTable(state);
@@ -9214,7 +9214,7 @@ namespace
 	 * What it does:
 	 * Toggles global allocation tracking gate from boolean arg-1.
 	 */
-	[[maybe_unused]] int LuaDebugTrackAllocations(lua_State* const state)
+	int LuaDebugTrackAllocations(lua_State* const state)
 	{
 		if (lua_type(state, 1) != LUA_TBOOLEAN) {
 			luaL_argerror(state, 1, "boolean expected");
@@ -9261,7 +9261,7 @@ namespace
 	 * Returns aligned byte size for one Lua `TObject` payload by exact runtime
 	 * type tag rules used by debug allocation helpers.
 	 */
-	[[maybe_unused]] std::size_t LuaDebugGetTObjectSize(const TObject* const object)
+	std::size_t LuaDebugGetTObjectSize(const TObject* const object)
 	{
 		if (object == nullptr) {
 			return 0;
@@ -9351,7 +9351,7 @@ namespace
 	 * Replaces each stack argument with a number containing its aligned object
 	 * allocation size and returns the converted argument count.
 	 */
-	[[maybe_unused]] int LuaDebugAllocatedSize(lua_State* const state)
+	int LuaDebugAllocatedSize(lua_State* const state)
 	{
 		const int argumentCount = lua_gettop(state);
 		for (int argumentIndex = 0; argumentIndex < argumentCount; ++argumentIndex) {
@@ -9397,7 +9397,7 @@ namespace
 	 * Builds a flat profile table for GC proto/C-closure nodes that carry
 	 * allocation counters, emitting per-node tuple lanes with total byte tally.
 	 */
-	[[maybe_unused]] int LuaDebugProfileData(lua_State* const state)
+	int LuaDebugProfileData(lua_State* const state)
 	{
 		lua_newtable(state);
 		auto* const outputTable = static_cast<Table*>((state->top - 1)->value.p);
@@ -9436,7 +9436,7 @@ namespace
 	 * is callable, otherwise prints the pending Lua error text to stderr and
 	 * drops helper/error stack lanes.
 	 */
-	[[maybe_unused]] void LuaCallAlert(lua_State* const state, const int status)
+	void LuaCallAlert(lua_State* const state, const int status)
 	{
 		if (status == 0) {
 			return;
@@ -9482,7 +9482,7 @@ namespace
 	 * Loads one source buffer as a Lua chunk, executes it when load succeeds,
 	 * then routes any error status through `callalert`.
 	 */
-	[[maybe_unused]] int lua_dobuffer(
+	int lua_dobuffer(
 		lua_State* const state,
 		const char* const buffer,
 		const int size,
@@ -9504,7 +9504,7 @@ namespace
 	 * What it does:
 	 * Executes one null-terminated source string by forwarding to `lua_dobuffer`.
 	 */
-	[[maybe_unused]] int lua_dostring(lua_State* const state, const char* const source)
+	int lua_dostring(lua_State* const state, const char* const source)
 	{
 		return lua_dobuffer(state, source, static_cast<int>(std::strlen(source)), source);
 	}
@@ -10933,7 +10933,7 @@ namespace
 	 * Bridges one Lua numeric value into `frexp` mantissa/exponent extraction
 	 * and returns the mantissa lane as `double`.
 	 */
-	[[maybe_unused]] double LuaFrexpMantissaBridgeA(const lua_Number value, int* const exponentOut)
+	double LuaFrexpMantissaBridgeA(const lua_Number value, int* const exponentOut)
 	{
 		if (exponentOut == nullptr) {
 			errno = EINVAL;
@@ -10949,7 +10949,7 @@ namespace
 	 * What it does:
 	 * Bridges one Lua numeric value plus exponent lane into `ldexp`.
 	 */
-	[[maybe_unused]] double LuaLdexpBridgeA(const lua_Number value, const int exponent)
+	double LuaLdexpBridgeA(const lua_Number value, const int exponent)
 	{
 		return std::ldexp(static_cast<double>(value), exponent);
 	}
@@ -10960,7 +10960,7 @@ namespace
 	 * What it does:
 	 * Secondary dispatch lane into the Lua `frexp` bridge helper.
 	 */
-	[[maybe_unused]] double LuaFrexpMantissaBridgeB(const lua_Number value, int* const exponentOut)
+	double LuaFrexpMantissaBridgeB(const lua_Number value, int* const exponentOut)
 	{
 		return LuaFrexpMantissaBridgeA(value, exponentOut);
 	}
@@ -10971,7 +10971,7 @@ namespace
 	 * What it does:
 	 * Secondary dispatch lane into the Lua `ldexp` bridge helper.
 	 */
-	[[maybe_unused]] double LuaLdexpBridgeB(const lua_Number value, const int exponent)
+	double LuaLdexpBridgeB(const lua_Number value, const int exponent)
 	{
 		return LuaLdexpBridgeA(value, exponent);
 	}
@@ -10983,7 +10983,7 @@ namespace
 	 * Promotes one Lua numeric value to `double`, applies `ceil`, and returns
 	 * the x87-compatible double-precision result lane.
 	 */
-	[[maybe_unused]] double LuaCeilBridge(const lua_Number value)
+	double LuaCeilBridge(const lua_Number value)
 	{
 		return std::ceil(static_cast<double>(value));
 	}
@@ -11453,7 +11453,7 @@ namespace
 	 * Raises a Lua error from arg-1 and optionally prefixes source/line
 	 * context using arg-2 stack level.
 	 */
-	[[maybe_unused]] int luaB_error(lua_State* const state)
+	int luaB_error(lua_State* const state)
 	{
 		const int level = static_cast<int>(luaL_optnumber(state, 2, 1.0f));
 		luaL_checkany(state, 1);
@@ -11550,7 +11550,7 @@ namespace
 	 * Returns arg-1 metatable when present; if protected `__metatable` exists,
 	 * returns that field instead.
 	 */
-	[[maybe_unused]] int luaB_getmetatable(lua_State* const state)
+	int luaB_getmetatable(lua_State* const state)
 	{
 		luaL_checkany(state, 1);
 		if (lua_getmetatable(state, 1) == 0) {
@@ -11562,7 +11562,7 @@ namespace
 		return 1;
 	}
 
-	[[maybe_unused]] void getfunc(lua_State* const state)
+	void getfunc(lua_State* const state)
 	{
 		if (lua_isfunction(state, 1) != 0) {
 			lua_pushvalue(state, 1);
@@ -11591,7 +11591,7 @@ namespace
 	 * Resolves target function (object or stack level), then returns its
 	 * effective environment (`__fenv` override when present).
 	 */
-	[[maybe_unused]] int luaB_getfenv(lua_State* const state)
+	int luaB_getfenv(lua_State* const state)
 	{
 		getfunc(state);
 		lua_getfenv(state, -1);
@@ -11610,7 +11610,7 @@ namespace
 	 * Requires two arguments, compares them with raw-equality semantics, and
 	 * pushes one boolean result.
 	 */
-	[[maybe_unused]] int luaB_rawequal(lua_State* const state)
+	int luaB_rawequal(lua_State* const state)
 	{
 		luaL_checkany(state, 1);
 		luaL_checkany(state, 2);
@@ -11625,7 +11625,7 @@ namespace
 	 * Requires table + key arguments, performs one raw table lookup, and
 	 * returns the retrieved value.
 	 */
-	[[maybe_unused]] int luaB_rawget(lua_State* const state)
+	int luaB_rawget(lua_State* const state)
 	{
 		luaL_checktype(state, 1, LUA_TTABLE);
 		luaL_checkany(state, 2);
@@ -11640,7 +11640,7 @@ namespace
 	 * Requires table/key/value arguments, performs one raw table write, and
 	 * returns the table lane.
 	 */
-	[[maybe_unused]] int luaB_rawset(lua_State* const state)
+	int luaB_rawset(lua_State* const state)
 	{
 		luaL_checktype(state, 1, LUA_TTABLE);
 		luaL_checkany(state, 2);
@@ -11655,7 +11655,7 @@ namespace
 	 * What it does:
 	 * Pushes current GC count and threshold as numeric values.
 	 */
-	[[maybe_unused]] int luaB_gcinfo(lua_State* const state)
+	int luaB_gcinfo(lua_State* const state)
 	{
 		lua_pushnumber(state, static_cast<lua_Number>(lua_getgccount(state)));
 		lua_pushnumber(state, static_cast<lua_Number>(lua_getgcthreshold(state)));
@@ -11668,7 +11668,7 @@ namespace
 	 * What it does:
 	 * Optionally sets GC threshold from arg-1 and returns no values.
 	 */
-	[[maybe_unused]] int luaB_collectgarbage(lua_State* const state)
+	int luaB_collectgarbage(lua_State* const state)
 	{
 		const lua_Number threshold = luaL_optnumber(state, 1, 0.0f);
 		lua_setgcthreshold(state, static_cast<int>(threshold));
@@ -11682,7 +11682,7 @@ namespace
 	 * Replaces arg-1 with the interned type-name string lane from
 	 * `global_State::typenames` and returns it.
 	 */
-	[[maybe_unused]] int luaB_type(lua_State* const state)
+	int luaB_type(lua_State* const state)
 	{
 		luaL_checkany(state, 1);
 
@@ -11701,7 +11701,7 @@ namespace
 	 * Iterates one table lane with `lua_next`; returns key/value pair when
 	 * available, otherwise pushes nil and returns one value.
 	 */
-	[[maybe_unused]] int luaB_next(lua_State* const state)
+	int luaB_next(lua_State* const state)
 	{
 		luaL_checktype(state, 1, LUA_TTABLE);
 		lua_settop(state, 2);
@@ -11720,7 +11720,7 @@ namespace
 	 * Returns the canonical Lua `pairs` iterator triple:
 	 * (`next`, table, nil).
 	 */
-	[[maybe_unused]] int luaB_pairs(lua_State* const state)
+	int luaB_pairs(lua_State* const state)
 	{
 		luaL_checktype(state, 1, LUA_TTABLE);
 		lua_pushlstring(state, "next", 4u);
@@ -11738,7 +11738,7 @@ namespace
 	 * (`ipairs`, table, 0), subsequent calls increment numeric index and fetch
 	 * array slot with `lua_rawgeti`.
 	 */
-	[[maybe_unused]] int luaB_ipairs(lua_State* const state)
+	int luaB_ipairs(lua_State* const state)
 	{
 		const float indexValue = lua_tonumber(state, 2);
 		luaL_checktype(state, 1, LUA_TTABLE);
@@ -11764,7 +11764,7 @@ namespace
 	 * Loads one Lua chunk from string input and returns either compiled
 	 * function (success) or `(nil, error)` on failure.
 	 */
-	[[maybe_unused]] int luaB_loadstring(lua_State* const state)
+	int luaB_loadstring(lua_State* const state)
 	{
 		size_t chunkLength = 0u;
 		const char* const chunkText = luaL_checklstring(state, 1, &chunkLength);
@@ -11785,7 +11785,7 @@ namespace
 	 * Loads one Lua chunk from optional file path and returns either compiled
 	 * function (success) or `(nil, error)` on failure.
 	 */
-	[[maybe_unused]] int luaB_loadfile(lua_State* const state)
+	int luaB_loadfile(lua_State* const state)
 	{
 		const char* const fileName = luaL_optlstring(state, 1, nullptr, nullptr);
 		if (luaL_loadfile(state, fileName) == 0) {
@@ -11804,7 +11804,7 @@ namespace
 	 * Loads an optional file path, executes the chunk, and returns all chunk
 	 * results currently on stack.
 	 */
-	[[maybe_unused]] int luaB_dofile(lua_State* const state)
+	int luaB_dofile(lua_State* const state)
 	{
 		const char* const fileName = luaL_optlstring(state, 1, nullptr, nullptr);
 		const int baseTop = lua_gettop(state);
@@ -11822,7 +11822,7 @@ namespace
 	 * What it does:
 	 * Expands table arg-1 array part into multiple return values.
 	 */
-	[[maybe_unused]] int luaB_unpack(lua_State* const state)
+	int luaB_unpack(lua_State* const state)
 	{
 		luaL_checktype(state, 1, LUA_TTABLE);
 		const int elementCount = luaL_getn(state, 1);
@@ -11840,7 +11840,7 @@ namespace
 	 * Executes protected call on arg-1 function using remaining stack args, then
 	 * prepends boolean success flag to returned value lanes.
 	 */
-	[[maybe_unused]] int luaB_pcall(lua_State* const state)
+	int luaB_pcall(lua_State* const state)
 	{
 		luaL_checkany(state, 1);
 		const int status = lua_call(state, lua_gettop(state) - 1, LUA_MULTRET);
@@ -11856,7 +11856,7 @@ namespace
 	 * Expands each '?' placeholder in the module path component using arg-1,
 	 * then concatenates all generated fragments into one composed name.
 	 */
-	[[maybe_unused]] void pushcomposename(lua_State* const state)
+	void pushcomposename(lua_State* const state)
 	{
 		const char* path = lua_tostring(state, -1);
 		int segmentCount = 1;
@@ -11881,7 +11881,7 @@ namespace
 	 * Creates one new coroutine thread and moves arg-1 Lua function onto the
 	 * new thread stack as its entry lane.
 	 */
-	[[maybe_unused]] int luaB_cocreate(lua_State* const state)
+	int luaB_cocreate(lua_State* const state)
 	{
 		lua_State* const newThread = lua_newthread(state);
 		if (lua_type(state, 1) != LUA_TFUNCTION) {
@@ -11899,7 +11899,7 @@ namespace
 	 * What it does:
 	 * Yields current coroutine with all values currently present on stack.
 	 */
-	[[maybe_unused]] int luaB_yield(lua_State* const state)
+	int luaB_yield(lua_State* const state)
 	{
 		return lua_yield(state, lua_gettop(state));
 	}
@@ -11911,7 +11911,7 @@ namespace
 	 * Applies one coroutine resume step: restores pending frame state when
 	 * resuming after yield, executes VM, then finalizes any immediate return.
 	 */
-	[[maybe_unused]] void resume(int* const userData, lua_State* const state)
+	void resume(int* const userData, lua_State* const state)
 	{
 		const int argumentCount = *userData;
 		CallInfo* const currentFrame = state->ci;
@@ -11945,7 +11945,7 @@ namespace
 	 * Emits return and tail-return debug hook events for one completed frame and
 	 * remaps `firstResult` to the current stack base after hook side effects.
 	 */
-	[[maybe_unused]] StkId callrethooks(StkId firstResult, lua_State* const state)
+	StkId callrethooks(StkId firstResult, lua_State* const state)
 	{
 		constexpr int kCiSavedPc = 3;
 
@@ -12182,7 +12182,7 @@ namespace
 	 * Moves resume arguments into target coroutine, executes one resume, then
 	 * moves either one error object or all yielded/returned values back.
 	 */
-	[[maybe_unused]] int auxresume(const int argumentCount, lua_State* const callerState, lua_State* const coroutineState)
+	int auxresume(const int argumentCount, lua_State* const callerState, lua_State* const coroutineState)
 	{
 		if (lua_checkstack(coroutineState, argumentCount) == 0) {
 			luaL_error(callerState, "too many arguments to resume");
@@ -12210,7 +12210,7 @@ namespace
 	 * Resumes coroutine from arg-1 using remaining args, returning status boolean
 	 * plus coroutine results (or status false + error object).
 	 */
-	[[maybe_unused]] int luaB_coresume(lua_State* const state)
+	int luaB_coresume(lua_State* const state)
 	{
 		lua_State* const coroutineState = lua_tothread(state, 1);
 		if (coroutineState == nullptr) {
@@ -12236,7 +12236,7 @@ namespace
 	 * Upvalue-bound coroutine wrapper: resumes coroutine with call args and
 	 * propagates errors with traceback context.
 	 */
-	[[maybe_unused]] int luaB_auxwrap(lua_State* const state)
+	int luaB_auxwrap(lua_State* const state)
 	{
 		lua_State* const coroutineState = lua_tothread(state, lua_upvalueindex(1));
 		const int resultCount = auxresume(lua_gettop(state), state, coroutineState);
@@ -12258,7 +12258,7 @@ namespace
 	 * Creates one coroutine from arg-1 Lua function and returns one closure that
 	 * resumes it through `luaB_auxwrap`.
 	 */
-	[[maybe_unused]] int luaB_cowrap(lua_State* const state)
+	int luaB_cowrap(lua_State* const state)
 	{
 		lua_State* const newThread = lua_newthread(state);
 		if (lua_type(state, 1) != LUA_TFUNCTION) {
@@ -12278,7 +12278,7 @@ namespace
 	 * Validates arg-1 presence/truthiness, raises Lua assertion error with
 	 * optional arg-2 message, and returns arg-1 as the only result on success.
 	 */
-	[[maybe_unused]] int luaB_assert(lua_State* const state)
+	int luaB_assert(lua_State* const state)
 	{
 		luaL_checkany(state, 1);
 		if (lua_toboolean(state, 1) == 0) {
@@ -12297,7 +12297,7 @@ namespace
 	 * Sets one table metatable after validating arg-2 type (`nil|table`) and
 	 * rejecting protected `__metatable` lanes.
 	 */
-	[[maybe_unused]] int luaB_setmetatable(lua_State* const state)
+	int luaB_setmetatable(lua_State* const state)
 	{
 		const int metatableType = lua_type(state, 2);
 		luaL_checktype(state, 1, LUA_TTABLE);
@@ -12322,7 +12322,7 @@ namespace
 	 * Creates one proxy userdata lane and optionally binds/validates its
 	 * metatable against the base-lib proxy registry upvalue.
 	 */
-	[[maybe_unused]] int luaB_newproxy(lua_State* const state)
+	int luaB_newproxy(lua_State* const state)
 	{
 		lua_settop(state, 1);
 
@@ -12365,7 +12365,7 @@ namespace
 	 * Implements Lua `LOG`/`_ALERT` by applying `tostring` to each argument,
 	 * joining with tab separators, and forwarding the final text to gpg logging.
 	 */
-	[[maybe_unused]] int LS_LOG(lua_State* const state)
+	int LS_LOG(lua_State* const state)
 	{
 		Ensure(state != nullptr, "state");
 
@@ -12406,7 +12406,7 @@ namespace
 	 * Writes one dumped Lua chunk block into an output FILE stream and reports
 	 * boolean success expected by this build's `lua_dump` path.
 	 */
-	[[maybe_unused]] int LS_dump_FileChunkWriter(
+	int LS_dump_FileChunkWriter(
 		lua_State* const,
 		const void* const buffer,
 		const size_t elementSize,
@@ -12424,7 +12424,7 @@ namespace
 	 * Implements legacy `import` fallback for this runtime lane by returning
 	 * false on the Lua stack.
 	 */
-	[[maybe_unused]] int LS_import(lua_State* const state)
+	int LS_import(lua_State* const state)
 	{
 		Ensure(state != nullptr, "state");
 		Ensure(state->stateUserData != nullptr, "state->stateUserData");
@@ -12442,7 +12442,7 @@ namespace
 	 * Loads one Lua source file, dumps the compiled chunk to output file path,
 	 * and returns success/failure boolean on the Lua stack.
 	 */
-	[[maybe_unused]] int LS_dump(lua_State* const state)
+	int LS_dump(lua_State* const state)
 	{
 		Ensure(state != nullptr, "state");
 		Ensure(state->stateUserData != nullptr, "state->stateUserData");
@@ -12488,7 +12488,7 @@ namespace
 	 * Registers script-global helper lanes (`import`, `LuaDumpBinary`) on the
 	 * active Lua globals table.
 	 */
-	[[maybe_unused]] void ScriptFunctionsRegister(LuaState* const state)
+	void ScriptFunctionsRegister(LuaState* const state)
 	{
 		Ensure(state != nullptr, "state");
 		LuaObject globals = state->GetGlobals();
@@ -12638,7 +12638,7 @@ namespace
 	 * Copies one tagged Lua value to `state->top`, grows stack when needed, and
 	 * advances top by one slot.
 	 */
-	[[maybe_unused]] StkId PushRawLuaObjectToStack(const TObject* const object, lua_State* const state)
+	StkId PushRawLuaObjectToStack(const TObject* const object, lua_State* const state)
 	{
 		StkId const top = state->top;
 		*top = *object;
@@ -13117,11 +13117,11 @@ extern "C"
 	 */
 	void* __cdecl luaHelper_ReallocFunction(
 		void* const ptr,
-		[[maybe_unused]] const int oldsize,
+		const int oldsize,
 		const int size,
-		[[maybe_unused]] void* const data,
-		[[maybe_unused]] const char* const allocName,
-		[[maybe_unused]] const unsigned int flags
+		void* const data,
+		const char* const allocName,
+		const unsigned int flags
 	)
 	{
 		return realloc_0(ptr, static_cast<std::size_t>(size));
@@ -13138,8 +13138,8 @@ extern "C"
 	 */
 	void __cdecl luaHelper_FreeFunction(
 		void* const ptr,
-		[[maybe_unused]] const int oldsize,
-		[[maybe_unused]] void* const data
+		const int oldsize,
+		void* const data
 	)
 	{
 		free_crt(ptr);
@@ -16255,7 +16255,7 @@ extern "C"
 	 * "script.lua(42): attempt to call a nil value". Only frames still running
 	 * Lua bytecode carry that position, so a C frame is left unannotated.
 	 */
-	static void addinfo(lua_State* const state, const char* const msg)
+	[[maybe_unused]] static void addinfo(lua_State* const state, const char* const msg)
 	{
 		constexpr int kChunkIdBufferSize = 60;
 		constexpr int kCallInfoStateRunningLua = 3;
@@ -17843,7 +17843,7 @@ namespace
  * Resolves one embedded LuaObject lane at owner offset `+0x78`, assigns from
  * one source object lane, and returns the owner runtime pointer.
  */
-[[maybe_unused]] LuaObjectAssignmentLaneOwnerRuntimeView* AssignEmbeddedLuaObjectAtOffset78(
+LuaObjectAssignmentLaneOwnerRuntimeView* AssignEmbeddedLuaObjectAtOffset78(
 	LuaObjectAssignmentLaneOwnerRuntimeView* const ownerRuntime,
 	const LuaObject& sourceObject
 )
@@ -17900,7 +17900,7 @@ LuaObject::~LuaObject()
  * What it does:
  * Forwards one import-thunk lane to `LuaObject::~LuaObject`.
  */
-[[maybe_unused]] void LuaObjectDtrThunk3(LuaObject* const object)
+void LuaObjectDtrThunk3(LuaObject* const object)
 {
 	object->~LuaObject();
 }
@@ -17911,7 +17911,7 @@ LuaObject::~LuaObject()
  * What it does:
  * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
  */
-[[maybe_unused]] void LuaObjectDtrThunk4(LuaObject* const object)
+void LuaObjectDtrThunk4(LuaObject* const object)
 {
 	object->~LuaObject();
 }
@@ -17922,7 +17922,7 @@ LuaObject::~LuaObject()
  * What it does:
  * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
  */
-[[maybe_unused]] void LuaObjectDtrThunk6(LuaObject* const object)
+void LuaObjectDtrThunk6(LuaObject* const object)
 {
 	object->~LuaObject();
 }
@@ -17933,7 +17933,7 @@ LuaObject::~LuaObject()
  * What it does:
  * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
  */
-[[maybe_unused]] void LuaObjectDtrThunk7(LuaObject* const object)
+void LuaObjectDtrThunk7(LuaObject* const object)
 {
 	object->~LuaObject();
 }
@@ -18081,7 +18081,7 @@ LuaState::~LuaState()
  * Runs `LuaState` non-deleting destruction, then conditionally releases the
  * object storage when the scalar-delete flag bit is set.
  */
-[[maybe_unused]] LuaState* DestroyLuaStateWithDeleteFlag(LuaState* const state, const std::uint8_t deleteFlag)
+LuaState* DestroyLuaStateWithDeleteFlag(LuaState* const state, const std::uint8_t deleteFlag)
 {
 	state->~LuaState();
 	if ((deleteFlag & 1u) != 0u) {
@@ -19056,7 +19056,7 @@ const LuaObject* LuaState::GetThreadObject() const
  * Bridges one `lua_State*` slot in `ECX` into `lua_call(L, nargs, nresults)`,
  * preserving the original thiscall adapter stack shape.
  */
-[[maybe_unused]] __declspec(naked) void __stdcall LuaStateSlotCallBridge(
+__declspec(naked) void __stdcall LuaStateSlotCallBridge(
 	const int /*nargs*/,
 	const int /*nresults*/
 )
@@ -19082,7 +19082,7 @@ const LuaObject* LuaState::GetThreadObject() const
  * Bridges register/stack lanes into `luaL_loadbuffer(*slot, buff, size, name)`
  * using the original stdcall adapter sequence.
  */
-[[maybe_unused]] __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stateSlot*/)
+__declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stateSlot*/)
 {
 	__asm
 	{
@@ -19377,7 +19377,7 @@ LuaStackObject LuaStackObject::GetByName(const char* const name) const
  * Reads one Lua stack-object lane pair `(state, stackIndex)` and returns the
  * legacy `lua_getn` length for that stack slot.
  */
-[[maybe_unused]] int32_t GetLuaStackObjectLengthLegacy(const LuaStackObject* const stackObject)
+int32_t GetLuaStackObjectLengthLegacy(const LuaStackObject* const stackObject)
 {
 	return lua_getn(stackObject->m_state->GetCState(), stackObject->m_stackIndex);
 }
@@ -19441,7 +19441,7 @@ namespace
  * Loads one object pointer from the dispatch slot and tail-calls its sixth
  * virtual lane.
  */
-[[maybe_unused]] std::uint32_t InvokeMainVirtualLaneFromSlot(VirtualLaneDispatchSlotView* const slot)
+std::uint32_t InvokeMainVirtualLaneFromSlot(VirtualLaneDispatchSlotView* const slot)
 {
 	return slot->mTarget->DispatchMainLane();
 }
@@ -19452,7 +19452,7 @@ namespace
  * What it does:
  * Returns one cached auxiliary 32-bit lane from the runtime view.
  */
-[[maybe_unused]] std::uint32_t ReadAuxiliaryRuntimeWord(const AuxiliaryWordRuntimeView* const view)
+std::uint32_t ReadAuxiliaryRuntimeWord(const AuxiliaryWordRuntimeView* const view)
 {
 	return view->mAuxiliaryWord;
 }
@@ -19464,7 +19464,7 @@ namespace
  * Returns inline string storage for short payloads and heap storage for long
  * payloads.
  */
-[[maybe_unused]] const char* ResolveInlineOrHeapStringData(const InlineOrHeapStringView* const view)
+const char* ResolveInlineOrHeapStringData(const InlineOrHeapStringView* const view)
 {
 	if (view->mLength < 0x10u) {
 		return view->mStorage.mInlineData;
@@ -19479,7 +19479,7 @@ namespace
  * Stores one dereferenced 32-bit lane from the source pointer slot into
  * `outValue`.
  */
-[[maybe_unused]] std::uint32_t* StoreIndirectWordFromPointerSlot(
+std::uint32_t* StoreIndirectWordFromPointerSlot(
 	std::uint32_t* const outValue,
 	const PointerWordSourceView* const source
 )
@@ -19494,7 +19494,7 @@ namespace
  * What it does:
  * Stores one pointer-slot address lane into `outValue`.
  */
-[[maybe_unused]] std::uint32_t* StorePointerSlotAddressWord(
+std::uint32_t* StorePointerSlotAddressWord(
 	std::uint32_t* const outValue,
 	const PointerWordSourceView* const source
 )
@@ -19819,7 +19819,7 @@ bool LuaObject::IsNumber() const noexcept
  * What it does:
  * Forwards one import-thunk lane to `LuaObject::IsNumber`.
  */
-[[maybe_unused]] bool LuaObjectIsNumberThunk2(const LuaObject* const object)
+bool LuaObjectIsNumberThunk2(const LuaObject* const object)
 {
 	return object->IsNumber();
 }
@@ -20753,7 +20753,7 @@ namespace
 	 * Unlinks one `UpVal` node from `lua_State::openupval` forward chain and
 	 * clears the removed node's `next` link lane.
 	 */
-	[[maybe_unused]] GCObject** UnlinkOpenUpvalueFromState(
+	GCObject** UnlinkOpenUpvalueFromState(
 		lua_State* const state,
 		GCObject* const upvalue
 	)
@@ -20796,7 +20796,7 @@ namespace
 	 * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
 	 * returns the owner pointer lane.
 	 */
-	[[maybe_unused]] OwnerWordLaneAt68Runtime* StoreOwnerWordLaneAt68(
+	OwnerWordLaneAt68Runtime* StoreOwnerWordLaneAt68(
 		OwnerWordWritePairRuntime* const writePair
 	)
 	{
@@ -21695,7 +21695,7 @@ double LuaObject::GetNumber() const
  * Validates LuaObject state/type and returns the numeric payload as one float
  * lane (`Value::n`), raising Lua's type-error lane for non-numeric values.
  */
-[[maybe_unused]] float LuaObjectGetNumberAsFloat(const LuaObject* const object)
+float LuaObjectGetNumberAsFloat(const LuaObject* const object)
 {
 	Ensure(object != nullptr, "object");
 	Ensure(object->m_state != nullptr, "m_state");
@@ -21712,7 +21712,7 @@ double LuaObject::GetNumber() const
  * Validates LuaObject state/type and returns one interned Lua string buffer,
  * raising Lua's typed-operation error lane on non-string values.
  */
-[[maybe_unused]] const char* LuaObjectGetStringChecked(const LuaObject* const object)
+const char* LuaObjectGetStringChecked(const LuaObject* const object)
 {
 	Ensure(object != nullptr, "object");
 	Ensure(object->m_state != nullptr, "m_state");
@@ -21731,7 +21731,7 @@ double LuaObject::GetNumber() const
  * Validates LuaObject state/type for function access and returns one C closure
  * entrypoint pointer, or `nullptr` if Lua still reports a non-function lane.
  */
-[[maybe_unused]] CFunction LuaObjectGetCFunctionChecked(const LuaObject* const object)
+CFunction LuaObjectGetCFunctionChecked(const LuaObject* const object)
 {
 	Ensure(object != nullptr, "object");
 	Ensure(object->m_state != nullptr, "m_state");
@@ -21757,7 +21757,7 @@ double LuaObject::GetNumber() const
  * Validates LuaObject state/type and returns the raw light-userdata pointer
  * payload (`Value::p`) from this tagged object.
  */
-[[maybe_unused]] void* LuaObjectGetLightUserDataChecked(const LuaObject* const object)
+void* LuaObjectGetLightUserDataChecked(const LuaObject* const object)
 {
 	Ensure(object != nullptr, "object");
 	Ensure(object->m_state != nullptr, "m_state");
@@ -21775,7 +21775,7 @@ double LuaObject::GetNumber() const
  * Fetches one boolean field from the date-table lane at stack index `-2` and
  * returns the converted truth-value while restoring the original stack top.
  */
-[[maybe_unused]] bool LuaDateGetBooleanField(
+bool LuaDateGetBooleanField(
 	const char* const fieldName,
 	lua_State* const  state
 )
@@ -21797,7 +21797,7 @@ double LuaObject::GetNumber() const
  * Fetches one numeric field from the date-table lane at stack index `-2`;
  * returns `defaultValue` on non-number fields and raises when required.
  */
-[[maybe_unused]] int LuaDateGetNumericFieldOrDefault(
+int LuaDateGetNumericFieldOrDefault(
 	int               defaultValue,
 	const char* const fieldName,
 	lua_State* const  state
@@ -21825,7 +21825,7 @@ double LuaObject::GetNumber() const
  * What it does:
  * Forwards one import-thunk lane to `LuaObject::GetNumber`.
  */
-[[maybe_unused]] double LuaObjectGetNumberThunk2(const LuaObject* const object)
+double LuaObjectGetNumberThunk2(const LuaObject* const object)
 {
 	return object->GetNumber();
 }
@@ -21961,7 +21961,7 @@ namespace LuaPlus
 	 * Destroys every live `LuaObject` in one contiguous range
 	 * `[beginObject, endObject)`.
 	 */
-	[[maybe_unused]] void DestroyLuaObjectRangeForward(
+	void DestroyLuaObjectRangeForward(
 		LuaPlus::LuaObject* const beginObject,
 		LuaPlus::LuaObject* const endObject
 	)
@@ -21978,7 +21978,7 @@ namespace LuaPlus
 	 * Destroys embedded `LuaObject` subobjects that live at `+0x04` inside one
 	 * 24-byte record range and returns the original record-begin lane.
 	 */
-	[[maybe_unused]] LuaPlus::LuaObject* DestroyEmbeddedLuaObjectRangeIn24ByteRecords(
+	LuaPlus::LuaObject* DestroyEmbeddedLuaObjectRangeIn24ByteRecords(
 		LuaPlus::LuaObject* const recordBegin,
 		LuaPlus::LuaObject* const recordEnd
 	)
@@ -22000,7 +22000,7 @@ namespace LuaPlus
 	 * Copy-constructs `count` consecutive destination lanes from one source
 	 * `LuaObject` and returns destination end.
 	 */
-	[[maybe_unused]] LuaPlus::LuaObject* CopyConstructLuaObjectCountAndReturnEnd(
+	LuaPlus::LuaObject* CopyConstructLuaObjectCountAndReturnEnd(
 		const LuaPlus::LuaObject* const source,
 		LuaPlus::LuaObject* destination,
 		const int count
@@ -22024,7 +22024,7 @@ namespace LuaPlus
 	 * `[destinationBegin, destinationEnd)` and returns the pointer returned by
 	 * the final assignment call (or `destinationBegin` when the range is empty).
 	 */
-	[[maybe_unused]] LuaPlus::LuaObject* AssignLuaObjectRangeForward(
+	LuaPlus::LuaObject* AssignLuaObjectRangeForward(
 		LuaPlus::LuaObject* const destinationBegin,
 		const LuaPlus::LuaObject* const source,
 		LuaPlus::LuaObject* const destinationEnd
@@ -22045,7 +22045,7 @@ namespace LuaPlus
 	 * Reverse-assigns one source range `[sourceBegin, sourceEnd)` into
 	 * destination lanes ending at `destinationEnd`, returning destination begin.
 	 */
-	[[maybe_unused]] LuaPlus::LuaObject* AssignLuaObjectRangeBackward(
+	LuaPlus::LuaObject* AssignLuaObjectRangeBackward(
 		LuaPlus::LuaObject* sourceEnd,
 		LuaPlus::LuaObject* destinationEnd,
 		LuaPlus::LuaObject* const sourceBegin
