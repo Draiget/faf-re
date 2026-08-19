@@ -1456,6 +1456,8 @@ namespace msvc8
          * Address: 0x004430E0 (FUN_004430E0)
          * Address: 0x004432D0 (FUN_004432D0)
          * Address: 0x004433F0 (FUN_004433F0)
+         * Address: 0x005DB5E0 (FUN_005DB5E0, msvc8::vector<EntityCategorySet>::size,
+         *   `weapon->mTargetPriorities.size()` in CAiAttackerImpl.cpp)
          *
          * What it does:
          * Returns element count from retained `[first_, last_)` range.
