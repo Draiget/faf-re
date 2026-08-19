@@ -429,13 +429,18 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005692D0 (FUN_005692D0, ??0CFormationInstance@Moho@@QAE@@Z)
-     * Mangled: ??0CFormationInstance@Moho@@QAE@@Z
+     * Mangled: ??0CAiFormationInstance@Moho@@QAE@@Z
+     *
+     * A standalone out-of-line body exists at 0x0059A470 but is unreferenced
+     * (zero code/data/vtable xrefs); see the .cpp definition for the full
+     * evidence note. The recovered behavior is proven from the identical
+     * sequence inlined into `operator new` (0x0059D0F0).
      *
      * What it does:
-     * Initializes base formation intrusive links, lane vectors, coord-cache
-     * map heads, and default scalar state for newly constructed formation
-     * instances.
+     * Runs the base `CFormationInstance` constructor (0x005692D0: formation
+     * intrusive links, lane vectors, coord-cache map heads, and default
+     * scalar state), then publishes the `CAiFormationInstance` vtable and
+     * clears the owning-`Sim` back-reference.
      */
     CAiFormationInstance();
 

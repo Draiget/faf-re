@@ -31,7 +31,7 @@
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
-#include "moho/unit/core/Unit.h"
+#include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -3681,12 +3681,22 @@ namespace moho
   }
 
   /**
-   * Address: 0x005692D0 (FUN_005692D0, ??0CFormationInstance@Moho@@QAE@@Z)
-   * Mangled: ??0CFormationInstance@Moho@@QAE@@Z
+   * Mangled: ??0CAiFormationInstance@Moho@@QAE@@Z
+   *
+   * A standalone out-of-line body for this constructor exists at 0x0059A470,
+   * but has zero incoming references of any kind (code, data, or vtable) in
+   * the callgraph index - every construction site found
+   * (`Moho::CAiFormationInstance::operator new`, 0x0059D0F0) inlines this
+   * exact sequence instead of calling out to it, so 0x0059A470 itself is not
+   * citable as reachable. The behavior recovered here - base
+   * `CFormationInstance` construction (0x005692D0, inlined: formation
+   * intrusive links, lane vectors, coord-cache map heads, default scalar
+   * state), vtable publication, and clearing the owning-`Sim` back-reference
+   * - is proven directly from that inlined copy, which the recovered
+   * `operator new` (`CAiFormationInstance.cpp`) already invokes.
    *
    * What it does:
-   * Initializes base formation intrusive links, lane vectors, coord-cache map
-   * heads, and default scalar state for newly constructed formation instances.
+   * See above.
    */
   CAiFormationInstance::CAiFormationInstance()
   {
@@ -3725,6 +3735,7 @@ namespace moho
     mPlanUpdateRequested = 0u;
     mMaxUnitSlotCount = 0;
     mFormationUnitSpacingMultiplier = 0.0f;
+    mSim = nullptr;
   }
 
   /**
