@@ -5,10 +5,12 @@
 
 #include "Wm3Vector3.h"
 #include "moho/ai/CAiTarget.h"
+#include "moho/misc/Listener.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/Broadcaster.h"
+#include "moho/unit/ECommandEvent.h"
 
 namespace gpg
 {
@@ -28,9 +30,23 @@ namespace moho
   class Unit;
 
   /**
+   * Layout-only carrier for the reserved dword between `CCommandTask` and
+   * the `Listener<ECommandEvent>` base (complete-object +0x30), positioning
+   * the listener at exactly +0x34.
+   */
+  struct CUnitGuardTaskReservedSlot
+  {
+    std::uint32_t mUnknown0030 = 0u; // +0x00 (complete-object +0x30)
+  };
+  static_assert(sizeof(CUnitGuardTaskReservedSlot) == 0x04, "CUnitGuardTaskReservedSlot size must be 0x04");
+
+  /**
    * Recovered command-task owner for unit guard behavior state.
    */
-  class CUnitGuardTask : public CCommandTask
+  class CUnitGuardTask
+    : public CCommandTask
+    , public CUnitGuardTaskReservedSlot
+    , public Listener<ECommandEvent>
   {
   public:
     /**
@@ -125,13 +141,17 @@ namespace moho
     void AbortMove();
 
     /**
-     * Address: 0x006147B0 (FUN_006147B0)
+     * Address: 0x006147B0 (FUN_006147B0, Moho::CUnitGuardTask::OnEvent)
+     * Primary vtable: `Listener<ECommandEvent>` secondary slot 1
+     * (`??_7CUnitGuardTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@` + 0x04).
      *
      * What it does:
      * Handles command-listener refresh flow by copying the linked command
-     * target payload into `mTarget` and refreshing guarded-unit lanes.
+     * target payload into `mTarget` and refreshing guarded-unit lanes. Does
+     * not read the event value - fires the same refresh regardless of which
+     * `ECommandEvent` triggered it.
      */
-    void OnLinkedCommandTargetChanged();
+    void OnEvent(ECommandEvent event) override;
 
     /**
      * Address: 0x00611A40 (FUN_00611A40)
@@ -315,9 +335,8 @@ namespace moho
     [[nodiscard]] Entity* GetBestEnemy();
 
   public:
-    std::uint32_t mUnknown0030; // +0x30
-    std::uint32_t mCommandEventListenerVftable; // +0x34
-    Broadcaster mCommandEventListenerLink; // +0x38
+    // 0x30 (mUnknown0030) and 0x34 (Listener<ECommandEvent>) now come from
+    // the base-class chain declared above.
     CCommandTask* mCommandTask; // +0x40
     WeakPtr<CUnitCommand> mPrimaryCommandRef; // +0x44
     WeakPtr<CUnitCommand> mCommandRef; // +0x4C
@@ -337,14 +356,13 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitGuardTask) == 0xC0, "CUnitGuardTask size must be 0xC0");
-  static_assert(offsetof(CUnitGuardTask, mUnknown0030) == 0x30, "CUnitGuardTask::mUnknown0030 offset must be 0x30");
+  // The base-class chain (CCommandTask + ReservedSlot + Listener<ECommandEvent>)
+  // must land mCommandTask, the first genuinely non-standard-layout member,
+  // at exactly +0x40 - offsetof on a member from a non-first base is not
+  // portable, so this checks the running byte total the same way instead.
   static_assert(
-    offsetof(CUnitGuardTask, mCommandEventListenerVftable) == 0x34,
-    "CUnitGuardTask::mCommandEventListenerVftable offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CUnitGuardTask, mCommandEventListenerLink) == 0x38,
-    "CUnitGuardTask::mCommandEventListenerLink offset must be 0x38"
+    sizeof(CCommandTask) + sizeof(CUnitGuardTaskReservedSlot) + sizeof(Listener<ECommandEvent>) == 0x40,
+    "CUnitGuardTask base-class chain must total 0x40 bytes"
   );
   static_assert(offsetof(CUnitGuardTask, mCommandTask) == 0x40, "CUnitGuardTask::mCommandTask offset must be 0x40");
   static_assert(
