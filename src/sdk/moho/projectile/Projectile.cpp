@@ -256,7 +256,7 @@ namespace
     return CachedType<moho::CProjectileAttributes>(moho::CProjectileAttributes::sType);
   }
 
-  [[nodiscard]] [[maybe_unused]] gpg::RType* CachedProjectileType()
+  [[nodiscard]] gpg::RType* CachedProjectileType()
   {
     return CachedType<moho::Projectile>(moho::Projectile::sType);
   }
