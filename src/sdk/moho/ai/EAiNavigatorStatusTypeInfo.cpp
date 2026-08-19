@@ -5,7 +5,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/IAiNavigator.h"
+#include "moho/ai/IAiNavigator.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -139,6 +139,30 @@ namespace
     gEAiNavigatorStatusTypeInfoConstructed = false;
   }
 } // namespace
+
+/**
+ * Address: 0x005A2EB0 (FUN_005A2EB0, Moho::EAiNavigatorStatusTypeInfo::EAiNavigatorStatusTypeInfo)
+ *
+ * IDA signature:
+ * Moho::EAiNavigatorStatusTypeInfo *__thiscall
+ * Moho::EAiNavigatorStatusTypeInfo::EAiNavigatorStatusTypeInfo(EAiNavigatorStatusTypeInfo *this);
+ *
+ * What it does:
+ * Constructs the `EAiNavigatorStatus` enum reflection descriptor and hands it
+ * to `gpg::PreRegisterRType` so the enum resolves through `gpg::LookupRType`.
+ *
+ *   0x005A2ED2  call ??0REnumType@gpg@@QAE@@Z     ; base
+ *   0x005A2EE9  mov  vftable, ??_7EAiNavigatorStatusTypeInfo@Moho@@6B@
+ *   0x005A2EF3  call gpg::PreRegisterRType(typeid(EAiNavigatorStatus), this)
+ *
+ * The vftable store is the compiler's; only the base call and the
+ * pre-registration are this body's own work.
+ */
+EAiNavigatorStatusTypeInfo::EAiNavigatorStatusTypeInfo()
+  : gpg::REnumType()
+{
+  gpg::PreRegisterRType(typeid(EAiNavigatorStatus), this);
+}
 
 /**
  * Address: 0x005A2F40 (FUN_005A2F40, scalar deleting thunk)

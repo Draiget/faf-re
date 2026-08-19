@@ -5,7 +5,7 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/ai/CAiPathSpline.h"
+#include "moho/ai/CAiPathSpline.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -145,6 +145,30 @@ namespace
 /**
  * Address: 0x005B20B0 (FUN_005B20B0, scalar deleting thunk)
  */
+/**
+ * Address: 0x005B2020 (FUN_005B2020, Moho::EPathTypeTypeInfo::EPathTypeTypeInfo)
+ *
+ * IDA signature:
+ * Moho::EPathTypeTypeInfo *__thiscall
+ * Moho::EPathTypeTypeInfo::EPathTypeTypeInfo(EPathTypeTypeInfo *this);
+ *
+ * What it does:
+ * Constructs the `EPathType` enum reflection descriptor and hands it to
+ * `gpg::PreRegisterRType` so the enum resolves through `gpg::LookupRType`.
+ *
+ *   0x005B2042  call ??0REnumType@gpg@@QAE@@Z     ; base
+ *   0x005B2059  mov  vftable, ??_7EPathTypeTypeInfo@Moho@@6B@
+ *   0x005B2063  call gpg::PreRegisterRType(typeid(EPathType), this)
+ *
+ * The vftable store is the compiler's; only the base call and the
+ * pre-registration are this body's own work.
+ */
+EPathTypeTypeInfo::EPathTypeTypeInfo()
+  : gpg::REnumType()
+{
+  gpg::PreRegisterRType(typeid(EPathType), this);
+}
+
 EPathTypeTypeInfo::~EPathTypeTypeInfo() = default;
 
 /**
