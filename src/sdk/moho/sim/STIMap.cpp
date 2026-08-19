@@ -78,7 +78,7 @@ namespace
    * Preserves one duplicate Lua-object copy lane used by terrain-type vector
    * growth paths and returns the destination end pointer.
    */
-  [[maybe_unused]] LuaPlus::LuaObject* CopyConstructLuaObjectRangeLaneB(
+  LuaPlus::LuaObject* CopyConstructLuaObjectRangeLaneB(
     const LuaPlus::LuaObject* from,
     LuaPlus::LuaObject* destination,
     const LuaPlus::LuaObject* to
@@ -259,7 +259,7 @@ namespace
    * Reads one position lane `{x,*,z}` and samples elevation from one indirect
    * `CHeightField*` owner lane.
    */
-  [[maybe_unused]] float SampleHeightFieldElevationFromPositionXZ(
+  float SampleHeightFieldElevationFromPositionXZ(
     const Wm3::Vec3f* const position,
     moho::CHeightField* const* const heightField
   )
@@ -599,7 +599,7 @@ namespace
    * What it does:
    * Writes a tier pointer lane into `outValue`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier**
+  moho::CHeightFieldTier**
   StoreTierPointerVariant1(moho::CHeightFieldTier*& outValue, moho::CHeightFieldTier* value) noexcept
   {
     outValue = value;
@@ -612,7 +612,7 @@ namespace
    * What it does:
    * Duplicate lane writing a tier pointer into `outValue`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier**
+  moho::CHeightFieldTier**
   StoreTierPointerVariant2(moho::CHeightFieldTier*& outValue, moho::CHeightFieldTier* value) noexcept
   {
     outValue = value;
@@ -625,7 +625,7 @@ namespace
    * What it does:
    * Writes `base[index]` into `outValue` from a raw tier-pointer lane.
    */
-  [[maybe_unused]] moho::CHeightFieldTier** StoreTierPointerByIndex(
+  moho::CHeightFieldTier** StoreTierPointerByIndex(
     moho::CHeightFieldTier*& outValue,
     moho::CHeightFieldTier* const* const baseLane,
     const std::int32_t index
@@ -653,7 +653,7 @@ namespace
    * Allocates raw storage for `count` tier entries and throws `std::bad_alloc`
    * on overflow.
    */
-  [[maybe_unused]] void* AllocateHeightFieldTierStorage(const std::uint32_t count)
+  void* AllocateHeightFieldTierStorage(const std::uint32_t count)
   {
     if (count != 0u && (std::numeric_limits<std::uint32_t>::max() / count) < sizeof(moho::CHeightFieldTier)) {
       throw std::bad_alloc();
@@ -708,7 +708,7 @@ namespace
    * What it does:
    * Deep-copies one tier aggregate (`data1` + `data2`) into `dst`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier*
+  moho::CHeightFieldTier*
   CopyHeightFieldTier(const moho::CHeightFieldTier& src, moho::CHeightFieldTier& dst)
   {
     CopyMinMaxGridAllocateAndCopy(dst.data1, src.data1);
@@ -778,7 +778,7 @@ namespace
    * What it does:
    * Duplicate range destroy loop for deep-owned tier entries.
    */
-  [[maybe_unused]] void DestroyHeightFieldTierRangeVariant2(
+  void DestroyHeightFieldTierRangeVariant2(
     moho::CHeightFieldTier* first,
     moho::CHeightFieldTier* last
   ) noexcept
@@ -947,7 +947,7 @@ namespace
    * What it does:
    * EH thunk forwarding to `ConstructHeightFieldTierFill`.
    */
-  [[maybe_unused]] void ConstructHeightFieldTierFillThunkVariant1(
+  void ConstructHeightFieldTierFillThunkVariant1(
     const moho::CHeightFieldTier& prototype,
     moho::CHeightFieldTier* outFirst,
     const std::uint32_t count
@@ -962,7 +962,7 @@ namespace
    * What it does:
    * Duplicate EH thunk forwarding to `ConstructHeightFieldTierFill`.
    */
-  [[maybe_unused]] void ConstructHeightFieldTierFillThunkVariant2(
+  void ConstructHeightFieldTierFillThunkVariant2(
     const moho::CHeightFieldTier& prototype,
     moho::CHeightFieldTier* outFirst,
     const std::uint32_t count
@@ -977,7 +977,7 @@ namespace
    * What it does:
    * EH thunk forwarding to `ConstructHeightFieldTierRange`.
    */
-  [[maybe_unused]] void ConstructHeightFieldTierRangeThunkVariant1(
+  void ConstructHeightFieldTierRangeThunkVariant1(
     const moho::CHeightFieldTier* first,
     const moho::CHeightFieldTier* last,
     moho::CHeightFieldTier* outFirst
@@ -992,7 +992,7 @@ namespace
    * What it does:
    * Duplicate EH thunk forwarding to `ConstructHeightFieldTierRange`.
    */
-  [[maybe_unused]] void ConstructHeightFieldTierRangeThunkVariant2(
+  void ConstructHeightFieldTierRangeThunkVariant2(
     const moho::CHeightFieldTier* first,
     const moho::CHeightFieldTier* last,
     moho::CHeightFieldTier* outFirst
@@ -1007,7 +1007,7 @@ namespace
    * What it does:
    * Duplicate EH thunk forwarding to `ConstructHeightFieldTierRange`.
    */
-  [[maybe_unused]] void ConstructHeightFieldTierRangeThunkVariant3(
+  void ConstructHeightFieldTierRangeThunkVariant3(
     const moho::CHeightFieldTier* first,
     const moho::CHeightFieldTier* last,
     moho::CHeightFieldTier* outFirst
@@ -1022,7 +1022,7 @@ namespace
    * What it does:
    * Duplicate EH thunk forwarding to `ConstructHeightFieldTierRange`.
    */
-  [[maybe_unused]] void ConstructHeightFieldTierRangeThunkVariant4(
+  void ConstructHeightFieldTierRangeThunkVariant4(
     const moho::CHeightFieldTier* first,
     const moho::CHeightFieldTier* last,
     moho::CHeightFieldTier* outFirst
@@ -1037,7 +1037,7 @@ namespace
    * What it does:
    * EH thunk forwarding to `CopyHeightFieldTierRangeForward`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier* CopyHeightFieldTierRangeForwardThunk(
+  moho::CHeightFieldTier* CopyHeightFieldTierRangeForwardThunk(
     const moho::CHeightFieldTier* first,
     const moho::CHeightFieldTier* last,
     moho::CHeightFieldTier* dstFirst
@@ -1052,7 +1052,7 @@ namespace
    * What it does:
    * Thunk forwarding to `CopyHeightFieldTierRangeToInitialized`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier* CopyHeightFieldTierRangeToInitializedThunk(
+  moho::CHeightFieldTier* CopyHeightFieldTierRangeToInitializedThunk(
     moho::CHeightFieldTier* dstFirst,
     moho::CHeightFieldTier* dstLast,
     const moho::CHeightFieldTier* srcFirst
@@ -1067,7 +1067,7 @@ namespace
    * What it does:
    * EH thunk forwarding to `CopyHeightFieldTierRangeBackward`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier* CopyHeightFieldTierRangeBackwardThunkVariant1(
+  moho::CHeightFieldTier* CopyHeightFieldTierRangeBackwardThunkVariant1(
     moho::CHeightFieldTier* dstEnd,
     moho::CHeightFieldTier* dstBegin,
     moho::CHeightFieldTier* srcEnd
@@ -1082,7 +1082,7 @@ namespace
    * What it does:
    * Duplicate EH thunk forwarding to `CopyHeightFieldTierRangeBackward`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier* CopyHeightFieldTierRangeBackwardThunkVariant2(
+  moho::CHeightFieldTier* CopyHeightFieldTierRangeBackwardThunkVariant2(
     moho::CHeightFieldTier* dstEnd,
     moho::CHeightFieldTier* dstBegin,
     moho::CHeightFieldTier* srcEnd
@@ -1097,7 +1097,7 @@ namespace
    * What it does:
    * Returns high byte of an integer lane.
    */
-  [[maybe_unused]] std::uint8_t HighByteVariant1(const std::uint32_t value) noexcept
+  std::uint8_t HighByteVariant1(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -1108,7 +1108,7 @@ namespace
    * What it does:
    * Duplicate lane returning high byte of an integer.
    */
-  [[maybe_unused]] std::uint8_t HighByteVariant2(const std::uint32_t value) noexcept
+  std::uint8_t HighByteVariant2(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -1119,7 +1119,7 @@ namespace
    * What it does:
    * Copies one tier from `source` into `dst` when `source` is non-null.
    */
-  [[maybe_unused]] moho::CHeightFieldTier*
+  moho::CHeightFieldTier*
   CopyHeightFieldTierFromPointerVariant1(moho::CHeightFieldTier& dst, const moho::CHeightFieldTier* source)
   {
     if (source != nullptr) {
@@ -1134,7 +1134,7 @@ namespace
    * What it does:
    * Duplicate lane copying one tier from pointer source.
    */
-  [[maybe_unused]] moho::CHeightFieldTier*
+  moho::CHeightFieldTier*
   CopyHeightFieldTierFromPointerVariant2(moho::CHeightFieldTier& dst, const moho::CHeightFieldTier* source)
   {
     return CopyHeightFieldTierFromPointerVariant1(dst, source);
@@ -1146,7 +1146,7 @@ namespace
    * What it does:
    * Stores `{min,max}` word pair and returns the destination slot.
    */
-  [[maybe_unused]] moho::SMinMax<std::uint16_t>*
+  moho::SMinMax<std::uint16_t>*
   StoreMinMaxWordPair(
     moho::SMinMax<std::uint16_t>& outValue,
     const std::uint16_t maxValue,
@@ -1164,7 +1164,7 @@ namespace
    * What it does:
    * Stores `(x,y)` float pair and returns the destination slot.
    */
-  [[maybe_unused]] Wm3::Vec2f* StoreVec2fPair(Wm3::Vec2f& outValue, const float x, const float y) noexcept
+  Wm3::Vec2f* StoreVec2fPair(Wm3::Vec2f& outValue, const float x, const float y) noexcept
   {
     outValue.x = x;
     outValue.y = y;
@@ -1210,7 +1210,7 @@ namespace
    * What it does:
    * Returns pointer to tier element at `index`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier*
+  moho::CHeightFieldTier*
   HeightFieldTierVectorElementAtVariant1(HeightFieldTierVector& tiers, const std::int32_t index) noexcept
   {
     moho::CHeightFieldTier* const first = tiers.begin();
@@ -1223,7 +1223,7 @@ namespace
    * What it does:
    * Duplicate lane returning pointer to tier element at `index`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier*
+  moho::CHeightFieldTier*
   HeightFieldTierVectorElementAtVariant2(HeightFieldTierVector& tiers, const std::int32_t index) noexcept
   {
     return HeightFieldTierVectorElementAtVariant1(tiers, index);
@@ -1235,7 +1235,7 @@ namespace
    * What it does:
    * Writes vector begin pointer lane into `outBegin`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier**
+  moho::CHeightFieldTier**
   WriteHeightFieldTierVectorBegin(moho::CHeightFieldTier*& outBegin, HeightFieldTierVector& tiers) noexcept
   {
     outBegin = tiers.begin();
@@ -1248,7 +1248,7 @@ namespace
    * What it does:
    * Writes vector end pointer lane into `outEnd`.
    */
-  [[maybe_unused]] moho::CHeightFieldTier**
+  moho::CHeightFieldTier**
   WriteHeightFieldTierVectorEnd(moho::CHeightFieldTier*& outEnd, HeightFieldTierVector& tiers) noexcept
   {
     outEnd = tiers.end();
@@ -1277,7 +1277,7 @@ namespace
    * What it does:
    * Removes one `[eraseFirst,eraseLast)` range and returns the new range start.
    */
-  [[maybe_unused]] moho::CHeightFieldTier** EraseHeightFieldTierRange(
+  moho::CHeightFieldTier** EraseHeightFieldTierRange(
     HeightFieldTierVector& tiers,
     moho::CHeightFieldTier*& outBegin,
     moho::CHeightFieldTier* eraseFirst,
@@ -1305,7 +1305,7 @@ namespace
    * What it does:
    * Resets tier vector storage and reserves `capacity` entries.
    */
-  [[maybe_unused]] bool ResetHeightFieldTierVectorStorage(
+  bool ResetHeightFieldTierVectorStorage(
     HeightFieldTierVector& tiers,
     const std::uint32_t capacity
   )
@@ -1555,7 +1555,7 @@ namespace
    * What it does:
    * Computes normalized cross product `lhs x rhs` into `outNormal`.
    */
-  [[maybe_unused]] Wm3::Vector3f*
+  Wm3::Vector3f*
   NormalizeCrossProduct(const Wm3::Vector3f& lhs, Wm3::Vector3f& outNormal, const Wm3::Vector3f& rhs) noexcept
   {
     outNormal.x = lhs.y * rhs.z - lhs.z * rhs.y;
@@ -1572,7 +1572,7 @@ namespace
    * Builds one normalized plane `{dir,dist}` from anchor point `p0` and
    * triangle edge points `p1`/`p2`.
    */
-  [[maybe_unused]] moho::VecDist*
+  moho::VecDist*
   BuildNormalizedPlaneFromAnchor(
     const Wm3::Vector3f& p1,
     const Wm3::Vector3f& p2,
@@ -1742,7 +1742,7 @@ namespace
    * What it does:
    * Routes one z-row update through the tier-error kernel without progress ticks.
    */
-  [[maybe_unused]] void
+  void
   UpdateErrorSingleRowNoProgress(moho::CHeightField& field, const std::int32_t z, const std::int32_t x0, const std::int32_t x1)
   {
     UpdateErrorKernel(field, nullptr, x0, z, x1, z);
@@ -3745,7 +3745,7 @@ namespace moho
    * Reads one `CHeightField*` lane from owner runtime state and returns
    * sampled terrain elevation at world `(x,z)`.
    */
-  [[maybe_unused]] double QueryOwnerHeightFieldElevation(
+  double QueryOwnerHeightFieldElevation(
     const HeightFieldOwnerRuntimeView* const owner,
     const float x,
     const float z
@@ -3765,7 +3765,7 @@ namespace moho
    * Computes one top-left short-coordinate lane from center `(x,z)` and
    * integral rectangle `{width,height}` by subtracting half-extents.
    */
-  [[maybe_unused]] std::int16_t* BuildTopLeftShortCoordsFromCenter(
+  std::int16_t* BuildTopLeftShortCoordsFromCenter(
     std::int16_t* const outCoordsXY,
     const float* const centerXZ,
     const int width,
@@ -4310,7 +4310,7 @@ namespace moho
   bool OCCUPY_CheckEdgeFlatness(
     const gpg::Rect2f& rect,
     const float pivotArg,
-    [[maybe_unused]] const float xmm1Slot,
+    const float xmm1Slot,
     const RUnitBlueprint& blueprint,
     const STIMap& map,
     float* const outMinHeight,
