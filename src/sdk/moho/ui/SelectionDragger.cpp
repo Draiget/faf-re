@@ -1,6 +1,7 @@
 #include "moho/ui/SelectionDragger.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <new>
 
@@ -9,12 +10,43 @@
 #include "moho/entity/UserEntity.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/unit/core/UserUnit.h"
 
 namespace
 {
+  /**
+   * Screen-space distance (in pixels) the cursor has to travel before a press
+   * stops being a click and latches into a rubber-band selection.
+   *
+   * Binary: `ds:0x00DFE5AC` = 4.0f, compared at 0x00864E1A-0x00864E29.
+   */
+  constexpr float kSelectionDragStretchThresholdPixels = 4.0f;
+
+  /**
+   * Half-thickness (in pixels) of each of the four rubber-band border bars, so
+   * the drawn frame is two pixels wide.
+   *
+   * Binary: `ds:0x00DFEC20` = 1.0f, added/subtracted at 0x00865214 onwards.
+   */
+  constexpr float kSelectionRectBorderHalfWidthPixels = 1.0f;
+
+  /** Translucent black fill of the rubber-band rectangle (0x00865050+0x92). */
+  constexpr std::uint32_t kSelectionRectFillColor = 0x30000000u;
+
+  /** Near-opaque white frame around the rubber-band rectangle (0x008651BD). */
+  constexpr std::uint32_t kSelectionRectBorderColor = 0xA0FFFFFFu;
+
+  /**
+   * Per-vertex modulator for every rubber-band quad: the batcher takes the
+   * bound solid-colour texture unmodified (`or eax, 0FFFFFFFFh` before each
+   * `DrawQuad` in 0x00865050).
+   */
+  constexpr std::uint32_t kSelectionRectVertexColor = 0xFFFFFFFFu;
+
   class ISelectionDraggerRuntimeLane
   {
   public:
@@ -45,6 +77,32 @@ namespace
   ) noexcept
   {
     return ::new (outLane) ISelectionDraggerRuntimeLane();
+  }
+
+  /**
+   * Emits one axis-aligned screen-space rectangle as a single prim-batcher
+   * quad.
+   *
+   * Every `DrawQuad` inside `SelectionDragger2D::Render` builds its four
+   * corners in the same order - `(x0,y0) -> (x1,y0) -> (x1,y1) -> (x0,y1)` -
+   * so the corner mechanics are lifted here instead of being open-coded five
+   * times.
+   */
+  void DrawSelectionRectQuad(
+    moho::CD3DPrimBatcher& batcher,
+    const float x0,
+    const float y0,
+    const float x1,
+    const float y1
+  )
+  {
+    batcher.DrawQuad(
+      moho::Vector3f(x0, y0, 0.0f),
+      moho::Vector3f(x1, y0, 0.0f),
+      moho::Vector3f(x1, y1, 0.0f),
+      moho::Vector3f(x0, y1, 0.0f),
+      kSelectionRectVertexColor
+    );
   }
 
   [[nodiscard]] float InvalidSelectionScreenCoord() noexcept
@@ -284,6 +342,109 @@ namespace moho
     SSelectionNodeUserEntity* cursor =
       sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
     (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+  }
+
+  /**
+   * Address: 0x00864DB0 (FUN_00864DB0, Moho::SelectionDragger2D::Func2)
+   * Mangled: vtable slot +0x04 of ??_7SelectionDragger2D@Moho@@6B@ (0x00E47A48)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SelectionDragger2D::Func2(
+   *     Moho::SelectionDragger2D *this, int a2);
+   *
+   * What it does:
+   * Stores the event's cursor position as the drag-end corner, latches
+   * `mStretch` once the straight-line drag distance passes the click
+   * threshold, then rebuilds the highlighted-unit bracket set: everything the
+   * current drag volume covers is collected into a scratch weak-set and copied
+   * into the process-global `sSelectionBrackets` (which is emptied first).
+   *
+   * Invocation: vtable slot +0x04 of `??_7SelectionDragger2D@Moho@@6B@`. The
+   * matching dispatch site is 0x008638A3 (`call edx` with
+   * `edx = [[this]+4]`) inside `SelectionDragger::DragRelease` (0x00863870),
+   * which forwards the release event through the dragger's own `DragMove`
+   * before resolving the selection.
+   */
+  void SelectionDragger2D::DragMove(const SMauiEventData* const eventData)
+  {
+    mX1 = eventData->mMousePos.x;
+    mY1 = eventData->mMousePos.y;
+
+    const float dragX = mX0 - mX1;
+    const float dragY = mY0 - mY1;
+    const bool stretchedPastClick =
+      std::sqrt((dragX * dragX) + (dragY * dragY)) > kSelectionDragStretchThresholdPixels;
+    // Latching `or`, not an assignment: once a drag has stretched it stays
+    // stretched even if the cursor returns to the press point (0x00864E34).
+    mStretch = static_cast<std::uint8_t>(mStretch | (stretchedPastClick ? 1u : 0u));
+
+    SSelectionSetUserEntity draggedSelection{};
+    InitializeLocalSelectionSet(draggedSelection);
+    CollectSelectionDraggerEntities(draggedSelection, *this);
+
+    // Drop last frame's brackets. The binary open-codes the full-range erase
+    // (`DestroySubtree(head->mParent)` plus the head/size reset) at
+    // 0x00864E71-0x00864EA4; `EraseRange` over `[head->mLeft, head)` is that
+    // same teardown through the one owning helper.
+    SSelectionNodeUserEntity* bracketCursor =
+      sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
+    (void)sSelectionBrackets.EraseRange(&bracketCursor, bracketCursor, sSelectionBrackets.mHead);
+
+    SSelectionNodeUserEntity* node = draggedSelection.mHead->mLeft;
+    node = SSelectionSetUserEntity::find(&draggedSelection, node, &node);
+    while (node != draggedSelection.mHead) {
+      SSelectionSetUserEntity::AddResult addResult{};
+      (void)SSelectionSetUserEntity::Add(&addResult, &sSelectionBrackets, DecodeSelectionEntity(node->mEnt));
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&draggedSelection, node, &node);
+    }
+
+    (void)draggedSelection.ReleaseStorage();
+  }
+
+  /**
+   * Address: 0x00865050 (FUN_00865050, Moho::SelectionDragger2D::Func4)
+   * Mangled: vtable slot +0x10 of ??_7SelectionDragger2D@Moho@@6B@ (0x00E47A54)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SelectionDragger2D::Func4(
+   *     Moho::SelectionDragger2D *this, Moho::CD3DPrimBatcher *a3);
+   *
+   * What it does:
+   * Draws the rubber-band rectangle. Nothing is emitted until the drag has
+   * stretched past the click threshold. Otherwise the drag endpoints are
+   * canonicalized into a screen rectangle, one translucent black quad fills it,
+   * and four near-opaque white bars are drawn one pixel outside/inside each
+   * edge to frame it.
+   *
+   * Invocation: vtable slot +0x10 of `??_7SelectionDragger2D@Moho@@6B@`. The
+   * dispatch site is 0x0086F06D (`call edx` with `edx = [[esi-4]+0x10]`,
+   * `ecx = esi-4`) inside `Moho::CUIWorldView::Draw` (0x0086EF40), which
+   * recovers the `IMauiDragger*` from its current-dragger intrusive link at
+   * `+0x29C` and hands the prim batcher straight through.
+   */
+  void SelectionDragger2D::Render(CD3DPrimBatcher* const batcher)
+  {
+    if (!HasActiveSelectionDrag()) {
+      return;
+    }
+
+    // Screen space: y grows downward, so the smaller y is the top edge.
+    const float left = std::min(mX1, mX0);
+    const float right = std::max(mX1, mX0);
+    const float top = std::min(mY1, mY0);
+    const float bottom = std::max(mY1, mY0);
+
+    batcher->SetTexture(CD3DBatchTexture::FromSolidColor(kSelectionRectFillColor));
+    DrawSelectionRectQuad(*batcher, left, bottom, right, top);
+
+    constexpr float kEdge = kSelectionRectBorderHalfWidthPixels;
+    batcher->SetTexture(CD3DBatchTexture::FromSolidColor(kSelectionRectBorderColor));
+    DrawSelectionRectQuad(*batcher, left - kEdge, top + kEdge, right + kEdge, top - kEdge);
+    DrawSelectionRectQuad(*batcher, left - kEdge, bottom + kEdge, right + kEdge, bottom - kEdge);
+    DrawSelectionRectQuad(*batcher, left - kEdge, bottom - kEdge, left + kEdge, top + kEdge);
+    DrawSelectionRectQuad(*batcher, right - kEdge, bottom - kEdge, right + kEdge, top + kEdge);
   }
 
   /**

@@ -4,10 +4,12 @@
 #include <cstdint>
 
 #include "moho/math/Vector3f.h"
+#include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
 {
   class CameraImpl;
+  class CD3DPrimBatcher;
   class CGeomSolid3;
   class CWldSession;
   struct SSelectionSetUserEntity;
@@ -28,10 +30,39 @@ namespace moho
   /**
    * Base runtime state shared by 2D/3D selection draggers.
    *
-   * This class currently models the recovered constructor layout/state lane.
-   * Additional virtual methods are recovered in later passes.
+   * `??_7SelectionDragger@Moho@@6B@` lives at 0x00E479D8 and is written by the
+   * constructor at 0x008637F0 (`mov dword ptr [eax], offset
+   * ??_7SelectionDragger@Moho@@6B@`, 0x008637F7), so the vtable is
+   * constructor-anchored. The destructor body at 0x00864080 restores
+   * `??_7IMauiDragger@Moho@@6B@` (0x00E38DC0) before unlinking the intrusive
+   * selection list, which is what proves `IMauiDragger` is the direct base and
+   * that it sits at offset 0.
+   *
+   * Slot map of `??_7SelectionDragger@Moho@@6B@` (read from the shipped PE):
+   *   +0x00  0x00864000  scalar deleting destructor  -> `DeleteWithFlag`
+   *   +0x04  0x0078DB50  `IMauiDragger::DragMove`    (inherited, empty body)
+   *   +0x08  0x00863870  `SelectionDragger::DragRelease` (override, NOT YET
+   *                      RECOVERED - see the note below)
+   *   +0x0C  0x0078DB80  `IMauiDragger::OnCurrentDraggerReplaced` (inherited)
+   *   +0x10  0x00A82547  `_purecall` -> `Render`
+   *   +0x14  0x00A82547  `_purecall` -> `BuildSelectionSolid`
+   *   +0x18  0x00A82547  `_purecall` -> `HasActiveSelectionDrag`
+   *
+   * Slots +0x04 and +0x0C hold the *same* addresses as the corresponding slots
+   * of `??_7IMauiDragger@Moho@@6B@`, so this class overrides neither: no
+   * derived-class body is declared for them here.
+   *
+   * Slot +0x08 (`SelectionDragger::DragRelease`, 0x00863870, 485 instructions)
+   * is a genuine override and is still blocked. Its no-modifier branch drives a
+   * per-priority `WeakSet<UserEntity>` bucket vector through three helpers that
+   * only exist as file-private statics of `moho/sim/CWldSession.cpp`
+   * (`CopySelectionSetFromOther` 0x00822210, `FindSelectionNodeByEntityGuarded`
+   * 0x00867780, `ReleaseSelectionWeakSetStorageRange` 0x00868CC0) plus the
+   * bucket-vector grow helper at 0x00867890, which is not recovered anywhere.
+   * Until those are reachable from this translation unit the slot stays pure,
+   * inherited from `IMauiDragger`.
    */
-  class SelectionDragger
+  class SelectionDragger : public IMauiDragger
   {
   public:
     /**
@@ -44,7 +75,11 @@ namespace moho
      */
     SelectionDragger(CameraImpl* camera, CWldSession* session);
 
-    virtual ~SelectionDragger();
+    /**
+     * Address: 0x00864080 (inlined destructor body, restores
+     *          `??_7IMauiDragger@Moho@@6B@` then drains the intrusive list)
+     */
+    ~SelectionDragger() override;
 
     /**
      * Address: 0x00864000 (FUN_00864000, Moho::SelectionDragger::dtr)
@@ -55,8 +90,27 @@ namespace moho
      */
     SelectionDragger* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
 
+    /**
+     * Vtable slot +0x10 of `??_7SelectionDragger@Moho@@6B@` (0x00A82547,
+     * `_purecall`).
+     *
+     * What it does:
+     * Draws the dragger's on-screen feedback through the shared prim batcher.
+     * `SelectionDragger2D` draws the selection rectangle (0x00865050);
+     * `SelectionDragger3D`'s override (0x00864C80) is an empty `retn 4`.
+     */
+    virtual void Render(CD3DPrimBatcher* batcher) = 0;
+
+    /**
+     * Vtable slot +0x14 of `??_7SelectionDragger@Moho@@6B@` (0x00A82547,
+     * `_purecall`).
+     */
     [[nodiscard]] virtual CGeomSolid3 BuildSelectionSolid() const = 0;
 
+    /**
+     * Vtable slot +0x18 of `??_7SelectionDragger@Moho@@6B@` (0x00A82547,
+     * `_purecall`).
+     */
     [[nodiscard]] virtual bool HasActiveSelectionDrag() const = 0;
 
   public:
@@ -83,6 +137,21 @@ namespace moho
   static_assert(sizeof(SelectionDragger) == 0x24,
                 "SelectionDragger size must be 0x24");
 
+  /**
+   * Rubber-band (screen-rectangle) selection dragger.
+   *
+   * `??_7SelectionDragger2D@Moho@@6B@` lives at 0x00E47A44 and is written by
+   * the constructor at 0x00864CB0 (`mov dword ptr [esi], offset
+   * ??_7SelectionDragger2D@Moho@@6B@`, 0x00864CC2), so the vtable is
+   * constructor-anchored. Slot map read from the shipped PE:
+   *   +0x00  0x00865470  scalar deleting destructor  -> `DeleteWithFlag`
+   *   +0x04  0x00864DB0  `DragMove`                  (override)
+   *   +0x08  0x00863870  `SelectionDragger::DragRelease` (inherited)
+   *   +0x0C  0x0078DB80  `IMauiDragger::OnCurrentDraggerReplaced` (inherited)
+   *   +0x10  0x00865050  `Render`                    (override)
+   *   +0x14  0x00864FC0  `BuildSelectionSolid`       (override)
+   *   +0x18  0x00864DA0  `HasActiveSelectionDrag`    (override)
+   */
   class SelectionDragger2D : public SelectionDragger
   {
   public:
@@ -122,6 +191,37 @@ namespace moho
      * deleting dtor vtable slot has a recovered source counterpart.
      */
     SelectionDragger2D* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
+
+    /**
+     * Address: 0x00864DB0 (FUN_00864DB0, Moho::SelectionDragger2D::Func2)
+     * Mangled: vtable slot +0x04 of ??_7SelectionDragger2D@Moho@@6B@
+     *
+     * IDA signature:
+     * void __thiscall Moho::SelectionDragger2D::Func2(
+     *     Moho::SelectionDragger2D *this, int a2);
+     *
+     * What it does:
+     * Tracks one pointer-drag step: stores the current cursor position as the
+     * drag-end corner, latches `mStretch` once the drag exceeds the click
+     * threshold, then recomputes the highlighted-unit bracket set by collecting
+     * everything under the current drag volume into `sSelectionBrackets`.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x00865050 (FUN_00865050, Moho::SelectionDragger2D::Func4)
+     * Mangled: vtable slot +0x10 of ??_7SelectionDragger2D@Moho@@6B@
+     *
+     * IDA signature:
+     * void __thiscall Moho::SelectionDragger2D::Func4(
+     *     Moho::SelectionDragger2D *this, Moho::CD3DPrimBatcher *a3);
+     *
+     * What it does:
+     * Draws the rubber-band rectangle: one translucent black fill quad over the
+     * canonicalized drag rectangle, then four 2-pixel white border bars around
+     * it. Draws nothing until the drag has stretched past the click threshold.
+     */
+    void Render(CD3DPrimBatcher* batcher) override;
 
     /**
      * Address: 0x00864FC0 (FUN_00864FC0, Moho::SelectionDragger2D::Func5)
