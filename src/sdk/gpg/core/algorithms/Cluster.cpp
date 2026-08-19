@@ -77,7 +77,7 @@ namespace
      * Releases one shared/weak control block referenced from owner offset
      * `+0x4`, invoking control vtable lanes when reference counters reach zero.
      */
-    [[maybe_unused]] volatile long* ReleaseOwnerSharedCountControlLane(
+    volatile long* ReleaseOwnerSharedCountControlLane(
       SharedCountOwnerRuntimeView* const owner
     )
     {
@@ -336,7 +336,7 @@ namespace
      * Copy-constructs one 16-cluster lane block and copies both tail dword
      * metadata lanes.
      */
-    [[maybe_unused]] ClusterArray16WithTailLanesRuntimeView* CopyConstructClusterArray16WithTailLanes(
+    ClusterArray16WithTailLanesRuntimeView* CopyConstructClusterArray16WithTailLanes(
         ClusterArray16WithTailLanesRuntimeView* const destination,
         const ClusterArray16WithTailLanesRuntimeView& source
     )
@@ -369,7 +369,7 @@ namespace
      * Copy-constructs one 16-cluster lane block, copies lane `+0x40`, and
      * overrides lane `+0x44` from caller-provided metadata.
      */
-    [[maybe_unused]] ClusterArray16WithTailLanesRuntimeView* CopyConstructClusterArray16WithTailLanesOverrideTail44(
+    ClusterArray16WithTailLanesRuntimeView* CopyConstructClusterArray16WithTailLanesOverrideTail44(
         ClusterArray16WithTailLanesRuntimeView* const destination,
         const ClusterArray16WithTailLanesRuntimeView& source,
         const std::uint32_t* const lane44Source
@@ -413,7 +413,7 @@ namespace
      * What it does:
      * Dispatch adapter lane for one 32-bit range fill request.
      */
-    [[maybe_unused]] void FillU32RangeDispatchA(
+    void FillU32RangeDispatchA(
         std::uint32_t* const dst,
         const unsigned int count,
         const std::uint32_t value
@@ -605,7 +605,7 @@ namespace
         registry.erase(it);
     }
 
-    [[maybe_unused]] void AttachSubclusterRingToCacheBase(
+    void AttachSubclusterRingToCacheBase(
         void* const cacheTreeBase, SubclusterTreeHeader* const header
     )
     {
@@ -783,7 +783,7 @@ namespace
      * What it does:
      * Stores one triple-word vector begin cursor into `outCursor`.
      */
-    [[maybe_unused]] TripleWordValueRuntime** StoreTripleWordVectorBeginCursor(
+    TripleWordValueRuntime** StoreTripleWordVectorBeginCursor(
       const TripleWordVectorRuntime* const vectorState,
       TripleWordValueRuntime** const outCursor
     ) noexcept
@@ -798,7 +798,7 @@ namespace
      * What it does:
      * Stores one triple-word vector end cursor into `outCursor`.
      */
-    [[maybe_unused]] TripleWordValueRuntime** StoreTripleWordVectorEndCursor_A(
+    TripleWordValueRuntime** StoreTripleWordVectorEndCursor_A(
       const TripleWordVectorRuntime* const vectorState,
       TripleWordValueRuntime** const outCursor
     ) noexcept
@@ -813,7 +813,7 @@ namespace
      * What it does:
      * Returns one byte cursor advanced by eight bytes.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t* ComputeByteCursorPlus8(
+    [[nodiscard]] std::uint8_t* ComputeByteCursorPlus8(
       const ByteCursorRuntime* const cursor
     ) noexcept
     {
@@ -826,7 +826,7 @@ namespace
      * What it does:
      * Writes one cursor advanced by `index * 12` bytes into `outCursor`.
      */
-    [[maybe_unused]] ByteCursorRuntime* ComputeByteCursorPlusStride12(
+    ByteCursorRuntime* ComputeByteCursorPlusStride12(
       const ByteCursorRuntime* const baseCursor,
       ByteCursorRuntime* const outCursor,
       const int index
@@ -842,7 +842,7 @@ namespace
      * What it does:
      * Writes one cursor rewound by `index * 12` bytes into `outCursor`.
      */
-    [[maybe_unused]] ByteCursorRuntime* ComputeByteCursorMinusStride12(
+    ByteCursorRuntime* ComputeByteCursorMinusStride12(
       const ByteCursorRuntime* const baseCursor,
       ByteCursorRuntime* const outCursor,
       const int index
@@ -858,7 +858,7 @@ namespace
      * What it does:
      * Writes one cursor advanced by `index * 4` bytes into `outCursor`.
      */
-    [[maybe_unused]] ByteCursorRuntime* ComputeByteCursorPlusStride4(
+    ByteCursorRuntime* ComputeByteCursorPlusStride4(
       const ByteCursorRuntime* const baseCursor,
       ByteCursorRuntime* const outCursor,
       const int index
@@ -874,7 +874,7 @@ namespace
      * What it does:
      * Initializes one inline byte-buffer cursor block and returns `state`.
      */
-    [[maybe_unused]] InlineByteCursorBuffer200Runtime* InitializeInlineByteCursorBuffer200(
+    InlineByteCursorBuffer200Runtime* InitializeInlineByteCursorBuffer200(
       InlineByteCursorBuffer200Runtime* const state
     ) noexcept
     {
@@ -892,7 +892,7 @@ namespace
      * What it does:
      * Returns the current cursor lane from one inline byte-buffer state.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
+    [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
       const InlineByteCursorBufferRuntime* const state
     ) noexcept
     {
@@ -905,7 +905,7 @@ namespace
      * What it does:
      * Returns used-byte count (`current - begin`) for one inline byte-buffer.
      */
-    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
+    [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
       const InlineByteCursorBufferRuntime* const state
     ) noexcept
     {
@@ -918,7 +918,7 @@ namespace
      * What it does:
      * Initializes one inline byte-buffer over `[origin, origin + capacity)`.
      */
-    [[maybe_unused]] InlineByteCursorBufferRuntime* InitializeInlineByteCursorBufferRuntime(
+    InlineByteCursorBufferRuntime* InitializeInlineByteCursorBufferRuntime(
       InlineByteCursorBufferRuntime* const state,
       std::uint8_t* const origin,
       const std::int32_t capacityBytes
@@ -937,7 +937,7 @@ namespace
      * What it does:
      * Returns total capacity in bytes (`end - begin`) for one inline buffer.
      */
-    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
+    [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
       const InlineByteCursorBufferRuntime* const state
     ) noexcept
     {
@@ -950,7 +950,7 @@ namespace
      * What it does:
      * Returns `begin + byteOffset` for one inline byte-buffer.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
+    [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
       const InlineByteCursorBufferRuntime* const state,
       const std::ptrdiff_t byteOffset
     ) noexcept
@@ -964,7 +964,7 @@ namespace
      * What it does:
      * Initializes one 64-byte embedded inline buffer runtime state.
      */
-    [[maybe_unused]] InlineByteCursorBuffer64Runtime* InitializeInlineByteCursorBuffer64Runtime(
+    InlineByteCursorBuffer64Runtime* InitializeInlineByteCursorBuffer64Runtime(
       InlineByteCursorBuffer64Runtime* const state
     ) noexcept
     {
@@ -978,7 +978,7 @@ namespace
      * What it does:
      * Initializes one intrusive ring node as a self-linked singleton.
      */
-    [[maybe_unused]] IntrusiveRingNodeRuntime* InitializeIntrusiveRingNode_A(
+    IntrusiveRingNodeRuntime* InitializeIntrusiveRingNode_A(
       IntrusiveRingNodeRuntime* const node
     ) noexcept
     {
@@ -993,7 +993,7 @@ namespace
      * What it does:
      * Unlinks one intrusive ring node from neighbors and re-self-links it.
      */
-    [[maybe_unused]] IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_A(
+    IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_A(
       IntrusiveRingNodeRuntime* const node
     ) noexcept
     {
@@ -1011,7 +1011,7 @@ namespace
      * What it does:
      * Returns the address of one 16-bit lane at `wordIndex`.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint16_t* ResolveWordTableEntryAddress(
+    [[nodiscard]] std::uint16_t* ResolveWordTableEntryAddress(
       const WordTableRuntime* const table,
       const std::int32_t wordIndex
     ) noexcept
@@ -1025,7 +1025,7 @@ namespace
      * What it does:
      * Unlinks `node` and inserts it immediately before `anchor`.
      */
-    [[maybe_unused]] IntrusiveRingNodeRuntime* RelinkIntrusiveRingNodeBeforeAnchor(
+    IntrusiveRingNodeRuntime* RelinkIntrusiveRingNodeBeforeAnchor(
       IntrusiveRingNodeRuntime* const node,
       IntrusiveRingNodeRuntime* const anchor
     ) noexcept
@@ -1045,7 +1045,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    [[maybe_unused]] IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_B(
+    IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_B(
       IntrusiveRingNodeRuntime* const node
     ) noexcept
     {
@@ -1058,7 +1058,7 @@ namespace
      * What it does:
      * Alias lane that initializes one intrusive ring node as self-linked.
      */
-    [[maybe_unused]] IntrusiveRingNodeRuntime* InitializeIntrusiveRingNode_B(
+    IntrusiveRingNodeRuntime* InitializeIntrusiveRingNode_B(
       IntrusiveRingNodeRuntime* const node
     ) noexcept
     {
@@ -1071,7 +1071,7 @@ namespace
      * What it does:
      * Returns one intrusive node `next` link lane.
      */
-    [[maybe_unused]] [[nodiscard]] IntrusiveRingNodeRuntime* GetIntrusiveRingNodeNext(
+    [[nodiscard]] IntrusiveRingNodeRuntime* GetIntrusiveRingNodeNext(
       const IntrusiveRingNodeRuntime* const node
     ) noexcept
     {
@@ -1103,7 +1103,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    [[maybe_unused]] IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_C(
+    IntrusiveRingNodeRuntime* UnlinkIntrusiveRingNode_C(
       IntrusiveRingNodeRuntime* const node
     ) noexcept
     {
@@ -1116,7 +1116,7 @@ namespace
      * What it does:
      * Initializes one 32-byte embedded inline buffer runtime state.
      */
-    [[maybe_unused]] InlineByteCursorBuffer32Runtime* InitializeInlineByteCursorBuffer32Runtime(
+    InlineByteCursorBuffer32Runtime* InitializeInlineByteCursorBuffer32Runtime(
       InlineByteCursorBuffer32Runtime* const state
     ) noexcept
     {
@@ -1130,7 +1130,7 @@ namespace
      * What it does:
      * Initializes one 120-byte embedded inline buffer runtime state.
      */
-    [[maybe_unused]] InlineByteCursorBuffer120Runtime* InitializeInlineByteCursorBuffer120Runtime(
+    InlineByteCursorBuffer120Runtime* InitializeInlineByteCursorBuffer120Runtime(
       InlineByteCursorBuffer120Runtime* const state
     ) noexcept
     {
@@ -1144,7 +1144,7 @@ namespace
      * What it does:
      * Stores one triple-word vector end cursor into `outCursor`.
      */
-    [[maybe_unused]] TripleWordValueRuntime** StoreTripleWordVectorEndCursor_B(
+    TripleWordValueRuntime** StoreTripleWordVectorEndCursor_B(
       const TripleWordVectorRuntime* const vectorState,
       TripleWordValueRuntime** const outCursor
     ) noexcept
@@ -1159,7 +1159,7 @@ namespace
      * What it does:
      * Returns one byte cursor positioned one triple-word record before `end`.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint8_t* ComputeTripleWordEndMinusOneRecord(
+    [[nodiscard]] std::uint8_t* ComputeTripleWordEndMinusOneRecord(
       const TripleWordVectorRuntime* const vectorState
     ) noexcept
     {
@@ -1173,7 +1173,7 @@ namespace
      * Compacts one triple-word range forward from `readCursor` to `writeCursor`,
      * updates vector end, and stores `writeCursor` to `outCursor`.
      */
-    [[maybe_unused]] TripleWordValueRuntime** CompactTripleWordRangeForward_A(
+    TripleWordValueRuntime** CompactTripleWordRangeForward_A(
       TripleWordVectorRuntime* const vectorState,
       TripleWordValueRuntime** const outCursor,
       TripleWordValueRuntime* const writeCursor,
@@ -1203,7 +1203,7 @@ namespace
      * What it does:
      * Alias lane that compacts one triple-word range forward and updates end.
      */
-    [[maybe_unused]] TripleWordValueRuntime** CompactTripleWordRangeForward_B(
+    TripleWordValueRuntime** CompactTripleWordRangeForward_B(
       TripleWordVectorRuntime* const vectorState,
       TripleWordValueRuntime** const outCursor,
       TripleWordValueRuntime* const writeCursor,
@@ -1219,7 +1219,7 @@ namespace
      * What it does:
      * Resets vector end to begin when begin/end differ.
      */
-    [[maybe_unused]] void ResetTripleWordVectorEndToBegin_A(TripleWordVectorRuntime* const vectorState) noexcept
+    void ResetTripleWordVectorEndToBegin_A(TripleWordVectorRuntime* const vectorState) noexcept
     {
       if (vectorState->begin != vectorState->end) {
         vectorState->end = vectorState->begin;
@@ -1232,7 +1232,7 @@ namespace
      * What it does:
      * Alias lane that resets vector end to begin when begin/end differ.
      */
-    [[maybe_unused]] void ResetTripleWordVectorEndToBegin_B(TripleWordVectorRuntime* const vectorState) noexcept
+    void ResetTripleWordVectorEndToBegin_B(TripleWordVectorRuntime* const vectorState) noexcept
     {
       if (vectorState->begin != vectorState->end) {
         vectorState->end = vectorState->begin;
@@ -1245,7 +1245,7 @@ namespace
      * What it does:
      * Copies one `(4 dword + 1 word)` lane bundle and binds one external tail lane.
      */
-    [[maybe_unused]] FourDwordWordAndTailRuntime* CopyFourDwordWordBundleWithTailLane(
+    FourDwordWordAndTailRuntime* CopyFourDwordWordBundleWithTailLane(
       FourDwordWordAndTailRuntime* const destination,
       const FourDwordWordRuntime* const sourceBundle,
       const std::uint32_t* const tailLaneSource
@@ -1266,7 +1266,7 @@ namespace
      * What it does:
      * Copies one 32-bit lane into destination storage.
      */
-    [[maybe_unused]] std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -1278,7 +1278,7 @@ namespace
      * What it does:
      * Copies one 8-bit lane into destination storage.
      */
-    [[maybe_unused]] std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -1290,7 +1290,7 @@ namespace
      * What it does:
      * Alias lane that copies one 32-bit value.
      */
-    [[maybe_unused]] std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -1302,7 +1302,7 @@ namespace
      * What it does:
      * Alias lane that copies one 8-bit value.
      */
-    [[maybe_unused]] std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -1314,7 +1314,7 @@ namespace
      * What it does:
      * Writes one `(dword, byte)` lane pair into destination storage.
      */
-    [[maybe_unused]] DwordAndByteLanesRuntime* WriteDwordAndByteLanes_A(
+    DwordAndByteLanesRuntime* WriteDwordAndByteLanes_A(
       DwordAndByteLanesRuntime* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -1331,7 +1331,7 @@ namespace
      * What it does:
      * Alias lane that writes one `(dword, byte)` pair.
      */
-    [[maybe_unused]] DwordAndByteLanesRuntime* WriteDwordAndByteLanes_B(
+    DwordAndByteLanesRuntime* WriteDwordAndByteLanes_B(
       DwordAndByteLanesRuntime* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -1348,7 +1348,7 @@ namespace
      * What it does:
      * Clears one node cursor lane to null.
      */
-    [[maybe_unused]] NodeCursorRuntime* ClearNodeCursor_A(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* ClearNodeCursor_A(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = nullptr;
       return cursor;
@@ -1360,7 +1360,7 @@ namespace
      * What it does:
      * Advances one node cursor to `node->next`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToNext_A(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToNext_A(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->next;
       return cursor;
@@ -1372,7 +1372,7 @@ namespace
      * What it does:
      * Alias lane that clears one node cursor lane to null.
      */
-    [[maybe_unused]] NodeCursorRuntime* ClearNodeCursor_B(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* ClearNodeCursor_B(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = nullptr;
       return cursor;
@@ -1384,7 +1384,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->next`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToNext_B(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToNext_B(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->next;
       return cursor;
@@ -1396,7 +1396,7 @@ namespace
      * What it does:
      * Sets one node cursor lane from caller-supplied pointer.
      */
-    [[maybe_unused]] NodeCursorRuntime* SetNodeCursor_A(
+    NodeCursorRuntime* SetNodeCursor_A(
       NodeCursorRuntime* const cursor,
       ForwardLinkNodeRuntime* const node
     ) noexcept
@@ -1411,7 +1411,7 @@ namespace
      * What it does:
      * Alias lane that sets one node cursor from caller-supplied pointer.
      */
-    [[maybe_unused]] NodeCursorRuntime* SetNodeCursor_B(
+    NodeCursorRuntime* SetNodeCursor_B(
       NodeCursorRuntime* const cursor,
       ForwardLinkNodeRuntime* const node
     ) noexcept
@@ -1426,7 +1426,7 @@ namespace
      * What it does:
      * Alias lane that sets one node cursor from caller-supplied pointer.
      */
-    [[maybe_unused]] NodeCursorRuntime* SetNodeCursor_C(
+    NodeCursorRuntime* SetNodeCursor_C(
       NodeCursorRuntime* const cursor,
       ForwardLinkNodeRuntime* const node
     ) noexcept
@@ -1441,7 +1441,7 @@ namespace
      * What it does:
      * Alias lane that sets one node cursor from caller-supplied pointer.
      */
-    [[maybe_unused]] NodeCursorRuntime* SetNodeCursor_D(
+    NodeCursorRuntime* SetNodeCursor_D(
       NodeCursorRuntime* const cursor,
       ForwardLinkNodeRuntime* const node
     ) noexcept
@@ -1456,7 +1456,7 @@ namespace
      * What it does:
      * Alias lane that clears one node cursor lane to null.
      */
-    [[maybe_unused]] NodeCursorRuntime* ClearNodeCursor_C(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* ClearNodeCursor_C(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = nullptr;
       return cursor;
@@ -1468,7 +1468,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->next`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToNext_C(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToNext_C(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->next;
       return cursor;
@@ -1480,7 +1480,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->lane00`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToLane00_A(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToLane00_A(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->lane00;
       return cursor;
@@ -1492,7 +1492,7 @@ namespace
      * What it does:
      * Alias lane that clears one node cursor lane to null.
      */
-    [[maybe_unused]] NodeCursorRuntime* ClearNodeCursor_D(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* ClearNodeCursor_D(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = nullptr;
       return cursor;
@@ -1504,7 +1504,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->next`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToNext_D(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToNext_D(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->next;
       return cursor;
@@ -1516,7 +1516,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->lane00`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToLane00_B(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToLane00_B(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->lane00;
       return cursor;
@@ -1534,7 +1534,7 @@ namespace
      * What it does:
      * Stores one 32-bit input lane into one dword lane object.
      */
-    [[maybe_unused]] SingleDwordLaneRuntime* StoreSingleDwordLane_A(
+    SingleDwordLaneRuntime* StoreSingleDwordLane_A(
       SingleDwordLaneRuntime* const lane,
       const std::uint32_t value
     ) noexcept
@@ -1549,7 +1549,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    [[maybe_unused]] SingleDwordLaneRuntime* StoreSingleDwordLane_B(
+    SingleDwordLaneRuntime* StoreSingleDwordLane_B(
       SingleDwordLaneRuntime* const lane,
       const std::uint32_t value
     ) noexcept
@@ -1564,7 +1564,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    [[maybe_unused]] SingleDwordLaneRuntime* StoreSingleDwordLane_C(
+    SingleDwordLaneRuntime* StoreSingleDwordLane_C(
       SingleDwordLaneRuntime* const lane,
       const std::uint32_t value
     ) noexcept
@@ -1579,7 +1579,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    [[maybe_unused]] SingleDwordLaneRuntime* StoreSingleDwordLane_D(
+    SingleDwordLaneRuntime* StoreSingleDwordLane_D(
       SingleDwordLaneRuntime* const lane,
       const std::uint32_t value
     ) noexcept
@@ -1600,7 +1600,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 4.
      */
-    [[maybe_unused]] int LoadVtableDwordSlot04(const VtableProbeRuntime* const object) noexcept
+    int LoadVtableDwordSlot04(const VtableProbeRuntime* const object) noexcept
     {
       return static_cast<int>(object->vtable[4]);
     }
@@ -1611,7 +1611,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 15.
      */
-    [[maybe_unused]] int LoadVtableDwordSlot15(const VtableProbeRuntime* const object) noexcept
+    int LoadVtableDwordSlot15(const VtableProbeRuntime* const object) noexcept
     {
       return static_cast<int>(object->vtable[15]);
     }
@@ -1622,7 +1622,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->lane00`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToLane00_C(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToLane00_C(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->lane00;
       return cursor;
@@ -1634,7 +1634,7 @@ namespace
      * What it does:
      * Alias lane that advances one node cursor to `node->lane00`.
      */
-    [[maybe_unused]] NodeCursorRuntime* AdvanceNodeCursorToLane00_D(NodeCursorRuntime* const cursor) noexcept
+    NodeCursorRuntime* AdvanceNodeCursorToLane00_D(NodeCursorRuntime* const cursor) noexcept
     {
       cursor->node = cursor->node->lane00;
       return cursor;
@@ -1675,7 +1675,7 @@ namespace
      * What it does:
      * Stores one dereferenced dword lane from source `+0x04` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreDereferencedLane04_A(
+    std::uint32_t* StoreDereferencedLane04_A(
       const TwoDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1690,7 +1690,7 @@ namespace
      * What it does:
      * Stores the dword lane at source `+0x04` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane04_A(
+    std::uint32_t* StoreLane04_A(
       const TwoDwordLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1706,7 +1706,7 @@ namespace
      * Alias lane that stores one dereferenced dword lane from source `+0x04`
      * into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreDereferencedLane04_B(
+    std::uint32_t* StoreDereferencedLane04_B(
       const TwoDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1721,7 +1721,7 @@ namespace
      * What it does:
      * Alias lane that stores the dword lane at source `+0x04` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane04_B(
+    std::uint32_t* StoreLane04_B(
       const TwoDwordLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1736,7 +1736,7 @@ namespace
      * What it does:
      * Alias lane that stores the dword lane at source `+0x04` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane04_C(
+    std::uint32_t* StoreLane04_C(
       const TwoDwordLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1751,7 +1751,7 @@ namespace
      * What it does:
      * Stores the dword lane at source `+0x08` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane08_A(
+    std::uint32_t* StoreLane08_A(
       const ThreeDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1766,7 +1766,7 @@ namespace
      * What it does:
      * Alias lane that stores the dword lane at source `+0x04` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane04_D(
+    std::uint32_t* StoreLane04_D(
       const TwoDwordLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1781,7 +1781,7 @@ namespace
      * What it does:
      * Alias lane that stores the dword lane at source `+0x08` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane08_B(
+    std::uint32_t* StoreLane08_B(
       const ThreeDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1803,7 +1803,7 @@ namespace
      * Pops one head-address lane into output, then advances head to
      * `*currentHead`.
      */
-    [[maybe_unused]] std::uint32_t* PopHeadAddressToOut_A(
+    std::uint32_t* PopHeadAddressToOut_A(
       HeadAddressLaneRuntime* const head,
       std::uint32_t* const outValue
     ) noexcept
@@ -1822,7 +1822,7 @@ namespace
      * Alias lane that pops one head-address lane into output, then advances
      * head to `*currentHead`.
      */
-    [[maybe_unused]] std::uint32_t* PopHeadAddressToOut_B(
+    std::uint32_t* PopHeadAddressToOut_B(
       HeadAddressLaneRuntime* const head,
       std::uint32_t* const outValue
     ) noexcept
@@ -1847,7 +1847,7 @@ namespace
      * Computes one dword address lane as `base + index*4` and stores it into
      * output.
      */
-    [[maybe_unused]] std::uint32_t* StoreDwordAddressStride4_A(
+    std::uint32_t* StoreDwordAddressStride4_A(
       const DwordBaseAddressLaneRuntime* const base,
       std::uint32_t* const outValue,
       const int index
@@ -1864,7 +1864,7 @@ namespace
      * Alias lane that computes one dword address as `base + index*4` and
      * stores it into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreDwordAddressStride4_B(
+    std::uint32_t* StoreDwordAddressStride4_B(
       const DwordBaseAddressLaneRuntime* const base,
       std::uint32_t* const outValue,
       const int index
@@ -1880,7 +1880,7 @@ namespace
      * What it does:
      * Stores one dereferenced dword lane from source `+0x08` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreDereferencedLane08_A(
+    std::uint32_t* StoreDereferencedLane08_A(
       const ThreeDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1895,7 +1895,7 @@ namespace
      * What it does:
      * Stores the dword lane at source `+0x08` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane08_C(
+    std::uint32_t* StoreLane08_C(
       const ThreeDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1911,7 +1911,7 @@ namespace
      * Alias lane that stores one dereferenced dword lane from source `+0x08`
      * into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreDereferencedLane08_B(
+    std::uint32_t* StoreDereferencedLane08_B(
       const ThreeDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -1926,7 +1926,7 @@ namespace
      * What it does:
      * Alias lane that stores the dword lane at source `+0x08` into output.
      */
-    [[maybe_unused]] std::uint32_t* StoreLane08_D(
+    std::uint32_t* StoreLane08_D(
       const ThreeDwordAndPointerLaneRuntime* const source,
       std::uint32_t* const outValue
     ) noexcept
@@ -2383,7 +2383,7 @@ namespace
      * Returns one node-search state lane for `(x,z)` by key lookup, inserting
      * a zero-initialized state when the key is not present.
      */
-    [[maybe_unused]] [[nodiscard]] ClusterNodeSearchState&
+    [[nodiscard]] ClusterNodeSearchState&
     ClusterNodeStateMapIndex(ClusterNodeSearchStateMap& stateByCoordinate, const std::uint8_t nodeX, const std::uint8_t nodeZ)
     {
         const std::uint16_t packedCoordinate = PackClusterNodeCoordinate(nodeX, nodeZ);
@@ -3574,7 +3574,7 @@ namespace
      * Gathers boundary nodes from 4x4 child clusters into one packed `uint16`
      * node list, then sorts and de-duplicates that packed node lane in-place.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
+    [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
       const gpg::HaStar::SubclusterData& subcluster,
       InlineBackedU16VectorRuntime& outNodes
     )
@@ -3656,7 +3656,7 @@ namespace
         "FastVectorN12CharRuntime::inlineOrigin offset must be 0x0C"
     );
 
-    [[maybe_unused]] void EnsureFastVectorN12CharCapacity(FastVectorN12CharRuntime& view, const unsigned int requiredCount)
+    void EnsureFastVectorN12CharCapacity(FastVectorN12CharRuntime& view, const unsigned int requiredCount)
     {
         const auto currentCapacity = (view.start != nullptr && view.capacityEnd != nullptr)
             ? static_cast<unsigned int>(view.capacityEnd - view.start)
@@ -3731,7 +3731,7 @@ namespace
      * Erases one byte range `[eraseBegin, eraseEnd)` from a `fastvector_n<char,12>`
      * lane by shifting the trailing tail left and updating the end cursor.
      */
-    [[maybe_unused]] [[nodiscard]] char* FastVectorN12CharEraseRange(
+    [[nodiscard]] char* FastVectorN12CharEraseRange(
         FastVectorN12CharRuntime& view,
         char* const eraseBegin,
         char* const eraseEnd
@@ -3755,7 +3755,7 @@ namespace
      * Releases dynamic storage for one `fastvector_n<char,12>` lane when active,
      * then restores the inline-storage cursor lanes.
      */
-    [[maybe_unused]] [[nodiscard]] char* FastVectorN12CharReleaseHeapStorage(
+    [[nodiscard]] char* FastVectorN12CharReleaseHeapStorage(
         FastVectorN12CharRuntime& view
     ) noexcept
     {
@@ -3884,7 +3884,7 @@ namespace
      * `gpg::HaStar::Cluster`, handling both vector-destruct (`flags&2`) and
      * optional storage release (`flags&1`).
      */
-    [[maybe_unused]] void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
+    void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
     {
         if ((flags & 0x02u) != 0u) {
 #if INTPTR_MAX == INT32_MAX
@@ -3947,7 +3947,7 @@ namespace
      * What it does:
      * Stores two source dword lanes into one two-dword destination record.
      */
-    [[maybe_unused]] TwoDwordLaneRuntime* StoreTwoDwordLanesFromSources_A(
+    TwoDwordLaneRuntime* StoreTwoDwordLanesFromSources_A(
       TwoDwordLaneRuntime* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -3965,7 +3965,7 @@ namespace
      * Alias lane that stores two source dword lanes into one destination
      * two-dword record.
      */
-    [[maybe_unused]] TwoDwordLaneRuntime* StoreTwoDwordLanesFromSources_B(
+    TwoDwordLaneRuntime* StoreTwoDwordLanesFromSources_B(
       TwoDwordLaneRuntime* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -4337,7 +4337,7 @@ namespace
      * Computes geometric node-to-node distance, quantizes traversal cost, and
      * writes one edge-cost byte into `out`.
      */
-    [[maybe_unused]] std::uint8_t* QuantizeClusterNodeEdgeCost(
+    std::uint8_t* QuantizeClusterNodeEdgeCost(
       std::uint8_t* const out,
       const ClusterNodeCoordinateRuntime& from,
       const ClusterNodeCoordinateRuntime& to,
@@ -4972,7 +4972,7 @@ Cluster ClusterBuild(const OccupationData& occupationData)
  */
 Cluster ClusterBuild(const SubclusterData& subclusterData)
 {
-    [[maybe_unused]] ClusterSearchScratch searchScratch{};
+    ClusterSearchScratch searchScratch{};
     searchScratch.Reset();
     (void)subclusterData;
 
