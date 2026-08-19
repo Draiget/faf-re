@@ -161,7 +161,7 @@ namespace moho
      * Allocates and zero-seeds one unit-blueprint map head node with legacy
      * tree color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateUnitBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateUnitBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
@@ -173,7 +173,7 @@ namespace moho
      * Allocates and zero-seeds one projectile-blueprint map head node with the
      * legacy tree color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateProjectileBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateProjectileBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
@@ -185,7 +185,7 @@ namespace moho
      * Allocates and zero-seeds one prop-blueprint map head node with the
      * legacy tree color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocatePropBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocatePropBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
@@ -197,7 +197,7 @@ namespace moho
      * Allocates and zero-seeds one mesh-blueprint map head node with the
      * legacy tree color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateMeshBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateMeshBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
@@ -209,7 +209,7 @@ namespace moho
      * Allocates and zero-seeds one emitter-blueprint map head node with the
      * legacy tree color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateEmitterBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateEmitterBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
@@ -221,12 +221,12 @@ namespace moho
      * Allocates and zero-seeds one beam-blueprint map head node with the
      * legacy tree color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateBeamBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateBeamBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
 
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateTrailBlueprintMapHeadNode()
+    [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateTrailBlueprintMapHeadNode()
     {
       return reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
     }
@@ -539,7 +539,7 @@ namespace moho
      * Stores one projectile-map begin-node lane (`head->left`) into caller
      * output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintMapBeginNodeLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintMapBeginNodeLane(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesMapOwnerRuntimeView* const owner
     ) noexcept
@@ -554,7 +554,7 @@ namespace moho
      * Stores one prop-map begin-node lane (`head->left`) into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintMapBeginNodeLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintMapBeginNodeLane(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesMapOwnerRuntimeView* const owner
     ) noexcept
@@ -569,7 +569,7 @@ namespace moho
      * Stores one mesh-map begin-node lane (`head->left`) into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintMapBeginNodeLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintMapBeginNodeLane(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesMapOwnerRuntimeView* const owner
     ) noexcept
@@ -638,7 +638,7 @@ namespace moho
      * Stores one associative-map begin-node lane (`head->left`) into caller
      * output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneA(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneA(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -653,7 +653,7 @@ namespace moho
      * Stores one associative-map begin-node lane (`head->left`) into caller
      * output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneB(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneB(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -668,7 +668,7 @@ namespace moho
      * Stores one associative-map end-node lane (`head`) into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapEndNodeFromHeadLaneA(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapEndNodeFromHeadLaneA(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -683,7 +683,7 @@ namespace moho
      * Stores one associative-map begin-node lane (`head->left`) into caller
      * output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneC(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneC(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -698,7 +698,7 @@ namespace moho
      * Stores one associative-map end-node lane (`head`) into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapEndNodeFromHeadLaneB(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapEndNodeFromHeadLaneB(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -712,7 +712,7 @@ namespace moho
      * What it does:
      * Stores one opaque pointer lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneA(void** const outValue, void* const value) noexcept
+    [[nodiscard]] void** StoreOpaquePointerLaneA(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -724,7 +724,7 @@ namespace moho
      * Stores one Lua-export binding-array begin lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingBeginLaneAdapter(
+    [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingBeginLaneAdapter(
       RRuleGameRulesLuaExportBinding** const outBinding,
       const RRuleGameRulesLuaExportBindingArray* const bindingArray
     ) noexcept
@@ -738,7 +738,7 @@ namespace moho
      * What it does:
      * Stores one Lua-export binding-array end lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingEndLaneAdapter(
+    [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingEndLaneAdapter(
       RRuleGameRulesLuaExportBinding** const outBinding,
       const RRuleGameRulesLuaExportBindingArray* const bindingArray
     ) noexcept
@@ -753,7 +753,7 @@ namespace moho
      * Stores one unit-blueprint map begin node lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreUnitBlueprintMapBeginNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreUnitBlueprintMapBeginNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -767,7 +767,7 @@ namespace moho
      * What it does:
      * Stores one unit-blueprint map end node lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreUnitBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreUnitBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -782,7 +782,7 @@ namespace moho
      * Stores one projectile-blueprint map end node lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -796,7 +796,7 @@ namespace moho
      * What it does:
      * Stores one prop-blueprint map end node lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -810,7 +810,7 @@ namespace moho
      * What it does:
      * Stores one mesh-blueprint map end node lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -825,7 +825,7 @@ namespace moho
      * Stores one emitter-blueprint map begin node lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintMapBeginNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintMapBeginNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -840,7 +840,7 @@ namespace moho
      * Stores one emitter-blueprint map end node lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -855,7 +855,7 @@ namespace moho
      * Stores one beam-blueprint map begin node lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintMapBeginNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintMapBeginNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -869,7 +869,7 @@ namespace moho
      * What it does:
      * Stores one beam-blueprint map end node lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -884,7 +884,7 @@ namespace moho
      * Stores one trail-blueprint map begin node lane into caller output
      * storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintMapBeginNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintMapBeginNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -898,7 +898,7 @@ namespace moho
      * What it does:
      * Stores one trail-blueprint map end node lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintMapEndNodeLaneAdapter(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintMapEndNodeLaneAdapter(
       RRuleGameRulesBlueprintNode** const outNode,
       const RRuleGameRulesBlueprintMap* const map
     ) noexcept
@@ -912,7 +912,7 @@ namespace moho
      * What it does:
      * Stores one opaque pointer lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneB(void** const outValue, void* const value) noexcept
+    [[nodiscard]] void** StoreOpaquePointerLaneB(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -923,7 +923,7 @@ namespace moho
      * What it does:
      * Stores one opaque pointer lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneC(void** const outValue, void* const value) noexcept
+    [[nodiscard]] void** StoreOpaquePointerLaneC(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -935,7 +935,7 @@ namespace moho
      * Unlinks one Lua-task intrusive node from its current list and rewires it
      * to a self-linked singleton.
      */
-    [[maybe_unused]] [[nodiscard]] LuaTaskListNode* DetachLuaTaskListNodeToSelfLinkedLane(
+    [[nodiscard]] LuaTaskListNode* DetachLuaTaskListNodeToSelfLinkedLane(
       LuaTaskListNode* const node
     ) noexcept
     {
@@ -953,7 +953,7 @@ namespace moho
      * Unlinks one Lua-task intrusive node, self-links it, then inserts it
      * directly after one anchor node.
      */
-    [[maybe_unused]] [[nodiscard]] LuaTaskListNode* DetachAndInsertLuaTaskListNodeAfterLane(
+    [[nodiscard]] LuaTaskListNode* DetachAndInsertLuaTaskListNodeAfterLane(
       LuaTaskListNode* const node,
       LuaTaskListNode* const anchor
     ) noexcept
@@ -987,7 +987,7 @@ namespace moho
      * Returns one Lua-export binding-array capacity count lane measured in
      * 16-byte binding elements.
      */
-    [[maybe_unused]] int GetLuaExportBindingCapacityLane(const RRuleGameRulesLuaExportBindingArray* const bindingArray)
+    int GetLuaExportBindingCapacityLane(const RRuleGameRulesLuaExportBindingArray* const bindingArray)
     {
       return ComputeLuaExportBindingCapacityLane(bindingArray);
     }
@@ -998,7 +998,7 @@ namespace moho
      * What it does:
      * Swaps two 32-bit value lanes and returns the left-hand storage pointer.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t* SwapDwordLaneValues(
+    [[nodiscard]] std::uint32_t* SwapDwordLaneValues(
       std::uint32_t* const lhs,
       std::uint32_t* const rhs
     ) noexcept
@@ -1015,7 +1015,7 @@ namespace moho
      * What it does:
      * Stores one iterator-node pointer lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneA(void** const outValue, void* const value) noexcept
+    [[nodiscard]] void** StoreIteratorNodePointerLaneA(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -1026,7 +1026,7 @@ namespace moho
      * What it does:
      * Stores one iterator-node pointer lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneB(void** const outValue, void* const value) noexcept
+    [[nodiscard]] void** StoreIteratorNodePointerLaneB(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -1037,7 +1037,7 @@ namespace moho
      * What it does:
      * Stores one iterator-node pointer lane into caller output storage.
      */
-    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneC(void** const outValue, void* const value) noexcept
+    [[nodiscard]] void** StoreIteratorNodePointerLaneC(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -1049,7 +1049,7 @@ namespace moho
      * Adapter lane that stores one projectile-blueprint map lower-bound node
      * into caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintLowerBoundAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintLowerBoundAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1065,7 +1065,7 @@ namespace moho
      * Adapter lane that stores one prop-blueprint map lower-bound node into
      * caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintLowerBoundAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintLowerBoundAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1081,7 +1081,7 @@ namespace moho
      * Adapter lane that stores one mesh-blueprint map lower-bound node into
      * caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintLowerBoundAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintLowerBoundAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1097,7 +1097,7 @@ namespace moho
      * Adapter lane that stores one emitter-blueprint map lower-bound node into
      * caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintLowerBoundAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintLowerBoundAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1113,7 +1113,7 @@ namespace moho
      * Adapter lane that stores one beam-blueprint map lower-bound node into
      * caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintLowerBoundAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintLowerBoundAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1129,7 +1129,7 @@ namespace moho
      * Adapter lane that stores one beam-map lookup candidate node into
      * caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamMapLookupAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamMapLookupAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1145,7 +1145,7 @@ namespace moho
      * Adapter lane that stores one trail-blueprint map lower-bound node into
      * caller-provided output storage.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintLowerBoundAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintLowerBoundAdapterLane(
       const RRuleGameRulesBlueprintMap* const map,
       const msvc8::string* const lookupId,
       RRuleGameRulesBlueprintNode** const outNode
@@ -1351,7 +1351,7 @@ namespace moho
      * Initializes one list-container runtime lane from an explicit allocator
      * proxy and self-links the sentinel task node.
      */
-    [[maybe_unused]] LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainerWithProxy(
+    LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainerWithProxy(
       void* const allocProxy,
       LuaTaskListContainerRuntimeView* const container
     )
@@ -1366,7 +1366,7 @@ namespace moho
      * Initializes one list-container runtime lane and self-links its sentinel
      * task node.
      */
-    [[maybe_unused]] LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainerDefault(
+    LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainerDefault(
       LuaTaskListContainerRuntimeView* const container
     )
     {
@@ -1380,7 +1380,7 @@ namespace moho
      * Initializes one Lua-task list container head lane as a self-linked
      * sentinel node and returns that sentinel pointer.
      */
-    [[maybe_unused]] [[nodiscard]] LuaTaskListNode* InitializeLuaTaskListContainerHeadLane(
+    [[nodiscard]] LuaTaskListNode* InitializeLuaTaskListContainerHeadLane(
       LuaTaskListContainerRuntimeView* const container
     )
     {
@@ -1400,7 +1400,7 @@ namespace moho
      * Initializes one blueprint-map runtime header, marks the head as sentinel,
      * and self-links `{left,parent,right}` to that head.
      */
-    [[maybe_unused]] RRuleGameRulesBlueprintMap* InitializeBlueprintMapHeader(RRuleGameRulesBlueprintMap* const map)
+    RRuleGameRulesBlueprintMap* InitializeBlueprintMapHeader(RRuleGameRulesBlueprintMap* const map)
     {
       map->mHead = reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
       map->mHead->mIsSentinel = 1u;
@@ -1418,7 +1418,7 @@ namespace moho
      * Initializes one projectile-blueprint map header and self-links the
      * sentinel head node lanes.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeProjectileBlueprintMapHeaderAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeProjectileBlueprintMapHeaderAdapterLane(
       RRuleGameRulesBlueprintMap* const map
     )
     {
@@ -1432,7 +1432,7 @@ namespace moho
      * Initializes one prop-blueprint map header and self-links the sentinel
      * head node lanes.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintMap* InitializePropBlueprintMapHeaderAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializePropBlueprintMapHeaderAdapterLane(
       RRuleGameRulesBlueprintMap* const map
     )
     {
@@ -1446,7 +1446,7 @@ namespace moho
      * Initializes one mesh-blueprint map header and self-links the sentinel
      * head node lanes.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeMeshBlueprintMapHeaderAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeMeshBlueprintMapHeaderAdapterLane(
       RRuleGameRulesBlueprintMap* const map
     )
     {
@@ -1460,7 +1460,7 @@ namespace moho
      * Initializes one emitter-blueprint map header and self-links the sentinel
      * head node lanes.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeEmitterBlueprintMapHeaderAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeEmitterBlueprintMapHeaderAdapterLane(
       RRuleGameRulesBlueprintMap* const map
     )
     {
@@ -1474,7 +1474,7 @@ namespace moho
      * Initializes one beam-blueprint map header and self-links the sentinel
      * head node lanes.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeBeamBlueprintMapHeaderAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeBeamBlueprintMapHeaderAdapterLane(
       RRuleGameRulesBlueprintMap* const map
     )
     {
@@ -1488,7 +1488,7 @@ namespace moho
      * Initializes one trail-blueprint map header and self-links the sentinel
      * head node lanes.
      */
-    [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeTrailBlueprintMapHeaderAdapterLane(
+    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeTrailBlueprintMapHeaderAdapterLane(
       RRuleGameRulesBlueprintMap* const map
     )
     {
@@ -1502,7 +1502,7 @@ namespace moho
      * Releases one Lua-export binding storage allocation and zeros begin/end/
      * capacity pointer lanes.
      */
-    [[maybe_unused]] void ResetLuaExportBindingStorageAdapterLane(
+    void ResetLuaExportBindingStorageAdapterLane(
       RRuleGameRulesLuaExportBindingArray* const storage
     ) noexcept
     {
@@ -1520,7 +1520,7 @@ namespace moho
      * What it does:
      * Releases one raw runtime storage lane through global `operator delete`.
      */
-    [[maybe_unused]] void DeleteRuntimeStorageLane(void* const storage)
+    void DeleteRuntimeStorageLane(void* const storage)
     {
       ::operator delete(storage);
     }
@@ -1818,7 +1818,7 @@ namespace moho
      * subsequently drained into the reload queue on the next
      * `UpdateLuaState` invocation through `EnqueueLuaReloadRequest`.
      */
-    [[maybe_unused]] void StageBlueprintReloadByPath(const msvc8::string& path)
+    void StageBlueprintReloadByPath(const msvc8::string& path)
     {
       gPendingBlueprintReloadPath = path;
     }
@@ -2051,7 +2051,7 @@ namespace moho
    * Executes the base-constructor instance-counter increment lane used by
    * `RRuleGameRules` startup construction.
    */
-  [[maybe_unused]] RRuleGameRules* initialize_RRuleGameRulesCtorCounterLane(RRuleGameRules* const object)
+  RRuleGameRules* initialize_RRuleGameRulesCtorCounterLane(RRuleGameRules* const object)
   {
     if (object == nullptr) {
       return nullptr;
@@ -2223,7 +2223,7 @@ namespace moho
    * Executes the scalar-deleting wrapper lane for `RRuleGameRulesImpl` by
    * running the core destructor body and optionally releasing object storage.
    */
-  [[maybe_unused]] RRuleGameRulesImpl* DestroyRRuleGameRulesImplWithDeleteFlag(
+  RRuleGameRulesImpl* DestroyRRuleGameRulesImplWithDeleteFlag(
     RRuleGameRulesImpl* const object,
     const std::uint8_t deleteFlags
   )
