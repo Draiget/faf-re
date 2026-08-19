@@ -327,30 +327,6 @@ namespace
   }
 
   /**
-   * Address: 0x004EB830 (FUN_004EB830)
-   *
-   * What it does:
-   * Thin local alias that forwards thrust-manipulator orientation blending to
-   * the canonical `moho::BlendOrientationDeltaByMaxAngle` helper.
-   */
-  [[nodiscard]] Wm3::Quaternionf* BlendThrustOrientationDelta(
-    const Wm3::Quaternionf& currentOrientation,
-    const Wm3::Quaternionf& targetOrientation,
-    const float turnStepRadians,
-    bool* const outNoStep,
-    Wm3::Quaternionf* const outOrientation
-  ) noexcept
-  {
-    return moho::BlendOrientationDeltaByMaxAngle(
-      currentOrientation,
-      targetOrientation,
-      turnStepRadians,
-      outNoStep,
-      outOrientation
-    );
-  }
-
-  /**
    * Address: 0x0064B6E0 (FUN_0064B6E0, CThrustManipulator serializer load body)
    *
    * What it does:
@@ -790,7 +766,12 @@ namespace moho
     (void)BuildShortestArcDeltaQuaternion(&targetOrientation, localDesired, runtime->mDirectionLane);
 
     Wm3::Quaternionf blendedOrientation{};
-    (void)BlendThrustOrientationDelta(runtime->mOrientation, targetOrientation, runtime->mTurnSpeed, nullptr, &blendedOrientation);
+    // 0x004EB830, shared with CSlaveManipulator::ManipulatorUpdate - the
+    // max-rate-limited reorientation step, called here exactly as the binary
+    // calls it rather than through a local forwarder.
+    (void)moho::BlendOrientationDeltaByMaxAngle(
+      runtime->mOrientation, targetOrientation, runtime->mTurnSpeed, nullptr, &blendedOrientation
+    );
 
     watchedBone->Rotate(blendedOrientation);
     runtime->mOrientation = blendedOrientation;
