@@ -79,7 +79,7 @@ namespace Wm3
    * Constructs three contiguous `TRational<32>` objects at `0x100`-byte stride
    * and returns the original destination pointer.
    */
-  [[maybe_unused]] char* ConstructRational32TripleAtStride256(char* const destination) noexcept
+  char* ConstructRational32TripleAtStride256(char* const destination) noexcept
   {
     auto* cursor = reinterpret_cast<std::uint8_t*>(destination);
     for (int index = 0; index < 3; ++index) {
@@ -96,7 +96,7 @@ namespace Wm3
    * Constructs three contiguous `TRational<64>` objects at `0x200`-byte stride
    * and returns the original destination pointer.
    */
-  [[maybe_unused]] char* ConstructRational64TripleAtStride512(char* const destination) noexcept
+  char* ConstructRational64TripleAtStride512(char* const destination) noexcept
   {
     auto* cursor = reinterpret_cast<std::uint8_t*>(destination);
     for (int index = 0; index < 3; ++index) {
@@ -113,7 +113,7 @@ namespace Wm3
    * Constructs two contiguous `TRational<16>` objects at `0x80`-byte stride
    * and returns the original destination pointer.
    */
-  [[maybe_unused]] char* ConstructRational16PairAtStride128(char* const destination) noexcept
+  char* ConstructRational16PairAtStride128(char* const destination) noexcept
   {
     auto* cursor = reinterpret_cast<std::uint8_t*>(destination);
     for (int index = 0; index < 2; ++index) {
@@ -130,7 +130,7 @@ namespace Wm3
    * Constructs two contiguous `TRational<32>` objects at `0x100`-byte stride
    * and returns the original destination pointer.
    */
-  [[maybe_unused]] char* ConstructRational32PairAtStride256(char* const destination) noexcept
+  char* ConstructRational32PairAtStride256(char* const destination) noexcept
   {
     auto* cursor = reinterpret_cast<std::uint8_t*>(destination);
     for (int index = 0; index < 2; ++index) {
@@ -151,7 +151,7 @@ namespace Wm3
     std::uint8_t gIntersectorDouble3RuntimeVtableTag = 0;
     std::uint8_t gQueryRuntimeVtableTag = 0;
 
-    [[maybe_unused]] void* RebindIntersectorDouble2RuntimeBaseVtable(
+    void* RebindIntersectorDouble2RuntimeBaseVtable(
       void* const intersectorRuntime
     ) noexcept
     {
@@ -162,7 +162,7 @@ namespace Wm3
       return runtime;
     }
 
-    [[maybe_unused]] void* RebindIntersectorDouble3RuntimeBaseVtable(
+    void* RebindIntersectorDouble3RuntimeBaseVtable(
       void* const intersectorRuntime
     ) noexcept
     {
@@ -173,7 +173,7 @@ namespace Wm3
       return runtime;
     }
 
-    [[maybe_unused]] void* RebindWm3RuntimeVtableWithFlag(
+    void* RebindWm3RuntimeVtableWithFlag(
       void* const runtimeObject,
       void* const reboundVtableTag,
       const std::uint8_t deleteFlags
@@ -197,7 +197,7 @@ namespace Wm3
    * Initializes one `Intersector<double, Vector2<double>>` runtime base lane
    * by binding the base vtable and clearing contact-time/type result lanes.
    */
-  [[maybe_unused]] void* ConstructIntersectorDouble2RuntimeBase(
+  void* ConstructIntersectorDouble2RuntimeBase(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -235,7 +235,7 @@ namespace Wm3
    * Initializes one `Intersector<double, Vector3<double>>` runtime base lane
    * by binding the base vtable and clearing contact-time/type result lanes.
    */
-  [[maybe_unused]] void* ConstructIntersectorDouble3RuntimeBase(
+  void* ConstructIntersectorDouble3RuntimeBase(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -273,7 +273,7 @@ namespace Wm3
    * Rebinds one `Intersector<double, Vector2<double>>` runtime object to the
    * base intersector vtable lane.
    */
-  [[maybe_unused]] void RebindIntersectorDouble2RuntimeBaseVtableThunk(
+  void RebindIntersectorDouble2RuntimeBaseVtableThunk(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -287,7 +287,7 @@ namespace Wm3
    * Rebinds one `Intersector<double, Vector3<double>>` runtime object to the
    * base intersector vtable lane.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble3RuntimeBaseVtableLaneE(
+  void* RebindIntersectorDouble3RuntimeBaseVtableLaneE(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -301,7 +301,7 @@ namespace Wm3
    * Tail-forwards one intersector base-vtable rebind thunk lane into the
    * canonical `Intersector<double, Vector3<double>>` base rebind helper.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble3RuntimeBaseVtableThunkLaneB(
+  void* RebindIntersectorDouble3RuntimeBaseVtableThunkLaneB(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -315,7 +315,7 @@ namespace Wm3
    * Thunk lane that forwards to the canonical
    * `Intersector<double, Vector3<double>>` base-vtable rebind helper.
    */
-  [[maybe_unused]] void RebindIntersectorDouble3RuntimeBaseVtableThunkLane(
+  void RebindIntersectorDouble3RuntimeBaseVtableThunkLane(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -328,7 +328,7 @@ namespace Wm3
    * What it does:
    * Returns the signed 2x2 determinant `a1*a4 - a2*a3` in 64-bit precision.
    */
-  [[maybe_unused]] std::int64_t ComputeDeterminant2x2Int64LaneA(
+  std::int64_t ComputeDeterminant2x2Int64LaneA(
     const std::int64_t a1,
     const std::int64_t a2,
     const std::int64_t a3,
@@ -344,7 +344,7 @@ namespace Wm3
    * What it does:
    * Alias lane of the signed 2x2 determinant helper.
    */
-  [[maybe_unused]] std::int64_t ComputeDeterminant2x2Int64LaneB(
+  std::int64_t ComputeDeterminant2x2Int64LaneB(
     const std::int64_t a1,
     const std::int64_t a2,
     const std::int64_t a3,
@@ -360,7 +360,7 @@ namespace Wm3
    * What it does:
    * Copies one 64-byte runtime lane from `source` into `destination`.
    */
-  [[maybe_unused]] void* Copy64ByteRuntimeLaneA(
+  void* Copy64ByteRuntimeLaneA(
     void* const destination,
     const void* const source
   ) noexcept
@@ -375,7 +375,7 @@ namespace Wm3
    * What it does:
    * Alias lane that copies one 64-byte runtime block.
    */
-  [[maybe_unused]] void* Copy64ByteRuntimeLaneB(
+  void* Copy64ByteRuntimeLaneB(
     void* const destination,
     const void* const source
   ) noexcept
@@ -390,7 +390,7 @@ namespace Wm3
    * Copies two adjacent 64-byte runtime lanes (128 bytes total) from source
    * into destination.
    */
-  [[maybe_unused]] void* CopyDual64ByteRuntimeLaneA(
+  void* CopyDual64ByteRuntimeLaneA(
     void* const destination,
     const void* const source
   ) noexcept
@@ -408,7 +408,7 @@ namespace Wm3
    * What it does:
    * Alias lane that copies two adjacent 64-byte runtime blocks.
    */
-  [[maybe_unused]] void* CopyDual64ByteRuntimeLaneB(
+  void* CopyDual64ByteRuntimeLaneB(
     void* const destination,
     const void* const source
   ) noexcept
@@ -423,7 +423,7 @@ namespace Wm3
    * Adapter lane that forwards to the canonical helper that rebinds one
    * `Intersector<double, Vector3<double>>` runtime base vtable.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble3BaseAdapterLaneA(
+  void* RebindIntersectorDouble3BaseAdapterLaneA(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -437,7 +437,7 @@ namespace Wm3
    * Adapter lane that forwards to the canonical helper that rebinds one
    * `Intersector<double, Vector3<double>>` runtime base vtable.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble3BaseAdapterLaneB(
+  void* RebindIntersectorDouble3BaseAdapterLaneB(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -451,7 +451,7 @@ namespace Wm3
    * Adapter lane that forwards to the canonical helper that rebinds one
    * `Intersector<double, Vector3<double>>` runtime base vtable.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble3BaseAdapterLaneC(
+  void* RebindIntersectorDouble3BaseAdapterLaneC(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -465,7 +465,7 @@ namespace Wm3
    * Adapter lane that forwards to the canonical helper that rebinds one
    * `Intersector<double, Vector3<double>>` runtime base vtable.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble3BaseAdapterLaneD(
+  void* RebindIntersectorDouble3BaseAdapterLaneD(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -479,7 +479,7 @@ namespace Wm3
    * Adapter lane that forwards to the canonical helper that rebinds one
    * `Intersector<double, Vector2<double>>` runtime base vtable.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble2BaseAdapterLaneA(
+  void* RebindIntersectorDouble2BaseAdapterLaneA(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -493,7 +493,7 @@ namespace Wm3
    * Adapter lane that forwards to the canonical helper that rebinds one
    * `Intersector<double, Vector2<double>>` runtime base vtable.
    */
-  [[maybe_unused]] void* RebindIntersectorDouble2BaseAdapterLaneB(
+  void* RebindIntersectorDouble2BaseAdapterLaneB(
     void* const intersectorRuntime
   ) noexcept
   {
@@ -526,7 +526,7 @@ namespace Wm3
    * Constructs one `IntrBox2Circle2<double>` runtime payload by initializing
    * the double-precision intersector base lane and binding box/circle owners.
    */
-  [[maybe_unused]] IntrBox2Circle2dCtorRuntimeView* ConstructIntrBox2Circle2dRuntime(
+  IntrBox2Circle2dCtorRuntimeView* ConstructIntrBox2Circle2dRuntime(
     IntrBox2Circle2dCtorRuntimeView* const runtime,
     const Box2<double>* const box,
     const void* const circle
@@ -552,7 +552,7 @@ namespace Wm3
    * Rebinds one `Wm3::Query`-derived runtime object to the `Query` base
    * vtable lane.
    */
-  [[maybe_unused]] void* RebindQueryRuntimeBaseVtableLaneA(
+  void* RebindQueryRuntimeBaseVtableLaneA(
     void* const queryRuntime
   ) noexcept
   {
@@ -570,7 +570,7 @@ namespace Wm3
    * Rebinds one `Wm3::Query`-derived runtime object to the `Query` base
    * vtable lane (alternate constructor lane).
    */
-  [[maybe_unused]] void* RebindQueryRuntimeBaseVtableLaneB(
+  void* RebindQueryRuntimeBaseVtableLaneB(
     void* const queryRuntime
   ) noexcept
   {
@@ -584,7 +584,7 @@ namespace Wm3
    * Rebinds one `Wm3::Query`-derived runtime object to the `Query` base
    * vtable lane (2D rational query family lane A).
    */
-  [[maybe_unused]] void* RebindQueryRuntimeBaseVtableLaneC(
+  void* RebindQueryRuntimeBaseVtableLaneC(
     void* const queryRuntime
   ) noexcept
   {
@@ -598,7 +598,7 @@ namespace Wm3
    * Rebinds one `Wm3::Query`-derived runtime object to the `Query` base
    * vtable lane (2D rational query family lane B).
    */
-  [[maybe_unused]] void* RebindQueryRuntimeBaseVtableLaneD(
+  void* RebindQueryRuntimeBaseVtableLaneD(
     void* const queryRuntime
   ) noexcept
   {
@@ -642,7 +642,7 @@ namespace Wm3
    * Constructs one `Wm3::Query` runtime base lane by binding the base query
    * vtable and returning `this`.
    */
-  [[maybe_unused]] VtableOnlyRuntime* ConstructQueryRuntimeBaseVtableLaneA(
+  VtableOnlyRuntime* ConstructQueryRuntimeBaseVtableLaneA(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -656,7 +656,7 @@ namespace Wm3
    * What it does:
    * Rebinds one `Wm3::Query` runtime object to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneE(
+  void RebindQueryRuntimeBaseVtableLaneE(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -670,7 +670,7 @@ namespace Wm3
    * Constructs one `Query3<float>` runtime lane by binding the derived vtable
    * and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery3FloatRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery3FloatRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -692,7 +692,7 @@ namespace Wm3
    * Constructs one `Query3<double>` runtime lane by binding the derived vtable
    * and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery3DoubleRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery3DoubleRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -714,7 +714,7 @@ namespace Wm3
    * Constructs one `Query3Int64<float>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery3Int64FloatRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery3Int64FloatRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -736,7 +736,7 @@ namespace Wm3
    * Constructs one `Query3Int64<double>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery3Int64DoubleRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery3Int64DoubleRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -758,7 +758,7 @@ namespace Wm3
    * Constructs one `Query3TInteger<float>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery3TIntegerFloatRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery3TIntegerFloatRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -780,7 +780,7 @@ namespace Wm3
    * Constructs one `Query3TInteger<double>` runtime lane by binding the
    * derived vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery3TIntegerDoubleRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery3TIntegerDoubleRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -801,7 +801,7 @@ namespace Wm3
    * What it does:
    * Rebinds one `Wm3::Query` runtime object to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneF(
+  void RebindQueryRuntimeBaseVtableLaneF(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -814,7 +814,7 @@ namespace Wm3
    * What it does:
    * Secondary rebind lane for one `Wm3::Query` runtime object's base vtable.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneG(
+  void RebindQueryRuntimeBaseVtableLaneG(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -827,7 +827,7 @@ namespace Wm3
    * What it does:
    * Third rebind lane for one `Wm3::Query` runtime object's base vtable.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneH(
+  void RebindQueryRuntimeBaseVtableLaneH(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -840,7 +840,7 @@ namespace Wm3
    * What it does:
    * Fourth rebind lane for one `Wm3::Query` runtime object's base vtable.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneI(
+  void RebindQueryRuntimeBaseVtableLaneI(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -854,7 +854,7 @@ namespace Wm3
    * Constructs one `Query2<float>` runtime lane by binding the derived vtable
    * and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery2FloatRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery2FloatRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -876,7 +876,7 @@ namespace Wm3
    * Constructs one `Query2<double>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery2DoubleRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery2DoubleRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -898,7 +898,7 @@ namespace Wm3
    * Constructs one `Query2Int64<float>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery2Int64FloatRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery2Int64FloatRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -920,7 +920,7 @@ namespace Wm3
    * Constructs one `Query2Int64<double>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery2Int64DoubleRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery2Int64DoubleRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -942,7 +942,7 @@ namespace Wm3
    * Constructs one `Query2TInteger<float>` runtime lane by binding the derived
    * vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery2TIntegerFloatRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery2TIntegerFloatRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -964,7 +964,7 @@ namespace Wm3
    * Constructs one `Query2TInteger<double>` runtime lane by binding the
    * derived vtable and storing the two owner lanes at `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] QueryRuntimeOwnerPairView* ConstructQuery2TIntegerDoubleRuntimeLaneA(
+  QueryRuntimeOwnerPairView* ConstructQuery2TIntegerDoubleRuntimeLaneA(
     QueryRuntimeOwnerPairView* const queryRuntime,
     const void* const ownerLane04,
     const void* const ownerLane08
@@ -985,7 +985,7 @@ namespace Wm3
    * What it does:
    * Rebinds one `Wm3::Query` runtime object to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneJ(
+  void RebindQueryRuntimeBaseVtableLaneJ(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -998,7 +998,7 @@ namespace Wm3
    * What it does:
    * Secondary rebind lane for one `Wm3::Query` runtime object's base vtable.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneK(
+  void RebindQueryRuntimeBaseVtableLaneK(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -1011,7 +1011,7 @@ namespace Wm3
    * What it does:
    * Third rebind lane for one `Wm3::Query` runtime object's base vtable.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneL(
+  void RebindQueryRuntimeBaseVtableLaneL(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -1024,7 +1024,7 @@ namespace Wm3
    * What it does:
    * Fourth rebind lane for one `Wm3::Query` runtime object's base vtable.
    */
-  [[maybe_unused]] void RebindQueryRuntimeBaseVtableLaneM(
+  void RebindQueryRuntimeBaseVtableLaneM(
     VtableOnlyRuntime* const queryRuntime
   ) noexcept
   {
@@ -1038,7 +1038,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for the
    * `Intersector<float, Vector2<float>>` runtime base object.
    */
-  [[maybe_unused]] void* ResetIntersectorFloat2VtableWithFlagRuntime(
+  void* ResetIntersectorFloat2VtableWithFlagRuntime(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1054,7 +1054,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for the
    * `Intersector<double, Vector2<double>>` runtime base object.
    */
-  [[maybe_unused]] void* ResetIntersectorDouble2VtableWithFlagRuntime(
+  void* ResetIntersectorDouble2VtableWithFlagRuntime(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1069,7 +1069,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for the
    * `Intersector<double, Vector3<double>>` runtime base object.
    */
-  [[maybe_unused]] void* ResetIntersectorDouble3VtableWithFlagRuntime(
+  void* ResetIntersectorDouble3VtableWithFlagRuntime(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1085,7 +1085,7 @@ namespace Wm3
    * object to the `Intersector<double, Vector2<double>>` base vtable and
    * deletes storage when bit0 of `deleteFlags` is set.
    */
-  [[maybe_unused]] void* ResetIntrBox2Circle2DoubleVtableWithFlagRuntimeAlias(
+  void* ResetIntrBox2Circle2DoubleVtableWithFlagRuntimeAlias(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1101,7 +1101,7 @@ namespace Wm3
    * object to the `Intersector<double, Vector3<double>>` base vtable and
    * deletes storage when bit0 of `deleteFlags` is set.
    */
-  [[maybe_unused]] void* ResetIntrLine3Box3DoubleVtableWithFlagRuntimeAlias(
+  void* ResetIntrLine3Box3DoubleVtableWithFlagRuntimeAlias(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1117,7 +1117,7 @@ namespace Wm3
    * the object to the `Intersector<double, Vector3<double>>` base vtable and
    * deletes storage when bit0 of `deleteFlags` is set.
    */
-  [[maybe_unused]] void* ResetIntrSegment3Capsule3DoubleVtableWithFlagRuntimeAlias(
+  void* ResetIntrSegment3Capsule3DoubleVtableWithFlagRuntimeAlias(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1133,7 +1133,7 @@ namespace Wm3
    * object to the `Intersector<double, Vector3<double>>` base vtable and
    * deletes storage when bit0 of `deleteFlags` is set.
    */
-  [[maybe_unused]] void* ResetIntrLine3Capsule3DoubleVtableWithFlagRuntimeAlias(
+  void* ResetIntrLine3Capsule3DoubleVtableWithFlagRuntimeAlias(
     void* const intersectorRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1148,7 +1148,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query3<float>` runtime object
    * by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery3FloatVtableWithFlagRuntime(
+  void* ResetQuery3FloatVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1163,7 +1163,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query3<double>` runtime object
    * by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery3DoubleVtableWithFlagRuntime(
+  void* ResetQuery3DoubleVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1177,7 +1177,7 @@ namespace Wm3
    * What it does:
    * Runs one deleting-dtor thunk lane for one `Query` runtime base object.
    */
-  [[maybe_unused]] void* ResetQueryVtableWithFlagRuntime(
+  void* ResetQueryVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1192,7 +1192,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query3Int64<float>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery3Int64FloatVtableWithFlagRuntime(
+  void* ResetQuery3Int64FloatVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1207,7 +1207,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query3Int64<double>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery3Int64DoubleVtableWithFlagRuntime(
+  void* ResetQuery3Int64DoubleVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1222,7 +1222,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query3TInteger<float>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery3TIntegerFloatVtableWithFlagRuntime(
+  void* ResetQuery3TIntegerFloatVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1237,7 +1237,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query3TInteger<double>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery3TIntegerDoubleVtableWithFlagRuntime(
+  void* ResetQuery3TIntegerDoubleVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1252,7 +1252,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query2<float>` runtime object by
    * rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery2FloatVtableWithFlagRuntime(
+  void* ResetQuery2FloatVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1267,7 +1267,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query2<double>` runtime object
    * by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery2DoubleVtableWithFlagRuntime(
+  void* ResetQuery2DoubleVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1282,7 +1282,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query2Int64<float>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery2Int64FloatVtableWithFlagRuntime(
+  void* ResetQuery2Int64FloatVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1297,7 +1297,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query2Int64<double>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery2Int64DoubleVtableWithFlagRuntime(
+  void* ResetQuery2Int64DoubleVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1312,7 +1312,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query2TInteger<float>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery2TIntegerFloatVtableWithFlagRuntime(
+  void* ResetQuery2TIntegerFloatVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1327,7 +1327,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for one `Query2TInteger<double>` runtime
    * object by rebinding to the `Query` base vtable lane.
    */
-  [[maybe_unused]] void* ResetQuery2TIntegerDoubleVtableWithFlagRuntime(
+  void* ResetQuery2TIntegerDoubleVtableWithFlagRuntime(
     void* const queryRuntime,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1388,7 +1388,7 @@ namespace Wm3
    * Builds one 2-point support sphere from the current support's first point
    * and one candidate point, then records the updated support state.
    */
-  [[maybe_unused]] float* UpdateTwoPointSupportSphereFromCandidate(
+  float* UpdateTwoPointSupportSphereFromCandidate(
     float* const outCenterRadiusSquared,
     const std::int32_t candidatePointIndex,
     const float* const* const shuffledPointTable,
@@ -1445,7 +1445,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for nested `TRational<16>` array
    * storage, handling both cookie-backed array and in-place fixed-lane forms.
    */
-  [[maybe_unused]] char* DestroyNestedRational16ArrayWithFlags(
+  char* DestroyNestedRational16ArrayWithFlags(
     char* const start,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1473,7 +1473,7 @@ namespace Wm3
    * Runs one deleting-dtor thunk lane for nested `TRational<32>` array
    * storage, handling both cookie-backed array and in-place fixed-lane forms.
    */
-  [[maybe_unused]] char* DestroyNestedRational32ArrayWithFlags(
+  char* DestroyNestedRational32ArrayWithFlags(
     char* const start,
     const std::uint8_t deleteFlags
   ) noexcept
@@ -1501,7 +1501,7 @@ namespace Wm3
    * Computes one `TRational<16>` addition-assignment lane and normalizes the
    * result by removing powers of two.
    */
-  [[maybe_unused]] TRational<16>* AddAssignRational16Normalized(
+  TRational<16>* AddAssignRational16Normalized(
     TRational<16>* const value,
     const TRational<16>* const rhs
   ) noexcept
@@ -1522,7 +1522,7 @@ namespace Wm3
    * Computes one `TRational<16>` multiply-assignment lane and normalizes the
    * result by removing powers of two.
    */
-  [[maybe_unused]] TRational<16>* MultiplyAssignRational16Normalized(
+  TRational<16>* MultiplyAssignRational16Normalized(
     TRational<16>* const value,
     const TRational<16>* const rhs
   ) noexcept
@@ -1543,7 +1543,7 @@ namespace Wm3
    * Computes one `TRational<16>` divide-assignment lane and normalizes the
    * result by removing powers of two.
    */
-  [[maybe_unused]] TRational<16>* DivideAssignRational16Normalized(
+  TRational<16>* DivideAssignRational16Normalized(
     TRational<16>* const value,
     const TRational<16>* const rhs
   ) noexcept
@@ -1663,7 +1663,7 @@ namespace Wm3
    * What it does:
    * Lexicographically compares two packed 3-double lanes as raw bytes.
    */
-  [[maybe_unused]] int ComparePackedVector3dLaneBytes(
+  int ComparePackedVector3dLaneBytes(
     const void* const lhsPackedVector3d,
     const void* const rhsPackedVector3d
   ) noexcept
@@ -1699,7 +1699,7 @@ namespace Wm3
    * Writes one double-precision 3D vector scaled by `scale` into `outScaled`
    * and returns that output pointer.
    */
-  [[maybe_unused]] Vector3<double>* ScaleVector3dInto(
+  Vector3<double>* ScaleVector3dInto(
     Vector3<double>* const outScaled,
     const double scale,
     const Vector3<double>& value
@@ -1808,7 +1808,7 @@ namespace Wm3
    * What it does:
    * Returns one cached float root lane from `IntrSegment3Capsule3f` by index.
    */
-  [[maybe_unused]] float IntrSegment3Capsule3fGetRootByIndex(
+  float IntrSegment3Capsule3fGetRootByIndex(
     const IntrSegment3Capsule3fRootsRuntimeView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -1822,7 +1822,7 @@ namespace Wm3
    * What it does:
    * Returns one cached double root lane from `IntrSegment3Capsule3d` by index.
    */
-  [[maybe_unused]] double IntrSegment3Capsule3dGetRootByIndex(
+  double IntrSegment3Capsule3dGetRootByIndex(
     const IntrSegment3Capsule3dRootsRuntimeView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -2685,7 +2685,7 @@ namespace Wm3
    * Expands one `Box3<double>` center/axis/extent lane into eight packed
    * corner points (`24` doubles) and returns the output lane pointer.
    */
-  [[maybe_unused]] double* ExpandBox3dToCornerTriplets(
+  double* ExpandBox3dToCornerTriplets(
     const Box3<double>* const sourceBox,
     double* const outCornerLanes
   ) noexcept
@@ -2747,7 +2747,7 @@ namespace Wm3
    * Initializes one `Box3<double>` lane from center, 3x3 axis matrix, and
    * extent vectors stored in caller-provided array lanes.
    */
-  [[maybe_unused]] Box3<double>* InitializeBox3dFromLaneArrays(
+  Box3<double>* InitializeBox3dFromLaneArrays(
     Box3<double>* const outBox,
     const double* const center,
     const double* const axisRows3x3,
@@ -2849,7 +2849,7 @@ namespace Wm3
    * Expands one `Box2<float>` center/axis/extent lane into four packed corner
    * points (`8` floats) and returns the output lane pointer.
    */
-  [[maybe_unused]] float* ExpandBox2fToCornerPairs(
+  float* ExpandBox2fToCornerPairs(
     const Box2<float>* const sourceBox,
     float* const outCornerLanes
   ) noexcept
@@ -2883,7 +2883,7 @@ namespace Wm3
    * Expands one `Box2<double>` center/axis/extent lane into four packed corner
    * points (`8` doubles) and returns the output lane pointer.
    */
-  [[maybe_unused]] double* ExpandBox2dToCornerPairs(
+  double* ExpandBox2dToCornerPairs(
     const Box2<double>* const sourceBox,
     double* const outCornerLanes
   ) noexcept
@@ -2935,7 +2935,7 @@ namespace Wm3
      * metric against the current best value, and updates the packed 2D
      * candidate state when the new candidate is better.
      */
-    [[maybe_unused]] void UpdateBestCandidate2D(
+    void UpdateBestCandidate2D(
       const Vector2f& probePoint,
       BestCandidate2DState* const bestCandidate,
       const Vector2f& axisB,
@@ -4427,7 +4427,7 @@ namespace Wm3
     using QueryTreeOwnerKeyCursorNil21 = QueryTreeOwnerKeyCursorView<QueryTreeOwnerView<QueryTreeNodeKeyNil21>>;
 
     template <class TOwner>
-    [[maybe_unused]] QueryTreeOwnerKeyCursorView<TOwner>* InitializeQueryTreeOwnerKeyCursor(
+    QueryTreeOwnerKeyCursorView<TOwner>* InitializeQueryTreeOwnerKeyCursor(
       QueryTreeOwnerKeyCursorView<TOwner>* const cursor,
       const std::uint32_t keyLane,
       TOwner* const owner
@@ -4490,7 +4490,7 @@ namespace Wm3
     static_assert(offsetof(QueryWordCursorView, owner) == 0x04, "QueryWordCursorView::owner offset must be 0x04");
     static_assert(offsetof(QueryWordCursorView, wordIndex) == 0x08, "QueryWordCursorView::wordIndex offset must be 0x08");
 
-    [[maybe_unused]] QueryWordCursorView* InitializeQueryWordCursor(
+    QueryWordCursorView* InitializeQueryWordCursor(
       QueryWordCursorView* const cursor,
       const std::uint32_t wordIndex,
       QueryWordChunkOwnerView* const owner
@@ -4692,7 +4692,7 @@ namespace Wm3
    * Returns the second "multiple closest points" flag lane from one
    * `Distance3f` runtime object.
    */
-  [[maybe_unused]] std::uint8_t GetDistance3fHasMultipleClosestPoints1(
+  std::uint8_t GetDistance3fHasMultipleClosestPoints1(
     const Distance3fRuntimeView* const runtime
   ) noexcept
   {
@@ -4706,7 +4706,7 @@ namespace Wm3
    * Returns one mutable pointer to the first closest-point lane of one
    * `Distance2d` runtime object.
    */
-  [[maybe_unused]] Vector2<double>* GetDistance2dClosestPoint0(
+  Vector2<double>* GetDistance2dClosestPoint0(
     Distance2dRuntimeView* const runtime
   ) noexcept
   {
@@ -4720,7 +4720,7 @@ namespace Wm3
    * Returns one mutable pointer to the second closest-point lane of one
    * `Distance2d` runtime object.
    */
-  [[maybe_unused]] Vector2<double>* GetDistance2dClosestPoint1(
+  Vector2<double>* GetDistance2dClosestPoint1(
     Distance2dRuntimeView* const runtime
   ) noexcept
   {
@@ -4734,7 +4734,7 @@ namespace Wm3
    * Returns the first "multiple closest points" flag lane from one
    * `Distance2d` runtime object.
    */
-  [[maybe_unused]] std::uint8_t GetDistance2dHasMultipleClosestPoints0(
+  std::uint8_t GetDistance2dHasMultipleClosestPoints0(
     const Distance2dRuntimeView* const runtime
   ) noexcept
   {
@@ -4748,7 +4748,7 @@ namespace Wm3
    * Returns the second "multiple closest points" flag lane from one
    * `Distance2d` runtime object.
    */
-  [[maybe_unused]] std::uint8_t GetDistance2dHasMultipleClosestPoints1(
+  std::uint8_t GetDistance2dHasMultipleClosestPoints1(
     const Distance2dRuntimeView* const runtime
   ) noexcept
   {
@@ -4762,7 +4762,7 @@ namespace Wm3
    * Returns one mutable pointer to the first closest-point lane of one
    * `Distance3d` runtime object.
    */
-  [[maybe_unused]] Vector3<double>* GetDistance3dClosestPoint0(
+  Vector3<double>* GetDistance3dClosestPoint0(
     Distance3dRuntimeView* const runtime
   ) noexcept
   {
@@ -4776,7 +4776,7 @@ namespace Wm3
    * Returns one mutable pointer to the second closest-point lane of one
    * `Distance3d` runtime object.
    */
-  [[maybe_unused]] Vector3<double>* GetDistance3dClosestPoint1(
+  Vector3<double>* GetDistance3dClosestPoint1(
     Distance3dRuntimeView* const runtime
   ) noexcept
   {
@@ -4790,7 +4790,7 @@ namespace Wm3
    * Returns the first "multiple closest points" flag lane from one
    * `Distance3d` runtime object.
    */
-  [[maybe_unused]] std::uint8_t GetDistance3dHasMultipleClosestPoints0(
+  std::uint8_t GetDistance3dHasMultipleClosestPoints0(
     const Distance3dRuntimeView* const runtime
   ) noexcept
   {
@@ -4804,7 +4804,7 @@ namespace Wm3
    * Returns the second "multiple closest points" flag lane from one
    * `Distance3d` runtime object.
    */
-  [[maybe_unused]] std::uint8_t GetDistance3dHasMultipleClosestPoints1(
+  std::uint8_t GetDistance3dHasMultipleClosestPoints1(
     const Distance3dRuntimeView* const runtime
   ) noexcept
   {
@@ -4818,7 +4818,7 @@ namespace Wm3
    * Clears the owner lane of one nil-`+0x15` query-tree key cursor while
    * preserving the key lane.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil21* ClearQueryTreeOwnerKeyCursorNil21OwnerLaneA(
+  QueryTreeOwnerKeyCursorNil21* ClearQueryTreeOwnerKeyCursorNil21OwnerLaneA(
     QueryTreeOwnerKeyCursorNil21* const cursor
   ) noexcept
   {
@@ -4833,7 +4833,7 @@ namespace Wm3
    * Alias lane that clears the owner lane of one nil-`+0x15` query-tree key
    * cursor.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil21* ClearQueryTreeOwnerKeyCursorNil21OwnerLaneB(
+  QueryTreeOwnerKeyCursorNil21* ClearQueryTreeOwnerKeyCursorNil21OwnerLaneB(
     QueryTreeOwnerKeyCursorNil21* const cursor
   ) noexcept
   {
@@ -4848,7 +4848,7 @@ namespace Wm3
    * Builds one `(cursor, inserted)` result lane for nil-`+0x15` query-tree
    * insertion results.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorResultNil21* BuildQueryTreeInsertResultNil21(
+  QueryTreeOwnerKeyCursorResultNil21* BuildQueryTreeInsertResultNil21(
     QueryTreeOwnerKeyCursorResultNil21* const outResult,
     const QueryTreeOwnerKeyCursorNil21* const cursor,
     const std::uint8_t* const inserted
@@ -4866,7 +4866,7 @@ namespace Wm3
    * Initializes one nil-`+0x15` red-black node lane with link pointers,
    * key/value payload lanes, color, and `isNil=0`.
    */
-  [[maybe_unused]] QueryTreeNodePairNil21* InitializeQueryTreeNodePairNil21(
+  QueryTreeNodePairNil21* InitializeQueryTreeNodePairNil21(
     QueryTreeNodePairNil21* const node,
     QueryTreeNodePairNil21* const left,
     QueryTreeNodePairNil21* const parent,
@@ -4891,7 +4891,7 @@ namespace Wm3
    * What it does:
    * Returns one indexed double lane from storage where each lane is 8 bytes.
    */
-  [[maybe_unused]] double* GetIndexedDoubleLaneStride8LaneA(
+  double* GetIndexedDoubleLaneStride8LaneA(
     double* const base,
     const std::int32_t index
   ) noexcept
@@ -4905,7 +4905,7 @@ namespace Wm3
    * What it does:
    * Returns one pointer to the second double lane (`base + 1`).
    */
-  [[maybe_unused]] double* GetSecondDoubleLanePointerLaneA(
+  double* GetSecondDoubleLanePointerLaneA(
     double* const base
   ) noexcept
   {
@@ -4918,7 +4918,7 @@ namespace Wm3
    * What it does:
    * Returns one pointer to the third double lane (`base + 2`).
    */
-  [[maybe_unused]] double* GetThirdDoubleLanePointerLaneA(
+  double* GetThirdDoubleLanePointerLaneA(
     double* const base
   ) noexcept
   {
@@ -4931,7 +4931,7 @@ namespace Wm3
    * What it does:
    * Returns one `Vector3<double>` z-lane (`+0x10`).
    */
-  [[maybe_unused]] double GetVector3dZLane(
+  double GetVector3dZLane(
     const Vector3<double>* const vector
   ) noexcept
   {
@@ -4944,7 +4944,7 @@ namespace Wm3
    * What it does:
    * Copies one `Vector3<double>` lane set into destination storage.
    */
-  [[maybe_unused]] Vector3<double>* CopyVector3dLaneA(
+  Vector3<double>* CopyVector3dLaneA(
     Vector3<double>* const destination,
     const Vector3<double>* const source
   ) noexcept
@@ -4961,7 +4961,7 @@ namespace Wm3
    * What it does:
    * Adds one `Vector3<double>` source lane set into destination storage.
    */
-  [[maybe_unused]] Vector3<double>* AddVector3dInPlaceLaneA(
+  Vector3<double>* AddVector3dInPlaceLaneA(
     Vector3<double>* const destination,
     const Vector3<double>* const source
   ) noexcept
@@ -4978,7 +4978,7 @@ namespace Wm3
    * What it does:
    * Returns one `Vector3<double>` dot product.
    */
-  [[maybe_unused]] double DotVector3dLaneA(
+  double DotVector3dLaneA(
     const Vector3<double>* const lhs,
     const Vector3<double>* const rhs
   ) noexcept
@@ -4993,7 +4993,7 @@ namespace Wm3
    * Initializes one `Box3<double>` from center, three axis vectors, and three
    * extent lanes.
    */
-  [[maybe_unused]] Box3<double>* InitializeBox3dFromCenterAxesExtentsLaneA(
+  Box3<double>* InitializeBox3dFromCenterAxesExtentsLaneA(
     Box3<double>* const box,
     const Vector3<double>* const center,
     const Vector3<double>* const axis0,
@@ -5020,7 +5020,7 @@ namespace Wm3
    * What it does:
    * Returns one pointer to the second double lane (`base + 1`).
    */
-  [[maybe_unused]] double* GetSecondDoubleLanePointerLaneB(
+  double* GetSecondDoubleLanePointerLaneB(
     double* const base
   ) noexcept
   {
@@ -5033,7 +5033,7 @@ namespace Wm3
    * What it does:
    * Copies one `Vector2<double>` lane set into destination storage.
    */
-  [[maybe_unused]] Vector2<double>* CopyVector2dLaneA(
+  Vector2<double>* CopyVector2dLaneA(
     Vector2<double>* const destination,
     const Vector2<double>* const source
   ) noexcept
@@ -5049,7 +5049,7 @@ namespace Wm3
    * What it does:
    * Alias lane that returns one indexed double lane from 8-byte lane storage.
    */
-  [[maybe_unused]] double* GetIndexedDoubleLaneStride8LaneB(
+  double* GetIndexedDoubleLaneStride8LaneB(
     double* const base,
     const std::int32_t index
   ) noexcept
@@ -5063,7 +5063,7 @@ namespace Wm3
    * What it does:
    * Clears both lanes of one nil-`+0x15` query-tree key cursor.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil21* ClearQueryTreeOwnerKeyCursorNil21(
+  QueryTreeOwnerKeyCursorNil21* ClearQueryTreeOwnerKeyCursorNil21(
     QueryTreeOwnerKeyCursorNil21* const cursor
   ) noexcept
   {
@@ -5079,7 +5079,7 @@ namespace Wm3
    * Builds one owner/node cursor at tree begin position by taking `head->left`
    * from the owner lane.
    */
-  [[maybe_unused]] QueryTreeOwnerNodeCursorNil21* InitializeQueryTreeOwnerNodeCursorAtBegin(
+  QueryTreeOwnerNodeCursorNil21* InitializeQueryTreeOwnerNodeCursorAtBegin(
     QueryTreePairOwnerNil21* const owner,
     QueryTreeOwnerNodeCursorNil21* const outCursor
   ) noexcept
@@ -5095,7 +5095,7 @@ namespace Wm3
    * What it does:
    * Copies one owner/node cursor lane into caller-provided output storage.
    */
-  [[maybe_unused]] QueryTreeOwnerNodeCursorNil21* CopyQueryTreeOwnerNodeCursorLaneA(
+  QueryTreeOwnerNodeCursorNil21* CopyQueryTreeOwnerNodeCursorLaneA(
     QueryTreeOwnerNodeCursorNil21* const sourceCursor,
     QueryTreeOwnerNodeCursorNil21* const outCursor
   ) noexcept
@@ -5112,7 +5112,7 @@ namespace Wm3
    * Returns one mutable pointer to the cached contact point lane in one
    * `IntrBox3Sphere3f` runtime object.
    */
-  [[maybe_unused]] Vector3<float>* GetIntrBox3Sphere3fContactPointLaneB(
+  Vector3<float>* GetIntrBox3Sphere3fContactPointLaneB(
     IntrBox3Sphere3fRuntimeView* const runtime
   ) noexcept
   {
@@ -5125,7 +5125,7 @@ namespace Wm3
    * What it does:
    * Returns one `Intersector2f` runtime contact-time lane.
    */
-  [[maybe_unused]] float GetIntersector2fContactTimeLaneA(
+  float GetIntersector2fContactTimeLaneA(
     const Intersector2fRuntimeView* const runtime
   ) noexcept
   {
@@ -5139,7 +5139,7 @@ namespace Wm3
    * Compares two nil-`+0x15` query-tree key cursors for key equality after
    * verifying they refer to the same non-null owner lane.
    */
-  [[maybe_unused]] bool AreQueryTreeOwnerKeyCursorsNil21EqualLaneA(
+  bool AreQueryTreeOwnerKeyCursorsNil21EqualLaneA(
     const QueryTreeOwnerKeyCursorNil21* const lhs,
     const QueryTreeOwnerKeyCursorNil21* const rhs
   ) noexcept
@@ -5153,7 +5153,7 @@ namespace Wm3
    * What it does:
    * Initializes one nil-`+0x15` query-tree key cursor `(owner, key)` lane.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil21* InitializeQueryTreeOwnerKeyCursorNil21LaneA(
+  QueryTreeOwnerKeyCursorNil21* InitializeQueryTreeOwnerKeyCursorNil21LaneA(
     QueryTreeOwnerKeyCursorNil21* const cursor,
     const std::uint32_t keyLane,
     QueryTreeOwnerView<QueryTreeNodeKeyNil21>* const owner
@@ -5169,7 +5169,7 @@ namespace Wm3
    * Returns the left-most node in one query tree subtree that uses nil marker
    * byte offset `+0x15`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil21* QueryTreeLeftmostNil21LaneC(QueryTreeNodeKeyNil21* const node) noexcept
+  QueryTreeNodeKeyNil21* QueryTreeLeftmostNil21LaneC(QueryTreeNodeKeyNil21* const node) noexcept
   {
     return FindSubtreeLeftmostFromLeftChild(node);
   }
@@ -5181,7 +5181,7 @@ namespace Wm3
    * Returns the right-most node in one query tree subtree that uses nil marker
    * byte offset `+0x15`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil21* QueryTreeRightmostNil21LaneC(QueryTreeNodeKeyNil21* const node) noexcept
+  QueryTreeNodeKeyNil21* QueryTreeRightmostNil21LaneC(QueryTreeNodeKeyNil21* const node) noexcept
   {
     return FindSubtreeRightmostFromRightChild(node);
   }
@@ -5193,7 +5193,7 @@ namespace Wm3
    * Divides one double-precision 3D vector by `scalar` and writes the result
    * into `outQuotient`; division by zero emits `DBL_MAX` in all lanes.
    */
-  [[maybe_unused]] Vector3<double>* DivideVector3dByScalarInto(
+  Vector3<double>* DivideVector3dByScalarInto(
     const Vector3<double>& source,
     Vector3<double>* const outQuotient,
     const double scalar
@@ -5233,7 +5233,7 @@ namespace Wm3
    * What it does:
    * Copies one four-lane double runtime vector into destination storage.
    */
-  [[maybe_unused]] FourDoubleRuntimeLane* CopyFourDoubleRuntimeLaneA(
+  FourDoubleRuntimeLane* CopyFourDoubleRuntimeLaneA(
     FourDoubleRuntimeLane* const destination,
     const FourDoubleRuntimeLane* const source
   ) noexcept
@@ -5251,7 +5251,7 @@ namespace Wm3
    * What it does:
    * Returns the four-lane dot product of two double-precision runtime vectors.
    */
-  [[maybe_unused]] double DotFourDoubleRuntimeLanes(
+  double DotFourDoubleRuntimeLanes(
     const FourDoubleRuntimeLane* const lhs,
     const FourDoubleRuntimeLane* const rhs
   ) noexcept
@@ -5269,7 +5269,7 @@ namespace Wm3
    * Compares two nil-`+0x15` query-tree key cursors for key inequality after
    * verifying they refer to the same non-null owner lane.
    */
-  [[maybe_unused]] bool AreQueryTreeOwnerKeyCursorsNil21NotEqualLaneA(
+  bool AreQueryTreeOwnerKeyCursorsNil21NotEqualLaneA(
     const QueryTreeOwnerKeyCursorNil21* const lhs,
     const QueryTreeOwnerKeyCursorNil21* const rhs
   ) noexcept
@@ -5284,7 +5284,7 @@ namespace Wm3
    * Alternate lane that initializes one nil-`+0x15` query-tree key cursor
    * `(owner, key)`.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil21* InitializeQueryTreeOwnerKeyCursorNil21LaneB(
+  QueryTreeOwnerKeyCursorNil21* InitializeQueryTreeOwnerKeyCursorNil21LaneB(
     QueryTreeOwnerKeyCursorNil21* const cursor,
     const std::uint32_t keyLane,
     QueryTreeOwnerView<QueryTreeNodeKeyNil21>* const owner
@@ -5300,7 +5300,7 @@ namespace Wm3
    * Returns true when one point lies inside one oriented box by projecting the
    * center-relative delta onto each box axis and comparing to extents.
    */
-  [[maybe_unused]] bool Box3ContainsPointByAxisProjection(
+  bool Box3ContainsPointByAxisProjection(
     const Vector3<float>* const point,
     const Box3<float>* const box
   ) noexcept
@@ -5326,7 +5326,7 @@ namespace Wm3
    * Returns true when any indexed float3 lane in one candidate list lies
    * within `distanceSquaredThreshold` of the selected pivot point lane.
    */
-  [[maybe_unused]] bool HasIndexedFloat3WithinDistanceSquared(
+  bool HasIndexedFloat3WithinDistanceSquared(
     const std::int32_t* const candidateIndexList,
     const std::int32_t pivotIndex,
     float* const* const pointTable,
@@ -5359,7 +5359,7 @@ namespace Wm3
    * Computes point-to-sphere signed distance-squared (`distance^2 - radius^2`)
    * in single precision and returns whether the point is inside/on the sphere.
    */
-  [[maybe_unused]] bool RuntimePointInsideSphereBySignedDistanceSquaredFloat(
+  bool RuntimePointInsideSphereBySignedDistanceSquaredFloat(
     const float* const point3,
     const float* const sphereCenterRadius4,
     float* const outSignedDistanceSquared
@@ -5381,7 +5381,7 @@ namespace Wm3
    * Computes point-to-sphere signed distance-squared (`distance^2 - radius^2`)
    * and returns whether the point is inside/on the sphere.
    */
-  [[maybe_unused]] bool RuntimePointInsideSphereBySignedDistanceSquared(
+  bool RuntimePointInsideSphereBySignedDistanceSquared(
     const double* const point3,
     const double* const sphereCenterRadius4,
     double* const outSignedDistanceSquared
@@ -5403,7 +5403,7 @@ namespace Wm3
    * Returns true when any indexed double3 lane in one candidate list lies
    * within `distanceSquaredThreshold` of the selected pivot point lane.
    */
-  [[maybe_unused]] bool HasIndexedDouble3WithinDistanceSquared(
+  bool HasIndexedDouble3WithinDistanceSquared(
     const std::int32_t* const candidateIndexList,
     const std::int32_t pivotIndex,
     double* const* const pointTable,
@@ -5435,7 +5435,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x44`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset68(char* const runtime) noexcept
+  char* RuntimePayloadOffset68(char* const runtime) noexcept
   {
     return runtime + 0x44;
   }
@@ -5446,7 +5446,7 @@ namespace Wm3
    * What it does:
    * Returns one indexed runtime payload lane at `this + 0x50 + index*0x0C`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset80IndexedBy12(
+  char* RuntimePayloadOffset80IndexedBy12(
     char* const runtime,
     const std::int32_t index
   ) noexcept
@@ -5460,7 +5460,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x70`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset112(char* const runtime) noexcept
+  char* RuntimePayloadOffset112(char* const runtime) noexcept
   {
     return runtime + 0x70;
   }
@@ -5471,7 +5471,7 @@ namespace Wm3
    * What it does:
    * Returns one indexed runtime payload lane at `this + 0x88 + index*0x18`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset136IndexedBy24(
+  char* RuntimePayloadOffset136IndexedBy24(
     char* const runtime,
     const std::int32_t index
   ) noexcept
@@ -5486,7 +5486,7 @@ namespace Wm3
    * Compares two nil-`+0x11` query-tree key cursors for key equality after
    * verifying they refer to the same non-null owner lane.
    */
-  [[maybe_unused]] bool AreQueryTreeOwnerKeyCursorsNil17EqualLaneA(
+  bool AreQueryTreeOwnerKeyCursorsNil17EqualLaneA(
     const QueryTreeOwnerKeyCursorNil17* const lhs,
     const QueryTreeOwnerKeyCursorNil17* const rhs
   ) noexcept
@@ -5500,7 +5500,7 @@ namespace Wm3
    * What it does:
    * Alternate lane of nil-`+0x11` query-tree key cursor equality.
    */
-  [[maybe_unused]] bool AreQueryTreeOwnerKeyCursorsNil17EqualLaneB(
+  bool AreQueryTreeOwnerKeyCursorsNil17EqualLaneB(
     const QueryTreeOwnerKeyCursorNil17* const lhs,
     const QueryTreeOwnerKeyCursorNil17* const rhs
   ) noexcept
@@ -5514,7 +5514,7 @@ namespace Wm3
    * What it does:
    * Initializes one nil-`+0x11` query-tree key cursor `(owner, key)` lane.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil17* InitializeQueryTreeOwnerKeyCursorNil17LaneA(
+  QueryTreeOwnerKeyCursorNil17* InitializeQueryTreeOwnerKeyCursorNil17LaneA(
     QueryTreeOwnerKeyCursorNil17* const cursor,
     const std::uint32_t keyLane,
     QueryTreeOwnerView<QueryTreeNodeKeyNil17>* const owner
@@ -5530,7 +5530,7 @@ namespace Wm3
    * Alternate lane that initializes one nil-`+0x11` query-tree key cursor
    * `(owner, key)`.
    */
-  [[maybe_unused]] QueryTreeOwnerKeyCursorNil17* InitializeQueryTreeOwnerKeyCursorNil17LaneB(
+  QueryTreeOwnerKeyCursorNil17* InitializeQueryTreeOwnerKeyCursorNil17LaneB(
     QueryTreeOwnerKeyCursorNil17* const cursor,
     const std::uint32_t keyLane,
     QueryTreeOwnerView<QueryTreeNodeKeyNil17>* const owner
@@ -5546,7 +5546,7 @@ namespace Wm3
    * Compares two nil-`+0x11` query-tree key cursors for key inequality after
    * verifying they refer to the same non-null owner lane.
    */
-  [[maybe_unused]] bool AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneA(
+  bool AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneA(
     const QueryTreeOwnerKeyCursorNil17* const lhs,
     const QueryTreeOwnerKeyCursorNil17* const rhs
   ) noexcept
@@ -5560,7 +5560,7 @@ namespace Wm3
    * What it does:
    * Alternate lane of nil-`+0x11` query-tree key cursor inequality.
    */
-  [[maybe_unused]] bool AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneB(
+  bool AreQueryTreeOwnerKeyCursorsNil17NotEqualLaneB(
     const QueryTreeOwnerKeyCursorNil17* const lhs,
     const QueryTreeOwnerKeyCursorNil17* const rhs
   ) noexcept
@@ -5574,7 +5574,7 @@ namespace Wm3
    * What it does:
    * Resolves one packed query-word cursor into a dword lane pointer.
    */
-  [[maybe_unused]] std::uint32_t* ResolveQueryWordCursorElementLaneA(
+  std::uint32_t* ResolveQueryWordCursorElementLaneA(
     const QueryWordCursorView* const cursor
   ) noexcept
   {
@@ -5587,7 +5587,7 @@ namespace Wm3
    * What it does:
    * Alternate lane of packed query-word cursor element resolution.
    */
-  [[maybe_unused]] std::uint32_t* ResolveQueryWordCursorElementLaneB(
+  std::uint32_t* ResolveQueryWordCursorElementLaneB(
     const QueryWordCursorView* const cursor
   ) noexcept
   {
@@ -5601,7 +5601,7 @@ namespace Wm3
    * Initializes one packed query-word cursor `(owner, wordIndex)` with
    * begin/end-inclusive range validation.
    */
-  [[maybe_unused]] QueryWordCursorView* InitializeQueryWordCursorLaneA(
+  QueryWordCursorView* InitializeQueryWordCursorLaneA(
     QueryWordCursorView* const cursor,
     const std::uint32_t wordIndex,
     QueryWordChunkOwnerView* const owner
@@ -5617,7 +5617,7 @@ namespace Wm3
    * Alternate lane that initializes one packed query-word cursor
    * `(owner, wordIndex)` with begin/end-inclusive range validation.
    */
-  [[maybe_unused]] QueryWordCursorView* InitializeQueryWordCursorLaneB(
+  QueryWordCursorView* InitializeQueryWordCursorLaneB(
     QueryWordCursorView* const cursor,
     const std::uint32_t wordIndex,
     QueryWordChunkOwnerView* const owner
@@ -5633,7 +5633,7 @@ namespace Wm3
    * Returns the right-most node in one query tree subtree that uses nil marker
    * byte offset `+0x11`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil17* QueryTreeRightmostNil17LaneC(QueryTreeNodeKeyNil17* const node) noexcept
+  QueryTreeNodeKeyNil17* QueryTreeRightmostNil17LaneC(QueryTreeNodeKeyNil17* const node) noexcept
   {
     return FindSubtreeRightmostFromRightChild(node);
   }
@@ -5645,7 +5645,7 @@ namespace Wm3
    * Returns the left-most node in one query tree subtree that uses nil marker
    * byte offset `+0x11`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil17* QueryTreeLeftmostNil17LaneC(QueryTreeNodeKeyNil17* const node) noexcept
+  QueryTreeNodeKeyNil17* QueryTreeLeftmostNil17LaneC(QueryTreeNodeKeyNil17* const node) noexcept
   {
     return FindSubtreeLeftmostFromLeftChild(node);
   }
@@ -5656,7 +5656,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `QueryTreeRightmostNil17LaneC`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil17* QueryTreeRightmostNil17LaneD(QueryTreeNodeKeyNil17* const node) noexcept
+  QueryTreeNodeKeyNil17* QueryTreeRightmostNil17LaneD(QueryTreeNodeKeyNil17* const node) noexcept
   {
     return QueryTreeRightmostNil17LaneC(node);
   }
@@ -5667,7 +5667,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `QueryTreeLeftmostNil17LaneC`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil17* QueryTreeLeftmostNil17LaneD(QueryTreeNodeKeyNil17* const node) noexcept
+  QueryTreeNodeKeyNil17* QueryTreeLeftmostNil17LaneD(QueryTreeNodeKeyNil17* const node) noexcept
   {
     return QueryTreeLeftmostNil17LaneC(node);
   }
@@ -5679,7 +5679,7 @@ namespace Wm3
    * Returns the right-most node in one query tree subtree that uses nil marker
    * byte offset `+0x21`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil33* QueryTreeRightmostNil33LaneA(QueryTreeNodeKeyNil33* const node) noexcept
+  QueryTreeNodeKeyNil33* QueryTreeRightmostNil33LaneA(QueryTreeNodeKeyNil33* const node) noexcept
   {
     return FindSubtreeRightmostFromRightChild(node);
   }
@@ -5691,7 +5691,7 @@ namespace Wm3
    * Returns the left-most node in one query tree subtree that uses nil marker
    * byte offset `+0x21`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil33* QueryTreeLeftmostNil33LaneA(QueryTreeNodeKeyNil33* const node) noexcept
+  QueryTreeNodeKeyNil33* QueryTreeLeftmostNil33LaneA(QueryTreeNodeKeyNil33* const node) noexcept
   {
     return FindSubtreeLeftmostFromLeftChild(node);
   }
@@ -5702,7 +5702,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `QueryTreeRightmostNil33LaneA`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil33* QueryTreeRightmostNil33LaneB(QueryTreeNodeKeyNil33* const node) noexcept
+  QueryTreeNodeKeyNil33* QueryTreeRightmostNil33LaneB(QueryTreeNodeKeyNil33* const node) noexcept
   {
     return QueryTreeRightmostNil33LaneA(node);
   }
@@ -5713,7 +5713,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `QueryTreeLeftmostNil33LaneA`.
    */
-  [[maybe_unused]] QueryTreeNodeKeyNil33* QueryTreeLeftmostNil33LaneB(QueryTreeNodeKeyNil33* const node) noexcept
+  QueryTreeNodeKeyNil33* QueryTreeLeftmostNil33LaneB(QueryTreeNodeKeyNil33* const node) noexcept
   {
     return QueryTreeLeftmostNil33LaneA(node);
   }
@@ -5725,7 +5725,7 @@ namespace Wm3
    * Builds one equal-range iterator tuple `(owner, lower, owner, upper)` for a
    * dword-key query tree with nil marker byte offset `+0x11`.
    */
-  [[maybe_unused]] QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* BuildQueryTreeEqualRangeNil17LaneA(
+  QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* BuildQueryTreeEqualRangeNil17LaneA(
     QueryTreeOwnerView<QueryTreeNodeKeyNil17>* const tree,
     QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* const outRange,
     const std::uint32_t* const key
@@ -5766,7 +5766,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `BuildQueryTreeEqualRangeNil17LaneA`.
    */
-  [[maybe_unused]] QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* BuildQueryTreeEqualRangeNil17LaneB(
+  QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* BuildQueryTreeEqualRangeNil17LaneB(
     QueryTreeOwnerView<QueryTreeNodeKeyNil17>* const tree,
     QueryTreeEqualRangeResultView<QueryTreeNodeKeyNil17>* const outRange,
     const std::uint32_t* const key
@@ -6123,7 +6123,7 @@ namespace Wm3
    * Erases all nodes matching `*key` from one nil-`+0x11` query tree lane and
    * returns the number of erased nodes.
    */
-  [[maybe_unused]] int EraseQueryTreeKeyRangeNil17LaneA(
+  int EraseQueryTreeKeyRangeNil17LaneA(
     QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>* const tree,
     const std::uint32_t* const key
   ) noexcept
@@ -6151,7 +6151,7 @@ namespace Wm3
    * Alternate lane of nil-`+0x11` query-tree erase-by-key; erases all nodes
    * matching `*key` and returns the number of erased nodes.
    */
-  [[maybe_unused]] int EraseQueryTreeKeyRangeNil17LaneB(
+  int EraseQueryTreeKeyRangeNil17LaneB(
     QueryTreeContainerWithSizeView<QueryTreeNodeKeyNil17>* const tree,
     const std::uint32_t* const key
   ) noexcept
@@ -6179,7 +6179,7 @@ namespace Wm3
    * Computes one `TRational<32>` divide-assignment lane and normalizes the
    * result by removing powers of two.
    */
-  [[maybe_unused]] TRational<32>* DivideAssignRational32Normalized(
+  TRational<32>* DivideAssignRational32Normalized(
     TRational<32>* const value,
     const TRational<32>* const rhs
   ) noexcept
@@ -6200,7 +6200,7 @@ namespace Wm3
    * Computes one `TRational<64>` multiply-assignment lane and normalizes the
    * result by removing powers of two.
    */
-  [[maybe_unused]] TRational<64>* MultiplyAssignRational64Normalized(
+  TRational<64>* MultiplyAssignRational64Normalized(
     TRational<64>* const value,
     const TRational<64>* const rhs
   ) noexcept
@@ -6221,7 +6221,7 @@ namespace Wm3
    * Computes one `TRational<64>` divide-assignment lane and normalizes the
    * result by removing powers of two.
    */
-  [[maybe_unused]] TRational<64>* DivideAssignRational64Normalized(
+  TRational<64>* DivideAssignRational64Normalized(
     TRational<64>* const value,
     const TRational<64>* const rhs
   ) noexcept
@@ -6242,7 +6242,7 @@ namespace Wm3
    * Finds one exact dword-key node in a query tree with nil marker byte offset
    * `+0x21`; when not found, returns the tree head sentinel lane.
    */
-  [[maybe_unused]] QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* FindExactQueryTreeNodeNil33LaneA(
+  QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* FindExactQueryTreeNodeNil33LaneA(
     QueryTreeOwnerView<QueryTreeNodeKeyNil33>* const tree,
     QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* const outResult,
     const std::uint32_t* const key
@@ -6274,7 +6274,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `FindExactQueryTreeNodeNil33LaneA`.
    */
-  [[maybe_unused]] QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* FindExactQueryTreeNodeNil33LaneB(
+  QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* FindExactQueryTreeNodeNil33LaneB(
     QueryTreeOwnerView<QueryTreeNodeKeyNil33>* const tree,
     QueryTreeNodeLookupResultView<QueryTreeNodeKeyNil33>* const outResult,
     const std::uint32_t* const key
@@ -6305,7 +6305,7 @@ namespace Wm3
    * Sifts one `{float key, dword payload}` heap lane upward between
    * `heapFloorIndex` and `insertIndex`, then writes the new lane.
    */
-  [[maybe_unused]] std::uint32_t SiftUpHeapEntryFloatKeyLane(
+  std::uint32_t SiftUpHeapEntryFloatKeyLane(
     HeapEntryFloatKey* const heapEntries,
     std::int32_t insertIndex,
     const std::int32_t heapFloorIndex,
@@ -6337,7 +6337,7 @@ namespace Wm3
    * Sifts one `{double key, dword, dword}` heap lane upward between
    * `heapFloorIndex` and `insertIndex`, then writes the new lane.
    */
-  [[maybe_unused]] std::uint32_t SiftUpHeapEntryDoubleKeyPairLane(
+  std::uint32_t SiftUpHeapEntryDoubleKeyPairLane(
     HeapEntryDoubleKeyPair* const heapEntries,
     std::int32_t insertIndex,
     const std::int32_t heapFloorIndex,
@@ -6372,7 +6372,7 @@ namespace Wm3
    * `heapFloorIndex`, then reinserts `insertionEntry` with the shared
    * sift-up lane to preserve binary max-heap ordering.
    */
-  [[maybe_unused]] std::uint32_t SiftDownThenSiftUpHeapEntryDoubleKeyPairLane(
+  std::uint32_t SiftDownThenSiftUpHeapEntryDoubleKeyPairLane(
     HeapEntryDoubleKeyPair* const heapEntries,
     const std::int32_t heapFloorIndex,
     const std::int32_t heapCount,
@@ -6416,7 +6416,7 @@ namespace Wm3
    * `insertionEntry` by routing through the shared double-key sift-down/sift-up
    * helper across the full `[begin, end)` heap range.
    */
-  [[maybe_unused]] std::uint32_t PopHeapRootThenInsertHeapEntryDoubleKeyPairLane(
+  std::uint32_t PopHeapRootThenInsertHeapEntryDoubleKeyPairLane(
     HeapEntryDoubleKeyPair* const begin,
     HeapEntryDoubleKeyPair* const end,
     HeapEntryDoubleKeyPair* const outPoppedEntry,
@@ -6443,7 +6443,7 @@ namespace Wm3
    * return the original root entry sits at `end - 1` and the
    * `[begin, end - 1)` prefix continues to satisfy the max-heap invariant.
    */
-  [[maybe_unused]] std::uint32_t PopHeapEntryDoubleKeyPairToBackRuntime(
+  std::uint32_t PopHeapEntryDoubleKeyPairToBackRuntime(
     HeapEntryDoubleKeyPair* const begin,
     HeapEntryDoubleKeyPair* const end
   ) noexcept
@@ -6478,7 +6478,7 @@ namespace Wm3
    * Re-evaluates one cached query lane when `key` changes, otherwise returns
    * the previously cached result.
    */
-  [[maybe_unused]] std::int32_t QueryCacheUpdateAndGetLaneA(
+  std::int32_t QueryCacheUpdateAndGetLaneA(
     QueryCacheLaneRuntimeView* const cacheLane,
     const std::int32_t key,
     void* const evaluatorRuntime
@@ -6500,7 +6500,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `QueryCacheUpdateAndGetLaneA`.
    */
-  [[maybe_unused]] std::int32_t QueryCacheUpdateAndGetLaneB(
+  std::int32_t QueryCacheUpdateAndGetLaneB(
     QueryCacheLaneRuntimeView* const cacheLane,
     const std::int32_t key,
     void* const evaluatorRuntime
@@ -6524,7 +6524,7 @@ namespace Wm3
    * Clears one owner slot and removes the same owner pointer from one
    * three-entry peer slot array; returns removed slot index or `-1`.
    */
-  [[maybe_unused]] int RemoveOwnerFromTriplePointerSlotsLaneA(
+  int RemoveOwnerFromTriplePointerSlotsLaneA(
     void* const ownerObject,
     const std::int32_t ownerSlotIndex,
     TriplePointerSlotArrayView* const peerSlots
@@ -6549,7 +6549,7 @@ namespace Wm3
    * What it does:
    * Alias lane of `RemoveOwnerFromTriplePointerSlotsLaneA`.
    */
-  [[maybe_unused]] int RemoveOwnerFromTriplePointerSlotsLaneB(
+  int RemoveOwnerFromTriplePointerSlotsLaneB(
     void* const ownerObject,
     const std::int32_t ownerSlotIndex,
     TriplePointerSlotArrayView* const peerSlots
@@ -6793,7 +6793,7 @@ namespace Wm3
    * Loads one single-precision runtime lane at `+0x04` and returns it as a
    * double-precision value.
    */
-  [[maybe_unused]] double LoadRuntimeFloatOffset04AsDoubleLaneA(
+  double LoadRuntimeFloatOffset04AsDoubleLaneA(
     const RuntimeFloatLane04View* const runtime
   ) noexcept
   {
@@ -6806,7 +6806,7 @@ namespace Wm3
    * What it does:
    * Loads one dword runtime lane at owner offset `+0x34`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset34LaneA(
+  std::uint32_t LoadRuntimeDwordOffset34LaneA(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6819,7 +6819,7 @@ namespace Wm3
    * What it does:
    * Loads one dword runtime lane at owner offset `+0x38`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset38LaneA(
+  std::uint32_t LoadRuntimeDwordOffset38LaneA(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6832,7 +6832,7 @@ namespace Wm3
    * What it does:
    * Loads one dword runtime lane at owner offset `+0x68`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset68LaneA(
+  std::uint32_t LoadRuntimeDwordOffset68LaneA(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6845,7 +6845,7 @@ namespace Wm3
    * What it does:
    * Loads one dword runtime lane at owner offset `+0x6C`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset6CLaneA(
+  std::uint32_t LoadRuntimeDwordOffset6CLaneA(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6858,7 +6858,7 @@ namespace Wm3
    * What it does:
    * Loads one dword runtime lane at owner offset `+0x24`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset24LaneA(
+  std::uint32_t LoadRuntimeDwordOffset24LaneA(
     const RuntimeDwordLane24_28View* const runtime
   ) noexcept
   {
@@ -6871,7 +6871,7 @@ namespace Wm3
    * What it does:
    * Returns one indexed runtime entry lane at `this + 0x28 + index*0x18`.
    */
-  [[maybe_unused]] RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneA(
+  RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneA(
     RuntimeStride24From40OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -6885,7 +6885,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that loads one dword runtime value at owner offset `+0x24`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset24LaneB(
+  std::uint32_t LoadRuntimeDwordOffset24LaneB(
     const RuntimeDwordLane24_28View* const runtime
   ) noexcept
   {
@@ -6898,7 +6898,7 @@ namespace Wm3
    * What it does:
    * Loads one dword runtime lane at owner offset `+0x28`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset28LaneA(
+  std::uint32_t LoadRuntimeDwordOffset28LaneA(
     const RuntimeDwordLane24_28View* const runtime
   ) noexcept
   {
@@ -6911,7 +6911,7 @@ namespace Wm3
    * What it does:
    * Returns one indexed runtime entry lane at `this + 0x30 + index*0x18`.
    */
-  [[maybe_unused]] RuntimeStride24EntryView* ResolveRuntimeEntryOffset48Stride24LaneA(
+  RuntimeStride24EntryView* ResolveRuntimeEntryOffset48Stride24LaneA(
     RuntimeStride24From48OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -6925,7 +6925,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that loads one dword runtime value at owner offset `+0x34`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset34LaneB(
+  std::uint32_t LoadRuntimeDwordOffset34LaneB(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6938,7 +6938,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that loads one dword runtime value at owner offset `+0x38`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset38LaneB(
+  std::uint32_t LoadRuntimeDwordOffset38LaneB(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6951,7 +6951,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that loads one dword runtime value at owner offset `+0x68`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset68LaneB(
+  std::uint32_t LoadRuntimeDwordOffset68LaneB(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6964,7 +6964,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that loads one dword runtime value at owner offset `+0x6C`.
    */
-  [[maybe_unused]] std::uint32_t LoadRuntimeDwordOffset6CLaneB(
+  std::uint32_t LoadRuntimeDwordOffset6CLaneB(
     const RuntimeDwordLane34_6CView* const runtime
   ) noexcept
   {
@@ -6978,7 +6978,7 @@ namespace Wm3
    * Reverses one contiguous byte span in place and returns the last front-side
    * byte value observed by the swap loop.
    */
-  [[maybe_unused]] char ReverseByteSpanInPlaceLaneA(
+  char ReverseByteSpanInPlaceLaneA(
     const std::int32_t byteCount,
     std::uint8_t* const bytes
   ) noexcept
@@ -7003,7 +7003,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x14`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset20LaneA(
+  char* RuntimePayloadOffset20LaneA(
     RuntimePayloadOffset20View* const runtime
   ) noexcept
   {
@@ -7016,7 +7016,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x20`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset32LaneA(
+  char* RuntimePayloadOffset32LaneA(
     RuntimePayloadOffset32View* const runtime
   ) noexcept
   {
@@ -7029,7 +7029,7 @@ namespace Wm3
    * What it does:
    * Returns one indexed runtime entry lane at `this + 0x18 + index*0x0C`.
    */
-  [[maybe_unused]] RuntimeStride12EntryView* ResolveRuntimeEntryOffset24Stride12LaneA(
+  RuntimeStride12EntryView* ResolveRuntimeEntryOffset24Stride12LaneA(
     RuntimeStride12From24OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -7044,7 +7044,7 @@ namespace Wm3
    * Alternate lane that returns one indexed runtime entry at
    * `this + 0x28 + index*0x18`.
    */
-  [[maybe_unused]] RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneB(
+  RuntimeStride24EntryView* ResolveRuntimeEntryOffset40Stride24LaneB(
     RuntimeStride24From40OwnerView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -7059,7 +7059,7 @@ namespace Wm3
    * Returns one row-relative payload pointer lane computed as
    * `rowBaseTable[rowIndex] + elementIndex * 4`.
    */
-  [[maybe_unused]] std::uintptr_t ResolveRuntimeRowStride4AddressLane(
+  std::uintptr_t ResolveRuntimeRowStride4AddressLane(
     const void* const runtimeOwner,
     const std::int32_t rowIndex,
     const std::int32_t elementIndex
@@ -7089,7 +7089,7 @@ namespace Wm3
    * Returns one row-relative payload pointer lane computed as
    * `rowBaseTable[rowIndex] + elementIndex * 8`.
    */
-  [[maybe_unused]] std::uintptr_t ResolveRuntimeRowStride8AddressLane(
+  std::uintptr_t ResolveRuntimeRowStride8AddressLane(
     const void* const runtimeOwner,
     const std::int32_t rowIndex,
     const std::int32_t elementIndex
@@ -7118,7 +7118,7 @@ namespace Wm3
    * What it does:
    * Initializes one four-dword runtime lane from four input dword lanes.
    */
-  [[maybe_unused]] FourDwordRuntimeLaneView* InitializeFourDwordRuntimeLaneA(
+  FourDwordRuntimeLaneView* InitializeFourDwordRuntimeLaneA(
     FourDwordRuntimeLaneView* const runtime,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -7135,7 +7135,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that initializes one four-dword runtime lane.
    */
-  [[maybe_unused]] FourDwordRuntimeLaneView* InitializeFourDwordRuntimeLaneB(
+  FourDwordRuntimeLaneView* InitializeFourDwordRuntimeLaneB(
     FourDwordRuntimeLaneView* const runtime,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -7152,7 +7152,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x2C`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset44LaneA(
+  char* RuntimePayloadOffset44LaneA(
     RuntimePayloadOffset44View* const runtime
   ) noexcept
   {
@@ -7165,7 +7165,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x38`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset56LaneA(
+  char* RuntimePayloadOffset56LaneA(
     RuntimePayloadOffset56View* const runtime
   ) noexcept
   {
@@ -7178,7 +7178,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x40`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset64LaneA(
+  char* RuntimePayloadOffset64LaneA(
     RuntimePayloadOffset64View* const runtime
   ) noexcept
   {
@@ -7191,7 +7191,7 @@ namespace Wm3
    * What it does:
    * Returns one runtime payload pointer lane at owner offset `+0x58`.
    */
-  [[maybe_unused]] char* RuntimePayloadOffset88LaneA(
+  char* RuntimePayloadOffset88LaneA(
     RuntimePayloadOffset88View* const runtime
   ) noexcept
   {
@@ -7205,7 +7205,7 @@ namespace Wm3
    * Initializes one `{dword,dword,byte}` runtime lane from the two input
    * source lanes.
    */
-  [[maybe_unused]] TwoDwordAndByteRuntimeView* InitializeTwoDwordAndByteRuntimeLaneA(
+  TwoDwordAndByteRuntimeView* InitializeTwoDwordAndByteRuntimeLaneA(
     TwoDwordAndByteRuntimeView* const runtime,
     const TwoDwordRuntimeView* const sourcePair,
     const ByteRuntimeView* const sourceByte
@@ -7221,7 +7221,7 @@ namespace Wm3
    * Initializes one `{dword + four-dword}` runtime lane from two source
    * payload lanes.
    */
-  [[maybe_unused]] OneAndFourDwordRuntimeLaneView* InitializeOneAndFourDwordRuntimeLaneA(
+  OneAndFourDwordRuntimeLaneView* InitializeOneAndFourDwordRuntimeLaneA(
     OneAndFourDwordRuntimeLaneView* const runtime,
     const SingleDwordRuntimeView* const sourceLane00,
     const FourDwordRuntimeInputView* const sourceLane04To10
@@ -7236,7 +7236,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that initializes one `{dword,dword,byte}` runtime lane.
    */
-  [[maybe_unused]] TwoDwordAndByteRuntimeView* InitializeTwoDwordAndByteRuntimeLaneB(
+  TwoDwordAndByteRuntimeView* InitializeTwoDwordAndByteRuntimeLaneB(
     TwoDwordAndByteRuntimeView* const runtime,
     const TwoDwordRuntimeView* const sourcePair,
     const ByteRuntimeView* const sourceByte
@@ -7251,7 +7251,7 @@ namespace Wm3
    * What it does:
    * Alternate lane that initializes one `{dword + four-dword}` runtime lane.
    */
-  [[maybe_unused]] OneAndFourDwordRuntimeLaneView* InitializeOneAndFourDwordRuntimeLaneB(
+  OneAndFourDwordRuntimeLaneView* InitializeOneAndFourDwordRuntimeLaneB(
     OneAndFourDwordRuntimeLaneView* const runtime,
     const SingleDwordRuntimeView* const sourceLane00,
     const FourDwordRuntimeInputView* const sourceLane04To10
@@ -7266,7 +7266,7 @@ namespace Wm3
    * What it does:
    * Clears one single-dword runtime lane and returns that same lane pointer.
    */
-  [[maybe_unused]] SingleDwordRuntimeView* ResetSingleDwordRuntimeLaneToZero(
+  SingleDwordRuntimeView* ResetSingleDwordRuntimeLaneToZero(
     SingleDwordRuntimeView* const runtime
   ) noexcept
   {
