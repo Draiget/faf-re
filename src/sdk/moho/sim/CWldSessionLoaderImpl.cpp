@@ -38,7 +38,12 @@ namespace moho
     }
 
     /**
-     * Address: 0x00412C70 (FUN_00412C70, func_UpdateLoadingProgress)
+     * Null-guard head of 0x00412C70 (`func_UpdateLoadingProgress`). NOT a
+     * separate binary function and deliberately carries no `Address:` block -
+     * the binary has one function there, whose body is owned by
+     * `SWldScenarioLoadControl::UpdateLoadingProgress` in
+     * moho/sim/WldSessionInfo.cpp. The recovered source splits the `mHandle`
+     * null test off from the locking body; this is the test.
      *
      * What it does:
      * Advances the loader's progress through its control handle. A load with no
