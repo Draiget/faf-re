@@ -74,7 +74,7 @@ namespace boost
    * Creates one named Win32 mutex lane and throws
    * `boost::thread_resource_error` when handle creation fails.
    */
-  [[maybe_unused]] void EnsureNamedMutexHandleCreatedOrThrow(
+  void EnsureNamedMutexHandleCreatedOrThrow(
     const char* const mutexName
   )
   {
@@ -91,7 +91,7 @@ namespace boost
    * Secondary named-mutex creation lane mirroring
    * `EnsureNamedMutexHandleCreatedOrThrow`.
    */
-  [[maybe_unused]] void EnsureNamedMutexHandleCreatedOrThrowSecondary(
+  void EnsureNamedMutexHandleCreatedOrThrowSecondary(
     const char* const mutexName
   )
   {
@@ -105,7 +105,7 @@ namespace boost
    * Initializes one single-lane Win32 mutex owner and throws
    * `boost::thread_resource_error` when mutex creation fails.
    */
-  [[maybe_unused]] WinMutexHandleRuntime* InitializeUnnamedMutexHandleOrThrow(
+  WinMutexHandleRuntime* InitializeUnnamedMutexHandleOrThrow(
     WinMutexHandleRuntime* const outHandle
   )
   {
@@ -130,7 +130,7 @@ namespace boost
    * Initializes one two-lane Win32 mutex owner (`handle`, `lane04`) and throws
    * `boost::thread_resource_error` when mutex creation fails.
    */
-  [[maybe_unused]] WinMutexHandlePairRuntime* InitializeUnnamedMutexHandlePairOrThrow(
+  WinMutexHandlePairRuntime* InitializeUnnamedMutexHandlePairOrThrow(
     WinMutexHandlePairRuntime* const outHandlePair
   )
   {
@@ -349,7 +349,7 @@ namespace boost
    * Rebinds one control-block runtime lane to the base
    * `boost::detail::sp_counted_base` vtable tag.
    */
-  [[maybe_unused]] SpCountedBaseRuntimeView* RebindSpCountedBaseVtableLaneA(
+  SpCountedBaseRuntimeView* RebindSpCountedBaseVtableLaneA(
     SpCountedBaseRuntimeView* const runtimeView
   ) noexcept
   {
@@ -368,7 +368,7 @@ namespace boost
    * use/weak counts to `1`, rebinding control vtable state, and storing payload
    * ownership pointer.
    */
-  [[maybe_unused]] SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain>* InitializeSpCountedImplPIRenTerrainLaneA(
+  SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain>* InitializeSpCountedImplPIRenTerrainLaneA(
     SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain>* const runtimeView,
     moho::IRenTerrain* const payload
   ) noexcept
@@ -391,7 +391,7 @@ namespace boost
    * setting use/weak counts to `1`, rebinding control vtable state, and storing
    * payload ownership pointer.
    */
-  [[maybe_unused]] SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher>*
+  SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher>*
   InitializeSpCountedImplPCD3DTextureBatcherLaneA(
     SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher>* const runtimeView,
     moho::CD3DTextureBatcher* const payload
@@ -461,7 +461,7 @@ namespace boost
    * Writes one source shared/weak pair into an owner slot at `+0x20` and
    * rebinds weak control ownership with legacy weak-retain/weak-release rules.
    */
-  [[maybe_unused]] void AssignWeakPairToOwnerOffset32(
+  void AssignWeakPairToOwnerOffset32(
     const SharedCountPair* const sourcePair,
     void* const ownerBase
   ) noexcept
@@ -509,7 +509,7 @@ namespace boost
    * Source-first adapter lane for
    * `AssignSharedPairRetainWithWeakRelease`.
    */
-  [[maybe_unused]] SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirst(
+  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirst(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
@@ -524,7 +524,7 @@ namespace boost
    * Source-first adapter lane for shared-pair assignment with retained
    * incoming shared-control ownership and weak-release of the replaced lane.
    */
-  [[maybe_unused]] SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterA(
+  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterA(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
@@ -539,7 +539,7 @@ namespace boost
    * Secondary source-first adapter lane for
    * `AssignSharedPairRetainWithWeakRelease`.
    */
-  [[maybe_unused]] SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterB(
+  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterB(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
@@ -554,7 +554,7 @@ namespace boost
    * Source-first adapter lane for shared-pair assignment with retained
    * incoming shared-control ownership and weak-release of the replaced lane.
    */
-  [[maybe_unused]] SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterC(
+  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterC(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
@@ -678,7 +678,7 @@ namespace boost
    * Source-first adapter lane that copies one `(px,pi)` pair into destination
    * storage when present and retains one shared control-block reference.
    */
-  [[maybe_unused]] SharedCountPair* AssignSharedPairRetainSourceFirstIfOutputPresent(
+  SharedCountPair* AssignSharedPairRetainSourceFirstIfOutputPresent(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
@@ -696,7 +696,7 @@ namespace boost
    * What it does:
    * Copies one raw shared-pair payload `(px,pi)` without refcount mutation.
    */
-  [[maybe_unused]] SharedCountPair* CopySharedPairAliasNoRetain(
+  SharedCountPair* CopySharedPairAliasNoRetain(
     SharedCountPair* const outPair,
     const SharedCountPair* const sourcePair
   ) noexcept
@@ -711,7 +711,7 @@ namespace boost
    * Reads one control payload pointer lane at `+0x0C` from the control block
    * stored in one shared-pair `pi` lane.
    */
-  [[maybe_unused]] void* ReadSharedPairControlPayloadLane(
+  void* ReadSharedPairControlPayloadLane(
     const SharedCountPair* const sharedPair
   ) noexcept
   {
@@ -837,7 +837,7 @@ namespace boost
    * Copy-assigns one five-lane runtime record where lane `+0x0C` is a
    * `boost::detail::shared_count` payload requiring retained assignment.
    */
-  [[maybe_unused]] RuntimeSharedCountTailRecord20* AssignRuntimeSharedCountTailRecord20(
+  RuntimeSharedCountTailRecord20* AssignRuntimeSharedCountTailRecord20(
     RuntimeSharedCountTailRecord20* const destination,
     const RuntimeSharedCountTailRecord20* const source
   )
@@ -869,7 +869,7 @@ namespace boost
    * Copy-assigns one mixed runtime block with three `shared_count` lanes and
    * five scalar lanes.
    */
-  [[maybe_unused]] RuntimeSharedCountTripleBlock* AssignRuntimeSharedCountTripleBlock(
+  RuntimeSharedCountTripleBlock* AssignRuntimeSharedCountTripleBlock(
     RuntimeSharedCountTripleBlock* const destination,
     const RuntimeSharedCountTripleBlock* const source
   )
@@ -977,7 +977,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<TextureD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplTextureD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplTextureD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -989,7 +989,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<RenderTargetD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplRenderTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplRenderTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1001,7 +1001,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<CubeRenderTargetD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplCubeRenderTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplCubeRenderTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1013,7 +1013,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<DepthStencilTargetD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplDepthStencilTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplDepthStencilTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1025,7 +1025,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<VertexFormatD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplVertexFormatD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplVertexFormatD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1037,7 +1037,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<VertexBufferD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplVertexBufferD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplVertexBufferD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1049,7 +1049,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<IndexBufferD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplIndexBufferD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplIndexBufferD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1061,7 +1061,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<EffectD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplEffectD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplEffectD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1073,7 +1073,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<PipelineStateD3D9>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplPipelineStateD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplPipelineStateD3D9IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1085,7 +1085,7 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<EffectD3D10>` control lane when present.
    */
-  [[maybe_unused]] int DeleteSpCountedImplEffectD3D10IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplEffectD3D10IfPresent(detail::sp_counted_base* const control) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -1189,7 +1189,7 @@ namespace boost
    * Adapter lane for `ReleaseSharedCountRange` that receives
    * `(rangeEnd, rangeBegin)` and returns one-past the released tail.
    */
-  [[maybe_unused]] SharedCountPair* ReleaseSharedCountRangeReverseArgs(
+  SharedCountPair* ReleaseSharedCountRangeReverseArgs(
     SharedCountPair* const rangeEnd,
     SharedCountPair* const rangeBegin
   ) noexcept
@@ -1225,7 +1225,7 @@ namespace boost
    * Adapter lane for count-based uninitialized shared-pair copy used by vector
    * growth/copy paths.
    */
-  [[maybe_unused]] SharedCountPair* UninitializedCopySharedPairCountRetainAlias(
+  SharedCountPair* UninitializedCopySharedPairCountRetainAlias(
     SharedCountPair* const destinationBegin,
     const std::uint32_t count,
     const SharedCountPair* const sourceBegin
@@ -1240,7 +1240,7 @@ namespace boost
    * What it does:
    * Releases one raw storage lane with global `operator delete`.
    */
-  [[maybe_unused]] void DeleteSharedPairStorage(void* const storage) noexcept
+  void DeleteSharedPairStorage(void* const storage) noexcept
   {
     ::operator delete(storage);
   }
@@ -1360,7 +1360,7 @@ namespace boost
    * Adapter lane that forwards backward shared-pair range copy-assign into the
    * canonical `CopyAssignSharedPairRangeBackwardRetain` helper.
    */
-  [[maybe_unused]] [[nodiscard]] SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAdapterA(
+  [[nodiscard]] SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAdapterA(
     const SharedCountPair* const sourceBegin,
     const SharedCountPair* const sourceEnd,
     SharedCountPair* const destinationEnd
@@ -1376,7 +1376,7 @@ namespace boost
    * Three-argument adapter lane that forwards one backward shared-pair range
    * assignment into `CopyAssignSharedPairRangeBackwardRetain`.
    */
-  [[maybe_unused]] [[nodiscard]] SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAdapterB(
+  [[nodiscard]] SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAdapterB(
     SharedCountPair* const destinationEnd,
     const SharedCountPair* const sourceBegin,
     const SharedCountPair* const sourceEnd
@@ -1444,7 +1444,7 @@ namespace boost
    * What it does:
    * Stores one 32-bit source lane into destination and returns destination.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordValueAdapterA(
+  std::uint32_t* StoreDwordValueAdapterA(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -1459,7 +1459,7 @@ namespace boost
    * What it does:
    * Sibling lane that stores one 32-bit source value and returns destination.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordValueAdapterB(
+  std::uint32_t* StoreDwordValueAdapterB(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -1474,7 +1474,7 @@ namespace boost
    * What it does:
    * Tertiary lane that stores one 32-bit source value and returns destination.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordValueAdapterC(
+  std::uint32_t* StoreDwordValueAdapterC(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -1489,7 +1489,7 @@ namespace boost
    * What it does:
    * Fourth adapter lane for one 32-bit destination store.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordValueAdapterD(
+  std::uint32_t* StoreDwordValueAdapterD(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -1505,7 +1505,7 @@ namespace boost
    * Adapter lane that forwards into `UninitializedCopySharedPairRangeRetain`
    * with an explicitly empty source range.
    */
-  [[maybe_unused]] SharedCountPair* UninitializedCopySharedPairEmptySourceAdapterA(
+  SharedCountPair* UninitializedCopySharedPairEmptySourceAdapterA(
     const SharedCountPair* const /*unusedSourceOwner*/,
     SharedCountPair* const destinationBegin
   ) noexcept
@@ -1520,7 +1520,7 @@ namespace boost
    * Sibling adapter lane that forwards the same empty-source copy request into
    * `UninitializedCopySharedPairRangeRetain`.
    */
-  [[maybe_unused]] SharedCountPair* UninitializedCopySharedPairEmptySourceAdapterB(
+  SharedCountPair* UninitializedCopySharedPairEmptySourceAdapterB(
     const SharedCountPair* const /*unusedSourceOwner*/,
     SharedCountPair* const destinationBegin
   ) noexcept
@@ -1534,7 +1534,7 @@ namespace boost
    * What it does:
    * Third empty-source adapter lane for `UninitializedCopySharedPairRangeRetain`.
    */
-  [[maybe_unused]] SharedCountPair* UninitializedCopySharedPairEmptySourceAdapterC(
+  SharedCountPair* UninitializedCopySharedPairEmptySourceAdapterC(
     const SharedCountPair* const /*unusedSourceOwner*/,
     SharedCountPair* const destinationBegin
   ) noexcept
@@ -1548,7 +1548,7 @@ namespace boost
    * What it does:
    * Copies one 32-bit lane from source into destination and returns destination.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordFromSourcePointerAdapterA(
+  std::uint32_t* CopyDwordFromSourcePointerAdapterA(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1564,7 +1564,7 @@ namespace boost
    * Sibling adapter lane that performs the same 32-bit source-to-destination
    * copy and returns destination.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordFromSourcePointerAdapterB(
+  std::uint32_t* CopyDwordFromSourcePointerAdapterB(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1579,7 +1579,7 @@ namespace boost
    * What it does:
    * Loads one 32-bit lane through two pointer indirections.
    */
-  [[maybe_unused]] std::uint32_t LoadFirstDwordViaDoublePointerAdapterA(
+  std::uint32_t LoadFirstDwordViaDoublePointerAdapterA(
     const std::uint32_t* const* const source
   ) noexcept
   {
@@ -1592,7 +1592,7 @@ namespace boost
    * What it does:
    * Sibling lane that loads one 32-bit value through two pointer indirections.
    */
-  [[maybe_unused]] std::uint32_t LoadFirstDwordViaDoublePointerAdapterB(
+  std::uint32_t LoadFirstDwordViaDoublePointerAdapterB(
     const std::uint32_t* const* const source
   ) noexcept
   {
@@ -1615,7 +1615,7 @@ namespace boost
    * What it does:
    * Reads and returns one byte-flag lane at object offset `+0x04`.
    */
-  [[maybe_unused]] std::uint8_t LoadByteFlagAtOffset4(
+  std::uint8_t LoadByteFlagAtOffset4(
     const ByteFlagOffset4RuntimeView* const objectView
   ) noexcept
   {
@@ -1664,7 +1664,7 @@ namespace boost
    * triplet uninitialized-copy range into `FUN_007568D0` while discarding one
    * zero scratch lane.
    */
-  [[maybe_unused]] SharedControlTriplet* UninitializedCopySharedControlTripletRangeRetainNullScratchAdapterA(
+  SharedControlTriplet* UninitializedCopySharedControlTripletRangeRetainNullScratchAdapterA(
     const SharedControlTriplet* sourceBegin,
     const SharedControlTriplet* sourceEnd,
     SharedControlTriplet* destinationBegin
@@ -1681,7 +1681,7 @@ namespace boost
    * triplet uninitialized-copy range into `FUN_007568D0` for append/grow
    * vector lanes.
    */
-  [[maybe_unused]] SharedControlTriplet* UninitializedCopySharedControlTripletRangeRetainNullScratchAdapterB(
+  SharedControlTriplet* UninitializedCopySharedControlTripletRangeRetainNullScratchAdapterB(
     const SharedControlTriplet* sourceBegin,
     const SharedControlTriplet* sourceEnd,
     SharedControlTriplet* destinationBegin
@@ -1873,7 +1873,7 @@ namespace boost
    * `CopyAssignSharedPairRangeBackwardRetain` with one trailing caller lane
    * kept as an ABI-preserved but behavior-unused parameter.
    */
-  [[maybe_unused]] SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAliasWithUnusedTail(
+  SharedCountPair* CopyAssignSharedPairRangeBackwardRetainAliasWithUnusedTail(
     const SharedCountPair* const sourceBegin,
     const SharedCountPair* const sourceEnd,
     SharedCountPair* const destinationEnd,
@@ -2052,7 +2052,7 @@ namespace boost
    * destination weak-control lane from the source control slot and then
    * copying the raw pointee lane.
    */
-  [[maybe_unused]] SharedCountPair* ConstructWeakPairFromSharedPair(
+  SharedCountPair* ConstructWeakPairFromSharedPair(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   )
@@ -2074,7 +2074,7 @@ namespace boost
    * `boost::detail::shared_count` tail lane, then copies the leading
    * control-pointer lane.
    */
-  [[maybe_unused]] WeakCountWithTailLaneView* ConstructWeakCountFromSharedTailLane(
+  WeakCountWithTailLaneView* ConstructWeakCountFromSharedTailLane(
     WeakCountWithTailLaneView* const outWeakCount,
     const SharedCountWithTailLaneView* const sourceSharedCount
   )
@@ -2092,7 +2092,7 @@ namespace boost
    * Forwarding lane that builds one weak-count tail from one shared-count tail
    * and copies the leading control-pointer lane.
    */
-  [[maybe_unused]] WeakCountWithTailLaneView* ConstructWeakCountFromSharedTailLaneAdapterA(
+  WeakCountWithTailLaneView* ConstructWeakCountFromSharedTailLaneAdapterA(
     WeakCountWithTailLaneView* const outWeakCount,
     const SharedCountWithTailLaneView* const sourceSharedCount
   )
@@ -2166,7 +2166,7 @@ namespace boost
    * Secondary ptr-container `push_back` null-pointer guard lane with the same
    * `boost::bad_pointer` throw semantics.
    */
-  [[maybe_unused]] void EnsurePtrContainerPushBackInputNotNullSecondary(
+  void EnsurePtrContainerPushBackInputNotNullSecondary(
     const void* const inputPointer
   )
   {
@@ -2357,7 +2357,7 @@ namespace boost
      * Unlinks one `PathPreviewFinder` intrusive queue node from its neighbors,
      * rewires it to self-linked sentinel links, and releases its allocation.
      */
-    [[maybe_unused]] PathPreviewFinderDisposeRuntimeView* DestroyPathPreviewFinderRuntime(
+    PathPreviewFinderDisposeRuntimeView* DestroyPathPreviewFinderRuntime(
       PathPreviewFinderDisposeRuntimeView* const finder
     ) noexcept
     {
@@ -2498,7 +2498,7 @@ namespace boost
    * What it does:
    * Initializes one recovered shared-count control block for `AudioEngine`.
    */
-  [[maybe_unused]] SpCountedImplStorage<moho::AudioEngine>* SpCountedImplPConstructAudioEngine(
+  SpCountedImplStorage<moho::AudioEngine>* SpCountedImplPConstructAudioEngine(
     SpCountedImplStorage<moho::AudioEngine>* const countedImpl,
     moho::AudioEngine* const ownedPointee
   ) noexcept
@@ -2513,7 +2513,7 @@ namespace boost
    * Runs one scalar-deleting destructor lane for the base control block by
    * rebinding the base vtable and optionally deleting storage.
    */
-  [[maybe_unused]] detail::sp_counted_base* SpCountedBaseDeletingDtorAudioEngine(
+  detail::sp_counted_base* SpCountedBaseDeletingDtorAudioEngine(
     detail::sp_counted_base* const control,
     const unsigned char deleteFlag
   ) noexcept
@@ -3461,7 +3461,7 @@ namespace boost
    * Restores one abstract `sp_counted_base` vtable lane used by the
    * `AudioEngine` control-block init path.
    */
-  [[maybe_unused]] detail::sp_counted_base* InitializeSpCountedBaseLaneForAudioEngine(
+  detail::sp_counted_base* InitializeSpCountedBaseLaneForAudioEngine(
     detail::sp_counted_base* const control
   ) noexcept
   {
@@ -5526,7 +5526,7 @@ namespace boost
    * Deletes one `std::stringstream` raw-pointer lane during
    * `shared_count<stringstream>` constructor unwind.
    */
-  [[maybe_unused]] int DeleteStdStringstreamSharedCountCtorPointeeOnUnwind(
+  int DeleteStdStringstreamSharedCountCtorPointeeOnUnwind(
     std::basic_stringstream<char, std::char_traits<char>, std::allocator<char>>* const stream
   ) noexcept
   {
@@ -5543,7 +5543,7 @@ namespace boost
    * Constructs one `boost::shared_ptr<std::stringstream>` from one raw
    * `std::stringstream*` lane.
    */
-  [[maybe_unused]] boost::shared_ptr<std::stringstream>* ConstructSharedStdStringstreamFromRaw(
+  boost::shared_ptr<std::stringstream>* ConstructSharedStdStringstreamFromRaw(
     boost::shared_ptr<std::stringstream>* const outSharedStream,
     std::stringstream* const stream
   )
@@ -5607,7 +5607,7 @@ namespace boost
    * Executes one deleting-destructor lane for an
    * `EffectTechniqueD3D9` pointee during `shared_count` constructor unwind.
    */
-  [[maybe_unused]] int DeleteEffectTechniqueD3D9SharedCountCtorPointeeOnUnwind(
+  int DeleteEffectTechniqueD3D9SharedCountCtorPointeeOnUnwind(
     gpg::gal::EffectTechniqueD3D9* const effectTechnique
   ) noexcept
   {
@@ -5621,7 +5621,7 @@ namespace boost
    * Executes one deleting-destructor lane for an
    * `EffectVariableD3D9` pointee during `shared_count` constructor unwind.
    */
-  [[maybe_unused]] int DeleteEffectVariableD3D9SharedCountCtorPointeeOnUnwind(
+  int DeleteEffectVariableD3D9SharedCountCtorPointeeOnUnwind(
     gpg::gal::EffectVariableD3D9* const effectVariable
   ) noexcept
   {
