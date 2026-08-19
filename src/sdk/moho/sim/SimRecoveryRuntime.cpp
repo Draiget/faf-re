@@ -2235,7 +2235,7 @@ namespace
  * Verifies one key in a lookup cache and refreshes the cached resolved lane
  * when the key is currently present.
  */
-[[maybe_unused]] bool TryResolveLookupAndCacheRuntime(
+bool TryResolveLookupAndCacheRuntime(
   const std::uint32_t key,
   LookupCacheRuntime* const cache,
   const std::uint32_t argument
@@ -2263,7 +2263,7 @@ namespace
  * Resizes one 32-bit pointer/id vector to `desiredCount` and zero-fills any
  * newly appended lanes.
  */
-[[maybe_unused]] std::uint32_t* ResizePointerVectorRuntime(
+std::uint32_t* ResizePointerVectorRuntime(
   const std::uint32_t desiredCount,
   LegacyVectorStorageRuntime<std::uint32_t>* const vector
 )
@@ -2278,7 +2278,7 @@ namespace
  * Thunk adapter lane that forwards one pointer/id-vector resize dispatch to
  * `ResizePointerVectorRuntime`.
  */
-[[maybe_unused]] std::uint32_t* ResizePointerVectorRuntimeThunk(
+std::uint32_t* ResizePointerVectorRuntimeThunk(
   const std::uint32_t desiredCount,
   LegacyVectorStorageRuntime<std::uint32_t>* const vector
 )
@@ -2448,7 +2448,7 @@ namespace
  * Swaps two 12-byte heap-entry lanes and updates the reverse-index map for
  * both moved entry ids.
  */
-[[maybe_unused]] std::int32_t* SwapIndexedPriorityQueueEntriesRuntime(
+std::int32_t* SwapIndexedPriorityQueueEntriesRuntime(
   IndexedPriorityQueueRuntimeOwner* const owner,
   const std::int32_t leftIndex,
   const std::int32_t rightIndex
@@ -2464,7 +2464,7 @@ namespace
  * Performs one max-heap upward insertion for a 16-bit value lane and returns
  * the final parent index lane from the insertion walk.
  */
-[[maybe_unused]] std::int32_t PushUInt16HeapEntryUpRuntime(
+std::int32_t PushUInt16HeapEntryUpRuntime(
   std::uint16_t* const heapValues,
   std::int32_t insertionIndex,
   const std::int32_t lowerBoundIndex,
@@ -2504,7 +2504,7 @@ namespace
  * Moves one pointer-word range left within contiguous storage, then updates
  * vector-end and returns the destination cursor lane.
  */
-[[maybe_unused]] std::uint32_t* ShiftPointerWordRangeLeftRuntime(
+std::uint32_t* ShiftPointerWordRangeLeftRuntime(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   std::uint32_t* const outCursor,
   std::uint32_t* const destination,
@@ -2536,7 +2536,7 @@ namespace
  * Copies one pointer-word range into destination storage and returns the
  * advanced destination cursor lane.
  */
-[[maybe_unused]] std::uint32_t* CopyPointerWordRangeRuntime(
+std::uint32_t* CopyPointerWordRangeRuntime(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationBegin
@@ -2562,7 +2562,7 @@ namespace
  * Copies one pointer-word range into storage ending at `destinationEnd` and
  * returns the begin lane of the copied range.
  */
-[[maybe_unused]] std::uint32_t* CopyPointerWordRangeBackwardRuntime(
+std::uint32_t* CopyPointerWordRangeBackwardRuntime(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd
@@ -2587,7 +2587,7 @@ namespace
  * What it does:
  * Resets one pointer vector logical end to begin, preserving capacity.
  */
-[[maybe_unused]] void ResetPointerVectorEndToBeginRuntime(
+void ResetPointerVectorEndToBeginRuntime(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector
 )
 {
@@ -2614,7 +2614,7 @@ namespace
  * Copies one contiguous 8-byte element range into `destinationBegin` up to the
  * cursor owner lane, then commits the advanced cursor.
  */
-[[maybe_unused]] Element8Runtime* CopyEightByteLaneRangeAndCommitCursorRuntime(
+Element8Runtime* CopyEightByteLaneRangeAndCommitCursorRuntime(
   Element8Runtime* const destinationBegin,
   const Element8Runtime* sourceBegin,
   CopyEndCursor8ByteRuntime* const cursorOwner
@@ -2640,7 +2640,7 @@ namespace
  * Sifts one 8-byte `(lane0,lane1)` heap entry up toward `minIndexExclusive`
  * ordered by the second dword lane.
  */
-[[maybe_unused]] std::uint32_t SiftElement8LanePairUpBySecondWordRuntime(
+std::uint32_t SiftElement8LanePairUpBySecondWordRuntime(
   std::uint32_t heapIndex,
   const std::uint32_t minIndexExclusive,
   Element8Runtime* const entries,
@@ -2674,7 +2674,7 @@ namespace
  * Sifts one 8-byte `(lane0,lane1)` heap hole down by signed `lane1` ordering,
  * then reinserts the displaced lane by the companion sift-up helper.
  */
-[[maybe_unused]] std::int32_t SiftElement8LanePairDownThenInsertBySecondWordRuntime(
+std::int32_t SiftElement8LanePairDownThenInsertBySecondWordRuntime(
   std::int32_t holeIndex,
   const std::int32_t lastIndex,
   Element8Runtime* const entries,
@@ -2735,7 +2735,7 @@ namespace
  * 0x007605E0 lane's element type is not yet proven. Splitting them needs the
  * second element type identified first.
  */
-[[maybe_unused]] std::int32_t HeapSortElement8RangeTailPassRuntime(
+std::int32_t HeapSortElement8RangeTailPassRuntime(
   Element8Runtime* const heapBegin,
   Element8Runtime* const heapEnd,
   const std::int32_t minIndexExclusive
@@ -2780,7 +2780,7 @@ namespace
  * Swaps one heap root with its predecessor tail lane and restores heap order
  * over the remaining prefix.
  */
-[[maybe_unused]] std::int32_t PopElement8TailIntoRootAndSiftRuntime(
+std::int32_t PopElement8TailIntoRootAndSiftRuntime(
   Element8Runtime* const heapBegin,
   Element8Runtime* const heapTail,
   const std::int32_t minIndexExclusive
@@ -2812,7 +2812,7 @@ namespace
  * Unlinks one intrusive list node from its ring and resets it to a
  * self-linked sentinel lane.
  */
-[[maybe_unused]] IntrusiveListNodeRuntime* UnlinkIntrusiveNodeAndResetSelfLinksRuntime(
+IntrusiveListNodeRuntime* UnlinkIntrusiveNodeAndResetSelfLinksRuntime(
   IntrusiveListNodeRuntime* const node
 ) noexcept
 {
@@ -2843,7 +2843,7 @@ namespace
  * What it does:
  * Returns the logical element count for one 20-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement20VectorRuntime(
+std::int32_t CountElement20VectorRuntime(
   const LegacyVectorStorageRuntime<Element20Runtime>* const vector
 ) noexcept
 {
@@ -2860,7 +2860,7 @@ namespace
  * What it does:
  * Rebinds one intrusive owner-slot node to the requested owner head slot.
  */
-[[maybe_unused]] IntrusiveOwnerSlotRuntime* RebindIntrusiveOwnerSlotNodeRuntime(
+IntrusiveOwnerSlotRuntime* RebindIntrusiveOwnerSlotNodeRuntime(
   IntrusiveOwnerSlotRuntime* const node,
   IntrusiveOwnerSlotRuntime*** const requestedOwnerSlotLane
 ) noexcept
@@ -2899,7 +2899,7 @@ namespace
  * Walks left links until the flag-17 RB sentinel is reached and returns the
  * last non-sentinel node.
  */
-[[maybe_unused]] RbNodeFlag17Runtime* DescendLeftUntilFlag17SentinelRuntime(
+RbNodeFlag17Runtime* DescendLeftUntilFlag17SentinelRuntime(
   RbNodeFlag17Runtime* node
 ) noexcept
 {
@@ -2930,7 +2930,7 @@ void SwapPriorityQueueEntries(PriorityQueue20Runtime& queue, std::uint32_t lhs, 
  * rewrite the position map, which lives on the queue - this is one of the
  * three callers of the swap at 0x00687530.
  */
-[[maybe_unused]] std::uint32_t SiftPriorityQueueEntryUpRuntime(
+std::uint32_t SiftPriorityQueueEntryUpRuntime(
   PriorityQueue20Runtime& queue,
   std::uint32_t index
 )
@@ -2958,7 +2958,7 @@ void SwapPriorityQueueEntries(PriorityQueue20Runtime& queue, std::uint32_t lhs, 
  * Acquires one handle slot from a free-list lane when available; otherwise
  * appends one new handle lane and returns its index.
  */
-[[maybe_unused]] std::int32_t AcquireOrReusePriorityHandleRuntime(
+std::int32_t AcquireOrReusePriorityHandleRuntime(
   std::int32_t* const lastHandle,
   LegacyVectorStorageRuntime<std::int32_t>* const handleLanes,
   const std::int32_t payload
@@ -2991,7 +2991,7 @@ void SwapPriorityQueueEntries(PriorityQueue20Runtime& queue, std::uint32_t lhs, 
  * Constructs `count` 20-byte weak-link lanes from one zeroed source lane and
  * returns one-past-the-last written lane.
  */
-[[maybe_unused]] moho::PrefixedWeakPtrDwordPayloadLane* ConstructPrefixedWeakPtrDwordLaneRangeFromZeroRuntime(
+moho::PrefixedWeakPtrDwordPayloadLane* ConstructPrefixedWeakPtrDwordLaneRangeFromZeroRuntime(
   const std::uint32_t count,
   moho::PrefixedWeakPtrDwordPayloadLane* const destination
 )
@@ -3015,7 +3015,7 @@ void SwapPriorityQueueEntries(PriorityQueue20Runtime& queue, std::uint32_t lhs, 
  * What it does:
  * Allocates one 24-byte queue-node lane and seeds scalar/key-link fields.
  */
-[[maybe_unused]] PriorityQueueNode24Runtime* AllocatePriorityQueueNode24Runtime(
+PriorityQueueNode24Runtime* AllocatePriorityQueueNode24Runtime(
   const std::uint32_t* const keyPairLane,
   const std::uint32_t lane00,
   const std::uint32_t lane04,
@@ -3119,7 +3119,7 @@ void SwapPriorityQueueEntries(
  * Sifts one priority-queue entry down toward leaves using
  * `(priority,boundedTick)` ordering.
  */
-[[maybe_unused]] std::uint32_t SiftPriorityQueueEntryDownRuntime(
+std::uint32_t SiftPriorityQueueEntryDownRuntime(
   PriorityQueue20Runtime& queue,
   std::uint32_t index
 )
@@ -3161,7 +3161,7 @@ void SwapPriorityQueueEntries(
  * Inserts one dword lane at `insertPosition` and writes the rebased cursor
  * lane into `outCursor`.
  */
-[[maybe_unused]] std::uint32_t* InsertDwordLaneAndRebaseCursorRuntime(
+std::uint32_t* InsertDwordLaneAndRebaseCursorRuntime(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   std::uint32_t* const outCursor,
   std::uint32_t* const insertPosition,
@@ -3190,7 +3190,7 @@ void SwapPriorityQueueEntries(
  * Fills one contiguous destination lane range with copies of one source
  * prefixed-weak lane.
  */
-[[maybe_unused]] moho::PrefixedWeakPtrDwordPayloadLane* FillPrefixedWeakPtrDwordLaneRangeFromSingleLaneRuntime(
+moho::PrefixedWeakPtrDwordPayloadLane* FillPrefixedWeakPtrDwordLaneRangeFromSingleLaneRuntime(
   const moho::PrefixedWeakPtrDwordPayloadLane* const sourceLane,
   moho::PrefixedWeakPtrDwordPayloadLane* const destinationBegin,
   moho::PrefixedWeakPtrDwordPayloadLane* const destinationEnd
@@ -3210,7 +3210,7 @@ void SwapPriorityQueueEntries(
  * Copies one prefixed-weak lane range backward from `[sourceBegin, sourceEnd)`
  * into storage ending at `destinationEnd`.
  */
-[[maybe_unused]] moho::PrefixedWeakPtrDwordPayloadLane* CopyPrefixedWeakPtrDwordLaneRangeBackwardRuntime(
+moho::PrefixedWeakPtrDwordPayloadLane* CopyPrefixedWeakPtrDwordLaneRangeBackwardRuntime(
   const moho::PrefixedWeakPtrDwordPayloadLane* sourceEnd,
   moho::PrefixedWeakPtrDwordPayloadLane* destinationEnd,
   const moho::PrefixedWeakPtrDwordPayloadLane* const sourceBegin
@@ -3233,7 +3233,7 @@ void SwapPriorityQueueEntries(
  * Inserts one 28-byte lane into a float7 vector and writes the rebased cursor
  * lane to `outCursor`.
  */
-[[maybe_unused]] std::uint32_t* InsertFloat7LaneAndRebaseCursorRuntime(
+std::uint32_t* InsertFloat7LaneAndRebaseCursorRuntime(
   LegacyVectorStorageRuntime<Float7Runtime>* const vector,
   std::uint32_t* const outCursor,
   Float7Runtime* const insertPosition,
@@ -3269,7 +3269,7 @@ void SwapPriorityQueueEntries(
  * The prior description of this body as the copy loop was not supported by the
  * assembly.
  */
-[[maybe_unused]] Float7Runtime* CopyFloat7RangeBackwardRuntime(
+Float7Runtime* CopyFloat7RangeBackwardRuntime(
   Float7Runtime* destinationEnd,
   const Float7Runtime* sourceEnd,
   const Float7Runtime* const sourceBegin
@@ -3290,7 +3290,7 @@ void SwapPriorityQueueEntries(
  * Inserts one 12-byte lane into an element12 vector and writes the rebased
  * cursor lane to `outCursor`.
  */
-[[maybe_unused]] std::uint32_t* InsertElement12LaneAndRebaseCursorRuntime(
+std::uint32_t* InsertElement12LaneAndRebaseCursorRuntime(
   LegacyVectorStorageRuntime<Element12Runtime>* const vector,
   std::uint32_t* const outCursor,
   Element12Runtime* const insertPosition,
@@ -3319,7 +3319,7 @@ void SwapPriorityQueueEntries(
  * Constructs `count` 12-byte dword-triple lanes from one zero source lane and
  * returns one-past-the-last written lane.
  */
-[[maybe_unused]] Element12Runtime* ConstructElement12LaneRangeFromZeroRuntime(
+Element12Runtime* ConstructElement12LaneRangeFromZeroRuntime(
   const std::uint32_t count,
   Element12Runtime* const destination
 )
@@ -3344,7 +3344,7 @@ void SwapPriorityQueueEntries(
  * Constructs `count` weak-link+payload lanes from one zero source lane and
  * returns one-past-the-last written lane.
  */
-[[maybe_unused]] moho::WeakPtrPayloadLane<std::uint32_t>* ConstructWeakPtrDwordPayloadLaneRangeFromZeroRuntime(
+moho::WeakPtrPayloadLane<std::uint32_t>* ConstructWeakPtrDwordPayloadLaneRangeFromZeroRuntime(
   const std::uint32_t count,
   moho::WeakPtrPayloadLane<std::uint32_t>* const destination
 )
@@ -3368,7 +3368,7 @@ void SwapPriorityQueueEntries(
  * Releases one legacy contiguous storage lane and resets begin/end/capacity
  * cursors to null.
  */
-[[maybe_unused]] void ReleaseLegacyBufferTripleRuntime(
+void ReleaseLegacyBufferTripleRuntime(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -3389,7 +3389,7 @@ void SwapPriorityQueueEntries(
  * What it does:
  * Allocates one 24-byte queue-node lane and seeds scalar/key-link fields.
  */
-[[maybe_unused]] PriorityQueueNode24Runtime* AllocatePriorityQueueNode24RuntimeB(
+PriorityQueueNode24Runtime* AllocatePriorityQueueNode24RuntimeB(
   const std::uint32_t* const keyPairLane,
   const std::uint32_t lane00,
   const std::uint32_t lane04,
@@ -3406,7 +3406,7 @@ void SwapPriorityQueueEntries(
  * Builds one begin-iterator lane for an `EntIdSet` payload by caching the
  * backing `BVIntSet` pointer and first live id.
  */
-[[maybe_unused]] std::uint32_t* BuildEntIdSetBeginIteratorRuntime(
+std::uint32_t* BuildEntIdSetBeginIteratorRuntime(
   moho::BVIntSet* const set,
   std::uint32_t* const outIteratorLanes
 )
@@ -3426,7 +3426,7 @@ void SwapPriorityQueueEntries(
  * What it does:
  * Releases one owned node-buffer lane and resets the owning storage metadata.
  */
-[[maybe_unused]] std::int32_t ReleaseEntityDbNodeBufferRuntime(
+std::int32_t ReleaseEntityDbNodeBufferRuntime(
   OwnedBufferRuntime* const owner
 )
 {
@@ -3440,7 +3440,7 @@ void SwapPriorityQueueEntries(
  * Finds-or-inserts one entity-db tree node by `EntId` and returns the
  * iterator/insert-status pair lane.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertEntityNodeByIdRuntime(
+MapInsertStatusRuntime* FindOrInsertEntityNodeByIdRuntime(
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -3456,7 +3456,7 @@ void SwapPriorityQueueEntries(
  * Finds-or-inserts one id-pool map node by key and emits the
  * `(node, inserted)` status pair.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertIdPoolNodeByKeyRuntime(
+MapInsertStatusRuntime* FindOrInsertIdPoolNodeByKeyRuntime(
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -3472,7 +3472,7 @@ void SwapPriorityQueueEntries(
  * Rebuilds one 100-slot IdPool history ring from another ring by replaying
  * each active snapshot lane in order.
  */
-[[maybe_unused]] moho::SimSubRes2* CopyIdPoolHistoryRingRuntime(
+moho::SimSubRes2* CopyIdPoolHistoryRingRuntime(
   moho::SimSubRes2* const destination,
   const moho::SimSubRes2* const source
 )
@@ -3495,7 +3495,7 @@ void SwapPriorityQueueEntries(
  * Appends one 12-byte projectile lane into a legacy growth vector with
  * automatic capacity expansion.
  */
-[[maybe_unused]] Element12Runtime* AppendProjectileLaneRuntime(
+Element12Runtime* AppendProjectileLaneRuntime(
   const Element12Runtime* const value,
   LegacyVectorStorageRuntime<Element12Runtime>* const vector
 )
@@ -3511,7 +3511,7 @@ void SwapPriorityQueueEntries(
  * Adapter lane that appends one projectile lane into the owner vector stored
  * at offset `+0x9B8`.
  */
-[[maybe_unused]] Element12Runtime* AppendProjectileLaneFromOwnerOffsetRuntime(
+Element12Runtime* AppendProjectileLaneFromOwnerOffsetRuntime(
   std::byte* const ownerBase,
   const Element12Runtime* const value
 )
@@ -3527,7 +3527,7 @@ void SwapPriorityQueueEntries(
  * Resizes one recon-blip pointer vector and fills newly exposed lanes with the
  * caller-provided pointer value.
  */
-[[maybe_unused]] std::uint32_t ResizeReconBlipPointerVectorRuntime(
+std::uint32_t ResizeReconBlipPointerVectorRuntime(
   const std::uint32_t desiredCount,
   const std::uint32_t* const fillValue,
   LegacyVectorStorageRuntime<std::uint32_t>* const vector
@@ -3548,7 +3548,7 @@ void SwapPriorityQueueEntries(
  * What it does:
  * Appends one 12-byte command lane into a legacy vector with on-demand growth.
  */
-[[maybe_unused]] Element12Runtime* AppendUnitCommandLaneRuntime(
+Element12Runtime* AppendUnitCommandLaneRuntime(
   const Element12Runtime* const value,
   LegacyVectorStorageRuntime<Element12Runtime>* const vector
 )
@@ -3563,7 +3563,7 @@ void SwapPriorityQueueEntries(
  * What it does:
  * Releases one CommandDatabase-owned node buffer and clears ownership lanes.
  */
-[[maybe_unused]] std::int32_t ReleaseCommandDatabaseNodeBufferRuntime(
+std::int32_t ReleaseCommandDatabaseNodeBufferRuntime(
   OwnedBufferRuntime* const owner
 )
 {
@@ -3577,7 +3577,7 @@ void SwapPriorityQueueEntries(
  * Finds-or-inserts one command-db tree node by command id and writes
  * `(node, inserted)` to the caller-provided status lane.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertCommandNodeByIdRuntime(
+MapInsertStatusRuntime* FindOrInsertCommandNodeByIdRuntime(
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -3592,7 +3592,7 @@ void SwapPriorityQueueEntries(
  * What it does:
  * Releases one CArmyStats-owned node buffer and clears ownership lanes.
  */
-[[maybe_unused]] std::int32_t ReleaseArmyStatsNodeBufferRuntime(
+std::int32_t ReleaseArmyStatsNodeBufferRuntime(
   OwnedBufferRuntime* const owner
 )
 {
@@ -3606,7 +3606,7 @@ void SwapPriorityQueueEntries(
  * Finds-or-inserts one army-stats tree node by key and emits the insertion
  * status pair for callers.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertArmyStatsNodeByKeyRuntime(
+MapInsertStatusRuntime* FindOrInsertArmyStatsNodeByKeyRuntime(
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -3621,7 +3621,7 @@ void SwapPriorityQueueEntries(
  * What it does:
  * Releases one influence-grid entry tree head and clears set ownership lanes.
  */
-[[maybe_unused]] std::int32_t ResetInfluenceGridEntryStorageRuntime(
+std::int32_t ResetInfluenceGridEntryStorageRuntime(
   OwnedBufferRuntime* const owner
 )
 {
@@ -3635,7 +3635,7 @@ void SwapPriorityQueueEntries(
  * Finds-or-inserts one wide-node influence map entry (sentinel flag lane at
  * +0x3D) and reports insertion status.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertInfluenceNodeWideRuntime(
+MapInsertStatusRuntime* FindOrInsertInfluenceNodeWideRuntime(
   LegacyMapStorageRuntime<MapNodeNil61Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -3651,7 +3651,7 @@ void SwapPriorityQueueEntries(
  * Finds-or-inserts one influence map entry node (sentinel flag lane at +0x15)
  * and returns the iterator/insert-status pair.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertInfluenceNodeRuntime(
+MapInsertStatusRuntime* FindOrInsertInfluenceNodeRuntime(
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -3667,7 +3667,7 @@ void SwapPriorityQueueEntries(
  * Allocates one influence-node storage lane and, on success, invokes the
  * caller-provided link/init callback.
  */
-[[maybe_unused]] void* AllocateInfluenceNodeAndInitRuntime(
+void* AllocateInfluenceNodeAndInitRuntime(
   const std::size_t nodeSize,
   void (*const initFn)(std::int32_t, std::int32_t, std::uint8_t),
   const std::int32_t initArg0,
@@ -3698,7 +3698,7 @@ static_assert(offsetof(DwordTimerLaneRuntime, timer) == 0x08, "DwordTimerLaneRun
  * Writes one input dword to the destination head lane and default-constructs
  * the embedded timer lane at `+0x08`.
  */
-[[maybe_unused]] DwordTimerLaneRuntime* InitializeDwordTimerLane(
+DwordTimerLaneRuntime* InitializeDwordTimerLane(
   DwordTimerLaneRuntime* const destination,
   const std::uint32_t lane00
 )
@@ -3736,7 +3736,7 @@ static_assert(
  * Copies the dword lane at `+0x08` and deep-copies the embedded
  * `gpg::fastvector_uint` lane at `+0x10`.
  */
-[[maybe_unused]] DwordAndFastVectorLaneRuntime* CopyDwordAndFastVectorLane(
+DwordAndFastVectorLaneRuntime* CopyDwordAndFastVectorLane(
   const DwordAndFastVectorLaneRuntime* const source,
   DwordAndFastVectorLaneRuntime* const destination
 )
@@ -3768,7 +3768,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Copies one leading byte lane, then assigns the embedded legacy string lane.
  */
-[[maybe_unused]] ByteAndStringLaneRuntime* CopyByteAndStringLane(
+ByteAndStringLaneRuntime* CopyByteAndStringLane(
   const ByteAndStringLaneRuntime* const source,
   ByteAndStringLaneRuntime* const destination
 )
@@ -3789,7 +3789,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Converts elapsed cycles from the embedded timer lane into microseconds and
  * atomically accumulates them into the owner counter at `+0x24`.
  */
-[[maybe_unused]] std::int32_t AccumulateTimerElapsedMicrosecondsRuntime(
+std::int32_t AccumulateTimerElapsedMicrosecondsRuntime(
   TimerAccumulatorRuntime* const runtime
 )
 {
@@ -3811,7 +3811,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Destroys one vector lane of `SSTIArmyConstantData` entries and releases the
  * backing storage block.
  */
-[[maybe_unused]] void DestroyArmyConstantDataVectorRuntime(
+void DestroyArmyConstantDataVectorRuntime(
   LegacyVectorStorageRuntime<moho::SSTIArmyConstantData>* const vector
 )
 {
@@ -3838,7 +3838,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Tail-forwards one `SSyncData` army-constant vector teardown thunk into the
  * canonical vector-destroy helper body.
  */
-[[maybe_unused]] void DestroyArmyConstantDataVectorThunk(
+void DestroyArmyConstantDataVectorThunk(
   LegacyVectorStorageRuntime<moho::SSTIArmyConstantData>* const vector
 )
 {
@@ -3852,7 +3852,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Destroys one vector lane of `SSTIArmyVariableData` entries and releases the
  * backing storage block.
  */
-[[maybe_unused]] void DestroyArmyVariableDataVectorRuntime(
+void DestroyArmyVariableDataVectorRuntime(
   LegacyVectorStorageRuntime<moho::SSTIArmyVariableData>* const vector
 )
 {
@@ -3884,7 +3884,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * — an unrelated deserializer with no connection to SSTIArmyVariableData or to
  * any vector teardown. The claim was fabricated ownership and has been removed.
  */
-[[maybe_unused]] void DestroyArmyVariableDataVectorThunk(
+void DestroyArmyVariableDataVectorThunk(
   LegacyVectorStorageRuntime<moho::SSTIArmyVariableData>* const vector
 )
 {
@@ -3898,7 +3898,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Destroys one vector lane of `SSTIUnitVariableData` slot wrappers
  * (`0x8-byte header + payload + tail`) and releases storage.
  */
-[[maybe_unused]] void DestroyUnitVariableDataSlotVectorRuntime(
+void DestroyUnitVariableDataSlotVectorRuntime(
   LegacyVectorStorageRuntime<SSTIUnitVariableDataSlotRuntime>* const vector
 )
 {
@@ -3925,7 +3925,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Tail-forwards one `SSyncData` unit-variable slot vector teardown thunk into
  * the canonical vector-destroy helper body.
  */
-[[maybe_unused]] void DestroyUnitVariableDataSlotVectorThunk(
+void DestroyUnitVariableDataSlotVectorThunk(
   LegacyVectorStorageRuntime<SSTIUnitVariableDataSlotRuntime>* const vector
 )
 {
@@ -3939,7 +3939,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Copies one GeomCamera range into destination lanes and destroys any now-extra
  * destination tail entries.
  */
-[[maybe_unused]] moho::GeomCamera3** CopyGeomCameraRangeAndPruneTailRuntime(
+moho::GeomCamera3** CopyGeomCameraRangeAndPruneTailRuntime(
   CameraCopyContextRuntime* const context,
   moho::GeomCamera3** const outIterator,
   moho::GeomCamera3* const destinationBegin,
@@ -3974,7 +3974,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Rebuilds one opaque pointer lane when requested/current lanes differ, then
  * returns the requested lane through `outValue`.
  */
-[[maybe_unused]] std::uint32_t* AssignRebuiltOpaqueLaneRuntimeA(
+std::uint32_t* AssignRebuiltOpaqueLaneRuntimeA(
   OpaqueLaneRebuildRuntime* const context,
   std::uint32_t* const outValue,
   const std::uint32_t requestedLane,
@@ -3998,7 +3998,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Rebuilds one opaque pointer lane with zero-initialized replacement storage
  * when requested/current lanes differ, then writes the requested lane out.
  */
-[[maybe_unused]] std::uint32_t* AssignRebuiltOpaqueLaneRuntimeB(
+std::uint32_t* AssignRebuiltOpaqueLaneRuntimeB(
   OpaqueLaneRebuildRuntime* const context,
   std::uint32_t* const outValue,
   const std::uint32_t requestedLane,
@@ -4021,7 +4021,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Appends one 12-byte pose-copy lane into a legacy growth vector.
  */
-[[maybe_unused]] Element12Runtime* AppendPoseCopyLaneRuntime(
+Element12Runtime* AppendPoseCopyLaneRuntime(
   const Element12Runtime* const value,
   LegacyVectorStorageRuntime<Element12Runtime>* const vector
 )
@@ -4037,7 +4037,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Resizes one word vector to `desiredCount`, trimming tail lanes when shrinking
  * and filling appended lanes with `fillByte` when growing.
  */
-[[maybe_unused]] std::uint32_t* ResizeWordVectorWithFillByteRuntime(
+std::uint32_t* ResizeWordVectorWithFillByteRuntime(
   const std::uint32_t desiredCount,
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   const std::uint8_t fillByte
@@ -4054,7 +4054,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Compacts one trailing 12-byte-word lane range `[sourceCursor, end)` into
  * `destination` and advances the owner vector end cursor to the compacted tail.
  */
-[[maybe_unused]] std::uint32_t** CompactWordVectorTailFromCursorRuntime(
+std::uint32_t** CompactWordVectorTailFromCursorRuntime(
   std::uint32_t** const outBeginStorage,
   CacheWordVectorRuntime* const runtime,
   std::uint32_t* const destination,
@@ -4087,7 +4087,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Finalizes one cached word-vector lane, synchronizes staged begin/end cursors,
  * and invalidates the cached index lane.
  */
-[[maybe_unused]] std::int32_t FinalizeWordVectorCacheStateRuntime(
+std::int32_t FinalizeWordVectorCacheStateRuntime(
   CacheWordVectorRuntime* const runtime
 )
 {
@@ -4110,7 +4110,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one RB-tree node lane with null links and marks it as the
  * sentinel-style root marker (`+0x2C=1`, `+0x2D=0`).
  */
-[[maybe_unused]] RbNodeFlag45Runtime* AllocateRuleTreeNodeRuntime()
+RbNodeFlag45Runtime* AllocateRuleTreeNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag45Runtime>();
   if (node == nullptr) {
@@ -4132,7 +4132,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Recursively destroys one RB-tree lane and releases dynamic string storage
  * when capacity is heap-backed (`capacity >= 16`).
  */
-[[maybe_unused]] void DestroyRuleTreeNodeRecursiveRuntime(
+void DestroyRuleTreeNodeRecursiveRuntime(
   RbNodeFlag45Runtime* const node
 )
 {
@@ -4152,7 +4152,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Resets one swap-backed dynamic array lane to its fallback storage block and
  * refreshes cached cursor/first-value lanes.
  */
-[[maybe_unused]] std::uint32_t ResetSwapBackedArrayRuntimeA(
+std::uint32_t ResetSwapBackedArrayRuntimeA(
   SwapBackedArrayRuntimeA* const runtime
 )
 {
@@ -4179,7 +4179,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one category-map node lane with cleared links and sentinel-state
  * flags (`+0x14=1`, `+0x15=0`).
  */
-[[maybe_unused]] RbNodeFlag21Runtime* AllocateCategoryMapNodeRuntime()
+RbNodeFlag21Runtime* AllocateCategoryMapNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
   if (node == nullptr) {
@@ -4201,7 +4201,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Destroys one contiguous range of `UnitWeaponInfo` entries (`0x98` bytes per
  * lane).
  */
-[[maybe_unused]] std::uint8_t* DestroyUnitWeaponInfoRangeRuntime(
+std::uint8_t* DestroyUnitWeaponInfoRangeRuntime(
   std::uint8_t* const begin,
   const std::uint8_t* const end
 )
@@ -4223,7 +4223,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Copies one RB-map header lane (size/root) and recomputes cached
  * leftmost/rightmost pointers for `isNil` flag offset `+0x41`.
  */
-[[maybe_unused]] RbMapFlag65Runtime* CopyMapHeaderAndExtremaFlag65Runtime(
+RbMapFlag65Runtime* CopyMapHeaderAndExtremaFlag65Runtime(
   RbMapFlag65Runtime* const destination,
   const RbMapFlag65Runtime* const source,
   const CloneTree65Fn cloneFn
@@ -4250,7 +4250,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Copy-constructs `count` consecutive `LuaObject` lanes from one source
  * object.
  */
-[[maybe_unused]] void CopyConstructLuaObjectRangeRuntime(
+void CopyConstructLuaObjectRangeRuntime(
   std::int32_t count,
   LuaPlus::LuaObject* destination,
   const LuaPlus::LuaObject* const source
@@ -4272,7 +4272,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Recursively destroys one linked tree lane and patches both back-reference
  * chains stored in words `+0x14/+0x18` and `+0x1C/+0x20`.
  */
-[[maybe_unused]] void DestroyLinkedTreeNodeRecursiveRuntime(
+void DestroyLinkedTreeNodeRecursiveRuntime(
   LinkedTreeNode37Runtime* node
 )
 {
@@ -4297,7 +4297,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Initializes `count` contiguous lanes with stride `0x34` using one
  * caller-supplied construction callback.
  */
-[[maybe_unused]] std::int32_t ConstructStride52RangeRuntime(
+std::int32_t ConstructStride52RangeRuntime(
   std::int32_t count,
   std::byte* destination,
   const void* const sourceContext,
@@ -4322,7 +4322,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Allocates one 3-word node and writes `{a1, a2, *a3}` payload lanes.
  */
-[[maybe_unused]] TripleIntNodeRuntime* AllocateTripleIntNodeRuntime(
+TripleIntNodeRuntime* AllocateTripleIntNodeRuntime(
   const std::int32_t lane0,
   const std::int32_t lane4,
   const std::int32_t* const lane8Source
@@ -4346,7 +4346,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Clears one linearized tree list lane by unlinking head sentinels and
  * deleting each chained node.
  */
-[[maybe_unused]] LinearTreeNodeRuntime* ClearLinearTreeStorageRuntime(
+LinearTreeNodeRuntime* ClearLinearTreeStorageRuntime(
   LinearTreeStorageRuntime* const storage
 )
 {
@@ -4379,7 +4379,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one IdPool-map node lane with cleared links and sentinel-state
  * flags (`+0x14=1`, `+0x15=0`).
  */
-[[maybe_unused]] RbNodeFlag21Runtime* AllocateIdPoolMapNodeRuntime()
+RbNodeFlag21Runtime* AllocateIdPoolMapNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
   if (node == nullptr) {
@@ -4401,7 +4401,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one `map<uint, IdPool>` node lane with cleared links and
  * sentinel-state flags (`+0x14=1`, `+0x15=0`).
  */
-[[maybe_unused]] RbNodeFlag21Runtime* AllocateUintIdPoolMapNodeRuntime()
+RbNodeFlag21Runtime* AllocateUintIdPoolMapNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
   if (node == nullptr) {
@@ -4422,7 +4422,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Returns lower-bound candidate node for one key in a string->float RB-tree.
  */
-[[maybe_unused]] StringFloatMapNodeRuntime* LowerBoundStringFloatMapRuntime(
+StringFloatMapNodeRuntime* LowerBoundStringFloatMapRuntime(
   StringFloatMapRuntime* const map,
   const std::string* const key
 )
@@ -4455,7 +4455,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Resets one swap-backed dynamic array lane (`+0x10` storage block) to fallback
  * storage and refreshes cached lanes.
  */
-[[maybe_unused]] std::uint32_t ResetSwapBackedArrayRuntimeB(
+std::uint32_t ResetSwapBackedArrayRuntimeB(
   SwapBackedArrayRuntimeB* const runtime
 )
 {
@@ -4482,7 +4482,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one command-db map node lane with cleared links and sentinel-state
  * flags (`+0x14=1`, `+0x15=0`).
  */
-[[maybe_unused]] RbNodeFlag21Runtime* AllocateCommandDbMapNodeRuntime()
+RbNodeFlag21Runtime* AllocateCommandDbMapNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
   if (node == nullptr) {
@@ -4504,7 +4504,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one RB-tree node lane with null links and marks it as
  * sentinel-root style (`+0x2C=1`, `+0x2D=0`).
  */
-[[maybe_unused]] RbNodeFlag45Runtime* AllocateArmyStatsTreeNodeRuntime()
+RbNodeFlag45Runtime* AllocateArmyStatsTreeNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag45Runtime>();
   if (node == nullptr) {
@@ -4526,7 +4526,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Recursively destroys one RB-tree lane and releases dynamic string storage
  * when capacity is heap-backed (`capacity >= 16`).
  */
-[[maybe_unused]] void DestroyArmyStatsTreeNodeRecursiveRuntime(
+void DestroyArmyStatsTreeNodeRecursiveRuntime(
   RbNodeFlag45Runtime* const node
 )
 {
@@ -4540,7 +4540,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Resets one linked owner lane to fallback array storage and unlinks the node
  * from its intrusive next/prev chain.
  */
-[[maybe_unused]] LinkedBufferOwnerRuntime* ResetLinkedBufferOwnerRuntime(
+LinkedBufferOwnerRuntime* ResetLinkedBufferOwnerRuntime(
   LinkedBufferOwnerRuntime* const owner
 )
 {
@@ -4576,7 +4576,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Copies one RB-map header lane (size/root) and recomputes cached
  * leftmost/rightmost pointers for `isNil` flag offset `+0x15`.
  */
-[[maybe_unused]] RbMapFlag21Runtime* CopyMapHeaderAndExtremaFlag21Runtime(
+RbMapFlag21Runtime* CopyMapHeaderAndExtremaFlag21Runtime(
   RbMapFlag21Runtime* const destination,
   const RbMapFlag21Runtime* const source,
   const CloneTree21Fn cloneFn
@@ -4603,7 +4603,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one compact RB-tree node lane with null links and sentinel-state
  * flags (`+0x10=1`, `+0x11=0`).
  */
-[[maybe_unused]] RbNodeFlag17Runtime* AllocateCompactTreeNodeRuntime()
+RbNodeFlag17Runtime* AllocateCompactTreeNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag17Runtime>();
   if (node == nullptr) {
@@ -4625,7 +4625,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Performs one sift-down step on a 4-float heap lane and then invokes the
  * caller-provided finalize callback.
  */
-[[maybe_unused]] std::int32_t SiftDownFloat4HeapAndFinalizeRuntime(
+std::int32_t SiftDownFloat4HeapAndFinalizeRuntime(
   std::int32_t heapIndex,
   const std::int32_t heapLast,
   Float4Runtime* const heapBase,
@@ -4664,7 +4664,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Allocates one doubly-linked sentinel lane and self-links both first words.
  */
-[[maybe_unused]] LinearTreeNodeRuntime* AllocateSelfLinkedPairNodeRuntime()
+LinearTreeNodeRuntime* AllocateSelfLinkedPairNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<LinearTreeNodeRuntime>();
   if (node == nullptr) {
@@ -4683,7 +4683,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Initializes one linear-tree storage lane by allocating its self-linked head
  * sentinel and resetting the tracked element count to zero.
  */
-[[maybe_unused]] [[nodiscard]] LinearTreeStorageRuntime* InitializeLinearTreeStorageHeadAndSize(
+[[nodiscard]] LinearTreeStorageRuntime* InitializeLinearTreeStorageHeadAndSize(
   LinearTreeStorageRuntime* const storage
 )
 {
@@ -4698,7 +4698,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Pure forwarding thunk to one owner cleanup callback.
  */
-[[maybe_unused]] void ForwardOwnerCleanupThunkRuntime(
+void ForwardOwnerCleanupThunkRuntime(
   void* const owner,
   const ForwardCleanupFn cleanupFn
 )
@@ -4715,7 +4715,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Collapses one tagged-insert cursor (`end = begin` when non-empty) and emits
  * one tagged insert call with key `9`.
  */
-[[maybe_unused]] std::int32_t ResetCursorAndInsertTaggedWordRuntime(
+std::int32_t ResetCursorAndInsertTaggedWordRuntime(
   const std::uint32_t* const value,
   TaggedInsertCursorRuntime* const cursor,
   const TaggedInsertRuntimeFn insertFn
@@ -4748,7 +4748,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one payload node lane and copies two integer lanes plus seven
  * float lanes from source.
  */
-[[maybe_unused]] FloatPayloadNodeRuntime* AllocateFloatPayloadNodeRuntime(
+FloatPayloadNodeRuntime* AllocateFloatPayloadNodeRuntime(
   const float* const sourceFloats,
   const std::int32_t lane0,
   const std::int32_t lane4
@@ -4776,7 +4776,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Allocates one decal-buffer tree node lane with null links and sentinel-state
  * flags (`+0x1C=1`, `+0x1D=0`).
  */
-[[maybe_unused]] RbNodeFlag29Runtime* AllocateDecalBufferTreeNodeRuntime()
+RbNodeFlag29Runtime* AllocateDecalBufferTreeNodeRuntime()
 {
   auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag29Runtime>();
   if (node == nullptr) {
@@ -4798,7 +4798,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Initializes one `RbNodeFlag29Runtime` tree-storage lane by allocating a head
  * sentinel node, wiring self-links, and clearing the element count.
  */
-[[maybe_unused]] RbNodeFlag29Runtime* InitializeDecalBufferTreeStorageHeadRuntime(
+RbNodeFlag29Runtime* InitializeDecalBufferTreeStorageHeadRuntime(
   LegacyMapStorageRuntime<RbNodeFlag29Runtime>* const storage
 )
 {
@@ -4819,7 +4819,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Initializes one decal-buffer tree-storage lane by allocating a sentinel
  * head node, wiring self-links, clearing count, and returning the storage.
  */
-[[maybe_unused]] LegacyMapStorageRuntime<RbNodeFlag29Runtime>* InitializeDecalBufferTreeStorageAndReturnStorageA(
+LegacyMapStorageRuntime<RbNodeFlag29Runtime>* InitializeDecalBufferTreeStorageAndReturnStorageA(
   LegacyMapStorageRuntime<RbNodeFlag29Runtime>* const storage
 )
 {
@@ -4840,7 +4840,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Sibling alias for the same decal-buffer tree-storage sentinel wiring lane;
  * returns the input storage pointer.
  */
-[[maybe_unused]] LegacyMapStorageRuntime<RbNodeFlag29Runtime>* InitializeDecalBufferTreeStorageAndReturnStorageB(
+LegacyMapStorageRuntime<RbNodeFlag29Runtime>* InitializeDecalBufferTreeStorageAndReturnStorageB(
   LegacyMapStorageRuntime<RbNodeFlag29Runtime>* const storage
 )
 {
@@ -4861,7 +4861,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Recursively destroys one compact RB-tree lane where `isNil` lives at
  * offset `+0x11`.
  */
-[[maybe_unused]] void DestroyCompactTreeNodeRecursiveRuntime(
+void DestroyCompactTreeNodeRecursiveRuntime(
   RbNodeFlag17Runtime* node
 )
 {
@@ -4882,7 +4882,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Destroys every compact-tree child node reachable from the current head
  * parent lane, then rewires the storage back to an empty sentinel state.
  */
-[[maybe_unused]] RbNodeFlag17Runtime* ResetCompactTreeStorageHeadRuntime(
+RbNodeFlag17Runtime* ResetCompactTreeStorageHeadRuntime(
   LegacyMapStorageRuntime<RbNodeFlag17Runtime>* const storage
 )
 {
@@ -4901,7 +4901,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Maps math-domain/range classification codes into `errno` (`EDOM`/`ERANGE`)
  * and returns the original pointer lane.
  */
-[[maybe_unused]] int* MapErrnoForMathInputRuntime(
+int* MapErrnoForMathInputRuntime(
   const int classificationCode
 )
 {
@@ -4921,7 +4921,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Iterates one pointer-word range and adds each resolved `Unit*` lane into one
  * unit-set container.
  */
-[[maybe_unused]] void AddUnitRangeFromPointerWordsRuntime(
+void AddUnitRangeFromPointerWordsRuntime(
   moho::SEntitySetTemplateUnit* const unitSet,
   const std::uint32_t* pointerBegin,
   const std::uint32_t* const pointerEnd
@@ -4947,7 +4947,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Appends one integer lane into a legacy vector payload.
  */
-[[maybe_unused]] std::int32_t* AppendLegacyIntVectorLaneRuntime(
+std::int32_t* AppendLegacyIntVectorLaneRuntime(
   LegacyVectorStorageRuntime<std::int32_t>* const vector,
   const std::int32_t* const value
 )
@@ -4968,7 +4968,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Resolves one owner-backed string-array index, advances by one lane, and
  * returns the mapped value when in range.
  */
-[[maybe_unused]] std::uint32_t* ResolveWxOwnerArrayValueRuntime(
+std::uint32_t* ResolveWxOwnerArrayValueRuntime(
   std::uint32_t* const outValue,
   const std::uint32_t* const objectHandleWord
 )
@@ -5016,7 +5016,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Normalizes one contiguous formation lane range by restoring each record to
  * fallback storage and updating cached cursors.
  */
-[[maybe_unused]] std::uint32_t* NormalizeFormationLaneRangeRuntime(
+std::uint32_t* NormalizeFormationLaneRangeRuntime(
   std::uint32_t* laneBegin,
   std::uint32_t* const laneEnd
 )
@@ -5045,7 +5045,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Parses one full wide-string double lane and reports strict-consume success.
  */
-[[maybe_unused]] bool ParseWideDoubleStrictRuntime(
+bool ParseWideDoubleStrictRuntime(
   const wchar_t** const sourceText,
   double* const outValue
 )
@@ -5067,7 +5067,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Parses one full wide-string integer lane using the supplied radix and
  * reports strict-consume success.
  */
-[[maybe_unused]] bool ParseWideLongStrictRuntime(
+bool ParseWideLongStrictRuntime(
   const wchar_t** const sourceText,
   std::uint32_t* const outValue,
   const std::uint32_t radix
@@ -5089,7 +5089,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * What it does:
  * Initializes one command-mode RB-tree storage head and resets size lanes.
  */
-[[maybe_unused]] std::uint32_t InitializeCommandModeTreeRuntime(
+std::uint32_t InitializeCommandModeTreeRuntime(
   std::uint8_t* const ownerBytes,
   RbNodeFlag25Runtime* (*const allocateNodeFn)()
 )
@@ -5119,7 +5119,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Resolves one runtime object from context and dispatches virtual slot `+0x20`
  * when available.
  */
-[[maybe_unused]] int DispatchResolvedObjectSlot32Runtime(
+int DispatchResolvedObjectSlot32Runtime(
   const int context,
   const int dispatchArg,
   void* (*const resolveFn)(int, int)
@@ -5147,7 +5147,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Window-proc hook lane that forwards selected messages through one object
  * dispatcher before chaining to the previous window procedure.
  */
-[[maybe_unused]] LRESULT CALLBACK DispatchWindowMessageHookRuntime(
+LRESULT CALLBACK DispatchWindowMessageHookRuntime(
   HWND window,
   UINT message,
   WPARAM wParam,
@@ -5197,7 +5197,7 @@ static_assert(offsetof(ByteAndStringLaneRuntime, text) == 0x04, "ByteAndStringLa
  * Routes profile-string writes to global-profile or private-profile API based
  * on whether target filename equals `L\"Default\"`.
  */
-[[maybe_unused]] BOOL WriteProfileStringDispatchRuntime(
+BOOL WriteProfileStringDispatchRuntime(
   LPCWSTR* const section,
   LPCWSTR* const key,
   LPCWSTR* const value,
@@ -5323,7 +5323,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Formats one float lane as `"%.4f"` into a temporary wx-string lane, routes
  * it through profile-string dispatch, then releases temporary string ref-data.
  */
-[[maybe_unused]] BOOL WriteProfileFormattedFloatRuntime(
+BOOL WriteProfileFormattedFloatRuntime(
   LPCWSTR* const section,
   LPCWSTR* const key,
   const float value,
@@ -5345,7 +5345,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Formats one signed long lane as `"%ld"` into a temporary wx-string lane,
  * routes it through profile-string dispatch, then releases string ref-data.
  */
-[[maybe_unused]] BOOL WriteProfileFormattedLongRuntime(
+BOOL WriteProfileFormattedLongRuntime(
   LPCWSTR* const section,
   LPCWSTR* const key,
   const long value,
@@ -5367,7 +5367,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Formats one signed int lane as `"%d"` into a temporary wx-string lane,
  * routes it through profile-string dispatch, then releases string ref-data.
  */
-[[maybe_unused]] BOOL WriteProfileFormattedIntRuntime(
+BOOL WriteProfileFormattedIntRuntime(
   LPCWSTR* const section,
   LPCWSTR* const key,
   const int value,
@@ -5390,7 +5390,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * token before mode-gated shutdown; otherwise directly calls `ExitWindowsEx`
  * when `mode < 2`.
  */
-[[maybe_unused]] bool ShutdownSystemWithPrivilegeRuntime(const unsigned int mode)
+bool ShutdownSystemWithPrivilegeRuntime(const unsigned int mode)
 {
   if (wxGetOsVersion(nullptr, nullptr) != 18) {
     return (mode < 2u) && (::ExitWindowsEx(7u, 0u) != FALSE);
@@ -5421,7 +5421,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Initializes one float-distance runtime lane with default tolerance/clamp
  * bounds.
  */
-[[maybe_unused]] DistanceVector2fRuntime* InitializeDistanceVector2fRuntime(
+DistanceVector2fRuntime* InitializeDistanceVector2fRuntime(
   DistanceVector2fRuntime* const runtime,
   void* const vtableToken
 )
@@ -5448,7 +5448,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Initializes one double-distance runtime lane with default tolerance/clamp
  * bounds.
  */
-[[maybe_unused]] DistanceVector2dRuntime* InitializeDistanceVector2dRuntime(
+DistanceVector2dRuntime* InitializeDistanceVector2dRuntime(
   DistanceVector2dRuntime* const runtime,
   void* const vtableToken
 )
@@ -5475,7 +5475,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Builds one 2-point support sphere lane `(center.xyz, radiusSquared)` from
  * two 3D points.
  */
-[[maybe_unused]] double* ComputeTwoPointSupportSphereRuntime(
+double* ComputeTwoPointSupportSphereRuntime(
   double* const outSphere4,
   const double* const pointA3,
   const double* const pointB3
@@ -5507,7 +5507,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Computes one triangle-derived closest-point lane and squared distance; emits
  * `DBL_MAX` sentinel output when determinant is under tolerance.
  */
-[[maybe_unused]] double* ComputeTriangleClosestPointRuntime(
+double* ComputeTriangleClosestPointRuntime(
   const double* const toleranceLane,
   double* const outPoint4,
   const double* const p3,
@@ -5570,7 +5570,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x19`.
  */
-[[maybe_unused]] RbNodeFlag25Runtime* AdvanceTreeIteratorFlag25Runtime(
+RbNodeFlag25Runtime* AdvanceTreeIteratorFlag25Runtime(
   const std::uint32_t /*unused*/,
   RbNodeFlag25Runtime** const iteratorLane
 )
@@ -5584,7 +5584,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x2D`.
  */
-[[maybe_unused]] RbNodeFlag45Runtime* AdvanceTreeIteratorFlag45RuntimeA(
+RbNodeFlag45Runtime* AdvanceTreeIteratorFlag45RuntimeA(
   const std::uint32_t /*unused*/,
   RbNodeFlag45Runtime** const iteratorLane
 )
@@ -5598,7 +5598,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * What it does:
  * Advances one map iterator lane using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] void AdvanceMapIteratorFlag21RuntimeA(
+void AdvanceMapIteratorFlag21RuntimeA(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -5612,7 +5612,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Adapter lane that advances one map iterator slot through
  * `AdvanceMapIteratorFlag21RuntimeA` and returns the original slot pointer.
  */
-[[maybe_unused]] RbNodeFlag21Runtime** AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterA(
+RbNodeFlag21Runtime** AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterA(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -5627,7 +5627,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Secondary adapter lane that advances one map iterator slot through
  * `AdvanceMapIteratorFlag21RuntimeA` and returns the original slot pointer.
  */
-[[maybe_unused]] RbNodeFlag21Runtime** AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterB(
+RbNodeFlag21Runtime** AdvanceMapIteratorFlag21RuntimeReturnSlotAdapterB(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -5641,7 +5641,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * What it does:
  * Advances one string-map iterator lane using sentinel flag offset `+0x2D`.
  */
-[[maybe_unused]] RbNodeFlag45Runtime* AdvanceRangeExtractorIteratorRuntime(
+RbNodeFlag45Runtime* AdvanceRangeExtractorIteratorRuntime(
   RbNodeFlag45Runtime** const iteratorLane
 )
 {
@@ -5654,7 +5654,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x2D`.
  */
-[[maybe_unused]] RbNodeFlag45Runtime* AdvanceTreeIteratorFlag45RuntimeB(
+RbNodeFlag45Runtime* AdvanceTreeIteratorFlag45RuntimeB(
   const std::uint32_t /*unused*/,
   RbNodeFlag45Runtime** const iteratorLane
 )
@@ -5668,7 +5668,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * What it does:
  * Advances one entity-map iterator lane using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] void AdvanceMapIteratorFlag21RuntimeB(
+void AdvanceMapIteratorFlag21RuntimeB(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -5682,7 +5682,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * Copies one 0x31-byte payload lane and increments embedded intrusive
  * reference counters (`+0x18`, `+0x20`, `+0x28`) when present.
  */
-[[maybe_unused]] RefCountedPayload49Runtime* CopyRefCountedPayload49Runtime(
+RefCountedPayload49Runtime* CopyRefCountedPayload49Runtime(
   RefCountedPayload49Runtime* const destination,
   const RefCountedPayload49Runtime* const source
 )
@@ -5715,7 +5715,7 @@ void ReleaseWxStringRuntime(WxStringRuntime* const value) noexcept
  * 11 instructions of argument shuffling ending in `call sub_85FDB0`, i.e. a
  * distinct register-shape adapter for this body, not a second copy of it.
  */
-[[maybe_unused]] RefCountedPayload49Runtime* FillStride52RefCountedPayload49LaneRuntime(
+RefCountedPayload49Runtime* FillStride52RefCountedPayload49LaneRuntime(
   std::uint32_t count,
   Element52Runtime* destination,
   const RefCountedPayload49Runtime* const source
@@ -5772,7 +5772,7 @@ namespace
  * Copies one half-open range of `0x34`-byte refcounted payload lanes from
  * `[sourceBegin, sourceEnd)` into `destination`.
  */
-[[maybe_unused]] Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeA(
+Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeA(
   Element52Runtime* const destination,
   const Element52Runtime* sourceBegin,
   const Element52Runtime* const sourceEnd
@@ -5788,7 +5788,7 @@ namespace
  * Alternate register-shape entry that copies one half-open `0x34`-byte
  * refcounted payload range into `destination`.
  */
-[[maybe_unused]] Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeB(
+Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeB(
   Element52Runtime* const destination,
   const Element52Runtime* sourceBegin,
   const Element52Runtime* const sourceEnd
@@ -5804,7 +5804,7 @@ namespace
  * Calling-convention adapter lane that forwards one `0x34`-stride half-open
  * range copy into `CopyStride52RefCountedPayload49RangeRuntimeA`.
  */
-[[maybe_unused]] Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeAdapterA(
+Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeAdapterA(
   const Element52Runtime* const sourceBegin,
   const Element52Runtime* const sourceEnd,
   Element52Runtime* const destination
@@ -5820,7 +5820,7 @@ namespace
  * Alternate calling-convention adapter lane that forwards one `0x34`-stride
  * half-open range copy into `CopyStride52RefCountedPayload49RangeRuntimeA`.
  */
-[[maybe_unused]] Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeAdapterB(
+Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeAdapterB(
   const Element52Runtime* const sourceBegin,
   const Element52Runtime* const sourceEnd,
   Element52Runtime* const destination
@@ -5836,7 +5836,7 @@ namespace
  * Third calling-convention adapter lane that forwards one `0x34`-stride
  * half-open range copy into `CopyStride52RefCountedPayload49RangeRuntimeA`.
  */
-[[maybe_unused]] Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeAdapterC(
+Element52Runtime* CopyStride52RefCountedPayload49RangeRuntimeAdapterC(
   const Element52Runtime* const sourceBegin,
   const Element52Runtime* const sourceEnd,
   Element52Runtime* const destination
@@ -5851,7 +5851,7 @@ namespace
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x2D`.
  */
-[[maybe_unused]] void AdvanceTreeIteratorFlag45RuntimeC(
+void AdvanceTreeIteratorFlag45RuntimeC(
   RbNodeFlag45Runtime** const iteratorLane
 )
 {
@@ -5864,7 +5864,7 @@ namespace
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x1D`.
  */
-[[maybe_unused]] RbNodeFlag29Runtime* RetreatTreeIteratorFlag29RuntimeA(
+RbNodeFlag29Runtime* RetreatTreeIteratorFlag29RuntimeA(
   const std::uint32_t /*unused*/,
   RbNodeFlag29Runtime** const iteratorLane
 )
@@ -5880,7 +5880,7 @@ namespace
  * Adapts one nil-29 iterator retreat through `RetreatTreeIteratorFlag29RuntimeA`
  * and returns the caller iterator-slot pointer.
  */
-[[maybe_unused]] [[nodiscard]] RbNodeFlag29Runtime** RetreatTreeIteratorFlag29RuntimeASlotAdapter(
+[[nodiscard]] RbNodeFlag29Runtime** RetreatTreeIteratorFlag29RuntimeASlotAdapter(
   const std::uint32_t laneTag,
   RbNodeFlag29Runtime** const iteratorLane
 )
@@ -5895,7 +5895,7 @@ namespace
  * What it does:
  * Advances one set/map iterator lane using sentinel flag offset `+0x0E`.
  */
-[[maybe_unused]] SetCharNodeNil14Runtime* AdvanceTreeIteratorFlag14Runtime(
+SetCharNodeNil14Runtime* AdvanceTreeIteratorFlag14Runtime(
   const std::uint32_t /*unused*/,
   SetCharNodeNil14Runtime** const iteratorLane
 )
@@ -5909,7 +5909,7 @@ namespace
  * What it does:
  * Writes one repeated 4-dword payload lane into `count` contiguous slots.
  */
-[[maybe_unused]] std::uint32_t* FillStride4DwordLaneRuntimeA(
+std::uint32_t* FillStride4DwordLaneRuntimeA(
   std::uint32_t* destination,
   const std::uint32_t* const source,
   std::uint32_t count
@@ -5939,7 +5939,7 @@ namespace
  * 11 instructions ending in `call sub_7CCEF0`, with no `add esi, 18h` stride and
  * no LuaObject placement-new — a register-shape adapter, not a second copy.
  */
-[[maybe_unused]] LuaPlus::LuaObject* FillStride24WordLuaObjectLaneRuntime(
+LuaPlus::LuaObject* FillStride24WordLuaObjectLaneRuntime(
   std::uint32_t count,
   Element24WordLuaObjectRuntime* destination,
   const Element24WordLuaObjectRuntime* const source
@@ -5968,7 +5968,7 @@ namespace
  * Forwards one 4-dword lane fill into `FillStride4DwordLaneRuntimeA` while
  * preserving the legacy null-source adapter semantics.
  */
-[[maybe_unused]] std::uint32_t* FillStride4DwordLaneRuntimeANullSourceAdapter(
+std::uint32_t* FillStride4DwordLaneRuntimeANullSourceAdapter(
   std::uint32_t* const destination,
   const std::uint32_t count
 )
@@ -5982,7 +5982,7 @@ namespace
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x25`.
  */
-[[maybe_unused]] PairNodeRuntime* AdvanceTreeIteratorFlag37Runtime(
+PairNodeRuntime* AdvanceTreeIteratorFlag37Runtime(
   const std::uint32_t /*unused*/,
   PairNodeRuntime** const iteratorLane
 )
@@ -5996,7 +5996,7 @@ namespace
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x2D`.
  */
-[[maybe_unused]] RbNodeFlag45Runtime* RetreatTreeIteratorFlag45RuntimeA(
+RbNodeFlag45Runtime* RetreatTreeIteratorFlag45RuntimeA(
   const std::uint32_t /*unused*/,
   RbNodeFlag45Runtime** const iteratorLane
 )
@@ -6010,7 +6010,7 @@ namespace
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0xB9`.
  */
-[[maybe_unused]] RbNodeLinksRuntime* RetreatTreeIteratorFlag185Runtime(
+RbNodeLinksRuntime* RetreatTreeIteratorFlag185Runtime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 )
@@ -6024,7 +6024,7 @@ namespace
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x25`.
  */
-[[maybe_unused]] PairNodeRuntime* RetreatTreeIteratorFlag37Runtime(
+PairNodeRuntime* RetreatTreeIteratorFlag37Runtime(
   const std::uint32_t /*unused*/,
   PairNodeRuntime** const iteratorLane
 )
@@ -6038,7 +6038,7 @@ namespace
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* RetreatTreeIteratorFlag21RuntimeA(
+RbNodeFlag21Runtime* RetreatTreeIteratorFlag21RuntimeA(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 )
@@ -6052,7 +6052,7 @@ namespace
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x2D`.
  */
-[[maybe_unused]] RbNodeFlag45Runtime* RetreatTreeIteratorFlag45RuntimeB(
+RbNodeFlag45Runtime* RetreatTreeIteratorFlag45RuntimeB(
   const std::uint32_t /*unused*/,
   RbNodeFlag45Runtime** const iteratorLane
 )
@@ -6060,7 +6060,7 @@ namespace
   return RetreatRbIteratorRuntime<RbNodeFlag45Runtime, 0x2Du>(iteratorLane);
 }
 
-[[maybe_unused]] std::uint32_t* FillStride3DwordLaneRuntime(
+std::uint32_t* FillStride3DwordLaneRuntime(
   std::uint32_t* destination,
   const std::uint32_t* const source,
   std::uint32_t count
@@ -6073,7 +6073,7 @@ namespace
  * Writes `count` zeroed 12-byte lanes and returns one-past-the-last written
  * lane.
  */
-[[maybe_unused]] Element12Runtime* ConstructElement12LaneRangeFromZeroRuntimeB(
+Element12Runtime* ConstructElement12LaneRangeFromZeroRuntimeB(
   Element12Runtime* const destination,
   const std::uint32_t count
 )
@@ -6095,7 +6095,7 @@ namespace
  * Descends repeatedly through `right` links until the flag-57 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeLinksRuntime* AdvanceTreeIteratorFlag57Runtime(
+RbNodeLinksRuntime* AdvanceTreeIteratorFlag57Runtime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 ) noexcept
@@ -6113,7 +6113,7 @@ namespace
  * Writes one repeated 3-dword source lane across `[destinationBegin,
  * destinationEnd)`.
  */
-[[maybe_unused]] std::uint32_t* FillStride3DwordLaneRuntimeB(
+std::uint32_t* FillStride3DwordLaneRuntimeB(
   std::uint32_t* destinationBegin,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const source
@@ -6135,7 +6135,7 @@ namespace
  * Copies one 3-dword lane range backward from `[sourceBegin, sourceEnd)` into
  * destination lanes ending at `destinationEnd`.
  */
-[[maybe_unused]] std::uint32_t* CopyStride3DwordRangeBackwardRuntime(
+std::uint32_t* CopyStride3DwordRangeBackwardRuntime(
   std::uint32_t* destinationEnd,
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* sourceEnd
@@ -6151,7 +6151,7 @@ namespace
   return destinationEnd;
 }
 
-[[maybe_unused]] PriorityQueueEntry12Runtime* SiftHeapEntry12ByScoreRuntime(
+PriorityQueueEntry12Runtime* SiftHeapEntry12ByScoreRuntime(
   std::int32_t insertionIndex,
   std::int32_t lowerBoundIndex,
   PriorityQueueEntry12Runtime* entries,
@@ -6167,7 +6167,7 @@ namespace
  * Sifts one 12-byte heap hole downward across the larger-child lane and then
  * reinserts the pending payload via `SiftHeapEntry12ByScoreRuntime(...)`.
  */
-[[maybe_unused]] PriorityQueueEntry12Runtime* SiftHeapHoleDownAndReinsertByScoreRuntime(
+PriorityQueueEntry12Runtime* SiftHeapHoleDownAndReinsertByScoreRuntime(
   std::int32_t holeIndex,
   const std::int32_t upperBoundIndex,
   PriorityQueueEntry12Runtime* const entries,
@@ -6206,7 +6206,7 @@ namespace
  * Sifts one 12-byte heap entry up toward `lowerBoundIndex` using only score
  * ordering, then writes the new entry lane.
  */
-[[maybe_unused]] PriorityQueueEntry12Runtime* SiftHeapEntry12ByScoreRuntime(
+PriorityQueueEntry12Runtime* SiftHeapEntry12ByScoreRuntime(
   std::int32_t insertionIndex,
   const std::int32_t lowerBoundIndex,
   PriorityQueueEntry12Runtime* const entries,
@@ -6245,7 +6245,7 @@ namespace
  * Sifts one 12-byte heap entry up toward `lowerBoundIndex` using
  * `(tieKey,score)` ordering, then writes the new entry lane.
  */
-[[maybe_unused]] PriorityQueueEntry12Runtime* SiftHeapEntry12ByScoreAndTieRuntime(
+PriorityQueueEntry12Runtime* SiftHeapEntry12ByScoreAndTieRuntime(
   std::int32_t insertionIndex,
   const std::int32_t lowerBoundIndex,
   PriorityQueueEntry12Runtime* const entries,
@@ -6289,7 +6289,7 @@ namespace
  * Rebinds one intrusive owner-slot node to the owner head slot at
  * `requestedOwner + 0x04`.
  */
-[[maybe_unused]] IntrusiveOwnerSlotRuntime* RebindIntrusiveOwnerSlotNodeRuntimeB(
+IntrusiveOwnerSlotRuntime* RebindIntrusiveOwnerSlotNodeRuntimeB(
   IntrusiveOwnerSlotRuntime* const node,
   IntrusiveOwnerAnchorRuntime* const requestedOwner
 ) noexcept
@@ -6320,7 +6320,7 @@ namespace
  * What it does:
  * Writes one repeated 3-dword payload lane into `count` contiguous slots.
  */
-[[maybe_unused]] std::uint32_t* FillStride3DwordLaneRuntime(
+std::uint32_t* FillStride3DwordLaneRuntime(
   std::uint32_t* destination,
   const std::uint32_t* const source,
   std::uint32_t count
@@ -6338,7 +6338,7 @@ namespace
   return destination;
 }
 
-[[maybe_unused]] std::uint32_t* FillStride4DwordWithDualRefLaneRuntime(
+std::uint32_t* FillStride4DwordWithDualRefLaneRuntime(
   std::uint32_t* destination,
   const std::uint32_t* const source,
   std::uint32_t count
@@ -6351,7 +6351,7 @@ namespace
  * Releases one `{begin,end,capacity}` storage triple and resets all three
  * cursor lanes to null.
  */
-[[maybe_unused]] void ReleaseLegacyBufferTripleRuntimeB(
+void ReleaseLegacyBufferTripleRuntimeB(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -6365,7 +6365,7 @@ namespace
  * Allocates one `count` dword storage lane and throws `std::bad_alloc` when
  * the `count * 4` byte request overflows 32-bit allocation arithmetic.
  */
-[[maybe_unused]] std::uint32_t* AllocateCheckedDwordStorageRuntime(
+std::uint32_t* AllocateCheckedDwordStorageRuntime(
   const std::uint32_t count
 )
 {
@@ -6383,7 +6383,7 @@ namespace
  * Clones one dword-vector storage triple into `destination`, preserving the
  * allocator cookie lane and strong exception cleanup semantics.
  */
-[[maybe_unused]] LegacyVectorStorageRuntime<std::uint32_t>* CloneDwordVectorStorageRuntime(
+LegacyVectorStorageRuntime<std::uint32_t>* CloneDwordVectorStorageRuntime(
   const LegacyVectorStorageRuntime<std::uint32_t>* const source,
   LegacyVectorStorageRuntime<std::uint32_t>* const destination
 )
@@ -6424,7 +6424,7 @@ namespace
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeB(
+std::uint32_t* CopyDwordRangeBackwardRuntimeB(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const sourceBegin
@@ -6440,7 +6440,7 @@ namespace
  * Swaps trailing three dword lanes (`+0x04/+0x08/+0x0C`) between two 16-byte
  * ranges while iterating backward.
  */
-[[maybe_unused]] Element16Runtime* SwapElement16TailLanesBackwardRuntime(
+Element16Runtime* SwapElement16TailLanesBackwardRuntime(
   Element16Runtime* destinationEnd,
   Element16Runtime* sourceEnd,
   Element16Runtime* const sourceBegin
@@ -6462,7 +6462,7 @@ namespace
  * What it does:
  * Resets one dword-vector logical end to begin while preserving capacity.
  */
-[[maybe_unused]] void ResetDwordVectorEndToBeginRuntimeB(
+void ResetDwordVectorEndToBeginRuntimeB(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector
 )
 {
@@ -6476,7 +6476,7 @@ namespace
  * Copies one dword range `[sourceBegin, sourceEnd)` to `destinationBegin` and
  * returns one-past-the-last written destination lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeForwardRuntimeB(
+std::uint32_t* CopyDwordRangeForwardRuntimeB(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationBegin,
   const std::uint32_t* const sourceBegin
@@ -6491,7 +6491,7 @@ namespace
  * What it does:
  * Returns the logical element count for one 12-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement12VectorRuntimeB(
+std::int32_t CountElement12VectorRuntimeB(
   const LegacyVectorStorageRuntime<Element12Runtime>* const vector
 ) noexcept
 {
@@ -6508,7 +6508,7 @@ namespace
  * What it does:
  * Returns the logical element count for one 12-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement12VectorRuntimeD(
+std::int32_t CountElement12VectorRuntimeD(
   const LegacyVectorStorageRuntime<Element12Runtime>* const vector
 ) noexcept
 {
@@ -6521,7 +6521,7 @@ namespace
  * What it does:
  * Returns the logical element count for one 12-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement12VectorRuntimeE(
+std::int32_t CountElement12VectorRuntimeE(
   const LegacyVectorStorageRuntime<Element12Runtime>* const vector
 ) noexcept
 {
@@ -6535,7 +6535,7 @@ namespace
  * Inserts one 12-byte lane at `insertPosition` and writes the rebased cursor
  * into `outCursor`.
  */
-[[maybe_unused]] Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntime(
+Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntime(
   LegacyVectorStorageRuntime<Element12Runtime>* const vector,
   Element12Runtime** const outCursor,
   Element12Runtime* const insertPosition,
@@ -6564,7 +6564,7 @@ namespace
  * Writes one repeated 3-float source lane across `[destinationBegin,
  * destinationEnd)`.
  */
-[[maybe_unused]] float* FillStride3FloatLaneRuntime(
+float* FillStride3FloatLaneRuntime(
   float* destinationBegin,
   float* const destinationEnd,
   const float* const source
@@ -6586,7 +6586,7 @@ namespace
  * Copies one 3-float lane range backward from `[sourceBegin, sourceEnd)` into
  * destination lanes ending at `destinationEnd`.
  */
-[[maybe_unused]] float* CopyStride3FloatRangeBackwardRuntime(
+float* CopyStride3FloatRangeBackwardRuntime(
   float* destinationEnd,
   const float* const sourceBegin,
   const float* sourceEnd
@@ -6608,7 +6608,7 @@ namespace
  * What it does:
  * Appends one dword lane to a legacy vector and returns the appended value.
  */
-[[maybe_unused]] std::uint32_t AppendDwordLaneRuntime(
+std::uint32_t AppendDwordLaneRuntime(
   const std::uint32_t* const valueLane,
   LegacyVectorStorageRuntime<std::uint32_t>* const vector
 )
@@ -6635,7 +6635,7 @@ namespace
  * Finds one exact key match in a flag-25 RB-map and returns the node when
  * present; otherwise returns the map head/sentinel node.
  */
-[[maybe_unused]] MapNodeNil25Runtime** FindExactMapNodeFlag25RuntimeA(
+MapNodeNil25Runtime** FindExactMapNodeFlag25RuntimeA(
   MapNodeNil25Runtime** const outNode,
   LegacyMapStorageRuntime<MapNodeNil25Runtime>* const map,
   const std::uint32_t* const keyLane
@@ -6661,7 +6661,7 @@ namespace
  * What it does:
  * Returns true when one 204-byte legacy vector lane is empty.
  */
-[[maybe_unused]] bool IsElement204VectorEmptyRuntime(
+bool IsElement204VectorEmptyRuntime(
   const LegacyVectorStorageRuntime<Element204Runtime>* const vector
 ) noexcept
 {
@@ -6678,7 +6678,7 @@ namespace
  * Moves one dword range left within vector storage, updates the vector end,
  * and stores `destination` in `outCursor`.
  */
-[[maybe_unused]] std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntime(
+std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntime(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   std::uint32_t** const outCursor,
   std::uint32_t* const destination,
@@ -6718,7 +6718,7 @@ struct ByteRangeStorageRuntime
 };
 static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime size must be 0x0C");
 
-[[maybe_unused]] std::uint8_t* ShiftByteRangeLeftAndCommitEndRuntime(
+std::uint8_t* ShiftByteRangeLeftAndCommitEndRuntime(
   ByteRangeStorageRuntime* const owner,
   std::uint8_t* const destination,
   const std::uint8_t* const sourceBegin
@@ -6743,7 +6743,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one 12-byte lane range backward from `[sourceBegin, sourceEnd)` into
  * destination lanes ending at `destinationEnd`.
  */
-[[maybe_unused]] std::uint32_t* CopyStride3DwordRangeBackwardRuntimeC(
+std::uint32_t* CopyStride3DwordRangeBackwardRuntimeC(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd
@@ -6759,7 +6759,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeG(
+std::uint32_t* CopyDwordRangeBackwardRuntimeG(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd
@@ -6775,7 +6775,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one 12-byte lane range backward from `[sourceBegin, sourceEnd)` into
  * destination lanes ending at `destinationEnd`.
  */
-[[maybe_unused]] std::uint32_t* CopyStride3DwordRangeBackwardRuntimeD(
+std::uint32_t* CopyStride3DwordRangeBackwardRuntimeD(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd
@@ -6791,7 +6791,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Moves one dword range `[sourceBegin, end)` left within vector storage,
  * commits the new end cursor, and stores `destination` in `outCursor`.
  */
-[[maybe_unused]] std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeB(
+std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeB(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   std::uint32_t** const outCursor,
   std::uint32_t* const destination,
@@ -6808,7 +6808,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeH(
+std::uint32_t* CopyDwordRangeBackwardRuntimeH(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd
@@ -6824,7 +6824,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeI(
+std::uint32_t* CopyDwordRangeBackwardRuntimeI(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd
@@ -6840,7 +6840,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Moves one dword range `[sourceBegin, end)` left within vector storage,
  * commits the new end cursor, and stores `destination` in `outCursor`.
  */
-[[maybe_unused]] std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeC(
+std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeC(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   std::uint32_t** const outCursor,
   std::uint32_t* const destination,
@@ -6857,7 +6857,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Moves one dword range `[sourceBegin, end)` left within vector storage,
  * commits the new end cursor, and stores `destination` in `outCursor`.
  */
-[[maybe_unused]] std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeD(
+std::uint32_t** ShiftDwordRangeLeftAndStoreCursorRuntimeD(
   LegacyVectorStorageRuntime<std::uint32_t>* const vector,
   std::uint32_t** const outCursor,
   std::uint32_t* const destination,
@@ -6874,7 +6874,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `left` links until the flag-21 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* DescendLeftUntilFlag21SentinelRuntime(
+RbNodeFlag21Runtime* DescendLeftUntilFlag21SentinelRuntime(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 ) noexcept
@@ -6892,7 +6892,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `right` links until the flag-25 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] MapNodeNil25Runtime* DescendRightUntilFlag25SentinelRuntime(
+MapNodeNil25Runtime* DescendRightUntilFlag25SentinelRuntime(
   const std::uint32_t /*unused*/,
   MapNodeNil25Runtime** const iteratorLane
 ) noexcept
@@ -6910,7 +6910,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `left` links until the flag-25 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] MapNodeNil25Runtime* DescendLeftUntilFlag25SentinelRuntime(
+MapNodeNil25Runtime* DescendLeftUntilFlag25SentinelRuntime(
   const std::uint32_t /*unused*/,
   MapNodeNil25Runtime** const iteratorLane
 ) noexcept
@@ -6927,7 +6927,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Returns the logical element count for one 52-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement52VectorRuntime(
+std::int32_t CountElement52VectorRuntime(
   const LegacyVectorStorageRuntime<Element52Runtime>* const vector
 ) noexcept
 {
@@ -6944,7 +6944,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeC(
+std::uint32_t* CopyDwordRangeBackwardRuntimeC(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const sourceBegin
@@ -6960,7 +6960,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Writes `count` zeroed 16-byte lanes and returns one-past-the-last written
  * lane.
  */
-[[maybe_unused]] Element16Runtime* ConstructElement16LaneRangeFromZeroRuntime(
+Element16Runtime* ConstructElement16LaneRangeFromZeroRuntime(
   Element16Runtime* const destination,
   const std::uint32_t count
 )
@@ -6986,7 +6986,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeD(
+std::uint32_t* CopyDwordRangeBackwardRuntimeD(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const sourceBegin
@@ -7002,7 +7002,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Releases one `{begin,end,capacity}` storage triple and resets all three
  * cursor lanes to null.
  */
-[[maybe_unused]] void ReleaseLegacyBufferTripleRuntimeC(
+void ReleaseLegacyBufferTripleRuntimeC(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -7016,7 +7016,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeE(
+std::uint32_t* CopyDwordRangeBackwardRuntimeE(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const sourceBegin
@@ -7032,7 +7032,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Clears one intrusive-node list by unlinking all nodes from the sentinel and
  * releasing each node lane.
  */
-[[maybe_unused]] IntrusiveNodeRuntime* ClearIntrusiveNodeListRuntimeA(
+IntrusiveNodeRuntime* ClearIntrusiveNodeListRuntimeA(
   IntrusiveNodeListRuntime* const list
 )
 {
@@ -7061,7 +7061,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Erases one intrusive-node half-open range `[first,last)` from the list;
  * when the range spans the whole list, it delegates to full-list clear.
  */
-[[maybe_unused]] IntrusiveNodeRuntime** EraseIntrusiveNodeRangeAndStoreCursorRuntimeA(
+IntrusiveNodeRuntime** EraseIntrusiveNodeRangeAndStoreCursorRuntimeA(
   IntrusiveNodeListRuntime* const list,
   IntrusiveNodeRuntime** const outCursor,
   IntrusiveNodeRuntime* first,
@@ -7103,7 +7103,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Erases one intrusive-node list lane, writes its successor into `outNext`,
  * and decrements list size.
  */
-[[maybe_unused]] IntrusiveNodeRuntime** EraseIntrusiveNodeAndStoreNextRuntimeA(
+IntrusiveNodeRuntime** EraseIntrusiveNodeAndStoreNextRuntimeA(
   IntrusiveNodeListRuntime* const list,
   IntrusiveNodeRuntime** const outNext,
   IntrusiveNodeRuntime* const node
@@ -7132,7 +7132,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Releases one `{begin,end,capacity}` storage triple and resets all three
  * cursor lanes to null.
  */
-[[maybe_unused]] void ReleaseLegacyBufferTripleRuntimeD(
+void ReleaseLegacyBufferTripleRuntimeD(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -7146,7 +7146,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Inserts one 12-byte lane at `insertPosition` and writes the rebased cursor
  * lane into `outCursor`.
  */
-[[maybe_unused]] Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntimeB(
+Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntimeB(
   LegacyVectorStorageRuntime<Element12Runtime>* const vector,
   Element12Runtime** const outCursor,
   Element12Runtime* const insertPosition,
@@ -7175,7 +7175,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Allocates one 40-byte intrusive payload node, inserts it before
  * `insertBefore`, and increments the owning list size lane.
  */
-[[maybe_unused]] std::int32_t InsertNode32BeforeAndGrowListRuntime(
+std::int32_t InsertNode32BeforeAndGrowListRuntime(
   IntrusivePayloadListRuntime* const list,
   IntrusivePayloadNode32Runtime* const insertBefore,
   const std::uint32_t* const payloadWords
@@ -7195,7 +7195,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Inserts one 12-byte lane at `insertPosition` and writes the rebased cursor
  * lane into `outCursor`.
  */
-[[maybe_unused]] Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntimeC(
+Element12Runtime** InsertElement12LaneAndStoreRebasedCursorRuntimeC(
   LegacyVectorStorageRuntime<Element12Runtime>* const vector,
   Element12Runtime** const outCursor,
   Element12Runtime* const insertPosition,
@@ -7212,7 +7212,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Resets one 16-bit vector storage lane, optionally allocates `count` entries,
  * and sets `{begin,end,capacity}` to the allocated range.
  */
-[[maybe_unused]] bool InitializeWordVectorStorageRuntime(
+bool InitializeWordVectorStorageRuntime(
   LegacyVectorStorageRuntime<std::uint16_t>* const vector,
   const std::uint32_t count
 )
@@ -7243,7 +7243,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Allocates one 40-byte intrusive payload node, inserts it before
  * `insertBefore`, increments list size, and stores the inserted-node cursor.
  */
-[[maybe_unused]] IntrusivePayloadNode32Runtime** InsertNode32BeforeAndGrowListStoreCursorRuntime(
+IntrusivePayloadNode32Runtime** InsertNode32BeforeAndGrowListStoreCursorRuntime(
   IntrusivePayloadListRuntime* const list,
   IntrusivePayloadNode32Runtime** const outCursor,
   IntrusivePayloadNode32Runtime* const insertBefore,
@@ -7265,7 +7265,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Acquires one slot id from a free-list lane when available; otherwise appends
  * one new pointer lane and returns its index.
  */
-[[maybe_unused]] std::int32_t AcquireOrReusePointerSlotRuntime(
+std::int32_t AcquireOrReusePointerSlotRuntime(
   std::int32_t* const freeHead,
   LegacyVectorStorageRuntime<std::int32_t*>* const vector,
   std::int32_t* const value
@@ -7298,7 +7298,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Clears one intrusive-node list by unlinking all nodes from the sentinel and
  * releasing each node lane.
  */
-[[maybe_unused]] IntrusiveNodeRuntime* ClearIntrusiveNodeListRuntimeB(
+IntrusiveNodeRuntime* ClearIntrusiveNodeListRuntimeB(
   IntrusiveNodeListRuntime* const list
 )
 {
@@ -7312,7 +7312,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Erases one intrusive-node half-open range `[first,last)` from the list;
  * when the range spans the whole list, it delegates to full-list clear.
  */
-[[maybe_unused]] IntrusiveNodeRuntime** EraseIntrusiveNodeRangeAndStoreCursorRuntimeB(
+IntrusiveNodeRuntime** EraseIntrusiveNodeRangeAndStoreCursorRuntimeB(
   IntrusiveNodeListRuntime* const list,
   IntrusiveNodeRuntime** const outCursor,
   IntrusiveNodeRuntime* first,
@@ -7354,7 +7354,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Erases one intrusive-node list lane, writes its successor into `outNext`,
  * and decrements list size.
  */
-[[maybe_unused]] IntrusiveNodeRuntime** EraseIntrusiveNodeAndStoreNextRuntimeB(
+IntrusiveNodeRuntime** EraseIntrusiveNodeAndStoreNextRuntimeB(
   IntrusiveNodeListRuntime* const list,
   IntrusiveNodeRuntime** const outNext,
   IntrusiveNodeRuntime* const node
@@ -7370,7 +7370,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Releases one `{begin,end,capacity}` storage triple and resets all three
  * cursor lanes to null.
  */
-[[maybe_unused]] void ReleaseLegacyBufferTripleRuntimeE(
+void ReleaseLegacyBufferTripleRuntimeE(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -7384,7 +7384,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Releases one `{begin,end,capacity}` storage triple and resets all three
  * cursor lanes to null.
  */
-[[maybe_unused]] void ReleaseLegacyBufferTripleRuntimeF(
+void ReleaseLegacyBufferTripleRuntimeF(
   LegacyBufferTripleRuntime* const owner
 )
 {
@@ -7398,7 +7398,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Allocates one 32-byte intrusive payload node, inserts it before
  * `insertBefore`, and increments the owning list size lane.
  */
-[[maybe_unused]] std::int32_t InsertNode24BeforeAndGrowListRuntime(
+std::int32_t InsertNode24BeforeAndGrowListRuntime(
   IntrusivePayloadListRuntime* const list,
   IntrusivePayloadNode24Runtime* const insertBefore,
   const std::uint32_t* const payloadWords
@@ -7418,7 +7418,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Allocates one 32-byte intrusive payload node, inserts it before
  * `insertBefore`, increments list size, and stores the inserted-node cursor.
  */
-[[maybe_unused]] IntrusivePayloadNode24Runtime** InsertNode24BeforeAndGrowListStoreCursorRuntime(
+IntrusivePayloadNode24Runtime** InsertNode24BeforeAndGrowListStoreCursorRuntime(
   IntrusivePayloadListRuntime* const list,
   IntrusivePayloadNode24Runtime** const outCursor,
   IntrusivePayloadNode24Runtime* const insertBefore,
@@ -7440,7 +7440,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one dword range `[sourceBegin, sourceEnd)` into storage ending at
  * `destinationEnd` and returns the destination begin lane.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardRuntimeF(
+std::uint32_t* CopyDwordRangeBackwardRuntimeF(
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationEnd,
   const std::uint32_t* const sourceBegin
@@ -7456,7 +7456,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Writes one repeated 4-dword payload lane and retains two intrusive weak-count
  * lanes (`+0x04`, `+0x0C`) in each destination record.
  */
-[[maybe_unused]] std::uint32_t* FillStride4DwordWithDualRefLaneRuntime(
+std::uint32_t* FillStride4DwordWithDualRefLaneRuntime(
   std::uint32_t* destination,
   const std::uint32_t* const source,
   std::uint32_t count
@@ -7489,8 +7489,8 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Compatibility adapter lane that forwards one null-source, zero-count
  * dispatch into `FillStride4DwordWithDualRefLaneRuntime(...)`.
  */
-[[maybe_unused]] std::uint32_t* FillStride4DwordWithDualRefLaneRuntimeNullAdapter(
-  [[maybe_unused]] const std::uint32_t* const unusedSourceLane,
+std::uint32_t* FillStride4DwordWithDualRefLaneRuntimeNullAdapter(
+  const std::uint32_t* const unusedSourceLane,
   std::uint32_t* const destination
 )
 {
@@ -7504,7 +7504,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Moves one RB-tree iterator lane forward using sentinel flag offset
  * `+0x0C49`.
  */
-[[maybe_unused]] RbNodeLinksRuntime* AdvanceTreeIteratorFlag3145Runtime(
+RbNodeLinksRuntime* AdvanceTreeIteratorFlag3145Runtime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 )
@@ -7518,7 +7518,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x0C49`.
  */
-[[maybe_unused]] RbNodeLinksRuntime* RetreatTreeIteratorFlag3145Runtime(
+RbNodeLinksRuntime* RetreatTreeIteratorFlag3145Runtime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 )
@@ -7533,7 +7533,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Walks the global flag-3145 RB-tree and returns the lower-bound node address
  * for `*keyLane`; returns the sentinel owner lane when no candidate is found.
  */
-[[maybe_unused]] std::uintptr_t FindLowerBoundInGlobalFlag3145TreeRuntime(
+std::uintptr_t FindLowerBoundInGlobalFlag3145TreeRuntime(
   const std::uintptr_t /*unusedOwner*/,
   const std::uint32_t* const keyLane
 ) noexcept
@@ -7568,7 +7568,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `right` links until the flag-3145 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeLinksRuntime* DescendRightUntilFlag3145SentinelRuntime(
+RbNodeLinksRuntime* DescendRightUntilFlag3145SentinelRuntime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 ) noexcept
@@ -7586,7 +7586,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `left` links until the flag-3145 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeLinksRuntime* DescendLeftUntilFlag3145SentinelRuntime(
+RbNodeLinksRuntime* DescendLeftUntilFlag3145SentinelRuntime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 ) noexcept
@@ -7603,7 +7603,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Returns the logical element count for one 12-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement12VectorRuntimeC(
+std::int32_t CountElement12VectorRuntimeC(
   const LegacyVectorStorageRuntime<Element12Runtime>* const vector
 ) noexcept
 {
@@ -7618,7 +7618,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Resolves one equal-range pair in a flag-25 RB-map:
  * `outPair[0] = lower_bound(key)`, `outPair[1] = upper_bound(key)`.
  */
-[[maybe_unused]] MapNodeNil25Runtime** FindMapEqualRangeFlag25Runtime(
+MapNodeNil25Runtime** FindMapEqualRangeFlag25Runtime(
   MapNodeNil25Runtime** const outPair,
   LegacyMapStorageRuntime<MapNodeNil25Runtime>* const map,
   const std::uint32_t* const keyLane
@@ -7645,7 +7645,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Resolves one owner pointer from an assisting-unit owner-slot lane
  * (`ownerLinkSlot - 8`), returning null when no slot is linked.
  */
-[[maybe_unused]] void* ResolveAssistingUnitOwnerRuntime(
+void* ResolveAssistingUnitOwnerRuntime(
   const AssistingUnitListOwnerRuntime* const owner
 ) noexcept
 {
@@ -7662,7 +7662,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one intrusive owner-slot node to the owner head slot at
  * `requestedOwner + 0x04`.
  */
-[[maybe_unused]] IntrusiveOwnerSlotRuntime* RebindIntrusiveOwnerSlotNodeRuntimeC(
+IntrusiveOwnerSlotRuntime* RebindIntrusiveOwnerSlotNodeRuntimeC(
   IntrusiveOwnerSlotRuntime* const node,
   IntrusiveOwnerAnchorRuntime* const requestedOwner
 ) noexcept
@@ -7677,7 +7677,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Finds one exact key match in a flag-21 RB-map and returns the node when
  * present; otherwise returns the map head/sentinel node.
  */
-[[maybe_unused]] MapNodeNil21Runtime** FindExactMapNodeFlag21RuntimeA(
+MapNodeNil21Runtime** FindExactMapNodeFlag21RuntimeA(
   MapNodeNil21Runtime** const outNode,
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const keyLane
@@ -7704,7 +7704,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Finds one exact key match in a flag-21 RB-map and returns the node when
  * present; otherwise returns the map head/sentinel node.
  */
-[[maybe_unused]] MapNodeNil21Runtime** FindExactMapNodeFlag21RuntimeB(
+MapNodeNil21Runtime** FindExactMapNodeFlag21RuntimeB(
   MapNodeNil21Runtime** const outNode,
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const keyLane
@@ -7720,7 +7720,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Resolves one equal-range pair in a flag-21 RB-map:
  * `outPair[0] = lower_bound(key)`, `outPair[1] = upper_bound(key)`.
  */
-[[maybe_unused]] MapNodeNil21Runtime** FindMapEqualRangeFlag21RuntimeA(
+MapNodeNil21Runtime** FindMapEqualRangeFlag21RuntimeA(
   MapNodeNil21Runtime** const outPair,
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const keyLane
@@ -7747,7 +7747,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Resolves one equal-range pair in a flag-21 RB-map:
  * `outPair[0] = lower_bound(key)`, `outPair[1] = upper_bound(key)`.
  */
-[[maybe_unused]] MapNodeNil21Runtime** FindMapEqualRangeFlag21RuntimeB(
+MapNodeNil21Runtime** FindMapEqualRangeFlag21RuntimeB(
   MapNodeNil21Runtime** const outPair,
   LegacyMapStorageRuntime<MapNodeNil21Runtime>* const map,
   const std::uint32_t* const keyLane
@@ -7763,7 +7763,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `right` links until the flag-21 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* DescendRightUntilFlag21SentinelRuntimeA(
+RbNodeFlag21Runtime* DescendRightUntilFlag21SentinelRuntimeA(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 ) noexcept
@@ -7781,7 +7781,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `left` links until the flag-21 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* DescendLeftUntilFlag21SentinelRuntimeA(
+RbNodeFlag21Runtime* DescendLeftUntilFlag21SentinelRuntimeA(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 ) noexcept
@@ -7799,7 +7799,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `right` links until the flag-21 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* DescendRightUntilFlag21SentinelRuntimeB(
+RbNodeFlag21Runtime* DescendRightUntilFlag21SentinelRuntimeB(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 ) noexcept
@@ -7814,7 +7814,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Descends repeatedly through `left` links until the flag-21 sentinel is
  * reached and returns the last non-sentinel node.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* DescendLeftUntilFlag21SentinelRuntimeB(
+RbNodeFlag21Runtime* DescendLeftUntilFlag21SentinelRuntimeB(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 ) noexcept
@@ -7828,7 +7828,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* RetreatTreeIteratorFlag21RuntimeB(
+RbNodeFlag21Runtime* RetreatTreeIteratorFlag21RuntimeB(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 )
@@ -7842,7 +7842,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* RetreatTreeIteratorFlag21RuntimeC(
+RbNodeFlag21Runtime* RetreatTreeIteratorFlag21RuntimeC(
   const std::uint32_t /*unused*/,
   RbNodeFlag21Runtime** const iteratorLane
 )
@@ -7856,7 +7856,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x11`.
  */
-[[maybe_unused]] MapNodeNil17Runtime* AdvanceTreeIteratorFlag17RuntimeA(
+MapNodeNil17Runtime* AdvanceTreeIteratorFlag17RuntimeA(
   const std::uint32_t /*unused*/,
   MapNodeNil17Runtime** const iteratorLane
 )
@@ -7870,7 +7870,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x4D`.
  */
-[[maybe_unused]] RbNodeLinksRuntime* RetreatTreeIteratorFlag77Runtime(
+RbNodeLinksRuntime* RetreatTreeIteratorFlag77Runtime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 )
@@ -7884,7 +7884,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x11`.
  */
-[[maybe_unused]] MapNodeNil17Runtime* AdvanceTreeIteratorFlag17RuntimeB(
+MapNodeNil17Runtime* AdvanceTreeIteratorFlag17RuntimeB(
   const std::uint32_t /*unused*/,
   MapNodeNil17Runtime** const iteratorLane
 )
@@ -7898,7 +7898,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one RB-tree iterator lane backward using sentinel flag offset `+0x39`.
  */
-[[maybe_unused]] RbNodeLinksRuntime* RetreatTreeIteratorFlag57Runtime(
+RbNodeLinksRuntime* RetreatTreeIteratorFlag57Runtime(
   const std::uint32_t /*unused*/,
   RbNodeLinksRuntime** const iteratorLane
 )
@@ -7912,7 +7912,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Advances one RB-tree iterator lane using sentinel flag offset `+0x1D`.
  */
-[[maybe_unused]] MapNodeNil29Runtime* AdvanceTreeIteratorFlag29RuntimeA(
+MapNodeNil29Runtime* AdvanceTreeIteratorFlag29RuntimeA(
   const std::uint32_t /*unused*/,
   MapNodeNil29Runtime** const iteratorLane
 )
@@ -7926,7 +7926,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one map iterator lane backward using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* RetreatMapIteratorFlag21RuntimeA(
+RbNodeFlag21Runtime* RetreatMapIteratorFlag21RuntimeA(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -7939,7 +7939,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Advances one map iterator lane using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* AdvanceMapIteratorFlag21RuntimeC(
+RbNodeFlag21Runtime* AdvanceMapIteratorFlag21RuntimeC(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -7952,7 +7952,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Moves one map iterator lane backward using sentinel flag offset `+0x15`.
  */
-[[maybe_unused]] RbNodeFlag21Runtime* RetreatMapIteratorFlag21RuntimeB(
+RbNodeFlag21Runtime* RetreatMapIteratorFlag21RuntimeB(
   RbNodeFlag21Runtime** const iteratorLane
 )
 {
@@ -7966,7 +7966,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Preserves one `thiscall` adapter lane that retreats a flag-21 map iterator
  * and then returns the original owner pointer.
  */
-[[maybe_unused]] [[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneA(
+[[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneA(
   void* const iteratorOwner
 )
 {
@@ -7983,7 +7983,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Preserves one `thiscall` adapter lane that retreats a flag-21 map iterator
  * and then returns the original owner pointer.
  */
-[[maybe_unused]] [[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneB(
+[[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneB(
   void* const iteratorOwner
 )
 {
@@ -8000,7 +8000,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Preserves one `thiscall` adapter lane that retreats a flag-21 map iterator
  * and then returns the original owner pointer.
  */
-[[maybe_unused]] [[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneC(
+[[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneC(
   void* const iteratorOwner
 )
 {
@@ -8017,7 +8017,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Preserves one `thiscall` adapter lane that retreats a flag-21 map iterator
  * and then returns the original owner pointer.
  */
-[[maybe_unused]] [[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneD(
+[[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneD(
   void* const iteratorOwner
 )
 {
@@ -8034,7 +8034,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Preserves one `thiscall` adapter lane that retreats a flag-21 map iterator
  * and then returns the original owner pointer.
  */
-[[maybe_unused]] [[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneE(
+[[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneE(
   void* const iteratorOwner
 )
 {
@@ -8051,7 +8051,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Preserves one `thiscall` adapter lane that retreats a flag-21 map iterator
  * and then returns the original owner pointer.
  */
-[[maybe_unused]] [[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneF(
+[[nodiscard]] void* RetreatMapIteratorFlag21OwnerAdapterLaneF(
   void* const iteratorOwner
 )
 {
@@ -8067,7 +8067,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Finds one integer value lane in a runtime array either forward or reverse.
  */
-[[maybe_unused]] int FindIntArrayIndexRuntime(
+int FindIntArrayIndexRuntime(
   const IntArrayLookupRuntime* const runtime,
   const int value,
   const bool reverseSearch
@@ -8101,7 +8101,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Thunk lane that forwards one integer-array lookup request into
  * `FUN_009A8550`.
  */
-[[maybe_unused]] int FindIntArrayIndexRuntimeAdapterLaneB(
+int FindIntArrayIndexRuntimeAdapterLaneB(
   const IntArrayLookupRuntime* const runtime,
   const int value,
   const bool reverseSearch
@@ -8117,7 +8117,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Thunk lane that forwards one integer-array lookup request into
  * `FUN_009A8550`.
  */
-[[maybe_unused]] int FindIntArrayIndexRuntimeAdapter(
+int FindIntArrayIndexRuntimeAdapter(
   const IntArrayLookupRuntime* const runtime,
   const int value,
   const bool reverseSearch
@@ -8132,7 +8132,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Dispatches virtual slot `+0x2C` on one polymorphic runtime object.
  */
-[[maybe_unused]] int DispatchVirtualSlot44Runtime(
+int DispatchVirtualSlot44Runtime(
   VirtualDispatch44Runtime* const runtime
 )
 {
@@ -8152,7 +8152,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Snapshots one 2x2 float basis lane into outputs and resets the live basis to
  * identity.
  */
-[[maybe_unused]] std::uint32_t SnapshotAndResetBasis2fRuntime(
+std::uint32_t SnapshotAndResetBasis2fRuntime(
   BasisPointerResetRuntimeF* const runtime
 )
 {
@@ -8186,7 +8186,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Snapshots one 2x2 double basis lane into outputs and resets the live basis
  * to identity.
  */
-[[maybe_unused]] std::uint32_t SnapshotAndResetBasis2dRuntime(
+std::uint32_t SnapshotAndResetBasis2dRuntime(
   BasisPointerResetRuntimeD* const runtime
 )
 {
@@ -8220,7 +8220,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Returns the IEEE-754 exponent-mask lane for one double, or full high dword
  * when the value is NaN/Inf-class.
  */
-[[maybe_unused]] std::uint32_t ClassifyDoubleExponentMaskRuntime(
+std::uint32_t ClassifyDoubleExponentMaskRuntime(
   const double value
 )
 {
@@ -8237,7 +8237,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one `[source, end)` lane sequence of 5-dword records into
  * destination.
  */
-[[maybe_unused]] std::uint32_t* CopyStride5DwordRangeRuntime(
+std::uint32_t* CopyStride5DwordRangeRuntime(
   std::uint32_t* destination,
   const std::uint32_t* const sourceEnd,
   const std::uint32_t* source
@@ -8266,7 +8266,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Adapts one register-lane caller shape into the canonical 5-dword stride
  * copy helper.
  */
-[[maybe_unused]] std::uint32_t* CopyStride5DwordRangeRegisterAdapterLaneA(
+std::uint32_t* CopyStride5DwordRangeRegisterAdapterLaneA(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationBegin
@@ -8282,7 +8282,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Adapts one register-lane caller shape into the canonical 5-dword stride
  * copy helper.
  */
-[[maybe_unused]] std::uint32_t* CopyStride5DwordRangeRegisterAdapterLaneB(
+std::uint32_t* CopyStride5DwordRangeRegisterAdapterLaneB(
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* const sourceEnd,
   std::uint32_t* const destinationBegin
@@ -8298,7 +8298,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Adapts one register-lane caller shape into an empty-range 5-dword copy
  * dispatch (`sourceBegin == sourceEnd`), preserving destination passthrough.
  */
-[[maybe_unused]] std::uint32_t* CopyStride5DwordRangeEmptyAdapterLaneA(
+std::uint32_t* CopyStride5DwordRangeEmptyAdapterLaneA(
   std::uint32_t* const destinationBegin,
   const std::uint32_t* const sourceLane
 )
@@ -8312,7 +8312,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Secondary register-lane adapter for empty-range 5-dword copy dispatch.
  */
-[[maybe_unused]] std::uint32_t* CopyStride5DwordRangeEmptyAdapterLaneB(
+std::uint32_t* CopyStride5DwordRangeEmptyAdapterLaneB(
   std::uint32_t* const destinationBegin,
   const std::uint32_t* const sourceLane
 )
@@ -8326,7 +8326,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * `this`-shape adapter for empty-range 5-dword copy dispatch.
  */
-[[maybe_unused]] std::uint32_t* CopyStride5DwordRangeEmptyAdapterLaneC(
+std::uint32_t* CopyStride5DwordRangeEmptyAdapterLaneC(
   std::uint32_t* const destinationBegin,
   const std::uint32_t* const sourceLane
 )
@@ -8341,7 +8341,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Unlinks one dual back-reference lane by patching both owner chains rooted at
  * `+0x08` and `+0x10`.
  */
-[[maybe_unused]] std::uint32_t* UnlinkDualBackReferenceRuntime(
+std::uint32_t* UnlinkDualBackReferenceRuntime(
   const std::uint32_t nodeAddress
 )
 {
@@ -8389,7 +8389,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Copies one `[source, sourceEnd)` sequence of 6-float lanes into destination.
  */
-[[maybe_unused]] float* CopyStride6FloatRangeRuntime(
+float* CopyStride6FloatRangeRuntime(
   float* destination,
   const float* source,
   const float* const sourceEnd
@@ -8417,7 +8417,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Register-shape adapter that forwards one float6 range-copy lane into the
  * canonical stride-6 helper.
  */
-[[maybe_unused]] float* CopyStride6FloatRangeRegisterAdapterA(
+float* CopyStride6FloatRangeRegisterAdapterA(
   const float* const sourceBegin,
   const float* const sourceEnd,
   float* const destination
@@ -8432,7 +8432,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Duplicate register-shape adapter of the float6 range-copy lane.
  */
-[[maybe_unused]] float* CopyStride6FloatRangeRegisterAdapterB(
+float* CopyStride6FloatRangeRegisterAdapterB(
   const float* const sourceBegin,
   const float* const sourceEnd,
   float* const destination
@@ -8448,7 +8448,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Duplicate adapter lane that forwards one float6 range copy to the canonical
  * helper.
  */
-[[maybe_unused]] float* CopyStride6FloatRangeRegisterAdapterC(
+float* CopyStride6FloatRangeRegisterAdapterC(
   const float* const sourceBegin,
   const float* const sourceEnd,
   float* const destination
@@ -8464,7 +8464,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Register-shape thunk that forwards one float6 range-copy lane into the
  * canonical stride-6 helper.
  */
-[[maybe_unused]] float* CopyStride6FloatRangeRegisterAdapterD(
+float* CopyStride6FloatRangeRegisterAdapterD(
   const float* const sourceBegin,
   const float* const sourceEnd,
   float* const destination
@@ -8480,7 +8480,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Duplicate register-shape thunk that forwards one float6 range copy into
  * the canonical helper.
  */
-[[maybe_unused]] float* CopyStride6FloatRangeRegisterAdapterE(
+float* CopyStride6FloatRangeRegisterAdapterE(
   const float* const sourceBegin,
   const float* const sourceEnd,
   float* const destination
@@ -8496,7 +8496,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wx object lane to `wxObject` vtable and drops the shared
  * reference.
  */
-[[maybe_unused]] void ResetWxObjectAndUnrefForCloseRuntime(
+void ResetWxObjectAndUnrefForCloseRuntime(
   WxObjectRuntime* const object,
   void* const wxObjectVtable,
   const WxUnrefFn unrefFn
@@ -8519,7 +8519,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wx object lane to `wxObject` vtable and drops the shared
  * reference.
  */
-[[maybe_unused]] void ResetWxObjectAndUnrefForQueryEndSessionRuntime(
+void ResetWxObjectAndUnrefForQueryEndSessionRuntime(
   WxObjectRuntime* const object,
   void* const wxObjectVtable,
   const WxUnrefFn unrefFn
@@ -8542,7 +8542,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wx object lane to `wxObject` vtable and drops the shared
  * reference.
  */
-[[maybe_unused]] void ResetWxObjectAndUnrefForEndSessionRuntime(
+void ResetWxObjectAndUnrefForEndSessionRuntime(
   WxObjectRuntime* const object,
   void* const wxObjectVtable,
   const WxUnrefFn unrefFn
@@ -8565,7 +8565,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Initializes one wx font-descriptor lane using caller values and falls back
  * to the normal-font point size when input size is `-1`.
  */
-[[maybe_unused]] int InitializeWxFontDescriptorRuntime(
+int InitializeWxFontDescriptorRuntime(
   WxFontDescriptorRuntime* const descriptor,
   std::int32_t pointSize,
   const std::int32_t family,
@@ -8608,7 +8608,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wx spin-button lane to its own vtable and forwards destruction
  * to `wxControl`.
  */
-[[maybe_unused]] int DestroyWxSpinButtonRuntime(
+int DestroyWxSpinButtonRuntime(
   WxObjectRuntime* const spinButton,
   void* const wxSpinButtonVtable,
   const WxControlDtorFn wxControlDtorFn
@@ -8629,7 +8629,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Releases four wx shared-string lanes in destruction order (`+0x20`, `+0x0C`,
  * `+0x08`, `+0x04`).
  */
-[[maybe_unused]] void ReleaseWxSharedStringBundleRuntime(
+void ReleaseWxSharedStringBundleRuntime(
   WxSharedStringOwnerRuntime* const owner
 )
 {
@@ -8650,7 +8650,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one protocol-base constructor on `this` and immediately rebinds the
  * instance vtable to the wx-file-protocol lane.
  */
-[[maybe_unused]] VtableOnlyRuntime* InitializeWxFileProtoRuntime(
+VtableOnlyRuntime* InitializeWxFileProtoRuntime(
   VtableOnlyRuntime* const fileProto,
   void* const wxFileProtoVtable,
   const WxProtocolCtorFn protocolCtorFn
@@ -8668,7 +8668,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one socket-input-stream constructor for the given handle, stores the
  * same socket handle at `+0x1C`, then rebinds the vtable to wxHTTPStream.
  */
-[[maybe_unused]] WxHttpStreamRuntime* InitializeWxHttpStreamRuntime(
+WxHttpStreamRuntime* InitializeWxHttpStreamRuntime(
   WxHttpStreamRuntime* const stream,
   const std::int32_t socketHandle,
   void* const wxHttpStreamVtable,
@@ -8688,7 +8688,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Clears one global hash-cleanup active flag, destroys all bucket chains via
  * callback, and resets owner lane `+0x08` to zero.
  */
-[[maybe_unused]] void* ResetHashBucketCleanupOwnerRuntime(
+void* ResetHashBucketCleanupOwnerRuntime(
   HashBucketCleanupOwnerRuntime* const owner,
   std::uint8_t* const globalCleanupActiveFlag,
   const HashBucketDestroyFn destroyNodeFn,
@@ -8708,7 +8708,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Reads one pair lane from lookup source at `+0x6C` and stores both values
  * scaled down by 10 into `+0x0C/+0x10`.
  */
-[[maybe_unused]] void UpdatePairTenthsFromLookupRuntime(
+void UpdatePairTenthsFromLookupRuntime(
   Div10PairOwnerRuntime* const owner,
   const PairLookupFn lookupFn
 )
@@ -8730,7 +8730,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Constructs one wx socket-output stream lane, stores the socket handle, and
  * binds the stream vtable.
  */
-[[maybe_unused]] WxSocketOutputStreamRuntime* InitializeWxSocketOutputStreamRuntime(
+WxSocketOutputStreamRuntime* InitializeWxSocketOutputStreamRuntime(
   WxSocketOutputStreamRuntime* const stream,
   const std::int32_t socketHandle,
   void* const wxSocketOutputStreamVtable,
@@ -8757,7 +8757,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Constructs one wx socket-input stream lane, stores the socket handle at
  * `+0x18`, and binds the input-stream vtable.
  */
-[[maybe_unused]] WxSocketInputStreamRuntime* InitializeWxSocketInputStreamRuntime(
+WxSocketInputStreamRuntime* InitializeWxSocketInputStreamRuntime(
   WxSocketInputStreamRuntime* const stream,
   const std::int32_t socketHandle,
   void* const wxSocketInputStreamVtable,
@@ -8785,7 +8785,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * constructor callbacks over a combined wx-socket-stream runtime object, then
  * applies caller-provided primary/output-adjusted vtable lanes.
  */
-[[maybe_unused]] WxSocketStreamRuntime* InitializeWxSocketStreamRuntime(
+WxSocketStreamRuntime* InitializeWxSocketStreamRuntime(
   WxSocketStreamRuntime* const stream,
   const std::int32_t socketHandle,
   void* const wxSocketStreamVtable,
@@ -8808,7 +8808,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Normalizes one packed 32-bit float lane represented as two 16-bit words and
  * returns the signed exponent delta produced by normalization.
  */
-[[maybe_unused]] std::int32_t NormalizePackedFloatWordsRuntime(
+std::int32_t NormalizePackedFloatWordsRuntime(
   std::uint16_t* const words
 ) noexcept
 {
@@ -8874,7 +8874,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * extraction; if that helper reports an all-zero mantissa (positive
  * delta), the value is re-classified as zero.
  */
-[[maybe_unused]] std::int16_t FrexpClassifyPackedFloatWordsRuntime(
+std::int16_t FrexpClassifyPackedFloatWordsRuntime(
   std::int32_t* const exponentOut,
   std::uint16_t* const words
 ) noexcept
@@ -8900,7 +8900,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
 }
 
 // Forward declaration: defined below at line ~9113 (FUN_00AC1677).
-[[maybe_unused]] std::int16_t NormalizePackedDoubleMantissaWordsRuntime(
+std::int16_t NormalizePackedDoubleMantissaWordsRuntime(
   std::uint16_t* words) noexcept;
 
 /**
@@ -8924,7 +8924,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * exponent extraction; if that helper reports an all-zero mantissa
  * (positive delta), the value is re-classified as zero.
  */
-[[maybe_unused]] std::int16_t FrexpClassifyPackedDoubleWordsRuntime(
+std::int16_t FrexpClassifyPackedDoubleWordsRuntime(
   std::int32_t* const exponentOut,
   std::uint16_t* const words
 ) noexcept
@@ -8958,7 +8958,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Normalizes one packed 64-bit float lane represented as four 16-bit words
  * and returns the signed exponent delta produced by normalization.
  */
-[[maybe_unused]] std::int16_t NormalizePackedDoubleMantissaWordsRuntime(
+std::int16_t NormalizePackedDoubleMantissaWordsRuntime(
   std::uint16_t* const words
 ) noexcept
 {
@@ -9022,7 +9022,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Scales one packed 64-bit floating-point lane (represented as four 16-bit
  * words) by a signed exponent delta and returns the CRT classification code.
  */
-[[maybe_unused]] std::int16_t ScalePackedDoubleWordsRuntime(
+std::int16_t ScalePackedDoubleWordsRuntime(
   std::uint16_t* const words,
   const int exponentDelta,
   const NormalizePackedDoubleFn normalizeFn,
@@ -9146,7 +9146,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Tail-forwards one packed-double scaling thunk lane into
  * `ScalePackedDoubleWordsRuntime`.
  */
-[[maybe_unused]] std::int16_t ScalePackedDoubleWordsRuntimeAdapter(
+std::int16_t ScalePackedDoubleWordsRuntimeAdapter(
   std::uint16_t* const words,
   const int exponentDelta,
   const NormalizePackedDoubleFn normalizeFn,
@@ -9163,7 +9163,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Releases both legacy string lanes in one wave-parameters object and resets
  * them to empty-inline form.
  */
-[[maybe_unused]] void ResetWaveParametersStringsRuntime(
+void ResetWaveParametersStringsRuntime(
   WaveParametersRuntime* const parameters,
   void* const waveParametersVtable
 )
@@ -9184,7 +9184,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies both wave-parameter string lanes and all scalar parameter lanes
  * (`+0x3C..+0x84`) from source to destination.
  */
-[[maybe_unused]] [[nodiscard]] WaveParametersRuntime* CopyWaveParametersPayloadRuntime(
+[[nodiscard]] WaveParametersRuntime* CopyWaveParametersPayloadRuntime(
   const WaveParametersRuntime* const source,
   WaveParametersRuntime* const destination
 )
@@ -9221,7 +9221,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copy-constructs one wave-parameters object by rebinding its vtable lane,
  * default-constructing both embedded string lanes, and copying payload lanes.
  */
-[[maybe_unused]] [[nodiscard]] WaveParametersRuntime* CopyConstructWaveParametersRuntime(
+[[nodiscard]] WaveParametersRuntime* CopyConstructWaveParametersRuntime(
   const WaveParametersRuntime* const source,
   WaveParametersRuntime* const destination
 )
@@ -9239,7 +9239,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Forward-copies one half-open wave-parameters range `[sourceBegin,sourceEnd)`
  * into destination storage and returns the destination end pointer.
  */
-[[maybe_unused]] [[nodiscard]] WaveParametersRuntime* CopyWaveParametersRangeForwardRuntime(
+[[nodiscard]] WaveParametersRuntime* CopyWaveParametersRangeForwardRuntime(
   const WaveParametersRuntime* sourceBegin,
   WaveParametersRuntime* destinationBegin,
   const WaveParametersRuntime* const sourceEnd
@@ -9261,7 +9261,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * When one sim-driver instance is active, requests its client-manager lane
  * and runs the manager debug dump callback.
  */
-[[maybe_unused]] void SimDriverDebugClientManagerRuntime()
+void SimDriverDebugClientManagerRuntime()
 {
   moho::ISTIDriver* const driver = moho::SIM_GetActiveDriver();
   if (driver == nullptr) {
@@ -9281,7 +9281,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wx button lane to its own vtable and forwards destruction to
  * `wxControl`.
  */
-[[maybe_unused]] int DestroyWxButtonRuntime(
+int DestroyWxButtonRuntime(
   WxObjectRuntime* const button,
   void* const wxButtonVtable,
   const WxControlDtorFn wxControlDtorFn
@@ -9301,7 +9301,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Initializes one shared NaN word-pair lane once and returns the pair base.
  */
-[[maybe_unused]] std::uint32_t* GetOrInitializeNaNWordPairRuntime(
+std::uint32_t* GetOrInitializeNaNWordPairRuntime(
   const std::uint32_t nanWord
 )
 {
@@ -9323,7 +9323,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Maps wx input/style bitflags into output style bits used by the caller lane.
  */
-[[maybe_unused]] int MapWxStyleFlagsRuntime(
+int MapWxStyleFlagsRuntime(
   const int flags,
   const bool skipExtendedMappings
 )
@@ -9357,7 +9357,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Reads one window text-metric lane from its HWND and writes into the caller
  * output structure.
  */
-[[maybe_unused]] TEXTMETRICW* ReadWindowTextMetricsRuntime(
+TEXTMETRICW* ReadWindowTextMetricsRuntime(
   const WindowTextMetricOwnerRuntime* const owner,
   TEXTMETRICW* const outMetrics
 )
@@ -9383,7 +9383,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Tests whether one rectangle lane intersects the stored region; returns `2`
  * on hit and `0` otherwise.
  */
-[[maybe_unused]] int TestRectangleInRegionRuntime(
+int TestRectangleInRegionRuntime(
   const RegionOwnerRuntime* const owner,
   const LONG left,
   const LONG top,
@@ -9410,7 +9410,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one `[source, sourceEnd)` range of emitter-curve key lanes and
  * assigns the key vtable token for each destination lane.
  */
-[[maybe_unused]] EmitterCurveKeyRuntime* CopyEmitterCurveKeyRangeRuntime(
+EmitterCurveKeyRuntime* CopyEmitterCurveKeyRangeRuntime(
   EmitterCurveKeyRuntime* destination,
   const EmitterCurveKeyRuntime* source,
   const EmitterCurveKeyRuntime* const sourceEnd,
@@ -9437,7 +9437,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Splits one millisecond lane into whole seconds (`+0x24`) and microseconds
  * remainder (`+0x28`).
  */
-[[maybe_unused]] TimeSplitRuntime* SplitMillisecondsToTimeRuntime(
+TimeSplitRuntime* SplitMillisecondsToTimeRuntime(
   TimeSplitRuntime* const destination,
   const std::uint32_t milliseconds
 )
@@ -9458,7 +9458,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Stores one seconds lane at owner `+0x24` and, when `owner+0x08` is present,
  * updates that target split-time lane from `seconds*1000` milliseconds.
  */
-[[maybe_unused]] std::uintptr_t UpdateOwnerSecondsAndSplitTimeRuntime(
+std::uintptr_t UpdateOwnerSecondsAndSplitTimeRuntime(
   TimeSplitOwnerRuntime* const owner,
   const std::int32_t seconds
 )
@@ -9481,7 +9481,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one distance-lane object to the `Distance<float, Vector2<float>>`
  * vtable token.
  */
-[[maybe_unused]] void ResetDistanceFloat2VtableRuntime(
+void ResetDistanceFloat2VtableRuntime(
   VtableOnlyRuntime* const distance
 )
 {
@@ -9498,7 +9498,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one distance-lane object through the canonical
  * `Distance<float, Vector2<float>>` vtable reset helper.
  */
-[[maybe_unused]] VtableOnlyRuntime* ResetDistanceFloat2VtableRuntimeAdapter(
+VtableOnlyRuntime* ResetDistanceFloat2VtableRuntimeAdapter(
   VtableOnlyRuntime* const distance
 ) noexcept
 {
@@ -9513,7 +9513,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one distance-lane object to the `Distance<double, Vector2<double>>`
  * vtable token.
  */
-[[maybe_unused]] void ResetDistanceDouble2VtableRuntime(
+void ResetDistanceDouble2VtableRuntime(
   VtableOnlyRuntime* const distance
 )
 {
@@ -9530,7 +9530,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one distance-lane object through the canonical
  * `Distance<double, Vector2<double>>` vtable reset helper.
  */
-[[maybe_unused]] VtableOnlyRuntime* ResetDistanceDouble2VtableRuntimeAdapter(
+VtableOnlyRuntime* ResetDistanceDouble2VtableRuntimeAdapter(
   VtableOnlyRuntime* const distance
 ) noexcept
 {
@@ -9538,7 +9538,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
   return distance;
 }
 
-[[maybe_unused]] void ResetDistanceFloat3VtableRuntime(
+void ResetDistanceFloat3VtableRuntime(
   VtableOnlyRuntime* const distance
 )
 {
@@ -9548,7 +9548,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
   }
 }
 
-[[maybe_unused]] void ResetDistanceDouble3VtableRuntime(
+void ResetDistanceDouble3VtableRuntime(
   VtableOnlyRuntime* const distance
 )
 {
@@ -9565,7 +9565,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one deleting-dtor thunk lane for the `Distance<float, Vector2<float>>`
  * base runtime object.
  */
-[[maybe_unused]] void* ResetDistanceFloat2BaseVtableWithFlagRuntime(
+void* ResetDistanceFloat2BaseVtableWithFlagRuntime(
   void* const distanceRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -9585,7 +9585,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one deleting-dtor thunk lane for the `Distance<float, Vector3<float>>`
  * base runtime object.
  */
-[[maybe_unused]] void* ResetDistanceFloat3BaseVtableWithFlagRuntime(
+void* ResetDistanceFloat3BaseVtableWithFlagRuntime(
   void* const distanceRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -9605,7 +9605,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one deleting-dtor thunk lane for the `Distance<double, Vector2<double>>`
  * base runtime object.
  */
-[[maybe_unused]] void* ResetDistanceDouble2BaseVtableWithFlagRuntime(
+void* ResetDistanceDouble2BaseVtableWithFlagRuntime(
   void* const distanceRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -9625,7 +9625,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one deleting-dtor thunk lane for the `Distance<double, Vector3<double>>`
  * base runtime object.
  */
-[[maybe_unused]] void* ResetDistanceDouble3BaseVtableWithFlagRuntime(
+void* ResetDistanceDouble3BaseVtableWithFlagRuntime(
   void* const distanceRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -9646,7 +9646,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * `Distance<float, Vector2<float>>` base state, binding object pointers, and
  * rebinding the derived vtable lane.
  */
-[[maybe_unused]] DistVector2Box2fRuntime* InitializeDistVector2Box2fRuntime(
+DistVector2Box2fRuntime* InitializeDistVector2Box2fRuntime(
   DistVector2Box2fRuntime* const runtime,
   const void* const vector2Runtime,
   const void* const box2Runtime
@@ -9671,7 +9671,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * `Distance<double, Vector2<double>>` base state, binding object pointers, and
  * rebinding the derived vtable lane.
  */
-[[maybe_unused]] DistVector2Box2dRuntime* InitializeDistVector2Box2dRuntime(
+DistVector2Box2dRuntime* InitializeDistVector2Box2dRuntime(
   DistVector2Box2dRuntime* const runtime,
   const void* const vector2Runtime,
   const void* const box2Runtime
@@ -9695,7 +9695,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one deleting-dtor thunk lane for the float distance-vector2 runtime
  * object by rebinding base vtable state and scalar-deleting when requested.
  */
-[[maybe_unused]] void* ResetDistanceFloat2VtableWithFlagRuntime(
+void* ResetDistanceFloat2VtableWithFlagRuntime(
   void* const distanceRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -9715,7 +9715,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Runs one deleting-dtor thunk lane for the double distance-vector2 runtime
  * object by rebinding base vtable state and scalar-deleting when requested.
  */
-[[maybe_unused]] void* ResetDistanceDouble2VtableWithFlagRuntime(
+void* ResetDistanceDouble2VtableWithFlagRuntime(
   void* const distanceRuntime,
   const std::uint8_t deleteFlags
 ) noexcept
@@ -9734,7 +9734,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Returns MXCSR when compatibility mode is enabled; otherwise returns zero.
  */
-[[maybe_unused]] int ReadMxcsrWhenCompatEnabledRuntime(
+int ReadMxcsrWhenCompatEnabledRuntime(
   const bool compatibilityEnabled
 )
 {
@@ -9748,7 +9748,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Captures one runtime-frame context lane into global scratch words and
  * returns the original result lane.
  */
-[[maybe_unused]] int CaptureRuntimeFrameContextRuntime(
+int CaptureRuntimeFrameContextRuntime(
   const int result,
   const int frameBase,
   const int arg3,
@@ -9770,7 +9770,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Writes `count` copies of one occupy-source binding payload into destination
  * storage and installs the occupy-source binding vtable lane on each record.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* FillOccupySourceBindingRangeRuntime(
+OccupySourceBindingRuntime* FillOccupySourceBindingRangeRuntime(
   OccupySourceBindingRuntime* destination,
   const OccupySourceBindingRuntime* const sourcePrototype,
   std::uint32_t count,
@@ -9796,7 +9796,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one `[source, sourceEnd)` range of occupy-source bindings, installing
  * the binding vtable token for each copied lane.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntime(
+OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntime(
   OccupySourceBindingRuntime* destination,
   const OccupySourceBindingRuntime* source,
   const OccupySourceBindingRuntime* const sourceEnd,
@@ -9823,7 +9823,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Register-shape adapter that forwards one occupy-source binding copy lane
  * into `CopyOccupySourceBindingRangeRuntime` using a zero-length source range.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeAdapterZeroSource(
+OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeAdapterZeroSource(
   OccupySourceBindingRuntime* const destination,
   void* const occupySourceBindingVtable
 )
@@ -9838,7 +9838,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Register-shape adapter that copies one occupy-source binding tail range into
  * a destination lane, with `sourceEnd` carried by the caller register lane.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeTailAdapterLaneA(
+OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeTailAdapterLaneA(
   const OccupySourceBindingRuntime* const sourceBegin,
   OccupySourceBindingRuntime* const destinationBegin,
   const OccupySourceBindingRuntime* const sourceEndRegisterLane
@@ -9860,7 +9860,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Fastcall-shape adapter for occupy-source fill, forwarding destination/source
  * plus count lanes into the canonical fill helper.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* FillOccupySourceBindingRangeRuntimeAdapterLaneA(
+OccupySourceBindingRuntime* FillOccupySourceBindingRangeRuntimeAdapterLaneA(
   OccupySourceBindingRuntime* const destinationBegin,
   const OccupySourceBindingRuntime* const sourcePrototype,
   const std::uint32_t count
@@ -9881,7 +9881,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Secondary register-shape adapter for occupy-source tail-range copy.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeTailAdapterLaneB(
+OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeTailAdapterLaneB(
   const OccupySourceBindingRuntime* const sourceBegin,
   OccupySourceBindingRuntime* const destinationBegin,
   const OccupySourceBindingRuntime* const sourceEndRegisterLane
@@ -9903,7 +9903,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Third register-shape adapter for occupy-source tail-range copy.
  */
-[[maybe_unused]] OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeTailAdapterLaneC(
+OccupySourceBindingRuntime* CopyOccupySourceBindingRangeRuntimeTailAdapterLaneC(
   const OccupySourceBindingRuntime* const sourceBegin,
   OccupySourceBindingRuntime* const destinationBegin,
   const OccupySourceBindingRuntime* const sourceEndRegisterLane
@@ -9925,7 +9925,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Copies one `[source, sourceEnd)` range of clutter seed lanes, installing the
  * seed vtable token for each copied lane.
  */
-[[maybe_unused]] ClutterSeedRuntime* CopyClutterSeedRangeRuntime(
+ClutterSeedRuntime* CopyClutterSeedRangeRuntime(
   ClutterSeedRuntime* destination,
   const ClutterSeedRuntime* source,
   const ClutterSeedRuntime* const sourceEnd,
@@ -9952,7 +9952,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Register-shape adapter that forwards one clutter-seed range copy into
  * `CopyClutterSeedRangeRuntime`, deriving the vtable token from source lane.
  */
-[[maybe_unused]] ClutterSeedRuntime* CopyClutterSeedRangeRuntimeAdapterA(
+ClutterSeedRuntime* CopyClutterSeedRangeRuntimeAdapterA(
   ClutterSeedRuntime* const destination,
   const ClutterSeedRuntime* const source,
   const ClutterSeedRuntime* const sourceEnd
@@ -9968,7 +9968,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Secondary register-shape adapter for clutter-seed range copy.
  */
-[[maybe_unused]] ClutterSeedRuntime* CopyClutterSeedRangeRuntimeAdapterB(
+ClutterSeedRuntime* CopyClutterSeedRangeRuntimeAdapterB(
   ClutterSeedRuntime* const destination,
   const ClutterSeedRuntime* const source,
   const ClutterSeedRuntime* const sourceEnd
@@ -9984,7 +9984,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * What it does:
  * Third register-shape adapter for clutter-seed range copy.
  */
-[[maybe_unused]] ClutterSeedRuntime* CopyClutterSeedRangeRuntimeAdapterC(
+ClutterSeedRuntime* CopyClutterSeedRangeRuntimeAdapterC(
   ClutterSeedRuntime* const destination,
   const ClutterSeedRuntime* const source,
   const ClutterSeedRuntime* const sourceEnd
@@ -10001,7 +10001,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds wios/ostream/istream subobject lanes to teardown vtables and invokes
  * `ios_base` final destruction on the `+0x0C` subobject lane.
  */
-[[maybe_unused]] void DestroyWideIoStreamBaseRuntime(
+void DestroyWideIoStreamBaseRuntime(
   std::byte* const completeObject,
   const WideIoStreamOffsetsRuntime& offsets,
   void* const wiosVtable,
@@ -10031,7 +10031,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wide-ostream teardown lane (`iosb`/`ios_base` subobject) and
  * invokes `ios_base` destruction for the `+0x04` subobject path.
  */
-[[maybe_unused]] void DestroyWideOstreamIosBaseLaneRuntime(
+void DestroyWideOstreamIosBaseLaneRuntime(
   std::byte* const completeObject,
   void* const wostreamIosbVtable,
   void* const iosBaseVtable,
@@ -10060,7 +10060,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Rebinds one wide-istream teardown lane (`wios`/`ios_base` subobject) and
  * invokes `ios_base` destruction for the `+0x08` subobject path.
  */
-[[maybe_unused]] void DestroyWideIstreamIosBaseLaneRuntime(
+void DestroyWideIstreamIosBaseLaneRuntime(
   std::byte* const completeObject,
   void* const wistreamWiosVtable,
   void* const iosBaseVtable,
@@ -10097,7 +10097,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Clears one RB-tree storage lane, frees the storage block, and resets owner
  * pointers/count.
  */
-[[maybe_unused]] int ClearTreeStorageLaneA17Runtime(
+int ClearTreeStorageLaneA17Runtime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearFn clearFn
 )
@@ -10125,7 +10125,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Clears one map-backed tree storage lane, frees the storage block, and
  * resets owner pointers/count.
  */
-[[maybe_unused]] int ClearTreeStorageLaneB17Runtime(
+int ClearTreeStorageLaneB17Runtime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearFn clearFn
 )
@@ -10153,7 +10153,7 @@ static_assert(sizeof(ByteRangeStorageRuntime) == 0x0C, "ByteRangeStorageRuntime 
  * Finds-or-inserts one `uint` key in an RB-tree lane whose nil flag lives at
  * `+0x11`, returning `(node, inserted)`.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertMapNodeNil17Runtime(
+MapInsertStatusRuntime* FindOrInsertMapNodeNil17Runtime(
   LegacyMapStorageRuntime<MapNodeNil17Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -10190,7 +10190,7 @@ namespace
  * Resolves one owner pointer from an index node's weak-owner slot lane
  * (`ownerLinkSlot - 8`), returning null when no owner slot is linked.
  */
-[[maybe_unused]] void* ResolveOwnerFromIndexWeakSlotRuntime(
+void* ResolveOwnerFromIndexWeakSlotRuntime(
   const OwnerSlotIndexRuntime* const index
 ) noexcept
 {
@@ -10208,7 +10208,7 @@ namespace
  * Clears one RB-tree storage lane, frees the storage block, and resets owner
  * pointers/count.
  */
-[[maybe_unused]] int ClearTreeStorageLaneC21Runtime(
+int ClearTreeStorageLaneC21Runtime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearFn clearFn
 )
@@ -10236,7 +10236,7 @@ namespace
  * Clears one embedded secondary RB-tree lane at owner offset `+0x08`, frees
  * its storage block, and resets owner pointers/count.
  */
-[[maybe_unused]] int ClearEmbeddedSecondaryTreeLaneRuntime(
+int ClearEmbeddedSecondaryTreeLaneRuntime(
   std::byte* const ownerBytes,
   const TreeClearFn clearFn
 )
@@ -10265,7 +10265,7 @@ namespace
  * Clears one RB-tree storage lane, frees the storage block, and resets owner
  * pointers/count.
  */
-[[maybe_unused]] int ClearTreeStorageLaneD21Runtime(
+int ClearTreeStorageLaneD21Runtime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearFn clearFn
 )
@@ -10293,7 +10293,7 @@ namespace
  * Finds-or-inserts one `uint` key in an RB-tree lane whose nil flag lives at
  * `+0x1D`, returning `(node, inserted)`.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertMapNodeNil29Runtime(
+MapInsertStatusRuntime* FindOrInsertMapNodeNil29Runtime(
   LegacyMapStorageRuntime<MapNodeNil29Runtime>* const map,
   const std::uint32_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -10309,7 +10309,7 @@ namespace
  * Copies records from wrapped pointer arrays while walking source/destination
  * cursors backward.
  */
-[[maybe_unused]] WrappedArrayCursorRuntime* CopyWrappedRecordRangeReverseRuntime(
+WrappedArrayCursorRuntime* CopyWrappedRecordRangeReverseRuntime(
   WrappedArrayCursorRuntime* const outCursor,
   const WrappedArrayCursorRuntime stopCursor,
   WrappedArrayCursorRuntime sourceCursor,
@@ -10347,7 +10347,7 @@ namespace
  * Copies records from wrapped pointer arrays while walking source/destination
  * cursors forward.
  */
-[[maybe_unused]] WrappedArrayCursorRuntime* CopyWrappedRecordRangeForwardRuntime(
+WrappedArrayCursorRuntime* CopyWrappedRecordRangeForwardRuntime(
   WrappedArrayCursorRuntime* const outCursor,
   const WrappedArrayCursorRuntime stopCursor,
   WrappedArrayCursorRuntime sourceCursor,
@@ -10385,7 +10385,7 @@ namespace
  * Appends one 16-byte lane in-place when capacity remains, otherwise routes
  * through the vector growth path.
  */
-[[maybe_unused]] int Append16ByteLaneWithGrowRuntime(
+int Append16ByteLaneWithGrowRuntime(
   const std::uint32_t inputWord,
   Vector16ByteOwnerRuntime* const owner,
   const Vector16ConstructFn constructFn,
@@ -10415,7 +10415,7 @@ namespace
  * Clears one owner-coupled tree storage lane via the 4-argument clear helper,
  * frees storage, and resets owner pointers/count.
  */
-[[maybe_unused]] int ClearOwnedTreeStorageLaneARuntime(
+int ClearOwnedTreeStorageLaneARuntime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearWithOwnerFn clearFn
 )
@@ -10443,7 +10443,7 @@ namespace
  * Clears one owner-coupled tree storage lane via the 4-argument clear helper,
  * frees storage, and resets owner pointers/count.
  */
-[[maybe_unused]] int ClearOwnedTreeStorageLaneBRuntime(
+int ClearOwnedTreeStorageLaneBRuntime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearWithOwnerFn clearFn
 )
@@ -10471,7 +10471,7 @@ namespace
  * Finds-or-inserts one `char` key in a set-style RB-tree lane whose nil flag
  * lives at `+0x0E`, returning `(node, inserted)`.
  */
-[[maybe_unused]] MapInsertStatusRuntime* FindOrInsertSetCharNodeRuntime(
+MapInsertStatusRuntime* FindOrInsertSetCharNodeRuntime(
   LegacyMapStorageRuntime<SetCharNodeNil14Runtime>* const setStorage,
   const std::int8_t* const key,
   MapInsertStatusRuntime* const outResult
@@ -10565,7 +10565,7 @@ namespace
  * Performs upward heap insertion for one `(priority, LuaObject)` lane in a
  * 24-byte stride heap array.
  */
-[[maybe_unused]] void InsertLuaHeapPairRuntime(
+void InsertLuaHeapPairRuntime(
   std::int32_t insertIndex,
   const std::int32_t firstIndex,
   std::byte* const heapStorage,
@@ -10604,7 +10604,7 @@ namespace
  * Clears one owner-coupled tree storage lane via the 4-argument clear helper,
  * frees storage, and resets owner pointers/count.
  */
-[[maybe_unused]] TreeStorageOwnerRuntime* ClearOwnedTreeStorageLaneAndReturnOwnerRuntime(
+TreeStorageOwnerRuntime* ClearOwnedTreeStorageLaneAndReturnOwnerRuntime(
   TreeStorageOwnerRuntime* const owner,
   const TreeClearWithOwnerFn clearFn
 )
@@ -10632,7 +10632,7 @@ namespace
  * Clears one cartographic-decal owner lane via its list clear routine, frees
  * list storage, and resets the storage pointer.
  */
-[[maybe_unused]] void ClearAndReleaseCartographicDecalOwnerRuntime(
+void ClearAndReleaseCartographicDecalOwnerRuntime(
   TreeStorageOwnerRuntime* const owner,
   const OwnerTreeClearFn clearOwnerFn
 )
@@ -10656,7 +10656,7 @@ namespace
  * Finds one lookup node by text key and returns either the matched node or the
  * owner sentinel when append-to-sink fails.
  */
-[[maybe_unused]] void** FindLookupNodeAndAppendTextRuntime(
+void** FindLookupNodeAndAppendTextRuntime(
   void* const textSink,
   void** const outNode,
   void* const owner,
@@ -10695,7 +10695,7 @@ namespace
  * Initializes a shared-ref pair from one object lane, enables
  * shared-from-this, then releases the previous counter lane.
  */
-[[maybe_unused]] void AssignSharedRefWithEnableRuntime(
+void AssignSharedRefWithEnableRuntime(
   void* const object,
   SharedRefRuntime* const destination,
   const InitSharedRefFn initFn,
@@ -10727,7 +10727,7 @@ namespace
  * Allocates one pair-key map node lane, writes keys/payload, and clears
  * color/nil state bytes.
  */
-[[maybe_unused]] PairNodeRuntime* AllocatePairNodeRuntime(
+PairNodeRuntime* AllocatePairNodeRuntime(
   const std::int32_t keyHigh,
   const std::int32_t keyLow,
   const std::int32_t keyExtra,
@@ -10763,7 +10763,7 @@ namespace
  * Copy-constructs one 24-byte pair-node payload lane with MeshKey-shaped
  * storage and retains shared/weak control counters for copied owner lanes.
  */
-[[maybe_unused]] PairNodeMeshKeyPayloadRuntime* CopyPairNodeMeshKeyPayloadWithRetainedOwnersRuntime(
+PairNodeMeshKeyPayloadRuntime* CopyPairNodeMeshKeyPayloadWithRetainedOwnersRuntime(
   PairNodeMeshKeyPayloadRuntime* const destination,
   const PairNodeMeshKeyPayloadRuntime* const source
 ) noexcept
@@ -10802,7 +10802,7 @@ namespace
  * What it does:
  * Runs one pre-delete hook for an object lane, then frees the object storage.
  */
-[[maybe_unused]] void RunCleanupThenDeleteObjectRuntime(
+void RunCleanupThenDeleteObjectRuntime(
   void* const object,
   const ObjectPreDeleteFn preDeleteFn
 )
@@ -10825,7 +10825,7 @@ namespace
  * lanes, releases node storage, decrements list size, and returns the next
  * node through `outNext`.
  */
-[[maybe_unused]] IntrusiveListNodeRuntime** EraseIntrusiveListNodeRuntime(
+IntrusiveListNodeRuntime** EraseIntrusiveListNodeRuntime(
   IntrusiveListNodeRuntime** const outNext,
   IntrusiveListRuntime* const owner,
   IntrusiveListNodeRuntime* const node
@@ -10859,7 +10859,7 @@ namespace
  * Replaces one destination intrusive-list lane with source contents when the
  * lists differ, then clears the source list.
  */
-[[maybe_unused]] std::size_t TransferListContentAndClearSourceRuntime(
+std::size_t TransferListContentAndClearSourceRuntime(
   IntrusiveListRuntime* const destination,
   std::byte* const sourceOwnerBytes,
   const ListClearFn clearFn,
@@ -10891,7 +10891,7 @@ namespace
  * Copies one camera-snapshot lane and updates the weak-counted pointer lane
  * with retain/release semantics.
  */
-[[maybe_unused]] void* CopyCameraSnapshotAndWeakCounterRuntime(
+void* CopyCameraSnapshotAndWeakCounterRuntime(
   const void* const source,
   void* const destination,
   const CameraCopyFn copyCameraFn,
@@ -10945,7 +10945,7 @@ namespace
  * Erases one mesh-thumbnail intrusive-list node (except sentinel), destroys
  * payload, and decrements list size.
  */
-[[maybe_unused]] MeshThumbnailListNodeRuntime** EraseMeshThumbnailListNodeRuntime(
+MeshThumbnailListNodeRuntime** EraseMeshThumbnailListNodeRuntime(
   MeshThumbnailListNodeRuntime** const outNext,
   TreeStorageOwnerRuntime* const listOwner,
   MeshThumbnailListNodeRuntime* const node,
@@ -10984,7 +10984,7 @@ namespace
  * Builds one current-selection range lane and, when valid, submits an
  * axis-aligned quad derived from selected entry bounds.
  */
-[[maybe_unused]] int UpdateSelectedEntryBoundsRuntime(
+int UpdateSelectedEntryBoundsRuntime(
   void* const owner,
   const void* const selectionState,
   const BuildSelectionRangeFn buildRangeFn,
@@ -11040,7 +11040,7 @@ namespace
  * Appends one 136-byte lane in-place when capacity remains, otherwise routes
  * through vector growth/reallocation path.
  */
-[[maybe_unused]] void AppendOrGrowStride136VectorRuntime(
+void AppendOrGrowStride136VectorRuntime(
   Stride136VectorRuntime* const vector,
   void* const source,
   const ConstructStride136Fn constructFn,
@@ -11075,7 +11075,7 @@ namespace
  * Clones one tree storage lane when source root differs from current token and
  * swaps the owner root pointer to the new clone.
  */
-[[maybe_unused]] void* CloneTreeStorageIntoOwnerRuntime(
+void* CloneTreeStorageIntoOwnerRuntime(
   void* const currentToken,
   TreeStorageOwnerRuntime* const owner,
   void* const sourceRoot,
@@ -11106,7 +11106,7 @@ namespace
  * What it does:
  * Destroys one D3D texture-batcher lane and frees its storage.
  */
-[[maybe_unused]] void DestroyTextureBatcherObjectRuntime(
+void DestroyTextureBatcherObjectRuntime(
   void* const batcher,
   const SimpleDtorFn destructorFn
 )
@@ -11127,7 +11127,7 @@ namespace
  * What it does:
  * Destroys one D3D prim-batcher lane and frees its storage.
  */
-[[maybe_unused]] void DestroyPrimBatcherObjectRuntime(
+void DestroyPrimBatcherObjectRuntime(
   void* const batcher,
   const SimpleDtorFn destructorFn
 )
@@ -11149,7 +11149,7 @@ namespace
  * Quantizes three float coordinates into ceil-rounded unsigned 16-bit lanes
  * and stores homogeneous `w=1`.
  */
-[[maybe_unused]] std::uint16_t* QuantizeFloatTripletToWord4Runtime(
+std::uint16_t* QuantizeFloatTripletToWord4Runtime(
   std::uint16_t* const outWord4,
   const float x,
   const float y,
@@ -11170,7 +11170,7 @@ namespace
  * Reads a 3x3 index neighborhood from the tesselator and emits 8 triangles
  * covering the patch around `(column, rowToken)`.
  */
-[[maybe_unused]] void EmitPatchTrianglesFromTesselatorRuntime(
+void EmitPatchTrianglesFromTesselatorRuntime(
   const std::int32_t column,
   void* const tesselator,
   const std::uint8_t* const rowToken,
@@ -11211,7 +11211,7 @@ namespace
  * Appends one 32-bit lane into a paged four-slot runtime buffer, allocating a
  * backing page when the destination page has not been materialized yet.
  */
-[[maybe_unused]] std::uint32_t* AppendPagedWordRuntime(
+std::uint32_t* AppendPagedWordRuntime(
   FourLanePagedRuntime<std::uint32_t>* const runtime,
   const std::uint32_t* const value
 )
@@ -11239,7 +11239,7 @@ namespace
  * Releases one 16-byte string-range owner array, destroying each owned string
  * subrange before deleting the backing owner storage.
  */
-[[maybe_unused]] void DestroyStringRangeBlock16OwnerRuntime(
+void DestroyStringRangeBlock16OwnerRuntime(
   RangeOwnerRuntime<StringRangeBlock16Runtime>* const owner
 )
 {
@@ -11273,7 +11273,7 @@ namespace
  * What it does:
  * Destroys one `SDecalInfo` range and then releases the owning storage block.
  */
-[[maybe_unused]] void DestroySDecalInfoRangeOwnerRuntime(
+void DestroySDecalInfoRangeOwnerRuntime(
   RangeOwnerRuntime<moho::SDecalInfo>* const owner
 )
 {
@@ -11298,7 +11298,7 @@ namespace
  * Releases one 12-byte shared-control owner range, decrements the embedded
  * control lanes, and deletes the backing storage block.
  */
-[[maybe_unused]] void DestroySharedControlRangeOwnerRuntime(
+void DestroySharedControlRangeOwnerRuntime(
   RangeOwnerRuntime<SharedControlLane12Runtime>* const owner
 )
 {
@@ -11336,7 +11336,7 @@ namespace
  * Releases one contiguous `msvc8::string` range and deletes the backing
  * storage block.
  */
-[[maybe_unused]] void DestroyStringRangeOwnerRuntime(
+void DestroyStringRangeOwnerRuntime(
   RangeOwnerRuntime<msvc8::string>* const owner
 )
 {
@@ -11360,7 +11360,7 @@ namespace
  * What it does:
  * Destroys every live `SSyncData` pointer in one four-slot paged range.
  */
-[[maybe_unused]] void DestroyPagedSyncDataRangeRuntime(
+void DestroyPagedSyncDataRangeRuntime(
   FourLanePagedRuntime<moho::SSyncData*>* const runtime,
   const std::uint32_t beginIndex,
   const std::uint32_t endIndex
@@ -11392,7 +11392,7 @@ namespace
  * Releases one contiguous `msvc8::string` range owner and deletes the backing
  * storage block.
  */
-[[maybe_unused]] void DestroyStringRangeOwnerRuntimeLegacy(
+void DestroyStringRangeOwnerRuntimeLegacy(
   RangeOwnerRuntime<msvc8::string>* const owner
 )
 {
@@ -11432,7 +11432,7 @@ RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
  * offset `+0x04`; the forwarded `CSimDriver*` argument is not consumed by this
  * invoker shape.
  */
-[[maybe_unused]] void InvokeDeferredSimDriverCallback(
+void InvokeDeferredSimDriverCallback(
   boost::detail::function::function_buffer* const invoker,
   moho::CSimDriver* const /*driver*/
 )
@@ -11448,7 +11448,7 @@ RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
  * Manages one deferred sim-driver callback payload for clone/destroy/type-check
  * and type-query operations.
  */
-[[maybe_unused]] void ManageDeferredSimDriverCallbackPayload(
+void ManageDeferredSimDriverCallbackPayload(
   const boost::detail::function::function_buffer* const sourcePayload,
   boost::detail::function::function_buffer* const targetPayload,
   const boost::detail::function::functor_manager_operation_type operation
@@ -11492,7 +11492,7 @@ RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
  * Binds the global deferred sim-driver callable vtable lanes to the canonical
  * invoker/manager handlers.
  */
-[[maybe_unused]] void __stdcall BindDeferredSimDriverCallableHandlers(
+void __stdcall BindDeferredSimDriverCallableHandlers(
   const std::uint32_t /*lane0*/,
   const std::uint32_t /*lane1*/
 ) noexcept
@@ -11507,7 +11507,7 @@ RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
  * What it does:
  * Initializes and returns the deferred sim-driver callable vtable singleton.
  */
-[[maybe_unused]] RuntimeDeferredSimDriverCallableVtable* InitializeDeferredSimDriverCallableVtable(
+RuntimeDeferredSimDriverCallableVtable* InitializeDeferredSimDriverCallableVtable(
   const std::uint32_t /*lane0*/,
   const std::uint32_t /*lane1*/
 ) noexcept
@@ -11523,7 +11523,7 @@ RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
  * Copies one 32-bit range backward from `[sourceBegin, sourceEnd)` into
  * destination storage.
  */
-[[maybe_unused]] std::uint32_t* CopyWordRangeBackwardRuntime(
+std::uint32_t* CopyWordRangeBackwardRuntime(
   std::uint32_t* destinationEnd,
   const std::uint32_t* const sourceBegin,
   const std::uint32_t* sourceEnd
@@ -11544,7 +11544,7 @@ RuntimeDeferredSimDriverCallableVtable gDeferredSimDriverCallableVtable{};
  * Copies one 32-bit range `[sourceBegin, sourceEnd)` into destination
  * storage.
  */
-[[maybe_unused]] std::uint32_t* CopyWordRangeForwardRuntime(
+std::uint32_t* CopyWordRangeForwardRuntime(
   std::uint32_t* destination,
   const std::uint32_t* sourceBegin,
   const std::uint32_t* const sourceEnd
@@ -11572,7 +11572,7 @@ static_assert(sizeof(StrideVectorRuntime) == 0x0C, "StrideVectorRuntime size mus
  * What it does:
  * Returns the element count for one stride-60 vector lane.
  */
-[[maybe_unused]] std::int32_t CountStride60ElementsRuntime(const StrideVectorRuntime* const vector) noexcept
+std::int32_t CountStride60ElementsRuntime(const StrideVectorRuntime* const vector) noexcept
 {
   if (vector == nullptr || vector->begin == nullptr) {
     return 0;
@@ -11588,7 +11588,7 @@ static_assert(sizeof(StrideVectorRuntime) == 0x0C, "StrideVectorRuntime size mus
  * Returns whether one 24-byte legacy vector lane has no live elements,
  * treating a null begin lane as empty.
  */
-[[maybe_unused]] bool IsElement24VectorEmptyRuntime(
+bool IsElement24VectorEmptyRuntime(
   const LegacyVectorStorageRuntime<Element24Runtime>* const vector
 ) noexcept
 {
@@ -11605,7 +11605,7 @@ static_assert(sizeof(StrideVectorRuntime) == 0x0C, "StrideVectorRuntime size mus
  * What it does:
  * Returns the capacity element count for one 36-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement36VectorCapacityRuntime(
+std::int32_t CountElement36VectorCapacityRuntime(
   const LegacyVectorStorageRuntime<Element36Runtime>* const vector
 ) noexcept
 {
@@ -11622,7 +11622,7 @@ static_assert(sizeof(StrideVectorRuntime) == 0x0C, "StrideVectorRuntime size mus
  * What it does:
  * Returns the capacity element count for one 24-byte legacy vector lane.
  */
-[[maybe_unused]] std::int32_t CountElement24VectorCapacityRuntime(
+std::int32_t CountElement24VectorCapacityRuntime(
   const LegacyVectorStorageRuntime<Element24Runtime>* const vector
 ) noexcept
 {
@@ -11670,7 +11670,7 @@ static_assert(offsetof(GuardThreatSlotRangeRuntime, end) == 0x14, "GuardThreatSl
  * Sums threat values from kind-7 candidates in one guarded slot range and
  * returns the number of contributing entries.
  */
-[[maybe_unused]] std::int32_t AccumulateGuardKind7ThreatRuntime(
+std::int32_t AccumulateGuardKind7ThreatRuntime(
   const GuardThreatSlotRangeRuntime* const range,
   std::int32_t* const outSum
 ) noexcept
@@ -11710,7 +11710,7 @@ static_assert(sizeof(WordVectorTailRuntime) == 0x0C, "WordVectorTailRuntime size
  * Copies one source tail range into destination words and updates the owning
  * vector tail pointer.
  */
-[[maybe_unused]] std::uint32_t** CopyTailRangeAndUpdateVectorEndRuntime(
+std::uint32_t** CopyTailRangeAndUpdateVectorEndRuntime(
   std::uint32_t** const outBegin,
   WordVectorTailRuntime* const owner,
   std::uint32_t* const destinationBegin,
@@ -11743,7 +11743,7 @@ static_assert(sizeof(WordVectorTailRuntime) == 0x0C, "WordVectorTailRuntime size
  * What it does:
  * Returns the leftmost node reachable from a flag-17 RB-tree head.
  */
-[[maybe_unused]] MapNodeNil17Runtime* FindTreeLeftmostNodeFlag17Runtime(MapNodeNil17Runtime* head) noexcept
+MapNodeNil17Runtime* FindTreeLeftmostNodeFlag17Runtime(MapNodeNil17Runtime* head) noexcept
 {
   MapNodeNil17Runtime* cursor = head->left;
   if (cursor->isNil != 0u) {
@@ -11763,7 +11763,7 @@ static_assert(sizeof(WordVectorTailRuntime) == 0x0C, "WordVectorTailRuntime size
  * What it does:
  * Returns the rightmost node reachable from a flag-17 RB-tree head.
  */
-[[maybe_unused]] MapNodeNil17Runtime* FindTreeRightmostNodeFlag17Runtime(MapNodeNil17Runtime* head) noexcept
+MapNodeNil17Runtime* FindTreeRightmostNodeFlag17Runtime(MapNodeNil17Runtime* head) noexcept
 {
   MapNodeNil17Runtime* cursor = head->right;
   while (cursor->isNil == 0u) {
@@ -11822,7 +11822,7 @@ static_assert(sizeof(ThreatLaneBuildRuntime) == 0x3E, "ThreatLaneBuildRuntime si
  * What it does:
  * Builds one packed threat-lane record from header words and one source lane.
  */
-[[maybe_unused]] ThreatLaneBuildRuntime* BuildThreatLaneRecordRuntime(
+ThreatLaneBuildRuntime* BuildThreatLaneRecordRuntime(
   ThreatLaneBuildRuntime* const outRecord,
   const std::uint32_t lane00,
   const ThreatLaneSourceRuntime& source,
@@ -11861,7 +11861,7 @@ static_assert(sizeof(ThreatLaneBuildRuntime) == 0x3E, "ThreatLaneBuildRuntime si
  * What it does:
  * Inserts one 4-float lane into a min-heap by promoting parents.
  */
-[[maybe_unused]] std::int32_t InsertFloat4HeapEntryByPromotingParentsRuntime(
+std::int32_t InsertFloat4HeapEntryByPromotingParentsRuntime(
   Float4Runtime* const heap,
   std::int32_t insertionIndex,
   const std::int32_t lowerBoundIndex,
@@ -11896,7 +11896,7 @@ static_assert(sizeof(ThreatLaneBuildRuntime) == 0x3E, "ThreatLaneBuildRuntime si
  * What it does:
  * Returns the element count for one stride-56 vector lane.
  */
-[[maybe_unused]] std::int32_t CountStride56ElementsRuntime(const StrideVectorRuntime* const vector) noexcept
+std::int32_t CountStride56ElementsRuntime(const StrideVectorRuntime* const vector) noexcept
 {
   if (vector == nullptr || vector->begin == nullptr) {
     return 0;
@@ -12479,7 +12479,7 @@ namespace
  * Initializes one bit-array surface descriptor from width/height and selector
  * lanes, including computed backing storage bytes.
  */
-[[maybe_unused]] BitArraySurfaceDescriptorRuntime* InitializeBitArraySurfaceDescriptorRuntime(
+BitArraySurfaceDescriptorRuntime* InitializeBitArraySurfaceDescriptorRuntime(
   BitArraySurfaceDescriptorRuntime* const descriptor,
   const std::uint32_t width,
   const std::uint32_t height,
@@ -12525,7 +12525,7 @@ namespace
  * Checks whether one nested owner lane has an active nonzero nested-state
  * marker at offset `+0x14`.
  */
-[[maybe_unused]] BOOL HasActiveNestedStateLaneRuntime(
+BOOL HasActiveNestedStateLaneRuntime(
   const NestedOwnerRuntime* const owner
 ) noexcept
 {
@@ -12542,7 +12542,7 @@ namespace
  * Transcodes one null-terminated narrow string into UTF-16 using either
  * passthrough ASCII lanes or a lookup table lane.
  */
-[[maybe_unused]] void ConvertNarrowToWideWithLookupRuntime(
+void ConvertNarrowToWideWithLookupRuntime(
   const TranscodeOwnerRuntime* const owner,
   const char* source,
   std::uint16_t* destination
@@ -12583,7 +12583,7 @@ namespace
  * Transcodes one null-terminated UTF-16 string into narrow bytes using either
  * passthrough ASCII lanes or a lookup table lane.
  */
-[[maybe_unused]] void ConvertWideToNarrowWithLookupRuntime(
+void ConvertWideToNarrowWithLookupRuntime(
   const TranscodeOwnerRuntime* const owner,
   const std::uint16_t* source,
   std::uint8_t* destination
@@ -12623,7 +12623,7 @@ namespace
  * Releases flagged secondary/primary resource lanes when bit-0 is set and then
  * dispatches the owner invoke slot.
  */
-[[maybe_unused]] int ReleaseFlaggedResourcesAndDispatchRuntime(
+int ReleaseFlaggedResourcesAndDispatchRuntime(
   ResourceDispatchOwnerRuntime* const owner,
   const std::int32_t /*unused*/
 )
@@ -12655,7 +12655,7 @@ namespace
  * Executes one optional pre-run slot and tail-calls the run slot when a run
  * cookie is present.
  */
-[[maybe_unused]] int RunCallbackChainNodeRuntime(
+int RunCallbackChainNodeRuntime(
   CallbackChainNodeRuntime* const node
 )
 {
@@ -12675,7 +12675,7 @@ namespace
  * What it does:
  * Returns one vtable word lane at offset `+0x38`.
  */
-[[maybe_unused]] std::int32_t ReadVTableWord56Runtime(
+std::int32_t ReadVTableWord56Runtime(
   const VTableWord56OwnerRuntime* const owner
 ) noexcept
 {
@@ -12691,7 +12691,7 @@ namespace
  * What it does:
  * Tail-calls one virtual slot at vtable offset `+0x04`.
  */
-[[maybe_unused]] int InvokeVTableSlot04Runtime(
+int InvokeVTableSlot04Runtime(
   VTableInvoke04OwnerRuntime* const owner
 )
 {
@@ -12707,7 +12707,7 @@ namespace
  * What it does:
  * Returns the `cFileName` lane from one `WIN32_FIND_DATAW` record.
  */
-[[maybe_unused]] wchar_t* GetFindDataFileNameRuntime(
+wchar_t* GetFindDataFileNameRuntime(
   WIN32_FIND_DATAW* const findData
 ) noexcept
 {
@@ -12720,7 +12720,7 @@ namespace
  * What it does:
  * Returns the file-attribute lane from one `WIN32_FIND_DATAW` record.
  */
-[[maybe_unused]] DWORD GetFindDataAttributesRuntime(
+DWORD GetFindDataAttributesRuntime(
   const WIN32_FIND_DATAW* const findData
 ) noexcept
 {
@@ -12733,7 +12733,7 @@ namespace
  * What it does:
  * Updates one byte lane at offset `+0x1D` and reports whether it changed.
  */
-[[maybe_unused]] std::uint8_t SetOwnerByteAt1DIfChangedRuntime(
+std::uint8_t SetOwnerByteAt1DIfChangedRuntime(
   std::uint8_t* const ownerBytes,
   const std::uint8_t value
 ) noexcept
@@ -12756,7 +12756,7 @@ namespace
  * Walks one linked list and resolves the payload pointer at an expanded index
  * where each node contributes `extraCount + 1` slots.
  */
-[[maybe_unused]] ExpandedStridePayloadRuntime* ResolveExpandedStrideNodeByIndexRuntime(
+ExpandedStridePayloadRuntime* ResolveExpandedStrideNodeByIndexRuntime(
   const ExpandedStrideOwnerRuntime* const owner,
   std::int32_t index
 ) noexcept
@@ -12790,7 +12790,7 @@ namespace
  * Resolves one selection node from packed 16-bit coordinates and updates the
  * active selection lane through the owner apply-selection slot.
  */
-[[maybe_unused]] int ResolveAndApplyPackedSelectionRuntime(
+int ResolveAndApplyPackedSelectionRuntime(
   SelectionOwnerRuntime* const owner,
   const std::int32_t /*unused*/,
   const std::int32_t packedCoords
@@ -12827,7 +12827,7 @@ namespace
  * What it does:
  * Copies one contiguous 4-word lane into owner storage at offset `+0x150`.
  */
-[[maybe_unused]] std::uint32_t CopyFourWordLaneToOwnerRuntime(
+std::uint32_t CopyFourWordLaneToOwnerRuntime(
   FourWordLaneOwnerRuntime* const owner,
   const FourWordLaneRuntime* const sourceLane
 ) noexcept
@@ -12847,7 +12847,7 @@ namespace
  * Stores three incoming scalar lanes at owner offsets `+0x2C`, `+0x30`,
  * `+0x34` and returns the third argument.
  */
-[[maybe_unused]] std::int32_t SetTripleWordLaneRuntime(
+std::int32_t SetTripleWordLaneRuntime(
   TripleWordLaneOwnerRuntime* const owner,
   const std::int32_t lane2C,
   const std::int32_t lane34,
@@ -12871,7 +12871,7 @@ namespace
  * Pushes each dword lane from one array into the owner dispatch lane at
  * `host + 0x130`.
  */
-[[maybe_unused]] std::int32_t PushDwordArrayIntoDispatchLaneRuntime(
+std::int32_t PushDwordArrayIntoDispatchLaneRuntime(
   BulkIdDispatchOwnerRuntime* const owner,
   const DwordArrayLaneRuntime* const values
 )
@@ -12896,7 +12896,7 @@ namespace
  * Finds the stride-8 entry with maximal lane-7 value among entries whose
  * lane-6 is positive.
  */
-[[maybe_unused]] ScoreEntryStride8Runtime* FindBestScoreEntryWithPositiveGateRuntime(
+ScoreEntryStride8Runtime* FindBestScoreEntryWithPositiveGateRuntime(
   ScoreEntryStride8Runtime* const entries,
   const std::int32_t count
 ) noexcept
@@ -12919,7 +12919,7 @@ namespace
  * What it does:
  * Finds the stride-8 entry with maximal lane-6 value.
  */
-[[maybe_unused]] ScoreEntryStride8Runtime* FindBestScoreEntryRuntime(
+ScoreEntryStride8Runtime* FindBestScoreEntryRuntime(
   ScoreEntryStride8Runtime* const entries,
   const std::int32_t count
 ) noexcept
@@ -12943,7 +12943,7 @@ namespace
  * Computes weighted RGB averages over one bounded 3D histogram range and writes
  * the resulting bytes using owner channel-offset lanes.
  */
-[[maybe_unused]] std::int32_t ComputeHistogramWeightedColorRuntime(
+std::int32_t ComputeHistogramWeightedColorRuntime(
   const HistogramProjectionOwnerRuntime* const owner,
   const HistogramBoundsRuntime* const bounds,
   std::uint8_t* const outColor
@@ -12992,7 +12992,7 @@ namespace
  * Scores each palette lane against a target window profile, writes indices with
  * minimal base-penalty threshold, and returns the written index count.
  */
-[[maybe_unused]] std::int32_t SelectPaletteIndicesByWindowPenaltyRuntime(
+std::int32_t SelectPaletteIndicesByWindowPenaltyRuntime(
   const PaletteSampleOwnerRuntime* const owner,
   const std::int32_t targetG,
   const std::int32_t targetR,
@@ -13048,7 +13048,7 @@ namespace
  * Updates 128 lattice slots with best candidate palette indices based on
  * weighted RGB distance ramps around the target color.
  */
-[[maybe_unused]] std::int32_t UpdateBestPaletteIndexLatticeRuntime(
+std::int32_t UpdateBestPaletteIndexLatticeRuntime(
   const PaletteSampleOwnerRuntime* const owner,
   const std::int32_t targetR,
   const std::int32_t targetG,
@@ -13125,7 +13125,7 @@ namespace
  * What it does:
  * Builds one iterator pair for the first non-null entry in a pointer array.
  */
-[[maybe_unused]] ArrayIteratorRuntime* BeginPointerArrayIteratorRuntime(
+ArrayIteratorRuntime* BeginPointerArrayIteratorRuntime(
   const PointerArrayOwnerRuntime* const owner,
   ArrayIteratorRuntime* const outIterator
 ) noexcept
@@ -13156,7 +13156,7 @@ namespace
  * Increments one nonzero ticket lane at `+0x0C`, returning null when the lane
  * is zero.
  */
-[[maybe_unused]] RefTicketRuntime* IncrementNonZeroRefTicketRuntime(
+RefTicketRuntime* IncrementNonZeroRefTicketRuntime(
   RefTicketRuntime* const owner
 ) noexcept
 {
@@ -13173,7 +13173,7 @@ namespace
  * What it does:
  * Returns true when one 16-bit lane is in range `[1, 0x1E]`.
  */
-[[maybe_unused]] BOOL IsWordInOneToThirtyRuntime(
+BOOL IsWordInOneToThirtyRuntime(
   const std::uint16_t* const lane
 ) noexcept
 {
@@ -13190,7 +13190,7 @@ namespace
  * Marks one handle lane for shutdown, calls its release slot, and clears owner
  * handle ownership.
  */
-[[maybe_unused]] int ShutdownAndReleaseHandleRuntime(
+int ShutdownAndReleaseHandleRuntime(
   ReleasableHandleOwnerRuntime* const owner
 )
 {
@@ -13212,7 +13212,7 @@ namespace
  * What it does:
  * Clears channel accumulator/output lane pairs selected by a 4-bit mask.
  */
-[[maybe_unused]] ChannelMaskOwnerRuntime* ClearChannelPairsByMaskRuntime(
+ChannelMaskOwnerRuntime* ClearChannelPairsByMaskRuntime(
   ChannelMaskOwnerRuntime* const owner,
   const std::uint8_t mask
 ) noexcept
@@ -13246,7 +13246,7 @@ namespace
  * What it does:
  * Finds one payload by id in the owner list at offset `+0x20`.
  */
-[[maybe_unused]] ManagedPayloadRuntime* FindPayloadByIdInList20Runtime(
+ManagedPayloadRuntime* FindPayloadByIdInList20Runtime(
   const ManagedNodeListsOwnerRuntime* const owner,
   const std::int32_t id
 ) noexcept
@@ -13264,7 +13264,7 @@ namespace
  * Removes the first node with matching payload id from the owner list at
  * offset `+0x20`.
  */
-[[maybe_unused]] std::uint8_t RemovePayloadByIdFromList20Runtime(
+std::uint8_t RemovePayloadByIdFromList20Runtime(
   ManagedNodeListsOwnerRuntime* const owner,
   const std::int32_t id
 ) noexcept
@@ -13281,7 +13281,7 @@ namespace
  * What it does:
  * Finds one payload by id in the owner list at offset `+0x1C`.
  */
-[[maybe_unused]] ManagedPayloadRuntime* FindPayloadByIdInList1CRuntime(
+ManagedPayloadRuntime* FindPayloadByIdInList1CRuntime(
   const ManagedNodeListsOwnerRuntime* const owner,
   const std::int32_t id
 ) noexcept
@@ -13299,7 +13299,7 @@ namespace
  * Removes the first node with matching payload id from the owner list at
  * offset `+0x1C`.
  */
-[[maybe_unused]] std::uint8_t RemovePayloadByIdFromList1CRuntime(
+std::uint8_t RemovePayloadByIdFromList1CRuntime(
   ManagedNodeListsOwnerRuntime* const owner,
   const std::int32_t id
 ) noexcept
@@ -13579,7 +13579,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Copies one byte range `[first, last)` into an optional destination buffer
  * and returns the destination cursor advanced by copied length.
  */
-[[maybe_unused]] std::uint8_t* CopyByteRangeAndAdvanceRuntimeA(
+std::uint8_t* CopyByteRangeAndAdvanceRuntimeA(
   const std::uint8_t* first,
   const std::uint8_t* last,
   std::uint8_t* output
@@ -13602,7 +13602,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Copies one byte range `[first, last)` into an optional destination buffer
  * and returns the destination cursor advanced by copied length.
  */
-[[maybe_unused]] std::uint8_t* CopyByteRangeAndAdvanceRuntimeB(
+std::uint8_t* CopyByteRangeAndAdvanceRuntimeB(
   const std::uint8_t* first,
   const std::uint8_t* last,
   std::uint8_t* output
@@ -13618,7 +13618,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Dispatches one event call to an optional local target, then forwards to the
  * fallback target unless it self-points to the owner.
  */
-[[maybe_unused]] int RelayDispatchToTargetsRuntime(
+int RelayDispatchToTargetsRuntime(
   RuntimeDispatchRelayOwner* const owner,
   const int arg0,
   const int arg1,
@@ -13647,7 +13647,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Decodes two ASCII hex digits into one byte value.
  */
-[[maybe_unused]] int DecodeAsciiHexByteRuntime(
+int DecodeAsciiHexByteRuntime(
   const std::uint8_t highDigit,
   const std::uint8_t lowDigit
 ) noexcept
@@ -13664,7 +13664,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Adds two 3-lane double vectors and writes the result into the destination
  * lane.
  */
-[[maybe_unused]] Double3LaneRuntime* AddDouble3LanesRuntime(
+Double3LaneRuntime* AddDouble3LanesRuntime(
   const Double3LaneRuntime* const lhs,
   Double3LaneRuntime* const out,
   const Double3LaneRuntime* const rhs
@@ -13683,7 +13683,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Swaps `byteCount` bytes between two buffers and returns the first cursor
  * advanced by that count.
  */
-[[maybe_unused]] std::uint8_t* SwapByteRangesRuntime(
+std::uint8_t* SwapByteRangesRuntime(
   std::uint8_t* first,
   std::uint32_t byteCount,
   std::uint8_t* second
@@ -13711,7 +13711,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Emits one triangle index strip over a [start,end) lane, selecting winding
  * order from the `flipWinding` flag and returning the advanced cursor.
  */
-[[maybe_unused]] int EmitTriangleStripIndicesRuntime(
+int EmitTriangleStripIndicesRuntime(
   int writeCursor,
   std::uint16_t* const outIndices,
   const int start,
@@ -13770,7 +13770,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Copies cached snapshot lanes from the bound payload into owner state and
  * decrements both owner-link and payload reference lanes.
  */
-[[maybe_unused]] int CopySnapshotAndReleaseBindingsRuntime(
+int CopySnapshotAndReleaseBindingsRuntime(
   SnapshotOwnerRuntime* const owner
 )
 {
@@ -13798,7 +13798,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Returns whether the input lane is nonzero.
  */
-[[maybe_unused]] BOOL IsNonZeroBoolLaneRuntime(const int value) noexcept
+BOOL IsNonZeroBoolLaneRuntime(const int value) noexcept
 {
   return (value != 0) ? TRUE : FALSE;
 }
@@ -13810,7 +13810,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three `(string,rank)` lanes ascending by string then rank using a
  * fixed three-comparator network; returns the final swap predicate.
  */
-[[maybe_unused]] char SortThreeStringRankLanesRuntime(
+char SortThreeStringRankLanesRuntime(
   StringRankLaneRuntime* const lane0,
   StringRankLaneRuntime* const lane1,
   StringRankLaneRuntime* const lane2
@@ -13847,7 +13847,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * then the medians of those trios are themselves sorted, leaving the
  * median-of-medians (ninther pivot) at `mid`.
  */
-[[maybe_unused]] void SelectStringRankNintherPivotForIntrosortRuntime(
+void SelectStringRankNintherPivotForIntrosortRuntime(
   StringRankLaneRuntime* const first,
   StringRankLaneRuntime* const mid,
   StringRankLaneRuntime* const end
@@ -13876,7 +13876,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three float3 lanes ascending by lane2 and returns the middle lane
  * pointer.
  */
-[[maybe_unused]] Float3LaneRuntime* SortThreeFloat3ByLane2AscendingRuntime(
+Float3LaneRuntime* SortThreeFloat3ByLane2AscendingRuntime(
   Float3LaneRuntime* const lane0,
   Float3LaneRuntime* const lane1,
   Float3LaneRuntime* const lane2
@@ -13901,7 +13901,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three float5 lanes ascending by lane4 and returns the middle lane
  * pointer.
  */
-[[maybe_unused]] Float5LaneRuntime* SortThreeFloat5ByLane4AscendingRuntime(
+Float5LaneRuntime* SortThreeFloat5ByLane4AscendingRuntime(
   Float5LaneRuntime* const lane0,
   Float5LaneRuntime* const lane1,
   Float5LaneRuntime* const lane2
@@ -13926,7 +13926,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three float4 lanes descending by lane3 and returns the middle lane
  * pointer.
  */
-[[maybe_unused]] Float4LaneRuntime* SortThreeFloat4ByLane3DescendingRuntime(
+Float4LaneRuntime* SortThreeFloat4ByLane3DescendingRuntime(
   Float4LaneRuntime* const lane0,
   Float4LaneRuntime* const lane1,
   Float4LaneRuntime* const lane2
@@ -13951,7 +13951,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three float2 lanes ascending by lane1 and returns the middle lane
  * pointer.
  */
-[[maybe_unused]] Float2LaneRuntime* SortThreeFloat2ByLane1AscendingRuntime(
+Float2LaneRuntime* SortThreeFloat2ByLane1AscendingRuntime(
   Float2LaneRuntime* const lane0,
   Float2LaneRuntime* const lane1,
   Float2LaneRuntime* const lane2
@@ -13976,7 +13976,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three `(id,score)` dword pairs descending by score and returns the
  * middle lane pointer.
  */
-[[maybe_unused]] std::uint32_t* SortThreeDwordPairsByScoreDescendingRuntime(
+std::uint32_t* SortThreeDwordPairsByScoreDescendingRuntime(
   std::uint32_t* const lane0Raw,
   std::uint32_t* const lane1Raw,
   std::uint32_t* const lane2Raw
@@ -14011,7 +14011,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * but dispatches each trio sort through
  * `SortThreeDwordPairsByScoreDescendingRuntime` (FUN_00760690).
  */
-[[maybe_unused]] void SelectDwordPairScoreDescendingNintherPivotRuntime(
+void SelectDwordPairScoreDescendingNintherPivotRuntime(
   std::uint32_t* const first,
   std::uint32_t* const mid,
   std::uint32_t* const end
@@ -14043,7 +14043,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three float3 lanes ascending by lane1 and returns the middle lane
  * pointer.
  */
-[[maybe_unused]] Float3LaneRuntime* SortThreeFloat3ByLane1AscendingRuntime(
+Float3LaneRuntime* SortThreeFloat3ByLane1AscendingRuntime(
   Float3LaneRuntime* const lane0,
   Float3LaneRuntime* const lane1,
   Float3LaneRuntime* const lane2
@@ -14068,7 +14068,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Sorts three float3 lanes by descending lane2 with ascending lane1 tie-break
  * and returns the middle lane pointer.
  */
-[[maybe_unused]] Float3LaneRuntime* SortThreeFloat3ByLane2DescTieLane1AscRuntime(
+Float3LaneRuntime* SortThreeFloat3ByLane2DescTieLane1AscRuntime(
   Float3LaneRuntime* const lane0,
   Float3LaneRuntime* const lane1,
   Float3LaneRuntime* const lane2
@@ -14092,7 +14092,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Sorts three float2 lanes ascending by lane0.
  */
-[[maybe_unused]] void SortThreeFloat2ByLane0AscendingRuntime(
+void SortThreeFloat2ByLane0AscendingRuntime(
   Float2LaneRuntime* const lane0,
   Float2LaneRuntime* const lane1,
   Float2LaneRuntime* const lane2
@@ -14115,7 +14115,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Sorts three 16-byte lanes ascending by their lane0 double key.
  */
-[[maybe_unused]] void SortThreeDword4ByDoubleKeyAscendingRuntime(
+void SortThreeDword4ByDoubleKeyAscendingRuntime(
   Dword4LaneRuntime* const lane0,
   Dword4LaneRuntime* const lane1,
   Dword4LaneRuntime* const lane2
@@ -14150,7 +14150,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * the inner sort routine returned in `EAX` (its result is unused by the
  * binary).
  */
-[[maybe_unused]] void SelectFloat2NintherPivotForIntrosortRuntime(
+void SelectFloat2NintherPivotForIntrosortRuntime(
   Float2LaneRuntime* const first,
   Float2LaneRuntime* const mid,
   Float2LaneRuntime* const end
@@ -14185,7 +14185,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * (FUN_00A728C0) for both the small-range median-of-three and the four
  * large-range trio sorts.
  */
-[[maybe_unused]] void SelectDword4NintherPivotForIntrosortRuntime(
+void SelectDword4NintherPivotForIntrosortRuntime(
   Dword4LaneRuntime* const first,
   Dword4LaneRuntime* const mid,
   Dword4LaneRuntime* const end
@@ -14229,7 +14229,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * post-condition); the caller treats this as a placeholder pointer, mirrored
  * here as a raw `std::uint32_t*` reinterpretation.
  */
-[[maybe_unused]] std::uint32_t* InsertionSortDword4ByDoubleKeyAscendingRuntime(
+std::uint32_t* InsertionSortDword4ByDoubleKeyAscendingRuntime(
   Dword4LaneRuntime* const first,
   Dword4LaneRuntime* const end
 ) noexcept
@@ -14274,7 +14274,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Updates one cached resolved value when key changes by invoking resolver slot
  * `+0x0C`.
  */
-[[maybe_unused]] int UpdateCachedResolvedValueRuntimeA(
+int UpdateCachedResolvedValueRuntimeA(
   CachedResolvedValueRuntime* const owner,
   const int key,
   CacheResolverRuntime* const resolver
@@ -14294,7 +14294,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Updates one cached resolved value when key changes by invoking resolver slot
  * `+0x0C`.
  */
-[[maybe_unused]] int UpdateCachedResolvedValueRuntimeB(
+int UpdateCachedResolvedValueRuntimeB(
   CachedResolvedValueRuntime* const owner,
   const int key,
   CacheResolverRuntime* const resolver
@@ -14310,7 +14310,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Queries viewport bounds and applies an updated rectangle with width scaled
  * to one-third.
  */
-[[maybe_unused]] int QueryAndApplyViewportThirdWidthRuntime(
+int QueryAndApplyViewportThirdWidthRuntime(
   ViewportQueryRuntime* const owner
 )
 {
@@ -14327,7 +14327,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Updates one parametric clip interval edge for a half-space inequality and
  * returns whether the interval remains valid.
  */
-[[maybe_unused]] bool UpdateClipIntervalLaneRuntime(
+bool UpdateClipIntervalLaneRuntime(
   const double denominator,
   const double numerator,
   double* const lower,
@@ -14363,7 +14363,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Writes three integer state lanes at offsets `+0x0C/+0x10/+0x14`.
  */
-[[maybe_unused]] int SetTripleStateLanesRuntimeA(
+int SetTripleStateLanesRuntimeA(
   TripleStateOwnerRuntime* const owner,
   const int value0C,
   const int value10,
@@ -14382,7 +14382,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Writes three integer state lanes at offsets `+0x0C/+0x10/+0x14`.
  */
-[[maybe_unused]] int SetTripleStateLanesRuntimeB(
+int SetTripleStateLanesRuntimeB(
   TripleStateOwnerRuntime* const owner,
   const int value0C,
   const int value10,
@@ -14398,7 +14398,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * What it does:
  * Validates a token lane and resets six state lanes when it matches.
  */
-[[maybe_unused]] char ValidateTokenAndResetStateRuntime(
+char ValidateTokenAndResetStateRuntime(
   MatchResetStateRuntime* const owner,
   const int token
 ) noexcept
@@ -14424,7 +14424,7 @@ void SwapByValueRuntime(T& lhs, T& rhs) noexcept
  * Releases one shared-counter owner lane by decrementing strong and weak bias
  * counters and invoking vtable release slots when they transition from zero.
  */
-[[maybe_unused]] int ReleaseSharedCounterOwnerRuntime(
+int ReleaseSharedCounterOwnerRuntime(
   SharedCounterOwnerRuntime* const owner
 )
 {
@@ -14516,7 +14516,7 @@ namespace
  * What it does:
  * Returns `this + 0x08`.
  */
-[[maybe_unused]] char* GetInlineLane08RuntimeA(char* const self) noexcept
+char* GetInlineLane08RuntimeA(char* const self) noexcept
 {
   return self + 8;
 }
@@ -14545,7 +14545,7 @@ namespace
  * What it does:
  * Calls one optional owned-object release slot with lane argument `1`.
  */
-[[maybe_unused]] int ReleaseOptionalOwnedObjectRuntime(OptionalReleaseOwnerRuntime* const owner)
+int ReleaseOptionalOwnedObjectRuntime(OptionalReleaseOwnerRuntime* const owner)
 {
   if (owner->target == nullptr || owner->target->vtable == nullptr || owner->target->vtable->release == nullptr) {
     return 0;
@@ -14893,7 +14893,7 @@ namespace
  * Computes one packed payload byte estimate from a counted array of
  * string-payload pointers (`len prefix at -8`), with base cost `0x15`.
  */
-[[maybe_unused]] int ComputePrefixedStringPayloadBudgetRuntime(
+int ComputePrefixedStringPayloadBudgetRuntime(
   const StringPayloadArrayOwnerRuntime* const owner
 ) noexcept
 {
@@ -14915,7 +14915,7 @@ namespace
  * Writes `strlen(input)` into the output dword lane and returns the input
  * pointer.
  */
-[[maybe_unused]] const char* CaptureCStringLengthRuntime(
+const char* CaptureCStringLengthRuntime(
   const char* const input,
   std::uint32_t* const outLength,
   const int /*unused*/
@@ -14931,7 +14931,7 @@ namespace
  * What it does:
  * Returns the first argument unchanged.
  */
-[[maybe_unused]] int ReturnFirstStdcallArgumentRuntime(
+int ReturnFirstStdcallArgumentRuntime(
   const int arg0,
   const int /*arg1*/,
   const int /*arg2*/
@@ -14946,7 +14946,7 @@ namespace
  * What it does:
  * Calls the optional release slot (`+0x04`) with lane `1` and reports success.
  */
-[[maybe_unused]] char ReleaseOptionalObjectAndReturnTrueRuntime(
+char ReleaseOptionalObjectAndReturnTrueRuntime(
   void* const object
 )
 {
@@ -14964,7 +14964,7 @@ namespace
  * What it does:
  * Copies one 3-double lane into destination and returns destination.
  */
-[[maybe_unused]] TripleDoubleLaneRuntime* CopyTripleDoubleLaneRuntime(
+TripleDoubleLaneRuntime* CopyTripleDoubleLaneRuntime(
   TripleDoubleLaneRuntime* const destination,
   const TripleDoubleLaneRuntime* const source
 ) noexcept
@@ -14979,7 +14979,7 @@ namespace
  * What it does:
  * Copies one 2-double lane into destination and returns destination.
  */
-[[maybe_unused]] DoublePairLaneRuntime* CopyDoublePairLaneRuntime(
+DoublePairLaneRuntime* CopyDoublePairLaneRuntime(
   DoublePairLaneRuntime* const destination,
   const DoublePairLaneRuntime* const source
 ) noexcept
@@ -14994,7 +14994,7 @@ namespace
  * What it does:
  * Returns true when the referenced double lane is non-negative.
  */
-[[maybe_unused]] BOOL IsDoubleLaneNonNegativeRuntime(const double* const value) noexcept
+BOOL IsDoubleLaneNonNegativeRuntime(const double* const value) noexcept
 {
   return (*value >= 0.0) ? TRUE : FALSE;
 }
@@ -15006,7 +15006,7 @@ namespace
  * Updates one FPU status lane from flag bit `0x40` and returns the sum of two
  * source lanes.
  */
-[[maybe_unused]] double AddDoublePairAndUpdateFpuStatusRuntime(
+double AddDoublePairAndUpdateFpuStatusRuntime(
   FpuStatusLaneRuntime* const state,
   const double first,
   const double second
@@ -15022,7 +15022,7 @@ namespace
  * What it does:
  * Returns one byte lane stored at offset `+0x08`.
  */
-[[maybe_unused]] char ReadByteLane08Runtime(const ByteAtOffset8Runtime* const owner) noexcept
+char ReadByteLane08Runtime(const ByteAtOffset8Runtime* const owner) noexcept
 {
   return static_cast<char>(owner->lane08);
 }
@@ -15034,7 +15034,7 @@ namespace
  * Writes the stored byte lane (`+0x08`) to output when output pointer and
  * length are both nonzero.
  */
-[[maybe_unused]] std::uint8_t* WriteByteLane08ToBufferRuntime(
+std::uint8_t* WriteByteLane08ToBufferRuntime(
   const ByteAtOffset8Runtime* const owner,
   std::uint8_t* const output,
   const int outputSize
@@ -15054,7 +15054,7 @@ namespace
  * What it does:
  * Returns the tail byte of one byte-buffer lane, or zero when empty.
  */
-[[maybe_unused]] char ReadTailByteOrZeroRuntime(const TailByteBufferOwnerRuntime* const owner) noexcept
+char ReadTailByteOrZeroRuntime(const TailByteBufferOwnerRuntime* const owner) noexcept
 {
   if (owner->size == 0u) {
     return 0;
@@ -15069,7 +15069,7 @@ namespace
  * Resets one inline offset-vector lane to empty, pointing begin/end/original
  * to embedded storage and capacity to storage+0x98.
  */
-[[maybe_unused]] InlineOffsetVectorRuntime* ResetInlineOffsetVectorStorageRuntime(
+InlineOffsetVectorRuntime* ResetInlineOffsetVectorStorageRuntime(
   InlineOffsetVectorRuntime* const owner
 ) noexcept
 {
@@ -15087,7 +15087,7 @@ namespace
  * Dispatches one payload pointer to the destination writer, selecting inline
  * or heap storage based on payload length `< 16`.
  */
-[[maybe_unused]] int DispatchSsoPayloadToDestinationRuntime(
+int DispatchSsoPayloadToDestinationRuntime(
   const SsoPayloadDispatchHandleRuntime* const handle
 )
 {
@@ -15104,7 +15104,7 @@ namespace
  * Invokes one unary callback with SSO payload selection (`inline` for len<16,
  * heap pointer otherwise).
  */
-[[maybe_unused]] int InvokeUnarySsoPayloadCallbackRuntime(
+int InvokeUnarySsoPayloadCallbackRuntime(
   const SsoUnaryCallbackHandleRuntime* const handle
 )
 {
@@ -15120,7 +15120,7 @@ namespace
  * Invokes one binary callback with selected SSO payload and callback-state lane
  * at offset `+0x20`.
  */
-[[maybe_unused]] void InvokeBinarySsoPayloadCallbackRuntime(
+void InvokeBinarySsoPayloadCallbackRuntime(
   const SsoBinaryCallbackHandleRuntime* const handle
 ) noexcept
 {
@@ -15135,7 +15135,7 @@ namespace
  * What it does:
  * Forwards to virtual slot `+0xD8`, ignoring the forwarded stack argument.
  */
-[[maybe_unused]] int InvokeSlotD8IgnoringArgumentRuntime(
+int InvokeSlotD8IgnoringArgumentRuntime(
   SlotD8OwnerRuntime* const owner,
   const int /*unused*/
 )
@@ -15149,7 +15149,7 @@ namespace
  * What it does:
  * Forwards to child virtual slot `+0x198` when child target at `+0xE8` exists.
  */
-[[maybe_unused]] int ForwardToChildSlot198Runtime(
+int ForwardToChildSlot198Runtime(
   Slot198ForwardOwnerRuntime* const owner,
   const int arg0,
   const int arg1
@@ -15168,7 +15168,7 @@ namespace
  * Looks up one node by key via slot `+0x50`, clears node lane `+0x10`, then
  * releases it with lane `1`.
  */
-[[maybe_unused]] char LookupClearLane10AndReleaseRuntime(
+char LookupClearLane10AndReleaseRuntime(
   LookupOwnerRuntime* const owner,
   const int key
 )
@@ -15189,7 +15189,7 @@ namespace
  * What it does:
  * Looks up one node by key via slot `+0x50` and releases it with lane `1`.
  */
-[[maybe_unused]] char LookupAndReleaseRuntime(
+char LookupAndReleaseRuntime(
   LookupOwnerRuntime* const owner,
   const int key
 )
@@ -15209,7 +15209,7 @@ namespace
  * What it does:
  * Writes one dword lane at offset `+0x15C`.
  */
-[[maybe_unused]] int SetLane15CRuntime(PairSourceOwnerRuntime* const owner, const int value) noexcept
+int SetLane15CRuntime(PairSourceOwnerRuntime* const owner, const int value) noexcept
 {
   owner->lane15C = static_cast<std::uint32_t>(value);
   return value;
@@ -15221,7 +15221,7 @@ namespace
  * What it does:
  * Writes one dword lane at offset `+0x160`.
  */
-[[maybe_unused]] int SetLane160Runtime(PairSourceOwnerRuntime* const owner, const int value) noexcept
+int SetLane160Runtime(PairSourceOwnerRuntime* const owner, const int value) noexcept
 {
   owner->lane160 = static_cast<std::uint32_t>(value);
   return value;
@@ -15233,7 +15233,7 @@ namespace
  * What it does:
  * Copies owner pair lanes from offsets `+0x14C/+0x150` into output.
  */
-[[maybe_unused]] PairLaneRuntime* CopyPrimaryPairLaneRuntime(
+PairLaneRuntime* CopyPrimaryPairLaneRuntime(
   const PairSourceOwnerRuntime* const owner,
   PairLaneRuntime* const outPair
 ) noexcept
@@ -15248,7 +15248,7 @@ namespace
  * What it does:
  * Copies owner pair lanes from offsets `+0x164/+0x168` into output.
  */
-[[maybe_unused]] PairLaneRuntime* CopySecondaryPairLaneRuntime(
+PairLaneRuntime* CopySecondaryPairLaneRuntime(
   const PairSourceOwnerRuntime* const owner,
   PairLaneRuntime* const outPair
 ) noexcept
@@ -15263,7 +15263,7 @@ namespace
  * What it does:
  * Writes one dword lane at offset `+0x2C` and returns success.
  */
-[[maybe_unused]] char WriteLane2CAndReturnTrueRuntime(
+char WriteLane2CAndReturnTrueRuntime(
   DwordAt2CWriterRuntime* const owner,
   const int value
 ) noexcept
@@ -15279,7 +15279,7 @@ namespace
  * Resets stream position/mode lanes to zero, then forwards to owner dispatch
  * slot `+0x20`.
  */
-[[maybe_unused]] int ResetStreamAndForwardDispatchRuntime(
+int ResetStreamAndForwardDispatchRuntime(
   ForwardDispatchOwnerRuntime* const owner,
   const int arg0,
   StreamLikeRuntime* const stream,
@@ -15298,7 +15298,7 @@ namespace
  * Saves current stream position, seeks to start, reads 6 bytes, returns the
  * trailing 16-bit lane, and restores previous stream position.
  */
-[[maybe_unused]] int ReadTrailingWordFromStreamHeaderRuntime(StreamLikeRuntime* const stream)
+int ReadTrailingWordFromStreamHeaderRuntime(StreamLikeRuntime* const stream)
 {
   const int previousPosition = stream->vtable->tellSlot(stream);
   stream->vtable->seekSlot(stream, 0, 0);
@@ -15319,7 +15319,7 @@ namespace
  * Forwards from a subobject lane at `+0x130` back to owner slot `+0x21C` with
  * fixed second argument `1`.
  */
-[[maybe_unused]] int ForwardSubobjectToOwnerSlot21CRuntime(
+int ForwardSubobjectToOwnerSlot21CRuntime(
   void* const subobjectAt130,
   const int arg0
 )
@@ -15334,7 +15334,7 @@ namespace
  * What it does:
  * Writes one dword lane at offset `+0x08`.
  */
-[[maybe_unused]] int SetLane08AndReturnRuntime(
+int SetLane08AndReturnRuntime(
   DwordAtOffset8Runtime* const owner,
   const int value
 ) noexcept
@@ -15350,7 +15350,7 @@ namespace
  * Dispatches via slot `+0x218` using cached owner lane `+0x138` and the first
  * eight forwarded arguments.
  */
-[[maybe_unused]] int DispatchWithCachedLane218Runtime(
+int DispatchWithCachedLane218Runtime(
   CachedDispatchOwnerRuntime* const owner,
   const int a2,
   const int a3,
@@ -15373,7 +15373,7 @@ namespace
  * What it does:
  * Dispatches via slot `+0x220` using cached owner lane `+0x138`.
  */
-[[maybe_unused]] int DispatchWithCachedLane220Runtime(
+int DispatchWithCachedLane220Runtime(
   CachedDispatchOwnerRuntime* const owner,
   const int value
 )
@@ -15619,7 +15619,7 @@ namespace
  * What it does:
  * Invokes one context-bound callback thunk with a forwarded integer argument.
  */
-[[maybe_unused]] int InvokeContextUnaryThunkRuntime(
+int InvokeContextUnaryThunkRuntime(
   const ThiscallContextUnaryThunkRuntime* const thunk,
   const int arg0
 )
@@ -15633,7 +15633,7 @@ namespace
  * What it does:
  * Invokes one cdecl binary thunk with two stored payload lanes.
  */
-[[maybe_unused]] int InvokeStoredBinaryCdeclThunkRuntime(const CdeclBinaryThunkRuntime* const thunk)
+int InvokeStoredBinaryCdeclThunkRuntime(const CdeclBinaryThunkRuntime* const thunk)
 {
   return thunk->invoke(thunk->arg0, thunk->arg1);
 }
@@ -15644,7 +15644,7 @@ namespace
  * What it does:
  * Invokes one unary cdecl thunk with a forwarded integer argument.
  */
-[[maybe_unused]] int InvokeUnaryCdeclThunkRuntime(
+int InvokeUnaryCdeclThunkRuntime(
   const CdeclUnaryThunkRuntime* const thunk,
   const int arg0
 )
@@ -15659,7 +15659,7 @@ namespace
  * Unlinks one intrusive node from its current list and resets it as a
  * self-linked singleton.
  */
-[[maybe_unused]] void ResetIntrusiveLinkNodeRuntime(IntrusiveLinkNodeRuntime* const node) noexcept
+void ResetIntrusiveLinkNodeRuntime(IntrusiveLinkNodeRuntime* const node) noexcept
 {
   node->next->prev = node->prev;
   node->prev->next = node->next;
@@ -15673,7 +15673,7 @@ namespace
  * What it does:
  * Returns whether lane `+0x18` is nonzero.
  */
-[[maybe_unused]] BOOL HasLane18ValueRuntime(const BoolLane18OwnerRuntime* const owner) noexcept
+BOOL HasLane18ValueRuntime(const BoolLane18OwnerRuntime* const owner) noexcept
 {
   return (owner->lane18 != 0u) ? TRUE : FALSE;
 }
@@ -15684,7 +15684,7 @@ namespace
  * What it does:
  * Forwards to virtual slot `+0x08`.
  */
-[[maybe_unused]] int InvokeSlot08Runtime(Slot08OwnerRuntime* const owner)
+int InvokeSlot08Runtime(Slot08OwnerRuntime* const owner)
 {
   return owner->vtable->slot08(owner);
 }
@@ -15695,7 +15695,7 @@ namespace
  * What it does:
  * Clears one 16-bit lane to zero.
  */
-[[maybe_unused]] void ZeroWordLaneRuntime(WordLaneOwnerRuntime* const owner) noexcept
+void ZeroWordLaneRuntime(WordLaneOwnerRuntime* const owner) noexcept
 {
   owner->value = 0u;
 }
@@ -15707,7 +15707,7 @@ namespace
  * Recomputes clamped viewport bounds, updates active scale/grid lanes, applies
  * target viewport changes, and optionally refreshes overlay state.
  */
-[[maybe_unused]] int UpdateViewportScaleStateRuntime(
+int UpdateViewportScaleStateRuntime(
   ViewScaleOwnerRuntime* const owner,
   const int scaleX,
   const int scaleY,
@@ -15760,7 +15760,7 @@ namespace
  * Queries current viewport origin, applies tile-scaled translation, and writes
  * current world offsets to the target viewport consumer.
  */
-[[maybe_unused]] int ApplyViewportTransformRuntime(
+int ApplyViewportTransformRuntime(
   const ViewScaleOwnerRuntime* const owner,
   ViewportConsumerRuntime* const target
 )
@@ -15781,7 +15781,7 @@ namespace
  * What it does:
  * Exports scale lanes at `+0x24/+0x28` into optional output pointers.
  */
-[[maybe_unused]] std::int32_t* GetScalePairRuntime(
+std::int32_t* GetScalePairRuntime(
   const ViewScaleOwnerRuntime* const owner,
   std::int32_t* const outScaleX,
   std::int32_t* const outScaleY
@@ -15802,7 +15802,7 @@ namespace
  * What it does:
  * Writes two byte lanes at `+0x44/+0x45`.
  */
-[[maybe_unused]] char SetByteLanes44And45Runtime(
+char SetByteLanes44And45Runtime(
   ViewScaleOwnerRuntime* const owner,
   const std::uint8_t lane44,
   const std::uint8_t lane45
@@ -15819,7 +15819,7 @@ namespace
  * What it does:
  * Exports grid lanes at `+0x2C/+0x30` into optional output pointers.
  */
-[[maybe_unused]] std::int32_t* GetGridPairRuntime(
+std::int32_t* GetGridPairRuntime(
   const ViewScaleOwnerRuntime* const owner,
   std::int32_t* const outGridX,
   std::int32_t* const outGridY
@@ -15841,7 +15841,7 @@ namespace
  * Converts absolute pixel coordinates to local coordinates using
  * `grid * scale` subtraction.
  */
-[[maybe_unused]] std::int32_t* ConvertToLocalCoordinatesRuntime(
+std::int32_t* ConvertToLocalCoordinatesRuntime(
   const ViewScaleOwnerRuntime* const owner,
   const int absoluteX,
   const int absoluteY,
@@ -15865,7 +15865,7 @@ namespace
  * Converts local coordinates to absolute pixel coordinates using
  * `grid * scale` addition.
  */
-[[maybe_unused]] std::int32_t* ConvertToAbsoluteCoordinatesRuntime(
+std::int32_t* ConvertToAbsoluteCoordinatesRuntime(
   const ViewScaleOwnerRuntime* const owner,
   const int localX,
   const int localY,
@@ -15889,7 +15889,7 @@ namespace
  * Resolves one keyed pointer value via slot `+0x4C` and writes it to the
  * output lane.
  */
-[[maybe_unused]] char TryResolvePointerByKeyRuntime(
+char TryResolvePointerByKeyRuntime(
   LookupOutOwnerRuntime* const owner,
   const int key,
   void** const outValue
@@ -15914,7 +15914,7 @@ namespace
  * Resolves one keyed pointer via slot `+0x4C` and writes `true` when the
  * resolved lane is non-null.
  */
-[[maybe_unused]] char TryResolvePresenceByKeyRuntime(
+char TryResolvePresenceByKeyRuntime(
   LookupOutOwnerRuntime* const owner,
   const int key,
   bool* const outPresent
@@ -15938,7 +15938,7 @@ namespace
  * What it does:
  * Forwards directly to virtual slot `+0x60`.
  */
-[[maybe_unused]] int InvokeSlot60NoArgsRuntime(LookupOutOwnerRuntime* const owner)
+int InvokeSlot60NoArgsRuntime(LookupOutOwnerRuntime* const owner)
 {
   const auto slot60 = reinterpret_cast<int(__thiscall*)(LookupOutOwnerRuntime*)>(owner->vtable->slot60);
   return slot60(owner);
@@ -15951,7 +15951,7 @@ namespace
  * Forwards to virtual slot `+0x60` after normalizing the byte flag argument to
  * an integer boolean.
  */
-[[maybe_unused]] int InvokeSlot60WithBoolRuntime(
+int InvokeSlot60WithBoolRuntime(
   LookupOutOwnerRuntime* const owner,
   const int arg0,
   const std::uint8_t arg1
@@ -15968,7 +15968,7 @@ namespace
  * Sets one FPU status byte from flag bit `0x40` and returns the sum of two
  * source double lanes.
  */
-[[maybe_unused]] double AddDoubleAndUpdateFpuStatusRuntime(
+double AddDoubleAndUpdateFpuStatusRuntime(
   FpuStatusLaneRuntime* const state,
   const double lhs,
   const double rhs
@@ -15984,7 +15984,7 @@ namespace
  * What it does:
  * Copies the 16-bit lane at `+0x08` into output and returns the output pointer.
  */
-[[maybe_unused]] std::uint16_t* CopyWordLane08ToOutputRuntime(
+std::uint16_t* CopyWordLane08ToOutputRuntime(
   const WordAtOffset8OwnerRuntime* const owner,
   std::uint16_t* const outValue,
   const int /*unused*/
@@ -16000,7 +16000,7 @@ namespace
  * What it does:
  * Copies the 16-bit lane at `+0x08` into output and returns that value.
  */
-[[maybe_unused]] std::uint16_t CopyWordLane08ToOutputAndReturnRuntime(
+std::uint16_t CopyWordLane08ToOutputAndReturnRuntime(
   const WordAtOffset8OwnerRuntime* const owner,
   std::uint16_t* const outValue,
   const int /*unused*/
@@ -16018,7 +16018,7 @@ namespace
  * Copies one dword from source to destination and advances the source cursor by
  * one dword.
  */
-[[maybe_unused]] std::uint32_t* CopyDwordAndAdvanceSourceRuntime(
+std::uint32_t* CopyDwordAndAdvanceSourceRuntime(
   const std::uint32_t* const source,
   std::uint32_t* const destination,
   const int /*unused*/
@@ -16034,7 +16034,7 @@ namespace
  * What it does:
  * Writes one dword value and advances destination cursor by one dword.
  */
-[[maybe_unused]] std::uint32_t* WriteDwordAndAdvanceDestinationRuntime(
+std::uint32_t* WriteDwordAndAdvanceDestinationRuntime(
   std::uint32_t* const destination,
   const std::uint32_t value,
   const int /*unused*/
@@ -16050,7 +16050,7 @@ namespace
  * What it does:
  * Forwards to virtual slot `+0x104`.
  */
-[[maybe_unused]] int InvokeSlot104Runtime(Slot104OwnerRuntime* const owner)
+int InvokeSlot104Runtime(Slot104OwnerRuntime* const owner)
 {
   return owner->vtable->slot104(owner);
 }
@@ -16062,7 +16062,7 @@ namespace
  * Updates double lanes `+0x30/+0x38` and notifies callback slot `+0x78` only
  * when either lane changes.
  */
-[[maybe_unused]] void SetPrimaryDoublePairAndNotifyRuntime(
+void SetPrimaryDoublePairAndNotifyRuntime(
   NotifyOnChangeOwnerRuntime* const owner,
   const double value0,
   const double value1
@@ -16082,7 +16082,7 @@ namespace
  * Converts two byte flags to sign lanes (`+1/-1`), updates lanes `+0x50/+0x54`
  * on change, and notifies callback slot `+0x78`.
  */
-[[maybe_unused]] int SetSignedFlagPairAndNotifyRuntime(
+int SetSignedFlagPairAndNotifyRuntime(
   NotifyOnChangeOwnerRuntime* const owner,
   const std::uint8_t flag0,
   const std::uint8_t flag1
@@ -16105,7 +16105,7 @@ namespace
  * Updates double lanes `+0x40/+0x48` and notifies callback slot `+0x78` only
  * when either lane changes.
  */
-[[maybe_unused]] void SetSecondaryDoublePairAndNotifyRuntime(
+void SetSecondaryDoublePairAndNotifyRuntime(
   NotifyOnChangeOwnerRuntime* const owner,
   const double value0,
   const double value1
@@ -16124,7 +16124,7 @@ namespace
  * What it does:
  * Sets base double lanes `+0x20/+0x28`.
  */
-[[maybe_unused]] void SetBaseDoublePairRuntime(
+void SetBaseDoublePairRuntime(
   NotifyOnChangeOwnerRuntime* const owner,
   const double value0,
   const double value1
@@ -16140,7 +16140,7 @@ namespace
  * What it does:
  * Forwards to virtual slot `+0x0C`.
  */
-[[maybe_unused]] int InvokeSlot0CRuntime(Slot0COwnerRuntime* const owner)
+int InvokeSlot0CRuntime(Slot0COwnerRuntime* const owner)
 {
   return owner->vtable->slot0C(owner);
 }
@@ -16151,7 +16151,7 @@ namespace
  * What it does:
  * Forwards to virtual slot `+0x08`.
  */
-[[maybe_unused]] int InvokeSlot08RuntimeB(Slot08OwnerRuntime* const owner)
+int InvokeSlot08RuntimeB(Slot08OwnerRuntime* const owner)
 {
   return owner->vtable->slot08(owner);
 }
