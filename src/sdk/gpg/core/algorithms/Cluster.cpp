@@ -16,6 +16,7 @@
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/containers/HashMap.h"
 
 namespace
 {
@@ -1944,18 +1945,6 @@ namespace
         std::array<std::uint8_t, sizeof(gpg::HaStar::SubclusterData)> mBytes{};
     };
 
-    [[nodiscard]] std::uint32_t ScrambleParkMiller(const std::uint32_t input)
-    {
-        const std::int64_t value = static_cast<std::int64_t>(input);
-        const std::int64_t quotient = value / 127773LL;
-        const std::int64_t remainder = value % 127773LL;
-        std::int64_t candidate = 16807LL * remainder - 2836LL * quotient;
-        if (candidate < 0) {
-            candidate += 0x7FFFFFFFLL;
-        }
-        return static_cast<std::uint32_t>(candidate);
-    }
-
     /**
      * Address: 0x00931460 (FUN_00931460, sub_931460)
      *
@@ -1982,13 +1971,16 @@ namespace
      * bytes - but `Cluster::mData` is a 4-byte heap pointer, so that hashed
      * 16 pointer values verbatim. Two structurally identical subclusters
      * built from different allocations hashed to different buckets, so the
-     * `unordered_map<SubclusterCacheKey, ...>` dedup cache this feeds could
-     * essentially never hit. `kSubclusterKeySalt` was a placeholder that
-     * went with it; `0x7BEF2693` (kept below, matching the binary's actual
-     * `xor eax, 7BEF2693h`) is the real per-instance constant this function
-     * uses to seed the level mix - the one already named
-     * `kOccupationKeySalt` is the same bit pattern reused for an unrelated
-     * key type (0x00932080, not verified against its own binary body yet).
+     * dedup cache this feeds could essentially never hit.
+     * `kSubclusterKeySalt` was a placeholder that went with it; `0x7BEF2693`
+     * (kept below, matching the binary's actual `xor eax, 7BEF2693h`) is the
+     * real per-instance constant this function uses to seed the level mix -
+     * the same bit pattern `kOccupationKeySalt` carries, now confirmed
+     * against 0x00932080's literal `push 7BEF2693h` feeding `gpg::HashBytes`.
+     *
+     * This is the raw key hash only. The container applies MSVC8's
+     * `stdext::hash_compare` pseudorandomizing step on top; see
+     * `hash_value(const SubclusterCacheKey&)` below.
      */
     [[nodiscard]] std::uint32_t HashSubclusterKey(const SubclusterCacheKey& key)
     {
@@ -2034,41 +2026,66 @@ namespace
     }
 
     /**
-     * Address: 0x00932080 (FUN_00932080, sub_932080) - hash primitive only
+     * Address: 0x00932080 (FUN_00932080, sub_932080) - the inlined key-hash
+     *   half; the enclosing bucket fold is `msvc8::hash_map::_Buckno`
      *
      * IDA signature:
-     * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *a2);
+     * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *key);
      *
      * What it does:
-     * Hashes an 18-byte occupation key through the engine's general-purpose
-     * `gpg::HashBytes`, same as `HashSubclusterKey`'s fix (see
-     * `SubclusterData::Hash` above) - not the fake FNV-style
-     * `HashBytesSalted` this called before.
+     * MSVC8's `stdext::hash_value` for the 18-byte occupation cache key:
+     * `gpg::HashBytes` over the raw key bytes, then the Park-Miller
+     * pseudorandomizing step `stdext::hash_compare::operator()(const Key&)`
+     * applies to every key (`msvc8::hash_value`). Found by argument-dependent
+     * lookup, which is how `msvc8::hash_compare` picks this up in place of the
+     * integral default - the same wiring `moho::hash_value(const SOCellPos&)`
+     * uses for the pathfinder node table.
      *
-     * The real function is a member of `vector_OccupationData`, a hand-rolled
-     * open-addressing hash table (`mMask`/`mMax`/bucket-vector fields; see
-     * `decomp/recovery/escalations/FUN_00932080.md`) that this engine's
-     * occupation cache uses instead of `std::unordered_map`. Recovering that
-     * whole container is a separate, larger task. What is fixed here is only
-     * the hash INPUT: `gpg::HashBytes(a2, 0x12u, 0x7BEF2693u)` over the raw
-     * key bytes - `0x12u` matches `OccupationCacheKey::mBytes`'s size and
-     * `0x7BEF2693u` is `kOccupationKeySalt`, both confirmed directly against
-     * the real disassembly. The bucket-index arithmetic that follows in the
-     * binary (`& this->mMask`, then a signed wrap against `this->mMax`) is
-     * that container's own indexing scheme; `std::unordered_map` manages its
-     * own buckets, so `ScrambleParkMiller(HashOccupationKey(key))` (this
-     * function's only caller) does not need to reproduce it.
+     * 0x00932080 is **not** a free hash function. It is the out-of-line
+     * emission of `msvc8::hash_map<OccupationCacheKey, Cluster::Data*>::_Buckno`
+     * for this key type, shared by its three call sites (`find` 0x00932B70,
+     * `equal_range` 0x00933EF0, `erase` 0x00933F80). The `this` displacements
+     * pin the container: `mov ecx,[esi+20h]` is `mMask` and `cmp [esi+24h],eax`
+     * is `mMaxidx`, matching `msvc8::hash_map`'s +0x20 / +0x24 exactly, and the
+     * tail `or edx,-1; sub edx,ecx; add eax,edx` is `bucket - (mMask >> 1) - 1`.
+     * Everything reproduced below is what that body inlines *before* the fold;
+     * the fold itself already exists once, in
+     * `legacy/containers/HashMap.h`, and must not be duplicated here.
+     *
+     * `0x12` matches `OccupationCacheKey::mBytes`'s size and `0x7BEF2693` is
+     * `kOccupationKeySalt`, both read straight off `push 12h` /
+     * `push 7BEF2693h` at 0x0093208A / 0x00932085.
      */
-    [[nodiscard]] std::uint32_t HashOccupationKey(const OccupationCacheKey& key)
+    [[nodiscard]] std::size_t hash_value(const OccupationCacheKey& key)
     {
-        return gpg::HashBytes(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
+        const std::uint32_t keyHash =
+          gpg::HashBytes(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
+        return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(keyHash)));
+    }
+
+    /**
+     * Address: inlined at 0x00934C89 and 0x00934D84 (inside FUN_00934BE0);
+     *   no standalone emission exists for this key type
+     *
+     * What it does:
+     * MSVC8's `stdext::hash_value` for the subcluster cache key: the engine's
+     * `SubclusterData::Hash` followed by the same Park-Miller step. The
+     * binary shows the pair back to back - `call SubclusterData::Hash` then
+     * `call ldiv` with 127773, `imul edx,41A7h`, `imul eax,0B14h`, and the
+     * `add edx,7FFFFFFFh` sign fixup - once in the grow lane and once on the
+     * insert lane, because `_Buckno` is inlined into `insert` for this key
+     * type instead of being emitted out of line.
+     */
+    [[nodiscard]] std::size_t hash_value(const SubclusterCacheKey& key)
+    {
+        return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(HashSubclusterKey(key))));
     }
 
     struct OccupationKeyHash
     {
         [[nodiscard]] std::size_t operator()(const OccupationCacheKey& key) const noexcept
         {
-            return static_cast<std::size_t>(ScrambleParkMiller(HashOccupationKey(key)));
+            return hash_value(key);
         }
     };
 
@@ -2080,19 +2097,18 @@ namespace
         }
     };
 
-    struct SubclusterKeyHash
+    /**
+     * Strict weak ordering half of the subcluster cache's
+     * `stdext::hash_compare` traits: `msvc8::hash_map` keeps each bucket
+     * window sorted by this predicate, which is what lets `insert`
+     * (0x00934BE0) scan the window backwards and stop on the first key that
+     * does not compare greater.
+     */
+    struct SubclusterKeyOrder
     {
-        [[nodiscard]] std::size_t operator()(const SubclusterCacheKey& key) const noexcept
+        [[nodiscard]] bool operator()(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs) const
         {
-            return static_cast<std::size_t>(ScrambleParkMiller(HashSubclusterKey(key)));
-        }
-    };
-
-    struct SubclusterKeyEq
-    {
-        [[nodiscard]] bool operator()(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs) const noexcept
-        {
-            return !SubclusterKeyLess(lhs, rhs) && !SubclusterKeyLess(rhs, lhs);
+            return SubclusterKeyLess(lhs, rhs);
         }
     };
 
@@ -2318,7 +2334,7 @@ namespace
     {
         [[nodiscard]] std::size_t operator()(const std::uint16_t packedCoordinate) const noexcept
         {
-            return static_cast<std::size_t>(ScrambleParkMiller(static_cast<std::uint32_t>(packedCoordinate)));
+            return msvc8::hash_value(static_cast<long>(packedCoordinate));
         }
     };
 
@@ -3765,8 +3781,29 @@ namespace
 
     using OccupationCacheRuntimeMap =
         std::unordered_map<OccupationCacheKey, gpg::HaStar::Cluster::Data*, OccupationKeyHash, OccupationKeyEq>;
+
+    /**
+     * The subcluster half of `ClusterCache` as the binary actually builds it:
+     * MSVC8's `stdext::hash_map`, already recovered once as `msvc8::hash_map`
+     * (`legacy/containers/HashMap.h`) for the pathfinder node table. The
+     * cluster-cache emission is a second instantiation of that same template -
+     * every `this` displacement in 0x00934BE0 lines up slot for slot:
+     *
+     *   `lea ecx,[esi+4]`  -> `mList`      (list, +0x04 proxy / +0x08 head / +0x0C size)
+     *   `mov edi,[esi+14h]`-> `mVec._Myfirst`, `[esi+18h]` -> `mVec._Mylast`
+     *   `mov [esi+20h],eax`-> `mMask`
+     *   `add [esi+24h],1`  -> `mMaxidx`
+     *
+     * and the load-factor test at 0x00934BE8 (`[esi+0Ch] >> 2` against
+     * `[esi+24h]`) is `mMaxidx <= size() / bucket_size` with the MSVC8
+     * `bucket_size = 4`. `kInitialOccupationBucketSlotCount` (9) is the same
+     * `min_buckets + 1` this container seeds `mVec` with.
+     */
     using SubclusterCacheRuntimeMap =
-        std::unordered_map<SubclusterCacheKey, gpg::HaStar::Cluster::Data*, SubclusterKeyHash, SubclusterKeyEq>;
+        msvc8::hash_map<
+            SubclusterCacheKey,
+            gpg::HaStar::Cluster::Data*,
+            msvc8::hash_compare<SubclusterCacheKey, SubclusterKeyOrder>>;
 
     struct RuntimeClusterCacheStore
     {
@@ -4099,7 +4136,9 @@ namespace
      * Address: 0x00932C60 (FUN_00932C60, sub_932C60)
      *
      * What it does:
-     * Finds a subcluster-key cache entry.
+     * Finds a subcluster-key cache entry. 0x00932C60 is the subcluster-key
+     * emission of `msvc8::hash_map::find` - the same bucket-window walk
+     * 0x00932B70 performs for the occupation key.
      */
     [[nodiscard]] CacheLookupResult FindSubclusterCacheEntry(
         void* const cacheTreeBase,
@@ -4158,19 +4197,27 @@ namespace
 
     /**
      * Address: 0x00934BE0 (FUN_00934BE0, sub_934BE0)
-     * Address: 0x00934130 (FUN_00934130, subcluster-cache bucket-vector
-     *   resize template emission absorbed by std::map::emplace rewrite)
      *
      * What it does:
      * Inserts a subcluster-key cache entry and reports insertion status.
      *
-     * The binary used a hash-table-backed cache (bucket vector +
-     * intrusive node lists) whose grow path called the per-T
-     * `vector<bucket_ptr>::resize(n, default)` template emission
-     * (FUN_00934130, 4-byte stride). The recovered cache uses
-     * `std::map<SubclusterCacheKey, ClusterData*>::emplace` (RB-tree),
-     * so the bucket-vector resize helper is never invoked; its role
-     * is absorbed by the modern map-backed insert path.
+     * 0x00934BE0 is the subcluster-key emission of
+     * `msvc8::hash_map::insert(const value_type&)`: grow when
+     * `mMaxidx <= size() / 4`, locate the sorted insertion point by scanning
+     * the bucket window backwards, bail out with `{position, false}` on an
+     * equivalent key, otherwise link the node and retarget every bucket
+     * boundary that still names the displaced node. Calling it by name here
+     * is what emits the rest of that instantiation's out-of-line bodies:
+     *
+     *   0x00932FD0 - `msvc8::list<value_type>::insert`'s node buy
+     *                (`operator new(0x50)` = 8 link bytes + the 0x48-byte
+     *                `pair<const SubclusterCacheKey, Cluster::Data*>`),
+     *   0x009329A0 - the pair's placement copy-construct (an
+     *                `eh vector copy constructor iterator` over the 16
+     *                `Cluster` handles, then `mLevel` at +0x40 and the
+     *                mapped pointer at +0x44),
+     *   0x009333D0 - `msvc8::list::_Incsize`,
+     *   0x00934130 - `msvc8::vector<iterator>::resize(n, end())` from `_Grow`.
      */
     [[nodiscard]] CacheInsertResult InsertSubclusterCacheEntry(
         void* const cacheTreeBase,
@@ -4180,7 +4227,8 @@ namespace
     {
         RuntimeClusterCacheStore& store = RuntimeClusterCacheForBase(cacheTreeBase);
         const SubclusterCacheKey key = MakeSubclusterCacheKey(subclusterData);
-        const auto insertResult = store.mSubcluster.emplace(key, clusterData);
+        const auto insertResult =
+          store.mSubcluster.insert(SubclusterCacheRuntimeMap::value_type(key, clusterData));
         const auto it = insertResult.first;
         const bool inserted = insertResult.second;
         if (inserted) {
