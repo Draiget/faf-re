@@ -11,6 +11,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "lua/LuaObject.h"
+#include "lua/LuaTableIterator.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
@@ -105,6 +106,18 @@ namespace
   };
   constexpr const char* kPickBestFinalFormationIndexName = "PickBestFinalFormationIndex";
   constexpr int kFormationBucketCount = static_cast<int>(sizeof(kFormationBuckets) / sizeof(kFormationBuckets[0]));
+
+  /**
+   * The category-word universe lane is a 4-byte handle that the sim fills with
+   * the owning `RRuleGameRules` instance (`mov [slot+8], rules` at
+   * 0x00576960, later overwritten by `mov edx,[category]` at 0x00576A21). This
+   * keeps the one narrowing conversion in a single named place instead of
+   * spelling a pointer cast at the assignment site.
+   */
+  [[nodiscard]] std::uint32_t ToCategoryUniverseHandle(const RRuleGameRules* const gameRules) noexcept
+  {
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(gameRules));
+  }
 
   [[nodiscard]] int ToFormationBucketIndex(const EFormationType type)
   {
@@ -453,6 +466,147 @@ int moho::FORMATION_PickBestFormation(
 
   lua_settop(rawState, savedTop);
   return bestIndex;
+}
+
+/**
+ * Address: 0x00570390 (FUN_00570390, sub_570390)
+ *
+ * IDA signature:
+ * unsigned int *__usercall sub_570390@<eax>(
+ *     Moho::SFormationScriptSlot *first@<eax>, Moho::SFormationScriptSlot *last@<ebx>);
+ *
+ * What it does:
+ * Releases each slot's category word lane and rebinds it to the inline run:
+ * `if (words.start != words.origin) { delete[] words.start; words.start =
+ * words.origin; words.capacity = *words.origin; } words.finish = words.start;`
+ * - exactly the loop at 0x0057039A..0x005703C1 over a 0x38 stride.
+ */
+void moho::ReleaseFormationScriptSlotCategoryStorage(
+  SFormationScriptSlot* const first,
+  SFormationScriptSlot* const last
+) noexcept
+{
+  for (SFormationScriptSlot* slot = first; slot != last; ++slot) {
+    slot->mCategory.mBits.mWords.ResetStorageToInline();
+  }
+}
+
+/**
+ * Address: 0x00568320 (FUN_00568320, sub_568320)
+ *
+ * IDA signature:
+ * unsigned int __usercall sub_568320@<eax>(Moho::SFormationScriptResult *this@<esi>);
+ *
+ * What it does:
+ * Destroys the produced slots (0x00568327 `call sub_570390` over
+ * `[mObjs.start, mObjs.finish)`), then releases the slot vector's heap buffer
+ * and rebinds the lanes to the inline run.
+ */
+moho::SFormationScriptResult::~SFormationScriptResult()
+{
+  ReleaseFormationScriptSlotCategoryStorage(mObjs.begin(), mObjs.end());
+  mObjs.ResetStorageToInline();
+}
+
+/**
+ * Address: 0x00576690 (FUN_00576690)
+ * Mangled:
+ * ?FORMATION_RunScript@Moho@@YA?AUSFormationScriptResult@1@PAVLuaState@LuaPlus@@PAVRRuleGameRules@1@VStrArg@gpg@@ABVLuaObject@4@@Z
+ *
+ * IDA signature:
+ * Moho::SFormationScriptResult *__usercall Moho::FORMATION_RunScript@<eax>(
+ *     Moho::SFormationScriptResult *result,
+ *     Moho::RRuleGameRules *gameRules,
+ *     const char *scriptName,
+ *     LuaPlus::LuaObject *unitTable,
+ *     LuaPlus::LuaState *state@<ecx>);
+ *
+ * What it does:
+ * Imports `/lua/formations.lua`, resolves `scriptName` in it, and calls it with
+ * the caller's table of unit Lua objects. Every returned five-element tuple
+ * `{offsetX, offsetZ, category, weight, flag}` becomes one
+ * `SFormationScriptSlot`; the flag of the last well-formed tuple is what ends
+ * up in `mSuccess`. A missing module returns an empty result silently; a
+ * missing function, a script error, a non-table return value and a malformed
+ * tuple each warn and leave the slots produced so far untouched.
+ */
+moho::SFormationScriptResult moho::FORMATION_RunScript(
+  LuaPlus::LuaState* const state,
+  RRuleGameRules* const gameRules,
+  const gpg::StrArg scriptName,
+  const LuaPlus::LuaObject& unitTable
+)
+{
+  SFormationScriptResult result{};
+
+  // 0x00576716: the module lookup is the plain SCR_Import lane, and a
+  // non-table result returns an empty, unsuccessful descriptor *without* a
+  // warning - unlike the four sibling FORMATION_* entry points.
+  LuaPlus::LuaObject module = SCR_Import(state, kFormationModulePath);
+  if (!module.IsTable()) {
+    return result;
+  }
+
+  LuaPlus::LuaObject scriptFunc = module.GetByName(scriptName);
+  if (!scriptFunc.IsFunction()) {
+    gpg::Warnf("Could not find lua create formation function %s.", scriptName);
+    return result;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int savedTop = lua_gettop(rawState);
+
+  scriptFunc.PushStack(state);
+  unitTable.PushStack(state);
+  if (lua_call(rawState, 1, 1) != 0) {
+    const LuaPlus::LuaStackObject errorSlot(state, -1);
+    gpg::Warnf("Formation script %s threw an error:\n%s", scriptName, errorSlot.GetString());
+    lua_settop(rawState, savedTop);
+    return result;
+  }
+
+  {
+    const LuaPlus::LuaStackObject returnedSlot(state, -1);
+    LuaPlus::LuaObject slotTable(returnedSlot);
+    if (!slotTable.IsTable()) {
+      gpg::Warnf("Formation script did not retuan a table!");
+    } else {
+      for (LuaPlus::LuaTableIterator entryIt(slotTable, 1); entryIt.IsValid(); entryIt.Next()) {
+        LuaPlus::LuaObject entry = entryIt.GetValue();
+        if (!entry.IsTable() || entry.GetCount() != 5) {
+          gpg::Warnf("Error in the formation slot! Either not a table or num params != 5.");
+          continue;
+        }
+
+        // 0x00576952..0x00576991: the slot is seeded with the caller's rules
+        // pointer as the category universe handle before anything else; the
+        // category read below then overwrites it with the category's own.
+        SFormationScriptSlot slot{};
+        slot.mCategory.mUniverse.mWordUniverseHandle = ToCategoryUniverseHandle(gameRules);
+
+        slot.mOffset.x = static_cast<float>(entry[1].GetNumber());
+        slot.mOffset.z = static_cast<float>(entry[2].GetNumber());
+
+        const EntityCategorySet* const category = func_GetCObj_EntityCategory(entry[3]);
+        slot.mCategory.mUniverse = category->mUniverse;
+        slot.mCategory.mBits.mFirstWordIndex = category->mBits.mFirstWordIndex;
+        // 0x00576A39: `gpg::fastvector_uint::cpy` over the word lanes only -
+        // the two reserved dwords are deliberately not carried across.
+        (void)gpg::FastVectorRuntimeCopyAssign(
+          gpg::AsFastVectorRuntimeView<unsigned int>(&slot.mCategory.mBits.mWords),
+          gpg::AsFastVectorRuntimeView<unsigned int>(&category->mBits.mWords)
+        );
+
+        slot.mWeight = static_cast<float>(entry[4].GetNumber());
+        result.mSuccess = entry[5].GetBoolean();
+
+        result.mObjs.push_back(slot);
+      }
+    }
+  }
+
+  lua_settop(rawState, savedTop);
+  return result;
 }
 
 /**

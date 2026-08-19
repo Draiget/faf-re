@@ -1714,62 +1714,11 @@ namespace
     return node;
   }
 
-  struct FormationScriptSlotNestedVectorRuntimeView
-  {
-    std::uint8_t lane00_17[0x18]{};
-    std::uint32_t* nestedBegin = nullptr;        // +0x18
-    std::uint32_t* nestedEnd = nullptr;          // +0x1C
-    std::uint32_t* nestedCapacityEnd = nullptr;  // +0x20
-    std::uint32_t* nestedInlineMetadata = nullptr; // +0x24
-    std::uint8_t lane28_37[0x10]{};
-  };
-  static_assert(
-    offsetof(FormationScriptSlotNestedVectorRuntimeView, nestedBegin) == 0x18,
-    "FormationScriptSlotNestedVectorRuntimeView::nestedBegin offset must be 0x18"
-  );
-  static_assert(
-    offsetof(FormationScriptSlotNestedVectorRuntimeView, nestedEnd) == 0x1C,
-    "FormationScriptSlotNestedVectorRuntimeView::nestedEnd offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(FormationScriptSlotNestedVectorRuntimeView, nestedCapacityEnd) == 0x20,
-    "FormationScriptSlotNestedVectorRuntimeView::nestedCapacityEnd offset must be 0x20"
-  );
-  static_assert(
-    offsetof(FormationScriptSlotNestedVectorRuntimeView, nestedInlineMetadata) == 0x24,
-    "FormationScriptSlotNestedVectorRuntimeView::nestedInlineMetadata offset must be 0x24"
-  );
-  static_assert(
-    sizeof(FormationScriptSlotNestedVectorRuntimeView) == 0x38,
-    "FormationScriptSlotNestedVectorRuntimeView size must be 0x38"
-  );
-
-  /**
-   * Address: 0x00570390 (FUN_00570390, sub_570390)
-   *
-   * What it does:
-   * Resets nested fastvector lanes to inline-storage mode for each slot in
-   * `[beginSlot, endSlot)` by freeing heap-backed nested buffers when present
-   * and rebinding begin/end/capacity lanes to inline metadata.
-   */
-  [[maybe_unused]] std::uint32_t* ResetFormationScriptSlotNestedVectorsToInline(
-    FormationScriptSlotNestedVectorRuntimeView* beginSlot,
-    FormationScriptSlotNestedVectorRuntimeView* const endSlot
-  )
-  {
-    std::uint32_t* result = nullptr;
-    for (FormationScriptSlotNestedVectorRuntimeView* slot = beginSlot; slot != endSlot; ++slot) {
-      result = slot->nestedBegin;
-      if (result != slot->nestedInlineMetadata) {
-        ::operator delete[](result);
-        slot->nestedBegin = slot->nestedInlineMetadata;
-        result = *reinterpret_cast<std::uint32_t**>(slot->nestedInlineMetadata);
-        slot->nestedCapacityEnd = result;
-      }
-      slot->nestedEnd = slot->nestedBegin;
-    }
-    return result;
-  }
+  // `sub_570390`, the `SFormationScriptSlot` destroy-range, used to live here as
+  // an untyped 0x38-byte view (`FormationScriptSlotNestedVectorRuntimeView`)
+  // with no caller. Now that `SFormationScriptSlot` is a real type it is
+  // `moho::ReleaseFormationScriptSlotCategoryStorage`, declared in
+  // `moho/ai/IAiFormationDB.h` and invoked from `~SFormationScriptResult`.
 
   void EnsureCoordCacheHead(moho::SFormationCoordCacheMap& cache)
   {
@@ -3381,9 +3330,12 @@ namespace
     formation.CleanupFormation();
 
     // The binary executes CAiFormationInstance::UpdateFormation (0x00568CA0)
-    // here, immediately after CleanupFormation. It is not wired up yet: its
-    // callee CAiFormationInstance::RunScript (0x00567300) bottoms out in
-    // Moho::FORMATION_RunScript (0x00576690), which is still unrecovered.
+    // here, immediately after CleanupFormation. It is not wired up yet. The
+    // Lua leaf of that chain, Moho::FORMATION_RunScript (0x00576690), is now
+    // recovered in moho/ai/CAiFormationDBImpl.cpp; what is still missing is the
+    // chain between them: UpdateFormation (0x00568CA0) -> Setup (0x00568820) ->
+    // CAiFormationInstance::RunScript (0x00567300), plus PreRunScript
+    // (0x00566B10).
   }
 
   [[nodiscard]] bool IsBusyFormationQueueCommand(const moho::EUnitCommandType commandType) noexcept
