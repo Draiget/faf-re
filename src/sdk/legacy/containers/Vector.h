@@ -1555,6 +1555,9 @@ namespace msvc8
          * Address: 0x004430D0 (FUN_004430D0, forwarding lane)
          * Address: 0x00443B80 (FUN_00443B80)
          * Address: 0x0074DC40 (FUN_0074DC40, msvc8::vector<Moho::CArmyImpl*>::resize)
+         * Address: 0x005EA3F0 (FUN_005EA3F0, SEH-wrapped entry lane)
+         * Address: 0x005EAF30 (FUN_005EAF30, msvc8::vector<Moho::SAiReservedTransportBone>::resize)
+         * Address: 0x005EA590 (FUN_005EA590, grow/insert-tail helper)
          *
          * What it does:
          * Resizes logical element count to `newSize` by erasing tail elements when
@@ -1562,7 +1565,14 @@ namespace msvc8
          * stride binary specialization at `0x0074DC40` is the
          * `std::vector<CArmyImpl*>::resize` emission used by `Moho::Sim::SerArmies`
          * (line `mArmiesList.resize(...)`) and `Moho::Sim::CreateArmies` — these
-         * sites invoke this method by name through the `msvc8::vector<T>` API.
+         * sites invoke this method by name through the `msvc8::vector<T>` API. The
+         * 0x20-byte stride specialization at `0x005EAF30` (`SAiReservedTransportBone`,
+         * reached through the SEH-wrapped call-site lane at `0x005EA3F0`) is the
+         * `RVectorType<SAiReservedTransportBone>` reflection SetCount emission; its
+         * own grow path (`0x005EA590`) matches this method's `reallocate_to`/
+         * `uninit_value_construct_n` shape exactly (same doubling-growth and
+         * default-construct-new-slots behavior), just compiled with the extra SEH
+         * landing pad MSVC emits when element construction can throw.
          */
         void resize(std::size_t newSize) {
             const std::size_t cur = size();
