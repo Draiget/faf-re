@@ -44,6 +44,19 @@ namespace gpg::gal
      * entry already maps `key` to `value`. The binary emits one specialization
      * per state-table flavor; modern C++ template instantiation collapses them
      * back into a single source helper.
+     *
+     * The 2007 binary backed this cache with `std::map<K,V>` (RB-tree), not a
+     * hash table - `map[key] = value` for the texture-stage specialization
+     * (0x00949D40) compiles down to `std::map<...>::operator[]`'s own
+     * find-or-default-insert machinery: `FUN_00949C10` (RB-tree descend;
+     * returns the existing slot on a hit, else calls the insert core) and
+     * `FUN_009499C0` (the insert-hint core; its own callees - `FUN_009492B0`,
+     * `FUN_00949620` external, `FUN_00948930`, and `FUN_009468D0` "redundant
+     * std::map<...>::_Tree internal emission" per its own skip note - are all
+     * already terminal). `std::unordered_map::operator[]` here is the same
+     * find-or-default-insert contract with a different underlying data
+     * structure; behavior is identical, so this modern rewrite already
+     * absorbs both binary helpers' role.
      */
     template <typename MapT, typename KeyT, typename ValueT>
     bool CacheValue(MapT& map, const KeyT key, const ValueT value)
