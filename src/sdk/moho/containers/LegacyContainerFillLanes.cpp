@@ -359,7 +359,7 @@ namespace
    * Runs scalar-delete destruction for one small-buffer array owner lane.
    * It resets heap-backed storage to inline storage and releases the shared owner.
    */
-  [[maybe_unused]] SmallBufferArrayRuntimeView* DestroySmallBufferArrayOwnerScalar(
+  SmallBufferArrayRuntimeView* DestroySmallBufferArrayOwnerScalar(
     SmallBufferArrayRuntimeView* const self,
     const std::uint8_t deleteFlag
   ) noexcept
@@ -439,7 +439,7 @@ namespace
    * What it does:
    * Returns the minimum scalar across five float lanes.
    */
-  [[maybe_unused]] float MinOfFiveFloatLanes(
+  float MinOfFiveFloatLanes(
     const float lane0,
     float lane1,
     const float lane2,
@@ -470,7 +470,7 @@ namespace
    * What it does:
    * Returns the maximum scalar across five float lanes.
    */
-  [[maybe_unused]] float MaxOfFiveFloatLanes(
+  float MaxOfFiveFloatLanes(
     const float lane0,
     float lane1,
     const float lane2,
@@ -501,7 +501,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x120`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteAt120(const ByteAt120RuntimeView* const source) noexcept
+  std::uint8_t ReadByteAt120(const ByteAt120RuntimeView* const source) noexcept
   {
     return source->lane120;
   }
@@ -512,7 +512,7 @@ namespace
    * What it does:
    * Stores one scalar dword into lane `+0x04`.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* StoreWordAtOffset4(
+  DwordPairLaneRuntimeView* StoreWordAtOffset4(
     DwordPairLaneRuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -527,7 +527,7 @@ namespace
    * What it does:
    * Stores one scalar dword into lane `+0x28`.
    */
-  [[maybe_unused]] WordAt28RuntimeView* StoreWordAtOffset28(
+  WordAt28RuntimeView* StoreWordAtOffset28(
     WordAt28RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -542,7 +542,7 @@ namespace
    * What it does:
    * Stores one scalar float into lane `+0x0C`.
    */
-  [[maybe_unused]] FloatAt0CRuntimeView* StoreFloatAtOffset0C(
+  FloatAt0CRuntimeView* StoreFloatAtOffset0C(
     FloatAt0CRuntimeView* const outValue,
     const float value
   ) noexcept
@@ -685,7 +685,7 @@ namespace
    * What it does:
    * Computes `base + index * 4` and stores the result dword in `outValue`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride4ByteOffset(
+  std::uint32_t* ComputeStride4ByteOffset(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -701,7 +701,7 @@ namespace
    * What it does:
    * Computes `base + index * 40` and stores the result dword in `outValue`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride40ByteOffset(
+  std::uint32_t* ComputeStride40ByteOffset(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -718,7 +718,7 @@ namespace
    * Swaps the three trailing dword lanes (`+0x04`, `+0x08`, `+0x0C`) between
    * two 16-byte lane blocks.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanesPrimary(
+  std::uint32_t* SwapTrailingTripletLanesPrimary(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -733,7 +733,7 @@ namespace
    * Secondary entrypoint for swapping trailing dword triplet lanes between
    * two 16-byte lane blocks.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanesSecondary(
+  std::uint32_t* SwapTrailingTripletLanesSecondary(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -747,7 +747,7 @@ namespace
    * What it does:
    * Swaps one leading dword lane between two word slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapLeadingWordLanePrimary(
+  std::uint32_t* SwapLeadingWordLanePrimary(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -761,7 +761,7 @@ namespace
    * What it does:
    * Secondary entrypoint for swapping one leading dword lane.
    */
-  [[maybe_unused]] std::uint32_t* SwapLeadingWordLaneSecondary(
+  std::uint32_t* SwapLeadingWordLaneSecondary(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -775,7 +775,7 @@ namespace
    * What it does:
    * Copies the first dword at `*source->lane04` into `outValue`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLaneA(
+  std::uint32_t* CopyFirstIndirectWordLaneA(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -789,7 +789,7 @@ namespace
    * What it does:
    * Secondary entrypoint for copying the first dword at `*source->lane04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLaneB(
+  std::uint32_t* CopyFirstIndirectWordLaneB(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -804,7 +804,7 @@ namespace
    * Initializes a self-relative span header with begin/cursor/lane0C pointing
    * at `this + 0x10`, and end pointing at `this + 0x80`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeader(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeader(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -822,7 +822,7 @@ namespace
    * What it does:
    * Zeros both dword lanes of a `{word,word}` pair.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* ZeroDwordPairLanePrimary(
+  DwordPairLaneRuntimeView* ZeroDwordPairLanePrimary(
     DwordPairLaneRuntimeView* const outValue
   ) noexcept
   {
@@ -837,7 +837,7 @@ namespace
    * What it does:
    * Advances one pointer slot to its current node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlotPrimary(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlotPrimary(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -848,7 +848,7 @@ namespace
    * What it does:
    * Tertiary entrypoint for copying the first dword at `*source->lane04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLaneC(
+  std::uint32_t* CopyFirstIndirectWordLaneC(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -863,7 +863,7 @@ namespace
    * Pops one intrusive node head from `headSlot`, writes the popped node
    * address to `outNodeAddress`, and advances `headSlot` to `node->next`.
    */
-  [[maybe_unused]] std::uint32_t* PopLinkedWordHeadNode(
+  std::uint32_t* PopLinkedWordHeadNode(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -880,7 +880,7 @@ namespace
    * What it does:
    * Secondary entrypoint for advancing one pointer slot to node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlotSecondary(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlotSecondary(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -891,7 +891,7 @@ namespace
    * What it does:
    * Copies one `{dword,byte}` pair from separate source lanes.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairPrimary(
+  DwordBytePairLane* CopyDwordBytePairPrimary(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const wordValue,
     const std::uint8_t* const byteValue
@@ -906,7 +906,7 @@ namespace
    * What it does:
    * Fourth entrypoint for copying the first dword at `*source->lane04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLaneD(
+  std::uint32_t* CopyFirstIndirectWordLaneD(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -920,7 +920,7 @@ namespace
    * What it does:
    * Fifth entrypoint for copying the first dword at `*source->lane04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLaneE(
+  std::uint32_t* CopyFirstIndirectWordLaneE(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -934,7 +934,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroSingleWordLanePrimary(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroSingleWordLanePrimary(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -945,7 +945,7 @@ namespace
    * What it does:
    * Secondary entrypoint for zeroing one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroSingleWordLaneSecondary(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroSingleWordLaneSecondary(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -956,7 +956,7 @@ namespace
    * What it does:
    * Secondary entrypoint for copying one `{dword,byte}` pair.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairSecondary(
+  DwordBytePairLane* CopyDwordBytePairSecondary(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const wordValue,
     const std::uint8_t* const byteValue
@@ -972,7 +972,7 @@ namespace
    * Packs five dword lanes plus two trailing byte flags into one 0x16-byte
    * runtime record.
    */
-  [[maybe_unused]] FiveWordAndTwoFlagsRuntimeView* StoreFiveWordAndTwoFlagRecord(
+  FiveWordAndTwoFlagsRuntimeView* StoreFiveWordAndTwoFlagRecord(
     FiveWordAndTwoFlagsRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t* const pairSource,
@@ -1106,7 +1106,7 @@ namespace
    * What it does:
    * Advances one pointer slot to its current node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlot739C00(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlot739C00(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -1118,7 +1118,7 @@ namespace
    * What it does:
    * Returns one dword-address lane at `*source + 8`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeWordAddressPlus8LaneA(const std::uint32_t* const source) noexcept
+  std::uint32_t* ComputeWordAddressPlus8LaneA(const std::uint32_t* const source) noexcept
   {
     return ComputeWordAddressPlus8(source);
   }
@@ -1129,7 +1129,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlot739C30(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlot739C30(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -1140,7 +1140,7 @@ namespace
    * What it does:
    * Initializes one self-relative span header with tail anchor at `+0x4C0`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail4C0(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail4C0(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -1153,7 +1153,7 @@ namespace
    * What it does:
    * Initializes one self-relative span header with tail anchor at `+0x970`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail970(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail970(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -1166,7 +1166,7 @@ namespace
    * What it does:
    * Copies the first dword at `*source->lane04` into `outValue`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLane739D30(
+  std::uint32_t* CopyFirstIndirectWordLane739D30(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -1180,7 +1180,7 @@ namespace
    * What it does:
    * Alias lane returning one dword-address at `*source + 8`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeWordAddressPlus8LaneB(const std::uint32_t* const source) noexcept
+  std::uint32_t* ComputeWordAddressPlus8LaneB(const std::uint32_t* const source) noexcept
   {
     return ComputeWordAddressPlus8(source);
   }
@@ -1191,7 +1191,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlot739ED0(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlot739ED0(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -1202,7 +1202,7 @@ namespace
    * What it does:
    * Alias lane returning one dword-address at `*source + 8`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeWordAddressPlus8LaneC(const std::uint32_t* const source) noexcept
+  std::uint32_t* ComputeWordAddressPlus8LaneC(const std::uint32_t* const source) noexcept
   {
     return ComputeWordAddressPlus8(source);
   }
@@ -1213,7 +1213,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlot739F10(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlot739F10(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -1224,7 +1224,7 @@ namespace
    * What it does:
    * Copies one dword from `source` into `destination` when destination is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordIfDestinationNonNullA(
+  std::uint32_t* CopySingleWordIfDestinationNonNullA(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1238,7 +1238,7 @@ namespace
    * What it does:
    * Alias lane for guarded single-word copy.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordIfDestinationNonNullB(
+  std::uint32_t* CopySingleWordIfDestinationNonNullB(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1253,7 +1253,7 @@ namespace
    * Pops one intrusive node head from `headSlot`, writes popped node address
    * to `outNodeAddress`, then advances `headSlot` to `node->next`.
    */
-  [[maybe_unused]] std::uint32_t* PopLinkedWordHeadNode73A270(
+  std::uint32_t* PopLinkedWordHeadNode73A270(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -1267,7 +1267,7 @@ namespace
    * What it does:
    * Alias lane for guarded single-word copy.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordIfDestinationNonNullC(
+  std::uint32_t* CopySingleWordIfDestinationNonNullC(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1281,7 +1281,7 @@ namespace
    * What it does:
    * Copies one two-dword pair from `source` when destination is non-null.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* CopyWordPairIfDestinationNonNullA(
+  DwordPairLaneRuntimeView* CopyWordPairIfDestinationNonNullA(
     DwordPairLaneRuntimeView* const destination,
     const DwordPairLaneRuntimeView* const source
   ) noexcept
@@ -1295,7 +1295,7 @@ namespace
    * What it does:
    * Alias lane for guarded single-word copy.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordIfDestinationNonNullD(
+  std::uint32_t* CopySingleWordIfDestinationNonNullD(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1309,7 +1309,7 @@ namespace
    * What it does:
    * Alias lane for guarded single-word copy.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordIfDestinationNonNullE(
+  std::uint32_t* CopySingleWordIfDestinationNonNullE(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1323,7 +1323,7 @@ namespace
    * What it does:
    * Alias lane for guarded single-word copy.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordIfDestinationNonNullF(
+  std::uint32_t* CopySingleWordIfDestinationNonNullF(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -1337,7 +1337,7 @@ namespace
    * What it does:
    * Alias lane for guarded two-dword pair copy.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* CopyWordPairIfDestinationNonNullB(
+  DwordPairLaneRuntimeView* CopyWordPairIfDestinationNonNullB(
     DwordPairLaneRuntimeView* const destination,
     const DwordPairLaneRuntimeView* const source
   ) noexcept
@@ -1351,7 +1351,7 @@ namespace
    * What it does:
    * Returns true when all four float lanes are exactly equal.
    */
-  [[maybe_unused]] BOOL AreFloat4LanesExactlyEqual(
+  BOOL AreFloat4LanesExactlyEqual(
     const Float4RuntimeView* const lhs,
     const Float4RuntimeView* const rhs
   ) noexcept
@@ -1365,7 +1365,7 @@ namespace
    * What it does:
    * Computes one byte address lane as `baseAddress + index * 16`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride16AddressLane(
+  std::uint32_t ComputeStride16AddressLane(
     const std::int32_t index,
     const std::uint32_t baseAddress
   ) noexcept
@@ -1379,7 +1379,7 @@ namespace
    * What it does:
    * Stores one dword subtraction lane `*source - subtractValue`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSubtractedWordLane(
+  std::uint32_t* StoreSubtractedWordLane(
     std::uint32_t* const outValue,
     const std::uint32_t* const source,
     const std::int32_t subtractValue
@@ -1395,7 +1395,7 @@ namespace
    * What it does:
    * Stores one source dword into `outValue`, then increments the source dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreWordAndPostIncrementSource(
+  std::uint32_t* StoreWordAndPostIncrementSource(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -1412,7 +1412,7 @@ namespace
    * What it does:
    * Zeros one 16-byte quad-dword lane.
    */
-  [[maybe_unused]] DwordQuadLaneRuntimeView* ZeroDwordQuadLane(
+  DwordQuadLaneRuntimeView* ZeroDwordQuadLane(
     DwordQuadLaneRuntimeView* const outValue
   ) noexcept
   {
@@ -1429,7 +1429,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteAt4(const ByteAt4RuntimeView* const source) noexcept
+  std::uint8_t ReadByteAt4(const ByteAt4RuntimeView* const source) noexcept
   {
     return source->lane04;
   }
@@ -1440,7 +1440,7 @@ namespace
    * What it does:
    * Copies one source dword to `outValue` and clears source to zero.
    */
-  [[maybe_unused]] std::uint32_t* TakeWordAndClearPrimary(
+  std::uint32_t* TakeWordAndClearPrimary(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -1454,7 +1454,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword and clearing it to zero.
    */
-  [[maybe_unused]] std::uint32_t* TakeWordAndClearSecondary(
+  std::uint32_t* TakeWordAndClearSecondary(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -1468,7 +1468,7 @@ namespace
    * What it does:
    * Returns one dword lane and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearWordLanePrimary(std::uint32_t* const lane) noexcept
+  std::uint32_t TakeAndClearWordLanePrimary(std::uint32_t* const lane) noexcept
   {
     return TakeAndClearWordLane(lane);
   }
@@ -1479,7 +1479,7 @@ namespace
    * What it does:
    * Alias lane returning one dword and clearing it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearWordLaneSecondary(std::uint32_t* const lane) noexcept
+  std::uint32_t TakeAndClearWordLaneSecondary(std::uint32_t* const lane) noexcept
   {
     return TakeAndClearWordLane(lane);
   }
@@ -1490,7 +1490,7 @@ namespace
    * What it does:
    * Swaps two dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* SwapWordPairLanes740320(
+  DwordPairLaneRuntimeView* SwapWordPairLanes740320(
     DwordPairLaneRuntimeView* const lhs,
     DwordPairLaneRuntimeView* const rhs
   ) noexcept
@@ -1563,7 +1563,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane7517D0(
+  std::uint32_t* SwapSingleWordLane7517D0(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1577,7 +1577,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane751820(
+  std::uint32_t* SwapSingleWordLane751820(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1592,7 +1592,7 @@ namespace
    * Swaps trailing dword triplet lanes (`+0x04`, `+0x08`, `+0x0C`) between
    * two 16-byte lane blocks.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes751830(
+  std::uint32_t* SwapTrailingTripletLanes751830(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1606,7 +1606,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes752140(
+  std::uint32_t* SwapTrailingTripletLanes752140(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1620,7 +1620,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes752170(
+  std::uint32_t* SwapTrailingTripletLanes752170(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1634,7 +1634,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes7521A0(
+  std::uint32_t* SwapTrailingTripletLanes7521A0(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1648,7 +1648,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes7521D0(
+  std::uint32_t* SwapTrailingTripletLanes7521D0(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1662,7 +1662,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes752200(
+  std::uint32_t* SwapTrailingTripletLanes752200(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1676,7 +1676,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes752230(
+  std::uint32_t* SwapTrailingTripletLanes752230(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1690,7 +1690,7 @@ namespace
    * What it does:
    * Alias lane for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanes752260(
+  std::uint32_t* SwapTrailingTripletLanes752260(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -1704,7 +1704,7 @@ namespace
    * What it does:
    * Swaps two dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* SwapWordPairLanes752290(
+  DwordPairLaneRuntimeView* SwapWordPairLanes752290(
     DwordPairLaneRuntimeView* const lhs,
     DwordPairLaneRuntimeView* const rhs
   ) noexcept
@@ -1718,7 +1718,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane7544C0(
+  std::uint32_t* SwapSingleWordLane7544C0(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1729,7 +1729,7 @@ namespace
   /**
    * Address: 0x007544E0 (FUN_007544E0)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane7544E0(
+  std::uint32_t* SwapSingleWordLane7544E0(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1740,7 +1740,7 @@ namespace
   /**
    * Address: 0x00754500 (FUN_00754500)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane754500(
+  std::uint32_t* SwapSingleWordLane754500(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1751,7 +1751,7 @@ namespace
   /**
    * Address: 0x00754520 (FUN_00754520)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane754520(
+  std::uint32_t* SwapSingleWordLane754520(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1762,7 +1762,7 @@ namespace
   /**
    * Address: 0x00754540 (FUN_00754540)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane754540(
+  std::uint32_t* SwapSingleWordLane754540(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1773,7 +1773,7 @@ namespace
   /**
    * Address: 0x00754560 (FUN_00754560)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane754560(
+  std::uint32_t* SwapSingleWordLane754560(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1784,7 +1784,7 @@ namespace
   /**
    * Address: 0x00754580 (FUN_00754580)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane754580(
+  std::uint32_t* SwapSingleWordLane754580(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1795,7 +1795,7 @@ namespace
   /**
    * Address: 0x00754590 (FUN_00754590)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane754590(
+  std::uint32_t* SwapSingleWordLane754590(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -1809,7 +1809,7 @@ namespace
    * What it does:
    * Stores one dword into lane `+0x0A68`.
    */
-  [[maybe_unused]] DwordAt2664RuntimeView* StoreWordAtOffset2664(
+  DwordAt2664RuntimeView* StoreWordAtOffset2664(
     DwordAt2664RuntimeView* const object,
     const std::uint32_t value
   ) noexcept
@@ -1824,7 +1824,7 @@ namespace
    * What it does:
    * Stores one byte into lane `+0x1F8`.
    */
-  [[maybe_unused]] ByteAt504RuntimeView* StoreByteAtOffset504(
+  ByteAt504RuntimeView* StoreByteAtOffset504(
     ByteAt504RuntimeView* const object,
     const std::uint8_t value
   ) noexcept
@@ -1839,7 +1839,7 @@ namespace
    * What it does:
    * Stores one word from `sourceA` and one word from `sourceB` into a pair lane.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* CopyFromTwoIndependentWordSources75F100(
+  DwordPairLaneRuntimeView* CopyFromTwoIndependentWordSources75F100(
     DwordPairLaneRuntimeView* const outValue,
     const std::uint32_t* const sourceA,
     const std::uint32_t* const sourceB
@@ -1854,7 +1854,7 @@ namespace
    * What it does:
    * Computes one address lane as `*base + index * 8`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride8ByteOffset75FB10(
+  std::uint32_t* ComputeStride8ByteOffset75FB10(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -1869,7 +1869,7 @@ namespace
    * What it does:
    * Computes one address lane as `*base + index * 12`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride12ByteOffset75FB50(
+  std::uint32_t* ComputeStride12ByteOffset75FB50(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -1884,7 +1884,7 @@ namespace
    * What it does:
    * Fills `[begin,end)` pair lanes with one constant two-word source payload.
    */
-  [[maybe_unused]] std::uint32_t* FillWordPairRangeWithConstant760020(
+  std::uint32_t* FillWordPairRangeWithConstant760020(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* const sourcePair
@@ -1899,7 +1899,7 @@ namespace
    * What it does:
    * Alias lane storing one word from each of two independent sources.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* CopyFromTwoIndependentWordSources760470(
+  DwordPairLaneRuntimeView* CopyFromTwoIndependentWordSources760470(
     DwordPairLaneRuntimeView* const outValue,
     const std::uint32_t* const sourceA,
     const std::uint32_t* const sourceB
@@ -1914,7 +1914,7 @@ namespace
    * What it does:
    * Alias lane for swapping two dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* SwapWordPairLanes760550(
+  DwordPairLaneRuntimeView* SwapWordPairLanes760550(
     DwordPairLaneRuntimeView* const lhs,
     DwordPairLaneRuntimeView* const rhs
   ) noexcept
@@ -1928,7 +1928,7 @@ namespace
    * What it does:
    * Alias lane for swapping two dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* SwapWordPairLanes760700(
+  DwordPairLaneRuntimeView* SwapWordPairLanes760700(
     DwordPairLaneRuntimeView* const lhs,
     DwordPairLaneRuntimeView* const rhs
   ) noexcept
@@ -1942,7 +1942,7 @@ namespace
    * What it does:
    * Alias lane for swapping two dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* SwapWordPairLanes760830(
+  DwordPairLaneRuntimeView* SwapWordPairLanes760830(
     DwordPairLaneRuntimeView* const lhs,
     DwordPairLaneRuntimeView* const rhs
   ) noexcept
@@ -1956,7 +1956,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane7609D0(
+  std::uint32_t* SwapSingleWordLane7609D0(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -2058,7 +2058,7 @@ namespace
    * What it does:
    * Advances one pointer slot to its current node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlot769DA0(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlot769DA0(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -2069,7 +2069,7 @@ namespace
    * What it does:
    * Copies one `{dword,byte}` pair from separate source lanes.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePair769DE0(
+  DwordBytePairLane* CopyDwordBytePair769DE0(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const wordValue,
     const std::uint8_t* const byteValue
@@ -2084,7 +2084,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroSingleWordLane76A1F0(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroSingleWordLane76A1F0(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -2095,7 +2095,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlot76A200(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlot76A200(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -2106,7 +2106,7 @@ namespace
    * What it does:
    * Computes one address lane as `*base + index * 12`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride12ByteOffset76A240(
+  std::uint32_t* ComputeStride12ByteOffset76A240(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -2121,7 +2121,7 @@ namespace
    * What it does:
    * Computes one address lane as `*base + index * 4`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride4ByteOffset76A280(
+  std::uint32_t* ComputeStride4ByteOffset76A280(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -2136,7 +2136,7 @@ namespace
    * What it does:
    * Copies the first dword at `*source->lane04` into `outValue`.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordLane76A290(
+  std::uint32_t* CopyFirstIndirectWordLane76A290(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -2151,7 +2151,7 @@ namespace
    * Pops one intrusive node head from `headSlot`, writes the popped node
    * address to `outNodeAddress`, and advances `headSlot` to `node->next`.
    */
-  [[maybe_unused]] std::uint32_t* PopLinkedWordHeadNode76A3E0(
+  std::uint32_t* PopLinkedWordHeadNode76A3E0(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -2165,7 +2165,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane76B510(
+  std::uint32_t* SwapSingleWordLane76B510(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -2179,7 +2179,7 @@ namespace
    * What it does:
    * Copies the dword pair at offsets `+0x04/+0x08` from `source` to `destination`.
    */
-  [[maybe_unused]] DwordTripleLaneRuntimeView* CopyTailWordPairFromTriple(
+  DwordTripleLaneRuntimeView* CopyTailWordPairFromTriple(
     DwordTripleLaneRuntimeView* const destination,
     const DwordTripleLaneRuntimeView* const source
   ) noexcept
@@ -2196,7 +2196,7 @@ namespace
    * Resolves one dword table pointer at `(*ownerSlot)->+0x1C` and returns
    * `table[indexSource->+0x2C]`.
    */
-  [[maybe_unused]] std::uint32_t LoadIndexedWordFromNestedTable(
+  std::uint32_t LoadIndexedWordFromNestedTable(
     const IndexedWordLaneAt44RuntimeView* const indexSource,
     const TablePointerAt28RuntimeView* const* const ownerSlot
   ) noexcept
@@ -2211,7 +2211,7 @@ namespace
    * What it does:
    * Computes one byte address lane as `baseAt4 + index * 12`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride12AddressFromBaseAt4(
+  std::uint32_t ComputeStride12AddressFromBaseAt4(
     const std::int32_t index,
     const DwordPairLaneRuntimeView* const source
   ) noexcept
@@ -2222,7 +2222,7 @@ namespace
   /**
    * Address: 0x0076CB20 (FUN_0076CB20)
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride4ByteOffset76CB20(
+  std::uint32_t* ComputeStride4ByteOffset76CB20(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -2234,7 +2234,7 @@ namespace
   /**
    * Address: 0x0076CB40 (FUN_0076CB40)
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride12ByteOffset76CB40(
+  std::uint32_t* ComputeStride12ByteOffset76CB40(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -2249,7 +2249,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x18`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteAt24(const ByteAt24RuntimeView* const source) noexcept
+  std::uint8_t ReadByteAt24(const ByteAt24RuntimeView* const source) noexcept
   {
     return source->lane18;
   }
@@ -2257,7 +2257,7 @@ namespace
   /**
    * Address: 0x0076E880 (FUN_0076E880)
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleWordLane76E880(
+  std::uint32_t* SwapSingleWordLane76E880(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -2272,7 +2272,7 @@ namespace
    * Unlinks one forward-link node from its current owner slot and re-inserts
    * it at owner lane `ownerBase + 0x58`.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntimeView* RelinkForwardNodeToOwnerOffset58(
+  ForwardLinkNodeRuntimeView* RelinkForwardNodeToOwnerOffset58(
     ForwardLinkNodeRuntimeView* const node,
     std::byte* const ownerBase
   ) noexcept
@@ -2289,7 +2289,7 @@ namespace
    * What it does:
    * Unlinks one forward-link node and restores self-links.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntimeView* UnlinkAndSelfLinkForwardNode(
+  ForwardLinkNodeRuntimeView* UnlinkAndSelfLinkForwardNode(
     ForwardLinkNodeRuntimeView* const node
   ) noexcept
   {
@@ -2303,7 +2303,7 @@ namespace
    * What it does:
    * Zeros the first three dword lanes of one runtime block.
    */
-  [[maybe_unused]] DwordTripleLaneRuntimeView* ZeroDwordTripleLane773230(
+  DwordTripleLaneRuntimeView* ZeroDwordTripleLane773230(
     DwordTripleLaneRuntimeView* const outValue
   ) noexcept
   {
@@ -2319,7 +2319,7 @@ namespace
    * What it does:
    * Initializes link lanes to self and zeroes four trailing dword lanes.
    */
-  [[maybe_unused]] LinkAndFourWordLanesRuntimeView* InitializeSelfLinkedAndZeroTail(
+  LinkAndFourWordLanesRuntimeView* InitializeSelfLinkedAndZeroTail(
     LinkAndFourWordLanesRuntimeView* const outValue
   ) noexcept
   {
@@ -2338,7 +2338,7 @@ namespace
    * What it does:
    * Copies one source dword pair into destination lanes `+0x08` and `+0x0C`.
    */
-  [[maybe_unused]] std::uint32_t CopyWordPairToDestinationOffset8(
+  std::uint32_t CopyWordPairToDestinationOffset8(
     const DwordPairLaneRuntimeView* const source,
     DwordPairAt8RuntimeView* const destination
   ) noexcept
@@ -2354,7 +2354,7 @@ namespace
    * What it does:
    * Reads one indexed dword lane from array base at offset `+0x10`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWordFromOffset16(
+  std::uint32_t ReadIndexedWordFromOffset16(
     const IndexedWordsFrom16RuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -2368,7 +2368,7 @@ namespace
    * What it does:
    * Initializes one forward-link node to self-links.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntimeView* SelfLinkForwardNode773AB0(
+  ForwardLinkNodeRuntimeView* SelfLinkForwardNode773AB0(
     ForwardLinkNodeRuntimeView* const node
   ) noexcept
   {
@@ -2381,7 +2381,7 @@ namespace
    * What it does:
    * Unlinks one forward-link node, self-links it, then inserts it at `slot`.
    */
-  [[maybe_unused]] ForwardLinkNodeRuntimeView* RelinkForwardNodeAtExternalSlot(
+  ForwardLinkNodeRuntimeView* RelinkForwardNodeAtExternalSlot(
     ForwardLinkNodeRuntimeView* const node,
     ForwardLinkNodeRuntimeView** const slot
   ) noexcept
@@ -2394,7 +2394,7 @@ namespace
   /**
    * Address: 0x00773B30 (FUN_00773B30)
    */
-  [[maybe_unused]] ForwardLinkNodeRuntimeView* UnlinkAndSelfLinkForwardNode773B30(
+  ForwardLinkNodeRuntimeView* UnlinkAndSelfLinkForwardNode773B30(
     ForwardLinkNodeRuntimeView* const node
   ) noexcept
   {
@@ -2404,7 +2404,7 @@ namespace
   /**
    * Address: 0x00773B50 (FUN_00773B50)
    */
-  [[maybe_unused]] ForwardLinkNodeRuntimeView* SelfLinkForwardNode773B50(
+  ForwardLinkNodeRuntimeView* SelfLinkForwardNode773B50(
     ForwardLinkNodeRuntimeView* const node
   ) noexcept
   {
@@ -2417,7 +2417,7 @@ namespace
    * What it does:
    * Initializes one self-relative span header with tail anchor at `+0x18`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail18_773BB0(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail18_773BB0(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -2430,7 +2430,7 @@ namespace
    * What it does:
    * Alias lane for zeroing one dword.
    */
-  [[maybe_unused]] std::uint32_t* ZeroSingleWordLane775BE0(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroSingleWordLane775BE0(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -2456,7 +2456,7 @@ namespace
    * What it does:
    * Composes one five-word lane and clears two trailing flag bytes.
    */
-  [[maybe_unused]] [[nodiscard]] FiveWordAndTwoFlagsRuntimeView* ComposeFiveWordAndTwoFlagsLane(
+  [[nodiscard]] FiveWordAndTwoFlagsRuntimeView* ComposeFiveWordAndTwoFlagsLane(
     FiveWordAndTwoFlagsRuntimeView* const outValue,
     const std::uint32_t lane00,
     const DwordPairLaneRuntimeView* const sourcePair,
@@ -2480,7 +2480,7 @@ namespace
    * What it does:
    * Writes `{object_address, object->lane0C80}` into one two-word output lane.
    */
-  [[maybe_unused]] [[nodiscard]] DwordPairLaneRuntimeView* ComposeObjectAndWideTailLane0C80(
+  [[nodiscard]] DwordPairLaneRuntimeView* ComposeObjectAndWideTailLane0C80(
     DwordPairLaneRuntimeView* const outValue,
     const WideTailPairAccessorRuntimeView* const source
   ) noexcept
@@ -2496,7 +2496,7 @@ namespace
    * What it does:
    * Writes `{object_address, object->lane0C84}` into one two-word output lane.
    */
-  [[maybe_unused]] [[nodiscard]] DwordPairLaneRuntimeView* ComposeObjectAndWideTailLane0C84(
+  [[nodiscard]] DwordPairLaneRuntimeView* ComposeObjectAndWideTailLane0C84(
     DwordPairLaneRuntimeView* const outValue,
     const WideTailPairAccessorRuntimeView* const source
   ) noexcept
@@ -2512,7 +2512,7 @@ namespace
    * What it does:
    * Initializes one four-lane dword span view with `count * 4` byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] DwordSpanRuntimeView* InitializeDwordSpanStride4(
+  [[nodiscard]] DwordSpanRuntimeView* InitializeDwordSpanStride4(
     DwordSpanRuntimeView* const outSpan,
     const std::int32_t count,
     const std::uint32_t beginAddress
@@ -2531,7 +2531,7 @@ namespace
    * What it does:
    * Initializes one four-lane dword span view with `count * 24` byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] DwordSpanRuntimeView* InitializeDwordSpanStride24(
+  [[nodiscard]] DwordSpanRuntimeView* InitializeDwordSpanStride24(
     DwordSpanRuntimeView* const outSpan,
     const std::int32_t count,
     const std::uint32_t beginAddress
@@ -2766,7 +2766,7 @@ namespace
    * What it does:
    * Stores one caller-provided scalar dword lane into output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreScalarDwordLane(
+  [[nodiscard]] std::uint32_t* StoreScalarDwordLane(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -2786,7 +2786,7 @@ namespace
    * What it does:
    * Zeros one caller-provided dword lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ZeroScalarDwordLane(std::uint32_t* const outValue) noexcept
+  [[nodiscard]] std::uint32_t* ZeroScalarDwordLane(std::uint32_t* const outValue) noexcept
   {
     *outValue = 0u;
     return outValue;
@@ -2799,7 +2799,7 @@ namespace
    * What it does:
    * Computes one `source->lane04 + index * 24` byte-offset lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ComputeLane04OffsetByIndexStride24(
+  [[nodiscard]] std::uint32_t ComputeLane04OffsetByIndexStride24(
     const std::int32_t index,
     const DwordPairLaneRuntimeView* const source
   ) noexcept
@@ -2814,7 +2814,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 4` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride4(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride4(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2831,7 +2831,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 12` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride12(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride12(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2847,7 +2847,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 24` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride24(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride24(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2865,7 +2865,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 8` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride8(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride8(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2882,7 +2882,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 20` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride20(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride20(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2898,7 +2898,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 60` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride60(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride60(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2914,7 +2914,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 120` byte-offset lane and stores it.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride120(
+  [[nodiscard]] std::uint32_t* StoreBaseWordOffsetByIndexStride120(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -2931,7 +2931,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index * 20` bytes.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* AdvanceStoredAddressByIndexStride20(
+  [[nodiscard]] std::uint32_t* AdvanceStoredAddressByIndexStride20(
     std::uint32_t* const addressSlot,
     const std::int32_t index
   ) noexcept
@@ -2947,7 +2947,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index * 60` bytes.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* AdvanceStoredAddressByIndexStride60(
+  [[nodiscard]] std::uint32_t* AdvanceStoredAddressByIndexStride60(
     std::uint32_t* const addressSlot,
     const std::int32_t index
   ) noexcept
@@ -2963,7 +2963,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index * 120` bytes.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* AdvanceStoredAddressByIndexStride120(
+  [[nodiscard]] std::uint32_t* AdvanceStoredAddressByIndexStride120(
     std::uint32_t* const addressSlot,
     const std::int32_t index
   ) noexcept
@@ -2979,7 +2979,7 @@ namespace
    * What it does:
    * Retreats one stored address lane by one 20-byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* RetreatStoredAddressByStride20(
+  [[nodiscard]] std::uint32_t* RetreatStoredAddressByStride20(
     std::uint32_t* const addressSlot
   ) noexcept
   {
@@ -2995,7 +2995,7 @@ namespace
    * Returns signed element distance between two stored address lanes with
    * 20-byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride20(
+  [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride20(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -3015,7 +3015,7 @@ namespace
    * Returns signed element distance between two stored address lanes with
    * 8-byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride8(
+  [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride8(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -3033,7 +3033,7 @@ namespace
    * Returns signed element distance between two stored address lanes with
    * 60-byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride60(
+  [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride60(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -3051,7 +3051,7 @@ namespace
    * Returns signed element distance between two stored address lanes with
    * 120-byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride120(
+  [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride120(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -3069,7 +3069,7 @@ namespace
    * Returns signed element distance between two stored address lanes with
    * 4-byte stride.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride4(
+  [[nodiscard]] std::int32_t DistanceBetweenStoredAddressesStride4(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -3085,7 +3085,7 @@ namespace
    * What it does:
    * Computes one `base + index * 32` byte address from a two-word lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ComputeBasePlusIndexStride32(
+  [[nodiscard]] std::uint32_t ComputeBasePlusIndexStride32(
     const DwordPairLaneRuntimeView* const source
   ) noexcept
   {
@@ -3192,7 +3192,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into caller-provided dword output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreLane08Dword(
+  [[nodiscard]] std::uint32_t* StoreLane08Dword(
     std::uint32_t* const outValue,
     const DwordTripleLaneRuntimeView* const source
   ) noexcept
@@ -3208,7 +3208,7 @@ namespace
    * Composes one `{dword,dword,dword}` output lane from one scalar source lane
    * and one two-dword source lane.
    */
-  [[maybe_unused]] [[nodiscard]] DwordTripleLaneRuntimeView* ComposeDwordTripleFromScalarAndPairLane(
+  [[nodiscard]] DwordTripleLaneRuntimeView* ComposeDwordTripleFromScalarAndPairLane(
     DwordTripleLaneRuntimeView* const outValue,
     const std::uint32_t* const scalarLaneSource,
     const DwordPairLaneRuntimeView* const pairLaneSource
@@ -3349,7 +3349,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into caller-provided dword output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreLane04Dword(
+  [[nodiscard]] std::uint32_t* StoreLane04Dword(
     std::uint32_t* const outValue,
     const DwordTripleLaneRuntimeView* const source
   ) noexcept
@@ -3372,7 +3372,7 @@ namespace
    * Loads one dword through the pointer lane at `+0x04` and stores it into
    * caller-provided output storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDereferencedLane04Dword(
+  [[nodiscard]] std::uint32_t* StoreDereferencedLane04Dword(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -3387,7 +3387,7 @@ namespace
    * What it does:
    * Writes one repeated dword value into `count` contiguous destination lanes.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneA(
+  std::uint32_t* FillDwordSpanCountedLaneA(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3411,7 +3411,7 @@ namespace
    * What it does:
    * Initializes one `{dword,byte}` lane pair record from caller source slots.
    */
-  [[maybe_unused]] [[nodiscard]] DwordBytePairLane* InitializeDwordBytePairLaneA(
+  [[nodiscard]] DwordBytePairLane* InitializeDwordBytePairLaneA(
     DwordBytePairLane* const outLane,
     const std::uint32_t* const dwordSlot,
     const std::uint8_t* const byteSlot
@@ -3428,7 +3428,7 @@ namespace
    * What it does:
    * Alias lane of `{dword,byte}` pair-record initialization.
    */
-  [[maybe_unused]] [[nodiscard]] DwordBytePairLane* InitializeDwordBytePairLaneB(
+  [[nodiscard]] DwordBytePairLane* InitializeDwordBytePairLaneB(
     DwordBytePairLane* const outLane,
     const std::uint32_t* const dwordSlot,
     const std::uint8_t* const byteSlot
@@ -3444,7 +3444,7 @@ namespace
    * What it does:
    * Initializes one `{dword,dword}` lane pair record from caller source slots.
    */
-  [[maybe_unused]] [[nodiscard]] DwordPairLaneRuntimeView* InitializeDwordPairLane(
+  [[nodiscard]] DwordPairLaneRuntimeView* InitializeDwordPairLane(
     DwordPairLaneRuntimeView* const outLane,
     const std::uint32_t* const firstDwordSlot,
     const std::uint32_t* const secondDwordSlot
@@ -3462,7 +3462,7 @@ namespace
    * What it does:
    * Swaps two `{dword,dword,dword}` lane records in place.
    */
-  [[maybe_unused]] [[nodiscard]] DwordTripleLaneRuntimeView* SwapDwordTripleLanes(
+  [[nodiscard]] DwordTripleLaneRuntimeView* SwapDwordTripleLanes(
     DwordTripleLaneRuntimeView* const left,
     DwordTripleLaneRuntimeView* const right
   ) noexcept
@@ -3479,7 +3479,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneB(
+  std::uint32_t* FillDwordSpanCountedLaneB(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3494,7 +3494,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneC(
+  std::uint32_t* FillDwordSpanCountedLaneC(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3509,7 +3509,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneD(
+  std::uint32_t* FillDwordSpanCountedLaneD(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3524,7 +3524,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneE(
+  std::uint32_t* FillDwordSpanCountedLaneE(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3539,7 +3539,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneF(
+  std::uint32_t* FillDwordSpanCountedLaneF(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3554,7 +3554,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneG(
+  std::uint32_t* FillDwordSpanCountedLaneG(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3569,7 +3569,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneH(
+  std::uint32_t* FillDwordSpanCountedLaneH(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3584,7 +3584,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneI(
+  std::uint32_t* FillDwordSpanCountedLaneI(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3599,7 +3599,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneJ(
+  std::uint32_t* FillDwordSpanCountedLaneJ(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3614,7 +3614,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneK(
+  std::uint32_t* FillDwordSpanCountedLaneK(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3629,7 +3629,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneL(
+  std::uint32_t* FillDwordSpanCountedLaneL(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3644,7 +3644,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneM(
+  std::uint32_t* FillDwordSpanCountedLaneM(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3659,7 +3659,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneN(
+  std::uint32_t* FillDwordSpanCountedLaneN(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3674,7 +3674,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneO(
+  std::uint32_t* FillDwordSpanCountedLaneO(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3689,7 +3689,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneP(
+  std::uint32_t* FillDwordSpanCountedLaneP(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3704,7 +3704,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneQ(
+  std::uint32_t* FillDwordSpanCountedLaneQ(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3719,7 +3719,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneR(
+  std::uint32_t* FillDwordSpanCountedLaneR(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3734,7 +3734,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneS(
+  std::uint32_t* FillDwordSpanCountedLaneS(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3749,7 +3749,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneT(
+  std::uint32_t* FillDwordSpanCountedLaneT(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3764,7 +3764,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneU(
+  std::uint32_t* FillDwordSpanCountedLaneU(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3779,7 +3779,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneV(
+  std::uint32_t* FillDwordSpanCountedLaneV(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3794,7 +3794,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneW(
+  std::uint32_t* FillDwordSpanCountedLaneW(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3809,7 +3809,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanCountedLaneX(
+  std::uint32_t* FillDwordSpanCountedLaneX(
     const std::uint32_t* valueSlot,
     std::uint32_t* destination,
     const std::uint32_t count
@@ -3825,7 +3825,7 @@ namespace
    * What it does:
    * Unlinks one intrusive link node from its owner-slot chain.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNode(IntrusiveLinkRuntimeView* const node) noexcept
+  IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNode(IntrusiveLinkRuntimeView* const node) noexcept
   {
     IntrusiveLinkRuntimeView** const ownerLink = LocateIntrusiveNodeOwnerLink(node);
     if (ownerLink != nullptr) {
@@ -3840,7 +3840,7 @@ namespace
    * What it does:
    * Unlinks one intrusive owner-link lane from its owning owner-slot chain.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNodeOwnerChainAlias(
+  IntrusiveLinkRuntimeView** UnlinkIntrusiveLinkNodeOwnerChainAlias(
     IntrusiveLinkRuntimeView* const node
   ) noexcept
   {
@@ -3868,7 +3868,7 @@ namespace
    * Walks one half-open stride-20 range and unlinks each embedded intrusive
    * owner-link lane at offset `+0x08`.
    */
-  [[maybe_unused]] void UnlinkIntrusiveLinkRangeStride20(
+  void UnlinkIntrusiveLinkRangeStride20(
     Stride20IntrusiveLinkElementRuntimeView* begin,
     Stride20IntrusiveLinkElementRuntimeView* const end
   ) noexcept
@@ -3886,7 +3886,7 @@ namespace
    * Alternate entrypoint that forwards one stride-20 half-open range to the
    * intrusive unlink walk helper.
    */
-  [[maybe_unused]] void UnlinkIntrusiveLinkRangeStride20AliasA(
+  void UnlinkIntrusiveLinkRangeStride20AliasA(
     Stride20IntrusiveLinkElementRuntimeView* const begin,
     Stride20IntrusiveLinkElementRuntimeView* const end
   ) noexcept
@@ -3901,7 +3901,7 @@ namespace
    * Secondary entrypoint that forwards one stride-20 half-open range to the
    * intrusive unlink walk helper.
    */
-  [[maybe_unused]] void UnlinkIntrusiveLinkRangeStride20AliasB(
+  void UnlinkIntrusiveLinkRangeStride20AliasB(
     Stride20IntrusiveLinkElementRuntimeView* const begin,
     Stride20IntrusiveLinkElementRuntimeView* const end
   ) noexcept
@@ -3934,7 +3934,7 @@ namespace
   static_assert(offsetof(RefCountedFloatLaneRuntimeView, lane30) == 0x30, "RefCountedFloatLaneRuntimeView::lane30 offset must be 0x30");
 #endif
 
-  [[maybe_unused]] void IncrementRefCountWordIfPresent(std::uint32_t refWord) noexcept
+  void IncrementRefCountWordIfPresent(std::uint32_t refWord) noexcept
   {
     if (refWord == 0u) {
       return;
@@ -3953,7 +3953,7 @@ namespace
    * Copies one mixed payload lane and bumps three intrusive ref-count lanes
    * (`+0x10`, `+0x18`, `+0x20`) when present.
    */
-  [[maybe_unused]] RefCountedFloatLaneRuntimeView* CopyRefCountedFloatLaneRuntime(
+  RefCountedFloatLaneRuntimeView* CopyRefCountedFloatLaneRuntime(
     RefCountedFloatLaneRuntimeView* const destination,
     const RefCountedFloatLaneRuntimeView* const source
   ) noexcept
@@ -4007,7 +4007,7 @@ namespace
    * Walks one half-open stride-28 range and releases each shared-owner control
    * block stored at lane `+0x14`.
    */
-  [[maybe_unused]] std::intptr_t ReleaseSharedOwnerRangeStride28(
+  std::intptr_t ReleaseSharedOwnerRangeStride28(
     Stride28SharedOwnerElementRuntimeView* begin,
     Stride28SharedOwnerElementRuntimeView* const end
   ) noexcept
@@ -4029,7 +4029,7 @@ namespace
    * Calls scalar-deleting-destructor slot 0 for each 16-byte object in one
    * half-open range.
    */
-  [[maybe_unused]] std::intptr_t DestroyVirtualRange16(
+  std::intptr_t DestroyVirtualRange16(
     VirtualDtor16RuntimeView* begin,
     VirtualDtor16RuntimeView* end
   ) noexcept
@@ -4044,7 +4044,7 @@ namespace
    * Calls scalar-deleting-destructor slot 0 for each 136-byte object in one
    * half-open range.
    */
-  [[maybe_unused]] std::intptr_t DestroyVirtualRange136(
+  std::intptr_t DestroyVirtualRange136(
     VirtualDtor136RuntimeView* begin,
     VirtualDtor136RuntimeView* end
   ) noexcept
@@ -4058,7 +4058,7 @@ namespace
    * What it does:
    * Writes one repeated dword value into one `[begin,end)` destination range.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanByEndLaneA(
+  std::uint32_t* FillDwordSpanByEndLaneA(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -4073,7 +4073,7 @@ namespace
    * What it does:
    * Swaps two 5-dword lanes in place and returns the first lane pointer.
    */
-  [[maybe_unused]] std::int32_t* SwapFiveDwordLanes(
+  std::int32_t* SwapFiveDwordLanes(
     std::int32_t* const firstLane,
     std::int32_t* const secondLane
   ) noexcept
@@ -4104,7 +4104,7 @@ namespace
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanByEndLaneB(
+  std::uint32_t* FillDwordSpanByEndLaneB(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -4119,7 +4119,7 @@ namespace
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanByEndLaneC(
+  std::uint32_t* FillDwordSpanByEndLaneC(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -4134,7 +4134,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneA() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneA() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneA);
   }
@@ -4145,7 +4145,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneB);
   }
@@ -4156,7 +4156,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneB);
   }
@@ -4167,7 +4167,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneCPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneCPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC);
   }
@@ -4178,7 +4178,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneCAliasSecondary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneCAliasSecondary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC);
   }
@@ -4189,7 +4189,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneDPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneDPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneD);
   }
@@ -4200,7 +4200,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneDAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneDAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneD);
   }
@@ -4211,7 +4211,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneEPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneEPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneE);
   }
@@ -4222,7 +4222,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneEAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneEAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneE);
   }
@@ -4233,7 +4233,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneFPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneFPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneF);
   }
@@ -4244,7 +4244,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneFAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneFAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneF);
   }
@@ -4255,7 +4255,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneGPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneGPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneG);
   }
@@ -4266,7 +4266,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneGAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneGAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneG);
   }
@@ -4277,7 +4277,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneHPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneHPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneH);
   }
@@ -4288,7 +4288,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneHAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneHAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneH);
   }
@@ -4299,7 +4299,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneIPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneIPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneI);
   }
@@ -4310,7 +4310,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneIAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneIAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneI);
   }
@@ -4321,7 +4321,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneJPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneJPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneJ);
   }
@@ -4332,7 +4332,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneJAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneJAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneJ);
   }
@@ -4343,7 +4343,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneKPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneKPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneK);
   }
@@ -4354,7 +4354,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneKAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneKAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneK);
   }
@@ -4365,7 +4365,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneLPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneLPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneL);
   }
@@ -4376,7 +4376,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneLAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneLAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneL);
   }
@@ -4387,7 +4387,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneMPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneMPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneM);
   }
@@ -4398,7 +4398,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneMAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneMAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneM);
   }
@@ -4409,7 +4409,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneNPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneNPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneN);
   }
@@ -4420,7 +4420,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneNAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneNAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneN);
   }
@@ -4431,7 +4431,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneOPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneOPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneO);
   }
@@ -4442,7 +4442,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneOAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneOAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneO);
   }
@@ -4453,7 +4453,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneP() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneP() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneP);
   }
@@ -4464,7 +4464,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneQ() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneQ() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneQ);
   }
@@ -4475,7 +4475,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneRPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneRPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneR);
   }
@@ -4486,7 +4486,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneRAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneRAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneR);
   }
@@ -4497,7 +4497,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneSPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneSPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneS);
   }
@@ -4508,7 +4508,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneSAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneSAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneS);
   }
@@ -4519,7 +4519,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneTPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneTPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneT);
   }
@@ -4530,7 +4530,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneTAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneTAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneT);
   }
@@ -4541,7 +4541,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneUPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneUPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneU);
   }
@@ -4552,7 +4552,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneUAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneUAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneU);
   }
@@ -4563,7 +4563,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneVPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneVPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneV);
   }
@@ -4574,7 +4574,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneVAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneVAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneV);
   }
@@ -4585,7 +4585,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneWPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneWPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneW);
   }
@@ -4596,7 +4596,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneWAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneWAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneW);
   }
@@ -4607,7 +4607,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneXPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneXPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneX);
   }
@@ -4618,7 +4618,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneXAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneXAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneX);
   }
@@ -4629,7 +4629,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneYPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneYPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneY);
   }
@@ -4640,7 +4640,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneYAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneYAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneY);
   }
@@ -4651,7 +4651,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneZPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneZPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneZ);
   }
@@ -4662,7 +4662,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneZAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneZAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneZ);
   }
@@ -4673,7 +4673,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAAPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAAPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAA);
   }
@@ -4684,7 +4684,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAAAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAAAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAA);
   }
@@ -4695,7 +4695,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneABPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneABPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAB);
   }
@@ -4706,7 +4706,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneABAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneABAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAB);
   }
@@ -4717,7 +4717,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneACPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneACPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAC);
   }
@@ -4728,7 +4728,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneACAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneACAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAC);
   }
@@ -4739,7 +4739,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneADPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneADPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAD);
   }
@@ -4750,7 +4750,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneADAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneADAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAD);
   }
@@ -4761,7 +4761,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAEPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAEPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAE);
   }
@@ -4772,7 +4772,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAEAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAEAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAE);
   }
@@ -4783,7 +4783,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAF() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAF() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAF);
   }
@@ -4794,7 +4794,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAFAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAFAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAF);
   }
@@ -4805,7 +4805,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAGPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAGPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAG);
   }
@@ -4816,7 +4816,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAGAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAGAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAG);
   }
@@ -4827,7 +4827,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAHPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAHPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAH);
   }
@@ -4838,7 +4838,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAHAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAHAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAH);
   }
@@ -4849,7 +4849,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAIPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAIPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAI);
   }
@@ -4860,7 +4860,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAIAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAIAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAI);
   }
@@ -4871,7 +4871,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAJPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAJPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAJ);
   }
@@ -4882,7 +4882,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAJAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAJAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAJ);
   }
@@ -4893,7 +4893,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAKPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAKPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAK);
   }
@@ -4904,7 +4904,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAKAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAKAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAK);
   }
@@ -4915,7 +4915,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneALPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneALPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAL);
   }
@@ -4926,7 +4926,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneALAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneALAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAL);
   }
@@ -4937,7 +4937,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAMPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAMPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAM);
   }
@@ -4948,7 +4948,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAMAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAMAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAM);
   }
@@ -4959,7 +4959,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneANPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneANPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAN);
   }
@@ -4970,7 +4970,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneANAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneANAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAN);
   }
@@ -4981,7 +4981,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAOPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAOPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAO);
   }
@@ -4992,7 +4992,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAOAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAOAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAO);
   }
@@ -5003,7 +5003,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAPPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAPPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAP);
   }
@@ -5014,7 +5014,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAPAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAPAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAP);
   }
@@ -5025,7 +5025,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAQPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAQPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAQ);
   }
@@ -5036,7 +5036,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAQAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAQAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAQ);
   }
@@ -5047,7 +5047,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneARPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneARPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAR);
   }
@@ -5058,7 +5058,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneARAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneARAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAR);
   }
@@ -5069,7 +5069,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneASPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneASPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAS);
   }
@@ -5080,7 +5080,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneASAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneASAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAS);
   }
@@ -5091,7 +5091,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneATPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneATPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAT);
   }
@@ -5102,7 +5102,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneATAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneATAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAT);
   }
@@ -5113,7 +5113,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAU() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAU() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAU);
   }
@@ -5124,7 +5124,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAUAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAUAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAU);
   }
@@ -5135,7 +5135,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAVPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAVPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAV);
   }
@@ -5146,7 +5146,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAVAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAVAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAV);
   }
@@ -5157,7 +5157,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAWPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAWPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAW);
   }
@@ -5168,7 +5168,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAWAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAWAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAW);
   }
@@ -5179,7 +5179,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAXPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAXPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAX);
   }
@@ -5190,7 +5190,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAXAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAXAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAX);
   }
@@ -5201,7 +5201,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAYPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAYPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAY);
   }
@@ -5212,7 +5212,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAYAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAYAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAY);
   }
@@ -5223,7 +5223,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAZPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAZPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAZ);
   }
@@ -5234,7 +5234,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneAZAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneAZAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneAZ);
   }
@@ -5245,7 +5245,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBAPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBAPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBA);
   }
@@ -5256,7 +5256,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBAAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBAAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBA);
   }
@@ -5267,7 +5267,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBBPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBBPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBB);
   }
@@ -5278,7 +5278,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBBAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBBAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBB);
   }
@@ -5289,7 +5289,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBCPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBCPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBC);
   }
@@ -5300,7 +5300,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBCAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBCAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBC);
   }
@@ -5311,7 +5311,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBDPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBDPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBD);
   }
@@ -5322,7 +5322,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBDAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBDAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBD);
   }
@@ -5333,7 +5333,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBEPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBEPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBE);
   }
@@ -5344,7 +5344,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBEAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBEAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBE);
   }
@@ -5355,7 +5355,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBFPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBFPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBF);
   }
@@ -5366,7 +5366,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBFAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBFAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBF);
   }
@@ -5377,7 +5377,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBGPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBGPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBG);
   }
@@ -5388,7 +5388,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBGAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBGAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBG);
   }
@@ -5399,7 +5399,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBHPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBHPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBH);
   }
@@ -5410,7 +5410,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBHAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBHAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBH);
   }
@@ -5421,7 +5421,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBIPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBIPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBI);
   }
@@ -5432,7 +5432,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBIAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBIAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBI);
   }
@@ -5443,7 +5443,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBJ() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBJ() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBJ);
   }
@@ -5454,7 +5454,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBJAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBJAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBJ);
   }
@@ -5465,7 +5465,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBKPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBKPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBK);
   }
@@ -5476,7 +5476,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBKAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBKAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBK);
   }
@@ -5487,7 +5487,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBLPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBLPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBL);
   }
@@ -5498,7 +5498,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBLAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBLAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBL);
   }
@@ -5509,7 +5509,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBMPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBMPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBM);
   }
@@ -5520,7 +5520,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBMAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBMAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBM);
   }
@@ -5531,7 +5531,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBNPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBNPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBN);
   }
@@ -5542,7 +5542,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBNAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBNAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBN);
   }
@@ -5553,7 +5553,7 @@ namespace
    * What it does:
    * Re-links one intrusive-list sentinel lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBOPrimary() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBOPrimary() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBO);
   }
@@ -5564,7 +5564,7 @@ namespace
    * What it does:
    * Alias lane of global intrusive-sentinel reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneBOAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneBOAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneBO);
   }
@@ -5900,7 +5900,7 @@ namespace
    * What it does:
    * Reads one 32-bit runtime lane from offset `+0x8D8`.
    */
-  [[maybe_unused]] std::uint32_t LoadLargeRuntimePrimaryWord(const LargeRuntimeWordAccessView* const view) noexcept
+  std::uint32_t LoadLargeRuntimePrimaryWord(const LargeRuntimeWordAccessView* const view) noexcept
   {
     return view->primaryWord;
   }
@@ -5911,7 +5911,7 @@ namespace
    * What it does:
    * Reads one 32-bit runtime lane from offset `+0x908`.
    */
-  [[maybe_unused]] std::uint32_t LoadLargeRuntimeSecondaryWord(const LargeRuntimeWordAccessView* const view) noexcept
+  std::uint32_t LoadLargeRuntimeSecondaryWord(const LargeRuntimeWordAccessView* const view) noexcept
   {
     return view->secondaryWord;
   }
@@ -5923,7 +5923,7 @@ namespace
    * Initializes one dual-anchor list header to singleton/self and static
    * anchor lanes.
    */
-  [[maybe_unused]] std::uint32_t* InitializeDualAnchorListHeaderPrimary(DualAnchorListHeaderRuntimeView* const header) noexcept
+  std::uint32_t* InitializeDualAnchorListHeaderPrimary(DualAnchorListHeaderRuntimeView* const header) noexcept
   {
     return InitializeDualAnchorListHeader(header);
   }
@@ -5934,7 +5934,7 @@ namespace
    * What it does:
    * Copies one entity-id runtime lane (`+0x68`) into caller-provided output.
    */
-  [[maybe_unused]] std::uint32_t* CopyEntityIdWordToOutput(
+  std::uint32_t* CopyEntityIdWordToOutput(
     std::uint32_t* const output,
     const EntityFieldAccessorRuntimeView* const source
   ) noexcept
@@ -5948,7 +5948,7 @@ namespace
    * What it does:
    * Reads one entity blueprint/runtime word lane (`+0x6C`).
    */
-  [[maybe_unused]] std::uint32_t LoadEntityBlueprintWord(const EntityFieldAccessorRuntimeView* const view) noexcept
+  std::uint32_t LoadEntityBlueprintWord(const EntityFieldAccessorRuntimeView* const view) noexcept
   {
     return view->blueprintWord;
   }
@@ -5959,7 +5959,7 @@ namespace
    * What it does:
    * Reads one entity army-owner lane (`+0x14C`).
    */
-  [[maybe_unused]] std::uint32_t LoadEntityArmyWord(const EntityFieldAccessorRuntimeView* const view) noexcept
+  std::uint32_t LoadEntityArmyWord(const EntityFieldAccessorRuntimeView* const view) noexcept
   {
     return view->armyWord;
   }
@@ -5970,7 +5970,7 @@ namespace
    * What it does:
    * Reads one entity dead-flag lane (`+0x99`).
    */
-  [[maybe_unused]] std::uint8_t LoadEntityDeadFlag(const EntityFieldAccessorRuntimeView* const view) noexcept
+  std::uint8_t LoadEntityDeadFlag(const EntityFieldAccessorRuntimeView* const view) noexcept
   {
     return view->deadFlag;
   }
@@ -5981,7 +5981,7 @@ namespace
    * What it does:
    * Reads one entity destroy-queued flag lane (`+0x1B9`).
    */
-  [[maybe_unused]] std::uint8_t LoadEntityDestroyQueuedFlag(const EntityFieldAccessorRuntimeView* const view) noexcept
+  std::uint8_t LoadEntityDestroyQueuedFlag(const EntityFieldAccessorRuntimeView* const view) noexcept
   {
     return view->destroyQueuedFlag;
   }
@@ -5992,7 +5992,7 @@ namespace
    * What it does:
    * Reads one builder-subsystem pointer lane from offset `+0x554`.
    */
-  [[maybe_unused]] std::uint32_t LoadEntityBuilderSubsystemWord(const EntityFieldAccessorRuntimeView* const view) noexcept
+  std::uint32_t LoadEntityBuilderSubsystemWord(const EntityFieldAccessorRuntimeView* const view) noexcept
   {
     return view->builderSubsystemWord;
   }
@@ -6003,7 +6003,7 @@ namespace
    * What it does:
    * Reads one intrusive link/runtime word from offset `+0x60`.
    */
-  [[maybe_unused]] std::uint32_t LoadEntityCoordNodeLinkWord(const EntityFieldAccessorRuntimeView* const view) noexcept
+  std::uint32_t LoadEntityCoordNodeLinkWord(const EntityFieldAccessorRuntimeView* const view) noexcept
   {
     return view->coordNodeLinkWord;
   }
@@ -6014,7 +6014,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x20`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail20(FourLaneHeaderTail20RuntimeView* const header) noexcept
+  std::uint32_t* InitializeFourLaneHeaderTail20(FourLaneHeaderTail20RuntimeView* const header) noexcept
   {
     return InitializeFourLaneHeader(header);
   }
@@ -6025,7 +6025,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x18`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail18(FourLaneHeaderTail18RuntimeView* const header) noexcept
+  std::uint32_t* InitializeFourLaneHeaderTail18(FourLaneHeaderTail18RuntimeView* const header) noexcept
   {
     return InitializeFourLaneHeader(header);
   }
@@ -6037,7 +6037,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x150`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail150(
+  std::uint32_t* InitializeFourLaneHeaderTail150(
     FourLaneHeaderTail150RuntimeView* const header
   ) noexcept
   {
@@ -6050,7 +6050,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x1A0`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail1A0(
+  std::uint32_t* InitializeFourLaneHeaderTail1A0(
     FourLaneHeaderTail1A0RuntimeView* const header
   ) noexcept
   {
@@ -6072,7 +6072,7 @@ namespace
    * Binds one external dword-span header to `base` with a fixed 80-dword
    * capacity window.
    */
-  [[maybe_unused]] ExternalDwordSpanHeader80RuntimeView* InitializeExternalDwordSpanCount80(
+  ExternalDwordSpanHeader80RuntimeView* InitializeExternalDwordSpanCount80(
     ExternalDwordSpanHeader80RuntimeView* const outHeader,
     const std::uint32_t base
   ) noexcept
@@ -6090,7 +6090,7 @@ namespace
    * What it does:
    * Copies one input word directly into caller-provided output.
    */
-  [[maybe_unused]] std::uint32_t* CopyInputWordToOutputPrimary(
+  std::uint32_t* CopyInputWordToOutputPrimary(
     std::uint32_t* const output,
     const std::uint32_t inputWord
   ) noexcept
@@ -6107,7 +6107,7 @@ namespace
    * What it does:
    * Copies source lane `+0x04` into caller-provided output.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceLane4ToOutputPrimary(
+  std::uint32_t* CopySourceLane4ToOutputPrimary(
     std::uint32_t* const output,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -6121,7 +6121,7 @@ namespace
    * What it does:
    * Copies source lane `+0x08` into caller-provided output.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceLane8ToOutputPrimary(
+  std::uint32_t* CopySourceLane8ToOutputPrimary(
     std::uint32_t* const output,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -6135,7 +6135,7 @@ namespace
    * What it does:
    * Loads one source indirect lane (`*(*(source + 0x04))`) into output.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceIndirectLane4ToOutput(
+  std::uint32_t* CopySourceIndirectLane4ToOutput(
     std::uint32_t* const output,
     const SourceIndirectLane4RuntimeView* const source
   ) noexcept
@@ -6149,7 +6149,7 @@ namespace
    * What it does:
    * Alias lane for copying source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceLane4ToOutputAlias(
+  std::uint32_t* CopySourceLane4ToOutputAlias(
     std::uint32_t* const output,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -6163,7 +6163,7 @@ namespace
    * What it does:
    * Alias lane for copying one input word directly into output.
    */
-  [[maybe_unused]] std::uint32_t* CopyInputWordToOutputAlias(
+  std::uint32_t* CopyInputWordToOutputAlias(
     std::uint32_t* const output,
     const std::uint32_t inputWord
   ) noexcept
@@ -6177,7 +6177,7 @@ namespace
    * What it does:
    * Alias lane for dual-anchor list-header singleton initialization.
    */
-  [[maybe_unused]] std::uint32_t* InitializeDualAnchorListHeaderAlias(DualAnchorListHeaderRuntimeView* const header) noexcept
+  std::uint32_t* InitializeDualAnchorListHeaderAlias(DualAnchorListHeaderRuntimeView* const header) noexcept
   {
     return InitializeDualAnchorListHeader(header);
   }
@@ -6188,7 +6188,7 @@ namespace
    * What it does:
    * Alias lane for copying source lane `+0x08` into output.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceLane8ToOutputAlias(
+  std::uint32_t* CopySourceLane8ToOutputAlias(
     std::uint32_t* const output,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -6202,7 +6202,7 @@ namespace
    * What it does:
    * Copies source lane `+0x0C` into caller-provided output.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceLane12ToOutput(
+  std::uint32_t* CopySourceLane12ToOutput(
     std::uint32_t* const output,
     const SourceLane12RuntimeView* const source
   ) noexcept
@@ -6216,7 +6216,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x14`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail14(FourLaneHeaderTail14RuntimeView* const header) noexcept
+  std::uint32_t* InitializeFourLaneHeaderTail14(FourLaneHeaderTail14RuntimeView* const header) noexcept
   {
     return InitializeFourLaneHeader(header);
   }
@@ -6227,7 +6227,7 @@ namespace
    * What it does:
    * Copies source lane `+0x04` into output (compact-lane variant).
    */
-  [[maybe_unused]] std::uint32_t* CopyCompactSourceLane4ToOutputPrimary(
+  std::uint32_t* CopyCompactSourceLane4ToOutputPrimary(
     std::uint32_t* const output,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -6241,7 +6241,7 @@ namespace
    * What it does:
    * Copies source lane `+0x08` into output (compact-lane variant).
    */
-  [[maybe_unused]] std::uint32_t* CopyCompactSourceLane8ToOutputPrimary(
+  std::uint32_t* CopyCompactSourceLane8ToOutputPrimary(
     std::uint32_t* const output,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -6255,7 +6255,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x1F0`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail1F0(FourLaneHeaderTail1F0RuntimeView* const header) noexcept
+  std::uint32_t* InitializeFourLaneHeaderTail1F0(FourLaneHeaderTail1F0RuntimeView* const header) noexcept
   {
     return InitializeFourLaneHeader(header);
   }
@@ -6266,7 +6266,7 @@ namespace
    * What it does:
    * Returns address of one stride-24 element from a base span.
    */
-  [[maybe_unused]] std::uintptr_t LocateStride24ElementAddress(
+  std::uintptr_t LocateStride24ElementAddress(
     const std::int32_t index,
     const Stride24SpanRuntimeView* const span
   ) noexcept
@@ -6281,7 +6281,7 @@ namespace
    * What it does:
    * Alias lane for copying source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* CopyCompactSourceLane4ToOutputAlias(
+  std::uint32_t* CopyCompactSourceLane4ToOutputAlias(
     std::uint32_t* const output,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -6295,7 +6295,7 @@ namespace
    * What it does:
    * Alias lane for copying source lane `+0x08` into output.
    */
-  [[maybe_unused]] std::uint32_t* CopyCompactSourceLane8ToOutputAlias(
+  std::uint32_t* CopyCompactSourceLane8ToOutputAlias(
     std::uint32_t* const output,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -6310,7 +6310,7 @@ namespace
    * What it does:
    * Returns address of one stride-20 element from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uintptr_t LocateStride20ElementAddress(
+  std::uintptr_t LocateStride20ElementAddress(
     const std::int32_t index,
     const Stride20SpanRuntimeView* const span
   ) noexcept
@@ -6325,7 +6325,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x100`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail100(FourLaneHeaderTail100RuntimeView* const header) noexcept
+  std::uint32_t* InitializeFourLaneHeaderTail100(FourLaneHeaderTail100RuntimeView* const header) noexcept
   {
     return InitializeFourLaneHeader(header);
   }
@@ -6336,7 +6336,7 @@ namespace
    * What it does:
    * Alias lane of intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] std::uint32_t* ResetGlobalIntrusiveSentinelLaneCAlias() noexcept
+  std::uint32_t* ResetGlobalIntrusiveSentinelLaneCAlias() noexcept
   {
     return ResetGlobalIntrusiveSentinel(gGlobalIntrusiveSentinelLaneC);
   }
@@ -6430,7 +6430,7 @@ namespace
    * What it does:
    * Clears one two-word output lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLane(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLane(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -6443,7 +6443,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C3D70(
+  std::uint32_t* StoreScalarDwordLane5C3D70(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6457,7 +6457,7 @@ namespace
    * What it does:
    * Returns one virtual-slot dword from vtable offset `+0x10`.
    */
-  [[maybe_unused]] std::uint32_t ReadVTableSlot10(const VTableOwnerRuntimeView* const owner) noexcept
+  std::uint32_t ReadVTableSlot10(const VTableOwnerRuntimeView* const owner) noexcept
   {
     return owner->vtable[4];
   }
@@ -6469,7 +6469,7 @@ namespace
    * What it does:
    * Stores one dereferenced indirect dword from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreIndirectLane4Dword(
+  std::uint32_t* StoreIndirectLane4Dword(
     std::uint32_t* const outValue,
     const DwordPointerAt4RuntimeView* const source
   ) noexcept
@@ -6483,7 +6483,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane4Dword5C4550(
+  std::uint32_t* StoreLane4Dword5C4550(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6497,7 +6497,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane4Dword5C4560(
+  std::uint32_t* StoreLane4Dword5C4560(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6511,7 +6511,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane4Dword5C4A50(
+  std::uint32_t* StoreLane4Dword5C4A50(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6525,7 +6525,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane8Dword5C4A60(
+  std::uint32_t* StoreLane8Dword5C4A60(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -6542,7 +6542,7 @@ namespace
    * What it does:
    * Stores one `source[0] + index * 4` address lane into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreOffsetAddressStride4FromBaseWord(
+  std::uint32_t* StoreOffsetAddressStride4FromBaseWord(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -6560,7 +6560,7 @@ namespace
    * What it does:
    * Computes one `source lane +0x04 + index * 12` byte address.
    */
-  [[maybe_unused]] std::uintptr_t ComputeOffsetAddressStride12FromLane4(
+  std::uintptr_t ComputeOffsetAddressStride12FromLane4(
     const std::int32_t index,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6574,7 +6574,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane8Dword5C50D0(
+  std::uint32_t* StoreLane8Dword5C50D0(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -6588,7 +6588,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C56C0(
+  std::uint32_t* StoreScalarDwordLane5C56C0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6602,7 +6602,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C5FE0(
+  std::uint32_t* StoreScalarDwordLane5C5FE0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6616,7 +6616,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C6000(
+  std::uint32_t* StoreScalarDwordLane5C6000(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6630,7 +6630,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C6030(
+  std::uint32_t* StoreScalarDwordLane5C6030(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6644,7 +6644,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane8Dword5C6090(
+  std::uint32_t* StoreLane8Dword5C6090(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -6660,7 +6660,7 @@ namespace
    * What it does:
    * Writes one `{left, right}` dword pair into output lanes.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromTwoSources(
+  DwordPairRuntimeView* StoreDwordPairFromTwoSources(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const left,
     const std::uint32_t* const right
@@ -6677,7 +6677,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C61E0(
+  std::uint32_t* StoreScalarDwordLane5C61E0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6694,7 +6694,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane4Dword5C6570(
+  std::uint32_t* StoreLane4Dword5C6570(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6708,7 +6708,7 @@ namespace
    * What it does:
    * Returns count of 4-byte elements in one pointer range lane.
    */
-  [[maybe_unused]] std::int32_t CountDwordRangeElements(const PointerRangeRuntimeView* const range) noexcept
+  std::int32_t CountDwordRangeElements(const PointerRangeRuntimeView* const range) noexcept
   {
     return static_cast<std::int32_t>(range->end - range->begin);
   }
@@ -6719,7 +6719,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane4Dword5C6E40(
+  std::uint32_t* StoreLane4Dword5C6E40(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6734,7 +6734,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane8Dword5C6E50(
+  std::uint32_t* StoreLane8Dword5C6E50(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -6748,7 +6748,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C73B0(
+  std::uint32_t* StoreScalarDwordLane5C73B0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6764,7 +6764,7 @@ namespace
    * What it does:
    * Alias lane for storing dereferenced indirect source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreIndirectLane4Dword5C73F0(
+  std::uint32_t* StoreIndirectLane4Dword5C73F0(
     std::uint32_t* const outValue,
     const DwordPointerAt4RuntimeView* const source
   ) noexcept
@@ -6778,7 +6778,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane4Dword5C7AE0(
+  std::uint32_t* StoreLane4Dword5C7AE0(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -6792,7 +6792,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C7E50(
+  std::uint32_t* StoreScalarDwordLane5C7E50(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6806,7 +6806,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C7F80(
+  std::uint32_t* StoreScalarDwordLane5C7F80(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6821,7 +6821,7 @@ namespace
    * What it does:
    * Writes one `{dword, byte}` lane to output storage.
    */
-  [[maybe_unused]] DwordByteLaneRuntimeView* StoreDwordByteLane(
+  DwordByteLaneRuntimeView* StoreDwordByteLane(
     DwordByteLaneRuntimeView* const outValue,
     const std::uint32_t* const sourceDword,
     const std::uint8_t* const sourceByte
@@ -6838,7 +6838,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane5C8030(
+  std::uint32_t* StoreScalarDwordLane5C8030(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -6852,7 +6852,7 @@ namespace
    * What it does:
    * Stores one `source[0] + index * 12` address lane into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreOffsetAddressStride12FromBaseWord(
+  std::uint32_t* StoreOffsetAddressStride12FromBaseWord(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -6871,7 +6871,7 @@ namespace
    * Replaces one pointer slot with the pointer stored at the pointed dword
    * lane.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotThroughStoredAddress(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** CollapsePointerSlotThroughStoredAddress(std::uint32_t** const pointerSlot) noexcept
   {
     *pointerSlot = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(**pointerSlot));
     return pointerSlot;
@@ -7014,7 +7014,7 @@ namespace
    * What it does:
    * Copies one source dword into output storage when output is non-null.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopySourceWordIfOutputPresent(
+  [[nodiscard]] std::uint32_t* CopySourceWordIfOutputPresent(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -7031,7 +7031,7 @@ namespace
    * What it does:
    * Clears one seven-word lane to all zeros.
    */
-  [[maybe_unused]] [[nodiscard]] SevenWordLaneRuntimeView* ClearSevenWordLane(
+  [[nodiscard]] SevenWordLaneRuntimeView* ClearSevenWordLane(
     SevenWordLaneRuntimeView* const outValue
   ) noexcept
   {
@@ -7061,7 +7061,7 @@ namespace
    * Initializes one intrusive node's two links from a caller head slot and
    * patches the previous head's back-link when present.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* LinkIntrusiveNodeFromHeadSlot(
+  IntrusiveNodeRuntimeView* LinkIntrusiveNodeFromHeadSlot(
     IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView** const headSlot
   ) noexcept
@@ -7083,7 +7083,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneAlpha(
+  std::uint32_t* StoreScalarWordLaneAlpha(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -7097,7 +7097,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneBeta(
+  std::uint32_t* StoreScalarWordLaneBeta(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -7112,7 +7112,7 @@ namespace
    * What it does:
    * Pops one head node from a forward-link chain and stores the removed node.
    */
-  [[maybe_unused]] ForwardLinkNodeSingleLaneRuntimeView** PopForwardLinkHeadToOutput(
+  ForwardLinkNodeSingleLaneRuntimeView** PopForwardLinkHeadToOutput(
     ForwardLinkNodeSingleLaneRuntimeView** const outValue,
     ForwardLinkNodeSingleLaneRuntimeView** const headSlot
   ) noexcept
@@ -7129,7 +7129,7 @@ namespace
    * What it does:
    * Advances one forward-link head slot to the current head's next node.
    */
-  [[maybe_unused]] ForwardLinkNodeSingleLaneRuntimeView** AdvanceForwardLinkHead(
+  ForwardLinkNodeSingleLaneRuntimeView** AdvanceForwardLinkHead(
     ForwardLinkNodeSingleLaneRuntimeView** const headSlot
   ) noexcept
   {
@@ -7143,7 +7143,7 @@ namespace
    * What it does:
    * Unlinks one intrusive node from its ring and restores singleton self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfAlpha(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfAlpha(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -7154,7 +7154,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfBeta(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfBeta(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -7165,7 +7165,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfGamma(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfGamma(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -7176,7 +7176,7 @@ namespace
    * What it does:
    * Reads one runtime capacity/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateCapacityWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateCapacityWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->capacityWord;
   }
@@ -7187,7 +7187,7 @@ namespace
    * What it does:
    * Writes one runtime primary flag byte.
    */
-  [[maybe_unused]] SparseRuntimeStateAccessorView* WriteRuntimeStatePrimaryFlag(
+  SparseRuntimeStateAccessorView* WriteRuntimeStatePrimaryFlag(
     SparseRuntimeStateAccessorView* const runtime,
     const std::uint8_t value
   ) noexcept
@@ -7202,7 +7202,7 @@ namespace
    * What it does:
    * Reads one runtime secondary flag byte.
    */
-  [[maybe_unused]] std::uint8_t ReadRuntimeStateSecondaryFlag(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint8_t ReadRuntimeStateSecondaryFlag(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->secondaryFlag;
   }
@@ -7213,7 +7213,7 @@ namespace
    * What it does:
    * Reads one runtime tertiary flag byte.
    */
-  [[maybe_unused]] std::uint8_t ReadRuntimeStateTertiaryFlag(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint8_t ReadRuntimeStateTertiaryFlag(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->tertiaryFlag;
   }
@@ -7224,7 +7224,7 @@ namespace
    * What it does:
    * Clears one two-word output lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneAlias(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneAlias(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -7237,7 +7237,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneGamma(
+  std::uint32_t* StoreScalarWordLaneGamma(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -7251,7 +7251,7 @@ namespace
    * What it does:
    * Initializes one four-lane intrusive header with a tail anchor at `+0x38`.
    */
-  [[maybe_unused]] std::uint32_t* InitializeFourLaneHeaderTail38(FourLaneHeaderTail38RuntimeView* const header) noexcept
+  std::uint32_t* InitializeFourLaneHeaderTail38(FourLaneHeaderTail38RuntimeView* const header) noexcept
   {
     auto* const beginAnchor = &header->beginAnchorWord;
     auto* const tailAnchor = &header->tailAnchorWord;
@@ -7270,7 +7270,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValues(
+  std::uint32_t* SwapDwordSlotValues(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -7313,7 +7313,7 @@ namespace
    * Swaps lanes `+0x04/+0x08/+0x0C` between two four-lane records while
    * preserving lane `+0x00`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapTrailingThreeDwordLanes(
+  DwordQuadRuntimeView* SwapTrailingThreeDwordLanes(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -7338,7 +7338,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanHeader(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanHeader(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::int32_t count,
     const std::uintptr_t baseAddress
@@ -7358,7 +7358,7 @@ namespace
    * What it does:
    * Reads one runtime profile/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateProfileWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateProfileWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->profileWord;
   }
@@ -7369,7 +7369,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfDelta(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfDelta(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -7380,7 +7380,7 @@ namespace
    * What it does:
    * Reads one runtime owner/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateOwnerWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateOwnerWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->ownerWord;
   }
@@ -7391,7 +7391,7 @@ namespace
    * What it does:
    * Reads one runtime timer/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateTimerWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateTimerWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->timerWord;
   }
@@ -7402,7 +7402,7 @@ namespace
    * What it does:
    * Reads one runtime timer flag byte.
    */
-  [[maybe_unused]] std::uint8_t ReadRuntimeStateTimerFlag(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint8_t ReadRuntimeStateTimerFlag(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->timerFlag;
   }
@@ -7413,7 +7413,7 @@ namespace
    * What it does:
    * Reads one runtime config/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateConfigWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateConfigWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->configWord;
   }
@@ -7424,7 +7424,7 @@ namespace
    * What it does:
    * Reads one runtime source/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateSourceWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateSourceWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->sourceWord;
   }
@@ -7435,7 +7435,7 @@ namespace
    * What it does:
    * Reads one runtime root/state dword lane.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeStateRootWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
+  std::uint32_t ReadRuntimeStateRootWord(const SparseRuntimeStateAccessorView* const runtime) noexcept
   {
     return runtime->rootWord;
   }
@@ -7446,7 +7446,7 @@ namespace
    * What it does:
    * Computes one `source lane +0x04 + index * 40` byte address.
    */
-  [[maybe_unused]] std::uintptr_t LocateStride40ElementAddress(
+  std::uintptr_t LocateStride40ElementAddress(
     const std::int32_t index,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -7465,7 +7465,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StorePairLaneWordToOutputPrimary(
+  std::uint32_t* StorePairLaneWordToOutputPrimary(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -7482,7 +7482,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreTripleLaneWordToOutputPrimary(
+  std::uint32_t* StoreTripleLaneWordToOutputPrimary(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -7496,7 +7496,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StorePairLaneWordToOutputAlias(
+  std::uint32_t* StorePairLaneWordToOutputAlias(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -7510,7 +7510,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreTripleLaneWordToOutputAlias(
+  std::uint32_t* StoreTripleLaneWordToOutputAlias(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -7530,7 +7530,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneOmega(
+  std::uint32_t* StoreScalarWordLaneOmega(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -7561,7 +7561,7 @@ namespace
    * What it does:
    * Writes one two-word output lane from two scalar dword inputs.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposeDwordPairFromValues(
+  DwordPairRuntimeView* ComposeDwordPairFromValues(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t left,
     const std::uint32_t right
@@ -7579,7 +7579,7 @@ namespace
    * Applies one callback to each `context + offset` entry in the range, then
    * stores the callback/context pair into one two-word binding lane.
    */
-  [[maybe_unused]] OffsetVisitorBindingRuntimeView* ApplyOffsetRangeAndBindVisitor(
+  OffsetVisitorBindingRuntimeView* ApplyOffsetRangeAndBindVisitor(
     OffsetVisitorBindingRuntimeView* const outBinding,
     const std::uint32_t* const beginOffsets,
     const std::uint32_t* const endOffsets,
@@ -7812,7 +7812,7 @@ namespace
    * What it does:
    * Initializes one two-word intrusive lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* InitializeSelfLinkPairLateA(std::uint32_t* const linkWords) noexcept
+  std::uint32_t* InitializeSelfLinkPairLateA(std::uint32_t* const linkWords) noexcept
   {
     return InitializeTwoWordSelfLink(linkWords);
   }
@@ -7824,7 +7824,7 @@ namespace
    * Unlinks one owner node at `owner+0x04`, restores singleton self-links, and
    * inserts it directly before `anchor`.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset04BeforeAnchor(
+  IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset04BeforeAnchor(
     void* const ownerBase,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -7839,7 +7839,7 @@ namespace
    * Unlinks one owner node at `owner+0x68`, restores singleton self-links, and
    * inserts it directly before `anchor`.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset68BeforeAnchor(
+  IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset68BeforeAnchor(
     void* const ownerBase,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -7854,7 +7854,7 @@ namespace
    * Unlinks one owner node at `owner+0x48`, restores singleton self-links, and
    * inserts it directly before `anchor`.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset48BeforeAnchor(
+  IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset48BeforeAnchor(
     void* const ownerBase,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -7869,7 +7869,7 @@ namespace
    * Returns owner base address for one intrusive node slot at offset `0x68`,
    * or null when the node slot is null.
    */
-  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotOffset68Primary(
+  void* ResolveOwnerBaseFromNodeSlotOffset68Primary(
     IntrusiveNodeRuntimeView* const* const nodeSlot
   ) noexcept
   {
@@ -7886,7 +7886,7 @@ namespace
    * What it does:
    * Alias lane for owner-base recovery from one offset-`0x68` node slot.
    */
-  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotOffset68Alias(
+  void* ResolveOwnerBaseFromNodeSlotOffset68Alias(
     IntrusiveNodeRuntimeView* const* const nodeSlot
   ) noexcept
   {
@@ -7900,7 +7900,7 @@ namespace
    * Returns owner base address for one intrusive node slot at offset `0x48`,
    * or null when the node slot is null.
    */
-  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotOffset48(
+  void* ResolveOwnerBaseFromNodeSlotOffset48(
     IntrusiveNodeRuntimeView* const* const nodeSlot
   ) noexcept
   {
@@ -7917,7 +7917,7 @@ namespace
    * What it does:
    * Clears one four-word lane tail (`+0x04/+0x08/+0x0C`) to zero.
    */
-  [[maybe_unused]] FourWordTailRuntimeView* ClearFourWordTailLanes(FourWordTailRuntimeView* const outValue) noexcept
+  FourWordTailRuntimeView* ClearFourWordTailLanes(FourWordTailRuntimeView* const outValue) noexcept
   {
     outValue->lane04 = 0u;
     outValue->lane08 = 0u;
@@ -7931,7 +7931,7 @@ namespace
    * What it does:
    * Stores one `*base + index * 4` address lane to output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride4Late(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride4Late(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -7946,7 +7946,7 @@ namespace
    * What it does:
    * Reads one owner/state dword lane at offset `+0x148`.
    */
-  [[maybe_unused]] std::uint32_t ReadRuntimeOwnerWordLate(const RuntimeStateOwnerRuntimeView* const runtime) noexcept
+  std::uint32_t ReadRuntimeOwnerWordLate(const RuntimeStateOwnerRuntimeView* const runtime) noexcept
   {
     return runtime->ownerWord;
   }
@@ -7958,7 +7958,7 @@ namespace
    * Returns element count for one pointer span with 48-byte stride, or zero
    * when the begin lane is null.
    */
-  [[maybe_unused]] std::int32_t CountStride48Elements(const ExternalSpanHeaderRuntimeView* const span) noexcept
+  std::int32_t CountStride48Elements(const ExternalSpanHeaderRuntimeView* const span) noexcept
   {
     if (span == nullptr || span->begin == 0u) {
       return 0;
@@ -7975,7 +7975,7 @@ namespace
    * What it does:
    * Initializes one two-word intrusive lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* InitializeSelfLinkPairPrimary(std::uint32_t* const linkWords) noexcept
+  std::uint32_t* InitializeSelfLinkPairPrimary(std::uint32_t* const linkWords) noexcept
   {
     return InitializeTwoWordSelfLink(linkWords);
   }
@@ -7986,7 +7986,7 @@ namespace
    * What it does:
    * Unlinks one intrusive node from its ring and restores singleton self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfEpsilon(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfEpsilon(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -7997,7 +7997,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfEta(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfEta(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -8008,7 +8008,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane4WordAlpha(
+  std::uint32_t* StoreSourceLane4WordAlpha(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8022,7 +8022,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane4WordBeta(
+  std::uint32_t* StoreSourceLane4WordBeta(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8036,7 +8036,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane8WordAlpha(
+  std::uint32_t* StoreSourceLane8WordAlpha(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -8050,7 +8050,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane8WordBeta(
+  std::uint32_t* StoreSourceLane8WordBeta(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -8064,7 +8064,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane4WordGamma(
+  std::uint32_t* StoreSourceLane4WordGamma(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8078,7 +8078,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane8WordGamma(
+  std::uint32_t* StoreSourceLane8WordGamma(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -8092,7 +8092,7 @@ namespace
    * What it does:
    * Computes one `source lane +0x04 + index * 20` byte address.
    */
-  [[maybe_unused]] std::uintptr_t LocateStride20ElementAddressPrimary(
+  std::uintptr_t LocateStride20ElementAddressPrimary(
     const std::int32_t index,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8106,7 +8106,7 @@ namespace
    * What it does:
    * Advances one stored dword address by 4 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceStoredAddressBy4(std::uint32_t* const addressSlot) noexcept
+  std::uint32_t* AdvanceStoredAddressBy4(std::uint32_t* const addressSlot) noexcept
   {
     *addressSlot += 4u;
     return addressSlot;
@@ -8118,7 +8118,7 @@ namespace
    * What it does:
    * Returns true when a two-word range lane is empty (`begin == end`).
    */
-  [[maybe_unused]] bool IsTwoWordRangeEmpty(const DwordPairRuntimeView* const range) noexcept
+  bool IsTwoWordRangeEmpty(const DwordPairRuntimeView* const range) noexcept
   {
     return range->lane00 == range->lane04;
   }
@@ -8148,7 +8148,7 @@ namespace
    * Returns true when a dword-vector lane is not allocated or contains no
    * elements (`begin == nullptr || begin == end`).
    */
-  [[maybe_unused]] bool IsDwordVectorLaneEmptyOrUnallocated(
+  bool IsDwordVectorLaneEmptyOrUnallocated(
     const DwordVectorBeginEndRuntimeView* const vectorLane
   ) noexcept
   {
@@ -8161,7 +8161,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane4WordDelta(
+  std::uint32_t* StoreSourceLane4WordDelta(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8176,7 +8176,7 @@ namespace
    * Unlinks one intrusive owner-node lane at `+0x04`, restores singleton
    * self-links, then relinks that node directly before `anchor`.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkOwnerNodeBeforeAnchor(
+  IntrusiveNodeRuntimeView* RelinkOwnerNodeBeforeAnchor(
     IntrusiveOwnerNodeSlotRuntimeView* const owner,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -8196,7 +8196,7 @@ namespace
    * Unlinks the intrusive node referenced by owner lane `+0x04` and returns
    * the owner base pointer located 4 bytes before that node.
    */
-  [[maybe_unused]] IntrusiveOwnerNodeSlotRuntimeView* UnlinkOwnerNodeAndReturnOwnerBase(
+  IntrusiveOwnerNodeSlotRuntimeView* UnlinkOwnerNodeAndReturnOwnerBase(
     IntrusiveOwnerNodeSlotRuntimeView* const owner
   ) noexcept
   {
@@ -8213,7 +8213,7 @@ namespace
    * Unlinks one intrusive node referenced by owner lane `+0x04`, restores
    * singleton self-links, and returns owner base pointer (`node - 4`).
    */
-  [[maybe_unused]] IntrusiveOwnerNodeSlotRuntimeView* UnlinkOwnerNodeAndReturnOwnerBaseLate(
+  IntrusiveOwnerNodeSlotRuntimeView* UnlinkOwnerNodeAndReturnOwnerBaseLate(
     IntrusiveOwnerNodeSlotRuntimeView* const owner
   ) noexcept
   {
@@ -8230,7 +8230,7 @@ namespace
    * When `node` is linked into a non-singleton ring, rewires adjacent links
    * through owner-head lanes and then restores `node` to singleton self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* PatchOwnerHeadAndUnlinkNode(
+  IntrusiveNodeRuntimeView* PatchOwnerHeadAndUnlinkNode(
     IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView** const ownerHeadSlot
   ) noexcept
@@ -8257,7 +8257,7 @@ namespace
    * Returns owner base pointer from one intrusive node pointer (`node - 4`)
    * and propagates null for null input.
    */
-  [[maybe_unused]] IntrusiveOwnerNodeSlotRuntimeView* ResolveOwnerBaseFromNodeMinus4(
+  IntrusiveOwnerNodeSlotRuntimeView* ResolveOwnerBaseFromNodeMinus4(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -8273,7 +8273,7 @@ namespace
    * What it does:
    * Alias lane for two-word singleton self-link initialization.
    */
-  [[maybe_unused]] std::uint32_t* InitializeSelfLinkPairAlias(std::uint32_t* const linkWords) noexcept
+  std::uint32_t* InitializeSelfLinkPairAlias(std::uint32_t* const linkWords) noexcept
   {
     return InitializeTwoWordSelfLink(linkWords);
   }
@@ -8284,7 +8284,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfZeta(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfZeta(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -8295,7 +8295,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane4WordEpsilon(
+  std::uint32_t* StoreSourceLane4WordEpsilon(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8309,7 +8309,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane8WordDelta(
+  std::uint32_t* StoreSourceLane8WordDelta(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -8323,7 +8323,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneA(
+  std::uint32_t* StoreScalarWordLaneA(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8337,7 +8337,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneB(
+  std::uint32_t* StoreScalarWordLaneB(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8351,7 +8351,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneC(
+  std::uint32_t* StoreScalarWordLaneC(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8365,7 +8365,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneD(
+  std::uint32_t* StoreScalarWordLaneD(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8379,7 +8379,7 @@ namespace
    * What it does:
    * Alias lane for storing source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane4WordZeta(
+  std::uint32_t* StoreSourceLane4WordZeta(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8393,7 +8393,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneE(
+  std::uint32_t* StoreScalarWordLaneE(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8407,7 +8407,7 @@ namespace
    * What it does:
    * Alias lane for computing `source lane +0x04 + index * 20`.
    */
-  [[maybe_unused]] std::uintptr_t LocateStride20ElementAddressAlias(
+  std::uintptr_t LocateStride20ElementAddressAlias(
     const std::int32_t index,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -8421,7 +8421,7 @@ namespace
    * What it does:
    * Stores one `base[0] + index * 20` address lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreOffsetAddressStride20FromBaseWord(
+  std::uint32_t* StoreOffsetAddressStride20FromBaseWord(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -8439,7 +8439,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneF(
+  std::uint32_t* StoreScalarWordLaneF(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8453,7 +8453,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneG(
+  std::uint32_t* StoreScalarWordLaneG(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8467,7 +8467,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneH(
+  std::uint32_t* StoreScalarWordLaneH(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8481,7 +8481,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneI(
+  std::uint32_t* StoreScalarWordLaneI(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -8495,7 +8495,7 @@ namespace
    * What it does:
    * Swaps one dword slot value between two storage pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapWordSlotValues(
+  std::uint32_t* SwapWordSlotValues(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -8634,7 +8634,7 @@ namespace
    * What it does:
    * Reads one dword lane from 8 bytes before the payload pointer stored at `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t ReadPayloadPrefixMinus8Word(
+  std::uint32_t ReadPayloadPrefixMinus8Word(
     const PrefixMinus8WordReaderRuntimeView* const self
   ) noexcept
   {
@@ -8648,7 +8648,7 @@ namespace
    * What it does:
    * Stores one scalar dword into lane `+0x08` and returns that value.
    */
-  [[maybe_unused]] std::uint32_t StoreLane08WordAndReturn(
+  std::uint32_t StoreLane08WordAndReturn(
     Lane08WordWriterRuntimeView* const self,
     const std::uint32_t value
   ) noexcept
@@ -8663,7 +8663,7 @@ namespace
    * What it does:
    * Returns lane index `9` from one indexed dword runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWord9(const IndexedWordAccessorRuntimeView* const self) noexcept
+  std::uint32_t ReadIndexedWord9(const IndexedWordAccessorRuntimeView* const self) noexcept
   {
     return self->words[9];
   }
@@ -8674,7 +8674,7 @@ namespace
    * What it does:
    * Returns lane index `12` from one indexed dword runtime view.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWord12(const IndexedWordAccessorRuntimeView* const self) noexcept
+  std::uint32_t ReadIndexedWord12(const IndexedWordAccessorRuntimeView* const self) noexcept
   {
     return self->words[12];
   }
@@ -8685,7 +8685,7 @@ namespace
    * What it does:
    * Copies one dword from source offset `+0x44` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyWordAt44ToOutput(
+  std::uint32_t* CopyWordAt44ToOutput(
     std::uint32_t* const outValue,
     const WordAt44RuntimeView* const source
   ) noexcept
@@ -8700,7 +8700,7 @@ namespace
    * What it does:
    * Stores one source dword into destination offset `+0x44`.
    */
-  [[maybe_unused]] const std::uint32_t* StoreWordIntoLane44(
+  const std::uint32_t* StoreWordIntoLane44(
     WordAt44RuntimeView* const destination,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -8715,7 +8715,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x134`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt134(const WordAt134RuntimeView* const source) noexcept
+  std::uint32_t ReadWordAt134(const WordAt134RuntimeView* const source) noexcept
   {
     return source->lane134;
   }
@@ -8726,7 +8726,7 @@ namespace
    * What it does:
    * Writes `{source_address, source->lane04}` into one two-word output lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposePairFromSourceAddressAndLane4(
+  DwordPairRuntimeView* ComposePairFromSourceAddressAndLane4(
     DwordPairRuntimeView* const outValue,
     const Lane4AddressPairRuntimeView* const source
   ) noexcept
@@ -8742,7 +8742,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x99C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt99C(const WordAt99CRuntimeView* const source) noexcept
+  std::uint32_t ReadWordAt99C(const WordAt99CRuntimeView* const source) noexcept
   {
     return source->lane99C;
   }
@@ -8753,7 +8753,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x988`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt988(const RuntimeCounter988And98CRuntimeView* const source) noexcept
+  std::uint32_t ReadWordAt988(const RuntimeCounter988And98CRuntimeView* const source) noexcept
   {
     return source->lane988;
   }
@@ -8764,7 +8764,7 @@ namespace
    * What it does:
    * Returns lane `+0x98C` and post-increments it.
    */
-  [[maybe_unused]] std::uint32_t PostIncrementWordAt98C(RuntimeCounter988And98CRuntimeView* const source) noexcept
+  std::uint32_t PostIncrementWordAt98C(RuntimeCounter988And98CRuntimeView* const source) noexcept
   {
     const std::uint32_t previous = source->lane98C;
     source->lane98C = previous + 1u;
@@ -8777,7 +8777,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x8C4`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt8C4(const WordAt8C4RuntimeView* const source) noexcept
+  std::uint32_t ReadWordAt8C4(const WordAt8C4RuntimeView* const source) noexcept
   {
     return source->lane8C4;
   }
@@ -8789,7 +8789,7 @@ namespace
    * Dispatches the scalar deleting-destructor slot for one prefixed virtual
    * object pointer unless the slot is null or sentinel `4`.
    */
-  [[maybe_unused]] std::uint32_t DispatchPrefixedVirtualDeleteLane(
+  std::uint32_t DispatchPrefixedVirtualDeleteLane(
     const std::uint32_t* const objectSlot,
     const std::int32_t deleteFlag
   ) noexcept
@@ -8810,7 +8810,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfTheta(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfTheta(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -8823,7 +8823,7 @@ namespace
    * What it does:
    * Returns one dword from storage and clears that storage to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearDword(std::uint32_t* const valueSlot) noexcept
+  std::uint32_t TakeAndClearDword(std::uint32_t* const valueSlot) noexcept
   {
     const std::uint32_t value = *valueSlot;
     *valueSlot = 0u;
@@ -8837,7 +8837,7 @@ namespace
    * Returns 4-byte element count from one begin/end lane pair at
    * `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountDwordVectorElementsBeginAt4EndAtC(
+  std::int32_t CountDwordVectorElementsBeginAt4EndAtC(
     const DwordVectorBeginEndAt0x0CRuntimeView* const vectorLane
   ) noexcept
   {
@@ -8855,7 +8855,7 @@ namespace
    * What it does:
    * Clears one two-word output lane to `{0,0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLane6D7890(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLane6D7890(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -8868,7 +8868,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValues6DBA50(
+  std::uint32_t* SwapDwordSlotValues6DBA50(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -8886,7 +8886,7 @@ namespace
    * Returns 40-byte element count from one begin/end pair at offsets
    * `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountStride40ElementsBeginAt4EndAtC(
+  std::int32_t CountStride40ElementsBeginAt4EndAtC(
     const DwordVectorBeginEndAt0x0CRuntimeView* const vectorLane
   ) noexcept
   {
@@ -8906,7 +8906,7 @@ namespace
    * Returns 12-byte element count from one begin/end pair at offsets
    * `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountStride12ElementsBeginAt4EndAtC(
+  std::int32_t CountStride12ElementsBeginAt4EndAtC(
     const DwordVectorBeginEndAt0x0CRuntimeView* const vectorLane
   ) noexcept
   {
@@ -8924,7 +8924,7 @@ namespace
    * What it does:
    * Computes one `begin@+0x04 + index*12` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride12AddressFromBeginAt4(
+  std::uint32_t ComputeStride12AddressFromBeginAt4(
     const std::int32_t index,
     const DwordVectorBeginEndAt0x0CRuntimeView* const source
   ) noexcept
@@ -8938,7 +8938,7 @@ namespace
    * What it does:
    * Computes one `begin@+0x04 + index*40` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride40AddressFromBeginAt4(
+  std::uint32_t ComputeStride40AddressFromBeginAt4(
     const std::int32_t index,
     const DwordVectorBeginEndAt0x0CRuntimeView* const source
   ) noexcept
@@ -8952,7 +8952,7 @@ namespace
    * What it does:
    * Alias lane for `begin@+0x04 + index*12` address computation.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride12AddressFromBeginAt4Alias(
+  std::uint32_t ComputeStride12AddressFromBeginAt4Alias(
     const std::int32_t index,
     const DwordVectorBeginEndAt0x0CRuntimeView* const source
   ) noexcept
@@ -8966,7 +8966,7 @@ namespace
    * What it does:
    * Stores one `*base + index*12` byte address lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride12AddressFromBaseSlot(
+  std::uint32_t* StoreStride12AddressFromBaseSlot(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseSlot,
     const std::int32_t index
@@ -8982,7 +8982,7 @@ namespace
    * What it does:
    * Returns 12-byte index delta between two address lanes (`(*lhs-*rhs)/12`).
    */
-  [[maybe_unused]] std::int32_t ComputeStride12IndexFromPointerDeltaPrimary(
+  std::int32_t ComputeStride12IndexFromPointerDeltaPrimary(
     const std::uint32_t* const lhsAddressSlot,
     const std::uint32_t* const rhsAddressSlot
   ) noexcept
@@ -8997,7 +8997,7 @@ namespace
    * What it does:
    * Stores one `*base + index*40` byte address lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride40AddressFromBaseSlot(
+  std::uint32_t* StoreStride40AddressFromBaseSlot(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseSlot,
     const std::int32_t index
@@ -9014,7 +9014,7 @@ namespace
    * What it does:
    * Returns 40-byte index delta between two address lanes (`(*lhs-*rhs)/40`).
    */
-  [[maybe_unused]] std::int32_t ComputeStride40IndexFromPointerDelta(
+  std::int32_t ComputeStride40IndexFromPointerDelta(
     const std::uint32_t* const lhsAddressSlot,
     const std::uint32_t* const rhsAddressSlot
   ) noexcept
@@ -9049,7 +9049,7 @@ namespace
    * Copies one intrusive link-and-payload lane and inserts the copied link
    * into the owner slot chain.
    */
-  [[maybe_unused]] IntrusiveLinkWithPayloadRuntimeView* CopyIntrusiveLinkWithPayload(
+  IntrusiveLinkWithPayloadRuntimeView* CopyIntrusiveLinkWithPayload(
     IntrusiveLinkWithPayloadRuntimeView* const outValue,
     const IntrusiveLinkWithPayloadRuntimeView* const source
   ) noexcept
@@ -9073,7 +9073,7 @@ namespace
    * Initializes `count` contiguous intrusive-link lanes from one owner-slot
    * source, stitching each new lane into that owner-slot chain.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView* CopyIntrusiveLinkRangeFromOwnerSlotLane(
+  IntrusiveLinkRuntimeView* CopyIntrusiveLinkRangeFromOwnerSlotLane(
     IntrusiveLinkRuntimeView* outValue,
     std::uint32_t count,
     IntrusiveLinkRuntimeView*** const ownerSlotLane
@@ -9108,7 +9108,7 @@ namespace
    * fill lane into `CopyIntrusiveLinkRangeFromOwnerSlotLane` and returns the
    * advanced destination cursor.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView* CopyIntrusiveLinkRangeFromOwnerSlotLaneSourceFirstAdapterA(
+  IntrusiveLinkRuntimeView* CopyIntrusiveLinkRangeFromOwnerSlotLaneSourceFirstAdapterA(
     IntrusiveLinkRuntimeView* const outValue,
     IntrusiveLinkRuntimeView*** const ownerSlotLane,
     const std::int32_t count
@@ -9125,7 +9125,7 @@ namespace
    * What it does:
    * Advances one stored address lane in-place by `index*12` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride12(
+  std::uint32_t* AdvanceAddressLaneByStride12(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -9140,7 +9140,7 @@ namespace
    * What it does:
    * Alias lane for 12-byte index delta between two address slots.
    */
-  [[maybe_unused]] std::int32_t ComputeStride12IndexFromPointerDeltaSecondary(
+  std::int32_t ComputeStride12IndexFromPointerDeltaSecondary(
     const std::uint32_t* const lhsAddressSlot,
     const std::uint32_t* const rhsAddressSlot
   ) noexcept
@@ -9155,7 +9155,7 @@ namespace
    * What it does:
    * Advances one stored address lane in-place by `index*40` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride40(
+  std::uint32_t* AdvanceAddressLaneByStride40(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -9171,7 +9171,7 @@ namespace
    * What it does:
    * Advances one stored address lane by a single 40-byte element stride.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByOneStride40(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByOneStride40(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 40u;
     return addressLane;
@@ -9191,7 +9191,7 @@ namespace
    * What it does:
    * Stores one packed word as `lowWord | (highByte << 24)`.
    */
-  [[maybe_unused]] PackedHighByteWordRuntimeView* PackHighByteIntoWord(
+  PackedHighByteWordRuntimeView* PackHighByteIntoWord(
     PackedHighByteWordRuntimeView* const outValue,
     const std::int32_t highByte,
     const std::uint32_t lowWord
@@ -9207,7 +9207,7 @@ namespace
    * What it does:
    * Returns the top-byte lane from one packed dword.
    */
-  [[maybe_unused]] std::uint8_t ReadPackedWordTopByte(const PackedHighByteWordRuntimeView* const value) noexcept
+  std::uint8_t ReadPackedWordTopByte(const PackedHighByteWordRuntimeView* const value) noexcept
   {
     return static_cast<std::uint8_t>(value->packedWord >> 24u);
   }
@@ -9218,7 +9218,7 @@ namespace
    * What it does:
    * Returns true when packed top-byte lane is not `0xFF`.
    */
-  [[maybe_unused]] bool IsPackedWordTopByteNotFF(const PackedHighByteWordRuntimeView* const value) noexcept
+  bool IsPackedWordTopByteNotFF(const PackedHighByteWordRuntimeView* const value) noexcept
   {
     return (value->packedWord & 0xFF000000u) != 0xFF000000u;
   }
@@ -9288,7 +9288,7 @@ namespace
    * What it does:
    * Clears dword tail lanes `+0x04`, `+0x08`, and `+0x0C`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* ClearDwordQuadTailLanes(DwordQuadRuntimeView* const lane) noexcept
+  DwordQuadRuntimeView* ClearDwordQuadTailLanes(DwordQuadRuntimeView* const lane) noexcept
   {
     lane->lane04 = 0u;
     lane->lane08 = 0u;
@@ -9302,7 +9302,7 @@ namespace
    * What it does:
    * Returns true when one span lane is empty, treating null `begin` as empty.
    */
-  [[maybe_unused]] bool IsDwordSpanBeginEndAt4And8Empty(const DwordSpanRuntimeView* const span) noexcept
+  bool IsDwordSpanBeginEndAt4And8Empty(const DwordSpanRuntimeView* const span) noexcept
   {
     return span->begin == 0u || CountDwordSlotsBetweenAddresses(span->end, span->begin) == 0;
   }
@@ -9313,7 +9313,7 @@ namespace
    * What it does:
    * Writes one dword pair from two source-word pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteDwordPairFromWordPointers(
+  DwordPairRuntimeView* WriteDwordPairFromWordPointers(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const firstSource,
     const std::uint32_t* const secondSource
@@ -9330,7 +9330,7 @@ namespace
    * What it does:
    * Returns the dword count between span lanes `+0x04` and `+0x0C`.
    */
-  [[maybe_unused]] std::int32_t CountDwordSpanCursorFromBegin(const DwordSpanRuntimeView* const span) noexcept
+  std::int32_t CountDwordSpanCursorFromBegin(const DwordSpanRuntimeView* const span) noexcept
   {
     if (span->begin == 0u) {
       return 0;
@@ -9344,7 +9344,7 @@ namespace
    * What it does:
    * Returns the dword count between span lanes `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] std::int32_t CountDwordSpanEndFromBegin(const DwordSpanRuntimeView* const span) noexcept
+  std::int32_t CountDwordSpanEndFromBegin(const DwordSpanRuntimeView* const span) noexcept
   {
     if (span->begin == 0u) {
       return 0;
@@ -9358,7 +9358,7 @@ namespace
    * What it does:
    * Writes one `{dword, byte}` lane from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* WriteDwordBytePairFromPointers(
+  DwordBytePairLane* WriteDwordBytePairFromPointers(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -9375,7 +9375,7 @@ namespace
    * What it does:
    * Stores `base + index * 4` into one output address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordStrideAddress(
+  std::uint32_t* StoreDwordStrideAddress(
     std::uint32_t* const outAddress,
     const std::uint32_t* const baseAddress,
     const std::int32_t index
@@ -9391,7 +9391,7 @@ namespace
    * What it does:
    * Returns the dword-slot distance between two address lanes.
    */
-  [[maybe_unused]] std::int32_t CountDwordAddressDistanceA(
+  std::int32_t CountDwordAddressDistanceA(
     const std::uint32_t* const leftAddress,
     const std::uint32_t* const rightAddress
   ) noexcept
@@ -9405,7 +9405,7 @@ namespace
    * What it does:
    * Advances one address lane by `count * 4`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByDwordCountA(
+  std::uint32_t* AdvanceAddressLaneByDwordCountA(
     std::uint32_t* const addressLane,
     const std::int32_t count
   ) noexcept
@@ -9420,7 +9420,7 @@ namespace
    * What it does:
    * Alias lane for dword-slot distance between two address lanes.
    */
-  [[maybe_unused]] std::int32_t CountDwordAddressDistanceB(
+  std::int32_t CountDwordAddressDistanceB(
     const std::uint32_t* const leftAddress,
     const std::uint32_t* const rightAddress
   ) noexcept
@@ -9434,7 +9434,7 @@ namespace
    * What it does:
    * Initializes one five-dword lane payload and clears two trailing flags.
    */
-  [[maybe_unused]] DwordQuintWithFlagPairRuntimeView* InitializeDwordQuintWithFlags(
+  DwordQuintWithFlagPairRuntimeView* InitializeDwordQuintWithFlags(
     DwordQuintWithFlagPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const DwordPairRuntimeView* const sourcePair,
@@ -9458,7 +9458,7 @@ namespace
    * What it does:
    * Copies one source dword into output when output storage is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentA(
+  std::uint32_t* CopySourceWordIfOutputPresentA(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -9475,7 +9475,7 @@ namespace
    * What it does:
    * Alias lane for advancing one address lane by `count * 4`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByDwordCountB(
+  std::uint32_t* AdvanceAddressLaneByDwordCountB(
     std::uint32_t* const addressLane,
     const std::int32_t count
   ) noexcept
@@ -9494,7 +9494,7 @@ namespace
    * What it does:
    * Swaps dword tail lanes `(+0x04,+0x08,+0x0C)` between two quad lanes.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesA(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesA(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -9519,7 +9519,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword when output is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentB(
+  std::uint32_t* CopySourceWordIfOutputPresentB(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -9536,7 +9536,7 @@ namespace
    * What it does:
    * Alias lane for swapping dword tail lanes `(+0x04,+0x08,+0x0C)`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesB(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesB(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -9561,7 +9561,7 @@ namespace
    * What it does:
    * Rewinds lane `+0x08` to lane `+0x04` when they differ.
    */
-  [[maybe_unused]] void AlignLane08ToLane04IfDifferent(DwordTripleRuntimeView* const lane) noexcept
+  void AlignLane08ToLane04IfDifferent(DwordTripleRuntimeView* const lane) noexcept
   {
     if (lane->lane04 != lane->lane08) {
       lane->lane08 = lane->lane04;
@@ -9589,7 +9589,7 @@ namespace
    * What it does:
    * Swaps one dword between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots(
+  std::uint32_t* SwapDwordSlots(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -9606,7 +9606,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword when output is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentC(
+  std::uint32_t* CopySourceWordIfOutputPresentC(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -9623,7 +9623,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword when output is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentD(
+  std::uint32_t* CopySourceWordIfOutputPresentD(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -9640,7 +9640,7 @@ namespace
    * What it does:
    * Copies one source dword lane into destination storage.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordToOutput(
+  std::uint32_t* CopySourceWordToOutput(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -9695,7 +9695,7 @@ namespace
    * Writes one 16-byte word block through stream write-window fast path with
    * virtual fallback.
    */
-  [[maybe_unused]] std::uint32_t* WriteStreamWordBlock16(
+  std::uint32_t* WriteStreamWordBlock16(
     StreamWriteWindowRuntimeView* const* const streamSlot,
     const std::uint32_t* const sourceWords
   ) noexcept
@@ -9710,7 +9710,7 @@ namespace
    * Writes one 8-byte word block through stream write-window fast path with
    * virtual fallback.
    */
-  [[maybe_unused]] std::uint32_t* WriteStreamWordBlock8(
+  std::uint32_t* WriteStreamWordBlock8(
     StreamWriteWindowRuntimeView* const* const streamSlot,
     const std::uint32_t* const sourceWords
   ) noexcept
@@ -9725,7 +9725,7 @@ namespace
    * Writes one 12-byte word block through stream write-window fast path with
    * virtual fallback.
    */
-  [[maybe_unused]] std::uint32_t* WriteStreamWordBlock12(
+  std::uint32_t* WriteStreamWordBlock12(
     StreamWriteWindowRuntimeView* const* const streamSlot,
     const std::uint32_t* const sourceWords
   ) noexcept
@@ -9739,7 +9739,7 @@ namespace
    * What it does:
    * Advances one address lane by one dword slot.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByOneDword(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByOneDword(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 4u;
     return addressLane;
@@ -9751,7 +9751,7 @@ namespace
    * What it does:
    * Copy-assigns one four-dword lane.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* CopyDwordQuadLane(
+  DwordQuadRuntimeView* CopyDwordQuadLane(
     DwordQuadRuntimeView* const destination,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -9770,7 +9770,7 @@ namespace
    * Initializes one self-relative lane block with anchors at `self + 0x20`
    * and `self + 0x28`.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockRuntimeView* InitializeSelfRelativeLaneBlockA(
+  SelfRelativeLaneBlockRuntimeView* InitializeSelfRelativeLaneBlockA(
     SelfRelativeLaneBlockRuntimeView* const self
   ) noexcept
   {
@@ -9793,7 +9793,7 @@ namespace
    * Initializes one four-lane self-relative header with anchors at
    * `self + 0x10` and `self + 0x20`.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockRuntimeView* InitializeSelfRelativeLaneBlockB(
+  SelfRelativeLaneBlockRuntimeView* InitializeSelfRelativeLaneBlockB(
     SelfRelativeLaneBlockRuntimeView* const self
   ) noexcept
   {
@@ -9814,7 +9814,7 @@ namespace
    * What it does:
    * Stores two scalar dwords into lanes `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* StoreLane04AndLane08A(
+  DwordTripleRuntimeView* StoreLane04AndLane08A(
     DwordTripleRuntimeView* const lane,
     const std::uint32_t lane04,
     const std::uint32_t lane08
@@ -9831,7 +9831,7 @@ namespace
    * What it does:
    * Alias lane for storing scalar dwords into `+0x04` and `+0x08`.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* StoreLane04AndLane08B(
+  DwordTripleRuntimeView* StoreLane04AndLane08B(
     DwordTripleRuntimeView* const lane,
     const std::uint32_t lane04,
     const std::uint32_t lane08
@@ -9848,7 +9848,7 @@ namespace
    * What it does:
    * Initializes one three-dword-and-flag lane payload.
    */
-  [[maybe_unused]] DwordTripleAndFlagRuntimeView* InitializeDwordTripleAndFlag(
+  DwordTripleAndFlagRuntimeView* InitializeDwordTripleAndFlag(
     DwordTripleAndFlagRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -9869,7 +9869,7 @@ namespace
    * What it does:
    * Initializes one three-dword-and-flag lane from source pair-plus-byte.
    */
-  [[maybe_unused]] DwordTripleAndFlagRuntimeView* InitializeDwordTripleAndFlagFromSources(
+  DwordTripleAndFlagRuntimeView* InitializeDwordTripleAndFlagFromSources(
     DwordTripleAndFlagRuntimeView* const outValue,
     const DwordTripleRuntimeView* const source,
     const std::uint8_t* const sourceByte
@@ -9888,7 +9888,7 @@ namespace
    * What it does:
    * Returns true when the first two dword lanes are equal.
    */
-  [[maybe_unused]] bool AreFirstTwoDwordLanesEqual(const DwordPairRuntimeView* const lane) noexcept
+  bool AreFirstTwoDwordLanesEqual(const DwordPairRuntimeView* const lane) noexcept
   {
     return lane->lane00 == lane->lane04;
   }
@@ -9899,7 +9899,7 @@ namespace
    * What it does:
    * Returns true when lane `+0x08` differs between two triple-lane values.
    */
-  [[maybe_unused]] bool IsLane08Different(
+  bool IsLane08Different(
     const DwordTripleRuntimeView* const left,
     const DwordTripleRuntimeView* const right
   ) noexcept
@@ -10060,7 +10060,7 @@ namespace
    * What it does:
    * Swaps one dword slot value between two pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots71A(
+  std::uint32_t* SwapDwordSlots71A(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -10079,7 +10079,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanes71A(
+  DwordPairRuntimeView* SwapDwordPairLanes71A(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -10100,7 +10100,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword slot value.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots71B(
+  std::uint32_t* SwapDwordSlots71B(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -10117,7 +10117,7 @@ namespace
    * What it does:
    * Maps one flat grid-cell index to centered X/Z world-space coordinates.
    */
-  [[maybe_unused]] GridCellPositionRuntimeView* BuildGridCellCenterPosition(
+  GridCellPositionRuntimeView* BuildGridCellCenterPosition(
     const GridCellMapperRuntimeView* const mapper,
     GridCellPositionRuntimeView* const outPosition,
     const std::int32_t cellIndex
@@ -10137,7 +10137,7 @@ namespace
    * What it does:
    * Stores one fixed sentinel dword value `0xF0000000`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSentinelWordF0000000(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreSentinelWordF0000000(std::uint32_t* const outValue) noexcept
   {
     *outValue = 0xF0000000u;
     return outValue;
@@ -10149,7 +10149,7 @@ namespace
    * What it does:
    * Reads one nested head dword through source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyNestedHeadWord71A(
+  std::uint32_t* CopyNestedHeadWord71A(
     std::uint32_t* const outValue,
     const PointerHeadAt4RuntimeView* const source
   ) noexcept
@@ -10164,7 +10164,7 @@ namespace
    * What it does:
    * Advances one stored address lane by 56 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride56A(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByStride56A(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 56u;
     return addressLane;
@@ -10176,7 +10176,7 @@ namespace
    * What it does:
    * Advances one stored address lane by 140 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride140A(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByStride140A(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 140u;
     return addressLane;
@@ -10188,7 +10188,7 @@ namespace
    * What it does:
    * Alias lane for advancing one address lane by 56 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride56B(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByStride56B(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 56u;
     return addressLane;
@@ -10200,7 +10200,7 @@ namespace
    * What it does:
    * Computes lower-bound node for one key in a tree with sentinel flag at `+0x3D`.
    */
-  [[maybe_unused]] TreeNodeFlagAt3DRuntimeView** LowerBoundTreeNodeFlag3DToOutput(
+  TreeNodeFlagAt3DRuntimeView** LowerBoundTreeNodeFlag3DToOutput(
     TreeNodeFlagAt3DRuntimeView** const outNode,
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt3DRuntimeView>* const tree,
     const std::uint32_t* const key
@@ -10216,7 +10216,7 @@ namespace
    * What it does:
    * Returns element count for one begin/cursor span using 56-byte stride.
    */
-  [[maybe_unused]] std::int32_t CountStride56ElementsBeginToCursor(
+  std::int32_t CountStride56ElementsBeginToCursor(
     const AddressSpanBeginCursorAt4AndCRuntimeView* const span
   ) noexcept
   {
@@ -10229,7 +10229,7 @@ namespace
    * What it does:
    * Returns 60-byte element count between begin (`+0x04`) and cursor (`+0x0C`).
    */
-  [[maybe_unused]] std::int32_t CountStride60ElementsBeginToCursor(
+  std::int32_t CountStride60ElementsBeginToCursor(
     const AddressSpanBeginCursorAt4AndCRuntimeView* const span
   ) noexcept
   {
@@ -10242,7 +10242,7 @@ namespace
    * What it does:
    * Computes lower-bound node for one key in a tree with sentinel flag at `+0x15`.
    */
-  [[maybe_unused]] TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutput(
+  TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutput(
     TreeNodeFlagAt15RuntimeView** const outNode,
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt15RuntimeView>* const tree,
     const std::uint32_t* const key
@@ -10258,7 +10258,7 @@ namespace
    * What it does:
    * Returns element count for one begin/cursor span using 140-byte stride.
    */
-  [[maybe_unused]] std::int32_t CountStride140ElementsBeginToCursor(
+  std::int32_t CountStride140ElementsBeginToCursor(
     const AddressSpanBeginCursorAt4AndCRuntimeView* const span
   ) noexcept
   {
@@ -10271,7 +10271,7 @@ namespace
    * What it does:
    * Writes one dword pair from two source-word pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposeDwordPairFromTwoWordSources71A(
+  DwordPairRuntimeView* ComposeDwordPairFromTwoWordSources71A(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const firstSource,
     const std::uint32_t* const secondSource
@@ -10288,7 +10288,7 @@ namespace
    * What it does:
    * Writes one prefixed dword plus one 44-byte mixed payload lane.
    */
-  [[maybe_unused]] PrefixedDwordPayload48RuntimeView* ComposePrefixedPayload48(
+  PrefixedDwordPayload48RuntimeView* ComposePrefixedPayload48(
     PrefixedDwordPayload48RuntimeView* const outValue,
     const std::uint32_t* const prefixSource,
     const DwordPairFloatPayload44RuntimeView* const payloadSource
@@ -10305,7 +10305,7 @@ namespace
    * What it does:
    * Alias lane for advancing one stored address lane by 140 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride140B(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByStride140B(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 140u;
     return addressLane;
@@ -10317,7 +10317,7 @@ namespace
    * What it does:
    * Returns 16-byte element count between begin (`+0x04`) and cursor (`+0x0C`).
    */
-  [[maybe_unused]] std::int32_t CountStride16ElementsBeginToCursor(
+  std::int32_t CountStride16ElementsBeginToCursor(
     const AddressSpanBeginCursorAt4AndCRuntimeView* const span
   ) noexcept
   {
@@ -10330,7 +10330,7 @@ namespace
    * What it does:
    * Copy-assigns one 44-byte mixed dword/float payload lane.
    */
-  [[maybe_unused]] DwordPairFloatPayload44RuntimeView* CopyPayload44MixedLanes(
+  DwordPairFloatPayload44RuntimeView* CopyPayload44MixedLanes(
     DwordPairFloatPayload44RuntimeView* const outValue,
     const DwordPairFloatPayload44RuntimeView* const source
   ) noexcept
@@ -10345,7 +10345,7 @@ namespace
    * What it does:
    * Alias lane for reading one nested head dword through source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyNestedHeadWord71B(
+  std::uint32_t* CopyNestedHeadWord71B(
     std::uint32_t* const outValue,
     const PointerHeadAt4RuntimeView* const source
   ) noexcept
@@ -10360,7 +10360,7 @@ namespace
    * What it does:
    * Returns lower-bound node pointer for one key in a tree with sentinel flag at `+0x3D`.
    */
-  [[maybe_unused]] TreeNodeFlagAt3DRuntimeView* LowerBoundTreeNodeFlag3D(
+  TreeNodeFlagAt3DRuntimeView* LowerBoundTreeNodeFlag3D(
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt3DRuntimeView>* const tree,
     const std::uint32_t* const key
   ) noexcept
@@ -10374,7 +10374,7 @@ namespace
    * What it does:
    * Alias lane for reading one nested head dword through source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyNestedHeadWord71C(
+  std::uint32_t* CopyNestedHeadWord71C(
     std::uint32_t* const outValue,
     const PointerHeadAt4RuntimeView* const source
   ) noexcept
@@ -10389,7 +10389,7 @@ namespace
    * What it does:
    * Alias lane for reading one nested head dword through source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyNestedHeadWord71D(
+  std::uint32_t* CopyNestedHeadWord71D(
     std::uint32_t* const outValue,
     const PointerHeadAt4RuntimeView* const source
   ) noexcept
@@ -10404,7 +10404,7 @@ namespace
    * What it does:
    * Returns lower-bound node pointer for one key in a tree with sentinel flag at `+0x15`.
    */
-  [[maybe_unused]] TreeNodeFlagAt15RuntimeView* LowerBoundTreeNodeFlag15(
+  TreeNodeFlagAt15RuntimeView* LowerBoundTreeNodeFlag15(
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt15RuntimeView>* const tree,
     const std::uint32_t* const key
   ) noexcept
@@ -10418,7 +10418,7 @@ namespace
    * What it does:
    * Clears one output dword lane to zero.
    */
-  [[maybe_unused]] std::uint32_t* ClearDwordLane71A(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ClearDwordLane71A(std::uint32_t* const outValue) noexcept
   {
     *outValue = 0u;
     return outValue;
@@ -10430,7 +10430,7 @@ namespace
    * What it does:
    * Alias lane for clearing one output dword to zero.
    */
-  [[maybe_unused]] std::uint32_t* ClearDwordLane71B(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ClearDwordLane71B(std::uint32_t* const outValue) noexcept
   {
     *outValue = 0u;
     return outValue;
@@ -10442,7 +10442,7 @@ namespace
    * What it does:
    * Stores one `base + index * 140` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride140Address(
+  std::uint32_t* StoreStride140Address(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseAddress,
     const std::int32_t index
@@ -10458,7 +10458,7 @@ namespace
    * What it does:
    * Returns 140-byte index delta between two address lanes.
    */
-  [[maybe_unused]] std::int32_t ComputeStride140IndexFromPointerDelta(
+  std::int32_t ComputeStride140IndexFromPointerDelta(
     const std::uint32_t* const lhsAddress,
     const std::uint32_t* const rhsAddress
   ) noexcept
@@ -10472,7 +10472,7 @@ namespace
    * What it does:
    * Stores one `base + index * 56` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride56Address(
+  std::uint32_t* StoreStride56Address(
     std::uint32_t* const outValue,
     const std::int32_t index,
     const std::uint32_t* const baseAddress
@@ -10488,7 +10488,7 @@ namespace
    * What it does:
    * Returns 56-byte index delta between two address lanes.
    */
-  [[maybe_unused]] std::int32_t ComputeStride56IndexFromPointerDelta(
+  std::int32_t ComputeStride56IndexFromPointerDelta(
     const std::uint32_t* const lhsAddress,
     const std::uint32_t* const rhsAddress
   ) noexcept
@@ -10502,7 +10502,7 @@ namespace
    * What it does:
    * Stores one `base + index * 16` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride16Address(
+  std::uint32_t* StoreStride16Address(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseAddress,
     const std::int32_t index
@@ -10763,7 +10763,7 @@ namespace
    * What it does:
    * Stores one dword into lanes `+0x0E0/+0x0E4` and marks byte lane `+0x141`.
    */
-  [[maybe_unused]] LaneE0E4AndFlag141RuntimeView* StoreLaneE0AndE4AndMarkFlag141(
+  LaneE0E4AndFlag141RuntimeView* StoreLaneE0AndE4AndMarkFlag141(
     LaneE0E4AndFlag141RuntimeView* const self,
     const std::uint32_t value
   ) noexcept
@@ -10780,7 +10780,7 @@ namespace
    * What it does:
    * Stores one dword into lane `+0x1C`.
    */
-  [[maybe_unused]] WordAt1CRuntimeView* StoreLane1CWord(
+  WordAt1CRuntimeView* StoreLane1CWord(
     WordAt1CRuntimeView* const self,
     const std::uint32_t value
   ) noexcept
@@ -10796,7 +10796,7 @@ namespace
    * Returns lane `+0xE4` from one prefixed object selected by index from an
    * 8-byte stride span at `(+0x10,+0x14)`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedPrefixedLaneE4(
+  std::uint32_t ReadIndexedPrefixedLaneE4(
     const PointerSpanStride8At10RuntimeView* const span,
     const std::uint32_t index
   ) noexcept
@@ -10832,7 +10832,7 @@ namespace
    * Returns 4-byte element count from one begin/end pair at offsets
    * `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountDwordElementsBeginAt4EndAtCAlias(
+  std::int32_t CountDwordElementsBeginAt4EndAtCAlias(
     const DwordVectorBeginEndAt0x0CRuntimeView* const vectorLane
   ) noexcept
   {
@@ -10845,7 +10845,7 @@ namespace
    * What it does:
    * Stores one `*base + index * 4` address lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride4AddressFromBaseWord(
+  std::uint32_t* StoreStride4AddressFromBaseWord(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -10860,7 +10860,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index * 4` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByDwordCountC(
+  std::uint32_t* AdvanceAddressLaneByDwordCountC(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -10874,7 +10874,7 @@ namespace
    * What it does:
    * Returns 4-byte element distance between two stored address lanes.
    */
-  [[maybe_unused]] std::int32_t CountDwordAddressDistanceC(
+  std::int32_t CountDwordAddressDistanceC(
     const std::uint32_t* const lhsAddress,
     const std::uint32_t* const rhsAddress
   ) noexcept
@@ -10888,7 +10888,7 @@ namespace
    * What it does:
    * Clears one two-word output lane to `{0,0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneA(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneA(DwordPairRuntimeView* const outValue) noexcept
   {
     return ClearDwordPairLane6D7890(outValue);
   }
@@ -10899,7 +10899,7 @@ namespace
    * What it does:
    * Writes one two-word lane from ordered scalar inputs.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteOrderedDwordPair(
+  DwordPairRuntimeView* WriteOrderedDwordPair(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -10917,7 +10917,7 @@ namespace
    * Stores one scalar dword into lane `+0x27C` and mirrors source lane
    * `source@+0x148 -> +0x900` into lane `+0x280`.
    */
-  [[maybe_unused]] SourceAt148AndTailRuntimeView* CaptureSourceLane900IntoTail(
+  SourceAt148AndTailRuntimeView* CaptureSourceLane900IntoTail(
     SourceAt148AndTailRuntimeView* const self,
     const std::uint32_t lane27CValue
   ) noexcept
@@ -10934,7 +10934,7 @@ namespace
    * Initializes one four-lane self-relative header with anchors at
    * `self + 0x10` and `self + 0x60`.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockTail60RuntimeView* InitializeSelfRelativeLaneBlockTail60(
+  SelfRelativeLaneBlockTail60RuntimeView* InitializeSelfRelativeLaneBlockTail60(
     SelfRelativeLaneBlockTail60RuntimeView* const self
   ) noexcept
   {
@@ -10953,7 +10953,7 @@ namespace
    * What it does:
    * Clears one 14-word lane block.
    */
-  [[maybe_unused]] FourteenWordRuntimeView* ClearFourteenWordBlock(FourteenWordRuntimeView* const outValue) noexcept
+  FourteenWordRuntimeView* ClearFourteenWordBlock(FourteenWordRuntimeView* const outValue) noexcept
   {
     for (auto& lane : outValue->lanes) {
       lane = 0u;
@@ -10967,7 +10967,7 @@ namespace
    * What it does:
    * Clears lanes `+0x04`, `+0x08`, `+0x0C`, and `+0x10`.
    */
-  [[maybe_unused]] FiveWordRuntimeView* ClearLanes04Through10(FiveWordRuntimeView* const outValue) noexcept
+  FiveWordRuntimeView* ClearLanes04Through10(FiveWordRuntimeView* const outValue) noexcept
   {
     outValue->lane04 = 0u;
     outValue->lane08 = 0u;
@@ -10982,7 +10982,7 @@ namespace
    * What it does:
    * Reads one dword lane from offset `+0x97C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt97C(const WordAt97CRuntimeView* const source) noexcept
+  std::uint32_t ReadWordAt97C(const WordAt97CRuntimeView* const source) noexcept
   {
     return source->lane97C;
   }
@@ -10993,7 +10993,7 @@ namespace
    * What it does:
    * Returns `max(lane04, lane08) - 1` from one pointed lane pair.
    */
-  [[maybe_unused]] std::int32_t ReadMaxLane04OrLane08MinusOne(
+  std::int32_t ReadMaxLane04OrLane08MinusOne(
     const WordPairAt4And8RuntimeView* const* const sourceSlot
   ) noexcept
   {
@@ -11009,7 +11009,7 @@ namespace
    * What it does:
    * Reads one byte lane from offset `+0x54`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteAt54(const ByteAt54RuntimeView* const source) noexcept
+  std::uint8_t ReadByteAt54(const ByteAt54RuntimeView* const source) noexcept
   {
     return source->lane54;
   }
@@ -11021,7 +11021,7 @@ namespace
    * Returns inline storage address at `+0x74` when length `+0x88 < 16`,
    * otherwise returns heap-pointer lane `+0x74`.
    */
-  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt74(const InlineStorageAt74RuntimeView* const source) noexcept
+  std::uint32_t ResolveStoragePointerAt74(const InlineStorageAt74RuntimeView* const source) noexcept
   {
     if (source->length88 < 16u) {
       return reinterpret_cast<std::uint32_t>(const_cast<std::uint32_t*>(&source->lane74));
@@ -11036,7 +11036,7 @@ namespace
    * Returns inline storage address at `+0x90` when length `+0xA4 < 16`,
    * otherwise returns heap-pointer lane `+0x90`.
    */
-  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt90(const InlineStorageAt90RuntimeView* const source) noexcept
+  std::uint32_t ResolveStoragePointerAt90(const InlineStorageAt90RuntimeView* const source) noexcept
   {
     if (source->lengthA4 < 16u) {
       return reinterpret_cast<std::uint32_t>(const_cast<std::uint32_t*>(&source->lane90));
@@ -11050,7 +11050,7 @@ namespace
    * What it does:
    * Reads one byte lane from offset `+0xE0`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteAtE0(const ByteAtE0RuntimeView* const source) noexcept
+  std::uint8_t ReadByteAtE0(const ByteAtE0RuntimeView* const source) noexcept
   {
     return source->laneE0;
   }
@@ -11062,7 +11062,7 @@ namespace
    * Copy-assigns one `{object, owner}` pair and increments owner use-count
    * lane `+0x04` when owner is present.
    */
-  [[maybe_unused]] SharedOwnerPairRuntimeView* CopySharedOwnerPairAndRetain(
+  SharedOwnerPairRuntimeView* CopySharedOwnerPairAndRetain(
     SharedOwnerPairRuntimeView* const destination,
     const SharedOwnerPairRuntimeView* const source
   ) noexcept
@@ -11083,7 +11083,7 @@ namespace
    * What it does:
    * Clears one two-word output lane to `{0,0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneB(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneB(DwordPairRuntimeView* const outValue) noexcept
   {
     return ClearDwordPairLane6D7890(outValue);
   }
@@ -11095,7 +11095,7 @@ namespace
    * Initializes one four-lane self-relative header with anchors at
    * `self + 0x10` and `self + 0x30`.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockTail30RuntimeView* InitializeSelfRelativeLaneBlockTail30(
+  SelfRelativeLaneBlockTail30RuntimeView* InitializeSelfRelativeLaneBlockTail30(
     SelfRelativeLaneBlockTail30RuntimeView* const self
   ) noexcept
   {
@@ -11114,7 +11114,7 @@ namespace
    * What it does:
    * Computes one `begin@+0x04 + index*40` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride40AddressFromBeginAt4AliasA(
+  std::uint32_t ComputeStride40AddressFromBeginAt4AliasA(
     const std::int32_t index,
     const DwordVectorBeginEndAt0x0CRuntimeView* const source
   ) noexcept
@@ -11128,7 +11128,7 @@ namespace
    * What it does:
    * Alias lane for `begin@+0x04 + index*40` address computation.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride40AddressFromBeginAt4AliasB(
+  std::uint32_t ComputeStride40AddressFromBeginAt4AliasB(
     const std::int32_t index,
     const DwordVectorBeginEndAt0x0CRuntimeView* const source
   ) noexcept
@@ -11142,7 +11142,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesA(
+  std::uint32_t* SwapDwordSlotValuesA(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11156,7 +11156,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesB(
+  std::uint32_t* SwapDwordSlotValuesB(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11170,7 +11170,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesC(
+  std::uint32_t* SwapDwordSlotValuesC(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11184,7 +11184,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesD(
+  std::uint32_t* SwapDwordSlotValuesD(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11198,7 +11198,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesE(
+  std::uint32_t* SwapDwordSlotValuesE(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11270,7 +11270,7 @@ namespace
    * What it does:
    * Returns 16-byte index delta between two address slots.
    */
-  [[maybe_unused]] std::int32_t ComputeStride16IndexFromPointerDeltaA(
+  std::int32_t ComputeStride16IndexFromPointerDeltaA(
     const std::uint32_t* const leftAddress,
     const std::uint32_t* const rightAddress
   ) noexcept
@@ -11284,7 +11284,7 @@ namespace
    * What it does:
    * Copy-assigns one four-float lane payload.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* CopyFloat4Lane(
+  Float4LaneRuntimeView* CopyFloat4Lane(
     Float4LaneRuntimeView* const outValue,
     const Float4LaneRuntimeView* const source
   ) noexcept
@@ -11299,7 +11299,7 @@ namespace
    * What it does:
    * Returns 56-byte index delta between two address lanes.
    */
-  [[maybe_unused]] std::int32_t ComputeStride56IndexFromPointerDeltaB(
+  std::int32_t ComputeStride56IndexFromPointerDeltaB(
     const std::uint32_t* const leftAddress,
     const std::uint32_t* const rightAddress
   ) noexcept
@@ -11313,7 +11313,7 @@ namespace
    * What it does:
    * Clears one output dword lane to zero.
    */
-  [[maybe_unused]] std::uint32_t* ClearDwordLaneA(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ClearDwordLaneA(std::uint32_t* const outValue) noexcept
   {
     *outValue = 0u;
     return outValue;
@@ -11325,7 +11325,7 @@ namespace
    * What it does:
    * Alias lane for clearing one output dword to zero.
    */
-  [[maybe_unused]] std::uint32_t* ClearDwordLaneB(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ClearDwordLaneB(std::uint32_t* const outValue) noexcept
   {
     *outValue = 0u;
     return outValue;
@@ -11337,7 +11337,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 140`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride140C(
+  std::uint32_t* AdvanceAddressLaneByStride140C(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -11352,7 +11352,7 @@ namespace
    * What it does:
    * Returns 140-byte index delta between two address lanes.
    */
-  [[maybe_unused]] std::int32_t ComputeStride140IndexFromPointerDeltaB(
+  std::int32_t ComputeStride140IndexFromPointerDeltaB(
     const std::uint32_t* const leftAddress,
     const std::uint32_t* const rightAddress
   ) noexcept
@@ -11366,7 +11366,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 56`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride56C(
+  std::uint32_t* AdvanceAddressLaneByStride56C(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -11381,7 +11381,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 16`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride16A(
+  std::uint32_t* AdvanceAddressLaneByStride16A(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -11396,7 +11396,7 @@ namespace
    * What it does:
    * Alias lane for 16-byte index delta between address slots.
    */
-  [[maybe_unused]] std::int32_t ComputeStride16IndexFromPointerDeltaB(
+  std::int32_t ComputeStride16IndexFromPointerDeltaB(
     const std::uint32_t* const leftAddress,
     const std::uint32_t* const rightAddress
   ) noexcept
@@ -11410,7 +11410,7 @@ namespace
    * What it does:
    * Writes one `{dword, byte}` lane from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* WriteDwordBytePairFromPointersA(
+  DwordBytePairLane* WriteDwordBytePairFromPointersA(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -11427,7 +11427,7 @@ namespace
    * What it does:
    * Alias lane for writing one `{dword, byte}` payload.
    */
-  [[maybe_unused]] DwordBytePairLane* WriteDwordBytePairFromPointersB(
+  DwordBytePairLane* WriteDwordBytePairFromPointersB(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -11444,7 +11444,7 @@ namespace
    * What it does:
    * Copies one source dword into output when output storage is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentE(
+  std::uint32_t* CopySourceWordIfOutputPresentE(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -11461,7 +11461,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword when output is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentF(
+  std::uint32_t* CopySourceWordIfOutputPresentF(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -11478,7 +11478,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 56`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride56D(
+  std::uint32_t* AdvanceAddressLaneByStride56D(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -11493,7 +11493,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 140`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride140D(
+  std::uint32_t* AdvanceAddressLaneByStride140D(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -11508,7 +11508,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 16`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride16B(
+  std::uint32_t* AdvanceAddressLaneByStride16B(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -11523,7 +11523,7 @@ namespace
    * What it does:
    * Initializes one five-dword lane payload and clears two trailing flags.
    */
-  [[maybe_unused]] DwordQuintWithFlagPairRuntimeView* InitializeDwordQuintWithFlagsB(
+  DwordQuintWithFlagPairRuntimeView* InitializeDwordQuintWithFlagsB(
     DwordQuintWithFlagPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const DwordPairRuntimeView* const sourcePair,
@@ -11547,7 +11547,7 @@ namespace
    * What it does:
    * Copy-assigns one mixed 48-byte dword/float payload lane.
    */
-  [[maybe_unused]] DwordTripleFloatPayload48RuntimeView* CopyMixedPayload48(
+  DwordTripleFloatPayload48RuntimeView* CopyMixedPayload48(
     DwordTripleFloatPayload48RuntimeView* const outValue,
     const DwordTripleFloatPayload48RuntimeView* const source
   ) noexcept
@@ -11562,7 +11562,7 @@ namespace
    * What it does:
    * Swaps dword tail lanes `(+0x04,+0x08,+0x0C)` between two quad lanes.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesC(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesC(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -11587,7 +11587,7 @@ namespace
    * What it does:
    * Alias lane for swapping dword tail lanes between two quads.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesD(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesD(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -11612,7 +11612,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword when output is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentG(
+  std::uint32_t* CopySourceWordIfOutputPresentG(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -11629,7 +11629,7 @@ namespace
    * What it does:
    * Alias lane for copying one source dword when output is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentH(
+  std::uint32_t* CopySourceWordIfOutputPresentH(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -11646,7 +11646,7 @@ namespace
    * What it does:
    * Alias lane for swapping dword tail lanes between two quads.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesE(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesE(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -11671,7 +11671,7 @@ namespace
    * What it does:
    * Alias lane for swapping dword tail lanes between two quads.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesF(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesF(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -11696,7 +11696,7 @@ namespace
    * What it does:
    * Fills one 56-byte payload range `[begin, end)` with one template payload.
    */
-  [[maybe_unused]] Payload56RuntimeView* FillPayload56Range(
+  Payload56RuntimeView* FillPayload56Range(
     Payload56RuntimeView* begin,
     Payload56RuntimeView* end,
     const Payload56RuntimeView* const value
@@ -11716,7 +11716,7 @@ namespace
    * Backward-copies one 56-byte payload range from `[sourceBegin, sourceEnd)`
    * into destination ending at `destEnd`.
    */
-  [[maybe_unused]] Payload56RuntimeView* CopyPayload56RangeBackward(
+  Payload56RuntimeView* CopyPayload56RangeBackward(
     Payload56RuntimeView* destEnd,
     Payload56RuntimeView* sourceEnd,
     Payload56RuntimeView* sourceBegin
@@ -11736,7 +11736,7 @@ namespace
    * What it does:
    * Fills one `[begin, end)` float4 range with one source float4 lane.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* FillFloat4Range(
+  Float4LaneRuntimeView* FillFloat4Range(
     Float4LaneRuntimeView* begin,
     Float4LaneRuntimeView* end,
     const Float4LaneRuntimeView* const value
@@ -11755,7 +11755,7 @@ namespace
    * What it does:
    * Forward-copies one 56-byte payload range `[sourceBegin, sourceEnd)` to destination.
    */
-  [[maybe_unused]] Payload56RuntimeView* CopyPayload56RangeForward(
+  Payload56RuntimeView* CopyPayload56RangeForward(
     Payload56RuntimeView* destBegin,
     Payload56RuntimeView* sourceBegin,
     Payload56RuntimeView* sourceEnd
@@ -11775,7 +11775,7 @@ namespace
    * What it does:
    * Swaps one dword slot between two pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotsIota(
+  std::uint32_t* SwapDwordSlotsIota(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11848,7 +11848,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesF(
+  std::uint32_t* SwapDwordSlotValuesF(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11862,7 +11862,7 @@ namespace
    * What it does:
    * Returns one dword lane value and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearDwordLaneA(std::uint32_t* const lane) noexcept
+  std::uint32_t TakeAndClearDwordLaneA(std::uint32_t* const lane) noexcept
   {
     const std::uint32_t value = *lane;
     *lane = 0u;
@@ -11875,7 +11875,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesG(
+  std::uint32_t* SwapDwordSlotValuesG(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11889,7 +11889,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesH(
+  std::uint32_t* SwapDwordSlotValuesH(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -11903,7 +11903,7 @@ namespace
    * What it does:
    * Moves one dword through source double-pointer and clears source to zero.
    */
-  [[maybe_unused]] std::uint32_t* MoveAndClearDoublePointerDword(
+  std::uint32_t* MoveAndClearDoublePointerDword(
     std::uint32_t* const outValue,
     std::uint32_t** const source
   ) noexcept
@@ -11919,7 +11919,7 @@ namespace
    * What it does:
    * Jump-thunk lane returning one stable internal marker pointer.
    */
-  [[maybe_unused]] void* ReturnJumpThunkMarkerA() noexcept
+  void* ReturnJumpThunkMarkerA() noexcept
   {
     return GetJumpThunkSentinelTargetMarker();
   }
@@ -11930,7 +11930,7 @@ namespace
    * What it does:
    * Jump-thunk alias returning one stable internal marker pointer.
    */
-  [[maybe_unused]] void* ReturnJumpThunkMarkerB() noexcept
+  void* ReturnJumpThunkMarkerB() noexcept
   {
     return GetJumpThunkSentinelTargetMarker();
   }
@@ -11944,7 +11944,7 @@ namespace
    * What it does:
    * Writes one dword pair as `{lane00 = a3, lane04 = a2}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposePairFromEdxAndEcxOrderA(
+  DwordPairRuntimeView* ComposePairFromEdxAndEcxOrderA(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00
@@ -11962,7 +11962,7 @@ namespace
    * What it does:
    * Copy-assigns one dword pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairLaneA(
+  DwordPairRuntimeView* CopyDwordPairLaneA(
     DwordPairRuntimeView* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -11977,7 +11977,7 @@ namespace
    * What it does:
    * Alias lane for copy-assigning one dword pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairLaneB(
+  DwordPairRuntimeView* CopyDwordPairLaneB(
     DwordPairRuntimeView* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -11992,7 +11992,7 @@ namespace
    * What it does:
    * Alias lane writing one dword pair as `{lane00 = a3, lane04 = a2}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposePairFromEdxAndEcxOrderB(
+  DwordPairRuntimeView* ComposePairFromEdxAndEcxOrderB(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00
@@ -12009,7 +12009,7 @@ namespace
    * What it does:
    * Alias lane writing one dword pair as `{lane00 = a3, lane04 = a2}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposePairFromEdxAndEcxOrderC(
+  DwordPairRuntimeView* ComposePairFromEdxAndEcxOrderC(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00
@@ -12026,7 +12026,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesI(
+  std::uint32_t* SwapDwordSlotValuesI(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -12040,7 +12040,7 @@ namespace
    * What it does:
    * Alias lane for copy-assigning one dword pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairLaneC(
+  DwordPairRuntimeView* CopyDwordPairLaneC(
     DwordPairRuntimeView* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -12055,7 +12055,7 @@ namespace
    * What it does:
    * Writes one dword pair as `{lane00 = value, lane04 = *sourceWord}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ComposePairFromValueAndPointerWord(
+  DwordPairRuntimeView* ComposePairFromValueAndPointerWord(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint32_t value
@@ -12072,7 +12072,7 @@ namespace
    * What it does:
    * Copy-assigns one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLaneFromSource(
+  std::uint32_t* CopyDwordLaneFromSource(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -12087,7 +12087,7 @@ namespace
    * What it does:
    * Alias lane for copy-assigning one dword pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairLaneD(
+  DwordPairRuntimeView* CopyDwordPairLaneD(
     DwordPairRuntimeView* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -12102,7 +12102,7 @@ namespace
    * What it does:
    * Copy-assigns one four-dword lane.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* CopyDwordQuadLaneB(
+  DwordQuadRuntimeView* CopyDwordQuadLaneB(
     DwordQuadRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -12117,7 +12117,7 @@ namespace
    * What it does:
    * Reads one byte flag lane at offset `+0x524`.
    */
-  [[maybe_unused]] std::uint8_t ReadFlagByteAt524(const ByteFlagAt524RuntimeView* const source) noexcept
+  std::uint8_t ReadFlagByteAt524(const ByteFlagAt524RuntimeView* const source) noexcept
   {
     return source->flag524;
   }
@@ -12128,7 +12128,7 @@ namespace
    * What it does:
    * Stores dword lane at `+0x98` and sets dirty byte at `+0x141`.
    */
-  [[maybe_unused]] DwordAndDirtyFlagRuntimeView* StoreWordAndSetDirtyFlag(
+  DwordAndDirtyFlagRuntimeView* StoreWordAndSetDirtyFlag(
     DwordAndDirtyFlagRuntimeView* const self,
     const std::uint32_t value
   ) noexcept
@@ -12144,7 +12144,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x284`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt284(const DwordAt284RuntimeView* const source) noexcept
+  std::uint32_t ReadWordAt284(const DwordAt284RuntimeView* const source) noexcept
   {
     return source->lane284;
   }
@@ -12155,7 +12155,7 @@ namespace
    * What it does:
    * Initializes a self-relative 4-lane header and sets sentinel lane `+0x18`.
    */
-  [[maybe_unused]] SelfRelativeHeaderLane7RuntimeView* InitializeSelfRelativeHeaderWithSentinel(
+  SelfRelativeHeaderLane7RuntimeView* InitializeSelfRelativeHeaderWithSentinel(
     SelfRelativeHeaderLane7RuntimeView* const self
   ) noexcept
   {
@@ -12174,7 +12174,7 @@ namespace
    * What it does:
    * Initializes one self-relative 4-lane header with anchor at `self + 24`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderLane24A(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderLane24A(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -12192,7 +12192,7 @@ namespace
    * What it does:
    * Initializes one self-relative 4-lane header with anchor at `self + 240`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderLane240(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderLane240(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -12210,7 +12210,7 @@ namespace
    * What it does:
    * Clears one two-dword lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneASecondary(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneASecondary(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -12223,7 +12223,7 @@ namespace
    * What it does:
    * Alias lane for clearing one two-dword lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneBSecondary(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneBSecondary(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -12236,7 +12236,7 @@ namespace
    * What it does:
    * Alias lane for clearing one two-dword lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneC(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneC(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -12249,7 +12249,7 @@ namespace
    * What it does:
    * Alias lane for clearing one two-dword lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneD(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneD(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -12263,7 +12263,7 @@ namespace
    * What it does:
    * Alias lane for clearing one two-dword lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneE(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneE(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -12277,7 +12277,7 @@ namespace
    * What it does:
    * Computes one `base@+0x04 + index*36` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride36AddressFromBaseAt4(
+  std::uint32_t ComputeStride36AddressFromBaseAt4(
     const std::int32_t index,
     const BaseAddressAt4RuntimeView* const source
   ) noexcept
@@ -12377,7 +12377,7 @@ namespace
    * Alias lane for initializing one self-relative header with `+0x10/+0x30`
    * anchors.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockTail30RuntimeView* InitializeSelfRelativeLaneBlockTail30Alias(
+  SelfRelativeLaneBlockTail30RuntimeView* InitializeSelfRelativeLaneBlockTail30Alias(
     SelfRelativeLaneBlockTail30RuntimeView* const self
   ) noexcept
   {
@@ -12390,7 +12390,7 @@ namespace
    * What it does:
    * Returns dword-slot distance between lanes `+0x00` and `+0x04`.
    */
-  [[maybe_unused]] std::int32_t CountDwordSlotsFromLane00ToLane04(
+  std::int32_t CountDwordSlotsFromLane00ToLane04(
     const DwordTripleAddressRuntimeView* const lanes
   ) noexcept
   {
@@ -12403,7 +12403,7 @@ namespace
    * What it does:
    * Returns dword-slot distance between lanes `+0x00` and `+0x08`.
    */
-  [[maybe_unused]] std::int32_t CountDwordSlotsFromLane00ToLane08(
+  std::int32_t CountDwordSlotsFromLane00ToLane08(
     const DwordTripleAddressRuntimeView* const lanes
   ) noexcept
   {
@@ -12417,7 +12417,7 @@ namespace
    * Returns inline storage address at `+0x44` when length `+0x58 < 16`,
    * otherwise returns heap-pointer lane `+0x44`.
    */
-  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt44(const InlineStorageAt44RuntimeView* const source) noexcept
+  std::uint32_t ResolveStoragePointerAt44(const InlineStorageAt44RuntimeView* const source) noexcept
   {
     if (source->length58 < 16u) {
       return reinterpret_cast<std::uint32_t>(const_cast<std::uint32_t*>(&source->lane44));
@@ -12431,7 +12431,7 @@ namespace
    * What it does:
    * Returns whether left float lane `+0x04` is greater than right lane `+0x04`.
    */
-  [[maybe_unused]] bool IsLane04FloatGreater(
+  bool IsLane04FloatGreater(
     const DwordAndFloatRuntimeView* const left,
     const DwordAndFloatRuntimeView* const right
   ) noexcept
@@ -12446,7 +12446,7 @@ namespace
    * What it does:
    * Clears dword lanes `+0x04/+0x08/+0x0C`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* ClearDwordLanes04To0C(DwordQuadRuntimeView* const lanes) noexcept
+  DwordQuadRuntimeView* ClearDwordLanes04To0C(DwordQuadRuntimeView* const lanes) noexcept
   {
     lanes->lane04 = 0u;
     lanes->lane08 = 0u;
@@ -12461,7 +12461,7 @@ namespace
    * What it does:
    * Advances one stored address lane by 8 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneBy8A(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneBy8A(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 8u;
     return addressLane;
@@ -12475,7 +12475,7 @@ namespace
    * Returns 8-byte element count from one begin/end pair at offsets
    * `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountStride8ElementsBeginAt4EndAtC(
+  std::int32_t CountStride8ElementsBeginAt4EndAtC(
     const DwordBeginMidEndRuntimeView* const lanes
   ) noexcept
   {
@@ -12493,7 +12493,7 @@ namespace
    * Returns 8-byte element count from one begin/mid pair at offsets
    * `(+0x04,+0x08)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountStride8ElementsBeginAt4MidAt8(
+  std::int32_t CountStride8ElementsBeginAt4MidAt8(
     const DwordBeginMidEndRuntimeView* const lanes
   ) noexcept
   {
@@ -12509,7 +12509,7 @@ namespace
    * What it does:
    * Returns true when one 8-byte begin/mid span is empty or unallocated.
    */
-  [[maybe_unused]] bool IsStride8ElementsBeginAt4MidAt8Empty(
+  bool IsStride8ElementsBeginAt4MidAt8Empty(
     const DwordBeginMidEndRuntimeView* const lanes
   ) noexcept
   {
@@ -12522,7 +12522,7 @@ namespace
    * What it does:
    * Returns `-1` when one source dword lane is zero; otherwise returns `0`.
    */
-  [[maybe_unused]] std::int32_t ReturnMinusOneIfSourceWordZero(const std::uint32_t* const sourceWord) noexcept
+  std::int32_t ReturnMinusOneIfSourceWordZero(const std::uint32_t* const sourceWord) noexcept
   {
     return (*sourceWord != 0u) ? 0 : -1;
   }
@@ -12533,7 +12533,7 @@ namespace
    * What it does:
    * Alias lane for advancing one stored address lane by 8 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneBy8B(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneBy8B(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 8u;
     return addressLane;
@@ -12548,7 +12548,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index * 8` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByIndexStride8(
+  std::uint32_t* AdvanceAddressLaneByIndexStride8(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -12564,7 +12564,7 @@ namespace
    * What it does:
    * Adds one `(end - begin) / 8` span count into one caller-provided counter.
    */
-  [[maybe_unused]] std::int32_t* AddStride8SpanCountToAccumulator(
+  std::int32_t* AddStride8SpanCountToAccumulator(
     std::int32_t* const accumulator,
     const std::uint32_t beginAddress,
     const std::uint32_t endAddress
@@ -12581,7 +12581,7 @@ namespace
    * What it does:
    * Advances one stored address lane by one 144-byte stride.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride144(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneByStride144(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 144u;
     return addressLane;
@@ -12593,7 +12593,7 @@ namespace
    * What it does:
    * Stores one `*base + index * 8` address lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride8AddressFromBaseWord(
+  std::uint32_t* StoreStride8AddressFromBaseWord(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -12608,7 +12608,7 @@ namespace
    * What it does:
    * Writes one two-word lane from two source-word pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteDwordPairFromWordPointersA(
+  DwordPairRuntimeView* WriteDwordPairFromWordPointersA(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const firstSource,
     const std::uint32_t* const secondSource
@@ -12623,7 +12623,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesA(
+  DwordPairRuntimeView* SwapDwordPairLanesA(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -12637,7 +12637,7 @@ namespace
    * What it does:
    * Alias lane for swapping both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesB(
+  DwordPairRuntimeView* SwapDwordPairLanesB(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -12651,7 +12651,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x08`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteAt08(const ByteAt08RuntimeView* const source) noexcept
+  std::uint8_t ReadByteAt08(const ByteAt08RuntimeView* const source) noexcept
   {
     return source->lane08;
   }
@@ -12726,7 +12726,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x2D`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane2D(const ByteLanesAt28To2ERuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane2D(const ByteLanesAt28To2ERuntimeView* const source) noexcept
   {
     return source->lane2D;
   }
@@ -12738,7 +12738,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x2C`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane2C(const ByteLanesAt28To2ERuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane2C(const ByteLanesAt28To2ERuntimeView* const source) noexcept
   {
     return source->lane2C;
   }
@@ -12749,7 +12749,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x28`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane28(const ByteLanesAt28To2ERuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane28(const ByteLanesAt28To2ERuntimeView* const source) noexcept
   {
     return source->lane28;
   }
@@ -12760,7 +12760,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x29`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane29(const ByteLanesAt28To2ERuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane29(const ByteLanesAt28To2ERuntimeView* const source) noexcept
   {
     return source->lane29;
   }
@@ -12771,7 +12771,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x2A`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane2A(const ByteLanesAt28To2ERuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane2A(const ByteLanesAt28To2ERuntimeView* const source) noexcept
   {
     return source->lane2A;
   }
@@ -12782,7 +12782,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x2E`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane2E(const ByteLanesAt28To2ERuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane2E(const ByteLanesAt28To2ERuntimeView* const source) noexcept
   {
     return source->lane2E;
   }
@@ -12793,7 +12793,7 @@ namespace
    * What it does:
    * Returns one dword lane from offset `+0x28`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane28(const WordAt28RuntimeView* const source) noexcept
+  std::uint32_t ReadWordLane28(const WordAt28RuntimeView* const source) noexcept
   {
     return source->lane28;
   }
@@ -12805,7 +12805,7 @@ namespace
    * What it does:
    * Returns one dword lane from offset `+0x34`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane34(const WordAt34RuntimeView* const source) noexcept
+  std::uint32_t ReadWordLane34(const WordAt34RuntimeView* const source) noexcept
   {
     return source->lane34;
   }
@@ -12816,7 +12816,7 @@ namespace
    * What it does:
    * Returns one dword lane from offset `+0x30`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane30(const WordAt30RuntimeView* const source) noexcept
+  std::uint32_t ReadWordLane30(const WordAt30RuntimeView* const source) noexcept
   {
     return source->lane30;
   }
@@ -12827,7 +12827,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x170`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane170(const ByteAt170RuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane170(const ByteAt170RuntimeView* const source) noexcept
   {
     return source->lane170;
   }
@@ -12838,7 +12838,7 @@ namespace
    * What it does:
    * Returns one dword lane from offset `+0x120`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane120(const WordAt120RuntimeView* const source) noexcept
+  std::uint32_t ReadWordLane120(const WordAt120RuntimeView* const source) noexcept
   {
     return source->lane120;
   }
@@ -12849,7 +12849,7 @@ namespace
    * What it does:
    * Returns one byte lane from offset `+0x71`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane71(const ByteAt71RuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane71(const ByteAt71RuntimeView* const source) noexcept
   {
     return source->lane71;
   }
@@ -12860,7 +12860,7 @@ namespace
    * What it does:
    * Returns whether dword lane `+0x08` is zero.
    */
-  [[maybe_unused]] bool IsLane08Zero(const DwordTripleLaneRuntimeView* const source) noexcept
+  bool IsLane08Zero(const DwordTripleLaneRuntimeView* const source) noexcept
   {
     return source->lane08 == 0u;
   }
@@ -12879,7 +12879,7 @@ namespace
    * Replaces one owner-word slot and runs deleting dispatch (`flag=1`) on the
    * previous owner when present.
    */
-  [[maybe_unused]] std::uint32_t* AssignReleasableWordAndReleasePrevious(
+  std::uint32_t* AssignReleasableWordAndReleasePrevious(
     std::uint32_t* const ownerWordSlot,
     const std::uint32_t newOwnerWord
   ) noexcept
@@ -12899,7 +12899,7 @@ namespace
    * What it does:
    * Returns true when two lane-`+0x04` dwords differ.
    */
-  [[maybe_unused]] bool IsLane04WordDifferent(
+  bool IsLane04WordDifferent(
     const DwordPairLaneRuntimeView* const left,
     const DwordPairLaneRuntimeView* const right
   ) noexcept
@@ -12913,7 +12913,7 @@ namespace
    * What it does:
    * Writes one dword from `*(source->lane04)` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDereferencedLane04WordA(
+  std::uint32_t* WriteDereferencedLane04WordA(
     std::uint32_t* const outValue,
     const PointerToWordAt04RuntimeView* const source
   ) noexcept
@@ -12928,7 +12928,7 @@ namespace
    * What it does:
    * Stores one zero dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDwordA(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDwordA(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -12939,7 +12939,7 @@ namespace
    * What it does:
    * Alias lane for writing one two-word lane from two source-word pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteDwordPairFromWordPointersB(
+  DwordPairRuntimeView* WriteDwordPairFromWordPointersB(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const firstSource,
     const std::uint32_t* const secondSource
@@ -12954,7 +12954,7 @@ namespace
    * What it does:
    * Alias lane for storing one zero dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDwordB(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDwordB(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -12965,7 +12965,7 @@ namespace
    * What it does:
    * Writes one `{dword, byte}` lane from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* WriteDwordBytePairFromPointersAlias(
+  DwordBytePairLane* WriteDwordBytePairFromPointersAlias(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -12980,7 +12980,7 @@ namespace
    * What it does:
    * Alias lane for writing one dword from `*(source->lane04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDereferencedLane04WordB(
+  std::uint32_t* WriteDereferencedLane04WordB(
     std::uint32_t* const outValue,
     const PointerToWordAt04RuntimeView* const source
   ) noexcept
@@ -12995,7 +12995,7 @@ namespace
    * What it does:
    * Clears one two-word output lane to `{0,0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLane739B20(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLane739B20(DwordPairRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -13008,7 +13008,7 @@ namespace
    * What it does:
    * Alias lane for writing one dword from `*(source->lane04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDereferencedLane04WordC(
+  std::uint32_t* WriteDereferencedLane04WordC(
     std::uint32_t* const outValue,
     const PointerToWordAt04RuntimeView* const source
   ) noexcept
@@ -13181,7 +13181,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword slot between two pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotsKappa(
+  std::uint32_t* SwapDwordSlotsKappa(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13195,7 +13195,7 @@ namespace
    * What it does:
    * Alias lane for copy-assigning one four-float payload.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* CopyFloat4LaneAliasB(
+  Float4LaneRuntimeView* CopyFloat4LaneAliasB(
     Float4LaneRuntimeView* const outValue,
     const Float4LaneRuntimeView* const source
   ) noexcept
@@ -13209,7 +13209,7 @@ namespace
    * What it does:
    * Copies one 56-byte payload when destination storage is non-null.
    */
-  [[maybe_unused]] Payload56RuntimeView* CopyPayload56IfOutputPresentA(
+  Payload56RuntimeView* CopyPayload56IfOutputPresentA(
     Payload56RuntimeView* const outValue,
     const Payload56RuntimeView* const source
   ) noexcept
@@ -13223,7 +13223,7 @@ namespace
    * What it does:
    * Copies one four-float payload when destination storage is non-null.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* CopyFloat4IfOutputPresentC(
+  Float4LaneRuntimeView* CopyFloat4IfOutputPresentC(
     Float4LaneRuntimeView* const outValue,
     const Float4LaneRuntimeView* const source
   ) noexcept
@@ -13237,7 +13237,7 @@ namespace
    * What it does:
    * Alias lane for backward-copying one 56-byte payload range.
    */
-  [[maybe_unused]] Payload56RuntimeView* CopyPayload56RangeBackwardAliasA(
+  Payload56RuntimeView* CopyPayload56RangeBackwardAliasA(
     Payload56RuntimeView* destEnd,
     Payload56RuntimeView* sourceEnd,
     Payload56RuntimeView* sourceBegin
@@ -13253,7 +13253,7 @@ namespace
    * Backward-copies one float4 range from `[sourceBegin, sourceEnd)` to
    * destination ending at `destEnd`.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* CopyFloat4RangeBackwardA(
+  Float4LaneRuntimeView* CopyFloat4RangeBackwardA(
     Float4LaneRuntimeView* destEnd,
     Float4LaneRuntimeView* sourceEnd,
     Float4LaneRuntimeView* sourceBegin
@@ -13273,7 +13273,7 @@ namespace
    * What it does:
    * Alias lane for copying one four-float payload when output is non-null.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* CopyFloat4IfOutputPresentD(
+  Float4LaneRuntimeView* CopyFloat4IfOutputPresentD(
     Float4LaneRuntimeView* const outValue,
     const Float4LaneRuntimeView* const source
   ) noexcept
@@ -13287,7 +13287,7 @@ namespace
    * What it does:
    * Stores one address lane and advances source address by 16 bytes.
    */
-  [[maybe_unused]] std::uint32_t* StoreAddressLaneAndAdvanceByStride16(
+  std::uint32_t* StoreAddressLaneAndAdvanceByStride16(
     std::uint32_t* const outAddress,
     std::uint32_t* const sourceAddress
   ) noexcept
@@ -13304,7 +13304,7 @@ namespace
    * What it does:
    * Moves one address lane backward by 16 bytes.
    */
-  [[maybe_unused]] std::uint32_t* RetreatAddressLaneByStride16D(
+  std::uint32_t* RetreatAddressLaneByStride16D(
     std::uint32_t* const addressLane
   ) noexcept
   {
@@ -13317,7 +13317,7 @@ namespace
    * What it does:
    * Stores one `baseAddress - 16*count` lane into output.
    */
-  [[maybe_unused]] std::uint32_t* StoreAddressLaneWithStride16Backstep(
+  std::uint32_t* StoreAddressLaneWithStride16Backstep(
     std::uint32_t* const outAddress,
     const std::uint32_t* const baseAddress,
     const std::int32_t count
@@ -13333,7 +13333,7 @@ namespace
    * What it does:
    * Writes one two-word lane from two input scalar slots.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteDwordPairFromSlotsA(
+  DwordPairRuntimeView* WriteDwordPairFromSlotsA(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const lane00Source,
     const std::uint32_t* const lane04Source
@@ -13350,7 +13350,7 @@ namespace
    * What it does:
    * Moves one address lane backward by `16 * count` bytes.
    */
-  [[maybe_unused]] std::uint32_t* RetreatAddressLaneByStride16ScaledA(
+  std::uint32_t* RetreatAddressLaneByStride16ScaledA(
     std::uint32_t* const addressLane,
     const std::int32_t count
   ) noexcept
@@ -13365,7 +13365,7 @@ namespace
    * What it does:
    * Alias lane for moving one address lane backward by 16 bytes.
    */
-  [[maybe_unused]] std::uint32_t* RetreatAddressLaneByStride16E(
+  std::uint32_t* RetreatAddressLaneByStride16E(
     std::uint32_t* const addressLane
   ) noexcept
   {
@@ -13378,7 +13378,7 @@ namespace
    * What it does:
    * Swaps two four-float payload lanes.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* SwapFloat4LanesA(
+  Float4LaneRuntimeView* SwapFloat4LanesA(
     Float4LaneRuntimeView* const left,
     Float4LaneRuntimeView* const right
   ) noexcept
@@ -13392,7 +13392,7 @@ namespace
    * What it does:
    * Alias lane for swapping two four-float payload lanes.
    */
-  [[maybe_unused]] Float4LaneRuntimeView* SwapFloat4LanesB(
+  Float4LaneRuntimeView* SwapFloat4LanesB(
     Float4LaneRuntimeView* const left,
     Float4LaneRuntimeView* const right
   ) noexcept
@@ -13406,7 +13406,7 @@ namespace
    * What it does:
    * Clears one eight-dword lane block to zero.
    */
-  [[maybe_unused]] EightWordRuntimeView* ClearEightDwordLaneBlockA(
+  EightWordRuntimeView* ClearEightDwordLaneBlockA(
     EightWordRuntimeView* const outValue
   ) noexcept
   {
@@ -13423,7 +13423,7 @@ namespace
    * Alias lane for initializing one self-relative header with tail anchor
    * at `self + 0x60`.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockTail60RuntimeView* InitializeSelfRelativeLaneBlockTail60AliasA(
+  SelfRelativeLaneBlockTail60RuntimeView* InitializeSelfRelativeLaneBlockTail60AliasA(
     SelfRelativeLaneBlockTail60RuntimeView* const self
   ) noexcept
   {
@@ -13436,7 +13436,7 @@ namespace
    * What it does:
    * Copy-assigns one 24-byte payload lane (`2 dwords + 4 floats`).
    */
-  [[maybe_unused]] DwordPairFloat4Payload24RuntimeView* CopyPayload24LaneA(
+  DwordPairFloat4Payload24RuntimeView* CopyPayload24LaneA(
     DwordPairFloat4Payload24RuntimeView* const outValue,
     const DwordPairFloat4Payload24RuntimeView* const source
   ) noexcept
@@ -13451,7 +13451,7 @@ namespace
    * What it does:
    * Copy-assigns one 32-byte payload lane (`1 dword + 7 floats`).
    */
-  [[maybe_unused]] DwordAndFloat7Payload32RuntimeView* CopyPayload32LaneA(
+  DwordAndFloat7Payload32RuntimeView* CopyPayload32LaneA(
     DwordAndFloat7Payload32RuntimeView* const outValue,
     const DwordAndFloat7Payload32RuntimeView* const source
   ) noexcept
@@ -13467,7 +13467,7 @@ namespace
    * Re-bases every pointer slot in one `[begin,end)` span by subtracting 76.
    * Returns number of adjusted slots.
    */
-  [[maybe_unused]] std::int32_t RebasePointerWordSlotsByMinus76(
+  std::int32_t RebasePointerWordSlotsByMinus76(
     PointerWordSlotSpanRuntimeView* const span
   ) noexcept
   {
@@ -13495,7 +13495,7 @@ namespace
    * What it does:
    * Returns 24-byte element count from one begin/end-at-`+0x08` span.
    */
-  [[maybe_unused]] std::int32_t CountStride24ElementsFromSpanAt0And8(
+  std::int32_t CountStride24ElementsFromSpanAt0And8(
     const ByteSpanWithEndAt8RuntimeView* const span
   ) noexcept
   {
@@ -13510,7 +13510,7 @@ namespace
    * What it does:
    * Returns 32-byte element count from one begin/end-at-`+0x08` span.
    */
-  [[maybe_unused]] std::int32_t CountStride32ElementsFromSpanAt0And8(
+  std::int32_t CountStride32ElementsFromSpanAt0And8(
     const ByteSpanWithEndAt8RuntimeView* const span
   ) noexcept
   {
@@ -13525,7 +13525,7 @@ namespace
    * What it does:
    * Alias lane for copy-assigning one 24-byte payload.
    */
-  [[maybe_unused]] DwordPairFloat4Payload24RuntimeView* CopyPayload24LaneB(
+  DwordPairFloat4Payload24RuntimeView* CopyPayload24LaneB(
     DwordPairFloat4Payload24RuntimeView* const outValue,
     const DwordPairFloat4Payload24RuntimeView* const source
   ) noexcept
@@ -13539,7 +13539,7 @@ namespace
    * What it does:
    * Alias lane for copy-assigning one 32-byte payload.
    */
-  [[maybe_unused]] DwordAndFloat7Payload32RuntimeView* CopyPayload32LaneB(
+  DwordAndFloat7Payload32RuntimeView* CopyPayload32LaneB(
     DwordAndFloat7Payload32RuntimeView* const outValue,
     const DwordAndFloat7Payload32RuntimeView* const source
   ) noexcept
@@ -13554,7 +13554,7 @@ namespace
    * Returns inline-storage address `+0x38` when length `+0x4C < 16`,
    * otherwise returns heap pointer lane `+0x38`.
    */
-  [[maybe_unused]] std::uint32_t ResolveStoragePointerAt38(
+  std::uint32_t ResolveStoragePointerAt38(
     const InlineStorageAt38RuntimeView* const source
   ) noexcept
   {
@@ -13570,7 +13570,7 @@ namespace
    * What it does:
    * Reads one dword lane from offset `+0x30`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordAt30FromInlineStorageBlock(
+  std::uint32_t ReadWordAt30FromInlineStorageBlock(
     const InlineStorageAt38RuntimeView* const source
   ) noexcept
   {
@@ -13583,7 +13583,7 @@ namespace
    * What it does:
    * Stores one byte flag into offset `+0x108`.
    */
-  [[maybe_unused]] ByteFlagAt108RuntimeView* WriteFlagByteAt108(
+  ByteFlagAt108RuntimeView* WriteFlagByteAt108(
     ByteFlagAt108RuntimeView* const outValue,
     const std::uint8_t flag
   ) noexcept
@@ -13599,7 +13599,7 @@ namespace
    * Scans one pointer-slot span at `(+0x10,+0x14)` and returns true when
    * any slot resolves to `targetWord` after applying `slotValue ? slotValue-8 : 0`.
    */
-  [[maybe_unused]] bool ContainsPointerMinus8InSlotSpan(
+  bool ContainsPointerMinus8InSlotSpan(
     const PointerSlotSpanAt10RuntimeView* const span,
     const std::uint32_t targetWord
   ) noexcept
@@ -13620,7 +13620,7 @@ namespace
    * What it does:
    * Returns dword-slot count from pointer-span lanes `(+0x10,+0x14)`.
    */
-  [[maybe_unused]] std::int32_t CountDwordSlotsInSpanAt10And14(
+  std::int32_t CountDwordSlotsInSpanAt10And14(
     const PointerSlotSpanAt10RuntimeView* const span
   ) noexcept
   {
@@ -13670,7 +13670,7 @@ namespace
    * Initializes one bounds quad as `{0, 0, width - 1, height - 1}` from the
    * nested dimensions pointer at lane `**(+0x04)`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeBoundsQuadFromNestedDimensionsMinusOne(
+  DwordQuadRuntimeView* InitializeBoundsQuadFromNestedDimensionsMinusOne(
     DwordQuadRuntimeView* const outValue,
     const PointerToDimensionsPointerAt04RuntimeView* const source
   ) noexcept
@@ -13689,7 +13689,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index * 20` byte-offset lane and stores it.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride20AliasA(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride20AliasA(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -13704,7 +13704,7 @@ namespace
    * What it does:
    * Initializes one intrusive two-link lane to singleton self-links.
    */
-  [[maybe_unused]] std::uint32_t* InitializeTwoWordSelfLinkAliasA(std::uint32_t* const linkWords) noexcept
+  std::uint32_t* InitializeTwoWordSelfLinkAliasA(std::uint32_t* const linkWords) noexcept
   {
     return InitializeTwoWordSelfLink(linkWords);
   }
@@ -13715,7 +13715,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesJ(
+  std::uint32_t* SwapDwordSlotValuesJ(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13729,7 +13729,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesK(
+  std::uint32_t* SwapDwordSlotValuesK(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13743,7 +13743,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesL(
+  std::uint32_t* SwapDwordSlotValuesL(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13757,7 +13757,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesM(
+  std::uint32_t* SwapDwordSlotValuesM(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13771,7 +13771,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesN(
+  std::uint32_t* SwapDwordSlotValuesN(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13785,7 +13785,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesO(
+  std::uint32_t* SwapDwordSlotValuesO(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13799,7 +13799,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesP(
+  std::uint32_t* SwapDwordSlotValuesP(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13813,7 +13813,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesQ(
+  std::uint32_t* SwapDwordSlotValuesQ(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13827,7 +13827,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesR(
+  std::uint32_t* SwapDwordSlotValuesR(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13841,7 +13841,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesS(
+  std::uint32_t* SwapDwordSlotValuesS(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13855,7 +13855,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesT(
+  std::uint32_t* SwapDwordSlotValuesT(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13869,7 +13869,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotValuesU(
+  std::uint32_t* SwapDwordSlotValuesU(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -13883,7 +13883,7 @@ namespace
    * What it does:
    * Alias lane for initializing one intrusive two-link lane to self-links.
    */
-  [[maybe_unused]] std::uint32_t* InitializeTwoWordSelfLinkAliasB(std::uint32_t* const linkWords) noexcept
+  std::uint32_t* InitializeTwoWordSelfLinkAliasB(std::uint32_t* const linkWords) noexcept
   {
     return InitializeTwoWordSelfLink(linkWords);
   }
@@ -13895,7 +13895,7 @@ namespace
    * Unlinks one intrusive node from its ring and restores singleton
    * self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfLambda(
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfLambda(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -13909,7 +13909,7 @@ namespace
    * Unlinks one intrusive node from its current ring, then inserts it
    * directly after `anchor`.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchor(
+  IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchor(
     IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -13928,7 +13928,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count=2)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount2(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount2(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -13945,7 +13945,7 @@ namespace
    * What it does:
    * Writes one dword from `**(source->lane04)` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordA(
+  std::uint32_t* WriteDoubleDereferencedLane04WordA(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -13960,7 +13960,7 @@ namespace
    * What it does:
    * Alias lane for writing one dword from `**(source->lane04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordB(
+  std::uint32_t* WriteDoubleDereferencedLane04WordB(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -13974,7 +13974,7 @@ namespace
    * What it does:
    * Alias lane for storing one zero dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDwordC(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDwordC(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -13985,7 +13985,7 @@ namespace
    * What it does:
    * Alias lane for storing one zero dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDwordD(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDwordD(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -13996,7 +13996,7 @@ namespace
    * What it does:
    * Alias lane for writing one `{dword, byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* WriteDwordBytePairFromPointersLaneB(
+  DwordBytePairLane* WriteDwordBytePairFromPointersLaneB(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -14012,7 +14012,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasA(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasA(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14026,7 +14026,7 @@ namespace
    * What it does:
    * Alias lane for storing one zero dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDwordE(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDwordE(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -14037,7 +14037,7 @@ namespace
    * What it does:
    * Initializes one self-relative span header with tail anchor at `+0x60`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail60(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail60(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -14050,7 +14050,7 @@ namespace
    * What it does:
    * Initializes one self-relative span header with tail anchor at `+0x90`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail90A(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail90A(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -14064,7 +14064,7 @@ namespace
    * Alias lane for initializing one self-relative span header at tail
    * `+0x90`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail90B(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail90B(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -14077,7 +14077,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count=32)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount32A(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount32A(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -14092,7 +14092,7 @@ namespace
    * Alias lane for initializing one external dword-span header with
    * `(base, count=32)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount32B(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount32B(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -14234,7 +14234,7 @@ namespace
    * What it does:
    * Stores one `base + index * 144` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride144AddressLaneA(
+  std::uint32_t* StoreStride144AddressLaneA(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseAddress,
     const std::int32_t index
@@ -14249,7 +14249,7 @@ namespace
    * What it does:
    * Returns 144-byte index delta between two address lanes.
    */
-  [[maybe_unused]] std::int32_t ComputeStride144IndexFromPointerDeltaA(
+  std::int32_t ComputeStride144IndexFromPointerDeltaA(
     const std::uint32_t* const lhsAddress,
     const std::uint32_t* const rhsAddress
   ) noexcept
@@ -14263,7 +14263,7 @@ namespace
    * What it does:
    * Writes one dword from `**(source->lane04)` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordC(
+  std::uint32_t* WriteDoubleDereferencedLane04WordC(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -14277,7 +14277,7 @@ namespace
    * What it does:
    * Writes one two-word lane from two source-word slots.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteDwordPairFromSlotsB(
+  DwordPairRuntimeView* WriteDwordPairFromSlotsB(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const lane00Source,
     const std::uint32_t* const lane04Source
@@ -14292,7 +14292,7 @@ namespace
    * What it does:
    * Returns one stored address lane advanced by 8 bytes.
    */
-  [[maybe_unused]] std::uint32_t ReadAddressLanePlus8(
+  std::uint32_t ReadAddressLanePlus8(
     const std::uint32_t* const addressLane
   ) noexcept
   {
@@ -14305,7 +14305,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to the current node-head dword.
    */
-  [[maybe_unused]] std::uint32_t** AdvancePointerSlotTertiary(std::uint32_t** const pointerSlot) noexcept
+  std::uint32_t** AdvancePointerSlotTertiary(std::uint32_t** const pointerSlot) noexcept
   {
     return AdvancePointerSlotFromNodeHead(pointerSlot);
   }
@@ -14317,7 +14317,7 @@ namespace
    * Returns lower-bound node pointer for one key in a tree with sentinel flag
    * at `+0x11`.
    */
-  [[maybe_unused]] TreeNodeFlagAt11RuntimeView* LowerBoundTreeNodeFlag11(
+  TreeNodeFlagAt11RuntimeView* LowerBoundTreeNodeFlag11(
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt11RuntimeView>* const tree,
     const std::uint32_t* const key
   ) noexcept
@@ -14332,7 +14332,7 @@ namespace
    * Returns upper-bound node pointer for one key in a tree with sentinel flag
    * at `+0x11`.
    */
-  [[maybe_unused]] TreeNodeFlagAt11RuntimeView* UpperBoundTreeNodeFlag11(
+  TreeNodeFlagAt11RuntimeView* UpperBoundTreeNodeFlag11(
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt11RuntimeView>* const tree,
     const std::uint32_t* const key
   ) noexcept
@@ -14347,7 +14347,7 @@ namespace
    * Initializes one tree node lane block (`+0x00..+0x11`) with key, links,
    * one state byte, and clears sentinel byte.
    */
-  [[maybe_unused]] TreeNodeFlag11InitRuntimeView* InitializeTreeNodeFlag11FromLanes(
+  TreeNodeFlag11InitRuntimeView* InitializeTreeNodeFlag11FromLanes(
     TreeNodeFlag11InitRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00,
@@ -14371,7 +14371,7 @@ namespace
    * What it does:
    * Alias lane for storing one zero dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDwordF(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDwordF(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -14382,7 +14382,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index * 144`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride144A(
+  std::uint32_t* AdvanceAddressLaneByStride144A(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -14397,7 +14397,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDword77A(
+  std::uint32_t* StoreScalarDword77A(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -14412,7 +14412,7 @@ namespace
    * What it does:
    * Alias lane for 144-byte index delta between two address lanes.
    */
-  [[maybe_unused]] std::int32_t ComputeStride144IndexFromPointerDeltaB(
+  std::int32_t ComputeStride144IndexFromPointerDeltaB(
     const std::uint32_t* const lhsAddress,
     const std::uint32_t* const rhsAddress
   ) noexcept
@@ -14426,7 +14426,7 @@ namespace
    * What it does:
    * Writes one `{dword, byte}` lane from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* WriteDwordBytePairFromPointersLaneC(
+  DwordBytePairLane* WriteDwordBytePairFromPointersLaneC(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -14441,7 +14441,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDword77B(
+  std::uint32_t* StoreScalarDword77B(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -14456,7 +14456,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasB(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasB(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14471,7 +14471,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasC(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasC(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14485,7 +14485,7 @@ namespace
    * What it does:
    * Alias lane for advancing one stored address lane by `index * 144`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride144B(
+  std::uint32_t* AdvanceAddressLaneByStride144B(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -14499,7 +14499,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDword77C(
+  std::uint32_t* StoreScalarDword77C(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -14514,7 +14514,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasD(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasD(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14528,7 +14528,7 @@ namespace
    * What it does:
    * Returns the minimum scalar across four float lanes.
    */
-  [[maybe_unused]] float MinOfFourFloatLanesA(
+  float MinOfFourFloatLanesA(
     const float lane0,
     const float lane1,
     const float lane2,
@@ -14544,7 +14544,7 @@ namespace
    * What it does:
    * Returns the maximum scalar across four float lanes.
    */
-  [[maybe_unused]] float MaxOfFourFloatLanesA(
+  float MaxOfFourFloatLanesA(
     const float lane0,
     const float lane1,
     const float lane2,
@@ -14560,7 +14560,7 @@ namespace
    * What it does:
    * Swaps dword lanes `+0x04/+0x08` between two triple-lane records.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* SwapDwordTailPairLanesA(
+  DwordTripleRuntimeView* SwapDwordTailPairLanesA(
     DwordTripleRuntimeView* const left,
     DwordTripleRuntimeView* const right
   ) noexcept
@@ -14574,7 +14574,7 @@ namespace
    * What it does:
    * Swaps dword tail lanes `(+0x04,+0x08,+0x0C)` between two quad lanes.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesG(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesG(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -14589,7 +14589,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasE(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasE(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14604,7 +14604,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasF(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasF(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14619,7 +14619,7 @@ namespace
    * Alias lane for copying one source dword into output when output is
    * non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentAliasG(
+  std::uint32_t* CopySourceWordIfOutputPresentAliasG(
     std::uint32_t* const output,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -14634,7 +14634,7 @@ namespace
    * Alias lane for swapping dword tail lanes `(+0x04,+0x08,+0x0C)` between
    * two quad lanes.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanesH(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanesH(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -14649,7 +14649,7 @@ namespace
    * Alias lane for swapping dword lanes `+0x04/+0x08` between two triple-lane
    * records.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* SwapDwordTailPairLanesB(
+  DwordTripleRuntimeView* SwapDwordTailPairLanesB(
     DwordTripleRuntimeView* const left,
     DwordTripleRuntimeView* const right
   ) noexcept
@@ -14663,7 +14663,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword slot between two pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotsLambda(
+  std::uint32_t* SwapDwordSlotsLambda(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -14798,7 +14798,7 @@ namespace
    * Fills `count` dword lanes in destination from one source-word slot.
    * Returns zero after the count is exhausted.
    */
-  [[maybe_unused]] std::int32_t FillDwordCountFromSourceWordA(
+  std::int32_t FillDwordCountFromSourceWordA(
     const std::uint32_t count,
     const std::uint32_t* const sourceWord,
     std::uint32_t* const destination
@@ -14813,7 +14813,7 @@ namespace
    * What it does:
    * Fills one `[begin,end)` dword range from a single source-word value.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanByEndFromSourceWord78A(
+  std::uint32_t* FillDwordSpanByEndFromSourceWord78A(
     std::uint32_t* const begin,
     std::uint32_t* const end,
     const std::uint32_t* const sourceWord
@@ -14829,7 +14829,7 @@ namespace
    * Initializes one five-lane header with zeroed first three lanes, caller
    * lane at `+0x0C`, and self pointer at `+0x10`.
    */
-  [[maybe_unused]] FourWordAndSelfPointerRuntimeView* InitializeFourWordHeaderWithSelfPointer(
+  FourWordAndSelfPointerRuntimeView* InitializeFourWordHeaderWithSelfPointer(
     FourWordAndSelfPointerRuntimeView* const outValue,
     const std::uint32_t lane0C
   ) noexcept
@@ -14849,7 +14849,7 @@ namespace
    * Advances one index lane by stride-4 element distance between two
    * addresses.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceIndexLaneByStride4AddressDeltaA(
+  std::uint32_t* AdvanceIndexLaneByStride4AddressDeltaA(
     std::uint32_t* const indexLane,
     const std::uint32_t beginAddress,
     const std::uint32_t endAddress
@@ -14865,7 +14865,7 @@ namespace
    * What it does:
    * Alias lane for count-based dword fill from one source-word slot.
    */
-  [[maybe_unused]] std::int32_t FillDwordCountFromSourceWordB(
+  std::int32_t FillDwordCountFromSourceWordB(
     const std::uint32_t count,
     const std::uint32_t* const sourceWord,
     std::uint32_t* const destination
@@ -14880,7 +14880,7 @@ namespace
    * What it does:
    * Alias lane for advancing one index lane by stride-4 address delta.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceIndexLaneByStride4AddressDeltaB(
+  std::uint32_t* AdvanceIndexLaneByStride4AddressDeltaB(
     std::uint32_t* const indexLane,
     const std::uint32_t beginAddress,
     const std::uint32_t endAddress
@@ -14895,7 +14895,7 @@ namespace
    * What it does:
    * Advances one address lane by `index * 4`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride4A(
+  std::uint32_t* AdvanceAddressLaneByStride4A(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -14910,7 +14910,7 @@ namespace
    * What it does:
    * Alias lane for count-based dword fill from one source-word slot.
    */
-  [[maybe_unused]] std::int32_t FillDwordCountFromSourceWordC(
+  std::int32_t FillDwordCountFromSourceWordC(
     const std::uint32_t count,
     const std::uint32_t* const sourceWord,
     std::uint32_t* const destination
@@ -14925,7 +14925,7 @@ namespace
    * What it does:
    * Stores zero to one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDword78A(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDword78A(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -14936,7 +14936,7 @@ namespace
    * What it does:
    * Advances one address lane by 4 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneBy4A(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneBy4A(std::uint32_t* const addressLane) noexcept
   {
     *addressLane += 4u;
     return addressLane;
@@ -14948,7 +14948,7 @@ namespace
    * What it does:
    * Retreats one address lane by 4 bytes.
    */
-  [[maybe_unused]] std::uint32_t* RetreatAddressLaneBy4A(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* RetreatAddressLaneBy4A(std::uint32_t* const addressLane) noexcept
   {
     *addressLane -= 4u;
     return addressLane;
@@ -14961,7 +14961,7 @@ namespace
    * Initializes one five-lane header with zeroed first four lanes and copies
    * span pointer lane `+0x10` from source.
    */
-  [[maybe_unused]] FourWordAndSpanPointerRuntimeView* InitializeFourWordHeaderWithCopiedSpanPointer(
+  FourWordAndSpanPointerRuntimeView* InitializeFourWordHeaderWithCopiedSpanPointer(
     FourWordAndSpanPointerRuntimeView* const outValue,
     const PointerToSpanStateAt10RuntimeView* const source
   ) noexcept
@@ -14980,7 +14980,7 @@ namespace
    * What it does:
    * Reads begin lane (`+0x00`) from the span object referenced by lane `+0x10`.
    */
-  [[maybe_unused]] std::uint32_t ReadSpanBeginFromLane10(
+  std::uint32_t ReadSpanBeginFromLane10(
     const PointerToSpanStateAt10RuntimeView* const source
   ) noexcept
   {
@@ -14993,7 +14993,7 @@ namespace
    * What it does:
    * Reads cursor lane (`+0x04`) from the span object referenced by lane `+0x10`.
    */
-  [[maybe_unused]] std::uint32_t ReadSpanCursorFromLane10(
+  std::uint32_t ReadSpanCursorFromLane10(
     const PointerToSpanStateAt10RuntimeView* const source
   ) noexcept
   {
@@ -15006,7 +15006,7 @@ namespace
    * What it does:
    * Alias lane for writing one two-word payload from source-word slots.
    */
-  [[maybe_unused]] DwordPairRuntimeView* WriteDwordPairFromSlotsC(
+  DwordPairRuntimeView* WriteDwordPairFromSlotsC(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const lane00Source,
     const std::uint32_t* const lane04Source
@@ -15021,7 +15021,7 @@ namespace
    * What it does:
    * Alias lane for storing zero to one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroDword78B(std::uint32_t* const outValue) noexcept
+  std::uint32_t* StoreZeroDword78B(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -15032,7 +15032,7 @@ namespace
    * What it does:
    * Alias lane for advancing one address lane by 4 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneBy4B(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* AdvanceAddressLaneBy4B(std::uint32_t* const addressLane) noexcept
   {
     return AdvanceAddressLaneBy4A(addressLane);
   }
@@ -15043,7 +15043,7 @@ namespace
    * What it does:
    * Alias lane for retreating one address lane by 4 bytes.
    */
-  [[maybe_unused]] std::uint32_t* RetreatAddressLaneBy4B(std::uint32_t* const addressLane) noexcept
+  std::uint32_t* RetreatAddressLaneBy4B(std::uint32_t* const addressLane) noexcept
   {
     return RetreatAddressLaneBy4A(addressLane);
   }
@@ -15054,7 +15054,7 @@ namespace
    * What it does:
    * Copies span pointer lane `+0x10` from source to destination.
    */
-  [[maybe_unused]] FourWordAndSpanPointerRuntimeView* CopySpanPointerLane10(
+  FourWordAndSpanPointerRuntimeView* CopySpanPointerLane10(
     FourWordAndSpanPointerRuntimeView* const destination,
     const PointerToSpanStateAt10RuntimeView* const source
   ) noexcept
@@ -15069,7 +15069,7 @@ namespace
    * What it does:
    * Alias lane for advancing one address lane by `index * 4`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride4B(
+  std::uint32_t* AdvanceAddressLaneByStride4B(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -15083,7 +15083,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword slot between two pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotsMu(
+  std::uint32_t* SwapDwordSlotsMu(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -15097,7 +15097,7 @@ namespace
    * What it does:
    * Alias lane for count-based dword fill from one source-word slot.
    */
-  [[maybe_unused]] std::int32_t FillDwordCountFromSourceWordD(
+  std::int32_t FillDwordCountFromSourceWordD(
     const std::uint32_t count,
     const std::uint32_t* const sourceWord,
     std::uint32_t* const destination
@@ -15112,7 +15112,7 @@ namespace
    * What it does:
    * Alias lane for swapping one dword slot between two pointers.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlotsNu(
+  std::uint32_t* SwapDwordSlotsNu(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -15127,7 +15127,7 @@ namespace
    * Forward-copies one dword range `[sourceBegin, sourceEnd)` into destination
    * and stores resulting destination end address.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeForwardStoreEndA(
+  std::uint32_t* CopyDwordRangeForwardStoreEndA(
     std::uint32_t* const outEndAddress,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
@@ -15146,7 +15146,7 @@ namespace
    * Backward-copies one dword range `[sourceBegin, sourceEnd)` into destination
    * ending at `destinationEnd` and stores resulting destination begin address.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardStoreBeginA(
+  std::uint32_t* CopyDwordRangeBackwardStoreBeginA(
     std::uint32_t* const outBeginAddress,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
@@ -15165,7 +15165,7 @@ namespace
    * Alias lane for backward-copying one dword range and storing resulting
    * destination begin address.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeBackwardStoreBeginB(
+  std::uint32_t* CopyDwordRangeBackwardStoreBeginB(
     std::uint32_t* const outBeginAddress,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
@@ -15181,7 +15181,7 @@ namespace
    * What it does:
    * Alias lane for forward-copying one dword range and storing destination end.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeForwardStoreEndB(
+  std::uint32_t* CopyDwordRangeForwardStoreEndB(
     std::uint32_t* const outEndAddress,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
@@ -15199,7 +15199,7 @@ namespace
    * advances cursor by 4, and grows end to cursor when cursor was already at
    * or beyond end.
    */
-  [[maybe_unused]] PointerToSpanStateAt10RuntimeView* WriteDwordThroughSpanCursorAndGrowEnd(
+  PointerToSpanStateAt10RuntimeView* WriteDwordThroughSpanCursorAndGrowEnd(
     PointerToSpanStateAt10RuntimeView* const owner,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -15226,7 +15226,7 @@ namespace
    * What it does:
    * Alias lane for advancing one address lane by `index * 4`.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByStride4C(
+  std::uint32_t* AdvanceAddressLaneByStride4C(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -15240,7 +15240,7 @@ namespace
    * What it does:
    * Alias lane for forward-copying one dword range and storing destination end.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeForwardStoreEndC(
+  std::uint32_t* CopyDwordRangeForwardStoreEndC(
     std::uint32_t* const outEndAddress,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
@@ -15338,7 +15338,7 @@ namespace
    * What it does:
    * Clears lane `+0x0C`, then stores two caller lanes into `+0x14/+0x18`.
    */
-  [[maybe_unused]] SevenWordLaneRuntimeView* ClearLane0CAndStoreTailPair(
+  SevenWordLaneRuntimeView* ClearLane0CAndStoreTailPair(
     SevenWordLaneRuntimeView* const outValue,
     const std::uint32_t lane18Value,
     const std::uint32_t lane14Value
@@ -15357,7 +15357,7 @@ namespace
    * Initializes a self-relative span header with begin/cursor/lane0C at
    * `this+0x10` and end at `this+0x710`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail710(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail710(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -15371,7 +15371,7 @@ namespace
    * Swaps trailing dword lanes (`+0x04/+0x08/+0x0C`) between two 16-byte
    * lane blocks.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanesLateA(
+  std::uint32_t* SwapTrailingTripletLanesLateA(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -15385,7 +15385,7 @@ namespace
    * What it does:
    * Alias entry for swapping trailing dword triplet lanes.
    */
-  [[maybe_unused]] std::uint32_t* SwapTrailingTripletLanesLateB(
+  std::uint32_t* SwapTrailingTripletLanesLateB(
     HeaderAndThreeWordLanesRuntimeView* const lhs,
     HeaderAndThreeWordLanesRuntimeView* const rhs
   ) noexcept
@@ -15399,7 +15399,7 @@ namespace
    * What it does:
    * Swaps one leading dword lane between two word slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapLeadingWordLaneLateA(
+  std::uint32_t* SwapLeadingWordLaneLateA(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -15413,7 +15413,7 @@ namespace
    * What it does:
    * Computes `*baseWord + index*4` and stores the resulting byte address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride4PathQueueVariant(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride4PathQueueVariant(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -15428,7 +15428,7 @@ namespace
    * What it does:
    * Swaps two consecutive dword lanes (`+0x00/+0x04`) between two records.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* SwapWordPairLanesLate(
+  DwordPairLaneRuntimeView* SwapWordPairLanesLate(
     DwordPairLaneRuntimeView* const lhs,
     DwordPairLaneRuntimeView* const rhs
   ) noexcept
@@ -15442,7 +15442,7 @@ namespace
    * What it does:
    * Alias entry for swapping one leading dword lane.
    */
-  [[maybe_unused]] std::uint32_t* SwapLeadingWordLaneLateB(
+  std::uint32_t* SwapLeadingWordLaneLateB(
     std::uint32_t* const lhs,
     std::uint32_t* const rhs
   ) noexcept
@@ -15456,7 +15456,7 @@ namespace
    * What it does:
    * Computes one upper-triangle flattened index: `offset + n*(n-1)/2`.
    */
-  [[maybe_unused]] std::int32_t ComputeUpperTriangleOffsetIndex(
+  std::int32_t ComputeUpperTriangleOffsetIndex(
     const std::int32_t offset,
     const std::int32_t n
   ) noexcept
@@ -15472,7 +15472,7 @@ namespace
    * What it does:
    * Returns packed pair count byte at `table+0x0C`, or zero when table is null.
    */
-  [[maybe_unused]] std::int32_t ReadPackedPairCountOrZero(
+  std::int32_t ReadPackedPairCountOrZero(
     const PackedPairTableOwnerRuntimeView* const owner
   ) noexcept
   {
@@ -15488,7 +15488,7 @@ namespace
    * What it does:
    * Reads first byte from one packed pair lane at `table + (index*2) + 0x0D`.
    */
-  [[maybe_unused]] std::int32_t ReadPackedPairFirstByte(
+  std::int32_t ReadPackedPairFirstByte(
     const PackedPairTableOwnerRuntimeView* const owner,
     const std::int32_t pairIndex
   ) noexcept
@@ -15503,7 +15503,7 @@ namespace
    * What it does:
    * Reads second byte from one packed pair lane at `table + (index*2) + 0x0E`.
    */
-  [[maybe_unused]] std::int32_t ReadPackedPairSecondByte(
+  std::int32_t ReadPackedPairSecondByte(
     const PackedPairTableOwnerRuntimeView* const owner,
     const std::int32_t pairIndex
   ) noexcept
@@ -15519,7 +15519,7 @@ namespace
    * Scans packed pair lanes for a `(first,second)` byte tuple and returns its
    * pair index, or `-1` when not found.
    */
-  [[maybe_unused]] std::int32_t FindPackedPairIndexByByteTuple(
+  std::int32_t FindPackedPairIndexByByteTuple(
     const PackedPairTableOwnerRuntimeView* const owner,
     const std::uint8_t first,
     const std::uint8_t second
@@ -15548,7 +15548,7 @@ namespace
    * `table + (pairCount*2) + selector + 0x0D`; when table is null, it reads
    * from absolute lane `selector + 0x0D` to preserve original fallback shape.
    */
-  [[maybe_unused]] std::uint8_t ReadPackedPairTailByte(
+  std::uint8_t ReadPackedPairTailByte(
     const PackedPairTableOwnerRuntimeView* const owner,
     const std::int32_t selector
   ) noexcept
@@ -15564,7 +15564,7 @@ namespace
    * What it does:
    * Increments ref-count dword at table base when owner table is present.
    */
-  [[maybe_unused]] std::uint32_t* AddRefPackedPairTableWord(
+  std::uint32_t* AddRefPackedPairTableWord(
     PackedPairTableOwnerRuntimeView* const owner
   ) noexcept
   {
@@ -15581,7 +15581,7 @@ namespace
    * What it does:
    * Tests whether packed relation byte for one unordered pair is non-negative.
    */
-  [[maybe_unused]] bool IsPackedPairRelationNonNegative(
+  bool IsPackedPairRelationNonNegative(
     const PackedPairTableOwnerRuntimeView* const owner,
     const std::uint32_t firstIndex,
     const std::uint32_t secondIndex
@@ -15605,7 +15605,7 @@ namespace
    * Resolves one 2D cell address from table descriptor lane `(base,stride)`
    * stored at descriptor index `lane*3 + 6`.
    */
-  [[maybe_unused]] std::uintptr_t ResolveTableCellAddressFromDescriptorLane(
+  std::uintptr_t ResolveTableCellAddressFromDescriptorLane(
     const std::int32_t lane,
     const std::uint32_t* const descriptorWords,
     const std::int32_t x,
@@ -15626,7 +15626,7 @@ namespace
    * What it does:
    * Zeros one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLanePathQueueA(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLanePathQueueA(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -15638,7 +15638,7 @@ namespace
    * Unlinks owner node at `owner+0x04`, restores singleton self-links, and
    * inserts it directly before anchor node at `(*ownerSlot->owner)+0x04`.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset04BeforeForeignOffset04Anchor(
+  IntrusiveNodeRuntimeView* RelinkOwnerNodeOffset04BeforeForeignOffset04Anchor(
     void* const ownerBase,
     const OwnerPointerLaneRuntimeView* const ownerSlot
   ) noexcept
@@ -15656,7 +15656,7 @@ namespace
    * What it does:
    * Unlinks owner node at `owner+0x04` and restores singleton self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkOwnerNodeOffset04AndSelfLink(
+  IntrusiveNodeRuntimeView* UnlinkOwnerNodeOffset04AndSelfLink(
     void* const ownerBase
   ) noexcept
   {
@@ -15671,7 +15671,7 @@ namespace
    * Evaluates one candidate metric through callback vtable slot `+0x0C` and
    * stores candidate id and metric when it improves the current best metric.
    */
-  [[maybe_unused]] void UpdateNearestCandidateMetric(
+  void UpdateNearestCandidateMetric(
     const std::uint32_t* const candidateWord,
     NearestCandidateMetricContextRuntimeView* const context
   ) noexcept
@@ -15692,7 +15692,7 @@ namespace
    * What it does:
    * Copies one byte lane from source to destination.
    */
-  [[maybe_unused]] std::uint8_t* CopySingleByteLane(
+  std::uint8_t* CopySingleByteLane(
     std::uint8_t* const outValue,
     const std::uint8_t* const source
   ) noexcept
@@ -15708,7 +15708,7 @@ namespace
    * Initializes a self-relative span header with begin/cursor/lane0C at
    * `this+0x10` and end at `this+0x650`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail650(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail650(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -15721,7 +15721,7 @@ namespace
    * What it does:
    * Computes one address lane as `*source->lane04 + index*12`.
    */
-  [[maybe_unused]] std::uintptr_t ComputeStride12AddressFromLane04(
+  std::uintptr_t ComputeStride12AddressFromLane04(
     const std::int32_t index,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -15735,7 +15735,7 @@ namespace
    * What it does:
    * Zeros both lanes of one dword pair record.
    */
-  [[maybe_unused]] DwordPairLaneRuntimeView* ZeroDwordPairLanePathQueue(
+  DwordPairLaneRuntimeView* ZeroDwordPairLanePathQueue(
     DwordPairLaneRuntimeView* const outValue
   ) noexcept
   {
@@ -15748,7 +15748,7 @@ namespace
    * What it does:
    * Copies one scalar dword lane from source to destination.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordLane(
+  std::uint32_t* CopySingleDwordLane(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -15762,7 +15762,7 @@ namespace
    * What it does:
    * Pushes one index onto a freelist chain: `nextByIndex[index]=head; head=index`.
    */
-  [[maybe_unused]] IndexChainPushRuntimeView* PushIndexOntoHeadChain(
+  IndexChainPushRuntimeView* PushIndexOntoHeadChain(
     IndexChainPushRuntimeView* const chain,
     const std::uint32_t index
   ) noexcept
@@ -15778,7 +15778,7 @@ namespace
    * What it does:
    * Alias entry for zeroing one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLanePathQueueB(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLanePathQueueB(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -15836,7 +15836,7 @@ namespace
    * What it does:
    * Clears one four-dword lane block to zero.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* ClearDwordQuadLane786360(DwordQuadRuntimeView* const outValue) noexcept
+  DwordQuadRuntimeView* ClearDwordQuadLane786360(DwordQuadRuntimeView* const outValue) noexcept
   {
     outValue->lane00 = 0u;
     outValue->lane04 = 0u;
@@ -15851,7 +15851,7 @@ namespace
    * What it does:
    * Returns one float lane from offset `+0xD4`.
    */
-  [[maybe_unused]] float ReadFloatLaneAtD4(const FloatLaneAtD4RuntimeView* const value) noexcept
+  float ReadFloatLaneAtD4(const FloatLaneAtD4RuntimeView* const value) noexcept
   {
     return value->laneD4;
   }
@@ -15862,7 +15862,7 @@ namespace
    * What it does:
    * Stores the same scalar dword into both lanes of one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreRepeatedDwordPair(
+  DwordPairRuntimeView* StoreRepeatedDwordPair(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -15879,7 +15879,7 @@ namespace
    * Returns whether left float lane `+0xD4` is greater than right lane
    * `+0xD4`.
    */
-  [[maybe_unused]] bool IsFloatLaneD4Greater(
+  bool IsFloatLaneD4Greater(
     const FloatLaneAtD4RuntimeView* const left,
     const FloatLaneAtD4RuntimeView* const right
   ) noexcept
@@ -15894,7 +15894,7 @@ namespace
    * When owners differ, unlinks owner node at `+0x34` and inserts it directly
    * after target owner anchor lane `+0x124`.
    */
-  [[maybe_unused]] std::uint32_t* RelinkOwnerNode52AfterOwnerAnchor292(
+  std::uint32_t* RelinkOwnerNode52AfterOwnerAnchor292(
     IntrusiveOwnerNode52AndAnchor292RuntimeView* const owner,
     IntrusiveOwnerNode52AndAnchor292RuntimeView* const targetOwner
   ) noexcept
@@ -15915,7 +15915,7 @@ namespace
    * Alias lane for initializing one intrusive two-link lane to singleton
    * self-links.
    */
-  [[maybe_unused]] std::uint32_t* InitializeTwoWordSelfLinkAliasC(std::uint32_t* const linkWords) noexcept
+  std::uint32_t* InitializeTwoWordSelfLinkAliasC(std::uint32_t* const linkWords) noexcept
   {
     return InitializeTwoWordSelfLink(linkWords);
   }
@@ -15926,7 +15926,7 @@ namespace
    * What it does:
    * Alias lane for intrusive unlink-and-selflink reset behavior.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfMu(IntrusiveNodeRuntimeView* const node) noexcept
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelfMu(IntrusiveNodeRuntimeView* const node) noexcept
   {
     return UnlinkIntrusiveNodeAndSelfLink(node);
   }
@@ -15941,7 +15941,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneGammaSecondary(
+  std::uint32_t* StoreScalarWordLaneGammaSecondary(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -15957,7 +15957,7 @@ namespace
    * What it does:
    * Unlinks owner node at `+0x34` and inserts it directly after `anchor`.
    */
-  [[maybe_unused]] std::uint32_t* RelinkOwnerNode52AfterAnchor(
+  std::uint32_t* RelinkOwnerNode52AfterAnchor(
     IntrusiveOwnerNode52RuntimeView* const owner,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -15973,7 +15973,7 @@ namespace
    * Returns owner base address from one intrusive node slot at `+0x04`
    * (`node - 0x34`), or null when slot is null.
    */
-  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotAt04Minus52(
+  void* ResolveOwnerBaseFromNodeSlotAt04Minus52(
     const IntrusiveOwnerNodeSlotRuntimeView* const ownerSlot
   ) noexcept
   {
@@ -15990,7 +15990,7 @@ namespace
    * What it does:
    * Unlinks one node from slot storage and returns owner base (`node - 0x34`).
    */
-  [[maybe_unused]] IntrusiveOwnerNode52RuntimeView* UnlinkNodeFromSlotAndResolveOwnerBase52(
+  IntrusiveOwnerNode52RuntimeView* UnlinkNodeFromSlotAndResolveOwnerBase52(
     IntrusiveNodeRuntimeView** const nodeSlot
   ) noexcept
   {
@@ -16005,7 +16005,7 @@ namespace
    * What it does:
    * Alias lane for clearing dword lanes `+0x04/+0x08/+0x0C`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* ClearDwordLanes04To0CAliasB(DwordQuadRuntimeView* const lanes) noexcept
+  DwordQuadRuntimeView* ClearDwordLanes04To0CAliasB(DwordQuadRuntimeView* const lanes) noexcept
   {
     return ClearDwordLanes04To0C(lanes);
   }
@@ -16017,7 +16017,7 @@ namespace
    * Returns 4-byte element count from one begin/end pair at offsets
    * `(+0x04,+0x08)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountDwordSlotsFromLane04ToLane08(
+  std::int32_t CountDwordSlotsFromLane04ToLane08(
     const WordPairAt4And8RuntimeView* const lanes
   ) noexcept
   {
@@ -16035,7 +16035,7 @@ namespace
    * Returns owner base address from one intrusive node slot at `+0x00`
    * (`node - 0x34`), or null when slot is null.
    */
-  [[maybe_unused]] void* ResolveOwnerBaseFromNodeSlotAt00Minus52(
+  void* ResolveOwnerBaseFromNodeSlotAt00Minus52(
     const IntrusiveNodeSlotAt00RuntimeView* const nodeSlot
   ) noexcept
   {
@@ -16053,7 +16053,7 @@ namespace
    * Alias lane for initializing one self-relative span header with tail anchor
    * at `+0x60`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail60AliasB(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail60AliasB(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -16067,7 +16067,7 @@ namespace
    * Returns 4-byte element count from one begin/end pair at offsets
    * `(+0x04,+0x0C)`; returns zero when begin is null.
    */
-  [[maybe_unused]] std::int32_t CountDwordSlotsFromLane04ToLane0C(
+  std::int32_t CountDwordSlotsFromLane04ToLane0C(
     const DwordBeginMidEndRuntimeView* const lanes
   ) noexcept
   {
@@ -16083,7 +16083,7 @@ namespace
    * What it does:
    * Alias lane for storing one `*base + index * 4` address lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreStride4AddressFromBaseWordAliasA(
+  std::uint32_t* StoreStride4AddressFromBaseWordAliasA(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -16099,7 +16099,7 @@ namespace
    * What it does:
    * Alias lane for 4-byte element distance between two stored address lanes.
    */
-  [[maybe_unused]] std::int32_t CountDwordAddressDistanceD(
+  std::int32_t CountDwordAddressDistanceD(
     const std::uint32_t* const lhsAddress,
     const std::uint32_t* const rhsAddress
   ) noexcept
@@ -16114,7 +16114,7 @@ namespace
    * What it does:
    * Alias lane for advancing one stored address lane by `index * 4` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceAddressLaneByDwordCountD(
+  std::uint32_t* AdvanceAddressLaneByDwordCountD(
     std::uint32_t* const addressLane,
     const std::int32_t index
   ) noexcept
@@ -16131,7 +16131,7 @@ namespace
    * Fills `count` destination dword lanes with one source dword value and
    * returns remaining count (zero on normal completion).
    */
-  [[maybe_unused]] std::int32_t FillDwordSpanCountedReturnRemaining(
+  std::int32_t FillDwordSpanCountedReturnRemaining(
     std::int32_t count,
     const std::uint32_t* const valueSlot,
     std::uint32_t* destination
@@ -16151,7 +16151,7 @@ namespace
    * What it does:
    * Fills one `[begin,end)` dword span with one source dword value.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordSpanByEndFromSingleWord(
+  std::uint32_t* FillDwordSpanByEndFromSingleWord(
     std::uint32_t* begin,
     const std::uint32_t* const sourceWord,
     std::uint32_t* const end
@@ -16290,7 +16290,7 @@ namespace
    * Stores one float lane and two byte-tag words at offsets
    * `+0x16C/+0x170/+0x174`.
    */
-  [[maybe_unused]] FloatAndTagWordsAt16CRuntimeView* SetFloatAndTagWordsAt16C(
+  FloatAndTagWordsAt16CRuntimeView* SetFloatAndTagWordsAt16C(
     FloatAndTagWordsAt16CRuntimeView* const outValue,
     const float value,
     const std::uint8_t tagAt174,
@@ -16309,7 +16309,7 @@ namespace
    * What it does:
    * Zeros one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLanePrimarySharedOwner(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLanePrimarySharedOwner(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -16320,7 +16320,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePrimarySharedOwner(
+  std::uint32_t* StoreScalarDwordLanePrimarySharedOwner(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16334,7 +16334,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x130`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane130(
+  std::uint32_t ReadWordLane130(
     const WordLanesAt11CThrough134RuntimeView* const source
   ) noexcept
   {
@@ -16347,7 +16347,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x130`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane130Primary(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane130Primary(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16362,7 +16362,7 @@ namespace
    * What it does:
    * Zeros a two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneSharedOwnerA(
+  DwordPairRuntimeView* ZeroDwordPairLaneSharedOwnerA(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -16375,7 +16375,7 @@ namespace
    * What it does:
    * Alias lane for zeroing a two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneSharedOwnerB(
+  DwordPairRuntimeView* ZeroDwordPairLaneSharedOwnerB(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -16388,7 +16388,7 @@ namespace
    * What it does:
    * Releases weak owner control block at lane `+0x04`.
    */
-  [[maybe_unused]] std::intptr_t ReleaseWeakOwnerFromPairLane(
+  std::intptr_t ReleaseWeakOwnerFromPairLane(
     const SharedOwnerPairRuntimeView* const pair
   ) noexcept
   {
@@ -16406,7 +16406,7 @@ namespace
    * What it does:
    * Copy-assigns one `{object, owner}` pair and increments owner use-count.
    */
-  [[maybe_unused]] SharedOwnerPairRuntimeView* CopySharedOwnerPairWithUseRetain(
+  SharedOwnerPairRuntimeView* CopySharedOwnerPairWithUseRetain(
     SharedOwnerPairRuntimeView* const destination,
     const SharedOwnerPairRuntimeView* const source
   ) noexcept
@@ -16420,7 +16420,7 @@ namespace
    * What it does:
    * Alias lane for zeroing a two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneSharedOwnerC(
+  DwordPairRuntimeView* ZeroDwordPairLaneSharedOwnerC(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -16434,7 +16434,7 @@ namespace
    * Replaces weak-owner pair contents, retains incoming owner weak-count, and
    * releases previous owner weak-count.
    */
-  [[maybe_unused]] std::intptr_t ReplaceWeakOwnerPairAndRetainIncoming(
+  std::intptr_t ReplaceWeakOwnerPairAndRetainIncoming(
     const std::uint32_t objectWord,
     SharedOwnerControlBlockRuntimeView* const* const incomingOwnerSlot,
     WeakOwnerPairRuntimeView* const destination
@@ -16464,7 +16464,7 @@ namespace
    * What it does:
    * Invokes virtual slot `+0x08` with delete-flag `1` when object is non-null.
    */
-  [[maybe_unused]] std::intptr_t DestroyObjectWithDeleteFlagOneIfPresent(void* const object) noexcept
+  std::intptr_t DestroyObjectWithDeleteFlagOneIfPresent(void* const object) noexcept
   {
     return InvokeDeleteFlagVirtualSlot2IfPresent(object);
   }
@@ -16475,7 +16475,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x11C`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane11C(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane11C(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16490,7 +16490,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x120`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane120Primary(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane120Primary(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16505,7 +16505,7 @@ namespace
    * What it does:
    * Zeros word triplet lanes `+0x08/+0x0C/+0x10`.
    */
-  [[maybe_unused]] WordTripletAt8RuntimeView* ZeroWordTripletAt8(
+  WordTripletAt8RuntimeView* ZeroWordTripletAt8(
     WordTripletAt8RuntimeView* const outValue
   ) noexcept
   {
@@ -16521,7 +16521,7 @@ namespace
    * What it does:
    * Zeros word triplet lanes `+0x04/+0x08/+0x0C`.
    */
-  [[maybe_unused]] WordTripletAt4RuntimeView* ZeroWordTripletAt4(
+  WordTripletAt4RuntimeView* ZeroWordTripletAt4(
     WordTripletAt4RuntimeView* const outValue
   ) noexcept
   {
@@ -16537,7 +16537,7 @@ namespace
    * What it does:
    * Returns element count for a 20-byte stride span at lanes `+0x04/+0x0C`.
    */
-  [[maybe_unused]] std::int32_t CountStride20ElementsFromBeginAndEnd(
+  std::int32_t CountStride20ElementsFromBeginAndEnd(
     const Stride20BeginAndEndAt4AndCRuntimeView* const span
   ) noexcept
   {
@@ -16568,7 +16568,7 @@ namespace
    * Walks one half-open stride-20 range and scalar-deletes each optional owned
    * pointer lane at `+0x08`, then clears trailing dword lanes `+0x0C/+0x10`.
    */
-  [[maybe_unused]] void DestroyOwnedPointerTripletsInStride20Range(
+  void DestroyOwnedPointerTripletsInStride20Range(
     Stride20OwnedPointerTripletRuntimeView* begin,
     Stride20OwnedPointerTripletRuntimeView* const end
   ) noexcept
@@ -16590,7 +16590,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneStride20A(
+  std::uint32_t* StoreScalarDwordLaneStride20A(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16604,7 +16604,7 @@ namespace
    * What it does:
    * Stores one `*base + index*20` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride20Primary(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride20Primary(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -16620,7 +16620,7 @@ namespace
    * Returns signed element distance between two stored addresses at 20-byte
    * stride.
    */
-  [[maybe_unused]] std::int32_t DistanceBetweenStoredAddressesStride20Primary(
+  std::int32_t DistanceBetweenStoredAddressesStride20Primary(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -16634,7 +16634,7 @@ namespace
    * What it does:
    * Advances one stored address lane by `index*20` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceStoredAddressByIndexStride20Primary(
+  std::uint32_t* AdvanceStoredAddressByIndexStride20Primary(
     std::uint32_t* const addressSlot,
     const std::int32_t index
   ) noexcept
@@ -16648,7 +16648,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneStride20B(
+  std::uint32_t* StoreScalarDwordLaneStride20B(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16662,7 +16662,7 @@ namespace
    * What it does:
    * Alias lane for signed 20-byte stride element distance.
    */
-  [[maybe_unused]] std::int32_t DistanceBetweenStoredAddressesStride20Secondary(
+  std::int32_t DistanceBetweenStoredAddressesStride20Secondary(
     const std::uint32_t* const leftAddressSlot,
     const std::uint32_t* const rightAddressSlot
   ) noexcept
@@ -16676,7 +16676,7 @@ namespace
    * What it does:
    * Alias lane for advancing one stored address by `index*20` bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceStoredAddressByIndexStride20Secondary(
+  std::uint32_t* AdvanceStoredAddressByIndexStride20Secondary(
     std::uint32_t* const addressSlot,
     const std::int32_t index
   ) noexcept
@@ -16690,7 +16690,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x120`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane120Secondary(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane120Secondary(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16705,7 +16705,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x124`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane124(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane124(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16720,7 +16720,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x128`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane128(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane128(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16735,7 +16735,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x12C`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane12C(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane12C(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16750,7 +16750,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x130`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane130Secondary(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane130Secondary(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16765,7 +16765,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x134`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLane134(
+  WordLanesAt11CThrough134RuntimeView* SetWordLane134(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -16798,7 +16798,7 @@ namespace
    * What it does:
    * Returns true when the 28-byte stride span at `+0x13C/+0x140` is empty.
    */
-  [[maybe_unused]] bool IsStride28SpanEmpty(
+  bool IsStride28SpanEmpty(
     const Stride28BeginEndAndFlagsRuntimeView* const state
   ) noexcept
   {
@@ -16816,7 +16816,7 @@ namespace
    * What it does:
    * Computes one address lane as `begin + index*28` from span lane `+0x13C`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride28AddressFromBeginAt13C(
+  std::uint32_t ComputeStride28AddressFromBeginAt13C(
     const std::int32_t index,
     const Stride28BeginEndAndFlagsRuntimeView* const state
   ) noexcept
@@ -16832,7 +16832,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x148`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane148(
+  std::uint32_t ReadWordLane148(
     const Stride28BeginEndAndFlagsRuntimeView* const state
   ) noexcept
   {
@@ -16845,7 +16845,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x150`.
    */
-  [[maybe_unused]] Stride28BeginEndAndFlagsRuntimeView* SetByteFlag150(
+  Stride28BeginEndAndFlagsRuntimeView* SetByteFlag150(
     Stride28BeginEndAndFlagsRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -16860,7 +16860,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x151`.
    */
-  [[maybe_unused]] Stride28BeginEndAndFlagsRuntimeView* SetByteFlag151(
+  Stride28BeginEndAndFlagsRuntimeView* SetByteFlag151(
     Stride28BeginEndAndFlagsRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -16875,7 +16875,7 @@ namespace
    * What it does:
    * Writes six consecutive dword lanes at offsets `+0x120..+0x134`.
    */
-  [[maybe_unused]] WordLanesAt11CThrough134RuntimeView* SetWordLanes120Through134FromSixInputs(
+  WordLanesAt11CThrough134RuntimeView* SetWordLanes120Through134FromSixInputs(
     WordLanesAt11CThrough134RuntimeView* const outValue,
     const std::uint32_t lane124Value,
     const std::uint32_t lane120Value,
@@ -16919,7 +16919,7 @@ namespace
    * What it does:
    * Invokes dispatch-table slot `+0x58` with zero scalar and zero float args.
    */
-  [[maybe_unused]] std::int32_t InvokeSlot58WithZeroWordAndFloat(
+  std::int32_t InvokeSlot58WithZeroWordAndFloat(
     const Slot58DispatchTableOwnerRuntimeView* const owner
   ) noexcept
   {
@@ -16953,7 +16953,7 @@ namespace
    * What it does:
    * Returns the sum of indirect float lanes `+0x10` and `+0x20`.
    */
-  [[maybe_unused]] float SumIndirectFloatLanes10And20(
+  float SumIndirectFloatLanes10And20(
     const FloatLanePointerAt11CRuntimeView* const source
   ) noexcept
   {
@@ -16974,7 +16974,7 @@ namespace
    * What it does:
    * Returns the pointer whose lane `+0x00` value is greater-or-equal.
    */
-  [[maybe_unused]] WordLane00RuntimeView* SelectWordPointerByGreaterOrEqual(
+  WordLane00RuntimeView* SelectWordPointerByGreaterOrEqual(
     WordLane00RuntimeView* const left,
     WordLane00RuntimeView* const right
   ) noexcept
@@ -16991,7 +16991,7 @@ namespace
    * What it does:
    * Returns the pointer whose lane `+0x00` value is less-or-equal.
    */
-  [[maybe_unused]] WordLane00RuntimeView* SelectWordPointerByLessOrEqual(
+  WordLane00RuntimeView* SelectWordPointerByLessOrEqual(
     WordLane00RuntimeView* const left,
     WordLane00RuntimeView* const right
   ) noexcept
@@ -17017,7 +17017,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x18`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane18(
+  std::uint32_t ReadWordLane18(
     const WordAt18RuntimeView* const source
   ) noexcept
   {
@@ -17056,7 +17056,7 @@ namespace
    * What it does:
    * Stores one dword lane at `+0x13C` and sets byte flag `+0x124` to one.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetWord13CAndMarkFlag124(
+  WordAndFlagLanesRuntimeView* SetWord13CAndMarkFlag124(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17072,7 +17072,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x13C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane13C(
+  std::uint32_t ReadWordLane13C(
     const WordAndFlagLanesRuntimeView* const source
   ) noexcept
   {
@@ -17085,7 +17085,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x121`.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetByteFlag121(
+  WordAndFlagLanesRuntimeView* SetByteFlag121(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -17100,7 +17100,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7A0070(
+  std::uint32_t* StoreScalarDwordLane7A0070(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17114,7 +17114,7 @@ namespace
    * What it does:
    * Returns one dword lane then clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeScalarWordAndClear(
+  std::uint32_t TakeScalarWordAndClear(
     std::uint32_t* const lane
   ) noexcept
   {
@@ -17129,7 +17129,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x154`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane154(
+  std::uint32_t ReadWordLane154(
     const WordAndFlagLanesRuntimeView* const source
   ) noexcept
   {
@@ -17153,7 +17153,7 @@ namespace
    * What it does:
    * Maps two source lanes from a four-float range into one output range.
    */
-  [[maybe_unused]] float* MapTwoFloatsFromQuartetIntoRange(
+  float* MapTwoFloatsFromQuartetIntoRange(
     const FloatQuartetRuntimeView* const source,
     const float* const outputRangeMin,
     const float* const outputRangeMax,
@@ -17195,7 +17195,7 @@ namespace
    * What it does:
    * Initializes an inline 8-byte-stride span header with capacity 8 elements.
    */
-  [[maybe_unused]] Stride8BeginCursorEndBaseRuntimeView* InitializeInlineStride8SpanHeader(
+  Stride8BeginCursorEndBaseRuntimeView* InitializeInlineStride8SpanHeader(
     Stride8BeginCursorEndBaseRuntimeView* const outValue
   ) noexcept
   {
@@ -17212,7 +17212,7 @@ namespace
    * What it does:
    * Returns element count for one 8-byte-stride span at `begin/cursor`.
    */
-  [[maybe_unused]] std::int32_t CountStride8ElementsFromBeginAndCursor(
+  std::int32_t CountStride8ElementsFromBeginAndCursor(
     const Stride8BeginCursorEndBaseRuntimeView* const source
   ) noexcept
   {
@@ -17225,7 +17225,7 @@ namespace
    * What it does:
    * Initializes an external 8-byte-stride span header from base and count.
    */
-  [[maybe_unused]] Stride8BeginCursorEndBaseRuntimeView* InitializeExternalStride8SpanHeader(
+  Stride8BeginCursorEndBaseRuntimeView* InitializeExternalStride8SpanHeader(
     Stride8BeginCursorEndBaseRuntimeView* const outValue,
     const std::int32_t elementCount,
     std::byte* const base
@@ -17268,7 +17268,7 @@ namespace
    * What it does:
    * Backward-copies one range of float-pair elements.
    */
-  [[maybe_unused]] FloatPairRuntimeView* MoveFloatPairRangeBackwardPrimary(
+  FloatPairRuntimeView* MoveFloatPairRangeBackwardPrimary(
     FloatPairRuntimeView* const destinationEnd,
     const FloatPairRuntimeView* const sourceBegin,
     const FloatPairRuntimeView* const sourceEnd
@@ -17283,7 +17283,7 @@ namespace
    * What it does:
    * Alias lane for backward-copying one range of float-pair elements.
    */
-  [[maybe_unused]] FloatPairRuntimeView* MoveFloatPairRangeBackwardSecondary(
+  FloatPairRuntimeView* MoveFloatPairRangeBackwardSecondary(
     FloatPairRuntimeView* const destinationEnd,
     const FloatPairRuntimeView* const sourceBegin,
     const FloatPairRuntimeView* const sourceEnd
@@ -17307,7 +17307,7 @@ namespace
    * What it does:
    * Reads one float lane at offset `+0x1C`.
    */
-  [[maybe_unused]] float ReadFloatLane1C(
+  float ReadFloatLane1C(
     const FloatAt1CRuntimeView* const source
   ) noexcept
   {
@@ -17320,7 +17320,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x13C`.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetWordLane13C(
+  WordAndFlagLanesRuntimeView* SetWordLane13C(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17335,7 +17335,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x140`.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetByteFlag140(
+  WordAndFlagLanesRuntimeView* SetByteFlag140(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -17350,7 +17350,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x142`.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetByteFlag142(
+  WordAndFlagLanesRuntimeView* SetByteFlag142(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -17365,7 +17365,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x143`.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetByteFlag143(
+  WordAndFlagLanesRuntimeView* SetByteFlag143(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -17380,7 +17380,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x141`.
    */
-  [[maybe_unused]] WordAndFlagLanesRuntimeView* SetByteFlag141(
+  WordAndFlagLanesRuntimeView* SetByteFlag141(
     WordAndFlagLanesRuntimeView* const outValue,
     const std::uint8_t flagValue
   ) noexcept
@@ -17404,7 +17404,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x2B`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane2B(
+  std::uint8_t ReadByteLane2B(
     const ByteAt2BRuntimeView* const source
   ) noexcept
   {
@@ -17464,7 +17464,7 @@ namespace
    * Rebinds one intrusive refcounted-object word and applies release/retain
    * semantics (`--refCount` then virtual slot-0 delete with flag `1` on zero).
    */
-  [[maybe_unused]] std::uint32_t* AssignIntrusiveRefCountedWord(
+  std::uint32_t* AssignIntrusiveRefCountedWord(
     std::uint32_t* const destinationWord,
     const std::uint32_t incomingWord
   ) noexcept
@@ -17480,7 +17480,7 @@ namespace
    * Rebinds one intrusive refcounted-object word from a source slot with the
    * same release/retain transfer semantics as `AssignIntrusiveRefCountedWord`.
    */
-  [[maybe_unused]] std::uint32_t* AssignIntrusiveRefCountedWordFromSlot(
+  std::uint32_t* AssignIntrusiveRefCountedWordFromSlot(
     const std::uint32_t* const sourceWordSlot,
     std::uint32_t* const destinationWord
   ) noexcept
@@ -17507,7 +17507,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7BB2B0(
+  std::uint32_t* StoreScalarDwordLane7BB2B0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17521,7 +17521,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7BB320(
+  std::uint32_t* StoreScalarDwordLane7BB320(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17535,7 +17535,7 @@ namespace
    * What it does:
    * Zeros one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLane7BB580(
+  DwordPairRuntimeView* ZeroDwordPairLane7BB580(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -17548,7 +17548,7 @@ namespace
    * What it does:
    * Alias lane for zeroing one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLane7BB8E0(
+  DwordPairRuntimeView* ZeroDwordPairLane7BB8E0(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -17561,7 +17561,7 @@ namespace
    * What it does:
    * Swaps one leading dword lane between two word slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleDwordLane7BB8F0(
+  std::uint32_t* SwapSingleDwordLane7BB8F0(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -17575,7 +17575,7 @@ namespace
    * What it does:
    * Alias lane for swapping one leading dword lane.
    */
-  [[maybe_unused]] std::uint32_t* SwapSingleDwordLane7BB900(
+  std::uint32_t* SwapSingleDwordLane7BB900(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -17589,7 +17589,7 @@ namespace
    * What it does:
    * Stores source pointer plus source lane `+0x0C` into a two-dword record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StorePointerAndWordAt0C7BB910(
+  DwordPairRuntimeView* StorePointerAndWordAt0C7BB910(
     DwordPairRuntimeView* const outValue,
     const PointerWithWordAt0CRuntimeView7B* const source
   ) noexcept
@@ -17605,7 +17605,7 @@ namespace
    * What it does:
    * Alias lane for zeroing one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLane7BBC40(
+  DwordPairRuntimeView* ZeroDwordPairLane7BBC40(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -17618,7 +17618,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7BC230(
+  std::uint32_t* StoreScalarDwordLane7BC230(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17632,7 +17632,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7BC240(
+  std::uint32_t* StoreScalarDwordLane7BC240(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17646,7 +17646,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*36` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride36_7BC250(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride36_7BC250(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -17662,7 +17662,7 @@ namespace
    * What it does:
    * Stores two scalar dword lanes into one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairLane7BC280(
+  DwordPairRuntimeView* StoreDwordPairLane7BC280(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -17677,7 +17677,7 @@ namespace
    * What it does:
    * Alias lane for storing two scalar dwords into one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairLane7BC3A0(
+  DwordPairRuntimeView* StoreDwordPairLane7BC3A0(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -17693,7 +17693,7 @@ namespace
    * Packs four dword lanes plus one 16-bit lane (zero-extended) into a
    * five-dword record.
    */
-  [[maybe_unused]] FiveWordRuntimeView* ComposeFiveWordRecordWithWord16Tail7BC3C0(
+  FiveWordRuntimeView* ComposeFiveWordRecordWithWord16Tail7BC3C0(
     FiveWordRuntimeView* const outValue,
     const std::uint16_t lane10LowWord,
     const std::uint32_t lane08,
@@ -17717,7 +17717,7 @@ namespace
    * Invokes scalar-deleting destructor slot `+0x00` with delete flag `1`
    * when object is non-null.
    */
-  [[maybe_unused]] std::intptr_t DestroyViaVirtualSlot0WithDeleteFlag7BCB50(void* const object) noexcept
+  std::intptr_t DestroyViaVirtualSlot0WithDeleteFlag7BCB50(void* const object) noexcept
   {
     return InvokeDeleteFlagVirtualSlot0IfPresent(object);
   }
@@ -17728,7 +17728,7 @@ namespace
    * What it does:
    * Alias lane for scalar-deleting destructor dispatch.
    */
-  [[maybe_unused]] std::intptr_t DestroyViaVirtualSlot0WithDeleteFlag7BCB60(void* const object) noexcept
+  std::intptr_t DestroyViaVirtualSlot0WithDeleteFlag7BCB60(void* const object) noexcept
   {
     return InvokeDeleteFlagVirtualSlot0IfPresent(object);
   }
@@ -17740,7 +17740,7 @@ namespace
    * Stores two scalar lanes and one source dword triplet into a five-dword
    * record.
    */
-  [[maybe_unused]] FiveWordRuntimeView* ComposeFiveWordRecordFromPairAndTriplet7BCF90(
+  FiveWordRuntimeView* ComposeFiveWordRecordFromPairAndTriplet7BCF90(
     FiveWordRuntimeView* const outValue,
     const DwordTripleLaneRuntimeView* const sourceTriplet,
     const std::uint32_t lane00,
@@ -17761,7 +17761,7 @@ namespace
    * What it does:
    * Stores two scalar dword lanes into one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairLane7BCFC0(
+  DwordPairRuntimeView* StoreDwordPairLane7BCFC0(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -17776,7 +17776,7 @@ namespace
    * What it does:
    * Stores two dword lanes plus one 16-bit lane into a packed record.
    */
-  [[maybe_unused]] DwordDwordWord16RuntimeView7B* StoreDwordDwordWord16Record7BCFD0(
+  DwordDwordWord16RuntimeView7B* StoreDwordDwordWord16Record7BCFD0(
     DwordDwordWord16RuntimeView7B* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -17792,7 +17792,7 @@ namespace
    * What it does:
    * Copies one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordLane7BCFF0(
+  std::uint32_t* CopySingleDwordLane7BCFF0(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -17806,7 +17806,7 @@ namespace
    * What it does:
    * Alias lane for copying one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordLane7BD000(
+  std::uint32_t* CopySingleDwordLane7BD000(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -17820,7 +17820,7 @@ namespace
    * What it does:
    * Copies one 16-bit lane.
    */
-  [[maybe_unused]] std::uint16_t* CopySingleWord16Lane7BD010(
+  std::uint16_t* CopySingleWord16Lane7BD010(
     std::uint16_t* const outValue,
     const std::uint16_t* const source
   ) noexcept
@@ -17835,7 +17835,7 @@ namespace
    * What it does:
    * Alias lane for storing two scalar dwords into one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairLane7BD060(
+  DwordPairRuntimeView* StoreDwordPairLane7BD060(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -17850,7 +17850,7 @@ namespace
    * What it does:
    * Alias lane for storing two dwords and one 16-bit lane.
    */
-  [[maybe_unused]] DwordDwordWord16RuntimeView7B* StoreDwordDwordWord16Record7BD2B0(
+  DwordDwordWord16RuntimeView7B* StoreDwordDwordWord16Record7BD2B0(
     DwordDwordWord16RuntimeView7B* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -17866,7 +17866,7 @@ namespace
    * What it does:
    * Copies one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairLane7BD340(
+  DwordPairRuntimeView* CopyDwordPairLane7BD340(
     DwordPairRuntimeView* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -17885,7 +17885,7 @@ namespace
    * Alias lane for storing source pointer plus source lane `+0x0C` into one
    * two-dword record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StorePointerAndWordAt0C7BD350(
+  DwordPairRuntimeView* StorePointerAndWordAt0C7BD350(
     DwordPairRuntimeView* const outValue,
     const PointerWithWordAt0CRuntimeView7B* const source
   ) noexcept
@@ -17901,7 +17901,7 @@ namespace
    * What it does:
    * Alias lane for storing two scalar dword lanes into one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairLane7BD4B0(
+  DwordPairRuntimeView* StoreDwordPairLane7BD4B0(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -17916,7 +17916,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7BD4C0(
+  std::uint32_t* StoreScalarDwordLane7BD4C0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -17930,7 +17930,7 @@ namespace
    * What it does:
    * Alias lane for copying one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairLane7BD4D0(
+  DwordPairRuntimeView* CopyDwordPairLane7BD4D0(
     DwordPairRuntimeView* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -17949,7 +17949,7 @@ namespace
    * Replaces weak-owner pair contents, retains incoming owner weak-count, and
    * releases previous owner weak-count.
    */
-  [[maybe_unused]] std::intptr_t ReplaceWeakOwnerPairAndRetainIncoming7BD790(
+  std::intptr_t ReplaceWeakOwnerPairAndRetainIncoming7BD790(
     const std::uint32_t objectWord,
     SharedOwnerControlBlockRuntimeView* const* const incomingOwnerSlot,
     WeakOwnerPairRuntimeView* const destination
@@ -18058,7 +18058,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchAlpha(
+  std::uint32_t* StoreScalarDwordLaneBatchAlpha(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18073,7 +18073,7 @@ namespace
    * Resolves one payload pointer lane as `headerAt+0x04 - 8` when header is
    * present; otherwise returns zero.
    */
-  [[maybe_unused]] std::uint32_t ResolvePayloadAddressFromHeaderMinus8(
+  std::uint32_t ResolvePayloadAddressFromHeaderMinus8(
     const BaseAddressAt4RuntimeView* const source
   ) noexcept
   {
@@ -18090,7 +18090,7 @@ namespace
    * What it does:
    * Stores one dword read from a double-indirect lane at `*(*source+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordFromLane04(
+  std::uint32_t* CopyDoubleIndirectWordFromLane04(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -18105,7 +18105,7 @@ namespace
    * Returns lower-bound candidate from one tree header using key lane
    * `*keyValue`.
    */
-  [[maybe_unused]] TreeNodeFlagAt1DRuntimeView* FindLowerBoundTreeNodeFlag1D(
+  TreeNodeFlagAt1DRuntimeView* FindLowerBoundTreeNodeFlag1D(
     TreeHeaderAt4RuntimeView<TreeNodeFlagAt1DRuntimeView>* const tree,
     const std::uint32_t* const keyValue
   ) noexcept
@@ -18119,7 +18119,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchBeta(
+  std::uint32_t* StoreScalarDwordLaneBatchBeta(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18133,7 +18133,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneBatchAlpha(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneBatchAlpha(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -18144,7 +18144,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchGamma(
+  std::uint32_t* StoreScalarDwordLaneBatchGamma(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18158,7 +18158,7 @@ namespace
    * What it does:
    * Returns true when lane `+0x04` is neither null nor sentinel value `8`.
    */
-  [[maybe_unused]] bool HasNonNullNonSentinelLane04(const BaseAddressAt4RuntimeView* const source) noexcept
+  bool HasNonNullNonSentinelLane04(const BaseAddressAt4RuntimeView* const source) noexcept
   {
     return source->baseAddress != 0u && source->baseAddress != 8u;
   }
@@ -18169,7 +18169,7 @@ namespace
    * What it does:
    * Unlinks one intrusive owner-node stored at `owner+0x10`.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10A(
+  IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10A(
     IntrusiveOwnerAt10RuntimeView* const owner
   ) noexcept
   {
@@ -18182,7 +18182,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchDelta(
+  std::uint32_t* StoreScalarDwordLaneBatchDelta(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18196,7 +18196,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneBatchBeta(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneBatchBeta(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -18207,7 +18207,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchEpsilon(
+  std::uint32_t* StoreScalarDwordLaneBatchEpsilon(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18221,7 +18221,7 @@ namespace
    * What it does:
    * Initializes one four-dword-plus-two-byte lane record.
    */
-  [[maybe_unused]] FourDwordAndTwoByteInitRuntimeView* InitializeFourDwordTwoByteLanePrimary(
+  FourDwordAndTwoByteInitRuntimeView* InitializeFourDwordTwoByteLanePrimary(
     FourDwordAndTwoByteInitRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00,
@@ -18245,7 +18245,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneBatch(
+  DwordBytePairLane* CopyDwordBytePairLaneBatch(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -18260,7 +18260,7 @@ namespace
    * What it does:
    * Conditionally copy-assigns one dword when destination is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresentPrimary(
+  std::uint32_t* CopyDwordIfDestinationPresentPrimary(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -18274,7 +18274,7 @@ namespace
    * What it does:
    * Alias lane for conditional one-dword copy.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresentSecondary(
+  std::uint32_t* CopyDwordIfDestinationPresentSecondary(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -18288,7 +18288,7 @@ namespace
    * What it does:
    * Alias lane for conditional one-dword copy.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresentTertiary(
+  std::uint32_t* CopyDwordIfDestinationPresentTertiary(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -18302,7 +18302,7 @@ namespace
    * What it does:
    * Unlinks one intrusive owner-node stored at `owner+0x10`.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10B(
+  IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10B(
     IntrusiveOwnerAt10RuntimeView* const owner
   ) noexcept
   {
@@ -18315,7 +18315,7 @@ namespace
    * What it does:
    * Alias lane for conditional one-dword copy.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresentQuaternary(
+  std::uint32_t* CopyDwordIfDestinationPresentQuaternary(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -18329,7 +18329,7 @@ namespace
    * What it does:
    * Alias lane for conditional one-dword copy.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresentQuinary(
+  std::uint32_t* CopyDwordIfDestinationPresentQuinary(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -18343,7 +18343,7 @@ namespace
    * What it does:
    * Alias lane for conditional one-dword copy.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresentSenary(
+  std::uint32_t* CopyDwordIfDestinationPresentSenary(
     std::uint32_t* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -18357,7 +18357,7 @@ namespace
    * What it does:
    * Unlinks one intrusive owner-node stored at `owner+0x10` and returns owner.
    */
-  [[maybe_unused]] IntrusiveOwnerAt10RuntimeView* UnlinkIntrusiveOwnerNodeAt10AndReturnOwner(
+  IntrusiveOwnerAt10RuntimeView* UnlinkIntrusiveOwnerNodeAt10AndReturnOwner(
     IntrusiveOwnerAt10RuntimeView* const owner
   ) noexcept
   {
@@ -18371,7 +18371,7 @@ namespace
    * What it does:
    * Alias lane for unlinking one intrusive owner-node at `owner+0x10`.
    */
-  [[maybe_unused]] IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10C(
+  IntrusiveLinkRuntimeView** UnlinkIntrusiveOwnerNodeAt10C(
     IntrusiveOwnerAt10RuntimeView* const owner
   ) noexcept
   {
@@ -18384,7 +18384,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchZeta(
+  std::uint32_t* StoreScalarDwordLaneBatchZeta(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18398,7 +18398,7 @@ namespace
    * What it does:
    * Fills `halfwordCount` 16-bit elements in destination with `value`.
    */
-  [[maybe_unused]] char* FillHalfwordSpanByValueThenCount(
+  char* FillHalfwordSpanByValueThenCount(
     char* const destination,
     const std::uint16_t value,
     const std::uint32_t halfwordCount
@@ -18419,7 +18419,7 @@ namespace
    * What it does:
    * Alias lane for filling 16-bit destination span with one value.
    */
-  [[maybe_unused]] char* FillHalfwordSpanByCountThenValue(
+  char* FillHalfwordSpanByCountThenValue(
     char* const destination,
     const std::uint32_t halfwordCount,
     const std::uint16_t value
@@ -18440,7 +18440,7 @@ namespace
    * What it does:
    * Initializes one inline-string lane block with external pointer seed.
    */
-  [[maybe_unused]] InlineStringLaneRuntimeView* InitializeInlineStringLaneWithExternalSeed(
+  InlineStringLaneRuntimeView* InitializeInlineStringLaneWithExternalSeed(
     InlineStringLaneRuntimeView* const outValue,
     const std::uint32_t externalLane04
   ) noexcept
@@ -18459,7 +18459,7 @@ namespace
    * What it does:
    * Computes one `base@+0x04 + index*36` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride36AddressFromBaseAt4LaneA(
+  std::uint32_t ComputeStride36AddressFromBaseAt4LaneA(
     const std::int32_t index,
     const BaseAddressAt4RuntimeView* const source
   ) noexcept
@@ -18473,7 +18473,7 @@ namespace
    * What it does:
    * Alias lane for `base@+0x04 + index*36`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride36AddressFromBaseAt4LaneB(
+  std::uint32_t ComputeStride36AddressFromBaseAt4LaneB(
     const std::int32_t index,
     const BaseAddressAt4RuntimeView* const source
   ) noexcept
@@ -18487,7 +18487,7 @@ namespace
    * What it does:
    * Zeros both dword lanes in one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneBatch(
+  DwordPairRuntimeView* ZeroDwordPairLaneBatch(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -18502,7 +18502,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04Word7C8A40(
+  std::uint32_t* WriteDoubleDereferencedLane04Word7C8A40(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -18516,7 +18516,7 @@ namespace
    * What it does:
    * Initializes one intrusive node as self-linked (`prev=this`, `next=this`).
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* InitializeIntrusiveNodeSelfLink7C8CD0(
+  IntrusiveNodeRuntimeView* InitializeIntrusiveNodeSelfLink7C8CD0(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -18530,7 +18530,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C8CF0(
+  std::uint32_t* StoreScalarDwordLane7C8CF0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18544,7 +18544,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C8D10(
+  std::uint32_t* StoreScalarDwordLane7C8D10(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18558,7 +18558,7 @@ namespace
    * What it does:
    * Unlinks one intrusive node and relinks it after anchor.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchor7C8D30(
+  IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchor7C8D30(
     IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -18572,7 +18572,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C8E50(
+  std::uint32_t* StoreScalarDwordLane7C8E50(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18586,7 +18586,7 @@ namespace
    * What it does:
    * Clears dword lanes `+0x04/+0x08/+0x0C` in one 4-lane record.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* ClearDwordTailLanes04To0C7C8E80(
+  DwordQuadRuntimeView* ClearDwordTailLanes04To0C7C8E80(
     DwordQuadRuntimeView* const outValue
   ) noexcept
   {
@@ -18602,7 +18602,7 @@ namespace
    * What it does:
    * Computes one `source@+0x04 + index*24` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride24AddressFromLane04_7C8F20(
+  std::uint32_t ComputeStride24AddressFromLane04_7C8F20(
     const std::int32_t index,
     const DwordPairLaneRuntimeView* const source
   ) noexcept
@@ -18616,7 +18616,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C8FC0(
+  std::uint32_t* StoreScalarDwordLane7C8FC0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18630,7 +18630,7 @@ namespace
    * What it does:
    * Moves one scalar dword from source into output and clears source to zero.
    */
-  [[maybe_unused]] std::uint32_t* MoveAndClearSourceWord7C8FD0(
+  std::uint32_t* MoveAndClearSourceWord7C8FD0(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -18645,7 +18645,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarDwordLane7C9390(
+  std::uint32_t* SwapScalarDwordLane7C9390(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -18659,7 +18659,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C93A0(
+  std::uint32_t* StoreScalarDwordLane7C93A0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18673,7 +18673,7 @@ namespace
    * What it does:
    * Stores one source address lane backstepped by 16 bytes.
    */
-  [[maybe_unused]] std::uint32_t* StoreWordMinusStride16_7C93C0(
+  std::uint32_t* StoreWordMinusStride16_7C93C0(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceAddress
   ) noexcept
@@ -18688,7 +18688,7 @@ namespace
    * What it does:
    * Advances one stored address lane by 16 bytes.
    */
-  [[maybe_unused]] std::uint32_t* AdvanceWordByStride16_7C93D0(
+  std::uint32_t* AdvanceWordByStride16_7C93D0(
     std::uint32_t* const addressLane
   ) noexcept
   {
@@ -18701,7 +18701,7 @@ namespace
    * What it does:
    * Unlinks one intrusive node and relinks it after anchor.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchor7C93F0(
+  IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchor7C93F0(
     IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -18715,7 +18715,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C9720(
+  std::uint32_t* StoreScalarDwordLane7C9720(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18729,7 +18729,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C9730(
+  std::uint32_t* StoreScalarDwordLane7C9730(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18743,7 +18743,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C9740(
+  std::uint32_t* StoreScalarDwordLane7C9740(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18757,7 +18757,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C9920(
+  std::uint32_t* StoreScalarDwordLane7C9920(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18771,7 +18771,7 @@ namespace
    * What it does:
    * Returns one scalar dword lane and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeScalarWordAndClear7C9940(
+  std::uint32_t TakeScalarWordAndClear7C9940(
     std::uint32_t* const lane
   ) noexcept
   {
@@ -18784,7 +18784,7 @@ namespace
    * What it does:
    * Stores one `{dword,byte}` pair from two scalar source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairFromPointers7C9980(
+  DwordBytePairLane* CopyDwordBytePairFromPointers7C9980(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -18799,7 +18799,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7C9FF0(
+  std::uint32_t* StoreScalarDwordLane7C9FF0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18813,7 +18813,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7CA260(
+  std::uint32_t* StoreScalarDwordLane7CA260(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18827,7 +18827,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*24` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride24_7CA6A0(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride24_7CA6A0(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -18842,7 +18842,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7CA6D0(
+  std::uint32_t* StoreScalarDwordLane7CA6D0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18856,7 +18856,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04Word7CA710(
+  std::uint32_t* WriteDoubleDereferencedLane04Word7CA710(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -18870,7 +18870,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7CA810(
+  std::uint32_t* StoreScalarDwordLane7CA810(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18884,7 +18884,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*36` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride36_7CA820(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride36_7CA820(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -18899,7 +18899,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7CAFC0(
+  std::uint32_t* StoreScalarDwordLane7CAFC0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -18913,7 +18913,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane7CB1F0(
+  std::uint32_t* StoreScalarDwordLane7CB1F0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -19023,7 +19023,7 @@ namespace
    * What it does:
    * Stores three dwords and one byte-pair, then clears the trailing byte lane.
    */
-  [[maybe_unused]] DwordTripleWithBytePairTerminatorRuntimeView* InitializeDwordTripleBytePairTerminator(
+  DwordTripleWithBytePairTerminatorRuntimeView* InitializeDwordTripleBytePairTerminator(
     DwordTripleWithBytePairTerminatorRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00,
@@ -19047,7 +19047,7 @@ namespace
    * What it does:
    * Clears one two-dword lane pair to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLanePrimary(
+  DwordPairRuntimeView* ClearDwordPairLanePrimary(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -19062,7 +19062,7 @@ namespace
    * What it does:
    * Clears one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ClearScalarDwordLanePrimary(
+  std::uint32_t* ClearScalarDwordLanePrimary(
     std::uint32_t* const outValue
   ) noexcept
   {
@@ -19075,7 +19075,7 @@ namespace
    * What it does:
    * Alias lane for clearing one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneSecondary(
+  DwordPairRuntimeView* ClearDwordPairLaneSecondary(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -19090,7 +19090,7 @@ namespace
    * What it does:
    * Alias lane for clearing one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* ClearScalarDwordLaneSecondary(
+  std::uint32_t* ClearScalarDwordLaneSecondary(
     std::uint32_t* const outValue
   ) noexcept
   {
@@ -19103,7 +19103,7 @@ namespace
    * What it does:
    * Returns one scalar lane and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearScalarLanePrimary(
+  std::uint32_t TakeAndClearScalarLanePrimary(
     std::uint32_t* const lane
   ) noexcept
   {
@@ -19174,7 +19174,7 @@ namespace
    * Invokes one deferred four-argument callable payload and copies the
    * resulting five-word lane into caller-provided output storage.
    */
-  [[maybe_unused]] FiveWordLaneRuntimeView* InvokeDeferredCallableToFiveWordLane(
+  FiveWordLaneRuntimeView* InvokeDeferredCallableToFiveWordLane(
     const FourArgCallableRuntimeView* const callable,
     FiveWordLaneRuntimeView* const outValue,
     const std::uint32_t laneA3,
@@ -19219,7 +19219,7 @@ namespace
    * Advances one deferred-cursor lane by promoting pending lanes to committed
    * state and resolving the next active window from deferred callable output.
    */
-  [[maybe_unused]] std::uint32_t AdvanceDeferredCursorLane(
+  std::uint32_t AdvanceDeferredCursorLane(
     DeferredCursorLaneRuntimeView* const cursor
   )
   {
@@ -19274,7 +19274,7 @@ namespace
    * What it does:
    * Alias entrypoint for one deferred-cursor advance step.
    */
-  [[maybe_unused]] std::uint32_t AdvanceDeferredCursorLaneAliasA(
+  std::uint32_t AdvanceDeferredCursorLaneAliasA(
     DeferredCursorLaneRuntimeView* const cursor
   )
   {
@@ -19287,7 +19287,7 @@ namespace
    * What it does:
    * Alias entrypoint for one deferred-cursor advance step.
    */
-  [[maybe_unused]] std::uint32_t AdvanceDeferredCursorLaneAliasB(
+  std::uint32_t AdvanceDeferredCursorLaneAliasB(
     DeferredCursorLaneRuntimeView* const cursor
   )
   {
@@ -19300,7 +19300,7 @@ namespace
    * What it does:
    * Alias entrypoint for one deferred-cursor advance step.
    */
-  [[maybe_unused]] std::uint32_t AdvanceDeferredCursorLaneAliasC(
+  std::uint32_t AdvanceDeferredCursorLaneAliasC(
     DeferredCursorLaneRuntimeView* const cursor
   )
   {
@@ -19313,7 +19313,7 @@ namespace
    * What it does:
    * Alias entrypoint for one deferred-cursor advance step.
    */
-  [[maybe_unused]] std::uint32_t AdvanceDeferredCursorLaneAliasD(
+  std::uint32_t AdvanceDeferredCursorLaneAliasD(
     DeferredCursorLaneRuntimeView* const cursor
   )
   {
@@ -19326,7 +19326,7 @@ namespace
    * What it does:
    * Writes one two-dword lane from two independent source pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairFromIndependentWordSources(
+  DwordPairRuntimeView* CopyDwordPairFromIndependentWordSources(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const sourceLane00,
     const std::uint32_t* const sourceLane04
@@ -19343,7 +19343,7 @@ namespace
    * What it does:
    * Copies one four-dword-plus-flag lane record.
    */
-  [[maybe_unused]] FourDwordAndByteFlagRuntimeView* CopyFourDwordAndByteFlagLane(
+  FourDwordAndByteFlagRuntimeView* CopyFourDwordAndByteFlagLane(
     FourDwordAndByteFlagRuntimeView* const outValue,
     const FourDwordAndByteFlagRuntimeView* const source
   ) noexcept
@@ -19362,7 +19362,7 @@ namespace
    * What it does:
    * Copies the head pair (`+0x00,+0x04`) from one four-dword source.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyHeadDwordPairFromQuadPrimary(
+  DwordPairRuntimeView* CopyHeadDwordPairFromQuadPrimary(
     DwordPairRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -19376,7 +19376,7 @@ namespace
    * What it does:
    * Copies the tail pair (`+0x08,+0x0C`) from one four-dword source.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyTailDwordPairFromQuadPrimary(
+  DwordPairRuntimeView* CopyTailDwordPairFromQuadPrimary(
     DwordPairRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -19390,7 +19390,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` lane from two source pointers.
    */
-  [[maybe_unused]] ByteAt4RuntimeView* CopyWordAndByteLaneFromPointers(
+  ByteAt4RuntimeView* CopyWordAndByteLaneFromPointers(
     ByteAt4RuntimeView* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -19407,7 +19407,7 @@ namespace
    * What it does:
    * Stores four dwords and clears trailing flag lane `+0x10`.
    */
-  [[maybe_unused]] FourDwordAndByteFlagRuntimeView* StoreFourDwordLaneAndClearFlag(
+  FourDwordAndByteFlagRuntimeView* StoreFourDwordLaneAndClearFlag(
     FourDwordAndByteFlagRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -19429,7 +19429,7 @@ namespace
    * What it does:
    * Alias lane for copying the head pair from one four-dword source.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyHeadDwordPairFromQuadSecondary(
+  DwordPairRuntimeView* CopyHeadDwordPairFromQuadSecondary(
     DwordPairRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -19443,7 +19443,7 @@ namespace
    * What it does:
    * Alias lane for copying the tail pair from one four-dword source.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyTailDwordPairFromQuadSecondary(
+  DwordPairRuntimeView* CopyTailDwordPairFromQuadSecondary(
     DwordPairRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -19457,7 +19457,7 @@ namespace
    * What it does:
    * Alias lane for copying the head pair from one four-dword source.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyHeadDwordPairFromQuadTertiary(
+  DwordPairRuntimeView* CopyHeadDwordPairFromQuadTertiary(
     DwordPairRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -19471,7 +19471,7 @@ namespace
    * What it does:
    * Alias lane for copying the tail pair from one four-dword source.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyTailDwordPairFromQuadTertiary(
+  DwordPairRuntimeView* CopyTailDwordPairFromQuadTertiary(
     DwordPairRuntimeView* const outValue,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -19485,7 +19485,7 @@ namespace
    * What it does:
    * Returns the signed lane delta `left(+0x04) - right(+0x04)`.
    */
-  [[maybe_unused]] std::int32_t CompareLane04DeltaBetweenPairs(
+  std::int32_t CompareLane04DeltaBetweenPairs(
     const DwordPairRuntimeView* const left,
     const DwordPairRuntimeView* const right
   ) noexcept
@@ -19500,7 +19500,7 @@ namespace
    * What it does:
    * Returns zero when flag `+0x10` is set; otherwise returns `lane0C-lane04`.
    */
-  [[maybe_unused]] std::int32_t CountLaneDeltaWhenFlagClearPrimary(
+  std::int32_t CountLaneDeltaWhenFlagClearPrimary(
     const FourDwordAndByteFlagRuntimeView* const source
   ) noexcept
   {
@@ -19513,7 +19513,7 @@ namespace
    * What it does:
    * Alias lane for `CountLaneDeltaWhenFlagClearPrimary`.
    */
-  [[maybe_unused]] std::int32_t CountLaneDeltaWhenFlagClearSecondary(
+  std::int32_t CountLaneDeltaWhenFlagClearSecondary(
     const FourDwordAndByteFlagRuntimeView* const source
   ) noexcept
   {
@@ -19526,7 +19526,7 @@ namespace
    * What it does:
    * Alias lane for `CountLaneDeltaWhenFlagClearPrimary`.
    */
-  [[maybe_unused]] std::int32_t CountLaneDeltaWhenFlagClearTertiary(
+  std::int32_t CountLaneDeltaWhenFlagClearTertiary(
     const FourDwordAndByteFlagRuntimeView* const source
   ) noexcept
   {
@@ -19539,7 +19539,7 @@ namespace
    * What it does:
    * Merges two source dword pairs into one four-dword record.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* MergeTwoDwordPairsIntoQuad(
+  DwordQuadRuntimeView* MergeTwoDwordPairsIntoQuad(
     DwordQuadRuntimeView* const outValue,
     const DwordPairRuntimeView* const firstPair,
     const DwordPairRuntimeView* const secondPair
@@ -19558,7 +19558,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x1534`.
    */
-  [[maybe_unused]] std::uint8_t ReadFlagByte1534FromObject(
+  std::uint8_t ReadFlagByte1534FromObject(
     const ByteFlagAt1534RuntimeView* const source
   ) noexcept
   {
@@ -19571,7 +19571,7 @@ namespace
    * What it does:
    * Reads one dword through lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t ReadDoubleDereferencedWordFromLane04(
+  std::uint32_t ReadDoubleDereferencedWordFromLane04(
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
   {
@@ -19584,7 +19584,7 @@ namespace
    * What it does:
    * Reads byte lane `+0x1534` from object pointer stored in lane `+0x04`.
    */
-  [[maybe_unused]] std::uint8_t ReadFlagByte1534FromLane04Object(
+  std::uint8_t ReadFlagByte1534FromLane04Object(
     const PointerAt04ToByteFlag1534RuntimeView* const source
   ) noexcept
   {
@@ -19597,7 +19597,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source pointer lane `*(+0x5C)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane5CWordPrimary(
+  std::uint32_t* WriteDoubleDereferencedLane5CWordPrimary(
     std::uint32_t* const outValue,
     const PointerAt5CToWordRuntimeView* const source
   ) noexcept
@@ -19612,7 +19612,7 @@ namespace
    * What it does:
    * Stores raw pointer lane `+0x5C` as one dword.
    */
-  [[maybe_unused]] std::uint32_t* WriteLane5CPointerWordPrimary(
+  std::uint32_t* WriteLane5CPointerWordPrimary(
     std::uint32_t* const outValue,
     const PointerAt5CToWordRuntimeView* const source
   ) noexcept
@@ -19627,7 +19627,7 @@ namespace
    * What it does:
    * Alias lane for writing one dword loaded through source pointer lane `+0x5C`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane5CWordSecondary(
+  std::uint32_t* WriteDoubleDereferencedLane5CWordSecondary(
     std::uint32_t* const outValue,
     const PointerAt5CToWordRuntimeView* const source
   ) noexcept
@@ -19642,7 +19642,7 @@ namespace
    * What it does:
    * Alias lane for storing raw pointer lane `+0x5C` as one dword.
    */
-  [[maybe_unused]] std::uint32_t* WriteLane5CPointerWordSecondary(
+  std::uint32_t* WriteLane5CPointerWordSecondary(
     std::uint32_t* const outValue,
     const PointerAt5CToWordRuntimeView* const source
   ) noexcept
@@ -19657,7 +19657,7 @@ namespace
    * What it does:
    * Writes one dword loaded through source lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordPrimary(
+  std::uint32_t* WriteDoubleDereferencedLane04WordPrimary(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -19671,7 +19671,7 @@ namespace
    * What it does:
    * Alias lane for writing one dword through `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordSecondary(
+  std::uint32_t* WriteDoubleDereferencedLane04WordSecondary(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -19772,7 +19772,7 @@ namespace
    * Pops one intrusive head-node pointer, writes popped node address, and
    * advances head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneA(
+  std::uint32_t* PopHeadNodeAddressLaneA(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -19786,7 +19786,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneEta(
+  std::uint32_t* StoreScalarDwordLaneEta(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -19800,7 +19800,7 @@ namespace
    * What it does:
    * Advances one head-slot pointer to `*head`.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneA(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneA(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -19811,7 +19811,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneTheta(
+  std::uint32_t* StoreScalarDwordLaneTheta(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -19825,7 +19825,7 @@ namespace
    * What it does:
    * Alias lane for advancing one head-slot pointer.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneB(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneB(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -19836,7 +19836,7 @@ namespace
    * What it does:
    * Stores one dword read from a double-indirect lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneA(
+  std::uint32_t* CopyDoubleIndirectWordLaneA(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -19850,7 +19850,7 @@ namespace
    * What it does:
    * Alias lane for double-indirect dword read at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneB(
+  std::uint32_t* CopyDoubleIndirectWordLaneB(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -19864,7 +19864,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneIota(
+  std::uint32_t* StoreScalarDwordLaneIota(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -19878,7 +19878,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneKappa(
+  std::uint32_t* StoreScalarDwordLaneKappa(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -19892,7 +19892,7 @@ namespace
    * What it does:
    * Alias lane for advancing one head-slot pointer.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneC(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneC(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -19903,7 +19903,7 @@ namespace
    * What it does:
    * Alias lane for popping one head-node address and advancing head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneB(
+  std::uint32_t* PopHeadNodeAddressLaneB(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -19917,7 +19917,7 @@ namespace
    * What it does:
    * Alias lane for advancing one head-slot pointer.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneD(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneD(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -19928,7 +19928,7 @@ namespace
    * What it does:
    * Stores one dword read from double-indirect lane at `+0x6C`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneAt108A(
+  std::uint32_t* CopyDoubleIndirectWordLaneAt108A(
     std::uint32_t* const outValue,
     const IndirectWordLaneAt108RuntimeView* const source
   ) noexcept
@@ -19942,7 +19942,7 @@ namespace
    * What it does:
    * Stores one direct dword lane from `+0x6C`.
    */
-  [[maybe_unused]] std::uint32_t* CopyWordLaneAt108A(
+  std::uint32_t* CopyWordLaneAt108A(
     std::uint32_t* const outValue,
     const WordLaneAt108RuntimeView* const source
   ) noexcept
@@ -19956,7 +19956,7 @@ namespace
    * What it does:
    * Alias lane for double-indirect dword read at `+0x6C`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneAt108B(
+  std::uint32_t* CopyDoubleIndirectWordLaneAt108B(
     std::uint32_t* const outValue,
     const IndirectWordLaneAt108RuntimeView* const source
   ) noexcept
@@ -19970,7 +19970,7 @@ namespace
    * What it does:
    * Alias lane for direct dword read at `+0x6C`.
    */
-  [[maybe_unused]] std::uint32_t* CopyWordLaneAt108B(
+  std::uint32_t* CopyWordLaneAt108B(
     std::uint32_t* const outValue,
     const WordLaneAt108RuntimeView* const source
   ) noexcept
@@ -19984,7 +19984,7 @@ namespace
    * What it does:
    * Stores one byte lane at offset `+0x64`.
    */
-  [[maybe_unused]] ByteLaneAt100RuntimeView* StoreByteLaneAt100(
+  ByteLaneAt100RuntimeView* StoreByteLaneAt100(
     ByteLaneAt100RuntimeView* const outValue,
     const std::uint8_t value
   ) noexcept
@@ -19998,7 +19998,7 @@ namespace
    * What it does:
    * Alias lane for popping one head-node address and advancing head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneC(
+  std::uint32_t* PopHeadNodeAddressLaneC(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -20012,7 +20012,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x24`.
    */
-  [[maybe_unused]] WordLaneAt36RuntimeView* StoreWordLaneAt36(
+  WordLaneAt36RuntimeView* StoreWordLaneAt36(
     WordLaneAt36RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20026,7 +20026,7 @@ namespace
    * What it does:
    * Writes one source `+0x04` dword into destination lane `+0x24`.
    */
-  [[maybe_unused]] WordLaneAt36RuntimeView* StoreWordLaneAt36FromSourceLane04(
+  WordLaneAt36RuntimeView* StoreWordLaneAt36FromSourceLane04(
     const DwordPairRuntimeView* const source,
     WordLaneAt36RuntimeView* const destination
   ) noexcept
@@ -20040,7 +20040,7 @@ namespace
    * What it does:
    * Alias lane for double-indirect dword read at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneC(
+  std::uint32_t* CopyDoubleIndirectWordLaneC(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -20054,7 +20054,7 @@ namespace
    * What it does:
    * Alias lane for double-indirect dword read at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneD(
+  std::uint32_t* CopyDoubleIndirectWordLaneD(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -20068,7 +20068,7 @@ namespace
    * What it does:
    * Zeros both dword lanes in one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneSigma(
+  DwordPairRuntimeView* ZeroDwordPairLaneSigma(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20083,7 +20083,7 @@ namespace
    * What it does:
    * Alias lane for double-indirect dword read at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneE(
+  std::uint32_t* CopyDoubleIndirectWordLaneE(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -20097,7 +20097,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneLambda(
+  std::uint32_t* StoreScalarDwordLaneLambda(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20111,7 +20111,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneMu(
+  std::uint32_t* StoreScalarDwordLaneMu(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20125,7 +20125,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneNu(
+  std::uint32_t* StoreScalarDwordLaneNu(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20139,7 +20139,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneOmega(
+  DwordBytePairLane* CopyDwordBytePairLaneOmega(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -20154,7 +20154,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneXi(
+  std::uint32_t* StoreScalarDwordLaneXi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20168,7 +20168,7 @@ namespace
    * What it does:
    * Alias lane for popping one head-node address and advancing head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneD(
+  std::uint32_t* PopHeadNodeAddressLaneD(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -20236,7 +20236,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchMu(
+  std::uint32_t* StoreScalarDwordLaneBatchMu(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20250,7 +20250,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchNu(
+  std::uint32_t* StoreScalarDwordLaneBatchNu(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20264,7 +20264,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchXi(
+  std::uint32_t* StoreScalarDwordLaneBatchXi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20278,7 +20278,7 @@ namespace
    * What it does:
    * Stores one two-dword pair from two scalar source pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairFromSourcePointersBatchA(
+  DwordPairRuntimeView* CopyDwordPairFromSourcePointersBatchA(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const sourceLane00,
     const std::uint32_t* const sourceLane04
@@ -20293,7 +20293,7 @@ namespace
    * What it does:
    * Replaces one pointer slot with its double-dereferenced value.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotViaDoubleDereferenceA(
+  std::uint32_t** CollapsePointerSlotViaDoubleDereferenceA(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -20306,7 +20306,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchOmicron(
+  std::uint32_t* StoreScalarDwordLaneBatchOmicron(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20320,7 +20320,7 @@ namespace
    * What it does:
    * Replaces one pointer slot with its double-dereferenced value.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotViaDoubleDereferenceB(
+  std::uint32_t** CollapsePointerSlotViaDoubleDereferenceB(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -20333,7 +20333,7 @@ namespace
    * What it does:
    * Replaces one pointer slot with its double-dereferenced value.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotViaDoubleDereferenceC(
+  std::uint32_t** CollapsePointerSlotViaDoubleDereferenceC(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -20346,7 +20346,7 @@ namespace
    * What it does:
    * Replaces one pointer slot with its double-dereferenced value.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotViaDoubleDereferenceD(
+  std::uint32_t** CollapsePointerSlotViaDoubleDereferenceD(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -20359,7 +20359,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchPi(
+  std::uint32_t* StoreScalarDwordLaneBatchPi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20373,7 +20373,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*4` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride4BatchA(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride4BatchA(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -20388,7 +20388,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchRho(
+  std::uint32_t* StoreScalarDwordLaneBatchRho(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20402,7 +20402,7 @@ namespace
    * What it does:
    * Reads one dword through pointer lane `+0x30`.
    */
-  [[maybe_unused]] std::uint32_t ReadDereferencedWordPointerAt30(
+  std::uint32_t ReadDereferencedWordPointerAt30(
     const WordPointerAt30RuntimeView* const source
   ) noexcept
   {
@@ -20415,7 +20415,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x24`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane24(
+  std::uint32_t ReadWordLane24(
     const WordAndByteFlagsAt24AndA5RuntimeView* const source
   ) noexcept
   {
@@ -20428,7 +20428,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x28`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane28FromWordAndFlagsState(
+  std::uint8_t ReadByteLane28FromWordAndFlagsState(
     const WordAndByteFlagsAt24AndA5RuntimeView* const source
   ) noexcept
   {
@@ -20441,7 +20441,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0xA5`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLaneA5(
+  std::uint8_t ReadByteLaneA5(
     const WordAndByteFlagsAt24AndA5RuntimeView* const source
   ) noexcept
   {
@@ -20454,7 +20454,7 @@ namespace
    * What it does:
    * Stores two scalar dword lanes into one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromScalarsBatchB(
+  DwordPairRuntimeView* StoreDwordPairFromScalarsBatchB(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00
@@ -20469,7 +20469,7 @@ namespace
    * What it does:
    * Reads one dword through lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t ReadDoubleDereferencedWordFromLane04BatchA(
+  std::uint32_t ReadDoubleDereferencedWordFromLane04BatchA(
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
   {
@@ -20482,7 +20482,7 @@ namespace
    * What it does:
    * Alias lane for reading one dword at offset `+0x24`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane24Alias(
+  std::uint32_t ReadWordLane24Alias(
     const WordAndByteFlagsAt24AndA5RuntimeView* const source
   ) noexcept
   {
@@ -20496,7 +20496,7 @@ namespace
    * Invokes scalar-deleting destructor slot `+0x00` with delete flag `1`
    * when object is non-null.
    */
-  [[maybe_unused]] std::intptr_t DestroyViaVirtualSlot0DeleteFlagOneIfPresentBatch(
+  std::intptr_t DestroyViaVirtualSlot0DeleteFlagOneIfPresentBatch(
     void* const object
   ) noexcept
   {
@@ -20509,7 +20509,7 @@ namespace
    * What it does:
    * Clears one two-dword pair lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneBatchAlpha(
+  DwordPairRuntimeView* ClearDwordPairLaneBatchAlpha(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20522,7 +20522,7 @@ namespace
    * What it does:
    * Stores one float lane at offset `+0x20`.
    */
-  [[maybe_unused]] FloatAt20RuntimeView* StoreFloatLane20Batch(
+  FloatAt20RuntimeView* StoreFloatLane20Batch(
     FloatAt20RuntimeView* const outValue,
     const float value
   ) noexcept
@@ -20537,7 +20537,7 @@ namespace
    * What it does:
    * Initializes one self-relative span header with anchors at `+0x10/+0x30`.
    */
-  [[maybe_unused]] SelfRelativeLaneBlockTail30RuntimeView* InitializeSelfRelativeLaneBlockTail30AliasBatch(
+  SelfRelativeLaneBlockTail30RuntimeView* InitializeSelfRelativeLaneBlockTail30AliasBatch(
     SelfRelativeLaneBlockTail30RuntimeView* const outValue
   ) noexcept
   {
@@ -20550,7 +20550,7 @@ namespace
    * What it does:
    * Clears one two-dword pair lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneBatchBeta(
+  DwordPairRuntimeView* ClearDwordPairLaneBatchBeta(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20563,7 +20563,7 @@ namespace
    * What it does:
    * Clears one `{object, owner}` pair and releases owner use/weak counts.
    */
-  [[maybe_unused]] std::intptr_t ResetSharedOwnerPairAndReleaseBatchA(
+  std::intptr_t ResetSharedOwnerPairAndReleaseBatchA(
     SharedOwnerPairRuntimeView* const pair
   ) noexcept
   {
@@ -20576,7 +20576,7 @@ namespace
    * What it does:
    * Clears one two-dword pair lane.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneBatchGamma(
+  DwordPairRuntimeView* ClearDwordPairLaneBatchGamma(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20589,7 +20589,7 @@ namespace
    * What it does:
    * Alias lane for clearing one `{object, owner}` pair and releasing owner.
    */
-  [[maybe_unused]] std::intptr_t ResetSharedOwnerPairAndReleaseBatchB(
+  std::intptr_t ResetSharedOwnerPairAndReleaseBatchB(
     SharedOwnerPairRuntimeView* const pair
   ) noexcept
   {
@@ -20602,7 +20602,7 @@ namespace
    * What it does:
    * Returns zero when lane `+0x00` is non-zero, otherwise returns `-1`.
    */
-  [[maybe_unused]] std::int32_t ReturnZeroWhenWordNonZeroElseMinusOne(
+  std::int32_t ReturnZeroWhenWordNonZeroElseMinusOne(
     const WordLane00RuntimeView* const source
   ) noexcept
   {
@@ -20615,7 +20615,7 @@ namespace
    * What it does:
    * Returns true when lane `+0x00` is zero.
    */
-  [[maybe_unused]] BOOL IsWordLane00Zero(
+  BOOL IsWordLane00Zero(
     const WordLane00RuntimeView* const source
   ) noexcept
   {
@@ -20628,7 +20628,7 @@ namespace
    * What it does:
    * Alias lane for clearing one `{object, owner}` pair and releasing owner.
    */
-  [[maybe_unused]] std::intptr_t ResetSharedOwnerPairAndReleaseBatchC(
+  std::intptr_t ResetSharedOwnerPairAndReleaseBatchC(
     SharedOwnerPairRuntimeView* const pair
   ) noexcept
   {
@@ -20657,7 +20657,7 @@ namespace
    * What it does:
    * Stores one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordAlpha(
+  std::uint32_t* StoreSourceLane04WordAlpha(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -20671,7 +20671,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneOmicron(
+  std::uint32_t* StoreScalarDwordLaneOmicron(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20685,7 +20685,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePi(
+  std::uint32_t* StoreScalarDwordLanePi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20699,7 +20699,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneRho(
+  std::uint32_t* StoreScalarDwordLaneRho(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20713,7 +20713,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneSigma(
+  std::uint32_t* StoreScalarDwordLaneSigma(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20727,7 +20727,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneTau(
+  std::uint32_t* StoreScalarDwordLaneTau(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20741,7 +20741,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneUpsilon(
+  std::uint32_t* StoreScalarDwordLaneUpsilon(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20755,7 +20755,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneGamma(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneGamma(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -20766,7 +20766,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePhi(
+  std::uint32_t* StoreScalarDwordLanePhi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20780,7 +20780,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneDelta(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneDelta(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -20791,7 +20791,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneChi(
+  std::uint32_t* StoreScalarDwordLaneChi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20805,7 +20805,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneEpsilon(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneEpsilon(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -20816,7 +20816,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneZeta(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneZeta(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -20827,7 +20827,7 @@ namespace
    * What it does:
    * Copies one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneAlpha(
+  DwordBytePairLane* CopyDwordBytePairLaneAlpha(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -20842,7 +20842,7 @@ namespace
    * What it does:
    * Alias lane for copying one `{dword,byte}` pair.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneBeta(
+  DwordBytePairLane* CopyDwordBytePairLaneBeta(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -20857,7 +20857,7 @@ namespace
    * What it does:
    * Reads one indexed dword lane from a stride-8 table at base offset `+0x08`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWordFromStride8TableOffset8(
+  std::uint32_t ReadIndexedWordFromStride8TableOffset8(
     const std::uint8_t* const tableBase,
     const std::int32_t index
   ) noexcept
@@ -20871,7 +20871,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x488`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane488(
+  std::uint32_t ReadWordLane488(
     const WordLaneAt488RuntimeView* const source
   ) noexcept
   {
@@ -20884,7 +20884,7 @@ namespace
    * What it does:
    * Zeros both dword lanes in one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneTauSecondary(
+  DwordPairRuntimeView* ZeroDwordPairLaneTauSecondary(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20899,7 +20899,7 @@ namespace
    * What it does:
    * Stores one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordBeta(
+  std::uint32_t* StoreSourceLane04WordBeta(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -20913,7 +20913,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordGamma(
+  std::uint32_t* StoreSourceLane04WordGamma(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -20927,7 +20927,7 @@ namespace
    * What it does:
    * Zeros both dword lanes in one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneUpsilonSecondary(
+  DwordPairRuntimeView* ZeroDwordPairLaneUpsilonSecondary(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20942,7 +20942,7 @@ namespace
    * What it does:
    * Zeros both dword lanes in one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLanePhi(
+  DwordPairRuntimeView* ZeroDwordPairLanePhi(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -20957,7 +20957,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePsi(
+  std::uint32_t* StoreScalarDwordLanePsi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -20971,7 +20971,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneEta(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneEta(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -20982,7 +20982,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesGamma(
+  DwordPairRuntimeView* SwapDwordPairLanesGamma(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -20996,7 +20996,7 @@ namespace
    * What it does:
    * Alias lane for swapping both dword lanes between pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesDelta(
+  DwordPairRuntimeView* SwapDwordPairLanesDelta(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -21010,7 +21010,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneTheta(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneTheta(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -21021,7 +21021,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneOmega(
+  std::uint32_t* StoreScalarDwordLaneOmega(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21035,7 +21035,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneAlpha2(
+  std::uint32_t* StoreScalarDwordLaneAlpha2(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21049,7 +21049,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*20` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride20Batch(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride20Batch(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -21187,7 +21187,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane from source argument.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLanePi(
+  std::uint32_t* StoreScalarWordLanePi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21201,7 +21201,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarWordLanesAlpha(
+  std::uint32_t* SwapScalarWordLanesAlpha(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -21215,7 +21215,7 @@ namespace
    * What it does:
    * Alias lane for swapping one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarWordLanesBeta(
+  std::uint32_t* SwapScalarWordLanesBeta(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -21229,7 +21229,7 @@ namespace
    * What it does:
    * Clears one two-dword lane pair to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneTau(
+  DwordPairRuntimeView* ZeroDwordPairLaneTau(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -21244,7 +21244,7 @@ namespace
    * What it does:
    * Alias lane for clearing one two-dword lane pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneUpsilon(
+  DwordPairRuntimeView* ZeroDwordPairLaneUpsilon(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -21259,7 +21259,7 @@ namespace
    * What it does:
    * Stores one dword pair from two scalar inputs.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromScalarsTau(
+  DwordPairRuntimeView* StoreDwordPairFromScalarsTau(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -21274,7 +21274,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from scalar source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairFromPointerSourcesPsi(
+  DwordBytePairLane* CopyDwordBytePairFromPointerSourcesPsi(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -21289,7 +21289,7 @@ namespace
    * What it does:
    * Returns one dword lane at offset `+0x1C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLaneAt1CPrimary(
+  std::uint32_t ReadWordLaneAt1CPrimary(
     const WordAt1CRuntimeView* const source
   ) noexcept
   {
@@ -21302,7 +21302,7 @@ namespace
    * What it does:
    * Returns one byte lane at offset `+0x29`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLaneAt29Primary(
+  std::uint8_t ReadByteLaneAt29Primary(
     const ByteAt29RuntimeView* const source
   ) noexcept
   {
@@ -21315,7 +21315,7 @@ namespace
    * What it does:
    * Returns one dword lane at offset `+0x2C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLaneAt2CPrimary(
+  std::uint32_t ReadWordLaneAt2CPrimary(
     const WordAt2CRuntimeView* const source
   ) noexcept
   {
@@ -21328,7 +21328,7 @@ namespace
    * What it does:
    * Returns one byte lane at offset `+0x48`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLaneAt48Primary(
+  std::uint8_t ReadByteLaneAt48Primary(
     const ByteAt48RuntimeView* const source
   ) noexcept
   {
@@ -21341,7 +21341,7 @@ namespace
    * What it does:
    * Clears sparse float lanes from `+0x10` to `+0xAC`.
    */
-  [[maybe_unused]] SparseFloatLaneBlockRuntimeView* ClearSparseFloatLaneBlockA(
+  SparseFloatLaneBlockRuntimeView* ClearSparseFloatLaneBlockA(
     SparseFloatLaneBlockRuntimeView* const self
   ) noexcept
   {
@@ -21354,7 +21354,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane from source argument.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRho(
+  std::uint32_t* StoreScalarWordLaneRho(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21368,7 +21368,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneSigma(
+  std::uint32_t* StoreScalarWordLaneSigma(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21382,7 +21382,7 @@ namespace
    * What it does:
    * Stores one dword read from double-indirect lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleIndirectWordFromLane04A(
+  std::uint32_t* WriteDoubleIndirectWordFromLane04A(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -21396,7 +21396,7 @@ namespace
    * What it does:
    * Swaps both dword lanes across two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesXi(
+  DwordPairRuntimeView* SwapDwordPairLanesXi(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -21410,7 +21410,7 @@ namespace
    * What it does:
    * Alias lane for swapping both dword lanes across pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesOmicron(
+  DwordPairRuntimeView* SwapDwordPairLanesOmicron(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -21424,7 +21424,7 @@ namespace
    * What it does:
    * Alias lane for reading one double-indirect dword from lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleIndirectWordFromLane04B(
+  std::uint32_t* WriteDoubleIndirectWordFromLane04B(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -21438,7 +21438,7 @@ namespace
    * What it does:
    * Stores one direct dword from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteWordFromLane04A(
+  std::uint32_t* WriteWordFromLane04A(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -21452,7 +21452,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane from source argument.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneTau(
+  std::uint32_t* StoreScalarWordLaneTau(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21466,7 +21466,7 @@ namespace
    * What it does:
    * Pops one head-node address and advances the source head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressPrimary(
+  std::uint32_t* PopHeadNodeAddressPrimary(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -21480,7 +21480,7 @@ namespace
    * What it does:
    * Advances one head-slot pointer to the next node.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotPrimary(
+  std::uint32_t** AdvanceHeadPointerSlotPrimary(
     std::uint32_t** const headSlot
   ) noexcept
   {
@@ -21493,7 +21493,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane from source argument.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneUpsilon(
+  std::uint32_t* StoreScalarWordLaneUpsilon(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21507,7 +21507,7 @@ namespace
    * What it does:
    * Alias lane for advancing one head-slot pointer.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotSecondary(
+  std::uint32_t** AdvanceHeadPointerSlotSecondary(
     std::uint32_t** const headSlot
   ) noexcept
   {
@@ -21520,7 +21520,7 @@ namespace
    * What it does:
    * Alias lane for swapping one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarWordLanesGamma(
+  std::uint32_t* SwapScalarWordLanesGamma(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -21534,7 +21534,7 @@ namespace
    * What it does:
    * Alias lane for swapping one scalar dword.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarWordLanesDelta(
+  std::uint32_t* SwapScalarWordLanesDelta(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -21548,7 +21548,7 @@ namespace
    * What it does:
    * Alias lane for reading one double-indirect dword from lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleIndirectWordFromLane04C(
+  std::uint32_t* WriteDoubleIndirectWordFromLane04C(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -21562,7 +21562,7 @@ namespace
    * What it does:
    * Alias lane for storing one direct dword from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteWordFromLane04B(
+  std::uint32_t* WriteWordFromLane04B(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -21576,7 +21576,7 @@ namespace
    * What it does:
    * Alias lane for storing one direct dword from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteWordFromLane04C(
+  std::uint32_t* WriteWordFromLane04C(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -21590,7 +21590,7 @@ namespace
    * What it does:
    * Alias lane for storing one direct dword from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteWordFromLane04D(
+  std::uint32_t* WriteWordFromLane04D(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -21674,7 +21674,7 @@ namespace
    * What it does:
    * Stores one dword read from a double-indirect lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneF(
+  std::uint32_t* CopyDoubleIndirectWordLaneF(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -21688,7 +21688,7 @@ namespace
    * What it does:
    * Stores one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordDelta(
+  std::uint32_t* StoreSourceLane04WordDelta(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -21702,7 +21702,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordEpsilon(
+  std::uint32_t* StoreSourceLane04WordEpsilon(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -21716,7 +21716,7 @@ namespace
    * What it does:
    * Zeros both dword lanes in one pair record.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneChi(
+  DwordPairRuntimeView* ZeroDwordPairLaneChi(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -21731,7 +21731,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordZeta(
+  std::uint32_t* StoreSourceLane04WordZeta(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -21745,7 +21745,7 @@ namespace
    * What it does:
    * Pops one intrusive head-node pointer and advances the head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneE(
+  std::uint32_t* PopHeadNodeAddressLaneE(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -21759,7 +21759,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesEpsilon(
+  DwordPairRuntimeView* SwapDwordPairLanesEpsilon(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -21773,7 +21773,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBeta2(
+  std::uint32_t* StoreScalarDwordLaneBeta2(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21787,7 +21787,7 @@ namespace
    * What it does:
    * Alias lane for popping one head-node pointer and advancing head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneF(
+  std::uint32_t* PopHeadNodeAddressLaneF(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -21801,7 +21801,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneGamma2(
+  std::uint32_t* StoreScalarDwordLaneGamma2(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21815,7 +21815,7 @@ namespace
    * What it does:
    * Advances one pointer slot to node-head next.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneE(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneE(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -21826,7 +21826,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneDelta2(
+  std::uint32_t* StoreScalarDwordLaneDelta2(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21840,7 +21840,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head next.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneF(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneF(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -21851,7 +21851,7 @@ namespace
    * What it does:
    * Swaps one leading dword lane between two word slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapLeadingWordLaneTertiary(
+  std::uint32_t* SwapLeadingWordLaneTertiary(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -21866,7 +21866,7 @@ namespace
    * Initializes one segment-extents lane block with zeroed header flags and
    * two source float3 vectors.
    */
-  [[maybe_unused]] SegmentExtentsRuntimeView* InitializeSegmentExtentsFromMinMaxVectors(
+  SegmentExtentsRuntimeView* InitializeSegmentExtentsFromMinMaxVectors(
     SegmentExtentsRuntimeView* const outValue,
     const float* const minVector,
     const float* const maxVector
@@ -21892,7 +21892,7 @@ namespace
    * What it does:
    * Alias lane for double-indirect dword read at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordLaneG(
+  std::uint32_t* CopyDoubleIndirectWordLaneG(
     std::uint32_t* const outValue,
     const IndirectWordPointerAt4RuntimeView* const source
   ) noexcept
@@ -21906,7 +21906,7 @@ namespace
    * What it does:
    * Stores one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordEta(
+  std::uint32_t* StoreSourceLane04WordEta(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -21920,7 +21920,7 @@ namespace
    * What it does:
    * Alias lane for popping one head-node pointer and advancing head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneG(
+  std::uint32_t* PopHeadNodeAddressLaneG(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -21934,7 +21934,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneEpsilon2(
+  std::uint32_t* StoreScalarDwordLaneEpsilon2(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21948,7 +21948,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head next.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneG(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneG(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -21959,7 +21959,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneZeta2(
+  std::uint32_t* StoreScalarDwordLaneZeta2(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -21973,7 +21973,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head next.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneH(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneH(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -21985,7 +21985,7 @@ namespace
    * Initializes one self-relative header with begin/cursor/free at `this+0x10`
    * and tail at `begin+0xBB8`.
    */
-  [[maybe_unused]] SelfRelativeTailBB8HeaderRuntimeView* InitializeSelfRelativeTailBB8Header(
+  SelfRelativeTailBB8HeaderRuntimeView* InitializeSelfRelativeTailBB8Header(
     SelfRelativeTailBB8HeaderRuntimeView* const outValue
   ) noexcept
   {
@@ -22003,7 +22003,7 @@ namespace
    * What it does:
    * Computes one `base + index*12` byte address lane from pointer slot `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride12AddressFromBasePointer(
+  std::uint32_t ComputeStride12AddressFromBasePointer(
     const std::int32_t index,
     const BasePointerWordRuntimeView* const source
   ) noexcept
@@ -22017,7 +22017,7 @@ namespace
    * What it does:
    * Initializes one header from external begin pointer with tail `begin+0xBB8`.
    */
-  [[maybe_unused]] SelfRelativeTailBB8HeaderRuntimeView* InitializeExternalTailBB8Header(
+  SelfRelativeTailBB8HeaderRuntimeView* InitializeExternalTailBB8Header(
     SelfRelativeTailBB8HeaderRuntimeView* const outValue,
     const std::uint32_t begin
   ) noexcept
@@ -22035,7 +22035,7 @@ namespace
    * What it does:
    * Writes one source dword into destination lane `+0x04`.
    */
-  [[maybe_unused]] WordLaneAt04RuntimeView* StoreWordLane04FromPointer(
+  WordLaneAt04RuntimeView* StoreWordLane04FromPointer(
     WordLaneAt04RuntimeView* const outValue,
     const std::uint32_t* const source
   ) noexcept
@@ -22050,7 +22050,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x400`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane400(
+  std::uint32_t ReadWordLane400(
     const WordLaneAt400RuntimeView* const source
   ) noexcept
   {
@@ -22063,7 +22063,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x3FC`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane3FC(
+  std::uint32_t ReadWordLane3FC(
     const WordLaneAt3FCRuntimeView* const source
   ) noexcept
   {
@@ -22076,7 +22076,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x4D5`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane4D5(
+  std::uint8_t ReadByteLane4D5(
     const ByteLaneAt4D5RuntimeView* const source
   ) noexcept
   {
@@ -22089,7 +22089,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x0F0`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane0F0(
+  std::uint32_t ReadWordLane0F0(
     const WordLaneAt0F0RuntimeView* const source
   ) noexcept
   {
@@ -22134,7 +22134,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count=100)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount100A(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount100A(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -22148,7 +22148,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count=3000)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount3000A(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount3000A(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -22163,7 +22163,7 @@ namespace
    * Alias lane for initializing one external dword-span header with
    * `(base, count=3000)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount3000B(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount3000B(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -22177,7 +22177,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane from source argument.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryA(
+  std::uint32_t* StoreScalarWordLaneRecoveryA(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22191,7 +22191,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryB(
+  std::uint32_t* StoreScalarWordLaneRecoveryB(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22205,7 +22205,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryC(
+  std::uint32_t* StoreScalarWordLaneRecoveryC(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22219,7 +22219,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryD(
+  std::uint32_t* StoreScalarWordLaneRecoveryD(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22233,7 +22233,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryE(
+  std::uint32_t* StoreScalarWordLaneRecoveryE(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22247,7 +22247,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryF(
+  std::uint32_t* StoreScalarWordLaneRecoveryF(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22262,7 +22262,7 @@ namespace
    * Initializes one self-relative 4-lane header with a tail anchor at
    * `self + 0x42`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail42(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail42(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -22275,7 +22275,7 @@ namespace
    * What it does:
    * Computes one `*baseWord + index*2` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeBaseWordOffsetByIndexStride2(
+  std::uint32_t ComputeBaseWordOffsetByIndexStride2(
     const std::uint32_t* const baseWord,
     const std::int32_t index
   ) noexcept
@@ -22290,7 +22290,7 @@ namespace
    * Initializes one self-relative 4-lane header with a tail anchor at
    * `self + 0x90`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail90(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail90(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -22304,7 +22304,7 @@ namespace
    * Initializes one self-relative 4-lane header with a tail anchor at
    * `self + 0x58`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail58(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail58(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -22318,7 +22318,7 @@ namespace
    * Alias lane for initializing one external dword-span header with
    * `(base, count=32)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount32C(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount32C(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -22332,7 +22332,7 @@ namespace
    * What it does:
    * Returns the sum of two scalar float lanes.
    */
-  [[maybe_unused]] float AddScalarFloatLanes(
+  float AddScalarFloatLanes(
     const float* const left,
     const float* const right
   ) noexcept
@@ -22346,7 +22346,7 @@ namespace
    * What it does:
    * Returns one scalar float lane multiplied by a scalar factor.
    */
-  [[maybe_unused]] float MultiplyScalarFloatLane(
+  float MultiplyScalarFloatLane(
     const float* const value,
     const float scalar
   ) noexcept
@@ -22360,7 +22360,7 @@ namespace
    * What it does:
    * Interpolates between two `{value,time}` samples at a requested sample time.
    */
-  [[maybe_unused]] float InterpolateFloatValueAtSampleTime(
+  float InterpolateFloatValueAtSampleTime(
     const FloatValueAndSampleTimeRuntimeView* const left,
     const FloatValueAndSampleTimeRuntimeView* const right,
     const float sampleTime
@@ -22376,7 +22376,7 @@ namespace
    * What it does:
    * Clears one two-dword lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneRecovery(
+  DwordPairRuntimeView* ClearDwordPairLaneRecovery(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -22392,7 +22392,7 @@ namespace
    * Initializes one self-relative 4-lane header with a tail anchor at
    * `self + 0x1A0`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail1A0(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail1A0(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -22405,7 +22405,7 @@ namespace
    * What it does:
    * Stores one direct dword from source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* WriteWordFromLane04RecoveryA(
+  std::uint32_t* WriteWordFromLane04RecoveryA(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -22420,7 +22420,7 @@ namespace
    * Alias lane for initializing one external dword-span header with
    * `(base, count=100)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount100B(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount100B(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -22434,7 +22434,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryG(
+  std::uint32_t* StoreScalarWordLaneRecoveryG(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22448,7 +22448,7 @@ namespace
    * What it does:
    * Alias lane for computing one `*baseWord + index * 8` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride8Recovery(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride8Recovery(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -22463,7 +22463,7 @@ namespace
    * What it does:
    * Alias lane for scalar dword store behavior.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordLaneRecoveryH(
+  std::uint32_t* StoreScalarWordLaneRecoveryH(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22477,7 +22477,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source lane `*(+0xB8)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDereferencedLaneB8WordA(
+  std::uint32_t* WriteDereferencedLaneB8WordA(
     std::uint32_t* const outValue,
     const PointerLaneAtB8RuntimeView* const source
   ) noexcept
@@ -22492,7 +22492,7 @@ namespace
    * What it does:
    * Stores raw pointer lane `+0xB8` as one dword.
    */
-  [[maybe_unused]] std::uint32_t* WriteLaneB8PointerWordA(
+  std::uint32_t* WriteLaneB8PointerWordA(
     std::uint32_t* const outValue,
     const PointerLaneAtB8RuntimeView* const source
   ) noexcept
@@ -22507,7 +22507,7 @@ namespace
    * What it does:
    * Alias lane for storing one dword loaded through source lane `*(+0xB8)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDereferencedLaneB8WordB(
+  std::uint32_t* WriteDereferencedLaneB8WordB(
     std::uint32_t* const outValue,
     const PointerLaneAtB8RuntimeView* const source
   ) noexcept
@@ -22521,7 +22521,7 @@ namespace
    * What it does:
    * Alias lane for storing raw pointer lane `+0xB8` as one dword.
    */
-  [[maybe_unused]] std::uint32_t* WriteLaneB8PointerWordB(
+  std::uint32_t* WriteLaneB8PointerWordB(
     std::uint32_t* const outValue,
     const PointerLaneAtB8RuntimeView* const source
   ) noexcept
@@ -22535,7 +22535,7 @@ namespace
    * What it does:
    * Computes one `base + 0x140 + index*20` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeOffsetAddressFromBaseWithTail140Stride20(
+  std::uint32_t ComputeOffsetAddressFromBaseWithTail140Stride20(
     const std::int32_t index,
     const std::uint32_t baseAddress
   ) noexcept
@@ -22549,7 +22549,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source lane `*(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordRecovery(
+  std::uint32_t* WriteDoubleDereferencedLane04WordRecovery(
     std::uint32_t* const outValue,
     const SourceIndirectLane4RuntimeView* const source
   ) noexcept
@@ -22588,7 +22588,7 @@ namespace
    * What it does:
    * Copies one dword from source pointer to destination pointer.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordFromPointerA(
+  std::uint32_t* CopySingleWordFromPointerA(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -22602,7 +22602,7 @@ namespace
    * What it does:
    * Copies one byte from source pointer to destination pointer.
    */
-  [[maybe_unused]] std::uint8_t* CopySingleByteFromPointerA(
+  std::uint8_t* CopySingleByteFromPointerA(
     std::uint8_t* const outValue,
     const std::uint8_t* const sourceByte
   ) noexcept
@@ -22616,7 +22616,7 @@ namespace
    * What it does:
    * Stores one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordTheta(
+  std::uint32_t* StoreSourceLane04WordTheta(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -22630,7 +22630,7 @@ namespace
    * What it does:
    * Alias lane for copying one byte from source pointer.
    */
-  [[maybe_unused]] std::uint8_t* CopySingleByteFromPointerB(
+  std::uint8_t* CopySingleByteFromPointerB(
     std::uint8_t* const outValue,
     const std::uint8_t* const sourceByte
   ) noexcept
@@ -22644,7 +22644,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordIota(
+  std::uint32_t* StoreSourceLane04WordIota(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -22658,7 +22658,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneIota(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneIota(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -22669,7 +22669,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBeta3(
+  std::uint32_t* StoreScalarDwordLaneBeta3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22683,7 +22683,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneGamma3(
+  std::uint32_t* StoreScalarDwordLaneGamma3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22697,7 +22697,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneKappa(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneKappa(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -22708,7 +22708,7 @@ namespace
    * What it does:
    * Advances one pointer slot to node-head next.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneI(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneI(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -22719,7 +22719,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneLambda(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneLambda(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -22730,7 +22730,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneDelta3(
+  std::uint32_t* StoreScalarDwordLaneDelta3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22744,7 +22744,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*4` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride4RecoveryA(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride4RecoveryA(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -22759,7 +22759,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneEpsilon3(
+  std::uint32_t* StoreScalarDwordLaneEpsilon3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22773,7 +22773,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneZeta3(
+  std::uint32_t* StoreScalarDwordLaneZeta3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22787,7 +22787,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneGamma(
+  DwordBytePairLane* CopyDwordBytePairLaneGamma(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -22802,7 +22802,7 @@ namespace
    * What it does:
    * Writes one dword pair from two source-word pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairFromTwoPointersA(
+  DwordPairRuntimeView* CopyDwordPairFromTwoPointersA(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const sourceWord0,
     const std::uint32_t* const sourceWord1
@@ -22819,7 +22819,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneMu(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneMu(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -22830,7 +22830,7 @@ namespace
    * What it does:
    * Alias lane for advancing one pointer slot to node-head next.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotLaneJ(std::uint32_t** const headSlot) noexcept
+  std::uint32_t** AdvanceHeadPointerSlotLaneJ(std::uint32_t** const headSlot) noexcept
   {
     return AdvanceHeadPointerSlot(headSlot);
   }
@@ -22841,7 +22841,7 @@ namespace
    * What it does:
    * Alias lane for writing one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneDelta(
+  DwordBytePairLane* CopyDwordBytePairLaneDelta(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -22856,7 +22856,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneEta3(
+  std::uint32_t* StoreScalarDwordLaneEta3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22870,7 +22870,7 @@ namespace
    * What it does:
    * Alias lane for storing one `*baseWord + index*4` byte-offset.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride4RecoveryB(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride4RecoveryB(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -22885,7 +22885,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordKappa(
+  std::uint32_t* StoreSourceLane04WordKappa(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -22899,7 +22899,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordLambda(
+  std::uint32_t* StoreSourceLane04WordLambda(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -22913,7 +22913,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordMu(
+  std::uint32_t* StoreSourceLane04WordMu(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -22927,7 +22927,7 @@ namespace
    * What it does:
    * Stores one dword through lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordRecoveryB(
+  std::uint32_t* WriteDoubleDereferencedLane04WordRecoveryB(
     std::uint32_t* const outValue,
     const DoubleIndirectLane04RuntimeView* const source
   ) noexcept
@@ -22941,7 +22941,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneNu(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneNu(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -22952,7 +22952,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneTheta3(
+  std::uint32_t* StoreScalarDwordLaneTheta3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -22966,7 +22966,7 @@ namespace
    * What it does:
    * Alias lane for storing source dword at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordNu(
+  std::uint32_t* StoreSourceLane04WordNu(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -22980,7 +22980,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneIota3(
+  std::uint32_t* StoreScalarDwordLaneIota3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23085,7 +23085,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneKappa3(
+  std::uint32_t* StoreScalarDwordLaneKappa3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23099,7 +23099,7 @@ namespace
    * What it does:
    * Stores one source dword lane at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordXi(
+  std::uint32_t* StoreSourceLane04WordXi(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -23113,7 +23113,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordOmicron(
+  std::uint32_t* StoreSourceLane04WordOmicron(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -23127,7 +23127,7 @@ namespace
    * What it does:
    * Writes one dword pair from two source-word pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairFromWordPointersRecovery83(
+  DwordPairRuntimeView* CopyDwordPairFromWordPointersRecovery83(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const sourceWord0,
     const std::uint32_t* const sourceWord1
@@ -23144,7 +23144,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x38`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane38(
+  std::uint32_t ReadWordLane38(
     const WordLaneAt38RuntimeView* const source
   ) noexcept
   {
@@ -23157,7 +23157,7 @@ namespace
    * What it does:
    * Initializes one self-relative 4-lane header with tail anchor at `self+0x80`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail80Recovery(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail80Recovery(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -23170,7 +23170,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneLambda3(
+  std::uint32_t* StoreScalarDwordLaneLambda3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23184,7 +23184,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneMu3(
+  std::uint32_t* StoreScalarDwordLaneMu3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23198,7 +23198,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneRecovery83A(
+  DwordBytePairLane* CopyDwordBytePairLaneRecovery83A(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -23213,7 +23213,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneXi(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneXi(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23224,7 +23224,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneNu3(
+  std::uint32_t* StoreScalarDwordLaneNu3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23238,7 +23238,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneOmicron(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneOmicron(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23249,7 +23249,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneXi3(
+  std::uint32_t* StoreScalarDwordLaneXi3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23263,7 +23263,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLanePi(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLanePi(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23274,7 +23274,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneRho(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneRho(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23285,7 +23285,7 @@ namespace
    * What it does:
    * Alias lane for writing one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneRecovery83B(
+  DwordBytePairLane* CopyDwordBytePairLaneRecovery83B(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -23300,7 +23300,7 @@ namespace
    * What it does:
    * Alias lane for writing one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneRecovery83C(
+  DwordBytePairLane* CopyDwordBytePairLaneRecovery83C(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -23315,7 +23315,7 @@ namespace
    * What it does:
    * Clears one two-dword lane pair to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ZeroDwordPairLaneRecovery83(
+  DwordPairRuntimeView* ZeroDwordPairLaneRecovery83(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -23330,7 +23330,7 @@ namespace
    * What it does:
    * Stores one dword pair from two scalar inputs.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromScalarsRecovery83(
+  DwordPairRuntimeView* StoreDwordPairFromScalarsRecovery83(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -23347,7 +23347,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x14C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane14C(
+  std::uint32_t ReadWordLane14C(
     const WordLaneAt14CRuntimeView* const source
   ) noexcept
   {
@@ -23360,7 +23360,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x188`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane188(
+  std::uint8_t ReadByteLane188(
     const ByteLaneAt188RuntimeView* const source
   ) noexcept
   {
@@ -23373,7 +23373,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x4E8`.
    */
-  [[maybe_unused]] ByteFlagLanesAt4E8RuntimeView* SetByteFlag4E8(
+  ByteFlagLanesAt4E8RuntimeView* SetByteFlag4E8(
     ByteFlagLanesAt4E8RuntimeView* const outValue,
     const std::uint8_t value
   ) noexcept
@@ -23388,7 +23388,7 @@ namespace
    * What it does:
    * Stores one byte flag lane at offset `+0x4E9`.
    */
-  [[maybe_unused]] ByteFlagLanesAt4E8RuntimeView* SetByteFlag4E9(
+  ByteFlagLanesAt4E8RuntimeView* SetByteFlag4E9(
     ByteFlagLanesAt4E8RuntimeView* const outValue,
     const std::uint8_t value
   ) noexcept
@@ -23403,7 +23403,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0xB8`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLaneB8(
+  std::uint8_t ReadByteLaneB8(
     const ByteLaneAtB8RuntimeView* const source
   ) noexcept
   {
@@ -23416,7 +23416,7 @@ namespace
    * What it does:
    * Reads one indexed dword lane from table block at offset `+0x1C0`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWordLane1C0(
+  std::uint32_t ReadIndexedWordLane1C0(
     const IndexedWordBlockAt1C0RuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -23430,7 +23430,7 @@ namespace
    * What it does:
    * Reads one indexed dword lane from table block at offset `+0x1C8`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWordLane1C8(
+  std::uint32_t ReadIndexedWordLane1C8(
     const IndexedWordBlockAt1C0RuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -23444,7 +23444,7 @@ namespace
    * What it does:
    * Reads one indexed dword lane from table block at offset `+0x1D0`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWordLane1D0(
+  std::uint32_t ReadIndexedWordLane1D0(
     const IndexedWordBlockAt1C0RuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -23458,7 +23458,7 @@ namespace
    * What it does:
    * Copies one two-dword pair from source lanes `+0x1F8/+0x1FC`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyWordPairAt1F8(
+  DwordPairRuntimeView* CopyWordPairAt1F8(
     DwordPairRuntimeView* const outValue,
     const IndexedWordBlockAt1C0RuntimeView* const source
   ) noexcept
@@ -23474,7 +23474,7 @@ namespace
    * What it does:
    * Copies one two-dword pair from source lanes `+0x200/+0x204`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyWordPairAt200(
+  DwordPairRuntimeView* CopyWordPairAt200(
     DwordPairRuntimeView* const outValue,
     const IndexedWordBlockAt1C0RuntimeView* const source
   ) noexcept
@@ -23490,7 +23490,7 @@ namespace
    * What it does:
    * Copies one two-dword pair from source lanes `+0x208/+0x20C`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyWordPairAt208(
+  DwordPairRuntimeView* CopyWordPairAt208(
     DwordPairRuntimeView* const outValue,
     const IndexedWordBlockAt1C0RuntimeView* const source
   ) noexcept
@@ -23533,7 +23533,7 @@ namespace
    * What it does:
    * Stores one source dword lane at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordPi(
+  std::uint32_t* StoreSourceLane04WordPi(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -23547,7 +23547,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneOmicron3(
+  std::uint32_t* StoreScalarDwordLaneOmicron3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23561,7 +23561,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneSigma(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneSigma(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23572,7 +23572,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePi3(
+  std::uint32_t* StoreScalarDwordLanePi3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23586,7 +23586,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneTau(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneTau(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23597,7 +23597,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneRecovery85A(
+  DwordBytePairLane* CopyDwordBytePairLaneRecovery85A(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -23612,7 +23612,7 @@ namespace
    * What it does:
    * Zeros one dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarDwordLaneUpsilon(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarDwordLaneUpsilon(std::uint32_t* const outValue) noexcept
   {
     return ZeroSingleWordLane(outValue);
   }
@@ -23623,7 +23623,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneRho3(
+  std::uint32_t* StoreScalarDwordLaneRho3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23637,7 +23637,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneSigma3(
+  std::uint32_t* StoreScalarDwordLaneSigma3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23651,7 +23651,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*8` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride8RecoveryB(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride8RecoveryB(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -23666,7 +23666,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneTau3(
+  std::uint32_t* StoreScalarDwordLaneTau3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23680,7 +23680,7 @@ namespace
    * What it does:
    * Stores one `*baseWord + index*4` byte-offset lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreBaseWordOffsetByIndexStride4RecoveryC(
+  std::uint32_t* StoreBaseWordOffsetByIndexStride4RecoveryC(
     std::uint32_t* const outValue,
     const std::uint32_t* const baseWord,
     const std::int32_t index
@@ -23695,7 +23695,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneUpsilon3(
+  std::uint32_t* StoreScalarDwordLaneUpsilon3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23709,7 +23709,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePhi3(
+  std::uint32_t* StoreScalarDwordLanePhi3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23723,7 +23723,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarDwordLaneRecovery85A(
+  std::uint32_t* SwapScalarDwordLaneRecovery85A(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -23737,7 +23737,7 @@ namespace
    * What it does:
    * Replaces one pointer slot with its double-dereferenced value.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotViaDoubleDereferenceE(
+  std::uint32_t** CollapsePointerSlotViaDoubleDereferenceE(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -23750,7 +23750,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneChi3(
+  std::uint32_t* StoreScalarDwordLaneChi3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23764,7 +23764,7 @@ namespace
    * What it does:
    * Replaces one pointer slot with its double-dereferenced value.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotViaDoubleDereferenceF(
+  std::uint32_t** CollapsePointerSlotViaDoubleDereferenceF(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -23777,7 +23777,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePsi3(
+  std::uint32_t* StoreScalarDwordLanePsi3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23791,7 +23791,7 @@ namespace
    * What it does:
    * Pops one head-node address and advances the head slot.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneH(
+  std::uint32_t* PopHeadNodeAddressLaneH(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -23805,7 +23805,7 @@ namespace
    * What it does:
    * Reads one byte flag lane at offset `+0x4E8`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteFlag4E8(
+  std::uint8_t ReadByteFlag4E8(
     const ByteFlagLanesAt4E8RuntimeView* const source
   ) noexcept
   {
@@ -23818,7 +23818,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x58`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane58(
+  std::uint32_t ReadWordLane58(
     const WordLaneAt58RuntimeView* const source
   ) noexcept
   {
@@ -23831,7 +23831,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneOmega3(
+  std::uint32_t* StoreScalarDwordLaneOmega3(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23845,7 +23845,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneAlpha4(
+  std::uint32_t* StoreScalarDwordLaneAlpha4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23859,7 +23859,7 @@ namespace
    * What it does:
    * Reads one byte flag lane at offset `+0x4E9`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteFlag4E9(
+  std::uint8_t ReadByteFlag4E9(
     const ByteFlagLanesAt4E8RuntimeView* const source
   ) noexcept
   {
@@ -23872,7 +23872,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x40`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane40(
+  std::uint32_t ReadWordLane40(
     const WordLaneAt40RuntimeView* const source
   ) noexcept
   {
@@ -23885,7 +23885,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x1B0`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane1B0(
+  std::uint8_t ReadByteLane1B0(
     const ByteLaneAt1B0RuntimeView* const source
   ) noexcept
   {
@@ -23898,7 +23898,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordRecoveryC(
+  std::uint32_t* WriteDoubleDereferencedLane04WordRecoveryC(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -23912,7 +23912,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBeta4(
+  std::uint32_t* StoreScalarDwordLaneBeta4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -23926,7 +23926,7 @@ namespace
    * What it does:
    * Stores one source dword lane at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordRho(
+  std::uint32_t* StoreSourceLane04WordRho(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24015,7 +24015,7 @@ namespace
    * What it does:
    * Moves one source dword into output storage and clears the source lane.
    */
-  [[maybe_unused]] std::uint32_t* TakeSourceWordIntoOutputAndClear(
+  std::uint32_t* TakeSourceWordIntoOutputAndClear(
     std::uint32_t* const outValue,
     std::uint32_t* const sourceWord
   ) noexcept
@@ -24032,7 +24032,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneGamma4(
+  std::uint32_t* StoreScalarDwordLaneGamma4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24046,7 +24046,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneDelta4(
+  std::uint32_t* StoreScalarDwordLaneDelta4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24060,7 +24060,7 @@ namespace
    * What it does:
    * Stores one dword lane at offset `+0x9C`.
    */
-  [[maybe_unused]] StateWordLanesAt88RuntimeView* SetWordLane9C(
+  StateWordLanesAt88RuntimeView* SetWordLane9C(
     StateWordLanesAt88RuntimeView* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24075,7 +24075,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x98`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane98(
+  std::uint32_t ReadWordLane98(
     const StateWordLanesAt88RuntimeView* const source
   ) noexcept
   {
@@ -24088,7 +24088,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x88`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane88(
+  std::uint32_t ReadWordLane88(
     const StateWordLanesAt88RuntimeView* const source
   ) noexcept
   {
@@ -24101,7 +24101,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0xA0`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLaneA0(
+  std::uint8_t ReadByteLaneA0(
     const StateWordLanesAt88RuntimeView* const source
   ) noexcept
   {
@@ -24114,7 +24114,7 @@ namespace
    * What it does:
    * Calls virtual slot 0 with delete-flag `1` when object is non-null.
    */
-  [[maybe_unused]] std::int32_t DestroyViaVTableSlot0DeleteOneA(
+  std::int32_t DestroyViaVTableSlot0DeleteOneA(
     VTableOwnerRuntimeView* const self
   ) noexcept
   {
@@ -24127,7 +24127,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneEpsilon4(
+  std::uint32_t* StoreScalarDwordLaneEpsilon4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24141,7 +24141,7 @@ namespace
    * What it does:
    * Invokes virtual slot `+0x2C` with one dereferenced dword argument.
    */
-  [[maybe_unused]] std::int32_t InvokeVirtualSlot44WithDereferencedWordA(
+  std::int32_t InvokeVirtualSlot44WithDereferencedWordA(
     VTableOwnerRuntimeView* const self,
     const std::uint32_t* const valueSlot
   ) noexcept
@@ -24155,7 +24155,7 @@ namespace
    * What it does:
    * Alias lane for virtual slot-0 delete-flag invocation.
    */
-  [[maybe_unused]] std::int32_t DestroyViaVTableSlot0DeleteOneB(
+  std::int32_t DestroyViaVTableSlot0DeleteOneB(
     VTableOwnerRuntimeView* const self
   ) noexcept
   {
@@ -24168,7 +24168,7 @@ namespace
    * What it does:
    * Stores one source dword lane at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordSigma(
+  std::uint32_t* StoreSourceLane04WordSigma(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24182,7 +24182,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordTau(
+  std::uint32_t* StoreSourceLane04WordTau(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24196,7 +24196,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordUpsilon(
+  std::uint32_t* StoreSourceLane04WordUpsilon(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24210,7 +24210,7 @@ namespace
    * What it does:
    * Computes lower-bound node for one key in a tree with sentinel flag at `+0x15`.
    */
-  [[maybe_unused]] TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutputRecoveryA(
+  TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutputRecoveryA(
     TreeNodeFlagAt15RuntimeView** const outNode,
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt15RuntimeView>* const tree,
     const std::uint32_t* const key
@@ -24226,7 +24226,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordPhi(
+  std::uint32_t* StoreSourceLane04WordPhi(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24240,7 +24240,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordChi(
+  std::uint32_t* StoreSourceLane04WordChi(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24254,7 +24254,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordPsi(
+  std::uint32_t* StoreSourceLane04WordPsi(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24268,7 +24268,7 @@ namespace
    * What it does:
    * Alias lane for lower-bound search in tree with sentinel flag at `+0x15`.
    */
-  [[maybe_unused]] TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutputRecoveryB(
+  TreeNodeFlagAt15RuntimeView** LowerBoundTreeNodeFlag15ToOutputRecoveryB(
     TreeNodeFlagAt15RuntimeView** const outNode,
     const TreeHeaderAt4RuntimeView<TreeNodeFlagAt15RuntimeView>* const tree,
     const std::uint32_t* const key
@@ -24283,7 +24283,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordOmega(
+  std::uint32_t* StoreSourceLane04WordOmega(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24297,7 +24297,7 @@ namespace
    * What it does:
    * Alias lane for storing one source dword lane at `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordAlpha5(
+  std::uint32_t* StoreSourceLane04WordAlpha5(
     std::uint32_t* const outValue,
     const SourceLane4RuntimeView* const source
   ) noexcept
@@ -24312,7 +24312,7 @@ namespace
    * Returns lower-bound node pointer for one float key in a tree with sentinel
    * flag at `+0x11`.
    */
-  [[maybe_unused]] std::uint32_t* LowerBoundTreeNodeFloatKeyFlag11ToOutput(
+  std::uint32_t* LowerBoundTreeNodeFloatKeyFlag11ToOutput(
     std::uint32_t* const outNodeAddress,
     const float* const key,
     const TreeHeaderAt4RuntimeView<TreeNodeFloatKeyFlagAt11RuntimeView>* const tree
@@ -24329,7 +24329,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneZeta4(
+  std::uint32_t* StoreScalarDwordLaneZeta4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24343,7 +24343,7 @@ namespace
    * What it does:
    * Stores one dword loaded through source lane `**(+0x04)`.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordRecoveryD(
+  std::uint32_t* WriteDoubleDereferencedLane04WordRecoveryD(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -24357,7 +24357,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneEta4(
+  std::uint32_t* StoreScalarDwordLaneEta4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24371,7 +24371,7 @@ namespace
    * What it does:
    * Writes one `{dword,byte}` pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairLaneRecovery85B(
+  DwordBytePairLane* CopyDwordBytePairLaneRecovery85B(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -24386,7 +24386,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneTheta4(
+  std::uint32_t* StoreScalarDwordLaneTheta4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24400,7 +24400,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneIota4(
+  std::uint32_t* StoreScalarDwordLaneIota4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24414,7 +24414,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneKappa4(
+  std::uint32_t* StoreScalarDwordLaneKappa4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24428,7 +24428,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneLambda4(
+  std::uint32_t* StoreScalarDwordLaneLambda4(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24455,7 +24455,7 @@ namespace
    * Sifts one heap slot down through the larger-child path, then sifts the
    * pending node upward so max-heap ordering by key lane `+0x14` is preserved.
    */
-  [[maybe_unused]] std::int32_t SiftHeapNodeDownThenUpByKeyLane14(
+  std::int32_t SiftHeapNodeDownThenUpByKeyLane14(
     std::int32_t startIndex,
     const std::int32_t heapCount,
     HeapComparableNodeLane14RuntimeView** const heapSlots,
@@ -24509,7 +24509,7 @@ namespace
    * Sifts one node pointer upward in a max-heap lane while parent key `+0x14`
    * is smaller than the inserted node key.
    */
-  [[maybe_unused]] std::int32_t SiftHeapNodeUpByKeyLane14(
+  std::int32_t SiftHeapNodeUpByKeyLane14(
     std::int32_t writeIndex,
     const std::int32_t stopIndex,
     HeapComparableNodeLane14RuntimeView* const insertedNode,
@@ -24538,7 +24538,7 @@ namespace
    * What it does:
    * Clears one two-dword lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLane86A(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLane86A(DwordPairRuntimeView* const outValue) noexcept
   {
     return ClearDwordPairLane(outValue);
   }
@@ -24549,7 +24549,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86A(
+  std::uint32_t* StoreScalarDwordLane86A(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24563,7 +24563,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86B(
+  std::uint32_t* StoreScalarDwordLane86B(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24577,7 +24577,7 @@ namespace
    * What it does:
    * Returns one scalar dword lane and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearScalarLane86A(std::uint32_t* const lane) noexcept
+  std::uint32_t TakeAndClearScalarLane86A(std::uint32_t* const lane) noexcept
   {
     return TakeAndClearWordLane(lane);
   }
@@ -24588,7 +24588,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanes86A(
+  DwordPairRuntimeView* SwapDwordPairLanes86A(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -24602,7 +24602,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots86A(
+  std::uint32_t* SwapDwordSlots86A(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -24616,7 +24616,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04Word86A(
+  std::uint32_t* StoreSourceLane04Word86A(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -24630,7 +24630,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane08Word86A(
+  std::uint32_t* StoreSourceLane08Word86A(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -24644,7 +24644,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86C(
+  std::uint32_t* StoreScalarDwordLane86C(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24658,7 +24658,7 @@ namespace
    * What it does:
    * Alias lane for storing one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86D(
+  std::uint32_t* StoreScalarDwordLane86D(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24672,7 +24672,7 @@ namespace
    * What it does:
    * Swaps lanes `+0x04/+0x08/+0x0C` between two four-lane records.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanes86A(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanes86A(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -24686,7 +24686,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots86B(
+  std::uint32_t* SwapDwordSlots86B(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -24701,7 +24701,7 @@ namespace
    * Alias lane for swapping lanes `+0x04/+0x08/+0x0C` between two four-lane
    * records.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* SwapDwordQuadTailLanes86B(
+  DwordQuadRuntimeView* SwapDwordQuadTailLanes86B(
     DwordQuadRuntimeView* const left,
     DwordQuadRuntimeView* const right
   ) noexcept
@@ -24715,7 +24715,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04Word86B(
+  std::uint32_t* StoreSourceLane04Word86B(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -24729,7 +24729,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane08Word86B(
+  std::uint32_t* StoreSourceLane08Word86B(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -24743,7 +24743,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots86C(
+  std::uint32_t* SwapDwordSlots86C(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -24757,7 +24757,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanes86B(
+  DwordPairRuntimeView* SwapDwordPairLanes86B(
     DwordPairRuntimeView* const left,
     DwordPairRuntimeView* const right
   ) noexcept
@@ -24771,7 +24771,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots86D(
+  std::uint32_t* SwapDwordSlots86D(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -24785,7 +24785,7 @@ namespace
    * What it does:
    * Returns one scalar dword lane and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearScalarLane86B(std::uint32_t* const lane) noexcept
+  std::uint32_t TakeAndClearScalarLane86B(std::uint32_t* const lane) noexcept
   {
     return TakeAndClearWordLane(lane);
   }
@@ -24796,7 +24796,7 @@ namespace
    * What it does:
    * Returns one dword from vtable slot at offset `+0x48`.
    */
-  [[maybe_unused]] std::uint32_t ReadVTableSlot72(const VTableOwnerRuntimeView* const owner) noexcept
+  std::uint32_t ReadVTableSlot72(const VTableOwnerRuntimeView* const owner) noexcept
   {
     return owner->vtable[18];
   }
@@ -24807,7 +24807,7 @@ namespace
    * What it does:
    * Moves three dword lanes from source to output and clears the source lanes.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* MoveAndClearDwordTripleLanes86A(
+  DwordTripleRuntimeView* MoveAndClearDwordTripleLanes86A(
     DwordTripleRuntimeView* const outValue,
     DwordTripleRuntimeView* const source
   ) noexcept
@@ -24829,7 +24829,7 @@ namespace
    * What it does:
    * Moves one source dword to output and clears the source lane.
    */
-  [[maybe_unused]] std::uint32_t* MoveAndClearSourceWord86A(
+  std::uint32_t* MoveAndClearSourceWord86A(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -24843,7 +24843,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86E(
+  std::uint32_t* StoreScalarDwordLane86E(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24857,7 +24857,7 @@ namespace
    * What it does:
    * Moves one source dword to output and clears the source lane.
    */
-  [[maybe_unused]] std::uint32_t* MoveAndClearSourceWord86B(
+  std::uint32_t* MoveAndClearSourceWord86B(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -24871,7 +24871,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86F(
+  std::uint32_t* StoreScalarDwordLane86F(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24885,7 +24885,7 @@ namespace
    * What it does:
    * Moves one source dword to output and clears the source lane.
    */
-  [[maybe_unused]] std::uint32_t* MoveAndClearSourceWord86C(
+  std::uint32_t* MoveAndClearSourceWord86C(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -24899,7 +24899,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLane86G(
+  std::uint32_t* StoreScalarDwordLane86G(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -24913,7 +24913,7 @@ namespace
    * What it does:
    * Returns one scalar dword lane and clears it to zero.
    */
-  [[maybe_unused]] std::uint32_t TakeAndClearScalarLane86C(std::uint32_t* const lane) noexcept
+  std::uint32_t TakeAndClearScalarLane86C(std::uint32_t* const lane) noexcept
   {
     return TakeAndClearWordLane(lane);
   }
@@ -24925,7 +24925,7 @@ namespace
    * Unlinks one intrusive two-link node from its ring and restores
    * singleton self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelf86A(
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeSelf86A(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -25005,7 +25005,7 @@ namespace
    * Unlinks one intrusive node from its current ring and relinks it directly
    * after the provided anchor node.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchorEpsilon(
+  IntrusiveNodeRuntimeView* RelinkIntrusiveNodeAfterAnchorEpsilon(
     IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView* const anchor
   ) noexcept
@@ -25019,7 +25019,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarDwordLaneEta(
+  std::uint32_t* SwapScalarDwordLaneEta(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -25033,7 +25033,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneMu5(
+  std::uint32_t* StoreScalarDwordLaneMu5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25047,7 +25047,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneNu5(
+  std::uint32_t* StoreScalarDwordLaneNu5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25062,7 +25062,7 @@ namespace
    * Binds the world-session load entry callback and caller-provided context
    * into one callback-binding pair.
    */
-  [[maybe_unused]] ScenarioLoadCallbackBindingRuntimeView* BindWorldSessionLoadEntryWithContext(
+  ScenarioLoadCallbackBindingRuntimeView* BindWorldSessionLoadEntryWithContext(
     ScenarioLoadCallbackBindingRuntimeView* const outBinding,
     void* const context
   ) noexcept
@@ -25078,7 +25078,7 @@ namespace
    * What it does:
    * Stores one scalar word and one dereferenced source word as a dword pair.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreWordPairFromScalarAndSourceWord(
+  DwordPairRuntimeView* StoreWordPairFromScalarAndSourceWord(
     DwordPairRuntimeView* const outPair,
     const std::uint32_t* const sourceWord,
     const std::uint32_t scalar
@@ -25095,7 +25095,7 @@ namespace
    * What it does:
    * Binds the world-session load entry callback into one callback-binding pair.
    */
-  [[maybe_unused]] ScenarioLoadCallbackBindingRuntimeView* BindWorldSessionLoadEntry(
+  ScenarioLoadCallbackBindingRuntimeView* BindWorldSessionLoadEntry(
     ScenarioLoadCallbackBindingRuntimeView* const outBinding
   ) noexcept
   {
@@ -25109,7 +25109,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneXi5(
+  std::uint32_t* StoreScalarDwordLaneXi5(
     std::uint32_t* const outValue,
     const std::uint32_t value,
     const std::uint32_t /*unused*/
@@ -25124,7 +25124,7 @@ namespace
    * What it does:
    * Copies one source dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordToOutputOmega(
+  std::uint32_t* CopySourceWordToOutputOmega(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -25139,7 +25139,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneOmicron5(
+  std::uint32_t* StoreScalarDwordLaneOmicron5(
     std::uint32_t* const outValue,
     const std::uint32_t value,
     const std::uint32_t /*unused*/
@@ -25154,7 +25154,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePi5(
+  std::uint32_t* StoreScalarDwordLanePi5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25168,7 +25168,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneRho5(
+  std::uint32_t* StoreScalarDwordLaneRho5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25182,7 +25182,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneSigma5(
+  std::uint32_t* StoreScalarDwordLaneSigma5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25196,7 +25196,7 @@ namespace
    * What it does:
    * Clears one two-dword lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneDelta(DwordPairRuntimeView* const outValue) noexcept
+  DwordPairRuntimeView* ClearDwordPairLaneDelta(DwordPairRuntimeView* const outValue) noexcept
   {
     return ClearDwordPairLane(outValue);
   }
@@ -25207,7 +25207,7 @@ namespace
    * What it does:
    * Reads one indexed dword from table pointer lane `+0x9C`.
    */
-  [[maybe_unused]] std::uint32_t ReadIndexedWordFromTableAt9C(
+  std::uint32_t ReadIndexedWordFromTableAt9C(
     const WordTableAt9CRuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -25221,7 +25221,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordTheta(
+  std::uint32_t* StoreSourceLane04WordTheta(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -25235,7 +25235,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane08WordTheta(
+  std::uint32_t* StoreSourceLane08WordTheta(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -25250,7 +25250,7 @@ namespace
    * Initializes one self-relative 4-lane header with tail anchor at
    * `self + 0x1A0`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail1A0Alias(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail1A0Alias(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -25263,7 +25263,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane04WordIota(
+  std::uint32_t* StoreSourceLane04WordIota(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -25277,7 +25277,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSourceLane08WordIota(
+  std::uint32_t* StoreSourceLane08WordIota(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -25291,7 +25291,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count=100)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount100C(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount100C(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -25305,7 +25305,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneTau5(
+  std::uint32_t* StoreScalarDwordLaneTau5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25319,7 +25319,7 @@ namespace
    * What it does:
    * Stores one `base + index*4` address lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreOffsetAddressStride4FromSourceWord(
+  std::uint32_t* StoreOffsetAddressStride4FromSourceWord(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord,
     const std::int32_t index
@@ -25334,7 +25334,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneUpsilon5(
+  std::uint32_t* StoreScalarDwordLaneUpsilon5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25348,7 +25348,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePhi5(
+  std::uint32_t* StoreScalarDwordLanePhi5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25362,7 +25362,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneChi5(
+  std::uint32_t* StoreScalarDwordLaneChi5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25376,7 +25376,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x1C`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane1C(const WordLaneAt1CRuntimeView* const source) noexcept
+  std::uint32_t ReadWordLane1C(const WordLaneAt1CRuntimeView* const source) noexcept
   {
     return source->lane1C;
   }
@@ -25387,7 +25387,7 @@ namespace
    * What it does:
    * Reads one dword lane at offset `+0x480`.
    */
-  [[maybe_unused]] std::uint32_t ReadWordLane480(const WordLaneAt480RuntimeView* const source) noexcept
+  std::uint32_t ReadWordLane480(const WordLaneAt480RuntimeView* const source) noexcept
   {
     return source->lane480;
   }
@@ -25398,7 +25398,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x484`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane484(const ByteLaneAt484RuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane484(const ByteLaneAt484RuntimeView* const source) noexcept
   {
     return source->lane484;
   }
@@ -25409,7 +25409,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x485`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane485(const ByteLaneAt485RuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane485(const ByteLaneAt485RuntimeView* const source) noexcept
   {
     return source->lane485;
   }
@@ -25511,7 +25511,7 @@ namespace
    * What it does:
    * Reads one byte lane at offset `+0x486`.
    */
-  [[maybe_unused]] std::uint8_t ReadByteLane486(const ByteLaneAt486RuntimeView* const source) noexcept
+  std::uint8_t ReadByteLane486(const ByteLaneAt486RuntimeView* const source) noexcept
   {
     return source->lane486;
   }
@@ -25522,7 +25522,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLanePsi5(
+  std::uint32_t* StoreScalarDwordLanePsi5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25536,7 +25536,7 @@ namespace
    * What it does:
    * Moves one source dword to output and clears the source lane.
    */
-  [[maybe_unused]] std::uint32_t* MoveAndClearSourceWord86D(
+  std::uint32_t* MoveAndClearSourceWord86D(
     std::uint32_t* const outValue,
     std::uint32_t* const source
   ) noexcept
@@ -25551,7 +25551,7 @@ namespace
    * Initializes one self-relative 4-lane header with tail anchor at
    * `self + 0x18`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail18(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail18(
     DwordQuadRuntimeView* const self
   ) noexcept
   {
@@ -25564,7 +25564,7 @@ namespace
    * What it does:
    * Initializes one external dword-span header from `(base, count=2)`.
    */
-  [[maybe_unused]] ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount2Alias(
+  ExternalDwordSpanHeaderRuntimeView* InitializeExternalDwordSpanCount2Alias(
     ExternalDwordSpanHeaderRuntimeView* const outHeader,
     const std::uintptr_t baseAddress
   ) noexcept
@@ -25579,7 +25579,7 @@ namespace
    * Stores a driver game-speed callback triple as
    * `{DriverNoteGameSpeedChanged, lane04, lane08}`.
    */
-  [[maybe_unused]] DriverGameSpeedCallbackTripleRuntimeView* BindDriverGameSpeedCallbackTripleA(
+  DriverGameSpeedCallbackTripleRuntimeView* BindDriverGameSpeedCallbackTripleA(
     DriverGameSpeedCallbackTripleRuntimeView* const outValue,
     const DriverGameSpeedChangedRuntimeFn lane08,
     const DriverGameSpeedChangedRuntimeFn lane04
@@ -25598,7 +25598,7 @@ namespace
    * Stores a driver game-speed callback triple as
    * `{DriverNoteGameSpeedChanged, source[0], source[1]}`.
    */
-  [[maybe_unused]] DriverGameSpeedCallbackTripleRuntimeView* BindDriverGameSpeedCallbackTripleB(
+  DriverGameSpeedCallbackTripleRuntimeView* BindDriverGameSpeedCallbackTripleB(
     DriverGameSpeedCallbackTripleRuntimeView* const outValue,
     const DriverGameSpeedCallbackPairRuntimeView* const source
   ) noexcept
@@ -25615,7 +25615,7 @@ namespace
    * What it does:
    * Stores one dword pair from two scalar lanes.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromScalarsUpsilon(
+  DwordPairRuntimeView* StoreDwordPairFromScalarsUpsilon(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -25630,7 +25630,7 @@ namespace
    * What it does:
    * Copies one source dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordToOutputAlpha6(
+  std::uint32_t* CopySourceWordToOutputAlpha6(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -25645,7 +25645,7 @@ namespace
    * What it does:
    * Stores one dword pair from two scalar lanes.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromScalarsPhi(
+  DwordPairRuntimeView* StoreDwordPairFromScalarsPhi(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04
@@ -25660,7 +25660,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneOmega5(
+  std::uint32_t* StoreScalarDwordLaneOmega5(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25674,7 +25674,7 @@ namespace
    * What it does:
    * Stores three scalar dword lanes into output when output is non-null.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* StoreDwordTripleIfOutputPresent(
+  DwordTripleRuntimeView* StoreDwordTripleIfOutputPresent(
     DwordTripleRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -25696,7 +25696,7 @@ namespace
    * Invokes one unary callback with inline-storage pointer (`+0x08`) when
    * length lane `+0x1C` is small, otherwise with heap pointer lane `+0x08`.
    */
-  [[maybe_unused]] std::int32_t InvokeSboUnaryCallbackAt1C(
+  std::int32_t InvokeSboUnaryCallbackAt1C(
     const SboDispatchAt1CRuntimeView* const source
   ) noexcept
   {
@@ -25711,7 +25711,7 @@ namespace
    * Invokes one binary callback with inline/heap source pointer and trailing
    * lane address at `+0x20`.
    */
-  [[maybe_unused]] std::int32_t InvokeSboBinaryCallbackAt1C(
+  std::int32_t InvokeSboBinaryCallbackAt1C(
     SboDispatchAt1CRuntimeView* const source
   ) noexcept
   {
@@ -25727,7 +25727,7 @@ namespace
    * Invokes one binary callback stored at `+0x00` with scalar lanes
    * `+0x04/+0x08`.
    */
-  [[maybe_unused]] std::int32_t InvokeBinaryCallbackWithPairLanes(
+  std::int32_t InvokeBinaryCallbackWithPairLanes(
     const SboDispatchAt1CRuntimeView* const source
   ) noexcept
   {
@@ -25742,7 +25742,7 @@ namespace
    * Invokes one unary external callback with inline/heap pointer resolved from
    * lane `+0x04` and length lane `+0x18`.
    */
-  [[maybe_unused]] std::int32_t InvokeExternalUnaryCallbackWithSboPointer(
+  std::int32_t InvokeExternalUnaryCallbackWithSboPointer(
     const SboDispatchAt18RuntimeView* const source,
     UnaryDispatchRuntimeFn* const callbackSlot
   ) noexcept
@@ -25757,7 +25757,7 @@ namespace
    * Invokes one binary external callback with resolved inline/heap pointer and
    * trailing lane address at `+0x1C`.
    */
-  [[maybe_unused]] std::int32_t InvokeExternalBinaryCallbackWithSboPointer(
+  std::int32_t InvokeExternalBinaryCallbackWithSboPointer(
     SboDispatchAt18RuntimeView* const source,
     BinaryDispatchRuntimeFn* const callbackSlot
   ) noexcept
@@ -25772,7 +25772,7 @@ namespace
    * What it does:
    * Invokes one binary external callback with dword pair lanes.
    */
-  [[maybe_unused]] std::int32_t InvokeExternalBinaryCallbackWithDwordPair(
+  std::int32_t InvokeExternalBinaryCallbackWithDwordPair(
     const DwordPairRuntimeView* const source,
     BinaryDispatchRuntimeFn* const callbackSlot
   ) noexcept
@@ -25786,7 +25786,7 @@ namespace
    * What it does:
    * Invokes virtual slot `+0x04` on one object with delete-flag `1`.
    */
-  [[maybe_unused]] std::int32_t InvokeVirtualSlot04DeleteOne(
+  std::int32_t InvokeVirtualSlot04DeleteOne(
     VTableOwnerRuntimeView* const self
   ) noexcept
   {
@@ -25801,7 +25801,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneAlpha6(
+  std::uint32_t* StoreScalarDwordLaneAlpha6(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25815,7 +25815,7 @@ namespace
    * What it does:
    * Returns whether one pointer slot is null.
    */
-  [[maybe_unused]] std::int32_t IsPointerSlotNullAlpha(const void* const* const slot) noexcept
+  std::int32_t IsPointerSlotNullAlpha(const void* const* const slot) noexcept
   {
     return (*slot == nullptr) ? 1 : 0;
   }
@@ -25826,7 +25826,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBeta6(
+  std::uint32_t* StoreScalarDwordLaneBeta6(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25842,7 +25842,7 @@ namespace
    * Replaces one owned virtual-object pointer slot and releases previous value
    * through virtual slot 0 with delete-flag `1` when present.
    */
-  [[maybe_unused]] void*** ReplaceOwnedVirtualPointerAndReleasePrevious(
+  void*** ReplaceOwnedVirtualPointerAndReleasePrevious(
     void*** const slot,
     void** const replacement
   ) noexcept
@@ -25862,7 +25862,7 @@ namespace
    * What it does:
    * Returns whether one pointer slot is null.
    */
-  [[maybe_unused]] std::int32_t IsPointerSlotNullBeta(const void* const* const slot) noexcept
+  std::int32_t IsPointerSlotNullBeta(const void* const* const slot) noexcept
   {
     return (*slot == nullptr) ? 1 : 0;
   }
@@ -25873,7 +25873,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneGamma6(
+  std::uint32_t* StoreScalarDwordLaneGamma6(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -25887,7 +25887,7 @@ namespace
    * What it does:
    * Returns whether one pointer slot is null.
    */
-  [[maybe_unused]] std::int32_t IsPointerSlotNullGamma(const void* const* const slot) noexcept
+  std::int32_t IsPointerSlotNullGamma(const void* const* const slot) noexcept
   {
     return (*slot == nullptr) ? 1 : 0;
   }
@@ -25898,7 +25898,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarDwordLaneTheta(
+  std::uint32_t* SwapScalarDwordLaneTheta(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -25912,7 +25912,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarDwordLaneIota(
+  std::uint32_t* SwapScalarDwordLaneIota(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -25926,7 +25926,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarDwordLaneKappa(
+  std::uint32_t* SwapScalarDwordLaneKappa(
     std::uint32_t* const left,
     std::uint32_t* const right
   ) noexcept
@@ -25940,7 +25940,7 @@ namespace
    * What it does:
    * Invokes virtual slot 0 with delete-flag `1` when object is present.
    */
-  [[maybe_unused]] std::int32_t DestroyViaVTableSlot0DeleteOneIfNonNull(
+  std::int32_t DestroyViaVTableSlot0DeleteOneIfNonNull(
     VTableOwnerRuntimeView* const self
   ) noexcept
   {
@@ -25967,7 +25967,7 @@ namespace
    * What it does:
    * Clears one two-dword output lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneBatchOmega(
+  DwordPairRuntimeView* ClearDwordPairLaneBatchOmega(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -25981,7 +25981,7 @@ namespace
    * What it does:
    * Writes one dword from `**(source->lane04)` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDoubleDereferencedLane04WordBatchOmega(
+  std::uint32_t* WriteDoubleDereferencedLane04WordBatchOmega(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -25999,7 +25999,7 @@ namespace
    * What it does:
    * Copies the first dword at `*source->lane04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteIndirectLane04WordBatchOmega(
+  std::uint32_t* WriteIndirectLane04WordBatchOmega(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -26014,7 +26014,7 @@ namespace
    * Initializes one self-relative span header with inline start at `+0x10`
    * and tail anchor at `+0x110`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail110BatchOmega(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail110BatchOmega(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -26028,7 +26028,7 @@ namespace
    * Initializes one self-relative span header with inline start at `+0x10`
    * and tail anchor at `+0x2810`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail2810BatchOmega(
+  SpanHeaderSelfRefRuntimeView* InitializeSelfRelativeSpanHeaderTail2810BatchOmega(
     SpanHeaderSelfRefRuntimeView* const outValue
   ) noexcept
   {
@@ -26041,7 +26041,7 @@ namespace
    * What it does:
    * Computes one `*baseAddress + index * 40` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride40AddressFromBaseWordBatchOmega(
+  std::uint32_t ComputeStride40AddressFromBaseWordBatchOmega(
     const std::int32_t index,
     const std::uint32_t* const baseAddress
   ) noexcept
@@ -26056,7 +26056,7 @@ namespace
    * What it does:
    * Advances one head pointer slot to `(*headSlot)->next`.
    */
-  [[maybe_unused]] std::uint32_t** AdvanceHeadPointerSlotBatchOmega(
+  std::uint32_t** AdvanceHeadPointerSlotBatchOmega(
     std::uint32_t** const headSlot
   ) noexcept
   {
@@ -26069,7 +26069,7 @@ namespace
    * What it does:
    * Initializes one `{dword,byte}` lane pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyDwordBytePairFromPointersBatchOmega(
+  DwordBytePairLane* CopyDwordBytePairFromPointersBatchOmega(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const wordSource,
     const std::uint8_t* const byteSource
@@ -26090,7 +26090,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchOmega(
+  std::uint32_t* StoreScalarDwordLaneBatchOmega(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -26104,7 +26104,7 @@ namespace
    * What it does:
    * Initializes one external span header from `(base, spanBytes=0x2800)`.
    */
-  [[maybe_unused]] SpanHeaderSelfRefRuntimeView* InitializeExternalSpanHeaderTail2800BatchOmega(
+  SpanHeaderSelfRefRuntimeView* InitializeExternalSpanHeaderTail2800BatchOmega(
     SpanHeaderSelfRefRuntimeView* const outValue,
     const std::uint32_t baseAddress
   ) noexcept
@@ -26119,7 +26119,7 @@ namespace
    * Pops one intrusive head-node pointer, writes popped node address, and
    * advances the head slot to `node->next`.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressLaneBatchOmega(
+  std::uint32_t* PopHeadNodeAddressLaneBatchOmega(
     std::uint32_t* const outNodeAddress,
     std::uint32_t** const headSlot
   ) noexcept
@@ -26133,7 +26133,7 @@ namespace
    * What it does:
    * Initializes one four-dword-plus-two-byte lane record.
    */
-  [[maybe_unused]] FourDwordAndTwoByteInitRuntimeView* InitializeFourDwordTwoByteLaneBatchOmega(
+  FourDwordAndTwoByteInitRuntimeView* InitializeFourDwordTwoByteLaneBatchOmega(
     FourDwordAndTwoByteInitRuntimeView* const outValue,
     const std::uint32_t lane04,
     const std::uint32_t lane00,
@@ -26153,7 +26153,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into caller-provided dword output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane08DwordBatchOmega(
+  std::uint32_t* StoreLane08DwordBatchOmega(
     std::uint32_t* const outValue,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -26167,7 +26167,7 @@ namespace
    * What it does:
    * Computes `*base + index * 8` and stores the result dword in output.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride8ByteOffsetBatchOmega(
+  std::uint32_t* ComputeStride8ByteOffsetBatchOmega(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -26182,7 +26182,7 @@ namespace
    * What it does:
    * Computes `*base + index * 4` and stores the result dword in output.
    */
-  [[maybe_unused]] std::uint32_t* ComputeStride4ByteOffsetBatchOmega(
+  std::uint32_t* ComputeStride4ByteOffsetBatchOmega(
     std::uint32_t* const outValue,
     const std::uint32_t* const base,
     const std::int32_t index
@@ -26200,7 +26200,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into caller-provided dword output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane08WordToOutputBatchSigma(
+  std::uint32_t* StoreLane08WordToOutputBatchSigma(
     std::uint32_t* const outValue,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -26216,7 +26216,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into caller-provided dword output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane04WordToOutputBatchSigma(
+  std::uint32_t* StoreLane04WordToOutputBatchSigma(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -26238,7 +26238,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchSigma(
+  std::uint32_t* StoreScalarDwordLaneBatchSigma(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -26252,7 +26252,7 @@ namespace
    * What it does:
    * Stores zero into output lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t* StoreZeroScalarDwordLaneBatchSigma(
+  std::uint32_t* StoreZeroScalarDwordLaneBatchSigma(
     std::uint32_t* const outValue
   ) noexcept
   {
@@ -26265,7 +26265,7 @@ namespace
    * What it does:
    * Reads and returns source lane `+0x08`.
    */
-  [[maybe_unused]] std::uint32_t ReadLane08WordBatchSigma(const SourceLane8RuntimeView* const source) noexcept
+  std::uint32_t ReadLane08WordBatchSigma(const SourceLane8RuntimeView* const source) noexcept
   {
     return source->lane08;
   }
@@ -26276,7 +26276,7 @@ namespace
    * What it does:
    * Reads and returns source lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t ReadLane04WordBatchSigma(const DwordPairRuntimeView* const source) noexcept
+  std::uint32_t ReadLane04WordBatchSigma(const DwordPairRuntimeView* const source) noexcept
   {
     return source->lane04;
   }
@@ -26288,7 +26288,7 @@ namespace
    * Returns true when left pointed C-string is lexicographically less than
    * right pointed C-string.
    */
-  [[maybe_unused]] bool CompareCStringPointerSlotsLessBatchSigma(
+  bool CompareCStringPointerSlotsLessBatchSigma(
     const char* const* const leftSlot,
     const char* const* const rightSlot
   ) noexcept
@@ -26311,7 +26311,7 @@ namespace
    * What it does:
    * Computes one `source lane +0x04 + index * 20` byte address.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride20AddressFromLane04BatchSigma(
+  std::uint32_t ComputeStride20AddressFromLane04BatchSigma(
     const std::int32_t index,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -26326,7 +26326,7 @@ namespace
    * What it does:
    * Initializes one two-dword lane pair from two source pointers.
    */
-  [[maybe_unused]] DwordPairRuntimeView* StoreDwordPairFromPointerSourcesBatchSigma(
+  DwordPairRuntimeView* StoreDwordPairFromPointerSourcesBatchSigma(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const lane00Source,
     const std::uint32_t* const lane04Source
@@ -26342,7 +26342,7 @@ namespace
    * What it does:
    * Initializes one `{dword,byte}` lane pair from source pointers.
    */
-  [[maybe_unused]] DwordBytePairLane* StoreDwordBytePairFromPointerSourcesBatchSigma(
+  DwordBytePairLane* StoreDwordBytePairFromPointerSourcesBatchSigma(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const lane00Source,
     const std::uint8_t* const lane04Source
@@ -26359,7 +26359,7 @@ namespace
    * Packs five dword lanes plus one input flag and one trailing zero flag into
    * one 0x16-byte runtime record.
    */
-  [[maybe_unused]] FiveWordAndTwoFlagsRuntimeView* InitializeFiveWordAndTwoFlagRecordBatchSigma(
+  FiveWordAndTwoFlagsRuntimeView* InitializeFiveWordAndTwoFlagRecordBatchSigma(
     FiveWordAndTwoFlagsRuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -26378,7 +26378,7 @@ namespace
    * What it does:
    * Copies one source dword into output when output storage is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentBatchSigma(
+  std::uint32_t* CopySourceWordIfOutputPresentBatchSigma(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -26392,7 +26392,7 @@ namespace
    * What it does:
    * Fills one `[begin,end)` range of dword pairs from one source pair lane.
    */
-  [[maybe_unused]] std::uint32_t* FillWordPairRangeWithConstantBatchSigma(
+  std::uint32_t* FillWordPairRangeWithConstantBatchSigma(
     std::uint32_t* const begin,
     std::uint32_t* const end,
     const std::uint32_t* const sourcePair
@@ -26446,7 +26446,7 @@ namespace
    * What it does:
    * Advances one pointer slot to the node link stored at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* AdvancePointerSlotFromNodeLink04BatchTau(
+  std::uint32_t* AdvancePointerSlotFromNodeLink04BatchTau(
     std::uint32_t* const pointerSlot
   ) noexcept
   {
@@ -26465,7 +26465,7 @@ namespace
    * What it does:
    * Stores one scalar dword into output lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchTau(
+  std::uint32_t* StoreScalarDwordLaneBatchTau(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -26480,7 +26480,7 @@ namespace
    * Pops one intrusive head-node pointer, writes popped node address, and
    * advances the head slot to `node->next`.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressFromThisSlotBatchTau(
+  std::uint32_t* PopHeadNodeAddressFromThisSlotBatchTau(
     std::uint32_t* const headSlot,
     std::uint32_t* const outNodeAddress
   ) noexcept
@@ -26498,7 +26498,7 @@ namespace
    * What it does:
    * Copies one source dword into output when output storage is non-null.
    */
-  [[maybe_unused]] std::uint32_t* CopySourceWordIfOutputPresentBatchTau(
+  std::uint32_t* CopySourceWordIfOutputPresentBatchTau(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -26513,7 +26513,7 @@ namespace
    * What it does:
    * Returns one dword-address lane at `*source + 8`.
    */
-  [[maybe_unused]] std::uint32_t ComputeWordAddressPlus8BatchTau(const std::uint32_t* const source) noexcept
+  std::uint32_t ComputeWordAddressPlus8BatchTau(const std::uint32_t* const source) noexcept
   {
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(ComputeWordAddressPlus8(source)));
   }
@@ -26524,7 +26524,7 @@ namespace
    * What it does:
    * Copies the first dword at `*source->lane04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectWordBatchTau(
+  std::uint32_t* CopyFirstIndirectWordBatchTau(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -26538,7 +26538,7 @@ namespace
    * What it does:
    * Writes one dword from `**(source->lane04)` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDoubleIndirectWordBatchTau(
+  std::uint32_t* CopyDoubleIndirectWordBatchTau(
     std::uint32_t* const outValue,
     const PointerToPointerAt04RuntimeView* const source
   ) noexcept
@@ -26552,7 +26552,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into caller-provided dword output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane04WordToOutputBatchTau(
+  std::uint32_t* StoreLane04WordToOutputBatchTau(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -26567,7 +26567,7 @@ namespace
    * Returns lane `+0x14` and updates lane `+0x0C` when lane `+0x14` is
    * non-zero and greater.
    */
-  [[maybe_unused]] std::uint32_t UpdateMaxLane0CFromLane14BatchTau(
+  std::uint32_t UpdateMaxLane0CFromLane14BatchTau(
     WordLanesAt0CAnd14RuntimeView* const valueLanes
   ) noexcept
   {
@@ -26584,7 +26584,7 @@ namespace
    * What it does:
    * Returns the maximum of two signed 64-bit values.
    */
-  [[maybe_unused]] std::int64_t MaxSignedQwordBatchTau(
+  std::int64_t MaxSignedQwordBatchTau(
     const std::int64_t leftValue,
     const std::int64_t rightValue
   ) noexcept
@@ -26599,7 +26599,7 @@ namespace
    * Replaces one owned virtual-object pointer slot and releases previous value
    * through virtual slot `+0x00` with delete-flag `1` when replaced.
    */
-  [[maybe_unused]] std::int32_t ReplaceOwnedVirtualPointerSlotBatchTau(
+  std::int32_t ReplaceOwnedVirtualPointerSlotBatchTau(
     void** const ownerSlot,
     void* const replacement
   ) noexcept
@@ -26624,7 +26624,7 @@ namespace
    * What it does:
    * Clears trailing dword lanes `+0x04/+0x08/+0x0C`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* ClearTrailingThreeWordLanesBatchTau(
+  DwordQuadRuntimeView* ClearTrailingThreeWordLanesBatchTau(
     DwordQuadRuntimeView* const outValue
   ) noexcept
   {
@@ -26640,7 +26640,7 @@ namespace
    * What it does:
    * Copies lanes `+0x04/+0x08/+0x0C/+0x10` from source to destination.
    */
-  [[maybe_unused]] ThreeWordAndByteAt10RuntimeView* CopyTrailingThreeWordsAndByteBatchTau(
+  ThreeWordAndByteAt10RuntimeView* CopyTrailingThreeWordsAndByteBatchTau(
     ThreeWordAndByteAt10RuntimeView* const destination,
     const ThreeWordAndByteAt10RuntimeView* const source
   ) noexcept
@@ -26659,7 +26659,7 @@ namespace
    * Calls virtual slot `+0x08` on one owned pointer slot when non-null, then
    * clears the slot.
    */
-  [[maybe_unused]] std::int32_t ReleaseOwnedPointerSlotViaVirtualSlot08BatchTau(
+  std::int32_t ReleaseOwnedPointerSlotViaVirtualSlot08BatchTau(
     void** const ownerSlot
   ) noexcept
   {
@@ -26680,7 +26680,7 @@ namespace
    * What it does:
    * Initializes three contiguous dword lanes from scalar inputs.
    */
-  [[maybe_unused]] SourceLane8RuntimeView* InitializeThreeWordRecordBatchTau(
+  SourceLane8RuntimeView* InitializeThreeWordRecordBatchTau(
     SourceLane8RuntimeView* const outValue,
     const std::uint32_t lane00,
     const std::uint32_t lane04,
@@ -26700,7 +26700,7 @@ namespace
    * Invokes virtual slot `+0x24` with four scalar args and returns the first
    * argument lane.
    */
-  [[maybe_unused]] std::int32_t InvokeVirtualSlot24AndReturnFirstArgBatchTau(
+  std::int32_t InvokeVirtualSlot24AndReturnFirstArgBatchTau(
     VTableOwnerRuntimeView* const self,
     const std::int32_t firstArg,
     const std::int32_t secondArg,
@@ -26720,7 +26720,7 @@ namespace
    * What it does:
    * Swaps one scalar dword lane between two storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapScalarWordSlotsBatchTau(
+  std::uint32_t* SwapScalarWordSlotsBatchTau(
     std::uint32_t* const leftWord,
     std::uint32_t* const rightWord
   ) noexcept
@@ -26735,7 +26735,7 @@ namespace
    * Copies trailing dword lanes `+0x04/+0x08/+0x0C` from source to
    * destination.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* CopyTrailingThreeWordLanesBatchTau(
+  DwordQuadRuntimeView* CopyTrailingThreeWordLanesBatchTau(
     DwordQuadRuntimeView* const destination,
     const DwordQuadRuntimeView* const source
   ) noexcept
@@ -26752,7 +26752,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into caller-provided dword output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane04WordToOutputBatchTauB(
+  std::uint32_t* StoreLane04WordToOutputBatchTauB(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -26766,7 +26766,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into caller-provided dword output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane08WordToOutputBatchTauB(
+  std::uint32_t* StoreLane08WordToOutputBatchTauB(
     std::uint32_t* const outValue,
     const SourceLane8RuntimeView* const source
   ) noexcept
@@ -26780,7 +26780,7 @@ namespace
    * What it does:
    * Clears one two-dword output lane to `{0, 0}`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* ClearDwordPairLaneBatchTau(
+  DwordPairRuntimeView* ClearDwordPairLaneBatchTau(
     DwordPairRuntimeView* const outValue
   ) noexcept
   {
@@ -26793,7 +26793,7 @@ namespace
    * What it does:
    * Swaps both dword lanes between two pair records.
    */
-  [[maybe_unused]] DwordPairRuntimeView* SwapDwordPairLanesBatchTau(
+  DwordPairRuntimeView* SwapDwordPairLanesBatchTau(
     DwordPairRuntimeView* const leftPair,
     DwordPairRuntimeView* const rightPair
   ) noexcept
@@ -26828,7 +26828,7 @@ namespace
    * What it does:
    * Computes one `source->lane04 + index * 12` byte address lane.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride12AddressFromLane04BatchUpsilon(
+  std::uint32_t ComputeStride12AddressFromLane04BatchUpsilon(
     const DwordPairRuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -26842,7 +26842,7 @@ namespace
    * What it does:
    * Copies one leading halfword and 0x1C tail bytes into destination lanes.
    */
-  [[maybe_unused]] WordAndTail28RuntimeView* CopyLeadingWordAndTail28BatchUpsilon(
+  WordAndTail28RuntimeView* CopyLeadingWordAndTail28BatchUpsilon(
     WordAndTail28RuntimeView* const outValue,
     const std::uint16_t* const sourceWord,
     const void* const sourceTailBytes
@@ -26859,7 +26859,7 @@ namespace
    * What it does:
    * Clears lane `+0x08` in one three-word record.
    */
-  [[maybe_unused]] DwordTripleRuntimeView* ClearLane08BatchUpsilon(DwordTripleRuntimeView* const outValue) noexcept
+  DwordTripleRuntimeView* ClearLane08BatchUpsilon(DwordTripleRuntimeView* const outValue) noexcept
   {
     outValue->lane08 = 0u;
     return outValue;
@@ -26871,7 +26871,7 @@ namespace
    * What it does:
    * Copies one scalar dword lane from source into destination.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleWordFromSourceSlotBatchUpsilon(
+  std::uint32_t* CopySingleWordFromSourceSlotBatchUpsilon(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceWord
   ) noexcept
@@ -26885,7 +26885,7 @@ namespace
    * What it does:
    * Pushes one index onto a freelist chain and returns the pushed index.
    */
-  [[maybe_unused]] std::uint32_t PushIndexOntoHeadChainBatchUpsilon(
+  std::uint32_t PushIndexOntoHeadChainBatchUpsilon(
     IndexChainPushRuntimeView* const chain,
     const std::uint32_t index
   ) noexcept
@@ -26902,7 +26902,7 @@ namespace
    * What it does:
    * Clears one scalar dword lane.
    */
-  [[maybe_unused]] std::uint32_t* ZeroScalarWordBatchUpsilon(std::uint32_t* const outValue) noexcept
+  std::uint32_t* ZeroScalarWordBatchUpsilon(std::uint32_t* const outValue) noexcept
   {
     return ZeroScalarDwordLane(outValue);
   }
@@ -26914,7 +26914,7 @@ namespace
    * What it does:
    * Collapses one pointer slot through the node-head lane at `*slot`.
    */
-  [[maybe_unused]] std::uint32_t** CollapsePointerSlotThroughNodeHeadBatchUpsilon(
+  std::uint32_t** CollapsePointerSlotThroughNodeHeadBatchUpsilon(
     std::uint32_t** const pointerSlot
   ) noexcept
   {
@@ -26927,7 +26927,7 @@ namespace
    * What it does:
    * Writes one `{dword, byte}` pair from independent source lanes.
    */
-  [[maybe_unused]] DwordBytePairLane* CopyWordAndBytePairBatchUpsilon(
+  DwordBytePairLane* CopyWordAndBytePairBatchUpsilon(
     DwordBytePairLane* const outValue,
     const std::uint32_t* const sourceWord,
     const std::uint8_t* const sourceByte
@@ -26943,7 +26943,7 @@ namespace
    * What it does:
    * Advances one pointer slot to the node link stored at offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* AdvancePointerSlotFromNodeLink04BatchUpsilon(
+  std::uint32_t* AdvancePointerSlotFromNodeLink04BatchUpsilon(
     std::uint32_t* const pointerSlot
   ) noexcept
   {
@@ -26956,7 +26956,7 @@ namespace
    * What it does:
    * Copies two independent dword sources into destination lanes `+0x00/+0x04`.
    */
-  [[maybe_unused]] DwordPairRuntimeView* CopyDwordPairFromIndependentSourcesBatchUpsilon(
+  DwordPairRuntimeView* CopyDwordPairFromIndependentSourcesBatchUpsilon(
     DwordPairRuntimeView* const outValue,
     const std::uint32_t* const sourceWordA,
     const std::uint32_t* const sourceWordB
@@ -26974,7 +26974,7 @@ namespace
    * What it does:
    * Swaps one 16-bit lane value between two slots.
    */
-  [[maybe_unused]] std::uint16_t* SwapSingleHalfwordLaneBatchUpsilon(
+  std::uint16_t* SwapSingleHalfwordLaneBatchUpsilon(
     std::uint16_t* const left,
     std::uint16_t* const right
   ) noexcept
@@ -26994,7 +26994,7 @@ namespace
    * What it does:
    * Stores one scalar dword lane from argument into destination.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarWordBatchUpsilon(
+  std::uint32_t* StoreScalarWordBatchUpsilon(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -27010,7 +27010,7 @@ namespace
    * What it does:
    * Stores source lane `+0x08` into caller-provided output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane08WordToOutputBatchUpsilon(
+  std::uint32_t* StoreLane08WordToOutputBatchUpsilon(
     std::uint32_t* const outValue,
     const DwordTripleRuntimeView* const source
   ) noexcept
@@ -27024,7 +27024,7 @@ namespace
    * What it does:
    * Reads one scalar dword lane at offset `+0x0C`.
    */
-  [[maybe_unused]] std::uint32_t ReadLane0CWordBatchUpsilon(const DwordQuadRuntimeView* const source) noexcept
+  std::uint32_t ReadLane0CWordBatchUpsilon(const DwordQuadRuntimeView* const source) noexcept
   {
     return source->lane0C;
   }
@@ -27035,7 +27035,7 @@ namespace
    * What it does:
    * Copies one dword from `*source->lane04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyFirstIndirectLane04WordBatchUpsilon(
+  std::uint32_t* CopyFirstIndirectLane04WordBatchUpsilon(
     std::uint32_t* const outValue,
     const DwordPointerLane04RuntimeView* const source
   ) noexcept
@@ -27049,7 +27049,7 @@ namespace
    * What it does:
    * Pops one head-node address from lane `+0x00` and advances it to `node->next`.
    */
-  [[maybe_unused]] std::uint32_t* PopHeadNodeAddressAndAdvanceBatchUpsilon(
+  std::uint32_t* PopHeadNodeAddressAndAdvanceBatchUpsilon(
     DwordPairRuntimeView* const headSlotOwner,
     std::uint32_t* const outNodeAddress
   ) noexcept
@@ -27063,7 +27063,7 @@ namespace
    * What it does:
    * Initializes one self-relative four-lane header with tail at `this+0x90`.
    */
-  [[maybe_unused]] DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail90BatchUpsilon(
+  DwordQuadRuntimeView* InitializeSelfRelativeHeaderTail90BatchUpsilon(
     DwordQuadRuntimeView* const outValue
   ) noexcept
   {
@@ -27078,7 +27078,7 @@ namespace
    * What it does:
    * Stores source lane `+0x04` into caller-provided output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane04WordToOutputBatchUpsilon(
+  std::uint32_t* StoreLane04WordToOutputBatchUpsilon(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source
   ) noexcept
@@ -27092,7 +27092,7 @@ namespace
    * What it does:
    * Stores one `source->lane00 + index * 12` byte address into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreLane00Stride12AddressByIndexBatchUpsilon(
+  std::uint32_t* StoreLane00Stride12AddressByIndexBatchUpsilon(
     std::uint32_t* const outValue,
     const DwordPairRuntimeView* const source,
     const std::int32_t index
@@ -27223,7 +27223,7 @@ namespace
    * What it does:
    * Stores one scalar dword into lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t* StoreScalarDwordLaneBatchPhi(
+  std::uint32_t* StoreScalarDwordLaneBatchPhi(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -27237,7 +27237,7 @@ namespace
    * What it does:
    * Resets one intrusive two-link node to singleton self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* InitializeIntrusiveNodeSelfLinksBatchPhi(
+  IntrusiveNodeRuntimeView* InitializeIntrusiveNodeSelfLinksBatchPhi(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -27253,7 +27253,7 @@ namespace
    * Unlinks one intrusive node from its ring and restores singleton
    * self-links.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi(
+  IntrusiveNodeRuntimeView* UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi(
     IntrusiveNodeRuntimeView* const node
   ) noexcept
   {
@@ -27266,7 +27266,7 @@ namespace
    * What it does:
    * Stores one intrusive node `next` pointer into caller-provided output.
    */
-  [[maybe_unused]] IntrusiveNodeRuntimeView** StoreIntrusiveNextPointerIntoOutputBatchPhi(
+  IntrusiveNodeRuntimeView** StoreIntrusiveNextPointerIntoOutputBatchPhi(
     const IntrusiveNodeRuntimeView* const node,
     IntrusiveNodeRuntimeView** const outValue
   ) noexcept
@@ -27281,7 +27281,7 @@ namespace
    * What it does:
    * Initializes one `{dword, byte}` lane pair from scalar inputs.
    */
-  [[maybe_unused]] DwordBytePairLane* InitializeDwordBytePairLaneBatchPhi(
+  DwordBytePairLane* InitializeDwordBytePairLaneBatchPhi(
     DwordBytePairLane* const outValue,
     const std::uint32_t lane00,
     const std::uint8_t lane04
@@ -27298,7 +27298,7 @@ namespace
    * What it does:
    * Returns one byte pointer lane at `this + 0x24`.
    */
-  [[maybe_unused]] std::byte* ResolveOffset24PointerBatchPhi(void* const self) noexcept
+  std::byte* ResolveOffset24PointerBatchPhi(void* const self) noexcept
   {
     return static_cast<std::byte*>(self) + 0x24;
   }
@@ -27309,7 +27309,7 @@ namespace
    * What it does:
    * Returns whether lane `+0x0C` equals `6`.
    */
-  [[maybe_unused]] bool IsLane0CEqualSixBatchPhi(
+  bool IsLane0CEqualSixBatchPhi(
     const HeaderAndThreeWordLanesRuntimeView* const source
   ) noexcept
   {
@@ -27323,7 +27323,7 @@ namespace
    * Returns one signed `((spanEnd - spanCursor) >> 3)` element count from a
    * nested span pointer.
    */
-  [[maybe_unused]] std::int32_t ComputeNestedStride8SpanCountBatchPhi(
+  std::int32_t ComputeNestedStride8SpanCountBatchPhi(
     const NestedSpanPointerRuntimeView* const source
   ) noexcept
   {
@@ -27336,7 +27336,7 @@ namespace
    * What it does:
    * Returns one byte pointer lane at `this + 0x2C`.
    */
-  [[maybe_unused]] std::byte* ResolveOffset2CPointerBatchPhi(void* const self) noexcept
+  std::byte* ResolveOffset2CPointerBatchPhi(void* const self) noexcept
   {
     return static_cast<std::byte*>(self) + 0x2C;
   }
@@ -27348,7 +27348,7 @@ namespace
    * Dispatches through table callback lane `+0x5C` with payload pointer
    * `this + 0x10`.
    */
-  [[maybe_unused]] std::int32_t InvokeCallbackSlot5CWithInlinePayloadBatchPhi(
+  std::int32_t InvokeCallbackSlot5CWithInlinePayloadBatchPhi(
     CallbackDispatchPayloadOwnerRuntimeView* const owner
   ) noexcept
   {
@@ -27361,7 +27361,7 @@ namespace
    * What it does:
    * Resets one `{dword, byte}` lane pair to `{0, 1}`.
    */
-  [[maybe_unused]] DwordBytePairLane* ResetDwordBytePairToDefaultBatchPhi(
+  DwordBytePairLane* ResetDwordBytePairToDefaultBatchPhi(
     DwordBytePairLane* const outValue
   ) noexcept
   {
@@ -27376,7 +27376,7 @@ namespace
    * What it does:
    * Stores one scalar dword into nested owner lane `+0x134`.
    */
-  [[maybe_unused]] OwnerPointerAt10RuntimeView* StoreNestedWordAt134BatchPhi(
+  OwnerPointerAt10RuntimeView* StoreNestedWordAt134BatchPhi(
     OwnerPointerAt10RuntimeView* const owner,
     const std::uint32_t value
   ) noexcept
@@ -27392,7 +27392,7 @@ namespace
    * Captures owner/back-link lanes from `source + 0x10` and installs `source`
    * as the new owner back-link.
    */
-  [[maybe_unused]] OwnerAndPreviousBackLinkRuntimeView* CaptureOwnerAndInstallBackLinkBatchPhi(
+  OwnerAndPreviousBackLinkRuntimeView* CaptureOwnerAndInstallBackLinkBatchPhi(
     OwnerAndPreviousBackLinkRuntimeView* const outValue,
     NodeWithOwnerAt10RuntimeView* const source
   ) noexcept
@@ -27410,7 +27410,7 @@ namespace
    * What it does:
    * Initializes one two-byte lane pair from scalar inputs.
    */
-  [[maybe_unused]] BytePairRuntimeView* InitializeBytePairLaneBatchPhi(
+  BytePairRuntimeView* InitializeBytePairLaneBatchPhi(
     BytePairRuntimeView* const outValue,
     const std::uint8_t lane00,
     const std::uint8_t lane01
@@ -27427,7 +27427,7 @@ namespace
    * What it does:
    * Writes `0xFF` into the first byte lane.
    */
-  [[maybe_unused]] BytePairRuntimeView* SetFirstByteToFFBatchPhi(
+  BytePairRuntimeView* SetFirstByteToFFBatchPhi(
     BytePairRuntimeView* const outValue
   ) noexcept
   {
@@ -27441,7 +27441,7 @@ namespace
    * What it does:
    * Copies source bytes at lanes `+0x04/+0x05` into a two-byte output pair.
    */
-  [[maybe_unused]] BytePairRuntimeView* CopyBytePairFromOffset04SourceBatchPhi(
+  BytePairRuntimeView* CopyBytePairFromOffset04SourceBatchPhi(
     BytePairRuntimeView* const outValue,
     const BytePairAt04RuntimeView* const source
   ) noexcept
@@ -27457,7 +27457,7 @@ namespace
    * What it does:
    * Computes one `base + index * 2` byte address from lane `+0x00`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride2AddressFromLane00BatchPhi(
+  std::uint32_t ComputeStride2AddressFromLane00BatchPhi(
     const std::uint32_t* const baseWord,
     const std::int32_t index
   ) noexcept
@@ -27471,7 +27471,7 @@ namespace
    * What it does:
    * Initializes one span header as `{origin=base, begin=base, end=base+2*count, cursor=base}`.
    */
-  [[maybe_unused]] DwordSpanRuntimeView* InitializeStride2SpanHeaderBatchPhi(
+  DwordSpanRuntimeView* InitializeStride2SpanHeaderBatchPhi(
     DwordSpanRuntimeView* const outValue,
     const std::uint32_t base,
     const std::int32_t count
@@ -27490,7 +27490,7 @@ namespace
    * What it does:
    * Copies one first-byte lane from source to destination.
    */
-  [[maybe_unused]] BytePairRuntimeView* CopyFirstByteLaneBatchPhi(
+  BytePairRuntimeView* CopyFirstByteLaneBatchPhi(
     BytePairRuntimeView* const destination,
     const BytePairRuntimeView* const source
   ) noexcept
@@ -27505,7 +27505,7 @@ namespace
    * What it does:
    * Computes one `begin + index * 12` byte address from lane `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t ComputeStride12AddressFromBeginLaneBatchPhi(
+  std::uint32_t ComputeStride12AddressFromBeginLaneBatchPhi(
     const DwordSpanRuntimeView* const source,
     const std::int32_t index
   ) noexcept
@@ -27519,7 +27519,7 @@ namespace
    * What it does:
    * Stores span `begin` lane (`+0x04`) into caller output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreSpanBeginLaneToOutputBatchPhi(
+  std::uint32_t* StoreSpanBeginLaneToOutputBatchPhi(
     const DwordSpanRuntimeView* const source,
     std::uint32_t* const outValue
   ) noexcept
