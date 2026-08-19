@@ -260,7 +260,7 @@ namespace
    * What it does:
    * Releases one shared control-block lane then clears one shared pair.
    */
-  [[maybe_unused]] boost::SharedCountPair* ResetSharedPairReleaseControl(
+  boost::SharedCountPair* ResetSharedPairReleaseControl(
     boost::SharedCountPair* const pair
   ) noexcept
   {
@@ -359,7 +359,7 @@ namespace
    * What it does:
    * Returns one dword-array element address from `base + index * 4`.
    */
-  [[maybe_unused]] std::uintptr_t ComputeDwordElementAddress(
+  std::uintptr_t ComputeDwordElementAddress(
     const std::uintptr_t* const baseAddressSlot,
     const std::int32_t elementIndex
   ) noexcept
@@ -373,7 +373,7 @@ namespace
    * What it does:
    * Returns one raw dword lane from caller-provided storage.
    */
-  [[maybe_unused]] std::uintptr_t ReadDwordSlot(const std::uintptr_t* const dwordSlot) noexcept
+  std::uintptr_t ReadDwordSlot(const std::uintptr_t* const dwordSlot) noexcept
   {
     return *dwordSlot;
   }
@@ -384,7 +384,7 @@ namespace
    * What it does:
    * Copies one dword from source offset `+0x04` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordFromOffset4Variant1(
+  std::uint32_t* CopyDwordFromOffset4Variant1(
     std::uint32_t* const outValue,
     const std::uint8_t* const source
   ) noexcept
@@ -399,7 +399,7 @@ namespace
    * What it does:
    * Copies one dword from source offset `+0x08` into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordFromOffset8(
+  std::uint32_t* CopyDwordFromOffset8(
     std::uint32_t* const outValue,
     const std::uint8_t* const source
   ) noexcept
@@ -414,7 +414,7 @@ namespace
    * What it does:
    * Duplicate lane that copies one dword from source offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordFromOffset4Variant2(
+  std::uint32_t* CopyDwordFromOffset4Variant2(
     std::uint32_t* const outValue,
     const std::uint8_t* const source
   ) noexcept
@@ -468,7 +468,7 @@ namespace
    * What it does:
    * Allocates one 2-lane weak-pair chunk block for ring storage.
    */
-  [[maybe_unused]] boost::SharedCountPair* AllocateWeakPairChunkBlock_004ADB30()
+  boost::SharedCountPair* AllocateWeakPairChunkBlock_004ADB30()
   {
     return static_cast<boost::SharedCountPair*>(::operator new(sizeof(boost::SharedCountPair) * 2U));
   }
@@ -480,7 +480,7 @@ namespace
    * Grows and reflows the ring chunk-pointer index while preserving queued
    * logical order around the read cursor.
    */
-  [[maybe_unused]] boost::SharedCountPair** GrowPrefetchWeakPairRingChunkIndex_004AD900(
+  boost::SharedCountPair** GrowPrefetchWeakPairRingChunkIndex_004AD900(
     PrefetchWeakPairRingQueueRuntime* const queue
   )
   {
@@ -610,7 +610,7 @@ namespace
    * Pops one weak pair from the prefetch ring-front cursor and weak-releases
    * its control lane.
    */
-  [[maybe_unused]] std::uint32_t PopPrefetchWeakPairRingFront(
+  std::uint32_t PopPrefetchWeakPairRingFront(
     PrefetchWeakPairRingQueueRuntime* const queue
   ) noexcept
   {
@@ -644,7 +644,7 @@ namespace
    * What it does:
    * Pushes one weak pair at the logical front of the prefetch ring queue.
    */
-  [[maybe_unused]] boost::SharedCountPair* PushPrefetchWeakPairRingFront(
+  boost::SharedCountPair* PushPrefetchWeakPairRingFront(
     PrefetchWeakPairRingQueueRuntime* const queue,
     const boost::SharedCountPair* const sourceWeakPair
   )
@@ -686,7 +686,7 @@ namespace
    * What it does:
    * Pushes one weak pair at the logical back of the prefetch ring queue.
    */
-  [[maybe_unused]] boost::SharedCountPair* PushPrefetchWeakPairRingBack(
+  boost::SharedCountPair* PushPrefetchWeakPairRingBack(
     PrefetchWeakPairRingQueueRuntime* const queue,
     const boost::SharedCountPair* const sourceWeakPair
   )
@@ -724,7 +724,7 @@ namespace
    * Releases all queued weak control blocks, deletes all chunk blocks, and
    * resets ring queue storage lanes.
    */
-  [[maybe_unused]] void CleanupPrefetchWeakPairRingQueue_004ADA70(
+  void CleanupPrefetchWeakPairRingQueue_004ADA70(
     PrefetchWeakPairRingQueueRuntime* const queue
   ) noexcept
   {
@@ -757,7 +757,7 @@ namespace
    * Thunk lane that forwards one prefetch weak-pair ring-queue cleanup request
    * into `FUN_004ADA70`.
    */
-  [[maybe_unused]] void CleanupPrefetchWeakPairRingQueueThunk(
+  void CleanupPrefetchWeakPairRingQueueThunk(
     PrefetchWeakPairRingQueueRuntime* const queue
   ) noexcept
   {
@@ -844,7 +844,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004ADB10(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004ADB10(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004ADB20 (FUN_004ADB20, nullsub_707)
@@ -852,7 +852,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004ADB20() noexcept {}
+  void NoOpHelperThunk_004ADB20() noexcept {}
 
   struct DwordAndBytePayload_004ADB80
   {
@@ -875,7 +875,7 @@ namespace
    * What it does:
    * Copies one dword lane and one byte lane from separate sources into output.
    */
-  [[maybe_unused]] DwordAndBytePayload_004ADB80* CopyDwordAndBytePayload_004ADB80(
+  DwordAndBytePayload_004ADB80* CopyDwordAndBytePayload_004ADB80(
     DwordAndBytePayload_004ADB80* const outPayload,
     const std::uint32_t* const dwordSource,
     const std::uint8_t* const byteSource
@@ -892,7 +892,7 @@ namespace
    * What it does:
    * Stores one dword lane into caller-provided output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordLane_004ADB90(
+  std::uint32_t* StoreDwordLane_004ADB90(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -907,7 +907,7 @@ namespace
    * What it does:
    * Reads one dword lane from caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLane_004ADBE0(const std::uint32_t* const valueSlot) noexcept
+  std::uint32_t ReadDwordLane_004ADBE0(const std::uint32_t* const valueSlot) noexcept
   {
     return *valueSlot;
   }
@@ -918,7 +918,7 @@ namespace
    * What it does:
    * Duplicate lane that stores one dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordLane_004ADBF0(
+  std::uint32_t* StoreDwordLane_004ADBF0(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -932,7 +932,7 @@ namespace
    * What it does:
    * Duplicate lane that reads one dword from caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLane_004ADC00(const std::uint32_t* const valueSlot) noexcept
+  std::uint32_t ReadDwordLane_004ADC00(const std::uint32_t* const valueSlot) noexcept
   {
     return ReadDwordLane_004ADBE0(valueSlot);
   }
@@ -943,7 +943,7 @@ namespace
    * What it does:
    * Duplicate lane that copies one dword + one byte payload.
    */
-  [[maybe_unused]] DwordAndBytePayload_004ADB80* CopyDwordAndBytePayload_004ADC30(
+  DwordAndBytePayload_004ADB80* CopyDwordAndBytePayload_004ADC30(
     DwordAndBytePayload_004ADB80* const outPayload,
     const std::uint32_t* const dwordSource,
     const std::uint8_t* const byteSource
@@ -958,7 +958,7 @@ namespace
    * What it does:
    * Duplicate lane that stores one dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordLane_004ADC40(
+  std::uint32_t* StoreDwordLane_004ADC40(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -972,7 +972,7 @@ namespace
    * What it does:
    * Duplicate lane that reads one dword from caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLane_004ADC80(const std::uint32_t* const valueSlot) noexcept
+  std::uint32_t ReadDwordLane_004ADC80(const std::uint32_t* const valueSlot) noexcept
   {
     return ReadDwordLane_004ADBE0(valueSlot);
   }
@@ -983,7 +983,7 @@ namespace
    * What it does:
    * Duplicate lane that stores one dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordLane_004ADC90(
+  std::uint32_t* StoreDwordLane_004ADC90(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -1026,7 +1026,7 @@ namespace
    * What it does:
    * Copies one forward dword range and returns the advanced destination lane.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeForward_004ADDB0(
+  std::uint32_t* CopyDwordRangeForward_004ADDB0(
     std::uint32_t* destination,
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd
@@ -1050,7 +1050,7 @@ namespace
    * Reallocates one dword vector lane and splices `[spliceBegin,spliceEnd)`
    * into the stream at `insertPosition`.
    */
-  [[maybe_unused]] std::uint32_t ReallocateAndSpliceDwordRange_004ADCE0(
+  std::uint32_t ReallocateAndSpliceDwordRange_004ADCE0(
     LegacyDwordSpliceRuntime4_004ADCE0& vectorRuntime,
     std::uint32_t* const insertPosition,
     const std::uint32_t newElementCount,
@@ -1085,7 +1085,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for dword ring/vector growth lanes.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyDwordGrowthMax_004ADDD0() noexcept
+  std::uint32_t ReadLegacyDwordGrowthMax_004ADDD0() noexcept
   {
     return 0x3FFFFFFFU;
   }
@@ -1121,7 +1121,7 @@ namespace
    * What it does:
    * Throws the legacy "vector<T> too long" length-error path.
    */
-  [[maybe_unused]] void ThrowVectorTooLong_004ADFF0()
+  void ThrowVectorTooLong_004ADFF0()
   {
     throw std::length_error("vector<T> too long");
   }
@@ -1132,7 +1132,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE070() noexcept {}
+  void NoOpHelperThunk_004AE070() noexcept {}
 
   /**
    * Address: 0x004AE0C0 (FUN_004AE0C0)
@@ -1140,7 +1140,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for 0x18-byte node vectors.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyNodeVectorGrowthMax_004AE0C0() noexcept
+  std::uint32_t ReadLegacyNodeVectorGrowthMax_004AE0C0() noexcept
   {
     return 0x1FFFFFFFU;
   }
@@ -1151,7 +1151,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE230(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AE230(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AE240 (FUN_004AE240, nullsub_710)
@@ -1159,7 +1159,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE240() noexcept {}
+  void NoOpHelperThunk_004AE240() noexcept {}
 
   /**
    * Address: 0x004AE250 (FUN_004AE250, nullsub_711)
@@ -1167,7 +1167,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE250() noexcept {}
+  void NoOpHelperThunk_004AE250() noexcept {}
 
   struct DwordPairView_004AE290
   {
@@ -1190,7 +1190,7 @@ namespace
    * What it does:
    * Copies one dword at offset `+0x04` into caller-provided output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLaneAtOffset4_004AE290(
+  std::uint32_t* CopyDwordLaneAtOffset4_004AE290(
     std::uint32_t* const outLane,
     const DwordPairView_004AE290* const sourcePair
   ) noexcept
@@ -1205,7 +1205,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for wider node/vector lanes.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyWideNodeGrowthMax_004AE2A0() noexcept
+  std::uint32_t ReadLegacyWideNodeGrowthMax_004AE2A0() noexcept
   {
     return 0x03FFFFFFU;
   }
@@ -1217,7 +1217,7 @@ namespace
    * Inserts one dword value into a legacy vector container at a target slot,
    * growing storage when capacity is exhausted.
    */
-  [[maybe_unused]] std::uint32_t* InsertSingleDwordIntoLegacyVector_004ADDE0(
+  std::uint32_t* InsertSingleDwordIntoLegacyVector_004ADDE0(
     const std::uint32_t* const valueSlot,
     LegacyDwordVectorContainer4_004ADDE0& vectorRuntime,
     std::uint32_t* const insertionPosition
@@ -1308,7 +1308,7 @@ namespace
    * What it does:
    * Writes two dword lanes into one output pair storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyTwoDwordLanes(
+  std::uint32_t* CopyTwoDwordLanes(
     std::uint32_t* const outPairStorage,
     const std::uint32_t* const sourceLane0,
     const std::uint32_t* const sourceLane1
@@ -1325,7 +1325,7 @@ namespace
    * What it does:
    * Reads one dword lane from caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLaneVariant1(const std::uint32_t* const dwordSlot) noexcept
+  std::uint32_t ReadDwordLaneVariant1(const std::uint32_t* const dwordSlot) noexcept
   {
     return *dwordSlot;
   }
@@ -1336,7 +1336,7 @@ namespace
    * What it does:
    * Rebinds one dword slot to the value at referenced offset `+0x04`.
    */
-  [[maybe_unused]] std::uint32_t* RebindDwordSlotToOffset4(std::uint32_t* const slot) noexcept
+  std::uint32_t* RebindDwordSlotToOffset4(std::uint32_t* const slot) noexcept
   {
     const auto* const base = reinterpret_cast<const std::uint8_t*>(*slot);
     *slot = *reinterpret_cast<const std::uint32_t*>(base + 0x04);
@@ -1349,7 +1349,7 @@ namespace
    * What it does:
    * Reads one dword lane from caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLaneVariant2(const std::uint32_t* const dwordSlot) noexcept
+  std::uint32_t ReadDwordLaneVariant2(const std::uint32_t* const dwordSlot) noexcept
   {
     return *dwordSlot;
   }
@@ -1360,7 +1360,7 @@ namespace
    * What it does:
    * Duplicate lane that reads one dword from caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t ReadDwordLaneVariant3(const std::uint32_t* const dwordSlot) noexcept
+  std::uint32_t ReadDwordLaneVariant3(const std::uint32_t* const dwordSlot) noexcept
   {
     return ReadDwordLaneVariant2(dwordSlot);
   }
@@ -1379,7 +1379,7 @@ namespace
    * What it does:
    * Initializes one legacy 4-lane pointer header with fixed self offsets.
    */
-  [[maybe_unused]] LegacyPointerHeader4_004ACC70* InitializeLegacyPointerHeader4(
+  LegacyPointerHeader4_004ACC70* InitializeLegacyPointerHeader4(
     LegacyPointerHeader4_004ACC70* const header
   ) noexcept
   {
@@ -1397,7 +1397,7 @@ namespace
    * What it does:
    * Swaps two dword lanes between two 2-lane storage slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapTwoDwordLanesVariant1(
+  std::uint32_t* SwapTwoDwordLanesVariant1(
     std::uint32_t* const lhsPairStorage,
     std::uint32_t* const rhsPairStorage
   ) noexcept
@@ -1438,7 +1438,7 @@ namespace
    * Inserts one dword range into one legacy 3-lane vector runtime at a target
    * insertion position, growing storage as needed.
    */
-  [[maybe_unused]] int InsertDwordRangeIntoVectorRuntime(
+  int InsertDwordRangeIntoVectorRuntime(
     LegacyDwordVectorRuntime3_004ACD80& vectorRuntime,
     std::uint32_t* const insertionPosition,
     const std::uint32_t* const sourceBegin,
@@ -1566,7 +1566,7 @@ namespace
    * What it does:
    * Initializes one 4-lane dword-pointer window from base + element count.
    */
-  [[maybe_unused]] LegacyDwordPointerWindow4_004ACE90* InitializeDwordPointerWindow4(
+  LegacyDwordPointerWindow4_004ACE90* InitializeDwordPointerWindow4(
     LegacyDwordPointerWindow4_004ACE90* const window,
     const std::uint32_t elementCount,
     std::uint32_t* const base
@@ -1585,7 +1585,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant1() noexcept {}
+  void NoOpHelperThunkVariant1() noexcept {}
 
   using IntrusivePairLink_004ACF00 = moho::TDatListItem<void, void>;
 
@@ -1595,7 +1595,7 @@ namespace
    * What it does:
    * Unlinks one intrusive pair-link node and rewires it to self-linked state.
    */
-  [[maybe_unused]] IntrusivePairLink_004ACF00* UnlinkIntrusivePairLinkNode(
+  IntrusivePairLink_004ACF00* UnlinkIntrusivePairLinkNode(
     IntrusivePairLink_004ACF00* const node
   ) noexcept
   {
@@ -1609,7 +1609,7 @@ namespace
    * What it does:
    * Duplicate lane that swaps two dword lanes across two 2-lane slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapTwoDwordLanesVariant2(
+  std::uint32_t* SwapTwoDwordLanesVariant2(
     std::uint32_t* const lhsPairStorage,
     std::uint32_t* const rhsPairStorage
   ) noexcept
@@ -1624,7 +1624,7 @@ namespace
    * Moves one dword tail range in a legacy vector runtime and exports the
    * destination iterator into output storage.
    */
-  [[maybe_unused]] std::uint32_t** MoveDwordVectorTailAndExportDestinationVariant1(
+  std::uint32_t** MoveDwordVectorTailAndExportDestinationVariant1(
     LegacyDwordVectorRuntime3_004ACD80& vectorRuntime,
     std::uint32_t** const outIterator,
     std::uint32_t* const destination,
@@ -1649,7 +1649,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant2() noexcept {}
+  void NoOpHelperThunkVariant2() noexcept {}
 
   /**
    * Address: 0x004AD110 (FUN_004AD110)
@@ -1657,7 +1657,7 @@ namespace
    * What it does:
    * Fills one dword range from one scalar source slot and returns end pointer.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeFromScalarSlot(
+  std::uint32_t* FillDwordRangeFromScalarSlot(
     const std::uint32_t* const sourceSlot,
     std::uint32_t* const destination,
     const std::size_t count
@@ -1673,7 +1673,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant3(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkVariant3(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AD150 (FUN_004AD150, nullsub_698)
@@ -1681,7 +1681,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant4() noexcept {}
+  void NoOpHelperThunkVariant4() noexcept {}
 
   /**
    * Address: 0x004AD190 (FUN_004AD190, nullsub_699)
@@ -1689,7 +1689,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant5() noexcept {}
+  void NoOpHelperThunkVariant5() noexcept {}
 
   struct RedBlackTreeNodeRuntime_004AD230
   {
@@ -1757,7 +1757,7 @@ namespace
    * What it does:
    * Copies one tree-head leftmost-node pointer into caller-provided storage.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230** CopyTreeHeadLeftmostNodeVariant1(
+  RedBlackTreeNodeRuntime_004AD230** CopyTreeHeadLeftmostNodeVariant1(
     RedBlackTreeNodeRuntime_004AD230** const outNode,
     const RedBlackTreeRuntime_004AD230& tree
   ) noexcept
@@ -1810,7 +1810,7 @@ namespace
    * What it does:
    * Inserts one node into one red-black tree runtime and rebalances the tree.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230** InsertTreeNodeAndRebalance(
+  RedBlackTreeNodeRuntime_004AD230** InsertTreeNodeAndRebalance(
     RedBlackTreeRuntime_004AD230& tree,
     RedBlackTreeNodeRuntime_004AD230** const outInsertedNode,
     const bool insertToLeftOfParent,
@@ -1893,7 +1893,7 @@ namespace
    * What it does:
    * Returns one node's parent pointer.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* ReadTreeNodeParent(
+  RedBlackTreeNodeRuntime_004AD230* ReadTreeNodeParent(
     RedBlackTreeNodeRuntime_004AD230* const node
   ) noexcept
   {
@@ -1940,7 +1940,7 @@ namespace
    * What it does:
    * Walks to the rightmost descendant while skipping the sentinel node.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* FindRightmostDescendant(
+  RedBlackTreeNodeRuntime_004AD230* FindRightmostDescendant(
     RedBlackTreeNodeRuntime_004AD230* node
   ) noexcept
   {
@@ -1958,7 +1958,7 @@ namespace
    * What it does:
    * Walks to the leftmost descendant while skipping the sentinel node.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* FindLeftmostDescendant(
+  RedBlackTreeNodeRuntime_004AD230* FindLeftmostDescendant(
     RedBlackTreeNodeRuntime_004AD230* node
   ) noexcept
   {
@@ -2008,7 +2008,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant6() noexcept {}
+  void NoOpHelperThunkVariant6() noexcept {}
 
   /**
    * Address: 0x004AD530 (FUN_004AD530, nullsub_701)
@@ -2016,7 +2016,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant7() noexcept {}
+  void NoOpHelperThunkVariant7() noexcept {}
 
   /**
    * Address: 0x004AD550 (FUN_004AD550, nullsub_702)
@@ -2024,7 +2024,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant8() noexcept {}
+  void NoOpHelperThunkVariant8() noexcept {}
 
   /**
    * Address: 0x004AD580 (FUN_004AD580, nullsub_703)
@@ -2032,7 +2032,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkVariant9() noexcept {}
+  void NoOpHelperThunkVariant9() noexcept {}
 
   /**
    * Address: 0x004AD5D0 (FUN_004AD5D0)
@@ -2040,7 +2040,7 @@ namespace
    * What it does:
    * Duplicate lane that copies the tree-head leftmost-node pointer.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230** CopyTreeHeadLeftmostNodeVariant2(
+  RedBlackTreeNodeRuntime_004AD230** CopyTreeHeadLeftmostNodeVariant2(
     RedBlackTreeNodeRuntime_004AD230** const outNode,
     const RedBlackTreeRuntime_004AD230& tree
   ) noexcept
@@ -2114,7 +2114,7 @@ namespace
    * What it does:
    * Returns one wide red-black-tree node parent lane.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* ReadWideTreeNodeParent_004AE3A0(
+  RedBlackTreeWideNodeRuntime_004AE3B0* ReadWideTreeNodeParent_004AE3A0(
     const RedBlackTreeWideNodeRuntime_004AE3B0* const node
   ) noexcept
   {
@@ -2127,7 +2127,7 @@ namespace
    * What it does:
    * Performs one left rotation around a wide red-black-tree node.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* RotateWideSubtreeLeft_004AE3B0(
+  RedBlackTreeWideNodeRuntime_004AE3B0* RotateWideSubtreeLeft_004AE3B0(
     RedBlackTreeWideNodeRuntime_004AE3B0* const pivot,
     RedBlackTreeWideRuntime_004AE3B0& tree
   ) noexcept
@@ -2159,7 +2159,7 @@ namespace
    * What it does:
    * Performs one right rotation around a wide red-black-tree node.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* RotateWideSubtreeRight_004AE410(
+  RedBlackTreeWideNodeRuntime_004AE3B0* RotateWideSubtreeRight_004AE410(
     RedBlackTreeWideNodeRuntime_004AE3B0* const pivot,
     RedBlackTreeWideRuntime_004AE3B0& tree
   ) noexcept
@@ -2191,7 +2191,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE4F0(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AE4F0(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AE500 (FUN_004AE500, nullsub_713)
@@ -2199,7 +2199,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE500() noexcept {}
+  void NoOpHelperThunk_004AE500() noexcept {}
 
   /**
    * Address: 0x004AE520 (FUN_004AE520, nullsub_714)
@@ -2207,7 +2207,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE520() noexcept {}
+  void NoOpHelperThunk_004AE520() noexcept {}
 
   /**
    * Address: 0x004AE530 (FUN_004AE530)
@@ -2215,7 +2215,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for wide tree/map node growth.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyWideTreeGrowthMax_004AE530() noexcept
+  std::uint32_t ReadLegacyWideTreeGrowthMax_004AE530() noexcept
   {
     return 0x1FFFFFFFU;
   }
@@ -2226,7 +2226,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE610(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AE610(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AE620 (FUN_004AE620, nullsub_716)
@@ -2234,7 +2234,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE620() noexcept {}
+  void NoOpHelperThunk_004AE620() noexcept {}
 
   /**
    * Address: 0x004AE670 (FUN_004AE670, nullsub_717)
@@ -2242,7 +2242,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE670() noexcept {}
+  void NoOpHelperThunk_004AE670() noexcept {}
 
   /**
    * Address: 0x004AE680 (FUN_004AE680)
@@ -2250,7 +2250,7 @@ namespace
    * What it does:
    * Copies one caller-provided dword lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLane_004AE680(
+  std::uint32_t* CopyDwordLane_004AE680(
     std::uint32_t* const outLane,
     const std::uint32_t value
   ) noexcept
@@ -2265,7 +2265,7 @@ namespace
    * What it does:
    * Stores one dword address lane computed as `base + index*4`.
    */
-  [[maybe_unused]] std::uint32_t* ComputeDwordAddressLane_004AE6C0(
+  std::uint32_t* ComputeDwordAddressLane_004AE6C0(
     std::uint32_t* const outLane,
     const std::uint32_t* const baseAddressLane,
     const std::int32_t elementIndex
@@ -2281,7 +2281,7 @@ namespace
    * What it does:
    * Duplicate lane that copies one caller-provided dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLane_004AE6E0(
+  std::uint32_t* CopyDwordLane_004AE6E0(
     std::uint32_t* const outLane,
     const std::uint32_t value
   ) noexcept
@@ -2295,7 +2295,7 @@ namespace
    * What it does:
    * Duplicate lane that copies one caller-provided dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLane_004AE6F0(
+  std::uint32_t* CopyDwordLane_004AE6F0(
     std::uint32_t* const outLane,
     const std::uint32_t value
   ) noexcept
@@ -2309,7 +2309,7 @@ namespace
    * What it does:
    * Advances one wide red-black-tree iterator to its in-order successor.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* AdvanceWideTreeIterator_004AE710(
+  RedBlackTreeWideNodeRuntime_004AE3B0* AdvanceWideTreeIterator_004AE710(
     RedBlackTreeWideNodeRuntime_004AE3B0*& iterator
   ) noexcept
   {
@@ -2346,7 +2346,7 @@ namespace
    * What it does:
    * Duplicate lane that copies one caller-provided dword into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLane_004AE760(
+  std::uint32_t* CopyDwordLane_004AE760(
     std::uint32_t* const outLane,
     const std::uint32_t value
   ) noexcept
@@ -2360,7 +2360,7 @@ namespace
    * What it does:
    * Stores two caller-provided dword lanes into output pair storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreTwoDwordLanes_004AE770(
+  std::uint32_t* StoreTwoDwordLanes_004AE770(
     std::uint32_t* const outPair,
     const std::uint32_t lane1,
     const std::uint32_t lane0
@@ -2377,7 +2377,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for dword lane growth.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyDwordGrowthMax_004AE7B0() noexcept
+  std::uint32_t ReadLegacyDwordGrowthMax_004AE7B0() noexcept
   {
     return 0x3FFFFFFFU;
   }
@@ -2389,7 +2389,7 @@ namespace
    * Allocates one 0x18-byte red-black-tree node and seeds zero links with
    * black color in legacy constructor lanes.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* AllocateBlackTreeNode_004AE7F0()
+  RedBlackTreeNodeRuntime_004AD230* AllocateBlackTreeNode_004AE7F0()
   {
     auto* const node = static_cast<RedBlackTreeNodeRuntime_004AD230*>(
       ::operator new(sizeof(RedBlackTreeNodeRuntime_004AD230))
@@ -2408,7 +2408,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AE830(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AE830(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AE840 (FUN_004AE840)
@@ -2416,7 +2416,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for 0x18-byte node lanes.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyNodeGrowthMax_004AE840() noexcept
+  std::uint32_t ReadLegacyNodeGrowthMax_004AE840() noexcept
   {
     return 0x1FFFFFFFU;
   }
@@ -2427,7 +2427,7 @@ namespace
    * What it does:
    * Allocates raw storage for one 0x18-byte red-black-tree node lane.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* AllocateRawTreeNodeStorage_004AE850()
+  RedBlackTreeNodeRuntime_004AD230* AllocateRawTreeNodeStorage_004AE850()
   {
     return static_cast<RedBlackTreeNodeRuntime_004AD230*>(
       ::operator new(sizeof(RedBlackTreeNodeRuntime_004AD230))
@@ -2440,7 +2440,7 @@ namespace
    * What it does:
    * Walks one wide tree node down its left chain to the leftmost descendant.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* FindWideTreeLeftmostDescendant_004AEB50(
+  RedBlackTreeWideNodeRuntime_004AE3B0* FindWideTreeLeftmostDescendant_004AEB50(
     RedBlackTreeWideNodeRuntime_004AE3B0* node
   ) noexcept
   {
@@ -2460,7 +2460,7 @@ namespace
    * What it does:
    * Walks one wide tree node down its right chain to the rightmost descendant.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* FindWideTreeRightmostDescendant_004AEE80(
+  RedBlackTreeWideNodeRuntime_004AE3B0* FindWideTreeRightmostDescendant_004AEE80(
     RedBlackTreeWideNodeRuntime_004AE3B0* node
   ) noexcept
   {
@@ -2478,7 +2478,7 @@ namespace
    * What it does:
    * Allocates one wide tree node with cleared link lanes and black color.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* AllocateBlackWideTreeNode_004AEB70()
+  RedBlackTreeWideNodeRuntime_004AE3B0* AllocateBlackWideTreeNode_004AEB70()
   {
     auto* const node = static_cast<RedBlackTreeWideNodeRuntime_004AE3B0*>(
       ::operator new(sizeof(RedBlackTreeWideNodeRuntime_004AE3B0))
@@ -2497,7 +2497,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AEBB0(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AEBB0(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AEBC0 (FUN_004AEBC0)
@@ -2505,7 +2505,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for dword lane growth.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyDwordGrowthMax_004AEBC0() noexcept
+  std::uint32_t ReadLegacyDwordGrowthMax_004AEBC0() noexcept
   {
     return 0x03FFFFFFU;
   }
@@ -2516,7 +2516,7 @@ namespace
    * What it does:
    * Allocates raw storage for one wide (0x50-byte) tree node lane.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* AllocateRawWideTreeNodeStorage_004AEBD0()
+  RedBlackTreeWideNodeRuntime_004AE3B0* AllocateRawWideTreeNodeStorage_004AEBD0()
   {
     return static_cast<RedBlackTreeWideNodeRuntime_004AE3B0*>(
       ::operator new(sizeof(RedBlackTreeWideNodeRuntime_004AE3B0))
@@ -2529,7 +2529,7 @@ namespace
    * What it does:
    * Returns one legacy max-count constant for wide-node growth.
    */
-  [[maybe_unused]] std::uint32_t ReadLegacyWideNodeGrowthMax_004AEBE0() noexcept
+  std::uint32_t ReadLegacyWideNodeGrowthMax_004AEBE0() noexcept
   {
     return 0x1FFFFFFFU;
   }
@@ -2540,7 +2540,7 @@ namespace
    * What it does:
    * Moves one narrow red-black-tree iterator to its in-order predecessor.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* RetreatTreeIterator_004AEC00(
+  RedBlackTreeNodeRuntime_004AD230* RetreatTreeIterator_004AEC00(
     RedBlackTreeNodeRuntime_004AD230*& iterator
   ) noexcept
   {
@@ -2583,7 +2583,7 @@ namespace
    * What it does:
    * Advances one narrow red-black-tree iterator to its in-order successor.
    */
-  [[maybe_unused]] RedBlackTreeNodeRuntime_004AD230* AdvanceTreeIterator_004AEC60(
+  RedBlackTreeNodeRuntime_004AD230* AdvanceTreeIterator_004AEC60(
     RedBlackTreeNodeRuntime_004AD230*& iterator
   ) noexcept
   {
@@ -2623,7 +2623,7 @@ namespace
    * What it does:
    * Moves one wide red-black-tree iterator to its in-order predecessor.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* RetreatWideTreeIterator_004AECE0(
+  RedBlackTreeWideNodeRuntime_004AE3B0* RetreatWideTreeIterator_004AECE0(
     RedBlackTreeWideNodeRuntime_004AE3B0*& iterator
   ) noexcept
   {
@@ -2666,7 +2666,7 @@ namespace
    * What it does:
    * Stores two caller-provided dword lanes into output pair storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreTwoDwordLanes_004AED40(
+  std::uint32_t* StoreTwoDwordLanes_004AED40(
     std::uint32_t* const outPair,
     const std::uint32_t lane1,
     const std::uint32_t lane0
@@ -2684,7 +2684,7 @@ namespace
    * Recursively destroys one narrow-tree node subtree (right branch first),
    * then deletes each traversed node while walking left links.
    */
-  [[maybe_unused]] void DestroyTreeNodeSubtree_004AEDE0(
+  void DestroyTreeNodeSubtree_004AEDE0(
     RedBlackTreeNodeRuntime_004AD230* node
   ) noexcept
   {
@@ -2707,7 +2707,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AEE20(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AEE20(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AEE40 (FUN_004AEE40)
@@ -2717,7 +2717,7 @@ namespace
    * destroys each node runtime payload, then deletes each traversed node while
    * walking left links.
    */
-  [[maybe_unused]] void DestroyWideTreeNodeSubtree_004AEE40(
+  void DestroyWideTreeNodeSubtree_004AEE40(
     RedBlackTreeWideNodeRuntime_004AE3B0* node
   ) noexcept
   {
@@ -2741,7 +2741,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AEEA0(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AEEA0(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AEEE0 (FUN_004AEEE0, nullsub_722)
@@ -2749,7 +2749,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AEEE0(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AEEE0(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AEEF0 (FUN_004AEEF0, nullsub_723)
@@ -2757,7 +2757,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity (`__stdcall` one arg).
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AEEF0(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunk_004AEEF0(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004AEF90 (FUN_004AEF90)
@@ -2766,7 +2766,7 @@ namespace
    * Rebinds one shared `(px,pi)` pair: retains incoming control, releases
    * previously bound shared control, then stores the incoming control lane.
    */
-  [[maybe_unused]] boost::SharedCountPair* AssignSharedPairRetainRelease_004AEF90(
+  boost::SharedCountPair* AssignSharedPairRetainRelease_004AEF90(
     const boost::SharedCountPair* const sourcePair,
     boost::SharedCountPair* const outPair
   ) noexcept
@@ -2792,7 +2792,7 @@ namespace
    * What it does:
    * Constructs one shared prefetch-data pointer from one raw payload pointer.
    */
-  [[maybe_unused]] boost::shared_ptr<moho::PrefetchData>* ConstructSharedPrefetchDataFromRaw_004AEFD0(
+  boost::shared_ptr<moho::PrefetchData>* ConstructSharedPrefetchDataFromRaw_004AEFD0(
     boost::shared_ptr<moho::PrefetchData>* const outShared,
     moho::PrefetchData* const payload
   )
@@ -2806,7 +2806,7 @@ namespace
    * What it does:
    * Copies one shared `(px,pi)` pair and retains one shared control-block ref.
    */
-  [[maybe_unused]] boost::SharedCountPair* AssignSharedPairRetain_004AEFF0(
+  boost::SharedCountPair* AssignSharedPairRetain_004AEFF0(
     boost::SharedCountPair* const outPair,
     const boost::SharedCountPair* const sourcePair
   ) noexcept
@@ -2829,7 +2829,7 @@ namespace
    * What it does:
    * Stores three caller-provided dword lanes into output tuple storage.
    */
-  [[maybe_unused]] DwordTripleRuntime_004AF050* StoreThreeDwordLanes_004AF050(
+  DwordTripleRuntime_004AF050* StoreThreeDwordLanes_004AF050(
     DwordTripleRuntime_004AF050* const outTriple,
     const std::uint32_t lane0,
     const std::uint32_t lane1,
@@ -2848,7 +2848,7 @@ namespace
    * What it does:
    * Swaps one dword lane between two caller-provided slots.
    */
-  [[maybe_unused]] std::uint32_t* SwapDwordSlots_004AF250(
+  std::uint32_t* SwapDwordSlots_004AF250(
     std::uint32_t* const lhsSlot,
     std::uint32_t* const rhsSlot
   ) noexcept
@@ -2865,7 +2865,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF2C0() noexcept {}
+  void NoOpHelperThunk_004AF2C0() noexcept {}
 
   /**
    * Address: 0x004AF2F0 (FUN_004AF2F0, nullsub_725)
@@ -2873,7 +2873,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF2F0() noexcept {}
+  void NoOpHelperThunk_004AF2F0() noexcept {}
 
   /**
    * Address: 0x004AF350 (FUN_004AF350, nullsub_726)
@@ -2881,7 +2881,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF350() noexcept {}
+  void NoOpHelperThunk_004AF350() noexcept {}
 
   /**
    * Address: 0x004AF360 (FUN_004AF360)
@@ -2890,7 +2890,7 @@ namespace
    * Allocates one contiguous buffer sized `elementCount * 8` with legacy
    * overflow guard and `std::bad_alloc` throw path.
    */
-  [[maybe_unused]] void* AllocateChecked8ByteStride_004AF360(const std::uint32_t elementCount)
+  void* AllocateChecked8ByteStride_004AF360(const std::uint32_t elementCount)
   {
     if (elementCount > 0x1FFFFFFFU) {
       throw std::bad_alloc();
@@ -2905,7 +2905,7 @@ namespace
    * Moves one dword range `[sourceBegin, sourceEnd)` into `destination` and
    * returns the end pointer after moved lanes.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeAndReturnEnd_004AF3F0(
+  std::uint32_t* MoveDwordRangeAndReturnEnd_004AF3F0(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -2927,7 +2927,7 @@ namespace
    * Copies one dword range `[sourceBegin, sourceEnd)` into the lane ending at
    * `destinationEnd`, returning the computed destination-begin pointer.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeToEndAndReturnBegin_004AF430(
+  std::uint32_t* CopyDwordRangeToEndAndReturnBegin_004AF430(
     std::uint32_t* const destinationEnd,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -2950,7 +2950,7 @@ namespace
    * Allocates one contiguous buffer sized `elementCount * 4` with legacy
    * overflow guard and `std::bad_alloc` throw path.
    */
-  [[maybe_unused]] void* AllocateChecked4ByteStride_004AF460(const std::uint32_t elementCount)
+  void* AllocateChecked4ByteStride_004AF460(const std::uint32_t elementCount)
   {
     if (elementCount > 0x3FFFFFFFU) {
       throw std::bad_alloc();
@@ -2964,7 +2964,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF4B0() noexcept {}
+  void NoOpHelperThunk_004AF4B0() noexcept {}
 
   /**
    * Address: 0x004AF4C0 (FUN_004AF4C0, nullsub_728)
@@ -2972,7 +2972,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF4C0() noexcept {}
+  void NoOpHelperThunk_004AF4C0() noexcept {}
 
   /**
    * Address: 0x004AF4D0 (FUN_004AF4D0, nullsub_729)
@@ -2980,7 +2980,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF4D0() noexcept {}
+  void NoOpHelperThunk_004AF4D0() noexcept {}
 
   /**
    * Address: 0x004AF4E0 (FUN_004AF4E0)
@@ -2988,7 +2988,7 @@ namespace
    * What it does:
    * Duplicate lane for checked allocation of `elementCount * 4` bytes.
    */
-  [[maybe_unused]] void* AllocateChecked4ByteStride_004AF4E0(const std::uint32_t elementCount)
+  void* AllocateChecked4ByteStride_004AF4E0(const std::uint32_t elementCount)
   {
     return AllocateChecked4ByteStride_004AF460(elementCount);
   }
@@ -2999,7 +2999,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF530() noexcept {}
+  void NoOpHelperThunk_004AF530() noexcept {}
 
   /**
    * Address: 0x004AF540 (FUN_004AF540, nullsub_731)
@@ -3007,7 +3007,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF540() noexcept {}
+  void NoOpHelperThunk_004AF540() noexcept {}
 
   /**
    * Address: 0x004AF550 (FUN_004AF550)
@@ -3016,7 +3016,7 @@ namespace
    * Allocates one contiguous buffer sized `elementCount * 24` with legacy
    * overflow guard and `std::bad_alloc` throw path.
    */
-  [[maybe_unused]] void* AllocateChecked24ByteStride_004AF550(const std::uint32_t elementCount)
+  void* AllocateChecked24ByteStride_004AF550(const std::uint32_t elementCount)
   {
     if (elementCount > 0x0AAAAAAAU) {
       throw std::bad_alloc();
@@ -3030,7 +3030,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF5B0() noexcept {}
+  void NoOpHelperThunk_004AF5B0() noexcept {}
 
   /**
    * Address: 0x004AF5C0 (FUN_004AF5C0)
@@ -3039,7 +3039,7 @@ namespace
    * Allocates one contiguous buffer sized `elementCount * 80` with legacy
    * overflow guard and `std::bad_alloc` throw path.
    */
-  [[maybe_unused]] void* AllocateChecked80ByteStride_004AF5C0(const std::uint32_t elementCount)
+  void* AllocateChecked80ByteStride_004AF5C0(const std::uint32_t elementCount)
   {
     if (elementCount > 0x03333333U) {
       throw std::bad_alloc();
@@ -3053,7 +3053,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF610() noexcept {}
+  void NoOpHelperThunk_004AF610() noexcept {}
 
   /**
    * Address: 0x004AF630 (FUN_004AF630, nullsub_734)
@@ -3061,7 +3061,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF630() noexcept {}
+  void NoOpHelperThunk_004AF630() noexcept {}
 
   struct DwordPairRuntime_004AF6F0
   {
@@ -3078,7 +3078,7 @@ namespace
    * Stores two caller-provided dword lanes and one dereferenced lane into
    * output triple storage.
    */
-  [[maybe_unused]] DwordTripleRuntime_004AF050* StoreDwordPairAndDereferencedLane_004AF6D0(
+  DwordTripleRuntime_004AF050* StoreDwordPairAndDereferencedLane_004AF6D0(
     DwordTripleRuntime_004AF050* const outTriple,
     const std::uint32_t lane0,
     const std::uint32_t lane1,
@@ -3097,7 +3097,7 @@ namespace
    * What it does:
    * Stores two caller-provided dword lanes into output pair storage.
    */
-  [[maybe_unused]] DwordPairRuntime_004AF6F0* StoreTwoDwordLanes_004AF6F0(
+  DwordPairRuntime_004AF6F0* StoreTwoDwordLanes_004AF6F0(
     DwordPairRuntime_004AF6F0* const outPair,
     const std::uint32_t lane0,
     const std::uint32_t lane1
@@ -3123,7 +3123,7 @@ namespace
    * What it does:
    * Stores one caller-provided dword lane into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordLaneFromValue_004AF700(
+  std::uint32_t* StoreDwordLaneFromValue_004AF700(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -3137,7 +3137,7 @@ namespace
    * What it does:
    * Copies one dword lane from source storage into output storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordLaneFromSource_004AF710(
+  std::uint32_t* CopyDwordLaneFromSource_004AF710(
     std::uint32_t* const outValue,
     const std::uint32_t* const sourceValue
   ) noexcept
@@ -3152,7 +3152,7 @@ namespace
    * What it does:
    * Duplicate lane of single-dword store into output storage.
    */
-  [[maybe_unused]] std::uint32_t* StoreDwordLaneFromValue_004AF720(
+  std::uint32_t* StoreDwordLaneFromValue_004AF720(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -3167,7 +3167,7 @@ namespace
    * Constructs one `boost::detail::shared_count` for prefetch payload
    * ownership from one raw `PrefetchData*`.
    */
-  [[maybe_unused]] boost::detail::shared_count* ConstructPrefetchSharedCountFromRaw_004AF790(
+  boost::detail::shared_count* ConstructPrefetchSharedCountFromRaw_004AF790(
     boost::detail::shared_count* const outCount,
     moho::PrefetchData* const payload
   )
@@ -3181,7 +3181,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF870() noexcept {}
+  void NoOpHelperThunk_004AF870() noexcept {}
 
   [[nodiscard]] std::uint8_t ExtractHighByteCore_004AF880(const std::uint32_t packedValue) noexcept
   {
@@ -3194,7 +3194,7 @@ namespace
    * What it does:
    * Returns the high byte from one caller-provided dword lane.
    */
-  [[maybe_unused]] std::uint8_t ExtractHighByte_004AF880(const std::uint32_t packedValue) noexcept
+  std::uint8_t ExtractHighByte_004AF880(const std::uint32_t packedValue) noexcept
   {
     return ExtractHighByteCore_004AF880(packedValue);
   }
@@ -3205,7 +3205,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF8B0() noexcept {}
+  void NoOpHelperThunk_004AF8B0() noexcept {}
 
   /**
    * Address: 0x004AF8C0 (FUN_004AF8C0)
@@ -3213,7 +3213,7 @@ namespace
    * What it does:
    * Duplicate lane of high-byte extraction from one dword input.
    */
-  [[maybe_unused]] std::uint8_t ExtractHighByte_004AF8C0(const std::uint32_t packedValue) noexcept
+  std::uint8_t ExtractHighByte_004AF8C0(const std::uint32_t packedValue) noexcept
   {
     return ExtractHighByteCore_004AF880(packedValue);
   }
@@ -3224,7 +3224,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF8F0() noexcept {}
+  void NoOpHelperThunk_004AF8F0() noexcept {}
 
   /**
    * Address: 0x004AF900 (FUN_004AF900)
@@ -3232,7 +3232,7 @@ namespace
    * What it does:
    * Duplicate lane of high-byte extraction from one dword input.
    */
-  [[maybe_unused]] std::uint8_t ExtractHighByte_004AF900(const std::uint32_t packedValue) noexcept
+  std::uint8_t ExtractHighByte_004AF900(const std::uint32_t packedValue) noexcept
   {
     return ExtractHighByteCore_004AF880(packedValue);
   }
@@ -3243,7 +3243,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF930() noexcept {}
+  void NoOpHelperThunk_004AF930() noexcept {}
 
   /**
    * Address: 0x004AF960 (FUN_004AF960)
@@ -3251,7 +3251,7 @@ namespace
    * What it does:
    * Duplicate lane of high-byte extraction from one dword input.
    */
-  [[maybe_unused]] std::uint8_t ExtractHighByte_004AF960(const std::uint32_t packedValue) noexcept
+  std::uint8_t ExtractHighByte_004AF960(const std::uint32_t packedValue) noexcept
   {
     return ExtractHighByteCore_004AF880(packedValue);
   }
@@ -3262,7 +3262,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AF9B0() noexcept {}
+  void NoOpHelperThunk_004AF9B0() noexcept {}
 
   /**
    * Address: 0x004AFA00 (FUN_004AFA00)
@@ -3270,7 +3270,7 @@ namespace
    * What it does:
    * Duplicate lane of high-byte extraction from one dword input.
    */
-  [[maybe_unused]] std::uint8_t ExtractHighByte_004AFA00(const std::uint32_t packedValue) noexcept
+  std::uint8_t ExtractHighByte_004AFA00(const std::uint32_t packedValue) noexcept
   {
     return ExtractHighByteCore_004AF880(packedValue);
   }
@@ -3297,7 +3297,7 @@ namespace
    * Initializes one `sp_counted_impl_p<PrefetchData>` storage lane with
    * use/weak counts set to one and owned payload pointer at `+0x0C`.
    */
-  [[maybe_unused]] PrefetchDataCountedImplStorage_004AFA60* InitializePrefetchDataCountedImplStorage_004AFA60(
+  PrefetchDataCountedImplStorage_004AFA60* InitializePrefetchDataCountedImplStorage_004AFA60(
     PrefetchDataCountedImplStorage_004AFA60* const outStorage,
     moho::PrefetchData* const payload
   ) noexcept
@@ -3309,7 +3309,7 @@ namespace
     );
   }
 
-  [[maybe_unused]] void ReleasePrefetchDataSharedPairsForDelete_004AFA80(
+  void ReleasePrefetchDataSharedPairsForDelete_004AFA80(
     moho::PrefetchData* const payload
   ) noexcept
   {
@@ -3324,7 +3324,7 @@ namespace
    * Disposes one counted prefetch payload by releasing nested shared lanes
    * then deleting the payload storage.
    */
-  [[maybe_unused]] void DisposePrefetchDataCountedPayload_004AFA80(
+  void DisposePrefetchDataCountedPayload_004AFA80(
     const PrefetchDataCountedImplStorage_004AFA60* const countedImpl
   ) noexcept
   {
@@ -3341,7 +3341,7 @@ namespace
    * What it does:
    * Returns legacy null get-deleter lane for counted prefetch payload storage.
    */
-  [[maybe_unused]] int GetPrefetchDataCountedImplDeleterNullResult_004AFAA0(
+  int GetPrefetchDataCountedImplDeleterNullResult_004AFAA0(
     const void* const typeInfoQuery
   ) noexcept
   {
@@ -3355,7 +3355,7 @@ namespace
    * Models the deleting-destructor thunk lane for prefetch counted-base
    * storage, with optional heap delete controlled by `deleteFlag & 1`.
    */
-  [[maybe_unused]] boost::detail::sp_counted_base* DestructPrefetchCountedBaseDeleting_004AFAB0(
+  boost::detail::sp_counted_base* DestructPrefetchCountedBaseDeleting_004AFAB0(
     boost::detail::sp_counted_base* const self,
     const unsigned char deleteFlag
   ) noexcept
@@ -3370,7 +3370,7 @@ namespace
    * Models the non-deleting destructor body lane for prefetch counted-base
    * storage.
    */
-  [[maybe_unused]] boost::detail::sp_counted_base* DestructPrefetchCountedBaseNonDeleting_004AFAD0(
+  boost::detail::sp_counted_base* DestructPrefetchCountedBaseNonDeleting_004AFAD0(
     boost::detail::sp_counted_base* const self
   ) noexcept
   {
@@ -3384,7 +3384,7 @@ namespace
    * Releases one prefetch payload's nested shared lanes and deletes payload
    * storage when the payload pointer is non-null.
    */
-  [[maybe_unused]] void DestroyPrefetchDataPayloadIfPresent_004AFAE0(
+  void DestroyPrefetchDataPayloadIfPresent_004AFAE0(
     moho::PrefetchData* const payload
   ) noexcept
   {
@@ -3421,7 +3421,7 @@ namespace
    * Validates one scoped recursive lock lane, enters one condition wait by
    * unlocking with cv-state transfer, blocks, then re-acquires the lock.
    */
-  [[maybe_unused]] void WaitConditionWithScopedRecursiveLock_004AEF30(
+  void WaitConditionWithScopedRecursiveLock_004AEF30(
     ScopedRecursiveMutexLockRuntime_004AEF30* const scopedLock,
     boost::detail::condition_impl* const conditionImpl
   )
@@ -3494,7 +3494,7 @@ namespace
    * Builds one 4-lane callable payload; rejects placement when guard reports
    * failure, otherwise copies lanes into caller output when provided.
    */
-  [[maybe_unused]] bool BuildPrefetchThreadCallablePayload_004AFB20(
+  bool BuildPrefetchThreadCallablePayload_004AFB20(
     PrefetchThreadCallableBuffer_004AFB20* const outPayload,
     const std::uint32_t lane0,
     const std::uint32_t lane1,
@@ -3529,7 +3529,7 @@ namespace
    * Invokes one bound prefetch-thread callable by computing adjusted `this`
    * pointer lane (`lane1 + lane2`) and jumping through callable entry lane.
    */
-  [[maybe_unused]] void InvokePrefetchThreadCallable_004AFDE0(
+  void InvokePrefetchThreadCallable_004AFDE0(
     PrefetchThreadCallableBuffer_004AFB20* const callablePayload,
     moho::ResourceManager* const /*unusedContext*/
   )
@@ -3549,7 +3549,7 @@ namespace
    * Manages one prefetch-thread callable payload for clone/destroy/type-check/
    * type-query operations.
    */
-  [[maybe_unused]] void ManagePrefetchThreadCallable_004AFDF0(
+  void ManagePrefetchThreadCallable_004AFDF0(
     const PrefetchThreadCallableBuffer_004AFB20* const inPayload,
     PrefetchThreadCallableBuffer_004AFB20* const outPayload,
     const boost::detail::function::functor_manager_operation_type operation
@@ -3597,7 +3597,7 @@ namespace
    * Stores the prefetch callable invoker/manager pair in global vtable
    * storage and returns that global vtable address.
    */
-  [[maybe_unused]] PrefetchThreadCallableVtable_004AF810* InitializePrefetchThreadCallableVtableGlobal_004AFB00(
+  PrefetchThreadCallableVtable_004AF810* InitializePrefetchThreadCallableVtableGlobal_004AFB00(
     const std::uint32_t /*unusedLane0*/,
     const std::uint32_t /*unusedLane1*/,
     const std::uint32_t /*unusedLane2*/,
@@ -3613,7 +3613,7 @@ namespace
    * What it does:
    * Duplicate lane of global prefetch callable vtable initialization.
    */
-  [[maybe_unused]] void InitializePrefetchThreadCallableVtableGlobal_004AFC30(
+  void InitializePrefetchThreadCallableVtableGlobal_004AFC30(
     const std::uint32_t /*unusedLane0*/,
     const std::uint32_t /*unusedLane1*/,
     const std::uint32_t /*unusedLane2*/,
@@ -3629,7 +3629,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AFC90() noexcept {}
+  void NoOpHelperThunk_004AFC90() noexcept {}
 
   /**
    * Address: 0x004AFCC0 (FUN_004AFCC0, nullsub_741)
@@ -3637,7 +3637,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AFCC0() noexcept {}
+  void NoOpHelperThunk_004AFCC0() noexcept {}
 
   /**
    * Address: 0x004AFD20 (FUN_004AFD20)
@@ -3645,7 +3645,7 @@ namespace
    * What it does:
    * Duplicate lane of global prefetch callable vtable initialization.
    */
-  [[maybe_unused]] void InitializePrefetchThreadCallableVtableGlobal_004AFD20(
+  void InitializePrefetchThreadCallableVtableGlobal_004AFD20(
     const std::uint32_t /*unusedLane0*/,
     const std::uint32_t /*unusedLane1*/,
     const std::uint32_t /*unusedLane2*/,
@@ -3662,7 +3662,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AFD40() noexcept {}
+  void NoOpHelperThunk_004AFD40() noexcept {}
 
   /**
    * Address: 0x004AFF00 (FUN_004AFF00, nullsub_743)
@@ -3670,7 +3670,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AFF00() noexcept {}
+  void NoOpHelperThunk_004AFF00() noexcept {}
 
   /**
    * Address: 0x004AFF10 (FUN_004AFF10, nullsub_744)
@@ -3678,7 +3678,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AFF10() noexcept {}
+  void NoOpHelperThunk_004AFF10() noexcept {}
 
   /**
    * Address: 0x004AF810 (FUN_004AF810)
@@ -3688,7 +3688,7 @@ namespace
    * output `+0x08`, and stores vtable pointer at output `+0x00` when build
    * succeeds (otherwise stores null).
    */
-  [[maybe_unused]] PrefetchThreadCallableVtable_004AF810* AssignPrefetchThreadCallableVtable_004AF810(
+  PrefetchThreadCallableVtable_004AF810* AssignPrefetchThreadCallableVtable_004AF810(
     PrefetchThreadCallableRuntime_004AF070* const outCallable,
     const std::uint32_t lane0,
     const std::uint32_t lane1,
@@ -3717,7 +3717,7 @@ namespace
    * Clears callable vtable lane and then assigns one lazily-built callable
    * payload/vtable tuple from four caller-provided dword lanes.
    */
-  [[maybe_unused]] PrefetchThreadCallableRuntime_004AF070* InitializePrefetchThreadCallable_004AF070(
+  PrefetchThreadCallableRuntime_004AF070* InitializePrefetchThreadCallable_004AF070(
     PrefetchThreadCallableRuntime_004AF070* const outCallable,
     const std::uint32_t lane0,
     const std::uint32_t lane1,
@@ -3737,7 +3737,7 @@ namespace
    * Erases one wide red-black-tree node, rebalances colors/rotations, and
    * returns the successor iterator through caller-provided output storage.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0** EraseWideTreeNode_004AE860(
+  RedBlackTreeWideNodeRuntime_004AE3B0** EraseWideTreeNode_004AE860(
     RedBlackTreeWideRuntime_004AE3B0& tree,
     RedBlackTreeWideNodeRuntime_004AE3B0** const outNext,
     RedBlackTreeWideNodeRuntime_004AE3B0* eraseNode
@@ -3961,7 +3961,7 @@ fixup_after_transplant:
    * Erases one iterator range from the active-factory keyed registry and
    * returns the next iterator through caller-provided output storage.
    */
-  [[maybe_unused]] std::map<unsigned int, moho::ResourceFactoryBase*>::iterator*
+  std::map<unsigned int, moho::ResourceFactoryBase*>::iterator*
   EraseFactoryRegistrationRange_004AE0D0(
     std::map<unsigned int, moho::ResourceFactoryBase*>& activeFactoryRegistrationsByKey,
     std::map<unsigned int, moho::ResourceFactoryBase*>::iterator* const outNext,
@@ -4022,7 +4022,7 @@ fixup_after_transplant:
    * What it does:
    * Initializes one wide prefetch-request tree node from link lanes and key.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* InitializePrefetchRequestWideNode_004AED80(
+  RedBlackTreeWideNodeRuntime_004AE3B0* InitializePrefetchRequestWideNode_004AED80(
     RedBlackTreeWideNodeRuntime_004AE3B0* const node,
     RedBlackTreeWideNodeRuntime_004AE3B0* const left,
     RedBlackTreeWideNodeRuntime_004AE3B0* const right,
@@ -4052,7 +4052,7 @@ fixup_after_transplant:
    * Allocates one wide prefetch-request tree node and seeds its runtime
    * payload from the request key.
    */
-  [[maybe_unused]] RedBlackTreeWideNodeRuntime_004AE3B0* AllocatePrefetchRequestTreeNode_004AE460(
+  RedBlackTreeWideNodeRuntime_004AE3B0* AllocatePrefetchRequestTreeNode_004AE460(
     RedBlackTreeWideNodeRuntime_004AE3B0* const head,
     RedBlackTreeWideNodeRuntime_004AE3B0* const parentHint,
     const PrefetchRequestKey& key
@@ -4077,7 +4077,7 @@ fixup_after_transplant:
    * Erases one iterator range from the prefetch-request entry map and
    * returns the next iterator through caller-provided output storage.
    */
-  [[maybe_unused]] PrefetchRequestEntryMap::iterator* ErasePrefetchRequestEntryRange_004AE2B0(
+  PrefetchRequestEntryMap::iterator* ErasePrefetchRequestEntryRange_004AE2B0(
     PrefetchRequestEntryMap& requestEntries,
     PrefetchRequestEntryMap::iterator* const outNext,
     PrefetchRequestEntryMap::iterator first,
@@ -4111,7 +4111,7 @@ fixup_after_transplant:
    * What it does:
    * Returns lower-bound iterator for one prefetch-request key.
    */
-  [[maybe_unused]] PrefetchRequestEntryMap::iterator LowerBoundPrefetchRequestEntry_004AD790(
+  PrefetchRequestEntryMap::iterator LowerBoundPrefetchRequestEntry_004AD790(
     PrefetchRequestEntryMap& requestEntries,
     const PrefetchRequestKey& key
   )
@@ -4125,7 +4125,7 @@ fixup_after_transplant:
    * What it does:
    * Returns upper-bound iterator for one prefetch-request key.
    */
-  [[maybe_unused]] PrefetchRequestEntryMap::iterator UpperBoundPrefetchRequestEntry_004AD800(
+  PrefetchRequestEntryMap::iterator UpperBoundPrefetchRequestEntry_004AD800(
     PrefetchRequestEntryMap& requestEntries,
     const PrefetchRequestKey& key
   )
@@ -4139,7 +4139,7 @@ fixup_after_transplant:
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AD890() noexcept {}
+  void NoOpHelperThunk_004AD890() noexcept {}
 
   /**
    * Address: 0x004AD8A0 (FUN_004AD8A0, nullsub_705)
@@ -4147,7 +4147,7 @@ fixup_after_transplant:
    * What it does:
    * No-op helper thunk retained for callsite parity.
    */
-  [[maybe_unused]] void NoOpHelperThunk_004AD8A0() noexcept {}
+  void NoOpHelperThunk_004AD8A0() noexcept {}
 
   /**
    * Address: 0x004AD8F0 (FUN_004AD8F0)
@@ -4155,7 +4155,7 @@ fixup_after_transplant:
    * What it does:
    * Stores one tree-node pointer and its key lane into output pair storage.
    */
-  [[maybe_unused]] std::uintptr_t* StoreNodePointerAndKeyLane_004AD8F0(
+  std::uintptr_t* StoreNodePointerAndKeyLane_004AD8F0(
     std::uintptr_t* const outPair,
     const RedBlackTreeNodeRuntime_004AD230* const node
   ) noexcept
@@ -4193,7 +4193,7 @@ fixup_after_transplant:
    * Inserts one prefetch-request entry by key and returns iterator + inserted
    * status after map rebalancing.
    */
-  [[maybe_unused]] PrefetchRequestInsertResult_004AD5E0 InsertPrefetchRequestEntry_004AD5E0(
+  PrefetchRequestInsertResult_004AD5E0 InsertPrefetchRequestEntry_004AD5E0(
     PrefetchRequestEntryMap& requestEntries,
     const PrefetchRequestKey& key
   )
@@ -4487,7 +4487,7 @@ namespace
     }
   };
 
-  [[maybe_unused]] ResourceManagerConVarStartupBootstrap gResourceManagerConVarStartupBootstrap;
+  ResourceManagerConVarStartupBootstrap gResourceManagerConVarStartupBootstrap;
 } // namespace
 
 /**
@@ -4527,7 +4527,7 @@ moho::ResourceManager::~ResourceManager()
  * Thunk lane that forwards one resource-manager teardown request into
  * `FUN_004A9C00`.
  */
-[[maybe_unused]] void DestroyResourceManagerRuntimeAdapter(moho::ResourceManager* const manager) noexcept
+void DestroyResourceManagerRuntimeAdapter(moho::ResourceManager* const manager) noexcept
 {
   if (manager != nullptr) {
     manager->~ResourceManager();
