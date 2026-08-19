@@ -41,7 +41,10 @@ namespace moho
    * Engine-instantiated body of `msvc8::vector<Moho::ResourceDeposit>::push_back`.
    * Appends one `ResourceDeposit` (size 0x14) at `_Mylast`, growing the storage
    * via the MSVC8 slow-path insert helper when the active range has reached
-   * `_Myend`; otherwise placement-constructs the new element at the tail.
+   * `_Myend`; otherwise placement-constructs the new element at the tail. The
+   * capacity-full path routes through the 20-byte insert-return wrapper at
+   * `0x00547B40` (grow core `0x00547FE0`) — same shape as the other
+   * `push_back` specializations catalogued in `legacy/containers/Vector.h`.
    *
    * Caller: Moho::CSimResources::AddDeposit (0x00545F10).
    */
