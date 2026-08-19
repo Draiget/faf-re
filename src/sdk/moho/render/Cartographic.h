@@ -23,6 +23,8 @@ namespace gpg::gal
 
 namespace moho
 {
+  class CHeightField;
+  class IWldTerrainRes;
   struct GeomCamera3;
 
   /**
@@ -292,6 +294,38 @@ namespace moho
      */
     [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetEffect();
 
+    /**
+     * Address: 0x007D13E0 (FUN_007D13E0)
+     * Mangled: ?Initialize@Cartographic@Moho@@QAEXPAVIWldTerrainRes@2@IIIII@Z
+     *
+     * IDA signature:
+     * int __thiscall Moho::Cartographic::Initialize(Moho::CWldTerrainRes *this, Moho::Cartographic *a2);
+     *
+     * What it does:
+     * Creates the screen-frame quad GPU resources, then hands the terrain
+     * resource plus its topographic sample count and its five hypsometric
+     * palette entries to `InitializeTerrain`, and finally marks the
+     * cartographic runtime initialized. Anything thrown out of that
+     * sequence runs `Shutdown()` before the exception is rethrown.
+     *
+     * The five `hypsometricColor*` parameters are declared by the mangled
+     * symbol but are never read by the shipped body: it re-reads the same
+     * five lanes through `terrain->GetHypsometricColor(0..4)` after
+     * `InitializeFrame()` has run. MSVC's whole-program optimizer therefore
+     * dropped them at the single call site (0x007F8C45 pushes only the
+     * `this` lane and leaves the terrain-resource pointer in `ecx`). The
+     * definition keeps the declared arity for symbol fidelity and the
+     * binary's own reads for behavioral fidelity.
+     */
+    void Initialize(
+      IWldTerrainRes* terrain,
+      std::uint32_t hypsometricColor0,
+      std::uint32_t hypsometricColor1,
+      std::uint32_t hypsometricColor2,
+      std::uint32_t hypsometricColor3,
+      std::uint32_t hypsometricColor4
+    );
+
   private:
     /**
      * Address: 0x007D2E40 (FUN_007D2E40, ?RenderParticles@Cartographic@Moho@@AAEXHMABVGeomCamera3@2@@Z)
@@ -302,6 +336,65 @@ namespace moho
      * particle renderer with fixed water/suppress flags.
      */
     void RenderParticles(std::int32_t tick, float frameAlpha, const GeomCamera3& camera);
+
+    /**
+     * Address: 0x007D1E90 (FUN_007D1E90)
+     * Mangled: ?InitializeFrame@Cartographic@Moho@@AAEXXZ
+     *
+     * IDA signature:
+     * void __usercall Moho::Cartographic::InitializeFrame(Moho::Cartographic *this@<esi>);
+     *
+     * What it does:
+     * Creates the cartographic frame vertex declaration, the four-vertex
+     * frame vertex buffer and the shared six-index quad index buffer, then
+     * uploads the two-triangle index list into the latter.
+     */
+    void InitializeFrame();
+
+    /**
+     * Address: 0x007D20F0 (FUN_007D20F0)
+     * Mangled: ?InitializeTerrain@Cartographic@Moho@@AAEXPAVIWldTerrainRes@2@HIIIII@Z
+     *
+     * IDA signature:
+     * int __thiscall Moho::Cartographic::InitializeTerrain(
+     *   int this, int a2, int a3, int a4, int a5, int a6, int a7, int a8);
+     *
+     * What it does:
+     * Derives the cartographic shader coefficient lanes and the elevation
+     * band from the active terrain heightfield's tier-0 bounds and the map's
+     * water configuration, stores the hypsometric palette, builds the three
+     * terrain lookup textures, and uploads the terrain ground quad.
+     */
+    void InitializeTerrain(
+      IWldTerrainRes* terrain,
+      std::int32_t topographicSamples,
+      std::uint32_t hypsometricColor0,
+      std::uint32_t hypsometricColor1,
+      std::uint32_t hypsometricColor2,
+      std::uint32_t hypsometricColor3,
+      std::uint32_t hypsometricColor4
+    );
+
+    /**
+     * Address: 0x007D24F0 (FUN_007D24F0)
+     * Mangled: ?InitializeTerrainTextures@Cartographic@Moho@@AAEXABVCHeightField@2@HHH@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::Cartographic::InitializeTerrainTextures(
+     *   Moho::Cartographic *this, const struct Moho::CHeightField *a2, int a3, int a4, int a5);
+     *
+     * What it does:
+     * Builds the three cartographic lookup textures: the half-float
+     * elevation map sampled off the heightfield at grid resolution, the
+     * 256x1 hypsometric colour ramp, and the 256x1 topographic contour
+     * ramp quantized into `topographicSamples` elevation bands.
+     */
+    void InitializeTerrainTextures(
+      const CHeightField& heightField,
+      std::int32_t gridWidth,
+      std::int32_t gridHeight,
+      std::int32_t topographicSamples
+    );
 
   public:
     // Runtime-initialized flag. Cleared by the ctor and Shutdown, set by
@@ -318,8 +411,10 @@ namespace moho
     // variable. InitializeTerrain writes {(w>>1)/(width-1), (h>>1)/(height-1), 0, 1}.
     float mTerrainSizeCoeff[4];                                                 // +0x18
 
-    // Height-to-normalized scale for elevation sampling ("terrainHeightScale"),
-    // 0.125f from InitializeTerrain.
+    // Height-word-to-world scale for elevation sampling ("terrainHeightScale").
+    // InitializeTerrain writes flt_E4F6DC, byte-verified as 0x3C000000 = 1/128 =
+    // 0.0078125f in the shipped image - the same constant the cartographic
+    // elevation kernel multiplies raw uint16 height words by.
     float mTerrainHeightScale;                                                  // +0x28
 
     // Elevation bounds of the tier box ("elevMaximum"/"elevMinimum"). Passed to

@@ -29,6 +29,8 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 
 namespace
 {
@@ -451,64 +453,245 @@ namespace
     }
   }
 
-  struct HeightFieldKernelSampleRuntimeView
+  // --- Cartographic terrain / frame initialization constants ---------------
+  //
+  // Every float below was byte-verified against the shipped image
+  // (bin/2025.7.1/ForgedAlliance.exe) at the .rdata address named in its
+  // trailing comment; the integers come from the immediates in the
+  // corresponding `.asm` exports.
+
+  constexpr std::uint32_t kCartographicFrameVertexFormatToken = 7U;
+  constexpr std::uint32_t kCartographicTerrainVertexFormatToken = 10U;
+
+  constexpr std::uint32_t kCartographicFrameVertexCount = 4U;
+  constexpr std::uint32_t kCartographicFrameVertexStride = 24U;
+  constexpr std::uint32_t kCartographicTerrainVertexCount = 4U;
+  constexpr std::uint32_t kCartographicTerrainVertexStride = 8U;
+  constexpr std::uint32_t kCartographicQuadIndexCount = 6U;
+
+  constexpr std::uint32_t kCartographicBufferTypeManaged = 1U;
+  constexpr std::uint32_t kCartographicBufferUsageStatic = 1U;
+  constexpr std::uint32_t kCartographicBufferUsageDynamic = 2U;
+  constexpr std::uint32_t kCartographicIndexFormat16Bit = 1U;
+
+  constexpr std::uint32_t kCartographicTextureSourceDevice = 2U;
+  constexpr std::uint32_t kCartographicTextureType2D = 1U;
+  constexpr std::uint32_t kCartographicTextureUsageStatic = 1U;
+  constexpr std::uint32_t kCartographicTextureMipLevels = 1U;
+
+  // GAL surface-format tokens as written into TextureContext::format_.
+  constexpr std::uint32_t kCartographicElevationTextureFormat = 14U;
+  constexpr std::uint32_t kCartographicHypsometricTextureFormat = 2U;
+  constexpr std::uint32_t kCartographicTopographicTextureFormat = 5U;
+
+  // Both lookup ramps are one row of 256 texels indexed by normalized height.
+  constexpr std::int32_t kCartographicRampTexelCount = 256;
+
+  // The elevation map is a two-channel 16-bit surface; only the first channel
+  // carries the packed height, so consecutive texels are two words apart.
+  constexpr std::ptrdiff_t kCartographicElevationTexelWordStride = 2;
+
+  // InitializeTerrainTextures clamps the requested contour count into [1, 100].
+  constexpr std::int32_t kCartographicMinTopographicBands = 1;
+  constexpr std::int32_t kCartographicMaxTopographicBands = 100;
+
+  // Raw uint16 height word <-> world elevation. flt_E4F6DC = 0x3C000000.
+  constexpr float kCartographicHeightWordScale = 1.0f / 128.0f;
+  constexpr float kCartographicHeightWordsPerUnit = 128.0f; // dword_DFE8B4
+
+  // Sentinel written into the elevation lanes when the map has no water.
+  constexpr float kCartographicNoWaterElevation = -10000.0f; // dword_E4F6E4
+
+  // Ramp texel index -> normalized height. dword_E41914 = 1/255.
+  constexpr float kCartographicInverseRampRange = 1.0f / 255.0f;
+
+  // Topographic contour shading maps a band ceiling onto [16, 255].
+  constexpr float kCartographicContourShadeScale = 239.0f; // dword_E4F93C
+  constexpr float kCartographicContourShadeBias = 16.0f;   // dword_E4F938
+  constexpr std::int32_t kCartographicContourShadeMinimum = 16;
+  constexpr std::int32_t kCartographicContourShadeMaximum = 255;
+
+  /**
+   * Leading layout of `Moho::CWldTerrainRes` as the cartographic init path
+   * walks it: `InitializeTerrain` reads the owning `STIMap` straight out of
+   * `IWldTerrainRes+0x04` (0x007D2119 `mov eax, [eax+4]`) and then chases
+   * `STIMap+0x00` for the heightfield (0x007D211C `mov ebp, [eax]`).
+   *
+   * `IWldTerrainRes` already publishes `GetHeightField()`, `IsWaterEnabled()`
+   * and `GetWaterElevation()` for exactly this chase, but not the deep-water
+   * lane this function also needs, so the view is spelled out here the same
+   * way the sibling consumers do it (`MapImager.cpp`, `Clutter.cpp`,
+   * `CWldSplat.cpp`). It is deliberately identical to theirs so a later
+   * consolidation pass can lift all four into one owning accessor.
+   */
+  struct CWldTerrainResRuntimeView
   {
-    const std::uint16_t* samples = nullptr; // +0x00
-    std::int32_t width = 0;                 // +0x04
-    std::int32_t height = 0;                // +0x08
+    const void* mVftable; // +0x00
+    moho::STIMap* mMap;   // +0x04
   };
-  static_assert(
-    offsetof(HeightFieldKernelSampleRuntimeView, samples) == 0x00,
-    "HeightFieldKernelSampleRuntimeView::samples offset must be 0x00"
-  );
-  static_assert(
-    offsetof(HeightFieldKernelSampleRuntimeView, width) == 0x04,
-    "HeightFieldKernelSampleRuntimeView::width offset must be 0x04"
-  );
-  static_assert(
-    offsetof(HeightFieldKernelSampleRuntimeView, height) == 0x08,
-    "HeightFieldKernelSampleRuntimeView::height offset must be 0x08"
-  );
-  static_assert(sizeof(HeightFieldKernelSampleRuntimeView) == 0x0C, "HeightFieldKernelSampleRuntimeView size must be 0x0C");
+
+  static_assert(offsetof(CWldTerrainResRuntimeView, mMap) == 0x04, "CWldTerrainResRuntimeView::mMap offset must be 0x04");
+  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x08, "CWldTerrainResRuntimeView size must be 0x08");
+
+  [[nodiscard]] moho::STIMap& CartographicTerrainMap(const moho::IWldTerrainRes& terrain) noexcept
+  {
+    return *reinterpret_cast<const CWldTerrainResRuntimeView*>(&terrain)->mMap;
+  }
+
+  /**
+   * Packs one IEEE-754 binary32 value into a binary16 word.
+   *
+   * The shipped elevation-texture fill loop converts each sampled height with
+   * `D3DXFloat32To16Array` (direct call at 0x007D2759). D3DX is an external
+   * runtime and this tree only reaches it through
+   * `gpg::gal::InvokeD3DXFloat32To16Array`, which lives in an anonymous
+   * namespace inside `D3D9Interfaces.cpp` and is therefore not linkable from
+   * another translation unit. This helper reproduces the same conversion
+   * (round-to-nearest, denormal-preserving, saturating to +/-Inf) that the
+   * D3D9 backend falls back to when the D3DX export is unavailable.
+   */
+  [[nodiscard]] std::uint16_t PackFloat32AsHalfFloat(const float value) noexcept
+  {
+    std::uint32_t bits = 0U;
+    static_assert(sizeof(bits) == sizeof(value), "float/uint32_t size mismatch");
+    std::memcpy(&bits, &value, sizeof(bits));
+
+    const std::uint32_t sign = (bits >> 16U) & 0x8000U;
+    const std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
+    std::uint32_t mantissa = bits & 0x007FFFFFU;
+
+    if (exponent <= 0) {
+      if (exponent < -10) {
+        return static_cast<std::uint16_t>(sign);
+      }
+      mantissa = (mantissa | 0x00800000U) >> static_cast<std::uint32_t>(1 - exponent);
+      return static_cast<std::uint16_t>(sign | ((mantissa + 0x00001000U) >> 13U));
+    }
+
+    if (exponent >= 31) {
+      return static_cast<std::uint16_t>(sign | 0x7C00U);
+    }
+
+    return static_cast<std::uint16_t>(
+      sign | (static_cast<std::uint32_t>(exponent) << 10U) | ((mantissa + 0x00001000U) >> 13U)
+    );
+  }
+
+  /**
+   * Address: 0x007D0E60 (FUN_007D0E60, sub_7D0E60)
+   *
+   * IDA signature:
+   * int __usercall sub_7D0E60@<eax>(unsigned int to@<eax>, int from@<ecx>, float t@<xmm0>);
+   *
+   * What it does:
+   * Blends two packed 8-bit-per-channel colors channel by channel with
+   * `from + (to - from) * t`, truncating each channel back to a byte. Used
+   * once, by the cartographic hypsometric ramp fill, to fade the fourth
+   * palette entry into the fifth across the above-water band.
+   */
+  [[nodiscard]] std::int32_t BlendPackedColor(
+    const std::int32_t fromColor,
+    const std::int32_t toColor,
+    const float weight
+  ) noexcept
+  {
+    const auto from = static_cast<std::uint32_t>(fromColor);
+    const auto to = static_cast<std::uint32_t>(toColor);
+
+    std::uint32_t blended = 0U;
+    for (unsigned int channelShift = 0U; channelShift < 32U; channelShift += 8U) {
+      const auto fromChannel = static_cast<std::int32_t>((from >> channelShift) & 0xFFU);
+      const auto toChannel = static_cast<std::int32_t>((to >> channelShift) & 0xFFU);
+      const float channel =
+        (static_cast<float>(toChannel - fromChannel) * weight) + static_cast<float>(fromChannel);
+      const auto packedChannel = static_cast<std::uint32_t>(static_cast<std::int32_t>(channel)) & 0xFFU;
+      blended |= packedChannel << channelShift;
+    }
+
+    return static_cast<std::int32_t>(blended);
+  }
 
   /**
    * Address: 0x007D0F70 (FUN_007D0F70)
    *
+   * IDA signature:
+   * float __usercall sub_7D0F70@<xmm0>(int *field@<eax>, int x@<edx>, int z@<ecx>,
+   *                                    float baseline@<xmm3>, float scale@<xmm4>);
+   *
    * What it does:
-   * Samples one clamped terrain-height lane, applies the legacy 3x3 kernel
-   * weights (`0,1,0 / 1,3,1 / 0,1,0`), then normalizes by `1/7`.
+   * Applies the legacy 3x3 cartographic elevation kernel to one clamped
+   * heightfield sample and normalizes the weighted sum by `1/7`. The weight
+   * table at 0x00DFEA1C is byte-verified as `{0,1,0, 1,3,1, 0,1,0}`.
+   *
+   * The shipped body evaluates all nine weighted terms against the *same*
+   * texel: its unrolled loop advances only the weight cursor and never the
+   * clamped `(x-1, z-1)` sample coordinates, so the kernel collapses to
+   * `((word / 128) - baseline) * scale`. That is what the game computes, so
+   * the summation shape is preserved verbatim rather than "fixed".
+   *
+   * The `int*` first parameter is the leading `{data, width, height}` triple
+   * of `Moho::CHeightField` - the caller passes the heightfield itself
+   * (0x007D2720 `mov eax, [esp+arg_0]`).
    */
-  [[maybe_unused]] float CartographicSampleHeightKernelRuntime(
-    const HeightFieldKernelSampleRuntimeView* const field,
-    const std::int32_t xIndex,
-    const std::int32_t yIndex,
+  [[nodiscard]] float SampleCartographicHeightKernel(
+    const moho::CHeightField& field,
+    const std::int32_t x,
+    const std::int32_t z,
     const float baseline,
     const float scale
   ) noexcept
   {
-    if (field == nullptr || field->samples == nullptr || field->width <= 0 || field->height <= 0) {
-      return 0.0f;
-    }
-
-    constexpr float kHeightScale = 0.0078125f;
-    constexpr float kKernelWeights[9] = {
+    constexpr std::array<float, 9> kKernelWeights{
       0.0f, 1.0f, 0.0f,
       1.0f, 3.0f, 1.0f,
       0.0f, 1.0f, 0.0f,
     };
-    constexpr float kKernelNormalize = 0.142857149f;
+    constexpr float kKernelNormalize = 0.142857149f; // dword_E4F8B4
 
-    const std::int32_t clampedX = std::max(0, std::min(xIndex - 1, field->width - 1));
-    const std::int32_t clampedY = std::max(0, std::min(yIndex - 1, field->height - 1));
-    const std::uint16_t packedHeight = field->samples[(clampedY * field->width) + clampedX];
-    const float normalizedHeight = (static_cast<float>(packedHeight) * kHeightScale) - baseline;
+    const std::int32_t clampedX = std::max(0, std::min(x - 1, field.width - 1));
+    const std::int32_t clampedZ = std::max(0, std::min(z - 1, field.height - 1));
+    const std::uint16_t heightWord = field.data[(clampedZ * field.width) + clampedX];
+    const float normalizedHeight =
+      (static_cast<float>(heightWord) * kCartographicHeightWordScale) - baseline;
 
     float weightedHeight = 0.0f;
-    for (float weight : kKernelWeights) {
+    for (const float weight : kKernelWeights) {
       weightedHeight += (normalizedHeight * weight) * scale;
     }
 
     return weightedHeight * kKernelNormalize;
+  }
+
+  /**
+   * Locks the whole of texture level 0 and hands back the mapped bytes.
+   *
+   * The three cartographic lookup textures are each filled through the same
+   * `Lock(&lockRect, 0, &wholeSurface, 0)` / `Unlock(0)` pair the binary
+   * emits at 0x007D26C1, 0x007D28BE and 0x007D2B5A; lifting it keeps the
+   * zeroed whole-surface RECT out of the three fill loops.
+   */
+  [[nodiscard]] void* LockWholeCartographicTexture(gpg::gal::TextureD3D9& texture)
+  {
+    gpg::gal::TextureLockRect lockedRect{};
+    RECT wholeSurface{};
+    texture.Lock(&lockedRect, 0, &wholeSurface, 0);
+    return lockedRect.bits;
+  }
+
+  void FillCartographicTextureContext(
+    gpg::gal::TextureContext& context,
+    const std::uint32_t format,
+    const std::uint32_t width,
+    const std::uint32_t height
+  ) noexcept
+  {
+    context.source_ = kCartographicTextureSourceDevice;
+    context.type_ = kCartographicTextureType2D;
+    context.usage_ = kCartographicTextureUsageStatic;
+    context.format_ = format;
+    context.mipmapLevels_ = kCartographicTextureMipLevels;
+    context.width_ = width;
+    context.height_ = height;
   }
 } // namespace
 
@@ -1163,5 +1346,409 @@ namespace moho
   void Cartographic::RenderParticles(const std::int32_t tick, const float frameAlpha, const GeomCamera3& camera)
   {
     (void)moho::sWorldParticles.RenderEffects(const_cast<GeomCamera3*>(&camera), 0, 1, tick, frameAlpha);
+  }
+  /**
+   * Address: 0x007D1E90 (FUN_007D1E90)
+   * Mangled: ?InitializeFrame@Cartographic@Moho@@AAEXXZ
+   *
+   * IDA signature:
+   * void __usercall Moho::Cartographic::InitializeFrame(Moho::Cartographic *this@<esi>);
+   *
+   * What it does:
+   * Creates the cartographic frame vertex declaration (format token 7), the
+   * four-vertex / 24-byte-stride frame vertex buffer, and the shared quad
+   * index buffer, then uploads the same two-triangle index list the decal
+   * batches use.
+   */
+  void Cartographic::InitializeFrame()
+  {
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+
+    boost::shared_ptr<gpg::gal::VertexFormatD3D9> frameVertexFormat;
+    device->CreateVertexFormat(&frameVertexFormat, kCartographicFrameVertexFormatToken);
+    mFrameVertexFormat = frameVertexFormat;
+
+    gpg::gal::VertexBufferContext frameVertexContext(
+      kCartographicFrameVertexCount,
+      kCartographicFrameVertexStride,
+      kCartographicBufferTypeManaged,
+      kCartographicBufferUsageDynamic
+    );
+
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> frameVertexBuffer;
+    device->CreateVertexBuffer(&frameVertexBuffer, &frameVertexContext);
+    mFrameVertexBuffer = frameVertexBuffer;
+
+    gpg::gal::IndexBufferContext quadIndexContext(
+      kCartographicQuadIndexCount,
+      kCartographicIndexFormat16Bit,
+      kCartographicBufferUsageStatic
+    );
+
+    boost::shared_ptr<gpg::gal::IndexBufferD3D9> quadIndexBuffer;
+    device->CreateIndexBuffer(&quadIndexBuffer, &quadIndexContext);
+    mQuadIndexBuffer = quadIndexBuffer;
+
+    auto* const indexWords = reinterpret_cast<std::uint32_t*>(
+      mQuadIndexBuffer->Lock(0U, sizeof(kCartographicQuadIndexWords), gpg::gal::MohoD3DLockFlags::None)
+    );
+    std::memcpy(indexWords, kCartographicQuadIndexWords.data(), sizeof(kCartographicQuadIndexWords));
+    (void)mQuadIndexBuffer->Unlock();
+  }
+
+  /**
+   * Address: 0x007D24F0 (FUN_007D24F0)
+   * Mangled: ?InitializeTerrainTextures@Cartographic@Moho@@AAEXABVCHeightField@2@HHH@Z
+   *
+   * IDA signature:
+   * void __thiscall Moho::Cartographic::InitializeTerrainTextures(
+   *   Moho::Cartographic *this, const struct Moho::CHeightField *a2, int a3, int a4, int a5);
+   *
+   * What it does:
+   * Builds the three cartographic lookup textures from the elevation band
+   * that `InitializeTerrain` just derived:
+   *
+   *   - `mElevTexture`: a `gridWidth x gridHeight` half-float surface holding
+   *     the heightfield sampled through the 3x3 cartographic kernel and
+   *     normalized into the tier-0 elevation band;
+   *   - `mHypsometricTexture`: a 256x1 ARGB ramp that assigns the abyss, deep
+   *     and shore palette entries to everything at or below the corresponding
+   *     normalized water elevation and fades palette entry 3 into entry 4
+   *     across the land band;
+   *   - `mTopographicTexture`: a 256x1 8-bit ramp quantized into
+   *     `clamp(topographicSamples, 1, 100)` equal contour bands over the land
+   *     range, shaded into [16, 255] and zeroed below the water line.
+   */
+  void Cartographic::InitializeTerrainTextures(
+    const CHeightField& heightField,
+    const std::int32_t gridWidth,
+    const std::int32_t gridHeight,
+    const std::int32_t topographicSamples
+  )
+  {
+    const std::int32_t bandCount = std::clamp(
+      topographicSamples, kCartographicMinTopographicBands, kCartographicMaxTopographicBands
+    );
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+
+    // Everything below works in "normalized elevation": 0 at the tier box
+    // floor, 1 at its ceiling. A degenerate band keeps a unit scale so the
+    // ramps stay well defined.
+    const float elevationSpan = mElevMaximum - mElevMinimum;
+    const float inverseElevationSpan = elevationSpan > 0.0f ? 1.0f / elevationSpan : 1.0f;
+
+    const float normalizedSurface = (mSurfaceElevation - mElevMinimum) * inverseElevationSpan;
+    const float normalizedWater = (mWaterElevation - mElevMinimum) * inverseElevationSpan;
+    const float normalizedDefault = (mDefaultElevation - mElevMinimum) * inverseElevationSpan;
+
+    const float sampleStepX =
+      static_cast<float>(heightField.width - 1) / static_cast<float>(gridWidth - 1);
+    const float sampleStepZ =
+      static_cast<float>(heightField.height - 1) / static_cast<float>(gridHeight - 1);
+
+    // 1. Half-float elevation map at cartographic grid resolution.
+    {
+      gpg::gal::TextureContext elevationContext;
+      FillCartographicTextureContext(
+        elevationContext,
+        kCartographicElevationTextureFormat,
+        static_cast<std::uint32_t>(gridWidth),
+        static_cast<std::uint32_t>(gridHeight)
+      );
+
+      boost::shared_ptr<gpg::gal::TextureD3D9> elevationTexture;
+      device->CreateTexture(&elevationTexture, &elevationContext);
+      mElevTexture = elevationTexture;
+
+      auto* rowCursor = static_cast<std::uint16_t*>(LockWholeCartographicTexture(*mElevTexture));
+      for (std::int32_t z = 0; z < gridHeight; ++z) {
+        const auto sampleZ = static_cast<std::int32_t>(static_cast<float>(z) * sampleStepZ);
+        std::uint16_t* texel = rowCursor;
+        for (std::int32_t x = 0; x < gridWidth; ++x) {
+          const auto sampleX = static_cast<std::int32_t>(static_cast<float>(x) * sampleStepX);
+          const float elevation = SampleCartographicHeightKernel(
+            heightField, sampleX, sampleZ, mElevMinimum, inverseElevationSpan
+          );
+          *texel = PackFloat32AsHalfFloat(elevation);
+          texel += kCartographicElevationTexelWordStride;
+        }
+        rowCursor += kCartographicElevationTexelWordStride * gridWidth;
+      }
+      (void)mElevTexture->Unlock(0);
+    }
+
+    // 2. Hypsometric colour ramp.
+    {
+      gpg::gal::TextureContext hypsometricContext;
+      FillCartographicTextureContext(
+        hypsometricContext,
+        kCartographicHypsometricTextureFormat,
+        static_cast<std::uint32_t>(kCartographicRampTexelCount),
+        1U
+      );
+
+      boost::shared_ptr<gpg::gal::TextureD3D9> hypsometricTexture;
+      device->CreateTexture(&hypsometricTexture, &hypsometricContext);
+      mHypsometricTexture = hypsometricTexture;
+
+      auto* const rampTexels =
+        static_cast<std::int32_t*>(LockWholeCartographicTexture(*mHypsometricTexture));
+      for (std::int32_t texelIndex = 0; texelIndex < kCartographicRampTexelCount; ++texelIndex) {
+        const float normalized = static_cast<float>(texelIndex) * kCartographicInverseRampRange;
+
+        if (!mHasElevationBounds) {
+          rampTexels[texelIndex] = BlendPackedColor(
+            mHypsometricColors[3],
+            mHypsometricColors[4],
+            (normalized - normalizedSurface) / (1.0f - normalizedSurface)
+          );
+        } else if (normalizedDefault >= normalized) {
+          rampTexels[texelIndex] = mHypsometricColors[0];
+        } else if (normalizedWater >= normalized) {
+          rampTexels[texelIndex] = mHypsometricColors[1];
+        } else if (normalizedSurface >= normalized) {
+          rampTexels[texelIndex] = mHypsometricColors[2];
+        } else {
+          rampTexels[texelIndex] = BlendPackedColor(
+            mHypsometricColors[3],
+            mHypsometricColors[4],
+            (normalized - normalizedSurface) / (1.0f - normalizedSurface)
+          );
+        }
+      }
+      (void)mHypsometricTexture->Unlock(0);
+    }
+
+    // 3. Topographic contour ramp. The land range above the deep-water line is
+    //    split into `bandCount` equal bands; each ramp texel takes the shade of
+    //    the first band whose ceiling reaches it.
+    const float landSpan = 1.0f - normalizedWater;
+    const float bandStep = landSpan / static_cast<float>(bandCount);
+
+    std::array<float, static_cast<std::size_t>(kCartographicMaxTopographicBands) + 1U> bandCeilings{};
+    bandCeilings[0] = bandStep + normalizedWater;
+    for (std::int32_t band = 1; band < bandCount; ++band) {
+      bandCeilings[static_cast<std::size_t>(band)] =
+        bandCeilings[static_cast<std::size_t>(band) - 1U] + bandStep;
+    }
+
+    {
+      gpg::gal::TextureContext topographicContext;
+      FillCartographicTextureContext(
+        topographicContext,
+        kCartographicTopographicTextureFormat,
+        static_cast<std::uint32_t>(kCartographicRampTexelCount),
+        1U
+      );
+
+      boost::shared_ptr<gpg::gal::TextureD3D9> topographicTexture;
+      device->CreateTexture(&topographicTexture, &topographicContext);
+      mTopographicTexture = topographicTexture;
+
+      auto* const rampTexels =
+        static_cast<std::uint8_t*>(LockWholeCartographicTexture(*mTopographicTexture));
+      for (std::int32_t texelIndex = 0; texelIndex < kCartographicRampTexelCount; ++texelIndex) {
+        const float normalized = static_cast<float>(texelIndex) * kCartographicInverseRampRange;
+
+        if (mHasElevationBounds && normalizedWater >= normalized) {
+          rampTexels[texelIndex] = 0U;
+          continue;
+        }
+
+        std::int32_t band = 0;
+        while (band < bandCount && bandCeilings[static_cast<std::size_t>(band)] < normalized) {
+          ++band;
+        }
+
+        const float shade =
+          (((bandCeilings[static_cast<std::size_t>(band)] - normalizedWater) / landSpan)
+           * kCartographicContourShadeScale)
+          + kCartographicContourShadeBias;
+        rampTexels[texelIndex] = static_cast<std::uint8_t>(std::clamp(
+          static_cast<std::int32_t>(shade),
+          kCartographicContourShadeMinimum,
+          kCartographicContourShadeMaximum
+        ));
+      }
+      (void)mTopographicTexture->Unlock(0);
+    }
+  }
+
+  /**
+   * Address: 0x007D20F0 (FUN_007D20F0)
+   * Mangled: ?InitializeTerrain@Cartographic@Moho@@AAEXPAVIWldTerrainRes@2@HIIIII@Z
+   *
+   * IDA signature:
+   * int __thiscall Moho::Cartographic::InitializeTerrain(
+   *   int this, int a2, int a3, int a4, int a5, int a6, int a7, int a8);
+   *
+   * What it does:
+   * Derives every cartographic shader constant from the terrain resource's
+   * heightfield and its owning map:
+   *
+   *   - `mGridSizeCoeff` / `mTerrainSizeCoeff` from the half-resolution
+   *     cartographic grid versus the full heightfield sample span;
+   *   - `mElevMinimum` / `mElevMaximum` from the tier-0 bounding box;
+   *   - the three elevation lanes from the map's water configuration, falling
+   *     back to the tier-box floor when the map has no water at all;
+   *   - the five hypsometric palette entries straight from the caller.
+   *
+   * It then builds the three lookup textures and uploads the ground quad -
+   * four `int16` (x, elevation, z, 1) corners spanning the whole heightfield
+   * at the water-surface elevation, expressed back in raw height words.
+   */
+  void Cartographic::InitializeTerrain(
+    IWldTerrainRes* const terrain,
+    const std::int32_t topographicSamples,
+    const std::uint32_t hypsometricColor0,
+    const std::uint32_t hypsometricColor1,
+    const std::uint32_t hypsometricColor2,
+    const std::uint32_t hypsometricColor3,
+    const std::uint32_t hypsometricColor4
+  )
+  {
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+
+    STIMap& map = CartographicTerrainMap(*terrain);
+    const CHeightField& heightField = *map.GetHeightField();
+
+    const std::int32_t sampleSpanX = heightField.width - 1;
+    const std::int32_t sampleSpanZ = heightField.height - 1;
+
+    // The cartographic grid is half the heightfield resolution on each axis.
+    const std::int32_t gridWidth = sampleSpanX >> 1;
+    const std::int32_t gridHeight = sampleSpanZ >> 1;
+
+    // Inlined `CHeightField::GetBounds3D()` (0x00577660): tier count from
+    // `mGrids`, then `GetTierBox(0, 0, tierCount)` at 0x007D215D.
+    const Wm3::AxisAlignedBox3f tierBox = heightField.GetBounds3D();
+
+    mGridSizeCoeff[0] = 1.0f / static_cast<float>(gridWidth);
+    mGridSizeCoeff[1] = 1.0f / static_cast<float>(gridHeight);
+    mGridSizeCoeff[2] = 0.0f;
+    mGridSizeCoeff[3] = 1.0f;
+
+    mTerrainSizeCoeff[0] = static_cast<float>(gridWidth) / static_cast<float>(heightField.width - 1);
+    mTerrainSizeCoeff[1] = static_cast<float>(gridHeight) / static_cast<float>(heightField.height - 1);
+    mTerrainSizeCoeff[2] = 0.0f;
+    mTerrainSizeCoeff[3] = 1.0f;
+
+    mTerrainHeightScale = kCartographicHeightWordScale;
+    mElevMaximum = tierBox.Max.y;
+    mElevMinimum = tierBox.Min.y;
+
+    // The binary re-tests `mWaterEnabled` inside each of the three branches:
+    // the inlined STIMap water accessors carry their own guard and MSVC could
+    // not fold it against the outer test. The inner test can never fail once
+    // the outer one has passed, so the sentinel is unreachable in practice -
+    // it is spelled out here because the shipped code does select it.
+    mHasElevationBounds = map.mWaterEnabled != 0U;
+    const float waterSurfaceElevation =
+      map.mWaterEnabled != 0U ? map.mWaterElevation : kCartographicNoWaterElevation;
+    const float waterDeepElevation =
+      map.mWaterEnabled != 0U ? map.mWaterElevationDeep : kCartographicNoWaterElevation;
+
+    mSurfaceElevation = mHasElevationBounds ? waterSurfaceElevation : tierBox.Min.y;
+    mWaterElevation = mHasElevationBounds ? waterDeepElevation : tierBox.Min.y;
+    mDefaultElevation = mHasElevationBounds ? waterDeepElevation : tierBox.Min.y;
+
+    mHypsometricColors[0] = static_cast<std::int32_t>(hypsometricColor0);
+    mHypsometricColors[1] = static_cast<std::int32_t>(hypsometricColor1);
+    mHypsometricColors[2] = static_cast<std::int32_t>(hypsometricColor2);
+    mHypsometricColors[3] = static_cast<std::int32_t>(hypsometricColor3);
+    mHypsometricColors[4] = static_cast<std::int32_t>(hypsometricColor4);
+
+    InitializeTerrainTextures(heightField, gridWidth, gridHeight, topographicSamples);
+
+    boost::shared_ptr<gpg::gal::VertexFormatD3D9> terrainVertexFormat;
+    device->CreateVertexFormat(&terrainVertexFormat, kCartographicTerrainVertexFormatToken);
+    mTerrainVertexFormat = terrainVertexFormat;
+
+    // The ground quad lives in heightfield sample space with the elevation
+    // carried as a raw height word, so it is 4 x int16 per corner.
+    const auto elevationWord = static_cast<std::int16_t>(
+      static_cast<std::int32_t>(mSurfaceElevation * kCartographicHeightWordsPerUnit)
+    );
+    const auto cornerX = static_cast<std::int16_t>(sampleSpanX);
+    const auto cornerZ = static_cast<std::int16_t>(sampleSpanZ);
+
+    const std::array<std::int16_t, 16> terrainQuadVertices{
+      0, elevationWord, cornerZ, 1,
+      0, elevationWord, 0, 1,
+      cornerX, elevationWord, cornerZ, 1,
+      cornerX, elevationWord, 0, 1,
+    };
+
+    gpg::gal::VertexBufferContext terrainVertexContext(
+      kCartographicTerrainVertexCount,
+      kCartographicTerrainVertexStride,
+      kCartographicBufferTypeManaged,
+      kCartographicBufferUsageStatic
+    );
+
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> terrainVertexBuffer;
+    device->CreateVertexBuffer(&terrainVertexBuffer, &terrainVertexContext);
+    mTerrainVertexBuffer = terrainVertexBuffer;
+
+    void* const vertexData = mTerrainVertexBuffer->Lock(
+      0U, sizeof(terrainQuadVertices), gpg::gal::MohoD3DLockFlags::None
+    );
+    std::memcpy(vertexData, terrainQuadVertices.data(), sizeof(terrainQuadVertices));
+    (void)mTerrainVertexBuffer->Unlock();
+  }
+
+  /**
+   * Address: 0x007D13E0 (FUN_007D13E0)
+   * Mangled: ?Initialize@Cartographic@Moho@@QAEXPAVIWldTerrainRes@2@IIIII@Z
+   *
+   * IDA signature:
+   * int __thiscall Moho::Cartographic::Initialize(Moho::CWldTerrainRes *this, Moho::Cartographic *a2);
+   *
+   * What it does:
+   * Brings the cartographic view up: frame resources first, then the terrain
+   * pass fed with the terrain resource's own topographic sample count and
+   * hypsometric palette, then the initialized flag. The whole sequence sits
+   * in an EH scope whose funclet (0x007D1490) calls `Shutdown()` and rethrows,
+   * so a half-built cartographic view never survives a failed initialization.
+   *
+   * The five `hypsometricColor*` parameters are declared by the mangled symbol
+   * but the shipped body never reads them - it fetches the same five lanes
+   * from `terrain` itself, after `InitializeFrame()`. Whole-program
+   * optimization consequently removed them from the single call site
+   * (0x007F8C45 pushes only `this` and passes the terrain resource in `ecx`).
+   * Keeping the declared arity preserves the symbol; keeping the binary's own
+   * reads preserves the behavior no matter what a future caller passes.
+   */
+  void Cartographic::Initialize(
+    IWldTerrainRes* const terrain,
+    [[maybe_unused]] const std::uint32_t hypsometricColor0,
+    [[maybe_unused]] const std::uint32_t hypsometricColor1,
+    [[maybe_unused]] const std::uint32_t hypsometricColor2,
+    [[maybe_unused]] const std::uint32_t hypsometricColor3,
+    [[maybe_unused]] const std::uint32_t hypsometricColor4
+  )
+  {
+    try {
+      InitializeFrame();
+
+      // MSVC evaluates the argument list right to left, which is the order the
+      // shipped code queries these lanes in: colour 4 down to colour 0, then
+      // the sample count.
+      InitializeTerrain(
+        terrain,
+        terrain->GetTopographicSamples(),
+        terrain->GetHypsometricColor(0),
+        terrain->GetHypsometricColor(1),
+        terrain->GetHypsometricColor(2),
+        terrain->GetHypsometricColor(3),
+        terrain->GetHypsometricColor(4)
+      );
+
+      mInitialized = true;
+    } catch (...) {
+      Shutdown();
+      throw;
+    }
   }
 } // namespace moho
