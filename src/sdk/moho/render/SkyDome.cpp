@@ -954,8 +954,8 @@ void SkyDome::Destroy()
    *
    * What it does:
    * Selects the "Cirrus" technique, feeds the animation tick/interpolant lanes,
-   * the camera position/projection, cirrus multiplier/color, cloud texture, and
-   * the packed cirrus parameter block, then renders the dome with that
+   * the camera position/projection, cirrus multiplier/color, cirrus texture,
+   * and the packed cirrus parameter block, then renders the dome with that
    * technique.
    */
   void SkyDome::RenderCirrus(const int tick, const float interpolant, const GeomCamera3& cam)
@@ -972,7 +972,10 @@ void SkyDome::Destroy()
     effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
     effect->SetMatrix("cirrusMultiplier")->SetFloat(mCirrusMultiplier);
     effect->SetMatrix("cirrusColor")->SetPtr(&mCirrusColor_R, 3 * sizeof(float));
-    effect->SetMatrix("cirrusTexture")->SetTexture(mCloudsTexture);
+    // 0x00819971: `mov eax, [ebp+214h]` / `mov eax, [ebp+218h]` — the
+    // "cirrusTexture" sampler is fed from the +0x214 lane (mCirrusTex, loaded
+    // by CreateTextures from mCirrusTexPath), not the +0x21C lane.
+    effect->SetMatrix("cirrusTexture")->SetTexture(mCirrusTex);
     effect->SetMatrix("aCirrus")->SetPtr(mCirrusData, sizeof(mCirrusData));
 
     RenderDomeUsing(technique);
