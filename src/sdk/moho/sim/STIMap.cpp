@@ -18,6 +18,7 @@
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/ISimResources.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/GridTraversalLine.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -1747,22 +1748,11 @@ namespace
     UpdateErrorKernel(field, nullptr, x0, z, x1, z);
   }
 
-  struct GridTraversalLine
-  {
-    float x0;           // +0x00
-    float z0;           // +0x04
-    float x1;           // +0x08
-    float z1;           // +0x0C
-    float dx;           // +0x10
-    float dz;           // +0x14
-    std::int32_t step;  // +0x18
-    std::int32_t xEdge; // +0x1C
-    std::int32_t zEdge; // +0x20
-    std::int32_t xMask; // +0x24
-    std::int32_t zMask; // +0x28
-  };
-
-  static_assert(sizeof(GridTraversalLine) == 0x2C, "GridTraversalLine size must be 0x2C");
+  using moho::AdvanceGridTraversalEdge;
+  using moho::GetGridTraversalCell;
+  using moho::GridTraversalLine;
+  using moho::InitGridTraversalLine;
+  using moho::IsGridTraversalBeyondEnd;
 
   [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
   {
@@ -1796,52 +1786,6 @@ namespace
   [[nodiscard]] float PlaneSide(const Wm3::Vec3f& point, const Wm3::Vec3f& normal, const float planeDistance) noexcept
   {
     return Dot3(point, normal) - planeDistance;
-  }
-
-  /**
-   * Address: 0x0040D860 (FUN_0040D860, ??0struct_Line@@QAE@@Z)
-   *
-   * What it does:
-   * Initializes grid-walker line state from segment endpoints and step size.
-   */
-  void InitGridTraversalLine(
-    GridTraversalLine& line,
-    const std::int32_t step,
-    const float xEnd,
-    const float xStart,
-    const float zStart,
-    const float zEnd
-  )
-  {
-    line.step = step;
-
-    if (xEnd < xStart) {
-      line.x0 = -xStart;
-      line.x1 = -xEnd;
-      line.xMask = -step;
-    } else {
-      line.x0 = xStart;
-      line.x1 = xEnd;
-      line.xMask = 0;
-    }
-
-    std::int32_t zMask = 0;
-    if (zEnd < zStart) {
-      line.z0 = -zStart;
-      line.z1 = -zEnd;
-      zMask = -step;
-    } else {
-      line.z0 = zStart;
-      line.z1 = zEnd;
-    }
-
-    line.dx = line.x1 - line.x0;
-    line.dz = line.z1 - line.z0;
-    line.zMask = zMask;
-
-    const std::int32_t alignMask = -step;
-    line.xEdge = FloorToInt(line.x0) & alignMask;
-    line.zEdge = FloorToInt(line.z0) & alignMask;
   }
 
   /**
@@ -1901,30 +1845,6 @@ namespace
   }
 
   /**
-   * Address: 0x00475FD0 (FUN_00475FD0)
-   *
-   * IDA signature:
-   * int __usercall sub_475FD0@<eax>(int result@<eax>);
-   *
-   * What it does:
-   * Advances one grid-boundary edge (X or Z) based on segment crossing order.
-   */
-  void AdvanceGridTraversalEdge(GridTraversalLine& line) noexcept
-  {
-    const std::int32_t nextXEdge = line.xEdge + line.step;
-    const std::int32_t nextZEdge = line.zEdge + line.step;
-
-    const float xMetric = (static_cast<float>(nextXEdge) - line.x1) * line.dz;
-    const float zMetric = (static_cast<float>(nextZEdge) - line.z1) * line.dx;
-
-    if (zMetric <= xMetric) {
-      line.zEdge = nextZEdge;
-    } else {
-      line.xEdge = nextXEdge;
-    }
-  }
-
-  /**
    * Address: 0x00476010 (FUN_00476010)
    *
    * IDA signature:
@@ -1943,32 +1863,6 @@ namespace
     } else {
       line.zEdge -= line.step;
     }
-  }
-
-  /**
-   * Address: 0x00476050 (FUN_00476050)
-   *
-   * IDA signature:
-   * int *__usercall sub_476050@<eax>(int *result@<eax>, _DWORD *a2@<ecx>);
-   *
-   * What it does:
-   * Decodes current signed cell coordinates from masked traversal edge state.
-   */
-  void GetGridTraversalCell(const GridTraversalLine& line, std::int32_t& outX, std::int32_t& outZ) noexcept
-  {
-    outX = line.xEdge ^ line.xMask;
-    outZ = line.zEdge ^ line.zMask;
-  }
-
-  /**
-   * Address: 0x00476070 (FUN_00476070)
-   *
-   * What it does:
-   * Returns true once traversal edges move past the segment end coordinates.
-   */
-  [[nodiscard]] bool IsGridTraversalBeyondEnd(const GridTraversalLine& line) noexcept
-  {
-    return static_cast<float>(line.xEdge) > line.x1 || static_cast<float>(line.zEdge) > line.z1;
   }
 
   /**

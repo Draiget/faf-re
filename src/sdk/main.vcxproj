@@ -1866,6 +1866,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\CDebugCanvas.h" />
     <ClInclude Include="moho\sim\COGrid.h" />
     <ClInclude Include="moho\sim\COGridSerializer.h" />
+    <ClInclude Include="moho\sim\GridTraversalLine.h" />
     <ClInclude Include="moho\sim\CMersenneTwister.h" />
     <ClInclude Include="moho\sim\CMersenneTwisterTypeInfo.h" />
     <ClInclude Include="moho\sim\CMersenneTwisterSerializer.h" />

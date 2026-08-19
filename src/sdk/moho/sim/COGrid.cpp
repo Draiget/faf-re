@@ -19,6 +19,7 @@
 #include "Wm3Box3.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
+#include "moho/sim/GridTraversalLine.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -73,35 +74,43 @@ namespace
     return span ? AccessSpanRuntime(span).mTypeFlags : 0u;
   }
 
-  struct GridTraversalLine
-  {
-    float x0;           // +0x00
-    float z0;           // +0x04
-    float x1;           // +0x08
-    float z1;           // +0x0C
-    float dx;           // +0x10
-    float dz;           // +0x14
-    std::int32_t step;  // +0x18
-    std::int32_t xEdge; // +0x1C
-    std::int32_t zEdge; // +0x20
-    std::int32_t xMask; // +0x24
-    std::int32_t zMask; // +0x28
-  };
-  static_assert(sizeof(GridTraversalLine) == 0x2C, "GridTraversalLine size must be 0x2C");
+  using moho::AdvanceGridTraversalEdge;
+  using moho::GetGridTraversalCell;
+  using moho::GridTraversalLine;
+  using moho::InitGridTraversalLine;
+  using moho::IsGridTraversalBeyondEnd;
 
   [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value));
   }
+} // namespace
 
-  void InitGridTraversalLine(
-    GridTraversalLine& line,
-    const std::int32_t step,
-    const float xEnd,
-    const float xStart,
-    const float zStart,
-    const float zEnd
-  ) noexcept
+/**
+ * Address: 0x0040D860 (FUN_0040D860, ??0struct_Line@@QAE@@Z)
+ *
+ * IDA signature:
+ * void __thiscall struct_Line::struct_Line(int step, struct_Line *line,
+ *   float xEnd, float xStart, float zStart, float zEnd);
+ *
+ * What it does:
+ * Initializes grid-walker line state from segment endpoints and step size.
+ * Each axis whose end lies before its start is negated so the walk always runs
+ * in the increasing direction, and the flip is recorded in that axis' mask.
+ *
+ * This is the one out-of-line definition; the binary has a real function here,
+ * so it is deliberately not header-inline. The type and the three inlined
+ * walker helpers live in moho/sim/GridTraversalLine.h.
+ */
+void moho::InitGridTraversalLine(
+  GridTraversalLine& line,
+  const std::int32_t step,
+  const float xEnd,
+  const float xStart,
+  const float zStart,
+  const float zEnd
+) noexcept
+{
   {
     line.step = step;
 
@@ -133,32 +142,61 @@ namespace
     line.xEdge = FloorToInt(line.x0) & alignMask;
     line.zEdge = FloorToInt(line.z0) & alignMask;
   }
+}
 
-  void AdvanceGridTraversalEdge(GridTraversalLine& line) noexcept
-  {
-    const std::int32_t nextXEdge = line.xEdge + line.step;
-    const std::int32_t nextZEdge = line.zEdge + line.step;
+/**
+ * Address: 0x00475FD0 (FUN_00475FD0, sub_475FD0)
+ *
+ * IDA signature:
+ * int __usercall sub_475FD0@<eax>(int result@<eax>);
+ *
+ * What it does:
+ * Advances one grid-boundary edge (X or Z) based on segment crossing order.
+ */
+void moho::AdvanceGridTraversalEdge(GridTraversalLine& line) noexcept
+{
+  const std::int32_t nextXEdge = line.xEdge + line.step;
+  const std::int32_t nextZEdge = line.zEdge + line.step;
 
-    const float xMetric = (static_cast<float>(nextXEdge) - line.x1) * line.dz;
-    const float zMetric = (static_cast<float>(nextZEdge) - line.z1) * line.dx;
-    if (zMetric <= xMetric) {
-      line.zEdge = nextZEdge;
-    } else {
-      line.xEdge = nextXEdge;
-    }
+  const float xMetric = (static_cast<float>(nextXEdge) - line.x1) * line.dz;
+  const float zMetric = (static_cast<float>(nextZEdge) - line.z1) * line.dx;
+  if (zMetric <= xMetric) {
+    line.zEdge = nextZEdge;
+  } else {
+    line.xEdge = nextXEdge;
   }
+}
 
-  void GetGridTraversalCell(const GridTraversalLine& line, std::int32_t& outX, std::int32_t& outZ) noexcept
-  {
-    outX = line.xEdge ^ line.xMask;
-    outZ = line.zEdge ^ line.zMask;
-  }
+/**
+ * Address: 0x00476050 (FUN_00476050)
+ *
+ * IDA signature:
+ * int *__usercall sub_476050@<eax>(int *result@<eax>, _DWORD *a2@<ecx>);
+ *
+ * What it does:
+ * Decodes current signed cell coordinates from masked traversal edge state.
+ */
+void moho::GetGridTraversalCell(
+  const GridTraversalLine& line, std::int32_t& outX, std::int32_t& outZ
+) noexcept
+{
+  outX = line.xEdge ^ line.xMask;
+  outZ = line.zEdge ^ line.zMask;
+}
 
-  [[nodiscard]] bool IsGridTraversalBeyondEnd(const GridTraversalLine& line) noexcept
-  {
-    return static_cast<float>(line.xEdge) > line.x1 || static_cast<float>(line.zEdge) > line.z1;
-  }
+/**
+ * Address: 0x00476070 (FUN_00476070)
+ *
+ * What it does:
+ * Returns true once traversal edges move past the segment end coordinates.
+ */
+bool moho::IsGridTraversalBeyondEnd(const GridTraversalLine& line) noexcept
+{
+  return static_cast<float>(line.xEdge) > line.x1 || static_cast<float>(line.zEdge) > line.z1;
+}
 
+namespace
+{
   [[nodiscard]] moho::Entity* EntityFromCollisionSpan(moho::EntityCollisionCellSpan* const span) noexcept
   {
     if (span == nullptr) {
