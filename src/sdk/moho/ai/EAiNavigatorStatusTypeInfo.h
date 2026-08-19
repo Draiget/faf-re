@@ -14,6 +14,20 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A2EB0 (FUN_005A2EB0, Moho::EAiNavigatorStatusTypeInfo::EAiNavigatorStatusTypeInfo)
+     *
+     * What it does:
+     * Runs the `gpg::REnumType` base constructor, installs this descriptor's
+     * vftable (0x00E1BFD4) and pre-registers it against
+     * `typeid(EAiNavigatorStatus)` so `gpg::LookupRType` can resolve the enum.
+     *
+     * The class previously declared no constructor at all, so the implicit one
+     * built the base and stopped - the `PreRegisterRType` call at 0x005A2EF3
+     * never happened and the descriptor stayed invisible to reflection.
+     */
+    EAiNavigatorStatusTypeInfo();
+
+    /**
      * Address: 0x005A2F40 (FUN_005A2F40, scalar deleting thunk)
      */
     ~EAiNavigatorStatusTypeInfo() override;
