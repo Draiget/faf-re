@@ -7,15 +7,18 @@
 #include "gpg/core/containers/String.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/containers/TDatList.h"
+#include "moho/entity/EntityCategoryReflection.h"
 
 namespace LuaPlus
 {
+  class LuaObject;
   class LuaState;
-}
+} // namespace LuaPlus
 
 namespace moho
 {
   class CAiFormationInstance;
+  class RRuleGameRules;
   class Unit;
 
   /**
@@ -105,6 +108,115 @@ namespace moho
   );
 
   /**
+   * One entry of the slot table `/lua/formations.lua` hands back: the
+   * script-space offset from the formation centre, the unit category allowed
+   * to take that slot, and the slot's ordering weight.
+   *
+   * Layout is proven instruction-by-instruction from `FORMATION_RunScript`
+   * (0x00576690), which builds one of these in its own frame at
+   * `entry_esp-0x530` and appends it. Displacements below are relative to that
+   * base:
+   *   +0x00 `mOffset.x`  `fstp` @0x005769C0 (`GetNumber` on Lua index 1)
+   *   +0x04 `mOffset.z`  `fstp` @0x005769F3 (`GetNumber` on Lua index 2)
+   *   +0x08 `mCategory.mUniverse`               `mov` @0x00576960, @0x00576A23
+   *   +0x10 `mCategory.mBits.mFirstWordIndex`   `mov` @0x00576A35
+   *   +0x18 `mCategory.mBits.mWords` pointer lanes @0x00576981..0x0057698D,
+   *         with `capacity == &mWeight`, which pins the two-word inline run at
+   *         +0x28..+0x30 and therefore `mCategory` at exactly 0x28 bytes
+   *   +0x30 `mWeight`    `fstp` @0x00576A5D (`GetNumber` on Lua index 4)
+   *
+   * The 0x38 stride is proven twice more inside
+   * `CAiFormationInstance::RunScript` (0x00567300): the `0x92492493` multiply
+   * plus `sar edx,5` divide-by-56 at 0x00567838, and the `add ebx,38h` cursor
+   * step at 0x00567939. `sub_570390` (the element destroy-range) walks the same
+   * 0x38 stride and frees the nested word lane at +0x18/+0x24.
+   *
+   * Two lanes are never written by the binary and therefore carry stack garbage
+   * in the shipped build: `mCategory.mReserved04` (+0x0C),
+   * `mCategory.mBits.mReservedMetaWord` (+0x14) and `mReserved34` (+0x34). The
+   * recovered form value-initializes them, which differs byte-wise from the
+   * binary but is not observable - nothing reads them.
+   */
+  struct SFormationScriptSlot
+  {
+    SCoordsVec2 mOffset{};            // +0x00
+    EntityCategorySet mCategory{};    // +0x08
+    float mWeight{0.0f};              // +0x30
+    /// Tail word the binary neither writes nor reads; present only because the
+    /// element stride is provably 0x38 and the fields above end at 0x34.
+    std::uint32_t mReserved34{0};     // +0x34
+  };
+  static_assert(sizeof(SFormationScriptSlot) == 0x38, "SFormationScriptSlot size must be 0x38");
+  static_assert(offsetof(SFormationScriptSlot, mOffset) == 0x00, "SFormationScriptSlot::mOffset offset must be 0x00");
+  static_assert(
+    offsetof(SFormationScriptSlot, mCategory) == 0x08, "SFormationScriptSlot::mCategory offset must be 0x08"
+  );
+  static_assert(offsetof(SFormationScriptSlot, mWeight) == 0x30, "SFormationScriptSlot::mWeight offset must be 0x30");
+
+  /**
+   * Address: 0x00570390 (FUN_00570390, sub_570390)
+   *
+   * IDA signature:
+   * unsigned int *__usercall sub_570390@<eax>(
+   *     Moho::SFormationScriptSlot *first@<eax>, Moho::SFormationScriptSlot *last@<ebx>);
+   *
+   * What it does:
+   * The emitted destroy-range for `SFormationScriptSlot`: for every slot in
+   * `[first, last)` it releases the category word lane's heap buffer when one
+   * is active and rebinds the lane to its inline run. Idempotent - a second
+   * pass over the same range is a no-op, which is why the binary can both call
+   * it from `~SFormationScriptResult` and let the container teardown follow.
+   */
+  void ReleaseFormationScriptSlotCategoryStorage(SFormationScriptSlot* first, SFormationScriptSlot* last) noexcept;
+
+  /**
+   * The value `FORMATION_RunScript` (0x00576690) returns: whether the script
+   * reported success, plus the slot table it produced.
+   *
+   * Layout proven from the `FORMATION_RunScript` frame, where the local sits at
+   * `entry_esp-0x488`:
+   *   +0x00 `mSuccess`   byte store @0x005766D0, byte load @0x00576736
+   *   +0x08 `mObjs` pointer lanes @0x005766D8..0x005766ED; the capacity lane is
+   *         set to `inline + 0x460`, and 0x460 / 0x38 == 20 inline slots
+   *   +0x18 inline slot run
+   * `sub_576C20` (the `mObjs` copy constructor) writes the same shape onto the
+   * returned object: `[dst+0x00..0x0C] = dst+0x10`, `capacity = dst+0x10+0x460`.
+   * `sub_568320` (the destructor) reads `+0x08`/`+0x0C`/`+0x14`, i.e. the
+   * vector's start/finish/origin lanes at `mObjs+0x00/+0x04/+0x0C`.
+   *
+   * The four bytes at +0x04 are never written; the vector simply starts at the
+   * next 8-byte boundary.
+   */
+  struct SFormationScriptResult
+  {
+    bool mSuccess{false};                                 // +0x00
+    std::uint8_t mPad01[3]{};                             // +0x01
+    std::uint32_t mReserved04{0};                         // +0x04
+    gpg::fastvector_n<SFormationScriptSlot, 20> mObjs{};  // +0x08
+
+    SFormationScriptResult() = default;
+    SFormationScriptResult(const SFormationScriptResult&) = default;
+    SFormationScriptResult& operator=(const SFormationScriptResult&) = default;
+
+    /**
+     * Address: 0x00568320 (FUN_00568320, sub_568320)
+     *
+     * IDA signature:
+     * unsigned int __usercall sub_568320@<eax>(Moho::SFormationScriptResult *this@<esi>);
+     *
+     * What it does:
+     * Destroys every produced slot's category word lane, then releases the slot
+     * vector's heap buffer and rebinds it to the inline run.
+     */
+    ~SFormationScriptResult();
+  };
+  static_assert(sizeof(SFormationScriptResult) == 0x478, "SFormationScriptResult size must be 0x478");
+  static_assert(
+    offsetof(SFormationScriptResult, mSuccess) == 0x00, "SFormationScriptResult::mSuccess offset must be 0x00"
+  );
+  static_assert(offsetof(SFormationScriptResult, mObjs) == 0x08, "SFormationScriptResult::mObjs offset must be 0x08");
+
+  /**
    * Address: 0x00575A30 (FUN_00575A30, ?FORMATION_GetNumScripts@Moho@@YAIPAVLuaState@LuaPlus@@W4EFormationType@1@@Z)
    *
    * What it does:
@@ -139,6 +251,37 @@ namespace moho
    * the selected formation index.
    */
   int FORMATION_PickBestFormation(LuaPlus::LuaState* state, EFormationType formationType, float radius);
+
+  /**
+   * Address: 0x00576690 (FUN_00576690)
+   * Mangled:
+   * ?FORMATION_RunScript@Moho@@YA?AUSFormationScriptResult@1@PAVLuaState@LuaPlus@@PAVRRuleGameRules@1@VStrArg@gpg@@ABVLuaObject@4@@Z
+   *
+   * IDA signature:
+   * Moho::SFormationScriptResult *__usercall Moho::FORMATION_RunScript@<eax>(
+   *     Moho::SFormationScriptResult *result,
+   *     Moho::RRuleGameRules *gameRules,
+   *     const char *scriptName,
+   *     LuaPlus::LuaObject *unitTable,
+   *     LuaPlus::LuaState *state@<ecx>);
+   *
+   * What it does:
+   * Imports `/lua/formations.lua`, calls the named formation function with the
+   * caller's table of unit Lua objects, and converts the returned array of
+   * `{offsetX, offsetZ, category, weight, flag}` tuples into slot descriptors.
+   * The boolean of the last well-formed tuple becomes `mSuccess`; malformed
+   * tuples are warned about and skipped.
+   *
+   * The shipped call site (0x005673F5 in `CAiFormationInstance::RunScript`) is
+   * LTCG-customised: `state` arrives in ECX and the caller cleans the four
+   * pushed dwords itself even though the mangled name claims `__cdecl`.
+   */
+  [[nodiscard]] SFormationScriptResult FORMATION_RunScript(
+    LuaPlus::LuaState* state,
+    RRuleGameRules* gameRules,
+    gpg::StrArg scriptName,
+    const LuaPlus::LuaObject& unitTable
+  );
 
   /**
    * VFTABLE: 0x00E1B45C
