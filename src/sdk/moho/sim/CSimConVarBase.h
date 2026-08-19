@@ -86,6 +86,11 @@ namespace moho
     {
     }
 
+    /**
+     * Address: 0x0057DF30 (FUN_0057DF30) for the `TSimConVar<int>` instantiation -
+     * not explicitly specialized like `<bool>`/`<float>` below, so this generic
+     * body is what the compiler actually emits for `int`.
+     */
     CSimConVarInstanceBase* CreateInstance() override
     {
       auto* const instance = new TSimConVarInstance<T>();

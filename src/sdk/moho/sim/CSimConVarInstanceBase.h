@@ -187,6 +187,14 @@ namespace moho
   static_assert(sizeof(CSimConVarInstanceBase) == 0x08, "CSimConVarInstanceBase size must be 0x08");
   static_assert(offsetof(CSimConVarInstanceBase, mName) == 0x04, "CSimConVarInstanceBase::mName offset must be 0x04");
 
+  /**
+   * No explicit destructor: the compiler-generated default over the sole `T
+   * mValue` member plus the inherited `virtual ~CSimConVarInstanceBase()`
+   * compiles down to the binary's scalar-deleting destructors for each
+   * instantiation - `TSimConVarInstance<bool>` at 0x0057FD80 (FUN_0057FD80),
+   * `TSimConVarInstance<int>` at 0x0057FDA0 (FUN_0057FDA0). Both instances
+   * are constructed via `TSimConVar<T>::CreateInstance()` above.
+   */
   template <typename T>
   class TSimConVarInstance : public CSimConVarInstanceBase
   {
