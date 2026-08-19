@@ -1054,34 +1054,6 @@ namespace moho
     }
   }
 
-  struct CUnitPatrolFormationListenerRuntimeView
-  {
-    std::uint8_t reserved00_3C[0x3D]{};
-    std::uint8_t needsListenerResync = 0; // +0x3D
-  };
-  static_assert(
-    offsetof(CUnitPatrolFormationListenerRuntimeView, needsListenerResync) == 0x3D,
-    "CUnitPatrolFormationListenerRuntimeView::needsListenerResync offset must be 0x3D"
-  );
-
-  /**
-   * Address: 0x0061C470 (FUN_0061C470)
-   *
-   * What it does:
-   * Decrements one formation-listener countdown lane and marks listener-resync
-   * state when this call consumes the last pending count.
-   */
-  [[maybe_unused]] int CUnitPatrolTaskConsumeFormationListenerCountdown(
-    CUnitPatrolFormationListenerRuntimeView* const listenerRuntime,
-    const int pendingCount
-  ) noexcept
-  {
-    const int result = pendingCount - 1;
-    if (pendingCount == 1 && listenerRuntime != nullptr) {
-      listenerRuntime->needsListenerResync = 1;
-    }
-    return result;
-  }
 } // namespace moho
 
 namespace gpg
