@@ -58,6 +58,21 @@ namespace moho
      */
     UserArmy(CWldSession* session, const SSTIArmyConstantData& constantData);
 
+    /**
+     * Address: 0x008B1650 (FUN_008B1650)
+     * Mangled: ??1UserArmy@Moho@@QAE@XZ
+     *
+     * IDA signature:
+     * void __stdcall Moho::UserArmy::~UserArmy(Moho::UserArmy *this);
+     *
+     * What it does:
+     * Retires one client-side army mirror: empties the quick-select avatar
+     * registry and both idle registries, destroys the two registry head
+     * sentinels, releases the avatar buffer, detaches every weak reference
+     * still aimed at the army, and unwinds the serialized `IArmy` payload.
+     */
+    ~UserArmy();
+
     UserArmy(const UserArmy&) = delete;
     UserArmy& operator=(const UserArmy&) = delete;
 

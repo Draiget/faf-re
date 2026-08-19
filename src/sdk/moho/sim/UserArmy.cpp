@@ -49,13 +49,70 @@ namespace moho
     InitWeakEntitySetHead(mEngineers);
     InitWeakEntitySetHead(mFactories);
 
-    // 0x008B15DA..0x008B1624: the binary then runs `clear()` over the avatar
-    // vector and both registries before assigning the payload. All three were
-    // just brought up empty, so those calls are no-ops; they are not
-    // reproduced rather than standing up a second tree-teardown path next to
-    // `SSelectionSetUserEntity::EraseRange`.
+    // 0x008B15DA..0x008B1624: the binary then runs the same three `clear()`
+    // calls the destructor opens with (see `~UserArmy`) before assigning the
+    // payload. All three registries were just brought up empty - the avatar
+    // vector has `begin() == end()` and both trees hold nothing but their head
+    // sentinel - so every one of those calls is a provable no-op and is not
+    // reproduced here.
 
     (void)AssignArmyConstantData(constantData, this);
+  }
+
+  /**
+   * Address: 0x008B1650 (FUN_008B1650)
+   * Mangled: ??1UserArmy@Moho@@QAE@XZ
+   *
+   * IDA signature:
+   * void __stdcall Moho::UserArmy::~UserArmy(Moho::UserArmy *this);
+   *
+   * What it does:
+   * Runs the army-mirror teardown the session drives when a world session
+   * unwinds. The destructor body proper empties the three runtime registries
+   * (0x008B1693 avatar range-erase, 0x008B16AA and 0x008B16DB registry
+   * clears); everything after that is the member/base unwind MSVC emits in
+   * reverse declaration order (0x008B16F4..0x008B17A9).
+   */
+  UserArmy::~UserArmy()
+  {
+    // ---- destructor body (0x008B1668..0x008B16F1) --------------------------
+    //
+    // 0x008B1693: `mAvatars.clear()`. MSVC8's `vector::erase(begin(), end())`
+    // runs `_Destroy` over the erased run, and for a weak-pointer element that
+    // is the owner-chain detach at FUN_008B38C0. `WeakPtr<UserUnit>` has no
+    // detaching destructor in the recovered model, so the detach is spelled
+    // out here. `UnlinkFromOwnerChain` additionally blanks the record's own
+    // two link lanes, which the binary leaves dirty - the buffer is released a
+    // few instructions later, so that is not observable.
+    for (WeakPtr<UserUnit>& avatar : mAvatars) {
+      avatar.UnlinkFromOwnerChain();
+    }
+    mAvatars.clear();
+
+    // 0x008B16AA / 0x008B16DB: both idle registries are cleared while their
+    // head sentinels stay alive. The compiler inlined the full-range fast path
+    // of `EraseRange` at both sites.
+    ClearWeakEntitySet(mEngineers);
+    ClearWeakEntitySet(mFactories);
+
+    // ---- member unwind (0x008B16F4..0x008B17A9) ----------------------------
+    //
+    // `WeakEntitySetUserEntity` and `WeakObject` are raw ABI aggregates with no
+    // destructors of their own, so the two teardown steps the compiler emitted
+    // for them are written out here, in the binary's order: factories first,
+    // then engineers.
+    DestroyWeakEntitySet(mFactories);
+    DestroyWeakEntitySet(mEngineers);
+
+    // 0x008B1778..0x008B179E: drop every weak reference still aimed at this
+    // army, blanking each node as it leaves the chain. The binary runs this
+    // after releasing the avatar buffer (0x008B1761); here `~mAvatars` releases
+    // that buffer once this body returns. The two operations touch disjoint
+    // storage, so the swap is not observable.
+    mWeakRefs.DetachAllWeakReferences();
+
+    // 0x008B17A9 `IArmy::~IArmy`: the `SSTIArmyVariableData` member followed by
+    // the `SSTIArmyConstantData` base subobject, both emitted by the compiler.
   }
 
   /**

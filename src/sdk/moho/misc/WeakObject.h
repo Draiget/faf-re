@@ -85,6 +85,25 @@ namespace moho
     }
 
   public:
+    /**
+     * Drops every weak reference still aimed at this object, blanking each
+     * node's owner slot and forward link as it leaves the chain.
+     *
+     * Owners run this when they are torn down, so that a weak holder outliving
+     * the owner observes a detached node rather than a dangling owner slot.
+     * The walk is destructive and leaves the head slot empty.
+     */
+    void DetachAllWeakReferences() noexcept
+    {
+      auto** cursor = reinterpret_cast<WeakLinkNodeView**>(WeakLinkHeadSlot());
+      while (*cursor != nullptr) {
+        WeakLinkNodeView* const node = *cursor;
+        *cursor = node->nextInOwner;
+        node->ownerLinkSlot = nullptr;
+        node->nextInOwner = nullptr;
+      }
+    }
+
     // Head link slot for intrusive weak-guard / weak-pointer chains.
     // WeakPtr<T>::ownerLinkSlot points to this slot in owner objects.
     uint32_t weakLinkHead_;
