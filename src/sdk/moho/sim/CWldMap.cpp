@@ -3216,6 +3216,24 @@ namespace moho
   }
 
   /**
+   * What it does: see the header - reads the active map's water-enabled flag
+   * through the terrain runtime view's `mMap` lane.
+   */
+  bool IWldTerrainRes::IsWaterEnabled() const
+  {
+    return AsTerrainRuntimeView(this)->mMap->mWaterEnabled != 0;
+  }
+
+  /**
+   * What it does: see the header - reads the active map's water elevation
+   * through the terrain runtime view's `mMap` lane.
+   */
+  float IWldTerrainRes::GetWaterElevation() const
+  {
+    return AsTerrainRuntimeView(this)->mMap->mWaterElevation;
+  }
+
+  /**
    * Address: 0x008A1030 (FUN_008A1030, Moho::CWldTerrainRes::GetBool)
    *
    * What it does:

@@ -11,6 +11,7 @@ namespace moho
 {
   class ID3DVertexSheet;
   class ShoreCell;
+  struct GeomCamera3;
   struct TerrainWaterResourceView;
 
   /**
@@ -79,6 +80,26 @@ namespace moho
      * shoreline vertex-sheet ownership, and updates shoreline-cell stats.
      */
     void Generate(TerrainWaterResourceView* terrainResource);
+
+    /**
+     * Address: 0x00812E80 (FUN_00812E80, Moho::Shoreline::Update)
+     * Mangled: ?Update@Shoreline@Moho@@QAEXABVGeomCamera3@2@@Z
+     *
+     * What it does:
+     * Refreshes shoreline mesh geometry for the current camera view. Resets
+     * the `Shoreline_Vertices` / `Shoreline_Triangles` engine stats to zero
+     * and clears `mShorelineTris`, then returns early when `mCells` is empty.
+     * Otherwise collects the shoreline's own spatial-db cells visible from
+     * `camera` (tagged with the same routing mask `Generate` registers
+     * `ShoreCell`s under), and if any are visible, locks the shoreline
+     * vertex stream and, for each visible `ShoreCell` (stopping once
+     * `mShorelineTris` reaches 4094), writes one 24-byte mesh record from
+     * `mPoints[0..2]`, a second from `mPoints[2],[1],[3]` when `mType > 1`,
+     * and a third from `mPoints[2],[3],[4]` when `mType > 2` - confirmed
+     * byte-for-byte against the raw disassembly. Unlocks the stream and
+     * publishes the final vertex/triangle counts to the engine stats.
+     */
+    void Update(const GeomCamera3& camera);
 
   public:
     SpatialDB_MeshInstance mSpatialDbEntry;                      // +0x04

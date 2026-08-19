@@ -65170,6 +65170,23 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
 
     moho::TerrainCommon* const terrain = worldView->terrain.get();
     if (moho::ren_Terrain && terrain != nullptr) {
+      // Per-frame render-context update (TerrainCommon slot 5), dispatched
+      // immediately before RenderTerrainNormals in the binary
+      // (0x007F93A6-0x007F93C7). The viewport block is the 3 contiguous
+      // Vector2i fields at runtime+0x308 (mScreenPos/mScreenSize/
+      // mFullScreen). minimapPass is always false from this call site; the
+      // binary's forceRegenerate push is worldView->view.get(), guaranteed
+      // non-null by the loop's own continue-guard above, used purely as a
+      // truthy flag - this call always forces a shoreline check.
+      terrain->UpdateRenderContext(
+        moho::REN_GetGameTick(),
+        moho::REN_GetSimDeltaSeconds(),
+        runtime->mCam,
+        reinterpret_cast<const std::int32_t*>(&runtime->mScreenPos),
+        false,
+        1
+      );
+
       RenderTerrainNormals(terrain);
       TransformTerrainNormals();
 

@@ -2037,6 +2037,35 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00577540 (FUN_00577540, Moho__CColHitResult__PlaneIntersection)
+   *
+   * What it does: see the header - same body as the file-private copy this
+   * TU already uses internally (`PlaneIntersection` in the anonymous
+   * namespace above), duplicated here as a public sibling for cross-TU
+   * callers rather than relocated, to avoid disturbing this file's existing
+   * internal call sites.
+   */
+  Wm3::Vec3f PlaneIntersection(const GeomLine3& line, const VecDist& plane, CGeomHitResult* const outHit)
+  {
+    const float dotDen = line.dir.x * plane.dir.x + line.dir.y * plane.dir.y + line.dir.z * plane.dir.z;
+    if (dotDen == 0.0f) {
+      return Wm3::Vec3f::NaN();
+    }
+
+    const float dotPos = line.pos.x * plane.dir.x + line.pos.y * plane.dir.y + line.pos.z * plane.dir.z;
+    const float t = (plane.dist - dotPos) / dotDen;
+    if (t < line.closest || line.farthest < t) {
+      return Wm3::Vec3f::NaN();
+    }
+
+    if (outHit) {
+      outHit->distance = t;
+    }
+
+    return Wm3::Vec3f{line.pos.x + line.dir.x * t, line.pos.y + line.dir.y * t, line.pos.z + line.dir.z * t};
+  }
+
+  /**
    * Address: 0x00578F90 (FUN_00578F90, boost::shared_ptr_CHeightField::shared_ptr_CHeightField)
    *
    * What it does:

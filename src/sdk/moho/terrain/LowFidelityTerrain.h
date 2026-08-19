@@ -216,6 +216,38 @@ namespace moho
      */
     void LoadTerrainLighting(TerrainShadowContext* shadowContext);
 
+    /**
+     * Address: 0x00808640 (FUN_00808640, Moho::LowFidelityTerrain::Func3)
+     * Primary vtable slot 5 (vftable @0x00E41A94; TerrainCommon slot 5).
+     *
+     * What it does:
+     * Per-frame render-context update. Stores the camera pointer
+     * unconditionally (no `mTerrainResource` null guard, unlike the other two
+     * fidelity classes), refreshes the cached camera-transform snapshot
+     * unconditionally, and derives a dirty flag from
+     * `IWldTerrainRes::IsInEditMode()` OR'd with a transform-compare against
+     * that snapshot. Outside minimap passes, also ORs in the decal manager's
+     * pending-changes flag. When mesh generation is enabled and something is
+     * dirty, rebuilds tessellation, re-derives the four skirt-range fields
+     * plus their min-scan base vertex, and (outside minimap passes, when
+     * `ren_Decals`) gathers on-screen decals into `mPrimaryPatchData`.
+     * Independently of the dirty gate, resets and (outside minimap passes,
+     * when `ren_Splats`) refills the splat-vertex lane, then unconditionally
+     * re-uploads the tesselator's current rect-cache and collision-index
+     * lanes into the terrain vertex/index sheets. Ignores its 6-int viewport-
+     * block and final parameters entirely (this class has no viewport-block
+     * fields and no shoreline) - confirmed absent from every use in the
+     * binary's own disassembly.
+     */
+    void UpdateRenderContext(
+      std::int32_t gameTick,
+      float deltaSeconds,
+      GeomCamera3* camera,
+      const std::int32_t* viewportBlock,
+      bool minimapPass,
+      std::int32_t forceRegenerate
+    ) override;
+
     TerrainWaterResourceView* mTerrainResource = nullptr;           // +0x0C
     CTesselator* mTesselator = nullptr;                             // +0x10
     CD3DVertexSheet* mTerrainVertexSheet = nullptr;                 // +0x14

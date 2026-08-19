@@ -1342,6 +1342,16 @@ namespace moho
   }
 
   /**
+   * Address: 0x00878CB0 (FUN_00878CB0, Moho::CDecalManager::Func26)
+   *
+   * What it does: see the header - plain field read, no side effects.
+   */
+  bool CDecalManager::HasPendingChanges() const
+  {
+    return mDidSomething != 0;
+  }
+
+  /**
    * Address: 0x0089DF70 (FUN_0089DF70, Moho::CWldSplat::CWldSplat)
    *
    * What it does:

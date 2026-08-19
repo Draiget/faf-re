@@ -458,6 +458,20 @@ namespace moho
     [[nodiscard]] CHeightField* GetHeightField() const;
 
     /**
+     * Not a distinct binary function - every caller inlines the same
+     * `mMap->mWaterEnabled` field read through the terrain runtime view.
+     * Promoted to a public accessor for the same reason as `GetHeightField()`.
+     */
+    [[nodiscard]] bool IsWaterEnabled() const;
+
+    /**
+     * Not a distinct binary function - every caller inlines the same
+     * `mMap->mWaterElevation` field read through the terrain runtime view.
+     * Promoted to a public accessor for the same reason as `GetHeightField()`.
+     */
+    [[nodiscard]] float GetWaterElevation() const;
+
+    /**
      * Address: 0x008A1040 (FUN_008A1040, ?GetCartographic@CWldTerrainRes@Moho@@UAEAAVCartographic@2@XZ)
      *
      * What it does:

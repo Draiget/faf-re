@@ -72,6 +72,22 @@ namespace moho
   static_assert(sizeof(CGeomHitResult) == 0x08, "CGeomHitResult size must be 0x08");
   static_assert(offsetof(CColHitResult, hitKind) == 0x08, "CColHitResult::hitKind offset must be 0x08");
 
+  /**
+   * Address: 0x00577540 (FUN_00577540, Moho__CColHitResult__PlaneIntersection)
+   *
+   * What it does:
+   * Intersects parametric segment `line` against `plane` (`{normal, dist}`),
+   * returning a NaN vector when the line is parallel to the plane or the hit
+   * falls outside `[line.closest, line.farthest]`.
+   *
+   * Public sibling of the file-private copy already used internally by
+   * `STIMap.cpp` (anonymous-namespace `PlaneIntersection`, same body) -
+   * duplicated here rather than relocated so this promotion does not disturb
+   * that file's existing internal call sites. Callers outside `STIMap.cpp`
+   * (e.g. the terrain decal-clip pipeline) should use this one.
+   */
+  [[nodiscard]] Wm3::Vec3f PlaneIntersection(const GeomLine3& line, const VecDist& plane, CGeomHitResult* outHit);
+
   class CHeightField
   {
   public:

@@ -227,6 +227,42 @@ namespace moho
     void LoadTerrainLighting(TerrainShadowContext* shadowContext);
 
     /**
+     * Address: 0x00804440 (FUN_00804440, Moho::MediumFidelityTerrain::Func3)
+     * Primary vtable slot 5 (vftable @0x00E41A94; TerrainCommon slot 5).
+     *
+     * What it does:
+     * Per-frame render-context update. No-ops when `mTerrainResource` is null.
+     * Otherwise stores the camera pointer and the 6-int viewport block
+     * unconditionally, then derives a dirty flag from
+     * `IWldTerrainRes::IsInEditMode()` OR'd with a transform-compare of
+     * `mCamera->tranform` against the cached `mOverlayTransform`. When not a
+     * minimap pass, OR `ren_ForceUpdateMinimapTerrain`, OR that dirty flag,
+     * refreshes `mOverlayTransform` from the camera and (outside minimap
+     * passes) ORs in the decal manager's pending-changes flag. When mesh
+     * generation is enabled and something is dirty, rebuilds tessellation,
+     * re-derives the four skirt-range fields plus their min-scan base vertex,
+     * and (outside minimap passes, when `ren_Decals`) gathers on-screen
+     * decals into `mDecalDrawCommands` - unlike the low-fidelity class, the
+     * per-decal fidelity field only gates whether the LOD-area threshold
+     * check applies (fidelity `0` always passes it) rather than being an
+     * unconditional skip. Independently of the dirty gate, resets and
+     * (outside minimap passes, when `ren_Splats`) refills the splat-vertex
+     * lane, capped at 2500 splats per frame with no per-splat fidelity check.
+     * Finally, unconditionally re-uploads the tesselator's current
+     * rect-cache and collision-index lanes into the terrain vertex/index
+     * sheets. Ignores its final (shoreline-regenerate) parameter entirely -
+     * this class has no shoreline.
+     */
+    void UpdateRenderContext(
+      std::int32_t gameTick,
+      float deltaSeconds,
+      GeomCamera3* camera,
+      const std::int32_t* viewportBlock,
+      bool minimapPass,
+      std::int32_t forceRegenerate
+    ) override;
+
+    /**
      * Address: 0x00805490 (FUN_00805490, sub_805490)
      *
      * What it does:
