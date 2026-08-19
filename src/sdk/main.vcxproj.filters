@@ -4803,6 +4803,9 @@
     <ClInclude Include="moho\sim\COGridSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\GridTraversalLine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\CRandomStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
