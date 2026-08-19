@@ -403,7 +403,7 @@ namespace
    * Allocates one compact bucket-tree node and writes `{left,parent,right}`
    * links plus `{handle,color,isNil}` payload/state lanes.
    */
-  [[maybe_unused]] [[nodiscard]] DecalBucketNode* AllocateClonedDecalBucketNode(
+  [[nodiscard]] DecalBucketNode* AllocateClonedDecalBucketNode(
     DecalBucketNode* const left,
     DecalBucketNode* const parent,
     DecalBucketNode* const right,
@@ -1377,6 +1377,186 @@ namespace
     return erasedCount;
   }
 
+  /**
+   * Address: 0x0077CD80 (FUN_0077CD80)
+   *
+   * What it does:
+   * Moves one decal-bucket iterator lane backward to its in-order
+   * predecessor in the sentinel-backed RB-tree (`isNil` at `+0x11`) - the
+   * predecessor-direction mirror of `AdvanceBucketNodeToSuccessor`.
+   */
+  DecalBucketNode* RetreatBucketNodeIterator(DecalBucketNode** const iteratorLane) noexcept
+  {
+    DecalBucketNode* const node = *iteratorLane;
+    if (node->isNil != 0u) {
+      DecalBucketNode* const right = node->right;
+      *iteratorLane = right;
+      return right;
+    }
+
+    DecalBucketNode* left = node->left;
+    if (left->isNil != 0u) {
+      DecalBucketNode* parent = node->parent;
+      while (parent->isNil == 0u) {
+        if (*iteratorLane != parent->left) {
+          break;
+        }
+        *iteratorLane = parent;
+        parent = parent->parent;
+      }
+
+      if ((*iteratorLane)->isNil == 0u) {
+        *iteratorLane = parent;
+      }
+      return parent;
+    }
+
+    DecalBucketNode* right = left->right;
+    while (right->isNil == 0u) {
+      left = right;
+      right = right->right;
+    }
+
+    *iteratorLane = left;
+    return right;
+  }
+
+  /**
+   * Address: 0x0077B600 (FUN_0077B600)
+   *
+   * What it does:
+   * Links a freshly constructed decal-bucket node under `where` (updating
+   * the header's cached leftmost/rightmost/root links) then repairs the
+   * red-red violation upwards and reblackens the root - MSVC8
+   * `_Tree::_Insert` specialized for the sentinel-backed DecalBucketNode
+   * layout (`isNil` at `+0x11`, `color` at `+0x10`). Twin of
+   * `LinkMapNodeAndRebalance` for the bucket tree; rejects the insert at
+   * the binary's own (smaller) bucket-tree `max_size() - 1` bound.
+   */
+  [[nodiscard]] DecalBucketNode* LinkBucketNodeAndRebalance(
+    DecalBucketNode* const where, DecalBucketTreeStorage* const tree, const bool addLeft, CDecalHandle* const handle
+  )
+  {
+    if (tree->size >= 0x3FFFFFFEu) {
+      throw std::length_error("map/set<T> too long");
+    }
+
+    DecalBucketNode* const head = tree->head;
+    DecalBucketNode* const fresh = AllocateClonedDecalBucketNode(head, where, head, handle, 0u);
+    ++tree->size;
+
+    if (where == head) {
+      head->parent = fresh;
+      head->left = fresh;
+      head->right = fresh;
+    } else if (addLeft) {
+      where->left = fresh;
+      if (where == head->left) {
+        head->left = fresh;
+      }
+    } else {
+      where->right = fresh;
+      if (where == head->right) {
+        head->right = fresh;
+      }
+    }
+
+    for (DecalBucketNode* n = fresh; n->parent->color == 0u;) {
+      DecalBucketNode* const parent = n->parent;
+      DecalBucketNode* const grand = parent->parent;
+
+      if (parent == grand->left) {
+        DecalBucketNode* const uncle = grand->right;
+        if (uncle->color == 0u) {
+          parent->color = 1u;
+          uncle->color = 1u;
+          grand->color = 0u;
+          n = grand;
+        } else {
+          if (n == parent->right) {
+            n = parent;
+            (void)RotateBucketNodeLeft(n, tree);
+          }
+          n->parent->color = 1u;
+          n->parent->parent->color = 0u;
+          (void)RotateBucketNodeRight(n->parent->parent, tree);
+        }
+      } else {
+        DecalBucketNode* const uncle = grand->left;
+        if (uncle->color == 0u) {
+          parent->color = 1u;
+          uncle->color = 1u;
+          grand->color = 0u;
+          n = grand;
+        } else {
+          if (n == parent->left) {
+            n = parent;
+            (void)RotateBucketNodeRight(n, tree);
+          }
+          n->parent->color = 1u;
+          n->parent->parent->color = 0u;
+          (void)RotateBucketNodeLeft(n->parent->parent, tree);
+        }
+      }
+    }
+
+    head->parent->color = 1u;
+    return fresh;
+  }
+
+  struct DecalBucketFindOrInsertResult
+  {
+    DecalBucketNode* node;
+    bool inserted;
+  };
+
+  /**
+   * Address: 0x0077A930 (FUN_0077A930)
+   *
+   * What it does:
+   * Finds the decal-bucket node keyed by `handle`, inserting a fresh node
+   * when no exact match exists - MSVC8 `_Tree::insert_unique` specialized
+   * for the sentinel-backed DecalBucketNode layout (`isNil` at `+0x11`).
+   * Twin of `FindStartTickBucketNode` for the bucket tree; the bucket key
+   * is the handle pointer's own bit pattern (matches the already-recovered
+   * `FindDecalBucketBoundsByKeyRuntime`/lower/upper-bound helpers in this
+   * file).
+   */
+  [[nodiscard]] DecalBucketFindOrInsertResult FindOrInsertBucketNode(
+    DecalBucketTreeStorage* const tree, CDecalHandle* const handle
+  )
+  {
+    DecalBucketNode* const head = tree->head;
+    const std::uint32_t key = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(handle));
+
+    DecalBucketNode* where = head;
+    bool addLeft = true;
+    for (DecalBucketNode* node = head->parent; node->isNil == 0u;) {
+      where = node;
+      const std::uint32_t nodeKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(node->handle));
+      addLeft = key < nodeKey;
+      node = addLeft ? node->left : node->right;
+    }
+
+    DecalBucketNode* probe = where;
+    if (addLeft) {
+      if (where == head->left) {
+        DecalBucketNode* const inserted = LinkBucketNodeAndRebalance(where, tree, true, handle);
+        return {inserted, true};
+      }
+      DecalBucketNode* iteratorSlot = where;
+      (void)RetreatBucketNodeIterator(&iteratorSlot);
+      probe = iteratorSlot;
+    }
+
+    const std::uint32_t probeKey = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(probe->handle));
+    if (probeKey >= key) {
+      return {probe, false};
+    }
+    DecalBucketNode* const inserted = LinkBucketNodeAndRebalance(where, tree, addLeft, handle);
+    return {inserted, true};
+  }
+
   struct DwordByteLanePairRuntimeView
   {
     std::uint32_t lane00; // +0x00
@@ -1745,8 +1925,11 @@ void CDecalBuffer::SwapVectors(msvc8::vector<SDecalInfo>* const addDecals, msvc8
  * Address: 0x007793D0 (FUN_007793D0, Moho::CDecalBuffer::CreateHandle)
  *
  * What it does:
- * Creates one script-visible decal handle, links it into active tracking, and
- * initializes per-army visibility flags for the new decal.
+ * Creates one script-visible decal handle, links it into active tracking,
+ * inserts it into its start-tick bucket (`FindOrCreateStartTickBucket` +
+ * `FindOrInsertBucketNode`, gated on `mStartTick != 0` exactly as the
+ * binary gates its `sub_77A250`/`sub_77A930` call pair), and initializes
+ * per-army visibility flags for the new decal.
  */
 CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
 {
@@ -1762,6 +1945,11 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
   }
 
   handle->mListNode.ListLinkBefore(&mHandleListHead);
+
+  if (handle->mInfo.mStartTick != 0u) {
+    DecalBucketTreeStorage* const bucket = FindOrCreateStartTickBucket(&mStartTickBuckets, handle->mInfo.mStartTick);
+    (void)FindOrInsertBucketNode(bucket, handle);
+  }
 
   CArmyImpl** const armiesBegin = mSim->mArmiesList.begin();
   CArmyImpl** const armiesEnd = mSim->mArmiesList.end();
