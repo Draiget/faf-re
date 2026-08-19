@@ -5909,11 +5909,20 @@ namespace moho
     , deltaFrame(0.0f)
     , instanceListStateFlags(0)
     , meshes{nullptr, nullptr, 0}
-    , meshSpatialDb{nullptr, 0}
+    , meshSpatialDb{}
   {
     meshCacheTree.head = CreateMeshCacheTreeSentinel();
     meshes.head = CreateMeshBatchTreeSentinel();
     (void)UnlinkMeshInstanceListLink(&instanceListHead);
+
+    // The binary's constructor ends by constructing this member:
+    //   0x007DF23A  push offset Moho__sMeshRenderer.bd   ; +0xAC
+    //   0x007DF244  call ??0SpatialDB_MeshInstance@Moho@@QAE@@Z
+    // which is InitializeStorage (0x00501D80). Without it the shard vector is
+    // never brought to a consistent empty state and the first CollectAllInVolume
+    // of the first world-view frame walks from a null begin to a garbage end.
+    meshSpatialDb.InitializeStorage();
+
     gMeshRendererInstance = this;
   }
 
