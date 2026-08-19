@@ -6755,6 +6755,96 @@ extern "C" double __cdecl RuntimePowDispatch(const double base, const double exp
 }
 
 /**
+ * Address: 0x00AAA815 (FUN_00AAA815, func_GetCompatModeSub)
+ *
+ * What it does:
+ * Probes SSE2 availability by executing an actual `movapd` under structured
+ * exception handling. Returns 1 when the instruction runs cleanly; the
+ * handler catches an access-violation or illegal-instruction fault (the two
+ * codes a `movapd` raises on hardware/OS combinations without real SSE2
+ * support) and returns 0 instead of letting the exception propagate.
+ */
+extern "C" int __cdecl func_GetCompatModeSub()
+{
+  __try {
+    volatile __m128d probe = _mm_setzero_pd();
+    (void)probe;
+    return 1;
+  } __except (
+    (GetExceptionCode() == static_cast<DWORD>(EXCEPTION_ACCESS_VIOLATION) ||
+     GetExceptionCode() == static_cast<DWORD>(EXCEPTION_ILLEGAL_INSTRUCTION))
+      ? EXCEPTION_EXECUTE_HANDLER
+      : EXCEPTION_CONTINUE_SEARCH
+  ) {
+    return 0;
+  }
+}
+
+/**
+ * Address: 0x00AAA865 (FUN_00AAA865, func_GetCompatMode)
+ *
+ * What it does:
+ * Detects SSE2 support two independent ways and requires both to agree:
+ * toggles EFLAGS.ID to confirm CPUID itself is available, reads CPUID leaf
+ * 1's feature bitmask (EDX bit 26 = SSE2) when it is, and separately runs
+ * `func_GetCompatModeSub`'s SEH-guarded instruction probe.
+ */
+extern "C" int __cdecl func_GetCompatMode()
+{
+  const unsigned int originalFlags = __readeflags();
+  __writeeflags(originalFlags ^ 0x200000u);
+  const bool cpuidAvailable = (__readeflags() != originalFlags);
+  __writeeflags(originalFlags);
+
+  unsigned int featureFlagsEdx = 0u;
+  if (cpuidAvailable) {
+    int cpuInfo[4] = {};
+    __cpuid(cpuInfo, 0);
+    __cpuid(cpuInfo, 1);
+    featureFlagsEdx = static_cast<unsigned int>(cpuInfo[3]);
+  }
+
+  return ((featureFlagsEdx & 0x4000000u) != 0u) && (func_GetCompatModeSub() != 0);
+}
+
+/**
+ * Address: 0x00A8ECBF (FUN_00A8ECBF, register_sseCompatMode)
+ *
+ * What it does:
+ * C-init table entry: writes `global_mode_sse2` from the SSE2 detection
+ * probe. Runs during the CRT's C-style static-init pass, before any C++
+ * static object constructor.
+ */
+extern "C" int __cdecl register_sseCompatMode()
+{
+  global_mode_sse2 = 0;
+  global_mode_sse2 = func_GetCompatMode();
+  return 0;
+}
+
+__pragma(section(".CRT$XIU", read))
+extern "C" __declspec(allocate(".CRT$XIU"))
+int(__cdecl* const gRegisterSseCompatModeInit)() = &register_sseCompatMode;
+
+/**
+ * Address: 0x00AAA8C5 (FUN_00AAA8C5, register_compatFlag)
+ *
+ * What it does:
+ * C-init table entry: writes `global_compat_flag` from the SSE2 detection
+ * probe. Runs during the CRT's C-style static-init pass, before any C++
+ * static object constructor.
+ */
+extern "C" int __cdecl register_compatFlag()
+{
+  global_compat_flag = func_GetCompatMode();
+  return 0;
+}
+
+__pragma(section(".CRT$XIU", read))
+extern "C" __declspec(allocate(".CRT$XIU"))
+int(__cdecl* const gRegisterCompatFlagInit)() = &register_compatFlag;
+
+/**
  * Address: 0x00A824E7 (FUN_00A824E7, memmove_s)
  *
  * IDA signature:
