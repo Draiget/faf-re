@@ -110,7 +110,7 @@ namespace gpg::core::legacy
    * Legacy adapter lane that forwards one checked 24-byte allocation request to
    * the canonical allocator helper.
    */
-  [[maybe_unused]] void* AllocateChecked24ByteLaneDispatchLaneA(const std::uint32_t elementCount)
+  void* AllocateChecked24ByteLaneDispatchLaneA(const std::uint32_t elementCount)
   {
     return AllocateChecked24ByteLane(elementCount);
   }
@@ -122,7 +122,7 @@ namespace gpg::core::legacy
    * Secondary adapter lane that forwards one checked 24-byte allocation
    * request to the canonical allocator helper.
    */
-  [[maybe_unused]] void* AllocateChecked24ByteLaneDispatchLaneB(const std::uint32_t elementCount)
+  void* AllocateChecked24ByteLaneDispatchLaneB(const std::uint32_t elementCount)
   {
     return AllocateChecked24ByteLane(elementCount);
   }
@@ -134,7 +134,7 @@ namespace gpg::core::legacy
    * Tertiary adapter lane that forwards one checked 24-byte allocation request
    * to the canonical allocator helper.
    */
-  [[maybe_unused]] void* AllocateChecked24ByteLaneDispatchLaneC(const std::uint32_t elementCount)
+  void* AllocateChecked24ByteLaneDispatchLaneC(const std::uint32_t elementCount)
   {
     return AllocateChecked24ByteLane(elementCount);
   }
@@ -145,7 +145,7 @@ namespace gpg::core::legacy
    * What it does:
    * Allocates exactly one 24-byte lane through the checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked24ByteLaneAdapter()
+  void* AllocateSingleChecked24ByteLaneAdapter()
   {
     return AllocateChecked24ByteLane(1u);
   }
@@ -223,7 +223,7 @@ namespace gpg::core::legacy
    * What it does:
    * Register-lane jump adapter that forces a single 12-byte checked allocation.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapterG()
+  void* AllocateSingleChecked12ByteLaneAdapterG()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -234,7 +234,7 @@ namespace gpg::core::legacy
    * What it does:
    * Allocates exactly one 12-byte lane through the checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapter()
+  void* AllocateSingleChecked12ByteLaneAdapter()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -246,7 +246,7 @@ namespace gpg::core::legacy
    * Preserves one register-shape adapter that forces a single 12-byte lane
    * allocation through the canonical checked allocator lane.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneRegisterAdapter()
+  void* AllocateSingleChecked12ByteLaneRegisterAdapter()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -258,7 +258,7 @@ namespace gpg::core::legacy
    * Allocates one 12-byte lane and initializes the first two dword lanes to
    * self-pointer links (`node[0]=node`, `node[1]=node`).
    */
-  [[maybe_unused]] std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNodeAdapterA()
+  std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNodeAdapterA()
   {
     auto* const result = static_cast<std::uint32_t*>(AllocateChecked12ByteLane(1u));
     if (result != nullptr) {
@@ -279,7 +279,7 @@ namespace gpg::core::legacy
    * initializes the first two dword lanes to self-pointer links
    * (`node[0]=node`, `node[1]=node`).
    */
-  [[maybe_unused]] std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNodeAdapterB()
+  std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNodeAdapterB()
   {
     auto* const result = static_cast<std::uint32_t*>(AllocateChecked12ByteLane(1u));
     if (result != nullptr) {
@@ -300,7 +300,7 @@ namespace gpg::core::legacy
    * self-links (`node[0]=node`, `node[1]=node`) while preserving the legacy
    * `result==-4` write-skip lane on the second store.
    */
-  [[maybe_unused]] std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNodeAdapterH()
+  std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNodeAdapterH()
   {
     auto* const result = static_cast<std::uint32_t*>(AllocateChecked12ByteLane(1u));
     if (result != nullptr) {
@@ -320,7 +320,7 @@ namespace gpg::core::legacy
    * Allocates one 12-byte lane and initializes the first two dword lanes to
    * self-pointer links (`node[0]=node`, `node[1]=node`).
    */
-  [[maybe_unused]] std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNode()
+  std::uint32_t* AllocateSingleChecked12ByteSelfLinkedNode()
   {
     auto* const result = static_cast<std::uint32_t*>(AllocateChecked12ByteLane(1u));
     if (result != nullptr) {
@@ -359,7 +359,7 @@ namespace gpg::core::legacy
    * Seeds one owner runtime lane with a freshly allocated self-linked node
    * head at `+0x04` and clears the dword counter lane at `+0x08`.
    */
-  [[maybe_unused]] SelfLinkedNodeHeadAndCountRuntimeView* InitializeSelfLinkedNodeHeadAndClearCount(
+  SelfLinkedNodeHeadAndCountRuntimeView* InitializeSelfLinkedNodeHeadAndClearCount(
     SelfLinkedNodeHeadAndCountRuntimeView* const runtime
   )
   {
@@ -376,7 +376,7 @@ namespace gpg::core::legacy
    * head at `+0x04` via adapter lane H and clears the dword counter lane at
    * `+0x08`.
    */
-  [[maybe_unused]] SelfLinkedNodeHeadAndCountRuntimeView*
+  SelfLinkedNodeHeadAndCountRuntimeView*
   InitializeSelfLinkedNodeHeadAndClearCountAdapterH(SelfLinkedNodeHeadAndCountRuntimeView* const runtime)
   {
     runtime->head = AllocateSingleChecked12ByteSelfLinkedNodeAdapterH();
@@ -391,7 +391,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 12-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapterB()
+  void* AllocateSingleChecked12ByteLaneAdapterB()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -403,7 +403,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 12-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapterC()
+  void* AllocateSingleChecked12ByteLaneAdapterC()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -415,7 +415,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 12-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapterD()
+  void* AllocateSingleChecked12ByteLaneAdapterD()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -427,7 +427,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 12-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapterE()
+  void* AllocateSingleChecked12ByteLaneAdapterE()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -439,7 +439,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 12-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked12ByteLaneAdapterF()
+  void* AllocateSingleChecked12ByteLaneAdapterF()
   {
     return AllocateChecked12ByteLane(1u);
   }
@@ -476,7 +476,7 @@ namespace gpg::core::legacy
    * What it does:
    * Register-lane jump adapter that forces a single 16-byte checked allocation.
    */
-  [[maybe_unused]] void* AllocateSingleChecked16ByteLaneAdapterC()
+  void* AllocateSingleChecked16ByteLaneAdapterC()
   {
     return AllocateChecked16ByteLane(1u);
   }
@@ -489,7 +489,7 @@ namespace gpg::core::legacy
    * Allocates exactly one 16-byte element lane through the checked-allocation
    * helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked16ByteLaneAdapter()
+  void* AllocateSingleChecked16ByteLaneAdapter()
   {
     return AllocateChecked16ByteLane(1u);
   }
@@ -501,7 +501,7 @@ namespace gpg::core::legacy
    * Preserves one jump-only adapter lane that forces a single 16-byte checked
    * allocation.
    */
-  [[maybe_unused]] void* AllocateSingleChecked16ByteLaneAdapterB()
+  void* AllocateSingleChecked16ByteLaneAdapterB()
   {
     return AllocateChecked16ByteLane(1u);
   }
@@ -513,7 +513,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 16-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked16ByteLaneAdapterD()
+  void* AllocateSingleChecked16ByteLaneAdapterD()
   {
     return AllocateChecked16ByteLane(1u);
   }
@@ -525,7 +525,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 16-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked16ByteLaneAdapterE()
+  void* AllocateSingleChecked16ByteLaneAdapterE()
   {
     return AllocateChecked16ByteLane(1u);
   }
@@ -537,7 +537,7 @@ namespace gpg::core::legacy
    * Allocates one 16-byte lane and initializes the first two dword lanes to
    * self-pointer links (`node[0]=node`, `node[1]=node`).
    */
-  [[maybe_unused]] std::uint32_t* AllocateSingleChecked16ByteSelfLinkedNodeAdapterA()
+  std::uint32_t* AllocateSingleChecked16ByteSelfLinkedNodeAdapterA()
   {
     auto* const result = static_cast<std::uint32_t*>(AllocateChecked16ByteLane(1u));
     if (result != nullptr) {
@@ -586,7 +586,7 @@ namespace gpg::core::legacy
    * What it does:
    * Register-lane jump adapter that forces a single 48-byte checked allocation.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterG()
+  void* AllocateSingleChecked48ByteLaneAdapterG()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -598,7 +598,7 @@ namespace gpg::core::legacy
    * Duplicate register-lane jump adapter that forces a single 48-byte checked
    * allocation.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterH()
+  void* AllocateSingleChecked48ByteLaneAdapterH()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -610,7 +610,7 @@ namespace gpg::core::legacy
    * Preserves one jump-only adapter lane that allocates exactly one 48-byte
    * checked element.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterI()
+  void* AllocateSingleChecked48ByteLaneAdapterI()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -623,7 +623,7 @@ namespace gpg::core::legacy
    * What it does:
    * Allocates one 48-byte element lane through the checked-allocation helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapter()
+  void* AllocateSingleChecked48ByteLaneAdapter()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -635,7 +635,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 48-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterB()
+  void* AllocateSingleChecked48ByteLaneAdapterB()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -647,7 +647,7 @@ namespace gpg::core::legacy
    * Secondary jump-adapter lane that allocates exactly one 48-byte element
    * through the checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterC()
+  void* AllocateSingleChecked48ByteLaneAdapterC()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -659,7 +659,7 @@ namespace gpg::core::legacy
    * Third jump-adapter lane that allocates exactly one 48-byte element through
    * the checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterD()
+  void* AllocateSingleChecked48ByteLaneAdapterD()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -671,7 +671,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 48-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterE()
+  void* AllocateSingleChecked48ByteLaneAdapterE()
   {
     return AllocateChecked48ByteLane(1u);
   }
@@ -683,7 +683,7 @@ namespace gpg::core::legacy
    * Jump-adapter lane that allocates exactly one 48-byte element through the
    * checked allocator helper.
    */
-  [[maybe_unused]] void* AllocateSingleChecked48ByteLaneAdapterF()
+  void* AllocateSingleChecked48ByteLaneAdapterF()
   {
     return AllocateChecked48ByteLane(1u);
   }

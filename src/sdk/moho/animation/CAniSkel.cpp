@@ -164,7 +164,7 @@ namespace
    * Initializes one in-place Boost shared-count control block for the
    * process-default animation skeleton with no-delete semantics.
    */
-  [[maybe_unused]] DefaultAniSkelSharedControl* InitializeDefaultAniSkelSharedControlInPlace(
+  DefaultAniSkelSharedControl* InitializeDefaultAniSkelSharedControlInPlace(
     DefaultAniSkelSharedControl* const outControl
   ) noexcept
   {
@@ -182,7 +182,7 @@ namespace
    * Initializes one caller-provided shared-pointer lane with the process-global
    * default skeleton and preserves shared-from-this wiring on that storage.
    */
-  [[maybe_unused]] boost::shared_ptr<const moho::CAniSkel>* InitializeDefaultAniSkelSharedPtrLane(
+  boost::shared_ptr<const moho::CAniSkel>* InitializeDefaultAniSkelSharedPtrLane(
     boost::shared_ptr<const moho::CAniSkel>* const outShared
   )
   {
@@ -254,7 +254,7 @@ namespace
    * Register-shape adapter that forwards one `(storage,count)` lane to the
    * canonical `ResizeAniSkelBoneVector` implementation.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ResizeAniSkelBoneVectorRegisterAdapter(
+  [[nodiscard]] std::uint32_t ResizeAniSkelBoneVectorRegisterAdapter(
     msvc8::vector<moho::SAniSkelBone>& storage,
     const std::uint32_t requestedCount
   )
@@ -299,7 +299,7 @@ namespace
    * Resizes `vector<SAniSkelBoneNameIndex>` to `requestedCount` using one
    * zero-initialized fill lane for growth.
    */
-  [[maybe_unused]] [[nodiscard]] std::size_t ResizeAniSkelBoneNameIndexVectorWithDefaultFill(
+  [[nodiscard]] std::size_t ResizeAniSkelBoneNameIndexVectorWithDefaultFill(
     msvc8::vector<moho::SAniSkelBoneNameIndex>& storage,
     const std::size_t requestedCount
   )
@@ -315,7 +315,7 @@ namespace
    * Copies one `vector<SAniSkelBoneNameIndex>` begin pointer lane into
    * caller-provided output storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex** ReadAniSkelBoneNameIndexBeginPointerLane(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex** ReadAniSkelBoneNameIndexBeginPointerLane(
     moho::SAniSkelBoneNameIndex** const outPointer,
     const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
   ) noexcept
@@ -331,7 +331,7 @@ namespace
    * Copies one `vector<SAniSkelBoneNameIndex>` end pointer lane into
    * caller-provided output storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex** ReadAniSkelBoneNameIndexEndPointerLane(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex** ReadAniSkelBoneNameIndexEndPointerLane(
     moho::SAniSkelBoneNameIndex** const outPointer,
     const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
   ) noexcept
@@ -347,7 +347,7 @@ namespace
    * Returns active element count for one `vector<SAniSkelBoneNameIndex>`
    * runtime lane when begin storage is present.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t CountAniSkelBoneNameIndexActiveLanes(
+  [[nodiscard]] std::uint32_t CountAniSkelBoneNameIndexActiveLanes(
     const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
   ) noexcept
   {
@@ -364,7 +364,7 @@ namespace
    * What it does:
    * Returns true when one pointer-lane slot currently holds null.
    */
-  [[maybe_unused]] [[nodiscard]] bool IsAniSkelBoneNameIndexPointerLaneNull(
+  [[nodiscard]] bool IsAniSkelBoneNameIndexPointerLaneNull(
     const moho::SAniSkelBoneNameIndex* const* const pointerSlot
   ) noexcept
   {
@@ -378,7 +378,7 @@ namespace
    * Materializes one `SAniSkelBoneNameIndex` pointer at `base + index` into
    * caller-owned output storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex** SelectAniSkelBoneNameIndexPointerAt(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex** SelectAniSkelBoneNameIndexPointerAt(
     moho::SAniSkelBoneNameIndex** const outPointer,
     moho::SAniSkelBoneNameIndex* const* const basePointer,
     const std::int32_t index
@@ -395,7 +395,7 @@ namespace
    * Stores one `SAniSkelBoneNameIndex` pointer into caller-owned output
    * storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex** StoreAniSkelBoneNameIndexPointer(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex** StoreAniSkelBoneNameIndexPointer(
     moho::SAniSkelBoneNameIndex** const outPointer,
     moho::SAniSkelBoneNameIndex* const value
   ) noexcept
@@ -410,7 +410,7 @@ namespace
    * What it does:
    * Returns the span between two dword-pointer lanes in 32-bit word units.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t CountDwordPointerSpan(
+  [[nodiscard]] std::int32_t CountDwordPointerSpan(
     const std::uint32_t* const* const endPointer,
     const std::uint32_t* const* const beginPointer
   ) noexcept
@@ -425,7 +425,7 @@ namespace
    * Materializes one `SAniSkelBone` pointer at `base + index` into
    * caller-owned output storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone** SelectAniSkelBonePointerAt(
+  [[nodiscard]] moho::SAniSkelBone** SelectAniSkelBonePointerAt(
     moho::SAniSkelBone** const outPointer,
     moho::SAniSkelBone* const* const basePointer,
     const std::int32_t index
@@ -442,7 +442,7 @@ namespace
    * Returns capacity element count for one `vector<SAniSkelBone>` runtime view
    * when begin storage is present; otherwise returns zero.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t CountAniSkelBoneCapacityLanes(
+  [[nodiscard]] std::uint32_t CountAniSkelBoneCapacityLanes(
     const msvc8::vector_runtime_view<moho::SAniSkelBone>& view
   ) noexcept
   {
@@ -461,7 +461,7 @@ namespace
    * `vector<SAniSkelBoneNameIndex>` runtime view when begin storage is
    * present; otherwise returns zero.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t CountAniSkelBoneNameIndexCapacityLanes(
+  [[nodiscard]] std::uint32_t CountAniSkelBoneNameIndexCapacityLanes(
     const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
   ) noexcept
   {
@@ -478,7 +478,7 @@ namespace
    * What it does:
    * Advances one `SAniSkelBoneNameIndex` pointer lane by `offset` elements.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex** AdvanceAniSkelBoneNameIndexPointerLane(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex** AdvanceAniSkelBoneNameIndexPointerLane(
     moho::SAniSkelBoneNameIndex** const pointerSlot,
     const std::int32_t offset
   ) noexcept
@@ -494,7 +494,7 @@ namespace
    * Secondary entrypoint returning one dword-pointer span in 32-bit word
    * units.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t CountDwordPointerSpanSecondary(
+  [[nodiscard]] std::int32_t CountDwordPointerSpanSecondary(
     const std::uint32_t* const* const endPointer,
     const std::uint32_t* const* const beginPointer
   ) noexcept
@@ -508,7 +508,7 @@ namespace
    * What it does:
    * Stores one `SAniSkelBone` pointer into caller-owned output storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone** StoreAniSkelBonePointer(
+  [[nodiscard]] moho::SAniSkelBone** StoreAniSkelBonePointer(
     moho::SAniSkelBone** const outPointer,
     moho::SAniSkelBone* const value
   ) noexcept
@@ -523,7 +523,7 @@ namespace
    * What it does:
    * Advances one `SAniSkelBone` pointer lane by `offset` elements.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone** AdvanceAniSkelBonePointerLane(
+  [[nodiscard]] moho::SAniSkelBone** AdvanceAniSkelBonePointerLane(
     moho::SAniSkelBone** const pointerSlot,
     const std::int32_t offset
   ) noexcept
@@ -549,7 +549,7 @@ namespace
    * Releases one heap-backed range-handle lane and clears all active range
    * pointers.
    */
-  [[maybe_unused]] void ResetHeapBackedRangeHandleLaneA(HeapBackedRangeHandleRuntimeView& view) noexcept
+  void ResetHeapBackedRangeHandleLaneA(HeapBackedRangeHandleRuntimeView& view) noexcept
   {
     ResetHeapBackedRangeHandle(view);
   }
@@ -561,7 +561,7 @@ namespace
    * Secondary release/clear lane for the same heap-backed range-handle
    * runtime shape.
    */
-  [[maybe_unused]] void ResetHeapBackedRangeHandleLaneB(HeapBackedRangeHandleRuntimeView& view) noexcept
+  void ResetHeapBackedRangeHandleLaneB(HeapBackedRangeHandleRuntimeView& view) noexcept
   {
     ResetHeapBackedRangeHandle(view);
   }
@@ -573,7 +573,7 @@ namespace
    * Third release/clear lane for the same heap-backed range-handle runtime
    * shape.
    */
-  [[maybe_unused]] void ResetHeapBackedRangeHandleLaneC(HeapBackedRangeHandleRuntimeView& view) noexcept
+  void ResetHeapBackedRangeHandleLaneC(HeapBackedRangeHandleRuntimeView& view) noexcept
   {
     ResetHeapBackedRangeHandle(view);
   }
@@ -584,7 +584,7 @@ namespace
    * What it does:
    * Deletes one heap-allocated runtime object lane.
    */
-  [[maybe_unused]] void DeleteRuntimeObjectLaneA(void* const objectStorage) noexcept
+  void DeleteRuntimeObjectLaneA(void* const objectStorage) noexcept
   {
     ::operator delete(objectStorage);
   }
@@ -595,7 +595,7 @@ namespace
    * What it does:
    * Secondary deleting lane for the same heap-runtime object contract.
    */
-  [[maybe_unused]] void DeleteRuntimeObjectLaneB(void* const objectStorage) noexcept
+  void DeleteRuntimeObjectLaneB(void* const objectStorage) noexcept
   {
     ::operator delete(objectStorage);
   }
@@ -606,7 +606,7 @@ namespace
    * What it does:
    * Copies one `SAniSkelBone` payload into destination storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBone(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBone(
     moho::SAniSkelBone* const destination,
     const moho::SAniSkelBone* const source
   ) noexcept
@@ -623,7 +623,7 @@ namespace
    * What it does:
    * Copies one `SAniSkelBone` payload with non-null source/destination lanes.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneNonNull(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneNonNull(
     moho::SAniSkelBone* const destination,
     const moho::SAniSkelBone* const source
   ) noexcept
@@ -632,7 +632,7 @@ namespace
     return destination;
   }
 
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeFromSingleValueNullable(
+  [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeFromSingleValueNullable(
     std::uint32_t count,
     moho::SAniSkelBone* destination,
     const moho::SAniSkelBone* const value
@@ -655,7 +655,7 @@ namespace
    * Copies `count` lanes from one source-bone value into contiguous destination
    * storage when destination lanes are present.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneCountedNullable(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneCountedNullable(
     std::uint32_t count,
     moho::SAniSkelBone* destination,
     const moho::SAniSkelBone* const value
@@ -679,7 +679,7 @@ namespace
    * Register-shape adapter that fills one contiguous skeleton-bone lane range
    * from a single source lane.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeRegisterAdapter(
+  [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeRegisterAdapter(
     const moho::SAniSkelBone* const value,
     moho::SAniSkelBone* const destination,
     const std::uint32_t count
@@ -695,7 +695,7 @@ namespace
    * Copies one contiguous source-bone range forward into destination storage
    * using the non-null single-bone lane copier.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeForwardNonNull(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeForwardNonNull(
     const moho::SAniSkelBone* sourceBegin,
     moho::SAniSkelBone* destinationBegin,
     const moho::SAniSkelBone* sourceEnd
@@ -717,7 +717,7 @@ namespace
    * Fills one destination-bone range from a single template-bone lane using
    * non-null copy semantics.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeFromSingleNonNull(
+  [[nodiscard]] moho::SAniSkelBone* FillAniSkelBoneRangeFromSingleNonNull(
     moho::SAniSkelBone* destinationBegin,
     const moho::SAniSkelBone* const value,
     const moho::SAniSkelBone* const destinationEnd
@@ -738,7 +738,7 @@ namespace
    * Copies one source-bone range backward into destination storage for overlap-
    * safe insertion-style moves.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeBackwardNonNull(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeBackwardNonNull(
     const moho::SAniSkelBone* sourceEnd,
     moho::SAniSkelBone* destinationEnd,
     const moho::SAniSkelBone* sourceBegin
@@ -763,7 +763,7 @@ namespace
    * Runs one counted nullable-copy lane with a null source pointer and returns
    * the destination pointer advanced by `count` skeleton-bone lanes.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* AdvanceAniSkelBoneAfterCountedNullFill(
+  [[nodiscard]] moho::SAniSkelBone* AdvanceAniSkelBoneAfterCountedNullFill(
     moho::SAniSkelBone* const destinationBegin,
     const std::uint32_t count
   ) noexcept
@@ -780,7 +780,7 @@ namespace
    * updates one runtime range-end lane, and stores the destination begin lane
    * through one caller-provided pointer slot.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone** CopyAniSkelBoneTailAndStoreDestinationBegin(
+  [[nodiscard]] moho::SAniSkelBone** CopyAniSkelBoneTailAndStoreDestinationBegin(
     moho::SAniSkelBone** const outDestinationBegin,
     HeapBackedRangeHandleRuntimeView* const rangeHandle,
     moho::SAniSkelBone* const destinationBegin,
@@ -806,7 +806,7 @@ namespace
    * Copies one half-open `SAniSkelBone` source range into destination storage
    * and returns the destination end pointer.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRange(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRange(
     const moho::SAniSkelBone* sourceBegin,
     moho::SAniSkelBone* destinationBegin,
     const moho::SAniSkelBone* sourceEnd
@@ -831,7 +831,7 @@ namespace
    * What it does:
    * Register-shape adapter for one contiguous `SAniSkelBone` range copy.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeRegisterAdapterLaneB(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeRegisterAdapterLaneB(
     const moho::SAniSkelBone* const sourceBegin,
     moho::SAniSkelBone* const destinationBegin,
     const moho::SAniSkelBone* const sourceEnd
@@ -840,7 +840,7 @@ namespace
     return CopyAniSkelBoneRange(sourceBegin, destinationBegin, sourceEnd);
   }
 
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex* CopyAniSkelBoneNameIndexRangeNullable(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex* CopyAniSkelBoneNameIndexRangeNullable(
     moho::SAniSkelBoneNameIndex* destination,
     const moho::SAniSkelBoneNameIndex* sourceBegin,
     const moho::SAniSkelBoneNameIndex* const sourceEnd
@@ -865,7 +865,7 @@ namespace
    * Register-shape adapter for one contiguous `SAniSkelBoneNameIndex` range
    * copy.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBoneNameIndex* CopyAniSkelBoneNameIndexRangeRegisterAdapter(
+  [[nodiscard]] moho::SAniSkelBoneNameIndex* CopyAniSkelBoneNameIndexRangeRegisterAdapter(
     const moho::SAniSkelBoneNameIndex* const sourceBegin,
     moho::SAniSkelBoneNameIndex* const destinationBegin,
     const moho::SAniSkelBoneNameIndex* const sourceEnd
@@ -881,7 +881,7 @@ namespace
    * Adapts one register-lane caller shape into the canonical skeleton-bone
    * range-copy helper.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeRegisterAdapter(
+  [[nodiscard]] moho::SAniSkelBone* CopyAniSkelBoneRangeRegisterAdapter(
     const moho::SAniSkelBone* const sourceBegin,
     const moho::SAniSkelBone* const sourceEnd,
     moho::SAniSkelBone* const destinationBegin

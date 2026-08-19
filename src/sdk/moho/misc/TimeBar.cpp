@@ -77,7 +77,7 @@ namespace moho
      * Allocates and zero-seeds one 24-byte tree-head node used by the
      * time-bar track-name map lane, preserving color/isNil defaults.
      */
-    [[maybe_unused]] [[nodiscard]] TimeBarTrackNodeHeadRuntimeView* AllocateTimeBarTrackNodeHeadRuntime()
+    [[nodiscard]] TimeBarTrackNodeHeadRuntimeView* AllocateTimeBarTrackNodeHeadRuntime()
     {
       auto* const node = static_cast<TimeBarTrackNodeHeadRuntimeView*>(gpg::core::legacy::AllocateChecked24ByteLane(1u));
       if (node != nullptr) {
@@ -378,7 +378,7 @@ namespace moho
      * Advances one pointer slot to the first pointer lane of the object it
      * currently references.
      */
-    [[maybe_unused]] PointerSlotRuntime* AdvancePointerSlotToPointeeNext(PointerSlotRuntime* const slot) noexcept
+    PointerSlotRuntime* AdvancePointerSlotToPointeeNext(PointerSlotRuntime* const slot) noexcept
     {
       slot->value = *reinterpret_cast<void**>(slot->value);
       return slot;
@@ -390,7 +390,7 @@ namespace moho
      * What it does:
      * Initializes one 24-byte event record from six scalar/pointer lanes.
      */
-    [[maybe_unused]] STimeBarEventRecord* InitializeTimeBarEventRecordFromRawLanes(
+    STimeBarEventRecord* InitializeTimeBarEventRecordFromRawLanes(
       STimeBarEventRecord* const outRecord,
       const std::uint32_t startCycleLo,
       const std::uint32_t startCycleHi,
@@ -416,7 +416,7 @@ namespace moho
      * Initializes one event record using the section start-cycle/name lanes
      * and explicit end-cycle/color lanes.
      */
-    [[maybe_unused]] STimeBarEventRecord* InitializeTimeBarEventRecordFromSectionStartAndEndLanes(
+    STimeBarEventRecord* InitializeTimeBarEventRecordFromSectionStartAndEndLanes(
       STimeBarEventRecord* const outRecord,
       const CTimeBarSection* const section,
       const std::uint32_t endCycleLo,
@@ -439,7 +439,7 @@ namespace moho
      * What it does:
      * Initializes one intrusive link node as a self-linked sentinel.
      */
-    [[maybe_unused]] IntrusiveLinkRuntime* InitializeIntrusiveLinkSelfA(IntrusiveLinkRuntime* const link) noexcept
+    IntrusiveLinkRuntime* InitializeIntrusiveLinkSelfA(IntrusiveLinkRuntime* const link) noexcept
     {
       link->prev = link;
       link->next = link;
@@ -453,7 +453,7 @@ namespace moho
      * Unlinks one intrusive list node from its neighbors and re-seeds it as a
      * self-linked sentinel.
      */
-    [[maybe_unused]] IntrusiveLinkRuntime* UnlinkIntrusiveLinkAndResetA(IntrusiveLinkRuntime* const link) noexcept
+    IntrusiveLinkRuntime* UnlinkIntrusiveLinkAndResetA(IntrusiveLinkRuntime* const link) noexcept
     {
       link->next->prev = link->prev;
       link->prev->next = link->next;
@@ -468,7 +468,7 @@ namespace moho
      * What it does:
      * Initializes one intrusive link node as a self-linked sentinel.
      */
-    [[maybe_unused]] IntrusiveLinkRuntime* InitializeIntrusiveLinkSelfB(IntrusiveLinkRuntime* const link) noexcept
+    IntrusiveLinkRuntime* InitializeIntrusiveLinkSelfB(IntrusiveLinkRuntime* const link) noexcept
     {
       link->prev = link;
       link->next = link;
@@ -481,7 +481,7 @@ namespace moho
      * What it does:
      * Loads the intrusive link `prev` pointer into one pointer slot.
      */
-    [[maybe_unused]] PointerSlotRuntime* LoadPointerSlotFromLinkPrev(
+    PointerSlotRuntime* LoadPointerSlotFromLinkPrev(
       PointerSlotRuntime* const outSlot,
       const IntrusiveLinkRuntime* const link
     ) noexcept
@@ -496,7 +496,7 @@ namespace moho
      * What it does:
      * Initializes one pointer slot from one pointer lane.
      */
-    [[maybe_unused]] PointerSlotRuntime* InitializePointerSlotFromPointerA(
+    PointerSlotRuntime* InitializePointerSlotFromPointerA(
       PointerSlotRuntime* const outSlot,
       void* const value
     ) noexcept
@@ -512,7 +512,7 @@ namespace moho
      * Checks whether writing one additional event would make next-index collide
      * with oldest-index in the fixed 10000-entry history ring.
      */
-    [[maybe_unused]] bool IsTimeBarHistoryRingFullOnNextWrite(const TimeBarRingStateRuntime* const state) noexcept
+    bool IsTimeBarHistoryRingFullOnNextWrite(const TimeBarRingStateRuntime* const state) noexcept
     {
       return ((state->nextIndex + 1) % kTimeBarHistoryCapacity) == state->oldestIndex;
     }
@@ -524,7 +524,7 @@ namespace moho
      * Advances the oldest-index modulo history capacity and returns one wrap
      * carry lane.
      */
-    [[maybe_unused]] std::int32_t AdvanceTimeBarHistoryOldestIndexWithWrapCount(TimeBarRingStateRuntime* const state) noexcept
+    std::int32_t AdvanceTimeBarHistoryOldestIndexWithWrapCount(TimeBarRingStateRuntime* const state) noexcept
     {
       const std::int32_t linearIndex = state->oldestIndex + 1;
       state->oldestIndex = linearIndex % kTimeBarHistoryCapacity;
@@ -537,7 +537,7 @@ namespace moho
      * What it does:
      * Initializes one ring-handle lane from the current oldest index.
      */
-    [[maybe_unused]] TimeBarRingHandleRuntime* InitializeTimeBarRingHandleFromOldestIndex(
+    TimeBarRingHandleRuntime* InitializeTimeBarRingHandleFromOldestIndex(
       TimeBarRingHandleRuntime* const outHandle,
       TimeBarRingStateRuntime* const state
     ) noexcept
@@ -553,7 +553,7 @@ namespace moho
      * What it does:
      * Initializes one ring-handle lane from the current next index.
      */
-    [[maybe_unused]] TimeBarRingHandleRuntime* InitializeTimeBarRingHandleFromNextIndex(
+    TimeBarRingHandleRuntime* InitializeTimeBarRingHandleFromNextIndex(
       TimeBarRingHandleRuntime* const outHandle,
       TimeBarRingStateRuntime* const state
     ) noexcept
@@ -569,7 +569,7 @@ namespace moho
      * What it does:
      * Returns one signed element count for a 24-byte element span lane.
      */
-    [[maybe_unused]] std::int32_t CountElement24RangeLength(const Element24SpanRuntime* const span) noexcept
+    std::int32_t CountElement24RangeLength(const Element24SpanRuntime* const span) noexcept
     {
       const auto spanBytes = reinterpret_cast<const std::uint8_t*>(span->end)
                            - reinterpret_cast<const std::uint8_t*>(span->begin);
@@ -583,7 +583,7 @@ namespace moho
      * Resolves one element pointer from base-plus-index lanes for 24-byte
      * records.
      */
-    [[maybe_unused]] STimeBarEventRecord* GetElement24PointerFromCursorA(const Element24CursorRuntime* const cursor) noexcept
+    STimeBarEventRecord* GetElement24PointerFromCursorA(const Element24CursorRuntime* const cursor) noexcept
     {
       return cursor->base + cursor->index;
     }
@@ -595,7 +595,7 @@ namespace moho
      * Resolves one element pointer from base-plus-index lanes for 24-byte
      * records.
      */
-    [[maybe_unused]] STimeBarEventRecord* GetElement24PointerFromCursorB(const Element24CursorRuntime* const cursor) noexcept
+    STimeBarEventRecord* GetElement24PointerFromCursorB(const Element24CursorRuntime* const cursor) noexcept
     {
       return cursor->base + cursor->index;
     }
@@ -606,7 +606,7 @@ namespace moho
      * What it does:
      * Moves one 24-byte cursor index backward by one slot modulo 10000.
      */
-    [[maybe_unused]] Element24CursorRuntime* MoveElement24CursorBackwardModCapacity(Element24CursorRuntime* const cursor) noexcept
+    Element24CursorRuntime* MoveElement24CursorBackwardModCapacity(Element24CursorRuntime* const cursor) noexcept
     {
       cursor->index = (cursor->index + (kTimeBarHistoryCapacity - 1)) % kTimeBarHistoryCapacity;
       return cursor;
@@ -618,7 +618,7 @@ namespace moho
      * What it does:
      * Compares two 24-byte cursor lanes for index inequality.
      */
-    [[maybe_unused]] bool AreElement24CursorIndicesDifferent(
+    bool AreElement24CursorIndicesDifferent(
       const Element24CursorRuntime* const lhs,
       const Element24CursorRuntime* const rhs
     ) noexcept
@@ -633,7 +633,7 @@ namespace moho
      * Unlinks one intrusive list node from its neighbors and re-seeds it as a
      * self-linked sentinel.
      */
-    [[maybe_unused]] IntrusiveLinkRuntime* UnlinkIntrusiveLinkAndResetB(IntrusiveLinkRuntime* const link) noexcept
+    IntrusiveLinkRuntime* UnlinkIntrusiveLinkAndResetB(IntrusiveLinkRuntime* const link) noexcept
     {
       link->next->prev = link->prev;
       link->prev->next = link->next;
@@ -649,7 +649,7 @@ namespace moho
      * Drains the oldest-index lane toward the current next-index by advancing
      * modulo history capacity, then resets both ring indices to zero.
      */
-    [[maybe_unused]] std::int32_t ResetTimeBarHistoryIndicesAfterDrain(TimeBarRingStateRuntime* const state) noexcept
+    std::int32_t ResetTimeBarHistoryIndicesAfterDrain(TimeBarRingStateRuntime* const state) noexcept
     {
       if (state->oldestIndex != state->nextIndex) {
         std::int32_t drainedIndex = state->oldestIndex;
@@ -670,7 +670,7 @@ namespace moho
      * What it does:
      * Checks whether oldest-index equals next-index in the fixed history ring.
      */
-    [[maybe_unused]] bool IsTimeBarHistoryRingEmpty(const TimeBarRingStateRuntime* const state) noexcept
+    bool IsTimeBarHistoryRingEmpty(const TimeBarRingStateRuntime* const state) noexcept
     {
       return state->oldestIndex == state->nextIndex;
     }
@@ -681,7 +681,7 @@ namespace moho
      * What it does:
      * Initializes one pointer slot from one pointer lane.
      */
-    [[maybe_unused]] PointerSlotRuntime* InitializePointerSlotFromPointerB(
+    PointerSlotRuntime* InitializePointerSlotFromPointerB(
       PointerSlotRuntime* const outSlot,
       void* const value
     ) noexcept
@@ -696,7 +696,7 @@ namespace moho
      * What it does:
      * Initializes one two-pointer lane from source pointer lanes.
      */
-    [[maybe_unused]] PointerPairRuntime* InitializePointerPairFromLanesA(
+    PointerPairRuntime* InitializePointerPairFromLanesA(
       PointerPairRuntime* const outPair,
       void* const first,
       void* const second
@@ -714,7 +714,7 @@ namespace moho
      * Unlinks one intrusive list node from its neighbors and re-seeds it as a
      * self-linked sentinel.
      */
-    [[maybe_unused]] IntrusiveLinkRuntime* UnlinkIntrusiveLinkAndResetC(IntrusiveLinkRuntime* const link) noexcept
+    IntrusiveLinkRuntime* UnlinkIntrusiveLinkAndResetC(IntrusiveLinkRuntime* const link) noexcept
     {
       link->next->prev = link->prev;
       link->prev->next = link->next;
@@ -729,7 +729,7 @@ namespace moho
      * What it does:
      * Initializes one pointer slot from one pointer lane.
      */
-    [[maybe_unused]] PointerSlotRuntime* InitializePointerSlotFromPointerC(
+    PointerSlotRuntime* InitializePointerSlotFromPointerC(
       PointerSlotRuntime* const outSlot,
       void* const value
     ) noexcept
@@ -744,7 +744,7 @@ namespace moho
      * What it does:
      * Initializes one two-pointer lane from source pointer lanes.
      */
-    [[maybe_unused]] PointerPairRuntime* InitializePointerPairFromLanesB(
+    PointerPairRuntime* InitializePointerPairFromLanesB(
       PointerPairRuntime* const outPair,
       void* const first,
       void* const second
@@ -762,7 +762,7 @@ namespace moho
      * Initializes one inline 1000-entry 24-byte range descriptor and points
      * begin/current/origin to its internal storage lane.
      */
-    [[maybe_unused]] InlineElement24Storage1000Runtime* InitializeInlineElement24BufferRangeWithInternalStorage1000(
+    InlineElement24Storage1000Runtime* InitializeInlineElement24BufferRangeWithInternalStorage1000(
       InlineElement24Storage1000Runtime* const outRange
     ) noexcept
     {
@@ -780,7 +780,7 @@ namespace moho
      * Resolves one element pointer from one base storage lane plus one
      * 24-byte-record index.
      */
-    [[maybe_unused]] STimeBarEventRecord* GetElement24PointerFromStorageAndIndex(
+    STimeBarEventRecord* GetElement24PointerFromStorageAndIndex(
       const std::int32_t index,
       const Element24StorageRuntime* const storage
     ) noexcept
@@ -795,7 +795,7 @@ namespace moho
      * Loads one pointer slot from the pointee referenced by a pair's second
      * lane.
      */
-    [[maybe_unused]] PointerSlotRuntime* LoadPointerSlotFromPairSecondPointee(
+    PointerSlotRuntime* LoadPointerSlotFromPairSecondPointee(
       PointerSlotRuntime* const outSlot,
       const PointerPairRuntime* const sourcePair
     ) noexcept
@@ -810,7 +810,7 @@ namespace moho
      * What it does:
      * Loads one pointer slot from a pair's second pointer lane.
      */
-    [[maybe_unused]] PointerSlotRuntime* LoadPointerSlotFromPairSecond(
+    PointerSlotRuntime* LoadPointerSlotFromPairSecond(
       PointerSlotRuntime* const outSlot,
       const PointerPairRuntime* const sourcePair
     ) noexcept
@@ -826,7 +826,7 @@ namespace moho
      * Initializes one 1000-entry 24-byte range descriptor from external
      * contiguous storage lanes.
      */
-    [[maybe_unused]] Element24RangeRuntime* InitializeElement24BufferRangeFromExternalStorage1000(
+    Element24RangeRuntime* InitializeElement24BufferRangeFromExternalStorage1000(
       Element24RangeRuntime* const outRange,
       STimeBarEventRecord* const storage
     ) noexcept
@@ -844,7 +844,7 @@ namespace moho
      * What it does:
      * Initializes one pointer slot from one pointer lane.
      */
-    [[maybe_unused]] PointerSlotRuntime* InitializePointerSlotFromPointerD(
+    PointerSlotRuntime* InitializePointerSlotFromPointerD(
       PointerSlotRuntime* const outSlot,
       void* const value
     ) noexcept
@@ -985,7 +985,7 @@ namespace moho
      * Writes one event record into the current history write slot and advances
      * the ring write index modulo history capacity.
      */
-    [[maybe_unused]] std::int32_t PushTimeBarHistoryRecordAndAdvanceWriteIndex(
+    std::int32_t PushTimeBarHistoryRecordAndAdvanceWriteIndex(
       TimeBarState& state,
       const STimeBarEventRecord& record
     ) noexcept
