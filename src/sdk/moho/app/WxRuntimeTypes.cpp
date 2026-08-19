@@ -64957,12 +64957,35 @@ void moho::WRenViewport::ReleaseDeviceResources(const bool fullShutdown)
     runtime->mMapImager.ClearBorder();
     meshRenderer->Shutdown();
 
-    // The binary follows this with a call to the shared terrain/water global
-    // teardown at 0x00809E80, which releases a set of file-scope texture
-    // batchers and texture-sheet handles that this tree has not modelled yet.
-    // It is shutdown-only bookkeeping - it releases globals as the process
-    // exits and has no bearing on the device-rebind path below - so its
-    // absence does not affect a reset. Tracked as its own recovery item.
+    // The binary follows this with `call sub_809E80` at 0x007F7130 - the
+    // shared terrain teardown. It drops the per-fidelity terrain statics of
+    // all three terrain TUs, three groups in this order, each group being
+    // `delete batcher; delete waterSurface; <sheets>.reset()`:
+    //
+    //   high   0x00809E81 sHighFidelityTextureBatcher          @0x010BF738
+    //          0x00809E9F sHighFidelityWaterSurface            @0x010C0ABC
+    //          0x00809EB7 sHighFidelityNoiseFillTexture        @0x010BF704
+    //          0x00809EFD sHighFidelityCubicBlendLookupTexture @0x010BF714
+    //          0x00809F3D sHighFidelityGridTexture             @0x010BF73C
+    //   medium 0x00809F7D sMediumFidelityTextureBatcher        @0x010BF724
+    //          0x00809F97 sMediumFidelityWaterSurface          @0x010BF734
+    //          0x00809FAF sMediumFidelityNoiseFillTexture      @0x010BF71C
+    //          0x00809FF5 sMediumFidelityCubicBlendLookup...   @0x010C0AB0
+    //          0x0080A035 sMediumFidelityGridTexture           @0x010BF728
+    //   low    0x0080A075 texture_batcher                      @0x010C0AB8
+    //          0x0080A08F sTerrainWaterSurface                 @0x010BF730
+    //          0x0080A0A7 sTerrainGridTexture                  @0x010BF70C
+    //
+    // Every one of those objects is already modelled - the names above are the
+    // recovered ones - but ten of the thirteen have internal linkage (the
+    // anonymous namespaces at the head of HighFidelityTerrain.cpp and
+    // MediumFidelityTerrain.cpp), so the call cannot be expressed from this
+    // file. Landing it means adding a `static void ReleaseSharedResources()`
+    // to each of the three terrain classes and calling the three from here.
+    //
+    // It stays shutdown-only bookkeeping in the meantime: it runs on the
+    // `fullShutdown` path as the process exits and has no bearing on the
+    // device-rebind path below, so its absence does not affect a reset.
   } else {
     meshRenderer->Reset();
   }
@@ -65230,11 +65253,57 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       RenderWater(terrain);
     }
 
+    // Not yet wired: the playable-boundary pass and the UI selection pass, in
+    // that order, between RenderWater and the 0x24 mesh bucket.
+    //
+    //   0x007F94D2  cmp  ren_PlayableBoundary, 0   ; jz 0x007F9500
+    //   0x007F94DF  test ebx, ebx                  ; jz 0x007F9500  (mSession)
+    //   0x007F94E3  cmp  [worldView->view], 0      ; jz 0x007F9500
+    //   0x007F94FB  call func_RenBoundary          ; 0x007D01C0, __thiscall
+    //               ecx = head; args (&mBoundaryRenderer, mSession, <local>)
+    //   0x007F9500  cmp  ren_Ui, 0                 ; jz 0x007F9536
+    //   0x007F952E  call func_RenUI                ; 0x007FD490, __cdecl/0x14
+    //               (mSession, mCam, mPrimBatcher.px, sDeltaFrame,
+    //                sWeightedFrameRate)  <- IDA's 4-arg signature is wrong,
+    //               it drops the 5th float; the push sequence at
+    //               0x007F9509..0x007F952D has five dwords and the callee
+    //               cleanup is `add esp, 14h` at 0x007F9533.
+    //
+    // Both bodies live in TUs this file does not own: func_RenBoundary needs
+    // sub_7D08D0 (0x007D08D0), which calls the "vision" effect accessor that
+    // is a file-static of moho/render/VisionRenderer.cpp; func_RenUI needs the
+    // sBlinkyBoxes list head, a file-static of moho/ui/UiRuntimeTypes.cpp.
+    // Both also need `mSession` (+0x2140) to actually be populated - see the
+    // note on that field - so wiring them here alone would still no-op.
+
     RenderMeshes(0x24, false);
     RenderEffects(false);
     RenderMeshes(0x28, false);
-    RenderRefractingEffects();
+
+    // Fog is dropped *before* the refracting-effects pass, not after it. The
+    // binary runs FogOff at 0x007F9551, then the fog-of-war block, and only
+    // reaches RenderRefractingEffects at 0x007F95AE - so the refraction pass
+    // draws unfogged. Emitting RenderRefractingEffects first (as this did)
+    // rendered it with the terrain fog state still bound.
     FogOff();
+
+    // Not yet wired: the fog-of-war overlay, between FogOff and the
+    // refracting-effects pass.
+    //
+    //   0x007F9556  cmp  ren_FogOfWar, 0           ; jz 0x007F95AC
+    //   0x007F955F  test ebx, ebx                  ; jz 0x007F95AC  (mSession)
+    //   0x007F9563  cmp  [mSession + 0x488], -1    ; jz 0x007F95AC
+    //               (focus army unset -> no fog of war to draw)
+    //   0x007F9589  call func_ren_FogOfWar         ; 0x0081C660, __thiscall
+    //               ecx = mSession; args (&mVisionRenderer, head, <local>,
+    //               sDeltaFrame)
+    //   0x007F958E  <stencil clear through device slot +0x98>
+    //
+    // Body lives in the moho/render/VisionRenderer.cpp TU: it needs both that
+    // file's static "vision" effect accessor and VisionDB::Entry::TryAdd
+    // (0x0081B490), which is not recovered yet.
+
+    RenderRefractingEffects();
 
     // Per-view debug-canvas overlay pass. Binary (WRenViewport::Render
     // @0x007F90D0, 0x007F9639..0x007F96D3): resets the 2D draw origin to
