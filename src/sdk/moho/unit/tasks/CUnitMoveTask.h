@@ -3,10 +3,12 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/misc/Listener.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/Broadcaster.h"
+#include "moho/unit/ECommandEvent.h"
 
 namespace gpg
 {
@@ -21,9 +23,53 @@ namespace moho
   class CUnitCommand;
   enum class EUnitCommandType : std::int32_t;
   enum EAiNavigatorEvent : std::int32_t;
+  enum EFormationdStatus : std::int32_t;
   struct SOCellPos;
 
-  class CUnitMoveTask : public CCommandTask
+  /**
+   * Layout-only carrier for the reserved dword between `CCommandTask` and the
+   * first `Listener<T>` base (complete-object +0x30). Multiple inheritance
+   * lays out non-virtual bases back-to-back in declaration order, so this
+   * 4-byte base positions `Listener<EAiNavigatorEvent>` at exactly +0x34.
+   */
+  struct CUnitMoveTaskReservedSlot30
+  {
+    std::uint32_t mUnknown0030 = 0u; // +0x00 (complete-object +0x30)
+  };
+  static_assert(sizeof(CUnitMoveTaskReservedSlot30) == 0x04, "CUnitMoveTaskReservedSlot30 size must be 0x04");
+
+  /**
+   * Layout-only carrier for the reserved dword between
+   * `Listener<EAiNavigatorEvent>` and `Listener<EFormationdStatus>`
+   * (complete-object +0x40), positioning `Listener<EFormationdStatus>` at
+   * exactly +0x44.
+   */
+  struct CUnitMoveTaskReservedSlot40
+  {
+    std::uint32_t mUnknown0040 = 0u; // +0x00 (complete-object +0x40)
+  };
+  static_assert(sizeof(CUnitMoveTaskReservedSlot40) == 0x04, "CUnitMoveTaskReservedSlot40 size must be 0x04");
+
+  /**
+   * Layout-only carrier for the reserved dword between
+   * `Listener<EFormationdStatus>` and `Listener<ECommandEvent>`
+   * (complete-object +0x50), positioning `Listener<ECommandEvent>` at
+   * exactly +0x54.
+   */
+  struct CUnitMoveTaskReservedSlot50
+  {
+    std::uint32_t mUnknown0050 = 0u; // +0x00 (complete-object +0x50)
+  };
+  static_assert(sizeof(CUnitMoveTaskReservedSlot50) == 0x04, "CUnitMoveTaskReservedSlot50 size must be 0x04");
+
+  class CUnitMoveTask
+    : public CCommandTask
+    , public CUnitMoveTaskReservedSlot30
+    , public Listener<EAiNavigatorEvent>
+    , public CUnitMoveTaskReservedSlot40
+    , public Listener<EFormationdStatus>
+    , public CUnitMoveTaskReservedSlot50
+    , public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;
@@ -106,24 +152,50 @@ namespace moho
     int Execute() override;
 
     /**
-     * Address: 0x00618BB0 (FUN_00618BB0)
+     * Address: 0x00618BB0 (FUN_00618BB0, Moho::CUnitMoveTask::OnEvent)
+     * Primary vtable: `Listener<EAiNavigatorEvent>` secondary slot 0
+     * (`??_7CUnitMoveTask@Moho@@6B?$Listener@W4EAiNavigatorEvent@Moho@@@Moho@@@`).
      *
      * What it does:
      * Applies navigator-event result transitions, clears instant-command lane,
      * and resumes owner-thread execution immediately.
      */
-    void HandleNavigatorEvent(EAiNavigatorEvent event);
+    void OnEvent(EAiNavigatorEvent event) override;
+
+    /**
+     * Address: 0x00618C30 (FUN_00618C30, nullsub_54)
+     * Primary vtable: `Listener<EFormationdStatus>` secondary slot 0
+     * (`??_7CUnitMoveTask@Moho@@6B?$Listener@W4EFormationdStatus@Moho@@@Moho@@@`).
+     *
+     * What it does:
+     * Intentional no-op; `CUnitMoveTask` does not react to formation-status
+     * events (unlike sibling command tasks such as `CUnitPatrolTask`).
+     */
+    void OnEvent(EFormationdStatus event) override;
+
+    /**
+     * Address: 0x00618C40 (FUN_00618C40, Moho::CUnitMoveTask::OnEvent)
+     * Primary vtable: `Listener<ECommandEvent>` secondary slot 0
+     * (`??_7CUnitMoveTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@`).
+     *
+     * What it does:
+     * Rebuilds `mMoveGoal` from the bound command whenever this task is not
+     * itself a ferry-transport move variant (`mMoveVariant == 0`), the unit
+     * still has a navigator, and the command weak reference still resolves.
+     * When the task has already prepared a dynamic (target-tracking) goal
+     * (`mHasPreparedDynamicGoal`), re-derives the goal from the command's live
+     * world position: coerces it through `Unit::PrepareMove` (honoring the
+     * owning army's whole-map override), re-samples the footprint-relative
+     * cell from the adjusted position, and - when this task still holds an
+     * O-grid occupancy reservation - re-reserves it at the new position.
+     * Otherwise takes the simpler static path: derives the goal directly from
+     * the command's cell position with no whole-map/occupancy handling. Both
+     * paths push the rebuilt goal to the unit's navigator. `mMoveGoal.mLayer`
+     * is preserved across the dynamic-path rebuild.
+     */
+    void OnEvent(ECommandEvent event) override;
 
   public:
-    std::uint32_t mUnknown0030; // 0x30
-    std::uint32_t mNavigatorListenerVftable; // 0x34
-    Broadcaster mNavigatorListenerLink; // 0x38
-    std::uint32_t mUnknown0040; // 0x40
-    std::uint32_t mFormationStatusListenerVftable; // 0x44
-    Broadcaster mFormationStatusListenerLink; // 0x48
-    std::uint32_t mUnknown0050; // 0x50
-    std::uint32_t mCommandEventListenerVftable; // 0x54
-    Broadcaster mCommandEventListenerLink; // 0x58
     CCommandTask* mDispatchTask; // 0x60
     SNavGoal mMoveGoal; // 0x64
     WeakPtr<CUnitCommand> mCommandRef; // 0x88
@@ -137,12 +209,18 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitMoveTask) == 0x98, "CUnitMoveTask size must be 0x98");
-  static_assert(offsetof(CUnitMoveTask, mNavigatorListenerVftable) == 0x34, "CUnitMoveTask::mNavigatorListenerVftable offset must be 0x34");
-  static_assert(offsetof(CUnitMoveTask, mNavigatorListenerLink) == 0x38, "CUnitMoveTask::mNavigatorListenerLink offset must be 0x38");
-  static_assert(offsetof(CUnitMoveTask, mFormationStatusListenerVftable) == 0x44, "CUnitMoveTask::mFormationStatusListenerVftable offset must be 0x44");
-  static_assert(offsetof(CUnitMoveTask, mFormationStatusListenerLink) == 0x48, "CUnitMoveTask::mFormationStatusListenerLink offset must be 0x48");
-  static_assert(offsetof(CUnitMoveTask, mCommandEventListenerVftable) == 0x54, "CUnitMoveTask::mCommandEventListenerVftable offset must be 0x54");
-  static_assert(offsetof(CUnitMoveTask, mCommandEventListenerLink) == 0x58, "CUnitMoveTask::mCommandEventListenerLink offset must be 0x58");
+  // The seven-base chain (CCommandTask + ReservedSlot30 + Listener<EAiNavigatorEvent>
+  // + ReservedSlot40 + Listener<EFormationdStatus> + ReservedSlot50 +
+  // Listener<ECommandEvent>) must land mDispatchTask, the first genuinely
+  // non-standard-layout member, at exactly +0x60 - offsetof on a member from a
+  // non-first base is not portable, so this checks the running byte total instead.
+  static_assert(
+    sizeof(CCommandTask) + sizeof(CUnitMoveTaskReservedSlot30) + sizeof(Listener<EAiNavigatorEvent>)
+        + sizeof(CUnitMoveTaskReservedSlot40) + sizeof(Listener<EFormationdStatus>)
+        + sizeof(CUnitMoveTaskReservedSlot50) + sizeof(Listener<ECommandEvent>)
+      == 0x60,
+    "CUnitMoveTask base-class chain must total 0x60 bytes"
+  );
   static_assert(offsetof(CUnitMoveTask, mDispatchTask) == 0x60, "CUnitMoveTask::mDispatchTask offset must be 0x60");
   static_assert(offsetof(CUnitMoveTask, mMoveGoal) == 0x64, "CUnitMoveTask::mMoveGoal offset must be 0x64");
   static_assert(offsetof(CUnitMoveTask, mCommandRef) == 0x88, "CUnitMoveTask::mCommandRef offset must be 0x88");

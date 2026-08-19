@@ -14,7 +14,9 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/ai/IAiNavigator.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/task/CTaskThread.h"
@@ -174,16 +176,6 @@ namespace moho
   gpg::RType* CUnitMoveTask::sType = nullptr;
 
   /**
-   * Address: 0x00618C30 (FUN_00618C30, nullsub_54)
-   *
-   * What it does:
-   * Preserves the `Listener<EFormationdStatus>` callback lane used by
-   * `CUnitMoveTask`; this callback is intentionally a no-op.
-   */
-  void __stdcall CUnitMoveTaskFormationStatusListenerNoOp(void* const)
-  {}
-
-  /**
    * Address: 0x006189C0 (FUN_006189C0, Moho::CommandIsInstant)
    *
    * What it does:
@@ -241,15 +233,12 @@ namespace moho
    */
   CUnitMoveTask::CUnitMoveTask()
     : CCommandTask()
-    , mUnknown0030(0)
-    , mNavigatorListenerVftable(0)
-    , mNavigatorListenerLink{}
-    , mUnknown0040(0)
-    , mFormationStatusListenerVftable(0)
-    , mFormationStatusListenerLink{}
-    , mUnknown0050(0)
-    , mCommandEventListenerVftable(0)
-    , mCommandEventListenerLink{}
+    , CUnitMoveTaskReservedSlot30()
+    , Listener<EAiNavigatorEvent>()
+    , CUnitMoveTaskReservedSlot40()
+    , Listener<EFormationdStatus>()
+    , CUnitMoveTaskReservedSlot50()
+    , Listener<ECommandEvent>()
     , mDispatchTask(nullptr)
     , mMoveGoal()
     , mCommandRef{}
@@ -294,7 +283,7 @@ namespace moho
     // (2 in binary head order) Command-event listener lane: unlink only while
     // the command weak reference still resolves to a live command object.
     if (mCommandRef.GetObjectPtr() != nullptr) {
-      mCommandEventListenerLink.ListUnlink();
+      Listener<ECommandEvent>::mListenerLink.ListUnlink();
     }
 
     // (3) Ferry-transport weak link: when this task required a transport
@@ -332,7 +321,7 @@ namespace moho
     // next command was classified instant.
     if (mUnit != nullptr) {
       if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-        mNavigatorListenerLink.ListUnlink();
+        Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
         if (mNextCmdIsInstant != 0u) {
           navigator->AbortMove();
         }
@@ -350,7 +339,7 @@ namespace moho
       CAiFormationInstance* const formation = command->mFormationInstance;
       if (formation != nullptr && mUnit != nullptr && formation->Func17(mUnit, true) &&
           command->mFormationInstance != nullptr) {
-        mFormationStatusListenerLink.ListUnlink();
+        Listener<EFormationdStatus>::mListenerLink.ListUnlink();
       }
     }
 
@@ -363,9 +352,9 @@ namespace moho
     // binary also rewrites each sub-object's vtable pointer to the base
     // `Listener<E>` vftable; those are dead stores on the dying object and are
     // handled implicitly by the C++ destructor.
-    mCommandEventListenerLink.ListUnlink();
-    mFormationStatusListenerLink.ListUnlink();
-    mNavigatorListenerLink.ListUnlink();
+    Listener<ECommandEvent>::mListenerLink.ListUnlink();
+    Listener<EFormationdStatus>::mListenerLink.ListUnlink();
+    Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
   }
 
   /**
@@ -507,13 +496,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00618BB0 (FUN_00618BB0)
+   * Address: 0x00618BB0 (FUN_00618BB0, Moho::CUnitMoveTask::OnEvent)
+   * Primary vtable: `Listener<EAiNavigatorEvent>` secondary slot 0
+   * (`??_7CUnitMoveTask@Moho@@6B?$Listener@W4EAiNavigatorEvent@Moho@@@Moho@@@`).
    *
    * What it does:
    * Applies navigator-event result transitions, clears instant-command lane,
    * and resumes owner-thread execution immediately.
    */
-  void CUnitMoveTask::HandleNavigatorEvent(
+  void CUnitMoveTask::OnEvent(
     const EAiNavigatorEvent event
   )
   {
@@ -557,6 +548,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x00618C30 (FUN_00618C30, nullsub_54)
+   * Primary vtable: `Listener<EFormationdStatus>` secondary slot 0
+   * (`??_7CUnitMoveTask@Moho@@6B?$Listener@W4EFormationdStatus@Moho@@@Moho@@@`).
+   *
+   * What it does:
+   * Intentional no-op; `CUnitMoveTask` does not react to formation-status
+   * events (unlike sibling command tasks such as `CUnitPatrolTask`).
+   */
+  void CUnitMoveTask::OnEvent(const EFormationdStatus /*event*/)
+  {}
+
+  /**
    * Address: 0x006180E0 (FUN_006180E0, Moho::CUnitMoveTask::CUnitMoveTask)
    *
    * What it does:
@@ -571,15 +574,12 @@ namespace moho
     const std::uint8_t moveVariant
   )
     : CCommandTask(dispatchTask)
-    , mUnknown0030(0)
-    , mNavigatorListenerVftable(0)
-    , mNavigatorListenerLink{}
-    , mUnknown0040(0)
-    , mFormationStatusListenerVftable(0)
-    , mFormationStatusListenerLink{}
-    , mUnknown0050(0)
-    , mCommandEventListenerVftable(0)
-    , mCommandEventListenerLink{}
+    , CUnitMoveTaskReservedSlot30()
+    , Listener<EAiNavigatorEvent>()
+    , CUnitMoveTaskReservedSlot40()
+    , Listener<EFormationdStatus>()
+    , CUnitMoveTaskReservedSlot50()
+    , Listener<ECommandEvent>()
     , mDispatchTask(dispatchTask)
     , mMoveGoal(moveGoal)
     , mCommandRef{}
@@ -602,7 +602,7 @@ namespace moho
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
       if (Broadcaster* const listenerHead = NavigatorListenerHead(navigator); listenerHead != nullptr) {
-        mNavigatorListenerLink.ListLinkBefore(listenerHead);
+        Listener<EAiNavigatorEvent>::mListenerLink.ListLinkBefore(listenerHead);
       }
     }
 
@@ -688,13 +688,77 @@ namespace moho
     }
 
     if (mUnit->AiNavigator != nullptr) {
-      mNavigatorListenerLink.ListUnlink();
+      Listener<EAiNavigatorEvent>::mListenerLink.ListUnlink();
     }
 
     Unit* const transportUnit = ResolveAssignedTransportUnit(mUnit);
     NewCallTransportCommand(mDispatchTask, transportUnit);
     mTransportDispatchIssued = 1u;
     return 1;
+  }
+
+  /**
+   * Address: 0x00618C40 (FUN_00618C40, Moho::CUnitMoveTask::OnEvent)
+   * Primary vtable: `Listener<ECommandEvent>` secondary slot 0
+   * (`??_7CUnitMoveTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@`).
+   *
+   * What it does:
+   * Rebuilds `mMoveGoal` from the bound command whenever this task is not
+   * itself a ferry-transport move variant, the unit still has a navigator,
+   * and the command weak reference still resolves. On the dynamic
+   * (target-tracking) path, re-derives the goal from the command's live
+   * world position, coerces it through `Unit::PrepareMove`, re-samples the
+   * footprint-relative cell from the adjusted position, and - while this
+   * task still holds an O-grid reservation - re-reserves it. The static path
+   * simply re-derives the goal from the command's cell position. Both paths
+   * push the rebuilt goal to the navigator.
+   */
+  void CUnitMoveTask::OnEvent(const ECommandEvent /*event*/)
+  {
+    if (mMoveVariant != 0u) {
+      return;
+    }
+
+    IAiNavigator* const navigator = mUnit->AiNavigator;
+    if (navigator == nullptr) {
+      return;
+    }
+
+    CUnitCommand* const command = mCommandRef.GetObjectPtr();
+    if (command == nullptr) {
+      return;
+    }
+
+    if (mHasPreparedDynamicGoal == 0u) {
+      SOCellPos commandCell{};
+      (void)CUnitCommand::GetPosition(command, mUnit, &commandCell);
+      mMoveGoal = SNavGoal(commandCell);
+      navigator->SetGoal(mMoveGoal);
+      return;
+    }
+
+    STIMap* const mapData = mUnit->SimulationRef->mMapData;
+    const SFootprint& footprint = mUnit->GetFootprint();
+
+    SOCellPos commandCell{};
+    (void)CUnitCommand::GetPosition(command, mUnit, &commandCell);
+    Wm3::Vector3f worldPos = COORDS_ToWorldPos(mapData, commandCell, footprint);
+
+    gpg::Rect2f skirtRect{};
+    (void)mUnit->PrepareMove(/*moveFlags=*/0, &worldPos, &skirtRect, mUnit->ArmyRef->UseWholeMap());
+
+    const ELayer preservedLayer = mMoveGoal.mLayer;
+    mMoveGoal = SNavGoal(mUnit->GetFootprint().ToCellPos(worldPos));
+    mMoveGoal.mLayer = preservedLayer;
+    navigator->SetGoal(mMoveGoal);
+
+    if (mIsOccupying != 0u) {
+      mUnit->FreeOgridRect();
+      const SCoordsVec2 worldPosXZ{worldPos.x, worldPos.z};
+      gpg::Rect2i ogridRect{};
+      (void)COORDS_ToGridRect(&ogridRect, worldPosXZ, mUnit->GetFootprint());
+      mUnit->ReserveOgridRect(ogridRect);
+    }
   }
 
   /**
