@@ -13212,6 +13212,44 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0091A310 (FUN_0091A310, luaM_growaux)
+	 *
+	 * IDA signature:
+	 * void *__cdecl luaM_growaux(lua_State *L, void *block, int *size, int size_elems, int limit, char *what);
+	 *
+	 * What it does:
+	 * Doubles an array's element count (starting from `MINSIZEARRAY` = 4 when it
+	 * was empty), clamped to `limit`, and reallocates the backing block through
+	 * `luaM_realloc`. If the array is already past half of `limit` it grows only
+	 * to `limit` itself; if it is already at `limit - MINSIZEARRAY` or beyond,
+	 * growing further would not make room for a useful batch of new elements, so
+	 * it reports `what` as a fixed overflow message instead of growing.
+	 */
+	void* luaM_growaux(
+		lua_State* const state, void* const block, int* const size, const int sizeElems, const int limit,
+		const char* const what
+	)
+	{
+		constexpr int kMinSizeArray = 4;
+
+		int newSize = *size * 2;
+		if (newSize < kMinSizeArray) {
+			newSize = kMinSizeArray;
+		} else if (*size >= limit / 2) {
+			if (*size >= limit - kMinSizeArray) {
+				luaG_runerror(state, what);
+			}
+			newSize = limit;
+		}
+
+		void* const newBlock = luaM_realloc(
+			state, block, static_cast<lu_mem>(sizeElems * *size), static_cast<lu_mem>(sizeElems * newSize)
+		);
+		*size = newSize;
+		return newBlock;
+	}
+
+	/**
 	 * Address: 0x0090EC20 (FUN_0090EC20, luaB_print)
 	 *
 	 * IDA signature:
