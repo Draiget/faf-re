@@ -345,7 +345,7 @@ namespace
    * What it does:
    * Fills one `[begin,end)` dword range from one repeated source value lane.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeByEndLaneD(
+  std::uint32_t* FillDwordRangeByEndLaneD(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -360,7 +360,7 @@ namespace
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeByEndLaneE(
+  std::uint32_t* FillDwordRangeByEndLaneE(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -375,7 +375,7 @@ namespace
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeByEndLaneF(
+  std::uint32_t* FillDwordRangeByEndLaneF(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -390,7 +390,7 @@ namespace
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeByEndLaneG(
+  std::uint32_t* FillDwordRangeByEndLaneG(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -405,7 +405,7 @@ namespace
    * What it does:
    * Alias lane of `[begin,end)` repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeByEndLaneH(
+  std::uint32_t* FillDwordRangeByEndLaneH(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* valueSlot
@@ -420,7 +420,7 @@ namespace
    * What it does:
    * Copies one source dword range into destination and returns destination end.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeForwardLaneA(
+  std::uint32_t* CopyDwordRangeForwardLaneA(
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd,
     std::uint32_t* destination
@@ -435,7 +435,7 @@ namespace
    * What it does:
    * Alias lane of forward dword range copy behavior.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeForwardLaneB(
+  std::uint32_t* CopyDwordRangeForwardLaneB(
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd,
     std::uint32_t* destination
@@ -451,7 +451,7 @@ namespace
    * Copies one dword range `[sourceBegin,sourceEnd)` with overlap-safe memmove
    * semantics and returns the one-past-end destination cursor.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeWithMemmoveLaneA(
+  std::uint32_t* CopyDwordRangeWithMemmoveLaneA(
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
     std::uint32_t* const destination
@@ -466,7 +466,7 @@ namespace
    * What it does:
    * Alias lane of overlap-safe dword range copy behavior.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeWithMemmoveLaneB(
+  std::uint32_t* CopyDwordRangeWithMemmoveLaneB(
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd,
     std::uint32_t* const destination
@@ -482,7 +482,7 @@ namespace
    * Erases one dword at `eraseAt` from a vector lane by shifting trailing data
    * left with overlap-safe memmove and returns the iterator out-slot.
    */
-  [[maybe_unused]] std::uint32_t** EraseDwordAtCursorAndReturnSlot(
+  std::uint32_t** EraseDwordAtCursorAndReturnSlot(
     DwordVectorRuntimeView* const vector,
     std::uint32_t** const outIteratorSlot,
     std::uint32_t* const eraseAt
@@ -505,7 +505,7 @@ namespace
    * What it does:
    * Fills one dword-pair range `[begin,end)` from one repeated pair value.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordPairRangeLaneA(
+  std::uint32_t* FillDwordPairRangeLaneA(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* pairValue
@@ -520,7 +520,7 @@ namespace
    * What it does:
    * Fills one dword-triple range `[begin,end)` from one repeated triple value.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordTripleRangeLaneA(
+  std::uint32_t* FillDwordTripleRangeLaneA(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* tripleValue
@@ -535,7 +535,7 @@ namespace
    * What it does:
    * Alias lane of dword-triple fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordTripleRangeLaneB(
+  std::uint32_t* FillDwordTripleRangeLaneB(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* tripleValue
@@ -550,7 +550,7 @@ namespace
    * What it does:
    * Alias lane of dword-triple fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordTripleRangeLaneC(
+  std::uint32_t* FillDwordTripleRangeLaneC(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* tripleValue
@@ -565,7 +565,7 @@ namespace
    * What it does:
    * Alias lane of dword-pair fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordPairRangeLaneB(
+  std::uint32_t* FillDwordPairRangeLaneB(
     std::uint32_t* begin,
     std::uint32_t* end,
     const std::uint32_t* pairValue
@@ -580,7 +580,7 @@ namespace
    * What it does:
    * Copies one source dword-pair range into destination pair storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordPairRangeLaneA(
+  std::uint32_t* CopyDwordPairRangeLaneA(
     std::uint32_t* destination,
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd
@@ -595,7 +595,7 @@ namespace
    * What it does:
    * Copies one source dword-triple range into destination triple storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyDwordTripleRangeLaneA(
+  std::uint32_t* CopyDwordTripleRangeLaneA(
     std::uint32_t* destination,
     const std::uint32_t* sourceBegin,
     const std::uint32_t* sourceEnd
@@ -610,7 +610,7 @@ namespace
    * What it does:
    * Writes one repeated dword value into `count` contiguous destination lanes.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordCountedLaneY(
+  std::uint32_t* FillDwordCountedLaneY(
     std::uint32_t* destination,
     const std::uint32_t count,
     const std::uint32_t* valueSlot
@@ -625,7 +625,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordCountedLaneZ(
+  std::uint32_t* FillDwordCountedLaneZ(
     std::uint32_t* destination,
     const std::uint32_t count,
     const std::uint32_t* valueSlot
@@ -640,7 +640,7 @@ namespace
    * What it does:
    * Alias lane of counted repeated-dword fill behavior.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordCountedLaneAA(
+  std::uint32_t* FillDwordCountedLaneAA(
     std::uint32_t* destination,
     const std::uint32_t count,
     const std::uint32_t* valueSlot
@@ -656,7 +656,7 @@ namespace
    * Returns linked-node count when the owner activation marker is set.
    * Returns `-1` when the activation marker is clear.
    */
-  [[maybe_unused]] std::int32_t CountLinkedNodesIfActive(const LinkCountOwnerRuntimeView* const owner) noexcept
+  std::int32_t CountLinkedNodesIfActive(const LinkCountOwnerRuntimeView* const owner) noexcept
   {
     if (owner->activeMarker == 0u) {
       return -1;
@@ -675,7 +675,7 @@ namespace
    * What it does:
    * Returns one cached dword value from offset `+0x21C`.
    */
-  [[maybe_unused]] std::int32_t GetValueAtOffset21C(const ValueIndexAccessorRuntimeView* const runtime) noexcept
+  std::int32_t GetValueAtOffset21C(const ValueIndexAccessorRuntimeView* const runtime) noexcept
   {
     return runtime->valueAt21C;
   }
@@ -686,7 +686,7 @@ namespace
    * What it does:
    * Returns one cached dword value from offset `+0x218`.
    */
-  [[maybe_unused]] std::int32_t GetValueAtOffset218(const ValueIndexAccessorRuntimeView* const runtime) noexcept
+  std::int32_t GetValueAtOffset218(const ValueIndexAccessorRuntimeView* const runtime) noexcept
   {
     return runtime->valueAt218;
   }
@@ -697,7 +697,7 @@ namespace
    * What it does:
    * Returns one nested owner dword from `*(this+0x134)+0x19C`.
    */
-  [[maybe_unused]] std::int32_t GetNestedValueAtOffset134_19C(const ParentWithNestedOwnerRuntimeView* const runtime) noexcept
+  std::int32_t GetNestedValueAtOffset134_19C(const ParentWithNestedOwnerRuntimeView* const runtime) noexcept
   {
     return runtime->nested->value;
   }
@@ -708,7 +708,7 @@ namespace
    * What it does:
    * Stores one caller dword at offset `+0x28` and returns that value.
    */
-  [[maybe_unused]] std::int32_t SetValueAtOffset28(SetterAtOffset28RuntimeView* const runtime, const std::int32_t value) noexcept
+  std::int32_t SetValueAtOffset28(SetterAtOffset28RuntimeView* const runtime, const std::int32_t value) noexcept
   {
     runtime->value = value;
     return value;
@@ -720,7 +720,7 @@ namespace
    * What it does:
    * Writes constant `1` to one byte lane at offset `+0x88`.
    */
-  [[maybe_unused]] void SetFlagAtOffset88True(FlagSetterAtOffset88RuntimeView* const runtime) noexcept
+  void SetFlagAtOffset88True(FlagSetterAtOffset88RuntimeView* const runtime) noexcept
   {
     runtime->flag = 1u;
   }
@@ -731,7 +731,7 @@ namespace
    * What it does:
    * Stores one caller dword at offset `+0x84` and returns that value.
    */
-  [[maybe_unused]] std::int32_t SetValueAtOffset84LaneA(
+  std::int32_t SetValueAtOffset84LaneA(
     SetterAtOffset84RuntimeView* const runtime,
     const std::int32_t value
   ) noexcept
@@ -746,7 +746,7 @@ namespace
    * What it does:
    * Alias lane of offset `+0x84` dword store/return behavior.
    */
-  [[maybe_unused]] std::int32_t SetValueAtOffset84LaneB(
+  std::int32_t SetValueAtOffset84LaneB(
     SetterAtOffset84RuntimeView* const runtime,
     const std::int32_t value
   ) noexcept
@@ -761,7 +761,7 @@ namespace
    * What it does:
    * Stores one caller dword at offset `+0x0C` and returns that value.
    */
-  [[maybe_unused]] std::int32_t SetValueAtOffset0C(
+  std::int32_t SetValueAtOffset0C(
     SetterAtOffset0CRuntimeView* const runtime,
     const std::int32_t value
   ) noexcept
@@ -776,7 +776,7 @@ namespace
    * What it does:
    * Stores one caller dword at offset `+0x10` and returns that value.
    */
-  [[maybe_unused]] std::int32_t SetValueAtOffset10(
+  std::int32_t SetValueAtOffset10(
     SetterAtOffset10RuntimeView* const runtime,
     const std::int32_t value
   ) noexcept
@@ -791,7 +791,7 @@ namespace
    * What it does:
    * Stores one caller dword at offset `+0x7C` and returns that value.
    */
-  [[maybe_unused]] std::int32_t SetValueAtOffset7C(
+  std::int32_t SetValueAtOffset7C(
     SetterAtOffset7CRuntimeView* const runtime,
     const std::int32_t value
   ) noexcept
@@ -807,7 +807,7 @@ namespace
    * Returns nested dword lane at `*(this+0x04)+0x08`; returns `0` when
    * nested pointer lane is null.
    */
-  [[maybe_unused]] std::int32_t GetNestedValueAtOffset04Then08OrZero(
+  std::int32_t GetNestedValueAtOffset04Then08OrZero(
     const PointerAtOffset04RuntimeView* const runtime
   ) noexcept
   {
@@ -822,7 +822,7 @@ namespace
    * Writes one out-dword from `(*sourceOwnerSlot)+0x24` when owner is present;
    * otherwise writes `0`, then returns out slot.
    */
-  [[maybe_unused]] std::uint32_t* StoreOwnerValueAtOffset24OrZero(
+  std::uint32_t* StoreOwnerValueAtOffset24OrZero(
     std::uint32_t* const outValue,
     const ValueAtOffset24RuntimeView* const* const sourceOwnerSlot
   ) noexcept
@@ -839,7 +839,7 @@ namespace
    * Calls virtual init slot `vtable[4]` with `(arg0,1)`, stores two lane values,
    * and returns the first stored value.
    */
-  [[maybe_unused]] std::int32_t InitAndStoreLaneValues(
+  std::int32_t InitAndStoreLaneValues(
     InitAndStoreRuntimeView* const runtime,
     const std::int32_t arg0,
     const std::int32_t valueA,
@@ -859,7 +859,7 @@ namespace
    * What it does:
    * Returns one of two cached values based on selector (`4` vs non-`4`).
    */
-  [[maybe_unused]] std::int32_t SelectDualCachedValue(
+  std::int32_t SelectDualCachedValue(
     const DualSelectionRuntimeView* const runtime,
     const std::int32_t selector
   ) noexcept
@@ -874,7 +874,7 @@ namespace
    * Writes one dual-cache lane selected by `selector` (`4` vs non-`4`) and
    * returns the stored value.
    */
-  [[maybe_unused]] std::int32_t SetDualCachedValue(
+  std::int32_t SetDualCachedValue(
     DualSelectionRuntimeView* const runtime,
     const std::int32_t selector,
     const std::int32_t value
@@ -896,7 +896,7 @@ namespace
    * Returns indexed lookup-table entry when table pointer is present.
    * Returns `0` when table pointer is null.
    */
-  [[maybe_unused]] std::int32_t LookupIndexedValueOrZero(
+  std::int32_t LookupIndexedValueOrZero(
     const IndexedLookupOwnerRuntimeView* const runtime,
     const std::int32_t index
   ) noexcept
@@ -913,7 +913,7 @@ namespace
    * What it does:
    * Returns base pointer lane at `+0x04`, offset by `+12` when non-null.
    */
-  [[maybe_unused]] std::uintptr_t GetPointerPlus12WhenPresent(const PointerLaneRuntimeView* const runtime) noexcept
+  std::uintptr_t GetPointerPlus12WhenPresent(const PointerLaneRuntimeView* const runtime) noexcept
   {
     const std::uintptr_t value = runtime->ptr;
     return (value != 0u) ? (value + 12u) : value;
@@ -925,7 +925,7 @@ namespace
    * What it does:
    * Returns `*(a2+0x0C)` only when both input pointers are non-null; otherwise `0`.
    */
-  [[maybe_unused]] std::int32_t GetSecondaryValueAtOffset0CIfBothPresent(
+  std::int32_t GetSecondaryValueAtOffset0CIfBothPresent(
     const void* const first,
     const ValueAtPlus0CRuntimeView* const second
   ) noexcept

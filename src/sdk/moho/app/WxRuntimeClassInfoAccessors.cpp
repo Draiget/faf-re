@@ -77,7 +77,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxFontList::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetFontListClassInfoRuntime() noexcept
+  void* wxGetFontListClassInfoRuntime() noexcept
   {
     return gWxFontListClassInfoTable;
   }
@@ -88,7 +88,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxResourceCache::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetResourceCacheClassInfoRuntime() noexcept
+  void* wxGetResourceCacheClassInfoRuntime() noexcept
   {
     return gWxResourceCacheClassInfoTable;
   }
@@ -99,7 +99,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxColourDatabase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetColourDatabaseClassInfoRuntime() noexcept
+  void* wxGetColourDatabaseClassInfoRuntime() noexcept
   {
     return gWxColourDatabaseClassInfoTable;
   }
@@ -110,7 +110,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxBitmapList::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetBitmapListClassInfoRuntime() noexcept
+  void* wxGetBitmapListClassInfoRuntime() noexcept
   {
     return gWxBitmapListClassInfoTable;
   }
@@ -121,7 +121,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxLocaleModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetLocaleModuleClassInfoRuntime() noexcept
+  void* wxGetLocaleModuleClassInfoRuntime() noexcept
   {
     return gWxLocaleModuleClassInfoTable;
   }
@@ -132,7 +132,7 @@ namespace
    * What it does:
    * Returns one runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeA() noexcept
+  void** wxGetEventTableRuntimeBridgeA() noexcept
   {
     return gWxEventTableRuntimeBridgeA;
   }
@@ -143,7 +143,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxHelpProviderModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetHelpProviderModuleClassInfoRuntime() noexcept
+  void* wxGetHelpProviderModuleClassInfoRuntime() noexcept
   {
     return gWxHelpProviderModuleClassInfoTable;
   }
@@ -154,7 +154,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxContextHelp::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetContextHelpClassInfoRuntime() noexcept
+  void* wxGetContextHelpClassInfoRuntime() noexcept
   {
     return gWxContextHelpClassInfoTable;
   }
@@ -165,7 +165,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxContextHelpButton::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetContextHelpButtonClassInfoRuntime() noexcept
+  void* wxGetContextHelpButtonClassInfoRuntime() noexcept
   {
     return gWxContextHelpButtonClassInfoTable;
   }
@@ -176,7 +176,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxSystemSettingsModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetSystemSettingsModuleClassInfoRuntime() noexcept
+  void* wxGetSystemSettingsModuleClassInfoRuntime() noexcept
   {
     return gWxSystemSettingsModuleClassInfoTable;
   }
@@ -187,7 +187,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxBrush::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetBrushClassInfoRuntime() noexcept
+  void* wxGetBrushClassInfoRuntime() noexcept
   {
     return gWxBrushClassInfoTable;
   }
@@ -198,7 +198,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDCBase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDcBaseClassInfoRuntime() noexcept
+  void* wxGetDcBaseClassInfoRuntime() noexcept
   {
     return gWxDcBaseClassInfoTable;
   }
@@ -209,7 +209,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDCModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDcModuleClassInfoRuntime() noexcept
+  void* wxGetDcModuleClassInfoRuntime() noexcept
   {
     return gWxDcModuleClassInfoTable;
   }
@@ -220,7 +220,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxToolTip::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetToolTipClassInfoRuntime() noexcept
+  void* wxGetToolTipClassInfoRuntime() noexcept
   {
     return gWxToolTipClassInfoTable;
   }
@@ -231,7 +231,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxIndividualLayoutConstraint::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetIndividualLayoutConstraintClassInfoRuntime() noexcept
+  void* wxGetIndividualLayoutConstraintClassInfoRuntime() noexcept
   {
     return gWxIndividualLayoutConstraintClassInfoTable;
   }
@@ -242,7 +242,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxLayoutConstraints::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetLayoutConstraintsClassInfoRuntime() noexcept
+  void* wxGetLayoutConstraintsClassInfoRuntime() noexcept
   {
     return gWxLayoutConstraintsClassInfoTable;
   }
@@ -253,7 +253,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxFontDialog::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetFontDialogClassInfoRuntime() noexcept
+  void* wxGetFontDialogClassInfoRuntime() noexcept
   {
     return gWxFontDialogClassInfoTable;
   }
@@ -264,7 +264,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxHashTable::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetHashTableClassInfoRuntime() noexcept
+  void* wxGetHashTableClassInfoRuntime() noexcept
   {
     return gWxHashTableClassInfoTable;
   }
@@ -275,7 +275,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxPopupWindow::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetPopupWindowClassInfoRuntime() noexcept
+  void* wxGetPopupWindowClassInfoRuntime() noexcept
   {
     return gWxPopupWindowClassInfoTable;
   }
@@ -286,7 +286,7 @@ namespace
    * What it does:
    * Returns one runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeB() noexcept
+  void** wxGetEventTableRuntimeBridgeB() noexcept
   {
     return gWxEventTableRuntimeBridgeB;
   }
@@ -297,7 +297,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxSpinCtrl::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetSpinCtrlClassInfoRuntime() noexcept
+  void* wxGetSpinCtrlClassInfoRuntime() noexcept
   {
     return gWxSpinCtrlClassInfoTable;
   }
@@ -308,7 +308,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxMemoryDC::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetMemoryDcClassInfoRuntime() noexcept
+  void* wxGetMemoryDcClassInfoRuntime() noexcept
   {
     return gWxMemoryDcClassInfoTable;
   }
@@ -319,7 +319,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxFontMapperModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetFontMapperModuleClassInfoRuntime() noexcept
+  void* wxGetFontMapperModuleClassInfoRuntime() noexcept
   {
     return gWxFontMapperModuleClassInfoTable;
   }
@@ -330,7 +330,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxFontData::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetFontDataClassInfoRuntime() noexcept
+  void* wxGetFontDataClassInfoRuntime() noexcept
   {
     return gWxFontDataClassInfoTable;
   }
@@ -341,7 +341,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxICOHandler::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetIcoHandlerClassInfoRuntime() noexcept
+  void* wxGetIcoHandlerClassInfoRuntime() noexcept
   {
     return gWxIcoHandlerClassInfoTable;
   }
@@ -352,7 +352,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxCURHandler::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetCurHandlerClassInfoRuntime() noexcept
+  void* wxGetCurHandlerClassInfoRuntime() noexcept
   {
     return gWxCurHandlerClassInfoTable;
   }
@@ -363,7 +363,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxANIHandler::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetAniHandlerClassInfoRuntime() noexcept
+  void* wxGetAniHandlerClassInfoRuntime() noexcept
   {
     return gWxAniHandlerClassInfoTable;
   }
@@ -374,7 +374,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxPathList::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetPathListClassInfoRuntime() noexcept
+  void* wxGetPathListClassInfoRuntime() noexcept
   {
     return gWxPathListClassInfoTable;
   }
@@ -385,7 +385,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxPen::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetPenClassInfoRuntime() noexcept
+  void* wxGetPenClassInfoRuntime() noexcept
   {
     return gWxPenClassInfoTable;
   }
@@ -396,7 +396,7 @@ namespace
    * What it does:
    * Returns one runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeC() noexcept
+  void** wxGetEventTableRuntimeBridgeC() noexcept
   {
     return gWxEventTableRuntimeBridgeC;
   }
@@ -407,7 +407,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxSpinEvent::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetSpinEventClassInfoRuntime() noexcept
+  void* wxGetSpinEventClassInfoRuntime() noexcept
   {
     return gWxSpinEventClassInfoTable;
   }
@@ -418,7 +418,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxListBox::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetListBoxClassInfoRuntime() noexcept
+  void* wxGetListBoxClassInfoRuntime() noexcept
   {
     return gWxListBoxClassInfoTable;
   }
@@ -429,7 +429,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxTimerEvent::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetTimerEventClassInfoRuntime() noexcept
+  void* wxGetTimerEventClassInfoRuntime() noexcept
   {
     return gWxTimerEventClassInfoTable;
   }
@@ -440,7 +440,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxScreenDC::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetScreenDcClassInfoRuntime() noexcept
+  void* wxGetScreenDcClassInfoRuntime() noexcept
   {
     return gWxScreenDcClassInfoTable;
   }
@@ -451,7 +451,7 @@ namespace
    * What it does:
    * Returns one additional runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeD() noexcept
+  void** wxGetEventTableRuntimeBridgeD() noexcept
   {
     return &gWxEventTableRuntimeBridgeD;
   }
@@ -462,7 +462,7 @@ namespace
    * What it does:
    * Returns one additional runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeE() noexcept
+  void** wxGetEventTableRuntimeBridgeE() noexcept
   {
     return &gWxEventTableRuntimeBridgeE;
   }
@@ -473,7 +473,7 @@ namespace
    * What it does:
    * Returns one additional runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeF() noexcept
+  void** wxGetEventTableRuntimeBridgeF() noexcept
   {
     return &gWxEventTableRuntimeBridgeF;
   }
@@ -484,7 +484,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxMDIParentFrame::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetMdiParentFrameClassInfoRuntime() noexcept
+  void* wxGetMdiParentFrameClassInfoRuntime() noexcept
   {
     return gWxMdiParentFrameClassInfoTable;
   }
@@ -495,7 +495,7 @@ namespace
    * What it does:
    * Returns one additional runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeG() noexcept
+  void** wxGetEventTableRuntimeBridgeG() noexcept
   {
     return &gWxEventTableRuntimeBridgeG;
   }
@@ -506,7 +506,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDragImage::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDragImageClassInfoRuntime() noexcept
+  void* wxGetDragImageClassInfoRuntime() noexcept
   {
     return gWxDragImageClassInfoTable;
   }
@@ -518,7 +518,7 @@ namespace
    * Returns the runtime class-info storage for
    * `wxMSWSystemMenuFontModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetMswSystemMenuFontModuleClassInfoRuntime() noexcept
+  void* wxGetMswSystemMenuFontModuleClassInfoRuntime() noexcept
   {
     return gWxMswSystemMenuFontModuleClassInfoTable;
   }
@@ -529,7 +529,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxRadioBox::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetRadioBoxClassInfoRuntime() noexcept
+  void* wxGetRadioBoxClassInfoRuntime() noexcept
   {
     return gWxRadioBoxClassInfoTable;
   }
@@ -540,7 +540,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxStaticLine::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetStaticLineClassInfoRuntime() noexcept
+  void* wxGetStaticLineClassInfoRuntime() noexcept
   {
     return gWxStaticLineClassInfoTable;
   }
@@ -551,7 +551,7 @@ namespace
    * What it does:
    * Returns one additional runtime event-table storage anchor.
    */
-  [[maybe_unused]] void** wxGetEventTableRuntimeBridgeH() noexcept
+  void** wxGetEventTableRuntimeBridgeH() noexcept
   {
     return &gWxEventTableRuntimeBridgeH;
   }
@@ -562,7 +562,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxToolBarBase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetToolBarBaseClassInfoRuntime() noexcept
+  void* wxGetToolBarBaseClassInfoRuntime() noexcept
   {
     return gWxToolBarBaseClassInfoTable;
   }
@@ -573,7 +573,7 @@ namespace
    * What it does:
    * Returns one third-level runtime event-table storage anchor.
    */
-  [[maybe_unused]] void*** wxGetEventTableRuntimeBridgeI() noexcept
+  void*** wxGetEventTableRuntimeBridgeI() noexcept
   {
     return &gWxEventTableRuntimeBridgeI;
   }
@@ -584,7 +584,7 @@ namespace
    * What it does:
    * Returns one runtime event-table anchor object.
    */
-  [[maybe_unused]] void* wxGetEventTableRuntimeAnchorA() noexcept
+  void* wxGetEventTableRuntimeAnchorA() noexcept
   {
     return &gWxEventTableRuntimeAnchorA;
   }
@@ -595,7 +595,7 @@ namespace
    * What it does:
    * Returns one runtime event-table anchor object.
    */
-  [[maybe_unused]] void* wxGetEventTableRuntimeAnchorB() noexcept
+  void* wxGetEventTableRuntimeAnchorB() noexcept
   {
     return &gWxEventTableRuntimeAnchorB;
   }
@@ -606,7 +606,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxEnhMetaFile::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetEnhMetaFileClassInfoRuntime() noexcept
+  void* wxGetEnhMetaFileClassInfoRuntime() noexcept
   {
     return gWxEnhMetaFileClassInfoTable;
   }
@@ -617,7 +617,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxClipboard::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetClipboardClassInfoRuntime() noexcept
+  void* wxGetClipboardClassInfoRuntime() noexcept
   {
     return gWxClipboardClassInfoTable;
   }
@@ -628,7 +628,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxFileProto::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetFileProtoClassInfoRuntime() noexcept
+  void* wxGetFileProtoClassInfoRuntime() noexcept
   {
     return gWxFileProtoClassInfoTable;
   }
@@ -639,7 +639,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxServerBase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetServerBaseClassInfoRuntime() noexcept
+  void* wxGetServerBaseClassInfoRuntime() noexcept
   {
     return gWxServerBaseClassInfoTable;
   }
@@ -650,7 +650,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxClientBase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetClientBaseClassInfoRuntime() noexcept
+  void* wxGetClientBaseClassInfoRuntime() noexcept
   {
     return gWxClientBaseClassInfoTable;
   }
@@ -661,7 +661,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDDEModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDdeModuleClassInfoRuntime() noexcept
+  void* wxGetDdeModuleClassInfoRuntime() noexcept
   {
     return gWxDdeModuleClassInfoTable;
   }
@@ -672,7 +672,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDDEConnection::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDdeConnectionClassInfoRuntime() noexcept
+  void* wxGetDdeConnectionClassInfoRuntime() noexcept
   {
     return gWxDdeConnectionClassInfoTable;
   }
@@ -683,7 +683,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDDEClient::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDdeClientClassInfoRuntime() noexcept
+  void* wxGetDdeClientClassInfoRuntime() noexcept
   {
     return gWxDdeClientClassInfoTable;
   }
@@ -694,7 +694,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxDDEServer::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetDdeServerClassInfoRuntime() noexcept
+  void* wxGetDdeServerClassInfoRuntime() noexcept
   {
     return gWxDdeServerClassInfoTable;
   }
@@ -705,7 +705,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxPrintPaperType::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetPrintPaperTypeClassInfoRuntime() noexcept
+  void* wxGetPrintPaperTypeClassInfoRuntime() noexcept
   {
     return gWxPrintPaperTypeClassInfoTable;
   }
@@ -716,7 +716,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxPrintPaperDatabase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetPrintPaperDatabaseClassInfoRuntime() noexcept
+  void* wxGetPrintPaperDatabaseClassInfoRuntime() noexcept
   {
     return gWxPrintPaperDatabaseClassInfoTable;
   }
@@ -727,7 +727,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxPrintPaperModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetPrintPaperModuleClassInfoRuntime() noexcept
+  void* wxGetPrintPaperModuleClassInfoRuntime() noexcept
   {
     return gWxPrintPaperModuleClassInfoTable;
   }
@@ -738,7 +738,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxClipboardModule::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetClipboardModuleClassInfoRuntime() noexcept
+  void* wxGetClipboardModuleClassInfoRuntime() noexcept
   {
     return gWxClipboardModuleClassInfoTable;
   }
@@ -749,7 +749,7 @@ namespace
    * What it does:
    * Returns the runtime class-info storage for `wxConnectionBase::sm_classInfo`.
    */
-  [[maybe_unused]] void* wxGetConnectionBaseClassInfoRuntime() noexcept
+  void* wxGetConnectionBaseClassInfoRuntime() noexcept
   {
     return gWxConnectionBaseClassInfoTable;
   }
