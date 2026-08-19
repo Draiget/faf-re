@@ -1651,7 +1651,6 @@ namespace msvc8
          * Address: 0x00443300 (FUN_00443300)
          * Address: 0x00443420 (FUN_00443420)
          * Address: 0x0057D820 (FUN_0057D820, msvc8::vector<SAiAttackVectorDebug>::push_back)
-         * Address: 0x007BB120 (FUN_007BB120, msvc8::vector<Moho::SNetCommandArg>::push_back)
          * Address: 0x007C8F30 (FUN_007C8F30, msvc8::vector<Moho::LaunchPlayerOptionEntry>::push_back)
          * Address: 0x007E3850 (FUN_007E3850, msvc8::vector<Moho::MeshLOD*>::push_back — Mesh::CreateLOD lods.push_back)
          * Address: 0x0075F1A0 (FUN_0075F1A0, msvc8::vector<Moho::Sim::DumpUnitsCountEntry>::push_back
@@ -1659,6 +1658,14 @@ namespace msvc8
          * Sim::DumpUnits invokes counts.push_back({blueprint,1}) by name — on the
          * capacity-full path this routes to insert(end(),1,value) → _Insert_n
          * (FUN_0075F810), on the fast path it appends in place)
+         * Address: 0x00769D00 (FUN_00769D00, msvc8::vector<gpg::AStarOpenHeap<TCell>::Entry>::insert
+         * iterator-returning wrapper — gpg::AStarSearch.h's AStarOpenHeap::Push calls
+         * mEntries.push_back(entry) by name; the 12-byte Entry stride routes through
+         * this insert(end(),1,value)-shaped lane on the capacity-full path. Grow core
+         * at 0x00769F60)
+         * Address: 0x007BB120 (FUN_007BB120, msvc8::vector<Moho::SNetCommandArg>::push_back
+         * — its own capacity-full path routes through the 36-byte insert-return
+         * wrapper at 0x007BB780, whose grow core is 0x007BBD60)
          * Address: 0x006D1960 (FUN_006D1960, msvc8::vector<moho::SUpgradeNotifyPair>::push_back
          * for the 8-byte `{mSourceId, mDestId}` element — `sar 3` stride at 0x006D1974
          * and 0x006D1980. The fast path copies the two dwords through FUN_006D2730
