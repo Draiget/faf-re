@@ -350,8 +350,14 @@ namespace moho
       }
     };
 
+    // Layout-compatible overlay for a `boost::shared_ptr<T>` member of the
+    // batcher. Ownership is *strong*: the binary's rebind lane at 0x004387B4
+    // does `lock xadd [pi+4], 1` (`use_count_`, i.e. `add_ref_copy`) and drops
+    // the previous control block through 0x004229B0, which decrements
+    // `use_count_` at +0x04 and only then falls through to the weak lane -
+    // that is `sp_counted_base::release()`, not `weak_release()`.
     template <typename T>
-    struct LegacyWeakHandle
+    struct LegacySharedHandle
     {
       T* px;                                 // +0x00
       boost::detail::sp_counted_base* pi;    // +0x04
@@ -366,8 +372,14 @@ namespace moho
     std::uint32_t mUnknown028 = 0;                      // +0x28
     LegacyVector<std::int16_t> mPrimitives{};           // +0x2C
     std::uint32_t mMode = 0;                            // +0x38
-    LegacyWeakHandle<CD3DBatchTexture> mTexture{};      // +0x3C
-    LegacyWeakHandle<CD3DDynamicTextureSheet> mDynamicTexSheet{}; // +0x44
+    // Offsets proven from the binary, not from field order:
+    //   0x00438870 `cmp [esi+3Ch], ebx` tests the incoming *sheet* pointer, and
+    //   0x0043A214 (Flush) `cmp [ebp+3Ch], ebx` / `lea eax, [ebp+3Ch]` hands
+    //   +0x3C to the texture shader var as a `shared_ptr<CD3DDynamicTextureSheet>`.
+    //   0x004387A5 `mov [edi+44h], edx` stores the incoming CD3DBatchTexture*,
+    //   with its control block at +0x48 (`cmp esi, [edi+48h]`).
+    LegacySharedHandle<CD3DDynamicTextureSheet> mDynamicTexSheet{}; // +0x3C
+    LegacySharedHandle<CD3DBatchTexture> mTexture{};                // +0x44
     float mP2x = 0.0f;                                  // +0x4C
     float mP2y = 0.0f;                                  // +0x50
     float mP1x = 1.0f;                                  // +0x54
@@ -404,6 +416,14 @@ namespace moho
     "moho::CD3DPrimBatcherRuntimeView::mMode offset must be 0x38"
   );
   static_assert(
+    offsetof(CD3DPrimBatcherRuntimeView, mDynamicTexSheet) == 0x3C,
+    "moho::CD3DPrimBatcherRuntimeView::mDynamicTexSheet offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(CD3DPrimBatcherRuntimeView, mTexture) == 0x44,
+    "moho::CD3DPrimBatcherRuntimeView::mTexture offset must be 0x44"
+  );
+  static_assert(
     offsetof(CD3DPrimBatcherRuntimeView, mViewMatrix) == 0x5C,
     "moho::CD3DPrimBatcherRuntimeView::mViewMatrix offset must be 0x5C"
   );
@@ -431,6 +451,45 @@ namespace moho
     offsetof(CD3DPrimBatcherRuntimeView, mAlphaMultiplier) == 0x120,
     "moho::CD3DPrimBatcherRuntimeView::mAlphaMultiplier offset must be 0x120"
   );
+
+  /**
+   * Address: 0x0043A8B0 (FUN_0043A8B0)
+   * Mangled: ??1WeakPtr_CD3DBatchTexture@Moho@@QAE@@Z
+   *          (the IDB label is the analyst's; the emitted body is the
+   *           out-of-line `boost::shared_ptr<Moho::CD3DBatchTexture>::reset()`
+   *           instantiation - `this_type().swap(*this)` in boost 1.34.1)
+   *
+   * IDA signature:
+   * void __usercall Moho::WeakPtr_CD3DBatchTexture::~WeakPtr_CD3DBatchTexture(
+   *     boost::shared_ptr_CD3DBatchTexture *result@<eax>);
+   *
+   * What it does:
+   * Empties one `shared_ptr<CD3DBatchTexture>` lane in place: clears `px`,
+   * detaches the control block, then drops one *strong* owner reference from
+   * the detached block - disposing the pointee when `use_count_` reaches zero
+   * and destroying the block when `weak_count_` follows it to zero.
+   */
+  void ResetSharedBatchTextureHandle(boost::shared_ptr<CD3DBatchTexture>& handle) noexcept;
+
+  /**
+   * Address: 0x0043A860 (FUN_0043A860)
+   * Mangled: ??1WeakPtr_CD3DDynamicTextureSheet@Moho@@QAE@@Z
+   *          (the IDB label is the analyst's; the emitted body is the
+   *           out-of-line
+   *           `boost::shared_ptr<Moho::CD3DDynamicTextureSheet>::reset()`
+   *           instantiation - `this_type().swap(*this)` in boost 1.34.1)
+   *
+   * IDA signature:
+   * void __usercall Moho::WeakPtr_CD3DDynamicTextureSheet::~WeakPtr_CD3DDynamicTextureSheet(
+   *     boost::shared_ptr_CD3DDynamicTextureSheet *result@<eax>);
+   *
+   * What it does:
+   * Empties one `shared_ptr<CD3DDynamicTextureSheet>` lane in place: clears
+   * `px`, detaches the control block, then drops one *strong* owner reference
+   * from the detached block - disposing the sheet when `use_count_` reaches
+   * zero and destroying the block when `weak_count_` follows it to zero.
+   */
+  void ResetSharedDynamicTextureSheetHandle(boost::shared_ptr<CD3DDynamicTextureSheet>& handle) noexcept;
 
   /**
    * Address: 0x00453AB0 (?DRAW_WireOval@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Vector3@M@Wm3@@11II@Z)
