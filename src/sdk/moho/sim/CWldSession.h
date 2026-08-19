@@ -1161,6 +1161,17 @@ namespace moho
      *
      * What it does:
      * Classifies visible units and renders strategic icons, overlays, and lifebars.
+     *
+     * Argument note: the body reads the third slot as a `float`, not as the
+     * `CWldMap*` the mangled name types it. Both reads are `movss` against
+     * `[esp+argC]` - 0x0085B843, which stores it into the icon-aux object's
+     * tick-fraction lane with `movss dword ptr [ebp+1Ch], xmm0`, and
+     * 0x0085BCF8, which loads it straight into `xmm1` as the interpolant for
+     * `UserEntity::GetInterpolatedTransform(float)` at 0x0085BD08. The
+     * declared type is kept because `CRenderWorldView::Render` (0x0086EE69)
+     * passes its own `map` parameter through unchanged and the same puzzle is
+     * already documented on `DrawEconomyOverlay` below; retyping the whole
+     * `map` slot chain is a separate pass that has to own CRenderWorldView.
      */
     void RenderStrategicIcons(CameraImpl* camera, CD3DPrimBatcher* primBatcher, CWldMap* map);
 
@@ -1929,6 +1940,47 @@ namespace moho
   extern float UI_RenProjectileGlowMax;    // 0x00F57B2C
   extern float UI_RenProjectileGlowPeriod; // 0x00F57B30
   extern float UI_CurGlowTime;             // 0x010A6460
+
+  /**
+   * Strategic-icon and unit-bar console variables, read by the strategic-icon
+   * pass (`CWldSession::RenderStrategicIcons` 0x0085B6E0 and the four emitters
+   * it drives: the lifebar/fuel/shield bar stack at 0x0085CD40, the icon quad
+   * stack at 0x0085D9A0, the custom-name label at 0x0085E0A0 and the
+   * selection-set label at 0x0085E3A0).
+   *
+   * Every address is the absolute operand of the instruction that reads the
+   * variable; the reading instruction's address is in the matching definition
+   * comment in CWldSession.cpp. `ui_LifebarOffset` is spelled exactly as the
+   * binary mangles it (`?ui_LifebarOffset@Moho@@3MA`) - lower-case `b`,
+   * unlike the `ui_LifeBar*` colour/cutoff family next to it.
+   */
+  extern bool ui_RenderUnitBars;               // 0x00F57B26
+  extern bool ui_RenderIcons;                  // 0x00F57B27
+  extern float ui_lifebarHeight;               // 0x00F57B6C
+  extern float ui_LifebarWidth;                // 0x00F57B70
+  extern float ui_LifebarLOD;                  // 0x00F57B74
+  extern float ui_LifebarOffset;               // 0x00F57B78
+  extern bool ui_NisRenderIcons;               // 0x00F57B7C
+  extern bool ui_RenderCustomNames;            // 0x00F57B7D
+  extern bool ui_RenderSelectionSetNames;      // 0x00F57B7E
+  extern std::uint32_t ui_CustomNameColor;     // 0x00F57B80
+  extern std::int32_t ui_CustomNameFontSize;   // 0x00F57B84
+  extern std::uint32_t ui_SelectionSetNamesColor; // 0x00F57B88
+  extern float ui_StrategicIconBlinkRate;      // 0x00F57B8C
+  extern float ui_FuelEmptyBlinkRate;          // 0x00F57B90
+  extern float ui_StrategicIconBlinkDuration;  // 0x00F57B94
+  extern std::uint32_t ui_LifeBarGoodColor;    // 0x00F57B98
+  extern std::uint32_t ui_LifeBarMedColor;     // 0x00F57B9C
+  extern std::uint32_t ui_LifeBarBadColor;     // 0x00F57BA0
+  extern float ui_LifeBarGoodCutoff;           // 0x00F57BA4
+  extern float ui_LifeBarBadCutoff;            // 0x00F57BA8
+  extern std::uint32_t ui_FuelBarColor;        // 0x00F57BAC
+  extern std::uint32_t ui_FuelWarningColor;    // 0x00F57BB0
+  extern std::uint32_t ui_ShieldBarColor;      // 0x00F57BB4
+  extern std::uint32_t ui_ProgressBarColor;    // 0x00F57BB8
+  extern msvc8::string ui_CustomNameFont;      // 0x00F5B300
+  extern bool ui_ForceLifbarsOnEnemy;          // 0x010A644A
+  extern bool ui_AlwaysRenderStrategicIcons;   // 0x010A644B
 
   /**
    * Debug toggle gating `UICommandGraph::DrawCommandGraphMesh`'s path-preview

@@ -1319,6 +1319,39 @@ namespace moho
   float UI_RenProjectileGlowMax = 0.0f;     // 0x00F57B2C
   float UI_RenProjectileGlowPeriod = 0.0f;  // 0x00F57B30
   float UI_CurGlowTime = 0.0f;              // 0x010A6460
+
+  // Strategic-icon and unit-bar console variables. None of these existed in
+  // the tree; every address below is the absolute operand of the instruction
+  // that reads it, taken from the `.asm` of the five functions that make up
+  // the strategic-icon pass (0x0085B6E0, 0x0085CD40, 0x0085D9A0, 0x0085E0A0,
+  // 0x0085E3A0). All ship zeroed - the console/UI layer writes them.
+  bool ui_RenderUnitBars = false;                 // 0x00F57B26 (0x0085BFDB)
+  bool ui_RenderIcons = false;                    // 0x00F57B27 (0x0085C0B1)
+  float ui_lifebarHeight = 0.0f;                  // 0x00F57B6C (0x0085CDCB)
+  float ui_LifebarWidth = 0.0f;                   // 0x00F57B70 (0x0085CDB6)
+  float ui_LifebarLOD = 0.0f;                     // 0x00F57B74 (0x0085BFE8)
+  float ui_LifebarOffset = 0.0f;                  // 0x00F57B78 (0x0085CECE)
+  bool ui_NisRenderIcons = false;                 // 0x00F57B7C (0x0085C0A4)
+  bool ui_RenderCustomNames = false;              // 0x00F57B7D (0x0085E0BE)
+  bool ui_RenderSelectionSetNames = false;        // 0x00F57B7E (0x0085E3BE)
+  std::uint32_t ui_CustomNameColor = 0u;          // 0x00F57B80 (0x0085E2ED)
+  std::int32_t ui_CustomNameFontSize = 0;         // 0x00F57B84 (0x0085E145)
+  std::uint32_t ui_SelectionSetNamesColor = 0u;   // 0x00F57B88 (0x0085E72A)
+  float ui_StrategicIconBlinkRate = 0.0f;         // 0x00F57B8C (0x0085DC44)
+  float ui_FuelEmptyBlinkRate = 0.0f;             // 0x00F57B90 (0x0085D113)
+  float ui_StrategicIconBlinkDuration = 0.0f;     // 0x00F57B94 (0x0085DC22)
+  std::uint32_t ui_LifeBarGoodColor = 0u;         // 0x00F57B98 (0x0085D070)
+  std::uint32_t ui_LifeBarMedColor = 0u;          // 0x00F57B9C (0x0085D085)
+  std::uint32_t ui_LifeBarBadColor = 0u;          // 0x00F57BA0 (0x0085D065)
+  float ui_LifeBarGoodCutoff = 0.0f;              // 0x00F57BA4 (0x0085D05E)
+  float ui_LifeBarBadCutoff = 0.0f;               // 0x00F57BA8 (0x0085D07C)
+  std::uint32_t ui_FuelBarColor = 0u;             // 0x00F57BAC (0x0085D0EE)
+  std::uint32_t ui_FuelWarningColor = 0u;         // 0x00F57BB0 (0x0085D135)
+  std::uint32_t ui_ShieldBarColor = 0u;           // 0x00F57BB4 (0x0085D0DA)
+  std::uint32_t ui_ProgressBarColor = 0u;         // 0x00F57BB8 (0x0085D14B)
+  msvc8::string ui_CustomNameFont{};              // 0x00F5B300 (0x0085E124)
+  bool ui_ForceLifbarsOnEnemy = false;            // 0x010A644A (0x0085C031)
+  bool ui_AlwaysRenderStrategicIcons = false;     // 0x010A644B (0x0085C148)
   // 0x010A6443 lies past ForgedAlliance.exe's raw .data (zero-filled BSS tail),
   // so the path-preview overlay ships off.
   bool ui_DrawPathPreview = false;          // 0x010A6443
@@ -3129,11 +3162,163 @@ namespace moho
       return &previewTransform;
     }
 
+    /**
+     * One classified entity in the strategic-icon pass - `struct_UnitIconData`
+     * in the IDB. `CWldSession::RenderStrategicIcons` fills one of these per
+     * visible entity, files it into one of the five runs on
+     * `StrategicIconAuxView` below, and the emitters read it back.
+     *
+     * Layout evidence, all from the binary:
+     *  - the copy-assignment at 0x0085CB00 walks every lane in order: two
+     *    dwords at `+0`/`+4`, three floats at `+8`/`+12`/`+16`, three
+     *    shared-pointer pairs at `+20`/`+24`, `+28`/`+32` and `+36`/`+40`
+     *    (each re-seated through the `use_count_`/`weak_release` pair, so each
+     *    is a `boost::shared_ptr`), then five single bytes at `+44`..`+48`;
+     *  - the destructor at 0x0085CA20 releases exactly the control blocks held
+     *    at `+0x18` (`mov esi, [edi+18h]`), `+0x20` and `+0x28`, which pins the
+     *    three shared pointers to `+0x14`, `+0x1C` and `+0x24`;
+     *  - the element stride is 0x34 in both the vector grow lane
+     *    (`add esi, 34h` @ 0x0085EF3A) and the lifebar loop
+     *    (`add edi, 34h` @ 0x0085C9C5), and every size computation in the
+     *    family divides the byte span by 52.
+     *
+     * Flag roles come from `RenderUnitIcon` (0x0085D9A0), which is the only
+     * reader: `+0x2C` gates the newly-created blink (0x0085DBF6), `+0x2D` the
+     * pause overlay quad (0x0085DCD5), `+0x2E` the stunned overlay quad
+     * (0x0085DD3C), `+0x2F` suppresses the base icon quad (0x0085DC90) and
+     * `+0x30` marks the formation-preview ghost, whose colour is alpha-halved
+     * instead of team-coloured (0x0085DBE1).
+     *
+     * The binary's per-type container and special-member emissions for this
+     * struct are all covered by code that already exists, so none of them get
+     * a hand-written copy here:
+     *  - 0x0085CA20 is the compiler-generated `~UnitIconData` (three
+     *    `shared_ptr` releases in reverse declaration order);
+     *  - 0x0085CB00 is the compiler-generated `operator=`;
+     *  - 0x0085ED70 / 0x0085EED0 / 0x0085F1B0 / 0x0085F290 are
+     *    `msvc8::vector<UnitIconData>`'s `reserve` / `push_back` /
+     *    `erase(first,last)` / destructor, and 0x0085F140, 0x0085F930,
+     *    0x0085FDB0, 0x0085FFB0 and 0x0085F310 are that same instantiation's
+     *    grow, allocate, copy-construct, uninitialised-copy and length-error
+     *    lanes. They belong on `msvc8::vector<T>` in
+     *    src/sdk/legacy/containers/Vector.h next to the other per-type
+     *    emissions listed there, not as a second set of container primitives.
+     */
+    struct UnitIconData
+    {
+      UserEntity* mUnit = nullptr;                       // +0x00
+      const REntityBlueprint* mBlueprint = nullptr;      // +0x04
+      float mWorldX = 0.0f;                              // +0x08
+      float mWorldY = 0.0f;                              // +0x0C
+      float mWorldZ = 0.0f;                              // +0x10
+      boost::shared_ptr<CD3DBatchTexture> mIconTexture;    // +0x14
+      boost::shared_ptr<CD3DBatchTexture> mPausedTexture;  // +0x1C
+      boost::shared_ptr<CD3DBatchTexture> mStunnedTexture; // +0x24
+      /// Own or allied unit: the only ones whose icon blinks while fresh.
+      bool mIsFriendly = false;        // +0x2C
+      /// Draw the pause/toggle-off overlay over the icon.
+      bool mShowPausedOverlay = false; // +0x2D
+      /// Draw the stunned overlay over the icon.
+      bool mShowStunnedOverlay = false; // +0x2E
+      /// The unit's mesh is already on screen, so only the overlays are drawn.
+      bool mSuppressBaseIcon = false;  // +0x2F
+      /// Formation-preview ghost rather than a live unit.
+      bool mIsFormationGhost = false;  // +0x30
+      std::uint8_t pad_0031_0033[0x03]{};
+    };
+
+    static_assert(sizeof(UnitIconData) == 0x34, "UnitIconData size must be 0x34");
+    static_assert(offsetof(UnitIconData, mBlueprint) == 0x04, "UnitIconData::mBlueprint offset must be 0x04");
+    static_assert(offsetof(UnitIconData, mWorldX) == 0x08, "UnitIconData::mWorldX offset must be 0x08");
+    static_assert(offsetof(UnitIconData, mWorldZ) == 0x10, "UnitIconData::mWorldZ offset must be 0x10");
+    static_assert(offsetof(UnitIconData, mIconTexture) == 0x14, "UnitIconData::mIconTexture offset must be 0x14");
+    static_assert(offsetof(UnitIconData, mPausedTexture) == 0x1C, "UnitIconData::mPausedTexture offset must be 0x1C");
+    static_assert(
+      offsetof(UnitIconData, mStunnedTexture) == 0x24, "UnitIconData::mStunnedTexture offset must be 0x24"
+    );
+    static_assert(offsetof(UnitIconData, mIsFriendly) == 0x2C, "UnitIconData::mIsFriendly offset must be 0x2C");
+    static_assert(
+      offsetof(UnitIconData, mIsFormationGhost) == 0x30, "UnitIconData::mIsFormationGhost offset must be 0x30"
+    );
+
+    /**
+     * The strategic-icon pass's per-frame scratch object - `struct_IconAux` in
+     * the IDB. `CWldSession::RenderStrategicIcons` lazily allocates exactly one
+     * of these into a process-global lane (0x010C4300) on its first frame and
+     * reuses it forever after, clearing the five icon runs at the top of each
+     * frame rather than reallocating them.
+     *
+     * Size evidence: the single allocation site pushes 0xACh
+     * (`push 0ACh` @ 0x0085B72D) into `operator new` before running the
+     * constructor at 0x0085B2A0.
+     *
+     * Field evidence (constructor 0x0085B2A0 unless noted):
+     *  - `+0x00..0x0F` is the camera's viewport rect, copied a float at a time
+     *    from `GeomCamera3::viewport.r[3]` (`fld [eax+2B4h]` ->
+     *    `fstp [ebp+0]` .. `fld [eax+2C0h]` -> `fstp [ebp+0Ch]`,
+     *    0x0085B864..0x0085B88B). It is the one region the constructor leaves
+     *    alone, because the render entry rewrites it every frame.
+     *  - `+0x10` session (`mov [ebp+10h], edi` @ 0x0085B861), `+0x14` batcher
+     *    (`mov [ebp+14h], ebx` @ 0x0085B7C6), `+0x18` camera view
+     *    (`mov [ebp+18h], eax` @ 0x0085B7C0).
+     *  - `+0x1C` is a float, not the `CWldMap*` the mangled name types into
+     *    that argument slot: the render entry stores the incoming slot with
+     *    `movss dword ptr [ebp+1Ch], xmm0` (0x0085B85C) after loading it with
+     *    `movss xmm0, [esp+argC]`, and the constructor zeroes it with
+     *    `movss dword ptr [esi+1Ch], xmm0` (0x0085B2D0) rather than a `mov`.
+     *    The lifebar emitter reads it back as the sub-tick interpolant that
+     *    drives the fuel-empty blink (`*(float *)(aux+28)` at 0x0085D103).
+     *  - `+0x20` the 0xFFFFFFFF solid-colour texture the bar quads are drawn
+     *    with (`CD3DBatchTexture::FromSolidColor` @ 0x0085B349, stored at
+     *    0x0085B35B/0x0085B38A).
+     *  - `+0x28` the generic-icon table: `GetGenericIcons` is handed `aux+0x28`
+     *    (`add eax, 28h` @ 0x0085B788) and indexes it as 8-byte elements
+     *    (`&_Myfirst[2 * iconType]`), and 0x0085F020 sizes it to exactly 8.
+     *  - `+0x38`/`+0x40` the pause and stunned rest textures.
+     *  - `+0x48`, `+0x58`, `+0x68`, `+0x78`, `+0x88` the five icon runs, each
+     *    a 0x10-byte `msvc8::vector` header the frame entry clears in turn
+     *    (`lea eax, [ebp+48h]` .. `lea eax, [ebp+88h]`,
+     *    0x0085B7C3..0x0085B82D) and the constructor reserves at
+     *    0x200/0x200/0x40/0x80/0x80 elements.
+     *  - `+0x98`, `+0x9C`, `+0xA0`, `+0xA4` the four `GameColors.TeamColorMode`
+     *    entries, decoded in source order Self/Ally/Enemy/Neutral but stored
+     *    Self/Neutral/Ally/Enemy (`mov [esi+98h], eax` 0x0085B4B1,
+     *    `[esi+0A0h]` 0x0085B54C, `[esi+0A4h]` 0x0085B5DF, `[esi+9Ch]`
+     *    0x0085B672), and `+0xA8` the unidentified-blip colour
+     *    (`mov [esi+0A8h], eax` @ 0x0085B6AD).
+     *
+     * The five runs are drawn in declaration order, which is why the split
+     * matters: ground icons, then air icons on top of them (the classifier
+     * picks the second run when `RUnitBlueprint::Air.CanFly`, blueprint+0x368,
+     * is set - 0x0085C2E8), then the high-sort-priority icons whose blueprint
+     * carries its own texture, then the selected units, and finally the
+     * lifebars under their own `TLifeBar` technique.
+     */
     struct StrategicIconAuxView
     {
-      std::uint8_t mUnknown00[0x38];
-      boost::shared_ptr<CD3DBatchTexture> mPauseRestTexture;   // +0x38
-      boost::shared_ptr<CD3DBatchTexture> mStunnedRestTexture; // +0x40
+      float mViewportX = 0.0f;              // +0x00
+      float mViewportY = 0.0f;              // +0x04
+      float mViewportWidth = 0.0f;          // +0x08
+      float mViewportHeight = 0.0f;         // +0x0C
+      CWldSession* mSession = nullptr;      // +0x10
+      CD3DPrimBatcher* mBatcher = nullptr;  // +0x14
+      const GeomCamera3* mCamera = nullptr; // +0x18
+      /// Sub-tick interpolant for this frame; see the `+0x1C` note above.
+      float mTickFraction = 0.0f;                                       // +0x1C
+      boost::shared_ptr<CD3DBatchTexture> mWhiteTexture;                // +0x20
+      msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mGenericIcons; // +0x28
+      boost::shared_ptr<CD3DBatchTexture> mPauseRestTexture;            // +0x38
+      boost::shared_ptr<CD3DBatchTexture> mStunnedRestTexture;          // +0x40
+      msvc8::vector<UnitIconData> mGroundIcons;       // +0x48
+      msvc8::vector<UnitIconData> mAirIcons;          // +0x58
+      msvc8::vector<UnitIconData> mHighPriorityIcons; // +0x68
+      msvc8::vector<UnitIconData> mSelectedIcons;     // +0x78
+      msvc8::vector<UnitIconData> mLifebarIcons;      // +0x88
+      std::uint32_t mSelfColor = 0u;         // +0x98
+      std::uint32_t mNeutralColor = 0u;      // +0x9C
+      std::uint32_t mAllyColor = 0u;         // +0xA0
+      std::uint32_t mEnemyColor = 0u;        // +0xA4
+      std::uint32_t mUnidentifiedColor = 0u; // +0xA8
 
       /**
        * Address: 0x0085EA60 (FUN_0085EA60, struct_IconAux::GetStunIcons)
@@ -3145,6 +3330,26 @@ namespace moho
       void LoadPauseAndStunnedRestTextures(CWldSession* session);
     };
 
+    static_assert(sizeof(StrategicIconAuxView) == 0xAC, "StrategicIconAuxView size must be 0xAC");
+    static_assert(
+      offsetof(StrategicIconAuxView, mViewportWidth) == 0x08, "StrategicIconAuxView::mViewportWidth offset must be 0x08"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mSession) == 0x10, "StrategicIconAuxView::mSession offset must be 0x10"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mBatcher) == 0x14, "StrategicIconAuxView::mBatcher offset must be 0x14"
+    );
+    static_assert(offsetof(StrategicIconAuxView, mCamera) == 0x18, "StrategicIconAuxView::mCamera offset must be 0x18");
+    static_assert(
+      offsetof(StrategicIconAuxView, mTickFraction) == 0x1C, "StrategicIconAuxView::mTickFraction offset must be 0x1C"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mWhiteTexture) == 0x20, "StrategicIconAuxView::mWhiteTexture offset must be 0x20"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mGenericIcons) == 0x28, "StrategicIconAuxView::mGenericIcons offset must be 0x28"
+    );
     static_assert(
       offsetof(StrategicIconAuxView, mPauseRestTexture) == 0x38,
       "StrategicIconAuxView::mPauseRestTexture offset must be 0x38"
@@ -3152,6 +3357,29 @@ namespace moho
     static_assert(
       offsetof(StrategicIconAuxView, mStunnedRestTexture) == 0x40,
       "StrategicIconAuxView::mStunnedRestTexture offset must be 0x40"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mGroundIcons) == 0x48, "StrategicIconAuxView::mGroundIcons offset must be 0x48"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mAirIcons) == 0x58, "StrategicIconAuxView::mAirIcons offset must be 0x58"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mHighPriorityIcons) == 0x68,
+      "StrategicIconAuxView::mHighPriorityIcons offset must be 0x68"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mSelectedIcons) == 0x78, "StrategicIconAuxView::mSelectedIcons offset must be 0x78"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mLifebarIcons) == 0x88, "StrategicIconAuxView::mLifebarIcons offset must be 0x88"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mSelfColor) == 0x98, "StrategicIconAuxView::mSelfColor offset must be 0x98"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mUnidentifiedColor) == 0xA8,
+      "StrategicIconAuxView::mUnidentifiedColor offset must be 0xA8"
     );
 
     /**
@@ -12505,13 +12733,44 @@ namespace moho
     RenderStrategicIcons(CameraImpl* const /*camera*/, CD3DPrimBatcher* const /*primBatcher*/, CWldMap* const /*map*/)
   {
     // Recovered 0x0085B6E0 high-level flow:
-    // 1) Lazy-create icon auxiliary cache object (0x0085B2A0/0x0085FA20).
-    // 2) Classify units into icon/lifebar buckets (vec1..vec5).
-    // 3) Render strategic icons via RenderUnitIcon (0x0085D9A0).
-    // 4) Render formation icon pass and unit lifebar pass.
+    //  1) Read `show_attached_unit_lifebars` through OPTIONS_GetBool
+    //     (0x0085B719) and lazily build the process-global icon-aux object at
+    //     0x010C4300 - `operator new(0xAC)` + ctor 0x0085B2A0, then
+    //     GetGenericIcons (0x0085E7F0) and GetStunIcons (0x0085EA60) once.
+    //  2) Re-seat the aux camera/batcher/session/tick lanes, clear the five
+    //     icon runs (0x0085F1B0 per run) and push the pixel-exact screen
+    //     projection (MakeViewportPixelProjection, inlined at
+    //     0x0085B8B4..0x0085B95E) plus the identity view matrix.
+    //  3) Walk `CameraImpl::GetArmyUnitsInFrustum` (vtable slot 40, dispatched
+    //     at 0x0085BA9B) and classify each live entity that has a strategic
+    //     icon name into ground / air / high-priority / selected / lifebar
+    //     runs, plus the single hovered-unit slot.
+    //  4) Draw the runs in that order under the "TStrategicIcon" technique via
+    //     RenderUnitIcon (0x0085D9A0), then the formation ghost pass under
+    //     "TStrategicFormationIcon", then the lifebar pass under "TLifeBar"
+    //     (0x0085CD40 bars -> 0x0085E0A0 custom name -> 0x0085E3A0
+    //     selection-set name), flushing the batcher between passes.
     //
-    // Deep lift blockers:
-    // struct_IconAux/UnitIconData concrete layouts and CD3D* render interfaces.
+    // Layout blockers RESOLVED (see `UnitIconData` / `StrategicIconAuxView`
+    // above): both structs are now fully typed and offset-asserted from the
+    // constructor, copy-assignment, destructor and element-stride evidence.
+    //
+    // Remaining blockers are all missing API in headers this pass does not
+    // own, not missing evidence:
+    //  - `CameraImpl::GetArmyUnitsInFrustum` - vtable slot 40 (dispatched
+    //    through `[eax+0A0h]` at 0x0085BA71), returning
+    //    `gpg::fastvector_n<WeakPtr<UserEntity>, 40>&`. Not declared in
+    //    CameraImpl.h, and without it there is no unit list to classify.
+    //  - `Moho::teamcolors`, the per-army palette at 0x0128F1C0 that
+    //    RenderUnitIcon indexes when `CWldSession::mTeamColorMode` is on.
+    //  - `CWldSession`'s entity-id map, which the formation pass looks units
+    //    up in; it lives inside the `mEntitySpatialDbStorage` blob and is not
+    //    modelled yet.
+    //  - `RUnitBlueprint`'s strategic-icon sort priority: the classifier
+    //    compares the BYTE at blueprint+0x158 against 'A'
+    //    (`cmp byte ptr [edx+158h], 41h` @ 0x0085C2C0), while
+    //    REntityBlueprint.h currently types that lane as the 32-bit
+    //    `mStrategicIconRuntimeWord`.
   }
 
   /**
