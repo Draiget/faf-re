@@ -114,9 +114,20 @@ namespace moho
 
   /**
    * Address: 0x0043FD20 (FUN_0043FD20, sub_43FD20)
+   * Address: 0x0043FB10 (FUN_0043FB10, Moho::WeakPtr_VertexBufferD3D9::Release)
    *
    * What it does:
    * Releases retained vertex-buffer ownership and clears handle lanes.
+   * `BufferHandle` is `boost::shared_ptr<gpg::gal::VertexBufferD3D9>`
+   * (`ID3DVertexStream::BufferHandle`); `mBuffer.reset()` compiles down to
+   * this exact `sp_counted_impl_p` release body (decrement `use_count_`,
+   * `dispose()` at zero, decrement `weak_count_`, `destroy()` at zero) -
+   * one binary address shared by every `boost::shared_ptr<VertexBufferD3D9>`
+   * release/destroy site in this instantiation (SParticleBuffer, BoxRenderer,
+   * BoundaryRenderer, Cartographic, RangeRenderer, SkyDome, VisionRenderer,
+   * D3D9Interfaces, D3D10Interfaces - all already recovered, all reached via
+   * their own `.reset()`/destructor call on a `boost::shared_ptr<VertexBufferD3D9>`
+   * member, not a direct call to this address).
    */
   void CD3DVertexStream::ReleaseBufferHandle()
   {
