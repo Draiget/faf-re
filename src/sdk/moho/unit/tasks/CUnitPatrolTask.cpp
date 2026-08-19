@@ -18,6 +18,7 @@
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/CAiTransportImpl.h"
+#include "moho/ai/EFormationdStatusTypeInfo.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/ai/IFormationInstance.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
@@ -218,10 +219,10 @@ namespace moho
    */
   CUnitPatrolTask::CUnitPatrolTask() noexcept
     : CCommandTask()
-    , mFirstCommand(nullptr)
-    , mCommandEventListener()
-    , mReserved40(0)
-    , mFormationStatusListener()
+    , CUnitPatrolTaskCommandSlot()
+    , Listener<ECommandEvent>()
+    , CUnitPatrolTaskReservedSlot()
+    , Listener<EFormationdStatus>()
     , mDispatch(nullptr)
     , mBoundCommand(nullptr)
     , mFormationInstance(nullptr)
@@ -265,10 +266,10 @@ namespace moho
     const bool inFormation
   )
     : CCommandTask(dispatchTask)
-    , mFirstCommand(nullptr)
-    , mCommandEventListener()
-    , mReserved40(0)
-    , mFormationStatusListener()
+    , CUnitPatrolTaskCommandSlot()
+    , Listener<ECommandEvent>()
+    , CUnitPatrolTaskReservedSlot()
+    , Listener<EFormationdStatus>()
     , mDispatch(static_cast<IAiCommandDispatchImpl*>(dispatchTask))
     , mBoundCommand(nullptr)
     , mFormationInstance(formationInstance)
@@ -310,8 +311,8 @@ namespace moho
     // falls back to the node's own self-linked broadcaster to stay well-defined.
     Broadcaster* const commandBroadcasterHead = (frontCommand != nullptr)
       ? static_cast<Broadcaster*>(frontCommand)
-      : &mCommandEventListener.mListenerLink;
-    mCommandEventListener.mListenerLink.ListLinkBefore(commandBroadcasterHead);
+      : &this->Listener<ECommandEvent>::mListenerLink;
+    Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandBroadcasterHead);
 
     // Link the per-army membership node into the sim entity DB's registered-set
     // list (binary `mUnit->mSim->mEntityDB + 0x18`).
@@ -325,7 +326,7 @@ namespace moho
     if (mFormationInstance != nullptr) {
       if (Broadcaster* const formationHead = FormationStatusBroadcasterHead(mFormationInstance);
           formationHead != nullptr) {
-        mFormationStatusListener.mListenerLink.ListLinkBefore(formationHead);
+        Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(formationHead);
       }
     }
 
@@ -379,7 +380,7 @@ namespace moho
   {
     // (1) Unconditionally unlink the command-event listener lane
     // (0x0061B17A: splice prev/next, then self-relink the node).
-    mCommandEventListener.mListenerLink.ListUnlink();
+    Listener<ECommandEvent>::mListenerLink.ListUnlink();
 
     // (2) Navigator branch: stop honoring the formation, and abort the active
     // move only when the unit's current and previous positions compare equal
@@ -395,7 +396,7 @@ namespace moho
     // (3) Formation-status listener lane: unlink only when a formation instance
     // is bound (0x0061B1CF: `cmp [esi+58h], 0`).
     if (mFormationInstance != nullptr) {
-      mFormationStatusListener.mListenerLink.ListUnlink();
+      Listener<EFormationdStatus>::mListenerLink.ListUnlink();
     }
 
     // (4) Clear the two patrol move-state bits on the owner unit
@@ -408,6 +409,47 @@ namespace moho
     // (0x0061B21F..0x0061B250: three `movss` stores from the shared `vec0`
     // zero-vector global into `Unit::GuardedPos`).
     mUnit->GuardedPos = Wm3::Vector3f::Zero();
+  }
+
+  /**
+   * Address: 0x0061C3E0 (FUN_0061C3E0, Moho::CUnitPatrolTask::OnEvent)
+   *
+   * What it does:
+   * See the header declaration for the full behavior summary.
+   */
+  void CUnitPatrolTask::OnEvent(const ECommandEvent /*event*/)
+  {
+    SOCellPos cell{};
+    CUnitCommand::GetPosition(mBoundCommand, mUnit, &cell);
+
+    mGoal.minX = cell.x;
+    mGoal.minZ = cell.z;
+    mGoal.maxX = cell.x + 1;
+    mGoal.maxZ = cell.z + 1;
+    mGoal.aux0 = 0;
+    mGoal.aux1 = 0;
+    mGoal.aux2 = 0;
+    mGoal.aux3 = 0;
+    mGoal.aux4 = 0;
+
+    if (mUnit->AiNavigator != nullptr && mMoving) {
+      mUnit->AiNavigator->SetGoal(mGoal);
+    }
+
+    RecomputePatrolSearchBox();
+  }
+
+  /**
+   * Address: 0x0061C470 (FUN_0061C470, Moho::CUnitPatrolTask::OnEvent)
+   *
+   * What it does:
+   * See the header declaration for the full behavior summary.
+   */
+  void CUnitPatrolTask::OnEvent(const EFormationdStatus event)
+  {
+    if (event == FORMATIONSTATUS_FormationAtGoal) {
+      mNavStalled = true;
+    }
   }
 
   namespace
