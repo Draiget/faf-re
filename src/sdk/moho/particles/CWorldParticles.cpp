@@ -364,7 +364,7 @@ namespace
     }
   };
 
-  [[maybe_unused]] ParticleShaderVarBootstrap gParticleShaderVarBootstrap;
+  ParticleShaderVarBootstrap gParticleShaderVarBootstrap;
 
   template <typename TValue>
   [[nodiscard]] std::size_t RenderBucketVectorCount(
@@ -692,7 +692,7 @@ namespace
    * What it does:
    * Returns the key lane address from one particle-bucket tree entry-node slot.
    */
-  [[maybe_unused]] moho::ParticleBucketKeyRuntime* GetParticleBucketEntryNodeKeySlotA(
+  moho::ParticleBucketKeyRuntime* GetParticleBucketEntryNodeKeySlotA(
     ParticleBucketTreeEntryNodeRuntime* const* const nodeSlot
   ) noexcept
   {
@@ -705,7 +705,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket tree entry-node key-slot accessor.
    */
-  [[maybe_unused]] moho::ParticleBucketKeyRuntime* GetParticleBucketEntryNodeKeySlotB(
+  moho::ParticleBucketKeyRuntime* GetParticleBucketEntryNodeKeySlotB(
     ParticleBucketTreeEntryNodeRuntime* const* const nodeSlot
   ) noexcept
   {
@@ -718,7 +718,7 @@ namespace
    * What it does:
    * Returns the key lane address from one trail-bucket tree entry-node slot.
    */
-  [[maybe_unused]] moho::TrailBucketKeyRuntime* GetTrailBucketEntryNodeKeySlotA(
+  moho::TrailBucketKeyRuntime* GetTrailBucketEntryNodeKeySlotA(
     TrailBucketTreeEntryNodeRuntime* const* const nodeSlot
   ) noexcept
   {
@@ -731,7 +731,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket tree entry-node key-slot accessor.
    */
-  [[maybe_unused]] moho::TrailBucketKeyRuntime* GetTrailBucketEntryNodeKeySlotB(
+  moho::TrailBucketKeyRuntime* GetTrailBucketEntryNodeKeySlotB(
     TrailBucketTreeEntryNodeRuntime* const* const nodeSlot
   ) noexcept
   {
@@ -1003,7 +1003,7 @@ namespace
     return outNode;
   }
 
-  [[maybe_unused]] void DestroyParticleBucketTreeNodesRecursive(
+  void DestroyParticleBucketTreeNodesRecursive(
     ParticleBucketTreeEntryNodeRuntime* const node,
     ParticleBucketTreeEntryNodeRuntime* const head
   ) noexcept
@@ -1025,7 +1025,7 @@ namespace
     ::operator delete(node);
   }
 
-  [[maybe_unused]] void DestroyParticleBucketTreeNodesRecursive(
+  void DestroyParticleBucketTreeNodesRecursive(
     moho::ParticleBucketTreeNodeRuntime* const node,
     moho::ParticleBucketTreeNodeRuntime* const head
   ) noexcept
@@ -1036,7 +1036,7 @@ namespace
     );
   }
 
-  [[maybe_unused]] void DestroyTrailBucketTreeNodesRecursive(
+  void DestroyTrailBucketTreeNodesRecursive(
     TrailBucketTreeEntryNodeRuntime* const node,
     TrailBucketTreeEntryNodeRuntime* const head
   ) noexcept
@@ -1058,7 +1058,7 @@ namespace
     ::operator delete(node);
   }
 
-  [[maybe_unused]] void DestroyTrailBucketTreeNodesRecursive(
+  void DestroyTrailBucketTreeNodesRecursive(
     moho::TrailBucketTreeNodeRuntime* const node,
     moho::TrailBucketTreeNodeRuntime* const head
   ) noexcept
@@ -1100,7 +1100,7 @@ namespace
    * Releases one particle-bucket map lane: destroys mapped bucket payloads,
    * destroys all tree nodes/keys, then frees the map head sentinel.
    */
-  [[maybe_unused]] void ReleaseParticleBucketTreeStorage(
+  void ReleaseParticleBucketTreeStorage(
     moho::ParticleBucketTreeRuntime& treeRuntime
   ) noexcept
   {
@@ -1126,7 +1126,7 @@ namespace
    * Releases one trail-bucket map lane: destroys mapped bucket payloads,
    * destroys all tree nodes/keys, then frees the map head sentinel.
    */
-  [[maybe_unused]] void ReleaseTrailBucketTreeStorage(
+  void ReleaseTrailBucketTreeStorage(
     moho::TrailBucketTreeRuntime& treeRuntime
   ) noexcept
   {
@@ -1352,7 +1352,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAG() noexcept {}
+  void NoOpHelperThunkAG() noexcept {}
 
   /**
    * Address: 0x0049C9B0 (FUN_0049C9B0, nullsub_605)
@@ -1360,7 +1360,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAH() noexcept {}
+  void NoOpHelperThunkAH() noexcept {}
 
   /**
    * Address: 0x0049C9D0 (FUN_0049C9D0, sub_49C9D0)
@@ -1383,7 +1383,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAI() noexcept {}
+  void NoOpHelperThunkAI() noexcept {}
 
   /**
    * Address: 0x00498600 (FUN_00498600, sub_498600)
@@ -1519,7 +1519,7 @@ namespace
    * Duplicate `(pointer, inserted-flag)` lane writer retained for callsite
    * parity.
    */
-  [[maybe_unused]] PointerByteFlagPairRuntime* WritePointerByteFlagPairFromSlotsDuplicateA(
+  PointerByteFlagPairRuntime* WritePointerByteFlagPairFromSlotsDuplicateA(
     PointerByteFlagPairRuntime* const outPair,
     void* const* const pointerSlot,
     const std::uint8_t* const flagSlot
@@ -1537,7 +1537,7 @@ namespace
    * Duplicate `(pointer, inserted-flag)` lane writer retained for callsite
    * parity.
    */
-  [[maybe_unused]] PointerByteFlagPairRuntime* WritePointerByteFlagPairFromSlotsDuplicateB(
+  PointerByteFlagPairRuntime* WritePointerByteFlagPairFromSlotsDuplicateB(
     PointerByteFlagPairRuntime* const outPair,
     void* const* const pointerSlot,
     const std::uint8_t* const flagSlot
@@ -1589,7 +1589,7 @@ namespace
    * What it does:
    * Duplicate pointer-slot writer retained for callsite parity.
    */
-  [[maybe_unused]] void** WritePointerSlotValueE(void** const outPointerSlot, void* const pointer) noexcept
+  void** WritePointerSlotValueE(void** const outPointerSlot, void* const pointer) noexcept
   {
     *outPointerSlot = pointer;
     return outPointerSlot;
@@ -1601,7 +1601,7 @@ namespace
    * What it does:
    * Duplicate pointer-slot writer retained for callsite parity.
    */
-  [[maybe_unused]] void** WritePointerSlotValueF(void** const outPointerSlot, void* const pointer) noexcept
+  void** WritePointerSlotValueF(void** const outPointerSlot, void* const pointer) noexcept
   {
     *outPointerSlot = pointer;
     return outPointerSlot;
@@ -1613,7 +1613,7 @@ namespace
    * What it does:
    * Duplicate pointer-slot writer retained for callsite parity.
    */
-  [[maybe_unused]] void** WritePointerSlotValueG(void** const outPointerSlot, void* const pointer) noexcept
+  void** WritePointerSlotValueG(void** const outPointerSlot, void* const pointer) noexcept
   {
     *outPointerSlot = pointer;
     return outPointerSlot;
@@ -1625,7 +1625,7 @@ namespace
    * What it does:
    * Duplicate pointer-slot writer retained for callsite parity.
    */
-  [[maybe_unused]] void** WritePointerSlotValueH(void** const outPointerSlot, void* const pointer) noexcept
+  void** WritePointerSlotValueH(void** const outPointerSlot, void* const pointer) noexcept
   {
     *outPointerSlot = pointer;
     return outPointerSlot;
@@ -2270,7 +2270,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallB(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallB(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x0049C670 (FUN_0049C670, sub_49C670)
@@ -2289,7 +2289,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAF() noexcept {}
+  void NoOpHelperThunkAF() noexcept {}
 
   [[nodiscard]] moho::TrailSegmentPoolNodeRuntime* AllocateTrailSegmentPoolHeadNode()
   {
@@ -2840,7 +2840,7 @@ namespace
    * What it does:
    * Advances one particle-bucket iterator slot to its in-order successor.
    */
-  [[maybe_unused]] ParticleBucketTreeEntryNodeRuntime* MoveParticleBucketIteratorToNext(
+  ParticleBucketTreeEntryNodeRuntime* MoveParticleBucketIteratorToNext(
     ParticleBucketTreeEntryNodeRuntime** const inOutNode
   ) noexcept
   {
@@ -2858,7 +2858,7 @@ namespace
    * What it does:
    * Advances one trail-bucket iterator slot to its in-order successor.
    */
-  [[maybe_unused]] TrailBucketTreeEntryNodeRuntime* MoveTrailBucketIteratorToNext(
+  TrailBucketTreeEntryNodeRuntime* MoveTrailBucketIteratorToNext(
     TrailBucketTreeEntryNodeRuntime** const inOutNode
   ) noexcept
   {
@@ -2876,7 +2876,7 @@ namespace
    * What it does:
    * Thunk-style duplicate for particle-bucket iterator advance.
    */
-  [[maybe_unused]] ParticleBucketTreeEntryNodeRuntime* MoveParticleBucketIteratorToNextDuplicate(
+  ParticleBucketTreeEntryNodeRuntime* MoveParticleBucketIteratorToNextDuplicate(
     ParticleBucketTreeEntryNodeRuntime** const inOutNode
   ) noexcept
   {
@@ -2889,7 +2889,7 @@ namespace
    * What it does:
    * Thunk-style duplicate for trail-bucket iterator advance.
    */
-  [[maybe_unused]] TrailBucketTreeEntryNodeRuntime* MoveTrailBucketIteratorToNextDuplicate(
+  TrailBucketTreeEntryNodeRuntime* MoveTrailBucketIteratorToNextDuplicate(
     TrailBucketTreeEntryNodeRuntime** const inOutNode
   ) noexcept
   {
@@ -2902,7 +2902,7 @@ namespace
    * What it does:
    * Thunk-style duplicate for particle-bucket iterator advance.
    */
-  [[maybe_unused]] ParticleBucketTreeEntryNodeRuntime* MoveParticleBucketIteratorToNextDuplicateB(
+  ParticleBucketTreeEntryNodeRuntime* MoveParticleBucketIteratorToNextDuplicateB(
     ParticleBucketTreeEntryNodeRuntime** const inOutNode
   ) noexcept
   {
@@ -2915,7 +2915,7 @@ namespace
    * What it does:
    * Thunk-style duplicate for trail-bucket iterator advance.
    */
-  [[maybe_unused]] TrailBucketTreeEntryNodeRuntime* MoveTrailBucketIteratorToNextDuplicateB(
+  TrailBucketTreeEntryNodeRuntime* MoveTrailBucketIteratorToNextDuplicateB(
     TrailBucketTreeEntryNodeRuntime** const inOutNode
   ) noexcept
   {
@@ -2928,7 +2928,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAT() noexcept {}
+  void NoOpHelperThunkAT() noexcept {}
 
   /**
    * Address: 0x0049E060 (FUN_0049E060, nullsub_626)
@@ -2936,7 +2936,7 @@ namespace
    * What it does:
    * Duplicate no-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAU() noexcept {}
+  void NoOpHelperThunkAU() noexcept {}
 
   /**
    * Address: 0x0049E0A0 (FUN_0049E0A0, sub_49E0A0)
@@ -2974,7 +2974,7 @@ namespace
    * Copy-constructs one particle-bucket key/value lane from source key and
    * bucket slot pointers.
    */
-  [[maybe_unused]] ParticleBucketKeyValueRuntime* CopyConstructParticleBucketKeyValueFromKeyAndBucketSlot(
+  ParticleBucketKeyValueRuntime* CopyConstructParticleBucketKeyValueFromKeyAndBucketSlot(
     const moho::ParticleBucketKeyRuntime& sourceKey,
     ParticleBucketKeyValueRuntime* const destination,
     moho::ParticleRenderBucketRuntime* const* const bucketSlot
@@ -2992,7 +2992,7 @@ namespace
    * Copy-constructs one particle-bucket key/value temporary lane and releases
    * source key resources after transfer.
    */
-  [[maybe_unused]] ParticleBucketKeyValueRuntime* CopyConstructParticleBucketKeyValueAndReleaseSource(
+  ParticleBucketKeyValueRuntime* CopyConstructParticleBucketKeyValueAndReleaseSource(
     ParticleBucketKeyValueRuntime* const destination,
     ParticleBucketKeyValueRuntime& source
   )
@@ -3013,7 +3013,7 @@ namespace
    * What it does:
    * Writes one compact `(pointer, byte-flag)` lane into caller storage.
    */
-  [[maybe_unused]] PointerByteFlagPairRuntime* WritePointerByteFlagPairDirectA(
+  PointerByteFlagPairRuntime* WritePointerByteFlagPairDirectA(
     PointerByteFlagPairRuntime* const outPair,
     void* const pointer,
     const std::uint8_t flag
@@ -3043,7 +3043,7 @@ namespace
    * What it does:
    * Writes two dword lanes into caller output storage.
    */
-  [[maybe_unused]] DwordPairRuntime* WriteDwordPairRuntimeA(
+  DwordPairRuntime* WriteDwordPairRuntimeA(
     DwordPairRuntime* const outPair,
     const std::uint32_t value0,
     const std::uint32_t value1
@@ -3060,7 +3060,7 @@ namespace
    * What it does:
    * Writes one dword lane into caller output storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDwordSlotFromRegisterLike(
+  std::uint32_t* WriteDwordSlotFromRegisterLike(
     std::uint32_t* const outValueSlot,
     const std::uint32_t value
   ) noexcept
@@ -3093,7 +3093,7 @@ namespace
    * Copy-constructs one trail-bucket key/value lane from source key and bucket
    * slot pointers.
    */
-  [[maybe_unused]] TrailBucketKeyValueRuntime* CopyConstructTrailBucketKeyValueFromKeyAndBucketSlot(
+  TrailBucketKeyValueRuntime* CopyConstructTrailBucketKeyValueFromKeyAndBucketSlot(
     const moho::TrailBucketKeyRuntime& sourceKey,
     TrailBucketKeyValueRuntime* const destination,
     moho::TrailRenderBucketRuntime* const* const bucketSlot
@@ -3111,7 +3111,7 @@ namespace
    * Copy-constructs one trail-bucket key/value temporary lane and releases
    * source key resources after transfer.
    */
-  [[maybe_unused]] TrailBucketKeyValueRuntime* CopyConstructTrailBucketKeyValueAndReleaseSource(
+  TrailBucketKeyValueRuntime* CopyConstructTrailBucketKeyValueAndReleaseSource(
     TrailBucketKeyValueRuntime* const destination,
     TrailBucketKeyValueRuntime& source
   )
@@ -3132,7 +3132,7 @@ namespace
    * What it does:
    * Duplicate compact `(pointer, byte-flag)` lane writer.
    */
-  [[maybe_unused]] PointerByteFlagPairRuntime* WritePointerByteFlagPairDirectB(
+  PointerByteFlagPairRuntime* WritePointerByteFlagPairDirectB(
     PointerByteFlagPairRuntime* const outPair,
     void* const pointer,
     const std::uint8_t flag
@@ -3147,7 +3147,7 @@ namespace
    * What it does:
    * Duplicate two-dword lane writer.
    */
-  [[maybe_unused]] DwordPairRuntime* WriteDwordPairRuntimeB(
+  DwordPairRuntime* WriteDwordPairRuntimeB(
     DwordPairRuntime* const outPair,
     const std::uint32_t value0,
     const std::uint32_t value1
@@ -3163,7 +3163,7 @@ namespace
    * Walks one particle-bucket node iterator range, destroying mapped bucket
    * payloads while preserving key-node ownership for caller erase helpers.
    */
-  [[maybe_unused]] ParticleBucketTreeEntryNodeRuntime* DestroyParticleBucketPayloadRange(
+  ParticleBucketTreeEntryNodeRuntime* DestroyParticleBucketPayloadRange(
     ParticleBucketTreeEntryNodeRuntime* const rangeBegin,
     const ParticleBucketTreeEntryNodeRuntime* const rangeEnd
   ) noexcept
@@ -3187,7 +3187,7 @@ namespace
    * Walks one trail-bucket node iterator range, destroying mapped bucket
    * payloads while preserving key-node ownership for caller erase helpers.
    */
-  [[maybe_unused]] TrailBucketTreeEntryNodeRuntime* DestroyTrailBucketPayloadRange(
+  TrailBucketTreeEntryNodeRuntime* DestroyTrailBucketPayloadRange(
     TrailBucketTreeEntryNodeRuntime* const rangeBegin,
     const TrailBucketTreeEntryNodeRuntime* const rangeEnd
   ) noexcept
@@ -3210,7 +3210,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAV() noexcept {}
+  void NoOpHelperThunkAV() noexcept {}
 
   /**
    * Address: 0x0049E3A0 (FUN_0049E3A0, nullsub_628)
@@ -3218,7 +3218,7 @@ namespace
    * What it does:
    * Duplicate no-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAW() noexcept {}
+  void NoOpHelperThunkAW() noexcept {}
 
   /**
    * Address: 0x0049DAD0 (FUN_0049DAD0, sub_49DAD0)
@@ -4178,7 +4178,7 @@ namespace
    * Destroys one particle-bucket payload lane and releases the owning heap
    * block when present.
    */
-  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucket(moho::ParticleRenderBucketRuntime* const bucket) noexcept
+  void DestroyAndDeleteParticleRenderBucket(moho::ParticleRenderBucketRuntime* const bucket) noexcept
   {
     if (bucket == nullptr) {
       return;
@@ -4195,7 +4195,7 @@ namespace
    * Destroys one trail-bucket payload lane and releases the owning heap block
    * when present.
    */
-  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucket(moho::TrailRenderBucketRuntime* const bucket) noexcept
+  void DestroyAndDeleteTrailRenderBucket(moho::TrailRenderBucketRuntime* const bucket) noexcept
   {
     if (bucket == nullptr) {
       return;
@@ -4439,7 +4439,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAJ() noexcept {}
+  void NoOpHelperThunkAJ() noexcept {}
 
   /**
    * Address: 0x0049CD60 (FUN_0049CD60, nullsub_608)
@@ -4447,7 +4447,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAK() noexcept {}
+  void NoOpHelperThunkAK() noexcept {}
 
   /**
    * Address: 0x0049CD80 (FUN_0049CD80, sub_49CD80)
@@ -4455,7 +4455,7 @@ namespace
    * What it does:
    * Writes one duplicate 32-bit scalar lane into caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDwordSlotValueDirectDuplicateC(
+  std::uint32_t* WriteDwordSlotValueDirectDuplicateC(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -4470,7 +4470,7 @@ namespace
    * What it does:
    * Returns one fixed legacy max-count constant (`0x1FFFFFFF`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMaxElementCount_0x1FFFFFFF_TrailA() noexcept
+  std::uint32_t GetLegacyMaxElementCount_0x1FFFFFFF_TrailA() noexcept
   {
     return 0x1FFFFFFFU;
   }
@@ -4481,7 +4481,7 @@ namespace
    * What it does:
    * Returns one fixed legacy max-count constant (`0x3FFFFFFF`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMaxElementCount_0x3FFFFFFF_TrailA() noexcept
+  std::uint32_t GetLegacyMaxElementCount_0x3FFFFFFF_TrailA() noexcept
   {
     return 0x3FFFFFFFU;
   }
@@ -4492,7 +4492,7 @@ namespace
    * What it does:
    * Duplicate legacy max-count constant helper (`0x1FFFFFFF`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMaxElementCount_0x1FFFFFFF_TrailB() noexcept
+  std::uint32_t GetLegacyMaxElementCount_0x1FFFFFFF_TrailB() noexcept
   {
     return 0x1FFFFFFFU;
   }
@@ -4503,7 +4503,7 @@ namespace
    * What it does:
    * Duplicate legacy max-count constant helper (`0x3FFFFFFF`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMaxElementCount_0x3FFFFFFF_TrailB() noexcept
+  std::uint32_t GetLegacyMaxElementCount_0x3FFFFFFF_TrailB() noexcept
   {
     return 0x3FFFFFFFU;
   }
@@ -4514,7 +4514,7 @@ namespace
    * What it does:
    * Writes one duplicate 32-bit scalar lane into caller-provided storage.
    */
-  [[maybe_unused]] std::uint32_t* WriteDwordSlotValueDirectDuplicateD(
+  std::uint32_t* WriteDwordSlotValueDirectDuplicateD(
     std::uint32_t* const outValue,
     const std::uint32_t value
   ) noexcept
@@ -4529,7 +4529,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallD(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallD(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x0049D080 (FUN_0049D080, sub_49D080)
@@ -4537,7 +4537,7 @@ namespace
    * What it does:
    * Returns one fixed legacy max-count constant (`0x3FFFFFFF`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMaxElementCount_0x3FFFFFFF_TrailC() noexcept
+  std::uint32_t GetLegacyMaxElementCount_0x3FFFFFFF_TrailC() noexcept
   {
     return 0x3FFFFFFFU;
   }
@@ -4548,7 +4548,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallE(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallE(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x0049DA20 (FUN_0049DA20, sub_49DA20)
@@ -4556,7 +4556,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x03FFFFFF`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF_DuplicateA() noexcept
+  std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF_DuplicateA() noexcept
   {
     return 0x03FFFFFFU;
   }
@@ -4567,7 +4567,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x03FFFFFF`).
   */
-  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF() noexcept
+  std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF() noexcept
   {
     return 0x03FFFFFFU;
   }
@@ -4578,7 +4578,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x04924924`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x04924924() noexcept
+  std::uint32_t GetLegacyMapHelperConstant_0x04924924() noexcept
   {
     return 0x04924924U;
   }
@@ -4589,7 +4589,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x04924924`).
    */
-  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x04924924_DuplicateA() noexcept
+  std::uint32_t GetLegacyMapHelperConstant_0x04924924_DuplicateA() noexcept
   {
     return 0x04924924U;
   }
@@ -4600,7 +4600,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAP() noexcept {}
+  void NoOpHelperThunkAP() noexcept {}
 
   /**
    * Address: 0x0049DB90 (FUN_0049DB90, nullsub_622)
@@ -4608,7 +4608,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAQ() noexcept {}
+  void NoOpHelperThunkAQ() noexcept {}
 
   /**
    * Address: 0x0049DBA0 (FUN_0049DBA0, nullsub_623)
@@ -4616,7 +4616,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAR() noexcept {}
+  void NoOpHelperThunkAR() noexcept {}
 
   /**
    * Address: 0x0049DBB0 (FUN_0049DBB0, nullsub_624)
@@ -4624,7 +4624,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAS() noexcept {}
+  void NoOpHelperThunkAS() noexcept {}
 
   /**
    * Address: 0x0049EC90 (FUN_0049EC90, nullsub_641)
@@ -4632,7 +4632,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAX() noexcept {}
+  void NoOpHelperThunkAX() noexcept {}
 
   /**
    * Address: 0x0049ECB0 (FUN_0049ECB0, nullsub_642)
@@ -4640,7 +4640,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAY() noexcept {}
+  void NoOpHelperThunkAY() noexcept {}
 
   /**
    * Address: 0x0049EF40 (FUN_0049EF40, sub_49EF40)
@@ -4649,7 +4649,7 @@ namespace
    * Compares one compact pointer+flag pair by its packed dword at offset
    * `+0x04`.
    */
-  [[maybe_unused]] bool IsPointerByteFlagPairOffset4LessThan(
+  bool IsPointerByteFlagPairOffset4LessThan(
     const PointerByteFlagPairRuntime& lhs,
     const PointerByteFlagPairRuntime& rhs
   ) noexcept
@@ -4668,7 +4668,7 @@ namespace
    * Returns whether one legacy string equals one NUL-terminated C-string by
    * exact length+payload comparison.
    */
-  [[maybe_unused]] bool IsMsvc8StringEqualToCStringExact(const msvc8::string& lhs, const char* const rhs)
+  bool IsMsvc8StringEqualToCStringExact(const msvc8::string& lhs, const char* const rhs)
   {
     const std::size_t rhsLength = std::strlen(rhs);
     if (lhs.size() != rhsLength) {
@@ -4684,7 +4684,7 @@ namespace
    * What it does:
    * Returns whether two dword slots store equal values.
    */
-  [[maybe_unused]] bool AreDwordSlotsEqualA(const std::uint32_t* const lhs, const std::uint32_t* const rhs) noexcept
+  bool AreDwordSlotsEqualA(const std::uint32_t* const lhs, const std::uint32_t* const rhs) noexcept
   {
     return *lhs == *rhs;
   }
@@ -4695,7 +4695,7 @@ namespace
    * What it does:
    * Duplicate dword-slot equality comparator retained for callsite parity.
    */
-  [[maybe_unused]] bool AreDwordSlotsEqualB(const std::uint32_t* const lhs, const std::uint32_t* const rhs) noexcept
+  bool AreDwordSlotsEqualB(const std::uint32_t* const lhs, const std::uint32_t* const rhs) noexcept
   {
     return *lhs == *rhs;
   }
@@ -4706,7 +4706,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAZ() noexcept {}
+  void NoOpHelperThunkAZ() noexcept {}
 
   /**
    * Address: 0x0049EFB0 (FUN_0049EFB0, sub_49EFB0)
@@ -4714,7 +4714,7 @@ namespace
    * What it does:
    * Returns byte lane `+1` from one packed dword value.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordA(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordA(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -4758,7 +4758,7 @@ namespace
    * Copies one world-particle range into pre-constructed destination storage and
    * returns destination end.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyAssignedWorldParticleRangeAndReturnEnd(
+  moho::SWorldParticle* CopyAssignedWorldParticleRangeAndReturnEnd(
     moho::SWorldParticle* destination,
     const moho::SWorldParticle* sourceBegin,
     const moho::SWorldParticle* const sourceEnd
@@ -4778,7 +4778,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBA() noexcept {}
+  void NoOpHelperThunkBA() noexcept {}
 
   /**
    * Address: 0x0049F000 (FUN_0049F000, sub_49F000)
@@ -4786,7 +4786,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordB(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordB(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -4798,7 +4798,7 @@ namespace
    * Copies one trail-runtime range into pre-constructed destination storage and
    * returns destination end.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyAssignedTrailRuntimeRangeAndReturnEnd(
+  moho::TrailRuntimeView* CopyAssignedTrailRuntimeRangeAndReturnEnd(
     moho::TrailRuntimeView* destination,
     const moho::TrailRuntimeView* sourceBegin,
     const moho::TrailRuntimeView* const sourceEnd
@@ -4818,7 +4818,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBB() noexcept {}
+  void NoOpHelperThunkBB() noexcept {}
 
   /**
    * Address: 0x0049F050 (FUN_0049F050, sub_49F050)
@@ -4826,7 +4826,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordC(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordC(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -4837,7 +4837,7 @@ namespace
    * What it does:
    * Moves `dwordCount` dword elements and returns caller-provided token.
    */
-  [[maybe_unused]] std::uintptr_t MoveDwordRangeByCountAndReturnTokenA(
+  std::uintptr_t MoveDwordRangeByCountAndReturnTokenA(
     const std::uint32_t* const source,
     std::uint32_t* const destination,
     const std::uint32_t dwordCount,
@@ -4856,7 +4856,7 @@ namespace
    * Moves one dword range identified by begin/end pointers and returns
    * destination end.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndA(
+  std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndA(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -4876,7 +4876,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBC() noexcept {}
+  void NoOpHelperThunkBC() noexcept {}
 
   /**
    * Address: 0x0049F0C0 (FUN_0049F0C0, sub_49F0C0)
@@ -4884,7 +4884,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordD(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordD(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -4895,7 +4895,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-count helper that returns caller token.
    */
-  [[maybe_unused]] std::uintptr_t MoveDwordRangeByCountAndReturnTokenB(
+  std::uintptr_t MoveDwordRangeByCountAndReturnTokenB(
     const std::uint32_t* const source,
     std::uint32_t* const destination,
     const std::uint32_t dwordCount,
@@ -4911,7 +4911,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-end-pointer helper.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndB(
+  std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndB(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -4926,7 +4926,7 @@ namespace
    * What it does:
    * Destroys one contiguous world-particle range.
    */
-  [[maybe_unused]] void DestroyWorldParticleRange(
+  void DestroyWorldParticleRange(
     moho::SWorldParticle* begin,
     moho::SWorldParticle* const end
   ) noexcept
@@ -4944,7 +4944,7 @@ namespace
    * Copy-constructs `count` world-particle instances from one source particle
    * into destination storage with rollback on constructor failure.
    */
-  [[maybe_unused]] void CopyConstructWorldParticleFillCountOrRollback(
+  void CopyConstructWorldParticleFillCountOrRollback(
     const moho::SWorldParticle& source,
     std::uint32_t count,
     moho::SWorldParticle* destination
@@ -4973,7 +4973,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for world-particle fill-count copy construction.
    */
-  [[maybe_unused]] void ForwardCopyConstructWorldParticleFillCount(
+  void ForwardCopyConstructWorldParticleFillCount(
     const moho::SWorldParticle& source,
     const std::uint32_t count,
     moho::SWorldParticle* const destination
@@ -5173,7 +5173,7 @@ namespace
    * What it does:
    * Destroys one contiguous trail-runtime range.
    */
-  [[maybe_unused]] void DestroyTrailRuntimeViewRangeForVectorTail(
+  void DestroyTrailRuntimeViewRangeForVectorTail(
     moho::TrailRuntimeView* begin,
     const moho::TrailRuntimeView* const end
   ) noexcept
@@ -5191,7 +5191,7 @@ namespace
    * Copy-constructs `count` trail-runtime lanes from one source payload into
    * contiguous destination storage.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyConstructTrailRuntimeFillCount(
+  moho::TrailRuntimeView* CopyConstructTrailRuntimeFillCount(
     moho::TrailRuntimeView* destination,
     std::uint32_t count,
     const moho::TrailRuntimeView& source
@@ -5214,7 +5214,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for trail-runtime fill-count copy construction.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* ForwardCopyConstructTrailRuntimeFillCount(
+  moho::TrailRuntimeView* ForwardCopyConstructTrailRuntimeFillCount(
     moho::TrailRuntimeView* const destination,
     const std::uint32_t count,
     const moho::TrailRuntimeView& source
@@ -5230,7 +5230,7 @@ namespace
    * Copy-constructs one world-beam range (`[sourceBegin, sourceEnd)`) into
    * destination storage with rollback on copy failure.
    */
-  [[maybe_unused]] void CopyConstructWorldBeamRangeOrRollback(
+  void CopyConstructWorldBeamRangeOrRollback(
     const moho::SWorldBeam* sourceBegin,
     const moho::SWorldBeam* const sourceEnd,
     moho::SWorldBeam* destination
@@ -5260,7 +5260,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for world-beam range copy construction.
    */
-  [[maybe_unused]] void ForwardCopyConstructWorldBeamRange(
+  void ForwardCopyConstructWorldBeamRange(
     const moho::SWorldBeam* const sourceBegin,
     const moho::SWorldBeam* const sourceEnd,
     moho::SWorldBeam* const destination
@@ -5275,7 +5275,7 @@ namespace
    * What it does:
    * Wrapper thunk for world-beam range copy-construction with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldBeamRangeOrRollbackThunk(
+  void CopyConstructWorldBeamRangeOrRollbackThunk(
     moho::SWorldBeam* const destination,
     const moho::SWorldBeam* const sourceBegin,
     const moho::SWorldBeam* const sourceEnd
@@ -5290,7 +5290,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBD() noexcept {}
+  void NoOpHelperThunkBD() noexcept {}
 
   /**
    * Address: 0x0049F260 (FUN_0049F260, sub_49F260)
@@ -5298,7 +5298,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordE(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordE(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -5310,7 +5310,7 @@ namespace
    * Copy-constructs `count` world-beam instances from one source payload into
    * destination storage with rollback on copy failure.
    */
-  [[maybe_unused]] void CopyConstructWorldBeamFillCountOrRollback(
+  void CopyConstructWorldBeamFillCountOrRollback(
     const moho::SWorldBeam& source,
     std::uint32_t count,
     moho::SWorldBeam* destination
@@ -5339,7 +5339,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for world-beam fill-count copy construction.
    */
-  [[maybe_unused]] void ForwardCopyConstructWorldBeamFillCount(
+  void ForwardCopyConstructWorldBeamFillCount(
     const moho::SWorldBeam& source,
     const std::uint32_t count,
     moho::SWorldBeam* const destination
@@ -5354,7 +5354,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordF(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordF(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -5366,7 +5366,7 @@ namespace
    * Writes one repeated 15-float lane into `count` destination blocks and
    * returns destination end.
    */
-  [[maybe_unused]] float* FillFifteenFloatLaneAndReturnEnd(
+  float* FillFifteenFloatLaneAndReturnEnd(
     float* destination,
     std::uint32_t count,
     const float* const sourceLane
@@ -5391,7 +5391,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for 15-float-lane fill helper.
    */
-  [[maybe_unused]] float* ForwardFillFifteenFloatLane(
+  float* ForwardFillFifteenFloatLane(
     float* const destination,
     const std::uint32_t count,
     const float* const sourceLane
@@ -5406,7 +5406,7 @@ namespace
    * What it does:
    * Initializes one particle-bucket tree header with a fresh sentinel head.
    */
-  [[maybe_unused]] moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHead(
+  moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHead(
     moho::ParticleBucketTreeRuntime* const treeRuntime
   )
   {
@@ -5426,7 +5426,7 @@ namespace
    * Destroys and deletes one mapped particle-bucket payload from one tree node
    * when present.
    */
-  [[maybe_unused]] void DestroyParticleBucketNodeMappedBucketIfPresent(
+  void DestroyParticleBucketNodeMappedBucketIfPresent(
     ParticleBucketTreeEntryNodeRuntime* const node
   ) noexcept
   {
@@ -5443,7 +5443,7 @@ namespace
    * What it does:
    * Initializes one trail-bucket tree header with a fresh sentinel head.
    */
-  [[maybe_unused]] moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHead(
+  moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHead(
     moho::TrailBucketTreeRuntime* const treeRuntime
   )
   {
@@ -5463,7 +5463,7 @@ namespace
    * Destroys and deletes one mapped trail-bucket payload from one tree node
    * when present.
    */
-  [[maybe_unused]] void DestroyTrailBucketNodeMappedBucketIfPresent(
+  void DestroyTrailBucketNodeMappedBucketIfPresent(
     TrailBucketTreeEntryNodeRuntime* const node
   ) noexcept
   {
@@ -5480,7 +5480,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBE() noexcept {}
+  void NoOpHelperThunkBE() noexcept {}
 
   /**
    * Address: 0x0049F460 (FUN_0049F460, sub_49F460)
@@ -5488,7 +5488,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordG(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordG(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -5500,7 +5500,7 @@ namespace
    * Copies one dword-pair range (`[sourceBegin, sourceEnd)`) and returns
    * destination end.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeAndReturnEnd(
+  DwordPairRuntime* CopyDwordPairRangeAndReturnEnd(
     DwordPairRuntime* destination,
     const DwordPairRuntime* sourceBegin,
     const DwordPairRuntime* const sourceEnd
@@ -5521,7 +5521,7 @@ namespace
    * What it does:
    * Writes one repeated dword-pair value across `count` destination elements.
    */
-  [[maybe_unused]] DwordPairRuntime* FillDwordPairRangeFromSingleValue(
+  DwordPairRuntime* FillDwordPairRangeFromSingleValue(
     DwordPairRuntime* destination,
     const DwordPairRuntime& sourceValue,
     std::uint32_t count
@@ -5544,7 +5544,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for dword-pair fill helper.
    */
-  [[maybe_unused]] DwordPairRuntime* ForwardFillDwordPairRange(
+  DwordPairRuntime* ForwardFillDwordPairRange(
     DwordPairRuntime* const destination,
     const DwordPairRuntime& sourceValue,
     const std::uint32_t count
@@ -5559,7 +5559,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBF() noexcept {}
+  void NoOpHelperThunkBF() noexcept {}
 
   /**
    * Address: 0x0049F4C0 (FUN_0049F4C0, sub_49F4C0)
@@ -5567,7 +5567,7 @@ namespace
    * What it does:
    * Writes one repeated dword value across `count` destination elements.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeFromSingleValue(
+  std::uint32_t* FillDwordRangeFromSingleValue(
     std::uint32_t* destination,
     const std::uint32_t value,
     std::uint32_t count
@@ -5587,7 +5587,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBG() noexcept {}
+  void NoOpHelperThunkBG() noexcept {}
 
   /**
    * Address: 0x0049F4F0 (FUN_0049F4F0, sub_49F4F0)
@@ -5595,7 +5595,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordH(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordH(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -5728,7 +5728,7 @@ namespace
    * What it does:
    * Duplicate dword-pair range copier that returns destination end.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeAndReturnEndDuplicateC(
+  DwordPairRuntime* CopyDwordPairRangeAndReturnEndDuplicateC(
     DwordPairRuntime* destination,
     const DwordPairRuntime* sourceBegin,
     const DwordPairRuntime* const sourceEnd
@@ -5743,7 +5743,7 @@ namespace
    * What it does:
    * Duplicate dword-pair fill helper that writes one repeated source value.
    */
-  [[maybe_unused]] DwordPairRuntime* FillDwordPairRangeFromSingleValueDuplicateB(
+  DwordPairRuntime* FillDwordPairRangeFromSingleValueDuplicateB(
     DwordPairRuntime* destination,
     const DwordPairRuntime& sourceValue,
     std::uint32_t count
@@ -5766,7 +5766,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for duplicate dword-pair fill helper lane.
    */
-  [[maybe_unused]] DwordPairRuntime* ForwardFillDwordPairRangeDuplicate(
+  DwordPairRuntime* ForwardFillDwordPairRangeDuplicate(
     DwordPairRuntime* const destination,
     const DwordPairRuntime& sourceValue,
     const std::uint32_t count
@@ -5781,7 +5781,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBH() noexcept {}
+  void NoOpHelperThunkBH() noexcept {}
 
   /**
    * Address: 0x0049F550 (FUN_0049F550, sub_49F550)
@@ -5790,7 +5790,7 @@ namespace
    * Writes one repeated dword source value across `count` destination elements
    * and returns remaining count.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemaining(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemaining(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* destination
@@ -5811,7 +5811,7 @@ namespace
    * Calling-convention bridge thunk for world-particle range copy-construction
    * with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldParticleRangeOrRollbackBridgeThunk(
+  void CopyConstructWorldParticleRangeOrRollbackBridgeThunk(
     moho::SWorldParticle* destination,
     const moho::SWorldParticle* sourceBegin,
     const moho::SWorldParticle* const sourceEnd
@@ -5826,7 +5826,7 @@ namespace
    * What it does:
    * Assign-fills one world-particle range from one source particle.
    */
-  [[maybe_unused]] moho::SWorldParticle* FillWorldParticleAssignedRangeFromSingleValue(
+  moho::SWorldParticle* FillWorldParticleAssignedRangeFromSingleValue(
     moho::SWorldParticle* destinationBegin,
     moho::SWorldParticle* const destinationEnd,
     const moho::SWorldParticle& source
@@ -5845,7 +5845,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordI(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordI(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -5856,7 +5856,7 @@ namespace
    * What it does:
    * Assign-copy-backward helper for one world-particle range.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyBackwardWorldParticleAssignedRange(
+  moho::SWorldParticle* CopyBackwardWorldParticleAssignedRange(
     const moho::SWorldParticle* sourceBegin,
     const moho::SWorldParticle* sourceEnd,
     moho::SWorldParticle* destinationEnd
@@ -5876,7 +5876,7 @@ namespace
    * What it does:
    * Calling-convention bridge thunk for trail-runtime range copy-construction.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunk(
+  moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunk(
     moho::TrailRuntimeView* destination,
     const moho::TrailRuntimeView* sourceBegin,
     const moho::TrailRuntimeView* const sourceEnd
@@ -5891,7 +5891,7 @@ namespace
    * What it does:
    * Assign-fills one trail-runtime range from one source lane.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* FillTrailRuntimeAssignedRangeFromSingleValue(
+  moho::TrailRuntimeView* FillTrailRuntimeAssignedRangeFromSingleValue(
     moho::TrailRuntimeView* destinationBegin,
     moho::TrailRuntimeView* const destinationEnd,
     const moho::TrailRuntimeView& source
@@ -5910,7 +5910,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordJ(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordJ(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -5921,7 +5921,7 @@ namespace
    * What it does:
    * Assign-copy-backward helper for one trail-runtime range.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyBackwardTrailRuntimeAssignedRange(
+  moho::TrailRuntimeView* CopyBackwardTrailRuntimeAssignedRange(
     const moho::TrailRuntimeView* sourceBegin,
     const moho::TrailRuntimeView* sourceEnd,
     moho::TrailRuntimeView* destinationEnd
@@ -5941,7 +5941,7 @@ namespace
    * What it does:
    * Destroys one contiguous world-beam range by resetting both texture lanes.
    */
-  [[maybe_unused]] void DestroyWorldBeamRangeByTextureLaneReset(
+  void DestroyWorldBeamRangeByTextureLaneReset(
     moho::SWorldBeam* begin,
     const moho::SWorldBeam* const end
   ) noexcept
@@ -5959,7 +5959,7 @@ namespace
    * Calling-convention bridge thunk for world-beam range copy-construction
    * with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldBeamRangeOrRollbackBridgeThunk(
+  void CopyConstructWorldBeamRangeOrRollbackBridgeThunk(
     moho::SWorldBeam* destination,
     const moho::SWorldBeam* sourceBegin,
     const moho::SWorldBeam* const sourceEnd
@@ -5974,7 +5974,7 @@ namespace
    * What it does:
    * Assign-fills one world-beam range from one source beam.
    */
-  [[maybe_unused]] moho::SWorldBeam* FillWorldBeamAssignedRangeFromSingleValue(
+  moho::SWorldBeam* FillWorldBeamAssignedRangeFromSingleValue(
     moho::SWorldBeam* destinationBegin,
     moho::SWorldBeam* const destinationEnd,
     const moho::SWorldBeam& source
@@ -5993,7 +5993,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordK(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordK(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -6004,7 +6004,7 @@ namespace
    * What it does:
    * Assign-copy-backward helper for one world-beam range.
    */
-  [[maybe_unused]] moho::SWorldBeam* CopyBackwardWorldBeamAssignedRange(
+  moho::SWorldBeam* CopyBackwardWorldBeamAssignedRange(
     const moho::SWorldBeam* sourceBegin,
     const moho::SWorldBeam* sourceEnd,
     moho::SWorldBeam* destinationEnd
@@ -6024,7 +6024,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBI() noexcept {}
+  void NoOpHelperThunkBI() noexcept {}
 
   /**
    * Address: 0x0049F770 (FUN_0049F770, sub_49F770)
@@ -6032,7 +6032,7 @@ namespace
    * What it does:
    * Calling-convention bridge thunk for 15-float-lane range copying.
    */
-  [[maybe_unused]] float* CopyFifteenFloatLaneRangeBridgeThunk(
+  float* CopyFifteenFloatLaneRangeBridgeThunk(
     float* destination,
     const float* sourceBegin,
     const float* const sourceEnd
@@ -6048,7 +6048,7 @@ namespace
    * Fills each 15-float lane in one destination pointer range from one source
    * lane value.
    */
-  [[maybe_unused]] void FillFifteenFloatLaneForPointerRange(
+  void FillFifteenFloatLaneForPointerRange(
     float* destinationBegin,
     const float* const sourceLane,
     const float* const destinationEnd
@@ -6068,7 +6068,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBJ() noexcept {}
+  void NoOpHelperThunkBJ() noexcept {}
 
   /**
    * Address: 0x0049F810 (FUN_0049F810, sub_49F810)
@@ -6076,7 +6076,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordL(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordL(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -6088,7 +6088,7 @@ namespace
    * Calling-convention bridge thunk for reverse copying one 15-float-lane
    * range; returns destination begin.
    */
-  [[maybe_unused]] float* CopyBackwardFifteenFloatLaneRangeBridgeThunk(
+  float* CopyBackwardFifteenFloatLaneRangeBridgeThunk(
     float* destinationEnd,
     const float* sourceEnd,
     const float* const sourceBegin
@@ -6103,7 +6103,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBK() noexcept {}
+  void NoOpHelperThunkBK() noexcept {}
 
   /**
    * Address: 0x0049F860 (FUN_0049F860, sub_49F860)
@@ -6111,7 +6111,7 @@ namespace
    * What it does:
    * Calling-convention bridge thunk for nullable dword-pair range copy.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkA(
+  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkA(
     DwordPairRuntime* destination,
     const DwordPairRuntime* sourceEnd,
     const DwordPairRuntime* const sourceBegin
@@ -6127,7 +6127,7 @@ namespace
    * Writes one repeated dword-pair source value into
    * `[destinationBegin, destinationEnd)`.
    */
-  [[maybe_unused]] DwordPairRuntime* FillDwordPairRangeFromSingleValueByEndPointerA(
+  DwordPairRuntime* FillDwordPairRangeFromSingleValueByEndPointerA(
     DwordPairRuntime* destinationBegin,
     const DwordPairRuntime* const destinationEnd,
     const DwordPairRuntime& sourceValue
@@ -6147,7 +6147,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordM(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordM(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -6158,7 +6158,7 @@ namespace
    * What it does:
    * Copies one dword-pair range backward and returns destination begin.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginA(
+  DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginA(
     DwordPairRuntime* destinationEnd,
     const DwordPairRuntime* const sourceBegin,
     const DwordPairRuntime* sourceEnd
@@ -6173,7 +6173,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-end-pointer helper.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndC(
+  std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndC(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -6189,7 +6189,7 @@ namespace
    * Writes one repeated dword source value into
    * `[destinationBegin, destinationEnd)`.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeFromPointerValueByEndPointerA(
+  std::uint32_t* FillDwordRangeFromPointerValueByEndPointerA(
     std::uint32_t* destinationBegin,
     const std::uint32_t* const destinationEnd,
     const std::uint32_t* const sourceValue
@@ -6204,7 +6204,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordN(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordN(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -6216,7 +6216,7 @@ namespace
    * Moves one dword range into the tail ending at `destinationEnd` and returns
    * destination begin.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeIntoTailAndReturnBegin(
+  std::uint32_t* MoveDwordRangeIntoTailAndReturnBegin(
     const std::uint32_t* const sourceEnd,
     std::uint32_t* const destinationEnd,
     const std::uint32_t* const sourceBegin
@@ -6237,7 +6237,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBL() noexcept {}
+  void NoOpHelperThunkBL() noexcept {}
 
   /**
    * Address: 0x0049F960 (FUN_0049F960, sub_49F960)
@@ -6245,7 +6245,7 @@ namespace
    * What it does:
    * Duplicate nullable dword-pair range copy bridge thunk.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkB(
+  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkB(
     DwordPairRuntime* destination,
     const DwordPairRuntime* sourceEnd,
     const DwordPairRuntime* const sourceBegin
@@ -6260,7 +6260,7 @@ namespace
    * What it does:
    * Duplicate dword-pair fill helper using destination begin/end pointers.
    */
-  [[maybe_unused]] DwordPairRuntime* FillDwordPairRangeFromSingleValueByEndPointerB(
+  DwordPairRuntime* FillDwordPairRangeFromSingleValueByEndPointerB(
     DwordPairRuntime* destinationBegin,
     const DwordPairRuntime* const destinationEnd,
     const DwordPairRuntime& sourceValue
@@ -6275,7 +6275,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordO(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordO(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -6286,7 +6286,7 @@ namespace
    * What it does:
    * Duplicate backward dword-pair range copier.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginB(
+  DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginB(
     DwordPairRuntime* destinationEnd,
     const DwordPairRuntime* const sourceBegin,
     const DwordPairRuntime* sourceEnd
@@ -6301,7 +6301,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-end-pointer helper.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndD(
+  std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndD(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -6316,7 +6316,7 @@ namespace
    * What it does:
    * Duplicate dword fill helper using destination begin/end pointers.
    */
-  [[maybe_unused]] std::uint32_t* FillDwordRangeFromPointerValueByEndPointerB(
+  std::uint32_t* FillDwordRangeFromPointerValueByEndPointerB(
     std::uint32_t* destinationBegin,
     const std::uint32_t* const destinationEnd,
     const std::uint32_t* const sourceValue
@@ -6331,7 +6331,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordP(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordP(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8U) & 0xFFU);
   }
@@ -6379,7 +6379,7 @@ namespace
    * What it does:
    * Duplicate dword tail-move helper that returns destination begin.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeIntoTailAndReturnBeginDuplicateA(
+  std::uint32_t* MoveDwordRangeIntoTailAndReturnBeginDuplicateA(
     const std::uint32_t* const sourceEnd,
     std::uint32_t* const destinationEnd,
     const std::uint32_t* const sourceBegin
@@ -6394,7 +6394,7 @@ namespace
    * What it does:
    * Builds one dword-pair from object pointer plus the field lane at `+0x3C`.
    */
-  [[maybe_unused]] DwordPairRuntime* BuildPointerAndField3CPair(
+  DwordPairRuntime* BuildPointerAndField3CPair(
     DwordPairRuntime* const destination,
     const PointerWithFieldAt3CRuntime* const sourceObject
   ) noexcept
@@ -6411,7 +6411,7 @@ namespace
    * What it does:
    * Builds one dword-pair from object pointer plus the field lane at `+0x34`.
    */
-  [[maybe_unused]] DwordPairRuntime* BuildPointerAndField34Pair(
+  DwordPairRuntime* BuildPointerAndField34Pair(
     DwordPairRuntime* const destination,
     const PointerWithFieldAt34Runtime* const sourceObject
   ) noexcept
@@ -6428,7 +6428,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateA(
+  void DestroyAndDeleteParticleRenderBucketDuplicateA(
     moho::ParticleRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -6441,7 +6441,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateA(
+  void DestroyAndDeleteTrailRenderBucketDuplicateA(
     moho::TrailRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -6454,7 +6454,7 @@ namespace
    * What it does:
    * Assign-copies one world-particle payload into pre-constructed storage.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyAssignWorldParticleAndReturnDestination(
+  moho::SWorldParticle* CopyAssignWorldParticleAndReturnDestination(
     const moho::SWorldParticle& source,
     moho::SWorldParticle* const destination
   ) noexcept
@@ -6469,7 +6469,7 @@ namespace
    * What it does:
    * Assign-copies one trail-runtime payload into pre-constructed storage.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyAssignTrailRuntimeAndReturnDestination(
+  moho::TrailRuntimeView* CopyAssignTrailRuntimeAndReturnDestination(
     const moho::TrailRuntimeView& source,
     moho::TrailRuntimeView* const destination
   ) noexcept
@@ -6484,7 +6484,7 @@ namespace
    * What it does:
    * Assign-copies one world-beam payload into pre-constructed storage.
    */
-  [[maybe_unused]] moho::SWorldBeam* CopyAssignWorldBeamAndReturnDestination(
+  moho::SWorldBeam* CopyAssignWorldBeamAndReturnDestination(
     const moho::SWorldBeam& source,
     moho::SWorldBeam* const destination
   ) noexcept
@@ -6499,7 +6499,7 @@ namespace
    * What it does:
    * Copy-copies one 15-float lane into destination storage.
    */
-  [[maybe_unused]] float* CopySingleFifteenFloatLaneAndReturnDestination(
+  float* CopySingleFifteenFloatLaneAndReturnDestination(
     float* const destination,
     const float* const source
   ) noexcept
@@ -6513,7 +6513,7 @@ namespace
    * What it does:
    * Conditionally copy-constructs one world-particle when destination is valid.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyConstructWorldParticleIfDestinationPresent(
+  moho::SWorldParticle* CopyConstructWorldParticleIfDestinationPresent(
     moho::SWorldParticle* const destination,
     const moho::SWorldParticle& source
   )
@@ -6530,7 +6530,7 @@ namespace
    * What it does:
    * Destroys one world-particle payload in place.
    */
-  [[maybe_unused]] void DestroyWorldParticleInPlace(moho::SWorldParticle* const particle) noexcept
+  void DestroyWorldParticleInPlace(moho::SWorldParticle* const particle) noexcept
   {
     DestroyWorldParticleForVectorTailLocal(*particle);
   }
@@ -6542,7 +6542,7 @@ namespace
    * Conditionally assign-copies one trail-runtime payload when destination is
    * valid.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyAssignTrailRuntimeIfDestinationPresent(
+  moho::TrailRuntimeView* CopyAssignTrailRuntimeIfDestinationPresent(
     moho::TrailRuntimeView* const destination,
     const moho::TrailRuntimeView& source
   ) noexcept
@@ -6559,7 +6559,7 @@ namespace
    * What it does:
    * Destroys one trail payload in place.
    */
-  [[maybe_unused]] void DestroyTrailRuntimeInPlace(moho::TrailRuntimeView* const trail) noexcept
+  void DestroyTrailRuntimeInPlace(moho::TrailRuntimeView* const trail) noexcept
   {
     DestroyTrailRuntimeViewForVectorTailLocal(*trail);
   }
@@ -6571,7 +6571,7 @@ namespace
    * Conditionally assign-copies one world-beam payload when destination is
    * valid.
    */
-  [[maybe_unused]] moho::SWorldBeam* CopyAssignWorldBeamIfDestinationPresent(
+  moho::SWorldBeam* CopyAssignWorldBeamIfDestinationPresent(
     moho::SWorldBeam* const destination,
     const moho::SWorldBeam& source
   ) noexcept
@@ -6588,7 +6588,7 @@ namespace
    * What it does:
    * Destroys both counted texture lanes in one world-beam payload.
    */
-  [[maybe_unused]] void DestroyWorldBeamTextureLanesInPlace(moho::SWorldBeam* const beam) noexcept
+  void DestroyWorldBeamTextureLanesInPlace(moho::SWorldBeam* const beam) noexcept
   {
     DestroyWorldBeamForVectorTailLocal(*beam);
   }
@@ -6599,7 +6599,7 @@ namespace
    * What it does:
    * Conditionally copies one 15-float lane when destination is valid.
    */
-  [[maybe_unused]] float* CopySingleFifteenFloatLaneIfDestinationPresent(
+  float* CopySingleFifteenFloatLaneIfDestinationPresent(
     float* const destination,
     const float* const source
   ) noexcept
@@ -6616,7 +6616,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBM() noexcept {}
+  void NoOpHelperThunkBM() noexcept {}
 
   /**
    * Address: 0x004A0060 (FUN_004A0060, sub_4A0060)
@@ -6624,7 +6624,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateB(
+  void DestroyAndDeleteParticleRenderBucketDuplicateB(
     moho::ParticleRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -6637,7 +6637,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateB(
+  void DestroyAndDeleteTrailRenderBucketDuplicateB(
     moho::TrailRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -6650,7 +6650,7 @@ namespace
    * What it does:
    * Conditionally copies one dword-pair when destination is valid.
    */
-  [[maybe_unused]] DwordPairRuntime* CopySingleDwordPairIfDestinationPresent(
+  DwordPairRuntime* CopySingleDwordPairIfDestinationPresent(
     DwordPairRuntime* const destination,
     const DwordPairRuntime& source
   ) noexcept
@@ -6667,7 +6667,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBN() noexcept {}
+  void NoOpHelperThunkBN() noexcept {}
 
   /**
    * Address: 0x004A00C0 (FUN_004A00C0, sub_4A00C0)
@@ -6675,7 +6675,7 @@ namespace
    * What it does:
    * Duplicate conditional dword-pair copy helper.
    */
-  [[maybe_unused]] DwordPairRuntime* CopySingleDwordPairIfDestinationPresentDuplicateA(
+  DwordPairRuntime* CopySingleDwordPairIfDestinationPresentDuplicateA(
     DwordPairRuntime* const destination,
     const DwordPairRuntime& source
   ) noexcept
@@ -6689,7 +6689,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBO() noexcept {}
+  void NoOpHelperThunkBO() noexcept {}
 
   /**
    * Address: 0x004A00E0 (FUN_004A00E0, sub_4A00E0)
@@ -6697,7 +6697,7 @@ namespace
    * What it does:
    * Duplicate dword-slot equality comparator.
    */
-  [[maybe_unused]] bool AreDwordSlotsEqualC(
+  bool AreDwordSlotsEqualC(
     const std::uint32_t* const lhs,
     const std::uint32_t* const rhs
   ) noexcept
@@ -6711,7 +6711,7 @@ namespace
    * What it does:
    * Duplicate dword-slot equality comparator.
    */
-  [[maybe_unused]] bool AreDwordSlotsEqualD(
+  bool AreDwordSlotsEqualD(
     const std::uint32_t* const lhs,
     const std::uint32_t* const rhs
   ) noexcept
@@ -6725,7 +6725,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-count helper that returns caller token.
    */
-  [[maybe_unused]] std::uintptr_t MoveDwordRangeByCountAndReturnTokenC(
+  std::uintptr_t MoveDwordRangeByCountAndReturnTokenC(
     const std::uint32_t* const source,
     std::uint32_t* const destination,
     const std::uint32_t dwordCount,
@@ -6741,7 +6741,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-count helper that returns caller token.
    */
-  [[maybe_unused]] std::uintptr_t MoveDwordRangeByCountAndReturnTokenD(
+  std::uintptr_t MoveDwordRangeByCountAndReturnTokenD(
     const std::uint32_t* const source,
     std::uint32_t* const destination,
     const std::uint32_t dwordCount,
@@ -6757,7 +6757,7 @@ namespace
    * What it does:
    * Duplicate packed-dword byte-lane (`+1`) reader.
    */
-  [[maybe_unused]] std::uint8_t ReadSecondByteFromDwordQ(const std::uint32_t value) noexcept
+  std::uint8_t ReadSecondByteFromDwordQ(const std::uint32_t value) noexcept
   {
     return ReadSecondByteFromDwordP(value);
   }
@@ -6769,7 +6769,7 @@ namespace
    * Duplicate particle-bucket tree-header initialization with fresh head
    * sentinel allocation.
    */
-  [[maybe_unused]] moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHeadDuplicateA(
+  moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHeadDuplicateA(
     moho::ParticleBucketTreeRuntime* const treeRuntime
   )
   {
@@ -6783,7 +6783,7 @@ namespace
    * Duplicate trail-bucket tree-header initialization with fresh head sentinel
    * allocation.
    */
-  [[maybe_unused]] moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHeadDuplicateA(
+  moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHeadDuplicateA(
     moho::TrailBucketTreeRuntime* const treeRuntime
   )
   {
@@ -6796,7 +6796,7 @@ namespace
    * What it does:
    * Returns one mapped trail-bucket payload pointer from one tree entry-node.
    */
-  [[maybe_unused]] moho::TrailRenderBucketRuntime* ReadTrailBucketEntryNodeMappedBucket(
+  moho::TrailRenderBucketRuntime* ReadTrailBucketEntryNodeMappedBucket(
     TrailBucketTreeEntryNodeRuntime* const node
   ) noexcept
   {
@@ -6809,7 +6809,7 @@ namespace
    * What it does:
    * Duplicate dword-range fill helper that writes one source slot value.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateA(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateA(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* const destination
@@ -6824,7 +6824,7 @@ namespace
    * What it does:
    * Duplicate dword-range fill helper that writes one source slot value.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateB(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateB(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* const destination
@@ -6840,7 +6840,7 @@ namespace
    * Calling-convention bridge thunk for world-particle range copy-construction
    * with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldParticleRangeOrRollbackBridgeThunkDuplicateA(
+  void CopyConstructWorldParticleRangeOrRollbackBridgeThunkDuplicateA(
     moho::SWorldParticle* const destination,
     const moho::SWorldParticle* const sourceBegin,
     const moho::SWorldParticle* const sourceEnd
@@ -6855,7 +6855,7 @@ namespace
    * What it does:
    * Duplicate backward assign-copy helper for one world-particle range.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyBackwardWorldParticleAssignedRangeDuplicateA(
+  moho::SWorldParticle* CopyBackwardWorldParticleAssignedRangeDuplicateA(
     const moho::SWorldParticle* const sourceBegin,
     const moho::SWorldParticle* const sourceEnd,
     moho::SWorldParticle* const destinationEnd
@@ -6871,7 +6871,7 @@ namespace
    * What it does:
    * Calling-convention bridge thunk for trail-runtime range copy-construction.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunkDuplicateA(
+  moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunkDuplicateA(
     moho::TrailRuntimeView* const destination,
     const moho::TrailRuntimeView* const sourceBegin,
     const moho::TrailRuntimeView* const sourceEnd
@@ -6886,7 +6886,7 @@ namespace
    * What it does:
    * Duplicate backward assign-copy helper for one trail-runtime range.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyBackwardTrailRuntimeAssignedRangeDuplicateA(
+  moho::TrailRuntimeView* CopyBackwardTrailRuntimeAssignedRangeDuplicateA(
     const moho::TrailRuntimeView* const sourceBegin,
     const moho::TrailRuntimeView* const sourceEnd,
     moho::TrailRuntimeView* const destinationEnd
@@ -6903,7 +6903,7 @@ namespace
    * Calling-convention bridge thunk for world-beam range copy-construction
    * with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldBeamRangeOrRollbackBridgeThunkDuplicateA(
+  void CopyConstructWorldBeamRangeOrRollbackBridgeThunkDuplicateA(
     moho::SWorldBeam* const destination,
     const moho::SWorldBeam* const sourceBegin,
     const moho::SWorldBeam* const sourceEnd
@@ -6918,7 +6918,7 @@ namespace
    * What it does:
    * Duplicate backward assign-copy helper for one world-beam range.
    */
-  [[maybe_unused]] moho::SWorldBeam* CopyBackwardWorldBeamAssignedRangeDuplicateA(
+  moho::SWorldBeam* CopyBackwardWorldBeamAssignedRangeDuplicateA(
     const moho::SWorldBeam* const sourceBegin,
     const moho::SWorldBeam* const sourceEnd,
     moho::SWorldBeam* const destinationEnd
@@ -6945,7 +6945,7 @@ namespace
    * Duplicate calling-convention bridge thunk for nullable 15-float-lane range
    * copy.
    */
-  [[maybe_unused]] float* CopyFifteenFloatLaneRangeBridgeThunkDuplicateA(
+  float* CopyFifteenFloatLaneRangeBridgeThunkDuplicateA(
     float* const destination,
     const float* const sourceBegin,
     const float* const sourceEnd
@@ -6961,7 +6961,7 @@ namespace
    * Duplicate calling-convention bridge thunk for backward 15-float-lane range
    * copy.
    */
-  [[maybe_unused]] float* CopyBackwardFifteenFloatLaneRangeBridgeThunkDuplicateA(
+  float* CopyBackwardFifteenFloatLaneRangeBridgeThunkDuplicateA(
     float* const destinationEnd,
     const float* const sourceEnd,
     const float* const sourceBegin
@@ -6977,7 +6977,7 @@ namespace
    * Duplicate calling-convention bridge thunk for nullable dword-pair range
    * copy.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateC(
+  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateC(
     DwordPairRuntime* const destination,
     const DwordPairRuntime* const sourceEnd,
     const DwordPairRuntime* const sourceBegin
@@ -6992,7 +6992,7 @@ namespace
    * What it does:
    * Duplicate backward dword-pair range copy helper.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginDuplicateC(
+  DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginDuplicateC(
     DwordPairRuntime* const destinationEnd,
     const DwordPairRuntime* const sourceBegin,
     const DwordPairRuntime* const sourceEnd
@@ -7007,7 +7007,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-end-pointer helper.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndDuplicateE(
+  std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndDuplicateE(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -7022,7 +7022,7 @@ namespace
    * What it does:
    * Moves one dword range by element count and returns destination begin.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByCountAndReturnDestinationDuplicateA(
+  std::uint32_t* MoveDwordRangeByCountAndReturnDestinationDuplicateA(
     const std::uint32_t* const source,
     const std::uint32_t dwordCount,
     std::uint32_t* const destination
@@ -7038,7 +7038,7 @@ namespace
    * Duplicate calling-convention bridge thunk for nullable dword-pair range
    * copy.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateD(
+  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateD(
     DwordPairRuntime* const destination,
     const DwordPairRuntime* const sourceEnd,
     const DwordPairRuntime* const sourceBegin
@@ -7053,7 +7053,7 @@ namespace
    * What it does:
    * Duplicate backward dword-pair range copy helper.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginDuplicateD(
+  DwordPairRuntime* CopyBackwardDwordPairRangeAndReturnBeginDuplicateD(
     DwordPairRuntime* const destinationEnd,
     const DwordPairRuntime* const sourceBegin,
     const DwordPairRuntime* const sourceEnd
@@ -7068,7 +7068,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-end-pointer helper.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndDuplicateF(
+  std::uint32_t* MoveDwordRangeByEndPointerAndReturnEndDuplicateF(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
@@ -7083,7 +7083,7 @@ namespace
    * What it does:
    * Duplicate dword-range move-by-count helper returning destination begin.
    */
-  [[maybe_unused]] std::uint32_t* MoveDwordRangeByCountAndReturnDestinationDuplicateB(
+  std::uint32_t* MoveDwordRangeByCountAndReturnDestinationDuplicateB(
     const std::uint32_t* const source,
     const std::uint32_t dwordCount,
     std::uint32_t* const destination
@@ -7098,7 +7098,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateC(
+  void DestroyAndDeleteParticleRenderBucketDuplicateC(
     moho::ParticleRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -7111,7 +7111,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateC(
+  void DestroyAndDeleteTrailRenderBucketDuplicateC(
     moho::TrailRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -7125,7 +7125,7 @@ namespace
    * Conditionally copy-constructs one world-particle when destination is
    * valid.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyConstructWorldParticleIfDestinationPresentDuplicateA(
+  moho::SWorldParticle* CopyConstructWorldParticleIfDestinationPresentDuplicateA(
     const moho::SWorldParticle& source,
     moho::SWorldParticle* const destination
   )
@@ -7142,7 +7142,7 @@ namespace
    * What it does:
    * Duplicate world-particle in-place destructor thunk.
    */
-  [[maybe_unused]] void DestroyWorldParticleInPlaceDuplicateA(moho::SWorldParticle* const particle) noexcept
+  void DestroyWorldParticleInPlaceDuplicateA(moho::SWorldParticle* const particle) noexcept
   {
     DestroyWorldParticleForVectorTailLocal(*particle);
   }
@@ -7154,7 +7154,7 @@ namespace
    * Conditionally copy-constructs one trail-runtime payload when destination is
    * valid.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyConstructTrailRuntimeIfDestinationPresent(
+  moho::TrailRuntimeView* CopyConstructTrailRuntimeIfDestinationPresent(
     moho::TrailRuntimeView* const destination,
     const moho::TrailRuntimeView& source
   ) noexcept
@@ -7171,7 +7171,7 @@ namespace
    * What it does:
    * Duplicate trail-runtime in-place destructor thunk.
    */
-  [[maybe_unused]] void DestroyTrailRuntimeInPlaceDuplicateA(moho::TrailRuntimeView* const trail) noexcept
+  void DestroyTrailRuntimeInPlaceDuplicateA(moho::TrailRuntimeView* const trail) noexcept
   {
     DestroyTrailRuntimeViewForVectorTailLocal(*trail);
   }
@@ -7183,7 +7183,7 @@ namespace
    * Conditionally copy-constructs one world-beam payload when destination is
    * valid.
    */
-  [[maybe_unused]] moho::SWorldBeam* CopyConstructWorldBeamIfDestinationPresentDuplicateA(
+  moho::SWorldBeam* CopyConstructWorldBeamIfDestinationPresentDuplicateA(
     const moho::SWorldBeam& source,
     moho::SWorldBeam* const destination
   )
@@ -7200,7 +7200,7 @@ namespace
    * What it does:
    * Duplicate world-beam texture-lane destructor thunk.
    */
-  [[maybe_unused]] void DestroyWorldBeamTextureLanesInPlaceDuplicateA(moho::SWorldBeam* const beam) noexcept
+  void DestroyWorldBeamTextureLanesInPlaceDuplicateA(moho::SWorldBeam* const beam) noexcept
   {
     DestroyWorldBeamForVectorTailLocal(*beam);
   }
@@ -7211,7 +7211,7 @@ namespace
    * What it does:
    * Conditionally copies one 15-float lane when destination is valid.
    */
-  [[maybe_unused]] float* CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA(
+  float* CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA(
     float* const destination,
     const float* const source
   ) noexcept
@@ -7228,7 +7228,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBP() noexcept {}
+  void NoOpHelperThunkBP() noexcept {}
 
   /**
    * Address: 0x004A06D0 (FUN_004A06D0, sub_4A06D0)
@@ -7236,7 +7236,7 @@ namespace
    * What it does:
    * Duplicate conditional dword-pair copy helper.
    */
-  [[maybe_unused]] DwordPairRuntime* CopySingleDwordPairIfDestinationPresentDuplicateB(
+  DwordPairRuntime* CopySingleDwordPairIfDestinationPresentDuplicateB(
     DwordPairRuntime* const destination,
     const DwordPairRuntime& source
   ) noexcept
@@ -7250,7 +7250,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBQ() noexcept {}
+  void NoOpHelperThunkBQ() noexcept {}
 
   /**
    * Address: 0x004A06F0 (FUN_004A06F0, sub_4A06F0)
@@ -7258,7 +7258,7 @@ namespace
    * What it does:
    * Duplicate conditional dword-pair copy helper.
    */
-  [[maybe_unused]] DwordPairRuntime* CopySingleDwordPairIfDestinationPresentDuplicateC(
+  DwordPairRuntime* CopySingleDwordPairIfDestinationPresentDuplicateC(
     DwordPairRuntime* const destination,
     const DwordPairRuntime& source
   ) noexcept
@@ -7272,7 +7272,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBR() noexcept {}
+  void NoOpHelperThunkBR() noexcept {}
 
   /**
    * Address: 0x004A0710 (FUN_004A0710, sub_4A0710)
@@ -7280,7 +7280,7 @@ namespace
    * What it does:
    * Destroys one world-particle payload and returns the input slot pointer.
    */
-  [[maybe_unused]] moho::SWorldParticle* DestroyWorldParticleInPlaceAndReturnSelf(
+  moho::SWorldParticle* DestroyWorldParticleInPlaceAndReturnSelf(
     moho::SWorldParticle* const particle
   ) noexcept
   {
@@ -7294,7 +7294,7 @@ namespace
    * What it does:
    * Destroys one trail-runtime payload and returns the input slot pointer.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* DestroyTrailRuntimeInPlaceAndReturnSelf(
+  moho::TrailRuntimeView* DestroyTrailRuntimeInPlaceAndReturnSelf(
     moho::TrailRuntimeView* const trail
   ) noexcept
   {
@@ -7309,7 +7309,7 @@ namespace
    * Destroys the two counted world-beam texture lanes and returns the beam
    * slot pointer.
    */
-  [[maybe_unused]] moho::SWorldBeam* DestroyWorldBeamTextureLanesInPlaceAndReturnSelf(
+  moho::SWorldBeam* DestroyWorldBeamTextureLanesInPlaceAndReturnSelf(
     moho::SWorldBeam* const beam
   ) noexcept
   {
@@ -7324,7 +7324,7 @@ namespace
    * Duplicate particle-bucket tree-header initialization with fresh sentinel
    * head allocation.
    */
-  [[maybe_unused]] moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHeadDuplicateB(
+  moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHeadDuplicateB(
     moho::ParticleBucketTreeRuntime* const treeRuntime
   )
   {
@@ -7337,7 +7337,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBS() noexcept {}
+  void NoOpHelperThunkBS() noexcept {}
 
   /**
    * Address: 0x004A0790 (FUN_004A0790, sub_4A0790)
@@ -7346,7 +7346,7 @@ namespace
    * Duplicate trail-bucket tree-header initialization with fresh sentinel head
    * allocation.
    */
-  [[maybe_unused]] moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHeadDuplicateB(
+  moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHeadDuplicateB(
     moho::TrailBucketTreeRuntime* const treeRuntime
   )
   {
@@ -7359,7 +7359,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBT() noexcept {}
+  void NoOpHelperThunkBT() noexcept {}
 
   /**
    * Address: 0x004A07D0 (FUN_004A07D0, sub_4A07D0)
@@ -7368,7 +7368,7 @@ namespace
    * Duplicate particle-bucket tree-header initialization with fresh sentinel
    * head allocation.
    */
-  [[maybe_unused]] moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHeadDuplicateC(
+  moho::ParticleBucketTreeRuntime* InitializeParticleBucketTreeWithFreshHeadDuplicateC(
     moho::ParticleBucketTreeRuntime* const treeRuntime
   )
   {
@@ -7382,7 +7382,7 @@ namespace
    * Duplicate trail-bucket tree-header initialization with fresh sentinel head
    * allocation.
    */
-  [[maybe_unused]] moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHeadDuplicateC(
+  moho::TrailBucketTreeRuntime* InitializeTrailBucketTreeWithFreshHeadDuplicateC(
     moho::TrailBucketTreeRuntime* const treeRuntime
   )
   {
@@ -7396,7 +7396,7 @@ namespace
    * Initializes one particle-bucket tree header and returns the resulting head
    * sentinel node.
    */
-  [[maybe_unused]] moho::ParticleBucketTreeNodeRuntime* InitializeParticleBucketTreeAndReturnHead(
+  moho::ParticleBucketTreeNodeRuntime* InitializeParticleBucketTreeAndReturnHead(
     moho::ParticleBucketTreeRuntime* const treeRuntime
   )
   {
@@ -7410,7 +7410,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallH(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallH(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A0870 (FUN_004A0870, nullsub_665)
@@ -7418,7 +7418,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBU() noexcept {}
+  void NoOpHelperThunkBU() noexcept {}
 
   /**
    * Address: 0x004A0880 (FUN_004A0880, sub_4A0880)
@@ -7427,7 +7427,7 @@ namespace
    * Initializes one trail-bucket tree header and returns the resulting head
    * sentinel node.
    */
-  [[maybe_unused]] moho::TrailBucketTreeNodeRuntime* InitializeTrailBucketTreeAndReturnHead(
+  moho::TrailBucketTreeNodeRuntime* InitializeTrailBucketTreeAndReturnHead(
     moho::TrailBucketTreeRuntime* const treeRuntime
   )
   {
@@ -7441,7 +7441,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallI(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallI(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A08C0 (FUN_004A08C0, nullsub_667)
@@ -7449,7 +7449,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBV() noexcept {}
+  void NoOpHelperThunkBV() noexcept {}
 
   /**
    * Address: 0x004A08D0 (FUN_004A08D0, sub_4A08D0)
@@ -7458,7 +7458,7 @@ namespace
    * Allocates one particle-bucket tree node and initializes link lanes to null
    * with default black/non-sentinel flags.
    */
-  [[maybe_unused]] moho::ParticleBucketTreeNodeRuntime* AllocateParticleBucketTreeNodeWithNullLinksBlack()
+  moho::ParticleBucketTreeNodeRuntime* AllocateParticleBucketTreeNodeWithNullLinksBlack()
   {
     auto* const node = static_cast<moho::ParticleBucketTreeNodeRuntime*>(
       AllocateParticleBucketTreeEntryNodeArrayOrThrow(1U)
@@ -7477,7 +7477,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallJ(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallJ(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A0920 (FUN_004A0920, sub_4A0920)
@@ -7486,7 +7486,7 @@ namespace
    * Allocates one trail-bucket tree node and initializes link lanes to null
    * with default black/non-sentinel flags.
    */
-  [[maybe_unused]] moho::TrailBucketTreeNodeRuntime* AllocateTrailBucketTreeNodeWithNullLinksBlack()
+  moho::TrailBucketTreeNodeRuntime* AllocateTrailBucketTreeNodeWithNullLinksBlack()
   {
     auto* const node = static_cast<moho::TrailBucketTreeNodeRuntime*>(
       AllocateTrailBucketTreeEntryNodeArrayOrThrow(1U)
@@ -7505,7 +7505,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallK(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallK(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A0970 (FUN_004A0970, nullsub_670)
@@ -7513,7 +7513,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallL(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallL(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A0980 (FUN_004A0980, sub_4A0980)
@@ -7521,7 +7521,7 @@ namespace
    * What it does:
    * Conditionally copies one dword lane when destination is valid.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateA(
+  std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateA(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceSlot
   ) noexcept
@@ -7538,7 +7538,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallM(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallM(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A09A0 (FUN_004A09A0, sub_4A09A0)
@@ -7546,7 +7546,7 @@ namespace
    * What it does:
    * Duplicate conditional dword-lane copy helper.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateB(
+  std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateB(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceSlot
   ) noexcept
@@ -7560,7 +7560,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallN(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallN(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A09C0 (FUN_004A09C0, nullsub_673)
@@ -7568,7 +7568,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallO(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallO(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x004A09D0 (FUN_004A09D0, nullsub_674)
@@ -7576,7 +7576,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBW() noexcept {}
+  void NoOpHelperThunkBW() noexcept {}
 
   /**
    * Address: 0x004A09E0 (FUN_004A09E0, sub_4A09E0)
@@ -7584,7 +7584,7 @@ namespace
    * What it does:
    * Duplicate dword-range fill helper that writes one source slot value.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateC(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateC(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* const destination
@@ -7599,7 +7599,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBX() noexcept {}
+  void NoOpHelperThunkBX() noexcept {}
 
   /**
    * Address: 0x004A0A10 (FUN_004A0A10, sub_4A0A10)
@@ -7607,7 +7607,7 @@ namespace
    * What it does:
    * Duplicate dword-range fill helper that writes one source slot value.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateD(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateD(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* const destination
@@ -7623,7 +7623,7 @@ namespace
    * Duplicate calling-convention bridge thunk for world-particle range
    * copy-construction with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldParticleRangeOrRollbackBridgeThunkDuplicateB(
+  void CopyConstructWorldParticleRangeOrRollbackBridgeThunkDuplicateB(
     moho::SWorldParticle* const destination,
     const moho::SWorldParticle* const sourceBegin,
     const moho::SWorldParticle* const sourceEnd
@@ -7639,7 +7639,7 @@ namespace
    * Duplicate calling-convention bridge thunk for trail-runtime range
    * copy-construction.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunkDuplicateB(
+  moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeBridgeThunkDuplicateB(
     moho::TrailRuntimeView* const destination,
     const moho::TrailRuntimeView* const sourceBegin,
     const moho::TrailRuntimeView* const sourceEnd
@@ -7655,7 +7655,7 @@ namespace
    * Duplicate calling-convention bridge thunk for world-beam range
    * copy-construction with rollback.
    */
-  [[maybe_unused]] void CopyConstructWorldBeamRangeOrRollbackBridgeThunkDuplicateB(
+  void CopyConstructWorldBeamRangeOrRollbackBridgeThunkDuplicateB(
     moho::SWorldBeam* const destination,
     const moho::SWorldBeam* const sourceBegin,
     const moho::SWorldBeam* const sourceEnd
@@ -7671,7 +7671,7 @@ namespace
    * Duplicate calling-convention bridge thunk for nullable 15-float-lane range
    * copy.
    */
-  [[maybe_unused]] float* CopyFifteenFloatLaneRangeBridgeThunkDuplicateB(
+  float* CopyFifteenFloatLaneRangeBridgeThunkDuplicateB(
     float* const destination,
     const float* const sourceBegin,
     const float* const sourceEnd
@@ -7687,7 +7687,7 @@ namespace
    * Duplicate calling-convention bridge thunk for nullable dword-pair range
    * copy.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateE(
+  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateE(
     DwordPairRuntime* const destination,
     const DwordPairRuntime* const sourceEnd,
     const DwordPairRuntime* const sourceBegin
@@ -7703,7 +7703,7 @@ namespace
    * Duplicate calling-convention bridge thunk for nullable dword-pair range
    * copy.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateF(
+  DwordPairRuntime* CopyDwordPairRangeNullableBridgeThunkDuplicateF(
     DwordPairRuntime* const destination,
     const DwordPairRuntime* const sourceEnd,
     const DwordPairRuntime* const sourceBegin
@@ -7718,7 +7718,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateD(
+  void DestroyAndDeleteParticleRenderBucketDuplicateD(
     moho::ParticleRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -7731,7 +7731,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateD(
+  void DestroyAndDeleteTrailRenderBucketDuplicateD(
     moho::TrailRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -7744,7 +7744,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBY() noexcept {}
+  void NoOpHelperThunkBY() noexcept {}
 
   /**
    * Address: 0x004A0B40 (FUN_004A0B40, nullsub_677)
@@ -7752,7 +7752,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkBZ() noexcept {}
+  void NoOpHelperThunkBZ() noexcept {}
 
   /**
    * Address: 0x004A0B50 (FUN_004A0B50, nullsub_678)
@@ -7760,7 +7760,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkCA() noexcept {}
+  void NoOpHelperThunkCA() noexcept {}
 
   /**
    * Address: 0x004A0B60 (FUN_004A0B60, sub_4A0B60)
@@ -7768,7 +7768,7 @@ namespace
    * What it does:
    * Duplicate conditional dword-lane copy helper.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateC(
+  std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateC(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceSlot
   ) noexcept
@@ -7782,7 +7782,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkCB() noexcept {}
+  void NoOpHelperThunkCB() noexcept {}
 
   /**
    * Address: 0x004A0B80 (FUN_004A0B80, sub_4A0B80)
@@ -7790,7 +7790,7 @@ namespace
    * What it does:
    * Duplicate conditional dword-lane copy helper.
    */
-  [[maybe_unused]] std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateD(
+  std::uint32_t* CopySingleDwordSlotIfDestinationPresentDuplicateD(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceSlot
   ) noexcept
@@ -7805,7 +7805,7 @@ namespace
    * Destroys and deletes one particle-bucket payload and returns the input
    * pointer.
    */
-  [[maybe_unused]] moho::ParticleRenderBucketRuntime* DestroyAndDeleteParticleRenderBucketAndReturnInput(
+  moho::ParticleRenderBucketRuntime* DestroyAndDeleteParticleRenderBucketAndReturnInput(
     moho::ParticleRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -7821,7 +7821,7 @@ namespace
    * Destroys and deletes one trail-bucket payload and returns the input
    * pointer.
    */
-  [[maybe_unused]] moho::TrailRenderBucketRuntime* DestroyAndDeleteTrailRenderBucketAndReturnInput(
+  moho::TrailRenderBucketRuntime* DestroyAndDeleteTrailRenderBucketAndReturnInput(
     moho::TrailRenderBucketRuntime* const bucket
   ) noexcept
   {
@@ -7836,7 +7836,7 @@ namespace
    * What it does:
    * Duplicate dword-range fill helper that writes one source slot value.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateE(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateE(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* const destination
@@ -7851,7 +7851,7 @@ namespace
    * What it does:
    * Duplicate dword-range fill helper that writes one source slot value.
    */
-  [[maybe_unused]] std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateF(
+  std::uint32_t FillDwordRangeFromPointerValueAndReturnRemainingDuplicateF(
     std::uint32_t count,
     const std::uint32_t* const sourceValue,
     std::uint32_t* const destination
@@ -7867,7 +7867,7 @@ namespace
    * Copy-constructs one world-particle range into destination storage with
    * rollback on constructor failure and returns destination end.
    */
-  [[maybe_unused]] moho::SWorldParticle* CopyConstructWorldParticleRangeOrRollbackCore(
+  moho::SWorldParticle* CopyConstructWorldParticleRangeOrRollbackCore(
     moho::SWorldParticle* const destination,
     const moho::SWorldParticle* const sourceBegin,
     const moho::SWorldParticle* const sourceEnd
@@ -7883,7 +7883,7 @@ namespace
    * What it does:
    * Thin forwarding wrapper for world-particle range copy construction core.
    */
-  [[maybe_unused]] moho::SWorldParticle* ForwardCopyConstructWorldParticleRange(
+  moho::SWorldParticle* ForwardCopyConstructWorldParticleRange(
     moho::SWorldParticle* const destination,
     const moho::SWorldParticle* const sourceBegin,
     const moho::SWorldParticle* const sourceEnd
@@ -7899,7 +7899,7 @@ namespace
    * Copy-constructs one trail-runtime range into destination storage when
    * destination is present and returns destination end.
    */
-  [[maybe_unused]] moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeAndReturnEndCore(
+  moho::TrailRuntimeView* CopyConstructTrailRuntimeRangeAndReturnEndCore(
     moho::TrailRuntimeView* const destination,
     const moho::TrailRuntimeView* const sourceBegin,
     const moho::TrailRuntimeView* const sourceEnd
@@ -7915,7 +7915,7 @@ namespace
    * Copy-constructs one world-beam range into destination storage with rollback
    * on constructor failure and returns destination end.
    */
-  [[maybe_unused]] moho::SWorldBeam* CopyConstructWorldBeamRangeOrRollbackCore(
+  moho::SWorldBeam* CopyConstructWorldBeamRangeOrRollbackCore(
     moho::SWorldBeam* const destination,
     const moho::SWorldBeam* const sourceBegin,
     const moho::SWorldBeam* const sourceEnd
@@ -7932,7 +7932,7 @@ namespace
    * Copies one 15-float-lane range into nullable destination storage and
    * returns destination end.
    */
-  [[maybe_unused]] float* CopyFifteenFloatLaneRangeAndReturnEndCore(
+  float* CopyFifteenFloatLaneRangeAndReturnEndCore(
     float* const destination,
     const float* const sourceBegin,
     const float* const sourceEnd
@@ -7947,7 +7947,7 @@ namespace
    * What it does:
    * Copies one nullable dword-pair range and returns destination end.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableAndReturnEndCoreA(
+  DwordPairRuntime* CopyDwordPairRangeNullableAndReturnEndCoreA(
     DwordPairRuntime* const destination,
     const DwordPairRuntime* const sourceBegin,
     const DwordPairRuntime* const sourceEnd
@@ -7962,7 +7962,7 @@ namespace
    * What it does:
    * Duplicate nullable dword-pair range copy helper.
    */
-  [[maybe_unused]] DwordPairRuntime* CopyDwordPairRangeNullableAndReturnEndCoreB(
+  DwordPairRuntime* CopyDwordPairRangeNullableAndReturnEndCoreB(
     DwordPairRuntime* const destination,
     const DwordPairRuntime* const sourceBegin,
     const DwordPairRuntime* const sourceEnd
@@ -7977,7 +7977,7 @@ namespace
    * What it does:
    * Lexicographically compares `count` 16-bit lanes and returns `-1/0/1`.
    */
-  [[maybe_unused]] int CompareWordRangeLexicographicallyA(
+  int CompareWordRangeLexicographicallyA(
     const std::uint16_t* lhs,
     std::uint32_t count,
     const std::uint16_t* rhs
@@ -8000,7 +8000,7 @@ namespace
    * What it does:
    * Duplicate 16-bit-lane lexicographic comparator.
    */
-  [[maybe_unused]] int CompareWordRangeLexicographicallyB(
+  int CompareWordRangeLexicographicallyB(
     const std::uint16_t* lhs,
     std::uint32_t count,
     const std::uint16_t* rhs
@@ -8015,7 +8015,7 @@ namespace
    * What it does:
    * Returns the length of one zero-terminated 16-bit string.
    */
-  [[maybe_unused]] std::int32_t GetZeroTerminatedWordStringLength(const std::uint16_t* text) noexcept
+  std::int32_t GetZeroTerminatedWordStringLength(const std::uint16_t* text) noexcept
   {
     const std::uint16_t* cursor = text;
     while (*cursor != 0U) {
@@ -8030,7 +8030,7 @@ namespace
    * What it does:
    * Returns whether one legacy string and one C-string differ by value.
    */
-  [[maybe_unused]] bool AreMsvc8StringAndCStringDifferent(
+  bool AreMsvc8StringAndCStringDifferent(
     const msvc8::string& lhs,
     const char* const rhs
   ) noexcept
@@ -8057,7 +8057,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
   */
-  [[maybe_unused]] void NoOpHelperThunkAL() noexcept {}
+  void NoOpHelperThunkAL() noexcept {}
 
   /**
    * Address: 0x0049D990 (FUN_0049D990, nullsub_616)
@@ -8065,7 +8065,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAM() noexcept {}
+  void NoOpHelperThunkAM() noexcept {}
 
   /**
    * Address: 0x0049D9A0 (FUN_0049D9A0, nullsub_617)
@@ -8073,7 +8073,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAN() noexcept {}
+  void NoOpHelperThunkAN() noexcept {}
 
   /**
    * Address: 0x0049D9B0 (FUN_0049D9B0, nullsub_618)
@@ -8081,7 +8081,7 @@ namespace
    * What it does:
    * No-op helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkAO() noexcept {}
+  void NoOpHelperThunkAO() noexcept {}
 
   /**
    * Address: 0x0049D9C0 (FUN_0049D9C0, nullsub_619)
@@ -8089,7 +8089,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallF(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallF(const std::uint32_t /*unused*/) noexcept {}
 
   /**
    * Address: 0x0049D9D0 (FUN_0049D9D0, nullsub_620)
@@ -8097,7 +8097,7 @@ namespace
    * What it does:
    * No-op stdcall helper thunk retained for binary parity.
    */
-  [[maybe_unused]] void NoOpHelperThunkStdcallG(const std::uint32_t /*unused*/) noexcept {}
+  void NoOpHelperThunkStdcallG(const std::uint32_t /*unused*/) noexcept {}
 
   void AppendParticleBufferToPoolList(
     moho::ParticleBufferPoolListRuntime& poolRuntime,
