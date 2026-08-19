@@ -60957,26 +60957,49 @@ long wxTopLevelWindowRuntime::MSWWindowProc(
   const long lParam
 )
 {
-  if (message == WM_CLOSE) {
-    if (!Close(false)) {
-      return 0;
-    }
-  }
+  bool processed = false;
+
+  switch (message) {
+  case WM_CLOSE:
+    // A close that goes ahead is *not* marked handled, so DefWindowProc gets
+    // it and destroys the window; a close that was vetoed is marked handled
+    // and stops here.
+    processed = !Close(false);
+    break;
 
   // The menu loop bookends. wParam is TRUE for a popup menu, which is the
   // only thing that distinguishes the two ids the event carries.
-  if (message == WM_ENTERMENULOOP) {
-    return DoSendMenuOpenCloseEvent(EnsureWxEvtMenuOpenRuntimeType(), wParam != 0) ? 1 : 0;
-  }
-  if (message == WM_PAINT) {
-    return HandlePaint() ? 1 : 0;
+  case WM_ENTERMENULOOP:
+    processed = DoSendMenuOpenCloseEvent(EnsureWxEvtMenuOpenRuntimeType(), wParam != 0);
+    break;
+
+  case WM_EXITMENULOOP:
+    processed = DoSendMenuOpenCloseEvent(EnsureWxEvtMenuCloseRuntimeType(), wParam != 0);
+    break;
+
+  case WM_PAINT:
+    processed = HandlePaint();
+    break;
+
+  default:
+    break;
   }
 
-  if (message == WM_EXITMENULOOP) {
-    return DoSendMenuOpenCloseEvent(EnsureWxEvtMenuCloseRuntimeType(), wParam != 0) ? 1 : 0;
+  // The accumulate-then-forward shape is the binary's, and for WM_PAINT it is
+  // load-bearing rather than cosmetic. A frame has no wxEVT_PAINT handler -
+  // WSupComFrame's table carries only OnCloseWindow and OnMove, and neither
+  // base adds one - so HandlePaint() raises the event, nobody takes it, and it
+  // answers false. Returning there without reaching MSWDefWindowProc meant
+  // DefWindowProc never ran its BeginPaint/EndPaint pair, so the update region
+  // stayed dirty and Windows regenerated WM_PAINT immediately. Pending() then
+  // never went false, the loop in WIN_AppExecute span between Pending() and
+  // Dispatch() at 100% of a core, and app->Main() - the whole frame driver -
+  // was never reached: no rendering, no SND_Frame(), and the splash movie that
+  // InitializeSessionFromCommandLine() starts on the first frame never began.
+  if (!processed) {
+    return wxWindowMswRuntime::MSWWindowProc(message, wParam, lParam);
   }
-
-  return wxWindowMswRuntime::MSWWindowProc(message, wParam, lParam);
+  return 0;
 }
 
 wxEventTable WSupComFrame::sm_eventTable = {&wxTopLevelWindowRuntime::sm_eventTable, nullptr};
@@ -61091,14 +61114,21 @@ void WSupComFrame::OnMove(
     return;
   }
 
-  std::int32_t positionLaneA = 0;
-  std::int32_t positionLaneB = 0;
+  // DoGetPosition fills x through the first argument and y through the second.
+  // Persisting them the other way round transposed the pair, and because
+  // CScApp::CreateDevice reads the two keys straight back into position.x and
+  // position.y, every launch re-applied the swap and the saved origin walked
+  // further off the desktop each time - the observed prefs were x=328 y=5978.
+  // The window then opened outside every monitor, so a run looked like it had
+  // rendered nothing at all.
+  std::int32_t positionX = 0;
+  std::int32_t positionY = 0;
 
-  DoGetPosition(&positionLaneA, &positionLaneB);
-  preferences->SetInteger(msvc8::string(kSupComFrameXPreferenceKey), positionLaneB);
+  DoGetPosition(&positionX, &positionY);
+  preferences->SetInteger(msvc8::string(kSupComFrameXPreferenceKey), positionX);
 
-  DoGetPosition(&positionLaneA, &positionLaneB);
-  preferences->SetInteger(msvc8::string(kSupComFrameYPreferenceKey), positionLaneA);
+  DoGetPosition(&positionX, &positionY);
+  preferences->SetInteger(msvc8::string(kSupComFrameYPreferenceKey), positionY);
 }
 
 /**
