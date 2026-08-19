@@ -11,6 +11,25 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004BB730 (FUN_004BB730)
+     * Mangled: ??0ScrGotoDialog@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::ScrGotoDialog *__thiscall Moho::ScrGotoDialog::ScrGotoDialog(Moho::ScrGotoDialog *this);
+     *
+     * What it does:
+     * Builds the script-debugger "Goto line" dialog. Restores the last screen
+     * position from the `Windows.Debug.Goto.x` / `Windows.Debug.Goto.y` user
+     * preferences, runs the `wxDialog` base with title "Goto", window name
+     * "ScrGotoDialog" and style `wxCAPTION|wxSYSTEM_MENU`, then fills it with a
+     * vertical box sizer holding two horizontal rows: a "Goto" prompt label
+     * plus the line-number entry field, and the default "Goto" button plus
+     * "Cancel". `mIsInitializing` stays set for the whole build so the move
+     * handler does not write the transient placement back to preferences.
+     */
+    ScrGotoDialog();
+
+    /**
      * Address: 0x004BBEA0 (FUN_004BBEA0)
      *
      * What it does:
