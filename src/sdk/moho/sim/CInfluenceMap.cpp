@@ -3938,8 +3938,8 @@ namespace moho
    * What it does:
    * Adapts one thiscall range-destroy lane into the canonical
    * `DestroyInfluenceGridRange(begin, end)` helper.
-   [[maybe_unused]] */
-  static void DestroyInfluenceGridRangeThiscallAdapter(
+   */
+  [[maybe_unused]] static void DestroyInfluenceGridRangeThiscallAdapter(
     InfluenceGrid* const rangeEnd,
     InfluenceGrid* const rangeBegin
   )
@@ -3953,8 +3953,8 @@ namespace moho
    * What it does:
    * Adapts one scalar-delete caller lane into
    * `DestroyInfluenceGridRange(begin, end)`.
-   [[maybe_unused]] */
-  static void DestroyInfluenceGridRangeDeleteAdapter(
+   */
+  [[maybe_unused]] static void DestroyInfluenceGridRangeDeleteAdapter(
     InfluenceGrid* const rangeBegin,
     InfluenceGrid* const rangeEnd
   ) noexcept
@@ -4044,8 +4044,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane caller shape into
    * `FillInfluenceGridRange(destinationBegin, destinationEnd, fillValue)`.
-   [[maybe_unused]] */
-  static InfluenceGrid* FillInfluenceGridRangeRegisterAdapter(
+   */
+  [[maybe_unused]] static InfluenceGrid* FillInfluenceGridRangeRegisterAdapter(
     const InfluenceGrid& fillValue,
     InfluenceGrid* const destinationBegin,
     InfluenceGrid* const destinationEnd
@@ -4088,8 +4088,8 @@ namespace moho
    * What it does:
    * Adapts one legacy call-convention lane into
    * `CopyInfluenceGridRangeBackward`.
-   [[maybe_unused]] */
-  static InfluenceGrid* CopyInfluenceGridRangeBackwardAdapter(
+   */
+  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeBackwardAdapter(
     InfluenceGrid* const sourceEnd,
     InfluenceGrid* const sourceBegin,
     InfluenceGrid* const destinationEnd
@@ -4129,8 +4129,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane caller shape into
    * `CopyInfluenceGridRange(sourceBegin, sourceEnd, destinationBegin)`.
-   [[maybe_unused]] */
-  static InfluenceGrid* CopyInfluenceGridRangeRegisterAdapter(
+   */
+  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeRegisterAdapter(
     const InfluenceGrid* const sourceBegin,
     const InfluenceGrid* const sourceEnd,
     InfluenceGrid* const destinationBegin
@@ -4181,8 +4181,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane call shape into
    * `CopyInfluenceGridRangeWithRollback(sourceBegin, sourceEnd, destination)`.
-   [[maybe_unused]] */
-  static InfluenceGrid* CopyInfluenceGridRangeWithRollbackRegisterAdapter(
+   */
+  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeWithRollbackRegisterAdapter(
     const InfluenceGrid* const sourceBegin,
     const InfluenceGrid* const sourceEnd,
     InfluenceGrid* const destination
@@ -4222,8 +4222,8 @@ namespace moho
    * What it does:
    * Adapts one register-lane call shape into
    * `CopyInfluenceGridCountedRangeWithRollback(count, destination, source)`.
-   [[maybe_unused]] */
-  static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackRegisterAdapter(
+   */
+  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackRegisterAdapter(
     const std::uint32_t count,
     InfluenceGrid* const destination,
     const InfluenceGrid* const source
@@ -4238,8 +4238,8 @@ namespace moho
    * What it does:
    * Adapts one counted rollback-copy lane and returns one-past the last copied
    * `InfluenceGrid` destination slot.
-   [[maybe_unused]] */
-  static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackAdapter(
+   */
+  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridCountedRangeWithRollbackAdapter(
     const InfluenceGrid* const sourceBegin,
     InfluenceGrid* const destinationBegin,
     const std::uint32_t count
@@ -4258,8 +4258,8 @@ namespace moho
    * Alternate guarded contiguous `InfluenceGrid` range-copy lane that copies
    * `[sourceBegin, sourceEnd)` into destination storage and destroys already
    * constructed grids before rethrowing on copy failure.
-   [[maybe_unused]] */
-  static InfluenceGrid* CopyInfluenceGridRangeWithRollbackAlt(
+   */
+  [[maybe_unused]] static InfluenceGrid* CopyInfluenceGridRangeWithRollbackAlt(
     const InfluenceGrid* const sourceBegin,
     const InfluenceGrid* const sourceEnd,
     InfluenceGrid* const destinationBegin
