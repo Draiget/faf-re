@@ -127,12 +127,6 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::IEffectManager* ResolveEffectManager(const moho::IEffect* const effect) noexcept
-  {
-    const std::uintptr_t rawManager = static_cast<std::uintptr_t>(effect->mUnknown3C);
-    return reinterpret_cast<moho::IEffectManager*>(rawManager);
-  }
-
   [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
   {
     return (point.x * viewport.r[1].x) + (point.y * viewport.r[1].y) + (point.z * viewport.r[1].z) + viewport.r[1].w;
@@ -599,7 +593,7 @@ namespace moho
       return false;
     }
 
-    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    Sim* const sim = mManager->GetSim();
     if (!sim) {
       return true;
     }
@@ -642,7 +636,7 @@ namespace moho
   bool CEfxEmitter::IsVisible()
   {
     if (mParams.start_[EFFECT_EMITIFVISIBLE] > 0.0f) {
-      Sim* const sim = ResolveEffectManager(this)->GetSim();
+      Sim* const sim = mManager->GetSim();
       msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
       GeomCamera3* const camerasEnd = cameras.end();
       GeomCamera3* camera = cameras.begin();
@@ -684,7 +678,7 @@ namespace moho
    */
   bool CEfxEmitter::ProcessLifetime()
   {
-    IEffectManager* const effectManager = ResolveEffectManager(this);
+    IEffectManager* const effectManager = mManager;
     const float* const params = mParams.start_;
 
     if (params[EFFECT_LIFETIME] >= 0.0f &&
@@ -1049,7 +1043,7 @@ namespace moho
 
       float emitY = worldY;
       if (p[EFFECT_SNAPTOWATERLINE] > 0.0f) {
-        STIMap* const map = ResolveEffectManager(this)->GetSim()->mMapData;
+        STIMap* const map = mManager->GetSim()->mMapData;
         const float waterElevation = map->mWaterEnabled ? map->mWaterElevation : -10000.0f;
         if (efx_ParticleWaterSurface <= mParams.start_[EFFECT_SORTORDER]) {
           const float above = waterElevation + efx_WaterOffset;
@@ -1062,7 +1056,7 @@ namespace moho
 
       bool skipEmission = false;
       if (mParams.start_[EFFECT_ONLYEMITONWATER] > 0.0f) {
-        STIMap* const map = ResolveEffectManager(this)->GetSim()->mMapData;
+        STIMap* const map = mManager->GetSim()->mMapData;
         const float elevation = map->GetHeightField()->GetElevation(worldX, worldZ);
         const float waterElevation = map->mWaterEnabled ? map->mWaterElevation : -10000.0f;
         if (elevation > waterElevation) {
@@ -1170,7 +1164,7 @@ namespace moho
           particle.mRotationCurve = mCurves.begin()[EMITTER_ROTATION_RATE_CURVE].GetValue(curvePhase) * 0.017453292f;
         }
 
-        Sim* const sim = ResolveEffectManager(this)->GetSim();
+        Sim* const sim = mManager->GetSim();
         AppendWorldParticleToVector(sim->GetParticleBuffer()->mParticles, particle);
       }
 
@@ -1198,7 +1192,7 @@ namespace moho
   {
     const float* const start = mParams.start_;
     if ((start[EFFECT_EMITIFVISIBLE] > 0.0f || start[EFFECT_CREATEIFVISIBLE] > 0.0f)
-        && (ResolveEffectManager(this)->GetSim()->mCurTick % 3u) == 0u) {
+        && (mManager->GetSim()->mCurTick % 3u) == 0u) {
       VMatrix4 attachMatrix{};
       (void)InterpolatePosition(this, &attachMatrix, 0, 0.0f);
       const float* const p = mParams.start_;
@@ -1251,7 +1245,7 @@ namespace moho
       mParams.start_[EFFECT_TICKINCREMENT] + mParams.start_[EFFECT_TICKCOUNT];
 
     if (dbg_Emitter) {
-      Sim* const sim = ResolveEffectManager(this)->GetSim();
+      Sim* const sim = mManager->GetSim();
       CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
       VMatrix4 startMatrix{};
       VMatrix4 endMatrix{};

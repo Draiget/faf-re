@@ -1552,6 +1552,43 @@ void CAiPathSpline::Generate(
 {
   // TODO(binary-fidelity): current body is a provisional typed lift. Exact FA behavior
   // depends on full PPS state-machine reconstruction from 0x005B2FF0.
+  //
+  // 2026-08-19: read the complete 722-line decompile end to end. Full recovery
+  // is close - every dependency the real body needs is already recovered:
+  //   SteeringParams::SteeringParams        (this file, ctor above)
+  //   RotateDirectionTowardTargetLimited    (0x006992C0, this file)
+  //   ComputeSteeringSpeedCapFromParams     (0x00699760, this file, currently
+  //                                          [[maybe_unused]] - Generate is
+  //                                          its only real caller)
+  //   UnitIsBlockedAt                       (0x0062ABA0, Unit.cpp)
+  //   func_UnitWontFitAt                    (0x0062AA90, Unit.cpp)
+  //   func_VecSetLengthS                    (0x005B1C90, Vector3f.cpp)
+  //   mNodes.PushBack(CPathPoint{...})      - the raw fastvector-growth code
+  //     in the decompile (sub_5B4BB0 et al.) is exactly what PushPathPoint()
+  //     above already does; call it or inline the same three-field assign.
+  //
+  // One real gap remains, isolated to a single early branch (formation-based
+  // max-node-count override, decompile lines ~174-179):
+  //   0x005B307C  call Unit::GetFormation
+  //   0x005B3085  call Unit::GetFormation (again)
+  //   0x005B308E  mov eax, [edx+4Ch] ; vtable slot 19
+  //   0x005B3091  call eax           ; CFormationInstance::CommandIsForm (0x00569BF0, unrecovered)
+  //   0x005B3097  mov ecx, formation_path_value  ; IDA-named data symbol, real
+  //                                                address not yet resolved -
+  //                                                open the raw .asm bytes at
+  //                                                0x005B3097, not just the
+  //                                                symbolic name, to get it
+  //   ...
+  //   v119 = CommandIsForm() ? formation_path_value : 20;   // max path nodes
+  //   if (physics.TurnRadius > physics.TurnRate) v119 *= 3;
+  //
+  // CFormationInstance is a separately blocked subsystem (see
+  // project_cformationinstance_split_blocked in memory) - recovering
+  // CommandIsForm (likely small: name suggests a simple command-type check)
+  // plus resolving formation_path_value's real address unblocks this whole
+  // function. Everything else - the full PPS_0..PPS_8 steering/backup/brake
+  // state machine, the amphibious layer-change blend, the NaN-guard debug
+  // dump - is fully mapped and ready to transcribe once those two resolve.
   ResetNodesToInline();
   mCurrentNodeIndex = 0;
   mNodeCount = 0;

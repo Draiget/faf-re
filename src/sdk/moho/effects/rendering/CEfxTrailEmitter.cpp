@@ -50,12 +50,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] moho::IEffectManager* ResolveEffectManager(const moho::IEffect* const effect) noexcept
-  {
-    const std::uintptr_t rawManager = static_cast<std::uintptr_t>(effect->mUnknown3C);
-    return reinterpret_cast<moho::IEffectManager*>(rawManager);
-  }
-
   [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
   {
     return (point.x * viewport.r[1].x) + (point.y * viewport.r[1].y) + (point.z * viewport.r[1].z) + viewport.r[1].w;
@@ -248,7 +242,7 @@ namespace moho
       return false;
     }
 
-    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    Sim* const sim = mManager->GetSim();
     CArmyImpl** const armiesBegin = sim->mArmiesList.begin();
     const int focusArmy = sim->mSyncFilter.focusArmy;
     if (!armiesBegin) {
@@ -288,7 +282,7 @@ namespace moho
   {
     const float lifetime = mParams.start_[TRAIL_LIFETIME];
     if (!(lifetime < 0.0f || (static_cast<float>(mTrailLength) + mTotalTicks) < lifetime)) {
-      ResolveEffectManager(this)->DestroyEffect(this);
+      mManager->DestroyEffect(this);
       return true;
     }
 
@@ -301,7 +295,7 @@ namespace moho
       return false;
     }
 
-    ResolveEffectManager(this)->DestroyEffect(this);
+    mManager->DestroyEffect(this);
     return true;
   }
 
@@ -355,7 +349,7 @@ namespace moho
       return true;
     }
 
-    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    Sim* const sim = mManager->GetSim();
     const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
 
     for (const GeomCamera3& camera : cameras) {
@@ -483,7 +477,7 @@ namespace moho
     std::memcpy(&trail.uvScalar, &bp->BlendMode, sizeof(trail.uvScalar));
     mLife = life + 1.0f;
 
-    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    Sim* const sim = mManager->GetSim();
     SParticleBuffer* const particleBuffer = sim->GetParticleBuffer();
     AppendTrailToVector(particleBuffer->mTrails, trail);
 

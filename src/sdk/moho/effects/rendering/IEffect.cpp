@@ -118,8 +118,8 @@ namespace moho
   {
     InitializeEffectManagerNodeAndStats(*this);
 
-    mUnknown3C = 0;
-    mUnknown40 = 0xFFFFFFFFu;
+    mManager = nullptr;
+    mScriptObjectToken = -1;
   }
 
   /**
@@ -134,9 +134,8 @@ namespace moho
   {
     InitializeEffectManagerNodeAndStats(*this);
 
-    const std::uintptr_t rawManager = reinterpret_cast<std::uintptr_t>(manager);
-    mUnknown3C = static_cast<std::uint32_t>(rawManager);
-    mUnknown40 = static_cast<std::uint32_t>(scriptObjectToken);
+    mManager = manager;
+    mScriptObjectToken = scriptObjectToken;
   }
 
   /**
@@ -196,11 +195,11 @@ namespace moho
    * Address: 0x00654260 (FUN_00654260)
    *
    * What it does:
-   * Reads one opaque manager-owner lane at `IEffect+0x3C`.
+   * Returns the effect manager that owns this effect's intrusive-list lane.
    */
-  [[maybe_unused]] std::uint32_t ReadIEffectManagerOwnerLane(const IEffect* const effect) noexcept
+  [[maybe_unused]] IEffectManager* ReadIEffectManagerOwner(const IEffect* const effect) noexcept
   {
-    return effect->mUnknown3C;
+    return effect->mManager;
   }
 
   struct RefCountedRuntimeView

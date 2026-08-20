@@ -61,18 +61,6 @@ namespace
     return moho::CScriptObject::sType;
   }
 
-  [[nodiscard]] moho::IEffectManager* ReadEffectManagerField(const moho::IEffect* const effect)
-  {
-    const std::uintptr_t raw = static_cast<std::uintptr_t>(effect->mUnknown3C);
-    return reinterpret_cast<moho::IEffectManager*>(raw);
-  }
-
-  void WriteEffectManagerField(moho::IEffect* const effect, moho::IEffectManager* const manager)
-  {
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(manager);
-    effect->mUnknown3C = static_cast<std::uint32_t>(raw);
-  }
-
   /**
    * Address: 0x007713E0 (FUN_007713E0, deserialize body)
    *
@@ -80,18 +68,16 @@ namespace
    * Loads `CScriptObject` base payload, then reads one unowned
    * `IEffectManager*` pointer lane and one trailing integer lane.
    */
-  void DeserializeIEffectBody_007713E0(moho::IEffect* const effect, gpg::ReadArchive* const archive)
+  void DeserializeIEffectBody(moho::IEffect* const effect, gpg::ReadArchive* const archive)
   {
     const gpg::RRef nullOwner{};
     archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(effect), nullOwner);
 
     moho::IEffectManager* manager = nullptr;
     archive->ReadPointer_IEffectManager(&manager, &nullOwner);
-    WriteEffectManagerField(effect, manager);
+    effect->mManager = manager;
 
-    int luaObjectValue = static_cast<int>(effect->mUnknown40);
-    archive->ReadInt(&luaObjectValue);
-    effect->mUnknown40 = static_cast<std::uint32_t>(luaObjectValue);
+    archive->ReadInt(&effect->mScriptObjectToken);
   }
 
   /**
@@ -100,7 +86,7 @@ namespace
    * What it does:
    * Emits one unowned tracked pointer lane for `IEffectManager*`.
    */
-  gpg::WriteArchive* SerializeIEffectManagerPointer_007714E0(
+  gpg::WriteArchive* SerializeIEffectManagerPointer(
     moho::IEffectManager** const managerField, gpg::WriteArchive* const archive
   )
   {
@@ -117,15 +103,15 @@ namespace
    * Saves `CScriptObject` base payload, then writes one unowned
    * `IEffectManager*` pointer lane and one trailing integer lane.
    */
-  void SerializeIEffectBody_00771450(const moho::IEffect* const effect, gpg::WriteArchive* const archive)
+  void SerializeIEffectBody(const moho::IEffect* const effect, gpg::WriteArchive* const archive)
   {
     const gpg::RRef nullOwner{};
     archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(effect), nullOwner);
 
-    moho::IEffectManager* manager = ReadEffectManagerField(effect);
-    (void)SerializeIEffectManagerPointer_007714E0(&manager, archive);
+    moho::IEffectManager* manager = effect->mManager;
+    (void)SerializeIEffectManagerPointer(&manager, archive);
 
-    archive->WriteInt(static_cast<int>(effect->mUnknown40));
+    archive->WriteInt(effect->mScriptObjectToken);
   }
 
   /**
@@ -137,7 +123,7 @@ namespace
    */
   void SerializeIEffectThunkVariantA(gpg::RRef* const, moho::IEffect* const effect, gpg::WriteArchive* const archive)
   {
-    SerializeIEffectBody_00771450(effect, archive);
+    SerializeIEffectBody(effect, archive);
   }
 
   /**
@@ -149,7 +135,7 @@ namespace
    */
   void SerializeIEffectThunkVariantB(gpg::RRef* const, moho::IEffect* const effect, gpg::WriteArchive* const archive)
   {
-    SerializeIEffectBody_00771450(effect, archive);
+    SerializeIEffectBody(effect, archive);
   }
 } // namespace
 
@@ -166,7 +152,7 @@ namespace moho
   )
   {
     auto* const effect = reinterpret_cast<IEffect*>(objectPtr);
-    DeserializeIEffectBody_007713E0(effect, archive);
+    DeserializeIEffectBody(effect, archive);
   }
 
   /**
@@ -180,7 +166,7 @@ namespace moho
   )
   {
     auto* const effect = reinterpret_cast<IEffect*>(objectPtr);
-    SerializeIEffectBody_00771450(effect, archive);
+    SerializeIEffectBody(effect, archive);
   }
 
   /**

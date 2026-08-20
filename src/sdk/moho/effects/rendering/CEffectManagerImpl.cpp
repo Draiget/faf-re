@@ -545,7 +545,7 @@ namespace moho
     // colour, length, thickness, UV shift, repeat rate, LOD cutoff, texture, and
     // blend mode) and runs Reset(); constructing through the default ctor here
     // would silently drop all of them.
-    CEfxBeam* const effect = new (std::nothrow) CEfxBeam(params);
+    CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, params);
     if (effect == nullptr) {
       return nullptr;
     }

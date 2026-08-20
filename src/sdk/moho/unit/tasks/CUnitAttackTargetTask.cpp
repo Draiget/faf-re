@@ -20,6 +20,7 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/Vector3f.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -42,13 +43,6 @@ namespace moho
   [[nodiscard]]
   bool PrepareMove(int moveFlags, Unit* unit, Wm3::Vector3f* inOutPos, gpg::Rect2f* outSkirtRect, bool useWholeMap);
 
-  /**
-   * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)
-   *
-   * What it does:
-   * Rotates one vector by quaternion and stores result in `dest`.
-   */
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
 } // namespace moho
 
 namespace

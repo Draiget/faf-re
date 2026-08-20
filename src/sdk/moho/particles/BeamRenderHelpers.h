@@ -585,14 +585,6 @@ namespace moho
   void AppendTrailToVector(msvc8::vector<TrailRuntimeView>& trails, const TrailRuntimeView& trail);
 
   /**
-   * Address: 0x00495990 (FUN_00495990, std::vector_Beam::push_back)
-   *
-   * What it does:
-   * Appends one world-beam payload into a beam vector lane.
-   */
-  void AppendBeamToVector(msvc8::vector<SWorldBeam>& beams, const SWorldBeam& beam);
-
-  /**
    * Address: 0x00494740 (FUN_00494740, func_ParticleSelectTechnique)
    *
    * What it does:

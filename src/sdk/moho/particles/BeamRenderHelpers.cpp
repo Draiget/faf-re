@@ -2329,7 +2329,7 @@ namespace moho
     (void)FindOrInsertBeamBucketEntryByKey(buckets, bucketKey, &insertPosition);
 
     if (insertPosition.iterator != buckets.end()) {
-      AppendBeamToVector(insertPosition.iterator->second, beam);
+      insertPosition.iterator->second.push_back(beam);
     }
   }
 
@@ -2353,17 +2353,6 @@ namespace moho
   void AppendTrailToVector(msvc8::vector<TrailRuntimeView>& trails, const TrailRuntimeView& trail)
   {
     trails.push_back(trail);
-  }
-
-  /**
-   * Address: 0x00495990 (FUN_00495990, std::vector_Beam::push_back)
-   *
-   * What it does:
-   * Appends one world-beam payload into a beam vector lane.
-   */
-  void AppendBeamToVector(msvc8::vector<SWorldBeam>& beams, const SWorldBeam& beam)
-  {
-    beams.push_back(beam);
   }
 
   /**

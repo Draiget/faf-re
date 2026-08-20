@@ -37,9 +37,6 @@ namespace moho
   static_assert(sizeof(SCreateBeamTransform) == 0x1C, "SCreateBeamTransform size must be 0x1C");
 
   /**
-   * Address: 0x00657170 (FUN_00657170, func_AddBeam_SimConFunc call payload)
-   * Address: 0x00656020 (FUN_00656020, Moho::CEffectManagerImpl::CreateBeam)
-   *
    * What it does:
    * Carries one beam-spawn request from sim-console command parsing into
    * `IEffectManager::CreateBeam`.
@@ -60,8 +57,8 @@ namespace moho
     SCreateBeamParams();
 
     Entity* mAttachEntity;                 // +0x00
-    std::int32_t mAttachArmyIndex;         // +0x04
-    std::int32_t mAttachBoneIndex;         // +0x08
+    std::int32_t mAttachBoneIndex;         // +0x04
+    std::int32_t mAttachArmyIndex;         // +0x08
     Wm3::Vector3<float> mStart;            // +0x0C
     Wm3::Vector3<float> mEnd;              // +0x18
     float mLifetime;                       // +0x24
@@ -74,12 +71,12 @@ namespace moho
 
   static_assert(offsetof(SCreateBeamParams, mAttachEntity) == 0x00, "SCreateBeamParams::mAttachEntity offset must be 0x00");
   static_assert(
-    offsetof(SCreateBeamParams, mAttachArmyIndex) == 0x04,
-    "SCreateBeamParams::mAttachArmyIndex offset must be 0x04"
+    offsetof(SCreateBeamParams, mAttachBoneIndex) == 0x04,
+    "SCreateBeamParams::mAttachBoneIndex offset must be 0x04"
   );
   static_assert(
-    offsetof(SCreateBeamParams, mAttachBoneIndex) == 0x08,
-    "SCreateBeamParams::mAttachBoneIndex offset must be 0x08"
+    offsetof(SCreateBeamParams, mAttachArmyIndex) == 0x08,
+    "SCreateBeamParams::mAttachArmyIndex offset must be 0x08"
   );
   static_assert(offsetof(SCreateBeamParams, mStart) == 0x0C, "SCreateBeamParams::mStart offset must be 0x0C");
   static_assert(offsetof(SCreateBeamParams, mEnd) == 0x18, "SCreateBeamParams::mEnd offset must be 0x18");
@@ -162,7 +159,9 @@ namespace moho
     virtual IEffect* CreateBeam(const RBeamBlueprint* beamBlueprint, int armyIndex) = 0;
 
     /**
-     * Address: 0x00656020 (FUN_00656020, Moho::CEffectManagerImpl::CreateBeam)
+     * What it does:
+     * Creates one beam from the packed request contract. Concrete binary
+     * ownership belongs to the `CEffectManagerImpl` override.
      */
     virtual IEffect* CreateBeam(const SCreateBeamParams& params) = 0;
 

@@ -31,5 +31,7 @@ namespace moho
     void Init() override;
   };
 
+  static_assert(sizeof(CMauiBitmapTypeInfo) == 0x64, "CMauiBitmapTypeInfo size must be 0x64");
+
   void register_CMauiBitmapTypeInfoStartup();
 } // namespace moho
