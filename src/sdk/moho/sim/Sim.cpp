@@ -5574,6 +5574,27 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00838AE0 (FUN_00838AE0, sub_838AE0)
+   *
+   * What it does:
+   * Bridge for the recovered Sim.cpp-local `CountLiveUserEntityWeakSetEntriesAndPrune`
+   * worker: counts live weak-set entries in `set`, pruning tombstone nodes along
+   * the way, for callers outside Sim.cpp (`CFormation::ChooseFormation`'s own
+   * participant-tracking set). `WeakEntitySetUserEntity` and the Sim.cpp-local
+   * `UserEntityWeakSetRuntimeView` share the identical 12-byte
+   * `{allocProxy,head,size}` binary layout (both size/offset-asserted), so the
+   * reinterpret is a same-shape view, not a layout guess.
+   */
+  std::int32_t CountLiveUserEntityWeakSetEntriesAndPrune(WeakEntitySetUserEntity& set)
+  {
+    static_assert(
+      sizeof(WeakEntitySetUserEntity) == sizeof(UserEntityWeakSetRuntimeView),
+      "WeakEntitySetUserEntity and UserEntityWeakSetRuntimeView must share the same 12-byte layout"
+    );
+    return CountLiveUserEntityWeakSetEntriesAndPrune(reinterpret_cast<UserEntityWeakSetRuntimeView*>(&set));
+  }
+
+  /**
    * Address: 0x008B58A0 (FUN_008B58A0, struct_CommandManager::struct_CommandManager)
    *
    * What it does:

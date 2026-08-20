@@ -445,7 +445,7 @@ int moho::FORMATION_GetScriptIndex(
  * and returns the chosen travel-formation index (or `0` on import/lookup/call
  * failure).
  */
-[[maybe_unused]] int moho::FORMATION_PickTravelFormation(
+int moho::FORMATION_PickTravelFormation(
   LuaPlus::LuaState* const state,
   const EFormationType formationType,
   const float dist

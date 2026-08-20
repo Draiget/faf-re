@@ -16,6 +16,7 @@
 #include "moho/render/RDebugOverlay.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/SSTICommandSource.h"
+#include "moho/sim/WeakEntitySet.h"
 #include "moho/task/CTaskThread.h"
 #include "SDesyncInfo.h"
 #include "SSyncFilter.h"
@@ -126,6 +127,20 @@ namespace moho
     const LuaPlus::LuaStackObject& blueprintObject,
     const char* functionName
   );
+
+  /**
+   * Address: 0x00838AE0 (FUN_00838AE0, sub_838AE0)
+   *
+   * What it does:
+   * Bridge for the Sim.cpp-local `CountLiveUserEntityWeakSetEntriesAndPrune`
+   * worker: counts live weak-set entries in `set`, pruning tombstone nodes
+   * along the way, for callers outside Sim.cpp (`CFormation::ChooseFormation`'s
+   * own participant-tracking set). `WeakEntitySetUserEntity`
+   * (moho/sim/WeakEntitySet.h) and the Sim.cpp-local `UserEntityWeakSetRuntimeView`
+   * share the identical 12-byte `{allocProxy,head,size}` binary layout (both
+   * size/offset-asserted), so the bridge is a same-shape view, not a layout guess.
+   */
+  [[nodiscard]] std::int32_t CountLiveUserEntityWeakSetEntriesAndPrune(WeakEntitySetUserEntity& set);
 
   /**
    * One pending allied-upgrade notification: the pre-upgrade (source) and
