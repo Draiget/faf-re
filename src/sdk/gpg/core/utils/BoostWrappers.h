@@ -242,6 +242,7 @@ namespace boost
          * Address: 0x00873780 (FUN_00873780, boost::shared_ptr_UICommandGraph::~shared_ptr_UICommandGraph)
          * Address: 0x00824060 (FUN_00824060, Moho::WeakPtr_UICommandGraph::Release)
          * Address: 0x0053ACA0 (FUN_0053ACA0)
+         * Address: 0x005BE250 (FUN_005BE250, Moho::WeakPtr_CIntelGrid::release)
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
