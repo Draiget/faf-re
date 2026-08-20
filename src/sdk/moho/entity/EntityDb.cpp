@@ -2613,6 +2613,14 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x00687BC0 (FUN_00687BC0, sub_687BC0)
+   *
+   * What it does:
+   * Raw node allocator only (left/parent/right left null); the immediate
+   * caller (InitializeAllUnitsTreeHeadLane below) overwrites isNil=1 and
+   * self-links left/parent/right, matching the binary's split shape.
+   */
   [[nodiscard]] moho::CEntityDbAllUnitsNode* AllocateAllUnitsTreeNode()
   {
     auto* const node = static_cast<moho::CEntityDbAllUnitsNode*>(::operator new(sizeof(moho::CEntityDbAllUnitsNode)));
@@ -2674,6 +2682,15 @@ namespace
     return initialized != nullptr ? initialized->head : nullptr;
   }
 
+  /**
+   * Address: 0x00688180 (FUN_00688180, sub_688180, std::map_uint_IdPool::_Node
+   * allocator)
+   *
+   * What it does:
+   * Raw node allocator only (left/parent/right left null); the immediate
+   * caller (InitializeIdPoolTreeHeadLane below) overwrites isNil=1 and
+   * self-links left/parent/right, matching the binary's split shape.
+   */
   [[nodiscard]] moho::CEntityDbIdPoolNode* AllocateIdPoolTreeNode()
   {
     auto* const node = static_cast<moho::CEntityDbIdPoolNode*>(::operator new(sizeof(moho::CEntityDbIdPoolNode)));
