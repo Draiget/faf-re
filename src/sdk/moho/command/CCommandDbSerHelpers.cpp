@@ -509,6 +509,7 @@ namespace moho
   void register_CCommandDBSerializer()
   {
     (void)construct_CCommandDBSerializer_SaveLoadStartupLeaf();
+    gCCommandDBSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&CleanupSerializerAtexit);
   }
 } // namespace moho
