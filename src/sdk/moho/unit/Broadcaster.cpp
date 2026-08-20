@@ -343,7 +343,7 @@ namespace
    * Unlinks one broadcaster node from its current intrusive ring, restores it
    * to singleton links, then relinks it directly before `anchor`.
    */
-  [[maybe_unused]] moho::Broadcaster* RelinkBroadcasterNodeBeforeAnchor(
+  moho::Broadcaster* RelinkBroadcasterNodeBeforeAnchor(
     moho::Broadcaster* const node,
     moho::Broadcaster* const anchor
   ) noexcept
