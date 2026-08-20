@@ -2,6 +2,8 @@
 #include "WxAppVectorHelpers.h"
 
 #include <Windows.h>
+#include <cderr.h>
+#include <commdlg.h>
 #include <ddeml.h>
 #include <commctrl.h>
 #include <shellapi.h>
@@ -20977,6 +20979,1079 @@ void* wxHttpGetClassInfoRuntime() noexcept
   return gWxHttpClassInfoTable;
 }
 
+// =============================================================================
+// wxHTTP: header-list manipulation and request/response chain
+// =============================================================================
+//
+// Ground truth for this whole section: the vendored wxWidgets 2.4.2 source
+// tree (dependencies/wxWindows-2.4.2.7z), specifically:
+//   src/common/http.cpp, include/wx/protocol/http.h,
+//   include/wx/protocol/protocol.h, src/common/protocol.cpp,
+//   include/wx/list.h, src/common/list.cpp,
+//   include/wx/socket.h, src/common/socket.cpp.
+//
+// wxHTTP : wxProtocol : wxSocketClient : wxSocketBase : wxObject. m_headers
+// is a `wxList` (== wxObjectList, keyed wxKEY_STRING) mapping header name to
+// a heap `wxString*` value. Every function below was cross-checked line by
+// line against the real source and byte-matches it; deviations found along
+// the way (see wxHttpHeaderListFindCaseInsensitive's comment) are called out
+// explicitly rather than silently "corrected" to match the vendored source.
+
+namespace
+{
+  // ---------------------------------------------------------------------
+  // wxNodeBase / wxListBase layout for wxHTTP::m_headers (wx/list.h).
+  // Confirmed field-by-field from the compiled offsets read out of
+  // FUN_00A0E830 (SetHeader), FUN_00A0E990 (GetHeader), FUN_00A0EC30
+  // (ParseHeaders) and FUN_00A0E7E0 (ClearHeaders): wxNodeBase is
+  // {vfptr, m_key, m_data, m_next, m_previous, m_list} and wxListBase is
+  // {vfptr, wxObject::m_refData, m_count, m_destroy, m_nodeFirst,
+  // m_nodeLast, m_keyType}. The same two shapes are reused below for
+  // wxSocketBase::m_states (an unkeyed wxList) inside SaveState.
+  // ---------------------------------------------------------------------
+  struct WxHttpHeaderNode
+  {
+    void* vtable = nullptr;                // +0x00 wxNodeBase vtable
+    wchar_t* keyText = nullptr;            // +0x04 m_key.string (wxKEY_STRING)
+    wxStringRuntime* valueText = nullptr;  // +0x08 m_data (wxString*)
+    WxHttpHeaderNode* next = nullptr;      // +0x0C m_next
+    WxHttpHeaderNode* previous = nullptr;  // +0x10 m_previous
+    void* owningList = nullptr;            // +0x14 m_list
+
+    [[nodiscard]] const wchar_t* GetKeyString() const noexcept { return keyText; }
+    [[nodiscard]] wxStringRuntime* GetData() const noexcept { return valueText; }
+    [[nodiscard]] WxHttpHeaderNode* GetNext() const noexcept { return next; }
+  };
+  static_assert(sizeof(WxHttpHeaderNode) == 0x18, "WxHttpHeaderNode size must be 0x18");
+  static_assert(offsetof(WxHttpHeaderNode, keyText) == 0x04, "WxHttpHeaderNode::keyText offset must be 0x04");
+  static_assert(offsetof(WxHttpHeaderNode, valueText) == 0x08, "WxHttpHeaderNode::valueText offset must be 0x08");
+  static_assert(offsetof(WxHttpHeaderNode, next) == 0x0C, "WxHttpHeaderNode::next offset must be 0x0C");
+  static_assert(offsetof(WxHttpHeaderNode, previous) == 0x10, "WxHttpHeaderNode::previous offset must be 0x10");
+  static_assert(offsetof(WxHttpHeaderNode, owningList) == 0x14, "WxHttpHeaderNode::owningList offset must be 0x14");
+
+  struct WxHttpHeaderListRuntime
+  {
+    void* vtable = nullptr;                    // +0x00
+    void* refData = nullptr;                   // +0x04 wxObject::m_refData (unused by wxListBase)
+    std::uint32_t count = 0;                   // +0x08 m_count
+    std::uint32_t destroyContents = 0;         // +0x0C m_destroy
+    WxHttpHeaderNode* nodeFirst = nullptr;      // +0x10 m_nodeFirst
+    WxHttpHeaderNode* nodeLast = nullptr;       // +0x14 m_nodeLast
+    std::int32_t keyType = 2;                  // +0x18 m_keyType (wxKEY_STRING == 2)
+
+    [[nodiscard]] WxHttpHeaderNode* GetFirst() const noexcept { return nodeFirst; }
+  };
+  static_assert(sizeof(WxHttpHeaderListRuntime) == 0x1C, "WxHttpHeaderListRuntime size must be 0x1C");
+  static_assert(offsetof(WxHttpHeaderListRuntime, count) == 0x08, "WxHttpHeaderListRuntime::count offset must be 0x08");
+  static_assert(offsetof(WxHttpHeaderListRuntime, destroyContents) == 0x0C, "WxHttpHeaderListRuntime::destroyContents offset must be 0x0C");
+  static_assert(offsetof(WxHttpHeaderListRuntime, nodeFirst) == 0x10, "WxHttpHeaderListRuntime::nodeFirst offset must be 0x10");
+  static_assert(offsetof(WxHttpHeaderListRuntime, nodeLast) == 0x14, "WxHttpHeaderListRuntime::nodeLast offset must be 0x14");
+  static_assert(offsetof(WxHttpHeaderListRuntime, keyType) == 0x18, "WxHttpHeaderListRuntime::keyType offset must be 0x18");
+
+  // wxHTTP's own added fields, past the wxObject/wxSocketBase/wxSocketClient/
+  // wxProtocol prefix. Offsets confirmed directly from the decompiled bodies:
+  // SetHeader/ParseHeaders read/write `this+136` (m_read) and `this+108`
+  // (m_headers); GetInputStream reads `this+104` (m_perr) and `this+140`
+  // (m_addr).
+  struct WxHttpRuntimeView
+  {
+    std::uint8_t basePrefix[0x68]{};       // wxObject..wxProtocol prefix (opaque to wxHTTP's own methods)
+    std::int32_t lastError = 0;            // +0x68 m_perr (wxProtocolError)
+    WxHttpHeaderListRuntime headers{};     // +0x6C m_headers
+    std::uint8_t hasReadHeaders = 0;       // +0x88 m_read
+    std::uint8_t proxyMode = 0;            // +0x89 m_proxy_mode
+    std::uint8_t lane8A_8B[0x2]{};
+    void* socketAddress = nullptr;         // +0x8C m_addr (wxSockAddress*)
+  };
+  static_assert(offsetof(WxHttpRuntimeView, lastError) == 0x68, "WxHttpRuntimeView::lastError offset must be 0x68");
+  static_assert(offsetof(WxHttpRuntimeView, headers) == 0x6C, "WxHttpRuntimeView::headers offset must be 0x6C");
+  static_assert(offsetof(WxHttpRuntimeView, hasReadHeaders) == 0x88, "WxHttpRuntimeView::hasReadHeaders offset must be 0x88");
+  static_assert(offsetof(WxHttpRuntimeView, proxyMode) == 0x89, "WxHttpRuntimeView::proxyMode offset must be 0x89");
+  static_assert(offsetof(WxHttpRuntimeView, socketAddress) == 0x8C, "WxHttpRuntimeView::socketAddress offset must be 0x8C");
+
+  // -----------------------------------------------------------------------
+  // wx string primitives needed by the wxHTTP chain but not yet recovered
+  // anywhere else. All of these build their result through std::wstring and
+  // commit it via the existing AssignOwnedWxString/RetainWxStringRuntime/
+  // ReleaseWxStringSharedPayload lanes, matching this file's established
+  // idiom for wxString-producing helpers (see wxStringCopyPrefixRuntime,
+  // wxStringCopySuffixAfterFirstCharacterRuntime and friends above).
+  // -----------------------------------------------------------------------
+
+  /**
+   * Address: 0x00422AF0 (FUN_00422AF0)
+   * Mangled: ??1wxString@@QAE@XZ
+   *
+   * What it does:
+   * wxString::~wxString(): releases this string's shared COW payload if
+   * this lane owns it. wxStringRuntime has no C++ destructor of its own (it
+   * is a plain layout struct), so every local wxStringRuntime temporary
+   * created by the functions below calls this explicitly at the same points
+   * the original decompiled bodies run the inlined COW-release sequence.
+   */
+  void WxStringDestructRuntime(wxStringRuntime* const self) noexcept
+  {
+    if (self != nullptr) {
+      ReleaseWxStringSharedPayload(*self);
+    }
+  }
+
+  /**
+   * Address: 0x00960810 (FUN_00960810)
+   * Mangled: ??0wxString@@QAE@_WI@Z
+   *
+   * IDA signature:
+   * wxString *__userpurge wxString::wxString@<eax>(wxString *this@<ecx>, wxChar a2, size_t a3);
+   *
+   * What it does:
+   * wxString(wxChar ch, size_t count): builds a string of `count` repeated
+   * copies of `ch`. Used by wxHTTP::BuildRequest to build the single-space
+   * delimiter string passed to wxStringTokenizer when splitting the HTTP
+   * status line.
+   */
+  wxStringRuntime* WxStringConstructRepeatedCharRuntime(
+    wxStringRuntime* const outValue,
+    const wchar_t ch,
+    const std::size_t count
+  )
+  {
+    if (outValue == nullptr) {
+      return nullptr;
+    }
+
+    outValue->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    if (count != 0) {
+      AssignOwnedWxString(outValue, std::wstring(count, ch));
+    }
+    return outValue;
+  }
+
+  /**
+   * Address: 0x00960010 (FUN_00960010)
+   * Mangled: ?Find@wxString@@QBEHPB_W@Z
+   *
+   * IDA signature:
+   * int __thiscall wxString::Find(_WORD **this, char *a2);
+   *
+   * What it does:
+   * wxString::Find(const wxChar* needle): returns the zero-based index of
+   * the first occurrence of `needle` in this string via wcsstr, or -1 when
+   * absent. wxHTTP::BuildRequest uses this (through wxString::Contains) to
+   * test the response status line for "HTTP/".
+   */
+  std::int32_t WxStringFindSubstringRuntime(
+    const wxStringRuntime* const self,
+    const wchar_t* const needle
+  ) noexcept
+  {
+    if (self == nullptr || self->c_str() == nullptr || needle == nullptr) {
+      return -1;
+    }
+
+    const wchar_t* const found = ::wcsstr(self->c_str(), needle);
+    return found != nullptr ? static_cast<std::int32_t>(found - self->c_str()) : -1;
+  }
+
+  /**
+   * Address: 0x00961E10 (FUN_00961E10)
+   * Mangled: ?BeforeFirst@wxString@@QBE?AV1@_W@Z
+   *
+   * IDA signature:
+   * wxString *__thiscall wxString::BeforeFirst(unsigned __int16 **this, wxString *a2, int a3);
+   *
+   * What it does:
+   * wxString::BeforeFirst(wxChar ch): returns the prefix of this string up
+   * to (not including) the first occurrence of `ch`, or the whole string
+   * when `ch` is absent. wxHTTP::ParseHeaders uses this to split each
+   * "Name: value" response header line on ':'.
+   */
+  wxStringRuntime* WxStringBeforeFirstCharacterRuntime(
+    const wxStringRuntime* const self,
+    wxStringRuntime* const outText,
+    const wchar_t separator
+  )
+  {
+    if (outText == nullptr) {
+      return nullptr;
+    }
+
+    const std::wstring sourceText(self != nullptr && self->c_str() != nullptr ? self->c_str() : L"");
+    const std::size_t separatorIndex = sourceText.find(separator);
+    outText->m_pchData = nullptr;
+    AssignOwnedWxString(
+      outText,
+      separatorIndex == std::wstring::npos ? sourceText : sourceText.substr(0, separatorIndex)
+    );
+    return outText;
+  }
+
+  /**
+   * Address: 0x009610E0 (FUN_009610E0)
+   * Mangled: ?PrintfV@wxString@@QAEHPB_WPAD@Z (approx.)
+   *
+   * IDA signature:
+   * int __thiscall wxString::PrintfV(wxString *this, const wxChar *a2, va_list ArgList);
+   *
+   * What it does:
+   * wxString::PrintfV(fmt, args): formats `fmt`/`args` and replaces this
+   * string's content with the result, using the same measure-then-format
+   * two-pass shape as the original (GetWriteBuf/vsnwprintf-retry loop),
+   * expressed here via `_vscwprintf` + `std::vswprintf` and committed
+   * through AssignOwnedWxString -- the same pattern this file already uses
+   * for wxStringInitializeFromEmptyAndPrintfV (FUN_00962160). Returns the
+   * resulting string length, or -1 on failure.
+   */
+  int WxStringPrintfVRuntime(
+    wxStringRuntime* const self,
+    const wchar_t* const formatText,
+    va_list argumentList
+  )
+  {
+    if (self == nullptr) {
+      return -1;
+    }
+
+    if (formatText == nullptr) {
+      AssignOwnedWxString(self, std::wstring());
+      return 0;
+    }
+
+    va_list measureList{};
+    va_copy(measureList, argumentList);
+    const int requiredLength = ::_vscwprintf(formatText, measureList);
+    va_end(measureList);
+
+    if (requiredLength <= 0) {
+      AssignOwnedWxString(self, std::wstring());
+      return requiredLength;
+    }
+
+    std::vector<wchar_t> buffer(static_cast<std::size_t>(requiredLength) + 1u, L'\0');
+    va_list printList{};
+    va_copy(printList, argumentList);
+    const int writtenLength = std::vswprintf(buffer.data(), buffer.size(), formatText, printList);
+    va_end(printList);
+
+    if (writtenLength < 0) {
+      return -1;
+    }
+
+    AssignOwnedWxString(self, std::wstring(buffer.data(), static_cast<std::size_t>(writtenLength)));
+    return writtenLength;
+  }
+
+  /**
+   * Address: 0x009621A0 (FUN_009621A0)
+   * Mangled: ?Printf@wxString@@QAAHPB_WZZ (approx.)
+   *
+   * IDA signature:
+   * int wxString::Printf(wxString *a1, const wxChar *a2, ...);
+   *
+   * What it does:
+   * wxString::Printf(fmt, ...): va_start wrapper that forwards straight to
+   * PrintfV, exactly matching the vendored wx 2.4.2 source
+   * (src/common/string.cpp) -- confirmed to be a pure `va_start` +
+   * `PrintfV` + return forwarder with no other logic. Used by
+   * wxHTTP::BuildRequest (request line) and wxHTTP::SendHeaders
+   * ("Name: value\r\n" lines).
+   */
+  int WxStringPrintfRuntime(wxStringRuntime* const self, const wchar_t* const formatText, ...)
+  {
+    va_list args;
+    va_start(args, formatText);
+    const int result = WxStringPrintfVRuntime(self, formatText, args);
+    va_end(args);
+    return result;
+  }
+
+  // -----------------------------------------------------------------------
+  // wx list primitives for wxHTTP::m_headers (a keyed wxObjectList) and,
+  // reused, for wxSocketBase::m_states (an unkeyed wxList) in SaveState
+  // below -- both are wxListBase-derived with the identical binary layout
+  // modeled by WxHttpHeaderListRuntime/WxHttpHeaderNode above.
+  // -----------------------------------------------------------------------
+
+  /**
+   * Address: 0x00978560 (FUN_00978560)
+   * Mangled: ?DoDeleteNode@wxListBase@@AAEXPAVwxNodeBase@@@Z
+   *
+   * What it does:
+   * wxListBase::DoDeleteNode(): frees the node's key string (wxKEY_STRING
+   * lists only), runs the virtual DeleteData() contents-destroyer only when
+   * DeleteContents(TRUE) was requested, detaches the node from its owner,
+   * then deletes the node object itself. wxHTTP never calls
+   * DeleteContents(TRUE) on m_headers, so the DeleteData branch is
+   * preserved for fidelity but is dead in practice for this list.
+   */
+  void WxListBaseDoDeleteNodeRuntime(
+    WxHttpHeaderListRuntime* const list,
+    WxHttpHeaderNode* const node
+  ) noexcept
+  {
+    if (list->keyType == 2 /* wxKEY_STRING */ && node->keyText != nullptr) {
+      std::free(node->keyText);
+    }
+    if (list->destroyContents != 0 && node->valueText != nullptr) {
+      delete node->valueText;
+    }
+    node->owningList = nullptr;
+    delete node;
+  }
+
+  /**
+   * Address: 0x00978650 (FUN_00978650)
+   * Mangled: ?Clear@wxListBase@@QAEXXZ
+   *
+   * IDA signature:
+   * void __thiscall wxModuleListNode::Clear(wxModuleList *this);
+   *
+   * What it does:
+   * wxListBase::Clear(): deletes every node in the list via DoDeleteNode,
+   * then resets it to empty. The IDA-inferred owner name
+   * ("wxModuleListNode") is an artifact of ICF/template-instantiation
+   * symbol collision -- the body is wxListBase::Clear(), and this address
+   * is reached from wxHTTP::ClearHeaders() via `m_headers.Clear()`.
+   */
+  void WxListBaseClearRuntime(WxHttpHeaderListRuntime* const list) noexcept
+  {
+    WxHttpHeaderNode* node = list->nodeFirst;
+    while (node != nullptr) {
+      WxHttpHeaderNode* const next = node->next;
+      WxListBaseDoDeleteNodeRuntime(list, node);
+      node = next;
+    }
+    list->nodeLast = nullptr;
+    list->nodeFirst = nullptr;
+    list->count = 0;
+  }
+
+  /**
+   * Address: 0x00978380 (FUN_00978380)
+   * Mangled: ?Append@wxObjectList@@QAEPAVwxObjectListNode@@ABVwxString@@PAVwxObject@@@Z (approx.)
+   *
+   * IDA signature:
+   * wxNodeBase *__thiscall wxObjectList::Append(wxObjectList *this, const wchar_t *name, wxColour *color);
+   *
+   * What it does:
+   * wxObjectList::Append(key, object) (== wxListBase::Append(const wxChar*,
+   * void*) for the string-keyed case): allocates one node holding a private
+   * wcsdup() copy of `key` plus `object`, links it at the tail of the list,
+   * and bumps the node count. wxHTTP::SetHeader/ParseHeaders always call
+   * this on a wxKEY_STRING list.
+   */
+  WxHttpHeaderNode* WxObjectListAppendRuntime(
+    WxHttpHeaderListRuntime* const list,
+    const wchar_t* const key,
+    wxStringRuntime* const value
+  )
+  {
+    auto* const node = new WxHttpHeaderNode();
+    node->keyText = (key != nullptr) ? ::_wcsdup(key) : nullptr;
+    node->valueText = value;
+    node->next = nullptr;
+    node->previous = list->nodeLast;
+    node->owningList = list;
+
+    if (list->nodeLast != nullptr) {
+      list->nodeLast->next = node;
+    } else {
+      list->nodeFirst = node;
+    }
+    list->nodeLast = node;
+    ++list->count;
+    return node;
+  }
+
+  /**
+   * Address: 0x00978280 (FUN_00978280)
+   * Mangled: ?Append@wxListBase@@QAEPAVwxNodeBase@@PAX@Z
+   *
+   * IDA signature:
+   * wxNodeBase *__thiscall wxList::Append(wxList *this, int *a2);
+   *
+   * What it does:
+   * wxListBase::Append(void* object) (unkeyed overload): rejects the call
+   * on a keyed list, otherwise allocates one node holding just `object`
+   * (no key) and links it at the tail exactly like the keyed Append above.
+   * wxSocketBase::SaveState() uses this on m_states, which is an unkeyed
+   * wxList.
+   */
+  WxHttpHeaderNode* WxListAppendUnkeyedRuntime(
+    WxHttpHeaderListRuntime* const list,
+    void* const object
+  )
+  {
+    if (list->keyType != 0 /* wxKEY_NONE */) {
+      return nullptr;
+    }
+
+    auto* const node = new WxHttpHeaderNode();
+    node->keyText = nullptr;
+    node->valueText = static_cast<wxStringRuntime*>(object);
+    node->next = nullptr;
+    node->previous = list->nodeLast;
+    node->owningList = list;
+
+    if (list->nodeLast != nullptr) {
+      list->nodeLast->next = node;
+    } else {
+      list->nodeFirst = node;
+    }
+    list->nodeLast = node;
+    ++list->count;
+    return node;
+  }
+
+  /**
+   * wxListBase::Find(const wxListKey&) for the wxKEY_STRING case
+   * (wx/src/common/list.cpp: wxListKey::operator==() -> wxStrcmp()).
+   * Case-SENSITIVE. wxHTTP::SetHeader is the only caller in this chain;
+   * wxHTTP::GetHeader below deliberately does NOT use this (see its
+   * comment) because the real source folds case via wxString::Upper() on
+   * both sides instead of calling Find().
+   */
+  WxHttpHeaderNode* WxHttpHeaderListFindExact(
+    const WxHttpHeaderListRuntime* const list,
+    const wchar_t* const key
+  ) noexcept
+  {
+    for (WxHttpHeaderNode* node = list->nodeFirst; node != nullptr; node = node->next) {
+      if (node->keyText != nullptr && key != nullptr && ::wcscmp(node->keyText, key) == 0) {
+        return node;
+      }
+    }
+    return nullptr;
+  }
+}
+
+/**
+ * Address: 0x00A0E7E0 (FUN_00A0E7E0)
+ * Mangled: ?ClearHeaders@wxHTTP@@AAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall sub_A0E7E0(int this);
+ *
+ * What it does:
+ * wxHTTP::ClearHeaders(): releases every header value wxString (deleting
+ * the wxString object itself, matching `delete string;` in the real
+ * source) and deletes the owning nodes, then empties m_headers.
+ */
+void WxHttpClearHeadersRuntime(void* const httpSelf) noexcept
+{
+  auto* const self = static_cast<WxHttpRuntimeView*>(httpSelf);
+  for (WxHttpHeaderNode* node = self->headers.GetFirst(); node != nullptr; node = node->GetNext()) {
+    wxStringRuntime* const value = node->GetData();
+    if (value != nullptr) {
+      WxStringDestructRuntime(value);
+      delete value;
+    }
+  }
+  WxListBaseClearRuntime(&self->headers);
+}
+
+/**
+ * Address: 0x00A0E830 (FUN_00A0E830)
+ * Mangled: ?SetHeader@wxHTTP@@QAEXABVwxString@@0@Z
+ *
+ * IDA signature:
+ * wxNodeBase *__thiscall sub_A0E830(int this, const wchar_t **a2, wxString *a3);
+ *
+ * What it does:
+ * wxHTTP::SetHeader(const wxString& header, const wxString& h_data): if a
+ * response was just parsed (m_read), clears the stale header set first.
+ * Then either overwrites the value of an existing case-SENSITIVE key match
+ * (wxListBase::Find -> wxStrcmp, confirmed via the vtable-slot-5 indirect
+ * call in the disassembly) or appends a fresh (header, new wxString(h_data))
+ * node.
+ */
+void WxHttpSetHeaderRuntime(
+  void* const httpSelf,
+  const wxStringRuntime* const header,
+  const wxStringRuntime* const data
+)
+{
+  auto* const self = static_cast<WxHttpRuntimeView*>(httpSelf);
+  if (self->hasReadHeaders != 0) {
+    WxHttpClearHeadersRuntime(self);
+    self->hasReadHeaders = 0;
+  }
+
+  const wchar_t* const key = (header != nullptr) ? header->c_str() : nullptr;
+  const std::wstring dataText(data != nullptr && data->c_str() != nullptr ? data->c_str() : L"");
+
+  WxHttpHeaderNode* const existing = WxHttpHeaderListFindExact(&self->headers, key);
+  if (existing != nullptr) {
+    AssignOwnedWxString(existing->valueText, dataText);
+    return;
+  }
+
+  auto* const ownedValue = new wxStringRuntime();
+  ownedValue->m_pchData = nullptr;
+  AssignOwnedWxString(ownedValue, dataText);
+  (void)WxObjectListAppendRuntime(&self->headers, key, ownedValue);
+}
+
+/**
+ * Address: 0x00A0E990 (FUN_00A0E990)
+ * Mangled: ?GetHeader@wxHTTP@@QAE?AVwxString@@ABV2@@Z
+ *
+ * IDA signature:
+ * wxString *__thiscall sub_A0E990(_DWORD *this, wxString *a2, int a3);
+ *
+ * What it does:
+ * wxHTTP::GetHeader(const wxString& header): linear-searches m_headers via
+ * GetFirst()/GetNext() for a case-INSENSITIVE key match, returning the
+ * matched value or wxEmptyString.
+ *
+ * Case-fold correction: the real wx 2.4.2 source folds via
+ * `header.Upper() == key.Upper()` (src/common/http.cpp:100-113). This is
+ * confirmed against the compiled binary too -- the fold call
+ * (sub_961160) bottoms out at FUN_00960F20, which per-character calls
+ * FUN_00A8FA95, and CrtRuntimeHelpers.cpp:2306 identifies FUN_00A8FA95 as
+ * `towupper`. So the fold is genuinely uppercase-based, despite
+ * FUN_00960F20/FUN_00961160 being named "LowerInPlace"/
+ * "wxStringLowerCopyRuntime" elsewhere in this file (pre-existing
+ * misnomer, left alone here -- out of this recovery's scope to rename).
+ * This implementation performs the towupper-based fold directly instead of
+ * depending on that mislabeled helper.
+ */
+wxStringRuntime* WxHttpGetHeaderRuntime(
+  const void* const httpSelf,
+  const wxStringRuntime* const header,
+  wxStringRuntime* const outValue
+)
+{
+  if (outValue == nullptr) {
+    return nullptr;
+  }
+
+  const auto* const self = static_cast<const WxHttpRuntimeView*>(httpSelf);
+
+  std::wstring needleUpper(header != nullptr && header->c_str() != nullptr ? header->c_str() : L"");
+  for (wchar_t& ch : needleUpper) {
+    ch = static_cast<wchar_t>(::towupper(static_cast<wint_t>(ch)));
+  }
+
+  for (WxHttpHeaderNode* node = self->headers.GetFirst(); node != nullptr; node = node->GetNext()) {
+    std::wstring keyUpper(node->GetKeyString() != nullptr ? node->GetKeyString() : L"");
+    for (wchar_t& ch : keyUpper) {
+      ch = static_cast<wchar_t>(::towupper(static_cast<wint_t>(ch)));
+    }
+
+    if (needleUpper == keyUpper) {
+      outValue->m_pchData = nullptr;
+      RetainWxStringRuntime(outValue, node->GetData());
+      return outValue;
+    }
+  }
+
+  outValue->m_pchData = nullptr;
+  AssignOwnedWxString(outValue, std::wstring());
+  return outValue;
+}
+
+/**
+ * Address: 0x00A0EC30 (FUN_00A0EC30)
+ * Mangled: ?ParseHeaders@wxHTTP@@AAE_NXZ
+ *
+ * IDA signature:
+ * char __thiscall sub_A0EC30(int this);
+ *
+ * What it does:
+ * wxHTTP::ParseHeaders(): repeatedly reads one line via the free `GetLine`
+ * helper (see WxSocketGetLineRuntime below) until an empty line ends the
+ * header block; every non-empty line is split on ':' into
+ * (BeforeFirst-name, AfterFirst-value) and appended to m_headers. Returns
+ * FALSE on any socket read error, TRUE once the terminating blank line is
+ * consumed.
+ *
+ * The real source also declares an unused local `wxStringTokenizer
+ * tokenizer;` right beside `wxString line;` -- dead code that the compiler
+ * still constructs/destroys on every path. That local carries no
+ * observable behavior here (nothing reads it), so it is intentionally not
+ * reproduced; this preserves 1:1 *behavior* while dropping a genuinely
+ * inert local, consistent with this project's modern-C++ recovery style.
+ */
+bool WxHttpParseHeadersRuntime(void* const httpSelf)
+{
+  auto* const self = static_cast<WxHttpRuntimeView*>(httpSelf);
+
+  WxHttpClearHeadersRuntime(self);
+  self->hasReadHeaders = 1;
+
+  wxStringRuntime line{};
+  line.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+  for (;;) {
+    self->lastError = WxSocketGetLineRuntime(self, &line);
+    if (self->lastError != 0 /* wxPROTO_NOERR */) {
+      WxStringDestructRuntime(&line);
+      return false;
+    }
+
+    if (!WxStringRuntimeHasCharacters(&line)) {
+      break;
+    }
+
+    wxStringRuntime leftText{};
+    leftText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)WxStringBeforeFirstCharacterRuntime(&line, &leftText, L':');
+
+    const std::wstring lineText(line.c_str() != nullptr ? line.c_str() : L"");
+    const std::size_t colonIndex = lineText.find(L':');
+    std::wstring rightTextRaw = (colonIndex == std::wstring::npos)
+      ? std::wstring()
+      : lineText.substr(colonIndex + 1u);
+    // wxString::Strip(wxString::both): trim leading/trailing ASCII spaces.
+    const std::size_t firstNonSpace = rightTextRaw.find_first_not_of(L' ');
+    if (firstNonSpace == std::wstring::npos) {
+      rightTextRaw.clear();
+    } else {
+      const std::size_t lastNonSpace = rightTextRaw.find_last_not_of(L' ');
+      rightTextRaw = rightTextRaw.substr(firstNonSpace, lastNonSpace - firstNonSpace + 1u);
+    }
+
+    auto* const rightValue = new wxStringRuntime();
+    rightValue->m_pchData = nullptr;
+    AssignOwnedWxString(rightValue, rightTextRaw);
+
+    (void)WxObjectListAppendRuntime(
+      &self->headers,
+      leftText.c_str() != nullptr ? leftText.c_str() : L"",
+      rightValue
+    );
+    WxStringDestructRuntime(&leftText);
+  }
+
+  WxStringDestructRuntime(&line);
+  return true;
+}
+
+/**
+ * Address: 0x00A0EB40 (FUN_00A0EB40)
+ * Mangled: ?SendHeaders@wxHTTP@@AAEXXZ
+ *
+ * IDA signature:
+ * void __thiscall sub_A0EB40(_DWORD *this);
+ *
+ * What it does:
+ * wxHTTP::SendHeaders(): walks m_headers, formats each entry as
+ * "Name: Value\r\n" via wxString::Printf, converts the line to the local
+ * (Libc) multi-byte codepage, and writes the raw bytes directly to the
+ * socket.
+ */
+void WxHttpSendHeadersRuntime(void* const httpSelf)
+{
+  auto* const self = static_cast<WxHttpRuntimeView*>(httpSelf);
+
+  for (WxHttpHeaderNode* node = self->headers.GetFirst(); node != nullptr; node = node->GetNext()) {
+    wxStringRuntime* const value = node->GetData();
+    const wchar_t* const valueText = (value != nullptr && value->c_str() != nullptr) ? value->c_str() : L"";
+    const wchar_t* const keyText = node->GetKeyString() != nullptr ? node->GetKeyString() : L"";
+
+    wxStringRuntime line{};
+    line.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    (void)WxStringPrintfRuntime(&line, L"%s: %s\r\n", keyText, valueText);
+
+    const std::wstring lineText(line.c_str() != nullptr ? line.c_str() : L"");
+    const int mbLength = ::WideCharToMultiByte(CP_ACP, 0, lineText.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (mbLength > 0) {
+      std::vector<char> mbBuffer(static_cast<std::size_t>(mbLength), '\0');
+      const int converted = ::WideCharToMultiByte(
+        CP_ACP, 0, lineText.c_str(), -1, mbBuffer.data(), mbLength, nullptr, nullptr
+      );
+      if (converted > 0) {
+        (void)wxSocketWriteAndUpdateStatusRuntime(
+          reinterpret_cast<WxFtpSocketIoRuntimeView*>(self),
+          mbBuffer.data(),
+          static_cast<int>(::strlen(mbBuffer.data()))
+        );
+      }
+    }
+
+    WxStringDestructRuntime(&line);
+  }
+}
+
+// -----------------------------------------------------------------------
+// Cross-references into functions defined later in this translation unit
+// (WxFtpSocketIoRuntimeView / wxSocketWriteAndUpdateStatusRuntime /
+// wxSocketReadBufferedRuntime), and into other already-recovered
+// translation units (SnapshotOwnerRuntime / CopySnapshotAndReleaseBindingsRuntime
+// in SimRecoveryRuntime.cpp -- confirmed at true file scope there, i.e. not
+// inside an anonymous namespace, so this forward declaration binds to the
+// same external-linkage definition; RuntimeWtoiFromWideThunk in
+// CrtRuntimeHelpers.cpp, likewise file-scope / extern "C").
+// -----------------------------------------------------------------------
+namespace
+{
+  struct WxFtpSocketIoRuntimeView;
+}
+WxFtpSocketIoRuntimeView* wxSocketWriteAndUpdateStatusRuntime(
+  WxFtpSocketIoRuntimeView* const runtime,
+  char* const buffer,
+  const int byteCount
+);
+int wxSocketReadBufferedRuntime(
+  WxFtpSocketIoRuntimeView* const runtime,
+  char* const buffer,
+  const int byteCount
+);
+
+struct SnapshotOwnerRuntime;
+int CopySnapshotAndReleaseBindingsRuntime(SnapshotOwnerRuntime* const owner);
+
+extern "C" int __cdecl RuntimeWtoiFromWideThunk(const wchar_t* const text);
+
+namespace
+{
+  // -----------------------------------------------------------------------
+  // wxSocketBase field layout (wx/socket.h). Confirmed offsets: m_flags@16,
+  // m_states@40 (a 0x1C-byte embedded wxList -- see statesListLane below),
+  // m_clientData@92, m_notify@96, m_eventmask@100 -- all read directly out
+  // of the compiled FUN_00A2E3F0 (SaveState) body, which copies exactly
+  // these four fields into a freshly allocated wxSocketState.
+  // -----------------------------------------------------------------------
+  struct WxSocketBaseRuntimeView
+  {
+    void* vtable = nullptr;                          // +0x00
+    void* refData = nullptr;                         // +0x04
+    void* socketRuntime = nullptr;                   // +0x08 m_socket (GSocket*)
+    std::uint32_t socketType = 0;                    // +0x0C
+    std::uint32_t socketFlags = 0;                   // +0x10 m_flags
+    std::uint8_t socketOkFlag = 0;                   // +0x14
+    std::uint8_t socketConnectedFlag = 0;            // +0x15
+    std::uint8_t socketEstablishingFlag = 0;         // +0x16
+    std::uint8_t socketReadingFlag = 0;              // +0x17
+    std::uint8_t socketWritingFlag = 0;              // +0x18
+    std::uint8_t lane19_1F[0x07]{};                  // +0x19
+    std::uint32_t socketLastIoCount = 0;             // +0x20 m_lcount
+    std::uint32_t socketTimeoutSeconds = 600;        // +0x24 m_timeout
+    WxHttpHeaderListRuntime states{};                 // +0x28 m_states (unkeyed wxList, 0x1C bytes)
+    std::uint8_t socketInterruptFlag = 0;             // +0x44 m_interrupt
+    std::uint8_t socketBeingDeletedFlag = 0;          // +0x45 m_beingDeleted
+    std::uint8_t lane46_47[0x2]{};
+    void* unreadBuffer = nullptr;                     // +0x48 m_unread
+    std::uint32_t unreadBufferSize = 0;               // +0x4C m_unrd_size
+    std::uint32_t unreadBufferCursor = 0;             // +0x50 m_unrd_cur
+    std::int32_t socketHandlerId = -1;                // +0x54 m_id
+    void* socketEventHandler = nullptr;               // +0x58 m_handler
+    void* clientData = nullptr;                       // +0x5C m_clientData
+    std::uint8_t notifyEnabled = 0;                   // +0x60 m_notify
+    std::uint8_t lane61_63[0x3]{};
+    std::int32_t eventMask = 0;                       // +0x64 m_eventmask
+  };
+  static_assert(offsetof(WxSocketBaseRuntimeView, socketRuntime) == 0x08, "WxSocketBaseRuntimeView::socketRuntime offset must be 0x08");
+  static_assert(offsetof(WxSocketBaseRuntimeView, socketFlags) == 0x10, "WxSocketBaseRuntimeView::socketFlags offset must be 0x10");
+  static_assert(offsetof(WxSocketBaseRuntimeView, states) == 0x28, "WxSocketBaseRuntimeView::states offset must be 0x28");
+  static_assert(offsetof(WxSocketBaseRuntimeView, unreadBuffer) == 0x48, "WxSocketBaseRuntimeView::unreadBuffer offset must be 0x48");
+  static_assert(offsetof(WxSocketBaseRuntimeView, unreadBufferSize) == 0x4C, "WxSocketBaseRuntimeView::unreadBufferSize offset must be 0x4C");
+  static_assert(offsetof(WxSocketBaseRuntimeView, clientData) == 0x5C, "WxSocketBaseRuntimeView::clientData offset must be 0x5C");
+  static_assert(offsetof(WxSocketBaseRuntimeView, notifyEnabled) == 0x60, "WxSocketBaseRuntimeView::notifyEnabled offset must be 0x60");
+  static_assert(offsetof(WxSocketBaseRuntimeView, eventMask) == 0x64, "WxSocketBaseRuntimeView::eventMask offset must be 0x64");
+  static_assert(sizeof(WxSocketBaseRuntimeView) == 0x68, "WxSocketBaseRuntimeView size must be 0x68");
+
+  /**
+   * Address: 0x00A2E650 (FUN_00A2E650)
+   * Mangled: ?Pushback@wxSocketBase@@AAEXPBXI@Z
+   *
+   * What it does:
+   * wxSocketBase::Pushback(buffer, size): prepends `size` bytes to the
+   * front of the pushback (unread) buffer, growing/reallocating it first
+   * when it already holds data.
+   */
+  void WxSocketBasePushbackRuntime(
+    WxSocketBaseRuntimeView* const self,
+    const void* const buffer,
+    const std::size_t size
+  )
+  {
+    if (size == 0) {
+      return;
+    }
+
+    if (self->unreadBuffer != nullptr) {
+      auto* const grown = static_cast<char*>(std::malloc(size + self->unreadBufferSize));
+      std::memcpy(grown + size, self->unreadBuffer, self->unreadBufferSize);
+      std::free(self->unreadBuffer);
+      self->unreadBuffer = grown;
+    } else {
+      self->unreadBuffer = std::malloc(size);
+    }
+
+    std::memcpy(self->unreadBuffer, buffer, size);
+    self->unreadBufferSize += static_cast<std::uint32_t>(size);
+  }
+
+  /**
+   * Address: 0x00A2EE20 (FUN_00A2EE20)
+   * Mangled: ?Unread@wxSocketBase@@QAEAAV1@PBXI@Z (approx.)
+   *
+   * IDA signature:
+   * int __thiscall sub_A2EE20(int this, int a2, size_t a3);
+   *
+   * What it does:
+   * wxSocketBase::Unread(buffer, size): pushes `size` bytes back for the
+   * next Read() to see (via Pushback), resets the pushback cursor, and
+   * clears the "last read hit EOF/error" flag. Used by the free `GetLine`
+   * helper to return unconsumed bytes after the last '\n' back to the
+   * socket for the next call.
+   */
+  void WxSocketBaseUnreadRuntime(
+    WxSocketBaseRuntimeView* const self,
+    const void* const buffer,
+    const std::size_t size
+  )
+  {
+    if (size != 0) {
+      WxSocketBasePushbackRuntime(self, buffer, size);
+    }
+    self->unreadBufferCursor = static_cast<std::uint32_t>(size);
+    self->socketReadingFlag = 0;
+  }
+
+  /**
+   * Address: 0x00A2F320 (FUN_00A2F320)
+   * Mangled: ?Read@wxSocketBase@@QAEAAV1@PAXI@Z (approx.)
+   *
+   * IDA signature:
+   * int __thiscall sub_A2F320(int this, int a2, int a3);
+   *
+   * What it does:
+   * wxSocketBase::Read(buffer, nbytes): marks a read in progress, delegates
+   * to the already-recovered staged-cache + transport read loop
+   * (wxSocketReadBufferedRuntime), stores the transferred byte count in
+   * m_lcount, clears the in-progress flag, then updates m_error according
+   * to whether the transfer satisfied the wxSOCKET_WAITALL contract.
+   */
+  int WxSocketBaseReadRuntime(
+    WxSocketBaseRuntimeView* const self,
+    void* const buffer,
+    const std::size_t nbytes
+  )
+  {
+    self->socketReadingFlag = 1;
+    const int transferred = wxSocketReadBufferedRuntime(
+      reinterpret_cast<WxFtpSocketIoRuntimeView*>(self),
+      static_cast<char*>(buffer),
+      static_cast<int>(nbytes)
+    );
+    self->socketLastIoCount = static_cast<std::uint32_t>(transferred);
+    self->socketReadingFlag = 0;
+
+    constexpr std::uint32_t kWaitAll = 0x04; // wxSOCKET_WAITALL
+    if ((self->socketFlags & kWaitAll) == 0) {
+      self->socketOkFlag = (transferred == 0) ? 1 : 0;
+    } else {
+      self->socketOkFlag = (static_cast<std::size_t>(transferred) != nbytes) ? 1 : 0;
+    }
+    return transferred;
+  }
+
+  /**
+   * Address: 0x00A2E3F0 (FUN_00A2E3F0)
+   * Mangled: ?SaveState@wxSocketBase@@QAEXXZ
+   *
+   * IDA signature:
+   * wxNodeBase *__thiscall sub_A2E3F0(int this);
+   *
+   * What it does:
+   * wxSocketBase::SaveState(): allocates one wxSocketState snapshot
+   * (m_flags/m_notify/m_eventmask/m_clientData) and pushes it onto the
+   * m_states stack via the unkeyed wxListBase::Append. Paired with the
+   * already-recovered RestoreState (FUN_00A2EEB0 ==
+   * CopySnapshotAndReleaseBindingsRuntime in SimRecoveryRuntime.cpp, which
+   * pops m_states.Last() and copies these same four fields back).
+   */
+  void WxSocketBaseSaveStateRuntime(WxSocketBaseRuntimeView* const self)
+  {
+    static std::uint8_t sWxSocketStateVTableTag = 0;
+
+    // Layout matches SnapshotPayloadRuntime in SimRecoveryRuntime.cpp
+    // (vtable, lane04, lane08=m_flags, lane0C=m_eventmask, lane10=m_notify,
+    // pad, lane14=m_clientData) -- 0x18 bytes, matching `operator new(0x18u)`.
+    struct WxSocketStatePayload
+    {
+      void* vtable;
+      std::uint32_t refData;
+      std::uint32_t savedFlags;
+      std::int32_t savedEventMask;
+      std::uint8_t savedNotify;
+      std::uint8_t pad[3];
+      void* savedClientData;
+    };
+    static_assert(sizeof(WxSocketStatePayload) == 0x18, "WxSocketStatePayload size must be 0x18");
+
+    auto* const payload = static_cast<WxSocketStatePayload*>(::operator new(sizeof(WxSocketStatePayload)));
+    if (payload == nullptr) {
+      return;
+    }
+
+    payload->vtable = &sWxSocketStateVTableTag;
+    payload->refData = 0;
+    payload->savedFlags = self->socketFlags;
+    payload->savedNotify = self->notifyEnabled;
+    payload->savedEventMask = self->eventMask;
+    payload->savedClientData = self->clientData;
+
+    (void)WxListAppendUnkeyedRuntime(&self->states, payload);
+  }
+
+  /**
+   * Address: 0x00A2E610 (FUN_00A2E610)
+   * Mangled: ?Notify@wxSocketBase@@QAEX_N@Z
+   *
+   * IDA signature:
+   * void __thiscall sub_A2E610(int notify);
+   *
+   * What it does:
+   * wxSocketBase::Notify(bool notify): enables/disables event notification
+   * by writing the single m_notify byte lane.
+   */
+  void WxSocketBaseNotifyRuntime(WxSocketBaseRuntimeView* const self, const bool notify) noexcept
+  {
+    self->notifyEnabled = notify ? 1u : 0u;
+  }
+
+  /**
+   * Address: 0x00A2E470 (FUN_00A2E470)
+   * Mangled: ?SetFlags@wxSocketBase@@QAEXH@Z
+   *
+   * What it does:
+   * wxSocketBase::SetFlags(flags): overwrites the m_flags lane.
+   */
+  void WxSocketBaseSetFlagsRuntime(WxSocketBaseRuntimeView* const self, const std::uint32_t flags) noexcept
+  {
+    self->socketFlags = flags;
+  }
+}
+
+/**
+ * Address: 0x00A2F7E0 (FUN_00A2F7E0)
+ * Mangled: ?GetLine@@YA?AW4wxProtocolError@@PAVwxSocketBase@@AAVwxString@@@Z (approx.)
+ *
+ * IDA signature:
+ * int __cdecl sub_A2F7E0(int a1, wxString *a2);
+ *
+ * What it does:
+ * Free function `GetLine(wxSocketBase *sock, wxString &result)`
+ * (wx/protocol/protocol.h, "old function which only chops '\n' and not
+ * '\r\n'"): reads up to 2048 bytes from the socket, scans for the first
+ * '\n', copies everything before it (minus the trailing char) into
+ * `result`, and pushes back whatever came after the '\n' via Unread() for
+ * the next call to see. Returns wxPROTO_NETERR (1) on a failed/short read,
+ * wxPROTO_PROTERR (2) when no '\n' was found in the buffer, wxPROTO_NOERR
+ * (0) on success. This is wxHTTP::ParseHeaders' and BuildRequest's line
+ * reader (`m_perr = GetLine(this, line);`).
+ */
+std::int32_t WxSocketGetLineRuntime(void* const socketSelf, wxStringRuntime* const result)
+{
+  constexpr std::size_t kBufferSize = 2048;
+  auto* const self = static_cast<WxSocketBaseRuntimeView*>(socketSelf);
+
+  result->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+  std::vector<char> receiveBuffer(kBufferSize, '\0');
+  const int received = WxSocketBaseReadRuntime(self, receiveBuffer.data(), kBufferSize);
+  const std::size_t available = static_cast<std::size_t>(received > 0 ? received : 0);
+  if (self->socketOkFlag != 0 || available == 0) {
+    return 1; // wxPROTO_NETERR
+  }
+
+  const auto lineFeed = std::find(receiveBuffer.begin(), receiveBuffer.begin() + static_cast<std::ptrdiff_t>(available), '\n');
+  if (lineFeed == receiveBuffer.begin() + static_cast<std::ptrdiff_t>(available)) {
+    return 2; // wxPROTO_PROTERR
+  }
+
+  const std::size_t lineFeedIndex = static_cast<std::size_t>(std::distance(receiveBuffer.begin(), lineFeed));
+  std::wstring lineText(receiveBuffer.begin(), receiveBuffer.begin() + static_cast<std::ptrdiff_t>(lineFeedIndex));
+  AssignOwnedWxString(result, lineText);
+
+  const std::size_t consumed = lineFeedIndex + 1u;
+  WxSocketBaseUnreadRuntime(self, receiveBuffer.data() + consumed, available - consumed);
+  return 0; // wxPROTO_NOERR
+}
+
+namespace
+{
+  // -----------------------------------------------------------------------
+  // wxSocketClient::Connect(wxSockAddress&, bool) and the GSocket
+  // (src/msw/gsocket.c) primitives it needs. This is the one part of the
+  // wxHTTP chain that reaches outside wxHTTP/wxSocketBase into the raw
+  // Winsock transport layer; every callee it needs beyond these two
+  // functions (async-select mask, close/reset, writable/exception poll,
+  // dispatch message-slot reservation) is already recovered elsewhere in
+  // this file, and the true leaves here are genuine `__imp_*` Winsock
+  // imports (socket/connect/ioctlsocket/WSAGetLastError, already recovered
+  // in WinApiImportThunks.cpp) -- i.e. this bottoms out at a real wx/CRT/OS
+  // terminal boundary rather than cascading further.
+  // -----------------------------------------------------------------------
+  struct WxSocketRuntimeView;
+}
+[[nodiscard]] int wxSocketApplyAsyncSelectMaskRuntime(WxSocketRuntimeView* const socketRuntime);
+[[nodiscard]] int wxSocketCloseHandleRuntime(WxSocketRuntimeView* const socketRuntime);
+
+namespace
+{
+  struct WxSocketRuntimeView
+  {
+    SOCKET socketHandle = INVALID_SOCKET;             // +0x00
+    void* frameLane4 = nullptr;                        // +0x04
+    void* frameLane8 = nullptr;                        // +0x08
+    std::int32_t stateCode = 0;                        // +0x0C
+    std::uint8_t unknown10_13[0x4]{};                  // +0x10
+    std::int32_t connectionModeFlag = 0;                // +0x14
+    std::uint8_t unknown18_2B[0x14]{};                  // +0x18
+    std::int32_t eventStateMask = 0;                    // +0x2C
+    std::uint32_t callbacks[4]{};                       // +0x30
+    std::int32_t callbackArgs[4]{};                      // +0x40
+    std::int32_t asyncMessageId = 0;                    // +0x50
+  };
+  static_assert(sizeof(WxSocketRuntimeView) == 0x54, "WxSocketRuntimeView size must be 0x54 (must match the shared definition further down this file)");
+
+  /**
+   * Address: 0x00A2FBD0 (FUN_00A2FBD0)
+   *
+   * What it does:
+   * GSocket allocator (src/msw/gsocket.c GSocket_new): allocates and
+   * zero/default-initializes one GSocket record (invalid handle, no
+   * frames, default 600s timeout), then reserves its async-dispatch
+   * message slot via the already-recovered FUN_00A38080. Frees the
+   * allocation and returns null on reservation failure.
+   */
+  WxSocketRuntimeView* GSocketAllocateRuntime()
+  {
+    auto* const socketRuntime = static_cast<WxSocketRuntimeView*>(std::malloc(sizeof(WxSocketRuntimeView)));
+    if (socketRuntime == nullptr) {
+      return nullptr;
+    }
+
+    socketRuntime->socketHandle = INVALID_SOCKET;
+    socketRuntime->frameLane4 = nullptr;
+    socketRuntime->frameLane8 = nullptr;
+    socketRuntime->stateCode = 0;
+    socketRuntime->connectionModeFlag = 0;
+    socketRuntime->eventStateMask = 0;
+    std::fill(std::begin(socketRuntime->callbacks), std::end(socketRuntime->callbacks), 0u);
+    std::fill(std::begin(socketRuntime->unknown10_13), std::end(socketRuntime->unknown10_13), std::uint8_t{0});
+    std::fill(std::begin(socketRuntime->unknown18_2B), std::end(socketRuntime->unknown18_2B), std::uint8_t{0});
+    // GSocket internal flag/timeout lanes without a recovered name yet
+    // (offsets 0x18, 0x24 within unknown18_2B): the compiled ctor writes
+    // `1` at +0x18 (a stream/type flag) and `600` at +0x24 (default
+    // timeout in seconds, matching wxSocketBase's own 600s default seen
+    // above). Preserved byte-for-byte; see class-note above for why this
+    // stays a documented raw lane instead of a fully named field.
+    *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x18 - 0x18]) = 1;
+    *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x24 - 0x18]) = 600;
+
+    if (!wxSocketApplyAsyncSelectMaskRuntimeReservation(socketRuntime)) {
+      std::free(socketRuntime);
+      return nullptr;
+    }
+    return socketRuntime;
+  }
+}
+
 /**
  * Address: 0x00A100C0 (FUN_00A100C0)
  *
@@ -31736,6 +32811,177 @@ wxDialogRuntime* wxDestroyDialogRuntimeWithoutDeleteForwardThunk(
 ) noexcept
 {
   return wxDestroyDialogRuntimeWithoutDeleteRuntime(dialog);
+}
+
+/**
+ * Address: 0x009B39B0 (FUN_009B39B0)
+ * Mangled: ??0wxMessageDialog@@QAE@PAVwxWindow@@ABVwxString@@1JABVwxPoint@@@Z
+ *
+ * What it does:
+ * Runs the base `wxDialog` default constructor (binding the
+ * `wxMessageDialog` vtable through the derived-class constructor), then
+ * shares the caller's message/caption text lanes and stores the raw
+ * style/parent lanes. `pos` is accepted by the retail signature but never
+ * read there either.
+ */
+wxMessageDialogRuntime::wxMessageDialogRuntime(
+  void* const parentWindow,
+  const wxStringRuntime& message,
+  const wxStringRuntime& caption,
+  const std::int32_t style
+)
+  : wxDialogRuntime()
+{
+  (void)wxCopySharedWxStringRuntime(&caption, &mCaption);
+  (void)wxCopySharedWxStringRuntime(&message, &mMessage);
+  mDialogStyle = style;
+  mParent = parentWindow;
+}
+
+namespace
+{
+  // wx-style bit masks (wxWidgets-2.4.2 dependencies/wxWindows-2.4.2/include/
+  // wx/defs.h) that wxMessageDialog::ShowModal (FUN_009B3A70) decodes into a
+  // raw ::MessageBoxW style word.
+  constexpr std::int32_t kWxMessageDialogStyleYesNoMask = 0x0A;          // wxYES | wxNO
+  constexpr std::int32_t kWxMessageDialogStyleCancelBit = 0x10;         // wxCANCEL
+  constexpr std::int32_t kWxMessageDialogStyleNoDefaultBit = 0x80;      // wxNO_DEFAULT
+  constexpr std::int32_t kWxMessageDialogStyleOkBit = 0x04;             // wxOK
+  constexpr std::int32_t kWxMessageDialogStyleIconExclamationBit = 0x100; // wxICON_EXCLAMATION
+  constexpr std::int32_t kWxMessageDialogStyleIconHandBit = 0x200;        // wxICON_HAND
+  constexpr std::int32_t kWxMessageDialogStyleIconInformationBit = 0x800; // wxICON_INFORMATION
+  constexpr std::int32_t kWxMessageDialogStyleIconQuestionBit = 0x400;    // wxICON_QUESTION
+  constexpr std::int32_t kWxMessageDialogStyleStayOnTopBit = 0x8000;      // wxSTAY_ON_TOP
+
+  // wx modal-result ids (wxWidgets-2.4.2 stock ids: wxID_OK=5100,
+  // wxID_CANCEL=5101, wxID_YES=5103, wxID_NO=5104).
+  constexpr std::int32_t kWxMessageDialogResultOk = 5100;
+  constexpr std::int32_t kWxMessageDialogResultCancel = 5101;
+  constexpr std::int32_t kWxMessageDialogResultYes = 5103;
+  constexpr std::int32_t kWxMessageDialogResultNo = 5104;
+}
+
+/**
+ * Address: 0x009B3A70 (FUN_009B3A70)
+ * Mangled: ?ShowModal@wxMessageDialog@@UAEHXZ
+ *
+ * What it does:
+ * Pumps any pending message loop once when no top window is up yet,
+ * resolves an owner `HWND` (falling back through
+ * `wxResolveTopLevelOwnerWindow`), decodes the wx style bits into a raw
+ * `::MessageBoxW` style word, runs the native message box, and maps the
+ * Win32 result back to `wxID_OK`/`wxID_YES`/`wxID_NO`/`wxID_CANCEL`.
+ */
+std::int32_t wxMessageDialogRuntime::ShowModal()
+{
+  if (wxTheApp->GetTopWindow() == nullptr && wxTheApp->Pending()) {
+    do {
+      wxTheApp->Dispatch();
+    } while (wxTheApp->Pending());
+  }
+
+  if (mParent == nullptr) {
+    mParent = wxResolveTopLevelOwnerWindow(static_cast<wxWindowBase*>(this));
+  }
+
+  HWND ownerHwnd = nullptr;
+  if (mParent != nullptr) {
+    const auto* const ownerView = static_cast<const WxWindowNativeHandleRuntimeView*>(mParent);
+    ownerHwnd = ownerView->mNativeHandle;
+  }
+
+  UINT messageBoxStyle = 0;
+  if ((mDialogStyle & kWxMessageDialogStyleYesNoMask) != 0) {
+    messageBoxStyle = ((mDialogStyle & kWxMessageDialogStyleCancelBit) != 0)
+      ? static_cast<UINT>(MB_YESNOCANCEL)
+      : static_cast<UINT>(MB_YESNO);
+    if ((mDialogStyle & kWxMessageDialogStyleNoDefaultBit) != 0) {
+      messageBoxStyle |= MB_DEFBUTTON2;
+    }
+  }
+  if ((mDialogStyle & kWxMessageDialogStyleOkBit) != 0) {
+    messageBoxStyle = ((mDialogStyle & kWxMessageDialogStyleCancelBit) != 0)
+      ? static_cast<UINT>(MB_OKCANCEL)
+      : static_cast<UINT>(MB_OK);
+  }
+
+  if ((mDialogStyle & kWxMessageDialogStyleIconExclamationBit) != 0) {
+    messageBoxStyle |= MB_ICONEXCLAMATION;
+  } else if ((mDialogStyle & kWxMessageDialogStyleIconHandBit) != 0) {
+    messageBoxStyle |= MB_ICONHAND;
+  } else if ((mDialogStyle & kWxMessageDialogStyleIconInformationBit) != 0) {
+    messageBoxStyle |= MB_ICONASTERISK;
+  } else if ((mDialogStyle & kWxMessageDialogStyleIconQuestionBit) != 0) {
+    messageBoxStyle |= MB_ICONQUESTION;
+  }
+
+  if ((mDialogStyle & kWxMessageDialogStyleStayOnTopBit) != 0) {
+    messageBoxStyle |= MB_TOPMOST;
+  }
+  if (ownerHwnd == nullptr) {
+    messageBoxStyle |= MB_TASKMODAL;
+  }
+
+  switch (::MessageBoxW(ownerHwnd, mMessage.m_pchData, mCaption.m_pchData, messageBoxStyle)) {
+    case IDOK:
+      return kWxMessageDialogResultOk;
+    case IDYES:
+      return kWxMessageDialogResultYes;
+    case IDNO:
+      return kWxMessageDialogResultNo;
+    default:
+      return kWxMessageDialogResultCancel;
+  }
+}
+
+/**
+ * Address: 0x009A2340 (FUN_009A2340)
+ * Mangled: ??1wxMessageDialog@@UAE@XZ
+ *
+ * What it does:
+ * Releases the shared message/caption string lanes (message first, then
+ * caption, matching the retail release order), then runs the shared
+ * non-deleting dialog teardown lane.
+ */
+wxMessageDialogRuntime::~wxMessageDialogRuntime()
+{
+  ReleaseOwnedWxString(mMessage);
+  ReleaseOwnedWxString(mCaption);
+  (void)wxDestroyDialogRuntimeWithoutDeleteRuntime(this);
+}
+
+/**
+ * Address: 0x009CDF50 (FUN_009CDF50, wxMessageBox)
+ *
+ * What it does:
+ * Builds one transient `wxMessageDialogRuntime` at `wxDefaultPosition`, runs
+ * its modal loop, and maps the wx dialog result id back to the
+ * `wxOK`/`wxYES`/`wxNO`/`wxCANCEL` button-style return codes.
+ */
+int wxMessageBox(
+  const wxStringRuntime& message,
+  const wxStringRuntime& caption,
+  const std::int32_t style,
+  void* const parent
+)
+{
+  constexpr std::int32_t kWxMessageBoxResultOk = 4;      // wxOK
+  constexpr std::int32_t kWxMessageBoxResultYes = 2;     // wxYES
+  constexpr std::int32_t kWxMessageBoxResultNo = 8;      // wxNO
+  constexpr std::int32_t kWxMessageBoxResultCancel = 0x10; // wxCANCEL
+
+  wxMessageDialogRuntime dialog(parent, message, caption, style);
+
+  switch (dialog.ShowModal()) {
+    case kWxMessageDialogResultOk:
+      return kWxMessageBoxResultOk;
+    case kWxMessageDialogResultYes:
+      return kWxMessageBoxResultYes;
+    case kWxMessageDialogResultNo:
+      return kWxMessageBoxResultNo;
+    default:
+      return kWxMessageBoxResultCancel;
+  }
 }
 
 /**
@@ -93979,6 +95225,480 @@ namespace
 
     return name[1] == L'\0' || (name[1] == L'.' && name[2] == L'\0');
   }
+}
+
+extern "C" wchar_t* __cdecl RuntimeWideStringFindLast(wchar_t* text, wchar_t needle);
+
+namespace
+{
+  // wx-style bit masks (wxWidgets-2.4.2 dependencies/wxWindows-2.4.2/include/
+  // wx/defs.h and wx/filedlg.h fork values) that `wxFileDialog::ShowModal`
+  // (FUN_009B1840) and its constructor (FUN_009B1460) decode. Confirmed
+  // cross-consistently between both functions (the constructor's own
+  // wxMULTIPLE/wxSAVE conflict-resolution logic pins wxSAVE=0x02,
+  // wxMULTIPLE=0x20; ShowModal's OFN_* flag derivation pins the rest).
+  constexpr std::int32_t kWxFileDialogStyleSaveBit = 0x02;             // wxSAVE
+  constexpr std::int32_t kWxFileDialogStyleOverwritePromptBit = 0x04;  // wxOVERWRITE_PROMPT
+  constexpr std::int32_t kWxFileDialogStyleHideReadOnlyBit = 0x08;     // wxHIDE_READONLY
+  constexpr std::int32_t kWxFileDialogStyleHideReadOnlyOrSaveMask =
+    kWxFileDialogStyleSaveBit | kWxFileDialogStyleHideReadOnlyBit;
+  constexpr std::int32_t kWxFileDialogStyleFileMustExistBit = 0x10;    // wxFILE_MUST_EXIST
+  constexpr std::int32_t kWxFileDialogStyleMultipleBit = 0x20;         // wxMULTIPLE
+  constexpr std::int32_t kWxFileDialogStyleChangeDirBit = 0x40;        // wxCHANGE_DIR
+
+  /**
+   * Address: 0x009DE040 (FUN_009DE040, wxPathOnly)
+   *
+   * What it does:
+   * Returns the directory-only portion of `path`: the text before the last
+   * `/` or `\`, or `"<driveLetter>:."` for a bare drive-letter path with no
+   * separator, or an empty string for anything else (including an empty
+   * `path`).
+   */
+  wxStringRuntime* wxPathOnlyRuntime(
+    wxStringRuntime* const outValue,
+    const wchar_t* const path
+  )
+  {
+    const wchar_t* const safePath = (path != nullptr) ? path : L"";
+    if (safePath[0] != L'\0') {
+      std::wstring buffer(safePath);
+      std::int32_t lastSeparator = static_cast<std::int32_t>(buffer.size()) - 1;
+      while (lastSeparator > -1) {
+        const wchar_t candidate = buffer[static_cast<std::size_t>(lastSeparator)];
+        if (candidate == L'/' || candidate == L'\\') {
+          buffer.resize(static_cast<std::size_t>(lastSeparator));
+          AssignOwnedWxString(outValue, buffer);
+          return outValue;
+        }
+        --lastSeparator;
+      }
+
+      if (std::iswalpha(static_cast<wint_t>(buffer[0])) != 0
+          && buffer.size() > 1 && buffer[1] == L':') {
+        AssignOwnedWxString(outValue, std::wstring(1, buffer[0]) + L":.");
+        return outValue;
+      }
+    }
+
+    AssignOwnedWxString(outValue, std::wstring());
+    return outValue;
+  }
+
+  /**
+   * Address: 0x00961850 (FUN_00961850, wxArrayString::Sort)
+   *
+   * What it does:
+   * Ascending string sort of the array's shared text-pointer lanes
+   * (retail: `wxArrayString::Sort(false)`, a critical-section-guarded
+   * wrapper around a static-comparator quicksort; the guard exists only for
+   * the shared static comparator flag, so a direct `std::sort` with an
+   * explicit ascending comparator is behaviorally equivalent here).
+   */
+  void wxArrayStringSortAscendingRuntime(
+    WxArrayStringAddRuntimeView* const arrayRuntime
+  ) noexcept
+  {
+    if (arrayRuntime == nullptr || arrayRuntime->itemStorage == nullptr) {
+      return;
+    }
+
+    std::sort(
+      arrayRuntime->itemStorage,
+      arrayRuntime->itemStorage + arrayRuntime->itemCount,
+      [](const wchar_t* const left, const wchar_t* const right) {
+        return std::wcscmp(left != nullptr ? left : L"", right != nullptr ? right : L"") < 0;
+      }
+    );
+  }
+
+  /**
+   * `wxFileDialog`'s own-fields runtime view, layered on top of the
+   * `wxDialogRuntime` base (`sizeof(wxDialogRuntime) == 0x170`). Offsets
+   * cross-checked between the constructor (FUN_009B1460) and `ShowModal`
+   * (FUN_009B1840): message@0x170, dialogStyle@0x174, parent@0x178,
+   * directory@0x17C, path@0x180, fileName@0x184, fileNames@0x188,
+   * wildCard@0x198, filterIndex@0x19C. `ShowModal` is a non-virtual member
+   * here (this type has no vtable of its own); `ConstructWxFileDialog`
+   * below installs the raw vtable pointer wxFileDialog's binary layout
+   * expects at object offset 0, inside the `unknown000_16F` lane.
+   */
+  struct WxFileDialogRuntimeState
+  {
+    std::uint8_t unknown000_16F[0x170]{};
+    wxStringRuntime message{};                     // +0x170
+    std::int32_t dialogStyle = 0;                  // +0x174
+    void* parent = nullptr;                        // +0x178
+    wxStringRuntime directory{};                   // +0x17C
+    wxStringRuntime path{};                         // +0x180
+    wxStringRuntime fileName{};                     // +0x184
+    WxArrayStringAddRuntimeView fileNames{};         // +0x188
+    wxStringRuntime wildCard{};                      // +0x198
+    std::int32_t filterIndex = 0;                    // +0x19C
+
+    /**
+     * Address: 0x009B1840 (FUN_009B1840)
+     * Mangled: ?ShowModal@wxFileDialog@@UAEHXZ
+     *
+     * IDA signature:
+     * int __thiscall sub_9B1840(wxString *this);
+     *
+     * What it does:
+     * wxWidgets-2.4.2 MSW `wxFileDialog::ShowModal()`. Resolves an owner
+     * `HWND`, builds the `OPENFILENAMEW` from the dialog's style/title/
+     * directory/filter/filename lanes, and runs `::GetOpenFileNameW` /
+     * `::GetSaveFileNameW` (retrying once with an adjusted `lStructSize` on
+     * `CDERR_STRUCTSIZE`, matching the retail Win2000-vs-older-shell
+     * workaround). On success it splits multi-select results (`wxMULTIPLE`)
+     * into `fileNames`/`directory`/`path`, or fixes up the single-selection
+     * extension/path/directory lanes; then, in save mode, prompts to
+     * overwrite an existing file through `wxMessageBox`. Returns `wxID_OK`
+     * (5100) on acceptance, `wxID_CANCEL` (5101) otherwise.
+     */
+    std::int32_t ShowModal();
+  };
+  static_assert(offsetof(WxFileDialogRuntimeState, message) == 0x170, "WxFileDialogRuntimeState::message offset must be 0x170");
+  static_assert(offsetof(WxFileDialogRuntimeState, dialogStyle) == 0x174, "WxFileDialogRuntimeState::dialogStyle offset must be 0x174");
+  static_assert(offsetof(WxFileDialogRuntimeState, parent) == 0x178, "WxFileDialogRuntimeState::parent offset must be 0x178");
+  static_assert(offsetof(WxFileDialogRuntimeState, directory) == 0x17C, "WxFileDialogRuntimeState::directory offset must be 0x17C");
+  static_assert(offsetof(WxFileDialogRuntimeState, path) == 0x180, "WxFileDialogRuntimeState::path offset must be 0x180");
+  static_assert(offsetof(WxFileDialogRuntimeState, fileName) == 0x184, "WxFileDialogRuntimeState::fileName offset must be 0x184");
+  static_assert(offsetof(WxFileDialogRuntimeState, fileNames) == 0x188, "WxFileDialogRuntimeState::fileNames offset must be 0x188");
+  static_assert(offsetof(WxFileDialogRuntimeState, wildCard) == 0x198, "WxFileDialogRuntimeState::wildCard offset must be 0x198");
+  static_assert(offsetof(WxFileDialogRuntimeState, filterIndex) == 0x19C, "WxFileDialogRuntimeState::filterIndex offset must be 0x19C");
+  static_assert(sizeof(WxFileDialogRuntimeState) == 0x1A0, "WxFileDialogRuntimeState size must be 0x1A0");
+
+  std::int32_t WxFileDialogRuntimeState::ShowModal()
+  {
+    constexpr std::size_t kFileNameBufferCount = 65534; // wxMAXPATH (__WIN32__)
+    constexpr std::size_t kFileTitleBufferCount = 1030;  // wxMAXFILE + 1 + wxMAXEXT
+
+    // One extra leading sentinel element mirrors the retail binary's
+    // `word_F8F93E` (the wchar_t immediately before `word_F8F940`, read as
+    // `fileNameBuffer[nFileOffset-1]` below): keeps that read in-bounds
+    // instead of relying on whatever static storage happens to precede a
+    // bare array.
+    static wchar_t sFileNameBufferStorage[kFileNameBufferCount + 1];
+    wchar_t* const sFileNameBuffer = sFileNameBufferStorage + 1;
+    static wchar_t sFileTitleBuffer[kFileTitleBufferCount];
+    sFileNameBufferStorage[0] = L'\0';
+    sFileNameBuffer[0] = L'\0';
+    sFileTitleBuffer[0] = L'\0';
+
+    HWND ownerHwnd = nullptr;
+    if (parent != nullptr) {
+      ownerHwnd = static_cast<const WxWindowNativeHandleRuntimeView*>(parent)->mNativeHandle;
+    }
+    if (ownerHwnd == nullptr && wxTheApp != nullptr && wxTheApp->GetTopWindow() != nullptr) {
+      ownerHwnd = static_cast<const WxWindowNativeHandleRuntimeView*>(
+        static_cast<const void*>(wxTheApp->GetTopWindow())
+      )->mNativeHandle;
+    }
+
+    DWORD mswFlags = 0;
+    if ((dialogStyle & kWxFileDialogStyleHideReadOnlyOrSaveMask) != 0) {
+      mswFlags |= OFN_HIDEREADONLY;
+    }
+    if ((dialogStyle & kWxFileDialogStyleFileMustExistBit) != 0) {
+      mswFlags |= OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    }
+    if ((dialogStyle & kWxFileDialogStyleMultipleBit) != 0) {
+      mswFlags |= OFN_EXPLORER | OFN_ALLOWMULTISELECT;
+    }
+    if ((dialogStyle & kWxFileDialogStyleChangeDirBit) == 0) {
+      mswFlags |= OFN_NOCHANGEDIR;
+    }
+
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(OPENFILENAMEW);
+    ofn.hwndOwner = ownerHwnd;
+    ofn.lpstrTitle = message.m_pchData;
+    ofn.lpstrFileTitle = sFileTitleBuffer;
+    ofn.nMaxFileTitle = static_cast<DWORD>(kFileTitleBufferCount);
+
+    // Normalize the starting directory: convert '/' to '\\' and squeeze
+    // consecutive slashes into one (the file selector rejects doubled
+    // separators, except at the start of a UNC path).
+    std::wstring directoryText;
+    {
+      const wchar_t* const rawDirectory = (directory.m_pchData != nullptr) ? directory.m_pchData : L"";
+      const std::size_t length = std::wcslen(rawDirectory);
+      directoryText.reserve(length);
+      for (std::size_t i = 0; i < length; ++i) {
+        wchar_t ch = rawDirectory[i];
+        if (ch == L'/' || ch == L'\\') {
+          ch = L'\\';
+          while (i < length - 1) {
+            const wchar_t nextChar = rawDirectory[i + 1];
+            if (nextChar != L'\\' && nextChar != L'/') {
+              break;
+            }
+            if (i > 0) {
+              ++i;
+            } else {
+              break;
+            }
+          }
+        }
+        directoryText.push_back(ch);
+      }
+    }
+    ofn.lpstrInitialDir = directoryText.c_str();
+    ofn.Flags = mswFlags;
+
+    // Build the filter buffer: default to "*.*" when no wildcard was given,
+    // wrap a bare wildcard as "Files (%s)|%s" (localized when available),
+    // then replace every '|' with '\0' to form the native multi-string.
+    wxStringRuntime theFilter{};
+    if (wildCard.m_pchData != nullptr && std::wcslen(wildCard.m_pchData) != 0) {
+      (void)wxCopySharedWxStringRuntime(&wildCard, &theFilter);
+    } else {
+      AssignOwnedWxString(&theFilter, std::wstring(L"*.*"));
+    }
+
+    wxStringRuntime filterBuffer{};
+    if (wxFindFirstWideChar(theFilter.m_pchData, L'|') != nullptr) {
+      (void)wxCopySharedWxStringRuntime(&theFilter, &filterBuffer);
+    } else {
+      wxLocale* const locale = wxGetLocale();
+      const wchar_t* const formatText =
+        (locale != nullptr) ? locale->GetString(L"Files (%s)|%s", 0) : L"Files (%s)|%s";
+      std::array<wchar_t, 512> printfBuffer{};
+      (void)_snwprintf_s(
+        printfBuffer.data(), printfBuffer.size(), _TRUNCATE,
+        formatText, theFilter.m_pchData, theFilter.m_pchData
+      );
+      AssignOwnedWxString(&filterBuffer, std::wstring(printfBuffer.data()));
+    }
+    {
+      std::wstring filterText(filterBuffer.m_pchData != nullptr ? filterBuffer.m_pchData : L"");
+      filterText.push_back(L'|');
+      std::replace(filterText.begin(), filterText.end(), L'|', L'\0');
+      AssignOwnedWxString(&filterBuffer, filterText);
+    }
+    ofn.lpstrFilter = filterBuffer.m_pchData;
+    ofn.nFilterIndex = static_cast<DWORD>(filterIndex) + 1u;
+
+    {
+      const wchar_t* const sourceFileName = (fileName.m_pchData != nullptr) ? fileName.m_pchData : L"";
+      std::wcsncpy(sFileNameBuffer, sourceFileName, kFileNameBufferCount - 1);
+      sFileNameBuffer[kFileNameBufferCount - 1] = L'\0';
+    }
+    ofn.lpstrFile = sFileNameBuffer;
+    ofn.nMaxFile = static_cast<DWORD>(kFileNameBufferCount);
+
+    const auto runNativeFileDialog = [&](OPENFILENAMEW& dialogParams) -> BOOL {
+      return ((dialogStyle & kWxFileDialogStyleSaveBit) != 0)
+        ? ::GetSaveFileNameW(&dialogParams)
+        : ::GetOpenFileNameW(&dialogParams);
+    };
+
+    BOOL dialogAccepted = runNativeFileDialog(ofn);
+    DWORD extendedError = ::CommDlgExtendedError();
+    if (!dialogAccepted && extendedError == CDERR_STRUCTSIZE) {
+      const DWORD originalStructSize = ofn.lStructSize;
+      ofn.lStructSize = originalStructSize - static_cast<DWORD>(sizeof(void*) + 2 * sizeof(DWORD));
+      dialogAccepted = runNativeFileDialog(ofn);
+      extendedError = ::CommDlgExtendedError();
+      if (!dialogAccepted && extendedError == CDERR_STRUCTSIZE) {
+        ofn.lStructSize = originalStructSize + static_cast<DWORD>(sizeof(void*) + 2 * sizeof(DWORD));
+        dialogAccepted = runNativeFileDialog(ofn);
+      }
+    }
+
+    if (dialogAccepted) {
+      fileNames.itemCount = 0;
+
+      const bool multiSelect =
+        (dialogStyle & kWxFileDialogStyleMultipleBit) != 0
+        && sFileNameBuffer[ofn.nFileOffset - 1] == L'\0';
+
+      if (multiSelect) {
+        AssignOwnedWxString(&directory, std::wstring(sFileNameBuffer));
+
+        std::size_t cursor = ofn.nFileOffset;
+        AssignOwnedWxString(&fileName, std::wstring(&sFileNameBuffer[cursor]));
+        (void)wxArrayStringAddOneSharedTextRuntime(&fileNames, &fileName);
+        cursor += std::wcslen(&sFileNameBuffer[cursor]) + 1;
+
+        while (sFileNameBuffer[cursor] != L'\0') {
+          wxStringRuntime nextEntry{};
+          AssignOwnedWxString(&nextEntry, std::wstring(&sFileNameBuffer[cursor]));
+          (void)wxArrayStringAddOneSharedTextRuntime(&fileNames, &nextEntry);
+          cursor += std::wcslen(&sFileNameBuffer[cursor]) + 1;
+        }
+
+        std::wstring dirWithSeparator(directory.m_pchData != nullptr ? directory.m_pchData : L"");
+        if (dirWithSeparator.empty() || dirWithSeparator.back() != L'\\') {
+          dirWithSeparator.push_back(L'\\');
+        }
+        wxArrayStringSortAscendingRuntime(&fileNames);
+        AssignOwnedWxString(&path, dirWithSeparator + (fileName.m_pchData != nullptr ? fileName.m_pchData : L""));
+      } else {
+        filterIndex = static_cast<std::int32_t>(ofn.nFilterIndex) - 1;
+
+        if (ofn.nFileExtension == 0 || sFileNameBuffer[ofn.nFileExtension] == L'\0') {
+          // User typed a filename with no extension: drop a trailing '.' if
+          // present (avoids "abc..ext" once the default extension below is
+          // appended), then look up the current filter's extension.
+          std::size_t nameLength = std::wcslen(sFileNameBuffer);
+          if (nameLength > 0 && sFileNameBuffer[nameLength - 1] == L'.') {
+            sFileNameBuffer[nameLength - 1] = L'\0';
+            --nameLength;
+          }
+
+          const wchar_t* extensionCursor = filterBuffer.m_pchData;
+          const std::int32_t maxFilter = static_cast<std::int32_t>(ofn.nFilterIndex) * 2 - 1;
+          for (std::int32_t i = 0; i < maxFilter && extensionCursor != nullptr; ++i) {
+            extensionCursor += std::wcslen(extensionCursor) + 1;
+          }
+
+          wchar_t* const extension = extensionCursor != nullptr
+            ? RuntimeWideStringFindLast(const_cast<wchar_t*>(extensionCursor), L'.')
+            : nullptr;
+          if (extension != nullptr
+              && RuntimeWideStringFindLast(extension, L'*') == nullptr
+              && RuntimeWideStringFindLast(extension, L'?') == nullptr
+              && extension[1] != L'\0' && extension[1] != L' ') {
+            AssignOwnedWxString(&fileName, std::wstring(sFileNameBuffer) + extension);
+            std::wcsncpy(sFileNameBuffer + nameLength, extension, kFileNameBufferCount - nameLength);
+            sFileNameBuffer[kFileNameBufferCount - 1] = L'\0';
+          }
+        }
+
+        AssignOwnedWxString(&path, std::wstring(sFileNameBuffer));
+        AssignOwnedWxString(&fileName, std::wstring(wxFindFileNameStartInPath(sFileNameBuffer)));
+        (void)wxArrayStringAddOneSharedTextRuntime(&fileNames, &fileName);
+        (void)wxPathOnlyRuntime(&directory, sFileNameBuffer);
+      }
+
+      wxStringRuntime pathAsShared{};
+      pathAsShared.m_pchData = sFileNameBuffer;
+      if ((dialogStyle & kWxFileDialogStyleOverwritePromptBit) != 0 && wxFileExists(&pathAsShared)) {
+        wxStringRuntime confirmMessage{};
+        wxLocale* const locale = wxGetLocale();
+        const wchar_t* const formatText = (locale != nullptr)
+          ? locale->GetString(L"File '%s' already exists.\nDo you want to replace it?", 0)
+          : L"File '%s' already exists.\nDo you want to replace it?";
+        std::array<wchar_t, 1024> printfBuffer{};
+        (void)_snwprintf_s(
+          printfBuffer.data(), printfBuffer.size(), _TRUNCATE, formatText, sFileNameBuffer
+        );
+        AssignOwnedWxString(&confirmMessage, std::wstring(printfBuffer.data()));
+
+        wxStringRuntime confirmCaption{};
+        AssignOwnedWxString(&confirmCaption, std::wstring(L"Save File As"));
+
+        constexpr std::int32_t kWxYesNoIconExclamationStyle = 0x0A | 0x100; // wxYES_NO | wxICON_EXCLAMATION
+        constexpr std::int32_t kWxMessageBoxResultYes = 2;                  // wxYES
+        if (wxMessageBox(confirmMessage, confirmCaption, kWxYesNoIconExclamationStyle, nullptr)
+            != kWxMessageBoxResultYes) {
+          dialogAccepted = FALSE;
+        }
+        ReleaseOwnedWxString(confirmCaption);
+        ReleaseOwnedWxString(confirmMessage);
+      }
+    }
+
+    ReleaseOwnedWxString(filterBuffer);
+    ReleaseOwnedWxString(theFilter);
+
+    constexpr std::int32_t kWxFileDialogModalOk = 5100;     // wxID_OK
+    constexpr std::int32_t kWxFileDialogModalCancel = 5101; // wxID_CANCEL
+    return dialogAccepted ? kWxFileDialogModalOk : kWxFileDialogModalCancel;
+  }
+
+  // Minimal wxFileDialog vtable used to dispatch `ShowModal` from
+  // `WEmitterWx.cpp`'s `WxFileDialogVTable` (`ShowModal` is documented
+  // there as the `+0x1C` slot). Every other slot is left null: nothing in
+  // the recovered tree dispatches through them yet, and `ShowModal` is a
+  // non-virtual member here, so its address is a plain code pointer for a
+  // single-inheritance, non-virtual class - the same pointer-to-member
+  // extraction idiom `ScrWatchCtrl::ScrWatchCtrl` uses for
+  // `ConnectDynamicTreeItemActivatedHandler`.
+  using WxFileDialogShowModalFn = std::int32_t(__thiscall*)(void*);
+
+  struct WxFileDialogMinimalVTable
+  {
+    void* lanes000To018[7]{};
+    WxFileDialogShowModalFn showModal = nullptr; // +0x1C
+  };
+  static_assert(
+    offsetof(WxFileDialogMinimalVTable, showModal) == 0x1C,
+    "WxFileDialogMinimalVTable::showModal offset must be 0x1C"
+  );
+
+  const WxFileDialogMinimalVTable& WxFileDialogVTableSingleton()
+  {
+    static const WxFileDialogMinimalVTable vtable = [] {
+      WxFileDialogMinimalVTable table{};
+      using ShowModalMemberFn = std::int32_t (WxFileDialogRuntimeState::*)();
+      constexpr ShowModalMemberFn kShowModalMember = &WxFileDialogRuntimeState::ShowModal;
+      static_assert(
+        sizeof(kShowModalMember) == sizeof(void*),
+        "non-virtual single-inheritance member pointer must be a plain code address"
+      );
+      void* rawAddress = nullptr;
+      std::memcpy(&rawAddress, &kShowModalMember, sizeof(rawAddress));
+      table.showModal = reinterpret_cast<WxFileDialogShowModalFn>(rawAddress);
+      return table;
+    }();
+    return vtable;
+  }
+}
+
+/**
+ * Address: 0x009B1460 (FUN_009B1460, wxFileDialog::wxFileDialog)
+ * Mangled: ??0wxFileDialog@@QAE@PAVwxWindow@@ABVwxString@@111JABVwxPoint@@@Z
+ *
+ * IDA signature:
+ * int __thiscall sub_9B1460(int this, int a2, wxString *a3, wxString *a4, wxString *a5, wxString *a6, int a7, int a8);
+ *
+ * What it does:
+ * Placement-constructs one `WxFileDialogRuntimeState` inside the caller-
+ * owned `storage` block (`sizeof == 0x1A0`, matching the retail object
+ * size), installs wxFileDialog's vtable pointer, then shares the message/
+ * directory/file-name/wildcard text lanes and stores style/parent. When
+ * `style` requests both `wxMULTIPLE` and `wxSAVE`, `wxMULTIPLE` is cleared
+ * (multi-selection makes no sense for a save dialog), matching the retail
+ * conflict-resolution check. `pos` is accepted but never read, matching the
+ * retail body.
+ */
+void* ConstructWxFileDialog(
+  void* const storage,
+  void* const parentFrame,
+  const wxStringRuntime* const title,
+  const wxStringRuntime* const defaultDirectory,
+  const wxStringRuntime* const defaultFile,
+  const wxStringRuntime* const wildcard,
+  const std::int32_t style,
+  const void* const position
+)
+{
+  (void)position; // WXUNUSED(pos), matches the retail body
+
+  if (storage == nullptr) {
+    return nullptr;
+  }
+
+  auto* const fileDialog = new (storage) WxFileDialogRuntimeState();
+  *reinterpret_cast<const void**>(storage) = &WxFileDialogVTableSingleton();
+
+  (void)wxCopySharedWxStringRuntime(title, &fileDialog->message);
+
+  fileDialog->dialogStyle = style;
+  if ((style & kWxFileDialogStyleMultipleBit) != 0 && (style & kWxFileDialogStyleSaveBit) != 0) {
+    fileDialog->dialogStyle = style & ~kWxFileDialogStyleMultipleBit;
+  }
+  fileDialog->parent = parentFrame;
+
+  AssignOwnedWxString(&fileDialog->path, std::wstring());
+  (void)wxCopySharedWxStringRuntime(defaultFile, &fileDialog->fileName);
+  (void)wxCopySharedWxStringRuntime(defaultDirectory, &fileDialog->directory);
+  (void)wxCopySharedWxStringRuntime(wildcard, &fileDialog->wildCard);
+  fileDialog->filterIndex = 0;
+
+  return storage;
 }
 
 /**
