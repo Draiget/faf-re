@@ -1683,6 +1683,14 @@ namespace msvc8
          * — fast path only (no grow-core citation found); emitted via
          * storedCargo.push_back(storedUnit) in Sim::TransferUnit (Sim.cpp:11097),
          * one of several local msvc8::vector<Unit*> scratch lists in that function)
+         * Address: 0x0075F050 (FUN_0075F050, msvc8::vector<Moho::SPendingPoseCopy>::push_back
+         * splitter for the 12-byte `{EntId, boost::shared_ptr<CAniPose>}` element —
+         * fast path copies one element in place via `uninit_copy_n`'s per-T emission
+         * (FUN_0075FEA0, refcount-bumping copy of the `shared_ptr<CAniPose>` tail);
+         * capacity-full path tail-calls the insert(end(),1,value) grow lane
+         * (FUN_0075F240 → `_Insert_n` core FUN_0075F4B0). Emitted via
+         * sim->mPendingPoseCopies.push_back(entry) in cfunc_TryCopyPoseL
+         * (Sim.cpp), whose owner lane is Moho::Sim::mPendingPoseCopies at Sim+0x9E8)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -2094,6 +2102,23 @@ namespace msvc8
          * vec->push_back(source) in gpg::gal::PushBackEffectMacroIntoLane
          * (ContextInterfaces.cpp:266), whose owner lane is EffectContext's macro
          * vector at +0x54)
+         * Address: 0x0075F240 (FUN_0075F240, msvc8::vector<Moho::SPendingPoseCopy>::insert
+         * iterator-rebasing wrapper for the 12-byte element — converts the
+         * append-position pointer to an index, delegates to the `_Insert_n` grow
+         * core (FUN_0075F4B0), then rebinds the returned iterator against the
+         * (possibly reallocated) `first_`. Reached from push_back's capacity-full
+         * path (FUN_0075F050) in cfunc_TryCopyPoseL (Sim.cpp))
+         * Address: 0x0075F4B0 (FUN_0075F4B0, msvc8::vector<Moho::SPendingPoseCopy>::insert
+         * `_Insert_n` grow core for the 12-byte element — copies the by-ref value
+         * into a local temporary first (bumping its `shared_ptr<CAniPose>` refcount
+         * via `_InterlockedExchangeAdd`, guarding against reallocation invalidating
+         * the source), then either shifts the tail in place when capacity allows or
+         * reallocates and moves head/tail through the same refcount-bumping copy
+         * helper (FUN_0075FEA0). The binary's growth factor here is a true VC8 1.5x
+         * (`(cap>>1)+cap`, overflow-clamped to max_size, floored to the needed size)
+         * rather than this template's doubling approximation — final element
+         * contents and refcounts match exactly; only the post-growth `capacity()`
+         * value can differ from the original binary)
          *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
@@ -2210,6 +2235,15 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x0075FEA0 (FUN_0075FEA0, msvc8::vector<Moho::SPendingPoseCopy>::uninit_copy_n
+         * for the 12-byte `{EntId, boost::shared_ptr<CAniPose>}` element — per-slot
+         * dword-triple copy with an `_InterlockedExchangeAdd` refcount bump on the
+         * third dword (the `shared_ptr<CAniPose>` control-block pointer) when
+         * non-null; no try/catch scaffolding in the binary because a `shared_ptr`
+         * copy cannot throw. Used both by push_back's fast path (FUN_0075F050,
+         * single-element copy) and by the `_Insert_n` grow core (FUN_0075F4B0,
+         * head/tail range moves) for `Sim::mPendingPoseCopies`)
+         *
          * Uninitialized copy N from src to dst
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
