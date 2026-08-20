@@ -2520,7 +2520,15 @@ namespace
     CUIWorldViewCommandGraphHandle mComGraph;           // +0x20C
     moho::CUIWorldViewBuildDragRuntimeView mSubobject;  // +0x214
     std::uint8_t mConvertToPatrolCursor;                // +0x274
-    std::uint8_t mUnknown275;                           // +0x275
+    // Set on MET_MouseEnter and cleared on MET_MouseExit by
+    // CUIWorldView::HandleEvent (0x008704E4 / 0x00870500); CUIWorldView::Frame
+    // gates its per-frame hover refresh on it (0x00871152).
+    std::uint8_t mCursorInside;                         // +0x275
+    // Space-drag camera rotation in progress. The name is the one the rest of
+    // the tree already uses for this byte; its observable effect is that unit
+    // icons are hidden while it is set (CUIWorldView::Frame, 0x0087144E, feeds
+    // it into `mIconsVisible`), and `CameraRevertRotation` is what clears the
+    // rotation it accumulated.
     std::uint8_t mHideResources;                        // +0x276
     std::uint8_t mUnknown277To27F[0x09];                // +0x277
     msvc8::string mCameraTrack;                         // +0x280
@@ -4777,6 +4785,14 @@ float moho::ui_FootprintMinThickness = 2.0f;
 float moho::cam_DefaultMiniLOD = 1.8f;
 bool moho::ui_WindowedAlwaysShowsCursor = false;
 bool moho::ui_DragSelect2D = true;
+// Byte-verified shipped defaults, read straight out of bin/external/ForgedAlliance.exe
+// at the addresses in the header doc blocks (0x00F57AA4/A8/AC/B0, 0x00F57A8C, 0x00F57887).
+float moho::ui_KeyboardPanSpeed = 90.0f;
+float moho::ui_KeyboardPanAccelerateMultiplier = 4.0f;
+float moho::ui_KeyboardRotateSpeed = 10.0f;
+float moho::ui_KeyboardRotateAccelerateMultiplier = 2.0f;
+bool moho::ui_ScreenEdgeScrollView = true;
+bool moho::ui_ArrowKeysScrollView = true;
 moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
@@ -9251,17 +9267,72 @@ void moho::UIBuildDragger::OnCurrentDraggerReplaced()
 // its only caller in the binary.
 void func_OnCommandDragEnd(moho::SMauiEventData* eventData, std::int32_t commandId, LuaPlus::LuaState* state);
 
+// Forward declaration: defined later in this file (address 0x00823E40, see its
+// own doc comment there). The UICommandDragger constructor below is its only
+// caller in the binary (call site 0x00824037).
+static void func_OnCommandDragBegin(LuaPlus::LuaState* state);
+
 /**
- * Address: 0x00824120 (not IDA-classified as its own function; scalar
- * deleting destructor, slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
+ * Address: 0x00823FE0 (FUN_00823FE0, ??0UICommandDragger@Moho@@QAE@@Z)
+ *
+ * IDA signature:
+ * Moho::UICommandDragger *__stdcall Moho::UICommandDragger::UICommandDragger(
+ *     Moho::UICommandDragger *this, Moho::CWldSession *session,
+ *     Moho::CameraImpl *camera, int commandId);
  *
  * What it does:
- * Restores the base vtable and drains the inherited `WeakObject` chain -
- * this class adds no resources of its own beyond `IMauiDragger`'s (raw,
- * non-owning `mSession`/`mCam`/`mGraph` pointers and a plain `CmdId`), so the
- * compiler-generated body is behaviorally identical to the binary's.
+ * Binds the dragger to the session/camera/dragged-command triple, acquires a
+ * counted reference on the session's UI command graph (`allowCreate = true`,
+ * pushed as the literal `1` at 0x00824013) and then tells the UI Lua layer the
+ * drag has started.
+ *
+ * Field evidence, all from this function's own `.asm` (`esi` holds `this`):
+ *   0x00824001 `mov [esi+4], ecx`   - inherited `WeakObject::weakLinkHead_`
+ *   0x00824010 `mov [esi+0Ch], ecx` - `mCam`       (third stack argument)
+ *   0x0082401A `mov [esi], offset ??_7UICommandDragger@Moho@@6B@`
+ *   0x00824020 `mov [esi+8], eax`   - `mSession`   (second stack argument)
+ *   0x00824023 `mov [esi+10h], edx` - `mCommandId` (fourth stack argument)
+ *   0x00824015 `lea ecx, [esi+14h]` - hidden return buffer for the
+ *                                     `boost::shared_ptr<UICommandGraph>`
+ *                                     `GetCommandGraph` returns by value
+ *   0x00824030 `mov edx, [esi+8]` / 0x00824033 `mov eax, [edx+10h]`
+ *                                   - `mSession->mState`, the only argument of
+ *                                     `func_OnCommandDragBegin`
  */
-moho::UICommandDragger::~UICommandDragger() = default;
+moho::UICommandDragger::UICommandDragger(
+  moho::CWldSession* const session,
+  moho::CameraImpl* const camera,
+  const moho::CmdId commandId
+)
+  : mSession(session)
+  , mCam(camera)
+  , mCommandId(commandId)
+  , mGraph(session->GetCommandGraph(true))
+{
+  func_OnCommandDragBegin(mSession->mState);
+}
+
+/**
+ * Address: 0x008240C0 (FUN_008240C0, non-deleting destructor)
+ * Deleting dtor: 0x008240A0 (slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
+ *
+ * What it does:
+ * Drops the counted reference the constructor took on the session's UI command
+ * graph, then lets `IMauiDragger`'s own teardown restore the base vtable and
+ * drain the inherited `WeakObject` chain.
+ *
+ * `boost::SharedPtrRaw` is documented as a borrowing pair that never mutates
+ * refcounts, so `= default` (which this body used to be) would leak the
+ * reference `CWldSession::GetCommandGraph(true)` hands the constructor. The
+ * binary does release it: 0x008240E9 `mov edi, [esi+18h]`, 0x008240F6
+ * `lock xadd [edi+4], -1`, then `dispose()`/`destroy()` through control-block
+ * vtable slots +4/+8 - `sp_counted_base::release()`, which is what
+ * `SharedPtrRaw::release()` reproduces.
+ */
+moho::UICommandDragger::~UICommandDragger()
+{
+  mGraph.release();
+}
 
 /**
  * Address: 0x008241B0 (FUN_008241B0, slot +0x04 of ??_7UICommandDragger@Moho@@6B@)
@@ -9678,6 +9749,271 @@ static_assert(
   }
 
   state->mStepCount = static_cast<std::int32_t>(roundedStepCount) + carryAdjust + 1;
+}
+
+namespace
+{
+  /**
+   * The build-drag translation unit converts float->cell with `fld`/`fistp`
+   * pairs (x87 round-to-nearest-even) and then narrows through a 16-bit
+   * `movsx` - see 0x00823306 / 0x0082332C / 0x0082335E / 0x00823384 for the
+   * drag ends and 0x00823466 / 0x00823472 / 0x00823806 / 0x00823812 for the
+   * per-step positions. A plain `static_cast<int>` truncates instead of
+   * rounding, which shifts every placement on the negative half of the map, so
+   * the conversion is routed through the same round-then-narrow shape.
+   */
+  [[nodiscard]] std::int16_t BuildDragCellCoord(const float value) noexcept
+  {
+    return static_cast<std::int16_t>(std::lrintf(value));
+  }
+
+  /// The function-local `invalid_vec` sentinel `UIBuildDragger::DragRelease`
+  /// publishes into both world-view preview lanes (0x00823BEF sources the same
+  /// quiet NaN into x/y/z; the guard word at 0x010C7AB0 is MSVC's magic-static
+  /// machinery, which C++ provides for free).
+  [[nodiscard]] const Wm3::Vector3f& InvalidBuildDragVector() noexcept
+  {
+    static const Wm3::Vector3f sInvalid(
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN()
+    );
+    return sInvalid;
+  }
+} // namespace
+
+/**
+ * Address: 0x00823220 (FUN_00823220, sub_823220)
+ *
+ * IDA signature:
+ * Moho::UserEntity *__userpurge sub_823220@<eax>(
+ *     Moho::UIBuildDragger *this@<edi>, Moho::SMauiEventData *eventData);
+ *
+ * File-static in the binary as well as here: every other member of
+ * `UIBuildDragger` carries a real symbol and this address carries none, it
+ * takes `this` in `edi` rather than `ecx`, and its only caller
+ * (`UIBuildDragger::DragRelease`, 0x00823BE3) lives in the same translation
+ * unit. The `Moho::UserEntity*` return in the IDA signature is an artefact -
+ * the value left in `eax` at every exit is just the cursor of the inlined
+ * `~MouseInfo` weak-unlink walk (0x00823AF9-0x00823B21), and the caller
+ * overwrites `eax` at 0x00823BE8 without reading it.
+ *
+ * What it does:
+ * Turns one finished build drag into the run of build orders it stands for.
+ * Re-resolves the left-mouse command mode against a local snapshot of the
+ * session cursor and bails unless it is a build mode. Snaps both drag ends
+ * from footprint centre to footprint origin cells, pulls the active build
+ * template, then walks the drag line one template (or skirt) extent at a time,
+ * issuing `UNITCOMMAND_BuildMobile` at every step - once per template entry
+ * when a template is active, once for the dragged blueprint otherwise. Only
+ * the very first order of the run clears the target queue, and only when SHIFT
+ * is not held. Placements that fail the range/buildability tests are still
+ * issued while the session is not previewing invalid placements. Ends with a
+ * single `UNITCOMMAND_None` notification covering the whole run.
+ */
+static void IssueBuildDragOrders(
+  moho::UIBuildDragger* const dragger,
+  const moho::SMauiEventData* const eventData
+)
+{
+  moho::CWldSession* const session = dragger->mWldSession;
+
+  // 0x0082323B/0x00823241/0x0082324B: copy-construct a local cursor snapshot
+  // from the session's own MouseInfo lane at +0x4B0. The copy relinks the
+  // hovered-unit weak-owner chain onto the local; scope exit unlinks it (the
+  // compiler inlined that destructor at 0x00823AF9-0x00823B21).
+  const moho::MouseInfo cursorSnapshot(session->GetCursorInfo());
+
+  // 0x00823262/0x00823276: only the SHIFT bit of the modifier mask survives -
+  // it turns "replace the queue" into "append to it".
+  const bool appendToQueue = (eventData->mModifiers & moho::MEM_Shift) != 0;
+
+  moho::CommandModeData commandMode{};
+  (void)session->GetLeftMouseButtonAction(&commandMode, &cursorSnapshot, 0);
+
+  // 0x0082328D-0x0082329C: anything that is not a build mode drops out here.
+  if (commandMode.mMode != moho::COMMOD_Build && commandMode.mMode != moho::COMMOD_BuildAnchored) {
+    return;
+  }
+
+  auto* const buildBlueprint = static_cast<moho::RUnitBlueprint*>(commandMode.mBlueprint);
+  const moho::SFootprint& footprint = buildBlueprint->mFootprint;
+
+  // 0x008232D4-0x00823388: both drag ends move from footprint centre to
+  // footprint origin, round to the nearest cell, and narrow to 16 bits.
+  const float startX =
+    static_cast<float>(BuildDragCellCoord(dragger->mStart.x - static_cast<float>(footprint.mSizeX) * 0.5f));
+  const float startZ =
+    static_cast<float>(BuildDragCellCoord(dragger->mStart.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
+  const float endX =
+    static_cast<float>(BuildDragCellCoord(dragger->mEnd.x - static_cast<float>(footprint.mSizeX) * 0.5f));
+  const float endZ =
+    static_cast<float>(BuildDragCellCoord(dragger->mEnd.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
+
+  // 0x0082339E: only the first order of the run may clear the target queue.
+  bool hasIssuedAnyOrder = false;
+
+  // 0x008233A3: both spans are pure out-parameters - the callee writes them
+  // unconditionally, so the initialisers here are dead stores that keep the
+  // locals from being read uninitialised in the (impossible) failure path.
+  float templateSpanZ = 0.0f;
+  float templateSpanX = 0.0f;
+  moho::SBuildTemplateBuffer templates;
+  templates.InitInlineStorage();
+  (void)session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &templates);
+
+  BuildDragStepStateRuntimeView dragStep{};
+  moho::SOccupationResult occupation{};
+  moho::CHeightField* const heightField = session->mWldMap->mTerrainRes->GetHeightField();
+
+  if (!templates.Empty()) {
+    // 0x008233D5-0x00823419: step along whichever axis the drag is longer on,
+    // one whole template extent per step.
+    const float deltaX = std::fabs(endX - startX);
+    const float deltaZ = std::fabs(endZ - startZ);
+    const float stepLength = (deltaX > deltaZ) ? templateSpanX : templateSpanZ;
+    InitBuildDragStepState(&dragStep, stepLength, startX, startZ, endX, endZ);
+
+    while (dragStep.mStepCount > 0) { // 0x00823444 / 0x0082376C
+      // 0x00823460-0x008234B5: the step lands on a cell; the template anchors
+      // at that cell's centre.
+      const float anchorX = static_cast<float>(BuildDragCellCoord(dragStep.mX)) + 0.5f;
+      const float anchorZ = static_cast<float>(BuildDragCellCoord(dragStep.mZ)) + 0.5f;
+
+      // 0x0082347F-0x008234CC: the elevation probe walks the height field and
+      // the result is then discarded (`fstp st` at 0x008234CC) - the placement
+      // Y comes from the occupation result below.
+      (void)heightField->GetElevation(anchorX, anchorZ);
+
+      // By value: the binary copy-constructs a whole SBuildTemplateInfo per
+      // iteration (0x008234E0-0x00823735, four POD dwords plus the blueprint-id
+      // string) and destroys it at the bottom of the loop.
+      for (const moho::SBuildTemplateInfo* entry = templates.mStart; entry != templates.mFinish; ++entry) {
+        const moho::SBuildTemplateInfo templateEntry(*entry);
+        const float placeX = anchorX + templateEntry.mPos.x;
+        const float placeZ = anchorZ + templateEntry.mPos.z;
+
+        // 0x008235A5-0x008235CF: the entry's blueprint id is filename-normalised
+        // into a scoped temporary and resolved through the rules' vtable.
+        moho::RResId entryBlueprintId{};
+        (void)gpg::STR_SetFilename(&entryBlueprintId.name, gpg::StrArg(templateEntry.mBlueprintId.c_str()));
+        moho::RUnitBlueprint* const entryBlueprint = session->mRules->GetUnitBlueprint(entryBlueprintId);
+
+        // 0x008235FD-0x0082364F: the payload is built before the placement test
+        // runs, exactly as the binary orders it.
+        moho::SSTICommandIssueData issueData(moho::EUnitCommandType::UNITCOMMAND_BuildMobile);
+        issueData.mBlueprint = entryBlueprint;
+
+        const moho::SCoordsVec2 placement{placeX, placeZ};
+        const bool placeable =
+          moho::USERUNIT_CanBeBuiltAt(*session, entryBlueprint, placement, false, &occupation, nullptr);
+
+        // 0x00823664-0x00823671: an unbuildable spot is still ordered while the
+        // session is not previewing invalid placements.
+        if (placeable || !session->mShowInvalidBuildPlacementPreview) {
+          issueData.mTarget.mPos = occupation.pos;
+          issueData.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+          issueData.mTarget.mEnt = 0xF0000000u;
+
+          // 0x00823692-0x008236CF
+          moho::ISSUE_Command(session->mSelection, issueData, !hasIssuedAnyOrder && !appendToQueue);
+          hasIssuedAnyOrder = true;
+        }
+      }
+
+      // 0x0082373B-0x0082376C
+      dragStep.mX += dragStep.mXStep;
+      dragStep.mZ += dragStep.mZStep;
+      --dragStep.mStepCount;
+    }
+  } else {
+    // 0x00823777-0x00823799: without a template the stride is the blueprint's
+    // larger skirt extent.
+    const float stepLength = (buildBlueprint->Physics.SkirtSizeZ > buildBlueprint->Physics.SkirtSizeX)
+                               ? buildBlueprint->Physics.SkirtSizeZ
+                               : buildBlueprint->Physics.SkirtSizeX;
+    InitBuildDragStepState(&dragStep, stepLength, startX, startZ, endX, endZ);
+
+    while (dragStep.mStepCount > 0) { // 0x008237E4 / 0x00823A02
+      // 0x00823800-0x00823879: back from footprint origin to footprint centre.
+      const float placeX =
+        static_cast<float>(BuildDragCellCoord(dragStep.mX)) + static_cast<float>(footprint.mSizeX) * 0.5f;
+      const float placeZ =
+        static_cast<float>(BuildDragCellCoord(dragStep.mZ)) + static_cast<float>(footprint.mSizeZ) * 0.5f;
+
+      // 0x0082387F-0x0082389F: sampled and discarded, same as the template run.
+      (void)heightField->GetElevation(placeX, placeZ);
+
+      moho::SSTICommandIssueData issueData(moho::EUnitCommandType::UNITCOMMAND_BuildMobile);
+      issueData.mBlueprint = buildBlueprint;
+
+      // 0x008238B4-0x00823934: anchored builds must also be in range. When the
+      // range test fails the buildability test is skipped entirely, so
+      // `occupation` deliberately keeps whatever the previous step left in it -
+      // the binary relies on that when it falls through to the
+      // show-invalid path below.
+      const moho::SCoordsVec2 placement{placeX, placeZ};
+      bool placeable = true;
+      if (commandMode.mMode == moho::COMMOD_BuildAnchored) {
+        placeable = moho::USERUNIT_WithinBuildDistance(*session, buildBlueprint, placement);
+      }
+      if (placeable) {
+        placeable = moho::USERUNIT_CanBeBuiltAt(*session, buildBlueprint, placement, false, &occupation, nullptr);
+      }
+
+      if (placeable || !session->mShowInvalidBuildPlacementPreview) {
+        issueData.mTarget.mPos = occupation.pos;
+        issueData.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+        issueData.mTarget.mEnt = 0xF0000000u;
+
+        moho::ISSUE_Command(session->mSelection, issueData, !hasIssuedAnyOrder && !appendToQueue);
+        hasIssuedAnyOrder = true;
+      }
+
+      // 0x008239D5-0x00823A02
+      dragStep.mX += dragStep.mXStep;
+      dragStep.mZ += dragStep.mZStep;
+      --dragStep.mStepCount;
+    }
+  }
+
+  // 0x00823A08-0x00823A4A: one terminal notification for the whole run.
+  {
+    const moho::SSTICommandIssueData runCompleteData(moho::EUnitCommandType::UNITCOMMAND_None);
+    moho::UI_OnCommandIssued(session->mSelection, runCompleteData, !appendToQueue);
+  }
+
+  // 0x00823A4F-0x00823A93: destroy every entry's blueprint-id string and drop
+  // any spilled heap storage.
+  templates.DestroyStorage();
+}
+
+/**
+ * Address: 0x00823BD0 (FUN_00823BD0, slot +0x08 of ??_7UIBuildDragger@Moho@@6B@)
+ * Mangled: ?DragRelease@UIBuildDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::UIBuildDragger::DragRelease(
+ *     Moho::UIBuildDragger *this@<ecx>, Moho::SMauiEventData *eventData);
+ *
+ * What it does:
+ * Ends the build drag: one last `ReleaseDrag` snap of `mEnd` (0x00823BDD),
+ * the whole run of build orders (0x00823BE3), then both bound world-view
+ * preview lanes reset to the invalid-vector sentinel so the preview stops
+ * drawing (`mWldView->mStart` at +0x44..+0x4C, 0x00823C48/0x00823C55/
+ * 0x00823C62; `mWldView->mEnd` at +0x50..+0x58, 0x00823C6F/0x00823C7C/
+ * 0x00823C89), and finally `delete this` through slot +0x00 (0x00823C8E).
+ */
+void moho::UIBuildDragger::DragRelease(const moho::SMauiEventData* const eventData)
+{
+  ReleaseDrag(eventData);
+  IssueBuildDragOrders(this, eventData);
+
+  const Wm3::Vector3f& invalid = InvalidBuildDragVector();
+  mWldView->mStart = invalid;
+  mWldView->mEnd = invalid;
+
+  delete this;
 }
 
 /**
@@ -10456,8 +10792,11 @@ static DraggerLink* func_SetCurDragger(IMauiDragger* const dragger)
  * What it does:
  * Imports `/lua/ui/game/commandgraph.lua` and invokes
  * `OnCommandDragBegin()` on the active UI Lua state.
+ *
+ * Invocation: sole caller is `Moho::UICommandDragger::UICommandDragger`
+ * (0x00823FE0), which tail-calls it at 0x00824037 with `mSession->mState`.
  */
-[[maybe_unused]] static void func_OnCommandDragBegin(LuaPlus::LuaState* const state)
+static void func_OnCommandDragBegin(LuaPlus::LuaState* const state)
 {
   (void)InvokeUiLuaCallback(
     state,
@@ -10571,6 +10910,52 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
     static_cast<moho::UIBuildDragger*>(::operator new(sizeof(moho::UIBuildDragger), std::nothrow));
   if (storage != nullptr) {
     auto* const dragger = new (storage) moho::UIBuildDragger(session, worldView, camera);
+    func_PostDragger(originFrame, dragger, eventData);
+    return;
+  }
+
+  func_PostDragger(originFrame, nullptr, eventData);
+}
+
+/**
+ * Address: 0x008242B0 (FUN_008242B0, func_NewCommandDragger)
+ *
+ * IDA signature:
+ * int __usercall func_NewCommandDragger@<eax>(
+ *     Moho::CMauiFrame *a1@<edi>, Moho::CWldSession *a2,
+ *     Moho::SMauiEventData *a3, Moho::CameraImpl *a4, int isDragger);
+ *
+ * What it does:
+ * Allocates one `UICommandDragger` (`push 1Ch` at 0x008242C7 - the class's own
+ * 0x1C bytes), constructs it over the session/camera/dragged-command triple and
+ * posts it as the world view's active dragger. On allocation failure the
+ * constructor is skipped (`xor eax, eax` at 0x008242F8) and a null dragger is
+ * posted, exactly as the sibling build-drag and selection-drag factories do.
+ *
+ * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0),
+ * from the `COMMOD_Reclaim` arm of the left-button-press command-mode switch
+ * (call site 0x00870F..). That parent is not recovered yet - it is gated on
+ * `Moho::SCommandModeData::HandleEvent` (0x0081FCD0, 2167 instructions, owned
+ * by CWldSession.cpp) and on the `CFormation::Finalize` ->
+ * `CFormationInstance` construction path (0x008382A0 -> 0x0056A920 ->
+ * 0x005694B0), the same chain `CAiFormationDBImpl.cpp` already records as
+ * blocked. This helper therefore sits in the same frontier state as its three
+ * siblings above/below (`func_NewUIBuildDragger`, `NewSelectionDragger`,
+ * `func_StartMouseScrubbing`): recovered and correct, waiting only on that
+ * one parent to be wired by name.
+ */
+[[maybe_unused]] static void func_NewCommandDragger(
+  moho::CMauiFrame* const originFrame,
+  moho::CWldSession* const session,
+  moho::SMauiEventData* const eventData,
+  moho::CameraImpl* const camera,
+  const moho::CmdId commandId
+)
+{
+  auto* const storage =
+    static_cast<moho::UICommandDragger*>(::operator new(sizeof(moho::UICommandDragger), std::nothrow));
+  if (storage != nullptr) {
+    auto* const dragger = new (storage) moho::UICommandDragger(session, camera, commandId);
     func_PostDragger(originFrame, dragger, eventData);
     return;
   }
@@ -19417,7 +19802,7 @@ moho::CUIWorldView::CUIWorldView(
     // it here would construct a second live object over the first.
 
     view->mConvertToPatrolCursor = 0;                     // +0x274
-    view->mUnknown275 = 0;                                // +0x275
+    view->mCursorInside = 0;                                // +0x275
     view->mHideResources = 0;                             // +0x276
 
     // mCameraTrack (+0x280) is likewise already default-constructed (empty)

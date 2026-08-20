@@ -387,6 +387,63 @@ namespace moho
    * default is `true` (raw PE byte at 0x00F57A8D = 0x01).
    */
   extern bool ui_DragSelect2D;
+
+  /**
+   * Address: 0x00F57AA4 (?ui_KeyboardPanSpeed@Moho@@3MA)
+   *
+   * What it does:
+   * World-units-per-frame the world view pans when a scroll key is held or the
+   * cursor sits on a screen edge. Byte-verified shipped default `90.0f`
+   * (raw dword at 0x00F57AA4 = 0x42B40000).
+   */
+  extern float ui_KeyboardPanSpeed;
+
+  /**
+   * Address: 0x00F57AA8 (?ui_KeyboardPanAccelerateMultiplier@Moho@@3MA)
+   *
+   * What it does:
+   * Factor `ui_KeyboardPanSpeed` is multiplied by while Ctrl is held.
+   * Byte-verified shipped default `4.0f` (0x40800000).
+   */
+  extern float ui_KeyboardPanAccelerateMultiplier;
+
+  /**
+   * Address: 0x00F57AAC (?ui_KeyboardRotateSpeed@Moho@@3MA)
+   *
+   * What it does:
+   * Spin delta the world view feeds `CameraImpl::CameraSpin` per frame while
+   * Insert/Delete is held. Byte-verified shipped default `10.0f` (0x41200000).
+   */
+  extern float ui_KeyboardRotateSpeed;
+
+  /**
+   * Address: 0x00F57AB0 (?ui_KeyboardRotateAccelerateMultiplier@Moho@@3MA)
+   *
+   * What it does:
+   * Factor `ui_KeyboardRotateSpeed` is multiplied by while Ctrl is held.
+   * Byte-verified shipped default `2.0f` (0x40000000).
+   */
+  extern float ui_KeyboardRotateAccelerateMultiplier;
+
+  /**
+   * Address: 0x00F57A8C (?ui_ScreenEdgeScrollView@Moho@@3_NA)
+   *
+   * What it does:
+   * Enables edge scrolling: with the cursor parked against a windowed head's
+   * outer pixel row/column, the world view pans away from that edge.
+   * Byte-verified shipped default `true` (raw byte at 0x00F57A8C = 0x01).
+   */
+  extern bool ui_ScreenEdgeScrollView;
+
+  /**
+   * Address: 0x00F57887 (?ui_ArrowKeysScrollView@Moho@@3_NA)
+   *
+   * What it does:
+   * Enables arrow-key scrolling of the world view. Byte-verified shipped
+   * default `true` (raw byte at 0x00F57887 = 0x01).
+   */
+  extern bool ui_ArrowKeysScrollView;
+
   extern IWldUIProvider* sWldUIProvider;
 
   enum EMauiEventType : std::int32_t
@@ -880,17 +937,16 @@ namespace moho
    *                      the body is byte-identical to `IMauiDragger`'s
    *                      0x0078DB90 apart from the `operator delete` rel32)
    *   +0x04  0x00823BB0  `DragMove`                 (override)
-   *   +0x08  0x00823BD0  `DragRelease`              (override, NOT YET
-   *                      RECOVERED - see the note below)
+   *   +0x08  0x00823BD0  `DragRelease`              (override)
    *   +0x0C  0x00823CA0  `OnCurrentDraggerReplaced` (override)
    *
    * Slot +0x08 (0x00823BD0) runs `ReleaseDrag`, then the build-order issuing
-   * worker at 0x00823220, then resets both world-view preview lanes to the
-   * shared invalid-vector sentinel, then `delete this`. 0x00823220 is a
-   * ~400-line command-queue worker with no recovered owner anywhere in
-   * `src/sdk/**`, so the override stays unrecovered and the slot inherits
-   * `IMauiDragger::DragRelease` (0x0078DB60), whose `delete this` is the tail
-   * the real override also ends on.
+   * worker at 0x00823220 (recovered as the file-static `IssueBuildDragOrders`
+   * in UiRuntimeTypes.cpp - it is `static` in the binary too: every other
+   * member of this class carries a real symbol and that address carries none,
+   * and it takes `this` in `edi` rather than `ecx`), then resets both
+   * world-view preview lanes to the invalid-vector sentinel, then
+   * `delete this`.
    */
   class UIBuildDragger : public IMauiDragger
   {
@@ -918,6 +974,23 @@ namespace moho
      * current world-surface intersection when the blueprint is a DRAGBUILD.
      */
     void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x00823BD0 (FUN_00823BD0, slot +0x08 of ??_7UIBuildDragger@Moho@@6B@)
+     * Mangled: ?DragRelease@UIBuildDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::UIBuildDragger::DragRelease(
+     *     Moho::UIBuildDragger *this@<ecx>, Moho::SMauiEventData *eventData);
+     *
+     * What it does:
+     * Ends the build drag: snaps `mEnd` one last time through the shared
+     * `ReleaseDrag` helper, converts the finished drag line into its run of
+     * build orders, clears both world-view preview lanes back to the
+     * invalid-vector sentinel so nothing keeps drawing, then deletes the
+     * dragger.
+     */
+    void DragRelease(const SMauiEventData* eventData) override;
 
     /**
      * Address: 0x00823CA0 (FUN_00823CA0, slot +0x0C of ??_7UIBuildDragger@Moho@@6B@)
@@ -980,18 +1053,24 @@ namespace moho
    * declared in CWldSession.h) - the class itself is thin cursor-tracking
    * state, matching `UIBuildDragger`'s own shape above.
    *
-   * Slot map of `??_7UICommandDragger@Moho@@6B@` (dwords read out of the
-   * shipped image):
-   *   +0x00  0x00824120  scalar deleting destructor (not IDA-classified as
-   *                      its own function - same situation as
-   *                      `~IMauiDragger` at 0x0078DB20; restores the base
-   *                      vtable and drains the inherited `WeakObject` chain
-   *                      the same way, see `IMauiDragger`'s own doc comment
-   *                      above for the instruction-level evidence both
-   *                      share)
-   *   +0x04  0x008241B0  `DragMove`    (override)
-   *   +0x08  0x00824210  `DragRelease` (override)
-   *   +0x0C  (inherited)  `OnCurrentDraggerReplaced` - not overridden
+   * Slot map of `??_7UICommandDragger@Moho@@6B@`, read as raw dwords out of
+   * the shipped image at VA 0x00E42600 (the address the constructor stores at
+   * 0x0082401A):
+   *   +0x00  0x008240A0  scalar deleting destructor - calls the non-deleting
+   *                      body at 0x008240C0, then `operator delete` when the
+   *                      caller passes bit0
+   *   +0x04  0x008241B0  `DragMove`                 (override)
+   *   +0x08  0x00824210  `DragRelease`              (override)
+   *   +0x0C  0x00824290  `OnCurrentDraggerReplaced` (override - drops the
+   *                      dragged command's highlight through 0x0082A030
+   *                      before `delete this`)
+   *
+   * A previous pass recorded this slot map as `+0x00 0x00824120` with slot
+   * +0x0C inherited. Both were wrong: 0x00824120 is an instruction *inside*
+   * the non-deleting destructor at 0x008240C0 (the point where it restores
+   * `??_7IMauiDragger@Moho@@6B@`), and slot +0x0C really does hold an
+   * override. The addresses above were re-read byte-for-byte from
+   * `bin/external/ForgedAlliance.exe`.
    *
    * Field evidence: both `DragMove` (0x008241B0) and `DragRelease`
    * (0x00824210) read `[this+0Ch]` as the camera (dispatched through its own
@@ -1009,13 +1088,37 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00824120 (not IDA-classified as its own function; scalar
-     * deleting destructor, slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
+     * Address: 0x00823FE0 (FUN_00823FE0, ??0UICommandDragger@Moho@@QAE@@Z)
+     *
+     * IDA signature:
+     * Moho::UICommandDragger *__stdcall Moho::UICommandDragger::UICommandDragger(
+     *     Moho::UICommandDragger *this, Moho::CWldSession *session,
+     *     Moho::CameraImpl *camera, int commandId);
      *
      * What it does:
-     * Restores the base vtable and drains the inherited `WeakObject` chain,
-     * matching `IMauiDragger::~IMauiDragger`'s own body exactly (see that
-     * destructor's doc comment for the shared instruction-level evidence).
+     * Binds the dragger to the session, camera and the command id being
+     * dragged, takes a counted reference on the session's UI command graph
+     * (creating it when absent) and notifies the UI Lua layer that a command
+     * drag has begun.
+     */
+    UICommandDragger(CWldSession* session, CameraImpl* camera, CmdId commandId);
+
+    /**
+     * Address: 0x008240C0 (FUN_008240C0, non-deleting destructor)
+     * Deleting dtor: 0x008240A0 (slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
+     *
+     * What it does:
+     * Drops the counted reference the constructor took on the session's UI
+     * command graph, then runs `IMauiDragger`'s own teardown (base vtable
+     * restore plus the `WeakObject` chain drain).
+     *
+     * The graph release is not optional bookkeeping: 0x008240E9 loads
+     * `[this+18h]` (the control-block half of `mGraph`) and 0x008240F6 does
+     * `lock xadd [pn+4], -1`, followed by `dispose()` through vtable slot +4
+     * and `destroy()` through slot +8 once the weak count also reaches zero -
+     * i.e. exactly `boost::detail::sp_counted_base::release()`. The
+     * constructor's own unwind funclet (0x00BC2238) releases the same lane
+     * via `Moho::WeakPtr_UICommandGraph::Release` (0x00824060).
      */
     ~UICommandDragger() override;
 
