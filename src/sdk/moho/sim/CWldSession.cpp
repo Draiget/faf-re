@@ -8271,6 +8271,17 @@ namespace moho
       head->mParent->mColor = 1u;
     }
 
+    /**
+     * Address: 0x00898A50 (FUN_00898A50, std::map<Moho::EntId,Moho::UserEntity*>::insert)
+     *
+     * What it does:
+     * BST-descends `SessionEntityMap` by `entityId`, returns immediately on an
+     * existing key (matching `std::map::insert`'s "keeps the existing value"
+     * semantics), otherwise allocates and links a fresh node then red-black
+     * rebalances from it. The binary's own decompile splits find-position and
+     * link+rebalance across this function and a `sub_899490` tail; both phases
+     * are faithfully present here in one method rather than split further.
+     */
     void InsertSessionEntityMapEntry(
       SessionEntityMap& map,
       const std::uint32_t entityId,
@@ -8444,6 +8455,22 @@ namespace moho
       }
     }
 
+    /**
+     * Address: 0x00898B10 (FUN_00898B10, std::map<Moho::EntId,Moho::UserEntity*>::erase)
+     *
+     * What it does:
+     * Splices `node` out of `SessionEntityMap`'s red-black tree and red-black
+     * rebalances from the splice point, mirroring the standard `_Tree::erase`
+     * unlink/rebalance shape.
+     *
+     * Known simplification: the binary throws `std::out_of_range("invalid
+     * map/set<T> iterator")` when `node` is the nil sentinel; this recovery
+     * treats that case as a silent no-op instead. Every real caller
+     * (`CWldSession::RemoveEntity`/`OrphanEntity`) already guards
+     * `mapNode != nullptr && mapNode != entityMap.mHead` before calling this,
+     * so the divergence is unreachable from any currently-recovered call
+     * site — left as a documented gap rather than silently claimed identical.
+     */
     void EraseSessionEntityMapNode(SessionEntityMap& map, SessionEntityMapNode* const node) noexcept
     {
       SessionEntityMapNode* const head = map.mHead;
