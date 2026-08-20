@@ -1879,7 +1879,7 @@ namespace
    * Resolves one command-manager queue view and returns the most recent
    * non-null helper entry, scanning backward from the logical tail.
    */
-  [[maybe_unused]] [[nodiscard]] UserCommandIssueHelperRuntimeView* GetLastQueuedUserCommandHelper(
+  [[nodiscard]] UserCommandIssueHelperRuntimeView* GetLastQueuedUserCommandHelper(
     UserCommandQueue* const managerPtr
   ) noexcept
   {
@@ -1910,7 +1910,7 @@ namespace
    * Returns whether one `UserUnit` is currently idle enough for dock-target
    * candidate selection (not busy and no pending command queue entries).
    */
-  [[maybe_unused]] [[nodiscard]] bool IsDockTargetQueueIdle(const UserUnit* const unit) noexcept
+  [[nodiscard]] bool IsDockTargetQueueIdle(const UserUnit* const unit) noexcept
   {
     if (unit == nullptr || GetLuaRuntimeView(unit).isBusy != 0u) {
       return false;
@@ -3316,7 +3316,7 @@ namespace
    * seeds from stored cursor entity-id lanes, then replays queued issue events
    * (`type 0` merge, `type 3` erase) into the cache and returns that set.
    */
-  [[maybe_unused]] [[nodiscard]] UserCommandIssueWeakSetRuntimeView* GetEntitiesUnderCursor(
+  [[nodiscard]] UserCommandIssueWeakSetRuntimeView* GetEntitiesUnderCursor(
     UserCommandIssueCursorEntityCacheRuntimeView* const helper
   ) noexcept
   {
