@@ -1127,6 +1127,508 @@ bool moho::ScrDebugWindow::OpenMountedSourcePathAndTrackRecent(const msvc8::stri
   return true;
 }
 
+namespace
+{
+  // ===========================================================================
+  // Real wxWidgets-2.4.2 library bridges (classified `external_dependency`).
+  //
+  // Real wx headers (`<wx/menu.h>`, `<wx/toolbar.h>`, `<wx/splitter.h>`, ...)
+  // cannot be `#include`d in this translation unit: they redeclare `wxPoint`/
+  // `wxSize`/`wxRect`/`wxEventTable`/etc at *global* scope, which collides
+  // with this project's "Runtime" reconstructions of those same names
+  // (confirmed by a direct build attempt - see ScrWatchCtrl.cpp for the first
+  // use of this bridging idiom, matching `ConstructWxFileDialog` in
+  // `moho/app/WEmitterWx.cpp`). The constructor calls the statically-linked
+  // library bodies directly through these minimal, evidence-matched
+  // trampolines instead.
+  //
+  // Every non-virtual entry below cites the exact call-target address read
+  // from `FUN_004BC110`'s disassembly. The handful of virtual calls
+  // (`AddSeparator`/`Realize`/`Append`/`SplitVertically`/`AddPage`) only have
+  // vtable-slot-offset evidence from this call site (no resolved target
+  // address pulled from a vtable dump this pass) - they bridge to wx's own
+  // public, stably-named API for that exact call shape instead of an offset
+  // dispatch, per CLAUDE.md's ban on `*(T**)(obj+0xNN)` vtable magic in
+  // recovered source.
+
+  /** Address: 0x004BB050 (??0wxMenu@@QAE@@Z, wxMenu::wxMenu) */
+  void* ConstructWxMenu(void* storage);
+
+  /**
+   * Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem)
+   * Real signature: wxMenuItem(wxMenu* parentMenu, int id, const wxString&
+   * text, const wxString& helpString, bool isCheckable, wxMenu* subMenu).
+   */
+  void* ConstructWxMenuItem(
+    void* storage,
+    void* parentMenu,
+    std::int32_t id,
+    const wxStringRuntime* text,
+    const wxStringRuntime* helpString,
+    bool isCheckable,
+    void* subMenu
+  );
+
+  /** wxMenu::Append(wxMenuItem*) - vtable dispatch at this call site. */
+  void AppendWxMenuItem(void* menu, void* menuItem);
+
+  /** wxMenu::AppendSeparator() - Address: 0x004BAF20 (wxMenu::AppendSeparator). */
+  void AppendWxMenuSeparator(void* menu);
+
+  /** Address: 0x00998B90 (??0wxMenuBar@@Z, wxMenuBar::wxMenuBar) */
+  void* ConstructWxMenuBar(void* storage);
+
+  /** wxMenuBar::Append(wxMenu*, const wxString&) - vtable dispatch at this call site. */
+  void AppendWxMenuBarMenu(void* menuBar, void* menu, const wxStringRuntime* title);
+
+  /** Address: 0x009A9570 (?SetMenuBar@wxFrameBase@@UAEXPAVwxMenuBar@@@Z) */
+  void SetFrameMenuBar(void* frameThis, void* menuBar);
+
+  /** Address: 0x0099EE20 (?CreateToolBar@wxFrame@@UAEPAVwxToolBar@@JHABVwxString@@@Z) */
+  void* CreateFrameToolBar(void* frameThis, std::int32_t style, std::int32_t id, const wxStringRuntime* name);
+
+  /** Address: 0x004BB2D0 (sub_4BB2D0, wxToolBarBase::AddTool convenience overload) */
+  void AddToolBarTool(
+    void* toolbar,
+    std::int32_t id,
+    const wxStringRuntime* label,
+    void* bitmap,
+    const wxStringRuntime* shortHelp
+  );
+
+  /** wxToolBar::AddSeparator() - vtable dispatch (+0x228) at this call site. */
+  void AddToolBarSeparator(void* toolbar);
+
+  /** wxToolBar::Realize() - vtable dispatch (+0x240) at this call site. */
+  void RealizeToolBar(void* toolbar);
+
+  /** Address: 0x00977BF0 (??0wxBitmap@@QAE@@Z_1, wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
+  void* ConstructWxBitmapFromFile(void* storage, const wxStringRuntime* path, std::int32_t type);
+
+  /** Address: 0x00975B00 (__imp_??1wxBitmap@@UAE@XZ, wxBitmap::~wxBitmap) */
+  void DestroyWxBitmap(void* bitmap);
+
+  /**
+   * Address: 0x004BB1F0 (??0wxTextCtrl@@QAE@...@Z, wxTextCtrl::wxTextCtrl)
+   * Real signature: wxTextCtrl(wxWindow* parent, wxWindowID id, const
+   * wxString& value, const wxPoint& pos, const wxSize& size, long style,
+   * const wxValidator& validator, const wxString& name).
+   */
+  void* ConstructWxTextCtrl(
+    void* storage,
+    void* parent,
+    std::int32_t id,
+    const wxStringRuntime* value,
+    const wxPoint* position,
+    const wxSize* size,
+    std::int32_t style,
+    const void* validator,
+    const wxStringRuntime* name
+  );
+
+  /**
+   * Address: 0x004BB380 (sub_4BB380, wxSplitterWindow::wxSplitterWindow)
+   * Binary call shape: (storage, parent, id, name) - position/size/style use
+   * wx's own defaults (wxDefaultPosition/wxDefaultSize/wxSP_3D) internally.
+   */
+  void* ConstructWxSplitterWindow(void* storage, void* parent, std::int32_t id, const wxStringRuntime* name);
+
+  /** wxSplitterWindow::SplitVertically(wxWindow*, wxWindow*, int) - vtable dispatch (+0x20C) at this call site. */
+  bool SplitWxSplitterWindowVertically(void* splitter, void* leftPane, void* rightPane, std::int32_t sashPosition);
+
+  /**
+   * Address: 0x004BB4A0 (sub_4BB4A0, wxGenericDirCtrl::wxGenericDirCtrl)
+   * Binary call shape: (storage, parent, defaultPath, filter, name); id/pos/
+   * size/style use wx's own defaults internally.
+   */
+  void* ConstructWxGenericDirCtrl(
+    void* storage,
+    void* parent,
+    const wxStringRuntime* defaultPath,
+    const wxStringRuntime* filter,
+    const wxStringRuntime* name
+  );
+
+  /**
+   * Address: 0x009A7740 (sub_9A7740, wxNotebook::wxNotebook)
+   * Binary call shape: (storage, parent, id, pos, size, style, name).
+   */
+  void* ConstructWxNotebook(
+    void* storage,
+    void* parent,
+    std::int32_t id,
+    const wxPoint* position,
+    const wxSize* size,
+    std::int32_t style,
+    const wxStringRuntime* name
+  );
+
+  /** wxNotebook::AddPage(wxWindow*, const wxString&, bool, int) - vtable dispatch (+0x250) at this call site. */
+  void AddNotebookPage(void* notebook, void* page, const wxStringRuntime* label, bool select, std::int32_t imageId);
+
+  /**
+   * Address: 0x004BB680 (sub_4BB680, wxListCtrl::wxListCtrl)
+   * Binary call shape: (storage, parent, id, pos, size, style, validator, name).
+   */
+  void* ConstructWxListCtrl(
+    void* storage,
+    void* parent,
+    std::int32_t id,
+    const wxPoint* position,
+    const wxSize* size,
+    std::int32_t style,
+    const void* validator,
+    const wxStringRuntime* name
+  );
+
+  /** Address: 0x00974B60 (sub_974B60, wxAcceleratorTable::wxAcceleratorTable(int, const wxAcceleratorEntry*)) */
+  void* ConstructWxAcceleratorTable(void* storage, std::int32_t entryCount, const void* entries);
+
+  /** Address: 0x00974AB0 (sub_974AB0, wxObject::UnRef via ~wxObject on a stack-scoped accelerator-table clone) */
+  void UnrefWxObject(void* object);
+
+  /**
+   * Address: 0x0097AC50 (FUN_0097AC50, wxEvtHandler::Connect)
+   *
+   * Same bridge as `ScrWatchCtrl.cpp`'s copy (each translation unit needs its
+   * own extern declaration for the shared statically-linked symbol - see that
+   * file for the full rationale). Builds one dynamic event-table entry and
+   * appends it to the target handler's `m_dynamicEvents` list.
+   */
+  void ConnectDynamicTreeItemActivatedHandler(
+    void* evtHandlerThis,
+    std::int32_t id,
+    std::int32_t lastId,
+    void* memberFunctionThunk,
+    void* userData
+  );
+
+  // ===========================================================================
+  // Local construction helpers - collapse the ~15 repeated menu-item /
+  // toolbar-button decompiler blocks (each: build wxString label/help, build
+  // wxMenuItem/load bitmap, append, release temporaries) into one call apiece.
+
+  /**
+   * Appends one command menu item {id, label, help} to `menu`, matching the
+   * binary's `wxMenuItem::wxMenuItem(menu, id, label, help, false, nullptr)`
+   * + `wxMenu::Append(item)` pair (e.g. 0x004BC2E9-0x004BC33A for "Close").
+   */
+  void AppendMenuItem(void* const menu, const std::int32_t id, const wchar_t* const label, const wchar_t* const help)
+  {
+    const wxStringRuntime labelText = wxStringRuntime::Borrow(label);
+    const wxStringRuntime helpText = wxStringRuntime::Borrow(help);
+    void* const itemStorage = ::operator new(0x74u, std::nothrow);
+    if (itemStorage == nullptr) {
+      return;
+    }
+
+    void* const item = ConstructWxMenuItem(itemStorage, menu, id, &labelText, &helpText, false, nullptr);
+    AppendWxMenuItem(menu, item);
+  }
+
+  /**
+   * Resolves one debug-toolbar bitmap through the VFS (`/coderes/engine/...`)
+   * exactly as `sPFWaitHandleSet->mHandle->FindFile` + `gpg::STR_Utf8ToWide`
+   * do at every one of the eight toolbar-button sites (e.g. 0x004BCB2E for
+   * "Resume").
+   */
+  [[nodiscard]] void* LoadToolbarBitmapFromVfs(const char* const vfsPath)
+  {
+    moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+    if (vfs == nullptr) {
+      return nullptr;
+    }
+
+    msvc8::string resolvedPath{};
+    (void)vfs->FindFile(&resolvedPath, vfsPath, nullptr);
+
+    const std::wstring wideResolvedPath = gpg::STR_Utf8ToWide(resolvedPath.c_str());
+    const wxStringRuntime widePathText = wxStringRuntime::Borrow(wideResolvedPath.c_str());
+
+    void* const bitmapStorage = ::operator new(0x18u, std::nothrow);
+    if (bitmapStorage == nullptr) {
+      return nullptr;
+    }
+
+    constexpr std::int32_t kWxBitmapTypeBmpResource = 1;
+    return ConstructWxBitmapFromFile(bitmapStorage, &widePathText, kWxBitmapTypeBmpResource);
+  }
+
+  /**
+   * Adds one bitmap tool button to `toolbar`, matching the binary's
+   * FindFile+STR_Utf8ToWide+wxBitmap+AddTool+~wxBitmap sequence (e.g.
+   * 0x004BCAF7-0x004BCBAC for "Resume").
+   */
+  void AddToolbarButton(
+    void* const toolbar,
+    const std::int32_t id,
+    const char* const vfsBitmapPath,
+    const wchar_t* const label,
+    const wchar_t* const shortHelp
+  )
+  {
+    void* const bitmap = LoadToolbarBitmapFromVfs(vfsBitmapPath);
+    const wxStringRuntime labelText = wxStringRuntime::Borrow(label);
+    const wxStringRuntime shortHelpText = wxStringRuntime::Borrow(shortHelp);
+    AddToolBarTool(toolbar, id, &labelText, bitmap, &shortHelpText);
+    DestroyWxBitmap(bitmap);
+  }
+
+  constexpr char kDebugWindowWidthPreferenceKey[] = "Windows.Debug.width";
+  constexpr char kDebugWindowHeightPreferenceKey[] = "Windows.Debug.height";
+} // namespace
+
+/**
+ * Address: 0x004BC110 (FUN_004BC110, ??0ScrDebugWindow@Moho@@...)
+ *
+ * IDA signature:
+ * Moho::ScrDebugWindow *__stdcall Moho::ScrDebugWindow::ScrDebugWindow(
+ *     Moho::ScrDebugWindow *this);
+ *
+ * What it does:
+ * Builds the script-debugger frame: File/View/Debug menu bar, a toolbar with
+ * resume/step/breakpoint/find buttons, a nested-splitter layout (source-file
+ * tree | notebook of call-stack list + local/global watch trees), a keyboard
+ * accelerator table, and restores persisted window geometry/sash positions/
+ * column widths from user preferences. Validates the persisted recent-files
+ * list against disk on the way out, dropping entries that no longer resolve
+ * through the VFS.
+ */
+moho::ScrDebugWindow::ScrDebugWindow()
+{
+  constexpr std::int32_t kFrameStyle = 541068864; // 0x203D2100 (binary's wxFrame style word, 0x004BC1D3)
+  (void)Create(
+    nullptr,
+    -1,
+    L"Debugger",
+    wxPoint{-1, -1},
+    wxSize{-1, -1},
+    kFrameStyle,
+    wxStringRuntime::Borrow(L"ScrDebugWindow")
+  );
+
+  mIsInitializingControls = 1;
+  mCreationThreadId = ::GetCurrentThreadId();
+
+  moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
+
+  // ----- Menu bar: File / View / Debug -----
+  void* const fileMenu = ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  AppendMenuItem(fileMenu, 101, L"Close", L"Close source file");
+  AppendMenuItem(fileMenu, 102, L"Close All", L"Close all files");
+  AppendMenuItem(fileMenu, 103, L"Reload All", L"Reload all source file");
+
+  void* const viewMenu = ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  AppendMenuItem(viewMenu, 201, L"Goto", L"Goto line number");
+
+  void* const debugMenu = ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  AppendMenuItem(debugMenu, 301, L"Step", L"Step execution");
+  AppendMenuItem(debugMenu, 302, L"Resume", L"Resume execution");
+  AppendWxMenuSeparator(debugMenu);
+  AppendMenuItem(debugMenu, 303, L"Enable breakpoints", L"Enable all breakpoints");
+  AppendMenuItem(debugMenu, 304, L"Disable breakpoints", L"Disable all breakpoints");
+  AppendWxMenuSeparator(debugMenu);
+  AppendMenuItem(debugMenu, 305, L"Clear breakpoints", L"Clear all breakpoints");
+
+  void* const menuBar = ConstructWxMenuBar(::operator new(0x160u, std::nothrow));
+  const wxStringRuntime fileMenuTitle = wxStringRuntime::Borrow(L"File");
+  const wxStringRuntime viewMenuTitle = wxStringRuntime::Borrow(L"View");
+  const wxStringRuntime debugMenuTitle = wxStringRuntime::Borrow(L"Debug");
+  AppendWxMenuBarMenu(menuBar, fileMenu, &fileMenuTitle);
+  AppendWxMenuBarMenu(menuBar, viewMenu, &viewMenuTitle);
+  AppendWxMenuBarMenu(menuBar, debugMenu, &debugMenuTitle);
+  SetFrameMenuBar(this, menuBar);
+
+  // ----- Toolbar -----
+  constexpr std::int32_t kToolBarStyle = 2097188; // 0x200124 (binary's wxToolBar style word, 0x004BCA5B)
+  void* const toolBar = CreateFrameToolBar(this, kToolBarStyle, -1, nullptr);
+  AddToolbarButton(toolBar, 302, "/coderes/engine/dbg_tool_resume.bmp", L"Resume", L"Resume execution");
+  AddToolbarButton(toolBar, 301, "/coderes/engine/dbg_tool_step.bmp", L"Step", L"Step into");
+  AddToolBarSeparator(toolBar);
+  AddToolbarButton(
+    toolBar, 303, "/coderes/engine/dbg_tool_enablebreakpoints.bmp", L"Enable", L"Enable all breakpoints"
+  );
+  AddToolbarButton(
+    toolBar, 304, "/coderes/engine/dbg_tool_disablebreakpoints.bmp", L"Disable", L"Disable all breakpoints"
+  );
+  AddToolBarSeparator(toolBar);
+  AddToolbarButton(toolBar, 305, "/coderes/engine/dbg_tool_clearbreakpoints.bmp", L"Clear", L"Clear breakpoints");
+  AddToolBarSeparator(toolBar);
+  AddToolbarButton(toolBar, 1002, "/coderes/engine/dbg_tool_find.bmp", L"Find", L"Find");
+  AddToolbarButton(toolBar, 1003, "/coderes/engine/dbg_tool_findnext.bmp", L"Next", L"Find Next");
+  AddToolbarButton(toolBar, 1004, "/coderes/engine/dbg_tool_findprev.bmp", L"Previous", L"Find Previous");
+  RealizeToolBar(toolBar);
+
+  // ----- Nested splitters: outer(source tree | notebook) -----
+  const wxStringRuntime outerSplitterName = wxStringRuntime::Borrow(L"splitter");
+  void* const outerSplitter = ConstructWxSplitterWindow(::operator new(0x1A4u, std::nothrow), this, 102, &outerSplitterName);
+
+  const wxStringRuntime innerSplitterName = wxStringRuntime::Borrow(L"splitter");
+  void* const innerSplitter =
+    ConstructWxSplitterWindow(::operator new(0x1A4u, std::nothrow), outerSplitter, 101, &innerSplitterName);
+
+  // Source-file tree, parented to the outer splitter's first pane.
+  moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+  msvc8::string resolvedRootPath{};
+  if (vfs != nullptr) {
+    (void)vfs->FindFile(&resolvedRootPath, "/", nullptr);
+  }
+  const std::wstring wideRootPath = gpg::STR_Utf8ToWide(resolvedRootPath.c_str());
+  const wxStringRuntime rootPathText = wxStringRuntime::Borrow(wideRootPath.c_str());
+  const wxStringRuntime luaFilterText = wxStringRuntime::Borrow(L"Script files (*.lua)|*.lua");
+  const wxStringRuntime treeCtrlName = wxStringRuntime::Borrow(L"treeCtrl");
+  void* const sourceTree = ConstructWxGenericDirCtrl(
+    ::operator new(0x158u, std::nothrow), innerSplitter, &rootPathText, &luaFilterText, &treeCtrlName
+  );
+  mSourcePathOwnerControl = sourceTree;
+
+  // Source-file list control, parented to the same splitter pane.
+  mSourceControl = new moho::ScrSourceCtrl(reinterpret_cast<wxWindowBase*>(innerSplitter));
+
+  // ----- Notebook: Stack / Locals / Globals, parented to the outer splitter's second pane -----
+  const wxPoint kDefaultPosition{-1, -1};
+  const wxSize kDefaultSize{-1, -1};
+  const wxStringRuntime notebookName = wxStringRuntime::Borrow(L"notebook");
+  void* const notebook = ConstructWxNotebook(
+    ::operator new(0x1A4u, std::nothrow),
+    outerSplitter,
+    -1,
+    &kDefaultPosition,
+    &kDefaultSize,
+    0x90,
+    &notebookName
+  );
+
+  const wxStringRuntime listCtrlName = wxStringRuntime::Borrow(L"wxListCtrl");
+  void* const callStackListRaw = ConstructWxListCtrl(
+    ::operator new(0x150u, std::nothrow), notebook, 301, &kDefaultPosition, &kDefaultSize, 32,
+    nullptr, &listCtrlName
+  );
+  mCallStackControl = callStackListRaw;
+  const wxStringRuntime stackPageTitle = wxStringRuntime::Borrow(L"Stack");
+  AddNotebookPage(notebook, callStackListRaw, &stackPageTitle, false, -1);
+
+  const std::int32_t localValueWidth =
+    preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugLocalWatchValueColumnPreferenceKey), 128) : 128;
+  const std::int32_t localTypeWidth =
+    preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugLocalWatchTypeColumnPreferenceKey), 64) : 64;
+  const std::int32_t localNameWidth =
+    preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugLocalWatchNameColumnPreferenceKey), 96) : 96;
+  mLocalWatchControl = new moho::ScrWatchCtrl(
+    reinterpret_cast<wxWindowBase*>(notebook), 302,
+    static_cast<std::uint32_t>(localNameWidth), static_cast<std::uint32_t>(localTypeWidth),
+    static_cast<std::uint32_t>(localValueWidth)
+  );
+  const wxStringRuntime localsPageTitle = wxStringRuntime::Borrow(L"Locals");
+  AddNotebookPage(notebook, mLocalWatchControl, &localsPageTitle, false, -1);
+
+  const std::int32_t globalValueWidth =
+    preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugGlobalWatchValueColumnPreferenceKey), 128) : 128;
+  const std::int32_t globalTypeWidth =
+    preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugGlobalWatchTypeColumnPreferenceKey), 64) : 64;
+  const std::int32_t globalNameWidth =
+    preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugGlobalWatchNameColumnPreferenceKey), 96) : 96;
+  mGlobalWatchControl = new moho::ScrWatchCtrl(
+    reinterpret_cast<wxWindowBase*>(notebook), 303,
+    static_cast<std::uint32_t>(globalNameWidth), static_cast<std::uint32_t>(globalTypeWidth),
+    static_cast<std::uint32_t>(globalValueWidth)
+  );
+  const wxStringRuntime globalsPageTitle = wxStringRuntime::Borrow(L"Globals");
+  AddNotebookPage(notebook, mGlobalWatchControl, &globalsPageTitle, false, -1);
+
+  // Source-tree double-click/activation opens the file (0x004BD9EF: Connect
+  // on the dircontrol's own id, matching OnSourceTreeItemActivated's already-
+  // recovered read of `mSourcePathOwnerControl`).
+  {
+    using OnSourceTreeItemActivatedThunk = void (ScrDebugWindow::*)(void*);
+    constexpr OnSourceTreeItemActivatedThunk kHandler = &ScrDebugWindow::OnSourceTreeItemActivated;
+    void* rawHandlerAddress = nullptr;
+    std::memcpy(&rawHandlerAddress, &kHandler, sizeof(rawHandlerAddress));
+    ConnectDynamicTreeItemActivatedHandler(sourceTree, -1, -1, rawHandlerAddress, nullptr);
+  }
+
+  // ----- Persisted geometry -----
+  std::int32_t windowX = -1;
+  std::int32_t windowY = -1;
+  std::int32_t windowWidth = -1;
+  std::int32_t windowHeight = -1;
+  if (preferences != nullptr) {
+    windowX = preferences->GetInteger(msvc8::string(kDebugWindowXPreferenceKey), -1);
+    windowY = preferences->GetInteger(msvc8::string(kDebugWindowYPreferenceKey), -1);
+    windowWidth = preferences->GetInteger(msvc8::string(kDebugWindowWidthPreferenceKey), -1);
+    windowHeight = preferences->GetInteger(msvc8::string(kDebugWindowHeightPreferenceKey), -1);
+  }
+  DoSetSize(windowX, windowY, windowWidth, windowHeight, 3);
+
+  std::int32_t clientWidth = 0;
+  std::int32_t clientHeight = 0;
+  DoGetClientSize(&clientWidth, &clientHeight);
+
+  const std::int32_t verticalSashDefault = static_cast<std::int32_t>(static_cast<float>(clientHeight) * 0.80000001f);
+  const std::int32_t verticalSashPosition = preferences != nullptr
+    ? preferences->GetInteger(msvc8::string(kDebugVerticalSashPreferenceKey), verticalSashDefault)
+    : verticalSashDefault;
+  (void)SplitWxSplitterWindowVertically(outerSplitter, innerSplitter, notebook, verticalSashPosition);
+
+  const std::int32_t horizontalSashDefault = static_cast<std::int32_t>(static_cast<float>(clientWidth) * 0.25f);
+  const std::int32_t horizontalSashPosition = preferences != nullptr
+    ? preferences->GetInteger(msvc8::string(kDebugHorizontalSashPreferenceKey), horizontalSashDefault)
+    : horizontalSashDefault;
+  // Inner splitter's second pane is `mSourceControl` (the ScrSourceCtrl page
+  // list), not the notebook - matches 0x004BD4A3 reading `this->v97`
+  // (mSourceControl), not `this->v96` (mSourcePathOwnerControl) reread twice.
+  (void)SplitWxSplitterWindowVertically(innerSplitter, sourceTree, mSourceControl, horizontalSashPosition);
+
+  // ----- Keyboard accelerator table -----
+  struct WxAcceleratorEntryRaw
+  {
+    std::int32_t mFlags = 0;    // wxACCEL_NORMAL=0, ALT=1, CTRL=2, SHIFT=4
+    std::int32_t mKeyCode = 0;  // WXK_* virtual-key code
+    std::int32_t mCommandId = 0;
+    void* mMenuItem = nullptr;
+  };
+
+  const WxAcceleratorEntryRaw accelerators[8] = {
+    {2, 345, 101, nullptr}, // Ctrl+F6  -> Close
+    {2, 71, 201, nullptr},  // Ctrl+G   -> Goto
+    {0, 346, 302, nullptr}, // F7       -> Resume
+    {0, 351, 301, nullptr}, // F12      -> Step
+    {6, 350, 305, nullptr}, // Ctrl+Shift+F11 -> Clear breakpoints
+    {0, 344, 1003, nullptr},  // F5     -> Find Next
+    {4, 344, 1004, nullptr},  // Shift+F5 -> Find Previous
+    {2, 82, 103, nullptr},    // Ctrl+R -> Reload All
+  };
+  void* const accelTableStorage = ::operator new(0x10u, std::nothrow);
+  void* const accelTable = ConstructWxAcceleratorTable(accelTableStorage, 8, accelerators);
+  SetAcceleratorTable(accelTable);
+  UnrefWxObject(accelTable);
+
+  mIsInitializingControls = 0;
+
+  // ----- Recent-files list: drop entries that no longer resolve through the VFS -----
+  // Mirrors 0x004BD9DB-0x004BDA61: `sub_4C3670` (this file's
+  // `OpenOrSelectMountedSourcePath`) both tests resolution *and* opens a
+  // source page as a side effect, matching what the binary does here - a
+  // stale saved file list gets each surviving entry opened as a tab.
+  bool recentFilesChanged = false;
+  for (auto it = mRecentSourceFiles.begin(); it != mRecentSourceFiles.end();) {
+    const bool resolved = OpenOrSelectMountedSourcePath(
+      reinterpret_cast<ScrSourceControlRuntimeView*>(mSourceControl), *it
+    );
+    if (resolved) {
+      ++it;
+    } else {
+      it = mRecentSourceFiles.erase(it);
+      recentFilesChanged = true;
+    }
+  }
+
+  if (recentFilesChanged) {
+    PersistRecentSourceFiles(mRecentSourceFiles);
+    moho::USER_SavePreferences();
+  }
+}
+
 /**
  * Address: 0x004BC100 (FUN_004BC100)
  *

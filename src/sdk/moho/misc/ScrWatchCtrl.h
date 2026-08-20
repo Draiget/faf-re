@@ -12,6 +12,25 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004D6FF0 (FUN_004D6FF0, ??0ScrWatchCtrl@Moho@@QAE@PAVwxWindow@@ABHHHHABVwxPoint@@ABVwxSize@@@Z)
+     * Mangled: ??0ScrWatchCtrl@Moho@@QAE@PAVwxWindow@@ABHHHHABVwxPoint@@ABVwxSize@@@Z
+     *
+     * What it does:
+     * Builds the base tree-list control (fixed style, default name), appends
+     * the Variable/Type/Value columns at the given widths, seeds the root
+     * item, and dynamically connects tree-item-activation to
+     * `OnItemActivate` (this control's static event table is empty - the
+     * binary wires this handler per-instance instead).
+     */
+    ScrWatchCtrl(
+      wxWindowBase* parentWindow,
+      std::int32_t windowId,
+      std::uint32_t nameColumnWidth,
+      std::uint32_t typeColumnWidth,
+      std::uint32_t valueColumnWidth
+    );
+
+    /**
      * Address: 0x004D6FE0 (FUN_004D6FE0, Moho::ScrWatchCtrl::GetEventTable)
      *
      * What it does:
