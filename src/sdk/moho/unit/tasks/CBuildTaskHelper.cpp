@@ -1,12 +1,16 @@
 #include "moho/unit/tasks/CBuildTaskHelper.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdlib>
 #include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/IAiSiloBuild.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/CEconomyEvent.h"
@@ -497,3 +501,124 @@ namespace moho
     archive->WriteBool(mIsSilo);
   }
 } // namespace moho
+
+namespace
+{
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase).
+  struct CBuildTaskHelperSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CBuildTaskHelperSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CBuildTaskHelperSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CBuildTaskHelperSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CBuildTaskHelperSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CBuildTaskHelperSerializerHelperNode) == 0x14,
+    "CBuildTaskHelperSerializerHelperNode size must be 0x14"
+  );
+
+  CBuildTaskHelperSerializerHelperNode gCBuildTaskHelperSerializer{};
+
+  /**
+   * Unlinks `CBuildTaskHelperSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCBuildTaskHelperSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCBuildTaskHelperSerializer.mListLinks);
+  }
+
+  /**
+   * Address: 0x005F5960 (FUN_005F5960, Moho::CBuildTaskHelperSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CBuildTaskHelper`. Forwards the
+   * reflected object pointer to `CBuildTaskHelper::MemberDeserialize`
+   * (FUN_005FE540 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeCBuildTaskHelperSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const helper = reinterpret_cast<moho::CBuildTaskHelper*>(objectPtr);
+    if (helper == nullptr) {
+      return;
+    }
+    helper->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x005F5970 (FUN_005F5970, Moho::CBuildTaskHelperSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `CBuildTaskHelper`. Forwards the
+   * reflected object pointer to `CBuildTaskHelper::MemberSerialize`
+   * (FUN_005FE610 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeCBuildTaskHelperSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const helper = reinterpret_cast<const moho::CBuildTaskHelper*>(objectPtr);
+    if (helper == nullptr) {
+      return;
+    }
+    helper->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF92A0 (FUN_00BF92A0, Moho::CBuildTaskHelperSerializer::~CBuildTaskHelperSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CBuildTaskHelperSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CBuildTaskHelperSerializer_atexit()
+  {
+    (void)UnlinkCBuildTaskHelperSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BCF830 (FUN_00BCF830, register_CBuildTaskHelperSerializer)
+   *
+   * What it does:
+   * Initializes the global `CBuildTaskHelper` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_CBuildTaskHelperSerializer()
+  {
+    (void)UnlinkCBuildTaskHelperSerializerNodePrimary();
+    gCBuildTaskHelperSerializer.mSerLoadFunc = &DeserializeCBuildTaskHelperSerializerCallback;
+    gCBuildTaskHelperSerializer.mSerSaveFunc = &SerializeCBuildTaskHelperSerializerCallback;
+    (void)std::atexit(&cleanup_CBuildTaskHelperSerializer_atexit);
+  }
+
+  struct CBuildTaskHelperSerializerStartupBootstrap
+  {
+    CBuildTaskHelperSerializerStartupBootstrap()
+    {
+      register_CBuildTaskHelperSerializer();
+    }
+  };
+
+  [[maybe_unused]] CBuildTaskHelperSerializerStartupBootstrap gCBuildTaskHelperSerializerStartupBootstrap;
+} // namespace
