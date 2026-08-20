@@ -1,5 +1,7 @@
 #include "moho/audio/CSimSoundManagerSaveConstruct.h"
 
+#include <cstdlib>
+
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/audio/AudioReflectionHelpers.h"
@@ -20,6 +22,31 @@ namespace gpg
   RRef* RRef_Sim(RRef* outRef, moho::Sim* value);
 } // namespace gpg
 
+namespace
+{
+  // Address: 0x010BAF7C -- process-global `CSimSoundManagerSaveConstruct`
+  // singleton. Constructing it runs CSimSoundManagerSaveConstruct::
+  // CSimSoundManagerSaveConstruct() (0x00BDC520), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterSaveConstructArgsFunction() on it from within the
+  // first ReadArchive/WriteArchive construction.
+  moho::CSimSoundManagerSaveConstruct gCSimSoundManagerSaveConstruct;
+
+  /**
+   * Address: 0x00C01560 (FUN_00C01560)
+   *
+   * What it does:
+   * Unlinks the `CSimSoundManagerSaveConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BDC520) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupCSimSoundManagerSaveConstruct()
+  {
+    gCSimSoundManagerSaveConstruct.ResetLinks();
+  }
+} // namespace
+
 namespace moho
 {
   /**
@@ -28,13 +55,15 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
-   * into `sNewHelpers`), then binds the save-construct-args callback field.
+   * into `sNewHelpers`), binds the save-construct-args callback field, and
+   * registers process-exit cleanup.
    */
   CSimSoundManagerSaveConstruct::CSimSoundManagerSaveConstruct()
     : mSerSaveConstructArgsFunc(
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&CSimSoundManagerSaveConstruct::SaveConstructArgs)
       )
   {
+    (void)std::atexit(&CleanupCSimSoundManagerSaveConstruct);
   }
 
   /**
@@ -75,14 +104,3 @@ namespace moho
     audio_reflection::RegisterSaveConstructArgsCallback(typeInfo, mSerSaveConstructArgsFunc);
   }
 } // namespace moho
-
-namespace
-{
-  // Address: 0x010BAF7C -- process-global `CSimSoundManagerSaveConstruct`
-  // singleton. Constructing it runs CSimSoundManagerSaveConstruct::
-  // CSimSoundManagerSaveConstruct() (0x00BDC520), which splices this helper
-  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterSaveConstructArgsFunction() on it from within the
-  // first ReadArchive/WriteArchive construction.
-  moho::CSimSoundManagerSaveConstruct gCSimSoundManagerSaveConstruct;
-} // namespace

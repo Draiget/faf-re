@@ -1,5 +1,6 @@
 #include "moho/audio/CSimSoundManagerConstruct.h"
 
+#include <cstdlib>
 #include <new>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -16,6 +17,30 @@ namespace gpg
   };
 } // namespace gpg
 
+namespace
+{
+  // Address: 0x010BAF40 -- process-global `CSimSoundManagerConstruct` singleton.
+  // Constructing it runs CSimSoundManagerConstruct::CSimSoundManagerConstruct()
+  // (0x00BDC550), which splices this helper into gpg::SerHelperBase::sNewHelpers;
+  // gpg::SerHelperBase::InitNewHelpers() later dispatches RegisterConstructFunction()
+  // on it from within the first ReadArchive/WriteArchive construction.
+  moho::CSimSoundManagerConstruct gCSimSoundManagerConstruct;
+
+  /**
+   * Address: 0x00C01590 (FUN_00C01590)
+   *
+   * What it does:
+   * Unlinks the `CSimSoundManagerConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BDC550) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupCSimSoundManagerConstruct()
+  {
+    gCSimSoundManagerConstruct.ResetLinks();
+  }
+} // namespace
+
 namespace moho
 {
   /**
@@ -24,12 +49,14 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
-   * into `sNewHelpers`), then binds the construct/delete callback fields.
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
   CSimSoundManagerConstruct::CSimSoundManagerConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CSimSoundManagerConstruct::Construct))
     , mDeleteCallback(&CSimSoundManagerConstruct::Deconstruct)
   {
+    (void)std::atexit(&CleanupCSimSoundManagerConstruct);
   }
 
   /**
@@ -81,13 +108,3 @@ namespace moho
     audio_reflection::RegisterConstructCallbacks(typeInfo, mConstructCallback, mDeleteCallback);
   }
 } // namespace moho
-
-namespace
-{
-  // Address: 0x010BAF40 -- process-global `CSimSoundManagerConstruct` singleton.
-  // Constructing it runs CSimSoundManagerConstruct::CSimSoundManagerConstruct()
-  // (0x00BDC550), which splices this helper into gpg::SerHelperBase::sNewHelpers;
-  // gpg::SerHelperBase::InitNewHelpers() later dispatches RegisterConstructFunction()
-  // on it from within the first ReadArchive/WriteArchive construction.
-  moho::CSimSoundManagerConstruct gCSimSoundManagerConstruct;
-} // namespace
