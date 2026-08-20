@@ -12599,6 +12599,56 @@ int Sim::DumpUnits(
 }
 
 /**
+ * Address: 0x0075D7A0 (FUN_0075D7A0, Moho::Sim::DebugDumpArmyStats)
+ *
+ * IDA signature:
+ * void __cdecl Moho::Sim::DebugDumpArmyStats(
+ *     Moho::Sim *sim, std::vector_string *commandArgs, Wm3::Vector3f *worldPos,
+ *     Moho::CArmyImpl *focusArmy, std::vector_WeakObject_IUnit *selectedUnits);
+ *
+ * What it does:
+ * `DebugDumpArmyStats <armyIndex>` console callback. With fewer than two
+ * tokens it prints the usage line; otherwise it parses the index, looks that
+ * army up in `mArmiesList` (`[edx+910h]`/`[edx+914h]` at 0x0075D7F5 and
+ * 0x0075D802) and, when the slot holds a live army, dumps its stat snapshot
+ * through `CArmyStats::DumpStats` (0x0075D838).
+ *
+ * The binary indexes `mArmiesList` twice - once to load the army pointer at
+ * 0x0075D814 and once for the `GetArmyStats` call at 0x0075D82E - so the
+ * inlined bounds check appears twice, and the failing arm at 0x0075D840 is
+ * the usual null-deref trap. Only the first index can actually fail, so the
+ * recovered form keeps the single guard the source expressed.
+ */
+int Sim::DebugDumpArmyStats(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  if (commandArgs == nullptr || commandArgs->size() < 2u) {
+    sim->Printf("usage: DebugDumpArmyStats armyIndex");
+    return 0;
+  }
+
+  const auto armyIndex = static_cast<std::size_t>(std::atoi((*commandArgs)[1].c_str()));
+  if (armyIndex >= sim->mArmiesList.size()) {
+    return 0;
+  }
+
+  if (CArmyImpl* const army = sim->mArmiesList[armyIndex]; army != nullptr) {
+    army->GetArmyStats()->DumpStats();
+  }
+
+  return 0;
+}
+
+/**
  * Address: 0x0064BB80 (FUN_0064BB80, Moho::Sim::SallyShears)
  *
  * What it does:

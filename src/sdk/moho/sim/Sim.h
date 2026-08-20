@@ -582,6 +582,28 @@ namespace moho
     );
 
     /**
+     * Address: 0x0075D7A0 (FUN_0075D7A0, Moho::Sim::DebugDumpArmyStats)
+     *
+     * IDA signature:
+     * void __cdecl Moho::Sim::DebugDumpArmyStats(
+     *     Moho::Sim *sim, std::vector_string *commandArgs, Wm3::Vector3f *worldPos,
+     *     Moho::CArmyImpl *focusArmy, std::vector_WeakObject_IUnit *selectedUnits);
+     *
+     * What it does:
+     * `DebugDumpArmyStats <armyIndex>` console callback: parses the index
+     * argument, resolves that army out of `mArmiesList`, and dumps its stat
+     * snapshot through `CArmyStats::DumpStats`. Prints the usage line when
+     * called with fewer than two tokens.
+     */
+    static int DebugDumpArmyStats(
+      Sim* sim,
+      CSimConCommand::ParsedCommandArgs* commandArgs,
+      Wm3::Vector3f* worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit* selectedUnits
+    );
+
+    /**
      * Address: 0x0064BB80 (FUN_0064BB80, Moho::Sim::SallyShears)
      *
      * What it does:
