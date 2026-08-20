@@ -34769,6 +34769,71 @@ unsigned long wxWindowMswRuntime::OnCtlColor(
   return 0;
 }
 
+namespace
+{
+  /**
+   * Address: 0x00967CA0 (FUN_00967CA0)
+   *
+   * What it does:
+   * Sends `count` `WM_VSCROLL` messages of the given scroll `kind`
+   * (`SB_LINEUP`/`SB_LINEDOWN`/`SB_PAGEUP`/`SB_PAGEDOWN`) to `hwnd`, stopping
+   * early once the vertical scroll position stops moving (already at an
+   * end). Returns whether the position changed at all.
+   */
+  bool ScrollVertically(const HWND hwnd, const int kind, const int count)
+  {
+    const int posStart = GetScrollPos(hwnd, SB_VERT);
+
+    int pos = posStart;
+    for (int n = 0; n < count; ++n) {
+      SendMessageW(hwnd, WM_VSCROLL, static_cast<WPARAM>(kind), 0);
+
+      const int posNew = GetScrollPos(hwnd, SB_VERT);
+      if (posNew == pos) {
+        break;
+      }
+
+      pos = posNew;
+    }
+
+    return pos != posStart;
+  }
+} // namespace
+
+/**
+ * Address: 0x00967D00 (FUN_00967D00, wxWindow::ScrollLines)
+ *
+ * What it does:
+ * Scrolls the native window up or down by the given number of lines via
+ * repeated `WM_VSCROLL` line messages.
+ */
+bool wxWindowMswRuntime::ScrollLines(const std::int32_t lines)
+{
+  const bool down = lines > 0;
+  return ScrollVertically(
+    reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())),
+    down ? SB_LINEDOWN : SB_LINEUP,
+    down ? lines : -lines
+  );
+}
+
+/**
+ * Address: 0x00967D30 (FUN_00967D30, wxWindow::ScrollPages)
+ *
+ * What it does:
+ * Scrolls the native window up or down by the given number of pages via
+ * repeated `WM_VSCROLL` page messages.
+ */
+bool wxWindowMswRuntime::ScrollPages(const std::int32_t pages)
+{
+  const bool down = pages > 0;
+  return ScrollVertically(
+    reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())),
+    down ? SB_PAGEDOWN : SB_PAGEUP,
+    down ? pages : -pages
+  );
+}
+
 /**
  * Address: 0x0042B830 (FUN_0042B830)
  * Mangled: ?ContainsHWND@wxWindow@@UBE_NK@Z
