@@ -152,7 +152,7 @@ namespace
    * Initializes callback lanes for global `ResourceDepositSerializer` helper
    * storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] ResourceDepositSerializerHelper* InitializeResourceDepositSerializerStartupThunk() noexcept
+  [[nodiscard]] ResourceDepositSerializerHelper* InitializeResourceDepositSerializerStartupThunk() noexcept
   {
     gpg::SerHelperBase* const self = ResourceDepositSerializerSelfNode();
     gResourceDepositSerializer.mHelperPrev = self;
@@ -169,7 +169,7 @@ namespace
    * Unlinks `ResourceDepositSerializer` helper node from the intrusive helper
    * list and restores self-linked sentinel links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupResourceDepositSerializerHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupResourceDepositSerializerHelperNodePrimary() noexcept
   {
     return ResetResourceDepositSerializerHelperLinks();
   }
@@ -206,11 +206,30 @@ namespace
     gResourceDepositTypeInfoConstructed = false;
   }
 
+  void cleanup_ResourceDepositSerializer_atexit()
+  {
+    (void)CleanupResourceDepositSerializerHelperNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BC9670 (FUN_00BC9670, register_ResourceDepositSerializer)
+   *
+   * What it does:
+   * Initializes the global ResourceDeposit serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_ResourceDepositSerializer()
+  {
+    (void)InitializeResourceDepositSerializerStartupThunk();
+    (void)std::atexit(&cleanup_ResourceDepositSerializer_atexit);
+  }
+
   struct ResourceDepositTypeInfoStartup
   {
     ResourceDepositTypeInfoStartup()
     {
       moho::register_ResourceDepositTypeInfo();
+      register_ResourceDepositSerializer();
     }
   };
 
