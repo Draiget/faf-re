@@ -19,11 +19,11 @@ Progress DB status breakdown:
 - `external_dependency`: `5,506` (8.49%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `412` (0.61%)
-- `in_progress`: `0` (0.00%)
-- **`blocked`: `1,959` (2.92%)**
+- `in_progress`: `4` (0.01%)
+- **`blocked`: `1,955` (2.91%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,371`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,371`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,367`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,367`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
@@ -42,15 +42,15 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,371 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,367 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `350` | 14.76% |
-| Vtable-anchored (recover with the owning class) | `183` | 7.72% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `350` | 14.79% |
+| Vtable-anchored (recover with the owning class) | `181` | 7.65% |
 | Framework dispatch (wx/EH/Lua/reflection) | `45` | 1.90% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `811` | 34.20% |
-| No indexed callsite evidence (needs investigation/evidence) | `978` | 41.25% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `809` | 34.18% |
+| No indexed callsite evidence (needs investigation/evidence) | `978` | 41.32% |
 | Unclassified data xref (manual review) | `3` | 0.13% |
 | RTTI-only | `1` | 0.04% |
 

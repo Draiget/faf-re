@@ -468,6 +468,22 @@ namespace moho
       return sentinel;
     }
 
+    /**
+     * Address: 0x00556DE0 (FUN_00556DE0, sub_556DE0)
+     *
+     * What it does:
+     * The binary's allocator (`sub_556DE0`) only allocates the node and sets
+     * `_Color=1`/`_Isnil=0` (left/parent/right left null); its sole caller,
+     * `EntityCategorySet::EntityCategorySet` (0x0055520B-0x00555233),
+     * immediately overwrites `_Isnil=1` and self-links left/parent/right to
+     * the head itself. This helper fuses both steps, since nothing else in
+     * this tree calls the allocator without that follow-up.
+     *
+     * Previously mis-cited on an orphaned `AllocateCategoryMapNodeRuntime` in
+     * SimRecoveryRuntime.cpp (zero real callers there, and its field values
+     * -- isNil=0, no self-link -- matched only the allocator's raw output,
+     * not the net state after construction); removed from there.
+     */
     [[nodiscard]] CategoryLookupNodeRuntimeView* AllocateCategoryLookupHeadNodeRuntime() noexcept
     {
       auto* const head = new (std::nothrow) CategoryLookupNodeRuntimeView{};
