@@ -1,6 +1,7 @@
 #include "moho/ai/SPickUpInfo.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -136,7 +137,7 @@ namespace moho
    * Unlinks one startup helper lane for the `SPickUpInfo` serializer helper
    * node and restores self-links.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_SPickUpInfoSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_SPickUpInfoSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gSPickUpInfoSerializerStartupNode);
   }
@@ -199,6 +200,67 @@ namespace moho
     archive->WriteFloat(mDistanceSq);
   }
 } // namespace moho
+
+namespace
+{
+  void DeserializeSPickUpInfoSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::SPickUpInfo*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeSPickUpInfoSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::SPickUpInfo*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_SPickUpInfoSerializer_atexit()
+  {
+    (void)moho::cleanup_SPickUpInfoSerializerStartupThunkA();
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BD1C50 (FUN_00BD1C50, register_SPickUpInfoSerializer)
+   *
+   * What it does:
+   * Initializes the global SPickUpInfo serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_SPickUpInfoSerializer()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gSPickUpInfoSerializerStartupNode);
+    gSPickUpInfoSerializerStartupNode.mHelperNext = self;
+    gSPickUpInfoSerializerStartupNode.mHelperPrev = self;
+    gSPickUpInfoSerializerStartupNode.mLoad = &DeserializeSPickUpInfoSerializerCallback;
+    gSPickUpInfoSerializerStartupNode.mSave = &SerializeSPickUpInfoSerializerCallback;
+    (void)std::atexit(&cleanup_SPickUpInfoSerializer_atexit);
+  }
+} // namespace moho
+
+namespace
+{
+  struct SPickUpInfoSerializerStartupBootstrap
+  {
+    SPickUpInfoSerializerStartupBootstrap()
+    {
+      moho::register_SPickUpInfoSerializer();
+    }
+  };
+
+  [[maybe_unused]] SPickUpInfoSerializerStartupBootstrap gSPickUpInfoSerializerStartupBootstrap;
+} // namespace
 
 namespace gpg
 {
