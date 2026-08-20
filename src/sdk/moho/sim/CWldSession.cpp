@@ -8693,6 +8693,10 @@ namespace moho
 
     /**
      * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
+     * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
+     * — identical node-splice/rebalance/return-next shape, a separate
+     * per-call-site emission of the same std::_Tree::erase(iterator) operation;
+     * reached via CWldSession.cpp's own EraseSelectionNodeAndAdvance callers)
      *
      * What it does:
      * Erases one `UserEntity` weak-set node from the selection RB-tree, unlinks
