@@ -381,6 +381,25 @@ namespace
   }
 
   /**
+   * Address: 0x00BC9E60 (FUN_00BC9E60, register_EntityCategory)
+   *
+   * What it does:
+   * Reads and returns the current head of the `Core` Lua init-form set. See
+   * the declaration in `EntityCategoryReflection.h` for the full evidence
+   * trail on why the binary's list-prepend half is not reproduced here.
+   */
+  CScrLuaInitForm* register_EntityCategory()
+  {
+    CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
+    CScrLuaInitForm* const previousHead = coreSet.mForms;
+    // Prepend intentionally omitted - the anchor's real identity cannot be
+    // recovered from available evidence (see header doc comment), and a
+    // placeholder object would corrupt the list per the already-diagnosed
+    // register_CAiAttackerImplLuaInitFormAnchor case in CAiAttackerImpl.cpp.
+    return previousHead;
+  }
+
+  /**
    * Address: 0x00557670 (FUN_00557670, func_EntityCategoryAdd)
    */
   EntityCategorySet* func_EntityCategoryAdd(
@@ -977,6 +996,7 @@ namespace
   {
     EntityCategoryReflectionLuaBinderBootstrap()
     {
+      (void)::moho::register_EntityCategory();
       (void)::moho::register_EntityCategory__add_LuaFuncDef();
       (void)::moho::register_EntityCategory__sub_LuaFuncDef();
       (void)::moho::register_EntityCategory__mul_LuaFuncDef();
