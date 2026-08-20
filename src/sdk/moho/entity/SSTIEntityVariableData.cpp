@@ -59,7 +59,6 @@ namespace
     }
   };
 
-  gpg::SerSaveLoadHelperListRuntime gSSTIEntityAttachInfoSerializer{};
   moho::SSTIEntityVariableDataSerializer gSSTIEntityVariableDataSerializer{};
 
   // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
@@ -89,6 +88,11 @@ namespace
 
   EntityAttributesSerializerHelper gEntityAttributesSerializer{};
 
+  // Same 0x14-byte SerHelperBase-derived shape as gEntityAttributesSerializer
+  // above (vtable + mNext/mPrev + load/save callback lanes) -- reused here
+  // rather than duplicating the layout for a second serializer global.
+  EntityAttributesSerializerHelper gSSTIEntityAttachInfoSerializer{};
+
   [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
     EntityAttributesSerializerHelper& helper
   ) noexcept
@@ -109,9 +113,9 @@ namespace
    * Unlinks `SSTIEntityAttachInfo` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIEntityAttachInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityAttachInfoSerializer));
   }
 
   /**
@@ -123,7 +127,84 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityAttachInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTIEntityAttachInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityAttachInfoSerializer));
+  }
+
+  /**
+   * Address: 0x00558310 (FUN_00558310, Moho::SSTIEntityAttachInfoSerializer::Deserialize)
+   *
+   * What it does:
+   * Reads one `SSTIEntityAttachInfo` (a raw `EntId`) from the archive
+   * through `moho::EntId`'s reflected type.
+   */
+  void DeserializeSSTIEntityAttachInfoSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::EntId));
+      moho::SSTIEntityAttachInfo::sType = type;
+    }
+
+    const gpg::RRef entIdRef{};
+    archive->Read(type, reinterpret_cast<void*>(static_cast<std::uintptr_t>(objectPtr)), entIdRef);
+  }
+
+  /**
+   * Address: 0x00558350 (FUN_00558350, Moho::SSTIEntityAttachInfoSerializer::Serialize)
+   *
+   * What it does:
+   * Writes one `SSTIEntityAttachInfo` (a raw `EntId`) to the archive through
+   * `moho::EntId`'s reflected type.
+   */
+  void SerializeSSTIEntityAttachInfoSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::EntId));
+      moho::SSTIEntityAttachInfo::sType = type;
+    }
+
+    const gpg::RRef entIdRef{};
+    archive->Write(type, reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)), entIdRef);
+  }
+
+  /**
+   * Address: 0x00BF4ED0 (FUN_00BF4ED0, Moho::SSTIEntityAttachInfoSerializer::~SSTIEntityAttachInfoSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `SSTIEntityAttachInfo` serializer
+   * helper node, matching the sibling `EntityAttributes` cleanup lane.
+   */
+  void cleanup_SSTIEntityAttachInfoSerializer_atexit()
+  {
+    (void)UnlinkSSTIEntityAttachInfoSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA040 (FUN_00BCA040, register_SSTIEntityAttachInfoSerializer)
+   *
+   * What it does:
+   * Initializes the global SSTIEntityAttachInfo serializer helper callbacks
+   * and installs process-exit cleanup.
+   */
+  void register_SSTIEntityAttachInfoSerializer()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gSSTIEntityAttachInfoSerializer.mNext);
+    gSSTIEntityAttachInfoSerializer.mNext = self;
+    gSSTIEntityAttachInfoSerializer.mPrev = self;
+    gSSTIEntityAttachInfoSerializer.mLoadCallback = &DeserializeSSTIEntityAttachInfoSerializerCallback;
+    gSSTIEntityAttachInfoSerializer.mSaveCallback = &SerializeSSTIEntityAttachInfoSerializerCallback;
+    (void)std::atexit(&cleanup_SSTIEntityAttachInfoSerializer_atexit);
   }
 
   /**
@@ -1199,6 +1280,7 @@ namespace
     {
       register_SSTIEntityVariableDataSerializer();
       register_EntityAttributesSerializer();
+      register_SSTIEntityAttachInfoSerializer();
     }
   };
 
