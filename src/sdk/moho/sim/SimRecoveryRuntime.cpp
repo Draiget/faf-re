@@ -4016,21 +4016,6 @@ std::uint32_t* AssignRebuiltOpaqueLaneRuntimeB(
 }
 
 /**
- * Address: 0x0075F050 (FUN_0075F050)
- *
- * What it does:
- * Appends one 12-byte pose-copy lane into a legacy growth vector.
- */
-Element12Runtime* AppendPoseCopyLaneRuntime(
-  const Element12Runtime* const value,
-  LegacyVectorStorageRuntime<Element12Runtime>* const vector
-)
-{
-  const Element12Runtime copy = value != nullptr ? *value : Element12Runtime{};
-  return AppendTrivialValue(vector, copy);
-}
-
-/**
  * Address: 0x00765130 (FUN_00765130)
  *
  * What it does:
