@@ -811,7 +811,7 @@ namespace
    * Initializes one category-rule traversal cursor with game-rules owner,
    * category ordinal bitset pointer, and first selected ordinal.
    */
-  [[maybe_unused]] [[nodiscard]] CategoryRuleCursor* InitializeCategoryRuleCursor(
+  [[nodiscard]] CategoryRuleCursor* InitializeCategoryRuleCursor(
     CategoryRuleCursor* const outCursor,
     moho::RRuleGameRules* const rules,
     const moho::BVIntSet& categoryOrdinals
