@@ -86,8 +86,7 @@ namespace moho
    * Slot map of `??_7SelectionDragger@Moho@@6B@` (read from the shipped PE):
    *   +0x00  0x00864000  scalar deleting destructor  -> `DeleteWithFlag`
    *   +0x04  0x0078DB50  `IMauiDragger::DragMove`    (inherited, empty body)
-   *   +0x08  0x00863870  `SelectionDragger::DragRelease` (override, NOT YET
-   *                      RECOVERED - see the note below)
+   *   +0x08  0x00863870  `SelectionDragger::DragRelease` (override, recovered)
    *   +0x0C  0x0078DB80  `IMauiDragger::OnCurrentDraggerReplaced` (inherited)
    *   +0x10  0x00A82547  `_purecall` -> `ISelectionDragger::Render`
    *   +0x14  0x00A82547  `_purecall` -> `BuildSelectionSolid`
@@ -98,14 +97,23 @@ namespace moho
    * derived-class body is declared for them here.
    *
    * Slot +0x08 (`SelectionDragger::DragRelease`, 0x00863870, 485 instructions)
-   * is a genuine override and is still blocked. Its no-modifier branch drives a
-   * per-priority `WeakSet<UserEntity>` bucket vector through three helpers that
-   * only exist as file-private statics of `moho/sim/CWldSession.cpp`
+   * is a genuine override, recovered in SelectionDragger.cpp. Its no-modifier
+   * branch drives a per-priority `SSelectionSetUserEntity` bucket vector; the
+   * three CWldSession.cpp-local helpers this slot used to depend on
    * (`CopySelectionSetFromOther` 0x00822210, `FindSelectionNodeByEntityGuarded`
-   * 0x00867780, `ReleaseSelectionWeakSetStorageRange` 0x00868CC0) plus the
-   * bucket-vector grow helper at 0x00867890, which is not recovered anywhere.
-   * Until those are reachable from this translation unit the slot stays pure,
-   * inherited from `IMauiDragger`.
+   * 0x00867780, `ReleaseSelectionWeakSetStorageRange` 0x00868CC0) are all
+   * file-private (anonymous namespace) to that TU, so the recovered body does
+   * not call them directly - it reaches the identical observable behavior
+   * through the already-public `SSelectionSetUserEntity` API instead (`Find`,
+   * `find`, `Add`, `Iterator_inc`, `IsEmptyAfterPrune`, `ReleaseStorage`) plus
+   * this file's own `AddSelectionRange`/`DecodeSelectionEntity` helpers. The
+   * bucket-vector growth path (0x00867890/0x00867B90/0x00868040, a hand-rolled
+   * `vector<WeakEntitySetUserEntity>::resize`) is likewise not ported literally;
+   * the recovered body grows an `msvc8::vector<SSelectionSetUserEntity>`
+   * through the already-recovered generic `resize()` plus a per-slot
+   * `InitializeLocalSelectionSet()` call, matching the binary's per-element
+   * defensive-copy-of-an-empty-source semantics without needing the raw
+   * 12-byte-stride internals.
    */
   class SelectionDragger : public ISelectionDragger
   {
@@ -134,6 +142,29 @@ namespace moho
      * `deleteFlags` is set.
      */
     SelectionDragger* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
+
+    /**
+     * Address: 0x00863870 (FUN_00863870)
+     *
+     * IDA signature:
+     * void __thiscall Moho::SelectionDragger::DragRelease(
+     *     Moho::SelectionDragger *this, Moho::SMauiEventData *a2);
+     *
+     * What it does:
+     * Forwards the release event through this dragger's own `DragMove`, then
+     * either releases the click-selection path (dragger inactive) or resolves
+     * a new session selection from the entities the drag volume covers: with
+     * Shift held, merges/toggles the dragged set against the current
+     * selection; otherwise groups intersected entities into per-priority
+     * buckets (mesh-bounds test against the drag solid, blueprint selection
+     * scale/`LOWSELECTPRIO` override) and selects the first non-empty bucket.
+     *
+     * Invocation: vtable slot +0x08 of `??_7SelectionDragger@Moho@@6B@`,
+     * `??_7SelectionDragger2D@Moho@@6B@` and `??_7SelectionDragger3D@Moho@@6B@`
+     * (all three data-xref the same body; neither derived class overrides this
+     * slot).
+     */
+    void DragRelease(const SMauiEventData* eventData) override;
 
     /**
      * Vtable slot +0x14 of `??_7SelectionDragger@Moho@@6B@` (0x00A82547,
