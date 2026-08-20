@@ -895,6 +895,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\CAimManipulatorTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiNavigatorAir.cpp" />
     <ClCompile Include="moho\ai\CAimManipulatorSerializer.cpp" />
+    <ClCompile Include="moho\ai\CBuilderArmManipulatorSerializer.cpp" />
     <ClCompile Include="moho\sim\ManipulatorLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\ai\CBuilderArmManipulatorTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAimManipulator.cpp" />
@@ -1917,6 +1918,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\CBuilderArmManipulatorTypeInfo.h" />
     <ClInclude Include="moho\ai\CAimManipulator.h" />
     <ClInclude Include="moho\ai\CAimManipulatorSerializer.h" />
+    <ClInclude Include="moho\ai\CBuilderArmManipulatorSerializer.h" />
     <ClInclude Include="moho\ai\CAimManipulatorTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiNavigatorAir.h" />
     <ClInclude Include="moho\ai\CAiNavigatorAirConstruct.h" />
