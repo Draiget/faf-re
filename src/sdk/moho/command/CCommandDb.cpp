@@ -733,11 +733,31 @@ namespace moho
    * What it does:
    * Initializes one command database with its owning Sim and empty
    * container/id-pool lanes.
+   *
+   * Sentinel allocation (0x006E2840, FUN_006E2840, sub_6E2840):
+   * The binary buys the command map's header/sentinel node through a raw
+   * node allocator (isNil=0 by default), then this constructor's own body
+   * patches isNil=1 and self-links left/parent/right before zeroing
+   * `_Mysize` - the same split-allocator shape as
+   * `AllocateAllUnitsTreeNode`/`InitializeAllUnitsTreeHeadLane` in
+   * EntityDb.cpp. Here the split is fused inside `commands`'s own default
+   * construction: `msvc8::map`'s shared `detail::rb_tree` default
+   * constructor (legacy/containers/RbTree.h) calls `rb_tree::buy_head()`,
+   * which performs the identical alloc + self-link + isNil=1/color=black
+   * sequence, so no separate call is needed in this constructor's body.
+   *
+   * `pendingReleasedCmdIds` (binary's `this->vec`):
+   * Declared at +0x0CC0, immediately after `pool`'s 0x0CB0-byte `IdPool`
+   * span, closing the struct out exactly at the asserted 0xCD0 size.
+   * `msvc8::vector<CmdId>`'s default constructor already zeroes
+   * `_Myfirst`/`_Mylast`/`_Myend`, matching the binary's explicit
+   * zero-stores.
    */
   CCommandDb::CCommandDb(Sim* const sim)
     : sim(sim)
     , commands()
     , pool()
+    , pendingReleasedCmdIds()
   {
   }
 
