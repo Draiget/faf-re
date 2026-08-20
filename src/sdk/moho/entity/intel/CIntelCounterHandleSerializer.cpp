@@ -36,23 +36,6 @@ namespace
     return self;
   }
 
-  /**
-   * Address: 0x0076FCB0 (FUN_0076FCB0)
-   *
-   * What it does:
-   * Invokes `CIntelCounterHandle::Destroy(1)` for one runtime object when the
-   * pointer lane is non-null.
-   */
-  [[maybe_unused]] void DeleteIntelCounterHandleViaDestroyIfPresent(void* const object)
-  {
-    auto* const handle = static_cast<moho::CIntelCounterHandle*>(object);
-    if (!handle) {
-      return;
-    }
-
-    handle->Destroy(1);
-  }
-
   void cleanup_CIntelCounterHandleSerializer_atexit()
   {
     (void)moho::cleanup_CIntelCounterHandleSerializer();
@@ -151,6 +134,7 @@ namespace moho
     InitializeSerializerNode(gCIntelCounterHandleSerializer);
     gCIntelCounterHandleSerializer.mLoadCallback = &CIntelCounterHandleSerializer::Deserialize;
     gCIntelCounterHandleSerializer.mSaveCallback = &CIntelCounterHandleSerializer::Serialize;
+    gCIntelCounterHandleSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_CIntelCounterHandleSerializer_atexit);
   }
 } // namespace moho
