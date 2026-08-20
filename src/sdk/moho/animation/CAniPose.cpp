@@ -1,6 +1,7 @@
 #include "CAniPose.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <new>
 #include <typeinfo>
@@ -220,7 +221,7 @@ namespace
    * Initializes callback lanes for global `CAniPoseSerializer` helper storage
    * and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseSerializerStartupThunk() noexcept
+  [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseSerializerStartupThunk() noexcept
   {
     gpg::SerHelperBase* const self = HelperNodeSelf(gCAniPoseSerializer);
     gCAniPoseSerializer.mHelperPrev = self;
@@ -237,7 +238,7 @@ namespace
    * Initializes callback lanes for global `CAniPoseBoneSerializer` helper
    * storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseBoneSerializerStartupThunk() noexcept
+  [[nodiscard]] SerSaveLoadHelperNodeView* InitializeCAniPoseBoneSerializerStartupThunk() noexcept
   {
     gpg::SerHelperBase* const self = HelperNodeSelf(gCAniPoseBoneSerializer);
     gCAniPoseBoneSerializer.mHelperPrev = self;
@@ -254,7 +255,7 @@ namespace
    * Unlinks `CAniPoseSerializer` helper node from the intrusive helper list
    * and restores self-linked sentinel links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseSerializerHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseSerializerHelperNodePrimary() noexcept
   {
     return ResetHelperNodeLinks(gCAniPoseSerializer);
   }
@@ -277,7 +278,7 @@ namespace
    * Unlinks `CAniPoseBoneSerializer` helper node from the intrusive helper
    * list and restores self-linked sentinel links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseBoneSerializerHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupCAniPoseBoneSerializerHelperNodePrimary() noexcept
   {
     return ResetHelperNodeLinks(gCAniPoseBoneSerializer);
   }
@@ -292,6 +293,53 @@ namespace
   {
     return ResetHelperNodeLinks(gCAniPoseBoneSerializer);
   }
+
+  void cleanup_CAniPoseSerializer_atexit()
+  {
+    (void)CleanupCAniPoseSerializerHelperNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BC9960 (FUN_00BC9960, register_CAniPoseSerializer)
+   *
+   * What it does:
+   * Initializes the global CAniPose serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CAniPoseSerializer()
+  {
+    (void)InitializeCAniPoseSerializerStartupThunk();
+    (void)std::atexit(&cleanup_CAniPoseSerializer_atexit);
+  }
+
+  void cleanup_CAniPoseBoneSerializer_atexit()
+  {
+    (void)CleanupCAniPoseBoneSerializerHelperNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BC99C0 (FUN_00BC99C0, register_CAniPoseBoneSerializer)
+   *
+   * What it does:
+   * Initializes the global CAniPoseBone serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CAniPoseBoneSerializer()
+  {
+    (void)InitializeCAniPoseBoneSerializerStartupThunk();
+    (void)std::atexit(&cleanup_CAniPoseBoneSerializer_atexit);
+  }
+
+  struct CAniPoseSerializerStartupBootstrap
+  {
+    CAniPoseSerializerStartupBootstrap()
+    {
+      register_CAniPoseSerializer();
+      register_CAniPoseBoneSerializer();
+    }
+  };
+
+  [[maybe_unused]] CAniPoseSerializerStartupBootstrap gCAniPoseSerializerStartupBootstrap;
 
   template <typename TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* staticType)
