@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <new>
 
 #include "gpg/core/containers/FastVector.h"
 #include "moho/collision/CGeomSolid3.h"
@@ -46,38 +45,6 @@ namespace
    * `DrawQuad` in 0x00865050).
    */
   constexpr std::uint32_t kSelectionRectVertexColor = 0xFFFFFFFFu;
-
-  class ISelectionDraggerRuntimeLane
-  {
-  public:
-    ISelectionDraggerRuntimeLane() noexcept
-      : mSelectionListHead(nullptr)
-    {}
-
-    virtual ~ISelectionDraggerRuntimeLane() = default;
-
-  public:
-    moho::SelectionDraggerLink* mSelectionListHead; // +0x04
-  };
-  static_assert(sizeof(ISelectionDraggerRuntimeLane) == 0x08, "ISelectionDraggerRuntimeLane size must be 0x08");
-  static_assert(
-    offsetof(ISelectionDraggerRuntimeLane, mSelectionListHead) == 0x04,
-    "ISelectionDraggerRuntimeLane::mSelectionListHead offset must be 0x04"
-  );
-
-  /**
-   * Address: 0x00864040 (FUN_00864040)
-   *
-   * What it does:
-   * Constructs one selection-dragger interface base lane by clearing the
-   * intrusive list-head pointer and installing the interface vtable.
-   */
-  [[maybe_unused]] ISelectionDraggerRuntimeLane* InitializeISelectionDraggerRuntimeLane(
-    ISelectionDraggerRuntimeLane* const outLane
-  ) noexcept
-  {
-    return ::new (outLane) ISelectionDraggerRuntimeLane();
-  }
 
   /**
    * Emits one axis-aligned screen-space rectangle as a single prim-batcher
@@ -225,14 +192,16 @@ namespace moho
    * Address: 0x008637F0 (FUN_008637F0, ??0SelectionDragger@Moho@@...)
    *
    * What it does:
-   * Initializes list/session/camera lanes, captures drag-start screen
-   * coordinates from `CWldSession::CursorScreenPos`, and seeds the world
-   * position from `CWldSession::CursorWorldPos` when available (otherwise
-   * from the process-wide invalid vector singleton).
+   * Initializes session/camera lanes, captures drag-start screen coordinates
+   * from `CWldSession::CursorScreenPos`, and seeds the world position from
+   * `CWldSession::CursorWorldPos` when available (otherwise from the
+   * process-wide invalid vector singleton). The `mov dword ptr [eax+4], 0` the
+   * body opens with (0x008637F0) is the inlined `IMauiDragger` base
+   * constructor clearing its own `WeakObject` head, not a member of this
+   * class - the compiler emits it from the base initializer.
    */
   SelectionDragger::SelectionDragger(CameraImpl* const camera, CWldSession* const session)
-    : mSelectionListHead(nullptr)
-    , mSess(session)
+    : mSess(session)
     , mCam(camera)
     , mX0(0.0f)
     , mY0(0.0f)
@@ -250,15 +219,17 @@ namespace moho
     mY0 = session->CursorScreenPos.y;
   }
 
-  SelectionDragger::~SelectionDragger()
-  {
-    while (mSelectionListHead != nullptr) {
-      SelectionDraggerLink* const next = mSelectionListHead->mNext;
-      mSelectionListHead->mOwnerHead = nullptr;
-      mSelectionListHead->mNext = nullptr;
-      mSelectionListHead = next;
-    }
-  }
+  /**
+   * Address: 0x00864080 (non-deleting destructor body)
+   *
+   * What it does:
+   * Nothing of its own. The whole body is the inlined base teardown: the vptr
+   * restore to `??_7IMauiDragger@Moho@@6B@` at 0x00864080 and the drain loop
+   * over `[ecx+4]` at 0x00864090 are `~IMauiDragger` (0x0078DB20), which the
+   * compiler emits as base destruction. Kept out-of-line so the address
+   * annotation has a definition to sit on.
+   */
+  SelectionDragger::~SelectionDragger() = default;
 
   /**
    * Address: 0x00864000 (FUN_00864000, Moho::SelectionDragger::dtr)

@@ -2051,8 +2051,10 @@ namespace
 
   struct CMauiScrollbarRuntimeView
   {
-    std::uint8_t mUnknown00To11F[0x120]{};
-    std::uint32_t mDraggerList = 0; // +0x120
+    // +0x11C/+0x120 are the embedded `IMauiDragger` sub-object (vptr and
+    // `WeakObject::weakLinkHead_`); they are modelled by `CMauiScrollbar`'s own
+    // base and are deliberately not re-declared here.
+    std::uint8_t mUnknown00To123[0x124]{};
     moho::CMauiCurrentFocusControlRuntimeView mScrollableLink{}; // +0x124
     boost::shared_ptr<moho::CD3DBatchTexture> mThumbTop{}; // +0x12C
     boost::shared_ptr<moho::CD3DBatchTexture> mThumbBottom{}; // +0x134
@@ -2083,7 +2085,6 @@ namespace
     offsetof(CMauiScrollbarRuntimeView, mScrollableLink) == 0x124,
     "CMauiScrollbarRuntimeView::mScrollableLink offset must be 0x124"
   );
-  static_assert(offsetof(CMauiScrollbarRuntimeView, mDraggerList) == 0x120, "CMauiScrollbarRuntimeView::mDraggerList offset must be 0x120");
   static_assert(offsetof(CMauiScrollbarRuntimeView, mThumbTop) == 0x12C, "CMauiScrollbarRuntimeView::mThumbTop offset must be 0x12C");
   static_assert(
     offsetof(CMauiScrollbarRuntimeView, mThumbBottom) == 0x134,
@@ -2675,15 +2676,6 @@ namespace
 
   using DraggerLink = moho::TDatListItem<IMauiDragger, void>;
 
-  struct IMauiDraggerRuntimeView
-  {
-    std::uint32_t mVftable = 0;
-    DraggerLink* mList = nullptr;
-  };
-
-  static_assert(offsetof(IMauiDraggerRuntimeView, mList) == 0x4, "IMauiDraggerRuntimeView::mList offset must be 0x4");
-  static_assert(sizeof(IMauiDraggerRuntimeView) == 0x8, "IMauiDraggerRuntimeView size must be 0x8");
-
 } // namespace
 
 /**
@@ -2696,10 +2688,11 @@ namespace
  * What it does:
  * Runs the `CScriptObject` base constructor, installs both vtables (the
  * script-object one at +0x00 and the `IMauiDragger` one at +0x34), clears the
- * dragger list-head lane at +0x38, and binds the owning Lua table.
+ * `IMauiDragger` base's weak-reference head at +0x38 (asm 0x0078DE77, part of
+ * the inlined base constructor), and binds the owning Lua table.
  */
 moho::CMauiLuaDragger::CMauiLuaDragger(const LuaPlus::LuaObject& luaObject)
-  : CScriptObject(), IMauiDragger(), mList(nullptr)
+  : CScriptObject(), IMauiDragger()
 {
   SetLuaObject(luaObject);
 }
@@ -2888,28 +2881,34 @@ namespace
     return reinterpret_cast<DraggerLink*>(&sCurrentDragger);
   }
 
+  /**
+   * `lea ecx, [eax+4]` at 0x0078E594 (`func_SetCurDragger`): the dragger's
+   * weak-reference head cell is the link the current-dragger sentinel splices
+   * itself into. The cell is `WeakObject`'s only member, so its address is the
+   * `WeakObject` sub-object address - no offset arithmetic is needed.
+   */
   [[nodiscard]] DraggerLink* DraggerLinkFromObject(IMauiDragger* const dragger) noexcept
   {
     if (dragger == nullptr) {
       return nullptr;
     }
 
-    auto* const draggerView = reinterpret_cast<IMauiDraggerRuntimeView*>(dragger);
-    return reinterpret_cast<DraggerLink*>(&draggerView->mList);
+    return reinterpret_cast<DraggerLink*>(static_cast<moho::WeakObject*>(dragger)->WeakLinkHeadSlot());
   }
 
+  /**
+   * `add eax, -4` at 0x0078DDC9 (`func_GetCurrentDraggerFromMouseMoveLane`):
+   * the inverse of the above. Recovering the owner is the base-to-derived
+   * adjustment the compiler emits for `WeakObject` -> `IMauiDragger`, so it is
+   * expressed as that cast rather than as a hand-written subtraction.
+   */
   [[nodiscard]] IMauiDragger* DraggerFromLink(DraggerLink* const link) noexcept
   {
     if (link == nullptr) {
       return nullptr;
     }
 
-    constexpr std::uintptr_t kListOffset = offsetof(IMauiDraggerRuntimeView, mList);
-    const std::uintptr_t linkAddress = reinterpret_cast<std::uintptr_t>(link);
-    if (linkAddress < kListOffset) {
-      return nullptr;
-    }
-    return reinterpret_cast<IMauiDragger*>(linkAddress - kListOffset);
+    return static_cast<IMauiDragger*>(reinterpret_cast<moho::WeakObject*>(link));
   }
 
   DraggerLink* DetachDraggerList(DraggerLink*& head) noexcept
@@ -2932,13 +2931,15 @@ gpg::RType* moho::CMauiLuaDragger::sType = nullptr;
  * Address: 0x0078DEF0 (FUN_0078DEF0, Moho::CMauiLuaDragger::~CMauiLuaDragger)
  *
  * What it does:
- * Detaches every node still linked through the dragger's own list head before
- * the `IMauiDragger` and `CScriptObject` bases run.
+ * Nothing of its own. The whole body the binary shows is the inlined base
+ * teardown: `lea ecx, [esi+34h]` (0x0078DEF6) re-bases to the `IMauiDragger`
+ * sub-object, 0x0078DEFD restores `??_7IMauiDragger@Moho@@6B@`, the loop at
+ * 0x0078DF10 drains that base's `WeakObject` chain, and 0x0078DF24 tail-calls
+ * `~CScriptObject` (0x004C7340). All four steps are compiler-emitted base
+ * destruction here, so this body stays empty; it is kept out-of-line so the
+ * address annotation has a definition to sit on.
  */
-moho::CMauiLuaDragger::~CMauiLuaDragger()
-{
-  (void)DetachDraggerList(mList);
-}
+moho::CMauiLuaDragger::~CMauiLuaDragger() = default;
 
 /**
  * Address: 0x0078DBD0 (FUN_0078DBD0, Moho::CMauiLuaDragger::StaticGetClass)
@@ -9047,6 +9048,31 @@ int moho::cfunc_CMauiFrameSetTargetHeadL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0078DB20 (??1IMauiDragger@Moho@@UAE@XZ)
+ * Mangled: ??1IMauiDragger@Moho@@UAE@XZ
+ *
+ * IDA signature:
+ * void __thiscall Moho::IMauiDragger::~IMauiDragger(Moho::IMauiDragger *this@<ecx>);
+ *
+ * What it does:
+ * Drops every weak reference still aimed at this dragger. The shipped body is
+ * the vptr restore (`mov [ecx], offset ??_7IMauiDragger@Moho@@6B@`, emitted by
+ * the compiler here) followed by the drain loop over the inherited
+ * `WeakObject` head at `[ecx+4]`:
+ *   0x0078DB30  mov  esi, [eax+4]   ; next = node->nextInOwner
+ *   0x0078DB33  mov  [ecx+4], esi   ; head = next
+ *   0x0078DB36  mov  [eax], edx     ; node->ownerLinkSlot = nullptr
+ *   0x0078DB38  mov  [eax+4], edx   ; node->nextInOwner   = nullptr
+ * which is exactly `WeakObject::DetachAllWeakReferences()`. Every derived
+ * dragger destructor in the image inlines this same block rather than calling
+ * it, so it is the single owner of the teardown.
+ */
+moho::IMauiDragger::~IMauiDragger()
+{
+  DetachAllWeakReferences();
+}
+
+/**
  * Address: 0x0078DB50 (slot +0x04 of ??_7IMauiDragger@Moho@@6B@, VA 0x00E38DC0)
  * Mangled: ?DragMove@IMauiDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
  *
@@ -9111,8 +9137,7 @@ moho::UIBuildDragger::UIBuildDragger(
   moho::CUIWorldViewBuildDragRuntimeView* const worldView,
   moho::CameraImpl* const camera
 )
-  : mList(nullptr)
-  , mWldSession(session)
+  : mWldSession(session)
   , mWldView(worldView)
   , mCam(camera)
   , mStart(0.0f, 0.0f, 0.0f)
@@ -16784,8 +16809,10 @@ moho::CMauiScrollbar::CMauiScrollbar(
 )
   : CMauiControl(luaObject, parent, "scrollbar")
 {
+  // asm 0x007A04ED clears the embedded `IMauiDragger` base's weak-reference
+  // head at +0x120 and 0x007A04F3 installs its vptr at +0x11C; both are the
+  // inlined `IMauiDragger` base constructor, which the compiler emits here.
   CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
-  scrollbarView->mDraggerList = 0;
   scrollbarView->mScrollableLink = {};
   scrollbarView->mThumbTop = {};
   scrollbarView->mThumbBottom = {};
@@ -16815,9 +16842,10 @@ moho::CMauiScrollbar::CMauiScrollbar(
  *      reference-count release at the count word (`+0x148/+0x140/+0x138/+0x130`).
  *   2. Unlink the bound scrollable focus sentinel (`mScrollableLink`, `+0x124`).
  *   3. Restore the embedded `IMauiDragger` sub-object vtable (`+0x11C`) and
- *      detach every node from its dragger list (`mDraggerList`, `+0x120`).
- * The base `CMauiControl` (and empty `IMauiDragger`) teardown is then chained
- * by the compiler-emitted base-class destruction, mirroring the tail
+ *      drain its `WeakObject` head (`+0x120`) - both are `~IMauiDragger`
+ *      inlined, so the compiler emits them as part of base destruction.
+ * The base `CMauiControl` / `IMauiDragger` teardown is then chained by the
+ * compiler-emitted base-class destruction, mirroring the tail
  * `call CMauiControl::~CMauiControl` in the binary.
  *
  * The deleting-destructor slot (FUN_007A0570) — `~self(); if (flag & 1) delete this;`
@@ -16842,15 +16870,11 @@ moho::CMauiScrollbar::~CMauiScrollbar()
   // ---- Step 2: Unlink the bound scrollable focus sentinel ----
   UnlinkFocusControlSentinel(&scrollbarView->mScrollableLink);
 
-  // ---- Step 3: Detach the embedded IMauiDragger list ----
-  // The `IMauiDragger` sub-object base begins at +0x11C (vtable) / +0x120
-  // (dragger-list head); resolve it through the typed base pointer rather than
-  // raw offset arithmetic. The binary also rewrites the sub-object vtable back
-  // to `IMauiDragger`'s here - the compiler emits that itself as the base
-  // destructor runs, so only the list detach belongs in this body.
-  IMauiDragger* const draggerBase = static_cast<IMauiDragger*>(this);
-  auto* const draggerBaseView = reinterpret_cast<IMauiDraggerRuntimeView*>(draggerBase);
-  (void)DetachDraggerList(draggerBaseView->mList);
+  // ---- Step 3: the embedded IMauiDragger sub-object ----
+  // The binary rewrites the sub-object vtable at +0x11C back to
+  // `??_7IMauiDragger@Moho@@6B@` and drains its weak-reference head at +0x120.
+  // Both are `~IMauiDragger` (0x0078DB20) inlined, so the compiler-emitted base
+  // destruction covers them and nothing belongs in this body.
 }
 
 /**
@@ -23164,8 +23188,9 @@ void moho::CMauiBitmap::OnPatternEnd()
  * Moho::CMauiEditDragMove (FUN_007913A0). We model that sub-object as the typed
  * `CMauiEditClickDragger` member `CMauiEditRuntimeView::mClickDragger` (+0x11C);
  * placement-constructing it here makes the compiler emit + install the
- * CMauiEdit-specific override vtable exactly as the binary does, and its list
- * head (`mList`, +0x120) starts null (matches `.c` line 19 `this->mList = 0`).
+ * CMauiEdit-specific override vtable exactly as the binary does, and the
+ * `IMauiDragger` base's weak-reference head (+0x120) starts null (matches
+ * `.c` line 19 `this->mList = 0`).
  */
 moho::CMauiEdit::CMauiEdit(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
   : CMauiControl(luaObject, parent, "edit")
@@ -23176,8 +23201,9 @@ moho::CMauiEdit::CMauiEdit(LuaPlus::LuaObject* const luaObject, CMauiControl* co
   // 0x00E395CC) into the embedded click-dragger sub-object at +0x11C. Because the
   // runtime-view overlays raw CMauiEdit bytes (its member ctors do not run for
   // us), construct the typed sub-object in place: the CMauiEditClickDragger ctor
-  // writes its vptr (DragMove -> Moho::CMauiEditDragMove) and clears its intrusive
-  // list head (`mList`, +0x120 -> null, matching `.c` line 19 `this->mList = 0`).
+  // writes its vptr (DragMove -> Moho::CMauiEditDragMove) and clears the
+  // `IMauiDragger` base's weak-reference head (+0x120 -> null, matching `.c`
+  // line 19 `this->mList = 0`).
   new (&editView->mClickDragger) CMauiEditClickDragger();
 
   editView->mFont = nullptr;
@@ -23235,18 +23261,12 @@ moho::CMauiEdit::~CMauiEdit()
   ReleaseIntrusiveFont(editView->mFont);
 
   // asm 0x0078F230: destroying the embedded IMauiDragger sub-object resets its
-  // vptr at +0x11C back to the plain ??_7IMauiDragger@Moho@@6B@ vtable (the
-  // compiler-emitted secondary sub-object dtor), before the intrusive list at
-  // +0x120 is unlinked below.
+  // vptr at +0x11C back to the plain ??_7IMauiDragger@Moho@@6B@ vtable, and
+  // asm 0x0078F236-0x0078F250 then drains the base's weak-reference head at
+  // +0x120, clearing each node's owner/next lanes. Both halves are
+  // `~IMauiDragger` (0x0078DB20) inlined, so running the typed sub-object's
+  // destructor performs the whole sequence.
   editView->mClickDragger.~CMauiEditClickDragger();
-
-  // asm 0x0078F236-0x0078F250: detach every node from the click-dragger's
-  // intrusive list head (`mList`, +0x120), clearing each node's owner/next lanes.
-  for (DraggerLink* node = editView->mClickDragger.mList; node != nullptr; node = editView->mClickDragger.mList) {
-    editView->mClickDragger.mList = node->mNext;
-    node->mPrev = nullptr;
-    node->mNext = nullptr;
-  }
 }
 
 /**

@@ -14,6 +14,7 @@
 #include "lua/LuaObject.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CmdDefs.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/IRenderWorldView.h"
@@ -455,6 +456,44 @@ namespace moho
   /**
    * Base of every MAUI pointer-drag handler.
    *
+   * Layout is vptr (+0x00) followed by the inherited `WeakObject` sub-object
+   * (+0x04), so the complete base is 8 bytes. The `WeakObject` base is proven
+   * by the RTTI class-hierarchy descriptor behind
+   * `??_7IMauiDragger@Moho@@6B@`: the COL at 0x00E9301C names
+   * `.?AVIMauiDragger@Moho@@` and its base-class array lists
+   * `.?AVWeakObject@Moho@@` at `mdisp=0x4`. `MOHO_EMPTY_BASES`-style layout
+   * does not apply here - `WeakObject` carries one dword, and MSVC places the
+   * newly introduced vfptr ahead of a non-polymorphic base, which is exactly
+   * the `mdisp=0x4` the descriptor records.
+   *
+   * `??1IMauiDragger@Moho@@UAE@XZ` lives at 0x0078DB20 (IDA did not classify
+   * it as a function, so it is read straight out of the shipped image) and is
+   * nothing but the inlined `WeakObject` teardown after the vptr restore:
+   *   0x0078DB20  mov  dword ptr [ecx], offset ??_7IMauiDragger@Moho@@6B@
+   *   0x0078DB26  mov  eax, [ecx+4]          ; head = weakLinkHead_
+   *   0x0078DB30  mov  esi, [eax+4]          ; next  = node->nextInOwner
+   *   0x0078DB33  mov  [ecx+4], esi          ; head  = next
+   *   0x0078DB36  mov  [eax], edx            ; node->ownerLinkSlot = nullptr
+   *   0x0078DB38  mov  [eax+4], edx          ; node->nextInOwner   = nullptr
+   *   0x0078DB3B  mov  eax, [ecx+4]          ; loop while head != nullptr
+   * which is `WeakObject::DetachAllWeakReferences()` verbatim. Every derived
+   * dragger the compiler inlined that same sequence into agrees on both the
+   * `+0x04` displacement and the two-dword node shape:
+   *   `Moho::IMauiDragger::dtr`      0x0078DB99 / 0x0078DBA2 (`[esi+4]`)
+   *   `~UICommandDragger`            0x00824120 / 0x00824130 (`[esi+4]`)
+   *   `~SelectionDragger`            0x00864086 / 0x00864090 (`[ecx+4]`)
+   *   `~CMauiLuaDragger`             0x0078DF03 / 0x0078DF10 (`lea ecx,[esi+34h]`)
+   * and the ctors clear the same lane before installing the derived vptr
+   * (`mov [eax+4], 0` at 0x008637F0 for `SelectionDragger`,
+   * `mov [esi+38h], eax` at 0x0078DE77 for `CMauiLuaDragger`,
+   * `mov [esi+120h], ebx` at 0x007A04ED for `CMauiScrollbar`).
+   *
+   * The lane is the object's weak-reference chain, not a list of children:
+   * `func_SetCurDragger` (0x0078E590) links the process-global current-dragger
+   * weak node into it with `lea ecx,[eax+4]`, and
+   * `func_GetCurrentDraggerFromMouseMoveLane` (0x0078DDC0) recovers the owner
+   * with `add eax, -4`.
+   *
    * None of the three drag entry points is pure. The shipped
    * `??_7IMauiDragger@Moho@@6B@` at 0x00E38DC0 carries a real body in every
    * slot (dwords read out of `.rdata` in the shipped image):
@@ -476,11 +515,24 @@ namespace moho
    * shipped vtables show: `SelectionDragger` and `SelectionDragger2D` both
    * keep 0x0078DB50 in +0x04 / 0x0078DB80 in +0x0C.
    */
-  class IMauiDragger
+  class IMauiDragger : public WeakObject
   {
   public:
     /**
-     * Address: 0x0078DB20 (FUN_0078DB20, ??1IMauiDragger@Moho@@UAE@XZ)
+     * What it does:
+     * Clears the inherited `WeakObject` head so a freshly built dragger owns
+     * no weak references. Every derived constructor in the image inlines this
+     * single store before installing its own vptr - `mov dword ptr [eax+4], 0`
+     * at 0x008637F0 (`SelectionDragger`), `mov [esi+38h], eax` at 0x0078DE77
+     * (`CMauiLuaDragger`, eax = 0), `mov [esi+120h], ebx` at 0x007A04ED
+     * (`CMauiScrollbar`, ebx = 0).
+     */
+    IMauiDragger() noexcept
+      : WeakObject{}
+    {}
+
+    /**
+     * Address: 0x0078DB20 (??1IMauiDragger@Moho@@UAE@XZ)
      * Scalar deleting destructor: 0x0078DB90 (slot +0x00)
      * Mangled: ??1IMauiDragger@Moho@@UAE@XZ
      *
@@ -488,11 +540,11 @@ namespace moho
      * void __thiscall Moho::IMauiDragger::~IMauiDragger(Moho::IMauiDragger *this@<ecx>);
      *
      * What it does:
-     * Restores the base vtable and drains the intrusive current-dragger link
-     * lane that lives directly behind the vptr, zeroing each node as it is
-     * unlinked.
+     * Restores the base vtable and drains the inherited `WeakObject` chain that
+     * lives directly behind the vptr, zeroing each node's owner slot and
+     * forward link as it is unlinked.
      */
-    virtual ~IMauiDragger() = default;
+    virtual ~IMauiDragger();
 
     /**
      * Address: 0x0078DB50 (slot +0x04 of ??_7IMauiDragger@Moho@@6B@)
@@ -547,7 +599,7 @@ namespace moho
      */
     virtual void OnCurrentDraggerReplaced();
   };
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(IMauiDragger) == 0x4, "moho::IMauiDragger size must be 0x4");
+  static_assert(sizeof(IMauiDragger) == 0x8, "moho::IMauiDragger size must be 0x8");
 
   /**
    * The dragger `Dragger()` hands back to script, and the only dragger whose
@@ -560,10 +612,16 @@ namespace moho
    * has no `ButtonRelease` branch at all, it creates one of these on press and
    * hangs `self:OnClick(...)` off the dragger's `OnRelease`.
    *
-   * Layout follows the binary: `CScriptObject` at +0x00, the `IMauiDragger`
-   * sub-object at +0x34 (its own vtable), and the intrusive
-   * current-dragger link at +0x38 - the same "IMauiDragger sub-object + 4"
-   * position `UIBuildDragger::mList` occupies.
+   * Layout follows the binary: `CScriptObject` at +0x00 and the `IMauiDragger`
+   * sub-object at +0x34. The constructor at 0x0078DE50 proves both, and proves
+   * that +0x38 is nothing but the `IMauiDragger` base's own `WeakObject` lane
+   * rather than a member of this class:
+   *   0x0078DE77  mov  [esi+38h], eax   ; eax = 0, weakLinkHead_ = nullptr
+   *   0x0078DE7A  mov  [esi+34h], offset ??_7IMauiDragger@Moho@@6B@
+   * i.e. the inlined `IMauiDragger` base constructor writing its own two
+   * dwords. The destructor at 0x0078DEF0 mirrors it, re-basing to the
+   * sub-object first (`lea ecx,[esi+34h]`, 0x0078DEF6) and then running the
+   * base teardown against `[ecx+4]`.
    */
   class CMauiLuaDragger final : public CScriptObject, public IMauiDragger
   {
@@ -636,13 +694,10 @@ namespace moho
      * over.
      */
     void OnCurrentDraggerReplaced() override;
-
-    TDatListItem<IMauiDragger, void>* mList = nullptr; // +0x38
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiLuaDragger, mList) == 0x38, "moho::CMauiLuaDragger::mList offset must be 0x38"
-  );
+  // +0x00 CScriptObject (0x34), +0x34 IMauiDragger sub-object (vptr +0x34,
+  // WeakObject::weakLinkHead_ +0x38) = 0x3C complete-object size.
   static_assert(sizeof(CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger size must be 0x3C");
 
   struct CUIWorldViewBuildDragRuntimeView
@@ -885,7 +940,8 @@ namespace moho
     void ReleaseDrag(const SMauiEventData* eventData);
 
   public:
-    TDatListItem<IMauiDragger, void>* mList = nullptr;      // +0x04
+    // +0x00 vptr and +0x04 `WeakObject::weakLinkHead_` both belong to the
+    // `IMauiDragger` base; this class's own storage starts at +0x08.
     CWldSession* mWldSession = nullptr;                     // +0x08
     CUIWorldViewBuildDragRuntimeView* mWldView = nullptr;   // +0x0C
     CameraImpl* mCam = nullptr;                             // +0x10
@@ -893,7 +949,6 @@ namespace moho
     Wm3::Vector3f mEnd{};                                   // +0x20
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mList) == 0x4, "moho::UIBuildDragger::mList offset must be 0x4");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(UIBuildDragger, mWldSession) == 0x8, "moho::UIBuildDragger::mWldSession offset must be 0x8"
   );
@@ -2054,9 +2109,11 @@ namespace moho
    *   slot 2 (0x007914C0) DragRelease -> Moho::CMauiEdit::DragRelease
    *   slot 3 (0x00791590) OnCurrentDraggerReplaced -> no-op (FUN_00791590)
    *
-   * Size is exactly 0x08 (vtable @+0x00, intrusive list head @+0x04) so it
-   * occupies the same 8 bytes the raw `mClickDraggerStorage[0x8]` overlay used;
-   * `CMauiEdit`'s total layout/size is unchanged.
+   * Size is exactly 0x08 - both dwords come from the `IMauiDragger` base
+   * (vtable @+0x00, `WeakObject::weakLinkHead_` @+0x04), so this class adds no
+   * storage of its own. It occupies the same 8 bytes the raw
+   * `mClickDraggerStorage[0x8]` overlay used; `CMauiEdit`'s total layout/size
+   * is unchanged.
    */
   class CMauiEditClickDragger final : public IMauiDragger
   {
@@ -2088,12 +2145,11 @@ namespace moho
      */
     void OnCurrentDraggerReplaced() override;
 
-    // +0x04: intrusive dragger-list head (the binary's `mList` lane).
-    TDatListItem<IMauiDragger, void>* mList = nullptr; // +0x04
+    // No storage of its own: the whole sub-object is the `IMauiDragger` base
+    // (vptr +0x00, `WeakObject::weakLinkHead_` +0x04).
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditClickDragger, mList) == 0x4, "moho::CMauiEditClickDragger::mList offset must be 0x4");
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiEditClickDragger) == 0x8, "moho::CMauiEditClickDragger size must be 0x8");
+  static_assert(sizeof(CMauiEditClickDragger) == 0x8, "moho::CMauiEditClickDragger size must be 0x8");
 
   class CMauiFrame : public CMauiControl
   {
@@ -2923,11 +2979,16 @@ namespace moho
     ~CMauiScrollbar() override;
   };
 
-  // The `IMauiDragger` sub-object has to begin at +0x11C, where
-  // `CMauiScrollbarRuntimeView` reads its vtable and dragger-list head; that
-  // holds only while `CMauiControl` reserves its full 0x11C. The remaining
-  // lanes up to the binary's 0x158 allocation live in the overlay.
-  static_assert(sizeof(CMauiScrollbar) == 0x120, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
+  // The `IMauiDragger` sub-object has to begin at +0x11C; that holds only
+  // while `CMauiControl` reserves its full 0x11C. The constructor at
+  // 0x007A04B0 writes both of the sub-object's dwords there -
+  // `mov [esi+120h], ebx` (ebx = 0, 0x007A04ED) clears
+  // `WeakObject::weakLinkHead_` and `mov [esi+11Ch], offset
+  // ??_7IMauiDragger@Moho@@6B@` (0x007A04F3) installs the base vptr before
+  // 0x007A0503 replaces it with the scrollbar's own thunk vtable - so the
+  // class ends at 0x124. The remaining lanes up to the binary's 0x158
+  // allocation live in `CMauiScrollbarRuntimeView`.
+  static_assert(sizeof(CMauiScrollbar) == 0x124, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
 
   class CMauiText : public CMauiControl
   {
