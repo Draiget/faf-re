@@ -36,9 +36,11 @@ namespace moho
    *
    * What it does:
    * Serializer construct-callback thunk that forwards to the canonical
-   * `CIntelPosHandleConstruct::Construct` implementation.
+   * `CIntelPosHandleConstruct::Construct` implementation. This is the exact
+   * address the real `CIntelPosHandleConstruct` constructor (0x00BDCCB0)
+   * stores into `mConstructCallback`.
    */
-  [[maybe_unused]] void ConstructCIntelPosHandleSerializerThunk(
+  void ConstructCIntelPosHandleSerializerThunk(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int version,
@@ -62,6 +64,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076FCB0 (FUN_0076FCB0)
+   *
+   * What it does:
+   * Deleting-teardown callback: invokes `CIntelPosHandle::Destroy(1)` for one
+   * runtime object when the pointer lane is non-null.
+   */
+  void CIntelPosHandleConstruct::Deconstruct(void* const objectPtr)
+  {
+    auto* const handle = static_cast<CIntelPosHandle*>(objectPtr);
+    if (handle != nullptr) {
+      handle->Destroy(1);
+    }
+  }
+
+  /**
+   * Address: 0x00BDCCB0 (FUN_00BDCCB0, dynamic initializer for the global
+   * `CIntelPosHandleConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), then binds the construct/delete callback fields.
+   */
+  CIntelPosHandleConstruct::CIntelPosHandleConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCIntelPosHandleSerializerThunk))
+    , mDeleteCallback(&CIntelPosHandleConstruct::Deconstruct)
+  {
+  }
+
+  /**
    * Address: 0x0076FA80 (FUN_0076FA80, gpg::SerConstructHelper_CIntelPosHandle::Init)
    *
    * What it does:
@@ -76,3 +107,14 @@ namespace moho
     type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010BB3EC -- process-global `CIntelPosHandleConstruct`
+  // singleton. Constructing it runs CIntelPosHandleConstruct::
+  // CIntelPosHandleConstruct() (0x00BDCCB0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterConstructFunction() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::CIntelPosHandleConstruct gCIntelPosHandleConstruct;
+} // namespace
