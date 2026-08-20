@@ -1,5 +1,7 @@
 #include "moho/unit/tasks/CUnitCarrierLaunch.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <new>
 #include <type_traits>
@@ -396,7 +398,30 @@ namespace moho
 
 namespace
 {
-  gpg::SerSaveLoadHelperListRuntime gCUnitCarrierLaunchSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by all of them.
+  struct CUnitCarrierLaunchSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitCarrierLaunchSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CUnitCarrierLaunchSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitCarrierLaunchSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CUnitCarrierLaunchSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CUnitCarrierLaunchSerializerHelperNode) == 0x14,
+    "CUnitCarrierLaunchSerializerHelperNode size must be 0x14"
+  );
+
+  CUnitCarrierLaunchSerializerHelperNode gCUnitCarrierLaunchSerializer{};
 
   /**
    * Address: 0x00607620 (FUN_00607620)
@@ -407,7 +432,7 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLaunchSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer.mListLinks);
   }
 
   /**
@@ -419,6 +444,91 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierLaunchSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierLaunchSerializer.mListLinks);
   }
+
+  /**
+   * Address: 0x006075D0 (FUN_006075D0, Moho::CUnitCarrierLaunchSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CUnitCarrierLaunch`. Forwards the
+   * reflected object pointer to `CUnitCarrierLaunch::MemberDeserialize`;
+   * `version` and the owner-ref lane are unused by the member (mirrors the
+   * binary tail call).
+   */
+  void DeserializeCUnitCarrierLaunchSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitCarrierLaunch*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x006075E0 (FUN_006075E0, Moho::CUnitCarrierLaunchSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `CUnitCarrierLaunch`. Forwards the
+   * reflected object pointer to `CUnitCarrierLaunch::MemberSerialize`;
+   * `version` and the owner-ref lane are unused by the member (mirrors the
+   * binary tail call).
+   */
+  void SerializeCUnitCarrierLaunchSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitCarrierLaunch*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF9A50 (FUN_00BF9A50, Moho::CUnitCarrierLaunchSerializer::~CUnitCarrierLaunchSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CUnitCarrierLaunchSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CUnitCarrierLaunchSerializer_atexit()
+  {
+    (void)UnlinkCUnitCarrierLaunchSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BD02E0 (FUN_00BD02E0, register_CUnitCarrierLaunchSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitCarrierLaunch` serializer helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`.
+   */
+  void register_CUnitCarrierLaunchSerializer()
+  {
+    (void)UnlinkCUnitCarrierLaunchSerializerNodePrimary();
+    gCUnitCarrierLaunchSerializer.mSerLoadFunc = &DeserializeCUnitCarrierLaunchSerializerCallback;
+    gCUnitCarrierLaunchSerializer.mSerSaveFunc = &SerializeCUnitCarrierLaunchSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitCarrierLaunchSerializer_atexit);
+  }
+
+  struct CUnitCarrierLaunchSerializerStartupBootstrap
+  {
+    CUnitCarrierLaunchSerializerStartupBootstrap()
+    {
+      register_CUnitCarrierLaunchSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitCarrierLaunchSerializerStartupBootstrap gCUnitCarrierLaunchSerializerStartupBootstrap;
 } // namespace
