@@ -34,10 +34,10 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,387` | 30.66% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,389` | 30.66% |
 | Vtable-anchored (virtual override of a recovered class) | `5,890` | 11.02% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,548` | 10.38% |
-| No recovered caller token yet (orphan risk) | `2,154` | 4.03% |
+| No recovered caller token yet (orphan risk) | `2,152` | 4.03% |
 | No callsite evidence (no recorded code/data caller in the index) | `23,250` | 43.50% |
 | Unclassified data xref (manual review) | `216` | 0.40% |
 | RTTI-only | `4` | 0.01% |
