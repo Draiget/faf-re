@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <typeinfo>
 
@@ -314,7 +315,7 @@ namespace moho
    * Unlinks one startup helper lane for the `CUnitRefuel` serializer helper
    * node and restores self-links.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CUnitRefuelSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_CUnitRefuelSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gCUnitRefuelSerializerStartupNode);
   }
@@ -412,7 +413,71 @@ namespace moho
     archive->WriteBool(mHasTransportReservation);
     archive->WriteBool(mIsCarrier);
   }
+} // namespace moho
 
+namespace
+{
+  void DeserializeCUnitRefuelSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::CUnitRefuel*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeCUnitRefuelSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::CUnitRefuel*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_CUnitRefuelSerializer_atexit()
+  {
+    (void)moho::cleanup_CUnitRefuelSerializerStartupThunkA();
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BD18B0 (FUN_00BD18B0, register_CUnitRefuelSerializer)
+   *
+   * What it does:
+   * Initializes the global CUnitRefuel serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CUnitRefuelSerializer()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCUnitRefuelSerializerStartupNode);
+    gCUnitRefuelSerializerStartupNode.mHelperNext = self;
+    gCUnitRefuelSerializerStartupNode.mHelperPrev = self;
+    gCUnitRefuelSerializerStartupNode.mLoad = &DeserializeCUnitRefuelSerializerCallback;
+    gCUnitRefuelSerializerStartupNode.mSave = &SerializeCUnitRefuelSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitRefuelSerializer_atexit);
+  }
+} // namespace moho
+
+namespace
+{
+  struct CUnitRefuelSerializerStartupBootstrap
+  {
+    CUnitRefuelSerializerStartupBootstrap()
+    {
+      moho::register_CUnitRefuelSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitRefuelSerializerStartupBootstrap gCUnitRefuelSerializerStartupBootstrap;
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x00621490 (FUN_00621490, ?TaskTick@CUnitRefuel@Moho@@UAE?AW4ETaskStatus@2@XZ)
    *
