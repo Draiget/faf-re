@@ -4158,28 +4158,6 @@ std::uint32_t ResetSwapBackedArrayRuntimeA(
 }
 
 /**
- * Address: 0x00556DE0 (FUN_00556DE0)
- *
- * What it does:
- * Allocates one category-map node lane with cleared links and sentinel-state
- * flags (`+0x14=1`, `+0x15=0`).
- */
-RbNodeFlag21Runtime* AllocateCategoryMapNodeRuntime()
-{
-  auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  node->left = nullptr;
-  node->parent = nullptr;
-  node->right = nullptr;
-  node->sentinel20 = 1u;
-  node->isNil21 = 0u;
-  return node;
-}
-
-/**
  * Address: 0x0055D940 (FUN_0055D940)
  *
  * What it does:
