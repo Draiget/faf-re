@@ -4844,6 +4844,195 @@ namespace
   }
 
   /**
+   * Address: 0x008B3E50 (FUN_008B3E50, sub_8B3E50)
+   *
+   * What it does:
+   * Relocate-copies a UI-side command target's type/entity-link/position
+   * lanes (the first 0x18 bytes of `moho::UserTarget`, see
+   * `UserCommandTargetView`'s own doc comment in UserUnit.h) into a sim-side
+   * `CAiTarget`, relinking the destination's weak-entity chain membership to
+   * the source's when they differ and leaving `targetPoint`/`targetIsMobile`
+   * untouched (matches `CAiTarget::CopyFromLinkedTarget`'s own field split,
+   * just against a different source type). Sole caller is `sub_8B4A40`
+   * (0x008B4A68: eax=dest=localEvent+0x18, esi=source=sub_8B4A40's own 3rd
+   * stack arg).
+   */
+  CAiTarget& CopyUserCommandTargetIntoAiTarget(
+    CAiTarget& destination, const UserCommandTargetView& source
+  ) noexcept
+  {
+    destination.targetType = static_cast<EAiTargetType>(source.targetType);
+    if (reinterpret_cast<std::uintptr_t>(destination.targetEntity.ownerLinkSlot) != source.targetEntity.ownerLinkSlot) {
+      destination.targetEntity.ResetFromOwnerLinkSlot(reinterpret_cast<void*>(source.targetEntity.ownerLinkSlot));
+    }
+    destination.position = source.position;
+    return destination;
+  }
+
+  /**
+   * Address: 0x008BECD0 (FUN_008BECD0, sub_8BECD0)
+   *
+   * What it does:
+   * Converts one UI-side command target (`moho::UserTarget`, see
+   * `UserCommandTargetView` in UserUnit.h) into the sim-side network payload
+   * `SSTITarget`. `Entity` targets resolve the owning `UserEntity`'s stable
+   * id (`SCreateEntityParams::mEntityId` at `UserEntity::mParams`, decoded
+   * through the same `ownerLinkSlot - 8` weak-owner convention used
+   * throughout UserUnit.cpp) or the sentinel id `0xF0000000` when the link
+   * slot is null or still the empty-slot tombstone (`== 8`); `Position`
+   * targets copy the inline position; any other target type maps to
+   * `AITARGET_None` with the sentinel id. Sole caller is
+   * `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
+   */
+  [[nodiscard]] SSTITarget ConvertUserCommandTargetToSSTITarget(const UserCommandTargetView& source) noexcept
+  {
+    constexpr std::uint32_t kUnresolvedTargetEntityId = 0xF0000000u;
+
+    SSTITarget result{};
+    if (source.targetType == UserTargetType::Entity) {
+      result.mType = EAiTargetType::AITARGET_Entity;
+      result.mEntityId = kUnresolvedTargetEntityId;
+      if (source.targetEntity.ownerLinkSlot != 0u && source.targetEntity.ownerLinkSlot != 8u) {
+        const auto* const entity =
+          reinterpret_cast<const UserEntity*>(source.targetEntity.ownerLinkSlot - 8u);
+        result.mEntityId = entity->mParams.mEntityId;
+      }
+    } else if (source.targetType == UserTargetType::Position) {
+      result.mType = EAiTargetType::AITARGET_Ground;
+      result.mEntityId = kUnresolvedTargetEntityId;
+      result.mPos = source.position;
+    } else {
+      result.mType = EAiTargetType::AITARGET_None;
+      result.mEntityId = kUnresolvedTargetEntityId;
+    }
+    return result;
+  }
+
+  // Local command-issue update event type used for "set target" events
+  // (0x008B4A5F: `mov ecx, 4` feeding InitializeCommandIssueUpdateEvent).
+  constexpr std::uint32_t kCommandIssueUpdateEventTypeSetTarget = 4u;
+
+  /**
+   * Address: 0x008B4A40 (FUN_008B4A40, sub_8B4A40)
+   *
+   * What it does:
+   * Builds one local "set-target" command-issue update event (command id
+   * `commandId`, target payload relocate-copied from `targetPayload` via
+   * `CopyUserCommandTargetIntoAiTarget`), enqueues it into the helper's
+   * local ring queue, then destroys the local event. Sole caller is
+   * `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
+   *
+   * The destroy step calls the real `sub_8B4800` (`DestroyCommandIssueLocalEvent`,
+   * UserUnit.cpp) rather than this file's own unaddressed
+   * `DestroyCommandIssueUpdateEvent` symmetry helper - the binary call site
+   * (0x008B4A9E) resolves to 0x008B4800 specifically. `UserCommandIssueLocalEventRuntimeView`
+   * and `CommandIssueUpdateEventRuntimeView` are proven byte-compatible for
+   * every field both name (see the former's doc comment in UserUnit.h), so
+   * the cast below is a same-object dual-view bridge, not a layout guess.
+   */
+  void QueueCommandIssueSetTargetEvent(
+    CommandIssueHelperRuntimeView& commandIssueHelper,
+    const CmdId commandId,
+    const UserCommandTargetView& targetPayload
+  )
+  {
+    CommandIssueUpdateEventRuntimeView localEvent{};
+    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeSetTarget);
+    CopyUserCommandTargetIntoAiTarget(localEvent.target, targetPayload);
+    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
+    DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
+  }
+
+  /**
+   * Address: 0x008B0EE0 (FUN_008B0EE0, ?ISSUE_SetCommandTarget@Moho@@YAXPAVUserCommand@1@ABVUserTarget@1@@Z)
+   *
+   * IDA signature:
+   * void __cdecl Moho::ISSUE_SetCommandTarget(Moho::UserCommand* helper, Moho::UserTarget const& target);
+   *
+   * What it does:
+   * Client/UI-side command-target keystone, the `ISSUE_Command` family's
+   * counterpart for redirecting a command already in flight. Resolves the
+   * target's world position and gates it against the same no-rush timer/
+   * radius rule `ISSUE_Command` applies (skipped outright when the target is
+   * `None`, or when the resolved position is invalid/no focus army is set);
+   * once past the gate (or bypassed via an invalid position/focus army),
+   * further gates on the helper's own command type: when it is not the
+   * pickup-style type (raw ordinal `22`; no named `EUnitCommandType`
+   * enumerator has been recovered for it yet), the retarget always proceeds.
+   * When it is that type, the retarget proceeds only if the target resolves
+   * to a live entity in one of `FERRYBEACON`/`TRANSPORTATION`/
+   * `AIRSTAGINGPLATFORM` - any other entity (or a non-entity target) is
+   * silently rejected. On proceed: converts the target to `SSTITarget` and
+   * publishes it through the active sim driver, then queues the matching
+   * local "set-target" update event via `QueueCommandIssueSetTargetEvent`.
+   */
+  void ISSUE_SetCommandTarget(UserCommandIssueHelper* const helper, const UserCommandTargetView& target)
+  {
+    auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(*helper);
+
+    CWldSession* const session = WLD_GetActiveSession();
+    auto* const playableMap = reinterpret_cast<STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+
+    bool shouldRetarget = (target.targetType == UserTargetType::None);
+    if (!shouldRetarget) {
+      const Wm3::Vector3<float> targetPosition = ResolvePositionFromTarget(target);
+      if (!IsValidVector3f(targetPosition)) {
+        shouldRetarget = true;
+      } else if (session->FocusArmy >= 0) {
+        if (UserArmy* const focusArmyByIndex = session->userArmies[static_cast<std::size_t>(session->FocusArmy)];
+            focusArmyByIndex != nullptr) {
+          const bool insidePlayableArea = focusArmyByIndex->mVarDat.mUseWholeMap != 0u || playableMap == nullptr ||
+            playableMap->IsPlayable(targetPosition);
+          if (insidePlayableArea) {
+            const UserArmy* const focusArmy = session->GetFocusArmy();
+            if (focusArmy->mVarDat.mNoRushTimer <= 0) {
+              shouldRetarget = true;
+            } else {
+              const float deltaX = (focusArmy->mVarDat.mArmyStart.x + focusArmy->mVarDat.mNoRushOffset.x) - targetPosition.x;
+              const float deltaZ = (focusArmy->mVarDat.mArmyStart.y + focusArmy->mVarDat.mNoRushOffset.y) - targetPosition.z;
+              const float distance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
+              shouldRetarget = (distance <= focusArmy->mVarDat.mNoRushRadius);
+            }
+          }
+        }
+      }
+    }
+
+    if (!shouldRetarget) {
+      return;
+    }
+
+    // Command-type gate: only the pickup-style command type (raw ordinal 22;
+    // see this function's own doc comment) restricts retargeting to a live
+    // entity in one of the three transport-ish categories below. Every other
+    // command type retargets unconditionally.
+    if (ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(22)) {
+      if (target.targetType == UserTargetType::Entity && target.targetEntity.ownerLinkSlot != 0u &&
+          target.targetEntity.ownerLinkSlot != 8u) {
+        UserEntity* const targetEntity = DecodeEntityFromCommandTargetIfEntity(&target);
+        const bool isEligibleEntity = targetEntity->IsInCategory(msvc8::string("FERRYBEACON", 11u)) ||
+          targetEntity->IsInCategory(msvc8::string("TRANSPORTATION", 14u)) ||
+          targetEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM", 18u));
+        if (!isEligibleEntity) {
+          return;
+        }
+      }
+      // Entity link is null/tombstone, or the target isn't an Entity at all:
+      // the binary falls out of the `if (*a2 == 1)`/`if (v8)`/`if (v8)` chain
+      // without ever reaching the category checks or the reject, i.e. it
+      // reaches the end of the function without dispatching either.
+      else {
+        return;
+      }
+    }
+
+    if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
+      simDriver->SetCommandTarget(helperView.commandId, ConvertUserCommandTargetToSSTITarget(target));
+    }
+    QueueCommandIssueSetTargetEvent(helperView, helperView.commandId, target);
+  }
+
+  /**
    * Address: 0x008B4960 (FUN_008B4960, sub_8B4960)
    *
    * What it does:

@@ -3458,6 +3458,224 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A6220 (FUN_008A6220)
+   * Mangled: ?Reset@CWldTerrainRes@Moho@@EAE_NUSChartSize@2@PAVLuaState@LuaPlus@@@Z
+   * Slot: 23 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54, entry 0x00E4BDB0);
+   * dispatched by `CWldMap::MapNew` at 0x00890D69 (`mov eax, [eax+5Ch]`).
+   *
+   * IDA signature:
+   * char __thiscall Moho::CWldTerrainRes::Reset(Moho::CWldTerrainRes *this,
+   *     int chartWidth, int chartHeight, LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Rebuilds every terrain-resource lane for a brand-new chart: replaces the
+   * owned `STIMap`, reloads terrain types from Lua, refreshes the whole
+   * heightfield bound/error hierarchy, reallocates the half-resolution debug
+   * dirty mask, restores the default background/skycube/`<default>` env-cube
+   * lookup, rebuilds the normal map and stratum defaults, allocates and clears
+   * both stratum-mask textures plus the water map, restores the fixed
+   * lighting/sun/fog constants, recreates the water masks at water-map
+   * resolution, cycles edit mode once, replaces the decal manager, and
+   * reconfigures the sky dome from the fresh world bounds. Always returns true
+   * (`0x008A6A46: mov al, 1`).
+   */
+  bool IWldTerrainRes::Reset(const SChartSize chartSize, LuaPlus::LuaState* const state)
+  {
+    auto* const view = AsTerrainRuntimeView(this);
+    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
+    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+
+    // 0x008A625F: the single stack-resident progress handle is zeroed at entry
+    // and reused for both `InitNormalMap` (0x008A658E) and `EnterEditMode`
+    // (0x008A694B) - both `lea` the same frame slot.
+    CBackgroundTaskControl loadControl{};
+    loadControl.mHandle = nullptr;
+
+    // 0x008A6246-0x008A6252: the device-resource lane is captured once up front
+    // and reused for every texture allocation below. The binary performs no null
+    // check on either the device or the resources pointer here.
+    ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
+
+    // 0x008A6256-0x008A62AC: a fresh sim map for the requested chart replaces the
+    // previously owned one, which is destroyed only after the swap.
+    auto* const newMap = new STIMap(
+      static_cast<std::uint32_t>(chartSize.mWidth),
+      static_cast<std::uint32_t>(chartSize.mHeight)
+    );
+    STIMap* const previousMap = view->mMap;
+    view->mMap = newMap;
+    delete previousMap;
+
+    // 0x008A62AF-0x008A62BA
+    view->mMap->LoadTerrainTypes(state);
+
+    // 0x008A62BB-0x008A630E: refresh the full bound/error hierarchy. Both calls
+    // re-chase `mMap->mHeightField` and pass an unbounded rectangle.
+    gpg::Rect2i wholeField{};
+    wholeField.x0 = 0;
+    wholeField.z0 = 0;
+    wholeField.x1 = 0x7FFFFFFF;
+    wholeField.z1 = 0x7FFFFFFF;
+    view->mMap->mHeightField.get()->UpdateBounds(wholeField);
+    view->mMap->mHeightField.get()->UpdateError(wholeField);
+
+    // 0x008A630F-0x008A6372: half-resolution debug dirty mask, swapped then freed.
+    const std::int32_t halfWidth = chartSize.mWidth / 2;
+    const std::int32_t halfHeight = chartSize.mHeight / 2;
+    auto* const newDirtyTerrain = new gpg::BitArray2D(
+      static_cast<unsigned int>(halfWidth),
+      static_cast<unsigned int>(halfHeight)
+    );
+    gpg::BitArray2D* const previousDirtyTerrain = visualView->mDebugDirtyTerrain;
+    visualView->mDebugDirtyTerrain = newDirtyTerrain;
+    delete previousDirtyTerrain;
+
+    // 0x008A6373-0x008A6421: default sky/background art, each built as a
+    // transient `std::string` from a literal + explicit length.
+    SetBackground(msvc8::string("/textures/environment/defaultbackground.dds", 43u));
+    SetSkycube(msvc8::string("/textures/environment/defaultskycube.dds", 40u));
+
+    // 0x008A6422-0x008A6449: the binary inlines `CWldTerrainRes::ClearEnvLookup`
+    // (0x008A1640) here - same subtree sweep plus sentinel rebind - so the call is
+    // made statically to keep the non-virtual shape the compiler emitted.
+    IWldTerrainRes::ClearEnvLookup();
+
+    // 0x008A644C-0x008A6588: reinstate the single `<default>` environment entry.
+    // Note the texture request at 0x008A64B7 passes the string literal directly,
+    // not the `std::string` that is handed to the entry constructor.
+    {
+      const msvc8::string defaultEnvironmentName("/textures/environment/defaultenvcube.dds", 40u);
+      const msvc8::string defaultEnvironmentKey("<default>", 9u);
+
+      ID3DDeviceResources::TextureResourceHandle defaultEnvironmentTexture;
+      resources->GetTexture(
+        defaultEnvironmentTexture,
+        "/textures/environment/defaultenvcube.dds",
+        nullptr,
+        true
+      );
+
+      const TerrainEnvironmentLookupEntry defaultEnvironment(defaultEnvironmentName, defaultEnvironmentTexture);
+
+      TerrainEnvironmentLookupNodeRuntimeView* const node =
+        InsertTerrainEnvironmentNode(view->mEnvLookup, defaultEnvironmentKey);
+      if (node != nullptr) {
+        node->mValue.mEnvironmentName.assign(defaultEnvironment.mEnvironmentName, 0u, 0xFFFFFFFFu);
+        node->mValue.mTexture = defaultEnvironment.mTexture;
+      }
+    }
+
+    // 0x008A6589-0x008A6598
+    InitNormalMap(loadControl);
+    SetStratumDefaults();
+
+    // 0x008A659A-0x008A65BF: stratum masks live at half chart resolution; both
+    // lanes are recomputed from the arguments rather than reused.
+    normalView->mStrata.v1 = static_cast<std::uint32_t>(halfWidth);
+    normalView->mStrata.v2 = static_cast<std::uint32_t>(halfHeight);
+
+    // 0x008A65BF-0x008A667E: stratum mask 0 - the returned handle is assigned into
+    // the member, the temporary released, and only then is the member cleared.
+    {
+      ID3DDeviceResources::DynamicTextureSheetHandle sheet;
+      normalView->mStratumMask0 = resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2);
+    }
+    ClearTexture(normalView->mStratumMask0);
+
+    // 0x008A667F-0x008A6748: stratum mask 1 - sized from the lanes just written.
+    {
+      ID3DDeviceResources::DynamicTextureSheetHandle sheet;
+      normalView->mStratumMask1 = resources->NewDynamicTextureSheet(
+        sheet,
+        static_cast<int>(normalView->mStrata.v1),
+        static_cast<int>(normalView->mStrata.v2),
+        2
+      );
+    }
+    ClearTexture(normalView->mStratumMask1);
+
+    // 0x008A674E-0x008A6814: water map, same half resolution.
+    {
+      ID3DDeviceResources::DynamicTextureSheetHandle sheet;
+      visualView->mWaterMapTexture = resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2);
+    }
+    ClearTexture(visualView->mWaterMapTexture);
+
+    // 0x008A6815-0x008A6825: the water masks are sized from the sheet the driver
+    // actually handed back, not from the requested extent.
+    Wm3::Vector3f waterMapDimensions{};
+    visualView->mWaterMapTexture->GetDimensions(&waterMapDimensions);
+
+    // 0x008A6827-0x008A691F: fixed lighting / sun / shadow / fog defaults.
+    view->mLightingMultiplier = 1.5f;
+    view->mSunDirection.x = 0.70700002f;
+    view->mSunDirection.y = 0.70700002f;
+    view->mSunDirection.z = 0.0f;
+    view->mSunAmbience.x = 0.2f;
+    view->mSunAmbience.y = 0.2f;
+    view->mSunAmbience.z = 0.2f;
+    view->mSunColor.x = 1.0f;
+    view->mSunColor.y = 1.0f;
+    view->mSunColor.z = 1.0f;
+    view->mShadowFillColor.x = 0.69999999f;
+    view->mShadowFillColor.y = 0.69999999f;
+    view->mShadowFillColor.z = 0.75f;
+    view->mSpecularColor.x = 0.0f;
+    view->mSpecularColor.y = 0.0f;
+    view->mSpecularColor.z = 0.0f;
+    view->mSpecularColor.w = 0.0f;
+    view->mBloom = 0.079999998f;
+    view->mFogInfo.mStartDistance = 1.0f;
+    view->mFogInfo.mCutoffDistance = 1.0f;
+    view->mFogInfo.mMinClamp = 1.0f;
+    view->mFogInfo.mMaxClamp = 0.0f;
+    view->mFogInfo.mCurveExponent = 1000.0f;
+
+    // 0x008A691A-0x008A693B
+    SetWaterDefaults();
+    CreateWaterMasks(
+      static_cast<std::int32_t>(waterMapDimensions.x),
+      static_cast<std::int32_t>(waterMapDimensions.y)
+    );
+
+    // 0x008A693C-0x008A6958: one edit-mode cycle republishes the freshly created
+    // dynamic textures into the runtime instances the renderer samples.
+    EnterEditMode(loadControl);
+    ExitEditMode();
+
+    // 0x008A6959-0x008A6979: swap in a decal manager bound to this terrain, then
+    // destroy the previous one through its virtual destructor.
+    CDecalManager* const newDecalManager = CDecalManager::Create(this);
+    CDecalManager* const previousDecalManager = visualView->mDecalManager;
+    visualView->mDecalManager = newDecalManager;
+    delete previousDecalManager;
+
+    // 0x008A697A-0x008A6A3C: the sky dome is centred on the XZ midpoint of the
+    // fresh world bounds with a zero Y origin, its radius being the XZ half-
+    // diagonal divided by cos(72 degrees), and its elevation taken from the map's
+    // water plane when water is enabled (otherwise the terrain floor).
+    const Wm3::AxisAlignedBox3f bounds = GetWorldBounds();
+    const float centerZ = (bounds.Min.z + bounds.Max.z) * 0.5f;
+    const float centerX = (bounds.Min.x + bounds.Max.x) * 0.5f;
+    const float halfExtentZ = bounds.Max.z - centerZ;
+    const float halfExtentX = bounds.Max.x - centerX;
+
+    const double halfExtentZSquared = static_cast<double>(halfExtentZ) * static_cast<double>(halfExtentZ);
+    const double halfExtentXSquared = static_cast<double>(halfExtentX) * static_cast<double>(halfExtentX);
+    const float domeRadius = static_cast<float>(
+      std::sqrt(halfExtentZSquared + halfExtentXSquared) / std::cos(1.25663697719574)
+    );
+
+    const STIMap* const map = view->mMap;
+    const float domeElevation = map->mWaterEnabled != 0 ? map->mWaterElevation : bounds.Min.y;
+
+    const Wm3::Vector3f domeOrigin{centerX, 0.0f, centerZ};
+    view->mSkyDome.SetupHorizonAndCirrus(domeOrigin, domeElevation, domeRadius);
+
+    return true;
+  }
+
+  /**
    * Address: 0x008A6A60 (FUN_008A6A60, ?GetWorldBounds@CWldTerrainRes@Moho@@EBE?AV?$AxisAlignedBox3@M@Wm3@@XZ)
    *
    * What it does:
@@ -5138,171 +5356,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x008A6220 (FUN_008A6220,
-   * ?Reset@CWldTerrainRes@Moho@@EAE_NUSChartSize@2@PAVLuaState@LuaPlus@@@Z)
-   *
-   * IDA signature:
-   * char __thiscall Moho::CWldTerrainRes::Reset(
-   *     Moho::CWldTerrainRes *this, int a2, int a3, LuaPlus::LuaState *a4);
-   *
-   * What it does:
-   * Rebuilds the terrain resource in place for a freshly (re)loaded map of
-   * `size.mWidth x size.mHeight` (mirrors the `Load`/`Finalize` idioms
-   * already recovered above for the same field set).
-   */
-  bool IWldTerrainRes::Reset(const SChartSize size, LuaPlus::LuaState* const luaState)
-  {
-    auto* const runtimeView = AsTerrainRuntimeView(this);
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
-
-    const std::int32_t halfWidth = size.mWidth / 2;
-    const std::int32_t halfHeight = size.mHeight / 2;
-
-    // Rebuild the terrain map, destroying whatever was previously owned.
-    {
-      STIMap* const oldMap = runtimeView->mMap;
-      runtimeView->mMap = new STIMap(size.mWidth, size.mHeight);
-      if (oldMap != nullptr) {
-        oldMap->~STIMap();
-        ::operator delete(oldMap);
-      }
-    }
-    runtimeView->mMap->LoadTerrainTypes(luaState);
-
-    // Full-rect bounds + error refresh (asm passes 0..0x7FFFFFFF, matching
-    // the identical full-range refresh in `Load`).
-    gpg::Rect2i fullRect{};
-    fullRect.x0 = 0;
-    fullRect.z0 = 0;
-    fullRect.x1 = 0x7FFFFFFF;
-    fullRect.z1 = 0x7FFFFFFF;
-    CHeightField* const field = runtimeView->mMap->mHeightField.get();
-    field->UpdateBounds(fullRect);
-    field->UpdateError(fullRect);
-
-    // Half-resolution debug-dirty-terrain bit array.
-    {
-      gpg::BitArray2D* const oldDirty = visualView->mDebugDirtyTerrain;
-      visualView->mDebugDirtyTerrain = new gpg::BitArray2D(halfWidth, halfHeight);
-      if (oldDirty != nullptr) {
-        oldDirty->~BitArray2D();
-        ::operator delete(oldDirty);
-      }
-    }
-
-    // Default background / skycube textures.
-    SetBackground(msvc8::string("/textures/environment/defaultbackground.dds"));
-    SetSkycube(msvc8::string("/textures/environment/defaultskycube.dds"));
-
-    // Environment lookup reset to a single "<default>" entry (the binary
-    // inlines `ClearEnvLookup`'s own body here - same subtree-teardown
-    // helper `DeleteTerrainEnvironmentSubtreePostOrder`/0x008A8720 - then
-    // upserts through the same find-or-insert lane `AddEnvLookup` uses).
-    ClearEnvLookup();
-    AddEnvLookup(msvc8::string("<default>"), msvc8::string("/textures/environment/defaultenvcube.dds"));
-
-    CBackgroundTaskControl loadControl{};
-    InitNormalMap(loadControl);
-    SetStratumDefaults();
-
-    CD3DDevice* const device = D3D_GetDevice();
-    ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
-
-    // Recreate the two half-resolution stratum utility masks (format 2,
-    // matching the `NewDynamicTextureSheet` vtable dispatch at +0x3C seen
-    // twice more below - resolved via RTTI/vtable evidence on
-    // `ID3DDeviceResources`, slot 15 = `NewDynamicTextureSheet`).
-    boost::shared_ptr<CD3DDynamicTextureSheet> stratumMask0{};
-    if (resources != nullptr) {
-      resources->NewDynamicTextureSheet(stratumMask0, halfWidth, halfHeight, 2);
-    }
-    normalView->mStratumMask0 = stratumMask0;
-    ClearTexture(normalView->mStratumMask0);
-
-    boost::shared_ptr<CD3DDynamicTextureSheet> stratumMask1{};
-    if (resources != nullptr) {
-      resources->NewDynamicTextureSheet(stratumMask1, halfWidth, halfHeight, 2);
-    }
-    normalView->mStratumMask1 = stratumMask1;
-    ClearTexture(normalView->mStratumMask1);
-
-    // Recreate the water-map texture (also format 2 here; `Finalize`'s later
-    // upgrade pass recreates it again at format 12).
-    boost::shared_ptr<CD3DDynamicTextureSheet> waterMap{};
-    if (resources != nullptr) {
-      resources->NewDynamicTextureSheet(waterMap, halfWidth, halfHeight, 2);
-    }
-    visualView->mWaterMapTexture = waterMap;
-    ClearTexture(visualView->mWaterMapTexture);
-
-    // Lighting / sun / ambience / color / shadow / specular / bloom / fog
-    // defaults (hardcoded literals, matching the binary's float constants).
-    runtimeView->mLightingMultiplier = 1.5f;
-    runtimeView->mSunDirection = Wm3::Vector3f{0.707f, 0.707f, 0.0f};
-    runtimeView->mSunAmbience = Wm3::Vector3f{0.2f, 0.2f, 0.2f};
-    runtimeView->mSunColor = Wm3::Vector3f{1.0f, 1.0f, 1.0f};
-    runtimeView->mShadowFillColor = Wm3::Vector3f{0.7f, 0.7f, 0.75f};
-    runtimeView->mSpecularColor = Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
-    runtimeView->mBloom = 0.08f;
-    runtimeView->mFogStartDistance = 1.0f;
-    runtimeView->mFogCutoffDistance = 1.0f;
-    runtimeView->mFogMinClamp = 1.0f;
-    runtimeView->mFogMaxClamp = 0.0f;
-    runtimeView->mFogCurveExponent = 1000.0f;
-
-    SetWaterDefaults();
-
-    // Water masks (foam/flatness/depth-bias) sized to the just-created
-    // water-map texture's real dimensions (the binary re-queries
-    // `GetDimensions` here rather than reusing `halfWidth`/`halfHeight`
-    // directly - numerically identical since the sheet was just created at
-    // exactly that size, but the dispatch is preserved for fidelity).
-    Wm3::Vector3f waterMapDimensions{};
-    visualView->mWaterMapTexture->GetDimensions(&waterMapDimensions);
-    CreateWaterMasks(
-      static_cast<std::int32_t>(waterMapDimensions.x),
-      static_cast<std::int32_t>(waterMapDimensions.y)
-    );
-
-    EnterEditMode(loadControl);
-    ExitEditMode();
-
-    // Fresh decal manager, destroying whatever was previously owned.
-    {
-      CDecalManager* const oldDecalManager = runtimeView->mDecalManager;
-      runtimeView->mDecalManager = CDecalManager::Create(this);
-      if (oldDecalManager != nullptr) {
-        delete oldDecalManager;
-      }
-    }
-
-    // Reposition the sky dome from freshly computed world bounds (same
-    // formula as `Load`'s pre-0x3A skydome-derivation branch, including the
-    // `1.2566...` (~2*pi/5) FOV-derived cosine scale).
-    const Wm3::AxisAlignedBox3f bounds = GetWorldBounds();
-    const float centerX = (bounds.Max.x + bounds.Min.x) * 0.5f;
-    const float centerY = (bounds.Min.y + bounds.Max.y) * 0.5f;
-    const float centerZ = (bounds.Max.z + bounds.Min.z) * 0.5f;
-    const float halfExtentX = bounds.Max.x - centerX;
-    const float halfExtentY = bounds.Min.y - centerY;
-    const float domeRadius = static_cast<float>(
-      std::sqrt(halfExtentX * halfExtentX + halfExtentY * halfExtentY) / std::cos(1.25663697719574)
-    );
-    const float sunElevation = runtimeView->mMap->mWaterEnabled
-      ? runtimeView->mMap->mWaterElevation
-      : bounds.Min.y;
-
-    runtimeView->mSkyDome.SetupHorizonAndCirrus(
-      Wm3::Vector3f{centerX, centerY, centerZ},
-      sunElevation,
-      domeRadius
-    );
-
-    return true;
-  }
-
-  /**
    * Address: 0x008A0A20 (FUN_008A0A20, ??0struct_Env@@QAE@@Z)
    *
    * What it does:
@@ -5354,6 +5407,44 @@ namespace moho
     DestroyWldProps(mProps);
     DestroyTerrainRes(mTerrainRes);
     DestroyPreviewChunk(mMapPreviewChunk);
+  }
+
+  /**
+   * Address: 0x00890D40 (FUN_00890D40, ?MapNew@CWldMap@Moho@@QAE_NHHPAVLuaState@LuaPlus@@@Z)
+   *
+   * IDA signature:
+   * char __usercall Moho::CWldMap::MapNew@<al>(Moho::CWldMap *this@<eax>,
+   *     int width, int height, LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Drops every currently owned map resource, then builds an empty chart of the
+   * requested size: a fresh terrain resource reset to `width x height`
+   * (0x00890D69 dispatches `IWldTerrainRes` vtable slot 23 = `Reset`) and a
+   * fresh, empty prop set. The terrain `Reset` result is discarded and the
+   * function unconditionally reports success (`0x00890D8E: mov al, 1`).
+   */
+  bool CWldMap::MapNew(const std::int32_t width, const std::int32_t height, LuaPlus::LuaState* const state)
+  {
+    Reset();
+
+    // 0x00890D49-0x00890D5E: swap in the new terrain resource, destroy the old.
+    IWldTerrainRes* const newTerrainRes = WLD_CreateTerrainRes();
+    IWldTerrainRes* const previousTerrainRes = mTerrainRes;
+    mTerrainRes = newTerrainRes;
+    DestroyTerrainRes(previousTerrainRes);
+
+    // 0x00890D60-0x00890D77: the binary dereferences the freshly stored terrain
+    // resource without a null check and ignores the returned status byte.
+    const SChartSize chartSize{width, height};
+    (void)mTerrainRes->Reset(chartSize, state);
+
+    // 0x00890D79-0x00890D8C: same swap-then-destroy shape for the prop set.
+    CWldProps* const newProps = WLD_CreateProps();
+    CWldProps* const previousProps = mProps;
+    mProps = newProps;
+    DestroyWldProps(previousProps);
+
+    return true;
   }
 
   /**
