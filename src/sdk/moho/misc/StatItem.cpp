@@ -735,7 +735,7 @@ namespace
    * Commits one logging batch by rebasing every item's sample-end lane to the
    * sample-begin lane across the full stat tree.
    */
-  [[maybe_unused]] void CommitStatSampleRangesRecursive(moho::StatItem* item)
+  void CommitStatSampleRangesRecursive(moho::StatItem* item)
   {
     if (!item) {
       return;
@@ -758,7 +758,7 @@ namespace
    * Computes `(avg, max, min, count)` over one stat item's captured sample
    * history lane.
    */
-  [[maybe_unused]] bool TryComputeStatSampleAggregate(
+  bool TryComputeStatSampleAggregate(
     const moho::StatItem* item,
     float* outAverage,
     float* outMaximum,
@@ -806,7 +806,7 @@ namespace
    * Emits one depth-tagged stat report line per node with captured samples and
    * tracks maximum name width per depth for later formatting passes.
    */
-  [[maybe_unused]] bool BuildStatReportRecursive(
+  bool BuildStatReportRecursive(
     moho::StatItem* item,
     std::string& report,
     const unsigned int depth,

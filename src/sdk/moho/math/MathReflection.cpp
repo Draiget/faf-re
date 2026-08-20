@@ -228,7 +228,7 @@ namespace
    * Compares two 3D points component-wise and returns true when all axis deltas
    * are within one `0.001f` absolute threshold.
    */
-  [[maybe_unused]] [[nodiscard]] bool PointsAreSimilarWithinEpsilon(
+  [[nodiscard]] bool PointsAreSimilarWithinEpsilon(
     const Wm3::Vector3f& lhs,
     const Wm3::Vector3f& rhs
   ) noexcept

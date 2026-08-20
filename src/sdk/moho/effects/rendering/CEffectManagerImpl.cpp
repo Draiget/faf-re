@@ -156,7 +156,7 @@ namespace moho
      * Unlinks one manager-list node from its current intrusive list and resets
      * that node back to self-linked sentinel form.
      */
-    [[maybe_unused]] IEffect::ManagerListNode* UnlinkManagerListNodeAndSelfReference(
+    IEffect::ManagerListNode* UnlinkManagerListNodeAndSelfReference(
       IEffect::ManagerListNode* const node
     ) noexcept
     {
