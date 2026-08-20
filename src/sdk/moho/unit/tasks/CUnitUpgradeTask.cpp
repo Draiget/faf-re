@@ -1,6 +1,7 @@
 #include "moho/unit/tasks/CUnitUpgradeTask.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -8,6 +9,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/EntityId.h"
@@ -60,6 +62,13 @@ namespace
 
   CUnitUpgradeTaskSerializerStartupNode gCUnitUpgradeTaskSerializer{};
 
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    CUnitUpgradeTaskSerializerStartupNode& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
+
   void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
     auto* const task = reinterpret_cast<moho::CUnitUpgradeTask*>(static_cast<std::uintptr_t>(objectPtr));
@@ -73,21 +82,49 @@ namespace
   }
 
   /**
-   * Address: 0x005F8800 (FUN_005F8800)
+   * Address: 0x00BF93C0 (FUN_00BF93C0, Moho::CUnitUpgradeTaskSerializer::~CUnitUpgradeTaskSerializer)
    *
    * What it does:
-   * Initializes callback lanes for global `CUnitUpgradeTaskSerializer` helper
-   * storage and returns that helper object.
+   * Process-exit teardown: unlinks the `CUnitUpgradeTaskSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
    */
-  [[maybe_unused]] [[nodiscard]] CUnitUpgradeTaskSerializerStartupNode* InitializeCUnitUpgradeTaskSerializerStartupThunk()
+  void cleanup_CUnitUpgradeTaskSerializer_atexit()
+  {
+    (void)gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitUpgradeTaskSerializer));
+  }
+
+  /**
+   * Address: 0x00BCF8F0 (FUN_00BCF8F0, register_CUnitUpgradeTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitUpgradeTaskSerializer` helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`. Supersedes the previous orphaned
+   * startup thunk (cited at FUN_005F8800, a distinct real binary function
+   * that performs the same self-link/field-store sequence but is never
+   * called from any recovered path and installs no `atexit` cleanup -- left
+   * unrecovered pending its own callsite evidence).
+   */
+  void register_CUnitUpgradeTaskSerializer()
   {
     gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitUpgradeTaskSerializer.mNext);
     gCUnitUpgradeTaskSerializer.mPrev = self;
     gCUnitUpgradeTaskSerializer.mNext = self;
     gCUnitUpgradeTaskSerializer.mLoad = &DeserializeCUnitUpgradeTaskSerializerCallback;
     gCUnitUpgradeTaskSerializer.mSave = &SerializeCUnitUpgradeTaskSerializerCallback;
-    return &gCUnitUpgradeTaskSerializer;
+    (void)std::atexit(&cleanup_CUnitUpgradeTaskSerializer_atexit);
   }
+
+  struct CUnitUpgradeTaskSerializerStartupBootstrap
+  {
+    CUnitUpgradeTaskSerializerStartupBootstrap()
+    {
+      register_CUnitUpgradeTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitUpgradeTaskSerializerStartupBootstrap gCUnitUpgradeTaskSerializerStartupBootstrap;
 } // namespace
 
 namespace moho
