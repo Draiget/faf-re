@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -12,6 +13,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/containers/SCoordsVec2.h"
@@ -492,3 +494,124 @@ namespace moho
     task->MemberSerialize(archive);
   }
 } // namespace moho
+
+namespace
+{
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase).
+  struct CUnitSacrificeTaskSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitSacrificeTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CUnitSacrificeTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitSacrificeTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CUnitSacrificeTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CUnitSacrificeTaskSerializerHelperNode) == 0x14,
+    "CUnitSacrificeTaskSerializerHelperNode size must be 0x14"
+  );
+
+  CUnitSacrificeTaskSerializerHelperNode gCUnitSacrificeTaskSerializer{};
+
+  /**
+   * Unlinks `CUnitSacrificeTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitSacrificeTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitSacrificeTaskSerializer.mListLinks);
+  }
+
+  /**
+   * Address: 0x005FB0D0 (FUN_005FB0D0, Moho::CUnitSacrificeTaskSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CUnitSacrificeTask`. Forwards the
+   * reflected object pointer to `CUnitSacrificeTask::MemberDeserialize`
+   * (FUN_005FF2C0 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeCUnitSacrificeTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitSacrificeTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x005FB0E0 (FUN_005FB0E0, Moho::CUnitSacrificeTaskSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `CUnitSacrificeTask`. Forwards the
+   * reflected object pointer to `CUnitSacrificeTask::MemberSerialize`
+   * (FUN_005FF360 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeCUnitSacrificeTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<const moho::CUnitSacrificeTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF9570 (FUN_00BF9570, Moho::CUnitSacrificeTaskSerializer::~CUnitSacrificeTaskSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CUnitSacrificeTaskSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CUnitSacrificeTaskSerializer_atexit()
+  {
+    (void)UnlinkCUnitSacrificeTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BCFA10 (FUN_00BCFA10, register_CUnitSacrificeTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitSacrificeTask` serializer helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`.
+   */
+  void register_CUnitSacrificeTaskSerializer()
+  {
+    (void)UnlinkCUnitSacrificeTaskSerializerNodePrimary();
+    gCUnitSacrificeTaskSerializer.mSerLoadFunc = &DeserializeCUnitSacrificeTaskSerializerCallback;
+    gCUnitSacrificeTaskSerializer.mSerSaveFunc = &SerializeCUnitSacrificeTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitSacrificeTaskSerializer_atexit);
+  }
+
+  struct CUnitSacrificeTaskSerializerStartupBootstrap
+  {
+    CUnitSacrificeTaskSerializerStartupBootstrap()
+    {
+      register_CUnitSacrificeTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitSacrificeTaskSerializerStartupBootstrap gCUnitSacrificeTaskSerializerStartupBootstrap;
+} // namespace
