@@ -3266,6 +3266,56 @@ public:
    */
   bool ScrollPages(std::int32_t pages) override;
 
+  /**
+   * Address: 0x00967B40 (FUN_00967B40, wxWindow::SetScrollPos)
+   * Mangled: ?SetScrollPos@wxWindow@@UAEXHH_N@Z
+   *
+   * What it does:
+   * Pushes a new thumb position to the native scrollbar via
+   * `::SetScrollInfo` (position-only, `SIF_POS`). No-op if the window has
+   * no native handle yet.
+   */
+  void SetScrollPos(std::int32_t orientation, std::int32_t position, bool refresh) override;
+
+  /**
+   * Address: 0x00967AC0 (FUN_00967AC0, wxWindow::GetScrollRange)
+   * Mangled: ?GetScrollRange@wxWindow@@UBEHH@Z
+   *
+   * What it does:
+   * Reads the native scrollbar's min/max via `::GetScrollRange`, then
+   * compensates for the Win95+ `SCROLLINFO` "page size > 1" quirk using the
+   * thumb size last recorded by `SetScrollbar`.
+   */
+  std::int32_t GetScrollRange(std::int32_t orientation) const override;
+
+  /**
+   * Address: 0x00967BA0 (FUN_00967BA0, wxWindow::SetScrollbar)
+   * Mangled: ?SetScrollbar@wxWindow@@UAEXHHHH_N@Z
+   *
+   * What it does:
+   * Sets the native scrollbar's full range/page/position in one
+   * `::SetScrollInfo` call, adjusting the range for the same Win95+ page-size
+   * quirk `GetScrollRange` compensates for, and records the thumb size for
+   * that later compensation.
+   */
+  void SetScrollbar(
+    std::int32_t orientation,
+    std::int32_t position,
+    std::int32_t thumbSize,
+    std::int32_t range,
+    bool refresh
+  ) override;
+
+  /**
+   * Address: 0x00967B20 (FUN_00967B20, wxWindow::GetScrollThumb)
+   * Mangled: ?GetScrollThumb@wxWindow@@UBEHH@Z
+   *
+   * What it does:
+   * Returns the thumb (page) size last recorded by `SetScrollbar` for the
+   * given orientation.
+   */
+  [[nodiscard]] std::int32_t GetScrollThumb(std::int32_t orientation) const override;
+
   static wxEventTable sm_eventTable;
 };
 

@@ -11395,6 +11395,11 @@ namespace
     // window+0x131 when the window is not on screen yet, for Show to consume.
     std::uint8_t iconized = 0;
     std::uint8_t maximizeOnShow = 0;
+    // wxWindowMSW::m_xThumbSize/m_yThumbSize: the scrollbar page size last
+    // passed to SetScrollbar(), needed by GetScrollRange() to compensate for
+    // a Win95+ SCROLLINFO quirk (see SetScrollbar/GetScrollRange below).
+    std::int32_t xThumbSize = 0;
+    std::int32_t yThumbSize = 0;
   };
 
   struct WxTextCtrlRuntimeState
@@ -34832,6 +34837,123 @@ bool wxWindowMswRuntime::ScrollPages(const std::int32_t pages)
     down ? SB_PAGEDOWN : SB_PAGEUP,
     down ? pages : -pages
   );
+}
+
+/**
+ * Address: 0x00967B40 (FUN_00967B40, wxWindow::SetScrollPos)
+ *
+ * What it does:
+ * Pushes a new thumb position to the native scrollbar (position-only,
+ * `SIF_POS`). No-op if the window has no native handle yet.
+ */
+void wxWindowMswRuntime::SetScrollPos(
+  const std::int32_t orientation, const std::int32_t position, const bool refresh
+)
+{
+  const HWND hwnd = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+  if (hwnd == nullptr) {
+    return;
+  }
+
+  // wx's wxHORIZONTAL == 4; anything else (wxVERTICAL == 8) is treated as vertical.
+  const int direction = (orientation == 4) ? SB_HORZ : SB_VERT;
+
+  SCROLLINFO info{};
+  info.cbSize = sizeof(SCROLLINFO);
+  info.fMask = SIF_POS;
+  info.nPos = position;
+
+  SetScrollInfo(hwnd, direction, &info, refresh);
+}
+
+/**
+ * Address: 0x00967AC0 (FUN_00967AC0, wxWindow::GetScrollRange)
+ *
+ * What it does:
+ * Reads the native scrollbar's min/max via `::GetScrollRange`, then
+ * compensates for the Win95+ `SCROLLINFO` "page size > 1" quirk using the
+ * thumb size last recorded by `SetScrollbar`.
+ */
+std::int32_t wxWindowMswRuntime::GetScrollRange(const std::int32_t orientation) const
+{
+  const HWND hwnd = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+  if (hwnd == nullptr) {
+    return 0;
+  }
+
+  const int direction = (orientation == 4) ? SB_HORZ : SB_VERT;
+  int minPos = 0;
+  int maxPos = 0;
+  ::GetScrollRange(hwnd, direction, &minPos, &maxPos);
+
+  const std::int32_t pageSize = GetScrollThumb(orientation);
+  if (pageSize > 1) {
+    maxPos -= (pageSize - 1);
+  }
+
+  return maxPos + pageSize;
+}
+
+/**
+ * Address: 0x00967BA0 (FUN_00967BA0, wxWindow::SetScrollbar)
+ *
+ * What it does:
+ * Sets the native scrollbar's full range/page/position in one
+ * `::SetScrollInfo` call, adjusting the range for the same Win95+ page-size
+ * quirk `GetScrollRange` compensates for, and records the thumb size for
+ * that later compensation.
+ */
+void wxWindowMswRuntime::SetScrollbar(
+  const std::int32_t orientation,
+  const std::int32_t position,
+  const std::int32_t thumbSize,
+  const std::int32_t range,
+  const bool refresh
+)
+{
+  int adjustedRange = range - thumbSize;
+  if (thumbSize > 1 && range > 0) {
+    adjustedRange += (thumbSize - 1);
+  }
+
+  const HWND hwnd = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+  if (hwnd != nullptr) {
+    const int direction = (orientation == 4) ? SB_HORZ : SB_VERT;
+
+    SCROLLINFO info{};
+    info.cbSize = sizeof(SCROLLINFO);
+    info.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+    info.nPage = static_cast<UINT>(thumbSize);
+    info.nMin = 0;
+    info.nMax = adjustedRange;
+    info.nPos = position;
+
+    SetScrollInfo(hwnd, direction, &info, refresh);
+  }
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  if (orientation == 4) {
+    state.xThumbSize = thumbSize;
+  } else {
+    state.yThumbSize = thumbSize;
+  }
+}
+
+/**
+ * Address: 0x00967B20 (FUN_00967B20, wxWindow::GetScrollThumb)
+ *
+ * What it does:
+ * Returns the thumb (page) size last recorded by `SetScrollbar` for the
+ * given orientation.
+ */
+std::int32_t wxWindowMswRuntime::GetScrollThumb(const std::int32_t orientation) const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr) {
+    return 0;
+  }
+
+  return (orientation == 4) ? state->xThumbSize : state->yThumbSize;
 }
 
 /**
