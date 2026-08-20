@@ -37,6 +37,7 @@
 #include "moho/render/BoundaryRenderer.h"
 #include "moho/render/IRenderWorldView.h"
 #include "moho/render/RangeRenderer.h"
+#include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/VisionRenderer.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -2334,9 +2335,9 @@ namespace moho
     }
 
     if (session != nullptr) {
-      // 0x007D1B6C calls `func_RenUI` (0x007FD490) here, __cdecl with five
-      // dword arguments and `add esp, 14h` at 0x007D1B71. Argument roles
-      // decoded from the shipped pushes at 0x007D1B56..0x007D1B6B:
+      // 0x007D1B6C, __cdecl with five dword arguments and `add esp, 14h` at
+      // 0x007D1B71. Argument roles decoded from the shipped pushes at
+      // 0x007D1B56..0x007D1B6B:
       //   [esp+0x00] the active `CWldSession*` (the same `sWldSession` this
       //              branch is gated on),
       //   [esp+0x04] the world view's `GeomCamera3*` (ebp, from
@@ -2344,10 +2345,10 @@ namespace moho
       //   [esp+0x08] the raw `CD3DPrimBatcher*` out of `primBatcher` (edi,
       //              loaded at 0x007D1B4D, not an owning handle),
       //   [esp+0x0C] `deltaFrame`, forwarded unchanged,
-      //   [esp+0x10] a literal `0.0f` (`fldz` at 0x007D1B56).
-      // `func_RenUI` is not recovered yet and its owning translation unit
-      // (`moho/ui/UiRuntimeTypes.cpp`) is outside this file, so the call is
-      // deliberately left unwired rather than approximated.
+      //   [esp+0x10] a literal `0.0f` (`fldz` at 0x007D1B56) - the cartographic
+      //              pass freezes the blinky-box cycle rather than advancing
+      //              it, so the world view's own pass stays the only ticker.
+      RenUI(session, &cameraView, primBatcher.get(), deltaFrame, 0.0f);
     }
 
     device->Clear(

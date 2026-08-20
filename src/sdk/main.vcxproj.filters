@@ -2163,6 +2163,9 @@
     <ClCompile Include="moho\render\SelectionBracketParams.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\SelectionBracketRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\RenderGeometryBuffers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -5026,6 +5029,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\SelectionBracketParams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\SelectionBracketRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\RenderGeometryBuffers.h">

@@ -1220,6 +1220,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\render\Cartographic.cpp" />
     <ClCompile Include="moho\render\Shadow.cpp" />
     <ClCompile Include="moho\render\SelectionBracketParams.cpp" />
+    <ClCompile Include="moho\render\SelectionBracketRenderer.cpp" />
     <ClCompile Include="moho\render\RenderGeometryBuffers.cpp" />
     <ClCompile Include="moho\render\VisionRenderer.cpp" />
     <ClCompile Include="moho\misc\RangeExtractor.cpp" />
@@ -1731,6 +1732,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\render\ProjectileArcRenderer.h" />
     <ClInclude Include="moho\render\RangeRendererStartupRegistrations.h" />
     <ClInclude Include="moho\render\SelectionBracketParams.h" />
+    <ClInclude Include="moho\render\SelectionBracketRenderer.h" />
     <ClInclude Include="moho\render\RenderGeometryBuffers.h" />
     <ClInclude Include="moho\effects\rendering\SEfxCurve.h" />
     <ClInclude Include="moho\effects\rendering\SEfxCurveSerializer.h" />

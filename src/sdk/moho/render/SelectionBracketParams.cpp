@@ -65,6 +65,19 @@ namespace moho
   float ren_SelectBracketSize = 0.0f;
 
   /**
+   * Address: 0x010BF644 (sSelectionParamsSentinel)
+   *
+   * What it does:
+   * Publishes the process-global selection-params import latch so
+   * `func_DrawSelectionBrackets` (moho/render/SelectionBracketRenderer.cpp)
+   * can read and republish the same object this translation unit owns.
+   */
+  void*& SelectionParamsSentinel() noexcept
+  {
+    return gSelectionParamsSentinel;
+  }
+
+  /**
    * Address: 0x007FC4B0 (FUN_007FC4B0, func_LoadLuaSelectionParams)
    *
    * What it does:

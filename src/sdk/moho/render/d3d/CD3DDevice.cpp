@@ -2062,6 +2062,11 @@ namespace moho
     return sDeltaFrame;
   }
 
+  float REN_GetWeightedFrameSeconds()
+  {
+    return sWeightedFrameRate;
+  }
+
   int REN_GetGameTick()
   {
     return sCurGameTick;
