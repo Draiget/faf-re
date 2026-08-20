@@ -36,9 +36,11 @@ namespace moho
    *
    * What it does:
    * Serializer construct-callback thunk that forwards to the canonical
-   * `CIntelCounterHandleConstruct::Construct` implementation.
+   * `CIntelCounterHandleConstruct::Construct` implementation. This is the
+   * exact address the real `CIntelCounterHandleConstruct` constructor
+   * (0x00BDCD50) stores into `mConstructCallback`.
    */
-  [[maybe_unused]] void ConstructCIntelCounterHandleSerializerThunk(
+  void ConstructCIntelCounterHandleSerializerThunk(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int version,
@@ -62,6 +64,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076FD90 (FUN_0076FD90)
+   *
+   * What it does:
+   * Deleting-teardown callback: invokes `CIntelCounterHandle::Destroy(1)` for
+   * one runtime object when the pointer lane is non-null.
+   */
+  void CIntelCounterHandleConstruct::Deconstruct(void* const objectPtr)
+  {
+    auto* const handle = static_cast<CIntelCounterHandle*>(objectPtr);
+    if (handle != nullptr) {
+      handle->Destroy(1);
+    }
+  }
+
+  /**
+   * Address: 0x00BDCD50 (FUN_00BDCD50, dynamic initializer for the global
+   * `CIntelCounterHandleConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), then binds the construct/delete callback fields.
+   */
+  CIntelCounterHandleConstruct::CIntelCounterHandleConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCIntelCounterHandleSerializerThunk))
+    , mDeleteCallback(&CIntelCounterHandleConstruct::Deconstruct)
+  {
+  }
+
+  /**
    * Address: 0x0076FBA0 (FUN_0076FBA0, gpg::SerConstructHelper_CIntelCounterHandle::Init)
    *
    * What it does:
@@ -76,3 +107,14 @@ namespace moho
     type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010BB400 -- process-global `CIntelCounterHandleConstruct`
+  // singleton. Constructing it runs CIntelCounterHandleConstruct::
+  // CIntelCounterHandleConstruct() (0x00BDCD50), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterConstructFunction() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::CIntelCounterHandleConstruct gCIntelCounterHandleConstruct;
+} // namespace
