@@ -69,9 +69,12 @@ namespace moho
         }
       }
 
-      // Dispatched for its side effects only - the binary drops the result.
-      (void)IsMiniMap();
-      mWldSession->RenderStrategicIcons(mCamera, batcher, map);
+      // `IsMiniMap()`'s result is NOT dropped: 0x0086EE5B pushes the returned
+      // `eax` as the last of the five stack slots this call site sets up, and
+      // `RenderStrategicIcons` forwards it to its custom-name and
+      // selection-set label passes so the minimap draws status bars without
+      // text. (An earlier pass recorded this dispatch as side-effect-only.)
+      mWldSession->RenderStrategicIcons(mCamera, batcher, map, IsMiniMap());
     }
 
     mWldSession->RenderProjectileIcons(mCamera, this, batcher, map, deltaSeconds);

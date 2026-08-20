@@ -14371,6 +14371,456 @@ namespace moho
     // creation chain, and preview-instance ownership container at 0x010C425C/0x010C4260.
   }
 
+  namespace
+  {
+    /**
+     * Gap between two stacked bars, in screen pixels (`flt_DFEB0C` added twice
+     * per row at 0x0085D22F / 0x0085D23E).
+     */
+    constexpr float kLifebarRowGap = 2.0f;
+
+    /** Every bar sits on an opaque black backdrop (`0FF000000h`, 0x0085D285). */
+    constexpr std::uint32_t kLifebarBackdropColor = 0xFF000000u;
+
+    /**
+     * A filled bar never gets thinner than this even when the bar itself is
+     * (`comiss` against `flt_DFEB0C` at 0x0085D55D / 0x0085D581).
+     */
+    constexpr float kLifebarMinFillHeight = 2.0f;
+
+    /** The drop shadow under a label is offset one pixel down-right (0x0085E2A3). */
+    constexpr float kLabelShadowOffset = 1.0f;
+
+    /** Label drop shadow colour (`0FF000000h` pushed at 0x0085E2AB). */
+    constexpr std::uint32_t kLabelShadowColor = 0xFF000000u;
+
+    /**
+     * Address: 0x004EAA50 (FUN_004EAA50)
+     *
+     * What it does:
+     * Returns the shared "no screen position" sentinel - a `Wm3::Vector2f`
+     * whose components are both NaN. The binary keeps it in a
+     * function-local static (storage 0x010C7AB4/0x010C7AB8 behind the
+     * one-bit init guard at 0x010C7ABC) and both of
+     * `DrawUnitCustomNameLabel`'s early-outs hand it back: the first inlines
+     * the guard (0x0085E33F), the second calls this body (0x0085E0F5).
+     */
+    [[nodiscard]] const Wm3::Vector2f& InvalidScreenPoint()
+    {
+      static const Wm3::Vector2f sentinel{
+        std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()
+      };
+      return sentinel;
+    }
+
+    /**
+     * Address: 0x005657B0 (FUN_005657B0, sub_5657B0)
+     *
+     * IDA signature:
+     * BOOL __usercall sub_5657B0@<eax>(float *a1@<esi>);
+     *
+     * What it does:
+     * Reports whether a screen point carries a real position, i.e. neither
+     * component is NaN. This is the read side of `InvalidScreenPoint()`.
+     */
+    [[nodiscard]] bool IsValidScreenPoint(const Wm3::Vector2f& point)
+    {
+      return !std::isnan(point.X()) && !std::isnan(point.Y());
+    }
+
+    /**
+     * Address: 0x010C4284 (the cached custom-name font)
+     *
+     * What it does:
+     * Returns the process-wide font the custom-name labels render with,
+     * creating it on first use from the `ui_CustomNameFont` /
+     * `ui_CustomNameFontSize` console variables (0x0085E11B..0x0085E171).
+     * The binary keeps exactly one reference for the life of the process -
+     * the temporary handle `CD3DFont::Create` returns is assigned into the
+     * global and then released - so the static below deliberately never
+     * releases either.
+     */
+    [[nodiscard]] CD3DFont* CustomNameFont()
+    {
+      static boost::SharedPtrRaw<CD3DFont> font{};
+      if (font.px == nullptr) {
+        font = CD3DFont::Create(ui_CustomNameFontSize, ui_CustomNameFont.c_str());
+      }
+      return font.px;
+    }
+
+    /**
+     * Emits one axis-aligned screen-space bar.
+     *
+     * All six quads in `DrawUnitLifebars` hand their corners to
+     * `CD3DPrimBatcher::DrawQuad` in the same rotation - top-left, down the
+     * left edge, across the bottom, back up the right edge - so the corner
+     * mechanics are lifted here instead of being open-coded six times. That
+     * rotation is the binary's own: at 0x0085D317 the `topLeft` argument
+     * (the vector pushed first, read from the callee frame at +8 in
+     * 0x00438DD0) is `(left, top)` while `topRight` (the `ecx` argument,
+     * read at 0x00438DA3) is `(left, bottom)`.
+     */
+    void DrawLifebarQuad(
+      CD3DPrimBatcher& primBatcher,
+      const float left,
+      const float top,
+      const float right,
+      const float bottom,
+      const std::uint32_t color
+    )
+    {
+      primBatcher.DrawQuad(
+        Wm3::Vector3f(left, top, 0.0f),
+        Wm3::Vector3f(left, bottom, 0.0f),
+        Wm3::Vector3f(right, bottom, 0.0f),
+        Wm3::Vector3f(right, top, 0.0f),
+        color
+      );
+    }
+
+    /**
+     * Phase of the shared "empty fuel" blink, in [0,1)
+     * (0x0085D107..0x0085D11B and the identical block at
+     * 0x0085D18E..0x0085D1A2).
+     *
+     * Driven by the sim clock rather than the wall clock so every warning bar
+     * on screen blinks in step: the whole-tick counter plus this frame's
+     * sub-tick interpolant, scaled by the console rate and wrapped.
+     */
+    [[nodiscard]] float FuelWarningBlinkPhase(const StrategicIconAuxView& aux)
+    {
+      const double simTime = static_cast<double>(aux.mSession->mGameTick) + static_cast<double>(aux.mTickFraction);
+      return static_cast<float>(std::fmod(simTime * static_cast<double>(ui_FuelEmptyBlinkRate), 1.0));
+    }
+
+    /**
+     * Address: 0x0085CD40 (FUN_0085CD40, sub_85CD40)
+     *
+     * IDA signature:
+     * float *__usercall sub_85CD40@<eax>(UnitIconData *icon@<eax>,
+     *   Wm3::Vector2f *labelCursor, struct_IconAux *aux);
+     *
+     * What it does:
+     * Draws one unit's stacked status bars in the strategic view and reports
+     * where a text label under them would start.
+     *
+     * Row one is always the health bar. Row two and three are conditional: a
+     * unit with a shield puts the shield on row two and fuel (or, when the
+     * unit carries no fuel at all, build progress) on row three; a unit
+     * without a shield collapses to a single second row showing whichever of
+     * fuel and build progress is further along. Fuel at or below empty - but
+     * not the "no fuel lane at all" sentinel of -1 - swaps that bar to the
+     * warning colour and fills it completely on alternate blink phases.
+     *
+     * Each row is an opaque black backdrop with a coloured fill inset one
+     * pixel, the fill running `fraction` of the way across.
+     *
+     * `labelCursor` receives the horizontal centre of the bar stack and the
+     * bottom edge of the last row actually drawn, which is what
+     * `DrawUnitCustomNameLabel` hangs its text off.
+     */
+    void DrawUnitLifebars(const UnitIconData& icon, Wm3::Vector2f& labelCursor, const StrategicIconAuxView& aux)
+    {
+      CD3DPrimBatcher& primBatcher = *aux.mBatcher;
+      primBatcher.SetTexture(aux.mWhiteTexture);
+
+      const GeomCamera3& camera = *aux.mCamera;
+      const REntityBlueprint& blueprint = *icon.mBlueprint;
+      const Wm3::Vector3f worldPosition{icon.mWorldX, icon.mWorldY, icon.mWorldZ};
+
+      // Row 2 of the viewport matrix is the perspective-correct width factor;
+      // dividing by it keeps the bar a constant on-screen size as the camera
+      // pulls back (0x0085CD6A..0x0085CDAF).
+      const float widthScale = camera.viewport.ProjectViewportWidthRow2(worldPosition);
+
+      // A blueprint may override either bar extent; a non-positive value means
+      // "use the console default" (0x0085CDA8 / 0x0085CDC6).
+      const float barWidthSource = (blueprint.mLifeBarSize > 0.0f) ? blueprint.mLifeBarSize : ui_LifebarWidth;
+      const float barHeightSource = (blueprint.mLifeBarHeight > 0.0f) ? blueprint.mLifeBarHeight : ui_lifebarHeight;
+      const float barWidth = (1.0f / widthScale) * barWidthSource;
+      const float barHeight = (1.0f / widthScale) * barHeightSource;
+
+      // The anchor is not the unit's screen position: the world point is taken
+      // into VIEW space first so the stack can be dropped straight down the
+      // camera's own up axis by the blueprint's lifebar offset, and only then
+      // projected. That is why this cannot go through `GeomCamera3::Project` -
+      // the offset is applied mid-pipeline (0x0085CDFF..0x0085CFA1).
+      const VMatrix4& view = camera.view;
+      const float viewX = (view.r[0].x * worldPosition.X()) + (view.r[1].x * worldPosition.Y()) +
+        (view.r[2].x * worldPosition.Z()) + view.r[3].x;
+      const float viewY = (view.r[0].y * worldPosition.X()) + (view.r[1].y * worldPosition.Y()) +
+        (view.r[2].y * worldPosition.Z()) + view.r[3].y;
+      const float viewZ = (view.r[0].z * worldPosition.X()) + (view.r[1].z * worldPosition.Y()) +
+        (view.r[2].z * worldPosition.Z()) + view.r[3].z;
+      const float viewW = (view.r[0].w * worldPosition.X()) + (view.r[1].w * worldPosition.Y()) +
+        (view.r[2].w * worldPosition.Z()) + view.r[3].w;
+
+      const float inverseViewW = 1.0f / viewW;
+      const float anchorX = viewX * inverseViewW;
+      const float anchorY = (viewY * inverseViewW) - (blueprint.mLifeBarOffset + ui_LifebarOffset);
+      const float anchorZ = viewZ * inverseViewW;
+
+      const VMatrix4& projection = camera.projection;
+      const float clipX = (projection.r[0].x * anchorX) + (projection.r[1].x * anchorY) +
+        (projection.r[2].x * anchorZ) + projection.r[3].x;
+      const float clipY = (projection.r[0].y * anchorX) + (projection.r[1].y * anchorY) +
+        (projection.r[2].y * anchorZ) + projection.r[3].y;
+      const float clipW = (projection.r[0].w * anchorX) + (projection.r[1].w * anchorY) +
+        (projection.r[2].w * anchorZ) + projection.r[3].w;
+
+      // NDC to whole pixels, Y flipped, same mapping the resource splats use.
+      const float inverseClipW = 1.0f / clipW;
+      const float anchorScreenX =
+        std::floor(((clipX * inverseClipW) - -1.0f) * aux.mViewportWidth * 0.5f);
+      const float anchorScreenY = std::floor(
+        ((((clipY * inverseClipW) - -1.0f) * (-0.0f - aux.mViewportHeight)) * 0.5f) + aux.mViewportHeight
+      );
+
+      const float halfBarWidth = barWidth * 0.5f;
+      const float barLeft = anchorScreenX - halfBarWidth;
+      const float barRight = barLeft + barWidth;
+      const float barTop = anchorScreenY - (barHeight * 0.5f);
+
+      const UserEntity& entity = *icon.mUnit;
+      float healthFraction = entity.mVariableData.mHealth / entity.mVariableData.mMaxHealth;
+      // Written as the binary's inverted compares so a NaN ratio (a unit with
+      // zero max health) clamps to full rather than propagating.
+      if (!(1.0f > healthFraction)) {
+        healthFraction = 1.0f;
+      }
+      if (0.0f > healthFraction) {
+        healthFraction = 0.0f;
+      }
+
+      std::uint32_t healthColor = ui_LifeBarBadColor;
+      if (healthFraction > ui_LifeBarGoodCutoff) {
+        healthColor = ui_LifeBarGoodColor;
+      } else if (healthFraction > ui_LifeBarBadCutoff) {
+        healthColor = ui_LifeBarMedColor;
+      }
+
+      // Rows two and three stay at zero for anything that is not a unit, which
+      // is what suppresses them below.
+      float secondRowFraction = 0.0f;
+      float thirdRowFraction = 0.0f;
+      std::uint32_t secondRowColor = 0u;
+      std::uint32_t thirdRowColor = 0u;
+
+      // Slot 3 (`[vftable+0x0C]`, the non-const overload) is the one the
+      // binary dispatches at 0x0085D091, matching the caller's own test.
+      if (const UserUnit* const unit = icon.mUnit->IsUserUnit(); unit != nullptr) {
+        const float fuelRatio = unit->mUnitVarDat.mFuelRatio;
+        const float shieldRatio = unit->mUnitVarDat.mShieldRatio;
+        const float workProgress = unit->mUnitVarDat.mWorkProgress;
+
+        // -1 is the "this unit has no fuel lane" sentinel, distinct from an
+        // empty tank at 0 (0x0085D0D3 / 0x0085D180).
+        constexpr float kNoFuelLaneSentinel = -1.0f;
+
+        if (shieldRatio > 0.0f) {
+          secondRowColor = ui_ShieldBarColor;
+          secondRowFraction = shieldRatio;
+
+          if (!(fuelRatio > kNoFuelLaneSentinel)) {
+            thirdRowColor = ui_ProgressBarColor;
+            thirdRowFraction = workProgress;
+          } else {
+            thirdRowColor = ui_FuelBarColor;
+            thirdRowFraction = fuelRatio;
+            if (!(0.0f < fuelRatio) && FuelWarningBlinkPhase(aux) > 0.5f) {
+              thirdRowColor = ui_FuelWarningColor;
+              thirdRowFraction = 1.0f;
+            }
+          }
+        } else {
+          if (fuelRatio > workProgress) {
+            secondRowColor = ui_FuelBarColor;
+            secondRowFraction = fuelRatio;
+          } else {
+            secondRowColor = ui_ProgressBarColor;
+            secondRowFraction = workProgress;
+          }
+
+          if (fuelRatio > kNoFuelLaneSentinel && !(0.0f < fuelRatio) && FuelWarningBlinkPhase(aux) > 0.5f) {
+            secondRowColor = ui_FuelWarningColor;
+            secondRowFraction = 1.0f;
+          }
+        }
+
+        if (!(1.0f > secondRowFraction)) {
+          secondRowFraction = 1.0f;
+        }
+        if (0.0f > secondRowFraction) {
+          secondRowFraction = 0.0f;
+        }
+        if (!(1.0f > thirdRowFraction)) {
+          thirdRowFraction = 1.0f;
+        }
+        if (0.0f > thirdRowFraction) {
+          thirdRowFraction = 0.0f;
+        }
+      }
+
+      const float secondRowTop = barTop + (barHeight + kLifebarRowGap);
+      const float thirdRowTop = secondRowTop + (barHeight + kLifebarRowGap);
+
+      // Backdrops first, one row at a time, each row gated on the row above
+      // having something to show.
+      DrawLifebarQuad(primBatcher, barLeft, barTop, barRight, barTop + barHeight, kLifebarBackdropColor);
+
+      float lastRowTop = barTop;
+      if (secondRowFraction > 0.0f) {
+        DrawLifebarQuad(
+          primBatcher, barLeft, secondRowTop, barRight, secondRowTop + barHeight, kLifebarBackdropColor
+        );
+        lastRowTop = secondRowTop;
+
+        if (thirdRowFraction > 0.0f) {
+          DrawLifebarQuad(
+            primBatcher, barLeft, thirdRowTop, barRight, thirdRowTop + barHeight, kLifebarBackdropColor
+          );
+          lastRowTop = thirdRowTop;
+        }
+      }
+
+      labelCursor = Wm3::Vector2f(barLeft + halfBarWidth, lastRowTop + barHeight);
+
+      // Then the coloured fills, inset one pixel inside their backdrops.
+      const float fillTrackWidth = barWidth - 1.0f;
+      const float fillHeight = (barHeight - kLifebarRowGap) + 1.0f;
+      const float fillBottomOffset = (fillHeight < kLifebarMinFillHeight) ? kLifebarMinFillHeight : fillHeight;
+
+      DrawLifebarQuad(
+        primBatcher,
+        barLeft + 1.0f,
+        barTop + 1.0f,
+        barLeft + (healthFraction * fillTrackWidth),
+        barTop + fillBottomOffset,
+        healthColor
+      );
+
+      if (secondRowFraction > 0.0f) {
+        DrawLifebarQuad(
+          primBatcher,
+          barLeft + 1.0f,
+          secondRowTop + 1.0f,
+          barLeft + (secondRowFraction * fillTrackWidth),
+          secondRowTop + fillBottomOffset,
+          secondRowColor
+        );
+
+        if (thirdRowFraction > 0.0f) {
+          DrawLifebarQuad(
+            primBatcher,
+            barLeft + 1.0f,
+            thirdRowTop + 1.0f,
+            barLeft + (thirdRowFraction * fillTrackWidth),
+            thirdRowTop + fillBottomOffset,
+            thirdRowColor
+          );
+        }
+      }
+    }
+
+    /**
+     * Address: 0x0085E0A0 (FUN_0085E0A0, sub_85E0A0)
+     *
+     * IDA signature:
+     * Wm3::Vector2f *__cdecl sub_85E0A0(Wm3::Vector2f *result, UnitIconData *icon,
+     *   struct_IconAux *aux, Wm3::Vector2f *labelCursor, char isMiniMap);
+     *
+     * What it does:
+     * Draws one unit's player-assigned custom name under its status bars and
+     * returns where the text was placed, so the next label down can stack
+     * beneath it. Returns `InvalidScreenPoint()` when nothing was drawn -
+     * labels are off, this is the minimap, or the unit has no custom name -
+     * which is the caller's signal to leave its cursor untouched.
+     *
+     * The label is centred on `labelCursor` when the bar pass gave it one;
+     * otherwise it falls back to projecting the unit itself and applying the
+     * same blueprint + console lifebar offset the bars use. Either way the
+     * text is snapped to whole pixels and drawn twice, an opaque black copy
+     * one pixel down-right first so it stays readable over terrain.
+     */
+    [[nodiscard]] Wm3::Vector2f DrawUnitCustomNameLabel(
+      const UnitIconData& icon,
+      const StrategicIconAuxView& aux,
+      const Wm3::Vector2f& labelCursor,
+      const bool isMiniMap
+    )
+    {
+      if (!ui_RenderCustomNames || isMiniMap) {
+        return InvalidScreenPoint();
+      }
+
+      UserUnit* const unit = icon.mUnit->IsUserUnit();
+
+      // `UserUnit::GetCustomName` (vtable slot 24, `[vftable+0x60]`) hands back
+      // the address of the unit's `msvc8::string`, not a C string - the binary
+      // reads `_Mysize` at +0x14 and picks the inline buffer or heap pointer off
+      // `_Myres` at +0x18. Same reinterpret the console command family uses.
+      const auto& customName = *reinterpret_cast<const msvc8::string*>(unit->GetCustomName());
+      if (customName.empty()) {
+        return InvalidScreenPoint();
+      }
+
+      CD3DFont* const font = CustomNameFont();
+
+      // The second `GetAdvance` argument is not materialised at this call site
+      // (0x0085E196 sets up only the string); zero is the neutral flag value.
+      const float textWidth = font->GetAdvance(customName.c_str(), 0);
+      const float lineHeight = font->mHeight;
+
+      float textLeft = 0.0f;
+      float textBaseline = 0.0f;
+      if (IsValidScreenPoint(labelCursor)) {
+        textLeft = labelCursor.X() - (textWidth * 0.5f);
+        textBaseline = labelCursor.Y();
+      } else {
+        const Wm3::Vector2f projected = aux.mCamera->Project(
+          Wm3::Vector3f(icon.mWorldX, icon.mWorldY, icon.mWorldZ),
+          0.0f,
+          aux.mViewportWidth,
+          aux.mViewportHeight,
+          0.0f
+        );
+        textLeft = projected.X() - (textWidth * 0.5f);
+        textBaseline = (icon.mBlueprint->mLifeBarOffset + projected.Y()) + ui_LifebarOffset;
+      }
+      textBaseline += lineHeight;
+
+      const float snappedLeft = std::floor(textLeft);
+      const float snappedBaseline = std::floor(textBaseline);
+
+      const Wm3::Vector2f shadowOrigin{snappedLeft + kLabelShadowOffset, snappedBaseline + kLabelShadowOffset};
+      const Wm3::Vector2f textOrigin{snappedLeft, snappedBaseline};
+
+      // The trailing glyph-scale / max-advance pair is not passed at either
+      // call site - `Render2D` materialises its own axis constants on entry
+      // (0x00426583..0x004265AB) - so both draws use the file's established
+      // unscaled / unclipped defaults.
+      font->Render2D(
+        customName.c_str(),
+        aux.mBatcher,
+        shadowOrigin,
+        kLabelShadowColor,
+        1.0f,
+        std::numeric_limits<float>::quiet_NaN()
+      );
+      font->Render2D(
+        customName.c_str(),
+        aux.mBatcher,
+        textOrigin,
+        ui_CustomNameColor,
+        1.0f,
+        std::numeric_limits<float>::quiet_NaN()
+      );
+
+      return textOrigin;
+    }
+  } // namespace
+
   /**
    * Address: 0x0085B6E0 (FUN_0085B6E0,
    * ?RenderStrategicIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@@Z)
@@ -14412,20 +14862,35 @@ namespace moho
    *    `v148.playableRectX1` in the original - hovered units are excluded
    *    from all four runs below, matching the binary, but nothing consumes
    *    them yet).
-   *  - The lifebar collection + draw stack (0x0085CD40 bars, 0x0085E0A0
-   *    custom name, 0x0085E3A0 selection-set name): needs
-   *    `show_attached_unit_lifebars` (`OPTIONS_GetBool`) and
-   *    `IUnit::GetAttributes1()->mToggleCaps` / `HasScriptBit`, neither
-   *    modelled yet. The same `GetAttributes1`/`HasScriptBit` gap also means
-   *    the paused-overlay flag below only reflects `mUnitVarDat.mIsPaused`,
-   *    not the additional "toggled off a scripted ability" case the binary
-   *    also sets it for.
+   *  - The lifebar *collection* gate (0x0085BFDB..0x0085C09F), the one site
+   *    that fills `mLifebarIcons`. An earlier pass recorded this as blocked
+   *    on `show_attached_unit_lifebars` (`OPTIONS_GetBool`) and
+   *    `IUnit::GetAttributes1()->mToggleCaps` / `HasScriptBit`; none of those
+   *    appear in the disassembly. What the gate actually reads is
+   *    `ui_RenderUnitBars`, `ui_LifebarLOD` against this frame's zoom,
+   *    `ui_ForceLifbarsOnEnemy`, `IUnit::IsUnitState(UNITSTATE_BeingUpgraded)`
+   *    (slot 15, dispatched at 0x0085C05C with `push 25h`),
+   *    `UserUnit::mIsBusy` (+0x1A2) and
+   *    `IUnit::GetBlueprint()->Display.HideLifebars` (slot 7 at 0x0085C083,
+   *    then the byte at +0x275). Three things still need pinning before it
+   *    can land: the identity of `UserEntity+0x71` and
+   *    `REntityBlueprint+0xF8`, and the session lane at `CWldSession+0x4C0`
+   *    that 0x0085C03A compares the icon's unit against.
+   *
+   *    The draw side of that stack is no longer deferred: the bars
+   *    (0x0085CD40) and the custom-name label (0x0085E0A0) are recovered
+   *    above and run in phase 4 below. Until the collection gate lands,
+   *    `mLifebarIcons` stays empty and that loop is a no-op.
+   *  - The "toggled off a scripted ability" half of the paused-overlay flag
+   *    below, which currently reflects only `mUnitVarDat.mIsPaused`.
+   *  - The selection-set name label (0x0085E3A0), which stacks under the
+   *    custom name using the same cursor protocol.
    *  - The formation-ghost pass ("TStrategicFormationIcon"): needs
    *    `IFormationInstance::Contains`, not modelled yet - a separate,
    *    already-tracked blocker (see the `CFormationInstance` split notes).
    */
   void CWldSession::RenderStrategicIcons(
-    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, CWldMap* const map
+    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, CWldMap* const map, const bool isMiniMap
   )
   {
     // --- Phase 1: lazy singleton build --------------------------------
@@ -14615,7 +15080,38 @@ namespace moho
       }
     }
 
-    // Phase 4 (draw) is deferred - see the function comment above.
+    // --- Phase 4: draw the lifebar / label stack ------------------------
+    // The icon-quad runs collected above are still drawn by the deferred
+    // 0x0085D9A0 pass; this is the bar-and-label stack that follows it in
+    // the binary (0x0085C890..0x0085C9DB).
+    (void)primBatcher->Setup("TLifeBar");
+
+    for (UnitIconData& lifebarIcon : aux.mLifebarIcons) {
+      // The bar pass always writes both components before returning, on every
+      // path; it is the label pass that may decline.
+      Wm3::Vector2f labelCursor{};
+      DrawUnitLifebars(lifebarIcon, labelCursor, aux);
+
+      // Props and wrecks get bars but never labels - only a real unit can
+      // carry a custom name or belong to a named selection set
+      // (0x0085C915..0x0085C923).
+      if (lifebarIcon.mUnit->IsUserUnit() == nullptr) {
+        continue;
+      }
+
+      // A label that declined to draw returns the NaN sentinel, which leaves
+      // the cursor where the bars left it so the next label still stacks
+      // correctly (the caller-side isnan pair at 0x0085C973/0x0085C989).
+      const Wm3::Vector2f afterCustomName = DrawUnitCustomNameLabel(lifebarIcon, aux, labelCursor, isMiniMap);
+      if (IsValidScreenPoint(afterCustomName)) {
+        labelCursor = afterCustomName;
+      }
+
+      // The selection-set name label (0x0085E3A0) stacks under this one and
+      // is still deferred - see the function comment above.
+    }
+
+    primBatcher->Flush();
   }
 
   /**

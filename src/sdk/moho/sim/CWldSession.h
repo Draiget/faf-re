@@ -1177,7 +1177,15 @@ namespace moho
      * already documented on `DrawEconomyOverlay` below; retyping the whole
      * `map` slot chain is a separate pass that has to own CRenderWorldView.
      */
-    void RenderStrategicIcons(CameraImpl* camera, CD3DPrimBatcher* primBatcher, CWldMap* map);
+    /**
+     * `isMiniMap` is a fourth argument the mangled name does not carry.
+     * `CRenderWorldView::Render` dispatches `IsMiniMap()` at 0x0086EE4E and
+     * pushes the result at 0x0086EE5B as the fifth stack slot (the first
+     * holds `this`), and this function forwards it - unmodified, loop
+     * invariant - to both label passes as their suppress flag: the minimap
+     * draws bars but never text.
+     */
+    void RenderStrategicIcons(CameraImpl* camera, CD3DPrimBatcher* primBatcher, CWldMap* map, bool isMiniMap);
 
     /**
      * Address: 0x008621B0 (FUN_008621B0,
