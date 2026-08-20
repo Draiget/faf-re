@@ -5,10 +5,13 @@
 #include <cstdint>
 #include <limits>
 
+#include "gpg/core/containers/Rect2.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
@@ -108,12 +111,101 @@ namespace
 
     indexSheet->Unlock();
   }
+
+  /// Fixed-point scale of the 16-bit terrain height grid (1/128). Byte-verified
+  /// from `flt_E4F6DC` @0x00E4F6DC = 0x3C000000.
+  constexpr float kHeightWordScale = 0.0078125f;
+
+  /// Vertex colour of the dirty-terrain overlay quads (opaque white; the tint
+  /// comes from the batch texture). 0x00801F81/0x008021E4/... `mov ..., -1`.
+  constexpr std::uint32_t kDirtyRectVertexColor = 0xFFFFFFFFu;
+
+  /// Solid-colour batch texture the dirty-terrain overlay is drawn with:
+  /// half-transparent magenta. 0x00801FB4 `push 8000FFFFh`.
+  constexpr std::uint32_t kDirtyRectOverlayColor = 0x8000FFFFu;
+
+  /**
+   * Builds one corner vertex of a dirty-rectangle overlay quad: the grid
+   * position as-is, the terrain height sampled at the clamped grid cell, and
+   * the caller's UV.
+   *
+   * The binary open-codes the clamp four times over
+   * 0x008020F3-0x0080228E - `min` against the last grid index first, then `max`
+   * against zero - rather than calling `CHeightField::GetHeightAt`
+   * (0x00478490), whose null/size guard is absent here. The two agree for every
+   * in-range field, but the clamp is reproduced rather than substituted so the
+   * degenerate-field behaviour stays the binary's.
+   */
+  [[nodiscard]] moho::CD3DPrimBatcher::Vertex MakeDirtyRectCornerVertex(
+    const moho::CHeightField& field,
+    const std::int32_t x,
+    const std::int32_t z,
+    const float u,
+    const float v
+  ) noexcept
+  {
+    const std::int32_t sampleX = std::max(std::min(x, field.width - 1), 0);
+    const std::int32_t sampleZ = std::max(std::min(z, field.height - 1), 0);
+
+    moho::CD3DPrimBatcher::Vertex vertex{};
+    vertex.mX = static_cast<float>(x);
+    vertex.mY = static_cast<float>(field.data[(sampleZ * field.width) + sampleX]) * kHeightWordScale;
+    vertex.mZ = static_cast<float>(z);
+    vertex.mColor = kDirtyRectVertexColor;
+    vertex.mU = u;
+    vertex.mV = v;
+    return vertex;
+  }
+
+  /**
+   * Dirty-rectangle visibility predicate for the debug overlay: strict interior
+   * overlap with the camera footprint first (0x00802070-0x008020AA, which is
+   * `gpg::Rect2i::Overlaps` inlined verbatim, both positive-area guards
+   * included), and failing that an inclusive containment test of the dirty rect
+   * inside the footprint (0x008020B7-0x008020DD).
+   *
+   * `CWldMap.cpp` carries the same predicate with the two arms swapped
+   * (`ShouldSyncDirtyRectInCameraBounds`); it is file-private there, and the
+   * arm order here is the one 0x00801EE0 evaluates.
+   */
+  [[nodiscard]] bool DirtyRectVisibleInCameraFootprint(
+    const gpg::Rect2i& cameraFootprint,
+    const gpg::Rect2i& dirtyRect
+  ) noexcept
+  {
+    if (cameraFootprint.Overlaps(dirtyRect)) {
+      return true;
+    }
+
+    return dirtyRect.x0 >= cameraFootprint.x0
+      && cameraFootprint.x1 >= dirtyRect.x1
+      && dirtyRect.z0 >= cameraFootprint.z0
+      && cameraFootprint.z1 >= dirtyRect.z1;
+  }
 } // namespace
 
 namespace moho
 {
   extern bool ren_Terrain;
   extern bool ren_Skirt;
+
+  /**
+   * Address: 0x010A643D (?ren_ShowDirtyTerrain@Moho@@3_NA)
+   *
+   * What it does:
+   * Debug toggle read by `HighFidelityTerrain::DrawDirtyTerrain` (0x00801F01)
+   * as the single gate on the dirty-rectangle overlay pass. The address lies in
+   * the zero-fill tail of `.data` (raw size 0x60000 ends before it), so the
+   * shipped image default is `false`.
+   *
+   * Defined once in `moho/misc/RuntimeTuningGlobals.cpp` alongside the rest of
+   * the `ren_*` toggle table, which is where the binary's own zero-fill lane
+   * for this address belongs; declared `extern` here (as
+   * `MediumFidelityTerrain.cpp` already does for the same global) so the two
+   * fidelity backends read the one object rather than each getting a private
+   * copy.
+   */
+  extern bool ren_ShowDirtyTerrain;
 
   // The primary patch lane is reinterpreted as the decal command lane by
   // the decal passes, exactly as low fidelity does: 0x10 header + 500 * 0x18
@@ -1446,6 +1538,189 @@ namespace moho
     vertexView.endVertex = static_cast<std::int32_t>(mUnknown30);
 
     (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
+   * Address: 0x00801B10 (FUN_00801B10, Moho::HighFidelityTerrain::CondDrawTerrainTechnique)
+   * Primary vtable slot 7 (vftable @0x00E41A14, slot @0x00E41A30 -> 0x00801B10).
+   *
+   * IDA signature:
+   * void __userpurge Moho::HighFidelityTerrain::CondDrawTerrainTechnique(
+   *     Moho::HighFidelityTerrain *this@<ecx>, float, std::string *params);
+   *
+   * What it does:
+   * Draws one terrain pass under a caller-chosen technique. Gated on
+   * `ren_Terrain` like the rest of the class: selects the `terrain` effect and
+   * the technique named at `params + 0x00`, binds the pass's view matrix
+   * (`params + 0x5C`, 0x00801B70) and projection matrix (`params + 0x1C`,
+   * 0x00801B8F) and the tesselator height scale, then issues the terrain
+   * triangle list.
+   *
+   * The height scale is fetched before the `Exists()` guard in the binary
+   * (0x00801B95 calls the tesselator, 0x00801BAB tests the var), so the
+   * tesselator call happens whether or not the var is bound.
+   *
+   * This is the exact twin of `MediumFidelityTerrain::CondDrawTerrainTechnique`
+   * (0x00805B50) down to the instruction shape.
+   */
+  void HighFidelityTerrain::CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique(params.mTechniqueName.c_str());
+
+    auto& shaderVars = GetTerrainShaderVars();
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&params.mView);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&params.mProjection);
+    }
+
+    const float heightScale = mTesselator->GetHeightScale();
+    if (shaderVars.heightScale.Exists()) {
+      shaderVars.heightScale.SetFloat(heightScale);
+    }
+
+    DrawTriangles();
+  }
+
+  /**
+   * Address: 0x00803640 (FUN_00803640, Moho::HighFidelityTerrain::DrawTerrainTechnique)
+   * Primary vtable slot 13 (vftable @0x00E41A14, slot @0x00E41A48 -> 0x00803640).
+   *
+   * IDA signature:
+   * void __thiscall Moho::HighFidelityTerrain::DrawTerrainTechnique(
+   *     Moho::HighFidelityTerrain *this, boost::shared_ptr_CD3DDynamicTextureSheet overlay,
+   *     std::string *techniqueName);
+   *
+   * What it does:
+   * Runs one full opaque terrain pass. Rebinds all terrain-lighting shader vars
+   * with no shadow source (0x00803662, `LoadTerrainLighting(nullptr)`),
+   * re-selects the `terrain` effect, selects the caller-provided technique,
+   * binds the overlay texture sheet into the `overlayTexture` shader var
+   * (0x008036A5), loads the base terrain shader vars with an empty
+   * terrain-normal handle (the zeroed 8-byte block built at
+   * 0x008036AD-0x008036BA), and submits the terrain triangle list. The retained
+   * overlay handle is released as the by-value `shared_ptr` parameter goes out
+   * of scope (0x008036D3-0x00803703, the unwind funclet at 0x00BBD670).
+   *
+   * The binary calls `D3D_GetDevice` twice - once per selection - and that is
+   * preserved here; the same shape is in
+   * `MediumFidelityTerrain::DrawTerrain` (0x00807660).
+   */
+  void HighFidelityTerrain::DrawTerrainTechnique(
+    boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+    const msvc8::string* const techniqueName
+  )
+  {
+    LoadTerrainLighting(nullptr);
+
+    D3D_GetDevice()->SelectFxFile("terrain");
+    D3D_GetDevice()->SelectTechnique(techniqueName->c_str());
+
+    GetTerrainShaderVars().overlayTexture.GetTexture(overlayTexture);
+
+    LoadShaderVars({});
+
+    DrawTriangles();
+  }
+
+  /**
+   * Address: 0x00801EE0 (FUN_00801EE0, Moho::HighFidelityTerrain::DrawDirtyTerrain)
+   * Primary vtable slot 14 (vftable @0x00E41A14, slot @0x00E41A4C -> 0x00801EE0).
+   *
+   * IDA signature:
+   * void __thiscall Moho::HighFidelityTerrain::DrawDirtyTerrain(
+   *     Moho::HighFidelityTerrain *this, Moho::CD3DPrimBatcher *batcher);
+   *
+   * What it does:
+   * The dirty-rectangle debug overlay, gated on `ren_ShowDirtyTerrain`
+   * (0x00801F01). Sets the prim batcher up for the `primbatcher` effect's
+   * `TAlphaBlendLinearSampleNoDepth` technique - the binary inlines
+   * `CD3DPrimBatcher::Setup` (0x00438560) here, right down to the
+   * `mRebuildComposite = 0` store at 0x00801F39 - then binds the terrain
+   * camera's projection and view matrices, in that order.
+   *
+   * It computes the terrain footprint of the camera frustum
+   * (`CHeightField::ConvexIntersection` against `mCamera->solid2`), truncates
+   * its X/Z bounds to grid indices, and binds a half-transparent magenta
+   * solid-colour batch texture. Then, for every rectangle in the terrain
+   * resource's debug dirty-rectangle list that either strictly overlaps that
+   * footprint or is fully contained by it, it emits one height-conforming quad:
+   * the four corners take the rectangle's own X/Z but sample terrain height at
+   * the clamped grid cell, so the quad hugs the terrain. A final `Flush`
+   * submits the batch.
+   *
+   * The terrain resource is read straight off the `sWldMap` global twice - once
+   * for the height field, once for the dirty-rect list - exactly as
+   * `HighFidelityTerrain::DrawShoreline` (0x008131D0) reads it in this file.
+   */
+  void HighFidelityTerrain::DrawDirtyTerrain(CD3DPrimBatcher* const batcher)
+  {
+    if (!ren_ShowDirtyTerrain) {
+      return;
+    }
+
+    (void)batcher->Setup("TAlphaBlendLinearSampleNoDepth");
+
+    const GeomCamera3& camera = *mCamera;
+    batcher->SetProjectionMatrix(camera.projection);
+    batcher->SetViewMatrix(camera.view);
+
+    IWldTerrainRes* heightFieldSource = nullptr;
+    if (CWldSession* const activeSession = WLD_GetActiveSession();
+        activeSession != nullptr && activeSession->mWldMap != nullptr) {
+      heightFieldSource = activeSession->mWldMap->mTerrainRes;
+    }
+
+    const auto* const heightFieldView = reinterpret_cast<const TerrainWaterResourceView*>(heightFieldSource);
+    const auto* const heightField =
+      reinterpret_cast<const CHeightField*>(heightFieldView->mMap->mHeightFieldObject);
+
+    // Terrain footprint of the camera frustum, truncated to grid indices. The
+    // binary keeps only the X/Z lanes of the box (0x00801F88-0x00801FA3
+    // `cvttss2si` against Min.x / Min.z / Max.x / Max.z).
+    const Wm3::AxisAlignedBox3f cameraBounds = heightField->ConvexIntersection(camera.solid2);
+    const gpg::Rect2i cameraFootprint{
+      static_cast<std::int32_t>(cameraBounds.Min.X()),
+      static_cast<std::int32_t>(cameraBounds.Min.Z()),
+      static_cast<std::int32_t>(cameraBounds.Max.X()),
+      static_cast<std::int32_t>(cameraBounds.Max.Z())
+    };
+
+    // Temporary on purpose: the binary drops the control block immediately
+    // after the bind (0x00801FE6-0x00802023), not at end of scope.
+    batcher->SetTexture(CD3DBatchTexture::FromSolidColor(kDirtyRectOverlayColor));
+
+    IWldTerrainRes* dirtyRectSource = nullptr;
+    if (CWldSession* const activeSession = WLD_GetActiveSession();
+        activeSession != nullptr && activeSession->mWldMap != nullptr) {
+      dirtyRectSource = activeSession->mWldMap->mTerrainRes;
+    }
+
+    for (const gpg::Rect2i& dirtyRect : dirtyRectSource->GetDebugDirtyRects()) {
+      if (!DirtyRectVisibleInCameraFootprint(cameraFootprint, dirtyRect)) {
+        continue;
+      }
+
+      const CD3DPrimBatcher::Vertex nearLeft =
+        MakeDirtyRectCornerVertex(*heightField, dirtyRect.x0, dirtyRect.z0, 0.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex nearRight =
+        MakeDirtyRectCornerVertex(*heightField, dirtyRect.x1, dirtyRect.z0, 1.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex farRight =
+        MakeDirtyRectCornerVertex(*heightField, dirtyRect.x1, dirtyRect.z1, 1.0f, 1.0f);
+      const CD3DPrimBatcher::Vertex farLeft =
+        MakeDirtyRectCornerVertex(*heightField, dirtyRect.x0, dirtyRect.z1, 0.0f, 1.0f);
+
+      batcher->DrawQuad(farLeft, farRight, nearRight, nearLeft);
+    }
+
+    batcher->Flush();
   }
 
   /**

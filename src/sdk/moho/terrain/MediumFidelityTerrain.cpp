@@ -34,6 +34,7 @@
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
 
 namespace
 {
@@ -52,6 +53,89 @@ namespace
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
   constexpr float kMinDecalAlpha = 0.0039215689f;
   constexpr std::int32_t kMaxSplatsPerFrame = 2500;
+
+  // ----- ren_ShowDirtyTerrain debug-overlay helpers (FUN_00805F10) -----
+
+  /// Solid-colour batch texture the dirty-terrain overlay draws with
+  /// (0x00805FE4 `push 8000FFFFh`): half-transparent cyan.
+  constexpr std::uint32_t kDirtyTerrainOverlayColor = 0x8000FFFFu;
+
+  /// Per-vertex colour of every dirty-rect quad (0x008061B1 and siblings write
+  /// `0FFFFFFFFh` into `Vertex::mColor`).
+  constexpr std::uint32_t kDirtyRectVertexColor = 0xFFFFFFFFu;
+
+  /// `flt_E4F6DC` (0x3C000000 == 1/128): the terrain height-word to world-unit
+  /// scale every `movzx`/`cvtsi2ss`/`mulss xmm0, xmm1` triple applies.
+  constexpr float kHeightWordScale = 0.0078125f;
+
+  /**
+   * The height-field the active world map is rendering.
+   *
+   * `REN_GetTerrainRes()` is inlined at 0x00805F88 (`mov eax, sWldMap` /
+   * `mov eax, [eax+4]`); the two further loads at 0x00805F98/0x00805F9B walk
+   * `IWldTerrainRes::mPlayableRectSource` (+0x04, the owning `STIMap`) and
+   * that map's first member, the shared height-field handle. There is no null
+   * guard in the binary and none is added here.
+   */
+  [[nodiscard]] moho::CHeightField& ActiveTerrainHeightField(moho::IWldTerrainRes& terrainRes) noexcept
+  {
+    return *reinterpret_cast<moho::STIMap*>(terrainRes.mPlayableRectSource)->GetHeightField();
+  }
+
+  /**
+   * `view` covers `rect` on all four edges (inclusive).
+   *
+   * The second half of the per-rect gate at 0x008060E7-0x0080610D, tested in
+   * exactly this order. `gpg::Rect2` models the strict-overlap half
+   * (`Overlaps`) but has no rect-in-rect predicate, so it lives here.
+   */
+  [[nodiscard]] bool RectCovers(const gpg::Rect2i& view, const gpg::Rect2i& rect) noexcept
+  {
+    return rect.x0 >= view.x0 && view.x1 >= rect.x1 && rect.z0 >= view.z0 && view.z1 >= rect.z1;
+  }
+
+  /// Clamp one grid coordinate into `[0, extent - 1]`, in the binary's
+  /// min-then-max order (`cmp`/`cmovless` pair, then `test`/`jge` against 0).
+  [[nodiscard]] std::int32_t ClampHeightSampleIndex(const std::int32_t coordinate, const std::int32_t extent) noexcept
+  {
+    std::int32_t clamped = extent - 1;
+    if (coordinate < clamped) {
+      clamped = coordinate;
+    }
+    if (clamped < 0) {
+      clamped = 0;
+    }
+    return clamped;
+  }
+
+  /// Height-field sample at `(x, z)` in world units, edge-clamped.
+  [[nodiscard]] float
+    SampleTerrainHeight(const moho::CHeightField& field, const std::int32_t x, const std::int32_t z) noexcept
+  {
+    const std::int32_t sampleX = ClampHeightSampleIndex(x, field.width);
+    const std::int32_t sampleZ = ClampHeightSampleIndex(z, field.height);
+    return static_cast<float>(field.data[sampleX + (sampleZ * field.width)]) * kHeightWordScale;
+  }
+
+  /// One dirty-rect quad corner: grid position lifted onto the terrain surface,
+  /// opaque white, with the caller's unit UV.
+  [[nodiscard]] moho::CD3DPrimBatcher::Vertex MakeDirtyRectCorner(
+    const moho::CHeightField& field,
+    const std::int32_t x,
+    const std::int32_t z,
+    const float u,
+    const float v
+  ) noexcept
+  {
+    moho::CD3DPrimBatcher::Vertex corner{};
+    corner.mX = static_cast<float>(x);
+    corner.mY = SampleTerrainHeight(field, x, z);
+    corner.mZ = static_cast<float>(z);
+    corner.mColor = kDirtyRectVertexColor;
+    corner.mU = u;
+    corner.mV = v;
+    return corner;
+  }
 
   [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
   {
@@ -133,10 +217,18 @@ namespace moho
     return shadowContext.useSecondaryShadowTexture ? shadowContext.secondaryShadowTexture
                                                    : shadowContext.primaryShadowTexture;
   }
+  // Defined in moho/app/WxRuntimeTypes.cpp (0x007FA170); folds in both the map
+  // and terrain null checks. FUN_00805F10 inlines it twice (0x00805F88 and
+  // 0x00806055) rather than caching the result.
+  [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
+
   extern bool ren_Terrain;
   extern bool ren_Skirt;
   extern bool ren_Decals;
   extern bool ren_ShowNormals;
+  /// 0x010A643D, zero-fill. Gates the dirty-terrain debug overlay
+  /// (0x00805F31 `cmp ?ren_ShowDirtyTerrain@Moho@@3_NA, 0`).
+  extern bool ren_ShowDirtyTerrain;
   extern bool ren_DecalOverDraw;
   extern bool ren_glowingDecals;
   extern bool ren_bicubicnormals;
@@ -642,6 +734,81 @@ namespace moho
     LoadShaderVars({});
 
     DrawTriangles();
+  }
+
+  /**
+   * Address: 0x00805F10 (FUN_00805F10, Moho::MediumFidelityTerrain::DrawDirtyTerrain)
+   * Primary vtable slot 14 (??_7MediumFidelityTerrain@Moho@@6B@ @0x00E41A54, +0x38).
+   *
+   * IDA signature:
+   * void __thiscall Moho::MediumFidelityTerrain::DrawDirtyTerrain(
+   *     MediumFidelityTerrain *this@<ecx>, Moho::CD3DPrimBatcher *primBatcher);
+   *
+   * What it does:
+   * Draws the `ren_ShowDirtyTerrain` debug overlay. Sets the prim batcher up on
+   * the `primbatcher` effect's `TAlphaBlendLinearSampleNoDepth` technique, binds
+   * the terrain camera's projection/view matrices and a half-transparent cyan
+   * solid-colour batch texture, intersects the camera's far frustum solid with
+   * the terrain to get the visible grid footprint, then emits one terrain-hugging
+   * quad per entry of the terrain resource's debug dirty-rect list that the
+   * footprint either strictly overlaps or fully covers. Flushes the batcher on
+   * the way out.
+   *
+   * The two gate halves are the binary's own predicates: the first
+   * (0x008060A0-0x008060DA) is `gpg::Rect2::Overlaps` inlined, operand for
+   * operand including its two `IsRegular` tails; the second
+   * (0x008060E7-0x0080610D) is the inclusive rect-covers-rect test. Each quad
+   * corner samples the height field with the coordinate clamped to
+   * `[0, extent-1]` - the same edge clamp the sibling terrain-decal code uses,
+   * but without `CHeightField::GetHeightAt`'s null/extent guard, which this
+   * body does not perform.
+   */
+  void MediumFidelityTerrain::DrawDirtyTerrain(CD3DPrimBatcher* const primBatcher)
+  {
+    if (!ren_ShowDirtyTerrain) {
+      return;
+    }
+
+    // `CD3DPrimBatcher::Setup` (0x00438560) inlined at 0x00805F43-0x00805F6F:
+    // SelectFxFile + SelectTechnique + clear the composite-rebuild flag.
+    primBatcher->Setup("TAlphaBlendLinearSampleNoDepth");
+    primBatcher->SetProjectionMatrix(mCamera->projection);
+    primBatcher->SetViewMatrix(mCamera->view);
+
+    const CHeightField& heightField = ActiveTerrainHeightField(*REN_GetTerrainRes());
+    const Wm3::AxisAlignedBox3f cameraFootprint = heightField.ConvexIntersection(mCamera->solid2);
+
+    // Four `cvttss2si` at 0x00805FB8-0x00805FDB: the footprint's Y extent is
+    // never read, and the XZ extent truncates toward zero rather than flooring.
+    const gpg::Rect2i visibleRect{
+      static_cast<std::int32_t>(cameraFootprint.Min.x),
+      static_cast<std::int32_t>(cameraFootprint.Min.z),
+      static_cast<std::int32_t>(cameraFootprint.Max.x),
+      static_cast<std::int32_t>(cameraFootprint.Max.z)
+    };
+
+    // The temporary is released at the end of the full expression, matching the
+    // guarded release at 0x00806016-0x00806053.
+    primBatcher->SetTexture(CD3DBatchTexture::FromSolidColor(kDirtyTerrainOverlayColor));
+
+    for (const gpg::Rect2i& dirtyRect : REN_GetTerrainRes()->GetDebugDirtyRects()) {
+      if (!visibleRect.Overlaps(dirtyRect) && !RectCovers(visibleRect, dirtyRect)) {
+        continue;
+      }
+
+      const CD3DPrimBatcher::Vertex nearLeft =
+        MakeDirtyRectCorner(heightField, dirtyRect.x0, dirtyRect.z0, 0.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex nearRight =
+        MakeDirtyRectCorner(heightField, dirtyRect.x1, dirtyRect.z0, 1.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex farRight =
+        MakeDirtyRectCorner(heightField, dirtyRect.x1, dirtyRect.z1, 1.0f, 1.0f);
+      const CD3DPrimBatcher::Vertex farLeft =
+        MakeDirtyRectCorner(heightField, dirtyRect.x0, dirtyRect.z1, 0.0f, 1.0f);
+
+      primBatcher->DrawQuad(farLeft, farRight, nearRight, nearLeft);
+    }
+
+    primBatcher->Flush();
   }
 
   /**

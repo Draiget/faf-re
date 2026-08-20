@@ -63,10 +63,50 @@ namespace moho
 
   class CD3DDynamicTextureSheet;
   class CD3DIndexSheet;
+  class CD3DPrimBatcher;
   class CD3DVertexSheet;
   class CTesselator;
   struct GeomCamera3;
   struct TerrainWaterResourceView;
+
+  /**
+   * Draw parameters for one terrain technique pass - the argument block of
+   * `IRenTerrain` vtable slot 7 (`CondDrawTerrainTechnique`), shared by every
+   * fidelity class that overrides that slot.
+   *
+   * Derived from FUN_00805B50's operands, which all normalise to the same
+   * stack argument: the technique name is an `msvc8::string` at +0x00 whose
+   * `_Myres` the binary tests at +0x18 and whose SSO buffer it reads at
+   * +0x04; the two matrices sit at +0x1C and +0x5C. Those tile exactly:
+   * a 28-byte msvc8::string ends at 0x1C, and 0x1C + 0x40 == 0x5C. The
+   * low-fidelity override (FUN_00809050) reads the same three offsets
+   * (0x0080907A `cmp [eax+18h], 10h`, 0x008090B0 `lea eax, [edi+5Ch]`,
+   * 0x008090CF `add edi, 1Ch`).
+   *
+   * Note the offsets coincide with `GeomCamera3` (projection +0x1C, view
+   * +0x5C), because a `VTransform` is also 0x1C bytes. It is not a camera:
+   * +0x18 there is `pos_.z`, and the binary tests that slot as an integer
+   * string length.
+   */
+  struct STerrainTechniqueDrawParams
+  {
+    msvc8::string mTechniqueName; // +0x00
+    VMatrix4 mProjection;         // +0x1C
+    VMatrix4 mView;               // +0x5C
+  };
+
+  static_assert(
+    offsetof(STerrainTechniqueDrawParams, mTechniqueName) == 0x00,
+    "STerrainTechniqueDrawParams::mTechniqueName offset must be 0x00"
+  );
+  static_assert(
+    offsetof(STerrainTechniqueDrawParams, mProjection) == 0x1C,
+    "STerrainTechniqueDrawParams::mProjection offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(STerrainTechniqueDrawParams, mView) == 0x5C,
+    "STerrainTechniqueDrawParams::mView offset must be 0x5C"
+  );
 
   /**
    * Runtime shadow-render context passed into the terrain-lighting binder when
@@ -391,47 +431,41 @@ namespace moho
     void DrawTerrainSkirt() override;
 
     /**
-     * Draw parameters for one terrain technique pass.
-     *
-     * Derived from FUN_00805B50's operands, which all normalise to the same
-     * stack argument: the technique name is an `msvc8::string` at +0x00 whose
-     * `_Myres` the binary tests at +0x18 and whose SSO buffer it reads at
-     * +0x04; the two matrices sit at +0x1C and +0x5C. Those tile exactly:
-     * a 28-byte msvc8::string ends at 0x1C, and 0x1C + 0x40 == 0x5C.
-     *
-     * Note the offsets coincide with `GeomCamera3` (projection +0x1C, view
-     * +0x5C), because a `VTransform` is also 0x1C bytes. It is not a camera:
-     * +0x18 there is `pos_.z`, and the binary tests that slot as an integer
-     * string length.
-     */
-    struct STerrainTechniqueDrawParams
-    {
-      msvc8::string mTechniqueName;  // +0x00
-      VMatrix4 mProjection;          // +0x1C
-      VMatrix4 mView;                // +0x5C
-    };
-
-    /**
      * Address: 0x00805B50 (FUN_00805B50, Moho::MediumFidelityTerrain::CondDrawTerrainTechnique)
+     * Primary vtable slot 7 (??_7MediumFidelityTerrain@Moho@@6B@ @0x00E41A54, +0x1C).
+     *
+     * IDA signature:
+     * void __userpurge Moho::MediumFidelityTerrain::CondDrawTerrainTechnique(
+     *     int this@<ecx>, int@<esi>, float, int params);
      *
      * What it does:
      * Draws one terrain pass under a caller-chosen technique, gated on
      * `ren_Terrain`.
+     *
+     * The binary's frame is `retn 8` - a leading dword the body never reads
+     * (its stack slot is reused as the `fstp` scratch for the height scale at
+     * 0x00805BE2) followed by the params block. Only the params block is
+     * modeled; the dead leading argument has no observable effect. The
+     * low-fidelity override at 0x00809050 has the identical frame.
      */
-    void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
 
-    static_assert(
-      offsetof(STerrainTechniqueDrawParams, mTechniqueName) == 0x00,
-      "STerrainTechniqueDrawParams::mTechniqueName offset must be 0x00"
-    );
-    static_assert(
-      offsetof(STerrainTechniqueDrawParams, mProjection) == 0x1C,
-      "STerrainTechniqueDrawParams::mProjection offset must be 0x1C"
-    );
-    static_assert(
-      offsetof(STerrainTechniqueDrawParams, mView) == 0x5C,
-      "STerrainTechniqueDrawParams::mView offset must be 0x5C"
-    );
+    /**
+     * Address: 0x00805F10 (FUN_00805F10, Moho::MediumFidelityTerrain::DrawDirtyTerrain)
+     * Primary vtable slot 14 (??_7MediumFidelityTerrain@Moho@@6B@ @0x00E41A54, +0x38).
+     *
+     * IDA signature:
+     * void __thiscall Moho::MediumFidelityTerrain::DrawDirtyTerrain(
+     *     MediumFidelityTerrain *this@<ecx>, Moho::CD3DPrimBatcher *primBatcher);
+     *
+     * What it does:
+     * Debug overlay pass (`ren_ShowDirtyTerrain`). Sets the prim batcher up on
+     * the `primbatcher` effect's `TAlphaBlendLinearSampleNoDepth` technique
+     * with the terrain camera's matrices and a half-transparent cyan solid
+     * texture, then draws one terrain-hugging quad per debug dirty rectangle
+     * that the camera footprint overlaps or fully covers.
+     */
+    virtual void DrawDirtyTerrain(CD3DPrimBatcher* primBatcher);
 
   private:
     /**

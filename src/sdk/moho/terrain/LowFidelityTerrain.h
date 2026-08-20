@@ -22,6 +22,7 @@ namespace gpg::gal
 namespace moho
 {
   class CD3DIndexSheet;
+  class CD3DPrimBatcher;
   class CD3DTextureBatcher;
   class CD3DVertexSheet;
   class CTesselator;
@@ -31,6 +32,7 @@ namespace moho
   class StratumMaterial;
   struct GeomCamera3;
   struct SNormalMapInfo;
+  struct STerrainTechniqueDrawParams;
   struct TerrainShadowContext;
 
   /**
@@ -129,6 +131,27 @@ namespace moho
     void DrawTerrainDepth(const GeomCamera3& camera) override;
 
     /**
+     * Address: 0x00809050 (FUN_00809050, Moho::LowFidelityTerrain::CondDrawTerrainTechnique)
+     * Primary vtable slot 7 (??_7LowFidelityTerrain@Moho@@6B@ @0x00E41A94, +0x1C).
+     *
+     * IDA signature:
+     * void __userpurge sub_809050(int this@<ecx>, int@<edi>, int@<esi>,
+     *     float, int params);
+     *
+     * What it does:
+     * Draws one terrain pass under a caller-chosen technique. Instruction for
+     * instruction the same body as the medium-fidelity override at 0x00805B50,
+     * differing only in the tesselator field offset (+0x10 rather than +0x2F30)
+     * and in which indexed-draw helper closes the pass.
+     *
+     * Like the medium-fidelity override, the binary's frame is `retn 8`: a
+     * leading dword the body never reads (its slot is reused as the `fstp`
+     * scratch for the height scale at 0x008090DF) followed by the params block.
+     * Only the params block is modeled.
+     */
+    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+
+    /**
      * Address: 0x00809B20 (FUN_00809B20, Moho::LowFidelityTerrain::DrawTerrainNormal)
      *
      * What it does:
@@ -152,12 +175,17 @@ namespace moho
 
     /**
      * Address: 0x00809D70 (FUN_00809D70, Moho::LowFidelityTerrain::DrawDirtyTerrain)
+     * Primary vtable slot 14 (??_7LowFidelityTerrain@Moho@@6B@ @0x00E41A94, +0x38).
      *
      * What it does:
      * Preserves the dirty-terrain pass hook as an intentional no-op for this
-     * low-fidelity terrain lane.
+     * low-fidelity terrain lane - the whole body is `retn 4`.
+     *
+     * The parameter type comes from the medium-fidelity override of the same
+     * slot (0x00805F10), which uses it as the `CD3DPrimBatcher` the debug
+     * overlay quads are queued on.
      */
-    virtual void DrawDirtyTerrain(std::int32_t arg0);
+    virtual void DrawDirtyTerrain(CD3DPrimBatcher* primBatcher);
 
     /**
      * Address: 0x00808590 (FUN_00808590, Moho::LowFidelityTerrain::Destroy)

@@ -5,7 +5,9 @@
 
 #include "boost/weak_ptr.h"
 #include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/String.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/water/Shoreline.h"
 
@@ -17,7 +19,9 @@ namespace gpg::gal
 namespace moho
 {
   class ID3DRenderTarget;
+  class CD3DDynamicTextureSheet;
   class CD3DIndexSheet;
+  class CD3DPrimBatcher;
   class CD3DVertexSheet;
   class CTesselator;
   struct GeomCamera3;
@@ -120,7 +124,7 @@ namespace moho
 
     /**
      * Address: 0x008003E0 (FUN_008003E0, Moho::HighFidelityTerrain::Func3)
-     * Primary vtable slot 5 (vftable @0x00E41A94; TerrainCommon slot 5).
+     * Primary vtable slot 5 (vftable @0x00E41A14, slot @0x00E41A28; TerrainCommon slot 5).
      *
      * What it does:
      * Per-frame render-context update. No-ops when `mTerrainResource` is
@@ -268,6 +272,71 @@ namespace moho
      * sheets when the legacy index-count lane is positive and divisible by 3.
      */
     void DrawTriangles();
+
+    /**
+     * Address: 0x00801B10 (FUN_00801B10, Moho::HighFidelityTerrain::CondDrawTerrainTechnique)
+     * Primary vtable slot 7 (vftable @0x00E41A14, slot @0x00E41A30 -> 0x00801B10).
+     *
+     * IDA signature:
+     * void __userpurge Moho::HighFidelityTerrain::CondDrawTerrainTechnique(
+     *     Moho::HighFidelityTerrain *this@<ecx>, float, std::string *params);
+     *
+     * What it does:
+     * Draws one terrain pass under a caller-chosen technique, gated on
+     * `ren_Terrain`. Selects the `terrain` effect and the technique named in
+     * the params block, binds that block's view and projection matrices plus
+     * the tesselator height scale, then issues the terrain triangle list.
+     * Unlike `DrawTerrainDepth` the technique is not a literal - it comes from
+     * the params block, which is what makes this the `Cond` variant.
+     *
+     * `STerrainTechniqueDrawParams` is the shared slot-7 argument block; its
+     * single owning definition lives in `MediumFidelityTerrain.h` (namespace
+     * scope, not nested), which is why that header is included here. 0x00801B10
+     * reads the same three displacements the medium override does: +0x00/+0x18
+     * for the technique string, +0x1C for the projection, +0x5C for the view.
+     */
+    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+
+    /**
+     * Address: 0x00803640 (FUN_00803640, Moho::HighFidelityTerrain::DrawTerrainTechnique)
+     * Primary vtable slot 13 (vftable @0x00E41A14, slot @0x00E41A48 -> 0x00803640).
+     *
+     * IDA signature:
+     * void __thiscall Moho::HighFidelityTerrain::DrawTerrainTechnique(
+     *     Moho::HighFidelityTerrain *this, boost::shared_ptr_CD3DDynamicTextureSheet overlay,
+     *     std::string *techniqueName);
+     *
+     * What it does:
+     * Runs one full opaque terrain pass: rebinds every terrain-lighting shader
+     * var with no shadow source, re-selects the `terrain` effect, selects the
+     * caller-provided technique, binds the overlay texture sheet, loads the
+     * base terrain shader vars with no terrain-normal target, and submits the
+     * terrain triangle list. The retained overlay handle is released as the
+     * by-value `shared_ptr` parameter goes out of scope.
+     */
+    virtual void DrawTerrainTechnique(
+      boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+      const msvc8::string* techniqueName
+    );
+
+    /**
+     * Address: 0x00801EE0 (FUN_00801EE0, Moho::HighFidelityTerrain::DrawDirtyTerrain)
+     * Primary vtable slot 14 (vftable @0x00E41A14, slot @0x00E41A4C -> 0x00801EE0).
+     *
+     * IDA signature:
+     * void __thiscall Moho::HighFidelityTerrain::DrawDirtyTerrain(
+     *     Moho::HighFidelityTerrain *this, Moho::CD3DPrimBatcher *batcher);
+     *
+     * What it does:
+     * Debug overlay, gated on `ren_ShowDirtyTerrain`. Sets the prim batcher up
+     * for the `primbatcher` effect's `TAlphaBlendLinearSampleNoDepth`
+     * technique, binds the terrain camera matrices and a translucent
+     * magenta solid-colour batch texture, then draws one height-conforming
+     * quad over every entry of the terrain resource's debug dirty-rectangle
+     * list that overlaps - or is fully contained by - the terrain footprint
+     * of the camera frustum.
+     */
+    virtual void DrawDirtyTerrain(CD3DPrimBatcher* batcher);
 
     /**
      * Address: 0x008131D0 (FUN_008131D0, Moho::HighFidelityTerrain::DrawShoreline)

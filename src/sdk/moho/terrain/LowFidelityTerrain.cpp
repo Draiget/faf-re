@@ -447,6 +447,57 @@ namespace moho
   }
 
   /**
+   * Address: 0x00809050 (FUN_00809050, Moho::LowFidelityTerrain::CondDrawTerrainTechnique)
+   * Primary vtable slot 7 (??_7LowFidelityTerrain@Moho@@6B@ @0x00E41A94, +0x1C).
+   *
+   * IDA signature:
+   * void __userpurge sub_809050(int this@<ecx>, int@<edi>, int@<esi>,
+   *     float, int params);
+   *
+   * What it does:
+   * Draws one terrain pass under a caller-chosen technique. Gated on
+   * `ren_Terrain` like the rest of the class: selects the `terrain` effect and
+   * the technique named by the params block, binds that pass's view/projection
+   * matrices and the tesselator height scale, then issues the one prebuilt
+   * low-fidelity terrain batch.
+   *
+   * Unlike `DrawTerrainDepth` the technique is not a literal - it comes from
+   * the params block, which is what makes this the `Cond` variant. The body is
+   * the medium-fidelity override (0x00805B50) instruction for instruction,
+   * differing only in the tesselator field offset (`mov ecx, [ebx+10h]` at
+   * 0x008090D5 versus `[edi+2F30h]`) and in the closing draw helper
+   * (`sub_807F50` with `this` in esi, versus medium's `sub_805490`).
+   */
+  void LowFidelityTerrain::CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params)
+  {
+    if (!ren_Terrain) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("terrain");
+    device->SelectTechnique(params.mTechniqueName.c_str());
+
+    auto& shaderVars = GetTerrainShaderVars();
+    if (shaderVars.viewMatrix.Exists()) {
+      shaderVars.viewMatrix.SetMatrix4x4(&params.mView);
+    }
+    if (shaderVars.projMatrix.Exists()) {
+      shaderVars.projMatrix.SetMatrix4x4(&params.mProjection);
+    }
+
+    // The height scale is read before the Exists() guard in the binary
+    // (0x008090D5-0x008090DF precedes the shader-var probe), so the tesselator
+    // call happens whether or not the var is bound.
+    const float heightScale = mTesselator->GetHeightScale();
+    if (shaderVars.heightScale.Exists()) {
+      shaderVars.heightScale.SetFloat(heightScale);
+    }
+
+    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
+  }
+
+  /**
    * Address: 0x00809B50 (FUN_00809B50, Moho::LowFidelityTerrain::DrawWaterTerrain)
    * Primary vtable slot 11 (vftable @0x00E41A94).
    *
@@ -552,12 +603,14 @@ namespace moho
 
   /**
    * Address: 0x00809D70 (FUN_00809D70, Moho::LowFidelityTerrain::DrawDirtyTerrain)
+   * Primary vtable slot 14 (??_7LowFidelityTerrain@Moho@@6B@ @0x00E41A94, +0x38).
    *
    * What it does:
    * Preserves the dirty-terrain pass hook as an intentional no-op for this
-   * low-fidelity terrain lane.
+   * low-fidelity terrain lane - the whole body is `retn 4`. The parameter type
+   * comes from the medium-fidelity override of the same slot (0x00805F10).
    */
-  void LowFidelityTerrain::DrawDirtyTerrain(const std::int32_t /*arg0*/)
+  void LowFidelityTerrain::DrawDirtyTerrain(CD3DPrimBatcher* const /*primBatcher*/)
   {}
 
   /**
