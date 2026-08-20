@@ -8527,6 +8527,11 @@ namespace moho::runtime
   static_assert(offsetof(RuntimeFilebufCharView, myFile) == 0x4C, "RuntimeFilebufCharView::myFile offset must be 0x4C");
   static_assert(sizeof(RuntimeFilebufCharView) == 0x50, "RuntimeFilebufCharView size must be 0x50");
 
+  // Mirrors `` `std::basic_filebuf<char>::_Init'::`2'::_Stinit`` (.data, 0x010C6BB4).
+  // Confirmed via data_refs: FUN_004C5430 (`_Init`) reads this exact address into a
+  // freshly bound filebuf's stateWord (+0x44), and FUN_004C55A0 (`close`, see
+  // RuntimeFilebufClose below) writes this exact address back into stateWord when
+  // releasing the file - same global, read on init, restored on close.
   std::int32_t gRuntimeFilebufInitialStateWord = 0;
 
   void RuntimeFilebufResetIoLanes(RuntimeFilebufCharView* const filebuf)
@@ -8606,6 +8611,171 @@ namespace moho::runtime
     filebuf->codecvtFacet = codecvtFacet;
     RuntimeFilebufResetIoLanes(filebuf);
     return reinterpret_cast<std::intptr_t>(filebuf);
+  }
+
+  /**
+   * Address: 0x004C5640 (FUN_004C5640, std::basic_filebuf<char>::_Endwrite)
+   *
+   * IDA signature:
+   * char __thiscall std::filebuf::_Endwrite(void *this);
+   *
+   * What it does:
+   * Flushes a pending codecvt shift-state reset before the filebuf goes
+   * idle. In the original binary this is called from `close()` (see
+   * RuntimeFilebufClose below), `seekoff()`, and `seekpos()` - anywhere a
+   * write sequence through a stateful encoding needs to leave the output
+   * in the "initial shift state" before repositioning or closing.
+   *
+   * Early-out true when there is no attached codecvt facet (+0x3C) or when
+   * `wroteSome` (+0x41) is already clear: nothing was written through a
+   * stateful encoding, so there is nothing to unshift. Otherwise it flushes
+   * the pending put area via `overflow(EOF)` (dispatch slot +0x04) and, on
+   * success, loops calling the facet's `unshift()` - the public wrapper the
+   * binary calls indirectly through the codecvt vtable at +24 bytes, i.e.
+   * `do_unshift` - into a growable scratch buffer, `fwrite`-ing whatever
+   * `unshift` produced on each pass:
+   *   - `error`   -> stop, report failure.
+   *   - `noconv`  -> stop, report success; nothing was ever pending.
+   *   - `ok`      -> clears `wroteSome`, then falls into the shared tail
+   *                  below; since `wroteSome` is now false the tail always
+   *                  returns success after at most one more `fwrite`.
+   *   - `partial` -> falls into the same shared tail with `wroteSome`
+   *                  still set. If this call produced zero bytes the
+   *                  scratch buffer was too small to make progress, so it
+   *                  is grown by 8 bytes and the facet is called again
+   *                  with the same (persisted) shift state; if it produced
+   *                  bytes but is still not done, the buffer is reused as
+   *                  is for another round.
+   * This shape matches the published Dinkumware `<fstream>` `_Endwrite`
+   * algorithm for this era (see CLAUDE.md's CRT/STL reference-source
+   * convention) - error/noconv exit immediately, ok/partial share a
+   * flush-then-check-`wroteSome` tail, and only a partial-with-zero-progress
+   * result grows the buffer.
+   *
+   * The scratch buffer is a real `std::string` used purely as byte storage
+   * (mirrors the binary's SSO-buffer growth via `append`, without modelling
+   * its raw `_Bxty`/`_Mysize`/`_Myres` internals). The unshift state is a
+   * function-local `std::mbstate_t` rather than an alias of `stateWord`
+   * (+0x44) directly: the original VC8 ABI's `mbstate_t` was a 4-byte `int`
+   * and fit that field exactly (matches `close()` restoring it from a
+   * single-DWORD `_Stinit` global), but `codecvtFacet` here is typed as the
+   * real, modern `std::codecvt<char,char,mbstate_t>` and its `unshift()`
+   * needs the toolchain's real (8-byte `_Mbstatet`) `mbstate_t` - which no
+   * longer fits the original 4-byte slot, so this recovery cannot alias it
+   * without corrupting the adjacent `closeOnClose`/`myFile` fields.
+   */
+  bool RuntimeFilebufEndwrite(RuntimeFilebufCharView* const filebuf)
+  {
+    if (filebuf->codecvtFacet == nullptr || !filebuf->wroteSome) {
+      return true;
+    }
+
+    if (filebuf->dispatch->overflow(filebuf, EOF) == EOF) {
+      return false;
+    }
+
+    std::string scratch(8, '\0');
+    std::mbstate_t shiftState{};
+
+    for (;;) {
+      char* const to = scratch.data();
+      char* const toEnd = to + scratch.size();
+      char* toNext = to;
+
+      const std::codecvt_base::result unshiftResult =
+        filebuf->codecvtFacet->unshift(shiftState, to, toEnd, toNext);
+
+      if (unshiftResult == std::codecvt_base::error) {
+        return false;
+      }
+      if (unshiftResult == std::codecvt_base::noconv) {
+        return true;
+      }
+      if (unshiftResult == std::codecvt_base::ok) {
+        filebuf->wroteSome = 0;
+      }
+
+      const std::size_t producedByteCount = static_cast<std::size_t>(toNext - to);
+      if (producedByteCount != 0 &&
+          std::fwrite(to, 1, producedByteCount, filebuf->myFile) != producedByteCount) {
+        return false;
+      }
+
+      if (!filebuf->wroteSome) {
+        return true;
+      }
+
+      if (producedByteCount == 0) {
+        scratch.append(8, '\0');
+      }
+      // else: partial made progress with room to spare - retry with the same buffer.
+    }
+  }
+
+  /**
+   * Address: 0x004C55A0 (FUN_004C55A0, std::basic_filebuf<char>::close)
+   *
+   * IDA signature:
+   * int __thiscall std::filebuf::close(int this);
+   *
+   * IDA's `int` return is really `basic_filebuf<char>*`: the real mangled
+   * signature is `?close@?$basic_filebuf@DU?$char_traits@D@std@@@std@@QAEPAV12@XZ`,
+   * i.e. `std::basic_filebuf<char>::close()` returning `this` on success or
+   * a null pointer on failure - matching the standard `close()` contract.
+   *
+   * What it does:
+   * No-ops to failure when `myFile` (+0x4C) is already null - a filebuf
+   * that isn't open has nothing to close. Otherwise it calls
+   * RuntimeFilebufEndwrite() to flush any pending codecvt shift-state reset
+   * (result false demotes the return value to null) and unconditionally
+   * `fclose`s `myFile` afterward regardless of whether the unshift flush
+   * succeeded (a failed `fclose` also demotes the return value to null).
+   * Either way, the filebuf is then reset to a fresh, unopened state:
+   * `closeOnClose` (+0x48) and `wroteSome` (+0x41) cleared, the streambuf
+   * I/O lanes reset (RuntimeFilebufResetIoLanes - matches the binary's
+   * `std::wstreambuf::_Init` call, ICF-merged from the shared streambuf
+   * base `_Init`), `myFile` nulled, `codecvtFacet` (+0x3C) cleared, and
+   * `stateWord` (+0x44) restored to `gRuntimeFilebufInitialStateWord`
+   * (confirmed to be the same `_Stinit` global RuntimeFilebufInit reads -
+   * see the comment on that global above).
+   *
+   * Source-level trigger: `moho::USER_SavePreferences()`
+   * (src/sdk/moho/misc/StartupHelpers.cpp) calls the real, standard
+   * `std::filebuf::close()` through a genuine `std::filebuf*` obtained from
+   * `std::ofstream::rdbuf()`:
+   *   if (std::filebuf* const fileBuffer = outputStream.rdbuf(); fileBuffer != nullptr) {
+   *     if (fileBuffer->close() == nullptr) { outputStream.setstate(std::ios::failbit); }
+   *   }
+   * That real call is serviced by the toolchain's own `std::filebuf::close()`,
+   * not by this recovered mirror - the same relationship RuntimeFopen has
+   * with the real `::_fsopen` it documents. RuntimeFilebufClose exists as
+   * the address-traceable, 1:1 recovery of what FUN_004C55A0 does in the
+   * shipped binary, and it invokes RuntimeFilebufEndwrite by name below,
+   * which is what satisfies that function's own invocation requirement.
+   */
+  RuntimeFilebufCharView* RuntimeFilebufClose(RuntimeFilebufCharView* const filebuf)
+  {
+    RuntimeFilebufCharView* result = filebuf;
+
+    if (filebuf->myFile != nullptr) {
+      if (!RuntimeFilebufEndwrite(filebuf)) {
+        result = nullptr;
+      }
+      if (std::fclose(filebuf->myFile) != 0) {
+        result = nullptr;
+      }
+    } else {
+      result = nullptr;
+    }
+
+    filebuf->closeOnClose = 0;
+    filebuf->wroteSome = 0;
+    RuntimeFilebufResetIoLanes(filebuf);
+    filebuf->myFile = nullptr;
+    filebuf->codecvtFacet = nullptr;
+    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
+
+    return result;
   }
 
   /**
