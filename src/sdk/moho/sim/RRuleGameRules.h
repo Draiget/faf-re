@@ -37,6 +37,13 @@ namespace moho
   struct RTrailBlueprint;
   struct REffectBlueprint;
 
+  /**
+   * Real binary object constructed at `RRuleGameRulesImpl::mEntityCategoryLookup`.
+   * Full layout + ctor/dtor live in RRuleGameRules.cpp (internal to this TU);
+   * only a pointer to it escapes into the class layout below.
+   */
+  struct EntityCategoryLookupTableRuntimeView;
+
   struct RRuleGameRulesBlueprintNode : msvc8::Tree<RRuleGameRulesBlueprintNode>
   {
     msvc8::string mBlueprintId; // +0x0C
@@ -462,7 +469,18 @@ namespace moho
      * vector object, not four independent lanes.
      */
     msvc8::vector<RBlueprint*> mBlueprintsByOrdinal;  // +0xB4
-    void* mEntityCategoryLookup;                      // +0xC4
+    /**
+     * Real ground-truth object is `Moho::EntityCategorySet`/`EntityCategory`
+     * (the mangled ctor/dtor names differ - see the address block on
+     * `EntityCategoryLookupTableRuntimeView` in RRuleGameRules.cpp for why).
+     * Field keeps its established source-level name: `EntityCategorySet` and
+     * `EntityCategory` are both already taken in this codebase by unrelated
+     * types, and this exact field name is referenced by name from
+     * RUnitBlueprint.cpp and Sim.cpp (owned by other concurrent recovery
+     * passes), so only the type changes here - `void*` to the real pointee -
+     * not the identifier.
+     */
+    EntityCategoryLookupTableRuntimeView* mEntityCategoryLookup; // +0xC4
     void* mPendingBlueprintReloadNext;                // +0xC8
     void* mPendingBlueprintReloadPrev;                // +0xCC
   };
