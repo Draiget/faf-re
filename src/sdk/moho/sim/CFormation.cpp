@@ -97,9 +97,19 @@ namespace
     return hasSurfaceUnits ? kFormationTypeMixed : kFormationTypeAir;
   }
 
-  [[nodiscard]] moho::CFormation::Node* AllocateFormationNode()
+  /**
+   * Allocates one `SSelectionNodeUserEntity`-shaped tree node for
+   * `CFormation`'s own participating-unit weak-set (see the field doc on
+   * `CFormation::mNodeHead`). Kept as a local nothrow allocator (rather than
+   * reusing `moho::AllocateWeakEntitySetHead()`, moho/sim/WeakEntitySet.h)
+   * because `CFormation::CFormation` (0x00838070) is asm-verified to use a
+   * `nothrow` allocation with an explicit null check, unlike the shared
+   * helper's throwing `::operator new`.
+   */
+  [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateFormationNode()
   {
-    auto* const node = static_cast<moho::CFormation::Node*>(::operator new(sizeof(moho::CFormation::Node), std::nothrow));
+    auto* const node =
+      static_cast<moho::SSelectionNodeUserEntity*>(::operator new(sizeof(moho::SSelectionNodeUserEntity), std::nothrow));
     if (node == nullptr) {
       return nullptr;
     }
@@ -107,13 +117,13 @@ namespace
     node->mLeft = nullptr;
     node->mParent = nullptr;
     node->mRight = nullptr;
-    node->mValue = nullptr;
-    node->mListPrev = nullptr;
-    node->mListNext = nullptr;
+    node->mKey = 0u;
+    node->mEnt.mOwnerLinkSlot = nullptr;
+    node->mEnt.mNextOwner = nullptr;
     node->mColor = 1u;
     node->mIsSentinel = 0u;
-    node->mPad1A[0] = 0u;
-    node->mPad1A[1] = 0u;
+    node->pad_1A[0] = 0u;
+    node->pad_1A[1] = 0u;
     return node;
   }
 
@@ -122,23 +132,25 @@ namespace
    *
    * What it does:
    * Recursively destroys one formation-node subtree in left-chain order,
-   * unlinking each node from the owner-link lane rooted at `mListPrev`.
+   * unlinking each node from the owner-link lane rooted at `mEnt.mOwnerLinkSlot`
+   * (the same intrusive owner-chain-head slot every weak-entity-set node in
+   * the engine uses; see `SSelectionWeakRefUserEntity`).
    */
-  void DestroyFormationNodeTreeWithOwnerUnlink(moho::CFormation::Node* node)
+  void DestroyFormationNodeTreeWithOwnerUnlink(moho::SSelectionNodeUserEntity* node)
   {
-    moho::CFormation::Node* cursor = node;
+    moho::SSelectionNodeUserEntity* cursor = node;
     while (cursor != nullptr && cursor->mIsSentinel == 0u) {
       DestroyFormationNodeTreeWithOwnerUnlink(cursor->mRight);
 
-      moho::CFormation::Node* const left = cursor->mLeft;
-      moho::CFormation::Node* const owner = cursor->mListPrev;
+      moho::SSelectionNodeUserEntity* const left = cursor->mLeft;
+      auto* const owner = static_cast<moho::SSelectionNodeUserEntity*>(cursor->mEnt.mOwnerLinkSlot);
       if (owner != nullptr) {
         auto* slotLane = reinterpret_cast<std::uintptr_t*>(&owner->mLeft);
-        auto** const needle = reinterpret_cast<moho::CFormation::Node**>(&cursor->mListPrev);
-        while (reinterpret_cast<moho::CFormation::Node**>(*slotLane) != needle) {
+        auto** const needle = reinterpret_cast<moho::SSelectionNodeUserEntity**>(&cursor->mEnt.mOwnerLinkSlot);
+        while (reinterpret_cast<moho::SSelectionNodeUserEntity**>(*slotLane) != needle) {
           slotLane = reinterpret_cast<std::uintptr_t*>(*slotLane + sizeof(std::uint32_t));
         }
-        *slotLane = reinterpret_cast<std::uintptr_t>(cursor->mListNext);
+        *slotLane = reinterpret_cast<std::uintptr_t>(cursor->mEnt.mNextOwner);
       }
 
       ::operator delete(cursor);
@@ -171,7 +183,7 @@ namespace moho
     , mTimeLeft(0.5f)
     , mLastUpdate(0.0f)
   {
-    Node* const head = AllocateFormationNode();
+    SSelectionNodeUserEntity* const head = AllocateFormationNode();
     mNodeHead = head;
     if (head != nullptr) {
       head->mIsSentinel = 1u;
@@ -198,7 +210,7 @@ namespace moho
       curInstance->operator_delete(1);
     }
 
-    Node* const nodeHead = mNodeHead;
+    SSelectionNodeUserEntity* const nodeHead = mNodeHead;
     if (nodeHead != nullptr) {
       DestroyFormationNodeTreeWithOwnerUnlink(nodeHead->mParent);
       ::operator delete(nodeHead);
