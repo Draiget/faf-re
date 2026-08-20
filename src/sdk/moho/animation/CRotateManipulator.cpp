@@ -255,7 +255,7 @@ namespace
    * Deserializes one `CRotateManipulator` lane from IAniManipulator base data
    * plus rotate-state flags, axis, angular lanes, and follow-bone index.
    */
-  [[maybe_unused]] void DeserializeCRotateManipulatorSerializerBody(
+  void DeserializeCRotateManipulatorSerializerBody(
     moho::CRotateManipulator* const manipulator,
     gpg::ReadArchive* const archive
   )
@@ -291,7 +291,7 @@ namespace
    * Serializes one `CRotateManipulator` lane to IAniManipulator base data plus
    * rotate-state flags, axis, angular lanes, and follow-bone index.
    */
-  [[maybe_unused]] void SerializeCRotateManipulatorSerializerBody(
+  void SerializeCRotateManipulatorSerializerBody(
     const moho::CRotateManipulator* const manipulator,
     gpg::WriteArchive* const archive
   )
@@ -434,7 +434,7 @@ namespace
    * Initializes callback lanes for global `CRotateManipulator` serializer
    * helper storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] CRotateManipulatorSerializerHelperNode*
+  [[nodiscard]] CRotateManipulatorSerializerHelperNode*
   InitializeCRotateManipulatorSerializerStartupThunkPrimary()
   {
     gpg::SerHelperBase* const self = SerializerSelfNode(gCRotateManipulatorSerializer);
@@ -465,7 +465,7 @@ namespace
    * Startup cleanup variant that unlinks and self-resets the global
    * CRotateManipulator serializer helper node.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CRotateManipulatorSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_CRotateManipulatorSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gCRotateManipulatorSerializer);
   }
@@ -481,6 +481,34 @@ namespace
   {
     return UnlinkSerializerNode(gCRotateManipulatorSerializer);
   }
+
+  void cleanup_CRotateManipulatorSerializer_atexit()
+  {
+    (void)cleanup_CRotateManipulatorSerializerStartupThunkA();
+  }
+
+  /**
+   * Address: 0x00BD3010 (FUN_00BD3010, register_CRotateManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes the global `CRotateManipulator` serializer helper callbacks
+   * and installs process-exit cleanup.
+   */
+  void register_CRotateManipulatorSerializer()
+  {
+    (void)InitializeCRotateManipulatorSerializerStartupThunkPrimary();
+    (void)std::atexit(&cleanup_CRotateManipulatorSerializer_atexit);
+  }
+
+  struct CRotateManipulatorSerializerStartupBootstrap
+  {
+    CRotateManipulatorSerializerStartupBootstrap()
+    {
+      register_CRotateManipulatorSerializer();
+    }
+  };
+
+  [[maybe_unused]] CRotateManipulatorSerializerStartupBootstrap gCRotateManipulatorSerializerStartupBootstrap;
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
