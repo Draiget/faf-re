@@ -2639,6 +2639,15 @@ RRef MovePointerSlotRef(void* const slotObject, RRef* const sourceRef)
     return MakePointerSlotRef<T>(slot);
 }
 
+/**
+ * Address: 0x00557440 (FUN_00557440, gpg::RPointerType_RBlueprint::Delete)
+ *
+ * What it does:
+ * Releases one allocated pointer-slot lane. IDA marks the instantiation
+ * body a plain thunk (`::operator delete(slotObject)`, no other type-
+ * specific logic), so this template citation is added per verified T;
+ * confirm a new T's `Delete` body matches exactly before extending the list.
+ */
 template <class T>
 void DeletePointerSlot(void* const slotObject)
 {
@@ -3114,6 +3123,76 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
 
     RRef out{};
     gpg::RRef_CSndParams_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x00557470 (FUN_00557470, gpg::RPointerType_RBlueprint::NewRef)
+ *
+ * What it does:
+ * Allocates one `RBlueprint*` pointer-slot lane and wraps it as `RRef`.
+ */
+RRef NewRBlueprintPointerSlotRef()
+{
+    auto* const slot = static_cast<moho::RBlueprint**>(::operator new(sizeof(moho::RBlueprint*)));
+    RRef out{};
+    gpg::RRef_RBlueprint_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005574A0 (FUN_005574A0, gpg::RPointerType_RBlueprint::CpyRef)
+ *
+ * What it does:
+ * Allocates one `RBlueprint*` pointer-slot lane and copies the upcast source
+ * slot value into it. Frees the new slot and rethrows if the upcast fails.
+ */
+RRef CopyRBlueprintPointerSlotRef(RRef* const sourceRef)
+{
+    auto* const slot = static_cast<moho::RBlueprint**>(::operator new(sizeof(moho::RBlueprint*)));
+    if (slot) {
+        try {
+            *slot = *sourceRef->TryUpcastRBlueprintPointerSlot();
+        } catch (...) {
+            ::operator delete(slot);
+            throw;
+        }
+    }
+
+    RRef out{};
+    gpg::RRef_RBlueprint_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x00557530 (FUN_00557530, gpg::RPointerType_RBlueprint::CtrRef)
+ *
+ * What it does:
+ * Wraps existing `RBlueprint*` pointer-slot storage as a reflected `RRef`.
+ */
+RRef ConstructRBlueprintPointerSlotRef(void* const slotObject)
+{
+    RRef out{};
+    gpg::RRef_RBlueprint_P(&out, static_cast<moho::RBlueprint**>(slotObject));
+    return out;
+}
+
+/**
+ * Address: 0x00557560 (FUN_00557560, gpg::RPointerType_RBlueprint::MovRef)
+ *
+ * What it does:
+ * Writes the upcast source slot pointer value into the destination
+ * `RBlueprint*` slot lane.
+ */
+RRef MoveRBlueprintPointerSlotRef(void* const slotObject, RRef* const sourceRef)
+{
+    auto* const slot = static_cast<moho::RBlueprint**>(slotObject);
+    if (slot) {
+        *slot = *sourceRef->TryUpcastRBlueprintPointerSlot();
+    }
+
+    RRef out{};
+    gpg::RRef_RBlueprint_P(&out, slot);
     return out;
 }
 
@@ -11859,6 +11938,12 @@ RType* gpg::RPointerType<moho::CDecalHandle>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x00557380 (FUN_00557380)
+ * Demangled: gpg::RPointerType_RBlueprint::dtr
+ */
+gpg::RPointerType<moho::RBlueprint>::~RPointerType() = default;
+
+/**
  * Address: 0x00556F00 (FUN_00556F00)
  * Demangled: gpg::RPointerType_RBlueprint::GetName
  */
@@ -11899,6 +11984,36 @@ const RIndexed* gpg::RPointerType<moho::RBlueprint>::IsPointer() const
 }
 
 /**
+ * Address: 0x00557240 (FUN_00557240)
+ * Demangled: gpg::RPointerType_RBlueprint::SubscriptIndex
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th `RBlueprint` in the array the
+ * pointer slot addresses (stride `sizeof(RBlueprint)`).
+ */
+RRef gpg::RPointerType<moho::RBlueprint>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const slot = static_cast<moho::RBlueprint**>(obj);
+    RRef out{};
+    gpg::RRef_RBlueprint(&out, (*slot) + ind);
+    return out;
+}
+
+/**
+ * Address: 0x00557230 (FUN_00557230)
+ * Demangled: gpg::RPointerType_RBlueprint::GetCount
+ *
+ * What it does:
+ * Returns 1 when the pointer slot is non-null, else 0 (a pointer type holds
+ * at most one element).
+ */
+size_t gpg::RPointerType<moho::RBlueprint>::GetCount(void* const obj) const
+{
+    auto* const slot = static_cast<moho::RBlueprint* const*>(obj);
+    return (*slot != nullptr) ? 1u : 0u;
+}
+
+/**
  * Address: 0x00557280 (FUN_00557280)
  * Demangled: gpg::RPointerType_RBlueprint::AssignPointer
  *
@@ -11920,11 +12035,11 @@ void gpg::RPointerType<moho::RBlueprint>::Init()
 {
     v24 = true;
     size_ = sizeof(moho::RBlueprint*);
-    newRefFunc_ = &NewPointerSlotRef<moho::RBlueprint>;
-    cpyRefFunc_ = &CopyPointerSlotRef<moho::RBlueprint>;
+    newRefFunc_ = &NewRBlueprintPointerSlotRef;
+    cpyRefFunc_ = &CopyRBlueprintPointerSlotRef;
     deleteFunc_ = &DeletePointerSlot<moho::RBlueprint>;
-    ctorRefFunc_ = &ConstructPointerSlotRef<moho::RBlueprint>;
-    movRefFunc_ = &MovePointerSlotRef<moho::RBlueprint>;
+    ctorRefFunc_ = &ConstructRBlueprintPointerSlotRef;
+    movRefFunc_ = &MoveRBlueprintPointerSlotRef;
 }
 
 RType* gpg::RPointerType<moho::RBlueprint>::GetPointeeType() const
