@@ -3245,6 +3245,27 @@ public:
     long result
   );
 
+  /**
+   * Address: 0x00967D00 (FUN_00967D00, wxWindow::ScrollLines)
+   * Mangled: ?ScrollLines@wxWindow@@UAE_NH@Z
+   *
+   * What it does:
+   * Sends `lines` worth of `WM_VSCROLL` line-up/line-down messages to the
+   * native window, stopping early once the scroll position stops moving
+   * (already at an end). Returns whether the position actually changed.
+   */
+  bool ScrollLines(std::int32_t lines) override;
+
+  /**
+   * Address: 0x00967D30 (FUN_00967D30, wxWindow::ScrollPages)
+   * Mangled: ?ScrollPages@wxWindow@@UAE_NH@Z
+   *
+   * What it does:
+   * Same shape as `ScrollLines`, sending `WM_VSCROLL` page-up/page-down
+   * messages instead.
+   */
+  bool ScrollPages(std::int32_t pages) override;
+
   static wxEventTable sm_eventTable;
 };
 
@@ -7240,6 +7261,15 @@ namespace moho
     std::int32_t mActiveDragButton = 0;
 
     /**
+     * Unconfirmed trailing lane: `operator new(0x1B0)` (the allocation size
+     * for this type at 0x006626FF) is four bytes past `mActiveDragButton`,
+     * but no recovered method reads/writes anything past it yet. Kept as a
+     * named, sized placeholder per CLAUDE.md's typed-placeholder rule rather
+     * than guessed at.
+     */
+    std::uint8_t mReserved1ACTo1AF[0x4]{};
+
+    /**
      * Address: 0x00661330 (FUN_00661330, Moho::WCurveEditor::WCurveEditor)
      * Mangled: ??0WCurveEditor@Moho@@QAE@@Z
      *
@@ -7266,7 +7296,7 @@ namespace moho
      * key, and shows the control.
      */
     WCurveEditor(
-      wxWindowBase* parent,
+      WCurveEditorPanel* parent,
       std::int32_t id,
       float viewTimeMax,
       float viewValueMin,
@@ -8625,6 +8655,36 @@ namespace moho
   {
     std::uint8_t mUnknown04To177[0x174];
     ManagedWindowSlot* mManagedSlotsHead = nullptr;
+
+    /**
+     * Address: 0x004F40E0 (FUN_004F40E0, Moho::WWinManagedFrame::WWinManagedFrame)
+     * Mangled: ??0WWinManagedFrame@Moho@@QAE@PAVwxWindow@@HABVwxString@@ABVwxPoint@@ABVwxSize@@J1@Z
+     *
+     * IDA signature:
+     * Moho::WWinManagedFrame *__fastcall Moho::WWinManagedFrame::WWinManagedFrame(
+     *   wxSize *size@<ecx>, wxString *title, Moho::WWinManagedFrame *this,
+     *   wxString *name);
+     * (the mangled name gives the real, full 7-argument prototype - IDA's
+     * decompile only resolved 4 of the arguments by the time it ran.)
+     *
+     * What it does:
+     * Runs the real `wxFrame::wxFrame(this, parent, id, title,
+     * wxDefaultPosition, size, style, name)` construction. This tree does not
+     * model native HWND creation for tool windows (`CreateBase` fills in the
+     * shared state-only lane instead, same judgement call as
+     * `WCurveEditor`/`WCurveEditorPanel`), zeroes the managed-slot chain head,
+     * installs this type's vtable, then registers this frame's owner-chain
+     * head in `managedFrames` via `RegisterManagedOwnerSlot`.
+     */
+    WWinManagedFrame(
+      wxWindowBase* parent,
+      std::int32_t id,
+      const wxStringRuntime& title,
+      const wxPoint& position,
+      const wxSize& size,
+      long style,
+      const wxStringRuntime& name
+    );
 
     static WWinManagedFrame* FromManagedSlotHeadLink(ManagedWindowSlot** ownerHeadLink) noexcept;
     static ManagedWindowSlot** NullManagedSlotHeadLinkSentinel() noexcept;
