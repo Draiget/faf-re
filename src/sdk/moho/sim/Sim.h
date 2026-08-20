@@ -902,6 +902,27 @@ namespace moho
     );
 
     /**
+     * Address: 0x0075D5D0 (FUN_0075D5D0, Moho::Sim::DebugSetPlayableRect)
+     *
+     * IDA signature:
+     * void __cdecl Moho::Sim::DebugSetPlayableRect(Moho::Sim *sim, std::vector_string *commandArgs);
+     *
+     * What it does:
+     * `DebugSetPlayableRect x0 y0 x1 y1` - parses the four integer bounds into
+     * a `gpg::Rect2i` and hands it to `STIMap::SetPlayableMapRect`, then
+     * mirrors the accepted change into Sim Lua by running
+     * `SyncPlayableRect({...})`. Prints the syntax line for short argument
+     * vectors and an error line when the map rejects the rectangle.
+     */
+    static int DebugSetPlayableRect(
+      Sim* sim,
+      CSimConCommand::ParsedCommandArgs* commandArgs,
+      Wm3::Vector3f* worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit* selectedUnits
+    );
+
+    /**
      * Address: 0x0075D860 (FUN_0075D860, Moho::Sim::DebugMoveCamera)
      *
      * What it does:

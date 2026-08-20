@@ -7,6 +7,8 @@
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/IEffectWeakPtrReflection.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
@@ -977,10 +979,12 @@ namespace moho
    *
    * What it does:
    * See the declaration's IDA-signature note for the parameter mapping.
-   * Resolves `attachUnit` (when given) to a concrete `Unit*` through
-   * `IUnit::IsUnit`, storing it as a weak link (an empty `attachUnit`, or one
-   * that is not really backed by a `Unit`, leaves `mAttachedUnit` at its
-   * freshly-constructed empty state - the binary's own "unlink from an empty
+   * Resolves `attachEntity` (when given) to a concrete sim-side `Unit*` by
+   * looking `UserEntity::mParams.mEntityId` up in the active sim's `CEntityDb`
+   * and taking that entity's `IsUnit()` view (0x00663ACF..0x00663B08),
+   * storing it as a weak link (an empty `attachEntity`, or one whose id is not
+   * a live sim unit, leaves `mAttachedUnit` at its freshly-constructed empty
+   * state - the binary's own "unlink from an empty
    * chain" branch for that case is a no-op on a brand-new object). Seeds the
    * default particle/ramp texture paths, builds the File/Options/LOD menu
    * bar (every Options/LOD item checkable, three pre-checked, matching
@@ -992,7 +996,7 @@ namespace moho
    * `WCurveEditorPanel` notebook tab per animatable curve before finishing
    * with a `RefreshPreviewEmitter` pass.
    */
-  WEmitterWx::WEmitterWx(IUnit* const attachUnit, const Wm3::Vector3f& spawnPosition, const char* const boneName)
+  WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f& spawnPosition, const char* const boneName)
     : WWinManagedFrame(
         nullptr, -1, wxStringRuntime::Borrow(L"Emitter Editor"), wxPoint{-1, -1}, wxSize{800, 600},
         541068864L, wxStringRuntime::Borrow(L"MohoFrame")
@@ -1007,8 +1011,14 @@ namespace moho
 
     mSim = ReadActiveSimFromDriver(moho::SIM_GetActiveDriver());
 
-    if (attachUnit != nullptr) {
-      mAttachedUnit.Set(attachUnit->IsUnit());
+    if (attachEntity != nullptr) {
+      // 0x00663ACF..0x00663B08: the user-side entity only carries an id; the
+      // weak link is to the sim-side `Unit` the active sim's entity DB holds
+      // under that id.
+      CEntityDb* const entityDb = mSim != nullptr ? mSim->mEntityDB : nullptr;
+      Entity* const simEntity =
+        entityDb != nullptr ? entityDb->FindEntityById(attachEntity->mParams.mEntityId) : nullptr;
+      mAttachedUnit.Set(simEntity != nullptr ? simEntity->IsUnit() : nullptr);
     }
     if (boneName != nullptr) {
       mBoneName = msvc8::string(boneName);

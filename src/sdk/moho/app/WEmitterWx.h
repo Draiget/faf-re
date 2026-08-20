@@ -17,6 +17,7 @@ namespace moho
   class IUnit;
   class Sim;
   class Unit;
+  class UserEntity;
 
   struct WEmitterTextControlVTable;
   struct WEmitterPreviewPanelVTable;
@@ -93,17 +94,24 @@ namespace moho
      *
      * IDA signature:
      * Moho::WEmitterWx *__thiscall Moho::WEmitterWx::WEmitterWx(
-     *   IUnit *attachUnit@<ecx>, Moho::WEmitterWx *this, float *spawnPosition,
+     *   UserEntity *attachEntity@<ecx>, Moho::WEmitterWx *this, float *spawnPosition,
      *   char *boneName);
      * (IDA's own `this`/`a2` labels are swapped from real C++ ABI, same as
      * `WCurveEditor::WCurveEditor` - `a2` on the stack is the actual
      * constructed object.)
      *
+     * `attachEntity` is a *user-side* entity, not a sim-side `IUnit`: the sole
+     * caller (`Moho::EFX_CreateEmitterWindow`, 0x00669EB0) decodes it out of
+     * `sWldSession->mSelection`, whose weak-set nodes hold
+     * `&UserEntity::mIUnitChainHead` (+0x08), and the constructor reads
+     * `[attachEntity+0x44]` at 0x00663ACF - `UserEntity::mParams.mEntityId`.
+     *
      * What it does:
      * Builds the top-level "Emitter Editor" frame (800x600,
-     * `WWinManagedFrame::WWinManagedFrame`), resolves `attachUnit` into the
-     * weak `mAttachedUnit` link (through the active sim driver's entity map
-     * when `attachUnit` is an `IUnit*`, or unlinked when null), stores
+     * `WWinManagedFrame::WWinManagedFrame`), resolves `attachEntity` into the
+     * weak `mAttachedUnit` link by looking its entity id up in the active
+     * sim's `CEntityDb` and taking that sim entity's `IsUnit()` view (unlinked
+     * when `attachEntity` is null or the id is not a live sim unit), stores
      * `boneName` into `mBoneName` when given, seeds the default particle/ramp
      * texture paths, builds the File/Options/LOD menu bar (each item wired to
      * `OnMenuCommand` through the shared command-sink event table), resolves
@@ -112,7 +120,7 @@ namespace moho
      * `WCurveEditorPanel` notebook tab per animatable curve before finishing
      * with a `RefreshPreviewEmitter` pass.
      */
-    WEmitterWx(IUnit* attachUnit, const Wm3::Vector3f& spawnPosition, const char* boneName);
+    WEmitterWx(UserEntity* attachEntity, const Wm3::Vector3f& spawnPosition, const char* boneName);
 
     /**
      * Address: 0x006672F0 (FUN_006672F0)

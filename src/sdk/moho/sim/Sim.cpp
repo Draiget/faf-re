@@ -1240,6 +1240,13 @@ namespace
   constexpr const char* kSetArmyColorInvalidArmyText = "Invalid army %i";
   constexpr const char* kDbgUsageText = "usage: %s [name]";
 
+  /// 0x00E352F4, pushed to Sim::Printf when fewer than five tokens are given.
+  constexpr const char* kDebugSetPlayableRectUsageText = "usage: DebugSetPlayableRect x0 y0 x1 y1";
+  /// 0x00E35114, pushed to Sim::Printf when `STIMap::SetPlayableMapRect` refuses the rect.
+  constexpr const char* kDebugSetPlayableRectInvalidText = "Attempted to set an invalid playable rect.";
+  /// 0x00E3531C, the Sim-Lua mirror `gpg::STR_Printf` builds at 0x0075D739.
+  constexpr const char* kDebugSetPlayableRectSyncFormat = "SyncPlayableRect({ x0=%s, x1=%s, y0=%s, y1=%s })";
+
   /// 0x0064BEC7, pushed to Sim::Printf when the amount argument is missing.
   constexpr const char* kDamageUnitUsageText = "Syntax: DamageUnit <amount>";
   /// 0x0064BE2D ("Debug"), the damage type DamageUnit reports.
@@ -13480,6 +13487,62 @@ int Sim::SimLua(
   sim->Printf("%s", commandText.c_str());
   (void)SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
   clearSelectedUnitGlobal();
+  return 0;
+}
+
+/**
+ * Address: 0x0075D5D0 (FUN_0075D5D0, Moho::Sim::DebugSetPlayableRect)
+ *
+ * IDA signature:
+ * void __cdecl Moho::Sim::DebugSetPlayableRect(Moho::Sim *sim, std::vector_string *commandArgs);
+ *
+ * What it does:
+ * `DebugSetPlayableRect x0 y0 x1 y1`. Parses the four bounds with `atoi` into
+ * a `gpg::Rect2i` laid out `{x0, z0, x1, z1}` (0x0075D6A6..0x0075D6C2 stores
+ * arg1 -> x0, arg2 -> z0, arg3 -> x1, arg4 -> z1), asks the sim's `STIMap` to
+ * clamp and adopt it, and on success mirrors the change into Sim Lua by
+ * running `SyncPlayableRect({ ... })`. The Lua mirror is built from the *raw
+ * argument tokens*, not from the clamped rectangle - 0x0075D6EF re-reads the
+ * argument vector and pushes the four strings in the order
+ * `x0=arg1, x1=arg3, y0=arg2, y1=arg4`.
+ */
+int Sim::DebugSetPlayableRect(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  if (commandArgs == nullptr || commandArgs->size() < 5u) {
+    sim->Printf(kDebugSetPlayableRectUsageText);
+    return 0;
+  }
+
+  const gpg::Rect2i playableRect{
+    std::atoi(commandArgs->at(1u).c_str()),
+    std::atoi(commandArgs->at(2u).c_str()),
+    std::atoi(commandArgs->at(3u).c_str()),
+    std::atoi(commandArgs->at(4u).c_str())
+  };
+
+  if (!sim->mMapData->SetPlayableMapRect(playableRect)) {
+    sim->Printf(kDebugSetPlayableRectInvalidText);
+    return 0;
+  }
+
+  const msvc8::string syncCommand = gpg::STR_Printf(
+    kDebugSetPlayableRectSyncFormat,
+    commandArgs->at(1u).c_str(),
+    commandArgs->at(3u).c_str(),
+    commandArgs->at(2u).c_str(),
+    commandArgs->at(4u).c_str()
+  );
+  (void)SCR_LuaDoString(syncCommand.c_str(), sim->mLuaState);
   return 0;
 }
 
