@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <new>
 #include <typeinfo>
@@ -1204,6 +1205,35 @@ namespace
     task->MemberSerialize(archive);
   }
 
+  /**
+   * Address: 0x00BFA1B0 (FUN_00BFA1B0, Moho::CUnitPatrolTaskSerializer::~CUnitPatrolTaskSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CUnitPatrolTask` serializer helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CUnitPatrolTaskSerializer_atexit()
+  {
+    (void)UnlinkCUnitPatrolTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BD1340 (FUN_00BD1340, register_CUnitPatrolTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitPatrolTask` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_CUnitPatrolTaskSerializer()
+  {
+    (void)UnlinkCUnitPatrolTaskSerializerNodePrimary();
+    gCUnitPatrolTaskSerializer.mSerLoadFunc = &CUnitPatrolTaskSerializerDeserialize;
+    gCUnitPatrolTaskSerializer.mSerSaveFunc = &CUnitPatrolTaskSerializerSerialize;
+    (void)std::atexit(&cleanup_CUnitPatrolTaskSerializer_atexit);
+  }
+
   struct SerConstructHelperView
   {
     void* mVftable;
@@ -1330,13 +1360,13 @@ namespace
       // trampolines (FUN_0061ADA0 / FUN_0061ADB0) by name so the member bodies
       // (FUN_0061CF50 / FUN_0061D0C0) are reachable, and self-links the
       // intrusive helper node exactly like the binary's
-      // `SerSaveLoadHelper<CUnitPatrolTask>` static-init registrar
-      // (mirrors register_CThrustManipulatorSerializer). The engine install
-      // path `InstallMohoCUnitPatrolTaskSerializerCallbacks` copies these into
-      // the reflection descriptor's `serLoadFunc_` / `serSaveFunc_`.
-      (void)UnlinkCUnitPatrolTaskSerializerNodePrimary();
-      gCUnitPatrolTaskSerializer.mSerLoadFunc = &CUnitPatrolTaskSerializerDeserialize;
-      gCUnitPatrolTaskSerializer.mSerSaveFunc = &CUnitPatrolTaskSerializerSerialize;
+      // `SerSaveLoadHelper<CUnitPatrolTask>` static-init registrar. The real
+      // binary does this from its own distinct static-init entry,
+      // `register_CUnitPatrolTaskSerializer` (FUN_00BD1340); call it here
+      // rather than duplicating its body. The engine install path
+      // `InstallMohoCUnitPatrolTaskSerializerCallbacks` copies these into the
+      // reflection descriptor's `serLoadFunc_` / `serSaveFunc_`.
+      register_CUnitPatrolTaskSerializer();
     }
   };
 
