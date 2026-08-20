@@ -74,6 +74,17 @@ namespace moho
   void register_DamageUnit_ConAlias();
 
   /**
+   * Address: 0x00BD3A10 (FUN_00BD3A10, register_DamageUnit_SimConFunc)
+   *
+   * What it does:
+   * Registers the `DamageUnit` sim command callback and installs startup
+   * cleanup. The binary's body is the single store
+   * `mov SimConFunc_DamageUnit.mFunc, offset Moho__Sim__DamageUnit` at
+   * 0x00BD3A31 - this is the only reference to that function in the image.
+   */
+  void register_DamageUnit_SimConFunc();
+
+  /**
    * Address: 0x00BD3A50 (FUN_00BD3A50, register_AddImpulse_ConAliasDef)
    *
    * What it does:

@@ -391,6 +391,28 @@ namespace moho
     );
 
     /**
+     * Address: 0x0064BD20 (FUN_0064BD20, Moho::Sim::DamageUnit)
+     *
+     * IDA signature:
+     * void callcnv_33 Moho::Sim::DamageUnit(Moho::Sim *a1, std::vector_string *a4,
+     *     Wm3::Vector3f *a3, Moho::CArmyImpl *_B0, std::vector_WeakObject_IUnit *a5);
+     *
+     * What it does:
+     * `DamageUnit <amount>` console command. Builds one single-target `CDamage`
+     * of type "Debug" carrying the parsed amount, clears the instigator so the
+     * damage is attributed to nobody, and applies it to every selected unit in
+     * turn. Negative amounts heal. Prints the syntax line when the amount is
+     * missing.
+     */
+    static int DamageUnit(
+      Sim* sim,
+      CSimConCommand::ParsedCommandArgs* commandArgs,
+      Wm3::Vector3f* worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit* selectedUnits
+    );
+
+    /**
      * Address: 0x00651B00 (FUN_00651B00, Moho::Sim::dbg)
      *
      * What it does:
