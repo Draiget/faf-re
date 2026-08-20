@@ -5138,6 +5138,171 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A6220 (FUN_008A6220,
+   * ?Reset@CWldTerrainRes@Moho@@EAE_NUSChartSize@2@PAVLuaState@LuaPlus@@@Z)
+   *
+   * IDA signature:
+   * char __thiscall Moho::CWldTerrainRes::Reset(
+   *     Moho::CWldTerrainRes *this, int a2, int a3, LuaPlus::LuaState *a4);
+   *
+   * What it does:
+   * Rebuilds the terrain resource in place for a freshly (re)loaded map of
+   * `size.mWidth x size.mHeight` (mirrors the `Load`/`Finalize` idioms
+   * already recovered above for the same field set).
+   */
+  bool IWldTerrainRes::Reset(const SChartSize size, LuaPlus::LuaState* const luaState)
+  {
+    auto* const runtimeView = AsTerrainRuntimeView(this);
+    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
+    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+
+    const std::int32_t halfWidth = size.mWidth / 2;
+    const std::int32_t halfHeight = size.mHeight / 2;
+
+    // Rebuild the terrain map, destroying whatever was previously owned.
+    {
+      STIMap* const oldMap = runtimeView->mMap;
+      runtimeView->mMap = new STIMap(size.mWidth, size.mHeight);
+      if (oldMap != nullptr) {
+        oldMap->~STIMap();
+        ::operator delete(oldMap);
+      }
+    }
+    runtimeView->mMap->LoadTerrainTypes(luaState);
+
+    // Full-rect bounds + error refresh (asm passes 0..0x7FFFFFFF, matching
+    // the identical full-range refresh in `Load`).
+    gpg::Rect2i fullRect{};
+    fullRect.x0 = 0;
+    fullRect.z0 = 0;
+    fullRect.x1 = 0x7FFFFFFF;
+    fullRect.z1 = 0x7FFFFFFF;
+    CHeightField* const field = runtimeView->mMap->mHeightField.get();
+    field->UpdateBounds(fullRect);
+    field->UpdateError(fullRect);
+
+    // Half-resolution debug-dirty-terrain bit array.
+    {
+      gpg::BitArray2D* const oldDirty = visualView->mDebugDirtyTerrain;
+      visualView->mDebugDirtyTerrain = new gpg::BitArray2D(halfWidth, halfHeight);
+      if (oldDirty != nullptr) {
+        oldDirty->~BitArray2D();
+        ::operator delete(oldDirty);
+      }
+    }
+
+    // Default background / skycube textures.
+    SetBackground(msvc8::string("/textures/environment/defaultbackground.dds"));
+    SetSkycube(msvc8::string("/textures/environment/defaultskycube.dds"));
+
+    // Environment lookup reset to a single "<default>" entry (the binary
+    // inlines `ClearEnvLookup`'s own body here - same subtree-teardown
+    // helper `DeleteTerrainEnvironmentSubtreePostOrder`/0x008A8720 - then
+    // upserts through the same find-or-insert lane `AddEnvLookup` uses).
+    ClearEnvLookup();
+    AddEnvLookup(msvc8::string("<default>"), msvc8::string("/textures/environment/defaultenvcube.dds"));
+
+    CBackgroundTaskControl loadControl{};
+    InitNormalMap(loadControl);
+    SetStratumDefaults();
+
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
+
+    // Recreate the two half-resolution stratum utility masks (format 2,
+    // matching the `NewDynamicTextureSheet` vtable dispatch at +0x3C seen
+    // twice more below - resolved via RTTI/vtable evidence on
+    // `ID3DDeviceResources`, slot 15 = `NewDynamicTextureSheet`).
+    boost::shared_ptr<CD3DDynamicTextureSheet> stratumMask0{};
+    if (resources != nullptr) {
+      resources->NewDynamicTextureSheet(stratumMask0, halfWidth, halfHeight, 2);
+    }
+    normalView->mStratumMask0 = stratumMask0;
+    ClearTexture(normalView->mStratumMask0);
+
+    boost::shared_ptr<CD3DDynamicTextureSheet> stratumMask1{};
+    if (resources != nullptr) {
+      resources->NewDynamicTextureSheet(stratumMask1, halfWidth, halfHeight, 2);
+    }
+    normalView->mStratumMask1 = stratumMask1;
+    ClearTexture(normalView->mStratumMask1);
+
+    // Recreate the water-map texture (also format 2 here; `Finalize`'s later
+    // upgrade pass recreates it again at format 12).
+    boost::shared_ptr<CD3DDynamicTextureSheet> waterMap{};
+    if (resources != nullptr) {
+      resources->NewDynamicTextureSheet(waterMap, halfWidth, halfHeight, 2);
+    }
+    visualView->mWaterMapTexture = waterMap;
+    ClearTexture(visualView->mWaterMapTexture);
+
+    // Lighting / sun / ambience / color / shadow / specular / bloom / fog
+    // defaults (hardcoded literals, matching the binary's float constants).
+    runtimeView->mLightingMultiplier = 1.5f;
+    runtimeView->mSunDirection = Wm3::Vector3f{0.707f, 0.707f, 0.0f};
+    runtimeView->mSunAmbience = Wm3::Vector3f{0.2f, 0.2f, 0.2f};
+    runtimeView->mSunColor = Wm3::Vector3f{1.0f, 1.0f, 1.0f};
+    runtimeView->mShadowFillColor = Wm3::Vector3f{0.7f, 0.7f, 0.75f};
+    runtimeView->mSpecularColor = Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+    runtimeView->mBloom = 0.08f;
+    runtimeView->mFogStartDistance = 1.0f;
+    runtimeView->mFogCutoffDistance = 1.0f;
+    runtimeView->mFogMinClamp = 1.0f;
+    runtimeView->mFogMaxClamp = 0.0f;
+    runtimeView->mFogCurveExponent = 1000.0f;
+
+    SetWaterDefaults();
+
+    // Water masks (foam/flatness/depth-bias) sized to the just-created
+    // water-map texture's real dimensions (the binary re-queries
+    // `GetDimensions` here rather than reusing `halfWidth`/`halfHeight`
+    // directly - numerically identical since the sheet was just created at
+    // exactly that size, but the dispatch is preserved for fidelity).
+    Wm3::Vector3f waterMapDimensions{};
+    visualView->mWaterMapTexture->GetDimensions(&waterMapDimensions);
+    CreateWaterMasks(
+      static_cast<std::int32_t>(waterMapDimensions.x),
+      static_cast<std::int32_t>(waterMapDimensions.y)
+    );
+
+    EnterEditMode(loadControl);
+    ExitEditMode();
+
+    // Fresh decal manager, destroying whatever was previously owned.
+    {
+      CDecalManager* const oldDecalManager = runtimeView->mDecalManager;
+      runtimeView->mDecalManager = CDecalManager::Create(this);
+      if (oldDecalManager != nullptr) {
+        delete oldDecalManager;
+      }
+    }
+
+    // Reposition the sky dome from freshly computed world bounds (same
+    // formula as `Load`'s pre-0x3A skydome-derivation branch, including the
+    // `1.2566...` (~2*pi/5) FOV-derived cosine scale).
+    const Wm3::AxisAlignedBox3f bounds = GetWorldBounds();
+    const float centerX = (bounds.Max.x + bounds.Min.x) * 0.5f;
+    const float centerY = (bounds.Min.y + bounds.Max.y) * 0.5f;
+    const float centerZ = (bounds.Max.z + bounds.Min.z) * 0.5f;
+    const float halfExtentX = bounds.Max.x - centerX;
+    const float halfExtentY = bounds.Min.y - centerY;
+    const float domeRadius = static_cast<float>(
+      std::sqrt(halfExtentX * halfExtentX + halfExtentY * halfExtentY) / std::cos(1.25663697719574)
+    );
+    const float sunElevation = runtimeView->mMap->mWaterEnabled
+      ? runtimeView->mMap->mWaterElevation
+      : bounds.Min.y;
+
+    runtimeView->mSkyDome.SetupHorizonAndCirrus(
+      Wm3::Vector3f{centerX, centerY, centerZ},
+      sunElevation,
+      domeRadius
+    );
+
+    return true;
+  }
+
+  /**
    * Address: 0x008A0A20 (FUN_008A0A20, ??0struct_Env@@QAE@@Z)
    *
    * What it does:
