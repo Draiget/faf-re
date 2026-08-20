@@ -112,41 +112,41 @@ namespace moho
 
     // Slot 19. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C7A0 (FUN_0073C7A0),
     // ECmdStreamOp::CMDST_SingleStep (6)
-    virtual void SingleStep() = 0;
+    virtual CmdId SingleStep() = 0;
 
     // Slot 20. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C840 (FUN_0073C840),
     // ECmdStreamOp::CMDST_CreateUnit (7)
-    virtual void CreateUnit(uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, float heading) = 0;
+    virtual CmdId CreateUnit(uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, float heading) = 0;
 
     // Slot 21. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C8F0 (FUN_0073C8F0),
     // ECmdStreamOp::CMDST_CreateProp (8)
-    virtual void CreateProp(const char* id, const Wm3::Vec3f& loc) = 0;
+    virtual CmdId CreateProp(const char* id, const Wm3::Vec3f& loc) = 0;
 
     // Slot 22. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C990 (FUN_0073C990),
     // ECmdStreamOp::CMDST_DestroyEntity (9)
-    virtual void DestroyEntity(EntId entityId) = 0;
+    virtual CmdId DestroyEntity(EntId entityId) = 0;
 
     // Slot 23. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CA30 (FUN_0073CA30),
     // ECmdStreamOp::CMDST_WarpEntity (10)
-    virtual void WarpEntity(EntId entityId, const VTransform& transform) = 0;
+    virtual CmdId WarpEntity(EntId entityId, const VTransform& transform) = 0;
 
     // Slot 24. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CAD0 (FUN_0073CAD0),
     // ECmdStreamOp::CMDST_ProcessInfoPair (11)
-    virtual void ProcessInfoPair(void* id, const char* key, const char* val) = 0;
+    virtual CmdId ProcessInfoPair(void* id, const char* key, const char* val) = 0;
 
     // Slot 25. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CB70 (FUN_0073CB70),
     // ECmdStreamOp::CMDST_IssueCommand (12)
-    virtual void
+    virtual CmdId
     IssueCommand(const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear) = 0;
 
     // Slot 26. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CC10 (FUN_0073CC10),
     // ECmdStreamOp::CMDST_IssueFactoryCommand (13)
-    virtual void
+    virtual CmdId
     IssueFactoryCommand(const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear) = 0;
 
     // Slot 27. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CCB0 (FUN_0073CCB0),
     // ECmdStreamOp::CMDST_IncreaseCommandCount (14)
-    virtual void IncreaseCommandCount(CmdId id, int count) = 0;
+    virtual CmdId IncreaseCommandCount(CmdId id, int count) = 0;
 
     // Slot 28. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CD50 (FUN_0073CD50),
     // ECmdStreamOp::CMDST_DecreaseCommandCount (15). Returns the resulting command cookie
@@ -155,33 +155,33 @@ namespace moho
 
     // Slot 29. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CDF0 (FUN_0073CDF0),
     // ECmdStreamOp::CMDST_SetCommandTarget (16)
-    virtual void SetCommandTarget(CmdId id, const SSTITarget& target) = 0;
+    virtual CmdId SetCommandTarget(CmdId id, const SSTITarget& target) = 0;
 
     // Slot 30. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CE90 (FUN_0073CE90),
     // ECmdStreamOp::CMDST_SetCommandType (17)
-    virtual void SetCommandType(CmdId id, EUnitCommandType type) = 0;
+    virtual CmdId SetCommandType(CmdId id, EUnitCommandType type) = 0;
 
     // Slot 31. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CF30 (FUN_0073CF30),
     // ECmdStreamOp::CMDST_SetCommandCells (18)
-    virtual void
+    virtual CmdId
     SetCommandCells(CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target) = 0;
 
     // Slot 32. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CFD0 (FUN_0073CFD0),
     // ECmdStreamOp::CMDST_RemoveCommandFromQueue (19)
-    virtual void RemoveCommandFromUnitQueue(CmdId id, EntId unitId) = 0;
+    virtual CmdId RemoveCommandFromUnitQueue(CmdId id, EntId unitId) = 0;
 
     // Slot 33. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073D070 (FUN_0073D070),
     // ECmdStreamOp::CMDST_ExecuteLuaInSim (21)
-    virtual void ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) = 0;
+    virtual CmdId ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) = 0;
 
     // Slot 34. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073D110 (FUN_0073D110),
     // ECmdStreamOp::CMDST_LuaSimCallback (22)
-    virtual void
+    virtual CmdId
     LuaSimCallback(const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities) = 0;
 
     // Slot 35. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073D1B0 (FUN_0073D1B0),
     // ECmdStreamOp::CMDST_DebugCommand (20)
-    virtual void ExecuteDebugCommand(
+    virtual CmdId ExecuteDebugCommand(
       const char* command,
       const Wm3::Vector3<float>& worldPos,
       uint32_t focusArmy,

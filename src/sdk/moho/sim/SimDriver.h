@@ -707,42 +707,42 @@ namespace moho
     /**
      * Address: 0x0073C7A0 (FUN_0073C7A0)
      */
-    void SingleStep() override;
+    CmdId SingleStep() override;
     /**
      * Address: 0x0073C840 (FUN_0073C840)
      */
-    void CreateUnit(uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, float heading) override;
+    CmdId CreateUnit(uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, float heading) override;
     /**
      * Address: 0x0073C8F0 (FUN_0073C8F0)
      */
-    void CreateProp(const char* id, const Wm3::Vec3f& loc) override;
+    CmdId CreateProp(const char* id, const Wm3::Vec3f& loc) override;
     /**
      * Address: 0x0073C990 (FUN_0073C990)
      */
-    void DestroyEntity(EntId entityId) override;
+    CmdId DestroyEntity(EntId entityId) override;
     /**
      * Address: 0x0073CA30 (FUN_0073CA30)
      */
-    void WarpEntity(EntId entityId, const VTransform& transform) override;
+    CmdId WarpEntity(EntId entityId, const VTransform& transform) override;
     /**
      * Address: 0x0073CAD0 (FUN_0073CAD0)
      */
-    void ProcessInfoPair(void* id, const char* key, const char* val) override;
+    CmdId ProcessInfoPair(void* id, const char* key, const char* val) override;
     /**
      * Address: 0x0073CB70 (FUN_0073CB70)
      */
-    void
+    CmdId
     IssueCommand(const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear) override;
     /**
      * Address: 0x0073CC10 (FUN_0073CC10)
      */
-    void IssueFactoryCommand(
+    CmdId IssueFactoryCommand(
       const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear
     ) override;
     /**
      * Address: 0x0073CCB0 (FUN_0073CCB0)
      */
-    void IncreaseCommandCount(CmdId id, int count) override;
+    CmdId IncreaseCommandCount(CmdId id, int count) override;
     /**
      * Address: 0x0073CD50 (FUN_0073CD50)
      */
@@ -750,35 +750,35 @@ namespace moho
     /**
      * Address: 0x0073CDF0 (FUN_0073CDF0)
      */
-    void SetCommandTarget(CmdId id, const SSTITarget& target) override;
+    CmdId SetCommandTarget(CmdId id, const SSTITarget& target) override;
     /**
      * Address: 0x0073CE90 (FUN_0073CE90)
      */
-    void SetCommandType(CmdId id, EUnitCommandType type) override;
+    CmdId SetCommandType(CmdId id, EUnitCommandType type) override;
     /**
      * Address: 0x0073CF30 (FUN_0073CF30)
      */
-    void SetCommandCells(
+    CmdId SetCommandCells(
       CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target
     ) override;
     /**
      * Address: 0x0073CFD0 (FUN_0073CFD0)
      */
-    void RemoveCommandFromUnitQueue(CmdId id, EntId unitId) override;
+    CmdId RemoveCommandFromUnitQueue(CmdId id, EntId unitId) override;
     /**
      * Address: 0x0073D070 (FUN_0073D070)
      */
-    void ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) override;
+    CmdId ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) override;
     /**
      * Address: 0x0073D110 (FUN_0073D110)
      */
-    void LuaSimCallback(
+    CmdId LuaSimCallback(
       const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
     ) override;
     /**
      * Address: 0x0073D1B0 (FUN_0073D1B0)
      */
-    void ExecuteDebugCommand(
+    CmdId ExecuteDebugCommand(
       const char* command,
       const Wm3::Vector3<float>& worldPos,
       uint32_t focusArmy,
@@ -881,7 +881,6 @@ namespace moho
      */
     void PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock);
     // Local source-side adapter for removed out-param command-cookie returns.
-    void ForwardCommandResultLocked();
     static void JoinAndDeleteThread(boost::thread*& thread);
 
   private:
