@@ -340,32 +340,9 @@ namespace
     "UserUnitLuaObjectRuntimeView::luaObject offset must be 0x170"
   );
 
-  struct UserEntityWeakLinkView
-  {
-    std::uintptr_t ownerLinkSlot;         // +0x00
-    UserEntityWeakLinkView* nextInOwner;  // +0x04
-  };
-  static_assert(sizeof(UserEntityWeakLinkView) == 0x08, "UserEntityWeakLinkView size must be 0x08");
-
-  enum class UserTargetType : std::int32_t
-  {
-    Entity = 1,
-    Position = 2,
-  };
-
-  struct UserCommandTargetView
-  {
-    UserTargetType targetType;             // +0x00
-    UserEntityWeakLinkView targetEntity;   // +0x04
-    Wm3::Vector3<float> position;          // +0x0C
-  };
-  static_assert(
-    offsetof(UserCommandTargetView, targetEntity) == 0x04, "UserCommandTargetView::targetEntity offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandTargetView, position) == 0x0C, "UserCommandTargetView::position offset must be 0x0C"
-  );
-  static_assert(sizeof(UserCommandTargetView) == 0x18, "UserCommandTargetView size must be 0x18");
+  // UserEntityWeakLinkView / UserTargetType / UserCommandTargetView moved to
+  // UserUnit.h (moho namespace) so Moho::ISSUE_SetCommandTarget (Sim.cpp) and
+  // func_ProcessCommandDrag (CWldSession.cpp) can construct/pass them.
 
   struct UserCommandRawTargetView
   {
@@ -565,70 +542,11 @@ namespace
     "UserCommandManagerRuntimeView::resolvedRangeDirty offset must be 0x60"
   );
 
-  struct UserCommandIssueWeakSetRuntimeView
-  {
-    void* allocatorProxy;            // +0x00
-    SSelectionNodeUserEntity* head;  // +0x04
-    std::uint32_t size;              // +0x08
-  };
-  static_assert(
-    offsetof(UserCommandIssueWeakSetRuntimeView, head) == 0x04,
-    "UserCommandIssueWeakSetRuntimeView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueWeakSetRuntimeView, size) == 0x08,
-    "UserCommandIssueWeakSetRuntimeView::size offset must be 0x08"
-  );
-  static_assert(sizeof(UserCommandIssueWeakSetRuntimeView) == 0x0C, "UserCommandIssueWeakSetRuntimeView size must be 0x0C");
-
-  struct UserCommandIssueCellVectorRuntimeView
-  {
-    void* begin;        // +0x00
-    void* end;          // +0x04
-    void* capacityEnd;  // +0x08
-    void** inlineBase;  // +0x0C
-    std::uint8_t pad_0010_0018[0x08];
-  };
-  static_assert(offsetof(UserCommandIssueCellVectorRuntimeView, begin) == 0x00, "UserCommandIssueCellVectorRuntimeView::begin offset must be 0x00");
-  static_assert(offsetof(UserCommandIssueCellVectorRuntimeView, end) == 0x04, "UserCommandIssueCellVectorRuntimeView::end offset must be 0x04");
-  static_assert(
-    offsetof(UserCommandIssueCellVectorRuntimeView, capacityEnd) == 0x08,
-    "UserCommandIssueCellVectorRuntimeView::capacityEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCellVectorRuntimeView, inlineBase) == 0x0C,
-    "UserCommandIssueCellVectorRuntimeView::inlineBase offset must be 0x0C"
-  );
-  static_assert(sizeof(UserCommandIssueCellVectorRuntimeView) == 0x18, "UserCommandIssueCellVectorRuntimeView size must be 0x18");
-
-  struct UserCommandIssueLocalEventRuntimeView
-  {
-    CmdId commandId;                                // +0x00
-    std::uint32_t eventType;                        // +0x04
-    UserCommandIssueWeakSetRuntimeView entitySet;   // +0x08
-    std::int32_t countDelta;                        // +0x14
-    std::uint8_t pad_0018_001C[0x04];
-    SSelectionWeakRefUserEntity targetEntityWeak;   // +0x1C
-    std::uint8_t pad_0024_0038[0x14];
-    UserCommandIssueCellVectorRuntimeView cells;    // +0x38
-  };
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, entitySet) == 0x08,
-    "UserCommandIssueLocalEventRuntimeView::entitySet offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, countDelta) == 0x14,
-    "UserCommandIssueLocalEventRuntimeView::countDelta offset must be 0x14"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, targetEntityWeak) == 0x1C,
-    "UserCommandIssueLocalEventRuntimeView::targetEntityWeak offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, cells) == 0x38,
-    "UserCommandIssueLocalEventRuntimeView::cells offset must be 0x38"
-  );
-  static_assert(sizeof(UserCommandIssueLocalEventRuntimeView) == 0x50, "UserCommandIssueLocalEventRuntimeView size must be 0x50");
+  // UserCommandIssueWeakSetRuntimeView / UserCommandIssueCellVectorRuntimeView /
+  // UserCommandIssueLocalEventRuntimeView moved to UserUnit.h (moho namespace)
+  // so the Sim.cpp local command-issue update-event keystone can destroy its
+  // local event through DestroyCommandIssueLocalEvent (see the type's own
+  // doc comment there).
 
   struct UserCommandIssueLocalQueueRuntimeView
   {
@@ -1218,12 +1136,18 @@ namespace
     }
   }
 
+} // namespace
+
+namespace moho
+{
   /**
    * Address: 0x008B4800 (FUN_008B4800)
    *
    * What it does:
    * Releases dynamic command-cell storage back to inline capacity, detaches
    * target weak-owner linkage, and destroys the local weak-entity set lane.
+   * Exposed (declared in UserUnit.h) so the Sim.cpp local command-issue
+   * update-event keystone can invoke the canonical teardown by name.
    */
   void DestroyCommandIssueLocalEvent(UserCommandIssueLocalEventRuntimeView& event) noexcept
   {
@@ -1237,7 +1161,10 @@ namespace
     UnlinkCommandIssueTargetWeakOwnerNoReset(event.targetEntityWeak);
     DestroyCommandIssueWeakSet(event.entitySet);
   }
+} // namespace moho
 
+namespace
+{
   [[nodiscard]] SSelectionNodeUserEntity*
   FindWeakEntitySetNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key) noexcept
   {
@@ -3201,13 +3128,21 @@ namespace
   }
 
   /**
+} // namespace
+
+namespace moho
+{
+  /**
    * Address: 0x008BEE30 (FUN_008BEE30)
    *
    * What it does:
    * Resolves one command-target entity owner when target type is `Entity`
    * (`1`) and the weak-owner slot is non-null; returns null otherwise.
+   * Exposed (declared in UserUnit.h) so `Moho::ISSUE_SetCommandTarget`
+   * (Sim.cpp) can run the transport/ferry-beacon category checks its own
+   * body runs against the drag target.
    */
-  [[maybe_unused]] [[nodiscard]] UserEntity* DecodeEntityFromCommandTargetIfEntity(
+  [[nodiscard]] UserEntity* DecodeEntityFromCommandTargetIfEntity(
     const UserCommandTargetView* const target
   ) noexcept
   {
@@ -3217,14 +3152,20 @@ namespace
 
     return nullptr;
   }
+} // namespace moho
 
+namespace
+{
   [[nodiscard]] Wm3::Vector3<float> InvalidCommandQueuePosition() noexcept
   {
     return Invalid<Wm3::Vector3<float>>();
   }
 
   [[nodiscard]] UserEntity* FindSessionEntityById(CWldSession* session, std::int32_t entityId) noexcept;
+} // namespace
 
+namespace moho
+{
   /**
    * Address: 0x008BED50 (FUN_008BED50, sub_8BED50)
    *
@@ -3232,6 +3173,8 @@ namespace
    * Resolves one command-target world position: returns entity position when
    * target type is `Entity` and weak owner resolves, returns inline target
    * position for `Position`, otherwise returns `Invalid<Wm3::Vector3f>()`.
+   * Exposed (declared in UserUnit.h) so `Moho::ISSUE_SetCommandTarget`
+   * (Sim.cpp) can resolve the drag-target world position it publishes.
    */
   [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserCommandTargetView& target) noexcept
   {
@@ -3247,7 +3190,10 @@ namespace
 
     return InvalidCommandQueuePosition();
   }
+} // namespace moho
 
+namespace
+{
   [[nodiscard]] Wm3::Vector3<float>
   ResolvePositionFromRawTarget(const UserCommandRawTargetView& target, CWldSession* const session) noexcept
   {
