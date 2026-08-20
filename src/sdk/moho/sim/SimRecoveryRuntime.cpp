@@ -4395,28 +4395,6 @@ std::uint32_t ResetSwapBackedArrayRuntimeB(
 }
 
 /**
- * Address: 0x006E2840 (FUN_006E2840)
- *
- * What it does:
- * Allocates one command-db map node lane with cleared links and sentinel-state
- * flags (`+0x14=1`, `+0x15=0`).
- */
-RbNodeFlag21Runtime* AllocateCommandDbMapNodeRuntime()
-{
-  auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  node->left = nullptr;
-  node->parent = nullptr;
-  node->right = nullptr;
-  node->sentinel20 = 1u;
-  node->isNil21 = 0u;
-  return node;
-}
-
-/**
  * Address: 0x00703A10 (FUN_00703A10)
  *
  * What it does:
