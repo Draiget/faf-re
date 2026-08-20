@@ -215,10 +215,30 @@ namespace
     }
   };
 
-  gpg::SerSaveLoadHelperListRuntime gSUnitOffsetInfoSerializer{};
-  gpg::SerSaveLoadHelperListRuntime gSOffsetInfoSerializer{};
-  gpg::SerSaveLoadHelperListRuntime gIFormationInstanceSerializer{};
-  gpg::SerSaveLoadHelperListRuntime gSAssignedLocInfoSerializer{};
+  // The binary globals are 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by all of them.
+  struct FormationSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(FormationSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "FormationSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(FormationSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "FormationSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(FormationSerializerHelperNode) == 0x14, "FormationSerializerHelperNode size must be 0x14");
+
+  FormationSerializerHelperNode gSUnitOffsetInfoSerializer{};
+  FormationSerializerHelperNode gSOffsetInfoSerializer{};
+  FormationSerializerHelperNode gIFormationInstanceSerializer{};
+  FormationSerializerHelperNode gSAssignedLocInfoSerializer{};
 
   /**
    * Address: 0x00566360 (FUN_00566360, SerSaveLoadHelper<SUnitOffsetInfo>::unlink lane A)
@@ -227,9 +247,9 @@ namespace
    * Unlinks `SUnitOffsetInfo` serializer helper links and restores self-links
    * for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSUnitOffsetInfoSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSUnitOffsetInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSUnitOffsetInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSUnitOffsetInfoSerializer.mListLinks);
   }
 
   /**
@@ -241,7 +261,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSUnitOffsetInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSUnitOffsetInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSUnitOffsetInfoSerializer.mListLinks);
   }
 
   /**
@@ -251,9 +271,9 @@ namespace
    * Unlinks `SOffsetInfo` serializer helper links and restores self-links for
    * intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSOffsetInfoSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSOffsetInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSOffsetInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSOffsetInfoSerializer.mListLinks);
   }
 
   /**
@@ -265,7 +285,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSOffsetInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSOffsetInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSOffsetInfoSerializer.mListLinks);
   }
 
   /**
@@ -275,9 +295,9 @@ namespace
    * Unlinks `IFormationInstance` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkIFormationInstanceSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkIFormationInstanceSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gIFormationInstanceSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gIFormationInstanceSerializer.mListLinks);
   }
 
   /**
@@ -289,7 +309,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkIFormationInstanceSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gIFormationInstanceSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gIFormationInstanceSerializer.mListLinks);
   }
 
   /**
@@ -299,9 +319,9 @@ namespace
    * Unlinks `SAssignedLocInfo` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSAssignedLocInfoSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSAssignedLocInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSAssignedLocInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSAssignedLocInfoSerializer.mListLinks);
   }
 
   /**
@@ -313,8 +333,275 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSAssignedLocInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSAssignedLocInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSAssignedLocInfoSerializer.mListLinks);
   }
+
+  /**
+   * Address: 0x00566300 (FUN_00566300, Moho::SUnitOffsetInfoSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for SUnitOffsetInfo. Forwards the
+   * reflected object pointer to SUnitOffsetInfo::MemberDeserialize
+   * (FUN_005707B0 body); version and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeSUnitOffsetInfoSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const info = reinterpret_cast<moho::SUnitOffsetInfo*>(objectPtr);
+    if (info == nullptr) {
+      return;
+    }
+    info->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00566310 (FUN_00566310, Moho::SUnitOffsetInfoSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for SUnitOffsetInfo. Forwards the
+   * reflected object pointer to SUnitOffsetInfo::MemberSerialize
+   * (FUN_005708A0 body); version and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeSUnitOffsetInfoSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const info = reinterpret_cast<moho::SUnitOffsetInfo*>(objectPtr);
+    if (info == nullptr) {
+      return;
+    }
+    info->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF5860 (FUN_00BF5860, Moho::SUnitOffsetInfoSerializer::~SUnitOffsetInfoSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the SUnitOffsetInfoSerializer helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_SUnitOffsetInfoSerializer_atexit()
+  {
+    (void)UnlinkSUnitOffsetInfoSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCAAC0 (FUN_00BCAAC0, register_SUnitOffsetInfoSerializer)
+   *
+   * What it does:
+   * Initializes the global SUnitOffsetInfo serializer helper load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via atexit.
+   */
+  void register_SUnitOffsetInfoSerializer()
+  {
+    (void)UnlinkSUnitOffsetInfoSerializerLaneA();
+    gSUnitOffsetInfoSerializer.mSerLoadFunc = &DeserializeSUnitOffsetInfoSerializerCallback;
+    gSUnitOffsetInfoSerializer.mSerSaveFunc = &SerializeSUnitOffsetInfoSerializerCallback;
+    (void)std::atexit(&cleanup_SUnitOffsetInfoSerializer_atexit);
+  }
+
+  /**
+   * Address: 0x00BF58F0 (FUN_00BF58F0, Moho::SOffsetInfoSerializer::~SOffsetInfoSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the SOffsetInfoSerializer helper node,
+   * matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_SOffsetInfoSerializer_atexit()
+  {
+    (void)UnlinkSOffsetInfoSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCAB20 (FUN_00BCAB20, register_SOffsetInfoSerializer)
+   *
+   * What it does:
+   * Initializes the global SOffsetInfo serializer helper load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via atexit.
+   */
+  void register_SOffsetInfoSerializer()
+  {
+    (void)UnlinkSOffsetInfoSerializerLaneA();
+    gSOffsetInfoSerializer.mSerLoadFunc = &moho::SOffsetInfoSerializer::Deserialize;
+    gSOffsetInfoSerializer.mSerSaveFunc = &moho::SOffsetInfoSerializer::Serialize;
+    (void)std::atexit(&cleanup_SOffsetInfoSerializer_atexit);
+  }
+
+  /**
+   * Address: 0x005666F0 (FUN_005666F0, Moho::IFormationInstanceSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for IFormationInstance. Forwards the
+   * reflected object pointer to IFormationInstance::MemberDeserialize
+   * (FUN_00570D80 body); version and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeIFormationInstanceSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const instance = reinterpret_cast<moho::IFormationInstance*>(objectPtr);
+    if (instance == nullptr) {
+      return;
+    }
+    moho::IFormationInstance::MemberDeserialize(instance, archive);
+  }
+
+  /**
+   * Address: 0x00566700 (FUN_00566700, Moho::IFormationInstanceSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for IFormationInstance. Forwards the
+   * reflected object pointer to IFormationInstance::MemberSerialize
+   * (FUN_00570DD0 body); version and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeIFormationInstanceSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const instance = reinterpret_cast<moho::IFormationInstance*>(objectPtr);
+    if (instance == nullptr) {
+      return;
+    }
+    moho::IFormationInstance::MemberSerialize(instance, archive);
+  }
+
+  /**
+   * Address: 0x00BF5980 (FUN_00BF5980, Moho::IFormationInstanceSerializer::~IFormationInstanceSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the IFormationInstanceSerializer
+   * helper node, matching the sibling unlink lanes used across other
+   * serializer registrars.
+   */
+  void cleanup_IFormationInstanceSerializer_atexit()
+  {
+    (void)UnlinkIFormationInstanceSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCAB80 (FUN_00BCAB80, register_IFormationInstanceSerializer)
+   *
+   * What it does:
+   * Initializes the global IFormationInstance serializer helper load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via atexit.
+   */
+  void register_IFormationInstanceSerializer()
+  {
+    (void)UnlinkIFormationInstanceSerializerLaneA();
+    gIFormationInstanceSerializer.mSerLoadFunc = &DeserializeIFormationInstanceSerializerCallback;
+    gIFormationInstanceSerializer.mSerSaveFunc = &SerializeIFormationInstanceSerializerCallback;
+    (void)std::atexit(&cleanup_IFormationInstanceSerializer_atexit);
+  }
+
+  /**
+   * Address: 0x005668E0 (FUN_005668E0, Moho::SAssignedLocInfoSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for SAssignedLocInfo. Forwards the
+   * reflected object pointer to SAssignedLocInfo::MemberDeserialize
+   * (FUN_00570E20 body); version and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeSAssignedLocInfoSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const slot = reinterpret_cast<moho::SAssignedLocInfo*>(objectPtr);
+    if (slot == nullptr) {
+      return;
+    }
+    moho::SAssignedLocInfo::MemberDeserialize(slot, archive);
+  }
+
+  /**
+   * Address: 0x005668F0 (FUN_005668F0, Moho::SAssignedLocInfoSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for SAssignedLocInfo. Forwards the
+   * reflected object pointer to SAssignedLocInfo::MemberSerialize
+   * (FUN_00570E80 body); version and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeSAssignedLocInfoSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    const auto* const slot = reinterpret_cast<const moho::SAssignedLocInfo*>(objectPtr);
+    if (slot == nullptr) {
+      return;
+    }
+    moho::SAssignedLocInfo::MemberSerialize(slot, archive);
+  }
+
+  /**
+   * Address: 0x00BF5A10 (FUN_00BF5A10, Moho::SAssignedLocInfoSerializer::~SAssignedLocInfoSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the SAssignedLocInfoSerializer helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_SAssignedLocInfoSerializer_atexit()
+  {
+    (void)UnlinkSAssignedLocInfoSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCABE0 (FUN_00BCABE0, register_SAssignedLocInfoSerializer)
+   *
+   * What it does:
+   * Initializes the global SAssignedLocInfo serializer helper load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via atexit.
+   */
+  void register_SAssignedLocInfoSerializer()
+  {
+    (void)UnlinkSAssignedLocInfoSerializerLaneA();
+    gSAssignedLocInfoSerializer.mSerLoadFunc = &DeserializeSAssignedLocInfoSerializerCallback;
+    gSAssignedLocInfoSerializer.mSerSaveFunc = &SerializeSAssignedLocInfoSerializerCallback;
+    (void)std::atexit(&cleanup_SAssignedLocInfoSerializer_atexit);
+  }
+
+  struct FormationSerializerStartupBootstrap
+  {
+    FormationSerializerStartupBootstrap()
+    {
+      register_SUnitOffsetInfoSerializer();
+      register_SOffsetInfoSerializer();
+      register_IFormationInstanceSerializer();
+      register_SAssignedLocInfoSerializer();
+    }
+  };
+
+  [[maybe_unused]] FormationSerializerStartupBootstrap gFormationSerializerStartupBootstrap;
 
   msvc8::string gRMapTypeEntIdSUnitOffsetInfoName;
   bool gRMapTypeEntIdSUnitOffsetInfoNameCleanupRegistered = false;
@@ -823,12 +1110,51 @@ namespace
     return gQuaternionfType;
   }
 
+  /**
+   * Reflection cache for `map<EntId,SUnitOffsetInfo>`.
+   *
+   * The binary keeps this in its own global (`std::map<EntId,SUnitOffsetInfo>::sType`
+   * at 0x010C6F8C, filled at 0x00570B8D by `SOffsetInfo::MemberSerialize`),
+   * separate from the element-type cache `Moho::SOffsetInfo::sType` at
+   * 0x010C6F6C that `RFastVectorType<SOffsetInfo>::SerLoad` fills at
+   * 0x0056DF43. This lane previously stored the *map* descriptor into
+   * `SOffsetInfo::sType`, which would hand an `SOffsetInfo`-typed consumer a
+   * `map<...>` descriptor instead.
+   */
+  gpg::RType* gMapEntIdSUnitOffsetInfoType = nullptr;
+
   [[nodiscard]] gpg::RType* CachedMapEntIdSUnitOffsetInfoType()
+  {
+    if (!gMapEntIdSUnitOffsetInfoType) {
+      gMapEntIdSUnitOffsetInfoType = gpg::LookupRType(typeid(FormationUnitOffsetMap));
+    }
+    return gMapEntIdSUnitOffsetInfoType;
+  }
+
+  /**
+   * Element-type cache for `SOffsetInfo`, mirroring the binary's
+   * `Moho::SOffsetInfo::sType` global (0x010C6F6C).
+   */
+  [[nodiscard]] gpg::RType* CachedSOffsetInfoType()
   {
     gpg::RType* type = moho::SOffsetInfo::sType;
     if (!type) {
-      type = gpg::LookupRType(typeid(FormationUnitOffsetMap));
+      type = gpg::LookupRType(typeid(moho::SOffsetInfo));
       moho::SOffsetInfo::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Element-type cache for `SAssignedLocInfo`, mirroring the binary's
+   * `Moho::SAssignedLocInfo::sType` global.
+   */
+  [[nodiscard]] gpg::RType* CachedSAssignedLocInfoType()
+  {
+    gpg::RType* type = moho::SAssignedLocInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SAssignedLocInfo));
+      moho::SAssignedLocInfo::sType = type;
     }
     return type;
   }
@@ -3041,32 +3367,115 @@ namespace
     ResetFormationLaneEntryUnitMapStorage(fill);
   }
 
-  using SetReflectedCountFn = void (*)(void*, int);
-
   /**
-   * Address: 0x01104FA0 (`gpg::RFastVectorType<Moho::SOffsetInfo>` descriptor)
+   * Address: 0x0056DEC0 (FUN_0056DEC0, gpg::RFastVectorType_SOffsetInfo::SerLoad)
+   *
+   * IDA signature:
+   * void __cdecl sub_56DEC0(gpg::ReadArchive *a1, _DWORD *a2, int a3, gpg::RRef *a6);
    *
    * What it does:
-   * Holds the descriptor's `RIndexed::SetCount` slot so the linker keeps the
-   * lane addressable from this translation unit. The retail descriptor is
-   * built by FUN_00571C00, which installs the
-   * `RFastVectorType<Moho::SOffsetInfo>` vtable pair (the main `RType` table
-   * plus the `{for gpg::RIndexed}` sub-object table) and preregisters it for
-   * `gpg::fastvector<Moho::SOffsetInfo>`; reflection reaches this body only
-   * through that `RIndexed` slot.
+   * Reads the serialized lane count, grows the reflected
+   * `fastvector<SOffsetInfo>` to that count -- copy-filling appended lanes from
+   * a freshly default-initialised prototype -- then deserializes each lane
+   * through `ReadArchive::Read`.
+   *
+   * The prototype is a real object, built at 0x0056DF00 and torn down at
+   * 0x0056DF17 around the resize at 0x0056DF0C, because a lane entry owns a
+   * sentinel-backed unit map and an intrusive weak back-link; a zeroed stack
+   * blob would leave both malformed. The element descriptor is cached in
+   * `SOffsetInfo::sType` (0x0056DF43), not the map descriptor.
    */
-  struct FastVectorLaneEntryReflectionSlots
+  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
-    SetReflectedCountFn setCount;
-  };
+    auto* const laneVector = reinterpret_cast<moho::SFormationLaneVec*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(laneVector != nullptr);
+    if (!archive || !laneVector) {
+      return;
+    }
 
-  const FastVectorLaneEntryReflectionSlots kFastVectorLaneEntryReflectionSlots = {
-    &SetFastVectorLaneEntryCount,
-  };
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
 
-  [[maybe_unused]] [[nodiscard]] const void* PublishFastVectorLaneEntryReflectionSlots() noexcept
+    {
+      moho::SOffsetInfo fill{};
+      (void)InitializeDefaultFormationLaneEntry(&fill);
+      ResizeLaneEntryVectorByCountWithFill(count, laneVector, &fill);
+      ResetFormationLaneEntryUnitMapStorage(fill);
+    }
+
+    gpg::RType* const elementType = CachedSOffsetInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(laneVector);
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(elementType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x0056D650 (FUN_0056D650, gpg::fastvector_n16_SAssignedLocInfo::resize_fill)
+   *
+   * What it does:
+   * Resizes one runtime `fastvector<SAssignedLocInfo>` lane and fills appended
+   * elements from `*fillValue`. `SAssignedLocInfo` is a trivially-copyable
+   * 0x10 POD, so the retail body copies it as four raw dwords
+   * (0x0056D67F-0x0056D691) rather than invoking a copy constructor.
+   */
+  void FastVectorSAssignedLocInfoResize(
+    const moho::SAssignedLocInfo* const fillValue,
+    const unsigned int newSize,
+    void* const objectStorage
+  )
   {
-    return static_cast<const void*>(&kFastVectorLaneEntryReflectionSlots);
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(objectStorage);
+    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+  }
+
+  /**
+   * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot of the `fastvector<SAssignedLocInfo>` descriptor.
+   * Resizes the reflected lane, filling appended entries from a zeroed
+   * prototype -- the retail body clears the 0x10 stack prototype with
+   * `xorps xmm0` plus two `movss` stores and two zeroed dwords
+   * (0x0056C3B3-0x0056C3D3) before calling the resize.
+   */
+  void SetFastVectorAssignedLocInfoCount(void* const slotVector, const int count)
+  {
+    const moho::SAssignedLocInfo fill{};
+    FastVectorSAssignedLocInfoResize(&fill, static_cast<unsigned int>(count), slotVector);
+  }
+
+  /**
+   * Address: 0x0056E000 (FUN_0056E000, gpg::RFastVectorType_SAssignedLocInfo::SerLoad)
+   *
+   * What it does:
+   * Reads the serialized slot count, resizes the reflected
+   * `fastvector<SAssignedLocInfo>` filling appended lanes from a zeroed
+   * prototype, then deserializes each 0x10 lane through `ReadArchive::Read`.
+   */
+  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    const moho::SAssignedLocInfo fill{};
+    FastVectorSAssignedLocInfoResize(&fill, count, storage);
+
+    gpg::RType* const elementType = CachedSAssignedLocInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(storage);
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(elementType, view.ElementAtUnchecked(i), owner);
+    }
   }
 
   /**
@@ -4050,11 +4459,18 @@ namespace moho
    * Address: 0x00566510 (FUN_00566510, Moho::SOffsetInfoSerializer::Serialize)
    *
    * What it does:
-   * Static reflection serializer callback: forwards one `SOffsetInfo` payload
-   * to `SOffsetInfo::MemberSerialize`.
+   * Reflection save-callback facade: forwards one `SOffsetInfo` payload to
+   * `SOffsetInfo::MemberSerialize`; `version` and the owner-ref lane are
+   * unused by the member (mirrors the binary tail call).
    */
-  void SOffsetInfoSerializer::Serialize(gpg::WriteArchive* const archive, SOffsetInfo* const offsetInfo)
+  void SOffsetInfoSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
+    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
     if (offsetInfo != nullptr) {
       offsetInfo->MemberSerialize(archive);
     }
@@ -4120,11 +4536,18 @@ namespace moho
    * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
    *
    * What it does:
-   * Static reflection serializer callback: forwards one `SOffsetInfo` payload
-   * to `SOffsetInfo::MemberDeserialize`.
+   * Reflection load-callback facade: forwards one `SOffsetInfo` payload to
+   * `SOffsetInfo::MemberDeserialize`; `version` and the owner-ref lane are
+   * unused by the member (mirrors the binary tail call).
    */
-  void SOffsetInfoSerializer::Deserialize(gpg::ReadArchive* const archive, SOffsetInfo* const offsetInfo)
+  void SOffsetInfoSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
+    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
     if (offsetInfo != nullptr) {
       offsetInfo->MemberDeserialize(archive);
     }
