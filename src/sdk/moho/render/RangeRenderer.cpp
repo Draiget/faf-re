@@ -10,21 +10,34 @@
 #include <string_view>
 
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
+#include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "moho/app/WxRuntimeTypes.h"
+#include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/RangeExtractor.h"
 #include "moho/misc/StartupHelpers.h"
-#include "moho/render/RangeRendererStartupRegistrations.h"
+#include "moho/render/camera/CameraImpl.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/render/d3d/ShaderVar.h"
+#include "moho/render/RangeRendererStartupRegistrations.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/VisibilityRect.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
 
@@ -130,50 +143,66 @@ namespace
     return FillRangeExtractionPayloadSpan(destination, &payloadValue, count);
   }
 
-  struct RangeExtractionFastVectorN20RuntimeView
+  /**
+   * Address: 0x007F03D0 (FUN_007F03D0, sub_7F03D0)
+   *
+   * `sub_7F03D0`'s only real caller in this binary is `RangeRenderer::Render`
+   * (0x007EEAA3) - byte-verified via the namespace callgraph index, which
+   * lists exactly one code xref to this address. A prior recovery pass
+   * attributed this address to a `fastvector_n<SRangeExtractionPayload,20>`
+   * copy helper, citing no caller evidence; that shape does not match the one
+   * real call site, which snapshots `CameraImpl::GetArmyUnitsInFrustum()`'s
+   * cached `CameraFrustumUserEntityList` (stride
+   * `sizeof(CameraUserEntityWeakRef) == 0x08`) into a `Render`-local buffer
+   * before building `func_ExtractRanges`'s candidate-pool view. Retyped here
+   * per that evidence; the struct's total inline-capacity span (0x140 bytes)
+   * is unchanged from the original recovery, only the element stride/count
+   * (0x08 * 40, not 0x10 * 20).
+   */
+  struct CameraFrustumWeakRefSnapshotBuffer
   {
-    moho::SRangeExtractionPayload* mStart;         // +0x00
-    moho::SRangeExtractionPayload* mFinish;        // +0x04
-    moho::SRangeExtractionPayload* mCapacity;      // +0x08
-    moho::SRangeExtractionPayload* mOriginalStart; // +0x0C
-    moho::SRangeExtractionPayload mInlineStorage[20]; // +0x10
+    moho::CameraUserEntityWeakRef* mStart;                      // +0x00
+    moho::CameraUserEntityWeakRef* mFinish;                     // +0x04
+    moho::CameraUserEntityWeakRef* mCapacity;                   // +0x08
+    moho::CameraUserEntityWeakRef* mOriginalStart;               // +0x0C
+    moho::CameraUserEntityWeakRef mInlineStorage[40];            // +0x10
   };
-  static_assert(sizeof(RangeExtractionFastVectorN20RuntimeView) == 0x150, "RangeExtractionFastVectorN20RuntimeView size must be 0x150");
+  static_assert(sizeof(CameraFrustumWeakRefSnapshotBuffer) == 0x150, "CameraFrustumWeakRefSnapshotBuffer size must be 0x150");
 
   /**
    * Address: 0x007F03D0 (FUN_007F03D0, sub_7F03D0)
    *
    * What it does:
-   * Rebinds one `fastvector_n<SRangeExtractionPayload,20>` lane to inline
-   * storage and copies source payload entries, spilling to heap when source
-   * exceeds inline capacity.
+   * Rebinds one `fastvector_n<CameraUserEntityWeakRef,40>` snapshot buffer to
+   * inline storage and copies the camera's current frustum weak-ref list into
+   * it, spilling to heap when the source list exceeds inline capacity.
    */
-  [[maybe_unused]] RangeExtractionFastVectorN20RuntimeView* CopyRangeExtractionFastVectorN20(
-    RangeExtractionFastVectorN20RuntimeView* const destination,
-    const RangeExtractionFastVectorN20RuntimeView& source
+  CameraFrustumWeakRefSnapshotBuffer* SnapshotCameraFrustumWeakRefs(
+    CameraFrustumWeakRefSnapshotBuffer* const destination,
+    const moho::CameraFrustumUserEntityList& source
   )
   {
     if (destination == nullptr) {
       return nullptr;
     }
 
-    constexpr std::size_t kInlineCount = 20u;
-    moho::SRangeExtractionPayload* const inlineStart = &destination->mInlineStorage[0];
+    constexpr std::size_t kInlineCount = 40u;
+    moho::CameraUserEntityWeakRef* const inlineStart = &destination->mInlineStorage[0];
     destination->mStart = inlineStart;
     destination->mFinish = inlineStart;
     destination->mCapacity = inlineStart + kInlineCount;
     destination->mOriginalStart = inlineStart;
 
-    const moho::SRangeExtractionPayload* const sourceStart = source.mStart;
-    const moho::SRangeExtractionPayload* const sourceFinish = source.mFinish;
+    const moho::CameraUserEntityWeakRef* const sourceStart = source.mStart;
+    const moho::CameraUserEntityWeakRef* const sourceFinish = source.mFinish;
     if (sourceStart == nullptr || sourceFinish == nullptr || sourceFinish <= sourceStart) {
       return destination;
     }
 
     const std::size_t sourceCount = static_cast<std::size_t>(sourceFinish - sourceStart);
-    moho::SRangeExtractionPayload* writeStart = inlineStart;
+    moho::CameraUserEntityWeakRef* writeStart = inlineStart;
     if (sourceCount > kInlineCount) {
-      writeStart = static_cast<moho::SRangeExtractionPayload*>(::operator new[](sourceCount * sizeof(*writeStart)));
+      writeStart = static_cast<moho::CameraUserEntityWeakRef*>(::operator new[](sourceCount * sizeof(*writeStart)));
       destination->mStart = writeStart;
       destination->mFinish = writeStart;
       destination->mCapacity = writeStart + sourceCount;
@@ -353,60 +382,6 @@ namespace
     return destination;
   }
 
-  /**
-   * Address: 0x007EF5A0 (FUN_007EF5A0, func_RenderRings)
-   *
-   * What it does:
-   * Recovers the geometry-preparation head of `func_RenderRings`:
-   * - computes zoom-scaled inner/outer thickness offsets from the
-   *   `range_InnerThicknessCoeff` / `range_OuterThicknessCoeff` console
-   *   variables, which the binary reads as globals at this point
-   * - expands source ring entries into fill + edge payload buffers
-   *
-   * Notes:
-   * The downstream dynamic-buffer draw/stencil frame passes remain in the
-   * unrecovered tail lane of FUN_007EF5A0.
-   */
-  [[maybe_unused]] std::uint32_t PrepareRenderRingsGeometryPass(
-    RangeExtractionPayloadVector& ringEntries,
-    const moho::RangeRingRadiusParams& innerRingParams,
-    const moho::RangeRingRadiusParams& outerRingParams,
-    const float playableMapSpan,
-    const float zoomScale,
-    RangeExtractionPayloadVector& outFillPayloads,
-    RangeExtractionPayloadVector& outEdgePayloads
-  )
-  {
-    const float innerThicknessCoeff = moho::range_InnerThicknessCoeff;
-    const float outerThicknessCoeff = moho::range_OuterThicknessCoeff;
-
-    const std::uint32_t ringCount = static_cast<std::uint32_t>(ringEntries.size());
-    outFillPayloads.clear();
-    outEdgePayloads.clear();
-    if (ringCount == 0u) {
-      return 0u;
-    }
-
-    const float innerThicknessOffset =
-      (((innerRingParams.thicknessScalar * innerThicknessCoeff) * playableMapSpan) - innerRingParams.radius) *
-        zoomScale +
-      innerRingParams.radius;
-    const float outerThicknessOffset =
-      (((outerRingParams.thicknessScalar * outerThicknessCoeff) * playableMapSpan) - outerRingParams.radius) *
-        zoomScale +
-      outerRingParams.radius;
-
-    RangeRingGeometryBuildState buildState{
-      innerThicknessOffset,
-      outerThicknessOffset,
-      &outFillPayloads,
-      &outEdgePayloads,
-    };
-
-    BuildRingPayloadBuffers(buildState, ringEntries.begin(), ringEntries.end());
-    return ringCount;
-  }
-
   struct RangeDynamicVertexAllocatorVTable
   {
     std::uint8_t reserved_00[0x08];
@@ -442,7 +417,7 @@ namespace
    * a 1000-vertex arena, either by appending after current occupancy or by
    * resetting/relocking the arena when append would overflow.
    */
-  [[maybe_unused]] bool ReserveDynamicRingVertexSliceRuntime(
+  bool ReserveDynamicRingVertexSliceRuntime(
     const std::uint32_t requestedVertexCount,
     int* const outVertexWriteBase,
     RangeDynamicVertexReservationStateRuntime* const state,
@@ -490,6 +465,240 @@ namespace
     );
     *outVertexWriteBase = writeBase;
     return writeBase != 0;
+  }
+
+  constexpr std::int32_t kTriangleListPrimitiveToken = 4; // D3DPT_TRIANGLELIST
+  constexpr std::uint32_t kDynamicVertexBatchLimit = 1000u;
+
+  /**
+   * "range" effect shader-variable slot for the fill/burn ring color. Follows
+   * the same lazy-register idiom as `CRenFrame.cpp`'s `DEFINE_FRAME_SHADER_VAR_GETTER`
+   * family (register-on-first-use static, bound into the "frame" effect group -
+   * this is the same effect `CRenFrame::Render` selects for the "RangeMask" /
+   * "RangeFill" / "RangeBurn" technique passes below). The exact HLSL variable
+   * name is not independently byte-verified (IDA's own symbol for the binary
+   * global is `shaderVarFrameRangeColor`, matching this getter's naming
+   * convention); "RangeColor" is the best-evidence name given the surrounding
+   * `FrameTexture1..4`/`BlurScale`/`GlowCopyScale` siblings.
+   */
+  [[nodiscard]] moho::ShaderVar& GetFrameRangeColorShaderVar()
+  {
+    static moho::ShaderVar shaderVar{};
+    static const bool registered = (moho::RegisterShaderVar("RangeColor", &shaderVar, "frame"), true);
+    (void)registered;
+    return shaderVar;
+  }
+
+  /**
+   * Address: 0x007EF9B0 (FUN_007EF9B0, func_Draw_Rings)
+   *
+   * IDA signature (LTCG-reshaped; `retn 8` pops exactly 2 stack dwords beyond
+   * the ecx register argument - the seven-argument `char a3, int a4..a8`
+   * shape Hex-Rays printed is a decompiler stack-tracking artifact, the same
+   * family as the "positive sp value" warning on `RangeRenderer::Render`):
+   * void __usercall func_Draw_Rings(GeomCamera3 *cameraView@<ecx>, unsigned int vertexCount,
+   *                                  int dynamicStreamStartVertex);
+   *
+   * `edi` (RangeRenderer* rangeRenderer) is never reloaded between
+   * `func_RenderRings` setting it up (0x007EF791) and this call - LTCG left it
+   * live across the call instead of re-pushing it. Modelled here as an
+   * explicit parameter rather than relying on caller register state.
+   *
+   * What it does:
+   * Draws one batch of range-ring geometry through the "range" effect's
+   * "Cast" technique: binds the camera's projection matrix (view matrix
+   * variable is fetched but never rewritten here - the device already carries
+   * it), binds the renderer's static ring-template vertex/index buffers on
+   * stream 0 and its dynamic per-batch vertex buffer on stream 1 (offset by
+   * `dynamicStreamStartVertex`, the vertex index `ReserveDynamicRingVertexSliceRuntime`
+   * returned for this batch), and issues one indexed draw per technique pass.
+   */
+  void DrawRangeRingBatch(
+    const moho::GeomCamera3& cameraView,
+    moho::RangeRenderer& rangeRenderer,
+    const std::uint32_t vertexCount,
+    const int dynamicStreamStartVertex
+  )
+  {
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+
+    boost::shared_ptr<gpg::gal::EffectD3D9> effect = AcquireRangeRingBaseEffect();
+    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> castTechnique = effect->SetTechnique("Cast");
+    [[maybe_unused]] boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrixVar = effect->SetMatrix("viewMatrix");
+    boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrixVar = effect->SetMatrix("projMatrix");
+
+    // The binary's OnReset dispatch (EffectD3D9 vtable slot 5, +0x14) passes
+    // `&cameraView.view` as an extra argument that the currently recovered
+    // `EffectD3D9::OnReset()` does not declare (0-arg). `EffectD3D9.hpp` is
+    // outside this file's ownership; calling the 0-arg form here is the best
+    // typed call available without reintroducing raw vtable dispatch. Flagged
+    // for a follow-up EffectD3D9 pass.
+    effect->OnReset();
+    projMatrixVar->SetMatrix4x4(&cameraView.projection);
+
+    device->SetVertexDeclaration(rangeRenderer.mGeometry.mVertexFormat);
+    // Stream 0 (static ring-template geometry) is bound with an indexed-data
+    // frequency of `vertexCount` - this batch's instance count - matching the
+    // standard D3D9 hardware-instancing idiom for a per-vertex template stream
+    // shared across many instances. Stream 1 (this batch's dynamic per-instance
+    // data) steps once per instance (frequency 1) starting at
+    // `dynamicStreamStartVertex`.
+    constexpr std::uint32_t kD3DStreamSourceIndexedData = 0x40000000u;
+    device->SetVertexBuffer(
+      0, rangeRenderer.mGeometry.mVertexBuffer, static_cast<int>(kD3DStreamSourceIndexedData | vertexCount), 0
+    );
+    device->SetVertexBuffer(1, rangeRenderer.mDynamicVertexBuffer, 1, dynamicStreamStartVertex);
+    device->SetBufferIndices(rangeRenderer.mGeometry.mIndexBuffer);
+
+    const int passCount = castTechnique->BeginTechnique();
+    for (int pass = 0; pass < passCount; ++pass) {
+      castTechnique->BeginPass(pass);
+      gpg::gal::DrawIndexedContext drawContext(
+        kTriangleListPrimitiveToken, static_cast<int>(rangeRenderer.mVertexCount),
+        static_cast<int>(rangeRenderer.mIndexCount), 0, 0
+      );
+      device->DrawIndexedPrimitive(&drawContext);
+      castTechnique->EndPass();
+    }
+    castTechnique->EndTechnique();
+  }
+
+  /**
+   * Address: 0x007EF5A0 (FUN_007EF5A0, func_RenderRings)
+   *
+   * IDA signature (LTCG-reshaped __fastcall; param roles resolved from
+   * `RangeRenderer::Render`'s three call sites plus `func_RenderBuildRings`
+   * and `sub_7EF420`, all of which pass the exact same slot shapes):
+   * void __fastcall func_RenderRings(
+   *     RangeRingRadiusParams *outerRingParams@<ecx>, CameraImpl *camera@<edx>,
+   *     RangeRenderer *rangeRenderer, unsigned int headIndex, RangeRingColor *ringColor,
+   *     RangeRingRadiusParams *innerRingParams, RangeExtractionPayloadVector *ringEntries);
+   *
+   * `ringEntries` (the stack-passed last parameter, "i" in the decompile) is a
+   * pre-filled accumulator: every caller extracts candidate ranges into it
+   * before this call (`func_ExtractRanges`, `sub_7EF280`, `sub_7EF420`,
+   * `func_RenderBuildRings`). This function reads its element count from
+   * `{_Myfirst,_Mylast}` directly (0x007EF5C4-DC) and bails when empty.
+   *
+   * What it does:
+   * - resolves the playable-map span (max of width/height from the terrain's
+   *   playable rect) and the camera's zoom ratio
+   *   (`CameraGetTargetZoom() / GetMaxZoom()`)
+   * - derives inner/outer ring thickness offsets from the profile's radius
+   *   params, the `range_InnerThicknessCoeff`/`range_OuterThicknessCoeff`
+   *   console variables, the map span and the zoom ratio (matches
+   *   `BuildRingPayloadEntry`'s formula exactly - re-verified against this
+   *   function's own raw asm at 0x007EF678-6D6)
+   * - expands every source entry into 1 fill payload + 2 edge payloads
+   *   (`BuildRingPayloadBuffers`)
+   * - draws the fill payloads in batches of up to 1000 dynamic vertices, each
+   *   batch locked via `ReserveDynamicRingVertexSliceRuntime` and drawn via
+   *   `DrawRangeRingBatch`, then runs the renderer's "RangeMask" frame pass
+   * - draws the edge payloads (2x the fill count, inner+outer edge per source
+   *   entry) the same way, then runs "RangeFill" (gated on `range_Fill`) and
+   *   "RangeBurn", pushing `ringColor` into the `shaderVarFrameRangeColor`-
+   *   equivalent shader variable before the burn pass
+   * - clears the device target/stencil once at the end
+   */
+  void RenderRingBatch(
+    const moho::RangeRingRadiusParams& outerRingParams,
+    const moho::CameraImpl& camera,
+    moho::RangeRenderer& rangeRenderer,
+    const unsigned int headIndex,
+    const moho::RangeRingColor& ringColor,
+    const moho::RangeRingRadiusParams& innerRingParams,
+    const RangeExtractionPayloadVector& ringEntries
+  )
+  {
+    const std::uint32_t ringCount = static_cast<std::uint32_t>(ringEntries.size());
+    if (ringCount == 0u) {
+      return;
+    }
+
+    moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes();
+    if (terrainRes == nullptr) {
+      return;
+    }
+
+    moho::VisibilityRect playableRect{};
+    (void)terrainRes->GetPlayableMapRect(playableRect);
+    const std::int32_t widthSpan = playableRect.maxX - playableRect.minX;
+    const std::int32_t heightSpan = playableRect.maxZ - playableRect.minZ;
+    const float playableMapSpan = static_cast<float>(widthSpan < heightSpan ? heightSpan : widthSpan);
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::DeviceContext* const deviceContext = device->GetDeviceContext();
+    const gpg::gal::Head& head = deviceContext->GetHead(headIndex);
+
+    const moho::GeomCamera3& cameraView = camera.CameraGetView();
+    const float zoomScale = camera.CameraGetTargetZoom() / camera.GetMaxZoom();
+
+    const float innerThicknessOffset =
+      (((innerRingParams.thicknessScalar * moho::range_InnerThicknessCoeff) * playableMapSpan) -
+       innerRingParams.radius) *
+        zoomScale +
+      innerRingParams.radius;
+    const float outerThicknessOffset =
+      (((outerRingParams.thicknessScalar * moho::range_OuterThicknessCoeff) * playableMapSpan) -
+       outerRingParams.radius) *
+        zoomScale +
+      outerRingParams.radius;
+
+    RangeExtractionPayloadVector fillPayloads;
+    RangeExtractionPayloadVector edgePayloads;
+    RangeRingGeometryBuildState buildState{innerThicknessOffset, outerThicknessOffset, &fillPayloads, &edgePayloads};
+    BuildRingPayloadBuffers(buildState, ringEntries.begin(), ringEntries.end());
+
+    // `ReserveDynamicRingVertexSliceRuntime`'s state parameter is the same
+    // `{activeVertexCount@+0x40, allocator@+0x44}` lane the binary reads
+    // straight out of the `RangeRenderer` object at those exact offsets
+    // (`RangeRenderer::mDynamicRingVertexCount`/`mDynamicVertexBuffer` per the
+    // header's own static_asserts) - this is that function's own documented
+    // aliasing contract, not new offset magic introduced here.
+    auto* const dynamicState = reinterpret_cast<RangeDynamicVertexReservationStateRuntime*>(&rangeRenderer);
+
+    const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads) {
+      const std::uint32_t totalCount = static_cast<std::uint32_t>(payloads.size());
+      std::uint32_t drawn = 0u;
+      while (drawn < totalCount) {
+        const std::uint32_t remaining = totalCount - drawn;
+        const std::uint32_t batchCount = remaining < kDynamicVertexBatchLimit ? remaining : kDynamicVertexBatchLimit;
+
+        int lockedWritePtr = 0;
+        std::uint32_t previousVertexCount = 0u;
+        if (ReserveDynamicRingVertexSliceRuntime(batchCount, &lockedWritePtr, dynamicState, &previousVertexCount)) {
+          std::memcpy(
+            reinterpret_cast<void*>(lockedWritePtr), payloads.begin() + drawn,
+            sizeof(moho::SRangeExtractionPayload) * batchCount
+          );
+          rangeRenderer.mDynamicVertexBuffer->Unlock();
+          DrawRangeRingBatch(cameraView, rangeRenderer, batchCount, static_cast<int>(previousVertexCount));
+        }
+        drawn += batchCount;
+      }
+    };
+
+    drawBatched(fillPayloads);
+
+    rangeRenderer.mFrame.InitTransformedVerts(static_cast<float>(head.mWidth), static_cast<float>(head.mHeight));
+    rangeRenderer.mFrame.mName.assign_owned("RangeMask");
+    rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+
+    drawBatched(edgePayloads);
+
+    if (moho::range_Fill) {
+      rangeRenderer.mFrame.mName.assign_owned("RangeFill");
+      rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+    }
+
+    if (GetFrameRangeColorShaderVar().Exists()) {
+      GetFrameRangeColorShaderVar().mEffectVariable->SetMem(4u, &ringColor.r);
+    }
+
+    rangeRenderer.mFrame.mName.assign_owned("RangeBurn");
+    rangeRenderer.mFrame.Render(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
+
+    device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
   }
 
   void WriteRingBandVertex(
@@ -1349,6 +1558,265 @@ namespace
     tree->mSize = 0u;
     return 0;
   }
+
+  /**
+   * Shared blueprint gate used by `func_RenderBuildRings` and `sub_7EF420`
+   * before either checks a profile's own category filter. Both binary bodies
+   * test the candidate blueprint against two named categories ("AllMilitary"
+   * then "AllIntel") ahead of the profile-specific
+   * `EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)` check;
+   * IDA's decompile renders those two tests as calls into
+   * `std::operator<(basic_string,basic_string)` (`__imp_??$?MDU?$char_traits...`),
+   * which is almost certainly an `/OPT:ICF`-folded byte-identical body shared
+   * with an unrelated string comparison rather than a literal string compare
+   * of "AllMilitary"/"AllIntel" against something - the surrounding operands
+   * (a blueprint-relative category bitset, an inline bit index) don't fit a
+   * string-comparison call shape. Reconstructed here using the already-typed,
+   * already-recovered `EntityCategoryLookupResolver::GetEntityCategory(name)`
+   * + `EntityCategory::HasBlueprint` pair, which matches the surrounding
+   * category-membership semantics exactly.
+   */
+  [[nodiscard]] bool BlueprintPassesRangeVisibilityGate(
+    const moho::CWldSession& session, const moho::RUnitBlueprint& blueprint
+  ) noexcept
+  {
+    const moho::EntityCategoryLookupResolver* const resolver = session.GetCategoryLookupResolver();
+    if (resolver == nullptr) {
+      return false;
+    }
+
+    const moho::CategoryWordRangeView* const allMilitary = resolver->GetEntityCategory("AllMilitary");
+    if (allMilitary == nullptr || !moho::EntityCategory::HasBlueprint(&blueprint, allMilitary)) {
+      return false;
+    }
+
+    const moho::CategoryWordRangeView* const allIntel = resolver->GetEntityCategory("AllIntel");
+    return allIntel != nullptr && moho::EntityCategory::HasBlueprint(&blueprint, allIntel);
+  }
+
+  /**
+   * Address: 0x007EEE50 (FUN_007EEE50, func_RenderBuildRings)
+   *
+   * IDA signature:
+   * Moho::UserEntity *__thiscall func_RenderBuildRings(
+   *     Moho::CWldSession *this, Moho::RangeRenderer *renderer,
+   *     RangeExtractionPayloadVector *scratchPayload, Moho::CameraImpl *camera,
+   *     unsigned int headIndex);
+   *
+   * Callsite evidence: sole caller is `RangeRenderer::Render` (0x007EEA5B),
+   * gated on `range_RenderBuild` at both the caller and this recovery.
+   *
+   * What it does:
+   * Resolves the current build-placement cursor snapshot
+   * (`GetLeftMouseButtonAction`); when the cursor is in build/build-anchored
+   * mode with a live preview blueprint, walks every registered range profile
+   * and - for each whose extractor resolves and whose category filter (plus
+   * the shared `BlueprintPassesRangeVisibilityGate`) accepts the preview
+   * blueprint - extracts one range at the cursor's world position and draws
+   * it immediately with `profile.mBuildRingColor`.
+   */
+  void RenderBuildRingsUnderCursor(
+    moho::CWldSession& session,
+    RangeExtractionPayloadVector& scratchPayload,
+    moho::RangeRenderer& rangeRenderer,
+    const moho::CameraImpl& camera,
+    const unsigned int headIndex
+  )
+  {
+    moho::CommandModeData modeData{};
+    (void)session.GetLeftMouseButtonAction(&modeData, &session.GetCursorInfo(), 0);
+
+    if (modeData.mMode != moho::COMMOD_Build && modeData.mMode != moho::COMMOD_BuildAnchored) {
+      return;
+    }
+    if (modeData.mBlueprint == nullptr) {
+      return;
+    }
+
+    const auto* const blueprint = static_cast<const moho::RUnitBlueprint*>(modeData.mBlueprint);
+    const Wm3::Vector3f& cursorWorldPos = session.GetCursorInfo().mMouseWorldPos;
+
+    for (moho::SRangeRenderCategoryTreeNode* node = rangeRenderer.mRangeProfiles.mHead->mLeft;
+         node != rangeRenderer.mRangeProfiles.mHead; (void)AdvanceRangeProfileTreeIterator(0u, &node)) {
+      const moho::SRangeRenderProfile& profile = AsRangeProfileNodeView(node)->mValue;
+
+      moho::RangeExtractor* const extractor = moho::GetRangeExtractor(profile.mExtractorName);
+      if (extractor == nullptr) {
+        continue;
+      }
+      if (!BlueprintPassesRangeVisibilityGate(session, *blueprint)) {
+        continue;
+      }
+      if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+        continue;
+      }
+
+      moho::SRangeExtractionPayload payload{};
+      if (!extractor->Range(&payload, blueprint, cursorWorldPos)) {
+        continue;
+      }
+
+      scratchPayload.clear();
+      (void)AppendRangeExtractionPayload(scratchPayload, payload);
+      RenderRingBatch(
+        profile.mOuterRingParams, camera, rangeRenderer, headIndex, profile.mBuildRingColor, profile.mInnerRingParams,
+        scratchPayload
+      );
+    }
+  }
+
+  /**
+   * Address: 0x007EF280 (FUN_007EF280, sub_7EF280)
+   *
+   * IDA signature:
+   * void __thiscall sub_7EF280(
+   *     Moho::CWldSession *this, RangeExtractionPayloadVector *outPayloads,
+   *     const Moho::SRangeRenderProfile *profile, float alpha);
+   *
+   * Callsite evidence: sole caller is `RangeRenderer::Render` (0x007EEB78,
+   * inside the `mRangeProfiles` tree walk), gated on `range_RenderSelected`
+   * per `RangeRendererStartupRegistrations.h`'s reader map and re-confirmed
+   * at both the caller and this recovery.
+   *
+   * What it does:
+   * For the current focus army's selected units, extracts one range per unit
+   * whose blueprint passes the profile's category filter (plus the shared
+   * `BlueprintPassesRangeVisibilityGate`) and appends it to `outPayloads`.
+   * Unlike `func_RenderBuildRings`/`sub_7EF420`, this does not draw
+   * immediately - `RangeRenderer::Render` batches every accepted unit for one
+   * profile into a single `RenderRingBatch` call using
+   * `profile.mSelectedRingColor`.
+   */
+  void RenderSelectedUnitsRange(
+    const moho::CWldSession& session, RangeExtractionPayloadVector& outPayloads,
+    const moho::SRangeRenderProfile& profile, const float alpha
+  )
+  {
+    outPayloads.clear();
+    if (!moho::range_RenderSelected) {
+      return;
+    }
+
+    moho::RangeExtractor* const extractor = moho::GetRangeExtractor(profile.mExtractorName);
+    if (extractor == nullptr) {
+      return;
+    }
+
+    const moho::UserArmy* const focusArmy = session.GetFocusUserArmy();
+    if (focusArmy == nullptr) {
+      return;
+    }
+
+    msvc8::vector<moho::UserUnit*> selectedUnits;
+    session.GetSelectionUnits(selectedUnits);
+
+    for (moho::UserUnit* const unit : selectedUnits) {
+      if (unit == nullptr || unit->mArmy != focusArmy) {
+        continue;
+      }
+
+      auto* const iunit = static_cast<moho::IUnit*>(unit);
+      const moho::RUnitBlueprint* const blueprint = iunit->GetBlueprint();
+      if (blueprint == nullptr) {
+        continue;
+      }
+      if (!BlueprintPassesRangeVisibilityGate(session, *blueprint)) {
+        continue;
+      }
+      if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+        continue;
+      }
+
+      moho::SRangeExtractionPayload payload{};
+      if (extractor->Extract(&payload, unit, alpha)) {
+        (void)AppendRangeExtractionPayload(outPayloads, payload);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x007EF420 (FUN_007EF420, sub_7EF420)
+   *
+   * IDA signature:
+   * int __userpurge sub_7EF420(
+   *     Moho::CWldSession *session@<eax>, Moho::RangeRenderer *renderer,
+   *     RangeExtractionPayloadVector *scratchPayload, Moho::CameraImpl *camera,
+   *     float alpha, unsigned int headIndex);
+   *
+   * Callsite evidence: sole caller is `RangeRenderer::Render`. The call site
+   * (0x007EEBCE) sits inside `RangeRenderer::Render`'s own byte range
+   * (0x007EEA00-0x007EEC70) but the namespace callgraph index attributes its
+   * owning chunk to `sub_128E217` - an IDA chunk-boundary artifact from this
+   * function's SEH-heavy layout, not a real separate caller (verified by
+   * reading the call byte directly out of `FUN_007EEA00.asm`). Gated on
+   * `range_RenderHighlighted` per `RangeRendererStartupRegistrations.h`'s
+   * reader map and re-confirmed here.
+   *
+   * What it does:
+   * Resolves the currently-hovered unit (`CWldSession::GetHoveredUserEntity`);
+   * when it belongs to the focus army, walks every registered range profile
+   * and - for each whose extractor resolves and whose category filter (plus
+   * the shared visibility gate) accepts the hovered unit's blueprint -
+   * extracts one range for that unit and draws it immediately with
+   * `profile.mHighlightedRingColor`.
+   */
+  void RenderHighlightedUnitRange(
+    moho::CWldSession& session, RangeExtractionPayloadVector& scratchPayload, moho::RangeRenderer& rangeRenderer,
+    const moho::CameraImpl& camera, const float alpha, const unsigned int headIndex
+  )
+  {
+    if (!moho::range_RenderHighlighted) {
+      return;
+    }
+
+    moho::UserEntity* const hoveredEntity = session.GetHoveredUserEntity();
+    if (hoveredEntity == nullptr) {
+      return;
+    }
+
+    moho::UserUnit* const hoveredUnit = hoveredEntity->IsUserUnit();
+    if (hoveredUnit == nullptr) {
+      return;
+    }
+
+    if (session.GetFocusUserArmy() != hoveredEntity->mArmy) {
+      return;
+    }
+
+    auto* const iunit = static_cast<moho::IUnit*>(hoveredUnit);
+    const moho::RUnitBlueprint* const blueprint = iunit->GetBlueprint();
+    if (blueprint == nullptr) {
+      return;
+    }
+
+    for (moho::SRangeRenderCategoryTreeNode* node = rangeRenderer.mRangeProfiles.mHead->mLeft;
+         node != rangeRenderer.mRangeProfiles.mHead; (void)AdvanceRangeProfileTreeIterator(0u, &node)) {
+      const moho::SRangeRenderProfile& profile = AsRangeProfileNodeView(node)->mValue;
+
+      moho::RangeExtractor* const extractor = moho::GetRangeExtractor(profile.mExtractorName);
+      if (extractor == nullptr) {
+        continue;
+      }
+      if (!BlueprintPassesRangeVisibilityGate(session, *blueprint)) {
+        continue;
+      }
+      if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+        continue;
+      }
+
+      moho::SRangeExtractionPayload payload{};
+      if (!extractor->Extract(&payload, hoveredEntity, alpha)) {
+        continue;
+      }
+
+      scratchPayload.clear();
+      (void)AppendRangeExtractionPayload(scratchPayload, payload);
+      RenderRingBatch(
+        profile.mOuterRingParams, camera, rangeRenderer, headIndex, profile.mHighlightedRingColor,
+        profile.mInnerRingParams, scratchPayload
+      );
+    }
+  }
 } // namespace
 
 namespace moho
@@ -1472,6 +1940,93 @@ namespace moho
 
       mGeometry.mIndexBuffer->Unlock();
     }
+  }
+
+  /**
+   * Address: 0x007EEA00 (FUN_007EEA00, Moho::RangeRenderer::Render)
+   *
+   * IDA signature (compiler-invented register convention, `retn 0Ch`):
+   * void __usercall Render(CWldSession *session@<ecx>, CameraImpl *camera@<ebx>,
+   *                        RangeRenderer *renderer, unsigned headIndex, float alpha);
+   *
+   * See the declaration's own evidence block for the camera-type / callsite
+   * proof; re-verified here against the full raw disassembly (0x007EEA00-
+   * 0x007EEC70 - the real body runs past the 0x007EEB55 boundary IDA's own
+   * function-chunk metadata reports, into a chunk it mis-attributes to
+   * `sub_128E217`; every instruction in that tail was read directly out of
+   * `FUN_007EEA00.asm` and cross-checked against this function's own callee
+   * list).
+   *
+   * What it does:
+   * - if `range_RenderBuild`, runs the build-placement preview pass
+   *   (`RenderBuildRingsUnderCursor`)
+   * - for each currently-visible profile (`mVisibleProfiles`, set by
+   *   `MoveCategories`), snapshots the camera's frustum weak-ref list
+   *   (`SnapshotCameraFrustumWeakRefs`), extracts one range per accepted
+   *   candidate (`func_ExtractRanges`) and draws the batch with
+   *   `profile.mBuildRingColor`
+   * - for each registered profile in `mRangeProfiles` (not just the visible
+   *   subset), runs the selected-units pass (`RenderSelectedUnitsRange`) and
+   *   draws the batch with `profile.mSelectedRingColor`
+   * - runs the highlighted/hovered-unit pass (`RenderHighlightedUnitRange`)
+   *
+   * Not yet wired: the binary's final pass (0x007EEBD3-EC48) submits the
+   * current selection's axis-aligned bounds as one more ring
+   * (`sub_7EF1C0`, called with a fixed thin-ring color/radius) before the
+   * device-clear at the end. `sub_7EF1C0` reads `UserArmy`-relative fields at
+   * +0x1BC..+0x1D0 that have no named accessor in `moho/sim/UserArmy.h` yet
+   * (that header is owned by a concurrently active recovery pass, not this
+   * file); recovering `sub_7EF1C0` here would require adding raw offset
+   * reads to a class this file does not own, which the reconstruction
+   * fidelity contract forbids. Left `blocked` with
+   * `blocker_type=needs_layout` pending named `UserArmy` selection-bounds
+   * fields - see the recovery report for exact field offsets/sizes gathered
+   * from the binary.
+   */
+  void RangeRenderer::Render(
+    CWldSession* const worldSession, CameraImpl* const camera, const unsigned int viewportHeadIndex,
+    const float alpha
+  )
+  {
+    if (worldSession == nullptr || camera == nullptr) {
+      return;
+    }
+
+    RangeExtractionPayloadVector scratchPayload;
+
+    if (range_RenderBuild) {
+      RenderBuildRingsUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
+    }
+
+    if (!mVisibleProfiles.empty()) {
+      CameraFrustumUserEntityList* const frustumList = camera->GetArmyUnitsInFrustum();
+      if (frustumList != nullptr) {
+        CameraFrustumWeakRefSnapshotBuffer candidateSnapshot{};
+        (void)SnapshotCameraFrustumWeakRefs(&candidateSnapshot, *frustumList);
+        const SRangeProfileWeakRefCandidatePoolView candidatePool{candidateSnapshot.mStart, candidateSnapshot.mFinish};
+
+        for (SRangeRenderProfile& profile : mVisibleProfiles) {
+          scratchPayload.clear();
+          func_ExtractRanges(candidatePool, alpha, profile, scratchPayload);
+          RenderRingBatch(
+            profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mBuildRingColor,
+            profile.mInnerRingParams, scratchPayload
+          );
+        }
+      }
+    }
+
+    for (SRangeRenderCategoryTreeNode* node = mRangeProfiles.mHead->mLeft; node != mRangeProfiles.mHead;
+         (void)AdvanceRangeProfileTreeIterator(0u, &node)) {
+      const SRangeRenderProfile& profile = AsRangeProfileNodeView(node)->mValue;
+      RenderSelectedUnitsRange(*worldSession, scratchPayload, profile, alpha);
+      RenderRingBatch(
+        profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mSelectedRingColor,
+        profile.mInnerRingParams, scratchPayload
+      );
+    }
+
+    RenderHighlightedUnitRange(*worldSession, scratchPayload, *this, *camera, alpha, viewportHeadIndex);
   }
 
   /**
