@@ -3742,114 +3742,217 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F9A70 (FUN_008F9A70, boost::detail::shared_count_EffectD3D10::shared_count_EffectD3D10)
+     *
+     * What it does:
+     * Allocates one 0x10-byte `sp_counted_impl_p<EffectD3D10>` control
+     * block, publishes its vtable, sets use/weak count to one, and stores
+     * the owned raw pointer - the control-block half of constructing one
+     * `shared_ptr<EffectD3D10>`.
+     */
+    boost::detail::shared_count* ConstructSharedCountEffectD3D10FromRaw(
+      boost::detail::shared_count* const outCount, EffectD3D10* const effect
+    )
+    {
+      return boost::ConstructSharedCountFromRaw(outCount, effect);
+    }
+
+    /**
      * Address: 0x008FA3D0 (FUN_008FA3D0, boost::shared_ptr_EffectD3D10::shared_ptr_EffectD3D10)
      *
      * What it does:
      * Constructs one `shared_ptr<EffectD3D10>` from one raw pointer lane.
+     * FUN_008FA3D0's own disassembly publishes `px` ("effect") first, then
+     * builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9A70 above - a real, separately-emitted call, not
+     * inlined - also reached the same way from `DeviceD3D10::CreateEffect`'s
+     * `reset()`) before a no-op `sp_enable_shared_from_this` (`EffectD3D10`
+     * does not derive from `enable_shared_from_this`); reproduced
+     * explicitly here instead of relying on boost's own converting
+     * constructor.
      */
     boost::shared_ptr<EffectD3D10>* ConstructSharedEffectD3D10FromRaw(
       boost::shared_ptr<EffectD3D10>* const outEffect, EffectD3D10* const effect
     )
     {
-      return ::new (outEffect) boost::shared_ptr<EffectD3D10>(effect);
+      return boost::ConstructSharedFromRawViaCountCtor(outEffect, effect, ConstructSharedCountEffectD3D10FromRaw);
     }
 
     /**
      * Address: 0x008FA460 (FUN_008FA460, boost::shared_ptr_CubeRenderTargetD3D10::shared_ptr_CubeRenderTargetD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<CubeRenderTargetD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<CubeRenderTargetD3D10>` from one raw
+     * pointer lane. FUN_008FA460's own disassembly publishes `px` first,
+     * then builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9C20 above, `ConstructSharedCountCubeRenderTargetD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`CubeRenderTargetD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<CubeRenderTargetD3D10>* ConstructSharedCubeRenderTargetD3D10FromRaw(
       boost::shared_ptr<CubeRenderTargetD3D10>* const outCubeRenderTarget,
       CubeRenderTargetD3D10* const cubeRenderTarget
     )
     {
-      return boost::ConstructSharedFromRaw(outCubeRenderTarget, cubeRenderTarget);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outCubeRenderTarget, cubeRenderTarget, ConstructSharedCountCubeRenderTargetD3D10FromRaw
+      );
     }
 
     /**
      * Address: 0x008FA490 (FUN_008FA490, boost::shared_ptr_DepthStencilTargetD3D10::shared_ptr_DepthStencilTargetD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<DepthStencilTargetD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<DepthStencilTargetD3D10>` from one raw
+     * pointer lane. FUN_008FA490's own disassembly publishes `px` first,
+     * then builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9CB0 above, `ConstructSharedCountDepthStencilTargetD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`DepthStencilTargetD3D10` does not
+     * derive from `enable_shared_from_this`); reproduced explicitly here
+     * instead of relying on boost's own converting constructor.
      */
     boost::shared_ptr<DepthStencilTargetD3D10>* ConstructSharedDepthStencilTargetD3D10FromRaw(
       boost::shared_ptr<DepthStencilTargetD3D10>* const outDepthStencilTarget,
       DepthStencilTargetD3D10* const depthStencilTarget
     )
     {
-      return boost::ConstructSharedFromRaw(outDepthStencilTarget, depthStencilTarget);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outDepthStencilTarget, depthStencilTarget, ConstructSharedCountDepthStencilTargetD3D10FromRaw
+      );
     }
 
     /**
      * Address: 0x008FA4C0 (FUN_008FA4C0, boost::shared_ptr_VertexFormatD3D10::shared_ptr_VertexFormatD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<VertexFormatD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<VertexFormatD3D10>` from one raw pointer
+     * lane. FUN_008FA4C0's own disassembly publishes `px` first, then
+     * builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9D40 above, `ConstructSharedCountVertexFormatD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`VertexFormatD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<VertexFormatD3D10>* ConstructSharedVertexFormatD3D10FromRaw(
       boost::shared_ptr<VertexFormatD3D10>* const outVertexFormat,
       VertexFormatD3D10* const vertexFormat
     )
     {
-      return boost::ConstructSharedFromRaw(outVertexFormat, vertexFormat);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outVertexFormat, vertexFormat, ConstructSharedCountVertexFormatD3D10FromRaw
+      );
     }
 
     /**
      * Address: 0x008FA4F0 (FUN_008FA4F0, boost::shared_ptr_VertexBufferD3D10::shared_ptr_VertexBufferD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<VertexBufferD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<VertexBufferD3D10>` from one raw pointer
+     * lane. FUN_008FA4F0's own disassembly publishes `px` first, then
+     * builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9DD0 above, `ConstructSharedCountVertexBufferD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`VertexBufferD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<VertexBufferD3D10>* ConstructSharedVertexBufferD3D10FromRaw(
       boost::shared_ptr<VertexBufferD3D10>* const outVertexBuffer,
       VertexBufferD3D10* const vertexBuffer
     )
     {
-      return boost::ConstructSharedFromRaw(outVertexBuffer, vertexBuffer);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outVertexBuffer, vertexBuffer, ConstructSharedCountVertexBufferD3D10FromRaw
+      );
     }
 
     /**
      * Address: 0x008FA520 (FUN_008FA520, boost::shared_ptr_IndexBufferD3D10::shared_ptr_IndexBufferD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<IndexBufferD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<IndexBufferD3D10>` from one raw pointer
+     * lane. FUN_008FA520's own disassembly publishes `px` first, then
+     * builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9E60 above, `ConstructSharedCountIndexBufferD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`IndexBufferD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<IndexBufferD3D10>* ConstructSharedIndexBufferD3D10FromRaw(
       boost::shared_ptr<IndexBufferD3D10>* const outIndexBuffer,
       IndexBufferD3D10* const indexBuffer
     )
     {
-      return boost::ConstructSharedFromRaw(outIndexBuffer, indexBuffer);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outIndexBuffer, indexBuffer, ConstructSharedCountIndexBufferD3D10FromRaw
+      );
     }
 
     /**
      * Address: 0x0094B840 (FUN_0094B840, boost::shared_ptr_EffectTechniqueD3D10::shared_ptr_EffectTechniqueD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<EffectTechniqueD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<EffectTechniqueD3D10>` from one raw
+     * pointer lane. FUN_0094B840's own disassembly publishes `px` first,
+     * then builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_0094B6C0 above, `ConstructSharedCountEffectTechniqueD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`EffectTechniqueD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<EffectTechniqueD3D10>* ConstructSharedEffectTechniqueD3D10FromRaw(
       boost::shared_ptr<EffectTechniqueD3D10>* const outEffectTechnique,
       EffectTechniqueD3D10* const effectTechnique
     )
     {
-      return boost::ConstructSharedFromRaw(outEffectTechnique, effectTechnique);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outEffectTechnique, effectTechnique, ConstructSharedCountEffectTechniqueD3D10FromRaw
+      );
     }
 
     /**
      * Address: 0x0094B870 (FUN_0094B870, boost::shared_ptr_EffectVariableD3D10::shared_ptr_EffectVariableD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<EffectVariableD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<EffectVariableD3D10>` from one raw
+     * pointer lane. FUN_0094B870's own disassembly publishes `px` first,
+     * then builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_0094B750 above, `ConstructSharedCountEffectVariableD3D10FromRaw`
+     * - a real, separately-emitted call, not inlined) before a no-op
+     * `sp_enable_shared_from_this` (`EffectVariableD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<EffectVariableD3D10>* ConstructSharedEffectVariableD3D10FromRaw(
       boost::shared_ptr<EffectVariableD3D10>* const outEffectVariable,
       EffectVariableD3D10* const effectVariable
     )
     {
-      return boost::ConstructSharedFromRaw(outEffectVariable, effectVariable);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outEffectVariable, effectVariable, ConstructSharedCountEffectVariableD3D10FromRaw
+      );
+    }
+
+    /**
+     * Address: 0x008F9B00 (FUN_008F9B00, boost::detail::shared_count_TextureD3D10::shared_count_TextureD3D10)
+     *
+     * What it does:
+     * Allocates one 0x10-byte `sp_counted_impl_p<TextureD3D10>` control
+     * block, publishes its vtable, sets use/weak count to one, and stores
+     * the owned raw pointer - the control-block half of constructing one
+     * `shared_ptr<TextureD3D10>`.
+     */
+    boost::detail::shared_count* ConstructSharedCountTextureD3D10FromRaw(
+      boost::detail::shared_count* const outCount, TextureD3D10* const texture
+    )
+    {
+      return boost::ConstructSharedCountFromRaw(outCount, texture);
     }
 
     /**
@@ -3857,38 +3960,98 @@ namespace gpg::gal
      *
      * What it does:
      * Constructs one `shared_ptr<TextureD3D10>` from one raw pointer lane.
+     * FUN_008FA400's own disassembly publishes `px` ("tex") first, then
+     * builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9B00 above - a real, separately-emitted call, not
+     * inlined - also reached the same way from `DeviceD3D10::CreateTexture`)
+     * before a no-op `sp_enable_shared_from_this` (`TextureD3D10` does not
+     * derive from `enable_shared_from_this`); reproduced explicitly here
+     * instead of relying on boost's own converting constructor.
      */
     boost::shared_ptr<TextureD3D10>* ConstructSharedTextureD3D10FromRaw(
       boost::shared_ptr<TextureD3D10>* const outTexture, TextureD3D10* const texture
     )
     {
-      return ::new (outTexture) boost::shared_ptr<TextureD3D10>(texture);
+      return boost::ConstructSharedFromRawViaCountCtor(outTexture, texture, ConstructSharedCountTextureD3D10FromRaw);
+    }
+
+    /**
+     * Address: 0x008F9B90 (FUN_008F9B90, boost::detail::shared_count_RenderTargetD3D10::shared_count_RenderTargetD3D10)
+     *
+     * What it does:
+     * Allocates one 0x10-byte `sp_counted_impl_p<RenderTargetD3D10>`
+     * control block, publishes its vtable, sets use/weak count to one,
+     * and stores the owned raw pointer - the control-block half of
+     * constructing one `shared_ptr<RenderTargetD3D10>`.
+     */
+    boost::detail::shared_count* ConstructSharedCountRenderTargetD3D10FromRaw(
+      boost::detail::shared_count* const outCount, RenderTargetD3D10* const renderTarget
+    )
+    {
+      return boost::ConstructSharedCountFromRaw(outCount, renderTarget);
     }
 
     /**
      * Address: 0x008FA430 (FUN_008FA430, boost::shared_ptr_RenderTargetD3D10::shared_ptr_RenderTargetD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<RenderTargetD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<RenderTargetD3D10>` from one raw pointer
+     * lane. FUN_008FA430's own disassembly publishes `px` ("targ") first,
+     * then builds the control block through one discrete `shared_count(T*)`
+     * call (FUN_008F9B90 above - a real, separately-emitted call, not
+     * inlined - also reached the same way from
+     * `AssignSharedRenderTargetD3D10FromRaw`'s `reset()` and from
+     * `DeviceD3D10::CreateVolumeTexture`) before a no-op
+     * `sp_enable_shared_from_this` (`RenderTargetD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<RenderTargetD3D10>* ConstructSharedRenderTargetD3D10FromRawCtor(
       boost::shared_ptr<RenderTargetD3D10>* const outRenderTarget, RenderTargetD3D10* const renderTarget
     )
     {
-      return ::new (outRenderTarget) boost::shared_ptr<RenderTargetD3D10>(renderTarget);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outRenderTarget, renderTarget, ConstructSharedCountRenderTargetD3D10FromRaw
+      );
+    }
+
+    /**
+     * Address: 0x008FA0E0 (FUN_008FA0E0, boost::detail::shared_count_PipelineStateD3D10::shared_count_PipelineStateD3D10)
+     *
+     * What it does:
+     * Allocates one 0x10-byte `sp_counted_impl_p<PipelineStateD3D10>`
+     * control block, publishes its vtable, sets use/weak count to one,
+     * and stores the owned raw pointer - the control-block half of
+     * constructing one `shared_ptr<PipelineStateD3D10>`.
+     */
+    boost::detail::shared_count* ConstructSharedCountPipelineStateD3D10FromRaw(
+      boost::detail::shared_count* const outCount, PipelineStateD3D10* const pipelineState
+    )
+    {
+      return boost::ConstructSharedCountFromRaw(outCount, pipelineState);
     }
 
     /**
      * Address: 0x008FA5F0 (FUN_008FA5F0, boost::shared_ptr_PipelineStateD3D10::shared_ptr_PipelineStateD3D10)
      *
      * What it does:
-     * Constructs one `shared_ptr<PipelineStateD3D10>` from one raw pointer lane.
+     * Constructs one `shared_ptr<PipelineStateD3D10>` from one raw pointer
+     * lane. FUN_008FA5F0's own disassembly publishes `px` ("pipeline")
+     * first, then builds the control block through one discrete
+     * `shared_count(T*)` call (FUN_008FA0E0 above - a real, separately-
+     * emitted call, not inlined - also reached the same way from
+     * `AssignSharedPipelineStateD3D10FromRaw`'s `reset()`) before a no-op
+     * `sp_enable_shared_from_this` (`PipelineStateD3D10` does not derive
+     * from `enable_shared_from_this`); reproduced explicitly here instead
+     * of relying on boost's own converting constructor.
      */
     boost::shared_ptr<PipelineStateD3D10>* ConstructSharedPipelineStateD3D10FromRaw(
       boost::shared_ptr<PipelineStateD3D10>* const outPipelineState, PipelineStateD3D10* const pipelineState
     )
     {
-      return ::new (outPipelineState) boost::shared_ptr<PipelineStateD3D10>(pipelineState);
+      return boost::ConstructSharedFromRawViaCountCtor(
+        outPipelineState, pipelineState, ConstructSharedCountPipelineStateD3D10FromRaw
+      );
     }
 
     /**
