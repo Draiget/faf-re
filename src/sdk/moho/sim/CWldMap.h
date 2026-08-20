@@ -181,6 +181,24 @@ namespace moho
      */
     [[nodiscard]] bool Load(gpg::BinaryReader& reader, CBackgroundTaskControl& loadControl);
 
+    /**
+     * Address: 0x008908F0 (FUN_008908F0,
+     * ?Save@RWldMapPreviewChunk@Moho@@QAE_NAAVBinaryWriter@gpg@@@Z)
+     *
+     * IDA signature:
+     * bool __thiscall Moho::RWldMapPreviewChunk::Save(
+     *     Moho::RWldMapPreviewChunk *this, gpg::BinaryWriter &writer);
+     *
+     * What it does:
+     * Writes the preview-chunk header (`0xBEEFFEED` magic, version 2, preview
+     * width/height, UTF-16 preview name including its terminator, and a
+     * zero metadata-entry count), then re-encodes the retained preview texture
+     * through the GAL backend into a memory buffer and appends it as a
+     * size-prefixed blob. Returns false without writing the payload when no
+     * runtime texture is bound.
+     */
+    [[nodiscard]] bool Save(gpg::BinaryWriter& writer);
+
     boost::shared_ptr<ID3DTextureSheet> mPreviewTexture; // +0x00
     Wm3::Vector2f mPreviewSize;                          // +0x08
     msvc8::string mPreviewName;                          // +0x10
@@ -331,6 +349,26 @@ namespace moho
      */
     [[nodiscard]]
     virtual bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl);
+
+    /**
+     * Address: 0x008A30B0 (FUN_008A30B0, ?Save@CWldTerrainRes@Moho@@UAE_NAAVBinaryWriter@gpg@@@Z)
+     * Slot: 74 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54, entry 0x00E4BE7C),
+     * i.e. the slot immediately after `Load` (slot 73, 0x008A1700).
+     *
+     * IDA signature:
+     * bool __thiscall Moho::CWldTerrainRes::Save(
+     *     Moho::CWldTerrainRes *this, gpg::BinaryWriter &writer);
+     *
+     * What it does:
+     * Writes the complete terrain payload of a `.scmap` in save order: format
+     * version 60, heightfield extents/scale/samples, resolved composite-shader
+     * flag and shader/background/skycube names, environment-lookup pairs,
+     * lighting/fog/water scalars, water shader + wave system, hypsometric and
+     * imager lanes, stratum texturing, the normal-map sheet array, both stratum
+     * masks, the water map, the water foam/flatness/depth-bias planes, the
+     * terrain-type grid, the sky dome, and the decal set.
+     */
+    virtual bool Save(gpg::BinaryWriter& writer);
 
     /**
      * Address: 0x008A4040 (FUN_008A4040, ?LoadTexturing@CWldTerrainRes@Moho@@QAEXAAVBinaryReader@gpg@@I@Z)
@@ -1155,6 +1193,22 @@ namespace moho
      */
     [[nodiscard]]
     bool MapLoad(gpg::StrArg mapName, LuaPlus::LuaState* state, bool previewOnly, CBackgroundTaskControl& loadControl);
+
+    /**
+     * Address: 0x00891030 (FUN_00891030, ?MapSave@CWldMap@Moho@@QAE_NVStrArg@gpg@@@Z)
+     *
+     * IDA signature:
+     * bool __thiscall Moho::CWldMap::MapSave(Moho::CWldMap *this, gpg::StrArg mapName);
+     *
+     * What it does:
+     * Resolves `mapName` to a writable on-disk path through the virtual file
+     * system (mounted directory prefix + `\` + base name), opens it for
+     * writing, emits the `Map\x1A` / version-2 file header, then saves the
+     * preview chunk, the terrain resource and the prop set through the same
+     * `gpg::BinaryWriter`. Returns false when any owned map resource is missing
+     * or the destination stream cannot be opened.
+     */
+    [[nodiscard]] bool MapSave(gpg::StrArg mapName);
 
     /**
      * Address: 0x00891250 (FUN_00891250, ?MapSetPreview@CWldMap@Moho@@QAEXV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Vector2@M@Wm3@@PBD@Z)
