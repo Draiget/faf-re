@@ -85,6 +85,26 @@ namespace moho
      */
     bool ManipulatorUpdate() override;
 
+    /**
+     * Address: 0x00637510 (FUN_00637510)
+     *
+     * What it does:
+     * Loads serialized `CBuilderArmManipulator` member lanes from archive
+     * state: the `IAniManipulator` base, the goal weak-pointer lane, and every
+     * builder-arm tracking parameter.
+     */
+    static void MemberDeserialize(CBuilderArmManipulator* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00637640 (FUN_00637640)
+     *
+     * What it does:
+     * Saves serialized `CBuilderArmManipulator` member lanes into archive
+     * state: the `IAniManipulator` base, the goal weak-pointer lane, and every
+     * builder-arm tracking parameter.
+     */
+    static void MemberSerialize(const CBuilderArmManipulator* object, gpg::WriteArchive* archive);
+
   private:
     /**
      * Address: 0x00636220 (FUN_00636220, sub_636220)

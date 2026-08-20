@@ -990,6 +990,9 @@
     <ClCompile Include="moho\ai\CAimManipulatorSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\CBuilderArmManipulatorSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\CAimManipulatorTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4084,6 +4087,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAimManipulatorSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\CBuilderArmManipulatorSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAimManipulatorTypeInfo.h">
