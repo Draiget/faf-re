@@ -5,6 +5,7 @@
 #include <limits>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <new>
 #include <string>
@@ -1578,7 +1579,7 @@ namespace moho
    * Deserializes one `CSquad` payload lane in binary order:
    * `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats`.
    */
-  [[maybe_unused]] void DeserializeCSquadSerializerPayload(
+  void DeserializeCSquadSerializerPayload(
     gpg::ReadArchive* const archive,
     CSquad* const squad
   )
@@ -1631,7 +1632,7 @@ namespace moho
    * Serializes one `CSquad` payload lane in binary order:
    * `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats`.
    */
-  [[maybe_unused]] void SerializeCSquadSerializerPayload(
+  void SerializeCSquadSerializerPayload(
     CSquad* const squad,
     gpg::WriteArchive* const archive
   )
@@ -1687,7 +1688,7 @@ namespace moho
    * Deserializes one `CPlatoon` payload lane in binary order:
    * CScriptObject base, sim/army pointers, squad list, strings, and stat lanes.
    */
-  [[maybe_unused]] void DeserializeCPlatoonSerializerPayload(
+  void DeserializeCPlatoonSerializerPayload(
     CPlatoon* const platoon,
     gpg::ReadArchive* const archive
   )
@@ -1753,7 +1754,7 @@ namespace moho
    * Serializes one `CPlatoon` payload lane in binary order:
    * CScriptObject base, sim/army pointers, squad list, strings, and stat lanes.
    */
-  [[maybe_unused]] void SerializeCPlatoonSerializerPayload(
+  void SerializeCPlatoonSerializerPayload(
     CPlatoon* const platoon,
     gpg::WriteArchive* const archive
   )
@@ -1820,7 +1821,7 @@ namespace moho
    * Forwards one CSquad serializer-load callback lane to
    * `DeserializeCSquadSerializerPayload`.
    */
-  [[maybe_unused]] void DeserializeCSquadSerializerCallback(
+  void DeserializeCSquadSerializerCallback(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int,
@@ -1837,7 +1838,7 @@ namespace moho
    * Forwards one CSquad serializer-save callback lane to
    * `SerializeCSquadSerializerPayload`.
    */
-  [[maybe_unused]] void SerializeCSquadSerializerCallback(
+  void SerializeCSquadSerializerCallback(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
@@ -1857,7 +1858,7 @@ namespace moho
    * Forwards one CPlatoon serializer-load callback lane to
    * `DeserializeCPlatoonSerializerPayload`.
    */
-  [[maybe_unused]] void DeserializeCPlatoonSerializerCallback(
+  void DeserializeCPlatoonSerializerCallback(
     gpg::ReadArchive* const archive,
     const int objectPtr,
     const int,
@@ -1877,7 +1878,7 @@ namespace moho
    * Forwards one CPlatoon serializer-save callback lane to
    * `SerializeCPlatoonSerializerPayload`.
    */
-  [[maybe_unused]] void SerializeCPlatoonSerializerCallback(
+  void SerializeCPlatoonSerializerCallback(
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
@@ -2119,6 +2120,77 @@ namespace moho
     gCPlatoonSerializerHelper.mSaveCallback = &SerializeCPlatoonSerializerCallback;
     return &gCPlatoonSerializerHelper;
   }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCSquadSerializerHelper() noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(gCSquadSerializerHelper);
+    if (gCSquadSerializerHelper.mHelperNext != nullptr && gCSquadSerializerHelper.mHelperPrev != nullptr) {
+      gCSquadSerializerHelper.mHelperNext->mPrev = gCSquadSerializerHelper.mHelperPrev;
+      gCSquadSerializerHelper.mHelperPrev->mNext = gCSquadSerializerHelper.mHelperNext;
+    }
+    gCSquadSerializerHelper.mHelperPrev = self;
+    gCSquadSerializerHelper.mHelperNext = self;
+    return self;
+  }
+
+  void cleanup_CSquadSerializer_atexit()
+  {
+    (void)UnlinkCSquadSerializerHelper();
+  }
+
+  /**
+   * Address: 0x00BDAC20 (FUN_00BDAC20, register_CSquadSerializer)
+   *
+   * What it does:
+   * Initializes the global CSquad serializer helper callbacks and installs
+   * process-exit cleanup.
+   */
+  void register_CSquadSerializer()
+  {
+    (void)InitializeCSquadSerializerHelperStoragePrimary();
+    (void)std::atexit(&cleanup_CSquadSerializer_atexit);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCPlatoonSerializerHelper() noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(gCPlatoonSerializerHelper);
+    if (gCPlatoonSerializerHelper.mHelperNext != nullptr && gCPlatoonSerializerHelper.mHelperPrev != nullptr) {
+      gCPlatoonSerializerHelper.mHelperNext->mPrev = gCPlatoonSerializerHelper.mHelperPrev;
+      gCPlatoonSerializerHelper.mHelperPrev->mNext = gCPlatoonSerializerHelper.mHelperNext;
+    }
+    gCPlatoonSerializerHelper.mHelperPrev = self;
+    gCPlatoonSerializerHelper.mHelperNext = self;
+    return self;
+  }
+
+  void cleanup_CPlatoonSerializer_atexit()
+  {
+    (void)UnlinkCPlatoonSerializerHelper();
+  }
+
+  /**
+   * Address: 0x00BDACC0 (FUN_00BDACC0, register_CPlatoonSerializer)
+   *
+   * What it does:
+   * Initializes the global CPlatoon serializer helper callbacks and installs
+   * process-exit cleanup.
+   */
+  void register_CPlatoonSerializer()
+  {
+    (void)InitializeCPlatoonSerializerHelperStoragePrimary();
+    (void)std::atexit(&cleanup_CPlatoonSerializer_atexit);
+  }
+
+  struct CPlatoonSerializerStartupBootstrap
+  {
+    CPlatoonSerializerStartupBootstrap()
+    {
+      register_CSquadSerializer();
+      register_CPlatoonSerializer();
+    }
+  };
+
+  [[maybe_unused]] CPlatoonSerializerStartupBootstrap gCPlatoonSerializerStartupBootstrap;
 
   /**
    * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
