@@ -14862,25 +14862,6 @@ namespace moho
    *    `v148.playableRectX1` in the original - hovered units are excluded
    *    from all four runs below, matching the binary, but nothing consumes
    *    them yet).
-   *  - The lifebar *collection* gate (0x0085BFDB..0x0085C09F), the one site
-   *    that fills `mLifebarIcons`. An earlier pass recorded this as blocked
-   *    on `show_attached_unit_lifebars` (`OPTIONS_GetBool`) and
-   *    `IUnit::GetAttributes1()->mToggleCaps` / `HasScriptBit`; none of those
-   *    appear in the disassembly. What the gate actually reads is
-   *    `ui_RenderUnitBars`, `ui_LifebarLOD` against this frame's zoom,
-   *    `ui_ForceLifbarsOnEnemy`, `IUnit::IsUnitState(UNITSTATE_BeingUpgraded)`
-   *    (slot 15, dispatched at 0x0085C05C with `push 25h`),
-   *    `UserUnit::mIsBusy` (+0x1A2) and
-   *    `IUnit::GetBlueprint()->Display.HideLifebars` (slot 7 at 0x0085C083,
-   *    then the byte at +0x275). Three things still need pinning before it
-   *    can land: the identity of `UserEntity+0x71` and
-   *    `REntityBlueprint+0xF8`, and the session lane at `CWldSession+0x4C0`
-   *    that 0x0085C03A compares the icon's unit against.
-   *
-   *    The draw side of that stack is no longer deferred: the bars
-   *    (0x0085CD40) and the custom-name label (0x0085E0A0) are recovered
-   *    above and run in phase 4 below. Until the collection gate lands,
-   *    `mLifebarIcons` stays empty and that loop is a no-op.
    *  - The "toggled off a scripted ability" half of the paused-overlay flag
    *    below, which currently reflects only `mUnitVarDat.mIsPaused`.
    *  - The selection-set name label (0x0085E3A0), which stacks under the
@@ -14893,6 +14874,11 @@ namespace moho
     CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, CWldMap* const map, const bool isMiniMap
   )
   {
+    // Read once per frame, before the singleton is even built (0x0085B719).
+    // An "attached" unit - one riding a transport or docked - normally has its
+    // lifebar suppressed; this option puts it back.
+    const bool showAttachedUnitLifebars = OPTIONS_GetBool("show_attached_unit_lifebars");
+
     // --- Phase 1: lazy singleton build --------------------------------
     if (gStrategicIconAuxiliary == nullptr) {
       gStrategicIconAuxiliary = new StrategicIconAuxView();
@@ -15005,6 +14991,33 @@ namespace moho
         }
       } else if (asUnit != nullptr && asUnit->mUnitVarDat.mIsBusy && asUnit->GetBlueprint()->Air.CanFly) {
         continue;
+      }
+
+      // --- Lifebar collection gate (0x0085BFDB..0x0085C09F) -------------
+      // The one producer of `mLifebarIcons`. Everything below is read in the
+      // binary's own order; each early-out lands on the same 0x0085C0A4
+      // continue as the icon test that follows.
+      if (ui_RenderUnitBars && ui_LifebarLOD > currentZoomValue && !entity->mVariableData.mIsDead &&
+          blueprint->mLifeBarRender != 0) {
+        // Enemy units only get bars when their health is actually known
+        // (`selectedVariantEligible`, intel bit 0x08), and then only if the
+        // player forced enemy bars on or is hovering this unit. Friendly units
+        // skip all three tests.
+        bool eligible = iconData.mIsFriendly;
+        if (!eligible && selectedVariantEligible) {
+          eligible = ui_ForceLifbarsOnEnemy || entity == GetHoveredUserEntity();
+        }
+
+        if (eligible && asUnit != nullptr) {
+          // A unit mid-upgrade is drawn by the upgrade progress UI instead
+          // (slot 15, dispatched with `push 25h` at 0x0085C06B).
+          const IUnit* const unitBridge = GetIUnitBridge(asUnit);
+          const bool attachedAndHidden = !showAttachedUnitLifebars && asUnit->mUnitVarDat.mIsBusy;
+          if (!unitBridge->IsUnitState(UNITSTATE_BeingUpgraded) && !attachedAndHidden &&
+              unitBridge->GetBlueprint()->Display.HideLifebars == 0) {
+            aux.mLifebarIcons.push_back(iconData);
+          }
+        }
       }
 
       if (!ui_NisRenderIcons || (!ui_RenderIcons && !iconData.mShowPausedOverlay) || entity->IsBeingBuilt()) {
