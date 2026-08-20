@@ -4339,6 +4339,36 @@ namespace moho
   }
 
   /**
+   * Address: 0x0056A6B0 (FUN_0056A6B0, Moho::CFormationInstance::Update)
+   * Slot: 17
+   *
+   * What it does:
+   * When a plan update is pending, clears the pending flag and runs one
+   * cleanup+rebuild pass: drops dead unit links, resets transient formation
+   * state, and rebuilds the formation plan.
+   *
+   * `RemoveDeadUnits`/`UpdateFormation` are declared on `CAiFormationInstance`
+   * (the only class that derives from `CFormationInstance`), matching the
+   * binary's own `this` typing at this call site -- `CAiFormationInstance`
+   * overrides this same vtable slot with its own, much larger update pass
+   * (`FUN_0059AE80`), so this base implementation only actually runs if a
+   * future sibling class inherits `CFormationInstance` without overriding
+   * slot 17.
+   */
+  void CFormationInstance::Update()
+  {
+    if (!mPlanUpdateRequested) {
+      return;
+    }
+
+    mPlanUpdateRequested = 0;
+    auto* const aiInstance = static_cast<CAiFormationInstance*>(this);
+    aiInstance->RemoveDeadUnits(nullptr);
+    CleanupFormation();
+    aiInstance->UpdateFormation();
+  }
+
+  /**
    * Address: 0x0056A210 (FUN_0056A210)
    *
    * What it does:
