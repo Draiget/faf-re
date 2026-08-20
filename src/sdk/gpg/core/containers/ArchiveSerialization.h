@@ -234,4 +234,16 @@ namespace gpg
    * object/type lanes into the destination ref.
    */
   RRef* AssignSimRef(RRef* outRef, moho::Sim* value);
+
+  /**
+   * Address: 0x0055D590 (FUN_0055D590, gpg::RFastVectorType_UnitWeaponInfo::SerSave)
+   *
+   * What it does:
+   * Writes one contiguous `fastvector<UnitWeaponInfo>` payload as element count
+   * plus each reflected lane in order. Declared here so the
+   * `RFastVectorType<Moho::UnitWeaponInfo>` descriptor
+   * (FastVectorUIntReflection.cpp) can bind it into `serSaveFunc_`, which is
+   * the binary's only reference to this body.
+   */
+  void SaveFastVectorUnitWeaponInfo(WriteArchive* archive, int objectPtr, int version, RRef* ownerRef);
 } // namespace gpg
