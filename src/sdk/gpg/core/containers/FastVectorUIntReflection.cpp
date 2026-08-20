@@ -8,6 +8,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/unit/core/Unit.h"
@@ -186,6 +187,126 @@ namespace gpg
   static_assert(
     sizeof(RFastVectorType<moho::UnitWeaponInfo>) == 0x68,
     "RFastVectorType<Moho::UnitWeaponInfo> size must be 0x68"
+  );
+
+  /**
+   * VFTABLE: 0x00E1904C (primary, 11 slots) / 0x00E1907C (RIndexed subobject @ +0x64, 4 slots)
+   *
+   * What it is:
+   * Reflection/indexing adapter for `gpg::fastvector<Moho::SOffsetInfo>`.
+   * `Moho::SOffsetInfo` is the RTTI name for the formation lane entry (also
+   * aliased `moho::SFormationLaneEntry` in CAiFormationInstance.h); it is
+   * 0x4C bytes, so `GetCount` divides the byte span by 76.
+   */
+  template <>
+  class RFastVectorType<moho::SOffsetInfo> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    /**
+     * Address: 0x005720E0 (FUN_005720E0, gpg::RFastVectorType_SOffsetInfo::dtr)
+     * Slot: 2
+     */
+    ~RFastVectorType() override;
+
+    /**
+     * Address: 0x0056C020 (FUN_0056C020, gpg::RFastVectorType_SOffsetInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0056C0E0 (FUN_0056C0E0, gpg::RFastVectorType_SOffsetInfo::GetLexical)
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x0056C170 (FUN_0056C170, gpg::RFastVectorType_SOffsetInfo::IsIndexed)
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0056C0C0 (FUN_0056C0C0, gpg::RFastVectorType_SOffsetInfo::Init)
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x0056C200 (FUN_0056C200, gpg::RFastVectorType_SOffsetInfo::SubscriptIndex)
+     */
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0056C180 (FUN_0056C180, gpg::RFastVectorType_SOffsetInfo::GetCount)
+     */
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
+     */
+    void SetCount(void* obj, int count) const override;
+  };
+
+  static_assert(
+    sizeof(RFastVectorType<moho::SOffsetInfo>) == 0x68,
+    "RFastVectorType<Moho::SOffsetInfo> size must be 0x68"
+  );
+
+  /**
+   * VFTABLE: 0x00E19090 (primary, 11 slots) / 0x00E190C0 (RIndexed subobject @ +0x64, 4 slots)
+   *
+   * What it is:
+   * Reflection/indexing adapter for `gpg::fastvector<Moho::SAssignedLocInfo>`.
+   * The element (`SAssignedLocInfo`, aliased `moho::SFormationOccupiedSlot`)
+   * is a trivially-copyable 0x10-byte POD (2D position + footprint size +
+   * lane token), so `GetCount` divides the byte span by 16 with a shift.
+   */
+  template <>
+  class RFastVectorType<moho::SAssignedLocInfo> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    /**
+     * Address: 0x00572140 (FUN_00572140, gpg::RFastVectorType_SAssignedLocInfo::dtr)
+     * Slot: 2
+     */
+    ~RFastVectorType() override;
+
+    /**
+     * Address: 0x0056C240 (FUN_0056C240, gpg::RFastVectorType_SAssignedLocInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0056C300 (FUN_0056C300, gpg::RFastVectorType_SAssignedLocInfo::GetLexical)
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x0056C390 (FUN_0056C390, gpg::RFastVectorType_SAssignedLocInfo::IsIndexed)
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0056C2E0 (FUN_0056C2E0, gpg::RFastVectorType_SAssignedLocInfo::Init)
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x0056C3F0 (FUN_0056C3F0, gpg::RFastVectorType_SAssignedLocInfo::SubscriptIndex)
+     */
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0056C3A0 (FUN_0056C3A0, gpg::RFastVectorType_SAssignedLocInfo::GetCount)
+     */
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
+     */
+    void SetCount(void* obj, int count) const override;
+  };
+
+  static_assert(
+    sizeof(RFastVectorType<moho::SAssignedLocInfo>) == 0x68,
+    "RFastVectorType<Moho::SAssignedLocInfo> size must be 0x68"
   );
 
   template <>
@@ -532,6 +653,49 @@ namespace
     }
 
     return reinterpret_cast<FastVectorUnitWeaponInfoType*>(gFastVectorUnitWeaponInfoTypeStorage);
+  }
+
+  using FastVectorSOffsetInfoType = gpg::RFastVectorType<moho::SOffsetInfo>;
+  using FastVectorSAssignedLocInfoType = gpg::RFastVectorType<moho::SAssignedLocInfo>;
+
+  /**
+   * Address: 0x01104FA0 (`gpg::RFastVectorType<Moho::SOffsetInfo>` descriptor storage)
+   *
+   * Built in-place from FUN_00571C00; the RIndexed sub-object vtable lands at
+   * 0x01105004, i.e. storage + 0x64.
+   */
+  alignas(FastVectorSOffsetInfoType)
+    unsigned char gFastVectorSOffsetInfoTypeStorage[sizeof(FastVectorSOffsetInfoType)]{};
+  bool gFastVectorSOffsetInfoTypeConstructed = false;
+
+  /**
+   * Address: 0x01104ED0 (`gpg::RFastVectorType<Moho::SAssignedLocInfo>` descriptor storage)
+   *
+   * Built in-place from FUN_00571C70; the RIndexed sub-object vtable lands at
+   * 0x01104F34, i.e. storage + 0x64.
+   */
+  alignas(FastVectorSAssignedLocInfoType)
+    unsigned char gFastVectorSAssignedLocInfoTypeStorage[sizeof(FastVectorSAssignedLocInfoType)]{};
+  bool gFastVectorSAssignedLocInfoTypeConstructed = false;
+
+  [[nodiscard]] FastVectorSOffsetInfoType* AcquireFastVectorSOffsetInfoType()
+  {
+    if (!gFastVectorSOffsetInfoTypeConstructed) {
+      new (gFastVectorSOffsetInfoTypeStorage) FastVectorSOffsetInfoType();
+      gFastVectorSOffsetInfoTypeConstructed = true;
+    }
+
+    return reinterpret_cast<FastVectorSOffsetInfoType*>(gFastVectorSOffsetInfoTypeStorage);
+  }
+
+  [[nodiscard]] FastVectorSAssignedLocInfoType* AcquireFastVectorSAssignedLocInfoType()
+  {
+    if (!gFastVectorSAssignedLocInfoTypeConstructed) {
+      new (gFastVectorSAssignedLocInfoTypeStorage) FastVectorSAssignedLocInfoType();
+      gFastVectorSAssignedLocInfoTypeConstructed = true;
+    }
+
+    return reinterpret_cast<FastVectorSAssignedLocInfoType*>(gFastVectorSAssignedLocInfoTypeStorage);
   }
 
   [[nodiscard]] gpg::RType* CachedFloatType()
@@ -917,34 +1081,32 @@ namespace
     return cached;
   }
 
+  /**
+   * Element-type cache for `SOffsetInfo`, mirroring the binary's
+   * `Moho::SOffsetInfo::sType` global (0x010C6F6C).
+   */
   [[nodiscard]] gpg::RType* CachedSOffsetInfoTypeCompat()
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::REF_FindTypeNamed("Moho::SOffsetInfo");
-      if (!cached) {
-        cached = gpg::REF_FindTypeNamed("Moho::SUnitOffsetInfo");
-      }
-      if (!cached) {
-        cached = gpg::LookupRType(typeid(int));
-      }
+    gpg::RType* type = moho::SOffsetInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SOffsetInfo));
+      moho::SOffsetInfo::sType = type;
     }
-    return cached;
+    return type;
   }
 
+  /**
+   * Element-type cache for `SAssignedLocInfo`, mirroring the binary's
+   * `Moho::SAssignedLocInfo::sType` global.
+   */
   [[nodiscard]] gpg::RType* CachedSAssignedLocInfoTypeCompat()
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::REF_FindTypeNamed("Moho::SAssignedLocInfo");
-      if (!cached) {
-        cached = gpg::REF_FindTypeNamed("Moho::SFormationOccupiedSlot");
-      }
-      if (!cached) {
-        cached = gpg::LookupRType(typeid(int));
-      }
+    gpg::RType* type = moho::SAssignedLocInfo::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SAssignedLocInfo));
+      moho::SAssignedLocInfo::sType = type;
     }
-    return cached;
+    return type;
   }
 
   /**
@@ -1029,7 +1191,7 @@ namespace
    * Lazily builds and caches the reflected `fastvector<SOffsetInfo>` type
    * name.
    */
-  [[maybe_unused]] const char* GetFastVectorSOffsetInfoTypeName()
+  const char* GetFastVectorSOffsetInfoTypeName()
   {
     if (gFastVectorSOffsetInfoTypeName.empty()) {
       gpg::RType* const elementType = CachedSOffsetInfoTypeCompat();
@@ -1050,7 +1212,7 @@ namespace
    * Lazily builds and caches the reflected `fastvector<SAssignedLocInfo>` type
    * name.
    */
-  [[maybe_unused]] const char* GetFastVectorSAssignedLocInfoTypeName()
+  const char* GetFastVectorSAssignedLocInfoTypeName()
   {
     if (gFastVectorSAssignedLocInfoTypeName.empty()) {
       gpg::RType* const elementType = CachedSAssignedLocInfoTypeCompat();
@@ -1870,6 +2032,265 @@ void gpg::RFastVectorType<moho::UnitWeaponInfo>::SetCount(void* obj, const int c
   SetFastVectorUnitWeaponInfoCount(obj, count);
 }
 
+// ---------------------------------------------------------------------------
+// gpg::RFastVectorType<Moho::SOffsetInfo>
+//
+// Descriptor storage 0x01104FA0, built in place by FUN_00571C00. Slot map from
+// the RTTI dump: primary vftable 0x00E1904C (dtr@2, GetName@3, GetLexical@4,
+// IsIndexed@6, Init@9), RIndexed vftable 0x00E1907C at subobject offset 100
+// (SubscriptIndex@0, GetCount@1, SetCount@2, AssignPointer@3 = base 0x00401320).
+//
+// The SetCount/SerLoad/SerSave bodies live in CAiFormationInstance.cpp
+// (as `moho::SetFastVectorSOffsetInfoCount`/`moho::LoadFastVectorSOffsetInfo`/
+// `moho::SaveFastVectorSOffsetInfo`) because they need the lane-entry
+// default-prototype (sentinel-backed unit map + intrusive weak back-link) and
+// resize helpers that are file-local to that translation unit.
+// ---------------------------------------------------------------------------
+
+namespace gpg
+{
+  /**
+   * Address: 0x00571C00 (FUN_00571C00, preregister_RFastVectorType_SOffsetInfo)
+   *
+   * What it does:
+   * Constructs the static `RFastVectorType<Moho::SOffsetInfo>` descriptor in
+   * place -- the retail body inlines the default constructor as
+   * `RType::RType()` plus the two vtable-pointer stores -- and preregisters it
+   * under `typeid(gpg::fastvector<Moho::SOffsetInfo>)`.
+   */
+  gpg::RType* preregister_FastVectorSOffsetInfoType()
+  {
+    FastVectorSOffsetInfoType* const type = AcquireFastVectorSOffsetInfoType();
+    gpg::PreRegisterRType(typeid(gpg::fastvector<moho::SOffsetInfo>), type);
+    return type;
+  }
+
+  void cleanup_FastVectorSOffsetInfoType()
+  {
+    if (!gFastVectorSOffsetInfoTypeConstructed) {
+      return;
+    }
+
+    AcquireFastVectorSOffsetInfoType()->~FastVectorSOffsetInfoType();
+    gFastVectorSOffsetInfoTypeConstructed = false;
+  }
+
+  int register_FastVectorSOffsetInfoTypeAtexit()
+  {
+    (void)preregister_FastVectorSOffsetInfoType();
+    return std::atexit(&cleanup_FastVectorSOffsetInfoType);
+  }
+} // namespace gpg
+
+/**
+ * Address: 0x005720E0 (FUN_005720E0, gpg::RFastVectorType_SOffsetInfo::dtr)
+ */
+gpg::RFastVectorType<moho::SOffsetInfo>::~RFastVectorType() = default;
+
+/**
+ * Address: 0x0056C020 (FUN_0056C020, gpg::RFastVectorType_SOffsetInfo::GetName)
+ */
+const char* gpg::RFastVectorType<moho::SOffsetInfo>::GetName() const
+{
+  return GetFastVectorSOffsetInfoTypeName();
+}
+
+/**
+ * Address: 0x0056C0E0 (FUN_0056C0E0, gpg::RFastVectorType_SOffsetInfo::GetLexical)
+ *
+ * What it does:
+ * Renders `"<base RType lexical>, size=<count>"`. The retail body reaches the
+ * count by dispatching slot 1 of its own RIndexed sub-object vtable
+ * (`[this+0x64] + 4`), matching this class's own `GetCount`.
+ */
+msvc8::string gpg::RFastVectorType<moho::SOffsetInfo>::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+}
+
+/**
+ * Address: 0x0056C170 (FUN_0056C170, gpg::RFastVectorType_SOffsetInfo::IsIndexed)
+ */
+const gpg::RIndexed* gpg::RFastVectorType<moho::SOffsetInfo>::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x0056C0C0 (FUN_0056C0C0, gpg::RFastVectorType_SOffsetInfo::Init)
+ */
+void gpg::RFastVectorType<moho::SOffsetInfo>::Init()
+{
+  size_ = 0x10;
+  version_ = 1;
+  serLoadFunc_ = &moho::LoadFastVectorSOffsetInfo;
+  serSaveFunc_ = &moho::SaveFastVectorSOffsetInfo;
+}
+
+/**
+ * Address: 0x0056C200 (FUN_0056C200, gpg::RFastVectorType_SOffsetInfo::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference for `fastvector<SOffsetInfo>[ind]`.
+ * Element stride is 0x4C (`imul eax, 4Ch` in the retail body), matching
+ * `sizeof(SOffsetInfo)`. The retail body performs no bounds or null check.
+ */
+gpg::RRef gpg::RFastVectorType<moho::SOffsetInfo>::SubscriptIndex(void* obj, const int ind) const
+{
+  auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(obj);
+  gpg::RRef out{};
+  gpg::RRef_SOffsetInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  return out;
+}
+
+/**
+ * Address: 0x0056C180 (FUN_0056C180, gpg::RFastVectorType_SOffsetInfo::GetCount)
+ *
+ * What it does:
+ * Returns the lane count as `(end - begin) / 76`, matching `sizeof(SOffsetInfo)`.
+ */
+size_t gpg::RFastVectorType<moho::SOffsetInfo>::GetCount(void* obj) const
+{
+  const auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(obj);
+  return view.Size();
+}
+
+/**
+ * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
+ */
+void gpg::RFastVectorType<moho::SOffsetInfo>::SetCount(void* obj, const int count) const
+{
+  moho::SetFastVectorSOffsetInfoCount(obj, count);
+}
+
+// ---------------------------------------------------------------------------
+// gpg::RFastVectorType<Moho::SAssignedLocInfo>
+//
+// Descriptor storage 0x01104ED0, built in place by FUN_00571C70. Slot map from
+// the RTTI dump: primary vftable 0x00E19090 (dtr@2, GetName@3, GetLexical@4,
+// IsIndexed@6, Init@9), RIndexed vftable 0x00E190C0 at subobject offset 100
+// (SubscriptIndex@0, GetCount@1, SetCount@2, AssignPointer@3 = base 0x00401320).
+//
+// The SetCount/SerLoad/SerSave bodies live in CAiFormationInstance.cpp for
+// symmetry with `SOffsetInfo`'s, even though `SAssignedLocInfo` is a plain
+// POD (no lane-entry-specific dependency); this keeps every fastvector
+// callback for the formation-lane subsystem's element types in one place.
+// ---------------------------------------------------------------------------
+
+namespace gpg
+{
+  /**
+   * Address: 0x00571C70 (FUN_00571C70, preregister_RFastVectorType_SAssignedLocInfo)
+   *
+   * What it does:
+   * Constructs the static `RFastVectorType<Moho::SAssignedLocInfo>` descriptor
+   * in place -- the retail body inlines the default constructor as
+   * `RType::RType()` plus the two vtable-pointer stores -- and preregisters it
+   * under `typeid(gpg::fastvector<Moho::SAssignedLocInfo>)`.
+   */
+  gpg::RType* preregister_FastVectorSAssignedLocInfoType()
+  {
+    FastVectorSAssignedLocInfoType* const type = AcquireFastVectorSAssignedLocInfoType();
+    gpg::PreRegisterRType(typeid(gpg::fastvector<moho::SAssignedLocInfo>), type);
+    return type;
+  }
+
+  void cleanup_FastVectorSAssignedLocInfoType()
+  {
+    if (!gFastVectorSAssignedLocInfoTypeConstructed) {
+      return;
+    }
+
+    AcquireFastVectorSAssignedLocInfoType()->~FastVectorSAssignedLocInfoType();
+    gFastVectorSAssignedLocInfoTypeConstructed = false;
+  }
+
+  int register_FastVectorSAssignedLocInfoTypeAtexit()
+  {
+    (void)preregister_FastVectorSAssignedLocInfoType();
+    return std::atexit(&cleanup_FastVectorSAssignedLocInfoType);
+  }
+} // namespace gpg
+
+/**
+ * Address: 0x00572140 (FUN_00572140, gpg::RFastVectorType_SAssignedLocInfo::dtr)
+ */
+gpg::RFastVectorType<moho::SAssignedLocInfo>::~RFastVectorType() = default;
+
+/**
+ * Address: 0x0056C240 (FUN_0056C240, gpg::RFastVectorType_SAssignedLocInfo::GetName)
+ */
+const char* gpg::RFastVectorType<moho::SAssignedLocInfo>::GetName() const
+{
+  return GetFastVectorSAssignedLocInfoTypeName();
+}
+
+/**
+ * Address: 0x0056C300 (FUN_0056C300, gpg::RFastVectorType_SAssignedLocInfo::GetLexical)
+ */
+msvc8::string gpg::RFastVectorType<moho::SAssignedLocInfo>::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+}
+
+/**
+ * Address: 0x0056C390 (FUN_0056C390, gpg::RFastVectorType_SAssignedLocInfo::IsIndexed)
+ */
+const gpg::RIndexed* gpg::RFastVectorType<moho::SAssignedLocInfo>::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x0056C2E0 (FUN_0056C2E0, gpg::RFastVectorType_SAssignedLocInfo::Init)
+ */
+void gpg::RFastVectorType<moho::SAssignedLocInfo>::Init()
+{
+  size_ = 0x10;
+  version_ = 1;
+  serLoadFunc_ = &moho::LoadFastVectorSAssignedLocInfo;
+  serSaveFunc_ = &moho::SaveFastVectorSAssignedLocInfo;
+}
+
+/**
+ * Address: 0x0056C3F0 (FUN_0056C3F0, gpg::RFastVectorType_SAssignedLocInfo::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference for `fastvector<SAssignedLocInfo>[ind]`.
+ * Element stride is 0x10 (`shl/lea *16` in the retail body), matching
+ * `sizeof(SAssignedLocInfo)`. The retail body performs no bounds or null check.
+ */
+gpg::RRef gpg::RFastVectorType<moho::SAssignedLocInfo>::SubscriptIndex(void* obj, const int ind) const
+{
+  auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(obj);
+  gpg::RRef out{};
+  gpg::RRef_SAssignedLocInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  return out;
+}
+
+/**
+ * Address: 0x0056C3A0 (FUN_0056C3A0, gpg::RFastVectorType_SAssignedLocInfo::GetCount)
+ *
+ * What it does:
+ * Returns the lane count as `(end - begin) >> 4` -- a shift rather than a
+ * reciprocal multiply, because `sizeof(SAssignedLocInfo)` is 16.
+ */
+size_t gpg::RFastVectorType<moho::SAssignedLocInfo>::GetCount(void* obj) const
+{
+  const auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(obj);
+  return view.Size();
+}
+
+/**
+ * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
+ */
+void gpg::RFastVectorType<moho::SAssignedLocInfo>::SetCount(void* obj, const int count) const
+{
+  moho::SetFastVectorSAssignedLocInfoCount(obj, count);
+}
+
 /**
  * Address: 0x0065ABB0 (FUN_0065ABB0, preregister_FastVectorStringType)
  *
@@ -2273,6 +2694,26 @@ namespace
   };
 
   [[maybe_unused]] FastVectorUnitWeaponInfoReflectionBootstrap gFastVectorUnitWeaponInfoReflectionBootstrap;
+
+  struct FastVectorSOffsetInfoReflectionBootstrap
+  {
+    FastVectorSOffsetInfoReflectionBootstrap()
+    {
+      (void)gpg::register_FastVectorSOffsetInfoTypeAtexit();
+    }
+  };
+
+  [[maybe_unused]] FastVectorSOffsetInfoReflectionBootstrap gFastVectorSOffsetInfoReflectionBootstrap;
+
+  struct FastVectorSAssignedLocInfoReflectionBootstrap
+  {
+    FastVectorSAssignedLocInfoReflectionBootstrap()
+    {
+      (void)gpg::register_FastVectorSAssignedLocInfoTypeAtexit();
+    }
+  };
+
+  [[maybe_unused]] FastVectorSAssignedLocInfoReflectionBootstrap gFastVectorSAssignedLocInfoReflectionBootstrap;
 } // namespace
 
 
@@ -2296,4 +2737,17 @@ GPG_PREREGISTER_INIT(preregister_FastVectorUnitWeaponInfoType_86ef6d, gpg::prere
 GPG_PREREGISTER_INIT(
   register_FastVectorUnitWeaponInfoTypeAtexit_86ef6d,
   gpg::register_FastVectorUnitWeaponInfoTypeAtexit
+)
+GPG_PREREGISTER_INIT(preregister_FastVectorSOffsetInfoType_86ef6d, gpg::preregister_FastVectorSOffsetInfoType)
+GPG_PREREGISTER_INIT(
+  register_FastVectorSOffsetInfoTypeAtexit_86ef6d,
+  gpg::register_FastVectorSOffsetInfoTypeAtexit
+)
+GPG_PREREGISTER_INIT(
+  preregister_FastVectorSAssignedLocInfoType_86ef6d,
+  gpg::preregister_FastVectorSAssignedLocInfoType
+)
+GPG_PREREGISTER_INIT(
+  register_FastVectorSAssignedLocInfoTypeAtexit_86ef6d,
+  gpg::register_FastVectorSAssignedLocInfoTypeAtexit
 )
