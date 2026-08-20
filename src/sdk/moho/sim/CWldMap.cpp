@@ -17,13 +17,16 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/core/streams/Stream.h"
+#include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "lua/LuaObject.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/math/Vector4f.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/render/Cartographic.h"
@@ -31,6 +34,7 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/SkyDome.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/textures/DXTCodec.h"
@@ -47,6 +51,47 @@
 namespace
 {
   constexpr float kQuaternionNormalizeEpsilon = 0.000001f;
+
+  /**
+   * `.scmap` container header, written at 0x008911D2/0x008911DA by
+   * `CWldMap::MapSave` and validated at 0x00890E81 by `CWldMap::MapLoad`.
+   */
+  constexpr std::uint32_t kWorldMapFileMagic = 0x1A70614DU; // 'Map' + 0x1A
+  constexpr std::uint32_t kWorldMapFileVersion = 2U;
+
+  /**
+   * The two header lanes are staged adjacently on the stack at 0x008911D2 and
+   * flushed by a single 8-byte `BinaryWriter::Write` (0x008915F0), so they are
+   * modelled as one record rather than two separate scalar writes.
+   */
+  struct SWorldMapFileHeader
+  {
+    std::uint32_t mMagic;   // +0x00
+    std::uint32_t mVersion; // +0x04
+  };
+  static_assert(offsetof(SWorldMapFileHeader, mVersion) == 0x04, "SWorldMapFileHeader::mVersion offset must be 0x04");
+  static_assert(sizeof(SWorldMapFileHeader) == 0x08, "SWorldMapFileHeader size must be 0x08");
+
+  /**
+   * Header of the terrain payload that `CWldTerrainRes::Save` appends after the
+   * preview chunk (0x008A30D8 writes the version, 0x008A3176 the sample scale).
+   */
+  constexpr std::int32_t kTerrainSaveVersion = 60;
+  constexpr float kTerrainHeightSampleScale = 0.0078125f; // 1/128
+
+  /**
+   * Elevation lane written for all three water planes when the map has no water
+   * (0x008A3722 selects this constant over `STIMap::mWaterElevation*`).
+   */
+  constexpr float kNoWaterElevationSentinel = -10000.0f;
+
+  /**
+   * `CD3DDevice::CreateDynamicTextureSheetFromSource` format tokens used by the
+   * terrain save path: 12 for the raw normal-map/water-map planes (0x008A3A87,
+   * 0x008A3DAC), 2 for the two stratum masks (0x008A3B5D, 0x008A3C6F).
+   */
+  constexpr int kTerrainRawSheetFormat = 12;
+  constexpr int kTerrainMaskSheetFormat = 2;
 
   struct Stride76RangeRuntimeView
   {
@@ -1284,6 +1329,85 @@ namespace
   {
     writer.WriteString(layer.mPath);
     writer.Write(layer.mSize);
+  }
+
+  /**
+   * Address: 0x0089F350 (FUN_0089F350, sub_89F350)
+   *
+   * IDA signature:
+   * void __stdcall sub_89F350(Moho::StratumMaterial *strata);
+   *
+   * What it does:
+   * One-shot resolve of the terrain stratum shader's "composite" capability.
+   * The first time it runs for a stratum set (`mResolvedShaderUsage` still
+   * clear) it looks up the `terrain` effect and reads its `usage` string
+   * annotation for the configured shader name, defaulting to `undefined`. If
+   * the annotation is not exactly `composite` it warns, clears the composite
+   * flag that gets serialized into the map, and falls the shader name back to
+   * `TTerrain`. The resolved flag is then latched so later calls are no-ops.
+   */
+  void ResolveTerrainCompositeShaderUsage(moho::StratumMaterial& strata)
+  {
+    if (strata.byte0 != 0) {
+      return;
+    }
+
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    moho::ID3DDeviceResources* const resources = device->GetResources();
+    moho::CD3DEffect* const terrainEffect = resources->FindEffect("terrain");
+
+    const msvc8::string defaultUsage{"undefined", 9U};
+    const msvc8::string usageAnnotationName{"usage", 5U};
+    const msvc8::string usage =
+      terrainEffect->GetStringAnnotation(strata.mShaderName, usageAnnotationName, defaultUsage);
+
+    // 0x0089F401-0x0089F420: compare(0, size(), "composite", 9) != 0 -> the
+    // shader did not declare itself composite.
+    const bool notComposite = usage.compare(0U, usage.size(), "composite", 9U) != 0;
+
+    if (notComposite) {
+      gpg::Warnf(
+        "terrain shader '%s' is not specified as 'composite,' defaulting to TTerrain",
+        strata.mShaderName.c_str()
+      );
+      strata.byte1 = 0;
+      // 0x0089F4BE re-runs basic_string(const char*, size_type) over the live
+      // member, which retidies to the SSO state without releasing the previous
+      // heap block before assigning - reproduced exactly.
+      strata.mShaderName.tidy(false, 0U);
+      (void)strata.mShaderName.assign("TTerrain", 8U);
+    }
+
+    strata.byte0 = 1;
+  }
+
+  /**
+   * Address family: inlined four times inside `CWldTerrainRes::Save`
+   * (0x008A3A79 normal-map planes, 0x008A3B55 stratum mask 0, 0x008A3C67
+   * stratum mask 1, 0x008A3DA0 water map).
+   *
+   * What it does:
+   * Re-encodes one retained texture sheet through
+   * `CD3DDevice::CreateDynamicTextureSheetFromSource` in archive mode and
+   * streams the resulting sheet with `ID3DTextureSheet::SaveToArchive`, which
+   * writes a byte-count header followed by the encoded texture bytes.
+   */
+  void SaveTerrainSheetToArchive(
+    gpg::BinaryWriter& writer,
+    moho::ID3DTextureSheet* const sourceSheet,
+    const int formatToken
+  )
+  {
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+
+    // The binary copies the source handle into the by-value parameter (an
+    // interlocked add on its control block) and the callee releases it again;
+    // the net refcount change is zero, so the guard lane is passed as null here
+    // exactly as the other recovered call sites in this file do.
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet> archiveSheet;
+    (void)device->CreateDynamicTextureSheetFromSource(archiveSheet, sourceSheet, nullptr, formatToken, true);
+
+    (void)archiveSheet->SaveToArchive(writer.stream(), true);
   }
 
   [[nodiscard]] QuaternionLanes QuaternionFromMatrixRows(const float matrix[3][3]) noexcept
@@ -2945,6 +3069,78 @@ namespace moho
 
     mPreviewTexture = boost::static_pointer_cast<ID3DTextureSheet>(previewTexture);
     return mPreviewTexture.get() != nullptr;
+  }
+
+  /**
+   * Address: 0x008908F0 (FUN_008908F0,
+   * ?Save@RWldMapPreviewChunk@Moho@@QAE_NAAVBinaryWriter@gpg@@@Z)
+   *
+   * IDA signature:
+   * bool __thiscall Moho::RWldMapPreviewChunk::Save(
+   *     Moho::RWldMapPreviewChunk *this, gpg::BinaryWriter &writer);
+   *
+   * What it does:
+   * Emits the version-2 preview chunk that `RWldMapPreviewChunk::Load` reads
+   * back: magic, version, preview width/height, the preview name as UTF-16
+   * including its terminator, and an empty metadata table. It then re-encodes
+   * the retained preview texture through the GAL backend into a memory buffer
+   * and appends it as a `uint32` byte count followed by the encoded bytes.
+   * Returns false (leaving the payload unwritten) when the chunk holds no
+   * runtime texture.
+   */
+  bool RWldMapPreviewChunk::Save(gpg::BinaryWriter& writer)
+  {
+    constexpr std::uint32_t kPreviewHeaderMagic = 0xBEEFFEEDU;
+    constexpr std::uint32_t kPreviewChunkVersion = 2U;
+    constexpr std::uint32_t kPreviewMetadataEntryCount = 0U;
+    // 0x00890B48: image-format token handed to the GAL texture-save lane.
+    constexpr int kPreviewImageFormatToken = 4;
+
+    writer.Write(kPreviewHeaderMagic);
+    writer.Write(kPreviewChunkVersion);
+    writer.Write(mPreviewSize.x);
+    writer.Write(mPreviewSize.y);
+
+    // 0x008909DD-0x00890A2C: the name goes out as UTF-16 with its NUL, sized
+    // `2 * length + 2` straight from the converted wide string.
+    const std::wstring previewNameWide = gpg::STR_Utf8ToWide(mPreviewName.c_str());
+    writer.Write(
+      reinterpret_cast<const char*>(previewNameWide.c_str()),
+      (previewNameWide.size() + 1U) * sizeof(wchar_t)
+    );
+
+    writer.Write(kPreviewMetadataEntryCount);
+
+    // 0x00890A58-0x00890AB7: probe the sheet for a live runtime texture. The
+    // probed handle is released before the branch is taken, so it is scoped.
+    bool hasRuntimeTexture = false;
+    if (mPreviewTexture.get() != nullptr) {
+      ID3DTextureSheet::TextureHandle probedTexture{};
+      hasRuntimeTexture = mPreviewTexture->GetTexture(probedTexture).get() != nullptr;
+    }
+    if (!hasRuntimeTexture) {
+      return false;
+    }
+
+    gpg::MemBuffer<char> encodedTexture{};
+    msvc8::string imageFormatName{"", 0U};
+
+    // 0x00890B21: the return value is discarded - the call only forces the D3D
+    // device online before the GAL singleton is queried.
+    (void)D3D_GetDevice();
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    if (device != nullptr) {
+      ID3DTextureSheet::TextureHandle texture{};
+      mPreviewTexture->GetTexture(texture);
+      gpg::gal::TextureD3D9* rawTexture = texture.get();
+      device->Func5(&rawTexture, imageFormatName, kPreviewImageFormatToken, &encodedTexture);
+    }
+
+    const std::uint32_t encodedByteCount = static_cast<std::uint32_t>(encodedTexture.Size());
+    writer.Write(encodedByteCount);
+    writer.Write(encodedTexture.data(), encodedByteCount);
+    return true;
   }
 
   /**
@@ -4742,6 +4938,156 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A30B0 (FUN_008A30B0, ?Save@CWldTerrainRes@Moho@@UAE_NAAVBinaryWriter@gpg@@@Z)
+   * Slot: 74 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54, entry 0x00E4BE7C)
+   *
+   * IDA signature:
+   * bool __thiscall Moho::CWldTerrainRes::Save(
+   *     Moho::CWldTerrainRes *this, gpg::BinaryWriter &writer);
+   *
+   * What it does:
+   * Writes the whole terrain payload of a `.scmap`, mirroring the read order of
+   * `IWldTerrainRes::Load`: format version, heightfield extents/scale/samples,
+   * the resolved composite-shader flag plus shader/background/skycube names,
+   * environment-lookup pairs, the lighting/fog/specular scalars, the water
+   * enable + three elevation planes, water-shader and wave-system payloads, the
+   * hypsometric/imager lanes, stratum texturing (which also writes the decal
+   * manager), the normal-map sheet array, both stratum masks, the water map,
+   * the three water byte planes, the terrain-type grid, the sky dome and the
+   * cartographic decals. Always reports success.
+   */
+  bool IWldTerrainRes::Save(gpg::BinaryWriter& writer)
+  {
+    TerrainRuntimeView& view = *AsTerrainRuntimeView(this);
+    TerrainNormalMapRuntimeView& normalView = *AsTerrainNormalMapRuntimeView(this);
+    STIMap& map = *view.mMap;
+    const CHeightField& heightField = *map.mHeightField.get();
+
+    // 0x008A30D8-0x008A31DF: version, cell extents (samples - 1), the fixed
+    // 1/128 sample scale, then the raw 16-bit height grid.
+    writer.Write(kTerrainSaveVersion);
+    writer.Write(heightField.width - 1);
+    writer.Write(heightField.height - 1);
+    writer.Write(kTerrainHeightSampleScale);
+    writer.Write(
+      reinterpret_cast<const char*>(heightField.data),
+      static_cast<std::size_t>(heightField.width) * static_cast<std::size_t>(heightField.height)
+        * sizeof(std::uint16_t)
+    );
+
+    // 0x008A31FA: latch the shader's composite capability before persisting it.
+    ResolveTerrainCompositeShaderUsage(view.mStrata);
+    writer.Write(view.mStrata.byte1);
+    writer.WriteString(view.mStrata.mShaderName);
+    writer.WriteString(view.mBackgroundFile);
+    writer.WriteString(view.mSkycubeFile);
+
+    // 0x008A324C-0x008A3344: entry count, then key/environment-name pairs in
+    // in-order tree traversal.
+    writer.Write(view.mEnvLookup.mSize);
+    TerrainEnvironmentLookupNodeRuntimeView* const envHead = view.mEnvLookup.mHead;
+    TerrainEnvironmentLookupNodeRuntimeView* envNode = envHead != nullptr ? envHead->left : nullptr;
+    while (envNode != nullptr && envNode != envHead) {
+      writer.WriteString(envNode->mKey);
+      writer.WriteString(envNode->mValue.mEnvironmentName);
+      envNode = IncrementTerrainEnvironmentNode(envNode, envHead);
+    }
+
+    writer.Write(view.mLightingMultiplier);
+
+    writer.Write(view.mSunDirection.x);
+    writer.Write(view.mSunDirection.y);
+    writer.Write(view.mSunDirection.z);
+
+    writer.Write(view.mSunAmbience.x);
+    writer.Write(view.mSunAmbience.y);
+    writer.Write(view.mSunAmbience.z);
+
+    writer.Write(view.mSunColor.x);
+    writer.Write(view.mSunColor.y);
+    writer.Write(view.mSunColor.z);
+
+    writer.Write(view.mShadowFillColor.x);
+    writer.Write(view.mShadowFillColor.y);
+    writer.Write(view.mShadowFillColor.z);
+
+    writer.Write(view.mSpecularColor.x);
+    writer.Write(view.mSpecularColor.y);
+    writer.Write(view.mSpecularColor.z);
+    writer.Write(view.mSpecularColor.w);
+
+    writer.Write(view.mBloom);
+
+    writer.Write(view.mFogStartDistance);
+    writer.Write(view.mFogCutoffDistance);
+    writer.Write(view.mFogMinClamp);
+    writer.Write(view.mFogMaxClamp);
+    writer.Write(view.mFogCurveExponent);
+
+    // 0x008A3722-0x008A3836: the three water planes fall back to the
+    // -10000 sentinel whenever the map has water disabled.
+    writer.Write(map.mWaterEnabled);
+    writer.Write(map.mWaterEnabled != 0 ? map.mWaterElevation : kNoWaterElevationSentinel);
+    writer.Write(map.mWaterEnabled != 0 ? map.mWaterElevationDeep : kNoWaterElevationSentinel);
+    writer.Write(map.mWaterEnabled != 0 ? map.mWaterElevationAbyss : kNoWaterElevationSentinel);
+
+    view.mWaterShaderProperties.Save(writer);
+    view.mWaveSystem.Save(writer);
+
+    writer.Write(view.mTopographicSamples);
+    writer.Write(view.mHypsometricColor[0]);
+    writer.Write(view.mHypsometricColor[1]);
+    writer.Write(view.mHypsometricColor[2]);
+    writer.Write(view.mHypsometricColor[3]);
+    writer.Write(view.mHypsometricColor[4]);
+    writer.Write(view.mImagerElevationOffset);
+
+    SaveTexturing(writer);
+
+    // 0x008A398A-0x008A3B17: normal-map tile grid, then one archived sheet per
+    // tile.
+    writer.Write(view.mNormalMapWidth);
+    writer.Write(view.mNormalMapHeight);
+
+    const TerrainNormalMapHandleArray& normalMap = normalView.mNormalMap;
+    const std::int32_t normalMapSheetCount =
+      normalMap.mBegin != nullptr ? static_cast<std::int32_t>(normalMap.mEnd - normalMap.mBegin) : 0;
+    writer.Write(normalMapSheetCount);
+    for (std::int32_t sheetIndex = 0; sheetIndex < normalMapSheetCount; ++sheetIndex) {
+      SaveTerrainSheetToArchive(writer, normalMap.mBegin[sheetIndex].get(), kTerrainRawSheetFormat);
+    }
+
+    SaveTerrainSheetToArchive(writer, normalView.mStratumMask0.get(), kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, normalView.mStratumMask1.get(), kTerrainMaskSheetFormat);
+
+    // 0x008A3D49: the water map is stored as a one-element sheet array.
+    constexpr std::int32_t kWaterMapSheetCount = 1;
+    writer.Write(kWaterMapSheetCount);
+    SaveTerrainSheetToArchive(writer, view.mWaterMapTexture.get(), kTerrainRawSheetFormat);
+
+    // 0x008A3E90-0x008A3F2C: the three per-texel water byte planes are sized
+    // from the water map's own dimensions.
+    Wm3::Vector3f waterMapDimensions{};
+    (void)view.mWaterMapTexture->GetDimensions(&waterMapDimensions);
+    const std::size_t waterPlaneBytes =
+      static_cast<std::size_t>(static_cast<std::int32_t>(waterMapDimensions.y * waterMapDimensions.x));
+
+    writer.Write(reinterpret_cast<const char*>(view.mWaterFoam), waterPlaneBytes);
+    writer.Write(reinterpret_cast<const char*>(view.mWaterFlatness), waterPlaneBytes);
+    writer.Write(reinterpret_cast<const char*>(view.mWaterDepthBias), waterPlaneBytes);
+
+    const TerrainTypeGrid& terrainTypeGrid = map.mTerrainType;
+    writer.Write(
+      reinterpret_cast<const char*>(terrainTypeGrid.data),
+      static_cast<std::size_t>(terrainTypeGrid.width) * static_cast<std::size_t>(terrainTypeGrid.height)
+    );
+
+    view.mSkyDome.Save(writer);
+    view.mCartographic.WriteDecals(writer);
+    return true;
+  }
+
+  /**
    * Address: 0x008A4600 (FUN_008A4600, ?SaveTexturing@CWldTerrainRes@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
    *
    * What it does:
@@ -5486,7 +5832,7 @@ namespace moho
     std::uint32_t fileVersion = 0;
     reader.ReadExact(fileMagic);
     reader.ReadExact(fileVersion);
-    if (fileMagic != 0x1A70614Du || fileVersion != 2u) {
+    if (fileMagic != kWorldMapFileMagic || fileVersion != kWorldMapFileVersion) {
       return false;
     }
 
@@ -5518,6 +5864,61 @@ namespace moho
       return false;
     }
 
+    return true;
+  }
+
+  /**
+   * Address: 0x00891030 (FUN_00891030, ?MapSave@CWldMap@Moho@@QAE_NVStrArg@gpg@@@Z)
+   *
+   * IDA signature:
+   * bool __thiscall Moho::CWldMap::MapSave(Moho::CWldMap *this, gpg::StrArg mapName);
+   *
+   * What it does:
+   * Refuses to save unless all three owned resources are present, resolves the
+   * destination through the virtual file system (mounted directory of the map's
+   * directory prefix, `\`, and the map's base name), opens that path for
+   * writing, emits the `Map\x1A` / version-2 container header, and saves the
+   * preview chunk, terrain resource and prop set into the same writer. The
+   * stream is closed for both directions before it is released.
+   */
+  bool CWldMap::MapSave(const gpg::StrArg mapName)
+  {
+    // 0x00891053-0x0089106D: every owned resource must exist.
+    if (mMapPreviewChunk == nullptr || mTerrainRes == nullptr || mProps == nullptr) {
+      return false;
+    }
+
+    // 0x00891073-0x008910DD: resolve the map's directory prefix through the
+    // mounted virtual file system. The prefix string is a temporary that dies
+    // with the statement; the resolved mount path outlives the whole function.
+    FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+    CVirtualFileSystem* const fileSystem = waitHandleSet->mHandle;
+
+    msvc8::string mountedDirectory;
+    mountedDirectory.tidy(false, 0U);
+    (void)fileSystem->FindFile(&mountedDirectory, FILE_DirPrefix(mapName).c_str(), nullptr);
+
+    // 0x008910E2-0x0089114E: "<mounted dir>\<base name>". All three string
+    // temporaries are destroyed once the stream has been opened.
+    msvc8::auto_ptr<gpg::Stream> stream =
+      DISK_OpenFileWrite((mountedDirectory + "\\" + FILE_Base(mapName, false)).c_str());
+    if (stream.get() == nullptr) {
+      return false;
+    }
+
+    gpg::BinaryWriter writer(stream.get());
+
+    // 0x008911C6-0x008911E2: magic and version go out as one 8-byte write.
+    const SWorldMapFileHeader header{kWorldMapFileMagic, kWorldMapFileVersion};
+    writer.Write(header);
+
+    // 0x008911F0-0x00891210: each stage's status byte is discarded by the
+    // binary - a partial save still reports success to the caller.
+    (void)mMapPreviewChunk->Save(writer);
+    (void)mTerrainRes->Save(writer);
+    (void)mProps->Save(writer);
+
+    stream->VirtClose(gpg::Stream::ModeBoth);
     return true;
   }
 
