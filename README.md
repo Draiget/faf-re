@@ -20,10 +20,10 @@ Progress DB status breakdown:
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `424` (0.63%)
 - `in_progress`: `3` (0.00%)
-- **`blocked`: `2,087` (3.11%)**
+- **`blocked`: `2,086` (3.11%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,511`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,511`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,510`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,510`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
@@ -42,15 +42,15 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 | Unclassified data xref (manual review) | `216` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,511 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,510 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `416` | 16.57% |
-| Vtable-anchored (recover with the owning class) | `203` | 8.08% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `415` | 16.53% |
+| Vtable-anchored (recover with the owning class) | `203` | 8.09% |
 | Framework dispatch (wx/EH/Lua/reflection) | `67` | 2.67% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `834` | 33.21% |
-| No indexed callsite evidence (needs investigation/evidence) | `987` | 39.31% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `834` | 33.23% |
+| No indexed callsite evidence (needs investigation/evidence) | `987` | 39.32% |
 | Unclassified data xref (manual review) | `3` | 0.12% |
 | RTTI-only | `1` | 0.04% |
 
