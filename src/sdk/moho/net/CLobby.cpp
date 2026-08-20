@@ -283,7 +283,7 @@ namespace
    * Unlinks one intrusive peer-list head node from its current ring and
    * restores self-linked sentinel lanes.
    */
-  [[maybe_unused]] moho::TDatListItem<moho::SPeer, void>* UnlinkPeerListHead(
+  moho::TDatListItem<moho::SPeer, void>* UnlinkPeerListHead(
     moho::TDatListItem<moho::SPeer, void>* const head
   ) noexcept
   {
