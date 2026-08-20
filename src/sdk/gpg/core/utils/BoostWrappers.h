@@ -282,6 +282,33 @@ namespace boost
         detail::sp_counted_base* pi;
     };
 
+    /**
+     * Same `(px, pi)` layout as `boost::shared_ptr<T>` and
+     * `SharedPtrLayoutView<T>` above, but types `pi` as a real,
+     * placement-newable `detail::shared_count` instead of the bare
+     * control-block pointer it wraps.
+     *
+     * `shared_ptr<T>`'s converting constructor is private boost-vendored
+     * code and cannot be extended to accept a pre-built `shared_count`,
+     * so recovered code that needs to name the per-T `shared_count(T*)`
+     * control-block step explicitly (the binary emits it as its own
+     * out-of-line function per T - see the `ConstructSharedCount*FromRaw`
+     * family in D3D9Interfaces.cpp / D3D10Interfaces.cpp) reinterprets the
+     * caller's raw `boost::shared_ptr<T>*` storage through this view,
+     * writes `px`, and placement-news `pi` via that per-T helper -
+     * reproducing exactly what boost's own `shared_ptr(Y*)` does
+     * (`px(p), pi_(p)`, member-declaration order) without reaching into
+     * its private members. See `ConstructSharedFromRawViaCountCtor` below.
+     */
+    template <class T>
+    struct SharedPtrConstructionView
+    {
+        T* px;
+        detail::shared_count pi;
+    };
+
+    static_assert(sizeof(SharedPtrConstructionView<void>) == 0x08, "SharedPtrConstructionView size must be 0x08");
+
     struct SharedCountPair
     {
         void* px;
@@ -497,6 +524,44 @@ namespace boost
     )
     {
         return ::new (static_cast<void*>(outCount)) detail::shared_count(rawPointer);
+    }
+
+    /**
+     * Builds one `boost::shared_ptr<T>` in caller-provided storage the same
+     * two-step way the binary's own per-type outer constructors do: publish
+     * `px` first, then construct the control block through the caller-
+     * supplied per-T `shared_count(T*)` helper (`constructCount`, typically
+     * one of the `ConstructSharedCount<Type>FromRaw` free functions next to
+     * each type's outer wrapper). This is `SharedPtrConstructionView<T>`'s
+     * one intended use: reinterpret the raw output slot through the typed
+     * view, write both lanes explicitly, and hand back the original
+     * pointer - matching boost's real `shared_ptr(Y* p): px(p), pi_(p) {}`
+     * member-init order without depending on private boost members.
+     *
+     * `T` types that derive from `boost::enable_shared_from_this<T>` are
+     * out of scope for this helper: boost's real converting constructor
+     * also runs `sp_enable_shared_from_this(this, p, p)` after `pi_(p)`,
+     * which this bypasses. None of the current per-type callers derive
+     * from it (confirmed per-type at each call site); a type that does
+     * must bind its weak-this manually after calling this, the way
+     * `ConstructSharedEffectD3D9FromRaw` already does for `selfWeak_`.
+     */
+    template <class T>
+    [[nodiscard]] inline boost::shared_ptr<T>* ConstructSharedFromRawViaCountCtor(
+        boost::shared_ptr<T>* const outShared,
+        T* const rawPointer,
+        detail::shared_count* (* const constructCount)(detail::shared_count*, T*)
+    )
+    {
+        static_assert(
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrConstructionView<T>),
+            "boost::shared_ptr<T> layout must match the (px,pi) SharedPtrConstructionView pair"
+        );
+
+        auto* const view = reinterpret_cast<SharedPtrConstructionView<T>*>(outShared);
+        view->px = rawPointer;
+        constructCount(&view->pi, rawPointer);
+        return outShared;
     }
 
     /**
