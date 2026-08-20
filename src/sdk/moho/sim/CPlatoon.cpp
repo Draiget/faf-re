@@ -1251,7 +1251,7 @@ namespace moho
    * Returns cached `CPlatoon` metatable object from Lua object-factory
    * storage.
    */
-  [[maybe_unused]] LuaPlus::LuaObject* func_GetCPlatoonFactory(
+  LuaPlus::LuaObject* func_GetCPlatoonFactory(
     LuaPlus::LuaObject* const object,
     LuaPlus::LuaState* const state
   )
