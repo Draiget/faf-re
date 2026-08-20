@@ -134,6 +134,7 @@ namespace moho
     InitializeSerializerNode(gCIntelPosHandleSerializer);
     gCIntelPosHandleSerializer.mLoadCallback = &CIntelPosHandleSerializer::Deserialize;
     gCIntelPosHandleSerializer.mSaveCallback = &CIntelPosHandleSerializer::Serialize;
+    gCIntelPosHandleSerializer.RegisterSerializeFunctions();
     (void)std::atexit(&cleanup_CIntelPosHandleSerializer_atexit);
   }
 } // namespace moho
