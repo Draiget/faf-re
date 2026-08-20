@@ -69,6 +69,125 @@ namespace gpg
 
   static_assert(sizeof(RFastVectorType<float>) == 0x68, "RFastVectorType<float> size must be 0x68");
 
+  /**
+   * VFTABLE: 0x00E17F2C (primary, 11 slots) / 0x00E17F5C (RIndexed subobject @ +0x64, 4 slots)
+   *
+   * What it is:
+   * Reflection/indexing adapter for `gpg::fastvector<Moho::SSTIEntityAttachInfo>`.
+   * The element is a bare 4-byte entity id, so `GetCount` divides the byte span
+   * by 4 with a shift rather than a reciprocal multiply.
+   */
+  template <>
+  class RFastVectorType<moho::SSTIEntityAttachInfo> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    /**
+     * Address: 0x00559650 (FUN_00559650, gpg::RFastVectorType_SSTIEntityAttachInfo::dtr)
+     * Slot: 2
+     */
+    ~RFastVectorType() override;
+
+    /**
+     * Address: 0x00558C30 (FUN_00558C30, gpg::RFastVectorType_SSTIEntityAttachInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00558CF0 (FUN_00558CF0, gpg::RFastVectorType_SSTIEntityAttachInfo::GetLexical)
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x00558D80 (FUN_00558D80, gpg::RFastVectorType_SSTIEntityAttachInfo::IsIndexed)
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x00558CD0 (FUN_00558CD0, gpg::RFastVectorType_SSTIEntityAttachInfo::Init)
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x00558DD0 (FUN_00558DD0, gpg::RFastVectorType_SSTIEntityAttachInfo::SubscriptIndex)
+     */
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x00558D90 (FUN_00558D90, gpg::RFastVectorType_SSTIEntityAttachInfo::GetCount)
+     */
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x00558DA0 (FUN_00558DA0, gpg::RFastVectorType_SSTIEntityAttachInfo::SetCount)
+     */
+    void SetCount(void* obj, int count) const override;
+  };
+
+  static_assert(
+    sizeof(RFastVectorType<moho::SSTIEntityAttachInfo>) == 0x68,
+    "RFastVectorType<Moho::SSTIEntityAttachInfo> size must be 0x68"
+  );
+
+  /**
+   * VFTABLE: 0x00E1882C (primary, 11 slots) / 0x00E1885C (RIndexed subobject @ +0x64, 4 slots)
+   *
+   * What it is:
+   * Reflection/indexing adapter for `gpg::fastvector<Moho::UnitWeaponInfo>`.
+   * `sizeof(UnitWeaponInfo)` is 0x98, so `GetCount` divides the byte span by
+   * 152 through the compiler's reciprocal-multiply sequence
+   * (`imul 6BCA1AF3h; sar edx,6`) at 0x0055CD59.
+   */
+  template <>
+  class RFastVectorType<moho::UnitWeaponInfo> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    /**
+     * Address: 0x0055EAF0 (FUN_0055EAF0, gpg::RFastVectorType_UnitWeaponInfo::dtr)
+     * Slot: 2
+     */
+    ~RFastVectorType() override;
+
+    /**
+     * Address: 0x0055CBF0 (FUN_0055CBF0, gpg::RFastVectorType_UnitWeaponInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0055CCB0 (FUN_0055CCB0, gpg::RFastVectorType_UnitWeaponInfo::GetLexical)
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x0055CD40 (FUN_0055CD40, gpg::RFastVectorType_UnitWeaponInfo::IsIndexed)
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0055CC90 (FUN_0055CC90, gpg::RFastVectorType_UnitWeaponInfo::Init)
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x0055CDE0 (FUN_0055CDE0, gpg::RFastVectorType_UnitWeaponInfo::SubscriptIndex)
+     */
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0055CD50 (FUN_0055CD50, gpg::RFastVectorType_UnitWeaponInfo::GetCount)
+     */
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0055CD70 (FUN_0055CD70, gpg::RFastVectorType_UnitWeaponInfo::SetCount)
+     */
+    void SetCount(void* obj, int count) const override;
+  };
+
+  static_assert(
+    sizeof(RFastVectorType<moho::UnitWeaponInfo>) == 0x68,
+    "RFastVectorType<Moho::UnitWeaponInfo> size must be 0x68"
+  );
+
   template <>
   class RFastVectorType<msvc8::string> final : public gpg::RType, public gpg::RIndexed
   {
@@ -369,6 +488,50 @@ namespace
     }
 
     return reinterpret_cast<FastVectorFloatType*>(gFastVectorFloatTypeStorage);
+  }
+
+  using FastVectorSSTIEntityAttachInfoType = gpg::RFastVectorType<moho::SSTIEntityAttachInfo>;
+  using FastVectorUnitWeaponInfoType = gpg::RFastVectorType<moho::UnitWeaponInfo>;
+
+  /**
+   * Address: 0x01104CC8 (`gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>` descriptor storage)
+   *
+   * The binary places this descriptor in `.data` and builds it in-place from
+   * FUN_00559580; the RIndexed sub-object vtable lands at 0x01104D2C, i.e.
+   * storage + 0x64.
+   */
+  alignas(FastVectorSSTIEntityAttachInfoType)
+    unsigned char gFastVectorSSTIEntityAttachInfoTypeStorage[sizeof(FastVectorSSTIEntityAttachInfoType)]{};
+  bool gFastVectorSSTIEntityAttachInfoTypeConstructed = false;
+
+  /**
+   * Address: 0x01104D98 (`gpg::RFastVectorType<Moho::UnitWeaponInfo>` descriptor storage)
+   *
+   * Built in-place from FUN_0055E9B0; the RIndexed sub-object vtable lands at
+   * 0x01104DFC, i.e. storage + 0x64.
+   */
+  alignas(FastVectorUnitWeaponInfoType)
+    unsigned char gFastVectorUnitWeaponInfoTypeStorage[sizeof(FastVectorUnitWeaponInfoType)]{};
+  bool gFastVectorUnitWeaponInfoTypeConstructed = false;
+
+  [[nodiscard]] FastVectorSSTIEntityAttachInfoType* AcquireFastVectorSSTIEntityAttachInfoType()
+  {
+    if (!gFastVectorSSTIEntityAttachInfoTypeConstructed) {
+      new (gFastVectorSSTIEntityAttachInfoTypeStorage) FastVectorSSTIEntityAttachInfoType();
+      gFastVectorSSTIEntityAttachInfoTypeConstructed = true;
+    }
+
+    return reinterpret_cast<FastVectorSSTIEntityAttachInfoType*>(gFastVectorSSTIEntityAttachInfoTypeStorage);
+  }
+
+  [[nodiscard]] FastVectorUnitWeaponInfoType* AcquireFastVectorUnitWeaponInfoType()
+  {
+    if (!gFastVectorUnitWeaponInfoTypeConstructed) {
+      new (gFastVectorUnitWeaponInfoTypeStorage) FastVectorUnitWeaponInfoType();
+      gFastVectorUnitWeaponInfoTypeConstructed = true;
+    }
+
+    return reinterpret_cast<FastVectorUnitWeaponInfoType*>(gFastVectorUnitWeaponInfoTypeStorage);
   }
 
   [[nodiscard]] gpg::RType* CachedFloatType()
@@ -690,6 +853,15 @@ namespace
   // now live in FastVectorSOCellPosReflection.cpp, next to the class they
   // serve.
 
+  /**
+   * Invalid-`EntId` sentinel the binary fills appended
+   * `fastvector<SSTIEntityAttachInfo>` lanes with. `SSTIEntityAttachInfo` is a
+   * bare 4-byte entity id, so a freshly grown lane is stamped "no entity"
+   * rather than zeroed -- id 0 is a legal entity. Seen as the immediate
+   * `0F0000000h` at 0x00558DAF (`SetCount`) and 0x00558FA4 (`SerLoad`).
+   */
+  constexpr std::int32_t kInvalidAttachedEntityId = static_cast<std::int32_t>(0xF0000000u);
+
   [[nodiscard]] gpg::RType* CachedSSTIEntityAttachInfoType()
   {
     gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
@@ -782,7 +954,7 @@ namespace
    * Lazily builds and caches the reflected
    * `fastvector<SSTIEntityAttachInfo>` type name.
    */
-  [[maybe_unused]] const char* GetFastVectorSSTIEntityAttachInfoTypeName()
+  const char* GetFastVectorSSTIEntityAttachInfoTypeName()
   {
     if (gFastVectorSSTIEntityAttachInfoTypeName.empty()) {
       gpg::RType* const elementType = CachedSSTIEntityAttachInfoType();
@@ -806,7 +978,7 @@ namespace
    * Lazily builds and caches the reflected `fastvector<UnitWeaponInfo>` type
    * name.
    */
-  [[maybe_unused]] const char* GetFastVectorUnitWeaponInfoTypeName()
+  const char* GetFastVectorUnitWeaponInfoTypeName()
   {
     if (gFastVectorUnitWeaponInfoTypeName.empty()) {
       gpg::RType* const elementType = CachedUnitWeaponInfoType();
@@ -848,32 +1020,6 @@ namespace
       static_cast<unsigned int>(count),
       gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(vector)
     );
-  }
-
-  /**
-   * Address: 0x01104D98 (`gpg::RFastVectorType<Moho::UnitWeaponInfo>` descriptor)
-   *
-   * What it does:
-   * Holds the descriptor's `RIndexed::SetCount` slot so the linker keeps the
-   * lane addressable from this translation unit. The retail descriptor is
-   * built by FUN_0055E9B0, which installs the
-   * `RFastVectorType<Moho::UnitWeaponInfo>` vtable pair (the main `RType`
-   * table plus the `{for gpg::RIndexed}` sub-object table) and preregisters it
-   * for `gpg::fastvector<Moho::UnitWeaponInfo>`; reflection reaches this body
-   * only through that `RIndexed` slot.
-   */
-  struct FastVectorUnitWeaponInfoReflectionSlots
-  {
-    void (*setCount)(void*, int);
-  };
-
-  const FastVectorUnitWeaponInfoReflectionSlots kFastVectorUnitWeaponInfoReflectionSlots = {
-    &SetFastVectorUnitWeaponInfoCount,
-  };
-
-  [[maybe_unused]] [[nodiscard]] const void* PublishFastVectorUnitWeaponInfoReflectionSlots() noexcept
-  {
-    return static_cast<const void*>(&kFastVectorUnitWeaponInfoReflectionSlots);
   }
 
   /**
@@ -986,7 +1132,7 @@ namespace
    * resizes with invalid-id sentinel fill (`0xF0000000`), then deserializes
    * each lane through `ReadArchive::Read`.
    */
-  [[maybe_unused]] void LoadFastVectorSSTIEntityAttachInfo(
+  void LoadFastVectorSSTIEntityAttachInfo(
     gpg::ReadArchive* archive,
     int objectPtr,
     int,
@@ -1004,7 +1150,7 @@ namespace
     archive->ReadUInt(&count);
 
     moho::SSTIEntityAttachInfo fill{};
-    fill.mPlaceholderState = 0xF0000000u;
+    fill.mAttachedEntityId = kInvalidAttachedEntityId;
     FastVectorSSTIEntityAttachInfoResize(&fill, count, storage);
 
     gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
@@ -1049,7 +1195,7 @@ namespace
    * Writes one reflected `fastvector<moho::SSTIEntityAttachInfo>` payload as
    * archive count plus per-lane reflected attach-info serialization.
    */
-  [[maybe_unused]] void SaveFastVectorSSTIEntityAttachInfo(
+  void SaveFastVectorSSTIEntityAttachInfo(
     gpg::WriteArchive* archive,
     int objectPtr,
     int,
@@ -1071,6 +1217,54 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(attachInfoType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x0055D4C0 (FUN_0055D4C0, gpg::RFastVectorType_UnitWeaponInfo::SerLoad)
+   *
+   * IDA signature:
+   * void __cdecl sub_55D4C0(gpg::ReadArchive *a1, gpg::fastvector_n1_UnitWeaponInfo *a2,
+   *                         int a3, gpg::RRef *a6);
+   *
+   * What it does:
+   * Reads the serialized lane count, grows the reflected
+   * `fastvector<UnitWeaponInfo>` to that count -- copy-filling appended lanes
+   * from a freshly default-constructed prototype -- then deserializes each lane
+   * through `ReadArchive::Read`.
+   *
+   * The prototype is a real object rather than a zeroed blob because
+   * `UnitWeaponInfo` owns two `EntityCategorySet` word vectors and two
+   * `msvc8::string` lanes; the retail body constructs it at 0x0055D4F7 and
+   * destroys it at 0x0055D523, immediately after the resize at 0x0055D50F and
+   * before the read loop.
+   */
+  void LoadFastVectorUnitWeaponInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    {
+      moho::UnitWeaponInfo fill;
+      gpg::FastVectorRuntimeResizeFill<moho::UnitWeaponInfo>(
+        &fill,
+        count,
+        gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(storage)
+      );
+    }
+
+    gpg::RType* const weaponInfoType = CachedUnitWeaponInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    auto& view = gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(storage);
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(weaponInfoType, view.ElementAtUnchecked(i), owner);
     }
   }
 } // namespace
@@ -1409,6 +1603,271 @@ void gpg::RFastVectorType<float>::SetCount(void* obj, const int count) const
 
   const float fill = 0.0f;
   FastVectorFloatResize(&fill, static_cast<unsigned int>(count), obj);
+}
+
+// ---------------------------------------------------------------------------
+// gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>
+//
+// Descriptor storage 0x01104CC8, built in place by FUN_00559580. Slot map from
+// the RTTI dump: primary vftable 0x00E17F2C (dtr@2, GetName@3, GetLexical@4,
+// IsIndexed@6, Init@9), RIndexed vftable 0x00E17F5C at subobject offset 100
+// (SubscriptIndex@0, GetCount@1, SetCount@2, AssignPointer@3 = base 0x00401320).
+// ---------------------------------------------------------------------------
+
+namespace gpg
+{
+  /**
+   * Address: 0x00559580 (FUN_00559580, preregister_RFastVectorType_SSTIEntityAttachInfo)
+   *
+   * What it does:
+   * Constructs the static `RFastVectorType<Moho::SSTIEntityAttachInfo>`
+   * descriptor in place -- the retail body inlines the default constructor as
+   * `RType::RType()` plus the two vtable-pointer stores -- and preregisters it
+   * under `typeid(gpg::fastvector<Moho::SSTIEntityAttachInfo>)`.
+   */
+  gpg::RType* preregister_FastVectorSSTIEntityAttachInfoType()
+  {
+    FastVectorSSTIEntityAttachInfoType* const type = AcquireFastVectorSSTIEntityAttachInfoType();
+    gpg::PreRegisterRType(typeid(gpg::fastvector<moho::SSTIEntityAttachInfo>), type);
+    return type;
+  }
+
+  void cleanup_FastVectorSSTIEntityAttachInfoType()
+  {
+    if (!gFastVectorSSTIEntityAttachInfoTypeConstructed) {
+      return;
+    }
+
+    AcquireFastVectorSSTIEntityAttachInfoType()->~FastVectorSSTIEntityAttachInfoType();
+    gFastVectorSSTIEntityAttachInfoTypeConstructed = false;
+  }
+
+  int register_FastVectorSSTIEntityAttachInfoTypeAtexit()
+  {
+    (void)preregister_FastVectorSSTIEntityAttachInfoType();
+    return std::atexit(&cleanup_FastVectorSSTIEntityAttachInfoType);
+  }
+} // namespace gpg
+
+/**
+ * Address: 0x00559650 (FUN_00559650, gpg::RFastVectorType_SSTIEntityAttachInfo::dtr)
+ */
+gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::~RFastVectorType() = default;
+
+/**
+ * Address: 0x00558C30 (FUN_00558C30, gpg::RFastVectorType_SSTIEntityAttachInfo::GetName)
+ */
+const char* gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::GetName() const
+{
+  return GetFastVectorSSTIEntityAttachInfoTypeName();
+}
+
+/**
+ * Address: 0x00558CF0 (FUN_00558CF0, gpg::RFastVectorType_SSTIEntityAttachInfo::GetLexical)
+ *
+ * What it does:
+ * Renders `"<base RType lexical>, size=<count>"`. The retail body reaches the
+ * count by dispatching slot 1 of its own RIndexed sub-object vtable
+ * (`[this+0x64] + 4`, called at 0x00558D3F with `this+0x64`), which is exactly
+ * this class's `GetCount`.
+ */
+msvc8::string gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+}
+
+/**
+ * Address: 0x00558D80 (FUN_00558D80, gpg::RFastVectorType_SSTIEntityAttachInfo::IsIndexed)
+ */
+const gpg::RIndexed* gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x00558CD0 (FUN_00558CD0, gpg::RFastVectorType_SSTIEntityAttachInfo::Init)
+ */
+void gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::Init()
+{
+  size_ = 0x10;
+  version_ = 1;
+  serLoadFunc_ = &LoadFastVectorSSTIEntityAttachInfo;
+  serSaveFunc_ = &SaveFastVectorSSTIEntityAttachInfo;
+}
+
+/**
+ * Address: 0x00558DD0 (FUN_00558DD0, gpg::RFastVectorType_SSTIEntityAttachInfo::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference for
+ * `fastvector<SSTIEntityAttachInfo>[ind]`. Element stride is 4 bytes
+ * (`lea eax, [eax+ecx*4]`-equivalent `4 * a3` at 0x00558DD8); the retail body
+ * performs no bounds or null check, so none is added here.
+ */
+gpg::RRef gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::SubscriptIndex(void* obj, const int ind) const
+{
+  auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(obj);
+  gpg::RRef out{};
+  gpg::RRef_SSTIEntityAttachInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  return out;
+}
+
+/**
+ * Address: 0x00558D90 (FUN_00558D90, gpg::RFastVectorType_SSTIEntityAttachInfo::GetCount)
+ *
+ * What it does:
+ * Returns the lane count as `(end - begin) >> 2` -- a shift rather than a
+ * reciprocal multiply, because `sizeof(SSTIEntityAttachInfo)` is 4.
+ */
+size_t gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::GetCount(void* obj) const
+{
+  const auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(obj);
+  return view.Size();
+}
+
+/**
+ * Address: 0x00558DA0 (FUN_00558DA0, gpg::RFastVectorType_SSTIEntityAttachInfo::SetCount)
+ *
+ * What it does:
+ * Resizes the reflected lane, stamping appended entries with the invalid-EntId
+ * sentinel (`0F0000000h` at 0x00558DAF) rather than zero -- entity id 0 is a
+ * legal id.
+ */
+void gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::SetCount(void* obj, const int count) const
+{
+  moho::SSTIEntityAttachInfo fill{};
+  fill.mAttachedEntityId = kInvalidAttachedEntityId;
+  FastVectorSSTIEntityAttachInfoResize(&fill, static_cast<unsigned int>(count), obj);
+}
+
+// ---------------------------------------------------------------------------
+// gpg::RFastVectorType<Moho::UnitWeaponInfo>
+//
+// Descriptor storage 0x01104D98, built in place by FUN_0055E9B0. Slot map from
+// the RTTI dump: primary vftable 0x00E1882C (dtr@2, GetName@3, GetLexical@4,
+// IsIndexed@6, Init@9), RIndexed vftable 0x00E1885C at subobject offset 100
+// (SubscriptIndex@0, GetCount@1, SetCount@2, AssignPointer@3 = base 0x00401320).
+// ---------------------------------------------------------------------------
+
+namespace gpg
+{
+  /**
+   * Address: 0x0055E9B0 (FUN_0055E9B0, preregister_RFastVectorType_UnitWeaponInfo)
+   *
+   * What it does:
+   * Constructs the static `RFastVectorType<Moho::UnitWeaponInfo>` descriptor in
+   * place -- the retail body inlines the default constructor as `RType::RType()`
+   * (0x0055E9D2) plus the primary and RIndexed vtable-pointer stores
+   * (0x0055E9E9 / 0x0055E9F3) -- and preregisters it under
+   * `typeid(gpg::fastvector<Moho::UnitWeaponInfo>)` before returning it.
+   */
+  gpg::RType* preregister_FastVectorUnitWeaponInfoType()
+  {
+    FastVectorUnitWeaponInfoType* const type = AcquireFastVectorUnitWeaponInfoType();
+    gpg::PreRegisterRType(typeid(gpg::fastvector<moho::UnitWeaponInfo>), type);
+    return type;
+  }
+
+  void cleanup_FastVectorUnitWeaponInfoType()
+  {
+    if (!gFastVectorUnitWeaponInfoTypeConstructed) {
+      return;
+    }
+
+    AcquireFastVectorUnitWeaponInfoType()->~FastVectorUnitWeaponInfoType();
+    gFastVectorUnitWeaponInfoTypeConstructed = false;
+  }
+
+  int register_FastVectorUnitWeaponInfoTypeAtexit()
+  {
+    (void)preregister_FastVectorUnitWeaponInfoType();
+    return std::atexit(&cleanup_FastVectorUnitWeaponInfoType);
+  }
+} // namespace gpg
+
+/**
+ * Address: 0x0055EAF0 (FUN_0055EAF0, gpg::RFastVectorType_UnitWeaponInfo::dtr)
+ */
+gpg::RFastVectorType<moho::UnitWeaponInfo>::~RFastVectorType() = default;
+
+/**
+ * Address: 0x0055CBF0 (FUN_0055CBF0, gpg::RFastVectorType_UnitWeaponInfo::GetName)
+ */
+const char* gpg::RFastVectorType<moho::UnitWeaponInfo>::GetName() const
+{
+  return GetFastVectorUnitWeaponInfoTypeName();
+}
+
+/**
+ * Address: 0x0055CCB0 (FUN_0055CCB0, gpg::RFastVectorType_UnitWeaponInfo::GetLexical)
+ *
+ * What it does:
+ * Renders `"<base RType lexical>, size=<count>"`. The retail body loads the
+ * RIndexed sub-object vtable at `[this+0x64]`, takes slot 1 (`+4`) and calls it
+ * with `this+0x64` and `ref.mObj` (0x0055CCF6-0x0055CD00) -- i.e. this class's
+ * own `GetCount`.
+ */
+msvc8::string gpg::RFastVectorType<moho::UnitWeaponInfo>::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+}
+
+/**
+ * Address: 0x0055CD40 (FUN_0055CD40, gpg::RFastVectorType_UnitWeaponInfo::IsIndexed)
+ */
+const gpg::RIndexed* gpg::RFastVectorType<moho::UnitWeaponInfo>::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x0055CC90 (FUN_0055CC90, gpg::RFastVectorType_UnitWeaponInfo::Init)
+ */
+void gpg::RFastVectorType<moho::UnitWeaponInfo>::Init()
+{
+  size_ = 0x10;
+  version_ = 1;
+  serLoadFunc_ = &LoadFastVectorUnitWeaponInfo;
+  serSaveFunc_ = &gpg::SaveFastVectorUnitWeaponInfo;
+}
+
+/**
+ * Address: 0x0055CDE0 (FUN_0055CDE0, gpg::RFastVectorType_UnitWeaponInfo::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference for `fastvector<UnitWeaponInfo>[ind]`.
+ * Element stride is 0x98 (`imul eax, 98h` at 0x0055CDE8), matching
+ * `sizeof(UnitWeaponInfo)`. The retail body performs no bounds or null check.
+ */
+gpg::RRef gpg::RFastVectorType<moho::UnitWeaponInfo>::SubscriptIndex(void* obj, const int ind) const
+{
+  auto& view = gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(obj);
+  gpg::RRef out{};
+  gpg::RRef_UnitWeaponInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  return out;
+}
+
+/**
+ * Address: 0x0055CD50 (FUN_0055CD50, gpg::RFastVectorType_UnitWeaponInfo::GetCount)
+ *
+ * What it does:
+ * Returns the lane count as `(end - begin) / 0x98`, which the compiler emits as
+ * the reciprocal-multiply sequence `imul 6BCA1AF3h; sar edx,6` at 0x0055CD59.
+ */
+size_t gpg::RFastVectorType<moho::UnitWeaponInfo>::GetCount(void* obj) const
+{
+  const auto& view = gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(obj);
+  return view.Size();
+}
+
+/**
+ * Address: 0x0055CD70 (FUN_0055CD70, gpg::RFastVectorType_UnitWeaponInfo::SetCount)
+ */
+void gpg::RFastVectorType<moho::UnitWeaponInfo>::SetCount(void* obj, const int count) const
+{
+  SetFastVectorUnitWeaponInfoCount(obj, count);
 }
 
 /**
@@ -1794,6 +2253,26 @@ namespace
   };
 
   [[maybe_unused]] FastVectorVector3fReflectionBootstrap gFastVectorVector3fReflectionBootstrap;
+
+  struct FastVectorSSTIEntityAttachInfoReflectionBootstrap
+  {
+    FastVectorSSTIEntityAttachInfoReflectionBootstrap()
+    {
+      (void)gpg::register_FastVectorSSTIEntityAttachInfoTypeAtexit();
+    }
+  };
+
+  [[maybe_unused]] FastVectorSSTIEntityAttachInfoReflectionBootstrap gFastVectorSSTIEntityAttachInfoReflectionBootstrap;
+
+  struct FastVectorUnitWeaponInfoReflectionBootstrap
+  {
+    FastVectorUnitWeaponInfoReflectionBootstrap()
+    {
+      (void)gpg::register_FastVectorUnitWeaponInfoTypeAtexit();
+    }
+  };
+
+  [[maybe_unused]] FastVectorUnitWeaponInfoReflectionBootstrap gFastVectorUnitWeaponInfoReflectionBootstrap;
 } // namespace
 
 
@@ -1805,3 +2284,16 @@ GPG_PREREGISTER_INIT(preregister_FastVectorStringType_86ef6d, gpg::preregister_F
 GPG_PREREGISTER_INIT(register_FastVectorStringTypeAtexit_86ef6d, gpg::register_FastVectorStringTypeAtexit)
 GPG_PREREGISTER_INIT(preregister_FastVectorVector3fType_86ef6d, gpg::preregister_FastVectorVector3fType)
 GPG_PREREGISTER_INIT(register_FastVectorVector3fTypeAtexit_86ef6d, gpg::register_FastVectorVector3fTypeAtexit)
+GPG_PREREGISTER_INIT(
+  preregister_FastVectorSSTIEntityAttachInfoType_86ef6d,
+  gpg::preregister_FastVectorSSTIEntityAttachInfoType
+)
+GPG_PREREGISTER_INIT(
+  register_FastVectorSSTIEntityAttachInfoTypeAtexit_86ef6d,
+  gpg::register_FastVectorSSTIEntityAttachInfoTypeAtexit
+)
+GPG_PREREGISTER_INIT(preregister_FastVectorUnitWeaponInfoType_86ef6d, gpg::preregister_FastVectorUnitWeaponInfoType)
+GPG_PREREGISTER_INIT(
+  register_FastVectorUnitWeaponInfoTypeAtexit_86ef6d,
+  gpg::register_FastVectorUnitWeaponInfoTypeAtexit
+)
