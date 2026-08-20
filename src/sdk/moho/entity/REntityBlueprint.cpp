@@ -64,7 +64,8 @@ namespace moho
     , mSelectionThickness(0.0f)
     , mUseOOBTestZoom(0.0f)
     , mStrategicIconName()
-    , mStrategicIconRuntimeWord(0)
+    , mStrategicIconSortPriority(0)
+    , mStrategicIconSortPriorityPad0159_015B{}
     , mStrategicIconRest()
     , mStrategicIconSelected()
     , mStrategicIconOver()
