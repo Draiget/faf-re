@@ -11484,3 +11484,74 @@ int LuaSerializeFromString(lua_State* const L)
 
   return pushedCount;
 }
+
+/**
+ * Address: 0x00923AC0 (FUN_00923AC0, func_serialize_tostring)
+ *
+ * IDA signature:
+ * int __cdecl func_serialize_tostring(lua_State *L);
+ *
+ * What it does:
+ * Implements the Lua-visible `serialize.tostring(...)` entry point, the exact
+ * inverse of `serialize.fromstring` above: drops the GC threshold, opens a
+ * `gpg::TextWriteArchive` over a fresh `std::stringstream`, serializes every
+ * argument currently on the stack as a reflected `TObject`, appends the
+ * null-typed terminator value that `fromstring`'s read loop stops on, and
+ * pushes the accumulated text back to Lua as a single string. Returns 1.
+ *
+ * Referenced as a `lua_CFunction` from the `serializelib` registration table
+ * at 0x00D47068 (slot 0x00D4706C, keyed "tostring"), which
+ * `luaopen_serialize` (0x00923690) hands to `luaL_openlib` - a plain C
+ * callback, not a virtual, so there is no implicit `this`.
+ */
+int LuaSerializeToString(lua_State* const L)
+{
+  lua_setgcthreshold(L, 0);
+
+  const int argumentCount = lua_gettop(L);
+
+  // 0x00923AD8: operator new(0x88) then basic_stringstream(mode 3). The
+  // shared_ptr binds the ostream sub-object at +8 (0x00923B0C) while the
+  // control block owns the whole stringstream, so `buffer` stays valid for
+  // the str() read below.
+  std::stringstream* const buffer = new std::stringstream(std::ios_base::in | std::ios_base::out);
+  const boost::shared_ptr<std::ostream> stream(buffer);
+
+  gpg::WriteArchive* const archive = gpg::CreateTextWriteArchive(stream);
+
+  static gpg::RType* sObjectType = nullptr;
+  if (sObjectType == nullptr) {
+    sObjectType = gpg::LookupRType(typeid(LuaPlus::TObject));
+  }
+
+  // 0x00923B4A-0x00923BA8: walks the argument frame from base upward and stops
+  // early on the first slot whose type tag is zero.
+  for (int index = 1; index <= argumentCount; ++index) {
+    LuaPlus::TObject* const slot = &L->base[index - 1];
+    if (slot->tt == 0) {
+      break;
+    }
+
+    gpg::RRef ownerRef{};
+    (void)gpg::RRef_lua_State(&ownerRef, L);
+
+    archive->Write(sObjectType, slot, ownerRef);
+  }
+
+  // 0x00923BC0-0x00923BF6: one trailing write of a null object through a null
+  // owner ref. This is the terminator LuaSerializeFromString's loop reads.
+  const void* terminator = nullptr;
+  const gpg::RRef nullOwnerRef{};
+  archive->Write(sObjectType, &terminator, nullOwnerRef);
+
+  // 0x00923BFB: std::stringstream::str(), which forwards to the embedded
+  // stringbuf at +0x0C (FUN_008D4A80 -> FUN_0047B610).
+  const std::string text = buffer->str();
+  lua_pushlstring(L, text.data(), text.size());
+
+  if (archive != nullptr) {
+    delete archive;
+  }
+
+  return 1;
+}

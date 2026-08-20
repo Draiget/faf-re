@@ -17625,15 +17625,22 @@ namespace
  * Address: 0x00923690 (FUN_00923690, luaopen_serialize)
  *
  * What it does:
- * Opens the LuaPlus `serialize` library table. The original binary registers
- * two functions through `serializelib` at `0x00D47068` (data table contents
- * not yet recovered); for now this opens an empty table so callers see the
- * library exists. Runtime `serialize.*` calls will return nil until the
- * function lane is recovered.
+ * Opens the LuaPlus `serialize` library table with the two functions the
+ * binary registers through `serializelib` at 0x00D47068. Table contents read
+ * out of the shipped image:
+ *   0x00D47068 -> "tostring"   / 0x00D4706C -> 0x00923AC0 LuaSerializeToString
+ *   0x00D47070 -> "fromstring" / 0x00D47074 -> 0x00923D20 LuaSerializeFromString
+ *   0x00D47078 -> { nullptr, nullptr } sentinel
+ * Both bodies live in `gpg/core/containers/ArchiveSerialization.cpp`; naming
+ * them here is what keeps them in the link, and what makes runtime
+ * `serialize.tostring` / `serialize.fromstring` resolve instead of returning
+ * nil.
  */
 extern "C" int luaopen_serialize(lua_State* const state)
 {
 	static const luaL_reg kSerializeLibrary[] = {
+		{"tostring", &LuaSerializeToString},
+		{"fromstring", &LuaSerializeFromString},
 		{nullptr, nullptr}
 	};
 	luaL_openlib(state, "serialize", kSerializeLibrary, 0);
