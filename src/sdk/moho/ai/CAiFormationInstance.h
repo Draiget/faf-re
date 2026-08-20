@@ -137,6 +137,35 @@ namespace moho
     offsetof(SUnitOffsetInfo, mSpeedBandHigh) == 0x2C, "SUnitOffsetInfo::mSpeedBandHigh offset must be 0x2C"
   );
 
+  /**
+   * RTTI: `.?AUSOffsetInfo@Moho@@` (dumps/rtti_dump_all.hpp).
+   *
+   * The formation lane entry. This one 0x4C object was modelled twice in this
+   * header until now -- once as `SOffsetInfo` (named from the binary's own RTTI
+   * type descriptor, with the +0x0C position and the +0x44 weak-link lane
+   * resolved) and once as `SFormationLaneEntry` (an invented name, but with the
+   * +0x18..+0x40 span resolved to real behaviour from
+   * `CAiFormationInstance::RunScript`). Neither name is a placeholder for the
+   * other: they are the same bytes.
+   *
+   * `SOffsetInfo` owns the definition because it is the name the shipped binary
+   * carries in RTTI; `SFormationLaneEntry` remains as a thin alias below. The
+   * field set is the union of what both models had proven:
+   *
+   *   - `unitMap` @ +0x00 keeps the intrusive `SFormationLaneUnitMap` typing the
+   *     lane-map helpers in CAiFormationInstance.cpp operate on. It is the same
+   *     0x0C MSVC8 tree the reflected `map<EntId,SUnitOffsetInfo>` serializer
+   *     writes, which is why `MemberSerialize` hands it `this` rather than a
+   *     member address.
+   *   - `mPos` @ +0x0C resolves what `SFormationLaneEntry` carried as an opaque
+   *     `unknown0C[0xC]` span.
+   *   - +0x18..+0x40 keep the behaviour-derived names, retyped as `SCoordsVec2`
+   *     pairs so the reflected coordinate serializer can address them directly.
+   *   - +0x44 keeps the raw intrusive weak-link word pair the lane-relink
+   *     helpers manipulate; that 8-byte lane is the binary's `WeakPtr<IUnit>`,
+   *     and the serializer reads/writes it through the reflected
+   *     `WeakPtr<IUnit>` descriptor at `&linkedUnitBackLinkHeadWord`.
+   */
   struct SOffsetInfo
   {
     inline static gpg::RType* sType = nullptr;
@@ -161,34 +190,50 @@ namespace moho
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
-    // map<EntId, SUnitOffsetInfo>; EntId is int32_t (see moho/entity/Entity.h).
-    // Binary-facing layout: the MSVC8 tree is 0x0C bytes. `std::map` only
-    // happens to measure 0x0C under `_ITERATOR_DEBUG_LEVEL=2`, so the size
-    // assert below failed in every non-debug configuration.
-    msvc8::map<std::int32_t, SUnitOffsetInfo> mUnitOffsets; // +0x00
-    Wm3::Vec3f mPos;                                       // +0x0C
-    SCoordsVec2 mCoords1;                                  // +0x18
-    SCoordsVec2 mCoords2;                                  // +0x20
-    SCoordsVec2 mCoords3;                                  // +0x28
-    SCoordsVec2 mCoords4;                                  // +0x30
-    std::uint8_t mFlagA;                                   // +0x38
-    std::uint8_t mFlagB;                                   // +0x39
-    std::uint8_t pad3A[2];                                 // +0x3A
-    float mScalarA;                                        // +0x3C
-    float mScalarB;                                        // +0x40
-    WeakPtr<IUnit> mUnit;                                  // +0x44
+    SFormationLaneUnitMap unitMap;            // +0x00
+    Wm3::Vec3f mPos;                          // +0x0C
+    /// Mean XZ of the formation-script slot table, written by
+    /// `CAiFormationInstance::RunScript` (0x00567300, phase 5, the
+    /// `var_C08.m_next`/`m_state` sums divided by slot count at
+    /// 0x0056795C-0x005679D4).
+    SCoordsVec2 meanSlotOffset;               // +0x18
+    SCoordsVec2 overlapRadius;                // +0x20
+    SCoordsVec2 dynamicOffset;                // +0x28
+    SCoordsVec2 overlapAnchor;                // +0x30
+    std::uint8_t applyDynamicOffset;          // +0x38
+    std::uint8_t slotAvailable;               // +0x39
+    std::uint8_t pad3A[2];                    // +0x3A
+    float preferredSpeed;                     // +0x3C
+    float speedAnchor;                        // +0x40
+    std::uint32_t linkedUnitBackLinkHeadWord; // +0x44
+    std::uint32_t linkedUnitBackLinkNextWord; // +0x48
   };
   static_assert(sizeof(SOffsetInfo) == 0x4C, "SOffsetInfo size must be 0x4C");
   static_assert(offsetof(SOffsetInfo, mPos) == 0x0C, "SOffsetInfo::mPos offset must be 0x0C");
-  static_assert(offsetof(SOffsetInfo, mCoords1) == 0x18, "SOffsetInfo::mCoords1 offset must be 0x18");
-  static_assert(offsetof(SOffsetInfo, mCoords2) == 0x20, "SOffsetInfo::mCoords2 offset must be 0x20");
-  static_assert(offsetof(SOffsetInfo, mCoords3) == 0x28, "SOffsetInfo::mCoords3 offset must be 0x28");
-  static_assert(offsetof(SOffsetInfo, mCoords4) == 0x30, "SOffsetInfo::mCoords4 offset must be 0x30");
-  static_assert(offsetof(SOffsetInfo, mFlagA) == 0x38, "SOffsetInfo::mFlagA offset must be 0x38");
-  static_assert(offsetof(SOffsetInfo, mFlagB) == 0x39, "SOffsetInfo::mFlagB offset must be 0x39");
-  static_assert(offsetof(SOffsetInfo, mScalarA) == 0x3C, "SOffsetInfo::mScalarA offset must be 0x3C");
-  static_assert(offsetof(SOffsetInfo, mScalarB) == 0x40, "SOffsetInfo::mScalarB offset must be 0x40");
-  static_assert(offsetof(SOffsetInfo, mUnit) == 0x44, "SOffsetInfo::mUnit offset must be 0x44");
+  static_assert(
+    offsetof(SOffsetInfo, meanSlotOffset) == 0x18, "SOffsetInfo::meanSlotOffset offset must be 0x18"
+  );
+  static_assert(offsetof(SOffsetInfo, overlapRadius) == 0x20, "SOffsetInfo::overlapRadius offset must be 0x20");
+  static_assert(offsetof(SOffsetInfo, dynamicOffset) == 0x28, "SOffsetInfo::dynamicOffset offset must be 0x28");
+  static_assert(offsetof(SOffsetInfo, overlapAnchor) == 0x30, "SOffsetInfo::overlapAnchor offset must be 0x30");
+  static_assert(
+    offsetof(SOffsetInfo, applyDynamicOffset) == 0x38, "SOffsetInfo::applyDynamicOffset offset must be 0x38"
+  );
+  static_assert(offsetof(SOffsetInfo, slotAvailable) == 0x39, "SOffsetInfo::slotAvailable offset must be 0x39");
+  static_assert(offsetof(SOffsetInfo, preferredSpeed) == 0x3C, "SOffsetInfo::preferredSpeed offset must be 0x3C");
+  static_assert(offsetof(SOffsetInfo, speedAnchor) == 0x40, "SOffsetInfo::speedAnchor offset must be 0x40");
+  static_assert(
+    offsetof(SOffsetInfo, linkedUnitBackLinkHeadWord) == 0x44,
+    "SOffsetInfo::linkedUnitBackLinkHeadWord offset must be 0x44"
+  );
+
+  /**
+   * Thin alias for the single owning `SOffsetInfo` definition above. Kept
+   * because the recovered lane-map / relink helpers and the
+   * `fastvector<SOffsetInfo>` reflection lane were all written against this
+   * name; the binary knows the object only as `Moho::SOffsetInfo`.
+   */
+  using SFormationLaneEntry = SOffsetInfo;
 
   /**
    * Static reflection serializer callback for `SOffsetInfo`.
@@ -212,61 +257,13 @@ namespace moho
     static void Deserialize(gpg::ReadArchive* archive, SOffsetInfo* offsetInfo);
   };
 
-  struct SFormationLaneEntry
-  {
-    SFormationLaneUnitMap unitMap;            // +0x00
-    std::uint8_t unknown0C[0xC];              // +0x0C (still unresolved)
-    /// Mean XZ of the formation-script slot table, written by
-    /// `CAiFormationInstance::RunScript` (0x00567300, phase 5, the
-    /// `var_C08.m_next`/`m_state` sums divided by slot count at
-    /// 0x0056795C-0x005679D4). Named per the escalation notes at
-    /// `decomp/recovery/escalations/FUN_00567300.md`, which pin these two
-    /// floats to struct offsets +0x18/+0x1C inside what was previously the
-    /// opaque `unknown0C` span.
-    float meanSlotOffsetX;                    // +0x18
-    float meanSlotOffsetZ;                    // +0x1C
-    float overlapRadiusX;                     // +0x20
-    float overlapRadiusZ;                     // +0x24
-    float dynamicOffsetX;                     // +0x28
-    float dynamicOffsetZ;                     // +0x2C
-    float overlapAnchorX;                     // +0x30
-    float overlapAnchorZ;                     // +0x34
-    std::uint8_t applyDynamicOffset;          // +0x38
-    std::uint8_t slotAvailable;               // +0x39
-    std::uint8_t pad3A[2];                    // +0x3A
-    float preferredSpeed;                     // +0x3C
-    float speedAnchor;                        // +0x40
-    std::uint32_t linkedUnitBackLinkHeadWord; // +0x44
-    std::uint32_t linkedUnitBackLinkNextWord; // +0x48
-  };
-  static_assert(sizeof(SFormationLaneEntry) == 0x4C, "SFormationLaneEntry size must be 0x4C");
-  static_assert(
-    offsetof(SFormationLaneEntry, meanSlotOffsetX) == 0x18, "SFormationLaneEntry::meanSlotOffsetX offset must be 0x18"
-  );
-  static_assert(
-    offsetof(SFormationLaneEntry, meanSlotOffsetZ) == 0x1C, "SFormationLaneEntry::meanSlotOffsetZ offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(SFormationLaneEntry, dynamicOffsetX) == 0x28, "SFormationLaneEntry::dynamicOffsetX offset must be 0x28"
-  );
-  static_assert(
-    offsetof(SFormationLaneEntry, slotAvailable) == 0x39, "SFormationLaneEntry::slotAvailable offset must be 0x39"
-  );
-  static_assert(
-    offsetof(SFormationLaneEntry, preferredSpeed) == 0x3C, "SFormationLaneEntry::preferredSpeed offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(SFormationLaneEntry, linkedUnitBackLinkHeadWord) == 0x44,
-    "SFormationLaneEntry::linkedUnitBackLinkHeadWord offset must be 0x44"
-  );
-
-  struct SFormationOccupiedSlot
+  struct SAssignedLocInfo
   {
     SCoordsVec2 position;      // +0x00
     std::int32_t footprintSize; // +0x08
     std::int32_t laneToken;     // +0x0C
 
-    SFormationOccupiedSlot() = default;
+    SAssignedLocInfo() = default;
 
     /**
      * Address: 0x0059A3F0 (FUN_0059A3F0)
@@ -275,7 +272,7 @@ namespace moho
      * Initializes one occupied-slot payload from `(position, footprintSize,
      * laneToken)`.
      */
-    SFormationOccupiedSlot(const SCoordsVec2& slotPosition, std::int32_t footprintSizeValue, std::int32_t laneTokenValue) noexcept;
+    SAssignedLocInfo(const SCoordsVec2& slotPosition, std::int32_t footprintSizeValue, std::int32_t laneTokenValue) noexcept;
 
     /**
      * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
@@ -284,7 +281,7 @@ namespace moho
      * Loads one occupied-slot lane: assigned 2D position, footprint size, and
      * lane token.
      */
-    static void MemberDeserialize(SFormationOccupiedSlot* slot, gpg::ReadArchive* archive);
+    static void MemberDeserialize(SAssignedLocInfo* slot, gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00570E80 (FUN_00570E80, Moho::SAssignedLocInfo::MemberSerialize)
@@ -293,13 +290,21 @@ namespace moho
      * Stores one occupied-slot lane: assigned 2D position, footprint size, and
      * lane token.
      */
-    static void MemberSerialize(const SFormationOccupiedSlot* slot, gpg::WriteArchive* archive);
+    static void MemberSerialize(const SAssignedLocInfo* slot, gpg::WriteArchive* archive);
   };
-  static_assert(sizeof(SFormationOccupiedSlot) == 0x10, "SFormationOccupiedSlot size must be 0x10");
+  static_assert(sizeof(SAssignedLocInfo) == 0x10, "SAssignedLocInfo size must be 0x10");
+  /**
+   * Thin alias for the single owning `SAssignedLocInfo` definition above.
+   * `SAssignedLocInfo` is the name the shipped binary carries in RTTI
+   * (`.?AUSAssignedLocInfo@Moho@@`) and the name `Reflection.h` forward-
+   * declares for `RRef_SAssignedLocInfo`, which previously left it an
+   * incomplete type with no definition anywhere in the tree.
+   */
+  using SFormationOccupiedSlot = SAssignedLocInfo;
   static_assert(
-    offsetof(SFormationOccupiedSlot, footprintSize) == 0x08, "SFormationOccupiedSlot::footprintSize offset must be 0x08"
+    offsetof(SAssignedLocInfo, footprintSize) == 0x08, "SAssignedLocInfo::footprintSize offset must be 0x08"
   );
-  static_assert(offsetof(SFormationOccupiedSlot, laneToken) == 0x0C, "SFormationOccupiedSlot::laneToken offset must be 0x0C");
+  static_assert(offsetof(SAssignedLocInfo, laneToken) == 0x0C, "SAssignedLocInfo::laneToken offset must be 0x0C");
 
   struct SFormationCoordCacheNode
   {
@@ -339,10 +344,13 @@ namespace moho
 
   using SFormationLinkedUnitRefVec = gpg::fastvector_n<SFormationLinkedUnitRef, 4>;
   using SFormationLaneVec = gpg::fastvector_n<SFormationLaneEntry, 2>;
-  using SFormationOccupiedSlotVec = gpg::fastvector_n<SFormationOccupiedSlot, 16>;
+  using SAssignedLocInfoVec = gpg::fastvector_n<SAssignedLocInfo, 16>;
   static_assert(sizeof(SFormationLinkedUnitRefVec) == 0x30, "SFormationLinkedUnitRefVec size must be 0x30");
   static_assert(sizeof(SFormationLaneVec) == 0xA8, "SFormationLaneVec size must be 0xA8");
-  static_assert(sizeof(SFormationOccupiedSlotVec) == 0x110, "SFormationOccupiedSlotVec size must be 0x110");
+  static_assert(sizeof(SAssignedLocInfoVec) == 0x110, "SAssignedLocInfoVec size must be 0x110");
+
+  /// Thin alias kept alongside `SFormationOccupiedSlot` for the same reason.
+  using SFormationOccupiedSlotVec = SAssignedLocInfoVec;
 
   /**
    * The transient "candidate unit set" `PreRunScript`/`Setup`/`RunScript`/
@@ -411,7 +419,7 @@ namespace moho
     std::uint32_t mUnknown_0x01C;                 // +0x1C
     SFormationLinkedUnitRefVec mUnits;            // +0x20
     SFormationLaneVec mLanes[2];                  // +0x50
-    SFormationOccupiedSlotVec mOccupiedSlots;     // +0x1A0
+    SAssignedLocInfoVec mOccupiedSlots;     // +0x1A0
     SFormationCoordCacheMap mCoordCachePrimary;   // +0x2B0
     SFormationCoordCacheMap mCoordCacheSecondary; // +0x2BC
     Wm3::Vec3f mForwardVector;                    // +0x2C8
@@ -441,6 +449,20 @@ namespace moho
      * unlinking its weak back-link words) before resetting them to inline.
      */
     void CleanupFormation();
+
+    /**
+     * Address: 0x0056A6B0 (FUN_0056A6B0, Moho::CFormationInstance::Update)
+     * Slot: 17
+     *
+     * What it does:
+     * When a plan update is pending, clears the pending flag and runs one
+     * cleanup+rebuild pass: drops dead unit links, resets transient formation
+     * state, and rebuilds the formation plan. `CAiFormationInstance` overrides
+     * this slot with its own, much larger update pass (`FUN_0059AE80`); this
+     * base implementation is the one every other `CFormationInstance`-rooted
+     * override falls back to.
+     */
+    virtual void Update();
 
     /**
      * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)

@@ -938,7 +938,7 @@ namespace
    */
   [[nodiscard]] std::int32_t* CopyOccupiedSlotFootprintSizeLane(
     std::int32_t* const destination,
-    const moho::SFormationOccupiedSlot* const source
+    const moho::SAssignedLocInfo* const source
   ) noexcept
   {
     *destination = source->footprintSize;
@@ -953,7 +953,7 @@ namespace
    */
   [[nodiscard]] std::int32_t* CopyOccupiedSlotLaneTokenLane(
     std::int32_t* const destination,
-    const moho::SFormationOccupiedSlot* const source
+    const moho::SAssignedLocInfo* const source
   ) noexcept
   {
     *destination = source->laneToken;
@@ -2333,14 +2333,14 @@ namespace
     const moho::SFormationLaneEntry& rhs
   ) noexcept
   {
-    const bool overlapX = (lhs.overlapRadiusX - lhs.overlapAnchorX) <= (rhs.overlapAnchorX + rhs.overlapRadiusX)
-      && (rhs.overlapRadiusX - rhs.overlapAnchorX) <= (lhs.overlapAnchorX + lhs.overlapRadiusX);
+    const bool overlapX = (lhs.overlapRadius.x - lhs.overlapAnchor.x) <= (rhs.overlapAnchor.x + rhs.overlapRadius.x)
+      && (rhs.overlapRadius.x - rhs.overlapAnchor.x) <= (lhs.overlapAnchor.x + lhs.overlapRadius.x);
     if (!overlapX) {
       return false;
     }
 
-    const bool overlapZ = (lhs.overlapRadiusZ - lhs.overlapAnchorZ) <= (rhs.overlapAnchorZ + rhs.overlapRadiusZ)
-      && (rhs.overlapRadiusZ - rhs.overlapAnchorZ) <= (lhs.overlapAnchorZ + lhs.overlapRadiusZ);
+    const bool overlapZ = (lhs.overlapRadius.z - lhs.overlapAnchor.z) <= (rhs.overlapAnchor.z + rhs.overlapRadius.z)
+      && (rhs.overlapRadius.z - rhs.overlapAnchor.z) <= (lhs.overlapAnchor.z + lhs.overlapRadius.z);
     return overlapZ;
   }
 
@@ -2569,13 +2569,13 @@ namespace
     laneEntry->unitMap.head = head;
     laneEntry->unitMap.size = 0u;
 
-    std::memset(laneEntry->unknown0C, 0, sizeof(laneEntry->unknown0C));
-    laneEntry->overlapRadiusX = 0.0f;
-    laneEntry->overlapRadiusZ = 0.0f;
-    laneEntry->dynamicOffsetX = 0.0f;
-    laneEntry->dynamicOffsetZ = 0.0f;
-    laneEntry->overlapAnchorX = 2.0f;
-    laneEntry->overlapAnchorZ = 2.0f;
+    laneEntry->mPos = Wm3::Vec3f{};
+    laneEntry->overlapRadius.x = 0.0f;
+    laneEntry->overlapRadius.z = 0.0f;
+    laneEntry->dynamicOffset.x = 0.0f;
+    laneEntry->dynamicOffset.z = 0.0f;
+    laneEntry->overlapAnchor.x = 2.0f;
+    laneEntry->overlapAnchor.z = 2.0f;
     laneEntry->applyDynamicOffset = 0u;
     laneEntry->slotAvailable = 0u;
     laneEntry->preferredSpeed = std::numeric_limits<float>::infinity();
@@ -2627,13 +2627,13 @@ namespace
   {
     (void)InitializeLaneEntryMapAndCloneSource(destination, source);
 
-    std::memcpy(destination->unknown0C, source->unknown0C, sizeof(destination->unknown0C));
-    destination->overlapRadiusX = source->overlapRadiusX;
-    destination->overlapRadiusZ = source->overlapRadiusZ;
-    destination->dynamicOffsetX = source->dynamicOffsetX;
-    destination->dynamicOffsetZ = source->dynamicOffsetZ;
-    destination->overlapAnchorX = source->overlapAnchorX;
-    destination->overlapAnchorZ = source->overlapAnchorZ;
+    destination->mPos = source->mPos;
+    destination->overlapRadius.x = source->overlapRadius.x;
+    destination->overlapRadius.z = source->overlapRadius.z;
+    destination->dynamicOffset.x = source->dynamicOffset.x;
+    destination->dynamicOffset.z = source->dynamicOffset.z;
+    destination->overlapAnchor.x = source->overlapAnchor.x;
+    destination->overlapAnchor.z = source->overlapAnchor.z;
     destination->applyDynamicOffset = source->applyDynamicOffset;
     destination->slotAvailable = source->slotAvailable;
     destination->preferredSpeed = source->preferredSpeed;
@@ -2740,13 +2740,13 @@ namespace
       CopyLaneMapIntoClearedStorage(destination->unitMap, source->unitMap);
     }
 
-    std::memcpy(destination->unknown0C, source->unknown0C, sizeof(destination->unknown0C));
-    destination->overlapRadiusX = source->overlapRadiusX;
-    destination->overlapRadiusZ = source->overlapRadiusZ;
-    destination->dynamicOffsetX = source->dynamicOffsetX;
-    destination->dynamicOffsetZ = source->dynamicOffsetZ;
-    destination->overlapAnchorX = source->overlapAnchorX;
-    destination->overlapAnchorZ = source->overlapAnchorZ;
+    destination->mPos = source->mPos;
+    destination->overlapRadius.x = source->overlapRadius.x;
+    destination->overlapRadius.z = source->overlapRadius.z;
+    destination->dynamicOffset.x = source->dynamicOffset.x;
+    destination->dynamicOffset.z = source->dynamicOffset.z;
+    destination->overlapAnchor.x = source->overlapAnchor.x;
+    destination->overlapAnchor.z = source->overlapAnchor.z;
     destination->applyDynamicOffset = source->applyDynamicOffset;
     destination->slotAvailable = source->slotAvailable;
     destination->preferredSpeed = source->preferredSpeed;
@@ -3250,26 +3250,26 @@ namespace
         const moho::SFormationLaneEntry* const laneEnd = formation.mLanes[laneIndex].end();
         while (candidate != laneEnd) {
           if (LaneEntriesOverlap(*candidate, *lane0Entry)) {
-            float mergedBandA = std::max(lane0Entry->overlapAnchorX, candidate->overlapAnchorX);
+            float mergedBandA = std::max(lane0Entry->overlapAnchor.x, candidate->overlapAnchor.x);
             if (mergedBandA < kBandFloor) {
               mergedBandA = kBandFloor;
             }
 
-            float mergedBandB = std::max(lane0Entry->overlapAnchorZ, candidate->overlapAnchorZ);
+            float mergedBandB = std::max(lane0Entry->overlapAnchor.z, candidate->overlapAnchor.z);
             if (mergedBandB < kBandFloor) {
               mergedBandB = kBandFloor;
             }
 
             const float mergedSpeed = std::min(lane0Entry->preferredSpeed, candidate->preferredSpeed);
 
-            candidate->overlapRadiusX = lane0Entry->overlapRadiusX;
-            candidate->overlapRadiusZ = lane0Entry->overlapRadiusZ;
-            candidate->overlapAnchorX = mergedBandA;
-            candidate->overlapAnchorZ = mergedBandB;
+            candidate->overlapRadius.x = lane0Entry->overlapRadius.x;
+            candidate->overlapRadius.z = lane0Entry->overlapRadius.z;
+            candidate->overlapAnchor.x = mergedBandA;
+            candidate->overlapAnchor.z = mergedBandB;
             candidate->preferredSpeed = mergedSpeed;
 
-            lane0Entry->overlapAnchorX = mergedBandA;
-            lane0Entry->overlapAnchorZ = mergedBandB;
+            lane0Entry->overlapAnchor.x = mergedBandA;
+            lane0Entry->overlapAnchor.z = mergedBandB;
             lane0Entry->preferredSpeed = mergedSpeed;
           }
           ++candidate;
@@ -3856,7 +3856,7 @@ namespace moho
    * Initializes one occupied-slot payload from `(position, footprintSize,
    * laneToken)`.
    */
-  SFormationOccupiedSlot::SFormationOccupiedSlot(
+  SAssignedLocInfo::SAssignedLocInfo(
     const SCoordsVec2& slotPosition,
     const std::int32_t footprintSizeValue,
     const std::int32_t laneTokenValue
@@ -3874,7 +3874,7 @@ namespace moho
    * Loads one occupied-slot lane: assigned 2D position, footprint size, and
    * lane token.
    */
-  void SFormationOccupiedSlot::MemberDeserialize(SFormationOccupiedSlot* const slot, gpg::ReadArchive* const archive)
+  void SAssignedLocInfo::MemberDeserialize(SAssignedLocInfo* const slot, gpg::ReadArchive* const archive)
   {
     if (!archive || !slot) {
       return;
@@ -3898,7 +3898,7 @@ namespace moho
    * Stores one occupied-slot lane: assigned 2D position, footprint size, and
    * lane token.
    */
-  void SFormationOccupiedSlot::MemberSerialize(const SFormationOccupiedSlot* const slot, gpg::WriteArchive* const archive)
+  void SAssignedLocInfo::MemberSerialize(const SAssignedLocInfo* const slot, gpg::WriteArchive* const archive)
   {
     if (!archive || !slot) {
       return;
@@ -4028,21 +4028,21 @@ namespace moho
     gpg::RType* const coordsType = CachedSCoordsVec2Type();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
-      archive->Write(coordsType, &mCoords1, ownerRef);
-      archive->Write(coordsType, &mCoords2, ownerRef);
-      archive->Write(coordsType, &mCoords3, ownerRef);
-      archive->Write(coordsType, &mCoords4, ownerRef);
+      archive->Write(coordsType, &meanSlotOffset, ownerRef);
+      archive->Write(coordsType, &overlapRadius, ownerRef);
+      archive->Write(coordsType, &dynamicOffset, ownerRef);
+      archive->Write(coordsType, &overlapAnchor, ownerRef);
     }
 
-    archive->WriteBool(mFlagA != 0);
-    archive->WriteBool(mFlagB != 0);
-    archive->WriteFloat(mScalarA);
-    archive->WriteFloat(mScalarB);
+    archive->WriteBool(applyDynamicOffset != 0);
+    archive->WriteBool(slotAvailable != 0);
+    archive->WriteFloat(preferredSpeed);
+    archive->WriteFloat(speedAnchor);
 
     gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
     GPG_ASSERT(weakPtrType != nullptr);
     if (weakPtrType) {
-      archive->Write(weakPtrType, &mUnit, ownerRef);
+      archive->Write(weakPtrType, &linkedUnitBackLinkHeadWord, ownerRef);
     }
   }
 
@@ -4091,28 +4091,28 @@ namespace moho
     gpg::RType* const coordsType = CachedSCoordsVec2Type();
     GPG_ASSERT(coordsType != nullptr);
     if (coordsType) {
-      archive->Read(coordsType, &mCoords1, ownerRef);
-      archive->Read(coordsType, &mCoords2, ownerRef);
-      archive->Read(coordsType, &mCoords3, ownerRef);
-      archive->Read(coordsType, &mCoords4, ownerRef);
+      archive->Read(coordsType, &meanSlotOffset, ownerRef);
+      archive->Read(coordsType, &overlapRadius, ownerRef);
+      archive->Read(coordsType, &dynamicOffset, ownerRef);
+      archive->Read(coordsType, &overlapAnchor, ownerRef);
     }
 
-    // mFlagA/mFlagB are 1-byte fields written via WriteBool; read back through a
+    // applyDynamicOffset/slotAvailable are 1-byte fields written via WriteBool; read back through a
     // bool lane (matches the binary's ReadBool into the byte).
     bool flagA = false;
     archive->ReadBool(&flagA);
-    mFlagA = flagA ? 1u : 0u;
+    applyDynamicOffset = flagA ? 1u : 0u;
     bool flagB = false;
     archive->ReadBool(&flagB);
-    mFlagB = flagB ? 1u : 0u;
+    slotAvailable = flagB ? 1u : 0u;
 
-    archive->ReadFloat(&mScalarA);
-    archive->ReadFloat(&mScalarB);
+    archive->ReadFloat(&preferredSpeed);
+    archive->ReadFloat(&speedAnchor);
 
     gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
     GPG_ASSERT(weakPtrType != nullptr);
     if (weakPtrType) {
-      archive->Read(weakPtrType, &mUnit, ownerRef);
+      archive->Read(weakPtrType, &linkedUnitBackLinkHeadWord, ownerRef);
     }
   }
 
@@ -4521,9 +4521,9 @@ namespace moho
    *     lane's preferred speed (min over units of
    *     `CanFly ? MaxAirspeed*0.85f/CalcTransportLoadFactor() : MaxSpeed*0.85f`).
    *  5. Computes slot-table span/mean statistics feeding
-   *     `overlapAnchorX/Z = max(2.0f, span)`, `overlapRadiusX/Z = mean unit
+   *     `overlapAnchor.x/Z = max(2.0f, span)`, `overlapRadius.x/Z = mean unit
    *     XZ`, and the slot-mean lanes now named
-   *     `meanSlotOffsetX/Z`.
+   *     `meanSlotOffset.x/Z`.
    *  6. Builds one `SFormationRunScriptCandidate` per script slot (rotated
    *     offset, category, weight) and sorts them ascending by squared
    *     distance from the formation mean.
@@ -4623,12 +4623,12 @@ namespace moho
     const float invSlotCount = 1.0f / static_cast<float>(scriptResult.mObjs.size());
 
     SFormationLaneEntry laneEntry{};
-    laneEntry.overlapAnchorX = std::max(2.0f, slotMaxX - slotMinX);
-    laneEntry.overlapAnchorZ = std::max(2.0f, slotMaxZ - slotMinZ);
-    laneEntry.overlapRadiusX = meanX;
-    laneEntry.overlapRadiusZ = meanZ;
-    laneEntry.meanSlotOffsetX = slotSumX * invSlotCount;
-    laneEntry.meanSlotOffsetZ = slotSumZ * invSlotCount;
+    laneEntry.overlapAnchor.x = std::max(2.0f, slotMaxX - slotMinX);
+    laneEntry.overlapAnchor.z = std::max(2.0f, slotMaxZ - slotMinZ);
+    laneEntry.overlapRadius.x = meanX;
+    laneEntry.overlapRadius.z = meanZ;
+    laneEntry.meanSlotOffset.x = slotSumX * invSlotCount;
+    laneEntry.meanSlotOffset.z = slotSumZ * invSlotCount;
     laneEntry.preferredSpeed = preferredSpeed;
     laneEntry.speedAnchor = preferredSpeed;
 
@@ -4866,8 +4866,8 @@ namespace moho
         float localX = node->formationOffsetX;
         float localZ = node->formationOffsetZ;
         if (lane->applyDynamicOffset != 0u) {
-          localX += lane->dynamicOffsetX;
-          localZ += lane->dynamicOffsetZ;
+          localX += lane->dynamicOffset.x;
+          localZ += lane->dynamicOffset.z;
         }
 
         SCoordsVec2 requested{};
@@ -4960,8 +4960,8 @@ namespace moho
         float localX = node->formationOffsetX;
         float localZ = node->formationOffsetZ;
         if (laneEntry->applyDynamicOffset != 0u) {
-          localX += laneEntry->dynamicOffsetX;
-          localZ += laneEntry->dynamicOffsetZ;
+          localX += laneEntry->dynamicOffset.x;
+          localZ += laneEntry->dynamicOffset.z;
         }
         position.x = mFormationCenter.x + localX;
         position.z = mFormationCenter.z + localZ;
@@ -5451,10 +5451,10 @@ namespace moho
         if (hasLiveUnit && !overCapacity && leaderSpeed > 0.0f) {
           lane->applyDynamicOffset = 1u;
           lane->slotAvailable = 1u;
-          lane->dynamicOffsetX = laneTarget.x - mFormationCenter.x;
-          lane->dynamicOffsetZ = laneTarget.z - mFormationCenter.z;
-          lane->overlapAnchorX = std::fabs(lane->dynamicOffsetX);
-          lane->overlapAnchorZ = std::fabs(lane->dynamicOffsetZ);
+          lane->dynamicOffset.x = laneTarget.x - mFormationCenter.x;
+          lane->dynamicOffset.z = laneTarget.z - mFormationCenter.z;
+          lane->overlapAnchor.x = std::fabs(lane->dynamicOffset.x);
+          lane->overlapAnchor.z = std::fabs(lane->dynamicOffset.z);
           DispatchFormationUpdateEvent(1, mUnitLinkListHead);
         }
 
@@ -5596,7 +5596,7 @@ namespace moho
     const bool useWholeMap = (runtimeUnit->ArmyRef != nullptr) ? runtimeUnit->ArmyRef->UseWholeMap() : false;
 
     auto reserveSlot = [this, footprintSize, laneToken](const SCoordsVec2& slotPos) {
-      SFormationOccupiedSlot slot{};
+      SAssignedLocInfo slot{};
       slot.position = slotPos;
       slot.footprintSize = footprintSize;
       slot.laneToken = laneToken;
@@ -5660,8 +5660,8 @@ namespace moho
     const std::int32_t laneToken
   ) const
   {
-    const SFormationOccupiedSlot* slot = mOccupiedSlots.begin();
-    const SFormationOccupiedSlot* const slotEnd = mOccupiedSlots.end();
+    const SAssignedLocInfo* slot = mOccupiedSlots.begin();
+    const SAssignedLocInfo* const slotEnd = mOccupiedSlots.end();
     while (slot != slotEnd) {
       std::int32_t slotLaneToken = 0;
       (void)CopyOccupiedSlotLaneTokenLane(&slotLaneToken, slot);
