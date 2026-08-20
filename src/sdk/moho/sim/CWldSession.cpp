@@ -43,9 +43,14 @@
 #include "moho/net/IClientMgrUIInterface.h"
 #include "moho/resource/RResId.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/d3d/ShaderVar.h"
+#include "moho/resource/CSimResources.h"
+#include "moho/resource/IResources.h"
+#include "moho/resource/ResourceDeposit.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "gpg/core/streams/BinaryReader.h"
@@ -1306,6 +1311,12 @@ namespace moho
   float UI_RenProjectileGlowMax = 0.0f;     // 0x00F57B2C
   float UI_RenProjectileGlowPeriod = 0.0f;  // 0x00F57B30
   float UI_CurGlowTime = 0.0f;              // 0x010A6460
+
+  // Read once per deposit by `CWldSession::RenderResources` (0x00862E68). The
+  // 75 is the shipped value: `bin/2025.7.1/ForgedAlliance.exe` holds
+  // 0x42960000 at 0x00F57B08, and `func_UI_ResourceLODCutoff_ConVarDef`
+  // (0x00BE6010) only binds the console variable to this same storage.
+  float UI_ResourceLODCutoff = 75.0f;       // 0x00F57B08
 
   // Strategic-icon and unit-bar console variables. None of these existed in
   // the tree; every address below is the absolute operand of the instruction
@@ -14771,23 +14782,239 @@ namespace moho
     primBatcher->Flush();
   }
 
+  namespace
+  {
+    /** "/env/common/splats/mass_strategic.dds" - literal at 0x00E47488. */
+    constexpr const char* kMassStrategicSplat = "/env/common/splats/mass_strategic.dds";
+
+    /** "/env/common/splats/hydrocarbon_strategic.dds" - literal at 0x00E474B0. */
+    constexpr const char* kHydrocarbonStrategicSplat = "/env/common/splats/hydrocarbon_strategic.dds";
+
+    /**
+     * Splat quads are drawn unmodulated (`or eax, 0FFFFFFFFh` at 0x00862F63 /
+     * 0x00863361 feeds all four vertex colour lanes); the tint lives in the
+     * texture.
+     */
+    constexpr std::uint32_t kResourceSplatColor = 0xFFFFFFFFu;
+
+    /**
+     * A splat quad is half the texture's pixel size: both extents are the
+     * dimension shifted right by two, i.e. width/4 either side of the centre
+     * (`shr eax, 2` at 0x0086309D / 0x008630B9, and again at 0x00863298 /
+     * 0x008632B4). The `fild` + negative fixup around each shift is the
+     * unsigned-to-float conversion of the `std::uint32_t` dimension.
+     */
+    constexpr std::uint32_t kResourceSplatHalfExtentShift = 2u;
+
+    /**
+     * Address: 0x010C4340 (`shaderVarPrimBatcherTime`)
+     *
+     * What it does:
+     * Returns the process-global `primbatcher` effect's `"time"` shader
+     * variable. The binary registers it from a CRT static initialiser,
+     * `register_ShaderVarPrimBatcherTime` (0x00BE6050,
+     * `func_register_ShaderVar("time", &shaderVarPrimBatcherTime,
+     * "primbatcher")`), and tears it down through the `atexit` hook at
+     * 0x00C07480.
+     *
+     * The canonical home for this slot is `ShaderVar.cpp` next to
+     * `register_ShaderVarPrimBatcherCompositeMatrix` / `...Texture1` /
+     * `...AlphaMultiplier`; it is defined here as a function-local static
+     * because this translation unit is its only reader so far. The lazy
+     * registration is equivalent to the binary's CRT initialiser: nothing can
+     * observe the slot before the first `RenderResources` call.
+     */
+    [[nodiscard]] ShaderVar& PrimBatcherTimeShaderVar()
+    {
+      static ShaderVar slot;
+      static const bool registered = (RegisterShaderVar("time", &slot, "primbatcher"), true);
+      (void)registered;
+      return slot;
+    }
+
+    /**
+     * Address: 0x0086309A..0x0086325A (mass splat run, inlined)
+     * Address: 0x00863295..0x00863455 (hydrocarbon splat run, inlined)
+     *
+     * What it does:
+     * Binds one strategic-resource splat texture and emits one screen-space
+     * quad per collected deposit centre. The compiler emitted this twice, once
+     * per resource kind, from what was plainly one helper: both runs compute
+     * the same half-extents, bind through the same `SetTexture` overload and
+     * build the same four vertices, differing only in which stack slots the
+     * scheduler picked for them.
+     *
+     * A missing texture skips the whole run (`test ecx, ecx` / `jz` at
+     * 0x00863092 and 0x0086328D), but an empty point list still binds the
+     * texture - the count test comes after `SetTexture` in both runs.
+     */
+    void DrawResourceSplats(
+      CD3DPrimBatcher& primBatcher,
+      const boost::shared_ptr<CD3DBatchTexture>& splat,
+      const gpg::fastvector<Wm3::Vector2f>& screenPoints
+    )
+    {
+      if (!splat) {
+        return;
+      }
+
+      const float halfWidth = static_cast<float>(splat->mWidth >> kResourceSplatHalfExtentShift);
+      const float halfHeight = static_cast<float>(splat->mHeight >> kResourceSplatHalfExtentShift);
+      primBatcher.SetTexture(splat);
+
+      for (const Wm3::Vector2f& centre : screenPoints) {
+        const float left = centre.X() - halfWidth;
+        const float right = centre.X() + halfWidth;
+        const float top = centre.Y() - halfHeight;
+        const float bottom = centre.Y() + halfHeight;
+
+        const CD3DPrimBatcher::Vertex topLeft{left, top, 0.0f, kResourceSplatColor, 0.0f, 0.0f};
+        const CD3DPrimBatcher::Vertex bottomLeft{left, bottom, 0.0f, kResourceSplatColor, 0.0f, 1.0f};
+        const CD3DPrimBatcher::Vertex bottomRight{right, bottom, 0.0f, kResourceSplatColor, 1.0f, 1.0f};
+        const CD3DPrimBatcher::Vertex topRight{right, top, 0.0f, kResourceSplatColor, 1.0f, 0.0f};
+        primBatcher.DrawQuad(topLeft, bottomLeft, bottomRight, topRight);
+      }
+    }
+  } // namespace
+
   /**
    * Address: 0x00862A80 (FUN_00862A80, ?RenderResources@CWldSession@Moho@@QAEXPAVGeomCamera3@2@PAVCD3DPrimBatcher@2@@Z)
+   *
+   * IDA signature:
+   * void __usercall Moho::CWldSession::RenderResources(Moho::CWldSession *this,
+   *   Moho::GeomCamera3 *camera@<ecx>, Moho::CD3DPrimBatcher *primBatcher);
+   *
+   * What it does:
+   * Draws the strategic-view mass and hydrocarbon splats. Binds the
+   * `TResourceIcon` technique of the `primbatcher` effect, pushes the wall
+   * clock into that effect's `time` variable, switches the batcher to the
+   * pixel-exact screen projection, then asks the sim's resource registry for
+   * every deposit whose terrain AABB intersects the camera's second frustum
+   * solid. Each deposit that lies wholly inside the playable rect and whose
+   * terrain-height centre is nearer than `UI_ResourceLODCutoff` is projected
+   * to a whole screen pixel and bucketed by resource kind; the two buckets are
+   * then drawn with their respective splat textures and flushed.
+   *
+   * Locals map, from the frame slots the disassembly actually uses (IDA's own
+   * frame naming past 0x00862D3A is shifted 0x10 low because it does not model
+   * the indirect `DepositCollides` call's argument purge, which is why the
+   * decompile aliases unrelated slots onto one another):
+   *   ebp-0x7F8 `gpg::fastvector_n<Wm3::Vector2f, 16>` hydrocarbon points
+   *             (inline window ebp-0x7E8 .. ebp-0x768 = 0x80 bytes)
+   *   ebp-0x768 `gpg::fastvector_n<Wm3::Vector2f, 64>` mass points
+   *             (inline window ebp-0x758 .. ebp-0x558 = 0x200 bytes)
+   *   ebp-0x558 `gpg::fastvector_n<ResourceDeposit, 64>` query output
+   *             (inline window ebp-0x548 .. ebp-0x48  = 0x500 bytes)
+   *   ebp-0x898 .. ebp-0x88C  the playable rect, copied out of `STIMap`
+   *   ebp-0x8B0 .. ebp-0x8A8  the deposit centre (x, terrain height, z)
+   *   ebp-0x8B8 / ebp-0x8B4   the floored screen pixel
+   *   ebp-0x848 / ebp-0x850   the mass / hydrocarbon splat handles
    */
-  void CWldSession::RenderResources(GeomCamera3* const /*camera*/, CD3DPrimBatcher* const /*primBatcher*/)
+  void CWldSession::RenderResources(GeomCamera3* const camera, CD3DPrimBatcher* const primBatcher)
   {
-    // Recovered 0x00862A80 high-level flow:
-    // 1) Bind TResourceIcon technique and push primbatcher time shader var.
-    // 2) Build strategic projection matrix from GeomCamera3 viewport.
-    // 3) Query deposit collisions against camera solid, bucket mass/hydro points.
-    // 4) Render strategic splats from:
-    //    "/env/common/splats/mass_strategic.dds"
-    //    "/env/common/splats/hydrocarbon_strategic.dds"
-    // 5) Flush primbatcher and release temporary vectors/textures.
-    //
-    // Deep lift blockers:
-    // IResources::DepositCollides typed contract, CD3DBatchTexture/CD3DPrimBatcher full API,
-    // and transient fastvector wrappers used by collision query output.
+    // 0x00862AA6..0x00862ACC: `D3D_GetDevice()->SelectFxFile("primbatcher")`,
+    // `SelectTechnique("TResourceIcon")` and the composite-matrix invalidation
+    // are `CD3DPrimBatcher::Setup` (0x00438560) inlined verbatim.
+    (void)primBatcher->Setup("TResourceIcon");
+
+    // The resource-icon shader animates off the process wall clock, not off a
+    // sim tick - `gpg::time::GetSystemTimer().ElapsedSeconds()` at
+    // 0x00862AD3/0x00862ADA.
+    ShaderVar& timeShaderVar = PrimBatcherTimeShaderVar();
+    const float shaderTime = gpg::time::GetSystemTimer().ElapsedSeconds();
+    if (timeShaderVar.Exists()) {
+      timeShaderVar.SetFloat(shaderTime);
+    }
+
+    // Raw viewport extents, not the whole-pixel truncation the projection
+    // matrix below uses: 0x00862B18/0x00862B20 keep the untruncated floats and
+    // 0x00862F42/0x00862F56 map NDC onto them.
+    const float viewportWidth = camera->viewport.r[3].z;
+    const float viewportHeight = camera->viewport.r[3].w;
+
+    // `mWldMap->mTerrainRes` + 0x04 is the active `STIMap`; its playable rect
+    // sits at +0x08 (0x00862B09..0x00862B4D reads all four bounds).
+    const VisibilityRect& playableRect = mWldMap->mTerrainRes->mPlayableRectSource->mPlayableRect;
+
+    primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(*camera));
+    primBatcher->SetViewMatrix(VMatrix4::Identity());
+
+    IResources* const resources = mSimResources.px;
+    CHeightField* const heightField = mWldMap->mTerrainRes->GetHeightField();
+
+    // Declaration order is the binary's: the tail destroys the query output
+    // first (0x008634DB), then the hydrocarbon bucket (0x00863512), then the
+    // mass bucket (0x00863549).
+    gpg::fastvector_n<Wm3::Vector2f, 64> massPoints;
+    gpg::fastvector_n<Wm3::Vector2f, 16> hydrocarbonPoints;
+
+    // The binary hands `DepositCollides` a 64-deposit inline fastvector. This
+    // tree's `CSimResources::DepositCollides` takes the plain
+    // `gpg::fastvector<T>` base and appends through that base's `PushBack`,
+    // whose grow path frees `start_` unconditionally, so an inline window
+    // cannot be handed across the call - heap-backed on purpose, same as the
+    // projectile-arc `Collect` site.
+    gpg::fastvector<ResourceDeposit> deposits;
+
+    // Virtual dispatch through `IResources` slot 7 (`[vftable+0x1C]` at
+    // 0x00862D2D..0x00862D3A). `kNone` asks for every deposit kind.
+    resources->DepositCollides(&camera->solid2, heightField, &deposits, kNone);
+
+    for (const ResourceDeposit& deposit : deposits) {
+      const gpg::Rect2i& footprint = deposit.footprintRect;
+
+      // Centre of the integer footprint, computed the binary's way: the extent
+      // is differenced in integers first, then halved and re-based
+      // (0x00862D8A..0x00862DC5).
+      const float centreX =
+        (static_cast<float>(footprint.x1 - footprint.x0) * 0.5f) + static_cast<float>(footprint.x0);
+      const float centreZ =
+        (static_cast<float>(footprint.z1 - footprint.z0) * 0.5f) + static_cast<float>(footprint.z0);
+
+      // A deposit that pokes out of the playable rect is dropped whole, not
+      // clipped (four signed compares at 0x00862DB1..0x00862DF4).
+      if (footprint.x0 < playableRect.minX || playableRect.maxX < footprint.x1 ||
+          footprint.z0 < playableRect.minZ || playableRect.maxZ < footprint.z1) {
+        continue;
+      }
+
+      const Wm3::Vector3f centre{centreX, heightField->GetElevation(centreX, centreZ), centreZ};
+
+      // Row 1 of the viewport matrix carries the renderer's LOD depth; splats
+      // stop drawing past the cutoff (0x00862E15..0x00862E6F).
+      if (camera->viewport.ProjectViewportDepthRow1(centre) <= UI_ResourceLODCutoff) {
+        continue;
+      }
+
+      // 0x00862E75..0x00862F5F is `GeomCamera3::Project` (0x00470F60) inlined
+      // over a viewport anchored at the origin with a flipped Y axis: x maps
+      // onto [0, width] and y onto [height, -0]. The two zero terms fold away
+      // in the emission, which is why no `sub`/`add` against them survives.
+      const Wm3::Vector2f projected = camera->Project(centre, 0.0f, viewportWidth, viewportHeight, -0.0f);
+
+      // Splats snap to whole pixels so the texture samples 1:1 (two `floor`
+      // calls at 0x00862F81 / 0x00862F91).
+      const Wm3::Vector2f screenPoint{std::floor(projected.X()), std::floor(projected.Y())};
+
+      if (deposit.depositType == kMass) {
+        massPoints.push_back(screenPoint);
+      } else {
+        hydrocarbonPoints.push_back(screenPoint);
+      }
+    }
+
+    // Both handles stay alive until after the flush - the binary releases the
+    // hydrocarbon one at 0x00863469 and the mass one at 0x008634A6, both past
+    // `Flush`. The `1` border argument asks `FromFile` for a one-texel guard
+    // band so the atlas neighbours cannot bleed into the splat.
+    const boost::shared_ptr<CD3DBatchTexture> massSplat = CD3DBatchTexture::FromFile(kMassStrategicSplat, 1u);
+    DrawResourceSplats(*primBatcher, massSplat, massPoints);
+
+    const boost::shared_ptr<CD3DBatchTexture> hydrocarbonSplat =
+      CD3DBatchTexture::FromFile(kHydrocarbonStrategicSplat, 1u);
+    DrawResourceSplats(*primBatcher, hydrocarbonSplat, hydrocarbonPoints);
+
+    primBatcher->Flush();
   }
 
   namespace
