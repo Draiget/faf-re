@@ -199,7 +199,21 @@ namespace boost
         }
 
         /**
-         * Address: 0x004229B0 (FUN_004229B0, boost::detail::sp_counted_base::weak_release)
+         * Address: 0x00446FC0 (FUN_00446FC0, backing `SpCountedBaseWeakReleaseFromSlot`
+         * in BoostWrappers.cpp)
+         *
+         * NOTE (2026-08-20 audit): 0x004229B0 was historically cited here and is
+         * WRONG - that address decrements `use_count_` at +0x04 first and calls
+         * vtable slot +0x04 (`dispose()`) before ever touching `weak_count_`,
+         * which is `sp_counted_base::release()` with `weak_release()` inlined
+         * into it (see `release()` below), not a standalone weak drop. The
+         * genuine weak-only body only exists at 0x00446FC0: it touches
+         * `weak_count_` at +0x08 exclusively and calls vtable slot +0x08
+         * (`destroy()`) - it never calls `dispose()` and never touches +0x04.
+         * Every call site that actually invokes FUN_004229B0 must call
+         * `release()` on this wrapper, not `weak_release()`; several
+         * `src/sdk/**` call sites had this backwards and were corrected in the
+         * same audit (see BoostWrappers.cpp and CWldSession.cpp).
          *
          * What it does:
          * Releases one weak owner from the control block and clears the borrowed
@@ -214,6 +228,7 @@ namespace boost
         }
 
         /**
+         * Address: 0x004229B0 (FUN_004229B0, boost::detail::sp_counted_base::release)
          * Address: 0x00422B80 (FUN_00422B80, Moho::WeakPtr_CD3DDynamicTextureSheet::Release)
          * Address: 0x004260B0 (FUN_004260B0, Moho::WeakPtr_CD3DBatchTexture::Release)
          * Address: 0x005383B0 (FUN_005383B0)
@@ -3769,11 +3784,19 @@ namespace boost
     /**
      * Address: 0x007DD160 (FUN_007DD160)
      *
+     * NOTE (2026-08-20 audit): formerly named `...WithWeakRelease`. FUN_007DD160
+     * retains the incoming control via `add_ref_copy()` (`lock xadd [pi+4], 1`)
+     * and releases the previous control via a call to FUN_004229B0, which is
+     * `sp_counted_base::release()` (see BoostWrappers.h `release()` evidence
+     * list), not `weak_release()`. Both lanes are ordinary strong shared-count
+     * ownership; renamed to stop asserting a weak drop that never happens. Zero
+     * external callers at rename time (grep-verified across src/sdk).
+     *
      * What it does:
      * Copies one `(px,pi)` pair and rebinds ownership by shared-retaining the
-     * incoming control lane and weak-releasing the previous control lane.
+     * incoming control lane and shared-releasing the previous control lane.
      */
-    SharedCountPair* AssignSharedPairRetainWithWeakRelease(
+    SharedCountPair* AssignSharedPairRetainAndRelease(
         SharedCountPair* outPair,
         const SharedCountPair* sourcePair
     ) noexcept;
