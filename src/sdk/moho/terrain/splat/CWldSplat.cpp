@@ -1088,6 +1088,10 @@ namespace moho
 
   /**
    * Address: 0x008780A0 (Moho::CDecalManager decal-append lane, inlined push_back in LoadDecal/NewSplat)
+   * Address: 0x00879070 (FUN_00879070, std::vector<Moho::CWldTerrainDecal*>::push_back
+   * — identical check-capacity/grow-or-append shape, a separate per-call-site
+   * emission of the same operation; reached from CDecalManager::AddSplat's
+   * `AppendDecal(mDecals, decal)` call in this file)
    *
    * What it does:
    * Appends one `CWldTerrainDecal*` into the manager's `mDecals` vector, mirroring
