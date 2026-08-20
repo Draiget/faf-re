@@ -44,7 +44,7 @@ namespace
    * Unlinks `REmitterBlueprintConstruct` helper node from the global helper
    * intrusive list and restores it as a self-linked sentinel.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupEmitterBlueprintConstructHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupEmitterBlueprintConstructHelperNodePrimary() noexcept
   {
     return ResetEmitterBlueprintConstructHelperLinks();
   }

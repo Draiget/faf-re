@@ -37,7 +37,7 @@ namespace
    * Unlinks `CAniResourceSkelSaveConstruct` helper node from the intrusive
    * helper list and restores self-linked sentinel links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelSaveConstructHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelSaveConstructHelperNodePrimary() noexcept
   {
     return ResetCAniResourceSkelSaveConstructHelperLinks();
   }

@@ -32,7 +32,7 @@ namespace
    * Unlinks `RProjectileBlueprintConstruct` helper node from the global
    * serializer-helper intrusive list and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintConstructHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintConstructHelperNodePrimary() noexcept
   {
     return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintConstruct);
   }

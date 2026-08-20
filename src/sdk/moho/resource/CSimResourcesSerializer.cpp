@@ -59,7 +59,7 @@ namespace
    * Unlinks `CSimResourcesSerializer` helper node from the intrusive helper
    * list and restores self-linked sentinel links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCSimResourcesSerializerHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupCSimResourcesSerializerHelperNodePrimary() noexcept
   {
     return ResetCSimResourcesSerializerHelperLinks();
   }

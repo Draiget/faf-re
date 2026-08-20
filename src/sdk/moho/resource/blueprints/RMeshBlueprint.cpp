@@ -26,7 +26,7 @@ namespace moho
      * `source` into `destination`, then destroys already-built elements before
      * rethrowing if one copy step throws.
      */
-    [[maybe_unused]] RMeshBlueprintLOD* CopyRMeshBlueprintLODCountedRangeWithRollback(
+    RMeshBlueprintLOD* CopyRMeshBlueprintLODCountedRangeWithRollback(
       RMeshBlueprintLOD* destination,
       int count,
       const RMeshBlueprintLOD* source
@@ -91,7 +91,7 @@ namespace moho
      * Copy-constructs one contiguous source range into destination storage and
      * destroys already-built destination elements before rethrowing on failure.
      */
-    [[maybe_unused]] RMeshBlueprintLOD* CopyRMeshBlueprintLODRangeWithRollback(
+    RMeshBlueprintLOD* CopyRMeshBlueprintLODRangeWithRollback(
       RMeshBlueprintLOD* destinationBegin,
       RMeshBlueprintLOD* destinationEnd,
       const RMeshBlueprintLOD* sourceBegin

@@ -592,7 +592,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `MotorFallDownTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyMotorFallDownTypeInfoBody(MotorFallDownTypeInfo* const typeInfo) noexcept
+  void DestroyMotorFallDownTypeInfoBody(MotorFallDownTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -809,7 +809,7 @@ namespace moho
      * `mFallDirectionRadians`/`mBreakOnWhack` from the first XZ normal pair and
      * accumulates force into `mFallDepth`.
      */
-    [[maybe_unused]] bool ApplyMotorFallDownWhackImpulse(
+    bool ApplyMotorFallDownWhackImpulse(
       const float* const normalXYZ,
       MotorFallDown* const motor,
       const float force,

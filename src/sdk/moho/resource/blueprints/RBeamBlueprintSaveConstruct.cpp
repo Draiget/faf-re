@@ -31,7 +31,7 @@ namespace
    * Unlinks the global `RBeamBlueprintSaveConstruct` helper node from the
    * intrusive serializer-helper list and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintSaveConstructHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupBeamBlueprintSaveConstructHelperNodePrimary() noexcept
   {
     return moho::blueprint_ser::UnlinkHelperNode(gBeamBlueprintSaveConstruct);
   }

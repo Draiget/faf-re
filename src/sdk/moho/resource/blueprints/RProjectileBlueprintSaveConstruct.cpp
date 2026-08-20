@@ -31,7 +31,7 @@ namespace
    * Unlinks `RProjectileBlueprintSaveConstruct` helper node from the global
    * serializer-helper intrusive list and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintSaveConstructHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupProjectileBlueprintSaveConstructHelperNodePrimary() noexcept
   {
     return moho::blueprint_ser::UnlinkHelperNode(gProjectileBlueprintSaveConstruct);
   }
@@ -109,7 +109,7 @@ namespace moho
    * Initializes the global `RProjectileBlueprintSaveConstruct` helper links,
    * binds its save-construct callback lane, and returns the helper instance.
    */
-  [[maybe_unused]] RProjectileBlueprintSaveConstruct* InitializeRProjectileBlueprintSaveConstructHelperLane()
+  RProjectileBlueprintSaveConstruct* InitializeRProjectileBlueprintSaveConstructHelperLane()
   {
     blueprint_ser::InitializeHelperNode(gProjectileBlueprintSaveConstruct);
     gProjectileBlueprintSaveConstruct.mSaveConstructArgsCallback =

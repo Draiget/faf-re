@@ -4841,7 +4841,7 @@ namespace moho
    * What it does:
    * Copies this entity's draw-scale triple `(x,y,z)` into caller storage.
    */
-  [[maybe_unused]] Wm3::Vector3f* CopyEntityDrawScaleToVector(
+  Wm3::Vector3f* CopyEntityDrawScaleToVector(
     Wm3::Vector3f* const outScale,
     const Entity* const entity
   ) noexcept
@@ -4859,7 +4859,7 @@ namespace moho
    * Stores one draw-scale triple and relinks this entity's coord node before
    * the simulation coord-entities head.
    */
-  [[maybe_unused]] TDatListItem<Entity, void>* SetEntityDrawScaleAndRelinkCoordNode(
+  TDatListItem<Entity, void>* SetEntityDrawScaleAndRelinkCoordNode(
     Entity* const entity,
     const Wm3::Vector3f* const drawScale
   ) noexcept
@@ -4906,7 +4906,7 @@ namespace moho
    * What it does:
    * Stores one max-health lane value and returns the entity pointer.
    */
-  [[maybe_unused]] Entity* StoreEntityMaxHealthLane(Entity* const entity, const float maxHealth) noexcept
+  Entity* StoreEntityMaxHealthLane(Entity* const entity, const float maxHealth) noexcept
   {
     entity->MaxHealth = maxHealth;
     return entity;

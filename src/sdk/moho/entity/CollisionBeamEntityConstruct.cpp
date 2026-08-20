@@ -145,7 +145,7 @@ namespace moho
    * Adapts construct-callback calling convention lanes into
    * `CollisionBeamEntity::MemberConstruct`.
    */
-  [[maybe_unused]] void ForwardCollisionBeamEntityMemberConstruct(
+  void ForwardCollisionBeamEntityMemberConstruct(
     gpg::ReadArchive& archive,
     const int version,
     const gpg::RRef& ownerRef,
