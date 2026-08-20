@@ -34957,6 +34957,59 @@ std::int32_t wxWindowMswRuntime::GetScrollThumb(const std::int32_t orientation) 
 }
 
 /**
+ * Address: 0x009685A0 (FUN_009685A0, wxWindow::DoScreenToClient)
+ *
+ * What it does:
+ * Converts a screen-space point to this window's client space via
+ * `::ScreenToClient`.
+ */
+void wxWindowMswRuntime::DoScreenToClient(std::int32_t* const x, std::int32_t* const y) const
+{
+  POINT point{};
+  if (x != nullptr) {
+    point.x = *x;
+  }
+  if (y != nullptr) {
+    point.y = *y;
+  }
+
+  ScreenToClient(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())), &point);
+
+  if (x != nullptr) {
+    *x = point.x;
+  }
+  if (y != nullptr) {
+    *y = point.y;
+  }
+}
+
+/**
+ * Address: 0x009685F0 (FUN_009685F0, wxWindow::DoClientToScreen)
+ *
+ * What it does:
+ * Converts a client-space point to screen space via `::ClientToScreen`.
+ */
+void wxWindowMswRuntime::DoClientToScreen(std::int32_t* const x, std::int32_t* const y) const
+{
+  POINT point{};
+  if (x != nullptr) {
+    point.x = *x;
+  }
+  if (y != nullptr) {
+    point.y = *y;
+  }
+
+  ClientToScreen(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())), &point);
+
+  if (x != nullptr) {
+    *x = point.x;
+  }
+  if (y != nullptr) {
+    *y = point.y;
+  }
+}
+
+/**
  * Address: 0x0042B830 (FUN_0042B830)
  * Mangled: ?ContainsHWND@wxWindow@@UBE_NK@Z
  *
