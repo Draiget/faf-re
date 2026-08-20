@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -854,3 +855,103 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace
+{
+  struct CTextureScrollerSerializerHelper
+  {
+    void* mVTable = nullptr;
+    gpg::SerHelperBase* mHelperNext = nullptr;
+    gpg::SerHelperBase* mHelperPrev = nullptr;
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(CTextureScrollerSerializerHelper, mHelperNext) == 0x04,
+    "CTextureScrollerSerializerHelper::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CTextureScrollerSerializerHelper, mHelperPrev) == 0x08,
+    "CTextureScrollerSerializerHelper::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CTextureScrollerSerializerHelper) == 0x14, "CTextureScrollerSerializerHelper size must be 0x14"
+  );
+
+  CTextureScrollerSerializerHelper gCTextureScrollerSerializer{};
+
+  [[nodiscard]] gpg::SerHelperBase* CTextureScrollerSerializerSelfNode() noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&gCTextureScrollerSerializer.mHelperNext);
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCTextureScrollerSerializerNode() noexcept
+  {
+    if (gCTextureScrollerSerializer.mHelperNext != nullptr && gCTextureScrollerSerializer.mHelperPrev != nullptr) {
+      gCTextureScrollerSerializer.mHelperNext->mPrev = gCTextureScrollerSerializer.mHelperPrev;
+      gCTextureScrollerSerializer.mHelperPrev->mNext = gCTextureScrollerSerializer.mHelperNext;
+    }
+    gpg::SerHelperBase* const self = CTextureScrollerSerializerSelfNode();
+    gCTextureScrollerSerializer.mHelperPrev = self;
+    gCTextureScrollerSerializer.mHelperNext = self;
+    return self;
+  }
+
+  void DeserializeCTextureScrollerSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::CTextureScroller*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeCTextureScrollerSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::CTextureScroller*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_CTextureScrollerSerializer_atexit()
+  {
+    (void)UnlinkCTextureScrollerSerializerNode();
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BDD750 (FUN_00BDD750, register_CTextureScrollerSerializer)
+   *
+   * What it does:
+   * Initializes the global CTextureScroller serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CTextureScrollerSerializer()
+  {
+    gpg::SerHelperBase* const self = CTextureScrollerSerializerSelfNode();
+    gCTextureScrollerSerializer.mHelperNext = self;
+    gCTextureScrollerSerializer.mHelperPrev = self;
+    gCTextureScrollerSerializer.mLoadCallback = &DeserializeCTextureScrollerSerializerCallback;
+    gCTextureScrollerSerializer.mSaveCallback = &SerializeCTextureScrollerSerializerCallback;
+    (void)std::atexit(&cleanup_CTextureScrollerSerializer_atexit);
+  }
+} // namespace moho
+
+namespace
+{
+  struct CTextureScrollerSerializerStartupBootstrap
+  {
+    CTextureScrollerSerializerStartupBootstrap()
+    {
+      moho::register_CTextureScrollerSerializer();
+    }
+  };
+
+  [[maybe_unused]] CTextureScrollerSerializerStartupBootstrap gCTextureScrollerSerializerStartupBootstrap;
+} // namespace
