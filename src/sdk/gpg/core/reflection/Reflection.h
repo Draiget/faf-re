@@ -5710,6 +5710,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x005A1900 (FUN_005A1900)
+     * Demangled: gpg::RPointerType_RUnitBlueprint::dtr
+     */
+    ~RPointerType() override;
+
+    /**
      * Address: 0x005A14F0 (FUN_005A14F0)
      * Demangled: gpg::RPointerType_RUnitBlueprint::GetName
      */
@@ -5736,6 +5742,28 @@ namespace gpg
      */
     [[nodiscard]]
     const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x005A1830 (FUN_005A1830)
+     * Demangled: gpg::RPointerType_RUnitBlueprint::SubscriptIndex
+     *
+     * What it does:
+     * Builds a reflected reference to the `ind`-th `RUnitBlueprint` in the
+     * array the pointer slot addresses (stride `sizeof(RUnitBlueprint)`).
+     */
+    [[nodiscard]]
+    RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x005A1820 (FUN_005A1820)
+     * Demangled: gpg::RPointerType_RUnitBlueprint::GetCount
+     *
+     * What it does:
+     * Returns 1 when the pointer slot is non-null, else 0 (a pointer type
+     * holds at most one element).
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
 
     /**
      * Address: 0x005A1870 (FUN_005A1870)

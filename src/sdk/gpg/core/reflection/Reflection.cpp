@@ -2641,6 +2641,7 @@ RRef MovePointerSlotRef(void* const slotObject, RRef* const sourceRef)
 
 /**
  * Address: 0x00557440 (FUN_00557440, gpg::RPointerType_RBlueprint::Delete)
+ * Address: 0x005A1A80 (FUN_005A1A80, gpg::RPointerType_RUnitBlueprint::Delete)
  *
  * What it does:
  * Releases one allocated pointer-slot lane. IDA marks the instantiation
@@ -3193,6 +3194,78 @@ RRef MoveRBlueprintPointerSlotRef(void* const slotObject, RRef* const sourceRef)
 
     RRef out{};
     gpg::RRef_RBlueprint_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005A1AB0 (FUN_005A1AB0, gpg::RPointerType_RUnitBlueprint::NewRef)
+ *
+ * What it does:
+ * Allocates one `RUnitBlueprint*` pointer-slot lane and wraps it as `RRef`.
+ */
+RRef NewRUnitBlueprintPointerSlotRef()
+{
+    auto* const slot = static_cast<moho::RUnitBlueprint**>(::operator new(sizeof(moho::RUnitBlueprint*)));
+    RRef out{};
+    gpg::RRef_RUnitBlueprint_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005A1AE0 (FUN_005A1AE0, gpg::RPointerType_RUnitBlueprint::CpyRef)
+ *
+ * What it does:
+ * Allocates one `RUnitBlueprint*` pointer-slot lane and copies the upcast
+ * source slot value into it. Frees the new slot and rethrows if the upcast
+ * fails.
+ */
+RRef CopyRUnitBlueprintPointerSlotRef(RRef* const sourceRef)
+{
+    auto* const slot = static_cast<moho::RUnitBlueprint**>(::operator new(sizeof(moho::RUnitBlueprint*)));
+    if (slot) {
+        try {
+            *slot = *sourceRef->TryUpcastRUnitBlueprintPointerSlot();
+        } catch (...) {
+            ::operator delete(slot);
+            throw;
+        }
+    }
+
+    RRef out{};
+    gpg::RRef_RUnitBlueprint_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005A1B70 (FUN_005A1B70, gpg::RPointerType_RUnitBlueprint::CtrRef)
+ *
+ * What it does:
+ * Wraps existing `RUnitBlueprint*` pointer-slot storage as a reflected
+ * `RRef`.
+ */
+RRef ConstructRUnitBlueprintPointerSlotRef(void* const slotObject)
+{
+    RRef out{};
+    gpg::RRef_RUnitBlueprint_P(&out, static_cast<moho::RUnitBlueprint**>(slotObject));
+    return out;
+}
+
+/**
+ * Address: 0x005A1BA0 (FUN_005A1BA0, gpg::RPointerType_RUnitBlueprint::MovRef)
+ *
+ * What it does:
+ * Writes the upcast source slot pointer value into the destination
+ * `RUnitBlueprint*` slot lane.
+ */
+RRef MoveRUnitBlueprintPointerSlotRef(void* const slotObject, RRef* const sourceRef)
+{
+    auto* const slot = static_cast<moho::RUnitBlueprint**>(slotObject);
+    if (slot) {
+        *slot = *sourceRef->TryUpcastRUnitBlueprintPointerSlot();
+    }
+
+    RRef out{};
+    gpg::RRef_RUnitBlueprint_P(&out, slot);
     return out;
 }
 
@@ -12881,6 +12954,12 @@ RType* gpg::RPointerType<moho::IFormationInstance>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x005A1900 (FUN_005A1900)
+ * Demangled: gpg::RPointerType_RUnitBlueprint::dtr
+ */
+gpg::RPointerType<moho::RUnitBlueprint>::~RPointerType() = default;
+
+/**
  * Address: 0x005A14F0 (FUN_005A14F0)
  * Demangled: gpg::RPointerType_RUnitBlueprint::GetName
  */
@@ -12921,6 +13000,36 @@ const RIndexed* gpg::RPointerType<moho::RUnitBlueprint>::IsPointer() const
 }
 
 /**
+ * Address: 0x005A1830 (FUN_005A1830)
+ * Demangled: gpg::RPointerType_RUnitBlueprint::SubscriptIndex
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th `RUnitBlueprint` in the array
+ * the pointer slot addresses (stride `sizeof(RUnitBlueprint)`).
+ */
+RRef gpg::RPointerType<moho::RUnitBlueprint>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const slot = static_cast<moho::RUnitBlueprint**>(obj);
+    RRef out{};
+    gpg::RRef_RUnitBlueprint(&out, (*slot) + ind);
+    return out;
+}
+
+/**
+ * Address: 0x005A1820 (FUN_005A1820)
+ * Demangled: gpg::RPointerType_RUnitBlueprint::GetCount
+ *
+ * What it does:
+ * Returns 1 when the pointer slot is non-null, else 0 (a pointer type holds
+ * at most one element).
+ */
+size_t gpg::RPointerType<moho::RUnitBlueprint>::GetCount(void* const obj) const
+{
+    auto* const slot = static_cast<moho::RUnitBlueprint* const*>(obj);
+    return (*slot != nullptr) ? 1u : 0u;
+}
+
+/**
  * Address: 0x005A1870 (FUN_005A1870)
  * Demangled: gpg::RPointerType_RUnitBlueprint::AssignPointer
  *
@@ -12944,8 +13053,8 @@ namespace
  */
 gpg::RPointerTypeBase* BindRUnitBlueprintPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
 {
-    typeInfo->cpyRefFunc_ = &CopyPointerSlotRef<moho::RUnitBlueprint>;
-    typeInfo->movRefFunc_ = &MovePointerSlotRef<moho::RUnitBlueprint>;
+    typeInfo->cpyRefFunc_ = &CopyRUnitBlueprintPointerSlotRef;
+    typeInfo->movRefFunc_ = &MoveRUnitBlueprintPointerSlotRef;
     return typeInfo;
 }
 
@@ -12960,8 +13069,8 @@ gpg::RPointerTypeBase* BindRUnitBlueprintPointerAll(gpg::RPointerTypeBase* const
 {
     typeInfo->v24 = true;
     typeInfo->size_ = sizeof(moho::RUnitBlueprint*);
-    typeInfo->newRefFunc_ = &NewPointerSlotRef<moho::RUnitBlueprint>;
-    typeInfo->ctorRefFunc_ = &ConstructPointerSlotRef<moho::RUnitBlueprint>;
+    typeInfo->newRefFunc_ = &NewRUnitBlueprintPointerSlotRef;
+    typeInfo->ctorRefFunc_ = &ConstructRUnitBlueprintPointerSlotRef;
     (void)BindRUnitBlueprintPointerCopyAndMove(typeInfo);
     typeInfo->deleteFunc_ = &DeletePointerSlot<moho::RUnitBlueprint>;
     return typeInfo;
