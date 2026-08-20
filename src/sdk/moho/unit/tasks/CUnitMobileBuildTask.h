@@ -138,7 +138,31 @@ namespace moho
      */
     int Execute() override;
 
-    void OnEvent(ECommandEvent) override {}
+    /**
+     * Address: 0x005F80C0 (FUN_005F80C0, Moho::CUnitMobileBuildTask::OnEvent)
+     * Mangled: ?OnEvent@CUnitMobileBuildTask@Moho@@UAEXW4ECommandEvent@2@@Z
+     *
+     * VFTable SLOT: 0 of the `Listener<ECommandEvent>` sub-object at +0x34
+     * (`??_7CUnitMobileBuildTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@`).
+     *
+     * IDA signature:
+     * void __thiscall sub_5F80C0(Listener<ECommandEvent>* this, ECommandEvent event);
+     *
+     * What it does:
+     * Re-seats the build order after the owning command was edited. Abandons
+     * any build already in flight (drops the target's no-reclaim protection,
+     * zeroes the builder's work progress, stops the helper's build focus and
+     * clears both weak links), then recomputes the placement from the
+     * command's current target: cell-snaps the gun target position by the
+     * blueprint footprint, converts it back to a world position through the
+     * sim's map, and refreshes `mBuildPosition`, `mBuildRect` and
+     * `mBuildSkirt`. Finally rewinds the task to `TASKSTATE_Preparing` and
+     * unstages the owning task thread so it runs again next frame.
+     *
+     * The `event` argument is never read - every command event re-seats the
+     * order identically.
+     */
+    void OnEvent(ECommandEvent event) override;
 
   private:
     /**

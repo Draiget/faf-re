@@ -42,6 +42,7 @@
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
 #include "moho/task/CCommandTask.h"
+#include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
@@ -724,6 +725,96 @@ namespace moho
       mListenerLink.ListUnlink();
     }
     mListenerLink.ListResetLinks();
+  }
+
+  /**
+   * Address: 0x005F80C0 (FUN_005F80C0, Moho::CUnitMobileBuildTask::OnEvent)
+   * Mangled: ?OnEvent@CUnitMobileBuildTask@Moho@@UAEXW4ECommandEvent@2@@Z
+   *
+   * VFTable SLOT: 0 of the `Listener<ECommandEvent>` sub-object at +0x34.
+   *
+   * What it does:
+   * See the declaration. `this` is the listener sub-object, so every field
+   * displacement in the shipped body is 0x34 below the complete-object offset
+   * (`[ebp-18h]` = `mUnit` at +0x1C, `[ebp+84h]` = `mBuildUnit` at +0xB8, and
+   * so on). The `Sim*` at `[mUnit+0x150]` is `Entity::SimulationRef`: `Unit`
+   * is `IUnit`-primary and carries its `Entity` sub-object at `Unit+0x08`
+   * (`lea edi,[esi+8]` before the `Entity::Entity` call at 0x006A5082), so
+   * `Unit+0x150` is `Entity+0x148`. The task deliberately goes through the
+   * unit rather than its own `CCommandTask::mSim`.
+   */
+  void CUnitMobileBuildTask::OnEvent(const ECommandEvent event)
+  {
+    (void)event;
+
+    // 0x005F80CF..0x005F8170: tear down a build already in flight. Guarded on
+    // the weak link being live (`!= 0` and `!= 4`, the `WeakPtr<Unit>`
+    // sentinel), so a re-seat before the seed unit exists skips it entirely.
+    if (mBuildUnit.HasValue()) {
+      // 0x005F80FD: the shipped code loads the low half of the 64-bit state
+      // mask and stores it back untouched because only the high half carries
+      // the bit - `and [unit+4A4h], 0FFFFFEFFh` clears bit 8 of the high
+      // dword, i.e. bit 40, `UNITSTATE_NoReclaim`.
+      mBuildUnit.GetObjectPtr()->UnitStateMask &= ~kUnitStateNoReclaimMask;
+
+      // 0x005F811E: no null check on `mUnit` here, unlike the destructor -
+      // a listener event can only arrive on a task that still has its builder.
+      mUnit->WorkProgress = 0.0f;
+      mBuildHelper.OnStopBuild(true);
+
+      mBuildUnit.UnlinkFromOwnerChain();
+      mPendingBuildEntity.UnlinkFromOwnerChain();
+    }
+
+    // 0x005F8173..0x005F8222: re-derive the build placement from the command's
+    // current gun target. The target world position is snapped back to the
+    // footprint's origin cell, then re-expanded to a world position on the
+    // sim map so the build lands on the grid.
+    const RUnitBlueprint& blueprint = *mBlueprint;
+    const SFootprint& footprint = blueprint.mFootprint;
+    const Wm3::Vec3f targetPos = mCommand->mTarget.GetTargetPosGun(false);
+
+    const SOCellPos originCell{
+      static_cast<std::int16_t>(static_cast<std::int32_t>(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f))),
+      static_cast<std::int16_t>(static_cast<std::int32_t>(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+    };
+
+    mBuildPosition = COORDS_ToWorldPos(
+      mUnit->SimulationRef->mMapData,
+      originCell,
+      static_cast<ELayer>(footprint.mOccupancyCaps),
+      footprint.mSizeX,
+      footprint.mSizeZ
+    );
+
+    // 0x005F8250..0x005F82D3: the occupancy rectangle, re-snapped from the
+    // *new* build position rather than reusing `originCell` - the shipped body
+    // reloads the blueprint and both footprint bytes for this second pass.
+    const auto rectX0 = static_cast<std::int32_t>(
+      static_cast<std::int16_t>(static_cast<std::int32_t>(
+        mBuildPosition.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
+    );
+    const auto rectZ0 = static_cast<std::int32_t>(
+      static_cast<std::int16_t>(static_cast<std::int32_t>(
+        mBuildPosition.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+    );
+
+    mBuildRect.x0 = rectX0;
+    mBuildRect.z0 = rectZ0;
+    mBuildRect.x1 = rectX0 + footprint.mSizeX;
+    mBuildRect.z1 = rectZ0 + footprint.mSizeZ;
+
+    // 0x005F82D9..0x005F831B: the skirt rectangle for the same position.
+    const SCoordsVec2 skirtOrigin{mBuildPosition.x, mBuildPosition.z};
+    mBuildSkirt = blueprint.GetSkirtRect(skirtOrigin);
+
+    // 0x005F8321..0x005F835D: rewind the state machine and put the owning
+    // thread back on its stage's ready list so it re-runs next frame.
+    mTaskState = TASKSTATE_Preparing;
+    if (CTaskThread* const ownerThread = mOwnerThread; ownerThread != nullptr) {
+      ownerThread->mPendingFrames = 0;
+      ownerThread->Unstage();
+    }
   }
 
   /**
