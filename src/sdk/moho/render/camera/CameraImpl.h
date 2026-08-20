@@ -400,6 +400,25 @@ namespace moho
     virtual void CameraRevertRotation();
 
     /**
+     * Address: 0x007A8240 (FUN_007A8240, Moho::CameraImpl::CameraSetPivot)
+     * Slot: 30 (+0x78 of ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, between
+     * `CameraRevertRotation` at slot 29 and `CameraZoom` at slot 31 - read
+     * straight out of the shipped image)
+     *
+     * IDA signature:
+     * Wm3::Vector2f *__thiscall Moho::CameraImpl::CameraSetPivot(
+     *     Moho::CameraImpl *this@<ecx>, Wm3::Vector2f *pivot);
+     *
+     * What it does:
+     * Parks the screen-space point the next zoom/spin should pivot around.
+     * The whole body is the two-float store `0x007A8246 fstp [ecx+36Ch]` /
+     * `0x007A824F fstp [ecx+370h]`, which is `CameraImplRuntimeView::mPivot`
+     * (CameraImpl.cpp). The `Wm3::Vector2f*` return is just the incoming
+     * argument left in `eax`; no caller reads it.
+     */
+    virtual void CameraSetPivot(const Wm3::Vector2f& pivot);
+
+    /**
      * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
      * Slot: 0
      *

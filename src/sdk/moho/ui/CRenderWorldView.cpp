@@ -61,7 +61,7 @@ namespace moho
     const float deltaSeconds
   )
   {
-    if (!mHideResources && !cam_Free) {
+    if (!mCameraRotationActive && !cam_Free) {
       if (mEnableResourceRendering) {
         GeomCamera3* const resourceView = const_cast<GeomCamera3*>(&mCamera->CameraGetView());
         if (UI_RenResources) {

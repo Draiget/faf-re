@@ -33,6 +33,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/containers/TDatList.h"
+#include "moho/render/SelectionBracketRenderer.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaBaseClassSpec.h"
 #include "moho/lua/CScrLuaClassBinder.h"
@@ -2529,7 +2530,7 @@ namespace
     // icons are hidden while it is set (CUIWorldView::Frame, 0x0087144E, feeds
     // it into `mIconsVisible`), and `CameraRevertRotation` is what clears the
     // rotation it accumulated.
-    std::uint8_t mHideResources;                        // +0x276
+    std::uint8_t mCameraRotationActive;                 // +0x276
     std::uint8_t mUnknown277To27F[0x09];                // +0x277
     msvc8::string mCameraTrack;                         // +0x280
     // The pair at +0x29C is a weak link to the overlay this view draws, not a
@@ -10470,6 +10471,49 @@ void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
   (void)dragMoveFn(dragTarget, &dragDelta);
   sMouseScrubDelta.x = 0;
   sMouseScrubDelta.y = 0;
+  return 0;
+}
+
+/**
+ * Address: 0x00873BD0 (FUN_00873BD0)
+ *
+ * IDA signature:
+ * int __thiscall sub_873BD0(Moho::CameraImpl *this@<ecx>, Wm3::Vector2f *delta);
+ *
+ * What it does:
+ * The drag-move callback `CUIWorldView::HandleEvent` hands to
+ * `CameraDragger`'s constructor for a middle-button camera drag: it forwards
+ * the accumulated pointer delta straight to `CameraImpl::CameraPan`.
+ *
+ * The whole body is two instructions - `0x00873BD0 mov eax,[ecx]` followed by
+ * `0x00873BD2 jmp dword ptr [eax+80h]` - so it is a tail-call through vtable
+ * slot 32 of `??_7CameraImpl@Moho@@6B@` (0x00E3C474 +0x80 == 0x007A6F00 ==
+ * `CameraImpl::CameraPan`). Because it is a `jmp` and not a `call`, the
+ * caller's stack argument passes through untouched: this takes **two**
+ * arguments, `this` in `ecx` and the `Wm3::Vector2f*` on the stack, matching
+ * `CameraDragDeltaFn`.
+ *
+ * A previous pass recovered this address into `moho/misc/WinApiImportThunks.cpp`
+ * as `LegacyInvokeVirtualIntReaderSlot128RuntimeLaneAlpha`, a one-argument
+ * generic "read an int through vtable+0x80" thunk. That was wrong on arity, on
+ * ownership and on intent, and the name encoded the vtable displacement, so it
+ * has been deleted from that file along with the two runtime-view structs that
+ * existed only to support it.
+ *
+ * Its single reference in the binary is the address-taken `push offset` at
+ * 0x00870B66 inside `CUIWorldView::HandleEvent`, which is still blocked, so
+ * nothing names it yet - it is carried here, next to the `CameraDragger`
+ * helpers that share that blocked caller, ready for `&CameraDraggerPanCamera`
+ * to be passed to `func_CameraDraggerConstruct` when that parent lands.
+ *
+ * The `int` return matches `CameraDragDeltaFn`; the binary leaves whatever
+ * `CameraPan` (a `void` function) happened to put in `eax`, and
+ * `func_CameraDraggerDragMove` discards it on the scrub path and returns it
+ * unread on the other, so no observable behavior depends on the value.
+ */
+[[maybe_unused]] static int CameraDraggerPanCamera(void* const cameraTarget, Wm3::Vector2f* const panDelta)
+{
+  static_cast<moho::CameraImpl*>(cameraTarget)->CameraPan(*panDelta);
   return 0;
 }
 
@@ -19764,18 +19808,16 @@ moho::CUIWorldView::CUIWorldView(
 
     auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(this);
 
-    // Installs the CRenderWorldView vtable at +0x11C (the binary's ctor writes
-    // it twice: the plain IRenderWorldView vtable, then this class's own -
-    // both folded into one placement-construction here). Every field this
-    // struct owns (mCamera, mIsMiniMap, mLeftMouseCommand, mComGraph,
-    // mBuildDrag, mCameraTrack, ...) occupies the exact same bytes as the
-    // CUIWorldViewCtorRuntimeView fields the rest of this constructor writes
-    // below, so those writes are unchanged - this only adds the vtable
-    // pointer and default-constructs the class members that need real ctors
-    // (mBuildDrag, mCameraTrack, mComGraph, both CommandModeData blocks).
-    // Must run before any of those writes, or it would stomp them back to
-    // their default-constructed values.
-    (void)new (&view->mRenderVftable) moho::CRenderWorldView();
+    // The binary writes the +0x11C vtable twice here (0x0086E4DF the plain
+    // ??_7IRenderWorldView@Moho@@6B@, then 0x0086E4EF this class's own
+    // ??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@) - exactly what
+    // constructing the IRenderWorldView base and then the CRenderWorldView
+    // sub-object does. Both now happen implicitly as base construction, so
+    // there is nothing to place here. Every field that sub-object owns
+    // (mCamera, mIsMiniMap, mLeftMouseCommand, mComGraph, mBuildDrag,
+    // mCameraTrack, ...) occupies the exact same bytes as the
+    // CUIWorldViewCtorRuntimeView lanes the rest of this constructor writes
+    // below, so those writes are unchanged.
 
     view->mCamera = nullptr;                              // +0x120
     view->mCachedViewLeft = -1.0f;                        // +0x124
@@ -19803,7 +19845,7 @@ moho::CUIWorldView::CUIWorldView(
 
     view->mConvertToPatrolCursor = 0;                     // +0x274
     view->mCursorInside = 0;                                // +0x275
-    view->mHideResources = 0;                             // +0x276
+    view->mCameraRotationActive = 0;                      // +0x276
 
     // mCameraTrack (+0x280) is likewise already default-constructed (empty)
     // by the placement-new above; assign rather than placement-new over it.
@@ -19834,7 +19876,7 @@ moho::CUIWorldView::CUIWorldView(
       view->mCamera->CanShake(false);
     }
 
-    auto* const renderView = reinterpret_cast<moho::IRenderWorldView*>(&view->mRenderVftable);
+    auto* const renderView = static_cast<moho::IRenderWorldView*>(this);
     moho::CMauiControlExtendedRuntimeView* const extendedView =
       moho::CMauiControlExtendedRuntimeView::FromControl(control);
     moho::CMauiControl* const rootFrame = extendedView->mRootFrame;
@@ -19932,7 +19974,7 @@ moho::CUIWorldView::~CUIWorldView()
     sCurrentDraggerKeycode = 0;
   }
 
-  ren_Viewport->RemoveWorldView(reinterpret_cast<IRenderWorldView*>(&view->mRenderVftable));
+  ren_Viewport->RemoveWorldView(static_cast<IRenderWorldView*>(this));
 
   UnlinkFocusControlSentinel(&view->mOverlayLink);
 
@@ -19985,7 +20027,7 @@ int moho::cfunc_CUIWorldView__initL(LuaPlus::LuaState* const state)
     trackCamera = msvc8::string(trackStr, std::strlen(trackStr));
   }
 
-  void* const storage = AllocateZeroedUiObject<void>(0x2A8u);
+  void* const storage = AllocateZeroedUiObject<void>(sizeof(CUIWorldView));
   CUIWorldView* worldView = nullptr;
   if (storage != nullptr) {
     LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
@@ -21931,7 +21973,7 @@ void moho::CUIWorldView::SetHidden(const bool hidden)
   CMauiControl::SetHidden(hidden);
 
   CUIWorldViewRuntimeView* const view = CUIWorldViewRuntimeView::FromWorldView(this);
-  auto* const renderView = reinterpret_cast<IRenderWorldView*>(&view->mRenderWorldView);
+  auto* const renderView = static_cast<IRenderWorldView*>(this);
   if (hidden) {
     ren_Viewport->RemoveWorldView(renderView);
   } else {
@@ -26907,32 +26949,13 @@ namespace moho
 
 namespace
 {
-  struct BlinkyBoxRuntimeView final : moho::TDatListItem<BlinkyBoxRuntimeView, void>
-  {
-    moho::SSelectionWeakRefUserEntity mUnit; // +0x08
-    std::uint8_t mIsOn;                      // +0x10
-    std::uint8_t pad_11_13[3]{};             // +0x11
-    float mCurDuration;                      // +0x14
-    float mCurCycleTime;                     // +0x18
-    float mOnTime;                           // +0x1C
-    float mOffTime;                          // +0x20
-    float mTotalTime;                        // +0x24
-  };
+  // `BlinkyBox` and the `sBlinkyBoxes` ring sentinel used to live here with
+  // internal linkage, which put them out of reach of `func_RenUI`
+  // (0x007FD490) - the binary's other reader of the same list. They now live
+  // in `moho/render/SelectionBracketRenderer.h`, with the single definition of
+  // the sentinel in `SelectionBracketRenderer.cpp`, so both readers share one
+  // object instead of silently splitting the list in two.
 
-  static_assert(sizeof(BlinkyBoxRuntimeView) == 0x28, "BlinkyBoxRuntimeView size must be 0x28");
-  static_assert(offsetof(BlinkyBoxRuntimeView, mUnit) == 0x08, "BlinkyBoxRuntimeView::mUnit offset must be 0x08");
-  static_assert(offsetof(BlinkyBoxRuntimeView, mIsOn) == 0x10, "BlinkyBoxRuntimeView::mIsOn offset must be 0x10");
-  static_assert(
-    offsetof(BlinkyBoxRuntimeView, mCurDuration) == 0x14, "BlinkyBoxRuntimeView::mCurDuration offset must be 0x14"
-  );
-  static_assert(
-    offsetof(BlinkyBoxRuntimeView, mCurCycleTime) == 0x18, "BlinkyBoxRuntimeView::mCurCycleTime offset must be 0x18"
-  );
-  static_assert(offsetof(BlinkyBoxRuntimeView, mOnTime) == 0x1C, "BlinkyBoxRuntimeView::mOnTime offset must be 0x1C");
-  static_assert(offsetof(BlinkyBoxRuntimeView, mOffTime) == 0x20, "BlinkyBoxRuntimeView::mOffTime offset must be 0x20");
-  static_assert(offsetof(BlinkyBoxRuntimeView, mTotalTime) == 0x24, "BlinkyBoxRuntimeView::mTotalTime offset must be 0x24");
-
-  moho::TDatListItem<BlinkyBoxRuntimeView, void> sBlinkyBoxes{};
   /**
    * Address: 0x007FC7F0 (FUN_007FC7F0)
    *
@@ -26940,14 +26963,14 @@ namespace
    * Unlinks the global blinky-box intrusive list sentinel from its neighbors,
    * restores self-links, and returns the sentinel node.
    */
-  [[maybe_unused]] [[nodiscard]] moho::TDatListItem<BlinkyBoxRuntimeView, void>*
+  [[maybe_unused]] [[nodiscard]] moho::TDatListItem<moho::BlinkyBox, void>*
   ResetGlobalBlinkyBoxListSentinelRuntimeLaneAlpha() noexcept
   {
-    sBlinkyBoxes.mPrev->mNext = sBlinkyBoxes.mNext;
-    sBlinkyBoxes.mNext->mPrev = sBlinkyBoxes.mPrev;
-    sBlinkyBoxes.mNext = &sBlinkyBoxes;
-    sBlinkyBoxes.mPrev = &sBlinkyBoxes;
-    return &sBlinkyBoxes;
+    moho::sBlinkyBoxes.mPrev->mNext = moho::sBlinkyBoxes.mNext;
+    moho::sBlinkyBoxes.mNext->mPrev = moho::sBlinkyBoxes.mPrev;
+    moho::sBlinkyBoxes.mNext = &moho::sBlinkyBoxes;
+    moho::sBlinkyBoxes.mPrev = &moho::sBlinkyBoxes;
+    return &moho::sBlinkyBoxes;
   }
 
   void LinkBlinkyBoxUnitOwner(
@@ -26977,7 +27000,7 @@ namespace
  */
 void moho::func_PushBlinkyBox(UserEntity* const entity, const float onTime, const float offTime, const float totalTime)
 {
-  auto* const blinkyBox = new BlinkyBoxRuntimeView{};
+  auto* const blinkyBox = new moho::BlinkyBox{};
 
   LinkBlinkyBoxUnitOwner(entity, blinkyBox->mUnit);
   blinkyBox->mCurDuration = 0.0f;
@@ -26987,7 +27010,7 @@ void moho::func_PushBlinkyBox(UserEntity* const entity, const float onTime, cons
   blinkyBox->mIsOn = 0u;
   blinkyBox->mTotalTime = totalTime;
 
-  blinkyBox->ListLinkBefore(&sBlinkyBoxes);
+  blinkyBox->ListLinkBefore(&moho::sBlinkyBoxes);
 }
 
 /**
