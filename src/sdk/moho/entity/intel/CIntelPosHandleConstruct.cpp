@@ -1,5 +1,6 @@
 #include "moho/entity/intel/CIntelPosHandleConstruct.h"
 
+#include <cstdlib>
 #include <new>
 
 #include "moho/entity/intel/CIntelPosHandle.h"
@@ -12,6 +13,31 @@ namespace gpg
     void SetUnowned(const RRef& ref, unsigned int flags);
   };
 } // namespace gpg
+
+namespace
+{
+  // Address: 0x010BB3EC -- process-global `CIntelPosHandleConstruct`
+  // singleton. Constructing it runs CIntelPosHandleConstruct::
+  // CIntelPosHandleConstruct() (0x00BDCCB0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterConstructFunction() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::CIntelPosHandleConstruct gCIntelPosHandleConstruct;
+
+  /**
+   * Address: 0x00C01EA0 (FUN_00C01EA0)
+   *
+   * What it does:
+   * Unlinks the `CIntelPosHandleConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BDCCB0) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupCIntelPosHandleConstruct()
+  {
+    gCIntelPosHandleConstruct.ResetLinks();
+  }
+} // namespace
 
 namespace moho
 {
@@ -84,12 +110,14 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
-   * into `sNewHelpers`), then binds the construct/delete callback fields.
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
   CIntelPosHandleConstruct::CIntelPosHandleConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCIntelPosHandleSerializerThunk))
     , mDeleteCallback(&CIntelPosHandleConstruct::Deconstruct)
   {
+    (void)std::atexit(&CleanupCIntelPosHandleConstruct);
   }
 
   /**
@@ -107,14 +135,3 @@ namespace moho
     type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  // Address: 0x010BB3EC -- process-global `CIntelPosHandleConstruct`
-  // singleton. Constructing it runs CIntelPosHandleConstruct::
-  // CIntelPosHandleConstruct() (0x00BDCCB0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterConstructFunction() on it from within the first
-  // ReadArchive/WriteArchive construction.
-  moho::CIntelPosHandleConstruct gCIntelPosHandleConstruct;
-} // namespace

@@ -1,5 +1,6 @@
 #include "moho/entity/intel/CIntelCounterHandleConstruct.h"
 
+#include <cstdlib>
 #include <new>
 
 #include "moho/entity/intel/CIntelCounterHandle.h"
@@ -12,6 +13,31 @@ namespace gpg
     void SetUnowned(const RRef& ref, unsigned int flags);
   };
 } // namespace gpg
+
+namespace
+{
+  // Address: 0x010BB400 -- process-global `CIntelCounterHandleConstruct`
+  // singleton. Constructing it runs CIntelCounterHandleConstruct::
+  // CIntelCounterHandleConstruct() (0x00BDCD50), which splices this helper
+  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterConstructFunction() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::CIntelCounterHandleConstruct gCIntelCounterHandleConstruct;
+
+  /**
+   * Address: 0x00C01F60 (FUN_00C01F60)
+   *
+   * What it does:
+   * Unlinks the `CIntelCounterHandleConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BDCD50) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupCIntelCounterHandleConstruct()
+  {
+    gCIntelCounterHandleConstruct.ResetLinks();
+  }
+} // namespace
 
 namespace moho
 {
@@ -84,12 +110,14 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
-   * into `sNewHelpers`), then binds the construct/delete callback fields.
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
    */
   CIntelCounterHandleConstruct::CIntelCounterHandleConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCIntelCounterHandleSerializerThunk))
     , mDeleteCallback(&CIntelCounterHandleConstruct::Deconstruct)
   {
+    (void)std::atexit(&CleanupCIntelCounterHandleConstruct);
   }
 
   /**
@@ -107,14 +135,3 @@ namespace moho
     type->deleteFunc_ = mDeleteCallback;
   }
 } // namespace moho
-
-namespace
-{
-  // Address: 0x010BB400 -- process-global `CIntelCounterHandleConstruct`
-  // singleton. Constructing it runs CIntelCounterHandleConstruct::
-  // CIntelCounterHandleConstruct() (0x00BDCD50), which splices this helper
-  // into gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
-  // later dispatches RegisterConstructFunction() on it from within the first
-  // ReadArchive/WriteArchive construction.
-  moho::CIntelCounterHandleConstruct gCIntelCounterHandleConstruct;
-} // namespace
