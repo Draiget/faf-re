@@ -21722,6 +21722,18 @@ int CopySnapshotAndReleaseBindingsRuntime(SnapshotOwnerRuntime* const owner);
 
 extern "C" int __cdecl RuntimeWtoiFromWideThunk(const wchar_t* const text);
 
+// wxSocketBase::Notify(bool) (FUN_00A2E610) is recovered further down this
+// file under its pre-existing name/type (see the ownership-correction note
+// on that definition for why it stays there rather than being renamed).
+namespace
+{
+  struct WxObjectDestroyFlagsRuntimeView;
+}
+std::uint8_t wxObjectSetDelayedDestroyFlag(
+  WxObjectDestroyFlagsRuntimeView* const object,
+  const std::uint8_t enabled
+);
+
 namespace
 {
   // -----------------------------------------------------------------------
@@ -21916,20 +21928,17 @@ namespace
     (void)WxListAppendUnkeyedRuntime(&self->states, payload);
   }
 
-  /**
-   * Address: 0x00A2E610 (FUN_00A2E610)
-   * Mangled: ?Notify@wxSocketBase@@QAEX_N@Z
-   *
-   * IDA signature:
-   * void __thiscall sub_A2E610(int notify);
-   *
-   * What it does:
-   * wxSocketBase::Notify(bool notify): enables/disables event notification
-   * by writing the single m_notify byte lane.
-   */
+  // wxSocketBase::Notify(bool) (FUN_00A2E610) is already recovered further
+  // down this file as `wxObjectSetDelayedDestroyFlag` -- see the ownership
+  // correction note on that definition. wxHTTP::BuildRequest and
+  // wxHTTP::GetInputStream call it directly through this thin same-layout
+  // adapter rather than duplicating a second body at the same address.
   void WxSocketBaseNotifyRuntime(WxHttpSocketBaseRuntimeView* const self, const bool notify) noexcept
   {
-    self->notifyEnabled = notify ? 1u : 0u;
+    (void)wxObjectSetDelayedDestroyFlag(
+      reinterpret_cast<WxObjectDestroyFlagsRuntimeView*>(self),
+      notify ? 1u : 0u
+    );
   }
 
   /**
@@ -63307,6 +63316,36 @@ void moho::WWinManagedFrame::AppendManagedSlotForOwner(
 }
 
 /**
+ * Address: 0x004F40E0 (FUN_004F40E0, Moho::WWinManagedFrame::WWinManagedFrame)
+ * Mangled: ??0WWinManagedFrame@Moho@@QAE@PAVwxWindow@@HABVwxString@@ABVwxPoint@@ABVwxSize@@J1@Z
+ *
+ * What it does:
+ * See the declaration's IDA-signature note for the parameter mapping. Fills
+ * in the shared wx window state (state-only - see the declaration's note),
+ * zeroes the managed-slot chain head, then registers this frame's
+ * owner-chain head in `managedFrames`.
+ */
+moho::WWinManagedFrame::WWinManagedFrame(
+  wxWindowBase* const parent,
+  const std::int32_t id,
+  const wxStringRuntime& title,
+  const wxPoint& position,
+  const wxSize& size,
+  const long style,
+  const wxStringRuntime& name
+)
+{
+  (void)CreateBase(parent, id, position, size, style, name);
+  SetTitle(title);
+  if (parent != nullptr) {
+    parent->AddChild(this);
+  }
+
+  mManagedSlotsHead = nullptr;
+  RegisterManagedOwnerSlot();
+}
+
+/**
  * Address: 0x004F40E0 (FUN_004F40E0, WWinManagedFrame ctor tail)
  *
  * What it does:
@@ -70591,9 +70630,24 @@ void wxDestroySizerItemNoDeleteRuntime(
 
 /**
  * Address: 0x00A2E610 (FUN_00A2E610)
+ * Mangled: ?Notify@wxSocketBase@@QAEX_N@Z
  *
  * What it does:
- * Writes one object delayed-destroy flag lane and returns the written value.
+ * Writes one object delayed-destroy flag lane and returns the written
+ * value.
+ *
+ * Ownership correction (found while recovering the wxHTTP chain in
+ * WxRuntimeTypes.cpp): this is wxSocketBase::Notify(bool), not a generic
+ * "delayed destroy" setter. `WxObjectDestroyFlagsRuntimeView::
+ * delayedDestroyFlag` sits at +0x60, the exact offset wxHTTP::BuildRequest
+ * and wxHTTP::GetInputStream write through their own
+ * WxHttpSocketBaseRuntimeView::notifyEnabled field (`this+96` in the
+ * decompiled bodies of FUN_00A0F0F0 and FUN_00A0F6E0, both calling
+ * `sub_A2E610(0)` at exactly the point real wx source calls
+ * `Notify(FALSE)`), and wxSocketBase::SaveState (FUN_00A2E3F0) reads that
+ * same byte as `m_notify` when snapshotting socket state. Kept under its
+ * existing name/type here to avoid a wider rename across this file; wxHTTP
+ * calls it directly as Notify(bool) via this same address.
  */
 std::uint8_t wxObjectSetDelayedDestroyFlag(
   WxObjectDestroyFlagsRuntimeView* const object,
