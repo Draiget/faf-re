@@ -22,11 +22,15 @@
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/audio/IUserSoundManager.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConFunc.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/core/Thread.h"
+#include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
+#include "moho/math/MathReflection.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -40,9 +44,16 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/resource/RResId.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
+#include "moho/sim/CRandomStream.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/UserArmy.h"
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
@@ -105,6 +116,19 @@ namespace
     "<LOC Engine0024>You must have a unit selected to rename.";
   constexpr const char* kUIRenameSingleSelectionLocToken =
     "<LOC Engine0025>You may only name one unit at a time, please limit your selection to one unit.";
+  constexpr const char* kRenameUnitSelectionRequiredLocToken =
+    "<LOC Engine0021>You must have a unit selected to name it.";
+  constexpr const char* kRenameUnitSingleSelectionLocToken =
+    "<LOC Engine0022>Naming a unit requires you only have one unit selected.";
+  constexpr const char* kRenameUnitNoCustomNameLocToken = "<LOC Engine0023>Unit has no custom name";
+  constexpr const char* kRenameUnitInfoKey = "CustomName";
+  constexpr const char* kRenameUnitPrintFormat = "Unit name: %s";
+  constexpr const char* kCreateUnitInvalidArmyFormat = "Invalid army index (%d) -- must be less than %d";
+  constexpr const char* kCreateUnitWorldCameraName = "WorldCamera";
+  constexpr const char* kCreateUnitErrorSoundBank = "Interface";
+  constexpr const char* kCreateUnitErrorSoundCue = "UI_Menu_Error_01";
+  constexpr const char* kPlaceholderPropBlueprintPath = "/props/rplaceholder/rplaceholder_prop";
+  constexpr int kLotsOfPropsDefaultCount = 100;
   constexpr const char* kUIMakeSelectionSetUsageText =
     "USAGE: UI_MakeSelectionSet [name] - create a named selection set based on the current selection";
   constexpr const char* kUIApplySelectionSetUsageText =
@@ -263,9 +287,44 @@ namespace
     return reinterpret_cast<UserEntity*>(userUnit);
   }
 
-  [[nodiscard]] const STIMap* ResolveTerrainMapForTeleport(const CWldSession* const session) noexcept
+  /**
+   * The session's terrain map header. Every console command that needs it walks
+   * the same two hops the binary does (`mWldMap` -> `mTerrainRes` -> the
+   * terrain-owned `STIMap`); the recovered `IWldTerrainRes` types that lane as
+   * `mPlayableRectSource`, which is the same word.
+   */
+  [[nodiscard]] const STIMap* ResolveSessionTerrainMap(const CWldSession* const session) noexcept
   {
     return reinterpret_cast<const STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+  }
+
+  /**
+   * `UserUnit::GetCustomName` (vtable slot +0x60) hands back the address of the
+   * unit's in-object custom-name storage; the recovered declaration types that
+   * anchor as `char*`, but the binary reads it as an `msvc8::string` (it tests
+   * `+0x14` for the size and picks the SSO buffer or heap pointer off `+0x04`).
+   * Recover the string the engine actually reads through.
+   */
+  [[nodiscard]] const msvc8::string& CustomNameStorage(UserUnit* const userUnit) noexcept
+  {
+    return *reinterpret_cast<const msvc8::string*>(userUnit->GetCustomName());
+  }
+
+  /**
+   * One uniformly distributed index in `[0, extent)` drawn from the process
+   * global Mersenne stream under `math_GlobalRandomMutex`.
+   *
+   * The binary inlines the twister extraction and scales it with a 32x32->64
+   * `mul` keeping only the high dword, which is the classic bias-free
+   * multiply-shift bucketing rather than a modulo - preserved verbatim here
+   * because the bucket boundaries (and therefore the spawn pattern) differ from
+   * `%`.
+   */
+  [[nodiscard]] std::uint32_t RandomIndexBelowExtent(const std::uint32_t extent)
+  {
+    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    const std::uint64_t sample = math_GlobalRandomStream.twister.NextUInt32();
+    return static_cast<std::uint32_t>((sample * static_cast<std::uint64_t>(extent)) >> 32);
   }
 
   void PrintLocalizedConsoleLine(const char* const locToken)
@@ -342,7 +401,10 @@ namespace
     char* end;
   };
 
-  [[maybe_unused]] Wm3::Vector2f lastMouseScreenPos{};
+  /// The screen point `CON_CreateUnit` last projected through the world camera.
+  /// Repeating the same point makes the command fall back to the live cursor
+  /// world position instead of re-projecting.
+  Wm3::Vector2f lastMouseScreenPos{};
   static_assert(sizeof(Wm3::Vector2f) == 0x8, "Wm3::Vector2f size must be 0x8");
 
   /**
@@ -352,7 +414,6 @@ namespace
    * Byte-compares one screen-space cursor point against the cached
    * create-unit cursor point and returns `-1`, `0`, or `1`.
    */
-  [[maybe_unused]]
   [[nodiscard]]
   int cmp_LastMouseScreenPos(const Wm3::Vector2f& mouseScreenPos) noexcept
   {
@@ -2014,7 +2075,11 @@ void moho::UI_ShowRenameDialog()
     return;
   }
 
-  ShowRenameDialogLua(selectedUnit->GetCustomName());
+  // `GetCustomName` hands back the address of the unit's `msvc8::string`
+  // storage, which the binary copies into a temporary before handing it to the
+  // dialog helper; taking it as a `char*` directly would push the string
+  // object's own bytes into Lua.
+  ShowRenameDialogLua(CustomNameStorage(selectedUnit).c_str());
 }
 
 /**
@@ -2229,6 +2294,214 @@ void moho::CON_CreateProp(void* const commandArgs)
   SIM_GetActiveDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->CursorWorldPos);
 }
 
+/**
+ * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
+ *
+ * IDA signature:
+ * void __cdecl Moho::CON_CreateUnit(std::vector_string *arg0);
+ *
+ * What it does:
+ * `CreateUnit <blueprintId> [armyIndex] [screenX screenY]`. Resolves the spawn
+ * point from an explicit screen point through the world camera's
+ * screen-to-surface projection (only when that point differs from the last one
+ * this command used - repeating the same coordinates falls back to the live
+ * cursor world position), resolves the army from the explicit index or the
+ * session focus army, grid-snaps the position onto the blueprint's footprint,
+ * and asks the sim driver to spawn the unit. An unresolvable blueprint id plays
+ * the UI error cue instead.
+ */
+void moho::CON_CreateUnit(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  const std::size_t tokenCount = args.Count();
+  if (tokenCount < 2u) {
+    return;
+  }
+
+  SCoordsVec2 spawnPos{session->CursorWorldPos.x, session->CursorWorldPos.z};
+
+  // The binary gates the explicit-screen-point path on `tokenCount >= 4` while
+  // reading tokens 3 *and* 4, so a four-token invocation reads one past the
+  // argument vector. `ConCommandArgsView::At` is bounds-checked and yields an
+  // absent token there, which `ParseIntToken` turns into 0 - the same value the
+  // out-of-bounds read produced for every well-formed argument vector.
+  if (tokenCount >= 4u) {
+    const Wm3::Vector2f screenPoint{
+      static_cast<float>(ParseIntToken(args.At(3u))),
+      static_cast<float>(ParseIntToken(args.At(4u)))
+    };
+
+    if (cmp_LastMouseScreenPos(screenPoint) != 0) {
+      CameraImpl* const worldCamera = CAM_GetCamera(kCreateUnitWorldCameraName);
+      const Wm3::Vector3f surfacePoint = worldCamera->CameraScreenToSurface(screenPoint);
+      spawnPos.x = surfacePoint.x;
+      spawnPos.z = surfacePoint.z;
+      lastMouseScreenPos = screenPoint;
+    }
+  }
+
+  int armyIndex = 0;
+  if (tokenCount >= 3u) {
+    armyIndex = ParseIntToken(args.At(2u));
+
+    const std::size_t armyCount = session->userArmies.size();
+    if (static_cast<std::size_t>(armyIndex) >= armyCount) {
+      CON_Printf(kCreateUnitInvalidArmyFormat, armyIndex, static_cast<int>(armyCount));
+      return;
+    }
+  } else {
+    armyIndex = session->FocusArmy;
+    if (armyIndex < 0) {
+      return;
+    }
+  }
+
+  UserArmy* const spawnArmy = session->userArmies[static_cast<std::size_t>(armyIndex)];
+  if (spawnArmy == nullptr) {
+    return;
+  }
+
+  msvc8::string requestedBlueprint;
+  requestedBlueprint.assign_owned(TokenDataOrEmpty(args.At(1u)));
+
+  RResId requestedBlueprintId{};
+  (void)gpg::STR_CopyFilename(&requestedBlueprintId.name, &requestedBlueprint);
+
+  RUnitBlueprint* const blueprint = session->mRules->GetUnitBlueprint(requestedBlueprintId);
+  requestedBlueprintId.name.clear();
+
+  if (blueprint == nullptr) {
+    USER_GetSound()->Play(msvc8::string(kCreateUnitErrorSoundCue), msvc8::string(kCreateUnitErrorSoundBank));
+    return;
+  }
+
+  const Wm3::Vector3f snappedPos =
+    COORDS_GridSnap(ResolveSessionTerrainMap(session), spawnPos, blueprint->mFootprint, LAYER_None);
+  const SCoordsVec2 gridSnappedPos{snappedPos.x, snappedPos.z};
+
+  RResId spawnBlueprintId{};
+  (void)gpg::STR_CopyFilename(&spawnBlueprintId.name, &blueprint->mBlueprintId);
+
+  SIM_GetActiveDriver()
+    ->CreateUnit(static_cast<std::uint32_t>(spawnArmy->mArmyIndex), spawnBlueprintId, gridSnappedPos, 0.0f);
+
+  spawnBlueprintId.name.clear();
+}
+
+/**
+ * Address: 0x008330B0 (FUN_008330B0, Moho::CON_LotsOfProps)
+ *
+ * IDA signature:
+ * void __cdecl Moho::CON_LotsOfProps(std::vector_string *a1);
+ *
+ * What it does:
+ * `LotsOfProps [propBlueprint] [count]`. Scatters `count` (default 100) copies
+ * of one lowercased prop blueprint path across uniformly random height-field
+ * cells, sampling terrain elevation at each cell center and lifting the spawn to
+ * the water plane where the map's water sits above the terrain.
+ */
+void moho::CON_LotsOfProps(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+
+  msvc8::string propBlueprintPath;
+  if (args.Count() >= 2u) {
+    propBlueprintPath.assign_owned(TokenDataOrEmpty(args.At(1u)));
+
+    // The binary lowercases the freshly copied path in place through the same
+    // transform helper rather than building a second buffer.
+    char* const pathBegin = propBlueprintPath.raw_data_mut_unsafe();
+    (void)CopyLowercasedRange(pathBegin, pathBegin, pathBegin + propBlueprintPath.size());
+  } else {
+    propBlueprintPath.assign_owned(kPlaceholderPropBlueprintPath);
+  }
+
+  int propCount = kLotsOfPropsDefaultCount;
+  if (args.Count() >= 3u) {
+    propCount = ParseIntToken(args.At(2u));
+  }
+
+  const STIMap* const terrainMap = ResolveSessionTerrainMap(session);
+  const CHeightField* const heightField = terrainMap->mHeightField.get();
+
+  for (int spawnIndex = 0; spawnIndex < propCount; ++spawnIndex) {
+    // Both cell indices are truncated to 16 bits before they become world
+    // coordinates, exactly as the binary's `movsx`/`fild` pair does.
+    const auto cellX =
+      static_cast<std::int16_t>(RandomIndexBelowExtent(static_cast<std::uint32_t>(heightField->width - 1)));
+    const auto cellZ =
+      static_cast<std::int16_t>(RandomIndexBelowExtent(static_cast<std::uint32_t>(heightField->height - 1)));
+
+    const float worldX = static_cast<float>(cellX) + 0.5f;
+    const float worldZ = static_cast<float>(cellZ) + 0.5f;
+
+    float worldY = heightField->GetElevation(worldX, worldZ);
+    if (terrainMap->mWaterEnabled != 0u && terrainMap->mWaterElevation > worldY) {
+      worldY = terrainMap->mWaterElevation;
+    }
+
+    SIM_GetActiveDriver()->CreateProp(propBlueprintPath.c_str(), Wm3::Vec3f{worldX, worldY, worldZ});
+  }
+}
+
+/**
+ * Address: 0x00833C70 (FUN_00833C70, Moho::CON_CConFunc_KillSelectedUnits)
+ *
+ * What it does:
+ * Issues one `UNITCOMMAND_KillSelf` against the active session's selection with
+ * the queue-clear flag set, so the selected units die through their normal
+ * death sequence. Prints localized "no session" feedback when no world session
+ * is active.
+ */
+void moho::CON_KillSelectedUnits(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_KillSelf);
+  ISSUE_Command(session->mSelection, commandIssueData, true);
+}
+
+/**
+ * Address: 0x00833D60 (FUN_00833D60, Moho::CON_DestroySelectedUnits)
+ *
+ * What it does:
+ * Issues one `UNITCOMMAND_DestroySelf` against the active session's selection
+ * with the queue-clear flag set, removing the selected units outright rather
+ * than killing them. Prints localized "no session" feedback when no world
+ * session is active.
+ */
+void moho::CON_DestroySelectedUnits(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_DestroySelf);
+  ISSUE_Command(session->mSelection, commandIssueData, true);
+}
+
 namespace
 {
   /**
@@ -2302,7 +2575,189 @@ namespace
 
     return false;
   }
+
+  /**
+   * The first live selection entry, or `nullptr` when the selection holds only
+   * tombstones. The binary reaches it by starting at the tree's left-most node
+   * and letting `find` prune dead weak-links forward; both `UI_TrackUnit` and
+   * `RenameUnit` open with exactly that probe.
+   */
+  [[nodiscard]] moho::SSelectionNodeUserEntity* FirstLiveSelectionNode(moho::SSelectionSetUserEntity& selection)
+  {
+    moho::SSelectionNodeUserEntity* const head = selection.mHead;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    moho::SSelectionNodeUserEntity* cursor = nullptr;
+    moho::SSelectionNodeUserEntity* const node = moho::SSelectionSetUserEntity::find(&selection, head->mLeft, &cursor);
+    return node != head ? node : nullptr;
+  }
 } // namespace
+
+/**
+ * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
+ *
+ * IDA signature:
+ * void __cdecl Moho::CON_ProcessInfoPair(std::vector_string *arg0);
+ *
+ * What it does:
+ * `ProcessInfoPair <key> <value>`. Publishes the pair through
+ * `ISTIDriver::ProcessInfoPair` once per selected unit, but only for units
+ * owned by the session's focus army - the same ownership gate the sim applies
+ * before honouring an info pair. Prints localized "no session" feedback when no
+ * world session is active, and silently ignores short argument vectors.
+ */
+void moho::CON_ProcessInfoPair(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 3u) {
+    return;
+  }
+
+  const UserArmy* const focusArmy = session->GetFocusArmy();
+
+  msvc8::vector<UserUnit*> selectedUnits;
+  session->GetSelectionUnits(selectedUnits);
+
+  const char* const infoKey = TokenDataOrEmpty(args.At(1u));
+  const char* const infoValue = TokenDataOrEmpty(args.At(2u));
+
+  for (UserUnit* const selectedUnit : selectedUnits) {
+    UserEntity* const entityView = ResolveUserEntityView(selectedUnit);
+    if (entityView == nullptr || entityView->mArmy != focusArmy) {
+      continue;
+    }
+
+    SIM_GetActiveDriver()->ProcessInfoPair(
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityView->mParams.mEntityId)),
+      infoKey,
+      infoValue
+    );
+  }
+}
+
+/**
+ * Address: 0x00834460 (FUN_00834460, Moho::UI_TrackUnit)
+ *
+ * IDA signature:
+ * void __cdecl Moho::CON_UI_TrackUnit(std::vector_string *a1);
+ *
+ * What it does:
+ * `UI_TrackUnit <camera> [camera ...]`. For each named runtime camera this
+ * toggles selection tracking: the camera drops its target when the selection is
+ * empty or when its current target already is the first selected entity,
+ * otherwise it starts tracking the whole selection at the camera's current
+ * target zoom with a zero-second transition.
+ */
+void moho::UI_TrackUnit(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  const std::size_t tokenCount = args.Count();
+  if (tokenCount <= 1u) {
+    return;
+  }
+
+  SSelectionSetUserEntity& selection = session->mSelection;
+
+  for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
+    CameraImpl* const camera = CAM_GetManager()->GetCamera(TokenDataOrEmpty(args.At(tokenIndex)));
+    if (camera == nullptr) {
+      continue;
+    }
+
+    SSelectionNodeUserEntity* const firstLiveNode = FirstLiveSelectionNode(selection);
+    if (firstLiveNode == nullptr) {
+      camera->TargetNothing();
+      continue;
+    }
+
+    if (DecodeUserEntityFromSelectionSlot(firstLiveNode->mEnt) == camera->GetTargetEntity()) {
+      camera->TargetNothing();
+      continue;
+    }
+
+    camera->TargetEntities(selection, true, camera->CameraGetTargetZoom(), 0.0f);
+  }
+}
+
+/**
+ * Address: 0x008354B0 (FUN_008354B0, Moho::RenameUnit)
+ *
+ * IDA signature:
+ * void __cdecl Moho::RenameUnit(std::vector_string *arg0);
+ *
+ * What it does:
+ * `RenameUnit [name words ...]`. With no name tokens it prints the single
+ * selected unit's custom name (or the localized "no custom name" line);
+ * otherwise it joins every remaining token with single spaces, trims the
+ * surrounding whitespace, and publishes the result as a `("CustomName", name)`
+ * info pair through the sim driver. Requires exactly one selected user-unit and
+ * prints the matching localized rejection otherwise.
+ */
+void moho::RenameUnit(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  SSelectionSetUserEntity& selection = session->mSelection;
+  SSelectionNodeUserEntity* const firstLiveNode = FirstLiveSelectionNode(selection);
+  if (firstLiveNode == nullptr) {
+    PrintLocalizedConsoleLine(kRenameUnitSelectionRequiredLocToken);
+    return;
+  }
+
+  if (selection.size() > 1) {
+    PrintLocalizedConsoleLine(kRenameUnitSingleSelectionLocToken);
+    return;
+  }
+
+  UserEntity* const selectedEntity = DecodeUserEntityFromSelectionSlot(firstLiveNode->mEnt);
+  UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
+  if (selectedUnit == nullptr) {
+    PrintLocalizedConsoleLine(kRenameUnitSelectionRequiredLocToken);
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() == 1u) {
+    const msvc8::string& currentName = CustomNameStorage(selectedUnit);
+    if (currentName.empty()) {
+      PrintLocalizedConsoleLine(kRenameUnitNoCustomNameLocToken);
+      return;
+    }
+
+    CON_Printf(kRenameUnitPrintFormat, currentName.c_str());
+    return;
+  }
+
+  // The binary appends `token + " "` for every remaining token and then trims,
+  // which leaves exactly the single-space join the shared helper produces.
+  const msvc8::string joinedName = JoinConCommandTokens(args, 1u);
+  const msvc8::string customName = gpg::STR_TrimWhitespace(joinedName.c_str());
+
+  UserEntity* const entityView = ResolveUserEntityView(selectedUnit);
+  SIM_GetActiveDriver()->ProcessInfoPair(
+    reinterpret_cast<void*>(static_cast<std::uintptr_t>(entityView->mParams.mEntityId)),
+    kRenameUnitInfoKey,
+    customName.c_str()
+  );
+}
 
 /**
  * Address: 0x008338A0 (FUN_008338A0, Moho::CON_StartCommandMode)
@@ -2466,7 +2921,7 @@ void moho::CON_TeleportSelectedUnits(void* const commandArgs)
     }
   }
 
-  const STIMap* const terrainMap = ResolveTerrainMapForTeleport(session);
+  const STIMap* const terrainMap = ResolveSessionTerrainMap(session);
   ISTIDriver* const simDriver = SIM_GetActiveDriver();
 
   msvc8::vector<UserUnit*> selectedUnits;
@@ -3001,6 +3456,21 @@ namespace
   constexpr const char* kConsoleStartupConDebugClearBuildTemplatesDescription =
     "Clear all generated build templates.";
   constexpr const char* kConsoleStartupConCreatePropDescription = "Spawn one prop at cursor world position.";
+  // Command name/description pairs below are the exact `.data` initializers the
+  // binary stores in each `CConFunc` global (the registrar only writes the
+  // vftable and callback words); read back from `ForgedAlliance.exe` at the
+  // global's `+0x04`/`+0x08` lanes.
+  constexpr const char* kConsoleStartupConCreateUnitDescription =
+    "spawn a unit by id at the mouse cursor or specified location, case sensitive";
+  constexpr const char* kConsoleStartupConLotsOfPropsDescription =
+    "spawn 100 props all over the map 2nd Arg = name of prop";
+  constexpr const char* kConsoleStartupConKillSelectedUnitsDescription = "kill selected units.";
+  constexpr const char* kConsoleStartupConDestroySelectedUnitsDescription = "destroy selected units.";
+  constexpr const char* kConsoleStartupConProcessInfoPairDescription =
+    "set the assist mode flag for the selected units.";
+  constexpr const char* kConsoleStartupConUITrackUnitDescription = "track selected units.";
+  constexpr const char* kConsoleStartupConRenameUnitDescription =
+    "Give selected unit a custom name, or with no parameters print name";
   constexpr const char* kConsoleStartupConIssueCommandDescription =
     "Issue a fixed unit command (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) to the current selection.";
   constexpr const char* kConsoleStartupConMeshRebatchDescription =
@@ -3044,6 +3514,13 @@ namespace
   CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection{};
   CConFunc gCConFunc_DebugClearBuildTemplates{};
   CConFunc gCConFunc_CreateProp{};
+  CConFunc gCConFunc_CreateUnit{};
+  CConFunc gCConFunc_LotsOfProps{};
+  CConFunc gCConFunc_KillSelectedUnits{};
+  CConFunc gCConFunc_DestroySelectedUnits{};
+  CConFunc gCConFunc_ProcessInfoPair{};
+  CConFunc gCConFunc_UI_TrackUnit{};
+  CConFunc gCConFunc_RenameUnit{};
   CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_mesh_Rebatch{};
   CConFunc gCConFunc_p4_Edit{};
@@ -4258,6 +4735,238 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C060A0 (FUN_00C060A0, ??1CConFunc_CreateUnit@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `CreateUnit`.
+   */
+  void cleanup_CConFunc_CreateUnit()
+  {
+    CleanupStartupConCommand(gCConFunc_CreateUnit);
+  }
+
+  /**
+   * Address: 0x00BE3EF0 (FUN_00BE3EF0, register_CConFunc_CreateUnit)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_00832C50.xrefs.txt` -> `code from=0x00BE3F10 owner=0x00BE3EF0 type= 1
+   * from_name=register_CConFunc_CreateUnit owner_name=register_CConFunc_CreateUnit`
+   * (`mov Moho__CConFunc_CreateUnit.mFunc, offset Moho__CON_CreateUnit`).
+   *
+   * What it does:
+   * Registers startup console callback for `CreateUnit` and schedules the
+   * matching cleanup lane at process exit.
+   */
+  void register_CConFunc_CreateUnit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_CreateUnit,
+      kConsoleStartupConCreateUnitDescription,
+      "CreateUnit",
+      &CON_CreateUnit,
+      &cleanup_CConFunc_CreateUnit
+    );
+  }
+
+  /**
+   * Address: 0x00C060D0 (FUN_00C060D0, ??1CConFunc_LotsOfProps@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `LotsOfProps`.
+   */
+  void cleanup_CConFunc_LotsOfProps()
+  {
+    CleanupStartupConCommand(gCConFunc_LotsOfProps);
+  }
+
+  /**
+   * Address: 0x00BE3F30 (FUN_00BE3F30, register_CConFunc_LotsOfProps)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_008330B0.xrefs.txt` -> `code from=0x00BE3F50 owner=0x00BE3F30 type= 1
+   * from_name=register_CConFunc_LotsOfProps owner_name=register_CConFunc_LotsOfProps`
+   * (`mov Moho__CConFunc_LotsOfProps.mFunc, offset Moho__CON_LotsOfProps`).
+   *
+   * What it does:
+   * Registers startup console callback for `LotsOfProps`.
+   */
+  void register_CConFunc_LotsOfProps()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_LotsOfProps,
+      kConsoleStartupConLotsOfPropsDescription,
+      "LotsOfProps",
+      &CON_LotsOfProps,
+      &cleanup_CConFunc_LotsOfProps
+    );
+  }
+
+  /**
+   * Address: 0x00C06190 (FUN_00C06190, ??1CConFunc_KillSelectedUnits@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `KillSelectedUnits`.
+   */
+  void cleanup_CConFunc_KillSelectedUnits()
+  {
+    CleanupStartupConCommand(gCConFunc_KillSelectedUnits);
+  }
+
+  /**
+   * Address: 0x00BE4030 (FUN_00BE4030, register_CConFunc_KillSelectedUnits)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_00833C70.xrefs.txt` -> `code from=0x00BE4050 owner=0x00BE4030 type= 1
+   * from_name=register_CConFunc_KillSelectedUnits owner_name=register_CConFunc_KillSelectedUnits`
+   * (`mov Moho__CConFunc_KillSelectedUnits.mFunc, offset Moho__CON_CConFunc_KillSelectedUnits`).
+   *
+   * What it does:
+   * Registers startup console callback for `KillSelectedUnits`.
+   */
+  void register_CConFunc_KillSelectedUnits()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_KillSelectedUnits,
+      kConsoleStartupConKillSelectedUnitsDescription,
+      "KillSelectedUnits",
+      &CON_KillSelectedUnits,
+      &cleanup_CConFunc_KillSelectedUnits
+    );
+  }
+
+  /**
+   * Address: 0x00C061C0 (FUN_00C061C0, ??1CConFunc_DestroySelectedUnits@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `DestroySelectedUnits`.
+   */
+  void cleanup_CConFunc_DestroySelectedUnits()
+  {
+    CleanupStartupConCommand(gCConFunc_DestroySelectedUnits);
+  }
+
+  /**
+   * Address: 0x00BE4070 (FUN_00BE4070, register_CConFunc_DestroySelectedUnits)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_00833D60.xrefs.txt` -> `code from=0x00BE4090 owner=0x00BE4070 type= 1
+   * from_name=register_CConFunc_DestroySelectedUnits owner_name=register_CConFunc_DestroySelectedUnits`
+   * (`mov Moho__CConFunc_DestroySelectedUnits.mFunc, offset Moho__CON_DestroySelectedUnits`).
+   *
+   * What it does:
+   * Registers startup console callback for `DestroySelectedUnits`.
+   */
+  void register_CConFunc_DestroySelectedUnits()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_DestroySelectedUnits,
+      kConsoleStartupConDestroySelectedUnitsDescription,
+      "DestroySelectedUnits",
+      &CON_DestroySelectedUnits,
+      &cleanup_CConFunc_DestroySelectedUnits
+    );
+  }
+
+  /**
+   * Address: 0x00C06280 (FUN_00C06280, ??1CConFunc_ProcessInfoPair@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ProcessInfoPair`.
+   */
+  void cleanup_CConFunc_ProcessInfoPair()
+  {
+    CleanupStartupConCommand(gCConFunc_ProcessInfoPair);
+  }
+
+  /**
+   * Address: 0x00BE4170 (FUN_00BE4170, register_CConFunc_ProcessInfoPair)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_00834240.xrefs.txt` -> `code from=0x00BE4190 owner=0x00BE4170 type= 1
+   * from_name=register_CConFunc_ProcessInfoPair owner_name=register_CConFunc_ProcessInfoPair`
+   * (`mov Moho__CConFunc_ProcessInfoPair.mFunc, offset Moho__CON_ProcessInfoPair`).
+   *
+   * What it does:
+   * Registers startup console callback for `ProcessInfoPair`.
+   */
+  void register_CConFunc_ProcessInfoPair()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ProcessInfoPair,
+      kConsoleStartupConProcessInfoPairDescription,
+      "ProcessInfoPair",
+      &CON_ProcessInfoPair,
+      &cleanup_CConFunc_ProcessInfoPair
+    );
+  }
+
+  /**
+   * Address: 0x00C062B0 (FUN_00C062B0, ??1CConFunc_UI_TrackUnit@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_TrackUnit`.
+   */
+  void cleanup_CConFunc_UI_TrackUnit()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_TrackUnit);
+  }
+
+  /**
+   * Address: 0x00BE41B0 (FUN_00BE41B0, register_CConFunc_UI_TrackUnit)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_00834460.xrefs.txt` -> `code from=0x00BE41D0 owner=0x00BE41B0 type= 1
+   * from_name=register_CConFunc_UI_TrackUnit owner_name=register_CConFunc_UI_TrackUnit`
+   * (`mov Moho__CConFunc_UI_TrackUnit.mFunc, offset Moho__UI_TrackUnit`).
+   *
+   * What it does:
+   * Registers startup console callback for `UI_TrackUnit`.
+   */
+  void register_CConFunc_UI_TrackUnit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_TrackUnit,
+      kConsoleStartupConUITrackUnitDescription,
+      "UI_TrackUnit",
+      &UI_TrackUnit,
+      &cleanup_CConFunc_UI_TrackUnit
+    );
+  }
+
+  /**
+   * Address: 0x00C06520 (FUN_00C06520, ??1CConFunc_RenameUnit@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `RenameUnit`.
+   */
+  void cleanup_CConFunc_RenameUnit()
+  {
+    CleanupStartupConCommand(gCConFunc_RenameUnit);
+  }
+
+  /**
+   * Address: 0x00BE44F0 (FUN_00BE44F0, register_CConFunc_RenameUnit)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_008354B0.xrefs.txt` -> `code from=0x00BE4510 owner=0x00BE44F0 type= 1
+   * from_name=register_CConFunc_RenameUnit owner_name=register_CConFunc_RenameUnit`
+   * (`mov Moho__CConFunc_RenameUnit.mFunc, offset Moho__RenameUnit`).
+   *
+   * What it does:
+   * Registers startup console callback for `RenameUnit`.
+   */
+  void register_CConFunc_RenameUnit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_RenameUnit,
+      kConsoleStartupConRenameUnitDescription,
+      "RenameUnit",
+      &RenameUnit,
+      &cleanup_CConFunc_RenameUnit
+    );
+  }
+
+  /**
    * Address: 0x00C06130 (FUN_00C06130, ??1CConFunc_IssueCommand@Moho@@QAE@@Z)
    *
    * What it does:
@@ -4572,6 +5281,13 @@ namespace
       moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();
       moho::register_CConFunc_CreateProp();
+      moho::register_CConFunc_CreateUnit();
+      moho::register_CConFunc_LotsOfProps();
+      moho::register_CConFunc_KillSelectedUnits();
+      moho::register_CConFunc_DestroySelectedUnits();
+      moho::register_CConFunc_ProcessInfoPair();
+      moho::register_CConFunc_UI_TrackUnit();
+      moho::register_CConFunc_RenameUnit();
       moho::register_CConFunc_IssueCommand();
       moho::register_CConFunc_StartCommandMode();
       moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
