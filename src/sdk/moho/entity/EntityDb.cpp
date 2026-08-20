@@ -2683,8 +2683,8 @@ namespace
   }
 
   /**
-   * Address: 0x00688180 (FUN_00688180, sub_688180, std::map_uint_IdPool::_Node
-   * allocator)
+   * Address: 0x00688180 (FUN_00688180, sub_688180)
+   * Mangled: std::map_uint_IdPool::_Node allocator
    *
    * What it does:
    * Raw node allocator only (left/parent/right left null); the immediate
