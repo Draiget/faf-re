@@ -10,47 +10,47 @@ Progress snapshot:
   - *IDA index, exported*
 - Progress coverage:  **`96.87%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,063`*
+  - *Total amount of completed tokens: `65,064`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,460` (82.17%)
+- `recovered`: `53,463` (82.17%)
 - `skip`: `6,126` (9.42%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,477` (8.42%) — proven third-party/import-boundary code
+- `external_dependency`: `5,475` (8.41%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `409` (0.61%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `1,765` (2.63%)**
+- **`blocked`: `1,764` (2.63%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,174`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,174`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,173`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,173`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Binary Callsite Readiness
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,460 functions) — binary caller context
+### Recovered (53,463 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,389` | 30.66% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,390` | 30.66% |
 | Vtable-anchored (virtual override of a recovered class) | `5,891` | 11.02% |
-| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,558` | 10.40% |
-| No recovered caller token yet (orphan risk) | `2,152` | 4.03% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,250` | 43.49% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,560` | 10.40% |
+| No recovered caller token yet (orphan risk) | `2,151` | 4.02% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,251` | 43.49% |
 | Unclassified data xref (manual review) | `216` | 0.40% |
 | RTTI-only | `4` | 0.01% |
 
-### Not-yet-recovered (2,174 blocked + needs_evidence) — backlog readiness
+### Not-yet-recovered (2,173 blocked + needs_evidence) — backlog readiness
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `347` | 15.96% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `347` | 15.97% |
 | Vtable-anchored (recover with the owning class) | `125` | 5.75% |
 | Framework dispatch (wx/EH/Lua/reflection) | `9` | 0.41% |
-| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `771` | 35.46% |
-| No indexed callsite evidence (needs investigation/evidence) | `919` | 42.27% |
+| **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `771` | 35.48% |
+| No indexed callsite evidence (needs investigation/evidence) | `918` | 42.25% |
 | Unclassified data xref (manual review) | `2` | 0.09% |
 | RTTI-only | `1` | 0.05% |
 
