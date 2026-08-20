@@ -22,7 +22,16 @@ namespace moho
 
   static_assert(sizeof(wxAccelTableEntryRuntime) == 0x10, "wxAccelTableEntryRuntime size must be 0x10");
 
-  class ScrDebugWindow : public wxTopLevelWindowRuntime
+  /**
+   * `ScrDebugWindow` is a real `wxFrame` in this binary's RTTI
+   * (`class ScrDebugWindow : public wxFrame, public wxFrameBase, ...`,
+   * `dumps/rtti_dump_all.hpp`), and its vftable
+   * (`??_7ScrDebugWindow@Moho@@6B@`, VA 0x00E0863C) carries
+   * `wxFrame::ShowFullScreen` (FUN_0099EC80) at slot 138, same as
+   * `WSupComFrame`/`wxLogFrameRuntime` - see `wxFrameRuntime` in
+   * `WxRuntimeTypes.h` for the shared override.
+   */
+  class ScrDebugWindow : public wxFrameRuntime
   {
   public:
     /**
