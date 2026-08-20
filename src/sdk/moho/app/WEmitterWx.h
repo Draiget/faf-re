@@ -14,6 +14,7 @@ namespace moho
 {
   class Entity;
   class IEffect;
+  class IUnit;
   class Sim;
   class Unit;
 
@@ -70,302 +71,49 @@ namespace moho
     "WEmitterCommandCheckSource::mFirstMenuItemNode offset must be 0x44"
   );
 
-  struct WEmitterCurveEditorVTable;
-  struct WEmitterCurvePanel;
-
   /**
-   * One vertical column of the curve envelope: a time on the horizontal axis
-   * plus the value/tangent pair that gives the band its height there.
+   * `WCurveEditor` (curve widget), `WCurveEditorPanel` (key/range field
+   * panel wrapping one editor) and their `CurveEnvelopeColumn` paint helper
+   * are recovered in `moho/app/WxRuntimeTypes.h` alongside `WSupComFrame`
+   * and friends - `WCurveEditorPanel` needs to be visible there so other
+   * wx-runtime consumers can reference it without pulling in this
+   * WEmitterWx-specific header. This pass connected the pre-existing
+   * behavior methods below to the real constructors
+   * (`Moho::WCurveEditor::WCurveEditor`, `Moho::WCurveEditorPanel::WCurveEditorPanel`);
+   * they previously lived here under the working names `WEmitterCurveEditor`
+   * / `WEmitterCurvePanel` before either constructor had callsite evidence
+   * to recover against.
    */
-  struct CurveEnvelopeColumn
-  {
-    float mTime = 0.0f;
-    float mValue = 0.0f;
-    float mTangent = 0.0f;
-  };
-
-  /** Envelope edge selectors taken by `ProjectCurvePointToScreen`. */
-  inline constexpr std::int32_t kCurveEnvelopeUpperEdge = 0;
-  inline constexpr std::int32_t kCurveEnvelopeCurveValue = 1;
-  inline constexpr std::int32_t kCurveEnvelopeLowerEdge = 2;
-
-  struct WEmitterCurveEditor
-  {
-    WEmitterCurveEditorVTable* mVTable = nullptr;
-    std::uint8_t mReserved004To027[0x24]{};
-
-    /** wx window id, used as the command id of the curve-changed event. */
-    std::int32_t mWindowId = 0;
-    std::uint8_t mReserved02CTo12F[0x104]{};
-
-    /**
-     * Cursor into `mCurve.mKeys` naming the key the user currently has
-     * selected. Seeded to `mCurve.mKeys.begin()` by the constructor
-     * (0x00661470) and by FUN_00661A90 (0x00661B37); "no selection" is
-     * expressed as `mSelectedKey == mCurve.mKeys.end()`.
-     */
-    Wm3::Vector3f* mSelectedKey = nullptr;
-    std::uint8_t mReserved134To137[0x4]{};
-    SEfxCurve mCurve;
-
-    /**
-     * Time-axis pixels-per-unit, recomputed by the paint handler
-     * (FUN_006621F0) as `clientWidth / (mViewTimeMax - mViewTimeMin)`.
-     */
-    float mViewTimeScale = 0.0f;
-
-    /**
-     * Value-axis units-per-pixel scale. Recomputed by the resize handler
-     * (FUN_006621F0 stores the value span here, then divides the time span by
-     * it) and used as the divisor that converts pixel / wheel deltas into
-     * curve-value deltas (FUN_006617A0, FUN_00661820, FUN_00661900,
-     * FUN_00661A90 all divide by `[this+0x174]`).
-     */
-    float mViewValueScale = 0.0f;
-
-    /** Client size cached by the paint handler (FUN_006621F0). */
-    std::int32_t mClientWidth = 0;
-    std::int32_t mClientHeight = 0;
-
-    /**
-     * Visible view rectangle over the curve, stored interleaved as
-     * (timeMin, valueMin, timeMax, valueMax). Proven by the `WCurveEditor`
-     * constructor at 0x006613FA-0x0066142F, which seeds `[0x180] = 0.0f`,
-     * `[0x188] = arg8`, `[0x184] = argC`, `[0x18C] = arg10`; and by the span
-     * arithmetic in FUN_006621F0 (`[0x188]-[0x180]` paired with
-     * `[0x18C]-[0x184]`).
-     */
-    float mViewTimeMin = 0.0f;
-    float mViewValueMin = 0.0f;
-    float mViewTimeMax = 0.0f;
-    float mViewValueMax = 0.0f;
-    /** Set once the widget has captured the mouse for a drag (FUN_00661820). */
-    std::uint8_t mMouseCaptured = 0;
-    std::uint8_t mCurveDirty = 0;
-    std::uint8_t mReserved192To193[0x2]{};
-
-    /** Caption painted at the widget's top-left corner. */
-    wxStringRuntime mCaption;
-
-    /** Script key this curve is written out under (FUN_00661580). */
-    wxStringRuntime mScriptName;
-
-    /** Panel that owns this editor; refreshed after a curve assignment. */
-    WEmitterCurvePanel* mOwnerPanel = nullptr;
-
-    /** Cursor position cached on button-down (FUN_00661820). */
-    std::int32_t mLastMouseX = 0;
-    std::int32_t mLastMouseY = 0;
-
-    /** Which button is driving the current drag: 1 = left, 2 = middle. */
-    std::int32_t mActiveDragButton = 0;
-
-    void ResetCurveXRange(float rangeMax) noexcept;
-
-    /**
-     * Address: 0x006617A0 (FUN_006617A0)
-     *
-     * What it does:
-     * `wxEventTableEntry` mouse-wheel sink at 0x00F59D44: zooms the value axis
-     * about its centre, rejecting zooms that would collapse the visible span
-     * below 0.1f, then raises the curve-changed notification.
-     */
-    void ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept;
-
-    /**
-     * Address: 0x00661100 (FUN_00661100)
-     *
-     * What it does:
-     * Clears the dirty flag and posts a `wxEVT_COMMAND_BUTTON_CLICKED`
-     * command event carrying this editor's window id, so the owning panel
-     * learns the curve changed.
-     */
-    void PostCurveChangedCommand();
-
-    /**
-     * Address: 0x006614B0 (FUN_006614B0)
-     *
-     * What it does:
-     * Moves the selected key to `(time, value, tangent)`, clamping the time
-     * into the visible time range and against the neighbouring keys (to keep
-     * keys sorted by time) and the value into the visible value range.
-     */
-    void MoveSelectedKeyTo(float time, float value, float tangent);
-
-    /**
-     * Address: 0x00661B90 (FUN_00661B90)
-     *
-     * What it does:
-     * Paints one span of the curve's tangent envelope between the given key
-     * and its neighbour (clamped to the visible time range at either end),
-     * then draws the curve line across that span.
-     */
-    void DrawKeyEnvelopeSpan(void* dc, const Wm3::Vector3f* key) const;
-
-    /**
-     * Address: 0x00662180 (FUN_00662180)
-     *
-     * What it does:
-     * Draws one key's 5x5 grab handle, cyan when selected and red otherwise.
-     */
-    void DrawKeyHandle(void* dc, const Wm3::Vector3f* key) const;
-
-    /**
-     * Address: 0x006621F0 (FUN_006621F0)
-     *
-     * What it does:
-     * `wxEventTableEntry` paint sink: caches the client size, derives the view
-     * scales, and paints the envelope spans, key handles and axis labels.
-     */
-    void OnPaint();
-
-    /**
-     * Address: 0x00661820 (FUN_00661820)
-     *
-     * What it does:
-     * Button-down sink: caches the cursor, selects the nearest key, records the
-     * drag button, captures the mouse and repaints.
-     */
-    void OnMouseDown(wxEventRuntime& mouseEvent);
-
-    /**
-     * Address: 0x00661A90 (FUN_00661A90)
-     *
-     * What it does:
-     * Key-editing sink: a plain click inserts a key at the cursor, a
-     * control-click deletes the nearest one (never the last).
-     */
-    void OnCurveKeyEdit(wxEventRuntime& mouseEvent);
-
-    /**
-     * Address: 0x006612A0 (FUN_006612A0)
-     *
-     * What it does:
-     * Projects one curve point to widget space. `edge` selects the upper
-     * envelope edge (`value + tangent/2`), the curve value itself, or the
-     * lower edge (`value - tangent/2`).
-     */
-    [[nodiscard]] wxPoint ProjectCurvePointToScreen(
-      std::int32_t edge,
-      const CurveEnvelopeColumn& column
-    ) const noexcept;
-
-    /**
-     * Address: 0x00669E40 (FUN_00669E40)
-     *
-     * What it does:
-     * Replaces the edited curve wholesale, drops the now-dangling selection,
-     * notifies, and refreshes the owning panel's fields.
-     */
-    void AssignCurve(const SEfxCurve& source);
-
-    /**
-     * Address: 0x00661580 (FUN_00661580)
-     *
-     * What it does:
-     * Formats this curve as a Lua table (`XRange` plus one `{x,y,z}` line per
-     * key). See the body note: the retail exporter discards the text.
-     */
-    void FormatCurveScript() const;
-
-    void MarkCurveClean() noexcept;
-    [[nodiscard]] const SEfxCurve& Curve() const noexcept;
-  };
-  static_assert(offsetof(WEmitterCurveEditor, mCurve) == 0x138, "WEmitterCurveEditor::mCurve offset must be 0x138");
-  static_assert(
-    offsetof(WEmitterCurveEditor, mViewTimeScale) == 0x170,
-    "WEmitterCurveEditor::mViewTimeScale offset must be 0x170"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mViewValueScale) == 0x174,
-    "WEmitterCurveEditor::mViewValueScale offset must be 0x174"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mClientWidth) == 0x178,
-    "WEmitterCurveEditor::mClientWidth offset must be 0x178"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mClientHeight) == 0x17C,
-    "WEmitterCurveEditor::mClientHeight offset must be 0x17C"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mViewTimeMin) == 0x180,
-    "WEmitterCurveEditor::mViewTimeMin offset must be 0x180"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mViewValueMin) == 0x184,
-    "WEmitterCurveEditor::mViewValueMin offset must be 0x184"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mViewTimeMax) == 0x188,
-    "WEmitterCurveEditor::mViewTimeMax offset must be 0x188"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mViewValueMax) == 0x18C,
-    "WEmitterCurveEditor::mViewValueMax offset must be 0x18C"
-  );
-  static_assert(
-    offsetof(WEmitterCurveEditor, mCurveDirty) == 0x191,
-    "WEmitterCurveEditor::mCurveDirty offset must be 0x191"
-  );
-
-  struct WEmitterCurvePanel : WCurveEditorPanel
-  {
-    std::uint8_t mReserved004To133[0x130]{};
-    WEmitterCurveEditor* mCurveEditor = nullptr;      // +0x134
-
-    /**
-     * The five numeric fields the panel keeps in sync with the editor. Their
-     * wx command ids are consecutive from 622 (0x26E), which is how
-     * FUN_00663650 selects between them.
-     */
-    WEmitterTextControl* mKeyTimeText = nullptr;      // +0x138, id 622
-    WEmitterTextControl* mKeyValueText = nullptr;     // +0x13C, id 623
-    WEmitterTextControl* mKeyTangentText = nullptr;   // +0x140, id 624
-    WEmitterTextControl* mViewValueMinText = nullptr; // +0x144, id 625
-    WEmitterTextControl* mViewValueMaxText = nullptr; // +0x148, id 626
-
-    /** Set once the panel's fields are bound; commits are ignored until then. */
-    std::uint8_t mFieldsLive = 0;                     // +0x14C
-
-    /**
-     * Address: 0x00663650 (FUN_00663650)
-     *
-     * What it does:
-     * `wxEventTableEntry` sink shared by all five numeric fields: re-reads the
-     * committed text, applies it to the selected key or the visible value
-     * range, and mirrors the parsed value back into the field.
-     */
-    void OnCurveFieldCommitted(wxEventRuntime& commandEvent);
-
-    /**
-     * Address: 0x00663400 (FUN_00663400)
-     *
-     * What it does:
-     * Pushes the editor's current key and view-range values back out into the
-     * five numeric fields, formatted as `%f`.
-     */
-    void RefreshFieldsFromCurve();
-  };
-  static_assert(
-    offsetof(WEmitterCurvePanel, mCurveEditor) == 0x134,
-    "WEmitterCurvePanel::mCurveEditor offset must be 0x134"
-  );
-  static_assert(
-    offsetof(WEmitterCurvePanel, mKeyTimeText) == 0x138,
-    "WEmitterCurvePanel::mKeyTimeText offset must be 0x138"
-  );
-  static_assert(
-    offsetof(WEmitterCurvePanel, mViewValueMaxText) == 0x148,
-    "WEmitterCurvePanel::mViewValueMaxText offset must be 0x148"
-  );
-  static_assert(
-    offsetof(WEmitterCurvePanel, mFieldsLive) == 0x14C,
-    "WEmitterCurvePanel::mFieldsLive offset must be 0x14C"
-  );
 
   struct WEmitterWx : WWinManagedFrame
   {
+    /**
+     * Address: 0x00663900 (FUN_00663900, Moho::WEmitterWx::WEmitterWx)
+     * Mangled: ??0WEmitterWx@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::WEmitterWx *__thiscall Moho::WEmitterWx::WEmitterWx(
+     *   IUnit *attachUnit@<ecx>, Moho::WEmitterWx *this, float *spawnPosition,
+     *   char *boneName);
+     * (IDA's own `this`/`a2` labels are swapped from real C++ ABI, same as
+     * `WCurveEditor::WCurveEditor` - `a2` on the stack is the actual
+     * constructed object.)
+     *
+     * What it does:
+     * Builds the top-level "Emitter Editor" frame (800x600,
+     * `WWinManagedFrame::WWinManagedFrame`), resolves `attachUnit` into the
+     * weak `mAttachedUnit` link (through the active sim driver's entity map
+     * when `attachUnit` is an `IUnit*`, or unlinked when null), stores
+     * `boneName` into `mBoneName` when given, seeds the default particle/ramp
+     * texture paths, builds the File/Options/LOD menu bar (each item wired to
+     * `OnMenuCommand` through the shared command-sink event table), resolves
+     * the initial preview effect (attached-to-entity or free-standing at
+     * `spawnPosition`), and lays out the scalar/flag/texture controls plus one
+     * `WCurveEditorPanel` notebook tab per animatable curve before finishing
+     * with a `RefreshPreviewEmitter` pass.
+     */
+    WEmitterWx(IUnit* attachUnit, const Wm3::Vector3f& spawnPosition, const char* boneName);
+
     /**
      * Address: 0x006672F0 (FUN_006672F0)
      *
@@ -480,7 +228,7 @@ namespace moho
     double mCachedRepeatTime = 0.0;                            // +0x1D8
     std::uint8_t mRefreshGuard = 0;                            // +0x1E0
     std::uint8_t mReserved1E1To1E3[0x3]{};
-    msvc8::vector<WEmitterCurvePanel*> mCurvePanels;           // +0x1E4
+    msvc8::vector<WCurveEditorPanel*> mCurvePanels;             // +0x1E4
     WeakPtr<IEffect> mPreviewEffect;                           // +0x1F4
     WeakPtr<Unit> mAttachedUnit;                               // +0x1FC
     msvc8::string mBoneName;                                   // +0x204
