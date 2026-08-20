@@ -1,5 +1,7 @@
 #include "moho/unit/tasks/CUnitMoveTask.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -833,7 +835,39 @@ namespace gpg
 
 namespace
 {
-  gpg::SerSaveLoadHelperListRuntime gCUnitMoveTaskSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes) - `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by every
+  // SerHelperBase-derived serializer, so it undersized this global (same
+  // bug found and fixed for EntityAttributes/CUnitGuardTask this session).
+  struct CUnitMoveTaskSerializerHelper
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitMoveTaskSerializerHelper, mNext) == 0x04,
+    "CUnitMoveTaskSerializerHelper::mNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CUnitMoveTaskSerializerHelper, mPrev) == 0x08,
+    "CUnitMoveTaskSerializerHelper::mPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CUnitMoveTaskSerializerHelper) == 0x14, "CUnitMoveTaskSerializerHelper size must be 0x14"
+  );
+
+  CUnitMoveTaskSerializerHelper gCUnitMoveTaskSerializer{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    CUnitMoveTaskSerializerHelper& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
 
   /**
    * Address: 0x00619040 (FUN_00619040)
@@ -844,7 +878,7 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMoveTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitMoveTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitMoveTaskSerializer));
   }
 
   /**
@@ -856,6 +890,58 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitMoveTaskSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitMoveTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitMoveTaskSerializer));
   }
+
+  void DeserializeCUnitMoveTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::CUnitMoveTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeCUnitMoveTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::CUnitMoveTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_CUnitMoveTaskSerializer_atexit()
+  {
+    (void)UnlinkCUnitMoveTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BD1050 (FUN_00BD1050, register_CUnitMoveTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global CUnitMoveTask serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CUnitMoveTaskSerializer()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitMoveTaskSerializer.mNext);
+    gCUnitMoveTaskSerializer.mNext = self;
+    gCUnitMoveTaskSerializer.mPrev = self;
+    gCUnitMoveTaskSerializer.mLoadCallback = &DeserializeCUnitMoveTaskSerializerCallback;
+    gCUnitMoveTaskSerializer.mSaveCallback = &SerializeCUnitMoveTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitMoveTaskSerializer_atexit);
+  }
+
+  struct CUnitMoveTaskSerializerStartupBootstrap
+  {
+    CUnitMoveTaskSerializerStartupBootstrap()
+    {
+      register_CUnitMoveTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitMoveTaskSerializerStartupBootstrap gCUnitMoveTaskSerializerStartupBootstrap;
 } // namespace
