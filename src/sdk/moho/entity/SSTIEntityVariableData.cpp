@@ -176,7 +176,7 @@ namespace
    * Initializes callback lanes for global `SSTIEntityVariableDataSerializer`
    * helper storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] moho::SSTIEntityVariableDataSerializer*
+  [[nodiscard]] moho::SSTIEntityVariableDataSerializer*
   InitializeSSTIEntityVariableDataSerializerStartupThunk()
   {
     gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gSSTIEntityVariableDataSerializer.mNext);
@@ -185,6 +185,24 @@ namespace
     gSSTIEntityVariableDataSerializer.mSerLoadFunc = &DeserializeSSTIEntityVariableDataSerializerCallback;
     gSSTIEntityVariableDataSerializer.mSerSaveFunc = &SerializeSSTIEntityVariableDataSerializerCallback;
     return &gSSTIEntityVariableDataSerializer;
+  }
+
+  void cleanup_SSTIEntityVariableDataSerializer_atexit()
+  {
+    (void)UnlinkSSTIEntityVariableDataSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA100 (FUN_00BCA100, register_SSTIEntityVariableDataSerializer)
+   *
+   * What it does:
+   * Initializes the global SSTIEntityVariableData serializer helper
+   * callbacks and installs process-exit cleanup.
+   */
+  void register_SSTIEntityVariableDataSerializer()
+  {
+    (void)InitializeSSTIEntityVariableDataSerializerStartupThunk();
+    (void)std::atexit(&cleanup_SSTIEntityVariableDataSerializer_atexit);
   }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
@@ -1095,6 +1113,19 @@ namespace moho
   // Cached reflected `SSTIEntityAttachInfo` lane.
   gpg::RType* SSTIEntityAttachInfo::sType = nullptr;
 } // namespace moho
+
+namespace
+{
+  struct SSTIEntityVariableDataSerializerStartupBootstrap
+  {
+    SSTIEntityVariableDataSerializerStartupBootstrap()
+    {
+      register_SSTIEntityVariableDataSerializer();
+    }
+  };
+
+  [[maybe_unused]] SSTIEntityVariableDataSerializerStartupBootstrap gSSTIEntityVariableDataSerializerStartupBootstrap;
+} // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
