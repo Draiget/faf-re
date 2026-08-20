@@ -1,6 +1,7 @@
 #include "moho/console/CConCommand.h"
 
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdarg>
 #include <cstdlib>
@@ -2597,6 +2598,106 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x007B55D0 (FUN_007B55D0, Moho::CON_CopySelectedUnitsToClipboard)
+ *
+ * What it does:
+ * Builds one `CreateUnitAtMouse(...)` Lua line per selected user-unit,
+ * positioned/oriented relative to the selection centroid, and copies the
+ * whole script to the Windows clipboard. Silently does nothing when there is
+ * no active session or the selection is empty (no localized "no session"
+ * feedback, unlike the other selection commands in this file).
+ *
+ * The binary reads the active session through the raw global `Moho::sWldSession`
+ * rather than through `WLD_GetActiveSession()`; both name the same `.data`
+ * slot (confirmed from `WLD_CreateSession`/`WLD_DestroySession`, which write
+ * that exact address while assigning the already-recovered `gActiveWldSession`),
+ * so this uses the established wrapper for consistency with every sibling
+ * command in this file.
+ */
+void moho::CON_CopySelectedUnitsToClipboard(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return;
+  }
+
+  SSelectionSetUserEntity& selection = session->mSelection;
+  SSelectionNodeUserEntity* const head = selection.mHead;
+  if (head == nullptr || FirstLiveSelectionNode(selection) == nullptr) {
+    return;
+  }
+
+  // First pass: sum ground-plane position (X/Z) across every live selected
+  // entity to find the selection's centroid.
+  float sumX = 0.0f;
+  float sumZ = 0.0f;
+  {
+    SSelectionNodeUserEntity* node = head->mLeft;
+    node = SSelectionSetUserEntity::find(&selection, node, &node);
+    while (node != head) {
+      if (UserEntity* const entity = DecodeUserEntityFromSelectionSlot(node->mEnt); entity != nullptr) {
+        sumX += entity->mVariableData.mCurTransform.pos_.x;
+        sumZ += entity->mVariableData.mCurTransform.pos_.z;
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+    }
+  }
+
+  const double inverseSelectionSize = 1.0 / static_cast<double>(static_cast<unsigned int>(selection.size()));
+  const float centroidX = static_cast<float>(sumX * inverseSelectionSize);
+  const float centroidZ = static_cast<float>(sumZ * inverseSelectionSize);
+
+  // Second pass: for every selected user-unit, append one
+  // `CreateUnitAtMouse` line encoding its position/yaw relative to the
+  // centroid, its blueprint id, and its owning army index.
+  msvc8::string commandScript;
+  {
+    SSelectionNodeUserEntity* node = head->mLeft;
+    node = SSelectionSetUserEntity::find(&selection, node, &node);
+    while (node != head) {
+      if (UserEntity* const entity = DecodeUserEntityFromSelectionSlot(node->mEnt); entity != nullptr) {
+        if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
+          const VTransform& transform = unit->mVariableData.mCurTransform;
+          const float relX = transform.pos_.x - centroidX;
+          const float relZ = transform.pos_.z - centroidZ;
+
+          // Standard yaw-from-quaternion extraction (Y-up ground plane):
+          // atan2(2*(w*y + x*z), 1 - 2*(x^2 + y^2)).
+          const float sinYaw = 2.0f
+            * (transform.orient_.w * transform.orient_.y + transform.orient_.z * transform.orient_.x);
+          const float cosYaw = 1.0f
+            - 2.0f * (transform.orient_.y * transform.orient_.y + transform.orient_.x * transform.orient_.x);
+          const float yaw = std::atan2(sinYaw, cosYaw);
+
+          const UserArmy* const army = unit->mArmy;
+          const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+
+          const msvc8::string commandLine = gpg::STR_Printf(
+            "   CreateUnitAtMouse('%s', %d, %7.2f, %7.2f, %8.5f)\n",
+            blueprint->mBlueprintId.c_str(),
+            army->mArmyIndex,
+            relX,
+            relZ,
+            yaw
+          );
+          commandScript += commandLine;
+        }
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+    }
+  }
+
+  const std::wstring wideCommandScript = gpg::STR_Utf8ToWide(commandScript.c_str());
+  (void)WIN_CopyToClipboard(wideCommandScript.c_str());
+}
+
+/**
  * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
  *
  * IDA signature:
@@ -3602,6 +3703,8 @@ namespace
     "spawn 100 props all over the map 2nd Arg = name of prop";
   constexpr const char* kConsoleStartupConKillSelectedUnitsDescription = "kill selected units.";
   constexpr const char* kConsoleStartupConDestroySelectedUnitsDescription = "destroy selected units.";
+  constexpr const char* kConsoleStartupConCopySelectedUnitsToClipboardDescription =
+    "copy selected units as a CreateUnitAtMouse Lua script to the clipboard.";
   constexpr const char* kConsoleStartupConProcessInfoPairDescription =
     "set the assist mode flag for the selected units.";
   constexpr const char* kConsoleStartupConUITrackUnitDescription = "track selected units.";
@@ -3656,6 +3759,7 @@ namespace
   CConFunc gCConFunc_LotsOfProps{};
   CConFunc gCConFunc_KillSelectedUnits{};
   CConFunc gCConFunc_DestroySelectedUnits{};
+  CConFunc gCConFunc_CopySelectedUnitsToClipboard{};
   CConFunc gCConFunc_ProcessInfoPair{};
   CConFunc gCConFunc_UI_TrackUnit{};
   CConFunc gCConFunc_RenameUnit{};
@@ -5040,6 +5144,39 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C03720 (FUN_00C03720, ??1CConFunc_CopySelectedUnitsToClipboard@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `CopySelectedUnitsToClipboard`.
+   */
+  void cleanup_CConFunc_CopySelectedUnitsToClipboard()
+  {
+    CleanupStartupConCommand(gCConFunc_CopySelectedUnitsToClipboard);
+  }
+
+  /**
+   * Address: 0x00BDF990 (FUN_00BDF990, register_CConFunc_CopySelectedUnitsToClipboard)
+   *
+   * Callsite evidence (class 1, code xref):
+   * `FUN_007B55D0.xrefs.txt` -> `code from=0x00BDF9B0 owner=0x00BDF990 type= 1
+   * from_name=register_CConFunc_CopySelectedUnitsToClipboard owner_name=register_CConFunc_CopySelectedUnitsToClipboard`
+   * (`mov Moho__CConFunc_CopySelectedUnitsToClipboard.mFunc, offset Moho__CON_CopySelectedUnitsToClipboard`).
+   *
+   * What it does:
+   * Registers startup console callback for `CopySelectedUnitsToClipboard`.
+   */
+  void register_CConFunc_CopySelectedUnitsToClipboard()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_CopySelectedUnitsToClipboard,
+      kConsoleStartupConCopySelectedUnitsToClipboardDescription,
+      "CopySelectedUnitsToClipboard",
+      &CON_CopySelectedUnitsToClipboard,
+      &cleanup_CConFunc_CopySelectedUnitsToClipboard
+    );
+  }
+
+  /**
    * Address: 0x00C06280 (FUN_00C06280, ??1CConFunc_ProcessInfoPair@Moho@@QAE@@Z)
    *
    * What it does:
@@ -5458,6 +5595,7 @@ namespace
       moho::register_CConFunc_LotsOfProps();
       moho::register_CConFunc_KillSelectedUnits();
       moho::register_CConFunc_DestroySelectedUnits();
+      moho::register_CConFunc_CopySelectedUnitsToClipboard();
       moho::register_CConFunc_ProcessInfoPair();
       moho::register_CConFunc_UI_TrackUnit();
       moho::register_CConFunc_RenameUnit();
