@@ -10968,6 +10968,21 @@ MeshThumbnailListNodeRuntime** EraseMeshThumbnailListNodeRuntime(
  * What it does:
  * Builds one current-selection range lane and, when valid, submits an
  * axis-aligned quad derived from selected entry bounds.
+ *
+ * Wiring status (intentionally not yet called):
+ * The real, single binary caller is `Moho::RangeRenderer::Render`
+ * (`FUN_007EEA00`, 0x007EEBD3), whose recovered body in
+ * `moho/render/RangeRenderer.cpp` documents this exact gap in its own
+ * address-block comment: the final selection-bounds ring pass is left
+ * unwired because this function reads `UserArmy`-relative fields at
+ * `+0x1BC..+0x1D0` that have no named accessor yet, and `UserArmy.h` is
+ * owned by a different, concurrently active recovery pass. Wiring the
+ * call here would require adding raw offset reads into a class this
+ * file does not own, which the reconstruction fidelity contract
+ * forbids. See `decomp/recovery/recovered_progress.json`
+ * (`fa_full_2026_03_26`, `FUN_007EF1C0`, `blocker_type=needs_layout`)
+ * for the exact field list gathered from the binary. Unblocks once
+ * `UserArmy` grows named selection-bounds accessors at those offsets.
  */
 int UpdateSelectedEntryBoundsRuntime(
   void* const owner,
