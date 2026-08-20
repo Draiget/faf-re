@@ -148,8 +148,12 @@ namespace moho
      * at 0x007D183F-0x007D1A2C and `Moho::WRenViewport::Render` at
      * 0x007F940E-0x007F944B.
      *
-     * No body is recovered yet; the render chain below it is still blocked on
-     * the `sWldMap` and `shaderVarFrameRangeColor` globals.
+     * The full render chain below it is now recovered: `func_RenderBuildRings`,
+     * `func_RenderRings`, `func_Draw_Rings`, `sub_7EF280` and `sub_7EF420` all
+     * live in `RangeRenderer.cpp`. `sub_7EF1C0` (the final selection-bounds
+     * ring pass) remains `blocked` on named `UserArmy` selection-bounds
+     * fields owned by a different in-flight recovery pass - see the
+     * `Render()` definition's own comment for the exact blocker.
      */
     void Render(CWldSession* worldSession, CameraImpl* camera, unsigned int viewportHeadIndex, float alpha);
 
@@ -176,7 +180,7 @@ namespace moho
 
   public:
     SRangeRenderCategoryTree mRangeProfiles;                           // +0x04
-    msvc8::vector<SRangeRenderProfile> mVisibleProfiles;              // +0x14
+    msvc8::vector<SRangeRenderProfile> mVisibleProfiles;              // +0x10
     std::uint32_t mIndexCount;                                        // +0x20
     std::uint32_t mVertexCount;                                       // +0x24
     RenderGeometryBuffers mGeometry;                                  // +0x28
