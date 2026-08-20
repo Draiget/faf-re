@@ -1794,7 +1794,7 @@ namespace moho
    * Allocates one `CAnimationManipulator`, builds one typed `RRef` for that
    * object, and stores it as unowned in the construct-result lane.
    */
-  [[maybe_unused]] void CAnimationManipulatorMemberConstruct(gpg::SerConstructResult* const result)
+  void CAnimationManipulatorMemberConstruct(gpg::SerConstructResult* const result)
   {
     auto* const object = new CAnimationManipulator();
     const gpg::RRef objectRef = MakeTypedRef(object, CachedCAnimationManipulatorType());

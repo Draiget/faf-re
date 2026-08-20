@@ -283,7 +283,7 @@ namespace
    * Resolves current transport owner of this dispatch unit and asks that
    * transport to detach the unit when both lanes are valid.
    */
-  [[maybe_unused]] int DetachDispatchUnitFromTransport(IAiCommandDispatchImpl* const dispatch)
+  int DetachDispatchUnitFromTransport(IAiCommandDispatchImpl* const dispatch)
   {
     if (!dispatch || !dispatch->mUnit) {
       return 0;

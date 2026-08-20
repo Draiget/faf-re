@@ -2331,7 +2331,7 @@ namespace
    * head one-by-one, and dispatches one integer update event through each
    * listener's vtable slot-0 callback.
    */
-  [[maybe_unused]] void DispatchFormationUpdateEvent(
+  void DispatchFormationUpdateEvent(
     const std::int32_t eventCode,
     moho::TDatListItem<void, void>& listenerHead
   )
