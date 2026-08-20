@@ -1,6 +1,7 @@
 #include "CEconomy.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <typeinfo>
 #include <new>
 
@@ -58,9 +59,6 @@ namespace
     }
   };
 
-  gpg::SerSaveLoadHelperListRuntime gSEconValueSerializer{};
-  gpg::SerSaveLoadHelperListRuntime gSEconTotalsSerializer{};
-
   struct CEconomySerializerHelperRuntime
   {
     void* mVtable;
@@ -88,6 +86,13 @@ namespace
   static_assert(sizeof(CEconomySerializerHelperRuntime) == 0x14, "CEconomySerializerHelperRuntime size must be 0x14");
 
   CEconomySerializerHelperRuntime gCEconomySerializerHelper{};
+
+  // Same 0x14-byte SerHelperBase-derived shape as gCEconomySerializerHelper
+  // above (vtable + mHelperNext/mHelperPrev + load/save callback lanes) --
+  // reused here rather than duplicating the layout for these two globals.
+  CEconomySerializerHelperRuntime gSEconValueSerializer{};
+  CEconomySerializerHelperRuntime gSEconTotalsSerializer{};
+
   struct CEconomyConstructHelperRuntime
   {
     void* mVtable;
@@ -151,9 +156,9 @@ namespace
    * Unlinks `SEconValue` serializer helper links and restores self-links for
    * intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSEconValueSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSEconValueSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSEconValueSerializer);
+    return UnlinkHelperNode(gSEconValueSerializer);
   }
 
   /**
@@ -165,7 +170,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSEconValueSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSEconValueSerializer);
+    return UnlinkHelperNode(gSEconValueSerializer);
   }
 
   /**
@@ -175,9 +180,9 @@ namespace
    * Unlinks `SEconTotals` serializer helper links and restores self-links for
    * intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSEconTotalsSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSEconTotalsSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSEconTotalsSerializer);
+    return UnlinkHelperNode(gSEconTotalsSerializer);
   }
 
   /**
@@ -189,8 +194,169 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSEconTotalsSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSEconTotalsSerializer);
+    return UnlinkHelperNode(gSEconTotalsSerializer);
   }
+
+  /**
+   * Address: 0x00563C50 (FUN_00563C50, Moho::SEconValueSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `SEconValue`. Reads the two-float
+   * (energy, mass) pair directly through the archive; `SEconValue` has no
+   * MemberDeserialize of its own, matching the binary's inline field reads.
+   */
+  void DeserializeSEconValueSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const value = reinterpret_cast<moho::SEconValue*>(objectPtr);
+    if (archive == nullptr || value == nullptr) {
+      return;
+    }
+    archive->ReadFloat(&value->energy);
+    archive->ReadFloat(&value->mass);
+  }
+
+  /**
+   * Address: 0x00563C80 (FUN_00563C80, Moho::SEconValueSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `SEconValue`. Writes the two-float
+   * (energy, mass) pair directly through the archive; `SEconValue` has no
+   * MemberSerialize of its own, matching the binary's inline field writes.
+   */
+  void SerializeSEconValueSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    const auto* const value = reinterpret_cast<const moho::SEconValue*>(objectPtr);
+    if (archive == nullptr || value == nullptr) {
+      return;
+    }
+    archive->WriteFloat(value->energy);
+    archive->WriteFloat(value->mass);
+  }
+
+  /**
+   * Address: 0x00BF56C0 (FUN_00BF56C0, Moho::SEconValueSerializer::~SEconValueSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `SEconValueSerializer` helper node,
+   * matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_SEconValueSerializer_atexit()
+  {
+    (void)UnlinkSEconValueSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA870 (FUN_00BCA870, register_SEconValueSerializer)
+   *
+   * What it does:
+   * Initializes the global `SEconValue` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_SEconValueSerializer()
+  {
+    InitializeHelperNode(gSEconValueSerializer);
+    gSEconValueSerializer.mLoadCallback = &DeserializeSEconValueSerializerCallback;
+    gSEconValueSerializer.mSaveCallback = &SerializeSEconValueSerializerCallback;
+    (void)std::atexit(&cleanup_SEconValueSerializer_atexit);
+  }
+
+  /**
+   * Address: 0x00563E80 (FUN_00563E80, Moho::SEconTotalsSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `SEconTotals`. Forwards the
+   * reflected object pointer to `SEconTotals::MemberDeserialize`
+   * (FUN_005641F0 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeSEconTotalsSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const totals = reinterpret_cast<moho::SEconTotals*>(objectPtr);
+    if (totals == nullptr) {
+      return;
+    }
+    totals->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00563E90 (FUN_00563E90, Moho::SEconTotalsSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `SEconTotals`. Forwards the
+   * reflected object pointer to `SEconTotals::MemberSerialize`
+   * (FUN_00564320 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeSEconTotalsSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const totals = reinterpret_cast<moho::SEconTotals*>(objectPtr);
+    if (totals == nullptr) {
+      return;
+    }
+    totals->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF5750 (FUN_00BF5750, Moho::SEconTotalsSerializer::~SEconTotalsSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `SEconTotalsSerializer` helper node,
+   * matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_SEconTotalsSerializer_atexit()
+  {
+    (void)UnlinkSEconTotalsSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA8D0 (FUN_00BCA8D0, register_SEconTotalsSerializer)
+   *
+   * What it does:
+   * Initializes the global `SEconTotals` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_SEconTotalsSerializer()
+  {
+    InitializeHelperNode(gSEconTotalsSerializer);
+    gSEconTotalsSerializer.mLoadCallback = &DeserializeSEconTotalsSerializerCallback;
+    gSEconTotalsSerializer.mSaveCallback = &SerializeSEconTotalsSerializerCallback;
+    (void)std::atexit(&cleanup_SEconTotalsSerializer_atexit);
+  }
+
+  struct SEconValueAndTotalsSerializerStartupBootstrap
+  {
+    SEconValueAndTotalsSerializerStartupBootstrap()
+    {
+      register_SEconValueSerializer();
+      register_SEconTotalsSerializer();
+    }
+  };
+
+  [[maybe_unused]] SEconValueAndTotalsSerializerStartupBootstrap gSEconValueAndTotalsSerializerStartupBootstrap;
 
   /**
    * Address: 0x007730D0 (FUN_007730D0)
