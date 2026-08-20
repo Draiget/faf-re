@@ -245,6 +245,47 @@ namespace moho
     func_NewEntityCategory(LuaPlus::LuaState* state, LuaPlus::LuaObject* out, EntityCategorySet* value);
 
   /**
+   * Address: 0x00BC9E60 (FUN_00BC9E60, register_EntityCategory)
+   *
+   * What it does:
+   * Reads the current head of the `Core` Lua init-form set
+   * (`Moho::scr_CoreInits`) and returns it, matching the read half of the
+   * binary's list-prepend.
+   *
+   * The binary's own body is only 5 instructions: construct nothing, then
+   * splice a link-time-constant object into `scr_CoreInits.mForms` by raw
+   * pointer:
+   *
+   *   mov eax, scr_CoreInits.mForms          ; save old head
+   *   mov resource_deposit_t_end.mPrevDef, eax  ; anchor->mNextInSet = old head
+   *   mov scr_CoreInits.mForms, offset resource_deposit_t_end
+   *   retn
+   *
+   * IDA's `resource_deposit_t_end` label is a proximity artifact, not this
+   * object's identity - it is literally the one-past-end address of the
+   * unrelated `resource_deposit_t` string array read by
+   * `Moho::IResources::Translate` (FUN_00546CD0); the linker simply placed
+   * the next `.data` object at that exact byte. The write at +0x10 into that
+   * address matches `CScrLuaInitForm::mNextInSet`, so the anchor genuinely
+   * is a `CScrLuaInitForm`-derived object (most likely `CScrLuaBinder`,
+   * matching the RTTI-dumped `Moho::<anon>::ParseEntityCategory_LuaFuncDef :
+   * CScrLuaBinder, CScrLuaInitForm`), but this call site has zero callees:
+   * the object's own fields - name, docstring, and (for a `CScrLuaBinder`)
+   * the bound Lua C function pointer - are baked in as link-time-constant
+   * data with no constructor call and no code xref, so nothing in the
+   * available IDA exports identifies which Lua form it actually is.
+   *
+   * Reproducing the write with a placeholder object would either publish a
+   * null-vtable node (crashing the first `CScrLuaInitFormSet::RunInits`
+   * walk) or fabricate unverified behavior for whatever form this really
+   * is - both forbidden by this project's fidelity rules. This mirrors the
+   * already-diagnosed `register_CAiAttackerImplLuaInitFormAnchor` case in
+   * `CAiAttackerImpl.cpp` (see the "Init-form anchor bug" writeup): keep the
+   * provable read, omit the unprovable write.
+   */
+  CScrLuaInitForm* register_EntityCategory();
+
+  /**
    * Address: 0x00557670 (FUN_00557670, func_EntityCategoryAdd)
    *
    * What it does:
