@@ -260,10 +260,20 @@ namespace moho
       int watchedBoneIndex, int referenceBoneIndex, bool markSkipInterp
     );
 
-    bool ManipulatorUpdate() override;
-
     /**
-     * Address: 0x006347E0 (FUN_006347E0, ?MoveManipulator@CBoneEntityManipulator@Moho@@QAEXXZ)
+     * Address: 0x006347E0 (FUN_006347E0, Moho::CBoneEntityManipulator::MoveManipulator)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CBoneEntityManipulator::MoveManipulator(CBoneEntityManipulator *this);
+     *
+     * VFTable SLOT: 1 (`??_7CBoneEntityManipulator@Moho@@6B@` = 0x00E21548,
+     * this address is stored at 0x00E2154C; the same slot in
+     * `??_7IAniManipulator@Moho@@6B@` (0x00E213A0) holds `_purecall`
+     * 0x00A82547, which is the slot `ManipulatorUpdate` declares). IDA's
+     * `MoveManipulator` label is a family-wide proximity artifact - every
+     * sibling manipulator carries it on the body that occupies this same slot.
+     * The constructor additionally calls it non-virtually at 0x006345D1 for
+     * the initial solve.
      *
      * What it does:
      * Drives the watched pose bone to track the target entity bone. With a live
@@ -273,7 +283,7 @@ namespace moho
      * parks the bone at (0, -10000, 0) with identity orientation and resets the
      * pose max-offset to -inf.
      */
-    void MoveManipulator();
+    bool ManipulatorUpdate() override;
 
     WeakPtr<Unit> mGoalUnit;           // +0x80
     WeakPtr<Entity> mTargetEntity;     // +0x88

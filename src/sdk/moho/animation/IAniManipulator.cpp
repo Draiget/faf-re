@@ -1560,7 +1560,9 @@ namespace moho
 
     (void)AddWatchBone(watchedBoneIndex);
     InitPivotFromBoneBounds();
-    MoveManipulator();
+    // 0x006345D1: the ctor's own initial solve, a direct (non-virtual) call to
+    // the body that also occupies vtable slot 1.
+    (void)ManipulatorUpdate();
 
     if (markSkipInterp) {
       if (CAniPoseBone* const watchedBone =
@@ -1721,16 +1723,23 @@ namespace moho
     return true;
   }
 
-  bool CBoneEntityManipulator::ManipulatorUpdate()
-  {
-    return false;
-  }
-
   /**
-   * Address: 0x006347E0 (FUN_006347E0, ?MoveManipulator@CBoneEntityManipulator@Moho@@QAEXXZ)
+   * Address: 0x006347E0 (FUN_006347E0, Moho::CBoneEntityManipulator::MoveManipulator)
    *
    * IDA signature:
    * void __thiscall Moho::CBoneEntityManipulator::MoveManipulator(CBoneEntityManipulator *this);
+   *
+   * VFTable SLOT: 1 (`??_7CBoneEntityManipulator@Moho@@6B@` = 0x00E21548, this
+   * address is stored at 0x00E2154C; slot 1 of `??_7IAniManipulator@Moho@@6B@`
+   * is `_purecall`, so this is the class's `ManipulatorUpdate` override, not a
+   * separate non-virtual method - IDA's `MoveManipulator` label is a
+   * family-wide proximity artifact. The ctor also calls it directly at
+   * 0x006345D1 (`call Moho__CBoneEntityManipulator__MoveManipulator`, xref
+   * owner 0x00634460) for the initial solve.
+   *
+   * The binary body returns nothing; `CAniActor::Update` discards the slot's
+   * result. Recovered as `true` on both arms, matching the sibling
+   * manipulators - neither arm is an early-out, both always solve.
    *
    * What it does:
    * Solves the watched pose bone toward the target entity bone. With a live
@@ -1741,7 +1750,7 @@ namespace moho
    * target: parks the bone at (0, -10000, 0) with identity orientation and
    * resets the pose max-offset to -inf.
    */
-  void CBoneEntityManipulator::MoveManipulator()
+  bool CBoneEntityManipulator::ManipulatorUpdate()
   {
     CAniPose* const pose = mOwnerActor->mPose.px;
     Entity* const targetEntity = mTargetEntity.GetObjectPtr();
@@ -1786,6 +1795,8 @@ namespace moho
       }
       pose->mMaxOffset = -std::numeric_limits<float>::infinity();
     }
+
+    return true;
   }
 
   /**
