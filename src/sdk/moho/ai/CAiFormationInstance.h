@@ -244,21 +244,35 @@ namespace moho
      * Address: 0x00566510 (FUN_00566510, Moho::SOffsetInfoSerializer::Serialize)
      *
      * What it does:
-     * Forwards one `SOffsetInfo` payload to `SOffsetInfo::MemberSerialize`.
+     * Reflection save-callback facade for `SOffsetInfo`. Forwards the
+     * reflected object pointer to `SOffsetInfo::MemberSerialize`; `version`
+     * and the owner-ref lane are unused by the member (mirrors the binary
+     * tail call). Signature matches `gpg::RType::save_func_t` since this is
+     * stored directly into the reflected serializer helper's callback slot.
      */
-    static void Serialize(gpg::WriteArchive* archive, SOffsetInfo* offsetInfo);
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
      *
      * What it does:
-     * Forwards one `SOffsetInfo` payload to `SOffsetInfo::MemberDeserialize`.
+     * Reflection load-callback facade for `SOffsetInfo`. Forwards the
+     * reflected object pointer to `SOffsetInfo::MemberDeserialize`; `version`
+     * and the owner-ref lane are unused by the member (mirrors the binary
+     * tail call). Signature matches `gpg::RType::load_func_t` since this is
+     * stored directly into the reflected serializer helper's callback slot.
      */
-    static void Deserialize(gpg::ReadArchive* archive, SOffsetInfo* offsetInfo);
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   struct SAssignedLocInfo
   {
+    /// Element-type reflection cache. The binary keeps this as the
+    /// `Moho::SAssignedLocInfo::sType` global that
+    /// `RFastVectorType<SAssignedLocInfo>::SerLoad` (0x0056E000) fills on first
+    /// use. Static storage, so it does not affect the 0x10 layout below.
+    inline static gpg::RType* sType = nullptr;
+
     SCoordsVec2 position;      // +0x00
     std::int32_t footprintSize; // +0x08
     std::int32_t laneToken;     // +0x0C
@@ -293,6 +307,67 @@ namespace moho
     static void MemberSerialize(const SAssignedLocInfo* slot, gpg::WriteArchive* archive);
   };
   static_assert(sizeof(SAssignedLocInfo) == 0x10, "SAssignedLocInfo size must be 0x10");
+
+  /**
+   * Address: 0x0056DEC0 (FUN_0056DEC0, gpg::RFastVectorType_SOffsetInfo::SerLoad)
+   *
+   * What it does:
+   * `RIndexed`-owning `SerLoad` callback body for `gpg::fastvector<SOffsetInfo>`
+   * reflection. Exposed (not file-local) because
+   * `gpg::RFastVectorType<Moho::SOffsetInfo>::Init` (FastVectorUIntReflection.cpp)
+   * stores this address into `serLoadFunc_`; the lane-entry default-prototype
+   * and resize helpers it needs are file-local to CAiFormationInstance.cpp.
+   */
+  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+  /**
+   * Address: 0x0056DF80 (FUN_0056DF80, gpg::RFastVectorType_SOffsetInfo::SerSave)
+   *
+   * What it does:
+   * `RIndexed`-owning `SerSave` callback body for `gpg::fastvector<SOffsetInfo>`
+   * reflection. Exposed for the same reason as `LoadFastVectorSOffsetInfo`.
+   */
+  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+  /**
+   * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot body for `gpg::fastvector<SOffsetInfo>`
+   * reflection. Exposed for the same reason as `LoadFastVectorSOffsetInfo`.
+   */
+  void SetFastVectorSOffsetInfoCount(void* laneVector, int count);
+
+  /**
+   * Address: 0x0056E000 (FUN_0056E000, gpg::RFastVectorType_SAssignedLocInfo::SerLoad)
+   *
+   * What it does:
+   * `RIndexed`-owning `SerLoad` callback body for
+   * `gpg::fastvector<SAssignedLocInfo>` reflection. Exposed so
+   * `gpg::RFastVectorType<Moho::SAssignedLocInfo>::Init`
+   * (FastVectorUIntReflection.cpp) can store this address into `serLoadFunc_`.
+   */
+  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+  /**
+   * Address: 0x0056E0A0 (FUN_0056E0A0, gpg::RFastVectorType_SAssignedLocInfo::SerSave)
+   *
+   * What it does:
+   * `RIndexed`-owning `SerSave` callback body for
+   * `gpg::fastvector<SAssignedLocInfo>` reflection. Exposed for the same
+   * reason as `LoadFastVectorSAssignedLocInfo`.
+   */
+  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+  /**
+   * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot body for `gpg::fastvector<SAssignedLocInfo>`
+   * reflection. Exposed for the same reason as `LoadFastVectorSAssignedLocInfo`.
+   */
+  void SetFastVectorSAssignedLocInfoCount(void* slotVector, int count);
+
   /**
    * Thin alias for the single owning `SAssignedLocInfo` definition above.
    * `SAssignedLocInfo` is the name the shipped binary carries in RTTI
