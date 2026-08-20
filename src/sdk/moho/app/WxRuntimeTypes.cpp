@@ -9,6 +9,8 @@
 #include <ole2.h>
 #include <objidl.h>
 
+#include <d3d9.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -64249,6 +64251,18 @@ namespace moho
   // invoked by name before its definition and across the WRenViewport members.
   void REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, int head);
   void REN_RenderViewportUI(WRenViewport* viewport, const void* worldViewInfoVector);
+  void REN_RenderCameraOutline(WRenViewport* viewport, const GeomCamera3* camera, float groundY, bool useFocusedColor);
+  unsigned int REN_RenderCartographic(WRenViewport* viewport, int head, const void* worldViewInfoVector);
+
+  /**
+   * The active world session (`Moho::sWldSession`, 0x010A6470). Read directly
+   * (not through `WLD_GetActiveSession()`) by `RenderCartographic`
+   * (0x007F8C96 `mov eax, Moho__sWldSession`) to gate the fog-of-war
+   * `VisionRenderer` selection. Declared locally the same way
+   * `Cartographic.cpp` declares it - no owning header for this global exists
+   * in this tree yet.
+   */
+  extern CWldSession* sWldSession;
 } // namespace moho
 
 namespace
@@ -64759,6 +64773,323 @@ void moho::REN_RenderViewportUI(WRenViewport* const viewport, const void* const 
   if (moho::ed_EnableHook && moho::ed_Hook != nullptr) {
     moho::ed_Hook->Hook1();
   }
+}
+
+namespace
+{
+  /**
+   * Intersects one camera ray with the horizontal cartographic ground plane
+   * `y = groundY` and returns the world-space hit point, or a NaN sentinel
+   * when the ray is parallel to the plane or the hit falls outside the ray's
+   * valid `[closest, farthest]` extent.
+   *
+   * Inlined four times (once per NDC screen corner) into the shipped
+   * `RenderCameraOutline` body (0x007F98A0..0x007F9E5E). The binary's own
+   * denominator/numerator expressions carry dead `* 0.0` terms for the
+   * plane's zero-valued x/z normal components - the cartographic ground
+   * plane is always horizontal (normal = (0,1,0)) - which this helper folds
+   * away rather than reproducing as decompiler-shaped arithmetic. The NaN
+   * sentinel matches the binary's lazily-initialized `invalid_vec` (a
+   * function-local `static const` here is equivalent and simpler than the
+   * binary's explicit `invalid_vec_static_guard` byte).
+   */
+  [[nodiscard]] Wm3::Vec3f IntersectCameraRayWithGroundPlane(const moho::GeomLine3& ray, const float groundY) noexcept
+  {
+    static const Wm3::Vec3f kInvalidVec{
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::quiet_NaN()
+    };
+
+    if (ray.dir.y == 0.0f) {
+      return kInvalidVec;
+    }
+
+    const float t = (groundY - ray.pos.y) / ray.dir.y;
+    if (t < ray.closest || t > ray.farthest) {
+      return kInvalidVec;
+    }
+
+    return Wm3::Vec3f{
+      ray.pos.x + (ray.dir.x * t),
+      ray.pos.y + (ray.dir.y * t),
+      ray.pos.z + (ray.dir.z * t)
+    };
+  }
+
+  /**
+   * Runtime overlay for the leading `IWldTerrainRes` layout `RenderCartographic`
+   * reads directly: the owning `STIMap` pointer at `IWldTerrainRes+0x04`
+   * (0x007F8C74 `mov eax, [edi+4]`), used only for a null check that gates the
+   * playable-boundary renderer selection. `Cartographic.cpp` already models
+   * this identical shape as `CWldTerrainResRuntimeView` for its own internal
+   * use (see that file's comment on why this two-field view is duplicated
+   * per-consumer rather than shared - it has internal linkage there).
+   */
+  struct WRenTerrainResMapView
+  {
+    const void* mVftable; // +0x00
+    const void* mMap;     // +0x04
+  };
+
+  static_assert(offsetof(WRenTerrainResMapView, mMap) == 0x04, "WRenTerrainResMapView::mMap offset must be 0x04");
+} // namespace
+
+/**
+ * Address: 0x007F98A0 (FUN_007F98A0)
+ * Mangled: ?RenderCameraOutline@WRenViewport@Moho@@AAEXPBVGeomCamera3@2@M_N@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::WRenViewport::RenderCameraOutline(
+ *     Moho::WRenViewport* this, const Moho::GeomCamera3* camera, float groundY, bool useFocusedColor);
+ *
+ * What it does:
+ * Draws one four-line picture-in-picture frustum outline for `camera` onto
+ * the cartographic terrain, at cartographic ground height `groundY`. Each of
+ * the four NDC screen corners (0,0)/(1,0)/(1,1)/(0,1) is unprojected through
+ * `camera` and intersected with the horizontal plane `y = groundY`; a corner
+ * whose ray is parallel to the plane or whose hit falls outside the ray's
+ * valid range degenerates to a NaN vertex. The outline uses the `"TYellow"`
+ * technique when `useFocusedColor` is set, `"TRed"` otherwise, drawn as four
+ * solid-red lines (`0xFFFF0000`) through the shared prim batcher.
+ *
+ * Not modeled as a member on `WRenViewport` (declared `AAE` = private in the
+ * mangled name); like `REN_RenderViewportUI`, the SDK header does not carry
+ * this private method, so it is recovered as a `moho::`-scoped free helper
+ * taking the viewport explicitly and invoked by name from
+ * `REN_RenderCartographic`, its sole caller (xref: 0x007F8FE2, confirmed by
+ * `FUN_007F98A0.xrefs.txt`).
+ */
+void moho::REN_RenderCameraOutline(
+  WRenViewport* const viewport,
+  const GeomCamera3* const camera,
+  const float groundY,
+  const bool useFocusedColor
+)
+{
+  if (camera == nullptr) {
+    return;
+  }
+
+  auto* const runtime = reinterpret_cast<WRenViewportDestroyRuntimeView*>(viewport);
+  CD3DPrimBatcher* const primBatcher = runtime->mPrimBatcher.get();
+
+  primBatcher->Setup(useFocusedColor ? "TYellow" : "TRed");
+  primBatcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFF0000u));
+  primBatcher->SetProjectionMatrix(runtime->mCam->projection);
+  primBatcher->SetViewMatrix(runtime->mCam->view);
+
+  const Wm3::Vector2f kNdcCorners[4] = {
+    Wm3::Vector2f{0.0f, 0.0f},
+    Wm3::Vector2f{1.0f, 0.0f},
+    Wm3::Vector2f{1.0f, 1.0f},
+    Wm3::Vector2f{0.0f, 1.0f}
+  };
+
+  CD3DPrimBatcher::Vertex corners[4];
+  for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
+    const GeomLine3 ray = camera->Unproject(kNdcCorners[cornerIndex]);
+    const Wm3::Vec3f hit = IntersectCameraRayWithGroundPlane(ray, groundY);
+    corners[cornerIndex] = CD3DPrimBatcher::Vertex{hit.x, hit.y, hit.z, 0xFFFFFFFFu, 0.0f, 0.0f};
+  }
+
+  primBatcher->DrawLine(corners[0], corners[1]);
+  primBatcher->DrawLine(corners[1], corners[2]);
+  primBatcher->DrawLine(corners[2], corners[3]);
+  primBatcher->DrawLine(corners[3], corners[0]);
+  primBatcher->Flush();
+}
+
+/**
+ * Address: 0x007F8BA0 (FUN_007F8BA0, 0x007F8BA0..0x007F90C4)
+ * Mangled: ?RenderCartographic@WRenViewport@Moho@@AAEIHAAV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
+ *
+ * IDA signature (LTCG-reshaped; see ABI note below):
+ * unsigned int __userpurge Moho::WRenViewport::RenderCartographic(
+ *     gpg::gal::DeviceD3D9* deadDeviceArg@<edi>, Moho::WRenViewport* viewport,
+ *     unsigned int head, const void* worldViewInfoVector);
+ *
+ * ABI note. The mangled symbol spells `(int head, std::vector<SWorldViewInfo>&)`
+ * with an implicit `this`, but the shipped body is `retn 0Ch` - three stack
+ * dwords - plus one register argument (`edi`, a `gpg::gal::DeviceD3D9*` the
+ * body only ever stores into a local and never reads before that local is
+ * overwritten; dead, so it is dropped from this declaration). The sole call
+ * site (`WRenViewport::Render`, 0x007F97AF..0x007F97B2) pushes exactly three
+ * values, closest-to-farthest from the return address:
+ *
+ *   +0x04 `viewport` (`this`)     (0x007F97B1 `push ebp`)
+ *   +0x08 `head`                  (0x007F97B0 `push ecx`, `ecx = [ebp+320h]` = mHead)
+ *   +0x0C `worldViewInfoVector`   (0x007F97AF `push ebx`) - the exact same
+ *                                  value `Render` also forwards to
+ *                                  `REN_RenderViewportUI` as its own
+ *                                  `worldViewInfoVector` argument.
+ *
+ * Whole-program optimization moved `this` onto the stack (as for
+ * `Cartographic::Render`) and collapsed the mangled `vector<SWorldViewInfo>&`
+ * parameter into the same opaque `{mFirst,mLast,mEnd}`-shaped pointer
+ * `REN_RenderViewportUI` already receives from the same caller - both
+ * callees read only offsets +4/+8 of it (never +0), matching
+ * `REN_RenderViewportUI`'s own documented `[mLast, mEnd)` traversal exactly,
+ * so this declaration keeps the identical `const void*` shape instead of
+ * re-deriving a second name for the same layout.
+ *
+ * What it does:
+ * Renders the cartographic ("strategic"/top-down) view for every world-view
+ * entry that targets `head`. Bails out early (returns 0) when there is no
+ * active world map/terrain, or when none of the head's world-view entries
+ * currently have the optional-feature flag off and shaking enabled
+ * (`!Func2() && CanShake()`). Lazily initializes the terrain's
+ * `Cartographic` runtime on first use, then for each qualifying world-view
+ * entry: acquires this head's colour and depth-stencil render-target
+ * surfaces and a copy of the viewport's shared prim batcher, and calls
+ * `Cartographic::Render` to paint the terrain/mesh/decal/UI cartographic
+ * pass into them. When the entry reports `IsMiniMap()`, additionally
+ * restores the device viewport to the entry's own camera rect and overlays
+ * every other same-head world-view's camera frustum outline
+ * (`REN_RenderCameraOutline`) as a picture-in-picture indicator.
+ *
+ * Evidence for the ambiguous per-element loop (0x007F8BE7..0x007F8C38 and
+ * 0x007F8CD0..0x007F8E94): Hex-Rays types the walked collection's element
+ * pointer as `Moho::CD3DVertexSheet*`/`Moho::VisionRenderer*` purely from a
+ * coincidental cast chain (`v12->__vftable` re-read as if `__vftable` were a
+ * field of an object, rather than the object's own vtable pointer value).
+ * That cannot be right: the calls dispatch at vtable offsets
+ * +0x10/+0x24/+0x28/+0x30 (slots 4/9/10/12), one slot beyond
+ * `ID3DVertexSheet`'s entire 10-slot vtable (max offset 0x24, `Func9`) -
+ * `CD3DVertexSheet` has no slot 12 to call. Those four offsets instead match
+ * `Moho::IRenderWorldView` exactly: slot 4 = `GetCameraView()` (its return
+ * value is read at +0x2B4/+0x2B8/+0x2BC/+0x2C0, which is
+ * `GeomCamera3::viewport.r[3]` = {X,Y,Width,Height} - confirmed by the
+ * pre-existing `MakeViewportPixelProjection` helper in `GeomCamera3.h`
+ * reading the same `viewport.r[3].z/.w` lanes), slot 9 = `Func2()`, slot 10 =
+ * `IsMiniMap()`, slot 12 = `CanShake()`. The walked collection is therefore
+ * `WRenViewportWorldViewParamRuntime` (`sizeof == 0x14`, `view` at +0x00) -
+ * the exact same "`SWorldViewInfo` record" `REN_RenderViewportUI` already
+ * documents at the identical stride, reached from the identical
+ * caller-supplied pointer.
+ *
+ * The `_InterlockedExchangeAdd` pairs the decompiler shows around the
+ * render-target/prim-batcher locals (0x007F8D62..0x007F8E7C) are the
+ * compiler inlining `boost::shared_ptr` copy-construction/destruction for
+ * the by-value `colorTarget`/`depthStencilTarget`/`primBatcher` parameters
+ * of `Cartographic::Render` - ordinary `boost::shared_ptr` locals below
+ * reproduce the same refcounting without hand-written atomics.
+ *
+ * Self-exclusion note (0x007F8FB6 `cmp esi, [var_58]`, inside the
+ * `IsMiniMap()` outline-scan loop): `var_58`'s exact register provenance
+ * could not be pinned down byte-for-byte across the large intervening
+ * `Cartographic::Render` call and shared_ptr cleanup sequence. Excluding the
+ * world-view currently being rendered from its own outline scan is the only
+ * reading consistent with a picture-in-picture overlay - it must never draw
+ * its own camera's outline into its own cartographic pass - so that is what
+ * this recovery implements.
+ */
+unsigned int moho::REN_RenderCartographic(
+  WRenViewport* const viewport,
+  const int head,
+  const void* const worldViewInfoVector
+)
+{
+  IWldTerrainRes* const terrain = moho::REN_GetTerrainRes();
+  if (terrain == nullptr) {
+    return 0;
+  }
+
+  const auto& worldViews = *static_cast<const WRenViewportWorldViewVectorRuntime*>(worldViewInfoVector);
+
+  bool anyRenderable = false;
+  for (const WRenViewportWorldViewParamRuntime* entry = worldViews.mLast; entry != worldViews.mEnd; ++entry) {
+    if (!entry->view->Func2() && entry->view->CanShake()) {
+      anyRenderable = true;
+      break;
+    }
+  }
+  if (!anyRenderable) {
+    return 0;
+  }
+
+  moho::Cartographic& cartographic = terrain->GetCartographic();
+  if (!cartographic.IsInitialized()) {
+    // The five hypsometric-color lanes the mangled Initialize() declares are
+    // never read by its shipped body (it re-reads them off the terrain
+    // itself) - see Cartographic::Initialize's own doc comment.
+    cartographic.Initialize(terrain, 0, 0, 0, 0, 0);
+  }
+
+  gpg::gal::Device* const galInstance = gpg::gal::Device::GetInstance();
+  gpg::gal::DeviceContext* const deviceContext = galInstance->GetDeviceContext();
+  (void)deviceContext->GetHead(static_cast<std::uint32_t>(head)); // result unused, matches the binary
+
+  const auto* const terrainMapView = reinterpret_cast<const WRenTerrainResMapView*>(terrain);
+  auto* const destroyView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(viewport);
+
+  BoundaryRenderer* const boundaryRenderer =
+    (moho::ren_PlayableBoundary && terrainMapView->mMap != nullptr) ? &destroyView->mBoundaryRenderer : nullptr;
+
+  VisionRenderer* const visionRenderer =
+    (moho::ren_FogOfWar && moho::sWldSession != nullptr && moho::sWldSession->FocusArmy != -1)
+      ? &destroyView->mVisionRenderer
+      : nullptr;
+
+  WRenViewportRenderPassRuntime* const passView = AsRenderPassView(viewport);
+  unsigned int outlineDrawCount = 0;
+
+  for (const WRenViewportWorldViewParamRuntime* entry = worldViews.mLast; entry != worldViews.mEnd; ++entry) {
+    IRenderWorldView* const worldView = entry->view;
+    GeomCamera3* const cameraView = worldView->GetCameraView();
+
+    if (entry->head != head || worldView->Func2() || !worldView->CanShake()) {
+      continue;
+    }
+
+    ID3DRenderTarget::SurfaceHandle colorTarget;
+    passView->mPrimaryTargetLocks[head]->GetSurface(colorTarget);
+    ID3DDepthStencil::SurfaceHandle depthStencilTarget;
+    passView->mDepthStencilTargets[head]->GetSurface(depthStencilTarget);
+
+    cartographic.Render(
+      static_cast<unsigned int>(head),
+      moho::REN_GetGameTick(),
+      moho::REN_GetSimDeltaSeconds(),
+      worldView,
+      &destroyView->mRangeRenderer,
+      visionRenderer,
+      boundaryRenderer,
+      colorTarget,
+      depthStencilTarget,
+      destroyView->mPrimBatcher
+    );
+
+    if (!worldView->IsMiniMap()) {
+      continue;
+    }
+
+    destroyView->mCam = cameraView;
+
+    D3DVIEWPORT9 restoredViewport{};
+    restoredViewport.X = static_cast<DWORD>(cameraView->viewport.r[3].x);
+    restoredViewport.Y = static_cast<DWORD>(cameraView->viewport.r[3].y);
+    restoredViewport.Width = static_cast<DWORD>(cameraView->viewport.r[3].z);
+    restoredViewport.Height = static_cast<DWORD>(cameraView->viewport.r[3].w);
+    restoredViewport.MinZ = 0.0f;
+    restoredViewport.MaxZ = 1.0f;
+    galInstance->SetViewport(&restoredViewport);
+
+    for (const WRenViewportWorldViewParamRuntime* other = worldViews.mLast; other != worldViews.mEnd; ++other) {
+      if (other->head != head || other->view->Func2() || other == entry) {
+        continue;
+      }
+
+      const float groundY = other->view->GetCameraOffset()->y;
+      GeomCamera3* const otherCamera = other->view->GetCameraView();
+      moho::REN_RenderCameraOutline(viewport, otherCamera, groundY, head == 0);
+      ++outlineDrawCount;
+    }
+
+    destroyView->mCam = nullptr;
+  }
+
+  return outlineDrawCount;
 }
 
 namespace
@@ -65350,6 +65681,15 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   // has exactly one call to this at 0x007F97A4, after the loop rather than
   // before it.
   UpdateRenderViewportCoordinates();
+
+  // Cartographic ("strategic"/top-down) pass. The binary calls this
+  // immediately after the coordinate update and before the UI pass
+  // (0x007F97AF..0x007F97B2: `push ebx; push ecx(mHead); push ebp(this);
+  // call RenderCartographic`) - this call was missing from the recovered
+  // body, which orphaned `Moho::Cartographic::Render` (its sole caller).
+  // The return value (outline-overlay draw count) is unused by this caller,
+  // matching the binary (the pushed result is never read after the call).
+  (void)moho::REN_RenderCartographic(this, head, worldViewInfoVector);
 
   // Draw the UI control tree over the rendered viewport. The binary does this
   // at 0x007F97B7..0x007F97DD, immediately after the coordinate update and

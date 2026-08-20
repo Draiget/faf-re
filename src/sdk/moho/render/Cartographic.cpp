@@ -8,6 +8,8 @@
 #include <new>
 #include <stdexcept>
 
+#include <d3d9.h>
+
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/Device.hpp"
@@ -23,13 +25,26 @@
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/backends/d3d9/DepthStencilTargetD3D9.hpp"
+#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/Head.hpp"
+#include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/RenderTargetContext.hpp"
+#include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/particles/CWorldParticles.h"
+#include "moho/render/BoundaryRenderer.h"
+#include "moho/render/IRenderWorldView.h"
+#include "moho/render/RangeRenderer.h"
+#include "moho/render/VisionRenderer.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
 
 namespace
@@ -693,10 +708,226 @@ namespace
     context.width_ = width;
     context.height_ = height;
   }
+
+  // ---------------------------------------------------------------------
+  // Render-arm constants. Every float below is byte-verified out of
+  // `bin/2025.7.1/ForgedAlliance.exe` rather than trusted from the IDA
+  // listing.
+  // ---------------------------------------------------------------------
+
+  // Opaque black, the colour `RenderTerrainStage0` clears the offscreen
+  // cartographic frame to (0x007D2ED0 pushes the immediate directly).
+  constexpr std::uint32_t kCartographicFrameClearColor = 0xFF000000u;
+
+  // Opaque white, the colour `Cartographic::Render` clears the head to just
+  // before the UI pass (0x007D1B84 pushes 0FFFFFFFFh).
+  constexpr std::uint32_t kCartographicHeadClearColor = 0xFFFFFFFFu;
+
+  constexpr float kCartographicClearDepth = 1.0f;
+  constexpr std::int32_t kCartographicClearStencil = 0;
+
+  // Half-texel correction applied to both screen-quad extents so the
+  // composite samples texel centres. flt_E4F724, byte-verified 0x3F000000.
+  constexpr float kCartographicHalfTexel = 0.5f;
+
+  // Top-left corner of the composite quad in screen space, i.e. the same
+  // half-texel shifted to the negative side. dword_E4F8D0, byte-verified
+  // 0xBF000000.
+  constexpr float kCartographicScreenQuadOrigin = -0.5f;
+
+  // The `1.0f` the composite quad uses for `z`, `rhw` and the far texture
+  // coordinates. Held at 0x00DFEC20, byte-verified 0x3F800000.
+  constexpr float kCartographicScreenQuadUnit = 1.0f;
+
+  constexpr float kCartographicScreenQuadZero = 0.0f;
+
+  // Four `(x, y, z, rhw, u, v)` corners, 24 bytes each - the 0x60 bytes the
+  // shipped body locks and memcpys at 0x007D3702..0x007D3705.
+  constexpr std::size_t kCartographicFrameVertexFloatCount = 24U;
+  constexpr std::uint32_t kCartographicFrameVertexByteSize = 96U;
+
+  // Head viewport depth range used by both `SetViewport` payloads.
+  constexpr float kCartographicViewportMinDepth = 0.0f;
+  constexpr float kCartographicViewportMaxDepth = 1.0f;
+
+  /**
+   * `Cartographic::GetEffect` (0x007D1E50) hands the cartographic effect back
+   * through the abstract `gpg::gal::Effect` handle, which it builds by
+   * aliasing the very `EffectD3D9` the device resources own (see
+   * `Cartographic::GetEffect` further down this file). The GAL headers in this
+   * tree still model `Effect` and `EffectD3D9` as two unrelated skeletons, so
+   * reading the technique/variable interface back out of that handle needs the
+   * matching inverse alias. Both `RenderTerrainStage0` (0x007D2EEE) and
+   * `RenderTerrainStage1` (0x007D371E) call `GetEffect` and then dispatch
+   * through `EffectD3D9` slot 3 (`SetMatrix`, +0x0C) and slot 4
+   * (`SetTechnique`, +0x10) on the returned pointer.
+   */
+  [[nodiscard]] gpg::gal::EffectD3D9& CartographicEffectInterface(
+    const boost::shared_ptr<gpg::gal::Effect>& effect
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::gal::EffectD3D9*>(effect.get());
+  }
+
+  /**
+   * Keeps one concrete D3D9 target alive while a `gpg::gal::OutputContext`
+   * lane holds a pointer of the abstract context flavour its header declares.
+   *
+   * The shipped `OutputContext(SurfaceHandle, TextureHandle)` ctor
+   * (0x008E77D0) simply copies the two caller words and bumps the use count -
+   * the D3D9 backend parks a `RenderTargetD3D9` and a
+   * `DepthStencilTargetD3D9` in those two lanes, which is exactly how
+   * `D3D9Interfaces.cpp` models them in `OutputContextD3D9RuntimeView`.
+   * Boost 1.34.1 predates the aliasing `shared_ptr` constructor, so crossing
+   * the two handle flavours reuses the deleter-alias idiom this file already
+   * applies in `Cartographic::GetEffect`.
+   */
+  template <class Owner>
+  struct CartographicTargetAliasDeleter
+  {
+    explicit CartographicTargetAliasDeleter(boost::shared_ptr<Owner> ownerHandle)
+      : owner(ownerHandle)
+    {
+    }
+
+    template <class Aliased>
+    void operator()(Aliased*) const noexcept
+    {
+    }
+
+    boost::shared_ptr<Owner> owner;
+  };
+
+  [[nodiscard]] gpg::gal::OutputContext::SurfaceHandle AsOutputContextSurface(
+    const boost::shared_ptr<gpg::gal::RenderTargetD3D9>& colorTarget
+  )
+  {
+    return gpg::gal::OutputContext::SurfaceHandle(
+      reinterpret_cast<gpg::gal::RenderTargetContext*>(colorTarget.get()),
+      CartographicTargetAliasDeleter<gpg::gal::RenderTargetD3D9>(colorTarget)
+    );
+  }
+
+  [[nodiscard]] gpg::gal::OutputContext::TextureHandle AsOutputContextDepthStencil(
+    const boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9>& depthStencilTarget
+  )
+  {
+    return gpg::gal::OutputContext::TextureHandle(
+      reinterpret_cast<gpg::gal::TextureContext*>(depthStencilTarget.get()),
+      CartographicTargetAliasDeleter<gpg::gal::DepthStencilTargetD3D9>(depthStencilTarget)
+    );
+  }
+
+  /**
+   * Returns the output context one device head renders into.
+   *
+   * `gpg::gal::Device::GetHead2` is slot 7 (+0x1C) and really answers with the
+   * head's `gpg::gal::OutputContext`; the GAL base declaration still spells the
+   * return type `Head*` because that header pair was lifted before the
+   * output-context lane was identified. `moho/render/d3d/CD3DDevice.cpp`
+   * (0x00650, 0x00817) already reads the result the same way.
+   */
+  [[nodiscard]] gpg::gal::OutputContext& CartographicHeadOutputContext(
+    gpg::gal::DeviceD3D9& device,
+    const unsigned int headIndex
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::gal::OutputContext*>(device.GetHead2(headIndex));
+  }
+
+  /**
+   * Returns the render-target description of one device head.
+   *
+   * The shipped `RenderTerrainStage1` walks
+   * `GetHead2(headIndex)->surface->GetContext()` at 0x007D35C9..0x007D35D1 and
+   * reads `width_` (+0x04) and `height_` (+0x08) off the result. The surface
+   * lane holds the concrete `RenderTargetD3D9` whose slot-1 virtual
+   * `GetContext()` returns that description.
+   */
+  [[nodiscard]] const gpg::gal::RenderTargetContext& CartographicHeadRenderTargetContext(
+    gpg::gal::DeviceD3D9& device,
+    const unsigned int headIndex
+  ) noexcept
+  {
+    gpg::gal::OutputContext& outputContext = CartographicHeadOutputContext(device, headIndex);
+    auto* const renderTarget =
+      reinterpret_cast<gpg::gal::RenderTargetD3D9*>(outputContext.surface.get());
+    return *renderTarget->GetContext();
+  }
+
+  /**
+   * Builds the screen-space quad `RenderTerrainStage1` composites the
+   * offscreen cartographic frame with: four `(x, y, z, rhw, u, v)` corners
+   * spanning the whole head, shifted by half a texel on both axes so the
+   * sampler lands on texel centres.
+   *
+   * Corner order and constants come straight from the shipped stores at
+   * 0x007D3648..0x007D36F9.
+   */
+  [[nodiscard]] std::array<float, kCartographicFrameVertexFloatCount>
+  BuildCartographicFrameQuad(const float frameWidth, const float frameHeight)
+  {
+    const float left = kCartographicScreenQuadOrigin;
+    const float bottom = kCartographicScreenQuadOrigin;
+    const float right = frameWidth - kCartographicHalfTexel;
+    const float top = frameHeight - kCartographicHalfTexel;
+
+    constexpr float one = kCartographicScreenQuadUnit;
+    constexpr float zero = kCartographicScreenQuadZero;
+
+    return {
+      left,  top,    one, one, zero, one,
+      left,  bottom, one, one, zero, zero,
+      right, top,    one, one, one,  one,
+      right, bottom, one, one, one,  zero,
+    };
+  }
+
+  /**
+   * Fills one D3D9 viewport payload. `gpg::gal::Device::SetViewport` (slot 34,
+   * +0x88) forwards its opaque argument straight to
+   * `IDirect3DDevice9::SetViewport`, so the payload is a plain
+   * `D3DVIEWPORT9`; the shipped body builds the identical 24-byte block on its
+   * own stack at 0x007D190A..0x007D1954.
+   */
+  [[nodiscard]] D3DVIEWPORT9 MakeCartographicViewport(
+    const std::int32_t left,
+    const std::int32_t top,
+    const std::int32_t width,
+    const std::int32_t height
+  ) noexcept
+  {
+    D3DVIEWPORT9 viewport{};
+    viewport.X = static_cast<DWORD>(left);
+    viewport.Y = static_cast<DWORD>(top);
+    viewport.Width = static_cast<DWORD>(width);
+    viewport.Height = static_cast<DWORD>(height);
+    viewport.MinZ = kCartographicViewportMinDepth;
+    viewport.MaxZ = kCartographicViewportMaxDepth;
+    return viewport;
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * The active world session (`Moho::sWldSession`, 0x010A6470).
+   * `Cartographic::Render` caches it at 0x007D1832 and gates the range-ring,
+   * fog-of-war, boundary and UI passes on it being non-null. The global has no
+   * owning header in this tree yet, so it is declared here where it is used.
+   */
+  extern CWldSession* sWldSession;
+
+  /**
+   * Address: 0x007FA730 (FUN_007FA730, Moho::REN_DebugStuff)
+   * Mangled: ?REN_DebugStuff@Moho@@YAXV?$shared_ptr@VCD3DPrimBatcher@Moho@@@boost@@H@Z
+   *
+   * Defined in `moho/app/WxRuntimeTypes.cpp`, which declares it locally too -
+   * there is no owning header for it yet. Called by `Cartographic::Render` at
+   * 0x007D1BE0 with the head index in `ecx`.
+   */
+  void REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, int head);
+
   /**
    * Address: 0x007D4A00 (FUN_007D4A00, sub_7D4A00)
    *
@@ -1275,11 +1506,8 @@ namespace moho
    * dirty decal instance vertices, binds the cartographic effect, and draws
    * one instanced quad pass for each technique pass.
    */
-  void CartographicDecalBatch::Render(const bool enabled, const std::int32_t tick, const GeomCamera3& camera)
+  void CartographicDecalBatch::Render(const GeomCamera3& camera)
   {
-    (void)enabled;
-    (void)tick;
-
     InitializeRenderResources();
     const std::int32_t decalCount = mDecals.mDecalCount;
     ResolveDecalTexture();
@@ -1750,5 +1978,399 @@ namespace moho
       Shutdown();
       throw;
     }
+  }
+
+  /**
+   * Address: 0x007D2CB0 (FUN_007D2CB0)
+   * Mangled: ?RenderMeshes@Cartographic@Moho@@AAEXHMABVGeomCamera3@2@@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::Cartographic::RenderMeshes(
+   *   Moho::Cartographic *this@<edi>, int gameTick, float deltaFrame,
+   *   const Moho::GeomCamera3 *camera);
+   *
+   * What it does:
+   * Binds this view's hypsometric ramp into the shared `"mesh"` effect
+   * (`ID3DDeviceResources::FindEffect`, dispatched at +0x4C, 0x007D2CEF) and
+   * makes that effect current, then rebuilds the global mesh batch map for the
+   * frame and draws it through the mesh renderer's cartographic pass fed with
+   * the water-surface elevation and the tier elevation band.
+   *
+   * The batch fade plane is row 1 of the camera's viewport matrix
+   * (`camera + 0x294` = `viewport@0x284 + 0x10`, 0x007D2D70), the same lane
+   * `WRenViewport::Render` passes.
+   */
+  void Cartographic::RenderMeshes(
+    const std::int32_t gameTick,
+    const float deltaFrame,
+    const GeomCamera3& camera
+  )
+  {
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device->GetResources();
+    CD3DEffect* const meshEffect = resources->FindEffect("mesh");
+
+    const boost::shared_ptr<gpg::gal::EffectD3D9> meshBaseEffect = meshEffect->GetBaseEffect();
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> hypsometricTextureVar =
+      meshBaseEffect->SetMatrix("hypsometricTexture");
+    hypsometricTextureVar->SetTexture(mHypsometricTexture);
+
+    (void)device->SetCurEffect(meshEffect);
+
+    MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
+    meshRenderer->Batch(gameTick, deltaFrame, camera, camera.viewport.r[1]);
+    meshRenderer->RenderCartographic(
+      mSurfaceElevation,
+      mElevMinimum,
+      mElevMaximum,
+      camera,
+      meshRenderer->meshes
+    );
+  }
+
+  /**
+   * Address: 0x007D2EA0 (FUN_007D2EA0)
+   * Mangled: ?RenderTerrainStage0@Cartographic@Moho@@AAEXABVGeomCamera3@2@_N@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::Cartographic::RenderTerrainStage0(
+   *   Moho::Cartographic *this@<edx>, const Moho::GeomCamera3 *camera@<ecx>, bool mirrored);
+   *
+   * What it does:
+   * Paints the cartographic terrain into whatever offscreen frame is currently
+   * bound. Clears it to opaque black, resolves the `"cartographic"` effect,
+   * binds the `"Terrain_Stage0"` technique together with the camera matrices,
+   * the four shader coefficient / elevation scalars, the two `float4`
+   * coefficient lanes and the three lookup textures, then draws the terrain
+   * ground quad once per technique pass.
+   *
+   * `mirrored` is declared by the mangled symbol but neither passed by the
+   * shipped call site (0x007D19E6..0x007D19EF pushes nothing; the body is a
+   * bare `retn`) nor read by the shipped body, so it stays unread here too.
+   */
+  void Cartographic::RenderTerrainStage0(const GeomCamera3& camera, [[maybe_unused]] const bool mirrored)
+  {
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    device->Clear(
+      true,
+      true,
+      true,
+      kCartographicFrameClearColor,
+      kCartographicClearDepth,
+      kCartographicClearStencil
+    );
+
+    const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();
+    gpg::gal::EffectD3D9& cartographicEffect = CartographicEffectInterface(effect);
+
+    const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique =
+      cartographicEffect.SetTechnique("Terrain_Stage0");
+
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrixVar =
+      cartographicEffect.SetMatrix("viewMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrixVar =
+      cartographicEffect.SetMatrix("projMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> gridSizeCoeffVar =
+      cartographicEffect.SetMatrix("gridSizeCoeff");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> terrainSizeCoeffVar =
+      cartographicEffect.SetMatrix("terrainSizeCoeff");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> terrainHeightScaleVar =
+      cartographicEffect.SetMatrix("terrainHeightScale");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> elevMaximumVar =
+      cartographicEffect.SetMatrix("elevMaximum");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> elevMinimumVar =
+      cartographicEffect.SetMatrix("elevMinimum");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> elevTextureVar =
+      cartographicEffect.SetMatrix("elevTexture");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> hypsometricTextureVar =
+      cartographicEffect.SetMatrix("hypsometricTexture");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> topographicTextureVar =
+      cartographicEffect.SetMatrix("topographicTexture");
+
+    viewMatrixVar->SetMatrix4x4(&camera.view);
+    projMatrixVar->SetMatrix4x4(&camera.projection);
+    // Slot 7 (+0x1C) binds a `float4`; both coefficient lanes are four floats.
+    gridSizeCoeffVar->Func4(mGridSizeCoeff);
+    terrainSizeCoeffVar->Func4(mTerrainSizeCoeff);
+    terrainHeightScaleVar->SetFloat(mTerrainHeightScale);
+    elevMaximumVar->SetFloat(mElevMaximum);
+    elevMinimumVar->SetFloat(mElevMinimum);
+    elevTextureVar->SetTexture(mElevTexture);
+    hypsometricTextureVar->SetTexture(mHypsometricTexture);
+    topographicTextureVar->SetTexture(mTopographicTexture);
+
+    device->SetVertexDeclaration(mTerrainVertexFormat);
+    device->SetVertexBuffer(0U, mTerrainVertexBuffer, 1, 0);
+    device->SetBufferIndices(mQuadIndexBuffer);
+
+    const auto passCount = static_cast<unsigned int>(technique->BeginTechnique());
+    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+      technique->BeginPass(static_cast<int>(passIndex));
+      gpg::gal::DrawIndexedContext drawContext(
+        static_cast<int>(kCartographicTopologyTriangleList),
+        static_cast<int>(kCartographicQuadVertexCount),
+        static_cast<int>(kCartographicQuadPrimitiveCountInput),
+        0,
+        0
+      );
+      (void)device->DrawIndexedPrimitive(&drawContext);
+      technique->EndPass();
+    }
+    technique->EndTechnique();
+  }
+
+  /**
+   * Address: 0x007D3580 (FUN_007D3580)
+   * Mangled: ?RenderTerrainStage1@Cartographic@Moho@@AAEXH
+   *          V?$shared_ptr@VRenderTarget@gal@gpg@@@boost@@@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::Cartographic::RenderTerrainStage1(
+   *   Moho::Cartographic *this, int headIndex,
+   *   boost::shared_ptr<gpg::gal::RenderTarget> colorTarget);
+   *
+   * What it does:
+   * Composites the offscreen cartographic frame back onto the head. Clears the
+   * head to opaque black, rewrites the four-corner screen quad in the frame
+   * vertex buffer to cover the head's render target, then draws it once per
+   * pass of the `"Terrain_Stage1"` technique with the head dimensions bound as
+   * `frameWidth` / `frameHeight` and the offscreen colour target bound as
+   * `frameTexture` (`EffectVariableD3D9` slot 3, +0x0C, at 0x007D38BC).
+   *
+   * The quad is half-texel corrected on both axes and carries `z = rhw = 1`, so
+   * it is a pre-transformed full-target blit.
+   */
+  void Cartographic::RenderTerrainStage1(
+    const std::int32_t headIndex,
+    boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget
+  )
+  {
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    const gpg::gal::RenderTargetContext& headTarget =
+      CartographicHeadRenderTargetContext(*device, static_cast<unsigned int>(headIndex));
+
+    device->Clear(
+      true,
+      true,
+      true,
+      kCartographicFrameClearColor,
+      kCartographicClearDepth,
+      kCartographicClearStencil
+    );
+
+    const auto frameWidth = static_cast<float>(static_cast<std::int32_t>(headTarget.width_));
+    const auto frameHeight = static_cast<float>(static_cast<std::int32_t>(headTarget.height_));
+
+    const std::array<float, kCartographicFrameVertexFloatCount> frameQuad =
+      BuildCartographicFrameQuad(frameWidth, frameHeight);
+
+    void* const vertexData = mFrameVertexBuffer->Lock(
+      0U, kCartographicFrameVertexByteSize, gpg::gal::MohoD3DLockFlags::Discard
+    );
+    std::memcpy(vertexData, frameQuad.data(), kCartographicFrameVertexByteSize);
+    (void)mFrameVertexBuffer->Unlock();
+
+    const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();
+    gpg::gal::EffectD3D9& cartographicEffect = CartographicEffectInterface(effect);
+
+    const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique =
+      cartographicEffect.SetTechnique("Terrain_Stage1");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> frameWidthVar =
+      cartographicEffect.SetMatrix("frameWidth");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> frameHeightVar =
+      cartographicEffect.SetMatrix("frameHeight");
+    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> frameTextureVar =
+      cartographicEffect.SetMatrix("frameTexture");
+
+    device->SetVertexDeclaration(mFrameVertexFormat);
+    device->SetVertexBuffer(0U, mFrameVertexBuffer, 1, 0);
+    device->SetBufferIndices(mQuadIndexBuffer);
+
+    frameWidthVar->SetFloat(frameWidth);
+    frameHeightVar->SetFloat(frameHeight);
+    frameTextureVar->Func3(colorTarget);
+
+    const auto passCount = static_cast<unsigned int>(technique->BeginTechnique());
+    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+      technique->BeginPass(static_cast<int>(passIndex));
+      gpg::gal::DrawIndexedContext drawContext(
+        static_cast<int>(kCartographicTopologyTriangleList),
+        static_cast<int>(kCartographicQuadVertexCount),
+        static_cast<int>(kCartographicQuadPrimitiveCountInput),
+        0,
+        0
+      );
+      (void)device->DrawIndexedPrimitive(&drawContext);
+      technique->EndPass();
+    }
+    technique->EndTechnique();
+  }
+
+  /**
+   * Address: 0x007D17C0 (FUN_007D17C0)
+   * Mangled: ?Render@Cartographic@Moho@@QAEXV?$shared_ptr@VRenderTarget@gal@gpg@@@boost@@
+   *          V?$shared_ptr@VDepthStencilTarget@gal@gpg@@@4@HHM
+   *          V?$shared_ptr@VCD3DPrimBatcher@Moho@@@4@PAVIRenderWorldView@2@_N@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::Cartographic::Render(
+   *   Moho::Cartographic *this, unsigned int headIndex, int gameTick, float deltaFrame,
+   *   Moho::IRenderWorldView *worldView, Moho::RangeRenderer *rangeRenderer,
+   *   Moho::VisionRenderer *visionRenderer, Moho::BoundaryRenderer *boundaryRenderer,
+   *   boost::shared_ptr<gpg::gal::RenderTarget> colorTarget,
+   *   boost::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
+   *   boost::shared_ptr<Moho::CD3DPrimBatcher> primBatcher);
+   *
+   * What it does:
+   * Draws one whole cartographic ("strategic") frame for one device head.
+   *
+   *   - forces `ui_AlwaysRenderStrategicIcons` on for the duration and restores
+   *     the caller's value on the way out (0x007D17E7 / 0x007D1C0E);
+   *   - clears the caller-supplied colour+depth pair and switches the device to
+   *     the world view's viewport rectangle, which the camera carries as row 3
+   *     of its viewport matrix, truncated to integers;
+   *   - paints the terrain through `RenderTerrainStage0`, then - only while a
+   *     world session exists - the weapon range rings, the fog of war and the
+   *     playable boundary on top of it;
+   *   - rebinds the head's own output context and viewport and composites that
+   *     offscreen frame back onto it through `RenderTerrainStage1`;
+   *   - draws the meshes, the world particles and every cartographic decal
+   *     batch, then the UI, over the composite;
+   *   - clears the head to opaque white with depth+stencil only, runs the world
+   *     view's own render callback and the debug overlay, and finally restores
+   *     the head's full viewport.
+   *
+   * See the declaration for the shipped stack layout: link-time code generation
+   * moved `this` onto the stack, hoisted the three renderer lanes out of the
+   * caller and pushed the three by-value handles to the tail (`retn 38h`).
+   */
+  void Cartographic::Render(
+    const unsigned int headIndex,
+    const std::int32_t gameTick,
+    const float deltaFrame,
+    IRenderWorldView* const worldView,
+    RangeRenderer* const rangeRenderer,
+    VisionRenderer* const visionRenderer,
+    BoundaryRenderer* const boundaryRenderer,
+    boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget,
+    boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> depthStencilTarget,
+    boost::shared_ptr<CD3DPrimBatcher> primBatcher
+  )
+  {
+    const bool previousAlwaysRenderStrategicIcons = ui_AlwaysRenderStrategicIcons;
+    ui_AlwaysRenderStrategicIcons = true;
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
+    gpg::gal::OutputContext& headOutputContext = CartographicHeadOutputContext(*device, headIndex);
+    (void)device->ClearTextures();
+
+    CWldSession* const session = sWldSession;
+    CameraImpl* const camera = worldView->GetCamera();
+    const GeomCamera3& cameraView = *worldView->GetCameraView();
+
+    // The world view publishes its screen rectangle as row 3 of the camera's
+    // viewport matrix. The shipped body converts all four lanes with the FPU
+    // rounding mode forced to truncate (0x007D1876 `or eax, 0C00h`), which is
+    // what a C++ float-to-int conversion already does.
+    const D3DVIEWPORT9 worldViewViewport = MakeCartographicViewport(
+      static_cast<std::int32_t>(cameraView.viewport.r[3].x),
+      static_cast<std::int32_t>(cameraView.viewport.r[3].y),
+      static_cast<std::int32_t>(cameraView.viewport.r[3].z),
+      static_cast<std::int32_t>(cameraView.viewport.r[3].w)
+    );
+
+    const D3DVIEWPORT9 fullHeadViewport = MakeCartographicViewport(
+      0,
+      0,
+      static_cast<std::int32_t>(head.mWidth),
+      static_cast<std::int32_t>(head.mHeight)
+    );
+
+    // The shipped body destroys this output context as soon as ClearTarget
+    // returns (EH state 3 -> 2 at 0x007D19C8), so it is a full-expression
+    // temporary rather than a function-scope local.
+    {
+      const gpg::gal::OutputContext cartographicTarget(
+        AsOutputContextSurface(colorTarget),
+        AsOutputContextDepthStencil(depthStencilTarget)
+      );
+      device->ClearTarget(&cartographicTarget);
+    }
+
+    device->SetViewport(&worldViewViewport);
+
+    RenderTerrainStage0(cameraView, false);
+
+    if (session != nullptr) {
+      if (rangeRenderer != nullptr && camera != nullptr) {
+        rangeRenderer->Render(session, camera, headIndex, deltaFrame);
+      }
+
+      if (visionRenderer != nullptr) {
+        RenderFogOfWar(*session, *visionRenderer, headIndex, cameraView, deltaFrame);
+      }
+
+      if (boundaryRenderer != nullptr) {
+        RenderPlayableBoundary(headIndex, *boundaryRenderer, *session, cameraView);
+      }
+    }
+
+    device->ClearTarget(&headOutputContext);
+    device->SetViewport(&worldViewViewport);
+
+    RenderTerrainStage1(static_cast<std::int32_t>(headIndex), colorTarget);
+    RenderMeshes(gameTick, deltaFrame, cameraView);
+
+    // The shipped body inlines this one-line forwarder at 0x007D1AFB..
+    // 0x007D1B20 (`sWorldParticles.RenderEffects(camera, 0, 1, tick, alpha)`),
+    // which is why the out-of-line copy at 0x007D2E40 carries no xrefs of its
+    // own. Calling it by name keeps both the behaviour and the symbol.
+    RenderParticles(gameTick, deltaFrame, cameraView);
+
+    const CartographicListNode* const batchSentinel = mListSentinel;
+    for (CartographicListNode* node = mListSentinel->mNext; node != batchSentinel; node = node->mNext) {
+      node->mBatch.Render(cameraView);
+    }
+
+    if (session != nullptr) {
+      // 0x007D1B6C calls `func_RenUI` (0x007FD490) here, __cdecl with five
+      // dword arguments and `add esp, 14h` at 0x007D1B71. Argument roles
+      // decoded from the shipped pushes at 0x007D1B56..0x007D1B6B:
+      //   [esp+0x00] the active `CWldSession*` (the same `sWldSession` this
+      //              branch is gated on),
+      //   [esp+0x04] the world view's `GeomCamera3*` (ebp, from
+      //              `IRenderWorldView::GetCameraView`),
+      //   [esp+0x08] the raw `CD3DPrimBatcher*` out of `primBatcher` (edi,
+      //              loaded at 0x007D1B4D, not an owning handle),
+      //   [esp+0x0C] `deltaFrame`, forwarded unchanged,
+      //   [esp+0x10] a literal `0.0f` (`fldz` at 0x007D1B56).
+      // `func_RenUI` is not recovered yet and its owning translation unit
+      // (`moho/ui/UiRuntimeTypes.cpp`) is outside this file, so the call is
+      // deliberately left unwired rather than approximated.
+    }
+
+    device->Clear(
+      false,
+      true,
+      true,
+      kCartographicHeadClearColor,
+      kCartographicClearDepth,
+      kCartographicClearStencil
+    );
+
+    // 0x007D1BB2 dispatches `IRenderWorldView` slot 0 here as
+    // `worldView->Render(primBatcher.get(), gameTick, deltaFrame, 0.0f)` -
+    // four stack dwords, the third of which the shipped code stores with
+    // `fstp` (0x007D1BAD), i.e. a float. The declaration in
+    // `moho/render/IRenderWorldView.h` currently types that third parameter
+    // `CWldMap*`, which no value here can satisfy; the call is left unwired
+    // until that header is corrected rather than misrepresented with a cast.
+
+    REN_DebugStuff(primBatcher, static_cast<int>(headIndex));
+
+    device->SetViewport(&fullHeadViewport);
+
+    ui_AlwaysRenderStrategicIcons = previousAlwaysRenderStrategicIcons;
   }
 } // namespace moho

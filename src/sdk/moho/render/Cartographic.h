@@ -15,7 +15,9 @@ namespace gpg
 
 namespace gpg::gal
 {
+  class DepthStencilTargetD3D9;
   class IndexBufferD3D9;
+  class RenderTargetD3D9;
   class TextureD3D9;
   class VertexBufferD3D9;
   class VertexFormatD3D9;
@@ -23,8 +25,13 @@ namespace gpg::gal
 
 namespace moho
 {
+  class BoundaryRenderer;
+  class CD3DPrimBatcher;
   class CHeightField;
+  class IRenderWorldView;
   class IWldTerrainRes;
+  class RangeRenderer;
+  class VisionRenderer;
   struct GeomCamera3;
 
   /**
@@ -150,12 +157,22 @@ namespace moho
     /**
      * Address: 0x007D50D0 (FUN_007D50D0, sub_7D50D0)
      *
+     * IDA signature:
+     * void __thiscall sub_7D50D0(
+     *   Moho::CartographicDecalBatch *this@<ecx>, const Moho::GeomCamera3 *camera);
+     *
      * What it does:
      * Ensures cartographic decal GPU resources and texture state exist, uploads
      * dirty decal instance vertices, binds the cartographic effect, and draws
      * one instanced quad pass for each technique pass.
+     *
+     * The shipped body ends in `retn 4` (0x007D53EE) - one stack argument, the
+     * batch in `ecx` - and the sole call site, the decal-list walk inside
+     * `Cartographic::Render` at 0x007D1B30..0x007D1B34, pushes only the camera.
+     * The earlier `(enabled, tick, camera)` arity declared here was a guess the
+     * body never read; it is dropped so the declaration matches the shipped ABI.
      */
-    void Render(bool enabled, std::int32_t tick, const GeomCamera3& camera);
+    void Render(const GeomCamera3& camera);
 
     /**
      * Address: 0x007D56C0 (FUN_007D56C0, sub_7D56C0)
@@ -326,6 +343,72 @@ namespace moho
       std::uint32_t hypsometricColor4
     );
 
+    /**
+     * Address: 0x007D17C0 (FUN_007D17C0)
+     * Mangled: ?Render@Cartographic@Moho@@QAEXV?$shared_ptr@VRenderTarget@gal@gpg@@@boost@@
+     *          V?$shared_ptr@VDepthStencilTarget@gal@gpg@@@4@HHM
+     *          V?$shared_ptr@VCD3DPrimBatcher@Moho@@@4@PAVIRenderWorldView@2@_N@Z
+     *
+     * IDA signature:
+     * void __usercall Moho::Cartographic::Render(
+     *   Moho::Cartographic *this, unsigned int headIndex, int gameTick, float deltaFrame,
+     *   Moho::IRenderWorldView *worldView, Moho::RangeRenderer *rangeRenderer,
+     *   Moho::VisionRenderer *visionRenderer, Moho::BoundaryRenderer *boundaryRenderer,
+     *   boost::shared_ptr<gpg::gal::RenderTarget> colorTarget,
+     *   boost::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
+     *   boost::shared_ptr<Moho::CD3DPrimBatcher> primBatcher);
+     *
+     * What it does:
+     * Draws one complete cartographic ("strategic") view for one device head:
+     * forces strategic icons on for the duration, clears the caller's colour and
+     * depth pair, sets the world view's viewport rect, paints the terrain
+     * hypsometric/topographic pass into it, overlays the range rings, the
+     * fog-of-war and the playable boundary while a world session exists, then
+     * composites that offscreen frame back onto the head and finally draws the
+     * meshes, particles, decal batches and UI on top before restoring the head's
+     * full viewport and the strategic-icon toggle.
+     *
+     * ABI note. The mangled symbol above spells an eight-argument list, but the
+     * shipped body is `retn 38h` (0x007D1CCD) - 0x38 = 56 bytes of stack
+     * arguments - and the sole call site (`WRenViewport::RenderCartographic`,
+     * 0x007F8DCD..0x007F8DF6) pushes exactly the eleven lanes this declaration
+     * carries, in this order, with `this` as the first stack argument:
+     *
+     *   +0x04 `this`              (0x007D19E6 feeds it to RenderTerrainStage0)
+     *   +0x08 headIndex           (0x007D1807 -> DeviceContext::GetHead)
+     *   +0x0C gameTick            (0x007D1B92 -> world-view render callback)
+     *   +0x10 deltaFrame          (0x007D1A12 `fld`, a float)
+     *   +0x14 worldView           (0x007D183F/0x007D1857 -> GetCamera/GetCameraView)
+     *   +0x18 rangeRenderer       (0x007D19FF; caller passes `&viewport+0x37C`)
+     *   +0x1C visionRenderer      (0x007D1A3F; caller gates it on `ren_FogOfWar`)
+     *   +0x20 boundaryRenderer    (0x007D1A68; gated on `ren_PlayableBoundary`)
+     *   +0x24 colorTarget         (0x007D19A6 -> OutputContext surface lane)
+     *   +0x2C depthStencilTarget  (0x007D19A6 -> OutputContext second lane)
+     *   +0x34 primBatcher         (0x007D1B4D -> UI pass / REN_DebugStuff)
+     *
+     * Whole-program optimization moved `this` onto the stack, hoisted the three
+     * renderer lanes out of the caller and pushed the three by-value
+     * `boost::shared_ptr` arguments to the tail. This declaration follows the
+     * shipped layout because the shipped body reads lanes the mangled list does
+     * not contain. The two target handles are typed as the concrete D3D9
+     * implementations the runtime actually carries - `D3D9Interfaces.cpp` models
+     * the same two `OutputContext` lanes as `boost::shared_ptr<RenderTargetD3D9>`
+     * and `boost::shared_ptr<DepthStencilTargetD3D9>` - because the in-repo GAL
+     * headers do not declare `RenderTargetD3D9 : RenderTarget`.
+     */
+    void Render(
+      unsigned int headIndex,
+      std::int32_t gameTick,
+      float deltaFrame,
+      IRenderWorldView* worldView,
+      RangeRenderer* rangeRenderer,
+      VisionRenderer* visionRenderer,
+      BoundaryRenderer* boundaryRenderer,
+      boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget,
+      boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> depthStencilTarget,
+      boost::shared_ptr<CD3DPrimBatcher> primBatcher
+    );
+
   private:
     /**
      * Address: 0x007D2E40 (FUN_007D2E40, ?RenderParticles@Cartographic@Moho@@AAEXHMABVGeomCamera3@2@@Z)
@@ -395,6 +478,72 @@ namespace moho
       std::int32_t gridHeight,
       std::int32_t topographicSamples
     );
+
+    /**
+     * Address: 0x007D2EA0 (FUN_007D2EA0)
+     * Mangled: ?RenderTerrainStage0@Cartographic@Moho@@AAEXABVGeomCamera3@2@_N@Z
+     *
+     * IDA signature:
+     * void __usercall Moho::Cartographic::RenderTerrainStage0(
+     *   Moho::Cartographic *this@<edx>, const Moho::GeomCamera3 *camera@<ecx>, bool mirrored);
+     *
+     * What it does:
+     * Paints the cartographic terrain into the currently bound offscreen frame:
+     * clears it to opaque black, binds the camera matrices plus the eight
+     * cartographic coefficient / elevation lanes and the three lookup textures
+     * into the `"Terrain_Stage0"` technique, then draws the terrain ground quad
+     * once per technique pass.
+     *
+     * The shipped body ends in a bare `retn` (0x007D3578): link-time code
+     * generation put `this` in `edx` and the camera in `ecx`, and dropped the
+     * declared `bool` entirely - the sole call site (0x007D19E6..0x007D19EF)
+     * pushes nothing at all. The declared arity is kept for symbol fidelity and
+     * the parameter stays unread, exactly as in the shipped image.
+     */
+    void RenderTerrainStage0(const GeomCamera3& camera, bool mirrored);
+
+    /**
+     * Address: 0x007D3580 (FUN_007D3580)
+     * Mangled: ?RenderTerrainStage1@Cartographic@Moho@@AAEXH
+     *          V?$shared_ptr@VRenderTarget@gal@gpg@@@boost@@@Z
+     *
+     * IDA signature:
+     * void __usercall Moho::Cartographic::RenderTerrainStage1(
+     *   Moho::Cartographic *this, int headIndex,
+     *   boost::shared_ptr<gpg::gal::RenderTarget> colorTarget);
+     *
+     * What it does:
+     * Composites the offscreen cartographic frame back onto the head. Clears the
+     * head to opaque black, uploads a screen-space quad covering the head's
+     * render target (half-texel corrected, `z = rhw = 1`), then draws it once per
+     * pass of the `"Terrain_Stage1"` technique with the frame size and the
+     * offscreen colour target bound as `frameWidth` / `frameHeight` /
+     * `frameTexture`.
+     *
+     * The shipped body is `retn 10h` (0x007D3AB7): link-time code generation
+     * moved `this` onto the stack ahead of the two declared arguments.
+     */
+    void RenderTerrainStage1(std::int32_t headIndex, boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget);
+
+    /**
+     * Address: 0x007D2CB0 (FUN_007D2CB0)
+     * Mangled: ?RenderMeshes@Cartographic@Moho@@AAEXHMABVGeomCamera3@2@@Z
+     *
+     * IDA signature:
+     * void __usercall Moho::Cartographic::RenderMeshes(
+     *   Moho::Cartographic *this@<edi>, int gameTick, float deltaFrame,
+     *   const Moho::GeomCamera3 *camera);
+     *
+     * What it does:
+     * Binds this view's hypsometric ramp into the shared `"mesh"` effect and
+     * makes that effect current, then rebuilds the global mesh batch map for the
+     * frame and draws it through the mesh renderer's cartographic pass, fed with
+     * the water-surface elevation and the tier elevation band.
+     *
+     * `retn 0Ch` (0x007D2E31): the three declared arguments stay on the stack;
+     * link-time code generation only moved `this` into `edi`.
+     */
+    void RenderMeshes(std::int32_t gameTick, float deltaFrame, const GeomCamera3& camera);
 
   public:
     // Runtime-initialized flag. Cleared by the ctor and Shutdown, set by
