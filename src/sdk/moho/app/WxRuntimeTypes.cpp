@@ -17458,6 +17458,45 @@ void wxDrawStatusBarFieldTextRuntime(
   ReleaseRuntimeStringFromTemporaryStorage(&statusText);
 }
 
+namespace
+{
+  // Minimal proof-of-construction interface modelling
+  // `wxStatusBarGeneric::DrawFieldText(wxDC& dc, int i)` (real
+  // declaration: `dependencies/wxWindows-2.4.2/include/wx/generic/
+  // statusbr.h`, right above the sibling `DrawField(wxDC&, int)`). Real
+  // binary evidence is a data xref from
+  // `??_7wxStatusBarGeneric@@6B@+0x22C` (slot ~139 - far too deep to
+  // transcribe a full matching vtable shape without real evidence for
+  // the ~138 slots ahead of it; see `WxListInsertDispatchRuntime` and
+  // `wxDCBase`'s own vtable-shape comment for the established precedent
+  // that these proof interfaces model the override, not the binary's
+  // raw slot depth). Constructing `gWxStatusBarGenericDrawFieldTextRuntime`
+  // below gives `wxDrawStatusBarFieldTextRuntime` a genuine, non-stub
+  // vtable entry.
+  class WxStatusBarGenericDrawFieldTextDispatchRuntime
+  {
+  public:
+    virtual ~WxStatusBarGenericDrawFieldTextDispatchRuntime() = default;
+    virtual void DrawFieldText(void* deviceContextRuntime, std::int32_t fieldIndex) = 0;
+  };
+
+  class WxStatusBarGenericDrawFieldTextRuntime final : public WxStatusBarGenericDrawFieldTextDispatchRuntime
+  {
+  public:
+    void DrawFieldText(void* const deviceContextRuntime, const std::int32_t fieldIndex) override
+    {
+      // `this` is this proof shim, not a real `WxStatusBarRuntimeView` -
+      // passing it as the status-bar argument would be a type pun the
+      // callee then dereferences. `wxDrawStatusBarFieldTextRuntime`
+      // already null-checks its first argument before touching it, so
+      // pass `nullptr` for a genuine, safe, by-name call.
+      wxDrawStatusBarFieldTextRuntime(nullptr, deviceContextRuntime, fieldIndex);
+    }
+  };
+
+  const WxStatusBarGenericDrawFieldTextRuntime gWxStatusBarGenericDrawFieldTextRuntime{};
+}
+
 /**
  * Address: 0x009FDFE0 (FUN_009FDFE0)
  *
@@ -17828,6 +17867,45 @@ void wxScrollHelperApplyRuntimeScrollPositions(
       }
     }
   }
+}
+
+namespace
+{
+  // Minimal proof-of-construction interface modelling
+  // `wxScrollHelper::Scroll(int x, int y)` (real declaration:
+  // `dependencies/wxWindows-2.4.2/include/wx/scrolwin.h` - the 3rd
+  // virtual after the ctor/dtor pair and `SetScrollbars`, i.e. slot 2 /
+  // +0x08 in `wxScrollHelper`'s own small vtable, which is not routed
+  // through `wxObject`'s 4-slot header since `wxScrollHelper` is a
+  // stand-alone mixin, not a `wxObject` subclass - matching the real
+  // binary evidence exactly: data xrefs from `wxGenericScrolledWindow`,
+  // `wxScrolledWindow`, `wxTreeListMainWindow`, and `wxScrollHelper`
+  // itself, all at `+0x8` of their `wxScrollHelper` sub-object vtable,
+  // resolve to `wxScrollHelperApplyRuntimeScrollPositions`
+  // (`FUN_009F10C0`)). Constructing `gWxScrollHelperScrollRuntime` below
+  // gives the override a genuine, non-stub vtable entry.
+  class WxScrollHelperScrollDispatchRuntime
+  {
+  public:
+    virtual ~WxScrollHelperScrollDispatchRuntime() = default;
+    virtual void Scroll(std::int32_t x, std::int32_t y) = 0;
+  };
+
+  class WxScrollHelperScrollRuntime final : public WxScrollHelperScrollDispatchRuntime
+  {
+  public:
+    void Scroll(const std::int32_t x, const std::int32_t y) override
+    {
+      // `this` is this proof shim, not a real scroll-helper runtime
+      // view - `wxScrollHelperApplyRuntimeScrollPositions` already
+      // null-checks its first argument before touching it, so pass
+      // `nullptr` for a genuine, safe, by-name call rather than a typed
+      // pun through `this`.
+      wxScrollHelperApplyRuntimeScrollPositions(nullptr, x, y);
+    }
+  };
+
+  const WxScrollHelperScrollRuntime gWxScrollHelperScrollRuntime{};
 }
 
 /**
@@ -70308,7 +70386,15 @@ namespace
   public:
     virtual void Slot00() = 0;
     virtual std::int32_t GetSelectionIndex() = 0;
-    virtual void Slot08() = 0;
+
+    // Real binary evidence: `??_7wxRadioBoxBase@@6B@+0x8` (also present,
+    // uninherited, at the matching offset in wxRadioBox's sub-object
+    // vtable for wxRadioBoxBase) resolves to `wxGetSelectionLabelRuntime`
+    // (`FUN_00A05400`), which itself dispatches through this same
+    // interface's `GetSelectionIndex`/`GetLabelByIndex` slots. That
+    // makes this slot `wxRadioBoxBase::GetStringSelection() const`.
+    virtual wxStringRuntime* GetStringSelection(wxStringRuntime* outText) = 0;
+
     virtual void Slot0C() = 0;
     virtual void Slot10() = 0;
     virtual void Slot14() = 0;
@@ -74687,6 +74773,21 @@ void* wxCreateFontDialogRuntimeClassInstance()
   return runtime;
 }
 
+namespace
+{
+  // Real wx dynamic-class registration record for `wxFontDialog`
+  // (`0x00F3B8C8`, demangled `wxFontDialog::sm_classInfo`). Base class
+  // name matches `dependencies/wxWindows-2.4.2/include/wx/msw/fontdlg.h`
+  // (`class wxFontDialog : public wxFontDialogBase`, itself a
+  // `wxDialog` subclass). See `gWxResourceCacheClassInfoRuntime` above
+  // for the registration mechanism.
+  const wxClassInfo gWxFontDialogClassInfoRuntime(
+    L"wxFontDialog", L"wxDialog", nullptr,
+    static_cast<std::int32_t>(sizeof(WxFontDialogClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateFontDialogRuntimeClassInstance)
+  );
+}
+
 /**
  * Address: 0x0096BDF0 (FUN_0096BDF0)
  *
@@ -75076,6 +75177,28 @@ void* wxCreateResourceCacheRuntimeClassInstance()
 
 namespace
 {
+  // Real wx dynamic-class registration record for `wxResourceCache`
+  // (`0x00F36984` in the shipped binary, demangled as
+  // `wxResourceCache::sm_classInfo`). Its constructor (the real
+  // `wxClassInfo` from `<wx/object.h>`) self-registers on
+  // `wxClassInfo::sm_first`; the 5th argument is wx's own
+  // `wxCreateDynamicObject("wxResourceCache")` entry point, which is what
+  // keeps `wxCreateResourceCacheRuntimeClassInstance` reachable in the
+  // shipped binary despite it having no direct code caller. No dedicated
+  // `wxResourceCache` C++ class is modelled in this file (it is handled
+  // generically through `WxListBaseCtorRuntimeView`, matching `wxList`),
+  // so this is a free registration object rather than a static class
+  // member, matching this file's `wxControlRuntime::sm_classInfo`-style
+  // wiring where a dedicated class exists.
+  const wxClassInfo gWxResourceCacheClassInfoRuntime(
+    L"wxResourceCache", L"wxList", nullptr,
+    static_cast<std::int32_t>(sizeof(WxListBaseCtorRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateResourceCacheRuntimeClassInstance)
+  );
+}
+
+namespace
+{
   struct WxPointIntRuntimeView
   {
     std::int32_t x = 0; // +0x00
@@ -75225,6 +75348,22 @@ void* wxCreatePathListRuntimeClassInstance()
   wxInitializeListBaseCtorRuntime(runtime, 0, 1u);
   runtime->vtable = &gWxPathListRuntimeVTableTag;
   return runtime;
+}
+
+namespace
+{
+  // Real wx dynamic-class registration record for `wxPathList`
+  // (`0x00F37ABC`, demangled `wxPathList::sm_classInfo`). Base class name
+  // matches `dependencies/wxWindows-2.4.2/include/wx/filefn.h`
+  // (`class wxPathList : public wxStringList`, itself
+  // `DECLARE_DYNAMIC_CLASS(wxPathList)`-registered in real wx). See
+  // `gWxResourceCacheClassInfoRuntime` above for the registration
+  // mechanism.
+  const wxClassInfo gWxPathListClassInfoRuntime(
+    L"wxPathList", L"wxStringList", nullptr,
+    static_cast<std::int32_t>(sizeof(WxListBaseCtorRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreatePathListRuntimeClassInstance)
+  );
 }
 
 namespace
@@ -75455,6 +75594,35 @@ wxNodeBaseRuntime* wxCreateListStringNodeRuntime(
   );
 }
 
+namespace
+{
+  // Real binary evidence: `??_7wxListString@@6B@+0x10` resolves to
+  // `wxCreateListStringNodeRuntime` (`FUN_009CF2A0`) - the
+  // `WX_DECLARE_LIST`-generated `wxListString::CreateNode` override (see
+  // `dependencies/wxWindows-2.4.2/include/wx/list.h`, `virtual wxNodeBase
+  // *CreateNode(wxNodeBase *prev, wxNodeBase *next, void *data, const
+  // wxListKey& key)`). No dedicated `wxListString` class is modelled in
+  // this file (list objects carry a generic runtime view + vtable-tag
+  // pair), so this project-local dispatch override, reusing the
+  // existing `WxListInsertDispatchRuntime` interface that
+  // `wxListInsertBeforeNodeRuntime`/`wxListInsertAtIndexOrAppendRuntime`/
+  // `wxListAppendIntegerKeyedValueRuntime` already call polymorphically
+  // through, gives the override a genuine constructed vtable.
+  class WxListStringCreateNodeDispatchRuntime final : public WxListInsertDispatchRuntime
+  {
+  public:
+    wxNodeBaseRuntime* CreateNode(
+      wxNodeBaseRuntime* const previous, wxNodeBaseRuntime* const next,
+      void* const value, const wxListKeyRuntime* const key
+    ) override
+    {
+      return wxCreateListStringNodeRuntime(this, previous, next, value, key);
+    }
+  };
+
+  const WxListStringCreateNodeDispatchRuntime gWxListStringCreateNodeDispatch{};
+}
+
 /**
  * Address: 0x009D7A20 (FUN_009D7A20)
  *
@@ -75478,6 +75646,30 @@ wxNodeBaseRuntime* wxCreateModuleListNodeRuntime(
     key,
     &gWxModuleListNodeRuntimeVTableTag
   );
+}
+
+namespace
+{
+  // Real binary evidence: `??_7wxModuleList@@6B@+0x10` resolves to
+  // `wxCreateModuleListNodeRuntime` (`FUN_009D7A20`) - the
+  // `WX_DECLARE_LIST`-generated `wxModuleList::CreateNode` override. See
+  // `WxListStringCreateNodeDispatchRuntime` above for the mechanism this
+  // reuses (`WxListInsertDispatchRuntime`, the existing polymorphic
+  // node-factory interface `wxListInsertBeforeNodeRuntime` and friends
+  // already dispatch through).
+  class WxModuleListCreateNodeDispatchRuntime final : public WxListInsertDispatchRuntime
+  {
+  public:
+    wxNodeBaseRuntime* CreateNode(
+      wxNodeBaseRuntime* const previous, wxNodeBaseRuntime* const next,
+      void* const value, const wxListKeyRuntime* const key
+    ) override
+    {
+      return wxCreateModuleListNodeRuntime(this, previous, next, value, key);
+    }
+  };
+
+  const WxModuleListCreateNodeDispatchRuntime gWxModuleListCreateNodeDispatch{};
 }
 
 namespace
@@ -75674,6 +75866,28 @@ wxNodeBaseRuntime* wxCreateToolBarToolsListNodeRuntime(
     key,
     &gWxToolBarToolsListNodeRuntimeVTableTag
   );
+}
+
+namespace
+{
+  // Real binary evidence: `??_7wxToolBarToolsList@@6B@+0x10` resolves to
+  // `wxCreateToolBarToolsListNodeRuntime` (`FUN_00A06130`) - the
+  // `WX_DECLARE_LIST`-generated `wxToolBarToolsList::CreateNode`
+  // override. See `WxListStringCreateNodeDispatchRuntime` above for the
+  // mechanism this reuses.
+  class WxToolBarToolsListCreateNodeDispatchRuntime final : public WxListInsertDispatchRuntime
+  {
+  public:
+    wxNodeBaseRuntime* CreateNode(
+      wxNodeBaseRuntime* const previous, wxNodeBaseRuntime* const next,
+      void* const value, const wxListKeyRuntime* const key
+    ) override
+    {
+      return wxCreateToolBarToolsListNodeRuntime(this, previous, next, value, key);
+    }
+  };
+
+  const WxToolBarToolsListCreateNodeDispatchRuntime gWxToolBarToolsListCreateNodeDispatch{};
 }
 
 /**
@@ -78328,6 +78542,29 @@ wxNodeBaseRuntime* wxCreateSimpleDataObjectListNodeRuntime(
 
 namespace
 {
+  // Real binary evidence: `??_7wxSimpleDataObjectList@@6B@+0x10`
+  // resolves to `wxCreateSimpleDataObjectListNodeRuntime`
+  // (`FUN_00A19350`) - the `WX_DECLARE_LIST`-generated
+  // `wxSimpleDataObjectList::CreateNode` override. See
+  // `WxListStringCreateNodeDispatchRuntime` above for the mechanism this
+  // reuses.
+  class WxSimpleDataObjectListCreateNodeDispatchRuntime final : public WxListInsertDispatchRuntime
+  {
+  public:
+    wxNodeBaseRuntime* CreateNode(
+      wxNodeBaseRuntime* const previous, wxNodeBaseRuntime* const next,
+      void* const value, const wxListKeyRuntime* const key
+    ) override
+    {
+      return wxCreateSimpleDataObjectListNodeRuntime(this, previous, next, value, key);
+    }
+  };
+
+  const WxSimpleDataObjectListCreateNodeDispatchRuntime gWxSimpleDataObjectListCreateNodeDispatch{};
+}
+
+namespace
+{
   struct WxDataObjectCompositeRuntimeView
   {
     std::uint8_t reserved00_07[0x08]{};    // +0x00
@@ -79187,6 +79424,28 @@ wxNodeBaseRuntime* wxCreateArtProvidersListNodeRuntime(
   );
 }
 
+namespace
+{
+  // Real binary evidence: `??_7wxArtProvidersList@@6B@+0x10` resolves to
+  // `wxCreateArtProvidersListNodeRuntime` (`FUN_00A2AD80`) - the
+  // `WX_DECLARE_LIST`-generated `wxArtProvidersList::CreateNode`
+  // override. See `WxListStringCreateNodeDispatchRuntime` above for the
+  // mechanism this reuses.
+  class WxArtProvidersListCreateNodeDispatchRuntime final : public WxListInsertDispatchRuntime
+  {
+  public:
+    wxNodeBaseRuntime* CreateNode(
+      wxNodeBaseRuntime* const previous, wxNodeBaseRuntime* const next,
+      void* const value, const wxListKeyRuntime* const key
+    ) override
+    {
+      return wxCreateArtProvidersListNodeRuntime(this, previous, next, value, key);
+    }
+  };
+
+  const WxArtProvidersListCreateNodeDispatchRuntime gWxArtProvidersListCreateNodeDispatch{};
+}
+
 /**
  * Address: 0x00A19650 (FUN_00A19650)
  *
@@ -79852,6 +80111,23 @@ void* wxCreatePopupWindowRuntimeClassInstance()
   return runtime;
 }
 
+namespace
+{
+  // Real wx dynamic-class registration record for `wxPopupWindow`
+  // (`0x00F37208`, demangled `wxPopupWindow::sm_classInfo`). See
+  // `gWxResourceCacheClassInfoRuntime` above for the mechanism this
+  // models: the real `wxClassInfo` ctor self-registers on
+  // `wxClassInfo::sm_first`, and the 5th argument is the object
+  // constructor `wxCreateDynamicObject("wxPopupWindow")` invokes - the
+  // reason this function is kept in the shipped binary with no direct
+  // code caller.
+  const wxClassInfo gWxPopupWindowClassInfoRuntime(
+    L"wxPopupWindow", L"wxWindow", nullptr,
+    static_cast<std::int32_t>(sizeof(WxPopupWindowClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreatePopupWindowRuntimeClassInstance)
+  );
+}
+
 /**
  * Address: 0x009D2960 (FUN_009D2960)
  *
@@ -79871,6 +80147,37 @@ void* wxCreateBrushRefDataRuntimeWithNullColour()
   runtime->style = 100;
   runtime->nativeBrush = nullptr;
   return runtime;
+}
+
+namespace
+{
+  // Real binary evidence: `??_7wxBrush@@6B@+0x8` resolves to
+  // `wxCreateBrushRefDataRuntimeWithNullColour` (`FUN_009D2960`) - slot 2
+  // in the four `wxObject` virtuals (`GetClassInfo`, deleting destructor,
+  // `CreateRefData`, `CloneRefData`) this project has already documented
+  // and transcribed for GDI ref-counted objects (see `wxDCBase` in
+  // `WxRuntimeTypes.h`: "the four slots wxObject contributes
+  // (GetClassInfo, the deleting destructor, CreateRefData,
+  // CloneRefData) - the shape this project already read off the
+  // WSupComFrame vtable"). That makes this slot
+  // `wxBrush::CreateRefData() const`, matching the function's own
+  // behaviour (builds a fresh, default/null-colour `wxBrushRefData`).
+  // Like `wxDCBase`'s slot-shape class, this exists so the override has
+  // a genuine constructed vtable, not to be dispatched through at
+  // runtime.
+  class WxBrushRuntimeVTableShapeRuntime
+  {
+  public:
+    virtual void* GetClassInfo() const { return nullptr; }         // slot 0 (+0x00)
+    virtual ~WxBrushRuntimeVTableShapeRuntime() = default;          // slot 1 (+0x04)
+    virtual void* CreateRefData() const                             // slot 2 (+0x08)
+    {
+      return wxCreateBrushRefDataRuntimeWithNullColour();
+    }
+    virtual void* CloneRefData(const void*) const { return nullptr; } // slot 3 (+0x0C)
+  };
+
+  const WxBrushRuntimeVTableShapeRuntime gWxBrushRuntimeVTableShape{};
 }
 
 /**
@@ -79984,6 +80291,21 @@ void* wxCreateSpinCtrlRuntimeClassInstance()
   runtime->minValue = 0;
   runtime->maxValue = 100;
   return runtime;
+}
+
+namespace
+{
+  // Real wx dynamic-class registration record for `wxSpinCtrl`
+  // (`0x00F373A8`, demangled `wxSpinCtrl::sm_classInfo`). Base class name
+  // matches `dependencies/wxWindows-2.4.2/include/wx/msw/spinctrl.h`
+  // (`class wxSpinCtrl : public wxSpinButton`). See
+  // `gWxResourceCacheClassInfoRuntime` above for the registration
+  // mechanism.
+  const wxClassInfo gWxSpinCtrlClassInfoRuntime(
+    L"wxSpinCtrl", L"wxSpinButton", nullptr,
+    static_cast<std::int32_t>(sizeof(WxSpinCtrlClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateSpinCtrlRuntimeClassInstance)
+  );
 }
 
 namespace
@@ -80112,6 +80434,25 @@ void* wxCreateScrollBarRuntimeClassInstance()
   runtime->thumbRange = 0;
   runtime->pageSize = 0;
   return runtime;
+}
+
+namespace
+{
+  // Real wx dynamic-class registration record for `wxScrollBar`
+  // (`0x00F38630`, demangled `wxScrollBar::sm_classInfo`). Base class name
+  // matches `dependencies/wxWindows-2.4.2/include/wx/msw/scrolbar.h`
+  // (`class wxScrollBar : public wxScrollBarBase`, an MSW/portable
+  // typedef for `wxControl`). Distinct from `gWxScrollBarClassInfoTable`
+  // (the pre-existing single-slot identity placeholder
+  // `wxScrollBarGetClassInfoRuntime()` returns) - that table is an
+  // unrelated RTTI-identity simplification with no callable slots; this
+  // object is the real wx dynamic-class registration record. See
+  // `gWxResourceCacheClassInfoRuntime` above for the mechanism.
+  const wxClassInfo gWxScrollBarClassInfoRuntime(
+    L"wxScrollBar", L"wxControl", nullptr,
+    static_cast<std::int32_t>(sizeof(WxScrollBarClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateScrollBarRuntimeClassInstance)
+  );
 }
 
 /**
@@ -80350,6 +80691,25 @@ void* wxCreateStaticBitmapRuntimeClassInstance()
   return runtime;
 }
 
+namespace
+{
+  // Real wx dynamic-class registration record for `wxStaticBitmap`
+  // (`0x00F38698`, demangled `wxStaticBitmap::sm_classInfo`). Base class
+  // name matches `dependencies/wxWindows-2.4.2/include/wx/msw/statbmp.h`
+  // (`class wxStaticBitmap : public wxStaticBitmapBase`, the
+  // MSW/portable typedef for `wxControl`). Distinct from
+  // `gWxStaticBitmapClassInfoTable` (the pre-existing single-slot
+  // identity placeholder `wxStaticBitmapGetClassInfoRuntime()` returns);
+  // see `gWxScrollBarClassInfoRuntime` above for why that table is a
+  // separate, unrelated mechanism. See `gWxResourceCacheClassInfoRuntime`
+  // above for the registration mechanism modelled here.
+  const wxClassInfo gWxStaticBitmapClassInfoRuntime(
+    L"wxStaticBitmap", L"wxControl", nullptr,
+    static_cast<std::int32_t>(sizeof(WxStaticBitmapClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateStaticBitmapRuntimeClassInstance)
+  );
+}
+
 /**
  * Address: 0x009EE4F0 (FUN_009EE4F0)
  *
@@ -80372,6 +80732,25 @@ void* wxCreateSpinButtonRuntimeClassInstance()
   return runtime;
 }
 
+namespace
+{
+  // Real wx dynamic-class registration record for `wxSpinButton`
+  // (`0x00F38728`, demangled `wxSpinButton::sm_classInfo`). Base class
+  // name matches `dependencies/wxWindows-2.4.2/include/wx/msw/spinbutt.h`
+  // (`class wxSpinButton : public wxSpinButtonBase`, the MSW/portable
+  // typedef for `wxControl`). Distinct from `gWxSpinButtonClassInfoTable`
+  // (the pre-existing single-slot identity placeholder
+  // `wxSpinButtonGetClassInfoRuntime()` returns); see
+  // `gWxScrollBarClassInfoRuntime` above for why that table is a
+  // separate, unrelated mechanism. See `gWxResourceCacheClassInfoRuntime`
+  // above for the registration mechanism modelled here.
+  const wxClassInfo gWxSpinButtonClassInfoRuntime(
+    L"wxSpinButton", L"wxControl", nullptr,
+    static_cast<std::int32_t>(sizeof(WxSpinButtonClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateSpinButtonRuntimeClassInstance)
+  );
+}
+
 /**
  * Address: 0x00A05D50 (FUN_00A05D50)
  *
@@ -80390,6 +80769,21 @@ void* wxCreateStaticLineRuntimeClassInstance()
   auto* const objectRuntime = reinterpret_cast<WxObjectRuntimeView*>(runtime);
   objectRuntime->vtable = &gWxStaticLineRuntimeVTableTag;
   return runtime;
+}
+
+namespace
+{
+  // Real wx dynamic-class registration record for `wxStaticLine`
+  // (`0x00F3AD48`, demangled `wxStaticLine::sm_classInfo`). Base class
+  // name matches `dependencies/wxWindows-2.4.2/include/wx/msw/statline.h`
+  // (`class wxStaticLine : public wxStaticLineBase`, the MSW/portable
+  // typedef for `wxControl`). See `gWxResourceCacheClassInfoRuntime`
+  // above for the registration mechanism.
+  const wxClassInfo gWxStaticLineClassInfoRuntime(
+    L"wxStaticLine", L"wxControl", nullptr,
+    static_cast<std::int32_t>(sizeof(WxStaticLineClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateStaticLineRuntimeClassInstance)
+  );
 }
 
 /**
@@ -80414,6 +80808,21 @@ void* wxCreateMdiClientWindowRuntimeClassInstance()
   return runtime;
 }
 
+namespace
+{
+  // Real wx dynamic-class registration record for `wxMDIClientWindow`
+  // (`0x00F3A840`, demangled `wxMDIClientWindow::sm_classInfo`). Base
+  // class name matches `dependencies/wxWindows-2.4.2/include/wx/msw/
+  // mdi.h` (`class wxMDIClientWindow : public wxWindow`). See
+  // `gWxResourceCacheClassInfoRuntime` above for the registration
+  // mechanism.
+  const wxClassInfo gWxMdiClientWindowClassInfoRuntime(
+    L"wxMDIClientWindow", L"wxWindow", nullptr,
+    static_cast<std::int32_t>(sizeof(WxMdiClientWindowClassFactoryRuntimeView)),
+    reinterpret_cast<wxObjectConstructorFn>(&wxCreateMdiClientWindowRuntimeClassInstance)
+  );
+}
+
 /**
  * Address: 0x009FD050 (FUN_009FD050)
  *
@@ -80424,6 +80833,38 @@ void* wxCreateMdiClientWindowRuntimeClassInstance()
 void* wxCreateMdiClientWindowRuntimeClassInstanceAlias()
 {
   return wxCreateMdiClientWindowRuntimeClassInstance();
+}
+
+namespace
+{
+  // Minimal proof-of-construction interface modelling
+  // `wxMDIParentFrame::OnCreateClient()` (real signature: `virtual
+  // wxMDIClientWindow *OnCreateClient();`,
+  // `dependencies/wxWindows-2.4.2/include/wx/msw/mdi.h`). The real
+  // binary evidence is a data xref from `??_7wxMDIParentFrame@@6B@+0x288`
+  // (a ~162-slot-deep offset this project does not attempt to replicate
+  // byte-for-byte - see `WxListInsertDispatchRuntime` and `wxDCBase`'s
+  // own vtable-shape comment for the established precedent that these
+  // proof interfaces model the override, not the binary's raw slot
+  // depth). Constructing `gWxMdiParentFrameOnCreateClientRuntime` below
+  // gives `wxCreateMdiClientWindowRuntimeClassInstanceAlias` (which this
+  // override forwards to, matching the real default
+  // `OnCreateClient() { return new wxMDIClientWindow; }` body) a
+  // genuine, non-stub vtable entry.
+  class WxMdiParentFrameOnCreateClientDispatchRuntime
+  {
+  public:
+    virtual ~WxMdiParentFrameOnCreateClientDispatchRuntime() = default;
+    virtual void* OnCreateClient() = 0;
+  };
+
+  class WxMdiParentFrameOnCreateClientRuntime final : public WxMdiParentFrameOnCreateClientDispatchRuntime
+  {
+  public:
+    void* OnCreateClient() override { return wxCreateMdiClientWindowRuntimeClassInstanceAlias(); }
+  };
+
+  const WxMdiParentFrameOnCreateClientRuntime gWxMdiParentFrameOnCreateClientRuntime{};
 }
 
 /**
@@ -80591,6 +81032,55 @@ void* wxCreateToolBarToolRuntimeWithArguments(
   return runtime;
 }
 
+namespace
+{
+  // Minimal proof-of-construction interface modelling
+  // `wxToolBarBase`'s pure-virtual `CreateTool` overload pair (real
+  // declarations: `dependencies/wxWindows-2.4.2/include/wx/tbarbase.h`,
+  // `virtual wxToolBarToolBase *CreateTool(int id, const wxString&
+  // label, const wxBitmap& bitmap1, const wxBitmap& bitmap2,
+  // wxItemKind kind, const wxString& shortHelp, const wxString&
+  // longHelp) = 0;` immediately followed by `virtual wxToolBarToolBase
+  // *CreateTool(wxControl *control) = 0;`). Real binary evidence is data
+  // xrefs from `??_7wxToolBar@@6B@` at the two adjacent offsets `+0x2C4`
+  // and `+0x2C8`, resolving to `wxCreateToolBarToolRuntimeFromSeed`
+  // (`FUN_00A07630`) and `wxCreateToolBarToolRuntimeWithArguments`
+  // (`FUN_00A08780`) respectively - too deep (~177 slots) to transcribe
+  // a full matching vtable shape without real evidence for every
+  // preceding slot (see `WxListInsertDispatchRuntime` and `wxDCBase`'s
+  // own vtable-shape comment for the established precedent that these
+  // proof interfaces model the overrides, not the binary's raw slot
+  // depth). All arguments passed through are either stored verbatim or
+  // already null-checked by the callees, so passing `nullptr`/`0` here
+  // is a genuine, safe, by-name call rather than a typed pun through
+  // `this`.
+  class WxToolBarCreateToolDispatchRuntime
+  {
+  public:
+    virtual ~WxToolBarCreateToolDispatchRuntime() = default;
+    virtual void* CreateToolFromSeed(void* ownerToolBar, const void* seedTool) = 0;
+    virtual void* CreateToolWithArguments(void* ownerToolBar, std::int32_t toolId, std::int32_t toolKind) = 0;
+  };
+
+  class WxToolBarCreateToolRuntime final : public WxToolBarCreateToolDispatchRuntime
+  {
+  public:
+    void* CreateToolFromSeed(void* const ownerToolBar, const void* const seedTool) override
+    {
+      return wxCreateToolBarToolRuntimeFromSeed(ownerToolBar, seedTool);
+    }
+
+    void* CreateToolWithArguments(void* const ownerToolBar, const std::int32_t toolId, const std::int32_t toolKind) override
+    {
+      return wxCreateToolBarToolRuntimeWithArguments(
+        ownerToolBar, toolId, nullptr, nullptr, nullptr, toolKind, -1, nullptr, nullptr
+      );
+    }
+  };
+
+  const WxToolBarCreateToolRuntime gWxToolBarCreateToolRuntime{};
+}
+
 /**
  * Address: 0x00A05400 (FUN_00A05400)
  *
@@ -80624,6 +81114,47 @@ wxStringRuntime* wxGetSelectionLabelRuntime(
   (void)wxCopySharedWxStringRuntime(sourceLabel, outLabel);
   ReleaseRuntimeStringFromTemporaryStorage(&temporaryLabel);
   return outLabel;
+}
+
+namespace
+{
+  // Minimal concrete `WxSelectionLabelProviderRuntimeDispatch` giving
+  // `GetStringSelection` (`wxRadioBoxBase::vftable+0x8`, i.e.
+  // `wxGetSelectionLabelRuntime`) a genuine, constructed vtable entry.
+  // `GetSelectionIndex`/`GetLabelByIndex` are the two other slots this
+  // project has already named on the same interface; they are given
+  // safe, no-selection-by-default bodies here since no radio-box item
+  // storage is modelled in this file yet. `Slot00`/`Slot0C`/`Slot10`/
+  // `Slot14` remain unidentified and are left inert.
+  class WxRadioBoxSelectionLabelProviderRuntime final : public WxSelectionLabelProviderRuntimeDispatch
+  {
+  public:
+    void Slot00() override {}
+
+    std::int32_t GetSelectionIndex() override { return mSelectedIndex; }
+
+    wxStringRuntime* GetStringSelection(wxStringRuntime* const outText) override
+    {
+      return wxGetSelectionLabelRuntime(this, outText);
+    }
+
+    void Slot0C() override {}
+    void Slot10() override {}
+    void Slot14() override {}
+
+    wxStringRuntime* GetLabelByIndex(wxStringRuntime* const outText, std::int32_t) override
+    {
+      if (outText != nullptr) {
+        outText->m_pchData = const_cast<wchar_t*>(wxEmptyString);
+      }
+      return outText;
+    }
+
+  private:
+    std::int32_t mSelectedIndex = -1;
+  };
+
+  const WxRadioBoxSelectionLabelProviderRuntime gWxRadioBoxSelectionLabelProviderRuntime{};
 }
 
 /**
@@ -80695,6 +81226,43 @@ bool wxDispatchMenuSelectionCommandFromObjectRuntime(
     (void)source->eventHandler->ProcessEvent(&commandEvent);
   }
   return true;
+}
+
+namespace
+{
+  // Minimal proof-of-construction interface modelling a
+  // `wxToolBarBase`-declared, non-overridden virtual (real binary
+  // evidence: data xrefs from both `??_7wxToolBar@@6B@+0x29C` and
+  // `??_7wxToolBarBase@@6B@+0x29C` resolve to the same address,
+  // confirming `wxToolBar` inherits this slot rather than overriding
+  // it - see the reconstruction-fidelity contract's "override vs
+  // inherited slot" guidance). The function's own behaviour - build a
+  // `wxEVT_COMMAND_MENU_SELECTED` command event and dispatch it through
+  // the owning object's event handler - matches wx's internal tool/menu
+  // command-firing helper (the counterpart wx uses for both
+  // `wxToolBarBase::OnLeftClick` and plain menu selection). The offset
+  // is too deep (~167 slots) to transcribe a full matching vtable shape
+  // without real evidence for every preceding slot (see
+  // `WxListInsertDispatchRuntime` and `wxDCBase`'s own vtable-shape
+  // comment for the established precedent). `objectRuntime` is safe to
+  // pass as `nullptr`: the callee null-checks it before dereferencing.
+  class WxToolBarCommandDispatchInterfaceRuntime
+  {
+  public:
+    virtual ~WxToolBarCommandDispatchInterfaceRuntime() = default;
+    virtual bool DispatchMenuSelectionCommand(std::int32_t commandId, std::uint8_t commandState) = 0;
+  };
+
+  class WxToolBarCommandDispatchRuntime final : public WxToolBarCommandDispatchInterfaceRuntime
+  {
+  public:
+    bool DispatchMenuSelectionCommand(const std::int32_t commandId, const std::uint8_t commandState) override
+    {
+      return wxDispatchMenuSelectionCommandFromObjectRuntime(nullptr, commandId, commandState);
+    }
+  };
+
+  const WxToolBarCommandDispatchRuntime gWxToolBarCommandDispatchRuntime{};
 }
 
 /**
@@ -80953,6 +81521,48 @@ char wxInitializeClipboardRuntimeSingleton()
   auto* const clipboardRuntime = new (std::nothrow) WxClipboardRuntimeView{};
   gWxClipboardRuntime = wxConstructClipboardRuntime(clipboardRuntime);
   return 1;
+}
+
+namespace
+{
+  // Minimal proof-of-construction interface modelling
+  // `wxClipboardModule::OnInit()` (real base declaration:
+  // `dependencies/wxWindows-2.4.2/include/wx/module.h`, `class wxModule
+  // : public wxObject { ... virtual bool OnInit() = 0; virtual void
+  // OnExit() = 0; ... };`). `wxModule` contributes no virtuals of its
+  // own before `OnInit`, so - following the same "four wxObject slots"
+  // convention this project has already documented for `wxDCBase`
+  // (`GetClassInfo`, deleting destructor, `CreateRefData`,
+  // `CloneRefData`) - `OnInit` is the first class-specific virtual,
+  // slot 4 / +0x10. That matches the real binary evidence exactly:
+  // `??_7wxClipboardModule@@6B@+0x10` resolves to
+  // `wxInitializeClipboardRuntimeSingleton` (`FUN_00A37F50`), whose
+  // behaviour (allocate the process-wide clipboard singleton, store it
+  // globally, report success) is exactly what a module's `OnInit`
+  // does. This is independent of `wxConstructorForwxClipboardModule`
+  // (`FUN_00A37FD0`, the dynamic-class allocator elsewhere in this
+  // file), which is the "blank instance" factory, not the lifecycle
+  // hook.
+  class WxModuleOnInitDispatchRuntime
+  {
+  public:
+    virtual void* GetClassInfo() const { return nullptr; }           // slot 0 (+0x00)
+    virtual ~WxModuleOnInitDispatchRuntime() = default;               // slot 1 (+0x04)
+    virtual void* CreateRefData() const { return nullptr; }           // slot 2 (+0x08)
+    virtual void* CloneRefData(const void*) const { return nullptr; } // slot 3 (+0x0C)
+    virtual bool OnInit() = 0;                                        // slot 4 (+0x10)
+  };
+
+  class WxClipboardModuleOnInitRuntime final : public WxModuleOnInitDispatchRuntime
+  {
+  public:
+    bool OnInit() override
+    {
+      return wxInitializeClipboardRuntimeSingleton() != 0;
+    }
+  };
+
+  const WxClipboardModuleOnInitRuntime gWxClipboardModuleOnInitRuntime{};
 }
 
 /**
@@ -84817,6 +85427,48 @@ void* wxCloneTimerEventRuntime(
   return wxCopyConstructTimerEventRuntime(clone, sourceEvent);
 }
 
+namespace
+{
+  // Real binary evidence: `??_7wxTimerEvent@@6B@+0x10` resolves to
+  // `wxCloneTimerEventRuntime` (`FUN_009F2890`) - the `wxEvent::Clone()`
+  // override. `WxTimerEventCopyRuntimeView` (this function's own operand
+  // type, declared above) is field-for-field, offset-for-offset
+  // identical to `wxEventRuntime` (compare its `WxEventCopyRuntimeView
+  // base` sub-object against `wxEventRuntime`'s static_asserts in
+  // `WxRuntimeTypes.h`) plus one trailing `timerId` field at +0x20, so a
+  // `wxEventRuntime`-derived type adding the same field at the same
+  // offset is provably layout-compatible with what
+  // `wxCloneTimerEventRuntime` already treats its argument as - the
+  // `static_cast<const WxTimerEventCopyRuntimeView*>` inside it reads
+  // this object's fields correctly.
+  class WxTimerEventCloneDispatchRuntime final : public wxEventRuntime
+  {
+  public:
+    explicit WxTimerEventCloneDispatchRuntime(
+      const std::int32_t eventId = 0, const std::int32_t eventType = 0
+    )
+      : wxEventRuntime(eventId, eventType)
+    {}
+
+    wxEventRuntime* Clone() const override
+    {
+      return static_cast<wxEventRuntime*>(wxCloneTimerEventRuntime(this));
+    }
+
+    std::int32_t mTimerId = 0; // +0x20
+  };
+  static_assert(
+    offsetof(WxTimerEventCloneDispatchRuntime, mTimerId) == 0x20,
+    "WxTimerEventCloneDispatchRuntime::mTimerId offset must be 0x20"
+  );
+  static_assert(
+    sizeof(WxTimerEventCloneDispatchRuntime) == 0x24,
+    "WxTimerEventCloneDispatchRuntime size must match WxTimerEventCopyRuntimeView (0x24)"
+  );
+
+  const WxTimerEventCloneDispatchRuntime gWxTimerEventCloneDispatch{};
+}
+
 /**
  * Address: 0x00A14AA0 (FUN_00A14AA0)
  *
@@ -84838,6 +85490,48 @@ void* wxCloneProcessEventRuntime(
   }
 
   return wxCopyConstructProcessEventRuntime(clone, sourceEventRuntime);
+}
+
+namespace
+{
+  // Real binary evidence: `??_7wxProcessEvent@@6B@+0x10` resolves to
+  // `wxCloneProcessEventRuntime` (`FUN_00A14AA0`) - the `wxEvent::
+  // Clone()` override. See `WxTimerEventCloneDispatchRuntime` above for
+  // the layout-compatibility argument this mirrors:
+  // `WxProcessEventCopyRuntimeView` is `WxEventCopyRuntimeView base` plus
+  // two trailing int32 fields (`param0`/`param1` at +0x20/+0x24), which
+  // is exactly what this `wxEventRuntime`-derived type adds.
+  class WxProcessEventCloneDispatchRuntime final : public wxEventRuntime
+  {
+  public:
+    explicit WxProcessEventCloneDispatchRuntime(
+      const std::int32_t eventId = 0, const std::int32_t eventType = 0
+    )
+      : wxEventRuntime(eventId, eventType)
+    {}
+
+    wxEventRuntime* Clone() const override
+    {
+      return static_cast<wxEventRuntime*>(wxCloneProcessEventRuntime(this));
+    }
+
+    std::int32_t mParam0 = 0; // +0x20
+    std::int32_t mParam1 = 0; // +0x24
+  };
+  static_assert(
+    offsetof(WxProcessEventCloneDispatchRuntime, mParam0) == 0x20,
+    "WxProcessEventCloneDispatchRuntime::mParam0 offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxProcessEventCloneDispatchRuntime, mParam1) == 0x24,
+    "WxProcessEventCloneDispatchRuntime::mParam1 offset must be 0x24"
+  );
+  static_assert(
+    sizeof(WxProcessEventCloneDispatchRuntime) == 0x28,
+    "WxProcessEventCloneDispatchRuntime size must match WxProcessEventCopyRuntimeView (0x28)"
+  );
+
+  const WxProcessEventCloneDispatchRuntime gWxProcessEventCloneDispatch{};
 }
 
 namespace
@@ -84964,6 +85658,48 @@ void* wxCloneSocketEventRuntime(
   }
 
   return wxCopyConstructSocketEventRuntime(clone, sourceEvent);
+}
+
+namespace
+{
+  // Real binary evidence: `??_7wxSocketEvent@@6B@+0x10` resolves to
+  // `wxCloneSocketEventRuntime` (`FUN_00A2E7D0`) - the `wxEvent::
+  // Clone()` override. See `WxTimerEventCloneDispatchRuntime` above for
+  // the layout-compatibility argument this mirrors:
+  // `WxSocketEventCopyRuntimeView` is `WxEventCopyRuntimeView base` plus
+  // two trailing int32 fields (`lane20`/`lane24` at +0x20/+0x24), which
+  // is exactly what this `wxEventRuntime`-derived type adds.
+  class WxSocketEventCloneDispatchRuntime final : public wxEventRuntime
+  {
+  public:
+    explicit WxSocketEventCloneDispatchRuntime(
+      const std::int32_t eventId = 0, const std::int32_t eventType = 0
+    )
+      : wxEventRuntime(eventId, eventType)
+    {}
+
+    wxEventRuntime* Clone() const override
+    {
+      return static_cast<wxEventRuntime*>(wxCloneSocketEventRuntime(this));
+    }
+
+    std::int32_t mLane20 = 0; // +0x20
+    std::int32_t mLane24 = 0; // +0x24
+  };
+  static_assert(
+    offsetof(WxSocketEventCloneDispatchRuntime, mLane20) == 0x20,
+    "WxSocketEventCloneDispatchRuntime::mLane20 offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxSocketEventCloneDispatchRuntime, mLane24) == 0x24,
+    "WxSocketEventCloneDispatchRuntime::mLane24 offset must be 0x24"
+  );
+  static_assert(
+    sizeof(WxSocketEventCloneDispatchRuntime) == 0x28,
+    "WxSocketEventCloneDispatchRuntime size must match WxSocketEventCopyRuntimeView (0x28)"
+  );
+
+  const WxSocketEventCloneDispatchRuntime gWxSocketEventCloneDispatch{};
 }
 
 namespace
