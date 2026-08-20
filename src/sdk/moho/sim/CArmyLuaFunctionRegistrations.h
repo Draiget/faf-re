@@ -4,9 +4,28 @@
 
 #include "legacy/containers/String.h"
 
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
 namespace moho
 {
   class CScrLuaInitForm;
+
+  /**
+   * Address: 0x00506760 (FUN_00506760, ?GetColors@Moho@@YA?AVLuaObject@LuaPlus@@AAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Returns the lazily-loaded `/lua/gameColors.lua` root table, loading it on
+   * first call. Every other color resolver in this file reads through this
+   * table, and it is also the table `StrategicIconAuxView`'s constructor
+   * (`CWldSession.cpp`, 0x0085B2A0) reads `GameColors.TeamColorMode` from -
+   * exposed here (rather than kept file-private) so that caller can reuse the
+   * same cached table instead of loading `gameColors.lua` a second time.
+   */
+  [[nodiscard]] LuaPlus::LuaObject* GetColors();
 
   /**
    * Address: 0x005068B0 (FUN_005068B0, ?GetPlayerColor@Moho@@YAIH@Z)
