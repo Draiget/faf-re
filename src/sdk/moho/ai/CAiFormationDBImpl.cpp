@@ -107,6 +107,19 @@ namespace
   constexpr const char* kPickBestFinalFormationIndexName = "PickBestFinalFormationIndex";
   constexpr int kFormationBucketCount = static_cast<int>(sizeof(kFormationBuckets) / sizeof(kFormationBuckets[0]));
 
+  /// Distinct from `kFormationBuckets`: `PickBestTravelFormationIndex` (Lua)
+  /// takes a per-type name string covering all three `EFormationType` values,
+  /// including a dedicated "Combo" name for `Mixed`, unlike the two-entry
+  /// script-bucket table the other `FORMATION_*` helpers clamp into. Verified
+  /// against the binary's `formationtype_names` rdata array at 0x00F58C44
+  /// (indexed directly by `EFormationType` with no bounds clamp).
+  constexpr const char* kFormationTravelTypeNames[] = {
+    "SurfaceFormations",
+    "AirFormations",
+    "ComboFormations",
+  };
+  constexpr const char* kPickBestTravelFormationIndexName = "PickBestTravelFormationIndex";
+
   /**
    * The category-word universe lane is a 4-byte handle that the sim fills with
    * the owning `RRuleGameRules` instance (`mov [slot+8], rules` at
@@ -418,6 +431,59 @@ int moho::FORMATION_GetScriptIndex(
   }
 
   return -1;
+}
+
+/**
+ * Address: 0x00576010 (FUN_00576010, ?FORMATION_PickTravelFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
+ *
+ * IDA signature:
+ * int __usercall Moho::FORMATION_PickTravelFormation@<eax>(
+ *     int formationType, float dist, LuaPlus::LuaState *state@<ecx>);
+ *
+ * What it does:
+ * Calls `/lua/formations.lua`::`PickBestTravelFormationIndex(formationTypeName, dist)`
+ * and returns the chosen travel-formation index (or `0` on import/lookup/call
+ * failure).
+ */
+[[maybe_unused]] int moho::FORMATION_PickTravelFormation(
+  LuaPlus::LuaState* const state,
+  const EFormationType formationType,
+  const float dist
+)
+{
+  LuaPlus::LuaObject formationTypeArg;
+  formationTypeArg.AssignString(state, kFormationTravelTypeNames[static_cast<int>(formationType)]);
+
+  LuaPlus::LuaObject distArg;
+  distArg.AssignNumber(state, dist);
+
+  LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
+  if (!module.IsTable()) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject pickTravelFn = module.GetByName(kPickBestTravelFormationIndexName);
+  if (!pickTravelFn.IsFunction()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int savedTop = lua_gettop(rawState);
+
+  pickTravelFn.PushStack(rawState);
+  formationTypeArg.PushStack(rawState);
+  distArg.PushStack(rawState);
+  if (lua_call(rawState, 2, 1) != 0) {
+    lua_settop(rawState, savedTop);
+    return 0;
+  }
+
+  const LuaPlus::LuaStackObject resultSlot(state, -1);
+  const LuaPlus::LuaObject result(resultSlot);
+  const int travelFormationIndex = result.GetInteger();
+
+  lua_settop(rawState, savedTop);
+  return travelFormationIndex;
 }
 
 /**

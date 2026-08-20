@@ -244,6 +244,17 @@ namespace moho
   int FORMATION_GetScriptIndex(LuaPlus::LuaState* state, gpg::StrArg scriptName, EFormationType formationType);
 
   /**
+   * Address: 0x00576010 (FUN_00576010, ?FORMATION_PickTravelFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
+   *
+   * What it does:
+   * Calls `/lua/formations.lua`::`PickBestTravelFormationIndex(formationTypeName, dist)`
+   * and returns the chosen travel-formation index (or `0` on import/lookup/call
+   * failure). Used by `CFormation::ChooseFormation` once the drag distance
+   * exceeds 200 units.
+   */
+  int FORMATION_PickTravelFormation(LuaPlus::LuaState* state, EFormationType formationType, float dist);
+
+  /**
    * Address: 0x00576350 (FUN_00576350, ?FORMATION_PickBestFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
    *
    * What it does:
