@@ -2018,6 +2018,14 @@ namespace moho
   extern float UI_CurGlowTime;             // 0x010A6460
 
   /**
+   * Strategic-view LOD cutoff for the mass/hydrocarbon resource splats,
+   * compared against the camera viewport matrix's row-1 depth of each deposit
+   * centre by `CWldSession::RenderResources` (0x00862E68). Bound to the
+   * console by `func_UI_ResourceLODCutoff_ConVarDef` (0x00BE6010); ships at 75.
+   */
+  extern float UI_ResourceLODCutoff; // 0x00F57B08
+
+  /**
    * Strategic-icon and unit-bar console variables, read by the strategic-icon
    * pass (`CWldSession::RenderStrategicIcons` 0x0085B6E0 and the four emitters
    * it drives: the lifebar/fuel/shield bar stack at 0x0085CD40, the icon quad
