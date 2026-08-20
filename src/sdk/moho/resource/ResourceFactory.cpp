@@ -153,7 +153,7 @@ namespace moho
       return outResource;
     }
 
-    outResource.reset(rawResource);
+    ConstructSharedRScmResourceFromRaw(&outResource, rawResource);
     return outResource;
   }
 
