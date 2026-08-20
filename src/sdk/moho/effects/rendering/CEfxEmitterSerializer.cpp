@@ -1,6 +1,9 @@
 #include <cstddef>
+#include <cstdlib>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/effects/rendering/CEfxEmitter.h"
 
 namespace
 {
@@ -76,4 +79,73 @@ namespace moho
   {
     return UnlinkHelperNode(gCEfxEmitterSerializer);
   }
+
+  /**
+   * Address: 0x0065E140 (FUN_0065E140, Moho::CEfxEmitterSerializer::Deserialize)
+   *
+   * What it does:
+   * Forwards one CEfxEmitter serializer-load callback lane to
+   * `CEfxEmitter::MemberDeserialize`.
+   */
+  void DeserializeCEfxEmitterSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<CEfxEmitter*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0065E150 (FUN_0065E150, Moho::CEfxEmitterSerializer::Serialize)
+   *
+   * What it does:
+   * Forwards one CEfxEmitter serializer-save callback lane to
+   * `CEfxEmitter::MemberSerialize`.
+   */
+  void SerializeCEfxEmitterSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<CEfxEmitter*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_CEfxEmitterSerializer_atexit()
+  {
+    (void)UnlinkCEfxEmitterSerializerNodeVariantA();
+  }
+
+  /**
+   * Address: 0x00BD4310 (FUN_00BD4310, register_CEfxEmitterSerializer)
+   *
+   * What it does:
+   * Initializes the global CEfxEmitter serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CEfxEmitterSerializer()
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(gCEfxEmitterSerializer);
+    gCEfxEmitterSerializer.mHelperNext = self;
+    gCEfxEmitterSerializer.mHelperPrev = self;
+    gCEfxEmitterSerializer.mLoadCallback = &DeserializeCEfxEmitterSerializerCallback;
+    gCEfxEmitterSerializer.mSaveCallback = &SerializeCEfxEmitterSerializerCallback;
+    (void)std::atexit(&cleanup_CEfxEmitterSerializer_atexit);
+  }
 } // namespace moho
+
+namespace
+{
+  struct CEfxEmitterSerializerStartupBootstrap
+  {
+    CEfxEmitterSerializerStartupBootstrap()
+    {
+      moho::register_CEfxEmitterSerializer();
+    }
+  };
+
+  [[maybe_unused]] CEfxEmitterSerializerStartupBootstrap gCEfxEmitterSerializerStartupBootstrap;
+} // namespace
