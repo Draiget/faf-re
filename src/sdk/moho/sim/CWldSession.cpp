@@ -6414,6 +6414,13 @@ namespace moho
       return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entity));
     }
 
+    /**
+     * Address: 0x007FDFE0 (FUN_007FDFE0, std::map<unsigned int,WeakPtr<UserEntity>>::find
+     * — lower-bound descent by uint key, matching this function's direct
+     * equality-during-descent shape to the same effect. Emitted via
+     * FindSelectionNodeByKey's real callers: FindSelectionNodeByEntityGuarded
+     * (0x00867780, above) and this file's other selection-lookup sites.
+     */
     [[nodiscard]] SSelectionNodeUserEntity*
     FindSelectionNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key)
     {
