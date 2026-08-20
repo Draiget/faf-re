@@ -6807,12 +6807,6 @@ namespace moho
       bool inserted;
     };
 
-    struct SelectionFindResBool
-    {
-      SSelectionSetUserEntity::FindResult res;
-      bool found;
-    };
-
     /**
      * Address: 0x007B25C0 (FUN_007B25C0)
      *
@@ -6922,7 +6916,7 @@ namespace moho
      */
     [[nodiscard]] SSelectionNodeUserEntity* InitSelectionNodeValueAndWeakLink(
       SSelectionNodeUserEntity* const node,
-      SSelectionSetUserEntity* const set,
+      WeakEntitySetUserEntity* const set,
       UserEntity* const entity
     )
     {
@@ -6950,7 +6944,7 @@ namespace moho
      * Allocates one selection-tree node and initializes it for one entity key.
      */
     [[nodiscard]] SSelectionNodeUserEntity*
-    AllocateAndInitSelectionNode(SSelectionSetUserEntity* const set, UserEntity* const entity)
+    AllocateAndInitSelectionNode(WeakEntitySetUserEntity* const set, UserEntity* const entity)
     {
       if (set == nullptr || set->mHead == nullptr) {
         return nullptr;
@@ -6969,7 +6963,7 @@ namespace moho
      */
     [[nodiscard]] SelectionInsertFindResult* InsertSelectionNodeAndRebalance(
       SelectionInsertFindResult* const outResult,
-      SSelectionSetUserEntity* const set,
+      WeakEntitySetUserEntity* const set,
       UserEntity* const entity
     )
     {
@@ -7024,10 +7018,16 @@ namespace moho
      * What it does:
      * Performs one find-or-insert operation for the selection weak-set key lane
      * and returns `{node,inserted}`.
+     *
+     * Takes the bare 12-byte header so both weak-set instantiations share it:
+     * the binary reads only the head at `[set+4]` (0x0082242A) and the live
+     * count at `[set+8]` (0x00822688), never the extra `+0x0C` selection lane,
+     * and this body is the one `WeakSet<UserUnit>::Add` (0x00822270) calls
+     * directly at 0x008222D2.
      */
     [[nodiscard]] SelectionInsertFindResult* FindOrInsertSelectionNodeByUserEntity(
       SelectionInsertFindResult* const outResult,
-      SSelectionSetUserEntity* const set,
+      WeakEntitySetUserEntity* const set,
       UserEntity* const entity
     )
     {
@@ -7298,33 +7298,6 @@ namespace moho
       SelectionInsertFindResult findResult{};
       *outNode = FindOrInsertSelectionNodeByUserEntity(&findResult, set, entity)->node;
       return outNode;
-    }
-
-    /**
-     * Address: 0x00822270 (FUN_00822270, sub_822270)
-     *
-     * What it does:
-     * Inserts one unit key into a weak-set under a scoped weak-owner guard and
-     * writes one `{set,node,found}` result payload.
-     */
-    [[nodiscard]] SelectionFindResBool* InsertSelectionUnitWithWeakGuard(
-      SelectionFindResBool* const outResult,
-      SSelectionSetUserEntity* const set,
-      UserUnit* const unit
-    )
-    {
-      outResult->res.mSet = set;
-      outResult->res.mRes = (set != nullptr) ? set->mHead : nullptr;
-      outResult->found = false;
-
-      UserEntity* const entity = reinterpret_cast<UserEntity*>(unit);
-      ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-
-      SelectionInsertFindResult insertResult{};
-      (void)FindOrInsertSelectionNodeByUserEntity(&insertResult, set, entity);
-      outResult->res.mRes = insertResult.node;
-      outResult->found = insertResult.inserted;
-      return outResult;
     }
 
     /**
@@ -13804,17 +13777,53 @@ namespace moho
   /**
    * Address: 0x00822270 (FUN_00822270, sub_822270)
    *
+   * IDA signature:
+   * Moho::WeakSet_UserUnit_FindResBool *__userpurge sub_822270@<eax>(
+   *     Moho::WeakSet_UserUnit_FindResBool *result@<esi>,
+   *     Moho::WeakSet_UserUnit *set,
+   *     Moho::UserUnit *unit);
+   *
    * What it does:
-   * Inserts one unit into a user-entity selection/weak-set under a scoped
-   * weak-owner guard, discarding the `{set,node,found}` payload. Thin void
-   * wrapper over the file-static `InsertSelectionUnitWithWeakGuard`; exposed
-   * (declared in CWldSession.h) so the command-issue update-event path (Sim.cpp)
-   * can insert into an event weak-set without naming the private result type.
+   * Inserts one unit key into a `WeakSet<UserUnit>` and returns the
+   * `{iterator, inserted}` pair through the caller-supplied sret slot
+   * (`[esi+0]=set`, `[esi+4]=node`, `[esi+8]=inserted`, 0x00822306..0x0082230C).
+   *
+   * The map insert is bracketed by an intrusive weak guard so the unit cannot
+   * be destroyed out from under the tree while it rebalances: a stack
+   * `WeakPtr<UserUnit>` is pushed onto the unit's weak-owner use-list before
+   * the insert (0x008222A9-0x008222B3, reaching the `WeakObject` sub-object
+   * with the same `+ 8` adjust `WeakSet<UserEntity>::Add` uses at 0x007AE1DA)
+   * and spliced back out afterwards by walking the chain until the slot that
+   * points at it is found (0x008222DF-0x008222F8). The splice also runs on the
+   * throwing path, through the EH funclet at 0x00B94260 - which is why the
+   * guard is expressed as an RAII object here.
+   *
+   * `unit` is reinterpreted rather than statically upcast because `UserUnit`
+   * has no reconstructed definition in this tree yet; the binary itself does
+   * no adjustment either - both `Add` emissions derive the `WeakObject`
+   * sub-object from the raw element pointer with the identical `add eax, 8`,
+   * which is only possible if `UserUnit`'s `UserEntity` sub-object sits at
+   * offset zero.
    */
-  void InsertUnitIntoCommandIssueWeakSet(SSelectionSetUserEntity* const set, UserUnit* const unit)
+  WeakUnitSetUserUnit::AddResult* WeakUnitSetUserUnit::Add(
+    AddResult* const outResult,
+    WeakUnitSetUserUnit* const set,
+    UserUnit* const unit
+  )
   {
-    SelectionFindResBool discardedResult{};
-    (void)InsertSelectionUnitWithWeakGuard(&discardedResult, set, unit);
+    outResult->mOwnerSet = set;
+    outResult->mNode = (set != nullptr) ? set->mHead : nullptr;
+    outResult->mWasInserted = 0u;
+
+    UserEntity* const entity = reinterpret_cast<UserEntity*>(unit);
+    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
+
+    SelectionInsertFindResult insertResult{};
+    (void)FindOrInsertSelectionNodeByUserEntity(&insertResult, set, entity);
+
+    outResult->mNode = insertResult.node;
+    outResult->mWasInserted = insertResult.inserted ? 1u : 0u;
+    return outResult;
   }
 
   /**

@@ -80,7 +80,7 @@ namespace moho
      * `0` when both are `-1`).
      *
      * `selection`'s decompiled `std::vector*` typing is a decompiler
-     * type-confusion (see the field doc on `mNodeHead` above): it is really a
+     * type-confusion (see the field doc on `mParticipants` above): it is really a
      * `SSelectionSetUserEntity*` - the exact tree/node/weak-ref shape
      * `ProcessMouse` (0x00838800) forwards in from its own `eax`-passed
      * selection set, and the same shape `PruneTombstonesAndFindLive`/
@@ -93,24 +93,17 @@ namespace moho
     );
 
   public:
-    /// `WeakEntitySetUserEntity`-shaped: `{mTreeAllocProxy, mNodeHead, mNodeCount}`
-    /// is the same 12-byte weak-set header as `WeakEntitySetUserEntity`
-    /// (moho/sim/WeakEntitySet.h), and `mNodeHead`'s node type is the same
-    /// `SSelectionNodeUserEntity` the session selection tree uses (RB-tree
-    /// triple + weak-entity-ref payload, 0x1C bytes). This tracks the set of
-    /// units currently participating in the drag-formation: `ChooseFormation`
-    /// (0x008384C0) inserts each unit it visits via `sub_822270`
-    /// (`InsertSelectionUnitWithWeakGuard`, passing `this` reinterpreted as
-    /// `SSelectionSetUserEntity*` - confirmed by the ASM, which repurposes
-    /// `ebp` to hold `this` for the whole function and pushes it verbatim as
-    /// the "set" argument), and `Finalize` (0x008382A0) walks it back out via
-    /// `sub_7B29C0` (`PruneTombstonesAndFindLive`) to build the
-    /// `CFormationInstance`'s unit list. `Reset()`/`~CFormation()` already
-    /// tear this tree down through the same intrusive owner-chain unlink used
-    /// by every other weak-entity set in the engine.
-    void* mTreeAllocProxy;             // +0x00
-    SSelectionNodeUserEntity* mNodeHead; // +0x04
-    std::uint32_t mNodeCount;          // +0x08
+    /// The set of units currently participating in the drag-formation, a
+    /// `WeakSet<UserUnit>` embedded at `this + 0x00`: `ChooseFormation`
+    /// (0x008384C0) inserts each unit it visits by calling
+    /// `WeakSet<UserUnit>::Add` (0x00822270) with `this` verbatim as the "set"
+    /// argument - the ASM repurposes `ebp` to hold `this` for the whole
+    /// function and pushes it unadjusted - and `Finalize` (0x008382A0) walks it
+    /// back out via `sub_7B29C0` (`PruneTombstonesAndFindLive`) to build the
+    /// `CFormationInstance`'s unit list. `Reset()`/`~CFormation()` tear the
+    /// tree down through the same intrusive owner-chain unlink every other
+    /// weak set in the engine uses.
+    WeakUnitSetUserUnit mParticipants; // +0x00 { proxy, mHead@+0x04, mSize@+0x08 }
     IFormationInstance* mCurInstance;  // +0x0C
     bool mReady;                       // +0x10
     std::uint8_t mPad11[0x03];         // +0x11
@@ -128,8 +121,7 @@ namespace moho
   };
 
   static_assert(sizeof(CFormation) == 0x64, "CFormation size must be 0x64");
-  static_assert(offsetof(CFormation, mNodeHead) == 0x04, "CFormation::mNodeHead offset must be 0x04");
-  static_assert(offsetof(CFormation, mNodeCount) == 0x08, "CFormation::mNodeCount offset must be 0x08");
+  static_assert(offsetof(CFormation, mParticipants) == 0x00, "CFormation::mParticipants offset must be 0x00");
   static_assert(offsetof(CFormation, mCurInstance) == 0x0C, "CFormation::mCurInstance offset must be 0x0C");
   static_assert(offsetof(CFormation, mType) == 0x14, "CFormation::mType offset must be 0x14");
   static_assert(offsetof(CFormation, mBestFormation) == 0x3C, "CFormation::mBestFormation offset must be 0x3C");

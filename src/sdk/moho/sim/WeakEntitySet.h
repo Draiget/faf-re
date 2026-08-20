@@ -118,4 +118,100 @@ namespace moho
     set.mHead = AllocateWeakEntitySetHead();
     set.mSize = 0u;
   }
+
+  class UserUnit;
+
+  /**
+   * `WeakSet<UserUnit>` — the engine's second weak-set instantiation.
+   *
+   * It is the set type the unit-facing session API hands around:
+   * `?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z`
+   * (0x00896000) and `?GetValidAttackingUnits@…` (0x00896090) both take one by
+   * reference, `CFormation` embeds one at its own `+0x00` as the drag-formation
+   * participant tree, and the command-issue "select unit" ring events carry one
+   * at `event+0x08`.
+   *
+   * Layout evidence, read off the `WeakSet<UserUnit>` emission itself
+   * (0x00822270 `Add`, 0x00822420 find-or-insert, 0x00822670 insert,
+   * 0x008229E0 node alloc, 0x00822AB0 node init):
+   *   - the header is the same 12-byte MSVC8 tree header: `sub_822420` loads
+   *     the head from `[set+4]` (0x0082242A) and `sub_822670` compares the
+   *     live-node count at `[set+8]` against `0x15555554` (0x00822688);
+   *   - the nodes are the same 0x1C shape: `sub_822420` descends `mLeft` at
+   *     `[n]` (0x00822450) / `mRight` at `[n+8]` (0x00822454), compares keys at
+   *     `[n+0xC]` (0x00822440) and tests the sentinel flag at `[n+0x19]`
+   *     (0x00822430), while `sub_822AB0` seeds the weak-owner pair at `+0x10`
+   *     (0x00822ACA) and clears `mColor`/`mIsSentinel` at `+0x18`/`+0x19`
+   *     (0x00822ADA / 0x00822ADE);
+   *   - the nodes come out of the very same shared 28-byte node allocator
+   *     `sub_7B4FA0` (called at 0x008229E6) that the `WeakSet<UserEntity>`
+   *     emission uses;
+   *   - the key is the raw element pointer stored verbatim (0x00822294), and
+   *     the weak-owner chain is reached through the identical `+ 8`
+   *     `WeakObject` sub-object adjust (0x0082229A) that
+   *     `WeakSet<UserEntity>::Add` uses at 0x007AE1DA.
+   *
+   * The two instantiations are therefore byte-identical, as they must be:
+   * `UserUnit` reaches `UserEntity` through a single non-virtual base at
+   * offset zero, so the stored pointer, its key encoding and its `WeakObject`
+   * sub-object are all the same bytes at the same address. This is modelled as
+   * a distinct C++ type layered over the shared header and node definitions
+   * rather than as a second copy of the layout, so the two emissions cannot
+   * drift apart.
+   */
+  struct WeakUnitSetUserUnit : WeakEntitySetUserEntity
+  {
+    /** One `{owning set, tree node}` iterator pair. */
+    struct Index
+    {
+      WeakUnitSetUserUnit* mOwnerSet;  // +0x00
+      SSelectionNodeUserEntity* mNode; // +0x04
+    };
+
+    /**
+     * The `std::pair<iterator, bool>` `Add` returns through its hidden sret
+     * pointer: `{set, node}` at `+0x00`/`+0x04` and the inserted flag at
+     * `+0x08` (0x00822306..0x0082230C).
+     */
+    struct AddResult : Index
+    {
+      std::uint8_t mWasInserted;        // +0x08
+      std::uint8_t mReserved09_0B[3]{}; // +0x09
+    };
+
+    /**
+     * Address: 0x00822270 (FUN_00822270, sub_822270)
+     *
+     * IDA signature:
+     * Moho::WeakSet_UserUnit_FindResBool *__userpurge sub_822270@<eax>(
+     *     Moho::WeakSet_UserUnit_FindResBool *result@<esi>,
+     *     Moho::WeakSet_UserUnit *set,
+     *     Moho::UserUnit *unit);
+     *
+     * What it does:
+     * Inserts one unit key into the weak set and returns `{iterator, inserted}`.
+     * The map insert is bracketed by an intrusive weak guard: a stack
+     * `WeakPtr<UserUnit>` is linked into the unit's weak-owner use-list before
+     * the insert (0x008222A9-0x008222B3) and spliced back out afterwards by
+     * walking the chain until the slot pointing at it is found
+     * (0x008222DF-0x008222F8), so a unit destroyed while the tree is being
+     * rebalanced tombstones this reference instead of leaving it dangling. The
+     * splice also runs on the throwing path, through the EH funclet at
+     * 0x00B94260.
+     *
+     * Defined in CWldSession.cpp, next to the rest of this instantiation's
+     * red-black tree lanes.
+     */
+    [[nodiscard]] static AddResult* Add(AddResult* outResult, WeakUnitSetUserUnit* set, UserUnit* unit);
+  };
+
+  static_assert(sizeof(WeakUnitSetUserUnit) == 0x0C, "WeakUnitSetUserUnit size must be 0x0C");
+  static_assert(offsetof(WeakUnitSetUserUnit, mHead) == 0x04, "WeakUnitSetUserUnit::mHead offset must be 0x04");
+  static_assert(offsetof(WeakUnitSetUserUnit, mSize) == 0x08, "WeakUnitSetUserUnit::mSize offset must be 0x08");
+  static_assert(sizeof(WeakUnitSetUserUnit::Index) == 0x08, "WeakUnitSetUserUnit::Index size must be 0x08");
+  static_assert(
+    offsetof(WeakUnitSetUserUnit::AddResult, mWasInserted) == 0x08,
+    "WeakUnitSetUserUnit::AddResult::mWasInserted offset must be 0x08"
+  );
+  static_assert(sizeof(WeakUnitSetUserUnit::AddResult) == 0x0C, "WeakUnitSetUserUnit::AddResult size must be 0x0C");
 } // namespace moho

@@ -1761,17 +1761,6 @@ namespace moho
   void GetSessionUserUnits(CWldSession* session, msvc8::vector<UserUnit*>& outUnits);
 
   /**
-   * Address: 0x00822270 (FUN_00822270, sub_822270)
-   *
-   * What it does:
-   * Inserts one unit into a user-entity selection/weak-set under a scoped
-   * weak-owner guard, discarding the find-result payload. Thin void wrapper over
-   * the file-static `InsertSelectionUnitWithWeakGuard`; declared here so the
-   * command-issue update-event path (Sim.cpp) can insert into an event weak-set.
-   */
-  void InsertUnitIntoCommandIssueWeakSet(SSelectionSetUserEntity* set, UserUnit* unit);
-
-  /**
    * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
    * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
    * — identical node-splice/rebalance/return-next shape, a separate
