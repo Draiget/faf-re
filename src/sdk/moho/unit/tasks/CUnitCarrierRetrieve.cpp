@@ -1,5 +1,7 @@
 #include "moho/unit/tasks/CUnitCarrierRetrieve.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -446,7 +448,39 @@ namespace moho
 
 namespace
 {
-  gpg::SerSaveLoadHelperListRuntime gCUnitCarrierRetrieveSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes) - `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by every
+  // SerHelperBase-derived serializer, so it undersized this global (same
+  // bug found and fixed for several sibling serializers this session).
+  struct CUnitCarrierRetrieveSerializerHelper
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mLoadCallback = nullptr;
+    gpg::RType::save_func_t mSaveCallback = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitCarrierRetrieveSerializerHelper, mNext) == 0x04,
+    "CUnitCarrierRetrieveSerializerHelper::mNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CUnitCarrierRetrieveSerializerHelper, mPrev) == 0x08,
+    "CUnitCarrierRetrieveSerializerHelper::mPrev offset must be 0x08"
+  );
+  static_assert(
+    sizeof(CUnitCarrierRetrieveSerializerHelper) == 0x14, "CUnitCarrierRetrieveSerializerHelper size must be 0x14"
+  );
+
+  CUnitCarrierRetrieveSerializerHelper gCUnitCarrierRetrieveSerializer{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    CUnitCarrierRetrieveSerializerHelper& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
 
   /**
    * Address: 0x006063F0 (FUN_006063F0)
@@ -457,7 +491,7 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierRetrieveSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierRetrieveSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitCarrierRetrieveSerializer));
   }
 
   /**
@@ -469,6 +503,59 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitCarrierRetrieveSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitCarrierRetrieveSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitCarrierRetrieveSerializer));
   }
+
+  void DeserializeCUnitCarrierRetrieveSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::CUnitCarrierRetrieve*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeCUnitCarrierRetrieveSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::CUnitCarrierRetrieve*>(static_cast<std::uintptr_t>(objectPtr))
+      ->MemberSerialize(archive);
+  }
+
+  void cleanup_CUnitCarrierRetrieveSerializer_atexit()
+  {
+    (void)UnlinkCUnitCarrierRetrieveSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BD0220 (FUN_00BD0220, register_CUnitCarrierRetrieveSerializer)
+   *
+   * What it does:
+   * Initializes the global CUnitCarrierRetrieve serializer helper callbacks
+   * and installs process-exit cleanup.
+   */
+  void register_CUnitCarrierRetrieveSerializer()
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitCarrierRetrieveSerializer.mNext);
+    gCUnitCarrierRetrieveSerializer.mNext = self;
+    gCUnitCarrierRetrieveSerializer.mPrev = self;
+    gCUnitCarrierRetrieveSerializer.mLoadCallback = &DeserializeCUnitCarrierRetrieveSerializerCallback;
+    gCUnitCarrierRetrieveSerializer.mSaveCallback = &SerializeCUnitCarrierRetrieveSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitCarrierRetrieveSerializer_atexit);
+  }
+
+  struct CUnitCarrierRetrieveSerializerStartupBootstrap
+  {
+    CUnitCarrierRetrieveSerializerStartupBootstrap()
+    {
+      register_CUnitCarrierRetrieveSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitCarrierRetrieveSerializerStartupBootstrap gCUnitCarrierRetrieveSerializerStartupBootstrap;
 } // namespace
