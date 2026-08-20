@@ -11600,6 +11600,19 @@ namespace
   std::int32_t gWxEvtEnterWindowRuntimeType = 0;
   std::int32_t gWxEvtLeaveWindowRuntimeType = 0;
   std::int32_t gWxEvtHelpRuntimeType = 0;
+  // The eight scroll-window event types `wxWindow::MSWOnScroll` (0x0096A920)
+  // selects between. The binary reads them from the globals at 0x00F8F474
+  // (LINEUP), 0x00F8F584 (LINEDOWN), 0x00F8F560 (PAGEUP), 0x00F8F428
+  // (PAGEDOWN), 0x00F8F404 (TOP), 0x00F8F508 (BOTTOM), plus THUMBRELEASE and
+  // THUMBTRACK on the shared thumb path.
+  std::int32_t gWxEvtScrollWinLineUpRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinLineDownRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinPageUpRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinPageDownRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinThumbReleaseRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinThumbTrackRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinTopRuntimeType = 0;
+  std::int32_t gWxEvtScrollWinBottomRuntimeType = 0;
 
   [[nodiscard]] std::int32_t EnsureWxEvtIdleRuntimeType()
   {
@@ -11831,6 +11844,70 @@ namespace
       gWxEvtIconizeRuntimeType = wxNewEventType();
     }
     return gWxEvtIconizeRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinLineUpRuntimeType()
+  {
+    if (gWxEvtScrollWinLineUpRuntimeType == 0) {
+      gWxEvtScrollWinLineUpRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinLineUpRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinLineDownRuntimeType()
+  {
+    if (gWxEvtScrollWinLineDownRuntimeType == 0) {
+      gWxEvtScrollWinLineDownRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinLineDownRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinPageUpRuntimeType()
+  {
+    if (gWxEvtScrollWinPageUpRuntimeType == 0) {
+      gWxEvtScrollWinPageUpRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinPageUpRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinPageDownRuntimeType()
+  {
+    if (gWxEvtScrollWinPageDownRuntimeType == 0) {
+      gWxEvtScrollWinPageDownRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinPageDownRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinThumbReleaseRuntimeType()
+  {
+    if (gWxEvtScrollWinThumbReleaseRuntimeType == 0) {
+      gWxEvtScrollWinThumbReleaseRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinThumbReleaseRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinThumbTrackRuntimeType()
+  {
+    if (gWxEvtScrollWinThumbTrackRuntimeType == 0) {
+      gWxEvtScrollWinThumbTrackRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinThumbTrackRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinTopRuntimeType()
+  {
+    if (gWxEvtScrollWinTopRuntimeType == 0) {
+      gWxEvtScrollWinTopRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinTopRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtScrollWinBottomRuntimeType()
+  {
+    if (gWxEvtScrollWinBottomRuntimeType == 0) {
+      gWxEvtScrollWinBottomRuntimeType = wxNewEventType();
+    }
+    return gWxEvtScrollWinBottomRuntimeType;
   }
 
   [[nodiscard]] std::int32_t EnsureWxEvtChildFocusRuntimeType()
@@ -38664,6 +38741,117 @@ namespace
   );
 } // namespace
 
+/**
+ * Address: 0x0096A920 (FUN_0096A920)
+ * Mangled: ?MSWOnScroll@wxWindow@@UAE_NHGGK@Z
+ * Slot: +0x1E0 of ??_7wxWindow@@6B@ (VA 0x00D4DB44)
+ *
+ * IDA signature:
+ * char __thiscall wxWindow::MSWOnScroll(
+ *     wxWindow *this@<ecx>, int orientation, int command, int position,
+ *     int controlHandle);
+ *
+ * What it does:
+ * Translates one WM_HSCROLL/WM_VSCROLL into a `wxScrollWinEvent` and offers it
+ * to this window's event handler.
+ *
+ * Argument order is fixed by the forwarding block at 0x0096A95D-0x0096A977,
+ * which re-pushes the four incoming slots in reverse: `arg_0` (+0x64)
+ * orientation, `arg_4` (+0x68) SB_* command, `arg_8` (+0x6C) position, and the
+ * control handle at +0x70.
+ *
+ * Behaviour details worth keeping:
+ *  - A message that carries a non-null control handle came from a real
+ *    scrollbar *control*; 0x0096A950 resolves it with `wxFindWinFromHandle` and
+ *    re-dispatches through that window's own +0x1E0 slot (0x0096A963), so the
+ *    scrollbar - not the frame the message was posted to - gets the event.
+ *  - The `position` argument is only 16 bits, so for the two thumb codes the
+ *    binary throws it away and re-reads the true 32-bit value with
+ *    `GetScrollInfo` (0x0096AA21-0x0096AA5x): `cbSize` 28 = sizeof(SCROLLINFO),
+ *    `fMask` 16 = SIF_TRACKPOS, and the bar selector is `orientation != 4`
+ *    (0x0096AA28 `cmp ecx, 4` / `setnz dl`, with `ecx` reloaded from `arg_0` at
+ *    0x0096A9B4) - SB_HORZ for wxHORIZONTAL, SB_VERT otherwise.
+ *  - SB_THUMBPOSITION maps to THUMBRELEASE and SB_THUMBTRACK to THUMBTRACK;
+ *    every other SB_* code falls through to the default arm, which destroys the
+ *    event and returns false without dispatching (0x0096AACx).
+ *
+ * Event-field evidence (`var_34` is the event object): 0x0096A9C4
+ * `mov [esp+60h+var_2C], esi` is `mEventObject` at +0x08, 0x0096A9E5 and
+ * friends write the type at +0x0C, 0x0096A9B0 writes the position lane at +0x20
+ * (`mCommandInt`) and 0x0096A9C0 the orientation at +0x24 (`mExtraLong`).
+ */
+bool wxWindowMswRuntime::MSWOnScroll(
+  const std::int32_t orientation,
+  const unsigned short command,
+  const unsigned short position,
+  const unsigned long controlHandle
+)
+{
+  // wxHORIZONTAL, the value MSWWindowProc computes for WM_HSCROLL.
+  constexpr std::int32_t kScrollOrientationHorizontal = 4;
+
+  if (controlHandle != 0u) {
+    wxWindowMswRuntime* const controlWindow = wxFindWinFromHandle(static_cast<int>(controlHandle));
+    if (controlWindow != nullptr) {
+      return controlWindow->MSWOnScroll(orientation, command, position, controlHandle);
+    }
+  }
+
+  WxScrollWinEventFactoryRuntime scrollEvent;
+  scrollEvent.mEventObject = this;
+  scrollEvent.mCommandInt = position;
+  scrollEvent.mExtraLong = orientation;
+
+  switch (command) {
+  case SB_LINEUP:
+    scrollEvent.mEventType = EnsureWxEvtScrollWinLineUpRuntimeType();
+    break;
+
+  case SB_LINEDOWN:
+    scrollEvent.mEventType = EnsureWxEvtScrollWinLineDownRuntimeType();
+    break;
+
+  case SB_PAGEUP:
+    scrollEvent.mEventType = EnsureWxEvtScrollWinPageUpRuntimeType();
+    break;
+
+  case SB_PAGEDOWN:
+    scrollEvent.mEventType = EnsureWxEvtScrollWinPageDownRuntimeType();
+    break;
+
+  case SB_THUMBPOSITION:
+  case SB_THUMBTRACK: {
+    SCROLLINFO scrollInfo{};
+    scrollInfo.cbSize = sizeof(SCROLLINFO);
+    scrollInfo.fMask = SIF_TRACKPOS;
+    (void)::GetScrollInfo(
+      reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())),
+      (orientation != kScrollOrientationHorizontal) ? SB_VERT : SB_HORZ,
+      &scrollInfo
+    );
+    scrollEvent.mCommandInt = scrollInfo.nTrackPos;
+    scrollEvent.mEventType = (command == SB_THUMBPOSITION)
+                               ? EnsureWxEvtScrollWinThumbReleaseRuntimeType()
+                               : EnsureWxEvtScrollWinThumbTrackRuntimeType();
+    break;
+  }
+
+  case SB_TOP:
+    scrollEvent.mEventType = EnsureWxEvtScrollWinTopRuntimeType();
+    break;
+
+  case SB_BOTTOM:
+    scrollEvent.mEventType = EnsureWxEvtScrollWinBottomRuntimeType();
+    break;
+
+  default:
+    // Nothing to raise - SB_ENDSCROLL and anything else lands here.
+    return false;
+  }
+
+  return GetEventHandler()->ProcessEvent(&scrollEvent);
+}
+
 long wxWindowMswRuntime::MSWWindowProc(
   const unsigned int message,
   const unsigned int wParam,
@@ -38713,6 +38901,25 @@ long wxWindowMswRuntime::MSWWindowProc(
   case WM_MOUSEWHEEL:
     processed = HandleMouseWheel(wParam, lParam);
     break;
+
+  case WM_HSCROLL:
+  case WM_VSCROLL: {
+    // 0x0096D663-0x0096D6A8. `UnpackScroll` splits the packed wParam/lParam
+    // into the SB_* code, the 16-bit position and the originating control
+    // handle; the orientation is then derived branchlessly at
+    // 0x0096D694-0x0096D69E as `4 * (message != WM_HSCROLL) + 4`, i.e.
+    // wxHORIZONTAL (4) for WM_HSCROLL and wxVERTICAL (8) for WM_VSCROLL.
+    unsigned short scrollCode = 0;
+    unsigned short scrollPosition = 0;
+    unsigned int scrollControl = 0;
+    (void)UnpackScroll(
+      static_cast<int>(wParam), static_cast<int>(lParam), &scrollCode, &scrollPosition, &scrollControl
+    );
+
+    const std::int32_t orientation = (message != WM_HSCROLL) ? 8 : 4;
+    processed = MSWOnScroll(orientation, scrollCode, scrollPosition, scrollControl);
+    break;
+  }
 
   case WM_LBUTTONDOWN:
   case WM_LBUTTONUP:
