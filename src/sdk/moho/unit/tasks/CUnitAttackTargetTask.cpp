@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -10,6 +11,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiAttackerImpl.h"
@@ -211,6 +213,13 @@ namespace
 
   CUnitAttackTargetTaskSerializerStartupNode gCUnitAttackTargetTaskSerializer{};
 
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    CUnitAttackTargetTaskSerializerStartupNode& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
+
   void DeserializeCUnitAttackTargetTaskSerializerCallback(
     gpg::ReadArchive* const archive,
     const int objectPtr,
@@ -234,22 +243,47 @@ namespace
   }
 
   /**
-   * Address: 0x005F44C0 (FUN_005F44C0)
+   * Address: 0x00BF90A0 (FUN_00BF90A0, Moho::CUnitAttackTargetTaskSerializer::~CUnitAttackTargetTaskSerializer)
    *
    * What it does:
-   * Initializes callback lanes for global `CUnitAttackTargetTaskSerializer`
-   * helper storage and returns that helper object.
+   * Process-exit teardown: unlinks the `CUnitAttackTargetTaskSerializer`
+   * helper node, matching the sibling unlink lanes used across other
+   * serializer registrars.
    */
-  [[maybe_unused]] [[nodiscard]] CUnitAttackTargetTaskSerializerStartupNode*
-  InitializeCUnitAttackTargetTaskSerializerStartupThunk()
+  void cleanup_CUnitAttackTargetTaskSerializer_atexit()
+  {
+    (void)gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitAttackTargetTaskSerializer));
+  }
+
+  /**
+   * Address: 0x00BCF4C0 (FUN_00BCF4C0, register_CUnitAttackTargetTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitAttackTargetTaskSerializer` helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`. Supersedes the previous
+   * orphaned startup thunk (mis-cited to FUN_005F44C0, a distinct real
+   * binary function with no recovered caller of its own).
+   */
+  void register_CUnitAttackTargetTaskSerializer()
   {
     gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCUnitAttackTargetTaskSerializer.mNext);
     gCUnitAttackTargetTaskSerializer.mPrev = self;
     gCUnitAttackTargetTaskSerializer.mNext = self;
     gCUnitAttackTargetTaskSerializer.mLoad = &DeserializeCUnitAttackTargetTaskSerializerCallback;
     gCUnitAttackTargetTaskSerializer.mSave = &SerializeCUnitAttackTargetTaskSerializerCallback;
-    return &gCUnitAttackTargetTaskSerializer;
+    (void)std::atexit(&cleanup_CUnitAttackTargetTaskSerializer_atexit);
   }
+
+  struct CUnitAttackTargetTaskSerializerStartupBootstrap
+  {
+    CUnitAttackTargetTaskSerializerStartupBootstrap()
+    {
+      register_CUnitAttackTargetTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitAttackTargetTaskSerializerStartupBootstrap gCUnitAttackTargetTaskSerializerStartupBootstrap;
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
