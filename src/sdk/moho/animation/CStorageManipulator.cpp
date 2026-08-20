@@ -794,7 +794,7 @@ namespace
    * here is the source-level invocation (evidence class 2, function-pointer
    * table) that keeps both callbacks linked into the engine binary.
    */
-  [[maybe_unused]] CStorageManipulatorSerializerHelperNode* InstallCStorageManipulatorSerializerCallbackStorage() noexcept
+  CStorageManipulatorSerializerHelperNode* InstallCStorageManipulatorSerializerCallbackStorage() noexcept
   {
     (void)UnlinkSerializerNode(gCStorageManipulatorSerializer);
     gCStorageManipulatorSerializer.mSerLoadFunc =
