@@ -294,11 +294,30 @@ namespace moho
      */
     void OnWindowMoved(void* commandEvent);
 
+    /**
+     * Address: 0x004BC110 (FUN_004BC110, ??0ScrDebugWindow@Moho@@...)
+     *
+     * IDA signature:
+     * Moho::ScrDebugWindow *__stdcall Moho::ScrDebugWindow::ScrDebugWindow(
+     *     Moho::ScrDebugWindow *this);
+     *
+     * What it does:
+     * Builds the script-debugger frame: File/View/Debug menu bar, a toolbar
+     * with resume/step/breakpoint/find buttons, a nested nested-splitter
+     * layout (source-file tree | notebook of call-stack list + local/global
+     * watch trees), a keyboard accelerator table, and restores persisted
+     * window geometry/sash positions/column widths from user preferences.
+     * Also validates the persisted recent-files list against disk, dropping
+     * entries that no longer resolve through the VFS.
+     */
+    ScrDebugWindow();
+
     static wxEventTable sm_eventTable;
 
     std::uint8_t mUnknown004To177[0x174]{};
     std::uint8_t mIsInitializingControls = 0; // +0x178
-    std::uint8_t mUnknown179To17F[0x7]{};
+    std::uint8_t mUnknown179To17B[0x3]{};
+    std::uint32_t mCreationThreadId = 0;      // +0x17C
     void* mSourcePathOwnerControl = nullptr;  // +0x180
     ScrSourceCtrl* mSourceControl = nullptr;  // +0x184
     void* mCallStackControl = nullptr;        // +0x188
@@ -328,8 +347,12 @@ static_assert(
   "ScrDebugWindow::mIsInitializingControls offset must be 0x178"
 );
 static_assert(
-  offsetof(moho::ScrDebugWindow, mUnknown179To17F) == 0x179,
-  "ScrDebugWindow::mUnknown179To17F offset must be 0x179"
+  offsetof(moho::ScrDebugWindow, mUnknown179To17B) == 0x179,
+  "ScrDebugWindow::mUnknown179To17B offset must be 0x179"
+);
+static_assert(
+  offsetof(moho::ScrDebugWindow, mCreationThreadId) == 0x17C,
+  "ScrDebugWindow::mCreationThreadId offset must be 0x17C"
 );
 static_assert(
   offsetof(moho::ScrDebugWindow, mSourcePathOwnerControl) == 0x180,
