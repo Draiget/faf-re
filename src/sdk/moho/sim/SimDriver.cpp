@@ -1112,10 +1112,21 @@ namespace
   /**
    * Replicates the binary's per-slot shared-pointer swap used by
    * `ReconBlip::SyncInterface`: writes the new pointee first, then, when the
-   * control block changes, add_ref_copy()s the new block and weak_release()s the
+   * control block changes, add_ref_copy()s the new block and release()s the
    * old one before storing it. Mirrors the `lock xadd [pi+4], 1` /
-   * `sp_counted_base::weak_release` sequence at 0x005BF0A4.. and 0x005BF186..
+   * `sp_counted_base::release` sequence at 0x005BF0AA.. and 0x005BF18C..
    * operating on a raw `{px, pi}` pair.
+   *
+   * NOTE (2026-08-20 audit): the old-block drop is a strong release, not a
+   * weak one. The call at 0x005BF0C0 (and its twin at 0x005BF19E) resolves
+   * by rel32 to 0x004229B0 - confirmed `sp_counted_base::release()` with
+   * `weak_release()` inlined into it, not a standalone weak drop (see
+   * `BoostWrappers.h`'s `release()`/`weak_release()` evidence blocks and the
+   * same-session fixes in `BoostWrappers.cpp`/`CWldSession.cpp`). The old
+   * code called `weak_release()` here while the acquire side already
+   * correctly did `add_ref_copy()` - the same one-sided bug: the previous
+   * pose/mesh control block's strong reference was never actually dropped
+   * (leak) while its weak_count_ was wrongly decremented instead.
    */
   void SwapSharedPointerSlotWithReconRefcount(
     boost::SharedPtrRaw<void>& slot,
@@ -1130,7 +1141,7 @@ namespace
       newPi->add_ref_copy();
     }
     if (slot.pi != nullptr) {
-      slot.pi->weak_release();
+      slot.pi->release();
     }
     slot.pi = newPi;
   }
