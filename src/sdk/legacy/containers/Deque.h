@@ -140,6 +140,15 @@ namespace msvc8
             // Keep nodes and map for capacity, as Dinkumware typically did
         }
 
+        /**
+         * Address: 0x0067B870 (FUN_0067B870, msvc8::deque<void*>::push_back
+         * specialization for `Moho::Sim::mDeletionQueue`) — grows the node map
+         * when the write slot's map index wraps onto a full map (`_Growmap`),
+         * lazily allocates the target node if unset, then constructs the value
+         * at the computed slot and bumps `_Mysize`. Emitted via
+         * SimulationRef->mDeletionQueue.push_back(this) in Entity::Destroy
+         * (Entity.cpp:4559).
+         */
         void push_back(const T& v)
         {
             grow_if_full(1);
