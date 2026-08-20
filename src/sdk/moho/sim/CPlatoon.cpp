@@ -310,7 +310,7 @@ namespace
    * Registers `CScriptObject` as reflected base at zero offset for the
    * platoon runtime type descriptor lane.
    */
-  [[maybe_unused]] void AddBase_CSCcriptObject(gpg::RType* const typeInfo)
+  void AddBase_CSCcriptObject(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCScriptObjectTypeForCPlatoonSerializer();
     gpg::RField baseField{};
@@ -730,7 +730,7 @@ namespace
    * Writes each squad pointer lane as `owned`, then emits a null-squad
    * `unowned` terminator lane for platoon squad-list serialization.
    */
-  [[maybe_unused]] void WritePlatoonSquadPointersToArchive(
+  void WritePlatoonSquadPointersToArchive(
     gpg::WriteArchive* const archive,
     moho::CPlatoon* const platoon
   )
