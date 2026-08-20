@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <iosfwd>
 
 #include "ArchiveSerialization.h"
 #include "boost/shared_ptr.h"
@@ -1573,4 +1574,13 @@ namespace gpg
    * Creates one file-backed concrete `ReadArchive` for save/load serializers.
    */
   ReadArchive* CreateBinaryReadArchive(const boost::shared_ptr<std::FILE>& file);
+
+  /**
+   * Address: 0x00939800 (FUN_00939800, ?CreateTextReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@Vistream@std@@@boost@@@Z)
+   *
+   * What it does:
+   * Creates one stream-backed concrete `ReadArchive` (TextReadArchive) for
+   * the Lua-facing `serialize.fromstring` text-deserialization path.
+   */
+  ReadArchive* CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream);
 } // namespace gpg
