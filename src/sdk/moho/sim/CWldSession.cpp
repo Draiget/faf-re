@@ -1404,7 +1404,10 @@ namespace moho
      *
      * What it does:
      * Copies one command-graph style node payload, including shared-texture
-     * control lanes for orderline/waypoint/arrowhead textures.
+     * control lanes for orderline/waypoint/arrowhead textures. Each lane is a
+     * strong retain-then-release rebind through FUN_004229B0
+     * (`sp_counted_base::release()`, see BoostWrappers.h) - see the definition
+     * for the 2026-08-20 audit note.
      */
     UICommandGraphNode* CopyFrom(const UICommandGraphNode& other);
 
@@ -2242,6 +2245,14 @@ namespace moho
   /**
    * Address: 0x00825060 (FUN_00825060, Moho::UICommandGraphNode::cpy)
    *
+   * NOTE (2026-08-20 audit): all three texture-lane releases below previously
+   * called `.weak_release()`. FUN_00825060 confirms all three inline copies of
+   * the retain/release pattern call FUN_004229B0 for the release step
+   * (verified by manual displacement calculation at 0x00825087, 0x0082510E,
+   * 0x0082513B), which is `sp_counted_base::release()`, not `weak_release()`
+   * (see BoostWrappers.h). The acquire side (`add_ref_copy()`) was already
+   * correct. Corrected to `.release()` to match.
+   *
    * What it does:
    * Copies one command-graph style node payload, including shared-texture
    * control lanes for orderline/waypoint/arrowhead textures.
@@ -2255,7 +2266,7 @@ namespace moho
         incomingControl->add_ref_copy();
       }
       if (mOrderlineTexture.pi != nullptr) {
-        mOrderlineTexture.pi->weak_release();
+        mOrderlineTexture.pi->release();
       }
       mOrderlineTexture.pi = incomingControl;
     }
@@ -2283,7 +2294,7 @@ namespace moho
         incomingControl->add_ref_copy();
       }
       if (mWaypointTexture.pi != nullptr) {
-        mWaypointTexture.pi->weak_release();
+        mWaypointTexture.pi->release();
       }
       mWaypointTexture.pi = incomingControl;
     }
@@ -2295,7 +2306,7 @@ namespace moho
         incomingControl->add_ref_copy();
       }
       if (mArrowheadTexture.pi != nullptr) {
-        mArrowheadTexture.pi->weak_release();
+        mArrowheadTexture.pi->release();
       }
       mArrowheadTexture.pi = incomingControl;
     }
@@ -2306,6 +2317,15 @@ namespace moho
   /**
    * Address: 0x00825570 (FUN_00825570)
    * Mangled: ?LoadTextures@UICommandGraphNode@Moho@@QAEXPAVLuaObject@LuaPlus@@PBDPAVLuaState@3@@Z
+   *
+   * NOTE (2026-08-20 audit): all three texture-lane assignments below
+   * (orderline/waypoint/arrowhead) previously called `.weak_release()` in the
+   * shared `assignSharedLane` lambda. FUN_00825570 confirms all three call
+   * sites (0x008256E4, 0x00825B26, 0x00825EF9, xref-verified) target
+   * FUN_004229B0, i.e. `sp_counted_base::release()`, not `weak_release()`
+   * (see BoostWrappers.h). The acquire side (`add_ref_copy()`) was already
+   * correct. Corrected to `.release()`; the lambda was renamed from
+   * `assignWeakSharedLane` to match (function-local, no external callers).
    *
    * What it does:
    * Loads command-graph texture/style lanes from one Lua table entry, honoring
@@ -2329,18 +2349,18 @@ namespace moho
       return !probe.IsNil();
     };
 
-    const auto assignWeakSharedLane = [](
-                                       boost::SharedPtrRaw<void>& destination,
-                                       void* const sourcePx,
-                                       boost::detail::sp_counted_base* const sourceControl
-                                     ) {
+    const auto assignSharedLane = [](
+                                    boost::SharedPtrRaw<void>& destination,
+                                    void* const sourcePx,
+                                    boost::detail::sp_counted_base* const sourceControl
+                                  ) {
       destination.px = sourcePx;
       if (sourceControl != destination.pi) {
         if (sourceControl != nullptr) {
           sourceControl->add_ref_copy();
         }
         if (destination.pi != nullptr) {
-          destination.pi->weak_release();
+          destination.pi->release();
         }
         destination.pi = sourceControl;
       }
@@ -2354,7 +2374,7 @@ namespace moho
           resources->GetTexture(loadedTexture, textureValue.GetString(), 0, true);
 
           const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-          assignWeakSharedLane(mOrderlineTexture, loadedRaw.px, loadedRaw.pi);
+          assignSharedLane(mOrderlineTexture, loadedRaw.px, loadedRaw.pi);
         }
       }
     }
@@ -2395,7 +2415,7 @@ namespace moho
       LuaPlus::LuaObject textureValue = nodeTable["waypoint_texture"];
       const boost::shared_ptr<CD3DBatchTexture> loadedTexture = CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
       const boost::SharedPtrRaw<CD3DBatchTexture> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-      assignWeakSharedLane(mWaypointTexture, loadedRaw.px, loadedRaw.pi);
+      assignSharedLane(mWaypointTexture, loadedRaw.px, loadedRaw.pi);
     }
 
     if (hasKey("waypoint_color")) {
@@ -2430,7 +2450,7 @@ namespace moho
       LuaPlus::LuaObject textureValue = nodeTable["arrowhead_texture"];
       const boost::shared_ptr<CD3DBatchTexture> loadedTexture = CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
       const boost::SharedPtrRaw<CD3DBatchTexture> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-      assignWeakSharedLane(mArrowheadTexture, loadedRaw.px, loadedRaw.pi);
+      assignSharedLane(mArrowheadTexture, loadedRaw.px, loadedRaw.pi);
     }
   }
 
@@ -3946,9 +3966,28 @@ namespace moho
     /**
      * Address: 0x0086EDD0 (FUN_0086EDD0, ??0WeakPtr_UICommandGraph@Moho@@QAE@@Z)
      *
+     * NOTE (2026-08-20 audit): despite the `WeakPtr_UICommandGraph` mangled
+     * name, FUN_0086EDD0's own body proves this member is strong-owning, not
+     * weak-observing - exactly the same "WeakPtr_X is really a shared_ptr"
+     * situation already fixed for `WeakPtr_CD3DBatchTexture` in
+     * CD3DPrimBatcher.cpp. Disassembly: the acquire step is
+     * `lock xadd [pi+4],1` (`use_count_` at +0x04, i.e. `add_ref_copy()`, not
+     * `weak_add_ref()`) and the release step calls FUN_004229B0 (manually
+     * verified by displacement calculation: rel32 -0x0044C449 from 0x0086EDF4
+     * resolves to exactly 0x004229B0), which is `sp_counted_base::release()`
+     * (see BoostWrappers.h), not `weak_release()`. `CWldSession`'s
+     * `mUICommandGraphPx`/`mUICommandGraphControl` fields (declared in
+     * CWldSession.h, out of scope for this pass) are therefore a STRONG
+     * owning reference to the session's command graph, not a weak observer -
+     * their header comment ("weak control block for mUICommandGraphPx") is
+     * now known to be wrong and needs a follow-up fix in CWldSession.h. Names
+     * here are kept stable (function-local to this TU either way, but the
+     * fields they mutate are declared externally) and documented instead.
+     *
      * What it does:
-     * Copies one shared command-graph payload into one weak lane, rebinding
-     * control ownership only when the incoming control block changes.
+     * Copies one shared command-graph payload into `CWldSession`'s owning
+     * command-graph lane, rebinding control ownership only when the incoming
+     * control block changes.
      */
     void CopySharedToWeakCommandGraph(
       const boost::SharedPtrRaw<UICommandGraph>& shared,
@@ -3961,21 +4000,36 @@ namespace moho
 
       if (incomingControl != weakControl) {
         if (incomingControl != nullptr) {
-          incomingControl->weak_add_ref();
+          incomingControl->add_ref_copy();
         }
 
         if (weakControl != nullptr) {
-          weakControl->weak_release();
+          weakControl->release();
         }
 
         weakControl = incomingControl;
       }
     }
 
+    /**
+     * Address: 0x00824060 (FUN_00824060, Moho::WeakPtr_UICommandGraph::Release)
+     *
+     * NOTE (2026-08-20 audit): FUN_00824060 is byte-shape-identical to
+     * FUN_004229B0 (decrements `use_count_` at +0x04, calls dispose() via
+     * vtable slot +0x04, then decrements `weak_count_` at +0x08 and calls
+     * destroy() via vtable slot +0x08) - it is release(), already cited under
+     * `SharedPtrRaw<T>::release()`'s evidence list in BoostWrappers.h. Session
+     * teardown must release the strong reference `CopySharedToWeakCommandGraph`
+     * establishes (see its note above), not weak-release it.
+     *
+     * What it does:
+     * Releases `CWldSession`'s owning reference to its command graph on
+     * session teardown.
+     */
     void ReleaseWeakCommandGraph(UICommandGraph*& px, boost::detail::sp_counted_base*& control)
     {
       if (control) {
-        control->weak_release();
+        control->release();
       }
       px = nullptr;
       control = nullptr;
