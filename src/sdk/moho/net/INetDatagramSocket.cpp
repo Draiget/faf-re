@@ -8,52 +8,17 @@
 #include "gpg/core/utils/Logging.h"
 using namespace moho;
 
-namespace
-{
-  class INetDatagramHandlerVtableProbe final : public moho::INetDatagramHandler
-  {
-  public:
-    void OnDatagram(
-      moho::CMessage* /*msg*/,
-      moho::INetDatagramSocket* /*socket*/,
-      u_long /*address*/,
-      u_short /*port*/
-    ) override
-    {
-    }
-  };
-
-  struct INetDatagramHandlerRuntimeView
-  {
-    void* vtable; // +0x00
-  };
-
-  [[nodiscard]] void* INetDatagramHandlerVtableToken() noexcept
-  {
-    static INetDatagramHandlerVtableProbe probe{};
-    return *reinterpret_cast<void**>(&probe);
-  }
-} // namespace
-
-/**
- * Address: 0x007BF7C0 (FUN_007BF7C0)
- *
- * What it does:
- * Rebinds one datagram-handler runtime lane to the recovered interface
- * vtable token.
- */
-[[maybe_unused]] moho::INetDatagramHandler* InitializeINetDatagramHandlerBaseVtable(
-  moho::INetDatagramHandler* const handler
-) noexcept
-{
-  if (handler == nullptr) {
-    return nullptr;
-  }
-
-  auto* const runtime = reinterpret_cast<INetDatagramHandlerRuntimeView*>(handler);
-  runtime->vtable = INetDatagramHandlerVtableToken();
-  return handler;
-}
+// FUN_007BF7C0 (`mov dword ptr [eax], offset ??_7INetDatagramHandler@Moho@@6B@;
+// retn`) is the compiler-synthesized INetDatagramHandler base-subobject
+// vtable-install: every real derived class inlines this same 6-byte sequence
+// directly into its own constructor (confirmed against CDiscoveryService's
+// real ctor at FUN_007BF650, which writes its own combined
+// ??_7CDiscoveryService@Moho@@6BINetDatagramHandler@Moho@@@ vtable at the
+// INetDatagramHandler subobject offset rather than calling out to this
+// fragment). It has zero callers and zero callees in the binary and no
+// independent source-level existence -- the previous
+// InitializeINetDatagramHandlerBaseVtable wrapper here was an orphan with no
+// real caller anywhere in src/sdk/**, removed.
 
 /**
  * Address: 0x0047EF30 (FUN_0047EF30)
