@@ -158,7 +158,7 @@ namespace
    * Ensures one `vector<RMeshBlueprintLOD>` has capacity for at least
    * `requestedCount` elements and returns previous capacity.
    */
-  [[maybe_unused]] unsigned int EnsureMeshBlueprintLodVectorCapacity(
+  unsigned int EnsureMeshBlueprintLodVectorCapacity(
     LODVector& storage,
     const unsigned int requestedCount
   )

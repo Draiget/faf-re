@@ -147,7 +147,7 @@ namespace
    * Lazily resolves reflected type for `vector<ResourceDeposit>` and
    * deserializes `CSimResources::deposits_`.
    */
-  [[maybe_unused]] void DeserializeCSimResourcesDepositsPrimary(
+  void DeserializeCSimResourcesDepositsPrimary(
     gpg::ReadArchive* const archive,
     moho::CSimResources* const object
   )
@@ -164,7 +164,7 @@ namespace
    * Lazily resolves reflected type for `vector<ResourceDeposit>` and
    * serializes `CSimResources::deposits_`.
    */
-  [[maybe_unused]] void SerializeCSimResourcesDepositsPrimary(
+  void SerializeCSimResourcesDepositsPrimary(
     gpg::WriteArchive* const archive,
     moho::CSimResources* const object
   )

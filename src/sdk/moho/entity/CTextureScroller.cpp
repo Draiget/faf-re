@@ -428,7 +428,7 @@ namespace
    * What it does:
    * Allocates one `CTextureScroller` and returns a typed reflected reference.
    */
-  [[maybe_unused]] gpg::RRef NewTextureScrollerRef()
+  gpg::RRef NewTextureScrollerRef()
   {
     auto* const object = new (std::nothrow) moho::CTextureScroller(nullptr);
     return MakeTextureScrollerRef(object);
@@ -441,7 +441,7 @@ namespace
    * Placement-constructs one `CTextureScroller` in caller-provided storage and
    * returns a typed reflected reference.
    */
-  [[maybe_unused]] gpg::RRef CtrTextureScrollerRef(void* const objectPtr)
+  gpg::RRef CtrTextureScrollerRef(void* const objectPtr)
   {
     auto* const object = reinterpret_cast<moho::CTextureScroller*>(objectPtr);
     if (object != nullptr) {
@@ -456,7 +456,7 @@ namespace
    * What it does:
    * Releases storage for one `CTextureScroller` object pointer.
    */
-  [[maybe_unused]] void DeleteTextureScrollerObject(void* const objectPtr)
+  void DeleteTextureScrollerObject(void* const objectPtr)
   {
     if (objectPtr != nullptr) {
       operator delete(objectPtr);
@@ -469,7 +469,7 @@ namespace
    * What it does:
    * No-op destruct callback lane used by legacy texture-scroller type-info.
    */
-  [[maybe_unused]] void DestructTextureScrollerObject(void* const)
+  void DestructTextureScrollerObject(void* const)
   {}
 
   /**

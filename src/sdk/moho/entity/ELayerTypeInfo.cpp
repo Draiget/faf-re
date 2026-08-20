@@ -71,7 +71,7 @@ namespace
    * Initializes callback lanes for startup-owned `ELayer` primitive serializer
    * helper storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] moho::ELayerPrimitiveSerializer*
+  [[nodiscard]] moho::ELayerPrimitiveSerializer*
   InitializeELayerPrimitiveSerializerStartupThunkPrimary()
   {
     auto* const serializer = AcquireELayerPrimitiveSerializer();

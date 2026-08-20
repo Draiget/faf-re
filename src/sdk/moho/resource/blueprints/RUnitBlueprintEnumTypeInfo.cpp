@@ -356,7 +356,7 @@ namespace
    * Unlinks `ERuleBPUnitMovementType` primitive serializer helper node and
    * restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  [[nodiscard]] gpg::SerHelperBase*
   CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary() noexcept
   {
     return UnlinkSerializerNode(gERuleBPUnitMovementTypePrimitiveSerializer);
@@ -411,7 +411,7 @@ namespace
    * Unlinks `ERuleBPUnitCommandCaps` primitive serializer helper node and
    * restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  [[nodiscard]] gpg::SerHelperBase*
   CleanupERuleBPUnitCommandCapsPrimitiveSerializerNodePrimary() noexcept
   {
     return UnlinkSerializerNode(gERuleBPUnitCommandCapsPrimitiveSerializer);
@@ -466,7 +466,7 @@ namespace
    * Unlinks `ERuleBPUnitToggleCaps` primitive serializer helper node and
    * restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase*
+  [[nodiscard]] gpg::SerHelperBase*
   CleanupERuleBPUnitToggleCapsPrimitiveSerializerNodePrimary() noexcept
   {
     return UnlinkSerializerNode(gERuleBPUnitToggleCapsPrimitiveSerializer);

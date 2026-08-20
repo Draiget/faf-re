@@ -140,7 +140,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `MotorTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyMotorTypeInfoBody(MotorTypeInfo* const typeInfo) noexcept
+  void DestroyMotorTypeInfoBody(MotorTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -234,7 +234,7 @@ namespace moho
    * Startup leaf that initializes global `MotorSerializer` callback lanes and
    * returns its serializer helper pointer.
    */
-  [[maybe_unused]] gpg::SerHelperBase* construct_MotorSerializer_StartupLeaf()
+  gpg::SerHelperBase* construct_MotorSerializer_StartupLeaf()
   {
     InitializeSerializerNode(gMotorSerializer);
     gMotorSerializer.mDeserialize = &MotorSerializer::Deserialize;

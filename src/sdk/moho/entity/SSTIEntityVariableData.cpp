@@ -199,7 +199,7 @@ namespace
    * Unlinks `SSTIEntityVariableData` serializer helper links and restores
    * self-links for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityVariableDataSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTIEntityVariableDataSerializerLaneA() noexcept
   {
     return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gSSTIEntityVariableDataSerializer));
   }
@@ -504,7 +504,7 @@ namespace
    * into destination storage and destroys already-constructed payload lanes
    * before rethrowing if a copy step throws.
    */
-  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollback(
+  SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollback(
     const SSTIEntityVariableDataSlotRuntime* sourceBegin,
     const SSTIEntityVariableDataSlotRuntime* sourceEnd,
     SSTIEntityVariableDataSlotRuntime* destinationBegin
@@ -591,7 +591,7 @@ namespace
    * into destination storage and destroys already-constructed payload lanes
    * before rethrowing if a copy step throws.
    */
-  [[maybe_unused]] SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(
+  SSTIEntityVariableDataSlotRuntime* CopySSTIEntityVariableDataSlotRangeWithRollbackCounted(
     const std::uint32_t count,
     SSTIEntityVariableDataSlotRuntime* const destinationBegin,
     const SSTIEntityVariableDataSlotRuntime* const sourceBegin
