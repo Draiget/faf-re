@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/weak_ptr.h"
+#include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/collision/ECollisionShape.h"
@@ -86,11 +86,37 @@ namespace moho
     float mSelectionThickness;                                // +0x134
     float mUseOOBTestZoom;                                    // +0x138
     msvc8::string mStrategicIconName;                         // +0x13C
-    std::uint32_t mStrategicIconRuntimeWord;                  // +0x158 (runtime word; semantics unresolved)
-    boost::weak_ptr<CD3DBatchTexture> mStrategicIconRest;     // +0x15C
-    boost::weak_ptr<CD3DBatchTexture> mStrategicIconSelected; // +0x164
-    boost::weak_ptr<CD3DBatchTexture> mStrategicIconOver;     // +0x16C
-    boost::weak_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
+    /**
+     * Strategic-icon draw-order tier. `CWldSession::RenderStrategicIcons`
+     * (0x0085B6E0) reads it with a single-byte compare against `'A'` (0x41)
+     * - `cmp byte ptr [edx+158h], 41h` at 0x0085C2C0 - to decide whether a
+     * unit's icon has its own high-priority texture (>= 'A') or falls back
+     * to the shared ground/air icon runs. Byte-sized, not the 32-bit word
+     * this lane used to be typed as; the three bytes at +0x159..+0x15B are
+     * unused padding up to `mStrategicIconRest`.
+     */
+    std::uint8_t mStrategicIconSortPriority;                  // +0x158
+    std::uint8_t mStrategicIconSortPriorityPad0159_015B[3];    // +0x159
+    /**
+     * Four cached strategic-icon textures for this blueprint - rest, selected,
+     * mouse-over and selected+mouse-over - read by the icon-texture picker
+     * inlined into `CWldSession::RenderStrategicIcons`'s callee chain
+     * (0x0085D880/0x0085CBD0). Retyped from `boost::weak_ptr` to
+     * `boost::shared_ptr` (same 8-byte `{px, pn}` layout, so the offsets
+     * below are unaffected): the reader promotes each one with a bare
+     * `lock xadd [pn+4], 1` (0x0085D90A/0x0085D944/0x0085D992/0x0085CC15 et
+     * al.) and no zero-check beforehand. A real `weak_ptr::lock()` goes
+     * through `shared_count(weak_count const&)`'s `add_ref_lock()`, which
+     * *does* check for an expired control block first
+     * (`dependencies/boost_1_34_1/boost/detail/shared_count.hpp`) - the
+     * binary never does that check here, so this is an ordinary
+     * `shared_ptr` copy-construct (unconditional increment when the control
+     * block pointer is non-null), not a weak-to-shared promotion.
+     */
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconRest;     // +0x15C
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelected; // +0x164
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconOver;     // +0x16C
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
 
     static gpg::RType* sType;
 
@@ -214,8 +240,8 @@ namespace moho
     offsetof(REntityBlueprint, mStrategicIconName) == 0x13C, "REntityBlueprint::mStrategicIconName offset must be 0x13C"
   );
   static_assert(
-    offsetof(REntityBlueprint, mStrategicIconRuntimeWord) == 0x158,
-    "REntityBlueprint::mStrategicIconRuntimeWord offset must be 0x158"
+    offsetof(REntityBlueprint, mStrategicIconSortPriority) == 0x158,
+    "REntityBlueprint::mStrategicIconSortPriority offset must be 0x158"
   );
   static_assert(
     offsetof(REntityBlueprint, mStrategicIconRest) == 0x15C, "REntityBlueprint::mStrategicIconRest offset must be 0x15C"
