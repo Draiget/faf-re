@@ -13,6 +13,8 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
+#include "lua/LuaObject.h"
+#include "lua/LuaPrimitives.h"
 #include "moho/ai/EFormationdStatusTypeInfo.h"
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/CAiPersonality.h"
@@ -11422,3 +11424,63 @@ namespace gpg
     ::SaveOwnedRawPointerFromCArmyStatItemOwnerFieldLane1_Impl(archive, ownerToken);
   }
 } // namespace gpg
+
+/**
+ * Address: 0x00923D20 (FUN_00923D20, func_serialize_fromstring)
+ *
+ * IDA signature:
+ * int __cdecl func_serialize_fromstring(lua_State *L);
+ *
+ * What it does:
+ * Implements the Lua-visible `serialize.fromstring(str)` entry point:
+ * wraps the input string in a `std::stringstream`, builds a
+ * `gpg::TextReadArchive` over it via `gpg::CreateTextReadArchive`, then
+ * repeatedly deserializes one reflected `TObject` value per call and
+ * pushes it onto the Lua stack until a void/terminator value is read,
+ * returning the count of values pushed. Referenced as a `lua_CFunction`
+ * from a registration table anchored at `??_7UdataSerializer@@6B@`+0x1C
+ * (0x00D47074) -- this is a plain Lua C-function callback, not a
+ * polymorphic virtual call (its calling convention has no implicit
+ * `this`).
+ */
+int LuaSerializeFromString(lua_State* const L)
+{
+  std::size_t length = 0;
+  const char* const data = luaL_checklstring(L, 1, &length);
+
+  const boost::shared_ptr<std::istream> stream(
+    new std::stringstream(std::string(data, length), std::ios_base::in | std::ios_base::out)
+  );
+
+  gpg::ReadArchive* const archive = gpg::CreateTextReadArchive(stream);
+
+  lua_settop(L, 0);
+
+  static gpg::RType* sObjectType = nullptr;
+  if (sObjectType == nullptr) {
+    sObjectType = gpg::LookupRType(typeid(LuaPlus::TObject));
+  }
+
+  for (;;) {
+    const int top = lua_gettop(L);
+    lua_settop(L, top + 1);
+    LuaPlus::TObject* const slot = L->top - 1;
+
+    gpg::RRef ownerRef{};
+    (void)gpg::RRef_lua_State(&ownerRef, L);
+
+    archive->Read(sObjectType, slot, ownerRef);
+    if (slot->tt == 0) {
+      break;
+    }
+  }
+
+  --L->top;
+  const int pushedCount = lua_gettop(L);
+
+  if (archive != nullptr) {
+    delete archive;
+  }
+
+  return pushedCount;
+}

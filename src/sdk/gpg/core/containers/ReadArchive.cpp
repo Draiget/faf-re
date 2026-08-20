@@ -15,6 +15,7 @@
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiPathFinder.h"
@@ -2373,22 +2374,63 @@ namespace
 
   struct TextReadArchiveRuntimeView
   {
-    std::uint8_t pad_0000_0040[0x40];
-    std::istream* stream;                    // +0x40
-    boost::detail::sp_counted_base* control; // +0x44
+    std::uint8_t pad_0000_0038[0x38];
+    std::istream* streamOwnerPx;              // +0x38 (boost::shared_ptr<std::istream>::px)
+    boost::detail::sp_counted_base* control;  // +0x3C (boost::shared_ptr<std::istream>::pn.pi_)
+    std::istream* stream;                     // +0x40 (raw cached copy for hot Read* paths)
   };
+  static_assert(
+    offsetof(TextReadArchiveRuntimeView, streamOwnerPx) == 0x38,
+    "TextReadArchiveRuntimeView::streamOwnerPx offset must be 0x38"
+  );
+  static_assert(
+    offsetof(TextReadArchiveRuntimeView, control) == 0x3C,
+    "TextReadArchiveRuntimeView::control offset must be 0x3C"
+  );
   static_assert(
     offsetof(TextReadArchiveRuntimeView, stream) == 0x40,
     "TextReadArchiveRuntimeView::stream offset must be 0x40"
-  );
-  static_assert(
-    offsetof(TextReadArchiveRuntimeView, control) == 0x44,
-    "TextReadArchiveRuntimeView::control offset must be 0x44"
   );
 
   class TextReadArchive : public gpg::ReadArchive
   {
   public:
+    /**
+     * Address: 0x00939330 (FUN_00939330, ??0TextReadArchive@@QAE@ABV?$shared_ptr@Vistream@std@@@boost@@@Z)
+     * Mangled: ??0TextReadArchive@@QAE@ABV?$shared_ptr@Vistream@std@@@boost@@@Z
+     *
+     * IDA signature:
+     * TextReadArchive *__thiscall TextReadArchive::TextReadArchive(TextReadArchive *this, boost::shared_ptr_istream *a2);
+     *
+     * What it does:
+     * Runs `gpg::ReadArchive` base construction, installs the
+     * `TextReadArchive` vtable, then copies the caller's
+     * `boost::shared_ptr<std::istream>` into the owning slot (retaining its
+     * control block via `add_ref_copy()`) and caches the raw
+     * `std::istream*` separately for the hot `Read*` accessor paths.
+     * Finishes by clearing the stream's error state via
+     * `std::ios_base::clear`.
+     */
+    explicit TextReadArchive(const boost::shared_ptr<std::istream>& stream)
+      : gpg::ReadArchive()
+    {
+      // `boost::shared_ptr<T>` has the same {px, pi} layout as this
+      // codebase's `SharedPtrRaw<T>` (see BoostWrappers.h) on this VC8-era
+      // Boost; reinterpret to pull the raw owning pointers into the
+      // already-established byte-offset fields the sibling `Read*` methods
+      // and destructor expect (see `TextReadArchiveRuntimeView`).
+      const auto& raw = reinterpret_cast<const boost::SharedPtrRaw<std::istream>&>(stream);
+      auto* const runtime = reinterpret_cast<TextReadArchiveRuntimeView*>(this);
+      runtime->streamOwnerPx = raw.px;
+      boost::detail::sp_counted_base* const control = raw.pi;
+      runtime->control = control;
+      if (control != nullptr) {
+        control->add_ref_copy();
+      }
+      runtime->stream = raw.px;
+      runtime->stream->clear();
+    }
+
     /**
      * Address: 0x00939700 (FUN_00939700, ??1TextReadArchive@@QAE@@Z)
      *
@@ -2400,6 +2442,7 @@ namespace
     {
       auto* const runtime = reinterpret_cast<TextReadArchiveRuntimeView*>(this);
       boost::detail::sp_counted_base* const control = runtime->control;
+      runtime->streamOwnerPx = nullptr;
       runtime->stream = nullptr;
       runtime->control = nullptr;
       if (control != nullptr) {
@@ -2695,6 +2738,23 @@ namespace
     return &typeHandles[insertIndex];
   }
 } // namespace
+
+/**
+ * Address: 0x00939800 (FUN_00939800, ?CreateTextReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@Vistream@std@@@boost@@@Z)
+ * Mangled: ?CreateTextReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@Vistream@std@@@boost@@@Z
+ *
+ * IDA signature:
+ * gpg::ReadArchive *__cdecl gpg::CreateTextReadArchive(boost::shared_ptr_istream *a1);
+ *
+ * What it does:
+ * Heap-allocates and constructs one `TextReadArchive` bound to the given
+ * input stream, returning it through the polymorphic `gpg::ReadArchive*`
+ * factory interface. Returns `nullptr` if allocation fails.
+ */
+ReadArchive* CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream)
+{
+  return new (std::nothrow) TextReadArchive(stream);
+}
 
 /**
  * Address: 0x00952B60 (FUN_00952B60, ??0ReadArchive@gpg@@QAE@XZ)
