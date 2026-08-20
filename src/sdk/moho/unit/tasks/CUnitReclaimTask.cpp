@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -936,6 +937,61 @@ namespace moho
   }
 
 } // namespace moho
+
+namespace
+{
+  void DeserializeCUnitReclaimTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeCUnitReclaimTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::CUnitReclaimTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_CUnitReclaimTaskSerializer_atexit()
+  {
+    (void)moho::cleanup_CUnitReclaimTaskSerializerStartupThunkA();
+  }
+
+  /**
+   * Address: 0x00BD17E0 (FUN_00BD17E0, register_CUnitReclaimTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global CUnitReclaimTask serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CUnitReclaimTaskSerializer()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCUnitReclaimTaskSerializerStartupNode);
+    gCUnitReclaimTaskSerializerStartupNode.mHelperNext = self;
+    gCUnitReclaimTaskSerializerStartupNode.mHelperPrev = self;
+    gCUnitReclaimTaskSerializerStartupNode.mLoad = &DeserializeCUnitReclaimTaskSerializerCallback;
+    gCUnitReclaimTaskSerializerStartupNode.mSave = &SerializeCUnitReclaimTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitReclaimTaskSerializer_atexit);
+  }
+
+  struct CUnitReclaimTaskSerializerStartupBootstrap
+  {
+    CUnitReclaimTaskSerializerStartupBootstrap()
+    {
+      register_CUnitReclaimTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitReclaimTaskSerializerStartupBootstrap gCUnitReclaimTaskSerializerStartupBootstrap;
+} // namespace
 
 namespace gpg
 {
