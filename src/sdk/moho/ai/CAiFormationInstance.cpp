@@ -367,6 +367,19 @@ namespace
     [[nodiscard]] const char* GetName() const override;
 
     /**
+     * Address: 0x0056BA10 (FUN_0056BA10, gpg::RMapType_EntId_SUnitOffsetInfo::GetLexical)
+     *
+     * IDA signature:
+     * std::string *__thiscall gpg::RMapType_EntId_SUnitOffsetInfo::GetLexical(
+     *     gpg::RType *this, std::string *dest, _DWORD *a3);
+     *
+     * What it does:
+     * Appends `", size=<n>"` to the base `RType::GetLexical` text, taking the
+     * element count straight off the reflected map's node-count lane.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
      * Address: 0x0056DC00 (FUN_0056DC00, gpg::RMapType_EntId_SUnitOffsetInfo::SerSave)
      *
      * What it does:
@@ -453,6 +466,19 @@ namespace
     [[nodiscard]] const char* GetName() const override;
 
     /**
+     * Address: 0x0056C510 (FUN_0056C510, gpg::RMapType_EntId_SCoordsVec2::GetLexical)
+     *
+     * IDA signature:
+     * std::string *__thiscall gpg::RMapType_EntId_SCoordsVec2::GetLexical(
+     *     gpg::RType *this, std::string *dest, _DWORD *a3);
+     *
+     * What it does:
+     * Appends `", size=<n>"` to the base `RType::GetLexical` text, taking the
+     * element count straight off the reflected map's node-count lane.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
      * Address: 0x0056E220 (FUN_0056E220, gpg::RMapType_EntId_SCoordsVec2::SerSave)
      *
      * What it does:
@@ -520,6 +546,23 @@ namespace
       }
     }
     return gRMapTypeEntIdSUnitOffsetInfoName.c_str();
+  }
+
+  /**
+   * Address: 0x0056BA10 (FUN_0056BA10, gpg::RMapType_EntId_SUnitOffsetInfo::GetLexical)
+   *
+   * What it does:
+   * Renders the reflected map as `"<base RType lexical>, size=<count>"`. The
+   * binary reads the count straight out of the map object's node-count word
+   * rather than dispatching a virtual, because this descriptor has no
+   * `RIndexed` sub-object; the typed `size()` accessor is that same word.
+   */
+  msvc8::string RMapType_EntId_SUnitOffsetInfo::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const auto* const mapObject = static_cast<const FormationUnitOffsetMap*>(ref.mObj);
+    const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
+    return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
   }
 
   /**
@@ -595,6 +638,23 @@ namespace
       }
     }
     return gRMapTypeEntIdSCoordsVec2TypeName.c_str();
+  }
+
+  /**
+   * Address: 0x0056C510 (FUN_0056C510, gpg::RMapType_EntId_SCoordsVec2::GetLexical)
+   *
+   * What it does:
+   * Renders the reflected map as `"<base RType lexical>, size=<count>"`. The
+   * binary reads the count straight out of the map object's node-count word
+   * rather than dispatching a virtual, because this descriptor has no
+   * `RIndexed` sub-object; the typed `size()` accessor is that same word.
+   */
+  msvc8::string RMapType_EntId_SCoordsVec2::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const auto* const mapObject = static_cast<const FormationCoordMap*>(ref.mObj);
+    const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
+    return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
   }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)

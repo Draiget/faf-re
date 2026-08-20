@@ -2081,6 +2081,23 @@ msvc8::string BuildPointerName(RType* const pointeeType)
     return STR_Printf("%s*", pointeeName);
 }
 
+/**
+ * Address: 0x0059D990 (FUN_0059D990, gpg::RPointerType_IFormationInstance::NewRef)
+ * Address: 0x005DE700 (FUN_005DE700, gpg::RPointerType_CAcquireTargetTask::NewRef)
+ * Address: 0x0063E010 (FUN_0063E010, gpg::RPointerType_IAniManipulator::NewRef)
+ * Address: 0x0067EBB0 (FUN_0067EBB0, gpg::RPointerType_Entity::NewRef)
+ * Address: 0x006E3B80 (FUN_006E3B80, gpg::RPointerType_CUnitCommand::NewRef)
+ * Address: 0x00712190 (FUN_00712190, gpg::RPointerType_CArmyStatItem::NewRef)
+ *
+ * What it does:
+ * Allocates one `T*` pointer-slot lane and wraps it as a reflected `RRef`.
+ *
+ * Every cited emission is the same 14-instruction body — `operator new(4)`,
+ * then the pointee's `RRef_<T>_P` slot factory — differing only in which
+ * factory is called. Confirm a new T's body matches before extending the list;
+ * types whose `NewRef` diverges (UnitWeapon, IEffect, ReconBlip, CEconomyEvent)
+ * are recovered as their own named helpers.
+ */
 template <class T>
 RRef NewPointerSlotRef()
 {
@@ -2088,6 +2105,24 @@ RRef NewPointerSlotRef()
     return MakePointerSlotRef<T>(slot);
 }
 
+/**
+ * Address: 0x0059D9C0 (FUN_0059D9C0, gpg::RPointerType_IFormationInstance::CpyRef)
+ * Address: 0x005DE730 (FUN_005DE730, gpg::RPointerType_CAcquireTargetTask::CpyRef)
+ * Address: 0x0063E040 (FUN_0063E040, gpg::RPointerType_IAniManipulator::CpyRef)
+ * Address: 0x0067EBE0 (FUN_0067EBE0, gpg::RPointerType_Entity::CpyRef)
+ * Address: 0x006E3BB0 (FUN_006E3BB0, gpg::RPointerType_CUnitCommand::CpyRef)
+ * Address: 0x007121C0 (FUN_007121C0, gpg::RPointerType_CArmyStatItem::CpyRef)
+ *
+ * What it does:
+ * Allocates one `T*` pointer-slot lane, copies the upcast source slot value
+ * into it, and wraps the lane as a reflected `RRef`. The allocation is guarded
+ * by an EH funclet that frees the lane and rethrows when the upcast throws.
+ *
+ * Every cited emission is the same 48-instruction body (`__CxxFrameHandler3`
+ * frame, `operator new(4)`, `RRef::TryUpcast_<T>_P`, `RRef_<T>_P`, unwind
+ * funclet calling `operator delete`), differing only in the two per-type
+ * helpers. Confirm a new T's body matches before extending the list.
+ */
 template <class T>
 RRef CopyPointerSlotRef(RRef* const sourceRef)
 {
@@ -2619,12 +2654,46 @@ void InvokeDeletingDestructorSlot8(void* const objectStorage, const unsigned int
     typeInfo->AddBase(baseField);
 }
 
+/**
+ * Address: 0x0059DA50 (FUN_0059DA50, gpg::RPointerType_IFormationInstance::CtrRef)
+ * Address: 0x005DE7C0 (FUN_005DE7C0, gpg::RPointerType_CAcquireTargetTask::CtrRef)
+ * Address: 0x0063E0D0 (FUN_0063E0D0, gpg::RPointerType_IAniManipulator::CtrRef)
+ * Address: 0x0067EC70 (FUN_0067EC70, gpg::RPointerType_Entity::CtrRef)
+ * Address: 0x006E3C40 (FUN_006E3C40, gpg::RPointerType_CUnitCommand::CtrRef)
+ * Address: 0x00712250 (FUN_00712250, gpg::RPointerType_CArmyStatItem::CtrRef)
+ *
+ * What it does:
+ * Wraps existing `T*` pointer-slot storage as a reflected `RRef` without
+ * allocating.
+ *
+ * Every cited emission is the same 13-instruction body — a straight forward to
+ * the pointee's `RRef_<T>_P` slot factory — differing only in which factory is
+ * called. Confirm a new T's body matches before extending the list.
+ */
 template <class T>
 RRef ConstructPointerSlotRef(void* const slotObject)
 {
     return MakePointerSlotRef<T>(static_cast<T**>(slotObject));
 }
 
+/**
+ * Address: 0x0059DA80 (FUN_0059DA80, gpg::RPointerType_IFormationInstance::MovRef)
+ * Address: 0x005DE7F0 (FUN_005DE7F0, gpg::RPointerType_CAcquireTargetTask::MovRef)
+ * Address: 0x0063E100 (FUN_0063E100, gpg::RPointerType_IAniManipulator::MovRef)
+ * Address: 0x0067ECA0 (FUN_0067ECA0, gpg::RPointerType_Entity::MovRef)
+ * Address: 0x006E3C70 (FUN_006E3C70, gpg::RPointerType_CUnitCommand::MovRef)
+ * Address: 0x00712280 (FUN_00712280, gpg::RPointerType_CArmyStatItem::MovRef)
+ *
+ * What it does:
+ * Writes the upcast source slot pointer value into the destination `T*` slot
+ * lane and wraps that lane as a reflected `RRef`.
+ *
+ * Every cited emission is the same 43-instruction body. It differs from
+ * `CopyPointerSlotRef` in that the lane is caller-supplied rather than
+ * allocated, so the unwind funclet is the compiler's empty
+ * (`nullsub`) cleanup rather than an `operator delete` call. Confirm a new T's
+ * body matches before extending the list.
+ */
 template <class T>
 RRef MovePointerSlotRef(void* const slotObject, RRef* const sourceRef)
 {
@@ -2641,8 +2710,14 @@ RRef MovePointerSlotRef(void* const slotObject, RRef* const sourceRef)
 
 /**
  * Address: 0x00557440 (FUN_00557440, gpg::RPointerType_RBlueprint::Delete)
+ * Address: 0x0059D960 (FUN_0059D960, gpg::RPointerType_IFormationInstance::Delete)
  * Address: 0x005A1A80 (FUN_005A1A80, gpg::RPointerType_RUnitBlueprint::Delete)
  * Address: 0x005DE530 (FUN_005DE530, gpg::RPointerType_UnitWeapon::Delete)
+ * Address: 0x005DE560 (FUN_005DE560, gpg::RPointerType_CAcquireTargetTask::Delete)
+ * Address: 0x0063DFE0 (FUN_0063DFE0, gpg::RPointerType_IAniManipulator::Delete)
+ * Address: 0x0067EB80 (FUN_0067EB80, gpg::RPointerType_Entity::Delete)
+ * Address: 0x006E3B50 (FUN_006E3B50, gpg::RPointerType_CUnitCommand::Delete)
+ * Address: 0x00712150 (FUN_00712150, gpg::RPointerType_CArmyStatItem::Delete)
  *
  * What it does:
  * Releases one allocated pointer-slot lane. IDA marks the instantiation
@@ -11292,6 +11367,32 @@ void RIndexed::AssignPointer(void*, const RRef&) const
 /**
  * Address: 0x0040CB00 (FUN_0040CB00, gpg::RPointerType_CTaskThread::SubscriptIndex)
  * Address: 0x004214F0 (FUN_004214F0, gpg::RPointerType_CLuaConOutputHandler::SubscriptIndex)
+ * Address: 0x0059D800 (FUN_0059D800, gpg::RPointerType_IFormationInstance::SubscriptIndex)
+ * Address: 0x005C83C0 (FUN_005C83C0, gpg::RPointerType_ReconBlip::SubscriptIndex)
+ * Address: 0x005DE260 (FUN_005DE260, gpg::RPointerType_CAcquireTargetTask::SubscriptIndex)
+ * Address: 0x0063DE80 (FUN_0063DE80, gpg::RPointerType_IAniManipulator::SubscriptIndex)
+ * Address: 0x0066CD80 (FUN_0066CD80, gpg::RPointerType_IEffect::SubscriptIndex)
+ * Address: 0x0067E660 (FUN_0067E660, gpg::RPointerType_Entity::SubscriptIndex)
+ * Address: 0x006B2850 (FUN_006B2850, gpg::RPointerType_CEconomyEvent::SubscriptIndex)
+ * Address: 0x006E39F0 (FUN_006E39F0, gpg::RPointerType_CUnitCommand::SubscriptIndex)
+ * Address: 0x00711910 (FUN_00711910, gpg::RPointerType_CArmyStatItem::SubscriptIndex)
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th pointee in the array the pointer
+ * slot addresses.
+ *
+ * Every cited emission is the same body specialized only in two constants the
+ * compiler folded in: the element stride (`sizeof(T)`) and the pointee's
+ * `RRef_<T>` factory. This shared recovery expresses both through the pointee
+ * descriptor (`size_` / `ctorRefFunc_`), which is what those two constants
+ * resolve to at runtime. Verified strides per citation: CTaskThread 0x1C,
+ * IFormationInstance 0x10, ReconBlip 0x4D0, CAcquireTargetTask 0x3C,
+ * IAniManipulator 0x80, IEffect 0x44, Entity 0x270, CEconomyEvent 0x7C,
+ * CUnitCommand 0x178, CArmyStatItem 0xAC. Confirm a new T's body matches this
+ * shape before extending the citation list — several sibling specializations
+ * (SimArmy, Shield, CDecalHandle, RBlueprint, UnitWeapon, CScriptObject,
+ * CSndParams, RUnitBlueprint) instead emit their own override and are recovered
+ * separately.
  */
 RRef gpg::RPointerTypeBase::SubscriptIndex(void* const obj, const int ind) const
 {
@@ -11320,6 +11421,24 @@ RRef gpg::RPointerTypeBase::SubscriptIndex(void* const obj, const int ind) const
 /**
  * Address: 0x0040CAF0 (FUN_0040CAF0, gpg::RPointerType_CTaskThread::GetCount)
  * Address: 0x004214E0 (FUN_004214E0, gpg::RPointerType_CLuaConOutputHandler::GetCount)
+ * Address: 0x0059D7F0 (FUN_0059D7F0, gpg::RPointerType_IFormationInstance::GetCount)
+ * Address: 0x005C83B0 (FUN_005C83B0, gpg::RPointerType_ReconBlip::GetCount)
+ * Address: 0x005DE250 (FUN_005DE250, gpg::RPointerType_CAcquireTargetTask::GetCount)
+ * Address: 0x0063DE70 (FUN_0063DE70, gpg::RPointerType_IAniManipulator::GetCount)
+ * Address: 0x0066CD70 (FUN_0066CD70, gpg::RPointerType_IEffect::GetCount)
+ * Address: 0x0067E650 (FUN_0067E650, gpg::RPointerType_Entity::GetCount)
+ * Address: 0x006B2840 (FUN_006B2840, gpg::RPointerType_CEconomyEvent::GetCount)
+ * Address: 0x006E39E0 (FUN_006E39E0, gpg::RPointerType_CUnitCommand::GetCount)
+ * Address: 0x00711900 (FUN_00711900, gpg::RPointerType_CArmyStatItem::GetCount)
+ *
+ * What it does:
+ * Returns 1 when the pointer slot holds a non-null pointer, else 0 (a pointer
+ * type indexes at most one element).
+ *
+ * All cited emissions are byte-identical five-instruction bodies
+ * (`mov ecx,[esp+4]; xor eax,eax; cmp [ecx],eax; setnz al; retn 4`) — the
+ * pointee type never appears, so one shared recovery covers every T that does
+ * not emit its own override.
  */
 size_t gpg::RPointerTypeBase::GetCount(void* const obj) const
 {
@@ -12301,6 +12420,12 @@ RType* gpg::RPointerType<moho::UnitWeapon>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x0063DF50 (FUN_0063DF50)
+ * Demangled: gpg::RPointerType_IAniManipulator::dtr
+ */
+gpg::RPointerType<moho::IAniManipulator>::~RPointerType() = default;
+
+/**
  * Address: 0x0063DB40 (FUN_0063DB40)
  * Demangled: gpg::RPointerType_IAniManipulator::GetName
  */
@@ -12372,6 +12497,12 @@ RType* gpg::RPointerType<moho::IAniManipulator>::GetPointeeType() const
 {
     return CachedIAniManipulatorType();
 }
+
+/**
+ * Address: 0x0066CE50 (FUN_0066CE50)
+ * Demangled: gpg::RPointerType_IEffect::dtr
+ */
+gpg::RPointerType<moho::IEffect>::~RPointerType() = default;
 
 /**
  * Address: 0x0066CA40 (FUN_0066CA40)
@@ -12465,6 +12596,12 @@ std::uint32_t gpg::RPointerType<moho::CUnitCommand>::sNameInitGuard = 0u;
     typeInfo->fields_ = {};
     typeInfo->bases_ = {};
 }
+
+/**
+ * Address: 0x006E3AC0 (FUN_006E3AC0)
+ * Demangled: gpg::RPointerType_CUnitCommand::dtr
+ */
+gpg::RPointerType<moho::CUnitCommand>::~RPointerType() = default;
 
 /**
  * Address: 0x006E36B0 (FUN_006E36B0)
@@ -12988,6 +13125,12 @@ RType* gpg::RPointerType<moho::CSndParams>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x0059D8D0 (FUN_0059D8D0)
+ * Demangled: gpg::RPointerType_IFormationInstance::dtr
+ */
+gpg::RPointerType<moho::IFormationInstance>::~RPointerType() = default;
+
+/**
  * Address: 0x0059D4C0 (FUN_0059D4C0)
  * Demangled: gpg::RPointerType_IFormationInstance::GetName
  */
@@ -13199,6 +13342,12 @@ RType* gpg::RPointerType<moho::RUnitBlueprint>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x005C8550 (FUN_005C8550)
+ * Demangled: gpg::RPointerType_ReconBlip::dtr
+ */
+gpg::RPointerType<moho::ReconBlip>::~RPointerType() = default;
+
+/**
  * Address: 0x005C8080 (FUN_005C8080)
  * Demangled: gpg::RPointerType_ReconBlip::GetName
  */
@@ -13273,6 +13422,12 @@ RType* gpg::RPointerType<moho::ReconBlip>::GetPointeeType() const
 
 msvc8::string gpg::RPointerType<moho::CArmyStatItem>::sName{};
 std::uint32_t gpg::RPointerType<moho::CArmyStatItem>::sNameInitGuard = 0u;
+
+/**
+ * Address: 0x00711A30 (FUN_00711A30)
+ * Demangled: gpg::RPointerType_CArmyStatItem::dtr
+ */
+gpg::RPointerType<moho::CArmyStatItem>::~RPointerType() = default;
 
 /**
  * Address: 0x007115D0 (FUN_007115D0)
