@@ -3337,6 +3337,17 @@ public:
    */
   void DoClientToScreen(std::int32_t* x, std::int32_t* y) const override;
 
+  /**
+   * Address: 0x00967C40 (FUN_00967C40, wxWindow::ScrollWindow)
+   * Mangled: ?ScrollWindow@wxWindow@@UAEXHHPBVwxRect@@@Z
+   *
+   * What it does:
+   * Scrolls the native window's contents by `(dx, dy)` via `::ScrollWindow`,
+   * restricted to `rect` if given (converted to a Win32 `RECT`), else the
+   * whole client area.
+   */
+  void ScrollWindow(std::int32_t dx, std::int32_t dy, const void* rect) override;
+
   static wxEventTable sm_eventTable;
 };
 
