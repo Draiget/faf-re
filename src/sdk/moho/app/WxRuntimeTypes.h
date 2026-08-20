@@ -3151,16 +3151,29 @@ public:
    */
   bool HandleDropFiles(void* hDrop);
   virtual void SetupColours() {}
+  /**
+   * Address: 0x0096A920 (FUN_0096A920)
+   * Mangled: ?MSWOnScroll@wxWindow@@UAE_NHGGK@Z
+   * Slot: +0x1E0 of ??_7wxWindow@@6B@ (VA 0x00D4DB44) - the slot
+   * `wxWindow::MSWWindowProc` dispatches WM_HSCROLL/WM_VSCROLL through at
+   * 0x0096D686, and the slot `wxNotebook::MSWOnScroll` (0x009A6E10) chains up
+   * to at 0x009A6E24.
+   *
+   * IDA signature:
+   * char __thiscall wxWindow::MSWOnScroll(
+   *     wxWindow *this@<ecx>, int orientation, int command, int position,
+   *     int controlHandle);
+   *
+   * What it does:
+   * Turns one WM_HSCROLL/WM_VSCROLL into a `wxScrollWinEvent`. A message that
+   * came from a real scrollbar *control* is re-routed to that control's own
+   * window first; otherwise the SB_* code picks the event type, and the two
+   * thumb codes re-read the true 32-bit position from the scrollbar (the
+   * 16-bit `position` argument is truncated for ranges above 0xFFFF).
+   */
   virtual bool MSWOnScroll(
     std::int32_t orientation, unsigned short command, unsigned short position, unsigned long controlHandle
-  )
-  {
-    (void)orientation;
-    (void)command;
-    (void)position;
-    (void)controlHandle;
-    return false;
-  }
+  );
   virtual bool MSWOnNotify(std::int32_t controlId, long notificationCode, long* result)
   {
     (void)controlId;
