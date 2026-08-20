@@ -73,33 +73,9 @@ namespace
     return &sColorLuaState;
   }
 
-  /**
-   * Address: 0x00506760 (FUN_00506760, ?GetColors@Moho@@YA?AVLuaObject@LuaPlus@@AAVLuaState@3@@Z)
-   *
-   * What it does:
-   * Lazily creates and loads the static `sGameColorsObj` table by executing
-   * `/lua/gameColors.lua`; throws `XDataError` when script load fails.
-   */
-  [[nodiscard]] LuaPlus::LuaObject* GetColors()
-  {
-    static LuaPlus::LuaObject sGameColorsObject;
-    static bool sLoadOnce = true;
-
-    if (sLoadOnce) {
-      LuaPlus::LuaState* const colorState = GetColorLuaState();
-      sGameColorsObject.AssignNewTable(colorState, 0, 0);
-      if (!moho::SCR_LuaDoScript(colorState, kGameColorsScriptPath, &sGameColorsObject)) {
-        throw moho::XDataError("Error reading gameColors");
-      }
-      sLoadOnce = false;
-    }
-
-    return &sGameColorsObject;
-  }
-
   [[nodiscard]] std::uint32_t ResolvePlayerColorByIndex(LuaPlus::LuaState* const state, const int colorIndex)
   {
-    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+    LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
     const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
     const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
@@ -109,7 +85,7 @@ namespace
 
   [[nodiscard]] std::uint32_t ResolveArmyColorByIndex(LuaPlus::LuaState* const state, const int colorIndex)
   {
-    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+    LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
     const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
     const LuaPlus::LuaObject armyColors = gameColors[kArmyColorsTableName];
@@ -119,7 +95,7 @@ namespace
 
   [[nodiscard]] std::uint32_t ResolveGameColorField(LuaPlus::LuaState* const state, const char* const fieldName)
   {
-    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+    LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
     const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
     const LuaPlus::LuaObject colorObject = gameColors[fieldName];
@@ -128,7 +104,7 @@ namespace
 
   [[nodiscard]] msvc8::string ResolvePlayerColorNameByIndex(LuaPlus::LuaState* const state, const int colorIndex)
   {
-    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+    LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
     const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
     const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
@@ -138,7 +114,7 @@ namespace
 
   [[nodiscard]] std::uint32_t ResolvePlayerColorCount(LuaPlus::LuaState* const state)
   {
-    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+    LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
     const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
     const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
@@ -162,6 +138,36 @@ namespace moho
   int cfunc_SetArmyColorIndexL(LuaPlus::LuaState* state);
   int cfunc_AddBuildRestrictionL(LuaPlus::LuaState* state);
   int cfunc_RemoveBuildRestrictionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00506760 (FUN_00506760, ?GetColors@Moho@@YA?AVLuaObject@LuaPlus@@AAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Lazily creates and loads the static `sGameColorsObj` table by executing
+   * `/lua/gameColors.lua`; throws `XDataError` when script load fails.
+   *
+   * Declared in `CArmyLuaFunctionRegistrations.h` (rather than kept
+   * file-private) so other TUs that need the cached game-colors table -
+   * `StrategicIconAuxView`'s constructor in `CWldSession.cpp` (0x0085B2A0)
+   * reads `GameColors.TeamColorMode` from it - reuse this one static load
+   * instead of duplicating it.
+   */
+  [[nodiscard]] LuaPlus::LuaObject* GetColors()
+  {
+    static LuaPlus::LuaObject sGameColorsObject;
+    static bool sLoadOnce = true;
+
+    if (sLoadOnce) {
+      LuaPlus::LuaState* const colorState = GetColorLuaState();
+      sGameColorsObject.AssignNewTable(colorState, 0, 0);
+      if (!moho::SCR_LuaDoScript(colorState, kGameColorsScriptPath, &sGameColorsObject)) {
+        throw moho::XDataError("Error reading gameColors");
+      }
+      sLoadOnce = false;
+    }
+
+    return &sGameColorsObject;
+  }
 
   /**
    * Address: 0x005068B0 (FUN_005068B0, ?GetPlayerColor@Moho@@YAIH@Z)
