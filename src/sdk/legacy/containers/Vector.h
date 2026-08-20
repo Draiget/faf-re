@@ -1691,6 +1691,12 @@ namespace msvc8
          * (FUN_0075F240 → `_Insert_n` core FUN_0075F4B0). Emitted via
          * sim->mPendingPoseCopies.push_back(entry) in cfunc_TryCopyPoseL
          * (Sim.cpp), whose owner lane is Moho::Sim::mPendingPoseCopies at Sim+0x9E8)
+         * Address: 0x005DBD90 (FUN_005DBD90, msvc8::vector<Moho::UnitWeapon*>::push_back
+         * for `CAiAttackerImplRuntimeView::mWeapons` — fast path appends the raw
+         * pointer in place; capacity-full path tail-calls the insert(end(),1,value)
+         * grow lane `_Insert_n` (FUN_005DD120, already cited above). Emitted via
+         * view->mWeapons.push_back(weapon) in CAiAttackerImpl::CreateWeapon
+         * (CAiAttackerImpl.cpp:973))
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
