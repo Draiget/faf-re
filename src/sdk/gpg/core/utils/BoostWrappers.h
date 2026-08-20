@@ -244,6 +244,7 @@ namespace boost
          * Address: 0x0053ACA0 (FUN_0053ACA0)
          * Address: 0x005BE250 (FUN_005BE250, Moho::WeakPtr_CIntelGrid::release)
          * Address: 0x0055FC60 (FUN_0055FC60, boost::shared_ptr_RScmResource::release)
+         * Address: 0x005CE460 (FUN_005CE460, boost::shared_ptr_CIntelGrid::release)
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
