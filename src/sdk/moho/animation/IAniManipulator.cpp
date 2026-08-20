@@ -1078,7 +1078,7 @@ namespace
    * goal-unit weak pointer, foot/knee/hip bones, straight-leg flag, and
    * foot-fall tuning floats.
    */
-  [[maybe_unused]] void DeserializeCFootPlantManipulatorState(
+  void DeserializeCFootPlantManipulatorState(
     moho::CFootPlantManipulator* const object,
     gpg::ReadArchive* const archive
   )
@@ -1106,7 +1106,7 @@ namespace
    * goal-unit weak pointer, foot/knee/hip bones, straight-leg flag, and
    * foot-fall tuning floats.
    */
-  [[maybe_unused]] void SerializeCFootPlantManipulatorState(
+  void SerializeCFootPlantManipulatorState(
     const moho::CFootPlantManipulator* const object,
     gpg::WriteArchive* const archive
   )
@@ -1153,6 +1153,61 @@ namespace
   )
   {
     SerializeCFootPlantManipulatorState(object, archive);
+  }
+
+  struct CFootPlantManipulatorSerializerHelperNode
+  {
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    sizeof(CFootPlantManipulatorSerializerHelperNode) == 0x10,
+    "CFootPlantManipulatorSerializerHelperNode size must be 0x10"
+  );
+
+  CFootPlantManipulatorSerializerHelperNode gCFootPlantManipulatorSerializer{};
+
+  void DeserializeCFootPlantManipulatorSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    DeserializeCFootPlantManipulatorState(
+      reinterpret_cast<moho::CFootPlantManipulator*>(static_cast<std::uintptr_t>(objectPtr)), archive
+    );
+  }
+
+  void SerializeCFootPlantManipulatorSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    SerializeCFootPlantManipulatorState(
+      reinterpret_cast<const moho::CFootPlantManipulator*>(static_cast<std::uintptr_t>(objectPtr)), archive
+    );
+  }
+
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCFootPlantManipulatorSerializerNode() noexcept
+  {
+    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCFootPlantManipulatorSerializer.mNext);
+    if (gCFootPlantManipulatorSerializer.mNext != nullptr && gCFootPlantManipulatorSerializer.mPrev != nullptr) {
+      gCFootPlantManipulatorSerializer.mNext->mPrev = gCFootPlantManipulatorSerializer.mPrev;
+      gCFootPlantManipulatorSerializer.mPrev->mNext = gCFootPlantManipulatorSerializer.mNext;
+    }
+    gCFootPlantManipulatorSerializer.mPrev = self;
+    gCFootPlantManipulatorSerializer.mNext = self;
+    return self;
+  }
+
+  void cleanup_CFootPlantManipulatorSerializer_atexit()
+  {
+    (void)UnlinkCFootPlantManipulatorSerializerNode();
   }
 
   /**
@@ -2410,6 +2465,21 @@ namespace moho
     gIAniManipulatorSerializer.mSerSaveFunc = &IAniManipulatorSerializer::Serialize;
     (void)std::atexit(&CleanupIAniManipulatorSerializerAtexit);
   }
+
+  /**
+   * Address: 0x00BD2A20 (FUN_00BD2A20, register_CFootPlantManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes CFootPlantManipulator serializer helper callbacks and
+   * installs exit cleanup.
+   */
+  void register_CFootPlantManipulatorSerializer()
+  {
+    (void)UnlinkCFootPlantManipulatorSerializerNode();
+    gCFootPlantManipulatorSerializer.mSerLoadFunc = &DeserializeCFootPlantManipulatorSerializerCallback;
+    gCFootPlantManipulatorSerializer.mSerSaveFunc = &SerializeCFootPlantManipulatorSerializerCallback;
+    (void)std::atexit(&cleanup_CFootPlantManipulatorSerializer_atexit);
+  }
 } // namespace moho
 
 namespace
@@ -2420,6 +2490,7 @@ namespace
     {
       (void)moho::register_IAniManipulatorTypeInfo_AtExit();
       moho::register_IAniManipulatorSerializer();
+      moho::register_CFootPlantManipulatorSerializer();
     }
   };
 
