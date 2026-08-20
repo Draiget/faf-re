@@ -4,7 +4,7 @@
 #include <typeinfo>
 
 #include "moho/unit/Broadcaster.h"
-#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -308,14 +308,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x006EEBE0 (FUN_006EEBE0, helper Init)
+   * Address: 0x006F8520 (FUN_006F8520, gpg::SerSaveLoadHelper<Moho::CUnitCommandQueue>::Init)
+   *
+   * What it does:
+   * Binds `CUnitCommandQueue` load/save callbacks onto its reflected type
+   * metadata; asserts neither slot is already claimed before installing them.
    */
   void CUnitCommandQueueSerializer::RegisterSerializeFunctions()
   {
     gpg::RType* const type = CUnitCommandQueue::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
 

@@ -254,18 +254,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8F90 (FUN_00BD8F90, register_CUnitCommandSerializer)
+   * Address: 0x006EA0E0 (FUN_006EA0E0, gpg::SerSaveLoadHelper<Moho::CUnitCommand>::Init)
    *
    * What it does:
-   * Binds `CUnitCommand` load/save callbacks into RTTI and schedules helper
-   * cleanup at process exit.
+   * Binds `CUnitCommand` load/save callbacks onto its reflected type
+   * metadata; asserts neither slot is already claimed before installing them.
    */
   void CUnitCommandSerializer::RegisterSerializeFunctions()
   {
     gpg::RType* const type = CUnitCommand::StaticGetClass();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerialize;
   }
 

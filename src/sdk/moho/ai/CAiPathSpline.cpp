@@ -2104,13 +2104,20 @@ void CPathPointSerializer::Serialize(
   SerializePathPointSerializerBody(*point, archive);
 }
 
+/**
+ * Address: 0x0062F910 (FUN_0062F910, gpg::SerSaveLoadHelper<Moho::CPathPoint>::Init)
+ *
+ * What it does:
+ * Binds `CPathPoint` load/save callbacks onto its reflected type metadata;
+ * asserts neither slot is already claimed before installing them.
+ */
 void CPathPointSerializer::RegisterSerializeFunctions()
 {
   gpg::RType* const type = ResolveCPathPointType();
   GPG_ASSERT(type != nullptr);
-  GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-  GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+  GPG_ASSERT(type->serLoadFunc_ == nullptr);
   type->serLoadFunc_ = mDeserialize;
+  GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = mSerialize;
 }
 
