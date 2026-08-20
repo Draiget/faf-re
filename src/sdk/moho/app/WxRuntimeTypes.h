@@ -5418,12 +5418,24 @@ public:
    * icon is asked for when something needs one and does not care.
    */
   [[nodiscard]] virtual wxIcon GetIcon() const;
-  virtual bool ShowFullScreen(bool show, long style)
-  {
-    (void)show;
-    (void)style;
-    return false;
-  }
+  /**
+   * Address: 0x0098C430 (FUN_0098C430)
+   * Mangled: ?ShowFullScreen@wxTopLevelWindowMSW@@UAE_N_NJ@Z
+   * Slot: +0x1F0 of ??_7wxTopLevelWindowMSW@@6B@ (VA 0x00D540F4) and of
+   * ??_7wxTopLevelWindow@@6B@ (VA 0x00D5432C)
+   *
+   * IDA signature:
+   * char __thiscall wxTopLevelWindowMSW::ShowFullScreen(
+   *     wxTopLevelWindowMSW *this@<ecx>, bool show, int style);
+   *
+   * What it does:
+   * Going full-screen: remembers the current window style, rect and maximised
+   * state, strips the border/caption bits the `style` mask asks for, resizes
+   * the window to the whole desktop and sends a size event. Coming back:
+   * restores the maximised state, the saved style and the saved rect. Returns
+   * false when already in the requested state.
+   */
+  virtual bool ShowFullScreen(bool show, long style);
 
   /**
    * Address: 0x0098C250 (FUN_0098C250, wxTopLevelWindowMSW::DoShowWindow)

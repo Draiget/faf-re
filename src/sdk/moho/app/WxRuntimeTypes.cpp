@@ -11106,7 +11106,16 @@ namespace
     std::int32_t fsOldY = 0;
     std::int32_t fsOldWidth = 0;
     std::int32_t fsOldHeight = 0;
-    std::uint8_t flag34 = 0;
+    // wxTopLevelWindowMSW::m_fsIsShowing, the object's +0x14D byte
+    // (0x0098C486 sets it, 0x0098C5CD clears it).
+    std::uint8_t fsIsShowing = 0;
+    // m_fsStyle @ +0x134 (0x0098C48D), m_fsOldWindowStyle @ +0x148
+    // (0x0098C499) and m_fsIsMaximized @ +0x14C (0x0098C4E0): the three
+    // full-screen lanes ShowFullScreen saves on the way in and replays on the
+    // way out. fsOldX/Y/Width/Height above are m_fsOldSize @ +0x138..+0x144.
+    long fsStyle = 0;
+    long fsOldWindowStyle = 0;
+    std::uint8_t fsIsMaximized = 0;
     // wxTopLevelWindowMSW::m_icons, which the binary keeps on the object at
     // +0x124 (wxTopLevelWindowMSW::GetIcon, 0x0098BFA0, reads it there).
     wxIconBundle icons{};
@@ -31363,6 +31372,118 @@ bool wxTopLevelWindowRuntime::DoShowWindow(
  * the visible bit at window+0xCC - and otherwise remembers the request so the
  * next `Show(true)` can raise it maximised instead.
  */
+/**
+ * Address: 0x0098C430 (FUN_0098C430)
+ * Mangled: ?ShowFullScreen@wxTopLevelWindowMSW@@UAE_N_NJ@Z
+ *
+ * IDA signature:
+ * char __thiscall wxTopLevelWindowMSW::ShowFullScreen(
+ *     wxTopLevelWindowMSW *this@<ecx>, bool show, int style);
+ *
+ * What it does:
+ * Toggles the frame between windowed and full-screen, saving on the way in
+ * exactly what it replays on the way out.
+ *
+ * Field evidence, all from this function's own `.asm` (`esi` holds `this`):
+ *   0x0098C479 `mov eax, [esi+108h]`        - `m_hWnd`
+ *   0x0098C486 `mov byte ptr [esi+14Dh], 1` - `m_fsIsShowing` (cleared at
+ *                                             0x0098C5CD)
+ *   0x0098C48D `mov [esi+134h], ebx`        - `m_fsStyle`, the `style` argument
+ *   0x0098C499 `mov [esi+148h], eax`        - `m_fsOldWindowStyle`
+ *   0x0098C4AD..0x0098C4CA                  - `m_fsOldSize` x/y/width/height
+ *                                             at +0x138/+0x13C/+0x140/+0x144
+ *   0x0098C4E0 `mov [esi+14Ch], al`         - `m_fsIsMaximized`
+ *   0x0098C563 `mov eax, [esi+28h]`         - `m_windowId`
+ *   0x0098C581 `mov ecx, [esi+5Ch]`         - `m_eventHandler`
+ * Style masks, read as immediates rather than trusting IDA (which resolved
+ * both to unrelated symbol names):
+ *   0x0098C4ED `mov eax, 840000h` under `test bl, 8`   - WS_BORDER|WS_THICKFRAME
+ *                                                        for wxFULLSCREEN_NOBORDER
+ *   0x0098C4F7 `or eax, 0C80000h` under `test bl, 10h` - WS_CAPTION|WS_SYSMENU
+ *                                                        for wxFULLSCREEN_NOCAPTION
+ *   0x0098C4FC `not eax` / 0x0098C4FE `and ecx, eax`   - old style minus those
+ * `-16` at 0x0098C507/0x0098C5E3 is GWL_STYLE and `20h` at 0x0098C54C /
+ * 0x0098C5FE is SWP_FRAMECHANGED.
+ */
+bool wxTopLevelWindowRuntime::ShowFullScreen(const bool show, const long style)
+{
+  // WS_* bits the two full-screen style flags strip. Spelled out rather than
+  // pulled from <windows.h> constants so the pairing with the immediates above
+  // stays checkable.
+  constexpr long kFullScreenNoBorderBits = 0x00840000L; // WS_BORDER | WS_THICKFRAME
+  constexpr long kFullScreenNoCaptionBits = 0x00C80000L; // WS_CAPTION | WS_SYSMENU
+  constexpr long kFullScreenNoBorder = 0x0008L;
+  constexpr long kFullScreenNoCaption = 0x0010L;
+
+  if (show) {
+    if (IsFullScreen()) {
+      return false;
+    }
+
+    WxTopLevelWindowRuntimeState& state = EnsureWxTopLevelWindowRuntimeState(this);
+    const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+
+    state.fsIsShowing = 1u;
+    state.fsStyle = style;
+    state.fsOldWindowStyle = ::GetWindowLongW(windowHandle, GWL_STYLE);
+
+    WxWindowRectRuntimeView savedRect{};
+    (void)wxWindowQueryRectRuntime(this, &savedRect);
+    state.fsOldX = savedRect.x;
+    state.fsOldY = savedRect.y;
+    state.fsOldWidth = savedRect.width;
+    state.fsOldHeight = savedRect.height;
+
+    state.fsIsMaximized = IsMaximized() ? 1u : 0u;
+
+    long strippedBits = 0;
+    if ((style & kFullScreenNoBorder) != 0) {
+      strippedBits = kFullScreenNoBorderBits;
+    }
+    if ((style & kFullScreenNoCaption) != 0) {
+      strippedBits |= kFullScreenNoCaptionBits;
+    }
+    (void)::SetWindowLongW(windowHandle, GWL_STYLE, state.fsOldWindowStyle & ~strippedBits);
+
+    RECT desktopRect{};
+    (void)::GetWindowRect(::GetDesktopWindow(), &desktopRect);
+    const std::int32_t desktopWidth = desktopRect.right - desktopRect.left;
+    const std::int32_t desktopHeight = desktopRect.bottom - desktopRect.top;
+
+    DoSetSize(-1, -1, desktopWidth, desktopHeight, 0);
+    (void)::SetWindowPos(windowHandle, nullptr, 0, 0, desktopWidth, desktopHeight, SWP_FRAMECHANGED);
+
+    WxSizeEventFactoryRuntime sizeEvent;
+    // 0x0098C563 `mov eax, [esi+28h]` - wxWindowBase::m_windowId, which this
+    // tree keeps in the side state rather than on the (thin) window object.
+    sizeEvent.mEventId = EnsureWxWindowBaseRuntimeState(this).windowId;
+    sizeEvent.mSizeX = desktopWidth;
+    sizeEvent.mSizeY = desktopHeight;
+    (void)GetEventHandler()->ProcessEvent(&sizeEvent);
+    return true;
+  }
+
+  if (!IsFullScreen()) {
+    return false;
+  }
+
+  WxTopLevelWindowRuntimeState& state = EnsureWxTopLevelWindowRuntimeState(this);
+  const HWND windowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+
+  // The binary reads m_fsIsMaximized and clears m_fsIsShowing before the
+  // Maximize dispatch (0x0098C5BB / 0x0098C5CD), so a Maximize override that
+  // asks IsFullScreen() already sees the windowed state.
+  const bool restoreMaximized = state.fsIsMaximized != 0u;
+  state.fsIsShowing = 0u;
+  Maximize(restoreMaximized);
+
+  (void)::SetWindowLongW(windowHandle, GWL_STYLE, state.fsOldWindowStyle);
+  (void)::SetWindowPos(
+    windowHandle, nullptr, state.fsOldX, state.fsOldY, state.fsOldWidth, state.fsOldHeight, SWP_FRAMECHANGED
+  );
+  return true;
+}
+
 void wxTopLevelWindowRuntime::Maximize(
   const bool maximize
 )
@@ -31619,7 +31740,7 @@ BOOL wxDestroyTopLevelWindowParentRuntime()
  */
 void wxTopLevelWindowRuntime::ResetTopLevelFlag34() noexcept
 {
-  EnsureWxTopLevelWindowRuntimeState(this).flag34 = 0;
+  EnsureWxTopLevelWindowRuntimeState(this).fsIsShowing = 0;
 }
 
 /**
@@ -32577,7 +32698,7 @@ bool wxTopLevelWindowRuntime::IsOneOfBars(
 bool wxTopLevelWindowRuntime::IsFullScreen() const
 {
   const WxTopLevelWindowRuntimeState* const state = FindWxTopLevelWindowRuntimeState(this);
-  return state != nullptr && state->flag34 != 0;
+  return state != nullptr && state->fsIsShowing != 0;
 }
 
 wxTopLevelWindowRuntime* wxDestroyTopLevelWindowMswWithoutDeleteRuntime(

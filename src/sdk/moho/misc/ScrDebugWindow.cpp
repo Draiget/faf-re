@@ -1127,6 +1127,16 @@ bool moho::ScrDebugWindow::OpenMountedSourcePathAndTrackRecent(const msvc8::stri
   return true;
 }
 
+/**
+ * Address: 0x0096AFC0 (FUN_0096AFC0, wxCharCodeWXToMSW)
+ *
+ * Defined at global scope in `moho/ui/UiRuntimeTypes.cpp`. Declared here
+ * rather than pulled in by header because that header is `WxRuntimeTypes.h`,
+ * which this translation unit is barred from including (see the bridge note
+ * below). `ConstructWxAcceleratorTable` is the only user here.
+ */
+int wxCharCodeWXToMSW(int keyCode, bool* isSpecial);
+
 namespace
 {
   // ===========================================================================
@@ -1281,11 +1291,164 @@ namespace
     const wxStringRuntime* name
   );
 
-  /** Address: 0x00974B60 (sub_974B60, wxAcceleratorTable::wxAcceleratorTable(int, const wxAcceleratorEntry*)) */
-  void* ConstructWxAcceleratorTable(void* storage, std::int32_t entryCount, const void* entries);
+  // ---------------------------------------------------------------------
+  // The accelerator-table pair below is NOT a forwarding bridge like the rest
+  // of this block: both bodies are recovered outright, because both are small,
+  // fully self-contained, and were previously declared here without ever being
+  // defined anywhere in `src/sdk` - the link only tolerated that because
+  // `main.vcxproj` sets `ForceFileOutput` (`/FORCE`), which turns an
+  // unresolved external into a silent warning.
+  //
+  // `wxAcceleratorTable` is two words (vtable @+0x00, `m_refData` @+0x04) and
+  // its ref-data is the 0x10 bytes `operator new(0x10u)` asks for at
+  // 0x00974B7B, laid out by `wxAcceleratorRefData::wxAcceleratorRefData`
+  // (0x00974A40): vtable @+0x00, `m_count` @+0x04 seeded to 1, the `HACCEL`
+  // @+0x08 and an `m_ok` byte @+0x0C. Neither vtable pointer is reproduced -
+  // this translation unit cannot name the real `wxObject`/`wxAcceleratorTable`
+  // vtables without the wx headers it is barred from including - so the two
+  // slots are left null and documented rather than faked.
+  // ---------------------------------------------------------------------
 
-  /** Address: 0x00974AB0 (sub_974AB0, wxObject::UnRef via ~wxObject on a stack-scoped accelerator-table clone) */
-  void UnrefWxObject(void* object);
+  /// `wxAcceleratorRefData`, the 0x10-byte block behind one accelerator table.
+  struct WxAcceleratorRefDataRuntimeView
+  {
+    void* mVftable = nullptr;   // +0x00 (??_7wxAcceleratorRefData@@6B@)
+    std::int32_t mCount = 1;    // +0x04 (0x00974A43 seeds it to 1)
+    HACCEL mAcceleratorTable{}; // +0x08 (0x00974C0E)
+    std::uint8_t mIsOk = 0;     // +0x0C (0x00974C22)
+    std::uint8_t mPad0D[3]{};   // +0x0D
+  };
+  static_assert(sizeof(WxAcceleratorRefDataRuntimeView) == 0x10, "wxAcceleratorRefData size must be 0x10");
+
+  /// `wxAcceleratorTable` itself: `wxObject`'s vtable plus `m_refData`.
+  struct WxAcceleratorTableRuntimeView
+  {
+    void* mVftable = nullptr;                          // +0x00
+    WxAcceleratorRefDataRuntimeView* mRefData = nullptr; // +0x04
+  };
+  static_assert(sizeof(WxAcceleratorTableRuntimeView) == 0x08, "wxAcceleratorTable size must be 0x08");
+
+  /// One entry of the caller's `wxAcceleratorEntry` array: 16 bytes, which is
+  /// the stride 0x00974BE1 (`v10 += 8` over `WORD*`) walks.
+  struct WxAcceleratorEntryRuntimeView
+  {
+    std::int32_t mFlags = 0;     // +0x00 read at 0x00974BA6
+    std::int32_t mKeyCode = 0;   // +0x04 read at 0x00974BC1
+    std::int32_t mCommandId = 0; // +0x08 read at 0x00974BDB
+    void* mMenuItem = nullptr;   // +0x0C
+  };
+  static_assert(sizeof(WxAcceleratorEntryRuntimeView) == 0x10, "wxAcceleratorEntry stride must be 0x10");
+
+  /**
+   * Address: 0x00974B60 (FUN_00974B60,
+   * ??0wxAcceleratorTable@@QAE@HPBVwxAcceleratorEntry@@@Z)
+   *
+   * IDA signature:
+   * _DWORD *__thiscall sub_974B60(_DWORD *this@<ecx>, int cAccel, int entries);
+   *
+   * What it does:
+   * Translates one `wxAcceleratorEntry` array into the Win32 `ACCEL` array
+   * `CreateAcceleratorTableW` wants, publishes the resulting `HACCEL` in a
+   * freshly allocated ref-data block, and records whether the call succeeded.
+   *
+   * Flag mapping, read as immediates from this function's own `.asm` (all
+   * three set FVIRTKEY alongside their modifier, which is why the constants
+   * are 0x11/0x05/0x09 rather than 0x10/0x04/0x08):
+   *   0x00974BAB `mov bl, 11h` under `test al, 1`  - wxACCEL_ALT   -> FALT|FVIRTKEY
+   *   0x00974BB5 `or bl, 5`    under `test al, 4`  - wxACCEL_SHIFT -> FSHIFT|FVIRTKEY
+   *   0x00974BBC `or bl, 9`    under `test al, 2`  - wxACCEL_CTRL  -> FCONTROL|FVIRTKEY
+   * `wxCharCodeWXToMSW`'s out-parameter adds FVIRTKEY on its own at 0x00974BD1
+   * for keys it classifies as virtual. The `ACCEL` array is 6 bytes per entry
+   * (`operator new(6 * cAccel)` at 0x00974B92, `p_cmd += 3` over `WORD*`) and
+   * is freed immediately after the table is built (0x00974C15).
+   */
+  void* ConstructWxAcceleratorTable(void* const storage, const std::int32_t entryCount, const void* const entries)
+  {
+    auto* const table = static_cast<WxAcceleratorTableRuntimeView*>(storage);
+    table->mRefData = nullptr;
+    table->mVftable = nullptr; // ??_7wxAcceleratorTable@@6B@ - see the note above.
+
+    auto* const refData =
+      static_cast<WxAcceleratorRefDataRuntimeView*>(::operator new(sizeof(WxAcceleratorRefDataRuntimeView), std::nothrow));
+    if (refData != nullptr) {
+      // wxAcceleratorRefData::wxAcceleratorRefData (0x00974A40).
+      refData->mVftable = nullptr; // ??_7wxAcceleratorRefData@@6B@
+      refData->mCount = 1;
+      refData->mAcceleratorTable = nullptr;
+      refData->mIsOk = 0;
+    }
+    table->mRefData = refData;
+
+    const auto* const entryArray = static_cast<const WxAcceleratorEntryRuntimeView*>(entries);
+    std::vector<ACCEL> nativeEntries(static_cast<std::size_t>(entryCount < 0 ? 0 : entryCount));
+    for (std::int32_t index = 0; index < entryCount; ++index) {
+      const WxAcceleratorEntryRuntimeView& entry = entryArray[index];
+
+      BYTE virtualFlags = 0;
+      if ((entry.mFlags & 0x1) != 0) { // wxACCEL_ALT
+        virtualFlags = FALT | FVIRTKEY;
+      }
+      if ((entry.mFlags & 0x4) != 0) { // wxACCEL_SHIFT
+        virtualFlags |= FSHIFT | FVIRTKEY;
+      }
+      if ((entry.mFlags & 0x2) != 0) { // wxACCEL_CTRL
+        virtualFlags |= FCONTROL | FVIRTKEY;
+      }
+
+      bool isVirtualKey = false;
+      const int mswKeyCode = wxCharCodeWXToMSW(entry.mKeyCode, &isVirtualKey);
+      if (isVirtualKey) {
+        virtualFlags |= FVIRTKEY;
+      }
+
+      ACCEL& nativeEntry = nativeEntries[static_cast<std::size_t>(index)];
+      nativeEntry.fVirt = virtualFlags;
+      nativeEntry.key = static_cast<WORD>(mswKeyCode);
+      nativeEntry.cmd = static_cast<WORD>(entry.mCommandId);
+    }
+
+    if (refData != nullptr) {
+      refData->mAcceleratorTable =
+        ::CreateAcceleratorTableW(nativeEntries.empty() ? nullptr : nativeEntries.data(), entryCount);
+      refData->mIsOk = (refData->mAcceleratorTable != nullptr) ? 1u : 0u;
+    }
+
+    return table;
+  }
+
+  /**
+   * Address: 0x00974AB0 (FUN_00974AB0)
+   *
+   * IDA signature:
+   * void __thiscall sub_974AB0(wxObject *this@<ecx>);
+   *
+   * What it does:
+   * `~wxAcceleratorTable`: restores the plain `wxObject` vtable (0x00974AB0)
+   * and drops one reference on the ref-data (0x00974AB9 tail-calls
+   * `wxObject::UnRef`, 0x00977F40). The last reference destroys the block, and
+   * with it the `HACCEL` the constructor above created - which is why the
+   * frame is given the table before this runs.
+   */
+  void UnrefWxObject(void* const object)
+  {
+    auto* const table = static_cast<WxAcceleratorTableRuntimeView*>(object);
+    table->mVftable = nullptr; // ??_7wxObject@@6B@ - see the note above.
+
+    WxAcceleratorRefDataRuntimeView* const refData = table->mRefData;
+    if (refData == nullptr) {
+      return;
+    }
+
+    table->mRefData = nullptr;
+    if (--refData->mCount != 0) {
+      return;
+    }
+
+    if (refData->mAcceleratorTable != nullptr) {
+      (void)::DestroyAcceleratorTable(refData->mAcceleratorTable);
+    }
+    ::operator delete(refData);
+  }
 
   /**
    * Address: 0x0097AC50 (FUN_0097AC50, wxEvtHandler::Connect)
