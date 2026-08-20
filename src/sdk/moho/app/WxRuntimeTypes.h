@@ -2603,6 +2603,28 @@ public:
   virtual bool ContainsHWND(unsigned long nativeHandle) const;
 
   /**
+   * Address: 0x00967A90 (FUN_00967A90)
+   * Mangled: ?GetScrollPos@wxWindow@@UBEHH@Z
+   * Slot: overrides `wxWindowBase::GetScrollPos`'s slot (the `return 0;`
+   * placeholder above) - confirmed `VTABLE_CONFIRMED` with 28 named vtables
+   * genuinely constructed in this binary (`wxWindow`, `wxRadioButton`,
+   * `wxTextCtrl`, `wxCheckBox`, `wxChoice`, `wxTopLevelWindowMSW`, `wxDialog`,
+   * `wxControl`, `wxSplitterWindow`, `wxListCtrl`, `wxListView`, `wxFrame`,
+   * `wxTreeCtrl`, `wxGenericDirCtrl` and more), i.e. this is the real
+   * implementation behind every scroll-position query this engine's UI ever
+   * makes.
+   *
+   * IDA signature:
+   * int __thiscall wxWindow::GetScrollPos(wxWindow *this, int orientation);
+   *
+   * What it does:
+   * Reads the native scrollbar position via `::GetScrollPos`, picking
+   * `SB_HORZ`/`SB_VERT` from whether `orientation` is `wxHORIZONTAL` (4).
+   * Returns 0 when there is no native handle yet.
+   */
+  [[nodiscard]] std::int32_t GetScrollPos(std::int32_t orientation) const override;
+
+  /**
    * Address: 0x0042B840 (FUN_0042B840)
    * Mangled: ?GetClassInfo@wxWindow@@UBEPAVwxClassInfo@@XZ
    *
@@ -5485,6 +5507,47 @@ public:
    * Returns one cached fullscreen-visible flag.
    */
   [[nodiscard]] bool IsFullScreen() const;
+
+  /**
+   * Address: 0x0098CF40 (FUN_0098CF40)
+   * Mangled: ?DoScreenToClient@wxTopLevelWindowBase@@MBEXPAH0@Z
+   * Slot: overrides `wxWindowMswRuntime::DoScreenToClient`'s slot (+0x50, the
+   * same slot `GetClientAreaOrigin` sits at is read through `[eax+50h]`
+   * inside this function's own body at 0x0098CF59 - confirmed
+   * `VTABLE_CONFIRMED` with all 9 named vtables that carry this override
+   * (`wxTopLevelWindowMSW`, `wxTopLevelWindow`, `wxDialog`,
+   * `wxTopLevelWindowBase`, `wxFrame`, `wxFrameBase`, `Moho::ScrDebugWindow`,
+   * `Moho::WEmitterWx`, `WSupComFrame`) genuinely constructed in this binary.
+   *
+   * IDA signature:
+   * void __thiscall wxTopLevelWindowBase::DoScreenToClient(
+   *     wxTopLevelWindowBase *this, int *x, int *y);
+   *
+   * What it does:
+   * Converts screen coordinates to client coordinates like the base `wxWindow`
+   * implementation, then also subtracts the client-area origin - the extra
+   * step top-level windows need because their client area starts below the
+   * caption/menu furniture.
+   */
+  void DoScreenToClient(std::int32_t* x, std::int32_t* y) const override;
+
+  /**
+   * Address: 0x0098CF90 (FUN_0098CF90)
+   * Mangled: ?DoClientToScreen@wxTopLevelWindowBase@@MBEXPAH0@Z
+   * Slot: overrides `wxWindowMswRuntime::DoClientToScreen`'s slot; same 9
+   * `VTABLE_CONFIRMED` vtables as `DoScreenToClient` above (both are read
+   * through the same `GetClientAreaOrigin` vtable dispatch at 0x0098CF98).
+   *
+   * IDA signature:
+   * void __thiscall wxTopLevelWindowBase::DoClientToScreen(
+   *     wxTopLevelWindowBase *this, int *x, int *y);
+   *
+   * What it does:
+   * The inverse of `DoScreenToClient` above: adds the client-area origin
+   * first, then converts to screen coordinates like the base `wxWindow`
+   * implementation.
+   */
+  void DoClientToScreen(std::int32_t* x, std::int32_t* y) const override;
 
   /**
    * Address: 0x004A3700 (FUN_004A3700)

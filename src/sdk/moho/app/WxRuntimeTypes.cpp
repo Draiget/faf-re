@@ -32974,6 +32974,50 @@ bool wxTopLevelWindowRuntime::IsFullScreen() const
   return state != nullptr && state->fsIsShowing != 0;
 }
 
+/**
+ * Address: 0x0098CF40 (FUN_0098CF40, wxTopLevelWindowBase::DoScreenToClient)
+ *
+ * What it does:
+ * See the declaration's own doc comment.
+ */
+void wxTopLevelWindowRuntime::DoScreenToClient(
+  std::int32_t* const x,
+  std::int32_t* const y
+) const
+{
+  wxWindowMswRuntime::DoScreenToClient(x, y);
+
+  const wxPoint origin = GetClientAreaOrigin();
+  if (x != nullptr) {
+    *x -= origin.x;
+  }
+  if (y != nullptr) {
+    *y -= origin.y;
+  }
+}
+
+/**
+ * Address: 0x0098CF90 (FUN_0098CF90, wxTopLevelWindowBase::DoClientToScreen)
+ *
+ * What it does:
+ * See the declaration's own doc comment.
+ */
+void wxTopLevelWindowRuntime::DoClientToScreen(
+  std::int32_t* const x,
+  std::int32_t* const y
+) const
+{
+  const wxPoint origin = GetClientAreaOrigin();
+  if (x != nullptr) {
+    *x += origin.x;
+  }
+  if (y != nullptr) {
+    *y += origin.y;
+  }
+
+  wxWindowMswRuntime::DoClientToScreen(x, y);
+}
+
 wxTopLevelWindowRuntime* wxDestroyTopLevelWindowMswWithoutDeleteRuntime(
   wxTopLevelWindowRuntime* topLevelWindow
 ) noexcept;
@@ -35259,6 +35303,24 @@ void wxWindowMswRuntime::SetScrollPos(
   info.nPos = position;
 
   SetScrollInfo(hwnd, direction, &info, refresh);
+}
+
+/**
+ * Address: 0x00967A90 (FUN_00967A90, wxWindow::GetScrollPos)
+ *
+ * What it does:
+ * See the declaration's own doc comment.
+ */
+std::int32_t wxWindowMswRuntime::GetScrollPos(const std::int32_t orientation) const
+{
+  const HWND hwnd = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+  if (hwnd == nullptr) {
+    return 0;
+  }
+
+  // wx's wxHORIZONTAL == 4; anything else (wxVERTICAL == 8) is treated as vertical.
+  const int direction = (orientation == 4) ? SB_HORZ : SB_VERT;
+  return ::GetScrollPos(hwnd, direction);
 }
 
 /**
