@@ -214,7 +214,7 @@ namespace
    * Clones one 0x20-byte legacy callback payload lane to heap storage and
    * returns the callback adapter lane after running the source cleanup path.
    */
-  [[maybe_unused]] LegacyCallbackLifecycleAdapter CloneLegacyCallbackPayloadLaneToHeap(
+  LegacyCallbackLifecycleAdapter CloneLegacyCallbackPayloadLaneToHeap(
     LegacyCallbackPayloadLane* const sourceLane,
     LegacyCallbackPayloadLane** const destinationHeapLane
   )

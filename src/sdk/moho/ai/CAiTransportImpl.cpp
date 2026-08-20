@@ -1032,7 +1032,7 @@ namespace
    * indices, links the weak-unit lane, copies one reserved-bone vector payload,
    * and returns the destination entry pointer.
    */
-  [[maybe_unused]] SAiReservedTransportBone* InitReservedTransportBoneEntry(
+  SAiReservedTransportBone* InitReservedTransportBoneEntry(
     const unsigned int transportBoneIndex,
     const unsigned int attachBoneIndex,
     SAiReservedTransportBone* const destination,
