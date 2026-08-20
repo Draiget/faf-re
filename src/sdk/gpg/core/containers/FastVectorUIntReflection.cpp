@@ -685,14 +685,10 @@ namespace
   // callbacks that used it now live in FastVectorEntIdReflection.cpp, next to
   // the class they serve.
 
-  [[nodiscard]] gpg::RType* CachedSOCellPosType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SOCellPos));
-    }
-    return cached;
-  }
+  // NOTE: CachedSOCellPosType() (the `Moho::SOCellPos::sType` cache) and the
+  // `RFastVectorType<Moho::SOCellPos>` SerLoad/SerSave callbacks that used it
+  // now live in FastVectorSOCellPosReflection.cpp, next to the class they
+  // serve.
 
   [[nodiscard]] gpg::RType* CachedSSTIEntityAttachInfoType()
   {
@@ -704,8 +700,6 @@ namespace
     return type;
   }
 
-  msvc8::string gFastVectorSOCellPosTypeName;
-  bool gFastVectorSOCellPosTypeNameCleanupRegistered = false;
   msvc8::string gFastVectorSSTIEntityAttachInfoTypeName;
   bool gFastVectorSSTIEntityAttachInfoTypeNameCleanupRegistered = false;
   msvc8::string gFastVectorUnitWeaponInfoTypeName;
@@ -714,12 +708,6 @@ namespace
   bool gFastVectorSOffsetInfoTypeNameCleanupRegistered = false;
   msvc8::string gFastVectorSAssignedLocInfoTypeName;
   bool gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = false;
-
-  void cleanup_FastVectorSOCellPosTypeName()
-  {
-    gFastVectorSOCellPosTypeName = msvc8::string{};
-    gFastVectorSOCellPosTypeNameCleanupRegistered = false;
-  }
 
   void cleanup_FastVectorSSTIEntityAttachInfoTypeName()
   {
@@ -785,26 +773,6 @@ namespace
       }
     }
     return cached;
-  }
-
-  /**
-   * Address: 0x00553050 (FUN_00553050, gpg::RFastVectorType_SOCellPos::GetName)
-   *
-   * What it does:
-   * Lazily builds and caches the reflected `fastvector<SOCellPos>` type name.
-   */
-  [[maybe_unused]] const char* GetFastVectorSOCellPosTypeName()
-  {
-    if (gFastVectorSOCellPosTypeName.empty()) {
-      gpg::RType* const elementType = CachedSOCellPosType();
-      const char* const elementName = elementType ? elementType->GetName() : "SOCellPos";
-      gFastVectorSOCellPosTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SOCellPos");
-      if (!gFastVectorSOCellPosTypeNameCleanupRegistered) {
-        gFastVectorSOCellPosTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorSOCellPosTypeName);
-      }
-    }
-    return gFastVectorSOCellPosTypeName.c_str();
   }
 
   /**
@@ -962,12 +930,6 @@ namespace
     gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
   }
 
-  void FastVectorSOCellPosResize(const moho::SOCellPos* fillValue, const unsigned int newSize, void* objectStorage)
-  {
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
-  }
-
   /**
    * Address: 0x00558EC0 (FUN_00558EC0, gpg::fastvector_n1_SSTIEntityAttachInfo::resize_fill)
    *
@@ -1013,37 +975,6 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(vector3Type, view.ElementAtUnchecked(i), owner);
-    }
-  }
-
-  /**
-   * Address: 0x005536A0 (FUN_005536A0, gpg::RFastVectorType_SOCellPos::SerLoad)
-   *
-   * What it does:
-   * Reads count for one reflected `fastvector<moho::SOCellPos>`, resizes with
-   * invalid-cell sentinel fill (`-32768,-32768`), then deserializes each lane
-   * through `ReadArchive::Read`.
-   */
-  [[maybe_unused]] void LoadFastVectorSOCellPos(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-
-    constexpr moho::SOCellPos fill{-32768, -32768};
-    FastVectorSOCellPosResize(&fill, count, storage);
-
-    gpg::RType* const soCellPosType = CachedSOCellPosType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(storage);
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(soCellPosType, view.ElementAtUnchecked(i), owner);
     }
   }
 
@@ -1112,33 +1043,6 @@ namespace
   }
 
   /**
-   * Address: 0x00553720 (FUN_00553720, gpg::RFastVectorType_SOCellPos::SerSave)
-   *
-   * What it does:
-   * Writes one reflected `fastvector<moho::SOCellPos>` payload as archive
-   * count plus per-lane reflected `SOCellPos` serialization.
-   */
-  [[maybe_unused]] void SaveFastVectorSOCellPos(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
-    archive->WriteUInt(count);
-
-    gpg::RType* const soCellPosType = CachedSOCellPosType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(soCellPosType, view.ElementAtUnchecked(i), owner);
-    }
-  }
-
-  /**
    * Address: 0x00559000 (FUN_00559000, gpg::RFastVectorType_SSTIEntityAttachInfo::SerSave)
    *
    * What it does:
@@ -1200,6 +1104,19 @@ void gpg::register_RFastVectorType_uint()
 void gpg::FastVectorUIntResize(const unsigned int* fillValue, const unsigned int newSize, void* objectStorage)
 {
   auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(objectStorage);
+  gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+}
+
+/**
+ * Address: 0x005532F0 (FUN_005532F0)
+ *
+ * What it does:
+ * Resizes reflected `moho::SOCellPos` fastvector storage and fills newly
+ * appended lanes with `*fillValue`.
+ */
+void gpg::FastVectorSOCellPosResize(const moho::SOCellPos* fillValue, const unsigned int newSize, void* objectStorage)
+{
+  auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(objectStorage);
   gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
 }
 
