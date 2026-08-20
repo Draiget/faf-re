@@ -21,7 +21,16 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00545AE0 (FUN_00545AE0, Moho::EResourceTypeTypeInfo::dtr)
+     * Address: 0x00545A50 (FUN_00545A50, Moho::EResourceTypeTypeInfo::EResourceTypeTypeInfo)
+     *
+     * What it does:
+     * Preregisters this type descriptor under `typeid(EResourceType)` so
+     * `gpg::LookupRType` can find it later.
+     */
+    EResourceTypeTypeInfo();
+
+    /**
+     * Address: 0x00BF4190 (FUN_00BF4190, Moho::EResourceTypeTypeInfo::~EResourceTypeTypeInfo)
      */
     ~EResourceTypeTypeInfo() override;
 
@@ -93,4 +102,13 @@ namespace moho
   static_assert(sizeof(EResourceTypePrimitiveSerializer) == 0x14, "EResourceTypePrimitiveSerializer size must be 0x14");
 
   static_assert(sizeof(EResourceTypeTypeInfo) == 0x78, "EResourceTypeTypeInfo size must be 0x78");
+
+  /**
+   * Address: 0x00BC95F0 (FUN_00BC95F0, register_EResourceTypeTypeInfo)
+   *
+   * What it does:
+   * Constructs the global `EResourceTypeTypeInfo` descriptor and schedules
+   * its teardown at process exit.
+   */
+  void register_EResourceTypeTypeInfo();
 } // namespace moho
