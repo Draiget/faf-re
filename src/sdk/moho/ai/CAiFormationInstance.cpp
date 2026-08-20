@@ -3354,31 +3354,6 @@ namespace
     }
   }
 
-  [[nodiscard]] bool CanPlaceFormationSlot(
-    const moho::CAiFormationInstance& formation,
-    const moho::SCoordsVec2& position,
-    const moho::SFootprint& footprint,
-    const std::int32_t footprintSize,
-    const bool useWholeMap,
-    const std::int32_t laneToken
-  )
-  {
-    if (formation.mSim == nullptr || formation.mSim->mOGrid == nullptr || formation.mSim->mMapData == nullptr) {
-      return false;
-    }
-
-    if (footprint.FitsAt(position, *formation.mSim->mOGrid) != static_cast<moho::EOccupancyCaps>(0u)) {
-      return false;
-    }
-
-    const Wm3::Vec3f worldPos{position.x, 0.0f, position.z};
-    if (!formation.mSim->mMapData->IsWithin(worldPos, static_cast<float>(footprintSize), useWholeMap)) {
-      return false;
-    }
-
-    return formation.Func27(position, footprintSize, laneToken);
-  }
-
   /**
    * Address: 0x007212B0 (FUN_007212B0, func_UnitCanMoveAt)
    *
@@ -3386,7 +3361,7 @@ namespace
    * Converts one world-space slot position to footprint-anchored grid cell
    * coordinates and asks `COORDS_CanMoveAt` whether the unit can occupy it.
    */
-  [[maybe_unused]] bool UnitCanMoveAtFormationSlot(
+  [[nodiscard]] bool UnitCanMoveAtFormationSlot(
     moho::Unit* const unit,
     const moho::SCoordsVec2& position,
     moho::COGrid* const grid
@@ -3397,6 +3372,39 @@ namespace
     // __ftol, so this rounds to nearest rather than truncating.
     moho::SOCellPos cell = footprint.ToCellPos(Wm3::Vec3f{position.x, 0.0f, position.z});
     return moho::COORDS_CanMoveAt(&cell, grid, unit, false, nullptr);
+  }
+
+  [[nodiscard]] bool CanPlaceFormationSlot(
+    const moho::CAiFormationInstance& formation,
+    const moho::SCoordsVec2& position,
+    const moho::SFootprint& footprint,
+    const std::int32_t footprintSize,
+    const bool useWholeMap,
+    const std::int32_t laneToken,
+    moho::Unit* const unit
+  )
+  {
+    if (formation.mSim == nullptr || formation.mSim->mOGrid == nullptr || formation.mSim->mMapData == nullptr) {
+      return false;
+    }
+
+    if (footprint.FitsAt(position, *formation.mSim->mOGrid) != static_cast<moho::EOccupancyCaps>(0u)) {
+      return false;
+    }
+
+    // 0x0059AAC8/0x0059AC22 (both FindSlotFor call sites): the binary checks
+    // func_UnitCanMoveAt right after FitsAt and before IsWithin - this was
+    // elided from the earlier lift of this helper.
+    if (!UnitCanMoveAtFormationSlot(unit, position, formation.mSim->mOGrid)) {
+      return false;
+    }
+
+    const Wm3::Vec3f worldPos{position.x, 0.0f, position.z};
+    if (!formation.mSim->mMapData->IsWithin(worldPos, static_cast<float>(footprintSize), useWholeMap)) {
+      return false;
+    }
+
+    return formation.Func27(position, footprintSize, laneToken);
   }
 } // namespace
 
@@ -5044,7 +5052,7 @@ namespace moho
       mOccupiedSlots.push_back(slot);
     };
 
-    if (CanPlaceFormationSlot(*this, *pos, footprint, footprintSize, useWholeMap, laneToken)) {
+    if (CanPlaceFormationSlot(*this, *pos, footprint, footprintSize, useWholeMap, laneToken, runtimeUnit)) {
       reserveSlot(*pos);
       dest->x = pos->x;
       dest->z = pos->z;
@@ -5061,7 +5069,7 @@ namespace moho
           SCoordsVec2 candidate{};
           candidate.x = pos->x + static_cast<float>(dx);
           candidate.z = pos->z + static_cast<float>(dz);
-          if (!CanPlaceFormationSlot(*this, candidate, footprint, footprintSize, useWholeMap, laneToken)) {
+          if (!CanPlaceFormationSlot(*this, candidate, footprint, footprintSize, useWholeMap, laneToken, runtimeUnit)) {
             continue;
           }
 
