@@ -1,6 +1,7 @@
 #include "CWldSession.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -44,7 +45,10 @@
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/console/CConCommand.h"
+#include "lua/LuaTableIterator.h"
+#include "moho/sim/CArmyLuaFunctionRegistrations.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/EGenericIconTypeTypeInfo.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/net/CGpgNetInterface.h"
@@ -98,8 +102,11 @@ namespace
   FormationPreviewSharedPairRuntimeView* gFormationPreviewSharedPairsEnd = nullptr;
   std::uintptr_t gFormationPreviewSharedPairsOwnerLane = 0u;
 
-  struct StrategicIconAuxRuntimeView;
-  StrategicIconAuxRuntimeView* gStrategicIconAuxiliary = nullptr;
+  // `StrategicIconAuxView` (the real type) and `gStrategicIconAuxiliary`
+  // live in the `moho`-scoped anonymous namespace alongside the type's
+  // definition (see `CWldSession::RenderStrategicIcons`'s callee cluster) -
+  // a plain forward declaration here would name an unrelated, permanently
+  // incomplete type in *this* (global-scope) anonymous namespace instead.
 
   std::uintptr_t gStrategicIconScratchOwnerLane = 0u;
   std::uint32_t* gStrategicIconScratchDataLane = nullptr;
@@ -278,39 +285,6 @@ namespace
   [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLaneSecondary() noexcept
   {
     return &gFormationPreviewSharedPairsOwnerLane;
-  }
-
-  /**
-   * Address: 0x0085EFE0 (FUN_0085EFE0)
-   *
-   * What it does:
-   * Returns the global strategic-icon auxiliary object lane.
-   */
-  [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneA() noexcept
-  {
-    return gStrategicIconAuxiliary;
-  }
-
-  /**
-   * Address: 0x0085EFF0 (FUN_0085EFF0)
-   *
-   * What it does:
-   * Secondary entrypoint returning the strategic-icon auxiliary object lane.
-   */
-  [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneB() noexcept
-  {
-    return gStrategicIconAuxiliary;
-  }
-
-  /**
-   * Address: 0x0085F000 (FUN_0085F000)
-   *
-   * What it does:
-   * Third entrypoint returning the strategic-icon auxiliary object lane.
-   */
-  [[nodiscard]] StrategicIconAuxRuntimeView* GetStrategicIconAuxiliaryLaneC() noexcept
-  {
-    return gStrategicIconAuxiliary;
   }
 
   /**
@@ -2570,6 +2544,47 @@ namespace moho
       return dynamic_cast<IWldUIProvider*>(sWldUIProvider);
     }
 
+    // Forward-declared here (rather than defined) because the process-global
+    // singleton lane below only ever holds a pointer; `StrategicIconAuxView`
+    // itself is defined later in this same `moho`-scoped anonymous
+    // namespace, next to `CWldSession::RenderStrategicIcons`'s callee
+    // cluster (0x0085B6E0's lazy-init target, address 0x010C4300).
+    struct StrategicIconAuxView;
+    StrategicIconAuxView* gStrategicIconAuxiliary = nullptr;
+
+    /**
+     * Address: 0x0085EFE0 (FUN_0085EFE0)
+     *
+     * What it does:
+     * Returns the global strategic-icon auxiliary object lane.
+     */
+    [[nodiscard]] StrategicIconAuxView* GetStrategicIconAuxiliaryLaneA() noexcept
+    {
+      return gStrategicIconAuxiliary;
+    }
+
+    /**
+     * Address: 0x0085EFF0 (FUN_0085EFF0)
+     *
+     * What it does:
+     * Secondary entrypoint returning the strategic-icon auxiliary object lane.
+     */
+    [[nodiscard]] StrategicIconAuxView* GetStrategicIconAuxiliaryLaneB() noexcept
+    {
+      return gStrategicIconAuxiliary;
+    }
+
+    /**
+     * Address: 0x0085F000 (FUN_0085F000)
+     *
+     * What it does:
+     * Third entrypoint returning the strategic-icon auxiliary object lane.
+     */
+    [[nodiscard]] StrategicIconAuxView* GetStrategicIconAuxiliaryLaneC() noexcept
+    {
+      return gStrategicIconAuxiliary;
+    }
+
     CWldSession* gActiveWldSession = nullptr;
     SWldSessionInfo* gPendingWldSessionInfo = nullptr;
     EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
@@ -3321,6 +3336,38 @@ namespace moho
       std::uint32_t mUnidentifiedColor = 0u; // +0xA8
 
       /**
+       * Address: 0x0085B2A0 (FUN_0085B2A0, struct_TeamColors::struct_TeamColors)
+       * Mangled: struct_IconAux *__stdcall struct_TeamColors::struct_TeamColors(struct_IconAux *this)
+       *
+       * What it does:
+       * Builds the white solid-colour texture, reserves the five icon runs to
+       * their binary-observed capacities (0x200/0x200/0x40/0x80/0x80 for
+       * ground/air/high-priority/selected/lifebar), and decodes the four
+       * `GameColors.TeamColorMode` entries plus the unidentified-blip colour.
+       * `mGenericIcons`/`mPauseRestTexture`/`mStunnedRestTexture` are left
+       * empty here - the binary fills them from separate calls
+       * (`LoadGenericIcons`/`LoadPauseAndStunnedRestTextures`) right after
+       * construction, not from this constructor.
+       */
+      StrategicIconAuxView();
+
+      /**
+       * Address: 0x0085E7F0 (FUN_0085E7F0, struct_IconAux::GetGenericIcons)
+       * Mangled: LuaPlus::LuaObject *__cdecl struct_IconAux::GetGenericIcons(Moho::CWldSession *session, std::vector *target)
+       *
+       * What it does:
+       * Loads `/lua/ui/game/strategicIcons.lua`'s `GenericIcons` table and
+       * fills one `mGenericIcons` slot per `EGenericIconType` key with the
+       * named batch texture. `mGenericIcons` is sized to exactly 8 first
+       * (0x0085F020, the `msvc8::vector<boost::shared_ptr<CD3DBatchTexture>>`
+       * resize lane for this instantiation - a per-type container emission
+       * already covered generically by `msvc8::vector<T>::resize`, the same
+       * way the sibling `UnitIconData` instantiation's reserve/push_back/erase
+       * lanes are documented above rather than hand-recovered).
+       */
+      void LoadGenericIcons(CWldSession* session);
+
+      /**
        * Address: 0x0085EA60 (FUN_0085EA60, struct_IconAux::GetStunIcons)
        *
        * What it does:
@@ -3383,6 +3430,64 @@ namespace moho
     );
 
     /**
+     * Address: 0x0085B2A0 (FUN_0085B2A0, struct_TeamColors::struct_TeamColors)
+     *
+     * What it does:
+     * Builds the white solid-colour texture, reserves the five icon runs to
+     * their binary-observed capacities, and decodes the team-color palette.
+     * See the class comment above for the full field-by-field evidence.
+     */
+    StrategicIconAuxView::StrategicIconAuxView()
+    {
+      mWhiteTexture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+
+      mGroundIcons.reserve(0x200);
+      mAirIcons.reserve(0x200);
+      mHighPriorityIcons.reserve(0x40);
+      mSelectedIcons.reserve(0x80);
+      mLifebarIcons.reserve(0x80);
+
+      LuaPlus::LuaObject* const colors = moho::GetColors();
+      const LuaPlus::LuaObject gameColors = (*colors)["GameColors"];
+      const LuaPlus::LuaObject teamColorMode = gameColors["TeamColorMode"];
+
+      // Decoded in the binary's source order (Self/Ally/Enemy/Neutral); the
+      // storage order (Self/Neutral/Ally/Enemy) is just field layout, not a
+      // reordering of which key feeds which member.
+      mSelfColor = SCR_DecodeColor(msvc8::string(teamColorMode["Self"].GetString()));
+      mAllyColor = SCR_DecodeColor(msvc8::string(teamColorMode["Ally"].GetString()));
+      mEnemyColor = SCR_DecodeColor(msvc8::string(teamColorMode["Enemy"].GetString()));
+      mNeutralColor = SCR_DecodeColor(msvc8::string(teamColorMode["Neutral"].GetString()));
+
+      mUnidentifiedColor = moho::GetUnidentifiedColor();
+    }
+
+    /**
+     * Address: 0x0085E7F0 (FUN_0085E7F0, struct_IconAux::GetGenericIcons)
+     *
+     * What it does:
+     * Loads `/lua/ui/game/strategicIcons.lua`'s `GenericIcons` table and
+     * fills one `mGenericIcons` slot per `EGenericIconType` key with the
+     * named batch texture.
+     */
+    void StrategicIconAuxView::LoadGenericIcons(CWldSession* const session)
+    {
+      mGenericIcons.resize(8);
+
+      const LuaPlus::LuaObject iconTable = SCR_Import(session->mState, "/lua/ui/game/strategicIcons.lua");
+      const LuaPlus::LuaObject genericIcons = iconTable.GetByName("GenericIcons");
+
+      for (LuaPlus::LuaTableIterator iter(genericIcons, 1); iter.IsValid(); iter.Next()) {
+        EGenericIconType iconType{};
+        gpg::RRef enumRef{};
+        gpg::RRef_EGenericIconType(&enumRef, &iconType);
+        SCR_GetEnum(session->mState, iter.GetKey().GetString(), enumRef);
+
+        mGenericIcons[static_cast<std::size_t>(iconType)] = CD3DBatchTexture::FromFile(iter.GetValue().GetString(), 0u);
+      }
+    }
+
+    /**
      * Address: 0x0085EA60 (FUN_0085EA60, struct_IconAux::GetStunIcons)
      *
      * What it does:
@@ -3404,6 +3509,120 @@ namespace moho
       if (stunnedRest.IsString()) {
         mStunnedRestTexture = CD3DBatchTexture::FromFile(stunnedRest.GetString(), 0u);
       }
+    }
+
+    /**
+     * Address: 0x0085CBD0 (FUN_0085CBD0, sub_85CBD0)
+     *
+     * IDA signature:
+     * _DWORD *callcnv_F3 sub_85CBD0@<eax>(_DWORD *a1@<eax>, _DWORD **a2@<ebx>, int a3@<edi>, _DWORD *a4@<esi>, char a5);
+     *
+     * What it does:
+     * Picks the shared "no specific blueprint icon" texture for one unit:
+     * a fixed structure icon for immobile blueprints, or a land/naval/air
+     * icon looked up by the unit's movement layer for mobile ones, or the
+     * plain white texture when the layer doesn't match any of those three.
+     * `wantHighlightVariant` selects the `*HL` (highlight) icon set over the
+     * plain set - the caller (`PickUnitStrategicIconTexture` below) passes
+     * `true` for the mouse-over case and `false` otherwise.
+     *
+     * Evidence: `iconData->mBlueprint->IsMobile()` is the vtable-slot-4
+     * dispatch at 0x0085CBD9/0x0085CBDC (`REntityBlueprint` vftable slot 4,
+     * byte-verified against `bin/2025.7.1/ForgedAlliance.exe` at 0x00E0F604
+     * == 0x00511B60 == `REntityBlueprint::IsMobile`). The category switch
+     * reads `iconData->mUnit->mVariableData.mLayerMask` (UserEntity+0xF0,
+     * `cmp .. 0F0h` @ 0x0085CC20/0x0085CC87) and its case labels (1 / 2,4,8 /
+     * 16) match `ELayer`'s `LAYER_Land` / `LAYER_Seabed|LAYER_Sub|LAYER_Water`
+     * / `LAYER_Air` exactly. Every branch is a plain `boost::shared_ptr`
+     * copy (`sub_428340`, itself just `*dst = *src; if (src.pn)
+     * ++src.pn->use_count_`) from one of `aux->mGenericIcons`'s eight slots
+     * or `aux->mWhiteTexture` - never a weak-to-shared promotion.
+     */
+    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> PickGenericStrategicIconTexture(
+      const StrategicIconAuxView& aux, const UnitIconData& iconData, const bool wantHighlightVariant
+    )
+    {
+      if (!iconData.mBlueprint->IsMobile()) {
+        return aux.mGenericIcons[wantHighlightVariant ? GIT_StructureHL : GIT_Structure];
+      }
+
+      switch (static_cast<ELayer>(iconData.mUnit->mVariableData.mLayerMask)) {
+        case LAYER_Land:
+          return aux.mGenericIcons[wantHighlightVariant ? GIT_LandHL : GIT_Land];
+        case LAYER_Seabed:
+        case LAYER_Sub:
+        case LAYER_Water:
+          return aux.mGenericIcons[wantHighlightVariant ? GIT_NavalHL : GIT_Naval];
+        case LAYER_Air:
+          return aux.mGenericIcons[wantHighlightVariant ? GIT_AirHL : GIT_Air];
+        default:
+          return aux.mWhiteTexture;
+      }
+    }
+
+    /**
+     * Address: 0x0085D880 (FUN_0085D880, sub_85D880)
+     *
+     * IDA signature:
+     * Moho::CAniPose **__usercall sub_85D880@<eax>(Moho::UserEntity **eax0@<eax>,
+     *   Moho::CAniPose **a2@<edx>, char a3@<cl>, int a4, char a5, _DWORD *a1);
+     *
+     * What it does:
+     * Picks the strategic-icon texture for one classified unit. A unit that
+     * qualifies for a per-blueprint icon (is a real `UserUnit` and its
+     * `mIntelStateFlags` "has real blueprint data" bit is set - the same bit
+     * `UserEntity.cpp` already names `kSelectionBracketEnemyVisibleMask`) picks
+     * one of the blueprint's four cached textures by `(isHovered, isSelected
+     * && selectedVariantEligible)`: Rest / Over / Selected / SelectedOver.
+     * Everything else (recon blips, wrecks, props, or a unit whose intel
+     * doesn't carry full blueprint data) falls back to
+     * `PickGenericStrategicIconTexture`.
+     *
+     * Evidence, all byte-verified in `FUN_0085D880.asm`:
+     *  - `mov edx, [eax+0Ch]; call edx` (0x0085D893/0x0085D89E) is vtable
+     *    slot 3 on `iconData.mUnit`, i.e. `UserEntity::IsUserUnit()`
+     *    (Hex-Rays' "IsUserUnit2" is its own disambiguation of the
+     *    const/non-const overload pair, not a distinct virtual).
+     *  - `test byte ptr [eax+3E0h], 10h` (0x0085D8AB/0x0085D954) reads bit
+     *    0x10 of `UserUnit::mIntelStateFlags` (already documented on that
+     *    field: "0x10=has-data").
+     *  - The four cached-texture fetches are inlined `boost::shared_ptr`
+     *    copies (unconditional `lock xadd`, no expiry check) from
+     *    `iconData.mBlueprint`+0x15C/0x164/0x16C/0x174 -
+     *    `mStrategicIconRest/Selected/Over/SelectedOver` exactly (see the
+     *    retype note on those fields in `REntityBlueprint.h`).
+     */
+    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> PickUnitStrategicIconTexture(
+      const StrategicIconAuxView& aux,
+      const UnitIconData& iconData,
+      const bool isSelected,
+      const bool selectedVariantEligible,
+      const bool isHovered
+    )
+    {
+      UserUnit* const asUnit = iconData.mUnit->IsUserUnit();
+      // Same bit UserEntity.cpp's kSelectionBracketEnemyVisibleMask names on
+      // mIntelStateFlags; re-declared locally because that constant is
+      // file-private there.
+      constexpr std::uint32_t kHasBlueprintIconDataMask = 0x10u;
+      const bool usesGenericIcon =
+        asUnit == nullptr || (asUnit->mIntelStateFlags & kHasBlueprintIconDataMask) == 0u;
+
+      if (isHovered) {
+        if (usesGenericIcon) {
+          return PickGenericStrategicIconTexture(aux, iconData, /*wantHighlightVariant=*/true);
+        }
+        return (isSelected && selectedVariantEligible) ? iconData.mBlueprint->mStrategicIconSelectedOver
+                                                         : iconData.mBlueprint->mStrategicIconOver;
+      }
+
+      if (isSelected && selectedVariantEligible) {
+        return iconData.mBlueprint->mStrategicIconSelected;
+      }
+      if (usesGenericIcon) {
+        return PickGenericStrategicIconTexture(aux, iconData, /*wantHighlightVariant=*/false);
+      }
+      return iconData.mBlueprint->mStrategicIconRest;
     }
 
     template <typename TPointee>
@@ -12728,49 +12947,248 @@ namespace moho
   /**
    * Address: 0x0085B6E0 (FUN_0085B6E0,
    * ?RenderStrategicIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@@Z)
+   *
+   * What it does:
+   * Lazily builds the process-global icon-aux singleton, re-seats its
+   * per-frame camera/batcher state and screen projection, then walks every
+   * unit `CameraImpl::GetAllUnitsInFrustum()` currently sees and classifies
+   * each one carrying a strategic-icon name into one of four runs (ground /
+   * air / high-priority / selected), picking its icon texture through
+   * `PickUnitStrategicIconTexture`.
+   *
+   * Blockers this pass resolved (see cited evidence at each site):
+   *  - `CameraImpl` vtable slot mixup: the dispatch at 0x0085BA71 (byte
+   *    offset 0xA0 from the vtable head) is slot 40 = `GetAllUnitsInFrustum`,
+   *    not `GetArmyUnitsInFrustum` (slot 41, +0xA4) as an earlier pass's
+   *    comment guessed - confirmed by reading the shipped vtable directly
+   *    out of `bin/2025.7.1/ForgedAlliance.exe` (see `CameraImpl.h`).
+   *  - `REntityBlueprint::mStrategicIconSortPriority` retyped from a 32-bit
+   *    `mStrategicIconRuntimeWord` to the real single byte the classifier
+   *    compares against `'A'`.
+   *  - `CWldSession`'s `EntId -> UserEntity*` map was already modelled
+   *    (`SessionEntityMap` / `LookupEntityId`) by a prior pass - no new work
+   *    needed there.
+   *  - `StrategicIconAuxView`'s constructor and `LoadGenericIcons` recovered
+   *    (0x0085B2A0 / 0x0085E7F0); `gStrategicIconAuxiliary` retyped from a
+   *    never-defined `StrategicIconAuxRuntimeView` forward declaration to
+   *    the real, complete type.
+   *  - `PickUnitStrategicIconTexture` / `PickGenericStrategicIconTexture`
+   *    recovered (0x0085D880 / 0x0085CBD0), which required retyping
+   *    `REntityBlueprint`'s four cached icon fields from `boost::weak_ptr`
+   *    to `boost::shared_ptr` (see the evidence note on those fields).
+   *
+   * Deferred to a follow-up pass - not drawn by this function yet:
+   *  - The actual draw calls (`RenderUnitIcon`, 0x0085D9A0): the icon-quad
+   *    geometry, the `Moho::teamcolors` per-army palette
+   *    (`+0x0128F1C0`, read when `mTeamColorMode` is on), the blink timer,
+   *    and the single dedicated "hovered unit" slot (this function's local
+   *    `v148.playableRectX1` in the original - hovered units are excluded
+   *    from all four runs below, matching the binary, but nothing consumes
+   *    them yet).
+   *  - The lifebar collection + draw stack (0x0085CD40 bars, 0x0085E0A0
+   *    custom name, 0x0085E3A0 selection-set name): needs
+   *    `show_attached_unit_lifebars` (`OPTIONS_GetBool`) and
+   *    `IUnit::GetAttributes1()->mToggleCaps` / `HasScriptBit`, neither
+   *    modelled yet. The same `GetAttributes1`/`HasScriptBit` gap also means
+   *    the paused-overlay flag below only reflects `mUnitVarDat.mIsPaused`,
+   *    not the additional "toggled off a scripted ability" case the binary
+   *    also sets it for.
+   *  - The formation-ghost pass ("TStrategicFormationIcon"): needs
+   *    `IFormationInstance::Contains`, not modelled yet - a separate,
+   *    already-tracked blocker (see the `CFormationInstance` split notes).
    */
-  void CWldSession::
-    RenderStrategicIcons(CameraImpl* const /*camera*/, CD3DPrimBatcher* const /*primBatcher*/, CWldMap* const /*map*/)
+  void CWldSession::RenderStrategicIcons(
+    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, CWldMap* const map
+  )
   {
-    // Recovered 0x0085B6E0 high-level flow:
-    //  1) Read `show_attached_unit_lifebars` through OPTIONS_GetBool
-    //     (0x0085B719) and lazily build the process-global icon-aux object at
-    //     0x010C4300 - `operator new(0xAC)` + ctor 0x0085B2A0, then
-    //     GetGenericIcons (0x0085E7F0) and GetStunIcons (0x0085EA60) once.
-    //  2) Re-seat the aux camera/batcher/session/tick lanes, clear the five
-    //     icon runs (0x0085F1B0 per run) and push the pixel-exact screen
-    //     projection (MakeViewportPixelProjection, inlined at
-    //     0x0085B8B4..0x0085B95E) plus the identity view matrix.
-    //  3) Walk `CameraImpl::GetArmyUnitsInFrustum` (vtable slot 40, dispatched
-    //     at 0x0085BA9B) and classify each live entity that has a strategic
-    //     icon name into ground / air / high-priority / selected / lifebar
-    //     runs, plus the single hovered-unit slot.
-    //  4) Draw the runs in that order under the "TStrategicIcon" technique via
-    //     RenderUnitIcon (0x0085D9A0), then the formation ghost pass under
-    //     "TStrategicFormationIcon", then the lifebar pass under "TLifeBar"
-    //     (0x0085CD40 bars -> 0x0085E0A0 custom name -> 0x0085E3A0
-    //     selection-set name), flushing the batcher between passes.
-    //
-    // Layout blockers RESOLVED (see `UnitIconData` / `StrategicIconAuxView`
-    // above): both structs are now fully typed and offset-asserted from the
-    // constructor, copy-assignment, destructor and element-stride evidence.
-    //
-    // Remaining blockers are all missing API in headers this pass does not
-    // own, not missing evidence:
-    //  - `CameraImpl::GetArmyUnitsInFrustum` - vtable slot 40 (dispatched
-    //    through `[eax+0A0h]` at 0x0085BA71), returning
-    //    `gpg::fastvector_n<WeakPtr<UserEntity>, 40>&`. Not declared in
-    //    CameraImpl.h, and without it there is no unit list to classify.
-    //  - `Moho::teamcolors`, the per-army palette at 0x0128F1C0 that
-    //    RenderUnitIcon indexes when `CWldSession::mTeamColorMode` is on.
-    //  - `CWldSession`'s entity-id map, which the formation pass looks units
-    //    up in; it lives inside the `mEntitySpatialDbStorage` blob and is not
-    //    modelled yet.
-    //  - `RUnitBlueprint`'s strategic-icon sort priority: the classifier
-    //    compares the BYTE at blueprint+0x158 against 'A'
-    //    (`cmp byte ptr [edx+158h], 41h` @ 0x0085C2C0), while
-    //    REntityBlueprint.h currently types that lane as the 32-bit
-    //    `mStrategicIconRuntimeWord`.
+    // --- Phase 1: lazy singleton build --------------------------------
+    if (gStrategicIconAuxiliary == nullptr) {
+      gStrategicIconAuxiliary = new StrategicIconAuxView();
+      gStrategicIconAuxiliary->LoadGenericIcons(this);
+      gStrategicIconAuxiliary->LoadPauseAndStunnedRestTextures(this);
+    }
+    StrategicIconAuxView& aux = *gStrategicIconAuxiliary;
+
+    // --- Phase 2: re-seat per-frame camera/batcher state, clear the four
+    // implemented runs, push the pixel-exact screen projection ----------
+    const GeomCamera3& view = camera->CameraGetView();
+    aux.mViewportX = view.viewport.r[3].x;
+    aux.mViewportY = view.viewport.r[3].y;
+    aux.mViewportWidth = view.viewport.r[3].z;
+    aux.mViewportHeight = view.viewport.r[3].w;
+    aux.mSession = this;
+    aux.mBatcher = primBatcher;
+    aux.mCamera = &view;
+    // aux.mTickFraction re-seat deferred alongside the lifebar pass, its
+    // only reader - see the class comment above `mTickFraction`.
+
+    aux.mGroundIcons.clear();
+    aux.mAirIcons.clear();
+    aux.mHighPriorityIcons.clear();
+    aux.mSelectedIcons.clear();
+    // aux.mLifebarIcons collection deferred alongside the lifebar draw pass.
+
+    primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
+    primBatcher->SetViewMatrix(VMatrix4::Identity());
+
+    // The binary reads this parameter's raw bits as a float sub-tick
+    // interpolation fraction for `GetInterpolatedTransform()` below,
+    // despite the mangled signature typing it `CWldMap*` - confirmed
+    // end-to-end via float-register (`fld`/`fstp`/`movss`) moves, both here
+    // (0x0085B85C, storing `[esp+argC]`) and at the real caller
+    // (`CRenderWorldView::Render`, 0x0086EE58/0x0086EE63, `fld [ebp+map]`).
+    // Preserved exactly rather than "fixed", per this project's
+    // binary-fidelity mandate.
+    const float tickFraction = std::bit_cast<float>(map);
+
+    // "Current zoom" scalar used below as the mesh-fade-in comparison
+    // baseline: the camera target position projected through row 1 of the
+    // viewport matrix (0x0085BA1E..0x0085BA93 in the binary).
+    const Wm3::Vector3f targetPosition = camera->GetTargetPosition();
+    const float currentZoomValue = (view.viewport.r[1].x * targetPosition.x) +
+      (view.viewport.r[1].y * targetPosition.y) + (view.viewport.r[1].z * targetPosition.z) + view.viewport.r[1].w;
+
+    // --- Phase 3: classify every unit in frustum ------------------------
+    UserArmy* const focusArmy = GetFocusArmy();
+    CameraFrustumUserEntityList* const allUnits = camera->GetAllUnitsInFrustum();
+
+    for (CameraUserEntityWeakRef* ref = allUnits->mStart; ref != allUnits->mFinish; ++ref) {
+      UserEntity* const entity = DecodeCameraFrustumWeakRef(*ref);
+      if (entity == nullptr || entity->mVariableData.mIsDead) {
+        continue;
+      }
+
+      UserUnit* const asUnit = entity->IsUserUnit();
+
+      // `mIntelStateFlags` bit 0x20: this unit renders through some other
+      // path already and its strategic icon is suppressed outright
+      // (`(v26->mSelectionMaskUsed & 0x20) == 0` gates entry at 0x0085BAC3).
+      constexpr std::uint32_t kStrategicIconEntitySuppressedMask = 0x20u;
+      if (asUnit != nullptr && (asUnit->mIntelStateFlags & kStrategicIconEntitySuppressedMask) != 0u) {
+        continue;
+      }
+
+      const REntityBlueprint* const blueprint = entity->mParams.mBlueprint;
+      if (blueprint == nullptr || blueprint->mStrategicIconName.empty()) {
+        continue;
+      }
+
+      UnitIconData iconData{};
+      iconData.mUnit = entity;
+      iconData.mBlueprint = blueprint;
+
+      const VTransform interpolated = entity->GetInterpolatedTransform(tickFraction);
+      iconData.mWorldX = interpolated.pos_.x;
+      iconData.mWorldY = interpolated.pos_.y;
+      iconData.mWorldZ = interpolated.pos_.z;
+
+      // `mIntelStateFlags` bit 0x08 ("health-valid") / bit 0x10
+      // ("has-data"): both default true for non-`UserUnit` entities
+      // (wrecks, props, ...), matching `isBusy_60`/`v49`'s init at
+      // 0x0085BB60..0x0085BB74.
+      constexpr std::uint32_t kIntelHealthValidMask = 0x08u;
+      constexpr std::uint32_t kHasBlueprintIconDataMask = 0x10u;
+      const bool selectedVariantEligible =
+        asUnit == nullptr || (asUnit->mIntelStateFlags & kIntelHealthValidMask) != 0u;
+      const bool hasFullBlueprintIconData =
+        asUnit == nullptr || (asUnit->mIntelStateFlags & kHasBlueprintIconDataMask) != 0u;
+
+      iconData.mIsFriendly =
+        focusArmy == nullptr || focusArmy->IsAlly(static_cast<std::uint32_t>(entity->mArmy->mArmyIndex));
+
+      iconData.mShowStunnedOverlay = asUnit != nullptr && asUnit->mUnitVarDat.mStunTicks != 0;
+      iconData.mShowPausedOverlay = asUnit != nullptr && asUnit->mUnitVarDat.mIsPaused;
+
+      if (focusArmy == nullptr || entity->mArmy == focusArmy) {
+        if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr &&
+            !mWldMap->mTerrainRes->IsInPlayableRect(interpolated.pos_)) {
+          continue;
+        }
+      }
+
+      if (iconData.mIsFriendly) {
+        UserEntity* const attachmentParent = entity->GetAttachmentParent();
+        if (attachmentParent != nullptr && attachmentParent->IsInCategory(msvc8::string("CARRIER"))) {
+          continue;
+        }
+      } else if (asUnit != nullptr && asUnit->mUnitVarDat.mIsBusy && asUnit->GetBlueprint()->Air.CanFly) {
+        continue;
+      }
+
+      if (!ui_NisRenderIcons || (!ui_RenderIcons && !iconData.mShowPausedOverlay) || entity->IsBeingBuilt()) {
+        continue;
+      }
+
+      // When the unit's own mesh is already close enough to be visible
+      // without help, skip the icon entirely for units that have full
+      // intel data (or belong to an immobile blueprint under a focus
+      // army) and aren't paused - everyone else still gets an icon.
+      const bool skipWhenMeshVisible =
+        (hasFullBlueprintIconData || (focusArmy != nullptr && !blueprint->IsMobile())) &&
+        !iconData.mShowPausedOverlay;
+
+      const RMeshBlueprint* const mesh = entity->mVariableData.mMeshBlueprint;
+      if (mesh != nullptr && !ui_AlwaysRenderStrategicIcons) {
+        const float fadeThreshold = std::min(mesh->mIconFadeInZoom, camera->GetMaxZoom() * 0.89f);
+        if (fadeThreshold <= currentZoomValue) {
+          if (skipWhenMeshVisible) {
+            continue;
+          }
+          iconData.mSuppressBaseIcon = iconData.mShowPausedOverlay || iconData.mShowStunnedOverlay;
+        }
+      }
+
+      const bool isHovered = entity == GetHoveredUserEntity();
+
+      SSelectionSetUserEntity::FindResult selectionFind{};
+      const bool isSelected =
+        FindSelectionNodeByEntityGuarded(&selectionFind, &mSelection, entity)->mRes != mSelection.mHead;
+
+      boost::shared_ptr<CD3DBatchTexture> icon =
+        PickUnitStrategicIconTexture(aux, iconData, isSelected, selectedVariantEligible, isHovered);
+      if (!icon) {
+        continue;
+      }
+      iconData.mIconTexture = std::move(icon);
+
+      if (iconData.mShowPausedOverlay) {
+        iconData.mPausedTexture = aux.mPauseRestTexture;
+      }
+      if (iconData.mShowStunnedOverlay) {
+        iconData.mStunnedTexture = aux.mStunnedRestTexture;
+      }
+
+      // The single dedicated "hovered unit" slot is part of the deferred
+      // draw pass (see the function comment) - hovered units are excluded
+      // from all four runs here, matching the binary, but nothing consumes
+      // them yet.
+      if (isHovered) {
+        continue;
+      }
+
+      if (isSelected) {
+        aux.mSelectedIcons.push_back(iconData);
+        continue;
+      }
+
+      // Sort-priority byte < 'A' always wins the high-priority run
+      // (0x0085C2C0..0x0085C2C7). At/above 'A' the binary default-
+      // constructs a `WeakPtr_CD3DBatchTexture` and tests it - a
+      // no-argument constructor is unconditionally empty, so that branch
+      // is provably always false and always falls through to ground/air.
+      if (blueprint->mStrategicIconSortPriority < static_cast<std::uint8_t>('A')) {
+        aux.mHighPriorityIcons.push_back(iconData);
+        continue;
+      }
+
+      if (asUnit != nullptr && asUnit->GetBlueprint()->Air.CanFly) {
+        aux.mAirIcons.push_back(iconData);
+      } else {
+        aux.mGroundIcons.push_back(iconData);
+      }
+    }
+
+    // Phase 4 (draw) is deferred - see the function comment above.
   }
 
   /**
