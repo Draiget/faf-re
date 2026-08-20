@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/sim/WeakEntitySet.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
@@ -13,19 +14,6 @@ namespace moho
   class CFormation
   {
   public:
-    struct Node
-    {
-      Node* mLeft;                // +0x00
-      Node* mParent;              // +0x04
-      Node* mRight;               // +0x08
-      void* mValue;               // +0x0C
-      Node* mListPrev;            // +0x10
-      Node* mListNext;            // +0x14
-      std::uint8_t mColor;        // +0x18
-      std::uint8_t mIsSentinel;   // +0x19
-      std::uint8_t mPad1A[0x02];  // +0x1A
-    };
-
     /**
      * Address: 0x00838070 (FUN_00838070, ??0CFormation@Moho@@QAE@@Z)
      *
@@ -71,8 +59,23 @@ namespace moho
     static void UpdateOrientation(const Wm3::Vector3f& mouseWorldPos, CFormation* formation);
 
   public:
+    /// `WeakEntitySetUserEntity`-shaped: `{mTreeAllocProxy, mNodeHead, mNodeCount}`
+    /// is the same 12-byte weak-set header as `WeakEntitySetUserEntity`
+    /// (moho/sim/WeakEntitySet.h), and `mNodeHead`'s node type is the same
+    /// `SSelectionNodeUserEntity` the session selection tree uses (RB-tree
+    /// triple + weak-entity-ref payload, 0x1C bytes). This tracks the set of
+    /// units currently participating in the drag-formation: `ChooseFormation`
+    /// (0x008384C0) inserts each unit it visits via `sub_822270`
+    /// (`InsertSelectionUnitWithWeakGuard`, passing `this` reinterpreted as
+    /// `SSelectionSetUserEntity*` - confirmed by the ASM, which repurposes
+    /// `ebp` to hold `this` for the whole function and pushes it verbatim as
+    /// the "set" argument), and `Finalize` (0x008382A0) walks it back out via
+    /// `sub_7B29C0` (`PruneTombstonesAndFindLive`) to build the
+    /// `CFormationInstance`'s unit list. `Reset()`/`~CFormation()` already
+    /// tear this tree down through the same intrusive owner-chain unlink used
+    /// by every other weak-entity set in the engine.
     void* mTreeAllocProxy;             // +0x00
-    Node* mNodeHead;                   // +0x04
+    SSelectionNodeUserEntity* mNodeHead; // +0x04
     std::uint32_t mNodeCount;          // +0x08
     IFormationInstance* mCurInstance;  // +0x0C
     bool mReady;                       // +0x10
@@ -89,14 +92,6 @@ namespace moho
     float mTimeLeft;                   // +0x5C
     float mLastUpdate;                 // +0x60
   };
-
-  static_assert(sizeof(CFormation::Node) == 0x1C, "CFormation::Node size must be 0x1C");
-  static_assert(offsetof(CFormation::Node, mLeft) == 0x00, "CFormation::Node::mLeft offset must be 0x00");
-  static_assert(offsetof(CFormation::Node, mParent) == 0x04, "CFormation::Node::mParent offset must be 0x04");
-  static_assert(offsetof(CFormation::Node, mRight) == 0x08, "CFormation::Node::mRight offset must be 0x08");
-  static_assert(offsetof(CFormation::Node, mValue) == 0x0C, "CFormation::Node::mValue offset must be 0x0C");
-  static_assert(offsetof(CFormation::Node, mColor) == 0x18, "CFormation::Node::mColor offset must be 0x18");
-  static_assert(offsetof(CFormation::Node, mIsSentinel) == 0x19, "CFormation::Node::mIsSentinel offset must be 0x19");
 
   static_assert(sizeof(CFormation) == 0x64, "CFormation size must be 0x64");
   static_assert(offsetof(CFormation, mNodeHead) == 0x04, "CFormation::mNodeHead offset must be 0x04");
