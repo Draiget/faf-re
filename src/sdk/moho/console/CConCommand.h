@@ -691,6 +691,18 @@ namespace moho
   void CON_DestroySelectedUnits(void* commandArgs);
 
   /**
+   * Address: 0x007B55D0 (FUN_007B55D0, Moho::CON_CopySelectedUnitsToClipboard)
+   *
+   * What it does:
+   * Builds one `CreateUnitAtMouse(...)` Lua line per selected user-unit,
+   * positioned/oriented relative to the selection centroid, and copies the
+   * whole script to the Windows clipboard. Silently does nothing when there
+   * is no active session or the selection is empty (no localized "no
+   * session" feedback, unlike the other selection commands in this file).
+   */
+  void CON_CopySelectedUnitsToClipboard(void* commandArgs);
+
+  /**
    * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
    *
    * What it does:
