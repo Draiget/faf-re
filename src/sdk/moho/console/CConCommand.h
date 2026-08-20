@@ -650,6 +650,78 @@ namespace moho
   void CON_TeleportSelectedUnits(void* commandArgs);
 
   /**
+   * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
+   *
+   * What it does:
+   * Spawns one unit blueprint (argument #1) for an explicit army index
+   * (argument #2, else the session focus army) at either an explicit screen
+   * point (arguments #3/#4) resolved through the world camera or the current
+   * cursor world position. Grid-snaps the spawn to the blueprint footprint and
+   * plays the UI error cue when the blueprint id does not resolve.
+   */
+  void CON_CreateUnit(void* commandArgs);
+
+  /**
+   * Address: 0x008330B0 (FUN_008330B0, Moho::CON_LotsOfProps)
+   *
+   * What it does:
+   * Scatters `count` (argument #2, default 100) copies of one prop blueprint
+   * (argument #1 lowercased, else the placeholder prop) over uniformly random
+   * height-field cells, lifting each spawn to the water plane when the map has
+   * water above the sampled terrain elevation.
+   */
+  void CON_LotsOfProps(void* commandArgs);
+
+  /**
+   * Address: 0x00833C70 (FUN_00833C70, Moho::CON_CConFunc_KillSelectedUnits)
+   *
+   * What it does:
+   * Issues `UNITCOMMAND_KillSelf` against the active session's selection with
+   * queue-clear set, or prints localized "no session" feedback.
+   */
+  void CON_KillSelectedUnits(void* commandArgs);
+
+  /**
+   * Address: 0x00833D60 (FUN_00833D60, Moho::CON_DestroySelectedUnits)
+   *
+   * What it does:
+   * Issues `UNITCOMMAND_DestroySelf` against the active session's selection
+   * with queue-clear set, or prints localized "no session" feedback.
+   */
+  void CON_DestroySelectedUnits(void* commandArgs);
+
+  /**
+   * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
+   *
+   * What it does:
+   * Forwards the `(key, value)` pair from arguments #1/#2 through
+   * `ISTIDriver::ProcessInfoPair` for every selected unit owned by the session
+   * focus army.
+   */
+  void CON_ProcessInfoPair(void* commandArgs);
+
+  /**
+   * Address: 0x00834460 (FUN_00834460, Moho::UI_TrackUnit)
+   *
+   * What it does:
+   * For each camera named in arguments #1.. toggles selection tracking: clears
+   * the camera target when the selection is empty or already the camera's
+   * target, otherwise tracks the whole selection at the camera's current target
+   * zoom with no transition time.
+   */
+  void UI_TrackUnit(void* commandArgs);
+
+  /**
+   * Address: 0x008354B0 (FUN_008354B0, Moho::RenameUnit)
+   *
+   * What it does:
+   * With no arguments prints the single selected unit's custom name; otherwise
+   * joins arguments #1.. into one whitespace-trimmed name and publishes it as a
+   * `("CustomName", name)` info pair through the sim driver.
+   */
+  void RenameUnit(void* commandArgs);
+
+  /**
    * Address: 0x008D3810 (FUN_008D3810)
    *
    * What it does:
