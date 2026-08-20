@@ -1,6 +1,7 @@
 #include "moho/command/SSTITarget.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <initializer_list>
 #include <typeinfo>
 
@@ -45,7 +46,30 @@ namespace
     }
   };
 
-  gpg::SerSaveLoadHelperListRuntime gSSTITargetSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by all of them.
+  struct SSTITargetSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(SSTITargetSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "SSTITargetSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SSTITargetSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "SSTITargetSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(SSTITargetSerializerHelperNode) == 0x14,
+    "SSTITargetSerializerHelperNode size must be 0x14"
+  );
+
+  SSTITargetSerializerHelperNode gSSTITargetSerializer{};
 
   /**
    * Address: 0x0055B170 (FUN_0055B170, SerSaveLoadHelper<SSTITarget>::unlink lane A)
@@ -54,9 +78,9 @@ namespace
    * Unlinks `SSTITarget` serializer helper links and restores self-links for
    * intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTITargetSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSSTITargetSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTITargetSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTITargetSerializer.mListLinks);
   }
 
   /**
@@ -68,8 +92,93 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkSSTITargetSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gSSTITargetSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gSSTITargetSerializer.mListLinks);
   }
+
+  /**
+   * Address: 0x0055B120 (FUN_0055B120, Moho::SSTITargetSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `SSTITarget`. Forwards the
+   * reflected object pointer to `SSTITarget::MemberDeserialize`
+   * (FUN_0055B3A0 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeSSTITargetSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const target = reinterpret_cast<moho::SSTITarget*>(objectPtr);
+    if (target == nullptr) {
+      return;
+    }
+    target->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0055B130 (FUN_0055B130, Moho::SSTITargetSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `SSTITarget`. Forwards the
+   * reflected object pointer to `SSTITarget::MemberSerialize`
+   * (FUN_0055B460 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeSSTITargetSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    const auto* const target = reinterpret_cast<const moho::SSTITarget*>(objectPtr);
+    if (target == nullptr) {
+      return;
+    }
+    target->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF5170 (FUN_00BF5170, Moho::SSTITargetSerializer::~SSTITargetSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `SSTITargetSerializer` helper node,
+   * matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_SSTITargetSerializer_atexit()
+  {
+    (void)UnlinkSSTITargetSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA310 (FUN_00BCA310, register_SSTITargetSerializer)
+   *
+   * What it does:
+   * Initializes the global `SSTITarget` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_SSTITargetSerializer()
+  {
+    (void)UnlinkSSTITargetSerializerLaneA();
+    gSSTITargetSerializer.mSerLoadFunc = &DeserializeSSTITargetSerializerCallback;
+    gSSTITargetSerializer.mSerSaveFunc = &SerializeSSTITargetSerializerCallback;
+    (void)std::atexit(&cleanup_SSTITargetSerializer_atexit);
+  }
+
+  struct SSTITargetSerializerStartupBootstrap
+  {
+    SSTITargetSerializerStartupBootstrap()
+    {
+      register_SSTITargetSerializer();
+    }
+  };
+
+  [[maybe_unused]] SSTITargetSerializerStartupBootstrap gSSTITargetSerializerStartupBootstrap;
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {
