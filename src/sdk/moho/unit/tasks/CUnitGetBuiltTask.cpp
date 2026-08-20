@@ -1,7 +1,16 @@
 #include "moho/unit/tasks/CUnitGetBuiltTask.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <typeinfo>
+
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/task/CCommandTask.h"
 #include "moho/unit/core/Unit.h"
 
 namespace moho
@@ -70,7 +79,30 @@ namespace moho
 
 namespace
 {
-  gpg::SerSaveLoadHelperListRuntime gCUnitGetBuiltTaskSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by all of them.
+  struct CUnitGetBuiltTaskSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitGetBuiltTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CUnitGetBuiltTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitGetBuiltTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CUnitGetBuiltTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CUnitGetBuiltTaskSerializerHelperNode) == 0x14,
+    "CUnitGetBuiltTaskSerializerHelperNode size must be 0x14"
+  );
+
+  CUnitGetBuiltTaskSerializerHelperNode gCUnitGetBuiltTaskSerializer{};
 
   /**
    * Address: 0x0060A7B0 (FUN_0060A7B0)
@@ -81,7 +113,7 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitGetBuiltTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitGetBuiltTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitGetBuiltTaskSerializer.mListLinks);
   }
 
   /**
@@ -93,6 +125,114 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitGetBuiltTaskSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitGetBuiltTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitGetBuiltTaskSerializer.mListLinks);
   }
+
+  // CUnitGetBuiltTask adds no fields beyond CCommandTask (see the trivial
+  // forwarding constructors above), so the binary serializes it purely as
+  // its CCommandTask base -- both facades below read/write through the
+  // cached CCommandTask reflection type rather than a per-class member
+  // Deserialize/Serialize.
+  [[nodiscard]] gpg::RType* CachedCCommandTaskTypeForGetBuiltTask()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x0060A700 (FUN_0060A700, Moho::CUnitGetBuiltTaskSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CUnitGetBuiltTask`. Reads the
+   * object's `CCommandTask` base lane directly through the cached
+   * `CCommandTask` reflection type (the derived class adds no fields);
+   * `version` is unused by the binary tail call.
+   */
+  void DeserializeCUnitGetBuiltTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    archive->Read(
+      CachedCCommandTaskTypeForGetBuiltTask(),
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(objectPtr)),
+      owner
+    );
+  }
+
+  /**
+   * Address: 0x0060A740 (FUN_0060A740, Moho::CUnitGetBuiltTaskSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `CUnitGetBuiltTask`. Writes the
+   * object's `CCommandTask` base lane directly through the cached
+   * `CCommandTask` reflection type (the derived class adds no fields);
+   * `version` is unused by the binary tail call.
+   */
+  void SerializeCUnitGetBuiltTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    archive->Write(
+      CachedCCommandTaskTypeForGetBuiltTask(),
+      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)),
+      owner
+    );
+  }
+
+  /**
+   * Address: 0x00BF9BD0 (FUN_00BF9BD0, Moho::CUnitGetBuiltTaskSerializer::~CUnitGetBuiltTaskSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CUnitGetBuiltTaskSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CUnitGetBuiltTaskSerializer_atexit()
+  {
+    (void)UnlinkCUnitGetBuiltTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BD05F0 (FUN_00BD05F0, register_CUnitGetBuiltTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitGetBuiltTask` serializer helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`.
+   */
+  void register_CUnitGetBuiltTaskSerializer()
+  {
+    (void)UnlinkCUnitGetBuiltTaskSerializerNodePrimary();
+    gCUnitGetBuiltTaskSerializer.mSerLoadFunc = &DeserializeCUnitGetBuiltTaskSerializerCallback;
+    gCUnitGetBuiltTaskSerializer.mSerSaveFunc = &SerializeCUnitGetBuiltTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitGetBuiltTaskSerializer_atexit);
+  }
+
+  struct CUnitGetBuiltTaskSerializerStartupBootstrap
+  {
+    CUnitGetBuiltTaskSerializerStartupBootstrap()
+    {
+      register_CUnitGetBuiltTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitGetBuiltTaskSerializerStartupBootstrap gCUnitGetBuiltTaskSerializerStartupBootstrap;
 } // namespace
