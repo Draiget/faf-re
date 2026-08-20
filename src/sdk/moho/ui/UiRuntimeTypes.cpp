@@ -92,6 +92,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/CUIWorldMesh.h"
+#include "moho/ui/SelectionDragger.h"
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "moho/ui/EMauiScrollAxisTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
@@ -4775,6 +4776,7 @@ float moho::ui_ExtractSnapTolerance = 20.0f;
 float moho::ui_FootprintMinThickness = 2.0f;
 float moho::cam_DefaultMiniLOD = 1.8f;
 bool moho::ui_WindowedAlwaysShowsCursor = false;
+bool moho::ui_DragSelect2D = true;
 moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
@@ -9244,6 +9246,67 @@ void moho::UIBuildDragger::OnCurrentDraggerReplaced()
   delete this;
 }
 
+// Forward declaration: defined later in this file (address 0x00823F00,
+// see its own doc comment there). UICommandDragger::DragRelease below is
+// its only caller in the binary.
+void func_OnCommandDragEnd(moho::SMauiEventData* eventData, std::int32_t commandId, LuaPlus::LuaState* state);
+
+/**
+ * Address: 0x00824120 (not IDA-classified as its own function; scalar
+ * deleting destructor, slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
+ *
+ * What it does:
+ * Restores the base vtable and drains the inherited `WeakObject` chain -
+ * this class adds no resources of its own beyond `IMauiDragger`'s (raw,
+ * non-owning `mSession`/`mCam`/`mGraph` pointers and a plain `CmdId`), so the
+ * compiler-generated body is behaviorally identical to the binary's.
+ */
+moho::UICommandDragger::~UICommandDragger() = default;
+
+/**
+ * Address: 0x008241B0 (FUN_008241B0, slot +0x04 of ??_7UICommandDragger@Moho@@6B@)
+ * Mangled: ?DragMove@UICommandDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::UICommandDragger::DragMove(
+ *     Moho::UICommandDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
+ *
+ * What it does:
+ * Unprojects the event's screen mouse position through the bound camera
+ * into a world-surface point, then forwards it to `func_ProcessCommandDrag`
+ * along with the dragged command's graph/id, `released = false`.
+ */
+void moho::UICommandDragger::DragMove(const moho::SMauiEventData* const eventData)
+{
+  const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
+  const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
+  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, false);
+}
+
+/**
+ * Address: 0x00824210 (FUN_00824210, slot +0x08 of ??_7UICommandDragger@Moho@@6B@)
+ * Mangled: ?DragRelease@UICommandDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+ *
+ * IDA signature:
+ * void __thiscall Moho::UICommandDragger::DragRelease(
+ *     Moho::UICommandDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
+ *
+ * What it does:
+ * Unprojects the event's screen mouse position the same way `DragMove`
+ * does, forwards it to `func_ProcessCommandDrag` with `released = true`,
+ * notifies the UI Lua layer via `func_OnCommandDragEnd` (0x00824260-0x00824266:
+ * `state` is read through `this->mSession->mState`), then deletes this
+ * dragger (the inherited `IMauiDragger` `delete this` shape, slot +0x00).
+ */
+void moho::UICommandDragger::DragRelease(const moho::SMauiEventData* const eventData)
+{
+  const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
+  const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
+  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, true);
+  func_OnCommandDragEnd(const_cast<moho::SMauiEventData*>(eventData), mCommandId, mSession->mState);
+  delete this;
+}
+
 namespace
 {
   constexpr std::int32_t kBuildPreviewMeshColor = static_cast<std::int32_t>(0xFF00FF00u);
@@ -10409,10 +10472,16 @@ static DraggerLink* func_SetCurDragger(IMauiDragger* const dragger)
  *
  * What it does:
  * Builds one Maui-event Lua payload and invokes
- * `/lua/ui/game/commandgraph.lua:OnCommandDragEnd(event, isDragger)`.
+ * `/lua/ui/game/commandgraph.lua:OnCommandDragEnd(event, cmdId)`.
+ *
+ * The second argument is the dragged command's id, not a boolean: the only
+ * caller in the binary (`Moho::UICommandDragger::DragRelease`, 0x00824210)
+ * loads it from `this->mCommandId` at 0x0082425D (`mov eax, [esi+10h]`) and
+ * pushes it directly, and the receiving script declares
+ * `function OnCommandDragEnd(event, cmdId)`.
  */
-[[maybe_unused]] static void func_OnCommandDragEnd(
-  moho::SMauiEventData* const eventData, const std::int32_t isDragger, LuaPlus::LuaState* const state
+void func_OnCommandDragEnd(
+  moho::SMauiEventData* const eventData, const std::int32_t commandId, LuaPlus::LuaState* const state
 )
 {
   LuaPlus::LuaObject eventObject{};
@@ -10422,7 +10491,7 @@ static DraggerLink* func_SetCurDragger(IMauiDragger* const dragger)
     state,
     "/lua/ui/game/commandgraph.lua",
     "OnCommandDragEnd",
-    [&eventObject, isDragger](LuaPlus::LuaFunction<void>& callbackFunction) { callbackFunction(eventObject, isDragger); }
+    [&eventObject, commandId](LuaPlus::LuaFunction<void>& callbackFunction) { callbackFunction(eventObject, commandId); }
   );
 }
 
@@ -10507,6 +10576,71 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
   }
 
   func_PostDragger(originFrame, nullptr, eventData);
+}
+
+/**
+ * Address: 0x00865880 (FUN_00865880)
+ * Decompiler placeholder name: `func_NewSelectionDragger2D` - misleading.
+ * Despite the name, this allocates a `SelectionDragger3D` on the
+ * `Moho::ui_DragSelect2D == false` path: that branch's sole callee is
+ * `Moho::SelectionDragger3D::SelectionDragger3D` (0x008640F0, see
+ * `SelectionDragger.cpp`), not a second `SelectionDragger2D` construction.
+ * Recovered here as a behavior-first free-function name instead.
+ *
+ * IDA signature:
+ * Moho::SelectionDragger2D *__usercall func_NewSelectionDragger2D@<eax>(
+ *     Moho::CWldSession *edx0@<edx>, Moho::CMauiFrame *a1,
+ *     struct Moho::SMauiEventData *a3);
+ * (The `Moho::SelectionDragger2D*` return type in that signature is the
+ * decompiler's own imprecise type inference - the `ui_DragSelect2D == false`
+ * path returns a `SelectionDragger3D*` through the same slot, so the real
+ * common return type is `IMauiDragger*`, which is what both branches
+ * construct a subclass of.)
+ *
+ * What it does:
+ * Allocates either a `SelectionDragger2D` (screen-space rubber-band) or a
+ * `SelectionDragger3D` (world-space volume, highlighted with terrain decals)
+ * depending on `Moho::ui_DragSelect2D`, constructs it with the supplied
+ * camera/session, then posts it as the world view's active dragger through
+ * `func_PostDragger`. Posts a null dragger on allocation failure (matching
+ * the binary's `xor eax, eax` fallthrough on both branches).
+ *
+ * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0,
+ * not yet recovered). The disassembly at 0x00870E0C-0x00870E23 resolves the
+ * call's arguments from the world view's own fields: `camera` from
+ * `CUIWorldViewRuntimeView::mViewportCallback` (+0x120, the raw pointer
+ * value the constructor chain stores verbatim into `SelectionDragger::mCam`
+ * with no dereference in between), `session` from
+ * `CUIWorldViewRuntimeView::mSession` (+0x208), and `originFrame` from
+ * `CMauiControlExtendedRuntimeView::mRootFrame` (+0xFC, part of the
+ * `CMauiControl` base layout); `eventData` is `HandleEvent`'s own event
+ * argument forwarded through unchanged.
+ */
+[[maybe_unused]] static moho::IMauiDragger* NewSelectionDragger(
+  moho::CameraImpl* const camera,
+  moho::CWldSession* const session,
+  moho::CMauiFrame* const originFrame,
+  moho::SMauiEventData* const eventData
+)
+{
+  moho::IMauiDragger* dragger = nullptr;
+
+  if (moho::ui_DragSelect2D) {
+    auto* const storage =
+      static_cast<moho::SelectionDragger2D*>(::operator new(sizeof(moho::SelectionDragger2D), std::nothrow));
+    if (storage != nullptr) {
+      dragger = new (storage) moho::SelectionDragger2D(camera, session);
+    }
+  } else {
+    auto* const storage =
+      static_cast<moho::SelectionDragger3D*>(::operator new(sizeof(moho::SelectionDragger3D), std::nothrow));
+    if (storage != nullptr) {
+      dragger = new (storage) moho::SelectionDragger3D(camera, session);
+    }
+  }
+
+  func_PostDragger(originFrame, dragger, eventData);
+  return dragger;
 }
 
 // Forward declarations for the wx mouse-event selector helpers defined at

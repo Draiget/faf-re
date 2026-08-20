@@ -376,6 +376,17 @@ namespace moho
    * Forces cursor visibility when the primary render head runs fullscreen.
    */
   extern bool ui_WindowedAlwaysShowsCursor;
+  /**
+   * Address: 0x00F57A8D (?ui_DragSelect2D@Moho@@3_NA)
+   *
+   * What it does:
+   * Selects which selection dragger `NewSelectionDragger` constructs for a
+   * left-mouse drag in select mode: `SelectionDragger2D` (screen-space
+   * rubber-band) when true, `SelectionDragger3D` (world-space volume,
+   * highlighted with terrain decals) when false. Byte-verified shipped
+   * default is `true` (raw PE byte at 0x00F57A8D = 0x01).
+   */
+  extern bool ui_DragSelect2D;
   extern IWldUIProvider* sWldUIProvider;
 
   enum EMauiEventType : std::int32_t
@@ -961,6 +972,107 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mEnd) == 0x20, "moho::UIBuildDragger::mEnd offset must be 0x20");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(UIBuildDragger) == 0x2C, "moho::UIBuildDragger size must be 0x2C");
+
+  /**
+   * The dragger MAUI installs while the player drags an existing command's
+   * marker/waypoint on the command graph to redirect it. Both drag callbacks
+   * funnel into the shared `func_ProcessCommandDrag` worker (CWldSession.cpp,
+   * declared in CWldSession.h) - the class itself is thin cursor-tracking
+   * state, matching `UIBuildDragger`'s own shape above.
+   *
+   * Slot map of `??_7UICommandDragger@Moho@@6B@` (dwords read out of the
+   * shipped image):
+   *   +0x00  0x00824120  scalar deleting destructor (not IDA-classified as
+   *                      its own function - same situation as
+   *                      `~IMauiDragger` at 0x0078DB20; restores the base
+   *                      vtable and drains the inherited `WeakObject` chain
+   *                      the same way, see `IMauiDragger`'s own doc comment
+   *                      above for the instruction-level evidence both
+   *                      share)
+   *   +0x04  0x008241B0  `DragMove`    (override)
+   *   +0x08  0x00824210  `DragRelease` (override)
+   *   +0x0C  (inherited)  `OnCurrentDraggerReplaced` - not overridden
+   *
+   * Field evidence: both `DragMove` (0x008241B0) and `DragRelease`
+   * (0x00824210) read `[this+0Ch]` as the camera (dispatched through its own
+   * vtable slot +0x1C, `CameraScreenToSurface`), `[this+10h]` as the dragged
+   * command's `CmdId` (passed to `func_ProcessCommandDrag`'s `arg4` and, in
+   * `DragRelease`, to `func_OnCommandDragEnd`'s `isDragger`), and `[this+14h]`
+   * as the owning `UICommandGraph*` (passed as `func_ProcessCommandDrag`'s
+   * `arg0`). `DragRelease` additionally reads `[this+8]` at 0x00824260, then
+   * dereferences its own `+0x10` (0x00824263) to reach `func_OnCommandDragEnd`'s
+   * `state` argument - exactly `CWldSession::mState`'s own offset (see
+   * CWldSession.h) - so `[this+8]` is `CWldSession* mSession`, matching
+   * `UIBuildDragger::mWldSession`'s identical role at the identical offset.
+   */
+  class UICommandDragger : public IMauiDragger
+  {
+  public:
+    /**
+     * Address: 0x00824120 (not IDA-classified as its own function; scalar
+     * deleting destructor, slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
+     *
+     * What it does:
+     * Restores the base vtable and drains the inherited `WeakObject` chain,
+     * matching `IMauiDragger::~IMauiDragger`'s own body exactly (see that
+     * destructor's doc comment for the shared instruction-level evidence).
+     */
+    ~UICommandDragger() override;
+
+    /**
+     * Address: 0x008241B0 (FUN_008241B0, slot +0x04 of ??_7UICommandDragger@Moho@@6B@)
+     * Mangled: ?DragMove@UICommandDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::UICommandDragger::DragMove(
+     *     Moho::UICommandDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
+     *
+     * What it does:
+     * Unprojects the event's screen mouse position through the bound camera
+     * into a world-surface point, then forwards it to `func_ProcessCommandDrag`
+     * along with the dragged command's graph/id, `released = false`.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x00824210 (FUN_00824210, slot +0x08 of ??_7UICommandDragger@Moho@@6B@)
+     * Mangled: ?DragRelease@UICommandDragger@Moho@@UAEXPBUSMauiEventData@2@@Z
+     *
+     * IDA signature:
+     * void __thiscall Moho::UICommandDragger::DragRelease(
+     *     Moho::UICommandDragger *this@<ecx>, const Moho::SMauiEventData *eventData);
+     *
+     * What it does:
+     * Unprojects the event's screen mouse position the same way `DragMove`
+     * does, forwards it to `func_ProcessCommandDrag` with `released = true`,
+     * notifies the UI Lua layer via `func_OnCommandDragEnd`, then deletes
+     * this dragger (the inherited `IMauiDragger` `delete this` shape, slot
+     * +0x00).
+     */
+    void DragRelease(const SMauiEventData* eventData) override;
+
+  public:
+    // +0x00 vptr and +0x04 WeakObject::weakLinkHead_ both belong to the
+    // IMauiDragger base; this class's own storage starts at +0x08.
+    CWldSession* mSession = nullptr;  // +0x08
+    CameraImpl* mCam = nullptr;       // +0x0C
+    CmdId mCommandId{};                // +0x10
+    // The ctor (0x00823FE0) writes CWldSession::GetCommandGraph(bool)'s
+    // hidden-return-value shared_ptr (px+pi, 8 bytes) directly into this
+    // slot via `lea ecx,[esi+14h]` -- a raw pointer here would overflow the
+    // object by 4 bytes. sizeof(UICommandDragger)==0x1C matches
+    // operator new(0x1C) at the sole factory call site.
+    boost::SharedPtrRaw<UICommandGraph> mGraph{}; // +0x14
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UICommandDragger, mCam) == 0xC, "moho::UICommandDragger::mCam offset must be 0xC");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(UICommandDragger, mCommandId) == 0x10, "moho::UICommandDragger::mCommandId offset must be 0x10"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(UICommandDragger, mGraph) == 0x14, "moho::UICommandDragger::mGraph offset must be 0x14"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(UICommandDragger) == 0x1C, "moho::UICommandDragger size must be 0x1C");
 
   struct wxEvtHandlerRuntime
   {
