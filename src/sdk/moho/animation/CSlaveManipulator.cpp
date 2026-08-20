@@ -120,7 +120,7 @@ namespace
    * Deserializes one `CSlaveManipulator` lane by loading IAniManipulator base
    * state then source-bone, current quaternion, and max-rate fields.
    */
-  [[maybe_unused]] void DeserializeCSlaveManipulatorSerializerBody(
+  void DeserializeCSlaveManipulatorSerializerBody(
     moho::CSlaveManipulator* const manipulator,
     gpg::ReadArchive* const archive
   )
@@ -143,7 +143,7 @@ namespace
    * Serializes one `CSlaveManipulator` lane by saving IAniManipulator base
    * state then source-bone, current quaternion, and max-rate fields.
    */
-  [[maybe_unused]] void SerializeCSlaveManipulatorSerializerBody(
+  void SerializeCSlaveManipulatorSerializerBody(
     const moho::CSlaveManipulator* const manipulator,
     gpg::WriteArchive* const archive
   )
@@ -257,7 +257,7 @@ namespace
    * Startup cleanup variant that unlinks and self-resets the global
    * CSlaveManipulator serializer helper node.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlaveManipulatorSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_CSlaveManipulatorSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gCSlaveManipulatorSerializer);
   }
@@ -273,6 +273,40 @@ namespace
   {
     return UnlinkSerializerNode(gCSlaveManipulatorSerializer);
   }
+
+  void cleanup_CSlaveManipulatorSerializer_atexit()
+  {
+    (void)cleanup_CSlaveManipulatorSerializerStartupThunkA();
+  }
+
+  /**
+   * Address: 0x00BD31F0 (FUN_00BD31F0, register_CSlaveManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes the global `CSlaveManipulator` serializer helper callbacks
+   * and installs process-exit cleanup.
+   */
+  void register_CSlaveManipulatorSerializer()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCSlaveManipulatorSerializer);
+    gCSlaveManipulatorSerializer.mNext = self;
+    gCSlaveManipulatorSerializer.mPrev = self;
+    gCSlaveManipulatorSerializer.mSerLoadFunc =
+      reinterpret_cast<gpg::RType::load_func_t>(&DeserializeCSlaveManipulatorSerializerBody);
+    gCSlaveManipulatorSerializer.mSerSaveFunc =
+      reinterpret_cast<gpg::RType::save_func_t>(&SerializeCSlaveManipulatorSerializerBody);
+    (void)std::atexit(&cleanup_CSlaveManipulatorSerializer_atexit);
+  }
+
+  struct CSlaveManipulatorSerializerStartupBootstrap
+  {
+    CSlaveManipulatorSerializerStartupBootstrap()
+    {
+      register_CSlaveManipulatorSerializer();
+    }
+  };
+
+  [[maybe_unused]] CSlaveManipulatorSerializerStartupBootstrap gCSlaveManipulatorSerializerStartupBootstrap;
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
