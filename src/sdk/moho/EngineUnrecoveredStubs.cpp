@@ -67,8 +67,9 @@ namespace moho
   // (FUN_00737E60) along with its mMethod==0 callee
   // SIM_DoDamagePoint (FUN_00737140). Replaces the no-op stub.
   // SIM_DoDamageArea (FUN_00737680, mMethod==1) and func_DoDamageRing
-  // (FUN_00737B30, mMethod==2) are still blocked; their stubs live here
-  // so the SIM_Damage dispatcher links until those bodies are recovered.
+  // (FUN_00737B30, mMethod==2) are now recovered in
+  // src/sdk/moho/sim/CDamage.cpp -- the SIM_Damage dispatcher's remaining
+  // two branches, both wired by name. No stub remains for either.
 }
 
 // REMOVED: ADXM_WaitVsync, mpvcdec_InitDct C++-mangled stubs. Their C-linkage
