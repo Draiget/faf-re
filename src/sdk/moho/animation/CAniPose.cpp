@@ -770,6 +770,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063E180 (FUN_0063E180, boost::detail::shared_count_CAniPose::shared_count_CAniPose)
+   *
+   * What it does:
+   * Engine-instantiated `boost::detail::shared_count(CAniPose*)` converting
+   * constructor: allocates one 0x10-byte `sp_counted_impl_p<CAniPose>`
+   * control block, sets use/weak count to 1, publishes its vftable, and
+   * stores the raw pose pointer. Source-level wire-up: `UserEntity`'s pose
+   * setup (`moho/entity/UserEntity.cpp:808-812`) explicitly calls
+   * `CreateCAniPoseSharedPtr(pose, out)` (FUN_0063CA40, already recovered
+   * and wired), whose `out.reset(pose)` body pulls in this exact templated
+   * `shared_count<CAniPose>` ctor emission.
+   */
+  boost::detail::shared_count* ConstructSharedCountCAniPoseFromRaw(
+    boost::detail::shared_count* const outCount,
+    CAniPose* const pose
+  )
+  {
+    return boost::ConstructSharedCountFromRaw(outCount, pose);
+  }
+
+  /**
    * Address: 0x0054C9C0 (FUN_0054C9C0, Moho::CAniPoseBone::CAniPoseBone)
    *
    * What it does:
