@@ -63,6 +63,10 @@ namespace moho
   bool ed_EnableHook = true;              // 0x00F57E55 = 0x01
   bool ren_Oblivion = false;              // 0x010A6417, zero-fill
   bool ren_ShowNormals = false;           // 0x010A643C, zero-fill
+  /// Gates the terrain dirty-rect debug overlay, read at 0x00805F31
+  /// (`cmp ?ren_ShowDirtyTerrain@Moho@@3_NA, 0` in
+  /// MediumFidelityTerrain::DrawDirtyTerrain).
+  bool ren_ShowDirtyTerrain = false;      // 0x010A643D, zero-fill
   bool ren_DecalOverDraw = false;         // 0x010A6440, zero-fill
   bool ren_ShowFrameTimes = false;        // 0x010A6430, zero-fill
   bool ren_ShowNetworkStats = false;      // 0x010A6431, zero-fill
