@@ -61793,10 +61793,14 @@ namespace
 
   /**
    * Address: 0x007FB7C0 (FUN_007FB7C0, boost::shared_ptr_IRenTerrain::operator=)
+   * Address: 0x007FBA60 (FUN_007FBA60, boost::detail::shared_count_IRenTerrain::shared_count_IRenTerrain)
    *
    * What it does:
    * Rebinds one `shared_ptr<TerrainCommon>` from a raw pointer and releases
-   * prior ownership.
+   * prior ownership. The real `boost::shared_ptr<TerrainCommon>::reset(T*)`
+   * this delegates to internally constructs a fresh `shared_count(T*)`
+   * control block (0x007FBA60) before releasing the old one; this single
+   * call covers both.
    */
   boost::shared_ptr<moho::TerrainCommon>* AssignSharedTerrainFromRaw(
     boost::shared_ptr<moho::TerrainCommon>* const outTerrain,
