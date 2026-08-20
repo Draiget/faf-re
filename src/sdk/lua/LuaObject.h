@@ -3092,3 +3092,20 @@ namespace LuaPlus
 	 */
 	void ClearAndResetLuaObjectFastVector(gpg::core::fastvector_runtime_view<LuaPlus::LuaObject>& view) noexcept;
 }
+
+/**
+ * The two `lua_CFunction` entries of the `serialize` library table
+ * (`serializelib`, 0x00D47068), defined in
+ * `gpg/core/containers/ArchiveSerialization.cpp` next to the reflection
+ * archive plumbing they drive. Declared here - the header both that file and
+ * `lua/LuaObject.cpp` already include - so `luaopen_serialize` (0x00923690)
+ * can name them when it builds the table, which is the only thing that keeps
+ * either body in the link.
+ *
+ * Table layout read out of the shipped image:
+ *   0x00D47068 -> "tostring"   / 0x00D4706C -> 0x00923AC0
+ *   0x00D47070 -> "fromstring" / 0x00D47074 -> 0x00923D20
+ *   0x00D47078 -> { nullptr, nullptr } sentinel
+ */
+int LuaSerializeToString(lua_State* L);
+int LuaSerializeFromString(lua_State* L);
