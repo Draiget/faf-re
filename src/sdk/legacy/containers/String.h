@@ -6,6 +6,46 @@
 
 namespace msvc8
 {
+    /**
+     * Address: 0x00ABF013 (FUN_00ABF013)
+     * Mangled: ?_Xlen@_String_base@std@@SAXXZ
+     *
+     * IDA signature:
+     * void __cdecl __noreturn std::_String_base::_Xlen(void);
+     *
+     * What it does:
+     * Dinkumware's shared (non-templated) "requested string length is not
+     * representable" helper - throws std::length_error("string too long")
+     * and never returns. In the binary it is called from every
+     * basic_string<char>/basic_string<wchar_t> growth path: std::string::assign
+     * (0x004056FE), std::string::append (0x00405829, 0x00405840), insert,
+     * replace, and the wstring equivalents (18 call sites total, decoded from
+     * the raw E8 bytes; see FUN_00ABF013.xrefs.txt). Those STL-internal bodies
+     * are tracked `skip` in recovered_progress.json (generic Dinkumware
+     * library code, not FA engine logic); `msvc8::string::assign_owned_strong`
+     * is this project's higher-level stand-in for their length guard, so that
+     * is where this is wired.
+     */
+    [[noreturn]] void ThrowStringTooLong();
+
+    /**
+     * Address: 0x00ABF052 (FUN_00ABF052)
+     *
+     * IDA signature:
+     * void __cdecl __noreturn std::_String_base::_Xran(void);
+     *
+     * What it does:
+     * Dinkumware's shared (non-templated) "position/offset argument out of
+     * range" helper - throws std::out_of_range("invalid string position") and
+     * never returns. In the binary it is called from std::string::assign
+     * (0x004056C3), std::string::append (0x00405803), erase, insert, replace,
+     * and the wstring equivalents (12 call sites total, decoded from the raw
+     * E8 bytes; see FUN_00ABF052.xrefs.txt). `msvc8::string::assign(other,
+     * pos, count)` already models FUN_004056B0 (std::string::assign)
+     * including its pos-vs-size check, so this is wired there.
+     */
+    [[noreturn]] void ThrowInvalidStringPosition();
+
 #pragma pack(push, 4)
     struct string
 	{
@@ -224,6 +264,9 @@ namespace msvc8
          * Strong-guarantee owning assignment for recovered MSVC8 paths whose
          * original `basic_string::assign` allocates before releasing the old
          * buffer and propagates allocation/length failures.
+         *
+         * The length guard is std::_String_base::_Xlen (0x00ABF013): see
+         * ThrowStringTooLong().
          */
         void assign_owned_strong(std::string_view value);
         void assign_owned_strong(const char* value);
@@ -346,18 +389,22 @@ namespace msvc8
 
         /**
          * Assign from a substring of another msvc8::string.
-         * Semantics modeled after MSVC8 std::string::assign(str, pos, count).
+         * Semantics modeled after MSVC8 std::string::assign(str, pos, count)
+         * (FUN_004056B0), including its out-of-range behavior.
          *
          * Differences vs original MSVC8:
-         *  - No dynamic reallocation is performed (this wrapper is in-place only).
-         *  - If requested substring length exceeds capacity(), content is truncated to capacity().
+         *  - If requested substring length exceeds capacity(), content is truncated to capacity()
+         *    instead of reallocating without bound.
          *
          * @param other Source string.
-         * @param pos   Starting position in source (clamped to other.size()).
+         * @param pos   Starting position in source.
          * @param count Number of characters to copy; npos means "to the end".
          * @return *this
+         * @throws std::out_of_range via ThrowInvalidStringPosition() (the
+         *         std::_String_base::_Xran equivalent, 0x00ABF052) if
+         *         pos > other.size().
          */
-        string& assign(const string& other, std::size_t pos, std::size_t count = npos) noexcept;
+        string& assign(const string& other, std::size_t pos, std::size_t count = npos);
         string& assign(std::size_t count, char ch) noexcept {
             clear();
             (void)append(count, ch);

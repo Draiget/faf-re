@@ -7,6 +7,37 @@
 #include <stdexcept>
 #include <utility>
 
+/**
+ * Address: 0x00ABF013 (FUN_00ABF013)
+ * Mangled: ?_Xlen@_String_base@std@@SAXXZ
+ *
+ * IDA signature:
+ * void __cdecl __noreturn std::_String_base::_Xlen(void);
+ *
+ * What it does:
+ * Throws std::length_error("string too long"); never returns. See the
+ * declaration in String.h for the full call-site evidence.
+ */
+[[noreturn]] void msvc8::ThrowStringTooLong()
+{
+    throw std::length_error("string too long");
+}
+
+/**
+ * Address: 0x00ABF052 (FUN_00ABF052)
+ *
+ * IDA signature:
+ * void __cdecl __noreturn std::_String_base::_Xran(void);
+ *
+ * What it does:
+ * Throws std::out_of_range("invalid string position"); never returns. See
+ * the declaration in String.h for the full call-site evidence.
+ */
+[[noreturn]] void msvc8::ThrowInvalidStringPosition()
+{
+    throw std::out_of_range("invalid string position");
+}
+
 // All three converting constructors copy, which is what MSVC8's
 // `std::basic_string` does: short input goes in the inline buffer, anything
 // longer gets a heap block of its own.
@@ -236,7 +267,7 @@ void msvc8::string::assign_owned(const char* const value) {
 
 void msvc8::string::assign_owned_strong(const std::string_view value) {
     if (value.size() > maxCapGuard) {
-        throw std::length_error("legacy string too long");
+        ThrowStringTooLong();
     }
 
     if (value.size() <= 15U) {
@@ -625,16 +656,18 @@ msvc8::string& msvc8::string::reset_and_assign(const string& other) noexcept {
     return assign(other, 0U, npos);
 }
 
-msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const std::size_t count) noexcept {
+msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const std::size_t count) {
     // Basic sanity checks: if source is bogus, clear destination.
     if (!other.basic_sanity()) {
         clear();
         return *this;
     }
 
-    // Range check like _Xran(): clamp pos to size (produces empty result if pos == size).
+    // Range check matching std::string::assign (FUN_004056B0, confirmed via
+    // decoded call bytes at 0x004056C3): pos beyond the source's size is not
+    // clamped in the binary - it throws std::_String_base::_Xran.
     if (pos > other.mySize) {
-        pos = other.mySize;
+        ThrowInvalidStringPosition();
     }
 
     const std::size_t remainder = static_cast<std::size_t>(other.mySize) - pos;
