@@ -537,6 +537,23 @@ namespace moho
     );
 
     /**
+     * Address: 0x00764CF0 (FUN_00764CF0, Moho::Sim::path_GeneratePreview)
+     *
+     * What it does:
+     * `path_GeneratePreview` sim command. Runs a background pathfind preview
+     * (drag-to-move UI) for the largest eligible selected unit, updating the
+     * focus army's cached `PathPreviewFinder`; clears it when no unit
+     * qualifies.
+     */
+    static int path_GeneratePreview(
+      Sim* sim,
+      CSimConCommand::ParsedCommandArgs* commandArgs,
+      Wm3::Vector3f* worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit* selectedUnits
+    );
+
+    /**
      * Address: 0x006D1900 (FUN_006D1900, Moho::Sim::DebugAIStatesOff)
      *
      * What it does:
