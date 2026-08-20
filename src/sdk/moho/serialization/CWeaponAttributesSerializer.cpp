@@ -407,7 +407,7 @@ namespace
    * Loads the same `CWeaponAttributes` lanes as `FUN_006D3780`, but always
    * uses an empty owner-ref lane for the weapon-pointer read path.
    */
-  [[maybe_unused]] void LoadCWeaponAttributesNoOwnerRef(
+  void LoadCWeaponAttributesNoOwnerRef(
     gpg::ReadArchive* const archive,
     moho::CWeaponAttributes* const attributes
   )
