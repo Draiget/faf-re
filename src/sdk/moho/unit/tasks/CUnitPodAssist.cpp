@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <new>
 #include <typeinfo>
@@ -674,6 +675,61 @@ namespace moho
     archive->Write(CachedWeakPtrUnitType(), const_cast<WeakPtr<Unit>*>(&mAssistTarget), weakRef);
   }
 } // namespace moho
+
+namespace
+{
+  void DeserializeCUnitPodAssistSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<moho::CUnitPodAssist*>(static_cast<std::uintptr_t>(objectPtr))->MemberDeserialize(archive);
+  }
+
+  void SerializeCUnitPodAssistSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    reinterpret_cast<const moho::CUnitPodAssist*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
+  }
+
+  void cleanup_CUnitPodAssistSerializer_atexit()
+  {
+    (void)moho::cleanup_CUnitPodAssistSerializerStartupThunkA();
+  }
+
+  /**
+   * Address: 0x00BD1590 (FUN_00BD1590, register_CUnitPodAssistSerializer)
+   *
+   * What it does:
+   * Initializes the global CUnitPodAssist serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CUnitPodAssistSerializer()
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(gCUnitPodAssistSerializerStartupNode);
+    gCUnitPodAssistSerializerStartupNode.mHelperNext = self;
+    gCUnitPodAssistSerializerStartupNode.mHelperPrev = self;
+    gCUnitPodAssistSerializerStartupNode.mLoad = &DeserializeCUnitPodAssistSerializerCallback;
+    gCUnitPodAssistSerializerStartupNode.mSave = &SerializeCUnitPodAssistSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitPodAssistSerializer_atexit);
+  }
+
+  struct CUnitPodAssistSerializerStartupBootstrap
+  {
+    CUnitPodAssistSerializerStartupBootstrap()
+    {
+      register_CUnitPodAssistSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitPodAssistSerializerStartupBootstrap gCUnitPodAssistSerializerStartupBootstrap;
+} // namespace
 
 namespace gpg
 {
