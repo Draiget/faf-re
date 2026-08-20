@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <new>
 #include <typeinfo>
@@ -1734,24 +1735,6 @@ namespace
   }
 
   /**
-   * Address: 0x00615420 (FUN_00615420)
-   *
-   * What it does:
-   * Initializes startup helper links plus callback lanes for global
-   * `CUnitMeleeAttackTargetTaskSerializer` storage and returns the helper.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CUnitMeleeAttackTargetTaskSerializer* InitializeCUnitMeleeAttackTargetTaskSerializerStartupThunk()
-  {
-    gpg::SerHelperBase* const self =
-      reinterpret_cast<gpg::SerHelperBase*>(&gCUnitMeleeAttackTargetTaskSerializer.mHelperNext);
-    gCUnitMeleeAttackTargetTaskSerializer.mHelperPrev = self;
-    gCUnitMeleeAttackTargetTaskSerializer.mHelperNext = self;
-    gCUnitMeleeAttackTargetTaskSerializer.mDeserialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize;
-    gCUnitMeleeAttackTargetTaskSerializer.mSerialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Serialize;
-    return &gCUnitMeleeAttackTargetTaskSerializer;
-  }
-
-  /**
    * Address: 0x00615450 (FUN_00615450)
    *
    * What it does:
@@ -1778,4 +1761,48 @@ namespace
       AsSerSaveLoadHelperListRuntime(gCUnitMeleeAttackTargetTaskSerializer)
     );
   }
+
+  /**
+   * Address: 0x00BF9F90 (FUN_00BF9F90, Moho::CUnitMeleeAttackTargetTaskSerializer::~CUnitMeleeAttackTargetTaskSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CUnitMeleeAttackTargetTaskSerializer`
+   * helper node, matching the sibling unlink lanes used across other
+   * serializer registrars.
+   */
+  void cleanup_CUnitMeleeAttackTargetTaskSerializer_atexit()
+  {
+    (void)UnlinkCUnitMeleeAttackTargetTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BD0E00 (FUN_00BD0E00, register_CUnitMeleeAttackTargetTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitMeleeAttackTargetTaskSerializer` helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`. Supersedes the previous
+   * orphaned startup thunk, which self-linked and set the callback lanes but
+   * never installed the `atexit` cleanup the real binary registers here.
+   */
+  void register_CUnitMeleeAttackTargetTaskSerializer()
+  {
+    gpg::SerHelperBase* const self =
+      reinterpret_cast<gpg::SerHelperBase*>(&gCUnitMeleeAttackTargetTaskSerializer.mHelperNext);
+    gCUnitMeleeAttackTargetTaskSerializer.mHelperNext = self;
+    gCUnitMeleeAttackTargetTaskSerializer.mHelperPrev = self;
+    gCUnitMeleeAttackTargetTaskSerializer.mDeserialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Deserialize;
+    gCUnitMeleeAttackTargetTaskSerializer.mSerialize = &moho::CUnitMeleeAttackTargetTaskSerializer::Serialize;
+    (void)std::atexit(&cleanup_CUnitMeleeAttackTargetTaskSerializer_atexit);
+  }
+
+  struct CUnitMeleeAttackTargetTaskSerializerStartupBootstrap
+  {
+    CUnitMeleeAttackTargetTaskSerializerStartupBootstrap()
+    {
+      register_CUnitMeleeAttackTargetTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitMeleeAttackTargetTaskSerializerStartupBootstrap gCUnitMeleeAttackTargetTaskSerializerStartupBootstrap;
 } // namespace
