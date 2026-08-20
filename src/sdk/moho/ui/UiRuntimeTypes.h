@@ -3736,16 +3736,32 @@ namespace moho
     std::int32_t mInputLocks = 0;               // +0x1C
     std::int32_t mWorldViewDepth = 0;           // +0x20
     std::int32_t mState = 0;                    // +0x24
-    std::uint8_t mPad28[0x04]{};                // +0x28
+    /// Event type of the last right-button action this view processed, stored
+    /// at 0x00870F2C and tested `== MET_ButtonDClick` at 0x008710B8 so the
+    /// release path can tell a double-click order from a single-click one.
+    /// Was dead padding until `HandleEvent`'s two accesses were mapped.
+    EMauiEventType mLastRightButtonEvent = MET_Unknown; // +0x28
     CommandModeData mLeftMouseCommand;          // +0x2C
     CommandModeData mCommandData;               // +0x8C
     CWldSession* mWldSession = nullptr;         // +0xEC
     boost::SharedPtrRaw<UICommandGraph> mComGraph; // +0xF0
     CUIWorldViewBuildDragRuntimeView mBuildDrag; // +0xF8
     bool mConvertToPatrolCursor = false;        // +0x158
-    std::uint8_t mUnknown159 = 0;               // +0x159
-    bool mHideResources = false;                // +0x15A
-    std::uint8_t mPad15B[0x09]{};               // +0x15B
+    /// Set on MET_MouseEnter and cleared on MET_MouseExit by
+    /// `CUIWorldView::HandleEvent` (0x008704E4 / 0x00870500): the cursor is
+    /// inside this view.
+    std::uint8_t mCursorInside = 0;             // +0x159
+    /// Space-drag camera rotation in progress. Raised on the first rotating
+    /// motion frame (0x00870A55) and dropped when the drag ends or the pointer
+    /// leaves (0x0087051F / 0x00870A8F). `Render` reads it at 0x0086EE0B to
+    /// suppress the resource-splat pass, which is what the previous name
+    /// (`mHideResources`) described - the effect rather than the cause.
+    bool mCameraRotationActive = false;         // +0x15A
+    std::uint8_t mPad15B = 0;                   // +0x15B
+    /// Cursor position the last rotation frame sampled, so the next frame can
+    /// hand `CameraSpin` a delta. Read at 0x008709DE / 0x008709F1 and rewritten
+    /// at 0x00870A5F / 0x00870A68 (CUIWorldView +0x278 / +0x27C).
+    Wm3::Vector2f mLastCursorScreenPos{};       // +0x15C
     msvc8::string mCameraTrack;                 // +0x164
     CMauiCurrentFocusControlRuntimeView mOverlayLink; // +0x180
     bool mHighlightEnabled = true;              // +0x188
@@ -3783,7 +3799,17 @@ namespace moho
     offsetof(CRenderWorldView, mConvertToPatrolCursor) == 0x158,
     "CRenderWorldView::mConvertToPatrolCursor offset must be 0x158"
   );
-  static_assert(offsetof(CRenderWorldView, mHideResources) == 0x15A, "CRenderWorldView::mHideResources offset must be 0x15A");
+  static_assert(
+    offsetof(CRenderWorldView, mCursorInside) == 0x159, "CRenderWorldView::mCursorInside offset must be 0x159"
+  );
+  static_assert(
+    offsetof(CRenderWorldView, mCameraRotationActive) == 0x15A,
+    "CRenderWorldView::mCameraRotationActive offset must be 0x15A"
+  );
+  static_assert(
+    offsetof(CRenderWorldView, mLastCursorScreenPos) == 0x15C,
+    "CRenderWorldView::mLastCursorScreenPos offset must be 0x15C"
+  );
   static_assert(offsetof(CRenderWorldView, mCameraTrack) == 0x164, "CRenderWorldView::mCameraTrack offset must be 0x164");
   static_assert(offsetof(CRenderWorldView, mOverlayLink) == 0x180, "CRenderWorldView::mOverlayLink offset must be 0x180");
   static_assert(
@@ -3836,7 +3862,28 @@ namespace moho
    * the `IRenderWorldView` sub-object, which is still reached through
    * `CUIWorldViewRuntimeView::mRenderWorldView`.
    */
-  class CUIWorldView : public CMauiControl
+  /**
+   * Second-base evidence (re-read out of `bin/external/ForgedAlliance.exe`):
+   *
+   * `CUIWorldView`'s complete-object locator at 0x00E9BCD8 lists nine entries
+   * in its base-class array, the last of which is
+   * `.?AVIRenderWorldView@Moho@@` at `mdisp = 0x11C`, and the constructor
+   * (0x0086E4EF) installs `??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@`
+   * - the derived class's override table for that secondary base - at
+   * `[this+11Ch]`. The secondary locator behind it (0x00E490D8) records
+   * `offset = 0x11C` and names `.?AVCUIWorldView@Moho@@`, so every field from
+   * +0x120 up belongs to this class through that sub-object.
+   *
+   * `Moho::CRenderWorldView` is NOT a class in the shipped image - the string
+   * `.?AVCRenderWorldView@Moho@@` does not appear anywhere in it. It is this
+   * tree's name for exactly that `IRenderWorldView`-derived portion, and every
+   * method it declares is a slot of the secondary vtable above (slot 0
+   * 0x0086EE00 `Render`, slot 10 0x0086DC90 `IsMiniMap`, ...). Deriving from
+   * it here is therefore layout-exact rather than an invention:
+   * `sizeof(CMauiControl) == 0x11C` + `sizeof(CRenderWorldView) == 0x18C`
+   * == 0x2A8, the size the sole allocation site asks the UI heap for.
+   */
+  class CUIWorldView : public CMauiControl, public CRenderWorldView
   {
   public:
     static gpg::RType* sType;
@@ -3917,6 +3964,18 @@ namespace moho
      */
     void SetHidden(bool hidden) override;
   };
+
+  // 0x11C (CMauiControl) + 0x18C (the IRenderWorldView sub-object at +0x11C)
+  // == the 0x2A8 the Lua `__init` binder allocates for one world view.
+  static_assert(sizeof(CUIWorldView) == 0x2A8, "CUIWorldView size must be 0x2A8");
+  // The secondary base must land exactly on the +0x11C the constructor writes
+  // its override table to (0x0086E4EF). MSVC lays non-virtual bases out in
+  // declaration order, so this is `sizeof(CMauiControl)` - assert the two
+  // agree rather than trusting the ordering silently.
+  static_assert(
+    sizeof(CMauiControl) == 0x11C,
+    "CRenderWorldView sub-object must start at CUIWorldView+0x11C"
+  );
 
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiCurrentFocusControlRuntimeView) == 0x8, "CMauiCurrentFocusControlRuntimeView size must be 0x8");

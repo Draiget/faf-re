@@ -1847,6 +1847,29 @@ void moho::CameraImpl::CameraRevertRotation()
 }
 
 /**
+ * Address: 0x007A8240 (FUN_007A8240, Moho::CameraImpl::CameraSetPivot)
+ * Slot: 30 (+0x78 of ??_7CameraImpl@Moho@@6B@)
+ *
+ * IDA signature:
+ * Wm3::Vector2f *__thiscall Moho::CameraImpl::CameraSetPivot(
+ *     Moho::CameraImpl *this@<ecx>, Wm3::Vector2f *pivot);
+ *
+ * What it does:
+ * Parks the screen-space point the next zoom or spin should pivot around.
+ * The whole body is two float stores - 0x007A8246 `fstp dword ptr [ecx+36Ch]`
+ * and 0x007A824F `fstp dword ptr [ecx+370h]` - which is exactly
+ * `CameraImplRuntimeView::mPivot`. The `Wm3::Vector2f*` in the IDA signature
+ * is the incoming argument still sitting in `eax` at `retn 4`; no call site
+ * reads it, so this is modelled as returning `void`.
+ */
+void moho::CameraImpl::CameraSetPivot(const Wm3::Vector2f& pivot)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  runtime->mPivot.x = pivot.X();
+  runtime->mPivot.y = pivot.Y();
+}
+
+/**
  * Address: 0x007A80A0 (FUN_007A80A0, Moho::CameraImpl::CameraReset)
  * Mangled: ?CameraReset@CameraImpl@Moho@@UAEXXZ
  *

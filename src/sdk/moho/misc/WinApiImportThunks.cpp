@@ -81413,25 +81413,6 @@ namespace moho::runtime
     return 0;
   }
 
-  struct LegacyVirtualIntReaderSlot128VTable
-  {
-    std::uint8_t reserved00[0x80];
-    LegacyVirtualIntReader readAtSlot128;
-  };
-  static_assert(
-    offsetof(LegacyVirtualIntReaderSlot128VTable, readAtSlot128) == 0x80,
-    "LegacyVirtualIntReaderSlot128VTable::readAtSlot128 offset must be 0x80"
-  );
-
-  struct LegacyVirtualIntReaderSlot128RuntimeView
-  {
-    LegacyVirtualIntReaderSlot128VTable* vtable;
-  };
-  static_assert(
-    sizeof(LegacyVirtualIntReaderSlot128RuntimeView) == 0x4,
-    "LegacyVirtualIntReaderSlot128RuntimeView size must be 0x4"
-  );
-
   struct LegacyVirtualIntReaderSlot536VTable
   {
     std::uint8_t reserved00[0x218];
@@ -81481,17 +81462,6 @@ namespace moho::runtime
     sizeof(LegacyVirtualIntReaderWithIntArgSlot576RuntimeView) == 0x4,
     "LegacyVirtualIntReaderWithIntArgSlot576RuntimeView size must be 0x4"
   );
-
-  /**
-   * Address: 0x00873BD0 (FUN_00873BD0)
-   *
-   * What it does:
-   * Tail-dispatches to one int-returning virtual slot at `vtable + 0x80`.
-   */
-  int LegacyInvokeVirtualIntReaderSlot128RuntimeLaneAlpha(LegacyVirtualIntReaderSlot128RuntimeView* const owner)
-  {
-    return owner->vtable->readAtSlot128(owner);
-  }
 
   /**
    * Address: 0x009824C0 (FUN_009824C0)
