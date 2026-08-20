@@ -2400,6 +2400,10 @@ namespace gpg::core::legacy
    * Address: 0x00553B90 (FUN_00553B90, SSyncData uint dword grow/insert lane)
    * Address: 0x00559190 (FUN_00559190, SSTIEntityAttachInfo dword grow/insert lane)
    * Address: 0x00657F60 (FUN_00657F60, fastvector<float> dword grow/insert lane)
+   * Address: 0x008228C0 (FUN_008228C0, fastvector<Moho::UserUnit*> dword
+   * grow/insert lane — reached via PushBackUserUnitPointerRange (0x008224E0,
+   * this file) on the capacity-full path; real fastvector<UserUnit*> usage
+   * at e.g. CWldSession.cpp:12092/moho/sim/CCommandLuaFunctionRegistrations.cpp:2412)
    *
    * What it does:
    * Allocates replacement storage for one 4-byte fastvector lane and
