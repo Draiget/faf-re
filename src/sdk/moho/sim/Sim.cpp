@@ -4445,7 +4445,7 @@ namespace
    * first, then sequential cursor), packs the active source byte into high bits,
    * and writes the resulting command id to `outCommandId`.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* AllocatePackedCommandIdFromManager(
+  [[nodiscard]] std::uint32_t* AllocatePackedCommandIdFromManager(
     CommandManager* const commandManager,
     std::uint32_t* const outCommandId
   ) noexcept
@@ -5661,7 +5661,7 @@ namespace
    * For `TransportReverseLoadUnits`, replaces the incoming selected-unit set
    * with one best transport candidate plus the requested target unit.
    */
-  [[maybe_unused]] void RetargetReverseLoadUnits(
+  void RetargetReverseLoadUnits(
     const SSTICommandIssueData& issueData,
     Sim* const sim,
     SEntitySetTemplateUnit& selectedUnits
@@ -12446,7 +12446,7 @@ namespace
    * Converts `SEconTotals::mMaxStorage` signed 64-bit ENERGY/MASS lanes into a
    * pair of float lanes using the original sign-bit split conversion path.
    */
-  [[maybe_unused]] [[nodiscard]] SEconPair* BuildSignedMaxStorageFloatPair(
+  [[nodiscard]] SEconPair* BuildSignedMaxStorageFloatPair(
     SEconPair* const outPair,
     const SEconTotals& totals
   ) noexcept
