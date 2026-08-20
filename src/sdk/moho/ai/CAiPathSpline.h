@@ -584,6 +584,14 @@ namespace moho
   public:
     static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0062F910 (FUN_0062F910, gpg::SerSaveLoadHelper<Moho::CPathPoint>::Init)
+     *
+     * What it does:
+     * Binds `CPathPoint` load/save callbacks onto its reflected type
+     * metadata; asserts neither slot is already claimed before installing them.
+     */
     virtual void RegisterSerializeFunctions();
 
   public:

@@ -145,7 +145,11 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x006EEBE0 (FUN_006EEBE0, helper Init)
+     * Address: 0x006F8520 (FUN_006F8520, gpg::SerSaveLoadHelper<Moho::CUnitCommandQueue>::Init)
+     *
+     * What it does:
+     * Binds `CUnitCommandQueue` load/save callbacks onto its reflected type
+     * metadata; asserts neither slot is already claimed before installing them.
      */
     virtual void RegisterSerializeFunctions();
 
