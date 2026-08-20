@@ -266,6 +266,18 @@ namespace boost
       return reinterpret_cast<SpCountedBaseRuntimeView*>(control);
     }
 
+    // NOTE (2026-08-20 audit): despite the "Weak" name inherited from the public
+    // wrappers below, FUN_0043D940 (one of the addresses backing this core, see
+    // `AssignWeakPairFromShared`) proves both lanes are ordinary strong
+    // shared-count ownership, not weak: the acquire step is `lock xadd [pi+4],1`
+    // (`use_count_` at +0x04 - `add_ref_copy()`, not `weak_add_ref()`) and the
+    // release step calls FUN_004229B0, which is `sp_counted_base::release()`
+    // (dispose-then-weak-release fused; see BoostWrappers.h), not
+    // `weak_release()`. The public entry points (`AssignWeakPairFromShared`,
+    // `AssignWeakPairFromSharedReversed`) are called from outside this TU
+    // (AudioEngine.cpp, BeamRenderHelpers.cpp, CWorldParticles.cpp,
+    // CD3DDevice.cpp, ResourceManager.cpp) so their names are kept stable;
+    // only the body is corrected here.
     template <typename OutPairT, typename SourcePairT>
     SharedCountPair* AssignWeakPairFromSharedCore(OutPairT* const outPair, const SourcePairT* const sourcePair) noexcept
     {
@@ -274,10 +286,10 @@ namespace boost
       detail::sp_counted_base* const sourceControl = sourcePair->pi;
       if (sourceControl != outPair->pi) {
         if (sourceControl != nullptr) {
-          sourceControl->weak_add_ref();
+          sourceControl->add_ref_copy();
         }
         if (outPair->pi != nullptr) {
-          outPair->pi->weak_release();
+          outPair->pi->release();
         }
         outPair->pi = sourceControl;
       }
@@ -413,9 +425,16 @@ namespace boost
    * Address: 0x0043F2E0 (FUN_0043F2E0)
    * Address: 0x004438C0 (FUN_004438C0)
    *
+   * NOTE (2026-08-20 audit): the name is a legacy misnomer kept for external
+   * callers (AudioEngine.cpp, BeamRenderHelpers.cpp, CWorldParticles.cpp,
+   * CD3DDevice.cpp, ResourceManager.cpp) - FUN_0043D940 proves this is a
+   * strong shared-count rebind (`add_ref_copy()` on acquire, real
+   * `release()` via FUN_004229B0 on the replaced lane), not a weak one. See
+   * `AssignWeakPairFromSharedCore` above for the evidence.
+   *
    * What it does:
    * Copies one `(px,pi)` pair and rebinds control ownership by retaining the
-   * incoming `pi` then weak-releasing the previous `pi`.
+   * incoming `pi` then releasing the previous `pi`.
    */
   SharedCountPair* AssignWeakPairFromShared(
     SharedCountPair* const outPair,
@@ -433,8 +452,9 @@ namespace boost
    * Address: 0x0089AE50 (FUN_0089AE50, Moho::WeakPtr_UICommandGraph::cpy)
    *
    * What it does:
-   * Executes the same weak-owner pair rebind as `AssignWeakPairFromShared`,
-   * but receives arguments in `(source, destination)` order.
+   * Executes the same strong shared-count pair rebind as
+   * `AssignWeakPairFromShared` (see its 2026-08-20 audit note), but receives
+   * arguments in `(source, destination)` order.
    */
   SharedCountPair* AssignWeakPairFromSharedReversed(
     const SharedCountPair* const sourcePair,
@@ -458,8 +478,11 @@ namespace boost
    * Address: 0x0088B790 (FUN_0088B790)
    *
    * What it does:
-   * Writes one source shared/weak pair into an owner slot at `+0x20` and
-   * rebinds weak control ownership with legacy weak-retain/weak-release rules.
+   * Writes one source `(px,pi)` pair into an owner slot at `+0x20` and rebinds
+   * control ownership with strong retain/release rules (see the 2026-08-20
+   * audit note on `AssignWeakPairFromShared` - the field is still named
+   * `weakPair` for layout-name stability, but the control block it owns is a
+   * strong reference).
    */
   void AssignWeakPairToOwnerOffset32(
     const SharedCountPair* const sourcePair,
@@ -477,11 +500,16 @@ namespace boost
   /**
    * Address: 0x007DD160 (FUN_007DD160)
    *
+   * NOTE (2026-08-20 audit): renamed from `...WithWeakRelease`. FUN_007DD160's
+   * release step calls FUN_004229B0, which is `sp_counted_base::release()`
+   * (dispose-then-weak-release fused; see BoostWrappers.h), never a standalone
+   * weak drop. Zero external callers at rename time (grep-verified).
+   *
    * What it does:
    * Copies one `(px,pi)` pair and rebinds ownership by shared-retaining the
-   * incoming control lane and weak-releasing the previously bound lane.
+   * incoming control lane and shared-releasing the previously bound lane.
    */
-  SharedCountPair* AssignSharedPairRetainWithWeakRelease(
+  SharedCountPair* AssignSharedPairRetainAndRelease(
     SharedCountPair* const outPair,
     const SharedCountPair* const sourcePair
   ) noexcept
@@ -494,7 +522,7 @@ namespace boost
         incomingControl->add_ref_copy();
       }
       if (outPair->pi != nullptr) {
-        outPair->pi->weak_release();
+        outPair->pi->release();
       }
       outPair->pi = incomingControl;
     }
@@ -507,14 +535,14 @@ namespace boost
    *
    * What it does:
    * Source-first adapter lane for
-   * `AssignSharedPairRetainWithWeakRelease`.
+   * `AssignSharedPairRetainAndRelease`.
    */
-  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirst(
+  SharedCountPair* AssignSharedPairRetainAndReleaseSourceFirst(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
   {
-    return AssignSharedPairRetainWithWeakRelease(outPair, sourcePair);
+    return AssignSharedPairRetainAndRelease(outPair, sourcePair);
   }
 
   /**
@@ -522,14 +550,14 @@ namespace boost
    *
    * What it does:
    * Source-first adapter lane for shared-pair assignment with retained
-   * incoming shared-control ownership and weak-release of the replaced lane.
+   * incoming shared-control ownership and shared-release of the replaced lane.
    */
-  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterA(
+  SharedCountPair* AssignSharedPairRetainAndReleaseSourceFirstAdapterA(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
   {
-    return AssignSharedPairRetainWithWeakRelease(outPair, sourcePair);
+    return AssignSharedPairRetainAndRelease(outPair, sourcePair);
   }
 
   /**
@@ -537,14 +565,14 @@ namespace boost
    *
    * What it does:
    * Secondary source-first adapter lane for
-   * `AssignSharedPairRetainWithWeakRelease`.
+   * `AssignSharedPairRetainAndRelease`.
    */
-  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterB(
+  SharedCountPair* AssignSharedPairRetainAndReleaseSourceFirstAdapterB(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
   {
-    return AssignSharedPairRetainWithWeakRelease(outPair, sourcePair);
+    return AssignSharedPairRetainAndRelease(outPair, sourcePair);
   }
 
   /**
@@ -552,23 +580,31 @@ namespace boost
    *
    * What it does:
    * Source-first adapter lane for shared-pair assignment with retained
-   * incoming shared-control ownership and weak-release of the replaced lane.
+   * incoming shared-control ownership and shared-release of the replaced lane.
    */
-  SharedCountPair* AssignSharedPairRetainWithWeakReleaseSourceFirstAdapterC(
+  SharedCountPair* AssignSharedPairRetainAndReleaseSourceFirstAdapterC(
     const SharedCountPair* const sourcePair,
     SharedCountPair* const outPair
   ) noexcept
   {
-    return AssignSharedPairRetainWithWeakRelease(outPair, sourcePair);
+    return AssignSharedPairRetainAndRelease(outPair, sourcePair);
   }
 
   /**
    * Address: 0x0055AA60 (FUN_0055AA60)
    *
+   * NOTE (2026-08-20 audit): despite the `...Weak` name (kept for the external
+   * caller in Entity.cpp), FUN_0055AA60 is byte-for-byte the same shape as
+   * FUN_0043D940 (see `AssignWeakPairFromShared`'s audit note): the acquire
+   * step is `lock xadd [pi+4],1` (`use_count_` at +0x04 - `add_ref_copy()`)
+   * and the release step calls FUN_004229B0, i.e. real `release()`, not
+   * `weak_release()`. This is an ordinary strong `shared_ptr<RScmResource>`
+   * rebind, not a weak one.
+   *
    * What it does:
    * Rebinds one borrowed `boost::shared_ptr<RScmResource>` lane to another by
-   * weak-retaining the incoming control block and weak-releasing the previous
-   * one, while always copying the raw pointee lane.
+   * shared-retaining the incoming control block and shared-releasing the
+   * previous one, while always copying the raw pointee lane.
    */
   moho::RScmResource** AssignSharedPtrRScmResourceWeak(
     const SharedPtrRaw<moho::RScmResource>* const sourceShared,
@@ -580,10 +616,10 @@ namespace boost
     detail::sp_counted_base* const incomingControl = sourceShared->pi;
     if (incomingControl != outShared->pi) {
       if (incomingControl != nullptr) {
-        incomingControl->weak_add_ref();
+        incomingControl->add_ref_copy();
       }
       if (outShared->pi != nullptr) {
-        outShared->pi->weak_release();
+        outShared->pi->release();
       }
       outShared->pi = incomingControl;
     }
@@ -594,8 +630,13 @@ namespace boost
   /**
    * Address: 0x0055FBD0 (FUN_0055FBD0, Moho::WeakPtr_RScmResource::WeakPtr_RScmResource)
    *
+   * NOTE (2026-08-20 audit): FUN_0055FBD0 is its own independent inlined copy
+   * of the same strong retain/release shape as FUN_0055AA60 (not literally a
+   * call to it), confirmed by direct disassembly comparison. Forwarding to
+   * the now-corrected `AssignSharedPtrRScmResourceWeak` models it faithfully.
+   *
    * What it does:
-   * Constructor/assign adapter lane for weak `RScmResource` pointer pairs that
+   * Constructor/assign adapter lane for `RScmResource` pointer pairs that
    * mirrors `AssignSharedPtrRScmResourceWeak`.
    */
   moho::RScmResource** ConstructWeakPtrRScmResourceFromShared(
@@ -1939,6 +1980,13 @@ namespace boost
 
   /**
    * Address: 0x00446FC0 (FUN_00446FC0)
+   *
+   * CONFIRMED (2026-08-20 audit): this is the genuine standalone
+   * `weak_release()` shape - `lock xadd [pi+8], -1` (`weak_count_` only) then,
+   * on zero, a tail-call through vtable slot +0x08 (`destroy()`). It never
+   * touches `use_count_` at +0x04 and never calls `dispose()`, unlike
+   * FUN_004229B0 (`release()`, see BoostWrappers.h). This call site and
+   * `SpCountedBaseWeakAssignSlot` below are correct as written.
    *
    * What it does:
    * Releases one weak-owner reference from one control-pointer slot.
