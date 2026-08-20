@@ -559,13 +559,40 @@ namespace moho
     virtual void CameraShake(const SCamShakeParams& shakeParams);
 
     /**
+     * Address: 0x007A7900 (FUN_007A7900, Moho::CameraImpl::GetAllUnitsInFrustum)
+     * Mangled: ?GetAllUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
+     * Slot: 40 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED via
+     * ctor 0x007A7950)
+     *
+     * What it does:
+     * One-line accessor returning the camera's *unfiltered* "every unit
+     * currently in frustum" weak-vector lane (`mFrustumLaneB`, +0x5B0) - as
+     * opposed to `GetArmyUnitsInFrustum()` below (slot 41, +0x700), which is
+     * filtered down to the focus army's units.
+     *
+     * `CWldSession::RenderStrategicIcons` (0x0085B6E0) dispatches through
+     * `[eax+0A0h]` at 0x0085BA71 - byte offset 0xA0 from the vtable head is
+     * slot 40, confirmed by reading the shipped vtable directly out of
+     * `bin/2025.7.1/ForgedAlliance.exe` at 0x00E3C514 (fixed-base, no
+     * relocations to account for): that slot holds 0x007A7900, not
+     * `GetArmyUnitsInFrustum` at 0x007A7910 (slot 41, +0xA4) as an earlier
+     * pass's comment guessed. It then walks every on-screen unit to classify
+     * it for the strategic-icon pass, matching "every visible unit" rather
+     * than "focus army's units only".
+     */
+    [[nodiscard]] virtual CameraFrustumUserEntityList* GetAllUnitsInFrustum();
+
+    /**
      * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
+     * Mangled: ?GetArmyUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
+     * Slot: 41 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED via
+     * ctor 0x007A7950)
      *
      * What it does:
      * Returns one cached weak-vector view of focus-army units currently in
      * camera frustum.
      */
-    [[nodiscard]] CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
+    [[nodiscard]] virtual CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
 
     /**
       * Alias of FUN_007A6BF0 (non-canonical helper lane).

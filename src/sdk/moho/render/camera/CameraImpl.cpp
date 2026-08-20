@@ -2217,6 +2217,21 @@ Wm3::Vector3f moho::CameraImpl::GetTargetPosition() const
 }
 
 /**
+ * Address: 0x007A7900 (FUN_007A7900, Moho::CameraImpl::GetAllUnitsInFrustum)
+ * Slot: 40 (see header for the byte-verified vtable evidence)
+ *
+ * What it does:
+ * One-line accessor returning the camera's unfiltered "every unit currently
+ * in frustum" lane (`mFrustumLaneB`, +0x5B0) - the sibling `mFrustumLaneA`
+ * at +0x460 and `mArmyUnitsInFrustum` at +0x700 are separate lanes for
+ * different consumers.
+ */
+moho::CameraFrustumUserEntityList* moho::CameraImpl::GetAllUnitsInFrustum()
+{
+  return &AsFrustumLanesView(this)->mFrustumLaneB.mView;
+}
+
+/**
  * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
  *
  * What it does:
