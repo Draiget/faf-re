@@ -31,7 +31,7 @@ namespace
    * Unlinks `RUnitBlueprintSaveConstruct` helper node from the global
    * serializer-helper intrusive list and restores self-links.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintSaveConstructHelperNodePrimary() noexcept
+  [[nodiscard]] gpg::SerHelperBase* CleanupUnitBlueprintSaveConstructHelperNodePrimary() noexcept
   {
     return moho::blueprint_ser::UnlinkHelperNode(gUnitBlueprintSaveConstruct);
   }

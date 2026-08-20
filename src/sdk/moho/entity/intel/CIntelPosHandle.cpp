@@ -46,7 +46,7 @@ namespace
    * or radius differs from the stored state by calling `SubViz`, updating the
    * cached fields, then calling `AddViz`.
    */
-  [[maybe_unused]] void RebuildEntityPositionWatchCoverage(
+  void RebuildEntityPositionWatchCoverage(
     moho::EntityPositionWatchEntry* const entry,
     const Wm3::Vec3f& newPos,
     const std::uint32_t requestedRadius

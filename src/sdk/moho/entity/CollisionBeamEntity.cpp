@@ -200,7 +200,7 @@ namespace moho
    * What it does:
    * Increments `CollisionBeamEntity` instance-count stat and returns input.
    */
-  [[maybe_unused]] void* IncrementCollisionBeamInstanceCounterAndReturn(void* const objectPtr)
+  void* IncrementCollisionBeamInstanceCounterAndReturn(void* const objectPtr)
   {
     AddInstanceCounterDelta(InstanceCounter<CollisionBeamEntity>::GetStatItem(), 1L);
     return objectPtr;

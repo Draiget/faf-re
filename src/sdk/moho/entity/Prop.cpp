@@ -160,7 +160,7 @@ namespace
    * Converts one footprint lane (`width/height/caps`) and top-left occupancy
    * cell origin into a `Rect2i`, then forwards to `COGrid::ExecuteOccupy`.
    */
-  [[maybe_unused]] void LoadOccupancyFromFootprintCellRuntime(
+  void LoadOccupancyFromFootprintCellRuntime(
     const OccupancyFootprintRuntimeView& footprint,
     const std::int16_t originX,
     const std::int16_t originZ,
