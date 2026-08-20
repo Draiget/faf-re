@@ -3,6 +3,11 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 
+namespace moho
+{
+  struct SOCellPos;
+} // namespace moho
+
 namespace gpg
 {
   template <class T>
@@ -97,4 +102,16 @@ namespace gpg
    * resize routine.
    */
   void FastVectorUIntResize(const unsigned int* fillValue, unsigned int newSize, void* objectStorage);
+
+  /**
+   * Address: 0x005532F0 (FUN_005532F0)
+   *
+   * What it does:
+   * Resizes reflected `moho::SOCellPos` fastvector storage and fills newly
+   * appended lanes with `*fillValue`. Exposed (not file-local) because
+   * `gpg::RFastVectorType<Moho::SOCellPos>::SetCount` / `SerLoad`
+   * (FastVectorSOCellPosReflection.cpp) and `Moho::CDecoder::DecodeCells`
+   * (CDecoder.cpp) all dispatch through this one compiled body.
+   */
+  void FastVectorSOCellPosResize(const moho::SOCellPos* fillValue, unsigned int newSize, void* objectStorage);
 } // namespace gpg
