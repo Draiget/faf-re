@@ -514,7 +514,7 @@ namespace
    * What it does:
    * Appends one `SNetCommand` to the back of the legacy deque command queue.
    */
-  [[maybe_unused]] void PushBackQueuedCommand(
+  void PushBackQueuedCommand(
     msvc8::deque<SNetCommand>& commandQueue,
     const SNetCommand& command
   )
