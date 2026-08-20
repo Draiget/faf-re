@@ -5434,8 +5434,15 @@ public:
   /**
    * Address: 0x0098C430 (FUN_0098C430)
    * Mangled: ?ShowFullScreen@wxTopLevelWindowMSW@@UAE_N_NJ@Z
-   * Slot: +0x1F0 of ??_7wxTopLevelWindowMSW@@6B@ (VA 0x00D540F4) and of
-   * ??_7wxTopLevelWindow@@6B@ (VA 0x00D5432C)
+   * Slot: 138 of the primary vftable (+0x228) - confirmed identically in
+   * `dumps/rtti_dump_all.hpp`'s flattened vtable dumps for both
+   * `wxTopLevelWindowMSW` and `WSupComFrame` (`sub_98C430`/`sub_99EC80` both
+   * land at "slot 138"). The `+0x1F0` this comment previously cited came from
+   * the same nearest-preceding-symbol bug documented on
+   * `wxFrameRuntime::ShowFullScreen` below; slot 138 is the number that
+   * matches this function's own asm (0x0098C4E0 et al. address `this`
+   * directly, so it carries no slot arithmetic of its own to cross-check
+   * against, but the two independent RTTI dumps agree).
    *
    * IDA signature:
    * char __thiscall wxTopLevelWindowMSW::ShowFullScreen(
@@ -5447,6 +5454,12 @@ public:
    * the window to the whole desktop and sends a size event. Coming back:
    * restores the maximised state, the saved style and the saved rect. Returns
    * false when already in the requested state.
+   *
+   * `wxFrame`-descended classes (`WSupComFrame`, `wxLogFrameRuntime`,
+   * `Moho::ScrDebugWindow`) override this slot with
+   * `wxFrameRuntime::ShowFullScreen` instead, which wraps toolbar/status-bar/
+   * menu handling around a call back into this implementation - see that
+   * class below.
    */
   virtual bool ShowFullScreen(bool show, long style);
 
@@ -5703,12 +5716,135 @@ int wxDisplayTransformProjectY(const WxDisplayTransformRuntimeView* transform, i
  */
 [[nodiscard]] wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(wxTopLevelWindowRuntime* frame) noexcept;
 
+/**
+ * `wxFrameBase`/`wxFrame` runtime layer, sitting between
+ * `wxTopLevelWindowRuntime` and every engine class that is actually a
+ * `wxFrame` in the real RTTI: `WSupComFrame`, `wxLogFrameRuntime` and
+ * `Moho::ScrDebugWindow`. All three carry `FUN_0099EC80`
+ * (`wxFrame::ShowFullScreen`) at slot 138 of their own vftable
+ * (`??_7WSupComFrame@@6B@` VA 0x00E4F434, `??_7ScrDebugWindow@Moho@@6B@` VA
+ * 0x00E0863C, `??_7wxLogFrame@@6B@` VA 0x00D673BC - all three confirmed
+ * `VTABLE_CONFIRMED` by `callgraph_index.py vptr-writers`, i.e. a real ctor in
+ * this binary writes each one), which is a different, later slot than
+ * `wxTopLevelWindowRuntime::ShowFullScreen` (`wxTopLevelWindowMSW`'s own
+ * body) occupies one level down. Before this class existed, every subclass of
+ * `wxTopLevelWindowRuntime` picked up the wrong body for that slot.
+ *
+ * `wxTopLevelWindowRootRuntime` (plain `wxTopLevelWindow`) and
+ * `Moho::WWxInputBox` (`wxDialog`) are deliberately NOT routed through this
+ * class - neither derives from `wxFrame` in `dumps/rtti_dump_all.hpp`
+ * (`WWxInputBox : public wxDialog, ...`), so they keep dispatching straight
+ * to `wxTopLevelWindowRuntime::ShowFullScreen`, which is correct for them.
+ */
+class wxFrameRuntime : public wxTopLevelWindowRuntime
+{
+public:
+  /**
+   * Address: 0x0099EC80 (FUN_0099EC80)
+   * Mangled: ?ShowFullScreen@wxFrame@@UAE_N_NJ@Z
+   * Slot: 138 of the primary vftable (+0x228; `dumps/rtti_dump_all.hpp`
+   * lists `sub_99EC80` at "slot 138" for both `WSupComFrame` and
+   * `wxLogFrame`, matching `IsFullScreen`'s own slot 139 read at 0x0099EC86
+   * `[eax+22Ch]` in this function's own asm - 0x22C is exactly 4 bytes past
+   * 0x228). `FUN_0099EC80.xrefs.txt`'s literal `from=` addresses for this
+   * slot are the vtable *head* symbols, not the slot address - a dumper
+   * artifact affecting every named-vtable xref in this repo's `.xrefs.txt`
+   * exports (it prints the disassembly text at the head/slot-0 entry instead
+   * of the real slot), which is why the RTTI dump's independent slot
+   * numbering is cited instead.
+   *
+   * IDA signature:
+   * bool __thiscall wxFrame::ShowFullScreen(wxFrame *this, bool show, int style);
+   *
+   * What it does:
+   * The frame-level wrapper around `wxTopLevelWindowRuntime::ShowFullScreen`:
+   * on the way into full screen, hides the toolbar/status bar/menu the
+   * `style` mask asks to drop; on the way out, restores them using the style
+   * saved by the base class's own `ShowFullScreen`. Always defers to the base
+   * implementation last for the actual window-shape change.
+   *
+   * `GetToolBar()`/`GetStatusBar()` are null for every frame this engine
+   * constructs (see their own doc comments), so every branch below that
+   * dispatches through the toolbar/status-bar object's own vtable is dead in
+   * this binary; each is kept as a guarded no-op with its exact asm address
+   * so the control-flow shape survives without inventing behaviour for a
+   * `wxToolBar`/`wxStatusBar` type this tree does not model.
+   */
+  bool ShowFullScreen(bool show, long style) override;
+
+  /**
+   * Address: 0x004BAAF0 (FUN_004BAAF0)
+   * Mangled: ?GetStatusBar@wxFrameBase@@UBEPAVwxStatusBar@@XZ
+   * Slot: 146 of the primary vftable (+0x248).
+   *
+   * IDA signature:
+   * wxStatusBar *__thiscall wxFrameBase::GetStatusBar(wxFrameBase *this);
+   *
+   * What it does:
+   * Trivial accessor for the status bar this frame owns. No
+   * `CreateStatusBar`/`SetStatusBar` caller exists anywhere in this tree
+   * (repo-wide grep across `src/sdk/moho/app/WxRuntimeTypes.cpp` and
+   * `src/sdk/moho/misc/ScrDebugWindow.cpp` finds none), so this reads back
+   * null for every real frame instance.
+   */
+  [[nodiscard]] virtual void* GetStatusBar() const;
+
+  /**
+   * Address: 0x004BAB00 (FUN_004BAB00)
+   * Mangled: ?GetToolBar@wxFrameBase@@UBEPAVwxToolBar@@XZ
+   * Slot: 151 of the primary vftable (+0x25C).
+   *
+   * IDA signature:
+   * wxToolBar *__thiscall wxFrameBase::GetToolBar(wxFrameBase *this);
+   *
+   * What it does:
+   * Trivial accessor for the toolbar this frame owns.
+   * `Moho::ScrDebugWindow` is the one class in this engine that actually
+   * creates one: its ctor calls `CreateFrameToolBar` (`ScrDebugWindow.cpp`),
+   * the bridge for `wxFrame::CreateToolBar` (FUN_0099EE20) - that bridge is
+   * declared but still undefined there (same declaration-only-bridge defect
+   * as `ConstructWxAcceleratorTable`/`UnrefWxObject` before commit
+   * da3e45fc), so today this still reads back null even for
+   * `Moho::ScrDebugWindow`. `WSupComFrame` and `wxLogFrameRuntime` never
+   * call anything toolbar-related, so it stays null for them regardless.
+   */
+  [[nodiscard]] virtual void* GetToolBar() const;
+
+  /**
+   * Address: 0x0099EA80 (FUN_0099EA80)
+   * Mangled: ?PositionStatusBar@wxFrame@@UAEXXZ
+   * Slot: 157 of the primary vftable (+0x274).
+   *
+   * IDA signature:
+   * void __thiscall wxFrame::PositionStatusBar(wxFrame *this);
+   * (IDA's decompiler shows a `wxChar*` return reusing `eax`'s last value,
+   * but the mangled name's `UAEXXZ` return code is `X` = void, and every
+   * caller-side use in `ShowFullScreen` discards the value; this recovery
+   * follows the mangled, ABI-authoritative signature.)
+   *
+   * What it does:
+   * Re-lays-out the status bar's field widths against the frame's current
+   * client size, gated on the status bar's own `+0xCC` bit-2 style flag.
+   * Only ever called from `ShowFullScreen`'s exit path, and only when
+   * `GetStatusBar()` is non-null - which never happens for any frame this
+   * engine constructs (see `GetStatusBar()` above). The real body
+   * (0x0099EA86..0x0099EAEA) dispatches twice through the status bar's own
+   * vtable (slots 101 and 104), for which this tree has no `wxStatusBar`
+   * type and no other evidence to derive one from, so it is not modeled;
+   * this is a final, evidence-backed no-op for every real instance, not a
+   * placeholder for future work.
+   */
+  virtual void PositionStatusBar();
+};
+
+static_assert(sizeof(wxFrameRuntime) == 0x4, "wxFrameRuntime size must be 0x4");
+
 class wxLogWindowRuntime;
 
 /**
  * Minimal recovered `wxLogFrame` runtime projection.
  */
-class wxLogFrameRuntime : public wxTopLevelWindowRuntime
+class wxLogFrameRuntime : public wxFrameRuntime
 {
 public:
   /**
@@ -6484,7 +6620,7 @@ extern wxApp* wxTheApp;
  * Full complete-object size is not asserted yet because only the tail flag
  * lanes are currently validated by direct behavior evidence.
  */
-class WSupComFrame : public wxTopLevelWindowRuntime
+class WSupComFrame : public wxFrameRuntime
 {
 public:
   /**

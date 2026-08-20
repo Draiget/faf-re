@@ -11121,6 +11121,46 @@ namespace
     wxIconBundle icons{};
   };
 
+  /**
+   * Side state for `wxFrameRuntime` (`WSupComFrame`, `wxLogFrameRuntime`,
+   * `Moho::ScrDebugWindow`), the wxFrame-level lanes `ShowFullScreen`
+   * (FUN_0099EC80) reads and writes on top of `WxTopLevelWindowRuntimeState`.
+   */
+  struct WxFrameRuntimeState
+  {
+    // wxFrameBase::m_frameStatusBar, this+0x158 - read by both
+    // FUN_004BAAF0 (GetStatusBar) and FUN_0099EA80 (PositionStatusBar). No
+    // CreateStatusBar/SetStatusBar caller exists anywhere in this tree, so
+    // this stays null for every real frame.
+    void* frameStatusBar = nullptr;
+    // wxFrameBase::m_frameToolBar, this+0x160 - read by FUN_004BAB00
+    // (GetToolBar). Moho::ScrDebugWindow's ctor calls the still-undefined
+    // CreateFrameToolBar bridge (wxFrame::CreateToolBar, FUN_0099EE20,
+    // declared in ScrDebugWindow.cpp but not yet defined there) to populate
+    // this for real; no other frame in this engine ever touches it.
+    void* frameToolBar = nullptr;
+    // wxFrame::m_hMenu, this+0x11C - the native menu handle wx's own
+    // SetMenuBar plumbing keeps in sync whenever a menu bar is attached
+    // (unrecovered/unwired for these classes today - see
+    // wxFrameRuntime::GetToolBar()'s doc comment for the same kind of gap on
+    // the toolbar side). ShowFullScreen only *reads* this field: on entry,
+    // with the wxFULLSCREEN_NOMENUBAR bit set, it just clears the native
+    // attachment (`SetMenu(hwnd, 0)` at 0x0099ED06..0x0099ED09) without
+    // touching this lane; on exit it reapplies whatever this currently holds
+    // (0x0099EDF4..0x0099EE06). Defaults to null here, so the restore is a
+    // no-op until SetMenuBar's native wiring is recovered separately.
+    unsigned long savedMenuHandle = 0;
+    // Unidentified wxFrameBase field at this+0x164, unconditionally cleared
+    // by ShowFullScreen's "entering full screen, not keeping the status bar"
+    // branch (0x0099ED67, `mov dword ptr [esi+164h], 0`). IDA's decompiler
+    // labelled the write `this->m_frameToolBar`, but that is provably wrong:
+    // GetToolBar() (FUN_004BAB00) reads this+0x160, four bytes earlier, and
+    // this function never touches +0x160 anywhere in its own body. Kept
+    // separate and unnamed rather than conflating it with the confirmed
+    // toolbar field; nothing else in this tree reads it.
+    std::uint32_t field_0x164 = 0;
+  };
+
   struct WxDialogRuntimeState
   {
     void* parentWindow = nullptr;
@@ -11145,6 +11185,7 @@ namespace
 
   std::unordered_map<const wxTopLevelWindowRuntime*, WxTopLevelWindowRuntimeState>
     gWxTopLevelWindowRuntimeStateByWindow{};
+  std::unordered_map<const wxFrameRuntime*, WxFrameRuntimeState> gWxFrameRuntimeStateByFrame{};
   std::unordered_map<const wxDialogRuntime*, WxDialogRuntimeState> gWxDialogRuntimeStateByDialog{};
   std::unordered_map<const wxLogFrameRuntime*, WxLogFrameRuntimeState> gWxLogFrameRuntimeStateByFrame{};
 
@@ -14423,6 +14464,21 @@ namespace
   )
   {
     return gWxTopLevelWindowRuntimeStateByWindow[window];
+  }
+
+  [[nodiscard]] const WxFrameRuntimeState* FindWxFrameRuntimeState(
+    const wxFrameRuntime* const frame
+  ) noexcept
+  {
+    const auto it = gWxFrameRuntimeStateByFrame.find(frame);
+    return it != gWxFrameRuntimeStateByFrame.end() ? &it->second : nullptr;
+  }
+
+  [[nodiscard]] WxFrameRuntimeState& EnsureWxFrameRuntimeState(
+    const wxFrameRuntime* const frame
+  )
+  {
+    return gWxFrameRuntimeStateByFrame[frame];
   }
 
   [[nodiscard]] WxDialogRuntimeState& EnsureWxDialogRuntimeState(
@@ -31561,6 +31617,146 @@ bool wxTopLevelWindowRuntime::ShowFullScreen(const bool show, const long style)
   return true;
 }
 
+/**
+ * Address: 0x004BAAF0 (FUN_004BAAF0, wxFrameBase::GetStatusBar)
+ *
+ * What it does:
+ * Returns the stored status bar pointer, always null in this engine - see
+ * the declaration's own doc comment for why.
+ */
+void* wxFrameRuntime::GetStatusBar() const
+{
+  const WxFrameRuntimeState* const state = FindWxFrameRuntimeState(this);
+  return (state != nullptr) ? state->frameStatusBar : nullptr;
+}
+
+/**
+ * Address: 0x004BAB00 (FUN_004BAB00, wxFrameBase::GetToolBar)
+ *
+ * What it does:
+ * Returns the stored toolbar pointer - see the declaration's own doc comment
+ * for the one real (still-unwired) writer, `CreateFrameToolBar`.
+ */
+void* wxFrameRuntime::GetToolBar() const
+{
+  const WxFrameRuntimeState* const state = FindWxFrameRuntimeState(this);
+  return (state != nullptr) ? state->frameToolBar : nullptr;
+}
+
+/**
+ * Address: 0x0099EA80 (FUN_0099EA80, wxFrame::PositionStatusBar)
+ *
+ * What it does:
+ * Nothing, for every frame this engine actually constructs - see the
+ * declaration's own doc comment for why the real body is not modeled.
+ */
+void wxFrameRuntime::PositionStatusBar()
+{
+}
+
+/**
+ * Address: 0x0099EC80 (FUN_0099EC80, wxFrame::ShowFullScreen)
+ * Mangled: ?ShowFullScreen@wxFrame@@UAE_N_NJ@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxFrame::ShowFullScreen(wxFrame *this, bool show, int style);
+ *
+ * What it does:
+ * See the declaration's own doc comment. Field evidence, all from this
+ * function's own `.asm` (`esi` holds `this`, `ebx` holds `show` for the
+ * whole function):
+ *   0x0099EC86 `mov edx, [eax+22Ch]`   - IsFullScreen(), slot 139
+ *   0x0099EC9F `mov edx, [eax+25Ch]`   - GetToolBar(), slot 151
+ *   0x0099ED06..09 `SetMenu(hwnd, 0)`  - only when `style & wxFULLSCREEN_NOMENUBAR`;
+ *                                        does not save the previous HMENU anywhere
+ *   0x0099ED11 `mov eax, [edx+248h]`   - GetStatusBar(), slot 146
+ *   0x0099ED67 `mov [esi+164h], 0`     - WxFrameRuntimeState::field_0x164
+ *   0x0099EDF4 `mov eax, [esi+11Ch]`   - m_hMenu, only ever *read* here; see
+ *                                        WxFrameRuntimeState::savedMenuHandle
+ *   0x0099EE06 `SetMenu(hwnd, m_hMenu)`
+ * The exit-full-screen branch (0x0099ED7C onward) reads its style bits from
+ * `[esi+134h]` - `WxTopLevelWindowRuntimeState::fsStyle`, the value the base
+ * class's own `ShowFullScreen` saved on the way in - not from this call's
+ * `style` argument, which is only threaded through to the tail call.
+ */
+bool wxFrameRuntime::ShowFullScreen(
+  const bool show,
+  const long style
+)
+{
+  if (IsFullScreen() == show) {
+    return false;
+  }
+
+  void* const toolBar = GetToolBar();
+
+  if (show) {
+    // Entering full screen (0x0099ECB4..0x0099ED76).
+    if (toolBar != nullptr) {
+      // 0x0099ECB8: toolBar's own vtable slot 0x194, args (0, &this[0x16C]) -
+      // moves the toolbar out of the way at its old position. No
+      // `wxToolBar` type exists in this tree and `toolBar` is always null
+      // here (see GetToolBar()'s doc comment), so this stays a guarded
+      // no-op rather than inventing that type for a branch nothing reaches.
+    }
+
+    if ((style & 0x2L) != 0 && toolBar != nullptr) {
+      // 0x0099ECD8/0x0099ECEE: toolBar's own vtable slots 0x1A0 and 0x7C -
+      // collapses the toolbar to zero height and hides it. Same
+      // always-null reasoning as above.
+    }
+
+    if ((style & 0x1L) != 0) {
+      (void)::SetMenu(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())), nullptr);
+    }
+
+    void* const statusBar = GetStatusBar();
+    if (statusBar != nullptr) {
+      // 0x0099ED21: statusBar's own vtable slot 0x194, args (0, &this[0x168]) -
+      // same "move out of the way" call as the toolbar's. `statusBar` is
+      // always null here (see GetStatusBar()'s doc comment).
+    }
+
+    if ((style & 0x4L) != 0 && statusBar != nullptr) {
+      // 0x0099ED41: statusBar's own vtable slot 0x7C, arg (1) - hides the
+      // status bar outright. Always-null, same reasoning.
+      return wxTopLevelWindowRuntime::ShowFullScreen(show, style);
+    }
+
+    // 0x0099ED67: cleared whenever the status bar isn't being kept visible -
+    // see WxFrameRuntimeState::field_0x164's own doc comment.
+    EnsureWxFrameRuntimeState(this).field_0x164 = 0;
+    return wxTopLevelWindowRuntime::ShowFullScreen(show, style);
+  }
+
+  // Exiting full screen (0x0099ED7C..0x0099EE1C), against the style the base
+  // class saved on the way in.
+  const WxTopLevelWindowRuntimeState* const topLevelState = FindWxTopLevelWindowRuntimeState(this);
+  const long savedStyle = (topLevelState != nullptr) ? topLevelState->fsStyle : 0;
+
+  if (toolBar != nullptr && (savedStyle & 0x2L) != 0) {
+    // 0x0099ED89: restores the toolbar to its saved height then shows it
+    // again. Always-null `toolBar`, same reasoning as the entry path.
+  }
+
+  if ((savedStyle & 0x4L) != 0 && GetStatusBar() != nullptr) {
+    // 0x0099EDB8: restores and re-shows the status bar, then repositions it.
+    // Always-null GetStatusBar(), same reasoning.
+    PositionStatusBar();
+  }
+
+  const WxFrameRuntimeState* const frameState = FindWxFrameRuntimeState(this);
+  const unsigned long savedMenu = (frameState != nullptr) ? frameState->savedMenuHandle : 0u;
+  if ((savedStyle & 0x1L) != 0 && savedMenu != 0u) {
+    (void)::SetMenu(
+      reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())),
+      reinterpret_cast<HMENU>(static_cast<std::uintptr_t>(savedMenu))
+    );
+  }
+
+  return wxTopLevelWindowRuntime::ShowFullScreen(show, style);
+}
+
 void wxTopLevelWindowRuntime::Maximize(
   const bool maximize
 )
@@ -31833,7 +32029,7 @@ wxLogFrameRuntime::wxLogFrameRuntime(
   wxLogWindowRuntime* const ownerLogWindow,
   const wchar_t* const titleText
 )
-  : wxTopLevelWindowRuntime()
+  : wxFrameRuntime()
 {
   constexpr long kWxLogFrameStyle = 0x20400E40;
   constexpr long kWxLogTextCtrlStyle = 0x40000030;
