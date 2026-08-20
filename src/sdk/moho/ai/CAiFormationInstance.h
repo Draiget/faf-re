@@ -32,6 +32,7 @@ namespace moho
   class RRuleGameRules;
   class Sim;
   struct SOCellPos;
+  struct SWeakRefSlot;
   class Unit;
 
   struct SFormationLinkedUnitRef
@@ -214,7 +215,16 @@ namespace moho
   struct SFormationLaneEntry
   {
     SFormationLaneUnitMap unitMap;            // +0x00
-    std::uint8_t unknown0C[0x14];             // +0x0C
+    std::uint8_t unknown0C[0xC];              // +0x0C (still unresolved)
+    /// Mean XZ of the formation-script slot table, written by
+    /// `CAiFormationInstance::RunScript` (0x00567300, phase 5, the
+    /// `var_C08.m_next`/`m_state` sums divided by slot count at
+    /// 0x0056795C-0x005679D4). Named per the escalation notes at
+    /// `decomp/recovery/escalations/FUN_00567300.md`, which pin these two
+    /// floats to struct offsets +0x18/+0x1C inside what was previously the
+    /// opaque `unknown0C` span.
+    float meanSlotOffsetX;                    // +0x18
+    float meanSlotOffsetZ;                    // +0x1C
     float overlapRadiusX;                     // +0x20
     float overlapRadiusZ;                     // +0x24
     float dynamicOffsetX;                     // +0x28
@@ -230,6 +240,12 @@ namespace moho
     std::uint32_t linkedUnitBackLinkNextWord; // +0x48
   };
   static_assert(sizeof(SFormationLaneEntry) == 0x4C, "SFormationLaneEntry size must be 0x4C");
+  static_assert(
+    offsetof(SFormationLaneEntry, meanSlotOffsetX) == 0x18, "SFormationLaneEntry::meanSlotOffsetX offset must be 0x18"
+  );
+  static_assert(
+    offsetof(SFormationLaneEntry, meanSlotOffsetZ) == 0x1C, "SFormationLaneEntry::meanSlotOffsetZ offset must be 0x1C"
+  );
   static_assert(
     offsetof(SFormationLaneEntry, dynamicOffsetX) == 0x28, "SFormationLaneEntry::dynamicOffsetX offset must be 0x28"
   );
@@ -327,6 +343,23 @@ namespace moho
   static_assert(sizeof(SFormationLinkedUnitRefVec) == 0x30, "SFormationLinkedUnitRefVec size must be 0x30");
   static_assert(sizeof(SFormationLaneVec) == 0xA8, "SFormationLaneVec size must be 0xA8");
   static_assert(sizeof(SFormationOccupiedSlotVec) == 0x110, "SFormationOccupiedSlotVec size must be 0x110");
+
+  /**
+   * The transient "candidate unit set" `PreRunScript`/`Setup`/`RunScript`/
+   * `UpdateFormation` build and drain (IDA's own local type library names
+   * it `gpg::fastvector_n4_WeakPtr_IUnit`). The element is `SWeakRefSlot`
+   * (moho/unit/core/Unit.h) rather than `WeakPtr<IUnit>` itself: a slot is
+   * bound/queried through `SWeakRefSlot::AsWeakPtr<IUnit>()`, which is the
+   * exact same intrusive weak-link relink logic, but keeps the container's
+   * own element type POD/trivially-destructible. `WeakPtr<IUnit>` carries a
+   * real (non-trivial) unlink destructor; letting the compiler auto-invoke
+   * that on an abandoned inline slot after a heap grow (the growth path
+   * leaves stale, non-null link bytes in the old inline array, which stays
+   * a live C++ subobject) would re-walk an already-spliced chain and can
+   * run off its end. Every unlink in this family is therefore the explicit
+   * call the binary itself makes.
+   */
+  using SFormationLayerUnitSet = gpg::fastvector_n<SWeakRefSlot, 4>;
 
   /**
    * The formation-instance state the binary keeps on `CFormationInstance`,
@@ -701,6 +734,80 @@ namespace moho
      * current formation orientation, then multiplies by slot-span scale.
      */
     SCoordsVec2* ComputeRunScriptOffset(const SCoordsVec2* sourceOffset, SCoordsVec2* dest) const;
+
+    /**
+     * Address: 0x00566B10 (FUN_00566B10, Moho::CAiFormationInstance::PreRunScript)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CAiFormationInstance::PreRunScript(
+     *     gpg::fastvector_n4_WeakPtr_IUnit *layerUnitsOut@<ebx>,
+     *     Moho::CAiFormationInstance *this,
+     *     gpg::fastvector_n4_WeakPtr_IUnit *candidateUnits, int layerIndex);
+     *
+     * What it does:
+     * Partitions the shared candidate-unit list by `GetLayer()`: every unit
+     * whose layer matches `layerIndex` is moved out of `candidateUnits` into
+     * `layerUnitsOut` (erased from the shared list so a later layer's pass
+     * never sees it again); units belonging to a different layer are left
+     * in place.
+     */
+    void PreRunScript(SFormationLayerUnitSet& layerUnitsOut, SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
+
+    /**
+     * Address: 0x00568820 (FUN_00568820, Moho::CAiFormationInstance::Setup)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CAiFormationInstance::Setup(
+     *     int layerIndex@<edi>, Moho::CAiFormationInstance *this,
+     *     gpg::fastvector_n4_WeakPtr_IUnit *candidateUnits);
+     *
+     * What it does:
+     * Claims this layer's units out of the shared candidate list via
+     * `PreRunScript`, runs the formation script over them via `RunScript`
+     * when any were claimed, then releases the per-layer scratch list.
+     */
+    void Setup(SFormationLayerUnitSet& candidateUnits, std::int32_t layerIndex);
+
+    /**
+     * Address: 0x00567300 (FUN_00567300, Moho::CAiFormationInstance::RunScript)
+     *
+     * ASM-only recovery (no `.c` decompile); see
+     * `decomp/recovery/escalations/FUN_00567300.md` for the stack-frame
+     * decode key, EH funclet table, and the seven-phase behavior this
+     * follows. 1010 instructions.
+     *
+     * IDA signature:
+     * void __stdcall Moho::CAiFormationInstance::RunScript(
+     *     gpg::fastvector_n4_WeakPtr_IUnit *units, std::int32_t layerIndex);
+     *
+     * What it does:
+     * Builds a Lua unit table from `units` and calls `Moho::FORMATION_RunScript`;
+     * early-exits if it produced no slots. Computes the mean unit position,
+     * builds one relative-position descriptor per unit (optionally rotated by
+     * `mOrientationBaseline`) while folding the lane's `preferredSpeed`,
+     * computes slot-table span/mean statistics, builds one scored candidate
+     * per (slot, unit) pair whose category matches and sorts them by squared
+     * distance, then greedily assigns each candidate's nearest still-free
+     * unit into the new lane entry's `unitMap` (warning on duplicate
+     * assignment), calls `RemoveUnit` for anything left unassigned, and
+     * appends the finished lane entry to `mLanes[layerIndex]`.
+     */
+    void RunScript(SFormationLayerUnitSet& units, std::int32_t layerIndex);
+
+    /**
+     * Address: 0x00568CA0 (FUN_00568CA0, Moho::CAiFormationInstance::UpdateFormation)
+     *
+     * What it does:
+     * Snapshots every live, mobile, non-building, non-destroy-queued linked
+     * unit into a weak-slot scratch list, accumulates the formation's mean
+     * facing and each unit's max footprint size, refreshes
+     * `mOrientationChng` when the facing changed enough, then rebuilds each
+     * formation layer in turn: releases the previous lane entries for that
+     * layer and calls `Setup` to claim and script this layer's units. After
+     * both layers rebuild, merges overlapping lane bands for `Form*`
+     * commands and broadcasts `FORMATIONSTATUS_FormationUpdated`.
+     */
+    void UpdateFormation();
 
   public:
     Sim* mSim;                                    // +0x328

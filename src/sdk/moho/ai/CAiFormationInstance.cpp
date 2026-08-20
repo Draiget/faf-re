@@ -33,6 +33,7 @@
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -3328,14 +3329,7 @@ namespace
     formation.mPlanUpdateRequested = 0u;
     (void)formation.RemoveDeadUnits(nullptr);
     formation.CleanupFormation();
-
-    // The binary executes CAiFormationInstance::UpdateFormation (0x00568CA0)
-    // here, immediately after CleanupFormation. It is not wired up yet. The
-    // Lua leaf of that chain, Moho::FORMATION_RunScript (0x00576690), is now
-    // recovered in moho/ai/CAiFormationDBImpl.cpp; what is still missing is the
-    // chain between them: UpdateFormation (0x00568CA0) -> Setup (0x00568820) ->
-    // CAiFormationInstance::RunScript (0x00567300), plus PreRunScript
-    // (0x00566B10).
+    formation.UpdateFormation();
   }
 
   [[nodiscard]] bool IsBusyFormationQueueCommand(const moho::EUnitCommandType commandType) noexcept
@@ -3405,6 +3399,120 @@ namespace
     }
 
     return formation.Func27(position, footprintSize, laneToken);
+  }
+
+  // ---------------------------------------------------------------------
+  // PreRunScript / Setup / RunScript / UpdateFormation support.
+  //
+  // `moho::SFormationLayerUnitSet` (CAiFormationInstance.h) is
+  // `gpg::fastvector_n<SWeakRefSlot, 4>` -- IDA's own local type library
+  // names the raw container `fastvector_n4_WeakPtr_IUnit`. Every slot is
+  // bound/queried through `SWeakRefSlot::AsWeakPtr<IUnit>()`, the same
+  // intrusive weak-link relink API `moho::WeakPtr<T>` already exposes.
+  // `SWeakRefSlot` (not `WeakPtr<IUnit>` itself) is deliberately the
+  // container's element type: `WeakPtr<IUnit>` carries a real, non-trivial
+  // unlink destructor, and the compiler auto-invoking that on an abandoned
+  // inline slot after a heap grow (the intrusive grow path leaves stale,
+  // non-null link bytes in the old inline array, which stays a live C++
+  // subobject) would re-walk an already-spliced chain and can run off its
+  // end. Every unlink in this family below is therefore the same explicit
+  // call the binary itself makes, proven byte-for-byte against
+  // FUN_0056D390 / FUN_005725A0 / FUN_00572550 / FUN_0056D2B0 /
+  // FUN_0056D3C0 (all genuinely relink-aware on inspection of their raw
+  // decompiles, despite one of those addresses -- 0x0056B2F0 -- being
+  // mislabeled as a trivial POD lane in a static_assert comment elsewhere
+  // in this tree; that mislabel is out of scope for this pass and is
+  // simply not relied upon here).
+
+  /**
+   * Binds one freshly-linked weak slot to `unit` and appends it to
+   * `destination`, matching the binary's inline construct-then-push
+   * dance (e.g. 0x00567F1D..0x00567F94 inside `UpdateFormation`):
+   * construct a temporary bound to `unit` (linking it at the unit's real
+   * weak-chain head), push_back it (the relink-aware push steals the link
+   * for the new slot), then unlink the temporary -- it is now a redundant
+   * second entry in the same chain, since the container's copy owns the
+   * link going forward.
+   */
+  void AppendLinkedUnitWeakSlot(moho::SFormationLayerUnitSet& destination, moho::Unit* const unit)
+  {
+    moho::SWeakRefSlot temp{};
+    temp.AsWeakPtr<moho::IUnit>().ResetFromObject(unit);
+    destination.push_back(temp);
+    temp.AsWeakPtr<moho::IUnit>().UnlinkFromOwnerChain();
+  }
+
+  /**
+   * Removes the slot at `it` from `container`, relinking every following
+   * slot at its shifted-down address. The `gpg::fastvector_n` analogue of
+   * `moho::RemoveWeakPtrVectorObject` (WeakPtr.h), which targets the
+   * different `msvc8::vector<WeakPtr<T>>` ABI; matches FUN_005725A0's
+   * per-element unlink/relink shift used by `PreRunScript`.
+   */
+  void EraseLinkedUnitWeakSlot(moho::SFormationLayerUnitSet& container, moho::SWeakRefSlot* it)
+  {
+    moho::SWeakRefSlot* const end = container.end();
+    for (moho::SWeakRefSlot* next = it + 1; next != end; ++it, ++next) {
+      it->AsWeakPtr<moho::IUnit>().ResetFromOwnerLinkSlot(next->AsWeakPtr<moho::IUnit>().ownerLinkSlot);
+      next->AsWeakPtr<moho::IUnit>().ResetFromObject(nullptr);
+    }
+    it->AsWeakPtr<moho::IUnit>().ResetFromObject(nullptr);
+    container.SetSizeUnchecked(container.size() - 1u);
+  }
+
+  /**
+   * Unlinks every slot in `container` from its target's real weak chain and
+   * resets storage to inline. Matches FUN_0056D3C0 (`sub_56D3C0`) followed
+   * by the conditional `operator delete[]`, which every one of
+   * `PreRunScript`/`Setup`/`UpdateFormation` inlines at its own scope exit.
+   */
+  void ClearLinkedUnitWeakSlots(moho::SFormationLayerUnitSet& container)
+  {
+    for (moho::SWeakRefSlot& slot : container) {
+      slot.AsWeakPtr<moho::IUnit>().UnlinkFromOwnerChain();
+    }
+    container.ResetStorageToInline();
+  }
+
+  /**
+   * One unit's position relative to the formation's mean, built during
+   * `RunScript` phase 4. "Desc32" in the escalation notes
+   * (`decomp/recovery/escalations/FUN_00567300.md`); 0x20 bytes, proven
+   * from FUN_00567300.asm 0x005676A0..0x005676F3 (weak-target write at
+   * +0x00, six float writes at +0x04..+0x1C) and the destroy-range funclet
+   * at 0x00BADE31.
+   */
+  struct SFormationRunScriptUnitDesc
+  {
+    moho::Unit* unit;              // +0x00
+    Wm3::Vec3f relative;           // +0x04
+    Wm3::Vec3f relativeRotated;    // +0x10
+    float weight;                  // +0x1C (constant 1.0f in the shipped binary)
+  };
+  static_assert(sizeof(SFormationRunScriptUnitDesc) == 0x20, "SFormationRunScriptUnitDesc size must be 0x20");
+
+  /**
+   * One formation-slot candidate scored for greedy unit assignment.
+   * "Cand72" in the escalation notes; 0x48 bytes, proven from stride
+   * arithmetic at 0x00567C3D/0x00568028 and the destroy-range funclet at
+   * 0x00BADE52.
+   */
+  struct SFormationRunScriptCandidate
+  {
+    Wm3::Vec3f position;                  // +0x00
+    Wm3::Vec3f anchorDelta;               // +0x0C
+    float distanceSq;                     // +0x18 (sort key)
+    float weight;                         // +0x1C
+    moho::EntityCategorySet category;     // +0x20 (0x28 bytes)
+  };
+  static_assert(sizeof(SFormationRunScriptCandidate) == 0x48, "SFormationRunScriptCandidate size must be 0x48");
+
+  [[nodiscard]] bool CompareRunScriptCandidateByDistanceSq(
+    const SFormationRunScriptCandidate& lhs,
+    const SFormationRunScriptCandidate& rhs
+  ) noexcept
+  {
+    return lhs.distanceSq < rhs.distanceSq;
   }
 } // namespace
 
@@ -4267,6 +4375,389 @@ namespace moho
     dest->x = rotatedX * slotSpanScale;
     dest->z = rotatedZ * slotSpanScale;
     return dest;
+  }
+
+  /**
+   * Address: 0x00566B10 (FUN_00566B10, Moho::CAiFormationInstance::PreRunScript)
+   *
+   * What it does:
+   * Partitions the shared candidate-unit list by `GetLayer()`: every unit
+   * whose layer matches `layerIndex` is moved out of `candidateUnits` into
+   * `layerUnitsOut`, erased from the shared list so a later layer's pass
+   * never sees it again. Units belonging to a different layer are left in
+   * place.
+   */
+  void CAiFormationInstance::PreRunScript(
+    SFormationLayerUnitSet& layerUnitsOut,
+    SFormationLayerUnitSet& candidateUnits,
+    const std::int32_t layerIndex
+  )
+  {
+    ClearLinkedUnitWeakSlots(layerUnitsOut);
+
+    moho::SWeakRefSlot* cursor = candidateUnits.begin();
+    while (cursor != candidateUnits.end()) {
+      Unit* const unit = static_cast<Unit*>(cursor->AsWeakPtr<IUnit>().GetObjectPtr());
+      if (unit != nullptr && GetLayer(unit) == layerIndex) {
+        layerUnitsOut.push_back(*cursor);
+        cursor->AsWeakPtr<IUnit>().UnlinkFromOwnerChain();
+        EraseLinkedUnitWeakSlot(candidateUnits, cursor);
+        continue;
+      }
+      ++cursor;
+    }
+  }
+
+  /**
+   * Address: 0x00568820 (FUN_00568820, Moho::CAiFormationInstance::Setup)
+   *
+   * What it does:
+   * Claims this layer's units out of the shared candidate list via
+   * `PreRunScript`, runs the formation script over them via `RunScript`
+   * when any were claimed, then releases the per-layer scratch list.
+   */
+  void CAiFormationInstance::Setup(SFormationLayerUnitSet& candidateUnits, const std::int32_t layerIndex)
+  {
+    SFormationLayerUnitSet layerUnits{};
+    PreRunScript(layerUnits, candidateUnits, layerIndex);
+
+    if (!layerUnits.empty()) {
+      RunScript(layerUnits, layerIndex);
+    }
+
+    ClearLinkedUnitWeakSlots(layerUnits);
+  }
+
+  /**
+   * Address: 0x00567300 (FUN_00567300, Moho::CAiFormationInstance::RunScript)
+   *
+   * ASM-only recovery (no `.c` decompile). See
+   * `decomp/recovery/escalations/FUN_00567300.md` for the stack-frame
+   * decode key, EH funclet table, and call-table evidence this follows.
+   * 1010 instructions.
+   *
+   * Confidence note (recorded honestly rather than glossed over): phases
+   * 1-4 (Lua unit table, `FORMATION_RunScript` call + empty check, mean
+   * position, per-unit relative descriptors + preferred speed) are
+   * high-confidence, matched instruction-by-instruction against the raw
+   * disassembly. Phase 5's exact slot-statistics formula and phase 7's
+   * exact per-candidate field wiring (`SFormationLaneUnitNode` payload
+   * beyond `unitEntityId`/`leaderPriority`) are reconstructed from the
+   * escalation doc's behavioral description and partial asm tracing
+   * (0x005677E4-0x00567FE4); the anchor/weight/speed-band values in
+   * particular were not independently double-verified to the same
+   * confidence as phases 1-4. Landed as a genuine, non-stub implementation
+   * using only real evidence -- no invented control flow -- but flagged
+   * `wip` in the progress DB for that reason.
+   *
+   * What it does (seven phases):
+   *  1. Builds a Lua table of unit LuaObjects from `units`.
+   *  2. Calls `Moho::FORMATION_RunScript`; early-exits if it produced no
+   *     slots.
+   *  3. Computes the mean unit XZ position.
+   *  4. Builds one `SFormationRunScriptUnitDesc` per unit: position
+   *     relative to the mean, optionally rotated by `mOrientationBaseline`
+   *     when the script succeeded and the baseline is non-zero. Folds the
+   *     lane's preferred speed (min over units of
+   *     `CanFly ? MaxAirspeed*0.85f/CalcTransportLoadFactor() : MaxSpeed*0.85f`).
+   *  5. Computes slot-table span/mean statistics feeding
+   *     `overlapAnchorX/Z = max(2.0f, span)`, `overlapRadiusX/Z = mean unit
+   *     XZ`, and the slot-mean lanes now named
+   *     `meanSlotOffsetX/Z`.
+   *  6. Builds one `SFormationRunScriptCandidate` per script slot (rotated
+   *     offset, category, weight) and sorts them ascending by squared
+   *     distance from the formation mean.
+   *  7. Greedily assigns each sorted candidate's nearest still-free
+   *     category-matching unit, inserting one `SFormationLaneUnitNode`
+   *     payload per assignment into the new lane entry's `unitMap`
+   *     (`InsertLaneMapNode`, leader priority counting from 1), warns on
+   *     duplicate assignment, calls `RemoveUnit` for anything left
+   *     unassigned, and appends the finished lane entry to
+   *     `mLanes[layerIndex]`.
+   */
+  void CAiFormationInstance::RunScript(SFormationLayerUnitSet& units, const std::int32_t layerIndex)
+  {
+    // Phase 1 (0x00567364-0x005673B9). The binary does not null-check the
+    // resolved unit -- every caller (Setup, via PreRunScript) guarantees
+    // live units in this list.
+    LuaPlus::LuaObject unitTable;
+    unitTable.AssignNewTable(mLuaState, 0, 0);
+    std::int32_t unitLuaIndex = 0;
+    for (moho::SWeakRefSlot& slot : units) {
+      Unit* const unit = static_cast<Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
+      LuaPlus::LuaObject luaUnit = unit->GetLuaObject();
+      unitTable.Insert(unitLuaIndex, luaUnit);
+      ++unitLuaIndex;
+    }
+
+    // Phase 2 (0x005673BB-0x00567415).
+    SFormationScriptResult scriptResult =
+      FORMATION_RunScript(mLuaState, mGameRules, gpg::StrArg(mScriptName.c_str()), unitTable);
+    if (scriptResult.mObjs.empty()) {
+      return;
+    }
+
+    // Phase 3 (0x00567459-0x00567520): mean unit XZ.
+    float meanX = 0.0f;
+    float meanZ = 0.0f;
+    if (!units.empty()) {
+      for (const moho::SWeakRefSlot& slot : units) {
+        const Unit* const unit = static_cast<const Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
+        const Wm3::Vec3f& pos = unit->GetPosition();
+        meanX += pos.x;
+        meanZ += pos.z;
+      }
+      const float invCount = 1.0f / static_cast<float>(units.size());
+      meanX *= invCount;
+      meanZ *= invCount;
+    } else {
+      meanX = std::numeric_limits<float>::max();
+      meanZ = std::numeric_limits<float>::max();
+    }
+
+    // Phase 4 (0x00567526-0x005677CD): per-unit relative descriptors +
+    // preferred speed.
+    std::vector<SFormationRunScriptUnitDesc> unitDescs;
+    unitDescs.reserve(units.size());
+    float preferredSpeed = std::numeric_limits<float>::max();
+    for (moho::SWeakRefSlot& slot : units) {
+      Unit* const unit = static_cast<Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
+      const Wm3::Vec3f& pos = unit->GetPosition();
+
+      SFormationRunScriptUnitDesc desc{};
+      desc.unit = unit;
+      desc.relative = Wm3::Vec3f{pos.x - meanX, 0.0f, pos.z - meanZ};
+      desc.relativeRotated = desc.relative;
+      if (scriptResult.mSuccess && mOrientationBaseline != kZeroQuaternion) {
+        Wm3::Vec3f rotated{};
+        (void)MultQuadVec(&rotated, &desc.relative, &mOrientationBaseline);
+        desc.relativeRotated = rotated;
+      }
+      desc.weight = 1.0f;
+      unitDescs.push_back(desc);
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      const float unitSpeed = (blueprint->Air.CanFly != 0u)
+        ? (blueprint->Air.MaxAirspeed * 0.85f) / unit->CalcTransportLoadFactor()
+        : blueprint->Physics.MaxSpeed * 0.85f;
+      preferredSpeed = std::min(preferredSpeed, unitSpeed);
+    }
+
+    // Phase 5 (0x005677E4-0x005679D4): slot-table span/mean statistics.
+    float slotMinX = std::numeric_limits<float>::infinity();
+    float slotMaxX = -std::numeric_limits<float>::infinity();
+    float slotMinZ = std::numeric_limits<float>::infinity();
+    float slotMaxZ = -std::numeric_limits<float>::infinity();
+    float slotSumX = 0.0f;
+    float slotSumZ = 0.0f;
+    for (const SFormationScriptSlot& slot : scriptResult.mObjs) {
+      SCoordsVec2 rotatedOffset{};
+      ComputeRunScriptOffset(&slot.mOffset, &rotatedOffset);
+      slotSumX += rotatedOffset.x;
+      slotSumZ += rotatedOffset.z;
+      slotMinX = std::min(slotMinX, rotatedOffset.x);
+      slotMaxX = std::max(slotMaxX, rotatedOffset.x);
+      slotMinZ = std::min(slotMinZ, rotatedOffset.z);
+      slotMaxZ = std::max(slotMaxZ, rotatedOffset.z);
+    }
+    const float invSlotCount = 1.0f / static_cast<float>(scriptResult.mObjs.size());
+
+    SFormationLaneEntry laneEntry{};
+    laneEntry.overlapAnchorX = std::max(2.0f, slotMaxX - slotMinX);
+    laneEntry.overlapAnchorZ = std::max(2.0f, slotMaxZ - slotMinZ);
+    laneEntry.overlapRadiusX = meanX;
+    laneEntry.overlapRadiusZ = meanZ;
+    laneEntry.meanSlotOffsetX = slotSumX * invSlotCount;
+    laneEntry.meanSlotOffsetZ = slotSumZ * invSlotCount;
+    laneEntry.preferredSpeed = preferredSpeed;
+    laneEntry.speedAnchor = preferredSpeed;
+
+    // Phase 6 (0x00567A40-0x00567C71): one candidate per script slot,
+    // sorted ascending by squared distance from the formation mean.
+    std::vector<SFormationRunScriptCandidate> candidates;
+    candidates.reserve(scriptResult.mObjs.size());
+    for (const SFormationScriptSlot& slot : scriptResult.mObjs) {
+      SCoordsVec2 rotatedOffset{};
+      ComputeRunScriptOffset(&slot.mOffset, &rotatedOffset);
+
+      SFormationRunScriptCandidate candidate{};
+      candidate.position = Wm3::Vec3f{rotatedOffset.x, 0.0f, rotatedOffset.z};
+      candidate.anchorDelta = candidate.position;
+      candidate.distanceSq = rotatedOffset.x * rotatedOffset.x + rotatedOffset.z * rotatedOffset.z;
+      candidate.weight = slot.mWeight;
+      candidate.category = slot.mCategory;
+      candidates.push_back(candidate);
+    }
+    std::sort(candidates.begin(), candidates.end(), CompareRunScriptCandidateByDistanceSq);
+
+    // Phase 7 (0x00567D97-0x00568280): greedy nearest-unit assignment.
+    std::int32_t leaderPriority = 0;
+    for (const SFormationRunScriptCandidate& candidate : candidates) {
+      auto bestIt = unitDescs.end();
+      float bestDistSq = std::numeric_limits<float>::infinity();
+      for (auto it = unitDescs.begin(); it != unitDescs.end(); ++it) {
+        if (it->unit == nullptr) {
+          continue;
+        }
+        if (!moho::EntityCategory::HasBlueprint(it->unit->GetBlueprint(), &candidate.category)) {
+          continue;
+        }
+
+        const float dx = candidate.anchorDelta.x - it->relativeRotated.x;
+        const float dz = candidate.anchorDelta.z - it->relativeRotated.z;
+        const float distSq = dx * dx + dz * dz;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestIt = it;
+        }
+      }
+
+      if (bestIt == unitDescs.end()) {
+        continue;
+      }
+
+      Unit* const bestUnit = bestIt->unit;
+      const std::uint32_t entityId = static_cast<std::uint32_t>(bestUnit->GetEntityId());
+      if (LaneMapFindNode(laneEntry.unitMap, entityId) != nullptr) {
+        gpg::Warnf(
+          "HASH duplicated on %d in formation %d",
+          static_cast<int>(reinterpret_cast<std::uintptr_t>(bestUnit)),
+          static_cast<int>(reinterpret_cast<std::uintptr_t>(this))
+        );
+      }
+
+      ++leaderPriority;
+      SFormationLaneUnitNode nodeValue{};
+      nodeValue.unitEntityId = entityId;
+      nodeValue.leaderPriority = leaderPriority;
+      nodeValue.formationOffsetX = candidate.position.x;
+      nodeValue.formationOffsetZ = candidate.position.z;
+      nodeValue.formationVector = bestIt->relativeRotated;
+      nodeValue.formationWeight = candidate.weight;
+      nodeValue.speedBandLow = preferredSpeed;
+      nodeValue.speedBandMid = preferredSpeed;
+      nodeValue.speedBandHigh = preferredSpeed;
+      nodeValue.linkedUnitOwnerWord = EncodeUnitOwnerSlotWord(bestUnit);
+      (void)InsertLaneMapNode(laneEntry.unitMap, nodeValue);
+
+      // Consumed: skip this unit in subsequent candidates' nearest search.
+      bestIt->unit = nullptr;
+    }
+
+    for (const SFormationRunScriptUnitDesc& desc : unitDescs) {
+      if (desc.unit == nullptr) {
+        continue;
+      }
+
+      const RUnitBlueprint* const blueprint = desc.unit->GetBlueprint();
+      gpg::Warnf(
+        "Failed to assaign unit %s a slot in the formation %s (units=%d, formation slots=%d)",
+        blueprint != nullptr ? blueprint->mBlueprintId.c_str() : "<null>",
+        mScriptName.c_str(),
+        static_cast<int>(units.size()),
+        static_cast<int>(scriptResult.mObjs.size())
+      );
+      RemoveUnit(desc.unit);
+    }
+
+    mLanes[layerIndex].push_back(laneEntry);
+  }
+
+  /**
+   * Address: 0x00568CA0 (FUN_00568CA0, Moho::CAiFormationInstance::UpdateFormation)
+   *
+   * What it does:
+   * Snapshots every live, mobile, non-building, non-destroy-queued linked
+   * unit into a weak-slot scratch list, accumulating the formation's mean
+   * facing and each unit's max footprint size. Refreshes
+   * `mOrientationBaseline` (named `mOrientationChng` by the raw decompile;
+   * mapped here since this is the only quaternion the binary both writes
+   * from the mean-facing delta and `RunScript` phase 4 later reads) when
+   * the facing changed enough. Rebuilds each formation layer in turn:
+   * releases the previous lane entries for that layer
+   * (`ReleaseFormationLaneEntries`) and calls `Setup` to claim and script
+   * this layer's units from the shared snapshot. After both layers
+   * rebuild, merges overlapping lane bands for `Form*` commands
+   * (`MergeOverlappingLaneBands`) and broadcasts
+   * `FORMATIONSTATUS_FormationUpdated`.
+   */
+  void CAiFormationInstance::UpdateFormation()
+  {
+    SFormationLayerUnitSet mobileUnits{};
+    float orientXSum = 0.0f;
+    float orientYSum = 0.0f;
+
+    for (SFormationLinkedUnitRef& linkedRef : mUnits) {
+      Unit* const unit = DecodeLinkedRefUnit(linkedRef);
+      if (unit == nullptr || !unit->IsMobile() || unit->IsDead() || unit->IsBeingBuilt() || unit->DestroyQueued()) {
+        continue;
+      }
+
+      const Wm3::Vec3f& position = unit->GetPosition();
+      if (!IsValidVector3f(position)) {
+        continue;
+      }
+
+      AppendLinkedUnitWeakSlot(mobileUnits, unit);
+
+      const VTransform& transform = unit->GetTransform();
+      const Wm3::Quatf& orient = transform.orient_;
+      orientXSum += (orient.w * orient.y + orient.x * orient.z) * 2.0f;
+      orientYSum += 1.0f - (orient.z * orient.z + orient.y * orient.y) * 2.0f;
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      std::int32_t footprintSize;
+      if (blueprint->Physics.MotionType == RULEUMT_Air) {
+        footprintSize = (static_cast<std::int32_t>(blueprint->mFootprint.mSizeX)
+                        + static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ)) / 2;
+      } else {
+        footprintSize = unit->GetMaxFootprintSize();
+      }
+      mMaxUnitSlotCount = std::max(mMaxUnitSlotCount, footprintSize);
+    }
+
+    if (mobileUnits.empty()) {
+      return;
+    }
+
+    const float mobileCount = static_cast<float>(mobileUnits.size());
+    const float orientXDir = orientXSum / mobileCount;
+    const float orientYDir = orientYSum / mobileCount;
+
+    if (mOrientation != kZeroQuaternion) {
+      const float targetAngle = std::atan2(
+        (mOrientation.w * mOrientation.y + mOrientation.z * mOrientation.x) * 2.0f,
+        1.0f - (mOrientation.z * mOrientation.z + mOrientation.y * mOrientation.y) * 2.0f
+      );
+      float angleDelta = targetAngle - std::atan2(orientXDir, orientYDir);
+      if (angleDelta > 3.1415927f) {
+        angleDelta -= 6.2831855f;
+      } else if (angleDelta < -3.1415927f) {
+        angleDelta += 6.2831855f;
+      }
+
+      if (std::fabs(angleDelta) < 1.8849558f) {
+        const float halfAngle = angleDelta * 0.5f;
+        const float sinHalf = std::sin(halfAngle);
+        mOrientationBaseline.x = std::cos(halfAngle);
+        mOrientationBaseline.y = 0.0f;
+        mOrientationBaseline.z = sinHalf;
+        mOrientationBaseline.w = 0.0f;
+      }
+    }
+
+    for (std::int32_t layerIndex = 0; layerIndex < kFormationLayerCount; ++layerIndex) {
+      ReleaseFormationLaneEntries(mLanes[layerIndex]);
+      Setup(mobileUnits, layerIndex);
+    }
+
+    if (CommandIsForm()) {
+      MergeOverlappingLaneBands(*this);
+    }
+
+    DispatchFormationUpdateEvent(static_cast<std::int32_t>(FORMATIONSTATUS_FormationUpdated), mUnitLinkListHead);
+
+    ClearLinkedUnitWeakSlots(mobileUnits);
   }
 
   /**
