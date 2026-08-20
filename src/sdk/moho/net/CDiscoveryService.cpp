@@ -3,7 +3,9 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/CWaitHandleSet.h"
@@ -11,6 +13,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
 #include "moho/net/Common.h"
 #include "moho/net/ELobbyMsg.h"
 #include "moho/net/INetDatagramHandler.h"
@@ -20,20 +23,16 @@
 
 namespace
 {
-  moho::INetDatagramHandler* InitializeINetDatagramHandlerBaseVtable(moho::INetDatagramHandler* handler) noexcept;
-
-  // Stub: vtable-patching helper is not yet recovered. Returns the handler
-  // unchanged so the discovery-service constructor can complete.
-  moho::INetDatagramHandler* InitializeINetDatagramHandlerBaseVtable(
-      moho::INetDatagramHandler* const handler) noexcept
-  {
-    return handler;
-  }
-
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kCDiscoveryServiceGetGameCountHelp = "CDiscoveryService.GetCount(self)";
   constexpr const char* kCDiscoveryServiceResetHelp = "CDiscoveryService.Reset(self)";
   constexpr const char* kCDiscoveryServiceDestroyHelp = "CDiscoveryService.Destory(self)";
+
+  // Fixed discovery-reply wire header (mirrors the 0x0B/0x01/0x00 bytes
+  // `CLobby::OnDatagram` writes when replying to a discovery request).
+  constexpr std::uint8_t kDiscoveryReplyMagic = 0x0B;
+  constexpr std::uint8_t kDiscoveryLobbyProtocolVersion = 0x01;
+  constexpr std::uint8_t kDiscoverySupComGameTypeFlag = 0x00;
 
   [[nodiscard]] gpg::RType* CachedCDiscoveryServiceRuntimeType()
   {
@@ -192,13 +191,6 @@ namespace
     return reinterpret_cast<moho::CTask*>(discoveryService->mPushTaskStorage);
   }
 
-  [[nodiscard]] moho::INetDatagramHandler* DatagramHandlerSubobject(
-    moho::CDiscoveryService* const discoveryService
-  ) noexcept
-  {
-    return reinterpret_cast<moho::INetDatagramHandler*>(&discoveryService->mDatagramHandlerVTable);
-  }
-
   class CDiscoveryServicePullTask final : public moho::CPullTask<moho::CDiscoveryService>
   {
   public:
@@ -247,9 +239,6 @@ namespace
 moho::CDiscoveryService::CDiscoveryService(const LuaPlus::LuaObject& clazz)
   : CScriptObject(clazz, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
 {
-  INetDatagramHandler* const datagramHandler = DatagramHandlerSubobject(this);
-  (void)InitializeINetDatagramHandlerBaseVtable(datagramHandler);
-
   ::new (static_cast<void*>(mPullTaskStorage)) CDiscoveryServicePullTask();
   ::new (static_cast<void*>(mPushTaskStorage)) CDiscoveryServicePushTask();
 
@@ -258,7 +247,7 @@ moho::CDiscoveryService::CDiscoveryService(const LuaPlus::LuaObject& clazz)
   mGamesCapacityEnd = nullptr;
   mNextDiscoveryBroadcastTimeSeconds = 0.0f;
 
-  INetDatagramSocket* const openedSocket = NET_OpenDatagramSocket(0, datagramHandler);
+  INetDatagramSocket* const openedSocket = NET_OpenDatagramSocket(0, this);
   INetDatagramSocket* const previousSocket = mDatagramSocket;
   mDatagramSocket = openedSocket;
   if (previousSocket != nullptr) {
@@ -382,6 +371,176 @@ gpg::RRef moho::CDiscoveryService::GetDerivedObjectRef()
   ref.mObj = this;
   ref.mType = GetClass();
   return ref;
+}
+
+/**
+ * Address: 0x007C87E0 (FUN_007C87E0, sub_7C87E0)
+ *
+ * IDA signature:
+ * int __usercall sub_7C87E0@<eax>(int a1@<edx>, _DWORD *a2@<esi>);
+ *
+ * What it does:
+ * Appends `newRecord` to `mGamesBegin..mGamesEnd`. When the backing
+ * allocation still has room (`count < capacity`), copies the record in
+ * place and bumps `mGamesEnd`. Otherwise grows the allocation by ~1.5x
+ * (minimum `count + 1`, matching the capacity math in FUN_007C9CD0's
+ * realloc path), copies the existing records into the new buffer, appends
+ * `newRecord`, and releases the old buffer.
+ */
+void moho::CDiscoveryService::AddDiscoveredGame(const DiscoveredGameRecord& newRecord)
+{
+  const auto count = static_cast<std::size_t>(mGamesEnd - mGamesBegin);
+  const auto capacity = static_cast<std::size_t>(mGamesCapacityEnd - mGamesBegin);
+
+  if (mGamesBegin != nullptr && count < capacity) {
+    *mGamesEnd = newRecord;
+    ++mGamesEnd;
+    return;
+  }
+
+  std::size_t newCapacity = capacity + capacity / 2;
+  if (newCapacity < count + 1) {
+    newCapacity = count + 1;
+  }
+
+  auto* const newBegin =
+    static_cast<DiscoveredGameRecord*>(::operator new(newCapacity * sizeof(DiscoveredGameRecord)));
+  DiscoveredGameRecord* newEnd = newBegin;
+  for (const DiscoveredGameRecord* src = mGamesBegin; src != mGamesEnd; ++src, ++newEnd) {
+    *newEnd = *src;
+  }
+  *newEnd = newRecord;
+  ++newEnd;
+
+  if (mGamesBegin != nullptr) {
+    ::operator delete(static_cast<void*>(mGamesBegin));
+  }
+
+  mGamesBegin = newBegin;
+  mGamesEnd = newEnd;
+  mGamesCapacityEnd = newBegin + newCapacity;
+}
+
+/**
+ * Address: 0x007BFB70 (FUN_007BFB70, ??_7CDiscoveryService@Moho@@6BINetDatagramHandler@Moho@@@ slot 0)
+ * Mangled implementer cite: IDA export name `Moho::CDiscoveryService::Pull`
+ *
+ * IDA signature:
+ * void __thiscall Moho::CDiscoveryService::OnDatagram(
+ *     Moho::CDiscoveryService *this, Moho::CMessage *msg,
+ *     Moho::INetDatagramSocket *socket, u_long address, u_short port);
+ *
+ * Vtable slot: slot 0 of `INetDatagramHandler`, confirmed constructed by the
+ * ctor (FUN_007BF650 writes `??_7CDiscoveryService@Moho@@6BINetDatagramHandler@Moho@@@`
+ * at +0x34) and dispatched from `CNetDatagramSocketImpl::Pull()`
+ * (`mDatagramHandler->OnDatagram(&msg, this, peerAddress, peerPort)`).
+ *
+ * What it does:
+ * Validates the lobby message kind, the fixed discovery-reply header
+ * (magic/protocol-version/SupCom-game flag), decodes the advertised game's
+ * protocol/port and its Lua config payload, then either refreshes an
+ * existing `DiscoveredGameRecord` (matched by sender address + advertised
+ * port) or appends a new one via `AddDiscoveredGame`, firing the
+ * `GameUpdated`/`GameFound` script callback either way.
+ */
+void moho::CDiscoveryService::OnDatagram(
+  CMessage* const msg,
+  INetDatagramSocket* /*socket*/,
+  const u_long address,
+  const u_short port
+)
+{
+  if (msg->GetType() != ELobbyMsg::LOBMSG_DiscoveryResponse) {
+    gpg::Logf(
+      "LOBBY: Ignoring unknown kind of discovery reply (type=%d) from %s:%d",
+      static_cast<int>(msg->GetType().raw()),
+      NET_GetHostName(address).c_str(),
+      static_cast<unsigned>(port)
+    );
+    return;
+  }
+
+  CMessageStream stream(msg);
+  const gpg::BinaryReader reader(&stream);
+
+  std::uint8_t replyMagic = 0;
+  reader.ReadExact(replyMagic);
+  if (replyMagic != kDiscoveryReplyMagic) {
+    gpg::Logf(
+      "LOBBY: Ignoring different version of discovery reply from %s:%d, got %d but expected %d",
+      NET_GetHostName(address).c_str(),
+      static_cast<unsigned>(port),
+      static_cast<int>(replyMagic),
+      static_cast<int>(kDiscoveryReplyMagic)
+    );
+    return;
+  }
+
+  std::uint8_t protocolVersion = 0;
+  reader.ReadExact(protocolVersion);
+  if (protocolVersion != kDiscoveryLobbyProtocolVersion) {
+    gpg::Logf(
+      "LOBBY: Ignoring discovery reply for different version of lobby protocol from %s:%d; got %d but expected %d",
+      NET_GetHostName(address).c_str(),
+      static_cast<unsigned>(port),
+      static_cast<int>(protocolVersion),
+      static_cast<int>(kDiscoveryLobbyProtocolVersion)
+    );
+    return;
+  }
+
+  std::uint8_t gameTypeFlag = 0;
+  reader.ReadExact(gameTypeFlag);
+  if (gameTypeFlag != kDiscoverySupComGameTypeFlag) {
+    gpg::Logf("LOBBY: Ignoring discovery reply for non-SupCom game.");
+    return;
+  }
+
+  auto protocol = static_cast<ENetProtocolType>(reader.ReadExact<std::uint8_t>());
+  std::uint16_t hostPort = 0;
+  reader.ReadExact(hostPort);
+
+  LuaPlus::LuaObject configObject;
+  mLuaObj.SCR_FromByteStream(configObject, mLuaObj.m_state, &reader);
+
+  configObject.SetString("Hostname", NET_GetHostName(address).c_str());
+  configObject.SetString(
+    "Address",
+    gpg::STR_Printf("%s:%i", NET_GetDottedOctetFromUInt32(address).c_str(), hostPort).c_str()
+  );
+
+  gpg::RRef protocolRef{};
+  gpg::RRef_ENetProtocol(&protocolRef, &protocol);
+  configObject.SetString("Protocol", protocolRef.GetLexical().c_str());
+
+  gpg::Logf(
+    "LOBBY: Received discovery reply for %s:%s:%d.",
+    NET_GetProtocolName(protocol).c_str(),
+    NET_GetHostName(address).c_str(),
+    hostPort
+  );
+
+  DiscoveredGameRecord* record = nullptr;
+  for (DiscoveredGameRecord* candidate = mGamesBegin; candidate != mGamesEnd; ++candidate) {
+    if (candidate->mHostAddress == address && candidate->mHostPort == hostPort) {
+      record = candidate;
+      break;
+    }
+  }
+
+  const bool isNewGame = record == nullptr;
+  if (isNewGame) {
+    DiscoveredGameRecord newRecord{};
+    newRecord.mProtocol = protocol;
+    newRecord.mHostAddress = address;
+    newRecord.mHostPort = hostPort;
+    newRecord.mLastReplyTimeSeconds = 0.0f;
+    AddDiscoveredGame(newRecord);
+    record = mGamesEnd - 1;
+  }
+
+  record->mLastReplyTimeSeconds = mTimer.ElapsedSeconds();
+  RunScriptIntObject(isNewGame ? "GameFound" : "GameUpdated", 0, configObject);
 }
 
 int moho::CDiscoveryService::GetGameCount() const noexcept
