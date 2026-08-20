@@ -38,19 +38,26 @@ namespace moho
    * layout have not yet been confirmed from binary evidence; the
    * struct is given a single `std::uintptr_t` body so it remains a
    * complete C++ type (so `typeid()` works) while keeping the
-   * placeholder explicit. Replace the body with the real layout
-   * once owner-side evidence is available.
+   * placeholder explicit.
+   *
+   * Resolved: `SSTIEntityAttachInfoSerializer::Deserialize`/`::Serialize`
+   * (FUN_00558310/FUN_00558350) pass this struct's address directly as the
+   * object pointer to `gpg::ReadArchive::Read`/`gpg::WriteArchive::Write`
+   * against `moho::EntId`'s reflected type -- the whole 4-byte struct IS an
+   * `EntId` (the entity this info is attached to). Stored as the raw
+   * `std::int32_t` underlying type rather than `moho::EntId` itself to avoid
+   * including `Entity.h` here, which already includes this header.
    */
   struct SSTIEntityAttachInfo
   {
     static gpg::RType* sType;
-    std::uintptr_t mPlaceholderState{};
+    std::int32_t mAttachedEntityId{};
   };
 
   static_assert(sizeof(SSTIEntityAttachInfo) == 0x04, "SSTIEntityAttachInfo size must be 0x04");
   static_assert(
-    offsetof(SSTIEntityAttachInfo, mPlaceholderState) == 0x00,
-    "SSTIEntityAttachInfo::mPlaceholderState offset must be 0x00"
+    offsetof(SSTIEntityAttachInfo, mAttachedEntityId) == 0x00,
+    "SSTIEntityAttachInfo::mAttachedEntityId offset must be 0x00"
   );
 
   enum class EUserEntityVisibilityMode : std::int32_t
