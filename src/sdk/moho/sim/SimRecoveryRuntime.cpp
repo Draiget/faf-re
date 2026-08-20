@@ -4336,50 +4336,6 @@ LinearTreeNodeRuntime* ClearLinearTreeStorageRuntime(
 }
 
 /**
- * Address: 0x00687BC0 (FUN_00687BC0)
- *
- * What it does:
- * Allocates one IdPool-map node lane with cleared links and sentinel-state
- * flags (`+0x14=1`, `+0x15=0`).
- */
-RbNodeFlag21Runtime* AllocateIdPoolMapNodeRuntime()
-{
-  auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  node->left = nullptr;
-  node->parent = nullptr;
-  node->right = nullptr;
-  node->sentinel20 = 1u;
-  node->isNil21 = 0u;
-  return node;
-}
-
-/**
- * Address: 0x00688180 (FUN_00688180)
- *
- * What it does:
- * Allocates one `map<uint, IdPool>` node lane with cleared links and
- * sentinel-state flags (`+0x14=1`, `+0x15=0`).
- */
-RbNodeFlag21Runtime* AllocateUintIdPoolMapNodeRuntime()
-{
-  auto* const node = AllocateZeroedRuntimeNode<RbNodeFlag21Runtime>();
-  if (node == nullptr) {
-    return nullptr;
-  }
-
-  node->left = nullptr;
-  node->parent = nullptr;
-  node->right = nullptr;
-  node->sentinel20 = 1u;
-  node->isNil21 = 0u;
-  return node;
-}
-
-/**
  * Address: 0x006AFBF0 (FUN_006AFBF0)
  *
  * What it does:
