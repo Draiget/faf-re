@@ -5147,6 +5147,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0063DF50 (FUN_0063DF50)
+     * Demangled: gpg::RPointerType_IAniManipulator::dtr
+     */
+    ~RPointerType() override;
+
+    /**
      * Address: 0x0063DB40 (FUN_0063DB40)
      * Demangled: gpg::RPointerType_IAniManipulator::GetName
      */
@@ -5205,6 +5211,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0066CE50 (FUN_0066CE50)
+     * Demangled: gpg::RPointerType_IEffect::dtr
+     */
+    ~RPointerType() override;
+
+    /**
      * Address: 0x0066CA40 (FUN_0066CA40)
      * Demangled: gpg::RPointerType_IEffect::GetName
      */
@@ -5262,6 +5274,12 @@ namespace gpg
   class RPointerType<moho::CUnitCommand> final : public RPointerTypeBase
   {
   public:
+    /**
+     * Address: 0x006E3AC0 (FUN_006E3AC0)
+     * Demangled: gpg::RPointerType_CUnitCommand::dtr
+     */
+    ~RPointerType() override;
+
     /**
      * Address: 0x006E36B0 (FUN_006E36B0)
      * Demangled: gpg::RPointerType_CUnitCommand::GetName
@@ -5678,6 +5696,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0059D8D0 (FUN_0059D8D0)
+     * Demangled: gpg::RPointerType_IFormationInstance::dtr
+     */
+    ~RPointerType() override;
+
+    /**
      * Address: 0x0059D4C0 (FUN_0059D4C0)
      * Demangled: gpg::RPointerType_IFormationInstance::GetName
      */
@@ -5826,6 +5850,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x005C8550 (FUN_005C8550)
+     * Demangled: gpg::RPointerType_ReconBlip::dtr
+     */
+    ~RPointerType() override;
+
+    /**
      * Address: 0x005C8080 (FUN_005C8080)
      * Demangled: gpg::RPointerType_ReconBlip::GetName
      */
@@ -5883,6 +5913,12 @@ namespace gpg
   class RPointerType<moho::CArmyStatItem> final : public RPointerTypeBase
   {
   public:
+    /**
+     * Address: 0x00711A30 (FUN_00711A30)
+     * Demangled: gpg::RPointerType_CArmyStatItem::dtr
+     */
+    ~RPointerType() override;
+
     /**
      * Address: 0x007115D0 (FUN_007115D0)
      * Demangled: gpg::RPointerType_CArmyStatItem::GetName

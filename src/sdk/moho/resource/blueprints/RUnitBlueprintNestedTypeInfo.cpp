@@ -16,6 +16,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
+
 namespace
 {
   using GeneralTypeInfo = moho::RUnitBlueprintGeneralTypeInfo;
@@ -30,6 +31,29 @@ namespace
   using WeaponTypeInfo = moho::RUnitBlueprintWeaponTypeInfo;
   using VectorFloatType = msvc8::vector<float>;
   void EnsureVectorFloatLoadCapacity(VectorFloatType& storage, std::size_t requiredCount);
+  [[nodiscard]] gpg::RType* CachedFloatType();
+
+  /**
+   * Cached `"vector<float>"` display name plus its one-shot build guard. The
+   * binary keeps these as the `gpg::RVectorType<float>` class statics `sName`
+   * and the init-guard word at `0x010C8E40`; the descriptor class is file-local
+   * here, so they are file-local too.
+   */
+  msvc8::string gVectorFloatTypeName;
+  std::uint32_t gVectorFloatTypeNameInitGuard = 0u;
+  constexpr std::uint32_t kVectorFloatTypeNameInitMask = 0x1u;
+
+  /**
+   * Address: 0x00BF3840 (FUN_00BF3840, gpg::RVectorType_float::sName cleanup)
+   *
+   * What it does:
+   * Releases the cached `vector<float>` display-name string at process exit.
+   */
+  void cleanup_VectorFloatReflectionTypeName()
+  {
+    gVectorFloatTypeName = msvc8::string();
+    gVectorFloatTypeNameInitGuard &= ~kVectorFloatTypeNameInitMask;
+  }
 
   /**
    * Address: 0x00524780 (FUN_00524780)
@@ -169,10 +193,17 @@ namespace
   class VectorFloatReflectionType final : public gpg::RType, public gpg::RIndexed
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "vector<float>";
-    }
+    /**
+     * Address: 0x005232C0 (FUN_005232C0, gpg::RVectorType_float::GetName)
+     *
+     * IDA signature:
+     * std::string::_Bxty *gpg::RVectorType_float::GetName();
+     *
+     * What it does:
+     * Lazily builds `"vector<float>"` once from the reflected element type's
+     * own name, caches it, and installs the atexit teardown for the cache.
+     */
+    [[nodiscard]] const char* GetName() const override;
 
     /**
      * Address: 0x00523380 (FUN_00523380, gpg::RVectorType_float::GetLexical)
@@ -334,6 +365,30 @@ namespace
    * with the reflected vector size as ", size=%d". Out-of-line definition
    * binds the binary symbol to the `??_7?$RVectorType@M@gpg@@6B@ +0x04` slot.
    */
+  /**
+   * Address: 0x005232C0 (FUN_005232C0, gpg::RVectorType_float::GetName)
+   *
+   * What it does:
+   * On the first call, resolves the reflected `float` descriptor, formats
+   * `"vector<%s>"` from its name into the cached `sName` lane, and registers the
+   * cache teardown with `atexit`. Later calls return the cached buffer. The
+   * guard word is set before the string is built, exactly as the binary does, so
+   * a re-entrant call during `LookupRType` cannot rebuild the name.
+   */
+  const char* VectorFloatReflectionType::GetName() const
+  {
+    if ((gVectorFloatTypeNameInitGuard & kVectorFloatTypeNameInitMask) == 0u) {
+      gVectorFloatTypeNameInitGuard |= kVectorFloatTypeNameInitMask;
+
+      const gpg::RType* const elementType = CachedFloatType();
+      const char* const elementName = elementType ? elementType->GetName() : "float";
+      gVectorFloatTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "float");
+      (void)std::atexit(&cleanup_VectorFloatReflectionTypeName);
+    }
+
+    return gVectorFloatTypeName.c_str();
+  }
+
   msvc8::string VectorFloatReflectionType::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);

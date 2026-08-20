@@ -1455,21 +1455,27 @@ namespace
 
   using BuildReserveMapStorage = moho::SBuildStructurePositionMap;
 
-  struct LegacyMapRuntimeView
-  {
-    void* allocProxy;
-    void* head;
-    std::uint32_t size;
-  };
+  /**
+   * Cached `"map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>"` display name plus
+   * its one-shot build guard. The binary keeps these as the
+   * `gpg::RMapType_IVector2i_SBuildReserveInfo` class static `sName` and the
+   * init-guard word at `0x010C8B70`; the descriptor class is file-local here, so
+   * they are file-local too.
+   */
+  msvc8::string gBuildReserveMapTypeName;
+  std::uint32_t gBuildReserveMapTypeNameInitGuard = 0u;
+  constexpr std::uint32_t kBuildReserveMapTypeNameInitMask = 0x1u;
 
-  [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
+  /**
+   * Address: 0x00BF6320 (FUN_00BF6320, gpg::RMapType_IVector2i_SBuildReserveInfo::sName cleanup)
+   *
+   * What it does:
+   * Releases the cached reflected map display-name string at process exit.
+   */
+  void cleanup_BuildReserveMapTypeName()
   {
-    if (object == nullptr) {
-      return 0u;
-    }
-
-    const auto* const mapView = static_cast<const LegacyMapRuntimeView*>(object);
-    return mapView->size;
+    gBuildReserveMapTypeName = msvc8::string();
+    gBuildReserveMapTypeNameInitGuard &= ~kBuildReserveMapTypeNameInitMask;
   }
 
   [[nodiscard]] gpg::RType* ResolveBuildReserveKeyType()
@@ -1500,15 +1506,57 @@ namespace
   class BuildReserveMapTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0057E240 (FUN_0057E240, gpg::RMapType_IVector2i_SBuildReserveInfo::GetName)
+     *
+     * IDA signature:
+     * std::string::_Bxty *gpg::RMapType_IVector2i_SBuildReserveInfo::GetName();
+     *
+     * What it does:
+     * Lazily builds `"map<key,value>"` once from the reflected key and value
+     * descriptors' own names, caches it, and installs the atexit teardown. The
+     * binary resolves the value descriptor first and the key descriptor second,
+     * but formats key-then-value.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>";
+      if ((gBuildReserveMapTypeNameInitGuard & kBuildReserveMapTypeNameInitMask) == 0u) {
+        gBuildReserveMapTypeNameInitGuard |= kBuildReserveMapTypeNameInitMask;
+
+        const gpg::RType* const valueType = ResolveBuildReserveValueType();
+        const gpg::RType* const keyType = ResolveBuildReserveKeyType();
+        const char* const keyName = keyType ? keyType->GetName() : "Wm3::IVector2<int>";
+        const char* const valueName = valueType ? valueType->GetName() : "Moho::SBuildReserveInfo";
+        gBuildReserveMapTypeName = gpg::STR_Printf(
+          "map<%s,%s>",
+          keyName ? keyName : "Wm3::IVector2<int>",
+          valueName ? valueName : "Moho::SBuildReserveInfo"
+        );
+        (void)std::atexit(&cleanup_BuildReserveMapTypeName);
+      }
+
+      return gBuildReserveMapTypeName.c_str();
     }
 
+    /**
+     * Address: 0x0057E320 (FUN_0057E320, gpg::RMapType_IVector2i_SBuildReserveInfo::GetLexical)
+     *
+     * IDA signature:
+     * std::string *__thiscall gpg::RMapType_IVector2i_SBuildReserveInfo::GetLexical(
+     *     gpg::RType *this, std::string *dest, _DWORD *a3);
+     *
+     * What it does:
+     * Renders the reflected map as `"<base RType lexical>, size=<count>"`. The
+     * binary reads the count straight out of the map object's node-count word
+     * rather than dispatching a virtual, because this descriptor has no
+     * `RIndexed` sub-object; the typed `size()` accessor is that same word.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
       const msvc8::string base = gpg::RType::GetLexical(ref);
-      return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements(ref.mObj)));
+      const auto* const mapObject = static_cast<const BuildReserveMapStorage*>(ref.mObj);
+      const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
     }
 
     static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
