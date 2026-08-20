@@ -2642,6 +2642,7 @@ RRef MovePointerSlotRef(void* const slotObject, RRef* const sourceRef)
 /**
  * Address: 0x00557440 (FUN_00557440, gpg::RPointerType_RBlueprint::Delete)
  * Address: 0x005A1A80 (FUN_005A1A80, gpg::RPointerType_RUnitBlueprint::Delete)
+ * Address: 0x005DE530 (FUN_005DE530, gpg::RPointerType_UnitWeapon::Delete)
  *
  * What it does:
  * Releases one allocated pointer-slot lane. IDA marks the instantiation
@@ -3266,6 +3267,76 @@ RRef MoveRUnitBlueprintPointerSlotRef(void* const slotObject, RRef* const source
 
     RRef out{};
     gpg::RRef_RUnitBlueprint_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005DE590 (FUN_005DE590, gpg::RPointerType_UnitWeapon::NewRef)
+ *
+ * What it does:
+ * Allocates one `UnitWeapon*` pointer-slot lane and wraps it as `RRef`.
+ */
+RRef NewUnitWeaponPointerSlotRef()
+{
+    auto* const slot = static_cast<moho::UnitWeapon**>(::operator new(sizeof(moho::UnitWeapon*)));
+    RRef out{};
+    gpg::RRef_UnitWeapon_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005DE5C0 (FUN_005DE5C0, gpg::RPointerType_UnitWeapon::CpyRef)
+ *
+ * What it does:
+ * Allocates one `UnitWeapon*` pointer-slot lane and copies the upcast source
+ * slot value into it. Frees the new slot and rethrows if the upcast fails.
+ */
+RRef CopyUnitWeaponPointerSlotRef(RRef* const sourceRef)
+{
+    auto* const slot = static_cast<moho::UnitWeapon**>(::operator new(sizeof(moho::UnitWeapon*)));
+    if (slot) {
+        try {
+            *slot = *sourceRef->TryUpcastUnitWeaponPointerSlot();
+        } catch (...) {
+            ::operator delete(slot);
+            throw;
+        }
+    }
+
+    RRef out{};
+    gpg::RRef_UnitWeapon_P(&out, slot);
+    return out;
+}
+
+/**
+ * Address: 0x005DE650 (FUN_005DE650, gpg::RPointerType_UnitWeapon::CtrRef)
+ *
+ * What it does:
+ * Wraps existing `UnitWeapon*` pointer-slot storage as a reflected `RRef`.
+ */
+RRef ConstructUnitWeaponPointerSlotRef(void* const slotObject)
+{
+    RRef out{};
+    gpg::RRef_UnitWeapon_P(&out, static_cast<moho::UnitWeapon**>(slotObject));
+    return out;
+}
+
+/**
+ * Address: 0x005DE680 (FUN_005DE680, gpg::RPointerType_UnitWeapon::MovRef)
+ *
+ * What it does:
+ * Writes the upcast source slot pointer value into the destination
+ * `UnitWeapon*` slot lane.
+ */
+RRef MoveUnitWeaponPointerSlotRef(void* const slotObject, RRef* const sourceRef)
+{
+    auto* const slot = static_cast<moho::UnitWeapon**>(slotObject);
+    if (slot) {
+        *slot = *sourceRef->TryUpcastUnitWeaponPointerSlot();
+    }
+
+    RRef out{};
+    gpg::RRef_UnitWeapon_P(&out, slot);
     return out;
 }
 
@@ -12121,6 +12192,12 @@ RType* gpg::RPointerType<moho::RBlueprint>::GetPointeeType() const
 }
 
 /**
+ * Address: 0x005DE330 (FUN_005DE330)
+ * Demangled: gpg::RPointerType_UnitWeapon::dtr
+ */
+gpg::RPointerType<moho::UnitWeapon>::~RPointerType() = default;
+
+/**
  * Address: 0x005DDB10 (FUN_005DDB10)
  * Demangled: gpg::RPointerType_UnitWeapon::GetName
  */
@@ -12161,6 +12238,36 @@ const RIndexed* gpg::RPointerType<moho::UnitWeapon>::IsPointer() const
 }
 
 /**
+ * Address: 0x005DDE50 (FUN_005DDE50)
+ * Demangled: gpg::RPointerType_UnitWeapon::SubscriptIndex
+ *
+ * What it does:
+ * Builds a reflected reference to the `ind`-th `UnitWeapon` in the array the
+ * pointer slot addresses (stride `sizeof(UnitWeapon)`).
+ */
+RRef gpg::RPointerType<moho::UnitWeapon>::SubscriptIndex(void* const obj, const int ind) const
+{
+    auto* const slot = static_cast<moho::UnitWeapon**>(obj);
+    RRef out{};
+    gpg::RRef_UnitWeapon(&out, (*slot) + ind);
+    return out;
+}
+
+/**
+ * Address: 0x005DDE40 (FUN_005DDE40)
+ * Demangled: gpg::RPointerType_UnitWeapon::GetCount
+ *
+ * What it does:
+ * Returns 1 when the pointer slot is non-null, else 0 (a pointer type holds
+ * at most one element).
+ */
+size_t gpg::RPointerType<moho::UnitWeapon>::GetCount(void* const obj) const
+{
+    auto* const slot = static_cast<moho::UnitWeapon* const*>(obj);
+    return (*slot != nullptr) ? 1u : 0u;
+}
+
+/**
  * Address: 0x005DDE90 (FUN_005DDE90)
  * Demangled: gpg::RPointerType_UnitWeapon::AssignPointer
  *
@@ -12181,11 +12288,11 @@ void gpg::RPointerType<moho::UnitWeapon>::Init()
 {
     v24 = true;
     size_ = sizeof(moho::UnitWeapon*);
-    newRefFunc_ = &NewPointerSlotRef<moho::UnitWeapon>;
-    cpyRefFunc_ = &CopyPointerSlotRef<moho::UnitWeapon>;
+    newRefFunc_ = &NewUnitWeaponPointerSlotRef;
+    cpyRefFunc_ = &CopyUnitWeaponPointerSlotRef;
     deleteFunc_ = &DeletePointerSlot<moho::UnitWeapon>;
-    ctorRefFunc_ = &ConstructPointerSlotRef<moho::UnitWeapon>;
-    movRefFunc_ = &MovePointerSlotRef<moho::UnitWeapon>;
+    ctorRefFunc_ = &ConstructUnitWeaponPointerSlotRef;
+    movRefFunc_ = &MoveUnitWeaponPointerSlotRef;
 }
 
 RType* gpg::RPointerType<moho::UnitWeapon>::GetPointeeType() const

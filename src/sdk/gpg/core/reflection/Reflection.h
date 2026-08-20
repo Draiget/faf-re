@@ -5061,6 +5061,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x005DE330 (FUN_005DE330)
+     * Demangled: gpg::RPointerType_UnitWeapon::dtr
+     */
+    ~RPointerType() override;
+
+    /**
      * Address: 0x005DDB10 (FUN_005DDB10)
      * Demangled: gpg::RPointerType_UnitWeapon::GetName
      */
@@ -5087,6 +5093,28 @@ namespace gpg
      */
     [[nodiscard]]
     const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x005DDE50 (FUN_005DDE50)
+     * Demangled: gpg::RPointerType_UnitWeapon::SubscriptIndex
+     *
+     * What it does:
+     * Builds a reflected reference to the `ind`-th `UnitWeapon` in the array
+     * the pointer slot addresses (stride `sizeof(UnitWeapon)`).
+     */
+    [[nodiscard]]
+    RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x005DDE40 (FUN_005DDE40)
+     * Demangled: gpg::RPointerType_UnitWeapon::GetCount
+     *
+     * What it does:
+     * Returns 1 when the pointer slot is non-null, else 0 (a pointer type
+     * holds at most one element).
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
 
     /**
      * Address: 0x005DDE90 (FUN_005DDE90)
