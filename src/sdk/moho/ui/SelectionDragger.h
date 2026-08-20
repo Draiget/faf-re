@@ -19,13 +19,56 @@ namespace moho
   // its derived-destructor body.
   extern SSelectionSetUserEntity sSelectionBrackets;
 
-  struct SelectionDraggerLink
+  /**
+   * Interface layer between `IMauiDragger` and the concrete selection
+   * draggers: a dragger the world view is allowed to draw.
+   *
+   * RTTI proves the layer exists and where it sits. The complete-object
+   * locator at 0x00E9AB4C names `.?AVISelectionDragger@Moho@@` and its
+   * base-class array is `{ISelectionDragger mdisp=0, IMauiDragger mdisp=0,
+   * WeakObject mdisp=4}`; `SelectionDragger`'s own locator (0x00E9AB60) and
+   * both leaves (`SelectionDragger2D` 0x00E9A9B0, `SelectionDragger3D`
+   * 0x00E9AA08) list the identical chain with `ISelectionDragger` between
+   * them.
+   *
+   * `??_7ISelectionDragger@Moho@@6B@` sits at 0x00E479F8 and is exactly five
+   * dwords wide - one more than `IMauiDragger`'s four, which is the single
+   * virtual this layer introduces:
+   *   +0x00  0x008640B0  scalar deleting destructor
+   *   +0x04  0x0078DB50  `IMauiDragger::DragMove`                (inherited)
+   *   +0x08  0x0078DB60  `IMauiDragger::DragRelease`             (inherited)
+   *   +0x0C  0x0078DB80  `IMauiDragger::OnCurrentDraggerReplaced`(inherited)
+   *   +0x10  0x00A82547  `_purecall`                 -> `Render`
+   * (the dword after it, 0x00E47A0C, is the next class's locator, so the table
+   * genuinely ends at five slots).
+   *
+   * The class is abstract, so the binary only ever runs its constructor and
+   * destructor as part of a derived object:
+   *   0x00864040  mov [eax+4], 0                 ; base weak head cleared
+   *               mov [eax], offset ??_7ISelectionDragger@Moho@@6B@
+   *   0x008640B0  restores ??_7IMauiDragger@Moho@@6B@, drains the weak chain,
+   *               then honours the scalar-delete flag
+   * Both are compiler-emitted here.
+   */
+  class ISelectionDragger : public IMauiDragger
   {
-    SelectionDraggerLink* mOwnerHead = nullptr; // +0x00
-    SelectionDraggerLink* mNext = nullptr; // +0x04
+  public:
+    /**
+     * Vtable slot +0x10 of `??_7ISelectionDragger@Moho@@6B@` (0x00A82547,
+     * `_purecall`).
+     *
+     * What it does:
+     * Draws the dragger's on-screen feedback through the shared prim batcher.
+     * `SelectionDragger2D` draws the selection rectangle (0x00865050);
+     * `SelectionDragger3D`'s override (0x00864C80) is an empty `retn 4`.
+     *
+     * Dispatched at 0x0086F06D inside `Moho::CUIWorldView::Draw` (0x0086EF40)
+     * - `call edx` with `edx = [[esi-4]+0x10]`, `ecx = esi-4`.
+     */
+    virtual void Render(CD3DPrimBatcher* batcher) = 0;
   };
 
-  static_assert(sizeof(SelectionDraggerLink) == 0x08, "SelectionDraggerLink size must be 0x08");
+  static_assert(sizeof(ISelectionDragger) == 0x08, "ISelectionDragger size must be 0x08");
 
   /**
    * Base runtime state shared by 2D/3D selection draggers.
@@ -33,10 +76,12 @@ namespace moho
    * `??_7SelectionDragger@Moho@@6B@` lives at 0x00E479D8 and is written by the
    * constructor at 0x008637F0 (`mov dword ptr [eax], offset
    * ??_7SelectionDragger@Moho@@6B@`, 0x008637F7), so the vtable is
-   * constructor-anchored. The destructor body at 0x00864080 restores
-   * `??_7IMauiDragger@Moho@@6B@` (0x00E38DC0) before unlinking the intrusive
-   * selection list, which is what proves `IMauiDragger` is the direct base and
-   * that it sits at offset 0.
+   * constructor-anchored. The instruction right before it, `mov dword ptr
+   * [eax+4], 0` at 0x008637F0, is the inlined base constructor clearing the
+   * `IMauiDragger`/`WeakObject` head, and the destructor body at 0x00864080
+   * restores `??_7IMauiDragger@Moho@@6B@` (0x00E38DC0) before draining that
+   * same `[ecx+4]` chain - which is what proves the dragger bases sit at
+   * offset 0 and that +0x04 is theirs, not this class's.
    *
    * Slot map of `??_7SelectionDragger@Moho@@6B@` (read from the shipped PE):
    *   +0x00  0x00864000  scalar deleting destructor  -> `DeleteWithFlag`
@@ -44,7 +89,7 @@ namespace moho
    *   +0x08  0x00863870  `SelectionDragger::DragRelease` (override, NOT YET
    *                      RECOVERED - see the note below)
    *   +0x0C  0x0078DB80  `IMauiDragger::OnCurrentDraggerReplaced` (inherited)
-   *   +0x10  0x00A82547  `_purecall` -> `Render`
+   *   +0x10  0x00A82547  `_purecall` -> `ISelectionDragger::Render`
    *   +0x14  0x00A82547  `_purecall` -> `BuildSelectionSolid`
    *   +0x18  0x00A82547  `_purecall` -> `HasActiveSelectionDrag`
    *
@@ -62,7 +107,7 @@ namespace moho
    * Until those are reachable from this translation unit the slot stays pure,
    * inherited from `IMauiDragger`.
    */
-  class SelectionDragger : public IMauiDragger
+  class SelectionDragger : public ISelectionDragger
   {
   public:
     /**
@@ -91,17 +136,6 @@ namespace moho
     SelectionDragger* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
 
     /**
-     * Vtable slot +0x10 of `??_7SelectionDragger@Moho@@6B@` (0x00A82547,
-     * `_purecall`).
-     *
-     * What it does:
-     * Draws the dragger's on-screen feedback through the shared prim batcher.
-     * `SelectionDragger2D` draws the selection rectangle (0x00865050);
-     * `SelectionDragger3D`'s override (0x00864C80) is an empty `retn 4`.
-     */
-    virtual void Render(CD3DPrimBatcher* batcher) = 0;
-
-    /**
      * Vtable slot +0x14 of `??_7SelectionDragger@Moho@@6B@` (0x00A82547,
      * `_purecall`).
      */
@@ -114,7 +148,8 @@ namespace moho
     [[nodiscard]] virtual bool HasActiveSelectionDrag() const = 0;
 
   public:
-    SelectionDraggerLink* mSelectionListHead; // +0x04
+    // +0x00 vptr and +0x04 `WeakObject::weakLinkHead_` belong to the
+    // `ISelectionDragger`/`IMauiDragger` bases; this class starts at +0x08.
     CWldSession* mSess;       // +0x08
     CameraImpl* mCam;         // +0x0C
     float mX0;                // +0x10
@@ -122,8 +157,6 @@ namespace moho
     Wm3::Vector3f mPos;       // +0x18
   };
 
-  static_assert(offsetof(SelectionDragger, mSelectionListHead) == 0x04,
-                "SelectionDragger::mSelectionListHead offset must be 0x04");
   static_assert(offsetof(SelectionDragger, mSess) == 0x08,
                 "SelectionDragger::mSess offset must be 0x08");
   static_assert(offsetof(SelectionDragger, mCam) == 0x0C,
