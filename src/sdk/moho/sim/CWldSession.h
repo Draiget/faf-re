@@ -1764,6 +1764,23 @@ namespace moho
   void InsertUnitIntoCommandIssueWeakSet(SSelectionSetUserEntity* set, UserUnit* unit);
 
   /**
+   * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
+   * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
+   * — identical node-splice/rebalance/return-next shape, a separate
+   * per-call-site emission of the same std::_Tree::erase(iterator) operation)
+   *
+   * What it does:
+   * Erases one `UserEntity` weak-set node from a selection RB-tree, unlinks
+   * its intrusive weak-owner chain lane, and returns the next in-order node.
+   * Declared here (moved to external linkage from its original CWldSession.cpp
+   * anonymous namespace) so `CFormation::ChooseFormation` (CFormation.cpp) can
+   * prune its own selection-set walk exactly as `SSelectionSetUserEntity::
+   * PruneTombstonesAndFindLive`/`EraseRange` do in this file.
+   */
+  [[nodiscard]] SSelectionNodeUserEntity*
+    EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node);
+
+  /**
    * Address context:
    * - process-global world-frame action lane (`sWldFrameAction`) consumed by
    *   `WLD_Frame`.

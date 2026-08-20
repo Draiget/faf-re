@@ -6272,8 +6272,9 @@ namespace moho
       return true;
     }
 
-    [[nodiscard]] SSelectionNodeUserEntity*
-    EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node);
+    // EraseSelectionNodeAndAdvance is declared in CWldSession.h (hoisted to
+    // external linkage below the anonymous namespace at 0x0066A550/0x007B30D0)
+    // and is visible here via that include.
 
     void ClearSelectionSet(SSelectionSetUserEntity& selection)
     {
@@ -9112,77 +9113,6 @@ namespace moho
       weakRef.mNextOwner = nullptr;
     }
 
-    /**
-     * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
-     * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
-     * — identical node-splice/rebalance/return-next shape, a separate
-     * per-call-site emission of the same std::_Tree::erase(iterator) operation;
-     * reached via CWldSession.cpp's own EraseSelectionNodeAndAdvance callers)
-     *
-     * What it does:
-     * Erases one `UserEntity` weak-set node from the selection RB-tree, unlinks
-     * its intrusive weak-owner chain lane, and returns the next in-order node.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity*
-    EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
-    {
-      if (selection.mHead == nullptr || IsSelectionNil(node)) {
-        throw std::out_of_range("invalid map/set<T> iterator");
-      }
-
-      SSelectionNodeUserEntity* const head = selection.mHead;
-      SSelectionNodeUserEntity* const next = NextTreeNode(node);
-
-      SSelectionNodeUserEntity* removed = node;
-      SSelectionNodeUserEntity* spliceTarget = node;
-      std::uint8_t removedColor = spliceTarget->mColor;
-      SSelectionNodeUserEntity* fixNode = head;
-      SSelectionNodeUserEntity* fixParent = head;
-
-      if (IsSelectionNil(node->mLeft)) {
-        fixNode = node->mRight;
-        fixParent = node->mParent;
-        ReplaceSelectionSubtree(selection, node, node->mRight);
-      } else if (IsSelectionNil(node->mRight)) {
-        fixNode = node->mLeft;
-        fixParent = node->mParent;
-        ReplaceSelectionSubtree(selection, node, node->mLeft);
-      } else {
-        spliceTarget = SelectionMin(node->mRight, head);
-        removedColor = spliceTarget->mColor;
-        fixNode = spliceTarget->mRight;
-        if (spliceTarget->mParent == node) {
-          fixParent = spliceTarget;
-          if (!IsSelectionNil(fixNode)) {
-            fixNode->mParent = spliceTarget;
-          }
-        } else {
-          fixParent = spliceTarget->mParent;
-          ReplaceSelectionSubtree(selection, spliceTarget, spliceTarget->mRight);
-          spliceTarget->mRight = node->mRight;
-          spliceTarget->mRight->mParent = spliceTarget;
-        }
-
-        ReplaceSelectionSubtree(selection, node, spliceTarget);
-        spliceTarget->mLeft = node->mLeft;
-        spliceTarget->mLeft->mParent = spliceTarget;
-        spliceTarget->mColor = node->mColor;
-      }
-
-      UnlinkSelectionWeakOwnerRef(removed->mEnt);
-      ::operator delete(removed);
-
-      if (selection.mSize > 0u) {
-        --selection.mSize;
-      }
-      if (removedColor == 1u) {
-        FixupAfterSelectionErase(selection, fixNode, fixParent);
-      }
-
-      RecomputeSelectionExtrema(selection);
-      return next;
-    }
-
     [[nodiscard]] SessionSaveSourceNode* GetSaveSourceTreeHead(const CWldSession* const session)
     {
       return static_cast<SessionSaveSourceNode*>(session->mSaveSourceTreeHead);
@@ -10844,6 +10774,82 @@ namespace moho
       return true;
     }
   } // namespace
+
+  /**
+   * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
+   * Address: 0x007B30D0 (FUN_007B30D0, std::map<unsigned int,WeakPtr<UserEntity>>::erase
+   * — identical node-splice/rebalance/return-next shape, a separate
+   * per-call-site emission of the same std::_Tree::erase(iterator) operation;
+   * reached via CWldSession.cpp's own EraseSelectionNodeAndAdvance callers)
+   *
+   * What it does:
+   * Erases one `UserEntity` weak-set node from the selection RB-tree, unlinks
+   * its intrusive weak-owner chain lane, and returns the next in-order node.
+   *
+   * Hoisted to external linkage (was file-local in the anonymous namespace
+   * above) and declared in CWldSession.h so `CFormation::ChooseFormation`
+   * (CFormation.cpp) can prune its own selection-set walk the same way
+   * `SSelectionSetUserEntity::PruneTombstonesAndFindLive`/`EraseRange` do.
+   */
+  [[nodiscard]] SSelectionNodeUserEntity*
+  EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* const node)
+  {
+    if (selection.mHead == nullptr || IsSelectionNil(node)) {
+      throw std::out_of_range("invalid map/set<T> iterator");
+    }
+
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    SSelectionNodeUserEntity* const next = NextTreeNode(node);
+
+    SSelectionNodeUserEntity* removed = node;
+    SSelectionNodeUserEntity* spliceTarget = node;
+    std::uint8_t removedColor = spliceTarget->mColor;
+    SSelectionNodeUserEntity* fixNode = head;
+    SSelectionNodeUserEntity* fixParent = head;
+
+    if (IsSelectionNil(node->mLeft)) {
+      fixNode = node->mRight;
+      fixParent = node->mParent;
+      ReplaceSelectionSubtree(selection, node, node->mRight);
+    } else if (IsSelectionNil(node->mRight)) {
+      fixNode = node->mLeft;
+      fixParent = node->mParent;
+      ReplaceSelectionSubtree(selection, node, node->mLeft);
+    } else {
+      spliceTarget = SelectionMin(node->mRight, head);
+      removedColor = spliceTarget->mColor;
+      fixNode = spliceTarget->mRight;
+      if (spliceTarget->mParent == node) {
+        fixParent = spliceTarget;
+        if (!IsSelectionNil(fixNode)) {
+          fixNode->mParent = spliceTarget;
+        }
+      } else {
+        fixParent = spliceTarget->mParent;
+        ReplaceSelectionSubtree(selection, spliceTarget, spliceTarget->mRight);
+        spliceTarget->mRight = node->mRight;
+        spliceTarget->mRight->mParent = spliceTarget;
+      }
+
+      ReplaceSelectionSubtree(selection, node, spliceTarget);
+      spliceTarget->mLeft = node->mLeft;
+      spliceTarget->mLeft->mParent = spliceTarget;
+      spliceTarget->mColor = node->mColor;
+    }
+
+    UnlinkSelectionWeakOwnerRef(removed->mEnt);
+    ::operator delete(removed);
+
+    if (selection.mSize > 0u) {
+      --selection.mSize;
+    }
+    if (removedColor == 1u) {
+      FixupAfterSelectionErase(selection, fixNode, fixParent);
+    }
+
+    RecomputeSelectionExtrema(selection);
+    return next;
+  }
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):

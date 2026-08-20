@@ -10,6 +10,7 @@
 namespace moho
 {
   class IFormationInstance;
+  struct SSelectionSetUserEntity;
 
   class CFormation
   {
@@ -57,6 +58,39 @@ namespace moho
      * formation in edx, not as a thiscall receiver.
      */
     static void UpdateOrientation(const Wm3::Vector3f& mouseWorldPos, CFormation* formation);
+
+    /**
+     * Address: 0x008384C0 (FUN_008384C0, Moho::CFormation::ChooseFormation)
+     *
+     * IDA signature:
+     * void __stdcall Moho::CFormation::ChooseFormation(
+     *     Moho::CFormation *a1, Wm3::Vector3f *a2, std::vector *a3, bool a4);
+     *
+     * What it does:
+     * Rebuilds this formation's own participant-tracking set from `selection`,
+     * averaging each live unit's world position (its most recently queued
+     * command destination when `useLastQueuedDestination` is set and that
+     * destination is valid, else its current position) into `mStart`. Stores
+     * `mFinish`/`mMousePos` from `mouseWorldPos`, derives `mDirection` from the
+     * start->finish XZ delta, classifies the formation type from the live
+     * selection, looks up the formation's script count, and - once the drag
+     * distance exceeds 200 units - picks the travel formation; whenever the
+     * type has scripts it always re-picks the best formation too (keeping the
+     * previous value only when the lookup itself returns `-1`, defaulting to
+     * `0` when both are `-1`).
+     *
+     * `selection`'s decompiled `std::vector*` typing is a decompiler
+     * type-confusion (see the field doc on `mNodeHead` above): it is really a
+     * `SSelectionSetUserEntity*` - the exact tree/node/weak-ref shape
+     * `ProcessMouse` (0x00838800) forwards in from its own `eax`-passed
+     * selection set, and the same shape `PruneTombstonesAndFindLive`/
+     * `Iterator_inc` (CWldSession.h) already operate on elsewhere.
+     */
+    void ChooseFormation(
+      const Wm3::Vector3f& mouseWorldPos,
+      SSelectionSetUserEntity* selection,
+      bool useLastQueuedDestination
+    );
 
   public:
     /// `WeakEntitySetUserEntity`-shaped: `{mTreeAllocProxy, mNodeHead, mNodeCount}`

@@ -1,5 +1,6 @@
 #include "moho/sim/CFormation.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -8,10 +9,14 @@
 #include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/Sim.h"
 #include "moho/ai/CAiFormationInstance.h"
+#include "moho/ai/IAiFormationDB.h"
 #include "moho/ai/IFormationInstance.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/math/Vector3f.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/core/UserUnit.h"
 #include "gpg/core/time/Timer.h"
 #include "lua/LuaObject.h"
 #include "Wm3Quaternion.h"
@@ -55,7 +60,7 @@ namespace
    * Walks one weak-selection set, classifies live units by movement layer, and
    * returns formation-type lane `0` (surface), `1` (air), or `2` (mixed).
    */
-  [[maybe_unused]] std::int32_t DetermineSelectionFormationType(
+  std::int32_t DetermineSelectionFormationType(
     moho::SSelectionSetUserEntity* const selection
   ) noexcept
   {
@@ -317,6 +322,101 @@ namespace moho
     if (instance != nullptr) {
       const Wm3::Quaternionf orientation = formation->mDirection;
       static_cast<CAiFormationInstance*>(instance)->SetOrientation(orientation);
+    }
+  }
+
+  /**
+   * Address: 0x008384C0 (FUN_008384C0, Moho::CFormation::ChooseFormation)
+   */
+  void CFormation::ChooseFormation(
+    const Wm3::Vector3f& mouseWorldPos,
+    SSelectionSetUserEntity* const selection,
+    const bool useLastQueuedDestination
+  )
+  {
+    mStart = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
+
+    // Walk the incoming selection, pruning tombstones exactly as
+    // SSelectionSetUserEntity's own erase-walking members do (PruneTombstonesAndFindLive
+    // deletes each tombstone it passes, matching the binary's fused
+    // advance-then-erase loop).
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)selection->PruneTombstonesAndFindLive(&node, selection->mHead->mLeft);
+    while (node != selection->mHead) {
+      UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
+      UserUnit* const unit = (entity != nullptr) ? reinterpret_cast<UserUnit*>(entity) : nullptr;
+
+      // Track every visited unit in this formation's own participant weak-set:
+      // `this` reinterpreted as `SSelectionSetUserEntity*` (see the mNodeHead
+      // field doc above). InsertUnitIntoCommandIssueWeakSet only ever touches
+      // the shared 12-byte {allocProxy,head,size} header, never the extra
+      // +0x0C selection lane, so mCurInstance (also at +0x0C) is untouched.
+      InsertUnitIntoCommandIssueWeakSet(reinterpret_cast<SSelectionSetUserEntity*>(this), unit);
+
+      Wm3::Vector3f unitPosition(0.0f, 0.0f, 0.0f);
+      bool haveQueuedPosition = false;
+      if (useLastQueuedDestination && unit != nullptr) {
+        if (const QueuedUserCommandRecord* const anchor = GetLastQueuedUserCommandAnchor(unit); anchor != nullptr) {
+          const Wm3::Vector3f queuedPosition = ResolveLastQueuedCommandAnchorPosition(anchor);
+          if (IsValidVector3f(queuedPosition)) {
+            unitPosition = queuedPosition;
+            haveQueuedPosition = true;
+          }
+        }
+      }
+      if (!haveQueuedPosition) {
+        unitPosition = unit->GetPosition();
+      }
+
+      mStart.x += unitPosition.x;
+      mStart.y += unitPosition.y;
+      mStart.z += unitPosition.z;
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)selection->PruneTombstonesAndFindLive(&node, node);
+    }
+
+    const std::int32_t participantCount =
+      CountLiveUserEntityWeakSetEntriesAndPrune(reinterpret_cast<WeakEntitySetUserEntity&>(*this));
+    if (participantCount == 0) {
+      constexpr float kFltMax = 3.4028235e38f;
+      mStart = Wm3::Vector3f(kFltMax, kFltMax, kFltMax);
+    } else {
+      const float invCount = 1.0f / static_cast<float>(participantCount);
+      mStart.x *= invCount;
+      mStart.y *= invCount;
+      mStart.z *= invCount;
+    }
+
+    mType = DetermineSelectionFormationType(selection);
+
+    mFinish = mouseWorldPos;
+    mMousePos = mouseWorldPos;
+
+    const Wm3::Vector3f headingDelta(mFinish.x - mStart.x, 0.0f, mFinish.z - mStart.z);
+    mDirection = COORDS_Orient(headingDelta);
+
+    LuaPlus::LuaState* const state = WLD_GetActiveSession()->mState;
+    const auto formationType = static_cast<EFormationType>(mType);
+    mNumFormationScripts = static_cast<std::int32_t>(FORMATION_GetNumScripts(state, formationType));
+
+    if (mNumFormationScripts > 0) {
+      const float dx = mFinish.x - mStart.x;
+      const float dy = mFinish.y - mStart.y;
+      const float dz = mFinish.z - mStart.z;
+      const float dragDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (dragDistance > 200.0f) {
+        mTravelFormation = FORMATION_PickTravelFormation(state, formationType, dragDistance);
+      }
+
+      const std::int32_t bestFormation = FORMATION_PickBestFormation(state, formationType, dragDistance);
+      if (bestFormation != -1) {
+        mBestFormation = bestFormation;
+      }
+      if (mBestFormation == -1) {
+        mBestFormation = 0;
+      }
     }
   }
 } // namespace moho
