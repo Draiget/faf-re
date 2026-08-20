@@ -11,9 +11,12 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
 
@@ -626,6 +629,130 @@ namespace moho
   bool SelectionDragger2D::HasActiveSelectionDrag() const
   {
     return mStretch != 0u;
+  }
+
+  /**
+   * Address: 0x008640F0 (FUN_008640F0, ??0SelectionDragger3D@Moho@@...)
+   *
+   * What it does:
+   * Chains the `SelectionDragger` base constructor, installs this class's own
+   * vtable, clears the stretch/active latch and the pending drag-end world
+   * position (seeded to the shared invalid-vector sentinel, matching the
+   * base constructor's own `mPos` seeding), zeroes the two highlight-decal
+   * weak-reference slots and the owned highlight-texture shared-pointer
+   * lane, and caches this view's decal manager
+   * (`session->mWldMap->mTerrainRes->GetDecalManager()`, matching
+   * 0x00864193-0x008641A1's `[[session+0x1C]+4]` vtable-slot-0x130 dispatch,
+   * confirmed as `IWldTerrainRes::GetDecalManager()`) for later use by
+   * `DragMove`/`~SelectionDragger3D` (both not yet recovered - see the class
+   * doc comment in SelectionDragger.h).
+   *
+   * The binary performs every one of these field writes unconditionally with
+   * no null check on `session` (0x00864193 dereferences `[edi+0x1C]`
+   * directly); this recovery matches that exactly rather than adding a
+   * defensive guard the original does not have. The sole caller
+   * (`func_NewSelectionDragger2D`/`NewSelectionDragger`, 0x00865880) always
+   * supplies a live session.
+   */
+  SelectionDragger3D::SelectionDragger3D(CameraImpl* const camera, CWldSession* const session)
+    : SelectionDragger(camera, session)
+    , mStretch(0)
+    , pad_0025{0, 0, 0}
+    , mDragEndPos(Invalid<Wm3::Vector3f>())
+    , field_0x34(0)
+    , field_0x38(0)
+    , field_0x3C(0)
+    , field_0x40(0)
+    , mHighlightTexture()
+    , mDecalManager(session->mWldMap->mTerrainRes->GetDecalManager())
+  {}
+
+  /**
+   * Address: 0x00864C90 (FUN_00864C90, Moho::SelectionDragger3D::Func1)
+   *
+   * What it does:
+   * Scalar-deleting-destructor variant for `SelectionDragger3D` - delegates
+   * to the destructor chain and conditionally releases the object's heap
+   * storage when bit 0 of `deleteFlags` is set. See the class doc comment in
+   * SelectionDragger.h: the destructor this chains into is the
+   * compiler-generated implicit one (still correctly chains to the base
+   * `~SelectionDragger()`), not a 1:1 port of the binary's 0x008641C0 body.
+   */
+  SelectionDragger3D* SelectionDragger3D::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
+  {
+    this->~SelectionDragger3D();
+    if ((deleteFlags & 1u) != 0u) {
+      ::operator delete(this);
+    }
+    return this;
+  }
+
+  /**
+   * Address: 0x00864C80 (FUN_00864C80, Moho::SelectionDragger3D::Func4)
+   * Mangled: vtable slot +0x10 of ??_7SelectionDragger3D@Moho@@6B@
+   *
+   * What it does:
+   * Empty override (`retn 4` in the binary) - the 3D dragger draws its
+   * highlight through terrain decals updated by `DragMove`, not through the
+   * shared prim batcher.
+   */
+  void SelectionDragger3D::Render(CD3DPrimBatcher*)
+  {}
+
+  /**
+   * Address: 0x00864670 (FUN_00864670, Moho::SelectionDragger3D::Func5)
+   *
+   * What it does:
+   * Builds one oriented world-space box between the inherited `mPos`
+   * (current cursor world position) and `mDragEndPos` (the drag's other
+   * endpoint): orients a 3x3 frame from the active camera's heading via
+   * `COORDS_Orient`/`QuatToMatrix`, sets the box center to the midpoint of
+   * the two points, sets the box's horizontal extents from the two points'
+   * delta rotated into that frame (via `MultQuadVec` with the conjugate
+   * orientation), and leaves the vertical extent (`Extent[1]`) at `FLT_MAX`
+   * so the volume is unbounded in that axis - i.e. an infinitely tall,
+   * heading-aligned column between the drag start and end points.
+   */
+  CGeomSolid3 SelectionDragger3D::BuildSelectionSolid() const
+  {
+    const Wm3::Quaternionf headingOrientation = COORDS_Orient(mCam->CameraGetHeading(), 0.0f);
+
+    Wm3::Quaternionf inverseHeadingOrientation{};
+    inverseHeadingOrientation.x = headingOrientation.x;
+    inverseHeadingOrientation.y = -0.0f - headingOrientation.y;
+    inverseHeadingOrientation.z = -0.0f - headingOrientation.z;
+    inverseHeadingOrientation.w = -0.0f - headingOrientation.w;
+
+    Wm3::Vector3f worldDelta{};
+    worldDelta.x = mDragEndPos.x - mPos.x;
+    worldDelta.y = mDragEndPos.y - mPos.y;
+    worldDelta.z = mDragEndPos.z - mPos.z;
+
+    Wm3::Vector3f localDelta{};
+    MultQuadVec(&localDelta, &worldDelta, &inverseHeadingOrientation);
+
+    Wm3::Box3f box{};
+    box.Center.x = (mDragEndPos.x + mPos.x) * 0.5f;
+    box.Center.y = (mDragEndPos.y + mPos.y) * 0.5f;
+    box.Center.z = (mDragEndPos.z + mPos.z) * 0.5f;
+    QuatToMatrix(&headingOrientation, box.Axis);
+    box.Extent[0] = std::fabs(localDelta.x * 0.5f);
+    box.Extent[1] = std::numeric_limits<float>::max();
+    box.Extent[2] = std::fabs(localDelta.z * 0.5f);
+
+    return CGeomSolid3(box);
+  }
+
+  /**
+   * Address: 0x00864320 (FUN_00864320, Moho::SelectionDragger3D::Func6)
+   *
+   * What it does:
+   * Returns whether the drag latched active (`mStretch`) and the current
+   * cursor world position is valid.
+   */
+  bool SelectionDragger3D::HasActiveSelectionDrag() const
+  {
+    return mStretch != 0u && IsValidVector3f(mPos);
   }
 
   /**
