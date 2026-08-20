@@ -14,6 +14,7 @@
 #include <string>
 #include <typeinfo>
 
+#include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
@@ -833,6 +834,14 @@ namespace
     return target;
   }
 } // namespace
+
+// Defined at file scope (global namespace, external linkage) in
+// CrtRuntimeHelpers.cpp - shared by every legacy VC8 "<container> too long"
+// throw lane in that file. Forward-declared here rather than duplicated so
+// UICommandGraph's own hash-table growth guards (ThrowHashBucketVectorTooLong,
+// CheckedIncrementListSize) can reuse the identical message/exception
+// construction instead of re-emitting it inline a second time.
+[[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
 
 namespace moho
 {
@@ -1799,6 +1808,209 @@ namespace moho
 
     template <typename TNode>
     static void DestroyMap(HashTable<TNode>& table);
+
+    /**
+     * The value portion of one HashListNode88 - everything after the
+     * intrusive mNext/mPrev link header. ConstructHashListNode88
+     * copy-constructs a new node's mKey/mDraw from one of these; the source
+     * may be a real existing node's tail (during rehash relocation,
+     * `&oldNode->mKey` overlays this exactly - the ctor-arg evidence at
+     * 0x00830523) or a freestanding stack composite built for a fresh
+     * insert (mMapAB0's insert-if-missing path, sub_82B300 at 0x0082B35C).
+     *
+     * mUnused04 mirrors HashListNode88::mKeyHigh's position but is never
+     * read by any of mMapAB0's find/insert primitives recovered below -
+     * only the low key dword participates in hashing/comparison, so this
+     * field is left exactly as uninitialized as the binary leaves it
+     * (0x00831D80 copies just the leading dword before delegating the tail
+     * to the draw-node relocate at 0x0082D530).
+     */
+    struct HashListNode88Value
+    {
+      std::uint32_t mKey;             // +0x00
+      std::uint32_t mUnused04;        // +0x04
+      UICommandGraphDrawNode mDraw;   // +0x08
+    };
+
+    /**
+     * Address: 0x0082D530 (FUN_0082D530, sub_82D530)
+     *
+     * What it does:
+     * Relocate-copies one command-graph draw node's full payload: command
+     * id, the intrusive command-issue helper chain link (re-publishing the
+     * helper's head to point at `destination` in place of `source`),
+     * position/weight/flag scalars, the owned mesh instance (retaining a
+     * new strong reference on the shared control block rather than
+     * transferring it, since `source` keeps its own reference until
+     * destroyed separately), the orientation hint/previous-centroid/
+     * reserved scalars, and both dword lanes. Used by the hash node
+     * constructor below whenever a node is built from an existing node's
+     * payload (rehash relocation) or a fresh stack value.
+     */
+    static UICommandGraphDrawNode* RelocateDrawNode(UICommandGraphDrawNode* destination, UICommandGraphDrawNode& source);
+
+    /**
+     * Address: 0x00831AB0 (FUN_00831AB0, sub_831AB0)
+     *
+     * What it does:
+     * Overflow-checked `operator new` for `count` HashListNode88 (0x88-byte)
+     * slots; throws `std::bad_alloc` when `count` would overflow the byte
+     * count. Matches the legacy VC8 `std::_Allocate<T>` shape already used
+     * throughout legacy/containers/Vector.h for other element sizes.
+     */
+    [[nodiscard]] static void* AllocateHashListNode88Storage(std::size_t count);
+
+    /**
+     * Address: 0x00831D80 (FUN_00831D80, sub_831D80)
+     *
+     * What it does:
+     * Constructs one HashListNode88Value in place: copies the key dword,
+     * then relocate-copies the draw-node payload via RelocateDrawNode.
+     * `mUnused04` is left untouched, matching the binary exactly.
+     */
+    static HashListNode88Value* ConstructHashListNode88Value(HashListNode88Value* destination, HashListNode88Value& source);
+
+    /**
+     * Address: 0x008304D0 (FUN_008304D0, sub_8304D0)
+     *
+     * What it does:
+     * Allocates one HashListNode88, links it explicitly via the caller-
+     * supplied `next`/`prev` (the classic Dinkumware `_Buynode(_Next, _Prev,
+     * _Val)` shape), then constructs its value portion from `valueSource`.
+     * If construction throws, the raw node is freed before the exception
+     * propagates (matches the binary's SEH cleanup funclet at 0x00830540).
+     */
+    [[nodiscard]] static HashListNode88* ConstructHashListNode88(
+      HashListNode88* next, HashListNode88* prev, HashListNode88Value& valueSource
+    );
+
+    /**
+     * Not a distinct binary function: the Park-Miller "minimal standard"
+     * integer scramble (`ldiv(key ^ 0xDEADBEEF, 127773)` then
+     * `16807*rem - 2836*quot`, wrapping negative results by `+0x7FFFFFFF`)
+     * is inlined independently at every hash-table site below
+     * (0x0082C240, 0x0082C2E0, 0x0082BFB0 x2) rather than shared in the
+     * binary. Lifted into one named helper here per the intent-first
+     * helper contract instead of duplicating the scramble four times.
+     */
+    [[nodiscard]] static std::uint32_t HashKeyToBucketIndex(const HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Address: 0x0082C240 (FUN_0082C240, sub_82C240)
+     *
+     * What it does:
+     * Finds the node whose key exactly matches `key` within its hash
+     * bucket, or returns the table's list sentinel (`mListHead`) when no
+     * exact match exists - the same "not found" convention
+     * InsertOrFindHashListNode88/FindOrInsertCommandGraphDrawNode use to
+     * detect a miss.
+     */
+    [[nodiscard]] static HashListNode88* FindHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Address: 0x0082C2E0 (FUN_0082C2E0, sub_82C2E0)
+     *
+     * What it does:
+     * Returns the `[first, last)` equal-range of nodes matching `key`
+     * within their hash bucket. An empty range collapses both ends to the
+     * table's list sentinel (`mListHead`), matching the binary's fallback
+     * (it reuses the sentinel rather than the bucket's own end pointer once
+     * no match is found).
+     */
+    [[nodiscard]] static std::pair<HashListNode88*, HashListNode88*>
+      EqualRangeHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Address: 0x0082B450 (FUN_0082B450, sub_82B450)
+     *
+     * What it does:
+     * Counts nodes matching `key` by walking EqualRangeHashListNode88's
+     * `[first, last)` range one `mNext` step at a time.
+     */
+    [[nodiscard]] static std::uint32_t CountHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
+
+    /**
+     * Address: 0x00830620 (FUN_00830620, sub_830620)
+     *
+     * What it does:
+     * Throws the legacy VC8 `std::length_error("vector<T> too long")`
+     * diagnostic for the hash bucket vector's growth overflow guard. Calls
+     * the same message-construction lane the binary uses at every other
+     * `vector<T> too long` site (`RuntimeThrowContainerTooLong`, defined at
+     * file scope in CrtRuntimeHelpers.cpp with external linkage) rather
+     * than re-emitting the string/exception construction inline a second
+     * time.
+     */
+    [[noreturn]] static void ThrowHashBucketVectorTooLong();
+
+    /**
+     * Address: 0x0082F210 (FUN_0082F210, sub_82F210)
+     *
+     * What it does:
+     * The hash bucket vector's insert-with-growth primitive: if existing
+     * capacity already covers the post-insert size, shifts the tail to open
+     * a gap at `insertPosition` and fills it with `fillValue` in place;
+     * otherwise reallocates (1.5x growth, or exactly enough when 1.5x still
+     * isn't enough), copying the elements before/after the insertion point
+     * around the newly-filled slots, then frees the old buffer. The
+     * binary's internal `sub_831860`/`sub_8326F0`/`sub_832BC0` loop bodies
+     * (plain dword-range copy / fill, confirmed from their own disassembly)
+     * are expressed here as `std::copy`/`std::fill_n` rather than as three
+     * more one-call wrapper functions.
+     */
+    static void** GrowHashBucketVector(
+      HashBucketVector& buckets, void** insertPosition, std::uint32_t insertCount, void* fillValue
+    );
+
+    /**
+     * Address: 0x0082D820 (FUN_0082D820, sub_82D820)
+     *
+     * What it does:
+     * Ensures the hash bucket vector holds at least `requiredLength`
+     * elements: grows via GrowHashBucketVector when short, or truncates the
+     * tail down to `requiredLength` in place when already longer. No-ops
+     * when already exactly that length.
+     */
+    static void** EnsureHashBucketVectorLength(HashBucketVector& buckets, std::uint32_t requiredLength, void* fillValue);
+
+    /**
+     * Address: 0x0082F050 (FUN_0082F050, sub_82F050)
+     *
+     * What it does:
+     * Adds `count` to `sizeField` after an overflow guard against the
+     * legacy VC8 list max-size (0x1FFFFFF), throwing
+     * `std::length_error("list<T> too long")` on overflow. Calls the same
+     * shared throw lane as ThrowHashBucketVectorTooLong above.
+     */
+    static std::uint32_t CheckedIncrementListSize(std::uint32_t count, std::uint32_t& sizeField);
+
+    /**
+     * Address: 0x0082BFB0 (FUN_0082BFB0, sub_82BFB0)
+     *
+     * What it does:
+     * `mMapAB0`'s hash-bucket insert lane: grows/rehashes one bucket at a
+     * time when the load factor is exceeded, then finds-or-inserts `key`,
+     * returning the existing node when found (`outInserted=false`) or a
+     * freshly constructed node linked into its bucket and the table's
+     * global list (`outInserted=true`, `mListSize` bumped via
+     * CheckedIncrementListSize).
+     */
+    static HashListNode88*
+      InsertOrFindHashListNode88(HashTable<HashListNode88>& table, HashListNode88Value& valueSource, bool& outInserted);
+
+    /**
+     * Address: 0x0082B300 (FUN_0082B300, sub_82B300)
+     *
+     * What it does:
+     * `mMapAB0`'s public find-or-insert entry point: looks `key` up via
+     * FindHashListNode88 first; on a miss, default-constructs a temporary
+     * draw node payload (0x00824600), relocate-copies it into a second
+     * temporary, and inserts a real node built from `{key, temporary}` via
+     * InsertOrFindHashListNode88. Always returns a pointer to the resolved
+     * node's draw-node payload (`&node->mDraw`).
+     */
+    [[nodiscard]] static UICommandGraphDrawNode*
+      FindOrInsertCommandGraphDrawNode(std::uint32_t key, HashTable<HashListNode88>& table);
 
     /**
      * Address: 0x008300D0 (FUN_008300D0)
@@ -4013,6 +4225,509 @@ namespace moho
     DestroyBuckets(table.mBuckets);
     table.mBucketMask = 1u;
     table.mBucketCount = 1u;
+  }
+
+  /**
+   * Address: 0x0082D530 (FUN_0082D530, sub_82D530)
+   */
+  UICommandGraph::UICommandGraphDrawNode* UICommandGraph::RelocateDrawNode(
+    UICommandGraphDrawNode* const destination, UICommandGraphDrawNode& source
+  )
+  {
+    destination->mCommandId = source.mCommandId;
+
+    destination->mHelperLink.mHead = source.mHelperLink.mHead;
+    if (source.mHelperLink.mHead != nullptr) {
+      destination->mHelperLink.mNext = source.mHelperLink.mHead->mFirst;
+      source.mHelperLink.mHead->mFirst = &destination->mHelperLink;
+    } else {
+      destination->mHelperLink.mNext = nullptr;
+    }
+
+    destination->mPositionSum = source.mPositionSum;
+    destination->mWeight = source.mWeight;
+    destination->mHasResolvedPosition = source.mHasResolvedPosition;
+    destination->mIsChainBoundary = source.mIsChainBoundary;
+    destination->mIsVisible = source.mIsVisible;
+
+    // Retain a new strong reference on the shared control block rather than
+    // transferring ownership - `source` keeps its own reference and is torn
+    // down separately by its caller.
+    destination->mMeshInstance = source.mMeshInstance.clone_retained();
+
+    destination->mOrientationHint = source.mOrientationHint;
+    destination->mPreviousCentroid = source.mPreviousCentroid;
+    destination->field_0x40 = source.field_0x40;
+    destination->field_0x44 = source.field_0x44;
+
+    const auto relocateLane = [](CommandGraphDwordLane& dstLane, const CommandGraphDwordLane& srcLane) {
+      const gpg::core::legacy::FastVectorInsertRuntimeView sourceView{
+        reinterpret_cast<std::byte*>(srcLane.mBegin), reinterpret_cast<std::byte*>(srcLane.mEnd),
+        reinterpret_cast<std::byte*>(srcLane.mCapacity), reinterpret_cast<std::byte*>(srcLane.mInlineOrigin)
+      };
+      (void)gpg::core::legacy::InitializeDwordInlineScratchFromView(
+        reinterpret_cast<gpg::core::legacy::DwordVectorInlineScratch*>(&dstLane), sourceView
+      );
+    };
+    relocateLane(destination->mLaneA, source.mLaneA);
+    relocateLane(destination->mLaneB, source.mLaneB);
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x00831AB0 (FUN_00831AB0, sub_831AB0)
+   */
+  void* UICommandGraph::AllocateHashListNode88Storage(const std::size_t count)
+  {
+    if ((0xFFFFFFFFu / static_cast<std::uint32_t>(count)) < sizeof(HashListNode88)) {
+      throw std::bad_alloc();
+    }
+    return ::operator new(sizeof(HashListNode88) * count);
+  }
+
+  /**
+   * Address: 0x00831D80 (FUN_00831D80, sub_831D80)
+   */
+  UICommandGraph::HashListNode88Value* UICommandGraph::ConstructHashListNode88Value(
+    HashListNode88Value* const destination, HashListNode88Value& source
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+    destination->mKey = source.mKey;
+    RelocateDrawNode(&destination->mDraw, source.mDraw);
+    return destination;
+  }
+
+  /**
+   * Address: 0x008304D0 (FUN_008304D0, sub_8304D0)
+   */
+  UICommandGraph::HashListNode88* UICommandGraph::ConstructHashListNode88(
+    HashListNode88* const next, HashListNode88* const prev, HashListNode88Value& valueSource
+  )
+  {
+    auto* const node = static_cast<HashListNode88*>(AllocateHashListNode88Storage(1));
+    node->mNext = next;
+    node->mPrev = prev;
+    try {
+      ConstructHashListNode88Value(reinterpret_cast<HashListNode88Value*>(&node->mKey), valueSource);
+    } catch (...) {
+      ::operator delete(node);
+      throw;
+    }
+    return node;
+  }
+
+  /**
+   * Not a distinct binary function - see the declaration's doc comment.
+   */
+  std::uint32_t UICommandGraph::HashKeyToBucketIndex(const HashTable<HashListNode88>& table, const std::uint32_t key) noexcept
+  {
+    const std::ldiv_t split = std::ldiv(static_cast<long>(key ^ 0xDEADBEEFu), 127773L);
+    long scrambled = 16807L * split.rem - 2836L * split.quot;
+    if (scrambled < 0) {
+      scrambled += 0x7FFFFFFFL;
+    }
+    std::uint32_t bucketIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
+    if (table.mBucketCount <= bucketIndex) {
+      bucketIndex += static_cast<std::uint32_t>(-1) - (table.mBucketMask >> 1u);
+    }
+    return bucketIndex;
+  }
+
+  /**
+   * Address: 0x0082C240 (FUN_0082C240, sub_82C240)
+   *
+   * The hash bucket vector stores one boundary pointer per bucket index
+   * plus one trailing sentinel-adjacent boundary (N+1 slots for N buckets):
+   * bucket[i]'s range is `[mBuckets.mStart[i], mBuckets.mStart[i+1])`, so
+   * adjacent buckets share a slot (bucket i's end is bucket i+1's begin).
+   * Confirmed directly from this function's own disassembly
+   * (`lea ecx,[ecx+eax*4]` - single dword stride per bucket index, not
+   * doubled).
+   */
+  UICommandGraph::HashListNode88* UICommandGraph::FindHashListNode88(
+    HashTable<HashListNode88>& table, const std::uint32_t key
+  ) noexcept
+  {
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
+    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+    HashListNode88* node = bucketSlots[bucketIndex];
+    HashListNode88* const bucketEnd = bucketSlots[bucketIndex + 1u];
+
+    if (node == bucketEnd) {
+      return table.mListHead;
+    }
+    while (node->mKey < key) {
+      node = node->mNext;
+      if (node == bucketEnd) {
+        return table.mListHead;
+      }
+    }
+    return (key >= node->mKey) ? node : table.mListHead;
+  }
+
+  /**
+   * Address: 0x0082C2E0 (FUN_0082C2E0, sub_82C2E0)
+   */
+  std::pair<UICommandGraph::HashListNode88*, UICommandGraph::HashListNode88*> UICommandGraph::EqualRangeHashListNode88(
+    HashTable<HashListNode88>& table, const std::uint32_t key
+  ) noexcept
+  {
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
+    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+    HashListNode88* node = bucketSlots[bucketIndex];
+    HashListNode88* const bucketEnd = bucketSlots[bucketIndex + 1u];
+
+    if (node != bucketEnd) {
+      while (node->mKey < key) {
+        node = node->mNext;
+        if (node == bucketEnd) {
+          break;
+        }
+      }
+    }
+
+    if (node == bucketEnd) {
+      return {table.mListHead, table.mListHead};
+    }
+
+    HashListNode88* const first = node;
+    do {
+      if (key < node->mKey) {
+        break;
+      }
+      node = node->mNext;
+    } while (node != bucketEnd);
+
+    if (first == node) {
+      return {table.mListHead, table.mListHead};
+    }
+    return {first, node};
+  }
+
+  /**
+   * Address: 0x0082B450 (FUN_0082B450, sub_82B450)
+   */
+  std::uint32_t UICommandGraph::CountHashListNode88(HashTable<HashListNode88>& table, const std::uint32_t key) noexcept
+  {
+    const auto [first, last] = EqualRangeHashListNode88(table, key);
+    std::uint32_t count = 0u;
+    for (HashListNode88* node = first; node != last; node = node->mNext) {
+      ++count;
+    }
+    return count;
+  }
+
+  /**
+   * Address: 0x00830620 (FUN_00830620, sub_830620)
+   */
+  [[noreturn]] void UICommandGraph::ThrowHashBucketVectorTooLong()
+  {
+    RuntimeThrowContainerTooLong("vector<T> too long");
+  }
+
+  /**
+   * Address: 0x0082F210 (FUN_0082F210, sub_82F210)
+   */
+  void** UICommandGraph::GrowHashBucketVector(
+    HashBucketVector& buckets, void** const insertPosition, const std::uint32_t insertCount, void* const fillValue
+  )
+  {
+    if (insertCount == 0u) {
+      return buckets.mStart;
+    }
+
+    const std::uint32_t oldCapacity =
+      buckets.mStart ? static_cast<std::uint32_t>(buckets.mEnd - buckets.mStart) : 0u;
+    const std::uint32_t oldSize =
+      buckets.mStart ? static_cast<std::uint32_t>(buckets.mFinish - buckets.mStart) : 0u;
+
+    if ((0x3FFFFFFFu - oldSize) < insertCount) {
+      ThrowHashBucketVectorTooLong();
+    }
+
+    if (oldCapacity >= (insertCount + oldSize)) {
+      // Enough spare capacity already: shift in place.
+      void** const oldFinish = buckets.mFinish;
+      if (static_cast<std::uint32_t>(oldFinish - insertPosition) >= insertCount) {
+        void** const shiftPoint = oldFinish - insertCount;
+        std::copy(shiftPoint, oldFinish, oldFinish);
+        buckets.mFinish = oldFinish + insertCount;
+        std::copy_backward(insertPosition, shiftPoint, oldFinish);
+        std::fill_n(insertPosition, insertCount, fillValue);
+      } else {
+        const std::uint32_t tailCount = static_cast<std::uint32_t>(oldFinish - insertPosition);
+        std::fill_n(oldFinish, insertCount - tailCount, fillValue);
+        buckets.mFinish = oldFinish + (insertCount - tailCount);
+        std::copy(insertPosition, oldFinish, buckets.mFinish);
+        buckets.mFinish += tailCount;
+        std::fill_n(insertPosition, tailCount, fillValue);
+      }
+      return insertPosition;
+    }
+
+    // Not enough capacity: reallocate (1.5x growth, or exactly enough when
+    // 1.5x still falls short), then rebuild before/fill/after around the
+    // gap into the new buffer. Matches the legacy VC8 `std::_Allocate<T>`
+    // overflow-checked shape for 4-byte elements (same logic already
+    // established for FUN_00831B40 in legacy/containers/Vector.h's
+    // `allocate_dword_slots_checked`, reproduced locally here since that
+    // helper is a private member of a template class not reachable from
+    // this file).
+    std::uint32_t newCapacity =
+      ((0x3FFFFFFFu - (oldCapacity >> 1u)) >= oldCapacity) ? (oldCapacity + (oldCapacity >> 1u)) : 0u;
+    if (newCapacity < (insertCount + oldSize)) {
+      newCapacity = insertCount + oldSize;
+    }
+
+    void** newStart = nullptr;
+    if (newCapacity != 0u) {
+      if (newCapacity > (static_cast<std::size_t>(-1) / sizeof(void*))) {
+        throw std::bad_alloc();
+      }
+      newStart = static_cast<void**>(::operator new(sizeof(void*) * newCapacity));
+    } else {
+      newStart = static_cast<void**>(::operator new(0));
+    }
+
+    const std::uint32_t beforeCount = static_cast<std::uint32_t>(insertPosition - buckets.mStart);
+    std::copy(buckets.mStart, insertPosition, newStart);
+    std::fill_n(newStart + beforeCount, insertCount, fillValue);
+    std::copy(insertPosition, buckets.mFinish, newStart + beforeCount + insertCount);
+
+    if (buckets.mStart != nullptr) {
+      ::operator delete(buckets.mStart);
+    }
+
+    buckets.mStart = newStart;
+    buckets.mFinish = newStart + oldSize + insertCount;
+    buckets.mEnd = newStart + newCapacity;
+    return newStart;
+  }
+
+  /**
+   * Address: 0x0082D820 (FUN_0082D820, sub_82D820)
+   */
+  void** UICommandGraph::EnsureHashBucketVectorLength(
+    HashBucketVector& buckets, const std::uint32_t requiredLength, void* const fillValue
+  )
+  {
+    const std::uint32_t currentLength =
+      buckets.mStart ? static_cast<std::uint32_t>(buckets.mFinish - buckets.mStart) : 0u;
+
+    if (currentLength >= requiredLength) {
+      if (buckets.mStart != nullptr && requiredLength < currentLength) {
+        // Truncate the tail down to `requiredLength` in place - the
+        // binary's move-tail-to-gap helper degenerates to a pure pointer
+        // update here because its source and the vector's own end always
+        // coincide on this path.
+        buckets.mFinish = buckets.mStart + requiredLength;
+      }
+      return buckets.mStart;
+    }
+
+    return GrowHashBucketVector(buckets, buckets.mFinish, requiredLength - currentLength, fillValue);
+  }
+
+  /**
+   * Address: 0x0082F050 (FUN_0082F050, sub_82F050)
+   */
+  std::uint32_t UICommandGraph::CheckedIncrementListSize(const std::uint32_t count, std::uint32_t& sizeField)
+  {
+    if ((0x1FFFFFFu - sizeField) < count) {
+      RuntimeThrowContainerTooLong("list<T> too long");
+    }
+    sizeField += count;
+    return sizeField;
+  }
+
+  /**
+   * Address: 0x0082BFB0 (FUN_0082BFB0, sub_82BFB0)
+   */
+  UICommandGraph::HashListNode88* UICommandGraph::InsertOrFindHashListNode88(
+    HashTable<HashListNode88>& table, HashListNode88Value& valueSource, bool& outInserted
+  )
+  {
+    if (table.mBucketCount <= (table.mListSize >> 2u)) {
+      // Load factor exceeded: grow the bucket boundary array (or just the
+      // mask, when slack already covers it) and redistribute exactly one
+      // old bucket's nodes between it and the newly-available bucket - the
+      // binary's incremental (split-one-bucket-per-insert) rehash, not a
+      // full rebuild.
+      const std::uint32_t bucketVectorLength =
+        table.mBuckets.mStart ? static_cast<std::uint32_t>(table.mBuckets.mFinish - table.mBuckets.mStart) : 0u;
+
+      if ((bucketVectorLength - 1u) > table.mBucketCount) {
+        if (table.mBucketMask < table.mBucketCount) {
+          table.mBucketMask = 2u * table.mBucketMask + 1u;
+        }
+      } else {
+        const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
+        table.mBucketMask = newMask;
+        EnsureHashBucketVectorLength(table.mBuckets, newMask + 2u, table.mListHead);
+      }
+
+      auto* const rehashBucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+      const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
+      HashListNode88* node = rehashBucketSlots[splitBucketIndex];
+      HashListNode88* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
+
+      if (splitBucketEnd != node) {
+        for (;;) {
+          // Raw masked hash WITHOUT the wraparound adjustment
+          // HashKeyToBucketIndex applies elsewhere: the binary compares
+          // this directly against splitBucketIndex, which by construction
+          // is always already within [0, mask] on this path.
+          const std::ldiv_t split = std::ldiv(static_cast<long>(node->mKey ^ 0xDEADBEEFu), 127773L);
+          long scrambled = 16807L * split.rem - 2836L * split.quot;
+          if (scrambled < 0) {
+            scrambled += 0x7FFFFFFFL;
+          }
+          const std::uint32_t rehashedIndex = static_cast<std::uint32_t>(scrambled) & table.mBucketMask;
+
+          if (rehashedIndex == splitBucketIndex) {
+            node = node->mNext;
+          } else {
+            HashListNode88* const next = node->mNext;
+            if (next != table.mListHead) {
+              if (rehashBucketSlots[splitBucketIndex] == node) {
+                std::uint32_t walkIndex = splitBucketIndex;
+                for (;;) {
+                  rehashBucketSlots[walkIndex] = next;
+                  if (walkIndex == 0u) {
+                    break;
+                  }
+                  --walkIndex;
+                  if (rehashBucketSlots[walkIndex] != node) {
+                    break;
+                  }
+                }
+              }
+
+              // Splice `node` out of its current position and onto the
+              // tail of the table's global list, immediately before the
+              // sentinel - exactly where the newly-available bucket's
+              // range belongs.
+              HashListNode88* const sentinel = table.mListHead;
+              HashListNode88* const oldTail = sentinel->mPrev;
+              node->mPrev->mNext = next;
+              next->mPrev = node->mPrev;
+              node->mNext = sentinel;
+              node->mPrev = oldTail;
+              oldTail->mNext = node;
+              sentinel->mPrev = node;
+            }
+
+            // Cascade: any bucket boundary between the split point and the
+            // new bucket that still holds the sentinel as its own begin
+            // (hasn't been individually established yet) is retargeted to
+            // this node's new tail position too.
+            std::uint32_t cascadeIndex = table.mBucketCount;
+            while (cascadeIndex > splitBucketIndex && rehashBucketSlots[cascadeIndex] == table.mListHead) {
+              rehashBucketSlots[cascadeIndex] = node;
+              --cascadeIndex;
+            }
+
+            if (next == table.mListHead) {
+              break;
+            }
+            node = next;
+          }
+        }
+      }
+
+      ++table.mBucketCount;
+    }
+
+    const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKey);
+    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+    HashListNode88* insertionPoint = bucketSlots[bucketIndex + 1u];
+
+    if (bucketSlots[bucketIndex] != insertionPoint) {
+      bool reachedBegin = false;
+      for (;;) {
+        insertionPoint = insertionPoint->mPrev;
+        if (insertionPoint->mKey <= valueSource.mKey) {
+          break;
+        }
+        if (bucketSlots[bucketIndex] == insertionPoint) {
+          reachedBegin = true;
+          break;
+        }
+      }
+
+      if (!reachedBegin) {
+        if (insertionPoint->mKey >= valueSource.mKey) {
+          outInserted = false;
+          return insertionPoint;
+        }
+        insertionPoint = insertionPoint->mNext;
+      }
+    }
+
+    HashListNode88* const newNode = ConstructHashListNode88(insertionPoint, insertionPoint->mPrev, valueSource);
+    CheckedIncrementListSize(1u, table.mListSize);
+
+    HashListNode88* const oldPrev = newNode->mPrev;
+    insertionPoint->mPrev = newNode;
+    oldPrev->mNext = newNode;
+
+    if (bucketSlots[bucketIndex] == insertionPoint) {
+      std::uint32_t cascadeIndex = bucketIndex;
+      for (;;) {
+        bucketSlots[cascadeIndex] = newNode;
+        if (cascadeIndex == 0u) {
+          break;
+        }
+        --cascadeIndex;
+        if (bucketSlots[cascadeIndex] != insertionPoint) {
+          break;
+        }
+      }
+    }
+
+    outInserted = true;
+    return newNode;
+  }
+
+  /**
+   * Address: 0x0082B300 (FUN_0082B300, sub_82B300)
+   */
+  UICommandGraph::UICommandGraphDrawNode* UICommandGraph::FindOrInsertCommandGraphDrawNode(
+    const std::uint32_t key, HashTable<HashListNode88>& table
+  )
+  {
+    HashListNode88* const found = FindHashListNode88(table, key);
+    if (found != table.mListHead) {
+      return &found->mDraw;
+    }
+
+    // Miss: build a default-valued draw node payload (0x00824600 -
+    // InitCommandGraphIssueRuntimeLane, shared with the command-issue
+    // helper's own runtime lane below: identical 0x78-byte shape, see
+    // CommandGraphIssueRuntimeView), relocate-copy it into a second
+    // temporary, and insert a real node built from `{key, temporary}`.
+    CommandGraphIssueRuntimeView tempDefault{};
+    (void)InitCommandGraphIssueRuntimeLane(&tempDefault);
+    auto* const tempDefaultAsDrawNode = reinterpret_cast<UICommandGraphDrawNode*>(&tempDefault);
+
+    UICommandGraphDrawNode tempRelocated{};
+    RelocateDrawNode(&tempRelocated, *tempDefaultAsDrawNode);
+
+    HashListNode88Value insertValue{};
+    insertValue.mKey = key;
+    RelocateDrawNode(&insertValue.mDraw, tempRelocated);
+
+    bool inserted = false;
+    HashListNode88* const resultNode = InsertOrFindHashListNode88(table, insertValue, inserted);
+
+    tempRelocated.~UICommandGraphDrawNode();
+    tempDefaultAsDrawNode->~UICommandGraphDrawNode();
+
+    return &resultNode->mDraw;
   }
 
   /**
