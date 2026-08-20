@@ -521,6 +521,24 @@ namespace moho
   void register_DumpUnits_SimConFuncDef();
 
   /**
+   * Address: 0x00BDC1B0 (FUN_00BDC1B0, register_DebugDumpArmyStats_ConAlias)
+   *
+   * What it does:
+   * Registers the `DebugDumpArmyStats` console alias and installs startup
+   * cleanup.
+   */
+  void register_DebugDumpArmyStats_ConAliasDef();
+
+  /**
+   * Address: 0x00BDC1E0 (FUN_00BDC1E0, register_DebugDumpArmyStats_SimConFunc)
+   *
+   * What it does:
+   * Registers the `DebugDumpArmyStats` sim command callback and installs
+   * startup cleanup.
+   */
+  void register_DebugDumpArmyStats_SimConFuncDef();
+
+  /**
    * Address: 0x00BD82A0 (FUN_00BD82A0, register_DebugSetProductionInActive_ConAliasDef)
    */
   void register_DebugSetProductionInActive_ConAliasDef();

@@ -453,6 +453,18 @@ namespace
     return sCommand;
   }
 
+  [[nodiscard]] moho::CConAlias*& ConAlias_DebugDumpArmyStats_slot()
+  {
+    static moho::CConAlias* sAlias = nullptr;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugDumpArmyStats_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
   [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetProductionInActive_slot()
   {
     static moho::CConAlias* sAlias = nullptr;
@@ -628,6 +640,8 @@ namespace
       moho::register_TrackStats_SimConFuncDef();
       moho::register_DumpUnits_ConAliasDef();
       moho::register_DumpUnits_SimConFuncDef();
+      moho::register_DebugDumpArmyStats_ConAliasDef();
+      moho::register_DebugDumpArmyStats_SimConFuncDef();
     }
   };
 
@@ -1901,6 +1915,37 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C012D0 (FUN_00C012D0, cleanup_DebugDumpArmyStats_ConAlias)
+   *
+   * What it does:
+   * Clears the startup-owned `DebugDumpArmyStats` alias payload and
+   * unregisters the command binding.
+   */
+  void cleanup_DebugDumpArmyStats_ConAlias()
+  {
+    if (CConAlias*& alias = ConAlias_DebugDumpArmyStats_slot(); alias != nullptr) {
+      alias->ShutdownRecovered();
+      delete alias;
+      alias = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00C01320 (FUN_00C01320, cleanup_DebugDumpArmyStats_SimConFunc)
+   *
+   * What it does:
+   * Destroys the startup-owned `DebugDumpArmyStats` sim-command callback
+   * object.
+   */
+  void cleanup_DebugDumpArmyStats_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_DebugDumpArmyStats_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
    * Address: 0x00BFE2B0 (FUN_00BFE2B0, sub_BFE2B0)
    */
   void cleanup_DebugSetProductionInActive_ConAlias()
@@ -2112,6 +2157,43 @@ namespace moho
       "DumpUnits"
     );
     RegisterAtexitCleanup<&cleanup_DumpUnits_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00BDC1B0 (FUN_00BDC1B0, register_DebugDumpArmyStats_ConAlias)
+   *
+   * What it does:
+   * Registers the `DebugDumpArmyStats` console alias and installs startup
+   * cleanup. All three strings are the binary's own, pushed at 0x00BDC1B0
+   * ("DoSimCommand DebugDumpArmyStats"), 0x00BDC1B5 ("DebugDumpArmyStats")
+   * and 0x00BDC1BF ("Dump current stats for army index.").
+   */
+  void register_DebugDumpArmyStats_ConAliasDef()
+  {
+    EnsureConAliasRegistration(
+      ConAlias_DebugDumpArmyStats_slot(),
+      "Dump current stats for army index.",
+      "DebugDumpArmyStats",
+      "DoSimCommand DebugDumpArmyStats"
+    );
+    RegisterAtexitCleanup<&cleanup_DebugDumpArmyStats_ConAlias>();
+  }
+
+  /**
+   * Address: 0x00BDC1E0 (FUN_00BDC1E0, register_DebugDumpArmyStats_SimConFunc)
+   *
+   * What it does:
+   * Registers the `DebugDumpArmyStats` sim command callback and installs
+   * startup cleanup. 0x00BDC201 stores `Moho::Sim::DebugDumpArmyStats`
+   * (0x0075D7A0) into the descriptor's `mFunc` slot.
+   */
+  void register_DebugDumpArmyStats_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::DebugDumpArmyStats>(
+      SimConFunc_DebugDumpArmyStats_slot(),
+      "DebugDumpArmyStats"
+    );
+    RegisterAtexitCleanup<&cleanup_DebugDumpArmyStats_SimConFunc>();
   }
 
   /**

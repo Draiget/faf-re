@@ -137,6 +137,20 @@ namespace moho
      */
     [[nodiscard]] float* FindOrCreateBlueprintStatValue(const ArmyBlueprintNameView* blueprintName);
 
+    /**
+     * Address: 0x0070ADD0 (FUN_0070ADD0, sub_70ADD0)
+     *
+     * IDA signature:
+     * int __usercall sub_70ADD0@<eax>(Moho::CArmyStatItem *a1@<eax>, int a2@<esi>);
+     *
+     * What it does:
+     * Copy-constructs this item's per-blueprint stat map (`mBlueprintStats`,
+     * `this + 0xA0`) into the caller-supplied, still-uninitialized `destination`
+     * lane and returns that lane. This is the by-value read of the blueprint map
+     * the binary performs before walking a snapshot of it.
+     */
+    ArmyBlueprintStatTree* CopyBlueprintStatsInto(ArmyBlueprintStatTree* destination) const;
+
   private:
     void DestroyBlueprintTree();
 
@@ -218,6 +232,25 @@ namespace moho
      * category summary, and economy summary stats for sync submission.
      */
     [[nodiscard]] msvc8::string ArmyXmlStatsNode(const msvc8::string& indent);
+
+    /**
+     * Address: 0x0070C160 (FUN_0070C160, Moho::CArmyStats::DumpStats)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CArmyStats::DumpStats(double a1@<st0>, Moho::CArmyStats *a2);
+     * (`this` arrives as the single stack argument; `retn 4`. The `st0` operand
+     * is decompiler noise from the FPU-stack state at entry.)
+     *
+     * What it does:
+     * Writes one human-readable army snapshot to `<dumpDir>/SnapShot<N>.txt` and
+     * mirrors it to the engine log. On the first call it asks the user for the
+     * output directory through a `wxDirDialog` (defaulting to
+     * `%USERPROFILE%/Desktop`) and restores the sim's 24-bit FPU precision after
+     * the dialog. Emits three sections - unit build summary, economy stats, and
+     * enemy-killed summary - each followed by the per-category sums taken from
+     * the rules' entity-category sets.
+     */
+    void DumpStats();
 
     /**
      * Address: 0x0070B820 (FUN_0070B820)
