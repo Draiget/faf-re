@@ -178,6 +178,25 @@ namespace moho
       bool straightLegs, float maxFootFall
     );
 
+    /**
+     * Address: 0x006395F0 (FUN_006395F0, Moho::CFootPlantManipulator::MoveManipulator)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CFootPlantManipulator::MoveManipulator(CFootPlantManipulator *this);
+     *
+     * VFTable SLOT: 1 (primary IAniManipulator view; `??_7CFootPlantManipulator@Moho@@6B@`
+     * head is 0x00E21B14, this address sits at 0x00E21B18, the slot the base
+     * leaves as `_purecall` at 0x00A82547).
+     *
+     * What it does:
+     * Solves the two-segment leg chain so the watched foot bone reaches the
+     * terrain (or raised-platform) height under it: samples the height field
+     * beneath the foot, clamps that target by the half-leg span and the
+     * per-manipulator maximum foot fall, then swings hip and knee by equal and
+     * opposite arccos-approximated rolls and applies a final knee correction
+     * whose sign flips when the foot is behind the hip forward axis or the
+     * manipulator was built with straight legs.
+     */
     bool ManipulatorUpdate() override;
 
     WeakPtr<Unit> mGoalUnit;         // +0x80
