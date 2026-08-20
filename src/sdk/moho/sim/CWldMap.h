@@ -285,6 +285,22 @@ namespace moho
   static_assert(offsetof(SFogInfo, mCurveExponent) == 0x10, "SFogInfo::mCurveExponent offset must be 0x10");
 
   /**
+   * Value parameter for `CWldTerrainRes::Reset` (0x008A6220). The binary
+   * passes this as a flattened two-dword by-value struct (mangled
+   * `USChartSize@2@`); the two dwords are used exclusively as a signed
+   * `(width, height)` pair (the asm computes half-extents via `cdq`+`sar`,
+   * a signed-division pattern), so the fields are modelled as `int32_t`.
+   */
+  struct SChartSize
+  {
+    std::int32_t mWidth;  // +0x00
+    std::int32_t mHeight; // +0x04
+  };
+  static_assert(offsetof(SChartSize, mWidth) == 0x00, "SChartSize::mWidth offset must be 0x00");
+  static_assert(offsetof(SChartSize, mHeight) == 0x04, "SChartSize::mHeight offset must be 0x04");
+  static_assert(sizeof(SChartSize) == 0x08, "SChartSize size must be 0x08");
+
+  /**
    * Recovered leading layout for IWldTerrainRes.
    * Only fields used by 0x0089E710 are mapped here.
    */
@@ -1061,6 +1077,30 @@ namespace moho
      * encodes per-texel normal lanes into DXT payload blocks.
      */
     void UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect);
+
+    /**
+     * Address: 0x008A6220 (FUN_008A6220,
+     * ?Reset@CWldTerrainRes@Moho@@EAE_NUSChartSize@2@PAVLuaState@LuaPlus@@@Z)
+     *
+     * IDA signature:
+     * char __thiscall Moho::CWldTerrainRes::Reset(
+     *     Moho::CWldTerrainRes *this, int a2, int a3, LuaPlus::LuaState *a4);
+     *
+     * What it does:
+     * Rebuilds the terrain resource in place for a freshly (re)loaded map of
+     * `size.mWidth x size.mHeight`: replaces `mMap` (a fresh `STIMap`), loads
+     * its terrain types, refreshes heightfield bounds/error over the full
+     * range, rebuilds the half-resolution debug-dirty-terrain bit array,
+     * resets background/skycube/environment-lookup defaults, rebuilds the
+     * normal map and stratum defaults, recreates the two half-resolution
+     * stratum utility masks and the water-map texture, resets lighting/fog/
+     * sun/shadow/specular defaults, cycles edit mode once, rebuilds the decal
+     * manager, and finally repositions the sky dome from freshly computed
+     * world bounds. Always returns true. Mangled access (`EAE`) marks this a
+     * private virtual; the vtable data-xref from `??_7CWldTerrainRes@Moho@@6B@`
+     * is the callsite evidence (VTABLE_CONFIRMED, zero direct code callers).
+     */
+    virtual bool Reset(SChartSize size, LuaPlus::LuaState* luaState);
 
   public:
     TerrainPlayableRectSource* mPlayableRectSource; // 0x04
