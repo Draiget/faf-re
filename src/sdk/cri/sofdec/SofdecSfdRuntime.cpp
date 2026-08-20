@@ -10955,6 +10955,120 @@
   );
   static_assert(sizeof(SfmpsStreamPrepRuntimeView) == 0x0C, "SfmpsStreamPrepRuntimeView size must be 0x0C");
 
+  /**
+   * Per-source-lane input descriptor `SFM2TS_Create` reads when opening one
+   * SJRBF ring buffer per configured M2TS transfer lane.
+   */
+  struct Sfm2tsSourceLane
+  {
+    std::int32_t sourceAddress = 0;   // +0x00
+    std::int32_t sourceSizeBytes = 0; // +0x04
+  };
+  static_assert(
+    offsetof(Sfm2tsSourceLane, sourceSizeBytes) == 0x04,
+    "Sfm2tsSourceLane::sourceSizeBytes offset must be 0x04"
+  );
+  static_assert(sizeof(Sfm2tsSourceLane) == 0x08, "Sfm2tsSourceLane size must be 0x08");
+
+  /**
+   * Per-lane M2TSD out-SJ override record. Field names borrow
+   * `M2TSD_SetOutSj`'s own parameter names: `SFM2TS_Create` seeds
+   * `streamIdFilter=-1`/`outStreamJoinAddress=0` and opens `relayRingBuffer`;
+   * `sfm2ts_ExecServerSub` reads all three back on every server step.
+   */
+  struct Sfm2tsTransferLaneOverride
+  {
+    std::int32_t streamIdFilter = -1;      // +0x00 (-1 = leave M2TSD's current filter alone)
+    std::int32_t outStreamJoinAddress = 0; // +0x04 (0 = unset; falls back to an alternate-lane override)
+    moho::SofdecSjRingBufferHandle* relayRingBuffer = nullptr; // +0x08
+  };
+  static_assert(
+    offsetof(Sfm2tsTransferLaneOverride, outStreamJoinAddress) == 0x04,
+    "Sfm2tsTransferLaneOverride::outStreamJoinAddress offset must be 0x04"
+  );
+  static_assert(
+    offsetof(Sfm2tsTransferLaneOverride, relayRingBuffer) == 0x08,
+    "Sfm2tsTransferLaneOverride::relayRingBuffer offset must be 0x08"
+  );
+  static_assert(sizeof(Sfm2tsTransferLaneOverride) == 0x0C, "Sfm2tsTransferLaneOverride size must be 0x0C");
+
+  /**
+   * Construction-time view of the SFM2TS transfer-strategy runtime block at
+   * `workctrlSubobj + 0x22F8` (evidence: `SFM2TS_Create`'s
+   * `lea edi, [ebp+22F8h]` / `mov [ebp+1F7Ch], edi` at 0x00ACF809/0x00ACF810
+   * publishes this same address as `SfmpsWorkctrlRuntimeView::
+   * streamPrepRuntime`). `SFM2TS_Create` establishes this block;
+   * `sfm2ts_ExecServerSub`, `sfm2ts_UpdateFlowCnt` and `SFM2TS_Destroy` read
+   * it back through their own narrower views over the same bytes
+   * (`SfmpsStreamPrepRuntimeView`, `Sfm2tsDestroyRuntimeView`).
+   *
+   * `workAddress`/`workSizeBytes` are write-once at construction time (they
+   * feed `M2TSD_Create`); once consumed, the same two dwords are reused as
+   * `SfmpsStreamPrepRuntimeView::pendingCondition5Bytes`/
+   * `pendingCondition6Bytes` for the remainder of the object's life
+   * (`sj_ChkPrepFlg` reads those names at these same two offsets).
+   */
+  struct Sfm2tsConstructRuntimeView
+  {
+    std::int32_t m2tsdRuntimeAddress = 0; // +0x00
+    std::int32_t workAddress = 0;         // +0x04
+    std::int32_t workSizeBytes = 0;       // +0x08
+    std::int32_t laneCount = 0;           // +0x0C
+    std::array<Sfm2tsSourceLane, 8> sourceLanes{};             // +0x10
+    std::array<Sfm2tsTransferLaneOverride, 8> laneOverrides{}; // +0x50
+  };
+  static_assert(
+    offsetof(Sfm2tsConstructRuntimeView, workAddress) == 0x04,
+    "Sfm2tsConstructRuntimeView::workAddress offset must be 0x04"
+  );
+  static_assert(
+    offsetof(Sfm2tsConstructRuntimeView, workSizeBytes) == 0x08,
+    "Sfm2tsConstructRuntimeView::workSizeBytes offset must be 0x08"
+  );
+  static_assert(
+    offsetof(Sfm2tsConstructRuntimeView, laneCount) == 0x0C,
+    "Sfm2tsConstructRuntimeView::laneCount offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(Sfm2tsConstructRuntimeView, sourceLanes) == 0x10,
+    "Sfm2tsConstructRuntimeView::sourceLanes offset must be 0x10"
+  );
+  static_assert(
+    offsetof(Sfm2tsConstructRuntimeView, laneOverrides) == 0x50,
+    "Sfm2tsConstructRuntimeView::laneOverrides offset must be 0x50"
+  );
+  static_assert(sizeof(Sfm2tsConstructRuntimeView) == 0xB0, "Sfm2tsConstructRuntimeView size must be 0xB0");
+
+  /**
+   * Narrow view over `SofdecSfdWorkctrlSubobj::bufferHandle` exposing the
+   * three SFM2TS alternate-lane words `sfm2ts_ExecServerSub` and
+   * `sfm2ts_UpdateFlowCnt` read: an always-live SFBUF handle/in-SJ address,
+   * plus two alternate out-SJ overrides gated by SFSET conditions 5/6. The
+   * surrounding bytes remain part of the opaque SFBUF buffer-handle blob.
+   */
+  struct SfbufAlternateLaneOverrideView
+  {
+    std::uint8_t reserved00[0x14]{};
+    std::int32_t inSjAddress = 0;             // +0x14
+    std::uint8_t reserved18[0x88 - 0x14 - 0x04]{};
+    std::int32_t alternateOutSjLane0 = 0;     // +0x88 (SFSET condition 5 gate)
+    std::uint8_t reserved8C[0xFC - 0x88 - 0x04]{};
+    std::int32_t alternateOutSjLane1 = 0;     // +0xFC (SFSET condition 6 gate)
+  };
+  static_assert(
+    offsetof(SfbufAlternateLaneOverrideView, inSjAddress) == 0x14,
+    "SfbufAlternateLaneOverrideView::inSjAddress offset must be 0x14"
+  );
+  static_assert(
+    offsetof(SfbufAlternateLaneOverrideView, alternateOutSjLane0) == 0x88,
+    "SfbufAlternateLaneOverrideView::alternateOutSjLane0 offset must be 0x88"
+  );
+  static_assert(
+    offsetof(SfbufAlternateLaneOverrideView, alternateOutSjLane1) == 0xFC,
+    "SfbufAlternateLaneOverrideView::alternateOutSjLane1 offset must be 0xFC"
+  );
+  static_assert(sizeof(SfbufAlternateLaneOverrideView) == 0x100, "SfbufAlternateLaneOverrideView size must be 0x100");
+
   struct SfmpsParserRuntimeView
   {
     std::int32_t parserHandleAddress = 0; // +0x00
@@ -12800,16 +12914,48 @@
    * Address: 0x00ACF330 (FUN_00ACF330, _sfm2ts_UpdateFlowCnt)
    *
    * What it does:
-   * SJ-layer flow-counter update wrapper: refreshes source flow counters and
-   * accumulates consumed/decoded 64-bit totals through the common SFMPS lane.
+   * When the transfer-strategy's SFBUF handle (`bufferHandle+0x14`) is
+   * bound, pulls the current per-lane flow-count snapshot and folds it into
+   * the shared source-flow and consumed-bytes 64-bit accumulators via
+   * `SFBUF_UpdateFlowCnt`, then folds `decodedUnitsDelta` into the
+   * decoded-units 64-bit accumulator directly. No-ops when unbound.
    */
-  std::int32_t sj_UpdateFlowCnt(
-    moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
-    const std::int32_t consumedBytesDelta,
-    const std::int32_t decodedUnitsDelta
+  std::int32_t sfm2ts_UpdateFlowCnt(
+    moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj, const std::int32_t decodedUnitsDelta
   )
   {
-    return sfmps_UpdateFlowCnt(workctrlSubobj, consumedBytesDelta, decodedUnitsDelta);
+    const auto* const altLaneView = reinterpret_cast<const SfbufAlternateLaneOverrideView*>(
+      reinterpret_cast<const std::uint8_t*>(workctrlSubobj->bufferHandle)
+    );
+    const std::int32_t sfbufHandle = altLaneView->inSjAddress;
+    if (sfbufHandle == 0) {
+      return 0;
+    }
+
+    auto* const flowView = reinterpret_cast<SfmpsFlowCountRuntimeView*>(workctrlSubobj);
+
+    std::int32_t outLane1FlowCount = 0;
+    std::int32_t outLane0FlowCount = 0;
+    (void)SFBUF_GetFlowCnt(sfbufHandle, &outLane1FlowCount, &outLane0FlowCount);
+
+    const std::int64_t updatedSourceFlow =
+      SFBUF_UpdateFlowCnt(flowView->sourceFlowLow, flowView->sourceFlowHigh, outLane1FlowCount);
+    flowView->sourceFlowLow = static_cast<std::int32_t>(updatedSourceFlow);
+    flowView->sourceFlowHigh = static_cast<std::int32_t>(updatedSourceFlow >> 32);
+
+    const std::int64_t updatedConsumedBytes =
+      SFBUF_UpdateFlowCnt(flowView->consumedBytesLow, flowView->consumedBytesHigh, outLane0FlowCount);
+    flowView->consumedBytesLow = static_cast<std::int32_t>(updatedConsumedBytes);
+    flowView->consumedBytesHigh = static_cast<std::int32_t>(updatedConsumedBytes >> 32);
+
+    const std::int64_t decodedAccumulated =
+      (static_cast<std::int64_t>(flowView->decodedUnitsHigh) << 32)
+      | static_cast<std::uint32_t>(flowView->decodedUnitsLow);
+    const std::int64_t nextDecoded = decodedAccumulated + static_cast<std::int64_t>(decodedUnitsDelta);
+    flowView->decodedUnitsLow = static_cast<std::int32_t>(nextDecoded);
+    flowView->decodedUnitsHigh = static_cast<std::int32_t>(nextDecoded >> 32);
+
+    return flowView->decodedUnitsHigh;
   }
 
   /**
@@ -13246,6 +13392,159 @@
       return chkTermFlg(workctrlSubobj);
     }
     return executionStage;
+  }
+
+  /**
+   * Address: 0x00ACF800 (FUN_00ACF800, _SFM2TS_Create)
+   *
+   * What it does:
+   * Publishes the SFM2TS construction-time runtime view over
+   * `workctrlSubobj + 0x22F8` (the same block `SfmpsWorkctrlRuntimeView::
+   * streamPrepRuntime` exposes for steady-state use), seeds it from the
+   * global `sfdm2ts_para` template via `initInf`, opens one SJRBF ring
+   * buffer per configured source lane (skipping lanes whose source is null
+   * or smaller than twice the per-lane quantum: 512000 bytes for lane 0,
+   * 10240 bytes for every other lane), creates the M2TSD demux instance
+   * over the configured work buffer, and installs its error callback.
+   */
+  extern "C" std::int32_t SFM2TS_Create(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    auto* const runtimeView = reinterpret_cast<Sfm2tsConstructRuntimeView*>(
+      reinterpret_cast<std::uint8_t*>(workctrlSubobj) + 0x22F8
+    );
+
+    auto* const workctrlView = reinterpret_cast<SfmpsWorkctrlRuntimeView*>(workctrlSubobj);
+    workctrlView->streamPrepRuntime = reinterpret_cast<SfmpsStreamPrepRuntimeView*>(runtimeView);
+    (void)initInf(reinterpret_cast<Sfm2tsInitInfoRuntimeView*>(runtimeView));
+
+    for (std::int32_t laneIndex = 0; laneIndex < runtimeView->laneCount; ++laneIndex) {
+      Sfm2tsTransferLaneOverride& laneOverride = runtimeView->laneOverrides[laneIndex];
+      laneOverride.streamIdFilter = -1;
+      laneOverride.outStreamJoinAddress = 0;
+
+      const Sfm2tsSourceLane& sourceLane = runtimeView->sourceLanes[laneIndex];
+      const std::int32_t perLaneQuantumBytes = (laneIndex != 0) ? 10240 : 512000;
+      if (sourceLane.sourceAddress != 0 && sourceLane.sourceSizeBytes >= 2 * perLaneQuantumBytes) {
+        laneOverride.relayRingBuffer = SJRBF_Create(
+          sourceLane.sourceAddress, sourceLane.sourceSizeBytes - perLaneQuantumBytes, perLaneQuantumBytes
+        );
+      } else {
+        laneOverride.relayRingBuffer = nullptr;
+      }
+    }
+
+    const std::int32_t m2tsdHandle = M2TSD_Create(
+      runtimeView->workAddress, static_cast<std::uint32_t>(runtimeView->workSizeBytes), runtimeView->laneCount
+    );
+    if (m2tsdHandle == 0) {
+      return SFLIB_SetErr(0, static_cast<std::int32_t>(0xFF000D21u));
+    }
+
+    (void)M2TSD_SetErrFn(
+      reinterpret_cast<M2TsdRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(m2tsdHandle))),
+      reinterpret_cast<std::int32_t>(&sfbuf_ErrFn),
+      reinterpret_cast<std::int32_t>(workctrlSubobj)
+    );
+    (void)SFSET_SetCond(workctrlSubobj, 73, 1);
+    runtimeView->m2tsdRuntimeAddress = m2tsdHandle;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACF170 (FUN_00ACF170, _execServerSub)
+   *
+   * What it does:
+   * Publishes current SFSET playback conditions into the M2TSD demux
+   * instance, feeds each configured transfer lane's stream-id filter and
+   * SJRBF-backed relay handle (falling back to an alternate-lane override
+   * from `bufferHandle` when SFSET condition 5/6 request one and the lane
+   * has none configured), steps the M2TSD decode pass, mirrors the
+   * resulting lane 0/1 stream-id filters back into the runtime lanes,
+   * publishes the decoded audio stream type from lane 1's state, and
+   * updates SJ flow counters. No-ops entirely when either PTS queue is
+   * full.
+   */
+  std::int32_t sfm2ts_ExecServerSub(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    const std::int32_t workctrlAddress = SjPointerToAddress(workctrlSubobj);
+    if (SFPTS_IsPtsQueFull(workctrlAddress, 1) || SFPTS_IsPtsQueFull(workctrlAddress, 2)) {
+      return 0;
+    }
+
+    auto* const workctrlView = reinterpret_cast<SfmpsWorkctrlRuntimeView*>(workctrlSubobj);
+    auto* const runtimeView = reinterpret_cast<Sfm2tsConstructRuntimeView*>(workctrlView->streamPrepRuntime);
+    const std::int32_t m2tsdAddress = runtimeView->m2tsdRuntimeAddress;
+    auto* const m2tsdRuntime = reinterpret_cast<M2TsdRuntimeView*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(m2tsdAddress))
+    );
+
+    (void)M2TSD_SetPesSw(m2tsdAddress, SFSET_GetCond(workctrlSubobj, 74));
+    (void)M2TSD_SetTsMapFn(m2tsdAddress, SFSET_GetCond(workctrlSubobj, 89), SFSET_GetCond(workctrlSubobj, 90));
+    (void)M2TSD_SetPesFn(m2tsdAddress, SFSET_GetCond(workctrlSubobj, 91), SFSET_GetCond(workctrlSubobj, 92));
+
+    auto* const altLaneView = reinterpret_cast<SfbufAlternateLaneOverrideView*>(workctrlSubobj->bufferHandle);
+    (void)M2TSD_SetInSj(m2tsdRuntime, altLaneView->inSjAddress);
+
+    const std::array<std::int32_t, 2> alternateOutSjByLane = {
+      (SFSET_GetCond(workctrlSubobj, 5) == 1) ? altLaneView->alternateOutSjLane0 : 0,
+      (SFSET_GetCond(workctrlSubobj, 6) == 1) ? altLaneView->alternateOutSjLane1 : 0,
+    };
+
+    std::int32_t nextAlternateSlot = 0;
+    for (std::int32_t laneIndex = 0; laneIndex < runtimeView->laneCount; ++laneIndex) {
+      Sfm2tsTransferLaneOverride& laneOverride = runtimeView->laneOverrides[laneIndex];
+      std::int32_t outStreamJoinAddress = laneOverride.outStreamJoinAddress;
+      std::int32_t relayStreamJoinAddress = reinterpret_cast<std::int32_t>(laneOverride.relayRingBuffer);
+
+      if (outStreamJoinAddress == 0) {
+        if (nextAlternateSlot >= 2) {
+          relayStreamJoinAddress = 0;
+        } else {
+          outStreamJoinAddress = alternateOutSjByLane[nextAlternateSlot];
+          ++nextAlternateSlot;
+          if (outStreamJoinAddress == 0) {
+            relayStreamJoinAddress = 0;
+          }
+        }
+      }
+
+      (void)M2TSD_SetOutSj(
+        m2tsdRuntime, laneIndex, laneOverride.streamIdFilter, relayStreamJoinAddress, outStreamJoinAddress
+      );
+      (void)M2TSD_SetCbFn(
+        m2tsdAddress, laneIndex, reinterpret_cast<std::int32_t>(&sfm2ts_cbfn), reinterpret_cast<std::int32_t>(workctrlSubobj)
+      );
+    }
+
+    M2TSD_Decode(m2tsdRuntime);
+
+    runtimeView->laneOverrides[0].streamIdFilter = m2tsdRuntime->laneEntries[0].streamIdFilter;
+    runtimeView->laneOverrides[1].streamIdFilter = m2tsdRuntime->laneEntries[1].streamIdFilter;
+    (void)SFADXT_SetAudioStreamType(workctrlSubobj, m2tsdRuntime->laneEntries[1].laneState);
+    (void)sfm2ts_UpdateFlowCnt(workctrlSubobj, m2tsdRuntime->decodeCycleProgressFlag);
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x00ACF140 (FUN_00ACF140, _SFM2TS_ExecServer)
+   *
+   * What it does:
+   * Runs one SFM2TS server step unless destination termination is already
+   * latched, then advances SJ state (prep processing / termination check)
+   * for the next execution stage. Returns the server step's own result
+   * (always 0) regardless of the SJ state update's result, matching the
+   * binary's discarded second call.
+   */
+  extern "C" std::int32_t SFM2TS_ExecServer(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    if (getTermDst(workctrlSubobj) == 1) {
+      return 0;
+    }
+
+    const std::int32_t result = sfm2ts_ExecServerSub(workctrlSubobj);
+    (void)sj_UpdateState(workctrlSubobj);
+    return result;
   }
 
   /**
@@ -20322,8 +20621,8 @@
   extern "C" SofdecTransferStrategy SFD_tr_sd_m2ts = {
     /* init        */ &SFM2TS_Init,
     /* finish      */ &SFM2TS_Finish,
-    /* execServer  */ nullptr, // TODO-TABLE SFM2TS_ExecServer 0x00ACF140
-    /* create      */ nullptr, // TODO-TABLE SFM2TS_Create 0x00ACF800
+    /* execServer  */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_ExecServer),
+    /* create      */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Create),
     /* destroy     */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Destroy),
     /* requestStop */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_RequestStop),
     /* start       */ reinterpret_cast<SftrnEntryCallback>(&SFM2TS_Start),
