@@ -1610,7 +1610,7 @@ namespace
    * Opens one resolved wave-bank file, reads the header and metadata lanes,
    * and returns whether the metadata streaming bit (`bit0`) is set.
    */
-  [[maybe_unused]] [[nodiscard]] bool IsStreamingWaveBank(const gpg::StrArg waveBankPath)
+  [[nodiscard]] bool IsStreamingWaveBank(const gpg::StrArg waveBankPath)
   {
     moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
     if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr || waveBankPath == nullptr) {
@@ -3070,7 +3070,7 @@ namespace
    * wave-bank runtime handle, closes the Win32 file handle when valid, and
    * resets the stored bank-name string to empty SSO state.
    */
-  [[maybe_unused]] void DestroyStreamingWaveBankResourceNoDelete(
+  void DestroyStreamingWaveBankResourceNoDelete(
     AudioStreamingWaveBankLoader* const streamingResource
   ) noexcept
   {
@@ -3211,7 +3211,7 @@ namespace
    * sound-path loading, growing the backing storage through the canonical
    * wait-handle append helper when the current capacity is exhausted.
    */
-  [[maybe_unused]] [[nodiscard]] void** PushBackNonNullAudioHandleStorageEntryA(
+  [[nodiscard]] void** PushBackNonNullAudioHandleStorageEntryA(
     AudioPointerVectorStorageRuntimeView& vectorRuntime,
     void* const entry
   )
@@ -3226,7 +3226,7 @@ namespace
    * Secondary non-null pointer push-back lane with the same growth and
    * `boost::bad_pointer` throw semantics as `FUN_004DB2A0`.
    */
-  [[maybe_unused]] [[nodiscard]] void** PushBackNonNullAudioHandleStorageEntryB(
+  [[nodiscard]] void** PushBackNonNullAudioHandleStorageEntryB(
     AudioPointerVectorStorageRuntimeView& vectorRuntime,
     void* const entry
   )
