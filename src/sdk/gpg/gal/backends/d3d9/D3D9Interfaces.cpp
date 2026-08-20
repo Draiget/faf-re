@@ -89,6 +89,15 @@ namespace gpg::gal
      */
     PipelineState::PipelineState() = default;
 
+    // Mesh-batching hardware capability flags. Console-settable (see
+    // `Moho::CON_mesh_Rebatch`, moho/console/CConCommand.cpp), which writes
+    // these two bytes directly rather than through an accessor - so they need
+    // external linkage rather than living in the anonymous namespace below.
+    // No owning header exists for this backend TU yet; the consumer declares
+    // them `extern` locally where it writes them.
+    std::uint8_t sMeshAllowFloat16 = 1U;
+    std::uint8_t sMeshAllowInstancing = 1U;
+
     namespace
     {
         using release_fn = unsigned long(__stdcall*)(void*);
@@ -362,8 +371,6 @@ namespace gpg::gal
             3U,
             4U,
         };
-        std::uint8_t sMeshAllowFloat16 = 1U;
-        std::uint8_t sMeshAllowInstancing = 1U;
 
         /**
          * Address: 0x00941280 (FUN_00941280)
