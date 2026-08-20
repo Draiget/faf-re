@@ -82,4 +82,19 @@ namespace gpg
   void register_RFastVectorType_uint();
 
   [[nodiscard]] RType* ResolveFastVectorUIntType();
+
+  /**
+   * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize)
+   * Address: 0x00553480 (FUN_00553480, ICF twin)
+   *
+   * What it does:
+   * Resizes reflected dword-array fastvector storage and fills newly appended
+   * lanes with `*fillValue`. Exposed (not file-local) because the linker
+   * folds `gpg::RFastVectorType<Moho::EntId>::SetCount` and its `SerLoad`
+   * callback (FastVectorEntIdReflection.cpp) into this exact same body —
+   * `EntId` storage is a flat array of 4-byte words, identical in layout to
+   * `unsigned int` storage, so both specializations share one compiled
+   * resize routine.
+   */
+  void FastVectorUIntResize(const unsigned int* fillValue, unsigned int newSize, void* objectStorage);
 } // namespace gpg
