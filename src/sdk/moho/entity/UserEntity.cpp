@@ -105,6 +105,12 @@ namespace
   /**
    * Address: 0x0063CA40 (FUN_0063CA40, boost::shared_ptr<Moho::CAniPose> helper)
    *
+   * A second call site reaches this same `shared_ptr<CAniPose>::operator=`/
+   * `reset` instantiation directly (not through this helper):
+   * `cfunc_TryCopyPoseL` (Sim.cpp, 0x0075D0E0) calls
+   * `pendingCopy.mPose.reset(clonedPose)` when rebinding a cloned pose onto
+   * the Sim's pending pose-copy entry before re-anchoring its transform.
+   *
    * What it does:
    * Rebinds one `boost::shared_ptr<CAniPose>` to the supplied pose pointer.
    */
