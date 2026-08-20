@@ -5,6 +5,8 @@
 
 #include "gpg/core/time/Timer.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/net/INetDatagramHandler.h"
+#include "moho/net/NetTransportEnums.h"
 #include "moho/script/CScriptObject.h"
 
 struct lua_State;
@@ -17,14 +19,19 @@ namespace moho
 {
   class CScrLuaInitForm;
   class INetDatagramSocket;
+  struct CMessage;
 
   /**
    * Runtime lane for one discovered game entry in discovery-service storage.
-   * Field ownership is partially recovered from timeout/update call lanes.
+   *
+   * Field layout confirmed against the temp record `CDiscoveryService::Pull`
+   * (0x007BFB70) builds on its stack before appending: protocol/address/port
+   * are written at +0x00/+0x04/+0x08 with the reply timestamp at +0x0C, and
+   * the append helper (0x007C87E0) later copies that same 16-byte shape.
    */
   struct DiscoveredGameRecord
   {
-    std::int32_t mUnknown00{0};       // +0x00 (semantic unresolved)
+    ENetProtocolType mProtocol{ENetProtocolType::kNone}; // +0x00
     std::uint32_t mHostAddress{0};    // +0x04
     std::uint16_t mHostPort{0};       // +0x08
     std::uint16_t mPad0A{0};          // +0x0A
@@ -38,7 +45,7 @@ namespace moho
   );
   static_assert(sizeof(DiscoveredGameRecord) == 0x10, "DiscoveredGameRecord size must be 0x10");
 
-  class CDiscoveryService : public CScriptObject
+  class CDiscoveryService : public CScriptObject, public INetDatagramHandler
   {
   public:
     /**
@@ -71,12 +78,46 @@ namespace moho
     gpg::RRef GetDerivedObjectRef() override;
 
     /**
+     * Address: 0x007BFB70 (FUN_007BFB70, ??_7CDiscoveryService@Moho@@6BINetDatagramHandler@Moho@@@ slot 0)
+     * Mangled implementer cite: IDA export name `Moho::CDiscoveryService::Pull`
+     *
+     * Vtable slot: slot 0 of `INetDatagramHandler`, confirmed constructed by
+     * this class's ctor (FUN_007BF650 writes
+     * `??_7CDiscoveryService@Moho@@6BINetDatagramHandler@Moho@@@` at +0x34) and
+     * dispatched from `CNetDatagramSocketImpl::Pull()`
+     * (`mDatagramHandler->OnDatagram(&msg, this, peerAddress, peerPort)`,
+     * src/sdk/moho/net/CNetDatagramSocketImpl.cpp).
+     *
+     * What it does:
+     * Parses one received discovery-reply UDP datagram: validates the lobby
+     * message kind/magic/protocol-version/game-type header bytes, decodes the
+     * advertised game's protocol/port and its Lua config payload, then
+     * updates an existing `DiscoveredGameRecord` or appends a new one via
+     * `AddDiscoveredGame` and fires the `GameUpdated`/`GameFound` script
+     * event.
+     */
+    void OnDatagram(CMessage* msg, INetDatagramSocket* socket, u_long address, u_short port) override;
+
+    /**
      * Returns current tracked-discovery-game count.
      */
     [[nodiscard]] int GetGameCount() const noexcept;
 
+  private:
+    /**
+     * Address: 0x007C87E0 (FUN_007C87E0, sub_7C87E0)
+     *
+     * Caller: `OnDatagram` (0x007BFB70), same recovery pass (paired
+     * bottom-up) - the only call site in the binary.
+     *
+     * What it does:
+     * Appends `newRecord` to the `mGamesBegin..mGamesEnd` storage, growing
+     * the backing allocation (~1.5x, matching the capacity math in
+     * FUN_007C9CD0's realloc path) when `mGamesEnd == mGamesCapacityEnd`.
+     */
+    void AddDiscoveredGame(const DiscoveredGameRecord& newRecord);
+
   public:
-    void* mDatagramHandlerVTable{nullptr};           // +0x34
     alignas(void*) std::uint8_t mPullTaskStorage[0x18]{}; // +0x38
     std::uint8_t mUnknown50_53[0x04]{};              // +0x50
     alignas(void*) std::uint8_t mPushTaskStorage[0x1C]{}; // +0x54
@@ -89,10 +130,6 @@ namespace moho
     INetDatagramSocket* mDatagramSocket{nullptr};     // +0x8C
   };
 
-  static_assert(
-    offsetof(CDiscoveryService, mDatagramHandlerVTable) == 0x34,
-    "CDiscoveryService::mDatagramHandlerVTable must be +0x34"
-  );
   static_assert(
     offsetof(CDiscoveryService, mPullTaskStorage) == 0x38,
     "CDiscoveryService::mPullTaskStorage must be +0x38"
