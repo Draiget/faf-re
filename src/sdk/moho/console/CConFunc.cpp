@@ -41,9 +41,7 @@ void moho::CConFunc::InitializeRecovered(const char* description, const char* na
  */
 void moho::CConFunc::Handle(void* commandArgs)
 {
-  if (const Callback callback = GetCallback(); callback != nullptr) {
-    callback(commandArgs);
-  }
+  GetCallback()(commandArgs);
 }
 
 moho::CConFunc::Callback moho::CConFunc::GetCallback() const noexcept

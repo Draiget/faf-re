@@ -13,6 +13,7 @@ namespace moho
 {
   class CParticleTexture;
   class CEffectManagerImpl;
+  class IEffectManager;
   class Entity;
 
   class IEffect : public CScriptObject
@@ -115,13 +116,13 @@ namespace moho
     using ManagerListNode = TDatListItem<IEffect, void>;
 
     TDatListItem<IEffect, void> mManagerListNode; // +0x34
-    std::uint32_t mUnknown3C;                     // +0x3C
-    std::uint32_t mUnknown40;                     // +0x40
+    IEffectManager* mManager;                     // +0x3C
+    std::int32_t mScriptObjectToken;              // +0x40
   };
 
   static_assert(offsetof(IEffect, mManagerListNode) == 0x34, "IEffect::mManagerListNode offset must be 0x34");
-  static_assert(offsetof(IEffect, mUnknown3C) == 0x3C, "IEffect::mUnknown3C offset must be 0x3C");
-  static_assert(offsetof(IEffect, mUnknown40) == 0x40, "IEffect::mUnknown40 offset must be 0x40");
+  static_assert(offsetof(IEffect, mManager) == 0x3C, "IEffect::mManager offset must be 0x3C");
+  static_assert(offsetof(IEffect, mScriptObjectToken) == 0x40, "IEffect::mScriptObjectToken offset must be 0x40");
   static_assert(sizeof(IEffect) == 0x44, "IEffect size must be 0x44");
 
   /**

@@ -29,8 +29,8 @@ namespace
       return;
     }
     auto& typeInfo = *reinterpret_cast<CMauiBitmapTypeInfo*>(gCMauiBitmapTypeInfoStorage);
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    typeInfo.~CMauiBitmapTypeInfo();
+    gCMauiBitmapTypeInfoConstructed = false;
   }
 
   struct CMauiBitmapTypeInfoBootstrap
@@ -117,10 +117,14 @@ void CMauiBitmapTypeInfo::Init()
 
 void moho::register_CMauiBitmapTypeInfoStartup()
 {
+  if (gCMauiBitmapTypeInfoConstructed) {
+    return;
+  }
+
   (void)AcquireCMauiBitmapTypeInfo();
   (void)std::atexit(&cleanup_CMauiBitmapTypeInfo);
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiBitmapTypeInfoStartup_77f800, moho::register_CMauiBitmapTypeInfoStartup)
+GPG_PREREGISTER_INIT(CMauiBitmapTypeInfoStartupPreregister, moho::register_CMauiBitmapTypeInfoStartup)

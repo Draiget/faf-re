@@ -17,8 +17,8 @@ namespace moho
    */
   SCreateBeamParams::SCreateBeamParams()
     : mAttachEntity(nullptr)
-    , mAttachArmyIndex(-1)
     , mAttachBoneIndex(-1)
+    , mAttachArmyIndex(-1)
     , mStart(0.0f, 0.0f, 0.0f)
     , mEnd(0.0f, 0.0f, 0.0f)
     , mLifetime(1.0f)

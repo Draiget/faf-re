@@ -12,6 +12,7 @@
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityTransformPayload.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/particles/CParticleTextureCountedPtr.h"
 #include "moho/render/EBeamParam.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -21,7 +22,6 @@
 #include "moho/sim/Sim.h"
 #include "Wm3Sphere3.h"
 
-#include "moho/particles/BeamRenderHelpers.h"
 #include "moho/particles/SParticleBuffer.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/ui/SDebugLine.h"
@@ -31,10 +31,6 @@ namespace moho
   // Debug console flag defined in EffectLuaStartupRegistrations.cpp
   // (?dbg_EfxBeams@Moho@@3_NA); when set, OnTick draws the beam cap segments.
   extern bool dbg_EfxBeams;
-
-  // Rotates `vec` by `quat` into `dest` (defined in moho/math/QuaternionMath.cpp);
-  // no shared header declares it, so forward-declare the external symbol here.
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
 } // namespace moho
 
 namespace
@@ -48,12 +44,6 @@ namespace
 
     GPG_ASSERT(cached != nullptr);
     return cached;
-  }
-
-  [[nodiscard]] moho::IEffectManager* ResolveEffectManager(const moho::IEffect* const effect)
-  {
-    const std::uintptr_t raw = static_cast<std::uintptr_t>(effect->mUnknown3C);
-    return reinterpret_cast<moho::IEffectManager*>(raw);
   }
 
   [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
@@ -305,15 +295,15 @@ namespace moho
    *     Moho::CEfxBeam *this, const Moho::SCreateBeamParams *params);
    *
    * What it does:
-   * Create-params beam ctor. Chains the default CEffectImpl base ctor, seeds the
+   * Create-params beam ctor. Chains the manager-bound CEffectImpl base ctor, seeds the
    * detached beam-end attach-info, sizes the param/texture/string lanes, then
    * applies every beam render parameter from the create-params payload in binary
    * order: a fixed LOD cutoff of 150, the two endpoints, beam length (from the
    * texture-scale lane), the shared start/end colour, the beam texture, thickness
    * (from width), UV shift and repeat rate, and the blend mode -- then Reset().
    */
-  CEfxBeam::CEfxBeam(const SCreateBeamParams& params)
-    : CEffectImpl()
+  CEfxBeam::CEfxBeam(CEffectManagerImpl* const manager, const SCreateBeamParams& params)
+    : CEffectImpl(manager, params.mAttachArmyIndex)
     , mBlendMode(0)
     , mVisible(false)
     , mPad195{0}
@@ -522,7 +512,7 @@ namespace moho
       }
     }
 
-    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    Sim* const sim = mManager->GetSim();
     CArmyImpl* const focusArmy = ResolveFocusArmy(sim);
     if (!focusArmy) {
       return true;
@@ -589,7 +579,7 @@ namespace moho
     if (mNewAttachment) {
       Entity* const sourceEntity = ResolveAttachEntity(mEntityInfo);
       if (IsAttachmentInvalid(sourceEntity)) {
-        ResolveEffectManager(this)->DestroyEffect(this);
+        mManager->DestroyEffect(this);
         return false;
       }
 
@@ -601,8 +591,8 @@ namespace moho
         mBeam.mStart = FetchVectorParam(*this, 0);
 
         const float beamLength = GetFloatParam(6);
-        mBeam.mEnd.x = 0.0f;
-        mBeam.mEnd.y = 0.0f;
+        mBeam.mEnd.x = beamLength * 0.0f;
+        mBeam.mEnd.y = beamLength * 0.0f;
         mBeam.mEnd.z = beamLength;
         mBeam.mLastInterpolation = sourceEntity->mVelocityScale;
 
@@ -768,22 +758,23 @@ namespace moho
       if (lifetime > 0.0f) {
         SetFloatParam(BEAM_LIFETIME, lifetime - 1.0f);
         if (GetFloatParam(BEAM_LIFETIME) <= 0.0f) {
-          ResolveEffectManager(this)->DestroyEffect(this);
+          mManager->DestroyEffect(this);
           return;
         }
       }
     }
 
-    // Refresh endpoint transforms; new beams skip the refresh gate.
+    // Refresh endpoint transforms only while the beam is new; stop this tick
+    // when the attachment update rejects the current endpoints.
     if (mIsNew && !Update()) {
       return;
     }
 
-    Sim* const sim = ResolveEffectManager(this)->GetSim();
+    Sim* const sim = mManager->GetSim();
     const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
-    for (const GeomCamera3& camera : cameras) {
-      if (CanSeeCam(&camera)) {
-        AppendBeamToVector(sim->GetParticleBuffer()->mBeams, mBeam);
+    for (std::size_t cameraIndex = 0; cameraIndex < cameras.size(); ++cameraIndex) {
+      if (CanSeeCam(&cameras[cameraIndex])) {
+        sim->GetParticleBuffer()->mBeams.push_back(mBeam);
         break;
       }
     }

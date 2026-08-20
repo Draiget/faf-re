@@ -44,15 +44,15 @@ namespace moho
      * Address: 0x00654A70 (FUN_00654A70, Moho::CEfxBeam::CEfxBeam)
      *
      * What it does:
-     * Create-params beam ctor. Chains the default CEffectImpl base ctor (manager
-     * binding happens later, via LinkActiveEffect in the factory), seeds the
+     * Create-params beam ctor. Chains the manager-bound CEffectImpl base ctor
+     * using the request's army/script token, seeds the
      * endpoint attach-info to the detached beam-end default, sizes the effect
      * parameter/texture/string lanes, then applies every beam render parameter
      * from `params` (endpoints, shared start/end colour, length, thickness, UV
      * shift, repeat rate, a fixed LOD cutoff of 150, and the beam texture) before
      * rebuilding render state via Reset().
      */
-    explicit CEfxBeam(const SCreateBeamParams& params);
+    CEfxBeam(CEffectManagerImpl* manager, const SCreateBeamParams& params);
 
     /**
      * Address: 0x00655D80 (FUN_00655D80, non-deleting destructor body)
