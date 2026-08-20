@@ -1,5 +1,6 @@
 #include "CAniDefaultSkelConstruct.h"
 
+#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -19,8 +20,6 @@ namespace moho
 
 namespace
 {
-  moho::CAniDefaultSkelConstruct gCAniDefaultSkelConstruct{};
-
   struct ScalarDeleteVTable
   {
     using deleting_dtor_t = int(__thiscall*)(void* self, int deleteFlag);
@@ -31,20 +30,6 @@ namespace
   {
     ScalarDeleteVTable* mVTable;
   };
-
-  template <typename THelper>
-  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
-  {
-    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
-  }
-
-  template <typename THelper>
-  void InitializeHelperNode(THelper& helper) noexcept
-  {
-    gpg::SerHelperBase* const self = HelperSelfNode(helper);
-    helper.mNext = self;
-    helper.mPrev = self;
-  }
 
   /**
    * Address: 0x0054CFC0 (FUN_0054CFC0)
@@ -63,21 +48,12 @@ namespace
   }
 
   /**
-   * Address: 0x0054DE50 (FUN_0054DE50)
+   * Address: 0x0054ABB0 (FUN_0054ABB0)
    *
    * What it does:
-   * Invokes the scalar deleting-destructor lane for a default skeleton object.
+   * Publishes the process-wide default skeleton as a shared `CAniSkel`
+   * construct-result payload.
    */
-  [[maybe_unused]] void DeleteDefaultSkelObject(void* const object)
-  {
-    if (object == nullptr) {
-      return;
-    }
-
-    auto* const scalarDeleteObject = static_cast<ScalarDeleteObject*>(object);
-    scalarDeleteObject->mVTable->mDeletingDtor(object, 1);
-  }
-
   void ConstructDefaultSkeletonSharedObject(
     gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const result
   )
@@ -91,24 +67,62 @@ namespace
   }
 
   /**
-   * Address: 0x0054C520 (FUN_0054C520)
+   * Address: 0x0054DE50 (FUN_0054DE50)
    *
    * What it does:
-   * Reinitializes startup helper storage for `CAniDefaultSkel` construct lane
-   * callbacks and restore self-linked helper node pointers.
+   * Invokes the scalar deleting-destructor lane for a default skeleton object.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CAniDefaultSkelConstruct* InitializeCAniDefaultSkelConstructHelperStartupThunk()
+  void DeleteDefaultSkelObject(void* const object)
   {
-    InitializeHelperNode(gCAniDefaultSkelConstruct);
-    gCAniDefaultSkelConstruct.mSerConstructFunc =
-      reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDefaultSkeletonSharedObject);
-    gCAniDefaultSkelConstruct.mDeleteFunc = &DeleteDefaultSkelObject;
-    return &gCAniDefaultSkelConstruct;
+    if (object == nullptr) {
+      return;
+    }
+
+    auto* const scalarDeleteObject = static_cast<ScalarDeleteObject*>(object);
+    scalarDeleteObject->mVTable->mDeletingDtor(object, 1);
+  }
+
+  // Address: 0x010AC254 -- process-global `CAniDefaultSkelConstruct`
+  // singleton. Constructing it runs CAniDefaultSkelConstruct::
+  // CAniDefaultSkelConstruct() (0x00BC9900), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterConstructFunction() on it from within the first
+  // ReadArchive/WriteArchive construction.
+  moho::CAniDefaultSkelConstruct gCAniDefaultSkelConstruct;
+
+  /**
+   * Address: 0x00BF4570 (FUN_00BF4570)
+   *
+   * What it does:
+   * Unlinks the `CAniDefaultSkelConstruct` helper node from whatever
+   * intrusive list it currently sits in and restores a self-linked sentinel
+   * state. Registered by the real dynamic initializer (0x00BC9900) as the
+   * global's `atexit` teardown.
+   */
+  void CleanupCAniDefaultSkelConstruct()
+  {
+    gCAniDefaultSkelConstruct.ResetLinks();
   }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC9900 (FUN_00BC9900, dynamic initializer for the global
+   * `CAniDefaultSkelConstruct` singleton)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), binds the construct/delete callback fields, and
+   * registers process-exit cleanup.
+   */
+  CAniDefaultSkelConstruct::CAniDefaultSkelConstruct()
+    : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDefaultSkeletonSharedObject))
+    , mDeleteFunc(&DeleteDefaultSkelObject)
+  {
+    (void)std::atexit(&CleanupCAniDefaultSkelConstruct);
+  }
+
   /**
    * Address: 0x0054C550 (FUN_0054C550)
    *
