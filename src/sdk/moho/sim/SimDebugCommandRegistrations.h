@@ -521,6 +521,29 @@ namespace moho
   void register_DumpUnits_SimConFuncDef();
 
   /**
+   * Address: 0x00BDC140 (FUN_00BDC140, register_DebugSetPlayableRect_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `DebugSetPlayableRect` console alias and installs startup
+   * cleanup. All three strings are the binary's own, pushed at 0x00BDC140
+   * ("DoSimCommand DebugSetPlayableRect"), 0x00BDC145 ("DebugSetPlayableRect")
+   * and 0x00BDC14F ("Set the playable rect of the map (minX, minZ, maxX, maxZ).").
+   */
+  void register_DebugSetPlayableRect_ConAliasDef();
+
+  /**
+   * Address: 0x00BDC170 (FUN_00BDC170, register_DebugSetPlayableRect_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `DebugSetPlayableRect` sim command callback and installs
+   * startup cleanup. The store at 0x00BDC191
+   * (`mov SimConFunc_DebugSetPlayableRect.mFunc, offset Moho__Sim__DebugSetPlayableRect`)
+   * is the only reference to `Moho::Sim::DebugSetPlayableRect` anywhere in the
+   * image.
+   */
+  void register_DebugSetPlayableRect_SimConFuncDef();
+
+  /**
    * Address: 0x00BDC1B0 (FUN_00BDC1B0, register_DebugDumpArmyStats_ConAlias)
    *
    * What it does:

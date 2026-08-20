@@ -453,6 +453,18 @@ namespace
     return sCommand;
   }
 
+  [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetPlayableRect_slot()
+  {
+    static moho::CConAlias* sAlias = nullptr;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugSetPlayableRect_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
   [[nodiscard]] moho::CConAlias*& ConAlias_DebugDumpArmyStats_slot()
   {
     static moho::CConAlias* sAlias = nullptr;
@@ -640,6 +652,8 @@ namespace
       moho::register_TrackStats_SimConFuncDef();
       moho::register_DumpUnits_ConAliasDef();
       moho::register_DumpUnits_SimConFuncDef();
+      moho::register_DebugSetPlayableRect_ConAliasDef();
+      moho::register_DebugSetPlayableRect_SimConFuncDef();
       moho::register_DebugDumpArmyStats_ConAliasDef();
       moho::register_DebugDumpArmyStats_SimConFuncDef();
     }
@@ -1915,6 +1929,39 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C01270 (FUN_00C01270, sub_C01270)
+   *
+   * What it does:
+   * Clears the startup-owned `DebugSetPlayableRect` alias payload and
+   * unregisters the command binding. `_atexit`-installed by
+   * `register_DebugSetPlayableRect_ConAliasDef` at 0x00BDC159.
+   */
+  void cleanup_DebugSetPlayableRect_ConAlias()
+  {
+    if (CConAlias*& alias = ConAlias_DebugSetPlayableRect_slot(); alias != nullptr) {
+      alias->ShutdownRecovered();
+      delete alias;
+      alias = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00C012C0 (FUN_00C012C0, sub_C012C0)
+   *
+   * What it does:
+   * Destroys the startup-owned `DebugSetPlayableRect` sim-command callback
+   * object. `_atexit`-installed by `register_DebugSetPlayableRect_SimConFuncDef`
+   * at 0x00BDC182.
+   */
+  void cleanup_DebugSetPlayableRect_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_DebugSetPlayableRect_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
    * Address: 0x00C012D0 (FUN_00C012D0, cleanup_DebugDumpArmyStats_ConAlias)
    *
    * What it does:
@@ -2157,6 +2204,45 @@ namespace moho
       "DumpUnits"
     );
     RegisterAtexitCleanup<&cleanup_DumpUnits_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00BDC140 (FUN_00BDC140, register_DebugSetPlayableRect_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `DebugSetPlayableRect` console alias and installs startup
+   * cleanup. All three strings are the binary's own, pushed at 0x00BDC140
+   * ("DoSimCommand DebugSetPlayableRect"), 0x00BDC145
+   * ("DebugSetPlayableRect") and 0x00BDC14F
+   * ("Set the playable rect of the map (minX, minZ, maxX, maxZ).").
+   */
+  void register_DebugSetPlayableRect_ConAliasDef()
+  {
+    EnsureConAliasRegistration(
+      ConAlias_DebugSetPlayableRect_slot(),
+      "Set the playable rect of the map (minX, minZ, maxX, maxZ).",
+      "DebugSetPlayableRect",
+      "DoSimCommand DebugSetPlayableRect"
+    );
+    RegisterAtexitCleanup<&cleanup_DebugSetPlayableRect_ConAlias>();
+  }
+
+  /**
+   * Address: 0x00BDC170 (FUN_00BDC170, register_DebugSetPlayableRect_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `DebugSetPlayableRect` sim command callback and installs
+   * startup cleanup. 0x00BDC191 stores `Moho::Sim::DebugSetPlayableRect`
+   * (0x0075D5D0) into the descriptor's `mFunc` slot and is the only reference
+   * to that function anywhere in the image.
+   */
+  void register_DebugSetPlayableRect_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::DebugSetPlayableRect>(
+      SimConFunc_DebugSetPlayableRect_slot(),
+      "DebugSetPlayableRect"
+    );
+    RegisterAtexitCleanup<&cleanup_DebugSetPlayableRect_SimConFunc>();
   }
 
   /**

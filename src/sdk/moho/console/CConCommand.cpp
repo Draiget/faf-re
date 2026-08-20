@@ -20,6 +20,7 @@
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
+#include "moho/app/WEmitterWx.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/audio/IUserSoundManager.h"
@@ -3061,6 +3062,141 @@ void moho::CON_mesh_Rebatch(void* const commandArgs)
 
 namespace
 {
+  /**
+   * Address: 0x0066A2A0 (FUN_0066A2A0, sub_66A2A0)
+   *
+   * IDA signature:
+   * void __usercall sub_66A2A0(moho::ManagedWindowSlot *slot@<eax>, moho::WWinManagedFrame *frame@<ecx>);
+   *
+   * What it does:
+   * Rebinds one managed-window slot onto `frame`'s intrusive owner-chain head
+   * (`WWinManagedFrame::mManagedSlotsHead`, +0x178 - the `lea edx, [ecx+178h]`
+   * at 0x0066A2A4): returns immediately when the slot is already bound there,
+   * otherwise splices the slot out of whatever chain currently holds it and
+   * pushes it at the head of the new one. A null `frame` leaves the slot
+   * bound to nothing.
+   *
+   * This is the per-translation-unit emission the linker kept for
+   * `EFX_CreateEmitterWindow`'s scoped frame handle; the wx runtime carries
+   * its own sibling emission for the `managedWindows`/`managedFrames`
+   * registry vectors.
+   */
+  void RebindManagedWindowSlotToFrame(moho::ManagedWindowSlot& slot, moho::WWinManagedFrame* const frame) noexcept
+  {
+    moho::ManagedWindowSlot** const ownerHeadLink = frame != nullptr ? &frame->mManagedSlotsHead : nullptr;
+    if (slot.ownerHeadLink == ownerHeadLink) {
+      return;
+    }
+
+    if (slot.ownerHeadLink != nullptr) {
+      // 0x0066A2B8..0x0066A2CD: the detach walk assumes the slot really is in
+      // the chain its owner link names, exactly as the binary does.
+      moho::ManagedWindowSlot** link = slot.ownerHeadLink;
+      while (*link != &slot) {
+        link = &(*link)->nextInOwnerChain;
+      }
+      *link = slot.nextInOwnerChain;
+    }
+
+    slot.ownerHeadLink = ownerHeadLink;
+    if (ownerHeadLink == nullptr) {
+      slot.nextInOwnerChain = nullptr;
+      return;
+    }
+
+    slot.nextInOwnerChain = *ownerHeadLink;
+    *ownerHeadLink = &slot;
+  }
+
+  /**
+   * Scoped managed-window handle on one `WWinManagedFrame`.
+   *
+   * `EFX_CreateEmitterWindow` keeps its freshly built editor frame alive
+   * through a stack-local slot bound into the frame's own owner chain, and
+   * unlinks it again on the way out - including on unwind, which is what the
+   * function's SEH state-0 funclet at 0x00BAD130 does.
+   */
+  class ScopedManagedFrameHandle
+  {
+  public:
+    explicit ScopedManagedFrameHandle(moho::WWinManagedFrame* const frame) noexcept
+    {
+      RebindManagedWindowSlotToFrame(mSlot, frame);
+    }
+
+    ScopedManagedFrameHandle(const ScopedManagedFrameHandle&) = delete;
+    ScopedManagedFrameHandle& operator=(const ScopedManagedFrameHandle&) = delete;
+
+    ~ScopedManagedFrameHandle() noexcept
+    {
+      mSlot.UnlinkFromOwner();
+    }
+
+    /** 0x0066A00C..0x0066A01E: `ownerHeadLink - 0x178`, or null when unbound. */
+    [[nodiscard]] moho::WWinManagedFrame* Get() const noexcept
+    {
+      return moho::WWinManagedFrame::FromManagedSlotHeadLink(mSlot.ownerHeadLink);
+    }
+
+  private:
+    moho::ManagedWindowSlot mSlot{};
+  };
+
+  /**
+   * Resolves the first still-live `UserEntity` held by one session selection
+   * set, or null when the selection has none left.
+   *
+   * 0x00669F14..0x00669F58 runs the tombstone-pruning `find` twice: once to
+   * test the set against its head sentinel and once more to read the surviving
+   * node's weak owner-link slot back into an entity pointer.
+   */
+  [[nodiscard]] moho::UserEntity* FirstLiveSelectedUserEntity(moho::SSelectionSetUserEntity& selection)
+  {
+    if (selection.IsEmptyFromHeadFind()) {
+      return nullptr;
+    }
+
+    moho::SSelectionNodeUserEntity* liveNode = nullptr;
+    (void)moho::SSelectionSetUserEntity::find(&selection, selection.mHead->mLeft, &liveNode);
+    return liveNode != nullptr ? DecodeUserEntityFromSelectionSlot(liveNode->mEnt) : nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x00669EB0 (FUN_00669EB0, Moho::EFX_CreateEmitterWindow)
+ *
+ * IDA signature:
+ * void __cdecl Moho::EFX_CreateEmitterWindow(std::vector_string *commandArgs);
+ *
+ * What it does:
+ * `EFX_CreateEmitterWindow [boneName]` console command - see the declaration.
+ * The attach target is resolved before the arguments are even looked at
+ * (0x00669EDF..0x00669F58) and the attached form is only taken when the
+ * argument vector carries a bone-name token *and* that target survived; every
+ * other combination opens the free-standing editor at the same cursor world
+ * position.
+ */
+void moho::EFX_CreateEmitterWindow(void* const commandArgs)
+{
+  // 0x00669EDF: the binary loads the active-session global and dereferences it
+  // straight away - this command is only reachable from an in-session console.
+  CWldSession& session = *WLD_GetActiveSession();
+
+  const Wm3::Vector3f spawnPosition = session.CursorWorldPos;
+  UserEntity* const attachEntity = FirstLiveSelectedUserEntity(session.mSelection);
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+
+  WEmitterWx* const editor = (args.Count() > 1u && attachEntity != nullptr)
+    ? new WEmitterWx(attachEntity, spawnPosition, args.At(1u)->c_str())
+    : new WEmitterWx(nullptr, spawnPosition, nullptr);
+
+  const ScopedManagedFrameHandle editorHandle(editor);
+  (void)editorHandle.Get()->Show(true);
+}
+
+namespace
+{
   int RunConTextMatchesLuaCallback(LuaPlus::LuaState* const state)
   {
     if (state == nullptr || state->m_state == nullptr) {
@@ -3475,6 +3611,8 @@ namespace
     "Issue a fixed unit command (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) to the current selection.";
   constexpr const char* kConsoleStartupConMeshRebatchDescription =
     "Toggle hardware mesh-batching capability flags (instancing, float16) and rebuild mesh render state.";
+  /// 0x00F59EDC, the `.data` initializer of `Moho::CConFunc_EFX_CreateEmitterWindow`.
+  constexpr const char* kConsoleStartupConEfxCreateEmitterWindowDescription = "Create emitter control window";
   constexpr const char* kConsoleStartupConP4EditDescription = "Perforce edit bridge command (unsupported in this build).";
   constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
     "Perforce opened-for-edit query command (unsupported in this build).";
@@ -3523,6 +3661,7 @@ namespace
   CConFunc gCConFunc_RenameUnit{};
   CConFunc gCConFunc_IssueCommand{};
   CConFunc gCConFunc_mesh_Rebatch{};
+  CConFunc gCConFunc_EFX_CreateEmitterWindow{};
   CConFunc gCConFunc_p4_Edit{};
   CConFunc gCConFunc_p4_IsOpenedForEdit{};
   CConFunc gCConFunc_exit{};
@@ -3683,6 +3822,39 @@ namespace moho
       "mesh_Rebatch",
       &moho::CON_mesh_Rebatch,
       &cleanup_CConFunc_mesh_Rebatch
+    );
+  }
+
+  /**
+   * Address: 0x00BFBF50 (FUN_00BFBF50, ??1CConFunc_EFX_CreateEmitterWindow@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `EFX_CreateEmitterWindow`.
+   */
+  void cleanup_CConFunc_EFX_CreateEmitterWindow()
+  {
+    CleanupStartupConCommand(gCConFunc_EFX_CreateEmitterWindow);
+  }
+
+  /**
+   * Address: 0x00BD44C0 (FUN_00BD44C0, register_CConFunc_EFX_CreateEmitterWindow)
+   *
+   * What it does:
+   * Registers the startup console callback for `EFX_CreateEmitterWindow`. The
+   * store `Moho__CConFunc_EFX_CreateEmitterWindow.mFunc = offset
+   * Moho__EFX_CreateEmitterWindow` at 0x00BD44E0 is the only reference to
+   * `Moho::EFX_CreateEmitterWindow` anywhere in the image. Name and
+   * description are the `.data` initializers the global already carries at
+   * `+0x04`/`+0x08` (0x00F59ED8 / 0x00F59EDC).
+   */
+  void register_CConFunc_EFX_CreateEmitterWindow()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_EFX_CreateEmitterWindow,
+      kConsoleStartupConEfxCreateEmitterWindowDescription,
+      "EFX_CreateEmitterWindow",
+      &moho::EFX_CreateEmitterWindow,
+      &cleanup_CConFunc_EFX_CreateEmitterWindow
     );
   }
 
@@ -5277,6 +5449,7 @@ namespace
       moho::register_CConFunc_BeginLoggingStats();
       moho::register_CConFunc_EndLoggingStats();
       moho::register_CConFunc_mesh_Rebatch();
+      moho::register_CConFunc_EFX_CreateEmitterWindow();
       moho::register_CConFunc_p4_Edit();
       moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();

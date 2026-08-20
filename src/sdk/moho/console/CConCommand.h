@@ -893,6 +893,22 @@ namespace moho
   void CON_mesh_Rebatch(void* commandArgs);
 
   /**
+   * Address: 0x00669EB0 (FUN_00669EB0, Moho::EFX_CreateEmitterWindow)
+   *
+   * IDA signature:
+   * void __cdecl Moho::EFX_CreateEmitterWindow(std::vector_string *commandArgs);
+   *
+   * What it does:
+   * `EFX_CreateEmitterWindow [boneName]` console command. Opens one
+   * "Emitter Editor" (`WEmitterWx`) frame at the world session's current
+   * cursor world position. When a bone name is given *and* the session
+   * selection still holds a live user entity, the editor is attached to that
+   * entity's bone; otherwise it is opened free-standing. The frame is then
+   * shown through a scoped managed-window handle.
+   */
+  void EFX_CreateEmitterWindow(void* commandArgs);
+
+  /**
    * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
    * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
    *
