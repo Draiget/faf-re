@@ -1560,6 +1560,19 @@ namespace msvc8
          * Address: 0x005EA3F0 (FUN_005EA3F0, SEH-wrapped entry lane)
          * Address: 0x005EAF30 (FUN_005EAF30, msvc8::vector<Moho::SAiReservedTransportBone>::resize)
          * Address: 0x005EA590 (FUN_005EA590, grow/insert-tail helper)
+         * Address: 0x005A0740 (FUN_005A0740, msvc8::vector<Moho::WeakPtr<Moho::CUnitCommand>>::resize
+         * — specialized "resize from empty" fast path: unconditionally allocates a
+         * fresh `newSize`-element block with no prior-buffer check, matching this
+         * method's grow branch when `cur == 0`. Every real call site reaches it with
+         * a genuinely empty destination: `CopyWeakPtrCUnitCommandVector`'s own
+         * `destination.resize(sourceSize)` call is only ever made on a freshly
+         * constructed local vector or one just emptied by
+         * `ResetWeakPtrCUnitCommandVectorStorage` (see
+         * `CFactoryBuildTask.cpp`'s `SnapshotFactoryCommandQueue`, which resets
+         * `commands` between its two copy calls for exactly this reason) —
+         * `CopyWeakPtrCUnitCommandVector` is itself called from
+         * `CFactoryBuildTask::InheritQueuedCommandsTo`, `CUnitFerryTask::GetUnitCommands`,
+         * and `ReplaceWithRouteCommandsIfAny`)
          *
          * What it does:
          * Resizes logical element count to `newSize` by erasing tail elements when
