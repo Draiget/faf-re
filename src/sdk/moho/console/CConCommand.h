@@ -810,6 +810,17 @@ namespace moho
   void CON_DumpPreloadedTextures(void* commandArgs);
 
   /**
+   * Address: 0x007EC220 (FUN_007EC220, Moho::CON_mesh_Rebatch)
+   *
+   * What it does:
+   * `mesh_Rebatch <allowInstancing> <allowFloat16>` console command. Sets the
+   * two hardware-mesh-batching capability flags from the literal token
+   * `"true"` (anything else clears the flag), forces the hardware vertex
+   * formatter to re-resolve, and resets the mesh renderer.
+   */
+  void CON_mesh_Rebatch(void* commandArgs);
+
+  /**
    * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
    * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
    *

@@ -31,6 +31,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_String.h"
+#include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/IConOutputHandler.h"
 #include "moho/misc/Stats.h"
@@ -2568,6 +2569,41 @@ void moho::CON_DumpPreloadedTextures(void* const commandArgs)
   stream.VirtClose(gpg::Stream::ModeBoth);
 }
 
+// `gpg::gal::sMeshAllowInstancing`/`sMeshAllowFloat16`
+// (gpg/gal/backends/d3d9/D3D9Interfaces.cpp) - the binary's `mesh_Rebatch`
+// body writes these two bytes directly, not through an accessor, so this TU
+// needs the same direct access. No owning header exists for the D3D9 backend
+// TU's globals yet, so they are declared `extern` here where they are
+// written, matching the pattern already used elsewhere in this codebase for
+// globals without a home header.
+namespace gpg::gal
+{
+  extern std::uint8_t sMeshAllowFloat16;
+  extern std::uint8_t sMeshAllowInstancing;
+} // namespace gpg::gal
+
+/**
+ * Address: 0x007EC220 (FUN_007EC220, Moho::CON_mesh_Rebatch)
+ *
+ * What it does:
+ * `mesh_Rebatch <allowInstancing> <allowFloat16>` console command - see the
+ * declaration.
+ */
+void moho::CON_mesh_Rebatch(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() != 3u) {
+    CON_Printf("usage: mesh_Rebatch [allowInstancing] [allowFloat16]");
+    return;
+  }
+
+  gpg::gal::sMeshAllowInstancing = TokenEq(args.At(1), "true") ? 1U : 0U;
+  gpg::gal::sMeshAllowFloat16 = TokenEq(args.At(2), "true") ? 1U : 0U;
+
+  REN_ResetHardwareVertexFormatter();
+  MeshRenderer::GetInstance()->Reset();
+}
+
 namespace
 {
   int RunConTextMatchesLuaCallback(LuaPlus::LuaState* const state)
@@ -2967,6 +3003,8 @@ namespace
   constexpr const char* kConsoleStartupConCreatePropDescription = "Spawn one prop at cursor world position.";
   constexpr const char* kConsoleStartupConIssueCommandDescription =
     "Issue a fixed unit command (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) to the current selection.";
+  constexpr const char* kConsoleStartupConMeshRebatchDescription =
+    "Toggle hardware mesh-batching capability flags (instancing, float16) and rebuild mesh render state.";
   constexpr const char* kConsoleStartupConP4EditDescription = "Perforce edit bridge command (unsupported in this build).";
   constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
     "Perforce opened-for-edit query command (unsupported in this build).";
@@ -3007,6 +3045,7 @@ namespace
   CConFunc gCConFunc_DebugClearBuildTemplates{};
   CConFunc gCConFunc_CreateProp{};
   CConFunc gCConFunc_IssueCommand{};
+  CConFunc gCConFunc_mesh_Rebatch{};
   CConFunc gCConFunc_p4_Edit{};
   CConFunc gCConFunc_p4_IsOpenedForEdit{};
   CConFunc gCConFunc_exit{};
@@ -3138,6 +3177,36 @@ namespace moho
   void cleanup_CConFunc_p4_Edit()
   {
     CleanupStartupConCommand(gCConFunc_p4_Edit);
+  }
+
+  /**
+   * Address: 0x00C03F00 (FUN_00C03F00, ??1CConFunc_mesh_Rebatch@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `mesh_Rebatch`.
+   */
+  void cleanup_CConFunc_mesh_Rebatch()
+  {
+    CleanupStartupConCommand(gCConFunc_mesh_Rebatch);
+  }
+
+  /**
+   * Address: 0x00BE0A20 (FUN_00BE0A20, register_CConFunc_mesh_Rebatch)
+   *
+   * What it does:
+   * Registers startup console callback for `mesh_Rebatch`. The store
+   * `Moho__CConFunc_mesh_Rebatch.mFunc = offset Moho__CON_mesh_Rebatch` is the
+   * only reference to `Moho::CON_mesh_Rebatch` anywhere in the image.
+   */
+  void register_CConFunc_mesh_Rebatch()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_mesh_Rebatch,
+      kConsoleStartupConMeshRebatchDescription,
+      "mesh_Rebatch",
+      &moho::CON_mesh_Rebatch,
+      &cleanup_CConFunc_mesh_Rebatch
+    );
   }
 
   /**
@@ -4498,6 +4567,7 @@ namespace
       moho::register_CConFunc_ClearStats();
       moho::register_CConFunc_BeginLoggingStats();
       moho::register_CConFunc_EndLoggingStats();
+      moho::register_CConFunc_mesh_Rebatch();
       moho::register_CConFunc_p4_Edit();
       moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();
