@@ -35010,6 +35010,32 @@ void wxWindowMswRuntime::DoClientToScreen(std::int32_t* const x, std::int32_t* c
 }
 
 /**
+ * Address: 0x00967C40 (FUN_00967C40, wxWindow::ScrollWindow)
+ *
+ * What it does:
+ * Scrolls the native window's contents by `(dx, dy)` via `::ScrollWindow`,
+ * restricted to `rect` if given, else the whole client area.
+ */
+void wxWindowMswRuntime::ScrollWindow(const std::int32_t dx, const std::int32_t dy, const void* const rect)
+{
+  RECT winRect{};
+  RECT* winRectPtr = nullptr;
+
+  if (rect != nullptr) {
+    const auto* const wxr = static_cast<const wxRect*>(rect);
+    winRect.left = wxr->x;
+    winRect.top = wxr->y;
+    winRect.right = wxr->x + wxr->width;
+    winRect.bottom = wxr->y + wxr->height;
+    winRectPtr = &winRect;
+  }
+
+  ::ScrollWindow(
+    reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle())), dx, dy, winRectPtr, winRectPtr
+  );
+}
+
+/**
  * Address: 0x0042B830 (FUN_0042B830)
  * Mangled: ?ContainsHWND@wxWindow@@UBE_NK@Z
  *
