@@ -20,8 +20,10 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/containers/BVIntSet.h"
+#include "moho/containers/BVSet.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/mesh/Mesh.h"
@@ -33,6 +35,8 @@
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/command/CommandManager.h"
+#include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/IClientManager.h"
@@ -1440,6 +1444,15 @@ namespace moho
     friend void DrawPathPreview(
       UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick,
       float tickFraction
+    );
+
+    /**
+     * `func_ProcessCommandDrag` (0x00829B40, `UICommandDragger::DragMove`/
+     * `DragRelease`'s worker in UiRuntimeTypes.cpp) needs `mSession` and
+     * `mMapAB0` plus the hash primitives below.
+     */
+    friend void ProcessCommandDrag(
+      const Wm3::Vector3f& mouse, UICommandGraph& graph, CmdId cmdId, bool released
     );
 
     /**
@@ -8439,12 +8452,23 @@ namespace moho
     {
       std::uint8_t mUnknown00_03[0x04]{};
       std::int32_t mEntryType = 0; // +0x04
-      std::uint8_t mUnknown08_23[0x1C]{};
+      // Per-entry relation tree `sub_8B4300` looks `mRelationLookupKey` up in
+      // (0x008B435F/0x008B4389: `eax = tree + 8`, `sub_82CEA0` reads
+      // `*(eax+4)` as the tree's own head pointer - a `WeakEntitySetUserEntity`
+      // proxy/head/size triple). See `CommandGraphAnchorHistoryRuntimeView::
+      // mRelationLookupKey`'s doc comment for the same "shape confirmed,
+      // semantic id not confirmed" caveat.
+      WeakEntitySetUserEntity mRelationTree{}; // +0x08
+      std::uint8_t mUnknown14_23[0x10]{};
       CommandGraphAnchorSampleRuntimeView mAnchorSample{}; // +0x24
     };
     static_assert(
       offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mEntryType) == 0x04,
       "CommandGraphAnchorHistoryEntryRuntimeView::mEntryType offset must be 0x04"
+    );
+    static_assert(
+      offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mRelationTree) == 0x08,
+      "CommandGraphAnchorHistoryEntryRuntimeView::mRelationTree offset must be 0x08"
     );
     static_assert(
       offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mAnchorSample) == 0x24,
@@ -8453,17 +8477,45 @@ namespace moho
 
     struct CommandGraphAnchorHistoryRuntimeView
     {
-      std::uint8_t mUnknown00_5B[0x5C]{};
+      std::uint8_t mUnknown00_3F[0x40]{};
+      // `sub_8B4300`'s fallback path (ring holds neither a type-0 nor a
+      // type-3 entry) scans this `[begin, end)` run of entity ids
+      // (0x008B4300-0x008B430A read `this+0x40`/`this+0x44` directly, before
+      // the ring-scan setup at `this+0xB8` even runs) for the candidate's own
+      // `UserEntity::mParams.mEntityId`.
+      const std::int32_t* mFallbackIdRunBegin = nullptr; // +0x40
+      const std::int32_t* mFallbackIdRunEnd = nullptr;   // +0x44
+      std::uint8_t mUnknown48_5B[0x14]{};
       CommandGraphAnchorSampleRuntimeView mFallbackSample{}; // +0x5C
-      std::uint8_t mUnknown74_BB[0x48]{};
+      std::uint8_t mUnknown74_B8[0x44]{};
+      // Search key `sub_8B4300` (`IsCandidateExcludedByCachedRelation` below)
+      // looks up in each history entry's own per-entry relation tree
+      // (0x008B430A/0x008B4310: `ebx = this + 0xB8`, then `*ebx` is forwarded
+      // unchanged through `sub_82B450`/`sub_82C2E0` as the lower-bound search
+      // key). The tree-walk shape is confirmed against `SSelectionNodeUserEntity`
+      // node-for-node; what this specific id counts (army? viewing-player?) is
+      // not independently confirmed.
+      std::uint32_t mRelationLookupKey = 0; // +0xB8
       CommandGraphAnchorHistoryEntryRuntimeView** mEntries = nullptr; // +0xBC
       std::uint32_t mEntryBase = 0; // +0xC0
       std::uint32_t mEntryStart = 0; // +0xC4
       std::uint32_t mEntryCount = 0; // +0xC8
     };
     static_assert(
+      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackIdRunBegin) == 0x40,
+      "CommandGraphAnchorHistoryRuntimeView::mFallbackIdRunBegin offset must be 0x40"
+    );
+    static_assert(
+      offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackIdRunEnd) == 0x44,
+      "CommandGraphAnchorHistoryRuntimeView::mFallbackIdRunEnd offset must be 0x44"
+    );
+    static_assert(
       offsetof(CommandGraphAnchorHistoryRuntimeView, mFallbackSample) == 0x5C,
       "CommandGraphAnchorHistoryRuntimeView::mFallbackSample offset must be 0x5C"
+    );
+    static_assert(
+      offsetof(CommandGraphAnchorHistoryRuntimeView, mRelationLookupKey) == 0xB8,
+      "CommandGraphAnchorHistoryRuntimeView::mRelationLookupKey offset must be 0xB8"
     );
     static_assert(
       offsetof(CommandGraphAnchorHistoryRuntimeView, mEntries) == 0xBC,
@@ -8605,6 +8657,368 @@ namespace moho
       }
     }
 
+    /**
+     * Shared entity weak-link insert/remove, matching `LinkWeakEntityOwner`/
+     * `UnlinkWeakEntityOwner` (UserUnit.cpp, internal linkage there - not
+     * reachable from this TU) field-for-field. Used below by both
+     * `ResolveCommandTargetEntityFromAnchorHistory`'s transient-sample
+     * teardown and `ProcessCommandDrag`'s new-target construction.
+     */
+    void LinkEntityWeakRef(UserEntity* const entity, SSelectionWeakRefUserEntity& weakRef) noexcept
+    {
+      weakRef.mOwnerLinkSlot = nullptr;
+      weakRef.mNextOwner = nullptr;
+      if (entity == nullptr) {
+        return;
+      }
+
+      auto** const ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
+      weakRef.mOwnerLinkSlot = ownerLinkSlot;
+      weakRef.mNextOwner = *ownerLinkSlot;
+      *ownerLinkSlot = &weakRef;
+    }
+
+    void UnlinkEntityWeakRef(SSelectionWeakRefUserEntity& weakRef) noexcept
+    {
+      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
+      if (ownerLinkSlot != nullptr) {
+        while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
+          ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
+        }
+        if (*ownerLinkSlot == &weakRef) {
+          *ownerLinkSlot = weakRef.mNextOwner;
+        }
+      }
+      weakRef.mOwnerLinkSlot = nullptr;
+      weakRef.mNextOwner = nullptr;
+    }
+
+    /**
+     * Address: 0x00824550 (FUN_00824550, sub_824550)
+     *
+     * Misclassified `external_dependency` by an earlier automated pass (its
+     * sole callee `sub_8B4080` walks the helper's own event-ring fields, not
+     * external runtime state - same misclassification family as the
+     * `mMapAB0` hash-subsystem thunks landed earlier this session).
+     *
+     * What it does:
+     * Resolves one command's live target entity from its command-graph
+     * anchor history (falling back to its cached default anchor sample when
+     * the history holds no build-position entry via
+     * `ResolveCommandGraphAnchorSampleFromHistory`), then unlinks the
+     * transient local sample from whatever weak-entity chain the lookup
+     * joined it to before returning the resolved entity. Sole caller is
+     * `func_ProcessCommandDrag` (0x00829B40).
+     */
+    [[nodiscard]] UserEntity* ResolveCommandTargetEntityFromAnchorHistory(
+      CommandGraphAnchorHistoryRuntimeView* const history
+    ) noexcept
+    {
+      CommandGraphAnchorSampleRuntimeView sample{};
+      (void)ResolveCommandGraphAnchorSampleFromHistory(&sample, history);
+
+      UserEntity* const entity = (sample.mSampleKind == 1) ? DecodeSelectedUserEntity(sample.mWeakRef) : nullptr;
+
+      UnlinkEntityWeakRef(sample.mWeakRef);
+
+      return entity;
+    }
+
+    /**
+     * Address: 0x0082E560 (FUN_0082E560, sub_82E560)
+     *
+     * What it does:
+     * Standard red-black-tree lower-bound walk over a `WeakEntitySetUserEntity`
+     * tree: returns the first node whose key is `>= key`, or the tree's own
+     * sentinel head when no such node exists. Node shape (mLeft/mParent/mRight,
+     * key at +0xC, `mIsSentinel` at +0x19) matches `SSelectionNodeUserEntity`
+     * exactly - this is the same node layout `WeakEntitySet.h` already models,
+     * just walked for nearest-match rather than exact-match (contrast
+     * `FindWeakEntitySetNodeByKey` in UserUnit.cpp, an exact-match walk over
+     * the same node shape).
+     */
+    [[nodiscard]] SSelectionNodeUserEntity* LowerBoundWeakEntitySetNode(
+      const WeakEntitySetUserEntity& tree, const std::uint32_t key
+    ) noexcept
+    {
+      SSelectionNodeUserEntity* const head = tree.mHead;
+      SSelectionNodeUserEntity* candidate = head;
+      SSelectionNodeUserEntity* node = head->mParent;
+      while (node->mIsSentinel == 0u) {
+        if (key <= node->mKey) {
+          candidate = node;
+          node = node->mLeft;
+        } else {
+          node = node->mRight;
+        }
+      }
+      return (candidate == head || key < candidate->mKey) ? head : candidate;
+    }
+
+    /**
+     * Address: 0x008B4300 (FUN_008B4300, sub_8B4300) plus the scoped map
+     * lookup it calls per matching ring entry, `sub_82CEA0` (0x0082CEA0),
+     * which itself wraps the lower-bound walk above (`sub_82E560`).
+     * Misclassified `external_dependency`/`owner_layout` by earlier automated
+     * passes for the same reason as `ResolveCommandTargetEntityFromAnchorHistory`.
+     *
+     * `sub_82CEA0`'s own body additionally threads a transient weak node
+     * through `candidateUnit`'s own link chain around the lookup
+     * (0x0082CEB2-0x0082CF11: insert before, splice out after). Nothing else
+     * runs between the insert and the splice-out in this single-threaded
+     * call, so the chain membership is never observable from outside
+     * `sub_82CEA0` itself; this recovery omits it as behaviorally inert.
+     *
+     * What it does:
+     * Scans `history`'s cached command-issue event ring from newest to
+     * oldest (same ring `ResolveCommandTargetEntityFromAnchorHistory` walks)
+     * for the first entry tagged type `0` or type `3`; for that entry, looks
+     * `history.mRelationLookupKey` up in the entry's own per-entry relation
+     * tree (`LowerBoundWeakEntitySetNode`) and returns whether the lookup
+     * came up empty (`true` = exclude the candidate). See
+     * `CommandGraphAnchorHistoryRuntimeView::mRelationLookupKey`'s doc
+     * comment: the lookup shape is confirmed, the exact game-rule the key
+     * encodes is not. When the ring holds neither event type, falls back to
+     * a direct membership scan of `history.mFallbackIdRunBegin/End` against
+     * `candidateUnit->mParams.mEntityId`.
+     */
+    [[nodiscard]] bool IsCandidateExcludedByCachedRelation(
+      CommandGraphAnchorHistoryRuntimeView& history, UserUnit* const candidateUnit
+    ) noexcept
+    {
+      std::uint32_t cursor = history.mEntryStart + history.mEntryCount;
+      while (cursor != history.mEntryStart) {
+        const std::uint32_t previousCursor = cursor - 1u;
+        std::uint32_t ringIndex = previousCursor;
+        if (history.mEntryBase <= previousCursor) {
+          ringIndex = previousCursor - history.mEntryBase;
+        }
+        cursor = previousCursor;
+
+        CommandGraphAnchorHistoryEntryRuntimeView* const entry = history.mEntries[ringIndex];
+        const std::int32_t entryType = entry->mEntryType;
+        if (entryType != 0 && entryType != 3) {
+          continue;
+        }
+
+        // 0x008B4370/0x008B439A: the binary runs this exact lookup (same tree,
+        // same key) twice per entry - once as an immediate-exclude gate only
+        // reachable for type 0 (0x008B434A: type 3 jumps straight past it via
+        // loc_8B4375), once as the shared found/not-found gate both types share.
+        // Nothing observable happens between the two calls (see this function's
+        // own doc comment on sub_82CEA0's inert scope-guard dance), so both reads
+        // are provably identical; computed once here instead of twice.
+        const bool foundInRelationTree =
+          LowerBoundWeakEntitySetNode(entry->mRelationTree, history.mRelationLookupKey) !=
+          entry->mRelationTree.mHead;
+
+        if (entryType == 0 && foundInRelationTree) {
+          return true; // immediate exclude (0x008B43AB)
+        }
+        if (foundInRelationTree) {
+          return false; // found on the shared gate: stop scanning, don't exclude (0x008B439F)
+        }
+        // not found: keep scanning older ring entries (0x008B439D -> loc_8B4320)
+      }
+
+      // Matches "return i != v15": excludes the candidate when its entity id
+      // *is* present in the fallback id run (not when it's absent).
+      for (const std::int32_t* idCursor = history.mFallbackIdRunBegin; idCursor != history.mFallbackIdRunEnd;
+           ++idCursor) {
+        if (*idCursor == candidateUnit->mParams.mEntityId) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+  } // namespace
+
+  /**
+   * Address: 0x00829B40 (FUN_00829B40, func_ProcessCommandDrag)
+     *
+     * What it does:
+     * The click-and-drag command redirect keystone both `UICommandDragger::
+     * DragMove` and `DragRelease` (UiRuntimeTypes.h/.cpp) funnel into. Looks
+     * the dragged command's live helper up by id; if the mouse position is
+     * invalid or the command isn't found, does nothing. Otherwise updates
+     * (or creates) the command's `mMapAB0` draw-node with the current mouse
+     * position (keyed by the helper's own pointer identity - see
+     * `sub_82C2E0`'s asm), and, for a factory-build command
+     * (`ResolveCommandIssueHelperCommandType == 8`) whose draw node was
+     * already resolved, re-validates build placement via
+     * `USERUNIT_CanBeBuiltAt` and updates the node's visibility flag
+     * (honoring `CWldSession::mShowInvalidBuildPlacementPreview`'s
+     * override). On release, unless the drag just ended over an invalid
+     * build placement, dispatches the new target: when the command already
+     * follows a live cached target entity
+     * (`ResolveCommandTargetEntityFromAnchorHistory`), searches nearby
+     * collected entities for the closest live unit sharing the cached
+     * target's army and not excluded by `IsCandidateExcludedByCachedRelation`,
+     * and issues that entity as the new target; otherwise, for a live
+     * factory-build command, snaps to the blueprint's resolved-footprint
+     * world position; otherwise clamps the raw mouse position to the map's
+     * playable rect and issues that as a `Position` target. All three paths
+     * converge on `Moho::ISSUE_SetCommandTarget`.
+     */
+    void ProcessCommandDrag(
+      const Wm3::Vector3f& mouse, UICommandGraph& graph, const CmdId cmdId, const bool released
+    )
+    {
+      CommandManager* const commandManager = graph.mSession->mCommandManager;
+
+      UserCommandIssueHelper* helper = nullptr;
+      if (const auto found = commandManager->mCommands.find(cmdId); found != commandManager->mCommands.end()) {
+        helper = found->second;
+      }
+      if (helper == nullptr) {
+        return;
+      }
+
+      if (!IsValidVector3f(mouse)) {
+        return;
+      }
+
+      // mMapAB0's draw-node hash is keyed by the helper's own pointer
+      // identity, not its command id (0x0082C2E3: sub_82C2E0 dereferences
+      // its "key" arg once via [esi]; this function's own call passes
+      // &result where result held the helper pointer's raw value).
+      const auto drawNodeKey = reinterpret_cast<std::uint32_t>(helper);
+
+      bool suppressDispatch = false;
+      if (UICommandGraph::CountHashListNode88(graph.mMapAB0, drawNodeKey) != 0) {
+        UICommandGraph::UICommandGraphDrawNode* const drawNode =
+          UICommandGraph::FindOrInsertCommandGraphDrawNode(drawNodeKey, graph.mMapAB0);
+
+        drawNode->mPositionSum = mouse;
+        drawNode->mWeight = 1.0f;
+
+        if (drawNode->mHasResolvedPosition != 0 &&
+            ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(8)) {
+          if (const REntityBlueprint* const genericBlueprint = helper->mConstantData.blueprint;
+              genericBlueprint != nullptr) {
+            gpg::RRef blueprintRef{};
+            (void)gpg::RRef_REntityBlueprint(&blueprintRef, const_cast<REntityBlueprint*>(genericBlueprint));
+            const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(blueprintRef, RUnitBlueprint::StaticGetClass());
+            if (unitBlueprintRef.mObj != nullptr) {
+              const auto* const unitBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
+              const float inverseWeight = 1.0f / drawNode->mWeight;
+              const SCoordsVec2 buildCenter{
+                drawNode->mPositionSum.x * inverseWeight, drawNode->mPositionSum.z * inverseWeight
+              };
+              SOccupationResult buildInfo{};
+              const bool canBuild = USERUNIT_CanBeBuiltAt(
+                *graph.mSession, unitBlueprint, buildCenter, false, &buildInfo,
+                reinterpret_cast<const UserCommand*>(helper)
+              );
+              drawNode->mIsVisible = (canBuild || !graph.mSession->mShowInvalidBuildPlacementPreview) ? 1u : 0u;
+            }
+          }
+        }
+
+        const bool wasInvalidPlacement = (drawNode->mIsVisible == 0);
+        drawNode->mHasResolvedPosition = released ? 0u : 1u;
+        if (wasInvalidPlacement && released) {
+          suppressDispatch = true;
+        }
+      }
+
+      if (!released || suppressDispatch) {
+        return;
+      }
+
+      if (UserEntity* const cachedTargetEntity = ResolveCommandTargetEntityFromAnchorHistory(
+            reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper)
+          );
+          cachedTargetEntity != nullptr) {
+        // Cached-target reacquire: search nearby collected entities for the
+        // closest live unit sharing the cached target's army.
+        gpg::fastvector<UserEntity*> candidates{};
+        auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(graph.mSession->GetEntitySpatialDbStorage());
+        (void)spatialDb->Collect(candidates, ENTITYTYPE_Unit);
+
+        UserEntity* closest = nullptr;
+        float closestDistanceSq = std::numeric_limits<float>::infinity();
+        for (UserEntity* const candidate : candidates) {
+          if (candidate == nullptr || candidate->IsBeingBuilt()) {
+            continue;
+          }
+
+          if (UserUnit* const candidateUnit = candidate->IsUserUnit(); candidateUnit != nullptr) {
+            auto& anchorHistory = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView&>(*helper);
+            if (IsCandidateExcludedByCachedRelation(anchorHistory, candidateUnit)) {
+              continue;
+            }
+          }
+
+          if (candidate->mArmy != cachedTargetEntity->mArmy) {
+            continue;
+          }
+
+          const Wm3::Vec3f& candidatePos = candidate->mVariableData.mCurTransform.pos_;
+          const float deltaX = mouse.x - candidatePos.x;
+          const float deltaZ = mouse.z - candidatePos.z;
+          const float distanceSq = (deltaX * deltaX) + (deltaZ * deltaZ);
+          if (distanceSq < closestDistanceSq) {
+            closestDistanceSq = distanceSq;
+            closest = candidate;
+          }
+        }
+
+        if (closest != nullptr) {
+          UserCommandTargetView entityTarget{};
+          entityTarget.targetType = UserTargetType::Entity;
+          LinkEntityWeakRef(closest, reinterpret_cast<SSelectionWeakRefUserEntity&>(entityTarget.targetEntity));
+          ISSUE_SetCommandTarget(helper, entityTarget);
+          UnlinkEntityWeakRef(reinterpret_cast<SSelectionWeakRefUserEntity&>(entityTarget.targetEntity));
+        }
+        return;
+      }
+
+      const REntityBlueprint* const genericBlueprint = helper->mConstantData.blueprint;
+      if (ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(8) &&
+          genericBlueprint != nullptr) {
+        // Factory-build command: snap to the blueprint's resolved-footprint
+        // world position.
+        gpg::RRef blueprintRef{};
+        (void)gpg::RRef_REntityBlueprint(&blueprintRef, const_cast<REntityBlueprint*>(genericBlueprint));
+        const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(blueprintRef, RUnitBlueprint::StaticGetClass());
+        const auto* const unitBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
+        const SFootprint* const footprint =
+          (unitBlueprint != nullptr) ? unitBlueprint->Physics.ResolvedFootprint : nullptr;
+        if (footprint != nullptr) {
+          const STIMap* const map =
+            reinterpret_cast<STIMap*>(graph.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
+          const SOCellPos cell = footprint->ToCellPos(mouse);
+          const Wm3::Vector3f worldPos = COORDS_ToWorldPos(map, cell, LAYER_None, 1, 1);
+
+          UserCommandTargetView positionTarget{};
+          positionTarget.targetType = UserTargetType::Position;
+          positionTarget.position = worldPos;
+          ISSUE_SetCommandTarget(helper, positionTarget);
+        }
+        return;
+      }
+
+      // Default: clamp the raw mouse position to the map's playable rect and
+      // issue it as a `Position` target.
+      const STIMap* const map = reinterpret_cast<STIMap*>(graph.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
+      Wm3::Vector3f clampedPos = mouse;
+      clampedPos.x = std::clamp(
+        clampedPos.x, static_cast<float>(map->mPlayableRect.x0 + 1), static_cast<float>(map->mPlayableRect.x1 - 1)
+      );
+      clampedPos.z = std::clamp(
+        clampedPos.z, static_cast<float>(map->mPlayableRect.z0 + 1), static_cast<float>(map->mPlayableRect.z1 - 1)
+      );
+
+      UserCommandTargetView positionTarget{};
+      positionTarget.targetType = UserTargetType::Position;
+      positionTarget.position = clampedPos;
+      ISSUE_SetCommandTarget(helper, positionTarget);
+    }
+
+  namespace
+  {
     /**
      * Alias of FUN_008BED50.
      *
@@ -12890,6 +13304,195 @@ namespace moho
     for (int remaining = count; remaining > 0; --remaining) {
       ISSUE_Command(selectedUnits, commandIssueData, false);
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // PART B (authored, NOT committed - see task instructions): the
+  // ISSUE_FactoryCommand / ISSUE_RemoveLastCommand / ISSUE_RemoveCommandFromUnitQueue
+  // family. Their real callers are Moho::SCommandModeData::HandleEvent
+  // (0x0081FCD0) and Moho::CUIWorldView::HandleEvent (0x008704B0), both still
+  // blocked, so wiring these in now would create source-level orphans.
+  // Left here uncommitted for the orchestrator to fold into the eventual
+  // unification pass once a caller lands.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Address: 0x008B5B50 (FUN_008B5B50, struct_CommandManager::NextCmdId)
+   *
+   * Recovered in Sim.cpp as a file-scope helper (no header declaration, so
+   * it cannot be called from this translation unit as written - same
+   * cross-TU gap as `func_OnCommandDragEnd`/moho/ui/CommandDragger.cpp).
+   * Declared here to document the real call `ISSUE_FactoryCommand` makes.
+   * Allocates one next command low-id from the manager's id-pool (released
+   * set first, then sequential cursor), packs the active source byte into
+   * the high byte, and writes the result to `outCommandId` (also returned).
+   */
+  [[nodiscard]] std::uint32_t* AllocatePackedCommandIdFromManager(
+    CommandManager* commandManager, std::uint32_t* outCommandId
+  ) noexcept;
+
+  /**
+   * Address: 0x008B00A0 (FUN_008B00A0, func_DecodeEntIdSet)
+   *
+   * Recovered in Sim.cpp as a file-scope helper - same cross-TU gap as
+   * `AllocatePackedCommandIdFromManager` above. Declared here to document
+   * the real call `ISSUE_FactoryCommand` makes: builds an entity-id set from
+   * a list of selected user units.
+   */
+  void func_DecodeEntIdSet(BVSet<EntId, EntIdUniverse>& out, const gpg::fastvector<UserUnit*>& units);
+
+  /**
+   * Address: 0x008B0730 (FUN_008B0730,
+   * ?ISSUE_FactoryCommand@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@USSTICommandIssueData@1@_N@Z)
+   *
+   * IDA note: the decompiler flags this function's own local-variable
+   * allocation as failed ("the output may be wrong!"), so its pseudocode is
+   * lower-confidence than usual. The structure below is cross-checked
+   * against the already-recovered sibling `ISSUE_Command(const
+   * gpg::fastvector<UserUnit*>&, SSTICommandIssueData, bool)` (Sim.cpp),
+   * which shares the same no-rush gate, id-allocation, and per-unit queue
+   * bookkeeping shape almost verbatim - factory commands go through
+   * `GetFactoryCommandQueue()`/`IssueFactoryCommand` instead of the plain
+   * command queue/`IssueCommand`. One low-confidence spot: the binary's own
+   * `struct_UserUnitManager::add` call appears to pass `arg8.mIndex` as its
+   * 4th argument rather than `clearQueue` - given the "variable allocation
+   * failed" warning and that `UserUnitManagerAdd`'s public contract
+   * (UserUnit.h) is `(manager, helper, cmdId, clearFlag)`, this recovery
+   * trusts the established public signature (`clearQueue`) over the
+   * uncertain decompiler artifact; flagged here for a follow-up asm-level
+   * re-check before this lands.
+   *
+   * What it does:
+   * Client/UI-side factory-command issue keystone over an explicit
+   * `UserUnit*` list (factories): allocates a command id, runs the no-rush
+   * gate against the resolved target, dispatches to the sim driver's
+   * `IssueFactoryCommand`, publishes/reuses the command-issue helper, and
+   * enqueues it into each unit's *factory* command queue (capped at 500
+   * queued entries unless `clearQueue` forces a reset).
+   */
+  void ISSUE_FactoryCommand(
+    const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, const bool clearQueue
+  )
+  {
+    CWldSession* const session = WLD_GetActiveSession();
+    CommandManager* const commandManager = session->mCommandManager;
+    STIMap* const playableMap = reinterpret_cast<STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+
+    std::uint32_t packedCommandId = 0u;
+    commandIssueData.nextCommandId =
+      static_cast<std::int32_t>(*AllocatePackedCommandIdFromManager(commandManager, &packedCommandId));
+    if ((static_cast<std::uint32_t>(commandIssueData.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+      return; // id-pool exhausted for this command source; nothing to issue.
+    }
+
+    // No-rush / playability gate - identical shape to ISSUE_Command's own
+    // gate (Sim.cpp) and Moho::ISSUE_SetCommandTarget's (Sim.cpp).
+    if (commandIssueData.mTarget.mType != EAiTargetType::AITARGET_None) {
+      constexpr float kInvalidLane = std::numeric_limits<float>::quiet_NaN();
+      Wm3::Vec3f targetPoint{kInvalidLane, kInvalidLane, kInvalidLane};
+
+      if (commandIssueData.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+        if (UserEntity* const targetEntity = session->LookupEntityId(static_cast<EntId>(commandIssueData.mTarget.mEnt))) {
+          targetPoint = targetEntity->mVariableData.mCurTransform.pos_;
+        }
+      } else {
+        targetPoint = commandIssueData.mTarget.mPos;
+      }
+
+      const std::int32_t focusArmyIndex = session->FocusArmy;
+      if (IsValidVector3f(targetPoint) && focusArmyIndex >= 0 &&
+          session->userArmies[static_cast<std::size_t>(focusArmyIndex)] != nullptr) {
+        const UserArmy* const focusArmy = session->GetFocusArmy();
+        const bool insidePlayableArea =
+          focusArmy->mVarDat.mUseWholeMap != 0u || playableMap == nullptr || playableMap->IsPlayable(targetPoint);
+
+        if (!insidePlayableArea) {
+          return;
+        }
+        if (focusArmy->mVarDat.mNoRushTimer > 0) {
+          const float deltaX = (focusArmy->mVarDat.mArmyStart.x + focusArmy->mVarDat.mNoRushOffset.x) - targetPoint.x;
+          const float deltaZ = (focusArmy->mVarDat.mArmyStart.y + focusArmy->mVarDat.mNoRushOffset.y) - targetPoint.z;
+          const float noRushDistance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
+          if (noRushDistance > focusArmy->mVarDat.mNoRushRadius) {
+            return;
+          }
+        }
+      }
+    }
+
+    BVSet<EntId, EntIdUniverse> issuedEntitySet{};
+    func_DecodeEntIdSet(issuedEntitySet, units);
+    if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
+      simDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
+    }
+
+    SSTICommandConstantData commandConstantData{};
+    InitializePublishedCommandDescriptorFromIssueData(&commandConstantData, &commandIssueData);
+
+    const CmdId commandId = static_cast<CmdId>(commandIssueData.nextCommandId);
+    UserCommandIssueHelper* const commandHelper =
+      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, commandId);
+    commandHelper->mVariableData = SSTICommandVariableData(commandIssueData);
+    commandHelper->mVariableDataDirty = 1u;
+
+    for (UserUnit* const unit : units) {
+      UserCommandQueue* const factoryQueue = unit->GetFactoryCommandQueue();
+      if (factoryQueue == nullptr) {
+        continue;
+      }
+
+      if (GetUserUnitManagerQueueSize(factoryQueue) <= 500) {
+        if (clearQueue) {
+          ResetUserUnitManagerState(factoryQueue, commandId);
+        }
+        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, clearQueue);
+      } else if (clearQueue) {
+        ResetUserUnitManagerState(factoryQueue, commandId);
+        UserUnitManagerAdd(factoryQueue, commandHelper, commandId, clearQueue);
+      }
+    }
+
+    UI_OnCommandIssued(units, commandIssueData, clearQueue);
+    session->DirtyCommandGraph();
+  }
+
+  /**
+   * Address: 0x008B0B30 (FUN_008B0B30,
+   * ?ISSUE_FactoryCommand@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * What it does:
+   * Converts one selected weak-set of user entities into live `UserUnit*`
+   * lanes (inline-buffered fastvector, capacity pre-reserved from the set
+   * size) and forwards to the explicit-unit `ISSUE_FactoryCommand`
+   * overload, which takes the command payload by value (copy-constructed on
+   * the stack here). Identical shape to `ISSUE_Command`'s own weak-set
+   * overload (CWldSession.cpp).
+   */
+  void ISSUE_FactoryCommand(
+    const SSelectionSetUserEntity& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
+  )
+  {
+    gpg::fastvector_n<UserUnit*, 2> selectedUnits{};
+    const std::int32_t entityCount = entities.size();
+    if (entityCount > 0) {
+      selectedUnits.reserve(static_cast<std::size_t>(entityCount));
+    }
+
+    SSelectionSetUserEntity* const mutableEntities = const_cast<SSelectionSetUserEntity*>(&entities);
+    SSelectionNodeUserEntity* node = nullptr;
+    node = SSelectionSetUserEntity::find(mutableEntities, mutableEntities->mHead->mLeft, &node);
+    while (node != mutableEntities->mHead) {
+      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      UserUnit* const selectedUnit = selectedEntity != nullptr ? selectedEntity->IsUserUnit() : nullptr;
+      if (selectedUnit != nullptr) {
+        selectedUnits.push_back(selectedUnit);
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(mutableEntities, node, &node);
+    }
+
+    ISSUE_FactoryCommand(selectedUnits, commandIssueData, clearQueue);
   }
 
   /**

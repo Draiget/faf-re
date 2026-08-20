@@ -34,6 +34,10 @@ namespace moho
   class UserUnit;
   struct SSyncData;
   struct UserCommandIssueHelper;
+  // The `Moho::UserTarget` command-target payload (UserUnit.h). Only used
+  // as an incomplete by-const-ref parameter type here; ISSUE_SetCommandTarget's
+  // definition (Sim.cpp) and its callers need the full UserUnit.h include.
+  struct UserCommandTargetView;
   // Opaque cross-TU handle to the runtime command-graph anchor-history object
   // (see UserUnit.h). Only used as an incomplete pointer by the dock worker bridge.
   struct QueuedUserCommandRecord;
@@ -1600,6 +1604,27 @@ namespace moho
   void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, bool clearQueue);
 
   /**
+   * Address: 0x008B0730 (FUN_008B0730,
+   * ?ISSUE_FactoryCommand@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@USSTICommandIssueData@1@_N@Z)
+   *
+   * PART B / NOT YET WIRED: authored in CWldSession.cpp but not committed -
+   * its real callers (`Moho::SCommandModeData::HandleEvent`,
+   * `Moho::CUIWorldView::HandleEvent`) are still blocked. See the definition
+   * for the full doc comment and the one flagged low-confidence spot.
+   */
+  void ISSUE_FactoryCommand(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, bool clearQueue);
+
+  /**
+   * Address: 0x008B0B30 (FUN_008B0B30,
+   * ?ISSUE_FactoryCommand@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
+   *
+   * PART B / NOT YET WIRED: see the fastvector overload above.
+   */
+  void ISSUE_FactoryCommand(
+    const SSelectionSetUserEntity& entities, const SSTICommandIssueData& commandIssueData, bool clearQueue
+  );
+
+  /**
    * Address: 0x008B0C80 (FUN_008B0C80)
    * Mangled: ?ISSUE_IncreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z
    *
@@ -1629,6 +1654,40 @@ namespace moho
     const SSTICommandIssueData& commandIssueData,
     bool clearQueue
   );
+
+  /**
+   * Address: 0x008B0EE0 (FUN_008B0EE0,
+   * ?ISSUE_SetCommandTarget@Moho@@YAXPAVUserCommand@1@ABVUserTarget@1@@Z)
+   *
+   * IDA signature:
+   * void __cdecl Moho::ISSUE_SetCommandTarget(Moho::UserCommand* helper, Moho::UserTarget const& target);
+   *
+   * What it does:
+   * Client/UI-side command-target keystone, the `ISSUE_Command` family's
+   * counterpart for redirecting a command already in flight. See the full
+   * doc comment on the definition (Sim.cpp) for the no-rush gate and the
+   * pickup-command category restriction. `UserCommandTargetView` is
+   * `UserUnit.h`'s name for the `Moho::UserTarget` payload this mangles to
+   * (only forward-declared here to avoid a CWldSession.h <-> UserUnit.h
+   * include cycle; callers need `moho/unit/core/UserUnit.h` for the
+   * complete type). Defined in Sim.cpp.
+   */
+  void ISSUE_SetCommandTarget(UserCommandIssueHelper* helper, const UserCommandTargetView& target);
+
+  /**
+   * Address: 0x00829B40 (FUN_00829B40, func_ProcessCommandDrag)
+   *
+   * What it does:
+   * The click-and-drag command redirect keystone both
+   * `Moho::UICommandDragger::DragMove` and `DragRelease` (moho/ui/CommandDragger.h/.cpp)
+   * funnel into. See the full doc comment on the definition (CWldSession.cpp)
+   * for the draw-node bookkeeping, factory-build placement re-validation, and
+   * the three ways a released drag can resolve its final target. Only
+   * forward-declares `UICommandGraph` here (defined in CWldSession.cpp) to
+   * avoid exposing that type's internals across the TU boundary; callers
+   * only ever pass a reference through. Defined in CWldSession.cpp.
+   */
+  void ProcessCommandDrag(const Wm3::Vector3f& mouse, UICommandGraph& graph, CmdId cmdId, bool released);
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):
@@ -2066,6 +2125,20 @@ namespace moho
   void DrawPathPreview(
     UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction
   );
+
+  /**
+   * Address: 0x00829B40 (FUN_00829B40, func_ProcessCommandDrag)
+   *
+   * Defined in CWldSession.cpp, not UiRuntimeTypes.cpp: like `DrawPathPreview`
+   * above, it reads `UICommandGraph::mSession`/`mMapAB0` directly and
+   * `UICommandGraph` is only a complete type here (declared a `friend` of
+   * `UICommandGraph` for that access). Callers are `Moho::UICommandDragger::
+   * DragMove`/`DragRelease` (UiRuntimeTypes.h/.cpp), which only ever see
+   * `UICommandGraph` as an opaque pointer they forward through. See the
+   * definition for the full doc comment (draw-node hash update, build-
+   * placement re-validation, and the three-way target dispatch on release).
+   */
+  void ProcessCommandDrag(const Wm3::Vector3f& mouse, UICommandGraph& graph, CmdId cmdId, bool released);
 
   /**
    * Address: 0x0082A120 (FUN_0082A120, sub_82A120)
