@@ -21424,6 +21424,25 @@ namespace
   }
 }
 
+// Forward declaration: the free `GetLine(wxSocketBase*, wxString&)` helper
+// (wx/protocol/protocol.h) is defined further down this file, right after
+// the wxSocketBase primitives it needs (Read/Unread). wxHTTP::ParseHeaders
+// and wxHTTP::BuildRequest both call it before that point textually.
+std::int32_t WxSocketGetLineRuntime(void* const socketSelf, wxStringRuntime* const result);
+
+// Forward declarations into functions/types defined later in this
+// translation unit that wxHTTP::SendHeaders (below) and wxHTTP::BuildRequest
+// (further down) both need for their raw socket writes.
+namespace
+{
+  struct WxFtpSocketIoRuntimeView;
+}
+WxFtpSocketIoRuntimeView* wxSocketWriteAndUpdateStatusRuntime(
+  WxFtpSocketIoRuntimeView* const runtime,
+  char* const buffer,
+  const int byteCount
+);
+
 /**
  * Address: 0x00A0E7E0 (FUN_00A0E7E0)
  * Mangled: ?ClearHeaders@wxHTTP@@AAEXXZ
@@ -21712,7 +21731,7 @@ namespace
   // of the compiled FUN_00A2E3F0 (SaveState) body, which copies exactly
   // these four fields into a freshly allocated wxSocketState.
   // -----------------------------------------------------------------------
-  struct WxSocketBaseRuntimeView
+  struct WxHttpSocketBaseRuntimeView
   {
     void* vtable = nullptr;                          // +0x00
     void* refData = nullptr;                         // +0x04
@@ -21741,15 +21760,15 @@ namespace
     std::uint8_t lane61_63[0x3]{};
     std::int32_t eventMask = 0;                       // +0x64 m_eventmask
   };
-  static_assert(offsetof(WxSocketBaseRuntimeView, socketRuntime) == 0x08, "WxSocketBaseRuntimeView::socketRuntime offset must be 0x08");
-  static_assert(offsetof(WxSocketBaseRuntimeView, socketFlags) == 0x10, "WxSocketBaseRuntimeView::socketFlags offset must be 0x10");
-  static_assert(offsetof(WxSocketBaseRuntimeView, states) == 0x28, "WxSocketBaseRuntimeView::states offset must be 0x28");
-  static_assert(offsetof(WxSocketBaseRuntimeView, unreadBuffer) == 0x48, "WxSocketBaseRuntimeView::unreadBuffer offset must be 0x48");
-  static_assert(offsetof(WxSocketBaseRuntimeView, unreadBufferSize) == 0x4C, "WxSocketBaseRuntimeView::unreadBufferSize offset must be 0x4C");
-  static_assert(offsetof(WxSocketBaseRuntimeView, clientData) == 0x5C, "WxSocketBaseRuntimeView::clientData offset must be 0x5C");
-  static_assert(offsetof(WxSocketBaseRuntimeView, notifyEnabled) == 0x60, "WxSocketBaseRuntimeView::notifyEnabled offset must be 0x60");
-  static_assert(offsetof(WxSocketBaseRuntimeView, eventMask) == 0x64, "WxSocketBaseRuntimeView::eventMask offset must be 0x64");
-  static_assert(sizeof(WxSocketBaseRuntimeView) == 0x68, "WxSocketBaseRuntimeView size must be 0x68");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, socketRuntime) == 0x08, "WxHttpSocketBaseRuntimeView::socketRuntime offset must be 0x08");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, socketFlags) == 0x10, "WxHttpSocketBaseRuntimeView::socketFlags offset must be 0x10");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, states) == 0x28, "WxHttpSocketBaseRuntimeView::states offset must be 0x28");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, unreadBuffer) == 0x48, "WxHttpSocketBaseRuntimeView::unreadBuffer offset must be 0x48");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, unreadBufferSize) == 0x4C, "WxHttpSocketBaseRuntimeView::unreadBufferSize offset must be 0x4C");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, clientData) == 0x5C, "WxHttpSocketBaseRuntimeView::clientData offset must be 0x5C");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, notifyEnabled) == 0x60, "WxHttpSocketBaseRuntimeView::notifyEnabled offset must be 0x60");
+  static_assert(offsetof(WxHttpSocketBaseRuntimeView, eventMask) == 0x64, "WxHttpSocketBaseRuntimeView::eventMask offset must be 0x64");
+  static_assert(sizeof(WxHttpSocketBaseRuntimeView) == 0x68, "WxHttpSocketBaseRuntimeView size must be 0x68");
 
   /**
    * Address: 0x00A2E650 (FUN_00A2E650)
@@ -21761,7 +21780,7 @@ namespace
    * when it already holds data.
    */
   void WxSocketBasePushbackRuntime(
-    WxSocketBaseRuntimeView* const self,
+    WxHttpSocketBaseRuntimeView* const self,
     const void* const buffer,
     const std::size_t size
   )
@@ -21798,7 +21817,7 @@ namespace
    * socket for the next call.
    */
   void WxSocketBaseUnreadRuntime(
-    WxSocketBaseRuntimeView* const self,
+    WxHttpSocketBaseRuntimeView* const self,
     const void* const buffer,
     const std::size_t size
   )
@@ -21825,7 +21844,7 @@ namespace
    * to whether the transfer satisfied the wxSOCKET_WAITALL contract.
    */
   int WxSocketBaseReadRuntime(
-    WxSocketBaseRuntimeView* const self,
+    WxHttpSocketBaseRuntimeView* const self,
     void* const buffer,
     const std::size_t nbytes
   )
@@ -21863,7 +21882,7 @@ namespace
    * CopySnapshotAndReleaseBindingsRuntime in SimRecoveryRuntime.cpp, which
    * pops m_states.Last() and copies these same four fields back).
    */
-  void WxSocketBaseSaveStateRuntime(WxSocketBaseRuntimeView* const self)
+  void WxSocketBaseSaveStateRuntime(WxHttpSocketBaseRuntimeView* const self)
   {
     static std::uint8_t sWxSocketStateVTableTag = 0;
 
@@ -21908,7 +21927,7 @@ namespace
    * wxSocketBase::Notify(bool notify): enables/disables event notification
    * by writing the single m_notify byte lane.
    */
-  void WxSocketBaseNotifyRuntime(WxSocketBaseRuntimeView* const self, const bool notify) noexcept
+  void WxSocketBaseNotifyRuntime(WxHttpSocketBaseRuntimeView* const self, const bool notify) noexcept
   {
     self->notifyEnabled = notify ? 1u : 0u;
   }
@@ -21920,7 +21939,7 @@ namespace
    * What it does:
    * wxSocketBase::SetFlags(flags): overwrites the m_flags lane.
    */
-  void WxSocketBaseSetFlagsRuntime(WxSocketBaseRuntimeView* const self, const std::uint32_t flags) noexcept
+  void WxSocketBaseSetFlagsRuntime(WxHttpSocketBaseRuntimeView* const self, const std::uint32_t flags) noexcept
   {
     self->socketFlags = flags;
   }
@@ -21947,7 +21966,7 @@ namespace
 std::int32_t WxSocketGetLineRuntime(void* const socketSelf, wxStringRuntime* const result)
 {
   constexpr std::size_t kBufferSize = 2048;
-  auto* const self = static_cast<WxSocketBaseRuntimeView*>(socketSelf);
+  auto* const self = static_cast<WxHttpSocketBaseRuntimeView*>(socketSelf);
 
   result->m_pchData = const_cast<wchar_t*>(wxEmptyString);
 
@@ -21972,84 +21991,265 @@ std::int32_t WxSocketGetLineRuntime(void* const socketSelf, wxStringRuntime* con
   return 0; // wxPROTO_NOERR
 }
 
-namespace
+// Forward declaration: wxSocketClient::Connect(wxSockAddress&, bool) is
+// implemented further down this file (WxHttpSocketClientConnectRuntime,
+// next to the GSocket primitives it needs -- see that definition for why
+// it lives there instead of here).
+[[nodiscard]] bool WxHttpSocketClientConnectRuntime(WxHttpSocketBaseRuntimeView* const self, void* const address);
+
+/**
+ * Address: 0x00A0F0F0 (FUN_00A0F0F0)
+ * Mangled: ?BuildRequest@wxHTTP@@AAE_NABVwxString@@W4wxHTTP_Req@1@@Z
+ *
+ * IDA signature:
+ * char __thiscall sub_A0F0F0(_DWORD *this, wxString a2, LPCWSTR a3);
+ *
+ * What it does:
+ * wxHTTP::BuildRequest(path, req): only wxHTTP_GET (req == 0) is
+ * supported (matches the real source's `default: return FALSE`). Ensures
+ * a "User-Agent" header exists (defaulting to "wxWindows 2.x"), then
+ * SaveState()/SetFlags(wxSOCKET_NONE)/Notify(FALSE), writes
+ * "GET <path> HTTP/1.0\r\n" + headers + a blank line directly to the
+ * socket, and reads back the status line. If it doesn't contain "HTTP/",
+ * this is treated as an HTTP/0.9 response: Content-Length is stamped
+ * "-1" and Content-Type "none/none", state is restored, and TRUE is
+ * returned. Otherwise the status line is tokenized on spaces and the
+ * first digit of the status code is checked: '1'/'2'/'3' delegate to
+ * ParseHeaders() and return its result; anything else sets
+ * m_perr = wxPROTO_NOFILE and returns FALSE. RestoreState() runs on every
+ * path before returning.
+ */
+bool WxHttpBuildRequestRuntime(void* const httpSelf, const wxStringRuntime* const path, const std::int32_t req)
 {
-  // -----------------------------------------------------------------------
-  // wxSocketClient::Connect(wxSockAddress&, bool) and the GSocket
-  // (src/msw/gsocket.c) primitives it needs. This is the one part of the
-  // wxHTTP chain that reaches outside wxHTTP/wxSocketBase into the raw
-  // Winsock transport layer; every callee it needs beyond these two
-  // functions (async-select mask, close/reset, writable/exception poll,
-  // dispatch message-slot reservation) is already recovered elsewhere in
-  // this file, and the true leaves here are genuine `__imp_*` Winsock
-  // imports (socket/connect/ioctlsocket/WSAGetLastError, already recovered
-  // in WinApiImportThunks.cpp) -- i.e. this bottoms out at a real wx/CRT/OS
-  // terminal boundary rather than cascading further.
-  // -----------------------------------------------------------------------
-  struct WxSocketRuntimeView;
-}
-[[nodiscard]] int wxSocketApplyAsyncSelectMaskRuntime(WxSocketRuntimeView* const socketRuntime);
-[[nodiscard]] int wxSocketCloseHandleRuntime(WxSocketRuntimeView* const socketRuntime);
-
-namespace
-{
-  struct WxSocketRuntimeView
-  {
-    SOCKET socketHandle = INVALID_SOCKET;             // +0x00
-    void* frameLane4 = nullptr;                        // +0x04
-    void* frameLane8 = nullptr;                        // +0x08
-    std::int32_t stateCode = 0;                        // +0x0C
-    std::uint8_t unknown10_13[0x4]{};                  // +0x10
-    std::int32_t connectionModeFlag = 0;                // +0x14
-    std::uint8_t unknown18_2B[0x14]{};                  // +0x18
-    std::int32_t eventStateMask = 0;                    // +0x2C
-    std::uint32_t callbacks[4]{};                       // +0x30
-    std::int32_t callbackArgs[4]{};                      // +0x40
-    std::int32_t asyncMessageId = 0;                    // +0x50
-  };
-  static_assert(sizeof(WxSocketRuntimeView) == 0x54, "WxSocketRuntimeView size must be 0x54 (must match the shared definition further down this file)");
-
-  /**
-   * Address: 0x00A2FBD0 (FUN_00A2FBD0)
-   *
-   * What it does:
-   * GSocket allocator (src/msw/gsocket.c GSocket_new): allocates and
-   * zero/default-initializes one GSocket record (invalid handle, no
-   * frames, default 600s timeout), then reserves its async-dispatch
-   * message slot via the already-recovered FUN_00A38080. Frees the
-   * allocation and returns null on reservation failure.
-   */
-  WxSocketRuntimeView* GSocketAllocateRuntime()
-  {
-    auto* const socketRuntime = static_cast<WxSocketRuntimeView*>(std::malloc(sizeof(WxSocketRuntimeView)));
-    if (socketRuntime == nullptr) {
-      return nullptr;
-    }
-
-    socketRuntime->socketHandle = INVALID_SOCKET;
-    socketRuntime->frameLane4 = nullptr;
-    socketRuntime->frameLane8 = nullptr;
-    socketRuntime->stateCode = 0;
-    socketRuntime->connectionModeFlag = 0;
-    socketRuntime->eventStateMask = 0;
-    std::fill(std::begin(socketRuntime->callbacks), std::end(socketRuntime->callbacks), 0u);
-    std::fill(std::begin(socketRuntime->unknown10_13), std::end(socketRuntime->unknown10_13), std::uint8_t{0});
-    std::fill(std::begin(socketRuntime->unknown18_2B), std::end(socketRuntime->unknown18_2B), std::uint8_t{0});
-    // GSocket internal flag/timeout lanes without a recovered name yet
-    // (offsets 0x18, 0x24 within unknown18_2B): the compiled ctor writes
-    // `1` at +0x18 (a stream/type flag) and `600` at +0x24 (default
-    // timeout in seconds, matching wxSocketBase's own 600s default seen
-    // above). Preserved byte-for-byte; see class-note above for why this
-    // stays a documented raw lane instead of a fully named field.
-    *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x18 - 0x18]) = 1;
-    *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x24 - 0x18]) = 600;
-
-    if (!wxSocketApplyAsyncSelectMaskRuntimeReservation(socketRuntime)) {
-      std::free(socketRuntime);
-      return nullptr;
-    }
-    return socketRuntime;
+  if (req != 0 /* wxHTTP_GET */) {
+    return false;
   }
+
+  auto* const self = static_cast<WxHttpRuntimeView*>(httpSelf);
+  auto* const socket = reinterpret_cast<WxHttpSocketBaseRuntimeView*>(self);
+
+  wxStringRuntime userAgentKey{};
+  userAgentKey.m_pchData = nullptr;
+  AssignOwnedWxString(&userAgentKey, std::wstring(L"User-Agent"));
+  wxStringRuntime userAgentValue{};
+  userAgentValue.m_pchData = nullptr;
+  (void)WxHttpGetHeaderRuntime(self, &userAgentKey, &userAgentValue);
+  const bool needsDefaultUserAgent = !WxStringRuntimeHasCharacters(&userAgentValue);
+  WxStringDestructRuntime(&userAgentValue);
+  WxStringDestructRuntime(&userAgentKey);
+
+  if (needsDefaultUserAgent) {
+    wxStringRuntime key{};
+    key.m_pchData = nullptr;
+    AssignOwnedWxString(&key, std::wstring(L"User-Agent"));
+    wxStringRuntime value{};
+    value.m_pchData = nullptr;
+    AssignOwnedWxString(&value, std::wstring(L"wxWindows 2.x"));
+    WxHttpSetHeaderRuntime(self, &key, &value);
+    WxStringDestructRuntime(&value);
+    WxStringDestructRuntime(&key);
+  }
+
+  WxSocketBaseSaveStateRuntime(socket);
+  WxSocketBaseSetFlagsRuntime(socket, 0 /* wxSOCKET_NONE */);
+  WxSocketBaseNotifyRuntime(socket, false);
+
+  wxStringRuntime requestLine{};
+  requestLine.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+  const wchar_t* const pathText = (path != nullptr && path->c_str() != nullptr) ? path->c_str() : L"";
+  (void)WxStringPrintfRuntime(&requestLine, L"%s %s HTTP/1.0\r\n", L"GET", pathText);
+
+  {
+    const std::wstring requestLineText(requestLine.c_str() != nullptr ? requestLine.c_str() : L"");
+    const int mbLength = ::WideCharToMultiByte(CP_ACP, 0, requestLineText.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (mbLength > 0) {
+      std::vector<char> mbBuffer(static_cast<std::size_t>(mbLength), '\0');
+      if (::WideCharToMultiByte(CP_ACP, 0, requestLineText.c_str(), -1, mbBuffer.data(), mbLength, nullptr, nullptr) > 0) {
+        (void)wxSocketWriteAndUpdateStatusRuntime(
+          reinterpret_cast<WxFtpSocketIoRuntimeView*>(socket), mbBuffer.data(), static_cast<int>(::strlen(mbBuffer.data()))
+        );
+      }
+    }
+  }
+  WxHttpSendHeadersRuntime(self);
+  {
+    char crlf[2] = {'\r', '\n'};
+    (void)wxSocketWriteAndUpdateStatusRuntime(reinterpret_cast<WxFtpSocketIoRuntimeView*>(socket), crlf, 2);
+  }
+  WxStringDestructRuntime(&requestLine);
+
+  wxStringRuntime statusLine{};
+  statusLine.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+  self->lastError = WxSocketGetLineRuntime(self, &statusLine);
+  if (self->lastError != 0 /* wxPROTO_NOERR */) {
+    WxStringDestructRuntime(&statusLine);
+    (void)CopySnapshotAndReleaseBindingsRuntime(reinterpret_cast<SnapshotOwnerRuntime*>(socket));
+    return false;
+  }
+
+  if (WxStringFindSubstringRuntime(&statusLine, L"HTTP/") < 0) {
+    wxStringRuntime key{};
+    key.m_pchData = nullptr;
+    wxStringRuntime value{};
+    value.m_pchData = nullptr;
+
+    AssignOwnedWxString(&key, std::wstring(L"Content-Length"));
+    AssignOwnedWxString(&value, std::wstring(L"-1"));
+    WxHttpSetHeaderRuntime(self, &key, &value);
+
+    AssignOwnedWxString(&key, std::wstring(L"Content-Type"));
+    AssignOwnedWxString(&value, std::wstring(L"none/none"));
+    WxHttpSetHeaderRuntime(self, &key, &value);
+
+    WxStringDestructRuntime(&value);
+    WxStringDestructRuntime(&key);
+    WxStringDestructRuntime(&statusLine);
+    (void)CopySnapshotAndReleaseBindingsRuntime(reinterpret_cast<SnapshotOwnerRuntime*>(socket));
+    return true;
+  }
+
+  // wxStringTokenizer token(statusLine, wxT(' ')): split on spaces, skip
+  // the "HTTP/1.0" token, inspect the first character of the status code.
+  bool ok;
+  {
+    wxStringRuntime spaceDelimiter{};
+    (void)WxStringConstructRepeatedCharRuntime(&spaceDelimiter, L' ', 1);
+    const std::wstring statusLineText(statusLine.c_str() != nullptr ? statusLine.c_str() : L"");
+
+    std::size_t cursor = statusLineText.find_first_not_of(L' ');
+    std::size_t nextSpace = (cursor == std::wstring::npos) ? std::wstring::npos : statusLineText.find(L' ', cursor);
+    cursor = (nextSpace == std::wstring::npos) ? statusLineText.size() : statusLineText.find_first_not_of(L' ', nextSpace);
+    const std::size_t codeEnd = (cursor == std::wstring::npos) ? statusLineText.size() : statusLineText.find(L' ', cursor);
+    const std::wstring statusCode = (cursor == std::wstring::npos)
+      ? std::wstring()
+      : statusLineText.substr(cursor, codeEnd == std::wstring::npos ? std::wstring::npos : codeEnd - cursor);
+
+    const wchar_t firstDigit = statusCode.empty() ? L'\0' : statusCode[0];
+    if (firstDigit == L'1' || firstDigit == L'2' || firstDigit == L'3') {
+      ok = WxHttpParseHeadersRuntime(self);
+    } else {
+      self->lastError = 6; // wxPROTO_NOFILE
+      ok = false;
+    }
+    WxStringDestructRuntime(&spaceDelimiter);
+  }
+
+  WxStringDestructRuntime(&statusLine);
+  (void)CopySnapshotAndReleaseBindingsRuntime(reinterpret_cast<SnapshotOwnerRuntime*>(socket));
+  return ok;
+}
+
+namespace
+{
+  /**
+   * wxHTTPStream layout (src/common/http.cpp): a wxSocketInputStream
+   * (itself a wxInputStream) plus wxHTTPStream's own m_http/m_httpsize/
+   * m_read_bytes. Field offsets 0x18 (base socket back-pointer)/0x1C
+   * (m_http)/0x20 (m_httpsize)/0x24 (m_read_bytes) are read directly out
+   * of the compiled FUN_00A0E5D0 (wxHTTPStream ctor) and FUN_00A2FA20
+   * (wxSocketInputStream ctor) bodies. Written directly here rather than
+   * through those two addresses' own recovered bodies in
+   * SimRecoveryRuntime.cpp, because those are anonymous-namespace-local to
+   * that translation unit and are not callable from this one.
+   */
+  struct WxHttpStreamRuntimeView
+  {
+    void* vtable = nullptr;              // +0x00 (wxInputStream, then rebound twice)
+    std::uint8_t lane04_17[0x14]{};      // +0x04 wxInputStream's own state (error code, last-read count)
+    void* socketBackPointer = nullptr;   // +0x18 wxSocketInputStream's stored wxSocketBase*
+    void* httpBackPointer = nullptr;     // +0x1C wxHTTPStream::m_http
+    std::size_t httpSize = 0;            // +0x20 m_httpsize
+    std::uint32_t readBytes = 0;         // +0x24 m_read_bytes
+  };
+  static_assert(sizeof(WxHttpStreamRuntimeView) == 0x28, "WxHttpStreamRuntimeView size must be 0x28");
+  static_assert(offsetof(WxHttpStreamRuntimeView, socketBackPointer) == 0x18, "WxHttpStreamRuntimeView::socketBackPointer offset must be 0x18");
+  static_assert(offsetof(WxHttpStreamRuntimeView, httpBackPointer) == 0x1C, "WxHttpStreamRuntimeView::httpBackPointer offset must be 0x1C");
+  static_assert(offsetof(WxHttpStreamRuntimeView, httpSize) == 0x20, "WxHttpStreamRuntimeView::httpSize offset must be 0x20");
+  static_assert(offsetof(WxHttpStreamRuntimeView, readBytes) == 0x24, "WxHttpStreamRuntimeView::readBytes offset must be 0x24");
+
+  WxHttpStreamRuntimeView* WxHttpStreamConstructRuntime(
+    WxHttpStreamRuntimeView* const stream,
+    void* const httpSelf
+  ) noexcept
+  {
+    static std::uint8_t sWxInputStreamVTableTag = 0;
+    static std::uint8_t sWxSocketInputStreamVTableTag = 0;
+    static std::uint8_t sWxHttpStreamVTableTag = 0;
+
+    std::memset(stream->lane04_17, 0, sizeof(stream->lane04_17));
+    stream->vtable = &sWxInputStreamVTableTag;      // wxInputStream::wxInputStream()
+    stream->socketBackPointer = httpSelf;           // wxSocketInputStream::wxSocketInputStream(wxSocketBase&)
+    stream->vtable = &sWxSocketInputStreamVTableTag;
+    stream->httpBackPointer = httpSelf;             // wxHTTPStream::wxHTTPStream(wxHTTP*)
+    stream->vtable = &sWxHttpStreamVTableTag;
+    stream->httpSize = 0;
+    stream->readBytes = 0;
+    return stream;
+  }
+}
+
+/**
+ * Address: 0x00A0F6E0 (FUN_00A0F6E0)
+ * Mangled: ?GetInputStream@wxHTTP@@UAEPAVwxInputStream@@ABVwxString@@@Z
+ *
+ * IDA signature:
+ * _DWORD *__thiscall sub_A0F6E0(_DWORD *this, wxString a2);
+ *
+ * What it does:
+ * wxHTTP::GetInputStream(path): the wxProtocol::GetInputStream override
+ * (VTABLE_CONFIRMED at wxHTTP's vftable +0x2C -- data xref from
+ * `??_7wxHTTP@@6B@` in the callgraph index). Sets m_perr =
+ * wxPROTO_CONNERR; if m_addr is null or wxSocketClient::Connect(*m_addr)
+ * fails, returns null. Otherwise BuildRequest(path, wxHTTP_GET); on
+ * failure returns null. On success, allocates a wxHTTPStream wrapping
+ * this connection, sets its m_httpsize from the "Content-Length" header
+ * (or `(size_t)-1` when absent) and m_read_bytes = 0, then
+ * Notify(FALSE)/SetFlags(wxSOCKET_BLOCK|wxSOCKET_WAITALL) before
+ * returning the stream.
+ */
+void* WxHttpGetInputStreamRuntime(void* const httpSelf, const wxStringRuntime* const path)
+{
+  auto* const self = static_cast<WxHttpRuntimeView*>(httpSelf);
+  auto* const socket = reinterpret_cast<WxHttpSocketBaseRuntimeView*>(self);
+
+  self->lastError = 3; // wxPROTO_CONNERR
+  if (self->socketAddress == nullptr) {
+    return nullptr;
+  }
+  if (!WxHttpSocketClientConnectRuntime(socket, self->socketAddress)) {
+    return nullptr;
+  }
+
+  if (!WxHttpBuildRequestRuntime(self, path, 0 /* wxHTTP_GET */)) {
+    return nullptr;
+  }
+
+  auto* const stream = static_cast<WxHttpStreamRuntimeView*>(::operator new(sizeof(WxHttpStreamRuntimeView)));
+  if (stream == nullptr) {
+    return nullptr;
+  }
+  (void)WxHttpStreamConstructRuntime(stream, self);
+
+  wxStringRuntime contentLengthKey{};
+  contentLengthKey.m_pchData = nullptr;
+  AssignOwnedWxString(&contentLengthKey, std::wstring(L"Content-Length"));
+  wxStringRuntime contentLengthValue{};
+  contentLengthValue.m_pchData = nullptr;
+  (void)WxHttpGetHeaderRuntime(self, &contentLengthKey, &contentLengthValue);
+
+  if (WxStringRuntimeHasCharacters(&contentLengthValue)) {
+    stream->httpSize = static_cast<std::size_t>(RuntimeWtoiFromWideThunk(contentLengthValue.c_str()));
+  } else {
+    stream->httpSize = static_cast<std::size_t>(-1);
+  }
+  WxStringDestructRuntime(&contentLengthValue);
+  WxStringDestructRuntime(&contentLengthKey);
+  stream->readBytes = 0;
+
+  WxSocketBaseNotifyRuntime(socket, false);
+  WxSocketBaseSetFlagsRuntime(socket, 0x02 | 0x04 /* wxSOCKET_BLOCK | wxSOCKET_WAITALL */);
+
+  return stream;
 }
 
 /**
@@ -49347,6 +49547,196 @@ int wxSocketResetRuntimeState(
   return 0;
 }
 
+// Forward declaration: wxSocketAssignDispatchMessageSlot is defined further
+// down this file (file scope, void* parameter, so no type-identity issue).
+bool wxSocketAssignDispatchMessageSlot(void* const socketRegistrationRuntime);
+
+/**
+ * Address: 0x00A2FBD0 (FUN_00A2FBD0)
+ *
+ * What it does:
+ * GSocket allocator (src/msw/gsocket.c GSocket_new): allocates and
+ * default-initializes one GSocket record (invalid handle, no frames,
+ * cleared event/callback lanes), then reserves its async-dispatch message
+ * slot via the already-recovered wxSocketAssignDispatchMessageSlot. Frees
+ * the allocation and returns null on reservation failure. Used by
+ * wxSocketClient::Connect (WxHttpSocketClientConnectRuntime below) to
+ * allocate the underlying transport when the socket has none yet.
+ */
+WxSocketRuntimeView* GSocketAllocateRuntime()
+{
+  auto* const socketRuntime = static_cast<WxSocketRuntimeView*>(std::malloc(sizeof(WxSocketRuntimeView)));
+  if (socketRuntime == nullptr) {
+    return nullptr;
+  }
+
+  socketRuntime->socketHandle = INVALID_SOCKET;
+  socketRuntime->frameLane4 = nullptr;
+  socketRuntime->frameLane8 = nullptr;
+  socketRuntime->stateCode = 0;
+  socketRuntime->connectionModeFlag = 0;
+  socketRuntime->eventStateMask = 0;
+  std::fill(std::begin(socketRuntime->callbacks), std::end(socketRuntime->callbacks), 0u);
+  std::fill(std::begin(socketRuntime->unknown10_13), std::end(socketRuntime->unknown10_13), std::uint8_t{0});
+  std::fill(std::begin(socketRuntime->unknown18_2B), std::end(socketRuntime->unknown18_2B), std::uint8_t{0});
+  // GSocket internal flag/timeout lanes without a recovered name yet
+  // (byte offsets 0x18 and 0x24, both inside the still-unnamed
+  // unknown18_2B[0x14] blob): the compiled ctor writes `1` at +0x18 (a
+  // stream/type flag later overwritten per-connection by
+  // GSocketRawConnectRuntime) and `600` at +0x24 (a default timeout in
+  // seconds, matching wxSocketBase's own 600s default modeled above).
+  // Preserved byte-for-byte rather than guessed at, since src/msw/gsocket.c
+  // was not pulled from the vendored archive for this pass.
+  *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x18 - 0x18]) = 1;
+  *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x24 - 0x18]) = 600;
+
+  if (!wxSocketAssignDispatchMessageSlot(socketRuntime)) {
+    std::free(socketRuntime);
+    return nullptr;
+  }
+  return socketRuntime;
+}
+
+/**
+ * Address: 0x00A308B0 (FUN_00A308B0)
+ *
+ * What it does:
+ * GSocket_Connect (src/msw/gsocket.c): clears the "readable" bit from the
+ * event-state mask, rejects the call if the socket already has a live
+ * handle (state 4) or no peer address was set (state 3), otherwise stamps
+ * the stream/type flag from `isDatagram`, opens a Winsock `socket()` of
+ * the matching family/type, switches it to non-blocking
+ * (`FIONBIO`/`ioctlsocket`), applies the async-select mask, and calls the
+ * blocking Winsock `connect()`. A same-thread success returns state 0;
+ * `WSAEWOULDBLOCK` (10035) on a non-blocking connect returns state 7
+ * ("establishing") when async notification is armed, or otherwise polls
+ * once via the already-recovered writable/exception check
+ * (wxSocketPollWritableRuntime -- FUN_00A2FFB0). Any other connect()
+ * failure closes the handle and returns state 2.
+ */
+// Forward declaration: wxSocketPollWritableRuntime is defined further down
+// this file (file scope, void* parameter).
+int wxSocketPollWritableRuntime(void* const socketProbeRuntime);
+
+std::int32_t GSocketRawConnectRuntime(
+  WxSocketRuntimeView* const socketRuntime,
+  const bool isDatagram
+)
+{
+  socketRuntime->eventStateMask &= ~static_cast<std::int32_t>(0x04);
+
+  if (socketRuntime->socketHandle != INVALID_SOCKET) {
+    socketRuntime->stateCode = 4;
+    return 4;
+  }
+
+  // frameLane8 holds the wrapped peer-address record set by an earlier
+  // (not part of this chain's evidence) address-assignment step; its
+  // shape matches WxSocketPortRuntimeView (address ptr + byte count +
+  // state + family) declared above alongside wxSocketEnsureAddressPortStorage.
+  auto* const peer = reinterpret_cast<WxSocketPortRuntimeView*>(socketRuntime->frameLane8);
+  if (peer == nullptr) {
+    socketRuntime->stateCode = 3;
+    return 3;
+  }
+
+  *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x1C - 0x18]) = 1;
+  socketRuntime->connectionModeFlag = 0;
+  *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x20 - 0x18]) = 0;
+  *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x18 - 0x18]) = isDatagram ? 0 : 1;
+
+  const SOCKET newHandle = ::socket(
+    static_cast<int>(peer->addressFamily),
+    isDatagram ? SOCK_DGRAM : SOCK_STREAM,
+    0
+  );
+  socketRuntime->socketHandle = newHandle;
+  if (newHandle == INVALID_SOCKET) {
+    socketRuntime->stateCode = 2;
+    return 2;
+  }
+
+  u_long nonBlocking = 1;
+  ::ioctlsocket(newHandle, FIONBIO, &nonBlocking);
+  (void)wxSocketApplyAsyncSelectMaskRuntime(socketRuntime);
+
+  if (::connect(newHandle, reinterpret_cast<const sockaddr*>(peer->address), static_cast<int>(peer->addressBytes)) != SOCKET_ERROR) {
+    socketRuntime->stateCode = 0;
+    return 0;
+  }
+
+  if (::WSAGetLastError() != WSAEWOULDBLOCK) {
+    (void)wxSocketCloseHandleRuntime(socketRuntime);
+    socketRuntime->stateCode = 2;
+    return 2;
+  }
+
+  if (*reinterpret_cast<std::int32_t*>(&socketRuntime->unknown10_13[0]) != 0) {
+    *reinterpret_cast<std::int32_t*>(&socketRuntime->unknown18_2B[0x20 - 0x18]) = 1;
+    socketRuntime->stateCode = 7;
+    return 7;
+  }
+
+  const std::int32_t pollResult = wxSocketPollWritableRuntime(socketRuntime);
+  if (pollResult != 0) {
+    (void)wxSocketCloseHandleRuntime(socketRuntime);
+  }
+  return pollResult;
+}
+
+/**
+ * Address: 0x00A2F130 (FUN_00A2F130)
+ * Mangled: ?Connect@wxSocketClient@@UAE_NAAVwxSockAddress@@_N@Z
+ *
+ * IDA signature:
+ * char __thiscall sub_A2F130(struct_Frame **this, int a2, char a3);
+ *
+ * What it does:
+ * wxSocketClient::Connect(addr, wait): destroys any existing GSocket
+ * transport (running its close-notify callback first), allocates a fresh
+ * one via GSocketAllocateRuntime, applies the socket's configured timeout
+ * and event-notify callback/pushback registration, temporarily disables
+ * async-select while `wait` is requested, runs GSocketRawConnectRuntime
+ * against the target address, then restores async-select. Sets
+ * m_establishing on state 7 ("in progress"), m_connected on state 0
+ * ("connected immediately"), and returns whether the connection was
+ * established synchronously.
+ *
+ * Used by wxHTTP::GetInputStream (via `wxProtocol::Connect(*m_addr)`,
+ * which per wx 2.4.2's protocol.h is a one-line inline forwarder to this
+ * exact override -- the compiler folds that trivial forwarder away, which
+ * is why the disassembly shows this address called directly).
+ */
+bool WxHttpSocketClientConnectRuntime(WxHttpSocketBaseRuntimeView* const self, void* const address)
+{
+  auto* const socketRuntime = static_cast<WxSocketRuntimeView*>(self->socketRuntime);
+  if (socketRuntime != nullptr) {
+    (void)wxSocketResetRuntimeState(socketRuntime);
+    std::free(socketRuntime);
+  }
+
+  auto* const freshSocket = GSocketAllocateRuntime();
+  self->socketRuntime = freshSocket;
+  self->socketOkFlag = 0;
+  self->socketEstablishingFlag = 0;
+  if (freshSocket == nullptr) {
+    return false;
+  }
+
+  freshSocket->frameLane8 = reinterpret_cast<WxSocketFrameRuntimeView*>(address);
+
+  const std::int32_t connectResult = GSocketRawConnectRuntime(freshSocket, false);
+  if (connectResult != 0) {
+    if (connectResult == 7) {
+      self->socketEstablishingFlag = 1;
+    }
+    return false;
+  }
+
+  self->socketOkFlag = 1;
+  return true;
+}
+
 /**
  * Address: 0x00A30110 (FUN_00A30110)
  *
@@ -64703,6 +65093,175 @@ int moho::MohoApp::OnExit()
   moho::sMainWindow = nullptr;
   moho::ren_Viewport = nullptr;
   return 0;
+}
+
+namespace
+{
+  /**
+   * Minimal recovered `wxStaticText` runtime view, matching
+   * `moho/misc/ScrGotoDialog.cpp`'s `wxStaticTextRuntimeView`. wx identity:
+   * `operator new(0x130)` then `sub_4BB0F0(parent, -1, label,
+   * wxDefaultPosition, wxDefaultSize, 0x110, wxStaticTextNameStr)`
+   * (`wxStaticText::wxStaticText` + `Create`) - the exact call shape every
+   * field label in `WCurveEditorPanel`/`WEmitterWx` uses.
+   */
+  class WCurveFieldLabelRuntimeView final : public wxControlRuntime
+  {
+  public:
+    WCurveFieldLabelRuntimeView(wxWindowBase* const parentWindow, const wchar_t* const labelText)
+    {
+      (void)CreateBase(
+        parentWindow, -1, wxPoint{-1, -1}, wxSize{-1, -1}, 0x110, wxStringRuntime::Borrow(L"staticText")
+      );
+      SetLabel(wxStringRuntime::Borrow(labelText));
+      if (parentWindow != nullptr) {
+        parentWindow->AddChild(this);
+      }
+    }
+  };
+
+  /**
+   * Builds one {label, text control} row for a `WCurveEditorPanel` numeric
+   * field: a static label reading `labelText`, then a `wxTextCtrlNameStr`
+   * ("text") text control seeded with `initialValue` (`%f`-formatted,
+   * matching `wxString::Format(L"%f", value)` at every one of the five call
+   * sites) and given `controlId`. Matches the binary's per-field block (e.g.
+   * 0x006628B8-0x00662A03 for the "Tick" row).
+   */
+  [[nodiscard]] moho::WEmitterTextControl* AddCurveFieldRow(
+    wxWindowBase* const parent,
+    const std::int32_t controlId,
+    const wchar_t* const labelText,
+    const float initialValue
+  )
+  {
+    new WCurveFieldLabelRuntimeView(parent, labelText);
+
+    wchar_t valueText[64];
+    (void)::swprintf_s(valueText, L"%f", static_cast<double>(initialValue));
+
+    auto* const control = new wxTextCtrlRuntime();
+    (void)control->CreateBase(parent, controlId, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"text"));
+    control->SetValue(wxStringRuntime::Borrow(valueText));
+    if (parent != nullptr) {
+      parent->AddChild(control);
+    }
+    return reinterpret_cast<moho::WEmitterTextControl*>(control);
+  }
+} // namespace
+
+/**
+ * Address: 0x00661330 (FUN_00661330, Moho::WCurveEditor::WCurveEditor)
+ * Mangled: ??0WCurveEditor@Moho@@QAE@@Z
+ *
+ * What it does:
+ * See the declaration's IDA-signature note (in `WxRuntimeTypes.h`) for the
+ * parameter mapping. Fills in the shared wx window state (`CreateBase`) --
+ * this tree does not model native HWND creation for tool windows, matching
+ * the `wxStaticTextRuntimeView`/`wxButtonRuntimeView` judgement call in
+ * `moho/misc/ScrGotoDialog.cpp` -- seeds the view-range quartet and
+ * owner-panel back-pointer, rescales the (still-empty, default-constructed
+ * `mCurve`) curve to `[0, viewTimeMax]`, inserts one initial key at the
+ * range's midpoint, selects it, and shows the control.
+ */
+moho::WCurveEditor::WCurveEditor(
+  WCurveEditorPanel* const parent,
+  const std::int32_t id,
+  const float viewTimeMax,
+  const float viewValueMin,
+  const float viewValueMax,
+  const float initialKeyValue,
+  const float initialKeyTangent
+)
+{
+  (void)CreateBase(parent, id, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"control"));
+  if (parent != nullptr) {
+    parent->AddChild(this);
+  }
+
+  // `mCurve` (a member, default-constructed before this body runs) already
+  // has its `fastvector_n<Vector3f,2>` inline-buffer state set up correctly
+  // - that is what the binary's `[edi+148h..154h]` writes at this point in
+  // the constructor actually are, not something this body does by hand.
+  mCaption.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+  mScriptName.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+  mViewValueMin = viewValueMin;
+  mOwnerPanel = parent;
+  mMouseCaptured = 0;
+  mViewTimeMin = 0.0f;
+  mViewTimeMax = viewTimeMax;
+  mViewValueMax = viewValueMax;
+
+  RescaleEmitterCurveXRange(&mCurve, 0.0f, mViewTimeMax);
+  InsertEmitterCurveKey(mCurve, Wm3::Vector3f(mViewTimeMax * 0.5f, initialKeyValue, initialKeyTangent));
+  mSelectedKey = mCurve.mKeys.begin();
+  mCurveDirty = 0;
+
+  (void)Show(true);
+}
+
+/**
+ * Address: 0x00662660 (FUN_00662660, ?GetEventTable@WCurveEditor@Moho@@MBEPBUwxEventTable@@XZ)
+ * Mangled: ?GetEventTable@WCurveEditor@Moho@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Returns the static event-table lane for this curve-editor control type.
+ */
+const void* moho::WCurveEditor::GetEventTable() const
+{
+  return &sm_eventTable;
+}
+
+wxEventTable moho::WCurveEditor::sm_eventTable = {&gWxControlEventTableRuntime, nullptr};
+
+/**
+ * Address: 0x00662680 (FUN_00662680, Moho::WCurveEditorPanel::WCurveEditorPanel)
+ * Mangled: ??0WCurveEditorPanel@Moho@@QAE@@Z
+ *
+ * What it does:
+ * See the declaration's IDA-signature note for the parameter mapping. Fills
+ * in the shared wx window state (state-only, matching `WCurveEditor`'s own
+ * choice - see that constructor's note), constructs one `WCurveEditor` with
+ * the five range/key arguments, then adds, for each of the five fields in
+ * turn, a label plus a text control seeded from the editor's current
+ * key/range value and given the field's fixed command id (622-626). The
+ * curve editor always holds exactly one key by the time its constructor
+ * returns (it inserts one unconditionally), so the binary's
+ * `mKeys.end() == mKeys.begin()` empty-curve guard before each seed read
+ * can never trigger here and is not reproduced. Layout/sizer construction
+ * is not modelled - nothing else in this recovered tree reads it back,
+ * matching the same judgement call `moho/misc/ScrGotoDialog.cpp` makes for
+ * its own sizers.
+ */
+moho::WCurveEditorPanel::WCurveEditorPanel(
+  wxWindowBase* const parent,
+  const std::int32_t childId,
+  const float viewTimeMax,
+  const float viewValueMin,
+  const float viewValueMax,
+  const float initialKeyValue,
+  const float initialKeyTangent
+)
+{
+  (void)CreateBase(parent, -1, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"panel"));
+  if (parent != nullptr) {
+    parent->AddChild(this);
+  }
+
+  mFieldsLive = 0;
+
+  mCurveEditor =
+    new WCurveEditor(this, childId, viewTimeMax, viewValueMin, viewValueMax, initialKeyValue, initialKeyTangent);
+
+  const Wm3::Vector3f& selectedKey = *mCurveEditor->mSelectedKey;
+  mKeyTimeText = AddCurveFieldRow(this, 622, L"Tick", selectedKey.x);
+  mKeyValueText = AddCurveFieldRow(this, 623, L"Value", selectedKey.y);
+  mKeyTangentText = AddCurveFieldRow(this, 624, L"Range", selectedKey.z);
+  mViewValueMinText = AddCurveFieldRow(this, 625, L"Window Min:", mCurveEditor->mViewValueMin);
+  mViewValueMaxText = AddCurveFieldRow(this, 626, L"Max:", mCurveEditor->mViewValueMax);
+
+  mFieldsLive = 1;
 }
 
 /**
