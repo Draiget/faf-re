@@ -80,7 +80,7 @@ namespace
    * base state, current/goal vectors, scalar motion parameters, and the
    * world-units flag.
    */
-  [[maybe_unused]] void DeserializeCSlideManipulatorSerializerBody(
+  void DeserializeCSlideManipulatorSerializerBody(
     moho::CSlideManipulator* const manipulator,
     gpg::ReadArchive* const archive
   )
@@ -114,7 +114,7 @@ namespace
    * state, current/goal vectors, scalar motion parameters, and the world-units
    * flag.
    */
-  [[maybe_unused]] void SerializeCSlideManipulatorSerializerBody(
+  void SerializeCSlideManipulatorSerializerBody(
     const moho::CSlideManipulator* const manipulator,
     gpg::WriteArchive* const archive
   )
@@ -261,7 +261,7 @@ namespace
    * Initializes callback lanes for global `CSlideManipulator` serializer helper
    * storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] CSlideManipulatorSerializerHelperNode* InitializeCSlideManipulatorSerializerStartupThunk()
+  [[nodiscard]] CSlideManipulatorSerializerHelperNode* InitializeCSlideManipulatorSerializerStartupThunk()
   {
     gpg::SerHelperBase* const self = SerializerSelfNode(gCSlideManipulatorSerializer);
     gCSlideManipulatorSerializer.mPrev = self;
@@ -278,7 +278,7 @@ namespace
    * Startup cleanup variant that unlinks and self-resets the global
    * CSlideManipulator serializer helper node.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CSlideManipulatorSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_CSlideManipulatorSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gCSlideManipulatorSerializer);
   }
@@ -294,6 +294,34 @@ namespace
   {
     return UnlinkSerializerNode(gCSlideManipulatorSerializer);
   }
+
+  void cleanup_CSlideManipulatorSerializer_atexit()
+  {
+    (void)cleanup_CSlideManipulatorSerializerStartupThunkA();
+  }
+
+  /**
+   * Address: 0x00BD34C0 (FUN_00BD34C0, register_CSlideManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes the global `CSlideManipulator` serializer helper callbacks
+   * and installs process-exit cleanup.
+   */
+  void register_CSlideManipulatorSerializer()
+  {
+    (void)InitializeCSlideManipulatorSerializerStartupThunk();
+    (void)std::atexit(&cleanup_CSlideManipulatorSerializer_atexit);
+  }
+
+  struct CSlideManipulatorSerializerStartupBootstrap
+  {
+    CSlideManipulatorSerializerStartupBootstrap()
+    {
+      register_CSlideManipulatorSerializer();
+    }
+  };
+
+  [[maybe_unused]] CSlideManipulatorSerializerStartupBootstrap gCSlideManipulatorSerializerStartupBootstrap;
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
