@@ -207,7 +207,16 @@ namespace moho
     }
 
     /**
-     * Address: 0x007E3F10 (FUN_007E3F10)
+     * Not a standalone binary function. This is the red-red fixup loop the
+     * compiler inlined into `_Tree::_Insert` at 0x007E3FD5..0x007E4090; the
+     * enclosing 0x007E3F10 is the whole `_Insert` (max-size throw at
+     * 0x007E3F28, `_Buynode` call at 0x007E3F8D, `++_Mysize` at 0x007E3F9C,
+     * header relink at 0x007E3F9F..0x007E3FD2, then this loop), and that
+     * address is owned by `msvc8::detail::rb_tree::insert_at` in
+     * `legacy/containers/RbTree.h`. It used to be annotated here as if
+     * 0x007E3F10 were a rebalance-only helper, which is wrong - the shipped
+     * function returns the freshly bought node through an sret and cleans
+     * three stack arguments (`retn 0Ch`), not two.
      *
      * What it does:
      * Rebalances the RB-tree after linking one red node.

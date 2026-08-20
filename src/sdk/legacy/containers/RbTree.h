@@ -119,6 +119,7 @@ namespace msvc8
 
         /**
          * Address: 0x0094F090 (FUN_0094F090, std::map<gpg::RType*,int>::iterator _Inc)
+         * Address: 0x007E42F0 (FUN_007E42F0, `_Inc` for the mesh batch-bucket map)
          *
          * IDA signature:
          * _Node *__thiscall operator(_Node **this);
@@ -520,11 +521,29 @@ namespace msvc8
             }
 
             /**
+             * Address: 0x007E3340 (FUN_007E3340, batch-bucket map insert(const_iterator, const value_type&))
+             *
+             * IDA signature:
+             * iterator *__userpurge insert@<eax>(_Tree *this@<ecx>, const value_type *val@<eax>,
+             *                                    iterator *result, _Nodeptr hint);
+             * (`retn 8` - the two stack dwords are the sret iterator and the hint
+             * node; the tree arrives in `ecx` and the value in `eax`.)
+             *
              * Hinted unique insert (MSVC8 `_Tree::insert(const_iterator, const value_type&)`).
              *
              * `map::operator[]` passes its `lower_bound` result as the hint, so the
              * common "fill the gap we just located" case links without a second
              * descent; a useless hint falls back to the plain unique insert.
+             *
+             * The shipped body matches this one branch for branch:
+             *   0x007E334D  `cmp [tree+8], 0`                  -> empty tree, link at the header
+             *   0x007E3374  `cmp hint, [head]`                 -> hint == leftmost
+             *   0x007E33A3  `cmp hint, head`                    -> hint == end(), compare against rightmost
+             *   0x007E33F3  `_Dec` then `cmp [before->right].isNil` at 0x007E3411
+             *   0x007E344E  `_Inc` then `cmp [at->right].isNil` at 0x007E3477
+             *   0x007E34B1  fall back to `insert_unique` and take `.first`
+             * Every accepted branch tail calls `_Insert` (0x007E3F10 = `insert_at`)
+             * with the `addLeft` flag this function decided.
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
