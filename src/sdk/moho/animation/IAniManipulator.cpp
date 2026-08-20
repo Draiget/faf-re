@@ -1,5 +1,6 @@
 #include "IAniManipulator.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstddef>
 #include <cstdint>
@@ -20,8 +21,12 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/math/MathReflection.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
+#include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -48,18 +53,33 @@ namespace
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType();
 
   /**
+   * Cubic arccos approximation shared by the foot-plant leg solve.
+   *
+   * The engine inlines this polynomial twice inside
+   * `CFootPlantManipulator::ManipulatorUpdate` (0x00639941-0x0063996B and
+   * 0x00639B53-0x00639B7D) and also keeps one out-of-line copy behind
+   * `ApproximateFootPlantAcosLane`. Coefficients are read straight from
+   * `.rdata`: 1.5707288 (0x00E4F76C), 0.21211439 (0x00E4F770), 0.074261002
+   * (0x00E4F774) and -0.018729299 (0x00E4F778).
+   */
+  [[nodiscard]] float ApproximateFootPlantAcos(const float value) noexcept
+  {
+    const float polynomial =
+      value * (((value * -0.018729299f) + 0.074261002f) * value - 0.21211439f) + 1.5707288f;
+    return std::sqrt(1.0f - value) * polynomial;
+  }
+
+  /**
    * Address: 0x0050CCF0 (FUN_0050CCF0, sub_50CCF0)
    *
    * What it does:
    * Evaluates one x87 polynomial lane used by foot-plant solve code to
-   * approximate an arccos-shaped angle from one normalized input scalar.
+   * approximate an arccos-shaped angle from one normalized input scalar,
+   * mirrored about a fixed offset so the caller's swing rotates the other way.
    */
-  [[maybe_unused]] float ApproximateFootPlantAcosLane(const float value) noexcept
+  [[nodiscard]] float ApproximateFootPlantAcosLane(const float value) noexcept
   {
-    const float oneMinusValue = 1.0f - value;
-    const float polynomial =
-      value * (((value * -0.018729299f) + 0.074261002f) * value - 0.21211439f) + 1.5707288f;
-    return 2.0f - std::sqrt(oneMinusValue) * polynomial;
+    return 2.0f - ApproximateFootPlantAcos(value);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -1464,6 +1484,22 @@ namespace moho
       }
       return &first[boneIndex];
     }
+
+    /**
+     * Projects `delta` onto `forwardAxis` while deliberately zeroing the
+     * vertical contribution.
+     *
+     * The foot-plant solve at 0x00639A70-0x00639AAE evaluates
+     * `axis.z * delta.z + axis.x * delta.x + delta.y * 0.0f`. The vertical term
+     * is multiplied by a materialized zero rather than dropped, so it is kept
+     * here to preserve NaN/Inf propagation exactly.
+     */
+    [[nodiscard]] float ForwardDotIgnoringVertical(
+      const Wm3::Vector3f& forwardAxis, const Wm3::Vector3f& delta
+    ) noexcept
+    {
+      return ((forwardAxis.z * delta.z) + (forwardAxis.x * delta.x)) + (delta.y * 0.0f);
+    }
   } // namespace
 
   /**
@@ -1550,9 +1586,139 @@ namespace moho
     mGoalUnit.UnlinkFromOwnerChain();
   }
 
+  /**
+   * Address: 0x006395F0 (FUN_006395F0, Moho::CFootPlantManipulator::MoveManipulator)
+   *
+   * IDA signature:
+   * void __thiscall Moho::CFootPlantManipulator::MoveManipulator(CFootPlantManipulator *this);
+   *
+   * VFTable SLOT: 1 (`??_7CFootPlantManipulator@Moho@@6B@` = 0x00E21B14, this
+   * address is stored at 0x00E21B18). `CAniActor::Update` dispatches through
+   * that slot at 0x0063AB29 and discards the result, so the binary never
+   * materializes a return value; the recovered body reports `false` for the
+   * dead-goal early-out and `true` once a solve ran, matching every sibling
+   * manipulator in this family.
+   *
+   * What it does:
+   * Plants the watched foot bone on the ground. Resolves the foot/knee/hip
+   * watch bindings, samples the height field under the foot (offset by the
+   * goal unit's raised-platform occupied rect when it is standing on one),
+   * clamps that target height by the half-leg span and by the maximum foot
+   * fall, then rotates hip and knee by equal and opposite arccos-approximated
+   * rolls. A second pass re-reads the moved bones and applies one more knee
+   * roll whose sign is mirrored when the knee-to-foot vector points behind the
+   * hip forward axis or the manipulator was built with straight legs.
+   */
   bool CFootPlantManipulator::ManipulatorUpdate()
   {
-    return false;
+    // 0x006395FF-0x0063961E: the goal weak link is decoded and dispatched
+    // unconditionally, so an emptied lane faults exactly as the binary does.
+    Unit* const goalUnit = mGoalUnit.GetObjectPtr();
+    if (goalUnit->IsDead()) {
+      return false;
+    }
+
+    CAniPose* const pose = mOwnerActor->mPose.px;
+    const SAniManipBinding* const watchBones = mWatchBones.mBegin;
+    CAniPoseBone* const footBone = ResolvePoseBoneByIndex(pose, watchBones[0].mBoneIndex);
+    CAniPoseBone* const kneeBone = ResolvePoseBoneByIndex(pose, watchBones[1].mBoneIndex);
+    CAniPoseBone* const hipBone = ResolvePoseBoneByIndex(pose, watchBones[2].mBoneIndex);
+
+    const VTransform& hipTransform = hipBone->GetCompositeTransform();
+    const Wm3::Quaternionf hipOrientation = hipTransform.orient_;
+    const Wm3::Vector3f hipPos = hipTransform.pos_;
+    const Wm3::Vector3f kneePos = kneeBone->GetCompositeTransform().pos_;
+    const Wm3::Vector3f footPos = footBone->GetCompositeTransform().pos_;
+
+    // Hip basis, used later to decide which way the knee is allowed to fold.
+    const VAxes3 hipAxes{hipOrientation};
+
+    // 0x00639786-0x006397EA: when the goal unit rides a raised platform, that
+    // platform unit's occupied-rect distance is added to the sampled terrain.
+    Unit* const raisedPlatform = goalUnit->UnitMotion != nullptr
+      ? goalUnit->UnitMotion->mRaisedPlatformUnit.GetObjectPtr()
+      : nullptr;
+
+    float targetGroundY =
+      goalUnit->SimulationRef->mMapData->mHeightField->GetElevation(footPos.x, footPos.z);
+    if (raisedPlatform != nullptr) {
+      targetGroundY = raisedPlatform->DistanceToOccupiedRect(&footPos) + targetGroundY;
+    }
+
+    // 0x0063984D-0x0063987E. Both clamps keep the binary's exact comparison
+    // polarity so unordered (NaN) operands land on the same branch.
+    if (const float spanLimitedY = mHalfLegSpan + targetGroundY; !(spanLimitedY > targetGroundY)) {
+      targetGroundY = spanLimitedY;
+    }
+    if (const float fallLimitedY = mMaxFootFall + footPos.y; fallLimitedY > targetGroundY) {
+      targetGroundY = fallLimitedY;
+    }
+
+    // Half of the vertical correction still owed to the foot; both leg
+    // segments absorb one half each (0x00639896-0x006398A2).
+    const float halfFootCorrection = (targetGroundY - footPos.y) * 0.5f;
+
+    // ---- hip/knee swing ---------------------------------------------------
+    const Wm3::Vector3f hipToKnee{kneePos.x - hipPos.x, kneePos.y - hipPos.y, kneePos.z - hipPos.z};
+    const float hipToKneeLength = std::sqrt(
+      ((hipToKnee.z * hipToKnee.z) + (hipToKnee.y * hipToKnee.y)) + (hipToKnee.x * hipToKnee.x)
+    );
+    const float hipToKneeDrop = std::fabs(hipPos.y - kneePos.y);
+    const float invHipToKneeLength = 1.0f / hipToKneeLength;
+
+    const float currentThighPitch = ApproximateFootPlantAcos(invHipToKneeLength * hipToKneeDrop);
+    const float desiredThighPitch = ApproximateFootPlantAcos(
+      invHipToKneeLength * std::min(hipToKneeLength, hipToKneeDrop - halfFootCorrection)
+    );
+    const float thighRoll = desiredThighPitch - currentThighPitch;
+
+    const Wm3::Vector3f rollAxis{1.0f, 0.0f, 0.0f};
+    Wm3::Quaternionf hipRotation{};
+    (void)EulerRollToQuat(&rollAxis, &hipRotation, -thighRoll);
+    Wm3::Quaternionf kneeRotation{};
+    (void)EulerRollToQuat(&rollAxis, &kneeRotation, thighRoll);
+
+    hipBone->Rotate(hipRotation);
+    kneeBone->Rotate(kneeRotation);
+
+    // ---- shin correction, measured on the already-swung pose ---------------
+    const Wm3::Vector3f swungKneePos = kneeBone->GetCompositeTransform().pos_;
+    const Wm3::Vector3f swungFootPos = footBone->GetCompositeTransform().pos_;
+    const Wm3::Vector3f kneeToFoot{
+      swungFootPos.x - swungKneePos.x,
+      swungFootPos.y - swungKneePos.y,
+      swungFootPos.z - swungKneePos.z,
+    };
+
+    // 0x00639AAE-0x00639AC0: fold the knee forward only when the foot leads the
+    // hip forward axis and the manipulator was not built with straight legs.
+    const bool foldKneeForward =
+      ForwardDotIgnoringVertical(hipAxes.vZ, kneeToFoot) > 0.0f && !mStraightLegs;
+
+    const float kneeToFootLength = std::sqrt(
+      ((kneeToFoot.z * kneeToFoot.z) + (kneeToFoot.y * kneeToFoot.y)) + (kneeToFoot.x * kneeToFoot.x)
+    );
+    const float kneeToFootDrop = std::fabs(swungKneePos.y - swungFootPos.y);
+    const float invKneeToFootLength = 1.0f / kneeToFootLength;
+
+    const float currentShinInput = invKneeToFootLength * kneeToFootDrop;
+    const float desiredShinInput =
+      invKneeToFootLength * std::min(kneeToFootLength, kneeToFootDrop - halfFootCorrection);
+
+    const float currentShinPitch = foldKneeForward
+      ? ApproximateFootPlantAcos(currentShinInput)
+      : ApproximateFootPlantAcosLane(currentShinInput);
+    const float desiredShinPitch = foldKneeForward
+      ? ApproximateFootPlantAcos(desiredShinInput)
+      : ApproximateFootPlantAcosLane(desiredShinInput);
+
+    // 0x00639BF8/0x00639C22 negate through `-0.0f` rather than a unary minus,
+    // which keeps the sign of a zero-valued roll identical to the binary.
+    Wm3::Quaternionf shinRotation{};
+    (void)EulerRollToQuat(&rollAxis, &shinRotation, -0.0f - (desiredShinPitch - currentShinPitch));
+    kneeBone->Rotate(shinRotation);
+
+    return true;
   }
 
   bool CBoneEntityManipulator::ManipulatorUpdate()
