@@ -18,47 +18,22 @@ namespace gpg
 
 namespace
 {
-  moho::CAniResourceSkelConstruct gCAniResourceSkelConstruct{};
-
-  [[nodiscard]] gpg::SerHelperBase* ResetCAniResourceSkelConstructHelperLinks() noexcept
+  struct ScalarDeleteVTable
   {
-    gCAniResourceSkelConstruct.mHelperNext->mPrev = gCAniResourceSkelConstruct.mHelperPrev;
-    gCAniResourceSkelConstruct.mHelperPrev->mNext = gCAniResourceSkelConstruct.mHelperNext;
-    gpg::SerHelperBase* const self = reinterpret_cast<gpg::SerHelperBase*>(&gCAniResourceSkelConstruct.mHelperNext);
-    gCAniResourceSkelConstruct.mHelperPrev = self;
-    gCAniResourceSkelConstruct.mHelperNext = self;
-    return self;
-  }
+    using deleting_dtor_t = int(__thiscall*)(void* self, int deleteFlag);
+    deleting_dtor_t mDeletingDtor;
+  };
 
-  /**
-   * Address: 0x00538860 (FUN_00538860)
-   *
-   * What it does:
-   * Unlinks `CAniResourceSkelConstruct` helper node from the intrusive helper
-   * list and restores self-linked sentinel links.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelConstructHelperNodePrimary() noexcept
+  struct ScalarDeleteObject
   {
-    return ResetCAniResourceSkelConstructHelperLinks();
-  }
-
-  /**
-   * Address: 0x00538890 (FUN_00538890)
-   *
-   * What it does:
-   * Secondary entrypoint for `CAniResourceSkelConstruct` helper-node
-   * unlink/reset.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* CleanupCAniResourceSkelConstructHelperNodeSecondary() noexcept
-  {
-    return ResetCAniResourceSkelConstructHelperLinks();
-  }
+    ScalarDeleteVTable* mVTable;
+  };
 } // namespace
 
 namespace moho
 {
   /**
-   * Address: 0x00539C80 (FUN_00539C80)
+   * Address: 0x00539C80 (FUN_00539C80, sub_539C80)
    *
    * What it does:
    * Packages one shared `CAniSkel` lane into the construct-result shared
@@ -78,6 +53,31 @@ namespace moho
     const boost::shared_ptr<void>& sharedAny =
       reinterpret_cast<const boost::shared_ptr<void>&>(skeleton);
     result->SetShared(sharedAny, skelType, 1U);
+  }
+
+  /**
+   * Address: 0x00BC90B0 (FUN_00BC90B0, register_CAniResourceSkelConstruct)
+   *
+   * What it does:
+   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
+   * into `sNewHelpers`), then binds the construct/delete callback fields.
+   */
+  CAniResourceSkelConstruct::CAniResourceSkelConstruct()
+    : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAniResourceSkelConstruct::Construct))
+    , mDeleteCallback(&CAniResourceSkelConstruct::Deconstruct)
+  {
+  }
+
+  /**
+   * Address: 0x00BF3BB0 (FUN_00BF3BB0, Moho::CAniResourceSkelConstruct::~CAniResourceSkelConstruct)
+   *
+   * What it does:
+   * Unlinks this helper node from whatever intrusive list it currently sits
+   * in and restores a self-linked sentinel state.
+   */
+  CAniResourceSkelConstruct::~CAniResourceSkelConstruct()
+  {
+    ResetLinks();
   }
 
   /**
@@ -113,6 +113,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x00539B80 (FUN_00539B80, Moho::CAniResourceSkelConstruct::Deconstruct)
+   *
+   * What it does:
+   * Deleting-teardown callback: dispatches through the runtime object's own
+   * vtable slot 0 (scalar deleting destructor) with the deleting flag set,
+   * when the object pointer is non-null.
+   */
+  void CAniResourceSkelConstruct::Deconstruct(void* const objectPtr)
+  {
+    if (objectPtr == nullptr) {
+      return;
+    }
+
+    auto* const scalarDeleteObject = static_cast<ScalarDeleteObject*>(objectPtr);
+    (void)scalarDeleteObject->mVTable->mDeletingDtor(objectPtr, 1);
+  }
+
+  /**
    * Address: 0x00539580 (FUN_00539580, gpg::SerConstructHelper_CAniResourceSkel::Init)
    *
    * What it does:
@@ -124,3 +142,16 @@ namespace moho
     resource_reflection::RegisterConstructCallbacks(typeInfo, mConstructCallback, mDeleteCallback);
   }
 } // namespace moho
+
+namespace
+{
+  // Address: 0x010ABBB4 -- process-global `CAniResourceSkelConstruct`
+  // singleton. Constructing it runs CAniResourceSkelConstruct::
+  // CAniResourceSkelConstruct() (0x00BC90B0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; gpg::SerHelperBase::InitNewHelpers()
+  // later dispatches RegisterConstructFunction() on it from within the first
+  // ReadArchive/WriteArchive construction. Its destructor
+  // (~CAniResourceSkelConstruct, 0x00BF3BB0) runs at normal static-duration
+  // teardown, matching the real binary's atexit registration.
+  moho::CAniResourceSkelConstruct gCAniResourceSkelConstruct;
+} // namespace
