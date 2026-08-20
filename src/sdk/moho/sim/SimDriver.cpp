@@ -1584,13 +1584,6 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
   }
 }
 
-// Source-only adapter: binary wrappers write mNextIssueBeat to caller-provided out pointers.
-void CSimDriver::ForwardCommandResultLocked()
-{
-  // The original methods return mNextIssueBeat via an out pointer.
-  // The reconstructed ISTIDriver interface models those methods as void.
-}
-
 /**
  * Address: 0x0073DAD0 (FUN_0073DAD0)
  *
@@ -2268,111 +2261,111 @@ void CSimDriver::Resume(std::int32_t* const outCommandCookie)
  * Address: 0x0073C7A0 (FUN_0073C7A0), ISTIDriver slot 19
  * Marshals CMDST_SingleStep and reports command-cookie result.
  */
-void CSimDriver::SingleStep()
+CmdId CSimDriver::SingleStep()
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SingleStep();
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073C840 (FUN_0073C840), ISTIDriver slot 20
  * Marshals CMDST_CreateUnit and reports command-cookie result.
  */
-void CSimDriver::CreateUnit(const uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, const float heading)
+CmdId CSimDriver::CreateUnit(const uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, const float heading)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->CreateUnit(armyIndex, id, pos, heading);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073C8F0 (FUN_0073C8F0), ISTIDriver slot 21
  * Marshals CMDST_CreateProp and reports command-cookie result.
  */
-void CSimDriver::CreateProp(const char* id, const Wm3::Vec3f& loc)
+CmdId CSimDriver::CreateProp(const char* id, const Wm3::Vec3f& loc)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->CreateProp(id, loc);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073C990 (FUN_0073C990), ISTIDriver slot 22
  * Marshals CMDST_DestroyEntity and reports command-cookie result.
  */
-void CSimDriver::DestroyEntity(const EntId entityId)
+CmdId CSimDriver::DestroyEntity(const EntId entityId)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->DestroyEntity(entityId);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CA30 (FUN_0073CA30), ISTIDriver slot 23
  * Marshals CMDST_WarpEntity and reports command-cookie result.
  */
-void CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
+CmdId CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->WarpEntity(entityId, transform);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CAD0 (FUN_0073CAD0), ISTIDriver slot 24
  * Marshals CMDST_ProcessInfoPair and reports command-cookie result.
  */
-void CSimDriver::ProcessInfoPair(void* id, const char* key, const char* val)
+CmdId CSimDriver::ProcessInfoPair(void* id, const char* key, const char* val)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->ProcessInfoPair(id, key, val);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CB70 (FUN_0073CB70), ISTIDriver slot 25
  * Marshals CMDST_IssueCommand and reports command-cookie result.
  */
-void CSimDriver::IssueCommand(
+CmdId CSimDriver::IssueCommand(
   const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, const bool clear
 )
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->IssueCommand(entities, data, clear);
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CC10 (FUN_0073CC10), ISTIDriver slot 26
  * Marshals CMDST_IssueFactoryCommand and reports command-cookie result.
  */
-void CSimDriver::IssueFactoryCommand(
+CmdId CSimDriver::IssueFactoryCommand(
   const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, const bool clear
 )
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->IssueFactoryCommand(entities, data, clear);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CCB0 (FUN_0073CCB0), ISTIDriver slot 27
  * Marshals CMDST_IncreaseCommandCount and reports command-cookie result.
  */
-void CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
+CmdId CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->IncreaseCommandCount(id, count);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
@@ -2392,83 +2385,83 @@ CmdId CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
  * Address: 0x0073CDF0 (FUN_0073CDF0), ISTIDriver slot 29
  * Marshals CMDST_SetCommandTarget and reports command-cookie result.
  */
-void CSimDriver::SetCommandTarget(const CmdId id, const SSTITarget& target)
+CmdId CSimDriver::SetCommandTarget(const CmdId id, const SSTITarget& target)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SetCommandTarget(id, target);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CE90 (FUN_0073CE90), ISTIDriver slot 30
  * Marshals CMDST_SetCommandType and reports command-cookie result.
  */
-void CSimDriver::SetCommandType(const CmdId id, const EUnitCommandType type)
+CmdId CSimDriver::SetCommandType(const CmdId id, const EUnitCommandType type)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SetCommandType(id, type);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CF30 (FUN_0073CF30), ISTIDriver slot 31
  * Marshals CMDST_SetCommandCells and reports command-cookie result.
  */
-void CSimDriver::SetCommandCells(
+CmdId CSimDriver::SetCommandCells(
   const CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target
 )
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SetCommandCells(id, cells, target);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073CFD0 (FUN_0073CFD0), ISTIDriver slot 32
  * Marshals CMDST_RemoveCommandFromQueue and reports command-cookie result.
  */
-void CSimDriver::RemoveCommandFromUnitQueue(const CmdId id, const EntId unitId)
+CmdId CSimDriver::RemoveCommandFromUnitQueue(const CmdId id, const EntId unitId)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->RemoveCommandFromUnitQueue(id, unitId);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073D070 (FUN_0073D070), ISTIDriver slot 33
  * Marshals CMDST_ExecuteLuaInSim and reports command-cookie result.
  */
-void CSimDriver::ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args)
+CmdId CSimDriver::ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->ExecuteLuaInSim(lua, args);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073D110 (FUN_0073D110), ISTIDriver slot 34
  * Marshals CMDST_LuaSimCallback and reports command-cookie result.
  */
-void CSimDriver::LuaSimCallback(
+CmdId CSimDriver::LuaSimCallback(
   const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
 )
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->LuaSimCallback(fnName, args, entities);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
  * Address: 0x0073D1B0 (FUN_0073D1B0), ISTIDriver slot 35
  * Marshals CMDST_DebugCommand and reports command-cookie result.
  */
-void CSimDriver::ExecuteDebugCommand(
+CmdId CSimDriver::ExecuteDebugCommand(
   const char* command,
   const Wm3::Vector3<float>& worldPos,
   const uint32_t focusArmy,
@@ -2478,7 +2471,7 @@ void CSimDriver::ExecuteDebugCommand(
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->ExecuteDebugCommand(command, worldPos, focusArmy, entities);
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  return mNextIssueBeat;
 }
 
 /**
