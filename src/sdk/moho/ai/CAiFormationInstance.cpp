@@ -2882,7 +2882,7 @@ namespace
    * default anchor/speed values, and unlinks any prior weak-unit backlink
    * chain.
    */
-  [[maybe_unused]] moho::SFormationLaneEntry* InitializeDefaultFormationLaneEntry(
+  moho::SFormationLaneEntry* InitializeDefaultFormationLaneEntry(
     moho::SFormationLaneEntry* const laneEntry
   )
   {
@@ -3306,7 +3306,7 @@ namespace
    * overwrite+trim lane, grows by ensuring capacity then copy-constructing
    * appended entries from `fillSource`.
    */
-  [[maybe_unused]] void ResizeLaneEntryVectorByCountWithFill(
+  void ResizeLaneEntryVectorByCountWithFill(
     const unsigned int requestedCount,
     moho::SFormationLaneVec* const laneVector,
     const moho::SFormationLaneEntry* const fillSource
@@ -3339,6 +3339,23 @@ namespace
     }
   }
 
+} // namespace
+
+// ---------------------------------------------------------------------------
+// gpg::RFastVectorType<Moho::SOffsetInfo> / gpg::RFastVectorType<Moho::SAssignedLocInfo>
+// reflection SetCount/SerLoad/SerSave bodies.
+//
+// Exposed with external linkage (not file-local) because
+// `gpg::RFastVectorType<Moho::SOffsetInfo>::Init/SetCount` and
+// `gpg::RFastVectorType<Moho::SAssignedLocInfo>::Init/SetCount`
+// (FastVectorUIntReflection.cpp) store/call these addresses directly; the
+// lane-entry default-prototype, resize, and teardown helpers they need stay
+// file-local to this translation unit, so their bodies live here rather than
+// beside the rest of the descriptor's slots.
+// ---------------------------------------------------------------------------
+
+namespace moho
+{
   /**
    * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
    *
@@ -3351,11 +3368,8 @@ namespace
    * appended entries from one default-initialised prototype. The prototype is
    * built and torn down around the resize because it owns a sentinel-backed
    * lane map, so it cannot simply be a zeroed stack blob.
-   *
-   * Lives in this translation unit rather than beside the descriptor's other
-   * slots because the three lane-entry helpers it needs are file-local here.
    */
-  void SetFastVectorLaneEntryCount(void* const laneVector, const int count)
+  void SetFastVectorSOffsetInfoCount(void* const laneVector, const int count)
   {
     moho::SFormationLaneEntry fill{};
     (void)InitializeDefaultFormationLaneEntry(&fill);
@@ -3413,6 +3427,33 @@ namespace
   }
 
   /**
+   * Address: 0x0056DF80 (FUN_0056DF80, gpg::RFastVectorType_SOffsetInfo::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<SOffsetInfo>` payload as archive count
+   * plus per-lane reflected serialization, mirroring `LoadFastVectorSOffsetInfo`.
+   */
+  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const laneVector = reinterpret_cast<moho::SFormationLaneVec*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(laneVector != nullptr);
+    if (!archive || !laneVector) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(laneVector);
+    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    archive->WriteUInt(count);
+
+    gpg::RType* const elementType = CachedSOffsetInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(elementType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
    * Address: 0x0056D650 (FUN_0056D650, gpg::fastvector_n16_SAssignedLocInfo::resize_fill)
    *
    * What it does:
@@ -3441,7 +3482,7 @@ namespace
    * `xorps xmm0` plus two `movss` stores and two zeroed dwords
    * (0x0056C3B3-0x0056C3D3) before calling the resize.
    */
-  void SetFastVectorAssignedLocInfoCount(void* const slotVector, const int count)
+  void SetFastVectorSAssignedLocInfoCount(void* const slotVector, const int count)
   {
     const moho::SAssignedLocInfo fill{};
     FastVectorSAssignedLocInfoResize(&fill, static_cast<unsigned int>(count), slotVector);
@@ -3478,6 +3519,37 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0056E0A0 (FUN_0056E0A0, gpg::RFastVectorType_SAssignedLocInfo::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<SAssignedLocInfo>` payload as archive
+   * count plus per-lane reflected serialization, mirroring
+   * `LoadFastVectorSAssignedLocInfo`.
+   */
+  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(storage);
+    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    archive->WriteUInt(count);
+
+    gpg::RType* const elementType = CachedSAssignedLocInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(elementType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+} // namespace moho
+
+namespace
+{
   /**
    * Address: 0x0056B590 (FUN_0056B590)
    *
