@@ -11,7 +11,7 @@
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/unit/core/Unit.h"
-#include "Wm3Vector3.h"
+#include "Wm3Vector3.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -283,20 +283,6 @@ namespace
   }
 
   /**
-   * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize)
-   * Address: 0x00553480 (FUN_00553480)
-   *
-   * What it does:
-   * Resizes reflected unsigned-int fastvector storage and fills newly appended
-   * lanes with `*fillValue`.
-   */
-  void FastVectorUIntResize(const unsigned int* fillValue, const unsigned int newSize, void* objectStorage)
-  {
-    auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
-  }
-
-  /**
    * Address: 0x004027F0 (FUN_004027F0)
    *
    * What it does:
@@ -315,7 +301,7 @@ namespace
     archive->ReadUInt(&count);
 
     const unsigned int fill = 0;
-    FastVectorUIntResize(&fill, count, storage);
+    gpg::FastVectorUIntResize(&fill, count, storage);
 
     auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
     for (unsigned int i = 0; i < count; ++i) {
@@ -694,29 +680,10 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedEntIdType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      constexpr const char* kEntIdTypeCandidates[] = {"EntId", "Moho::EntId", "int", "signed int"};
-      for (const char* const candidate : kEntIdTypeCandidates) {
-        if (!candidate) {
-          continue;
-        }
-
-        cached = gpg::REF_FindTypeNamed(candidate);
-        if (cached != nullptr) {
-          break;
-        }
-      }
-
-      if (!cached) {
-        cached = gpg::LookupRType(typeid(int));
-      }
-    }
-
-    return cached;
-  }
+  // NOTE: CachedEntIdType() (the `Moho::EntId::sType`-equivalent name-keyed
+  // RType cache) and the `RFastVectorType<Moho::EntId>` SerLoad/SerSave
+  // callbacks that used it now live in FastVectorEntIdReflection.cpp, next to
+  // the class they serve.
 
   [[nodiscard]] gpg::RType* CachedSOCellPosType()
   {
@@ -737,8 +704,6 @@ namespace
     return type;
   }
 
-  msvc8::string gFastVectorEntIdTypeName;
-  bool gFastVectorEntIdTypeNameCleanupRegistered = false;
   msvc8::string gFastVectorSOCellPosTypeName;
   bool gFastVectorSOCellPosTypeNameCleanupRegistered = false;
   msvc8::string gFastVectorSSTIEntityAttachInfoTypeName;
@@ -749,12 +714,6 @@ namespace
   bool gFastVectorSOffsetInfoTypeNameCleanupRegistered = false;
   msvc8::string gFastVectorSAssignedLocInfoTypeName;
   bool gFastVectorSAssignedLocInfoTypeNameCleanupRegistered = false;
-
-  void cleanup_FastVectorEntIdTypeName()
-  {
-    gFastVectorEntIdTypeName = msvc8::string{};
-    gFastVectorEntIdTypeNameCleanupRegistered = false;
-  }
 
   void cleanup_FastVectorSOCellPosTypeName()
   {
@@ -826,26 +785,6 @@ namespace
       }
     }
     return cached;
-  }
-
-  /**
-   * Address: 0x00552E70 (FUN_00552E70, gpg::RFastVectorType_EntId::GetName)
-   *
-   * What it does:
-   * Lazily builds and caches the reflected `fastvector<EntId>` type name.
-   */
-  [[maybe_unused]] const char* GetFastVectorEntIdTypeName()
-  {
-    if (gFastVectorEntIdTypeName.empty()) {
-      gpg::RType* const elementType = CachedEntIdType();
-      const char* const elementName = elementType ? elementType->GetName() : "EntId";
-      gFastVectorEntIdTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "EntId");
-      if (!gFastVectorEntIdTypeNameCleanupRegistered) {
-        gFastVectorEntIdTypeNameCleanupRegistered = true;
-        (void)std::atexit(&cleanup_FastVectorEntIdTypeName);
-      }
-    }
-    return gFastVectorEntIdTypeName.c_str();
   }
 
   /**
@@ -1078,37 +1017,6 @@ namespace
   }
 
   /**
-   * Address: 0x005535B0 (FUN_005535B0, gpg::RFastVectorType_EntId::SerLoad)
-   *
-   * What it does:
-   * Reads serialized lane count for one reflected `fastvector<EntId>`,
-   * resizes storage with invalid-id sentinel fill, then deserializes each lane
-   * through `ReadArchive::Read`.
-   */
-  [[maybe_unused]] void LoadFastVectorEntId(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-
-    constexpr unsigned int kInvalidEntIdFill = 0xF0000000u;
-    FastVectorUIntResize(&kInvalidEntIdFill, count, storage);
-
-    gpg::RType* const entIdType = CachedEntIdType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(entIdType, view.ElementAtUnchecked(i), owner);
-    }
-  }
-
-  /**
    * Address: 0x005536A0 (FUN_005536A0, gpg::RFastVectorType_SOCellPos::SerLoad)
    *
    * What it does:
@@ -1204,33 +1112,6 @@ namespace
   }
 
   /**
-   * Address: 0x00553630 (FUN_00553630, gpg::RFastVectorType_EntId::SerSave)
-   *
-   * What it does:
-   * Writes one reflected `fastvector<EntId>` payload as archive count plus
-   * per-lane reflected `EntId` serialization.
-   */
-  [[maybe_unused]] void SaveFastVectorEntId(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    const auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
-    archive->WriteUInt(count);
-
-    gpg::RType* const entIdType = CachedEntIdType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(entIdType, view.ElementAtUnchecked(i), owner);
-    }
-  }
-
-  /**
    * Address: 0x00553720 (FUN_00553720, gpg::RFastVectorType_SOCellPos::SerSave)
    *
    * What it does:
@@ -1306,6 +1187,20 @@ void gpg::register_RFastVectorType_uint()
 {
   (void)gFastVectorUIntType;
   (void)std::atexit(&cleanup_RFastVectorType_uint);
+}
+
+/**
+ * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize)
+ * Address: 0x00553480 (FUN_00553480, ICF twin)
+ *
+ * What it does:
+ * Resizes reflected dword-array fastvector storage and fills newly appended
+ * lanes with `*fillValue`.
+ */
+void gpg::FastVectorUIntResize(const unsigned int* fillValue, const unsigned int newSize, void* objectStorage)
+{
+  auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(objectStorage);
+  gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
 }
 
 /**
@@ -1421,7 +1316,7 @@ void gpg::RFastVectorType<unsigned int>::SetCount(void* obj, const int count) co
   }
 
   const unsigned int fill = 0;
-  FastVectorUIntResize(&fill, static_cast<unsigned int>(count), obj);
+  gpg::FastVectorUIntResize(&fill, static_cast<unsigned int>(count), obj);
 }
 
 /**
