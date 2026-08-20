@@ -1,5 +1,7 @@
 #include "moho/unit/tasks/CFactoryBuildTask.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <typeinfo>
 #include <new>
 
@@ -7,6 +9,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -552,3 +555,124 @@ namespace moho
     task->MemberSerialize(archive);
   }
 } // namespace moho
+
+namespace
+{
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase).
+  struct CFactoryBuildTaskSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CFactoryBuildTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CFactoryBuildTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CFactoryBuildTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CFactoryBuildTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CFactoryBuildTaskSerializerHelperNode) == 0x14,
+    "CFactoryBuildTaskSerializerHelperNode size must be 0x14"
+  );
+
+  CFactoryBuildTaskSerializerHelperNode gCFactoryBuildTaskSerializer{};
+
+  /**
+   * Unlinks `CFactoryBuildTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCFactoryBuildTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCFactoryBuildTaskSerializer.mListLinks);
+  }
+
+  /**
+   * Address: 0x005FA290 (FUN_005FA290, Moho::CFactoryBuildTaskSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CFactoryBuildTask`. Forwards the
+   * reflected object pointer to `CFactoryBuildTask::MemberDeserialize`
+   * (FUN_005FF020 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeCFactoryBuildTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CFactoryBuildTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x005FA2A0 (FUN_005FA2A0, Moho::CFactoryBuildTaskSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `CFactoryBuildTask`. Forwards the
+   * reflected object pointer to `CFactoryBuildTask::MemberSerialize`
+   * (FUN_005FF160 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeCFactoryBuildTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<const moho::CFactoryBuildTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF94E0 (FUN_00BF94E0, Moho::CFactoryBuildTaskSerializer::~CFactoryBuildTaskSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CFactoryBuildTaskSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CFactoryBuildTaskSerializer_atexit()
+  {
+    (void)UnlinkCFactoryBuildTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BCF9B0 (FUN_00BCF9B0, register_CFactoryBuildTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CFactoryBuildTask` serializer helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`.
+   */
+  void register_CFactoryBuildTaskSerializer()
+  {
+    (void)UnlinkCFactoryBuildTaskSerializerNodePrimary();
+    gCFactoryBuildTaskSerializer.mSerLoadFunc = &DeserializeCFactoryBuildTaskSerializerCallback;
+    gCFactoryBuildTaskSerializer.mSerSaveFunc = &SerializeCFactoryBuildTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CFactoryBuildTaskSerializer_atexit);
+  }
+
+  struct CFactoryBuildTaskSerializerStartupBootstrap
+  {
+    CFactoryBuildTaskSerializerStartupBootstrap()
+    {
+      register_CFactoryBuildTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CFactoryBuildTaskSerializerStartupBootstrap gCFactoryBuildTaskSerializerStartupBootstrap;
+} // namespace
