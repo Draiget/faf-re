@@ -11,7 +11,8 @@
 namespace gpg
 {
   class RType;
-}
+  class ReadArchive;
+} // namespace gpg
 
 namespace moho
 {
@@ -81,6 +82,21 @@ namespace moho
      */
     [[nodiscard]]
     CDecalHandle* CreateHandle(const SDecalInfo& info);
+
+    /**
+     * Address: 0x00779D70 (FUN_00779D70)
+     *
+     * IDA signature:
+     * void __stdcall sub_779D70(Moho::CDecalBuffer *buf, gpg::ReadArchive *ar);
+     *
+     * What it does:
+     * Load counterpart of `WriteDecalHandles`: reads owned `CDecalHandle`
+     * pointers until the null sentinel, tail-links each one into the intrusive
+     * handle list, and - gated on a non-zero start tick, exactly as
+     * `CreateHandle` gates it - re-registers the handle in its start-tick
+     * bucket tree.
+     */
+    void ReadDecalHandles(gpg::ReadArchive* ar);
 
     /**
      * Address: 0x00779680 (FUN_00779680, sub_779680)

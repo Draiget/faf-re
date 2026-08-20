@@ -4,6 +4,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/render/CDecalBuffer.h"
 #include "moho/render/CDecalHandle.h"
@@ -80,12 +81,37 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x00779C30 (FUN_00779C30, Moho::CDecalBufferSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback lane for `CDecalBuffer`. In the binary this is a
+   * calling-convention adapter (`jmp sub_77F0F0`) that reorders the reflection
+   * `(ReadArchive*, objectPtr, ...)` arguments into the `__usercall` load body.
+   * Recovered here as the typed callback that forwards to
+   * `CDecalBufferLoadCallback`.
+   */
+  void CDecalBufferDeserializeLane(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const buffer = reinterpret_cast<moho::CDecalBuffer*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    if (archive != nullptr && buffer != nullptr) {
+      moho::CDecalBufferLoadCallback(archive, buffer);
+    }
+  }
+
   struct CDecalBufferSerializerBootstrap
   {
     CDecalBufferSerializerBootstrap()
     {
       InitializeCDecalBufferSerializerLinks(gCDecalBufferSerializer);
-      gCDecalBufferSerializer.mLoadCallback = nullptr;
+      gCDecalBufferSerializer.mLoadCallback = &CDecalBufferDeserializeLane;
       gCDecalBufferSerializer.mSaveCallback = &CDecalBufferSerializeLane;
     }
   };
@@ -170,6 +196,29 @@ namespace moho
     ar->Write(CachedIdPoolType(), &buf->mPool, gpg::RRef{});
 
     WriteDecalHandles(buf, ar);
+  }
+
+  /**
+   * Address: 0x0077F0F0 (FUN_0077F0F0)
+   *
+   * IDA signature:
+   * void __usercall sub_77F0F0(gpg::ReadArchive *ar@<eax>, Moho::CDecalBuffer *buf@<esi>);
+   *
+   * What it does:
+   * Load body for one `CDecalBuffer`: reads the owning `Sim` (+0x00) as a
+   * tracked pointer, the `IdPool` sub-object (+0x08) via reflection with a
+   * lazily-resolved `RType`, then the owned decal-handle list. Each lane gets
+   * its own zeroed owner reference, matching the two locals the binary clears
+   * at 0x0077F106 and 0x0077F11A.
+   */
+  void CDecalBufferLoadCallback(gpg::ReadArchive* const ar, CDecalBuffer* const buf)
+  {
+    const gpg::RRef simRef{};
+    (void)ar->ReadPointer_Sim(&buf->mSim, &simRef);
+
+    ar->Read(CachedIdPoolType(), &buf->mPool, gpg::RRef{});
+
+    buf->ReadDecalHandles(ar);
   }
 
   /**

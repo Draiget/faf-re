@@ -10,6 +10,7 @@
 #include <typeinfo>
 #include <utility>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiReconDBImpl.h"
@@ -1988,6 +1989,43 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
   }
 
   return handle;
+}
+
+/**
+ * Address: 0x00779D70 (FUN_00779D70)
+ *
+ * IDA signature:
+ * void __stdcall sub_779D70(Moho::CDecalBuffer *buf, gpg::ReadArchive *ar);
+ *
+ * What it does:
+ * Reads the owned decal-handle stream written by `WriteDecalHandles`. Each
+ * archive read yields one owned `CDecalHandle*`; a null pointer terminates
+ * the stream. Every handle is tail-linked into `mHandleListHead` (the binary
+ * open-codes `ListUnlink` + self-link + link-before at 0x00779DB6..0x00779DD7)
+ * and, when its start tick is non-zero, re-registered in its start-tick
+ * bucket through the same `FindOrCreateStartTickBucket`/`FindOrInsertBucketNode`
+ * pair `CreateHandle` uses (0x00779DF7 / 0x00779E03).
+ *
+ * The owner reference is re-zeroed before every read, matching the binary
+ * clearing `mObj`/`mType` at 0x00779D88 and again at 0x00779E13.
+ */
+void CDecalBuffer::ReadDecalHandles(gpg::ReadArchive* const ar)
+{
+  for (;;) {
+    gpg::RRef ownerRef{};
+    CDecalHandle* handle = nullptr;
+    (void)ar->ReadPointerOwned_CDecalHandle(&handle, &ownerRef);
+    if (handle == nullptr) {
+      return;
+    }
+
+    handle->mListNode.ListLinkBefore(&mHandleListHead);
+
+    if (handle->mInfo.mStartTick != 0u) {
+      DecalBucketTreeStorage* const bucket = FindOrCreateStartTickBucket(&mStartTickBuckets, handle->mInfo.mStartTick);
+      (void)FindOrInsertBucketNode(bucket, handle);
+    }
+  }
 }
 
 /**

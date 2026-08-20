@@ -7,6 +7,7 @@
 namespace gpg
 {
   struct SerHelperBase;
+  class ReadArchive;
   class WriteArchive;
 } // namespace gpg
 
@@ -26,6 +27,20 @@ namespace moho
    * full owned decal-handle list.
    */
   void CDecalBufferSaveCallback(gpg::WriteArchive* ar, const CDecalBuffer* buf);
+
+  /**
+   * Address: 0x0077F0F0 (FUN_0077F0F0)
+   *
+   * IDA signature:
+   * void __usercall sub_77F0F0(gpg::ReadArchive *ar@<eax>, Moho::CDecalBuffer *buf@<esi>);
+   *
+   * What it does:
+   * Load body for one `CDecalBuffer` payload, mirroring
+   * `CDecalBufferSaveCallback`: reads the owning `Sim` as a tracked pointer,
+   * the id-pool sub-object through a lazily-resolved `RType`, then the owned
+   * decal-handle list.
+   */
+  void CDecalBufferLoadCallback(gpg::ReadArchive* ar, CDecalBuffer* buf);
 
   /**
    * Address: 0x00779CE0 (FUN_00779CE0)
