@@ -5080,7 +5080,7 @@ namespace
   }
 
   // Local command-issue update event type used for "select this unit" events
-  // (the ring's default event kind that InsertUnitIntoCommandIssueWeakSet fills).
+  // (the ring's default event kind whose weak set `WeakSet<UserUnit>::Add` fills).
   constexpr std::uint32_t kCommandIssueUpdateEventTypeSelectUnit = 0u;
 
   // Computes the ring index of the most-recently-enqueued (last) event.
@@ -5142,11 +5142,12 @@ namespace
     }
 
     CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
-    // entitySet is the 0x0C {proxy, head@+4, size} weak-set at event+0x08; it is
-    // layout-compatible with the leading 0x0C of SSelectionSetUserEntity, which is
-    // all the exposed insert helper touches (contract DUPLICATE-LAYOUT note).
-    InsertUnitIntoCommandIssueWeakSet(
-      reinterpret_cast<SSelectionSetUserEntity*>(&lastEvent->entitySet), unit
+    // entitySet is the 0x0C {proxy, head@+4, size} weak-set at event+0x08 - the
+    // same `WeakSet<UserUnit>` header `WeakSet<UserUnit>::Add` (0x00822270)
+    // takes, which is why the binary reaches it here with no adjustment at all.
+    WeakUnitSetUserUnit::AddResult selectedUnitAdd{};
+    (void)WeakUnitSetUserUnit::Add(
+      &selectedUnitAdd, reinterpret_cast<WeakUnitSetUserUnit*>(&lastEvent->entitySet), unit
     );
   }
 

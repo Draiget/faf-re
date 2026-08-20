@@ -105,7 +105,7 @@ namespace
   /**
    * Allocates one `SSelectionNodeUserEntity`-shaped tree node for
    * `CFormation`'s own participating-unit weak-set (see the field doc on
-   * `CFormation::mNodeHead`). Kept as a local nothrow allocator (rather than
+   * `CFormation::mParticipants`). Kept as a local nothrow allocator (rather than
    * reusing `moho::AllocateWeakEntitySetHead()`, moho/sim/WeakEntitySet.h)
    * because `CFormation::CFormation` (0x00838070) is asm-verified to use a
    * `nothrow` allocation with an explicit null check, unlike the shared
@@ -170,9 +170,7 @@ namespace moho
    * Address: 0x00838070 (FUN_00838070, ??0CFormation@Moho@@QAE@@Z)
    */
   CFormation::CFormation()
-    : mTreeAllocProxy(nullptr)
-    , mNodeHead(nullptr)
-    , mNodeCount(0)
+    : mParticipants{}
     , mCurInstance(nullptr)
     , mReady(false)
     , mPad11{0u, 0u, 0u}
@@ -189,7 +187,7 @@ namespace moho
     , mLastUpdate(0.0f)
   {
     SSelectionNodeUserEntity* const head = AllocateFormationNode();
-    mNodeHead = head;
+    mParticipants.mHead = head;
     if (head != nullptr) {
       head->mIsSentinel = 1u;
       head->mParent = head;
@@ -215,13 +213,13 @@ namespace moho
       curInstance->operator_delete(1);
     }
 
-    SSelectionNodeUserEntity* const nodeHead = mNodeHead;
+    SSelectionNodeUserEntity* const nodeHead = mParticipants.mHead;
     if (nodeHead != nullptr) {
       DestroyFormationNodeTreeWithOwnerUnlink(nodeHead->mParent);
       ::operator delete(nodeHead);
-      mNodeHead = nullptr;
+      mParticipants.mHead = nullptr;
     }
-    mNodeCount = 0u;
+    mParticipants.mSize = 0u;
   }
 
   /**
@@ -229,13 +227,13 @@ namespace moho
    */
   void CFormation::Reset()
   {
-    if (mNodeHead != nullptr) {
-      DestroyFormationNodeTreeWithOwnerUnlink(mNodeHead->mParent);
-      mNodeHead->mParent = mNodeHead;
-      mNodeHead->mLeft = mNodeHead;
-      mNodeHead->mRight = mNodeHead;
+    if (SSelectionNodeUserEntity* const nodeHead = mParticipants.mHead; nodeHead != nullptr) {
+      DestroyFormationNodeTreeWithOwnerUnlink(nodeHead->mParent);
+      nodeHead->mParent = nodeHead;
+      nodeHead->mLeft = nodeHead;
+      nodeHead->mRight = nodeHead;
     }
-    mNodeCount = 0u;
+    mParticipants.mSize = 0u;
 
     IFormationInstance* const curInstance = mCurInstance;
     mCurInstance = nullptr;
@@ -346,12 +344,13 @@ namespace moho
       UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
       UserUnit* const unit = (entity != nullptr) ? reinterpret_cast<UserUnit*>(entity) : nullptr;
 
-      // Track every visited unit in this formation's own participant weak-set:
-      // `this` reinterpreted as `SSelectionSetUserEntity*` (see the mNodeHead
-      // field doc above). InsertUnitIntoCommandIssueWeakSet only ever touches
-      // the shared 12-byte {allocProxy,head,size} header, never the extra
-      // +0x0C selection lane, so mCurInstance (also at +0x0C) is untouched.
-      InsertUnitIntoCommandIssueWeakSet(reinterpret_cast<SSelectionSetUserEntity*>(this), unit);
+      // Track every visited unit in this formation's own participant weak set.
+      // The binary calls `WeakSet<UserUnit>::Add` (0x00822270) here with `this`
+      // pushed verbatim as the set argument, which is exactly `mParticipants`
+      // at `this + 0x00`; the discarded `{iterator, inserted}` pair is the sret
+      // slot the call site never reads back.
+      WeakUnitSetUserUnit::AddResult participantAdd{};
+      (void)WeakUnitSetUserUnit::Add(&participantAdd, &mParticipants, unit);
 
       Wm3::Vector3f unitPosition(0.0f, 0.0f, 0.0f);
       bool haveQueuedPosition = false;
@@ -376,8 +375,7 @@ namespace moho
       (void)selection->PruneTombstonesAndFindLive(&node, node);
     }
 
-    const std::int32_t participantCount =
-      CountLiveUserEntityWeakSetEntriesAndPrune(reinterpret_cast<WeakEntitySetUserEntity&>(*this));
+    const std::int32_t participantCount = CountLiveUserEntityWeakSetEntriesAndPrune(mParticipants);
     if (participantCount == 0) {
       constexpr float kFltMax = 3.4028235e38f;
       mStart = Wm3::Vector3f(kFltMax, kFltMax, kFltMax);
