@@ -9280,7 +9280,7 @@ void moho::UICommandDragger::DragMove(const moho::SMauiEventData* const eventDat
 {
   const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
   const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
-  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, false);
+  moho::ProcessCommandDrag(surfacePoint, *mGraph.px, mCommandId, false);
 }
 
 /**
@@ -9302,7 +9302,7 @@ void moho::UICommandDragger::DragRelease(const moho::SMauiEventData* const event
 {
   const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
   const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
-  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, true);
+  moho::ProcessCommandDrag(surfacePoint, *mGraph.px, mCommandId, true);
   func_OnCommandDragEnd(const_cast<moho::SMauiEventData*>(eventData), mCommandId, mSession->mState);
   delete this;
 }
