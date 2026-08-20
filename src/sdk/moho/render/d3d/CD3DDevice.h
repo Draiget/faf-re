@@ -816,6 +816,17 @@ namespace moho
   [[nodiscard]] float REN_GetSimDeltaSeconds();
 
   /**
+   * Address: 0x010A642C (sWeightedFrameRate)
+   *
+   * What it does:
+   * Returns the exponentially smoothed frame time `REN_Frame` maintains
+   * (`sWeightedFrameRate * 0.9f + frameSeconds * 0.1f`). `WRenViewport::Render`
+   * hands it to the world-view UI selection pass as the blinky-box time delta
+   * (`fld sWeightedFrameRate` at 0x007F9509).
+   */
+  [[nodiscard]] float REN_GetWeightedFrameSeconds();
+
+  /**
    * What it does:
    * Returns the current render-frame game tick published by `REN_Frame`.
    */

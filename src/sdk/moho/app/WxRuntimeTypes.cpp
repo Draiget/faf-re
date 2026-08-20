@@ -69,6 +69,7 @@
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/RangeRenderer.h"
+#include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/Shadow.h"
 #include "moho/render/Silhouette.h"
 #include "moho/render/SkyDome.h"
@@ -67796,8 +67797,8 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       RenderWater(terrain);
     }
 
-    // Not yet wired: the playable-boundary pass and the UI selection pass, in
-    // that order, between RenderWater and the 0x24 mesh bucket.
+    // The playable-boundary pass and the UI selection pass, in that order,
+    // between RenderWater and the 0x24 mesh bucket.
     //
     //   0x007F94D2  cmp  ren_PlayableBoundary, 0   ; jz 0x007F9500
     //   0x007F94DF  test ebx, ebx                  ; jz 0x007F9500  (mSession)
@@ -67810,15 +67811,28 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     //                sWeightedFrameRate)  <- IDA's 4-arg signature is wrong,
     //               it drops the 5th float; the push sequence at
     //               0x007F9509..0x007F952D has five dwords and the callee
-    //               cleanup is `add esp, 14h` at 0x007F9533.
+    //               cleanup is `add esp, 14h` at 0x007F9533. `moho::RenUI`
+    //               takes all five; do not trim it back to four.
     //
-    // The UI selection pass (func_RenUI, 0x007FD490) is still unwired: it needs
-    // the sBlinkyBoxes list head, a file-static of moho/ui/UiRuntimeTypes.cpp.
+    // The fifth argument is the smoothed frame time (`fld sWeightedFrameRate`
+    // at 0x007F9509), not the sim delta - the blinky-box cycle advances on
+    // wall-clock frame time while the bracket geometry interpolates on
+    // `sDeltaFrame`.
     auto* const sessionView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
     if (moho::ren_PlayableBoundary && sessionView->mSession != nullptr && worldView->view != nullptr) {
       moho::RenderPlayableBoundary(
         static_cast<unsigned int>(head), sessionView->mBoundaryRenderer, *sessionView->mSession,
         *runtime->mCam
+      );
+    }
+
+    if (moho::ren_Ui) {
+      moho::RenUI(
+        sessionView->mSession,
+        runtime->mCam,
+        runtime->mPrimBatcher.batcher,
+        moho::REN_GetSimDeltaSeconds(),
+        moho::REN_GetWeightedFrameSeconds()
       );
     }
 

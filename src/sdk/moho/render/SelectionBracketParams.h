@@ -43,4 +43,14 @@ namespace moho
    * unchanged.
    */
   [[nodiscard]] void* LoadLuaSelectionParams(void* selectionParamsSentinel);
+
+  /**
+   * Address: 0x010BF644 (sSelectionParamsSentinel)
+   *
+   * Cross-TU accessor for the one-shot "the Lua tuning table has already been
+   * imported" latch. `func_DrawSelectionBrackets` (0x007FC820) both tests it
+   * at 0x007FC849 and republishes it at 0x007FC88F, so it cannot stay a
+   * translation-unit-private global here.
+   */
+  [[nodiscard]] void*& SelectionParamsSentinel() noexcept;
 }
