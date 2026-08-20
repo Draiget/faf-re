@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -74,6 +75,8 @@
 #include "moho/entity/EntityPositionWatchEntry.h"
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
+#include "moho/ai/CAiPathFinder.h"
+#include "moho/path/IPathTraveler.h"
 #include "moho/path/PathTables.h"
 #include "moho/particles/SParticleBuffer.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -7117,119 +7120,118 @@ namespace
     return moho::console::SimPathTimeoutPreviewConVar();
   }
 
-  struct PathPreviewFinderRuntimeView
+  struct PathPreviewFinderQueueOwnerRuntimeView
   {
-    void* mVTable;                       // +0x00
-    void* mPathQueueNodeNext;            // +0x04
-    void* mPathQueueNodePrev;            // +0x08
-    void* mOwnerContext;                 // +0x0C
-    Sim* mSim;                           // +0x10
-    COGrid* mOGrid;                      // +0x14
-    void* mPathPreviewCallbackOwner;     // +0x18
-    SOCellPos mStartCell;                // +0x1C
-    SOCellPos mGoalCell;                 // +0x20
-    const SFootprint* mFootprint;        // +0x24
-    std::uint8_t mGoalCellIsTraversable; // +0x28
-    std::uint8_t mPad_29_2B[3];          // +0x29
-  };
-  static_assert(offsetof(PathPreviewFinderRuntimeView, mSim) == 0x10, "PathPreviewFinderRuntimeView::mSim offset");
-  static_assert(offsetof(PathPreviewFinderRuntimeView, mOGrid) == 0x14, "PathPreviewFinderRuntimeView::mOGrid offset");
-  static_assert(
-    offsetof(PathPreviewFinderRuntimeView, mStartCell) == 0x1C, "PathPreviewFinderRuntimeView::mStartCell offset"
-  );
-  static_assert(offsetof(PathPreviewFinderRuntimeView, mGoalCell) == 0x20, "PathPreviewFinderRuntimeView::mGoalCell offset");
-  static_assert(
-    offsetof(PathPreviewFinderRuntimeView, mFootprint) == 0x24, "PathPreviewFinderRuntimeView::mFootprint offset"
-  );
-  static_assert(
-    offsetof(PathPreviewFinderRuntimeView, mGoalCellIsTraversable) == 0x28,
-    "PathPreviewFinderRuntimeView::mGoalCellIsTraversable offset"
-  );
-  static_assert(sizeof(PathPreviewFinderRuntimeView) == 0x2C, "PathPreviewFinderRuntimeView size must be 0x2C");
-
-  struct PathPreviewFinderOwnerDispatchVTableRuntimeView
-  {
-    void* slot00 = nullptr;
-    void* (__thiscall* ResolveSimRuntimeState)(Sim* sim) = nullptr; // +0x04
-    void* slots08_4F[(0x50 - 0x08) / sizeof(void*)]{};
-    void* (__thiscall* ResolvePreviewCallbackOwner)(Sim* sim) = nullptr; // +0x50
+    std::uint8_t mPad00_03[0x4];
+    TDatListItem<void, void> mQueueHead; // +0x04, owned by CArmyImpl's still-unresolved PathQueue lane
   };
   static_assert(
-    offsetof(PathPreviewFinderOwnerDispatchVTableRuntimeView, ResolveSimRuntimeState) == 0x04,
-    "PathPreviewFinderOwnerDispatchVTableRuntimeView::ResolveSimRuntimeState offset must be 0x04"
-  );
-  static_assert(
-    offsetof(PathPreviewFinderOwnerDispatchVTableRuntimeView, ResolvePreviewCallbackOwner) == 0x50,
-    "PathPreviewFinderOwnerDispatchVTableRuntimeView::ResolvePreviewCallbackOwner offset must be 0x50"
+    offsetof(PathPreviewFinderQueueOwnerRuntimeView, mQueueHead) == 0x4,
+    "PathPreviewFinderQueueOwnerRuntimeView::mQueueHead offset"
   );
 
-  struct PathPreviewFinderOwnerDispatchRuntimeView
-  {
-    PathPreviewFinderOwnerDispatchVTableRuntimeView* vtable = nullptr; // +0x00
-  };
+} // namespace
 
-  struct PathPreviewFinderSimStateRuntimeView
-  {
-    std::uint8_t pad0000_0907[0x908]{};
-    COGrid* oGrid = nullptr; // +0x908
-  };
-  static_assert(offsetof(PathPreviewFinderSimStateRuntimeView, oGrid) == 0x908, "PathPreviewFinderSimStateRuntimeView::oGrid offset");
-
+// `Moho::PathPreviewFinder` is forward-declared at real `moho::` scope in
+// gpg/core/utils/BoostWrappers.h (for `boost::shared_ptr<PathPreviewFinder>`'s
+// control-block instantiations) - it cannot live in the anonymous namespace
+// used by the rest of this file's file-local helpers, so this cluster opens a
+// real `namespace moho` block instead.
+namespace moho
+{
   /**
-   * Address: 0x007647E0 (FUN_007647E0, ??0PathPreviewFinder@Moho@@QAE@@Z)
+   * Preview-only `IPathTraveler` implementation used by `Sim::path_GeneratePreview`
+   * (the `path_GeneratePreview` SimCon command) to run a background pathfind on
+   * behalf of a UI drag-to-move preview.
    *
-   * What it does:
-   * Initializes one path-preview finder node, binds the finder owner context,
-   * resolves sim-grid/callback owner lanes through owner virtual dispatch, and
-   * clears active preview endpoints.
+   * RTTI: vftable@0x00E35D5C, 12 primary slots (inherited from `Moho::IPathTraveler`,
+   * `??_7PathPreviewFinder@Moho@@6B@`); bases `Moho::IPathTraveler` (mdisp=0),
+   * `.?AV?$DListItem@VIPathTraveler@Moho@@X@gpg@@` (mdisp=4, modeled by
+   * `IPathTraveler::mPathQueueNode`), `boost::noncopyable` (mdisp=4) - all already
+   * covered by deriving from the already-recovered `Moho::IPathTraveler`.
    */
-  [[maybe_unused]] PathPreviewFinderRuntimeView* InitializePathPreviewFinderRuntime(
-    PathPreviewFinderRuntimeView* const finder,
-    Sim* const sim
-  ) noexcept
+  class PathPreviewFinder final : public IPathTraveler
   {
-    if (finder == nullptr) {
-      return nullptr;
-    }
+  public:
+    /**
+     * Address: 0x007647E0 (FUN_007647E0, ??0PathPreviewFinder@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Binds the finder to its owning army, resolves the owning `Sim`/`COGrid`
+     * and the army's path-preview callback owner through `CArmyImpl::GetSim`/
+     * `CArmyImpl::GetPathFinder`, and clears the active preview endpoints.
+     */
+    explicit PathPreviewFinder(CArmyImpl* owningArmy) noexcept;
 
-    static std::uint8_t sPathPreviewFinderRuntimeVTableTag = 0;
-    finder->mVTable = &sPathPreviewFinderRuntimeVTableTag;
+    // Moho::IPathTraveler overrides (RTTI vftable slots 0-11).
+    [[nodiscard]] const SFootprint* GetFootprint() const override;
+    [[nodiscard]] bool CanTraverseCell(const SOCellPos& cellPos) const override;
+    [[nodiscard]] bool IsInBounds(const SOCellPos& fromCell, const SOCellPos& toCell, float* edgeCost) const override;
+    [[nodiscard]] float GetHeuristicCost(const SOCellPos& cellPos) const override;
+    void GetAnchorCell(HPathCell* outCell) const override;
+    [[nodiscard]] bool IsGoalCandidateCell(const SOCellPos& cellPos) const override;
+    void OnPathAccepted(const SNavPath& path) override;
+    [[nodiscard]] bool ShouldSearchRect(const gpg::Rect2i& rect) const override;
+    void OnPathSearchCancelled() override;
+    void OnPathRejected(const SNavPath& path) override;
+    [[nodiscard]] std::int32_t GetPathcap() const override;
+    void GetResultCell(HPathCell* outCell) const override;
 
-    void* const queueNodeHead = static_cast<void*>(&finder->mPathQueueNodeNext);
-    finder->mPathQueueNodeNext = queueNodeHead;
-    finder->mPathQueueNodePrev = queueNodeHead;
+    /**
+     * Address: 0x00764880 (FUN_00764880)
+     *
+     * What it does:
+     * Updates the preview finder start/goal lanes when footprint traversal state
+     * changes, then requeues the finder at the front of the callback-owner list.
+     */
+    void ApplySearchEndpoints(const SFootprint* footprint, const SOCellPos& startCell, const SOCellPos& goalCell);
 
-    finder->mOwnerContext = sim;
-    finder->mSim = sim;
-    finder->mOGrid = nullptr;
-    finder->mPathPreviewCallbackOwner = nullptr;
-    finder->mStartCell = SOCellPos{0, 0};
-    finder->mGoalCell = SOCellPos{0, 0};
-    finder->mFootprint = nullptr;
-    finder->mGoalCellIsTraversable = 0u;
+    /**
+     * Address: 0x00764900 (FUN_00764900)
+     *
+     * What it does:
+     * Detaches this finder from the callback-owner queue and clears its current
+     * footprint lane, when a footprint is currently active.
+     */
+    void ResetQueuedFootprint();
 
-    if (sim == nullptr) {
-      return finder;
-    }
+  public:
+    CArmyImpl* mOwnerContext;         // +0x0C
+    Sim* mSim;                        // +0x10
+    COGrid* mOGrid;                   // +0x14
+    void* mPathPreviewCallbackOwner;  // +0x18 (CArmyImpl::GetPathFinder() result; still-unresolved PathQueue owner)
+    SOCellPos mStartCell;             // +0x1C
+    SOCellPos mGoalCell;              // +0x20
+    const SFootprint* mFootprint;     // +0x24
+    bool mStartCellIsTraversable;     // +0x28 (asm: OCCUPY_FootprintFits tested against mStartCell, not mGoalCell)
+  };
 
-    auto* const ownerDispatch = reinterpret_cast<PathPreviewFinderOwnerDispatchRuntimeView*>(sim);
-    if (ownerDispatch->vtable == nullptr) {
-      return finder;
-    }
+  static_assert(offsetof(PathPreviewFinder, mOwnerContext) == 0x0C, "PathPreviewFinder::mOwnerContext offset");
+  static_assert(offsetof(PathPreviewFinder, mSim) == 0x10, "PathPreviewFinder::mSim offset");
+  static_assert(offsetof(PathPreviewFinder, mOGrid) == 0x14, "PathPreviewFinder::mOGrid offset");
+  static_assert(offsetof(PathPreviewFinder, mPathPreviewCallbackOwner) == 0x18, "PathPreviewFinder::mPathPreviewCallbackOwner offset");
+  static_assert(offsetof(PathPreviewFinder, mStartCell) == 0x1C, "PathPreviewFinder::mStartCell offset");
+  static_assert(offsetof(PathPreviewFinder, mGoalCell) == 0x20, "PathPreviewFinder::mGoalCell offset");
+  static_assert(offsetof(PathPreviewFinder, mFootprint) == 0x24, "PathPreviewFinder::mFootprint offset");
+  static_assert(offsetof(PathPreviewFinder, mStartCellIsTraversable) == 0x28, "PathPreviewFinder::mStartCellIsTraversable offset");
+  static_assert(sizeof(PathPreviewFinder) == 0x2C, "PathPreviewFinder size must be 0x2C");
 
-    if (ownerDispatch->vtable->ResolveSimRuntimeState != nullptr) {
-      auto* const simRuntimeState =
-        static_cast<PathPreviewFinderSimStateRuntimeView*>(ownerDispatch->vtable->ResolveSimRuntimeState(sim));
-      finder->mOGrid = simRuntimeState != nullptr ? simRuntimeState->oGrid : nullptr;
-    }
-
-    if (ownerDispatch->vtable->ResolvePreviewCallbackOwner != nullptr) {
-      finder->mPathPreviewCallbackOwner = ownerDispatch->vtable->ResolvePreviewCallbackOwner(sim);
-    }
-
-    return finder;
+  PathPreviewFinder::PathPreviewFinder(CArmyImpl* const owningArmy) noexcept
+    : IPathTraveler()
+    , mOwnerContext(owningArmy)
+    , mSim(owningArmy->GetSim())
+    , mOGrid(mSim->mOGrid)
+    , mPathPreviewCallbackOwner(owningArmy->GetPathFinder())
+    , mStartCell{0, 0}
+    , mGoalCell{0, 0}
+    , mFootprint(nullptr)
+    , mStartCellIsTraversable(false)
+  {
   }
+} // namespace moho
 
+namespace
+{
   /**
    * Address: 0x00763DC0 (FUN_00763DC0)
    * Address: 0x00764760 (FUN_00764760)
@@ -7302,133 +7304,100 @@ namespace
   {
     return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
   }
+} // namespace
 
-  /**
-   * Address: 0x007647C0 (FUN_007647C0)
-   *
-   * What it does:
-   * Returns the current preview footprint lane.
-   */
-  [[maybe_unused]] const SFootprint* PathPreviewGetFootprint(const PathPreviewFinderRuntimeView* const finder)
+namespace moho
+{
+  const SFootprint* PathPreviewFinder::GetFootprint() const
   {
-    return finder->mFootprint;
+    return mFootprint;
   }
 
-  /**
-   * Address: 0x007649C0 (FUN_007649C0)
-   *
-   * What it does:
-   * Returns whether one candidate cell can fit the current preview footprint on
-   * the active OGrid.
-   */
-  [[maybe_unused]] bool PathPreviewCanTraverseCell(
-    const PathPreviewFinderRuntimeView* const finder,
-    const SOCellPos& cellPos
-  )
+  bool PathPreviewFinder::CanTraverseCell(const SOCellPos& cellPos) const
   {
     return static_cast<std::uint8_t>(
-             OCCUPY_FootprintFits(*finder->mOGrid, cellPos, *finder->mFootprint, EOccupancyCaps::OC_ANY)
+             OCCUPY_FootprintFits(*mOGrid, cellPos, *mFootprint, EOccupancyCaps::OC_ANY)
            ) != 0u;
   }
 
-  /**
-   * Address: 0x007647A0 (FUN_007647A0)
-   *
-   * What it does:
-   * Uses an always-in-bounds policy for preview traversal.
-   */
-  [[maybe_unused]] bool PathPreviewIsInBounds(
-    const PathPreviewFinderRuntimeView*,
-    const SOCellPos& /*fromCell*/,
-    const SOCellPos& /*toCell*/,
-    float* /*edgeCost*/
-  )
+  // Address: 0x007647A0 (FUN_007647A0) -- always-in-bounds policy for preview traversal.
+  bool PathPreviewFinder::IsInBounds(const SOCellPos&, const SOCellPos&, float*) const
   {
     return true;
   }
 
-  /**
-   * Address: 0x00764930 (FUN_00764930)
-   *
-   * What it does:
-   * Computes diagonal-biased cost from one cell to the preview goal cell.
-   */
-  [[maybe_unused]] float PathPreviewGetHeuristicCost(
-    const PathPreviewFinderRuntimeView* const finder,
-    const SOCellPos& cellPos
-  )
+  float PathPreviewFinder::GetHeuristicCost(const SOCellPos& cellPos) const
   {
-    const float deltaX = std::fabs(static_cast<float>(finder->mGoalCell.x - cellPos.x));
-    const float deltaZ = std::fabs(static_cast<float>(finder->mGoalCell.z - cellPos.z));
+    const float deltaX = std::fabs(static_cast<float>(mGoalCell.x - cellPos.x));
+    const float deltaZ = std::fabs(static_cast<float>(mGoalCell.z - cellPos.z));
     constexpr float kDiagScale = 0.41421354f;
     constexpr float kPreviewCostScale = 1.01f;
     const float baseCost = (deltaZ <= deltaX) ? ((deltaZ * kDiagScale) + deltaX) : ((deltaX * kDiagScale) + deltaZ);
     return baseCost * kPreviewCostScale;
   }
 
-  /**
-   * Address: 0x00764A00 (FUN_00764A00)
-   *
-   * What it does:
-   * Writes the current preview anchor cell into the output lane.
-   */
-  [[maybe_unused]] SOCellPos* PathPreviewGetAnchorCell(
-    const PathPreviewFinderRuntimeView* const finder,
-    SOCellPos* const outCell
-  )
+  // Address: 0x00764A00 (FUN_00764A00) -- writes the current preview anchor cell into the output lane.
+  void PathPreviewFinder::GetAnchorCell(HPathCell* const outCell) const
   {
-    *outCell = finder->mStartCell;
-    return outCell;
+    outCell->x = static_cast<std::uint16_t>(mStartCell.x);
+    outCell->z = static_cast<std::uint16_t>(mStartCell.z);
+  }
+
+  bool PathPreviewFinder::IsGoalCandidateCell(const SOCellPos& cellPos) const
+  {
+    return cellPos.x == mGoalCell.x && cellPos.z == mGoalCell.z;
   }
 
   /**
-   * Address: 0x00764A60 (FUN_00764A60)
+   * Address: 0x00764A80 (FUN_00764A80)
    *
    * What it does:
-   * Returns whether the provided cell equals the current preview goal cell.
+   * Publishes the accepted/rejected path's cells to the owning army through
+   * `CArmyImpl::SetUnknownVectorWithMeta` (vtable slot +0x5C on the owner),
+   * reusing the same generic word-vector-with-meta payload
+   * (`Moho::SArmyVectorWithMeta`) `CArmyImpl` uses for its variable-data copy
+   * lane: each 4-byte `SOCellPos` cell is packed into one `mWords` element and
+   * the previous footprint pointer is carried in `mMetaWord`. Clears the
+   * active footprint lane before publishing.
    */
-  [[maybe_unused]] bool PathPreviewIsGoalCell(const PathPreviewFinderRuntimeView* const finder, const SOCellPos& cellPos)
+  void PathPreviewFinder::OnPathAccepted(const SNavPath& path)
   {
-    return cellPos.x == finder->mGoalCell.x && cellPos.z == finder->mGoalCell.z;
+    SArmyVectorWithMeta payload{};
+    const std::size_t cellCount = path.Count();
+    payload.mWords.resize(cellCount);
+    for (std::size_t i = 0; i < cellCount; ++i) {
+      payload.mWords[i] = std::bit_cast<std::uint32_t>(path.start[i]);
+    }
+    payload.mMetaWord = std::bit_cast<std::uint32_t>(mFootprint);
+    mFootprint = nullptr;
+
+    mOwnerContext->SetUnknownVectorWithMeta(&payload);
   }
 
-  /**
-   * Address: 0x00764A10 (FUN_00764A10)
-   *
-   * What it does:
-   * Returns true when either preview endpoint cell lies inside the candidate
-   * search rectangle.
-   */
-  [[maybe_unused]] bool PathPreviewShouldSearchRect(
-    const PathPreviewFinderRuntimeView* const finder,
-    const gpg::Rect2i& rect
-  )
+  bool PathPreviewFinder::ShouldSearchRect(const gpg::Rect2i& rect) const
   {
     const auto inRect = [&rect](const SOCellPos& cell) {
       return cell.x >= rect.x0 && cell.x < rect.x1 && cell.z >= rect.z0 && cell.z < rect.z1;
     };
-    return inRect(finder->mStartCell) || inRect(finder->mGoalCell);
+    return inRect(mStartCell) || inRect(mGoalCell);
+  }
+
+  // Address: 0x007647B0 (FUN_007647B0, nullsub_2211) -- no-op cancellation callback.
+  void PathPreviewFinder::OnPathSearchCancelled()
+  {
   }
 
   /**
-   * Address: 0x007647B0 (FUN_007647B0, nullsub_2211)
+   * Address: 0x00764B60 (FUN_00764B60)
    *
    * What it does:
-   * No-op callback lane used by preview path cancellation flow.
+   * The binary is a tail-call thunk (`jmp [[this]+0x18]`) into this finder's
+   * own `OnPathAccepted` vtable slot, i.e. a rejected search publishes the
+   * same cell payload as an accepted one.
    */
-  [[maybe_unused]] void PathPreviewOnSearchCancelled(PathPreviewFinderRuntimeView*) {}
-
-  /**
-   * Address: 0x007647D0 (FUN_007647D0)
-   *
-   * What it does:
-   * Clears one output result-cell lane.
-   */
-  [[maybe_unused]] SOCellPos* PathPreviewGetResultCell(SOCellPos* const outCell)
+  void PathPreviewFinder::OnPathRejected(const SNavPath& path)
   {
-    outCell->x = 0;
-    outCell->z = 0;
-    return outCell;
+    OnPathAccepted(path);
   }
 
   /**
@@ -7438,206 +7407,57 @@ namespace
    * Reads the current `path_TimeoutPreview` sim-convar value from the owning
    * sim lane used by path-preview traversal callbacks.
    */
-  [[maybe_unused]] std::int32_t PathPreviewTimeoutMs(const PathPreviewFinderRuntimeView* const finder)
+  std::int32_t PathPreviewFinder::GetPathcap() const
   {
-    CSimConVarInstanceBase* const instance = finder->mSim->GetSimVar(PathTimeoutPreviewConVar());
+    CSimConVarInstanceBase* const instance = mSim->GetSimVar(PathTimeoutPreviewConVar());
     return *reinterpret_cast<const std::int32_t*>(instance->GetValueStorage());
   }
 
-  struct PathPreviewFinderNodeRuntimeView
+  // Address: 0x007647D0 (FUN_007647D0) -- clears one output result-cell lane.
+  void PathPreviewFinder::GetResultCell(HPathCell* const outCell) const
   {
-    PathPreviewFinderNodeRuntimeView* mNext;
-    PathPreviewFinderNodeRuntimeView* mPrev;
-  };
-  static_assert(sizeof(PathPreviewFinderNodeRuntimeView) == 0x8, "PathPreviewFinderNodeRuntimeView size must be 0x8");
-
-  struct PathPreviewFinderQueueOwnerRuntimeView
-  {
-    std::uint8_t mPad00_03[0x4];
-    PathPreviewFinderNodeRuntimeView mQueueHead;
-  };
-  static_assert(
-    offsetof(PathPreviewFinderQueueOwnerRuntimeView, mQueueHead) == 0x4,
-    "PathPreviewFinderQueueOwnerRuntimeView::mQueueHead offset"
-  );
-
-  [[nodiscard]] PathPreviewFinderNodeRuntimeView* PathPreviewFinderQueueNode(PathPreviewFinderRuntimeView* const finder)
-  {
-    return reinterpret_cast<PathPreviewFinderNodeRuntimeView*>(&finder->mPathQueueNodeNext);
+    outCell->x = 0;
+    outCell->z = 0;
   }
 
-  [[nodiscard]] const PathPreviewFinderNodeRuntimeView* PathPreviewFinderQueueNode(
-    const PathPreviewFinderRuntimeView* const finder
-  )
-  {
-    return reinterpret_cast<const PathPreviewFinderNodeRuntimeView*>(&finder->mPathQueueNodeNext);
-  }
-
-  void PathPreviewDetachFinderNode(PathPreviewFinderRuntimeView* const finder)
-  {
-    PathPreviewFinderNodeRuntimeView* const node = PathPreviewFinderQueueNode(finder);
-    node->mPrev->mNext = node->mNext;
-    node->mNext->mPrev = node->mPrev;
-    node->mNext = node;
-    node->mPrev = node;
-  }
-
-  void PathPreviewQueueFinderFront(
-    PathPreviewFinderRuntimeView* const finder,
-    PathPreviewFinderQueueOwnerRuntimeView* const queueOwner
-  )
-  {
-    if (!queueOwner) {
-      return;
-    }
-
-    PathPreviewFinderNodeRuntimeView* const queueHead = &queueOwner->mQueueHead;
-    PathPreviewFinderNodeRuntimeView* const node = PathPreviewFinderQueueNode(finder);
-    node->mNext = queueHead->mNext;
-    node->mPrev = queueHead;
-    queueHead->mNext->mPrev = node;
-    queueHead->mNext = node;
-  }
-
-  /**
-   * Address: 0x00764880 (FUN_00764880)
-   *
-   * What it does:
-   * Updates the preview finder start/goal lanes when footprint traversal state
-   * changes, then requeues the finder at the front of the callback-owner list.
-   */
-  [[maybe_unused]] void PathPreviewApplySearchEndpoints(
-    PathPreviewFinderRuntimeView* const finder,
+  void PathPreviewFinder::ApplySearchEndpoints(
     const SFootprint* const footprint,
     const SOCellPos& startCell,
     const SOCellPos& goalCell
   )
   {
-    if (finder->mFootprint == footprint && finder->mGoalCellIsTraversable != 0u) {
+    if (mFootprint == footprint && mStartCellIsTraversable) {
       return;
     }
 
-    finder->mStartCell = startCell;
-    finder->mGoalCell = goalCell;
-    finder->mFootprint = footprint;
-    finder->mGoalCellIsTraversable = static_cast<std::uint8_t>(PathPreviewCanTraverseCell(finder, goalCell));
+    mStartCell = startCell;
+    mGoalCell = goalCell;
+    mFootprint = footprint;
+    // asm evidence (0x007648A9-0x007648B7): OCCUPY_FootprintFits is tested
+    // against the just-assigned mStartCell, not mGoalCell.
+    mStartCellIsTraversable =
+      static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, mStartCell, *footprint, EOccupancyCaps::OC_ANY)) != 0u;
 
-    PathPreviewDetachFinderNode(finder);
-    auto* const ownerSlot = reinterpret_cast<PathPreviewFinderQueueOwnerRuntimeView**>(finder->mPathPreviewCallbackOwner);
-    PathPreviewQueueFinderFront(finder, ownerSlot != nullptr ? *ownerSlot : nullptr);
-  }
-
-  /**
-   * Address: 0x00764900 (FUN_00764900)
-   *
-   * What it does:
-   * Detaches one active preview finder from the callback-owner queue and
-   * clears its current footprint lane.
-   */
-  [[maybe_unused]] PathPreviewFinderNodeRuntimeView* PathPreviewResetQueuedFootprint(PathPreviewFinderRuntimeView* const finder)
-  {
-    if (!finder->mFootprint) {
-      return nullptr;
+    mPathQueueNode.ListUnlink();
+    auto* const ownerSlot = reinterpret_cast<PathPreviewFinderQueueOwnerRuntimeView**>(mPathPreviewCallbackOwner);
+    if (ownerSlot != nullptr && *ownerSlot != nullptr) {
+      mPathQueueNode.ListLinkAfter(&(*ownerSlot)->mQueueHead);
     }
-
-    PathPreviewDetachFinderNode(finder);
-    finder->mFootprint = nullptr;
-    return PathPreviewFinderQueueNode(finder);
   }
 
-  struct PathPreviewPublishedPathRuntimeView
+  void PathPreviewFinder::ResetQueuedFootprint()
   {
-    msvc8::vector<SOCellPos> mCells;
-    const SFootprint* mPreviousFootprint;
-  };
-  static_assert(
-    offsetof(PathPreviewPublishedPathRuntimeView, mPreviousFootprint) == 0x10,
-    "PathPreviewPublishedPathRuntimeView::mPreviousFootprint offset"
-  );
-  static_assert(sizeof(PathPreviewPublishedPathRuntimeView) == 0x14, "PathPreviewPublishedPathRuntimeView size must be 0x14");
-
-  struct PathPreviewCallbackOwnerRuntimeView;
-  struct PathPreviewCallbackOwnerVTableRuntimeView
-  {
-    void* mSlots00_58[0x17];
-    void (__thiscall* PublishPreviewPath)(
-      PathPreviewCallbackOwnerRuntimeView* owner,
-      const PathPreviewPublishedPathRuntimeView* publishedPath
-    );
-  };
-  static_assert(
-    offsetof(PathPreviewCallbackOwnerVTableRuntimeView, PublishPreviewPath) == 0x5C,
-    "PathPreviewCallbackOwnerVTableRuntimeView::PublishPreviewPath offset"
-  );
-
-  struct PathPreviewCallbackOwnerRuntimeView
-  {
-    PathPreviewCallbackOwnerVTableRuntimeView* mVTable;
-  };
-
-  /**
-   * Address: 0x00764A80 (FUN_00764A80)
-   *
-   * What it does:
-   * Publishes one copied path cell lane vector to the preview callback owner,
-   * carrying the previous footprint lane as part of the payload.
-   */
-  [[maybe_unused]] void PathPreviewPublishPathCells(
-    PathPreviewFinderRuntimeView* const finder,
-    const msvc8::vector<SOCellPos>& sourceCells
-  )
-  {
-    auto* const owner = reinterpret_cast<PathPreviewCallbackOwnerRuntimeView*>(finder->mOwnerContext);
-    if (!owner || !owner->mVTable || !owner->mVTable->PublishPreviewPath) {
-      finder->mFootprint = nullptr;
+    if (mFootprint == nullptr) {
       return;
     }
 
-    PathPreviewPublishedPathRuntimeView publishedPath{};
-    publishedPath.mPreviousFootprint = finder->mFootprint;
-    finder->mFootprint = nullptr;
-
-    // The binary sizes the destination with the two-argument resize, filling
-    // appended slots with the `Invalid<SOCellPos>` sentinel rather than
-    // value-initialising them: 0x00764AD1 materialises 0xFFFF8000 and stores
-    // it as two 16-bit halves, then passes that 4-byte value BY VALUE to the
-    // resize lane at 0x00764AEB. The source count is computed once
-    // (0x00764AC9) and reused as both the resize count and the copy bound.
-    constexpr SOCellPos kInvalidCellPos{
-      static_cast<std::int16_t>(0x8000),
-      static_cast<std::int16_t>(0x8000)
-    };
-    const std::size_t cellCount = sourceCells.size();
-    publishedPath.mCells.resize(cellCount, kInvalidCellPos);
-    for (std::size_t i = 0; i < cellCount; ++i) {
-      publishedPath.mCells[i] = sourceCells[i];
-    }
-
-    owner->mVTable->PublishPreviewPath(owner, &publishedPath);
+    mPathQueueNode.ListUnlink();
+    mFootprint = nullptr;
   }
+} // namespace moho
 
-  struct PathPreviewFinderVTableRuntimeView
-  {
-    void* mSlots00_14[0x6];
-    std::int32_t(__thiscall* InvokeTimeoutSlot)(PathPreviewFinderRuntimeView* finder);
-  };
-  static_assert(
-    offsetof(PathPreviewFinderVTableRuntimeView, InvokeTimeoutSlot) == 0x18,
-    "PathPreviewFinderVTableRuntimeView::InvokeTimeoutSlot offset"
-  );
-
-  /**
-   * Address: 0x00764B60 (FUN_00764B60)
-   *
-   * What it does:
-   * Forwards timeout retrieval to the vtable timeout slot for this finder.
-   */
-  [[maybe_unused]] std::int32_t PathPreviewForwardTimeoutVirtual(PathPreviewFinderRuntimeView* const finder)
-  {
-    auto* const vtable = reinterpret_cast<PathPreviewFinderVTableRuntimeView*>(finder->mVTable);
-    return vtable->InvokeTimeoutSlot(finder);
-  }
-
+namespace
+{
   struct PathPreviewUnitSetRuntimeView
   {
     std::uint8_t mPad00_07[0x8];
@@ -7646,6 +7466,7 @@ namespace
   };
   static_assert(offsetof(PathPreviewUnitSetRuntimeView, mUnitBegin) == 0x8, "PathPreviewUnitSetRuntimeView::mUnitBegin");
   static_assert(offsetof(PathPreviewUnitSetRuntimeView, mUnitEnd) == 0xC, "PathPreviewUnitSetRuntimeView::mUnitEnd");
+  static_assert(offsetof(SEntitySetTemplateUnit, mVec) == 0x08, "SEntitySetTemplateUnit::mVec offset must alias PathPreviewUnitSetRuntimeView::mUnitBegin");
 
   [[nodiscard]] Unit* PathPreviewUnitFromSetHandle(void* const handle)
   {
@@ -7654,6 +7475,8 @@ namespace
     }
 
     // Unit-set handles retain an interior pointer; binary lane normalizes by -8.
+    // (Not `SEntitySetTemplateUnit::UnitFromEntry`'s `IsUnit()` dispatch: the
+    // asm at 0x00764B9A-0x00764BA6 does the raw pointer-minus-8 directly.)
     auto* const bytes = reinterpret_cast<std::uint8_t*>(handle);
     return reinterpret_cast<Unit*>(bytes - 0x8);
   }
@@ -7665,20 +7488,21 @@ namespace
    * Chooses one live unit from the candidate unit-set lane that has a resolved
    * footprint and the largest blueprint size-Z lane.
    */
-  [[maybe_unused]] Unit* PathPreviewSelectLargestUnit(const PathPreviewUnitSetRuntimeView* const unitSet)
+  Unit* PathPreviewSelectLargestUnit(const SEntitySetTemplateUnit* const unitSet)
   {
     if (!unitSet) {
       return nullptr;
     }
 
-    void** unitIt = unitSet->mUnitBegin;
-    if (unitIt == unitSet->mUnitEnd) {
+    const auto* const view = reinterpret_cast<const PathPreviewUnitSetRuntimeView*>(unitSet);
+    void** unitIt = view->mUnitBegin;
+    if (unitIt == view->mUnitEnd) {
       return nullptr;
     }
 
     Unit* bestUnit = nullptr;
     float bestSizeZ = 0.0f;
-    while (unitIt != unitSet->mUnitEnd) {
+    while (unitIt != view->mUnitEnd) {
       Unit* const unit = PathPreviewUnitFromSetHandle(*unitIt);
       ++unitIt;
       if (!unit) {
@@ -7802,7 +7626,7 @@ namespace
    * Chooses one terminal target position from queued command-target handles
    * (walking newest-to-oldest), then falls back to the unit position lane.
    */
-  [[maybe_unused]] Wm3::Vector3f* PathPreviewResolveEndPosition(Wm3::Vector3f* const outPos, Unit* const unit)
+  Wm3::Vector3f* PathPreviewResolveEndPosition(Wm3::Vector3f* const outPos, Unit* const unit)
   {
     const PathPreviewTargetQueueRuntimeView* const targetQueue = PathPreviewResolveTargetQueue(unit);
     if (targetQueue && targetQueue->mBegin && targetQueue->mBegin != targetQueue->mEnd) {
@@ -7832,7 +7656,119 @@ namespace
     outPos->z = unitPos.z;
     return outPos;
   }
+} // namespace
 
+namespace moho
+{
+  /**
+   * Address: 0x00764CF0 (FUN_00764CF0, Moho::Sim::path_GeneratePreview)
+   *
+   * IDA signature:
+   * void __cdecl Moho::Sim::path_GeneratePreview(
+   *   Moho::Sim* sim, std::vector<std::string>* commandArgs, Wm3::Vector3f* worldPos,
+   *   Moho::CArmyImpl* focusArmy, Moho::SEntitySetTemplateUnit* selectedUnits);
+   *
+   * What it does:
+   * `path_GeneratePreview` SimCon command. Picks the largest selected unit with
+   * a resolved footprint that isn't being built; if one exists, lazily creates
+   * (or reuses) the army's cached `PathPreviewFinder`, resolves the search
+   * start cell (the unit's current position, or its queued end-of-command
+   * target when the command's second argument is `"end"`) and goal cell (the
+   * mouse world position) footprint-centered, and applies them to the finder.
+   * If no eligible unit is selected, clears any cached preview finder and its
+   * published-path payload on the army. Every branch feeds the desync MD5
+   * hash and mirrors it to the sim log, matching the binary exactly so replay
+   * checksums stay reproducible.
+   */
+  int Sim::path_GeneratePreview(
+    Sim* const sim,
+    CSimConCommand::ParsedCommandArgs* const commandArgs,
+    Wm3::Vector3f* const worldPos,
+    CArmyImpl* const focusArmy,
+    SEntitySetTemplateUnit* const selectedUnits
+  )
+  {
+    if (focusArmy == nullptr) {
+      return 0;
+    }
+
+    SSTIArmyConstantData armyConstData{};
+    focusArmy->CopyArmyConstantData(&armyConstData);
+    sim->mContext.Update(&armyConstData.mArmyIndex, sizeof(armyConstData.mArmyIndex));
+    sim->Logf("path preview for army %d\n", armyConstData.mArmyIndex);
+
+    boost::shared_ptr<PathPreviewFinder> previewFinder{};
+    focusArmy->GetUnknownSharedRef(reinterpret_cast<boost::SharedPtrRaw<void>*>(&previewFinder));
+
+    Unit* const unit = PathPreviewSelectLargestUnit(selectedUnits);
+    if (unit != nullptr) {
+      // Binary logs/hashes a still-unresolved Unit diagnostic dword at +0x70
+      // (asm: `mov ecx, [esi+70h]` at 0x00764D7C) as "unit=0x%08x".
+      struct PreviewUnitDiagnosticView
+      {
+        std::uint8_t mPad00_6F[0x70];
+        std::uint32_t field_0x70;
+      };
+      static_assert(offsetof(PreviewUnitDiagnosticView, field_0x70) == 0x70, "PreviewUnitDiagnosticView::field_0x70 offset");
+      const std::uint32_t unitDiagnostic = reinterpret_cast<const PreviewUnitDiagnosticView*>(unit)->field_0x70;
+      sim->mContext.Update(&unitDiagnostic, sizeof(unitDiagnostic));
+      sim->Logf("  unit=0x%08x\n", unitDiagnostic);
+
+      if (!previewFinder) {
+        previewFinder = boost::shared_ptr<PathPreviewFinder>(new PathPreviewFinder(focusArmy));
+        focusArmy->SetUnknownSharedRef(reinterpret_cast<boost::SharedPtrRaw<void>*>(&previewFinder));
+      }
+
+      Wm3::Vector3f resolvedEndPos{};
+      const bool wantsEndPosition =
+        commandArgs->size() > 1 && (*commandArgs)[1] == "end";
+      const Wm3::Vector3f& sourcePos = wantsEndPosition
+        ? *PathPreviewResolveEndPosition(&resolvedEndPos, unit)
+        : unit->GetPosition();
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      const SFootprint* const footprint = blueprint->Physics.ResolvedFootprint;
+      const float halfSizeX = footprint->mSizeX * 0.5f;
+      const float halfSizeZ = footprint->mSizeZ * 0.5f;
+
+      SOCellPos start{};
+      start.x = static_cast<std::int16_t>(sourcePos.x - halfSizeX);
+      start.z = static_cast<std::int16_t>(sourcePos.z - halfSizeZ);
+
+      SOCellPos goal{};
+      goal.x = static_cast<std::int16_t>(worldPos->x - halfSizeX);
+      goal.z = static_cast<std::int16_t>(worldPos->z - halfSizeZ);
+
+      sim->mContext.Update(worldPos, sizeof(*worldPos));
+      sim->Logf("  mousePos=<%f,%f,%f>\n", worldPos->x, worldPos->y, worldPos->z);
+      sim->mContext.Update(&start, sizeof(start));
+      sim->Logf("  start=<%d,%d>\n", start.x, start.z);
+      sim->mContext.Update(&goal, sizeof(goal));
+      sim->Logf("  goal=<%d,%d>\n", goal.x, goal.z);
+
+      previewFinder->ApplySearchEndpoints(footprint, start, goal);
+    } else {
+      const std::int32_t noUnitSentinel = -1;
+      sim->mContext.Update(&noUnitSentinel, sizeof(noUnitSentinel));
+      sim->Logf("  no unit\n");
+
+      if (previewFinder) {
+        previewFinder->ResetQueuedFootprint();
+
+        boost::shared_ptr<PathPreviewFinder> clearedFinder{};
+        focusArmy->SetUnknownSharedRef(reinterpret_cast<boost::SharedPtrRaw<void>*>(&clearedFinder));
+
+        SArmyVectorWithMeta clearedPayload{};
+        focusArmy->SetUnknownVectorWithMeta(&clearedPayload);
+      }
+    }
+
+    return 0;
+  }
+} // namespace moho
+
+namespace
+{
   bool IsDebugWindowEnabled()
   {
     return moho::SCR_IsDebugWindowActive();

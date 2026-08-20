@@ -85,6 +85,15 @@ namespace moho
   void register_DamageUnit_SimConFunc();
 
   /**
+   * Address: 0x00BDC850 (FUN_00BDC850, register_path_GeneratePreview_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `path_GeneratePreview` sim command callback (drag-to-move
+   * pathfind preview) and installs startup cleanup.
+   */
+  void register_path_GeneratePreview_SimConFuncDef();
+
+  /**
    * Address: 0x00BD3A50 (FUN_00BD3A50, register_AddImpulse_ConAliasDef)
    *
    * What it does:

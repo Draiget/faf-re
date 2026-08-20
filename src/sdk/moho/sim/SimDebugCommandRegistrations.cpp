@@ -194,6 +194,30 @@ namespace
     return sCommand;
   }
 
+  // `path_GeneratePreview` is constructed in-place (matching the binary's
+  // 0x00BDC850 call shape: base `CSimConCommand` ctor invoked directly on
+  // static storage, then `__vftable`/`mFunc` assigned by hand, exactly what
+  // `CSimConFunc`'s own constructor does) rather than heap-allocated, so it
+  // uses the placement-storage pattern below (matching `dbg`'s), not the
+  // `SimConFunc_*_slot()`/`EnsureSimConFuncRegistration` heap pattern.
+  alignas(moho::CSimConFunc) unsigned char gPathGeneratePreviewSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
+  bool gPathGeneratePreviewSimConFuncConstructed = false;
+
+  [[nodiscard]] moho::CSimConFunc& PathGeneratePreviewSimConFunc()
+  {
+    return *std::launder(reinterpret_cast<moho::CSimConFunc*>(gPathGeneratePreviewSimConFuncStorage));
+  }
+
+  [[nodiscard]] moho::CSimConFunc& ConstructPathGeneratePreviewSimConFunc()
+  {
+    if (!gPathGeneratePreviewSimConFuncConstructed) {
+      new (gPathGeneratePreviewSimConFuncStorage) moho::CSimConFunc(true, "path_GeneratePreview", &moho::Sim::path_GeneratePreview);
+      gPathGeneratePreviewSimConFuncConstructed = true;
+    }
+
+    return PathGeneratePreviewSimConFunc();
+  }
+
   [[nodiscard]] moho::TSimConVar<bool>*& SimConVar_NoDamage_slot()
   {
     static moho::TSimConVar<bool>* sConVar = nullptr;
@@ -656,6 +680,7 @@ namespace
       moho::register_DebugSetPlayableRect_SimConFuncDef();
       moho::register_DebugDumpArmyStats_ConAliasDef();
       moho::register_DebugDumpArmyStats_SimConFuncDef();
+      moho::register_path_GeneratePreview_SimConFuncDef();
     }
   };
 
@@ -962,6 +987,42 @@ namespace moho
   {
     EnsureSimConFuncRegistration<&Sim::DamageUnit>(SimConFunc_DamageUnit_slot(), "DamageUnit");
     RegisterAtexitCleanup<&cleanup_DamageUnit_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00C01A20 (FUN_00C01A20, sub_C01A20)
+   *
+   * What it does:
+   * `atexit`-installed cleanup callback for the `path_GeneratePreview`
+   * `CSimConFunc` registration. The binary destroys the static-storage
+   * `SimConFunc_path_GeneratePreview` object in place
+   * (`Moho::CSimConCommand::~CSimConCommand(&SimConFunc_path_GeneratePreview)`),
+   * not a heap `delete`.
+   */
+  void cleanup_path_GeneratePreview_SimConFunc()
+  {
+    if (!gPathGeneratePreviewSimConFuncConstructed) {
+      return;
+    }
+
+    static_cast<CSimConCommand&>(PathGeneratePreviewSimConFunc()).~CSimConCommand();
+    gPathGeneratePreviewSimConFuncConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BDC850 (FUN_00BDC850, register_path_GeneratePreview_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `path_GeneratePreview` sim command callback (drag-to-move
+   * pathfind preview) and installs startup cleanup. Cheat-gated
+   * (`requiresCheat=true`), matching the binary's inlined
+   * `CSimConCommand(1, &SimConFunc_path_GeneratePreview, "path_GeneratePreview")`
+   * base-construction call.
+   */
+  void register_path_GeneratePreview_SimConFuncDef()
+  {
+    (void)ConstructPathGeneratePreviewSimConFunc();
+    RegisterAtexitCleanup<&cleanup_path_GeneratePreview_SimConFunc>();
   }
 
   /**
