@@ -508,7 +508,7 @@ namespace moho
      */
     [[nodiscard]] EReconFlags DoCounterDetection(const moho::Rect2<int>& rect, EReconFlags flags) const;
 
-    [[nodiscard]] static boost::SharedPtrRaw<CIntelGrid> MakeGrid(STIMap* map, std::uint32_t gridSize);
+    [[nodiscard]] static CIntelGrid* MakeGrid(STIMap* map, std::uint32_t gridSize);
 
   public:
     static gpg::RType* sType;

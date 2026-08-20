@@ -1199,16 +1199,16 @@ CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
     }
   }
 
-  mRadarGrid = MakeGrid(mMapData, 4);
-  mSonarGrid = MakeGrid(mMapData, 4);
-  mOmniGrid = MakeGrid(mMapData, 4);
-  mRCIGrid = MakeGrid(mMapData, 4);
-  mSCIGrid = MakeGrid(mMapData, 4);
-  mVCIGrid = MakeGrid(mMapData, 4);
+  boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, 4));
+  boost::ResetSharedPtrRawOwning(mSonarGrid, MakeGrid(mMapData, 4));
+  boost::ResetSharedPtrRawOwning(mOmniGrid, MakeGrid(mMapData, 4));
+  boost::ResetSharedPtrRawOwning(mRCIGrid, MakeGrid(mMapData, 4));
+  boost::ResetSharedPtrRawOwning(mSCIGrid, MakeGrid(mMapData, 4));
+  boost::ResetSharedPtrRawOwning(mVCIGrid, MakeGrid(mMapData, 4));
 
   if (fogOfWar) {
-    mVisionGrid = MakeGrid(mMapData, 2);
-    mWaterGrid = MakeGrid(mMapData, 4);
+    boost::ResetSharedPtrRawOwning(mVisionGrid, MakeGrid(mMapData, 2));
+    boost::ResetSharedPtrRawOwning(mWaterGrid, MakeGrid(mMapData, 4));
   }
 }
 
@@ -2463,12 +2463,20 @@ CAiReconDBImpl* CAiReconDBImpl::Create(CArmyImpl* const army, const bool fogOfWa
   return new CAiReconDBImpl(army, fogOfWar);
 }
 
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::MakeGrid(STIMap* const map, const std::uint32_t gridSize)
+/**
+ * Recovery-side helper only (not a distinct binary address): the original
+ * constructor inlines `operator new` + `CIntelGrid::CIntelGrid(map, size)`
+ * directly at each of its 8 call sites (e.g. 0x005C00A6-0x005C00C5) rather
+ * than factoring it into a callable function. Factored here for clarity;
+ * each call site still wraps the result via `boost::ResetSharedPtrRawOwning`
+ * to match the binary's separate `shared_ptr_CIntelGrid::operator=` call
+ * (e.g. 0x005C00D7) rather than binding a custom deleter.
+ */
+CIntelGrid* CAiReconDBImpl::MakeGrid(STIMap* const map, const std::uint32_t gridSize)
 {
   if (!map) {
-    return {};
+    return nullptr;
   }
 
-  auto* const grid = new CIntelGrid(map, gridSize);
-  return boost::SharedPtrRaw<CIntelGrid>::with_deleter(grid, [](CIntelGrid* const ptr) { delete ptr; });
+  return new CIntelGrid(map, gridSize);
 }
