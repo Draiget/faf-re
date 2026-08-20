@@ -11582,7 +11582,30 @@ namespace
     }
   };
 
-  gpg::SerSaveLoadHelperListRuntime gUnitWeaponInfoSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by all of them.
+  struct UnitWeaponInfoSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(UnitWeaponInfoSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "UnitWeaponInfoSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(UnitWeaponInfoSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "UnitWeaponInfoSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(UnitWeaponInfoSerializerHelperNode) == 0x14,
+    "UnitWeaponInfoSerializerHelperNode size must be 0x14"
+  );
+
+  UnitWeaponInfoSerializerHelperNode gUnitWeaponInfoSerializer{};
 
   // Runtime shape of the binary's `SerSaveLoadHelper<SSTIUnitVariableData>`
   // static-init global: the 0x0C intrusive-list links followed by the two
@@ -11617,9 +11640,9 @@ namespace
    * Unlinks `UnitWeaponInfo` serializer helper links and restores self-links
    * for intrusive-list sentinel state.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneA() noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneA() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer.mListLinks);
   }
 
   /**
@@ -11631,8 +11654,94 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::SerHelperBase* UnlinkUnitWeaponInfoSerializerLaneB() noexcept
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(gUnitWeaponInfoSerializer.mListLinks);
   }
+
+  /**
+   * Address: 0x0055C160 (FUN_0055C160, Moho::UnitWeaponInfoSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `UnitWeaponInfo`. Forwards the
+   * reflected object pointer to `UnitWeaponInfo::MemberDeserialize`; `version`
+   * and the owner-ref lane are unused by the member (mirrors the binary tail
+   * call).
+   */
+  void DeserializeUnitWeaponInfoSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const info = reinterpret_cast<moho::UnitWeaponInfo*>(objectPtr);
+    if (info == nullptr) {
+      return;
+    }
+    info->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0055C170 (FUN_0055C170, Moho::UnitWeaponInfoSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `UnitWeaponInfo`. Forwards the
+   * reflected object pointer to `UnitWeaponInfo::MemberSerialize`; `version`
+   * and the owner-ref lane are unused by the member (mirrors the binary tail
+   * call).
+   */
+  void SerializeUnitWeaponInfoSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const info = reinterpret_cast<moho::UnitWeaponInfo*>(objectPtr);
+    if (info == nullptr) {
+      return;
+    }
+    info->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF5300 (FUN_00BF5300, Moho::UnitWeaponInfoSerializer::~UnitWeaponInfoSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `UnitWeaponInfo` serializer helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_UnitWeaponInfoSerializer_atexit()
+  {
+    (void)UnlinkUnitWeaponInfoSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA580 (FUN_00BCA580, register_UnitWeaponInfoSerializer)
+   *
+   * What it does:
+   * Initializes the global `UnitWeaponInfo` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_UnitWeaponInfoSerializer()
+  {
+    (void)UnlinkUnitWeaponInfoSerializerLaneA();
+    gUnitWeaponInfoSerializer.mSerLoadFunc = &DeserializeUnitWeaponInfoSerializerCallback;
+    gUnitWeaponInfoSerializer.mSerSaveFunc = &SerializeUnitWeaponInfoSerializerCallback;
+    (void)std::atexit(&cleanup_UnitWeaponInfoSerializer_atexit);
+  }
+
+  struct UnitWeaponInfoSerializerStartupBootstrap
+  {
+    UnitWeaponInfoSerializerStartupBootstrap()
+    {
+      (void)moho::preregister_UnitWeaponInfoTypeInfo();
+      register_UnitWeaponInfoSerializer();
+    }
+  };
+
+  [[maybe_unused]] UnitWeaponInfoSerializerStartupBootstrap gUnitWeaponInfoSerializerStartupBootstrap;
 
   /**
    * Address: 0x0055C7C0 (FUN_0055C7C0, SerSaveLoadHelper<SSTIUnitVariableData>::unlink lane A)
@@ -11711,14 +11820,45 @@ namespace
   }
 
   /**
+   * Address: 0x00BF54B0 (FUN_00BF54B0, Moho::SSTIUnitVariableDataSerializer::~SSTIUnitVariableDataSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `SSTIUnitVariableData` serializer
+   * helper node, matching the sibling unlink lanes used across other
+   * serializer registrars.
+   */
+  void cleanup_SSTIUnitVariableDataSerializer_atexit()
+  {
+    (void)UnlinkSSTIUnitVariableDataSerializerLaneA();
+  }
+
+  /**
+   * Address: 0x00BCA6A0 (FUN_00BCA6A0, register_SSTIUnitVariableDataSerializer)
+   *
+   * What it does:
+   * Initializes the global `SSTIUnitVariableData` serializer helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`. Binding both facades by name
+   * here is the source-level invocation that keeps FUN_0055E030 /
+   * FUN_0055E420 reachable.
+   */
+  void register_SSTIUnitVariableDataSerializer()
+  {
+    (void)UnlinkSSTIUnitVariableDataSerializerLaneA();
+    gSSTIUnitVariableDataSerializer.mSerLoadFunc = &SSTIUnitVariableDataSerializerDeserialize;
+    gSSTIUnitVariableDataSerializer.mSerSaveFunc = &SSTIUnitVariableDataSerializerSerialize;
+    (void)std::atexit(&cleanup_SSTIUnitVariableDataSerializer_atexit);
+  }
+
+  /**
    * Static-init driver that publishes the load/save reflection callbacks for
    * `SSTIUnitVariableData`. The binary registers the equivalent helper via a
    * static-init-time `SerSaveLoadHelper<SSTIUnitVariableData>` global whose
    * ctor self-links the intrusive node and stores the two facade trampolines
-   * (FUN_0055C760 / FUN_0055C770) into +0x0C / +0x10. The engine install path
-   * later copies those into the reflection descriptor's serLoadFunc_ /
-   * serSaveFunc_. Binding both facades by name here is the source-level
-   * invocation that keeps FUN_0055E030 / FUN_0055E420 reachable.
+   * (FUN_0055C760 / FUN_0055C770) into +0x0C / +0x10 -- that is exactly
+   * `register_SSTIUnitVariableDataSerializer` (FUN_00BCA6A0), called below
+   * rather than duplicated. The engine install path later copies those into
+   * the reflection descriptor's serLoadFunc_ / serSaveFunc_.
    */
   struct SSTIUnitVariableDataSerializerRegistrar
   {
@@ -11728,9 +11868,7 @@ namespace
       // before publishing callbacks; idempotent with gUnitTypeInfoPreRegisterBootstrap.
       (void)moho::preregister_SSTIUnitVariableDataTypeInfo();
 
-      (void)UnlinkSSTIUnitVariableDataSerializerLaneA();
-      gSSTIUnitVariableDataSerializer.mSerLoadFunc = &SSTIUnitVariableDataSerializerDeserialize;
-      gSSTIUnitVariableDataSerializer.mSerSaveFunc = &SSTIUnitVariableDataSerializerSerialize;
+      register_SSTIUnitVariableDataSerializer();
     }
   };
 
