@@ -515,7 +515,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `MotorSinkAwayTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyMotorSinkAwayTypeInfoBody(MotorSinkAwayTypeInfo* const typeInfo) noexcept
+  void DestroyMotorSinkAwayTypeInfoBody(MotorSinkAwayTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;

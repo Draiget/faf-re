@@ -466,7 +466,7 @@ namespace
    * What it does:
    * Decodes packed table index bits (`[27:20]`) from one 32-bit lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t DecodePackedHistoryIndexByte(const PackedHistoryIndexWordView* const packedWord
+  [[nodiscard]] std::uint32_t DecodePackedHistoryIndexByte(const PackedHistoryIndexWordView* const packedWord
   ) noexcept
   {
     GPG_ASSERT(packedWord != nullptr);
@@ -913,7 +913,7 @@ namespace
    * Binds the `new/construct/delete/destruct` callback lanes for
    * `PositionHistory` reflection storage.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* BindPositionHistoryNewCtorDeleteDtr(gpg::RType* const typeInfo)
+  [[nodiscard]] gpg::RType* BindPositionHistoryNewCtorDeleteDtr(gpg::RType* const typeInfo)
   {
     GPG_ASSERT(typeInfo != nullptr);
     if (typeInfo == nullptr) {
@@ -934,7 +934,7 @@ namespace
    * Binds the `copy/move/delete/destruct` callback lanes for
    * `PositionHistory` reflection storage.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* BindPositionHistoryCopyMoveDeleteDtr(gpg::RType* const typeInfo)
+  [[nodiscard]] gpg::RType* BindPositionHistoryCopyMoveDeleteDtr(gpg::RType* const typeInfo)
   {
     GPG_ASSERT(typeInfo != nullptr);
     if (typeInfo == nullptr) {
@@ -1132,7 +1132,7 @@ namespace moho
    * Clears reflected field/base vector lanes and restores base `RObject`
    * teardown state for one `PositionHistoryTypeInfo` instance.
    */
-  [[maybe_unused]] void DestroyPositionHistoryTypeInfoBody(PositionHistoryTypeInfo* const typeInfo) noexcept
+  void DestroyPositionHistoryTypeInfoBody(PositionHistoryTypeInfo* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;

@@ -427,7 +427,7 @@ namespace
    * Clears reflected base/field vector lanes for one `fastvector<Entity*>`
    * type-info object while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyEntityPtrFastVectorTypeBody(EntityPtrFastVectorType* const typeInfo) noexcept
+  void DestroyEntityPtrFastVectorTypeBody(EntityPtrFastVectorType* const typeInfo) noexcept
   {
     if (typeInfo == nullptr) {
       return;

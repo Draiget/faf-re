@@ -72,7 +72,7 @@ namespace
    * Initializes callback lanes for startup-owned `EVisibilityMode` primitive
    * serializer helper storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] moho::EVisibilityModePrimitiveSerializer*
+  [[nodiscard]] moho::EVisibilityModePrimitiveSerializer*
   InitializeEVisibilityModePrimitiveSerializerStartupThunkPrimary()
   {
     auto* const serializer = AcquireEVisibilityModePrimitiveSerializer();

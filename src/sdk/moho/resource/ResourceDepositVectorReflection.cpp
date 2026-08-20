@@ -144,7 +144,7 @@ namespace
    * Source-first adapter lane for copying one 5-dword `ResourceDeposit` range
    * `[sourceBegin, sourceEnd)` and returning one-past-end destination storage.
    */
-  [[maybe_unused]] std::uint32_t* CopyResourceDepositWordQuintRangeSourceFirst(
+  std::uint32_t* CopyResourceDepositWordQuintRangeSourceFirst(
     std::uint32_t* const destination,
     const std::uint32_t* const sourceBegin,
     const std::uint32_t* const sourceEnd
