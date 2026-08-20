@@ -132,6 +132,10 @@ namespace
 
   /**
    * Address: 0x00594BD0 (FUN_00594BD0, std::map<std::string,Moho::CArmyStatItem*>::find)
+   * Address: 0x00595130 (FUN_00595130, std::map<std::string,Moho::CArmyStatItem*>::_Lbound
+   * - the lower-bound descent half that find()/operator[] both call in the
+   * binary; this recovery inlines the same descent directly rather than
+   * factoring it into a separate call, so both addresses resolve here)
    *
    * What it does:
    * Lower-bound descent by string key, returning the found node or the tree
