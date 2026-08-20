@@ -1,6 +1,8 @@
 #include "moho/unit/tasks/CUnitRepairTask.h"
 
 #include <cmath>
+#include <cstddef>
+#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -8,6 +10,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerSaveLoadHelperListRuntime.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/IAiCommandDispatchImpl.h"
@@ -607,3 +610,124 @@ namespace moho
     TaskResume(false, 0);
   }
 } // namespace moho
+
+namespace
+{
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase).
+  struct CUnitRepairTaskSerializerHelperNode
+  {
+    gpg::SerSaveLoadHelperListRuntime mListLinks{};
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitRepairTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CUnitRepairTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitRepairTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CUnitRepairTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CUnitRepairTaskSerializerHelperNode) == 0x14,
+    "CUnitRepairTaskSerializerHelperNode size must be 0x14"
+  );
+
+  CUnitRepairTaskSerializerHelperNode gCUnitRepairTaskSerializer{};
+
+  /**
+   * Unlinks `CUnitRepairTaskSerializer` helper node from the intrusive
+   * serializer-helper list and restores one self-linked node lane.
+   */
+  [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitRepairTaskSerializerNodePrimary()
+  {
+    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitRepairTaskSerializer.mListLinks);
+  }
+
+  /**
+   * Address: 0x005F9170 (FUN_005F9170, Moho::CUnitRepairTaskSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade for `CUnitRepairTask`. Forwards the
+   * reflected object pointer to `CUnitRepairTask::MemberDeserialize`
+   * (FUN_005FED70 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void DeserializeCUnitRepairTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitRepairTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x005F9180 (FUN_005F9180, Moho::CUnitRepairTaskSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade for `CUnitRepairTask`. Forwards the
+   * reflected object pointer to `CUnitRepairTask::MemberSerialize`
+   * (FUN_005FEEC0 body); `version` and the owner-ref lane are unused by the
+   * member (mirrors the binary tail call).
+   */
+  void SerializeCUnitRepairTaskSerializerCallback(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<const moho::CUnitRepairTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00BF9450 (FUN_00BF9450, Moho::CUnitRepairTaskSerializer::~CUnitRepairTaskSerializer)
+   *
+   * What it does:
+   * Process-exit teardown: unlinks the `CUnitRepairTaskSerializer` helper
+   * node, matching the sibling unlink lanes used across other serializer
+   * registrars.
+   */
+  void cleanup_CUnitRepairTaskSerializer_atexit()
+  {
+    (void)UnlinkCUnitRepairTaskSerializerNodePrimary();
+  }
+
+  /**
+   * Address: 0x00BCF950 (FUN_00BCF950, register_CUnitRepairTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitRepairTask` serializer helper's load/save
+   * callback lanes (self-linking the intrusive helper node) and installs
+   * process-exit cleanup via `atexit`.
+   */
+  void register_CUnitRepairTaskSerializer()
+  {
+    (void)UnlinkCUnitRepairTaskSerializerNodePrimary();
+    gCUnitRepairTaskSerializer.mSerLoadFunc = &DeserializeCUnitRepairTaskSerializerCallback;
+    gCUnitRepairTaskSerializer.mSerSaveFunc = &SerializeCUnitRepairTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitRepairTaskSerializer_atexit);
+  }
+
+  struct CUnitRepairTaskSerializerStartupBootstrap
+  {
+    CUnitRepairTaskSerializerStartupBootstrap()
+    {
+      register_CUnitRepairTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitRepairTaskSerializerStartupBootstrap gCUnitRepairTaskSerializerStartupBootstrap;
+} // namespace
