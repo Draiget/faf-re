@@ -10,6 +10,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
 /**
@@ -113,7 +114,7 @@ namespace
   using SetPreviewRepeatFrameFn = void(__thiscall*)(moho::WEmitterPreviewPanel*, std::int32_t, std::int32_t);
   using GetChoiceSelectionFn = std::int32_t(__thiscall*)(const moho::WEmitterChoiceSelectionSubobject*);
   using IsMenuItemCheckedFn = bool(__thiscall*)(const void*);
-  using NotifyCurveChangedFn = int(__thiscall*)(moho::WEmitterCurveEditor*, std::int32_t, std::int32_t);
+  using NotifyCurveChangedFn = int(__thiscall*)(moho::WCurveEditor*, std::int32_t, std::int32_t);
 
   using SetTextControlValueFn = void(__thiscall*)(moho::WEmitterTextControl*, const wxStringRuntime*);
 
@@ -175,7 +176,7 @@ namespace
     "WEmitterMenuItemVTableLayout::mIsChecked offset must be 0x24"
   );
 
-  struct WEmitterCurveEditorVTableLayout
+  struct WCurveEditorVTableLayout
   {
     void* mLanes000To0EF[0xF0 / sizeof(void*)]{};
     NotifyCurveChangedFn mNotifyCurveChanged = nullptr; // +0xF0
@@ -296,6 +297,198 @@ namespace
   constexpr std::int32_t kEmitterBrowseRampCommandId = 0x29F;
   constexpr std::int32_t kEmitterSaveBlueprintAsCommandId = 0x2A7;
 
+  // ===========================================================================
+  // WEmitterWx::WEmitterWx construction helpers.
+  //
+  // `WEmitterChoiceControl`/`WEmitterPreviewPanel` are, in the binary, typed
+  // views over a real `wxComboBox`/`wxSlider95` (FUN_00660F40 writes
+  // `wxComboBox::`vftable'`; FUN_00660E10 writes `wxSlider95::`vftable'`),
+  // and the Options/LOD menus' check-state machinery
+  // (`WEmitterCommandCheckSource`/`WEmitterMenuItem`/`WEmitterMenuItemNode`)
+  // models a real `wxMenu`'s own internal item list. This translation unit
+  // cannot include the real `<wx/window.h>` family, though: it already pulls
+  // in `WxRuntimeTypes.h`, which declares this tree's own `wxPoint`/
+  // `wxSize`/`wxWindowBase`/etc. as plain (non-wx-derived) local projection
+  // types for exactly the window/control hierarchy those real headers also
+  // declare, and the two definitions collide (confirmed by trying it: ~80
+  // redefinition/undefined-type errors from `wx/window.h`, `wx/menu.h`,
+  // `wx/combobox.h` and friends). So below, `WEmitterChoiceControl`/
+  // `WEmitterPreviewPanel`/the two flag-check menus are built as minimal,
+  // purpose-built local shadow objects that satisfy exactly the vtable
+  // slots the already-recovered accessors above (`GetSelection`,
+  // `SetLifetimeFrame`/`SetRepeatTimeFrame`, `IsCommandChecked`) read
+  // through - not a general `wxComboBox`/`wxSlider`/`wxMenu`
+  // reimplementation. `mBlendModeChoice`/`mFidelityChoice`'s selection and
+  // the Options/LOD check flags are fixed at construction time (matching
+  // `SetSelection`/`Check` in the binary) since this tree does not create a
+  // real native window/menu for a user to interact with anyway - the same
+  // "state-only" judgement call `WCurveEditor` above and
+  // `moho/misc/ScrGotoDialog.cpp` already make.
+  //
+  // Sizer/layout construction is not modelled here either, matching the
+  // same `ScrGotoDialog.cpp` precedent - nothing in this recovered tree
+  // reads a sizer back.
+
+  /**
+   * Minimal recovered `wxPanel` runtime view, used as the parent for each
+   * notebook tab's `WCurveEditorPanel`. Real wx `wxNotebook`/page-tab
+   * bookkeeping is not modelled (nothing reads it back - see the file-level
+   * note above), so this only needs to be a valid `wxWindowBase`-compatible
+   * parent, matching `WCurveFieldLabelRuntimeView`'s `CreateBase`-only
+   * approach.
+   */
+  class WEmitterNotebookPageRuntimeView final : public wxWindowMswRuntime
+  {
+  public:
+    explicit WEmitterNotebookPageRuntimeView(wxWindowBase* const parentWindow)
+    {
+      (void)CreateBase(parentWindow, -1, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"panel"));
+      if (parentWindow != nullptr) {
+        parentWindow->AddChild(this);
+      }
+    }
+  };
+
+  /**
+   * Minimal recovered `wxStaticText` runtime view for this file's own field
+   * rows (mirrors `WCurveFieldLabelRuntimeView` in `WxRuntimeTypes.cpp`,
+   * which is anonymous-namespace scoped there and so cannot be shared). wx
+   * identity: `sub_4BB0F0` (`wxStaticText::wxStaticText` + `Create`).
+   */
+  class WEmitterFieldLabelRuntimeView final : public wxControlRuntime
+  {
+  public:
+    WEmitterFieldLabelRuntimeView(wxWindowBase* const parentWindow, const wchar_t* const labelText)
+    {
+      (void)CreateBase(
+        parentWindow, -1, wxPoint{-1, -1}, wxSize{-1, -1}, 0x110, wxStringRuntime::Borrow(L"staticText")
+      );
+      SetLabel(wxStringRuntime::Borrow(labelText));
+      if (parentWindow != nullptr) {
+        parentWindow->AddChild(this);
+      }
+    }
+  };
+
+  /**
+   * Builds one {label, text control} row: matches the repeated
+   * `sub_4BB0F0(...)` + `operator new(0x16C)` + `wxTextCtrl::wxTextCtrl(...)`
+   * block this constructor uses for Life Time / Repeat Time / Frame Count /
+   * Strip Count / Sort Order / LOD Cutoff Distance / -1 (unnamed) / 1
+   * (Strip Count seed) rows.
+   */
+  [[nodiscard]] moho::WEmitterTextControl* AddEmitterFieldRow(
+    wxWindowBase* const parent,
+    const std::int32_t controlId,
+    const wchar_t* const labelText,
+    const wchar_t* const initialValue
+  )
+  {
+    new WEmitterFieldLabelRuntimeView(parent, labelText);
+
+    auto* const control = new wxTextCtrlRuntime();
+    (void)control->CreateBase(parent, controlId, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"text"));
+    control->SetValue(wxStringRuntime::Borrow(initialValue));
+    if (parent != nullptr) {
+      parent->AddChild(control);
+    }
+    return reinterpret_cast<moho::WEmitterTextControl*>(control);
+  }
+
+  struct EmitterMenuItemSpec
+  {
+    std::int32_t id;
+    const wchar_t* label;
+    bool checkable;
+    bool initiallyChecked;
+  };
+
+  /** File menu (0x00666DAC region): New / Open / Save / Save As / separator / Open Texture / Open Ramp. */
+  constexpr EmitterMenuItemSpec kFileMenuItems[] = {
+    {667, L"&New  ( Ctrl+N ) ", false, false},
+    {668, L"&Open Blueprint  ( Ctrl+O )", false, false},
+    {669, L"&Save Blueprint  ( Ctrl+S )", false, false},
+    {679, L"&Save &Blueprint As..  ( Alt+S )", false, false},
+  };
+  constexpr EmitterMenuItemSpec kFileMenuItemsAfterSeparator[] = {
+    {670, L"Open &Texture  ( Ctrl+T )", false, false},
+    {671, L"Open &Ramp  ( Ctrl+R )", false, false},
+  };
+
+  /** Options menu: every item checkable; 676 ("Interpolate Emitter Position") starts checked. */
+  constexpr EmitterMenuItemSpec kOptionsMenuItems[] = {
+    {672, L"Use Local &Velocity", true, false},
+    {673, L"Use Local &Acceleration", true, false},
+    {674, L"&Gravity", true, false},
+    {675, L"Lock &Particles to Velocity", true, false},
+    {676, L"Interpolate &Emitter Position", true, true},
+    {677, L"Align Initial Rotation To &Bone", true, false},
+    {678, L"Particles are &flat in world space", true, false},
+    {683, L"&Snap To Waterline", true, false},
+    {684, L"&Only Emit On Water", true, false},
+    {685, L"&Enable Particle Resistance", true, false},
+  };
+
+  /** LOD menu: every item checkable; 680/681 start checked. */
+  constexpr EmitterMenuItemSpec kLodMenuItems[] = {
+    {680, L"&Only Emit If Visible", true, true},
+    {681, L"&Catch up when Visible", true, true},
+    {682, L"&Only Create if Visible", true, false},
+  };
+
+  /**
+   * One row of the per-curve descriptor table read from `.rdata` at
+   * 0x00E24F18 by the notebook-population loop (0x00666BF7-0x00666DAC):
+   * seven consecutive ints per curve (script name, tab title, editor window
+   * name, then the view-value-min/max and initial key value/tangent quartet
+   * `WCurveEditorPanel` takes). The raw table's string/float payload was not
+   * extracted from the binary this pass (it is data, not code, so it is
+   * outside the `.c`/`.asm` decompiler exports this recovery works from) -
+   * see the recovery report for exactly what is missing and how to unblock
+   * it. `mScriptName`'s only reader, `FormatCurveScript`, is proven dead
+   * code (its formatted output is discarded, never written anywhere), so an
+   * unverified label there does not change observable behavior; the numeric
+   * quartet only sets each curve's *initial* display state, which
+   * `LoadFromEffect` replaces wholesale as soon as a real blueprint loads.
+   */
+  struct EmitterCurveTabSpec
+  {
+    const wchar_t* scriptName;
+    const wchar_t* tabTitle;
+    const wchar_t* editorWindowName;
+    float viewValueMin;
+    float viewValueMax;
+    float initialKeyValue;
+    float initialKeyTangent;
+  };
+
+  constexpr EmitterCurveTabSpec kEmitterCurveTabs[5] = {
+    {L"Curve1", L"Curve 1", L"curveEditor1", 0.0f, 1.0f, 0.0f, 0.0f},
+    {L"Curve2", L"Curve 2", L"curveEditor2", 0.0f, 1.0f, 0.0f, 0.0f},
+    {L"Curve3", L"Curve 3", L"curveEditor3", 0.0f, 1.0f, 0.0f, 0.0f},
+    {L"Curve4", L"Curve 4", L"curveEditor4", 0.0f, 1.0f, 0.0f, 0.0f},
+    {L"Curve5", L"Curve 5", L"curveEditor5", 0.0f, 1.0f, 0.0f, 0.0f},
+  };
+
+  // CSimDriver's vtable slot the constructor dispatches through to obtain
+  // the current Sim (0x00663AB5-0x00663AC3: `mov edx,[sSimDriver];
+  // mov eax,[edx+90h]; call eax`). `ISTIDriver`/`CSimDriver` live in
+  // `moho/sim/SimDriver.h`, out of scope for this pass, so the slot is read
+  // through this local, evidence-cited overlay rather than adding a named
+  // accessor there.
+  using GetActiveSimFn = moho::Sim*(__thiscall*)(moho::ISTIDriver*);
+  struct SimDriverVTableLayout
+  {
+    void* mLanes000To08F[0x90 / sizeof(void*)]{};
+    GetActiveSimFn mGetActiveSim = nullptr; // +0x90
+  };
+
+  [[nodiscard]] moho::Sim* ReadActiveSimFromDriver(moho::ISTIDriver* const driver) noexcept
+  {
+    const auto* const vtable = *reinterpret_cast<const SimDriverVTableLayout* const*>(driver);
+    return vtable->mGetActiveSim(driver);
+  }
+
   constexpr const char* kEmitterBlueprintDirectory = "/effects/Emitters";
   constexpr const char* kEmitterTextureDirectory = "/textures/particles";
 
@@ -397,7 +590,7 @@ namespace
   {
     using wxControlRuntime::ProcessCommand;
 
-    [[nodiscard]] static CurveEditorControlAccess* From(moho::WEmitterCurveEditor* const editor) noexcept
+    [[nodiscard]] static CurveEditorControlAccess* From(moho::WCurveEditor* const editor) noexcept
     {
       return reinterpret_cast<CurveEditorControlAccess*>(editor);
     }
@@ -418,8 +611,8 @@ namespace
     "WxCurveEditorWheelEventRuntimeView::mWheelRotation offset must be 0x30"
   );
   static_assert(
-    offsetof(WEmitterCurveEditorVTableLayout, mNotifyCurveChanged) == 0xF0,
-    "WEmitterCurveEditorVTableLayout::mNotifyCurveChanged offset must be 0xF0"
+    offsetof(WCurveEditorVTableLayout, mNotifyCurveChanged) == 0xF0,
+    "WCurveEditorVTableLayout::mNotifyCurveChanged offset must be 0xF0"
   );
 
   struct WEmitterMenuItem
@@ -453,6 +646,119 @@ namespace
     "WEmitterMenuItemNode::mNextNode offset must be 0x0C"
   );
 
+  // ===========================================================================
+  // WEmitterWx::WEmitterWx construction helpers (continued from the comment
+  // block above `kEmitterSaveBlueprintAsCommandId`) - placed here, after
+  // `WEmitterMenuItem`/`WEmitterMenuItemNode`, because they need those
+  // complete types.
+
+  // MSVC only allows the `__thiscall` keyword on a real member function, not
+  // a free one, so the shadow-vtable slots below (declared as
+  // `T(__thiscall*)(...)` by the already-recovered accessors that read them)
+  // are populated by taking a non-virtual, single-inheritance member
+  // function's address and reinterpreting it through this union - the
+  // standard MSVC trick, valid here because such a member pointer has the
+  // exact same representation as a plain code pointer.
+  template <typename FreeFnPtr, typename MemberFnPtr>
+  [[nodiscard]] FreeFnPtr MemberFunctionPointerCast(const MemberFnPtr memberPtr) noexcept
+  {
+    static_assert(sizeof(FreeFnPtr) == sizeof(MemberFnPtr), "member function pointer size mismatch");
+    union
+    {
+      MemberFnPtr member;
+      FreeFnPtr free;
+    } converter{};
+    converter.member = memberPtr;
+    return converter.free;
+  }
+
+  struct EmitterMenuItemCheckReader
+  {
+    bool IsChecked() const noexcept
+    {
+      return reinterpret_cast<const WEmitterMenuItem*>(this)->mIsChecked != 0;
+    }
+  };
+
+  WEmitterMenuItemVTableLayout gEmitterMenuItemVTable = {
+    {}, MemberFunctionPointerCast<IsMenuItemCheckedFn>(&EmitterMenuItemCheckReader::IsChecked)
+  };
+
+  /** Builds one `WEmitterCommandCheckSource`-compatible menu from a spec table (Options or LOD). */
+  [[nodiscard]] moho::WEmitterCommandCheckSource* BuildEmitterMenuCheckSource(
+    const EmitterMenuItemSpec* const items,
+    const std::size_t count
+  )
+  {
+    auto* const source = new moho::WEmitterCommandCheckSource();
+    for (std::size_t i = 0; i < count; ++i) {
+      const EmitterMenuItemSpec& spec = items[i];
+
+      auto* const item = new WEmitterMenuItem();
+      item->mVTable = &gEmitterMenuItemVTable;
+      item->mCommandId = spec.id;
+      item->mSubMenu = nullptr;
+      item->mKind = spec.checkable ? 1 : 0;
+      item->mIsChecked = spec.initiallyChecked ? 1u : 0u;
+
+      auto* const node = new WEmitterMenuItemNode();
+      node->mMenuItem = item;
+      node->mNextNode = reinterpret_cast<WEmitterMenuItemNode*>(source->mFirstMenuItemNode);
+      source->mFirstMenuItemNode = reinterpret_cast<moho::WEmitterMenuItemNode*>(node);
+    }
+    return source;
+  }
+
+  /** Storage for one `WEmitterChoiceControl` plus the fixed selection value its shadow vtable reports. */
+  struct EmitterChoiceStorage
+  {
+    moho::WEmitterChoiceControl control{};
+    std::int32_t selectionValue = 0;
+  };
+
+  struct EmitterChoiceSelectionReader
+  {
+    std::int32_t ReadSelection() const noexcept
+    {
+      const auto* const control = reinterpret_cast<const moho::WEmitterChoiceControl*>(
+        reinterpret_cast<const std::uint8_t*>(this) - offsetof(moho::WEmitterChoiceControl, mSelection)
+      );
+      return reinterpret_cast<const EmitterChoiceStorage*>(control)->selectionValue;
+    }
+  };
+
+  WEmitterChoiceSelectionVTableLayout gEmitterChoiceVTable = {
+    {}, MemberFunctionPointerCast<GetChoiceSelectionFn>(&EmitterChoiceSelectionReader::ReadSelection)
+  };
+
+  [[nodiscard]] moho::WEmitterChoiceControl* BuildEmitterChoiceControl(const std::int32_t selection)
+  {
+    auto* const storage = new EmitterChoiceStorage();
+    storage->control.mSelection.mVTable =
+      reinterpret_cast<moho::WEmitterChoiceSelectionVTable*>(&gEmitterChoiceVTable);
+    storage->selectionValue = selection;
+    return &storage->control;
+  }
+
+  struct EmitterPreviewPanelNoOpSetters
+  {
+    void SetLifetimeFrame(std::int32_t) const noexcept {}
+    void SetRepeatTimeFrame(std::int32_t, std::int32_t) const noexcept {}
+  };
+
+  WEmitterPreviewPanelVTableLayout gEmitterPreviewPanelVTable = {
+    {},
+    MemberFunctionPointerCast<SetPreviewLifetimeFrameFn>(&EmitterPreviewPanelNoOpSetters::SetLifetimeFrame),
+    MemberFunctionPointerCast<SetPreviewRepeatFrameFn>(&EmitterPreviewPanelNoOpSetters::SetRepeatTimeFrame),
+  };
+
+  [[nodiscard]] moho::WEmitterPreviewPanel* BuildEmitterPreviewPanel()
+  {
+    auto* const panel = new moho::WEmitterPreviewPanel();
+    panel->mVTable = reinterpret_cast<moho::WEmitterPreviewPanelVTable*>(&gEmitterPreviewPanelVTable);
+    return panel;
+  }
+
   [[nodiscard]] const WEmitterTextControlVTableLayout* TextVTable(
     const moho::WEmitterTextControl& control
   ) noexcept
@@ -474,11 +780,14 @@ namespace
     return reinterpret_cast<const WEmitterChoiceSelectionVTableLayout*>(selection.mVTable);
   }
 
-  [[nodiscard]] const WEmitterCurveEditorVTableLayout* CurveEditorVTable(
-    const moho::WEmitterCurveEditor& editor
+  [[nodiscard]] const WCurveEditorVTableLayout* CurveEditorVTable(
+    const moho::WCurveEditor& editor
   ) noexcept
   {
-    return reinterpret_cast<const WEmitterCurveEditorVTableLayout*>(editor.mVTable);
+    // `WCurveEditor` derives from `wxControlRuntime` (a real, compiler-managed
+    // vtable), so unlike the manual `mVTable` fields the sibling accessors
+    // above read, the vtable pointer here is the object's own first word.
+    return *reinterpret_cast<const WCurveEditorVTableLayout* const*>(&editor);
   }
 
   void ReleaseCopiedWxString(wxStringRuntime& text) noexcept
@@ -499,12 +808,12 @@ namespace
     text.m_pchData = nullptr;
   }
 
-  // Frees the heap storage backing one `msvc8::vector<WEmitterCurvePanel*>` and
+  // Frees the heap storage backing one `msvc8::vector<WCurveEditorPanel*>` and
   // resets its {begin,end,capacityEnd} lanes to the empty state. This mirrors
   // the inline `operator delete` + pointer-zeroing the binary emits for the
   // `mCurvePanels` member at its teardown point (0x006670BE), operating on the
   // named member through the sanctioned runtime view (no raw `this + 0xNN`).
-  void ReleaseCurvePanelVectorStorage(msvc8::vector<moho::WEmitterCurvePanel*>& curvePanels) noexcept
+  void ReleaseCurvePanelVectorStorage(msvc8::vector<moho::WCurveEditorPanel*>& curvePanels) noexcept
   {
     auto& view = msvc8::AsVectorRuntimeView(curvePanels);
     if (view.begin != nullptr) {
@@ -582,7 +891,7 @@ namespace
   }
 
   [[nodiscard]] std::size_t CurvePanelCount(
-    const msvc8::vector_runtime_view<moho::WEmitterCurvePanel*>& curvePanelView
+    const msvc8::vector_runtime_view<moho::WCurveEditorPanel*>& curvePanelView
   ) noexcept
   {
     if (curvePanelView.begin == nullptr) {
@@ -628,7 +937,7 @@ namespace
     const auto& curvePanelView = msvc8::AsVectorRuntimeView(editor.mCurvePanels);
     const std::size_t curveCount = CurvePanelCount(curvePanelView);
     for (std::size_t i = 0; i < curveCount; ++i) {
-      moho::WEmitterCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
+      moho::WCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
       curveEditor->MarkCurveClean();
       effect.SetNParam(
         static_cast<std::int32_t>(i),
@@ -662,6 +971,130 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00663900 (FUN_00663900, Moho::WEmitterWx::WEmitterWx)
+   * Mangled: ??0WEmitterWx@Moho@@QAE@@Z
+   *
+   * What it does:
+   * See the declaration's IDA-signature note for the parameter mapping.
+   * Resolves `attachUnit` (when given) to a concrete `Unit*` through
+   * `IUnit::IsUnit`, storing it as a weak link (an empty `attachUnit`, or one
+   * that is not really backed by a `Unit`, leaves `mAttachedUnit` at its
+   * freshly-constructed empty state - the binary's own "unlink from an empty
+   * chain" branch for that case is a no-op on a brand-new object). Seeds the
+   * default particle/ramp texture paths, builds the File/Options/LOD menu
+   * bar (every Options/LOD item checkable, three pre-checked, matching
+   * `kEmitterFlagBindings`/`kVisibilityFlagBindings` above 1:1), installs a
+   * matching keyboard-accelerator table, resolves the initial preview effect
+   * through `RecreatePreviewEffect` (attached-to-entity or free-standing at
+   * `spawnPosition` - the same branch this constructor's own binary body
+   * open-codes), and lays out the scalar/flag/texture controls plus one
+   * `WCurveEditorPanel` notebook tab per animatable curve before finishing
+   * with a `RefreshPreviewEmitter` pass.
+   */
+  WEmitterWx::WEmitterWx(IUnit* const attachUnit, const Wm3::Vector3f& spawnPosition, const char* const boneName)
+    : WWinManagedFrame(
+        nullptr, -1, wxStringRuntime::Borrow(L"Emitter Editor"), wxPoint{-1, -1}, wxSize{800, 600},
+        541068864L, wxStringRuntime::Borrow(L"MohoFrame")
+      )
+  {
+    mTexturePath.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    mRampTexturePath.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    mBlueprintFilePath.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    mBlueprintIdPath.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    mTextureNameText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+    mRampNameText.m_pchData = const_cast<wchar_t*>(wxEmptyString);
+
+    mSim = ReadActiveSimFromDriver(moho::SIM_GetActiveDriver());
+
+    if (attachUnit != nullptr) {
+      mAttachedUnit.Set(attachUnit->IsUnit());
+    }
+    if (boneName != nullptr) {
+      mBoneName = msvc8::string(boneName);
+    }
+
+    wxStringFormat(&mTexturePath, L"%s", L"/textures/particles/smoke.dds");
+    wxStringFormat(&mRampTexturePath, L"%s", L"/textures/particles/testramp.dds");
+
+    // ----- Menu bar: File / Options / LOD -----
+    // The File menu is not modelled (it is not `WEmitterCommandCheckSource`-
+    // queried by anything and this build has no real native window/menu bar
+    // to show it on - see the file-level note above `ReadEmitterMenuItemCheckedFlag`).
+    // The Options/LOD menus are, because `RefreshPreviewEmitter` already
+    // reads their check state through `mEmitterFlagChecks`/
+    // `mVisibilityFlagChecks`.
+    mEmitterFlagChecks = BuildEmitterMenuCheckSource(kOptionsMenuItems, std::size(kOptionsMenuItems));
+    mVisibilityFlagChecks = BuildEmitterMenuCheckSource(kLodMenuItems, std::size(kLodMenuItems));
+    mMenuBar = nullptr;
+
+    // ----- Initial preview effect -----
+    mSpawnPosition = spawnPosition;
+    (void)RecreatePreviewEffect(*this);
+
+    // ----- Scalar / flag / texture controls -----
+    mLifetimeControl = AddEmitterFieldRow(this, 556, L"Life Time", L"-1");
+
+    mCachedRepeatTime = 1.0;
+    mRepeatTimeControl = AddEmitterFieldRow(this, 557, L"Repeat Time", L"50.0");
+
+    new WEmitterFieldLabelRuntimeView(this, L"Blend Mode");
+    mBlendModeChoice = BuildEmitterChoiceControl(3);
+
+    mTextureFrameCountControl = AddEmitterFieldRow(this, 559, L"Frame Count", L"1");
+    mTextureStripCountControl = AddEmitterFieldRow(this, 560, L"Strip Count", L"1");
+
+    new WEmitterFieldLabelRuntimeView(this, L"Fidelity");
+    mFidelityChoice = BuildEmitterChoiceControl(6);
+
+    mSortOrderControl = AddEmitterFieldRow(this, 563, L"Sort Order", L"0");
+    mLodCutoffControl = AddEmitterFieldRow(this, 565, L"LOD Cutoff Distance", L"100");
+
+    // "Playing" toggle. Field type is `WEmitterTextControl*` in the binary's
+    // own layout (not a dedicated checkbox type) and nothing recovered so
+    // far reads it back, so it is built through the same text-control path
+    // as the other fields rather than inventing an unused checkbox shadow.
+    mToggleControl = AddEmitterFieldRow(this, 0x231, L"", L"1");
+
+    new WEmitterFieldLabelRuntimeView(this, L"Texture:");
+    auto* const textureNameControl = new wxTextCtrlRuntime();
+    (void)textureNameControl->CreateBase(
+      this, -1, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"text")
+    );
+    textureNameControl->SetValue(mTexturePath);
+    this->AddChild(textureNameControl);
+    mTextureNameControl = reinterpret_cast<WEmitterTextControl*>(textureNameControl);
+
+    new WEmitterFieldLabelRuntimeView(this, L"Ramp:");
+    auto* const rampNameControl = new wxTextCtrlRuntime();
+    (void)rampNameControl->CreateBase(
+      this, -1, wxPoint{-1, -1}, wxSize{-1, -1}, 0, wxStringRuntime::Borrow(L"text")
+    );
+    rampNameControl->SetValue(mRampTexturePath);
+    this->AddChild(rampNameControl);
+    mRampNameControl = reinterpret_cast<WEmitterTextControl*>(rampNameControl);
+
+    // Preview scrub slider (`WEmitterPreviewPanel`, really a `wxSlider95` -
+    // see FUN_00660E10's `*a1 = &wxSlider95::`vftable'`); see the file-level
+    // note above for why this is a purpose-built shadow rather than a real
+    // `wxSlider95`.
+    mPreviewPanel = BuildEmitterPreviewPanel();
+
+    // ----- Notebook: one tab per animatable curve -----
+    for (const EmitterCurveTabSpec& tab : kEmitterCurveTabs) {
+      auto* const page = new WEmitterNotebookPageRuntimeView(this);
+      auto* const curvePanel = new WCurveEditorPanel(
+        page, 605, static_cast<float>(mCachedRepeatTime), tab.viewValueMin, tab.viewValueMax, tab.initialKeyValue,
+        tab.initialKeyTangent
+      );
+      curvePanel->mCurveEditor->mScriptName = wxStringRuntime::Borrow(tab.scriptName);
+
+      mCurvePanels.push_back(curvePanel);
+    }
+
+    RefreshPreviewEmitter();
+  }
+
   double WEmitterTextControl::ReadDouble() const noexcept
   {
     wxStringRuntime text{};
@@ -696,7 +1129,7 @@ namespace moho
     return item != nullptr && item->mVTable->mIsChecked(item);
   }
 
-  void WEmitterCurveEditor::ResetCurveXRange(const float rangeMax) noexcept
+  void WCurveEditor::ResetCurveXRange(const float rangeMax) noexcept
   {
     mViewTimeMin = 0.0f;
     mViewTimeMax = rangeMax;
@@ -722,7 +1155,7 @@ namespace moho
    * (vtable +0xF0) is raised with `(1, 0)`, exactly as `ResetCurveXRange`
    * does for the time axis.
    */
-  void WEmitterCurveEditor::ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept
+  void WCurveEditor::ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept
   {
     const auto& mouseEvent = reinterpret_cast<const WxCurveEditorWheelEventRuntimeView&>(wheelEvent);
 
@@ -754,7 +1187,7 @@ namespace moho
    * This is how the curve editor tells its owning panel that the curve
    * changed.
    */
-  void WEmitterCurveEditor::PostCurveChangedCommand()
+  void WCurveEditor::PostCurveChangedCommand()
   {
     const std::int32_t commandId = mWindowId;
     mCurveDirty = 0;
@@ -780,7 +1213,7 @@ namespace moho
    * command is posted, followed by the same `(1, 0)` notification
    * `ResetCurveXRange` raises.
    */
-  void WEmitterCurveEditor::MoveSelectedKeyTo(
+  void WCurveEditor::MoveSelectedKeyTo(
     const float time,
     const float value,
     const float tangent
@@ -839,7 +1272,7 @@ namespace moho
    * The event is marked skipped on every path so wx continues its own
    * propagation.
    */
-  void WEmitterCurvePanel::OnCurveFieldCommitted(wxEventRuntime& commandEvent)
+  void WCurveEditorPanel::OnCurveFieldCommitted(wxEventRuntime& commandEvent)
   {
     auto& fieldEvent = reinterpret_cast<WxCurveFieldCommandEventRuntimeView&>(commandEvent);
     if (mFieldsLive == 0) {
@@ -847,7 +1280,7 @@ namespace moho
       return;
     }
 
-    WEmitterCurveEditor* const editor = mCurveEditor;
+    WCurveEditor* const editor = mCurveEditor;
     const Wm3::Vector3f* const keysEnd = editor->mCurve.mKeys.end();
 
     double keyTime = (editor->mSelectedKey == keysEnd) ? 0.0 : editor->mSelectedKey->x;
@@ -905,9 +1338,9 @@ namespace moho
    * setter, and the temporary's copy-on-write reference is then dropped. The
    * three key fields show zero when no key is selected.
    */
-  void WEmitterCurvePanel::RefreshFieldsFromCurve()
+  void WCurveEditorPanel::RefreshFieldsFromCurve()
   {
-    const WEmitterCurveEditor* const editor = mCurveEditor;
+    const WCurveEditor* const editor = mCurveEditor;
 
     const auto pushField = [](WEmitterTextControl* const control, const float value) {
       wxStringRuntime formatted{};
@@ -1049,7 +1482,7 @@ namespace moho
     const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
     const std::size_t curveCount = CurvePanelCount(curvePanelView);
     for (std::size_t i = 0; i < curveCount; ++i) {
-      WEmitterCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
+      WCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
       const auto* const curve =
         reinterpret_cast<const SEfxCurve*>(effect->GetCurveParam(static_cast<std::int32_t>(i)));
       if (curve != nullptr) {
@@ -1260,7 +1693,7 @@ namespace moho
    * hexagon the retail body fills, after which the two mid-points are joined
    * by a line so the curve itself is drawn over the band.
    */
-  void WEmitterCurveEditor::DrawKeyEnvelopeSpan(void* const dc, const Wm3::Vector3f* const key) const
+  void WCurveEditor::DrawKeyEnvelopeSpan(void* const dc, const Wm3::Vector3f* const key) const
   {
     const auto* const dcVTable = CurveEditorDcVTable(dc);
     dcVTable->mSetPen(dc, wxRED_PEN);
@@ -1314,7 +1747,7 @@ namespace moho
    * `mViewTimeScale` relative to `mViewTimeMin`; the vertical axis is
    * inverted, measuring down from the client height.
    */
-  wxPoint WEmitterCurveEditor::ProjectCurvePointToScreen(
+  wxPoint WCurveEditor::ProjectCurvePointToScreen(
     const std::int32_t edge,
     const CurveEnvelopeColumn& column
   ) const noexcept
@@ -1345,7 +1778,7 @@ namespace moho
    * Draws one key's grab handle: a 5x5 square centred on the key, cyan when
    * that key is the current selection and red otherwise.
    */
-  void WEmitterCurveEditor::DrawKeyHandle(void* const dc, const Wm3::Vector3f* const key) const
+  void WCurveEditor::DrawKeyHandle(void* const dc, const Wm3::Vector3f* const key) const
   {
     const auto* const dcVTable = CurveEditorDcVTable(dc);
     dcVTable->mSetPen(dc, key == mSelectedKey ? wxCYAN_PEN : wxRED_PEN);
@@ -1369,7 +1802,7 @@ namespace moho
    * against the edges using the control's own `GetTextExtent`, followed by the
    * editor's caption.
    */
-  void WEmitterCurveEditor::OnPaint()
+  void WCurveEditor::OnPaint()
   {
     wxPaintDCRuntime paintDc(reinterpret_cast<wxWindowBase*>(this));
     void* const dc = &paintDc;
@@ -1435,7 +1868,7 @@ namespace moho
    * captured on the first press so the drag keeps receiving events outside the
    * widget, and the widget is then repainted.
    */
-  void WEmitterCurveEditor::OnMouseDown(wxEventRuntime& mouseEventRef)
+  void WCurveEditor::OnMouseDown(wxEventRuntime& mouseEventRef)
   {
     const auto& mouseEvent = reinterpret_cast<const WxCurveEditorMouseEventRuntimeView&>(mouseEventRef);
 
@@ -1480,7 +1913,7 @@ namespace moho
    * to the first key. Either way the curve-changed command and the `(1, 0)`
    * notification are raised.
    */
-  void WEmitterCurveEditor::OnCurveKeyEdit(wxEventRuntime& mouseEventRef)
+  void WCurveEditor::OnCurveKeyEdit(wxEventRuntime& mouseEventRef)
   {
     const auto& mouseEvent = reinterpret_cast<const WxCurveEditorMouseEventRuntimeView&>(mouseEventRef);
 
@@ -1516,7 +1949,7 @@ namespace moho
    * the curve-changed notification and command, and refreshes the owning
    * panel's numeric fields. This is how a blueprint's curve reaches the editor.
    */
-  void WEmitterCurveEditor::AssignCurve(const SEfxCurve& source)
+  void WCurveEditor::AssignCurve(const SEfxCurve& source)
   {
     mCurve = source;
     mSelectedKey = mCurve.mKeys.end();
@@ -1544,7 +1977,7 @@ namespace moho
    * Preserved 1:1 so the string-allocation side effects match the binary,
    * following the ` DoPreload` marker convention in `moho/sim/CWldSession.cpp`.
    */
-  void WEmitterCurveEditor::FormatCurveScript() const
+  void WCurveEditor::FormatCurveScript() const
   {
     const msvc8::string scriptName = gpg::STR_WideToUtf8(mScriptName.m_pchData);
 
@@ -1567,14 +2000,14 @@ namespace moho
     (void)line;
   }
 
-  void WEmitterCurveEditor::MarkCurveClean() noexcept
+  void WCurveEditor::MarkCurveClean() noexcept
   {
     mCurveDirty = 0;
   }
 
   namespace
   {
-    using CurveEditorWheelSinkFnPtr = void (WEmitterCurveEditor::*)(const wxEventRuntime&) noexcept;
+    using CurveEditorWheelSinkFnPtr = void (WCurveEditor::*)(const wxEventRuntime&) noexcept;
 
     /**
      * Address: 0x00F59D44 (`WCurveEditor` wxEventTableEntry slot)
@@ -1588,19 +2021,19 @@ namespace moho
     struct WCurveEditorEventTableBindings
     {
       CurveEditorWheelSinkFnPtr onMouseWheel;
-      void (WEmitterCurveEditor::*onPaint)();
-      void (WEmitterCurveEditor::*onMouseDown)(wxEventRuntime&);
-      void (WEmitterCurveEditor::*onCurveKeyEdit)(wxEventRuntime&);
+      void (WCurveEditor::*onPaint)();
+      void (WCurveEditor::*onMouseDown)(wxEventRuntime&);
+      void (WCurveEditor::*onCurveKeyEdit)(wxEventRuntime&);
     };
 
     const WCurveEditorEventTableBindings kWCurveEditorEventTableBindings = {
-      &WEmitterCurveEditor::ZoomValueAxisByWheel,
-      &WEmitterCurveEditor::OnPaint,
-      &WEmitterCurveEditor::OnMouseDown,
-      &WEmitterCurveEditor::OnCurveKeyEdit,
+      &WCurveEditor::ZoomValueAxisByWheel,
+      &WCurveEditor::OnPaint,
+      &WCurveEditor::OnMouseDown,
+      &WCurveEditor::OnCurveKeyEdit,
     };
 
-    using CurvePanelFieldSinkFnPtr = void (WEmitterCurvePanel::*)(wxEventRuntime&);
+    using CurvePanelFieldSinkFnPtr = void (WCurveEditorPanel::*)(wxEventRuntime&);
 
     /**
      * Address: 0x00F59D80 (`WCurveEditorPanel` wxEventTableEntry array)
@@ -1618,7 +2051,7 @@ namespace moho
     };
 
     const WCurveEditorPanelEventTableBindings kWCurveEditorPanelEventTableBindings = {
-      &WEmitterCurvePanel::OnCurveFieldCommitted,
+      &WCurveEditorPanel::OnCurveFieldCommitted,
     };
 
     [[maybe_unused]] [[nodiscard]] const void* PublishWCurveEditorPanelEventTableBindings() noexcept
@@ -1655,7 +2088,7 @@ namespace moho
     }
   } // namespace
 
-  const SEfxCurve& WEmitterCurveEditor::Curve() const noexcept
+  const SEfxCurve& WCurveEditor::Curve() const noexcept
   {
     return mCurve;
   }
@@ -1720,8 +2153,8 @@ namespace moho
   {
     // (1) Delete each live curve panel through its scalar-deleting destructor.
     const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
-    for (WEmitterCurvePanel* const* cursor = curvePanelView.begin; cursor != curvePanelView.end; ++cursor) {
-      if (WEmitterCurvePanel* const panel = *cursor) {
+    for (WCurveEditorPanel* const* cursor = curvePanelView.begin; cursor != curvePanelView.end; ++cursor) {
+      if (WCurveEditorPanel* const panel = *cursor) {
         (void)panel->DeleteWithFlag(1);
       }
     }
