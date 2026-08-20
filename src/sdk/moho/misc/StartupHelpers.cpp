@@ -225,7 +225,7 @@ namespace
    * Replaces destination with source when destination already exists; otherwise
    * moves source to destination, logging Win32 error codes on failure.
    */
-  [[maybe_unused]] void CopyOrReplacePreferenceFile(const wchar_t* const sourcePath, const wchar_t* const destinationPath)
+  void CopyOrReplacePreferenceFile(const wchar_t* const sourcePath, const wchar_t* const destinationPath)
   {
     if (sourcePath == nullptr || destinationPath == nullptr) {
       return;
