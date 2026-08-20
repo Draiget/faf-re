@@ -46,6 +46,7 @@
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/animation/CAniActor.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/CUserSoundManager.h"
@@ -95,6 +96,7 @@
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/resource/RResId.h"
+#include "moho/resource/RScmResource.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "moho/resource/blueprints/REmitterBlueprint.h"
@@ -1062,6 +1064,7 @@ namespace
   constexpr const char* kSelectedUnitHelpText =
     "unit = SelectedUnit() -- Returns the currently selected unit. For use at the lua console, so you can call Lua methods on a unit.";
   constexpr const char* kSimConExecuteHelpText = "SimConExecute('command string') -- Perform a console command";
+  constexpr const char* kTryCopyPoseHelpText = "TryCopyPose(unitFrom,entityTo,bCopyWorldTransform)";
   constexpr const char* kFlattenMapRectName = "FlattenMapRect";
   constexpr const char* kFlattenMapRectHelpText = "FlattenRect(x, z, sizex, sizez, elevation)";
   constexpr const char* kFlattenMapRectOutsideBoundaryWarning =
@@ -15411,6 +15414,97 @@ int moho::cfunc_SimConExecuteL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0075D060 (FUN_0075D060, cfunc_TryCopyPose)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_TryCopyPoseL`.
+ */
+int moho::cfunc_TryCopyPose(lua_State* const luaContext)
+{
+  return cfunc_TryCopyPoseL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075D080 (FUN_0075D080, func_TryCopyPose_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the sim-lane global Lua binder for `TryCopyPose`. The binary's
+ * only caller is the tail-call trampoline `register_TryCopyPose_LuaFuncDef`
+ * (0x00BDC130, `jmp func_TryCopyPose_LuaFuncDef`); the recovered source
+ * skips modeling that bridge and instead invokes this publisher directly
+ * from `SimLuaFuncDefBootstrap`, matching every other sibling in this file
+ * (`func_RandomSim_LuaFuncDef`, `func_SelectedUnit_LuaFuncDef`, ...).
+ */
+moho::CScrLuaInitForm* moho::func_TryCopyPose_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "TryCopyPose",
+    &moho::cfunc_TryCopyPose,
+    nullptr,
+    "<global>",
+    kTryCopyPoseHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075D0E0 (FUN_0075D0E0, cfunc_TryCopyPoseL)
+ *
+ * IDA signature:
+ * int __cdecl cfunc_TryCopyPoseL(LuaPlus::LuaState *a1);
+ *
+ * What it does:
+ * Resolves `unitFrom` (arg 1) and `entityTo` (arg 2) from the Lua stack.
+ * When both share the same mesh and, if the meshes differ, the same
+ * skeleton, retains `unitFrom`'s current animation pose. If
+ * `bCopyWorldTransform` (arg 3) is false, clones that pose and re-anchors
+ * the clone to `entityTo`'s current world transform instead of carrying
+ * over the source's own transform (used when the destination was placed
+ * somewhere other than the source's location, e.g. a wreck pulled back
+ * onto the map). Queues the resulting `{entity id, pose}` pair onto the
+ * Sim's pending pose-copy lane (`Sim::mPendingPoseCopies`, +0x9E8) and
+ * returns whether the copy was attempted.
+ */
+int moho::cfunc_TryCopyPoseL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kTryCopyPoseHelpText, 3, argumentCount);
+  }
+
+  LuaPlus::LuaObject unitFromObject(LuaPlus::LuaStackObject(state, 1));
+  Unit* const unitFrom = SCR_FromLua_Unit(unitFromObject);
+
+  LuaPlus::LuaObject entityToObject(LuaPlus::LuaStackObject(state, 2));
+  Entity* const entityTo = SCR_FromLua_Entity(entityToObject, state);
+
+  const bool sameMeshAndSkeleton =
+    unitFrom->GetMesh().px == entityTo->GetMesh().px &&
+    entityTo->GetMesh().px->GetSkeleton() == unitFrom->GetMesh().px->GetSkeleton();
+
+  if (!sameMeshAndSkeleton) {
+    lua_pushboolean(state->m_state, 0);
+    return 1;
+  }
+
+  Sim* const sim = ResolveGlobalSim(state->m_state);
+
+  SPendingPoseCopy pendingCopy{entityTo->id_, unitFrom->AniActor->GetPoseShared()};
+
+  const bool bCopyWorldTransform = LuaPlus::LuaStackObject(state, 3).GetBoolean();
+  if (!bCopyWorldTransform) {
+    CAniPose* const clonedPose = new CAniPose(*pendingCopy.mPose);
+    pendingCopy.mPose.reset(clonedPose);
+    pendingCopy.mPose->SetWorldTransform(entityTo->GetTransformWm3());
+  }
+
+  sim->mPendingPoseCopies.push_back(pendingCopy);
+  lua_pushboolean(state->m_state, 1);
+  return 1;
+}
+
+/**
  * Address: 0x00759190 (FUN_00759190, cfunc_FlattenMapRect)
  *
  * What it does:
@@ -29706,6 +29800,7 @@ namespace
       (void)::moho::func_RandomSim_LuaFuncDef();
       (void)::moho::func_SelectedUnit_LuaFuncDef();
       (void)::moho::func_SimConExecute_LuaFuncDef();
+      (void)::moho::func_TryCopyPose_LuaFuncDef();
       (void)::moho::func_FlattenMapRect_LuaFuncDef();
       (void)::moho::func_ParseEntityCategorySim_LuaFuncDef();
       (void)::moho::func_ParseEntityCategoryUser_LuaFuncDef();

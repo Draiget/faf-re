@@ -37,6 +37,7 @@ namespace moho
   class CAiFormationDBImpl;
   class CSimConVarBase;
   class Unit;
+  class CAniPose;
 } // namespace moho
 
 namespace moho
@@ -139,6 +140,27 @@ namespace moho
   };
 
   static_assert(sizeof(SUpgradeNotifyPair) == 0x08, "SUpgradeNotifyPair size must be 0x08");
+
+  /**
+   * One pending pose-copy request queued by the `TryCopyPose` Lua binding:
+   * the destination entity id plus a retained handle on the source pose to
+   * apply. Accumulated in the Sim's pose-copy sync lane
+   * (`Sim::mPendingPoseCopies`, +0x9E8) by `cfunc_TryCopyPoseL` when the
+   * source unit's and destination entity's mesh+skeleton match; drained
+   * elsewhere in the sim update (drain site not yet recovered).
+   *
+   * Address: 0x0075D0E0 (FUN_0075D0E0, cfunc_TryCopyPoseL) — construction
+   * site: entity id at `+0x00`, `CAniPose*` at `+0x04`, refcount control
+   * block at `+0x08` (the layout of a `boost::shared_ptr<CAniPose>` at
+   * `+0x04`, matching this struct's tail).
+   */
+  struct SPendingPoseCopy
+  {
+    EntId mEntityId;                 // +0x00
+    boost::shared_ptr<CAniPose> mPose; // +0x04 (px), +0x08 (pn.pi_)
+  };
+
+  static_assert(sizeof(SPendingPoseCopy) == 0x0C, "SPendingPoseCopy size must be 0x0C");
 
   class Sim final : public ICommandSink
   {
@@ -1373,7 +1395,7 @@ namespace moho
     msvc8::vector<void*> mSyncSerializeGroup0;
     msvc8::vector<void*> mSyncSerializeGroup1;
     msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // 0x9D8 (was mSyncSerializeGroup3)
-    msvc8::vector<void*> mSyncSerializeGroup4;
+    msvc8::vector<SPendingPoseCopy> mPendingPoseCopies; // 0x9E8 (was mSyncSerializeGroup4)
     // 0x09F8 / 0x0A08: accumulated map-rect lists (each an msvc8::vector<gpg::Rect2i>,
     // 0x10 bytes: proxy/first/last/end). FlattenMapRect (FUN_0074B120) push_back's the
     // clamped flatten rect into both; the Sim map-data serializer (FUN_00745120) streams
@@ -2249,6 +2271,37 @@ namespace moho
    * Executes one console command string argument via `CON_Execute`.
    */
   int cfunc_SimConExecuteL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0075D060 (FUN_0075D060, cfunc_TryCopyPose)
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback state and forwards to `cfunc_TryCopyPoseL`.
+   */
+  int cfunc_TryCopyPose(lua_State* luaContext);
+
+  /**
+   * Address: 0x0075D080 (FUN_0075D080, func_TryCopyPose_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the sim-lane global Lua binder for `TryCopyPose`.
+   */
+  CScrLuaInitForm* func_TryCopyPose_LuaFuncDef();
+
+  /**
+   * Address: 0x0075D0E0 (FUN_0075D0E0, cfunc_TryCopyPoseL)
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Copies the source unit's current animation pose onto the destination
+   * entity when both share the same mesh and skeleton, queuing the result
+   * onto the Sim's pending pose-copy lane. See the `.cpp` definition for
+   * the full behavior write-up.
+   */
+  int cfunc_TryCopyPoseL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00759190 (FUN_00759190, cfunc_FlattenMapRect)
