@@ -130,6 +130,15 @@ namespace
     return bits;
   }
 
+  /**
+   * Address: 0x00594BD0 (FUN_00594BD0, std::map<std::string,Moho::CArmyStatItem*>::find)
+   *
+   * What it does:
+   * Lower-bound descent by string key, returning the found node or the tree
+   * head sentinel when absent. The binary splits this into a `_Lbound` call
+   * plus an equality check; this recovery walks the parent chain directly
+   * with the same key comparator (`CompareNameIndexKey`) to the same effect.
+   */
   [[nodiscard]] moho::ArmyNameIndexNode* FindNameIndexNode(
     moho::ArmyNameIndexTree* const tree, const msvc8::string& statPath
   )
