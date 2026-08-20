@@ -1,5 +1,7 @@
 #include "moho/unit/tasks/CUnitWaitForFerryTask.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -357,7 +359,47 @@ namespace moho
 
 namespace
 {
-  gpg::SerSaveLoadHelperListRuntime gCUnitWaitForFerryTaskSerializer{};
+  // The binary global is 0x14 bytes (vtable + mNext/mPrev + load/save
+  // callback lanes, matching every other SerHelperBase-derived serializer in
+  // this codebase); `gpg::SerSaveLoadHelperListRuntime` only models the
+  // leading 0x0C-byte intrusive-list header shared by all of them.
+  struct CUnitWaitForFerryTaskSerializerHelperNode
+  {
+    void* mVtable = nullptr;
+    gpg::SerHelperBase* mNext = nullptr;
+    gpg::SerHelperBase* mPrev = nullptr;
+    gpg::RType::load_func_t mSerLoadFunc = nullptr;
+    gpg::RType::save_func_t mSerSaveFunc = nullptr;
+  };
+  static_assert(
+    offsetof(CUnitWaitForFerryTaskSerializerHelperNode, mNext) == 0x04,
+    "CUnitWaitForFerryTaskSerializerHelperNode::mNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CUnitWaitForFerryTaskSerializerHelperNode, mPrev) == 0x08,
+    "CUnitWaitForFerryTaskSerializerHelperNode::mPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CUnitWaitForFerryTaskSerializerHelperNode, mSerLoadFunc) == 0x0C,
+    "CUnitWaitForFerryTaskSerializerHelperNode::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CUnitWaitForFerryTaskSerializerHelperNode, mSerSaveFunc) == 0x10,
+    "CUnitWaitForFerryTaskSerializerHelperNode::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(
+    sizeof(CUnitWaitForFerryTaskSerializerHelperNode) == 0x14,
+    "CUnitWaitForFerryTaskSerializerHelperNode size must be 0x14"
+  );
+
+  CUnitWaitForFerryTaskSerializerHelperNode gCUnitWaitForFerryTaskSerializer{};
+
+  [[nodiscard]] gpg::SerSaveLoadHelperListRuntime& AsSerSaveLoadHelperListRuntime(
+    CUnitWaitForFerryTaskSerializerHelperNode& helper
+  ) noexcept
+  {
+    return *reinterpret_cast<gpg::SerSaveLoadHelperListRuntime*>(&helper);
+  }
 
   /**
    * Address: 0x0060F9E0 (FUN_0060F9E0)
@@ -368,7 +410,7 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitWaitForFerryTaskSerializerNodePrimary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitWaitForFerryTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitWaitForFerryTaskSerializer));
   }
 
   /**
@@ -380,7 +422,33 @@ namespace
    */
   [[nodiscard]] gpg::SerHelperBase* UnlinkCUnitWaitForFerryTaskSerializerNodeSecondary()
   {
-    return gpg::UnlinkSerSaveLoadHelperNode(gCUnitWaitForFerryTaskSerializer);
+    return gpg::UnlinkSerSaveLoadHelperNode(AsSerSaveLoadHelperListRuntime(gCUnitWaitForFerryTaskSerializer));
+  }
+
+  /**
+   * Address: 0x0060F990 (FUN_0060F990, Moho::CUnitWaitForFerryTaskSerializer::Deserialize)
+   * Address: 0x00610590 (FUN_00610590, COMDAT/jmp alias)
+   * Address: 0x00610630 (FUN_00610630, COMDAT/jmp alias)
+   *
+   * What it does:
+   * Serializer-load callback registered with the reflected
+   * `Moho::CUnitWaitForFerryTask` type. Forwards the reflected object
+   * pointer into `CUnitWaitForFerryTask::MemberDeserialize` (FUN_00610C60
+   * body); `version` and the owner-ref lane are unused by the member
+   * (mirrors the binary tail-jump).
+   */
+  void DeserializeCUnitWaitForFerryTaskSerializerCallback(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const task = reinterpret_cast<moho::CUnitWaitForFerryTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
+    }
+    task->MemberDeserialize(archive);
   }
 
   /**
@@ -390,59 +458,66 @@ namespace
    *
    * What it does:
    * Serializer-save callback registered with the reflected
-   * `Moho::CUnitWaitForFerryTask` type. Forwards one `(task, archive)` pair
-   * into `CUnitWaitForFerryTask::MemberSerialize` (FUN_00610D30 body).
+   * `Moho::CUnitWaitForFerryTask` type. Forwards the reflected object
+   * pointer into `CUnitWaitForFerryTask::MemberSerialize` (FUN_00610D30
+   * body); `version` and the owner-ref lane are unused by the member
+   * (mirrors the binary tail-jump).
    */
-  void CUnitWaitForFerryTaskSerializerSave(
+  void SerializeCUnitWaitForFerryTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const moho::CUnitWaitForFerryTask* const task
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
   )
   {
-    if (task != nullptr) {
-      task->MemberSerialize(archive);
+    auto* const task = reinterpret_cast<moho::CUnitWaitForFerryTask*>(objectPtr);
+    if (task == nullptr) {
+      return;
     }
+    task->MemberSerialize(archive);
   }
-
-  using CUnitWaitForFerryTaskSerializerSaveFn =
-    void (*)(gpg::WriteArchive*, const moho::CUnitWaitForFerryTask*);
-
-  // ODR-used function-pointer anchor. Its volatile-store ensures the
-  // serializer-save callback participates in link-time symbol resolution
-  // and cannot be stripped. The original binary wires this exact callback
-  // pointer into the reflected serializer helper chain through
-  // `Moho::CUnitWaitForFerryTaskSerializer::Serialize` (FUN_0060F9A0).
-  CUnitWaitForFerryTaskSerializerSaveFn volatile gCUnitWaitForFerryTaskSerializerSaveCallback =
-    &CUnitWaitForFerryTaskSerializerSave;
 
   /**
-   * Address: 0x0060F990 (FUN_0060F990, Moho::CUnitWaitForFerryTaskSerializer::Deserialize)
-   * Address: 0x00610590 (FUN_00610590, COMDAT/jmp alias)
-   * Address: 0x00610630 (FUN_00610630, COMDAT/jmp alias)
+   * Address: 0x00BF9E30 (FUN_00BF9E30, Moho::CUnitWaitForFerryTaskSerializer::~CUnitWaitForFerryTaskSerializer)
    *
    * What it does:
-   * Serializer-load callback registered with the reflected
-   * `Moho::CUnitWaitForFerryTask` type. Forwards one `(task, archive)` pair
-   * into `CUnitWaitForFerryTask::MemberDeserialize` (FUN_00610C60 body).
+   * Process-exit teardown: unlinks the `CUnitWaitForFerryTaskSerializer`
+   * helper node, matching the sibling unlink lanes used across other
+   * serializer registrars.
    */
-  void CUnitWaitForFerryTaskSerializerLoad(
-    gpg::ReadArchive* const archive,
-    moho::CUnitWaitForFerryTask* const task
-  )
+  void cleanup_CUnitWaitForFerryTaskSerializer_atexit()
   {
-    if (task != nullptr) {
-      task->MemberDeserialize(archive);
-    }
+    (void)UnlinkCUnitWaitForFerryTaskSerializerNodePrimary();
   }
 
-  using CUnitWaitForFerryTaskSerializerLoadFn =
-    void (*)(gpg::ReadArchive*, moho::CUnitWaitForFerryTask*);
+  /**
+   * Address: 0x00BD0960 (FUN_00BD0960, register_CUnitWaitForFerryTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global `CUnitWaitForFerryTask` serializer helper's
+   * load/save callback lanes (self-linking the intrusive helper node) and
+   * installs process-exit cleanup via `atexit`.
+   */
+  void register_CUnitWaitForFerryTaskSerializer()
+  {
+    gpg::SerHelperBase* const self =
+      reinterpret_cast<gpg::SerHelperBase*>(&gCUnitWaitForFerryTaskSerializer.mNext);
+    gCUnitWaitForFerryTaskSerializer.mNext = self;
+    gCUnitWaitForFerryTaskSerializer.mPrev = self;
+    gCUnitWaitForFerryTaskSerializer.mSerLoadFunc = &DeserializeCUnitWaitForFerryTaskSerializerCallback;
+    gCUnitWaitForFerryTaskSerializer.mSerSaveFunc = &SerializeCUnitWaitForFerryTaskSerializerCallback;
+    (void)std::atexit(&cleanup_CUnitWaitForFerryTaskSerializer_atexit);
+  }
 
-  // ODR-used function-pointer anchor for the deserialize callback so link
-  // resolution preserves the symbol. The original binary wires this exact
-  // callback into the reflected serializer helper chain through
-  // `Moho::CUnitWaitForFerryTaskSerializer::Deserialize` (FUN_0060F990).
-  CUnitWaitForFerryTaskSerializerLoadFn volatile gCUnitWaitForFerryTaskSerializerLoadCallback =
-    &CUnitWaitForFerryTaskSerializerLoad;
+  struct CUnitWaitForFerryTaskSerializerStartupBootstrap
+  {
+    CUnitWaitForFerryTaskSerializerStartupBootstrap()
+    {
+      register_CUnitWaitForFerryTaskSerializer();
+    }
+  };
+
+  [[maybe_unused]] CUnitWaitForFerryTaskSerializerStartupBootstrap gCUnitWaitForFerryTaskSerializerStartupBootstrap;
 } // namespace
 
 namespace gpg
