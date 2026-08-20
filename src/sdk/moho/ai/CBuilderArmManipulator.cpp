@@ -1,6 +1,7 @@
 #include "moho/ai/CBuilderArmManipulator.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <cmath>
 #include <typeinfo>
 
@@ -104,7 +105,7 @@ namespace
    * `IAniManipulator` base state, goal weak-pointer lane, and all builder-arm
    * tracking parameters.
    */
-  [[maybe_unused]] void DeserializeCBuilderArmManipulatorSerializerBody(
+  void DeserializeCBuilderArmManipulatorSerializerBody(
     moho::CBuilderArmManipulator* const manipulator,
     gpg::ReadArchive* const archive
   )
@@ -164,7 +165,7 @@ namespace
     DeserializeCBuilderArmManipulatorSerializerBody(manipulator, archive);
   }
 
-  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBody(
+  void SerializeCBuilderArmManipulatorSerializerBody(
     const moho::CBuilderArmManipulator* manipulator,
     gpg::WriteArchive* archive
   );
@@ -207,7 +208,7 @@ namespace
    * Serializes one `CBuilderArmManipulator` lane by saving IAniManipulator
    * base state, goal weak-pointer lane, and all builder-arm tracking fields.
    */
-  [[maybe_unused]] void SerializeCBuilderArmManipulatorSerializerBody(
+  void SerializeCBuilderArmManipulatorSerializerBody(
     const moho::CBuilderArmManipulator* const manipulator,
     gpg::WriteArchive* const archive
   )
@@ -292,7 +293,7 @@ namespace moho
    * Initializes callback lanes for global `CBuilderArmManipulator` serializer
    * helper storage and returns that helper object.
    */
-  [[maybe_unused]] [[nodiscard]] void* InitializeCBuilderArmManipulatorSerializerStartupThunk()
+  [[nodiscard]] void* InitializeCBuilderArmManipulatorSerializerStartupThunk()
   {
     gpg::SerHelperBase* const self = SerializerSelfNode(gCBuilderArmManipulatorSerializerStartupNode);
     gCBuilderArmManipulatorSerializerStartupNode.mHelperPrev = self;
@@ -313,7 +314,7 @@ namespace moho
    * Unlinks one startup helper lane for the `CBuilderArmManipulator`
    * serializer helper node and restores self-links.
    */
-  [[maybe_unused]] gpg::SerHelperBase* cleanup_CBuilderArmManipulatorSerializerStartupThunkA()
+  gpg::SerHelperBase* cleanup_CBuilderArmManipulatorSerializerStartupThunkA()
   {
     return UnlinkSerializerNode(gCBuilderArmManipulatorSerializerStartupNode);
   }
@@ -328,6 +329,27 @@ namespace moho
   [[maybe_unused]] gpg::SerHelperBase* cleanup_CBuilderArmManipulatorSerializerStartupThunkB()
   {
     return UnlinkSerializerNode(gCBuilderArmManipulatorSerializerStartupNode);
+  }
+
+  namespace
+  {
+    void cleanup_CBuilderArmManipulatorSerializer_atexit()
+    {
+      (void)cleanup_CBuilderArmManipulatorSerializerStartupThunkA();
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00BD25B0 (FUN_00BD25B0, register_CBuilderArmManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes the global `CBuilderArmManipulator` serializer helper
+   * callbacks and installs process-exit cleanup.
+   */
+  void register_CBuilderArmManipulatorSerializer()
+  {
+    (void)InitializeCBuilderArmManipulatorSerializerStartupThunk();
+    (void)std::atexit(&cleanup_CBuilderArmManipulatorSerializer_atexit);
   }
 
   /**
@@ -728,3 +750,16 @@ namespace moho
     return true;
   }
 } // namespace moho
+
+namespace
+{
+  struct CBuilderArmManipulatorSerializerStartupBootstrap
+  {
+    CBuilderArmManipulatorSerializerStartupBootstrap()
+    {
+      moho::register_CBuilderArmManipulatorSerializer();
+    }
+  };
+
+  [[maybe_unused]] CBuilderArmManipulatorSerializerStartupBootstrap gCBuilderArmManipulatorSerializerStartupBootstrap;
+} // namespace
