@@ -56,6 +56,7 @@
 #include "moho/command/CCommandDb.h"
 #include "moho/command/CommandIssueHelper.h"
 #include "moho/sim/BuildQueueCommandDecrement.h"
+#include "moho/sim/CDamage.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
@@ -1235,6 +1236,11 @@ namespace
   constexpr const char* kSetArmyColorSyntaxText = "syntax: SetArmyColor(army,r,g,b)";
   constexpr const char* kSetArmyColorInvalidArmyText = "Invalid army %i";
   constexpr const char* kDbgUsageText = "usage: %s [name]";
+
+  /// 0x0064BEC7, pushed to Sim::Printf when the amount argument is missing.
+  constexpr const char* kDamageUnitUsageText = "Syntax: DamageUnit <amount>";
+  /// 0x0064BE2D ("Debug"), the damage type DamageUnit reports.
+  constexpr const char* kDamageUnitDamageType = "Debug";
   constexpr const char* kDbgAvailableOverlaysText = "Available overlays";
   constexpr const char* kDbgUnknownOverlayText = "Unknown debug overlay: %s";
   constexpr const char* kDbgAmbiguousOverlayText = "Ambiguous debug overlay: %s.";
@@ -11916,6 +11922,61 @@ int Sim::SetArmyColor(
 
   army->PlayerColorBgra = packedColor;
   army->ArmyColorBgra = packedColor;
+  return 0;
+}
+
+/**
+ * Address: 0x0064BD20 (FUN_0064BD20, Moho::Sim::DamageUnit)
+ *
+ * IDA signature:
+ * void callcnv_33 Moho::Sim::DamageUnit(Moho::Sim *a1, std::vector_string *a4,
+ *     Wm3::Vector3f *a3, Moho::CArmyImpl *_B0, std::vector_WeakObject_IUnit *a5);
+ *
+ * What it does:
+ * `DamageUnit <amount>` console command - see the declaration. The binary
+ * open-codes both weak-pointer operations as owner-chain walks: the instigator
+ * detach at 0x0064BDE6..0x0064BDFD and the per-unit target rebind at
+ * 0x0064BE60..0x0064BEA9. Both are exactly `WeakPtr<T>::Set`, so they are
+ * expressed through it rather than re-spelled here.
+ */
+int Sim::DamageUnit(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+  (void)focusArmy;
+
+  if (commandArgs == nullptr || commandArgs->size() < 2u) {
+    sim->Printf(kDamageUnitUsageText);
+    return 0;
+  }
+
+  CDamage damage(sim);
+  damage.mMethod = CDamage_SINGLE_TARGET;
+  damage.mAmount = static_cast<float>(std::atof(commandArgs->at(1).c_str()));
+
+  // 0x0064BDE6: the instigator the CDamage constructor installed is unlinked
+  // again, so debug damage is attributed to nobody.
+  damage.mInstigator.Set(nullptr);
+
+  // 0x0064BE01..0x0064BE36: the shared zero vector at 0x00F3D21C.
+  damage.mVector = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+  damage.mType = kDamageUnitDamageType;
+  damage.mDamageFriendly = 1u;
+
+  if (selectedUnits == nullptr) {
+    return 0;
+  }
+
+  for (Entity* const entity : selectedUnits->mVec) {
+    damage.mTarget.Set(entity);
+    SIM_Damage(sim, damage);
+  }
+
   return 0;
 }
 

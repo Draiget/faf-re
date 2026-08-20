@@ -170,6 +170,12 @@ namespace
     return sCommand;
   }
 
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_DamageUnit_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
   [[nodiscard]] moho::CConAlias*& ConAlias_DamageUnit_slot()
   {
     static moho::CConAlias* sAlias = nullptr;
@@ -572,6 +578,7 @@ namespace
       moho::register_ZeroExtraStorage_ConAliasDef();
       moho::register_ZeroExtraStorage_SimConFuncDef();
       moho::register_DamageUnit_ConAlias();
+      moho::register_DamageUnit_SimConFunc();
       moho::register_AddImpulse_ConAliasDef();
       moho::register_AddImpulse_SimConFuncDef();
       moho::register_WeaponTerrainBlockageTest_ConAliasDef();
@@ -764,6 +771,17 @@ namespace moho
   /**
    * Address: 0x00BFB590 (FUN_00BFB590, sub_BFB590)
    */
+  /**
+   * Address: 0x00BFB5A0 (FUN_00BFB5A0)
+   */
+  void cleanup_DamageUnit_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_DamageUnit_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
   void cleanup_DamageUnit_ConAlias()
   {
     if (CConAlias*& alias = ConAlias_DamageUnit_slot(); alias != nullptr) {
@@ -902,6 +920,20 @@ namespace moho
       "DoSimCommand DamageUnit"
     );
     RegisterAtexitCleanup<&cleanup_DamageUnit_ConAlias>();
+  }
+
+  /**
+   * Address: 0x00BD3A10 (FUN_00BD3A10, register_DamageUnit_SimConFunc)
+   *
+   * What it does:
+   * Registers the `DamageUnit` sim command callback and installs startup
+   * cleanup. The store at 0x00BD3A31 is the only reference to
+   * `Moho::Sim::DamageUnit` anywhere in the image.
+   */
+  void register_DamageUnit_SimConFunc()
+  {
+    EnsureSimConFuncRegistration<&Sim::DamageUnit>(SimConFunc_DamageUnit_slot(), "DamageUnit");
+    RegisterAtexitCleanup<&cleanup_DamageUnit_SimConFunc>();
   }
 
   /**
