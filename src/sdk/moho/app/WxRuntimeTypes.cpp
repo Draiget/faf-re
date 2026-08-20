@@ -12862,6 +12862,18 @@ namespace
   class WxScrollEventFactoryRuntime final : public wxCommandEventRuntime
   {
   public:
+    /**
+     * Address: 0x00979120 (FUN_00979120, ??0wxScrollEvent@@QAE@@Z, wxScrollEvent::wxScrollEvent)
+     *
+     * What it does:
+     * The real ctor takes (eventType, id, commandInt, extraLong); its only
+     * zero-arg-equivalent caller (wxConstructorForwxScrollEvent, 0x0097A140)
+     * passes (wxEVT_NULL, 0, 0, 0). The commandInt/extraLong writes it makes
+     * after the base wxCommandEvent ctor runs are redundant with that base
+     * ctor's own unconditional `m_extraLong = 0; m_commandInt = 0;` (verified
+     * in FUN_00979090) -- wxScrollEvent adds no fields of its own, so this
+     * default ctor is a faithful match for that call site.
+     */
     WxScrollEventFactoryRuntime()
       : wxCommandEventRuntime(0, 0)
     {}
@@ -13195,6 +13207,17 @@ namespace
   class WxScrollWinEventFactoryRuntime final : public wxEventRuntime
   {
   public:
+    /**
+     * Address: 0x00979170 (FUN_00979170, ??0wxScrollWinEvent@@QAE@@Z, wxScrollWinEvent::wxScrollWinEvent)
+     *
+     * What it does:
+     * The real ctor takes (eventType, commandInt, extraLong) and always
+     * constructs its wxEvent base with a hardcoded (id=0, type=wxEVT_NULL)
+     * before overwriting m_eventType with the passed-in type. Its only
+     * zero-arg-equivalent caller (wxConstructorForwxScrollWinEvent,
+     * 0x0097A1C0) passes (wxEVT_NULL, 0, 0) -- eventType, commandInt, and
+     * extraLong all end up zero, matching this default ctor exactly.
+     */
     WxScrollWinEventFactoryRuntime()
       : wxEventRuntime(0, 0)
       , mCommandInt(0)
