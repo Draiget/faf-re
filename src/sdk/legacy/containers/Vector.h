@@ -1704,6 +1704,13 @@ namespace msvc8
          * (FUN_0075F240 → `_Insert_n` core FUN_0075F4B0). Emitted via
          * sim->mPendingPoseCopies.push_back(entry) in cfunc_TryCopyPoseL
          * (Sim.cpp), whose owner lane is Moho::Sim::mPendingPoseCopies at Sim+0x9E8)
+         * Address: 0x0067B780 (FUN_0067B780, msvc8::vector<Moho::SEntityVariableUpdateEntry>::push_back
+         * for the 0xD8-byte `{EntId, reserved, SSTIEntityVariableData}` record —
+         * IDA's own type library names the element `pair_EntId_SSTIEntityVariableData`,
+         * matching this struct's real shape. Emitted via
+         * syncData->mEntityUpdates.push_back(defaultEntry) in
+         * QueueEntityVariableUpdate (SimDriver.cpp), called from
+         * Entity::SyncInterface)
          * Address: 0x005DBD90 (FUN_005DBD90, msvc8::vector<Moho::UnitWeapon*>::push_back
          * for `CAiAttackerImplRuntimeView::mWeapons` — fast path appends the raw
          * pointer in place; capacity-full path tail-calls the insert(end(),1,value)
