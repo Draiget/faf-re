@@ -304,20 +304,38 @@ namespace gpg
         char mBuffer[0x101]{};
     };
 
+    struct ThreadState;
+
     /**
-     * Thread-local entry holding a prefix text (shape inferred).
+     * One pushed thread-local context label.
+     *
+     * `owner` back-links to the ScopedLogContext instance that pushed this
+     * entry (its removal helper nulls out the owner's mEntry through this
+     * pointer); `state` back-links to the owning ThreadState so removal can
+     * find its containing vector without the scope guard having to cache a
+     * second pointer alongside mEntry.
+     *
+     * Address: 0x00937370 (FUN_00937370) — allocation/field-init shape only;
+     * see gpg::ScopedLogContext::ScopedLogContext for the citing constructor.
      */
     struct ThreadCtxEntry
     {
-        void* reserved{};
+        void* owner{};
         msvc8::string text;
+        ThreadState* state{};
     };
+    static_assert(sizeof(ThreadCtxEntry) == 0x24, "ThreadCtxEntry size must be 0x24");
 
     /**
      * Thread-local state, stored in TSS.
+     *
+     * `field_0x00` is confirmed present (sizeof == 0x14 per the
+     * `operator new(0x14u)` allocation in FUN_00937370) but its role is not
+     * yet identified; no examined code path reads or writes it.
      */
     struct ThreadState
     {
+        void* field_0x00{};
         ThreadCtxEntry** begin{};
         ThreadCtxEntry** end{};
         ThreadCtxEntry** cap{};
@@ -334,6 +352,7 @@ namespace gpg
             depthCache = 0;
         }
     };
+    static_assert(sizeof(ThreadState) == 0x14, "ThreadState size must be 0x14");
 
     /**
      * Global logging context singleton (size 0x1C).
@@ -394,10 +413,25 @@ namespace gpg
 
     /**
      * RAII scope that pushes one thread-local logging context label for nested logs.
+     *
+     * Binary layout is a single pointer (mEntry only) — the owning ThreadState
+     * is reached through mEntry->state, not cached on the scope guard itself.
      */
     class ScopedLogContext
     {
     public:
+        /**
+         * Address: 0x00937B50 (FUN_00937B50, ??0LogContext@gpg@@QAE@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z_0 [gpg::LogContext::LogContext])
+         * Address: 0x00937370 (FUN_00937370, sub_937370)
+         *
+         * What it does:
+         * Lazily ensures the global log singleton and this thread's ThreadState
+         * exist, allocates one ThreadCtxEntry carrying the label text plus
+         * owner/state back-pointers, and pushes it onto the thread's context
+         * stack. The binary splits the call_once/null-check guard (0x00937B50)
+         * from the allocate-and-push body (0x00937370, called only from
+         * 0x00937B50); this constructor covers both.
+         */
         explicit ScopedLogContext(const msvc8::string& text);
         explicit ScopedLogContext(const char* text);
 
@@ -414,9 +448,9 @@ namespace gpg
         ScopedLogContext& operator=(const ScopedLogContext&) = delete;
 
     private:
-        ThreadState* mTls{};
         ThreadCtxEntry* mEntry{};
     };
+    static_assert(sizeof(ScopedLogContext) == 0x04, "ScopedLogContext size must be 0x04");
 
     /**
      * Globals (mirror original dword_*).

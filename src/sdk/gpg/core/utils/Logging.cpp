@@ -1310,14 +1310,16 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
 
 ScopedLogContext::ScopedLogContext(const msvc8::string& text)
 {
-    mTls = EnsureThreadState();
-    if (!mTls) {
+    gpg::ThreadState* const tls = EnsureThreadState();
+    if (!tls) {
         return;
     }
 
     mEntry = new ThreadCtxEntry{};
+    mEntry->owner = this;
     mEntry->text = text;
-    PushThreadContext(mTls, mEntry);
+    mEntry->state = tls;
+    PushThreadContext(tls, mEntry);
 }
 
 ScopedLogContext::ScopedLogContext(const char* const text)
@@ -1343,19 +1345,17 @@ ScopedLogContext::~ScopedLogContext()
         HandleAssertFailure("state", 323, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
         delete mEntry;
         mEntry = nullptr;
-        mTls = nullptr;
         return;
     }
 
     g_LogCtx->rw.lock();
-    if (mTls) {
-        RemoveThreadContext(mTls, mEntry);
+    if (mEntry->state) {
+        RemoveThreadContext(mEntry->state, mEntry);
     }
     delete mEntry;
     g_LogCtx->rw.unlock();
 
     mEntry = nullptr;
-    mTls = nullptr;
 }
 
 // ---------------------------------------------------------------------------
