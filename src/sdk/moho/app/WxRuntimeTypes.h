@@ -3316,6 +3316,27 @@ public:
    */
   [[nodiscard]] std::int32_t GetScrollThumb(std::int32_t orientation) const override;
 
+  /**
+   * Address: 0x009685A0 (FUN_009685A0, wxWindow::DoScreenToClient)
+   * Mangled: ?DoScreenToClient@wxWindow@@UBEXPAH0@Z
+   *
+   * What it does:
+   * Converts a screen-space point to this window's client space via
+   * `::ScreenToClient`. Leaves each coordinate untouched if its output
+   * pointer is null.
+   */
+  void DoScreenToClient(std::int32_t* x, std::int32_t* y) const override;
+
+  /**
+   * Address: 0x009685F0 (FUN_009685F0, wxWindow::DoClientToScreen)
+   * Mangled: ?DoClientToScreen@wxWindow@@UBEXPAH0@Z
+   *
+   * What it does:
+   * Converts a client-space point to screen space via `::ClientToScreen`.
+   * Leaves each coordinate untouched if its output pointer is null.
+   */
+  void DoClientToScreen(std::int32_t* x, std::int32_t* y) const override;
+
   static wxEventTable sm_eventTable;
 };
 
