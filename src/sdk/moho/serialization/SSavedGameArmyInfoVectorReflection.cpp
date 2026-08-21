@@ -30,76 +30,19 @@ namespace
    * Appends one deserialized `SSavedGameArmyInfo` row to the destination
    * vector, growing backing storage when needed. When the active run still
    * has headroom the append reuses the existing backing buffer; otherwise
-   * the engine grow path reserves +1 capacity and fills the new tail slot
-   * via `FillUninitializedSavedGameArmyInfoRange` (FUN_00884330).
+   * the engine grow path reserves +1 capacity and fills the new tail slot.
    */
   void AppendSavedGameArmyInfo(
     msvc8::vector<moho::SSavedGameArmyInfo>& destination,
     const moho::SSavedGameArmyInfo& value
   )
   {
-    auto& view = msvc8::AsVectorRuntimeView(destination);
-    const bool hasRoom = view.begin != nullptr && view.end < view.capacityEnd;
-    if (hasRoom) {
+    if (destination.size() < destination.capacity()) {
       destination.push_back(value);
       return;
     }
 
-    const std::size_t currentSize = (view.begin != nullptr)
-      ? static_cast<std::size_t>(view.end - view.begin)
-      : 0u;
-    ResizeSavedGameArmyInfoVectorWithFill(destination, currentSize + 1u, value);
-  }
-
-  /**
-   * Address: 0x00884330 (FUN_00884330, fill_uninitialized_saved_game_army_info_range)
-   *
-   * IDA signature:
-   * void __cdecl __noreturn sub_884330(std::string *begin, std::string *fillValue);
-   *
-   * What it does:
-   * Default-initializes a contiguous range of `count` uninitialized
-   * `SSavedGameArmyInfo` slots (0x1C bytes each) and fills each slot's
-   * `mPlayerName` string from `fillValue`. On exception during any
-   * per-slot string assignment, the partially-constructed prefix is
-   * destroyed (via the engine's `SSavedGameArmyInfo` destructor at
-   * `sub_8846B0`) and the throw is rethrown to the caller.
-   *
-   * Used by the vector grow paths in FUN_00882A90 (append),
-   * FUN_00882BA0 (insert-n), FUN_008830C0 (resize-up), and
-   * FUN_008838D0 (assign-fill) when backing storage is enlarged to
-   * hold the new tail run.
-   */
-  void FillUninitializedSavedGameArmyInfoRange(
-    moho::SSavedGameArmyInfo* const begin,
-    const std::size_t count,
-    const moho::SSavedGameArmyInfo& fillValue
-  )
-  {
-    if (begin == nullptr || count == 0u) {
-      return;
-    }
-
-    moho::SSavedGameArmyInfo* cursor = begin;
-    const moho::SSavedGameArmyInfo* const end = begin + count;
-
-    try {
-      while (cursor != end) {
-        // Placement-new initializes the `msvc8::string` head to the
-        // inline-empty (_Myres=15, _Mysize=0, _Bx._Buf[0]=0) state; the
-        // subsequent assign then copies `fillValue.mPlayerName` into it,
-        // matching the binary at 0x0088437F..0x00884388.
-        ::new (cursor) moho::SSavedGameArmyInfo();
-        cursor->mPlayerName = fillValue.mPlayerName;
-        ++cursor;
-      }
-    } catch (...) {
-      while (cursor != begin) {
-        --cursor;
-        cursor->~SSavedGameArmyInfo();
-      }
-      throw;
-    }
+    ResizeSavedGameArmyInfoVectorWithFill(destination, destination.size() + 1u, value);
   }
 
   /**
@@ -111,17 +54,9 @@ namespace
    */
   void ReleaseSavedGameArmyInfoVectorStorage(msvc8::vector<moho::SSavedGameArmyInfo>& storage)
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (view.begin != nullptr) {
-      for (moho::SSavedGameArmyInfo* item = view.begin; item != view.end; ++item) {
-        item->~SSavedGameArmyInfo();
-      }
-      ::operator delete(view.begin);
-    }
-
-    view.begin = nullptr;
-    view.end = nullptr;
-    view.capacityEnd = nullptr;
+    // Per-element destructor sweep, free, then null all three lanes: VC8
+    // _Tidy(), which is what move-assigning an empty vector compiles to.
+    storage = msvc8::vector<moho::SSavedGameArmyInfo>{};
   }
 
   /**
@@ -157,10 +92,12 @@ namespace
   }
 
   /**
-   * Resize-with-fill wrapper that routes through the recovered
-   * `FillUninitializedSavedGameArmyInfoRange` helper (FUN_00884330) when
-   * growing the destination vector. Behaviorally equivalent to
-   * `vector::resize(newSize, value)` in the legacy binary grow paths.
+   * What it does:
+   * Resizes the destination vector to `newSize`, reserving the exact target
+   * capacity first on the grow side the way the binary does rather than
+   * letting the grow path pick a 1.5x capacity. The per-element fill lane it
+   * used (FUN_00884330) is `msvc8::vector<T>::uninit_fill_n` and is cited
+   * there.
    */
   void ResizeSavedGameArmyInfoVectorWithFill(
     msvc8::vector<moho::SSavedGameArmyInfo>& storage,
@@ -168,26 +105,13 @@ namespace
     const moho::SSavedGameArmyInfo& fillValue
   )
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentSize = (view.begin != nullptr)
-      ? static_cast<std::size_t>(view.end - view.begin)
-      : 0u;
-
-    if (newSize <= currentSize) {
-      if (view.begin != nullptr) {
-        for (moho::SSavedGameArmyInfo* it = view.begin + newSize; it != view.end; ++it) {
-          it->~SSavedGameArmyInfo();
-        }
-        view.end = view.begin + newSize;
-      }
-      return;
+    if (newSize > storage.size()) {
+      // The binary reserves the exact target before filling, rather than
+      // letting the grow path pick a 1.5x capacity.
+      storage.reserve(newSize);
     }
 
-    storage.reserve(newSize);
-    auto& grownView = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t growBy = newSize - currentSize;
-    FillUninitializedSavedGameArmyInfoRange(grownView.end, growBy, fillValue);
-    grownView.end += growBy;
+    storage.resize(newSize, fillValue);
   }
 
   /**
