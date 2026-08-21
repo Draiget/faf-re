@@ -27241,7 +27241,7 @@ namespace
     if (sourceCount <= currentLanes.capacity()) {
       // 0x00836DBF: assign over the live rows, then build the extra tail rows
       // into the spare capacity.
-      const FactoryQueueItem* const sourceSplit = mutableSnapshot.begin() + currentCount;
+      FactoryQueueItem* const sourceSplit = mutableSnapshot.begin() + currentCount;
       (void)CopyBuildQueueItemsThiscallAdapter(sourceSplit, mutableSnapshot.begin(), currentLanes.begin());
       (void)UninitializedCopyBuildQueueItemsAdapter(sourceSplit, mutableSnapshot.end(), currentLanes.end());
       while (currentLanes.size() < sourceCount) {
