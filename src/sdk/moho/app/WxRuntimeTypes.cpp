@@ -39114,6 +39114,32 @@ bool wxWindowMswRuntime::MSWOnScroll(
   return GetEventHandler()->ProcessEvent(&scrollEvent);
 }
 
+/**
+ * Address: 0x009A6E10 (FUN_009A6E10, wxNotebook::MSWOnScroll)
+ * Mangled: ?MSWOnScroll@wxNotebook@@UAE_NHGGK@Z
+ *
+ * IDA signature:
+ * char __thiscall wxNotebook::MSWOnScroll(
+ *     wxWindow *this, int orientation, int command, int position,
+ *     unsigned int controlHandle);
+ *
+ * What it does:
+ * See the declaration's own doc comment.
+ */
+bool wxNotebookRuntime::MSWOnScroll(
+  const std::int32_t orientation,
+  const unsigned short command,
+  const unsigned short position,
+  const unsigned long controlHandle
+)
+{
+  if (controlHandle != 0u) {
+    return false;
+  }
+
+  return wxWindowMswRuntime::MSWOnScroll(orientation, command, position, 0u);
+}
+
 long wxWindowMswRuntime::MSWWindowProc(
   const unsigned int message,
   const unsigned int wParam,
