@@ -2296,6 +2296,16 @@ namespace msvc8
          * `mLast`) corresponds to FUN_00950670; reallocation allocates via FUN_0094F1B0
          * (`operator new(8 * newCap)`, `0xFFFFFFFF/count < 8` overflow guard))
          *
+         * Address: 0x005C68E0 (FUN_005C68E0,
+         * msvc8::vector<Moho::SUnitVariableUpdateEntry>::_Insert_n for the
+         * 568-byte (0x238) element -- max_size 0xFFFFFFFF/568, 1.5x growth,
+         * allocation through the checked 568-byte lane, with a reallocate
+         * branch, an in-place tail-shift branch, and a pure-append fast path.
+         * Reached through the position-preserving wrapper FUN_005C51B0, which
+         * converts the insert position to an index before the call because a
+         * reallocation moves mFirst. Its caller is
+         * `Moho::QueueUnitVariableUpdate` in SimDriver.cpp.)
+         * Address: 0x005C51B0 (FUN_005C51B0, that wrapper)
          * Address: 0x00508480 (FUN_00508480,
          * msvc8::vector<Moho::SDelayedSubVizInfo>::_Insert_n for the 0x18-byte
          * element -- max_size guard through FUN_00507F80's throw lane, in-place
@@ -2415,6 +2425,9 @@ namespace msvc8
 
     private:
         /**
+         * Address: 0x005617C0 (FUN_005617C0, the range-destroy lane for 568-byte
+         * `Moho::SUnitVariableUpdateEntry` -- runs `~SSTIUnitVariableData` on the
+         * payload at each slot's +0x08)
          * Address: 0x005C6F70 (FUN_005C6F70, the range-destroy lane for 52-byte
          * `Moho::SPerArmyReconInfo` -- forward `~T()` sweep over `[first, last)`,
          * used by `erase` (FUN_005C6F00) and by `_Insert_n`'s reallocation path
@@ -2447,6 +2460,16 @@ namespace msvc8
          * single-element copy) and by the `_Insert_n` grow core (FUN_0075F4B0,
          * head/tail range moves) for `Sim::mPendingPoseCopies`)
          *
+         * Address: 0x00563430 (FUN_00563430,
+         * msvc8::vector<Moho::SUnitVariableUpdateEntry>::uninit_copy_n -- the
+         * range form, with the destroy-what-was-built rollback on throw)
+         * Address: 0x00562B70 (FUN_00562B70, register-shape adapter for FUN_00563430)
+         * Address: 0x00563070 (FUN_00563070, register-shape adapter for FUN_00563430)
+         * Address: 0x00563250 (FUN_00563250, register-shape adapter for FUN_00563430)
+         * Address: 0x005CD1C0 (FUN_005CD1C0, source-first adapter for FUN_00563430)
+         * Address: 0x00562680 (FUN_00562680, register-shape adapter for FUN_00563430)
+         * Address: 0x005CBB20 (FUN_005CBB20, the counted form of the same)
+         * Address: 0x005C9AD0 (FUN_005C9AD0, register-shape adapter for FUN_005CBB20)
          * Address: 0x005CDAE0 (FUN_005CDAE0, msvc8::vector<Moho::SPerArmyReconInfo>::
          * uninit_copy_n for the 52-byte element -- the `_Insert_n` reallocation
          * path's head/tail range copies, FUN_005C6F90)
@@ -2547,6 +2570,10 @@ namespace msvc8
          * 52-byte `Moho::SPerArmyReconInfo` -- copy-assigns a parallel source run
          * over `[destBegin, destEnd)`; used by FUN_005C6F90 to overwrite the
          * vacated insert gap)
+         * Address: 0x005CD1F0 (FUN_005CD1F0, the `std::copy` / `std::copy_backward`
+         * pair for 568-byte `Moho::SUnitVariableUpdateEntry` -- ICF-folded to one
+         * address)
+         * Address: 0x005C9E00 (FUN_005C9E00, register-shape adapter for FUN_005CD1F0)
          * Address: 0x005C9E70 (FUN_005C9E70, the `std::copy` emission used by
          * `msvc8::vector<Moho::SPerArmyReconInfo>::operator=` (FUN_005CA980) to
          * assign over the retained prefix; returns the one-past-end destination

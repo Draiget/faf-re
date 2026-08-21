@@ -684,6 +684,13 @@ namespace moho
    * `UserUnit::UpdateUnitData`. It lives here rather than in SimDriver.h
    * because it embeds a whole `SSTIUnitVariableData` by value.
    */
+  /**
+   * Address: 0x005BDA80 (FUN_005BDA80,
+   * `SUnitVariableUpdateEntry`'s compiler-generated default constructor --
+   * zeroes the two header words, default-constructs the `SSTIUnitVariableData`
+   * payload at +0x08, and zeroes the trailing recon-flag word. MSVC emits it
+   * out-of-line because the payload's own constructor is non-trivial.)
+   */
   struct SUnitVariableUpdateEntry
   {
     EntId mEntityId = 0;                    // +0x000

@@ -1067,14 +1067,6 @@ namespace moho
 
 namespace moho
 {
-  // Defined in Unit.cpp (msvc8::vector<SUnitVariableUpdateEntry>::_Insert_n,
-  // FUN_005C68E0/FUN_005C51B0) -- forward-declared locally to avoid pulling
-  // Vector.h's msvc8::vector template into Unit.h.
-  SUnitVariableUpdateEntry* InsertUnitVariableUpdateEntry(
-    msvc8::vector<SUnitVariableUpdateEntry>& storage,
-    SUnitVariableUpdateEntry* insertPosition,
-    const SUnitVariableUpdateEntry& value
-  );
 } // namespace moho
 
 /**
@@ -1101,11 +1093,11 @@ moho::SUnitVariableUpdateEntry* moho::QueueUnitVariableUpdate(
 
   SUnitVariableUpdateEntry defaultEntry{};
   defaultEntry.mEntityId = ToRaw(EEntityIdSentinel::Invalid);
-  SUnitVariableUpdateEntry* const stored = InsertUnitVariableUpdateEntry(
-    syncData->mUnitUpdates,
-    syncData->mUnitUpdates.end(),
-    defaultEntry
-  );
+  // VC8's push-default lane is `_Insert_n(end(), 1, value)` (FUN_005C68E0,
+  // reached through the position-preserving wrapper FUN_005C51B0), which is
+  // msvc8::vector<T>::insert -- see the address block on that member.
+  SUnitVariableUpdateEntry* const stored =
+    syncData->mUnitUpdates.insert(syncData->mUnitUpdates.end(), 1u, defaultEntry);
   if (stored == nullptr) {
     return nullptr;
   }
