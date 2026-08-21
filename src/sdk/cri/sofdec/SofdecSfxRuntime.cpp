@@ -131,7 +131,8 @@ struct SfxHandle {
   std::int32_t compositionCode; ///< +0x04 composition mode (sfxcnv_IsCnvUpHalf)
   std::int32_t outputBufferWidth;  ///< +0x08 SFX_Set/GetOutBufSize
   std::int32_t outputBufferHeight; ///< +0x0C SFX_Set/GetOutBufSize
-  std::uint8_t mUnknown10[0x14]; ///< +0x10
+  std::int32_t unitWidth;     ///< +0x10 SFX_SetUnitWidth
+  std::uint8_t mUnknown14[0x10]; ///< +0x14
   std::int32_t sfxz;          ///< +0x24 SFXZ sub-handle (SFX_Create)
   std::uint8_t mUnknown28_[0x08]; ///< +0x28 (+0x28 = 1, +0x2C = 0)
   std::int32_t sfxa;          ///< +0x30 SFXA sub-handle (SFX_Create)
@@ -161,6 +162,7 @@ static_assert(offsetof(SfxHandle, sfxz) == 0x24, "SfxHandle::sfxz must live at o
 static_assert(offsetof(SfxHandle, compositionCode) == 0x04, "SfxHandle::compositionCode must live at offset 0x04");
 static_assert(offsetof(SfxHandle, outputBufferWidth) == 0x08, "SfxHandle::outputBufferWidth must live at offset 0x08");
 static_assert(offsetof(SfxHandle, outputBufferHeight) == 0x0C, "SfxHandle::outputBufferHeight must live at offset 0x0C");
+static_assert(offsetof(SfxHandle, unitWidth) == 0x10, "SfxHandle::unitWidth must live at offset 0x10");
 static_assert(offsetof(SfxHandle, sfxa) == 0x30, "SfxHandle::sfxa must live at offset 0x30");
 static_assert(offsetof(SfxHandle, planeBase) == 0x38, "SfxHandle::planeBase must live at offset 0x38");
 static_assert(offsetof(SfxHandle, tableBase) == 0x50, "SfxHandle::tableBase must live at offset 0x50");
@@ -1536,6 +1538,25 @@ void SFX_SetOutBufSize(void* const sfxHandle, const std::int32_t outputPitch, co
   auto* const handle = static_cast<moho_cri_sfx_internal::SfxHandle*>(sfxHandle);
   handle->outputBufferWidth = outputPitch;
   handle->outputBufferHeight = outputHeight;
+}
+
+/**
+ * Address: 0x00ACCD90 (FUN_00ACCD90, _SFX_SetUnitWidth)
+ *
+ * IDA signature:
+ * int __cdecl SFX_SetUnitWidth(int a1, int a2);
+ *
+ * What it does:
+ * Records the destination pixel unit-width on the handle, matching
+ * `SFX_SetOutBufSize`'s parameter spelling for the same reason (the
+ * declaration `SofdecFoundationRuntime.cpp` publishes for
+ * `MWSFSFX_SetOutBufSize`, which calls this with the handle it resolved from
+ * `MWSFSFX_GetSfxHn`). Previously a no-argument stub in
+ * `SofdecExternalStubs.cpp` that silently discarded both arguments.
+ */
+void SFX_SetUnitWidth(void* const sfxHandle, const std::int32_t unitWidth)
+{
+  static_cast<moho_cri_sfx_internal::SfxHandle*>(sfxHandle)->unitWidth = unitWidth;
 }
 
 /**
