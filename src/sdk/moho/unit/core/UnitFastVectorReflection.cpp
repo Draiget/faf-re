@@ -363,6 +363,8 @@ namespace
 
 namespace gpg
 {
+  RFastVectorType<moho::WeakPtr<moho::Entity>>::~RFastVectorType() = default;
+
   /**
    * Address: 0x006AE400 (FUN_006AE400, gpg::RFastVectorType_WeakPtr_Entity::GetName)
    */

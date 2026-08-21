@@ -20,6 +20,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006B18B0 (FUN_006B18B0, gpg::RFastVectorType_WeakPtr_Entity::dtr)
+     */
+    ~RFastVectorType() override;
+
+    /**
      * Address: 0x006AE400 (FUN_006AE400, gpg::RFastVectorType_WeakPtr_Entity::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
