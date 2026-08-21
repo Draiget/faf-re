@@ -142,12 +142,18 @@ namespace msvc8
             return 1;
         }
 
+        /**
+         * Erases `[first, last)` and returns a cursor on the first survivor.
+         *
+         * The whole-tree fast path and the `erase(_First++)` walk both live on
+         * `rb_tree::erase_range` - see the address block there. The local loop
+         * this replaced agreed on the returned cursor, but it had no fast path:
+         * clearing a whole tree ran one rebalancing erase per element instead of
+         * the single recursive `_Erase` plus header reset the binary performs.
+         */
         iterator erase(iterator first, iterator last)
         {
-            while (first != last) {
-                first = erase(first);
-            }
-            return last;
+            return iterator(tree_.erase_range(first.node(), last.node()));
         }
 
         void swap(set& other) MSVC8_SET_NOEXCEPT { tree_.swap(other.tree_); }

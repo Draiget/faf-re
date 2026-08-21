@@ -97,7 +97,26 @@ namespace msvc8
             return n->isNil != 0;
         }
 
-        /** Leftmost (smallest) node of the subtree rooted at `n`. */
+        /**
+         * Address: 0x00899F60 (FUN_00899F60, `_Min`)
+         *
+         * Emitted for the session save-node map - the `map<uint32, string>`
+         * whose nodes carry `_Isnil` at +0x2D. The index reports 20 ICF twins:
+         * `_Min` is a two-instruction walk whose body is identical for every
+         * instantiation that shares this sentinel offset, so the linker folded
+         * them onto this one address.
+         *
+         * IDA signature:
+         * _DWORD *__usercall sub_899F60@<eax>(_DWORD *result@<eax>);
+         *
+         * What it does:
+         * Leftmost (smallest) node of the subtree rooted at `n`.
+         *
+         * The shipped body peels the first `_Left` load before the loop
+         * (`mov ecx,[eax]` / `cmp byte ptr [ecx+2Dh],0`), which is the same walk
+         * this expresses as a plain while loop. Reached from `erase(const_iterator)`
+         * at 0x0089A540 when the erased node was the leftmost one.
+         */
         template<class V>
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
@@ -107,7 +126,22 @@ namespace msvc8
             return n;
         }
 
-        /** Rightmost (largest) node of the subtree rooted at `n`. */
+        /**
+         * Address: 0x0089ABB0 (FUN_0089ABB0, `_Max`)
+         *
+         * Emitted for the session save-node map, and likewise folded across 20
+         * ICF twins.
+         *
+         * IDA signature:
+         * int __usercall sub_89ABB0@<eax>(int result@<eax>);
+         *
+         * What it does:
+         * Rightmost (largest) node of the subtree rooted at `n`.
+         *
+         * Mirror of `rb_min`, stepping `_Right` at +0x08. Reached from
+         * `erase(const_iterator)` at 0x0089A540 when the erased node was the
+         * rightmost one.
+         */
         template<class V>
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
@@ -441,12 +475,19 @@ namespace msvc8
              * `call sub_7E3B70` with `head->left` and `head` pushed as the
              * range, then `operator delete(head)` and
              * `[edi+4] = 0` / `[edi+8] = 0`.
+             *
+             * `erase_range(leftmost(), header())` below *is* that call - the two
+             * pushed operands are `head->left` (`begin()`) and `head` (`end()`),
+             * so the range always takes the member's whole-tree fast path. Calling
+             * `clear()` here instead would collapse to the same stores but would
+             * stop the range member from being emitted at all.
              */
             ~rb_tree()
             {
-                clear();
+                erase_range(leftmost(), header());
                 free_raw(head_);
                 head_ = nullptr;
+                size_ = 0;
             }
 
             // ---- observers ---------------------------------------------------
@@ -663,12 +704,30 @@ namespace msvc8
             }
 
             /**
+             * Address: 0x0089A540 (FUN_0089A540, `erase(const_iterator)`)
+             * Address: 0x007E4430 (FUN_007E4430, sibling emission)
+             *
+             * 0x0089A540 is the session save-node map `map<uint32, string>`
+             * (`_Isnil` at +0x2D); 0x007E4430 is the same member for the
+             * mesh-key map (`_Isnil` at +0x25).
+             *
+             * IDA signature:
+             * int *__stdcall sub_89A540(int this, int *result, int where);
+             *
+             * What it does:
              * Unlinks and destroys `erased`, returning its in-order successor.
              *
              * This is MSVC8's `_Tree::erase(const_iterator)` transplant plus
              * recolour pass: the successor is lifted into the erased node's slot
              * when both subtrees exist, then the black-height deficit is repaired
              * from the stitched-up child upwards.
+             *
+             * Both emissions open with the same `_Isnil` guard that throws
+             * `out_of_range("invalid map/set<T> iterator")` - the string is built
+             * in place, handed to `std::logic_error::logic_error`, and the vftable
+             * is then patched to `std::out_of_range` before `_CxxThrowException`.
+             * They close with `if (0 < _Mysize) --_Mysize;`, i.e. the shipped
+             * decrement is guarded rather than unconditional.
              */
             /**
              * Address: 0x00592920 (FUN_00592920, the blueprint-stat map's
@@ -678,7 +737,10 @@ namespace msvc8
              */
             node_type* erase_node(node_type* const erased)
             {
-                assert(erased != nullptr && !rb_is_nil(erased) && "msvc8 tree: erasing end()");
+                assert(erased != nullptr && "msvc8 tree: erasing a null node");
+                if (rb_is_nil(erased)) {
+                    throw std::out_of_range("invalid map/set<T> iterator");
+                }
 
                 node_type* const next = rb_increment(erased);
 
@@ -750,8 +812,59 @@ namespace msvc8
                 }
 
                 free_node(erased);
-                --size_;
+                if (size_ > 0) {
+                    --size_;
+                }
                 return next;
+            }
+
+            /**
+             * Address: 0x00899CA0 (FUN_00899CA0, `erase(iterator, iterator)`)
+             * Address: 0x007E3B70 (FUN_007E3B70, sibling emission)
+             *
+             * 0x00899CA0 is the session save-node map `map<uint32, string>`
+             * (`_Isnil` at +0x2D), reached from
+             * `Moho::SSessionSaveDataTypeInfo::Destruct` at 0x0089A450 and eight
+             * other call sites; 0x007E3B70 is the mesh-key map (`_Isnil` at
+             * +0x25), reached from that map's `_Tidy` at 0x007E2B20 - the body
+             * this class's destructor is annotated with.
+             *
+             * IDA signature:
+             * _DWORD *__userpurge sub_899CA0@<eax>(int this@<edi>, _DWORD *result,
+             *                                      _DWORD *first, _DWORD *last);
+             *
+             * What it does:
+             * Erases the half-open node range `[first, last)` and returns a cursor
+             * on the first surviving node.
+             *
+             * MSVC8 splits this in two. When the range is the whole tree it runs
+             * `clear()` inline and answers `begin()`; the shipped bodies show that
+             * inlining directly - `cmp first,[head]` / `cmp last,head`, then the
+             * recursive `_Erase` call (`sub_89A820` / `sub_7E4DD0`) followed by
+             * `head->parent = head`, `_Mysize = 0`, `head->left = head`,
+             * `head->right = head` and a load of `head->left` into the return slot.
+             *
+             * Otherwise it walks one node at a time as `erase(_First++)`: the
+             * post-increment's `_Inc` is inlined ahead of the call (the `+0x2D`
+             * / `+0x25` sentinel probes at 0x00899CF5 and 0x007E3B95), the *old*
+             * cursor is passed to `erase(const_iterator)` and that call's returned
+             * iterator is discarded. Recovering it as `first = erase(first)` would
+             * drop the second `_Inc` the shipped code performs.
+             */
+            node_type* erase_range(node_type* const first, node_type* const last)
+            {
+                if (first == leftmost() && last == header()) {
+                    clear();
+                    return leftmost();
+                }
+
+                iterator cursor(first);
+                const iterator stop(last);
+                while (cursor != stop) {
+                    // `erase(_First++)`: advance first, then erase the old cursor.
+                    (void)erase_node((cursor++).node());
+                }
+                return cursor.node();
             }
 
             /**
@@ -891,14 +1004,38 @@ namespace msvc8
                 free_raw(n);
             }
 
-            void destroy_subtree(node_type* const n) noexcept
+            /**
+             * Address: 0x0089A820 (FUN_0089A820, `_Erase`)
+             * Address: 0x007E4DD0 (FUN_007E4DD0, sibling emission)
+             * Address: 0x007E34E0 (FUN_007E34E0, sibling emission)
+             *
+             * 0x0089A820 is the session save-node map (`_Isnil` at +0x2D),
+             * 0x007E4DD0 the mesh-key map (`_Isnil` at +0x25) and 0x007E34E0 the
+             * batch-bucket map (`_Isnil` at +0x2D) - the annotated IDB names that
+             * last one `std::map_MeshBatchKey_vector_MeshInstance::RemoveAll`,
+             * which is a `_Tree::_Erase`, not a separate container operation.
+             *
+             * IDA signature:
+             * void __stdcall sub_89A820(_Node *rootNode);
+             *
+             * What it does:
+             * Destroys every node of the subtree rooted at `rootNode`.
+             *
+             * MSVC8 recurses on `_Right` only and unrolls the `_Left` descent into
+             * the enclosing loop, destroying the node visited on the *previous*
+             * turn - all three emissions show that exact shape (`call <self>` on
+             * `[node+8]`, `node = [node]`, then the inlined value destructor plus
+             * `operator delete` on the carried-over pointer). Recursing on both
+             * children would destroy the same set of nodes but is not what the
+             * shipped code does, and it doubles the stack depth on left spines.
+             */
+            void destroy_subtree(node_type* rootNode) noexcept
             {
-                if (rb_is_nil(n)) {
-                    return;
+                for (node_type* n = rootNode; !rb_is_nil(n); rootNode = n) {
+                    destroy_subtree(n->right);
+                    n = n->left;
+                    free_node(rootNode);
                 }
-                destroy_subtree(n->left);
-                destroy_subtree(n->right);
-                free_node(n);
             }
 
             /**
