@@ -4368,6 +4368,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00C09760 (FUN_00C09760, gpg::Rect2iTypeInfo::dtr, atexit-thunk lane)
+     * Address: 0x00906130 (FUN_00906130, gpg::Rect2iTypeInfo::dtr, vtable-slot lane)
+     */
+    ~Rect2iTypeInfo() override = default;
+
+    /**
      * Address: 0x00905FD0 (FUN_00905FD0, gpg::Rect2iTypeInfo::Rect2iTypeInfo)
      *
      * What it does:
@@ -4404,6 +4410,12 @@ namespace gpg
   class Rect2fTypeInfo final : public RType
   {
   public:
+    /**
+     * Address: 0x00C097C0 (FUN_00C097C0, gpg::Rect2fTypeInfo::dtr, atexit-thunk lane)
+     * Address: 0x00906190 (FUN_00906190, gpg::Rect2fTypeInfo::dtr, vtable-slot lane)
+     */
+    ~Rect2fTypeInfo() override = default;
+
     /**
      * Address: 0x00906080 (FUN_00906080, gpg::Rect2fTypeInfo::Rect2fTypeInfo)
      *
