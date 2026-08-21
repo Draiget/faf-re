@@ -437,6 +437,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00528410 (FUN_00528410, Moho::RMeshBlueprint::dtr, scalar-deleting
+   * destructor, D0 variant)
+   * Address: 0x00528440 (FUN_00528440, complete-object destructor, D1 variant)
+   *
+   * What it does:
+   * Tears down `mLods`' backing storage then chains into the `RBlueprint`
+   * base destructor.
+   */
+  RMeshBlueprint::~RMeshBlueprint()
+  {
+    ClearAndFreeMeshBlueprintLodVectorStorage(&mLods);
+  }
+
+  /**
    * Address: 0x005183D0 (FUN_005183D0)
    * Mangled: ??0RMeshBlueprintLOD@Moho@@QAE@XZ
    *
