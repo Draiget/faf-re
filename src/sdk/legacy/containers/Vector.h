@@ -2649,6 +2649,14 @@ namespace msvc8
          * pair for 568-byte `Moho::SUnitVariableUpdateEntry` -- ICF-folded to one
          * address)
          * Address: 0x005C9E00 (FUN_005C9E00, register-shape adapter for FUN_005CD1F0)
+         * Address: 0x005EC880 (FUN_005EC880, the `std::copy_backward` emission for
+         * the 0x20-byte `Moho::SAiReservedTransportBone` -- two cursors walking
+         * down together, `dst -= 0x20; src -= 0x20;` then
+         * `SAiReservedTransportBone::operator=` (FUN_005EE740) per element,
+         * returning the final source cursor. Reached from that element's
+         * `resize` grow path, FUN_005EA590, which is cited on resize above; the
+         * backward direction is what stops the tail shift corrupting itself
+         * when the ranges overlap.)
          * Address: 0x00583130 (FUN_00583130, the `std::copy` emission for
          * `Moho::SPointVector`, used by `clear()`'s degenerate self-range shift
          * in the AI brain's point-vector reset)
