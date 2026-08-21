@@ -222,6 +222,12 @@ namespace moho
 
   /**
    * Address: 0x005F84C0 (FUN_005F84C0, ??1CUnitUpgradeTask@Moho@@QAE@@Z)
+   * Address: 0x005F8660 (FUN_005F8660, scalar-deleting destructor,
+   * VTABLE_CONFIRMED via `??_7CUnitUpgradeTask@Moho@@6B@`)
+   *
+   * The scalar-deleting wrapper is ordinary C++ `delete` semantics
+   * (`~CUnitUpgradeTask(); if (deleteFlag & 1) operator delete(this);`), not
+   * modeled as a separate function.
    */
   CUnitUpgradeTask::~CUnitUpgradeTask()
   {
