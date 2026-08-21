@@ -191,6 +191,54 @@ namespace gpg::core::legacy
   }
 
   /**
+   * Address: 0x0071D740 (FUN_0071D740)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 64-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`.
+   */
+  void* AllocateChecked64ByteLane(const std::uint32_t elementCount)
+  {
+    return AllocateCheckedElements(elementCount, 64u);
+  }
+
+  /**
+   * Address: 0x005579D0 (FUN_005579D0)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 96-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`.
+   */
+  void* AllocateChecked96ByteLane(const std::uint32_t elementCount)
+  {
+    return AllocateCheckedElements(elementCount, 96u);
+  }
+
+  /**
+   * Address: 0x00751A50 (FUN_00751A50)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 144-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`.
+   */
+  void* AllocateChecked144ByteLane(const std::uint32_t elementCount)
+  {
+    return AllocateCheckedElements(elementCount, 144u);
+  }
+
+  /**
+   * Address: 0x00831BA0 (FUN_00831BA0)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 44-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`.
+   */
+  void* AllocateChecked44ByteLane(const std::uint32_t elementCount)
+  {
+    return AllocateCheckedElements(elementCount, 44u);
+  }
+
+  /**
    * Address: 0x0094F2D0 (FUN_0094F2D0, sub_94F2D0)
    *
    * What it does:
