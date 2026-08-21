@@ -13835,6 +13835,52 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
     return comparison - 2;
   }
 
+  /**
+   * Address: 0x00A8F089 (FUN_00A8F089, iswdigit)
+   *
+   * IDA signature:
+   * int __cdecl sub_A8F089(WCHAR a1);
+   *
+   * What it does:
+   * CRT `iswdigit()`: classifies one wide character through `iswctype` with
+   * the `_DIGIT` mask (0x4, confirmed as the literal `push 4` at 0x00A8F089).
+   */
+  extern "C" int __cdecl iswdigit(const wint_t character)
+  {
+    return ::iswctype(character, _DIGIT);
+  }
+
+  /**
+   * Address: 0x00A8F0D1 (FUN_00A8F0D1, iswspace)
+   *
+   * IDA signature:
+   * int __cdecl sub_A8F0D1(WCHAR a1);
+   *
+   * What it does:
+   * CRT `iswspace()`: classifies one wide character through `iswctype` with
+   * the `_SPACE` mask (0x8, confirmed as the literal `push 8` at 0x00A8F0D1).
+   */
+  extern "C" int __cdecl iswspace(const wint_t character)
+  {
+    return ::iswctype(character, _SPACE);
+  }
+
+  /**
+   * Address: 0x00A86A7F (FUN_00A86A7F, _ftime64)
+   *
+   * IDA signature:
+   * void callcnv_33 ftime64(struct __timeb64 *Time);
+   *
+   * What it does:
+   * CRT `_ftime64()`: a one-instruction tail-jump thunk onto the secure
+   * `_ftime64_s` lane, discarding its `errno_t` result. IDA marks the body
+   * `thunk` for exactly that reason.
+   */
+  extern "C" void __cdecl _ftime64(struct __timeb64* const timeBuffer)
+  {
+    (void)::_ftime64_s(timeBuffer);
+  }
+
   using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
 
   using RuntimeComSlotDispatchFn = int(__stdcall*)(void*);
