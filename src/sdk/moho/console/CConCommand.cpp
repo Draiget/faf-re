@@ -3565,17 +3565,8 @@ namespace
    */
   void cleanup_console_command_buffer()
   {
-    msvc8::vector_runtime_view<msvc8::string>& commandsView = msvc8::AsVectorRuntimeView(gSavedConsoleCommands);
-    if (commandsView.begin != nullptr) {
-      for (msvc8::string* cursor = commandsView.begin; cursor != commandsView.end; ++cursor) {
-        cursor->~string();
-      }
-      ::operator delete(static_cast<void*>(commandsView.begin));
-    }
-
-    commandsView.begin = nullptr;
-    commandsView.end = nullptr;
-    commandsView.capacityEnd = nullptr;
+    // Per-element ~string(), free, null the three lanes: VC8 _Tidy().
+    gSavedConsoleCommands = msvc8::vector<msvc8::string>{};
   }
 } // namespace
 
