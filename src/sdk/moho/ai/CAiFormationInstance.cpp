@@ -3556,9 +3556,9 @@ namespace moho
 
     gpg::RType* const elementType = CachedSOffsetInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(laneVector);
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SOffsetInfo>*>(laneVector);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, view.ElementAtUnchecked(i), owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -3578,14 +3578,14 @@ namespace moho
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(laneVector);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SOffsetInfo>*>(laneVector);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = CachedSOffsetInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, view.ElementAtUnchecked(i), owner);
+      archive->Write(elementType, &vec[i], owner);
     }
   }
 
@@ -3604,8 +3604,8 @@ namespace moho
     void* const objectStorage
   )
   {
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAssignedLocInfo>*>(objectStorage);
+    vec.Resize(newSize, fillValue ? *fillValue : moho::SAssignedLocInfo{});
   }
 
   /**
@@ -3649,9 +3649,9 @@ namespace moho
 
     gpg::RType* const elementType = CachedSAssignedLocInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(storage);
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAssignedLocInfo>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, view.ElementAtUnchecked(i), owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -3672,14 +3672,14 @@ namespace moho
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAssignedLocInfo>*>(storage);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = CachedSAssignedLocInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, view.ElementAtUnchecked(i), owner);
+      archive->Write(elementType, &vec[i], owner);
     }
   }
 } // namespace moho
