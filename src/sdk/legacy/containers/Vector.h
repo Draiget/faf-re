@@ -1450,6 +1450,9 @@ namespace msvc8
          * Address: 0x004433D0 (FUN_004433D0)
          * Address: 0x00443E40 (FUN_00443E40)
          * Address: 0x00444330 (FUN_00444330)
+         * Address: 0x0054C170 (FUN_0054C170,
+         * msvc8::vector<Moho::SAniSkelBoneNameIndex>::begin -- the out-pointer
+         * form MSVC emits when the result is returned through a caller slot)
          *
          * What it does:
          * Returns the first element pointer lane (`first_`).
@@ -1460,6 +1463,9 @@ namespace msvc8
          * Address: 0x004433E0 (FUN_004433E0)
          * Address: 0x00443E50 (FUN_00443E50)
          * Address: 0x00444340 (FUN_00444340)
+         * Address: 0x0054C180 (FUN_0054C180,
+         * msvc8::vector<Moho::SAniSkelBoneNameIndex>::end -- same out-pointer
+         * form as FUN_0054C170)
          *
          * What it does:
          * Returns the one-past-end pointer lane (`last_`).
@@ -1477,6 +1483,9 @@ namespace msvc8
          *   `weapon->mTargetPriorities.size()` in CAiAttackerImpl.cpp)
          *
          * What it does:
+         * Address: 0x0054C1B0 (FUN_0054C1B0,
+         * msvc8::vector<Moho::SAniSkelBoneNameIndex>::size)
+         *
          * Returns element count from retained `[first_, last_)` range.
          */
         [[nodiscard]] std::size_t size() const noexcept {
@@ -1487,6 +1496,11 @@ namespace msvc8
          * Address: 0x00443FA0 (FUN_00443FA0)
          *
          * What it does:
+         * Address: 0x0054DC40 (FUN_0054DC40,
+         * msvc8::vector<Moho::SAniSkelBone>::capacity)
+         * Address: 0x0054DCA0 (FUN_0054DCA0,
+         * msvc8::vector<Moho::SAniSkelBoneNameIndex>::capacity)
+         *
          * Returns reserved element capacity from retained `[first_, end_)` range.
          */
         [[nodiscard]] std::size_t capacity() const noexcept {

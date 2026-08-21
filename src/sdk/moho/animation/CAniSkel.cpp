@@ -309,56 +309,6 @@ namespace
   }
 
   /**
-   * Address: 0x0054C170 (FUN_0054C170)
-   *
-   * What it does:
-   * Copies one `vector<SAniSkelBoneNameIndex>` begin pointer lane into
-   * caller-provided output storage.
-   */
-  [[nodiscard]] moho::SAniSkelBoneNameIndex** ReadAniSkelBoneNameIndexBeginPointerLane(
-    moho::SAniSkelBoneNameIndex** const outPointer,
-    const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
-  ) noexcept
-  {
-    *outPointer = view.begin;
-    return outPointer;
-  }
-
-  /**
-   * Address: 0x0054C180 (FUN_0054C180)
-   *
-   * What it does:
-   * Copies one `vector<SAniSkelBoneNameIndex>` end pointer lane into
-   * caller-provided output storage.
-   */
-  [[nodiscard]] moho::SAniSkelBoneNameIndex** ReadAniSkelBoneNameIndexEndPointerLane(
-    moho::SAniSkelBoneNameIndex** const outPointer,
-    const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
-  ) noexcept
-  {
-    *outPointer = view.end;
-    return outPointer;
-  }
-
-  /**
-   * Address: 0x0054C1B0 (FUN_0054C1B0)
-   *
-   * What it does:
-   * Returns active element count for one `vector<SAniSkelBoneNameIndex>`
-   * runtime lane when begin storage is present.
-   */
-  [[nodiscard]] std::uint32_t CountAniSkelBoneNameIndexActiveLanes(
-    const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
-  ) noexcept
-  {
-    if (view.begin == nullptr) {
-      return 0u;
-    }
-
-    return static_cast<std::uint32_t>(view.end - view.begin);
-  }
-
-  /**
    * Address: 0x0054C200 (FUN_0054C200)
    *
    * What it does:
@@ -433,43 +383,6 @@ namespace
   {
     *outPointer = *basePointer + index;
     return outPointer;
-  }
-
-  /**
-   * Address: 0x0054DC40 (FUN_0054DC40)
-   *
-   * What it does:
-   * Returns capacity element count for one `vector<SAniSkelBone>` runtime view
-   * when begin storage is present; otherwise returns zero.
-   */
-  [[nodiscard]] std::uint32_t CountAniSkelBoneCapacityLanes(
-    const msvc8::vector_runtime_view<moho::SAniSkelBone>& view
-  ) noexcept
-  {
-    if (view.begin == nullptr) {
-      return 0u;
-    }
-
-    return static_cast<std::uint32_t>(view.capacityEnd - view.begin);
-  }
-
-  /**
-   * Address: 0x0054DCA0 (FUN_0054DCA0)
-   *
-   * What it does:
-   * Returns capacity element count for one
-   * `vector<SAniSkelBoneNameIndex>` runtime view when begin storage is
-   * present; otherwise returns zero.
-   */
-  [[nodiscard]] std::uint32_t CountAniSkelBoneNameIndexCapacityLanes(
-    const msvc8::vector_runtime_view<moho::SAniSkelBoneNameIndex>& view
-  ) noexcept
-  {
-    if (view.begin == nullptr) {
-      return 0u;
-    }
-
-    return static_cast<std::uint32_t>(view.capacityEnd - view.begin);
   }
 
   /**
