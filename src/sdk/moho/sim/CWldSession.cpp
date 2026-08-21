@@ -1673,18 +1673,31 @@ namespace moho
      * `{boost::SharedPtrRaw<CD3DBatchTexture>, msvc8::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
      *
-     * Only the fields actually read by the render pass (0x00829190,
-     * 0x008288D0, 0x0082A380) are modeled; `sub_826140` (0x00826140, the
-     * edge-list rebuild that publishes these) would pin the remaining bytes
-     * but hasn't been recovered yet, so no full `sizeof` is asserted.
+     * `mEdge` sits at offset +0x10 of the 0x2C-byte `HashListNode2C` that
+     * owns it (`mNext@0/mPrev@4/mKeyLow@8/mKeyHigh@0xC/mEdge@0x10`), which
+     * pins this struct's size at exactly 0x1C (0x2C - 0x10).
      */
     struct CommandGraphEdge
     {
-      std::uint8_t mUnknown00_03[0x04]{};  // +0x00, unconfirmed - needs sub_826140
-      float mBaseWidth;                    // +0x04, confirmed by FUN_008288D0.c:85
-      UICommandGraphDrawNode* mFromNode;   // +0x08
-      UICommandGraphDrawNode* mToNode;     // +0x0C
-      std::uint8_t mUnknown10_17[0x08]{};  // +0x10, unconfirmed - needs sub_826140
+      /**
+       * Touch/visit refcount: 0x00826960 increments this by one every time
+       * a queued order resolves to this (fromNode,toNode) edge, and reads
+       * it back (clamped to `ui_CommandGraphMaxNodeUnits`) as the edge's
+       * apparent unit weight in 0x008275B0's orientation-hint accumulation.
+       */
+      std::uint32_t mTouchCount{};          // +0x00, confirmed by FUN_00826960/FUN_008275B0
+      float mBaseWidth{};                   // +0x04, confirmed by FUN_008288D0.c:85 and FUN_00826960
+      UICommandGraphDrawNode* mFromNode{};  // +0x08
+      UICommandGraphDrawNode* mToNode{};    // +0x0C
+      /**
+       * Per-lane bundle-spacing index, both written by 0x008275B0 as
+       * `(loopIndex / max(laneCount - 1, 1)) - 0.5`: `mLaneBDistribution`
+       * while walking `mFromNode->mLaneB` (this edge seen from its "from"
+       * endpoint), `mLaneADistribution` while walking `mToNode->mLaneA`
+       * (this edge seen from its "to" endpoint).
+       */
+      float mLaneBDistribution{};           // +0x10, confirmed by FUN_008275B0
+      float mLaneADistribution{};           // +0x14, confirmed by FUN_008275B0
       /**
        * When set, 0x008288D0 skips `ResolveDrawNodeHighlightState` entirely
        * and draws this edge with the owning `CommandGraphNode`'s
@@ -1694,13 +1707,16 @@ namespace moho
        * per-edge override color/alpha; neither offset is actually read
        * anywhere in 0x008288D0, so that guess has been dropped).
        */
-      bool mForceHighlightStyle;            // +0x18
-      std::uint8_t mUnknown19_27[0x0F]{};   // +0x19, unconfirmed - needs sub_826140
+      bool mForceHighlightStyle{};           // +0x18
+      std::uint8_t mUnknown19_1B[0x03]{};    // +0x19, unconfirmed - not touched by FUN_00826960/FUN_008275B0
     };
 
+    static_assert(sizeof(CommandGraphEdge) == 0x1C, "CommandGraphEdge size must be 0x1C");
     static_assert(offsetof(CommandGraphEdge, mBaseWidth) == 0x04, "CommandGraphEdge::mBaseWidth offset must be 0x04");
     static_assert(offsetof(CommandGraphEdge, mFromNode) == 0x08, "CommandGraphEdge::mFromNode offset must be 0x08");
     static_assert(offsetof(CommandGraphEdge, mToNode) == 0x0C, "CommandGraphEdge::mToNode offset must be 0x0C");
+    static_assert(offsetof(CommandGraphEdge, mLaneBDistribution) == 0x10, "CommandGraphEdge::mLaneBDistribution offset must be 0x10");
+    static_assert(offsetof(CommandGraphEdge, mLaneADistribution) == 0x14, "CommandGraphEdge::mLaneADistribution offset must be 0x14");
     static_assert(offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18, "CommandGraphEdge::mForceHighlightStyle offset must be 0x18");
 
     /**
@@ -2049,11 +2065,40 @@ namespace moho
     static void InitTree(CommandGraphTree& tree);
 
     /**
+     * Address: 0x0082BEE0 (FUN_0082BEE0, sub_82BEE0)
+     *
+     * What it does:
+     * Frees one command-graph tree bucket's edge-pointer vector storage (if
+     * spilled off the vector's inline/proxy state to a heap buffer) and
+     * releases its owned batch-texture control block. Does not free the
+     * owning tree node - callers do that immediately afterward. Before this
+     * recovery pass, `DestroyTree`'s node-delete walk never called this,
+     * leaking `mEdges`' heap buffer and the texture refcount on every
+     * teardown (including the class destructor) - see the fix in
+     * `DestroyTree` below.
+     */
+    static void ReleaseCommandGraphTreeBucket(CommandGraphTreeBucket& bucket) noexcept;
+
+    /**
+     * Not a distinct binary function - the post-order (right subtree, this
+     * node, left subtree) node-destroy walk that 0x00824B50 (`DestroyTree`)
+     * inlines in the binary (0x0082CDE0 is that copy; a second copy at
+     * 0x00826000/`sub_826000` feeds the same release step into a
+     * rebuild-reset path that is not yet recovered - see
+     * `decomp/recovery/reports/by-source/src/sdk/moho/sim/CWldSession.cpp.reconstruction.md`).
+     * Lifted into one shared helper here per the intent-first helper
+     * contract instead of duplicating the walk.
+     */
+    static void DestroyCommandGraphTreeSubtree(CommandGraphTreeNode* sentinelHead, CommandGraphTreeNode* node);
+
+    /**
      * Address: 0x00824B50 (FUN_00824B50, sub_824B50)
      *
      * What it does:
      * Destroys one command-graph runtime tree (nodes + head sentinel) and
-     * clears head/size lanes.
+     * clears head/size lanes. Releases each node's bucket resources
+     * (texture refcount + edge-vector heap buffer) via
+     * `ReleaseCommandGraphTreeBucket` before freeing the node.
      */
     static void DestroyTree(CommandGraphTree& tree);
 
@@ -4834,27 +4879,45 @@ namespace moho
   }
 
   /**
+   * Address: 0x0082BEE0 (FUN_0082BEE0, sub_82BEE0)
+   */
+  void UICommandGraph::ReleaseCommandGraphTreeBucket(CommandGraphTreeBucket& bucket) noexcept
+  {
+    if (bucket.mEdges.data() != nullptr) {
+      ::operator delete(bucket.mEdges.data());
+    }
+    bucket.mEdges.reset_range_lanes_preserve_proxy();
+    bucket.mTexture.release();
+  }
+
+  /**
+   * Address: 0x0082CDE0 (FUN_0082CDE0, sub_82CDE0, `DestroyTree`'s copy of this walk)
+   */
+  void UICommandGraph::DestroyCommandGraphTreeSubtree(CommandGraphTreeNode* const sentinelHead, CommandGraphTreeNode* node)
+  {
+    if (node == nullptr || node == sentinelHead || node->mIsSentinel != 0u) {
+      return;
+    }
+
+    DestroyCommandGraphTreeSubtree(sentinelHead, node->mRight);
+    CommandGraphTreeNode* const left = node->mLeft;
+    ReleaseCommandGraphTreeBucket(BucketOf(*node));
+    ::operator delete(node);
+    DestroyCommandGraphTreeSubtree(sentinelHead, left);
+  }
+
+  /**
    * Address: 0x00824B50 (FUN_00824B50, sub_824B50)
    *
    * What it does:
    * Destroys command-graph runtime tree nodes rooted at `mHead->mParent`,
-   * then releases the head sentinel and clears head/size lanes.
+   * releasing each node's bucket resources first, then releases the head
+   * sentinel and clears head/size lanes.
    */
   void UICommandGraph::DestroyTree(CommandGraphTree& tree)
   {
-    auto destroySubtree = [&](auto&& self, CommandGraphTreeNode* node) -> void {
-      if (node == nullptr || node == tree.mHead || node->mIsSentinel != 0u) {
-        return;
-      }
-
-      self(self, node->mRight);
-      CommandGraphTreeNode* const left = node->mLeft;
-      ::operator delete(node);
-      self(self, left);
-    };
-
     if (tree.mHead) {
-      destroySubtree(destroySubtree, tree.mHead->mParent);
+      DestroyCommandGraphTreeSubtree(tree.mHead, tree.mHead->mParent);
       ::operator delete(tree.mHead);
     }
 
