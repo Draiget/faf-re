@@ -2599,6 +2599,11 @@ namespace msvc8
          * pair for 568-byte `Moho::SUnitVariableUpdateEntry` -- ICF-folded to one
          * address)
          * Address: 0x005C9E00 (FUN_005C9E00, register-shape adapter for FUN_005CD1F0)
+         * Address: 0x008A9DC0 (FUN_008A9DC0, the `std::copy` emission for
+         * `Moho::TerrainEnvironmentLookupPair` -- the pair's two member strings
+         * are copied through their own assign lanes, so this is the
+         * copy-assign form, used by `erase(first, last)` to shift survivors
+         * down)
          * Address: 0x005C9E70 (FUN_005C9E70, the `std::copy` emission used by
          * `msvc8::vector<Moho::SPerArmyReconInfo>::operator=` (FUN_005CA980) to
          * assign over the retained prefix; returns the one-past-end destination
