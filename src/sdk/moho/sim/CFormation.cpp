@@ -489,4 +489,43 @@ namespace moho
 
     ClearLinkedUnitRefs(collectedUnits);
   }
+
+  /**
+   * Address: 0x00838800 (FUN_00838800, Moho::CFormation::ProcessMouse)
+   *
+   * IDA signature:
+   * void __userpurge Moho::CFormation::ProcessMouse(
+   *     std::vector *a1@<eax>, Moho::CFormation *a2, char a3,
+   *     Wm3::Vector3f *mousePos, bool a5);
+   *
+   * What it does:
+   * `a1`'s decompiled `std::vector*` typing is the same decompiler
+   * type-confusion `ChooseFormation` and `PruneTombstonesAndFindLive`
+   * already document -- it is really the world session's
+   * `SSelectionSetUserEntity*`. When the trigger flag is clear, or the
+   * selection prunes down to no live entity, this drops the formation
+   * (`mReady = false`, `Reset()`); otherwise it marks the formation ready
+   * and forwards straight into `ChooseFormation()`/`Finalize()`.
+   */
+  void CFormation::ProcessMouse(
+    SSelectionSetUserEntity* const selection,
+    const bool triggerActive,
+    const Wm3::Vector3f& mousePos,
+    const bool useLastQueuedDestination
+  )
+  {
+    SSelectionNodeUserEntity* firstLive = nullptr;
+    const bool hasLiveSelection = triggerActive
+      && (*PruneTombstonesAndFindLive(*selection, &firstLive, selection->mHead->mLeft) != selection->mHead);
+
+    if (!hasLiveSelection) {
+      mReady = false;
+      Reset();
+      return;
+    }
+
+    mReady = true;
+    ChooseFormation(mousePos, selection, useLastQueuedDestination);
+    Finalize();
+  }
 } // namespace moho
