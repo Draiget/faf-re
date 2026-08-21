@@ -806,6 +806,16 @@ namespace gpg::core
      * Address: 0x004C7EB0 (FUN_004C7EB0, gpg::fastvector_n<LuaPlus::LuaObject>::InsertAt lane)
      * Address: 0x0057FE30 (FUN_0057FE30, gpg::fastvector_Entity::InsertAt)
      * Address: 0x005050A0 (FUN_005050A0, gpg::fastvector_UserEntity::InsertAt)
+     * Address: 0x004FD860 (FUN_004FD860, gpg::fastvector_CollisionShapeBase::insert_range
+     * -- asm-verified against FUN_004FD860.c: identical fits-in-tail /
+     * spills-past-end / grow branch structure to the trivially-copyable
+     * pointer-element lane above; a 4-byte pointer element compiles to the
+     * same body as the Entity* / UserEntity* lanes. Confirmed real code-callers per the
+     * callgraph: `FUN_004FD200`/`MarchLineAndGatherCollisionSpans` and
+     * `FUN_004FD000`, both operating on a `FastVectorN<pointer, 20>`-shaped
+     * span/shape vector that reaches this template's grow-capacity path via
+     * `push_back`/`InsertAt` under the same call convention as the other
+     * pointer-element lanes cited above)
      * Address: 0x0059CC10 (FUN_0059CC10, gpg::fastvector_n64_SAssignedLocInfo::InsertAt)
      * Address: 0x0056B2F0 (FUN_0056B2F0, gpg::fastvector_n<Moho::SFormationLinkedUnitRef, 4>::InsertAt)
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
@@ -1298,6 +1308,13 @@ namespace gpg::core
      * Address: 0x00505BA0 (FUN_00505BA0, gpg::fastvector_UserEntity::GrowInsert)
      * Address: 0x00723340 (FUN_00723340, gpg::fastvector_n<moho::CollisionResult, 10>::GrowInsert lane)
      * Address: 0x007677D0 (FUN_007677D0, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::GrowInsert lane)
+     * Address: 0x004FDC60 (FUN_004FDC60, gpg::fastvector_EntityOccupation::insert_new_range
+     * -- the real binary's per-type "allocate new buffer, copy prefix +
+     * inserted range + suffix" growth helper for the trivially-copyable
+     * pointer-element lane, called from `FUN_004FD860`'s grow branch; this
+     * modern `GrowInsert` consolidates every per-type growth helper (see the
+     * other addresses on this block) into one template, same as the other
+     * lanes)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes
