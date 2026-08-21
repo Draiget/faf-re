@@ -4184,6 +4184,10 @@ namespace
   constexpr std::int32_t kSfxCompoModeForcedLookup = 4097;
   constexpr std::int32_t kSfxCompoTableFullAlpha = 1;
   constexpr std::int32_t kSfxCompoTableLookup = 2;
+  constexpr std::int32_t kSfxCompoTable3110 = 4;
+  constexpr std::int32_t kSfxCompoTable3211 = 5;
+  constexpr std::int32_t kSfxCompoTableZ16 = 11;
+  constexpr std::int32_t kSfxCompoTableZ32 = 13;
   constexpr std::int32_t kSfxCompoTableForced = 21;
   constexpr std::int32_t kMwsfdErrorHistoryMaxIndex = 15;
   constexpr std::int32_t kMwsfdErrFramePoolSize = -16773355;

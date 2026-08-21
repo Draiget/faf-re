@@ -184,7 +184,11 @@ extern "C" {
   // SFXZ_Create. As a no-argument stub it left every SFXZ pool slot marked
   // live, so the 33rd SFX composition handle of a session could not be built
   // and every movie past that point failed with "E201185: can't create SfxHn".
-  void* SFXZ_GetZfrmRange() { return nullptr; }
+  // SFXZ_GetZfrmRange (0x00ACD7A0): real body in SofdecSfxRuntime.cpp, next
+  // to SFXZ_MakeCnvZTbl. Was a no-argument stub; every real call site
+  // (SFX_GetZfrmRange, and sfxcnv_MakeZTbl's Z16/Z32 table builders through
+  // SFXZ_MakeCnvZTbl) silently discarded all four arguments, so the zoom-
+  // frame range was never parsed out of the SFXZ handle's metadata tags.
   // SFXZ_IsSetZclip (0x00ACDDC0): real body in SofdecAdxPlatformRuntime.cpp,
   // next to SFX_SetZbit. Was a no-argument stub; every real call site
   // (SFX_MakeTblZ16/32's "Zclip is not set" gate) silently read false.
@@ -195,7 +199,12 @@ extern "C" {
   // SFX_GetCompoMode (0x00ACCD40): real body in SofdecAdxPlatformRuntime.cpp.
   // It was a no-argument stub, which C linkage let satisfy the one-argument
   // call in mwPlyFxGetCompoMode, so the composition mode always read back 0.
-  void* SFX_MakeTable() { return nullptr; }
+  // SFX_MakeTable (0x00ACE610): real body in SofdecSfxRuntime.cpp, next to
+  // sfxcnv_MakeTable. Was a no-argument stub; every real call site
+  // (SFX_CnvFrmByCbFunc's table-driven composition paths,
+  // sfxcnv_CnvFrmYcc420plnToZ/sfxcnv_CnvFrmArgb8888mbToZ's Z16/Z32 paths)
+  // silently discarded all three arguments, so no composition table was ever
+  // built.
   // SFX_SetOutBufSize (0x00ACCD50): real body in SofdecSfxRuntime.cpp.
   // SFX_SetUnitWidth (0x00ACCD90): real body in SofdecSfxRuntime.cpp next to
   // SFX_SetOutBufSize. As a no-argument stub it silently discarded both
@@ -299,7 +308,10 @@ extern "C" {
   // whole conversion path completed and reported success without ever writing
   // to the destination surface.
   void* sfxcnv_ExecFullAlphaByCbFunc() { return nullptr; }
-  void* sfxcnv_MakeZTbl() { return nullptr; }
+  // sfxcnv_MakeZTbl (0x00ACE780): real body in SofdecSfxRuntime.cpp, next to
+  // SFXCNV_MakeCcirFromY. Was a no-argument stub; every real call site
+  // (SFX_MakeTblZ16/32 directly, and sfxcnv_MakeTable's Z16/Z32 cases through
+  // SFX_MakeTable) silently discarded both arguments.
   // mpvhdec_ReadKernelIntraDefault (0x00AFAE50) and
   // mpvhdec_ReadKernelPredictedDefault (0x00AFD7C0) are recovered in
   // moho/movie/MPVDecoder.cpp. While these stubs stood, every block came back
