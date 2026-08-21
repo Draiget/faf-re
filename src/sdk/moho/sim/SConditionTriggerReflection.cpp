@@ -396,6 +396,30 @@ namespace
       return this;
     }
 
+    /**
+     * Address: 0x0070F950 (FUN_0070F950, gpg::RFastVectorType_SCondition::SerLoad)
+     *
+     * IDA signature:
+     * void __cdecl sub_70F950(gpg::ReadArchive *a1, _DWORD *a2, int a3, gpg::RRef *a6);
+     *
+     * What it does:
+     * Inverse of `Serialize` (0x0070FA50): reads the element count through
+     * `ReadArchive::ReadUInt`, sizes the `fastvector<SCondition>` lane to it
+     * with a default-constructed fill element, then reads each element back
+     * through the reflected `SCondition` type.
+     *
+     * The binary's element walk strides by 56 (`v6 += 56`), confirming
+     * `sizeof(moho::SCondition) == 56`, and caches the reflected type in the
+     * `Moho::SCondition::sType` static, populating it on first use via
+     * `gpg::LookupRType` — which is exactly what
+     * `moho::SCondition::StaticGetClass()` does here. The `Resize` call is
+     * the `gpg::fastvector<SCondition>::Resize` emission at 0x0070FC40, and
+     * the `operator delete[]` right after it is that call's inlined
+     * scratch-buffer teardown, not a source statement.
+     *
+     * Invocation: installed as this type's `serLoadFunc_` in the
+     * registration block below, which is how the archive layer reaches it.
+     */
     static void Deserialize(gpg::ReadArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
       auto& vec = *reinterpret_cast<gpg::fastvector<moho::SCondition>*>(objectPtr);
