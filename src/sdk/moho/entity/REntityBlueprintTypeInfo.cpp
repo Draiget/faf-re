@@ -133,6 +133,17 @@ namespace
     }
 
     /**
+     * Address: 0x00513C80 (FUN_00513C80, Moho::EFootprintFlagsTypeInfo::dtr)
+     *
+     * What it does:
+     * `EFootprintFlagsTypeInfo` adds no data members of its own, so the
+     * vtable-slot-2 scalar deleting destructor just tail-calls
+     * `gpg::REnumType::~REnumType` then conditionally frees the object --
+     * exactly what a defaulted destructor produces.
+     */
+    ~EFootprintFlagsTypeInfo() override = default;
+
+    /**
      * Address: 0x00513C20 (FUN_00513C20, Moho::EFootprintFlagsTypeInfo::Init)
      *
      * What it does:
