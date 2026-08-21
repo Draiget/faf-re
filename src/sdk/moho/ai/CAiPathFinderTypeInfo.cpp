@@ -10,7 +10,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/String.h"
 #include "moho/ai/CAiPathFinder.h"
-#include "moho/misc/Stats.h"
+#include "moho/misc/Stats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -20,6 +20,11 @@ namespace
   class Rect2iListTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005ABCA0 (FUN_005ABCA0, gpg::RListType_Rect2i::dtr)
+     */
+    ~Rect2iListTypeInfo() override = default;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     void Init() override;
