@@ -34,11 +34,11 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,557` | 30.93% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,558` | 30.93% |
 | Vtable-anchored (virtual override of a recovered class) | `5,909` | 11.04% |
 | Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,568` | 10.40% |
 | No recovered caller token yet (orphan risk) | `2,086` | 3.90% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,194` | 43.32% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,193` | 43.32% |
 | Unclassified data xref (manual review) | `217` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
@@ -46,11 +46,11 @@ Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across
 
 | Bucket | Count | % of backlog |
 |---|---:|---:|
-| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `306` | 14.15% |
+| **Candidate** (`OK_RECOVERED_CALLER` — caller token recovered; inspect its body) | `305` | 14.10% |
 | Vtable-anchored (recover with the owning class) | `113` | 5.22% |
 | Framework dispatch (wx/EH/Lua/reflection) | `1` | 0.05% |
 | **Caller functions unrecovered** (`NEEDS_RECOVERED_CALLER` — recover the parent first) | `757` | 35.00% |
-| No indexed callsite evidence (needs investigation/evidence) | `984` | 45.49% |
+| No indexed callsite evidence (needs investigation/evidence) | `985` | 45.54% |
 | Unclassified data xref (manual review) | `1` | 0.05% |
 | RTTI-only | `1` | 0.05% |
 
