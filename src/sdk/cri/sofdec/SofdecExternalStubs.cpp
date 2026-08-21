@@ -176,7 +176,10 @@ extern "C" {
   // SFMPVF_GetNumFrm now has real body in SofdecMpvRuntime.cpp (compiled).
   // SFPLY_DecideSvrStat: real body now in SofdecSfdRuntime.cpp (was named lowercase `sfply_DecideSvrStat`; renamed to match callers).
   // SFTIM_InitTcode, SFTIM_InitTtu: real bodies in SofdecMpvRuntime.cpp.
-  void* SFXLIB_Error() { return nullptr; }
+  // SFXLIB_Error (0x00ACCA20): real body in SofdecSfxRuntime.cpp next to
+  // SFX_SetErrFn. Was a no-argument stub; every real call site
+  // (SFX_CnvFrmByCbFunc's unsupported-composition-mode paths) silently
+  // discarded all three arguments, so error reporting never fired.
   // SFXZ_Destroy (0x00ACD670): real body in SofdecSfxRuntime.cpp next to
   // SFXZ_Create. As a no-argument stub it left every SFXZ pool slot marked
   // live, so the 33rd SFX composition handle of a session could not be built

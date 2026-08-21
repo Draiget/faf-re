@@ -183,7 +183,7 @@ struct SfxLibWorkHead {
   std::int32_t  last;            ///< +0x04 last-cell sentinel (= 32)
   std::int32_t  errFn;           ///< +0x08 error callback (SFX_SetErrFn)
   std::int32_t  errParam;        ///< +0x0C error callback context
-  std::int32_t  reserved10;      ///< +0x10
+  std::int32_t  numErrs;         ///< +0x10 error count (SFXLIB_Error)
   std::int32_t  cirFx;           ///< +0x14 CCIR matrix selector
   SfxHandle     objs[kSfxHandlePoolSize]; ///< +0x18, stride 0x94
 };
@@ -195,6 +195,8 @@ static_assert(offsetof(SfxLibWorkHead, last) == 0x04,
               "SfxLibWorkHead::last must live at offset 0x04");
 static_assert(offsetof(SfxLibWorkHead, errFn) == 0x08,
               "SfxLibWorkHead::errFn must live at offset 0x08");
+static_assert(offsetof(SfxLibWorkHead, numErrs) == 0x10,
+              "SfxLibWorkHead::numErrs must live at offset 0x10");
 static_assert(offsetof(SfxLibWorkHead, cirFx) == 0x14,
               "SfxLibWorkHead::cirFx must live at offset 0x14");
 
@@ -270,6 +272,34 @@ std::int32_t SFX_SetErrFn(std::int32_t errorCallbackAddress,
   sfx_libwork.errFn = errorCallbackAddress;
   sfx_libwork.errParam = errorCallbackContext;
   return errorCallbackAddress;
+}
+
+/**
+ * Address: 0x00ACCA20 (FUN_00ACCA20, _SFXLIB_Error)
+ *
+ * What it does:
+ * Increments the SFX library's error count and, when an error callback is
+ * installed (`SFX_SetErrFn`), invokes it with the stored context and the
+ * error message. `conversionState`/`streamState` are accepted to match the
+ * real call sites but are not read by the binary body. Previously a
+ * no-argument stub in SofdecExternalStubs.cpp; every real call site
+ * (SFX_CnvFrmByCbFunc's unsupported-composition-mode paths) silently
+ * discarded all three arguments, so error reporting never fired.
+ */
+void SFXLIB_Error(
+  moho::SfxCallbackFrameContext* const conversionState,
+  moho::SfxStreamState* const streamState,
+  const char* const message
+)
+{
+  (void)conversionState;
+  (void)streamState;
+
+  ++sfx_libwork.numErrs;
+  if (sfx_libwork.errFn != 0) {
+    using SfxErrorCallback = void(__cdecl*)(std::int32_t errorCallbackContext, const char* message);
+    reinterpret_cast<SfxErrorCallback>(static_cast<std::intptr_t>(sfx_libwork.errFn))(sfx_libwork.errParam, message);
+  }
 }
 
 /**
