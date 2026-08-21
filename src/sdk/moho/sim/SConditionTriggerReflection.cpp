@@ -352,6 +352,9 @@ namespace
       gpg::PreRegisterRType(typeid(gpg::fastvector<moho::SCondition>), this);
     }
 
+    /**
+     * Address: 0x00713130 (FUN_00713130, gpg::RFastVectorType_SCondition::dtr)
+     */
     ~RFastVectorSConditionTypeInfo() override = default;
 
     /**
@@ -521,6 +524,9 @@ namespace
       gpg::PreRegisterRType(typeid(boost::shared_ptr<moho::STrigger>), this);
     }
 
+    /**
+     * Address: 0x00713190 (FUN_00713190, gpg::RSharedPointerType_STrigger::dtr)
+     */
     ~RSharedPointerSTriggerTypeInfo() override = default;
 
     /**
@@ -683,6 +689,9 @@ namespace
       gpg::PreRegisterRType(typeid(std::list<boost::shared_ptr<moho::STrigger>>), this);
     }
 
+    /**
+     * Address: 0x00713310 (FUN_00713310, gpg::RListType_shared_ptr_STrigger::dtr)
+     */
     ~RListSharedPtrSTriggerTypeInfo() override = default;
 
     /**
@@ -1070,6 +1079,9 @@ namespace
       gpg::PreRegisterRType(typeid(UnitBlueprintWeightMap), this);
     }
 
+    /**
+     * Address: 0x007131F0 (FUN_007131F0, gpg::RMapType_RUnitBlueprintP_float::dtr)
+     */
     ~RMapUnitBlueprintFloatTypeInfo() override = default;
 
     /**
@@ -1194,6 +1206,9 @@ namespace
       gpg::PreRegisterRType(typeid(StringToArmyStatItemMap), this);
     }
 
+    /**
+     * Address: 0x007132B0 (FUN_007132B0, gpg::RMapType_string_CArmyStateItemP::dtr)
+     */
     ~RMapStringArmyStatItemPtrTypeInfo() override = default;
 
     /**
