@@ -9,8 +9,7 @@
 #include <commdlg.h>
 #include <shellapi.h>
 #include <shlobj.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include <shlwapi.h>
 #include <cstdint>
 #include <typeinfo>
 
