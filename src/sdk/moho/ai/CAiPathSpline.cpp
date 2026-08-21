@@ -745,17 +745,17 @@ namespace
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CPathPoint>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CPathPoint>*>(objectPtr);
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     const moho::CPathPoint fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    vec.Resize(count, fill);
 
     gpg::RType* const elementType = ResolveCPathPointType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, view.ElementAtUnchecked(i), owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -765,14 +765,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::CPathPoint>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::CPathPoint>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = ResolveCPathPointType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, view.ElementAtUnchecked(i), owner);
+      archive->Write(elementType, const_cast<moho::CPathPoint*>(&vec[i]), owner);
     }
   }
 
@@ -1649,12 +1649,13 @@ void CAiPathSpline::MemberDeserialize(gpg::ReadArchive* const archive)
   gpg::RType* const pathNodeVectorType = ResolveFastVectorCPathPointType();
   archive->Read(pathNodeVectorType, this, ownerRef);
 
-  auto& nodeView = gpg::AsFastVectorRuntimeView<CPathPoint>(this);
-  const std::size_t nodeCount = nodeView.begin ? nodeView.Size() : 0u;
+  // `nodes` is this class's first member (offset 0x00), which is why the
+  // binary passes `this` straight to the fastvector<CPathPoint> reflection type.
+  const std::size_t nodeCount = nodes.size();
   gpg::RType* const nodeType = ResolveCPathPointType();
   for (std::size_t i = 0; i < nodeCount; ++i) {
     gpg::RRef nodeRef{};
-    nodeRef.mObj = nodeView.ElementAtUnchecked(i);
+    nodeRef.mObj = &nodes[i];
     nodeRef.mType = nodeType;
     archive->TrackPointer(nodeRef);
   }
@@ -1682,12 +1683,11 @@ void CAiPathSpline::MemberSerialize(gpg::WriteArchive* const archive) const
   gpg::RType* const pathNodeVectorType = ResolveFastVectorCPathPointType();
   archive->Write(pathNodeVectorType, this, ownerRef);
 
-  const auto& nodeView = gpg::AsFastVectorRuntimeView<CPathPoint>(this);
-  const std::size_t nodeCount = nodeView.begin ? nodeView.Size() : 0u;
+  const std::size_t nodeCount = nodes.size();
   gpg::RType* const nodeType = ResolveCPathPointType();
   for (std::size_t i = 0; i < nodeCount; ++i) {
     gpg::RRef nodeRef{};
-    nodeRef.mObj = const_cast<CPathPoint*>(nodeView.ElementAtUnchecked(i));
+    nodeRef.mObj = const_cast<CPathPoint*>(&nodes[i]);
     nodeRef.mType = nodeType;
     archive->PreCreatedPtr(nodeRef);
   }
@@ -1861,12 +1861,12 @@ gpg::RRef FastVectorCPathPointTypeInfo::SubscriptIndex(void* obj, const int ind)
     return out;
   }
 
-  auto& view = gpg::AsFastVectorRuntimeView<CPathPoint>(obj);
-  if (!view.begin || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+  auto& vec = *static_cast<gpg::fastvector<CPathPoint>*>(obj);
+  if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     return out;
   }
 
-  out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+  out.mObj = &vec[static_cast<std::size_t>(ind)];
   return out;
 }
 
@@ -1876,12 +1876,7 @@ size_t FastVectorCPathPointTypeInfo::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = gpg::AsFastVectorRuntimeView<CPathPoint>(obj);
-  if (!view.begin) {
-    return 0u;
-  }
-
-  return view.Size();
+  return static_cast<const gpg::fastvector<CPathPoint>*>(obj)->size();
 }
 
 /**
@@ -1897,12 +1892,12 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
     return;
   }
 
-  auto& view = gpg::AsFastVectorRuntimeView<CPathPoint>(obj);
+  auto& vec = *static_cast<gpg::fastvector<CPathPoint>*>(obj);
   CPathPoint fill{};
   fill.mPosition = Wm3::Vector3f{};
   fill.mDirection = Wm3::Vector3f{};
   fill.mState = PPS_7;
-  gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
+  vec.Resize(static_cast<std::size_t>(count), fill);
 }
 
 void EPathPointStatePrimitiveSerializer::RegisterSerializeFunctions()
