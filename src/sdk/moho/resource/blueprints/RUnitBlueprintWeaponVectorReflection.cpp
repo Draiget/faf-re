@@ -6,7 +6,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -278,6 +278,11 @@ namespace
   }
 
 } // namespace
+
+/**
+ * Address: 0x00526740 (FUN_00526740, gpg::RVectorType_RUnitBlueprintWeapon::dtr)
+ */
+gpg::RVectorType_RUnitBlueprintWeapon::~RVectorType_RUnitBlueprintWeapon() = default;
 
 /**
  * Address: 0x00523490 (FUN_00523490, gpg::RVectorType_RUnitBlueprintWeapon::GetName)
