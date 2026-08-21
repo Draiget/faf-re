@@ -11,7 +11,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniPose.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -125,6 +125,11 @@ namespace gpg
   class RFastVectorType<moho::SAniManipBinding> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0063D1B0 (FUN_0063D1B0, gpg::RFastVectorType_SAniManipBinding::dtr)
+     */
+    ~RFastVectorType() override;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
@@ -544,6 +549,8 @@ namespace moho
 
 namespace gpg
 {
+  RFastVectorType<moho::SAniManipBinding>::~RFastVectorType() = default;
+
   /**
    * Address: 0x0063C320 (FUN_0063C320, gpg::RFastVectorType_SAniManipBinding::GetName)
    */
