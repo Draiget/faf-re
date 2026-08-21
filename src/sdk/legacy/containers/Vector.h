@@ -1415,6 +1415,10 @@ namespace msvc8
          * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
          * Address: 0x008D73C0 (FUN_008D73C0, msvc8::vector<gpg::gal::HeadSampleOption>::operator=(const vector&))
          * Address: 0x005ED190 (FUN_005ED190, msvc8::vector<int>::operator=(const vector&))
+         * Address: 0x0071E030 (FUN_0071E030,
+         * msvc8::vector<Moho::InfluenceGrid>::operator=(const vector&) --
+         * the same VC8 assign shape with rollback-safe copy-construction on
+         * both the capacity-reuse and full-reallocation paths)
          * Address: 0x0077E100 (FUN_0077E100,
          * msvc8::vector<Moho::SDecalInfo>::operator=(const vector&) for the
          * 0x90-byte element -- same VC8 assign shape: clear on an empty

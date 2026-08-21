@@ -2626,12 +2626,7 @@ std::size_t gpg::RVectorType_InfluenceGrid::GetCount(void* const obj) const
     return 0u;
   }
 
-  const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const InfluenceGridVector*>(obj));
-  if (!view.begin) {
-    return 0u;
-  }
-
-  return static_cast<std::size_t>(view.end - view.begin);
+  return static_cast<const InfluenceGridVector*>(obj)->size();
 }
 
 /**
@@ -4323,133 +4318,6 @@ namespace moho
   ) noexcept
   {
     CopyInfluenceGridCountedRange(destination, source, count);
-  }
-
-  [[nodiscard]] bool AllocateInfluenceGridStorage(
-    InfluenceGridVector& storage,
-    const std::size_t elementCount
-  ) noexcept
-  {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (elementCount == 0u) {
-      view.begin = nullptr;
-      view.end = nullptr;
-      view.capacityEnd = nullptr;
-      return true;
-    }
-
-    if (elementCount > (static_cast<std::size_t>(-1) / sizeof(InfluenceGrid))) {
-      return false;
-    }
-
-    void* rawStorage = nullptr;
-    try {
-      rawStorage = ::operator new(sizeof(InfluenceGrid) * elementCount);
-    } catch (...) {
-      return false;
-    }
-
-    view.begin = static_cast<InfluenceGrid*>(rawStorage);
-    view.end = view.begin;
-    view.capacityEnd = view.begin + elementCount;
-    return true;
-  }
-
-  [[nodiscard]] InfluenceGrid* CopyConstructInfluenceGridRangeWithRollback(
-    InfluenceGrid* destination,
-    const InfluenceGrid* sourceBegin,
-    const InfluenceGrid* sourceEnd
-  )
-  {
-    InfluenceGrid* write = destination;
-    try {
-      for (const InfluenceGrid* read = sourceBegin; read != sourceEnd; ++read, ++write) {
-        ::new (write) InfluenceGrid();
-        AssignInfluenceGridValue(*write, *read);
-      }
-      return write;
-    } catch (...) {
-      DestroyInfluenceGridRange(destination, write);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x0071E030 (FUN_0071E030)
-   *
-   * What it does:
-   * Assigns one `vector<InfluenceGrid>` lane with the original VC8-style
-   * capacity reuse and destruction order, including rollback-safe
-   * copy-construction for growth and full-reallocation paths.
-   */
-  [[nodiscard]] InfluenceGridVector& AssignInfluenceGridVector(
-    InfluenceGridVector& destination,
-    const InfluenceGridVector& source
-  )
-  {
-    if (&destination == &source) {
-      return destination;
-    }
-
-    auto& destinationView = msvc8::AsVectorRuntimeView(destination);
-    const auto& sourceView = msvc8::AsVectorRuntimeView(source);
-
-    const std::size_t sourceCount =
-      sourceView.begin ? static_cast<std::size_t>(sourceView.end - sourceView.begin) : 0u;
-    if (sourceCount == 0u) {
-      ClearInfluenceGridVectorStorage(destination);
-      return destination;
-    }
-
-    const std::size_t currentCount =
-      destinationView.begin ? static_cast<std::size_t>(destinationView.end - destinationView.begin) : 0u;
-    const InfluenceGrid* const sourceBegin = sourceView.begin;
-    const InfluenceGrid* const sourceEnd = sourceView.end;
-
-    if (sourceCount > currentCount) {
-      const std::size_t capacityCount =
-        destinationView.begin ? static_cast<std::size_t>(destinationView.capacityEnd - destinationView.begin) : 0u;
-      if (sourceCount <= capacityCount) {
-        InfluenceGrid* destinationCursor = destinationView.begin;
-        const InfluenceGrid* sourceCursor = sourceBegin;
-        for (; destinationCursor != destinationView.end; ++destinationCursor, ++sourceCursor) {
-          AssignInfluenceGridValue(*destinationCursor, *sourceCursor);
-        }
-
-        destinationView.end = CopyConstructInfluenceGridRangeWithRollback(destinationView.end, sourceCursor, sourceEnd);
-        return destination;
-      }
-
-      if (destinationView.begin != nullptr) {
-        DestroyInfluenceGridRange(destinationView.begin, destinationView.end);
-        ::operator delete(destinationView.begin);
-      }
-
-      destinationView.begin = nullptr;
-      destinationView.end = nullptr;
-      destinationView.capacityEnd = nullptr;
-      if (AllocateInfluenceGridStorage(destination, sourceCount)) {
-        try {
-          destinationView.end = CopyConstructInfluenceGridRangeWithRollback(destinationView.begin, sourceBegin, sourceEnd);
-        } catch (...) {
-          ::operator delete(destinationView.begin);
-          destinationView.begin = nullptr;
-          destinationView.end = nullptr;
-          destinationView.capacityEnd = nullptr;
-          throw;
-        }
-      }
-      return destination;
-    }
-
-    InfluenceGrid* destinationCursor = destinationView.begin;
-    const InfluenceGrid* sourceCursor = sourceBegin;
-    for (; sourceCursor != sourceEnd; ++sourceCursor, ++destinationCursor) {
-      AssignInfluenceGridValue(*destinationCursor, *sourceCursor);
-    }
-    DestroyInfluenceGridRange(destinationCursor, destinationView.end);
-    destinationView.end = destinationView.begin + sourceCount;
-    return destination;
   }
 
   [[nodiscard]] moho::InfluenceGrid* CopyConstructInfluenceGridIfPresent(
