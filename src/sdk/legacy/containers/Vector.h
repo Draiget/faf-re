@@ -1404,6 +1404,7 @@ namespace msvc8
          * Address: 0x006E2F30 (FUN_006E2F30, msvc8::vector<void*>::operator=(const vector&))
          * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
          * Address: 0x008D73C0 (FUN_008D73C0, msvc8::vector<gpg::gal::HeadSampleOption>::operator=(const vector&))
+         * Address: 0x005ED190 (FUN_005ED190, msvc8::vector<int>::operator=(const vector&))
          *
          * Copy assignment (strong exception safety)
          */
