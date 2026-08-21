@@ -387,6 +387,16 @@ namespace msvc8
              * the rebalancing path already used by every other insert, so no
              * second tree-building mechanic is introduced here.
              */
+            /**
+             * Address: 0x0070E320 (FUN_0070E320, the blueprint-stat map's copy
+             * constructor)
+             * Address: 0x0070F810 (FUN_0070F810, the copy driver it calls: clones the
+             * subtree, carries the size across and re-seats the extrema. All four of its
+             * binary callers -- 0x0070C160, 0x0070CC10, 0x0070E320, 0x0070E3A0 -- are
+             * blueprint-stat-map sites.)
+             * Address: 0x00710990 (FUN_00710990, the recursive subtree clone underneath
+             * it)
+             */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
             {
@@ -575,6 +585,14 @@ namespace msvc8
              * Every accepted branch tail calls `_Insert` (0x007E3F10 = `insert_at`)
              * with the `addLeft` flag this function decided.
              */
+            /**
+             * Address: 0x0070F6C0 (FUN_0070F6C0, the
+             * `std::map<const RBlueprint*, float>` instantiation behind
+             * `CArmyStatItem::mBlueprintStats`. It is the classic three-way hint check --
+             * empty tree, hint == begin, hint == end -- each falling through to the
+             * general insert at 0x00710A40, and it is reached from `operator[]`
+             * (0x0070E2B0), which is where VC8 puts its only hinted-insert call.)
+             */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
                 if (size_ == 0) {
@@ -651,6 +669,12 @@ namespace msvc8
              * recolour pass: the successor is lifted into the erased node's slot
              * when both subtrees exist, then the black-height deficit is repaired
              * from the stitched-up child upwards.
+             */
+            /**
+             * Address: 0x00592920 (FUN_00592920, the blueprint-stat map's
+             * erase-with-rebalance; identified by the colour/nil pair it rewrites at
+             * `[node+0x14]` / `[node+0x15]`, which pins it to that map's 0x18 node
+             * rather than the 0x30 name-index node in the same file.)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -740,6 +764,12 @@ namespace msvc8
              * recursive `_Erase` walk (`call sub_7E34E0`) and then relinks
              * `head->parent = head` / `head->left = head` / `head->right = head`
              * with `[esi+8] = 0`. It returns nothing.
+             */
+            /**
+             * Address: 0x00592230 (FUN_00592230, the blueprint-stat map's range erase.
+             * `CArmyStatItem::~CArmyStatItem` reaches it at 0x00585C39, which is what
+             * `clear()` compiles to.)
+             * Address: 0x00585BD0 (FUN_00585BD0, the typed teardown wrapper around it)
              */
             void clear() noexcept
             {
@@ -833,6 +863,11 @@ namespace msvc8
              * and the node allocator this function calls.
              */
             template<class... Args>
+            /**
+             * Address: 0x00711B00 (FUN_00711B00, the blueprint-stat map's node buy --
+             * writes the key at `+0x0C`, the float at `+0x10` and the colour/nil pair at
+             * `+0x14`/`+0x15`, matching the 0x18 node exactly.)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();

@@ -185,17 +185,6 @@ namespace
     return static_cast<moho::CArmyStatItem*>(parent->FindDirectChildByName(token));
   }
 
-  [[nodiscard]] moho::ArmyBlueprintStatNode* CreateBlueprintTreeSentinel()
-  {
-    auto* const head = new moho::ArmyBlueprintStatNode{};
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->color = 1;
-    head->isNil = 1;
-    return head;
-  }
-
   template <typename TNode>
   void DestroyNilTree(TNode* node, const std::uint8_t TNode::* nilField)
   {
@@ -206,74 +195,6 @@ namespace
     DestroyNilTree(node->left, nilField);
     DestroyNilTree(node->right, nilField);
     delete node;
-  }
-
-  [[nodiscard]] moho::ArmyBlueprintStatNode*
-  NextBlueprintNode(moho::ArmyBlueprintStatNode* node, moho::ArmyBlueprintStatNode* head)
-  {
-    if (node == nullptr || head == nullptr) {
-      return head;
-    }
-    if (node->isNil != 0u) {
-      return node->parent;
-    }
-
-    if (node->right != nullptr && node->right->isNil == 0u) {
-      node = node->right;
-      while (node->left != nullptr && node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    moho::ArmyBlueprintStatNode* parent = node->parent;
-    while (parent != nullptr && parent->isNil == 0u && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return (parent != nullptr) ? parent : head;
-  }
-
-  [[nodiscard]] const moho::ArmyBlueprintStatNode*
-  NextBlueprintNode(const moho::ArmyBlueprintStatNode* node, const moho::ArmyBlueprintStatNode* head)
-  {
-    if (node == nullptr || head == nullptr) {
-      return head;
-    }
-    if (node->isNil != 0u) {
-      return node->parent;
-    }
-
-    if (node->right != nullptr && node->right->isNil == 0u) {
-      node = node->right;
-      while (node->left != nullptr && node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    const moho::ArmyBlueprintStatNode* parent = node->parent;
-    while (parent != nullptr && parent->isNil == 0u && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return (parent != nullptr) ? parent : head;
-  }
-
-  [[nodiscard]] int CompareBlueprintStatKey(
-    const moho::ArmyBlueprintNameView* const lhs,
-    const moho::ArmyBlueprintNameView* const rhs
-  ) noexcept
-  {
-    const std::uintptr_t lhsValue = reinterpret_cast<std::uintptr_t>(lhs);
-    const std::uintptr_t rhsValue = reinterpret_cast<std::uintptr_t>(rhs);
-    if (lhsValue < rhsValue) {
-      return -1;
-    }
-    if (lhsValue > rhsValue) {
-      return 1;
-    }
-    return 0;
   }
 
   void AppendMsvcString(std::string& out, const msvc8::string& text)
@@ -318,15 +239,9 @@ namespace
     const moho::CArmyStatItem* const item
   )
   {
-    if (item->mBlueprintStats.head == nullptr) {
-      return;
-    }
-
-    const moho::ArmyBlueprintStatNode* const head = item->mBlueprintStats.head;
-    for (const moho::ArmyBlueprintStatNode* node = head->left; node != nullptr && node != head;
-         node = NextBlueprintNode(node, head)) {
-      if (node->blueprintName != nullptr) {
-        outKeys.insert(node->blueprintName);
+    for (const auto& entry : item->mBlueprintStats) {
+      if (entry.first != nullptr) {
+        outKeys.insert(entry.first);
       }
     }
   }
@@ -356,192 +271,6 @@ namespace
   [[nodiscard]] float ReadRequiredFloatStat(moho::CArmyStats& stats, const char* const statPath)
   {
     return stats.GetStat(statPath)->GetFloat(false);
-  }
-
-  [[nodiscard]] bool IsBlueprintNodeNil(const moho::ArmyBlueprintStatNode* const node)
-  {
-    return node == nullptr || node->isNil != 0u;
-  }
-
-  [[nodiscard]] moho::ArmyBlueprintStatNode*
-  BlueprintNodeMin(moho::ArmyBlueprintStatNode* node, moho::ArmyBlueprintStatNode* head)
-  {
-    while (!IsBlueprintNodeNil(node) && !IsBlueprintNodeNil(node->left)) {
-      node = node->left;
-    }
-    return IsBlueprintNodeNil(node) ? head : node;
-  }
-
-  [[nodiscard]] moho::ArmyBlueprintStatNode*
-  BlueprintNodeMax(moho::ArmyBlueprintStatNode* node, moho::ArmyBlueprintStatNode* head)
-  {
-    while (!IsBlueprintNodeNil(node) && !IsBlueprintNodeNil(node->right)) {
-      node = node->right;
-    }
-    return IsBlueprintNodeNil(node) ? head : node;
-  }
-
-  void RecomputeBlueprintExtrema(moho::ArmyBlueprintStatTree* const tree)
-  {
-    if (tree == nullptr || tree->head == nullptr) {
-      return;
-    }
-
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    moho::ArmyBlueprintStatNode* const root = head->parent;
-    if (IsBlueprintNodeNil(root)) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    head->left = BlueprintNodeMin(root, head);
-    head->right = BlueprintNodeMax(root, head);
-  }
-
-  void RotateBlueprintLeft(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* const node)
-  {
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    moho::ArmyBlueprintStatNode* const pivot = node->right;
-    node->right = pivot->left;
-    if (!IsBlueprintNodeNil(pivot->left)) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  void RotateBlueprintRight(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* const node)
-  {
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    moho::ArmyBlueprintStatNode* const pivot = node->left;
-    node->left = pivot->right;
-    if (!IsBlueprintNodeNil(pivot->right)) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->right) {
-      node->parent->right = pivot;
-    } else {
-      node->parent->left = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  void FixupAfterBlueprintInsert(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* node)
-  {
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    while (node != head->parent && node->parent->color == 0u) {
-      moho::ArmyBlueprintStatNode* const parent = node->parent;
-      moho::ArmyBlueprintStatNode* const grand = parent->parent;
-      if (grand == nullptr || grand == head) {
-        break;
-      }
-
-      if (parent == grand->left) {
-        moho::ArmyBlueprintStatNode* const uncle = grand->right;
-        if (!IsBlueprintNodeNil(uncle) && uncle->color == 0u) {
-          parent->color = 1;
-          uncle->color = 1;
-          grand->color = 0;
-          node = grand;
-          continue;
-        }
-
-        if (node == parent->right) {
-          node = parent;
-          RotateBlueprintLeft(tree, node);
-        }
-
-        node->parent->color = 1;
-        grand->color = 0;
-        RotateBlueprintRight(tree, grand);
-        continue;
-      }
-
-      moho::ArmyBlueprintStatNode* const uncle = grand->left;
-      if (!IsBlueprintNodeNil(uncle) && uncle->color == 0u) {
-        parent->color = 1;
-        uncle->color = 1;
-        grand->color = 0;
-        node = grand;
-        continue;
-      }
-
-      if (node == parent->left) {
-        node = parent;
-        RotateBlueprintRight(tree, node);
-      }
-
-      node->parent->color = 1;
-      grand->color = 0;
-      RotateBlueprintLeft(tree, grand);
-    }
-
-    if (head->parent != nullptr && head->parent != head) {
-      head->parent->color = 1;
-    }
-  }
-
-  [[nodiscard]] moho::ArmyBlueprintStatNode* FindOrInsertBlueprintStatNode(
-    moho::ArmyBlueprintStatTree* const tree,
-    const moho::ArmyBlueprintNameView* const blueprintName
-  )
-  {
-    if (tree == nullptr || tree->head == nullptr || blueprintName == nullptr) {
-      return nullptr;
-    }
-
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    moho::ArmyBlueprintStatNode* parent = head;
-    moho::ArmyBlueprintStatNode* node = head->parent;
-    int compareResult = 0;
-    while (!IsBlueprintNodeNil(node)) {
-      parent = node;
-      compareResult = CompareBlueprintStatKey(blueprintName, node->blueprintName);
-      if (compareResult == 0) {
-        return node;
-      }
-      node = (compareResult < 0) ? node->left : node->right;
-    }
-
-    auto* const inserted = new moho::ArmyBlueprintStatNode{};
-    inserted->left = head;
-    inserted->right = head;
-    inserted->parent = parent;
-    inserted->blueprintName = blueprintName;
-    inserted->value = 0.0f;
-    inserted->color = 0;
-    inserted->isNil = 0;
-
-    if (parent == head) {
-      head->parent = inserted;
-    } else if (compareResult < 0) {
-      parent->left = inserted;
-    } else {
-      parent->right = inserted;
-    }
-
-    ++tree->size;
-    FixupAfterBlueprintInsert(tree, inserted);
-    RecomputeBlueprintExtrema(tree);
-    return inserted;
   }
 
   [[nodiscard]] moho::ArmyNameIndexNode* CreateNameIndexSentinel()
@@ -855,17 +584,6 @@ namespace
   {
     RotateNameIndexRight(tree, node);
   }
-
-  void RotateRbLeft(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* const node)
-  {
-    RotateBlueprintLeft(tree, node);
-  }
-
-  void RotateRbRight(moho::ArmyBlueprintStatTree* const tree, moho::ArmyBlueprintStatNode* const node)
-  {
-    RotateBlueprintRight(tree, node);
-  }
-
   template <class TNode>
   [[nodiscard]] bool IsRbNil(const TNode* const node) noexcept
   {
@@ -980,329 +698,6 @@ namespace
   }
 
   /**
-   * Address: 0x00711B00 (FUN_00711B00, sub_711B00)
-   *
-   * IDA signature:
-   * int __userpurge sub_711B00@<eax>(_DWORD *a1@<esi>, int a2, int a3, int a4, char a5);
-   *
-   * What it does:
-   * Allocates one blueprint-stat node (`_Buynode`) with the caller's
-   * `{left, parent, right}` links and colour, copies the key/value pair out of
-   * `source` (`a1` points at `source + 0x0C`, i.e. the `{blueprintName, value}`
-   * pair), and marks the node non-sentinel.
-   */
-  [[nodiscard]] moho::ArmyBlueprintStatNode* AllocateBlueprintStatNodeCopy(
-    const moho::ArmyBlueprintStatNode* const source,
-    moho::ArmyBlueprintStatNode* const left,
-    moho::ArmyBlueprintStatNode* const parent,
-    moho::ArmyBlueprintStatNode* const right
-  )
-  {
-    auto* const node = new moho::ArmyBlueprintStatNode{};
-    node->left = left;
-    node->parent = parent;
-    node->right = right;
-    node->blueprintName = source->blueprintName;
-    node->value = source->value;
-    node->color = source->color;
-    node->isNil = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x00710990 (FUN_00710990, sub_710990)
-   *
-   * IDA signature:
-   * _DWORD *__thiscall sub_710990(_DWORD *this, int a2, int a3);
-   *
-   * What it does:
-   * Deep-copies one blueprint-stat subtree (`_Tree::_Copy` worker). Returns the
-   * destination tree's nil sentinel when `sourceNode` is the source sentinel,
-   * otherwise the freshly cloned subtree root, recursing into both children with
-   * the new node as their parent. On an allocation failure part-way through, the
-   * partially built subtree is destroyed before the exception propagates - that
-   * is the `sub_592C00` call in the unwind funclet at 0x00710A1F.
-   */
-  moho::ArmyBlueprintStatNode* CloneBlueprintStatSubtree(
-    moho::ArmyBlueprintStatNode* const destinationHead,
-    const moho::ArmyBlueprintStatNode* const sourceNode,
-    moho::ArmyBlueprintStatNode* const destinationParent
-  )
-  {
-    if (IsRbNil(sourceNode)) {
-      return destinationHead;
-    }
-
-    moho::ArmyBlueprintStatNode* clonedRoot = destinationHead;
-    moho::ArmyBlueprintStatNode* const cloned =
-      AllocateBlueprintStatNodeCopy(sourceNode, destinationHead, destinationParent, destinationHead);
-    if (clonedRoot->isNil != 0u) {
-      clonedRoot = cloned;
-    }
-
-    try {
-      cloned->left = CloneBlueprintStatSubtree(destinationHead, sourceNode->left, cloned);
-      cloned->right = CloneBlueprintStatSubtree(destinationHead, sourceNode->right, cloned);
-    } catch (...) {
-      DestroyNilTree(clonedRoot, &moho::ArmyBlueprintStatNode::isNil);
-      throw;
-    }
-
-    return clonedRoot;
-  }
-
-  /**
-   * Address: 0x0070F810 (FUN_0070F810, sub_70F810)
-   *
-   * IDA signature:
-   * int *__usercall sub_70F810@<eax>(int a1@<eax>, int a2@<ebx>);
-   *
-   * What it does:
-   * Copies `source`'s contents into the already-initialized `destination` map
-   * (`_Tree::_Copy`): clones the whole source subtree under the destination's nil
-   * sentinel, mirrors the element count, then recomputes the cached leftmost and
-   * rightmost pointers (`head->left` / `head->right`).
-   *
-   * A generic, un-attributed emission of this same address exists file-locally in
-   * `moho/sim/SimRecoveryRuntime.cpp` (`CopyMapHeaderAndExtremaFlag21Runtime`).
-   * It has zero callers, and its parameter types live in that file's anonymous
-   * namespace, so it is not reachable from any other translation unit. All four
-   * binary callers of 0x0070F810 (0x0070C160, 0x0070CC10, 0x0070E320, 0x0070E3A0)
-   * are blueprint-stat-map sites, so this typed body is the owning recovery.
-   */
-  void CopyBlueprintStatTreeContents(
-    moho::ArmyBlueprintStatTree* const destination,
-    const moho::ArmyBlueprintStatTree* const source
-  )
-  {
-    moho::ArmyBlueprintStatNode* const head = destination->head;
-    head->parent = CloneBlueprintStatSubtree(head, source->head->parent, head);
-    destination->size = source->size;
-    RecomputeBlueprintExtrema(destination);
-  }
-
-  /**
-   * Address: 0x00592920 (FUN_00592920, sub_592920)
-   *
-   * IDA signature:
-   * int *__stdcall sub_592920(int a1, int *arg4, int a2);
-   *
-   * What it does:
-   * Erases one node from the blueprint-stat map and returns the in-order
-   * successor the caller can keep iterating from (`std::map::erase(iterator)`).
-   * Splices the erased node out - directly when it has at most one child,
-   * otherwise by promoting its successor into its slot and swapping colours -
-   * keeps the cached leftmost/rightmost pointers valid, rebalances when a black
-   * node was removed, then frees the node and decrements the element count.
-   */
-  moho::ArmyBlueprintStatNode* EraseBlueprintStatNodeAndAdvance(
-    moho::ArmyBlueprintStatTree* const tree,
-    moho::ArmyBlueprintStatNode* const node
-  )
-  {
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    if (IsRbNil(node)) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    moho::ArmyBlueprintStatNode* const successor = NextBlueprintNode(node, head);
-    moho::ArmyBlueprintStatNode* fixNode = nullptr;
-    moho::ArmyBlueprintStatNode* fixParent = nullptr;
-    moho::ArmyBlueprintStatNode* promoted = nullptr;
-
-    if (IsRbNil(node->left)) {
-      fixNode = node->right;
-    } else if (IsRbNil(node->right)) {
-      fixNode = node->left;
-    } else {
-      promoted = successor;
-      fixNode = promoted->right;
-      if (promoted == node) {
-        // Cannot happen with two children; the binary still guards it
-        // (`cmp ecx, ebx` at 0x005929C3), so keep the same fall-through to the
-        // simple splice with `fixNode` left at the successor's right child.
-        promoted = nullptr;
-      }
-    }
-
-    if (promoted != nullptr) {
-      // Two children: promote the in-order successor into the erased slot.
-      node->left->parent = promoted;
-      promoted->left = node->left;
-      if (promoted == node->right) {
-        fixParent = promoted;
-      } else {
-        fixParent = promoted->parent;
-        if (!IsRbNil(fixNode)) {
-          fixNode->parent = fixParent;
-        }
-        fixParent->left = fixNode;
-        promoted->right = node->right;
-        node->right->parent = promoted;
-      }
-
-      if (head->parent == node) {
-        head->parent = promoted;
-      } else if (node->parent->left == node) {
-        node->parent->left = promoted;
-      } else {
-        node->parent->right = promoted;
-      }
-      promoted->parent = node->parent;
-      std::swap(promoted->color, node->color);
-    } else {
-      fixParent = node->parent;
-      if (!IsRbNil(fixNode)) {
-        fixNode->parent = fixParent;
-      }
-
-      if (head->parent == node) {
-        head->parent = fixNode;
-      } else if (fixParent->left == node) {
-        fixParent->left = fixNode;
-      } else {
-        fixParent->right = fixNode;
-      }
-
-      if (head->left == node) {
-        head->left = IsRbNil(fixNode) ? fixParent : BlueprintNodeMin(fixNode, head);
-      }
-      if (head->right == node) {
-        head->right = IsRbNil(fixNode) ? fixParent : BlueprintNodeMax(fixNode, head);
-      }
-    }
-
-    if (node->color == 1u) {
-      FixupAfterRbErase(tree, fixNode, fixParent);
-    }
-
-    delete node;
-    if (tree->size > 0u) {
-      --tree->size;
-    }
-    return successor;
-  }
-
-  /**
-   * Address: 0x00592230 (FUN_00592230, sub_592230)
-   *
-   * IDA signature:
-   * _DWORD *__userpurge sub_592230@<eax>(int a1@<edi>, _DWORD *a2, _DWORD *a3, _DWORD *a4);
-   *
-   * What it does:
-   * Erases the `[first, last)` node range from the blueprint-stat map
-   * (`std::map::erase(iterator, iterator)`), writing the resulting iterator to
-   * `outNext`. A whole-map range takes the fast path: the entire node subtree is
-   * released in one recursive sweep and the header is reset, skipping per-node
-   * rebalancing entirely.
-   */
-  moho::ArmyBlueprintStatNode** EraseBlueprintStatRange(
-    moho::ArmyBlueprintStatTree* const tree,
-    moho::ArmyBlueprintStatNode** const outNext,
-    moho::ArmyBlueprintStatNode* first,
-    moho::ArmyBlueprintStatNode* const last
-  )
-  {
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    if (first == head->left && last == head) {
-      DestroyNilTree(head->parent, &moho::ArmyBlueprintStatNode::isNil);
-      head->parent = head;
-      tree->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNext = tree->head->left;
-      return outNext;
-    }
-
-    while (first != last) {
-      first = EraseBlueprintStatNodeAndAdvance(tree, first);
-    }
-
-    *outNext = first;
-    return outNext;
-  }
-
-  /**
-   * Address: 0x00585BD0 (FUN_00585BD0, sub_585BD0)
-   *
-   * IDA signature:
-   * int __usercall sub_585BD0@<eax>(int a1@<eax>);
-   *
-   * What it does:
-   * Destroys one blueprint-stat map: clears every element through the range
-   * erase, frees the nil sentinel, and blanks the header lanes. This is the
-   * `std::map` destructor the binary jumps to from the DumpStats unwind funclets
-   * at 0x00BB0B7E and 0x00BB0B89.
-   */
-  void DestroyBlueprintStatTree(moho::ArmyBlueprintStatTree* const tree)
-  {
-    moho::ArmyBlueprintStatNode* const head = tree->head;
-    if (head == nullptr) {
-      return;
-    }
-
-    moho::ArmyBlueprintStatNode* next = nullptr;
-    (void)EraseBlueprintStatRange(tree, &next, head->left, head);
-    delete head;
-    tree->head = nullptr;
-    tree->size = 0u;
-  }
-
-  /**
-   * NOTE: inlined by the compiler at 0x0070C94D-0x0070C979 inside
-   * Moho::CArmyStats::DumpStats; no standalone symbol exists for it.
-   *
-   * What it does:
-   * `std::map::operator=` for the blueprint-stat map: on a non-self assignment
-   * it clears the destination through the range erase (0x00592230) and then
-   * re-copies the source contents (0x0070F810).
-   */
-  void AssignBlueprintStatTree(
-    moho::ArmyBlueprintStatTree* const destination,
-    const moho::ArmyBlueprintStatTree* const source
-  )
-  {
-    if (destination == source) {
-      return;
-    }
-
-    moho::ArmyBlueprintStatNode* next = nullptr;
-    (void)EraseBlueprintStatRange(destination, &next, destination->head->left, destination->head);
-    CopyBlueprintStatTreeContents(destination, source);
-  }
-
-  /**
-   * Address: 0x0070E320 (FUN_0070E320, sub_70E320)
-   *
-   * IDA signature:
-   * int __stdcall sub_70E320(int a1, int a2);
-   *
-   * What it does:
-   * Copy-constructs one blueprint-stat map: allocates and self-links the nil
-   * sentinel (`_Init`, the 0x00592360 `_Buynode` plus the `isNil`/self-link
-   * stores at 0x0070E34F-0x0070E361), zeroes the element count, then copies the
-   * source contents. If the copy throws, the half-built map is destroyed before
-   * the exception propagates - the unwind funclet at 0x0070E38E.
-   */
-  moho::ArmyBlueprintStatTree* ConstructBlueprintStatTreeCopy(
-    moho::ArmyBlueprintStatTree* const destination,
-    const moho::ArmyBlueprintStatTree* const source
-  )
-  {
-    destination->head = CreateBlueprintTreeSentinel();
-    destination->size = 0u;
-
-    try {
-      CopyBlueprintStatTreeContents(destination, source);
-    } catch (...) {
-      DestroyBlueprintStatTree(destination);
-      throw;
-    }
-
-    return destination;
-  }
-
-  /**
    * Scoped owner for one stack-local blueprint-stat map.
    *
    * `CArmyStats::DumpStats` keeps two of these on its frame and the binary gives
@@ -1318,10 +713,7 @@ namespace
     ScopedBlueprintStatTree(const ScopedBlueprintStatTree&) = delete;
     ScopedBlueprintStatTree& operator=(const ScopedBlueprintStatTree&) = delete;
 
-    ~ScopedBlueprintStatTree()
-    {
-      DestroyBlueprintStatTree(&mTree);
-    }
+    ~ScopedBlueprintStatTree() = default;
 
     [[nodiscard]] moho::ArmyBlueprintStatTree* Lane() noexcept
     {
@@ -1356,15 +748,9 @@ namespace
     const char* const logFormat
   )
   {
-    const moho::ArmyBlueprintStatNode* const head = tree.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    for (const moho::ArmyBlueprintStatNode* node = head->left; node != head;
-         node = NextBlueprintNode(node, head)) {
-      const moho::RBlueprint* const blueprint = AsBlueprint(node->blueprintName);
-      const int value = static_cast<int>(node->value);
+    for (const auto& entry : tree) {
+      const moho::RBlueprint* const blueprint = AsBlueprint(entry.first);
+      const int value = static_cast<int>(entry.second);
       gpg::Logf(logFormat, blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
       writer.Printf("%s(%s), %d\n", blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
     }
@@ -1655,9 +1041,8 @@ namespace moho
     : StatItem(name)
     , mBlueprintStats{}
   {
-    mBlueprintStats.meta0 = 0;
-    mBlueprintStats.head = CreateBlueprintTreeSentinel();
-    mBlueprintStats.size = 0;
+    // `msvc8::map`'s own constructor builds the head sentinel and zeroes the
+    // size, which is what the binary open-codes here.
   }
 
   /**
@@ -1671,9 +1056,9 @@ namespace moho
 
   void CArmyStatItem::DestroyBlueprintTree()
   {
-    // 0x00585C39 reaches the map teardown through the range erase at 0x00592230,
-    // which is exactly what DestroyBlueprintStatTree wraps.
-    DestroyBlueprintStatTree(&mBlueprintStats);
+    // 0x00585C39 reaches the map teardown through the range erase at
+    // 0x00592230, which is what `clear()` compiles to.
+    mBlueprintStats.clear();
   }
 
   /**
@@ -1682,22 +1067,19 @@ namespace moho
   void CArmyStatItem::ToLua(LuaPlus::LuaState* state, LuaPlus::LuaObject* outObject)
   {
     StatItem::ToLua(state, outObject);
-    if (mBlueprintStats.size == 0u) {
+    if (mBlueprintStats.empty()) {
       return;
     }
 
     LuaPlus::LuaObject blueprints;
     blueprints.AssignNewTable(state, 0, 0);
 
-    ArmyBlueprintStatNode* node = mBlueprintStats.head->left;
-    while (node != nullptr && node != mBlueprintStats.head) {
-      const ArmyBlueprintNameView* const nameView = node->blueprintName;
+    for (const auto& entry : mBlueprintStats) {
+      const ArmyBlueprintNameView* const nameView = entry.first;
       if (nameView != nullptr) {
-        const msvc8::string value = gpg::STR_Printf("%.2f", node->value);
+        const msvc8::string value = gpg::STR_Printf("%.2f", entry.second);
         blueprints.SetString(nameView->mName.c_str(), value.c_str());
       }
-
-      node = NextBlueprintNode(node, mBlueprintStats.head);
     }
 
     outObject->SetObject("Blueprints", &blueprints);
@@ -1712,20 +1094,15 @@ namespace moho
       return 0.0f;
     }
 
-    const ArmyBlueprintStatNode* const head = mBlueprintStats.head;
-    if (head == nullptr) {
-      return 0.0f;
-    }
-
     float total = 0.0f;
-    for (const ArmyBlueprintStatNode* node = head->left; node != head; node = NextBlueprintNode(node, head)) {
-      const ArmyBlueprintNameView* const blueprintView = node->blueprintName;
+    for (const auto& entry : mBlueprintStats) {
+      const ArmyBlueprintNameView* const blueprintView = entry.first;
       if (blueprintView == nullptr) {
         continue;
       }
 
       if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprintView->mBlueprintOrdinal))) {
-        total += node->value;
+        total += entry.second;
       }
     }
 
@@ -1742,12 +1119,11 @@ namespace moho
    */
   float* CArmyStatItem::FindOrCreateBlueprintStatValue(const ArmyBlueprintNameView* const blueprintName)
   {
-    ArmyBlueprintStatNode* const node = FindOrInsertBlueprintStatNode(&mBlueprintStats, blueprintName);
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    return &node->value;
+    // The binary is VC8's `map::operator[]`: lower_bound, then a *hinted*
+    // insert of a zero-initialised mapped value when the key is absent, and
+    // a reference to the mapped lane either way. That hinted insert is the
+    // emission at 0x0070F6C0.
+    return &mBlueprintStats[blueprintName];
   }
 
   /**
@@ -1763,7 +1139,8 @@ namespace moho
    */
   ArmyBlueprintStatTree* CArmyStatItem::CopyBlueprintStatsInto(ArmyBlueprintStatTree* const destination) const
   {
-    return ConstructBlueprintStatTreeCopy(destination, &mBlueprintStats);
+    *destination = mBlueprintStats;
+    return destination;
   }
 
   /**
@@ -2344,7 +1721,7 @@ namespace moho
     {
       ScopedBlueprintStatTree enemyKilledSnapshot;
       (void)enemiesKilled->CopyBlueprintStatsInto(enemyKilledSnapshot.Lane());
-      AssignBlueprintStatTree(blueprintSnapshot.Lane(), enemyKilledSnapshot.Lane());
+      *blueprintSnapshot.Lane() = *enemyKilledSnapshot.Lane();
     }
 
     DumpBlueprintStatLanes(writer, *blueprintSnapshot.Lane(), " %s(%s): %d");

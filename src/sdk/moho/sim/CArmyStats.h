@@ -8,6 +8,7 @@
 #include "moho/entity/EntityCategoryReflection.h"
 #include "../misc/StatItem.h"
 #include "../misc/Stats.h"
+#include "legacy/containers/Map.h"
 
 namespace moho
 {
@@ -30,25 +31,19 @@ namespace moho
   );
   static_assert(sizeof(ArmyBlueprintNameView) == 0x60, "ArmyBlueprintNameView size must be 0x60");
 
-  struct ArmyBlueprintStatNode
-  {
-    ArmyBlueprintStatNode* left;                // +0x00
-    ArmyBlueprintStatNode* parent;              // +0x04
-    ArmyBlueprintStatNode* right;               // +0x08
-    const ArmyBlueprintNameView* blueprintName; // +0x0C
-    float value;                                // +0x10
-    std::uint8_t color;                         // +0x14
-    std::uint8_t isNil;                         // +0x15
-    std::uint8_t pad_0016[2];
-  };
-  static_assert(sizeof(ArmyBlueprintStatNode) == 0x18, "ArmyBlueprintStatNode size must be 0x18");
-
-  struct ArmyBlueprintStatTree
-  {
-    std::uint32_t meta0;         // +0x00
-    ArmyBlueprintStatNode* head; // +0x04
-    std::uint32_t size;          // +0x08
-  };
+  /**
+   * The per-blueprint stat table is a plain `std::map<const RBlueprint*, float>`
+   * in the original: the node is 0x18 with the links at 0/4/8, the key pointer
+   * at +0x0C, the float at +0x10 and the colour/nil pair at +0x14/+0x15, which
+   * is exactly what `msvc8::map` lays out for an 8-byte `value_type`. The key
+   * comparison in the binary is a raw pointer compare, so the default
+   * `std::less` is the right predicate rather than a name-ordering one.
+   */
+  using ArmyBlueprintStatTree = msvc8::map<const ArmyBlueprintNameView*, float>;
+  // The 0x18 node is not nameable from here -- `msvc8::map` keeps `node_type`
+  // private -- but it is pinned by construction: links at 0/4/8, an 8-byte
+  // `pair<const ArmyBlueprintNameView*, float>` at +0x0C, colour at +0x14 and
+  // nil at +0x15, which the RbTree node template lays out exactly.
   static_assert(sizeof(ArmyBlueprintStatTree) == 0x0C, "ArmyBlueprintStatTree size must be 0x0C");
 
   struct ArmyNameIndexNode
