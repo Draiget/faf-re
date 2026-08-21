@@ -12306,6 +12306,10 @@ namespace moho
    */
   /**
    * Address: 0x007B4640 (FUN_007B4640, `_Tree::_Buynode()`)
+   * Address: 0x007B08D0 (FUN_007B08D0, byte-identical sibling `_Buynode()`
+   * emission reached through the other checked-28-byte-allocator instance,
+   * 0x007B1420, rather than 0x007B4FA0 -- same neutral-node shape, same
+   * ecx=1/null-links/colour-black/sentinel-cleared body)
    *
    * IDA signature:
    * SSelectionNodeUserEntity* __usercall sub_7B4640@<eax>();
