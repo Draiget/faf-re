@@ -969,6 +969,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0089B4C0 (FUN_0089B4C0, gpg::RMultiMapType_EntId_string::dtr)
+     */
+    ~RMultiMapType_EntId_string() override = default;
+
+    /**
      * Address: 0x00899120 (FUN_00899120, gpg::RMultiMapType_EntId_string::Init)
      *
      * What it does:
