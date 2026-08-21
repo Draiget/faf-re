@@ -5637,6 +5637,15 @@ void* AllocateChecked712ByteElements(const std::uint32_t count)
   return AllocateCheckedElementBlock(count, 712u);
 }
 
+/**
+ * Address: 0x005C7290 (FUN_005C7290, 52-byte-stride vector max-size-exceeded
+ * throw lane -- reached from `BuyVectorStorage52Byte`/
+ * `BuyVectorStorageByElementWidth`'s overflow guard, and from the
+ * `Moho::SPerArmyReconInfo` `_Insert_n` grow lane FUN_005C6F90)
+ *
+ * What it does:
+ * Throws `std::length_error` with the legacy VC8 vector overflow message.
+ */
 [[noreturn]] void ThrowVectorLengthError()
 {
   throw std::length_error("vector<T> too long");
