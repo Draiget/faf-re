@@ -77,6 +77,16 @@ namespace moho
   CScrLuaInitForm* func_ReconBlipIsKnownFake_LuaFuncDef();
 } // namespace moho
 
+// Defined later in this file at global scope (FUN_005C6F90); forward-declared
+// here since ResizePerArmyReconInfoVector's growth path (below) needs it
+// ahead of its definition.
+moho::SPerArmyReconInfo* InsertSPerArmyReconInfoRange(
+  msvc8::vector_runtime_view<moho::SPerArmyReconInfo>& storage,
+  moho::SPerArmyReconInfo* insertPosition,
+  std::size_t insertCount,
+  const moho::SPerArmyReconInfo& value
+);
+
 namespace
 {
   constexpr const char* kReconBlipLuaClassName = "ReconBlip";
@@ -174,7 +184,7 @@ namespace
    * Destroys one contiguous `SPerArmyReconInfo` range `[begin, end)` by
    * invoking the element destructor in forward order.
    */
-  [[maybe_unused]] void DestroyPerArmyReconInfoRange(
+  void DestroyPerArmyReconInfoRange(
     moho::SPerArmyReconInfo* begin,
     moho::SPerArmyReconInfo* const end
   )
@@ -395,7 +405,8 @@ namespace
   {
     const std::size_t currentCount = outReconInfo.size();
     if (currentCount < targetCount) {
-      outReconInfo.resize(targetCount, fillValue);
+      auto& view = msvc8::AsVectorRuntimeView(outReconInfo);
+      (void)InsertSPerArmyReconInfoRange(view, view.end, targetCount - currentCount, fillValue);
     }
 
     if (currentCount > targetCount) {
@@ -1265,6 +1276,29 @@ SPerArmyReconInfo::~SPerArmyReconInfo()
 }
 
 /**
+ * Address: 0x005C84D0 (FUN_005C84D0, Moho::SPerArmyReconInfo::SPerArmyReconInfo)
+ *
+ * What it does:
+ * Copy-constructs one per-army recon snapshot lane field-by-field.
+ * `boost::SharedPtrRaw<T>`'s own copy constructor retains the shared
+ * control block for `mMesh`/`mPriorPose`/`mPose`, matching the binary's
+ * direct `_InterlockedExchangeAdd` refcount bump for each.
+ */
+SPerArmyReconInfo::SPerArmyReconInfo(const SPerArmyReconInfo& other) noexcept
+  : mNeedsFlush(other.mNeedsFlush)
+  , mReconFlags(other.mReconFlags)
+  , mStiMesh(other.mStiMesh)
+  , mMesh(other.mMesh)
+  , mPriorPose(other.mPriorPose)
+  , mPose(other.mPose)
+  , mHealth(other.mHealth)
+  , mMaxHealth(other.mMaxHealth)
+  , mFractionComplete(other.mFractionComplete)
+  , mMaybeDead(other.mMaybeDead)
+{
+}
+
+/**
  * Address: 0x005CC5E0 (FUN_005CC5E0, Moho::SPerArmyReconInfo::operator=)
  * Mangled: ??4SPerArmyReconInfo@Moho@@QAEAAV01@ABV01@@Z
  *
@@ -1272,6 +1306,12 @@ SPerArmyReconInfo::~SPerArmyReconInfo()
  * Assigns scalar recon flags/health lanes and rebinds mesh/pose shared
  * control blocks with retain/release semantics in binary field order.
  */
+// Shared cross-TU helpers (defined at global scope in Vector.cpp);
+// forward-declared locally the way this codebase's other legacy container
+// recoveries already do (see Unit.cpp's AllocateChecked568ByteElements).
+[[noreturn]] void ThrowVectorLengthError();
+void* AllocateChecked52ByteElements(std::uint32_t count);
+
 SPerArmyReconInfo& SPerArmyReconInfo::operator=(const SPerArmyReconInfo& other)
 {
   mNeedsFlush = other.mNeedsFlush;
@@ -1287,6 +1327,234 @@ SPerArmyReconInfo& SPerArmyReconInfo::operator=(const SPerArmyReconInfo& other)
   mFractionComplete = other.mFractionComplete;
   mMaybeDead = other.mMaybeDead;
   return *this;
+}
+
+namespace
+{
+  /**
+   * Address: 0x005CDAE0 (FUN_005CDAE0, sub_5CDAE0)
+   * Address: 0x005C9EC0 (FUN_005C9EC0, sub_5C9EC0 -- same algorithm shape,
+   * a separately-compiled copy reached from FUN_005C6F90's in-place-insert
+   * branch instead of its reallocation branch)
+   *
+   * What it does:
+   * Copy-constructs one `[sourceBegin,sourceEnd)` range of `SPerArmyReconInfo`
+   * records into destination storage and returns one-past the last
+   * constructed record.
+   */
+  SPerArmyReconInfo* CopyConstructSPerArmyReconRange(
+    SPerArmyReconInfo* destination,
+    const SPerArmyReconInfo* sourceBegin,
+    const SPerArmyReconInfo* const sourceEnd
+  )
+  {
+    while (sourceBegin != sourceEnd) {
+      if (destination != nullptr) {
+        ::new (static_cast<void*>(destination)) SPerArmyReconInfo(*sourceBegin);
+        ++destination;
+      }
+      ++sourceBegin;
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x005CC2D0 (FUN_005CC2D0, sub_5CC2D0)
+   *
+   * What it does:
+   * Copy-constructs `count` copies of `*prototype` starting at `destination`.
+   */
+  void FillSPerArmyReconRangeFromPrototype(
+    std::size_t count,
+    SPerArmyReconInfo* destination,
+    const SPerArmyReconInfo* const prototype
+  )
+  {
+    while (count != 0u) {
+      if (destination != nullptr) {
+        ::new (static_cast<void*>(destination)) SPerArmyReconInfo(*prototype);
+      }
+      ++destination;
+      --count;
+    }
+  }
+
+  /**
+   * Address: 0x005C8720 (FUN_005C8720, sub_5C8720)
+   *
+   * What it does:
+   * Adapter that fills `count` copies of `*value` at `destination` (via
+   * `FillSPerArmyReconRangeFromPrototype`) and returns one-past the last
+   * filled record.
+   */
+  SPerArmyReconInfo* FillSPerArmyReconRangeFromValueAndAdvance(
+    SPerArmyReconInfo* const destination,
+    const std::size_t count,
+    const SPerArmyReconInfo* const value
+  )
+  {
+    FillSPerArmyReconRangeFromPrototype(count, destination, value);
+    return destination + count;
+  }
+
+  /**
+   * Address: 0x005C9EF0 (FUN_005C9EF0, sub_5C9EF0)
+   *
+   * What it does:
+   * Copy-assigns one `[destinationBegin,destinationEnd)` range from a
+   * parallel `SPerArmyReconInfo` source run starting at `source`, advancing
+   * `source` alongside `destination`.
+   */
+  void CopyAssignSPerArmyReconRange(
+    SPerArmyReconInfo* destinationBegin,
+    const SPerArmyReconInfo* const destinationEnd,
+    const SPerArmyReconInfo* source
+  )
+  {
+    while (destinationBegin != destinationEnd) {
+      *destinationBegin = *source;
+      ++destinationBegin;
+      ++source;
+    }
+  }
+
+  /**
+   * Address: 0x005C9F10 (FUN_005C9F10, sub_5C9F10)
+   *
+   * What it does:
+   * Copy-assigns one `[sourceBegin,sourceEnd)` range backward into
+   * `[destinationEnd - count, destinationEnd)`.
+   */
+  SPerArmyReconInfo* CopyAssignSPerArmyReconRangeReverse(
+    SPerArmyReconInfo* destinationEnd,
+    const SPerArmyReconInfo* sourceEnd,
+    const SPerArmyReconInfo* const sourceBegin
+  )
+  {
+    while (sourceEnd != sourceBegin) {
+      --destinationEnd;
+      --sourceEnd;
+      *destinationEnd = *sourceEnd;
+    }
+    return destinationEnd;
+  }
+} // namespace
+
+/**
+ * Address: 0x005C6F90 (FUN_005C6F90, sub_5C6F90)
+ *
+ * IDA signature:
+ * void __thiscall sub_5C6F90(void *this, int a2, int a3, unsigned int a4);
+ * -- `this` is really the by-ref value being inserted (copied into a local
+ * up front so reallocation can't invalidate it), `a2` is the vector storage
+ * (`{proxy@0,first@4,last@8,end@0xC}`), `a3` is the insert position, `a4`
+ * is the insert count.
+ *
+ * What it does:
+ * `msvc8::vector<SPerArmyReconInfo>::_Insert_n(position, count, value)`.
+ * No-ops when `count` is zero. Throws `std::length_error` (via
+ * `ThrowVectorLengthError`, FUN_005C7290) once size would exceed
+ * `max_size() == 0xFFFFFFFF/52`. When capacity is insufficient, grows at
+ * 1.5x (clamped to max_size, or `Count52ByteElementVectorLanes(storage)+count`
+ * when that undershoots), allocates through `AllocateChecked52ByteElements`
+ * (FUN_005C9F40), copy-constructs the `[first,position)` prefix and
+ * `[position,last)` suffix through `CopyConstructSPerArmyReconRange`
+ * (FUN_005CDAE0), fills the `count`-element gap through
+ * `FillSPerArmyReconRangeFromPrototype` (FUN_005CC2D0), then destroys and
+ * frees the old buffer. When capacity is already sufficient: if the
+ * existing `[position,last)` tail has at least `count` elements, the
+ * overflow portion is copy-constructed past the old end
+ * (`CopyConstructSPerArmyReconRange`, FUN_005C9EC0), the remainder of the
+ * tail is copy-assigned backward by `count` slots
+ * (`CopyAssignSPerArmyReconRangeReverse`, FUN_005C9F10), and the vacated
+ * `[position,position+count)` range is copy-assigned from the value
+ * (`CopyAssignSPerArmyReconRange`, FUN_005C9EF0); otherwise (tail shorter
+ * than `count`) the entire `[position,last)` tail is copy-constructed past
+ * the fully-inserted value region to `[position+count,last+count)`
+ * (`CopyConstructSPerArmyReconRange`, FUN_005C9EC0), the remaining new
+ * memory `[last,position+count)` is construct-filled from the value
+ * (`FillSPerArmyReconRangeFromValueAndAdvance`, FUN_005C8720), and finally
+ * the old (still-live) tail slots `[position,last)` are copy-assigned from
+ * the value (`CopyAssignSPerArmyReconRange`, FUN_005C9EF0, shared with the
+ * other branch).
+ */
+SPerArmyReconInfo* InsertSPerArmyReconInfoRange(
+  msvc8::vector_runtime_view<SPerArmyReconInfo>& storage,
+  SPerArmyReconInfo* const insertPosition,
+  const std::size_t insertCount,
+  const SPerArmyReconInfo& value
+)
+{
+  if (insertCount == 0u) {
+    return insertPosition;
+  }
+
+  const SPerArmyReconInfo localValue(value);
+
+  constexpr std::size_t kMaxElements = 0xFFFFFFFFu / sizeof(SPerArmyReconInfo);
+  const std::size_t curSize = storage.begin != nullptr
+    ? static_cast<std::size_t>(storage.end - storage.begin)
+    : 0u;
+  if (kMaxElements - curSize < insertCount) {
+    ThrowVectorLengthError();
+  }
+
+  const std::size_t capacity = storage.begin != nullptr
+    ? static_cast<std::size_t>(storage.capacityEnd - storage.begin)
+    : 0u;
+  const std::size_t newSize = curSize + insertCount;
+
+  if (capacity < newSize) {
+    // Reallocate: 1.5x growth, or exactly newSize when that undershoots.
+    std::size_t newCapacity = capacity + capacity / 2u;
+    if (newCapacity < newSize) {
+      newCapacity = newSize;
+    }
+
+    auto* const newFirst = static_cast<SPerArmyReconInfo*>(
+      AllocateChecked52ByteElements(static_cast<std::uint32_t>(newCapacity))
+    );
+
+    SPerArmyReconInfo* const gapBegin =
+      CopyConstructSPerArmyReconRange(newFirst, storage.begin, insertPosition);
+    FillSPerArmyReconRangeFromPrototype(insertCount, gapBegin, &localValue);
+    SPerArmyReconInfo* const gapEnd = gapBegin + insertCount;
+    (void)CopyConstructSPerArmyReconRange(gapEnd, insertPosition, storage.end);
+
+    if (storage.begin != nullptr) {
+      DestroyPerArmyReconInfoRange(storage.begin, storage.end);
+      ::operator delete(storage.begin);
+    }
+
+    storage.begin = newFirst;
+    storage.end = newFirst + newSize;
+    storage.capacityEnd = newFirst + newCapacity;
+    return gapBegin;
+  }
+
+  // In-place: capacity already covers the extra elements.
+  const std::size_t tailCount = static_cast<std::size_t>(storage.end - insertPosition);
+  SPerArmyReconInfo* const oldLast = storage.end;
+
+  if (tailCount >= insertCount) {
+    (void)CopyConstructSPerArmyReconRange(oldLast, oldLast - insertCount, oldLast);
+    storage.end = oldLast + insertCount;
+    (void)CopyAssignSPerArmyReconRangeReverse(oldLast, oldLast - insertCount, insertPosition);
+    CopyAssignSPerArmyReconRange(insertPosition, insertPosition + insertCount, &localValue);
+  } else {
+    // tailCount < insertCount: the entire existing tail [insertPosition,oldLast)
+    // relocates (copy-construct) past the fully-inserted value region, to
+    // [insertPosition+insertCount, oldLast+insertCount); the remaining new
+    // memory [oldLast, insertPosition+insertCount) is construct-filled from
+    // the value; then the old (still-live) tail slots [insertPosition,oldLast)
+    // are assigned from the value.
+    (void)CopyConstructSPerArmyReconRange(insertPosition + insertCount, insertPosition, oldLast);
+    (void)FillSPerArmyReconRangeFromValueAndAdvance(oldLast, insertCount - tailCount, &localValue);
+    storage.end = oldLast + insertCount;
+    CopyAssignSPerArmyReconRange(insertPosition, oldLast, &localValue);
+  }
+
+  return insertPosition;
 }
 
 /**

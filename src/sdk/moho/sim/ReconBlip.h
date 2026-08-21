@@ -69,6 +69,19 @@ namespace moho
      */
     ~SPerArmyReconInfo();
 
+    SPerArmyReconInfo() = default;
+
+    /**
+     * Address: 0x005C84D0 (FUN_005C84D0, Moho::SPerArmyReconInfo::SPerArmyReconInfo)
+     *
+     * What it does:
+     * Copy-constructs one per-army recon snapshot lane field-by-field,
+     * bumping the shared-control-block refcount for `mMesh`/`mPriorPose`/
+     * `mPose` directly (`_InterlockedExchangeAdd`) rather than going through
+     * `boost::SharedPtrRaw`'s own copy constructor.
+     */
+    SPerArmyReconInfo(const SPerArmyReconInfo& other) noexcept;
+
     /**
      * Address: 0x005CC5E0 (FUN_005CC5E0, Moho::SPerArmyReconInfo::operator=)
      * Mangled: ??4SPerArmyReconInfo@Moho@@QAEAAV01@ABV01@@Z
