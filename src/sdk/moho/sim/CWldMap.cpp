@@ -4248,6 +4248,21 @@ namespace moho
   {}
 
   /**
+   * Address: 0x0089E870 (FUN_0089E870, IWldTerrainRes scalar-deleting destructor)
+   *
+   * What it does:
+   * Releases the owned `mPlayableRectSource` (the terrain's real `STIMap`,
+   * reached through the same `reinterpret_cast` used elsewhere in this file)
+   * before the base object is torn down.
+   */
+  IWldTerrainRes::~IWldTerrainRes()
+  {
+    if (mPlayableRectSource != nullptr) {
+      delete reinterpret_cast<STIMap*>(mPlayableRectSource);
+    }
+  }
+
+  /**
    * Address: 0x008A7400 (FUN_008A7400, ?GetDecalManager@CWldTerrainRes@Moho@@EAEPAVIDecalManager@2@XZ)
    *
    * What it does:

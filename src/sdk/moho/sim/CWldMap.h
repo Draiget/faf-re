@@ -338,7 +338,15 @@ namespace moho
      */
     IWldTerrainRes();
 
-    virtual ~IWldTerrainRes() = default;
+    /**
+     * Address: 0x0089E870 (FUN_0089E870, IWldTerrainRes scalar-deleting destructor)
+     *
+     * What it does:
+     * Tears down the owned `mPlayableRectSource` (the terrain's real runtime
+     * `STIMap`, reached through the same `reinterpret_cast` this class's other
+     * accessors already use) before the base object is released.
+     */
+    virtual ~IWldTerrainRes();
 
     /**
      * Address: 0x008A1700 (FUN_008A1700, CWldTerrainRes::Load implementation path)
