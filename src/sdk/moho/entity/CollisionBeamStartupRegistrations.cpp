@@ -263,6 +263,10 @@ namespace moho
 
   /**
    * Address: 0x00BFC2D0 (FUN_00BFC2D0, Moho::ECollisionBeamEventTypeInfo::dtr)
+   * Address: 0x00672D50 (FUN_00672D50, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    */
   ECollisionBeamEventTypeInfo::~ECollisionBeamEventTypeInfo() = default;
 

@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -148,6 +148,10 @@ namespace moho
 {
   /**
    * Address: 0x00BF1F90 (FUN_00BF1F90, Moho::EVisibilityModeTypeInfo::dtr)
+   * Address: 0x0050A190 (FUN_0050A190, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    */
   EVisibilityModeTypeInfo::~EVisibilityModeTypeInfo() = default;
 
