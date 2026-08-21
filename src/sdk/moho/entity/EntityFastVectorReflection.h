@@ -87,6 +87,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006800E0 (FUN_006800E0, gpg::RVectorType_EntityP::dtr)
+     */
+    ~RVectorType() override;
+
+    /**
      * Address: 0x0067C0F0 (FUN_0067C0F0, gpg::RVectorType_Entity_P::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
