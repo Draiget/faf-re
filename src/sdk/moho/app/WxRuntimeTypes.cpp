@@ -69,11 +69,14 @@
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/RangeRenderer.h"
+#include "moho/render/RCamManager.h"
 #include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/Shadow.h"
 #include "moho/render/Silhouette.h"
+#include "moho/render/SimpleRenderWorldView.h"
 #include "moho/render/SkyDome.h"
 #include "moho/render/VisionRenderer.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
@@ -95,6 +98,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
 #include "moho/terrain/TerrainFactory.h"
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/HighFidelityTerrain.h"
@@ -42482,8 +42486,18 @@ void moho::WD3DViewport::D3DWindowOnDeviceExit(const bool fullShutdown)
 
 /**
  * Address: 0x0042BB20 (FUN_0042BB20)
+ * Mangled: ?RenderPreviewImage@WD3DViewport@Moho@@UAEX_N@Z
+ *
+ * The binary's `WD3DViewport` body is a bare `retn 4` - the do-nothing base
+ * default for viewports that never render a strategic-map preview. The real
+ * work is `WRenViewport`'s override (0x007F7400), which this tree reaches by
+ * forwarding because the inheritance is modelled inverted (see
+ * `WRenViewport::RenderAllHeads`).
  */
-void moho::WD3DViewport::RenderPreviewImage() {}
+void moho::WD3DViewport::RenderPreviewImage(const bool forceRegenerate)
+{
+  WRenViewport::RenderPreviewImage(forceRegenerate);
+}
 
 /**
  * Address: 0x0042BB30 (FUN_0042BB30)
@@ -65258,12 +65272,6 @@ namespace
     "WRenViewportRenderPassRuntime::mTerrainNormalFrame offset must be 0x2280"
   );
 
-  struct WRenViewportPreviewImageView final
-  {
-    std::uint8_t mUnknown0000_2193[0x2194];
-    moho::WPreviewImageRuntime mPreviewImage; // +0x2194
-  };
-
   struct WRenViewportReflectionPassView final
   {
     struct ReflectionRenderTargetSlot final
@@ -65293,10 +65301,10 @@ namespace
   static_assert(
     offsetof(WRenViewportRenderView, mCam) == 0x219C, "WRenViewportRenderView::mCam offset must be 0x219C"
   );
-  static_assert(
-    offsetof(WRenViewportPreviewImageView, mPreviewImage) == 0x2194,
-    "WRenViewportPreviewImageView::mPreviewImage offset must be 0x2194"
-  );
+  // `WRenViewportDestroyRuntimeView::mDynamicTextureSheet` (+0x2194) already
+  // covers this offset with a real `boost::shared_ptr<CD3DDynamicTextureSheet>`
+  // - see its own offset assert above. `GetPreviewImage` reads that same field.
+  //
   // Unconditional: these four are read/written by FUN_007F87F0 at these exact
   // displacements, and a silent drift here clips the whole engine to a 0x0
   // viewport (see the note on the struct).
@@ -65549,6 +65557,15 @@ namespace moho
   extern float fog_OffsetMultiplier;
   extern bool ren_PlayableBoundary;
   extern bool ren_FogOfWar;
+
+  // Save/restore triple read and cleared by WRenViewport::RenderPreviewImage
+  // (0x007F7590-0x007F75FB) around the strategic-map preview render pass,
+  // alongside ren_Ui/ren_Fx/fog_DistanceFog/ren_Shadows above. Defined (with
+  // byte-verified defaults) in RuntimeTuningGlobals.cpp.
+  extern bool ren_WorldBorder;  // 0x00F57E48 = 0x01
+  extern bool ren_Select;       // 0x00F57E4C = 0x01
+  extern bool ren_fog;          // 0x00F57E4D = 0x01
+  extern bool ren_Shadows;      // 0x00F57E53 = 0x01
 } // namespace moho
 
 /**
@@ -66650,16 +66667,18 @@ void moho::CON_WxInputBox(void* const commandArgs)
  * What it does:
  * Returns one retained preview-image shared-pointer lane from viewport
  * runtime storage.
+ *
+ * Notes:
+ * - The binary's own manual `_InterlockedIncrement` on the returned
+ *   control block is just `boost::shared_ptr`'s copy constructor decompiled
+ *   flat; returning `mDynamicTextureSheet` by value through the converting
+ *   `shared_ptr<CD3DDynamicTextureSheet>` -> `shared_ptr<ID3DTextureSheet>`
+ *   constructor performs the identical increment through boost's own code.
  */
 moho::WPreviewImageRuntime moho::WRenViewport::GetPreviewImage() const
 {
-  const auto* const runtime = reinterpret_cast<const WRenViewportPreviewImageView*>(this);
-  WPreviewImageRuntime previewImage = runtime->mPreviewImage;
-  if (previewImage.lane1 != nullptr) {
-    auto* const refCount = reinterpret_cast<volatile long*>(reinterpret_cast<std::uint8_t*>(previewImage.lane1) + 0x04u);
-    (void)InterlockedIncrement(refCount);
-  }
-  return previewImage;
+  const auto* const runtime = reinterpret_cast<const WRenViewportDestroyRuntimeView*>(this);
+  return runtime->mDynamicTextureSheet;
 }
 
 /**
@@ -68196,6 +68215,169 @@ void moho::WRenViewport::RenderAllHeads()
 
   ++moho::snd_index;
   gRenderLock = false;
+}
+
+/**
+ * Address: 0x007F7400 (FUN_007F7400, ?RenderPreviewImage@WRenViewport@Moho@@UAEX_N@Z)
+ * Mangled: ?RenderPreviewImage@WRenViewport@Moho@@UAEX_N@Z
+ *
+ * IDA signature:
+ * int __thiscall Moho::WRenViewport::RenderPreviewImage(
+ *     Moho::WRenViewport *this, bool forceRegenerate);
+ *
+ * What it does:
+ * Renders one top-down "strategic map" snapshot of the active world into
+ * this viewport's retained 256x256 preview texture (the sheet
+ * `GetPreviewImage()` returns, allocated once by `InitDeviceResources` via
+ * `NewDynamicTextureSheet`). Builds a throwaway camera framed on the loaded
+ * map's bounds, disables every non-terrain render pass and the editor input
+ * hook for the duration of one `Render` call against a one-element
+ * world-view list wrapping that camera, then composites the primary render
+ * target through a full-screen "TOpaque" frame pass, accumulates it into a
+ * fresh dynamic texture sheet via the device-resources copy lane, and blits
+ * that into the retained preview sheet with `UpdateSurface`. Every disabled
+ * toggle and the editor hook are restored before return, and the throwaway
+ * camera is deleted (which forgets itself from `RCamManager::mCams` as part
+ * of its own destructor chain - see `CameraImpl::~CameraImpl`).
+ *
+ * Notes:
+ * - `forceRegenerate` is not read anywhere in the recovered body; every path
+ *   below runs unconditionally, matching the binary.
+ * - The raw decompile shows this as manual `boost::detail::shared_count` /
+ *   `_InterlockedExchangeAdd` refcount bookkeeping and a `dtr_sp_counted_base`
+ *   virtual call on the camera pointer. Both are decompiler artifacts: the
+ *   shared_count calls are boost's own `shared_ptr<TerrainCommon>` machinery
+ *   (mirrored below through `AssignSharedTerrainFromRaw`, exactly as
+ *   `WRenViewport::AddWorldView` already uses it for the identical
+ *   `IRenTerrain::Create()` + `Create(terrainRes)` pair), and
+ *   `dtr_sp_counted_base(camera, 1)` is CameraImpl's own scalar-deleting
+ *   destructor (vtable slot 0) - i.e. a plain `delete camera;`.
+ * - The `1132462080` / `1132462080` pair the raw decompile assigns into the
+ *   viewport-size local is the bit pattern of `256.0f` twice over (a
+ *   `Wm3::Vector2f{256.0f, 256.0f}` written through adjacent stack slots),
+ *   not a pointer or a stack-reuse token.
+ * - `GetResources()->Func10(...)` is ID3DDeviceResources slot 18
+ *   (vtable +0x48 / decompiled offset 72), the same lane
+ *   `REN_MaybeDumpFrame` above uses to accumulate a render target into a
+ *   dynamic texture sheet. Unlike that persistent-lane caller, this pass
+ *   always hands Func10 an empty `currentSheet` (the binary's literal `0, 0`
+ *   pair), so it recreates the destination sheet fresh on every call instead
+ *   of reusing one across frames.
+ * - `GetPreviewImage()`'s real declared signature takes no arguments and
+ *   returns `WPreviewImageRuntime` (== `boost::shared_ptr<ID3DTextureSheet>`)
+ *   by value through a hidden return pointer; the raw decompile's apparent
+ *   second argument is that hidden pointer, not a real parameter.
+ */
+void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceRegenerate)
+{
+  moho::ed_EnableHook = false;
+
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  const int headWidth = device->GetHeadWidth(0);
+  const int headHeight = device->GetHeadHeight(0);
+
+  // `if (sWldMap) mTerrainRes = sWldMap->mTerrainRes;` in the binary, followed
+  // by an unconditional `mTerrainRes->mMap` deref. REN_GetTerrainRes folds in
+  // the same session/map null check this file already substitutes for that
+  // exact expression elsewhere (see WRenViewport::ReleaseDeviceResources); the
+  // extra null guard below only matters if this is ever reached without a
+  // loaded world, which does not happen on any real call path.
+  moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes();
+  if (terrainRes == nullptr) {
+    moho::ed_EnableHook = true;
+    return;
+  }
+  moho::STIMap* const map = reinterpret_cast<moho::STIMap*>(terrainRes->mPlayableRectSource);
+
+  moho::RCamManager* const camManager = moho::CAM_GetManager();
+  moho::CameraImpl* const camera = camManager->CreateCamera("Strategic map render camera", *map, nullptr);
+  camera->CameraSetViewport(Wm3::Vector2f(0.0f, 0.0f), Wm3::Vector2f(256.0f, 256.0f));
+
+  const Wm3::AxisAlignedBox3f mapBounds = map->GetBounds3D();
+  float mapExtent = mapBounds.Max.x - mapBounds.Min.x;
+  if ((mapBounds.Max.z - mapBounds.Min.z) > mapExtent) {
+    mapExtent = mapBounds.Max.z - mapBounds.Min.z;
+  }
+  const Wm3::Vec3f mapCenter{
+    (mapBounds.Min.x + mapBounds.Max.x) * 0.5f,
+    (mapBounds.Max.y + mapBounds.Min.y) * 0.5f,
+    (mapBounds.Min.z + mapBounds.Max.z) * 0.5f
+  };
+  camera->TargetManual(mapCenter, 3.1415925f, 1.5707963f, mapExtent, 0.0f);
+
+  camManager->Frame(0.0f, 0.0f);
+
+  const bool savedUi = moho::ren_Ui;
+  const bool savedFx = moho::ren_Fx;
+  const bool savedWorldBorder = moho::ren_WorldBorder;
+  const bool savedDistanceFog = moho::fog_DistanceFog;
+  const bool savedSelect = moho::ren_Select;
+  const bool savedShadows = moho::ren_Shadows;
+  const bool savedFog = moho::ren_fog;
+
+  moho::ren_Shadows = false;
+  moho::fog_DistanceFog = false;
+  moho::ren_fog = false;
+  moho::ren_Select = false;
+  moho::ren_Fx = false;
+  moho::ren_WorldBorder = false;
+  moho::ren_Ui = false;
+
+  moho::SimpleRenderWorldView previewView{};
+  previewView.mCameraView = const_cast<moho::GeomCamera3*>(&camera->CameraGetView());
+
+  WRenViewportWorldViewParamRuntime worldViewEntry{};
+  worldViewEntry.view = &previewView;
+  (void)AssignSharedTerrainFromRaw(&worldViewEntry.terrain, moho::IRenTerrain::Create());
+  if (worldViewEntry.terrain) {
+    (void)worldViewEntry.terrain->Create(reinterpret_cast<moho::TerrainWaterResourceView*>(terrainRes));
+  }
+
+  msvc8::vector<WRenViewportWorldViewParamRuntime> previewWorldViews{};
+  previewWorldViews.push_back(worldViewEntry);
+  Render(0, &previewWorldViews);
+
+  moho::ren_Ui = savedUi;
+  moho::ren_WorldBorder = savedWorldBorder;
+  moho::ren_Fx = savedFx;
+  moho::ren_Select = savedSelect;
+  moho::fog_DistanceFog = savedDistanceFog;
+  moho::ren_fog = savedFog;
+  moho::ren_Shadows = savedShadows;
+
+  device->SetRenderTarget2(0, false, 0, 1.0f, 0);
+  device->SetColorWriteState(false, true);
+
+  auto* const destroyView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
+  WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
+
+  destroyView->mFrame.mName = "TOpaque";
+  destroyView->mFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
+  destroyView->mFrame.SetTexture(0, passView->mPrimaryTargetLocks[0]);
+  destroyView->mFrame.Render(headWidth, headHeight);
+
+  boost::shared_ptr<moho::ID3DRenderTarget> screenLock{};
+  device->GetWriterLock1(screenLock, 0);
+  device->SetViewRect(screenLock.get(), passView->mPrimaryTargetLocks[0].get(), nullptr, nullptr);
+
+  moho::ID3DDeviceResources* const resources = device->GetResources();
+  boost::shared_ptr<moho::CD3DDynamicTextureSheet> previewSheet{};
+  resources->Func10(
+    previewSheet, passView->mPrimaryTargetLocks[0].get(), moho::ID3DDeviceResources::DynamicTextureSheetHandle{}
+  );
+  moho::CD3DDynamicTextureSheet* const resolvedSheet = previewSheet.get();
+
+  const RECT sourceRect{0, 0, 256, 256};
+  const moho::WPreviewImageRuntime previewImage = GetPreviewImage();
+  device->UpdateSurface(
+    resolvedSheet, static_cast<moho::CD3DDynamicTextureSheet*>(previewImage.get()), &sourceRect, nullptr
+  );
+
+  moho::ed_EnableHook = true;
+
+  // Forgets itself from RCamManager::mCams as part of ~CameraImpl chaining
+  // into ~RCamCamera (see CameraImpl.h); no ForgetCamera call is needed here.
+  delete camera;
 }
 
 /**

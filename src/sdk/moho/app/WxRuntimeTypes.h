@@ -8,6 +8,7 @@
 #include <string>
 
 #include "boost/mutex.h"
+#include "boost/shared_ptr.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -7399,6 +7400,7 @@ namespace moho
   class IRenderWorldView;
   class TerrainCommon;
   class IWldTerrainRes;
+  class ID3DTextureSheet;
 
   /**
    * Runtime app shell owning SupCom wx startup loop lanes.
@@ -8119,7 +8121,18 @@ namespace moho
    * - `CScApp::CreateAppFrame` (0x008CF8C0) reads `viewport->m_parent`
    *   before calling `GetHandle()` on both parent and viewport.
    */
-  struct WPreviewImageRuntime;
+
+  /**
+   * `WRenViewport::GetPreviewImage` (0x007F65D0) mangles to
+   * `?GetPreviewImage@WRenViewport@Moho@@UAE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ`,
+   * i.e. its real return type is `boost::shared_ptr<Moho::ID3DTextureSheet>`
+   * by value - not a bespoke two-pointer view struct. The retained field this
+   * wraps (`WRenViewportDestroyRuntimeView::mDynamicTextureSheet`, +0x2194 in
+   * WxRuntimeTypes.cpp) is already modelled as a real
+   * `boost::shared_ptr<CD3DDynamicTextureSheet>`, which converts to this alias
+   * through boost's own compatible-pointer constructor.
+   */
+  using WPreviewImageRuntime = boost::shared_ptr<ID3DTextureSheet>;
 
   struct WRenViewport : wxWindowMswRuntime
   {
@@ -8295,6 +8308,35 @@ namespace moho
      * runtime storage.
      */
     [[nodiscard]] virtual WPreviewImageRuntime GetPreviewImage() const;
+
+    /**
+     * Address: 0x007F7400 (FUN_007F7400, ?RenderPreviewImage@WRenViewport@Moho@@UAEX_N@Z)
+     * Mangled: ?RenderPreviewImage@WRenViewport@Moho@@UAEX_N@Z
+     *
+     * IDA signature:
+     * int __thiscall Moho::WRenViewport::RenderPreviewImage(
+     *     Moho::WRenViewport *this, bool forceRegenerate);
+     *
+     * What it does:
+     * Renders one top-down "strategic map" snapshot of the active world into
+     * this viewport's retained preview texture. Builds a throwaway camera
+     * framed on the loaded map's bounds, disables every non-terrain render
+     * pass and the editor input hook for the duration of one `Render` call
+     * against a one-element world-view list wrapping that camera, then blits
+     * the freshly rendered primary target through the active device's
+     * dynamic-texture-sheet path into the sheet `GetPreviewImage()` returns.
+     * Every disabled toggle and the editor hook are restored before return.
+     *
+     * Notes:
+     * - `forceRegenerate` is not read anywhere in the recovered body; every
+     *   path below runs unconditionally, matching the binary.
+     * - This is `WRenViewport`'s own override of the `WD3DViewport::
+     *   RenderPreviewImage` slot (0x0042BB20, a bare `retn` in the binary).
+     *   `WD3DViewport::RenderPreviewImage` forwards here, mirroring the
+     *   `RenderAllHeads` / `InitDeviceResources` / `ReleaseDeviceResources`
+     *   pattern used for the other `WD3DViewport`-declared virtuals.
+     */
+    virtual void RenderPreviewImage(bool forceRegenerate);
 
     /**
      * Address: 0x007F7FC0 (FUN_007F7FC0, ?TransformTerrainNormals@WRenViewport@Moho@@AAEXXZ)
@@ -8508,12 +8550,6 @@ namespace moho
     bool mOwnsPaint = false;
   };
 
-  struct WPreviewImageRuntime
-  {
-    void* lane0 = nullptr;
-    void* lane1 = nullptr;
-  };
-
   static_assert(sizeof(WPreviewImageRuntime) == 0x8, "moho::WPreviewImageRuntime size must be 0x8");
 
   struct WD3DViewport : WRenViewport
@@ -8572,8 +8608,15 @@ namespace moho
 
     /**
      * Address: 0x0042BB20 (FUN_0042BB20)
+     * Mangled: ?RenderPreviewImage@WD3DViewport@Moho@@UAEX_N@Z
+     *
+     * The binary's `WD3DViewport` body is a bare `retn 4` (one stack bool
+     * argument popped, nothing read) - the do-nothing base default. The real
+     * strategic-map preview render is `WRenViewport`'s override
+     * (0x007F7400), which this tree reaches by forwarding because the
+     * inheritance is modelled inverted (see `WRenViewport::RenderAllHeads`).
      */
-    virtual void RenderPreviewImage();
+    void RenderPreviewImage(bool forceRegenerate) override;
 
     /**
      * Address: 0x0042BB30 (FUN_0042BB30)
