@@ -140,6 +140,11 @@ namespace gpg
      */
     RVectorType_int();
 
+    /**
+     * Address: 0x005ED070 (FUN_005ED070, gpg::RVectorType_int::dtr)
+     */
+    ~RVectorType_int() override;
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
@@ -193,6 +198,11 @@ namespace gpg
      */
     RVectorType_SAiReservedTransportBone();
 
+    /**
+     * Address: 0x005ED0D0 (FUN_005ED0D0, gpg::RVectorType_SAiReservedTransportBone::dtr)
+     */
+    ~RVectorType_SAiReservedTransportBone() override;
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
@@ -245,6 +255,11 @@ namespace gpg
      * `msvc8::vector<SAttachPoint>`.
      */
     RVectorType_SAttachPoint();
+
+    /**
+     * Address: 0x005ED130 (FUN_005ED130, gpg::RVectorType_SAttachPoint::dtr)
+     */
+    ~RVectorType_SAttachPoint() override;
 
     [[nodiscard]] const char* GetName() const override;
 
@@ -841,6 +856,11 @@ gpg::RVectorType_int::RVectorType_int()
 }
 
 /**
+ * Address: 0x005ED070 (FUN_005ED070, gpg::RVectorType_int::dtr)
+ */
+gpg::RVectorType_int::~RVectorType_int() = default;
+
+/**
  * Address: 0x005E8D70 (FUN_005E8D70, gpg::RVectorType_int::GetName)
  *
  * What it does:
@@ -986,6 +1006,11 @@ gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone(
 {
   gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAiReservedTransportBone>), this);
 }
+
+/**
+ * Address: 0x005ED0D0 (FUN_005ED0D0, gpg::RVectorType_SAiReservedTransportBone::dtr)
+ */
+gpg::RVectorType_SAiReservedTransportBone::~RVectorType_SAiReservedTransportBone() = default;
 
 /**
  * Address: 0x005E8FE0 (FUN_005E8FE0, gpg::RVectorType_SAiReservedTransportBone::GetName)
@@ -1162,6 +1187,11 @@ gpg::RVectorType_SAttachPoint::RVectorType_SAttachPoint()
 {
   gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAttachPoint>), this);
 }
+
+/**
+ * Address: 0x005ED130 (FUN_005ED130, gpg::RVectorType_SAttachPoint::dtr)
+ */
+gpg::RVectorType_SAttachPoint::~RVectorType_SAttachPoint() = default;
 
 /**
  * Address: 0x005E9250 (FUN_005E9250, gpg::RVectorType_SAttachPoint::GetName)
