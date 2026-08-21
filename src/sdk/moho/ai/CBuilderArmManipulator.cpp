@@ -364,6 +364,14 @@ namespace moho
 
   /**
    * Address: 0x00635FA0 (FUN_00635FA0, ??1CBuilderArmManipulator@Moho@@UAE@XZ)
+   * Address: 0x00635C50 (FUN_00635C50, vtable-slot-2 scalar deleting
+   * destructor: the full compiler-emitted picture -- sets this object's own
+   * vtable and the `CScriptObject` sub-object vtable, unlinks the weak
+   * goal-target node from its intrusive owner chain (decompiled as a
+   * pointer-chasing loop over a mis-typed "vtable" field -- it is really the
+   * weak-link's `next` pointer, the same shape as `RWeakPtr`-style unlink
+   * elsewhere in this codebase), tail-calls `IAniManipulator::~IAniManipulator`,
+   * then conditionally frees the object)
    *
    * What it does:
    * Runs weak-target lane teardown and forwards destruction into

@@ -79,6 +79,16 @@ namespace moho
     RPropBlueprint();
 
     /**
+     * Address: 0x0051D2B0 (FUN_0051D2B0, Moho::RPropBlueprint::dtr)
+     *
+     * What it does:
+     * Releases `Display.MeshBlueprint.name` storage (the only lane
+     * `RPropBlueprint` owns beyond its base), then chains into
+     * `REntityBlueprint` destruction.
+     */
+    ~RPropBlueprint() override;
+
+    /**
      * Address: 0x0051D210 (FUN_0051D210)
      * Mangled: ?GetClass@RPropBlueprint@Moho@@UBEPAVRType@gpg@@XZ
      *

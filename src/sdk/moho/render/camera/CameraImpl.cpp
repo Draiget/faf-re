@@ -252,6 +252,18 @@ namespace
      * or zero when no world-session is active.
      */
     float Time() override;
+
+    /**
+     * Address: 0x007A7EA0 (FUN_007A7EA0, Moho::GameTimeSource::dtr)
+     *
+     * What it does:
+     * `GameTimeSource` adds no data members of its own, so the vtable-slot-2
+     * scalar deleting destructor just restores this object's own
+     * `ITimeSource`/`CameraTimeSourceRuntime` vftable then conditionally
+     * frees the object -- exactly what a defaulted destructor produces for
+     * a derived class with no extra state.
+     */
+    ~GameTimeSource() override = default;
   };
 
   class SystemTimeSource final : public CameraTimeSourceRuntime
@@ -264,6 +276,18 @@ namespace
      * Returns elapsed wall-clock time in seconds from the global system timer.
      */
     float Time() override;
+
+    /**
+     * Address: 0x007A7E70 (FUN_007A7E70, Moho::SystemTimeSource::dtr)
+     *
+     * What it does:
+     * `SystemTimeSource` adds no data members of its own, so the
+     * vtable-slot-2 scalar deleting destructor just restores this object's
+     * own `ITimeSource`/`CameraTimeSourceRuntime` vftable then conditionally
+     * frees the object -- exactly what a defaulted destructor produces for
+     * a derived class with no extra state.
+     */
+    ~SystemTimeSource() override = default;
   };
 
   struct CameraImplRuntimeView
