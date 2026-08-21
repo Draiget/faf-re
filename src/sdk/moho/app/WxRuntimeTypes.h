@@ -1694,6 +1694,41 @@ public:
   [[nodiscard]] wxWindowBase* GetEventHandler();
 
   /**
+   * Address: 0x00963790 (FUN_00963790, __imp_?PushEventHandler@wxWindowBase@@QAEXPAVwxEvtHandler@@@Z)
+   * Mangled: ?PushEventHandler@wxWindowBase@@QAEXPAVwxEvtHandler@@@Z
+   *
+   * What it does:
+   * Inserts `handler` at the front of this window's event-handler chain:
+   * `handler`'s next-handler lane becomes whatever handler currently sits at
+   * the front (GetEventHandler()), the old front's previous-handler lane
+   * points back at `handler`, and this window's front-of-chain pointer
+   * becomes `handler`. Events raised against this window are offered to
+   * `handler` first (see ProcessEvent / WX_InvokePushedEventHandlerDispatch).
+   *
+   * The binary reaches this method through an `__imp_` IAT thunk into the wx
+   * DLL rather than compiling its own copy, so there is no in-binary body to
+   * transcribe; this reproduces wxWindows-2.4.2's unmodified
+   * `wxWindowBase::PushEventHandler` (src/common/wincmn.cpp) against this
+   * project's window-keyed runtime-state side table, matching how the rest of
+   * this class's chain (GetEventHandler/nextHandler) is already modelled.
+   */
+  void PushEventHandler(wxWindowBase* handler);
+
+  /**
+   * Address: 0x009637B0 (FUN_009637B0, __imp_?PopEventHandler@wxWindowBase@@QAEPAVwxEvtHandler@@_N@Z)
+   * Mangled: ?PopEventHandler@wxWindowBase@@QAEPAVwxEvtHandler@@_N@Z
+   *
+   * What it does:
+   * Removes the handler currently at the front of this window's chain and
+   * returns it (or deletes it and returns null when `deleteHandler` is set).
+   * The next handler down the chain, if any, becomes the new front and has
+   * its previous-handler lane cleared. Mirrors the unmodified
+   * wxWindows-2.4.2 `wxWindowBase::PopEventHandler` for the same reason
+   * `PushEventHandler` above does.
+   */
+  wxWindowBase* PopEventHandler(bool deleteHandler = false);
+
+  /**
    * Address: 0x00964100 (FUN_00964100)
    * Mangled: ?OnHelp@wxWindowBase@@IAEXAAVwxHelpEvent@@@Z
    *

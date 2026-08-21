@@ -11397,10 +11397,12 @@ namespace
     unsigned long nativeHandle = 0;
     long previousWindowProc = 0;
     // wxEvtHandler lanes: whether this handler is listening, its dynamic
-    // bindings, and the next handler in the chain.
+    // bindings, and the next/previous handlers in the push/pop chain (see
+    // wxWindowBase::PushEventHandler/PopEventHandler).
     std::uint8_t handlerEnabled = 1;
     void* dynamicEvents = nullptr;
     wxWindowBase* nextHandler = nullptr;
+    wxWindowBase* previousHandler = nullptr;
     // wxWindow sets this in its destructor (the +0x0CC bit-3 flag at
     // 0x0096BF4E); a window on the way out stops raising focus events.
     std::uint8_t isBeingDeleted = 0;
@@ -39151,6 +39153,65 @@ wxWindowBase* wxWindowBase::GetEventHandler()
     return state->eventHandler;
   }
   return this;
+}
+
+/**
+ * Address: 0x00963790 (FUN_00963790, __imp_?PushEventHandler@wxWindowBase@@QAEXPAVwxEvtHandler@@@Z)
+ * Mangled: ?PushEventHandler@wxWindowBase@@QAEXPAVwxEvtHandler@@@Z
+ *
+ * What it does:
+ * See the declaration in WxRuntimeTypes.h: reproduces wxWindows-2.4.2's
+ * unmodified wxWindowBase::PushEventHandler against this project's
+ * window-keyed WxWindowBaseRuntimeState side table.
+ */
+void wxWindowBase::PushEventHandler(wxWindowBase* const handler)
+{
+  if (handler == nullptr) {
+    return;
+  }
+
+  wxWindowBase* const oldFront = GetEventHandler();
+  EnsureWxWindowBaseRuntimeState(handler).nextHandler = oldFront;
+
+  if (oldFront != nullptr) {
+    EnsureWxWindowBaseRuntimeState(oldFront).previousHandler = handler;
+  }
+
+  EnsureWxWindowBaseRuntimeState(this).eventHandler = handler;
+}
+
+/**
+ * Address: 0x009637B0 (FUN_009637B0, __imp_?PopEventHandler@wxWindowBase@@QAEPAVwxEvtHandler@@_N@Z)
+ * Mangled: ?PopEventHandler@wxWindowBase@@QAEPAVwxEvtHandler@@_N@Z
+ *
+ * What it does:
+ * See the declaration in WxRuntimeTypes.h: reproduces wxWindows-2.4.2's
+ * unmodified wxWindowBase::PopEventHandler against this project's
+ * window-keyed WxWindowBaseRuntimeState side table.
+ */
+wxWindowBase* wxWindowBase::PopEventHandler(const bool deleteHandler)
+{
+  wxWindowBase* const front = GetEventHandler();
+  if (front == nullptr) {
+    return nullptr;
+  }
+
+  WxWindowBaseRuntimeState& frontState = EnsureWxWindowBaseRuntimeState(front);
+  wxWindowBase* const next = frontState.nextHandler;
+  frontState.nextHandler = nullptr;
+
+  if (next != nullptr) {
+    EnsureWxWindowBaseRuntimeState(next).previousHandler = nullptr;
+  }
+
+  EnsureWxWindowBaseRuntimeState(this).eventHandler = next;
+
+  if (deleteHandler) {
+    delete front;
+    return nullptr;
+  }
+
+  return front;
 }
 
 /**

@@ -28,7 +28,7 @@ namespace moho
   // ===== Unrecovered cfunc(lua_State*) callbacks =====
   // cfunc_CAiBrainCreateResourceBuildingNearest recovered in CAiBrain.cpp (FUN_00589DB0).
   // cfunc_CAiBrainFindPlaceToBuild recovered in CAiBrain.cpp (FUN_0058A440).
-  int func_FlushEvents(lua_State*) { return 0; }
+  // func_FlushEvents recovered in UiRuntimeTypes.cpp (FUN_0084E0F0).
 }
 
 namespace moho

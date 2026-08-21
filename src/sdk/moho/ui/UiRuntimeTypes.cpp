@@ -18932,6 +18932,103 @@ int moho::cfunc_GetUIControlsAlphaL(LuaPlus::LuaState* const state)
   return 1;
 }
 
+namespace moho
+{
+  /**
+   * One input window's pushed event handlers, detached while
+   * SuspendInputWindowEventHandlersAndFlushQueue() pumps the wx event queue
+   * empty, restored afterward in reverse pop order.
+   */
+  struct SuspendedInputWindowHandlers
+  {
+    wxWindowBase* topHandler = nullptr;  // first PopEventHandler() result
+    wxWindowBase* nextHandler = nullptr; // second PopEventHandler() result
+  };
+
+  /**
+   * Address: 0x0084DA80 (FUN_0084DA80, sub_84DA80)
+   *
+   * IDA signature:
+   * void sub_84DA80(void);
+   *
+   * What it does:
+   * For every window in `g_UIManager->mInputWindows` (IDA's decompiler
+   * mis-typed this field's pointee as `Moho::WRenViewport`; the byte offset
+   * it reads -- UI_Manager+0x38/+0x3C, i.e. this vector's start_/end_ lanes
+   * -- lands exactly on `CUIManager::mInputWindows`, a
+   * `gpg::fastvector_n<wxWindowBase*, 2>`, per CUIManager.h), pops that
+   * window's two topmost pushed event handlers (each window in this engine
+   * carries at most the MAUI input mapper plus one more), pumps the wx
+   * message queue empty via `wxTheApp->Pending()`/`Dispatch()` so raw wx
+   * events are processed without those handlers intercepting them, then
+   * pushes the two handlers back in reverse pop order (restoring the
+   * original front-to-back order, matching a real PushEventHandler/
+   * PopEventHandler stack).
+   */
+  void SuspendInputWindowEventHandlersAndFlushQueue()
+  {
+    std::vector<SuspendedInputWindowHandlers> suspended(g_UIManager->mInputWindows.size());
+
+    std::size_t index = 0;
+    for (wxWindowBase* const inputWindow : g_UIManager->mInputWindows) {
+      suspended[index].topHandler = inputWindow->PopEventHandler(false);
+      suspended[index].nextHandler = inputWindow->PopEventHandler(false);
+      ++index;
+    }
+
+    while (wxTheApp->Pending()) {
+      wxTheApp->Dispatch();
+    }
+
+    index = 0;
+    for (wxWindowBase* const inputWindow : g_UIManager->mInputWindows) {
+      inputWindow->PushEventHandler(suspended[index].nextHandler);
+      inputWindow->PushEventHandler(suspended[index].topHandler);
+      ++index;
+    }
+  }
+} // namespace moho
+
+/**
+ * Address: 0x0084E0F0 (FUN_0084E0F0, func_FlushEvents)
+ * Mangled: registered directly as `luadef_FlushEvents.mFunc`, matching
+ * `CScrLuaBinder::LuaFunction = int(__cdecl*)(lua_State*)`
+ *
+ * IDA signature:
+ * int __cdecl func_FlushEvents(lua_State *luaContext);
+ *
+ * IDA's decompiler labels the parameter `LuaPlus::LuaState *a1` and the body
+ * opens with `LuaPlus::LuaState::CastState((lua_State *)a1)` - but CastState
+ * itself takes a `lua_State*` and returns the `LuaPlus::LuaState*` wrapper
+ * (see its real signature, `?CastState@LuaState@LuaPlus@@SAPAV12@PAUlua_State@@@Z`),
+ * which is exactly what this project's `ResolveBindingState` does inline by
+ * reading `stateUserData`. So the true parameter is the raw `lua_State*` the
+ * Lua VM hands every registered `lua_CFunction` - matching
+ * `CScrLuaBinder::LuaFunction` exactly, and matching how
+ * `func_FlushEvents_LuaFuncDef` below already registers `&moho::func_FlushEvents`
+ * as that binder's raw C function.
+ *
+ * What it does:
+ * Rejects any argument (FlushEvents takes none), then when the UI manager is
+ * live, suspends each input window's pushed event handlers, pumps the wx
+ * event queue empty, and restores them
+ * (SuspendInputWindowEventHandlersAndFlushQueue / FUN_0084DA80).
+ */
+int moho::func_FlushEvents(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kFlushEventsHelpText, 0, argumentCount);
+  }
+
+  if (g_UIManager != nullptr) {
+    SuspendInputWindowEventHandlersAndFlushQueue();
+  }
+
+  return 0;
+}
+
 /**
  * Address: 0x0084E140 (FUN_0084E140, func_FlushEvents_LuaFuncDef)
  *
