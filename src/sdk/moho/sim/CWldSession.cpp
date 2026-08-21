@@ -5026,10 +5026,15 @@ namespace moho
   }
 
   /**
-   * The command-graph rebuild frontier: three bodies `CreateMeshes`'s chain
-   * calls that are analyzed but not yet recovered. They are declared here at
+   * The command-graph rebuild frontier: the one body `CreateMeshes`'s chain
+   * calls that is analyzed but not yet recovered. It is declared here at
    * namespace scope - deliberately NOT in an anonymous namespace - so that a
-   * link reports them by name instead of silently folding them away.
+   * link reports it by name instead of silently folding it away.
+   *
+   * Its two former neighbours, `EstimateEdgeTravelTicks` (0x00826C50) and
+   * `EstimateDrawNodeWorkTicks` (0x00826F10), are recovered; they keep a
+   * declaration here only because `ResolveDrawNodeCompletionTick` below calls
+   * them ahead of the anonymous-namespace helpers their bodies need.
    *
    * Address: 0x00826140 (FUN_00826140, sub_826140)
    *
@@ -5060,8 +5065,9 @@ namespace moho
    * endpoint centroids divided by the slowest speed among the units the command
    * targets (air units use `Air.MaxAirspeed`, everything else
    * `Physics.MaxSpeed`), at 10 ticks per second, rounded up. Returns 0 for
-   * command types that do not involve movement. Blocked on the weak-set
-   * iterator advance at 0x007B4D90, which has no recovered counterpart.
+   * command types that do not involve movement.
+   *
+   * Body below, after the anonymous-namespace helpers it uses.
    */
   [[nodiscard]] std::int32_t EstimateEdgeTravelTicks(const UICommandGraph::CommandGraphEdge& edge);
 
@@ -9917,6 +9923,118 @@ namespace moho
     }
 
   } // namespace
+
+  /**
+   * Ten sim ticks a second - the rate both order-graph estimators below convert
+   * their real-time answer into the tick numbers `ResolveDrawNodeCompletionTick`
+   * propagates. Folded into 0x00826C50 and 0x00826F10 as the literal 10.0f at
+   * `ds:dword_DFF31C`.
+   */
+  constexpr float kCommandGraphTicksPerSecond = 10.0f;
+
+  /**
+   * Address: 0x00826C50 (FUN_00826C50, sub_826C50)
+   *
+   * IDA signature:
+   * int __stdcall sub_826C50(Moho::UICommandGraph::CommandGraphEdge *edge);
+   *
+   * What it does: see the declaration above `RebuildCommandQueueNodes`.
+   *
+   * The edge takes its command from the order it leads *to*, not the one it
+   * leaves: 0x00826C79 pins `esi` to `edge+0x0C` (`mToNode`) and every later
+   * `[esi+4]` reads that node's helper head.
+   *
+   * The successor step inside the walk is the `map<EntId, WeakPtr<UserEntity>>`
+   * `_Inc` emission at 0x007B4D90 (carried on `msvc8::detail::rb_increment`).
+   * It is spelled with this file's `SSelectionSetUserEntity::Iterator_inc`
+   * shape, which is the same body over the same node type and matches the
+   * binary's `_Node**` out-parameter call at 0x00826DE8.
+   */
+  std::int32_t EstimateEdgeTravelTicks(const UICommandGraph::CommandGraphEdge& edge)
+  {
+    // Both endpoints accumulate a position *sum* plus a weight so several units
+    // sharing one queue average into a single anchor; each side divides by its
+    // own weight before the separation is taken.
+    const Wm3::Vector3f fromCentroid = DrawNodeCentroid(*edge.mFromNode);
+    const Wm3::Vector3f toCentroid = DrawNodeCentroid(*edge.mToNode);
+
+    const float deltaX = fromCentroid.x - toCentroid.x;
+    const float deltaY = fromCentroid.y - toCentroid.y;
+    const float deltaZ = fromCentroid.z - toCentroid.z;
+    const float distance = std::sqrt(((deltaX * deltaX) + (deltaY * deltaY)) + (deltaZ * deltaZ));
+
+    // Unguarded exactly as the binary is (0x00826CFB feeds `[esi+4]` straight
+    // into the type resolver): an edge only exists because `LinkCommandGraphEdge`
+    // published it from two draw nodes that already carry a helper.
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(edge.mToNode->mHelperLink.mHead);
+
+    switch (ResolveCommandIssueHelperCommandType(*helper)) {
+      case EUnitCommandType::UNITCOMMAND_Move:
+      case EUnitCommandType::UNITCOMMAND_FormMove:
+      case EUnitCommandType::UNITCOMMAND_BuildMobile:
+      case EUnitCommandType::UNITCOMMAND_Attack:
+      case EUnitCommandType::UNITCOMMAND_FormAttack:
+      case EUnitCommandType::UNITCOMMAND_Patrol:
+      case EUnitCommandType::UNITCOMMAND_FormPatrol:
+      case EUnitCommandType::UNITCOMMAND_AggressiveMove:
+      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove:
+        break;
+
+      default:
+        // Nothing else walks a unit across the map, so it costs no travel time.
+        // This is the binary's jump-table default at 0x00826D1A.
+        return 0;
+    }
+
+    SSelectionSetUserEntity* const targeted = ResolveCommandIssueCursorEntities(*helper);
+
+    // The walk runs over a pruned *copy* rather than the helper's live cache:
+    // the range constructor drops the source's tombstones as it reads, so the
+    // loop below never re-checks them. The guard's teardown is the binary's
+    // erase-range + `operator delete(mHead)` pair at 0x00826E6D/0x00826EC0,
+    // which runs on both the answered and the gave-up exit.
+    ScopedCopiedSelectionSet liveTargetsGuard{};
+    SSelectionSetUserEntity& liveTargets = liveTargetsGuard.get();
+    {
+      SSelectionNodeUserEntity* firstLive = nullptr;
+      (void)targeted->PruneTombstonesAndFindLive(&firstLive, targeted->mHead->mLeft);
+      (void)InitSelectionSetFromIteratorRangePruningSourceTombstones(
+        &liveTargets, targeted, firstLive, targeted->mHead
+      );
+    }
+
+    float slowestSpeed = std::numeric_limits<float>::max();
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)liveTargets.PruneTombstonesAndFindLive(&node, liveTargets.mHead->mLeft);
+    while (node != liveTargets.mHead) {
+      // Air units are held to their airspeed and everything else to its ground
+      // speed. A unit with no positive speed of either kind is skipped rather
+      // than making the whole orderline infinitely slow.
+      auto* const unit = static_cast<UserUnit*>(ResolveWeakEntitySetNodeEntity(*node));
+      const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
+      const float unitSpeed =
+        (blueprint->Air.CanFly != 0u) ? blueprint->Air.MaxAirspeed : blueprint->Physics.MaxSpeed;
+      if (unitSpeed > 0.0f && slowestSpeed > unitSpeed) {
+        slowestSpeed = unitSpeed;
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)liveTargets.PruneTombstonesAndFindLive(&node, node);
+    }
+
+    // A set with nothing movable in it leaves the seed untouched, and the
+    // binary re-tests both ends of the range before dividing by it.
+    if (slowestSpeed >= std::numeric_limits<float>::max() || slowestSpeed <= 0.0f) {
+      return 0;
+    }
+
+    // Rounded up: the binary spells the ceiling as `(int)rint(t) + (t > rint(t))`
+    // (0x00826E4C..0x00826E5F), which agrees with `ceil` on every finite value
+    // because the correction only fires when round-to-nearest went down.
+    return static_cast<std::int32_t>(
+      std::ceil((distance * kCommandGraphTicksPerSecond) / slowestSpeed)
+    );
+  }
 
   /**
    * Address: 0x00829B40 (FUN_00829B40, func_ProcessCommandDrag)
