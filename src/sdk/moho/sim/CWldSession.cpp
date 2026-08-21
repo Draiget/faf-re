@@ -782,68 +782,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00899880 (FUN_00899880, sub_899880)
-   *
-   * What it does:
-   * Acquires contiguous `UserArmy*` vector storage for `count` lanes and
-   * fills each lane with one caller-supplied pointer value.
-   */
-  bool InitializeUserArmyPointerVector(
-    msvc8::vector<moho::UserArmy*>& target,
-    const std::uint32_t count,
-    moho::UserArmy* const* const fillValueSlot
-  )
-  {
-    auto& runtime = msvc8::AsVectorRuntimeView(target);
-    runtime.begin = nullptr;
-    runtime.end = nullptr;
-    runtime.capacityEnd = nullptr;
-
-    if (count == 0u) {
-      return false;
-    }
-
-    constexpr std::uint32_t kElementWidth = static_cast<std::uint32_t>(sizeof(moho::UserArmy*));
-    if (count > (std::numeric_limits<std::uint32_t>::max() / kElementWidth)) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    auto* const begin = static_cast<moho::UserArmy**>(
-      ::operator new(static_cast<std::size_t>(count) * sizeof(moho::UserArmy*))
-    );
-    moho::UserArmy* const fillValue = (fillValueSlot != nullptr) ? *fillValueSlot : nullptr;
-    for (std::uint32_t index = 0u; index < count; ++index) {
-      begin[index] = fillValue;
-    }
-
-    runtime.begin = begin;
-    runtime.end = begin + count;
-    runtime.capacityEnd = begin + count;
-    return true;
-  }
-
-  /**
-   * Address: 0x00898EC0 (FUN_00898EC0)
-   *
-   * What it does:
-   * Adapter lane that initializes one `vector<UserArmy*>` storage with
-   * `count` entries and a null fill value, then returns the destination vector
-   * pointer for chaining.
-   */
-  [[nodiscard]] msvc8::vector<moho::UserArmy*>* InitializeUserArmyPointerVectorNullFillAdapter(
-    msvc8::vector<moho::UserArmy*>* const target,
-    const std::uint32_t count
-  )
-  {
-    if (target == nullptr) {
-      return target;
-    }
-
-    moho::UserArmy* fillValue = nullptr;
-    (void)InitializeUserArmyPointerVector(*target, count, &fillValue);
-    return target;
-  }
 } // namespace
 
 // Defined at file scope (global namespace, external linkage) in
@@ -2887,8 +2825,9 @@ namespace moho
         return 0;
       }
 
-      const auto& runtime = msvc8::AsVectorRuntimeView(*callbacks);
-      std::intptr_t result = reinterpret_cast<std::intptr_t>(runtime.begin);
+      // The binary's return register still holds `_Myfirst` when the callback
+      // list is empty, so that is the seed value here.
+      std::intptr_t result = reinterpret_cast<std::intptr_t>(callbacks->data());
 
       const std::size_t callbackCount = callbacks->size();
       for (std::size_t i = 0; i < callbackCount; ++i) {
@@ -11409,10 +11348,10 @@ namespace moho
       // and every consumer indexes it the same way - `cfunc_IsObserverL`
       // dereferences `userArmies[FocusArmy]` the moment the in-game UI asks
       // whether the local player is an observer.
-      (void)InitializeUserArmyPointerVectorNullFillAdapter(
-        &userArmies,
-        static_cast<std::uint32_t>(launchInfo->mArmyLaunchInfo.size())
-      );
+      // FUN_00899880 / FUN_00898EC0 are the two halves of
+      // msvc8::vector<UserArmy*>::assign(count, nullptr) -- see the address
+      // block on that member in legacy/containers/Vector.h.
+      userArmies.assign(launchInfo->mArmyLaunchInfo.size(), nullptr);
 
       // Command sources and the focus army come off the same launch info.
       (void)CopyConstructCommandSourceVector(launchInfo->mCommandSources.mSrcs, &cmdSources);
@@ -16606,32 +16545,17 @@ namespace moho
     return DoTeardownCallbacks(callbacks);
   }
 
-  namespace
-  {
-    void ResetWldTeardownCallbackVectorTail()
-    {
-      auto& runtime = msvc8::AsVectorRuntimeView(gWldTeardownCallbacks);
-      runtime.end = nullptr;
-      runtime.capacityEnd = nullptr;
-    }
-  } // namespace
-
   /**
    * Address: 0x00869A80 (FUN_00869A80)
    *
    * What it does:
    * Releases global world-session teardown-callback vector storage and rewires
-   * all three storage lanes (`begin/end/capacityEnd`) to null.
+   * all three storage lanes to null -- VC8's `vector<T>::_Tidy()`, which is
+   * what move-assigning an empty vector compiles to.
    */
   void WLD_ResetOnTeardownCallbackStorage()
   {
-    auto& runtime = msvc8::AsVectorRuntimeView(gWldTeardownCallbacks);
-    if (runtime.begin != nullptr) {
-      ::operator delete(runtime.begin);
-    }
-
-    runtime.begin = nullptr;
-    ResetWldTeardownCallbackVectorTail();
+    gWldTeardownCallbacks = WldTeardownCallbackVector{};
   }
 
   /**
