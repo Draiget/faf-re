@@ -226,24 +226,9 @@ namespace
     const std::size_t requestedCount
   )
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentCount = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-
-    if (requestedCount < currentCount) {
-      if (view.begin && view.end) {
-        moho::SAniSkelBone* const eraseBegin = view.begin + requestedCount;
-        for (moho::SAniSkelBone* cursor = eraseBegin; cursor != view.end; ++cursor) {
-          cursor->~SAniSkelBone();
-        }
-        view.end = eraseBegin;
-      }
-      return requestedCount;
-    }
-
-    if (requestedCount > currentCount) {
-      storage.resize(requestedCount);
-    }
-
+    // Both arms are resize(): shrink destroys the surplus tail and rebases
+    // mLast, grow value-initialises the new slots.
+    storage.resize(requestedCount);
     return requestedCount;
   }
 
@@ -275,20 +260,9 @@ namespace
     const moho::SAniSkelBoneNameIndex& fillValue
   )
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentCount = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-
-    if (requestedCount < currentCount) {
-      if (view.begin) {
-        view.end = view.begin + requestedCount;
-      }
-      return requestedCount;
-    }
-
-    if (requestedCount > currentCount) {
-      storage.resize(requestedCount, fillValue);
-    }
-
+    // Both arms are resize(n, val). SAniSkelBoneNameIndex is trivially
+    // destructible, which is why the binary's shrink is a bare mLast rebase.
+    storage.resize(requestedCount, fillValue);
     return requestedCount;
   }
 
