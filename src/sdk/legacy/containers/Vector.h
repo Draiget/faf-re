@@ -1966,6 +1966,12 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x008555E0 (FUN_008555E0,
+         * msvc8::vector<boost::shared_ptr<T>>::erase(first, last) -- move-assigns
+         * the surviving tail forward over the erased slots, releases the
+         * now-orphan trailing control blocks, and rewinds mLast. Returns
+         * `first`, the MSVC iterator-after-erase contract. Reached from
+         * `CUIWorldViewBuildDragRuntimeView::ClearBuildPreviewCache`.)
          * Address: 0x005C6F00 (FUN_005C6F00,
          * msvc8::vector<Moho::SPerArmyReconInfo>::erase(first, last) for the
          * 52-byte element -- copy-assigns the `[last, mLast)` tail down over the

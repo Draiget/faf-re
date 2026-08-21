@@ -4027,24 +4027,6 @@ namespace boost
         SharedCountPair* end
     ) noexcept;
 
-    /**
-     * Address: 0x008555E0 (FUN_008555E0)
-     *
-     * What it does:
-     * Erases the half-open range `[eraseFirst, eraseLast)` from a vector of
-     * shared-pair lanes whose live tail ends at `*pLast`. Surviving entries in
-     * `[eraseLast, *pLast)` are move-assigned forward into `[eraseFirst, ...)`
-     * with retain-then-release control-block bookkeeping; the now-orphan tail
-     * pairs are released, and `*pLast` is rewound to the new live end. Returns
-     * the iterator pointing at the first erased slot (`eraseFirst`), matching
-     * `std::vector<T>::erase(first, last)` semantics.
-     */
-    SharedCountPair* EraseSharedPairVectorRange(
-        SharedCountPair** pLast,
-        SharedCountPair* eraseFirst,
-        SharedCountPair* eraseLast
-    ) noexcept;
-
     template <class T>
     [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedBorrow(const boost::shared_ptr<T>& source) noexcept
     {
