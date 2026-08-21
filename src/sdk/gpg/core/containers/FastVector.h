@@ -1505,6 +1505,20 @@ namespace gpg::core
     /**
      * Copy 'count' elements from raw memory; expand to exact-fit heap if count > N
      */
+    /**
+     * Address: 0x00577220 (FUN_00577220, the `SFormationScriptSlot`
+     * instantiation. It copies the incoming range forward through 0x005774B0
+     * -- one of the twins cited on `CopyRangeForward` -- then hands the old
+     * range to `ReleaseFormationScriptSlotCategoryStorage` (0x00570390) to
+     * free each slot's category word lane, and only then rebases `end_`.
+     *
+     * The destroy-after-copy order matters and is why this is one body rather
+     * than two: the source range may alias the destination when a vector is
+     * rebound to its own inline buffer, so the old slots cannot be released
+     * until their contents have been read out.
+     *
+     * Reached only from `ResetFrom` (0x00576F10).
+     */
     void CopyFromRaw_(const T* src, size_t count)
     {
       if (count == 0 || src == nullptr) {
