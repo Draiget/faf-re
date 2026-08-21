@@ -561,6 +561,12 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x00762120 (FUN_00762120,
+     * gpg::fastvector<Moho::SAudioRequest>::Resize -- shrink rebases mLast,
+     * grow ensures capacity then fills the appended slots in place)
+     * Address: 0x0063C700 (FUN_0063C700, the
+     * gpg::fastvector<Moho::SAniManipBinding> emission of the same)
+     *
      * Resizes the logical element count, growing storage when needed and
      * filling appended slots with `fill`.
      *

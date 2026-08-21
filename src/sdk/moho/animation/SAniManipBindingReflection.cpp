@@ -328,50 +328,6 @@ namespace
   }
 
   /**
-   * Address: 0x0063C700 (FUN_0063C700, sub_63C700)
-   *
-   * What it does:
-   * Resizes one `fastvector<SAniManipBinding>` runtime view to `requestedCount`
-   * and fills appended lanes from `fillValue`.
-   */
-  [[maybe_unused]] unsigned int ResizeFastVectorSAniManipBindingFill(
-    const unsigned int requestedCount,
-    const moho::SAniManipBinding* const fillValue,
-    gpg::fastvector_runtime_view<moho::SAniManipBinding>& view
-  )
-  {
-    moho::SAniManipBinding* const begin = view.begin;
-    const unsigned int currentCount = begin ? static_cast<unsigned int>(view.end - begin) : 0u;
-    if (requestedCount < currentCount) {
-      moho::SAniManipBinding* const newEnd = begin + requestedCount;
-      if (newEnd != view.end) {
-        view.end = newEnd;
-      }
-      return currentCount;
-    }
-
-    if (requestedCount > currentCount) {
-      const unsigned int currentCapacity = begin ? static_cast<unsigned int>(view.capacityEnd - begin) : 0u;
-      const moho::SAniManipBinding fill = fillValue ? *fillValue : moho::SAniManipBinding{};
-      if (requestedCount > currentCapacity) {
-        gpg::FastVectorRuntimeResizeFill(&fill, requestedCount, view);
-        return requestedCount;
-      }
-
-      moho::SAniManipBinding* const targetEnd = view.begin + requestedCount;
-      while (view.end != targetEnd) {
-        moho::SAniManipBinding* const slot = view.end;
-        view.end = slot + 1;
-        if (slot) {
-          *slot = fill;
-        }
-      }
-    }
-
-    return requestedCount;
-  }
-
-  /**
    * Address: 0x0063C7A0 (FUN_0063C7A0, gpg::RFastVectorType_SAniManipBinding::SerLoad)
    *
    * What it does:
@@ -386,14 +342,14 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAniManipBinding>*>(objectPtr);
     moho::SAniManipBinding fill{};
-    ResizeFastVectorSAniManipBindingFill(count, &fill, view);
+    vec.Resize(static_cast<std::size_t>(count), fill);
 
     gpg::RType* const elementType = CachedSAniManipBindingType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &view.begin[i], owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -409,14 +365,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAniManipBinding>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = CachedSAniManipBindingType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &view.begin[i], owner);
+      archive->Write(elementType, &vec[i], owner);
     }
   }
 } // namespace
@@ -644,12 +600,12 @@ namespace gpg
       return out;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(obj);
-    if (!view.begin || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+    auto& vec = *static_cast<gpg::fastvector<moho::SAniManipBinding>*>(obj);
+    if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
 
-    out.mObj = view.begin + ind;
+    out.mObj = vec.Data() + ind;
     return out;
   }
 
@@ -659,12 +615,12 @@ namespace gpg
       return 0u;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(obj);
-    if (!view.begin) {
+    auto& vec = *static_cast<gpg::fastvector<moho::SAniManipBinding>*>(obj);
+    if (vec.Data() == nullptr) {
       return 0u;
     }
 
-    return static_cast<std::size_t>(view.end - view.begin);
+    return vec.size();
   }
 
   void RFastVectorType<moho::SAniManipBinding>::SetCount(void* obj, const int count) const
@@ -673,9 +629,9 @@ namespace gpg
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAniManipBinding>(obj);
+    auto& vec = *static_cast<gpg::fastvector<moho::SAniManipBinding>*>(obj);
     moho::SAniManipBinding fill{};
-    ResizeFastVectorSAniManipBindingFill(static_cast<unsigned int>(count), &fill, view);
+    vec.Resize(static_cast<std::size_t>(count), fill);
   }
 } // namespace gpg
 
