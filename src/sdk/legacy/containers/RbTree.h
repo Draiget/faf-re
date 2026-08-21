@@ -120,6 +120,11 @@ namespace msvc8
         /**
          * Address: 0x0094F090 (FUN_0094F090, std::map<gpg::RType*,int>::iterator _Inc)
          * Address: 0x007E42F0 (FUN_007E42F0, `_Inc` for the mesh batch-bucket map)
+         * Address: 0x007B4D90 (FUN_007B4D90, `_Inc` for the
+         * `map<EntId, WeakPtr<UserEntity>>`-shaped weak-entity-set node walk --
+         * reached from `Moho::UICommandGraph`'s edge-travel-time and
+         * draw-node-work-time estimators (CWldSession.cpp) when they iterate a
+         * command's targeted `WeakSet<UserEntity>`/`SSelectionSetUserEntity`)
          *
          * IDA signature:
          * _Node *__thiscall operator(_Node **this);
@@ -354,6 +359,19 @@ namespace msvc8
 
             // ---- lifetime ----------------------------------------------------
 
+            /**
+             * Address: 0x007E2C30 (FUN_007E2C30, batch-bucket map `_Tree::_Init`)
+             *
+             * What it does:
+             * Buys the header sentinel, marks it nil, self-links its three
+             * pointers and zeroes the size.
+             *
+             * The shipped body is exactly this ctor with `buy_head` split out:
+             * `call sub_7E4B80` (the head-node allocator) then
+             * `mov [esi+4], eax` / `mov byte ptr [eax+2Dh], 1` (`_Isnil`) /
+             * `[eax+4] = eax` / `[eax] = eax` / `[eax+8] = eax` /
+             * `mov dword ptr [esi+8], 0`.
+             */
             rb_tree() : proxy_(nullptr), head_(buy_head()), size_(0) {}
 
             explicit rb_tree(const key_compare& comp) : carrier(comp), proxy_(nullptr), head_(buy_head()), size_(0) {}
@@ -402,6 +420,18 @@ namespace msvc8
                 return *this;
             }
 
+            /**
+             * Address: 0x007E2B20 (FUN_007E2B20, batch-bucket map `_Tree::_Tidy`)
+             *
+             * What it does:
+             * Erases every element, releases the header sentinel and clears the
+             * header/size lanes.
+             *
+             * Matches the shipped body: `erase(begin, end)` through
+             * `call sub_7E3B70` with `head->left` and `head` pushed as the
+             * range, then `operator delete(head)` and
+             * `[edi+4] = 0` / `[edi+8] = 0`.
+             */
             ~rb_tree()
             {
                 clear();
@@ -700,7 +730,17 @@ namespace msvc8
                 return next;
             }
 
-            /** Destroys every element and restores the empty header links. */
+            /**
+             * Address: 0x007E2D90 (FUN_007E2D90, batch-bucket map `_Tree::clear`)
+             *
+             * What it does:
+             * Destroys every element and restores the empty header links.
+             *
+             * The shipped body reads the root as `[[esi+4]+4]`, hands it to the
+             * recursive `_Erase` walk (`call sub_7E34E0`) and then relinks
+             * `head->parent = head` / `head->left = head` / `head->right = head`
+             * with `[esi+8] = 0`. It returns nothing.
+             */
             void clear() noexcept
             {
                 destroy_subtree(root());
@@ -726,6 +766,19 @@ namespace msvc8
 
             [[noreturn]] static void throw_too_long() { throw std::length_error("map/set<T> too long"); }
 
+            /**
+             * Address: 0x007E5740 (FUN_007E5740, batch-bucket map `allocator<_Node>::allocate`)
+             *
+             * What it does:
+             * Allocates storage for `n` nodes, rejecting counts that would
+             * overflow the byte size.
+             *
+             * The shipped body is the MSVC8 allocator: `0xFFFFFFFF / n`
+             * compared against `0x30` (the batch-bucket node size), throwing
+             * `std::bad_alloc` when the count does not fit, then
+             * `lea edx,[ecx+ecx*2] / shl edx,4` (n * 0x30) into `operator new`.
+             * This is a *sizing* helper, not a second `_Buynode` emission.
+             */
             [[nodiscard]] static node_type* alloc_raw()
             {
                 return static_cast<node_type*>(::operator new(sizeof(node_type)));
@@ -760,13 +813,24 @@ namespace msvc8
 
             /**
              * Address: 0x007E4BC0 (FUN_007E4BC0, batch-bucket map `_Buynode`)
-             * Address: 0x007E5070 (FUN_007E5070, sibling `_Buynode` emission)
-             * Address: 0x007E5740 (FUN_007E5740, sibling `_Buynode` emission)
              *
              * What it does:
              * Allocates one node, links both children to the header, marks it red
              * and non-nil, then copy/emplace-constructs the value payload,
              * releasing the storage again if that construction throws.
+             *
+             * The shipped body pins the node layout field for field:
+             * `call sub_7E5740` (the node allocator, `alloc_raw` above) then
+             * `[esi] = arg_0` (`_Left`), `[esi+4] = arg_4` (`_Parent`),
+             * `[esi+8] = arg_8` (`_Right`), `lea ecx,[esi+0Ch]` for the payload
+             * copy (`call sub_7E5070`, the `std::pair` copy constructor - see
+             * `MeshBatchBucket` in moho/mesh/MeshBatchKey.h), `[esi+2Ch] = 0`
+             * (`_Color` = red) and `[esi+2Dh] = 0` (`_Isnil`). It cleans four
+             * stack arguments (`retn 10h`).
+             *
+             * 0x007E5070 and 0x007E5740 are *not* sibling `_Buynode` emissions,
+             * as this block used to claim: they are the value copy constructor
+             * and the node allocator this function calls.
              */
             template<class... Args>
             [[nodiscard]] node_type* buy_node(Args&&... args)

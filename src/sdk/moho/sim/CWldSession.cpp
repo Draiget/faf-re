@@ -1,5 +1,7 @@
 #include "CWldSession.h"
 
+#include "legacy/algorithms/Sort.h"
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -89,6 +91,8 @@
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/ui/CUIManager.h"
 #include "moho/unit/core/EFireStateTypeInfo.h"
+#include "moho/ai/CAiFormationInstance.h"
+#include "moho/math/MathReflection.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
@@ -102,19 +106,39 @@ namespace
 {
   static_assert(sizeof(moho::WeakObject::WeakLinkNodeView) == 0x8, "WeakLinkNodeView size must be 0x8");
 
-  struct FormationPreviewSharedPairRuntimeView
+  /**
+   * One formation-placement ghost: the preview mesh `MeshRenderer` handed back
+   * and the "UnitFormationPreview" material it was shaded with.
+   *
+   * The implicit destructor is the binary's FUN_00859E90 - it drops the
+   * last-declared member first (`mMaterial`, then `mMesh`), which is exactly
+   * what MSVC emits for this member order. No source line spells it out.
+   */
+  struct FormationPreviewSharedPair
   {
-    boost::shared_ptr<void> primaryRuntime;
-    boost::shared_ptr<void> secondaryRuntime;
+    boost::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
+    boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
   };
-  static_assert(
-    sizeof(FormationPreviewSharedPairRuntimeView) == 0x10,
-    "FormationPreviewSharedPairRuntimeView size must be 0x10"
-  );
+  static_assert(sizeof(FormationPreviewSharedPair) == 0x10, "FormationPreviewSharedPair size must be 0x10");
 
-  FormationPreviewSharedPairRuntimeView* gFormationPreviewSharedPairsBegin = nullptr;
-  FormationPreviewSharedPairRuntimeView* gFormationPreviewSharedPairsEnd = nullptr;
-  std::uintptr_t gFormationPreviewSharedPairsOwnerLane = 0u;
+  /**
+   * Session-global ghost list for the formation-placement preview.
+   *
+   * This is one plain `msvc8::vector` parked at 0x010C4258, not the three loose
+   * pointer globals an earlier pass modelled:
+   *   myProxy_ +0x00 -> 0x010C4258   first_ +0x04 -> 0x010C425C
+   *   last_    +0x08 -> 0x010C4260   end_   +0x0C -> 0x010C4264
+   *
+   * That the container head is 0x010C4258 is settled by FUN_0085A280 and
+   * FUN_0085A630: both are a bare `mov eax, offset 0x010C4258; retn`, i.e.
+   * they hand back the container itself. FUN_00859F70 pins the 0x10-byte
+   * element width - it derives both size and capacity by `sar ..., 4` over the
+   * same three lanes.
+   *
+   * `CWldSession::RenderMeshPreviews` (0x008599D0) is the only writer: it
+   * clears the vector at the top of every frame and repopulates it.
+   */
+  msvc8::vector<FormationPreviewSharedPair> gFormationPreviews;
 
   // `StrategicIconAuxView` (the real type) and `gStrategicIconAuxiliary`
   // live in the `moho`-scoped anonymous namespace alongside the type's
@@ -244,7 +268,7 @@ namespace
     std::uintptr_t* const outValue
   ) noexcept
   {
-    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviewSharedPairsBegin);
+    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviews.begin());
     return outValue;
   }
 
@@ -259,7 +283,7 @@ namespace
     std::uintptr_t* const outValue
   ) noexcept
   {
-    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviewSharedPairsEnd);
+    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviews.end());
     return outValue;
   }
 
@@ -272,33 +296,36 @@ namespace
    */
   [[nodiscard]] std::int32_t GetFormationPreviewSharedPairCountLane() noexcept
   {
-    if (gFormationPreviewSharedPairsBegin == nullptr) {
+    if (gFormationPreviews.begin() == nullptr) {
       return 0;
     }
 
-    return static_cast<std::int32_t>(gFormationPreviewSharedPairsEnd - gFormationPreviewSharedPairsBegin);
+    return static_cast<std::int32_t>(gFormationPreviews.end() - gFormationPreviews.begin());
   }
 
   /**
    * Address: 0x0085A280 (FUN_0085A280)
    *
    * What it does:
-   * Returns the formation-preview shared-pair owner lane slot.
+   * Hands back the formation-preview container itself (`mov eax, offset
+   * 0x010C4258; retn 4`) - the address of `gFormationPreviews`, not of some
+   * separate owner word.
    */
   [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLanePrimary(const int /*unused*/) noexcept
   {
-    return &gFormationPreviewSharedPairsOwnerLane;
+    return &gFormationPreviews;
   }
 
   /**
    * Address: 0x0085A630 (FUN_0085A630)
    *
    * What it does:
-   * Secondary entrypoint returning the formation-preview shared-pair owner lane.
+   * Secondary entrypoint for the same thing (`mov eax, offset 0x010C4258;
+   * retn`) - the formation-preview container's own address.
    */
   [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLaneSecondary() noexcept
   {
-    return &gFormationPreviewSharedPairsOwnerLane;
+    return &gFormationPreviews;
   }
 
   /**
@@ -615,142 +642,20 @@ namespace
     return UnlinkSessionSaveDataSerializerHelperNode();
   }
 
-  /**
-   * Address: 0x00859E90 (FUN_00859E90)
-   *
-   * What it does:
-   * Releases one formation-preview shared-pair payload by dropping both
-   * retained shared ownership lanes.
-   */
-  void ReleaseFormationPreviewSharedPairRuntime(
-    FormationPreviewSharedPairRuntimeView* const sharedPair
-  ) noexcept
-  {
-    if (sharedPair == nullptr) {
-      return;
-    }
-
-    sharedPair->secondaryRuntime.~shared_ptr();
-    sharedPair->primaryRuntime.~shared_ptr();
-  }
-
-  /**
-   * Address: 0x0085A1D0 (FUN_0085A1D0)
-   *
-   * What it does:
-   * Releases every formation-preview shared-pair payload in one contiguous
-   * range `[beginPair, endPair)`.
-   */
-  void ReleaseFormationPreviewSharedPairRangeForward(
-    FormationPreviewSharedPairRuntimeView* const beginPair,
-    FormationPreviewSharedPairRuntimeView* const endPair
-  ) noexcept
-  {
-    for (FormationPreviewSharedPairRuntimeView* cursor = beginPair; cursor != endPair; ++cursor) {
-      ReleaseFormationPreviewSharedPairRuntime(cursor);
-    }
-  }
-
-  /**
-   * What it does:
-   * Move-assigns one formation-preview shared-pair entry from `src` to `dst`.
-   * Inlined from FUN_0085A9F0: copies `primaryRuntime` by bumping its use-count
-   * atomically, calls `weak_release` on the previous `dst.secondaryRuntime`
-   * slot before overwriting, then byte-copies the vtable and back-pointer lanes
-   * that follow the shared-pair header so the destination observes the exact
-   * same owner graph as the source.
-   */
-  void AssignFormationPreviewSharedPairSlotRuntime(
-    FormationPreviewSharedPairRuntimeView* const dst,
-    FormationPreviewSharedPairRuntimeView* const src
-  ) noexcept
-  {
-    if (dst == nullptr || src == nullptr) {
-      return;
-    }
-
-    dst->primaryRuntime = src->primaryRuntime;
-    dst->secondaryRuntime = src->secondaryRuntime;
-  }
-
-  /**
-   * Address: 0x0085A130 (FUN_0085A130)
-   *
-   * IDA signature:
-   * int *__stdcall sub_85A130(int *outFirst, int *first, int *last);
-   *
-   * What it does:
-   * Erases the contiguous slice `[first, last)` from the global formation-
-   * preview shared-pair vector (`0x010C425C..0x010C4260`) using the classic
-   * `std::vector::erase` shape:
-   *   1) Slide `[last, gEnd)` forward into `[first, ...)` via per-slot shared
-   *      assignment (FUN_0085A9F0), producing a new end at `first + (gEnd - last)`.
-   *   2) Destroy each retired entry in `[new_end, old_gEnd)` via the
-   *      shared-pair payload teardown helper (FUN_00859E90).
-   *   3) Rebind the global end to `new_end` and return the erase origin
-   *      through `*outFirst` so callers can resume iteration.
-   */
-  FormationPreviewSharedPairRuntimeView** EraseFormationPreviewSharedPairRange(
-    FormationPreviewSharedPairRuntimeView** const outFirstIterator,
-    FormationPreviewSharedPairRuntimeView* const first,
-    FormationPreviewSharedPairRuntimeView* const last
-  ) noexcept
-  {
-    if (first != last) {
-      FormationPreviewSharedPairRuntimeView* source = last;
-      FormationPreviewSharedPairRuntimeView* destination = first;
-
-      // Step 1: shift the tail `[last, gEnd)` down onto `[first, ...)`.
-      FormationPreviewSharedPairRuntimeView* originalEnd = gFormationPreviewSharedPairsEnd;
-      if (source != originalEnd) {
-        do {
-          AssignFormationPreviewSharedPairSlotRuntime(destination, source);
-          ++source;
-          ++destination;
-        } while (source != originalEnd);
-        originalEnd = gFormationPreviewSharedPairsEnd;
-      }
-
-      // Step 2: destroy retired entries `[new_end, old_gEnd)`.
-      FormationPreviewSharedPairRuntimeView* const newEnd = destination;
-      for (FormationPreviewSharedPairRuntimeView* cursor = newEnd; cursor != originalEnd; ++cursor) {
-        ReleaseFormationPreviewSharedPairRuntime(cursor);
-      }
-
-      // Step 3: rebind the global end to the new end.
-      gFormationPreviewSharedPairsEnd = newEnd;
-    }
-
-    if (outFirstIterator != nullptr) {
-      *outFirstIterator = first;
-    }
-    return outFirstIterator;
-  }
-
-  /**
-   * Address: 0x00859FE0 (FUN_00859FE0)
-   *
-   * What it does:
-   * Releases one tail entry from the formation-preview shared-pair container
-   * (`0x010C425C..0x010C4260`) and rewinds the active end pointer.
-   */
-  std::uintptr_t ReleaseOneFormationPreviewSharedPairFromTailRuntime() noexcept
-  {
-    std::uintptr_t result = 0u;
-    if (gFormationPreviewSharedPairsBegin == nullptr) {
-      return result;
-    }
-
-    result = reinterpret_cast<std::uintptr_t>(gFormationPreviewSharedPairsEnd);
-    if (gFormationPreviewSharedPairsEnd > gFormationPreviewSharedPairsBegin) {
-      FormationPreviewSharedPairRuntimeView* const tailEntry = gFormationPreviewSharedPairsEnd - 1;
-      ReleaseFormationPreviewSharedPairRuntime(tailEntry);
-      gFormationPreviewSharedPairsEnd = tailEntry;
-      result = reinterpret_cast<std::uintptr_t>(tailEntry);
-    }
-    return result;
-  }
-
+  // The formation-preview container emissions used to live here as one
+  // hand-written free function per operation. They are `msvc8::vector`
+  // members, so the addresses now sit on the template in
+  // `legacy/containers/Vector.h` and the call sites just use the container:
+  //
+  //   FUN_00859E90  ~FormationPreviewSharedPair (implicit, member order)
+  //   FUN_0085A1D0  destroy_range
+  //   FUN_0085A9F0  copy_or_move_assign, one slot
+  //   FUN_0085A130  erase, first..last
+  //   FUN_00859FE0  pop_back
+  //   FUN_00859F70  push_back
+  //   FUN_0085A920  uninit_fill_n / in-place construct, push_back fast path
+  //   FUN_0085A0E0  reallocate_to + insert, push_back grow path
+  //
   void LinkCursorInfoWeakOwnerRef(moho::MouseInfo& info) noexcept
   {
     moho::WeakObject::WeakLinkNodeView* const self =
@@ -1332,6 +1237,14 @@ namespace moho
   float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
   float ui_MaxTextLOD = 0.0f;                  // 0x00F57CCC
   std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
+
+  /**
+   * Degenerate-length cutoff `RecomputeDrawNodeOrientation` compares its summed
+   * edge direction against before normalizing (`flt_D71BFC`, loaded at
+   * 0x00827979). Below it the node keeps a zero orientation hint rather than
+   * normalizing noise into an arbitrary direction.
+   */
+  constexpr float kCommandGraphOrientationEpsilon = 1.0e-6f;
   float ui_MinWaypointSize = 0.0f;             // 0x00F57CD4
   float ui_MaxWaypointSize = 0.0f;             // 0x00F57CD8
   float ui_WaypointLineScale = 0.0f;           // 0x00F57CDC
@@ -1475,6 +1388,48 @@ namespace moho
     {
       CommandGraphHelperHead* mHead; // +0x00
       CommandGraphHelperLink* mNext; // +0x04
+
+      /**
+       * Splices this link out of whichever command's chain currently holds it.
+       *
+       * The chain is threaded pointer-to-pointer, so the only way to find the
+       * slot that refers to this link is to walk from the head. The leading
+       * null test is not redundant bookkeeping on our side - the binary really
+       * does re-test the head at every unlink site (0x00826568 in the draw-node
+       * destructor, 0x00829041 in `CreateMeshes`), because a node whose command
+       * has already been retired carries a null head.
+       *
+       * Leaves `mHead`/`mNext` untouched: every caller either overwrites them
+       * immediately via `LinkInto` or is destroying the node.
+       */
+      void UnlinkFromChain() noexcept
+      {
+        if (mHead == nullptr) {
+          return;
+        }
+
+        CommandGraphHelperLink** slot = &mHead->mFirst;
+        while (*slot != this) {
+          slot = &(*slot)->mNext;
+        }
+        *slot = mNext;
+      }
+
+      /**
+       * Publishes this link at the front of `head`'s chain, or clears it when
+       * `head` is null. Matches 0x0082905E..0x0082906D and the identical block
+       * the draw-node relocate helper runs at 0x0082D54B.
+       */
+      void LinkInto(CommandGraphHelperHead* const head) noexcept
+      {
+        mHead = head;
+        if (head != nullptr) {
+          mNext = head->mFirst;
+          head->mFirst = this;
+        } else {
+          mNext = nullptr;
+        }
+      }
     };
 
     struct CommandGraphHelperHead
@@ -1510,6 +1465,25 @@ namespace moho
           mCapacity = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*mInlineOrigin));
         }
         mEnd = mBegin;
+      }
+
+      [[nodiscard]] std::int32_t size() const noexcept
+      {
+        return static_cast<std::int32_t>(mEnd - mBegin);
+      }
+
+      [[nodiscard]] bool empty() const noexcept { return mEnd == mBegin; }
+
+      /**
+       * Every lane in this class stores pointers, so the raw dword element is
+       * always read back as one. The cast lives here rather than at the call
+       * sites: the lane's storage is dword-shaped because that is the binary's
+       * `gpg::fastvector` instantiation, not because callers think in dwords.
+       */
+      template <typename T>
+      [[nodiscard]] T* At(const std::int32_t index) const noexcept
+      {
+        return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBegin[index]));
       }
     };
 
@@ -1552,8 +1526,20 @@ namespace moho
        */
       Wm3::Vector3f mOrientationHint;      // +0x28
       Wm3::Vector3f mPreviousCentroid;     // +0x34
-      float field_0x40;                    // +0x40
-      std::uint32_t field_0x44;            // +0x44
+      /**
+       * Render scale driven by how busy the node is: `RecomputeDrawNodeOrientation`
+       * sets it to `sqrt(units on the busier edge lane)`, and the waypoint and
+       * ETA-label passes multiply their style scale by it. Was `field_0x40`
+       * until 0x008275B0's write at 0x008279E8 pinned the meaning.
+       */
+      float mUnitCountScale;               // +0x40
+      /**
+       * The game tick this order is estimated to finish on, propagated through
+       * the edge graph by `ResolveDrawNodeCompletionTick`. `DisplayCommandNode`
+       * subtracts the current tick from it to render "ETA: mm:ss". Was
+       * `field_0x44` until 0x008272A0's write at 0x008272E0 pinned the meaning.
+       */
+      std::uint32_t mCompletionTick;       // +0x44
       CommandGraphDwordLane mLaneA;        // +0x48
       CommandGraphDwordLane mLaneB;        // +0x60
 
@@ -2017,8 +2003,123 @@ namespace moho
 
     /**
      * Address: 0x00828FB0 (FUN_00828FB0, Moho::UICommandGraph::CreateMeshes)
+     *
+     * IDA signature:
+     * void callcnv_33 Moho::UICommandGraph::CreateMeshes(Moho::UICommandGraph *a1);
+     *
+     * What it does:
+     * The command graph's once-per-frame build pass. When the graph is dirty it
+     * rebuilds every queued-order node and edge from the live command queues and
+     * recomputes each node's orderline orientation. It then re-binds every
+     * draw node to whichever command-issue helper currently owns its command id
+     * (commands retire and are re-issued between frames, so the intrusive chain
+     * has to be re-pointed), seeding a node's world anchor from the helper's
+     * command history the first time that node resolves. On a rebuild frame it
+     * additionally propagates completion-tick estimates through the edge graph
+     * and creates the translucent "UnitPlace" preview mesh for mobile-build
+     * orders. Finally it drives the console path-preview overlay.
      */
     void CreateMeshes();
+
+    /**
+     * Address: 0x00826740 (FUN_00826740, sub_826740)
+     *
+     * IDA signature:
+     * void __thiscall sub_826740(Moho::UICommandGraph *this);
+     *
+     * What it does:
+     * Rebuilds the whole command-graph node/edge set from scratch. Resets the
+     * per-frame containers, collects every mesh-bearing entity in the session's
+     * spatial database, and folds each significant unit's command queue into
+     * the graph - plus the separate factory build queue for stationary
+     * factories.
+     */
+    void RebuildCommandQueueNodes();
+
+    /**
+     * Address: 0x00826000 (FUN_00826000, sub_826000)
+     *
+     * IDA signature:
+     * void __usercall sub_826000(Moho::UICommandGraph *this@<edi>);
+     *
+     * What it does:
+     * Clears everything a rebuild pass regenerates: the edge hash table and its
+     * buckets, the texture-keyed orderline tree, and both draw-node tables' edge
+     * lanes. Queue-head nodes (`mMapAB1`) additionally have their accumulated
+     * centroid and weight zeroed, because the rebuild re-accumulates them across
+     * every unit sharing the queue.
+     */
+    void PrepareForRebuild();
+
+    /**
+     * Address: 0x00826BA0 (FUN_00826BA0, sub_826BA0)
+     *
+     * IDA signature:
+     * _DWORD **__usercall sub_826BA0@<eax>(Moho::UICommandGraph *this@<ebx>);
+     *
+     * What it does:
+     * Recomputes the orderline orientation hint of every draw node, queue-head
+     * table first and per-command table second.
+     */
+    void RecomputeAllDrawNodeOrientations();
+
+    /**
+     * Address: 0x008275B0 (FUN_008275B0, sub_8275B0)
+     *
+     * IDA signature:
+     * void __usercall sub_8275B0(Moho::UICommandGraph::UICommandGraphDrawNode *this@<esi>);
+     *
+     * What it does:
+     * Derives one draw node's orderline tangent from the edges on both of its
+     * lanes: each edge contributes the unit vector towards its far endpoint's
+     * centroid, scaled by that edge's unit count (clamped to
+     * `ui_CommandGraphMaxNodeUnits`). The summed direction is normalized into
+     * `mOrientationHint`, and the node's render scale becomes the square root of
+     * the busier lane's unit total. Each edge also records where it sits in its
+     * lane's ribbon bundle, so parallel orderlines fan out instead of
+     * overlapping.
+     */
+    static void RecomputeDrawNodeOrientation(UICommandGraphDrawNode& drawNode);
+
+    /**
+     * Address: 0x008272A0 (FUN_008272A0, sub_8272A0)
+     *
+     * IDA signature:
+     * void __thiscall sub_8272A0(Moho::UICommandGraph *this, _DWORD *drawNode);
+     *
+     * What it does:
+     * Resolves the game tick one queued order is estimated to complete on, by
+     * depth-first walking the edges it depends on. Writing the current tick into
+     * the node up front doubles as the cycle guard: a node already being
+     * resolved returns immediately, so a cyclic order graph terminates.
+     */
+    void ResolveDrawNodeCompletionTick(UICommandGraphDrawNode& drawNode);
+
+    /**
+     * Address: 0x00827360 (FUN_00827360, sub_827360)
+     *
+     * IDA signature:
+     * void __userpurge sub_827360(
+     *   Moho::UICommandGraph::UICommandGraphDrawNode *drawNode@<esi>, Moho::UICommandGraph *graph);
+     *
+     * What it does:
+     * Gives a pending mobile-build order its translucent green placement mesh -
+     * the ghost of the unit that order will produce, stanced at the order's
+     * position. Only builds one when the node has no mesh yet and its command is
+     * a `BuildMobile`; every other order draws with waypoint markers alone.
+     *
+     * Analyzed, not yet recovered - part of the same rebuild frontier as
+     * `AddCommandQueueToCommandGraph` / `EstimateEdgeTravelTicks` /
+     * `EstimateDrawNodeWorkTicks` below. The body resolves the command's
+     * `SSTICommandConstantData::blueprint`, asks it for its display data
+     * (virtual slot 5), hands that to `CWldSession::mRules`' virtual slot 15 to
+     * get an `RMeshBlueprint`, then builds a "UnitPlace"-shadered
+     * `MeshMaterial` from the three texture-name strings at that blueprint's
+     * +0x64 and creates the instance through `MeshRenderer::CreateMeshInstance`
+     * with colour 0xFF00FF00. Blocked on modelling `RMeshBlueprint`'s +0x64
+     * string triple and the two virtual slots, neither of which is pinned yet.
+     */
+    static void CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph);
 
     void MarkDirty() noexcept
     {
@@ -3222,7 +3323,14 @@ namespace moho
         return;
       }
 
-      std::sort(
+      // The binary's whole sort instantiation for this element hangs off this
+      // one line -- twelve emitted bodies, catalogued on the members of
+      // legacy/algorithms/Sort.h. `msvc8::sort` rather than `std::sort`
+      // because only the former models VC8's introsort exactly: the same
+      // 32-element insertion-sort cutoff, the same 40-element ninther
+      // threshold in the median pick, and the same three-quarters recursion
+      // budget before it falls back to heapsort.
+      msvc8::sort(
         begin,
         end,
         [](const SBuildTemplateInfo& lhs, const SBuildTemplateInfo& rhs) noexcept { return lhs.mBuildOrder < rhs.mBuildOrder; }
@@ -4095,18 +4203,7 @@ namespace moho
 
     mMeshInstance.release();
 
-    if (mHelperLink.mHead == nullptr) {
-      return;
-    }
-
-    // Pointer-to-pointer walk: start at the command's chain head and advance
-    // through each link's `mNext` until the slot that refers to this link is
-    // found, then splice this link out of it.
-    CommandGraphHelperLink** slot = &mHelperLink.mHead->mFirst;
-    while (*slot != &mHelperLink) {
-      slot = &(*slot)->mNext;
-    }
-    *slot = mHelperLink.mNext;
+    mHelperLink.UnlinkFromChain();
   }
 
   /**
@@ -4263,13 +4360,10 @@ namespace moho
   {
     destination->mCommandId = source.mCommandId;
 
-    destination->mHelperLink.mHead = source.mHelperLink.mHead;
-    if (source.mHelperLink.mHead != nullptr) {
-      destination->mHelperLink.mNext = source.mHelperLink.mHead->mFirst;
-      source.mHelperLink.mHead->mFirst = &destination->mHelperLink;
-    } else {
-      destination->mHelperLink.mNext = nullptr;
-    }
+    // Re-publishes the *destination* into the source's chain without unlinking
+    // the source - the binary leaves both links pointing into it until the
+    // source node is destroyed separately by its caller.
+    destination->mHelperLink.LinkInto(source.mHelperLink.mHead);
 
     destination->mPositionSum = source.mPositionSum;
     destination->mWeight = source.mWeight;
@@ -4284,8 +4378,8 @@ namespace moho
 
     destination->mOrientationHint = source.mOrientationHint;
     destination->mPreviousCentroid = source.mPreviousCentroid;
-    destination->field_0x40 = source.field_0x40;
-    destination->field_0x44 = source.field_0x44;
+    destination->mUnitCountScale = source.mUnitCountScale;
+    destination->mCompletionTick = source.mCompletionTick;
 
     const auto relocateLane = [](CommandGraphDwordLane& dstLane, const CommandGraphDwordLane& srcLane) {
       const gpg::core::legacy::FastVectorInsertRuntimeView sourceView{
@@ -4870,11 +4964,403 @@ namespace moho
   }
 
   /**
-   * Address: 0x00828FB0 (FUN_00828FB0, Moho::UICommandGraph::CreateMeshes)
+   * What it does: see the header.
    */
   void UICommandGraph::CreateMeshes()
   {
-    // Remaining command-graph mesh build pass (0x00829190 chain) is pending deep lift.
+    bool rebuilt = false;
+    if (mNeedsRebuild != 0u) {
+      mNeedsRebuild = 0u;
+      RebuildCommandQueueNodes();
+      RecomputeAllDrawNodeOrientations();
+      rebuilt = true;
+    }
+
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      UICommandGraphDrawNode& drawNode = node->mDraw;
+
+      // Commands retire and are re-issued between frames while their draw node
+      // survives, so a node that is currently chained to *some* helper is
+      // re-pointed at whichever helper owns its command id right now. A node
+      // with no chain membership at all is left alone - it never had an owner
+      // and the rebuild pass is what gives it one.
+      if (drawNode.mHelperLink.mHead != nullptr) {
+        auto* const owner = reinterpret_cast<CommandGraphHelperHead*>(
+          FindCommandIssueHelperInSession(mSession, drawNode.mCommandId)
+        );
+        if (owner != drawNode.mHelperLink.mHead) {
+          drawNode.mHelperLink.UnlinkFromChain();
+          drawNode.mHelperLink.LinkInto(owner);
+        }
+      }
+
+      // First time this node resolves to a live command, seed its anchor from
+      // the command's own history. `mWeight` becomes 1 because this table keys
+      // one node per command - the centroid is that single position, unlike the
+      // queue-head table where the weight counts the units sharing the queue.
+      if (drawNode.mHelperLink.mHead != nullptr && drawNode.mHasResolvedPosition == 0u) {
+        drawNode.mPositionSum = ResolveCommandGraphAnchorWorldPosition(
+          *reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead)
+        );
+        drawNode.mWeight = 1.0f;
+      }
+    }
+
+    if (rebuilt) {
+      for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+        ResolveDrawNodeCompletionTick(node->mDraw);
+      }
+
+      for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+        CreateBuildPreviewMesh(node->mDraw, *this);
+      }
+    }
+
+    // The binary inlines `MAUI_KeyIsDown` (0x0079CB70) here in full - the
+    // foreground test, the focus-owner guard and the `wxCharCodeWXToMSW` +
+    // `GetKeyState` sign test at 0x0082911C..0x0082915D are that function's
+    // three steps, in its order.
+    if (ui_PathPreview) {
+      CON_Executef("path_GeneratePreview %s", MAUI_KeyIsDown(MKEY_SHIFT) ? "end" : "start");
+    }
+  }
+
+  /**
+   * The command-graph rebuild frontier: three bodies `CreateMeshes`'s chain
+   * calls that are analyzed but not yet recovered. They are declared here at
+   * namespace scope - deliberately NOT in an anonymous namespace - so that a
+   * link reports them by name instead of silently folding them away.
+   *
+   * Address: 0x00826140 (FUN_00826140, sub_826140)
+   *
+   * IDA signature:
+   * void __thiscall sub_826140(Moho::UserEntity *this, Moho::UICommandGraph *graph,
+   *                            Moho::UserCommandQueue *queue);
+   *
+   * What it does:
+   * Folds one entity's command queue into the graph: walks the queue's resolved
+   * command-issue helpers, finds-or-creates a draw node per command, adds this
+   * entity's position into the queue-head node's centroid accumulator, and
+   * chains consecutive orders together through `LinkCommandGraphEdge`
+   * (0x00826960). Blocked on that edge builder and the `mMapC`/tree/`mMapD`
+   * container primitives beneath it.
+   */
+  void AddCommandQueueToCommandGraph(
+    UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue
+  );
+
+  /**
+   * Address: 0x00826C50 (FUN_00826C50, sub_826C50)
+   *
+   * IDA signature:
+   * int __stdcall sub_826C50(Moho::UICommandGraph::CommandGraphEdge *edge);
+   *
+   * What it does:
+   * Travel time in game ticks along one orderline: the distance between the two
+   * endpoint centroids divided by the slowest speed among the units the command
+   * targets (air units use `Air.MaxAirspeed`, everything else
+   * `Physics.MaxSpeed`), at 10 ticks per second, rounded up. Returns 0 for
+   * command types that do not involve movement. Blocked on the weak-set
+   * iterator advance at 0x007B4D90, which has no recovered counterpart.
+   */
+  [[nodiscard]] std::int32_t EstimateEdgeTravelTicks(const UICommandGraph::CommandGraphEdge& edge);
+
+  /**
+   * Address: 0x00826F10 (FUN_00826F10, sub_826F10)
+   *
+   * IDA signature:
+   * int __stdcall sub_826F10(Moho::UICommandGraph *graph,
+   *                          Moho::UICommandGraph::UICommandGraphDrawNode *drawNode);
+   *
+   * What it does:
+   * Build time in game ticks for one order: asks `/lua/game.lua`'s
+   * `GetConstructEconomyModel` for each assisting engineer/factory's build rate,
+   * sums their reciprocals, and divides the remaining work fraction (derived
+   * from the part-built unit's health ratio) by that combined rate. Returns 0
+   * for any command that is not a `BuildMobile`/`BuildFactory`. Blocked on the
+   * same 0x007B4D90 iterator advance as the travel estimate above.
+   */
+  [[nodiscard]] std::int32_t EstimateDrawNodeWorkTicks(
+    UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode
+  );
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::RebuildCommandQueueNodes()
+  {
+    PrepareForRebuild();
+
+    // Inline capacity 100 - the binary's local is a 400-byte stack buffer that
+    // only spills to the heap on a map with more than 100 units on screen.
+    gpg::fastvector_n<UserEntity*, 100> entities;
+    (void)reinterpret_cast<SpatialDB_MeshInstance*>(&mSession->mEntitySpatialDbStorage[0])
+      ->Collect(entities, ENTITYTYPE_Unit);
+
+    for (UserEntity* const entity : entities) {
+      if (entity == nullptr) {
+        continue;
+      }
+
+      // Wall segments, walls and other decorative units never contribute an
+      // order line even when they carry a queue.
+      if (entity->IsInCategory(msvc8::string{"INSIGNIFICANTUNIT", 17u})) {
+        continue;
+      }
+
+      AddCommandQueueToCommandGraph(*entity, *this, entity->GetCommandQueue());
+
+      // A stationary factory's build queue is a second, separate order chain -
+      // mobile factories (engineers, hives) carry theirs on the normal queue
+      // above and must not be folded in twice.
+      const bool isFactory = entity->IsInCategory(msvc8::string{"FACTORY", 7u});
+      const bool isMobileFactory = isFactory && entity->IsInCategory(msvc8::string{"MOBILE", 6u});
+      if (isFactory && !isMobileFactory) {
+        AddCommandQueueToCommandGraph(*entity, *this, entity->GetFactoryCommandQueue());
+      }
+    }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::ResolveDrawNodeCompletionTick(UICommandGraphDrawNode& drawNode)
+  {
+    // Non-zero means "already solved this pass". Seeding it with the current
+    // tick before recursing is what makes a cyclic order graph terminate: a
+    // node reached again while it is still being solved returns immediately.
+    if (drawNode.mCompletionTick != 0u) {
+      return;
+    }
+
+    drawNode.mCompletionTick = static_cast<std::uint32_t>(mSession->mGameTick);
+
+    std::uint32_t startTick = static_cast<std::uint32_t>(mSession->mGameTick);
+    const std::int32_t incomingCount = drawNode.mLaneA.size();
+    for (std::int32_t index = 0; index < incomingCount; ++index) {
+      auto* const edge = drawNode.mLaneA.At<CommandGraphEdge>(index);
+      UICommandGraphDrawNode* const predecessor = edge->mFromNode;
+      if (predecessor != nullptr) {
+        ResolveDrawNodeCompletionTick(*predecessor);
+        const std::uint32_t readyTick =
+          predecessor->mCompletionTick + static_cast<std::uint32_t>(EstimateEdgeTravelTicks(*edge));
+        if (startTick < readyTick) {
+          startTick = readyTick;
+        }
+      }
+    }
+
+    const std::uint32_t finishTick =
+      startTick + static_cast<std::uint32_t>(EstimateDrawNodeWorkTicks(*this, drawNode));
+
+    // The already-stored tick winning means this order costs nothing and has no
+    // unfinished predecessor; the binary still steps it back by one so the node
+    // sorts before whatever depends on it.
+    if (drawNode.mCompletionTick >= finishTick) {
+      drawNode.mCompletionTick = drawNode.mCompletionTick - 1u;
+    } else {
+      drawNode.mCompletionTick = finishTick;
+    }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::PrepareForRebuild()
+  {
+    // Edge table: drop every node, then put the bucket vector back to the
+    // one-bucket starting state. `ClearHashListNodes` is 0x0082C840 here - the
+    // 0x2C node carries no owning payload, so it frees without destroying.
+    ClearHashListNodes(mMapC);
+    mMapC.mBuckets.assign(9u, mMapC.mListHead);
+    mMapC.mBucketMask = 1u;
+    mMapC.mBucketCount = 1u;
+
+    // Texture-keyed orderline tree: free every bucket, then re-empty the
+    // sentinel in place. Unlike `DestroyTree` the head survives - the rebuild
+    // pass immediately refills the tree through it.
+    DestroyCommandGraphTreeSubtree(mGraphRuntimeTree.mHead, mGraphRuntimeTree.mHead->mParent);
+    mGraphRuntimeTree.mHead->mParent = mGraphRuntimeTree.mHead;
+    mGraphRuntimeTree.mSize = 0u;
+    mGraphRuntimeTree.mHead->mLeft = mGraphRuntimeTree.mHead;
+    mGraphRuntimeTree.mHead->mRight = mGraphRuntimeTree.mHead;
+
+    // Draw nodes survive a rebuild; only the edge lanes they own are dropped,
+    // back to inline storage so the common single-edge case never re-allocates.
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      node->mDraw.mLaneA.ReleaseToInline();
+      node->mDraw.mLaneB.ReleaseToInline();
+    }
+
+    // Queue-head nodes additionally lose their accumulated centroid: the
+    // rebuild re-adds one weighted position per unit sharing the queue, so
+    // leaving the old sum in place would double-count every frame.
+    for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
+      node->mDraw.mLaneA.ReleaseToInline();
+      node->mDraw.mLaneB.ReleaseToInline();
+      node->mDraw.mPositionSum = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+      node->mDraw.mWeight = 0.0f;
+    }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::RecomputeAllDrawNodeOrientations()
+  {
+    for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
+      RecomputeDrawNodeOrientation(node->mDraw);
+    }
+
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      RecomputeDrawNodeOrientation(node->mDraw);
+    }
+  }
+
+  namespace
+  {
+    /**
+     * One lane's contribution to a draw node's orderline tangent.
+     *
+     * Both lanes accumulate the same way - the only differences are which
+     * endpoint of each edge is the "far" one and which distribution field
+     * records the ribbon offset - so the shared mechanic is lifted here rather
+     * than written twice. `lengthSquared` is supplied by the caller because the
+     * binary sums the three squares in a different component order per lane and
+     * float addition is not associative.
+     */
+    struct DrawNodeOrientationAccumulator
+    {
+      Wm3::Vector3f mDirectionSum{0.0f, 0.0f, 0.0f};
+      std::int32_t mUnitTotal = 0;
+    };
+
+    /**
+     * The node's centroid: draw nodes accumulate a position *sum* plus a weight
+     * so several units sharing one queue average into a single anchor.
+     */
+    [[nodiscard]] Wm3::Vector3f DrawNodeCentroid(
+      const moho::UICommandGraph::UICommandGraphDrawNode& drawNode
+    ) noexcept
+    {
+      const float inverseWeight = 1.0f / drawNode.mWeight;
+      return Wm3::Vector3f{
+        drawNode.mPositionSum.x * inverseWeight,
+        drawNode.mPositionSum.y * inverseWeight,
+        drawNode.mPositionSum.z * inverseWeight
+      };
+    }
+
+    /**
+     * Where one edge sits across its lane's ribbon bundle, in [-0.5, +0.5].
+     * A lane of one edge yields -0.5 rather than 0 because the binary clamps
+     * the divisor, not the result.
+     */
+    [[nodiscard]] float LaneBundleDistribution(const std::int32_t index, const float laneSpan) noexcept
+    {
+      const float divisor = (laneSpan < 1.0f) ? 1.0f : laneSpan;
+      return (static_cast<float>(index) / divisor) - 0.5f;
+    }
+  } // namespace
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::RecomputeDrawNodeOrientation(UICommandGraphDrawNode& drawNode)
+  {
+    const std::int32_t maxNodeUnits = ui_CommandGraphMaxNodeUnits;
+    const Wm3::Vector3f centroid = DrawNodeCentroid(drawNode);
+
+    // Lane A holds the edges this node is the *destination* of, so the far
+    // endpoint is each edge's `mFromNode` and the direction points inbound.
+    DrawNodeOrientationAccumulator laneA{};
+    {
+      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneA.size());
+      const float laneSpan = static_cast<float>(count) - 1.0f;
+      for (std::int32_t index = 0; index < count; ++index) {
+        auto* const edge = drawNode.mLaneA.At<CommandGraphEdge>(index);
+        const Wm3::Vector3f farCentroid = DrawNodeCentroid(*edge->mFromNode);
+
+        float dx = centroid.x - farCentroid.x;
+        float dy = centroid.y - farCentroid.y;
+        float dz = centroid.z - farCentroid.z;
+
+        const std::int32_t edgeUnits =
+          (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
+            ? maxNodeUnits
+            : static_cast<std::int32_t>(edge->mTouchCount);
+
+        const float lengthSquared = ((dx * dx) + (dy * dy)) + (dz * dz);
+        if (lengthSquared > 0.0f) {
+          const float scale = static_cast<float>(edgeUnits) / std::sqrt(lengthSquared);
+          dx = dx * scale;
+          dy = dy * scale;
+          dz = scale * dz;
+        }
+
+        laneA.mDirectionSum.x += dx;
+        laneA.mDirectionSum.y += dy;
+        laneA.mDirectionSum.z += dz;
+        laneA.mUnitTotal += edgeUnits;
+
+        edge->mLaneADistribution = LaneBundleDistribution(index, laneSpan);
+      }
+    }
+
+    // Lane B holds the edges leaving this node, so the far endpoint is each
+    // edge's `mToNode` and the direction points outbound.
+    DrawNodeOrientationAccumulator laneB{};
+    {
+      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneB.size());
+      const float laneSpan = static_cast<float>(count) - 1.0f;
+      for (std::int32_t index = 0; index < count; ++index) {
+        auto* const edge = drawNode.mLaneB.At<CommandGraphEdge>(index);
+        const Wm3::Vector3f farCentroid = DrawNodeCentroid(*edge->mToNode);
+
+        float dx = farCentroid.x - centroid.x;
+        float dy = farCentroid.y - centroid.y;
+        float dz = farCentroid.z - centroid.z;
+
+        const std::int32_t edgeUnits =
+          (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
+            ? maxNodeUnits
+            : static_cast<std::int32_t>(edge->mTouchCount);
+
+        // Component order differs from lane A's sum above; preserved because
+        // float addition is not associative and this is the binary's order.
+        const float lengthSquared = ((dz * dz) + (dy * dy)) + (dx * dx);
+        if (lengthSquared > 0.0f) {
+          const float scale = static_cast<float>(edgeUnits) / std::sqrt(lengthSquared);
+          dx = dx * scale;
+          dy = dy * scale;
+          dz = scale * dz;
+        }
+
+        laneB.mDirectionSum.x += dx;
+        laneB.mDirectionSum.y += dy;
+        laneB.mDirectionSum.z += dz;
+        laneB.mUnitTotal += edgeUnits;
+
+        edge->mLaneBDistribution = LaneBundleDistribution(index, laneSpan);
+      }
+    }
+
+    const float totalX = laneB.mDirectionSum.x + laneA.mDirectionSum.x;
+    const float totalY = laneB.mDirectionSum.y + laneA.mDirectionSum.y;
+    const float totalZ = laneB.mDirectionSum.z + laneA.mDirectionSum.z;
+
+    const float length = std::sqrt(((totalZ * totalZ) + (totalY * totalY)) + (totalX * totalX));
+    if (length <= kCommandGraphOrientationEpsilon) {
+      drawNode.mOrientationHint = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    } else {
+      const float inverseLength = 1.0f / length;
+      drawNode.mOrientationHint =
+        Wm3::Vector3f{totalX * inverseLength, totalY * inverseLength, totalZ * inverseLength};
+    }
+
+    const std::int32_t busierLaneUnits =
+      (laneA.mUnitTotal < laneB.mUnitTotal) ? laneB.mUnitTotal : laneA.mUnitTotal;
+    drawNode.mUnitCountScale = std::sqrt(static_cast<float>(busierLaneUnits));
   }
 
   /**
@@ -4995,7 +5481,7 @@ namespace moho
 
     const float depthW = camera.viewport.ProjectViewportWidthRow2(avg);
 
-    float size = (drawNode.field_0x40 * styleScale) / depthW;
+    float size = (drawNode.mUnitCountScale * styleScale) / depthW;
     size = std::clamp(size, ui_MinWaypointSize, ui_MaxWaypointSize);
 
     batcher.SetTexture(texture);
@@ -5056,7 +5542,7 @@ namespace moho
       const float pixelDistance = std::sqrt((dx * dx) + (dy * dy));
 
       const float depthW = camera.viewport.ProjectViewportWidthRow2(avg);
-      float worldTolerance = drawNode.field_0x40 / depthW;
+      float worldTolerance = drawNode.mUnitCountScale / depthW;
       worldTolerance = std::clamp(worldTolerance, ui_MinWaypointSize, ui_MaxWaypointSize);
 
       const float scaledTolerance = worldTolerance * depthW;
@@ -5168,12 +5654,12 @@ namespace moho
    * What it does:
    * Draws the "ETA: mm:ss" text label above one command-graph draw node,
    * gated by the "display_eta" option, the command not yet being due
-   * (`drawNode.field_0x44 - mSession->mGameTick < 0` skips), and - only for
+   * (`drawNode.mCompletionTick - mSession->mGameTick < 0` skips), and - only for
    * the non-highlighted/non-selected state - an LOD distance test against
    * `ui_MaxTextLOD` using the camera viewport's depth row (the same
    * `ProjectViewportDepthRow1` shape used throughout this file).
    *
-   * Glyph size is `field_0x40 * (style scale for the resolved highlight
+   * Glyph size is `mUnitCountScale * (style scale for the resolved highlight
    * state)`; the label anchors at the node's averaged position offset by
    * that glyph size in X/-Z, then is projected to screen space and nudged
    * by `mDebugFont->mDescent + 1` pixels vertically.
@@ -5186,7 +5672,7 @@ namespace moho
       return;
     }
 
-    const std::int32_t beatsUntilDue = static_cast<std::int32_t>(drawNode.field_0x44) - mSession->mGameTick;
+    const std::int32_t beatsUntilDue = static_cast<std::int32_t>(drawNode.mCompletionTick) - mSession->mGameTick;
     if (beatsUntilDue < 0) {
       return;
     }
@@ -5216,7 +5702,7 @@ namespace moho
       break;
     }
 
-    const float glyphScale = drawNode.field_0x40 * styleScale;
+    const float glyphScale = drawNode.mUnitCountScale * styleScale;
 
     if (!OPTIONS_GetBool("display_eta")) {
       return;
@@ -7662,8 +8148,22 @@ namespace moho
       return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entityLane != nullptr ? *entityLane : nullptr));
     }
 
+    /**
+     * Address: 0x008B3130 (FUN_008B3130)
+     * Address: 0x00867E90 (FUN_00867E90)
+     *
+     * What it does:
+     * Standard VC8 `_Tree::equal_range`: one descent tracking the last node
+     * whose key compares greater than `key` (the upper bound) and a second
+     * tracking the last node whose key does not compare less (the lower bound),
+     * both starting from `mHead->mParent` and stopping at the nil sentinel.
+     *
+     * The two addresses are the same 34-instruction body emitted twice -- same
+     * mnemonics, same 80 bytes, same field offsets (`mKey` at +0x0C, the nil
+     * flag at +0x19) -- once per copy of the erase-by-key lane above.
+     */
     void ResolveSelectionEqualRangeByKey(
-      SSelectionSetUserEntity* const set,
+      WeakEntitySetUserEntity* const set,
       const std::uint32_t key,
       SSelectionNodeUserEntity*& outLowerBound,
       SSelectionNodeUserEntity*& outUpperBound
@@ -7751,7 +8251,7 @@ namespace moho
 
     [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
       const UserEntity* const* entityLane,
-      SSelectionSetUserEntity* set
+      WeakEntitySetUserEntity* set
     );
 
     [[nodiscard]] SSelectionNodeUserEntity** FindOrInsertSelectionNodeWithHint(
@@ -7762,33 +8262,22 @@ namespace moho
     );
 
     /**
-     * Address: 0x008B2890 (FUN_008B2890, sub_8B2890)
-     *
-     * What it does:
-     * Guards one entity weak-owner intrusive lane, erases all selection-set
-     * entries matching that entity pointer key, restores owner links, and
-     * returns removed-count.
-     */
-    [[nodiscard]] std::int32_t EraseSelectionEntityGuardedByOwnerLink(
-      SSelectionSetUserEntity* const set,
-      UserEntity* const entity
-    )
-    {
-      ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-      UserEntity* entityKey = entity;
-      return EraseSelectionKeyRangeAndCount(&entityKey, set);
-    }
-
-    /**
      * Address: 0x008B2E70 (FUN_008B2E70, sub_8B2E70)
+     * Address: 0x00867AC0 (FUN_00867AC0, sub_867AC0)
      *
      * What it does:
-     * Resolves one equal-key range in the selection weak-set, counts how many
-     * nodes the range contains, erases that full range, and returns the count.
+     * VC8's `_Tree::erase(const key_type&)`: resolve the equal-key range,
+     * count it by walking the iterator, erase the whole range, return the
+     * count. The key arrives by address because the binary passes it as a
+     * `const key_type&`, and the key type here is the `UserEntity*` itself.
+     *
+     * Emitted twice. At 0x00867AC0 the set arrives in `eax` and the key lane
+     * in `ebx`, and the caller at 0x008676E0 keeps that return value as its
+     * own -- it never reassigns `eax` after the call.
      */
     [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
       const UserEntity* const* const entityLane,
-      SSelectionSetUserEntity* const set
+      WeakEntitySetUserEntity* const set
     )
     {
       SSelectionNodeUserEntity* first = nullptr;
@@ -11607,28 +12096,29 @@ namespace moho
    */
   /**
    * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
+   * Address: 0x008B2890 (FUN_008B2890, sub_8B2890)
    *
    * What it does:
-   * Removes one user-entity key from a weak set. The binary parks a marker in
-   * the entity's weak-owner chain for the duration of the erase and unwinds it
-   * afterwards, so the node teardown cannot lose the chain; that guard is what
-   * `ScopedSelectionOwnerLinkGuard` reproduces.
+   * Removes every entry keyed by `entity` from a weak set. The binary parks a
+   * marker in the entity's weak-owner chain for the duration of the erase and
+   * unwinds it afterwards, so the node teardown cannot lose the chain; that
+   * guard is what `ScopedSelectionOwnerLinkGuard` reproduces.
+   *
+   * The erase itself is the container's erase-by-key lane, not an open-coded
+   * find-and-unlink: at 0x008676E0 the guard is spliced in, `sub_867AC0` is
+   * called with the set in `eax` and `&entity` in `ecx`, the guard is unwound,
+   * and the count `sub_867AC0` returned is left in `eax` as this function's
+   * own result. Emitted a second time at 0x008B2890.
    */
   bool SSelectionSetUserEntity::Erase(WeakEntitySetUserEntity& set, UserEntity* const entity)
   {
-    const SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr || entity == nullptr) {
+    if (set.mHead == nullptr || entity == nullptr) {
       return false;
     }
 
     ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-    SSelectionNodeUserEntity* const node = FindSelectionNodeByKey(set, SelectionKeyFromEntity(entity));
-    if (node == nullptr || node == head) {
-      return false;
-    }
-
-    (void)EraseSelectionNodeAndAdvance(set, node);
-    return true;
+    UserEntity* entityKey = entity;
+    return EraseSelectionKeyRangeAndCount(&entityKey, &set) != 0;
   }
 
   SSelectionSetUserEntity::FindResult* SSelectionSetUserEntity::Find(
@@ -11829,7 +12319,37 @@ namespace moho
    * Recursively destroys one weak-set subtree and unlinks each node from its
    * user-entity weak-owner intrusive lane before delete.
    */
-  void SSelectionSetUserEntity::DestroySubtree(SSelectionNodeUserEntity* node)
+  /**
+   * Address: 0x007B4640 (FUN_007B4640, `_Tree::_Buynode()`)
+   * Address: 0x007B08D0 (FUN_007B08D0, byte-identical sibling `_Buynode()`
+   * emission reached through the other checked-28-byte-allocator instance,
+   * 0x007B1420, rather than 0x007B4FA0 -- same neutral-node shape, same
+   * ecx=1/null-links/colour-black/sentinel-cleared body)
+   *
+   * IDA signature:
+   * SSelectionNodeUserEntity* __usercall sub_7B4640@<eax>();
+   *
+   * What it does:
+   * Buys one neutral red-black tree node: `ecx = 1` into the shared checked
+   * 28-byte allocator, then all three links nulled, colour black and the
+   * sentinel flag cleared. Every weak-entity set in the engine comes up
+   * through this lane -- fourteen recovered callers reach it.
+   */
+  SSelectionNodeUserEntity* WeakEntitySetUserEntity::BuyNode()
+  {
+    auto* const node =
+      static_cast<SSelectionNodeUserEntity*>(msvc8::detail::AllocateChecked28ByteElements(1u));
+    node->mLeft = nullptr;
+    node->mParent = nullptr;
+    node->mRight = nullptr;
+    node->mColor = 1u;
+    node->mIsSentinel = 0u;
+    // The binary writes only +0x18 and +0x19 here; the two padding bytes at
+    // +0x1A keep whatever the allocator handed back, so they are left alone.
+    return node;
+  }
+
+  void WeakEntitySetUserEntity::DestroySubtree(SSelectionNodeUserEntity* node)
   {
     SSelectionNodeUserEntity* cursor = node;
     while (cursor != nullptr && cursor->mIsSentinel == 0u) {
@@ -11850,7 +12370,7 @@ namespace moho
    * erases (`first == mHead->mLeft` and `last == mHead`) it drops the whole
    * subtree in one pass and resets tree head links to empty sentinels.
    */
-  SSelectionNodeUserEntity** SSelectionSetUserEntity::EraseRange(
+  SSelectionNodeUserEntity** WeakEntitySetUserEntity::EraseRange(
     SSelectionNodeUserEntity** const outNode,
     SSelectionNodeUserEntity* const first,
     SSelectionNodeUserEntity* const last
@@ -12311,18 +12831,10 @@ namespace moho
     mUnknownShared40C.release();
     ClearBuildTemplates();
 
-    // Drop every formation-preview shared-pair payload still parked in the
-    // session-global preview vector. Using the recovered range-erase helper
-    // (FUN_0085A130) keeps the global begin/end pointers coherent with the
-    // destructor path the binary uses when the last world session unwinds.
-    if (gFormationPreviewSharedPairsBegin != nullptr && gFormationPreviewSharedPairsEnd != gFormationPreviewSharedPairsBegin) {
-      FormationPreviewSharedPairRuntimeView* firstIterator = nullptr;
-      (void)EraseFormationPreviewSharedPairRange(
-        &firstIterator,
-        gFormationPreviewSharedPairsBegin,
-        gFormationPreviewSharedPairsEnd
-      );
-    }
+    // Drop every formation-preview ghost still parked in the session-global
+    // preview vector. The binary runs the whole-range erase (FUN_0085A130)
+    // here, which is exactly what `clear` compiles to.
+    gFormationPreviews.clear();
 
     if (mRules) {
       delete mRules;
@@ -16470,21 +16982,134 @@ namespace moho
     primBatcher->Flush();
   }
 
+  namespace
+  {
+    /**
+     * Tint every formation-placement ghost is stamped with, written straight
+     * into `MeshInstance::color` at 0x00859E0B as the literal `0D8D8D800h`.
+     */
+    constexpr std::int32_t kFormationPreviewTint = static_cast<std::int32_t>(0xD8D8D800u);
+  }
+
   /**
    * Address: 0x008599D0 (FUN_008599D0, ?RenderMeshPreviews@CWldSession@Moho@@QAEHXZ)
+   *
+   * IDA signature:
+   * int __usercall sub_8599D0@<eax>(Moho::CWldSession *this);
+   *
+   * What it does:
+   * Rebuilds this frame's formation-placement ghosts. Last frame's previews are
+   * dropped unconditionally; then, only while the pending formation is ready,
+   * still has a live instance, and its placement timer has run out, every
+   * participant unit gets one translucent copy of its own mesh - reshaded with
+   * the "UnitFormationPreview" shader - parked on the terrain at the slot the
+   * formation assigned it and turned to face the formation heading.
    */
   void CWldSession::RenderMeshPreviews()
   {
-    // Recovered 0x008599D0 high-level flow:
-    // 1) Validate current formation + instance readiness.
-    // 2) Iterate formation units, query formation position/orientation.
-    // 3) Sample terrain elevation from STIMap/CHeightField.
-    // 4) Create "UnitFormationPreview" mesh material + mesh instances.
-    // 5) Set stance/orientation and tint preview mesh instances.
-    //
-    // Deep lift blockers:
-    // CFormation runtime layout, CAiFormationInstance accessors, MeshMaterial/MeshRenderer
-    // creation chain, and preview-instance ownership container at 0x010C425C/0x010C4260.
+    MeshRenderer* const renderer = MeshRenderer::GetInstance();
+
+    // 0x008599EF..0x00859A0A: the whole-range erase runs before every early-out
+    // below, so a formation that is no longer placeable clears its ghosts.
+    gFormationPreviews.clear();
+
+    CFormation* const formation = mCurFormation;
+    if (!formation->mReady || formation->mCurInstance == nullptr || formation->mTimeLeft > 0.0f) {
+      return;
+    }
+
+    // 0x00859AB1 / 0x00859AF8 dispatch instance slots 16 and 6, which only
+    // `CAiFormationInstance` declares - `mCurInstance` is typed as the bare
+    // `IFormationInstance` interface. Same reinterpret_cast the rest of the
+    // tree already uses to reach the concrete instance (Unit.cpp).
+    CAiFormationInstance* const instance =
+      reinterpret_cast<CAiFormationInstance*>(formation->mCurInstance);
+    WeakUnitSetUserUnit& participants = formation->mParticipants;
+
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)PruneTombstonesAndFindLive(participants, &node, participants.mHead->mLeft);
+    while (node != participants.mHead) {
+      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      if (entity != nullptr) {
+        // `mParticipants` only ever holds units, so the entity doubles as a
+        // `UserUnit` and its `IUnit` bridge subobject at +0x148 is what every
+        // formation-side call below is handed.
+        UserUnit* const unit = reinterpret_cast<UserUnit*>(entity);
+        IUnit* const bridge = GetIUnitBridge(unit);
+        Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
+
+        if (!bridge->IsDead() && instance->Func17(formationUnit, false)
+            && entity->GetAttachmentParent() == nullptr) {
+          const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
+          const RMeshBlueprint* const meshBlueprint = entity->mVariableData.mMeshBlueprint;
+          if (!meshBlueprint->mLods.empty()) {
+            SCoordsVec2 slot{};
+            instance->GetFormationPosition(&slot, formationUnit, nullptr);
+
+            // 0x00859B12 builds the basis for the formation heading and then
+            // never reads it back - a dead local in the 2007 source, kept
+            // because the constructor call is a real emission.
+            [[maybe_unused]] const VAxes3 heading{formation->mDirection};
+
+            // Park the ghost on the terrain: surface height under the slot,
+            // plus the unit's own half-height and its blueprint elevation.
+            Wm3::Vec3f position{slot.x, 0.0f, slot.z};
+            position.y =
+              GetSTIMap()->GetSurface(position) + blueprint->mSizeY + blueprint->Physics.Elevation;
+
+            gFormationPreviews.push_back(FormationPreviewSharedPair{});
+            FormationPreviewSharedPair& preview = gFormationPreviews.back();
+
+            // Only the top LOD is previewed, and only its three texture lanes -
+            // the shader is forced to "UnitFormationPreview" and the lookup and
+            // secondary maps are left empty (0x00859C3F..0x00859C71).
+            const RMeshBlueprintLOD& lod = *meshBlueprint->mLods.begin();
+            preview.mMaterial = MeshMaterial::Create(
+              msvc8::string{"UnitFormationPreview"},
+              lod.mAlbedoName,
+              lod.mNormalsName,
+              lod.mSpecularName,
+              msvc8::string{},
+              msvc8::string{},
+              nullptr
+            );
+
+            const float uniformScale = blueprint->Display.UniformScale;
+            preview.mMesh = boost::shared_ptr<MeshInstance>(renderer->CreateMeshInstance(
+              0, 0, meshBlueprint, Wm3::Vec3f{uniformScale, uniformScale, uniformScale}, false,
+              preview.mMaterial
+            ));
+
+            if (preview.mMesh) {
+              VTransform stance{Wm3::Vec3f{0.0f, 0.0f, 0.0f}, Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f}};
+              stance.orient_ = formation->mDirection;
+              stance.pos_ = position;
+
+              // Start and end stance are the same transform - the ghost does
+              // not interpolate.
+              //
+              // Not reproduced here: 0x00859DE4 zero-fills an 8-byte slot that
+              // EH state 5 covers for exactly this call plus the tint store,
+              // and 0x00859E1D hands it to the shared-count teardown
+              // (FUN_0055B7A0). Both halves are null for its whole lifetime, so
+              // the teardown returns on its first branch and the pair is
+              // observably a no-op - a default-constructed shared handle the
+              // 2007 source declared and never used. Behaviour is identical
+              // without it; inventing a variable to carry it would not be.
+              preview.mMesh->SetStance(stance, stance);
+              preview.mMesh->color = kFormationPreviewTint;
+            } else {
+              // 0x00859E26: the renderer refused the instance, so the slot
+              // that was just appended is retired again.
+              gFormationPreviews.pop_back();
+            }
+          }
+        }
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)PruneTombstonesAndFindLive(participants, &node, node);
+    }
   }
 
   namespace

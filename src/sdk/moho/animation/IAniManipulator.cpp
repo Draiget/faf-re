@@ -1092,6 +1092,8 @@ namespace
 
   /**
    * Address: 0x0063A460 (FUN_0063A460)
+   * Address: 0x0063A290 (FUN_0063A290, the linker-emitted `jmp` bridge to
+   * FUN_0063A460 -- one instruction, no callers of its own)
    *
    * What it does:
    * Loads CFootPlantManipulator payload lanes: IAniManipulator base state,

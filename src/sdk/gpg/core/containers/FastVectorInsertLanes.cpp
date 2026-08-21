@@ -587,6 +587,7 @@ namespace gpg::core::legacy
    * Address: 0x0080B150 (FUN_0080B150)
    * Address: 0x0080B2B0 (FUN_0080B2B0)
    * Address: 0x0080B3E0 (FUN_0080B3E0)
+   * Address: 0x004E7740 (FUN_004E7740)
    *
    * What it does:
    * Copies 24-byte elements from `[sourceBegin, sourceEnd)` into `destination`
