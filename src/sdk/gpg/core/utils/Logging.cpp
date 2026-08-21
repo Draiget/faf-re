@@ -75,31 +75,6 @@ static_assert(sizeof(IntrusiveLinkNodeRuntime) == 0x08, "IntrusiveLinkNodeRuntim
     return UnlinkIntrusiveNodeAndReturnNext(node);
 }
 
-struct PointerRangeDwordRuntimeView
-{
-    std::uint8_t reserved00_03[0x04]{};
-    const std::uint32_t* begin = nullptr; // +0x04
-    const std::uint32_t* end = nullptr;   // +0x08
-};
-static_assert(offsetof(PointerRangeDwordRuntimeView, begin) == 0x04, "PointerRangeDwordRuntimeView::begin offset must be 0x04");
-static_assert(offsetof(PointerRangeDwordRuntimeView, end) == 0x08, "PointerRangeDwordRuntimeView::end offset must be 0x08");
-
-/**
- * Address: 0x009358F0 (FUN_009358F0)
- *
- * What it does:
- * Returns whether a `[begin,end)` dword lane is empty (or has no begin lane).
- */
-[[maybe_unused]] bool IsPointerRangeDwordEmptyRuntime(
-    const PointerRangeDwordRuntimeView* const runtime
-) noexcept
-{
-    if (runtime == nullptr || runtime->begin == nullptr) {
-        return true;
-    }
-    return runtime->begin == runtime->end;
-}
-
 class HistoryLogTarget final : public gpg::LogTarget
 {
 public:
@@ -433,9 +408,15 @@ void RemoveThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const
         return;
     }
 
+    const std::uint32_t removedIndex = static_cast<std::uint32_t>(found - tls->begin);
+
     std::move(found + 1, tls->end, found);
     --tls->end;
     *tls->end = nullptr;
+
+    if (removedIndex < tls->depthCache) {
+        tls->depthCache = removedIndex;
+    }
 }
 
 const char* SeverityText(const gpg::LogSeverity level)
@@ -517,6 +498,38 @@ void gpg::InitLogContextSingleton()
 {
     std::call_once(g_LogOnce, &InitLogContextSingleton);
     return g_LogCtx;
+}
+
+/**
+ * Address: 0x009368C0 (FUN_009368C0)
+ *
+ * What it does:
+ * Nulls the owning ScopedLogContext's back-pointer (if the scope guard is
+ * still alive) so it won't later double-free this entry, then removes this
+ * entry from its owning ThreadState's context-label array via
+ * RemoveThreadContext (which also clamps the cached dispatch depth).
+ * Shared by gpg::ScopedLogContext::~ScopedLogContext (normal per-scope
+ * teardown) and gpg::ThreadState::~ThreadState (whole-thread teardown),
+ * matching the binary's two real call sites for this helper.
+ */
+void gpg::ThreadCtxEntry::DetachFromOwnerAndState() noexcept
+{
+    if (owner != nullptr) {
+        owner->mEntry = nullptr;
+    }
+    RemoveThreadContext(state, this);
+}
+
+/**
+ * Address: 0x00936FD0 (FUN_00936FD0, boost::thread_specific_ptr_ContextStack::cleanup)
+ *
+ * What it does:
+ * Runs ThreadState's destructor (address 0x00936CC0) and frees the
+ * allocation when the per-thread value is non-null.
+ */
+void gpg::ThreadStateTssDeleter::operator()(ThreadState* const state) const noexcept
+{
+    delete state;
 }
 
 /**
@@ -1349,10 +1362,12 @@ ScopedLogContext::~ScopedLogContext()
     }
 
     g_LogCtx->rw.lock();
-    if (mEntry->state) {
-        RemoveThreadContext(mEntry->state, mEntry);
-    }
-    delete mEntry;
+    // Capture before DetachFromOwnerAndState() runs: it nulls owner->mEntry
+    // (== this->mEntry, since owner == this here), matching the binary's
+    // `v2 = *this; sub_9368C0(v2); operator delete(v2);` ordering (FUN_00937B90).
+    ThreadCtxEntry* const entry = mEntry;
+    entry->DetachFromOwnerAndState();
+    delete entry;
     g_LogCtx->rw.unlock();
 
     mEntry = nullptr;

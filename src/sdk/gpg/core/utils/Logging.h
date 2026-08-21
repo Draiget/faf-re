@@ -305,6 +305,7 @@ namespace gpg
     };
 
     struct ThreadState;
+    class ScopedLogContext;
 
     /**
      * One pushed thread-local context label.
@@ -320,9 +321,25 @@ namespace gpg
      */
     struct ThreadCtxEntry
     {
-        void* owner{};
+        ScopedLogContext* owner{};
         msvc8::string text;
         ThreadState* state{};
+
+        /**
+         * Address: 0x009368C0 (FUN_009368C0)
+         *
+         * What it does:
+         * Nulls the owning ScopedLogContext's back-pointer (so a still-alive
+         * scope guard whose entry is force-destroyed by ThreadState teardown
+         * won't later double-free it), then unlinks this entry from its
+         * owning ThreadState's context-label array, clamping the cached
+         * dispatch depth down to the removed slot when necessary. Shared by
+         * both the normal per-scope teardown path
+         * (gpg::ScopedLogContext::~ScopedLogContext) and the whole-thread
+         * teardown path (gpg::ThreadState::~ThreadState), matching the
+         * binary's two real call sites for this helper.
+         */
+        void DetachFromOwnerAndState() noexcept;
     };
     static_assert(sizeof(ThreadCtxEntry) == 0x24, "ThreadCtxEntry size must be 0x24");
 
@@ -341,11 +358,32 @@ namespace gpg
         ThreadCtxEntry** cap{};
         std::uint32_t depthCache{};
 
+        /**
+         * Address: 0x009358F0 (FUN_009358F0)
+         *
+         * What it does:
+         * Returns true when the context-label array has never been
+         * allocated or currently holds no entries (begin == end).
+         */
+        [[nodiscard]] bool Empty() const noexcept { return begin == nullptr || begin == end; }
+
+        /**
+         * Address: 0x00936CC0 (FUN_00936CC0, boost::thread_specific_ptr_ContextStack
+         * cleanup body operating on a ContextStack instance)
+         *
+         * What it does:
+         * Repeatedly detaches and destroys the last pushed context entry
+         * (matching the binary's backward-pop loop) via
+         * ThreadCtxEntry::DetachFromOwnerAndState, then frees the backing
+         * array and clears the range/depth lanes.
+         */
         ~ThreadState() {
+            while (!Empty()) {
+                ThreadCtxEntry* const entry = end[-1];
+                entry->DetachFromOwnerAndState();
+                delete entry;
+            }
             if (begin) {
-                for (ThreadCtxEntry** it = begin; it != end; ++it) {
-                    delete *it;
-                }
                 delete[] begin;
             }
             begin = end = cap = nullptr;
@@ -355,11 +393,30 @@ namespace gpg
     static_assert(sizeof(ThreadState) == 0x14, "ThreadState size must be 0x14");
 
     /**
+     * Deleter for `core::TssPtr<ThreadState>`, matching the original
+     * `boost::thread_specific_ptr<ContextStack>` cleanup callback that
+     * boost invoked when a thread carrying a ThreadState exited.
+     *
+     * Address: 0x00936FD0 (FUN_00936FD0, boost::thread_specific_ptr_ContextStack::cleanup)
+     *
+     * IDA signature:
+     * void __cdecl boost::thread_specific_ptr_ContextStack::cleanup(void *a1);
+     *
+     * What it does:
+     * When the per-thread value is non-null, runs ThreadState's destructor
+     * (address 0x00936CC0) and frees the allocation — exactly `delete`.
+     */
+    struct ThreadStateTssDeleter
+    {
+        void operator()(ThreadState* state) const noexcept;
+    };
+
+    /**
      * Global logging context singleton (size 0x1C).
      */
     struct LogContext
     {
-        core::TssPtr<ThreadState> tss;
+        core::TssPtr<ThreadState, ThreadStateTssDeleter> tss;
         core::SharedLock rw;
         LogTargetNode head;
         ThreadState* lastTls{};
@@ -448,6 +505,8 @@ namespace gpg
         ScopedLogContext& operator=(const ScopedLogContext&) = delete;
 
     private:
+        friend struct ThreadCtxEntry;
+
         ThreadCtxEntry* mEntry{};
     };
     static_assert(sizeof(ScopedLogContext) == 0x04, "ScopedLogContext size must be 0x04");
