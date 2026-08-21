@@ -6393,6 +6393,35 @@ namespace
   }
 
   using ThreadExitHandler = void(__cdecl*)();
+
+  /**
+   * The thread-monitor's handler list.
+   *
+   * Address: 0x00AC5A70 (FUN_00AC5A70, std::list<thread_exit_handler>::list)
+   * Address: 0x00AC5AD0 (FUN_00AC5AD0, std::list<thread_exit_handler>::_Buynode)
+   * Address: 0x00AC5B70 (FUN_00AC5B70, std::list<thread_exit_handler>::~list)
+   *
+   * What it does:
+   * Instantiating this one alias is what makes MSVC emit the three
+   * out-of-line `std::list<thread_exit_handler>` bodies that IDA surfaces as
+   * standalone functions. They are compiler emissions of this alias, not
+   * three hand-written functions, so the instantiating call sites below are
+   * the recovery of all three:
+   *
+   *   - 0x00AC5A70 is the default ctor: `operator new(0xC)` for the sentinel
+   *     node, then self-links `_Next`/`_Prev`. Emitted by the
+   *     `new (std::nothrow) ThreadExitHandlerList()` in `at_thread_exit`.
+   *   - 0x00AC5AD0 is the node splice behind `push_front`: `operator new(0xC)`
+   *     then stores `_Next`, `_Prev` and `_Myval`. Emitted by the
+   *     `handlers->push_front(exitHandler)` in `at_thread_exit`.
+   *   - 0x00AC5B70 is the dtor: unlinks the sentinel, walks `_Next` freeing
+   *     each node, zeroes `_Mysize`, then frees the sentinel. Emitted by the
+   *     `delete handlers` lanes in `on_thread_exit` and `at_thread_exit`.
+   *
+   * The 0xC node width (`_Next`, `_Prev`, `_Myval`) identifies the
+   * specialisation: one pointer-sized payload, which is the
+   * `void(__cdecl*)()` handler.
+   */
   using ThreadExitHandlerList = std::list<ThreadExitHandler>;
 
 }
