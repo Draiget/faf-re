@@ -11366,9 +11366,7 @@ namespace
     const gpg::fastvector_n<moho::CmdId, 8>& source
   )
   {
-    auto& destinationView = gpg::AsFastVectorRuntimeView<moho::CmdId>(&destination);
-    const auto& sourceView = gpg::AsFastVectorRuntimeView<moho::CmdId>(&source);
-    gpg::FastVectorRuntimeCopyAssign(destinationView, sourceView);
+    destination = source;
   }
 
   /**
@@ -11411,9 +11409,7 @@ namespace
   template <class T, std::size_t N>
   void CopyFastVectorN(gpg::fastvector_n<T, N>& destination, const gpg::fastvector_n<T, N>& source)
   {
-    auto& destinationView = gpg::AsFastVectorRuntimeView<T>(&destination);
-    const auto& sourceView = gpg::AsFastVectorRuntimeView<T>(&source);
-    gpg::FastVectorRuntimeCopyAssign(destinationView, sourceView);
+    destination = source;
   }
 
   /**
@@ -11433,9 +11429,7 @@ namespace
     destination->restrictionCategory.mUniverse = source->restrictionCategory.mUniverse;
     destination->restrictionCategory.mBits.mFirstWordIndex = source->restrictionCategory.mBits.mFirstWordIndex;
 
-    auto& destinationWords = gpg::AsFastVectorRuntimeView<unsigned int>(&destination->restrictionCategory.mBits.mWords);
-    const auto& sourceWords = gpg::AsFastVectorRuntimeView<unsigned int>(&source->restrictionCategory.mBits.mWords);
-    gpg::FastVectorRuntimeCopyAssign(destinationWords, sourceWords);
+    destination->restrictionCategory.mBits.mWords = source->restrictionCategory.mBits.mWords;
 
     destination->spawnElevationOffset = source->spawnElevationOffset;
     destination->moveSpeedMult = source->moveSpeedMult;
@@ -13081,17 +13075,13 @@ UnitWeaponInfo& UnitWeaponInfo::operator=(const UnitWeaponInfo& other)
   mCat1.mUniverse = other.mCat1.mUniverse;
   mCat1.mBits.mFirstWordIndex = other.mCat1.mBits.mFirstWordIndex;
   {
-    auto& destinationWords = gpg::AsFastVectorRuntimeView<unsigned int>(&mCat1.mBits.mWords);
-    const auto& sourceWords = gpg::AsFastVectorRuntimeView<unsigned int>(&other.mCat1.mBits.mWords);
-    gpg::FastVectorRuntimeCopyAssign(destinationWords, sourceWords);
+    mCat1.mBits.mWords = other.mCat1.mBits.mWords;
   }
 
   mCat2.mUniverse = other.mCat2.mUniverse;
   mCat2.mBits.mFirstWordIndex = other.mCat2.mBits.mFirstWordIndex;
   {
-    auto& destinationWords = gpg::AsFastVectorRuntimeView<unsigned int>(&mCat2.mBits.mWords);
-    const auto& sourceWords = gpg::AsFastVectorRuntimeView<unsigned int>(&other.mCat2.mBits.mWords);
-    gpg::FastVectorRuntimeCopyAssign(destinationWords, sourceWords);
+    mCat2.mBits.mWords = other.mCat2.mBits.mWords;
   }
 
   mLayer = other.mLayer;
