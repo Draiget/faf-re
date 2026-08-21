@@ -425,17 +425,17 @@ namespace moho
     }
 
     if (!destination.empty()) {
-      auto& view = msvc8::AsVectorRuntimeView(destination);
-      if (view.begin && view.end) {
-        DetachWeakPtrCUnitCommandRange(view.begin, view.end);
-      }
+      // WeakPtr<T>'s primary-template dtor is trivial and does not unlink, so
+      // the owner chains have to be detached explicitly before the container
+      // reuses or frees the slots.
+      DetachWeakPtrCUnitCommandRange(destination.begin(), destination.end());
     }
 
     destination.resize(sourceSize);
     if (sourceSize != 0u) {
-      auto& destinationView = msvc8::AsVectorRuntimeView(destination);
-      const auto& sourceView = msvc8::AsVectorRuntimeView(source);
-      (void)CopyWeakPtrCUnitCommandRangeAndReturnEnd(destinationView.begin, sourceView.begin, sourceView.end);
+      (void)CopyWeakPtrCUnitCommandRangeAndReturnEnd(
+        destination.begin(), source.begin(), source.end()
+      );
     }
 
     return &destination;
@@ -450,15 +450,13 @@ namespace moho
    */
   void ResetWeakPtrCUnitCommandVectorStorage(WeakPtrVector& storage)
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (view.begin != nullptr) {
-      DetachWeakPtrCUnitCommandRange(view.begin, view.end);
-      ::operator delete(view.begin);
+    if (storage.data() != nullptr) {
+      // Trivial WeakPtr dtor again: unlink first, then let _Tidy() free the
+      // block and null the three lanes.
+      DetachWeakPtrCUnitCommandRange(storage.begin(), storage.end());
     }
 
-    view.begin = nullptr;
-    view.end = nullptr;
-    view.capacityEnd = nullptr;
+    storage = WeakPtrVector{};
   }
 
   namespace
