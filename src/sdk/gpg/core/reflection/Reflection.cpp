@@ -13543,6 +13543,52 @@ RType::RType()
 
 /**
  * Address: 0x008DD9D0 (FUN_008DD9D0)
+ * Address: 0x00506F60 (FUN_00506F60)
+ * Address: 0x0050BC60 (FUN_0050BC60)
+ * Address: 0x0050BE90 (FUN_0050BE90)
+ * Address: 0x00518750 (FUN_00518750)
+ * Address: 0x0051C300 (FUN_0051C300)
+ * Address: 0x0051D6C0 (FUN_0051D6C0)
+ * Address: 0x0051D870 (FUN_0051D870)
+ * Address: 0x005218A0 (FUN_005218A0)
+ * Address: 0x005229E0 (FUN_005229E0)
+ * Address: 0x0053A360 (FUN_0053A360)
+ * Address: 0x00541490 (FUN_00541490)
+ * Address: 0x00550740 (FUN_00550740)
+ * Address: 0x005526C0 (FUN_005526C0)
+ * Address: 0x00552950 (FUN_00552950)
+ * Address: 0x00557E40 (FUN_00557E40)
+ * Address: 0x00558050 (FUN_00558050)
+ * Address: 0x00558260 (FUN_00558260)
+ * Address: 0x005584B0 (FUN_005584B0)
+ * Address: 0x0055B070 (FUN_0055B070)
+ * Address: 0x0055C0B0 (FUN_0055C0B0)
+ * Address: 0x0055C2A0 (FUN_0055C2A0)
+ * Address: 0x0055C4A0 (FUN_0055C4A0)
+ * Address: 0x0055C6B0 (FUN_0055C6B0)
+ * Address: 0x00563BA0 (FUN_00563BA0)
+ * Address: 0x00563DD0 (FUN_00563DD0)
+ * Address: 0x00566250 (FUN_00566250)
+ * Address: 0x00566640 (FUN_00566640)
+ * Address: 0x00571FC0 (FUN_00571FC0)
+ * Address: 0x00572020 (FUN_00572020)
+ * Address: 0x005777E0 (FUN_005777E0)
+ * Address: 0x005A84D0 (FUN_005A84D0)
+ * Address: 0x005DFB90 (FUN_005DFB90)
+ * Address: 0x005DFBF0 (FUN_005DFBF0)
+ * Address: 0x005ECFB0 (FUN_005ECFB0)
+ * Address: 0x005ED010 (FUN_005ED010)
+ * Address: 0x005F4AF0 (FUN_005F4AF0)
+ * Address: 0x005FA1E0 (FUN_005FA1E0)
+ * Address: 0x00604200 (FUN_00604200)
+ * Address: 0x00607520 (FUN_00607520)
+ * Address: 0x00610F90 (FUN_00610F90)
+ * Address: 0x00618F20 (FUN_00618F20)
+ * Address: 0x0061ABB0 (FUN_0061ABB0)
+ * Address: 0x0061EE00 (FUN_0061EE00)
+ * Address: 0x006261D0 (FUN_006261D0)
+ * Address: 0x007668C0 (FUN_007668C0)
+ * Address: 0x00766B00 (FUN_00766B00)
  * Address: 0x00786760 (FUN_00786760)
  * Address: 0x0078CB00 (FUN_0078CB00)
  * Address: 0x0078DD70 (FUN_0078DD70)
@@ -13555,11 +13601,20 @@ RType::RType()
  * Address: 0x007B5E10 (FUN_007B5E10)
  * Address: 0x007C0920 (FUN_007C0920)
  * Address: 0x0086A4E0 (FUN_0086A4E0)
+ * Address: 0x0087FF90 (FUN_0087FF90)
+ * Address: 0x008801B0 (FUN_008801B0)
  * Demangled: gpg::RType::dtr
  *
  * What it does:
- * Destroys base reflection type descriptor state; the listed FUN_0078xxxx and
- * FUN_0086A4E0 lanes are COMDAT clones of the same RType teardown body.
+ * Frees the RType base's two `msvc8::vector<RField>` storage lanes
+ * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C) and restores the
+ * `gpg::RObject` vftable. The listed clone addresses are COMDAT clones of
+ * this exact body: each one is the vtable-slot-2 scalar deleting destructor
+ * of a distinct `gpg::RType`/`gpg::REnumType`-derived descriptor class
+ * (TypeInfo / RBroadcasterRType_* / RListenerRType_* / PathQueue*TypeInfo /
+ * SSavedGame*TypeInfo, etc.) that adds no data members of its own, so the
+ * compiler emitted a byte-identical destructor body per class for the
+ * vtable slot instead of one shared symbol.
  */
 RType::~RType() = default;
 
