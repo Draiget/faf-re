@@ -2614,6 +2614,9 @@ namespace msvc8
          * pair for 568-byte `Moho::SUnitVariableUpdateEntry` -- ICF-folded to one
          * address)
          * Address: 0x005C9E00 (FUN_005C9E00, register-shape adapter for FUN_005CD1F0)
+         * Address: 0x00583130 (FUN_00583130, the `std::copy` emission for
+         * `Moho::SPointVector`, used by `clear()`'s degenerate self-range shift
+         * in the AI brain's point-vector reset)
          * Address: 0x008A9DC0 (FUN_008A9DC0, the `std::copy` emission for
          * `Moho::TerrainEnvironmentLookupPair` -- the pair's two member strings
          * are copied through their own assign lanes, so this is the
