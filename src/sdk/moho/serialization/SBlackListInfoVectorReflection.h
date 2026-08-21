@@ -23,6 +23,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006DE0A0 (FUN_006DE0A0, gpg::RVectorType_SBlackListInfo::dtr)
+     */
+    ~RVectorType() override;
+
+    /**
      * Address: 0x006DB5D0 (FUN_006DB5D0, gpg::RVectorType_SBlackListInfo::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
