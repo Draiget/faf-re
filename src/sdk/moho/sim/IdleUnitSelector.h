@@ -44,17 +44,16 @@ namespace moho
    * `FUN_00865490` (the process-global constructor / static-init thunk,
    * called from `FUN_00BE6160`, the same static-init-table shape as
    * `SelectionListener`'s `FUN_00BE62E0` and `PauseListener`'s
-   * `FUN_00BE6320`) is deliberately left unrecovered here: its idle-set head
-   * allocation calls `FUN_007B08D0`, which `recovered_progress.json` marks
-   * `recovered` in `CrtRuntimeHelpers.cpp`, but no such body actually exists
-   * there (stale/fake progress entry - `SelectionDragger.h` independently
-   * documents `FUN_007B08D0` as still-unrecovered too). That dependency
-   * bottoms out in the real, genuine `FUN_007B1420`/`FUN_007B4FA0` leaf
-   * allocators in `src/sdk/legacy/containers/Vector.cpp`, a file another
-   * recovery pass has in flight as of this change. Recovering the
-   * constructor on top of a fabricated dependency would just add more
-   * contamination, so it stays `blocked` pending a real `FUN_007B08D0`
-   * recovery pass.
+   * `FUN_00BE6320`) needed `FUN_007B08D0` (the idle-set head sentinel
+   * allocation) recovered for real first - it is now cited as a sibling
+   * `WeakEntitySetUserEntity::BuyNode()` emission (CWldSession.cpp), so the
+   * constructor below is real. The raw decompile registers the
+   * not-yet-fully-constructed object with `WLD_AddOnTeardownCallback` before
+   * either vtable is written (matching `SelectionListener`'s identical
+   * pattern) - the callback vector is never touched before real process
+   * teardown, so the registration-before-construction-completes ordering is
+   * behaviorally inert; the magic-static + register-after modernization
+   * already accepted for `SelectionListener` applies here unchanged.
    */
   class IdleUnitSelector
     : public ISessionListener
@@ -63,6 +62,19 @@ namespace moho
   {
     // Primary vftable (ISessionListener, 2 entries)
   public:
+    /**
+     * Address: 0x00865490 (FUN_00865490, IdleUnitSelector process-global
+     * constructor)
+     *
+     * What it does:
+     * Brings the idle-set head up as an empty self-linked sentinel through
+     * the now-recovered `InitWeakEntitySetHead` and zeroes the trailing
+     * `mSizeMirrorOrUnused` lane, matching the binary's explicit field-by-field
+     * setup (this type has no member default constructors of its own - every
+     * owner initializes it explicitly).
+     */
+    IdleUnitSelector();
+
     /**
      * Address: 0x008656A0 (FUN_008656A0)
      * Slot: 0 (ISessionListener primary vtable)
