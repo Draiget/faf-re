@@ -97,6 +97,16 @@ namespace msvc8
 
         // ---- iteration --------------------------------------------------------
 
+        /**
+         * Address: 0x0052D120 (FUN_0052D120)  Address: 0x0052D1C0 (FUN_0052D1C0)
+         * Address: 0x0052D250 (FUN_0052D250)  Address: 0x0052D2E0 (FUN_0052D2E0)
+         * Address: 0x0052D370 (FUN_0052D370)  Address: 0x0052D410 (FUN_0052D410)
+         * Address: 0x0052D4B0 (FUN_0052D4B0)
+         *
+         * The map-header initialisers for the seven `RRuleGameRulesImpl` blueprint
+         * tables: seat the sentinel head, self-link it and zero the size. The
+         * binary open-codes this once per table where the constructor now does it.
+         */
         [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }

@@ -1100,28 +1100,6 @@ namespace
     AssignRetainedReconGrid(army.SciReconGrid, reconDb->ReconGetSCIGrid());
     AssignRetainedReconGrid(army.FogReconGrid, reconDb->ReconGetVCIGrid());
   }
-
-  void VisitUnitBlueprintNodes(
-    moho::RRuleGameRulesBlueprintNode* const node,
-    const moho::RRuleGameRulesBlueprintNode* const sentinel,
-    std::uint32_t& minCategoryBit,
-    std::uint32_t& maxCategoryBit
-  )
-  {
-    if (node == nullptr || node == sentinel || node->mIsSentinel != 0u) {
-      return;
-    }
-
-    VisitUnitBlueprintNodes(node->left, sentinel, minCategoryBit, maxCategoryBit);
-
-    if (auto* const blueprint = static_cast<moho::RUnitBlueprint*>(node->mBlueprint); blueprint != nullptr) {
-      minCategoryBit = std::min(minCategoryBit, blueprint->mCategoryBitIndex);
-      maxCategoryBit = std::max(maxCategoryBit, blueprint->mCategoryBitIndex);
-    }
-
-    VisitUnitBlueprintNodes(node->right, sentinel, minCategoryBit, maxCategoryBit);
-  }
-
   /**
    * Absorbs binary helpers:
    * Address: 0x00701D20 (FUN_00701D20, msvc8::map<RResId, RUnitBlueprint*>::map copy ctor)
@@ -1149,14 +1127,20 @@ namespace
     }
 
     const moho::RRuleGameRulesBlueprintMap& unitBlueprints = army.Simulation->mRules->GetUnitBlueprints();
-    moho::RRuleGameRulesBlueprintNode* const sentinel = unitBlueprints.mHead;
-    if (sentinel == nullptr || unitBlueprints.mSize == 0u) {
+    if (unitBlueprints.empty()) {
       return;
     }
 
+    // The binary recurses the tree in order; the bounds it collects do not
+    // depend on visit order, so a plain traversal is equivalent.
     std::uint32_t minCategoryBit = std::numeric_limits<std::uint32_t>::max();
     std::uint32_t maxCategoryBit = 0u;
-    VisitUnitBlueprintNodes(sentinel->left, sentinel, minCategoryBit, maxCategoryBit);
+    for (const auto& entry : unitBlueprints) {
+      if (auto* const blueprint = static_cast<moho::RUnitBlueprint*>(entry.second); blueprint != nullptr) {
+        minCategoryBit = std::min(minCategoryBit, blueprint->mCategoryBitIndex);
+        maxCategoryBit = std::max(maxCategoryBit, blueprint->mCategoryBitIndex);
+      }
+    }
     if (minCategoryBit == std::numeric_limits<std::uint32_t>::max() || maxCategoryBit < minCategoryBit) {
       return;
     }

@@ -14277,97 +14277,6 @@ namespace
     return 0;
   }
 
-  [[nodiscard]] RRuleGameRulesBlueprintNode* AllocateBlueprintMapHeadNode()
-  {
-    auto* const head = new (std::nothrow) RRuleGameRulesBlueprintNode{};
-    if (!head) {
-      return nullptr;
-    }
-
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->mBlueprint = nullptr;
-    head->mColor = kTreeBlack;
-    head->mIsSentinel = 1u;
-    return head;
-  }
-
-  [[nodiscard]] RRuleGameRulesBlueprintNode* EnsureBlueprintMapHead(RRuleGameRulesBlueprintMap& map)
-  {
-    if (map.mHead != nullptr) {
-      return map.mHead;
-    }
-
-    map.mHead = AllocateBlueprintMapHeadNode();
-    map.mSize = 0u;
-    return map.mHead;
-  }
-
-  [[nodiscard]] RRuleGameRulesBlueprintNode*
-  FindBlueprintMapNode(RRuleGameRulesBlueprintMap& map, const msvc8::string& blueprintId)
-  {
-    RRuleGameRulesBlueprintNode* const head = EnsureBlueprintMapHead(map);
-    if (!head) {
-      return nullptr;
-    }
-
-    RRuleGameRulesBlueprintNode* result = head;
-    RRuleGameRulesBlueprintNode* node = head->parent;
-    while (node != nullptr && node != head && node->mIsSentinel == 0u) {
-      if (CompareStringLex(node->mBlueprintId, blueprintId) >= 0) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || CompareStringLex(blueprintId, result->mBlueprintId) < 0) {
-      return head;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x0052BFC0 (FUN_0052BFC0, sub_52BFC0)
-   *
-   * What it does:
-   * Probes one unit-blueprint map for the normalized blueprint id and returns
-   * either the exact-match node or the map sentinel when no exact match exists.
-   */
-  [[nodiscard]] RRuleGameRulesBlueprintNode*
-  ProbeUnitBlueprintMapNode(RRuleGameRulesBlueprintMap& map, const msvc8::string& blueprintId)
-  {
-    return FindBlueprintMapNode(map, blueprintId);
-  }
-
-  /**
-   * Address: 0x0052C0A0 (FUN_0052C0A0, sub_52C0A0)
-   *
-   * What it does:
-   * Probes one projectile-blueprint map for the normalized blueprint id and
-   * returns either the exact-match node or the map sentinel.
-   */
-  [[nodiscard]] RRuleGameRulesBlueprintNode*
-  ProbeProjectileBlueprintMapNode(RRuleGameRulesBlueprintMap& map, const msvc8::string& blueprintId)
-  {
-    return FindBlueprintMapNode(map, blueprintId);
-  }
-
-  /**
-   * Address: 0x0052C180 (FUN_0052C180, sub_52C180)
-   *
-   * What it does:
-   * Probes one prop-blueprint map for the normalized blueprint id and returns
-   * either the exact-match node or the map sentinel.
-   */
-  [[nodiscard]] RRuleGameRulesBlueprintNode*
-  ProbePropBlueprintMapNode(RRuleGameRulesBlueprintMap& map, const msvc8::string& blueprintId)
-  {
-    return FindBlueprintMapNode(map, blueprintId);
-  }
-
   struct BlueprintNodeIdPayloadView
   {
     msvc8::string mBlueprintId; // +0x00
@@ -14383,96 +14292,6 @@ namespace
     offsetof(BlueprintNodeIdPayloadView, mBlueprint) == 0x1C,
     "BlueprintNodeIdPayloadView::mBlueprint offset must be 0x1C"
   );
-
-  /**
-   * Address: 0x00536650 (FUN_00536650)
-   *
-   * What it does:
-   * Initializes one blueprint-map node with left/parent/right links, copies
-   * blueprint id + payload pointer from one `{string,void*}` source lane, and
-   * writes color/sentinel state bytes.
-   */
-  [[maybe_unused]] [[nodiscard]] RRuleGameRulesBlueprintNode* InitializeBlueprintMapNodeFromIdPayload(
-    RRuleGameRulesBlueprintNode* const destination,
-    RRuleGameRulesBlueprintNode* const left,
-    RRuleGameRulesBlueprintNode* const parent,
-    RRuleGameRulesBlueprintNode* const right,
-    const BlueprintNodeIdPayloadView& source,
-    const std::uint8_t color
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    destination->left = left;
-    destination->parent = parent;
-    destination->right = right;
-    destination->mBlueprintId = source.mBlueprintId;
-    destination->mBlueprint = source.mBlueprint;
-    destination->mColor = color;
-    destination->mIsSentinel = 0u;
-    return destination;
-  }
-
-  [[nodiscard]] RRuleGameRulesBlueprintNode*
-  InsertBlueprintMapNode(RRuleGameRulesBlueprintMap& map, const msvc8::string& blueprintId, void* const blueprint)
-  {
-    RRuleGameRulesBlueprintNode* const head = EnsureBlueprintMapHead(map);
-    if (!head) {
-      return nullptr;
-    }
-
-    if (RRuleGameRulesBlueprintNode* const existing = FindBlueprintMapNode(map, blueprintId); existing && existing != head) {
-      return existing;
-    }
-
-    RRuleGameRulesBlueprintNode* parent = head;
-    RRuleGameRulesBlueprintNode* cursor = head->parent;
-    bool insertLeft = true;
-    while (cursor != nullptr && cursor != head && cursor->mIsSentinel == 0u) {
-      parent = cursor;
-      if (CompareStringLex(blueprintId, cursor->mBlueprintId) < 0) {
-        insertLeft = true;
-        cursor = cursor->left;
-      } else {
-        insertLeft = false;
-        cursor = cursor->right;
-      }
-    }
-
-    auto* const node = new (std::nothrow) RRuleGameRulesBlueprintNode{};
-    if (!node) {
-      return head;
-    }
-
-    node->left = head;
-    node->parent = parent;
-    node->right = head;
-    node->mBlueprintId = blueprintId;
-    node->mBlueprint = blueprint;
-    node->mColor = kTreeBlack;
-    node->mIsSentinel = 0u;
-
-    if (parent == head) {
-      head->parent = node;
-      head->left = node;
-      head->right = node;
-    } else if (insertLeft) {
-      parent->left = node;
-      if (parent == head->left) {
-        head->left = node;
-      }
-    } else {
-      parent->right = node;
-      if (parent == head->right) {
-        head->right = node;
-      }
-    }
-
-    ++map.mSize;
-    return node;
-  }
 
   [[nodiscard]] CategoryLookupNodeView* AllocateCategoryLookupHeadNode()
   {
@@ -14837,9 +14656,8 @@ namespace
     }
 
     TBlueprint* blueprint = nullptr;
-    if (RRuleGameRulesBlueprintNode* const found = FindBlueprintMapNode(map, normalizedId);
-        found != nullptr && found != map.mHead) {
-      blueprint = static_cast<TBlueprint*>(found->mBlueprint);
+    if (const auto found = map.find(normalizedId); found != map.end()) {
+      blueprint = static_cast<TBlueprint*>(found->second);
     }
 
     if (!blueprint) {
@@ -14851,8 +14669,8 @@ namespace
         return nullptr;
       }
 
-      RRuleGameRulesBlueprintNode* const inserted = InsertBlueprintMapNode(map, normalizedId, blueprint);
-      if (!inserted || inserted == map.mHead) {
+      const auto inserted = map.insert(RRuleGameRulesBlueprintMap::value_type(normalizedId, blueprint));
+      if (!inserted.second) {
         delete blueprint;
         return nullptr;
       }
@@ -14886,9 +14704,8 @@ namespace
     gpg::ScopedLogContext logScope(logContextText);
 
     TBlueprint* blueprint = nullptr;
-    if (RRuleGameRulesBlueprintNode* const found = FindBlueprintMapNode(map, normalizedId);
-        found != nullptr && found != map.mHead) {
-      blueprint = static_cast<TBlueprint*>(found->mBlueprint);
+    if (const auto found = map.find(normalizedId); found != map.end()) {
+      blueprint = static_cast<TBlueprint*>(found->second);
     }
 
     if (!blueprint) {
@@ -14900,8 +14717,8 @@ namespace
       blueprint->mOwnerRules = rules;
       gpg::STR_CopyFilename(&blueprint->BlueprintId.name, &normalizedId);
 
-      RRuleGameRulesBlueprintNode* const inserted = InsertBlueprintMapNode(map, normalizedId, blueprint);
-      if (!inserted || inserted == map.mHead) {
+      const auto inserted = map.insert(RRuleGameRulesBlueprintMap::value_type(normalizedId, blueprint));
+      if (!inserted.second) {
         delete blueprint;
         return nullptr;
       }

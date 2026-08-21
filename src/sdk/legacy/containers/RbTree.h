@@ -494,8 +494,28 @@ namespace msvc8
 
             [[nodiscard]] const key_compare& key_comp() const noexcept { return this->comp(); }
 
+            /**
+             * Address: 0x0052BB20 (FUN_0052BB20)  Address: 0x0052BC50 (FUN_0052BC50)
+             * Address: 0x0052BFA0 (FUN_0052BFA0)  Address: 0x0052C080 (FUN_0052C080)
+             * Address: 0x0052C160 (FUN_0052C160)  Address: 0x0052C330 (FUN_0052C330)
+             * Address: 0x0052C410 (FUN_0052C410)  Address: 0x0052C4F0 (FUN_0052C4F0)
+             *
+             * The `end()` lane -- the sentinel head itself.
+             */
             [[nodiscard]] node_type* header() const noexcept { return head_; }
             [[nodiscard]] node_type* root() const noexcept { return head_->parent; }
+            /**
+             * Address: 0x0052BB00 (FUN_0052BB00)  Address: 0x0052BB10 (FUN_0052BB10)
+             * Address: 0x0052BC40 (FUN_0052BC40)  Address: 0x0052BF90 (FUN_0052BF90)
+             * Address: 0x0052C240 (FUN_0052C240)  Address: 0x0052C320 (FUN_0052C320)
+             * Address: 0x0052C400 (FUN_0052C400)  Address: 0x0052C4E0 (FUN_0052C4E0)
+             * Address: 0x0052E140 (FUN_0052E140)  Address: 0x0052E320 (FUN_0052E320)
+             * Address: 0x0052E500 (FUN_0052E500)
+             *
+             * The `head->left` begin lane, emitted once per blueprint table.
+             *
+             * All belong to the seven `std::map<std::string, TBlueprint*>` tables on `RRuleGameRulesImpl` (+0x60 through +0xA8). One emission per table is why the same member carries six or seven addresses.
+             */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
 
@@ -523,6 +543,18 @@ namespace msvc8
              * What it does:
              * Returns the first node whose key does not order before `k`, or the
              * header when every stored key orders before it.
+             */
+            /**
+             * Address: 0x0052D150 (FUN_0052D150)  Address: 0x0052D1F0 (FUN_0052D1F0)
+             * Address: 0x0052D280 (FUN_0052D280)  Address: 0x0052D310 (FUN_0052D310)
+             * Address: 0x0052D3A0 (FUN_0052D3A0)  Address: 0x0052D440 (FUN_0052D440)
+             * Address: 0x0052D4E0 (FUN_0052D4E0)
+             * Address: 0x0052E060 (FUN_0052E060)  Address: 0x0052E240 (FUN_0052E240)
+             * Address: 0x0052E420 (FUN_0052E420)  Address: 0x0052E600 (FUN_0052E600)
+             * Address: 0x0052E7D0 (FUN_0052E7D0)  Address: 0x0052EB70 (FUN_0052EB70)
+             *
+             * The blueprint-id descent. The 0x0052Exxx six are the walk itself, one
+             * per table; the 0x0052Dxxx seven are the store-result adapters over it.
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -559,6 +591,15 @@ namespace msvc8
              * `CArmyStats::mNameIndex`; the `[this+0x14]` it opens with is that member's
              * offset in CArmyStats, not a node field)
              * Address: 0x00595130 (FUN_00595130, the same descent emitted a second time)
+             */
+            /**
+             * Address: 0x0052C420 (FUN_0052C420, already labelled
+             * `std::map_string_RBeamBlueprint::operator[]` -- the lower-bound-then-verify
+             * form `find` compiles to)
+             * Address: 0x0052C260 (FUN_0052C260)  Address: 0x0052C340 (FUN_0052C340)
+             * Address: 0x0052C500 (FUN_0052C500)
+             *
+             * The mesh, emitter and trail lookups respectively.
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -1005,6 +1046,14 @@ namespace msvc8
              * Address: 0x00711B00 (FUN_00711B00, the blueprint-stat map's node buy --
              * writes the key at `+0x0C`, the float at `+0x10` and the colour/nil pair at
              * `+0x14`/`+0x15`, matching the 0x18 node exactly.)
+             */
+            /**
+             * Address: 0x0052F740 (FUN_0052F740)  Address: 0x0052FAE0 (FUN_0052FAE0)
+             * Address: 0x0052FE80 (FUN_0052FE80)  Address: 0x00530220 (FUN_00530220)
+             * Address: 0x005305D0 (FUN_005305D0)  Address: 0x00530980 (FUN_00530980)
+             *
+             * The per-table head-sentinel allocators: one `operator new` of the 0x30
+             * node, then self-linked and flagged as the sentinel.
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
