@@ -23,7 +23,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/STIMap.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -31,6 +31,11 @@ namespace gpg
   class RMapType_uint_int final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0071DC40 (FUN_0071DC40, gpg::RMapType_uint_int::dtr)
+     */
+    ~RMapType_uint_int() override = default;
+
     /**
      * Address: 0x00718C70 (FUN_00718C70, gpg::RMapType_uint_int::GetName)
      */
@@ -56,6 +61,11 @@ namespace gpg
   class RMapType_uint_InfluenceMapEntry final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0071DD00 (FUN_0071DD00, gpg::RMapType_uint_InfluenceMapEntry::dtr)
+     */
+    ~RMapType_uint_InfluenceMapEntry() override = default;
+
     /**
      * Address: 0x00718FE0 (FUN_00718FE0, gpg::RMapType_uint_InfluenceMapEntry::GetName)
      */
@@ -89,6 +99,11 @@ namespace gpg
   class RVectorType_InfluenceGrid final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0071DCA0 (FUN_0071DCA0, gpg::RVectorType_InfluenceGrid::dtr)
+     */
+    ~RVectorType_InfluenceGrid() override = default;
+
     /**
      * Address: 0x00718DE0 (FUN_00718DE0, gpg::RVectorType_InfluenceGrid::GetName)
      */
@@ -142,6 +157,11 @@ namespace gpg
   class RVectorType_SThreat final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0071DD60 (FUN_0071DD60, gpg::RVectorType_SThreat::dtr)
+     */
+    ~RVectorType_SThreat() override = default;
+
     /**
      * Address: 0x00719150 (FUN_00719150, gpg::RVectorType_SThreat::GetName)
      */
