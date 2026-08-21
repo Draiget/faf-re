@@ -90332,6 +90332,49 @@ namespace moho::runtime
   {
     return ::getnameinfo(sockaddr, sockaddrLength, nodeBuffer, nodeBufferSize, serviceBuffer, serviceBufferSize, flags);
   }
+  /**
+   * Address: 0x00AC6488 (FUN_00AC6488, freeaddrinfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `freeaddrinfo`.
+   */
+  void Thunkfreeaddrinfo(void *addrInfo)
+  {
+    ::freeaddrinfo(addrInfo);
+  }
+
+  /**
+   * Address: 0x00AC64AC (FUN_00AC64AC, getsockname)
+   *
+   * What it does:
+   * Import thunk that forwards to `getsockname`.
+   */
+  int Thunkgetsockname(const std::uintptr_t socketHandle, void *name, int *nameLength)
+  {
+    return ::getsockname(socketHandle, name, nameLength);
+  }
+
+  /**
+   * Address: 0x00AC64B8 (FUN_00AC64B8, getpeername)
+   *
+   * What it does:
+   * Import thunk that forwards to `getpeername`.
+   */
+  int Thunkgetpeername(const std::uintptr_t socketHandle, void *name, int *nameLength)
+  {
+    return ::getpeername(socketHandle, name, nameLength);
+  }
+
+  /**
+   * Address: 0x00AC64CA (FUN_00AC64CA, WSAWaitForMultipleEvents)
+   *
+   * What it does:
+   * Import thunk that forwards to `WSAWaitForMultipleEvents`.
+   */
+  DWORD ThunkWSAWaitForMultipleEvents(const DWORD eventCount, const HANDLE *eventHandles, const BOOL waitAll, const DWORD timeoutMs, const BOOL alertable)
+  {
+    return ::WSAWaitForMultipleEvents(eventCount, eventHandles, waitAll, timeoutMs, alertable);
+  }
 } // namespace moho::runtime
 
 
