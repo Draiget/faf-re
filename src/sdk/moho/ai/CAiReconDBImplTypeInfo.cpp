@@ -10,7 +10,7 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/ai/IAiReconDBTypeInfo.h"
-#include "moho/sim/ReconBlip.h"
+#include "moho/sim/ReconBlip.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -60,6 +60,11 @@ namespace
   {
   public:
     /**
+     * Address: 0x005CA810 (FUN_005CA810, gpg::RVectorType_ReconBlipP::dtr)
+     */
+    ~ReconBlipPointerVectorTypeRuntime() override = default;
+
+    /**
      * Address: 0x005C40D0 (FUN_005C40D0, gpg::RVectorType_ReconBlipP::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
@@ -101,6 +106,11 @@ namespace
   class ReconBlipMapTypeRuntime final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005CA870 (FUN_005CA870, gpg::RMultiMapType_SReconKey_ReconBlipP::dtr)
+     */
+    ~ReconBlipMapTypeRuntime() override = default;
+
     /**
      * Address: 0x005C4D50 (FUN_005C4D50, gpg::RMultiMapType_SReconKey_ReconBlipP::GetName)
      */
