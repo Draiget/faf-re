@@ -68,6 +68,10 @@ namespace moho
 
   /**
    * Address: 0x00BF4190 (FUN_00BF4190, Moho::EResourceTypeTypeInfo::~EResourceTypeTypeInfo)
+   * Address: 0x00545AE0 (FUN_00545AE0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    *
    * The vtable-slot-0 deleting-destructor thunk (FUN_00545AE0, `this,
    * deleteFlags` shape: runs this destructor then conditionally frees the

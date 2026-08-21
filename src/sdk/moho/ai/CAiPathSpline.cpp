@@ -1791,6 +1791,12 @@ void CPathPointTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x0062F5B0 (FUN_0062F5B0, vtable-slot-2 scalar deleting
+ * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+ * conditionally frees the object -- ordinary C++ `delete` semantics, not
+ * modeled as a separate function here)
+ */
 EPathPointStateTypeInfo::~EPathPointStateTypeInfo() = default;
 
 const char* EPathPointStateTypeInfo::GetName() const

@@ -82,6 +82,10 @@ namespace moho
 
   /**
    * Address: 0x00715580 (FUN_00715580, j_??1REnumType@gpg@@QAE@@Z_48)
+   * Address: 0x00715560 (FUN_00715560, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    */
   EThreatTypeTypeInfo::~EThreatTypeTypeInfo() = default;
 

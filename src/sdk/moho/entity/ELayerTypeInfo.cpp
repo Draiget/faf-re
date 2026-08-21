@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <new>
-#include <typeinfo>
+#include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -141,6 +141,10 @@ namespace moho
 {
   /**
    * Address: 0x00BF2070 (FUN_00BF2070, Moho::ELayerTypeInfo::dtr)
+   * Address: 0x0050BA80 (FUN_0050BA80, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    */
   ELayerTypeInfo::~ELayerTypeInfo() = default;
 

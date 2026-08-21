@@ -6,7 +6,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -177,6 +177,12 @@ namespace moho
     gpg::PreRegisterRType(typeid(ECommandEvent), this);
   }
 
+  /**
+   * Address: 0x006E7DF0 (FUN_006E7DF0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `gpg::REnumType::~REnumType(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
+   */
   ECommandEventTypeInfo::~ECommandEventTypeInfo() = default;
 
   const char* ECommandEventTypeInfo::GetName() const
