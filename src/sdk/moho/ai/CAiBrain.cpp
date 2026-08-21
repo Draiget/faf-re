@@ -444,28 +444,6 @@ namespace
   }
 
   /**
-   * Address: 0x00583130 (FUN_00583130, func_CopyPointVects)
-   *
-   * What it does:
-   * Copies one half-open `SPointVector` range into destination storage and
-   * returns the end pointer reached by the copy loop.
-   */
-  [[maybe_unused]] [[nodiscard]] SPointVector* CopyPointVectorRangeAndReturnEnd(
-    SPointVector* destination,
-    const SPointVector* sourceBegin,
-    const SPointVector* sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      (void)CopySPointVectorAndReturnDestination(destination, sourceBegin);
-      ++destination;
-      ++sourceBegin;
-    }
-
-    return destination;
-  }
-
-  /**
    * Address: 0x0057D8B0 (FUN_0057D8B0)
    *
    * What it does:
