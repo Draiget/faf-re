@@ -2213,6 +2213,17 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x007E6940 (FUN_007E6940, boost::detail::sp_counted_impl_p<Moho::RMeshBlueprintLOD>::dispose)
+     *
+     * What it does:
+     * Deletes one owned `RMeshBlueprintLOD` pointee bound to this shared-count
+     * control lane when present.
+     */
+    void SpCountedImplPDisposeRMeshBlueprintLOD(
+        SpCountedImplStorage<moho::RMeshBlueprintLOD>* countedImpl
+    ) noexcept;
+
+    /**
      * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
      *
      * What it does:

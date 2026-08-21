@@ -4467,6 +4467,26 @@ namespace boost
   }
 
   /**
+   * Address: 0x007E6940 (FUN_007E6940, boost::detail::sp_counted_impl_p<Moho::RMeshBlueprintLOD>::dispose)
+   *
+   * What it does:
+   * Deletes one owned `RMeshBlueprintLOD` pointee bound to this shared-count
+   * control lane when present. Was previously mis-classified `external_dependency`
+   * ("no Moho/gpg engine references") -- the engine-ness comes from the template
+   * instantiation (T=RMeshBlueprintLOD), not from symbols visible in this
+   * function's own body, which is why the automated third-party-body scan
+   * missed it; the destructor callee (`0x00519800`) is
+   * `RMeshBlueprintLOD::~RMeshBlueprintLOD`, already reached from
+   * `gpg::RVectorType_RMeshBlueprintLOD::SerLoad`'s cleanup path.
+   */
+  void SpCountedImplPDisposeRMeshBlueprintLOD(
+    SpCountedImplStorage<moho::RMeshBlueprintLOD>* const countedImpl
+  ) noexcept
+  {
+    DisposeSpCountedImplPointee(countedImpl);
+  }
+
+  /**
    * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
    *
    * What it does:
