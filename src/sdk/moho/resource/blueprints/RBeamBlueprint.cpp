@@ -41,6 +41,10 @@ namespace moho
 
   /**
    * Address: 0x0050EFD0 (FUN_0050EFD0, Moho::RBeamBlueprint::dtr core)
+   * Address: 0x0050EFB0 (FUN_0050EFB0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the core body above then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Releases beam texture string storage and resets base resource-id storage.

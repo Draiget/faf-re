@@ -12,7 +12,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/EFormationdStatusTypeInfo.h"
-#include "moho/unit/Broadcaster.h"
+#include "moho/unit/Broadcaster.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -315,6 +315,11 @@ namespace moho
 
   /**
    * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
+   * Address: 0x00565CA0 (FUN_00565CA0, vtable-slot-2 scalar deleting
+   * destructor: the full compiler-emitted picture -- sets this object's own
+   * vftable, performs the same intrusive-list unlink as the body below
+   * (`ListUnlink()`), transitions the vftable down to `CountedObject` for
+   * base-class teardown, then conditionally frees the object)
    *
    * What it does:
    * Unlinks the embedded `Broadcaster<EFormationdStatus>` lane from its

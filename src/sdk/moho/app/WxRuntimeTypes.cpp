@@ -66423,6 +66423,10 @@ moho::MohoApp* CreateMohoAppWithBuildOptionsCheck()
 
 /**
  * Address: 0x00992070 (FUN_00992070, Moho::MohoApp::~MohoApp)
+ * Address: 0x004F1F60 (FUN_004F1F60, vtable-slot-2 scalar deleting
+ * destructor: tail-calls the body below then conditionally frees the object
+ * -- ordinary C++ `delete` semantics, not modeled as a separate function
+ * here)
  * Mangled: ??1MohoApp@Moho@@QAE@@Z
  *
  * What it does:

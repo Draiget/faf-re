@@ -31,6 +31,10 @@ namespace moho
 
   /**
    * Address: 0x0050EE20 (FUN_0050EE20, Moho::RTrailBlueprint::dtr core)
+   * Address: 0x0050EE00 (FUN_0050EE00, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the core body above then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Releases trail texture string storage and resets base resource-id storage.

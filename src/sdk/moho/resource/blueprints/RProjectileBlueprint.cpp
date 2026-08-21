@@ -82,6 +82,10 @@ namespace moho
 
   /**
    * Address: 0x0051B840 (FUN_0051B840, Moho::RProjectileBlueprint::dtr)
+   * Address: 0x0051B7F0 (FUN_0051B7F0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the core body above then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Runs non-deleting teardown for projectile-specific string lanes, then

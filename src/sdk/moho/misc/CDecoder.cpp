@@ -45,6 +45,11 @@ namespace
 
     /**
      * Address: 0x006E3FB0 (FUN_006E3FB0, non-deleting dtor lane)
+     * Address: 0x006E3F60 (FUN_006E3F60, vtable-slot-2 scalar deleting
+     * destructor: the full compiler-emitted picture -- restores the
+     * `std::runtime_error` vftable, frees the SSO message buffer when its
+     * capacity is >= 16, chains into `std::exception::~exception(this)`,
+     * then conditionally frees the object)
      *
      * What it does:
      * Destroys one decoder-message exception payload by delegating to

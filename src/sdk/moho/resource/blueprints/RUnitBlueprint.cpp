@@ -783,6 +783,10 @@ namespace moho
 
   /**
    * Address: 0x0051E980 (FUN_0051E980)
+   * Address: 0x0051E6D0 (FUN_0051E6D0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `Moho::RUnitBlueprint::~RUnitBlueprint(this)` then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    * Mangled: ??1RUnitBlueprint@Moho@@QAE@@Z
    *
    * What it does:

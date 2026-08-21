@@ -165,6 +165,10 @@ namespace moho
 
   /**
    * Address: 0x0050EB10 (FUN_0050EB10, ??1REmitterBlueprint@Moho@@UAE@XZ)
+   * Address: 0x0050EAF0 (FUN_0050EAF0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `Moho::REmitterBlueprint::~REmitterBlueprint(this)`
+   * then conditionally frees the object -- ordinary C++ `delete` semantics,
+   * not modeled as a separate function here)
    * Mangled: ??1REmitterBlueprint@Moho@@UAE@XZ
    *
    * IDA signature:
