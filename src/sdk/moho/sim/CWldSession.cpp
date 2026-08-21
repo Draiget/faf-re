@@ -1371,6 +1371,14 @@ namespace moho
   float ui_PathSmoothness = 0.0f;              // 0x00F57CC8
   float ui_MaxTextLOD = 0.0f;                  // 0x00F57CCC
   std::int32_t ui_CommandGraphMaxNodeUnits = 0; // 0x00F57CD0
+
+  /**
+   * Degenerate-length cutoff `RecomputeDrawNodeOrientation` compares its summed
+   * edge direction against before normalizing (`flt_D71BFC`, loaded at
+   * 0x00827979). Below it the node keeps a zero orientation hint rather than
+   * normalizing noise into an arbitrary direction.
+   */
+  constexpr float kCommandGraphOrientationEpsilon = 1.0e-6f;
   float ui_MinWaypointSize = 0.0f;             // 0x00F57CD4
   float ui_MaxWaypointSize = 0.0f;             // 0x00F57CD8
   float ui_WaypointLineScale = 0.0f;           // 0x00F57CDC
@@ -1514,6 +1522,48 @@ namespace moho
     {
       CommandGraphHelperHead* mHead; // +0x00
       CommandGraphHelperLink* mNext; // +0x04
+
+      /**
+       * Splices this link out of whichever command's chain currently holds it.
+       *
+       * The chain is threaded pointer-to-pointer, so the only way to find the
+       * slot that refers to this link is to walk from the head. The leading
+       * null test is not redundant bookkeeping on our side - the binary really
+       * does re-test the head at every unlink site (0x00826568 in the draw-node
+       * destructor, 0x00829041 in `CreateMeshes`), because a node whose command
+       * has already been retired carries a null head.
+       *
+       * Leaves `mHead`/`mNext` untouched: every caller either overwrites them
+       * immediately via `LinkInto` or is destroying the node.
+       */
+      void UnlinkFromChain() noexcept
+      {
+        if (mHead == nullptr) {
+          return;
+        }
+
+        CommandGraphHelperLink** slot = &mHead->mFirst;
+        while (*slot != this) {
+          slot = &(*slot)->mNext;
+        }
+        *slot = mNext;
+      }
+
+      /**
+       * Publishes this link at the front of `head`'s chain, or clears it when
+       * `head` is null. Matches 0x0082905E..0x0082906D and the identical block
+       * the draw-node relocate helper runs at 0x0082D54B.
+       */
+      void LinkInto(CommandGraphHelperHead* const head) noexcept
+      {
+        mHead = head;
+        if (head != nullptr) {
+          mNext = head->mFirst;
+          head->mFirst = this;
+        } else {
+          mNext = nullptr;
+        }
+      }
     };
 
     struct CommandGraphHelperHead
@@ -1549,6 +1599,25 @@ namespace moho
           mCapacity = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*mInlineOrigin));
         }
         mEnd = mBegin;
+      }
+
+      [[nodiscard]] std::int32_t size() const noexcept
+      {
+        return static_cast<std::int32_t>(mEnd - mBegin);
+      }
+
+      [[nodiscard]] bool empty() const noexcept { return mEnd == mBegin; }
+
+      /**
+       * Every lane in this class stores pointers, so the raw dword element is
+       * always read back as one. The cast lives here rather than at the call
+       * sites: the lane's storage is dword-shaped because that is the binary's
+       * `gpg::fastvector` instantiation, not because callers think in dwords.
+       */
+      template <typename T>
+      [[nodiscard]] T* At(const std::int32_t index) const noexcept
+      {
+        return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBegin[index]));
       }
     };
 
@@ -1591,8 +1660,20 @@ namespace moho
        */
       Wm3::Vector3f mOrientationHint;      // +0x28
       Wm3::Vector3f mPreviousCentroid;     // +0x34
-      float field_0x40;                    // +0x40
-      std::uint32_t field_0x44;            // +0x44
+      /**
+       * Render scale driven by how busy the node is: `RecomputeDrawNodeOrientation`
+       * sets it to `sqrt(units on the busier edge lane)`, and the waypoint and
+       * ETA-label passes multiply their style scale by it. Was `field_0x40`
+       * until 0x008275B0's write at 0x008279E8 pinned the meaning.
+       */
+      float mUnitCountScale;               // +0x40
+      /**
+       * The game tick this order is estimated to finish on, propagated through
+       * the edge graph by `ResolveDrawNodeCompletionTick`. `DisplayCommandNode`
+       * subtracts the current tick from it to render "ETA: mm:ss". Was
+       * `field_0x44` until 0x008272A0's write at 0x008272E0 pinned the meaning.
+       */
+      std::uint32_t mCompletionTick;       // +0x44
       CommandGraphDwordLane mLaneA;        // +0x48
       CommandGraphDwordLane mLaneB;        // +0x60
 
@@ -1634,6 +1715,24 @@ namespace moho
       void** mStart;     // +0x04
       void** mFinish;    // +0x08
       void** mEnd;       // +0x0C
+
+      /**
+       * Address: 0x0082DBA0 (FUN_0082DBA0, sub_82DBA0) - the VC8
+       * `vector<T>::assign(count, value)` emission for this bucket vector,
+       * which is spelled `erase(begin(), end())` followed by
+       * `insert(begin(), count, value)`. The erase degenerates to
+       * `mFinish = mStart` (its shift-down loop copies an empty range - the
+       * binary's `cmp edx, edx` at 0x0082DBB3 is always equal), and the insert
+       * fills in place because the caller's capacity already covers `count`.
+       */
+      void assign(const std::size_t count, void* const value) noexcept
+      {
+        mFinish = mStart;
+        for (std::size_t index = 0; index < count; ++index) {
+          *mFinish = value;
+          ++mFinish;
+        }
+      }
     };
 
     template <typename TNode>
@@ -2119,8 +2218,112 @@ namespace moho
 
     /**
      * Address: 0x00828FB0 (FUN_00828FB0, Moho::UICommandGraph::CreateMeshes)
+     *
+     * IDA signature:
+     * void callcnv_33 Moho::UICommandGraph::CreateMeshes(Moho::UICommandGraph *a1);
+     *
+     * What it does:
+     * The command graph's once-per-frame build pass. When the graph is dirty it
+     * rebuilds every queued-order node and edge from the live command queues and
+     * recomputes each node's orderline orientation. It then re-binds every
+     * draw node to whichever command-issue helper currently owns its command id
+     * (commands retire and are re-issued between frames, so the intrusive chain
+     * has to be re-pointed), seeding a node's world anchor from the helper's
+     * command history the first time that node resolves. On a rebuild frame it
+     * additionally propagates completion-tick estimates through the edge graph
+     * and creates the translucent "UnitPlace" preview mesh for mobile-build
+     * orders. Finally it drives the console path-preview overlay.
      */
     void CreateMeshes();
+
+    /**
+     * Address: 0x00826740 (FUN_00826740, sub_826740)
+     *
+     * IDA signature:
+     * void __thiscall sub_826740(Moho::UICommandGraph *this);
+     *
+     * What it does:
+     * Rebuilds the whole command-graph node/edge set from scratch. Resets the
+     * per-frame containers, collects every mesh-bearing entity in the session's
+     * spatial database, and folds each significant unit's command queue into
+     * the graph - plus the separate factory build queue for stationary
+     * factories.
+     */
+    void RebuildCommandQueueNodes();
+
+    /**
+     * Address: 0x00826000 (FUN_00826000, sub_826000)
+     *
+     * IDA signature:
+     * void __usercall sub_826000(Moho::UICommandGraph *this@<edi>);
+     *
+     * What it does:
+     * Clears everything a rebuild pass regenerates: the edge hash table and its
+     * buckets, the texture-keyed orderline tree, and both draw-node tables' edge
+     * lanes. Queue-head nodes (`mMapAB1`) additionally have their accumulated
+     * centroid and weight zeroed, because the rebuild re-accumulates them across
+     * every unit sharing the queue.
+     */
+    void PrepareForRebuild();
+
+    /**
+     * Address: 0x00826BA0 (FUN_00826BA0, sub_826BA0)
+     *
+     * IDA signature:
+     * _DWORD **__usercall sub_826BA0@<eax>(Moho::UICommandGraph *this@<ebx>);
+     *
+     * What it does:
+     * Recomputes the orderline orientation hint of every draw node, queue-head
+     * table first and per-command table second.
+     */
+    void RecomputeAllDrawNodeOrientations();
+
+    /**
+     * Address: 0x008275B0 (FUN_008275B0, sub_8275B0)
+     *
+     * IDA signature:
+     * void __usercall sub_8275B0(Moho::UICommandGraph::UICommandGraphDrawNode *this@<esi>);
+     *
+     * What it does:
+     * Derives one draw node's orderline tangent from the edges on both of its
+     * lanes: each edge contributes the unit vector towards its far endpoint's
+     * centroid, scaled by that edge's unit count (clamped to
+     * `ui_CommandGraphMaxNodeUnits`). The summed direction is normalized into
+     * `mOrientationHint`, and the node's render scale becomes the square root of
+     * the busier lane's unit total. Each edge also records where it sits in its
+     * lane's ribbon bundle, so parallel orderlines fan out instead of
+     * overlapping.
+     */
+    static void RecomputeDrawNodeOrientation(UICommandGraphDrawNode& drawNode);
+
+    /**
+     * Address: 0x008272A0 (FUN_008272A0, sub_8272A0)
+     *
+     * IDA signature:
+     * void __thiscall sub_8272A0(Moho::UICommandGraph *this, _DWORD *drawNode);
+     *
+     * What it does:
+     * Resolves the game tick one queued order is estimated to complete on, by
+     * depth-first walking the edges it depends on. Writing the current tick into
+     * the node up front doubles as the cycle guard: a node already being
+     * resolved returns immediately, so a cyclic order graph terminates.
+     */
+    void ResolveDrawNodeCompletionTick(UICommandGraphDrawNode& drawNode);
+
+    /**
+     * Address: 0x00827360 (FUN_00827360, sub_827360)
+     *
+     * IDA signature:
+     * void __userpurge sub_827360(
+     *   Moho::UICommandGraph::UICommandGraphDrawNode *drawNode@<esi>, Moho::UICommandGraph *graph);
+     *
+     * What it does:
+     * Gives a pending mobile-build order its translucent green placement mesh -
+     * the ghost of the unit that order will produce, stanced at the order's
+     * position. Only builds one when the node has no mesh yet and its command is
+     * a `BuildMobile`; every other order draws with waypoint markers alone.
+     */
+    static void CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph);
 
     void MarkDirty() noexcept
     {
@@ -4190,18 +4393,7 @@ namespace moho
 
     mMeshInstance.release();
 
-    if (mHelperLink.mHead == nullptr) {
-      return;
-    }
-
-    // Pointer-to-pointer walk: start at the command's chain head and advance
-    // through each link's `mNext` until the slot that refers to this link is
-    // found, then splice this link out of it.
-    CommandGraphHelperLink** slot = &mHelperLink.mHead->mFirst;
-    while (*slot != &mHelperLink) {
-      slot = &(*slot)->mNext;
-    }
-    *slot = mHelperLink.mNext;
+    mHelperLink.UnlinkFromChain();
   }
 
   /**
@@ -4361,13 +4553,10 @@ namespace moho
   {
     destination->mCommandId = source.mCommandId;
 
-    destination->mHelperLink.mHead = source.mHelperLink.mHead;
-    if (source.mHelperLink.mHead != nullptr) {
-      destination->mHelperLink.mNext = source.mHelperLink.mHead->mFirst;
-      source.mHelperLink.mHead->mFirst = &destination->mHelperLink;
-    } else {
-      destination->mHelperLink.mNext = nullptr;
-    }
+    // Re-publishes the *destination* into the source's chain without unlinking
+    // the source - the binary leaves both links pointing into it until the
+    // source node is destroyed separately by its caller.
+    destination->mHelperLink.LinkInto(source.mHelperLink.mHead);
 
     destination->mPositionSum = source.mPositionSum;
     destination->mWeight = source.mWeight;
@@ -4382,8 +4571,8 @@ namespace moho
 
     destination->mOrientationHint = source.mOrientationHint;
     destination->mPreviousCentroid = source.mPreviousCentroid;
-    destination->field_0x40 = source.field_0x40;
-    destination->field_0x44 = source.field_0x44;
+    destination->mUnitCountScale = source.mUnitCountScale;
+    destination->mCompletionTick = source.mCompletionTick;
 
     const auto relocateLane = [](CommandGraphDwordLane& dstLane, const CommandGraphDwordLane& srcLane) {
       const gpg::core::legacy::FastVectorInsertRuntimeView sourceView{
@@ -5080,11 +5269,403 @@ namespace moho
   }
 
   /**
-   * Address: 0x00828FB0 (FUN_00828FB0, Moho::UICommandGraph::CreateMeshes)
+   * What it does: see the header.
    */
   void UICommandGraph::CreateMeshes()
   {
-    // Remaining command-graph mesh build pass (0x00829190 chain) is pending deep lift.
+    bool rebuilt = false;
+    if (mNeedsRebuild != 0u) {
+      mNeedsRebuild = 0u;
+      RebuildCommandQueueNodes();
+      RecomputeAllDrawNodeOrientations();
+      rebuilt = true;
+    }
+
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      UICommandGraphDrawNode& drawNode = node->mDraw;
+
+      // Commands retire and are re-issued between frames while their draw node
+      // survives, so a node that is currently chained to *some* helper is
+      // re-pointed at whichever helper owns its command id right now. A node
+      // with no chain membership at all is left alone - it never had an owner
+      // and the rebuild pass is what gives it one.
+      if (drawNode.mHelperLink.mHead != nullptr) {
+        auto* const owner = reinterpret_cast<CommandGraphHelperHead*>(
+          FindCommandIssueHelperInSession(mSession, drawNode.mCommandId)
+        );
+        if (owner != drawNode.mHelperLink.mHead) {
+          drawNode.mHelperLink.UnlinkFromChain();
+          drawNode.mHelperLink.LinkInto(owner);
+        }
+      }
+
+      // First time this node resolves to a live command, seed its anchor from
+      // the command's own history. `mWeight` becomes 1 because this table keys
+      // one node per command - the centroid is that single position, unlike the
+      // queue-head table where the weight counts the units sharing the queue.
+      if (drawNode.mHelperLink.mHead != nullptr && drawNode.mHasResolvedPosition == 0u) {
+        drawNode.mPositionSum = ResolveCommandGraphAnchorWorldPosition(
+          *reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead)
+        );
+        drawNode.mWeight = 1.0f;
+      }
+    }
+
+    if (rebuilt) {
+      for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+        ResolveDrawNodeCompletionTick(node->mDraw);
+      }
+
+      for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+        CreateBuildPreviewMesh(node->mDraw, *this);
+      }
+    }
+
+    // The binary inlines `MAUI_KeyIsDown` (0x0079CB70) here in full - the
+    // foreground test, the focus-owner guard and the `wxCharCodeWXToMSW` +
+    // `GetKeyState` sign test at 0x0082911C..0x0082915D are that function's
+    // three steps, in its order.
+    if (ui_PathPreview) {
+      CON_Executef("path_GeneratePreview %s", MAUI_KeyIsDown(MKEY_SHIFT) ? "end" : "start");
+    }
+  }
+
+  /**
+   * The command-graph rebuild frontier: three bodies `CreateMeshes`'s chain
+   * calls that are analyzed but not yet recovered. They are declared here at
+   * namespace scope - deliberately NOT in an anonymous namespace - so that a
+   * link reports them by name instead of silently folding them away.
+   *
+   * Address: 0x00826140 (FUN_00826140, sub_826140)
+   *
+   * IDA signature:
+   * void __thiscall sub_826140(Moho::UserEntity *this, Moho::UICommandGraph *graph,
+   *                            Moho::UserCommandQueue *queue);
+   *
+   * What it does:
+   * Folds one entity's command queue into the graph: walks the queue's resolved
+   * command-issue helpers, finds-or-creates a draw node per command, adds this
+   * entity's position into the queue-head node's centroid accumulator, and
+   * chains consecutive orders together through `LinkCommandGraphEdge`
+   * (0x00826960). Blocked on that edge builder and the `mMapC`/tree/`mMapD`
+   * container primitives beneath it.
+   */
+  void AddCommandQueueToCommandGraph(
+    UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue
+  );
+
+  /**
+   * Address: 0x00826C50 (FUN_00826C50, sub_826C50)
+   *
+   * IDA signature:
+   * int __stdcall sub_826C50(Moho::UICommandGraph::CommandGraphEdge *edge);
+   *
+   * What it does:
+   * Travel time in game ticks along one orderline: the distance between the two
+   * endpoint centroids divided by the slowest speed among the units the command
+   * targets (air units use `Air.MaxAirspeed`, everything else
+   * `Physics.MaxSpeed`), at 10 ticks per second, rounded up. Returns 0 for
+   * command types that do not involve movement. Blocked on the weak-set
+   * iterator advance at 0x007B4D90, which has no recovered counterpart.
+   */
+  [[nodiscard]] std::int32_t EstimateEdgeTravelTicks(const UICommandGraph::CommandGraphEdge& edge);
+
+  /**
+   * Address: 0x00826F10 (FUN_00826F10, sub_826F10)
+   *
+   * IDA signature:
+   * int __stdcall sub_826F10(Moho::UICommandGraph *graph,
+   *                          Moho::UICommandGraph::UICommandGraphDrawNode *drawNode);
+   *
+   * What it does:
+   * Build time in game ticks for one order: asks `/lua/game.lua`'s
+   * `GetConstructEconomyModel` for each assisting engineer/factory's build rate,
+   * sums their reciprocals, and divides the remaining work fraction (derived
+   * from the part-built unit's health ratio) by that combined rate. Returns 0
+   * for any command that is not a `BuildMobile`/`BuildFactory`. Blocked on the
+   * same 0x007B4D90 iterator advance as the travel estimate above.
+   */
+  [[nodiscard]] std::int32_t EstimateDrawNodeWorkTicks(
+    UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode
+  );
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::RebuildCommandQueueNodes()
+  {
+    PrepareForRebuild();
+
+    // Inline capacity 100 - the binary's local is a 400-byte stack buffer that
+    // only spills to the heap on a map with more than 100 units on screen.
+    gpg::fastvector_n<UserEntity*, 100> entities;
+    (void)reinterpret_cast<SpatialDB_MeshInstance*>(&mSession->mEntitySpatialDbStorage[0])
+      ->Collect(entities, ENTITYTYPE_Unit);
+
+    for (UserEntity* const entity : entities) {
+      if (entity == nullptr) {
+        continue;
+      }
+
+      // Wall segments, walls and other decorative units never contribute an
+      // order line even when they carry a queue.
+      if (entity->IsInCategory(msvc8::string{"INSIGNIFICANTUNIT", 17u})) {
+        continue;
+      }
+
+      AddCommandQueueToCommandGraph(*entity, *this, entity->GetCommandQueue());
+
+      // A stationary factory's build queue is a second, separate order chain -
+      // mobile factories (engineers, hives) carry theirs on the normal queue
+      // above and must not be folded in twice.
+      const bool isFactory = entity->IsInCategory(msvc8::string{"FACTORY", 7u});
+      const bool isMobileFactory = isFactory && entity->IsInCategory(msvc8::string{"MOBILE", 6u});
+      if (isFactory && !isMobileFactory) {
+        AddCommandQueueToCommandGraph(*entity, *this, entity->GetFactoryCommandQueue());
+      }
+    }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::ResolveDrawNodeCompletionTick(UICommandGraphDrawNode& drawNode)
+  {
+    // Non-zero means "already solved this pass". Seeding it with the current
+    // tick before recursing is what makes a cyclic order graph terminate: a
+    // node reached again while it is still being solved returns immediately.
+    if (drawNode.mCompletionTick != 0u) {
+      return;
+    }
+
+    drawNode.mCompletionTick = static_cast<std::uint32_t>(mSession->mGameTick);
+
+    std::uint32_t startTick = static_cast<std::uint32_t>(mSession->mGameTick);
+    const std::int32_t incomingCount = drawNode.mLaneA.size();
+    for (std::int32_t index = 0; index < incomingCount; ++index) {
+      auto* const edge = drawNode.mLaneA.At<CommandGraphEdge>(index);
+      UICommandGraphDrawNode* const predecessor = edge->mFromNode;
+      if (predecessor != nullptr) {
+        ResolveDrawNodeCompletionTick(*predecessor);
+        const std::uint32_t readyTick =
+          predecessor->mCompletionTick + static_cast<std::uint32_t>(EstimateEdgeTravelTicks(*edge));
+        if (startTick < readyTick) {
+          startTick = readyTick;
+        }
+      }
+    }
+
+    const std::uint32_t finishTick =
+      startTick + static_cast<std::uint32_t>(EstimateDrawNodeWorkTicks(*this, drawNode));
+
+    // The already-stored tick winning means this order costs nothing and has no
+    // unfinished predecessor; the binary still steps it back by one so the node
+    // sorts before whatever depends on it.
+    if (drawNode.mCompletionTick >= finishTick) {
+      drawNode.mCompletionTick = drawNode.mCompletionTick - 1u;
+    } else {
+      drawNode.mCompletionTick = finishTick;
+    }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::PrepareForRebuild()
+  {
+    // Edge table: drop every node, then put the bucket vector back to the
+    // one-bucket starting state. `ClearHashListNodes` is 0x0082C840 here - the
+    // 0x2C node carries no owning payload, so it frees without destroying.
+    ClearHashListNodes(mMapC);
+    mMapC.mBuckets.assign(9u, mMapC.mListHead);
+    mMapC.mBucketMask = 1u;
+    mMapC.mBucketCount = 1u;
+
+    // Texture-keyed orderline tree: free every bucket, then re-empty the
+    // sentinel in place. Unlike `DestroyTree` the head survives - the rebuild
+    // pass immediately refills the tree through it.
+    DestroyCommandGraphTreeSubtree(mGraphRuntimeTree.mHead, mGraphRuntimeTree.mHead->mParent);
+    mGraphRuntimeTree.mHead->mParent = mGraphRuntimeTree.mHead;
+    mGraphRuntimeTree.mSize = 0u;
+    mGraphRuntimeTree.mHead->mLeft = mGraphRuntimeTree.mHead;
+    mGraphRuntimeTree.mHead->mRight = mGraphRuntimeTree.mHead;
+
+    // Draw nodes survive a rebuild; only the edge lanes they own are dropped,
+    // back to inline storage so the common single-edge case never re-allocates.
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      node->mDraw.mLaneA.ReleaseToInline();
+      node->mDraw.mLaneB.ReleaseToInline();
+    }
+
+    // Queue-head nodes additionally lose their accumulated centroid: the
+    // rebuild re-adds one weighted position per unit sharing the queue, so
+    // leaving the old sum in place would double-count every frame.
+    for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
+      node->mDraw.mLaneA.ReleaseToInline();
+      node->mDraw.mLaneB.ReleaseToInline();
+      node->mDraw.mPositionSum = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+      node->mDraw.mWeight = 0.0f;
+    }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::RecomputeAllDrawNodeOrientations()
+  {
+    for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
+      RecomputeDrawNodeOrientation(node->mDraw);
+    }
+
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      RecomputeDrawNodeOrientation(node->mDraw);
+    }
+  }
+
+  namespace
+  {
+    /**
+     * One lane's contribution to a draw node's orderline tangent.
+     *
+     * Both lanes accumulate the same way - the only differences are which
+     * endpoint of each edge is the "far" one and which distribution field
+     * records the ribbon offset - so the shared mechanic is lifted here rather
+     * than written twice. `lengthSquared` is supplied by the caller because the
+     * binary sums the three squares in a different component order per lane and
+     * float addition is not associative.
+     */
+    struct DrawNodeOrientationAccumulator
+    {
+      Wm3::Vector3f mDirectionSum{0.0f, 0.0f, 0.0f};
+      std::int32_t mUnitTotal = 0;
+    };
+
+    /**
+     * The node's centroid: draw nodes accumulate a position *sum* plus a weight
+     * so several units sharing one queue average into a single anchor.
+     */
+    [[nodiscard]] Wm3::Vector3f DrawNodeCentroid(
+      const moho::UICommandGraph::UICommandGraphDrawNode& drawNode
+    ) noexcept
+    {
+      const float inverseWeight = 1.0f / drawNode.mWeight;
+      return Wm3::Vector3f{
+        drawNode.mPositionSum.x * inverseWeight,
+        drawNode.mPositionSum.y * inverseWeight,
+        drawNode.mPositionSum.z * inverseWeight
+      };
+    }
+
+    /**
+     * Where one edge sits across its lane's ribbon bundle, in [-0.5, +0.5].
+     * A lane of one edge yields -0.5 rather than 0 because the binary clamps
+     * the divisor, not the result.
+     */
+    [[nodiscard]] float LaneBundleDistribution(const std::int32_t index, const float laneSpan) noexcept
+    {
+      const float divisor = (laneSpan < 1.0f) ? 1.0f : laneSpan;
+      return (static_cast<float>(index) / divisor) - 0.5f;
+    }
+  } // namespace
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::RecomputeDrawNodeOrientation(UICommandGraphDrawNode& drawNode)
+  {
+    const std::int32_t maxNodeUnits = ui_CommandGraphMaxNodeUnits;
+    const Wm3::Vector3f centroid = DrawNodeCentroid(drawNode);
+
+    // Lane A holds the edges this node is the *destination* of, so the far
+    // endpoint is each edge's `mFromNode` and the direction points inbound.
+    DrawNodeOrientationAccumulator laneA{};
+    {
+      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneA.size());
+      const float laneSpan = static_cast<float>(count) - 1.0f;
+      for (std::int32_t index = 0; index < count; ++index) {
+        auto* const edge = drawNode.mLaneA.At<CommandGraphEdge>(index);
+        const Wm3::Vector3f farCentroid = DrawNodeCentroid(*edge->mFromNode);
+
+        float dx = centroid.x - farCentroid.x;
+        float dy = centroid.y - farCentroid.y;
+        float dz = centroid.z - farCentroid.z;
+
+        const std::int32_t edgeUnits =
+          (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
+            ? maxNodeUnits
+            : static_cast<std::int32_t>(edge->mTouchCount);
+
+        const float lengthSquared = ((dx * dx) + (dy * dy)) + (dz * dz);
+        if (lengthSquared > 0.0f) {
+          const float scale = static_cast<float>(edgeUnits) / std::sqrt(lengthSquared);
+          dx = dx * scale;
+          dy = dy * scale;
+          dz = scale * dz;
+        }
+
+        laneA.mDirectionSum.x += dx;
+        laneA.mDirectionSum.y += dy;
+        laneA.mDirectionSum.z += dz;
+        laneA.mUnitTotal += edgeUnits;
+
+        edge->mLaneADistribution = LaneBundleDistribution(index, laneSpan);
+      }
+    }
+
+    // Lane B holds the edges leaving this node, so the far endpoint is each
+    // edge's `mToNode` and the direction points outbound.
+    DrawNodeOrientationAccumulator laneB{};
+    {
+      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneB.size());
+      const float laneSpan = static_cast<float>(count) - 1.0f;
+      for (std::int32_t index = 0; index < count; ++index) {
+        auto* const edge = drawNode.mLaneB.At<CommandGraphEdge>(index);
+        const Wm3::Vector3f farCentroid = DrawNodeCentroid(*edge->mToNode);
+
+        float dx = farCentroid.x - centroid.x;
+        float dy = farCentroid.y - centroid.y;
+        float dz = farCentroid.z - centroid.z;
+
+        const std::int32_t edgeUnits =
+          (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
+            ? maxNodeUnits
+            : static_cast<std::int32_t>(edge->mTouchCount);
+
+        // Component order differs from lane A's sum above; preserved because
+        // float addition is not associative and this is the binary's order.
+        const float lengthSquared = ((dz * dz) + (dy * dy)) + (dx * dx);
+        if (lengthSquared > 0.0f) {
+          const float scale = static_cast<float>(edgeUnits) / std::sqrt(lengthSquared);
+          dx = dx * scale;
+          dy = dy * scale;
+          dz = scale * dz;
+        }
+
+        laneB.mDirectionSum.x += dx;
+        laneB.mDirectionSum.y += dy;
+        laneB.mDirectionSum.z += dz;
+        laneB.mUnitTotal += edgeUnits;
+
+        edge->mLaneBDistribution = LaneBundleDistribution(index, laneSpan);
+      }
+    }
+
+    const float totalX = laneB.mDirectionSum.x + laneA.mDirectionSum.x;
+    const float totalY = laneB.mDirectionSum.y + laneA.mDirectionSum.y;
+    const float totalZ = laneB.mDirectionSum.z + laneA.mDirectionSum.z;
+
+    const float length = std::sqrt(((totalZ * totalZ) + (totalY * totalY)) + (totalX * totalX));
+    if (length <= kCommandGraphOrientationEpsilon) {
+      drawNode.mOrientationHint = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+    } else {
+      const float inverseLength = 1.0f / length;
+      drawNode.mOrientationHint =
+        Wm3::Vector3f{totalX * inverseLength, totalY * inverseLength, totalZ * inverseLength};
+    }
+
+    const std::int32_t busierLaneUnits =
+      (laneA.mUnitTotal < laneB.mUnitTotal) ? laneB.mUnitTotal : laneA.mUnitTotal;
+    drawNode.mUnitCountScale = std::sqrt(static_cast<float>(busierLaneUnits));
   }
 
   /**
@@ -5205,7 +5786,7 @@ namespace moho
 
     const float depthW = camera.viewport.ProjectViewportWidthRow2(avg);
 
-    float size = (drawNode.field_0x40 * styleScale) / depthW;
+    float size = (drawNode.mUnitCountScale * styleScale) / depthW;
     size = std::clamp(size, ui_MinWaypointSize, ui_MaxWaypointSize);
 
     batcher.SetTexture(texture);
@@ -5292,12 +5873,12 @@ namespace moho
    * What it does:
    * Draws the "ETA: mm:ss" text label above one command-graph draw node,
    * gated by the "display_eta" option, the command not yet being due
-   * (`drawNode.field_0x44 - mSession->mGameTick < 0` skips), and - only for
+   * (`drawNode.mCompletionTick - mSession->mGameTick < 0` skips), and - only for
    * the non-highlighted/non-selected state - an LOD distance test against
    * `ui_MaxTextLOD` using the camera viewport's depth row (the same
    * `ProjectViewportDepthRow1` shape used throughout this file).
    *
-   * Glyph size is `field_0x40 * (style scale for the resolved highlight
+   * Glyph size is `mUnitCountScale * (style scale for the resolved highlight
    * state)`; the label anchors at the node's averaged position offset by
    * that glyph size in X/-Z, then is projected to screen space and nudged
    * by `mDebugFont->mDescent + 1` pixels vertically.
@@ -5310,7 +5891,7 @@ namespace moho
       return;
     }
 
-    const std::int32_t beatsUntilDue = static_cast<std::int32_t>(drawNode.field_0x44) - mSession->mGameTick;
+    const std::int32_t beatsUntilDue = static_cast<std::int32_t>(drawNode.mCompletionTick) - mSession->mGameTick;
     if (beatsUntilDue < 0) {
       return;
     }
@@ -5340,7 +5921,7 @@ namespace moho
       break;
     }
 
-    const float glyphScale = drawNode.field_0x40 * styleScale;
+    const float glyphScale = drawNode.mUnitCountScale * styleScale;
 
     if (!OPTIONS_GetBool("display_eta")) {
       return;
