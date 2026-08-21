@@ -1834,6 +1834,16 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x00899880 (FUN_00899880, msvc8::vector<moho::UserArmy*>::assign
+         * -- nulls the three lanes, returns early on `_Count == 0`, guards
+         * `0xFFFFFFFF / 4 < _Count` with a `vector<T> too long` throw, then makes
+         * one exact-size `operator new(_Count * 4)` and fills every slot from the
+         * by-ref value. Reached from `CWldSession`'s session-init path, which
+         * pre-sizes `userArmies` to one null slot per launch-info army because
+         * `DoBeat` addresses it by army index rather than appending.)
+         * Address: 0x00898EC0 (FUN_00898EC0, the null-fill adapter around it --
+         * builds the `nullptr` temporary and returns the destination for
+         * chaining)
          * Address: 0x0082F110 (FUN_0082F110, msvc8::vector<void*>::assign(9, sentinel)
          * for UICommandGraph's MapAB hash-bucket table)
          * Address: 0x0082F680 (FUN_0082F680, the MapC emission of the same)
