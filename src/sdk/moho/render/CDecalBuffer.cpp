@@ -1907,19 +1907,9 @@ CDecalBuffer::~CDecalBuffer()
  */
 void CDecalBuffer::SwapVectors(msvc8::vector<SDecalInfo>* const addDecals, msvc8::vector<std::uint32_t>* const removeDecals)
 {
-  auto& visibleView = msvc8::AsVectorRuntimeView(mVisibleDecals);
-  auto& addView = msvc8::AsVectorRuntimeView(*addDecals);
-
-  std::swap(visibleView.begin, addView.begin);
-  std::swap(visibleView.end, addView.end);
-  std::swap(visibleView.capacityEnd, addView.capacityEnd);
-
-  auto& pendingHideView = msvc8::AsVectorRuntimeView(mPendingHideObjectIds);
-  auto& removeView = msvc8::AsVectorRuntimeView(*removeDecals);
-
-  std::swap(pendingHideView.begin, removeView.begin);
-  std::swap(pendingHideView.end, removeView.end);
-  std::swap(pendingHideView.capacityEnd, removeView.capacityEnd);
+  // Exchanging all three lanes pairwise is vector::swap.
+  mVisibleDecals.swap(*addDecals);
+  mPendingHideObjectIds.swap(*removeDecals);
 }
 
 /**
