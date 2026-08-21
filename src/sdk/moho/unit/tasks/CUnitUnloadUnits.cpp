@@ -206,6 +206,10 @@ namespace moho
 
   /**
    * Address: 0x00626070 (FUN_00626070, Moho::CUnitUnloadUnits::~CUnitUnloadUnits)
+   * Address: 0x00626100 (FUN_00626100, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears owner-unit unload state, requests variable-data refresh, and unlinks

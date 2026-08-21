@@ -415,6 +415,10 @@ namespace moho
 
   /**
    * Address: 0x00620280 (FUN_00620280, Moho::CUnitReclaimTask::~CUnitReclaimTask)
+   * Address: 0x0061ED20 (FUN_0061ED20, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Unlinks reclaim listeners/requests, clears reclaim/focus runtime state on
