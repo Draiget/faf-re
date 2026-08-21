@@ -2186,6 +2186,16 @@ namespace msvc8
          * contents and refcounts match exactly; only the post-growth `capacity()`
          * value can differ from the original binary)
          *
+         * Address: 0x00951F30 (FUN_00951F30, msvc8::vector<gpg::TypeHandle>::_Insert_n
+         * grow lane for the 8-byte `{type,version}` element (`sar 3` stride, max_size
+         * 0x1FFFFFFF, overflow throw through FUN_009514A0's `std::length_error("vector<T>
+         * too long")`). Its only reachable caller is `gpg::AppendTypeHandle` (FUN_00952C90,
+         * ReadArchive.cpp), which always calls it as a single-element append at `mLast`
+         * (from `gpg::ReadArchive::ReadTypeHandle`), so `_Count` is effectively always 1.
+         * The in-place growth path's tail-shift (empty here, since inserts land at
+         * `mLast`) corresponds to FUN_00950670; reallocation allocates via FUN_0094F1B0
+         * (`operator new(8 * newCap)`, `0xFFFFFFFF/count < 8` overflow guard))
+         *
          * Mirrors the MSVC8 STL `vector::_Insert_n` lane: when capacity is
          * sufficient, the live tail `[pos, end)` is shifted right by `count`
          * slots and the gap is filled with copies of `value`; when capacity
@@ -2564,6 +2574,8 @@ namespace msvc8
          * Address: 0x005A1D60 (FUN_005A1D60)
          * Address: 0x00783D90 (FUN_00783D90)
          * Address: 0x008B3700 (FUN_008B3700)
+         * Address: 0x0094F1B0 (FUN_0094F1B0, checked 8-byte-slot allocator for
+         * `msvc8::vector<gpg::TypeHandle>`'s `_Insert_n` reallocation path, FUN_00951F30)
          *
          * IDA signature:
          * Moho::WeakPtr_CUnitCommand *__fastcall sub_5A1D60(unsigned int a1);
