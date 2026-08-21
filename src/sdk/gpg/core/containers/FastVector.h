@@ -560,6 +560,24 @@ namespace gpg::core
       end_ = start_;
     }
 
+    /**
+     * Resizes the logical element count, growing storage when needed and
+     * filling appended slots with `fill`.
+     *
+     * The emitted per-element-type bodies are cited on
+     * `gpg::FastVectorRuntimeResizeFill`, which is this method's
+     * implementation. Only `FastVectorN` had a `Resize` until 2026-08-21,
+     * so every base-`FastVector` caller in the engine reached around the
+     * container through `AsFastVectorRuntimeView` -- see RULE ONE in
+     * CLAUDE.md.
+     */
+    void Resize(const size_t newSize, const T& fill = T{})
+    {
+      gpg::FastVectorRuntimeResizeFill<T>(
+        &fill, static_cast<unsigned int>(newSize), gpg::AsFastVectorRuntimeView<T>(this)
+      );
+    }
+
     FastVector(const FastVector&) = delete;
 
     /**
