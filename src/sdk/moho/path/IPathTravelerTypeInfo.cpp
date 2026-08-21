@@ -10,7 +10,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/path/IPathTraveler.h"
+#include "moho/path/IPathTraveler.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -18,6 +18,11 @@ namespace gpg
   class RDListType_IPathTraveler : public RType
   {
   public:
+    /**
+     * Address: 0x00769290 (FUN_00769290, gpg::RDListType_IPathTraveler::dtr)
+     */
+    ~RDListType_IPathTraveler() override;
+
     /**
      * Address: 0x00766ED0 (FUN_00766ED0, gpg::RDListType_IPathTraveler::GetName)
      *
@@ -128,6 +133,8 @@ namespace
     gDListIPathTravelerTypeNameInitGuard = 0;
   }
 } // namespace
+
+gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
 
 /**
  * Address: 0x00766ED0 (FUN_00766ED0, gpg::RDListType_IPathTraveler::GetName)
