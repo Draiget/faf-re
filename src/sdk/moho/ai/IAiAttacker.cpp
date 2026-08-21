@@ -18,7 +18,7 @@
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/Listener.h"
-#include "moho/unit/core/UnitWeapon.h"
+#include "moho/unit/core/UnitWeapon.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -104,6 +104,11 @@ namespace gpg
   class RVectorType_UnitWeaponPtr final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005DFC50 (FUN_005DFC50, gpg::RVectorType_UnitWeapon_P::dtr)
+     */
+    ~RVectorType_UnitWeaponPtr() override = default;
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
@@ -143,6 +148,11 @@ namespace gpg
   class RVectorType_CAcquireTargetTaskPtr final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005DFCB0 (FUN_005DFCB0, gpg::RVectorType_CAcquireTargetTask_P::dtr)
+     */
+    ~RVectorType_CAcquireTargetTaskPtr() override = default;
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
