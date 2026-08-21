@@ -12,7 +12,7 @@
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/IAiFormationDB.h"
 #include "moho/ai/IFormationInstance.h"
-#include "moho/misc/Stats.h"
+#include "moho/misc/Stats.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -22,6 +22,11 @@ namespace
   class IFormationInstanceFastVectorTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0059DFA0 (FUN_0059DFA0, gpg::RFastVectorType_IFormationInstance_P::dtr)
+     */
+    ~IFormationInstanceFastVectorTypeInfo() override = default;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
