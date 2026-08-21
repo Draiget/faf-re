@@ -19,7 +19,15 @@ namespace moho
 
   static_assert(sizeof(wxArrayPtrVoidRuntime) == 0xC, "wxArrayPtrVoidRuntime size must be 0xC");
 
-  class ScrSourceCtrl : public wxControlRuntime
+  /**
+   * RTTI (`dumps/rtti_dump_all.hpp`) has `Moho::ScrSourceCtrl` deriving from
+   * `wxNotebook` (not plain `wxControl`) - its own vftable head 0xE08F54
+   * still carries `wxNotebook::MSWOnScroll` (0x009A6E10) unchanged at slot
+   * 120 (0xE08F54 + 0x1E0 = 0xE09134). Deriving from `wxNotebookRuntime`
+   * instead of `wxControlRuntime` directly keeps that inherited override
+   * live through real C++ virtual dispatch.
+   */
+  class ScrSourceCtrl : public wxNotebookRuntime
   {
   public:
     /**

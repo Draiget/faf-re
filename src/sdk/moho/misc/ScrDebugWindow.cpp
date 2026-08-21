@@ -1262,6 +1262,18 @@ namespace
   /**
    * Address: 0x009A7740 (sub_9A7740, wxNotebook::wxNotebook)
    * Binary call shape: (storage, parent, id, pos, size, style, name).
+   *
+   * Still declaration-only, same defect class as its siblings in this block
+   * (see the block comment above). The real body chains through
+   * `sub_9A6450` (base ctor), `sub_9A66D0` (field init) and `sub_9A7290`
+   * (`Create` - the actual native `SysTabControl32` window creation), none
+   * of which are recovered yet. `wxNotebookRuntime`
+   * (`moho/app/WxRuntimeTypes.h`) now exists as the real C++ type this
+   * bridge should placement-construct once that chain is recovered; for now
+   * `moho::ScrSourceCtrl` - a genuine `wxNotebook` per RTTI, constructed a
+   * few lines below this bridge's own call site - already carries
+   * `wxNotebookRuntime::MSWOnScroll` through ordinary virtual dispatch, so
+   * `FUN_009A6E10` does not depend on this bridge being finished.
    */
   void* ConstructWxNotebook(
     void* storage,

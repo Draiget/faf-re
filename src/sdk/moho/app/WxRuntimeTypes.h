@@ -5167,6 +5167,55 @@ public:
 static_assert(sizeof(wxTextCtrlRuntime) == 0x4, "wxTextCtrlRuntime size must be 0x4");
 
 /**
+ * `wxNotebook`'s own layer over `wxControl`. RTTI
+ * (`dumps/rtti_dump_all.hpp`) puts the real chain as
+ * `wxNotebook : wxNotebookBase : wxControl : ...`; `wxNotebookBase` itself
+ * overrides nothing this tree needs yet (its own vtable listing still reads
+ * `sub_96A920` - `wxWindow::MSWOnScroll` - at slot 120), so it folds away
+ * per this tree's collapsed-hierarchy convention and `wxNotebookRuntime`
+ * sits directly on `wxControlRuntime`, matching `wxFrameRuntime` /
+ * `wxTopLevelWindowRuntime`'s override-only shape.
+ */
+class wxNotebookRuntime : public wxControlRuntime
+{
+public:
+  /**
+   * Address: 0x009A6E10 (FUN_009A6E10, wxNotebook::MSWOnScroll)
+   * Mangled: ?MSWOnScroll@wxNotebook@@UAE_NHGGK@Z
+   * Slot: 120 of the primary vftable (+0x1E0 of ??_7wxNotebook@@6B@, VA
+   * 0xD58FA4) - the same slot number `wxWindow::MSWOnScroll` (0x0096A920)
+   * occupies one level up (`dumps/rtti_dump_all.hpp`'s independent slot
+   * numbering for `wxNotebook` vs. `wxNotebookBase` confirms `wxNotebook`
+   * itself is the override's real owner: `wxNotebookBase`'s own listing
+   * still shows `sub_96A920` at slot 120, `wxNotebook`'s shows `sub_9A6E10`).
+   * Both of this function's data xrefs are vtable-slot writes: 0x00D59184
+   * (`wxNotebook`'s own vtable head 0xD58FA4 + 0x1E0) and 0x00E09134
+   * (`Moho::ScrSourceCtrl`'s own vtable head 0xE08F54 + 0x1E0 - RTTI-
+   * confirmed `ScrSourceCtrl` derives from `wxNotebook` and does not
+   * re-override this slot, so it inherits this exact body).
+   *
+   * IDA signature:
+   * char __thiscall wxNotebook::MSWOnScroll(
+   *     wxWindow *this, int orientation, int command, int position,
+   *     unsigned int controlHandle);
+   *
+   * What it does:
+   * Overrides the base scroll dispatch so a notebook never re-routes a
+   * WM_HSCROLL/WM_VSCROLL that names a real scrollbar control handle back
+   * through that control's own `MSWOnScroll` (0x009A6E17 `xor al, al` /
+   * `retn 10h` for a nonzero `controlHandle`); only messages with no control
+   * handle fall through to the base `wxWindow::MSWOnScroll` implementation,
+   * whose tail call at 0x009A6E24 re-zeroes that argument first
+   * (0x009A6E1C `mov [esp+arg_C], 0`), matching the branch's own guarantee.
+   */
+  bool MSWOnScroll(
+    std::int32_t orientation, unsigned short command, unsigned short position, unsigned long controlHandle
+  ) override;
+};
+
+static_assert(sizeof(wxNotebookRuntime) == 0x4, "wxNotebookRuntime size must be 0x4");
+
+/**
  * One loaded icon.
  *
  * The binary keeps this behind a ref-counted wxGDIImageRefData: width at
