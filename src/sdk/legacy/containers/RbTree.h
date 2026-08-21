@@ -1151,6 +1151,25 @@ namespace msvc8
              *
              * These belong to `std::map<std::string, CArmyStatItem*>` -- `CArmyStats::mNameIndex` -- whose node is 0x30. The colour/nil pair they rewrite sits at `[node+0x2C]`/`[node+0x2D]`, which is what separates them from the 0x18 blueprint-stat node in the same file.
              */
+            /**
+             * Address: 0x00A52800 (FUN_00A52800)
+             * Address: 0x00A529D0 (FUN_00A529D0, byte-identical ICF twin of
+             * 0x00A52800 -- same rotate_left body, folded to one binary symbol,
+             * both call sites reached independently)
+             *
+             * An unidentified `map<int32_t, T>` instantiation somewhere in the
+             * 0x00A5xxxx-0x00A67xxx address neighbourhood (node layout: right@0,
+             * parent@+4, left@+8, colour/nil byte@+33, int32 key@+12 -- field
+             * order differs from the batch-bucket/name-index instantiations
+             * above, but the rotate algorithm is byte-identical). Reached from
+             * `insert_at`'s fixup loop (0x00A63950, matches this template's
+             * `link_and_rebalance` shape exactly: same `map/set<T> too long`
+             * throw, same buy-node-then-fixup structure) through a caller chain
+             * (0x00A656A0 -> 0x00A65D00 -> 0x00A66270 -> 0x00A666F0 -> ...) that
+             * was not traced to a named owning class in this pass -- the class
+             * itself is still unidentified, only the tree-algorithm shape is
+             * confirmed.
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1220,6 +1239,12 @@ namespace msvc8
              * Address: 0x00594F80 (FUN_00594F80, the name-index map's recolour-and-rotate
              * fixup after a link -- it writes only the colour byte at `[node+0x2C]`)
              * Address: 0x00594B10 (FUN_00594B10, the link half that precedes it)
+             * Address: 0x00A63950 (FUN_00A63950, the link-and-rebalance half for
+             * the unidentified `map<int32_t, T>` instantiation cited on
+             * `rotate_left` above -- same `map/set<T> too long` throw guard,
+             * buy-node call, and fixup loop shape calling `rotate_left`
+             * (0x00A52800/0x00A529D0) on both the left- and right-uncle-red
+             * branches; owning class not traced in this pass)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
