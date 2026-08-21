@@ -87547,6 +87547,555 @@ namespace moho::runtime
   {
     return ::UpdateWindow(hWnd);
   }
+  /**
+   * Address: 0x00A819F4 (FUN_00A819F4, ScreenToClient)
+   *
+   * What it does:
+   * Import thunk that forwards to `ScreenToClient`.
+   */
+  BOOL ThunkScreenToClient(HWND hWnd, LPPOINT lpPoint)
+  {
+    return ::ScreenToClient(hWnd, lpPoint);
+  }
+
+  /**
+   * Address: 0x00A819FA (FUN_00A819FA, ClientToScreen)
+   *
+   * What it does:
+   * Import thunk that forwards to `ClientToScreen`.
+   */
+  BOOL ThunkClientToScreen(HWND hWnd, LPPOINT lpPoint)
+  {
+    return ::ClientToScreen(hWnd, lpPoint);
+  }
+
+  /**
+   * Address: 0x00A81A00 (FUN_00A81A00, MoveWindow)
+   *
+   * What it does:
+   * Import thunk that forwards to `MoveWindow`.
+   */
+  BOOL ThunkMoveWindow(HWND hWnd, const int X, const int Y, const int nWidth, const int nHeight, const BOOL bRepaint)
+  {
+    return ::MoveWindow(hWnd, X, Y, nWidth, nHeight, bRepaint);
+  }
+
+  /**
+   * Address: 0x00A81A06 (FUN_00A81A06, PostQuitMessage)
+   *
+   * What it does:
+   * Import thunk that forwards to `PostQuitMessage`.
+   */
+  void ThunkPostQuitMessage(const int nExitCode)
+  {
+    ::PostQuitMessage(nExitCode);
+  }
+
+  /**
+   * Address: 0x00A81A0C (FUN_00A81A0C, PeekMessageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `PeekMessageW`.
+   */
+  BOOL ThunkPeekMessageW(LPMSG lpMsg, HWND hWnd, const UINT wMsgFilterMin, const UINT wMsgFilterMax, const UINT wRemoveMsg)
+  {
+    return ::PeekMessageW(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax, wRemoveMsg);
+  }
+
+  /**
+   * Address: 0x00A81A12 (FUN_00A81A12, TrackPopupMenu)
+   *
+   * What it does:
+   * Import thunk that forwards to `TrackPopupMenu`.
+   */
+  BOOL ThunkTrackPopupMenu(HMENU hMenu, const UINT uFlags, const int x, const int y, const int nReserved, HWND hWnd, const RECT *prcRect)
+  {
+    return ::TrackPopupMenu(hMenu, uFlags, x, y, nReserved, hWnd, prcRect);
+  }
+
+  /**
+   * Address: 0x00A81A18 (FUN_00A81A18, DefWindowProcW)
+   *
+   * What it does:
+   * Import thunk that forwards to `DefWindowProcW`.
+   */
+  LRESULT ThunkDefWindowProcW(HWND hWnd, const UINT Msg, const WPARAM wParam, const LPARAM lParam)
+  {
+    return ::DefWindowProcW(hWnd, Msg, wParam, lParam);
+  }
+
+  /**
+   * Address: 0x00A81A1E (FUN_00A81A1E, CallWindowProcW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CallWindowProcW`.
+   */
+  LRESULT ThunkCallWindowProcW(WNDPROC lpPrevWndFunc, HWND hWnd, const UINT Msg, const WPARAM wParam, const LPARAM lParam)
+  {
+    return ::CallWindowProcW(lpPrevWndFunc, hWnd, Msg, wParam, lParam);
+  }
+
+  /**
+   * Address: 0x00A81A24 (FUN_00A81A24, GetUpdateRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetUpdateRgn`.
+   */
+  int ThunkGetUpdateRgn(HWND hWnd, HRGN hRgn, const BOOL bErase)
+  {
+    return ::GetUpdateRgn(hWnd, hRgn, bErase);
+  }
+
+  /**
+   * Address: 0x00A81A2A (FUN_00A81A2A, IsWindowEnabled)
+   *
+   * What it does:
+   * Import thunk that forwards to `IsWindowEnabled`.
+   */
+  BOOL ThunkIsWindowEnabled(HWND hWnd)
+  {
+    return ::IsWindowEnabled(hWnd);
+  }
+
+  /**
+   * Address: 0x00A81A30 (FUN_00A81A30, IsWindowVisible)
+   *
+   * What it does:
+   * Import thunk that forwards to `IsWindowVisible`.
+   */
+  BOOL ThunkIsWindowVisible(HWND hWnd)
+  {
+    return ::IsWindowVisible(hWnd);
+  }
+
+  /**
+   * Address: 0x00A81A36 (FUN_00A81A36, ChildWindowFromPoint)
+   *
+   * What it does:
+   * Import thunk that forwards to `ChildWindowFromPoint`.
+   */
+  HWND ThunkChildWindowFromPoint(HWND hWndParent, POINT Point)
+  {
+    return ::ChildWindowFromPoint(hWndParent, Point);
+  }
+
+  /**
+   * Address: 0x00A81A3C (FUN_00A81A3C, ChildWindowFromPointEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `ChildWindowFromPointEx`.
+   */
+  HWND ThunkChildWindowFromPointEx(HWND hwnd, POINT pt, const UINT flags)
+  {
+    return ::ChildWindowFromPointEx(hwnd, pt, flags);
+  }
+
+  /**
+   * Address: 0x00A81A42 (FUN_00A81A42, GetScrollInfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetScrollInfo`.
+   */
+  BOOL ThunkGetScrollInfo(HWND hwnd, const int nBar, LPSCROLLINFO lpsi)
+  {
+    return ::GetScrollInfo(hwnd, nBar, lpsi);
+  }
+
+  /**
+   * Address: 0x00A81A48 (FUN_00A81A48, GetActiveWindow)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetActiveWindow`.
+   */
+  HWND ThunkGetActiveWindow()
+  {
+    return ::GetActiveWindow();
+  }
+
+  /**
+   * Address: 0x00A81A4E (FUN_00A81A4E, GetWindow)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetWindow`.
+   */
+  HWND ThunkGetWindow(HWND hWnd, const UINT uCmd)
+  {
+    return ::GetWindow(hWnd, uCmd);
+  }
+
+  /**
+   * Address: 0x00A81A54 (FUN_00A81A54, GetMessagePos)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetMessagePos`.
+   */
+  DWORD ThunkGetMessagePos()
+  {
+    return ::GetMessagePos();
+  }
+
+  /**
+   * Address: 0x00A81A5A (FUN_00A81A5A, GetFocus)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetFocus`.
+   */
+  HWND ThunkGetFocus()
+  {
+    return ::GetFocus();
+  }
+
+  /**
+   * Address: 0x00A81A60 (FUN_00A81A60, GetCapture)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCapture`.
+   */
+  HWND ThunkGetCapture()
+  {
+    return ::GetCapture();
+  }
+
+  /**
+   * Address: 0x00A81A66 (FUN_00A81A66, IsWindow)
+   *
+   * What it does:
+   * Import thunk that forwards to `IsWindow`.
+   */
+  BOOL ThunkIsWindow(HWND hWnd)
+  {
+    return ::IsWindow(hWnd);
+  }
+
+  /**
+   * Address: 0x00A81A6C (FUN_00A81A6C, IsDialogMessageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `IsDialogMessageW`.
+   */
+  BOOL ThunkIsDialogMessageW(HWND hDlg, LPMSG lpMsg)
+  {
+    return ::IsDialogMessageW(hDlg, lpMsg);
+  }
+
+  /**
+   * Address: 0x00A81A72 (FUN_00A81A72, GetSysColor)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetSysColor`.
+   */
+  DWORD ThunkGetSysColor(const int nIndex)
+  {
+    return ::GetSysColor(nIndex);
+  }
+
+  /**
+   * Address: 0x00A81A78 (FUN_00A81A78, CreateWindowExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateWindowExW`.
+   */
+  HWND ThunkCreateWindowExW(const DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName, const DWORD dwStyle, const int X, const int Y, const int nWidth, const int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam)
+  {
+    return ::CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+  }
+
+  /**
+   * Address: 0x00A81A7E (FUN_00A81A7E, DestroyAcceleratorTable)
+   *
+   * What it does:
+   * Import thunk that forwards to `DestroyAcceleratorTable`.
+   */
+  BOOL ThunkDestroyAcceleratorTable(HACCEL hAccel)
+  {
+    return ::DestroyAcceleratorTable(hAccel);
+  }
+
+  /**
+   * Address: 0x00A81A84 (FUN_00A81A84, LoadAcceleratorsW)
+   *
+   * What it does:
+   * Import thunk that forwards to `LoadAcceleratorsW`.
+   */
+  HACCEL ThunkLoadAcceleratorsW(HINSTANCE hInstance, LPCWSTR lpTableName)
+  {
+    return ::LoadAcceleratorsW(hInstance, lpTableName);
+  }
+
+  /**
+   * Address: 0x00A81A8A (FUN_00A81A8A, CreateAcceleratorTableW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateAcceleratorTableW`.
+   */
+  HACCEL ThunkCreateAcceleratorTableW(LPACCEL paccel, const int cAccel)
+  {
+    return ::CreateAcceleratorTableW(paccel, cAccel);
+  }
+
+  /**
+   * Address: 0x00A81A90 (FUN_00A81A90, TranslateAcceleratorW)
+   *
+   * What it does:
+   * Import thunk that forwards to `TranslateAcceleratorW`.
+   */
+  int ThunkTranslateAcceleratorW(HWND hWnd, HACCEL hAccTable, LPMSG lpMsg)
+  {
+    return ::TranslateAcceleratorW(hWnd, hAccTable, lpMsg);
+  }
+
+  /**
+   * Address: 0x00A81A96 (FUN_00A81A96, GetIconInfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetIconInfo`.
+   */
+  BOOL ThunkGetIconInfo(HICON hIcon, PICONINFO piconinfo)
+  {
+    return ::GetIconInfo(hIcon, piconinfo);
+  }
+
+  /**
+   * Address: 0x00A81A9C (FUN_00A81A9C, DestroyCursor)
+   *
+   * What it does:
+   * Import thunk that forwards to `DestroyCursor`.
+   */
+  BOOL ThunkDestroyCursor(HCURSOR hCursor)
+  {
+    return ::DestroyCursor(hCursor);
+  }
+
+  /**
+   * Address: 0x00A81AA2 (FUN_00A81AA2, CreateCursor)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateCursor`.
+   */
+  HCURSOR ThunkCreateCursor(HINSTANCE hInst, const int xHotSpot, const int yHotSpot, const int nWidth, const int nHeight, const void *pvANDPlane, const void *pvXORPlane)
+  {
+    return ::CreateCursor(hInst, xHotSpot, yHotSpot, nWidth, nHeight, pvANDPlane, pvXORPlane);
+  }
+
+  /**
+   * Address: 0x00A81AA8 (FUN_00A81AA8, LoadImageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `LoadImageW`.
+   */
+  HANDLE ThunkLoadImageW(HINSTANCE hInst, LPCWSTR name, const UINT type, const int cx, const int cy, const UINT fuLoad)
+  {
+    return ::LoadImageW(hInst, name, type, cx, cy, fuLoad);
+  }
+
+  /**
+   * Address: 0x00A81AAE (FUN_00A81AAE, LoadCursorW)
+   *
+   * What it does:
+   * Import thunk that forwards to `LoadCursorW`.
+   */
+  HCURSOR ThunkLoadCursorW(HINSTANCE hInstance, LPCWSTR lpCursorName)
+  {
+    return ::LoadCursorW(hInstance, lpCursorName);
+  }
+
+  /**
+   * Address: 0x00A81AB4 (FUN_00A81AB4, CreateDialogParamW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDialogParamW`.
+   */
+  HWND ThunkCreateDialogParamW(HINSTANCE hInstance, LPCWSTR lpTemplateName, HWND hWndParent, DLGPROC lpDialogFunc, const LPARAM dwInitParam)
+  {
+    return ::CreateDialogParamW(hInstance, lpTemplateName, hWndParent, lpDialogFunc, dwInitParam);
+  }
+
+  /**
+   * Address: 0x00A81ABA (FUN_00A81ABA, GetWindowDC)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetWindowDC`.
+   */
+  HDC ThunkGetWindowDC(HWND hWnd)
+  {
+    return ::GetWindowDC(hWnd);
+  }
+
+  /**
+   * Address: 0x00A81AC0 (FUN_00A81AC0, BeginPaint)
+   *
+   * What it does:
+   * Import thunk that forwards to `BeginPaint`.
+   */
+  HDC ThunkBeginPaint(HWND hWnd, LPPAINTSTRUCT lpPaint)
+  {
+    return ::BeginPaint(hWnd, lpPaint);
+  }
+
+  /**
+   * Address: 0x00A81AC6 (FUN_00A81AC6, EndPaint)
+   *
+   * What it does:
+   * Import thunk that forwards to `EndPaint`.
+   */
+  BOOL ThunkEndPaint(HWND hWnd, const PAINTSTRUCT *lpPaint)
+  {
+    return ::EndPaint(hWnd, lpPaint);
+  }
+
+  /**
+   * Address: 0x00A81ACC (FUN_00A81ACC, PostMessageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `PostMessageW`.
+   */
+  BOOL ThunkPostMessageW(HWND hWnd, const UINT Msg, const WPARAM wParam, const LPARAM lParam)
+  {
+    return ::PostMessageW(hWnd, Msg, wParam, lParam);
+  }
+
+  /**
+   * Address: 0x00A81AD2 (FUN_00A81AD2, IsZoomed)
+   *
+   * What it does:
+   * Import thunk that forwards to `IsZoomed`.
+   */
+  BOOL ThunkIsZoomed(HWND hWnd)
+  {
+    return ::IsZoomed(hWnd);
+  }
+
+  /**
+   * Address: 0x00A81AD8 (FUN_00A81AD8, GetDesktopWindow_0)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetDesktopWindow_0`.
+   */
+  HWND ThunkGetDesktopWindow_0()
+  {
+    return ::GetDesktopWindow();
+  }
+
+  /**
+   * Address: 0x00A81ADE (FUN_00A81ADE, DrawMenuBar)
+   *
+   * What it does:
+   * Import thunk that forwards to `DrawMenuBar`.
+   */
+  BOOL ThunkDrawMenuBar(HWND hWnd)
+  {
+    return ::DrawMenuBar(hWnd);
+  }
+
+  /**
+   * Address: 0x00A81AE4 (FUN_00A81AE4, EnableMenuItem)
+   *
+   * What it does:
+   * Import thunk that forwards to `EnableMenuItem`.
+   */
+  BOOL ThunkEnableMenuItem(HMENU hMenu, const UINT uIDEnableItem, const UINT uEnable)
+  {
+    return ::EnableMenuItem(hMenu, uIDEnableItem, uEnable);
+  }
+
+  /**
+   * Address: 0x00A81AEA (FUN_00A81AEA, AdjustWindowRectEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `AdjustWindowRectEx`.
+   */
+  BOOL ThunkAdjustWindowRectEx(LPRECT lpRect, const DWORD dwStyle, const BOOL bMenu, const DWORD dwExStyle)
+  {
+    return ::AdjustWindowRectEx(lpRect, dwStyle, bMenu, dwExStyle);
+  }
+
+  /**
+   * Address: 0x00A81AF0 (FUN_00A81AF0, SetWindowRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetWindowRgn`.
+   */
+  int ThunkSetWindowRgn(HWND hWnd, HRGN hRgn, const BOOL bRedraw)
+  {
+    return ::SetWindowRgn(hWnd, hRgn, bRedraw);
+  }
+
+  /**
+   * Address: 0x00A81B02 (FUN_00A81B02, CreateDialogIndirectParamW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDialogIndirectParamW`.
+   */
+  HWND ThunkCreateDialogIndirectParamW(HINSTANCE hInstance, LPCDLGTEMPLATEW lpTemplate, HWND hWndParent, DLGPROC lpDialogFunc, const LPARAM dwInitParam)
+  {
+    return ::CreateDialogIndirectParamW(hInstance, lpTemplate, hWndParent, lpDialogFunc, dwInitParam);
+  }
+
+  /**
+   * Address: 0x00A81B08 (FUN_00A81B08, GetMessageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetMessageW`.
+   */
+  BOOL ThunkGetMessageW(LPMSG lpMsg, HWND hWnd, const UINT wMsgFilterMin, const UINT wMsgFilterMax)
+  {
+    return ::GetMessageW(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax);
+  }
+
+  /**
+   * Address: 0x00A81B0E (FUN_00A81B0E, LoadBitmapW)
+   *
+   * What it does:
+   * Import thunk that forwards to `LoadBitmapW`.
+   */
+  HBITMAP ThunkLoadBitmapW(HINSTANCE hInstance, LPCWSTR lpBitmapName)
+  {
+    return ::LoadBitmapW(hInstance, lpBitmapName);
+  }
+
+  /**
+   * Address: 0x00A81B14 (FUN_00A81B14, DispatchMessageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `DispatchMessageW`.
+   */
+  LRESULT ThunkDispatchMessageW(const MSG *lpMsg)
+  {
+    return ::DispatchMessageW(lpMsg);
+  }
+
+  /**
+   * Address: 0x00A81B1A (FUN_00A81B1A, TranslateMessage)
+   *
+   * What it does:
+   * Import thunk that forwards to `TranslateMessage`.
+   */
+  BOOL ThunkTranslateMessage(const MSG *lpMsg)
+  {
+    return ::TranslateMessage(lpMsg);
+  }
+
+  /**
+   * Address: 0x00A81B20 (FUN_00A81B20, keybd_event)
+   *
+   * What it does:
+   * Import thunk that forwards to `keybd_event`.
+   */
+  void Thunkkeybd_event(const BYTE bVk, const BYTE bScan, const DWORD dwFlags, const ULONG_PTR dwExtraInfo)
+  {
+    ::keybd_event(bVk, bScan, dwFlags, dwExtraInfo);
+  }
+
+  /**
+   * Address: 0x00A81B26 (FUN_00A81B26, GetWindowTextLengthW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetWindowTextLengthW`.
+   */
+  int ThunkGetWindowTextLengthW(HWND hWnd)
+  {
+    return ::GetWindowTextLengthW(hWnd);
+  }
 } // namespace moho::runtime
 
 
