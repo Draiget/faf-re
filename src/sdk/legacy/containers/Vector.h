@@ -2504,6 +2504,10 @@ namespace msvc8
          * gap and, via the pure-append dispatcher FUN_007F0D20, to write the new
          * element directly at `mLast` when there is no tail to shift)
          *
+         * Address: 0x00884330 (FUN_00884330,
+         * msvc8::vector<Moho::SSavedGameArmyInfo>::uninit_fill_n -- fills the
+         * reserved tail from a prototype after the resize-with-fill lane has
+         * reserved the exact target capacity)
          * Address: 0x005CC2D0 (FUN_005CC2D0, msvc8::vector<Moho::SPerArmyReconInfo>::
          * uninit_fill_n for the 52-byte element -- copy-constructs `count` copies
          * of the by-ref prototype, used by FUN_005C6F90 to fill the inserted gap)
