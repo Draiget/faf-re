@@ -89194,6 +89194,555 @@ namespace moho::runtime
   {
     return ::GetClipBox(hdc, lprect);
   }
+  /**
+   * Address: 0x00A81DD8 (FUN_00A81DD8, ExtSelectClipRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExtSelectClipRgn`.
+   */
+  int ThunkExtSelectClipRgn(HDC hdc, HRGN hrgn, const int mode)
+  {
+    return ::ExtSelectClipRgn(hdc, hrgn, mode);
+  }
+
+  /**
+   * Address: 0x00A81DDE (FUN_00A81DDE, SelectClipRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `SelectClipRgn`.
+   */
+  int ThunkSelectClipRgn(HDC hdc, HRGN hrgn)
+  {
+    return ::SelectClipRgn(hdc, hrgn);
+  }
+
+  /**
+   * Address: 0x00A81DE4 (FUN_00A81DE4, ExtFloodFill)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExtFloodFill`.
+   */
+  BOOL ThunkExtFloodFill(HDC hdc, const int x, const int y, const COLORREF color, const UINT type)
+  {
+    return ::ExtFloodFill(hdc, x, y, color, type);
+  }
+
+  /**
+   * Address: 0x00A81DEA (FUN_00A81DEA, Arc)
+   *
+   * What it does:
+   * Import thunk that forwards to `Arc`.
+   */
+  BOOL ThunkArc(HDC hdc, const int x1, const int y1, const int x2, const int y2, const int x3, const int y3, const int x4, const int y4)
+  {
+    return ::Arc(hdc, x1, y1, x2, y2, x3, y3, x4, y4);
+  }
+
+  /**
+   * Address: 0x00A81DF0 (FUN_00A81DF0, Pie)
+   *
+   * What it does:
+   * Import thunk that forwards to `Pie`.
+   */
+  BOOL ThunkPie(HDC hdc, const int left, const int top, const int right, const int bottom, const int xr1, const int yr1, const int xr2, const int yr2)
+  {
+    return ::Pie(hdc, left, top, right, bottom, xr1, yr1, xr2, yr2);
+  }
+
+  /**
+   * Address: 0x00A81DF6 (FUN_00A81DF6, SetPixel)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetPixel`.
+   */
+  COLORREF ThunkSetPixel(HDC hdc, const int x, const int y, const COLORREF color)
+  {
+    return ::SetPixel(hdc, x, y, color);
+  }
+
+  /**
+   * Address: 0x00A81DFC (FUN_00A81DFC, Polygon)
+   *
+   * What it does:
+   * Import thunk that forwards to `Polygon`.
+   */
+  BOOL ThunkPolygon(HDC hdc, const POINT *apt, const int cpt)
+  {
+    return ::Polygon(hdc, apt, cpt);
+  }
+
+  /**
+   * Address: 0x00A81E02 (FUN_00A81E02, SetPolyFillMode)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetPolyFillMode`.
+   */
+  int ThunkSetPolyFillMode(HDC hdc, const int mode)
+  {
+    return ::SetPolyFillMode(hdc, mode);
+  }
+
+  /**
+   * Address: 0x00A81E08 (FUN_00A81E08, Polyline)
+   *
+   * What it does:
+   * Import thunk that forwards to `Polyline`.
+   */
+  BOOL ThunkPolyline(HDC hdc, const POINT *apt, const int cpt)
+  {
+    return ::Polyline(hdc, apt, cpt);
+  }
+
+  /**
+   * Address: 0x00A81E0E (FUN_00A81E0E, Rectangle)
+   *
+   * What it does:
+   * Import thunk that forwards to `Rectangle`.
+   */
+  BOOL ThunkRectangle(HDC hdc, const int left, const int top, const int right, const int bottom)
+  {
+    return ::Rectangle(hdc, left, top, right, bottom);
+  }
+
+  /**
+   * Address: 0x00A81E14 (FUN_00A81E14, RoundRect)
+   *
+   * What it does:
+   * Import thunk that forwards to `RoundRect`.
+   */
+  BOOL ThunkRoundRect(HDC hdc, const int left, const int top, const int right, const int bottom, const int width, const int height)
+  {
+    return ::RoundRect(hdc, left, top, right, bottom, width, height);
+  }
+
+  /**
+   * Address: 0x00A81E1A (FUN_00A81E1A, Ellipse)
+   *
+   * What it does:
+   * Import thunk that forwards to `Ellipse`.
+   */
+  BOOL ThunkEllipse(HDC hdc, const int left, const int top, const int right, const int bottom)
+  {
+    return ::Ellipse(hdc, left, top, right, bottom);
+  }
+
+  /**
+   * Address: 0x00A81E20 (FUN_00A81E20, TextOutW)
+   *
+   * What it does:
+   * Import thunk that forwards to `TextOutW`.
+   */
+  BOOL ThunkTextOutW(HDC hdc, const int x, const int y, LPCWSTR lpString, const int c)
+  {
+    return ::TextOutW(hdc, x, y, lpString, c);
+  }
+
+  /**
+   * Address: 0x00A81E26 (FUN_00A81E26, SetBrushOrgEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetBrushOrgEx`.
+   */
+  BOOL ThunkSetBrushOrgEx(HDC hdc, const int x, const int y, LPPOINT lppt)
+  {
+    return ::SetBrushOrgEx(hdc, x, y, lppt);
+  }
+
+  /**
+   * Address: 0x00A81E2C (FUN_00A81E2C, SetROP2)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetROP2`.
+   */
+  int ThunkSetROP2(HDC hdc, const int rop2)
+  {
+    return ::SetROP2(hdc, rop2);
+  }
+
+  /**
+   * Address: 0x00A81E32 (FUN_00A81E32, SetWindowOrgEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetWindowOrgEx`.
+   */
+  BOOL ThunkSetWindowOrgEx(HDC hdc, const int x, const int y, LPPOINT lppt)
+  {
+    return ::SetWindowOrgEx(hdc, x, y, lppt);
+  }
+
+  /**
+   * Address: 0x00A81E38 (FUN_00A81E38, SetViewportOrgEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetViewportOrgEx`.
+   */
+  BOOL ThunkSetViewportOrgEx(HDC hdc, const int x, const int y, LPPOINT lppt)
+  {
+    return ::SetViewportOrgEx(hdc, x, y, lppt);
+  }
+
+  /**
+   * Address: 0x00A81E3E (FUN_00A81E3E, SetWindowExtEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetWindowExtEx`.
+   */
+  BOOL ThunkSetWindowExtEx(HDC hdc, const int x, const int y, LPSIZE lpsz)
+  {
+    return ::SetWindowExtEx(hdc, x, y, lpsz);
+  }
+
+  /**
+   * Address: 0x00A81E44 (FUN_00A81E44, SetViewportExtEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetViewportExtEx`.
+   */
+  BOOL ThunkSetViewportExtEx(HDC hdc, const int x, const int y, LPSIZE lpsz)
+  {
+    return ::SetViewportExtEx(hdc, x, y, lpsz);
+  }
+
+  /**
+   * Address: 0x00A81E50 (FUN_00A81E50, CreateHatchBrush)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateHatchBrush`.
+   */
+  HBRUSH ThunkCreateHatchBrush(const int iHatch, const COLORREF color)
+  {
+    return ::CreateHatchBrush(iHatch, color);
+  }
+
+  /**
+   * Address: 0x00A81E56 (FUN_00A81E56, CreatePatternBrush)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreatePatternBrush`.
+   */
+  HBRUSH ThunkCreatePatternBrush(HBITMAP hbm)
+  {
+    return ::CreatePatternBrush(hbm);
+  }
+
+  /**
+   * Address: 0x00A81E5C (FUN_00A81E5C, ExtCreatePen)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExtCreatePen`.
+   */
+  HPEN ThunkExtCreatePen(const DWORD iPenStyle, const DWORD cWidth, const LOGBRUSH *plbrush, const DWORD cStyle, const DWORD *pstyle)
+  {
+    return ::ExtCreatePen(iPenStyle, cWidth, plbrush, cStyle, pstyle);
+  }
+
+  /**
+   * Address: 0x00A81E62 (FUN_00A81E62, CreateDIBitmap)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDIBitmap`.
+   */
+  HBITMAP ThunkCreateDIBitmap(HDC hdc, const BITMAPINFOHEADER *pbmih, const DWORD flInit, const void *pjBits, const BITMAPINFO *pbmi, const UINT iUsage)
+  {
+    return ::CreateDIBitmap(hdc, pbmih, flInit, pjBits, pbmi, iUsage);
+  }
+
+  /**
+   * Address: 0x00A81E68 (FUN_00A81E68, CreateDCW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDCW`.
+   */
+  HDC ThunkCreateDCW(LPCWSTR pwszDriver, LPCWSTR pwszDevice, LPCWSTR pszPort, const DEVMODEW *pdm)
+  {
+    return ::CreateDCW(pwszDriver, pwszDevice, pszPort, pdm);
+  }
+
+  /**
+   * Address: 0x00A81E6E (FUN_00A81E6E, SetDIBits)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetDIBits`.
+   */
+  int ThunkSetDIBits(HDC hdc, HBITMAP hbm, const UINT start, const UINT cLines, const void *lpBits, const BITMAPINFO *lpbmi, const UINT ColorUse)
+  {
+    return ::SetDIBits(hdc, hbm, start, cLines, lpBits, lpbmi, ColorUse);
+  }
+
+  /**
+   * Address: 0x00A81E74 (FUN_00A81E74, CreateICW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateICW`.
+   */
+  HDC ThunkCreateICW(LPCWSTR pszDriver, LPCWSTR pszDevice, LPCWSTR pszPort, const DEVMODEW *pdm)
+  {
+    return ::CreateICW(pszDriver, pszDevice, pszPort, pdm);
+  }
+
+  /**
+   * Address: 0x00A81E7A (FUN_00A81E7A, GetTextExtentPoint32W)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetTextExtentPoint32W`.
+   */
+  BOOL ThunkGetTextExtentPoint32W(HDC hdc, LPCWSTR lpString, const int c, LPSIZE psizl)
+  {
+    return ::GetTextExtentPoint32W(hdc, lpString, c, psizl);
+  }
+
+  /**
+   * Address: 0x00A81E80 (FUN_00A81E80, CreateBitmapIndirect)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateBitmapIndirect`.
+   */
+  HBITMAP ThunkCreateBitmapIndirect(const BITMAP *pbm)
+  {
+    return ::CreateBitmapIndirect(pbm);
+  }
+
+  /**
+   * Address: 0x00A81E86 (FUN_00A81E86, GetSystemPaletteEntries)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetSystemPaletteEntries`.
+   */
+  UINT ThunkGetSystemPaletteEntries(HDC hdc, const UINT iStart, const UINT cEntries, LPPALETTEENTRY pPalEntries)
+  {
+    return ::GetSystemPaletteEntries(hdc, iStart, cEntries, pPalEntries);
+  }
+
+  /**
+   * Address: 0x00A81E8C (FUN_00A81E8C, CopyEnhMetaFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CopyEnhMetaFileW`.
+   */
+  HENHMETAFILE ThunkCopyEnhMetaFileW(HENHMETAFILE hEnh, LPCWSTR lpFileName)
+  {
+    return ::CopyEnhMetaFileW(hEnh, lpFileName);
+  }
+
+  /**
+   * Address: 0x00A81E92 (FUN_00A81E92, DeleteEnhMetaFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `DeleteEnhMetaFile`.
+   */
+  BOOL ThunkDeleteEnhMetaFile(HENHMETAFILE hmf)
+  {
+    return ::DeleteEnhMetaFile(hmf);
+  }
+
+  /**
+   * Address: 0x00A81E98 (FUN_00A81E98, GetEnhMetaFileHeader)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetEnhMetaFileHeader`.
+   */
+  UINT ThunkGetEnhMetaFileHeader(HENHMETAFILE hemf, const UINT nSize, LPENHMETAHEADER lpEnhMetaHeader)
+  {
+    return ::GetEnhMetaFileHeader(hemf, nSize, lpEnhMetaHeader);
+  }
+
+  /**
+   * Address: 0x00A81E9E (FUN_00A81E9E, CreateEnhMetaFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateEnhMetaFileW`.
+   */
+  HDC ThunkCreateEnhMetaFileW(HDC hdc, LPCWSTR lpFilename, const RECT *lprc, LPCWSTR lpDesc)
+  {
+    return ::CreateEnhMetaFileW(hdc, lpFilename, lprc, lpDesc);
+  }
+
+  /**
+   * Address: 0x00A81EA4 (FUN_00A81EA4, SetMetaFileBitsEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetMetaFileBitsEx`.
+   */
+  HMETAFILE ThunkSetMetaFileBitsEx(const UINT cbBuffer, const BYTE *lpData)
+  {
+    return ::SetMetaFileBitsEx(cbBuffer, lpData);
+  }
+
+  /**
+   * Address: 0x00A81EAA (FUN_00A81EAA, GetWinMetaFileBits)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetWinMetaFileBits`.
+   */
+  UINT ThunkGetWinMetaFileBits(HENHMETAFILE hemf, const UINT cbData16, LPBYTE pData16, const INT iMapMode, HDC hdcRef)
+  {
+    return ::GetWinMetaFileBits(hemf, cbData16, pData16, iMapMode, hdcRef);
+  }
+
+  /**
+   * Address: 0x00A81EB0 (FUN_00A81EB0, PlayEnhMetaFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `PlayEnhMetaFile`.
+   */
+  BOOL ThunkPlayEnhMetaFile(HDC hdc, HENHMETAFILE hmf, const RECT *lprect)
+  {
+    return ::PlayEnhMetaFile(hdc, hmf, lprect);
+  }
+
+  /**
+   * Address: 0x00A81EB6 (FUN_00A81EB6, CloseEnhMetaFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `CloseEnhMetaFile`.
+   */
+  HENHMETAFILE ThunkCloseEnhMetaFile(HDC hdc)
+  {
+    return ::CloseEnhMetaFile(hdc);
+  }
+
+  /**
+   * Address: 0x00A81EBC (FUN_00A81EBC, SetWinMetaFileBits)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetWinMetaFileBits`.
+   */
+  HENHMETAFILE ThunkSetWinMetaFileBits(const UINT nSize, const BYTE *lpMeta16Data, HDC hdcRef, const METAFILEPICT *lpMFP)
+  {
+    return ::SetWinMetaFileBits(nSize, lpMeta16Data, hdcRef, lpMFP);
+  }
+
+  /**
+   * Address: 0x00A81EC2 (FUN_00A81EC2, GetMetaFileBitsEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetMetaFileBitsEx`.
+   */
+  UINT ThunkGetMetaFileBitsEx(HMETAFILE hMF, const UINT cbBuffer, LPVOID lpData)
+  {
+    return ::GetMetaFileBitsEx(hMF, cbBuffer, lpData);
+  }
+
+  /**
+   * Address: 0x00A81EC8 (FUN_00A81EC8, CommDlgExtendedError)
+   *
+   * What it does:
+   * Import thunk that forwards to `CommDlgExtendedError`.
+   */
+  DWORD ThunkCommDlgExtendedError()
+  {
+    return ::CommDlgExtendedError();
+  }
+
+  /**
+   * Address: 0x00A81ECE (FUN_00A81ECE, GetSaveFileNameW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetSaveFileNameW`.
+   */
+  BOOL ThunkGetSaveFileNameW(LPOPENFILENAMEW lpofn)
+  {
+    return ::GetSaveFileNameW(lpofn);
+  }
+
+  /**
+   * Address: 0x00A81ED4 (FUN_00A81ED4, GetOpenFileNameW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetOpenFileNameW`.
+   */
+  BOOL ThunkGetOpenFileNameW(LPOPENFILENAMEW lpofn)
+  {
+    return ::GetOpenFileNameW(lpofn);
+  }
+
+  /**
+   * Address: 0x00A81EDA (FUN_00A81EDA, PrintDlgW)
+   *
+   * What it does:
+   * Import thunk that forwards to `PrintDlgW`.
+   */
+  BOOL ThunkPrintDlgW(LPPRINTDLGW pPD)
+  {
+    return ::PrintDlgW(pPD);
+  }
+
+  /**
+   * Address: 0x00A81EE0 (FUN_00A81EE0, ChooseColorW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ChooseColorW`.
+   */
+  BOOL ThunkChooseColorW(LPCHOOSECOLORW lpcc)
+  {
+    return ::ChooseColorW(lpcc);
+  }
+
+  /**
+   * Address: 0x00A81EE6 (FUN_00A81EE6, ChooseFontW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ChooseFontW`.
+   */
+  BOOL ThunkChooseFontW(LPCHOOSEFONTW lpcf)
+  {
+    return ::ChooseFontW(lpcf);
+  }
+
+  /**
+   * Address: 0x00A81EEC (FUN_00A81EEC, AdjustTokenPrivileges)
+   *
+   * What it does:
+   * Import thunk that forwards to `AdjustTokenPrivileges`.
+   */
+  BOOL ThunkAdjustTokenPrivileges(HANDLE TokenHandle, const BOOL DisableAllPrivileges, PTOKEN_PRIVILEGES NewState, const DWORD BufferLength, PTOKEN_PRIVILEGES PreviousState, PDWORD ReturnLength)
+  {
+    return ::AdjustTokenPrivileges(TokenHandle, DisableAllPrivileges, NewState, BufferLength, PreviousState, ReturnLength);
+  }
+
+  /**
+   * Address: 0x00A81EF2 (FUN_00A81EF2, LookupPrivilegeValueA)
+   *
+   * What it does:
+   * Import thunk that forwards to `LookupPrivilegeValueA`.
+   */
+  BOOL ThunkLookupPrivilegeValueA(LPCSTR lpSystemName, LPCSTR lpName, PLUID lpLuid)
+  {
+    return ::LookupPrivilegeValueA(lpSystemName, lpName, lpLuid);
+  }
+
+  /**
+   * Address: 0x00A81EF8 (FUN_00A81EF8, OpenProcessToken)
+   *
+   * What it does:
+   * Import thunk that forwards to `OpenProcessToken`.
+   */
+  BOOL ThunkOpenProcessToken(HANDLE ProcessHandle, const DWORD DesiredAccess, PHANDLE TokenHandle)
+  {
+    return ::OpenProcessToken(ProcessHandle, DesiredAccess, TokenHandle);
+  }
+
+  /**
+   * Address: 0x00A81EFE (FUN_00A81EFE, RegCreateKeyExA)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegCreateKeyExA`.
+   */
+  LSTATUS ThunkRegCreateKeyExA(HKEY hKey, LPCSTR lpSubKey, const DWORD Reserved, LPSTR lpClass, const DWORD dwOptions, const REGSAM samDesired, const LPSECURITY_ATTRIBUTES lpSecurityAttributes, PHKEY phkResult, LPDWORD lpdwDisposition)
+  {
+    return ::RegCreateKeyExA(hKey, lpSubKey, Reserved, lpClass, dwOptions, samDesired, lpSecurityAttributes, phkResult, lpdwDisposition);
+  }
+
+  /**
+   * Address: 0x00A81F04 (FUN_00A81F04, RegQueryValueExA)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegQueryValueExA`.
+   */
+  LSTATUS ThunkRegQueryValueExA(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData)
+  {
+    return ::RegQueryValueExA(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData);
+  }
 } // namespace moho::runtime
 
 
