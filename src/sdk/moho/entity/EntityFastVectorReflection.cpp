@@ -9,7 +9,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/Entity.h"
+#include "moho/entity/Entity.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -681,6 +681,8 @@ namespace gpg
 
     storage->resize(static_cast<std::size_t>(count), nullptr);
   }
+
+  RFastVectorType<moho::Entity*>::~RFastVectorType() = default;
 
   /**
    * Address: 0x00693C00 (FUN_00693C00, gpg::RFastVectorType_EntityP::GetName)

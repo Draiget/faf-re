@@ -135,6 +135,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006943F0 (FUN_006943F0, gpg::RFastVectorType_EntityP::dtr)
+     */
+    ~RFastVectorType() override;
+
+    /**
      * Address: 0x00693C00 (FUN_00693C00, gpg::RFastVectorType_EntityP::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
