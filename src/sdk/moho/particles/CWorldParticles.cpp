@@ -550,47 +550,28 @@ namespace
     listRuntime.size = 0U;
   }
 
-  void DestroyTrailSegmentPoolNodesRecursive(
-    moho::TrailSegmentPoolNodeRuntime* const node,
-    moho::TrailSegmentPoolNodeRuntime* const head
-  ) noexcept
+  /**
+   * Frees the buffers the pool owns. The binary recurses the tree and deletes
+   * each node as it goes; with a real container the node teardown belongs to
+   * the container, so only the owned payloads are released here.
+   */
+  void ReleaseTrailSegmentPoolBuffers(moho::TrailSegmentPoolRuntime& poolRuntime) noexcept
   {
-    if (node == nullptr || node == head || node->isNil != 0U) {
-      return;
-    }
-
-    DestroyTrailSegmentPoolNodesRecursive(node->left, head);
-    DestroyTrailSegmentPoolNodesRecursive(node->right, head);
-
-    if (node->segmentBuffer != nullptr) {
-      if (node->segmentBuffer->vertexSheet != nullptr) {
-        delete node->segmentBuffer->vertexSheet;
-        node->segmentBuffer->vertexSheet = nullptr;
+    for (moho::TrailSegmentBufferRuntime* const segmentBuffer : poolRuntime) {
+      if (segmentBuffer == nullptr) {
+        continue;
       }
-      ::operator delete(node->segmentBuffer);
-      node->segmentBuffer = nullptr;
-    }
 
-    ::operator delete(node);
+      delete segmentBuffer->vertexSheet;
+      segmentBuffer->vertexSheet = nullptr;
+      ::operator delete(segmentBuffer);
+    }
   }
 
   void ResetTrailSegmentPool(moho::TrailSegmentPoolRuntime& poolRuntime) noexcept
   {
-    moho::TrailSegmentPoolNodeRuntime* const head = poolRuntime.head;
-    if (head == nullptr) {
-      poolRuntime.size = 0U;
-      return;
-    }
-
-    DestroyTrailSegmentPoolNodesRecursive(head->left, head);
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->segmentBuffer = nullptr;
-    head->color = 1U;
-    head->isNil = 1U;
-    head->padding12 = 0U;
-    poolRuntime.size = 0U;
+    ReleaseTrailSegmentPoolBuffers(poolRuntime);
+    poolRuntime.clear();
   }
 
   void ReleaseParticleBufferPoolListStorage(
@@ -612,16 +593,10 @@ namespace
     moho::TrailSegmentPoolRuntime& poolRuntime
   ) noexcept
   {
-    moho::TrailSegmentPoolNodeRuntime* const head = poolRuntime.head;
-    if (head == nullptr) {
-      poolRuntime.size = 0U;
-      return;
-    }
-
-    DestroyTrailSegmentPoolNodesRecursive(head->left, head);
-    ::operator delete(head);
-    poolRuntime.head = nullptr;
-    poolRuntime.size = 0U;
+    // The binary frees the sentinel head too; that lifetime now belongs to
+    // the container, which releases it in its own destructor.
+    ReleaseTrailSegmentPoolBuffers(poolRuntime);
+    poolRuntime.clear();
   }
 
   /**
@@ -2232,39 +2207,6 @@ namespace
   }
 
   /**
-   * Address: 0x0049C680 (FUN_0049C680, sub_49C680)
-   *
-   * What it does:
-   * Allocates one raw trail-segment pool node lane.
-   */
-  [[nodiscard]] moho::TrailSegmentPoolNodeRuntime* AllocateTrailSegmentPoolNodeRaw()
-  {
-    return static_cast<moho::TrailSegmentPoolNodeRuntime*>(
-      ::operator new(sizeof(moho::TrailSegmentPoolNodeRuntime))
-    );
-  }
-
-  /**
-   * Address: 0x0049C620 (FUN_0049C620, sub_49C620)
-   *
-   * What it does:
-   * Allocates one trail-segment pool node and initializes the three link lanes
-   * to null with default black/non-sentinel flags.
-   */
-  [[nodiscard]] moho::TrailSegmentPoolNodeRuntime* AllocateTrailSegmentPoolNodeWithNullLinksBlack()
-  {
-    moho::TrailSegmentPoolNodeRuntime* const node = AllocateTrailSegmentPoolNodeRaw();
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->segmentBuffer = nullptr;
-    node->color = 1U;
-    node->isNil = 0U;
-    node->padding12 = 0U;
-    return node;
-  }
-
-  /**
    * Address: 0x0049C660 (FUN_0049C660, nullsub_602)
    *
    * What it does:
@@ -2290,19 +2232,6 @@ namespace
    * No-op helper thunk retained for binary parity.
    */
   void NoOpHelperThunkAF() noexcept {}
-
-  [[nodiscard]] moho::TrailSegmentPoolNodeRuntime* AllocateTrailSegmentPoolHeadNode()
-  {
-    auto* const head = AllocateTrailSegmentPoolNodeWithNullLinksBlack();
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->segmentBuffer = nullptr;
-    head->color = 1U;
-    head->isNil = 1U;
-    head->padding12 = 0U;
-    return head;
-  }
 
   [[nodiscard]] moho::ParticleBucketTreeNodeRuntime* AllocateParticleBucketTreeHeadNode()
   {
@@ -2346,18 +2275,9 @@ namespace
 
   void InitializeTrailSegmentPool(moho::TrailSegmentPoolRuntime& poolRuntime)
   {
-    if (poolRuntime.head == nullptr) {
-      poolRuntime.head = AllocateTrailSegmentPoolHeadNode();
-    } else {
-      poolRuntime.head->left = poolRuntime.head;
-      poolRuntime.head->parent = poolRuntime.head;
-      poolRuntime.head->right = poolRuntime.head;
-      poolRuntime.head->segmentBuffer = nullptr;
-      poolRuntime.head->color = 1U;
-      poolRuntime.head->isNil = 1U;
-      poolRuntime.head->padding12 = 0U;
-    }
-    poolRuntime.size = 0U;
+    // `msvc8::set`'s constructor seats the sentinel head and zeroes the
+    // size; the binary open-codes both branches of that here.
+    poolRuntime.clear();
   }
 
   void InitializeParticleBucketTree(moho::ParticleBucketTreeRuntime& treeRuntime)

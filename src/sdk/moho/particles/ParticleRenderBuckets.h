@@ -1,5 +1,6 @@
 #pragma once
 
+#include "legacy/containers/Set.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -91,41 +92,14 @@ namespace moho
    * One owner-pool RB-tree node lane for trail segment buffers, preserving the
    * original `left/parent/right + key + color/is-nil` shape.
    */
-  struct TrailSegmentPoolNodeRuntime
-  {
-    TrailSegmentPoolNodeRuntime* left = nullptr;   // +0x00
-    TrailSegmentPoolNodeRuntime* parent = nullptr; // +0x04
-    TrailSegmentPoolNodeRuntime* right = nullptr;  // +0x08
-    TrailSegmentBufferRuntime* segmentBuffer = nullptr; // +0x0C
-    std::uint8_t color = 0U;                       // +0x10
-    std::uint8_t isNil = 0U;                       // +0x11
-    std::uint16_t padding12 = 0U;                  // +0x12
-  };
-
-  static_assert(
-    offsetof(TrailSegmentPoolNodeRuntime, segmentBuffer) == 0x0C,
-    "TrailSegmentPoolNodeRuntime::segmentBuffer offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(TrailSegmentPoolNodeRuntime, color) == 0x10,
-    "TrailSegmentPoolNodeRuntime::color offset must be 0x10"
-  );
-  static_assert(
-    offsetof(TrailSegmentPoolNodeRuntime, isNil) == 0x11,
-    "TrailSegmentPoolNodeRuntime::isNil offset must be 0x11"
-  );
-  static_assert(sizeof(TrailSegmentPoolNodeRuntime) == 0x14, "TrailSegmentPoolNodeRuntime size must be 0x14");
-
   /**
-   * What it does:
-   * One `CWorldParticles` trail-segment owner pool header lane (`+0x1C`).
+   * The trail-segment owner pool is `std::set<TrailSegmentBufferRuntime*>`:
+   * the node is 0x14 with links at 0/4/8, the buffer pointer at +0x0C and the
+   * colour/nil pair at +0x10/+0x11, which is exactly what `msvc8::set` lays
+   * out for a 4-byte value. Ordering is by raw pointer, so the default
+   * `std::less` is the right predicate.
    */
-  struct TrailSegmentPoolRuntime
-  {
-    std::uint32_t iteratorProxy = 0U;            // +0x00
-    TrailSegmentPoolNodeRuntime* head = nullptr; // +0x04
-    std::uint32_t size = 0U;                     // +0x08
-  };
+  using TrailSegmentPoolRuntime = msvc8::set<TrailSegmentBufferRuntime*>;
 
   static_assert(sizeof(TrailSegmentPoolRuntime) == 0x0C, "TrailSegmentPoolRuntime size must be 0x0C");
 
