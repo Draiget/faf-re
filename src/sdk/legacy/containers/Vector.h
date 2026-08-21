@@ -2504,6 +2504,9 @@ namespace msvc8
          * gap and, via the pure-append dispatcher FUN_007F0D20, to write the new
          * element directly at `mLast` when there is no tail to shift)
          *
+         * Address: 0x005261D0 (FUN_005261D0,
+         * msvc8::vector<Moho::RUnitBlueprintWeapon>::uninit_fill_n -- the
+         * broadcast-fill of `_Insert_n`'s vacated gap)
          * Address: 0x00884330 (FUN_00884330,
          * msvc8::vector<Moho::SSavedGameArmyInfo>::uninit_fill_n -- fills the
          * reserved tail from a prototype after the resize-with-fill lane has
@@ -2582,6 +2585,9 @@ namespace msvc8
          * `msvc8::vector<Moho::SPerArmyReconInfo>::operator=` (FUN_005CA980) to
          * assign over the retained prefix; returns the one-past-end destination
          * cursor so the caller can destroy the excess tail)
+         * Address: 0x005261F0 (FUN_005261F0, the `std::copy_backward` lane for
+         * `Moho::RUnitBlueprintWeapon` -- shifts `_Insert_n`'s live tail right
+         * by `count` slots on the spare-capacity path)
          * Address: 0x005C9F10 (FUN_005C9F10, the matching `std::copy_backward`
          * lane -- copy-assigns `[srcBegin, srcEnd)` backward into
          * `[destEnd - n, destEnd)`; used by FUN_005C6F90's in-place branch to
