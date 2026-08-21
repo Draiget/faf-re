@@ -47,17 +47,6 @@ namespace
 
   static_assert(sizeof(ByteRasterAllocation) == 0x0C, "ByteRasterAllocation size must be 0x0C");
 
-  template <class T>
-  void RuntimeVectorAssignPointers(
-    msvc8::vector<T>& storage, T* const begin, const std::size_t size, const std::size_t capacity
-  ) noexcept
-  {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    view.begin = begin;
-    view.end = begin + size;
-    view.capacityEnd = begin + capacity;
-  }
-
   struct DelayedSubVizVectorLaneRuntime
   {
     std::uint32_t prefixLane;              // +0x00
@@ -698,142 +687,6 @@ namespace
   }
 
   /**
-   * Address: 0x005082B0 (FUN_005082B0, delayed-sub-viz vector reserve-exact)
-   *
-   * What it does:
-   * Ensures exact storage capacity for at least `requiredCapacity` entries,
-   * preserving existing elements and element count.
-   */
-  [[nodiscard]] moho::SDelayedSubVizInfo* EnsureDelayedSubVizVectorCapacity(
-    DelayedSubVizVector& storage, const std::size_t requiredCapacity
-  )
-  {
-    if (requiredCapacity > DelayedSubVizVectorMaxCountVariant1()) {
-      ThrowDelayedSubVizVectorTooLong();
-    }
-
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentCapacity = storage.capacity();
-    if (currentCapacity >= requiredCapacity) {
-      return view.begin;
-    }
-
-    const std::size_t currentSize = storage.size();
-    moho::SDelayedSubVizInfo* const oldBegin = view.begin;
-    moho::SDelayedSubVizInfo* const newBegin =
-      static_cast<moho::SDelayedSubVizInfo*>(AllocateDelayedSubVizStorage(requiredCapacity));
-
-    for (std::size_t i = 0; i < currentSize; ++i) {
-      (void)CopyDelayedSubVizInfoVariant1(&newBegin[i], &oldBegin[i]);
-    }
-
-    if (oldBegin) {
-      DeleteDelayedSubVizStorage(oldBegin);
-    }
-
-    RuntimeVectorAssignPointers(storage, newBegin, currentSize, requiredCapacity);
-    return newBegin;
-  }
-
-  /**
-   * Address: 0x00508480 (FUN_00508480, delayed-sub-viz vector insert-fill)
-   *
-   * What it does:
-   * Inserts `count` copies of `value` at `insertPosition`, growing storage when
-   * needed, and returns pointer to first inserted element.
-   */
-  [[nodiscard]] moho::SDelayedSubVizInfo* InsertDelayedSubVizInfoCopies(
-    DelayedSubVizVector& storage,
-    const std::size_t count,
-    moho::SDelayedSubVizInfo* const insertPosition,
-    const moho::SDelayedSubVizInfo& value
-  )
-  {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentSize = storage.size();
-    const std::size_t currentCapacity = storage.capacity();
-
-    if (count == 0u) {
-      return insertPosition;
-    }
-
-    if (DelayedSubVizVectorMaxCountVariant1() - currentSize < count) {
-      ThrowDelayedSubVizVectorTooLong();
-    }
-
-    std::size_t insertIndex = currentSize;
-    if (view.begin && insertPosition) {
-      if (insertPosition <= view.begin) {
-        insertIndex = 0u;
-      } else if (insertPosition >= view.end) {
-        insertIndex = currentSize;
-      } else {
-        insertIndex = static_cast<std::size_t>(insertPosition - view.begin);
-      }
-    }
-
-    if (currentCapacity >= currentSize + count) {
-      for (std::size_t i = currentSize; i > insertIndex; --i) {
-        view.begin[(i - 1u) + count] = view.begin[i - 1u];
-      }
-
-      (void)FillDelayedSubVizInfoRange(value, view.begin + insertIndex, view.begin + insertIndex + count);
-
-      view.end += count;
-      return view.begin + insertIndex;
-    }
-
-    std::size_t grownCapacity = 0u;
-    if (DelayedSubVizVectorMaxCountVariant1() - (currentCapacity >> 1u) >= currentCapacity) {
-      grownCapacity = currentCapacity + (currentCapacity >> 1u);
-    }
-    if (grownCapacity < currentSize + count) {
-      grownCapacity = currentSize + count;
-    }
-
-    moho::SDelayedSubVizInfo* const oldBegin = view.begin;
-    moho::SDelayedSubVizInfo* const newBegin =
-      static_cast<moho::SDelayedSubVizInfo*>(AllocateDelayedSubVizStorage(grownCapacity));
-
-    (void)CopyDelayedSubVizInfoRangeVariant1(newBegin, oldBegin, oldBegin + insertIndex);
-    (void)FillDelayedSubVizInfoRange(value, newBegin + insertIndex, newBegin + insertIndex + count);
-    (void)CopyDelayedSubVizInfoRangeVariant1(newBegin + insertIndex + count, oldBegin + insertIndex, oldBegin + currentSize);
-
-    if (oldBegin) {
-      DeleteDelayedSubVizStorage(oldBegin);
-    }
-
-    RuntimeVectorAssignPointers(storage, newBegin, currentSize + count, grownCapacity);
-    return newBegin + insertIndex;
-  }
-
-  /**
-   * Address: 0x005083C0 (FUN_005083C0, delayed-sub-viz vector resize with fill)
-   *
-   * What it does:
-   * Resizes vector payload to `desiredCount` by appending fill entries or
-   * erasing tail entries.
-   */
-  [[nodiscard]] moho::SDelayedSubVizInfo* ResizeDelayedSubVizVectorWithFill(
-    DelayedSubVizVector& storage, const std::size_t desiredCount, const moho::SDelayedSubVizInfo& fillValue
-  )
-  {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentSize = storage.size();
-
-    if (currentSize < desiredCount) {
-      return InsertDelayedSubVizInfoCopies(storage, desiredCount - currentSize, view.end, fillValue);
-    }
-
-    if (desiredCount < currentSize && view.begin) {
-      DelayedSubVizPointerSlot out{};
-      (void)EraseDelayedSubVizVectorTail(storage, &out, view.begin + desiredCount);
-    }
-
-    return view.begin;
-  }
-
-  /**
    * Address: 0x00507F40 (FUN_00507F40, delayed-sub-viz vector resize adapter)
    *
    * What it does:
@@ -846,7 +699,8 @@ namespace
   )
   {
     const moho::SDelayedSubVizInfo fillValue{};
-    return ResizeDelayedSubVizVectorWithFill(storage, desiredCount, fillValue);
+    storage.resize(desiredCount, fillValue);
+    return storage.begin();
   }
 
   /**
@@ -1424,10 +1278,12 @@ namespace
         return destination;
       }
 
+      // _Tidy() then _Buy(sourceSize) + _Ucopy(source) is VC8's assign(first, n):
+      // exact-size allocation followed by an uninitialised copy of the whole
+      // source range. FUN_005082B0 is the reserve half of that lane.
       ReleaseDelayedSubVizVectorStorage(*destination);
-      if (sourceSize && EnsureDelayedSubVizVectorCapacity(*destination, sourceSize)) {
-        auto& refreshedView = msvc8::AsVectorRuntimeView(*destination);
-        refreshedView.end = CopyDelayedSubVizInfoTail(refreshedView.begin, sourceView.begin, sourceView.end);
+      if (sourceSize != 0u) {
+        destination->assign(sourceView.begin, sourceSize);
       }
       return destination;
     }
@@ -1602,7 +1458,7 @@ namespace
   {
     const std::size_t insertionIndex = storage.size();
     moho::SDelayedSubVizInfo* const insertionPosition = storage.end();
-    (void)InsertDelayedSubVizInfoCopies(storage, 1u, insertionPosition, value);
+    (void)storage.insert(insertionPosition, 1u, value);
     return DelayedSubVizVectorPointerAt(storage, insertionIndex);
   }
 
@@ -1648,7 +1504,7 @@ namespace
     archive->ReadUInt(&count);
 
     DelayedSubVizVector loaded{};
-    (void)EnsureDelayedSubVizVectorCapacity(loaded, static_cast<std::size_t>(count));
+    loaded.reserve(static_cast<std::size_t>(count));
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     gpg::RType* const elementType = ResolveSDelayedSubVizInfoType();
 
@@ -2021,7 +1877,7 @@ void gpg::RVectorType<moho::SDelayedSubVizInfo>::SetCount(void* const obj, const
   }
 
   const moho::SDelayedSubVizInfo zeroFill{};
-  (void)ResizeDelayedSubVizVectorWithFill(*storage, static_cast<std::size_t>(count), zeroFill);
+  storage->resize(static_cast<std::size_t>(count), zeroFill);
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

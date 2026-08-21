@@ -1563,6 +1563,16 @@ namespace msvc8
          *
          * Reserve storage for at least new_cap elements
          */
+        /**
+         * Address: 0x005082B0 (FUN_005082B0,
+         * msvc8::vector<Moho::SDelayedSubVizInfo>::reserve -- exact-capacity
+         * grow: max_size guard, one `operator new(requiredCapacity * 0x18)`,
+         * element-wise copy of the live range into it, free the old block,
+         * rebase all three lanes. Reached from the delayed-sub-viz reflection
+         * loader and from `operator=`'s _Buy path.)
+         *
+         * Reserve at least `newCap` elements without changing size.
+         */
         void reserve(const std::size_t newCap) {
             if (newCap <= capacity()) {
                 return;
@@ -1624,6 +1634,11 @@ namespace msvc8
          * lane FUN_0082F210, shrinks by rebasing `mLast` (the erase call
          * degenerates to a pointer update because the element is trivially
          * destructible). Reached from the bucket-table rehash path.)
+         * Address: 0x005083C0 (FUN_005083C0,
+         * msvc8::vector<Moho::SDelayedSubVizInfo>::resize -- grows through the
+         * `_Insert_n` lane FUN_00508480 at `end()`, shrinks by erasing the
+         * `[begin() + n, end())` tail. Reached from the reflection SetCount
+         * lane, which passes a value-initialised fill.)
          * Address: 0x005C5460 (FUN_005C5460,
          * msvc8::vector<Moho::SPerArmyReconInfo>::resize for the 52-byte element
          * -- `size()` computed with the 4EC4EC4Fh/`sar 4` divide-by-0x34 magic
@@ -2267,6 +2282,13 @@ namespace msvc8
          * `mLast`) corresponds to FUN_00950670; reallocation allocates via FUN_0094F1B0
          * (`operator new(8 * newCap)`, `0xFFFFFFFF/count < 8` overflow guard))
          *
+         * Address: 0x00508480 (FUN_00508480,
+         * msvc8::vector<Moho::SDelayedSubVizInfo>::_Insert_n for the 0x18-byte
+         * element -- max_size guard through FUN_00507F80's throw lane, in-place
+         * tail shift when capacity allows, otherwise 1.5x growth
+         * (`cap + (cap >> 1)`, floored to size + count) with head/gap/tail
+         * rebuilt into the fresh block. Reached from `resize` (FUN_005083C0)
+         * and the single-element push path FUN_005079C0.)
          * Address: 0x0082F210 (FUN_0082F210, msvc8::vector<void*>::_Insert_n for
          * UICommandGraph's hash-bucket vector -- 4-byte element, max_size
          * 0x3FFFFFFF, overflow throw through FUN_00830620, 1.5x growth
