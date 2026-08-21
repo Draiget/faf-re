@@ -1321,24 +1321,6 @@ namespace
     "DistVector2Box2dRuntime::box2Runtime offset must be 0x5C"
   );
 
-  struct BasisPointerResetRuntimeF
-  {
-    std::byte pad00[20];
-    float** basisPair;
-    float* outputPrimary;
-    float* outputSecondary;
-    std::uint8_t wasReset;
-  };
-
-  struct BasisPointerResetRuntimeD
-  {
-    std::byte pad00[20];
-    double** basisPair;
-    double* outputPrimary;
-    double* outputSecondary;
-    std::uint8_t wasReset;
-  };
-
   struct IntArrayLookupRuntime
   {
     std::int32_t lane0;
@@ -8039,74 +8021,6 @@ int DispatchVirtualSlot44Runtime(
   using SlotFn = int (__thiscall*)(void*);
   const auto fn = reinterpret_cast<SlotFn>(runtime->vtable[11]);
   return fn != nullptr ? fn(runtime) : 0;
-}
-
-/**
- * Address: 0x00A6D420 (FUN_00A6D420)
- *
- * What it does:
- * Snapshots one 2x2 float basis lane into outputs and resets the live basis to
- * identity.
- */
-std::uint32_t SnapshotAndResetBasis2fRuntime(
-  BasisPointerResetRuntimeF* const runtime
-)
-{
-  if (runtime == nullptr || runtime->basisPair == nullptr || runtime->outputPrimary == nullptr || runtime->outputSecondary == nullptr) {
-    return 0u;
-  }
-
-  float* const basis0 = runtime->basisPair[0];
-  float* const basis1 = runtime->basisPair[1];
-  if (basis0 == nullptr || basis1 == nullptr) {
-    return 0u;
-  }
-
-  runtime->outputPrimary[0] = basis0[0];
-  runtime->outputPrimary[1] = basis1[1];
-  runtime->outputSecondary[0] = basis0[1];
-  runtime->outputSecondary[1] = 0.0f;
-
-  basis0[0] = 1.0f;
-  basis0[1] = 0.0f;
-  basis1[0] = 0.0f;
-  basis1[1] = 1.0f;
-  runtime->wasReset = 1u;
-  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(runtime->basisPair));
-}
-
-/**
- * Address: 0x00A6EF10 (FUN_00A6EF10)
- *
- * What it does:
- * Snapshots one 2x2 double basis lane into outputs and resets the live basis
- * to identity.
- */
-std::uint32_t SnapshotAndResetBasis2dRuntime(
-  BasisPointerResetRuntimeD* const runtime
-)
-{
-  if (runtime == nullptr || runtime->basisPair == nullptr || runtime->outputPrimary == nullptr || runtime->outputSecondary == nullptr) {
-    return 0u;
-  }
-
-  double* const basis0 = runtime->basisPair[0];
-  double* const basis1 = runtime->basisPair[1];
-  if (basis0 == nullptr || basis1 == nullptr) {
-    return 0u;
-  }
-
-  runtime->outputPrimary[0] = basis0[0];
-  runtime->outputPrimary[1] = basis1[1];
-  runtime->outputSecondary[0] = basis0[1];
-  runtime->outputSecondary[1] = 0.0;
-
-  basis0[0] = 1.0;
-  basis0[1] = 0.0;
-  basis1[0] = 0.0;
-  basis1[1] = 1.0;
-  runtime->wasReset = 1u;
-  return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(runtime->basisPair));
 }
 
 /**
