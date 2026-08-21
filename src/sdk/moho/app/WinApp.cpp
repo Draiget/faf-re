@@ -969,19 +969,10 @@ namespace
       throw std::length_error("vector<T> too long");
     }
 
-    moho::ManagedWindowSlot* storage = nullptr;
-    if (slotCount == 0u) {
-      storage = static_cast<moho::ManagedWindowSlot*>(::operator new(0u));
-    } else {
-      const std::size_t storageBytes =
-        static_cast<std::size_t>(slotCount) * sizeof(moho::ManagedWindowSlot);
-      storage = static_cast<moho::ManagedWindowSlot*>(::operator new(storageBytes));
-    }
-
-    auto& slotRuntime = msvc8::AsVectorRuntimeView(moho::managedWindows);
-    slotRuntime.begin = storage;
-    slotRuntime.end = storage;
-    slotRuntime.capacityEnd = storage + slotCount;
+    // VC8 _Buy(n): drop to empty, then one exact-size allocation with
+    // mLast == mFirst -- reserve() on an empty vector is precisely that.
+    moho::managedWindows = msvc8::vector<moho::ManagedWindowSlot>{};
+    moho::managedWindows.reserve(slotCount);
     return true;
   }
 
@@ -995,14 +986,12 @@ namespace
    */
   void CleanupManagedWindowsAtExit()
   {
-    auto& slotRuntime = msvc8::AsVectorRuntimeView(moho::managedWindows);
-    if (slotRuntime.begin != nullptr) {
-      (void)UnlinkManagedDialogSlotRange(slotRuntime.begin, slotRuntime.end);
-      ::operator delete(static_cast<void*>(slotRuntime.begin));
+    // Slot nodes are unlinked explicitly -- the element destructor is trivial
+    // and will not detach them -- then VC8 _Tidy() frees and nulls the lanes.
+    if (!moho::managedWindows.empty()) {
+      (void)UnlinkManagedDialogSlotRange(moho::managedWindows.begin(), moho::managedWindows.end());
     }
-    slotRuntime.begin = nullptr;
-    slotRuntime.end = nullptr;
-    slotRuntime.capacityEnd = nullptr;
+    moho::managedWindows = msvc8::vector<moho::ManagedWindowSlot>{};
   }
 
   /**
@@ -1015,14 +1004,10 @@ namespace
    */
   void CleanupManagedFramesAtExit()
   {
-    auto& slotRuntime = msvc8::AsVectorRuntimeView(moho::managedFrames);
-    if (slotRuntime.begin != nullptr) {
-      UnlinkManagedFrameSlotRange(slotRuntime.begin, slotRuntime.end);
-      ::operator delete(static_cast<void*>(slotRuntime.begin));
+    if (!moho::managedFrames.empty()) {
+      UnlinkManagedFrameSlotRange(moho::managedFrames.begin(), moho::managedFrames.end());
     }
-    slotRuntime.begin = nullptr;
-    slotRuntime.end = nullptr;
-    slotRuntime.capacityEnd = nullptr;
+    moho::managedFrames = decltype(moho::managedFrames){};
   }
 
   /**
