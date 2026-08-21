@@ -1619,6 +1619,11 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x0082D820 (FUN_0082D820, msvc8::vector<void*>::resize for
+         * UICommandGraph's hash-bucket vector -- grows through the `_Insert_n`
+         * lane FUN_0082F210, shrinks by rebasing `mLast` (the erase call
+         * degenerates to a pointer update because the element is trivially
+         * destructible). Reached from the bucket-table rehash path.)
          * Address: 0x005C5460 (FUN_005C5460,
          * msvc8::vector<Moho::SPerArmyReconInfo>::resize for the 52-byte element
          * -- `size()` computed with the 4EC4EC4Fh/`sar 4` divide-by-0x34 magic
@@ -1826,6 +1831,25 @@ namespace msvc8
                 uninit_copy_n(src + cur, n - cur, first_ + cur);
                 last_ = first_ + n;
             }
+        }
+
+        /**
+         * Address: 0x0082F110 (FUN_0082F110, msvc8::vector<void*>::assign(9, sentinel)
+         * for UICommandGraph's MapAB hash-bucket table)
+         * Address: 0x0082F680 (FUN_0082F680, the MapC emission of the same)
+         * Address: 0x0082FB80 (FUN_0082FB80, the MapD emission of the same)
+         *
+         * What it does:
+         * The VC8 `vector<T>::assign(_Count, _Val)` lane: copies `_Val` into a
+         * local, empties the vector, then inserts `_Count` copies at `begin()`.
+         * On an empty vector that lands as a single exact-size allocation --
+         * which is why the three emissions above show a bare
+         * `operator new(9 * 4)` followed by a nine-slot sentinel fill.
+         */
+        void assign(std::size_t count, const T& value) {
+            const T localValue(value);
+            clear();
+            insert(first_, count, localValue);
         }
 
         /**
@@ -2233,6 +2257,11 @@ namespace msvc8
          * `mLast`) corresponds to FUN_00950670; reallocation allocates via FUN_0094F1B0
          * (`operator new(8 * newCap)`, `0xFFFFFFFF/count < 8` overflow guard))
          *
+         * Address: 0x0082F210 (FUN_0082F210, msvc8::vector<void*>::_Insert_n for
+         * UICommandGraph's hash-bucket vector -- 4-byte element, max_size
+         * 0x3FFFFFFF, overflow throw through FUN_00830620, 1.5x growth
+         * (`(cap >> 1) + cap`), allocation through FUN_00831B40. Reached from
+         * `resize` (FUN_0082D820) when a bucket table is rehashed.)
          * Address: 0x005C6F90 (FUN_005C6F90, msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n
          * grow lane for the 52-byte element (`4EC4EC4Fh`/`sar 4` divide-by-0x34
          * magic pair, max_size 0x4EC4EC4 = 0xFFFFFFFF/52, overflow throw through
@@ -2705,6 +2734,8 @@ namespace msvc8
          * Address: 0x004445E0 (FUN_004445E0)
          * Address: 0x004449F0 (FUN_004449F0)
          * Address: 0x00444CD0 (FUN_00444CD0)
+         * Address: 0x00830620 (FUN_00830620, the 4-byte-stride throw lane for
+         * UICommandGraph's hash-bucket vector, reached from FUN_0082F210)
          * Address: 0x005C7290 (FUN_005C7290, the 52-byte-stride throw lane shared
          * by `BuyVectorStorage52Byte` and the `Moho::SPerArmyReconInfo`
          * `_Insert_n` grow lane FUN_005C6F90)

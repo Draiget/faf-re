@@ -107,32 +107,6 @@ namespace
   gpg::RType* gRScmResourceType = nullptr;
   gpg::RType* gCAniPoseType = nullptr;
 
-  /**
-   * Typed overlay onto an entity's intel-attributes block, which lives at the
-   * `Entity` subobject +0x128 (the `pad_0128[0x20]` lane, size-matched to
-   * `EntityAttributes` == `SSTIIntelAttributes`, 0x20 bytes).
-   * `ReconBlip::SyncInterface` (FUN_005BEFB0) reads the creator unit's Vision
-   * range from this block (`lea eax, [creator+130h]` after the -4 weak decode
-   * lands on the creator's Entity subobject +0x128) and writes the blip's own
-   * Vision radius into it (`lea eax, [this+128h]` at 0x005BF01F).
-   */
-  [[nodiscard]] moho::EntityAttributes& EntityIntelAttributes(moho::Entity& entity) noexcept
-  {
-    return *reinterpret_cast<moho::EntityAttributes*>(reinterpret_cast<std::uint8_t*>(&entity) + 0x128);
-  }
-
-  /**
-   * Typed overlay onto a `ReconBlip`'s unit variable-data payload. The blip
-   * stores it as the opaque `SReconBlipUnitVarData` (+0x298), but the binary
-   * passes it to `SSTIUnitVariableData::Assign` (FUN_005BEFB0 @0x005BF08D) — the
-   * two are byte-identical (0x228). This overlay hands the queue helper a typed
-   * `SSTIUnitVariableData` without re-embedding the type in the blip layout.
-   */
-  [[nodiscard]] moho::SSTIUnitVariableData& ReconBlipUnitVariableData(moho::ReconBlip& blip) noexcept
-  {
-    return *reinterpret_cast<moho::SSTIUnitVariableData*>(&blip.mUnitVarDat);
-  }
-
   struct SimArmyRuntimeView
   {
     std::uint8_t mPad00_07[0x08];
@@ -1145,12 +1119,11 @@ ReconBlip::~ReconBlip()
   // `mReconDat` is the last-declared member, so MSVC emits its
   // `msvc8::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
   // 0x005BECBB) as the first teardown step of this epilogue. Nothing to write.
-  static_assert(
-    sizeof(SReconBlipUnitVarData) == sizeof(SSTIUnitVariableData),
-    "SReconBlipUnitVarData layout must match SSTIUnitVariableData"
-  );
-  reinterpret_cast<SSTIUnitVariableData&>(mUnitVarDat).~SSTIUnitVariableData();
-  ::new (&mUnitVarDat) SReconBlipUnitVarData{};
+  // FUN_005BEC90 destroys the payload in place and re-inits it before the
+  // rest of the epilogue runs; `mUnitVarDat`'s own destructor then sees an
+  // already-empty payload.
+  mUnitVarDat.~SSTIUnitVariableData();
+  ::new (&mUnitVarDat) SSTIUnitVariableData{};
 
   mUnitConstDat.mStatsRoot.reset();
   mCreator.UnlinkFromOwnerChain();
@@ -1310,11 +1283,14 @@ void ReconBlip::Refresh()
   // recovery omitted this, so blips never picked up the unit's strategic icon.
   SetStrategicUnderlay(sourceUnit->GetStrategicUnderlay());
 
-  mUnitVarDat.mHasLinkedSource = sourceUnit->mAttachInfo.HasAttachTarget() ? 1u : 0u;
+  // The blip mirrors the source unit's sync payload: +0x0A is `mIsBusy`
+  // (which the UI reads back as "attached and hidden"), and +0x208/+0x209 are
+  // `mAttributes.mReclaimable` / `mAttributes.mCapturable`.
+  mUnitVarDat.mIsBusy = sourceUnit->mAttachInfo.HasAttachTarget();
 
   const UnitAttributes& sourceAttributes = sourceUnit->GetAttributes();
-  mUnitVarDat.mBlueprintState0 = sourceAttributes.GetReconBlipBlueprintState0();
-  mUnitVarDat.mBlueprintState1 = sourceAttributes.GetReconBlipBlueprintState1();
+  mUnitVarDat.mAttributes.mReclaimable = sourceAttributes.mReclaimable;
+  mUnitVarDat.mAttributes.mCapturable = sourceAttributes.mCapturable;
   BeingBuilt = sourceUnit->IsBeingBuilt() ? 1u : 0u;
 }
 
@@ -1620,12 +1596,15 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
 
   Unit* const creator = mCreator.GetObjectPtr();
   if (creator != nullptr) {
+    // `lea eax, [creator+130h]` (after the -4 weak decode lands on the
+    // creator's Entity subobject +0x128) and `lea eax, [this+128h]` at
+    // 0x005BF01F are both Entity::IntelAttributes.
     const std::uint32_t creatorVisionRange =
-      EntityIntelAttributes(*static_cast<Entity*>(creator)).GetRange(ENTATTR_Vision);
-    EntityIntelAttributes(*this).SetIntelRadius(ENTATTR_Vision, static_cast<int>(creatorVisionRange));
+      static_cast<Entity*>(creator)->IntelAttributes.GetRange(ENTATTR_Vision);
+    IntelAttributes.SetIntelRadius(ENTATTR_Vision, static_cast<int>(creatorVisionRange));
   }
 
-  SSTIUnitVariableData& varData = ReconBlipUnitVariableData(*this);
+  SSTIUnitVariableData& varData = mUnitVarDat;
   SUnitVariableUpdateEntry* const entry = QueueUnitVariableUpdate(syncData, id_, varData);
 
   const bool creatorAlive = creator != nullptr;

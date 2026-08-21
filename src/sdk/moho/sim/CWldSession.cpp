@@ -849,9 +849,10 @@ namespace
 // Defined at file scope (global namespace, external linkage) in
 // CrtRuntimeHelpers.cpp - shared by every legacy VC8 "<container> too long"
 // throw lane in that file. Forward-declared here rather than duplicated so
-// UICommandGraph's own hash-table growth guards (ThrowHashBucketVectorTooLong,
-// CheckedIncrementListSize) can reuse the identical message/exception
-// construction instead of re-emitting it inline a second time.
+// UICommandGraph's own hash-table growth guard (CheckedIncrementListSize) can
+// reuse the identical message/exception construction instead of re-emitting it
+// inline a second time. The bucket vector's own overflow lane (FUN_00830620)
+// is msvc8::vector<void*>::throw_too_long and is cited there.
 [[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
 
 namespace moho
@@ -1628,13 +1629,9 @@ namespace moho
       }
     };
 
-    struct HashBucketVector
-    {
-      void* mAllocProxy; // +0x00
-      void** mStart;     // +0x04
-      void** mFinish;    // +0x08
-      void** mEnd;       // +0x0C
-    };
+    // {_Alproxy, _Myfirst, _Mylast, _Myend} at +0x00/04/08/0C, 0x10 bytes --
+    // this is msvc8::vector<void*>, not a distinct type.
+    using HashBucketVector = msvc8::vector<void*>;
 
     template <typename TNode>
     struct HashTable
@@ -1793,8 +1790,6 @@ namespace moho
   private:
     static void ReleaseIntrusive(CD3DFont*& font);
     static void AssignIntrusive(CD3DFont*& dst, CD3DFont* src);
-    static void DestroyBuckets(HashBucketVector& buckets);
-    static void InitBuckets(HashBucketVector& buckets, void* sentinel);
 
     /**
      * Address: 0x0082F030 (FUN_0082F030)
@@ -1810,21 +1805,6 @@ namespace moho
      * Address: 0x0082FAF0 (FUN_0082FAF0)
      */
     static HashListNode10* AllocateMapDListSentinel();
-
-    /**
-     * Address: 0x0082F110 (FUN_0082F110)
-     */
-    static void InitMapABBuckets(HashBucketVector& buckets, void* sentinel);
-
-    /**
-     * Address: 0x0082F680 (FUN_0082F680)
-     */
-    static void InitMapCBuckets(HashBucketVector& buckets, void* sentinel);
-
-    /**
-     * Address: 0x0082FB80 (FUN_0082FB80)
-     */
-    static void InitMapDBuckets(HashBucketVector& buckets, void* sentinel);
 
     /**
      * Address: 0x0082BF40 (FUN_0082BF40)
@@ -1975,57 +1955,13 @@ namespace moho
     [[nodiscard]] static std::uint32_t CountHashListNode88(HashTable<HashListNode88>& table, std::uint32_t key) noexcept;
 
     /**
-     * Address: 0x00830620 (FUN_00830620, sub_830620)
-     *
-     * What it does:
-     * Throws the legacy VC8 `std::length_error("vector<T> too long")`
-     * diagnostic for the hash bucket vector's growth overflow guard. Calls
-     * the same message-construction lane the binary uses at every other
-     * `vector<T> too long` site (`RuntimeThrowContainerTooLong`, defined at
-     * file scope in CrtRuntimeHelpers.cpp with external linkage) rather
-     * than re-emitting the string/exception construction inline a second
-     * time.
-     */
-    [[noreturn]] static void ThrowHashBucketVectorTooLong();
-
-    /**
-     * Address: 0x0082F210 (FUN_0082F210, sub_82F210)
-     *
-     * What it does:
-     * The hash bucket vector's insert-with-growth primitive: if existing
-     * capacity already covers the post-insert size, shifts the tail to open
-     * a gap at `insertPosition` and fills it with `fillValue` in place;
-     * otherwise reallocates (1.5x growth, or exactly enough when 1.5x still
-     * isn't enough), copying the elements before/after the insertion point
-     * around the newly-filled slots, then frees the old buffer. The
-     * binary's internal `sub_831860`/`sub_8326F0`/`sub_832BC0` loop bodies
-     * (plain dword-range copy / fill, confirmed from their own disassembly)
-     * are expressed here as `std::copy`/`std::fill_n` rather than as three
-     * more one-call wrapper functions.
-     */
-    static void** GrowHashBucketVector(
-      HashBucketVector& buckets, void** insertPosition, std::uint32_t insertCount, void* fillValue
-    );
-
-    /**
-     * Address: 0x0082D820 (FUN_0082D820, sub_82D820)
-     *
-     * What it does:
-     * Ensures the hash bucket vector holds at least `requiredLength`
-     * elements: grows via GrowHashBucketVector when short, or truncates the
-     * tail down to `requiredLength` in place when already longer. No-ops
-     * when already exactly that length.
-     */
-    static void** EnsureHashBucketVectorLength(HashBucketVector& buckets, std::uint32_t requiredLength, void* fillValue);
-
-    /**
      * Address: 0x0082F050 (FUN_0082F050, sub_82F050)
      *
      * What it does:
      * Adds `count` to `sizeField` after an overflow guard against the
      * legacy VC8 list max-size (0x1FFFFFF), throwing
      * `std::length_error("list<T> too long")` on overflow. Calls the same
-     * shared throw lane as ThrowHashBucketVectorTooLong above.
+     * shared throw lane as msvc8::vector<T>::throw_too_long.
      */
     static std::uint32_t CheckedIncrementListSize(std::uint32_t count, std::uint32_t& sizeField);
 
@@ -4144,30 +4080,6 @@ namespace moho
     }
   }
 
-  void UICommandGraph::DestroyBuckets(HashBucketVector& buckets)
-  {
-    if (buckets.mStart) {
-      ::operator delete(buckets.mStart);
-    }
-
-    buckets.mAllocProxy = nullptr;
-    buckets.mStart = nullptr;
-    buckets.mFinish = nullptr;
-    buckets.mEnd = nullptr;
-  }
-
-  void UICommandGraph::InitBuckets(HashBucketVector& buckets, void* const sentinel)
-  {
-    buckets.mAllocProxy = nullptr;
-    buckets.mStart = static_cast<void**>(::operator new(9u * sizeof(void*)));
-    buckets.mFinish = buckets.mStart;
-    buckets.mEnd = buckets.mStart + 9;
-    for (void** it = buckets.mStart; it != buckets.mEnd; ++it) {
-      *it = sentinel;
-    }
-    buckets.mFinish = buckets.mEnd;
-  }
-
   /**
    * Address: 0x00826550 (FUN_00826550, sub_826550)
    *
@@ -4229,30 +4141,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0082F110 (FUN_0082F110)
-   */
-  void UICommandGraph::InitMapABBuckets(HashBucketVector& buckets, void* const sentinel)
-  {
-    InitBuckets(buckets, sentinel);
-  }
-
-  /**
-   * Address: 0x0082F680 (FUN_0082F680)
-   */
-  void UICommandGraph::InitMapCBuckets(HashBucketVector& buckets, void* const sentinel)
-  {
-    InitBuckets(buckets, sentinel);
-  }
-
-  /**
-   * Address: 0x0082FB80 (FUN_0082FB80)
-   */
-  void UICommandGraph::InitMapDBuckets(HashBucketVector& buckets, void* const sentinel)
-  {
-    InitBuckets(buckets, sentinel);
-  }
-
-  /**
    * Address: 0x0082BF40 (FUN_0082BF40)
    */
   void UICommandGraph::InitMapAB(HashTable<HashListNode88>& table, const UICommandGraph* const owner)
@@ -4260,7 +4148,7 @@ namespace moho
     table.mOwnerByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(owner) & 0xFFu);
     table.mListHead = AllocateMapABListSentinel();
     table.mListSize = 0u;
-    InitMapABBuckets(table.mBuckets, table.mListHead);
+    table.mBuckets.assign(9u, table.mListHead);
     table.mBucketMask = 1u;
     table.mBucketCount = 1u;
   }
@@ -4273,7 +4161,7 @@ namespace moho
     table.mOwnerByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(owner) & 0xFFu);
     table.mListHead = AllocateMapCListSentinel();
     table.mListSize = 0u;
-    InitMapCBuckets(table.mBuckets, table.mListHead);
+    table.mBuckets.assign(9u, table.mListHead);
     table.mBucketMask = 1u;
     table.mBucketCount = 1u;
   }
@@ -4286,7 +4174,7 @@ namespace moho
     table.mOwnerByte = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(owner) & 0xFFu);
     table.mListHead = AllocateMapDListSentinel();
     table.mListSize = 0u;
-    InitMapDBuckets(table.mBuckets, table.mListHead);
+    table.mBuckets.assign(9u, table.mListHead);
     table.mBucketMask = 1u;
     table.mBucketCount = 1u;
   }
@@ -4347,7 +4235,7 @@ namespace moho
       table.mListHead = nullptr;
     }
 
-    DestroyBuckets(table.mBuckets);
+    table.mBuckets = HashBucketVector{};  // VC8 _Tidy(): destroy + free + null the lanes
     table.mBucketMask = 1u;
     table.mBucketCount = 1u;
   }
@@ -4478,7 +4366,7 @@ namespace moho
   ) noexcept
   {
     const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
-    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
     HashListNode88* node = bucketSlots[bucketIndex];
     HashListNode88* const bucketEnd = bucketSlots[bucketIndex + 1u];
 
@@ -4502,7 +4390,7 @@ namespace moho
   ) noexcept
   {
     const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, key);
-    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
     HashListNode88* node = bucketSlots[bucketIndex];
     HashListNode88* const bucketEnd = bucketSlots[bucketIndex + 1u];
 
@@ -4547,117 +4435,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00830620 (FUN_00830620, sub_830620)
-   */
-  [[noreturn]] void UICommandGraph::ThrowHashBucketVectorTooLong()
-  {
-    RuntimeThrowContainerTooLong("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x0082F210 (FUN_0082F210, sub_82F210)
-   */
-  void** UICommandGraph::GrowHashBucketVector(
-    HashBucketVector& buckets, void** const insertPosition, const std::uint32_t insertCount, void* const fillValue
-  )
-  {
-    if (insertCount == 0u) {
-      return buckets.mStart;
-    }
-
-    const std::uint32_t oldCapacity =
-      buckets.mStart ? static_cast<std::uint32_t>(buckets.mEnd - buckets.mStart) : 0u;
-    const std::uint32_t oldSize =
-      buckets.mStart ? static_cast<std::uint32_t>(buckets.mFinish - buckets.mStart) : 0u;
-
-    if ((0x3FFFFFFFu - oldSize) < insertCount) {
-      ThrowHashBucketVectorTooLong();
-    }
-
-    if (oldCapacity >= (insertCount + oldSize)) {
-      // Enough spare capacity already: shift in place.
-      void** const oldFinish = buckets.mFinish;
-      if (static_cast<std::uint32_t>(oldFinish - insertPosition) >= insertCount) {
-        void** const shiftPoint = oldFinish - insertCount;
-        std::copy(shiftPoint, oldFinish, oldFinish);
-        buckets.mFinish = oldFinish + insertCount;
-        std::copy_backward(insertPosition, shiftPoint, oldFinish);
-        std::fill_n(insertPosition, insertCount, fillValue);
-      } else {
-        const std::uint32_t tailCount = static_cast<std::uint32_t>(oldFinish - insertPosition);
-        std::fill_n(oldFinish, insertCount - tailCount, fillValue);
-        buckets.mFinish = oldFinish + (insertCount - tailCount);
-        std::copy(insertPosition, oldFinish, buckets.mFinish);
-        buckets.mFinish += tailCount;
-        std::fill_n(insertPosition, tailCount, fillValue);
-      }
-      return insertPosition;
-    }
-
-    // Not enough capacity: reallocate (1.5x growth, or exactly enough when
-    // 1.5x still falls short), then rebuild before/fill/after around the
-    // gap into the new buffer. Matches the legacy VC8 `std::_Allocate<T>`
-    // overflow-checked shape for 4-byte elements (same logic already
-    // established for FUN_00831B40 in legacy/containers/Vector.h's
-    // `allocate_dword_slots_checked`, reproduced locally here since that
-    // helper is a private member of a template class not reachable from
-    // this file).
-    std::uint32_t newCapacity =
-      ((0x3FFFFFFFu - (oldCapacity >> 1u)) >= oldCapacity) ? (oldCapacity + (oldCapacity >> 1u)) : 0u;
-    if (newCapacity < (insertCount + oldSize)) {
-      newCapacity = insertCount + oldSize;
-    }
-
-    void** newStart = nullptr;
-    if (newCapacity != 0u) {
-      if (newCapacity > (static_cast<std::size_t>(-1) / sizeof(void*))) {
-        throw std::bad_alloc();
-      }
-      newStart = static_cast<void**>(::operator new(sizeof(void*) * newCapacity));
-    } else {
-      newStart = static_cast<void**>(::operator new(0));
-    }
-
-    const std::uint32_t beforeCount = static_cast<std::uint32_t>(insertPosition - buckets.mStart);
-    std::copy(buckets.mStart, insertPosition, newStart);
-    std::fill_n(newStart + beforeCount, insertCount, fillValue);
-    std::copy(insertPosition, buckets.mFinish, newStart + beforeCount + insertCount);
-
-    if (buckets.mStart != nullptr) {
-      ::operator delete(buckets.mStart);
-    }
-
-    buckets.mStart = newStart;
-    buckets.mFinish = newStart + oldSize + insertCount;
-    buckets.mEnd = newStart + newCapacity;
-    return newStart;
-  }
-
-  /**
-   * Address: 0x0082D820 (FUN_0082D820, sub_82D820)
-   */
-  void** UICommandGraph::EnsureHashBucketVectorLength(
-    HashBucketVector& buckets, const std::uint32_t requiredLength, void* const fillValue
-  )
-  {
-    const std::uint32_t currentLength =
-      buckets.mStart ? static_cast<std::uint32_t>(buckets.mFinish - buckets.mStart) : 0u;
-
-    if (currentLength >= requiredLength) {
-      if (buckets.mStart != nullptr && requiredLength < currentLength) {
-        // Truncate the tail down to `requiredLength` in place - the
-        // binary's move-tail-to-gap helper degenerates to a pure pointer
-        // update here because its source and the vector's own end always
-        // coincide on this path.
-        buckets.mFinish = buckets.mStart + requiredLength;
-      }
-      return buckets.mStart;
-    }
-
-    return GrowHashBucketVector(buckets, buckets.mFinish, requiredLength - currentLength, fillValue);
-  }
-
-  /**
    * Address: 0x0082F050 (FUN_0082F050, sub_82F050)
    */
   std::uint32_t UICommandGraph::CheckedIncrementListSize(const std::uint32_t count, std::uint32_t& sizeField)
@@ -4682,8 +4459,7 @@ namespace moho
       // old bucket's nodes between it and the newly-available bucket - the
       // binary's incremental (split-one-bucket-per-insert) rehash, not a
       // full rebuild.
-      const std::uint32_t bucketVectorLength =
-        table.mBuckets.mStart ? static_cast<std::uint32_t>(table.mBuckets.mFinish - table.mBuckets.mStart) : 0u;
+      const auto bucketVectorLength = static_cast<std::uint32_t>(table.mBuckets.size());
 
       if ((bucketVectorLength - 1u) > table.mBucketCount) {
         if (table.mBucketMask < table.mBucketCount) {
@@ -4692,10 +4468,10 @@ namespace moho
       } else {
         const std::uint32_t newMask = 2u * bucketVectorLength - 3u;
         table.mBucketMask = newMask;
-        EnsureHashBucketVectorLength(table.mBuckets, newMask + 2u, table.mListHead);
+        table.mBuckets.resize(newMask + 2u, table.mListHead);
       }
 
-      auto* const rehashBucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+      auto* const rehashBucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
       const std::uint32_t splitBucketIndex = table.mBucketCount - (table.mBucketMask >> 1u) - 1u;
       HashListNode88* node = rehashBucketSlots[splitBucketIndex];
       HashListNode88* const splitBucketEnd = rehashBucketSlots[splitBucketIndex + 1u];
@@ -4768,7 +4544,7 @@ namespace moho
     }
 
     const std::uint32_t bucketIndex = HashKeyToBucketIndex(table, valueSource.mKey);
-    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.mStart);
+    auto* const bucketSlots = reinterpret_cast<HashListNode88**>(table.mBuckets.data());
     HashListNode88* insertionPoint = bucketSlots[bucketIndex + 1u];
 
     if (bucketSlots[bucketIndex] != insertionPoint) {

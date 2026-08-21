@@ -7,6 +7,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/Entity.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
@@ -155,39 +156,6 @@ namespace moho
   );
   static_assert(
     offsetof(SReconBlipUnitConstData, mFake) == 0x0C, "SReconBlipUnitConstData::mFake offset must be 0x0C"
-  );
-
-  /**
-   * Opaque `SSTIUnitVariableData` payload for ReconBlip.
-   */
-  struct SReconBlipUnitVarData
-  {
-    std::uint8_t mPad00_09[0x0A];      // +0x00
-    std::uint8_t mHasLinkedSource;     // +0x0A
-    std::uint8_t mPad0B_43[0x39];      // +0x0B
-    msvc8::string mCustomName;          // +0x44
-    std::uint8_t mPad60_207[0x1A8];    // +0x60
-    std::uint8_t mBlueprintState0;     // +0x208
-    std::uint8_t mBlueprintState1;     // +0x209
-    std::uint8_t mPad20A_227[0x1E];    // +0x20A
-  };
-
-  static_assert(sizeof(SReconBlipUnitVarData) == 0x228, "SReconBlipUnitVarData size must be 0x228");
-  static_assert(
-    offsetof(SReconBlipUnitVarData, mHasLinkedSource) == 0x0A,
-    "SReconBlipUnitVarData::mHasLinkedSource offset must be 0x0A"
-  );
-  static_assert(
-    offsetof(SReconBlipUnitVarData, mCustomName) == 0x44,
-    "SReconBlipUnitVarData::mCustomName offset must be 0x44"
-  );
-  static_assert(
-    offsetof(SReconBlipUnitVarData, mBlueprintState0) == 0x208,
-    "SReconBlipUnitVarData::mBlueprintState0 offset must be 0x208"
-  );
-  static_assert(
-    offsetof(SReconBlipUnitVarData, mBlueprintState1) == 0x209,
-    "SReconBlipUnitVarData::mBlueprintState1 offset must be 0x209"
   );
 
   /**
@@ -516,7 +484,7 @@ namespace moho
     std::uint8_t mPad279[0x03];               // +0x279
     Wm3::Vec3f mJamOffset;                    // +0x27C
     SReconBlipUnitConstData mUnitConstDat;    // +0x288
-    SReconBlipUnitVarData mUnitVarDat;        // +0x298
+    SSTIUnitVariableData mUnitVarDat;         // +0x298
     msvc8::vector<SPerArmyReconInfo> mReconDat; // +0x4C0
   };
 

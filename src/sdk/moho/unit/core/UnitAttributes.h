@@ -93,16 +93,6 @@ namespace moho
      * `UnitAttributes` object.
      */
     static void MemberSerialize(const UnitAttributes* attributes, gpg::WriteArchive* archive);
-
-    [[nodiscard]] std::uint8_t GetReconBlipBlueprintState0() const noexcept
-    {
-      return static_cast<std::uint8_t>(mReclaimable ? 1u : 0u);
-    }
-
-    [[nodiscard]] std::uint8_t GetReconBlipBlueprintState1() const noexcept
-    {
-      return static_cast<std::uint8_t>(mCapturable ? 1u : 0u);
-    }
   };
 
   static_assert(offsetof(UnitAttributes, blueprint) == 0x00, "UnitAttributes::blueprint offset must be 0x00");
