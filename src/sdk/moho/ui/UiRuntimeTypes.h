@@ -354,6 +354,22 @@ namespace moho
    */
   extern float ui_ExtractSnapTolerance;
   /**
+   * Address: 0x00F57A98 (?ui_MinExtractSnapPixels@Moho@@3MA)
+   *
+   * Minimum on-screen extractor snap-search radius (pixels), clamping
+   * `ui_ExtractSnapTolerance`'s depth-scaled projection in
+   * `CUIWorldView::UpdateSelection`. Byte-verified shipped default is 20.0.
+   */
+  extern float ui_MinExtractSnapPixels;
+  /**
+   * Address: 0x00F57A9C (?ui_MaxExtractSnapPixels@Moho@@3MA)
+   *
+   * Maximum on-screen extractor snap-search radius (pixels), clamping
+   * `ui_ExtractSnapTolerance`'s depth-scaled projection in
+   * `CUIWorldView::UpdateSelection`. Byte-verified shipped default is 90.0.
+   */
+  extern float ui_MaxExtractSnapPixels;
+  /**
    * Address: 0x00F57BD0 (?ui_FootprintMinThickness@Moho@@3MA)
    *
    * Minimum on-screen thickness (in the prim batcher's post-perspective units)
@@ -3963,6 +3979,54 @@ namespace moho
      * (showing) the render-world-view in the global viewport.
      */
     void SetHidden(bool hidden) override;
+
+    /**
+     * Address: 0x0086F520 (FUN_0086F520, Moho::CUIWorldView::UpdateSelection)
+     *
+     * IDA signature:
+     * void __stdcall Moho::CUIWorldView::UpdateSelection(
+     *   Moho::CUIWorldView *this, Wm3::Vector2f *mouse);
+     *
+     * What it does:
+     * Rebuilds the world-view's hover/cursor state for one frame: raycasts
+     * the mouse through the terrain to get the world hit point and,
+     * whenever the raycast lands on the terrain, either persists that hit
+     * directly (cursor left the view since the last update) or scores every
+     * spatial-DB entity inside a screen-tolerance selection volume around
+     * the cursor - filtered by `SELECTABLE`/`FERRYBEACON`/`UNTARGETABLE`
+     * category, focus-army/playable-map visibility, and unit selection-mask
+     * state - by projected screen distance to pick the closest hover
+     * candidate, redirecting an unfinished unit's hover to its builder when
+     * the blueprint upgrade-source name matches, or to a carrier/factory
+     * attachment parent when the hovered entity is itself
+     * transportation-attached. Updates the command-graph waypoint highlight
+     * height, re-anchors the active build-template extractor preview onto
+     * the nearest mass/hydro deposit when one is queued, and finally
+     * persists the resolved cursor state into `mWldSession->CursorInfo()`.
+     */
+    void UpdateSelection(const Wm3::Vector2f& mouseScreenPos);
+
+    /**
+     * Address: 0x00871140 (FUN_00871140, Moho::CUIWorldView::Frame)
+     *
+     * IDA signature:
+     * void __thiscall Moho::CUIWorldView::OnFrame(
+     *   Moho::CUIWorldView *this, float deltaSeconds);
+     *
+     * VFTable SLOT: 13 (+0x34)
+     *
+     * What it does:
+     * The world view's per-frame update hook. Processes any active
+     * mid-mouse scrub, then - while the cursor is inside this view and not
+     * scrubbing - refreshes hover selection and fires the `OnUpdateCursor`
+     * script hook. While input is not locked, reverts an in-progress camera
+     * rotation drag on Space release, and - for the view that owns global
+     * camera commands - applies Insert/Delete keyboard camera spin,
+     * keyboard/screen-edge/arrow-key camera pan, refreshes the
+     * `OnIconsVisible` script hook on a visibility-state change, and fires
+     * `OnFrame(deltaSeconds)`.
+     */
+    void Frame(float deltaSeconds) override;
   };
 
   // 0x11C (CMauiControl) + 0x18C (the IRenderWorldView sub-object at +0x11C)

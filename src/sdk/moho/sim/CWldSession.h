@@ -2266,6 +2266,19 @@ namespace moho
   );
 
   /**
+   * Not a distinct binary function - `UICommandGraph` is only a complete
+   * type in CWldSession.cpp (see `DrawCommandGraphMeshIfPresent` above), so
+   * `Moho::CUIWorldView::UpdateSelection` (UiRuntimeTypes.cpp) calls
+   * `UICommandGraph::ResolveCursorHighlightCommandId` through this wrapper
+   * rather than on the bare `UICommandGraph*` its `mComGraph` holds, which is
+   * incomplete there. Returns -1 (no highlighted command) when `graph` is
+   * null.
+   */
+  [[nodiscard]] CmdId ResolveCommandGraphCursorHighlightIfPresent(
+    UICommandGraph* graph, const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
+  );
+
+  /**
    * Address context:
    * - global `Moho::sWldSession` consumed by save/load request paths.
    *
