@@ -2327,6 +2327,11 @@ namespace msvc8
          * (`cap + (cap >> 1)`, floored to size + count) with head/gap/tail
          * rebuilt into the fresh block. Reached from `resize` (FUN_005083C0)
          * and the single-element push path FUN_005079C0.)
+         * Address: 0x008FE010 (FUN_008FE010, msvc8::vector<void*>::_Insert_n for
+         * the D3D10 backend swap-chain vector -- same 4-byte-element shape:
+         * length-error throw / in-place tail-shift / grow-and-copy at
+         * max(cap + cap/2, size + count). Reached from push_back when capacity
+         * is exhausted.)
          * Address: 0x0082F210 (FUN_0082F210, msvc8::vector<void*>::_Insert_n for
          * UICommandGraph's hash-bucket vector -- 4-byte element, max_size
          * 0x3FFFFFFF, overflow throw through FUN_00830620, 1.5x growth
