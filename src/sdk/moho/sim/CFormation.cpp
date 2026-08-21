@@ -417,4 +417,76 @@ namespace moho
       }
     }
   }
+
+  /**
+   * Address: 0x008382A0 (FUN_008382A0, Moho::CFormation::Finalize)
+   */
+  void CFormation::Finalize()
+  {
+    IFormationInstance* const previousInstance = mCurInstance;
+    mCurInstance = nullptr;
+    if (previousInstance != nullptr) {
+      previousInstance->operator_delete(1);
+    }
+
+    if (mBestFormation < 0) {
+      return;
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    LuaPlus::LuaState* const state = session->mState;
+    RRuleGameRulesImpl* const gamerules = session->mRules;
+
+    // Collect every live, still-mobile, unattached participant unit into a
+    // transient weak-ref set. `mParticipants` is a `WeakUnitSetUserUnit`, not
+    // an `SSelectionSetUserEntity` -- the binary calls the exact same prune
+    // routine on it anyway (0x00838313/0x008383CC point `this` straight at
+    // `CFormation`'s own `+0x00`), which is why `PruneTombstonesAndFindLive`
+    // is generalized over the shared `WeakEntitySetUserEntity` header rather
+    // than reinterpret_cast-ed through the wrong set type here. The collected
+    // set feeds `CFormationInstance::Create`'s `mUnits` lane directly, so it
+    // is built as a `SFormationLinkedUnitRefVec` (via `AppendLinkedUnitRef`)
+    // rather than the `SFormationLayerUnitSet` shape `PreRunScript`/`Setup`/
+    // `UpdateFormation` use for their own transient candidate sets.
+    SFormationLinkedUnitRefVec collectedUnits{};
+
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)PruneTombstonesAndFindLive(mParticipants, &node, mParticipants.mHead->mLeft);
+    while (node != mParticipants.mHead) {
+      // `DecodeSelectionEntity` recovers the live `UserEntity*` (or `nullptr`
+      // for a tombstone) from the node's weak-ref pair; `mParticipants` only
+      // ever stores units inserted through `WeakUnitSetUserUnit::Add(UserUnit*)`,
+      // so every non-null result is safely a `UserUnit*` too (same
+      // reinterpret_cast `Add`'s own body already relies on, since `UserUnit`'s
+      // `UserEntity` base sits at offset zero).
+      UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
+      if (entity != nullptr) {
+        UserUnit* const candidateUnit = reinterpret_cast<UserUnit*>(entity);
+        IUnit* const iunitBridge = GetIUnitBridge(candidateUnit);
+        if (!iunitBridge->IsDead() && !entity->IsBeingBuilt() && entity->GetAttachmentParent() == nullptr) {
+          AppendLinkedUnitRef(collectedUnits, iunitBridge);
+        }
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)PruneTombstonesAndFindLive(mParticipants, &node, node);
+    }
+
+    const auto formationType = static_cast<EFormationType>(mType);
+    const char* const scriptName = FORMATION_GetScriptName(state, mBestFormation, formationType);
+
+    const SCoordsVec2 coords{mFinish.x, mFinish.z};
+    CFormationInstance* const newInstance =
+      CFormationInstance::Create(gamerules, state, collectedUnits, scriptName, coords, mDirection);
+
+    IFormationInstance* const staleInstance = mCurInstance;
+    mCurInstance = newInstance;
+    if (staleInstance != nullptr) {
+      staleInstance->operator_delete(1);
+    }
+
+    mLastUpdate = gpg::time::GetSystemTimer().ElapsedSeconds();
+
+    ClearLinkedUnitRefs(collectedUnits);
+  }
 } // namespace moho

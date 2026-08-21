@@ -92,6 +92,24 @@ namespace moho
       bool useLastQueuedDestination
     );
 
+    /**
+     * Address: 0x008382A0 (FUN_008382A0, Moho::CFormation::Finalize)
+     *
+     * What it does:
+     * Releases whatever formation instance is currently installed, then --
+     * only once a best-formation script has actually been chosen
+     * (`mBestFormation >= 0`) -- collects every live participant unit that is
+     * not dead, not still under construction, and not attached to another
+     * entity into a transient weak-ref set, resolves the chosen script's
+     * display name, and builds a fresh `CFormationInstance` from the
+     * collected units/name/finish coords/current direction. The freshly
+     * built instance becomes the new `mCurInstance` (releasing whatever
+     * instance the build itself observed installed there, in case one raced
+     * in), `mLastUpdate` is stamped from the system timer, and the transient
+     * collection's intrusive weak links are released before returning.
+     */
+    void Finalize();
+
   public:
     /// The set of units currently participating in the drag-formation, a
     /// `WeakSet<UserUnit>` embedded at `this + 0x00`: `ChooseFormation`

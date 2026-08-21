@@ -11281,30 +11281,53 @@ namespace moho
    *
    * What it does:
    * Advances from `start` to the first live weak-set node, deleting tombstone
-   * entries (null/`(void*)8` owner-link slots) as it goes.
+   * entries (null/`(void*)8` owner-link slots) as it goes. Generalized over the
+   * shared `WeakEntitySetUserEntity` header (declared in CWldSession.h) rather
+   * than left as an `SSelectionSetUserEntity` member, since the only field this
+   * touches is `mHead` (common to every weak-entity-set instantiation) and it
+   * forwards straight into `EraseSelectionNodeAndAdvance`, which already takes
+   * the same shared base. `CFormation::Finalize` (CFormation.cpp) calls this
+   * directly on `mParticipants` (a `WeakUnitSetUserUnit`), exactly as the binary
+   * does by pointing `this` at `CFormation`'s own `+0x00` participant set.
+   */
+  SSelectionNodeUserEntity** PruneTombstonesAndFindLive(
+    WeakEntitySetUserEntity& set,
+    SSelectionNodeUserEntity** const outNode,
+    SSelectionNodeUserEntity* const start
+  )
+  {
+    SSelectionNodeUserEntity* node = start;
+    if (set.mHead == nullptr) {
+      *outNode = nullptr;
+      return outNode;
+    }
+
+    while (node != set.mHead) {
+      void* const ownerLinkSlot = node->mEnt.mOwnerLinkSlot;
+      if (ownerLinkSlot != nullptr && ownerLinkSlot != reinterpret_cast<void*>(8)) {
+        break;
+      }
+
+      node = EraseSelectionNodeAndAdvance(set, node);
+    }
+
+    *outNode = node;
+    return outNode;
+  }
+
+  /**
+   * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
+   *
+   * Thin forwarder preserving the original member-call shape for every existing
+   * `SSelectionSetUserEntity`-typed caller in this file; the real body now lives
+   * in the free `moho::PruneTombstonesAndFindLive` above.
    */
   SSelectionNodeUserEntity** SSelectionSetUserEntity::PruneTombstonesAndFindLive(
     SSelectionNodeUserEntity** const outNode,
     SSelectionNodeUserEntity* const start
   )
   {
-    SSelectionNodeUserEntity* node = start;
-    if (mHead == nullptr) {
-      *outNode = nullptr;
-      return outNode;
-    }
-
-    while (node != mHead) {
-      void* const ownerLinkSlot = node->mEnt.mOwnerLinkSlot;
-      if (ownerLinkSlot != nullptr && ownerLinkSlot != reinterpret_cast<void*>(8)) {
-        break;
-      }
-
-      node = EraseSelectionNodeAndAdvance(*this, node);
-    }
-
-    *outNode = node;
-    return outNode;
+    return moho::PruneTombstonesAndFindLive(*this, outNode, start);
   }
 
   /**

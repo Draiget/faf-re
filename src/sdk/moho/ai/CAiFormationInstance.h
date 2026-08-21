@@ -30,6 +30,7 @@ namespace moho
   enum class EUnitCommandType : std::int32_t;
   class IUnit;
   class RRuleGameRules;
+  class RRuleGameRulesImpl;
   class Sim;
   struct SOCellPos;
   struct SWeakRefSlot;
@@ -445,6 +446,59 @@ namespace moho
   using SFormationLayerUnitSet = gpg::fastvector_n<SWeakRefSlot, 4>;
 
   /**
+   * Binds one freshly-linked weak slot to `unit` and appends it to
+   * `destination`, matching the binary's inline construct-then-push dance
+   * used by every `SFormationLayerUnitSet` builder in the engine: `UpdateFormation`
+   * (0x00567F1D..0x00567F94), `PreRunScript`/`Setup` (CAiFormationInstance.cpp),
+   * and `CFormation::Finalize` (0x0083836D..0x008383B6, CFormation.cpp) all
+   * inline this exact sequence -- construct a temporary bound to `unit`
+   * (linking it at the unit's real weak-chain head), push_back it (the
+   * relink-aware push steals the link for the new slot), then unlink the
+   * temporary, since the container's copy now owns the link going forward.
+   * Moved to external linkage (was file-local in CAiFormationInstance.cpp's
+   * anonymous namespace) so `CFormation::Finalize` can reuse it instead of
+   * duplicating the same intrusive-weak-guard dance.
+   */
+  void AppendLinkedUnitWeakSlot(SFormationLayerUnitSet& destination, Unit* unit);
+
+  /**
+   * Binds one freshly-linked `SFormationLinkedUnitRef` to `target` and appends
+   * it to `destination`, matching the same construct-then-push-then-unlink
+   * dance as `AppendLinkedUnitWeakSlot` above, but for the `mUnits` lane's own
+   * element type: link a temporary into `target`'s owner-chain head
+   * (`target + 0x04`, the `IUnit`/`WeakObject` chain head every `IUnit`
+   * sub-object carries, regardless of which concrete class it belongs to),
+   * push_back it (the copy steals the link), then unlink the now-redundant
+   * temporary. `CFormation::Finalize` (0x0083836D..0x008383B6, CFormation.cpp)
+   * inlines exactly this sequence to collect its participant set into the
+   * `SFormationLinkedUnitRefVec` it hands to `CFormationInstance::Create`.
+   */
+  void AppendLinkedUnitRef(SFormationLinkedUnitRefVec& destination, IUnit* target);
+
+  /**
+   * Unlinks every slot in `container` from its target's real weak chain and
+   * resets storage to inline. Matches FUN_0056D3C0 (`sub_56D3C0`) followed by
+   * the conditional `operator delete[]`, which every one of
+   * `PreRunScript`/`Setup`/`UpdateFormation` inlines at its own scope exit --
+   * and which `CFormation::Finalize` (0x00838464..0x008384A3) inlines too, to
+   * release the transient participant collection it builds each call. Moved
+   * to external linkage for the same reason as `AppendLinkedUnitWeakSlot`
+   * above.
+   */
+  void ClearLinkedUnitWeakSlots(SFormationLayerUnitSet& container);
+
+  /**
+   * `SFormationLinkedUnitRefVec` counterpart of `ClearLinkedUnitWeakSlots`
+   * above: unlinks every slot in `container` from its unit's real owner-chain
+   * (mirroring `AppendLinkedUnitRef`'s own link mechanics) and resets storage
+   * to inline. `CFormation::Finalize` calls this on its transient participant
+   * collection after handing it to `CFormationInstance::Create` (whose ctor
+   * copy-constructs its own `mUnits` from the same elements, re-linking each
+   * one into the unit's chain independently).
+   */
+  void ClearLinkedUnitRefs(SFormationLinkedUnitRefVec& container);
+
+  /**
    * The formation-instance state the binary keeps on `CFormationInstance`,
    * which `CAiFormationInstance` derives from and
    * `CAiFormationInstanceTypeInfo::Init` registers as its base.
@@ -467,6 +521,86 @@ namespace moho
     inline static gpg::RType* sType = nullptr;
 
     /**
+     * No standalone binary address: purely a base-subobject default-init
+     * step. `CAiFormationInstance::CAiFormationInstance()` already
+     * re-assigns every one of these base fields itself right after the
+     * base subobject exists, so this default constructor's own
+     * member-default-initialization is always immediately overwritten
+     * there -- it exists only so the derived class's no-arg constructor
+     * has a base to default-construct.
+     */
+    CFormationInstance() = default;
+
+    /**
+     * Address: 0x005694B0 (FUN_005694B0, Moho::CFormationInstance::CFormationInstance)
+     *
+     * IDA signature:
+     * Moho::CAiFormationInstance *__fastcall Moho::CFormationInstance::CFormationInstance(
+     *     Moho::RRuleGameRulesImpl *rules, int commandType, Moho::CFormationInstance *this,
+     *     LuaPlus::LuaState *state, gpg::fastvector_n<SFormationLinkedUnitRef, 4> *units,
+     *     const char *name, Moho::SCoordsVec2 *coords, Wm3::Quaternionf orientation);
+     *
+     * What it does:
+     * Self-links the intrusive unit-link list node, stamps the Lua state,
+     * game rules, and command type, copies the caller's initial unit-ref set
+     * into `mUnits`, default-constructs both lane vectors and the
+     * occupied-slot vector (implicit, matching the binary's inline
+     * `eh vector constructor iterator` + inline-buffer setup), eagerly
+     * builds both coord-cache head sentinels, sets the script name and
+     * formation center, and -- only when `coords` yields a valid flat
+     * ground-plane point -- derives the initial forward vector from
+     * `orientation` (same formula as `SetOrientation`), clears the occupied
+     * slots and both coord caches back to empty, and runs one
+     * `UpdateFormation` pass.
+     */
+    CFormationInstance(
+      RRuleGameRulesImpl* rules,
+      EUnitCommandType commandType,
+      LuaPlus::LuaState* state,
+      const SFormationLinkedUnitRefVec& units,
+      const char* name,
+      const SCoordsVec2& coords,
+      const Wm3::Quatf& orientation
+    );
+
+    /**
+     * Address: 0x0056A920 (FUN_0056A920, ??2CFormationInstance@Moho@@QAE@@Z,
+     * Moho::CFormationInstance::operator new)
+     *
+     * IDA signature:
+     * Moho::CAiFormationInstance *__cdecl Moho::CAiFormationInstance::operator new(
+     *     LuaPlus::LuaState *state, Moho::RRuleGameRulesImpl *rules,
+     *     Wm3::Vector3f *units, const char *name, Moho::SCoordsVec2 *coords,
+     *     float a6, float arg18, float a8, float a9);
+     *
+     * What it does:
+     * Despite the mangled `operator new` name, this is a plain static factory,
+     * not a real allocator overload: it calls `::operator new(0x328)` for the
+     * base `CFormationInstance` footprint, explicitly invokes the base ctor
+     * (0x005694B0) on the fresh storage with `commandType` hardcoded to
+     * `UNITCOMMAND_None` (matching the binary's literal `push 0`), and returns
+     * the constructed pointer (or `nullptr` if the allocation itself failed).
+     * The decompiler's `Wm3::Vector3f *units` parameter typing is a type-
+     * confusion artifact (the same one documented on `CFormation::mParticipants`
+     * elsewhere in this tree) -- the binary's only caller, `CFormation::Finalize`
+     * (0x0083843B), actually passes the address of a transient
+     * `gpg::fastvector_n4_WeakPtr_IUnit`-shaped collector, matching
+     * `SFormationLinkedUnitRefVec`'s copy-constructing consumer in the base
+     * ctor above. The four trailing floats are the caller's `mDirection`
+     * quaternion, spread across contiguous stack slots by the by-value ABI;
+     * reconstructed here as a single `Wm3::Quatf` parameter for clarity, since
+     * both sides of the only real call site pass/consume it as one unit.
+     */
+    [[nodiscard]] static CFormationInstance* Create(
+      RRuleGameRulesImpl* rules,
+      LuaPlus::LuaState* state,
+      const SFormationLinkedUnitRefVec& units,
+      const char* name,
+      const SCoordsVec2& coords,
+      const Wm3::Quatf& orientation
+    );
+
+    /**
      * Address: 0x005741D0 (FUN_005741D0, Moho::CFormationInstance::MemberDeserialize)
      *
      * What it does:
@@ -485,6 +619,27 @@ namespace moho
      * word are runtime-only and deliberately not written.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00569430 (FUN_00569430, Moho::CFormationInstance::operator delete)
+     * Slot: 0
+     *
+     * IDA signature:
+     * Moho::CFormationInstance *__thiscall Moho::CFormationInstance::operator delete(
+     *     Moho::CFormationInstance *this, char deleteFlags);
+     *
+     * What it does:
+     * Runs the destructor, then frees storage when bit0 of `deleteFlags` is
+     * set -- the real, distinct vtable slot-0 implementation for this class
+     * (not inherited from `CAiFormationInstance`'s own slot-0 override,
+     * `0x0059BD60`; `CFormationInstance`'s own vtable, `??_7CFormationInstance@Moho@@6B@`
+     * at 0xE18E0C, carries its own copy of this slot). This is what makes
+     * `CFormationInstance` a concrete, instantiable class in the binary --
+     * `CFormationInstance::Create` (0x0056A920) allocates exactly
+     * `sizeof(CFormationInstance)` (0x328) and placement-constructs a bare
+     * `CFormationInstance`, not a `CAiFormationInstance`.
+     */
+    void operator_delete(std::int32_t deleteFlags) override;
 
     std::int32_t mUnitCount;                      // +0x04
     TDatListItem<void, void> mUnitLinkListHead;   // +0x08
