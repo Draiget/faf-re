@@ -1717,6 +1717,14 @@ namespace msvc8
          * grow lane `_Insert_n` (FUN_005DD120, already cited above). Emitted via
          * view->mWeapons.push_back(weapon) in CAiAttackerImpl::CreateWeapon
          * (CAiAttackerImpl.cpp:973))
+         * Address: 0x008522A0 (FUN_008522A0, msvc8::vector<Wm3::Vector3f>::push_back
+         * for the 12-byte `Wm3::Vector3f` element — fast path only (no grow-core
+         * citation found). Emitted via attackIconPositions.push_back(targetPosition)
+         * / teleportIconPositions.push_back(targetPosition) in
+         * Moho::CWldSession::DrawCommandSplats (CWldSession.cpp), queuing each
+         * command-splat's icon-billboard world position for the batched
+         * attack_btn_up.dds / teleport_btn_up.dds draw passes that follow the
+         * main per-command-link loop)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range

@@ -85,13 +85,17 @@ namespace moho
       );
     }
 
-    // The binary re-fetches the camera view before each of the next two passes
-    // and discards it; neither takes a camera argument.
+    // The binary re-fetches the camera view before each of the next two
+    // passes; `RenderMeshPreviews` discards it (no camera argument), but the
+    // second fetch (0x0086EED7..0x0086EEE3) IS consumed - its result is one
+    // of the two explicit stack values `DrawCommandSplats` reads
+    // (0x0086EEE5..0x0086EEED pushes it alongside `batcher`), matching the
+    // same "IDA's declared zero-arg prototype undercounts the real args"
+    // pattern already documented on `DrawPathPreview`/`DrawEconomyOverlay`.
     (void)mCamera->CameraGetView();
     mWldSession->RenderMeshPreviews();
 
-    (void)mCamera->CameraGetView();
-    mWldSession->DrawCommandSplats();
+    mWldSession->DrawCommandSplats(const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher);
 
     mWldSession->DrawEconomyOverlay(mCamera, batcher, map);
 

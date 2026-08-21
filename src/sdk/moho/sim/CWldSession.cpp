@@ -26,6 +26,7 @@
 #include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/lua/SCR_Color.h"
 #include "moho/lua/SCR_String.h"
@@ -47,6 +48,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/IResources.h"
@@ -14360,30 +14362,259 @@ namespace moho
     return outMode;
   }
 
+  namespace
+  {
+    /** `TELEPORTBEACON` category the teleport-beacon splat/icon branch tests for (0x00851C5D). */
+    const msvc8::string kCommandSplatTeleportBeaconCategory("TELEPORTBEACON", 14u);
+
+    /** Default (non-teleport) command-splat line colour, `0x80800000` (0x00851D22). */
+    constexpr std::uint32_t kCommandSplatDefaultColor = 0x80800000u;
+
+    /** Same-army teleport-beacon command-splat line colour, `0x809040A0` (0x00851CF1). */
+    constexpr std::uint32_t kCommandSplatTeleportColor = 0x809040A0u;
+
+    /** Half-width of the beveled command-splat line ribbon, in world units (`0.1`, 0x00851B9E..0x00851BA6). */
+    constexpr float kCommandSplatLineHalfWidth = 0.1f;
+
+    /** Half-extent of the flat command-splat icon billboard, in world units (`1.0`, 0x00851E38..0x00851E42). */
+    constexpr float kCommandSplatIconHalfExtent = 1.0f;
+
+    /**
+     * Resolves the world-space anchor `CWldSession::DrawCommandSplats` draws
+     * one command-link line endpoint from/to for `entity`: either its own
+     * interpolated position (`boneIndex < 0`, 0x008519D9..0x00851A11) or the
+     * composite-transform position of bone `boneIndex` on its freshly
+     * refreshed debug pose (0x00851929..0x00851994, the same
+     * `MeshInstance::ComputeDebugPose` + `CAniPoseBone::GetCompositeTransform`
+     * chain `MeshRenderer::RenderSkeleton` issues for the skeleton-debug
+     * overlay). The interpolation alpha is `0.0f`: the incoming stack slot
+     * the binary reads for it is never written by the sole call site (which
+     * pushes only the session, camera and prim-batcher), so it resolves
+     * whatever was left on the caller's frame - the same "phantom
+     * interpolant" shape already documented and resolved to a hard `0.0f`
+     * on the sibling `DrawEconomyOverlay` above.
+     *
+     * The binary calls `CAniPoseBone::GetCompositeTransform` unconditionally
+     * even when `boneIndex` is out of range for the refreshed pose's bone
+     * array, leaving the bone pointer null (0x00851961..0x00851971) - a
+     * latent null-dereference crash on out-of-range data. Preserved here as
+     * a defensive `false` return instead of reproducing the crash.
+     */
+    [[nodiscard]] bool ResolveCommandSplatAnchorPosition(
+      UserEntity& entity, const std::int32_t boneIndex, Wm3::Vector3f& outPosition
+    )
+    {
+      if (boneIndex < 0) {
+        outPosition = entity.GetInterpolatedTransform(0.0f).pos_;
+        return true;
+      }
+
+      if (entity.mMeshInstance == nullptr) {
+        return false;
+      }
+
+      const boost::shared_ptr<CAniPose> pose = entity.mMeshInstance->ComputeDebugPose();
+      if (!pose) {
+        return false;
+      }
+
+      const std::ptrdiff_t boneCount = pose->mBones.end() - pose->mBones.begin();
+      if (boneIndex >= boneCount) {
+        return false;
+      }
+
+      outPosition = pose->mBones.begin()[boneIndex].GetCompositeTransform().pos_;
+      return true;
+    }
+
+    /**
+     * Binds one texture resource by path for the command-splat icon
+     * batches, matching 0x00851DB8..0x00851DF1 (attack icon) /
+     * 0x00851F3C..0x00851FAA (teleport icon):
+     * `CD3DDevice::GetResources()->GetTexture(handle, path, nullptr, true)`
+     * followed by `CD3DPrimBatcher::SetTexture` on the dynamic-sheet
+     * overload (the resolved `TextureResourceHandle` - a
+     * `shared_ptr<RD3DTextureResource>` - upcasts to the
+     * `shared_ptr<ID3DTextureSheet>` the overload wants, since
+     * `RD3DTextureResource` derives from `ID3DTextureSheet`).
+     */
+    void BindCommandSplatIconTexture(CD3DPrimBatcher& batcher, const char* const path)
+    {
+      CD3DDevice* const device = D3D_GetDevice();
+      ID3DDeviceResources* const resources = device->GetResources();
+      ID3DDeviceResources::TextureResourceHandle textureHandle{};
+      (void)resources->GetTexture(textureHandle, path, nullptr, true);
+      batcher.SetTexture(boost::shared_ptr<ID3DTextureSheet>(textureHandle));
+    }
+
+    /**
+     * Draws one flat, ground-aligned 2x2-world-unit icon billboard at
+     * `worldPosition` (0x00851E30..0x00851F27 / 0x00851FE0..0x008520D2 -
+     * the attack- and teleport-icon batch loops share this exact shape).
+     * The `+-1.0` X/Z corner offsets with no Y offset and the opaque-white
+     * vertex colour (`-1`, written repeatedly at 0x00851E55..0x00851F19 and
+     * its teleport-branch twin) come straight from the binary; the precise
+     * corner-to-UV pairing was not independently bit-verified (the source
+     * locals the binary reuses for this pass were, earlier in the same
+     * function, a `std::string` and two unrelated `Vertex` scratch buffers,
+     * which makes a byte-exact reconstruction of just this block
+     * impractical) - the standard 0..1 UV wrap used here reproduces the
+     * visible quad shape and opaque-white tint and is not expected to read
+     * any differently.
+     */
+    void DrawCommandSplatIcon(CD3DPrimBatcher& batcher, const Wm3::Vector3f& worldPosition)
+    {
+      constexpr std::uint32_t kIconColor = 0xFFFFFFFFu;
+
+      const CD3DPrimBatcher::Vertex topLeft{
+        worldPosition.x - kCommandSplatIconHalfExtent, worldPosition.y, worldPosition.z + kCommandSplatIconHalfExtent,
+        kIconColor, 0.0f, 0.0f};
+      const CD3DPrimBatcher::Vertex topRight{
+        worldPosition.x - kCommandSplatIconHalfExtent, worldPosition.y, worldPosition.z - kCommandSplatIconHalfExtent,
+        kIconColor, 0.0f, 1.0f};
+      const CD3DPrimBatcher::Vertex bottomRight{
+        worldPosition.x + kCommandSplatIconHalfExtent, worldPosition.y, worldPosition.z - kCommandSplatIconHalfExtent,
+        kIconColor, 1.0f, 1.0f};
+      const CD3DPrimBatcher::Vertex bottomLeft{
+        worldPosition.x + kCommandSplatIconHalfExtent, worldPosition.y, worldPosition.z + kCommandSplatIconHalfExtent,
+        kIconColor, 1.0f, 0.0f};
+      batcher.DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
+    }
+  } // namespace
+
   /**
    * Address: 0x008515B0 (FUN_008515B0, ?DrawCommandSplats@CWldSession@Moho@@QAEXXZ)
    */
-  void CWldSession::DrawCommandSplats()
+  void CWldSession::DrawCommandSplats(GeomCamera3* const camera, CD3DPrimBatcher* const primBatcher)
   {
-    // Recovered 0x008515B0 high-level flow:
-    // 1) Walk selection RB-tree/map and build unique source-entity set.
-    // 2) For each selected user entity with a bone-animated mesh instance,
-    //    refresh its debug pose via `MeshInstance::ComputeDebugPose`
-    //    (0x007DE7A0) so command-splat bone anchors (teleport beacon
-    //    quads) track the interpolated pose of that mesh instance in
-    //    the current frame. The skeleton-overlay path in
-    //    `MeshRenderer::RenderSkeleton` (0x007E2290) issues the same
-    //    pose-refresh call and is wired in this SDK pass.
-    // 3) Pull sim links and build line/teleport beacon quad batches.
-    // 4) Bind primbatcher textures:
-    //    "/textures/ui/common/game/waypoints/attack_btn_up.dds"
-    //    "/textures/ui/common/game/waypoints/teleport_btn_up.dds"
-    // 5) Emit quads and flush primbatcher.
-    //
-    // Deep lift blockers (typed dependencies still missing in SDK):
-    // CD3DDevice/CD3DDeviceResources/CD3DPrimBatcher/CD3DBatchTexture render API,
-    // full UserEntity selection-link iteration helpers, and CAniPoseBone
-    // debug-pose chain accessors.
+    // Walk the selection weak-set and collect the distinct army indices of
+    // every live selected unit (0x008515D4..0x00851696, `WeakSet_UserEntity`
+    // `find`/`Iterator::inc` over `mSelection`; the per-entity value added to
+    // the set is that unit's owning army index).
+    BVIntSet selectedArmies{};
+    if (mSelection.mHead != nullptr) {
+      SSelectionNodeUserEntity* node = nullptr;
+      node = SSelectionSetUserEntity::find(&mSelection, mSelection.mHead->mLeft, &node);
+      while (node != mSelection.mHead) {
+        if (UserEntity* const entity = ResolveWeakEntitySetNodeEntity(*node);
+            entity != nullptr && entity->mArmy != nullptr) {
+          (void)selectedArmies.Add(static_cast<unsigned int>(entity->mArmy->mArmyIndex));
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&mSelection, node, &node);
+      }
+    }
+
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    if (simDriver == nullptr) {
+      return;
+    }
+
+    // Always publish the selection's army mask to the sync filter, even when
+    // the rest of this overlay is not drawn this frame (0x008516A6..0x008516F5).
+    simDriver->SetSyncFilterMaskA(selectedArmies);
+
+    // The rest of the overlay only draws while Shift is held with no UI
+    // control focused and the game window foreground - `MAUI_KeyIsDown`
+    // already implements exactly that gate (0x00851704..0x00851742).
+    if (!MAUI_KeyIsDown(MKEY_SHIFT)) {
+      return;
+    }
+
+    primBatcher->Setup("TAlphaBlendLinearSampleNoDepth");
+    primBatcher->SetViewProjMatrix(*camera);
+    primBatcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+
+    msvc8::vector<Wm3::Vector3f> attackIconPositions{};
+    msvc8::vector<Wm3::Vector3f> teleportIconPositions{};
+
+    // `mSyncInlineVectors` is the per-beat command-link scratch buffer
+    // `CWldSession::DoBeat`/`AssignSyncInlineVectors` populate every beat
+    // (see its declaration above) - this is that lane's reader. Each record
+    // is one source unit's queued command-link run: `inlineVec_[2]` holds
+    // the source `EntId`, and the `{begin(),end()}` range holds
+    // `(boneIndex, targetEntId)` int32 pairs (0x008518A4..0x0085189A).
+    for (const SyncInlineVector& record : mSyncInlineVectors) {
+      UserEntity* const source = LookupEntityId(record.inlineVec_[2]);
+      if (source == nullptr) {
+        continue;
+      }
+
+      for (const std::int32_t* pair = record.begin(); pair + 1 < record.end(); pair += 2) {
+        const std::int32_t boneIndex = pair[0];
+        const EntId targetId = pair[1];
+
+        UserEntity* const target = LookupEntityId(targetId);
+        if (target == nullptr) {
+          continue;
+        }
+
+        Wm3::Vector3f sourcePosition{};
+        if (!ResolveCommandSplatAnchorPosition(*source, boneIndex, sourcePosition)) {
+          continue;
+        }
+
+        const Wm3::Vector3f targetPosition = target->GetInterpolatedTransform(0.0f).pos_;
+
+        // Direction from source to target, normalized (zero vector when the
+        // two points coincide) - 0x00851A37..0x00851AE9.
+        Wm3::Vector3f direction{
+          targetPosition.x - sourcePosition.x, targetPosition.y - sourcePosition.y,
+          targetPosition.z - sourcePosition.z};
+        const float distance =
+          std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+        if (distance > 0.0f) {
+          const float inverseDistance = 1.0f / distance;
+          direction = Wm3::Vector3f{
+            direction.x * inverseDistance, direction.y * inverseDistance, direction.z * inverseDistance};
+        } else {
+          direction = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
+        }
+
+        // Perpendicular bevel offset: the direction rotated 90 degrees
+        // about Y, scaled to the ribbon half-width (0x00851B8C..0x00851BA6).
+        const Wm3::Vector3f bevel{
+          direction.z * kCommandSplatLineHalfWidth, 0.0f, -direction.x * kCommandSplatLineHalfWidth};
+
+        // The line ribbon runs from one unit short of the source to one
+        // unit short of the target (0x00851AE9..0x00851C50), offset to one
+        // side by `bevel`.
+        const Wm3::Vector3f nearSource{
+          sourcePosition.x + direction.x, sourcePosition.y + direction.y, sourcePosition.z + direction.z};
+        const Wm3::Vector3f nearTarget{
+          targetPosition.x - direction.x, targetPosition.y - direction.y, targetPosition.z - direction.z};
+
+        const Wm3::Vector3f topLeft{nearSource.x + bevel.x, nearSource.y + bevel.y, nearSource.z + bevel.z};
+        const Wm3::Vector3f& topRight = nearSource;
+        const Wm3::Vector3f& bottomRight = nearTarget;
+        const Wm3::Vector3f bottomLeft{nearTarget.x + bevel.x, nearTarget.y + bevel.y, nearTarget.z + bevel.z};
+
+        const bool sameArmy = source->mArmy != nullptr && source->mArmy == target->mArmy;
+        const bool isTeleportBeacon = sameArmy && target->IsInCategory(kCommandSplatTeleportBeaconCategory);
+        const std::uint32_t lineColor = isTeleportBeacon ? kCommandSplatTeleportColor : kCommandSplatDefaultColor;
+
+        primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft, lineColor);
+
+        if (isTeleportBeacon) {
+          teleportIconPositions.push_back(targetPosition);
+        } else {
+          attackIconPositions.push_back(targetPosition);
+        }
+      }
+    }
+
+    BindCommandSplatIconTexture(*primBatcher, "/textures/ui/common/game/waypoints/attack_btn_up.dds");
+    for (const Wm3::Vector3f& iconPosition : attackIconPositions) {
+      DrawCommandSplatIcon(*primBatcher, iconPosition);
+    }
+
+    BindCommandSplatIconTexture(*primBatcher, "/textures/ui/common/game/waypoints/teleport_btn_up.dds");
+    for (const Wm3::Vector3f& iconPosition : teleportIconPositions) {
+      DrawCommandSplatIcon(*primBatcher, iconPosition);
+    }
+
+    primBatcher->Flush();
   }
 
   /**

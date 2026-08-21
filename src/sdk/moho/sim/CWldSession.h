@@ -1146,10 +1146,40 @@ namespace moho
     /**
      * Address: 0x008515B0 (FUN_008515B0, ?DrawCommandSplats@CWldSession@Moho@@QAEXXZ)
      *
+     * The mangled name types this as a zero-argument `__thiscall`, but the
+     * sole call site (`CRenderWorldView::Render`, 0x0086EEE5..0x0086EEED)
+     * pushes two explicit stack values before the call - the camera view
+     * pointer (`CameraImpl::CameraGetView()`'s result) and the session
+     * pointer itself, matching the same "IDA's declared prototype
+     * undercounts the real args" pattern already documented on
+     * `DrawPathPreview` and `DrawEconomyOverlay` in this file. `this`
+     * arrives normally in `ecx` (session-member field reads throughout the
+     * body confirm it); the second stack slot the body reads is a
+     * `CD3DPrimBatcher*` third value that `Render` also pushes at that call
+     * site (`edi`, its own `batcher` parameter, staged ahead of the
+     * intervening `CameraGetView` call).
+     *
      * What it does:
-     * Draws command-link splats/quads between selected units and their command targets.
+     * Debug/dev overlay, gated on Shift being held with no UI control
+     * focused (`MAUI_KeyIsDown(MKEY_SHIFT)`, 0x00851721..0x00851742):
+     * walks the selection weak-set, collects the distinct army indices of
+     * selected units into a `BVIntSet`, and always publishes that set via
+     * `ISTIDriver::SetSyncFilterMaskA` so the overlay can see sync data for
+     * those armies even when Shift is not held. While Shift is held, walks
+     * `mSyncInlineVectors` (the per-beat command-link scratch runs written
+     * by `CWldSession::DoBeat`/`AssignSyncInlineVectors`, previously an
+     * unread lane) and, for each `(sourceEntityId, {boneIndex, targetId})`
+     * record, draws a thin beveled line quad from the source unit's
+     * position (direct interpolated position, or one bone's composite pose
+     * position when `boneIndex >= 0`) to the target unit's position -
+     * teleport-colored when both units share an army and the target is in
+     * the "TELEPORTBEACON" category, attack-colored otherwise - then queues
+     * a small flat icon billboard at the target position into one of two
+     * batches. After the loop, draws the queued attack-icon batch textured
+     * with `attack_btn_up.dds` and the teleport-icon batch textured with
+     * `teleport_btn_up.dds`, then flushes the batcher.
      */
-    void DrawCommandSplats();
+    void DrawCommandSplats(GeomCamera3* camera, CD3DPrimBatcher* primBatcher);
 
     /**
      * Address: 0x008599D0 (FUN_008599D0, ?RenderMeshPreviews@CWldSession@Moho@@QAEHXZ)
