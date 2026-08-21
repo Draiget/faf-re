@@ -551,12 +551,11 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] SAttachPoint* ResetAttachPointVectorUsedRange(msvc8::vector<SAttachPoint>& storage) noexcept
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (view.begin != view.end) {
-      view.end = CopyAttachPointRange(view.begin, view.end, view.end);
-    }
-
-    return view.end;
+    // Erasing [begin, end) leaves the run empty while keeping capacity:
+    // clear(). (CopyAttachPointRange with source == destination == the whole
+    // run is the binary's degenerate shift; it moves nothing.)
+    storage.clear();
+    return storage.end();
   }
 
   /**
@@ -574,8 +573,9 @@ namespace
   ) noexcept
   {
     if (eraseBegin != eraseEnd) {
-      auto& view = msvc8::AsVectorRuntimeView(storage);
-      view.end = CopyAttachPointRange(eraseBegin, eraseEnd, view.end);
+      // Shift [eraseEnd, mLast) down over eraseBegin and drop mLast:
+      // erase(first, last).
+      (void)storage.erase(eraseBegin, eraseEnd);
     }
 
     *outCursor = eraseBegin;
@@ -595,18 +595,9 @@ namespace
     int* const erasePos
   ) noexcept
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    int* const activeEnd = view.end;
-
-    if (erasePos != activeEnd) {
-      int* const moveSource = erasePos + 1;
-      const std::ptrdiff_t remaining = activeEnd - moveSource;
-      if (remaining > 0) {
-        const std::size_t bytes = static_cast<std::size_t>(remaining) * sizeof(int);
-        (void)memmove_s(erasePos, bytes, moveSource, bytes);
-      }
-
-      view.end = erasePos + remaining;
+    if (erasePos != storage.end()) {
+      // Compact the tail over erasePos and drop mLast: erase(pos).
+      (void)storage.erase(erasePos);
     }
 
     return erasePos;
