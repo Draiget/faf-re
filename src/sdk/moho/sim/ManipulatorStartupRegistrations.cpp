@@ -114,6 +114,11 @@ namespace
   class RVectorTypeBool final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x006425F0 (FUN_006425F0, gpg::RVectorType_bool::dtr)
+     */
+    ~RVectorTypeBool() override;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
@@ -219,6 +224,8 @@ namespace
     gRecoveredRVectorTypeBoolName.clear();
     gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
   }
+
+  RVectorTypeBool::~RVectorTypeBool() = default;
 
   /**
    * Address: 0x00641C20 (FUN_00641C20, gpg::RVectorType_bool::GetName)
