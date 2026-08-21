@@ -196,15 +196,12 @@ namespace
     const std::size_t targetCount = static_cast<std::size_t>(count);
     if (targetCount > 0u) {
       // The binary grows the destination with reserve(count)
-      // (FUN_0067D9B0, msvc8::vector<Entity*>::reserve) followed by an
-      // element fill, not resize() (which routes through reallocate_to).
+      // (FUN_0067D9B0, msvc8::vector<Entity*>::reserve) and then fills the
+      // reserved slots. reserve() has already sized capacity to exactly
+      // targetCount, so the following resize takes _Insert_n's in-place
+      // branch -- no second reallocation, matching the binary.
       loaded.reserve(targetCount);
-      auto& view = msvc8::AsVectorRuntimeView(loaded);
-      auto* const slotsBegin = view.end;
-      for (std::size_t i = 0u; i < targetCount; ++i) {
-        slotsBegin[i] = nullptr;
-      }
-      view.end = slotsBegin + targetCount;
+      loaded.resize(targetCount, nullptr);
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -251,19 +248,19 @@ namespace
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::Entity*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::Entity* fill = nullptr;
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    vec.Resize(count, fill);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
       if (!tracked.object) {
-        view.begin[i] = nullptr;
+        vec[i] = nullptr;
         continue;
       }
 
@@ -273,7 +270,7 @@ namespace
 
       const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityType());
       if (upcast.mObj) {
-        view.begin[i] = static_cast<moho::Entity*>(upcast.mObj);
+        vec[i] = static_cast<moho::Entity*>(upcast.mObj);
         continue;
       }
 
@@ -307,18 +304,18 @@ namespace
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::Entity*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::Entity* fill = nullptr;
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    vec.Resize(count, fill);
 
     const gpg::RRef emptyOwner{};
     const gpg::RRef* const effectiveOwner = ownerRef ? ownerRef : &emptyOwner;
     for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadPointer_Entity(&view.begin[i], effectiveOwner);
+      archive->ReadPointer_Entity(&vec[i], effectiveOwner);
     }
   }
 
@@ -341,13 +338,13 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::Entity*>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     for (unsigned int i = 0; i < count; ++i) {
       gpg::RRef objectRef{};
-      (void)gpg::RRef_Entity(&objectRef, view.begin[i]);
+      (void)gpg::RRef_Entity(&objectRef, vec[i]);
       gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
     }
   }
@@ -364,14 +361,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(reinterpret_cast<const void*>(objectPtr));
+    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::Entity*>*>(objectPtr);
 
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      const gpg::RRef objectRef = MakeEntityObjectRef(view.begin[i]);
+      const gpg::RRef objectRef = MakeEntityObjectRef(vec[i]);
       gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, owner);
     }
   }
@@ -386,11 +383,11 @@ namespace
   void ResizeFastVectorEntityPointers(
     const unsigned int newSize,
     moho::Entity* const* fillItem,
-    gpg::fastvector_runtime_view<moho::Entity*>& view
+    gpg::fastvector<moho::Entity*>& vec
   )
   {
-    moho::Entity* fill = fillItem ? *fillItem : nullptr;
-    gpg::FastVectorRuntimeResizeFill(&fill, newSize, view);
+    moho::Entity* const fill = fillItem ? *fillItem : nullptr;
+    vec.Resize(newSize, fill);
   }
 
   /**
@@ -667,12 +664,7 @@ namespace gpg
       return 0u;
     }
 
-    const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const EntityPtrVector*>(obj));
-    if (!view.begin) {
-      return 0u;
-    }
-
-    return static_cast<std::size_t>(view.end - view.begin);
+    return static_cast<const EntityPtrVector*>(obj)->size();
   }
 
   /**
@@ -747,14 +739,14 @@ namespace gpg
       return MakeEntityPointerSlotRef(nullptr);
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(obj);
+    auto& vec = *static_cast<gpg::fastvector<moho::Entity*>*>(obj);
     GPG_ASSERT(ind >= 0);
     GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
-    if (!view.begin || ind < 0 || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+    if (vec.Data() == nullptr || ind < 0 || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return MakeEntityPointerSlotRef(nullptr);
     }
 
-    return MakeEntityPointerSlotRef(view.begin + ind);
+    return MakeEntityPointerSlotRef(vec.Data() + ind);
   }
 
   /**
@@ -766,12 +758,8 @@ namespace gpg
       return 0u;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(obj);
-    if (!view.begin) {
-      return 0u;
-    }
-
-    return static_cast<std::size_t>(view.end - view.begin);
+    const auto& vec = *static_cast<const gpg::fastvector<moho::Entity*>*>(obj);
+    return vec.size();
   }
 
   /**
@@ -785,9 +773,9 @@ namespace gpg
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(obj);
+    auto& vec = *static_cast<gpg::fastvector<moho::Entity*>*>(obj);
     moho::Entity* fill = nullptr;
-    ResizeFastVectorEntityPointers(static_cast<unsigned int>(count), &fill, view);
+    ResizeFastVectorEntityPointers(static_cast<unsigned int>(count), &fill, vec);
   }
 } // namespace gpg
 
