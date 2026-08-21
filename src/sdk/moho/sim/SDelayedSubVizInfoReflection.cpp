@@ -411,13 +411,7 @@ namespace
    */
   void ReleaseDelayedSubVizVectorStorage(DelayedSubVizVector& storage)
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (view.begin) {
-      DeleteDelayedSubVizStorage(view.begin);
-    }
-    view.begin = nullptr;
-    view.end = nullptr;
-    view.capacityEnd = nullptr;
+    storage = DelayedSubVizVector{};
   }
 
   /**
@@ -1015,19 +1009,16 @@ namespace
   )
   {
     GPG_ASSERT(outSlot != nullptr);
-    auto& view = msvc8::AsVectorRuntimeView(storage);
     GPG_ASSERT(eraseAt != nullptr);
-    GPG_ASSERT(view.begin != nullptr);
-    GPG_ASSERT(view.end != nullptr);
-    GPG_ASSERT(eraseAt >= view.begin && eraseAt < view.end);
+    GPG_ASSERT(!storage.empty());
+    GPG_ASSERT(eraseAt >= storage.begin() && eraseAt < storage.end());
 
-    if (!outSlot || !eraseAt || !view.begin || !view.end || eraseAt < view.begin || eraseAt >= view.end) {
+    if (!outSlot || !eraseAt || storage.empty() || eraseAt < storage.begin() || eraseAt >= storage.end()) {
       return outSlot;
     }
 
-    (void)CopyDelayedSubVizInfoRangeVariant2(eraseAt, eraseAt + 1, view.end);
-    view.end -= 1;
-    outSlot->element = eraseAt;
+    // Shift the tail down over `eraseAt` and drop mLast by one -- erase(pos).
+    outSlot->element = storage.erase(eraseAt);
     return outSlot;
   }
 
