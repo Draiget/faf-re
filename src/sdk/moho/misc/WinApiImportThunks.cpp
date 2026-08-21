@@ -90106,7 +90106,7 @@ namespace moho::runtime
    * What it does:
    * Import thunk that forwards to `CoCreateInstance`.
    */
-  HRESULT ThunkCoCreateInstance(const IID *const rclsid, LPUNKNOWN pUnkOuter, const DWORD dwClsContext, const IID *const riid, LPVOID *ppv)
+  HRESULT ThunkCoCreateInstance(const IID &rclsid, LPUNKNOWN pUnkOuter, const DWORD dwClsContext, const IID &riid, LPVOID *ppv)
   {
     return ::CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
   }
