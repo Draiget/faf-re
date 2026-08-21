@@ -13,7 +13,7 @@
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/Vector.h"
 #include "moho/unit/Broadcaster.h"
-#include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommand.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -872,6 +872,8 @@ namespace moho
 
 namespace gpg
 {
+  RVectorType<moho::WeakPtr<moho::CUnitCommand>>::~RVectorType() = default;
+
   /**
    * Address: 0x006E9B90 (FUN_006E9B90, gpg::RVectorType_WeakPtr_CUnitCommand::GetName)
    */

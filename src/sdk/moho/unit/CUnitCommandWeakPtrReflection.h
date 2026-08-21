@@ -209,6 +209,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006EC0B0 (FUN_006EC0B0, gpg::RVectorType_WeakPtr_CUnitCommand::dtr)
+     */
+    ~RVectorType() override;
+
+    /**
      * Address: 0x006E9B90 (FUN_006E9B90, gpg::RVectorType_WeakPtr_CUnitCommand::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
