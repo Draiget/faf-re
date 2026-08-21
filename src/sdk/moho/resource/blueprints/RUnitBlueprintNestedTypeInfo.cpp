@@ -13,7 +13,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/RResId.h"
-#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 
@@ -189,6 +189,11 @@ namespace
   {
   public:
     /**
+     * Address: 0x005266E0 (FUN_005266E0, gpg::RVectorType_float::dtr)
+     */
+    ~VectorFloatReflectionType() override;
+
+    /**
      * Address: 0x005232C0 (FUN_005232C0, gpg::RVectorType_float::GetName)
      *
      * IDA signature:
@@ -361,6 +366,8 @@ namespace
    * guard word is set before the string is built, exactly as the binary does, so
    * a re-entrant call during `LookupRType` cannot rebuild the name.
    */
+  VectorFloatReflectionType::~VectorFloatReflectionType() = default;
+
   const char* VectorFloatReflectionType::GetName() const
   {
     if ((gVectorFloatTypeNameInitGuard & kVectorFloatTypeNameInitMask) == 0u) {
