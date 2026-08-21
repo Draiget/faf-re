@@ -48,27 +48,6 @@ namespace
   static_assert(sizeof(ByteRasterAllocation) == 0x0C, "ByteRasterAllocation size must be 0x0C");
 
   template <class T>
-  [[nodiscard]] std::size_t RuntimeVectorSize(const msvc8::vector<T>& storage) noexcept
-  {
-    const auto& view = msvc8::AsVectorRuntimeView(storage);
-    return view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-  }
-
-  template <class T>
-  [[nodiscard]] std::size_t RuntimeVectorCapacity(const msvc8::vector<T>& storage) noexcept
-  {
-    const auto& view = msvc8::AsVectorRuntimeView(storage);
-    return view.begin ? static_cast<std::size_t>(view.capacityEnd - view.begin) : 0u;
-  }
-
-  template <class T>
-  [[nodiscard]] T* RuntimeVectorPointerAt(msvc8::vector<T>& storage, const std::size_t index) noexcept
-  {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    return view.begin + index;
-  }
-
-  template <class T>
   void RuntimeVectorAssignPointers(
     msvc8::vector<T>& storage, T* const begin, const std::size_t size, const std::size_t capacity
   ) noexcept
@@ -646,9 +625,8 @@ namespace
     DelayedSubVizVector& storage, DelayedSubVizPointerSlot* const outSlot, moho::SDelayedSubVizInfo* const newEnd
   )
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (newEnd != view.end && newEnd != nullptr) {
-      storage.erase(newEnd, view.end);
+    if (newEnd != storage.end() && newEnd != nullptr) {
+      (void)storage.erase(newEnd, storage.end());
     }
 
     if (outSlot) {
@@ -716,7 +694,7 @@ namespace
     DelayedSubVizVector& storage, const std::size_t index
   ) noexcept
   {
-    return RuntimeVectorPointerAt(storage, index);
+    return storage.ptr_at(index);
   }
 
   /**
@@ -735,12 +713,12 @@ namespace
     }
 
     auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentCapacity = RuntimeVectorCapacity(storage);
+    const std::size_t currentCapacity = storage.capacity();
     if (currentCapacity >= requiredCapacity) {
       return view.begin;
     }
 
-    const std::size_t currentSize = RuntimeVectorSize(storage);
+    const std::size_t currentSize = storage.size();
     moho::SDelayedSubVizInfo* const oldBegin = view.begin;
     moho::SDelayedSubVizInfo* const newBegin =
       static_cast<moho::SDelayedSubVizInfo*>(AllocateDelayedSubVizStorage(requiredCapacity));
@@ -772,8 +750,8 @@ namespace
   )
   {
     auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentSize = RuntimeVectorSize(storage);
-    const std::size_t currentCapacity = RuntimeVectorCapacity(storage);
+    const std::size_t currentSize = storage.size();
+    const std::size_t currentCapacity = storage.capacity();
 
     if (count == 0u) {
       return insertPosition;
@@ -841,7 +819,7 @@ namespace
   )
   {
     auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t currentSize = RuntimeVectorSize(storage);
+    const std::size_t currentSize = storage.size();
 
     if (currentSize < desiredCount) {
       return InsertDelayedSubVizInfoCopies(storage, desiredCount - currentSize, view.end, fillValue);
@@ -1375,7 +1353,7 @@ namespace
   )
   {
     if (outBegin) {
-      *outBegin = msvc8::AsVectorRuntimeView(storage).begin;
+      *outBegin = const_cast<moho::SDelayedSubVizInfo*>(storage.begin());
     }
     return outBegin;
   }
@@ -1388,7 +1366,7 @@ namespace
   )
   {
     if (outEnd) {
-      *outEnd = msvc8::AsVectorRuntimeView(storage).end;
+      *outEnd = const_cast<moho::SDelayedSubVizInfo*>(storage.end());
     }
     return outEnd;
   }
@@ -1433,9 +1411,9 @@ namespace
       return destination;
     }
 
-    const std::size_t destinationSize = RuntimeVectorSize(*destination);
+    const std::size_t destinationSize = destination->size();
     if (sourceSize > destinationSize) {
-      const std::size_t destinationCapacity = RuntimeVectorCapacity(*destination);
+      const std::size_t destinationCapacity = destination->capacity();
       if (destinationView.begin && sourceSize <= destinationCapacity) {
         const moho::SDelayedSubVizInfo* const sourceSplit = sourceView.begin + destinationSize;
         if (destinationSize) {
@@ -1622,8 +1600,8 @@ namespace
     DelayedSubVizVector& storage, const moho::SDelayedSubVizInfo& value
   )
   {
-    const std::size_t insertionIndex = RuntimeVectorSize(storage);
-    moho::SDelayedSubVizInfo* const insertionPosition = msvc8::AsVectorRuntimeView(storage).end;
+    const std::size_t insertionIndex = storage.size();
+    moho::SDelayedSubVizInfo* const insertionPosition = storage.end();
     (void)InsertDelayedSubVizInfoCopies(storage, 1u, insertionPosition, value);
     return DelayedSubVizVectorPointerAt(storage, insertionIndex);
   }
@@ -1639,11 +1617,10 @@ namespace
     DelayedSubVizVector& storage, const moho::SDelayedSubVizInfo& value
   )
   {
-    const auto& view = msvc8::AsVectorRuntimeView(storage);
-    const std::size_t size = RuntimeVectorSize(storage);
-    const std::size_t capacity = RuntimeVectorCapacity(storage);
+    const std::size_t size = storage.size();
+    const std::size_t capacity = storage.capacity();
 
-    if (view.begin && size < capacity) {
+    if (storage.data() != nullptr && size < capacity) {
       storage.push_back(value);
       return DelayedSubVizVectorPointerAt(storage, size);
     }
@@ -2028,7 +2005,7 @@ size_t gpg::RVectorType<moho::SDelayedSubVizInfo>::GetCount(void* const obj) con
     return 0u;
   }
 
-  return RuntimeVectorSize(*static_cast<const DelayedSubVizVector*>(obj));
+  return (*static_cast<const DelayedSubVizVector*>(obj)).size();
 }
 
 /**
