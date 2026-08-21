@@ -818,6 +818,10 @@ namespace moho
 
   /**
    * Address: 0x00812770 (FUN_00812770, sub_812770)
+   * Address: 0x00812720 (FUN_00812720, vtable-slot-2 scalar deleting
+   * destructor: the full compiler-emitted picture -- restores this object's
+   * own vftable, conditionally tears down the embedded `SpatialDB_MeshInstance`
+   * member (`mDB`), then conditionally frees the object)
    *
    * What it does:
    * Runs one shoreline-cell teardown lane; the embedded `SpatialDB_MeshInstance`

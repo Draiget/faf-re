@@ -191,6 +191,10 @@ CFireWeaponTask::CFireWeaponTask(UnitWeapon* const weapon)
 
 /**
  * Address: 0x006D3CF0 (FUN_006D3CF0, non-deleting body)
+ * Address: 0x006D3CD0 (FUN_006D3CD0, vtable-slot-2 scalar deleting
+ * destructor: tail-calls the body below then conditionally frees the
+ * object -- ordinary C++ `delete` semantics, not modeled as a separate
+ * function here)
  *
  * What it does:
  * Decrements the fire-task instance counter before base-task teardown.

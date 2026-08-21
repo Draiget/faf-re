@@ -49,6 +49,14 @@ namespace moho
      * decal runtime vtable lane.
      */
     CartographicDecal();
+
+    /**
+     * Address: 0x007D4900 (FUN_007D4900, vtable-slot-2 scalar deleting
+     * destructor: this trivial-payload class owns no heap resources, so the
+     * body is just the vftable restore plus a conditional `operator delete`
+     * -- ordinary C++ `delete` semantics, not modeled as a separate function
+     * here)
+     */
     virtual ~CartographicDecal() = default;
 
   public:

@@ -35,6 +35,10 @@ namespace moho
 
   /**
    * Address: 0x007DBD10 (FUN_007DBD10, ??1ShaderDictionary@Moho@@QAE@@Z)
+   * Address: 0x007DBEC0 (FUN_007DBEC0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * IDA signature:
    *   void __thiscall Moho::ShaderDictionary::~ShaderDictionary(
