@@ -2427,6 +2427,22 @@ namespace moho
     head->right = head;
   }
 
+  /**
+   * Address: 0x00533FD0 (FUN_00533FD0, the partial-cleanup emission MSVC
+   * generates from this destructor for the constructor's EH unwind path)
+   *
+   * FUN_005551F0's unwind funclet at 0x00BA0453 calls it when construction
+   * throws after the category map is live but before the word-range fastvector
+   * is, so it runs only this destructor's second half: erase the whole node
+   * range through the shared `_Tree::erase(first, last)` lane (FUN_00535750),
+   * `operator delete` the sentinel head, then null the head/size lanes. The
+   * full destructor at 0x00533E20 is the same tail preceded by the fastvector
+   * tidy (free +0x20 when it differs from the inline base at +0x2C, then reseat
+   * the SBO lanes), which is why that one is 32 instructions and this one 20.
+   *
+   * Per RULE ONE an unwind funclet target maps to no source line of its own -
+   * it is cited here rather than written as a separate function.
+   */
   EntityCategoryLookupTableRuntimeView::~EntityCategoryLookupTableRuntimeView()
   {
     CategoryLookupNodeRuntimeView* const head = categoryMap.head;
