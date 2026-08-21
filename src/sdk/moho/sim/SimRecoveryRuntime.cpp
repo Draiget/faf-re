@@ -9082,10 +9082,14 @@ std::int16_t ScalePackedDoubleWordsRuntimeAdapter(
 
 /**
  * Address: 0x00886FB0 (FUN_00886FB0)
+ * Address: 0x00886D80 (FUN_00886D80, Moho::WaveParameters scalar-deleting destructor)
  *
  * What it does:
  * Releases both legacy string lanes in one wave-parameters object and resets
- * them to empty-inline form.
+ * them to empty-inline form. `FUN_00886D80` is the vtable-slot-0 wrapper the
+ * binary calls through `delete`: it invokes this body then, when the low bit
+ * of its `deleteFlag` argument is set, frees the object with `operator delete`
+ * -- ordinary C++ `delete` semantics, not modeled as a separate function here.
  */
 void ResetWaveParametersStringsRuntime(
   WaveParametersRuntime* const parameters,
