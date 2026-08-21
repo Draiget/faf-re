@@ -2081,6 +2081,17 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x0053A270 (FUN_0053A270, boost::detail::sp_counted_impl_p<Moho::RScmResource>::destroy)
+     *
+     * What it does:
+     * Frees the control block itself once both use and weak counts reach
+     * zero (the pointee was already released by `dispose()`).
+     */
+    void SpCountedImplPDestroyRScmResource(
+        SpCountedImplStorage<moho::RScmResource>* self
+    ) noexcept;
+
+    /**
      * Address: 0x0053B3D0 (FUN_0053B3D0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::dispose)
      *
      * What it does:
@@ -2092,6 +2103,17 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x0053B400 (FUN_0053B400, boost::detail::sp_counted_impl_p<Moho::RScaResource>::destroy)
+     *
+     * What it does:
+     * Frees the control block itself once both use and weak counts reach
+     * zero (the pointee was already released by `dispose()`).
+     */
+    void SpCountedImplPDestroyRScaResource(
+        SpCountedImplStorage<moho::RScaResource>* self
+    ) noexcept;
+
+    /**
      * Address: 0x00545360 (FUN_00545360, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::dispose)
      *
      * What it does:
@@ -2100,6 +2122,17 @@ namespace boost
      */
     void SpCountedImplPDisposeLaunchInfoNew(
         SpCountedImplStorage<moho::LaunchInfoNew>* countedImpl
+    ) noexcept;
+
+    /**
+     * Address: 0x00545440 (FUN_00545440, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::destroy)
+     *
+     * What it does:
+     * Frees the control block itself once both use and weak counts reach
+     * zero (the pointee was already released by `dispose()`).
+     */
+    void SpCountedImplPDestroyLaunchInfoNew(
+        SpCountedImplStorage<moho::LaunchInfoNew>* self
     ) noexcept;
 
     /**
@@ -2309,6 +2342,17 @@ namespace boost
      */
     void SpCountedImplPdDisposeCAniDefaultSkelFunctionDeleter(
         SpCountedImplStorage<void>* countedImpl
+    ) noexcept;
+
+    /**
+     * Address: 0x0054EE00 (FUN_0054EE00, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::destroy)
+     *
+     * What it does:
+     * Frees the control block itself once both use and weak counts reach
+     * zero (the pointee was already released by `dispose()`).
+     */
+    void SpCountedImplPdDestroyCAniDefaultSkelFunctionDeleter(
+        SpCountedImplStorage<void>* self
     ) noexcept;
 
     /**
