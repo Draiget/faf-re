@@ -644,12 +644,9 @@ namespace
       // (FUN_005437F0, msvc8::vector<ArmyLaunchInfo>::reserve) then fills;
       // not resize() (which routes through reallocate_to).
       loaded.reserve(targetCount);
-      auto& view = msvc8::AsVectorRuntimeView(loaded);
-      auto* const slotsBegin = view.end;
-      for (std::size_t i = 0u; i < targetCount; ++i) {
-        ::new (static_cast<void*>(slotsBegin + i)) moho::ArmyLaunchInfo();
-      }
-      view.end = slotsBegin + targetCount;
+      // reserve() has already sized capacity to exactly targetCount, so this
+      // resize takes _Insert_n's in-place branch and does not reallocate.
+      loaded.resize(targetCount, moho::ArmyLaunchInfo{});
     }
     const gpg::RRef owner = NullOwnerRef();
     for (unsigned int i = 0; i < itemCount; ++i) {
@@ -1458,15 +1455,11 @@ namespace
    */
   [[maybe_unused]] void ResetArmyLaunchInfoVectorStorage(ArmyLaunchInfoVector& storage)
   {
-    auto& runtime = msvc8::AsVectorRuntimeView(storage);
-    if (runtime.begin != nullptr) {
-      (void)ResetArmyLaunchInfoUnitSourcesRange(runtime.begin, runtime.end);
-      ::operator delete(runtime.begin);
+    // Element cleanup sweep, then VC8 _Tidy(): free and null the three lanes.
+    if (!storage.empty()) {
+      (void)ResetArmyLaunchInfoUnitSourcesRange(storage.begin(), storage.end());
     }
-
-    runtime.begin = nullptr;
-    runtime.end = nullptr;
-    runtime.capacityEnd = nullptr;
+    storage = ArmyLaunchInfoVector{};
   }
 
   /**
@@ -1497,15 +1490,11 @@ namespace
    */
   [[maybe_unused]] void ResetCommandSourceVectorStorage(msvc8::vector<moho::SSTICommandSource>& storage)
   {
-    auto& runtime = msvc8::AsVectorRuntimeView(storage);
-    if (runtime.begin != nullptr) {
-      (void)ResetCommandSourceNameRange(runtime.begin, runtime.end);
-      ::operator delete(runtime.begin);
+    // Element cleanup sweep, then VC8 _Tidy(): free and null the three lanes.
+    if (!storage.empty()) {
+      (void)ResetCommandSourceNameRange(storage.begin(), storage.end());
     }
-
-    runtime.begin = nullptr;
-    runtime.end = nullptr;
-    runtime.capacityEnd = nullptr;
+    storage = msvc8::vector<moho::SSTICommandSource>{};
   }
 
   template <typename THelper>
