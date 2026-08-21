@@ -21,6 +21,13 @@ namespace gpg
 
   template <class T>
   void FastVectorRuntimeResizeFill(const T* fillValue, const unsigned int newSize, fastvector_runtime_view<T>& view);
+
+  template <class T>
+  [[nodiscard]] const fastvector_runtime_view<T>& AsFastVectorRuntimeView(const void* object) noexcept;
+
+  template <class T>
+  fastvector_runtime_view<T>*
+  FastVectorRuntimeCopyAssign(fastvector_runtime_view<T>& destination, const fastvector_runtime_view<T>& source);
 } // namespace gpg
 
 namespace gpg::core
@@ -554,7 +561,30 @@ namespace gpg::core
     }
 
     FastVector(const FastVector&) = delete;
-    FastVector& operator=(const FastVector&) = delete;
+
+    /**
+     * Copy assignment.
+     *
+     * MSVC emits one out-of-line body per element type; the recovered
+     * addresses live on `FastVectorRuntimeCopyAssign` below, which is this
+     * operator's implementation. The shape is VC8's: when the destination is
+     * already at least as long as the source, the elements are overwritten in
+     * place and `mLast` is rebased; otherwise capacity is grown, the
+     * overlapping prefix is overwritten, and the remainder is appended.
+     *
+     * This was `= delete` until 2026-08-21, which forced every caller in the
+     * engine to reach around the container through
+     * `AsFastVectorRuntimeView` -- see RULE ONE in CLAUDE.md.
+     */
+    FastVector& operator=(const FastVector& other)
+    {
+      if (this != &other) {
+        (void)gpg::FastVectorRuntimeCopyAssign<T>(
+          gpg::AsFastVectorRuntimeView<T>(this), gpg::AsFastVectorRuntimeView<T>(&other)
+        );
+      }
+      return *this;
+    }
 
     FastVector(FastVector&& other) noexcept
       : start_(other.start_)
