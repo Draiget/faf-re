@@ -36,6 +36,14 @@ namespace msvc8
         /** Below this many elements the sort switches to insertion sort. */
         inline constexpr std::ptrdiff_t kInsertionSortMax = 32;
 
+        /**
+         * Address: 0x0089C070 (FUN_0089C070, the swap for
+         * `Moho::SBuildTemplateInfo` -- 0x2C bytes of
+         * `{Wm3::Vector3f mPos; int mBuildOrder; msvc8::string mBlueprintId;}`.
+         * The 0x2C stack temp it opens with is the `T temp = lhs` below; the
+         * blueprint-id lane moves through `std::string::assign(str, 0, -1)`
+         * three times, once per leg of the three-way exchange.)
+         */
         template <class T>
         void iter_swap_value(T& lhs, T& rhs)
         {
@@ -49,6 +57,14 @@ namespace msvc8
          *          `_Unguarded_partition`)
          *
          * Orders `*a`, `*b`, `*c` so the median ends up in `*b`.
+         */
+        /**
+         * Address: 0x0089BD10 (FUN_0089BD10, the median pick for the
+         * `SBuildTemplateInfo` sort -- opens `cmp eax, 28h`, VC8's
+         * `40 < _Count` test that selects the median-of-nine ninther over a
+         * plain median-of-three, then drives the swap at 0x0089C070 up to
+         * fifteen times. Compares `[node+0x0C]` signed, which is
+         * `mBuildOrder`.)
          */
         template <class T, class Compare>
         void median3(T* const a, T* const b, T* const c, Compare comp)
@@ -71,6 +87,15 @@ namespace msvc8
          * Walks forward from the second element, sliding each one back over the
          * run of larger predecessors. The first element is special-cased so the
          * inner scan never needs a bounds test.
+         */
+        /**
+         * Address: 0x0089C4A0 (FUN_0089C4A0, the `SBuildTemplateInfo` body --
+         * recovers the element count with the 2E8BA2E9h divide-by-0x2C magic
+         * pair and keeps one 0x2C-byte element in a stack temp as the value
+         * being slid into place)
+         * Address: 0x0089BBA0 (FUN_0089BBA0, the 45-instruction outer guard
+         * MSVC emitted separately, which range-checks and tail-calls the body
+         * above)
          */
         template <class T, class Compare>
         void insertion_sort(T* const first, T* const last, Compare comp)
@@ -107,6 +132,14 @@ namespace msvc8
          * upward - the classic Dinkumware two-phase form, which does one
          * comparison per level on the way down instead of two.
          */
+        /**
+         * Address: 0x0089C170 (FUN_0089C170, the `SBuildTemplateInfo`
+         * instantiation -- the sift-down half)
+         * Address: 0x0089C350 (FUN_0089C350, VC8's `_Push_heap`, which this
+         * template inlines as its settle-upward loop. Recognisable from the
+         * `lea eax,[esi-1]; cdq; sub eax,edx; sar edi,1` parent-index
+         * computation, i.e. `(hole - 1) / 2`.)
+         */
         template <class T, class Compare>
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
@@ -136,6 +169,10 @@ namespace msvc8
             first[hole] = value;
         }
 
+        /**
+         * Address: 0x0089BED0 (FUN_0089BED0, the `SBuildTemplateInfo`
+         * instantiation; drives the sift-down at 0x0089C170)
+         */
         template <class T, class Compare>
         void make_heap(T* const first, T* const last, Compare comp)
         {
@@ -155,6 +192,15 @@ namespace msvc8
          * Repeatedly swaps the root to the back and re-sifts over the shrinking
          * prefix.
          */
+        /**
+         * Address: 0x0089BF70 (FUN_0089BF70, the `SBuildTemplateInfo`
+         * instantiation)
+         * Address: 0x0089C440 (FUN_0089C440, VC8's `_Pop_heap`)
+         * Address: 0x0089C680 (FUN_0089C680, VC8's `_Pop_heap_hole`, which
+         * hands back to the sift-down at 0x0089C170). Both are out-of-line in
+         * the binary and inlined here as the three-line pop step in the loop
+         * below.)
+         */
         template <class T, class Compare>
         void sort_heap(T* const first, T* last, Compare comp)
         {
@@ -171,6 +217,12 @@ namespace msvc8
          * What it does:
          * Partitions around the median of first/middle/last and returns the
          * half-open run of elements that compare equal to the pivot, so the
+         *
+         * Address: 0x0089B9E0 (FUN_0089B9E0, the `Moho::SBuildTemplateInfo`
+         * instantiation -- calls the median pick at 0x0089BD10 once and the
+         * swap at 0x0089C070 seven times, which is the shape of this
+         * function: one pivot selection, then the two scan loops plus the
+         * equal-run gathering at each end.)
          * driver can skip that whole block instead of re-sorting it.
          */
         template <class T, class Compare>
@@ -257,6 +309,14 @@ namespace msvc8
          * pathological input cannot drive it quadratic; small ranges finish with
          * insertion sort.
          */
+        /**
+         * Address: 0x0089B540 (FUN_0089B540, the `Moho::SBuildTemplateInfo`
+         * instantiation. It calls *itself* twice -- the two recursive
+         * branches below -- plus the partition at 0x0089B9E0 and all three
+         * fallbacks: insertion sort (0x0089BBA0), make_heap (0x0089BED0)
+         * and sort_heap (0x0089BF70). That call set is what identifies it
+         * as the introsort driver rather than any single phase.)
+         */
         template <class T, class Compare>
         void sort_impl(T* first, T* last, std::ptrdiff_t ideal, Compare comp)
         {
@@ -288,6 +348,12 @@ namespace msvc8
      * MSVC8 `std::sort(first, last, comp)`.
      *
      * The initial recursion budget is `last - first`, matching the 2007 header.
+     */
+    /**
+     * For the `Moho::SBuildTemplateInfo` instantiation this entry point is
+     * inlined into its caller -- `CWldSession::GenerateBuildTemplates`
+     * (0x00896AA0) calls the driver at 0x0089B540 directly. The whole
+     * twelve-body instantiation is catalogued on the members above.
      */
     template <class T, class Compare>
     void sort(T* const first, T* const last, Compare comp)

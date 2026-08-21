@@ -1,5 +1,7 @@
 #include "CWldSession.h"
 
+#include "legacy/algorithms/Sort.h"
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -3306,7 +3308,14 @@ namespace moho
         return;
       }
 
-      std::sort(
+      // The binary's whole sort instantiation for this element hangs off this
+      // one line -- twelve emitted bodies, catalogued on the members of
+      // legacy/algorithms/Sort.h. `msvc8::sort` rather than `std::sort`
+      // because only the former models VC8's introsort exactly: the same
+      // 32-element insertion-sort cutoff, the same 40-element ninther
+      // threshold in the median pick, and the same three-quarters recursion
+      // budget before it falls back to heapsort.
+      msvc8::sort(
         begin,
         end,
         [](const SBuildTemplateInfo& lhs, const SBuildTemplateInfo& rhs) noexcept { return lhs.mBuildOrder < rhs.mBuildOrder; }
