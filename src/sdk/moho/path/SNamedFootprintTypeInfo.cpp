@@ -9,7 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -618,6 +618,11 @@ namespace
   {
   public:
     /**
+     * Address: 0x00514AB0 (FUN_00514AB0, gpg::RListType_SNamedFootprint::dtr)
+     */
+    ~SNamedFootprintListTypeInfo() override;
+
+    /**
      * Address: 0x00513FB0 (FUN_00513FB0, gpg::RListType_SNamedFootprint::GetName)
      *
      * What it does:
@@ -656,6 +661,8 @@ namespace
   };
 
   static_assert(sizeof(SNamedFootprintListTypeInfo) == 0x64, "SNamedFootprintListTypeInfo size must be 0x64");
+
+  SNamedFootprintListTypeInfo::~SNamedFootprintListTypeInfo() = default;
 
   /**
    * Address: 0x00514070 (FUN_00514070, gpg::RListType_SNamedFootprint::GetLexical)
