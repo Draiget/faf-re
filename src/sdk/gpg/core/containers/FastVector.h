@@ -1517,7 +1517,19 @@ namespace gpg::core
      * rebound to its own inline buffer, so the old slots cannot be released
      * until their contents have been read out.
      *
-     * Reached only from `ResetFrom` (0x00576F10).
+     * Address: 0x00577010 (FUN_00577010, the same member's heap branch for that
+ * element -- taken when the incoming count exceeds the inline capacity. It
+ * sizes the block as `count * 8 - count` doubled three times, i.e.
+ * `count * 0x38`, calls `operator new`, fills it through 0x005770F0 and then
+ * releases the old range.)
+ * Address: 0x005770F0 (FUN_005770F0, the uninitialised copy that fills it.
+ * Per slot it copies the offset, universe handle and first-word index, then
+ * *constructs* the embedded `fastvector_n` in place -- seating all four of
+ * its lanes on the fresh inline buffer at `+0x18` -- before copying the words
+ * and `mWeight`. That in-place construction is what distinguishes it from the
+ * assigning copy at 0x00577450.)
+ *
+ * Reached only from `ResetFrom` (0x00576F10).
      */
     void CopyFromRaw_(const T* src, size_t count)
     {
