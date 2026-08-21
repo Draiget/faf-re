@@ -5164,8 +5164,69 @@ namespace moho
    * command-issue helpers, finds-or-creates a draw node per command, adds this
    * entity's position into the queue-head node's centroid accumulator, and
    * chains consecutive orders together through `LinkCommandGraphEdge`
-   * (0x00826960). Blocked on that edge builder and the `mMapC`/tree/`mMapD`
-   * container primitives beneath it.
+   * (0x00826960).
+   *
+   * Still blocked on that edge builder, but *not* on unknown layout - every
+   * offset below is now pinned, and the earlier "the `mMapC`/tree/`mMapD`
+   * container primitives" reading was wrong about what those primitives are.
+   * They are not bespoke containers: each is an emission of a template this
+   * file (or `legacy/containers`) already models, so the remaining work is
+   * instantiating the existing templates, not writing new per-type bodies.
+   *
+   * `LinkCommandGraphEdge(toNode@ecx, fromNode@edx, graph, forceHighlight)`
+   * decomposes as:
+   *  - 0x0082B490 - find-or-create the edge in `mMapC`, keyed by the 64-bit
+   *    `{fromNode, toNode}` pair, returning `&node->mEdge` (node+0x10). It is
+   *    the exact analogue of `FindOrInsertCommandGraphDrawNode` (0x0082B300),
+   *    and confirms `HashListNode2C` is
+   *    `{mNext, mPrev, mKeyLow@0x08, mKeyHigh@0x0C, mEdge@0x10}` - the edge's
+   *    own `mFromNode`/`mToNode` at +0x08/+0x0C are written *through* that
+   *    returned payload pointer at 0x008269AA/0x008269AD.
+   *  - 0x0082C750 / 0x0082C950 / 0x0082C480 / 0x0082B5E0 - `FindHashListNode`
+   *    and `InsertOrFindHashListNode` again, for `HashListNode2C` and
+   *    `HashListNode10`. 0x0082C480 was diffed against the recovered
+   *    0x0082BFB0 body: identical load-factor test, identical incremental
+   *    one-bucket rehash, identical cascade and insert-point walks. Only the
+   *    key traits differ - the 2C lane hashes a 64-bit key as
+   *    `3863*lo + 7919*hi + 53849*(lo ^ hi)` before the same Park-Miller
+   *    Schrage tail, and compares `(lo, hi)` lexicographically. So these are
+   *    one source template over `<TNode, TKey>`, and recovering them means
+   *    generalising `FindHashListNode88`/`InsertOrFindHashListNode88` rather
+   *    than forking a copy per node size.
+   *  - 0x0082B8B0 - `mGraphRuntimeTree[texture]`, i.e. VC8
+   *    `map::operator[]`: a `lower_bound` descent whose result is handed to
+   *    the hinted insert at 0x0082CC80. That hinted insert is the same
+   *    template `legacy/containers/RbTree.h` already carries as
+   *    `insert_hint` (its batch-bucket emission is cited there at
+   *    0x007E3340), over `insert_at`(0x0082E320) and `insert_unique`
+   *    (0x0082E170). The tree is keyed on the texture's *control block*
+   *    (0x008B8D0's compare reads node+0x10 against key+0x04, both `pi`
+   *    lanes), which is precisely boost's owner-based `shared_ptr::operator<`
+   *    - so the modelled type is
+   *    `map<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>` and the
+   *    0x18-byte payload is that pair. 0x0082D330 is just its value ctor
+   *    (retain the texture, default the vector).
+   *  - 0x0082BCB0 is `bucket.mEdges.push_back(edge)`, and the two lane
+   *    appends at 0x008269C8/0x008269F4 are `AppendRangeDwordLane`
+   *    (0x0082CF20), already recovered.
+   *
+   * Two decompiler artifacts in 0x00826140/0x00826960 that must not be
+   * transcribed literally, both MSVC stack-slot reuse rather than real
+   * aliasing:
+   *  - `LinkCommandGraphEdge`'s 4th parameter looks like it is both a `bool`
+   *    and a dereferenced pointer. It is a `bool` by value; the callee
+   *    reuses that incoming slot as a local `HashListNode10*` (0x00826AA5
+   *    passes `&arg_4` to the `mMapD` find, which overwrites it).
+   *  - in 0x00826140 the slot IDA calls `var_D0` holds the hovered entity
+   *    during the pre-scan, is reset to 0 at 0x008262EA, and thereafter holds
+   *    the previous command's type. Two distinct source locals with disjoint
+   *    lifetimes.
+   *
+   * The one genuine layout gap left is `CWldSession+0x4C0`, still
+   * `char pad_04C0[8]` in the header: 0x0082624C loads it, subtracts 8, and
+   * dispatches virtual slot 3 on the result to get the entity the cursor is
+   * hovering, which the pre-scan then looks up in each command's
+   * `GetEntitiesUnderCursor` set.
    */
   void AddCommandQueueToCommandGraph(
     UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue
