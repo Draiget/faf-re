@@ -1557,11 +1557,11 @@ namespace
   }
 
   /**
-   * Address: 0x0056AF80 (FUN_0056AF80)
-   *
-   * What it does:
-   * Finds the first lane-map node whose `unitEntityId` is not less than the
-   * requested key.
+   * Internal decomposition helper for `LaneMapFindNode` below (not a distinct
+   * binary function on its own -- it has no other caller in this file).
+   * Descends to the first lane-map node whose `unitEntityId` is not less than
+   * the requested key, matching the raw descent half of the real function's
+   * inlined `_Tree::find` body.
    */
   [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapLowerBoundNode(
     const moho::SFormationLaneUnitMap& map,
@@ -1581,6 +1581,24 @@ namespace
     });
   }
 
+  /**
+   * Address: 0x0056AF80 (FUN_0056AF80, decompiles as a raw `SFormationLaneUnitNode`-
+   * shaped `_Tree::find`: descend by `unitEntityId`, then collapse to "not found"
+   * when the descended node is the head sentinel or its key doesn't match)
+   * Address: 0x0056AFE0 (FUN_0056AFE0, IDA name `std::map_EntId_SUnitOffsetInfo::find`
+   * -- byte-identical compiled body reached from 8 call sites in this file
+   * (Func6/GetFormationLayer, GetFormationPosition, Func9, Func10,
+   * Func17/Contains, CalcFormationSpeed, Func11, Func12); the doc comment
+   * above `SOffsetInfo::unitMap` explains why: `unitMap` is "the same 0x0C
+   * MSVC8 tree the reflected `map<EntId,SUnitOffsetInfo>` serializer writes",
+   * so the compiler emits the identical `_Tree::find` body once per
+   * differently-typed call site instead of folding them)
+   *
+   * What it does:
+   * Finds the lane-map node whose `unitEntityId` exactly matches the
+   * requested key, or `nullptr` if no such node exists (the head sentinel and
+   * a lower-bound mismatch both collapse to "not found").
+   */
   [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapFindNode(
     const moho::SFormationLaneUnitMap& map,
     const std::uint32_t unitEntityId
