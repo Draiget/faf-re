@@ -3970,6 +3970,29 @@ namespace moho
     manager.resolvedLinksDirty = 1u;
     (void)ResetQueueLinkVectorToInlineStorage(&manager.resolvedLinks);
   }
+
+  /**
+   * Address: 0x008B6EE0 (FUN_008B6EE0, sub_8B6EE0) - see the doc comment on
+   * the declaration in UserUnit.h.
+   */
+  void RecordUnitManagerCommandHelperRemoval(
+    UserCommandIssueHelper* const helper,
+    UserCommandQueue* const manager,
+    const std::int32_t tag
+  ) noexcept
+  {
+    UserManagerHelperEntry entry{};
+    entry.commandType = tag;
+    entry.isResetCommand = 2;
+    entry.subject = helper;
+    entry.sequenceOrCount = -1;
+    PushUserManagerIssue(manager->issueQueue, entry);
+
+    QueueCommandIssueDeselectUnitEvent(helper, static_cast<CmdId>(tag), manager->ownerUnit);
+
+    manager->resolvedLinksDirty = 1u;
+    (void)ResetQueueLinkVectorToInlineStorage(&manager->resolvedLinks);
+  }
 } // namespace moho
 
 namespace

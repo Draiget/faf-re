@@ -1143,6 +1143,48 @@ namespace moho
   void QueueCommandIssueSelectUnitEvent(UserCommandIssueHelper* helper, CmdId cmdId, UserUnit* unit);
 
   /**
+   * Address: 0x008B4880 (FUN_008B4880, sub_8B4880)
+   *
+   * What it does:
+   * Appends a "deselect unit" local update event to one command-issue
+   * helper's ring queue (when needed) and inserts `unit` into that event's
+   * weak-set. Defined in Sim.cpp; declared here so
+   * `RecordUnitManagerCommandHelperRemoval` (below) can invoke it.
+   */
+  void QueueCommandIssueDeselectUnitEvent(UserCommandIssueHelper* helper, CmdId cmdId, UserUnit* unit);
+
+  /**
+   * Address: 0x008B6EE0 (FUN_008B6EE0, sub_8B6EE0)
+   *
+   * IDA signature:
+   * _DWORD *__userpurge sub_8B6EE0@<eax>(int a1@<eax>, int edi0@<edi>, int a3);
+   *
+   * What it does:
+   * Records that `helper` has been locally removed from `manager`'s
+   * tracked queue: pushes one `UserManagerHelperEntry{commandType=tag,
+   * isResetCommand=2, subject=helper, sequenceOrCount=-1}` onto the
+   * manager's pending issue queue (`isResetCommand=2` is a third pending-
+   * issue marker kind, distinct from `UserUnitManagerAdd`'s 0 and
+   * `ResetUserUnitManagerState`'s 1), records a "deselect unit" local ring
+   * event against `manager->ownerUnit` via `QueueCommandIssueDeselectUnitEvent`,
+   * marks the resolved-link range dirty, and resets it to inline storage.
+   *
+   * `tag` is not a `CmdId` despite landing in the entry's `commandType`
+   * slot and being forwarded as `QueueCommandIssueDeselectUnitEvent`'s own
+   * `cmdId` parameter: both call sites in `Moho::ISSUE_RemoveLastCommand`
+   * (FUN_008B1270) pass the *original unit-batch element count* (a
+   * loop-invariant computed once before the per-unit loop, not a per-
+   * command id) - confirmed by tracing the exact stack slot the binary
+   * pushes for this argument back to its single write site before the
+   * loop. Preserved exactly as evidenced rather than "corrected", since
+   * the field's actual consumer (if the marker is ever drained/read
+   * downstream) is outside this function's own body.
+   */
+  void RecordUnitManagerCommandHelperRemoval(
+    UserCommandIssueHelper* helper, UserCommandQueue* manager, std::int32_t tag
+  ) noexcept;
+
+  /**
    * VFTABLE: 0x00E4DB6C
    * COL:  0x00E9E888
    */
