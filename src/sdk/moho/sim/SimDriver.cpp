@@ -1065,6 +1065,18 @@ namespace moho
    */
 } // namespace moho
 
+namespace moho
+{
+  // Defined in Unit.cpp (msvc8::vector<SUnitVariableUpdateEntry>::_Insert_n,
+  // FUN_005C68E0/FUN_005C51B0) -- forward-declared locally to avoid pulling
+  // Vector.h's msvc8::vector template into Unit.h.
+  SUnitVariableUpdateEntry* InsertUnitVariableUpdateEntry(
+    msvc8::vector<SUnitVariableUpdateEntry>& storage,
+    SUnitVariableUpdateEntry* insertPosition,
+    const SUnitVariableUpdateEntry& value
+  );
+} // namespace moho
+
 /**
  * Address: 0x005C39A0 (FUN_005C39A0) + the inlined id/`Assign` tail of the
  *          SyncInterface overrides (FUN_006AC3A0 / FUN_005BEFB0).
@@ -1089,15 +1101,18 @@ moho::SUnitVariableUpdateEntry* moho::QueueUnitVariableUpdate(
 
   SUnitVariableUpdateEntry defaultEntry{};
   defaultEntry.mEntityId = ToRaw(EEntityIdSentinel::Invalid);
-  syncData->mUnitUpdates.push_back(defaultEntry);
-  if (syncData->mUnitUpdates.empty()) {
+  SUnitVariableUpdateEntry* const stored = InsertUnitVariableUpdateEntry(
+    syncData->mUnitUpdates,
+    syncData->mUnitUpdates.end(),
+    defaultEntry
+  );
+  if (stored == nullptr) {
     return nullptr;
   }
 
-  SUnitVariableUpdateEntry& stored = syncData->mUnitUpdates.back();
-  stored.mEntityId = entityId;
-  stored.mVariableData = variableData;
-  return &stored;
+  stored->mEntityId = entityId;
+  stored->mVariableData = variableData;
+  return stored;
 }
 
 void moho::SetUnitUpdateReconFlags(SUnitVariableUpdateEntry* const entry, const std::int32_t reconFlags) noexcept
