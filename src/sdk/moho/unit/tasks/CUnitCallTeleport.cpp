@@ -458,6 +458,10 @@ namespace moho
 
   /**
    * Address: 0x00600EF0 (FUN_00600EF0, Moho::CUnitCallTeleport::~CUnitCallTeleport)
+   * Address: 0x00601070 (FUN_00601070, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears call-teleport state flags on the owner unit, removes transport
@@ -542,6 +546,10 @@ namespace moho
 
   /**
    * Address: 0x0060AEC0 (FUN_0060AEC0, Moho::CUnitTeleportTask::~CUnitTeleportTask)
+   * Address: 0x0060A890 (FUN_0060A890, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears unit teleport state, publishes dispatch result, restores motion

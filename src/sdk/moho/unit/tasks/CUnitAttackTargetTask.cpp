@@ -633,6 +633,10 @@ namespace moho
 
   /**
    * Address: 0x005F4160 (FUN_005F4160, Moho::CUnitAttackTargetTask::~CUnitAttackTargetTask)
+   * Address: 0x005F2940 (FUN_005F2940, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears attack-task unit/listener lanes, disables temporary weapon state,

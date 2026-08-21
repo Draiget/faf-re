@@ -681,6 +681,10 @@ namespace moho
 
   /**
    * Address: 0x005F6AC0 (FUN_005F6AC0, ??1CUnitMobileBuildTask@Moho@@QAE@@Z)
+   * Address: 0x005F6880 (FUN_005F6880, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears owner/build-unit state bits, commits dispatch result lane for

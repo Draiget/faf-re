@@ -595,6 +595,10 @@ namespace moho
 
   /**
    * Address: 0x006050F0 (FUN_006050F0, ??1CUnitCaptureTask@Moho@@QAE@@Z)
+   * Address: 0x00604120 (FUN_00604120, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Unlinks command/listener lanes, clears capture state from owner/target,

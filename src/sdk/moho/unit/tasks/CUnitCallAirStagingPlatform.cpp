@@ -313,6 +313,10 @@ namespace moho
 
   /**
    * Address: 0x00601950 (FUN_00601950, ??1CUnitCallAirStagingPlatform@Moho@@QAE@@Z)
+   * Address: 0x00601AA0 (FUN_00601AA0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * IDA signature:
    * void __thiscall Moho::CUnitCallAirStagingPlatform::~CUnitCallAirStagingPlatform(
