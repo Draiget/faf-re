@@ -1681,6 +1681,11 @@ namespace msvc8
          * pair at 0x005C5497, growth tail-calling the `_Insert_n` lane
          * FUN_005C6F90 at 0x005C54D1 with `(mLast, newSize - size())`, shrink
          * tail-calling `erase(begin() + newSize, end())` (FUN_005C6F00) at
+         * Address: 0x006DC4E0 (FUN_006DC4E0,
+         * msvc8::vector<Moho::EntityCategorySet>::resize for the 0x28-byte
+         * element -- growth through the `_Insert_n` lane FUN_006DC600, shrink
+         * through the destroy lane FUN_006DBB50. Reached from
+         * `RVectorType<EntityCategorySet>::SetCount` (0x006DB410).)
          * 0x005C54F6. Reached from `Moho::CReconBlipManagerImpl`'s per-army
          * table sizing.)
          * Address: 0x00547F20 (FUN_00547F20,
@@ -2550,6 +2555,12 @@ namespace msvc8
          *
          * Destroy [first,last)
          *
+         * Address: 0x006DEB80 (FUN_006DEB80,
+         * msvc8::vector<Moho::EntityCategorySet>::destroy_range -- for this
+         * element the destructor's whole job is releasing the bit-word
+         * fastvector, so the body rebinds each lane's words back to inline
+         * storage, freeing the heap block where one is active.)
+         * Address: 0x006DC5E0 (FUN_006DC5E0, register-shape adapter for FUN_006DEB80)
          * Address: 0x0085A1D0 (FUN_0085A1D0 — 0x10-byte element, the
          * formation-preview ghost pair; walks the span forward calling the
          * pair's destructor, FUN_00859E90, on each slot)
@@ -2615,6 +2626,15 @@ namespace msvc8
          * Address: 0x00549A50 (FUN_00549A50, register-shape adapter for FUN_00549BC0)
          * Address: 0x00549750 (FUN_00549750, source-first adapter for FUN_00549A90)
          * Address: 0x00549940 (FUN_00549940, source-first adapter for FUN_00549A90)
+         * Address: 0x006E0400 (FUN_006E0400,
+         * msvc8::vector<Moho::EntityCategorySet>::uninit_copy_n for the
+         * 0x28-byte element -- copy-constructs each `BVSet`, writing the
+         * universe handle and the bit-set first-word index, rebinding the
+         * embedded `fastvector_n<unsigned int, 2>` to its inline storage and
+         * copying the source words through `gpg::fastvector_uint::cpy`
+         * (0x004028E0). On a partial range it tears the in-flight slots down
+         * and rethrows, which is the strong guarantee this member already
+         * provides.)
          *
          * Uninitialized copy N from src to dst
          */
@@ -2757,6 +2777,17 @@ namespace msvc8
          *
          * Assign n elements from src to dst (dst already constructed)
          *
+         * Address: 0x006DE9F0 (FUN_006DE9F0, the `std::copy` emission for the
+         * 0x28-byte `Moho::EntityCategorySet` -- per-element `BVSet::operator=`,
+         * which copies the universe handle and first-word index and forwards the
+         * words to `gpg::fastvector_uint::cpy` at 0x004028E0)
+         * Address: 0x006DDA60 (FUN_006DDA60, register-shape adapter for FUN_006DE9F0)
+         * Address: 0x006DFAD0 (FUN_006DFAD0, the matching `std::copy_backward`
+         * emission -- same per-element assign, walked in reverse so an
+         * overlapping shift cannot corrupt the tail)
+         * Address: 0x006DDC50 (FUN_006DDC50, register-shape adapter for FUN_006DFAD0)
+         * Address: 0x006DEBF0 (FUN_006DEBF0, the same assign emitted a third
+         * time, bounded by the destination range rather than the source)
          * Address: 0x0085A9F0 (FUN_0085A9F0 — 0x10-byte element, the
          * formation-preview ghost pair; the single-slot shared-handle assign
          * the erase shift-down loop at FUN_0085A130 drives)
