@@ -61,31 +61,28 @@ namespace
    * returns formation-type lane `0` (surface), `1` (air), or `2` (mixed).
    */
   std::int32_t DetermineSelectionFormationType(
-    moho::SSelectionSetUserEntity* const selection
+    moho::WeakEntitySetUserEntity& selection
   ) noexcept
   {
     constexpr std::int32_t kFormationTypeSurface = 0;
     constexpr std::int32_t kFormationTypeAir = 1;
     constexpr std::int32_t kFormationTypeMixed = 2;
 
-    if (selection == nullptr || selection->mHead == nullptr) {
+    if (selection.mHead == nullptr) {
       return kFormationTypeSurface;
     }
 
-    moho::SSelectionSetUserEntity::FindResult cursor{};
-    selection->First(&cursor);
-    if (cursor.mRes == selection->mHead) {
+    moho::SSelectionNodeUserEntity* node = nullptr;
+    (void)moho::PruneTombstonesAndFindLive(selection, &node, selection.mHead->mLeft);
+    if (node == selection.mHead) {
       return kFormationTypeSurface;
     }
 
     bool hasAirUnits = false;
     bool hasSurfaceUnits = false;
 
-    moho::SSelectionSetUserEntity::Index iterator{};
-    iterator.mOwnerSet = selection;
-    iterator.mNode = cursor.mRes;
-    while (iterator.mNode != selection->mHead) {
-      moho::UserEntity* const entity = DecodeSelectionEntity(iterator.mNode->mEnt);
+    while (node != selection.mHead) {
+      moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
       moho::Unit* const unit = ResolveSelectionUnit(entity);
       if (unit != nullptr && unit->mCurrentLayer == moho::LAYER_Air) {
         hasAirUnits = true;
@@ -93,7 +90,8 @@ namespace
         hasSurfaceUnits = true;
       }
 
-      iterator.Next();
+      moho::SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)moho::PruneTombstonesAndFindLive(selection, &node, node);
     }
 
     if (!hasAirUnits) {
@@ -328,7 +326,7 @@ namespace moho
    */
   void CFormation::ChooseFormation(
     const Wm3::Vector3f& mouseWorldPos,
-    SSelectionSetUserEntity* const selection,
+    WeakEntitySetUserEntity& selection,
     const bool useLastQueuedDestination
   )
   {
@@ -339,8 +337,8 @@ namespace moho
     // deletes each tombstone it passes, matching the binary's fused
     // advance-then-erase loop).
     SSelectionNodeUserEntity* node = nullptr;
-    (void)selection->PruneTombstonesAndFindLive(&node, selection->mHead->mLeft);
-    while (node != selection->mHead) {
+    (void)PruneTombstonesAndFindLive(selection, &node, selection.mHead->mLeft);
+    while (node != selection.mHead) {
       UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
       UserUnit* const unit = (entity != nullptr) ? reinterpret_cast<UserUnit*>(entity) : nullptr;
 
@@ -372,7 +370,7 @@ namespace moho
       mStart.z += unitPosition.z;
 
       SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)selection->PruneTombstonesAndFindLive(&node, node);
+      (void)PruneTombstonesAndFindLive(selection, &node, node);
     }
 
     const std::int32_t participantCount = CountLiveUserEntityWeakSetEntriesAndPrune(mParticipants);
@@ -546,7 +544,7 @@ namespace moho
     }
 
     mReady = true;
-    ChooseFormation(mousePos, selection, useLastQueuedDestination);
+    ChooseFormation(mousePos, *selection, useLastQueuedDestination);
     Finalize();
   }
 } // namespace moho

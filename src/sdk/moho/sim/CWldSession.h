@@ -32,6 +32,7 @@ namespace moho
 
   class UserArmy;
   class UserUnit;
+  class CWldSession;
   struct SSyncData;
   struct UserCommandIssueHelper;
   // The `Moho::UserTarget` command-target payload (UserUnit.h). Only used
@@ -230,12 +231,39 @@ namespace moho
      */
     CommandModeData& operator=(const CommandModeData& other);
 
+    /**
+     * Address: 0x0081FCD0 (FUN_0081FCD0, Moho::SCommandModeData::HandleEvent)
+     *
+     * IDA signature:
+     * void __thiscall Moho::SCommandModeData::HandleEvent(
+     *     Moho::SCommandModeData *this, Moho::CWldSession *a2, char a3);
+     *
+     * What it does:
+     * The world-view command-mode dispatcher: turns one committed mouse
+     * gesture (the drag snapshot this object carries) into the actual
+     * `ISSUE_*` traffic for the session's current selection. 2167
+     * instructions, one arm per command mode and, inside `COMMOD_Order`, one
+     * arm per `ERuleBPUnitCommandCaps` value. See the definition in
+     * CWldSession.cpp for the per-arm breakdown.
+     *
+     * `isDragUpdate` is set by the caller when this event replaces a command
+     * this same drag already issued (the attack-drag re-target path): it
+     * enables the `ISSUE_RemoveLastCommand` + "Coordinated Attack!" cursor
+     * banner behaviour in the `RULEUCC_Attack` arm.
+     */
+    void HandleEvent(CWldSession& session, bool isDragUpdate);
+
     ECommandMode mMode;
     ERuleBPUnitCommandCaps mCommandCaps;
     void* mBlueprint;
     MouseInfo mMouseDragStart;
     MouseInfo mMouseDragEnd;
     std::int32_t mModifiers;
+    /// The command id of the order this drag is currently editing, or `-1`
+    /// when the drag has not re-targeted an existing order yet. Written as a
+    /// sentinel `-1` by the `(MouseInfo, modifiers)` constructor (0x0081CEA0)
+    /// and consumed as a `CmdId` by `HandleEvent`'s attack/move arms
+    /// (0x0081FEA0, 0x0082078B).
     std::int32_t mIsDragged;
     std::int32_t mReserved5C;
   };
@@ -626,6 +654,34 @@ namespace moho
 
   private:
     SSelectionSetUserEntity mSet{};
+  };
+
+  /**
+   * `ScopedLocalSelectionSet`'s `WeakSet<UserUnit>` sibling: the transient
+   * participant set `Moho::SCommandModeData::HandleEvent` (0x0081FCD0) builds
+   * on the stack before handing it to `CFormation::ChooseFormation`.
+   *
+   * The two instantiations are byte-identical (see `WeakUnitSetUserUnit`'s own
+   * doc comment), so the head sentinel/teardown reuse the shared helpers; only
+   * the C++ element type differs, which is what keeps `WeakSet<UserUnit>::Add`
+   * (0x00822270) apart from `WeakSet<UserEntity>::Add` (0x007AE1B0).
+   *
+   * Address: 0x007B25C0 (ctor emission) / 0x007B2530 (dtor emission).
+   */
+  class ScopedLocalUnitSet final
+  {
+  public:
+    ScopedLocalUnitSet() { InitWeakEntitySetHead(mSet); }
+    ~ScopedLocalUnitSet() { DestroyWeakEntitySet(mSet); }
+
+    ScopedLocalUnitSet(const ScopedLocalUnitSet&) = delete;
+    ScopedLocalUnitSet& operator=(const ScopedLocalUnitSet&) = delete;
+
+    [[nodiscard]] WeakUnitSetUserUnit& get() noexcept { return mSet; }
+    [[nodiscard]] const WeakUnitSetUserUnit& get() const noexcept { return mSet; }
+
+  private:
+    WeakUnitSetUserUnit mSet{};
   };
 
   /**
@@ -1645,10 +1701,11 @@ namespace moho
    * Address: 0x008B0730 (FUN_008B0730,
    * ?ISSUE_FactoryCommand@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@USSTICommandIssueData@1@_N@Z)
    *
-   * PART B / NOT YET WIRED: authored in CWldSession.cpp but not committed -
-   * its real callers (`Moho::SCommandModeData::HandleEvent`,
-   * `Moho::CUIWorldView::HandleEvent`) are still blocked. See the definition
-   * for the full doc comment and the one flagged low-confidence spot.
+   * What it does:
+   * Factory-queue counterpart of `ISSUE_Command`: routes the command into each
+   * unit's *factory* command queue instead of its primary one. Defined in
+   * CWldSession.cpp; invoked from `SCommandModeData::HandleEvent`'s
+   * rally-point/patrol/ferry arms.
    */
   void ISSUE_FactoryCommand(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData commandIssueData, bool clearQueue);
 
@@ -1656,11 +1713,30 @@ namespace moho
    * Address: 0x008B0B30 (FUN_008B0B30,
    * ?ISSUE_FactoryCommand@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@ABUSSTICommandIssueData@1@_N@Z)
    *
-   * PART B / NOT YET WIRED: see the fastvector overload above.
+   * What it does:
+   * Weak-set overload of the above: resolves the live `UserUnit*` lanes out of
+   * the selection and forwards to the `fastvector` overload.
    */
   void ISSUE_FactoryCommand(
     const SSelectionSetUserEntity& entities, const SSTICommandIssueData& commandIssueData, bool clearQueue
   );
+
+  /**
+   * Address: 0x008B0EB0 (FUN_008B0EB0)
+   * Mangled: ?ISSUE_DecreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::ISSUE_DecreaseCommandCount(
+   *     int a1@<ecx>, Moho::UserCommand *a2@<edi>, int a3@<esi>);
+   *
+   * What it does:
+   * Mirror of `ISSUE_IncreaseCommandCount`: marshals a `DecreaseCommandCount`
+   * for `helper`'s command id through the active sim driver and records the
+   * matching local decrease-count update event against the driver-returned
+   * cookie. Defined in Sim.cpp next to the rest of the command-issue
+   * event-queue lanes.
+   */
+  void ISSUE_DecreaseCommandCount(UserCommandIssueHelper* helper, int count);
 
   /**
    * Address: 0x008B0C80 (FUN_008B0C80)

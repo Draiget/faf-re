@@ -80,15 +80,23 @@ namespace moho
      * `0` when both are `-1`).
      *
      * `selection`'s decompiled `std::vector*` typing is a decompiler
-     * type-confusion (see the field doc on `mParticipants` above): it is really a
-     * `SSelectionSetUserEntity*` - the exact tree/node/weak-ref shape
-     * `ProcessMouse` (0x00838800) forwards in from its own `eax`-passed
-     * selection set, and the same shape `PruneTombstonesAndFindLive`/
-     * `Iterator_inc` (CWldSession.h) already operate on elsewhere.
+     * type-confusion (see the field doc on `mParticipants` above). It is the
+     * shared 12-byte `{allocProxy, mHead, mSize}` weak-set header, and the two
+     * call sites in the binary hand in *different* instantiations of it:
+     *   - `CFormation::ProcessMouse` (0x00838800) forwards the session's
+     *     `WeakSet<UserEntity>` selection straight through;
+     *   - `Moho::SCommandModeData::HandleEvent` (0x0081FCD0, CWldSession.cpp)
+     *     and `sub_870310` build a transient `WeakSet<UserUnit>` first
+     *     (`WeakSet<UserUnit>::Add` 0x00822270 / `CWldSession::GetSelectionUnits`
+     *     0x00896000) and hand that in instead.
+     * The body only ever touches the shared header (`sub_7B29C0`
+     * `PruneTombstonesAndFindLive`, `sub_7B4D90` iterator-inc, `sub_7B30D0`
+     * tombstone erase), so the parameter is typed as the common base rather
+     * than as either derived set.
      */
     void ChooseFormation(
       const Wm3::Vector3f& mouseWorldPos,
-      SSelectionSetUserEntity* selection,
+      WeakEntitySetUserEntity& selection,
       bool useLastQueuedDestination
     );
 

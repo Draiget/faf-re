@@ -29461,6 +29461,35 @@ void SimTypeInfo::Init()
 namespace moho
 {
   /**
+   * Address: 0x008B0EB0 (FUN_008B0EB0)
+   * Mangled: ?ISSUE_DecreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::ISSUE_DecreaseCommandCount(
+   *     int a1@<ecx>, Moho::UserCommand *a2@<edi>, int a3@<esi>);
+   *
+   * What it does:
+   * Marshals a `DecreaseCommandCount` for `helper`'s own command id through the
+   * active sim driver (`sSimDriver`, vtable +0x70 at 0x008B0EBC), then records
+   * the matching local decrease-count update event against the *cookie the
+   * driver returned* - not the input command id - exactly as
+   * `cfunc_DeleteCommandL` (0x00843FA0) does for the Lua-facing path. The
+   * binary dereferences the driver global without a null test.
+   *
+   * `Moho::UserCommand*` is the mangled parameter type; the object is the
+   * command-issue helper (`[helper+0x04]` is `mConstantData.cmd`, and the
+   * update event is appended to the helper's own local ring queue).
+   */
+  void ISSUE_DecreaseCommandCount(UserCommandIssueHelper* const helper, const int count)
+  {
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    const CmdId resultCookie = simDriver->DecreaseCommandCount(helper->mConstantData.cmd, count);
+    QueueCommandIssueDecreaseCountEvent(
+      reinterpret_cast<CommandIssueHelperRuntimeView&>(*helper), resultCookie, count
+    );
+  }
+
+  /**
    * Address: 0x008B0180 (FUN_008B0180)
    * Mangled: ?ISSUE_Command@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@USSTICommandIssueData@1@_N@Z
    *
