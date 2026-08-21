@@ -9435,16 +9435,10 @@ moho::CUIWorldViewBuildDragRuntimeView::~CUIWorldViewBuildDragRuntimeView()
  */
 void moho::CUIWorldViewBuildDragRuntimeView::ClearBuildPreviewCache()
 {
-  // Drain mMeshes via the shared-pair vector erase helper so the linker keeps
-  // the out-of-line `vector<shared_ptr<MeshInstance>>::erase(first, last)`
-  // emission referenced from this site (FUN_008555E0).
-  {
-    auto& meshesView = msvc8::AsVectorRuntimeView(mMeshes);
-    auto* const firstPair = reinterpret_cast<boost::SharedCountPair*>(meshesView.begin);
-    auto* const lastPair = reinterpret_cast<boost::SharedCountPair*>(meshesView.end);
-    auto** const liveTailSlot = reinterpret_cast<boost::SharedCountPair**>(&meshesView.end);
-    (void)boost::EraseSharedPairVectorRange(liveTailSlot, firstPair, lastPair);
-  }
+  // Drain mMeshes. FUN_008555E0 is this container's own
+  // `erase(first, last)` emission -- releasing each shared control block as it
+  // goes -- so calling erase by name is what keeps that symbol referenced.
+  (void)mMeshes.erase(mMeshes.begin(), mMeshes.end());
 
   // mBlueprints holds trivially-destructible raw pointers, so the binary
   // collapses the live range with a single `_Mylast = _Myfirst` store.
@@ -26622,13 +26616,9 @@ namespace
   void DeleteRangeBuildQueueItems(FactoryQueueItem* begin, FactoryQueueItem* const end)
   {
     while (begin != end) {
-      auto& commandLanes = msvc8::AsVectorRuntimeView(begin->commands);
-      if (commandLanes.begin != nullptr) {
-        ::operator delete(commandLanes.begin);
-      }
-      commandLanes.begin = nullptr;
-      commandLanes.end = nullptr;
-      commandLanes.capacityEnd = nullptr;
+      // Free the row's command-id buffer and null all three lanes: _Tidy().
+      // The element is trivially destructible, so there is no per-element pass.
+      begin->commands = decltype(begin->commands){};
 
       if (begin->blueprintId.myRes >= 0x10u) {
         ::operator delete(begin->blueprintId.bx.ptr);
