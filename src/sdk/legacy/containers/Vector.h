@@ -2106,6 +2106,37 @@ namespace msvc8
          * push_back (FUN_00940230). Emitted via vec->push_back(source) in
          * gpg::gal::PushBackEffectMacroIntoLane (ContextInterfaces.cpp:266), whose
          * owner lane is EffectContext's macro vector at +0x54)
+         * Address: 0x007F1D50 (FUN_007F1D50, msvc8::vector<moho::SRangeExtractionPayload>::_Insert_n
+         * grow lane for the 0x10-byte `{centerX,centerZ,innerRadius,outerRadius}` element
+         * (`sar 4` stride, max_size 0xFFFFFFF = 0xFFFFFFFF/16 at 0x007F1DB0, overflow
+         * throw through FUN_007F1F90, which raises `std::length_error("vector<T> too
+         * long")`). `_Count` is folded to the constant 1 (`cmp esi,ecx` against
+         * `size+1` at 0x007F1DD4) because its only reachable caller is a
+         * single-element append lane: MSVC8's push_back tail-calls it at 0x007F036A
+         * on the capacity-full path (FUN_007F0310, recovered as
+         * AppendRangeExtractionPayload). The value's four floats are copied into a
+         * local `_Tmp` by the dword-move block at 0x007F1D6B-0x007F1D8F up front, so
+         * reallocation cannot invalidate the source. In-place growth splits the
+         * generic tail-shift into two binary calls for the count=1 case: FUN_007F3500
+         * (tail-calling the forward-copy primitive FUN_007F3EF0 to move the single
+         * trailing element into the newly uninitialized slot past `mLast`), then
+         * FUN_007F3560 (a backward per-element copy shifting the remaining
+         * `[pos, mLast-0x10)` run right by one slot); FUN_007F3530 then fills the
+         * vacated slot at `pos` from `_Tmp`. The pure-append case (`pos == mLast`)
+         * instead reaches FUN_007F0D20, which tail-calls the fill primitive
+         * FUN_007F39B0 to write `_Tmp` directly at `mLast`. Reallocation allocates via
+         * FUN_007F3590 (`operator new(16 * newCap)`, guarded by an
+         * `0xFFFFFFFF / newCap < 0x10` overflow check) and moves the head/gap/tail
+         * spans through the same FUN_007F3EF0 (copy) / FUN_007F39B0 (fill) primitives.
+         * A second code xref into this function's body at 0x007F0C39 sits inside an
+         * unexported `insert(iterator, value)` overload (0x007F0C10-0x007F0C49:
+         * computes the insert offset as an index, delegates here, then rebinds the
+         * returned iterator against the possibly-reallocated `first_`) -- that
+         * wrapper itself has zero callers anywhere in the shipped binary (verified by
+         * an exhaustive `call rel32` / `jmp rel32` / short-`jcc` / raw-pointer scan of
+         * every section, not just `.text`), so it is a dead template instantiation
+         * and is not wired into recovered source; only the push_back caller chain
+         * above is load-bearing)
          * Address: 0x006DBAE0 (FUN_006DBAE0, msvc8::vector<moho::EntityCategorySet>::insert
          * single-value lane — `insert(end(), 1, val)` for the 0x28-byte element. Computes
          * the insert offset twice with the 66666667h/`sar 4` magic pair (0x006DBAF8 and
@@ -2298,6 +2329,13 @@ namespace msvc8
         /**
          * Address: 0x006DEA30 (FUN_006DEA30, msvc8::vector<moho::EntityCategorySet>::uninit_fill_n
          * — reallocation fill-n-with-copy path of push_back for the 0x28-byte element)
+         * Address: 0x007F39B0 (FUN_007F39B0, msvc8::vector<moho::SRangeExtractionPayload>::
+         * uninit_fill_n for the 0x10-byte trivially-copyable element -- a plain
+         * count-driven dword-quad fill loop (`for(;count;--count,dst+=4) copy 4 dwords
+         * from the fixed source`). Used by the `_Insert_n` grow lane FUN_007F1D50
+         * (cited above on `insert`) both to fill the reallocated buffer's one-element
+         * gap and, via the pure-append dispatcher FUN_007F0D20, to write the new
+         * element directly at `mLast` when there is no tail to shift)
          *
          * Uninitialized fill N with value starting at dst
          */
@@ -2312,6 +2350,15 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x007F3EF0 (FUN_007F3EF0, msvc8::vector<moho::SRangeExtractionPayload>::
+         * uninit_move_n for the 0x10-byte trivially-copyable element -- a plain
+         * forward per-element dword-quad copy loop (`for(;src!=srcEnd;++dst,src+=4)
+         * copy 4 dwords`, no destroy pass since the element is POD). Used by the
+         * `_Insert_n` grow lane FUN_007F1D50 (cited above on `insert`) both to move
+         * the single trailing element past `mLast` on the in-place path (via the
+         * count=1 dispatcher FUN_007F3500) and to move the head/tail spans into the
+         * reallocated buffer)
+         *
          * Uninitialized move (or copy if non-movable) N elements src->dst.
          * Used by `insert(pos, count, value)` to shift the tail and to
          * populate the reallocated buffer's head/tail spans.
