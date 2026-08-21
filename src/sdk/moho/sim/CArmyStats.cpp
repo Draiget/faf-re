@@ -638,6 +638,16 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x00592E50 (FUN_00592E50, sub_592E50)
+   *
+   * What it does:
+   * Standard red-black left rotation on `node`: promotes `node->right`,
+   * relinking the pivoted subtree, the pivot's old left child, and the
+   * root/parent-child link (asm-verified instruction-by-instruction against
+   * FUN_00592E50.asm; the `isNil` check reads offset 0x2D, matching
+   * `ArmyNameIndexNode::isNil`).
+   */
   void RotateNameIndexLeft(moho::ArmyNameIndexTree* tree, moho::ArmyNameIndexNode* node)
   {
     moho::ArmyNameIndexNode* const head = tree->head;
@@ -660,6 +670,14 @@ namespace
     node->parent = pivot;
   }
 
+  /**
+   * Address: 0x00592EE0 (FUN_00592EE0, sub_592EE0)
+   *
+   * What it does:
+   * Standard red-black right rotation on `node` (mirror image of
+   * `RotateNameIndexLeft`), asm-verified instruction-by-instruction against
+   * FUN_00592EE0.asm.
+   */
   void RotateNameIndexRight(moho::ArmyNameIndexTree* tree, moho::ArmyNameIndexNode* node)
   {
     moho::ArmyNameIndexNode* const head = tree->head;
@@ -682,6 +700,20 @@ namespace
     node->parent = pivot;
   }
 
+  /**
+   * Address: 0x00594F80 (FUN_00594F80, std::map<std::string,Moho::CArmyStatItem*>'s
+   * `_Tree::_Insert` node-buy-and-link-and-rebalance body -- allocates/links
+   * the new node at the descended insertion point (calling the recovered
+   * copy-ctor-based node allocation this file already uses for `new
+   * moho::ArmyNameIndexNode{}`), then runs the identical red-black
+   * insert-fixup loop below via `RotateNameIndexLeft`/`RotateNameIndexRight`
+   * (FUN_00592E50/FUN_00592EE0))
+   *
+   * What it does:
+   * Standard CLR-style red-black insert fixup: while the inserted node's
+   * parent is red, recolor through the uncle or rotate to restore the
+   * red-black invariants, then force the root black.
+   */
   void FixupAfterNameIndexInsert(moho::ArmyNameIndexTree* const tree, moho::ArmyNameIndexNode* node)
   {
     moho::ArmyNameIndexNode* const head = tree->head;
@@ -737,6 +769,31 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x00594E70 (FUN_00594E70, std::map<std::string,Moho::CArmyStatItem*>'s
+   * `_Tree::_Insert` descent-and-duplicate-check body -- descends by key
+   * comparison (`CompareNameIndexKey`), consulting the predecessor via
+   * FUN_005952C0 when the descent doesn't land on the tree's cached minimum,
+   * then calls FUN_00594F80 to buy/link/rebalance a new node on a miss)
+   * Address: 0x00594C90 (FUN_00594C90, `std::map_string_CArmyStatItem_P::insert`
+   * -- pair<iterator,bool> wrapper around FUN_00594E70)
+   * Address: 0x00594B10 (FUN_00594B10, `std::map_string_CArmyStatItem_P::operator[]`
+   * -- `_Lbound`-then-equality-check wrapper that inserts a default-constructed
+   * mapped value on a miss and returns a reference to the slot)
+   *
+   * What it does:
+   * `std::map<std::string,CArmyStatItem*>::insert`/`operator[]` combined:
+   * finds the node for `statPath`, updating its value in place if present,
+   * otherwise inserting a new node with `value` and rebalancing. The real
+   * binary factors this into a separate descent (FUN_00594E70) and a
+   * buy-and-rebalance call (FUN_00594F80) reached only on a miss, plus a
+   * predecessor lookahead (FUN_005952C0) that is a pure performance
+   * micro-optimization of the same textbook BST insert-position search; this
+   * recovery's single-pass descent produces the identical final tree state.
+   * `GetItem` (0x005945E0) calls the real `operator[]` then assigns through
+   * the returned reference (`*operator[](key) = value`); calling this
+   * function with `value` directly achieves the same net effect.
+   */
   void InsertOrAssignNameIndexNode(
     moho::ArmyNameIndexTree* const tree, const msvc8::string& statPath, moho::CArmyStatItem* const value
   )
