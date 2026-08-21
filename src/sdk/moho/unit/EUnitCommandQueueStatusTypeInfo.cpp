@@ -56,6 +56,12 @@ namespace moho
 
   /**
    * Address: 0x00BFEEA0 (FUN_00BFEEA0, Moho::EUnitCommandQueueStatusTypeInfo::dtr)
+   * Address: 0x006EDA60 (FUN_006EDA60, scalar-deleting destructor,
+   * VTABLE_CONFIRMED via `??_7EUnitCommandQueueStatusTypeInfo@Moho@@6B@`)
+   *
+   * The scalar-deleting wrapper is ordinary C++ `delete` semantics
+   * (`~EUnitCommandQueueStatusTypeInfo(); if (deleteFlag & 1) operator delete(this);`),
+   * not modeled as a separate function.
    */
   EUnitCommandQueueStatusTypeInfo::~EUnitCommandQueueStatusTypeInfo() = default;
 
