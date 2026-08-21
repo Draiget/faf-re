@@ -269,28 +269,24 @@ namespace
     const std::size_t elementCount
   ) noexcept
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
+    // VC8 _Buy(n): drop to empty, then reserve exactly n. reserve() on an
+    // empty vector is one exact-size allocation with mLast == mFirst, which
+    // is what the binary's three lane writes produce.
+    storage = msvc8::vector<moho::SBlackListInfo>{};
     if (elementCount == 0u) {
-      view.begin = nullptr;
-      view.end = nullptr;
-      view.capacityEnd = nullptr;
       return true;
     }
 
-    if (elementCount > (static_cast<std::size_t>(-1) / sizeof(moho::SBlackListInfo))) {
+    if (elementCount > msvc8::vector<moho::SBlackListInfo>::max_size()) {
       return false;
     }
 
-    void* rawStorage = nullptr;
     try {
-      rawStorage = ::operator new(sizeof(moho::SBlackListInfo) * elementCount);
+      storage.reserve(elementCount);
     } catch (...) {
       return false;
     }
 
-    view.begin = static_cast<moho::SBlackListInfo*>(rawStorage);
-    view.end = view.begin;
-    view.capacityEnd = view.begin + elementCount;
     return true;
   }
 
@@ -322,6 +318,16 @@ namespace
    * Assigns one `vector<SBlackListInfo>` lane with explicit weak-entity
    * relink/unlink semantics, reusing destination storage whenever capacity
    * permits and preserving intrusive owner-chain integrity.
+   
+   *
+   * NOTE: this lane still opens a runtime view, deliberately. It is not a
+   * plain operator= -- every element transition has to unlink the previous
+   * occupant from its owner chain through UnlinkBlacklistWeakEntityRange,
+   * because SBlackListInfo's destructor is trivial and the container will
+   * not do it. The reserve-then-manually-fill-then-publish-the-size shape
+   * that needs has no public container primitive. It is also currently
+   * unreferenced; resolving that orphan is a separate question from the
+   * runtime-view sweep.
    */
   [[maybe_unused]] [[nodiscard]] msvc8::vector<moho::SBlackListInfo>& AssignBlacklistInfoVectorPreservingWeakLinks(
     msvc8::vector<moho::SBlackListInfo>& destination,
