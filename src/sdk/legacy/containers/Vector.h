@@ -1857,6 +1857,25 @@ namespace msvc8
         }
 
         /**
+         * Publishes one already-constructed slot past `mLast` without running a
+         * constructor.
+         *
+         * The mirror of `pop_back_no_destroy`, for the other half of the same
+         * binary idiom: several recovered lanes reserve exact capacity, fill
+         * the reserved slots through a per-type uninitialised-copy helper, and
+         * then advance `_Mylast` with a bare store to publish the new size (see
+         * the factory build-queue publish path at 0x00836DBF/0x00836DEC).
+         * Running `T()` here would overwrite what the fill just built.
+         *
+         * The caller is responsible for having constructed the slot; capacity
+         * must already cover it.
+         */
+        void push_back_no_construct() noexcept {
+            assert(last_ != end_);
+            ++last_;
+        }
+
+        /**
          * Assign from raw pointer + count (deep copy)
          */
         void assign(const T* src, std::size_t n) {
