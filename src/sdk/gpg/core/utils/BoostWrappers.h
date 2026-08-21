@@ -2136,6 +2136,22 @@ namespace boost
     ) noexcept;
 
     /**
+     * Address: 0x005791D0 (FUN_005791D0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::dispose)
+     *
+     * What it does:
+     * Deletes one owned `CHeightField` pointee bound to this shared-count
+     * control lane when present. The compiler re-inlined
+     * `CHeightField::~CHeightField()` (0x004784F0 / 0x00478420) directly into
+     * this dispose call site instead of calling out to it, then appended
+     * `operator delete(this)` -- that fused body is a distinct address,
+     * 0x00579250 (FUN_00579250), which `delete countedImpl->px` below
+     * reproduces behaviorally through the real recovered destructor.
+     */
+    void SpCountedImplPDisposeCHeightField(
+        SpCountedImplStorage<moho::CHeightField>* countedImpl
+    ) noexcept;
+
+    /**
      * Address: 0x005CC7E0 (FUN_005CC7E0, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::dispose)
      *
      * What it does:
@@ -2353,6 +2369,18 @@ namespace boost
      */
     void SpCountedImplPdDestroyCAniDefaultSkelFunctionDeleter(
         SpCountedImplStorage<void>* self
+    ) noexcept;
+
+    /**
+     * Address: 0x0054EDD0 (FUN_0054EDD0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::get_deleter)
+     *
+     * What it does:
+     * Returns the stored raw-function deleter lane at offset `+0x10` when the
+     * queried `type_info` matches `void (__cdecl *)(void *)`.
+     */
+    [[nodiscard]] void* SpCountedImplPdGetDeleterCAniDefaultSkelFunctionDeleter(
+        SpCountedImplStorage<void>* countedImpl,
+        detail::sp_typeinfo const& requestedType
     ) noexcept;
 
     /**
