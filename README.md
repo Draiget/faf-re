@@ -18,9 +18,9 @@ Progress DB status breakdown:
 - `skip`: `6,119` (9.40%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
 - `external_dependency`: `5,438` (8.35%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
-- `needs_evidence`: `409` (0.61%)
+- `needs_evidence`: `408` (0.61%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `1,741` (2.59%)**
+- **`blocked`: `1,742` (2.59%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
   - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,150`*
   - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,150`*
