@@ -88645,6 +88645,555 @@ namespace moho::runtime
   {
     return ::CreateBitmap(nWidth, nHeight, nPlanes, nBitCount, lpBits);
   }
+  /**
+   * Address: 0x00A81CAC (FUN_00A81CAC, CreateCompatibleDC)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateCompatibleDC`.
+   */
+  HDC ThunkCreateCompatibleDC(HDC hdc)
+  {
+    return ::CreateCompatibleDC(hdc);
+  }
+
+  /**
+   * Address: 0x00A81CB2 (FUN_00A81CB2, GetTextMetricsW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetTextMetricsW`.
+   */
+  BOOL ThunkGetTextMetricsW(HDC hdc, LPTEXTMETRICW lptm)
+  {
+    return ::GetTextMetricsW(hdc, lptm);
+  }
+
+  /**
+   * Address: 0x00A81CB8 (FUN_00A81CB8, GetKerningPairsW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetKerningPairsW`.
+   */
+  DWORD ThunkGetKerningPairsW(HDC hdc, const DWORD nPairs, LPKERNINGPAIR lpKernPair)
+  {
+    return ::GetKerningPairsW(hdc, nPairs, lpKernPair);
+  }
+
+  /**
+   * Address: 0x00A81CBE (FUN_00A81CBE, SetTextAlign)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetTextAlign`.
+   */
+  UINT ThunkSetTextAlign(HDC hdc, const UINT align)
+  {
+    return ::SetTextAlign(hdc, align);
+  }
+
+  /**
+   * Address: 0x00A81CC4 (FUN_00A81CC4, SetBkColor)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetBkColor`.
+   */
+  COLORREF ThunkSetBkColor(HDC hdc, const COLORREF color)
+  {
+    return ::SetBkColor(hdc, color);
+  }
+
+  /**
+   * Address: 0x00A81CCA (FUN_00A81CCA, CreateFontA)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateFontA`.
+   */
+  HFONT ThunkCreateFontA(const int cHeight, const int cWidth, const int cEscapement, const int cOrientation, const int cWeight, const DWORD bItalic, const DWORD bUnderline, const DWORD bStrikeOut, const DWORD iCharSet, const DWORD iOutPrecision, const DWORD iClipPrecision, const DWORD iQuality, const DWORD iPitchAndFamily, LPCSTR pszFaceName)
+  {
+    return ::CreateFontA(cHeight, cWidth, cEscapement, cOrientation, cWeight, bItalic, bUnderline, bStrikeOut, iCharSet, iOutPrecision, iClipPrecision, iQuality, iPitchAndFamily, pszFaceName);
+  }
+
+  /**
+   * Address: 0x00A81CD0 (FUN_00A81CD0, GetStockObject)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetStockObject`.
+   */
+  HGDIOBJ ThunkGetStockObject(const int i)
+  {
+    return ::GetStockObject(i);
+  }
+
+  /**
+   * Address: 0x00A81CD6 (FUN_00A81CD6, SelectObject)
+   *
+   * What it does:
+   * Import thunk that forwards to `SelectObject`.
+   */
+  HGDIOBJ ThunkSelectObject(HDC hdc, HGDIOBJ h)
+  {
+    return ::SelectObject(hdc, h);
+  }
+
+  /**
+   * Address: 0x00A81CDC (FUN_00A81CDC, SetTextColor)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetTextColor`.
+   */
+  COLORREF ThunkSetTextColor(HDC hdc, const COLORREF color)
+  {
+    return ::SetTextColor(hdc, color);
+  }
+
+  /**
+   * Address: 0x00A81CE2 (FUN_00A81CE2, GetPixel)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetPixel`.
+   */
+  COLORREF ThunkGetPixel(HDC hdc, const int x, const int y)
+  {
+    return ::GetPixel(hdc, x, y);
+  }
+
+  /**
+   * Address: 0x00A81CE8 (FUN_00A81CE8, AddFontMemResourceEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `AddFontMemResourceEx`.
+   */
+  HANDLE ThunkAddFontMemResourceEx(PVOID pFileView, const DWORD cjSize, PVOID pvResrved, DWORD *pNumFonts)
+  {
+    return ::AddFontMemResourceEx(pFileView, cjSize, pvResrved, pNumFonts);
+  }
+
+  /**
+   * Address: 0x00A81CEE (FUN_00A81CEE, CreateDIBSection)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDIBSection`.
+   */
+  HBITMAP ThunkCreateDIBSection(HDC hdc, const BITMAPINFO *pbmi, const UINT usage, void **ppvBits, HANDLE hSection, const DWORD offset)
+  {
+    return ::CreateDIBSection(hdc, pbmi, usage, ppvBits, hSection, offset);
+  }
+
+  /**
+   * Address: 0x00A81CF4 (FUN_00A81CF4, GdiFlush)
+   *
+   * What it does:
+   * Import thunk that forwards to `GdiFlush`.
+   */
+  BOOL ThunkGdiFlush()
+  {
+    return ::GdiFlush();
+  }
+
+  /**
+   * Address: 0x00A81CFA (FUN_00A81CFA, GetTextExtentPointW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetTextExtentPointW`.
+   */
+  BOOL ThunkGetTextExtentPointW(HDC hdc, LPCWSTR lpString, const int c, LPSIZE lpsz)
+  {
+    return ::GetTextExtentPointW(hdc, lpString, c, lpsz);
+  }
+
+  /**
+   * Address: 0x00A81D00 (FUN_00A81D00, RealizePalette)
+   *
+   * What it does:
+   * Import thunk that forwards to `RealizePalette`.
+   */
+  UINT ThunkRealizePalette(HDC hdc)
+  {
+    return ::RealizePalette(hdc);
+  }
+
+  /**
+   * Address: 0x00A81D06 (FUN_00A81D06, SelectPalette)
+   *
+   * What it does:
+   * Import thunk that forwards to `SelectPalette`.
+   */
+  HPALETTE ThunkSelectPalette(HDC hdc, HPALETTE hPal, const BOOL bForceBkgd)
+  {
+    return ::SelectPalette(hdc, hPal, bForceBkgd);
+  }
+
+  /**
+   * Address: 0x00A81D0C (FUN_00A81D0C, CreateRectRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateRectRgn`.
+   */
+  HRGN ThunkCreateRectRgn(const int x1, const int y1, const int x2, const int y2)
+  {
+    return ::CreateRectRgn(x1, y1, x2, y2);
+  }
+
+  /**
+   * Address: 0x00A81D12 (FUN_00A81D12, SetMapMode)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetMapMode`.
+   */
+  int ThunkSetMapMode(HDC hdc, const int iMode)
+  {
+    return ::SetMapMode(hdc, iMode);
+  }
+
+  /**
+   * Address: 0x00A81D18 (FUN_00A81D18, CreateSolidBrush)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateSolidBrush`.
+   */
+  HBRUSH ThunkCreateSolidBrush(const COLORREF color)
+  {
+    return ::CreateSolidBrush(color);
+  }
+
+  /**
+   * Address: 0x00A81D1E (FUN_00A81D1E, CreateFontIndirectW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateFontIndirectW`.
+   */
+  HFONT ThunkCreateFontIndirectW(const LOGFONTW *lplf)
+  {
+    return ::CreateFontIndirectW(lplf);
+  }
+
+  /**
+   * Address: 0x00A81D24 (FUN_00A81D24, GetDeviceCaps)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetDeviceCaps`.
+   */
+  int ThunkGetDeviceCaps(HDC hdc, const int index)
+  {
+    return ::GetDeviceCaps(hdc, index);
+  }
+
+  /**
+   * Address: 0x00A81D2A (FUN_00A81D2A, GetObjectW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetObjectW`.
+   */
+  int ThunkGetObjectW(HANDLE h, const int c, LPVOID pv)
+  {
+    return ::GetObjectW(h, c, pv);
+  }
+
+  /**
+   * Address: 0x00A81D30 (FUN_00A81D30, DeleteDC)
+   *
+   * What it does:
+   * Import thunk that forwards to `DeleteDC`.
+   */
+  BOOL ThunkDeleteDC(HDC hdc)
+  {
+    return ::DeleteDC(hdc);
+  }
+
+  /**
+   * Address: 0x00A81D36 (FUN_00A81D36, GetDIBits)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetDIBits`.
+   */
+  int ThunkGetDIBits(HDC hdc, HBITMAP hbm, const UINT start, const UINT cLines, LPVOID lpvBits, LPBITMAPINFO lpbmi, const UINT usage)
+  {
+    return ::GetDIBits(hdc, hbm, start, cLines, lpvBits, lpbmi, usage);
+  }
+
+  /**
+   * Address: 0x00A81D3C (FUN_00A81D3C, BitBlt)
+   *
+   * What it does:
+   * Import thunk that forwards to `BitBlt`.
+   */
+  BOOL ThunkBitBlt(HDC hdc, const int x, const int y, const int cx, const int cy, HDC hdcSrc, const int x1, const int y1, const DWORD rop)
+  {
+    return ::BitBlt(hdc, x, y, cx, cy, hdcSrc, x1, y1, rop);
+  }
+
+  /**
+   * Address: 0x00A81D42 (FUN_00A81D42, GetPaletteEntries)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetPaletteEntries`.
+   */
+  UINT ThunkGetPaletteEntries(HPALETTE hpal, const UINT iStart, const UINT cEntries, LPPALETTEENTRY pPalEntries)
+  {
+    return ::GetPaletteEntries(hpal, iStart, cEntries, pPalEntries);
+  }
+
+  /**
+   * Address: 0x00A81D48 (FUN_00A81D48, CreateCompatibleBitmap)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateCompatibleBitmap`.
+   */
+  HBITMAP ThunkCreateCompatibleBitmap(HDC hdc, const int cx, const int cy)
+  {
+    return ::CreateCompatibleBitmap(hdc, cx, cy);
+  }
+
+  /**
+   * Address: 0x00A81D4E (FUN_00A81D4E, StretchDIBits)
+   *
+   * What it does:
+   * Import thunk that forwards to `StretchDIBits`.
+   */
+  int ThunkStretchDIBits(HDC hdc, const int xDest, const int yDest, const int DestWidth, const int DestHeight, const int xSrc, const int ySrc, const int SrcWidth, const int SrcHeight, const void *lpBits, const BITMAPINFO *lpbmi, const UINT iUsage, const DWORD rop)
+  {
+    return ::StretchDIBits(hdc, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight, lpBits, lpbmi, iUsage, rop);
+  }
+
+  /**
+   * Address: 0x00A81D54 (FUN_00A81D54, SetDIBitsToDevice)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetDIBitsToDevice`.
+   */
+  int ThunkSetDIBitsToDevice(HDC hdc, const int xDest, const int yDest, const DWORD w, const DWORD h, const int xSrc, const int ySrc, const UINT StartScan, const UINT cLines, const void *lpvBits, const BITMAPINFO *lpbmi, const UINT ColorUse)
+  {
+    return ::SetDIBitsToDevice(hdc, xDest, yDest, w, h, xSrc, ySrc, StartScan, cLines, lpvBits, lpbmi, ColorUse);
+  }
+
+  /**
+   * Address: 0x00A81D5A (FUN_00A81D5A, GetBitmapBits)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetBitmapBits`.
+   */
+  LONG ThunkGetBitmapBits(HBITMAP hbit, const LONG cb, LPVOID lpvBits)
+  {
+    return ::GetBitmapBits(hbit, cb, lpvBits);
+  }
+
+  /**
+   * Address: 0x00A81D60 (FUN_00A81D60, ExtCreateRegion)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExtCreateRegion`.
+   */
+  HRGN ThunkExtCreateRegion(const XFORM *lpx, const DWORD nCount, const RGNDATA *lpData)
+  {
+    return ::ExtCreateRegion(lpx, nCount, lpData);
+  }
+
+  /**
+   * Address: 0x00A81D66 (FUN_00A81D66, GetRegionData)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetRegionData`.
+   */
+  DWORD ThunkGetRegionData(HRGN hrgn, const DWORD nCount, LPRGNDATA lpRgnData)
+  {
+    return ::GetRegionData(hrgn, nCount, lpRgnData);
+  }
+
+  /**
+   * Address: 0x00A81D6C (FUN_00A81D6C, CreatePolygonRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreatePolygonRgn`.
+   */
+  HRGN ThunkCreatePolygonRgn(const POINT *pptl, const int cPoint, const int iMode)
+  {
+    return ::CreatePolygonRgn(pptl, cPoint, iMode);
+  }
+
+  /**
+   * Address: 0x00A81D72 (FUN_00A81D72, CombineRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `CombineRgn`.
+   */
+  int ThunkCombineRgn(HRGN hrgnDst, HRGN hrgnSrc1, HRGN hrgnSrc2, const int iMode)
+  {
+    return ::CombineRgn(hrgnDst, hrgnSrc1, hrgnSrc2, iMode);
+  }
+
+  /**
+   * Address: 0x00A81D78 (FUN_00A81D78, GetRgnBox)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetRgnBox`.
+   */
+  int ThunkGetRgnBox(HRGN hrgn, LPRECT lprc)
+  {
+    return ::GetRgnBox(hrgn, lprc);
+  }
+
+  /**
+   * Address: 0x00A81D7E (FUN_00A81D7E, PtInRegion)
+   *
+   * What it does:
+   * Import thunk that forwards to `PtInRegion`.
+   */
+  BOOL ThunkPtInRegion(HRGN hrgn, const int x, const int y)
+  {
+    return ::PtInRegion(hrgn, x, y);
+  }
+
+  /**
+   * Address: 0x00A81D84 (FUN_00A81D84, RectInRegion)
+   *
+   * What it does:
+   * Import thunk that forwards to `RectInRegion`.
+   */
+  BOOL ThunkRectInRegion(HRGN hrgn, const RECT *lprect)
+  {
+    return ::RectInRegion(hrgn, lprect);
+  }
+
+  /**
+   * Address: 0x00A81D8A (FUN_00A81D8A, OffsetRgn)
+   *
+   * What it does:
+   * Import thunk that forwards to `OffsetRgn`.
+   */
+  int ThunkOffsetRgn(HRGN hrgn, const int x, const int y)
+  {
+    return ::OffsetRgn(hrgn, x, y);
+  }
+
+  /**
+   * Address: 0x00A81D90 (FUN_00A81D90, CreatePalette)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreatePalette`.
+   */
+  HPALETTE ThunkCreatePalette(const LOGPALETTE *plpal)
+  {
+    return ::CreatePalette(plpal);
+  }
+
+  /**
+   * Address: 0x00A81D96 (FUN_00A81D96, GetNearestPaletteIndex)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetNearestPaletteIndex`.
+   */
+  UINT ThunkGetNearestPaletteIndex(HPALETTE h, const COLORREF color)
+  {
+    return ::GetNearestPaletteIndex(h, color);
+  }
+
+  /**
+   * Address: 0x00A81D9C (FUN_00A81D9C, SetBkMode)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetBkMode`.
+   */
+  int ThunkSetBkMode(HDC hdc, const int mode)
+  {
+    return ::SetBkMode(hdc, mode);
+  }
+
+  /**
+   * Address: 0x00A81DA2 (FUN_00A81DA2, CreateBrushIndirect)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateBrushIndirect`.
+   */
+  HBRUSH ThunkCreateBrushIndirect(const LOGBRUSH *plbrush)
+  {
+    return ::CreateBrushIndirect(plbrush);
+  }
+
+  /**
+   * Address: 0x00A81DA8 (FUN_00A81DA8, LineTo)
+   *
+   * What it does:
+   * Import thunk that forwards to `LineTo`.
+   */
+  BOOL ThunkLineTo(HDC hdc, const int x, const int y)
+  {
+    return ::LineTo(hdc, x, y);
+  }
+
+  /**
+   * Address: 0x00A81DAE (FUN_00A81DAE, MoveToEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `MoveToEx`.
+   */
+  BOOL ThunkMoveToEx(HDC hdc, const int x, const int y, LPPOINT lppt)
+  {
+    return ::MoveToEx(hdc, x, y, lppt);
+  }
+
+  /**
+   * Address: 0x00A81DB4 (FUN_00A81DB4, CreatePen)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreatePen`.
+   */
+  HPEN ThunkCreatePen(const int iStyle, const int cWidth, const COLORREF color)
+  {
+    return ::CreatePen(iStyle, cWidth, color);
+  }
+
+  /**
+   * Address: 0x00A81DBA (FUN_00A81DBA, PatBlt)
+   *
+   * What it does:
+   * Import thunk that forwards to `PatBlt`.
+   */
+  BOOL ThunkPatBlt(HDC hdc, const int x, const int y, const int w, const int h, const DWORD rop)
+  {
+    return ::PatBlt(hdc, x, y, w, h, rop);
+  }
+
+  /**
+   * Address: 0x00A81DC0 (FUN_00A81DC0, TranslateCharsetInfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `TranslateCharsetInfo`.
+   */
+  BOOL ThunkTranslateCharsetInfo(DWORD *lpSrc, LPCHARSETINFO lpCs, const DWORD dwFlags)
+  {
+    return ::TranslateCharsetInfo(lpSrc, lpCs, dwFlags);
+  }
+
+  /**
+   * Address: 0x00A81DC6 (FUN_00A81DC6, GetBkColor)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetBkColor`.
+   */
+  COLORREF ThunkGetBkColor(HDC hdc)
+  {
+    return ::GetBkColor(hdc);
+  }
+
+  /**
+   * Address: 0x00A81DCC (FUN_00A81DCC, GetTextColor)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetTextColor`.
+   */
+  COLORREF ThunkGetTextColor(HDC hdc)
+  {
+    return ::GetTextColor(hdc);
+  }
+
+  /**
+   * Address: 0x00A81DD2 (FUN_00A81DD2, GetClipBox)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetClipBox`.
+   */
+  int ThunkGetClipBox(HDC hdc, LPRECT lprect)
+  {
+    return ::GetClipBox(hdc, lprect);
+  }
 } // namespace moho::runtime
 
 
