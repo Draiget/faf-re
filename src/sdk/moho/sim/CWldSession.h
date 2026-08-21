@@ -1778,6 +1778,27 @@ namespace moho
     EraseSelectionNodeAndAdvance(WeakEntitySetUserEntity& selection, SSelectionNodeUserEntity* node);
 
   /**
+   * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
+   *
+   * What it does:
+   * Advances from `start` to the first live weak-set node, deleting tombstone
+   * entries (null/`(void*)8` owner-link slots) as it goes. Generalized over the
+   * shared `WeakEntitySetUserEntity` base (moved to external linkage from
+   * `SSelectionSetUserEntity::PruneTombstonesAndFindLive`, which now forwards
+   * here) so `CFormation::Finalize` (CFormation.cpp) can prune its own
+   * `mParticipants` walk the same way: `mParticipants` is a `WeakUnitSetUserUnit`,
+   * not an `SSelectionSetUserEntity`, but both share the identical 12-byte
+   * `{allocProxy, mHead, mSize}` header this function only ever touches, and the
+   * binary itself calls this exact routine (0x00838313/0x008383CC) with `this`
+   * pointed straight at `CFormation::mParticipants` (offset 0 of `CFormation`).
+   */
+  [[nodiscard]] SSelectionNodeUserEntity** PruneTombstonesAndFindLive(
+    WeakEntitySetUserEntity& set,
+    SSelectionNodeUserEntity** outNode,
+    SSelectionNodeUserEntity* start
+  );
+
+  /**
    * Address context:
    * - process-global world-frame action lane (`sWldFrameAction`) consumed by
    *   `WLD_Frame`.

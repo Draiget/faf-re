@@ -28,6 +28,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/unit/Broadcaster.h"
@@ -3966,24 +3967,6 @@ namespace
   // simply not relied upon here).
 
   /**
-   * Binds one freshly-linked weak slot to `unit` and appends it to
-   * `destination`, matching the binary's inline construct-then-push
-   * dance (e.g. 0x00567F1D..0x00567F94 inside `UpdateFormation`):
-   * construct a temporary bound to `unit` (linking it at the unit's real
-   * weak-chain head), push_back it (the relink-aware push steals the link
-   * for the new slot), then unlink the temporary -- it is now a redundant
-   * second entry in the same chain, since the container's copy owns the
-   * link going forward.
-   */
-  void AppendLinkedUnitWeakSlot(moho::SFormationLayerUnitSet& destination, moho::Unit* const unit)
-  {
-    moho::SWeakRefSlot temp{};
-    temp.AsWeakPtr<moho::IUnit>().ResetFromObject(unit);
-    destination.push_back(temp);
-    temp.AsWeakPtr<moho::IUnit>().UnlinkFromOwnerChain();
-  }
-
-  /**
    * Removes the slot at `it` from `container`, relinking every following
    * slot at its shifted-down address. The `gpg::fastvector_n` analogue of
    * `moho::RemoveWeakPtrVectorObject` (WeakPtr.h), which targets the
@@ -3999,20 +3982,6 @@ namespace
     }
     it->AsWeakPtr<moho::IUnit>().ResetFromObject(nullptr);
     container.SetSizeUnchecked(container.size() - 1u);
-  }
-
-  /**
-   * Unlinks every slot in `container` from its target's real weak chain and
-   * resets storage to inline. Matches FUN_0056D3C0 (`sub_56D3C0`) followed
-   * by the conditional `operator delete[]`, which every one of
-   * `PreRunScript`/`Setup`/`UpdateFormation` inlines at its own scope exit.
-   */
-  void ClearLinkedUnitWeakSlots(moho::SFormationLayerUnitSet& container)
-  {
-    for (moho::SWeakRefSlot& slot : container) {
-      slot.AsWeakPtr<moho::IUnit>().UnlinkFromOwnerChain();
-    }
-    container.ResetStorageToInline();
   }
 
   /**
@@ -4059,6 +4028,81 @@ namespace
 
 namespace moho
 {
+  /**
+   * Binds one freshly-linked weak slot to `unit` and appends it to
+   * `destination`, matching the binary's inline construct-then-push dance
+   * used by every `SFormationLayerUnitSet` builder in the engine:
+   * `UpdateFormation` (0x00567F1D..0x00567F94), `PreRunScript`/`Setup` (below),
+   * and `CFormation::Finalize` (0x0083836D..0x008383B6, CFormation.cpp) all
+   * inline this exact sequence -- construct a temporary bound to `unit`
+   * (linking it at the unit's real weak-chain head), push_back it (the
+   * relink-aware push steals the link for the new slot), then unlink the
+   * temporary -- it is now a redundant second entry in the same chain, since
+   * the container's copy owns the link going forward. Moved to external
+   * linkage (was file-local to this TU's anonymous namespace) so
+   * `CFormation::Finalize` can reuse it instead of duplicating the same
+   * intrusive-weak-guard dance; declared in CAiFormationInstance.h.
+   */
+  void AppendLinkedUnitWeakSlot(SFormationLayerUnitSet& destination, Unit* const unit)
+  {
+    SWeakRefSlot temp{};
+    temp.AsWeakPtr<IUnit>().ResetFromObject(unit);
+    destination.push_back(temp);
+    temp.AsWeakPtr<IUnit>().UnlinkFromOwnerChain();
+  }
+
+  /**
+   * Unlinks every slot in `container` from its target's real weak chain and
+   * resets storage to inline. Matches FUN_0056D3C0 (`sub_56D3C0`) followed by
+   * the conditional `operator delete[]`, which every one of
+   * `PreRunScript`/`Setup`/`UpdateFormation` inlines at its own scope exit --
+   * and which `CFormation::Finalize` (0x00838464..0x008384A3) inlines too, to
+   * release the transient participant collection it builds each call. Moved
+   * to external linkage for the same reason as `AppendLinkedUnitWeakSlot`
+   * above; declared in CAiFormationInstance.h.
+   */
+  void ClearLinkedUnitWeakSlots(SFormationLayerUnitSet& container)
+  {
+    for (SWeakRefSlot& slot : container) {
+      slot.AsWeakPtr<IUnit>().UnlinkFromOwnerChain();
+    }
+    container.ResetStorageToInline();
+  }
+
+  /**
+   * `SFormationLinkedUnitRefVec` counterpart of `AppendLinkedUnitWeakSlot`
+   * above: links a temporary into `target`'s owner-chain head
+   * (`target + 0x04`, the `IUnit`/`WeakObject` chain head every `IUnit`
+   * sub-object carries), pushes it (the copy steals the link), then unlinks
+   * the now-redundant temporary -- same construct-then-push-then-unlink dance,
+   * for `mUnits`'s own element type.
+   */
+  void AppendLinkedUnitRef(SFormationLinkedUnitRefVec& destination, IUnit* const target)
+  {
+    SFormationLinkedUnitRef temp{};
+    if (target != nullptr) {
+      auto* const ownerHead = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(target) + 0x4u);
+      temp.ownerChainHead = ownerHead;
+      temp.nextChainLink = *ownerHead;
+      *ownerHead = PtrToWord(&temp);
+    }
+    destination.push_back(temp);
+    UnlinkLinkedRef(temp);
+  }
+
+  /**
+   * `SFormationLinkedUnitRefVec` counterpart of `ClearLinkedUnitWeakSlots`
+   * above: unlinks every slot in `container` from its unit's real owner-chain
+   * and resets storage to inline.
+   */
+  void ClearLinkedUnitRefs(SFormationLinkedUnitRefVec& container)
+  {
+    for (SFormationLinkedUnitRef& link : container) {
+      UnlinkLinkedRef(link);
+    }
+    container.ResetStorageToInline();
+  }
+
   /**
    * Address: 0x005744E0 (FUN_005744E0, Moho::CFormationInstance::MemberSerialize)
    *
@@ -4789,6 +4833,129 @@ namespace moho
   }
 
   /**
+   * Address: 0x005694B0 (FUN_005694B0, Moho::CFormationInstance::CFormationInstance)
+   *
+   * IDA signature:
+   * Moho::CAiFormationInstance *__fastcall Moho::CFormationInstance::CFormationInstance(
+   *     Moho::RRuleGameRulesImpl *rules, int commandType, Moho::CFormationInstance *this,
+   *     LuaPlus::LuaState *state, gpg::fastvector_n<SFormationLinkedUnitRef, 4> *units,
+   *     const char *name, Moho::SCoordsVec2 *coords, Wm3::Quaternionf orientation);
+   *
+   * What it does:
+   * Self-links the unit-link list node (implicit, `TDatListItem`'s own
+   * default ctor), stamps the Lua state/game-rules/command-type lanes, and
+   * copies the caller's initial unit-ref set into `mUnits` (the binary's
+   * `sub_56B200` is a default-construct-then-`ResetFrom` pair, matching
+   * `FastVectorN`'s own copy constructor exactly). Both lane vectors and the
+   * occupied-slot vector default-construct inline (the binary's own
+   * `eh vector constructor iterator` / inline-buffer setup). Both coord-cache
+   * head sentinels are allocated unconditionally here -- unlike
+   * `EnsureCoordCacheHead`'s guarded skip-if-already-built check used
+   * elsewhere, this ctor always builds a fresh head, matching
+   * `CAiFormationInstance`'s own default ctor's identical unconditional
+   * pattern. When `coords` resolves to a valid flat ground-plane point, the
+   * initial forward vector is derived from `orientation` with the same
+   * formula `SetOrientation` uses, then the transient plan state is reset
+   * (`CleanupFormation` -- a no-op superset over the freshly-empty lanes/
+   * baseline, but the real call the binary's tail block inlines) and one
+   * `UpdateFormation` pass runs. `mUnknown_0x01C` is left untouched, matching
+   * the binary -- it is never written here.
+   */
+  CFormationInstance::CFormationInstance(
+    RRuleGameRulesImpl* const rules,
+    const EUnitCommandType commandType,
+    LuaPlus::LuaState* const state,
+    const SFormationLinkedUnitRefVec& units,
+    const char* const name,
+    const SCoordsVec2& coords,
+    const Wm3::Quatf& orientation
+  )
+    : mUnitCount(0)
+    , mLuaState(state)
+    , mGameRules(rules)
+    , mCommandType(commandType)
+    , mUnits(units)
+    , mForwardVector(kZeroForwardVector)
+    , mOrientation(orientation)
+    , mOrientationBaseline(kZeroQuaternion)
+    , mScriptName(name)
+    , mFormationCenter(coords)
+    , mFormationUpdateScale(1.0f)
+    , mPlanUpdateRequested(0)
+    , mMaxUnitSlotCount(0)
+  {
+    mCoordCachePrimary.head = AllocateFormationCoordCacheHeadNode();
+    if (mCoordCachePrimary.head != nullptr) {
+      mCoordCachePrimary.head->left = mCoordCachePrimary.head;
+      mCoordCachePrimary.head->parent = mCoordCachePrimary.head;
+      mCoordCachePrimary.head->right = mCoordCachePrimary.head;
+      mCoordCachePrimary.head->isNil = 1u;
+    }
+    mCoordCachePrimary.size = 0u;
+
+    mCoordCacheSecondary.head = AllocateFormationCoordCacheHeadNode();
+    if (mCoordCacheSecondary.head != nullptr) {
+      mCoordCacheSecondary.head->left = mCoordCacheSecondary.head;
+      mCoordCacheSecondary.head->parent = mCoordCacheSecondary.head;
+      mCoordCacheSecondary.head->right = mCoordCacheSecondary.head;
+      mCoordCacheSecondary.head->isNil = 1u;
+    }
+    mCoordCacheSecondary.size = 0u;
+
+    const Wm3::Vec3f groundPoint{mFormationCenter.x, 0.0f, mFormationCenter.z};
+    if (!IsValidVector3f(groundPoint)) {
+      return;
+    }
+
+    if (!QuaternionEqualsExact(mOrientation, kZeroQuaternion)) {
+      const float x = mOrientation.x;
+      const float y = mOrientation.y;
+      const float z = mOrientation.z;
+      const float w = mOrientation.w;
+      mForwardVector.x = ((x * z) + (y * w)) * 2.0f;
+      mForwardVector.y = ((z * w) - (x * y)) * 2.0f;
+      mForwardVector.z = 1.0f - (((y * y) + (z * z)) * 2.0f);
+    }
+
+    CleanupFormation();
+    static_cast<CAiFormationInstance*>(this)->UpdateFormation();
+  }
+
+  /**
+   * Address: 0x0056A920 (FUN_0056A920, ??2CFormationInstance@Moho@@QAE@@Z,
+   * Moho::CFormationInstance::operator new)
+   *
+   * What it does:
+   * Allocates one `sizeof(CFormationInstance)` (0x328) block via a throwing
+   * `::operator new` guarded by the binary's own explicit post-allocation
+   * null check (0x0056A949/0x0056A953; reproduced here with the `nothrow`
+   * form, matching this file's established `AllocateFormationCoordCacheHeadNode`-
+   * style allocate-then-check idiom), then placement-constructs a
+   * `CFormationInstance` on it with `commandType` hardcoded to
+   * `UNITCOMMAND_None` (the binary's own `xor edx, edx` before the ctor
+   * call). Returns `nullptr` when the allocation itself fails; the caller
+   * (`CFormation::Finalize`, 0x0083843B) never observes a null return in
+   * practice, since it only calls this once `mBestFormation >= 0`.
+   */
+  CFormationInstance* CFormationInstance::Create(
+    RRuleGameRulesImpl* const rules,
+    LuaPlus::LuaState* const state,
+    const SFormationLinkedUnitRefVec& units,
+    const char* const name,
+    const SCoordsVec2& coords,
+    const Wm3::Quatf& orientation
+  )
+  {
+    void* const storage = ::operator new(sizeof(CFormationInstance), std::nothrow);
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    return new (storage) CFormationInstance(
+      rules, EUnitCommandType::UNITCOMMAND_None, state, units, name, coords, orientation);
+  }
+
+  /**
    * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)
    *
    * IDA signature:
@@ -4804,6 +4971,21 @@ namespace moho
   CFormationInstance::~CFormationInstance()
   {
     CleanupFormation();
+  }
+
+  /**
+   * Address: 0x00569430 (FUN_00569430, Moho::CFormationInstance::operator delete)
+   * Slot: 0
+   *
+   * What it does:
+   * Runs the destructor, then frees storage when bit0 of `deleteFlags` is set.
+   */
+  void CFormationInstance::operator_delete(const std::int32_t deleteFlags)
+  {
+    this->~CFormationInstance();
+    if ((deleteFlags & 1) != 0) {
+      ::operator delete(this);
+    }
   }
 
   /**
