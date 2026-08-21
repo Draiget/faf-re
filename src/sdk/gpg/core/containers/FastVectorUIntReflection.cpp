@@ -370,6 +370,11 @@ namespace gpg
   class RFastVectorType<Wm3::Vector3f> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x00517510 (FUN_00517510, gpg::RFastVectorType_Vector3f::dtr)
+     */
+    ~RFastVectorType() override;
+
     [[nodiscard]] const char* GetName() const override;
     /**
      * Address: 0x005159E0 (FUN_005159E0, gpg::RFastVectorType_Vector3f::GetLexical)
@@ -2515,6 +2520,11 @@ int register_FastVectorVector3fTypeAtexit()
   return std::atexit(&cleanup_FastVectorVector3fType);
 }
 } // namespace gpg
+
+/**
+ * Address: 0x00517510 (FUN_00517510, gpg::RFastVectorType_Vector3f::dtr)
+ */
+gpg::RFastVectorType<Wm3::Vector3f>::~RFastVectorType() = default;
 
 /**
  * Address: 0x00515920 (FUN_00515920, gpg::RFastVectorType_Vector3f::GetName)

@@ -15,7 +15,7 @@
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBlueprint.h"
-#include "moho/sim/SFootprint.h"
+#include "moho/sim/SFootprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -169,6 +169,11 @@ namespace
   {
   public:
     /**
+     * Address: 0x00513560 (FUN_00513560, gpg::RVectorType_string::dtr)
+     */
+    ~RStringVectorTypeInfo() override;
+
+    /**
      * Address: 0x00512C30 (FUN_00512C30, gpg::RVectorType_string::GetName)
      *
      * What it does:
@@ -245,6 +250,11 @@ namespace
     gRStringVectorTypeName.clear();
     gRStringVectorTypeNameInitGuard = 0u;
   }
+
+  /**
+   * Address: 0x00513560 (FUN_00513560, gpg::RVectorType_string::dtr)
+   */
+  RStringVectorTypeInfo::~RStringVectorTypeInfo() = default;
 
   const char* RStringVectorTypeInfo::GetName() const
   {
