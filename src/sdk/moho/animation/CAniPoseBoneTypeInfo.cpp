@@ -81,212 +81,6 @@ namespace
   }
 
   /**
-   * Address: 0x0054DF50 (FUN_0054DF50)
-   *
-   * IDA signature:
-   * int __usercall sub_54DF50@<eax>(int a1@<eax>, int a2@<ecx>, int a3@<ebx>);
-   *
-   * What it does:
-   * Copy-assigns the half-open range `[sourceBegin, sourceEnd)` of
-   * `CAniPoseBone` values into contiguous destination storage starting at
-   * `destinationBegin`, stepping both cursors by `sizeof(CAniPoseBone)`
-   * (`0x4C`) per iteration. Returns the advanced destination cursor so
-   * callers (see `AssignFastVectorCAniPoseBoneEnd` below) can restore
-   * the owning `fastvector`'s `end` lane when the source and destination
-   * ranges diverge. The inner `*dst = *src` invokes
-   * `CAniPoseBone::operator=` (FUN_0054EC50), which emits exactly the
-   * FST/FLD per-field pattern the release binary uses.
-   */
-  moho::CAniPoseBone* CopyAssignCAniPoseBoneRangeForward(
-    const moho::CAniPoseBone* const sourceBegin,
-    const moho::CAniPoseBone* const sourceEnd,
-    moho::CAniPoseBone* const destinationBegin
-  )
-  {
-    moho::CAniPoseBone* destinationCursor = destinationBegin;
-    for (const moho::CAniPoseBone* sourceCursor = sourceBegin;
-         sourceCursor != sourceEnd;
-         ++sourceCursor, ++destinationCursor) {
-      *destinationCursor = *sourceCursor;
-    }
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x0054CCC0 (FUN_0054CCC0)
-   *
-   * IDA signature:
-   * int __usercall sub_54CCC0@<eax>(int a1@<eax>, int a2@<edi>, int a3@<esi>);
-   *
-   * What it does:
-   * When the updated range end `sourceEnd` differs from the vector's
-   * existing end, rewinds the owning `fastvector<CAniPoseBone>`'s `end`
-   * lane by copy-assigning the `[view.end, sourceEnd)` region starting at
-   * `view.end` via the recovered range copy and then latches the advanced
-   * destination cursor back into `view.end`.
-   */
-  void AssignFastVectorCAniPoseBoneEnd(
-    gpg::fastvector_runtime_view<moho::CAniPoseBone>& view,
-    const moho::CAniPoseBone* const sourceEnd
-  )
-  {
-    if (view.end == sourceEnd) {
-      return;
-    }
-
-    view.end = CopyAssignCAniPoseBoneRangeForward(view.end, sourceEnd, view.end);
-  }
-
-  /**
-   * Address: 0x0054D790 (FUN_0054D790)
-   *
-   * IDA signature:
-   * void *__fastcall sub_54D790(int a1, void **a2, int a3, int a4, int a5);
-   *
-   * What it does:
-   * Reallocates one `fastvector<CAniPoseBone>` runtime view to a caller
-   * supplied `requestedCount` capacity. Allocates a fresh element buffer via
-   * the array `operator new`, copy-constructs the preserved `[begin, end)`
-   * lane forward into the new buffer using the recovered per-element lane,
-   * releases the old backing storage (or latches the inline-storage anchor
-   * when the vector was still parked on its SBO slot), and rebinds the
-   * view's begin/end/capacity triplet to the new buffer. Matches the binary
-   * shape that calls `FUN_0054DCF0` (`CopyConstructCAniPoseBoneRangeForward`)
-   * three times: once for the preserved prefix, once for the empty inserted
-   * slot range, and once for the preserved suffix. The middle call has zero
-   * length in every caller the binary exposes (see `FUN_0054CC90`'s reserve
-   * trampoline), so the reconstruction preserves that shape with an explicit
-   * zero-length sub-range boundary.
-   */
-  [[nodiscard]] moho::CAniPoseBone* PlacementCopyConstructCAniPoseBoneRange(
-    moho::CAniPoseBone* destinationBegin,
-    const moho::CAniPoseBone* sourceBegin,
-    const moho::CAniPoseBone* sourceEnd
-  )
-  {
-    moho::CAniPoseBone* destination = destinationBegin;
-    for (const moho::CAniPoseBone* source = sourceBegin; source != sourceEnd; ++source, ++destination) {
-      if (destination != nullptr) {
-        ::new (destination) moho::CAniPoseBone(*source);
-      }
-    }
-    return destination;
-  }
-
-  moho::CAniPoseBone* ReallocateFastVectorCAniPoseBone(
-    const unsigned int requestedCount,
-    gpg::fastvector_runtime_view<moho::CAniPoseBone>& view,
-    const moho::CAniPoseBone* const insertPos,
-    const moho::CAniPoseBone* const insertBegin,
-    const moho::CAniPoseBone* const insertEnd
-  )
-  {
-    auto* const newBegin = static_cast<moho::CAniPoseBone*>(
-      ::operator new(static_cast<std::size_t>(requestedCount) * sizeof(moho::CAniPoseBone))
-    );
-
-    // Preserved prefix: [view.begin, insertPos)
-    moho::CAniPoseBone* cursor = PlacementCopyConstructCAniPoseBoneRange(newBegin, view.begin, insertPos);
-
-    // Inserted range: [insertBegin, insertEnd). Zero-length for plain
-    // realloc paths (matches FUN_0054CC90's reserve usage exactly).
-    cursor = PlacementCopyConstructCAniPoseBoneRange(cursor, insertBegin, insertEnd);
-
-    // Preserved suffix: [insertPos, view.end). The binary walks the source
-    // range one element at a time (0x4C stride) to confirm the suffix is
-    // empty in every exported caller.
-    if (view.begin != view.end) {
-      cursor = PlacementCopyConstructCAniPoseBoneRange(cursor, insertPos, view.end);
-    }
-
-    // Release old storage, or latch the inline-storage slot when the vector
-    // was still parked on its SBO anchor.
-    if (view.begin == view.metadata) {
-      if (view.begin) {
-        // Inline-storage first word is the capacity end anchor; restore it.
-        *reinterpret_cast<moho::CAniPoseBone**>(view.metadata) = view.capacityEnd;
-      }
-    } else {
-      ::operator delete[](view.begin);
-    }
-
-    view.begin = newBegin;
-    view.end = cursor;
-    view.capacityEnd = newBegin + requestedCount;
-    return newBegin;
-  }
-
-  /**
-   * Address: 0x0054CC90 (FUN_0054CC90)
-   *
-   * IDA signature:
-   * unsigned int __usercall sub_54CC90@<eax>(unsigned int a1@<ecx>, int *a2@<edi>);
-   *
-   * What it does:
-   * Reserves capacity for `requestedCount` elements in one
-   * `fastvector<CAniPoseBone>` runtime view. When existing capacity already
-   * meets the request the current element count is returned without touching
-   * storage; otherwise the reallocate lane (recovered as
-   * `ReallocateFastVectorCAniPoseBone`) is invoked with a zero-length insert
-   * range so existing elements are preserved 1:1.
-   */
-  unsigned int ReserveFastVectorCAniPoseBoneCapacity(
-    const unsigned int requestedCount,
-    gpg::fastvector_runtime_view<moho::CAniPoseBone>& view
-  )
-  {
-    const unsigned int currentCount = view.begin
-      ? static_cast<unsigned int>(view.end - view.begin)
-      : 0u;
-    if (requestedCount <= currentCount) {
-      return currentCount;
-    }
-
-    moho::CAniPoseBone* const insertPos = view.begin;
-    (void)ReallocateFastVectorCAniPoseBone(requestedCount, view, insertPos, insertPos, insertPos);
-    return currentCount;
-  }
-
-  /**
-   * Address: 0x0054C280 (FUN_0054C280)
-   *
-   * What it does:
-   * Resizes one `fastvector<CAniPoseBone>` runtime view to `requestedCount`,
-   * preserving existing lanes and fill-constructing appended lanes from
-   * `fillValue` when growth is required. When shrinking, the destroyed-tail
-   * fixup lane (recovered as `AssignFastVectorCAniPoseBoneEnd`) is invoked
-   * explicitly so the release binary's post-shrink `end` latch stays
-   * observable in source.
-   */
-  void ResizeFastVectorCAniPoseBoneToCount(
-    const unsigned int requestedCount,
-    gpg::fastvector_runtime_view<moho::CAniPoseBone>& view,
-    const moho::CAniPoseBone& fillValue
-  )
-  {
-    const unsigned int currentCount = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
-    if (requestedCount == currentCount) {
-      return;
-    }
-
-    if (requestedCount < currentCount) {
-      // Mirror the binary's shrink-side tail fixup before delegating to the
-      // shared fastvector resize helper: when the shrink target coincides
-      // with the existing `end`, the helper is a no-op, which matches
-      // `FUN_0054CCC0`'s `if (a3 != a1)` guard.
-      AssignFastVectorCAniPoseBoneEnd(view, view.end);
-    } else {
-      // Mirror the binary's grow-side reserve before fill: the release build
-      // emits an explicit CAniPoseBone-specialized reserve lane here (see
-      // `ReserveFastVectorCAniPoseBoneCapacity` / `FUN_0054CC90`) so the
-      // fastvector's backing buffer is sized before the fill helper runs.
-      (void)ReserveFastVectorCAniPoseBoneCapacity(requestedCount, view);
-    }
-
-    gpg::FastVectorRuntimeResizeFill(&fillValue, requestedCount, view);
-  }
-
-  /**
    * Address: 0x00BF46D0 (FUN_00BF46D0, cleanup_FastVectorCAniPoseBoneTypeName)
    *
    * What it does:
@@ -313,9 +107,9 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CAniPoseBone>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CAniPoseBone>*>(objectPtr);
     const moho::CAniPoseBone fill = MakeDefaultCAniPoseBone();
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    vec.Resize(static_cast<std::size_t>(count), fill);
 
     gpg::RType* const elementType = CachedCAniPoseBoneType();
     if (!elementType) {
@@ -324,7 +118,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &view.begin[i], owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -340,8 +134,8 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::CAniPoseBone>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CAniPoseBone>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = CachedCAniPoseBoneType();
@@ -351,7 +145,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &view.begin[i], owner);
+      archive->Write(elementType, &vec[i], owner);
     }
   }
 
@@ -541,12 +335,12 @@ namespace gpg
       return out;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CAniPoseBone>(obj);
-    if (!view.begin || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+    auto& vec = *static_cast<gpg::fastvector<moho::CAniPoseBone>*>(obj);
+    if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
 
-    gpg::RRef_CAniPoseBone(&out, &view.begin[ind]);
+    gpg::RRef_CAniPoseBone(&out, &vec[ind]);
     return out;
   }
 
@@ -559,11 +353,11 @@ namespace gpg
       return 0u;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::CAniPoseBone>(obj);
-    if (!view.begin) {
+    auto& vec = *static_cast<gpg::fastvector<moho::CAniPoseBone>*>(obj);
+    if (vec.Data() == nullptr) {
       return 0u;
     }
-    return static_cast<size_t>(view.end - view.begin);
+    return static_cast<size_t>(vec.size());
   }
 
   /**
@@ -575,9 +369,9 @@ namespace gpg
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CAniPoseBone>(obj);
+    auto& vec = *static_cast<gpg::fastvector<moho::CAniPoseBone>*>(obj);
     const moho::CAniPoseBone fill = MakeDefaultCAniPoseBone();
-    ResizeFastVectorCAniPoseBoneToCount(static_cast<unsigned int>(count), view, fill);
+    vec.Resize(static_cast<std::size_t>(count), fill);
   }
 } // namespace gpg
 

@@ -450,6 +450,11 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x0054CC90 (FUN_0054CC90,
+     * gpg::fastvector<Moho::CAniPoseBone>::Reserve -- grows to exactly the
+     * requested count through the reallocate-insert lane with a zero-length
+     * insert range, so the live elements are preserved 1:1)
+     *
      * Reserve at least n elements; does not shrink.
      */
     void Reserve(size_t n)
@@ -561,6 +566,15 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x0054C280 (FUN_0054C280,
+     * gpg::fastvector<Moho::CAniPoseBone>::Resize -- the release build emits an
+     * explicit reserve-to-exact-count (FUN_0054CC90) ahead of the fill on the
+     * grow side, and a shrink-side end latch that is a no-op whenever the
+     * target already equals mLast, which is every call site. Both fold into
+     * this method.)
+     * Address: 0x0054CC90 (FUN_0054CC90, that reserve-to-exact-count lane)
+     * Address: 0x0054CCC0 (FUN_0054CCC0, that shrink-side end latch --
+     * `if (sourceEnd != mLast) mLast = copy_assign_range(...)`)
      * Address: 0x00762120 (FUN_00762120,
      * gpg::fastvector<Moho::SAudioRequest>::Resize -- shrink rebases mLast,
      * grow ensures capacity then fills the appended slots in place)
@@ -1982,6 +1996,11 @@ namespace gpg
    * Address: 0x00402C20 (FUN_00402C20)
    * Address: 0x00710F70 (FUN_00710F70, gpg::FastVectorRuntimeCopyRange<moho::SCondition> —
    * emitted transitively via InsertRange<SCondition> from CArmyStats trigger-condition append)
+   * Address: 0x0054D790 (FUN_0054D790, the `Moho::CAniPoseBone` emission —
+   * that element has a user-declared copy ctor, so the reallocate path
+   * copy-constructs rather than relocating bitwise)
+   * Address: 0x0054DF50 (FUN_0054DF50, the forward copy-assign range lane for
+   * the same element, used to rewind mLast after a shrink)
    *
    * What it does:
    * Copy-constructs [sourceBegin, sourceEnd) into `destination` and returns the
