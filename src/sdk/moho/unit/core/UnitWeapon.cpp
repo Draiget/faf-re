@@ -196,13 +196,14 @@ namespace
     msvc8::vector<moho::SBlackListInfo>& blacklist
   ) noexcept
   {
-    auto& runtime = msvc8::AsVectorRuntimeView(blacklist);
-    if (runtime.begin != runtime.end) {
-      UnlinkBlacklistWeakEntityRange(runtime.begin, runtime.end);
-      runtime.end = runtime.begin;
+    if (!blacklist.empty()) {
+      // SBlackListInfo's weak entity link is not unlinked by the trivial
+      // element destructor, so it has to be detached before the slots go.
+      UnlinkBlacklistWeakEntityRange(blacklist.begin(), blacklist.end());
+      blacklist.clear();
     }
 
-    return runtime.begin;
+    return blacklist.begin();
   }
 
   /**
@@ -395,24 +396,25 @@ namespace
       return nullptr;
     }
 
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (view.begin == nullptr || view.end == nullptr || view.end <= view.begin || erasePosition == nullptr) {
+    if (storage.empty() || erasePosition == nullptr) {
       *outPosition = erasePosition;
       return outPosition;
     }
 
-    if (erasePosition < view.begin || erasePosition >= view.end) {
+    if (erasePosition < storage.begin() || erasePosition >= storage.end()) {
       *outPosition = erasePosition;
       return outPosition;
     }
 
     moho::SBlackListInfo* const readBegin = erasePosition + 1;
-    if (readBegin != view.end) {
-      (void)CopyBlacklistRangeAssignWeakLinks(erasePosition, readBegin, view.end);
+    if (readBegin != storage.end()) {
+      (void)CopyBlacklistRangeAssignWeakLinks(erasePosition, readBegin, storage.end());
     }
 
-    UnlinkBlacklistWeakEntityRange(view.end - 1, view.end);
-    view.end -= 1;
+    // The shift leaves a stale copy in the old last slot; its weak link has to
+    // be detached before mLast drops, since the element destructor is trivial.
+    UnlinkBlacklistWeakEntityRange(storage.end() - 1, storage.end());
+    storage.pop_back_no_destroy();
     *outPosition = erasePosition;
     return outPosition;
   }
