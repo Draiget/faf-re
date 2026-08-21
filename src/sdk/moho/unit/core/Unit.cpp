@@ -12481,6 +12481,12 @@ CScrLuaInitForm* moho::func_CreateUnitHPR_LuaFuncDef()
 
 } // namespace moho
 
+// Shared checked-allocator lane for 568-byte elements (defined in Vector.cpp,
+// at file scope there); forward-declared locally the way this codebase's
+// other cross-TU legacy container helpers already are.
+void* AllocateChecked568ByteElements(std::uint32_t count);
+[[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
+
 namespace
 {
   struct UnitTypeInfoPreRegisterBootstrap
@@ -12519,7 +12525,7 @@ namespace
    * Destroys one contiguous slot range by invoking `SSTIUnitVariableData`
    * destructor on each embedded payload lane at slot offset `+0x08`.
    */
-  [[maybe_unused]] void DestroySSTIUnitVariableDataSlotPayloadRange(
+  void DestroySSTIUnitVariableDataSlotPayloadRange(
     SSTIUnitVariableDataSlotRuntime* begin,
     SSTIUnitVariableDataSlotRuntime* const end
   )
@@ -12696,7 +12702,7 @@ namespace
    * tail dword`) into destination storage and destroys already-constructed
    * payload lanes before rethrowing if a copy step throws.
    */
-  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(
+  SSTIUnitVariableDataSlotRuntime* CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(
     const std::uint32_t count,
     SSTIUnitVariableDataSlotRuntime* const destinationBegin,
     const SSTIUnitVariableDataSlotRuntime* const sourceBegin
@@ -12773,7 +12779,7 @@ namespace
    * Copy-assigns one contiguous `SSTIUnitVariableData` slot range in reverse
    * order and returns the beginning of the destination range.
    */
-  [[maybe_unused]] SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRangeReverse(
+  SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRangeReverse(
     SSTIUnitVariableDataSlotRuntime* destinationEnd,
     const SSTIUnitVariableDataSlotRuntime* sourceEnd,
     const SSTIUnitVariableDataSlotRuntime* sourceBegin
@@ -12802,7 +12808,7 @@ namespace
    * Copy-assigns one contiguous `SSTIUnitVariableData` slot range and returns
    * the advanced source cursor.
    */
-  [[maybe_unused]] const SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRange(
+  const SSTIUnitVariableDataSlotRuntime* CopyAssignSSTIUnitVariableDataSlotRange(
     SSTIUnitVariableDataSlotRuntime* destinationBegin,
     SSTIUnitVariableDataSlotRuntime* destinationEnd,
     const SSTIUnitVariableDataSlotRuntime* sourceBegin
@@ -12837,7 +12843,135 @@ namespace
   {
     return CopyAssignSSTIUnitVariableDataSlotRange(destinationBegin, destinationEnd, sourceBegin);
   }
+
+  /**
+   * Address: 0x005C68E0 (FUN_005C68E0, sub_5C68E0)
+   *
+   * IDA signature:
+   * void __thiscall sub_5C68E0(int this, _DWORD *arg0, int a1);
+   * -- `this` is really the by-ref value being inserted (copied into locals
+   * up front so reallocation can't invalidate it), `arg0` is the vector
+   * storage (`{proxy@0, first@4, last@8, end@0xC}`), `a1` is the insert
+   * position.
+   *
+   * What it does:
+   * `msvc8::vector<SUnitVariableUpdateEntry>::_Insert_n(position, 1, value)`.
+   * Throws `std::length_error` (via `sub_5617E0`) once size would exceed
+   * `max_size() == 0xFFFFFFFF/568`. When capacity is insufficient, grows at
+   * 1.5x (clamped to max_size, or `sub_561130(storage)+1` when that
+   * undershoots the requirement), allocates through
+   * `AllocateChecked568ByteElements` (FUN_005627E0), copy-constructs the
+   * `[first,position)` prefix and `[position,last)` suffix through
+   * `CopySSTIUnitVariableDataSlotRangeWithRollback` (FUN_005CDF60, reached
+   * here both directly and via the `sub_5C9DD0` calling-convention
+   * trampoline), fills the one-element gap through
+   * `CopySSTIUnitVariableDataSlotRangeWithRollbackCounted` (FUN_005CBB20,
+   * reached via the `sub_5C5220` adapter -- its DB note calling it a
+   * "typed throw shim" is wrong, it forwards to FUN_005CBB20 with count=1),
+   * then destroys and frees the old buffer. When capacity is already
+   * sufficient: if `position == last` (pure append), constructs the value
+   * directly at `last`; otherwise extends by copy-constructing the current
+   * last element one slot past the old end
+   * (`CopySSTIUnitVariableDataSlotRangeWithRollback`), copy-assigns the
+   * `[position, oldLast-1)` run backward by one slot
+   * (`CopyAssignSSTIUnitVariableDataSlotRangeReverse`, FUN_005CD1F0, via the
+   * `sub_5C9E10` trampoline), then copy-assigns the value into the vacated
+   * slot at `position` (`CopyAssignSSTIUnitVariableDataSlotRange`,
+   * FUN_005CBDE0).
+   */
+  SSTIUnitVariableDataSlotRuntime* InsertOneSSTIUnitVariableDataSlot(
+    msvc8::vector_runtime_view<SSTIUnitVariableDataSlotRuntime>& storage,
+    SSTIUnitVariableDataSlotRuntime* const insertPosition,
+    const SSTIUnitVariableDataSlotRuntime& value
+  )
+  {
+    constexpr std::size_t kMaxElements = 0xFFFFFFFFu / sizeof(SSTIUnitVariableDataSlotRuntime);
+
+    const std::size_t curSize = storage.begin != nullptr
+      ? static_cast<std::size_t>(storage.end - storage.begin)
+      : 0u;
+    if (kMaxElements - curSize < 1u) {
+      RuntimeThrowContainerTooLong("vector<T> too long");
+    }
+
+    const std::size_t capacity = storage.begin != nullptr
+      ? static_cast<std::size_t>(storage.capacityEnd - storage.begin)
+      : 0u;
+
+    if (capacity < curSize + 1u) {
+      // Reallocate: 1.5x growth, or exactly curSize+1 when that undershoots.
+      std::size_t newCapacity = capacity + capacity / 2u;
+      if (newCapacity < curSize + 1u) {
+        newCapacity = curSize + 1u;
+      }
+
+      auto* const newFirst = static_cast<SSTIUnitVariableDataSlotRuntime*>(
+        AllocateChecked568ByteElements(static_cast<std::uint32_t>(newCapacity))
+      );
+
+      SSTIUnitVariableDataSlotRuntime* const gapBegin =
+        CopySSTIUnitVariableDataSlotRangeWithRollback(storage.begin, insertPosition, newFirst);
+      SSTIUnitVariableDataSlotRuntime* const gapEnd =
+        CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(1u, gapBegin, &value);
+      (void)CopySSTIUnitVariableDataSlotRangeWithRollback(insertPosition, storage.end, gapEnd);
+
+      if (storage.begin != nullptr) {
+        DestroySSTIUnitVariableDataSlotPayloadRange(storage.begin, storage.end);
+        ::operator delete(storage.begin);
+      }
+
+      storage.begin = newFirst;
+      storage.end = newFirst + curSize + 1u;
+      storage.capacityEnd = newFirst + newCapacity;
+      return insertPosition == nullptr ? storage.begin : (newFirst + (insertPosition - storage.begin));
+    }
+
+    // In-place: capacity already covers the extra element.
+    if (insertPosition == storage.end) {
+      (void)CopySSTIUnitVariableDataSlotRangeWithRollbackCounted(1u, storage.end, &value);
+      ++storage.end;
+      return insertPosition;
+    }
+
+    SSTIUnitVariableDataSlotRuntime* const oldLast = storage.end;
+    (void)CopySSTIUnitVariableDataSlotRangeWithRollback(oldLast - 1, oldLast, oldLast);
+    ++storage.end;
+    (void)CopyAssignSSTIUnitVariableDataSlotRangeReverse(oldLast, insertPosition, oldLast - 1);
+    (void)CopyAssignSSTIUnitVariableDataSlotRange(insertPosition, insertPosition + 1, &value);
+    return insertPosition;
+  }
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x005C51B0 (FUN_005C51B0, sub_5C51B0)
+   *
+   * What it does:
+   * Thin position-to-index-preserving wrapper around the `_Insert_n` core
+   * (FUN_005C68E0): computes the insert position's element index before the
+   * call (since reallocation can move `storage.begin`), then returns a
+   * pointer rebased against the (possibly new) `begin`.
+   */
+  SUnitVariableUpdateEntry* InsertUnitVariableUpdateEntry(
+    msvc8::vector<SUnitVariableUpdateEntry>& storage,
+    SUnitVariableUpdateEntry* const insertPosition,
+    const SUnitVariableUpdateEntry& value
+  )
+  {
+    auto& view = msvc8::AsVectorRuntimeView(storage);
+    auto& slotView = reinterpret_cast<msvc8::vector_runtime_view<SSTIUnitVariableDataSlotRuntime>&>(view);
+    const auto* const slotPosition = reinterpret_cast<const SSTIUnitVariableDataSlotRuntime*>(insertPosition);
+    const auto& slotValue = reinterpret_cast<const SSTIUnitVariableDataSlotRuntime&>(value);
+
+    SSTIUnitVariableDataSlotRuntime* const resultSlot = InsertOneSSTIUnitVariableDataSlot(
+      slotView,
+      const_cast<SSTIUnitVariableDataSlotRuntime*>(slotPosition),
+      slotValue
+    );
+    return reinterpret_cast<SUnitVariableUpdateEntry*>(resultSlot);
+  }
+} // namespace moho
 
 /**
  * Address: 0x0055B6E0 (FUN_0055B6E0, ??0UnitWeaponInfo@Moho@@QAE@@Z)

@@ -5614,7 +5614,9 @@ void* AllocateChecked352ByteElements(const std::uint32_t count)
 }
 
 /**
- * Address: 0x005627E0 (FUN_005627E0)
+ * Address: 0x005627E0 (FUN_005627E0, reallocation-path allocator for
+ * moho::InsertUnitVariableUpdateEntry's msvc8::vector<SUnitVariableUpdateEntry>
+ * _Insert_n grow lane, Unit.cpp)
  *
  * What it does:
  * Allocates one checked raw block for 568-byte elements using the VC8
