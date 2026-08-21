@@ -361,13 +361,13 @@ namespace moho
    * exactly `moho::WeakPtr<T>::ResetFromOwnerLinkSlot`, and the +4 owner-link
    * offset is `CWldTerrainDecal::mLinkHead`.
    *
-   * STILL NOT RECOVERED: the derived destructor body (0x008641C0), which
-   * releases both decals through the cached manager and drains the two weak
-   * lanes. The compiler-generated implicit destructor runs instead (it still
-   * chains correctly into the base `~SelectionDragger()` and now also runs
-   * the two `WeakPtr` and the `boost::shared_ptr` member destructors, which
-   * the raw-dword model could not) - so the remaining gap is narrower than
-   * before: the two decals are not handed back to the decal manager.
+   * The derived destructor body (0x008641C0) is recovered below. Its only
+   * programmer-written statements are the two decal hand-backs and the
+   * `sSelectionBrackets` clear; the weak-lane drains, the
+   * `boost::shared_ptr` release and the base-vtable restore that follow
+   * them in the binary are compiler-emitted member/base teardown and are
+   * left to the implicit chain, per the "compiler-emitted glue is not
+   * source" rule.
    */
   class SelectionDragger3D : public SelectionDragger
   {
@@ -387,20 +387,36 @@ namespace moho
     SelectionDragger3D(CameraImpl* camera, CWldSession* session);
 
     /**
+     * Address: 0x008641C0 (FUN_008641C0, ??1SelectionDragger3D@Moho@@UAE@XZ)
+     * Mangled: ??1SelectionDragger3D@Moho@@UAE@XZ
+     *
+     * IDA signature:
+     * SelectionDragger_vtbl* __stdcall sub_8641C0(SelectionDragger_vtbl** this);
+     *
+     * What it does:
+     * Derived-destructor body for the 3D selection dragger: hands both
+     * highlight decals back to the cached decal manager (the land
+     * `WldTerrainDecalType_Albedo` lane first, then the water
+     * `WldTerrainDecalType_WaterAlbedo` lane), then clears the global
+     * `sSelectionBrackets` weak-set through the same full-range erase path
+     * `~SelectionDragger2D()` uses. Everything after that in the binary is
+     * compiler-emitted teardown — the `mHighlightTexture` `shared_count`
+     * release, the two `WeakPtr` owner-chain unlinks, the `IMauiDragger`
+     * vtable restore and the base `WeakObject` chain drain — so it is left
+     * to the implicit member/base destructor chain rather than hand-written.
+     */
+    ~SelectionDragger3D() override;
+
+    /**
      * Address: 0x00864C90 (FUN_00864C90, Moho::SelectionDragger3D::Func1)
      *
      * What it does:
      * Scalar-deleting-destructor variant for `SelectionDragger3D` —
-     * delegates to the implicit base/derived destructor chain and
-     * conditionally releases the object's heap storage when bit 0 of
-     * `deleteFlags` is set. Matches `SelectionDragger2D::DeleteWithFlag`'s
-     * role for the binary's `??_G` vtable slot.
-     *
-     * NOTE: the binary's own scalar-deleting destructor (0x00864C90) chains
-     * into the full derived destructor body at 0x008641C0, which this
-     * recovery does not yet provide (see the class doc comment) - the
-     * chained `~SelectionDragger3D()` this calls is therefore the
-     * compiler-generated implicit one, not a 1:1 port of 0x008641C0.
+     * delegates to the base/derived destructor chain and conditionally
+     * releases the object's heap storage when bit 0 of `deleteFlags` is
+     * set. Matches `SelectionDragger2D::DeleteWithFlag`'s role for the
+     * binary's `??_G` vtable slot, and chains into the recovered
+     * `~SelectionDragger3D()` (0x008641C0) exactly as the binary does.
      */
     SelectionDragger3D* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
 
