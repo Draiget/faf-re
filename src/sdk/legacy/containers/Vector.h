@@ -2333,6 +2333,10 @@ namespace msvc8
          * (`cap + (cap >> 1)`, floored to size + count) with head/gap/tail
          * rebuilt into the fresh block. Reached from `resize` (FUN_005083C0)
          * and the single-element push path FUN_005079C0.)
+         * Address: 0x00524780 (FUN_00524780, msvc8::vector<float>::_Insert_n --
+         * max_size 0x3FFFFFFF, in-place tail-shift when capacity covers the new
+         * size, otherwise geometric grow. Reached from push_back in the
+         * reflected vector<float> SerLoad lane.)
          * Address: 0x008FE010 (FUN_008FE010, msvc8::vector<void*>::_Insert_n for
          * the D3D10 backend swap-chain vector -- same 4-byte-element shape:
          * length-error throw / in-place tail-shift / grow-and-copy at
