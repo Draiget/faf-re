@@ -1430,6 +1430,12 @@ namespace msvc8
          * source, copy-assign-over-then-uninit-copy-the-excess when the source is
          * longer but fits in capacity, `_Tidy` + `_Buy` + `_Ucopy` when it does
          * not, and copy-assign-then-destroy-the-tail when the source is shorter)
+         * Address: 0x00548ED0 (FUN_00548ED0,
+         * msvc8::vector<Moho::ResourceDeposit>::operator=(const vector&) for
+         * the 20-byte element -- 148 instructions carrying the same VC8 assign
+         * shape, calling the `std::copy` lane FUN_00548C00 three times, once
+         * per branch. Reached from `RVectorType_ResourceDeposit::SerLoad`'s
+         * closing `*storage = loaded;`.)
          *
          * Copy assignment (strong exception safety)
          */
@@ -1593,6 +1599,13 @@ namespace msvc8
          * element-wise copy of the live range into it, free the old block,
          * rebase all three lanes. Reached from the delayed-sub-viz reflection
          * loader and from `operator=`'s _Buy path.)
+         * Address: 0x00547E00 (FUN_00547E00,
+         * msvc8::vector<Moho::ResourceDeposit>::reserve -- opens with the
+         * max_size guard against 0x0CCCCCCC, which is exactly
+         * `0xFFFFFFFF / 0x14`, then allocates, uninit-copies the live range
+         * through FUN_00549BC0, frees the old block and rebases the lanes.
+         * Reached from `RVectorType_ResourceDeposit::SerLoad` (0x00547950),
+         * which reserves the archived count before filling.)
          *
          * Reserve at least `newCap` elements without changing size.
          */
@@ -1670,6 +1683,16 @@ namespace msvc8
          * tail-calling `erase(begin() + newSize, end())` (FUN_005C6F00) at
          * 0x005C54F6. Reached from `Moho::CReconBlipManagerImpl`'s per-army
          * table sizing.)
+         * Address: 0x00547F20 (FUN_00547F20,
+         * msvc8::vector<Moho::ResourceDeposit>::resize for the 20-byte element
+         * -- `size()` via the 66666667h/`sar 3` divide-by-0x14 magic pair,
+         * growing through the `_Insert_n` lane FUN_00547FE0 and shrinking by
+         * recomputing `_Mylast` through the copy lane FUN_00548C00. Its caller
+         * `RVectorType_ResourceDeposit::SetCount` (0x00547650) shows the
+         * one-argument overload inlined into it: it reserves 0x14 stack bytes,
+         * zeroes all five dwords to build the `ResourceDeposit()` temporary,
+         * loads `edi`/`ebx` with the vector and the new count and falls into
+         * this body, which pops the by-value `_Val` with `retn 14h`.)
          *
          * What it does:
          * The VC8 `vector<T>::resize(_Newsize, _Val)` lane: grows by inserting
@@ -2544,6 +2567,22 @@ namespace msvc8
          * Address: 0x005C9EC0 (FUN_005C9EC0, the same specialisation emitted a
          * second time for FUN_005C6F90's in-place-insert branch, where it
          * copy-constructs the relocated tail past the old `mLast`)
+         * Address: 0x00549BC0 (FUN_00549BC0,
+         * msvc8::vector<Moho::ResourceDeposit>::uninit_copy_n for the 20-byte
+         * element -- copies five dwords per slot at stride 0x14, taking
+         * `[srcBegin, srcEnd)` on the stack and the destination cursor in
+         * `eax`. The `test eax, eax` guard sits *inside* the loop because the
+         * destination is freshly-allocated storage the compiler cannot prove
+         * non-null. Reached from `reserve` (FUN_00547E00).)
+         * Address: 0x00549A90 (FUN_00549A90, the identical 24-instruction body
+         * emitted a second time -- same mnemonics, same 60 bytes. This build
+         * did not fold them, so both COMDATs survive.)
+         * Address: 0x00548AB0 (FUN_00548AB0, register-shape adapter for FUN_00549BC0)
+         * Address: 0x00549480 (FUN_00549480, register-shape adapter for FUN_00549BC0)
+         * Address: 0x005498F0 (FUN_005498F0, register-shape adapter for FUN_00549BC0)
+         * Address: 0x00549A50 (FUN_00549A50, register-shape adapter for FUN_00549BC0)
+         * Address: 0x00549750 (FUN_00549750, source-first adapter for FUN_00549A90)
+         * Address: 0x00549940 (FUN_00549940, source-first adapter for FUN_00549A90)
          *
          * Uninitialized copy N from src to dst
          */
@@ -2676,6 +2715,13 @@ namespace msvc8
          * lane -- copy-assigns `[srcBegin, srcEnd)` backward into
          * `[destEnd - n, destEnd)`; used by FUN_005C6F90's in-place branch to
          * shift the live tail right without overlap corruption)
+         * Address: 0x00548C00 (FUN_00548C00, the `std::copy` emission for the
+         * 20-byte `Moho::ResourceDeposit` -- the same five-dword stride-0x14
+         * loop as FUN_00549BC0 but with all three cursors in registers and
+         * **no** null guard, because here the destination is already-live
+         * storage. Used by `resize`'s shrink branch (FUN_00547F20, to compute
+         * the new `_Mylast`) and three times by `operator=` (FUN_00548ED0) for
+         * its assign-over-the-retained-prefix paths.)
          *
          * Assign n elements from src to dst (dst already constructed)
          */
