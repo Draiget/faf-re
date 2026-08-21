@@ -211,7 +211,7 @@ namespace
   }
 
   [[nodiscard]] unsigned int ResizeFastVectorCountedPtrCParticleTexture(
-    gpg::fastvector_runtime_view<moho::CountedPtr_CParticleTexture>& view,
+    gpg::fastvector<moho::CountedPtr_CParticleTexture>& vec,
     const moho::CountedPtr_CParticleTexture* fillValue,
     unsigned int requestedCount
   );
@@ -229,18 +229,18 @@ namespace
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::CountedPtr_CParticleTexture fill{};
-    (void)ResizeFastVectorCountedPtrCParticleTexture(view, &fill, count);
+    (void)ResizeFastVectorCountedPtrCParticleTexture(vec, &fill, count);
 
     gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &view.begin[i], owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -257,14 +257,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &view.begin[i], owner);
+      archive->Write(elementType, &vec[i], owner);
     }
   }
 
@@ -277,14 +277,18 @@ namespace
    * lanes.
    */
   [[nodiscard]] unsigned int ResizeFastVectorCountedPtrCParticleTexture(
-    gpg::fastvector_runtime_view<moho::CountedPtr_CParticleTexture>& view,
+    gpg::fastvector<moho::CountedPtr_CParticleTexture>& vec,
     const moho::CountedPtr_CParticleTexture* const fillValue,
     const unsigned int requestedCount
   )
   {
-    const unsigned int currentCount = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    // Not a plain Resize: CountedPtr slots have to be released on shrink and
+    // retained on grow, which the container's trivial element handling does
+    // not do. The view is derived here so callers never see one.
+    auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(&vec);
+    const unsigned int currentCount = static_cast<unsigned int>(vec.size());
     if (requestedCount < currentCount) {
-      moho::CountedPtr_CParticleTexture* const newEnd = view.begin + requestedCount;
+      moho::CountedPtr_CParticleTexture* const newEnd = vec.Data() + requestedCount;
       for (moho::CountedPtr_CParticleTexture* cursor = newEnd; cursor != view.end; ++cursor) {
         moho::ResetCountedParticleTexturePtr(*cursor);
       }
@@ -295,7 +299,7 @@ namespace
     if (requestedCount > currentCount) {
       gpg::FastVectorRuntimeEnsureCapacity(static_cast<std::size_t>(requestedCount), view);
       moho::CParticleTexture* const fillTexture = fillValue ? fillValue->tex : nullptr;
-      moho::CountedPtr_CParticleTexture* const requestedEnd = view.begin + requestedCount;
+      moho::CountedPtr_CParticleTexture* const requestedEnd = vec.Data() + requestedCount;
       while (view.end != requestedEnd) {
         moho::CountedPtr_CParticleTexture* const slot = view.end;
         view.end = slot + 1;
@@ -303,7 +307,7 @@ namespace
       }
     }
 
-    return view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    return static_cast<unsigned int>(vec.size());
   }
 } // namespace
 
@@ -703,12 +707,12 @@ namespace gpg
       return out;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(obj);
-    if (!view.begin || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+    auto& vec = *static_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(obj);
+    if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
 
-    out.mObj = view.begin + ind;
+    out.mObj = vec.Data() + ind;
     return out;
   }
 
@@ -725,12 +729,12 @@ namespace gpg
       return 0u;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(obj);
-    if (!view.begin) {
+    auto& vec = *static_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(obj);
+    if (vec.Data() == nullptr) {
       return 0u;
     }
 
-    return static_cast<std::size_t>(view.end - view.begin);
+    return vec.size();
   }
 
   /**
@@ -746,9 +750,9 @@ namespace gpg
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::CountedPtr_CParticleTexture>(obj);
+    auto& vec = *static_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(obj);
     moho::CountedPtr_CParticleTexture fill{};
-    (void)ResizeFastVectorCountedPtrCParticleTexture(view, &fill, static_cast<unsigned int>(count));
+    (void)ResizeFastVectorCountedPtrCParticleTexture(vec, &fill, static_cast<unsigned int>(count));
   }
 } // namespace gpg
 
