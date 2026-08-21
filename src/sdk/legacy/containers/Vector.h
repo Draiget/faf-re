@@ -2098,6 +2098,14 @@ namespace msvc8
         /**
          * Insert `count` copies of `value` at iterator `pos`.
          *
+         * Address: 0x00653E80 (FUN_00653E80, msvc8::vector<moho::SDebugWorldText>::
+         * in-place tail-shift-by-move-assign loop for the 48-byte non-trivial
+         * element -- the `for (i = tail-count; i>0; --i) insertAt[count+i-1] =
+         * std::move(insertAt[i-1])` branch below, walking backward so overlapping
+         * source/destination ranges never clobber an unread element (position/
+         * style/depth as raw field copies, `text` reassigned via `assign`). Reached
+         * via the thin dispatcher FUN_00653A20 from the `_Insert_n` grow lane
+         * FUN_00653380, already cited below).
          * Address: 0x008DD050 (FUN_008DD050, msvc8::vector<gpg::RType*>::_Insert_n
          * grow lane for the global reflection TypeVec; the recovered caller
          * gpg::RType::RegisterType invokes insert(end(), 1, this) by name so this
@@ -2770,6 +2778,14 @@ namespace msvc8
          * of the by-ref prototype, used by FUN_005C6F90 to fill the inserted gap)
          * Address: 0x005C8720 (FUN_005C8720, the advance-returning `_Ufill`
          * adapter around FUN_005CC2D0: fills then returns `dst + count`)
+         * Address: 0x00653AD0 (FUN_00653AD0, msvc8::vector<moho::SDebugWorldText>::
+         * uninit_fill_n for the 48-byte non-trivial element -- a count-driven loop
+         * that copy-constructs `count` copies of the same source value into `dst`
+         * (position/style/depth as raw field copies, `text` zeroed to empty SSO
+         * state then `assign`ed), with a trailing EH cleanup loop that destroys the
+         * already-constructed prefix and rethrows on a `catch(...)`. Reached via the
+         * thin dispatcher FUN_00653330 from the `_Insert_n` grow lane FUN_00653380,
+         * already cited above)
          *
          * Uninitialized fill N with value starting at dst
          */
@@ -2792,6 +2808,15 @@ namespace msvc8
          * the single trailing element past `mLast` on the in-place path (via the
          * count=1 dispatcher FUN_007F3500) and to move the head/tail spans into the
          * reallocated buffer)
+         * Address: 0x00653F40 (FUN_00653F40, msvc8::vector<moho::SDebugWorldText>::
+         * uninit_move_n for the 48-byte non-trivial element -- forward per-element
+         * copy-construct loop over `[src, srcEnd)` into `dst` (position/style/depth
+         * as raw field copies, `text` zeroed to empty SSO state then `assign`ed --
+         * MSVC8 has no real move ctor for this type, so "move" degrades to copy,
+         * matching `move_if_noexcept` on a non-nothrow-movable T), with a trailing
+         * EH cleanup loop that destroys the already-constructed prefix and rethrows.
+         * Reached via the thin dispatcher FUN_006539E0 from the `_Insert_n` grow
+         * lane FUN_00653380, already cited above)
          *
          * Uninitialized move (or copy if non-movable) N elements src->dst.
          * Used by `insert(pos, count, value)` to shift the tail and to
