@@ -760,11 +760,14 @@ namespace
       return eraseBegin;
     }
 
-    auto& cellView = msvc8::AsVectorRuntimeView(shorelineCells);
-    ShoreCellRef* const previousEnd = cellView.end;
+    // Shift the survivors down, release the vacated tail's shared refs -- the
+    // element destructor does not -- then drop mLast: erase(first, last).
+    ShoreCellRef* const previousEnd = shorelineCells.end();
     ShoreCellRef* const newEnd = CopyShoreCellRefRange(eraseBegin, eraseEnd, previousEnd);
     ReleaseShoreCellRefRange(newEnd, previousEnd);
-    cellView.end = newEnd;
+    while (shorelineCells.end() != newEnd) {
+      shorelineCells.pop_back_no_destroy();
+    }
     return eraseBegin;
   }
 } // namespace
@@ -848,8 +851,7 @@ namespace moho
   {
     mVertexSheet.reset();
 
-    auto& cellView = msvc8::AsVectorRuntimeView(mCells);
-    (void)EraseShoreCellRefRange(mCells, cellView.begin, cellView.end);
+    (void)EraseShoreCellRefRange(mCells, mCells.begin(), mCells.end());
 
     mShorelineTris = 0;
   }

@@ -253,19 +253,12 @@ namespace
     const std::size_t targetCount = static_cast<std::size_t>(count);
     if (targetCount > 0u) {
       // Pre-grow the destination so each slot exists as a constructed
-      // EntityCategorySet before archive deserialization writes into it. We
-      // use the uninitialized-copy helper to clone a single empty prototype
-      // into each new slot, mirroring the binary's reserve-and-uninit-copy
-      // path for vector<EntityCategorySet> growth.
+      // EntityCategorySet before archive deserialization writes into it.
+      // reserve() has already sized capacity to exactly targetCount, so the
+      // resize takes _Insert_n's in-place branch and does not reallocate --
+      // the binary's reserve-and-uninit-copy growth path.
       loaded.reserve(targetCount);
-      const moho::EntityCategorySet emptyPrototype{};
-      auto& view = msvc8::AsVectorRuntimeView(loaded);
-      moho::EntityCategorySet* const slotsBegin = view.end;
-      for (std::size_t i = 0u; i < targetCount; ++i) {
-        moho::EntityCategorySet* const slot = slotsBegin + i;
-        (void)moho::UninitializedCopyEntityCategorySetRange(&emptyPrototype, &emptyPrototype + 1, slot);
-      }
-      view.end = slotsBegin + targetCount;
+      loaded.resize(targetCount, moho::EntityCategorySet{});
     }
 
     gpg::RType* const elementType = ResolveEntityCategorySetType();
@@ -442,12 +435,7 @@ size_t gpg::RVectorType<moho::EntityCategorySet>::GetCount(void* const obj) cons
     return 0u;
   }
 
-  const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const EntityCategorySetVector*>(obj));
-  if (!view.begin) {
-    return 0u;
-  }
-
-  return static_cast<std::size_t>(view.end - view.begin);
+  return static_cast<const EntityCategorySetVector*>(obj)->size();
 }
 
 /**
