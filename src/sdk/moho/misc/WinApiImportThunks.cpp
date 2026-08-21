@@ -6,6 +6,11 @@
 #include <mmsystem.h>
 #include <processenv.h>
 #include <dsound.h>
+#include <commdlg.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <cstdint>
 #include <typeinfo>
 
@@ -85347,6 +85352,555 @@ namespace moho::runtime
     return advancedCursorAddress;
   }
 
+  /**
+   * Address: 0x009AD390 (FUN_009AD390, GetCurrentThreadId)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentThreadId`.
+   */
+  DWORD ThunkGetCurrentThreadId()
+  {
+    return ::GetCurrentThreadId();
+  }
+
+  /**
+   * Address: 0x009C7520 (FUN_009C7520, GetCurrentProcessId_0)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentProcessId_0`.
+   */
+  DWORD ThunkGetCurrentProcessId_0()
+  {
+    return ::GetCurrentProcessId();
+  }
+
+  /**
+   * Address: 0x00A814D8 (FUN_00A814D8, PathFileExistsW)
+   *
+   * What it does:
+   * Import thunk that forwards to `PathFileExistsW`.
+   */
+  BOOL ThunkPathFileExistsW(LPCWSTR pszPath)
+  {
+    return ::PathFileExistsW(pszPath);
+  }
+
+  /**
+   * Address: 0x00A814F6 (FUN_00A814F6, GetTickCount)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetTickCount`.
+   */
+  DWORD ThunkGetTickCount()
+  {
+    return ::GetTickCount();
+  }
+
+  /**
+   * Address: 0x00A814FC (FUN_00A814FC, OpenThread)
+   *
+   * What it does:
+   * Import thunk that forwards to `OpenThread`.
+   */
+  HANDLE ThunkOpenThread(const DWORD dwDesiredAccess, const BOOL bInheritHandle, const DWORD dwThreadId)
+  {
+    return ::OpenThread(dwDesiredAccess, bInheritHandle, dwThreadId);
+  }
+
+  /**
+   * Address: 0x00A81502 (FUN_00A81502, GetCurrentThreadId_0)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentThreadId_0`.
+   */
+  DWORD ThunkGetCurrentThreadId_0()
+  {
+    return ::GetCurrentThreadId();
+  }
+
+  /**
+   * Address: 0x00A81508 (FUN_00A81508, QueueUserAPC)
+   *
+   * What it does:
+   * Import thunk that forwards to `QueueUserAPC`.
+   */
+  DWORD ThunkQueueUserAPC(PAPCFUNC pfnAPC, HANDLE hThread, const ULONG_PTR dwData)
+  {
+    return ::QueueUserAPC(pfnAPC, hThread, dwData);
+  }
+
+  /**
+   * Address: 0x00A8150E (FUN_00A8150E, CloseHandle)
+   *
+   * What it does:
+   * Import thunk that forwards to `CloseHandle`.
+   */
+  BOOL ThunkCloseHandle(HANDLE hObject)
+  {
+    return ::CloseHandle(hObject);
+  }
+
+  /**
+   * Address: 0x00A81514 (FUN_00A81514, GetCurrentProcess)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentProcess`.
+   */
+  HANDLE ThunkGetCurrentProcess()
+  {
+    return ::GetCurrentProcess();
+  }
+
+  /**
+   * Address: 0x00A8151A (FUN_00A8151A, GetCurrentThread)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentThread`.
+   */
+  HANDLE ThunkGetCurrentThread()
+  {
+    return ::GetCurrentThread();
+  }
+
+  /**
+   * Address: 0x00A8152C (FUN_00A8152C, CreateEventW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateEventW`.
+   */
+  HANDLE ThunkCreateEventW(LPSECURITY_ATTRIBUTES lpEventAttributes, const BOOL bManualReset, const BOOL bInitialState, LPCWSTR lpName)
+  {
+    return ::CreateEventW(lpEventAttributes, bManualReset, bInitialState, lpName);
+  }
+
+  /**
+   * Address: 0x00A81532 (FUN_00A81532, SetEvent)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetEvent`.
+   */
+  BOOL ThunkSetEvent(HANDLE hEvent)
+  {
+    return ::SetEvent(hEvent);
+  }
+
+  /**
+   * Address: 0x00A81538 (FUN_00A81538, Sleep)
+   *
+   * What it does:
+   * Import thunk that forwards to `Sleep`.
+   */
+  void ThunkSleep(const DWORD dwMilliseconds)
+  {
+    ::Sleep(dwMilliseconds);
+  }
+
+  /**
+   * Address: 0x00A8153E (FUN_00A8153E, FileTimeToSystemTime)
+   *
+   * What it does:
+   * Import thunk that forwards to `FileTimeToSystemTime`.
+   */
+  BOOL ThunkFileTimeToSystemTime(const FILETIME *lpFileTime, LPSYSTEMTIME lpSystemTime)
+  {
+    return ::FileTimeToSystemTime(lpFileTime, lpSystemTime);
+  }
+
+  /**
+   * Address: 0x00A81544 (FUN_00A81544, FileTimeToLocalFileTime)
+   *
+   * What it does:
+   * Import thunk that forwards to `FileTimeToLocalFileTime`.
+   */
+  BOOL ThunkFileTimeToLocalFileTime(const FILETIME *lpFileTime, LPFILETIME lpLocalFileTime)
+  {
+    return ::FileTimeToLocalFileTime(lpFileTime, lpLocalFileTime);
+  }
+
+  /**
+   * Address: 0x00A8154A (FUN_00A8154A, MapViewOfFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `MapViewOfFile`.
+   */
+  LPVOID ThunkMapViewOfFile(HANDLE hFileMappingObject, const DWORD dwDesiredAccess, const DWORD dwFileOffsetHigh, const DWORD dwFileOffsetLow, const SIZE_T dwNumberOfBytesToMap)
+  {
+    return ::MapViewOfFile(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
+  }
+
+  /**
+   * Address: 0x00A81550 (FUN_00A81550, UnmapViewOfFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `UnmapViewOfFile`.
+   */
+  BOOL ThunkUnmapViewOfFile(LPCVOID lpBaseAddress)
+  {
+    return ::UnmapViewOfFile(lpBaseAddress);
+  }
+
+  /**
+   * Address: 0x00A81556 (FUN_00A81556, ReadFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `ReadFile`.
+   */
+  BOOL ThunkReadFile(HANDLE hFile, LPVOID lpBuffer, const DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped)
+  {
+    return ::ReadFile(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
+  }
+
+  /**
+   * Address: 0x00A8155C (FUN_00A8155C, GetFileAttributesExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetFileAttributesExW`.
+   */
+  BOOL ThunkGetFileAttributesExW(LPCWSTR lpFileName, const GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
+  {
+    return ::GetFileAttributesExW(lpFileName, fInfoLevelId, lpFileInformation);
+  }
+
+  /**
+   * Address: 0x00A81562 (FUN_00A81562, CreateFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateFileW`.
+   */
+  HANDLE ThunkCreateFileW(LPCWSTR lpFileName, const DWORD dwDesiredAccess, const DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, const DWORD dwCreationDisposition, const DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
+  {
+    return ::CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+  }
+
+  /**
+   * Address: 0x00A81568 (FUN_00A81568, CreateFileMappingW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateFileMappingW`.
+   */
+  HANDLE ThunkCreateFileMappingW(HANDLE hFile, LPSECURITY_ATTRIBUTES lpFileMappingAttributes, const DWORD flProtect, const DWORD dwMaximumSizeHigh, const DWORD dwMaximumSizeLow, LPCWSTR lpName)
+  {
+    return ::CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
+  }
+
+  /**
+   * Address: 0x00A8156E (FUN_00A8156E, GetFileSize)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetFileSize`.
+   */
+  DWORD ThunkGetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh)
+  {
+    return ::GetFileSize(hFile, lpFileSizeHigh);
+  }
+
+  /**
+   * Address: 0x00A81574 (FUN_00A81574, CancelIo)
+   *
+   * What it does:
+   * Import thunk that forwards to `CancelIo`.
+   */
+  BOOL ThunkCancelIo(HANDLE hFile)
+  {
+    return ::CancelIo(hFile);
+  }
+
+  /**
+   * Address: 0x00A81580 (FUN_00A81580, ReadDirectoryChangesW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ReadDirectoryChangesW`.
+   */
+  BOOL ThunkReadDirectoryChangesW(HANDLE hDirectory, LPVOID lpBuffer, const DWORD nBufferLength, const BOOL bWatchSubtree, const DWORD dwNotifyFilter, LPDWORD lpBytesReturned, LPOVERLAPPED lpOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine)
+  {
+    return ::ReadDirectoryChangesW(hDirectory, lpBuffer, nBufferLength, bWatchSubtree, dwNotifyFilter, lpBytesReturned, lpOverlapped, lpCompletionRoutine);
+  }
+
+  /**
+   * Address: 0x00A81586 (FUN_00A81586, CreateFileA)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateFileA`.
+   */
+  HANDLE ThunkCreateFileA(LPCSTR lpFileName, const DWORD dwDesiredAccess, const DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, const DWORD dwCreationDisposition, const DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
+  {
+    return ::CreateFileA(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+  }
+
+  /**
+   * Address: 0x00A8158C (FUN_00A8158C, GetOverlappedResult)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetOverlappedResult`.
+   */
+  BOOL ThunkGetOverlappedResult(HANDLE hFile, LPOVERLAPPED lpOverlapped, LPDWORD lpNumberOfBytesTransferred, const BOOL bWait)
+  {
+    return ::GetOverlappedResult(hFile, lpOverlapped, lpNumberOfBytesTransferred, bWait);
+  }
+
+  /**
+   * Address: 0x00A81592 (FUN_00A81592, DosDateTimeToFileTime)
+   *
+   * What it does:
+   * Import thunk that forwards to `DosDateTimeToFileTime`.
+   */
+  BOOL ThunkDosDateTimeToFileTime(const WORD wFatDate, const WORD wFatTime, LPFILETIME lpFileTime)
+  {
+    return ::DosDateTimeToFileTime(wFatDate, wFatTime, lpFileTime);
+  }
+
+  /**
+   * Address: 0x00A81598 (FUN_00A81598, FormatMessageW)
+   *
+   * What it does:
+   * Import thunk that forwards to `FormatMessageW`.
+   */
+  DWORD ThunkFormatMessageW(const DWORD dwFlags, LPCVOID lpSource, const DWORD dwMessageId, const DWORD dwLanguageId, LPWSTR lpBuffer, const DWORD nSize, va_list *Arguments)
+  {
+    return ::FormatMessageW(dwFlags, lpSource, dwMessageId, dwLanguageId, lpBuffer, nSize, Arguments);
+  }
+
+  /**
+   * Address: 0x00A815A4 (FUN_00A815A4, SetThreadPriority)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetThreadPriority`.
+   */
+  BOOL ThunkSetThreadPriority(HANDLE hThread, const int nPriority)
+  {
+    return ::SetThreadPriority(hThread, nPriority);
+  }
+
+  /**
+   * Address: 0x00A815AA (FUN_00A815AA, CreateProcessW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateProcessW`.
+   */
+  BOOL ThunkCreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, const BOOL bInheritHandles, const DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation)
+  {
+    return ::CreateProcessW(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
+  }
+
+  /**
+   * Address: 0x00A815B0 (FUN_00A815B0, WaitForSingleObject)
+   *
+   * What it does:
+   * Import thunk that forwards to `WaitForSingleObject`.
+   */
+  DWORD ThunkWaitForSingleObject(HANDLE hHandle, const DWORD dwMilliseconds)
+  {
+    return ::WaitForSingleObject(hHandle, dwMilliseconds);
+  }
+
+  /**
+   * Address: 0x00A815B6 (FUN_00A815B6, GlobalUnlock)
+   *
+   * What it does:
+   * Import thunk that forwards to `GlobalUnlock`.
+   */
+  BOOL ThunkGlobalUnlock(HGLOBAL hMem)
+  {
+    return ::GlobalUnlock(hMem);
+  }
+
+  /**
+   * Address: 0x00A815BC (FUN_00A815BC, WriteFile)
+   *
+   * What it does:
+   * Import thunk that forwards to `WriteFile`.
+   */
+  BOOL ThunkWriteFile(HANDLE hFile, LPCVOID lpBuffer, const DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped)
+  {
+    return ::WriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
+  }
+
+  /**
+   * Address: 0x00A815C2 (FUN_00A815C2, GlobalAlloc)
+   *
+   * What it does:
+   * Import thunk that forwards to `GlobalAlloc`.
+   */
+  HGLOBAL ThunkGlobalAlloc(const UINT uFlags, const SIZE_T dwBytes)
+  {
+    return ::GlobalAlloc(uFlags, dwBytes);
+  }
+
+  /**
+   * Address: 0x00A815C8 (FUN_00A815C8, GlobalLock)
+   *
+   * What it does:
+   * Import thunk that forwards to `GlobalLock`.
+   */
+  LPVOID ThunkGlobalLock(HGLOBAL hMem)
+  {
+    return ::GlobalLock(hMem);
+  }
+
+  /**
+   * Address: 0x00A815CE (FUN_00A815CE, GetCurrentProcessId_1)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentProcessId_1`.
+   */
+  DWORD ThunkGetCurrentProcessId_1()
+  {
+    return ::GetCurrentProcessId();
+  }
+
+  /**
+   * Address: 0x00A815D4 (FUN_00A815D4, CreateMutexA)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateMutexA`.
+   */
+  HANDLE ThunkCreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes, const BOOL bInitialOwner, LPCSTR lpName)
+  {
+    return ::CreateMutexA(lpMutexAttributes, bInitialOwner, lpName);
+  }
+
+  /**
+   * Address: 0x00A815DA (FUN_00A815DA, SetUnhandledExceptionFilter)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetUnhandledExceptionFilter`.
+   */
+  LPTOP_LEVEL_EXCEPTION_FILTER ThunkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter)
+  {
+    return ::SetUnhandledExceptionFilter(lpTopLevelExceptionFilter);
+  }
+
+  /**
+   * Address: 0x00A815F2 (FUN_00A815F2, SuspendThread)
+   *
+   * What it does:
+   * Import thunk that forwards to `SuspendThread`.
+   */
+  DWORD ThunkSuspendThread(HANDLE hThread)
+  {
+    return ::SuspendThread(hThread);
+  }
+
+  /**
+   * Address: 0x00A815F8 (FUN_00A815F8, FreeLibrary)
+   *
+   * What it does:
+   * Import thunk that forwards to `FreeLibrary`.
+   */
+  BOOL ThunkFreeLibrary(HMODULE hLibModule)
+  {
+    return ::FreeLibrary(hLibModule);
+  }
+
+  /**
+   * Address: 0x00A815FE (FUN_00A815FE, GetModuleHandleExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetModuleHandleExW`.
+   */
+  BOOL ThunkGetModuleHandleExW(const DWORD dwFlags, LPCWSTR lpModuleName, HMODULE *phModule)
+  {
+    return ::GetModuleHandleExW(dwFlags, lpModuleName, phModule);
+  }
+
+  /**
+   * Address: 0x00A81604 (FUN_00A81604, TerminateProcess)
+   *
+   * What it does:
+   * Import thunk that forwards to `TerminateProcess`.
+   */
+  BOOL ThunkTerminateProcess(HANDLE hProcess, const UINT uExitCode)
+  {
+    return ::TerminateProcess(hProcess, uExitCode);
+  }
+
+  /**
+   * Address: 0x00A8160A (FUN_00A8160A, GetModuleFileNameW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetModuleFileNameW`.
+   */
+  DWORD ThunkGetModuleFileNameW(HMODULE hModule, LPWSTR lpFilename, const DWORD nSize)
+  {
+    return ::GetModuleFileNameW(hModule, lpFilename, nSize);
+  }
+
+  /**
+   * Address: 0x00A81610 (FUN_00A81610, SleepEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SleepEx`.
+   */
+  DWORD ThunkSleepEx(const DWORD dwMilliseconds, const BOOL bAlertable)
+  {
+    return ::SleepEx(dwMilliseconds, bAlertable);
+  }
+
+  /**
+   * Address: 0x00A81616 (FUN_00A81616, GlobalFree)
+   *
+   * What it does:
+   * Import thunk that forwards to `GlobalFree`.
+   */
+  HGLOBAL ThunkGlobalFree(HGLOBAL hMem)
+  {
+    return ::GlobalFree(hMem);
+  }
+
+  /**
+   * Address: 0x00A8161C (FUN_00A8161C, GetVersionExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetVersionExW`.
+   */
+  BOOL ThunkGetVersionExW(LPOSVERSIONINFOW lpVersionInformation)
+  {
+    return ::GetVersionExW(lpVersionInformation);
+  }
+
+  /**
+   * Address: 0x00A81622 (FUN_00A81622, GetModuleHandleW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetModuleHandleW`.
+   */
+  HMODULE ThunkGetModuleHandleW(LPCWSTR lpModuleName)
+  {
+    return ::GetModuleHandleW(lpModuleName);
+  }
+
+  /**
+   * Address: 0x00A81628 (FUN_00A81628, LocalFree)
+   *
+   * What it does:
+   * Import thunk that forwards to `LocalFree`.
+   */
+  HLOCAL ThunkLocalFree(HLOCAL hMem)
+  {
+    return ::LocalFree(hMem);
+  }
+
+  /**
+   * Address: 0x00A81634 (FUN_00A81634, ResetEvent)
+   *
+   * What it does:
+   * Import thunk that forwards to `ResetEvent`.
+   */
+  BOOL ThunkResetEvent(HANDLE hEvent)
+  {
+    return ::ResetEvent(hEvent);
+  }
+
+  /**
+   * Address: 0x00A8163A (FUN_00A8163A, GetSystemInfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetSystemInfo`.
+   */
+  void ThunkGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
+  {
+    ::GetSystemInfo(lpSystemInfo);
+  }
 } // namespace moho::runtime
 
 
