@@ -85900,6 +85900,555 @@ namespace moho::runtime
   {
     ::GetSystemInfo(lpSystemInfo);
   }
+  /**
+   * Address: 0x00A81640 (FUN_00A81640, GetNumaProcessorNode)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetNumaProcessorNode`.
+   */
+  BOOL ThunkGetNumaProcessorNode(UCHAR Processor, PUCHAR NodeNumber)
+  {
+    return ::GetNumaProcessorNode(Processor, NodeNumber);
+  }
+
+  /**
+   * Address: 0x00A81646 (FUN_00A81646, DeleteFileA)
+   *
+   * What it does:
+   * Import thunk that forwards to `DeleteFileA`.
+   */
+  BOOL ThunkDeleteFileA(LPCSTR lpFileName)
+  {
+    return ::DeleteFileA(lpFileName);
+  }
+
+  /**
+   * Address: 0x00A8164C (FUN_00A8164C, CreateDirectoryA)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDirectoryA`.
+   */
+  BOOL ThunkCreateDirectoryA(LPCSTR lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes)
+  {
+    return ::CreateDirectoryA(lpPathName, lpSecurityAttributes);
+  }
+
+  /**
+   * Address: 0x00A81652 (FUN_00A81652, GetFileAttributesW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetFileAttributesW`.
+   */
+  DWORD ThunkGetFileAttributesW(LPCWSTR lpFileName)
+  {
+    return ::GetFileAttributesW(lpFileName);
+  }
+
+  /**
+   * Address: 0x00A81658 (FUN_00A81658, CreateProcessA)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateProcessA`.
+   */
+  BOOL ThunkCreateProcessA(LPCSTR lpApplicationName, LPSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, const BOOL bInheritHandles, const DWORD dwCreationFlags, LPVOID lpEnvironment, LPCSTR lpCurrentDirectory, LPSTARTUPINFOA lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation)
+  {
+    return ::CreateProcessA(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
+  }
+
+  /**
+   * Address: 0x00A8165E (FUN_00A8165E, CopyFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CopyFileW`.
+   */
+  BOOL ThunkCopyFileW(LPCWSTR lpExistingFileName, LPCWSTR lpNewFileName, const BOOL bFailIfExists)
+  {
+    return ::CopyFileW(lpExistingFileName, lpNewFileName, bFailIfExists);
+  }
+
+  /**
+   * Address: 0x00A81664 (FUN_00A81664, CreateDirectoryW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateDirectoryW`.
+   */
+  BOOL ThunkCreateDirectoryW(LPCWSTR lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes)
+  {
+    return ::CreateDirectoryW(lpPathName, lpSecurityAttributes);
+  }
+
+  /**
+   * Address: 0x00A8166A (FUN_00A8166A, DeleteFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `DeleteFileW`.
+   */
+  BOOL ThunkDeleteFileW(LPCWSTR lpFileName)
+  {
+    return ::DeleteFileW(lpFileName);
+  }
+
+  /**
+   * Address: 0x00A81670 (FUN_00A81670, MoveFileExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `MoveFileExW`.
+   */
+  BOOL ThunkMoveFileExW(LPCWSTR lpExistingFileName, LPCWSTR lpNewFileName, const DWORD dwFlags)
+  {
+    return ::MoveFileExW(lpExistingFileName, lpNewFileName, dwFlags);
+  }
+
+  /**
+   * Address: 0x00A81676 (FUN_00A81676, MoveFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `MoveFileW`.
+   */
+  BOOL ThunkMoveFileW(LPCWSTR lpExistingFileName, LPCWSTR lpNewFileName)
+  {
+    return ::MoveFileW(lpExistingFileName, lpNewFileName);
+  }
+
+  /**
+   * Address: 0x00A8167C (FUN_00A8167C, FindFirstFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `FindFirstFileW`.
+   */
+  HANDLE ThunkFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
+  {
+    return ::FindFirstFileW(lpFileName, lpFindFileData);
+  }
+
+  /**
+   * Address: 0x00A81682 (FUN_00A81682, FindNextFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `FindNextFileW`.
+   */
+  BOOL ThunkFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
+  {
+    return ::FindNextFileW(hFindFile, lpFindFileData);
+  }
+
+  /**
+   * Address: 0x00A81688 (FUN_00A81688, FindClose)
+   *
+   * What it does:
+   * Import thunk that forwards to `FindClose`.
+   */
+  BOOL ThunkFindClose(HANDLE hFindFile)
+  {
+    return ::FindClose(hFindFile);
+  }
+
+  /**
+   * Address: 0x00A8168E (FUN_00A8168E, ReplaceFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ReplaceFileW`.
+   */
+  BOOL ThunkReplaceFileW(LPCWSTR lpReplacedFileName, LPCWSTR lpReplacementFileName, LPCWSTR lpBackupFileName, const DWORD dwReplaceFlags, LPVOID lpExclude, LPVOID lpReserved)
+  {
+    return ::ReplaceFileW(lpReplacedFileName, lpReplacementFileName, lpBackupFileName, dwReplaceFlags, lpExclude, lpReserved);
+  }
+
+  /**
+   * Address: 0x00A8169A (FUN_00A8169A, LoadLibraryA)
+   *
+   * What it does:
+   * Import thunk that forwards to `LoadLibraryA`.
+   */
+  HMODULE ThunkLoadLibraryA(LPCSTR lpLibFileName)
+  {
+    return ::LoadLibraryA(lpLibFileName);
+  }
+
+  /**
+   * Address: 0x00A816A0 (FUN_00A816A0, RaiseException)
+   *
+   * What it does:
+   * Import thunk that forwards to `RaiseException`.
+   */
+  void ThunkRaiseException(const DWORD dwExceptionCode, const DWORD dwExceptionFlags, const DWORD nNumberOfArguments, const ULONG_PTR *lpArguments)
+  {
+    ::RaiseException(dwExceptionCode, dwExceptionFlags, nNumberOfArguments, lpArguments);
+  }
+
+  /**
+   * Address: 0x00A816A6 (FUN_00A816A6, FormatMessageA)
+   *
+   * What it does:
+   * Import thunk that forwards to `FormatMessageA`.
+   */
+  DWORD ThunkFormatMessageA(const DWORD dwFlags, LPCVOID lpSource, const DWORD dwMessageId, const DWORD dwLanguageId, LPSTR lpBuffer, const DWORD nSize, va_list *Arguments)
+  {
+    return ::FormatMessageA(dwFlags, lpSource, dwMessageId, dwLanguageId, lpBuffer, nSize, Arguments);
+  }
+
+  /**
+   * Address: 0x00A816AC (FUN_00A816AC, OutputDebugStringA)
+   *
+   * What it does:
+   * Import thunk that forwards to `OutputDebugStringA`.
+   */
+  void ThunkOutputDebugStringA(LPCSTR lpOutputString)
+  {
+    ::OutputDebugStringA(lpOutputString);
+  }
+
+  /**
+   * Address: 0x00A816B2 (FUN_00A816B2, InterlockedIncrement)
+   *
+   * What it does:
+   * Import thunk that forwards to `InterlockedIncrement`.
+   */
+  LONG ThunkInterlockedIncrement(volatile LONG *lpAddend)
+  {
+    return ::InterlockedIncrement(lpAddend);
+  }
+
+  /**
+   * Address: 0x00A816B8 (FUN_00A816B8, InterlockedDecrement)
+   *
+   * What it does:
+   * Import thunk that forwards to `InterlockedDecrement`.
+   */
+  LONG ThunkInterlockedDecrement(volatile LONG *lpAddend)
+  {
+    return ::InterlockedDecrement(lpAddend);
+  }
+
+  /**
+   * Address: 0x00A816BE (FUN_00A816BE, QueryPerformanceCounter)
+   *
+   * What it does:
+   * Import thunk that forwards to `QueryPerformanceCounter`.
+   */
+  BOOL ThunkQueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount)
+  {
+    return ::QueryPerformanceCounter(lpPerformanceCount);
+  }
+
+  /**
+   * Address: 0x00A816C4 (FUN_00A816C4, QueryPerformanceFrequency)
+   *
+   * What it does:
+   * Import thunk that forwards to `QueryPerformanceFrequency`.
+   */
+  BOOL ThunkQueryPerformanceFrequency(LARGE_INTEGER *lpFrequency)
+  {
+    return ::QueryPerformanceFrequency(lpFrequency);
+  }
+
+  /**
+   * Address: 0x00A816CA (FUN_00A816CA, SetFilePointerEx)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetFilePointerEx`.
+   */
+  BOOL ThunkSetFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, const DWORD dwMoveMethod)
+  {
+    return ::SetFilePointerEx(hFile, liDistanceToMove, lpNewFilePointer, dwMoveMethod);
+  }
+
+  /**
+   * Address: 0x00A816D0 (FUN_00A816D0, EnterCriticalSection)
+   *
+   * What it does:
+   * Import thunk that forwards to `EnterCriticalSection`.
+   */
+  void ThunkEnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
+  {
+    ::EnterCriticalSection(lpCriticalSection);
+  }
+
+  /**
+   * Address: 0x00A816D6 (FUN_00A816D6, LeaveCriticalSection)
+   *
+   * What it does:
+   * Import thunk that forwards to `LeaveCriticalSection`.
+   */
+  void ThunkLeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
+  {
+    ::LeaveCriticalSection(lpCriticalSection);
+  }
+
+  /**
+   * Address: 0x00A816DC (FUN_00A816DC, VirtualAlloc)
+   *
+   * What it does:
+   * Import thunk that forwards to `VirtualAlloc`.
+   */
+  LPVOID ThunkVirtualAlloc(LPVOID lpAddress, const SIZE_T dwSize, const DWORD flAllocationType, const DWORD flProtect)
+  {
+    return ::VirtualAlloc(lpAddress, dwSize, flAllocationType, flProtect);
+  }
+
+  /**
+   * Address: 0x00A816E2 (FUN_00A816E2, InitializeCriticalSectionAndSpinCount)
+   *
+   * What it does:
+   * Import thunk that forwards to `InitializeCriticalSectionAndSpinCount`.
+   */
+  BOOL ThunkInitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection, const DWORD dwSpinCount)
+  {
+    return ::InitializeCriticalSectionAndSpinCount(lpCriticalSection, dwSpinCount);
+  }
+
+  /**
+   * Address: 0x00A816E8 (FUN_00A816E8, VirtualFree)
+   *
+   * What it does:
+   * Import thunk that forwards to `VirtualFree`.
+   */
+  BOOL ThunkVirtualFree(LPVOID lpAddress, const SIZE_T dwSize, const DWORD dwFreeType)
+  {
+    return ::VirtualFree(lpAddress, dwSize, dwFreeType);
+  }
+
+  /**
+   * Address: 0x00A816EE (FUN_00A816EE, DeleteCriticalSection)
+   *
+   * What it does:
+   * Import thunk that forwards to `DeleteCriticalSection`.
+   */
+  void ThunkDeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
+  {
+    ::DeleteCriticalSection(lpCriticalSection);
+  }
+
+  /**
+   * Address: 0x00A816F4 (FUN_00A816F4, VirtualQuery)
+   *
+   * What it does:
+   * Import thunk that forwards to `VirtualQuery`.
+   */
+  SIZE_T ThunkVirtualQuery(LPCVOID lpAddress, PMEMORY_BASIC_INFORMATION lpBuffer, const SIZE_T dwLength)
+  {
+    return ::VirtualQuery(lpAddress, lpBuffer, dwLength);
+  }
+
+  /**
+   * Address: 0x00A816FA (FUN_00A816FA, InitializeCriticalSection)
+   *
+   * What it does:
+   * Import thunk that forwards to `InitializeCriticalSection`.
+   */
+  void ThunkInitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
+  {
+    ::InitializeCriticalSection(lpCriticalSection);
+  }
+
+  /**
+   * Address: 0x00A81706 (FUN_00A81706, ExpandEnvironmentStringsW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExpandEnvironmentStringsW`.
+   */
+  DWORD ThunkExpandEnvironmentStringsW(LPCWSTR lpSrc, LPWSTR lpDst, const DWORD nSize)
+  {
+    return ::ExpandEnvironmentStringsW(lpSrc, lpDst, nSize);
+  }
+
+  /**
+   * Address: 0x00A81712 (FUN_00A81712, LocalAlloc)
+   *
+   * What it does:
+   * Import thunk that forwards to `LocalAlloc`.
+   */
+  HLOCAL ThunkLocalAlloc(const UINT uFlags, const SIZE_T uBytes)
+  {
+    return ::LocalAlloc(uFlags, uBytes);
+  }
+
+  /**
+   * Address: 0x00A81718 (FUN_00A81718, MultiByteToWideChar)
+   *
+   * What it does:
+   * Import thunk that forwards to `MultiByteToWideChar`.
+   */
+  int ThunkMultiByteToWideChar(const UINT CodePage, const DWORD dwFlags, LPCCH lpMultiByteStr, const int cbMultiByte, LPWSTR lpWideCharStr, const int cchWideChar)
+  {
+    return ::MultiByteToWideChar(CodePage, dwFlags, lpMultiByteStr, cbMultiByte, lpWideCharStr, cchWideChar);
+  }
+
+  /**
+   * Address: 0x00A8171E (FUN_00A8171E, WideCharToMultiByte)
+   *
+   * What it does:
+   * Import thunk that forwards to `WideCharToMultiByte`.
+   */
+  int ThunkWideCharToMultiByte(const UINT CodePage, const DWORD dwFlags, LPCWCH lpWideCharStr, const int cchWideChar, LPSTR lpMultiByteStr, const int cbMultiByte, LPCCH lpDefaultChar, LPBOOL lpUsedDefaultChar)
+  {
+    return ::WideCharToMultiByte(CodePage, dwFlags, lpWideCharStr, cchWideChar, lpMultiByteStr, cbMultiByte, lpDefaultChar, lpUsedDefaultChar);
+  }
+
+  /**
+   * Address: 0x00A81724 (FUN_00A81724, LoadLibraryW)
+   *
+   * What it does:
+   * Import thunk that forwards to `LoadLibraryW`.
+   */
+  HMODULE ThunkLoadLibraryW(LPCWSTR lpLibFileName)
+  {
+    return ::LoadLibraryW(lpLibFileName);
+  }
+
+  /**
+   * Address: 0x00A8172A (FUN_00A8172A, SetCurrentDirectoryW)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetCurrentDirectoryW`.
+   */
+  BOOL ThunkSetCurrentDirectoryW(LPCWSTR lpPathName)
+  {
+    return ::SetCurrentDirectoryW(lpPathName);
+  }
+
+  /**
+   * Address: 0x00A81730 (FUN_00A81730, SetErrorMode)
+   *
+   * What it does:
+   * Import thunk that forwards to `SetErrorMode`.
+   */
+  UINT ThunkSetErrorMode(const UINT uMode)
+  {
+    return ::SetErrorMode(uMode);
+  }
+
+  /**
+   * Address: 0x00A81736 (FUN_00A81736, GetDriveTypeW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetDriveTypeW`.
+   */
+  UINT ThunkGetDriveTypeW(LPCWSTR lpRootPathName)
+  {
+    return ::GetDriveTypeW(lpRootPathName);
+  }
+
+  /**
+   * Address: 0x00A8173C (FUN_00A8173C, GetLogicalDriveStringsW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetLogicalDriveStringsW`.
+   */
+  DWORD ThunkGetLogicalDriveStringsW(const DWORD nBufferLength, LPWSTR lpBuffer)
+  {
+    return ::GetLogicalDriveStringsW(nBufferLength, lpBuffer);
+  }
+
+  /**
+   * Address: 0x00A81742 (FUN_00A81742, CreateMutexW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateMutexW`.
+   */
+  HANDLE ThunkCreateMutexW(LPSECURITY_ATTRIBUTES lpMutexAttributes, const BOOL bInitialOwner, LPCWSTR lpName)
+  {
+    return ::CreateMutexW(lpMutexAttributes, bInitialOwner, lpName);
+  }
+
+  /**
+   * Address: 0x00A8174E (FUN_00A8174E, CreateSemaphoreW)
+   *
+   * What it does:
+   * Import thunk that forwards to `CreateSemaphoreW`.
+   */
+  HANDLE ThunkCreateSemaphoreW(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes, const LONG lInitialCount, const LONG lMaximumCount, LPCWSTR lpName)
+  {
+    return ::CreateSemaphoreW(lpSemaphoreAttributes, lInitialCount, lMaximumCount, lpName);
+  }
+
+  /**
+   * Address: 0x00A8175A (FUN_00A8175A, TlsSetValue)
+   *
+   * What it does:
+   * Import thunk that forwards to `TlsSetValue`.
+   */
+  BOOL ThunkTlsSetValue(const DWORD dwTlsIndex, LPVOID lpTlsValue)
+  {
+    return ::TlsSetValue(dwTlsIndex, lpTlsValue);
+  }
+
+  /**
+   * Address: 0x00A81760 (FUN_00A81760, ResumeThread)
+   *
+   * What it does:
+   * Import thunk that forwards to `ResumeThread`.
+   */
+  DWORD ThunkResumeThread(HANDLE hThread)
+  {
+    return ::ResumeThread(hThread);
+  }
+
+  /**
+   * Address: 0x00A81766 (FUN_00A81766, TlsGetValue)
+   *
+   * What it does:
+   * Import thunk that forwards to `TlsGetValue`.
+   */
+  LPVOID ThunkTlsGetValue(const DWORD dwTlsIndex)
+  {
+    return ::TlsGetValue(dwTlsIndex);
+  }
+
+  /**
+   * Address: 0x00A8176C (FUN_00A8176C, TlsFree)
+   *
+   * What it does:
+   * Import thunk that forwards to `TlsFree`.
+   */
+  BOOL ThunkTlsFree(const DWORD dwTlsIndex)
+  {
+    return ::TlsFree(dwTlsIndex);
+  }
+
+  /**
+   * Address: 0x00A81772 (FUN_00A81772, TlsAlloc)
+   *
+   * What it does:
+   * Import thunk that forwards to `TlsAlloc`.
+   */
+  DWORD ThunkTlsAlloc()
+  {
+    return ::TlsAlloc();
+  }
+
+  /**
+   * Address: 0x00A81778 (FUN_00A81778, TerminateThread)
+   *
+   * What it does:
+   * Import thunk that forwards to `TerminateThread`.
+   */
+  BOOL ThunkTerminateThread(HANDLE hThread, const DWORD dwExitCode)
+  {
+    return ::TerminateThread(hThread, dwExitCode);
+  }
+
+  /**
+   * Address: 0x00A8177E (FUN_00A8177E, GetExitCodeThread)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetExitCodeThread`.
+   */
+  BOOL ThunkGetExitCodeThread(HANDLE hThread, LPDWORD lpExitCode)
+  {
+    return ::GetExitCodeThread(hThread, lpExitCode);
+  }
+
+  /**
+   * Address: 0x00A81784 (FUN_00A81784, GetUserDefaultLCID)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetUserDefaultLCID`.
+   */
+  LCID ThunkGetUserDefaultLCID()
+  {
+    return ::GetUserDefaultLCID();
+  }
 } // namespace moho::runtime
 
 
