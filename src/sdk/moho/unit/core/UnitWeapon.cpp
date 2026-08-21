@@ -3256,6 +3256,10 @@ namespace moho
 
   /**
    * Address: 0x006D4A90 (FUN_006D4A90, Moho::UnitWeapon::~UnitWeapon)
+   * Address: 0x006D42C0 (FUN_006D42C0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Releases the owned fire-task lane and clears the target-priorities

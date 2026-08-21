@@ -506,6 +506,10 @@ namespace moho
 
   /**
    * Address: 0x00888D50 (FUN_00888D50, ??1WaveSystem@Moho@@UAE@XZ)
+   * Address: 0x00888D30 (FUN_00888D30, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Releases owned wave generators and restores generator cache storage to

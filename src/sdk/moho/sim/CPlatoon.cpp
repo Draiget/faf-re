@@ -2194,6 +2194,11 @@ namespace moho
 
   /**
    * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
+   * Address: 0x00724CA0 (FUN_00724CA0, vtable-slot-2 scalar deleting
+   * destructor dispatched through the `CScriptObject` sub-object vtable:
+   * casts back to `CPlatoon*` and tail-calls the body below, then
+   * conditionally frees the object -- ordinary C++ `delete` semantics, not
+   * modeled as a separate function here)
    */
   CPlatoon::~CPlatoon()
   {

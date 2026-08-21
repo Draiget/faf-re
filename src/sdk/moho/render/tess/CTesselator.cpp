@@ -832,6 +832,10 @@ namespace moho
 
   /**
    * Address: 0x0080BB70 (FUN_0080BB70, ??1CTesselator@Moho@@QAE@@Z)
+   * Address: 0x0080EB80 (FUN_0080EB80, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    * Mangled: ??1CTesselator@Moho@@QAE@@Z
    *
    * What it does:

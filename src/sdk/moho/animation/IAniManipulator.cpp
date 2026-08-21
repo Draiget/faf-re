@@ -1575,6 +1575,10 @@ namespace moho
 
   /**
    * Address: 0x00634630 (FUN_00634630, ??1CBoneEntityManipulator@Moho@@QAE@@Z)
+   * Address: 0x00634A40 (FUN_00634A40, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    */
   CBoneEntityManipulator::~CBoneEntityManipulator()
   {

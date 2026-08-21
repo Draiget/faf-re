@@ -272,6 +272,10 @@ namespace moho
 
   /**
    * Address: 0x0087FE90 (FUN_0087FE90, Moho::SaveLoadError::~SaveLoadError)
+   * Address: 0x0087FE70 (FUN_0087FE70, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Releases raw-message string storage before base exception teardown.

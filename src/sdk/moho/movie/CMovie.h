@@ -28,6 +28,13 @@ namespace moho
      */
     IMovie();
 
+    /**
+     * Address: 0x00873BF0 (FUN_00873BF0, vtable-slot-2 scalar deleting
+     * destructor: this base interface owns no resources, so the body is
+     * just the vftable restore plus a conditional `operator delete` --
+     * ordinary C++ `delete` semantics, not modeled as a separate function
+     * here)
+     */
     virtual ~IMovie() = default;
   };
 

@@ -65,6 +65,10 @@ namespace moho
 
   /**
    * Address: 0x0080F970 (??1LowFidelityWater@Moho@@QAE@@Z)
+   * Address: 0x008101C0 (FUN_008101C0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    * Mangled: ??1LowFidelityWater@Moho@@QAE@@Z
    *
    * What it does:

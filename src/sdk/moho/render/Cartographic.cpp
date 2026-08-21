@@ -1035,6 +1035,10 @@ namespace moho
 
   /**
    * Address: 0x007D4C80 (FUN_007D4C80, ??1CartographicDecalBatch@Moho@@UAE@XZ)
+   * Address: 0x007D4210 (FUN_007D4210, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Runs the shutdown lane, clears/deletes the intrusive decal sentinel, and
@@ -1113,6 +1117,10 @@ namespace moho
 
   /**
    * Address: 0x007D11B0 (FUN_007D11B0, ??1Cartographic@Moho@@UAE@XZ)
+   * Address: 0x007D1190 (FUN_007D1190, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * IDA signature:
    * void __thiscall Moho::Cartographic::~Cartographic(Moho::Cartographic* this);

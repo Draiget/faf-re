@@ -162,6 +162,13 @@ namespace moho
      */
     IDecalManager();
 
+    /**
+     * Address: 0x00877260 (FUN_00877260, vtable-slot-2 scalar deleting
+     * destructor: this base interface owns no resources, so the body is
+     * just the vftable restore plus a conditional `operator delete` --
+     * ordinary C++ `delete` semantics, not modeled as a separate function
+     * here)
+     */
     virtual ~IDecalManager() = default;
   };
 

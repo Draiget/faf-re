@@ -221,6 +221,10 @@ namespace moho
 
   /**
    * Address: 0x00873D80 (FUN_00873D80, ??1CMovie@Moho@@QAE@@Z)
+   * Address: 0x00874960 (FUN_00874960, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    * Mangled: ??1CMovie@Moho@@QAE@@Z
    *
    * IDA signature:

@@ -882,6 +882,10 @@ namespace moho
 
   /**
    * Address: 0x0069AED0 (FUN_0069AED0, Moho::Projectile::~Projectile)
+   * Address: 0x0069AEA0 (FUN_0069AEA0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Unlinks intrusive weak/broadcaster lanes owned by this projectile and
