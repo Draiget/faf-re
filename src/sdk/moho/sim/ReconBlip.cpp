@@ -1108,6 +1108,10 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
 
 /**
  * Address: 0x005BEC90 (FUN_005BEC90, Moho::ReconBlip::~ReconBlip)
+ * Address: 0x005BEC70 (FUN_005BEC70, vtable-slot-2 scalar deleting
+ * destructor: tail-calls the body below then conditionally frees the object
+ * -- ordinary C++ `delete` semantics, not modeled as a separate function
+ * here)
  *
  * What it does:
  * Destroys recon-blip-owned per-army state lanes, tears down unit variable/

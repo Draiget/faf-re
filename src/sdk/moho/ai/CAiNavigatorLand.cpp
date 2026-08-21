@@ -211,6 +211,11 @@ CAiNavigatorLand::CAiNavigatorLand(Unit* const unit)
 /**
  * Address: 0x005A4490 (FUN_005A4490, scalar deleting thunk)
  * Address: 0x005A3B80 (FUN_005A3B80, core dtor)
+ * Address: 0x005A9C50 (FUN_005A9C50, secondary-vtable adjustor thunk:
+ * adjusts `this` by -16 bytes back to the primary CAiNavigatorLand subobject
+ * and tail-calls the scalar deleting destructor with the same deleteFlag
+ * argument -- multiple-inheritance dispatch path, not modeled as a separate
+ * function here)
  */
 CAiNavigatorLand::~CAiNavigatorLand()
 {

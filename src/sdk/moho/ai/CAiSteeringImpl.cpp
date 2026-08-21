@@ -997,6 +997,10 @@ CAiSteeringImpl::CAiSteeringImpl(Unit* const unit, CUnitMotion* const motion, co
 
 /**
  * Address: 0x005D2920 (FUN_005D2920, ??1CAiSteeringImpl@Moho@@QAE@@Z)
+ * Address: 0x005D2730 (FUN_005D2730, vtable-slot-2 scalar deleting
+ * destructor: tail-calls the body below then conditionally frees the object
+ * -- ordinary C++ `delete` semantics, not modeled as a separate function
+ * here)
  */
 CAiSteeringImpl::~CAiSteeringImpl()
 {

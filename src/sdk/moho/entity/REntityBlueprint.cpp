@@ -91,6 +91,10 @@ namespace moho
 
   /**
    * Address: 0x00511E80 (FUN_00511E80)
+   * Address: 0x00511E60 (FUN_00511E60, vtable-slot-2 scalar deleting
+   * destructor: tail-calls `Moho::REntityBlueprint::~REntityBlueprint(this)`
+   * then conditionally frees the object -- ordinary C++ `delete` semantics,
+   * not modeled as a separate function here)
    * Mangled: ??1REntityBlueprint@Moho@@QAE@@Z
    *
    * What it does:
