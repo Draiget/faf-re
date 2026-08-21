@@ -8,22 +8,22 @@ Progress snapshot:
 
 - Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`97.02%`**
+- Progress coverage:  **`97.63%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of completed tokens: `65,167`*
+  - *Total amount of completed tokens: `65,573`*
 
 Progress DB status breakdown:
 
-- `recovered`: `53,630` (82.30%)
-- `skip`: `6,111` (9.38%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,426` (8.33%) — proven third-party/import-boundary code
+- `recovered`: `54,036` (82.41%)
+- `skip`: `6,111` (9.32%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
+- `external_dependency`: `5,426` (8.27%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `408` (0.61%)
 - `in_progress`: `0` (0.00%)
-- **`blocked`: `1,662` (2.47%)**
+- **`blocked`: `1,256` (1.87%)**
   - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,070`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `2,070`*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,664`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,664`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Build Quickstart + Patches
