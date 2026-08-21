@@ -2253,6 +2253,19 @@ namespace msvc8
          * Emitted via globalUserdata->mAllyUpgradeNotifications.push_back(pair) in
          * moho::cfunc_NotifyUpgradeL (Unit.cpp:11966), whose owner lane is
          * Moho::Sim::mAllyUpgradeNotifications at Sim+0x9D8)
+         * Address: 0x00540330 (FUN_00540330, msvc8::vector<Moho::SEjectRequest>::_Insert_n
+         * grow lane for the 8-byte `{const CClientBase* mRequester, int mAfterBeat}`
+         * element (`sar 3` stride, max_size 0x1FFFFFFF = 0xFFFFFFFF/8, overflow
+         * throw through FUN_00540580). `_Count` is folded to the constant 1 — the
+         * value arrives by pointer and is copied two dwords at a time with no
+         * destroy pass, so the element is trivially copyable, matching the
+         * `SUpgradeNotifyPair` sibling above. In-place growth shifts the tail
+         * through FUN_00540BD0/FUN_00540C20/FUN_00540E80 and returns the iterator
+         * via FUN_00540C00; the realloc path allocates through the checked
+         * 8-byte lane FUN_00540C40. Reached from push_back's capacity-full path
+         * (FUN_0053FC90, already cited above). Emitted via
+         * mEjectRequests.push_back(SEjectRequest(requester, afterBeat)) in
+         * Moho::CClientBase::AddOrUpdateEjectRequest (CClientBase.cpp))
          * Address: 0x006DC600 (FUN_006DC600, msvc8::vector<moho::EntityCategorySet>::_Insert_n
          * grow-and-fill lane for the 0x28-byte non-trivial element (stride divide by
          * the 66666667h/`sar 4` magic pair, max_size 0x6666666 = 0xFFFFFFFF/40 at
@@ -3069,6 +3082,9 @@ namespace msvc8
          * Address: 0x00452890 (FUN_00452890, reached from
          * `Moho::CAiSteeringImpl`'s vtable-anchored task chain via
          * `func_DebugLineArrayAppend`, FUN_004524F0)
+         * Address: 0x00540580 (FUN_00540580, the 8-byte-stride throw lane for
+         * `msvc8::vector<Moho::SEjectRequest>`, reached from the `_Insert_n`
+         * grow lane FUN_00540330, already cited above)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.

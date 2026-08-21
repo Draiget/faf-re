@@ -275,6 +275,21 @@ extern "C" int __cdecl _SFUO_Destroy()
   return 0;
 }
 
+/**
+ * Address: 0x0076C730 (FUN_0076C730, the 12-byte-element
+ * `LegacyVectorStorage<moho::OccupySourceBinding>` throw lane; reached from
+ * `InsertOccupySourceBindingRange`, FUN_0076C490, PathTables.cpp)
+ *
+ * What it does:
+ * Generic `std::length_error("... too long")` thrower shared by the
+ * hand-rolled `LegacyVectorStorage<T>`-based grow lanes that live outside
+ * the `msvc8::vector<T>` class template (see `throw_too_long()` in
+ * `legacy/containers/Vector.h` for the class-template's own equivalent).
+ * Each real binary throw lane is a byte-identical
+ * `std::logic_error`-then-vftable-patch-to-`length_error` emission
+ * differing only in the message literal; this consolidates them into one
+ * parametrized helper, with each real address cited at its call site.
+ */
 // Container/runtime helpers invoked from both the CRT prelude and the
 // moho::runtime block; defined at file scope so unqualified calls in either
 // region resolve to this single definition.
