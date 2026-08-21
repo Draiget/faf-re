@@ -61,124 +61,6 @@ namespace
     return cached;
   }
 
-  moho::EntityCategorySet* ResetEntityCategorySetWordStorageRangeImpl(
-    moho::EntityCategorySet* const begin,
-    moho::EntityCategorySet* const end
-  ) noexcept
-  {
-    if (begin == nullptr || end == nullptr || end < begin) {
-      return begin;
-    }
-
-    for (moho::EntityCategorySet* cursor = begin; cursor != end; ++cursor) {
-      gpg::core::legacy::ResetStorageToInline(cursor->mBits.mWords);
-    }
-
-    return begin;
-  }
-
-  /**
-   * Address: 0x006DE9F0 (FUN_006DE9F0)
-   *
-   * What it does:
-   * Copy-assigns one contiguous `EntityCategorySet` source range
-   * `[sourceBegin, sourceEnd)` into destination storage and returns the
-   * advanced destination cursor.
-   */
-  [[maybe_unused]] moho::EntityCategorySet* CopyEntityCategorySetRangeForward(
-    moho::EntityCategorySet* destinationBegin,
-    const moho::EntityCategorySet* sourceBegin,
-    const moho::EntityCategorySet* sourceEnd
-  )
-  {
-    moho::EntityCategorySet* destinationCursor = destinationBegin;
-    const moho::EntityCategorySet* sourceCursor = sourceBegin;
-
-    if (sourceCursor != sourceEnd) {
-      do {
-        destinationCursor->mUniverse = sourceCursor->mUniverse;
-        destinationCursor->mBits.mFirstWordIndex = sourceCursor->mBits.mFirstWordIndex;
-        (void)gpg::core::legacy::CopyFrom(
-          destinationCursor->mBits.mWords,
-          sourceCursor->mBits.mWords,
-          destinationCursor->mBits.mWords.originalVec_
-        );
-
-        ++destinationCursor;
-        ++sourceCursor;
-      } while (sourceCursor != sourceEnd);
-    }
-
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x006DDA60 (FUN_006DDA60)
-   *
-   * What it does:
-   * Register-order adapter lane that forwards one forward copy range into
-   * `CopyEntityCategorySetRangeForward`.
-   */
-  [[maybe_unused]] moho::EntityCategorySet* CopyEntityCategorySetRangeForwardAdapterA(
-    const moho::EntityCategorySet* const sourceBegin,
-    const moho::EntityCategorySet* const sourceEnd,
-    moho::EntityCategorySet* const destinationBegin
-  )
-  {
-    return CopyEntityCategorySetRangeForward(destinationBegin, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x006DFAD0 (FUN_006DFAD0)
-   *
-   * What it does:
-   * Copy-assigns one contiguous `EntityCategorySet` source range in reverse
-   * order from `(sourceBegin, sourceEnd]` into `(destinationBegin,
-   * destinationEnd]` and returns the rewound destination cursor.
-   */
-  [[maybe_unused]] moho::EntityCategorySet* CopyEntityCategorySetRangeBackward(
-    moho::EntityCategorySet* destinationEnd,
-    const moho::EntityCategorySet* sourceEnd,
-    const moho::EntityCategorySet* sourceBegin
-  )
-  {
-    moho::EntityCategorySet* destinationCursor = destinationEnd;
-    const moho::EntityCategorySet* sourceCursor = sourceEnd;
-
-    if (sourceBegin != sourceCursor) {
-      do {
-        --sourceCursor;
-        --destinationCursor;
-
-        destinationCursor->mUniverse = sourceCursor->mUniverse;
-        destinationCursor->mBits.mFirstWordIndex = sourceCursor->mBits.mFirstWordIndex;
-        (void)gpg::core::legacy::CopyFrom(
-          destinationCursor->mBits.mWords,
-          sourceCursor->mBits.mWords,
-          destinationCursor->mBits.mWords.originalVec_
-        );
-      } while (sourceCursor != sourceBegin);
-    }
-
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x006DDC50 (FUN_006DDC50)
-   *
-   * What it does:
-   * Register-order adapter lane that forwards one backward copy range into
-   * `CopyEntityCategorySetRangeBackward`.
-   */
-  [[maybe_unused]] moho::EntityCategorySet* CopyEntityCategorySetRangeBackwardAdapterA(
-    const moho::EntityCategorySet* const sourceBegin,
-    const moho::EntityCategorySet* const sourceEnd,
-    moho::EntityCategorySet* const destinationEnd
-  )
-  {
-    return CopyEntityCategorySetRangeBackward(destinationEnd, sourceEnd, sourceBegin);
-  }
-
   /**
    * Address: 0x006DFDE0 (FUN_006DFDE0)
    *
@@ -197,42 +79,11 @@ namespace
   }
 
   /**
-   * Address: 0x006DEBF0 (FUN_006DEBF0)
-   *
-   * What it does:
-   * Copy-assigns one contiguous `EntityCategorySet` destination range from
-   * source lanes and returns the advanced source cursor.
-   */
-  [[maybe_unused]] const moho::EntityCategorySet* CopyAssignEntityCategorySetRange(
-    moho::EntityCategorySet* destinationBegin,
-    moho::EntityCategorySet* destinationEnd,
-    const moho::EntityCategorySet* sourceBegin
-  )
-  {
-    moho::EntityCategorySet* destinationCursor = destinationBegin;
-    const moho::EntityCategorySet* sourceCursor = sourceBegin;
-
-    while (destinationCursor != destinationEnd) {
-      destinationCursor->mUniverse = sourceCursor->mUniverse;
-      destinationCursor->mBits.mFirstWordIndex = sourceCursor->mBits.mFirstWordIndex;
-      (void)gpg::core::legacy::CopyFrom(
-        destinationCursor->mBits.mWords,
-        sourceCursor->mBits.mWords,
-        destinationCursor->mBits.mWords.originalVec_
-      );
-      ++destinationCursor;
-      ++sourceCursor;
-    }
-
-    return sourceCursor;
-  }
-
-  /**
    * Address: 0x006DBEB0 (FUN_006DBEB0)
    *
    * What it does:
    * Loads a `vector<EntityCategorySet>` payload and replaces destination storage.
-   * Uses `UninitializedCopyEntityCategorySetRange` to materialize the destination
+   * Uses `msvc8::vector<EntityCategorySet>`'s uninitialized copy to materialize the destination
    * slots from a single empty BVSet template before per-element archive reads,
    * matching the binary's reserve-then-read pattern where each grown slot is
    * copy-constructed from a default-initialized prototype.
@@ -331,37 +182,6 @@ namespace
 
   EntityCategorySetVectorReflectionBootstrap gEntityCategorySetVectorReflectionBootstrap;
 } // namespace
-
-/**
- * Address: 0x006DEB80 (FUN_006DEB80)
- *
- * What it does:
- * Rebinds each `EntityCategorySet` bit-word lane in `[begin, end)` to inline
- * storage and clears logical size, releasing heap-backed word storage where
- * needed.
- */
-moho::EntityCategorySet* moho::ResetEntityCategorySetWordStorageRange(
-  EntityCategorySet* const begin,
-  EntityCategorySet* const end
-) noexcept
-{
-  return ResetEntityCategorySetWordStorageRangeImpl(begin, end);
-}
-
-/**
- * Address: 0x006DC5E0 (FUN_006DC5E0)
- *
- * What it does:
- * Register-order adapter lane that forwards to
- * `ResetEntityCategorySetWordStorageRange` with begin/end arguments reordered.
- */
-[[maybe_unused]] moho::EntityCategorySet* ResetEntityCategorySetWordStorageRangeAdapterA(
-  moho::EntityCategorySet* const end,
-  moho::EntityCategorySet* const begin
-) noexcept
-{
-  return moho::ResetEntityCategorySetWordStorageRange(begin, end);
-}
 
 gpg::RVectorType<moho::EntityCategorySet>::~RVectorType() = default;
 
@@ -488,8 +308,8 @@ namespace
 {
   /**
    * Tears down a partially-constructed `EntityCategorySet` range during
-   * exception unwind from `UninitializedCopyEntityCategorySetRange`. Mirrors
-   * the destruction lane of `ResetEntityCategorySetWordStorageRange` (the
+   * exception unwind from the container's uninitialized copy. Mirrors
+   * the container's element-destroy lane (the
    * fastvector resets to inline storage, freeing any heap-backed words).
    */
   void DestroyConstructedEntityCategorySetRange(
@@ -506,58 +326,6 @@ namespace
     }
   }
 } // namespace
-
-/**
- * Address: 0x006E0400 (FUN_006E0400)
- *
- * IDA signature:
- * void __cdecl __noreturn sub_6E0400(int sourceBegin, int sourceEnd, int destinationBegin);
- *
- * What it does:
- * Copy-constructs each `EntityCategorySet` from `[sourceBegin, sourceEnd)`
- * into the uninitialized destination buffer at `destinationBegin` by writing
- * the universe handle (`mUniverse`) and bit-set first-word index
- * (`mBits.mFirstWordIndex`) directly, rebinding the embedded
- * `fastvector_n<unsigned int, 2>` (`mBits.mWords`) to its inline storage,
- * and copying the source words via `gpg::core::legacy::CopyFrom`. Returns
- * the advanced destination cursor for chained writes.
- *
- * On exception during a partially-constructed range, the in-flight slots are
- * rebound back to inline storage so any heap-backed word storage allocated by
- * the copy helper is released before the exception propagates out, matching
- * the binary's EH-unwind behavior.
- */
-moho::EntityCategorySet* moho::UninitializedCopyEntityCategorySetRange(
-  const moho::EntityCategorySet* const sourceBegin,
-  const moho::EntityCategorySet* const sourceEnd,
-  moho::EntityCategorySet* const destinationBegin
-)
-{
-  moho::EntityCategorySet* destinationCursor = destinationBegin;
-  try {
-    for (const moho::EntityCategorySet* source = sourceBegin; source != sourceEnd; ++source) {
-      moho::EntityCategorySet* const slot = destinationCursor;
-      slot->mUniverse = source->mUniverse;
-      slot->mBits.mFirstWordIndex = source->mBits.mFirstWordIndex;
-      auto& destinationWords = slot->mBits.mWords;
-      destinationWords.start_ = destinationWords.inlineVec_;
-      destinationWords.end_ = destinationWords.inlineVec_;
-      destinationWords.capacity_ = destinationWords.inlineVec_ + 2u;
-      destinationWords.originalVec_ = destinationWords.inlineVec_;
-      (void)gpg::core::legacy::CopyFrom(
-        destinationWords,
-        source->mBits.mWords,
-        destinationWords.originalVec_
-      );
-      ++destinationCursor;
-    }
-  } catch (...) {
-    DestroyConstructedEntityCategorySetRange(destinationBegin, destinationCursor);
-    throw;
-  }
-
-  return destinationCursor;
-}
 
 /**
  * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)
