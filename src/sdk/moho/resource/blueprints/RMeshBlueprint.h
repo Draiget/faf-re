@@ -7,6 +7,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprintLODTypeInfo.h"
 
 namespace moho
 {
@@ -124,6 +125,20 @@ namespace moho
      * `mUniformScale = 1.0`, `mStraddleWater = 0`).
      */
     RMeshBlueprint(RRuleGameRules* owner, const RResId& resId);
+
+    /**
+     * Address: 0x00528410 (FUN_00528410, Moho::RMeshBlueprint::dtr, scalar-deleting
+     * destructor, D0 variant)
+     * Address: 0x00528440 (FUN_00528440, complete-object destructor, D1 variant)
+     *
+     * What it does:
+     * Tears down `mLods`' backing storage (`ClearAndFreeMeshBlueprintLodVectorStorage`,
+     * destroying each live `RMeshBlueprintLOD` element first), then chains into
+     * the `RBlueprint` base destructor. The D0 variant additionally frees `this`
+     * when the low bit of its `deleteFlag` argument is set (ordinary C++ `delete`
+     * semantics, not modeled as a separate function).
+     */
+    ~RMeshBlueprint();
 
     /**
      * Address: 0x00528360 (FUN_00528360)
