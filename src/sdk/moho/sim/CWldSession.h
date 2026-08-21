@@ -1713,6 +1713,25 @@ namespace moho
   void ISSUE_SetCommandTarget(UserCommandIssueHelper* helper, const UserCommandTargetView& target);
 
   /**
+   * Address: 0x008B4AC0 (FUN_008B4AC0, sub_8B4AC0)
+   *
+   * IDA signature:
+   * void __stdcall sub_8B4AC0(int arg0, int a2, int a3);
+   *
+   * What it does:
+   * Builds one local "set-type" command-issue update event (command id
+   * `newCmdId`), packs `newCommandType` into the target payload's reused
+   * `targetPoint` slot (the same union-style tag-data reuse
+   * `ISSUE_SetCommandTarget`'s sibling events use), enqueues it onto
+   * `helper`'s local ring queue, then destroys the local temporary. Sole
+   * caller is `UserUnit.h`'s `RestartQueuedCommandsFromHelper`, reissuing
+   * one already-queued order's command type in place (the mouse-drag
+   * "restart as Patrol/FormPatrol" keystone,
+   * `RestartMoveCommandAsPatrol`, CWldSession.cpp). Defined in Sim.cpp.
+   */
+  void ReissueCommandIssueEntryAsType(UserCommandIssueHelper& helper, CmdId newCmdId, EUnitCommandType newCommandType) noexcept;
+
+  /**
    * Address: 0x00829B40 (FUN_00829B40, func_ProcessCommandDrag)
    *
    * What it does:

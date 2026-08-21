@@ -37,6 +37,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
@@ -4200,6 +4201,132 @@ namespace moho
     }
 
     return nullptr;
+  }
+
+  /**
+   * Address: 0x008B7320 (FUN_008B7320, struct_UserUnitManager::Get) - see
+   * the doc comment on the declaration in UserUnit.h.
+   */
+  UserCommandIssueHelper* GetUserUnitManagerLastQueuedHelper(UserCommandQueue* const manager) noexcept
+  {
+    if (manager == nullptr) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<UserCommandIssueHelper*>(GetLastQueuedUserCommandHelper(manager));
+  }
+
+  /**
+   * Address: 0x0081DD00 inlines this exact tail dereference (see the doc
+   * comment on the declaration in UserUnit.h for why this differs from
+   * `ResolveUserUnitFrontCommandIssueHelper`/`GetLastQueuedUserCommandHelper`).
+   */
+  UserCommandIssueHelper* FindColocatedQueuedBuildOrderInManager(
+    UserCommandQueue* const manager,
+    const Wm3::Vector3f& dragPosition,
+    const REntityBlueprint* const candidateBlueprint
+  ) noexcept
+  {
+    UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    if (queueVector == nullptr || queueVector->begin == queueVector->end || candidateBlueprint == nullptr) {
+      return nullptr;
+    }
+
+    const SOCellPos dragCell = candidateBlueprint->mFootprint.ToCellPos(dragPosition);
+
+    for (UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
+      UserCommandIssueHelperRuntimeView* const entryHelper = entry->helper;
+      if (entryHelper == nullptr) {
+        continue;
+      }
+
+      auto* const queuedHelper = reinterpret_cast<UserCommandIssueHelper*>(entryHelper);
+      if (queuedHelper->mConstantData.blueprint != candidateBlueprint) {
+        continue;
+      }
+
+      const Wm3::Vector3f anchor = ResolveCommandGraphAnchorWorldPosition(*queuedHelper);
+      if (candidateBlueprint->mFootprint.ToCellPos(anchor) == dragCell) {
+        return queuedHelper;
+      }
+    }
+
+    return nullptr;
+  }
+
+  UserCommandIssueHelper* GetUserUnitManagerQueueTailHelperRaw(UserCommandQueue* const manager) noexcept
+  {
+    UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    if (queueVector == nullptr || queueVector->begin == queueVector->end) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<UserCommandIssueHelper*>(queueVector->end[-1].helper);
+  }
+
+  /**
+   * Address: 0x0081DD00 inlines this scan (see the doc comment on the
+   * declaration in UserUnit.h).
+   */
+  bool UserUnitManagerQueueHasUniformCommandType(
+    UserCommandQueue* const manager,
+    const EUnitCommandType commandType
+  ) noexcept
+  {
+    UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    if (queueVector == nullptr) {
+      return true;
+    }
+
+    for (const UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
+      // No null-skip: the binary dereferences each resolved entry's helper
+      // pointer unconditionally here (unlike the front/tail/contains
+      // accessors above), so this matches that exactly.
+      if (ResolveHelperCommandType(*entry->helper) != commandType) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Address: 0x0081DEF0 inlines this scan (see the doc comment on the
+   * declaration in UserUnit.h).
+   */
+  void RestartQueuedCommandsFromHelper(
+    UserCommandQueue* const manager,
+    UserCommandIssueHelper* const helper,
+    const EUnitCommandType matchCommandType,
+    const EUnitCommandType restartCommandType
+  ) noexcept
+  {
+    UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    if (queueVector == nullptr) {
+      return;
+    }
+
+    bool foundHelper = false;
+    for (UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
+      UserCommandIssueHelperRuntimeView* const entryHelper = entry->helper;
+      if (entryHelper == nullptr) {
+        continue;
+      }
+
+      if (reinterpret_cast<UserCommandIssueHelper*>(entryHelper) == helper) {
+        foundHelper = true;
+      }
+      if (!foundHelper || ResolveHelperCommandType(*entryHelper) != matchCommandType) {
+        continue;
+      }
+
+      auto& queuedHelper = *reinterpret_cast<UserCommandIssueHelper*>(entryHelper);
+      CmdId newCmdId = queuedHelper.mConstantData.cmd;
+      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+        newCmdId = simDriver->SetCommandType(newCmdId, restartCommandType);
+      }
+      ReissueCommandIssueEntryAsType(queuedHelper, newCmdId, restartCommandType);
+    }
   }
 
   /**

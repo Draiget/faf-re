@@ -5042,6 +5042,38 @@ namespace
     QueueCommandIssueSetTargetEvent(helperView, helperView.commandId, target);
   }
 
+  // Local command-issue update event type used for "set command type" events
+  // (0x008B4AE3: `mov ecx, 5` feeding InitializeCommandIssueUpdateEvent).
+  constexpr std::uint32_t kCommandIssueUpdateEventTypeSetType = 5u;
+
+  /**
+   * Address: 0x008B4AC0 (FUN_008B4AC0, sub_8B4AC0)
+   *
+   * IDA signature:
+   * void __stdcall sub_8B4AC0(int arg0, int a2, int a3);
+   *
+   * What it does:
+   * Builds one local "set-type" command-issue update event (command id
+   * `commandId`), packs `newCommandType` into the target payload's
+   * `targetPoint` slot (0x008B4AF8: `mov [eax+30h], ecx` - the same
+   * union-style tag-data reuse `QueueCommandIssueSetTargetEvent`'s sibling
+   * events use for their own payload data), enqueues it into the helper's
+   * local ring queue, then destroys the local event. Sole caller is
+   * `Moho::ReissueCommandIssueEntryAsType` below.
+   */
+  void QueueCommandIssueSetTypeEvent(
+    CommandIssueHelperRuntimeView& commandIssueHelper,
+    const CmdId commandId,
+    const EUnitCommandType newCommandType
+  )
+  {
+    CommandIssueUpdateEventRuntimeView localEvent{};
+    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeSetType);
+    localEvent.target.targetPoint = static_cast<std::int32_t>(newCommandType);
+    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
+    DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
+  }
+
   /**
    * Address: 0x008B4960 (FUN_008B4960, sub_8B4960)
    *
@@ -5603,6 +5635,30 @@ namespace moho
       "WeakEntitySetUserEntity and UserEntityWeakSetRuntimeView must share the same 12-byte layout"
     );
     return CountLiveUserEntityWeakSetEntriesAndPrune(reinterpret_cast<UserEntityWeakSetRuntimeView*>(&set));
+  }
+
+  /**
+   * Address: 0x008B4AC0 (FUN_008B4AC0, sub_8B4AC0)
+   *
+   * What it does:
+   * Bridge for the recovered Sim.cpp-local `QueueCommandIssueSetTypeEvent`
+   * worker (see that function's own doc comment for the full binary
+   * evidence): reissues one already-queued command-issue entry's command
+   * id/type in place. Exposed (declared in CWldSession.h) so
+   * `UserUnit.h`'s `RestartQueuedCommandsFromHelper` - and through it the
+   * mouse-drag "restart as Patrol/FormPatrol" keystone
+   * (`RestartMoveCommandAsPatrol`, CWldSession.cpp) - can reissue an
+   * in-flight order without owning the local ring-queue event mechanics.
+   */
+  void ReissueCommandIssueEntryAsType(
+    UserCommandIssueHelper& helper,
+    const CmdId newCmdId,
+    const EUnitCommandType newCommandType
+  ) noexcept
+  {
+    QueueCommandIssueSetTypeEvent(
+      reinterpret_cast<CommandIssueHelperRuntimeView&>(helper), newCmdId, newCommandType
+    );
   }
 
   /**
