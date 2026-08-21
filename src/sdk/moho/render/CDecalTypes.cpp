@@ -10,7 +10,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "legacy/containers/Vector.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace gpg
@@ -18,6 +18,11 @@ namespace gpg
   class RListType_SDecalInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0077DFE0 (FUN_0077DFE0, gpg::RListType_SDecalInfo::dtr)
+     */
+    ~RListType_SDecalInfo() override;
+
     /**
      * Address: 0x0077A760 (FUN_0077A760, gpg::RListType_SDecalInfo::GetName)
      *
@@ -583,6 +588,8 @@ namespace
   }
 
 } // namespace
+
+gpg::RListType_SDecalInfo::~RListType_SDecalInfo() = default;
 
 /**
  * Address: 0x0077A760 (FUN_0077A760, gpg::RListType_SDecalInfo::GetName)
