@@ -10,7 +10,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -455,6 +455,8 @@ size_t moho::RWeakPtrType<moho::IUnit>::GetCount(void* obj) const
   }
   return weak->HasValue() ? 1u : 0u;
 }
+
+gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0056BDF0 (FUN_0056BDF0, gpg::RFastVectorType_WeakPtr_IUnit::GetName)
