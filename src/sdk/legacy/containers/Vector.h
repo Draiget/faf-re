@@ -1824,6 +1824,12 @@ namespace msvc8
          * command-splat's icon-billboard world position for the batched
          * attack_btn_up.dds / teleport_btn_up.dds draw passes that follow the
          * main per-command-link loop)
+         * Address: 0x0053FC90 (FUN_0053FC90, msvc8::vector<Moho::SEjectRequest>::push_back
+         * for the 8-byte `{const CClientBase* mRequester, int mAfterBeat}` element —
+         * fast path checks capacity then tail-calls the shared grow-core
+         * (FUN_00540330) on overflow. Emitted via
+         * mEjectRequests.push_back(SEjectRequest(requester, afterBeat)) in
+         * Moho::CClientBase::AddOrUpdateEjectRequest (CClientBase.cpp))
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
