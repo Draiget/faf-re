@@ -142,40 +142,6 @@ namespace
     return bits;
   }
 
-  /**
-   * Address: 0x00594BD0 (FUN_00594BD0, std::map<std::string,Moho::CArmyStatItem*>::find)
-   * Address: 0x00595130 (FUN_00595130, std::map<std::string,Moho::CArmyStatItem*>::_Lbound
-   * - the lower-bound descent half that find()/operator[] both call in the
-   * binary; this recovery inlines the same descent directly rather than
-   * factoring it into a separate call, so both addresses resolve here)
-   *
-   * What it does:
-   * Lower-bound descent by string key, returning the found node or the tree
-   * head sentinel when absent. The binary splits this into a `_Lbound` call
-   * plus an equality check; this recovery walks the parent chain directly
-   * with the same key comparator (`CompareNameIndexKey`) to the same effect.
-   */
-  [[nodiscard]] moho::ArmyNameIndexNode* FindNameIndexNode(
-    moho::ArmyNameIndexTree* const tree, const msvc8::string& statPath
-  )
-  {
-    if (tree == nullptr || tree->head == nullptr) {
-      return nullptr;
-    }
-
-    moho::ArmyNameIndexNode* const head = tree->head;
-    moho::ArmyNameIndexNode* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      const int keyCmp = CompareNameIndexKey(statPath, node->key);
-      if (keyCmp == 0) {
-        return node;
-      }
-      node = (keyCmp < 0) ? node->left : node->right;
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CArmyStatItem* FindArmyChildByName(moho::CArmyStatItem* parent, const msvc8::string& token)
   {
     if (parent == nullptr) {
@@ -273,300 +239,6 @@ namespace
     return stats.GetStat(statPath)->GetFloat(false);
   }
 
-  [[nodiscard]] moho::ArmyNameIndexNode* CreateNameIndexSentinel()
-  {
-    auto* const head = new moho::ArmyNameIndexNode{};
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->color = 1;
-    head->isNil = 1;
-    return head;
-  }
-
-  [[nodiscard]] moho::ArmyNameIndexNode* NextNameIndexNode(moho::ArmyNameIndexNode* node, moho::ArmyNameIndexNode* head)
-  {
-    if (node == nullptr || head == nullptr) {
-      return head;
-    }
-    if (node->isNil != 0u) {
-      return node->parent;
-    }
-
-    if (node->right != nullptr && node->right->isNil == 0u) {
-      node = node->right;
-      while (node->left != nullptr && node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    moho::ArmyNameIndexNode* parent = node->parent;
-    while (parent != nullptr && parent->isNil == 0u && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return (parent != nullptr) ? parent : head;
-  }
-
-  [[nodiscard]] bool IsNameIndexNil(const moho::ArmyNameIndexNode* node)
-  {
-    return node == nullptr || node->isNil != 0u;
-  }
-
-  [[nodiscard]] moho::ArmyNameIndexNode* NameIndexMin(moho::ArmyNameIndexNode* node, moho::ArmyNameIndexNode* head)
-  {
-    while (!IsNameIndexNil(node) && !IsNameIndexNil(node->left)) {
-      node = node->left;
-    }
-    return IsNameIndexNil(node) ? head : node;
-  }
-
-  [[nodiscard]] moho::ArmyNameIndexNode* NameIndexMax(moho::ArmyNameIndexNode* node, moho::ArmyNameIndexNode* head)
-  {
-    while (!IsNameIndexNil(node) && !IsNameIndexNil(node->right)) {
-      node = node->right;
-    }
-    return IsNameIndexNil(node) ? head : node;
-  }
-
-  void RecomputeNameIndexExtrema(moho::ArmyNameIndexTree* tree)
-  {
-    if (tree == nullptr || tree->head == nullptr) {
-      return;
-    }
-
-    moho::ArmyNameIndexNode* const head = tree->head;
-    moho::ArmyNameIndexNode* const root = head->parent;
-    if (IsNameIndexNil(root)) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    head->left = NameIndexMin(root, head);
-    head->right = NameIndexMax(root, head);
-  }
-
-  void ReplaceNameIndexSubtree(
-    moho::ArmyNameIndexTree* tree, moho::ArmyNameIndexNode* oldNode, moho::ArmyNameIndexNode* newNode
-  )
-  {
-    moho::ArmyNameIndexNode* const head = tree->head;
-    if (oldNode->parent == head) {
-      head->parent = newNode;
-    } else if (oldNode == oldNode->parent->left) {
-      oldNode->parent->left = newNode;
-    } else {
-      oldNode->parent->right = newNode;
-    }
-
-    if (!IsNameIndexNil(newNode)) {
-      newNode->parent = oldNode->parent;
-    }
-  }
-
-  /**
-   * Address: 0x00592E50 (FUN_00592E50, sub_592E50)
-   *
-   * What it does:
-   * Standard red-black left rotation on `node`: promotes `node->right`,
-   * relinking the pivoted subtree, the pivot's old left child, and the
-   * root/parent-child link (asm-verified instruction-by-instruction against
-   * FUN_00592E50.asm; the `isNil` check reads offset 0x2D, matching
-   * `ArmyNameIndexNode::isNil`).
-   */
-  void RotateNameIndexLeft(moho::ArmyNameIndexTree* tree, moho::ArmyNameIndexNode* node)
-  {
-    moho::ArmyNameIndexNode* const head = tree->head;
-    moho::ArmyNameIndexNode* const pivot = node->right;
-    node->right = pivot->left;
-    if (!IsNameIndexNil(pivot->left)) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  /**
-   * Address: 0x00592EE0 (FUN_00592EE0, sub_592EE0)
-   *
-   * What it does:
-   * Standard red-black right rotation on `node` (mirror image of
-   * `RotateNameIndexLeft`), asm-verified instruction-by-instruction against
-   * FUN_00592EE0.asm.
-   */
-  void RotateNameIndexRight(moho::ArmyNameIndexTree* tree, moho::ArmyNameIndexNode* node)
-  {
-    moho::ArmyNameIndexNode* const head = tree->head;
-    moho::ArmyNameIndexNode* const pivot = node->left;
-    node->left = pivot->right;
-    if (!IsNameIndexNil(pivot->right)) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->right) {
-      node->parent->right = pivot;
-    } else {
-      node->parent->left = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  /**
-   * Address: 0x00594F80 (FUN_00594F80, std::map<std::string,Moho::CArmyStatItem*>'s
-   * `_Tree::_Insert` node-buy-and-link-and-rebalance body -- allocates/links
-   * the new node at the descended insertion point (calling the recovered
-   * copy-ctor-based node allocation this file already uses for `new
-   * moho::ArmyNameIndexNode{}`), then runs the identical red-black
-   * insert-fixup loop below via `RotateNameIndexLeft`/`RotateNameIndexRight`
-   * (FUN_00592E50/FUN_00592EE0))
-   *
-   * What it does:
-   * Standard CLR-style red-black insert fixup: while the inserted node's
-   * parent is red, recolor through the uncle or rotate to restore the
-   * red-black invariants, then force the root black.
-   */
-  void FixupAfterNameIndexInsert(moho::ArmyNameIndexTree* const tree, moho::ArmyNameIndexNode* node)
-  {
-    moho::ArmyNameIndexNode* const head = tree->head;
-    while (node != head->parent && node->parent->color == 0u) {
-      moho::ArmyNameIndexNode* const parent = node->parent;
-      moho::ArmyNameIndexNode* const grand = parent->parent;
-      if (grand == nullptr || grand == head) {
-        break;
-      }
-
-      if (parent == grand->left) {
-        moho::ArmyNameIndexNode* const uncle = grand->right;
-        if (!IsNameIndexNil(uncle) && uncle->color == 0u) {
-          parent->color = 1;
-          uncle->color = 1;
-          grand->color = 0;
-          node = grand;
-          continue;
-        }
-
-        if (node == parent->right) {
-          node = parent;
-          RotateNameIndexLeft(tree, node);
-        }
-
-        node->parent->color = 1;
-        grand->color = 0;
-        RotateNameIndexRight(tree, grand);
-        continue;
-      }
-
-      moho::ArmyNameIndexNode* const uncle = grand->left;
-      if (!IsNameIndexNil(uncle) && uncle->color == 0u) {
-        parent->color = 1;
-        uncle->color = 1;
-        grand->color = 0;
-        node = grand;
-        continue;
-      }
-
-      if (node == parent->left) {
-        node = parent;
-        RotateNameIndexRight(tree, node);
-      }
-
-      node->parent->color = 1;
-      grand->color = 0;
-      RotateNameIndexLeft(tree, grand);
-    }
-
-    if (head->parent != nullptr && head->parent != head) {
-      head->parent->color = 1;
-    }
-  }
-
-  /**
-   * Address: 0x00594E70 (FUN_00594E70, std::map<std::string,Moho::CArmyStatItem*>'s
-   * `_Tree::_Insert` descent-and-duplicate-check body -- descends by key
-   * comparison (`CompareNameIndexKey`), consulting the predecessor via
-   * FUN_005952C0 when the descent doesn't land on the tree's cached minimum,
-   * then calls FUN_00594F80 to buy/link/rebalance a new node on a miss)
-   * Address: 0x00594C90 (FUN_00594C90, `std::map_string_CArmyStatItem_P::insert`
-   * -- pair<iterator,bool> wrapper around FUN_00594E70)
-   * Address: 0x00594B10 (FUN_00594B10, `std::map_string_CArmyStatItem_P::operator[]`
-   * -- `_Lbound`-then-equality-check wrapper that inserts a default-constructed
-   * mapped value on a miss and returns a reference to the slot)
-   *
-   * What it does:
-   * `std::map<std::string,CArmyStatItem*>::insert`/`operator[]` combined:
-   * finds the node for `statPath`, updating its value in place if present,
-   * otherwise inserting a new node with `value` and rebalancing. The real
-   * binary factors this into a separate descent (FUN_00594E70) and a
-   * buy-and-rebalance call (FUN_00594F80) reached only on a miss, plus a
-   * predecessor lookahead (FUN_005952C0) that is a pure performance
-   * micro-optimization of the same textbook BST insert-position search; this
-   * recovery's single-pass descent produces the identical final tree state.
-   * `GetItem` (0x005945E0) calls the real `operator[]` then assigns through
-   * the returned reference (`*operator[](key) = value`); calling this
-   * function with `value` directly achieves the same net effect.
-   */
-  void InsertOrAssignNameIndexNode(
-    moho::ArmyNameIndexTree* const tree, const msvc8::string& statPath, moho::CArmyStatItem* const value
-  )
-  {
-    if (tree == nullptr || tree->head == nullptr) {
-      return;
-    }
-
-    moho::ArmyNameIndexNode* const head = tree->head;
-    moho::ArmyNameIndexNode* parent = head;
-    moho::ArmyNameIndexNode* node = head->parent;
-    int cmp = 0;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      parent = node;
-      cmp = CompareNameIndexKey(statPath, node->key);
-      if (cmp == 0) {
-        node->value = value;
-        return;
-      }
-      node = (cmp < 0) ? node->left : node->right;
-    }
-
-    auto* const inserted = new moho::ArmyNameIndexNode{};
-    inserted->left = head;
-    inserted->right = head;
-    inserted->parent = parent;
-    inserted->key.assign(statPath, 0, msvc8::string::npos);
-    inserted->value = value;
-    inserted->color = 0;
-    inserted->isNil = 0;
-
-    if (parent == head) {
-      head->parent = inserted;
-    } else if (cmp < 0) {
-      parent->left = inserted;
-    } else {
-      parent->right = inserted;
-    }
-
-    ++tree->size;
-    FixupAfterNameIndexInsert(tree, inserted);
-    RecomputeNameIndexExtrema(tree);
-  }
-
   // --- shared red-black erase mechanics --------------------------------------
   //
   // The per-blueprint stat map (`std::map<const RBlueprint*, float>`) and the
@@ -575,126 +247,10 @@ namespace
   // written once and shared by both node families through the `RotateRb*`
   // overload set.
 
-  void RotateRbLeft(moho::ArmyNameIndexTree* const tree, moho::ArmyNameIndexNode* const node)
-  {
-    RotateNameIndexLeft(tree, node);
-  }
-
-  void RotateRbRight(moho::ArmyNameIndexTree* const tree, moho::ArmyNameIndexNode* const node)
-  {
-    RotateNameIndexRight(tree, node);
-  }
   template <class TNode>
   [[nodiscard]] bool IsRbNil(const TNode* const node) noexcept
   {
     return node == nullptr || node->isNil != 0u;
-  }
-
-  template <class TTree, class TNode>
-  void FixupAfterRbErase(TTree* const tree, TNode* node, TNode* const nodeParent)
-  {
-    TNode* const head = tree->head;
-    TNode* parent = (!IsRbNil(node)) ? node->parent : nodeParent;
-    while (node != head->parent && (IsRbNil(node) || node->color == 1u)) {
-      if (parent == nullptr) {
-        break;
-      }
-
-      if (node == parent->left) {
-        TNode* sibling = parent->right;
-        if (sibling == head) {
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-        if (sibling->color == 0u) {
-          sibling->color = 1;
-          parent->color = 0;
-          RotateRbLeft(tree, parent);
-          sibling = parent->right;
-        }
-
-        const bool leftBlack = IsRbNil(sibling->left) || sibling->left->color == 1u;
-        const bool rightBlack = IsRbNil(sibling->right) || sibling->right->color == 1u;
-        if (leftBlack && rightBlack) {
-          sibling->color = 0;
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-
-        if (IsRbNil(sibling->right) || sibling->right->color == 1u) {
-          if (!IsRbNil(sibling->left)) {
-            sibling->left->color = 1;
-          }
-          sibling->color = 0;
-          RotateRbRight(tree, sibling);
-          sibling = parent->right;
-        }
-
-        sibling->color = parent->color;
-        parent->color = 1;
-        if (!IsRbNil(sibling->right)) {
-          sibling->right->color = 1;
-        }
-        RotateRbLeft(tree, parent);
-        node = head->parent;
-        break;
-      }
-
-      TNode* sibling = parent->left;
-      if (sibling == head) {
-        node = parent;
-        parent = node->parent;
-        continue;
-      }
-      if (sibling->color == 0u) {
-        sibling->color = 1;
-        parent->color = 0;
-        RotateRbRight(tree, parent);
-        sibling = parent->left;
-      }
-
-      const bool rightBlack = IsRbNil(sibling->right) || sibling->right->color == 1u;
-      const bool leftBlack = IsRbNil(sibling->left) || sibling->left->color == 1u;
-      if (rightBlack && leftBlack) {
-        sibling->color = 0;
-        node = parent;
-        parent = node->parent;
-        continue;
-      }
-
-      if (IsRbNil(sibling->left) || sibling->left->color == 1u) {
-        if (!IsRbNil(sibling->right)) {
-          sibling->right->color = 1;
-        }
-        sibling->color = 0;
-        RotateRbLeft(tree, sibling);
-        sibling = parent->left;
-      }
-
-      sibling->color = parent->color;
-      parent->color = 1;
-      if (!IsRbNil(sibling->left)) {
-        sibling->left->color = 1;
-      }
-      RotateRbRight(tree, parent);
-      node = head->parent;
-      break;
-    }
-
-    if (!IsRbNil(node)) {
-      node->color = 1;
-    }
-  }
-
-  void FixupAfterNameIndexErase(
-    moho::ArmyNameIndexTree* const tree,
-    moho::ArmyNameIndexNode* const node,
-    moho::ArmyNameIndexNode* const nodeParent
-  )
-  {
-    FixupAfterRbErase(tree, node, nodeParent);
   }
 
   /**
@@ -853,12 +409,12 @@ namespace
 
   [[nodiscard]] ArmyTriggerListRuntime* TriggerListRuntimeView(moho::CArmyStats* const object)
   {
-    return reinterpret_cast<ArmyTriggerListRuntime*>(&object->mNameIndex.metaC);
+    return reinterpret_cast<ArmyTriggerListRuntime*>(&object->mAuxProxy);
   }
 
   [[nodiscard]] const ArmyTriggerListRuntime* TriggerListRuntimeView(const moho::CArmyStats* const object)
   {
-    return reinterpret_cast<const ArmyTriggerListRuntime*>(&object->mNameIndex.metaC);
+    return reinterpret_cast<const ArmyTriggerListRuntime*>(&object->mAuxProxy);
   }
 
   /**
@@ -1286,13 +842,12 @@ namespace moho
   CArmyStats::CArmyStats(CAiBrain* ownerArmy)
     : mOwnerArmy(ownerArmy)
     , mNameIndex{}
+    , mAuxProxy(nullptr)
     , mAuxHead(CreateTriggerListSentinel())
     , mAuxSize(0)
   {
-    mNameIndex.meta0 = 0;
-    mNameIndex.head = CreateNameIndexSentinel();
-    mNameIndex.size = 0;
-    mNameIndex.metaC = 0;
+    // `msvc8::map`'s own constructor builds the head sentinel and zeroes the
+    // size, which is what the binary open-codes for the tree lanes here.
   }
 
   /**
@@ -1305,75 +860,15 @@ namespace moho
   }
 
   /**
-   * Address: 0x00703700 (FUN_00703700, name-index erase-iterator helper)
-   */
-  ArmyNameIndexNode* CArmyStats::EraseNameIndexNodeAndAdvance(ArmyNameIndexNode* node)
-  {
-    ArmyNameIndexNode* const head = mNameIndex.head;
-    if (IsNameIndexNil(node)) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    ArmyNameIndexNode* const next = NextNameIndexNode(node, head);
-    ArmyNameIndexNode* removed = node;
-    ArmyNameIndexNode* spliceTarget = node;
-    std::uint8_t removedColor = spliceTarget->color;
-    ArmyNameIndexNode* fixNode = head;
-    ArmyNameIndexNode* fixParent = head;
-
-    if (IsNameIndexNil(node->left)) {
-      fixNode = node->right;
-      fixParent = node->parent;
-      ReplaceNameIndexSubtree(&mNameIndex, node, node->right);
-    } else if (IsNameIndexNil(node->right)) {
-      fixNode = node->left;
-      fixParent = node->parent;
-      ReplaceNameIndexSubtree(&mNameIndex, node, node->left);
-    } else {
-      spliceTarget = NameIndexMin(node->right, head);
-      removedColor = spliceTarget->color;
-      fixNode = spliceTarget->right;
-      if (spliceTarget->parent == node) {
-        fixParent = spliceTarget;
-        if (!IsNameIndexNil(fixNode)) {
-          fixNode->parent = spliceTarget;
-        }
-      } else {
-        fixParent = spliceTarget->parent;
-        ReplaceNameIndexSubtree(&mNameIndex, spliceTarget, spliceTarget->right);
-        spliceTarget->right = node->right;
-        spliceTarget->right->parent = spliceTarget;
-      }
-
-      ReplaceNameIndexSubtree(&mNameIndex, node, spliceTarget);
-      spliceTarget->left = node->left;
-      spliceTarget->left->parent = spliceTarget;
-      spliceTarget->color = node->color;
-    }
-
-    delete removed;
-    if (mNameIndex.size > 0u) {
-      --mNameIndex.size;
-    }
-    if (removedColor == 1u) {
-      FixupAfterNameIndexErase(&mNameIndex, fixNode, fixParent);
-    }
-    RecomputeNameIndexExtrema(&mNameIndex);
-    return next;
-  }
-
-  /**
    * Address: 0x0070B980 (FUN_0070B980, CArmyStats vtable slot 0)
    */
   void CArmyStats::Delete(const char* statPath)
   {
-    ArmyNameIndexNode* node = mNameIndex.head->left;
-    while (node != nullptr && node != mNameIndex.head) {
-      const msvc8::string keyCopy = node->key;
-      if (std::strstr(keyCopy.c_str(), statPath) != nullptr) {
-        node = EraseNameIndexNodeAndAdvance(node);
+    for (auto it = mNameIndex.begin(); it != mNameIndex.end();) {
+      if (std::strstr(it->first.c_str(), statPath) != nullptr) {
+        it = mNameIndex.erase(it);
       } else {
-        node = NextNameIndexNode(node, mNameIndex.head);
+        ++it;
       }
     }
 
@@ -1434,8 +929,8 @@ namespace moho
   CArmyStatItem* CArmyStats::GetStat(const char* statPath)
   {
     const msvc8::string key(statPath);
-    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&mNameIndex, key)) {
-      return foundNode->value;
+    if (const auto found = mNameIndex.find(key); found != mNameIndex.end()) {
+      return found->second;
     }
 
     CArmyStatItem* const item = TraverseTables(statPath, false);
@@ -1444,7 +939,7 @@ namespace moho
     }
 
     item->Release(0);
-    InsertOrAssignNameIndexNode(&mNameIndex, key, item);
+    mNameIndex[key] = item;
     return item;
   }
 
@@ -1454,13 +949,13 @@ namespace moho
   CArmyStatItem* CArmyStats::GetItem(const char* const statPath)
   {
     const msvc8::string key(statPath);
-    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&mNameIndex, key)) {
-      return foundNode->value;
+    if (const auto found = mNameIndex.find(key); found != mNameIndex.end()) {
+      return found->second;
     }
 
     CArmyStatItem* const item = TraverseTables(statPath, true);
     item->Release(0);
-    InsertOrAssignNameIndexNode(&mNameIndex, key, item);
+    mNameIndex[key] = item;
     return item;
   }
 
@@ -1579,13 +1074,13 @@ namespace moho
   CArmyStatItem* ResolveArmyStatItemCachedCreate(CArmyStats* const armyStats, const char* const statPath)
   {
     const msvc8::string key(statPath);
-    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&armyStats->mNameIndex, key)) {
-      return foundNode->value;
+    if (const auto found = armyStats->mNameIndex.find(key); found != armyStats->mNameIndex.end()) {
+      return found->second;
     }
 
     CArmyStatItem* const item = armyStats->TraverseTablesCreate(statPath);
     item->Release(0);
-    InsertOrAssignNameIndexNode(&armyStats->mNameIndex, key, item);
+    armyStats->mNameIndex[key] = item;
     return item;
   }
 
@@ -2009,15 +1504,15 @@ namespace moho
   CArmyStatItem* CArmyStats::GetStringItemCached(const gpg::StrArg statPath)
   {
     const msvc8::string key(statPath ? statPath : "");
-    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&mNameIndex, key)) {
-      return foundNode->value;
+    if (const auto found = mNameIndex.find(key); found != mNameIndex.end()) {
+      return found->second;
     }
 
     CArmyStatItem* const item = GetStringItem(key.c_str());
     if (item != nullptr) {
       item->Release(0);
     }
-    InsertOrAssignNameIndexNode(&mNameIndex, key, item);
+    mNameIndex[key] = item;
     return item;
   }
 
@@ -2036,26 +1531,6 @@ namespace moho
       item->mType = EStatType::kString;
     }
     item->SetValue(value);
-  }
-
-  /**
-   * Address: 0x0070DDC0 (FUN_0070DDC0, CArmyStats name-index tree cleanup)
-   *
-   * What it does:
-   * Destroys all name-index nodes, frees the sentinel head, and resets the
-   * name-index runtime lane.
-   */
-  void CArmyStats::DestroyNameIndexTree()
-  {
-    ArmyNameIndexNode* const head = mNameIndex.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    DestroyNilTree(head->parent, &ArmyNameIndexNode::isNil);
-    delete head;
-    mNameIndex.head = nullptr;
-    mNameIndex.size = 0;
   }
 
   /**

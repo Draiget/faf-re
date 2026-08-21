@@ -61,14 +61,22 @@ namespace moho
   static_assert(offsetof(ArmyNameIndexNode, value) == 0x28, "ArmyNameIndexNode::value offset must be 0x28");
   static_assert(sizeof(ArmyNameIndexNode) == 0x30, "ArmyNameIndexNode size must be 0x30");
 
-  struct ArmyNameIndexTree
-  {
-    std::uint32_t meta0;     // +0x00
-    ArmyNameIndexNode* head; // +0x04
-    std::uint32_t size;      // +0x08
-    std::uint32_t metaC;     // +0x0C
-  };
-  static_assert(sizeof(ArmyNameIndexTree) == 0x10, "ArmyNameIndexTree size must be 0x10");
+  /**
+   * The by-name item index is `std::map<std::string, CArmyStatItem*>`: the
+   * node is 0x30 with links at 0/4/8, the 0x1C-byte key string at +0x0C, the
+   * item pointer at +0x28 and the colour/nil pair at +0x2C/+0x2D -- what
+   * `msvc8::map` lays out for a 0x20-byte `value_type`.
+   *
+   * The header is 0x0C, not the 0x10 this was modelled as. The fourth dword
+   * belonged to the trigger list that follows: `TriggerListRuntimeView` was
+   * reinterpreting `&mNameIndex.metaC` as a `{proxy, head, size}` triple
+   * whose second and third words are `mAuxHead` and `mAuxSize`. Modelled
+   * properly as `mAuxProxy` below; 0x14 + 0x0C = 0x20 and the three trigger
+   * words then run 0x20..0x2B, which is `sizeof(CArmyStats) == 0x2C`.
+   */
+  using ArmyNameIndexTree = msvc8::map<msvc8::string, CArmyStatItem*>;
+
+  static_assert(sizeof(ArmyNameIndexTree) == 0x0C, "ArmyNameIndexTree size must be 0x0C");
 
   struct ArmyTriggerNode
   {
@@ -413,11 +421,15 @@ namespace moho
   public:
     CAiBrain* mOwnerArmy;         // +0x10
     ArmyNameIndexTree mNameIndex; // +0x14
+    /// Allocator proxy of the trigger list at +0x20; `mAuxHead` and
+    /// `mAuxSize` below are that same list's head and count.
+    void* mAuxProxy;              // +0x20
     ArmyTriggerNode* mAuxHead;    // +0x24
     std::uint32_t mAuxSize;       // +0x28
   };
   static_assert(offsetof(CArmyStats, mOwnerArmy) == 0x10, "CArmyStats::mOwnerArmy offset must be 0x10");
   static_assert(offsetof(CArmyStats, mNameIndex) == 0x14, "CArmyStats::mNameIndex offset must be 0x14");
+  static_assert(offsetof(CArmyStats, mAuxProxy) == 0x20, "CArmyStats::mAuxProxy offset must be 0x20");
   static_assert(offsetof(CArmyStats, mAuxHead) == 0x24, "CArmyStats::mAuxHead offset must be 0x24");
   static_assert(offsetof(CArmyStats, mAuxSize) == 0x28, "CArmyStats::mAuxSize offset must be 0x28");
   static_assert(sizeof(CArmyStats) == 0x2C, "CArmyStats size must be 0x2C");
