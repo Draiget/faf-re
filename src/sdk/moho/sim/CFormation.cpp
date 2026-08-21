@@ -491,6 +491,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x00838A80 (FUN_00838A80, Moho::CFormation::LuaFinalize)
+   *
+   * What it does:
+   * Lua-facing re-finalize: only fires once more than one formation script
+   * is available, advancing `mBestFormation` to the next script round-robin
+   * before calling `Finalize()` again, then resets `mTimeLeft` to force an
+   * immediate next tick.
+   *
+   * Not yet invoked from recovered source: its sole caller,
+   * `Moho::CUIWorldView::HandleEvent` (0x008704B0), is still unrecovered.
+   */
+  [[maybe_unused]] void CFormation::LuaFinalize()
+  {
+    if (mNumFormationScripts > 1) {
+      mBestFormation = (mBestFormation + 1) % mNumFormationScripts;
+      Finalize();
+      mTimeLeft = 0.0f;
+    }
+  }
+
+  /**
    * Address: 0x00838800 (FUN_00838800, Moho::CFormation::ProcessMouse)
    *
    * IDA signature:

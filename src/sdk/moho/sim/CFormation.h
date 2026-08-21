@@ -134,6 +134,27 @@ namespace moho
       bool useLastQueuedDestination
     );
 
+    /**
+     * Address: 0x00838A80 (FUN_00838A80, Moho::CFormation::LuaFinalize)
+     *
+     * IDA signature:
+     * void __usercall Moho::CFormation::LuaFinalize(Moho::CFormation *a1@<esi>);
+     *
+     * What it does:
+     * Lua-facing re-finalize: only fires once more than one formation script
+     * is available, advancing `mBestFormation` to the next script round-robin
+     * (`(mBestFormation + 1) % mNumFormationScripts`) before calling
+     * `Finalize()` again to rebuild the live formation instance from the new
+     * choice, then resets `mTimeLeft` to force an immediate next tick.
+     *
+     * Not yet invoked from recovered source: its sole caller,
+     * `Moho::CUIWorldView::HandleEvent` (0x008704B0, 889 instructions), is
+     * still unrecovered. Frontier orphan pending that dispatcher, matching
+     * the same pattern as `func_NewCommandDragger`/`NewSelectionDragger`
+     * (UiRuntimeTypes.cpp).
+     */
+    [[maybe_unused]] void LuaFinalize();
+
   public:
     /// The set of units currently participating in the drag-formation, a
     /// `WeakSet<UserUnit>` embedded at `this + 0x00`: `ChooseFormation`
