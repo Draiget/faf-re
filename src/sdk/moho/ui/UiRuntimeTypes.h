@@ -319,6 +319,19 @@ namespace moho
    */
   extern bool cam_Free;
   /**
+   * Address: 0x00F57AA0 (?ren_BgLowerBound@Moho@@3MA)
+   *
+   * What it does:
+   * Zoom threshold below which the world view stops treating a space-drag as a
+   * camera rotation. `CUIWorldView::HandleEvent` compares it against
+   * `CameraImpl::CameraGetTargetZoom()` at 0x00870998 and only spins the camera
+   * while free-look is on or the camera is still zoomed in past this bound.
+   *
+   * Initial value read out of the shipped `.data` at VA 0x00F57AA0
+   * (`00 00 fa 42` == 125.0f).
+   */
+  extern float ren_BgLowerBound;
+  /**
    * Address: 0x010A6464 (?ui_DisableCursorFixing@Moho@@3_NA)
    *
    * What it does:
@@ -4022,6 +4035,38 @@ namespace moho
      * (showing) the render-world-view in the global viewport.
      */
     void SetHidden(bool hidden) override;
+
+    /**
+     * Address: 0x008704B0 (FUN_008704B0, Moho::CUIWorldView::HandleEvent)
+     * Mangled: ?HandleEvent@CUIWorldView@Moho@@UAE_NABUSMauiEventData@2@@Z
+     *
+     * VFTable SLOT: 12 (+0x30)
+     *
+     * IDA signature:
+     * bool __thiscall Moho::CUIWorldView::HandleEvent(
+     *   Moho::CUIWorldView *this, const Moho::SMauiEventData *eventData);
+     *
+     * What it does:
+     * The world view's whole pointer-input front end. Tracks cursor
+     * enter/exit (dropping any in-progress camera rotation and mid-mouse
+     * scrub on the way out), refreshes hover selection, and lets the
+     * `CMauiControl` base and the input lock claim the event first. It then
+     * raises the two command-graph hover banners - "double-click for
+     * coordinated attack" when the hovered command is an Attack/FormAttack
+     * none of the selection participates in, "click to convert moves into
+     * patrol" when it is a Move/FormMove that can be restarted as patrol -
+     * before dispatching, in the binary's own order: wheel rotation (command
+     * mode, else camera pivot + zoom), motion (space-drag camera spin or
+     * rotation revert, then camera pivot), middle-press (command mode, else a
+     * `CameraDragger`), left double-click (finalize a pending drag formation,
+     * else dispatch the left command or double-click-select), left press
+     * (build/minimap/selection/reclaim dragger or left-command dispatch by
+     * command mode), right double-click (coordinated-attack drag formation),
+     * and right release (shift+ctrl strips the hovered command from every unit
+     * under the cursor, otherwise the stored right-button command runs). Every
+     * arm that ends a drag resets the session's formation state.
+     */
+    [[nodiscard]] bool HandleEvent(const SMauiEventData& eventData) override;
 
     /**
      * Address: 0x0086F520 (FUN_0086F520, Moho::CUIWorldView::UpdateSelection)

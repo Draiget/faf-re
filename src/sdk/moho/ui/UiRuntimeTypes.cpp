@@ -93,7 +93,9 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/CUIWorldMesh.h"
+#include "moho/ui/IUIManager.h"
 #include "moho/ui/SelectionDragger.h"
+#include "moho/sim/CFormation.h"
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "moho/ui/EMauiScrollAxisTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
@@ -2719,41 +2721,186 @@ moho::CMauiLuaDragger::CMauiLuaDragger(const LuaPlus::LuaObject& luaObject)
 
 namespace
 {
-  using CameraDragDeltaFn = int(__thiscall*)(void*, Wm3::Vector2f*);
+  /**
+   * The drag-move callback a `CameraDragger` carries at `+0x18`.
+   *
+   * In the image the slot holds a `__thiscall` pointer - `CameraDragger::
+   * DragMove` loads the drag target into `ecx` before the indirect call
+   * (0x0086E17F) and the one callback ever stored there, 0x00873BD0, tail-jumps
+   * straight into `CameraImpl::CameraPan` with `ecx` still holding the camera.
+   * MSVC only accepts `__thiscall` on member functions, so the recovered source
+   * carries the drag target as an ordinary leading parameter instead; the slot
+   * is still one pointer wide and nothing outside this file ever writes it.
+   */
+  using CameraDragDeltaFn = int (*)(void*, Wm3::Vector2f*);
 
-  struct CameraDraggerRuntimeView
+  /**
+   * The middle-button camera drag.
+   *
+   * RTTI evidence (`??_R0?AVCameraDragger@Moho@@`, complete-object locator for
+   * `??_7CameraDragger@Moho@@6B@` at 0x00E49060): a single non-virtual base
+   * `Moho::IMauiDragger` at `mdisp = 0`, whose own `Moho::WeakObject` base sits
+   * at `mdisp = 4`, and a 4-slot primary vtable
+   *   +0x00 0x0086E250 (scalar deleting dtor)
+   *   +0x04 0x0086E140 `DragMove`
+   *   +0x08 0x0086E220 `DragRelease`
+   *   +0x0C 0x0086E1F0 `OnCurrentDraggerReplaced`
+   * which is exactly `IMauiDragger`'s slot order. The constructor
+   * (0x0086E060) installs that table at `[this]` (0x0086E096) and the sole
+   * allocation site asks for `operator new(0x20)` (0x00870B43 in
+   * `CUIWorldView::HandleEvent`), which is the size asserted below.
+   *
+   * This was previously modelled as a vtable-less `CameraDraggerRuntimeView`
+   * aggregate whose helpers were all unreachable. Since `HandleEvent` hands the
+   * instance to `func_PostDragger`, which dispatches
+   * `OnCurrentDraggerReplaced` through slot +0x0C on the *previous* dragger,
+   * a missing vptr would fault on the very next drag - so the class is
+   * expressed as the real `IMauiDragger` subclass the binary constructs.
+   */
+  class CameraDragger final : public moho::IMauiDragger
   {
-    void* mVftable = nullptr;            // +0x00
-    DraggerLink* mListHead = nullptr;    // +0x04
-    moho::CameraImpl* mCamera = nullptr; // +0x08
-    Wm3::Vector2f mPos{};                // +0x0C
-    std::uint32_t mUnknown14 = 0;        // +0x14
-    CameraDragDeltaFn mDragMoveFn = nullptr; // +0x18
-    std::int32_t mDragMoveOffset = 0;    // +0x1C
+  public:
+    /**
+     * Address: 0x0086E060 (FUN_0086E060, ??0CameraDragger@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one camera dragger with its drag target camera/lane and
+     * enables mouse-scrub mode for the owning control.
+     */
+    CameraDragger(
+      moho::CameraImpl* camera,
+      const Wm3::Vector2f& mousePos,
+      moho::CMauiControl* ownerControl,
+      CameraDragDeltaFn dragMoveFn,
+      std::int32_t dragMoveOffset
+    );
+
+    /**
+     * Address: 0x0086E0D0 (FUN_0086E0D0, Moho::CameraDragger::~CameraDragger)
+     * Scalar deleting destructor: 0x0086E250 (slot +0x00)
+     *
+     * What it does:
+     * Disables mouse-scrub mode; the `IMauiDragger` base then drains the
+     * weak-reference chain behind the vptr.
+     */
+    ~CameraDragger() override;
+
+    /**
+     * Address: 0x0086E140 (FUN_0086E140, Moho::CameraDragger::DragMove)
+     * Slot: +0x04
+     *
+     * What it does:
+     * Applies the camera drag delta from either raw mouse motion (cursor-fixing
+     * disabled) or the accumulated scrub delta, then resets the scrub lanes.
+     */
+    void DragMove(const moho::SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x0086E220 (FUN_0086E220, Moho::CameraDragger::DragRelease)
+     * Slot: +0x08
+     *
+     * What it does:
+     * Reverts a held camera rotation when free-look is off, then destroys this
+     * dragger.
+     */
+    void DragRelease(const moho::SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x0086E1F0 (FUN_0086E1F0, Moho::CameraDragger::DragCancel)
+     * Slot: +0x0C
+     *
+     * What it does:
+     * Mirrors `DragRelease`: conditionally reverts camera rotation, then
+     * destroys this dragger.
+     */
+    void OnCurrentDraggerReplaced() override;
+
+    moho::CameraImpl* mCamera = nullptr;      // +0x08
+    Wm3::Vector2f mPos{};                     // +0x0C
+    std::uint32_t mUnknown14 = 0;             // +0x14
+    CameraDragDeltaFn mDragMoveFn = nullptr;  // +0x18
+    std::int32_t mDragMoveOffset = 0;         // +0x1C
   };
 
-  static_assert(offsetof(CameraDraggerRuntimeView, mCamera) == 0x8, "CameraDraggerRuntimeView::mCamera offset must be 0x8");
-  static_assert(offsetof(CameraDraggerRuntimeView, mPos) == 0xC, "CameraDraggerRuntimeView::mPos offset must be 0xC");
+  static_assert(offsetof(CameraDragger, mCamera) == 0x8, "CameraDragger::mCamera offset must be 0x8");
+  static_assert(offsetof(CameraDragger, mPos) == 0xC, "CameraDragger::mPos offset must be 0xC");
+  static_assert(offsetof(CameraDragger, mDragMoveFn) == 0x18, "CameraDragger::mDragMoveFn offset must be 0x18");
   static_assert(
-    offsetof(CameraDraggerRuntimeView, mDragMoveFn) == 0x18,
-    "CameraDraggerRuntimeView::mDragMoveFn offset must be 0x18"
+    offsetof(CameraDragger, mDragMoveOffset) == 0x1C,
+    "CameraDragger::mDragMoveOffset offset must be 0x1C"
   );
-  static_assert(
-    offsetof(CameraDraggerRuntimeView, mDragMoveOffset) == 0x1C,
-    "CameraDraggerRuntimeView::mDragMoveOffset offset must be 0x1C"
-  );
-  static_assert(sizeof(CameraDraggerRuntimeView) == 0x20, "CameraDraggerRuntimeView size must be 0x20");
+  static_assert(sizeof(CameraDragger) == 0x20, "CameraDragger size must be 0x20");
 
-  struct MiniMapDraggerRuntimeView
+  /**
+   * The minimap click-drag: retargets a named camera at whatever world point
+   * the cursor is over.
+   *
+   * Same evidence shape as `CameraDragger` above
+   * (`??_7CMiniMapDragger@Moho@@6B@` at 0x00E49144, 4 slots:
+   * +0x00 0x0086E410 deleting dtor, +0x04 0x0086E2F0 `DragMove`,
+   * +0x08 0x0086E3F0 `DragRelease`, +0x0C 0x0086E3E0
+   * `OnCurrentDraggerReplaced`). The constructor at 0x0086E270 installs that
+   * table at `[this]` (0x0086E29B) and re-bases to `[this+8]` for the camera
+   * name (`lea ecx,[esi+8]` at 0x0086E298, then `_Mysize` at `[ecx+0x14]` and
+   * `_Myres` at `[ecx+0x18]`), so the string starts immediately after the
+   * 8-byte `IMauiDragger` base and the object ends at 0x08 + 0x1C == 0x24 -
+   * exactly the `operator new(0x24)` the sole allocation site issues
+   * (0x00870D8C in `CUIWorldView::HandleEvent`).
+   *
+   * The previous `MiniMapDraggerRuntimeView` modelling put a spare dword at
+   * +0x08 and the string at +0x0C, which made the object 0x28 bytes; that
+   * offset is corrected here against the constructor disassembly.
+   */
+  class CMiniMapDragger final : public moho::IMauiDragger
   {
-    void* mVftable = nullptr;             // +0x00
-    DraggerLink* mListHead = nullptr;     // +0x04
-    std::uint32_t mUnknown08 = 0;         // +0x08
-    msvc8::string mCameraName{};          // +0x0C
+  public:
+    /**
+     * Address: 0x0086E270 (FUN_0086E270, ??0CMiniMapDragger@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one minimap dragger and copies its camera-name lane from the
+     * incoming string payload.
+     */
+    explicit CMiniMapDragger(msvc8::string cameraName);
+
+    /**
+     * Address: 0x0086E430 (FUN_0086E430, Moho::CMiniMapDragger::~CMiniMapDragger)
+     * Scalar deleting destructor: 0x0086E410 (slot +0x00)
+     *
+     * What it does:
+     * Releases the camera-name storage; the `IMauiDragger` base then drains the
+     * weak-reference chain behind the vptr.
+     */
+    ~CMiniMapDragger() override;
+
+    /**
+     * Address: 0x0086E2F0 (FUN_0086E2F0, Moho::CMiniMapDragger::DragMove)
+     * Slot: +0x04
+     *
+     * What it does:
+     * Updates the world-session cursor screen lanes from the incoming Maui
+     * event coords and retargets the named minimap camera at the current cursor
+     * world point.
+     */
+    void DragMove(const moho::SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x0086E3F0 (FUN_0086E3F0, Moho::CMiniMapDragger::DragRelease)
+     * Slot: +0x08
+     */
+    void DragRelease(const moho::SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x0086E3E0 (FUN_0086E3E0, Moho::CMiniMapDragger::DragCancel)
+     * Slot: +0x0C
+     */
+    void OnCurrentDraggerReplaced() override;
+
+    msvc8::string mCameraName{}; // +0x08
   };
 
-  static_assert(offsetof(MiniMapDraggerRuntimeView, mListHead) == 0x4, "MiniMapDraggerRuntimeView::mListHead offset must be 0x4");
-  static_assert(offsetof(MiniMapDraggerRuntimeView, mCameraName) == 0xC, "MiniMapDraggerRuntimeView::mCameraName offset must be 0xC");
+  static_assert(offsetof(CMiniMapDragger, mCameraName) == 0x8, "CMiniMapDragger::mCameraName offset must be 0x8");
+  static_assert(sizeof(CMiniMapDragger) == 0x24, "CMiniMapDragger size must be 0x24");
 
   struct CurrentDraggerSentinel
   {
@@ -4645,16 +4792,27 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 
   /**
    * Address: 0x0079DB80 (FUN_0079DB80)
+   * Address: 0x00873810 (FUN_00873810, sub_873810)
    *
    * What it does:
-   * Rebinds one focus-owner intrusive link head to a new control `mNext` lane.
+   * Rebinds one two-word intrusive weak link to a new owner head slot: splices
+   * the link out of whatever chain currently holds it (walking the chain until
+   * the slot pointing back at this link is found), stores the new head address,
+   * and pushes the link onto the new owner's chain. A null head address just
+   * unbinds.
+   *
+   * 0x0079DB80 and 0x00873810 are byte-identical bodies - the same splice, the
+   * same `lea edx,[owner+4]` head-slot adjust, the same `mov [eax+4],0` unbind
+   * tail - emitted once per owner type. 0x0079DB80 is the `CMauiControl`
+   * emission (`SetCurrentFocusControlLink` below); 0x00873810 is the
+   * `IMauiDragger` one (`BindWorldViewOverlayDragger`, further down), whose
+   * `+0x04` is the `WeakObject` sub-object rather than a list node.
    */
-  void SetCurrentFocusControlLink(
+  void RebindIntrusiveOwnerLink(
     moho::CMauiCurrentFocusControlRuntimeView* const focusState,
-    moho::CMauiControl* const control
+    const std::uint32_t newFocusField
   ) noexcept
   {
-    const std::uint32_t newFocusField = FocusControlNextFieldAddress(control);
     const std::uint32_t currentFocusField = focusState->mFocusedControlPrevNextField;
     if (newFocusField == currentFocusField) {
       return;
@@ -4679,6 +4837,60 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
     } else {
       focusState->mNextPrevNextField = 0u;
     }
+  }
+
+  /**
+   * Address: 0x0079DB80 (FUN_0079DB80)
+   *
+   * What it does:
+   * Rebinds one focus-owner intrusive link head to a new control `mNext` lane.
+   */
+  void SetCurrentFocusControlLink(
+    moho::CMauiCurrentFocusControlRuntimeView* const focusState,
+    moho::CMauiControl* const control
+  ) noexcept
+  {
+    RebindIntrusiveOwnerLink(focusState, FocusControlNextFieldAddress(control));
+  }
+
+  /**
+   * Address: 0x00873810 (FUN_00873810, sub_873810)
+   *
+   * IDA signature:
+   * int __usercall sub_873810@<eax>(int *overlayLink@<eax>, Moho::IMauiDragger *dragger@<ecx>);
+   *
+   * What it does:
+   * Makes the world view hold a weak reference to the dragger it has just
+   * posted: rebinds `mOverlayLink` onto `dragger`'s `WeakObject` owner-head
+   * slot, so the link goes dead by itself when the dragger destroys itself on
+   * release/cancel. Passing a null dragger unbinds the link.
+   *
+   * `IMauiDragger` is `{vptr, WeakObject}` and nothing else (`sizeof == 0x8`),
+   * so its weak-owner head is the object's `+0x04` - which is the `lea
+   * edx,[ecx+4]` the shipped body performs at 0x00873814. This is the exact
+   * inverse of `UnlinkFocusControlSentinel(&view->mOverlayLink)`, which
+   * `CUIWorldView`'s destructor already runs over the same field.
+   *
+   * `CUIWorldView::HandleEvent` calls it at 0x00870E35, right after
+   * `NewSelectionDragger` has posted the drag-select dragger.
+   *
+   * Follow-up (deliberately not done in this pass, to keep the change off the
+   * constructor/destructor sites): `mOverlayLink` is really a
+   * `WeakPtr<IMauiDragger>` - `sizeof(CMauiCurrentFocusControlRuntimeView) ==
+   * 0x8 == sizeof(WeakPtr<void>)` and this is the only thing ever bound into
+   * it - and retyping the field would remove the address arithmetic below.
+   */
+  void BindWorldViewOverlayDragger(
+    moho::CMauiCurrentFocusControlRuntimeView& overlayLink,
+    moho::IMauiDragger* const dragger
+  ) noexcept
+  {
+    // Typed access to the dragger's own weak-owner head lane - no `+ 4` byte
+    // arithmetic: the offset comes from the `WeakObject` sub-object itself.
+    std::uint32_t* const ownerHeadSlot =
+      dragger != nullptr ? &static_cast<moho::WeakObject*>(dragger)->weakLinkHead_ : nullptr;
+
+    RebindIntrusiveOwnerLink(&overlayLink, NarrowPointerToFocusField(ownerHeadSlot));
   }
 
   class ScriptCallbackWeakGuard final
@@ -4789,6 +5001,9 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
 
 moho::EUIState moho::sUIState = moho::UIS_none;
 bool moho::cam_Free = false;
+// 0x00F57AA0 `?ren_BgLowerBound@Moho@@3MA`; the shipped `.data` word is
+// `00 00 fa 42` == 125.0f.
+float moho::ren_BgLowerBound = 125.0f;
 bool moho::ui_DisableCursorFixing = false;
 float moho::ui_SelectTolerance = 4.0f;
 float moho::ui_ExtractSnapTolerance = 20.0f;
@@ -10394,7 +10609,7 @@ void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
  * enabling scrub mode recenters the cursor to the control midpoint inside the
  * active UI head rectangle.
  */
-[[maybe_unused]] static void func_StartMouseScrubbing(const bool doStart, moho::CMauiControl* const control)
+static void func_StartMouseScrubbing(const bool doStart, moho::CMauiControl* const control)
 {
   if (moho::ui_DisableCursorFixing || sMouseIsScrubbing == static_cast<std::uint8_t>(doStart)) {
     return;
@@ -10451,36 +10666,6 @@ void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
 }
 
 /**
- * Address: 0x0086E140 (FUN_0086E140, Moho::CameraDragger::DragMove)
- *
- * What it does:
- * Applies camera drag delta from either raw mouse motion (cursor-fixing
- * disabled) or accumulated scrub delta, then resets scrub delta lanes.
- */
-[[maybe_unused]] static int func_CameraDraggerDragMove(
-  CameraDraggerRuntimeView* const dragger, const moho::SMauiEventData* const eventData
-)
-{
-  auto* const cameraBytes = reinterpret_cast<std::uint8_t*>(dragger->mCamera);
-  void* const dragTarget = cameraBytes + dragger->mDragMoveOffset;
-  CameraDragDeltaFn const dragMoveFn = dragger->mDragMoveFn;
-
-  if (moho::ui_DisableCursorFixing) {
-    const Wm3::Vector2f currentMousePos(eventData->mMousePos.x, eventData->mMousePos.y);
-    Wm3::Vector2f dragDelta(currentMousePos.x - dragger->mPos.x, currentMousePos.y - dragger->mPos.y);
-    const int result = dragMoveFn(dragTarget, &dragDelta);
-    dragger->mPos = currentMousePos;
-    return result;
-  }
-
-  Wm3::Vector2f dragDelta(static_cast<float>(sMouseScrubDelta.x), static_cast<float>(sMouseScrubDelta.y));
-  (void)dragMoveFn(dragTarget, &dragDelta);
-  sMouseScrubDelta.x = 0;
-  sMouseScrubDelta.y = 0;
-  return 0;
-}
-
-/**
  * Address: 0x00873BD0 (FUN_00873BD0)
  *
  * IDA signature:
@@ -10507,139 +10692,155 @@ void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
  * existed only to support it.
  *
  * Its single reference in the binary is the address-taken `push offset` at
- * 0x00870B66 inside `CUIWorldView::HandleEvent`, which is still blocked, so
- * nothing names it yet - it is carried here, next to the `CameraDragger`
- * helpers that share that blocked caller, ready for `&CameraDraggerPanCamera`
- * to be passed to `func_CameraDraggerConstruct` when that parent lands.
+ * 0x00870B66 inside `CUIWorldView::HandleEvent`, which is recovered below and
+ * passes `&CameraDraggerPanCamera` to `CameraDragger`'s constructor from its
+ * middle-button-press arm.
  *
  * The `int` return matches `CameraDragDeltaFn`; the binary leaves whatever
  * `CameraPan` (a `void` function) happened to put in `eax`, and
- * `func_CameraDraggerDragMove` discards it on the scrub path and returns it
+ * `CameraDragger::DragMove` discards it on the scrub path and returns it
  * unread on the other, so no observable behavior depends on the value.
  */
-[[maybe_unused]] static int CameraDraggerPanCamera(void* const cameraTarget, Wm3::Vector2f* const panDelta)
+static int CameraDraggerPanCamera(void* const cameraTarget, Wm3::Vector2f* const panDelta)
 {
   static_cast<moho::CameraImpl*>(cameraTarget)->CameraPan(*panDelta);
   return 0;
 }
 
 /**
- * Address: 0x0086E060 (FUN_0086E060, Moho::CameraDragger::CameraDragger)
+ * Address: 0x0086E060 (FUN_0086E060, ??0CameraDragger@Moho@@QAE@@Z)
  *
  * What it does:
  * Initializes one camera dragger with drag target camera/lane and enables
- * mouse-scrub mode for the owning control.
+ * mouse-scrub mode for the owning control. The `IMauiDragger` base installs the
+ * vptr and clears the weak-reference head (`mov [esi+4], ecx` with ecx==0 at
+ * 0x0086E080, `mov dword ptr [esi], offset ??_7CameraDragger@Moho@@6B@` at
+ * 0x0086E096).
  */
-[[maybe_unused]] static CameraDraggerRuntimeView* func_CameraDraggerConstruct(
-  CameraDraggerRuntimeView* const dragger,
+CameraDragger::CameraDragger(
   moho::CameraImpl* const camera,
-  const Wm3::Vector2f* const mousePos,
+  const Wm3::Vector2f& mousePos,
   moho::CMauiControl* const ownerControl,
   CameraDragDeltaFn const dragMoveFn,
   const std::int32_t dragMoveOffset
 )
+  : moho::IMauiDragger()
+  , mCamera(camera)
+  , mPos(mousePos)
+  , mDragMoveFn(dragMoveFn)
+  , mDragMoveOffset(dragMoveOffset)
 {
-  dragger->mListHead = nullptr;
-  dragger->mCamera = camera;
-  dragger->mPos = *mousePos;
-  dragger->mDragMoveFn = dragMoveFn;
-  dragger->mDragMoveOffset = dragMoveOffset;
   func_StartMouseScrubbing(true, ownerControl);
-  return dragger;
 }
 
 /**
  * Address: 0x0086E0D0 (FUN_0086E0D0, Moho::CameraDragger::~CameraDragger)
+ * Scalar deleting destructor: 0x0086E250 (FUN_0086E250, Moho::CameraDragger::dtr)
  *
  * What it does:
- * Disables mouse-scrub mode and unlinks all attached dragger-list nodes.
+ * Disables mouse-scrub mode. The `~IMauiDragger` base tail then unlinks every
+ * weak reference still aimed at this dragger - the `DetachDraggerList` half of
+ * the shipped body, which MSVC emits rather than the programmer writing it.
  */
-[[maybe_unused]] static void func_CameraDraggerDestruct(CameraDraggerRuntimeView* const dragger)
+CameraDragger::~CameraDragger()
 {
   func_StartMouseScrubbing(false, nullptr);
-  (void)DetachDraggerList(dragger->mListHead);
 }
 
 /**
- * Address: 0x0086E250 (FUN_0086E250, Moho::CameraDragger::dtr)
+ * Address: 0x0086E140 (FUN_0086E140, Moho::CameraDragger::DragMove)
+ * Slot: +0x04
  *
  * What it does:
- * Runs `CameraDragger` destructor behavior and frees storage when requested.
+ * Applies camera drag delta from either raw mouse motion (cursor-fixing
+ * disabled) or accumulated scrub delta, then resets scrub delta lanes.
  */
-[[maybe_unused]] static CameraDraggerRuntimeView* func_CameraDraggerDeletingDtor(
-  CameraDraggerRuntimeView* const dragger, const char deleteFlags
-)
+void CameraDragger::DragMove(const moho::SMauiEventData* const eventData)
 {
-  func_CameraDraggerDestruct(dragger);
-  if ((deleteFlags & 1) != 0) {
-    ::operator delete(dragger);
+  auto* const cameraBytes = reinterpret_cast<std::uint8_t*>(mCamera);
+  void* const dragTarget = cameraBytes + mDragMoveOffset;
+
+  if (moho::ui_DisableCursorFixing) {
+    const Wm3::Vector2f currentMousePos(eventData->mMousePos.x, eventData->mMousePos.y);
+    Wm3::Vector2f dragDelta(currentMousePos.x - mPos.x, currentMousePos.y - mPos.y);
+    (void)mDragMoveFn(dragTarget, &dragDelta);
+    mPos = currentMousePos;
+    return;
   }
-  return dragger;
+
+  Wm3::Vector2f dragDelta(static_cast<float>(sMouseScrubDelta.x), static_cast<float>(sMouseScrubDelta.y));
+  (void)mDragMoveFn(dragTarget, &dragDelta);
+  sMouseScrubDelta.x = 0;
+  sMouseScrubDelta.y = 0;
 }
 
 /**
- * Address: 0x0086E1F0 (FUN_0086E1F0, Moho::CameraDragger::DragCancel)
+ * Address: 0x0086E220 (FUN_0086E220, Moho::CameraDragger::DragRelease)
+ * Slot: +0x08
  *
  * What it does:
  * Reverts held camera rotation when free-look is off, then destroys this
  * dragger instance.
  */
-[[maybe_unused]] static void func_CameraDraggerDragCancel(CameraDraggerRuntimeView* const dragger)
+void CameraDragger::DragRelease(const moho::SMauiEventData* const /*eventData*/)
 {
   if (!moho::cam_Free) {
-    dragger->mCamera->CameraRevertRotation();
+    mCamera->CameraRevertRotation();
   }
-  if (dragger != nullptr) {
-    (void)func_CameraDraggerDeletingDtor(dragger, 1);
-  }
+  delete this;
 }
 
 /**
- * Address: 0x0086E220 (FUN_0086E220, Moho::CameraDragger::DragRelease)
+ * Address: 0x0086E1F0 (FUN_0086E1F0, Moho::CameraDragger::DragCancel)
+ * Slot: +0x0C
  *
  * What it does:
- * Mirrors `DragCancel`: conditionally reverts camera rotation and destroys
- * the dragger.
+ * Mirrors `DragRelease`: conditionally reverts camera rotation and destroys
+ * this dragger.
  */
-[[maybe_unused]] static void func_CameraDraggerDragRelease(
-  CameraDraggerRuntimeView* const dragger, const moho::SMauiEventData* const /*eventData*/
-)
+void CameraDragger::OnCurrentDraggerReplaced()
 {
   if (!moho::cam_Free) {
-    dragger->mCamera->CameraRevertRotation();
+    mCamera->CameraRevertRotation();
   }
-  if (dragger != nullptr) {
-    (void)func_CameraDraggerDeletingDtor(dragger, 1);
-  }
+  delete this;
 }
 
 /**
- * Address: 0x0086E270 (FUN_0086E270, Moho::CMiniMapDragger::CMiniMapDragger)
+ * Address: 0x0086E270 (FUN_0086E270, ??0CMiniMapDragger@Moho@@QAE@@Z)
  *
  * What it does:
  * Initializes one minimap dragger and copies its camera-name lane from the
- * incoming string payload.
+ * incoming string payload. The string arrives by value (`retn 20h` == the
+ * 4-byte `this` plus the 0x1C-byte `std::string`), which is why the sole call
+ * site copy-constructs a temporary before the call (0x00870DB5).
  */
-[[maybe_unused]] static MiniMapDraggerRuntimeView* func_MiniMapDraggerConstruct(
-  MiniMapDraggerRuntimeView* const dragger, msvc8::string cameraName
-)
+CMiniMapDragger::CMiniMapDragger(msvc8::string cameraName)
+  : moho::IMauiDragger()
 {
-  dragger->mListHead = nullptr;
-  ::new (&dragger->mCameraName) msvc8::string();
-  dragger->mCameraName.assign(cameraName, 0, msvc8::string::npos);
-  return dragger;
+  mCameraName.assign(cameraName, 0, msvc8::string::npos);
 }
 
 /**
+ * Address: 0x0086E430 (FUN_0086E430, Moho::CMiniMapDragger::~CMiniMapDragger)
+ * Scalar deleting destructor: 0x0086E410 (FUN_0086E410, Moho::CMiniMapDragger::dtr)
+ *
+ * What it does:
+ * Releases the camera-name storage and drains the `IMauiDragger` base's
+ * weak-reference chain. Both halves are compiler-emitted (the member string's
+ * destructor and the base destructor call), so the source body is empty.
+ */
+CMiniMapDragger::~CMiniMapDragger() = default;
+
+/**
  * Address: 0x0086E2F0 (FUN_0086E2F0, Moho::CMiniMapDragger::DragMove)
+ * Slot: +0x04
  *
  * What it does:
  * Updates world-session cursor screen lanes from incoming Maui event coords
  * and retargets the named minimap camera to the current cursor world point.
  */
-[[maybe_unused]] static void func_MiniMapDraggerDragMove(
-  MiniMapDraggerRuntimeView* const dragger, const moho::SMauiEventData* const eventData
-)
+void CMiniMapDragger::DragMove(const moho::SMauiEventData* const eventData)
 {
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
   if (activeSession == nullptr) {
@@ -10652,7 +10853,8 @@ void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
   }
 
   moho::RCamManager* const cameraManager = moho::CAM_GetManager();
-  moho::CameraImpl* const camera = cameraManager != nullptr ? cameraManager->GetCamera(dragger->mCameraName.c_str()) : nullptr;
+  moho::CameraImpl* const camera =
+    cameraManager != nullptr ? cameraManager->GetCamera(mCameraName.c_str()) : nullptr;
   if (camera == nullptr) {
     return;
   }
@@ -10666,62 +10868,27 @@ void moho::UI_SetInvertMidMouseScrub(const bool invert) noexcept
 }
 
 /**
- * Address: 0x0086E430 (FUN_0086E430, Moho::CMiniMapDragger::~CMiniMapDragger)
+ * Address: 0x0086E3F0 (FUN_0086E3F0, Moho::CMiniMapDragger::DragRelease)
+ * Slot: +0x08
  *
  * What it does:
- * Releases minimap dragger camera-name storage, restores empty-string state,
- * and unlinks all attached dragger-list nodes.
+ * Destroys this minimap dragger instance.
  */
-[[maybe_unused]] static DraggerLink* func_MiniMapDraggerDestruct(MiniMapDraggerRuntimeView* const dragger)
+void CMiniMapDragger::DragRelease(const moho::SMauiEventData* const /*eventData*/)
 {
-  dragger->mCameraName.~string();
-  ::new (&dragger->mCameraName) msvc8::string();
-  return DetachDraggerList(dragger->mListHead);
-}
-
-/**
- * Address: 0x0086E410 (FUN_0086E410, Moho::CMiniMapDragger::dtr)
- *
- * What it does:
- * Runs `CMiniMapDragger` destructor behavior and frees storage when requested.
- */
-[[maybe_unused]] static MiniMapDraggerRuntimeView* func_MiniMapDraggerDeletingDtor(
-  MiniMapDraggerRuntimeView* const dragger, const char deleteFlags
-)
-{
-  (void)func_MiniMapDraggerDestruct(dragger);
-  if ((deleteFlags & 1) != 0) {
-    ::operator delete(dragger);
-  }
-  return dragger;
+  delete this;
 }
 
 /**
  * Address: 0x0086E3E0 (FUN_0086E3E0, Moho::CMiniMapDragger::DragCancel)
+ * Slot: +0x0C
  *
  * What it does:
  * Destroys this minimap dragger instance.
  */
-[[maybe_unused]] static void func_MiniMapDraggerDragCancel(MiniMapDraggerRuntimeView* const dragger)
+void CMiniMapDragger::OnCurrentDraggerReplaced()
 {
-  if (dragger != nullptr) {
-    (void)func_MiniMapDraggerDeletingDtor(dragger, 1);
-  }
-}
-
-/**
- * Address: 0x0086E3F0 (FUN_0086E3F0, Moho::CMiniMapDragger::DragRelease)
- *
- * What it does:
- * Destroys this minimap dragger instance.
- */
-[[maybe_unused]] static void func_MiniMapDraggerDragRelease(
-  MiniMapDraggerRuntimeView* const dragger, const moho::SMauiEventData* const /*eventData*/
-)
-{
-  if (dragger != nullptr) {
-    (void)func_MiniMapDraggerDeletingDtor(dragger, 1);
-  }
+  delete this;
 }
 
 /**
@@ -10915,7 +11082,9 @@ static std::uint8_t func_SetMouseCapture(const bool shouldCapture, moho::wxEvtHa
  * Switches active dragger ownership, updates Win32 mouse-capture state, and
  * records the keycode lane used by the current dragger.
  */
-static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* const dragger, moho::SMauiEventData* const eventData)
+static void func_PostDragger(
+  moho::CMauiFrame* const originFrame, IMauiDragger* const dragger, const moho::SMauiEventData* const eventData
+)
 {
   IMauiDragger* const currentDragger = func_GetCurrentDragger();
   if (dragger == currentDragger) {
@@ -10948,10 +11117,10 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
  * camera lanes, then posts the dragger; on allocation failure it posts a null
  * dragger lane.
  */
-[[maybe_unused]] static void func_NewUIBuildDragger(
+static void func_NewUIBuildDragger(
   moho::CMauiFrame* const originFrame,
   moho::CWldSession* const session,
-  moho::SMauiEventData* const eventData,
+  const moho::SMauiEventData* const eventData,
   moho::CameraImpl* const camera,
   moho::CUIWorldViewBuildDragRuntimeView* const worldView
 )
@@ -10984,20 +11153,14 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
  *
  * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0),
  * from the `COMMOD_Reclaim` arm of the left-button-press command-mode switch
- * (call site 0x00870F..). That parent is not recovered yet - it is gated on
- * `Moho::SCommandModeData::HandleEvent` (0x0081FCD0, 2167 instructions, owned
- * by CWldSession.cpp) and on the `CFormation::Finalize` ->
- * `CFormationInstance` construction path (0x008382A0 -> 0x0056A920 ->
- * 0x005694B0), the same chain `CAiFormationDBImpl.cpp` already records as
- * blocked. This helper therefore sits in the same frontier state as its three
- * siblings above/below (`func_NewUIBuildDragger`, `NewSelectionDragger`,
- * `func_StartMouseScrubbing`): recovered and correct, waiting only on that
- * one parent to be wired by name.
+ * (call site 0x00870EBB). That parent is recovered further down this file and
+ * calls this helper by name, as it does the three siblings around it
+ * (`func_NewUIBuildDragger`, `NewSelectionDragger`, `func_StartMouseScrubbing`).
  */
-[[maybe_unused]] static void func_NewCommandDragger(
+static void func_NewCommandDragger(
   moho::CMauiFrame* const originFrame,
   moho::CWldSession* const session,
-  moho::SMauiEventData* const eventData,
+  const moho::SMauiEventData* const eventData,
   moho::CameraImpl* const camera,
   const moho::CmdId commandId
 )
@@ -11040,8 +11203,11 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
  * `func_PostDragger`. Posts a null dragger on allocation failure (matching
  * the binary's `xor eax, eax` fallthrough on both branches).
  *
- * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0,
- * not yet recovered). The disassembly at 0x00870E0C-0x00870E23 resolves the
+ * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0),
+ * recovered further down this file, which calls it by name from the
+ * `COMMOD_Move` non-minimap arm of its left-button-press command switch and
+ * then binds the returned dragger into the view's weak overlay link.
+ * The disassembly at 0x00870E0C-0x00870E23 resolves the
  * call's arguments from the world view's own fields: `camera` from
  * `CUIWorldViewRuntimeView::mViewportCallback` (+0x120, the raw pointer
  * value the constructor chain stores verbatim into `SelectionDragger::mCam`
@@ -11051,11 +11217,11 @@ static void func_PostDragger(moho::CMauiFrame* const originFrame, IMauiDragger* 
  * `CMauiControl` base layout); `eventData` is `HandleEvent`'s own event
  * argument forwarded through unchanged.
  */
-[[maybe_unused]] static moho::IMauiDragger* NewSelectionDragger(
+static moho::IMauiDragger* NewSelectionDragger(
   moho::CameraImpl* const camera,
   moho::CWldSession* const session,
   moho::CMauiFrame* const originFrame,
-  moho::SMauiEventData* const eventData
+  const moho::SMauiEventData* const eventData
 )
 {
   moho::IMauiDragger* dragger = nullptr;
@@ -22410,6 +22576,535 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
   resultCursor.mUnitHover = bestCandidate;
   resultCursor.mMouseScreenPos = mouseScreenPos;
   mWldSession->CursorInfo() = resultCursor;
+}
+
+namespace
+{
+  /// Both command-graph hover banners this file raises are posted with
+  /// `flt_E4F6E8` as their lifetime (0x00870770 and 0x00870817). The shipped
+  /// `.rdata` word at VA 0x00E4F6E8 is `00 00 80 bf` == -1.0f, i.e. "no
+  /// timeout" - the banner stays until something replaces or stops it.
+  ///
+  /// Deliberately not shared with `kCursorBannerSeconds` (3.0f) in
+  /// CWldSession.cpp: those are `SCommandModeData::HandleEvent`'s banners,
+  /// which carry a real duration, a named colour and `anchorToCursor = true`.
+  constexpr float kHintBannerNoTimeout = -1.0f;
+
+  /// Both banners are posted in the default colour (`push 0FFFFFFFFh` at
+  /// 0x0087077E / 0x00870825).
+  constexpr std::uint32_t kHintBannerDefaultColor = 0xFFFFFFFFu;
+
+  /**
+   * The cursor banner API names the two screen-space floats `SMauiMousePos`;
+   * the world view just hands `&cursorInfo.mMouseScreenPos` over in `ecx`
+   * (0x00870787 / 0x0087082C).
+   */
+  [[nodiscard]] moho::SMauiMousePos ToHintBannerPos(const Wm3::Vector2f& screenPos) noexcept
+  {
+    return moho::SMauiMousePos{screenPos.x, screenPos.y};
+  }
+
+  /**
+   * A `CmdId` packs its issuing source into the high byte, and the
+   * `(MouseInfo, modifiers)` command-mode constructor seeds the cursor's id
+   * lane with an all-ones sentinel. "The cursor is over a live command" is
+   * therefore the source-byte test the world view runs at 0x00870627 and
+   * 0x0087100D - the same test `SCommandModeData::HandleEvent` spells
+   * `HasDraggedCommand` on its own copy of the lane.
+   */
+  [[nodiscard]] bool HasHoveredCommand(const moho::MouseInfo& cursorInfo) noexcept
+  {
+    constexpr std::uint32_t kCommandSourceMask = 0xFF000000u;
+    return (static_cast<std::uint32_t>(cursorInfo.mIsDragger) & kCommandSourceMask) != kCommandSourceMask;
+  }
+
+  /**
+   * Resolves one weak-set node's recorded link slot back to its owning
+   * `UserEntity` by subtracting `offsetof(UserEntity, mIUnitChainHead)`.
+   *
+   * The engine never emits this as a function - every weak-set walk inlines
+   * it, which is why `CWldSession.cpp` (`DecodeSelectedUserEntity`) and
+   * `SelectionListener.cpp` (`ResolveSelectedUserEntity`) each carry their own
+   * copy. This is the same decode for this TU's two walks in
+   * `CUIWorldView::HandleEvent` (0x008706B0 and, through `sub_7B2920`,
+   * 0x00871077).
+   */
+  [[nodiscard]] moho::UserEntity* ResolveWeakSetOwnerEntity(
+    const moho::SSelectionWeakRefUserEntity& weakRef
+  ) noexcept
+  {
+    constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(moho::UserEntity, mIUnitChainHead);
+    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+    if (raw < kSelectionOwnerLinkOffset) {
+      return nullptr;
+    }
+    return reinterpret_cast<moho::UserEntity*>(raw - kSelectionOwnerLinkOffset);
+  }
+
+  /**
+   * Drops any pending drag formation.
+   *
+   * The binary open-codes this three-line tail at four separate points in
+   * `CUIWorldView::HandleEvent` - 0x00870578 (pointer left the view),
+   * 0x00870423 (the left-command helper's own tail), 0x008710D2 (the shared
+   * right-button tail) - always as "build a throwaway `WeakSet<UserUnit>`,
+   * clear `mReady`, `Reset()`, tear the set down again". The transient set is
+   * never populated or read; it exists because the same source statement
+   * scopes it, so it is kept here rather than optimised away.
+   */
+  void ClearPendingDragFormation(moho::CWldSession& session)
+  {
+    moho::ScopedLocalUnitSet formationUnitsGuard{};
+
+    moho::CFormation* const formation = session.mCurFormation;
+    formation->mReady = false;
+    formation->Reset();
+  }
+} // namespace
+
+/**
+ * Address: 0x00870310 (FUN_00870310, sub_870310)
+ *
+ * IDA signature:
+ * void __stdcall sub_870310(
+ *     Moho::CUIWorldView *view, Moho::UICursorInfo *cursorInfo,
+ *     char useLastQueuedDestination);
+ *
+ * What it does:
+ * The left-button command dispatch `CUIWorldView::HandleEvent` shares between
+ * its press and double-click arms. When the pending left command is a
+ * Move or Attack, it re-derives the drag formation from the current selection
+ * first: an empty selection drops the formation (`mReady = false`, `Reset()`),
+ * a non-empty one marks it ready and rebuilds it through
+ * `ChooseFormation` + `Finalize`. It then runs the stored left command
+ * (`SCommandModeData::HandleEvent`), telling it whether this was a
+ * double-click by testing the view's own state lane against
+ * `MET_ButtonDClick`. Finally it clears the formation again so the next drag
+ * starts clean.
+ *
+ * The trailing clear genuinely constructs and tears down a second empty
+ * participant set (0x00870423-0x0087048C) - that is `ClearPendingDragFormation`
+ * being inlined a second time, not dead code.
+ */
+static void ApplyDragFormationAndDispatchLeftCommand(
+  moho::CUIWorldView* const view,
+  moho::MouseInfo* const cursorInfo,
+  const bool useLastQueuedDestination
+)
+{
+  moho::CWldSession& session = *view->mWldSession;
+
+  const moho::ERuleBPUnitCommandCaps leftCommandCaps = view->mLeftMouseCommand.mCommandCaps;
+  if (leftCommandCaps == moho::RULEUCC_Attack || leftCommandCaps == moho::RULEUCC_Move) {
+    moho::ScopedLocalUnitSet formationUnitsGuard{};
+    moho::WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+    session.GetSelectionUnits(formationUnits);
+
+    moho::CFormation* const formation = session.mCurFormation;
+
+    // 0x0087037F-0x008703A9: prune from the left-most node and compare the
+    // first live node against the head sentinel - "is anything selected still
+    // alive".
+    moho::SSelectionNodeUserEntity* firstLive = formationUnits.mHead->mLeft;
+    firstLive = moho::SSelectionSetUserEntity::find(&formationUnits, firstLive, &firstLive);
+
+    if (firstLive == formationUnits.mHead) {
+      formation->mReady = false;
+      formation->Reset();
+    } else {
+      formation->mReady = true;
+      formation->ChooseFormation(cursorInfo->mMouseWorldPos, formationUnits, useLastQueuedDestination);
+      formation->Finalize();
+    }
+  }
+
+  // 0x00870403: `mState` holds the event type of the click that opened this
+  // command, so `== MET_ButtonDClick` is the "this was a double click" flag the
+  // command dispatcher wants.
+  view->mLeftMouseCommand.HandleEvent(session, view->mState == moho::MET_ButtonDClick);
+
+  ClearPendingDragFormation(session);
+}
+
+/**
+ * Address: 0x008704B0 (FUN_008704B0, Moho::CUIWorldView::HandleEvent)
+ * Mangled: ?HandleEvent@CUIWorldView@Moho@@UAE_NABUSMauiEventData@2@@Z
+ *
+ * VFTable SLOT: 12 (+0x30) of `??_7CUIWorldView@Moho@@6B@` (VA 0x00E49074)
+ *
+ * What it does: see the declaration.
+ */
+bool moho::CUIWorldView::HandleEvent(const SMauiEventData& eventData)
+{
+  // --- cursor enter / exit ------------------------------------------------
+  if (eventData.mEventType == MET_MouseEnter) {
+    mCursorInside = 1u;
+  } else if (eventData.mEventType == MET_MouseExit) {
+    // 0x008704F9: the rotation flag is read before `mCursorInside` is cleared.
+    const bool wasRotating = mCameraRotationActive;
+    mCursorInside = 0u;
+
+    if (wasRotating && !cam_Free) {
+      mCamera->CameraRevertRotation();
+    }
+    mCameraRotationActive = false;
+
+    // 0x00870526-0x00870566: this is `func_StartMouseScrubbing(false, ...)`
+    // inlined - same `ui_DisableCursorFixing`/already-stopped guard, same
+    // cursor show + default-texture restore, same recentre on the scrub origin.
+    func_StartMouseScrubbing(false, nullptr);
+
+    if (mWldSession->mCurFormation->mReady) {
+      ClearPendingDragFormation(*mWldSession);
+    }
+  }
+
+  if (sMouseIsScrubbing == 0u) {
+    UpdateSelection(Wm3::Vector2f(eventData.mMousePos.x, eventData.mMousePos.y));
+  }
+
+  MouseInfo& cursorInfo = mWldSession->CursorInfo();
+
+  // The base control gets first refusal, and a locked view swallows everything
+  // that survives it (0x008705F8 / 0x00870605).
+  if (CMauiControl::HandleEvent(eventData)) {
+    return true;
+  }
+  if (mInputLocks > 0) {
+    return true;
+  }
+
+  mConvertToPatrolCursor = false;
+
+  // --- command-graph hover banners ---------------------------------------
+  bool stopCursorText = true;
+
+  if (mComGraph.px != nullptr && HasHoveredCommand(cursorInfo)) {
+    UserCommandIssueHelper* const hoveredCommand =
+      FindCommandIssueHelperInSession(mWldSession, cursorInfo.mIsDragger);
+
+    if (hoveredCommand != nullptr) {
+      UICommandModeData uiCommandMode{};
+      UI_GetCommandMode(uiCommandMode);
+
+      ScopedLocalUnitSet selectionGuard{};
+      WeakUnitSetUserUnit& selectedUnits = selectionGuard.get();
+      mWldSession->GetSelectionUnits(selectedUnits);
+
+      // Does any selected unit already participate in the hovered command?
+      bool selectionExcluded = false;
+      WeakUnitSetUserUnit::FindResult cursor{};
+      (void)selectedUnits.First(&cursor);
+      while (cursor.mRes != selectedUnits.mHead) {
+        // The scan hands the decoded entity straight over as a unit - there is
+        // no `IsUserUnit` filter on this path (0x008706B0-0x008706C6).
+        auto* const selectedUnit = reinterpret_cast<UserUnit*>(ResolveWeakSetOwnerEntity(cursor.mRes->mEnt));
+        if (IsCommandCandidateExcludedByCachedRelation(*hoveredCommand, selectedUnit)) {
+          selectionExcluded = true;
+          break;
+        }
+        (void)WeakUnitSetUserUnit::Next(&cursor);
+      }
+
+      const bool inOrderMode = uiCommandMode.mMode == "order";
+
+      if (selectionExcluded) {
+        // Move orders the selection already owns can be restarted as patrol.
+        const EUnitCommandType hoveredCommandType = ResolveCommandIssueHelperCommandType(*hoveredCommand);
+        if (
+          (hoveredCommandType == EUnitCommandType::UNITCOMMAND_Move
+           || hoveredCommandType == EUnitCommandType::UNITCOMMAND_FormMove)
+          && CanRestartSelectionMoveCommandAsPatrol(mWldSession->mSelection, hoveredCommand)
+        ) {
+          UI_StartCursorText(
+            ToHintBannerPos(cursorInfo.mMouseScreenPos),
+            inOrderMode ? "<LOC Engine0009>Left-click to convert moves into patrol"
+                        : "<LOC Engine0010>Right-click to convert moves into patrol",
+            kHintBannerDefaultColor,
+            kHintBannerNoTimeout,
+            false
+          );
+          stopCursorText = false;
+          mConvertToPatrolCursor = true;
+        }
+      } else {
+        // Attack orders nothing in the selection owns can be joined by
+        // double-clicking - the "coordinated attack" gesture.
+        const EUnitCommandType hoveredCommandType = ResolveCommandIssueHelperCommandType(*hoveredCommand);
+        if (
+          hoveredCommandType == EUnitCommandType::UNITCOMMAND_Attack
+          || hoveredCommandType == EUnitCommandType::UNITCOMMAND_FormAttack
+        ) {
+          CommandModeData rightMouseCommand{};
+          (void)func_GetRightMouseButtonAction(&rightMouseCommand, &cursorInfo, 0, mWldSession);
+
+          CommandModeData leftMouseCommand{};
+          (void)mWldSession->GetLeftMouseButtonAction(&leftMouseCommand, &cursorInfo, 0);
+
+          if (
+            rightMouseCommand.mCommandCaps == RULEUCC_Attack
+            || leftMouseCommand.mCommandCaps == RULEUCC_Attack
+          ) {
+            UI_StartCursorText(
+              ToHintBannerPos(cursorInfo.mMouseScreenPos),
+              inOrderMode ? "<LOC Engine0007>Double left-click for coordinated attack"
+                          : "<LOC Engine0008>Double right-click for coordinated attack",
+              kHintBannerDefaultColor,
+              kHintBannerNoTimeout,
+              false
+            );
+            stopCursorText = false;
+          }
+        }
+      }
+    }
+  }
+
+  if (stopCursorText) {
+    UI_StopCursorText();
+  }
+
+  // --- wheel rotation (0x008708B4) ---------------------------------------
+  if (eventData.mEventType == MET_WheelRotation) {
+    CommandModeData wheelCommand(cursorInfo, eventData.mModifiers);
+    if (wheelCommand.mMode != COMMOD_None) {
+      wheelCommand.HandleEvent(*mWldSession, false);
+    } else {
+      mCamera->CameraSetPivot(cursorInfo.mMouseScreenPos);
+      mCamera->CameraZoom(
+        static_cast<float>(eventData.mWheelRotation) / static_cast<float>(eventData.mWheelData)
+      );
+    }
+    return true;
+  }
+
+  // --- pointer motion (0x00870963) ---------------------------------------
+  if (eventData.mEventType == MET_MouseMotion) {
+    const bool spaceDragActive =
+      MAUI_KeyIsDown(MKEY_SPACE) && (cam_Free || ren_BgLowerBound > mCamera->CameraGetTargetZoom());
+
+    if (spaceDragActive) {
+      if (mCursorInside != 0u) {
+        if (mCameraRotationActive) {
+          func_StartMouseScrubbing(true, this);
+
+          // With cursor fixing on, the pointer is pinned to the scrub anchor
+          // and the accumulated scrub delta is the motion; with it off, the
+          // delta is measured against the previous sample.
+          Wm3::Vector2f spinDelta;
+          if (ui_DisableCursorFixing) {
+            spinDelta.x = cursorInfo.mMouseScreenPos.x - mLastCursorScreenPos.x;
+            spinDelta.y = cursorInfo.mMouseScreenPos.y - mLastCursorScreenPos.y;
+          } else {
+            spinDelta.x = static_cast<float>(sMouseScrubDelta.x);
+            spinDelta.y = static_cast<float>(sMouseScrubDelta.y);
+          }
+
+          mCamera->CameraSpin(spinDelta);
+          sMouseScrubDelta.x = 0;
+          sMouseScrubDelta.y = 0;
+        } else {
+          mCameraRotationActive = true;
+        }
+
+        mLastCursorScreenPos = cursorInfo.mMouseScreenPos;
+      }
+    } else {
+      if (mCameraRotationActive && !cam_Free) {
+        mCamera->CameraRevertRotation();
+      }
+      mCameraRotationActive = false;
+      func_StartMouseScrubbing(false, nullptr);
+    }
+
+    mCamera->CameraSetPivot(cursorInfo.mMouseScreenPos);
+    return true;
+  }
+
+  // --- middle-button press (0x00870B0A) ----------------------------------
+  if (eventData.mEventType == MET_ButtonPress && eventData.mKeyCode == kPostDraggerMiddleButton) {
+    CommandModeData middleCommand(cursorInfo, eventData.mModifiers);
+    if (middleCommand.mMode != COMMOD_None) {
+      middleCommand.HandleEvent(*mWldSession, false);
+    } else {
+      auto* const storage = static_cast<CameraDragger*>(::operator new(sizeof(CameraDragger), std::nothrow));
+      IMauiDragger* dragger = nullptr;
+      if (storage != nullptr) {
+        dragger = new (storage) CameraDragger(
+          mCamera, cursorInfo.mMouseScreenPos, this, &CameraDraggerPanCamera, 0
+        );
+      }
+      func_PostDragger(GetRootFrame(), dragger, &eventData);
+    }
+    return false;
+  }
+
+  // --- left-button double click (0x00870BC9) -----------------------------
+  //
+  // Ordering matters: this test sits ahead of the left-press one, and a
+  // double-click on any other button falls straight through into the
+  // right-double-click arm at 0x00870F1B.
+  if (eventData.mEventType == MET_ButtonDClick && eventData.mKeyCode == kPostDraggerLeftButton) {
+    if (mWldSession->mCurFormation->mReady) {
+      mWldSession->mCurFormation->LuaFinalize();
+      return true;
+    }
+
+    mState = MET_ButtonDClick;
+
+    if (mLeftMouseCommand.mMode == COMMOD_Order) {
+      ApplyDragFormationAndDispatchLeftCommand(
+        this, &cursorInfo, (eventData.mModifiers & MEM_Shift) != 0
+      );
+      return true;
+    }
+
+    if (mLeftMouseCommand.mMode != COMMOD_Move) {
+      return false;
+    }
+
+    // 0x00870C2A-0x00870C34: `mUnitHover` is a weak-link slot, so "something
+    // live is hovered" is the slot decoding to a real owner - neither null nor
+    // the bare offset the slot is left holding when the entity dies. That is
+    // exactly what `CWldSession::GetHoveredUserEntity()` resolves.
+    if (mWldSession->GetHoveredUserEntity() != nullptr && !IsMiniMap()) {
+      mWldSession->HandleDoubleClickSelection(mCamera);
+    }
+    return true;
+  }
+
+  // --- left-button press (0x00870CA4) ------------------------------------
+  if (eventData.mEventType == MET_ButtonPress && eventData.mKeyCode == kPostDraggerLeftButton) {
+    if (mWldSession->mCurFormation->mReady) {
+      mWldSession->mCurFormation->LuaFinalize();
+      return true;
+    }
+
+    mState = MET_ButtonPress;
+
+    CommandModeData pressCommand{};
+    (void)mWldSession->GetLeftMouseButtonAction(&pressCommand, &cursorInfo, eventData.mModifiers);
+    mLeftMouseCommand = pressCommand;
+
+    switch (mLeftMouseCommand.mMode) {
+      case COMMOD_None:
+        return false;
+
+      case COMMOD_Build:
+      case COMMOD_BuildAnchored:
+        func_NewUIBuildDragger(
+          GetRootFrame(), mWldSession, &eventData, mCamera, &mBuildDrag
+        );
+        return true;
+
+      case COMMOD_Move:
+        if (IsMiniMap()) {
+          // A minimap only drags its own tracked camera, and only when it has
+          // one (0x00870D49).
+          if (mCameraTrack.empty()) {
+            return true;
+          }
+
+          if (CameraImpl* const trackedCamera = CAM_GetCamera(mCameraTrack.c_str()); trackedCamera != nullptr) {
+            CameraTargetRuntimeView::FromCamera(trackedCamera)->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
+          }
+
+          auto* const storage =
+            static_cast<CMiniMapDragger*>(::operator new(sizeof(CMiniMapDragger), std::nothrow));
+          IMauiDragger* miniMapDragger = nullptr;
+          if (storage != nullptr) {
+            miniMapDragger = new (storage) CMiniMapDragger(mCameraTrack);
+          }
+          func_PostDragger(GetRootFrame(), miniMapDragger, &eventData);
+          return true;
+        }
+
+        {
+          IMauiDragger* const selectionDragger = NewSelectionDragger(
+            mCamera, mWldSession, GetRootFrame(), &eventData
+          );
+          BindWorldViewOverlayDragger(mOverlayLink, selectionDragger);
+        }
+        return true;
+
+      case COMMOD_Reclaim:
+        func_NewCommandDragger(
+          GetRootFrame(), mWldSession, &eventData, mCamera, cursorInfo.mIsDragger
+        );
+        return true;
+
+      default:
+        // COMMOD_Order, COMMOD_Ping and anything past the jump table's six
+        // entries all land on the shared left-command dispatch.
+        ApplyDragFormationAndDispatchLeftCommand(
+          this, &cursorInfo, (eventData.mModifiers & MEM_Shift) != 0
+        );
+        return true;
+    }
+  }
+
+  // --- right-button double click (0x00870F12) -----------------------------
+  if (eventData.mEventType == MET_ButtonDClick && eventData.mKeyCode == kPostDraggerRightButton) {
+    mLastRightButtonEvent = MET_ButtonDClick;
+
+    CommandModeData rightCommand{};
+    (void)func_GetRightMouseButtonAction(&rightCommand, &cursorInfo, eventData.mModifiers, mWldSession);
+    mCommandData = rightCommand;
+
+    if (mCommandData.mMode != COMMOD_Order) {
+      return false;
+    }
+    if (mWldSession->GetSelection().size() == 0) {
+      return false;
+    }
+
+    const bool useLastQueuedDestination = (eventData.mModifiers & MEM_Shift) != 0;
+
+    ScopedLocalUnitSet formationUnitsGuard{};
+    WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+    mWldSession->GetSelectionUnits(formationUnits);
+    mWldSession->mCurFormation->ProcessMouse(
+      &formationUnits, true, cursorInfo.mMouseWorldPos, useLastQueuedDestination
+    );
+    return false;
+  }
+
+  // --- right-button release (0x00870FF7) ----------------------------------
+  if (eventData.mEventType == MET_ButtonRelease && eventData.mKeyCode == kPostDraggerRightButton) {
+    const bool overHoveredCommand = HasHoveredCommand(cursorInfo);
+    const auto modifiers = static_cast<std::uint32_t>(eventData.mModifiers);
+
+    if (
+      overHoveredCommand && (modifiers & MEM_Shift) != 0u && (modifiers & MEM_Ctrl) != 0u
+      && !mWldSession->IsObserver()
+    ) {
+      // Shift+Ctrl right-release strips the hovered command from every unit
+      // under the cursor instead of issuing anything.
+      if (
+        UserCommandIssueHelper* const hoveredCommand =
+          FindCommandIssueHelperInSession(mWldSession, cursorInfo.mIsDragger);
+        hoveredCommand != nullptr
+      ) {
+        SSelectionSetUserEntity& unitsUnderCursor = *ResolveCommandIssueCursorEntities(*hoveredCommand);
+
+        SSelectionSetUserEntity::FindResult cursor{};
+        (void)unitsUnderCursor.First(&cursor);
+        while (cursor.mRes != unitsUnderCursor.mHead) {
+          ISSUE_RemoveCommandFromUnitQueue(
+            hoveredCommand, reinterpret_cast<UserUnit*>(ResolveWeakSetOwnerEntity(cursor.mRes->mEnt))
+          );
+          (void)SSelectionSetUserEntity::Next(&cursor);
+        }
+      }
+    } else if (mCommandData.mMode != COMMOD_None && sMouseIsScrubbing == 0u) {
+      mCommandData.HandleEvent(*mWldSession, mLastRightButtonEvent == MET_ButtonDClick);
+    }
+
+    ClearPendingDragFormation(*mWldSession);
+    return false;
+  }
+
+  return false;
 }
 
 /**

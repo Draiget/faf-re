@@ -497,10 +497,13 @@ namespace moho
    * before calling `Finalize()` again, then resets `mTimeLeft` to force an
    * immediate next tick.
    *
-   * Not yet invoked from recovered source: its sole caller,
-   * `Moho::CUIWorldView::HandleEvent` (0x008704B0), is still unrecovered.
+   * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0,
+   * recovered in moho/ui/UiRuntimeTypes.cpp), from both the left-button-press
+   * and left-button-double-click arms (0x00870BEF, shared by the jump at
+   * 0x00870CC6) whenever a drag formation is already pending when the next
+   * left click arrives.
    */
-  [[maybe_unused]] void CFormation::LuaFinalize()
+  void CFormation::LuaFinalize()
   {
     if (mNumFormationScripts > 1) {
       mBestFormation = (mBestFormation + 1) % mNumFormationScripts;
@@ -527,7 +530,7 @@ namespace moho
    * and forwards straight into `ChooseFormation()`/`Finalize()`.
    */
   void CFormation::ProcessMouse(
-    SSelectionSetUserEntity* const selection,
+    WeakEntitySetUserEntity* const selection,
     const bool triggerActive,
     const Wm3::Vector3f& mousePos,
     const bool useLastQueuedDestination
