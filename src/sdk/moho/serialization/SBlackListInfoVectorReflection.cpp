@@ -85,12 +85,9 @@ namespace
       // (FUN_006DC9F0, msvc8::vector<SBlackListInfo>::reserve) rather than a
       // resize(), which would route through reallocate_to instead of reserve.
       loaded.reserve(targetCount);
-      auto& view = msvc8::AsVectorRuntimeView(loaded);
-      moho::SBlackListInfo* const slotsBegin = view.end;
-      for (std::size_t i = 0u; i < targetCount; ++i) {
-        ::new (static_cast<void*>(slotsBegin + i)) moho::SBlackListInfo();
-      }
-      view.end = slotsBegin + targetCount;
+      // reserve() has already sized capacity to exactly targetCount, so this
+      // resize takes _Insert_n's in-place branch and does not reallocate.
+      loaded.resize(targetCount, moho::SBlackListInfo{});
     }
 
     gpg::RType* const elementType = ResolveSBlackListInfoType();
@@ -309,12 +306,7 @@ size_t gpg::RVectorType<moho::SBlackListInfo>::GetCount(void* const obj) const
     return 0u;
   }
 
-  const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const SBlackListInfoVector*>(obj));
-  if (!view.begin) {
-    return 0u;
-  }
-
-  return static_cast<std::size_t>(view.end - view.begin);
+  return static_cast<const SBlackListInfoVector*>(obj)->size();
 }
 
 /**
