@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
@@ -67,20 +68,21 @@ namespace moho
     "RRuleGameRulesBlueprintNode::mIsSentinel offset must be 0x2D"
   );
 
-  struct RRuleGameRulesBlueprintMap
-  {
-    void* mAllocProxy;                  // +0x00
-    RRuleGameRulesBlueprintNode* mHead; // +0x04
-    std::uint32_t mSize;                // +0x08
-  };
+  /**
+   * Each blueprint table is `std::map<std::string, TBlueprint*>`. The mapped
+   * lane is stored untyped and cast at each use -- one node shape serves all
+   * seven tables -- so a `void*` mapped type is the faithful model.
+   *
+   * Node arithmetic closes: links 0x0C plus a
+   * `pair<const msvc8::string, void*>` of 0x20 puts colour/nil at
+   * +0x2C/+0x2D and the node at 0x30. The key order is the default
+   * `std::less` -- the binary compares through `CompareLex`, which is
+   * `char_traits::compare` over the common prefix then length, and
+   * `msvc8::string::operator<` is `compare(rhs.view()) < 0`.
+   */
+  using RRuleGameRulesBlueprintMap = msvc8::map<msvc8::string, void*>;
 
   static_assert(sizeof(RRuleGameRulesBlueprintMap) == 0x0C, "RRuleGameRulesBlueprintMap size must be 0x0C");
-  static_assert(
-    offsetof(RRuleGameRulesBlueprintMap, mHead) == 0x04, "RRuleGameRulesBlueprintMap::mHead offset must be 0x04"
-  );
-  static_assert(
-    offsetof(RRuleGameRulesBlueprintMap, mSize) == 0x08, "RRuleGameRulesBlueprintMap::mSize offset must be 0x08"
-  );
 
   struct RRuleGameRulesLuaExportBinding
   {

@@ -234,20 +234,6 @@ namespace moho
 
     using BlueprintMapHeadAllocator = RRuleGameRulesBlueprintNode* (*)();
 
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeBlueprintMapHeaderWithAllocator(
-      RRuleGameRulesBlueprintMap* const map,
-      const BlueprintMapHeadAllocator allocateHead
-    )
-    {
-      map->mHead = allocateHead();
-      map->mHead->mIsSentinel = 1u;
-      map->mHead->parent = map->mHead;
-      map->mHead->left = map->mHead;
-      map->mHead->right = map->mHead;
-      map->mSize = 0u;
-      return map;
-    }
-
     [[nodiscard]] std::string BuildInstanceCounterStatPathLocal(const char* const rawTypeName)
     {
       std::string path("Instance Counts_");
@@ -286,28 +272,6 @@ namespace moho
     [[nodiscard]] int CompareBlueprintIds(const msvc8::string& lhs, const msvc8::string& rhs) noexcept
     {
       return CompareLex(lhs.view(), rhs.view());
-    }
-
-    /**
-     * Address: 0x0052E060 (FUN_0052E060)
-     * Address: 0x0052E240 (FUN_0052E240)
-     * Address: 0x0052E420 (FUN_0052E420)
-     * Address: 0x0052E600 (FUN_0052E600)
-     * Address: 0x0052E7D0 (FUN_0052E7D0)
-     * Address: 0x0052EB70 (FUN_0052EB70)
-     *
-     * What it does:
-     * Performs one red-black-tree lower-bound walk on blueprint-id keyed map
-     * lanes and returns the first node whose key is not less than `lookupId`.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode*
-    LowerBoundBlueprintNodeById(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
-    {
-      return msvc8::lower_bound_node<RRuleGameRulesBlueprintNode, &RRuleGameRulesBlueprintNode::mIsSentinel>(
-        map.mHead, lookupId, [](const RRuleGameRulesBlueprintNode& node, const msvc8::string& query) {
-          return CompareBlueprintIds(node.mBlueprintId, query) < 0;
-        }
-      );
     }
 
     struct RRuleGameRulesMapOwnerRuntimeView
@@ -789,120 +753,11 @@ namespace moho
       return next;
     }
 
-    void AdvanceBlueprintNodeSuccessor(RRuleGameRulesBlueprintNode** const cursor) noexcept
-    {
-      RRuleGameRulesBlueprintNode* node = *cursor;
-      if (node->mIsSentinel != 0u) {
-        return;
-      }
-
-      RRuleGameRulesBlueprintNode* right = node->right;
-      if (right->mIsSentinel != 0u) {
-        RRuleGameRulesBlueprintNode* parent = node->parent;
-        while (parent->mIsSentinel == 0u) {
-          if (*cursor != parent->right) {
-            break;
-          }
-          *cursor = parent;
-          parent = parent->parent;
-        }
-        *cursor = parent;
-        return;
-      }
-
-      RRuleGameRulesBlueprintNode* left = right->left;
-      while (left->mIsSentinel == 0u) {
-        right = left;
-        left = left->left;
-      }
-      *cursor = right;
-    }
-
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBlueprintMapBeginNodeLaneCore(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesMapOwnerRuntimeView* const owner
-    ) noexcept
-    {
-      *outNode = owner->map->mHead->left;
-      return outNode;
-    }
-
-    /**
-     * Address: 0x0052E140 (FUN_0052E140)
-     *
-     * What it does:
-     * Stores one projectile-map begin-node lane (`head->left`) into caller
-     * output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintMapBeginNodeLane(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesMapOwnerRuntimeView* const owner
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLaneCore(outNode, owner);
-    }
-
-    /**
-     * Address: 0x0052E320 (FUN_0052E320)
-     *
-     * What it does:
-     * Stores one prop-map begin-node lane (`head->left`) into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintMapBeginNodeLane(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesMapOwnerRuntimeView* const owner
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLaneCore(outNode, owner);
-    }
-
-    /**
-     * Address: 0x0052E500 (FUN_0052E500)
-     *
-     * What it does:
-     * Stores one mesh-map begin-node lane (`head->left`) into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintMapBeginNodeLane(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesMapOwnerRuntimeView* const owner
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLaneCore(outNode, owner);
-    }
-
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBlueprintLowerBoundResultLane(
-      const RRuleGameRulesBlueprintMap& map,
-      const msvc8::string& lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      *outNode = LowerBoundBlueprintNodeById(map, lookupId);
-      return outNode;
-    }
-
     template <typename TValue>
     [[nodiscard]] TValue* StoreAdapterLane(TValue* const outValue, const TValue value) noexcept
     {
       *outValue = value;
       return outValue;
-    }
-
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBlueprintMapBeginNodeLane(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreAdapterLane(outNode, map->mHead->left);
-    }
-
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBlueprintMapEndNodeLane(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreAdapterLane(outNode, map->mHead);
     }
 
     [[nodiscard]] RRuleGameRulesLuaExportBinding** StoreLuaExportBindingBeginLane(
@@ -924,81 +779,6 @@ namespace moho
     [[nodiscard]] void** StoreOpaquePointerLane(void** const outValue, void* const value) noexcept
     {
       return StoreAdapterLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052BB00 (FUN_0052BB00)
-     *
-     * What it does:
-     * Stores one associative-map begin-node lane (`head->left`) into caller
-     * output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneA(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052BB10 (FUN_0052BB10)
-     *
-     * What it does:
-     * Stores one associative-map begin-node lane (`head->left`) into caller
-     * output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneB(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052BB20 (FUN_0052BB20)
-     *
-     * What it does:
-     * Stores one associative-map end-node lane (`head`) into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapEndNodeFromHeadLaneA(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052BC40 (FUN_0052BC40)
-     *
-     * What it does:
-     * Stores one associative-map begin-node lane (`head->left`) into caller
-     * output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapBeginNodeFromHeadLaneC(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052BC50 (FUN_0052BC50)
-     *
-     * What it does:
-     * Stores one associative-map end-node lane (`head`) into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreAssocMapEndNodeFromHeadLaneB(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
     }
 
     /**
@@ -1039,166 +819,6 @@ namespace moho
     ) noexcept
     {
       return StoreLuaExportBindingEndLane(outBinding, bindingArray);
-    }
-
-    /**
-     * Address: 0x0052BF90 (FUN_0052BF90)
-     *
-     * What it does:
-     * Stores one unit-blueprint map begin node lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreUnitBlueprintMapBeginNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052BFA0 (FUN_0052BFA0)
-     *
-     * What it does:
-     * Stores one unit-blueprint map end node lane into caller output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreUnitBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C080 (FUN_0052C080)
-     *
-     * What it does:
-     * Stores one projectile-blueprint map end node lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C160 (FUN_0052C160)
-     *
-     * What it does:
-     * Stores one prop-blueprint map end node lane into caller output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C240 (FUN_0052C240)
-     *
-     * What it does:
-     * Stores one mesh-blueprint map end node lane into caller output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C320 (FUN_0052C320)
-     *
-     * What it does:
-     * Stores one emitter-blueprint map begin node lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintMapBeginNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C330 (FUN_0052C330)
-     *
-     * What it does:
-     * Stores one emitter-blueprint map end node lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C400 (FUN_0052C400)
-     *
-     * What it does:
-     * Stores one beam-blueprint map begin node lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintMapBeginNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C410 (FUN_0052C410)
-     *
-     * What it does:
-     * Stores one beam-blueprint map end node lane into caller output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C4E0 (FUN_0052C4E0)
-     *
-     * What it does:
-     * Stores one trail-blueprint map begin node lane into caller output
-     * storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintMapBeginNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapBeginNodeLane(outNode, map);
-    }
-
-    /**
-     * Address: 0x0052C4F0 (FUN_0052C4F0)
-     *
-     * What it does:
-     * Stores one trail-blueprint map end node lane into caller output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintMapEndNodeLaneAdapter(
-      RRuleGameRulesBlueprintNode** const outNode,
-      const RRuleGameRulesBlueprintMap* const map
-    ) noexcept
-    {
-      return StoreBlueprintMapEndNodeLane(outNode, map);
     }
 
     /**
@@ -1337,191 +957,20 @@ namespace moho
       return StoreOpaquePointerLane(outValue, value);
     }
 
-    /**
-     * Address: 0x0052D150 (FUN_0052D150)
-     *
-     * What it does:
-     * Adapter lane that stores one projectile-blueprint map lower-bound node
-     * into caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreProjectileBlueprintLowerBoundAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052D1F0 (FUN_0052D1F0)
-     *
-     * What it does:
-     * Adapter lane that stores one prop-blueprint map lower-bound node into
-     * caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StorePropBlueprintLowerBoundAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052D280 (FUN_0052D280)
-     *
-     * What it does:
-     * Adapter lane that stores one mesh-blueprint map lower-bound node into
-     * caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreMeshBlueprintLowerBoundAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052D310 (FUN_0052D310)
-     *
-     * What it does:
-     * Adapter lane that stores one emitter-blueprint map lower-bound node into
-     * caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreEmitterBlueprintLowerBoundAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052D3A0 (FUN_0052D3A0)
-     *
-     * What it does:
-     * Adapter lane that stores one beam-blueprint map lower-bound node into
-     * caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamBlueprintLowerBoundAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052D440 (FUN_0052D440)
-     *
-     * What it does:
-     * Adapter lane that stores one beam-map lookup candidate node into
-     * caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreBeamMapLookupAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052D4E0 (FUN_0052D4E0)
-     *
-     * What it does:
-     * Adapter lane that stores one trail-blueprint map lower-bound node into
-     * caller-provided output storage.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode** StoreTrailBlueprintLowerBoundAdapterLane(
-      const RRuleGameRulesBlueprintMap* const map,
-      const msvc8::string* const lookupId,
-      RRuleGameRulesBlueprintNode** const outNode
-    ) noexcept
-    {
-      return StoreBlueprintLowerBoundResultLane(*map, *lookupId, outNode);
-    }
-
-    /**
-     * Address: 0x0052C420 (FUN_0052C420, std::map_string_RBeamBlueprint::operator[])
-     *
-     * What it does:
-     * Returns the matched blueprint-map node for one key lookup, or the tree
-     * sentinel head when no exact key match exists.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode*
-    FindBlueprintNodeByMapSubscript(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
-    {
-      RRuleGameRulesBlueprintNode* const candidate = LowerBoundBlueprintNodeById(map, lookupId);
-
-      if (candidate == nullptr || candidate == map.mHead) {
-        return map.mHead;
-      }
-
-      return (CompareBlueprintIds(lookupId, candidate->mBlueprintId) < 0) ? map.mHead : candidate;
-    }
-
-    /**
-     * Address: 0x0052C260 (FUN_0052C260)
-     *
-     * What it does:
-     * Resolves one mesh-blueprint map node from a lowered blueprint id key,
-     * returning the map sentinel head when no exact key match exists.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode*
-    FindMeshBlueprintNodeByBlueprintId(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
-    {
-      return FindBlueprintNodeByMapSubscript(map, lookupId);
-    }
-
-    /**
-     * Address: 0x0052C340 (FUN_0052C340)
-     *
-     * What it does:
-     * Resolves one emitter-blueprint map node from a lowered blueprint id key,
-     * returning the map sentinel head when no exact key match exists.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode*
-    FindEmitterBlueprintNodeByBlueprintId(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
-    {
-      return FindBlueprintNodeByMapSubscript(map, lookupId);
-    }
-
-    /**
-     * Address: 0x0052C500 (FUN_0052C500)
-     *
-     * What it does:
-     * Resolves one trail-blueprint map node from a lowered blueprint id key,
-     * returning the map sentinel head when no exact key match exists.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintNode*
-    FindTrailBlueprintNodeByBlueprintId(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
-    {
-      return FindBlueprintNodeByMapSubscript(map, lookupId);
-    }
-
     template <typename TBlueprint>
     [[nodiscard]] TBlueprint*
     LookupBlueprintByResId(const RRuleGameRulesBlueprintMap& map, const RResId& resId) noexcept
     {
-      if (resId.name.empty() || !map.mHead) {
+      if (resId.name.empty()) {
         return nullptr;
       }
 
-      const msvc8::string lookupId(resId.name.view());
-      RRuleGameRulesBlueprintNode* const node = FindBlueprintNodeByMapSubscript(map, lookupId);
-      if (!node || node == map.mHead) {
+      const auto found = map.find(msvc8::string(resId.name.view()));
+      if (found == map.end()) {
         return nullptr;
       }
 
-      return static_cast<TBlueprint*>(node->mBlueprint);
+      return static_cast<TBlueprint*>(found->second);
     }
 
     [[nodiscard]] LuaPlus::LuaState* ResolveRootState(LuaPlus::LuaState* state) noexcept
@@ -1685,108 +1134,6 @@ namespace moho
       container->head->taskThread = container->head;
       container->size = 0u;
       return container->head;
-    }
-
-    /**
-     * Address: 0x0052D120 (FUN_0052D120)
-     *
-     * What it does:
-     * Initializes one blueprint-map runtime header, marks the head as sentinel,
-     * and self-links `{left,parent,right}` to that head.
-     */
-    RRuleGameRulesBlueprintMap* InitializeBlueprintMapHeader(RRuleGameRulesBlueprintMap* const map)
-    {
-      map->mHead = reinterpret_cast<RRuleGameRulesBlueprintNode*>(AllocateBlueprintMapHeadNodeRuntime());
-      map->mHead->mIsSentinel = 1u;
-      map->mHead->parent = map->mHead;
-      map->mHead->left = map->mHead;
-      map->mHead->right = map->mHead;
-      map->mSize = 0u;
-      return map;
-    }
-
-    /**
-     * Address: 0x0052D1C0 (FUN_0052D1C0)
-     *
-     * What it does:
-     * Initializes one projectile-blueprint map header and self-links the
-     * sentinel head node lanes.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeProjectileBlueprintMapHeaderAdapterLane(
-      RRuleGameRulesBlueprintMap* const map
-    )
-    {
-      return InitializeBlueprintMapHeaderWithAllocator(map, &AllocateProjectileBlueprintMapHeadNode);
-    }
-
-    /**
-     * Address: 0x0052D250 (FUN_0052D250)
-     *
-     * What it does:
-     * Initializes one prop-blueprint map header and self-links the sentinel
-     * head node lanes.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializePropBlueprintMapHeaderAdapterLane(
-      RRuleGameRulesBlueprintMap* const map
-    )
-    {
-      return InitializeBlueprintMapHeaderWithAllocator(map, &AllocatePropBlueprintMapHeadNode);
-    }
-
-    /**
-     * Address: 0x0052D2E0 (FUN_0052D2E0)
-     *
-     * What it does:
-     * Initializes one mesh-blueprint map header and self-links the sentinel
-     * head node lanes.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeMeshBlueprintMapHeaderAdapterLane(
-      RRuleGameRulesBlueprintMap* const map
-    )
-    {
-      return InitializeBlueprintMapHeaderWithAllocator(map, &AllocateMeshBlueprintMapHeadNode);
-    }
-
-    /**
-     * Address: 0x0052D370 (FUN_0052D370)
-     *
-     * What it does:
-     * Initializes one emitter-blueprint map header and self-links the sentinel
-     * head node lanes.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeEmitterBlueprintMapHeaderAdapterLane(
-      RRuleGameRulesBlueprintMap* const map
-    )
-    {
-      return InitializeBlueprintMapHeaderWithAllocator(map, &AllocateEmitterBlueprintMapHeadNode);
-    }
-
-    /**
-     * Address: 0x0052D410 (FUN_0052D410)
-     *
-     * What it does:
-     * Initializes one beam-blueprint map header and self-links the sentinel
-     * head node lanes.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeBeamBlueprintMapHeaderAdapterLane(
-      RRuleGameRulesBlueprintMap* const map
-    )
-    {
-      return InitializeBlueprintMapHeaderWithAllocator(map, &AllocateBeamBlueprintMapHeadNode);
-    }
-
-    /**
-     * Address: 0x0052D4B0 (FUN_0052D4B0)
-     *
-     * What it does:
-     * Initializes one trail-blueprint map header and self-links the sentinel
-     * head node lanes.
-     */
-    [[nodiscard]] RRuleGameRulesBlueprintMap* InitializeTrailBlueprintMapHeaderAdapterLane(
-      RRuleGameRulesBlueprintMap* const map
-    )
-    {
-      return InitializeBlueprintMapHeaderWithAllocator(map, &AllocateTrailBlueprintMapHeadNode);
     }
 
     /**
@@ -2200,33 +1547,6 @@ namespace moho
       }
     }
 
-    void DestroyBlueprintNodeTree(
-      RRuleGameRulesBlueprintNode* const node,
-      RRuleGameRulesBlueprintNode* const sentinel
-    ) noexcept
-    {
-      if (node == nullptr || node == sentinel || node->mIsSentinel != 0u) {
-        return;
-      }
-
-      DestroyBlueprintNodeTree(node->left, sentinel);
-      DestroyBlueprintNodeTree(node->right, sentinel);
-      delete node;
-    }
-
-    void DestroyBlueprintMapNodesOnly(RRuleGameRulesBlueprintMap& map) noexcept
-    {
-      if (map.mHead == nullptr) {
-        map.mSize = 0u;
-        return;
-      }
-
-      DestroyBlueprintNodeTree(map.mHead->left, map.mHead);
-      delete map.mHead;
-      map.mHead = nullptr;
-      map.mSize = 0u;
-    }
-
     void DestroyBlueprintObjectsFromOrdinalArray(RRuleGameRulesImpl& rules) noexcept
     {
       for (RBlueprint*& slot : rules.mBlueprintsByOrdinal) {
@@ -2246,17 +1566,13 @@ namespace moho
 
     void DestroyBlueprintObjectsFromMap(RRuleGameRulesBlueprintMap& map) noexcept
     {
-      if (map.mHead == nullptr) {
-        return;
-      }
-
-      RRuleGameRulesBlueprintNode* node = map.mHead->left;
-      while (node != map.mHead) {
-        RRuleGameRulesBlueprintNode* const currentNode = node;
-        AdvanceBlueprintNodeSuccessor(&node);
-        if (currentNode->mBlueprint != nullptr) {
-          delete static_cast<RBlueprint*>(currentNode->mBlueprint);
-          currentNode->mBlueprint = nullptr;
+      // The binary deletes the pointed-to blueprints and nulls each lane but
+      // leaves the nodes in place; the map's own destructor tears the tree
+      // down afterwards.
+      for (auto& entry : map) {
+        if (entry.second != nullptr) {
+          delete static_cast<RBlueprint*>(entry.second);
+          entry.second = nullptr;
         }
       }
     }
@@ -2495,13 +1811,9 @@ namespace moho
     mFootprints.mHead = AllocateFootprintSentinelNode();
     mFootprints.mSize = 0u;
 
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mUnitBlueprints, &AllocateUnitBlueprintMapHeadNode);
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mProjectileBlueprints, &AllocateProjectileBlueprintMapHeadNode);
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mPropBlueprints, &AllocatePropBlueprintMapHeadNode);
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mMeshBlueprints, &AllocateMeshBlueprintMapHeadNode);
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mEmitterBlueprints, &AllocateEmitterBlueprintMapHeadNode);
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mBeamBlueprints, &AllocateBeamBlueprintMapHeadNode);
-    (void)InitializeBlueprintMapHeaderWithAllocator(&mTrailBlueprints, &AllocateTrailBlueprintMapHeadNode);
+    // Each map builds its own sentinel head in its constructor; the binary
+    // open-codes that seven times here, once per table, through a per-table
+    // head allocator.
 
     // Address: 0x00529120 (FUN_00529120) swap-old-value branch: allocates a
     // fresh EntityCategoryLookupTableRuntimeView, swaps it into
@@ -2672,13 +1984,9 @@ namespace moho
     delete mEntityCategoryLookup;
     mEntityCategoryLookup = nullptr;
 
-    DestroyBlueprintMapNodesOnly(mTrailBlueprints);
-    DestroyBlueprintMapNodesOnly(mBeamBlueprints);
-    DestroyBlueprintMapNodesOnly(mEmitterBlueprints);
-    DestroyBlueprintMapNodesOnly(mMeshBlueprints);
-    DestroyBlueprintMapNodesOnly(mPropBlueprints);
-    DestroyBlueprintMapNodesOnly(mProjectileBlueprints);
-    DestroyBlueprintMapNodesOnly(mUnitBlueprints);
+    // Each map's destructor frees its own nodes and sentinel head; the
+    // binary open-codes that teardown seven times here, in reverse
+    // declaration order, which is what member destruction does anyway.
 
     DestroyRuleFootprintsStorage(mFootprints);
 
@@ -2705,14 +2013,11 @@ namespace moho
   {
     PublishCategoriesTable(*this, mLuaState);
 
-    RRuleGameRulesBlueprintNode* unitNode = mUnitBlueprints.mHead->left;
-    while (unitNode != mUnitBlueprints.mHead) {
-      auto* const unitBlueprint = static_cast<RUnitBlueprint*>(unitNode->mBlueprint);
+    for (const auto& entry : mUnitBlueprints) {
+      auto* const unitBlueprint = static_cast<RUnitBlueprint*>(entry.second);
       if (unitBlueprint != nullptr) {
         unitBlueprint->AddEconomyRestrictions(this);
       }
-
-      AdvanceBlueprintNodeSuccessor(&unitNode);
     }
   }
 
@@ -2983,17 +2288,16 @@ namespace moho
    */
   RMeshBlueprint* RRuleGameRulesImpl::GetMeshBlueprint(const RResId& resId)
   {
-    if (resId.name.empty() || !mMeshBlueprints.mHead) {
+    if (resId.name.empty()) {
       return nullptr;
     }
 
-    const msvc8::string lookupId(resId.name.view());
-    RRuleGameRulesBlueprintNode* const node = FindMeshBlueprintNodeByBlueprintId(mMeshBlueprints, lookupId);
-    if (!node || node == mMeshBlueprints.mHead) {
+    const auto found = mMeshBlueprints.find(msvc8::string(resId.name.view()));
+    if (found == mMeshBlueprints.end()) {
       return nullptr;
     }
 
-    return static_cast<RMeshBlueprint*>(node->mBlueprint);
+    return static_cast<RMeshBlueprint*>(found->second);
   }
 
   /**
@@ -3009,17 +2313,16 @@ namespace moho
    */
   REmitterBlueprint* RRuleGameRulesImpl::GetEmitterBlueprint(const RResId& resId)
   {
-    if (resId.name.empty() || !mEmitterBlueprints.mHead) {
+    if (resId.name.empty()) {
       return nullptr;
     }
 
-    const msvc8::string lookupId(resId.name.view());
-    RRuleGameRulesBlueprintNode* const node = FindEmitterBlueprintNodeByBlueprintId(mEmitterBlueprints, lookupId);
-    if (!node || node == mEmitterBlueprints.mHead) {
+    const auto found = mEmitterBlueprints.find(msvc8::string(resId.name.view()));
+    if (found == mEmitterBlueprints.end()) {
       return nullptr;
     }
 
-    return static_cast<REmitterBlueprint*>(node->mBlueprint);
+    return static_cast<REmitterBlueprint*>(found->second);
   }
 
   /**
@@ -3035,17 +2338,16 @@ namespace moho
    */
   RTrailBlueprint* RRuleGameRulesImpl::GetTrailBlueprint(const RResId& resId)
   {
-    if (resId.name.empty() || !mTrailBlueprints.mHead) {
+    if (resId.name.empty()) {
       return nullptr;
     }
 
-    const msvc8::string lookupId(resId.name.view());
-    RRuleGameRulesBlueprintNode* const node = FindTrailBlueprintNodeByBlueprintId(mTrailBlueprints, lookupId);
-    if (!node || node == mTrailBlueprints.mHead) {
+    const auto found = mTrailBlueprints.find(msvc8::string(resId.name.view()));
+    if (found == mTrailBlueprints.end()) {
       return nullptr;
     }
 
-    return static_cast<RTrailBlueprint*>(node->mBlueprint);
+    return static_cast<RTrailBlueprint*>(found->second);
   }
 
   /**
@@ -3072,7 +2374,7 @@ namespace moho
    */
   unsigned int RRuleGameRulesImpl::GetUnitCount() const
   {
-    return mUnitBlueprints.mSize;
+    return mUnitBlueprints.size();
   }
 
   /**
@@ -3152,10 +2454,10 @@ namespace moho
       context->Update(&ordinalValue, sizeof(ordinalValue));
     }
 
-    const std::uint32_t unitCount = mUnitBlueprints.mSize;
-    const std::uint32_t projectileCount = mProjectileBlueprints.mSize;
-    const std::uint32_t propCount = mPropBlueprints.mSize;
-    const std::uint32_t meshCount = mMeshBlueprints.mSize;
+    const std::uint32_t unitCount = mUnitBlueprints.size();
+    const std::uint32_t projectileCount = mProjectileBlueprints.size();
+    const std::uint32_t propCount = mPropBlueprints.size();
+    const std::uint32_t meshCount = mMeshBlueprints.size();
     context->Update(&unitCount, sizeof(unitCount));
     context->Update(&projectileCount, sizeof(projectileCount));
     context->Update(&propCount, sizeof(propCount));
