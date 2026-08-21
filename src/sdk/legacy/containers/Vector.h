@@ -1415,6 +1415,11 @@ namespace msvc8
          * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
          * Address: 0x008D73C0 (FUN_008D73C0, msvc8::vector<gpg::gal::HeadSampleOption>::operator=(const vector&))
          * Address: 0x005ED190 (FUN_005ED190, msvc8::vector<int>::operator=(const vector&))
+         * Address: 0x0077E100 (FUN_0077E100,
+         * msvc8::vector<Moho::SDecalInfo>::operator=(const vector&) for the
+         * 0x90-byte element -- same VC8 assign shape: clear on an empty
+         * source, assign-over-then-uninit-copy-the-excess when the source is
+         * longer but fits, _Tidy + _Buy + _Ucopy when it does not)
          * Address: 0x005CA980 (FUN_005CA980,
          * msvc8::vector<Moho::SPerArmyReconInfo>::operator=(const vector&) for the
          * 52-byte element -- the full VC8 `assign` shape: erase-all on an empty
@@ -1690,6 +1695,11 @@ namespace msvc8
          *
          * What it does:
          * Collapses logical range to empty by rebasing `last_` to `first_`.
+         */
+        /**
+         * Address: 0x0077E2D0 (FUN_0077E2D0,
+         * msvc8::vector<Moho::SDecalInfo>::clear -- destroys the live run and
+         * rewinds mLast to mFirst without releasing capacity)
          */
         void clear() noexcept {
             destroy_all();
@@ -2460,6 +2470,10 @@ namespace msvc8
          * single-element copy) and by the `_Insert_n` grow core (FUN_0075F4B0,
          * head/tail range moves) for `Sim::mPendingPoseCopies`)
          *
+         * Address: 0x0077E7B0 (FUN_0077E7B0,
+         * msvc8::vector<Moho::SDecalInfo>::uninit_copy_n, with the
+         * destroy-what-was-built rollback on throw)
+         * Address: 0x0077E910 (FUN_0077E910, its fastcall-shape adapter)
          * Address: 0x00563430 (FUN_00563430,
          * msvc8::vector<Moho::SUnitVariableUpdateEntry>::uninit_copy_n -- the
          * range form, with the destroy-what-was-built rollback on throw)
