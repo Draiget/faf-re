@@ -942,11 +942,19 @@ namespace
   }
 
   /**
-   * Alias of FUN_00710460 (serializer load helper lane).
+   * Address: 0x00710460 (FUN_00710460,
+   * gpg::RMapType_string_CArmyStateItemP::SerLoad)
    *
    * What it does:
    * Clears destination storage, then reads `count` serialized
    * `string -> CArmyStatItem*` lanes from the archive.
+   *
+   * Paired with the save lane at 0x007105A0 below, which the same `Init`
+   * installs as `serSaveFunc_`. The binary reaches the count through the
+   * archive vtable slot at +0x20, then per entry calls the named import
+   * `gpg::ReadArchive::ReadPointer_CArmyStatItem` and assigns the key
+   * through `std::string::assign(str, 0, -1)` before the map insert -- the
+   * import is what identifies this body rather than its sibling.
    */
   void DeserializeStringArmyStatItemMap(
     gpg::ReadArchive* const archive,

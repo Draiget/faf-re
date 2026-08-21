@@ -2141,6 +2141,13 @@ namespace gpg
 
   /**
    * Address: 0x00402B10 (FUN_00402B10)
+   * Address: 0x00710E90 (FUN_00710E90, the reallocating branch of the
+   * `moho::SCondition` instantiation -- sizes the new block with
+   * `count * 8 - count` doubled three times, which is `count * 56`, the
+   * SCondition stride; uninitialised-copies the three segments in order
+   * (prefix, inserted range, suffix), destroys the old range, frees the old
+   * block only when it is not the inline buffer, and rebases the lanes.
+   * Reached from `gpg::fastvector_SCondition::insert_range` (0x0070FAD0).)
    *
    * What it does:
    * Inserts [sourceBegin, sourceEnd) at `insertPos`, growing runtime-view
