@@ -3,6 +3,7 @@
 #include "gpg/core/time/Timer.h"
 #include "lua/LuaObject.h"
 #include "legacy/containers/String.h"
+#include "moho/entity/EntityDb.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/SSTIArmyConstantData.h"
@@ -3421,16 +3422,42 @@ std::uint32_t* BuildEntIdSetBeginIteratorRuntime(
 }
 
 /**
- * Address: 0x006842E0 (FUN_006842E0)
+ * Address: 0x006842E0 (FUN_006842E0, sub_6842E0)
+ *
+ * IDA signature:
+ * int __usercall sub_6842E0@<eax>(int a1@<eax>);
+ *
+ * Prior-batch correction note: an earlier recovery pass mismatched this
+ * address onto the generic `OwnedBufferRuntime`/`ResetOwnedBufferRuntime`
+ * 3-field (`allocatorCookie`/`storage`/`logicalState`) shape shared by
+ * FUN_006E0A40/FUN_006FD8B0/FUN_00715440. The raw disassembly does not
+ * match that shape at all: it calls `sub_686EF0` (the `mAllUnits`
+ * range-erase, `EraseAllUnitsTreeRange` above) before touching only two
+ * fields (`[edi+4]`, `[edi+8]`), and `this` arrives via EAX (a destructor /
+ * construction-failure cleanup thunk convention -- both real callers are
+ * `jmp sub_6842E0` tail calls from `Moho::EntityDB::EntityDB` and
+ * `Moho::EntityDB::~EntityDB`), not via the ECX `owner` this pattern the
+ * `OwnedBufferRuntime` family uses. That prior citation was replaced with
+ * this recovery; `ResetOwnedBufferRuntime`'s three other real callers are
+ * untouched.
  *
  * What it does:
- * Releases one owned node-buffer lane and resets the owning storage metadata.
+ * Full teardown of one `EntityDB::mAllUnits` RB-tree: erases every node
+ * (`[begin(), end())`), frees the header sentinel node itself, then nulls
+ * the head pointer and element count. The binary always returns 0 here
+ * (a this-returning cleanup-thunk artifact, not meaningful data), so the
+ * recovered form drops the dead return value.
  */
-std::int32_t ReleaseEntityDbNodeBufferRuntime(
-  OwnedBufferRuntime* const owner
+void DestroyEntityDbAllUnitsTreeRuntime(
+  moho::CEntityDb* const entityDb
 )
 {
-  return ResetOwnedBufferRuntime(owner);
+  moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
+  (void)entityDb->EraseAllUnitsRange(head->left, head);
+
+  ::operator delete(head);
+  entityDb->mAllUnits = nullptr;
+  entityDb->mAllUnitsSize = 0u;
 }
 
 /**

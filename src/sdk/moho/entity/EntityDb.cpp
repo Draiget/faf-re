@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 #include <unordered_map>
 #include <utility>
@@ -2568,6 +2569,379 @@ namespace
   }
 
   /**
+   * Address: 0x005C8A20 (FUN_005C8A20)
+   *
+   * IDA signature:
+   * std::map_EntId_Entity::_Node *__usercall sub_5C8A20@<eax>(
+   *     std::map_EntId_Entity::_Node *node@<eax>);
+   *
+   * What it does:
+   * Walks one all-units node's left-child chain and returns the last
+   * non-sentinel lane reached (dinkumware `std::_Tree::_Min`).
+   */
+  [[nodiscard]] moho::CEntityDbAllUnitsNode* DescendAllUnitsLeftChainRuntime(moho::CEntityDbAllUnitsNode* node) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    moho::CEntityDbAllUnitsNode* cursor = node->left;
+    if (cursor != nullptr && cursor->isNil == 0u) {
+      do {
+        node = cursor;
+        cursor = cursor->left;
+      } while (cursor->isNil == 0u);
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x00686390 (FUN_00686390)
+   *
+   * IDA signature:
+   * std::map_EntId_Entity::_Node *__usercall sub_686390@<eax>(
+   *     std::map_EntId_Entity::_Node *node@<eax>);
+   *
+   * What it does:
+   * Walks one all-units node's right-child chain and returns the last
+   * non-sentinel lane reached (dinkumware `std::_Tree::_Max`).
+   */
+  [[nodiscard]] moho::CEntityDbAllUnitsNode* DescendAllUnitsRightChainRuntime(moho::CEntityDbAllUnitsNode* node) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    for (moho::CEntityDbAllUnitsNode* cursor = node->right; cursor != nullptr && cursor->isNil == 0u;
+         cursor = cursor->right) {
+      node = cursor;
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x00686340 (FUN_00686340)
+   *
+   * IDA signature:
+   * _DWORD *__thiscall sub_686340(_DWORD *this, int a2);
+   *
+   * ICF note: the linker folds every `std::_Tree<...>::_Lrotate`
+   * instantiation whose node layout matches this project's sentinel-node
+   * convention (`left@0/parent@4/right@8/isNil@0x15`) onto this one address.
+   * This recovery covers the `CEntityDbAllUnitsNode` instantiation exercised
+   * by `EraseAllUnitsTreeNode` below (verified caller: FUN_00685410, second
+   * caller FUN_00686190 belongs to an unrelated tree and is out of scope
+   * here).
+   *
+   * What it does:
+   * Standard red-black left rotation around `node`, re-pointing the tree's
+   * root link (`entityDb->mAllUnits->parent`) when `node` was the root.
+   */
+  moho::CEntityDbAllUnitsNode* RotateAllUnitsNodeLeft(
+    moho::CEntityDbAllUnitsNode* const node,
+    moho::CEntityDb* const entityDb
+  ) noexcept
+  {
+    moho::CEntityDbAllUnitsNode* const pivot = node->right;
+    node->right = pivot->left;
+    if (pivot->left->isNil == 0u) {
+      pivot->left->parent = node;
+    }
+    pivot->parent = node->parent;
+
+    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else if (node == node->parent->left) {
+      node->parent->left = pivot;
+    } else {
+      node->parent->right = pivot;
+    }
+
+    pivot->left = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x006863C0 (FUN_006863C0)
+   *
+   * IDA signature:
+   * int __thiscall sub_6863C0(_DWORD *this, int a2);
+   *
+   * ICF note: see `RotateAllUnitsNodeLeft`; same folding pattern, mirrored
+   * rotation.
+   *
+   * What it does:
+   * Standard red-black right rotation around `node`.
+   */
+  moho::CEntityDbAllUnitsNode* RotateAllUnitsNodeRight(
+    moho::CEntityDbAllUnitsNode* const node,
+    moho::CEntityDb* const entityDb
+  ) noexcept
+  {
+    moho::CEntityDbAllUnitsNode* const pivot = node->left;
+    node->left = pivot->right;
+    if (pivot->right->isNil == 0u) {
+      pivot->right->parent = node;
+    }
+    pivot->parent = node->parent;
+
+    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else if (node == node->parent->right) {
+      node->parent->right = pivot;
+    } else {
+      node->parent->left = pivot;
+    }
+
+    pivot->right = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x00685410 (FUN_00685410)
+   *
+   * IDA signature:
+   * int *__stdcall sub_685410(Moho::EntityDB *a1, std::map_EntId_Entity::_Node **a2,
+   *     Moho::CUnitIterAllArmies a3);
+   *
+   * IDA typing note: the decompiler infers a 12-byte `CUnitIterAllArmies`
+   * parameter for `a3` and separately mistypes the erased-node pointer as
+   * `Moho::EntityDB*` (`a1a`) in the red-black fixup section, reading a
+   * `mIdPool._Mysize` byte that is really the SAME register still holding
+   * the erased tree node -- i.e. `a1a->mIdPool` at that point in the
+   * pseudocode is really `erasedNode->color` (offset `+0x14`), not a real
+   * `EntityDB::mIdPool` access. The raw disassembly resolves both
+   * ambiguities: `retn 0Ch` pops exactly 3 caller-pushed dwords, and the
+   * caller (FUN_00686EF0) pushes exactly one dword for the third argument,
+   * so `a3` is a bare `CEntityDbAllUnitsNode*` node to erase, not a
+   * struct-by-value iterator; and the "Next" call at the top is the plain
+   * successor walk already recovered as `NextNodeInAllUnitsTree` (shared,
+   * ICF-folded address 0x005C87A0).
+   *
+   * What it does:
+   * Unlinks and destroys `erased` from the `mAllUnits` RB-tree, returning
+   * its in-order successor. Transplants the successor into the erased
+   * node's slot when both subtrees exist, then repairs the black-height
+   * deficit from the stitched-up child upward. MSVC8
+   * `std::_Tree<EntId, Entity*>::erase(iterator)` specialized for
+   * `CEntityDbAllUnitsNode` (`color` at `+0x14`, `isNil` at `+0x15`).
+   *
+   * Throws `std::out_of_range` when `erased` is the header sentinel
+   * (matches the binary's "invalid map/set<T> iterator" guard).
+   */
+  moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeNode(
+    moho::CEntityDb* const entityDb,
+    moho::CEntityDbAllUnitsNode* const erased
+  )
+  {
+    if (erased->isNil != 0u) {
+      throw std::out_of_range("invalid map/set<T> iterator");
+    }
+
+    moho::CEntityDbAllUnitsNode* const next = NextNodeInAllUnitsTree(erased);
+
+    moho::CEntityDbAllUnitsNode* lifted = erased;
+    moho::CEntityDbAllUnitsNode* fix = nullptr;
+    moho::CEntityDbAllUnitsNode* fixParent = nullptr;
+
+    if (erased->left->isNil != 0u) {
+      fix = erased->right;
+    } else if (erased->right->isNil != 0u) {
+      fix = erased->left;
+    } else {
+      lifted = next;
+      fix = lifted->right;
+    }
+
+    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
+
+    if (lifted == erased) {
+      fixParent = erased->parent;
+      if (fix->isNil == 0u) {
+        fix->parent = fixParent;
+      }
+
+      if (head->parent == erased) {
+        head->parent = fix;
+      } else if (fixParent->left == erased) {
+        fixParent->left = fix;
+      } else {
+        fixParent->right = fix;
+      }
+
+      if (head->left == erased) {
+        head->left = (fix->isNil != 0u) ? fixParent : DescendAllUnitsLeftChainRuntime(fix);
+      }
+      if (head->right == erased) {
+        head->right = (fix->isNil != 0u) ? fixParent : DescendAllUnitsRightChainRuntime(fix);
+      }
+    } else {
+      erased->left->parent = lifted;
+      lifted->left = erased->left;
+
+      if (lifted == erased->right) {
+        fixParent = lifted;
+      } else {
+        fixParent = lifted->parent;
+        if (fix->isNil == 0u) {
+          fix->parent = fixParent;
+        }
+        fixParent->left = fix;
+        lifted->right = erased->right;
+        erased->right->parent = lifted;
+      }
+
+      if (head->parent == erased) {
+        head->parent = lifted;
+      } else if (erased->parent->left == erased) {
+        erased->parent->left = lifted;
+      } else {
+        erased->parent->right = lifted;
+      }
+
+      lifted->parent = erased->parent;
+      std::swap(lifted->color, erased->color);
+    }
+
+    if (erased->color == 1u) {
+      moho::CEntityDbAllUnitsNode* fixCursor = fix;
+      moho::CEntityDbAllUnitsNode* fixParentCursor = fixParent;
+      while (fixCursor != head->parent && fixCursor->color == 1u) {
+        if (fixCursor == fixParentCursor->left) {
+          moho::CEntityDbAllUnitsNode* sibling = fixParentCursor->right;
+          if (sibling->color == 0u) {
+            sibling->color = 1u;
+            fixParentCursor->color = 0u;
+            (void)RotateAllUnitsNodeLeft(fixParentCursor, entityDb);
+            sibling = fixParentCursor->right;
+          }
+
+          if (sibling->isNil != 0u) {
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else if (sibling->left->color == 1u && sibling->right->color == 1u) {
+            sibling->color = 0u;
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else {
+            if (sibling->right->color == 1u) {
+              sibling->left->color = 1u;
+              sibling->color = 0u;
+              (void)RotateAllUnitsNodeRight(sibling, entityDb);
+              sibling = fixParentCursor->right;
+            }
+            sibling->color = fixParentCursor->color;
+            fixParentCursor->color = 1u;
+            sibling->right->color = 1u;
+            (void)RotateAllUnitsNodeLeft(fixParentCursor, entityDb);
+            fixCursor = head->parent;
+            break;
+          }
+        } else {
+          moho::CEntityDbAllUnitsNode* sibling = fixParentCursor->left;
+          if (sibling->color == 0u) {
+            sibling->color = 1u;
+            fixParentCursor->color = 0u;
+            (void)RotateAllUnitsNodeRight(fixParentCursor, entityDb);
+            sibling = fixParentCursor->left;
+          }
+
+          if (sibling->isNil != 0u) {
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else if (sibling->right->color == 1u && sibling->left->color == 1u) {
+            sibling->color = 0u;
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else {
+            if (sibling->left->color == 1u) {
+              sibling->right->color = 1u;
+              sibling->color = 0u;
+              (void)RotateAllUnitsNodeLeft(sibling, entityDb);
+              sibling = fixParentCursor->left;
+            }
+            sibling->color = fixParentCursor->color;
+            fixParentCursor->color = 1u;
+            sibling->left->color = 1u;
+            (void)RotateAllUnitsNodeRight(fixParentCursor, entityDb);
+            fixCursor = head->parent;
+            break;
+          }
+        }
+      }
+      fixCursor->color = 1u;
+    }
+
+    ::operator delete(erased);
+    if (entityDb->mAllUnitsSize != 0u) {
+      --entityDb->mAllUnitsSize;
+    }
+    return next;
+  }
+
+  /**
+   * Address: 0x00686EF0 (FUN_00686EF0)
+   *
+   * IDA signature:
+   * int *__userpurge sub_686EF0@<eax>(Moho::EntityDB *a1@<edi>, int *arg0,
+   *     Moho::Unit *a3, Moho::Unit *a3_4);
+   *
+   * IDA typing note: the decompiler types `a3`/`a3_4` as `Moho::Unit*` and
+   * reads a `__vftable_unit`-shaped field from the same base pointer that
+   * the loop branch treats as a raw `std::map_EntId_Entity::_Node*`
+   * sentinel (`_Myhead`, `_Left`, `_Right`, `_Parent`). Both readings are
+   * the SAME pointer: the `mAllUnits` RB-tree head/leftmost sentinel,
+   * misattributed to `Moho::Unit` because the decompiler's type inference
+   * for this register leaked in from an unrelated branch. Confirmed from
+   * the raw disassembly: `a3`/`a3_4` are compared directly against
+   * `entityDb->mAllUnits` and `entityDb->mAllUnits->left` -- real
+   * `CEntityDbAllUnitsNode*` iterators, never a `Moho::Unit*`.
+   *
+   * What it does:
+   * Erases `[first, last)` from the `mAllUnits` RB-tree. Takes the O(1)
+   * whole-tree fast path (recursive subtree destroy + sentinel reset) when
+   * erasing the full range (`first == begin() && last == end()`);
+   * otherwise advances to each node's successor before erasing it, so the
+   * walk stays valid across the erase. MSVC8
+   * `std::_Tree<EntId, Entity*>::erase(iterator, iterator)`.
+   */
+  moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeRange(
+    moho::CEntityDb* const entityDb,
+    moho::CEntityDbAllUnitsNode** const outPosition,
+    moho::CEntityDbAllUnitsNode* const first,
+    moho::CEntityDbAllUnitsNode* const last
+  )
+  {
+    moho::CEntityDbAllUnitsNode* const head = entityDb->mAllUnits;
+    moho::CEntityDbAllUnitsNode* cursor = first;
+
+    if (first == head->left && last == head) {
+      DestroyAllUnitsSubtreeRecursive(head->parent);
+      head->parent = head;
+      entityDb->mAllUnitsSize = 0u;
+      head->left = head;
+      head->right = head;
+      *outPosition = head;
+      return *outPosition;
+    }
+
+    if (first != last) {
+      do {
+        moho::CEntityDbAllUnitsNode* const erasing = cursor;
+        cursor = NextNodeInAllUnitsTree(cursor);
+        (void)EraseAllUnitsTreeNode(entityDb, erasing);
+      } while (cursor != last);
+    }
+
+    *outPosition = cursor;
+    return *outPosition;
+  }
+
+  /**
    * Address: 0x00688030 (FUN_00688030)
    *
    * IDA signature:
@@ -3781,6 +4155,24 @@ namespace moho
 
     auto* const entitySubobject = reinterpret_cast<Entity*>(node->unitListNode);
     return static_cast<Unit*>(entitySubobject);
+  }
+
+  /**
+   * Address: 0x00686EF0 (FUN_00686EF0, sub_686EF0)
+   *
+   * What it does:
+   * Erases `[first, last)` from `mAllUnits` and returns the node that
+   * followed the erased range (see `EraseAllUnitsTreeRange` for the full
+   * recovery, and `EraseAllUnitsTreeNode`/FUN_00685410 for the single-node
+   * erase it loops on).
+   */
+  CEntityDbAllUnitsNode* CEntityDb::EraseAllUnitsRange(
+    CEntityDbAllUnitsNode* const first,
+    CEntityDbAllUnitsNode* const last
+  )
+  {
+    CEntityDbAllUnitsNode* outPosition = nullptr;
+    return EraseAllUnitsTreeRange(this, &outPosition, first, last);
   }
 
   /**
