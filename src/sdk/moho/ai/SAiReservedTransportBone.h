@@ -49,6 +49,27 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /**
+     * Address: 0x005EE740 (FUN_005EE740, Moho::SAiReservedTransportBone::operator=)
+     *
+     * IDA signature:
+     * SAiReservedTransportBone *__usercall
+     *     SAiReservedTransportBone::operator=@<eax>(
+     *         const SAiReservedTransportBone *other@<edx>, SAiReservedTransportBone *this@<esi>);
+     *
+     * What it does:
+     * Copies the transport/attach bone indices directly, relinks the
+     * `reservedUnit` weak-pointer node onto the source's owner-chain slot
+     * (unlinking it from its previous owner chain first when the slot
+     * differs), and assigns the nested `reservedBones` vector via its own
+     * `operator=` (tail call into `msvc8::vector<int>::operator=`,
+     * 0x005ED190). Used by the erase-and-shift loop
+     * (`EraseReservedTransportBoneAndAdvance`) and by whole-vector assignment
+     * (`AssignReservedTransportBoneVector`) whenever `vector<SAiReservedTransportBone>`
+     * needs to assign one already-constructed element from another.
+     */
+    SAiReservedTransportBone& operator=(const SAiReservedTransportBone& other);
+
     std::uint32_t transportBoneIndex; // +0x00
     std::uint32_t attachBoneIndex;    // +0x04
     WeakPtr<Unit> reservedUnit;       // +0x08

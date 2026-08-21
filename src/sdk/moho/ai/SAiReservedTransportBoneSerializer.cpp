@@ -213,6 +213,32 @@ void* moho::DestroyReservedTransportBoneRange(SAiReservedTransportBone* begin, S
 }
 
 /**
+ * Address: 0x005EE740 (FUN_005EE740, Moho::SAiReservedTransportBone::operator=)
+ *
+ * What it does:
+ * Copies the transport/attach bone indices directly, relinks the
+ * `reservedUnit` weak-pointer node onto the source's owner-chain slot, and
+ * assigns the nested `reservedBones` vector via its own `operator=`. The
+ * binary tail-calls into `msvc8::vector<int>::operator=` (0x005ED190) for
+ * the vector member; the equivalent here is the plain `vector<int>`
+ * assignment expression, which resolves to that same canonical template
+ * method.
+ */
+SAiReservedTransportBone& SAiReservedTransportBone::operator=(const SAiReservedTransportBone& other)
+{
+  transportBoneIndex = other.transportBoneIndex;
+  attachBoneIndex = other.attachBoneIndex;
+
+  AssignWeakPtrLaneWithRelink(
+    reinterpret_cast<WeakPtr<void>&>(reservedUnit),
+    reinterpret_cast<const WeakPtr<void>&>(other.reservedUnit)
+  );
+
+  reservedBones = other.reservedBones;
+  return *this;
+}
+
+/**
  * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
  *
  * What it does:
