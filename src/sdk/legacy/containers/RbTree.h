@@ -554,6 +554,12 @@ namespace msvc8
             }
 
             /** Node holding `k`, or the header when absent. */
+            /**
+             * Address: 0x00594BD0 (FUN_00594BD0, the by-name lookup for
+             * `CArmyStats::mNameIndex`; the `[this+0x14]` it opens with is that member's
+             * offset in CArmyStats, not a node field)
+             * Address: 0x00595130 (FUN_00595130, the same descent emitted a second time)
+             */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
                 node_type* const found = lower_bound_node(k);
@@ -576,6 +582,12 @@ namespace msvc8
              * then confirms uniqueness by comparing against the in-order
              * predecessor of the descent result before linking a fresh node.
              * Returns the existing node with `false` when the key is present.
+             */
+            /**
+             * Address: 0x00594E70 (FUN_00594E70, the name-index map's insert-or-assign,
+             * which is what `mNameIndex[key] = item` compiles to at its four call sites in
+             * CArmyStats)
+             * Address: 0x00594C90 (FUN_00594C90, its descent half)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -735,6 +747,15 @@ namespace msvc8
              * `[node+0x14]` / `[node+0x15]`, which pins it to that map's 0x18 node
              * rather than the 0x30 name-index node in the same file.)
              */
+            /**
+             * Address: 0x00703700 (FUN_00703700, the name-index map's erase with
+             * rebalance -- the densest colour/nil traffic in the family, rewriting
+             * `[node+0x2C]`/`[node+0x2D]` across every rebalance branch)
+             * Address: 0x006FD7C0 (FUN_006FD7C0, the erase-and-advance wrapper that
+             * `CArmyStats::Delete`'s erase-while-iterating loop drives)
+             * Address: 0x00704A40 (FUN_00704A40, the same lane reached from
+             * `~CArmyStats`)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -883,6 +904,10 @@ namespace msvc8
              * `CArmyStatItem::~CArmyStatItem` reaches it at 0x00585C39, which is what
              * `clear()` compiles to.)
              * Address: 0x00585BD0 (FUN_00585BD0, the typed teardown wrapper around it)
+             */
+            /**
+             * Address: 0x00704000 (FUN_00704000, the name-index map's teardown)
+             * Address: 0x0070DDC0 (FUN_0070DDC0, its typed wrapper)
              */
             void clear() noexcept
             {
@@ -1072,6 +1097,11 @@ namespace msvc8
              * Rotates `n`'s right child up into `n`'s slot, re-parenting the moved
              * subtree and patching the header's root link when `n` was the root.
              */
+            /**
+             * Address: 0x00592E50 (FUN_00592E50, the name-index map's left rotate)
+             *
+             * These belong to `std::map<std::string, CArmyStatItem*>` -- `CArmyStats::mNameIndex` -- whose node is 0x30. The colour/nil pair they rewrite sits at `[node+0x2C]`/`[node+0x2D]`, which is what separates them from the 0x18 blueprint-stat node in the same file.
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1098,6 +1128,9 @@ namespace msvc8
              *
              * What it does:
              * Mirror of `rotate_left`: lifts `n`'s left child into `n`'s slot.
+             */
+            /**
+             * Address: 0x00592EE0 (FUN_00592EE0, the name-index map's right rotate)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -1134,6 +1167,11 @@ namespace msvc8
              * then repairs the red-red violation upwards and reblackens the root.
              */
             template<class... Args>
+            /**
+             * Address: 0x00594F80 (FUN_00594F80, the name-index map's recolour-and-rotate
+             * fixup after a link -- it writes only the colour byte at `[node+0x2C]`)
+             * Address: 0x00594B10 (FUN_00594B10, the link half that precedes it)
+             */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
                 if (max_size() - 1u <= size_) {
