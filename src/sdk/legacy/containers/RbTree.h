@@ -173,6 +173,10 @@ namespace msvc8
          * increment - see `rb_decrement` for the disassembly evidence.
          */
         template<class V>
+        /**
+         * Address: 0x0049AD20 (FUN_0049AD20, the in-order successor walk for the
+         * trail-segment owner pool, `std::set<TrailSegmentBufferRuntime*>`)
+         */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -502,6 +506,10 @@ namespace msvc8
              *
              * The `end()` lane -- the sentinel head itself.
              */
+            /**
+             * Address: 0x00498060 (FUN_00498060, the trail-segment pool's maximum;
+             * emitted again at 0x0087CC20)
+             */
             [[nodiscard]] node_type* header() const noexcept { return head_; }
             [[nodiscard]] node_type* root() const noexcept { return head_->parent; }
             /**
@@ -515,6 +523,10 @@ namespace msvc8
              * The `head->left` begin lane, emitted once per blueprint table.
              *
              * All belong to the seven `std::map<std::string, TBlueprint*>` tables on `RRuleGameRulesImpl` (+0x60 through +0xA8). One emission per table is why the same member carries six or seven addresses.
+             */
+            /**
+             * Address: 0x00498080 (FUN_00498080, the trail-segment pool's minimum;
+             * emitted again at 0x0087CC40)
              */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
@@ -629,6 +641,11 @@ namespace msvc8
              * which is what `mNameIndex[key] = item` compiles to at its four call sites in
              * CArmyStats)
              * Address: 0x00594C90 (FUN_00594C90, its descent half)
+             */
+            /**
+             * Address: 0x00496000 (FUN_00496000, the trail-segment pool's find-or-insert
+             * -- what `ReturnTrailSegmentBufferToOwnerPool` compiles to)
+             * Address: 0x00497E50 (FUN_00497E50, its link half)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -964,6 +981,9 @@ namespace msvc8
              * Address: 0x00704000 (FUN_00704000, the name-index map's teardown)
              * Address: 0x0070DDC0 (FUN_0070DDC0, its typed wrapper)
              */
+            /**
+             * Address: 0x00497E10 (FUN_00497E10, the trail-segment pool's subtree destroy)
+             */
             void clear() noexcept
             {
                 destroy_subtree(root());
@@ -1068,6 +1088,11 @@ namespace msvc8
              *
              * The per-table head-sentinel allocators: one `operator new` of the 0x30
              * node, then self-linked and flagged as the sentinel.
+             */
+            /**
+             * Address: 0x0049A7B0 (FUN_0049A7B0, the trail-segment pool's node allocate
+             * and link)
+             * Address: 0x0049EC00 (FUN_0049EC00, its node-array allocate)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -1184,6 +1209,18 @@ namespace msvc8
              * itself is still unidentified, only the tree-algorithm shape is
              * confirmed.
              */
+            /**
+             * Address: 0x00498010 (FUN_00498010, the `std::set<TrailSegmentBufferRuntime*>`
+             * instantiation behind `CWorldParticles`' trail-segment owner pool)
+             */
+            /**
+             * Address: 0x00A553F0 (FUN_00A553F0)
+             * Address: 0x00A55520 (FUN_00A55520, byte-identical sibling emission)
+             *
+             * Left-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
+             * colour/nil instantiations cited on `erase_node` above, reached
+             * from their rebalance-fixup loops (0x00A633D0/0x00A63690).
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1213,6 +1250,17 @@ namespace msvc8
              */
             /**
              * Address: 0x00592EE0 (FUN_00592EE0, the name-index map's right rotate)
+             */
+            /**
+             * Address: 0x004980C0 (FUN_004980C0, the same set's right rotate)
+             */
+            /**
+             * Address: 0x00A553A0 (FUN_00A553A0)
+             * Address: 0x00A554D0 (FUN_00A554D0, byte-identical sibling emission)
+             *
+             * Right-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
+             * colour/nil instantiations cited on `erase_node` above, reached
+             * from their rebalance-fixup loops (0x00A633D0/0x00A63690).
              */
             void rotate_right(node_type* const n) noexcept
             {
