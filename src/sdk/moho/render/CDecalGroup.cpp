@@ -1,5 +1,6 @@
 #include "moho/render/CDecalGroup.h"
 
+#include <algorithm>
 #include <cstring>
 
 #include "gpg/core/streams/BinaryReader.h"
@@ -25,10 +26,8 @@ namespace moho
     mName.myRes = 15u;
     mName.bx.buf[0] = '\0';
 
-    auto& decalView = msvc8::AsVectorRuntimeView(mDecals);
-    decalView.begin = nullptr;
-    decalView.end = nullptr;
-    decalView.capacityEnd = nullptr;
+    // msvc8::vector's default constructor already null-initialises all three
+    // lanes; the binary's explicit zeroing here IS that constructor inlined.
   }
 
   /**
@@ -41,13 +40,8 @@ namespace moho
    */
   CDecalGroup::~CDecalGroup()
   {
-    auto& decalView = msvc8::AsVectorRuntimeView(mDecals);
-    if (decalView.begin != nullptr) {
-      ::operator delete(decalView.begin);
-    }
-    decalView.begin = nullptr;
-    decalView.end = nullptr;
-    decalView.capacityEnd = nullptr;
+    // Free the block and null all three lanes: VC8 _Tidy().
+    mDecals = msvc8::vector<std::int32_t>{};
 
     if (mName.myRes >= 0x10u) {
       ::operator delete(mName.bx.ptr);
@@ -121,27 +115,13 @@ namespace moho
    */
   void CDecalGroup::RemoveFromGroup(const std::int32_t decalIndex)
   {
-    auto& decalView = msvc8::AsVectorRuntimeView(mDecals);
-
-    std::int32_t* found = decalView.begin;
-    while (found != decalView.end) {
-      if (*found == decalIndex) {
-        break;
-      }
-      ++found;
-    }
-
-    if (found == decalView.end) {
+    auto* const found = std::find(mDecals.begin(), mDecals.end(), decalIndex);
+    if (found == mDecals.end()) {
       return;
     }
 
-    const std::ptrdiff_t trailingCount = decalView.end - (found + 1);
-    if (trailingCount > 0) {
-      const std::size_t bytesToMove = static_cast<std::size_t>(trailingCount) * sizeof(std::int32_t);
-      (void)::memmove_s(found, bytesToMove, found + 1, bytesToMove);
-    }
-
-    --decalView.end;
+    // Shift the tail down over `found` and drop mLast -- erase(pos).
+    (void)mDecals.erase(found);
   }
 
   /**
@@ -156,13 +136,10 @@ namespace moho
     writer.Write(mIndex);
     writer.WriteString(mName);
 
-    const auto& decalView = msvc8::AsVectorRuntimeView(mDecals);
-    const std::uint32_t decalCount =
-      decalView.begin != nullptr ? static_cast<std::uint32_t>(decalView.end - decalView.begin) : 0u;
-    writer.Write(decalCount);
+    writer.Write(static_cast<std::uint32_t>(mDecals.size()));
 
-    for (std::int32_t* decalIt = decalView.begin; decalIt != decalView.end; ++decalIt) {
-      writer.Write(*decalIt);
+    for (const std::int32_t decal : mDecals) {
+      writer.Write(decal);
     }
   }
 
