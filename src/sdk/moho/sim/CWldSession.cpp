@@ -28,6 +28,7 @@
 #include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/lua/SCR_Color.h"
@@ -1665,6 +1666,18 @@ namespace moho
     {
       return *reinterpret_cast<CommandGraphTreeBucket*>(node.mPayload);
     }
+
+    /**
+     * `EstimateDrawNodeWorkTicks` (0x00826F10) reaches the game rules through
+     * `mSession` to build the "assisting unit" category: 0x0082700F loads
+     * `graph+0x0D24` and 0x00827015 the rules at `session+0x18` before the two
+     * `GetEntityCategory` dispatches. Declared here rather than beside the
+     * other friends above because it names `UICommandGraphDrawNode`, which is
+     * only complete from this point on.
+     */
+    friend std::int32_t EstimateDrawNodeWorkTicks(
+      UICommandGraph& graph, UICommandGraphDrawNode& drawNode
+    );
 
     /**
      * Tri-state highlight the render pass picks a waypoint/orderline style
@@ -5068,8 +5081,9 @@ namespace moho
    * `GetConstructEconomyModel` for each assisting engineer/factory's build rate,
    * sums their reciprocals, and divides the remaining work fraction (derived
    * from the part-built unit's health ratio) by that combined rate. Returns 0
-   * for any command that is not a `BuildMobile`/`BuildFactory`. Blocked on the
-   * same 0x007B4D90 iterator advance as the travel estimate above.
+   * for any command that is not a `BuildMobile`/`BuildFactory`.
+   *
+   * Body below, after the anonymous-namespace helpers it uses.
    */
   [[nodiscard]] std::int32_t EstimateDrawNodeWorkTicks(
     UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode
@@ -11960,6 +11974,134 @@ namespace moho
       return true;
     }
   } // namespace
+
+  /**
+   * Address: 0x00826F10 (FUN_00826F10, sub_826F10)
+   *
+   * IDA signature:
+   * int __stdcall sub_826F10(Moho::UICommandGraph *graph,
+   *                          Moho::UICommandGraph::UICommandGraphDrawNode *drawNode);
+   *
+   * What it does: see the declaration above `RebuildCommandQueueNodes`.
+   *
+   * It sits here rather than beside `EstimateEdgeTravelTicks` because it needs
+   * `ResolveEntityFromCommandIssueOwner` from the anonymous namespace above.
+   *
+   * Two shapes worth keeping honest, both read off the disassembly rather than
+   * the decompiler, which renders them misleadingly:
+   *
+   * - the blueprint fetch at 0x0082708A takes no argument. The decompiler shows
+   *   a stale `v33` (the FACTORY category) riding along; the actual instructions
+   *   are `lea ecx,[esi+148h]` + `call [vptr+1Ch]`, i.e. plain
+   *   `IUnit::GetBlueprint()` through the `UserUnit+0x148` bridge.
+   * - the loop body is wrapped in a real `try`/`catch`. The decompiler hides it
+   *   entirely; the funclet at 0x008271C9 pulls the message off the caught
+   *   object and warns "Error estimating work time: %s", then resumes at
+   *   0x008271EE, which is the iterator advance - so one unit whose Lua model
+   *   throws is skipped rather than abandoning the whole estimate.
+   */
+  std::int32_t EstimateDrawNodeWorkTicks(
+    UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode
+  )
+  {
+    LuaPlus::LuaState* const state = GetUiManagerGlobalLaneA()->mLuaState;
+
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (helper == nullptr) {
+      return 0;
+    }
+
+    // Kept at two calls exactly as 0x00826F52/0x00826F5E emit them, and the
+    // virtual's result really is dropped at 0x00826F6A (slot 3, `IsUserUnit`).
+    // The resolver is not pure - it unlinks the transient anchor sample from
+    // whatever weak-entity chain the lookup joined it to - so collapsing the
+    // pair would drop a side effect the original source performs twice.
+    auto* const anchorHistory = reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper);
+    if (ResolveCommandTargetEntityFromAnchorHistory(anchorHistory) != nullptr) {
+      (void)ResolveCommandTargetEntityFromAnchorHistory(anchorHistory)->IsUserUnit();
+    }
+
+    REntityBlueprint* const orderedBlueprint = helper->mConstantData.blueprint;
+
+    // Seeds: a command nobody is working on yet still has all of its work left,
+    // and no assisting unit means no build rate at all.
+    float remainingWorkFraction = 1.0f;
+    float combinedBuildRate = 0.0f;
+
+    // Only the two build orders carry work; the order graph treats everything
+    // else as costing no time. The binary re-resolves the type for the second
+    // test rather than reusing the first result.
+    if (ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile
+      && ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildFactory) {
+      return 0;
+    }
+
+    LuaPlus::LuaObject gameModule = SCR_Import(state, "/lua/game.lua");
+    LuaPlus::LuaObject constructEconomyModelObject = gameModule["GetConstructEconomyModel"];
+    LuaPlus::LuaFunction<> getConstructEconomyModel(constructEconomyModelObject);
+
+    // Engineers and factories are the two things that can pour build power into
+    // an order, so the walk below tests membership of their union once per unit.
+    const CategoryWordRangeView* const factoryCategory =
+      graph.mSession->mRules->GetEntityCategory("FACTORY");
+    const CategoryWordRangeView* const engineerCategory =
+      graph.mSession->mRules->GetEntityCategory("ENGINEER");
+    EntityCategorySet assistingCategory{};
+    (void)func_EntityCategoryAdd(engineerCategory, &assistingCategory, factoryCategory);
+
+    SSelectionSetUserEntity* const assistingUnits = ResolveCommandIssueCursorEntities(*helper);
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)assistingUnits->PruneTombstonesAndFindLive(&node, assistingUnits->mHead->mLeft);
+    while (node != assistingUnits->mHead) {
+      auto* const unit = static_cast<UserUnit*>(ResolveWeakEntitySetNodeEntity(*node));
+      const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
+
+      if (assistingCategory.ContainsBit(blueprint->mCategoryBitIndex) && orderedBlueprint != nullptr) {
+        // How much of the job is left is read off whatever this unit is
+        // currently working on, and only while it is working on *this* order -
+        // an engineer queued to help later must not shorten the estimate.
+        if (UserEntity* const workTarget = ResolveEntityFromCommandIssueOwner(unit);
+            workTarget != nullptr) {
+          if (ResolveUserUnitFrontCommandIssueHelper(unit->GetCommandQueue()) == helper) {
+            const float maxHealth = workTarget->mVariableData.mMaxHealth;
+            if (maxHealth > 0.0f) {
+              const float remaining = 1.0f - (workTarget->mVariableData.mHealth / maxHealth);
+              if (remainingWorkFraction > remaining) {
+                remainingWorkFraction = remaining;
+              }
+            }
+          }
+        }
+
+        // Rates add as reciprocals: each assister contributes 1/buildTime, and
+        // the combined rate is what the remaining fraction is divided by below.
+        try {
+          LuaPlus::LuaObject luaBlueprint = orderedBlueprint->GetLuaBlueprint(state);
+          const auto buildRate = static_cast<float>(getConstructEconomyModel.Call_UserunitObject_Num(
+            unit != nullptr ? &unit->mLuaObj : nullptr, luaBlueprint["Economy"]
+          ));
+          if (buildRate > 0.0f) {
+            combinedBuildRate += 1.0f / buildRate;
+          }
+        } catch (const std::exception& exception) {
+          gpg::Warnf("Error estimating work time: %s", exception.what());
+        }
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)assistingUnits->PruneTombstonesAndFindLive(&node, node);
+    }
+
+    if (combinedBuildRate <= 0.0f) {
+      return 0;
+    }
+
+    // Truncated, not rounded: 0x0082725F ORs 0xC00 into the x87 control word
+    // (round toward zero) for the one `fistp` and restores it straight after.
+    return static_cast<std::int32_t>(
+      (remainingWorkFraction * kCommandGraphTicksPerSecond) / combinedBuildRate
+    );
+  }
 
   /**
    * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
