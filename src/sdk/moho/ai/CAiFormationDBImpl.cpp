@@ -658,10 +658,7 @@ moho::SFormationScriptResult moho::FORMATION_RunScript(
         slot.mCategory.mBits.mFirstWordIndex = category->mBits.mFirstWordIndex;
         // 0x00576A39: `gpg::fastvector_uint::cpy` over the word lanes only -
         // the two reserved dwords are deliberately not carried across.
-        (void)gpg::FastVectorRuntimeCopyAssign(
-          gpg::AsFastVectorRuntimeView<unsigned int>(&slot.mCategory.mBits.mWords),
-          gpg::AsFastVectorRuntimeView<unsigned int>(&category->mBits.mWords)
-        );
+        slot.mCategory.mBits.mWords = category->mBits.mWords;
 
         slot.mWeight = static_cast<float>(entry[4].GetNumber());
         result.mSuccess = entry[5].GetBoolean();
