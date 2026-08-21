@@ -477,16 +477,6 @@ namespace moho
     [[nodiscard]] SSelectionNodeUserEntity**
       PruneTombstonesAndFindLive(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* start);
 
-    /**
-     * Address: 0x007AF740 (FUN_007AF740, sub_7AF740)
-     *
-     * What it does:
-     * Erases one half-open weak-set node range `[first,last)`. When the range
-     * is the full tree, it tears down the entire subtree in one pass and resets
-     * head links/size to the empty-state sentinel shape.
-     */
-    [[nodiscard]] SSelectionNodeUserEntity**
-      EraseRange(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* first, SSelectionNodeUserEntity* last);
 
     /**
      * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
@@ -518,15 +508,6 @@ namespace moho
      */
     static void Iterator_inc(SSelectionNodeUserEntity** cursor);
 
-  private:
-    /**
-     * Address: 0x007B0870 (FUN_007B0870, sub_7B0870)
-     *
-     * What it does:
-     * Recursively destroys one weak-set subtree and unlinks each node from its
-     * user-entity weak-owner intrusive lane before delete.
-     */
-    void DestroySubtree(SSelectionNodeUserEntity* node);
   };
 
   static_assert(sizeof(SSelectionSetUserEntity) == 0x10, "SSelectionSetUserEntity size must be 0x10");
