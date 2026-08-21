@@ -6,7 +6,7 @@
 #include <utility>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -362,6 +362,8 @@ moho::EntityCategorySet* moho::ResetEntityCategorySetWordStorageRange(
 {
   return moho::ResetEntityCategorySetWordStorageRange(begin, end);
 }
+
+gpg::RVectorType<moho::EntityCategorySet>::~RVectorType() = default;
 
 /**
  * Address: 0x006DB280 (FUN_006DB280, gpg::RVectorType_BVSet_PRBlueprint::GetName)
