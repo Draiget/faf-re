@@ -545,17 +545,9 @@ namespace moho
    */
   RUnitBlueprintAI::~RUnitBlueprintAI()
   {
-    auto& targetBonesView = msvc8::AsVectorRuntimeView(TargetBones);
-    if (targetBonesView.begin != nullptr) {
-      for (msvc8::string* cursor = targetBonesView.begin; cursor != targetBonesView.end; ++cursor) {
-        cursor->~string();
-      }
-      ::operator delete(targetBonesView.begin);
-    }
-
-    targetBonesView.begin = nullptr;
-    targetBonesView.end = nullptr;
-    targetBonesView.capacityEnd = nullptr;
+    // Per-element ~string() then free then null all three lanes is VC8's
+    // _Tidy(), which is what move-assigning an empty vector compiles to.
+    TargetBones = msvc8::vector<msvc8::string>{};
 
     if (BeaconName.myRes >= 0x10U) {
       ::operator delete(BeaconName.bx.ptr);
@@ -691,6 +683,10 @@ namespace moho
     Defense.Shield.ShieldSize = 0.0f;
     Defense.Shield.RegenAssistMult = 1.0f;
 
+    // NOTE: the binary nulls these three lanes WITHOUT freeing the block --
+    // this is an ownership abandon, not a _Tidy(). Assigning an empty vector
+    // here would add a free the binary does not perform, so the raw lane
+    // write stays until the ownership transfer is traced.
     auto& weaponBlueprintsView = msvc8::AsVectorRuntimeView(Weapons.WeaponBlueprints);
     weaponBlueprintsView.begin = nullptr;
     weaponBlueprintsView.end = nullptr;
@@ -846,10 +842,11 @@ namespace moho
    */
   void RUnitBlueprint::AddEconomyRestrictions(RRuleGameRulesImpl* const rules)
   {
-    auto& buildableCategoriesView = msvc8::AsVectorRuntimeView(Economy.BuildableCategories);
     auto* const economyCategoryCache = reinterpret_cast<EntityCategorySet*>(&Economy.CategoryCache);
 
-    for (msvc8::string* it = buildableCategoriesView.begin; it != buildableCategoriesView.end; ++it) {
+    for (msvc8::string* it = Economy.BuildableCategories.begin();
+         it != Economy.BuildableCategories.end();
+         ++it) {
       // The binary parses through the free function directly (a1 =
       // rules->mEntityCategoryLookup at +0xC4), not the virtual dispatch.
       CategoryWordRangeView parsedCategory;
