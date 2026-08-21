@@ -493,6 +493,13 @@ namespace gpg::core
     {
       Reserve(n);
     }
+    /**
+     * Address: 0x00576C80 (FUN_00576C80,
+     * gpg::fastvector_n<Moho::SFormationScriptSlot, 20>::push_back -- the
+     * `result.mObjs.push_back(slot)` in `Moho::FORMATION_RunScript`, one call
+     * per five-element tuple the formation script returns. Reaches the grow
+     * lane at 0x00576D60 when the twenty inline slots are used up.)
+     */
     void push_back(const value_type& v)
     {
       PushBack(v);
@@ -731,6 +738,16 @@ namespace gpg::core
      * soon as the source dies or is relocated. Every inline-storage vector in
      * the binary rebinds to its own buffer instead (`ResetFrom`).
      */
+    /**
+     * Address: 0x00576C20 (FUN_00576C20,
+     * gpg::fastvector_n<Moho::SFormationScriptSlot, 20>'s copy constructor --
+     * the lane `Moho::FORMATION_RunScript` (0x00576690) reaches when it
+     * returns `SFormationScriptResult` by value. It opens exactly as the
+     * `: FastVectorN()` delegation below does, seating the three lanes on
+     * `this + 0x10` and the capacity on `this + 0x10 + 0x460` -- 0x460 being
+     * twenty slots of 0x38 -- and then rebinds through the uninitialised copy
+     * at 0x00576F10, which is `ResetFrom`.)
+     */
     FastVectorN(const FastVectorN& other)
       : FastVectorN()
     {
@@ -755,6 +772,13 @@ namespace gpg::core
       this->start_ = this->end_ = this->capacity_ = nullptr;
     }
 
+    /**
+     * Address: 0x00576D60 (FUN_00576D60, the grow lane for the 0x38-byte
+     * `Moho::SFormationScriptSlot` -- recovers the live element count with the
+     * 92492493h magic and `sar 5`, which is a divide by 56, then reads the
+     * `{start_, end_, capacity_}` triple and relocates. Reached from both
+     * push_back (0x00576C80) and the copy constructor's rebind (0x00576F10).)
+     */
     /** Ensure capacity is at least newSize elements. */
     void Grow(size_t newSize)
     {
@@ -1125,6 +1149,14 @@ namespace gpg::core
       return this;
     }
 
+    /**
+     * Address: 0x00576F10 (FUN_00576F10, the rebind-and-copy lane for the
+     * 0x38-byte `Moho::SFormationScriptSlot`. Reached only from that type's
+     * fastvector copy constructor at 0x00576C20, and grows through 0x00576D60
+     * when the source outruns the twenty inline slots. Copies element-wise
+     * rather than by block because each slot carries an `EntityCategorySet`
+     * whose word lane has to be rebound to its own inline run.)
+     */
     // Reset to inline storage and copy from a plain FastVector view
     void ResetFrom(const FastVector<T>& src)
     {
