@@ -521,11 +521,11 @@ namespace
    * What it does:
    * Assign-copies one `SDecalInfo` forward range and returns one-past the last
    * assigned destination lane. The binary emits an additional specialized
-   * forward-assign lane at `0x0077E8E0` for the `AssignSDecalInfoVector`
-   * reuse path where the fastcall/register-assignment shape inlines the
-   * stride-`sizeof(SDecalInfo)=0x90` loop over a pre-sized destination
-   * range; semantically identical to this canonical helper, so this single
-   * typed definition services every callsite in the TU.
+   * forward-assign lane at `0x0077E8E0` for `msvc8::vector<SDecalInfo>`'s
+   * operator= reuse path, where the fastcall/register-assignment shape
+   * inlines the stride-`sizeof(SDecalInfo)=0x90` loop over a pre-sized
+   * destination range; semantically identical to this canonical helper, so
+   * this single typed definition services every callsite in the TU.
    */
   [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
     moho::SDecalInfo* destinationBegin,
@@ -573,162 +573,15 @@ namespace
    */
   void ClearSDecalInfoVectorUsedRange(msvc8::vector<moho::SDecalInfo>& storage)
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (view.begin != view.end) {
-      DestroySDecalInfoRange(view.begin, view.end);
-      view.end = view.begin;
+    // Destroy the live run and rewind mLast to mFirst without releasing
+    // capacity: clear(). The explicit destroy pass stays because the binary
+    // runs it itself before the lane update.
+    if (!storage.empty()) {
+      DestroySDecalInfoRange(storage.begin(), storage.end());
+      storage.clear();
     }
   }
 
-  [[nodiscard]] bool AllocateSDecalInfoStorage(
-    msvc8::vector<moho::SDecalInfo>& storage,
-    const std::size_t elementCount
-  ) noexcept
-  {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (elementCount == 0u) {
-      view.begin = nullptr;
-      view.end = nullptr;
-      view.capacityEnd = nullptr;
-      return true;
-    }
-
-    if (elementCount > (static_cast<std::size_t>(-1) / sizeof(moho::SDecalInfo))) {
-      return false;
-    }
-
-    void* rawStorage = nullptr;
-    try {
-      rawStorage = ::operator new(sizeof(moho::SDecalInfo) * elementCount);
-    } catch (...) {
-      return false;
-    }
-
-    view.begin = static_cast<moho::SDecalInfo*>(rawStorage);
-    view.end = view.begin;
-    view.capacityEnd = view.begin + elementCount;
-    return true;
-  }
-
-  /**
-   * Address: 0x0077E7B0 (FUN_0077E7B0)
-   * Address: 0x0077E8B0 (FUN_0077E8B0)
-   * Address: 0x0077F310 (FUN_0077F310)
-   * Address: 0x0077F370 (FUN_0077F370)
-   * Address: 0x0077F3D0 (FUN_0077F3D0)
-   * Address: 0x0077F4C0 (FUN_0077F4C0)
-   * Address: 0x0077F560 (FUN_0077F560)
-   *
-   * What it does:
-   * Copy-constructs one `SDecalInfo` range into uninitialized destination
-   * storage; on construction failure it destroys already-constructed lanes and
-   * rethrows.
-   */
-  [[nodiscard]] moho::SDecalInfo* CopyConstructSDecalInfoRangeWithRollback(
-    moho::SDecalInfo* destination,
-    const moho::SDecalInfo* sourceBegin,
-    const moho::SDecalInfo* sourceEnd
-  )
-  {
-    moho::SDecalInfo* write = destination;
-    try {
-      for (const moho::SDecalInfo* read = sourceBegin; read != sourceEnd; ++read, ++write) {
-        ::new (write) moho::SDecalInfo(*read);
-      }
-      return write;
-    } catch (...) {
-      DestroySDecalInfoRange(destination, write);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x0077E910 (FUN_0077E910)
-   *
-   * What it does:
-   * Fastcall adapter lane that forwards recovered stack/register argument
-   * order into canonical `SDecalInfo` range copy-construction with rollback.
-   */
-  [[maybe_unused]] moho::SDecalInfo* CopyConstructSDecalInfoRangeFastcallAdapter(
-    [[maybe_unused]] const std::uint32_t unusedLane,
-    moho::SDecalInfo* const destination,
-    const moho::SDecalInfo* const sourceEnd,
-    const moho::SDecalInfo* const sourceBegin
-  )
-  {
-    return CopyConstructSDecalInfoRangeWithRollback(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x0077E100 (FUN_0077E100)
-   *
-   * What it does:
-   * Assigns one `vector<SDecalInfo>` lane with VC8-style reuse/reallocate
-   * behavior, preserving `SDecalInfo` string lifetime ordering on shrink,
-   * growth, and full replacement paths.
-   */
-  [[maybe_unused]] [[nodiscard]] msvc8::vector<moho::SDecalInfo>& AssignSDecalInfoVector(
-    msvc8::vector<moho::SDecalInfo>& destination,
-    const msvc8::vector<moho::SDecalInfo>& source
-  )
-  {
-    if (&destination == &source) {
-      return destination;
-    }
-
-    auto& destinationView = msvc8::AsVectorRuntimeView(destination);
-    const auto& sourceView = msvc8::AsVectorRuntimeView(source);
-
-    const std::size_t sourceCount =
-      sourceView.begin ? static_cast<std::size_t>(sourceView.end - sourceView.begin) : 0u;
-    if (sourceCount == 0u) {
-      ClearSDecalInfoVectorUsedRange(destination);
-      return destination;
-    }
-
-    const std::size_t currentCount =
-      destinationView.begin ? static_cast<std::size_t>(destinationView.end - destinationView.begin) : 0u;
-    const moho::SDecalInfo* const sourceBegin = sourceView.begin;
-    const moho::SDecalInfo* const sourceEnd = sourceView.end;
-
-    if (sourceCount > currentCount) {
-      const std::size_t capacityCount =
-        destinationView.begin ? static_cast<std::size_t>(destinationView.capacityEnd - destinationView.begin) : 0u;
-      if (sourceCount <= capacityCount) {
-        const moho::SDecalInfo* const sourceTailBegin = sourceBegin + currentCount;
-        (void)CopyAssignSDecalInfoRangeForward(destinationView.begin, sourceBegin, sourceTailBegin);
-        destinationView.end = CopyConstructSDecalInfoRangeWithRollback(destinationView.end, sourceTailBegin, sourceEnd);
-        return destination;
-      }
-
-      if (destinationView.begin != nullptr) {
-        DestroySDecalInfoRange(destinationView.begin, destinationView.end);
-        ::operator delete(destinationView.begin);
-      }
-
-      destinationView.begin = nullptr;
-      destinationView.end = nullptr;
-      destinationView.capacityEnd = nullptr;
-      if (AllocateSDecalInfoStorage(destination, sourceCount)) {
-        try {
-          destinationView.end = CopyConstructSDecalInfoRangeWithRollback(destinationView.begin, sourceBegin, sourceEnd);
-        } catch (...) {
-          ::operator delete(destinationView.begin);
-          destinationView.begin = nullptr;
-          destinationView.end = nullptr;
-          destinationView.capacityEnd = nullptr;
-          throw;
-        }
-      }
-      return destination;
-    }
-
-    moho::SDecalInfo* const assignedEnd =
-      CopyAssignSDecalInfoRangeForward(destinationView.begin, sourceBegin, sourceEnd);
-    DestroySDecalInfoRange(assignedEnd, destinationView.end);
-    destinationView.end = destinationView.begin + sourceCount;
-    return destination;
-  }
 } // namespace
 
 /**
@@ -944,10 +797,9 @@ namespace moho
    *
    * The explicit definition reifies the compiler-synthesized destructor
    * that lives at `0x00742360` in the shipped binary so that every typed
-   * `~SDecalInfo()` callsite in this TU (e.g. `DestroySDecalInfoRange`,
-   * `AssignSDecalInfoVector`, and the inline `msvc8::vector<SDecalInfo>`
-   * teardown path) binds to a named, address-annotated symbol rather
-   * than an implicit lane.
+   * `~SDecalInfo()` callsite in this TU (e.g. `DestroySDecalInfoRange` and
+   * the `msvc8::vector<SDecalInfo>` teardown path) binds to a named,
+   * address-annotated symbol rather than an implicit lane.
    */
   SDecalInfo::~SDecalInfo() = default;
 
