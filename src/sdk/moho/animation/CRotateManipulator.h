@@ -46,6 +46,17 @@ namespace moho
     CRotateManipulator(const Wm3::Vector3f& axis, Sim* sim, CAniActor* ownerActor, int watchedBoneIndex);
 
     /**
+     * Address: 0x006436B0 (FUN_006436B0, Moho::CRotateManipulator::dtr)
+     *
+     * What it does:
+     * `CRotateManipulator` adds no data members needing separate teardown,
+     * so the vtable-slot-2 scalar deleting destructor just tail-calls
+     * `IAniManipulator::~IAniManipulator` then conditionally frees the
+     * object -- exactly what a defaulted destructor produces.
+     */
+    ~CRotateManipulator() override = default;
+
+    /**
      * Address: 0x00643860 (FUN_00643860, Moho::CRotateManipulator::MoveManipulator)
      *
      * What it does:

@@ -43,6 +43,17 @@ namespace moho
     CSlideManipulator(Sim* sim, CAniActor* ownerActor, int boneIndex);
 
     /**
+     * Address: 0x006470A0 (FUN_006470A0, Moho::CSlideManipulator::dtr)
+     *
+     * What it does:
+     * `CSlideManipulator` adds no data members needing separate teardown,
+     * so the vtable-slot-2 scalar deleting destructor just tail-calls
+     * `IAniManipulator::~IAniManipulator` then conditionally frees the
+     * object -- exactly what a defaulted destructor produces.
+     */
+    ~CSlideManipulator() override = default;
+
+    /**
      * Address: 0x00647300 (FUN_00647300, Moho::CSlideManipulator::MoveManipulator)
      *
      * What it does:

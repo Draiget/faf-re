@@ -40,6 +40,17 @@ namespace moho
     CSlaveManipulator(Sim* sim, CAniActor* ownerActor, int watchedBoneIndex, int sourceBoneIndex);
 
     /**
+     * Address: 0x00645FE0 (FUN_00645FE0, Moho::CSlaveManipulator::dtr)
+     *
+     * What it does:
+     * `CSlaveManipulator` adds no data members needing separate teardown,
+     * so the vtable-slot-2 scalar deleting destructor just tail-calls
+     * `IAniManipulator::~IAniManipulator` then conditionally frees the
+     * object -- exactly what a defaulted destructor produces.
+     */
+    ~CSlaveManipulator() override = default;
+
+    /**
      * Address: 0x00646140 (FUN_00646140, Moho::CSlaveManipulator::MoveManipulator)
      *
      * What it does:
