@@ -174,8 +174,6 @@ namespace
 
   /**
    * Address: 0x006224B0 (FUN_006224B0, CUnitRefuel::MemberDeserialize thunk)
-   * Address: 0x0063A290 (FUN_0063A290)
-   * Address: 0x0089BEA0 (FUN_0089BEA0)
    *
    * What it does:
    * Secondary load-callback forwarder to `CUnitRefuel::MemberDeserialize`.

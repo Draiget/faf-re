@@ -1430,6 +1430,12 @@ namespace msvc8
          * source, copy-assign-over-then-uninit-copy-the-excess when the source is
          * longer but fits in capacity, `_Tidy` + `_Buy` + `_Ucopy` when it does
          * not, and copy-assign-then-destroy-the-tail when the source is shorter)
+         * Address: 0x00548ED0 (FUN_00548ED0,
+         * msvc8::vector<Moho::ResourceDeposit>::operator=(const vector&) for
+         * the 20-byte element -- 148 instructions carrying the same VC8 assign
+         * shape, calling the `std::copy` lane FUN_00548C00 three times, once
+         * per branch. Reached from `RVectorType_ResourceDeposit::SerLoad`'s
+         * closing `*storage = loaded;`.)
          *
          * Copy assignment (strong exception safety)
          */
@@ -1593,6 +1599,13 @@ namespace msvc8
          * element-wise copy of the live range into it, free the old block,
          * rebase all three lanes. Reached from the delayed-sub-viz reflection
          * loader and from `operator=`'s _Buy path.)
+         * Address: 0x00547E00 (FUN_00547E00,
+         * msvc8::vector<Moho::ResourceDeposit>::reserve -- opens with the
+         * max_size guard against 0x0CCCCCCC, which is exactly
+         * `0xFFFFFFFF / 0x14`, then allocates, uninit-copies the live range
+         * through FUN_00549BC0, frees the old block and rebases the lanes.
+         * Reached from `RVectorType_ResourceDeposit::SerLoad` (0x00547950),
+         * which reserves the archived count before filling.)
          *
          * Reserve at least `newCap` elements without changing size.
          */
@@ -1668,8 +1681,23 @@ namespace msvc8
          * pair at 0x005C5497, growth tail-calling the `_Insert_n` lane
          * FUN_005C6F90 at 0x005C54D1 with `(mLast, newSize - size())`, shrink
          * tail-calling `erase(begin() + newSize, end())` (FUN_005C6F00) at
+         * Address: 0x006DC4E0 (FUN_006DC4E0,
+         * msvc8::vector<Moho::EntityCategorySet>::resize for the 0x28-byte
+         * element -- growth through the `_Insert_n` lane FUN_006DC600, shrink
+         * through the destroy lane FUN_006DBB50. Reached from
+         * `RVectorType<EntityCategorySet>::SetCount` (0x006DB410).)
          * 0x005C54F6. Reached from `Moho::CReconBlipManagerImpl`'s per-army
          * table sizing.)
+         * Address: 0x00547F20 (FUN_00547F20,
+         * msvc8::vector<Moho::ResourceDeposit>::resize for the 20-byte element
+         * -- `size()` via the 66666667h/`sar 3` divide-by-0x14 magic pair,
+         * growing through the `_Insert_n` lane FUN_00547FE0 and shrinking by
+         * recomputing `_Mylast` through the copy lane FUN_00548C00. Its caller
+         * `RVectorType_ResourceDeposit::SetCount` (0x00547650) shows the
+         * one-argument overload inlined into it: it reserves 0x14 stack bytes,
+         * zeroes all five dwords to build the `ResourceDeposit()` temporary,
+         * loads `edi`/`ebx` with the vector and the new count and falls into
+         * this body, which pops the by-value `_Val` with `retn 14h`.)
          *
          * What it does:
          * The VC8 `vector<T>::resize(_Newsize, _Val)` lane: grows by inserting
@@ -1801,6 +1829,20 @@ namespace msvc8
          * command-splat's icon-billboard world position for the batched
          * attack_btn_up.dds / teleport_btn_up.dds draw passes that follow the
          * main per-command-link loop)
+         * Address: 0x0053FC90 (FUN_0053FC90, msvc8::vector<Moho::SEjectRequest>::push_back
+         * for the 8-byte `{const CClientBase* mRequester, int mAfterBeat}` element —
+         * fast path checks capacity then tail-calls the shared grow-core
+         * (FUN_00540330) on overflow. Emitted via
+         * mEjectRequests.push_back(SEjectRequest(requester, afterBeat)) in
+         * Moho::CClientBase::AddOrUpdateEjectRequest (CClientBase.cpp))
+         *
+         * Address: 0x00859F70 (FUN_00859F70 — 0x10-byte element, the
+         * formation-preview ghost pair held by `gFormationPreviews` in
+         * `moho/sim/CWldSession.cpp`; identified by the `sar ecx, 4` /
+         * `sar esi, 4` pair that turns both the size and the capacity byte
+         * spans into element counts, and by the two out-of-line halves it
+         * calls — FUN_0085A920 for the in-place fast path and FUN_0085A0E0
+         * for the grow path)
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -1837,6 +1879,11 @@ namespace msvc8
 
         /**
          * Pop last (no check)
+         *
+         * Address: 0x00859FE0 (FUN_00859FE0 — 0x10-byte element, the
+         * formation-preview ghost pair; rewinds `last_` by one element and
+         * runs the pair's destructor. `CWldSession::RenderMeshPreviews` calls
+         * it when the renderer refuses the mesh instance it just appended.)
          */
         void pop_back() noexcept {
             --last_;
@@ -1910,6 +1957,8 @@ namespace msvc8
          * for UICommandGraph's MapAB hash-bucket table)
          * Address: 0x0082F680 (FUN_0082F680, the MapC emission of the same)
          * Address: 0x0082FB80 (FUN_0082FB80, the MapD emission of the same)
+         * Address: 0x0082DBA0 (FUN_0082DBA0, the HashListNode88 draw-node table's
+         * `mBuckets.assign(9, mListHead)` emission, UICommandGraph::PrepareForRebuild)
          *
          * What it does:
          * The VC8 `vector<T>::assign(_Count, _Val)` lane: copies `_Val` into a
@@ -2001,6 +2050,13 @@ namespace msvc8
          *
          * Erase a range [first,last). Returns iterator to the position that
          * now contains the element that followed the last erased element.
+         *
+         * Address: 0x0085A130 (FUN_0085A130 — 0x10-byte element, the
+         * formation-preview ghost pair. Shifts the tail down one slot at a
+         * time through FUN_0085A9F0 (`copy_or_move_assign`), destroys the
+         * retired span through FUN_0085A1D0 (`destroy_range`), then rebases
+         * `last_`. `CWldSession::RenderMeshPreviews` and `~CWldSession` both
+         * reach it as the whole-range `clear`.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -2376,6 +2432,14 @@ namespace msvc8
          * (SimDriver.cpp) routes here on the capacity-full path, where the
          * tail is empty and the gap fill runs with count == 1. The element's
          * push_back emission is cited on that method above, FUN_0067B780.)
+         * Address: 0x0067D320 (FUN_0067D320, msvc8::vector<Moho::SEntityVariableUpdateEntry>::_Insert_n
+         * grow-core for the same 0xD8-byte (216) element -- max_size guard
+         * `0xFFFFFFFF/216 = 19884107` overflow throw, 1.5x growth clamped to
+         * `size+1`, checked allocation, tail-shift via FUN_0067F9A0/FUN_0067F9E0,
+         * and the single-slot gap fill through the already-cited FUN_00680BD0.
+         * Reached from `Entity.cpp`'s sync-update insert path when
+         * `mEntityUpdates.push_back(...)`'s capacity-full branch grows the
+         * vector instead of filling in place.)
          * Address: 0x005C6F90 (FUN_005C6F90, msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n
          * grow lane for the 52-byte element (`4EC4EC4Fh`/`sar 4` divide-by-0x34
          * magic pair, max_size 0x4EC4EC4 = 0xFFFFFFFF/52, overflow throw through
@@ -2498,6 +2562,16 @@ namespace msvc8
          * (FUN_005C6F90) to tear down the old buffer)
          *
          * Destroy [first,last)
+         *
+         * Address: 0x006DEB80 (FUN_006DEB80,
+         * msvc8::vector<Moho::EntityCategorySet>::destroy_range -- for this
+         * element the destructor's whole job is releasing the bit-word
+         * fastvector, so the body rebinds each lane's words back to inline
+         * storage, freeing the heap block where one is active.)
+         * Address: 0x006DC5E0 (FUN_006DC5E0, register-shape adapter for FUN_006DEB80)
+         * Address: 0x0085A1D0 (FUN_0085A1D0 — 0x10-byte element, the
+         * formation-preview ghost pair; walks the span forward calling the
+         * pair's destructor, FUN_00859E90, on each slot)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -2544,6 +2618,31 @@ namespace msvc8
          * Address: 0x005C9EC0 (FUN_005C9EC0, the same specialisation emitted a
          * second time for FUN_005C6F90's in-place-insert branch, where it
          * copy-constructs the relocated tail past the old `mLast`)
+         * Address: 0x00549BC0 (FUN_00549BC0,
+         * msvc8::vector<Moho::ResourceDeposit>::uninit_copy_n for the 20-byte
+         * element -- copies five dwords per slot at stride 0x14, taking
+         * `[srcBegin, srcEnd)` on the stack and the destination cursor in
+         * `eax`. The `test eax, eax` guard sits *inside* the loop because the
+         * destination is freshly-allocated storage the compiler cannot prove
+         * non-null. Reached from `reserve` (FUN_00547E00).)
+         * Address: 0x00549A90 (FUN_00549A90, the identical 24-instruction body
+         * emitted a second time -- same mnemonics, same 60 bytes. This build
+         * did not fold them, so both COMDATs survive.)
+         * Address: 0x00548AB0 (FUN_00548AB0, register-shape adapter for FUN_00549BC0)
+         * Address: 0x00549480 (FUN_00549480, register-shape adapter for FUN_00549BC0)
+         * Address: 0x005498F0 (FUN_005498F0, register-shape adapter for FUN_00549BC0)
+         * Address: 0x00549A50 (FUN_00549A50, register-shape adapter for FUN_00549BC0)
+         * Address: 0x00549750 (FUN_00549750, source-first adapter for FUN_00549A90)
+         * Address: 0x00549940 (FUN_00549940, source-first adapter for FUN_00549A90)
+         * Address: 0x006E0400 (FUN_006E0400,
+         * msvc8::vector<Moho::EntityCategorySet>::uninit_copy_n for the
+         * 0x28-byte element -- copy-constructs each `BVSet`, writing the
+         * universe handle and the bit-set first-word index, rebinding the
+         * embedded `fastvector_n<unsigned int, 2>` to its inline storage and
+         * copying the source words through `gpg::fastvector_uint::cpy`
+         * (0x004028E0). On a partial range it tears the in-flight slots down
+         * and rethrows, which is the strong guarantee this member already
+         * provides.)
          *
          * Uninitialized copy N from src to dst
          */
@@ -2676,8 +2775,30 @@ namespace msvc8
          * lane -- copy-assigns `[srcBegin, srcEnd)` backward into
          * `[destEnd - n, destEnd)`; used by FUN_005C6F90's in-place branch to
          * shift the live tail right without overlap corruption)
+         * Address: 0x00548C00 (FUN_00548C00, the `std::copy` emission for the
+         * 20-byte `Moho::ResourceDeposit` -- the same five-dword stride-0x14
+         * loop as FUN_00549BC0 but with all three cursors in registers and
+         * **no** null guard, because here the destination is already-live
+         * storage. Used by `resize`'s shrink branch (FUN_00547F20, to compute
+         * the new `_Mylast`) and three times by `operator=` (FUN_00548ED0) for
+         * its assign-over-the-retained-prefix paths.)
          *
          * Assign n elements from src to dst (dst already constructed)
+         *
+         * Address: 0x006DE9F0 (FUN_006DE9F0, the `std::copy` emission for the
+         * 0x28-byte `Moho::EntityCategorySet` -- per-element `BVSet::operator=`,
+         * which copies the universe handle and first-word index and forwards the
+         * words to `gpg::fastvector_uint::cpy` at 0x004028E0)
+         * Address: 0x006DDA60 (FUN_006DDA60, register-shape adapter for FUN_006DE9F0)
+         * Address: 0x006DFAD0 (FUN_006DFAD0, the matching `std::copy_backward`
+         * emission -- same per-element assign, walked in reverse so an
+         * overlapping shift cannot corrupt the tail)
+         * Address: 0x006DDC50 (FUN_006DDC50, register-shape adapter for FUN_006DFAD0)
+         * Address: 0x006DEBF0 (FUN_006DEBF0, the same assign emitted a third
+         * time, bounded by the destination range rather than the source)
+         * Address: 0x0085A9F0 (FUN_0085A9F0 — 0x10-byte element, the
+         * formation-preview ghost pair; the single-slot shared-handle assign
+         * the erase shift-down loop at FUN_0085A130 drives)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -3054,6 +3175,17 @@ namespace msvc8
             std::uint32_t* insertPosition,
             std::uint32_t count,
             const std::uint32_t* valuePtr) noexcept;
+
+        /**
+         * Address: 0x007B4FA0 (FUN_007B4FA0), among others -- see the
+         * definition in Vector.cpp for the full address list.
+         *
+         * VC8's `_Allocate(count, (_Node*)0)` for the 28-byte red-black tree
+         * node, overflow guard included. Declared here so tree code outside
+         * this translation unit can buy nodes through the same checked lane
+         * the binary uses instead of open-coding `operator new`.
+         */
+        void* AllocateChecked28ByteElements(std::uint32_t count);
     } // namespace detail
 
     /**

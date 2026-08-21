@@ -7535,34 +7535,6 @@ std::int32_t CountElement12VectorRuntimeC(
 }
 
 /**
- * Address: 0x00867E90 (FUN_00867E90)
- * Address: 0x008B3130 (FUN_008B3130)
- *
- * What it does:
- * Resolves one equal-range pair in a flag-25 RB-map:
- * `outPair[0] = lower_bound(key)`, `outPair[1] = upper_bound(key)`.
- */
-MapNodeNil25Runtime** FindMapEqualRangeFlag25Runtime(
-  MapNodeNil25Runtime** const outPair,
-  LegacyMapStorageRuntime<MapNodeNil25Runtime>* const map,
-  const std::uint32_t* const keyLane
-) noexcept
-{
-  if (outPair == nullptr) {
-    return nullptr;
-  }
-
-  MapNodeNil25Runtime* head = nullptr;
-  if (map != nullptr) {
-    head = map->head;
-  }
-
-  const std::uint32_t key = keyLane != nullptr ? *keyLane : 0u;
-  FindMapEqualRangeByKeyRuntime(head, key, &outPair[0], &outPair[1]);
-  return outPair;
-}
-
-/**
  * Address: 0x0086DB30 (FUN_0086DB30)
  *
  * What it does:

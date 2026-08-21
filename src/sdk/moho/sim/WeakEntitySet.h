@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <new>
 
+#include "legacy/containers/Vector.h"
+
 namespace moho
 {
   class UserEntity;
@@ -135,6 +137,53 @@ namespace moho
      * "remove this command from every unit under the cursor" loop).
      */
     [[nodiscard]] static FindResult* Next(FindResult* cursor);
+
+    /**
+     * Address: 0x007AF740 (FUN_007AF740, sub_7AF740)
+     *
+     * What it does:
+     * Erases one half-open weak-set node range `[first,last)`. When the range
+     * is the full tree, it tears down the entire subtree in one pass and resets
+     * head links/size to the empty-state sentinel shape.
+     *
+     * Declared on the bare 12-byte header rather than on
+     * `SSelectionSetUserEntity`, because that is the object the binary hands
+     * these lanes: the body reads only `mHead` and writes only `mSize`, and the
+     * erase paths are reached with the per-army idle registries -- which are
+     * bare sets embedded in `UserArmy` at +0x1F8 and +0x204 -- exactly as often
+     * as with the session selection.
+     */
+    [[nodiscard]] SSelectionNodeUserEntity**
+      EraseRange(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* first, SSelectionNodeUserEntity* last);
+
+    /**
+     * Address: 0x007B0870 (FUN_007B0870, sub_7B0870)
+     *
+     * What it does:
+     * Recursively destroys one weak-set subtree and unlinks each node from its
+     * user-entity weak-owner intrusive lane before delete.
+     *
+     * Sits on the bare header for the same reason `EraseRange` does -- it is
+     * reached from the erase paths of every weak-entity set, and it reads no
+     * member state at all, only the nodes it is handed.
+     */
+    void DestroySubtree(SSelectionNodeUserEntity* node);
+
+    /**
+     * Address: 0x007B4640 (FUN_007B4640, `_Tree::_Buynode()`)
+     *
+     * What it does:
+     * Buys one raw tree node through the shared checked 28-byte allocator
+     * (0x007B4FA0) and brings it up in VC8's neutral state: all three links
+     * null, colour black, not a sentinel. The null tests the binary emits
+     * after each `lea` are compiler artifacts on a pointer it has just
+     * derived, and can never fire.
+     *
+     * Callers finish the node. `_Init` self-links it and flips `mIsSentinel`
+     * to make a head; the insert paths seat the links on the head and colour
+     * it red instead.
+     */
+    [[nodiscard]] static SSelectionNodeUserEntity* BuyNode();
   };
 
   static_assert(sizeof(WeakEntitySetUserEntity) == 0x0C, "WeakEntitySetUserEntity size must be 0x0C");
@@ -157,17 +206,17 @@ namespace moho
    */
   [[nodiscard]] inline SSelectionNodeUserEntity* AllocateWeakEntitySetHead()
   {
-    auto* const head = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
+    // VC8's `_Tree::_Init`: buy a neutral node, then self-link it and mark it
+    // the sentinel. The buy half is out-of-line in the binary at 0x007B4640,
+    // which already leaves the colour black and the pad bytes zeroed.
+    SSelectionNodeUserEntity* const head = WeakEntitySetUserEntity::BuyNode();
     head->mLeft = head;
     head->mParent = head;
     head->mRight = head;
     head->mKey = 0u;
     head->mEnt.mOwnerLinkSlot = nullptr;
     head->mEnt.mNextOwner = nullptr;
-    head->mColor = 1u;
     head->mIsSentinel = 1u;
-    head->pad_1A[0] = 0u;
-    head->pad_1A[1] = 0u;
     return head;
   }
 
