@@ -1855,9 +1855,19 @@ namespace msvc8
          * the linker uses to keep the symbol shape in the recovered binary.
          */
         void push_back(const T& value) {
-            ensure_grow_for(1);
-            new (static_cast<void*>(last_)) T(value);
-            ++last_;
+            // VC8 splits this in two and the binary keeps both halves out of
+            // line: when a slot is already spare it fills in place, otherwise
+            // it defers the whole grow-and-relocate to `insert(end(), value)`.
+            // Writing it as one `ensure_grow_for` + placement-new would be
+            // behaviourally identical but would stop the compiler emitting the
+            // single-element `insert` the binary calls, which is why the shape
+            // is preserved here rather than simplified.
+            if (size() < capacity()) {
+                uninit_fill_n(last_, 1u, value);
+                ++last_;
+            } else {
+                (void)insert(last_, value);
+            }
         }
 
         /** Push by rvalue */
@@ -2464,6 +2474,30 @@ namespace msvc8
          * invocation that keeps the canonical symbol shape in the recovered
          * binary.
          */
+        /**
+         * Address: 0x0067C750 (FUN_0067C750,
+         * msvc8::vector<Moho::SEntityVariableUpdateEntry>::insert(iterator,
+         * const T&) for the 0xD8-byte element -- recovers the insertion index
+         * with the 4BDA12F7h/`sar 6` divide-by-0xD8 magic pair *before* the
+         * insert, tail-calls the `_Insert_n` lane at 0x0067D320 with a count
+         * of one, then rebuilds the iterator as `first_ + off * 0xD8` because
+         * the insert may have reallocated. Reached from the grow half of
+         * `push_back` at 0x0067B780.)
+         *
+         * What it does:
+         * The VC8 single-element `insert`. The offset is captured up front and
+         * the iterator rebuilt from it afterwards, which is the only way the
+         * returned iterator survives a reallocation. The `size() == 0` guard
+         * mirrors the binary: on an empty vector `pos` may be null, so the
+         * difference is never taken.
+         */
+        iterator insert(const_iterator pos, const T& value) {
+            const std::size_t offset =
+                (size() == 0u) ? 0u : static_cast<std::size_t>(pos - first_);
+            (void)insert(pos, static_cast<std::size_t>(1), value);
+            return first_ + offset;
+        }
+
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
             const std::size_t offset = static_cast<std::size_t>(pos - first_);
