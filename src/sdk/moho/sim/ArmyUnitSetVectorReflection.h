@@ -46,7 +46,17 @@ namespace gpg
      * stride), via `gpg::RRef_EntitySetTemplate_Unit`.
      */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x007017E0 (FUN_007017E0, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::GetCount)
+     */
     size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x00701810 (FUN_00701810, gpg::RVectorType<Moho::SEntitySetTemplateUnit>::SetCount)
+     * VFTABLE: `??_7?$RVectorType@V?$EntitySetTemplate@VUnit@Moho@@@Moho@@@gpg@@6BRIndexed@gpg@@@`
+     * +0x8 (`gpg::RIndexed` sub-vtable), confirmed via data xref.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
