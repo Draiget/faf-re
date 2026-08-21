@@ -30,6 +30,17 @@ namespace moho
     );
 
     /**
+     * Address: 0x0053BA20 (FUN_0053BA20, Moho::CLocalClient::dtr)
+     *
+     * What it does:
+     * `CLocalClient` adds no data members of its own, so the vtable-slot-2
+     * scalar deleting destructor just tail-calls `CClientBase::~CClientBase`
+     * then conditionally frees the object -- exactly what a defaulted
+     * destructor produces for a derived class with no extra state.
+     */
+    ~CLocalClient() override = default;
+
+    /**
      * Address: 0x0053BA00 (FUN_0053BA00)
      * Address: 0x10129280 (sub_10129280)
      * Slot: 2
