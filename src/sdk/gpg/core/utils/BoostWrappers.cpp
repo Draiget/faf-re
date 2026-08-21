@@ -29,6 +29,7 @@
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/SConditionTriggerTypes.h"
+#include "moho/sim/STIMap.h"
 
 namespace moho
 {
@@ -4383,6 +4384,38 @@ namespace boost
   }
 
   /**
+   * Address: 0x005791D0 (FUN_005791D0, boost::detail::sp_counted_impl_p<Moho::CHeightField>::dispose)
+   *
+   * What it does:
+   * Deletes one owned `CHeightField` pointee bound to this shared-count
+   * control lane when present. The real asm (`mov esi,[ecx+0Ch]; test
+   * esi,esi; jz +5; call sub_579250`) reads `countedImpl->px` at control-block
+   * offset +0x0C (confirmed against `SpCountedImplStorage<PointeeT>::px`),
+   * and passes it to the callee in `esi` with no explicit push -- an
+   * `@<esi>`-register `this` convention, not a stack argument.
+   *
+   * The callee, `FUN_00579250` (0x00579250), is the compiler's own re-inlined
+   * clone of `CHeightField::~CHeightField()` (0x004784F0 / 0x00478420):
+   * it releases `mGrids`'s tier range through the same per-tier
+   * `operator delete[]` loop already recovered as
+   * `DestroyHeightFieldTierRangeVariant1` (0x00478910), frees the vector's
+   * backing buffer, then `delete[]`s the base `data` sample array -- but
+   * unlike the standalone destructor, it *also* finishes with
+   * `operator delete(this)`, because this is the compiled body of
+   * `boost::checked_delete(px)` (a full `delete px;` expression), not a bare
+   * destructor call. `delete countedImpl->px` below reproduces that exact
+   * sequence through the real recovered destructor plus a compiler-emitted
+   * `operator delete`, matching FUN_00579250's observable behavior without
+   * duplicating its logic a second time in source.
+   */
+  void SpCountedImplPDisposeCHeightField(
+    SpCountedImplStorage<moho::CHeightField>* const countedImpl
+  ) noexcept
+  {
+    DisposeSpCountedImplPointee(countedImpl);
+  }
+
+  /**
    * Address: 0x005CC7E0 (FUN_005CC7E0, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::dispose)
    *
    * What it does:
@@ -4697,6 +4730,24 @@ namespace boost
   ) noexcept
   {
     DestroySpCountedImplSelf(self);
+  }
+
+  /**
+   * Address: 0x0054EDD0 (FUN_0054EDD0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::get_deleter)
+   *
+   * What it does:
+   * Returns the stored raw-function deleter lane at offset `+0x10` when the
+   * queried `type_info` matches `void (__cdecl *)(void *)`.
+   */
+  void* SpCountedImplPdGetDeleterCAniDefaultSkelFunctionDeleter(
+    SpCountedImplStorage<void>* const countedImpl,
+    const detail::sp_typeinfo& requestedType
+  ) noexcept
+  {
+    if (!detail::sp_typeinfo_equal(requestedType, BOOST_SP_TYPEID(void (*)(void*)))) {
+      return nullptr;
+    }
+    return GetSpCountedImplPdDeleterStorage(countedImpl);
   }
 
   /**
