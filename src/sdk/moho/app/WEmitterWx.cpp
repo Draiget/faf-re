@@ -817,13 +817,7 @@ namespace
   // named member through the sanctioned runtime view (no raw `this + 0xNN`).
   void ReleaseCurvePanelVectorStorage(msvc8::vector<moho::WCurveEditorPanel*>& curvePanels) noexcept
   {
-    auto& view = msvc8::AsVectorRuntimeView(curvePanels);
-    if (view.begin != nullptr) {
-      ::operator delete(static_cast<void*>(view.begin));
-    }
-    view.begin = nullptr;
-    view.end = nullptr;
-    view.capacityEnd = nullptr;
+    curvePanels = msvc8::vector<moho::WCurveEditorPanel*>{};
   }
 
   [[nodiscard]] double ParseWideDouble(const wchar_t* const text) noexcept
@@ -892,17 +886,6 @@ namespace
     return effect;
   }
 
-  [[nodiscard]] std::size_t CurvePanelCount(
-    const msvc8::vector_runtime_view<moho::WCurveEditorPanel*>& curvePanelView
-  ) noexcept
-  {
-    if (curvePanelView.begin == nullptr) {
-      return 0u;
-    }
-
-    return static_cast<std::size_t>(curvePanelView.end - curvePanelView.begin);
-  }
-
   void ApplyTextFloatParam(
     moho::IEffect& effect,
     const moho::WEmitterTextControl* const control,
@@ -936,10 +919,9 @@ namespace
 
   void ApplyCurvePayloads(moho::IEffect& effect, const moho::WEmitterWx& editor) noexcept
   {
-    const auto& curvePanelView = msvc8::AsVectorRuntimeView(editor.mCurvePanels);
-    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    const std::size_t curveCount = editor.mCurvePanels.size();
     for (std::size_t i = 0; i < curveCount; ++i) {
-      moho::WCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
+      moho::WCurveEditor* const curveEditor = editor.mCurvePanels[i]->mCurveEditor;
       curveEditor->MarkCurveClean();
       effect.SetNParam(
         static_cast<std::int32_t>(i),
@@ -959,10 +941,9 @@ namespace
     editor.mCachedRepeatTime = repeatTime;
     const float repeatTimeFloat = static_cast<float>(repeatTime);
 
-    const auto& curvePanelView = msvc8::AsVectorRuntimeView(editor.mCurvePanels);
-    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    const std::size_t curveCount = editor.mCurvePanels.size();
     for (std::size_t i = 0; i < curveCount; ++i) {
-      curvePanelView.begin[i]->mCurveEditor->ResetCurveXRange(repeatTimeFloat);
+      editor.mCurvePanels[i]->mCurveEditor->ResetCurveXRange(repeatTimeFloat);
     }
 
     effect.SetFloatParam(kParamRepeatTime, repeatTimeFloat);
@@ -1489,10 +1470,9 @@ namespace moho
     pushPath(mTextureNameControl, mTexturePath, effect->GetStringParam(0));
     pushPath(mRampNameControl, mRampTexturePath, effect->GetStringParam(1));
 
-    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
-    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    const std::size_t curveCount = mCurvePanels.size();
     for (std::size_t i = 0; i < curveCount; ++i) {
-      WCurveEditor* const curveEditor = curvePanelView.begin[i]->mCurveEditor;
+      WCurveEditor* const curveEditor = mCurvePanels[i]->mCurveEditor;
       const auto* const curve =
         reinterpret_cast<const SEfxCurve*>(effect->GetCurveParam(static_cast<std::int32_t>(i)));
       if (curve != nullptr) {
@@ -1582,10 +1562,9 @@ namespace moho
     const msvc8::string rampPath = gpg::STR_WideToUtf8(mRampTexturePath.m_pchData);
     line = gpg::STR_Printf("\tRampTexture = [[%s]],\n", rampPath.c_str());
 
-    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
-    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    const std::size_t curveCount = mCurvePanels.size();
     for (std::size_t i = 0; i < curveCount; ++i) {
-      curvePanelView.begin[i]->mCurveEditor->FormatCurveScript();
+      mCurvePanels[i]->mCurveEditor->FormatCurveScript();
     }
 
     line = gpg::STR_Printf("}\n\n");
@@ -1674,10 +1653,9 @@ namespace moho
 
   void WEmitterWx::OnCurveEdited()
   {
-    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
-    const std::size_t curveCount = CurvePanelCount(curvePanelView);
+    const std::size_t curveCount = mCurvePanels.size();
     for (std::size_t i = 0; i < curveCount; ++i) {
-      curvePanelView.begin[i]->RefreshFieldsFromCurve();
+      mCurvePanels[i]->RefreshFieldsFromCurve();
     }
 
     RefreshPreviewEmitter();
@@ -2162,9 +2140,8 @@ namespace moho
   WEmitterWx::~WEmitterWx()
   {
     // (1) Delete each live curve panel through its scalar-deleting destructor.
-    const auto& curvePanelView = msvc8::AsVectorRuntimeView(mCurvePanels);
-    for (WCurveEditorPanel* const* cursor = curvePanelView.begin; cursor != curvePanelView.end; ++cursor) {
-      if (WCurveEditorPanel* const panel = *cursor) {
+    for (WCurveEditorPanel* const panel : mCurvePanels) {
+      if (panel != nullptr) {
         (void)panel->DeleteWithFlag(1);
       }
     }
