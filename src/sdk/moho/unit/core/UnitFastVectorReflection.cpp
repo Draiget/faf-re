@@ -457,6 +457,8 @@ namespace gpg
     ResizeFastVectorWeakPtrRuntime<moho::Entity>(vec, static_cast<std::size_t>(count));
   }
 
+  RFastVectorType<moho::ReconBlip*>::~RFastVectorType() = default;
+
   /**
    * Address: 0x006AE630 (FUN_006AE630, gpg::RFastVectorType_ReconBlip_P::GetName)
    */

@@ -70,6 +70,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006B1910 (FUN_006B1910, gpg::RFastVectorType_ReconBlip_P::dtr)
+     */
+    ~RFastVectorType() override;
+
+    /**
      * Address: 0x006AE630 (FUN_006AE630, gpg::RFastVectorType_ReconBlip_P::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
