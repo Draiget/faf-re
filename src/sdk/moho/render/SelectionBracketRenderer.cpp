@@ -472,4 +472,27 @@ namespace moho
 
     batcher->Flush();
   }
+
+  /**
+   * Address: 0x007FDAB0 (FUN_007FDAB0, sub_7FDAB0)
+   *
+   * What it does:
+   * Empties `sSelectionBrackets` in place, keeping its head sentinel.
+   *
+   * The binary open-codes the full-tree teardown - `DestroySubtree(head->
+   * mParent)` at 0x007FDABE, then `head->mParent = head->mLeft = head->mRight
+   * = head` and `mSize = 0` at 0x007FDAC3-0x007FDAE1. That is precisely the
+   * one-pass branch `EraseRange` takes when the range spans the whole tree,
+   * and `DestroySubtree` is private to the set, so the erase is reached
+   * through the owning public API rather than duplicated here.
+   *
+   * The head is dereferenced with no null guard, matching the binary: the
+   * global set is head-allocated at startup and this lane never sees an
+   * unbuilt set.
+   */
+  void ClearSelectionBrackets()
+  {
+    SSelectionNodeUserEntity* cursor = sSelectionBrackets.mHead->mLeft;
+    (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+  }
 } // namespace moho

@@ -3,18 +3,22 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
+
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/math/Vector3f.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
 {
   class CameraImpl;
-  class CD3DDynamicTextureSheet;
   class CD3DPrimBatcher;
   class CGeomSolid3;
   class CWldSession;
+  class CWldTerrainDecal;
   class IDecalManager;
+  class RD3DTextureResource;
   struct SSelectionSetUserEntity;
 
   // Global selection-bracket weak-set, defined in moho/ui/UiRuntimeTypes.cpp.
@@ -338,47 +342,32 @@ namespace moho
    * destructor at 0x008641C0, so the vtable is constructor-anchored. Slot
    * map read from the shipped PE:
    *   +0x00  0x00864C90  scalar deleting destructor  -> `DeleteWithFlag`
-   *   +0x04  0x00864340  `DragMove`                  (override, NOT YET
-   *          recovered here - see the doc note below)
+   *   +0x04  0x00864340  `DragMove`                  (override)
    *   +0x08  0x00863870  `SelectionDragger::DragRelease` (inherited)
    *   +0x0C  0x0078DB80  `IMauiDragger::OnCurrentDraggerReplaced` (inherited)
    *   +0x10  0x00864C80  `Render`                    (override, empty body)
    *   +0x14  0x00864670  `BuildSelectionSolid`       (override)
    *   +0x18  0x00864320  `HasActiveSelectionDrag`    (override)
    *
-   * NOT YET RECOVERED: `DragMove` (0x00864340) and the derived destructor
-   * body (0x008641C0). Both center on `field_0x34`/`field_0x38` and
-   * `field_0x3C`/`field_0x40` below, which the disassembly proves are used
-   * two different ways: `DragMove` (0x00864340) writes fresh decal-transform
-   * data through them, and the destructor both (a) passes
-   * `field_0x34 - 4`/`field_0x3C - 4` to a virtual "destroy" call reached
-   * through the cached decal manager, *and* (b) separately walks and unlinks
-   * `field_0x34`/`field_0x3C` themselves as intrusive-list node addresses
-   * through the exact generic drain helper `SelectionDragger`'s own base
-   * destructor uses for its `IMauiDragger` weak head (0x008642A5-0x8642DE
-   * mirrors 0x00864090's shape exactly). That dual use is consistent with
-   * each pair being a `WeakPtr`-shaped weak reference into a
-   * `CWldTerrainDecal`'s own intrusive weak-observer chain (matching this
-   * codebase's `WeakObject`/`WeakPtr_*` family), not a pair of independent
-   * scalars - but pinning down the exact owning type needs the same
-   * `IDecalManager`/decal-lifetime evidence pass `DragMove` needs, so it is
-   * deferred together with `DragMove` rather than guessed here.
+   * The two `WeakPtr<CWldTerrainDecal>` lanes below were previously modelled
+   * as four opaque dwords (`field_0x34`..`field_0x40`) because the earlier
+   * pass could not tell a weak-reference pair from two independent scalars.
+   * `SetTextures` (0x00864950) settles it: every read of `+0x34`/`+0x3C` in
+   * both this class's bodies is the `p ? p - 4 : 0` null-checked downcast
+   * MSVC emits for a base-subobject-to-derived conversion, and every write
+   * goes through 0x008679E0 - a generic node relink that upcasts its
+   * argument with `p ? p + 4 : 0`, unlinks the node from its previous
+   * owner's chain, and pushes it onto the new owner's head slot. That is
+   * exactly `moho::WeakPtr<T>::ResetFromOwnerLinkSlot`, and the +4 owner-link
+   * offset is `CWldTerrainDecal::mLinkHead`.
    *
-   * `DragMove` additionally touches an unrecovered
-   * `Moho::SelectionDragger3D::SetTextures` and collects entities into the
-   * shared `sSelectionBrackets` weak-set through a *second*,
-   * still-unrecovered container type the decompiler names
-   * `Moho::WeakSet_UserEntity` (distinct from this file's
-   * `SSelectionSetUserEntity`) plus three more unrecovered helpers
-   * (`FUN_007B08D0`, `FUN_007AF740`, `FUN_007FDAB0`).
-   *
-   * Until that cluster is resolved, this class declares no destructor of its
-   * own (the compiler-generated implicit one runs, which still correctly
-   * chains into the base `~SelectionDragger()`) and inherits
-   * `IMauiDragger::DragMove`'s empty body. Both are known, documented
-   * fidelity gaps - the dragger will not paint/update its 3D highlight
-   * decals, and destroying one will not release its two highlight-decal weak
-   * references or its highlight-texture shared-pointer lane - not oversights.
+   * STILL NOT RECOVERED: the derived destructor body (0x008641C0), which
+   * releases both decals through the cached manager and drains the two weak
+   * lanes. The compiler-generated implicit destructor runs instead (it still
+   * chains correctly into the base `~SelectionDragger()` and now also runs
+   * the two `WeakPtr` and the `boost::shared_ptr` member destructors, which
+   * the raw-dword model could not) - so the remaining gap is narrower than
+   * before: the two decals are not handed back to the decal manager.
    */
   class SelectionDragger3D : public SelectionDragger
   {
@@ -416,6 +405,50 @@ namespace moho
     SelectionDragger3D* DeleteWithFlag(std::uint8_t deleteFlags) noexcept;
 
     /**
+     * Address: 0x00864340 (FUN_00864340, Moho::SelectionDragger3D::Func2)
+     * Mangled: vtable slot +0x04 of ??_7SelectionDragger3D@Moho@@6B@ (0x00E47A28)
+     *
+     * IDA signature:
+     * void __thiscall Moho::SelectionDragger3D::Func2(
+     *     Moho::SelectionDragger3D *this, Moho::SMauiEventData *a2);
+     *
+     * What it does:
+     * Tracks one pointer-drag step of the volumetric selection dragger:
+     * latches `mStretch` once the cursor passes the click threshold,
+     * unprojects the cursor onto the terrain surface, and - on the first
+     * valid sample - anchors `mPos` there; on every later sample it stores
+     * the surface point as `mDragEndPos`, refreshes the two highlight decals
+     * so they span the heading-aligned box between anchor and cursor, and
+     * rebuilds the global `sSelectionBrackets` set from everything the drag
+     * volume covers.
+     *
+     * Invocation: vtable slot +0x04 of `??_7SelectionDragger3D@Moho@@6B@`.
+     * The dispatch site is 0x008638A3 (`call edx` with `edx = [[this]+4]`)
+     * inside `SelectionDragger::DragRelease` (0x00863870), which forwards
+     * the release event through the dragger's own `DragMove` before
+     * resolving the selection.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x00864950 (FUN_00864950, Moho::SelectionDragger3D::SetTextures)
+     *
+     * IDA signature:
+     * void __stdcall Moho::SelectionDragger3D::SetTextures(
+     *     Moho::SelectionDragger3D *a1);
+     *
+     * What it does:
+     * Lazily creates this dragger's two terrain highlight decals - one
+     * `WldTerrainDecalType_Albedo` for land and one
+     * `WldTerrainDecalType_WaterAlbedo` for water, so the highlight paints on
+     * both surfaces - binds the shared selection texture to each, disables
+     * their flatness optimization and LOD/dissolve cutoffs, and raises both
+     * to the front of the manager's draw order. Returns immediately once the
+     * decals exist, so repeated `DragMove` calls create them only once.
+     */
+    void SetTextures();
+
+    /**
      * Address: 0x00864C80 (FUN_00864C80, Moho::SelectionDragger3D::Func4)
      * Mangled: vtable slot +0x10 of ??_7SelectionDragger3D@Moho@@6B@
      *
@@ -431,10 +464,15 @@ namespace moho
      *
      * What it does:
      * Builds one oriented world-space capsule/box between the inherited
-     * `mPos` (current cursor world position, continuously updated while the
-     * drag is live) and `mDragEndPos` (the drag's other endpoint), aligned to
-     * the active camera's heading via `COORDS_Orient`/`MultQuadVec`, and
-     * wraps it in a `CGeomSolid3`.
+     * `mPos` and `mDragEndPos`, aligned to the active camera's heading via
+     * `COORDS_Orient`/`MultQuadVec`, and wraps it in a `CGeomSolid3`.
+     *
+     * Which endpoint is which is settled by `DragMove` (0x00864340): `mPos`
+     * is the *anchor*, latched once at 0x008643F7 by the first drag sample
+     * that lands on a valid surface while `mPos` is still the invalid
+     * sentinel, and left alone afterwards; `mDragEndPos` is the endpoint
+     * rewritten on every later sample (0x00864425). An earlier revision of
+     * this comment had the two the other way round.
      */
     [[nodiscard]] CGeomSolid3 BuildSelectionSolid() const override;
 
@@ -453,28 +491,41 @@ namespace moho
     Wm3::Vector3f mDragEndPos; // +0x28
 
     /**
-     * Two highlight-decal weak-reference slots (`field_0x34`/`field_0x38` and
-     * `field_0x3C`/`field_0x40`), each zero-initialized here and otherwise
-     * only written by the not-yet-recovered `DragMove` (0x00864340) and read
-     * by the not-yet-recovered derived destructor (0x008641C0) - see the
-     * class doc comment for what the disassembly shows about their shape and
-     * why they are not yet typed more precisely than raw dwords.
+     * The land-surface highlight decal (`WldTerrainDecalType_Albedo`), held
+     * weakly: the decal is owned by the decal manager, and this lane is only
+     * an observer that the decal's own teardown can blank.
+     *
+     * `SetTextures` (0x00864950) binds it with 0x008679E0 - the generic weak
+     * relink whose `owner + 4` upcast and `slot - 4` downcast identify it as
+     * `moho::WeakPtr<T>` over an owner whose weak head sits at +0x04, i.e.
+     * `CWldTerrainDecal::mLinkHead`.
      */
-    std::uint32_t field_0x34; // +0x34
-    std::uint32_t field_0x38; // +0x38
-    std::uint32_t field_0x3C; // +0x3C
-    std::uint32_t field_0x40; // +0x40
+    WeakPtr<CWldTerrainDecal> mAlbedoDecal; // +0x34
 
     /**
-     * Highlight texture shared-pointer lane. Zero-initialized here; released
-     * through `boost::SharedPtrRaw<T>::release()` in the binary's derived
-     * destructor (0x008641C0, matching its inlined `sp_counted_base::
-     * release()`/`weak_release()` chain at 0x0086427B-0x008642A5; see
-     * `Moho::WeakPtr_CD3DDynamicTextureSheet::Release`, 0x00422B80, cited
-     * from `FUN_008640F0`'s callee list) - not yet recovered here, see the
-     * class doc comment.
+     * The water-surface highlight decal (`WldTerrainDecalType_WaterAlbedo`),
+     * bound the same way at 0x00864B28-0x00864B53. Both decals carry the same
+     * texture and the same transform; only `mType` differs, so the highlight
+     * paints over land and water alike.
      */
-    boost::SharedPtrRaw<CD3DDynamicTextureSheet> mHighlightTexture; // +0x44
+    WeakPtr<CWldTerrainDecal> mWaterAlbedoDecal; // +0x3C
+
+    /**
+     * Highlight texture shared-pointer lane, owned by this dragger.
+     *
+     * `SetTextures` assigns it from
+     * `D3D_GetDevice()->GetResources()->GetTexture(...)` at
+     * 0x008649B3-0x008649DC: the returned handle's `px`/`pi` pair is copied
+     * into +0x44/+0x48, the new count is `lock xadd`-incremented and the old
+     * one released through `sp_counted_base::release()` (0x004229B0) - a
+     * plain `boost::shared_ptr` assignment, which is what fixes the element
+     * type. The earlier `SharedPtrRaw<CD3DDynamicTextureSheet>` model
+     * predates that evidence; `GetTexture`'s return type is
+     * `boost::shared_ptr<RD3DTextureResource>` (`ID3DDeviceResources::
+     * TextureResourceHandle`). Both models are 8 bytes, so the layout is
+     * unchanged.
+     */
+    boost::shared_ptr<RD3DTextureResource> mHighlightTexture; // +0x44
 
     /**
      * Cached decal manager for this dragger's owning terrain resource
@@ -490,14 +541,10 @@ namespace moho
                 "SelectionDragger3D::mStretch offset must be 0x24");
   static_assert(offsetof(SelectionDragger3D, mDragEndPos) == 0x28,
                 "SelectionDragger3D::mDragEndPos offset must be 0x28");
-  static_assert(offsetof(SelectionDragger3D, field_0x34) == 0x34,
-                "SelectionDragger3D::field_0x34 offset must be 0x34");
-  static_assert(offsetof(SelectionDragger3D, field_0x38) == 0x38,
-                "SelectionDragger3D::field_0x38 offset must be 0x38");
-  static_assert(offsetof(SelectionDragger3D, field_0x3C) == 0x3C,
-                "SelectionDragger3D::field_0x3C offset must be 0x3C");
-  static_assert(offsetof(SelectionDragger3D, field_0x40) == 0x40,
-                "SelectionDragger3D::field_0x40 offset must be 0x40");
+  static_assert(offsetof(SelectionDragger3D, mAlbedoDecal) == 0x34,
+                "SelectionDragger3D::mAlbedoDecal offset must be 0x34");
+  static_assert(offsetof(SelectionDragger3D, mWaterAlbedoDecal) == 0x3C,
+                "SelectionDragger3D::mWaterAlbedoDecal offset must be 0x3C");
   static_assert(offsetof(SelectionDragger3D, mHighlightTexture) == 0x44,
                 "SelectionDragger3D::mHighlightTexture offset must be 0x44");
   static_assert(offsetof(SelectionDragger3D, mDecalManager) == 0x4C,

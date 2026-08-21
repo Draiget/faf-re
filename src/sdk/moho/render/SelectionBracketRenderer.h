@@ -131,4 +131,29 @@ namespace moho
     float interpolationAlpha,
     float elapsedSeconds
   );
+
+  /**
+   * Address: 0x007FDAB0 (FUN_007FDAB0, sub_7FDAB0)
+   *
+   * IDA signature:
+   * int __cdecl sub_7FDAB0();
+   *
+   * What it does:
+   * Empties the process-global `sSelectionBrackets` weak-set in place,
+   * keeping its head sentinel: destroys the whole node subtree and resets the
+   * head's parent/left/right links back to the empty-state self-reference
+   * plus a zero size. The full-range `EraseRange` below takes exactly that
+   * one-pass path, which is where the binary's direct `DestroySubtree` call
+   * at 0x007FDABE plus the 0x007FDAC3-0x007FDAE1 head reset come from.
+   *
+   * Lives here rather than with the dragger because 0x007FDAB0 sits directly
+   * after this module's own bodies (`RenUI` 0x007FD490, the blinky-box lane
+   * ending 0x007FDA..) and well away from the 0x0086xxxx dragger cluster,
+   * and because this module is the one that owns the bracket set.
+   *
+   * Invocation: `SelectionDragger3D::DragMove` (0x00864340) calls it at
+   * 0x008645AF, once per drag step, to drop the previous step's brackets
+   * before repopulating them. It is the set's only code xref.
+   */
+  void ClearSelectionBrackets();
 } // namespace moho
