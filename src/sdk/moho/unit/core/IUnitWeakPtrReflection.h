@@ -110,6 +110,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00572080 (FUN_00572080, gpg::RFastVectorType_WeakPtr_IUnit::dtr)
+     */
+    ~RFastVectorType() override;
+
+    /**
      * Address: 0x0056BDF0 (FUN_0056BDF0, FA), 0x1015A110 (MohoEngine)
      *
      * What it does:
