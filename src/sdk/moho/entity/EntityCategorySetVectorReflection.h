@@ -23,6 +23,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006DE040 (FUN_006DE040, gpg::RVectorType_BVSet_RBlueprint_P_EntityCategoryHelper::dtr)
+     */
+    ~RVectorType() override;
+
+    /**
      * Address: 0x006DB280 (FUN_006DB280, gpg::RVectorType_BVSet_PRBlueprint::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
