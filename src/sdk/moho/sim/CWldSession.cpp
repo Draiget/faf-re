@@ -13934,6 +13934,103 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B1270 (FUN_008B1270,
+   * ?ISSUE_RemoveLastCommand@Moho@@YAXABV?$fastvector@PAVUserUnit@Moho@@@gpg@@@Z)
+   *
+   * IDA signature:
+   * void __cdecl Moho::ISSUE_RemoveLastCommand(gpg::fastvector<Moho::UserUnit *> const &);
+   *
+   * What it does:
+   * For each unit in `units`: resolves its command queue's most-recently
+   * queued command helper (backward null-skip scan via
+   * `GetUserUnitManagerLastQueuedHelper`), skipping units with no queue or
+   * no queued helper at all. For each match: tells the active sim driver
+   * to remove that command from the unit's server-side queue (by CmdId +
+   * EntId), then records the removal locally via
+   * `RecordUnitManagerCommandHelperRemoval` (UserUnit.h) - see that
+   * declaration's doc comment for the `unitCount` tag-value oddity both
+   * call sites here share. Finally marks the session's UI command graph
+   * dirty so the graph overlay redraws.
+   *
+   * Invocation: sole caller is the `WeakSet<UserEntity>` overload of
+   * `Moho::ISSUE_RemoveLastCommand` (FUN_008B1390, recovered alongside
+   * this one, below), which calls it by name a few lines down - itself
+   * pending its own sole caller `Moho::SCommandModeData::HandleEvent`
+   * (FUN_0081FCD0, not yet recovered - see the note on
+   * `CanRestartMoveCommandAsPatrol` above). This overload therefore has a
+   * real recovered source-level caller in this same commit and is not
+   * `[[maybe_unused]]`.
+   */
+  void ISSUE_RemoveLastCommand(const gpg::fastvector<UserUnit*>& units)
+  {
+    const std::int32_t unitCount = static_cast<std::int32_t>(units.Size());
+
+    for (UserUnit* const unit : units) {
+      if (unit == nullptr) {
+        continue;
+      }
+
+      UserCommandQueue* const manager = unit->GetCommandQueue();
+      UserCommandIssueHelper* const lastHelper = GetUserUnitManagerLastQueuedHelper(manager);
+      if (lastHelper == nullptr) {
+        continue;
+      }
+
+      const EntId entityId = unit->mParams.mEntityId;
+      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+        (void)simDriver->RemoveCommandFromUnitQueue(lastHelper->mConstantData.cmd, entityId);
+      }
+
+      RecordUnitManagerCommandHelperRemoval(lastHelper, manager, unitCount);
+    }
+
+    if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+      session->DirtyCommandGraph();
+    }
+  }
+
+  /**
+   * Address: 0x008B1390 (FUN_008B1390,
+   * ?ISSUE_RemoveLastCommand@Moho@@YAXABV?$WeakSet@VUserEntity@Moho@@@1@@Z)
+   *
+   * IDA signature:
+   * void __usercall Moho::ISSUE_RemoveLastCommand(Moho::WeakSet_UserEntity *a1@<ebx>);
+   *
+   * What it does:
+   * Collects every live `UserUnit` in `entities` into a
+   * `gpg::fastvector<UserUnit*>` (reserving up front for the weak-set's
+   * live size) and forwards to the `gpg::fastvector<UserUnit*>` overload
+   * of `ISSUE_RemoveLastCommand` (FUN_008B1270, above).
+   *
+   * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+   * (FUN_0081FCD0, not yet recovered - see the note on
+   * `CanRestartMoveCommandAsPatrol` above).
+   */
+  [[maybe_unused]] void ISSUE_RemoveLastCommand(SSelectionSetUserEntity& entities)
+  {
+    gpg::fastvector<UserUnit*> units{};
+    units.reserve(static_cast<std::size_t>(entities.size()));
+
+    if (SSelectionNodeUserEntity* const head = entities.mHead; head != nullptr) {
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&entities, node, &node);
+
+      while (node != head) {
+        if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
+          if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
+            units.push_back(unit);
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&entities, node, &node);
+      }
+    }
+
+    ISSUE_RemoveLastCommand(units);
+  }
+
+  /**
    * Address: 0x0083E150 (FUN_0083E150, func_UserScriptCommandObj)
    *
    * What it does:

@@ -5186,6 +5186,58 @@ namespace
     );
   }
 
+  // Local command-issue update event type used for "deselect unit" events
+  // (0x008B48F1: `mov ecx, 3` feeding InitializeCommandIssueUpdateEvent) -
+  // the DeselectUnit complement of kCommandIssueUpdateEventTypeSelectUnit.
+  constexpr std::uint32_t kCommandIssueUpdateEventTypeDeselectUnit = 3u;
+
+  /**
+   * Address: 0x008B4880 (FUN_008B4880, sub_8B4880)
+   *
+   * What it does:
+   * Structural mirror of QueueCommandIssueSelectUnitEventImpl (FUN_008B4720)
+   * with eventType=3 instead of 0: appends a "deselect unit" local update
+   * event into the helper's local ring queue when the queue is empty, or
+   * when the last event is not already a deselect-event (eventType != 3)
+   * for this command id, then inserts `unit` into that last event's
+   * weak-set. Unlike its select-unit sibling, the binary's own rebuild path
+   * (0x008B491D) tears the temporary down through the real
+   * `DestroyCommandIssueLocalEvent` (0x008B4800, UserUnit.h) rather than
+   * this file's own `DestroyCommandIssueUpdateEvent` symmetry helper -
+   * matched here exactly like `QueueCommandIssueSetTargetEvent` does for
+   * the same reason.
+   */
+  void QueueCommandIssueDeselectUnitEventImpl(
+    UserCommandIssueHelper& helper,
+    const CmdId commandId,
+    UserUnit* const unit
+  )
+  {
+    auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(helper);
+    CommandIssueUpdateQueueRuntimeView& queue = helperView.localQueue;
+
+    bool needNewEvent = true;
+    if (queue.count != 0u) {
+      const CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
+      if (lastEvent->eventType == kCommandIssueUpdateEventTypeDeselectUnit && lastEvent->commandId == commandId) {
+        needNewEvent = false;
+      }
+    }
+
+    if (needNewEvent) {
+      CommandIssueUpdateEventRuntimeView localEvent{};
+      InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeDeselectUnit);
+      EnqueueCommandIssueUpdateEvent(queue, localEvent);
+      DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
+    }
+
+    CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
+    WeakUnitSetUserUnit::AddResult deselectedUnitAdd{};
+    (void)WeakUnitSetUserUnit::Add(
+      &deselectedUnitAdd, reinterpret_cast<WeakUnitSetUserUnit*>(&lastEvent->entitySet), unit
+    );
+  }
+
   CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
   {
     if (!commandDb || !commandDb->commands.header_ptr()) {
@@ -8298,6 +8350,20 @@ namespace moho
   void QueueCommandIssueSelectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
   {
     ::QueueCommandIssueSelectUnitEventImpl(*helper, cmdId, unit);
+  }
+
+  /**
+   * Address: 0x008B4880 (FUN_008B4880, sub_8B4880)
+   *
+   * What it does:
+   * Public entry point (declared in UserUnit.h) that appends a "deselect
+   * unit" local update event into `helper`'s ring queue when needed, then
+   * inserts `unit` into that event's weak-set. Forwards to
+   * QueueCommandIssueDeselectUnitEventImpl.
+   */
+  void QueueCommandIssueDeselectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
+  {
+    ::QueueCommandIssueDeselectUnitEventImpl(*helper, cmdId, unit);
   }
 } // namespace moho
 
