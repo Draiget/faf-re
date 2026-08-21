@@ -395,16 +395,16 @@ namespace
 
     static void Deserialize(gpg::ReadArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto& view = gpg::AsFastVectorRuntimeView<moho::SCondition>(reinterpret_cast<void*>(objectPtr));
+      auto& vec = *reinterpret_cast<gpg::fastvector<moho::SCondition>*>(objectPtr);
       unsigned int count = 0;
       archive->ReadUInt(&count);
 
       const moho::SCondition fill{};
-      gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+      vec.Resize(static_cast<std::size_t>(count), fill);
 
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
       for (unsigned int i = 0; i < count; ++i) {
-        archive->Read(moho::SCondition::StaticGetClass(), view.ElementAtUnchecked(i), owner);
+        archive->Read(moho::SCondition::StaticGetClass(), &vec[i], owner);
       }
     }
 
@@ -417,13 +417,13 @@ namespace
      */
     static void Serialize(gpg::WriteArchive* archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      const auto& view = gpg::AsFastVectorRuntimeView<moho::SCondition>(reinterpret_cast<void*>(objectPtr));
-      const unsigned int count = static_cast<unsigned int>(view.Size());
+      auto& vec = *reinterpret_cast<gpg::fastvector<moho::SCondition>*>(objectPtr);
+      const unsigned int count = static_cast<unsigned int>(vec.size());
       archive->WriteUInt(count);
 
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
       for (unsigned int i = 0; i < count; ++i) {
-        archive->Write(moho::SCondition::StaticGetClass(), view.ElementAtUnchecked(i), owner);
+        archive->Write(moho::SCondition::StaticGetClass(), &vec[i], owner);
       }
     }
 
@@ -444,12 +444,12 @@ namespace
         return out;
       }
 
-      auto& view = gpg::AsFastVectorRuntimeView<moho::SCondition>(obj);
-      if (!view.Data() || static_cast<std::size_t>(ind) >= view.Size()) {
+      auto& vec = *static_cast<gpg::fastvector<moho::SCondition>*>(obj);
+      if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= vec.size()) {
         return out;
       }
 
-      out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+      out.mObj = &vec[static_cast<std::size_t>(ind)];
       return out;
     }
 
@@ -459,8 +459,8 @@ namespace
         return 0u;
       }
 
-      const auto& view = gpg::AsFastVectorRuntimeView<moho::SCondition>(obj);
-      return view.Data() ? view.Size() : 0u;
+      auto& vec = *static_cast<gpg::fastvector<moho::SCondition>*>(obj);
+      return vec.size();
     }
 
     /**
@@ -476,9 +476,9 @@ namespace
         return;
       }
 
-      auto& view = gpg::AsFastVectorRuntimeView<moho::SCondition>(obj);
+      auto& vec = *static_cast<gpg::fastvector<moho::SCondition>*>(obj);
       const moho::SCondition fill{};
-      gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
+      vec.Resize(static_cast<unsigned int>(count), fill);
     }
   };
   static_assert(sizeof(RFastVectorSConditionTypeInfo) == 0x68, "RFastVectorSConditionTypeInfo size must be 0x68");
