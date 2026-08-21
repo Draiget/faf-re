@@ -3626,6 +3626,9 @@ namespace
   class EntityDbIdPoolMapTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x006891F0 (FUN_006891F0, gpg::RMapType_uint_IdPool::dtr)
+     */
     ~EntityDbIdPoolMapTypeInfo() override;
 
     /**
@@ -3705,6 +3708,9 @@ namespace
   class EntityDbEntityListTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00689250 (FUN_00689250, gpg::RListType_EntityP::dtr)
+     */
     ~EntityDbEntityListTypeInfo() override;
 
     /**
