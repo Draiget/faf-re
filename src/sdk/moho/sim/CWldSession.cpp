@@ -55,6 +55,7 @@
 #include "moho/resource/ResourceDeposit.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
+#include "moho/script/CScriptEvent.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/console/CConCommand.h"
 #include "lua/LuaTableIterator.h"
@@ -5917,6 +5918,27 @@ namespace moho
       return reinterpret_cast<UserEntity*>(raw - kUserEntityWeakOwnerOffset);
     }
 
+    /**
+     * Address: 0x0081FD2B..0x0081FD4E (inlined into
+     * `Moho::SCommandModeData::HandleEvent`, FUN_0081FCD0)
+     *
+     * What it does:
+     * Resolves the entity a command-mode drag snapshot is hovering.
+     * `MouseInfo::mUnitHover` is an intrusive weak-link slot rather than a
+     * live pointer (the same lane `CWldSession::GetHoveredUserEntity` decodes
+     * for the session's own cursor), and an entity the session has already
+     * orphaned (`mMarkedForDeletion`) counts as "nothing hovered".
+     */
+    [[nodiscard]] UserEntity* DecodeHoveredDragEntity(const MouseInfo& cursor) noexcept
+    {
+      UserEntity* const entity =
+        DecodeUserEntityWeakLinkSlot(reinterpret_cast<const UserEntityWeakLinkSlotRuntimeView&>(cursor.mUnitHover));
+      if (entity == nullptr || entity->mMarkedForDeletion != 0u) {
+        return nullptr;
+      }
+      return entity;
+    }
+
     // GetHoveredUserEntity is now CWldSession::GetHoveredUserEntity, a public
     // member (declared near GetCursorInfo() in the header) - promoted so the
     // command-graph render pass in CRenderWorldView.cpp can call it too.
@@ -6010,14 +6032,11 @@ namespace moho
      * and no live selected user-unit already has that command helper queued.
      *
      * Invocation: sole caller in the binary is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, 2167 instructions, owned by this file), which is not
-     * recovered yet - it is gated on its own remaining leaf-callee/caller
-     * frontier (see that token's `recovered_progress.json` note). This
-     * helper is recovered and correct, waiting only on that one parent to
-     * be wired by name; un-`[[maybe_unused]]` it in the same pass that
-     * lands `HandleEvent`.
+     * (0x0081FCD0, 2167 instructions, owned by this file), from the
+     * `RULEUCC_Attack` hovered-target arm at 0x0081FEBD - recovered below and
+     * calling this by name.
      */
-    [[maybe_unused]] [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
+    [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
     {
       UserCommandIssueHelper* const helper = FindCommandIssueHelperInSession(&session, commandId);
       if (helper == nullptr) {
@@ -6080,17 +6099,12 @@ namespace moho
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
      * (0x0081FCD0, 2167 instructions, owned by this file), from the
-     * drag-move patrol-restart arm - on success the caller skips issuing a
-     * new command and instead calls `RestartMoveCommandAsPatrol` below with
-     * the same selection and helper. `HandleEvent` is not recovered yet -
-     * it is gated on its own remaining leaf-callee/caller frontier (see
-     * that token's `recovered_progress.json` note). This helper is
-     * recovered and correct, waiting only on that one parent to be wired
-     * by name; un-`[[maybe_unused]]` it in the same pass that lands
-     * `HandleEvent`, matching the sibling `CanStartCoordinatedAttack`
-     * above.
+     * drag-move patrol-restart arm (0x008207E6) - on success the caller
+     * skips issuing a new command and instead calls
+     * `RestartMoveCommandAsPatrol` below with the same selection and helper.
+     * `HandleEvent` is recovered below and calls this by name.
      */
-    [[maybe_unused]] [[nodiscard]] bool CanRestartMoveCommandAsPatrol(
+    [[nodiscard]] bool CanRestartMoveCommandAsPatrol(
       SSelectionSetUserEntity& selection,
       UserCommandIssueHelper* const helper
     )
@@ -6163,13 +6177,11 @@ namespace moho
      * command type.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), called with the same weak
+     * (0x0081FCD0, recovered below, 0x008207F7), called with the same weak
      * selection set still live in a register from the
      * `CanRestartMoveCommandAsPatrol` call immediately before it.
-     * Un-`[[maybe_unused]]` in the same pass that lands `HandleEvent`.
      */
-    [[maybe_unused]] void RestartMoveCommandAsPatrol(SSelectionSetUserEntity& selection, UserCommandIssueHelper* const helper)
+    void RestartMoveCommandAsPatrol(SSelectionSetUserEntity& selection, UserCommandIssueHelper* const helper)
     {
       const EUnitCommandType originalCommandType = ResolveCommandIssueHelperCommandType(*helper);
       const EUnitCommandType restartCommandType =
@@ -6227,14 +6239,13 @@ namespace moho
      * the early Patrol/FormPatrol detection returns true.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), called twice: once for a
-     * "reclaim to location" drag and once for the paired
-     * `ISSUE_FactoryCommand` drag, each time immediately followed by
-     * `Moho::STIMap::GetSurface` snapping `outAnchor` to the terrain when
-     * this returns false.
+     * (0x0081FCD0, recovered below), called twice from the `RULEUCC_Patrol`
+     * arm (0x00820BD7 and 0x00820CED): once for the plain-selection drag and
+     * once for the paired rally-point `ISSUE_FactoryCommand` drag, each time
+     * immediately followed by `Moho::STIMap::GetSurface` snapping `outAnchor`
+     * to the terrain when this returns false.
      */
-    [[maybe_unused]] [[nodiscard]] bool ResolveGroupMoveAnchorOrDetectPatrol(
+    [[nodiscard]] bool ResolveGroupMoveAnchorOrDetectPatrol(
       SSelectionSetUserEntity& selection,
       Wm3::Vector3f& outAnchor,
       const bool skipPatrolCheck
@@ -6337,11 +6348,10 @@ namespace moho
      * surface).
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), from the `RULEUCC_Ferry`
+     * (0x0081FCD0, recovered below, 0x008216BD), from the `RULEUCC_Ferry`
      * command-capability arm.
      */
-    [[maybe_unused]] [[nodiscard]] bool ResolveGroupFerryAnchorOrDetectFerry(
+    [[nodiscard]] bool ResolveGroupFerryAnchorOrDetectFerry(
       SSelectionSetUserEntity& selection,
       Wm3::Vector3f& outAnchor
     )
@@ -6420,12 +6430,12 @@ namespace moho
      * entity.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), from the factory
-     * build-command drag arm, gating whether to re-issue the existing
-     * queued order in place instead of stacking a duplicate.
+     * (0x0081FCD0, recovered below, 0x00821E8A), from the
+     * `COMMOD_Build`/`COMMOD_BuildAnchored` arm: when the drag position is
+     * not a legal build spot, the existing colocated order is decremented
+     * (`ISSUE_DecreaseCommandCount`) instead of a duplicate being stacked.
      */
-    [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindColocatedQueuedBuildOrder(
+    [[nodiscard]] UserCommandIssueHelper* FindColocatedQueuedBuildOrder(
       SSelectionSetUserEntity& selection,
       const Wm3::Vector3f& dragPosition,
       const REntityBlueprint* const candidateBlueprint
@@ -6478,12 +6488,12 @@ namespace moho
      * find-iterator debris from the last loop step; no caller inspects it.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), called three times to split
-     * the current selection ahead of a rally-point-aware factory/reclaim
-     * command.
+     * (0x0081FCD0, recovered below), called three times - from the
+     * `RULEUCC_Move` (0x0082069A), `RULEUCC_Patrol` (0x0082095E) and
+     * `RULEUCC_CallTransport` (0x00820F49) arms - to split the current
+     * selection ahead of a rally-point-aware factory command.
      */
-    [[maybe_unused]] void SplitSelectionByRallyPointCategory(
+    void SplitSelectionByRallyPointCategory(
       SSelectionSetUserEntity& source,
       SSelectionSetUserEntity& rallyPointSet,
       SSelectionSetUserEntity& otherSet
@@ -6533,12 +6543,12 @@ namespace moho
      * find-iterator debris from the last loop step; no caller inspects it.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), from the `RULEUCC_Ferry`
-     * command-capability arm: `airTransportSet` becomes the selection fed
-     * into `ResolveGroupFerryAnchorOrDetectFerry` immediately afterward.
+     * (0x0081FCD0, recovered below), from the `RULEUCC_Ferry` arm
+     * (0x0082162F) - `airTransportSet` becomes the selection fed into
+     * `ResolveGroupFerryAnchorOrDetectFerry` immediately afterward - and from
+     * the `RULEUCC_Transport` arm's no-extra-selection branch (0x008213D6).
      */
-    [[maybe_unused]] void SplitSelectionForFerryCommand(
+    void SplitSelectionForFerryCommand(
       SSelectionSetUserEntity& source,
       SSelectionSetUserEntity& airTransportSet,
       SSelectionSetUserEntity& landUnitSet
@@ -6594,13 +6604,13 @@ namespace moho
      * find-iterator debris from the last loop step; no caller inspects it.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), splitting the selection ahead
-     * of issuing a repair/assist-style command at a hovered "STRUCTURE"
+     * (0x0081FCD0, recovered below, 0x00820222), splitting the selection
+     * ahead of issuing a guard-style command at a hovered "STRUCTURE"
      * target - `nonRebuilderSet` is issued the command immediately after
-     * with the hovered entity as its direct target.
+     * with the hovered entity as its direct target, `rebuilderSet` gets the
+     * same command aimed at the structure's world position instead.
      */
-    [[maybe_unused]] void SplitSelectionByRebuilderCategory(
+    void SplitSelectionByRebuilderCategory(
       SSelectionSetUserEntity& source,
       SSelectionSetUserEntity& nonRebuilderSet,
       SSelectionSetUserEntity& rebuilderSet
@@ -6651,12 +6661,11 @@ namespace moho
      * find-iterator debris from the last loop step; no caller inspects it.
      *
      * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-     * (0x0081FCD0, not yet recovered - see the note on
-     * `CanRestartMoveCommandAsPatrol` above), from the `RULEUCC_Attack`
+     * (0x0081FCD0, recovered below, 0x0081FF48), from the `RULEUCC_Attack`
      * no-hover ground-target arm: `aggressiveMoveSet` is issued
      * `UNITCOMMAND_AggressiveMove` immediately afterward when non-empty.
      */
-    [[maybe_unused]] void SplitSelectionForAggressiveMove(
+    void SplitSelectionForAggressiveMove(
       SSelectionSetUserEntity& source,
       SSelectionSetUserEntity& aggressiveMoveSet,
       SSelectionSetUserEntity& otherSet
@@ -13953,13 +13962,10 @@ namespace moho
    * dirty so the graph overlay redraws.
    *
    * Invocation: sole caller is the `WeakSet<UserEntity>` overload of
-   * `Moho::ISSUE_RemoveLastCommand` (FUN_008B1390, recovered alongside
-   * this one, below), which calls it by name a few lines down - itself
-   * pending its own sole caller `Moho::SCommandModeData::HandleEvent`
-   * (FUN_0081FCD0, not yet recovered - see the note on
-   * `CanRestartMoveCommandAsPatrol` above). This overload therefore has a
-   * real recovered source-level caller in this same commit and is not
-   * `[[maybe_unused]]`.
+   * `Moho::ISSUE_RemoveLastCommand` (FUN_008B1390, below), which calls it by
+   * name a few lines down; that overload is in turn called by
+   * `Moho::SCommandModeData::HandleEvent` (FUN_0081FCD0, recovered in this
+   * file) from its `RULEUCC_Attack` arm.
    */
   void ISSUE_RemoveLastCommand(const gpg::fastvector<UserUnit*>& units)
   {
@@ -14003,10 +14009,10 @@ namespace moho
    * of `ISSUE_RemoveLastCommand` (FUN_008B1270, above).
    *
    * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
-   * (FUN_0081FCD0, not yet recovered - see the note on
-   * `CanRestartMoveCommandAsPatrol` above).
+   * (FUN_0081FCD0, recovered in this file), from the `RULEUCC_Attack` arm
+   * at 0x0081FDB9 when the event replaces a command the same drag issued.
    */
-  [[maybe_unused]] void ISSUE_RemoveLastCommand(SSelectionSetUserEntity& entities)
+  void ISSUE_RemoveLastCommand(SSelectionSetUserEntity& entities)
   {
     gpg::fastvector<UserUnit*> units{};
     units.reserve(static_cast<std::size_t>(entities.size()));
@@ -14029,6 +14035,1003 @@ namespace moho
 
     ISSUE_RemoveLastCommand(units);
   }
+
+  namespace
+  {
+    /// The `EntId` sentinel every ground-targeted command payload carries
+    /// (`mov [target+4], 0F0000000h` at every ground-target site in
+    /// `SCommandModeData::HandleEvent`).
+    constexpr std::uint32_t kGroundTargetEntityId = 0xF0000000u;
+
+    /// Cursor-banner lifetime shared by both banners this dispatcher raises
+    /// (`flt_E4F718`, pushed at 0x0081FEC6 and 0x008207FC).
+    constexpr float kCursorBannerSeconds = 3.0f;
+    /// ARGB red (0x0081FED2).
+    constexpr std::uint32_t kCoordinatedAttackBannerColor = 0xFFFF0000u;
+    /// ARGB green (0x0082080B).
+    constexpr std::uint32_t kPatrolInitiatedBannerColor = 0xFF00FF00u;
+
+    /**
+     * A `CmdId` packs the issuing command source into its high byte, and the
+     * `(MouseInfo, modifiers)` command-mode constructor (0x0081CEA0) seeds
+     * `mIsDragged` with an all-ones id. `HandleEvent` therefore tests only the
+     * source byte for the "this drag is not editing a live command" sentinel
+     * (0x0081FEA6 and 0x0082078E), not the whole word.
+     */
+    [[nodiscard]] bool HasDraggedCommand(const CommandModeData& commandMode) noexcept
+    {
+      constexpr std::uint32_t kCommandSourceMask = 0xFF000000u;
+      return (static_cast<std::uint32_t>(commandMode.mIsDragged) & kCommandSourceMask) != kCommandSourceMask;
+    }
+
+    /// `SCommandModeData::mModifiers` bit lanes, unpacked in one block at
+    /// 0x0081FD00-0x0081FD24 before the mode switch runs.
+    enum ECommandModeModifier : std::int32_t
+    {
+      /// Append to the existing command queue instead of replacing it.
+      COMMODMOD_Queue = 0x1,
+      /// Force the formation ("form") variant of the issued command.
+      COMMODMOD_Formation = 0x2,
+      /// Turn a plain move order into an aggressive-move order.
+      COMMODMOD_AttackMove = 0x4,
+    };
+
+    /**
+     * The drag snapshot stores the cursor in screen space as a plain
+     * `Wm3::Vector2f`; the cursor-banner API names the same two floats
+     * `SMauiMousePos` (the binary just hands `&mMouseScreenPos` over in `ecx`
+     * at 0x0081FEDA / 0x00820813).
+     */
+    [[nodiscard]] SMauiMousePos ToMauiMousePos(const Wm3::Vector2f& screenPos) noexcept
+    {
+      return SMauiMousePos{screenPos.x, screenPos.y};
+    }
+
+    void SetEntityTarget(SSTICommandIssueData& data, const UserEntity& target) noexcept
+    {
+      data.mTarget.mType = EAiTargetType::AITARGET_Entity;
+      data.mTarget.mEntityId = static_cast<std::uint32_t>(target.mParams.mEntityId);
+      data.mTarget.mPos = Wm3::Vec3f(0.0f, 0.0f, 0.0f);
+    }
+
+    void SetGroundTarget(SSTICommandIssueData& data, const Wm3::Vector3f& worldPos) noexcept
+    {
+      data.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      data.mTarget.mEntityId = kGroundTargetEntityId;
+      data.mTarget.mPos = worldPos;
+    }
+
+    /**
+     * Copies the drag formation's chosen script index, heading quaternion and
+     * spacing scale into the payload's formation lanes - the same
+     * `unk38`/`mOri`/`unk4C` triple `CPlatoon`'s own Form* command builders
+     * fill (CPlatoon.cpp).
+     */
+    void ApplyFormationLanes(SSTICommandIssueData& data, const CFormation& formation) noexcept
+    {
+      data.unk38 = formation.mBestFormation;
+      data.mOri = formation.mDirection;
+      data.unk4C = formation.mDirectionScale;
+    }
+
+    /// The drag formation has settled on a usable script and stopped ticking.
+    [[nodiscard]] bool IsFormationSettled(const CFormation& formation) noexcept
+    {
+      return formation.mReady && formation.mTimeLeft == 0.0f;
+    }
+
+    /// Issues `commandType` at the hovered entity for the whole selection.
+    void IssueOrderAtEntity(
+      SSelectionSetUserEntity& selection,
+      const EUnitCommandType commandType,
+      const UserEntity& target,
+      const bool clearQueue
+    )
+    {
+      SSTICommandIssueData commandData(commandType);
+      SetEntityTarget(commandData, target);
+      ISSUE_Command(selection, commandData, clearQueue);
+    }
+
+    /// Issues `commandType` at a world position for the whole selection.
+    void IssueOrderAtGround(
+      SSelectionSetUserEntity& selection,
+      const EUnitCommandType commandType,
+      const Wm3::Vector3f& worldPos,
+      const bool clearQueue
+    )
+    {
+      SSTICommandIssueData commandData(commandType);
+      SetGroundTarget(commandData, worldPos);
+      ISSUE_Command(selection, commandData, clearQueue);
+    }
+
+    /**
+     * The "snap the group anchor to the terrain, then re-issue at the drag
+     * position" tail both the `RULEUCC_Patrol` and `RULEUCC_Ferry` arms run
+     * when their anchor resolver reports the group is not already doing this
+     * exact thing. The second issue always passes `clearQueue == false` so it
+     * appends behind the first.
+     */
+    template <typename TIssueFn>
+    void IssueAnchoredThenDragPosition(
+      SSTICommandIssueData& commandData,
+      const CWldSession& session,
+      const Wm3::Vector3f& groupAnchor,
+      const Wm3::Vector3f& dragWorldPos,
+      const bool clearQueue,
+      TIssueFn&& issue
+    )
+    {
+      const float anchorSurface = session.GetSTIMap()->GetSurface(groupAnchor);
+      SetGroundTarget(commandData, Wm3::Vector3f(groupAnchor.x, anchorSurface, groupAnchor.z));
+      issue(commandData, clearQueue);
+
+      SetGroundTarget(commandData, dragWorldPos);
+      issue(commandData, false);
+    }
+
+    /**
+     * Address: 0x0081FF17-0x0082012A (the `RULEUCC_Attack` no-hover arm of
+     * `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * Splits the selection into units eligible for an attack-move
+     * (mobile + `FIRESTATE_ReturnFire`) and everything else, then issues an
+     * AggressiveMove at the drag position to the first group and a plain
+     * ground Attack to the second.
+     */
+    void IssueAttackMoveToGround(
+      CWldSession& session,
+      SSelectionSetUserEntity& selection,
+      const Wm3::Vector3f& dragWorldPos,
+      const bool formationModifier,
+      const bool clearQueue
+    )
+    {
+      ScopedLocalSelectionSet otherGuard{};
+      ScopedLocalSelectionSet aggressiveMoveGuard{};
+      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      SSelectionSetUserEntity& aggressiveMoveUnits = aggressiveMoveGuard.get();
+      SplitSelectionForAggressiveMove(selection, aggressiveMoveUnits, otherUnits);
+
+      if (!aggressiveMoveUnits.IsEmptyFromHeadFind()) {
+        const CFormation& formation = *session.mCurFormation;
+        SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_AggressiveMove);
+        ApplyFormationLanes(commandData, formation);
+
+        Wm3::Vector3f destination = dragWorldPos;
+        if (aggressiveMoveUnits.size() > 1 && formationModifier) {
+          commandData.mCommandType = EUnitCommandType::UNITCOMMAND_FormAggressiveMove;
+          destination = formation.mFinish;
+        }
+
+        SetGroundTarget(commandData, destination);
+        ISSUE_Command(aggressiveMoveUnits, commandData, clearQueue);
+      }
+
+      if (!otherUnits.IsEmptyFromHeadFind()) {
+        IssueOrderAtGround(otherUnits, EUnitCommandType::UNITCOMMAND_Attack, dragWorldPos, clearQueue);
+      }
+    }
+
+    /**
+     * Address: 0x00820661-0x00820B37 (the `RULEUCC_Move` arm of
+     * `Moho::SCommandModeData::HandleEvent`, also entered from the
+     * `RULEUCC_Guard` arm once the drag formation has settled)
+     *
+     * What it does:
+     * Splits the selection into rally-point holders and everything else, then
+     * issues Move/AggressiveMove (or their Form* variants once the drag
+     * formation has settled and more than one unit is moving) to the plain
+     * units and the same order as a *factory* command to the rally-point
+     * holders. Before issuing the plain order it offers the "keep dragging an
+     * already-queued move to convert it into a patrol" shortcut: when the drag
+     * is editing a live command whose queue passes
+     * `CanRestartMoveCommandAsPatrol`, the queued commands are restarted as
+     * Patrol/FormPatrol in place, a cursor banner is shown and **nothing** is
+     * issued - not even the rally-point half.
+     */
+    void IssueMoveOrderForDrag(
+      CommandModeData& commandMode,
+      CWldSession& session,
+      SSelectionSetUserEntity& selection,
+      const bool attackMoveModifier,
+      const bool queueModifier,
+      const bool clearQueue
+    )
+    {
+      const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
+
+      ScopedLocalSelectionSet rallyPointGuard{};
+      ScopedLocalSelectionSet otherGuard{};
+      SSelectionSetUserEntity& rallyPointUnits = rallyPointGuard.get();
+      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      SplitSelectionByRallyPointCategory(selection, rallyPointUnits, otherUnits);
+
+      const EUnitCommandType moveCommand = attackMoveModifier
+        ? EUnitCommandType::UNITCOMMAND_AggressiveMove
+        : EUnitCommandType::UNITCOMMAND_Move;
+      const EUnitCommandType formMoveCommand = attackMoveModifier
+        ? EUnitCommandType::UNITCOMMAND_FormAggressiveMove
+        : EUnitCommandType::UNITCOMMAND_FormMove;
+
+      if (!otherUnits.IsEmptyFromHeadFind()) {
+        const CFormation& formation = *session.mCurFormation;
+        SSTICommandIssueData commandData(moveCommand);
+        ApplyFormationLanes(commandData, formation);
+
+        Wm3::Vector3f destination = dragWorldPos;
+        // The stock build short-circuits this on the formation modifier the
+        // way the RULEUCC_Attack arm above does; in the shipped FAF binary the
+        // `jnz` that did so is NOP'd out at 0x0082074D-0x0082074E, leaving only
+        // the settled-formation test. Recovered as shipped.
+        if (otherUnits.size() > 1 && IsFormationSettled(formation)) {
+          commandData.mCommandType = formMoveCommand;
+          destination = formation.mFinish;
+        }
+        SetGroundTarget(commandData, destination);
+
+        if (HasDraggedCommand(commandMode)) {
+          UserCommandIssueHelper* const draggedCommand =
+            FindCommandIssueHelperInSession(&session, commandMode.mIsDragged);
+          if (CanRestartMoveCommandAsPatrol(selection, draggedCommand)) {
+            RestartMoveCommandAsPatrol(selection, draggedCommand);
+            UI_StartCursorText(
+              ToMauiMousePos(commandMode.mMouseDragStart.mMouseScreenPos),
+              "<LOC Engine0012>Patrol Initiated to location!",
+              kPatrolInitiatedBannerColor,
+              kCursorBannerSeconds,
+              true
+            );
+            return;
+          }
+        }
+
+        ISSUE_Command(otherUnits, commandData, clearQueue);
+      }
+
+      if (!rallyPointUnits.IsEmptyFromHeadFind()) {
+        SSTICommandIssueData rallyCommandData(moveCommand);
+        SetGroundTarget(rallyCommandData, dragWorldPos);
+        ISSUE_FactoryCommand(rallyPointUnits, rallyCommandData, clearQueue);
+      }
+    }
+
+    /**
+     * Address: 0x008203CE-0x0082065C (the `RULEUCC_Guard` arm of
+     * `Moho::SCommandModeData::HandleEvent`, reached once the drag formation
+     * is *not* settled)
+     *
+     * What it does:
+     * Guarding a hovered unit targets it directly, except when it is a
+     * STRUCTURE: then the selection is split by the REBUILDER category so the
+     * rebuilders are aimed at the structure's own world position (they can
+     * rebuild the wreck in place) while everybody else guards the entity, both
+     * halves carrying the structure's blueprint. With nothing hovered the
+     * order becomes a guard-this-spot for every mobile selected entity, in
+     * formation when more than one of them takes it.
+     */
+    void IssueGuardOrderForDrag(
+      CommandModeData& commandMode,
+      CWldSession& session,
+      SSelectionSetUserEntity& selection,
+      UserEntity* const hovered,
+      const bool queueModifier,
+      const bool clearQueue
+    )
+    {
+      const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
+      const EUnitCommandType guardCommand = UnitCommandCapToCommandType(commandMode.mCommandCaps);
+
+      if (UserUnit* const hoveredUnit = hovered != nullptr ? hovered->IsUserUnit() : nullptr;
+          hoveredUnit != nullptr) {
+        const RUnitBlueprint* const hoveredBlueprint = GetIUnitBridge(hoveredUnit)->GetBlueprint();
+
+        bool hoveredIsStructure = false;
+        if (hoveredBlueprint != nullptr) {
+          const msvc8::string structureCategory("STRUCTURE");
+          hoveredIsStructure = hovered->IsInCategory(structureCategory);
+        }
+
+        if (!hoveredIsStructure) {
+          IssueOrderAtEntity(selection, guardCommand, *hovered, clearQueue);
+          return;
+        }
+
+        ScopedLocalSelectionSet nonRebuilderGuard{};
+        ScopedLocalSelectionSet rebuilderGuard{};
+        SSelectionSetUserEntity& nonRebuilders = nonRebuilderGuard.get();
+        SSelectionSetUserEntity& rebuilders = rebuilderGuard.get();
+        SplitSelectionByRebuilderCategory(selection, nonRebuilders, rebuilders);
+
+        {
+          SSTICommandIssueData commandData(guardCommand);
+          SetEntityTarget(commandData, *hovered);
+          commandData.mBlueprint = const_cast<RUnitBlueprint*>(hoveredBlueprint);
+          ISSUE_Command(nonRebuilders, commandData, clearQueue);
+        }
+        {
+          SSTICommandIssueData commandData(UnitCommandCapToCommandType(commandMode.mCommandCaps));
+          SetGroundTarget(commandData, hovered->mVariableData.mCurTransform.pos_);
+          commandData.mBlueprint = const_cast<RUnitBlueprint*>(hoveredBlueprint);
+          ISSUE_Command(rebuilders, commandData, clearQueue);
+        }
+        return;
+      }
+
+      ScopedLocalUnitSet formationUnitsGuard{};
+      ScopedLocalSelectionSet guardTargetGuard{};
+      WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+      SSelectionSetUserEntity& guardTargets = guardTargetGuard.get();
+
+      SSelectionSetUserEntity::FindResult cursor{};
+      (void)selection.First(&cursor);
+      SSelectionSetUserEntity::Index iterator{&selection, cursor.mRes};
+      while (iterator.mNode != selection.mHead) {
+        UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
+        const REntityBlueprint* const blueprint = entity != nullptr ? entity->mParams.mBlueprint : nullptr;
+        if (blueprint != nullptr && blueprint->IsMobile()) {
+          SSelectionSetUserEntity::AddResult targetAdd{};
+          (void)SSelectionSetUserEntity::Add(&targetAdd, &guardTargets, entity);
+
+          if (UserUnit* const unit = entity->IsUserUnit(); unit != nullptr) {
+            WeakUnitSetUserUnit::AddResult participantAdd{};
+            (void)WeakUnitSetUserUnit::Add(&participantAdd, &formationUnits, unit);
+          }
+        }
+
+        (void)iterator.Next();
+      }
+
+      CFormation& formation = *session.mCurFormation;
+      if (guardTargets.size() > 1) {
+        formation.ChooseFormation(dragWorldPos, formationUnits, queueModifier);
+        if (formation.mBestFormation >= 0) {
+          SSTICommandIssueData commandData(UnitCommandCapToCommandType(commandMode.mCommandCaps));
+          SetGroundTarget(commandData, dragWorldPos);
+          ApplyFormationLanes(commandData, formation);
+          ISSUE_Command(guardTargets, commandData, clearQueue);
+          formation.Reset();
+        }
+        return;
+      }
+
+      if (!guardTargets.IsEmptyFromHeadFind()) {
+        IssueOrderAtGround(
+          guardTargets, UnitCommandCapToCommandType(commandMode.mCommandCaps), dragWorldPos, clearQueue
+        );
+      }
+    }
+
+    /**
+     * Address: 0x00820923-0x00820B37 (the `RULEUCC_Patrol` arm of
+     * `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * Splits the selection into rally-point holders and everybody else, picks
+     * Patrol or FormPatrol (the latter only once the drag formation has
+     * settled; otherwise a fresh formation is chosen from the selected units
+     * around the hovered unit, or around the drag position when nothing is
+     * hovered, and the whole arm is abandoned if no formation script fits),
+     * then issues that command to both halves. Each half first asks
+     * `ResolveGroupMoveAnchorOrDetectPatrol` whether the group is already
+     * patrolling: if it is, the drag position is used as-is; if not, the
+     * resolved group anchor is snapped to the terrain and issued first so the
+     * patrol runs anchor -> drag position.
+     */
+    void IssuePatrolOrderForDrag(
+      CommandModeData& commandMode,
+      CWldSession& session,
+      SSelectionSetUserEntity& selection,
+      UserEntity* const hovered,
+      const bool queueModifier,
+      const bool clearQueue
+    )
+    {
+      const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
+
+      ScopedLocalSelectionSet rallyPointGuard{};
+      ScopedLocalSelectionSet otherGuard{};
+      SSelectionSetUserEntity& rallyPointUnits = rallyPointGuard.get();
+      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      SplitSelectionByRallyPointCategory(selection, rallyPointUnits, otherUnits);
+
+      CFormation& formation = *session.mCurFormation;
+      SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_Patrol);
+      SetGroundTarget(commandData, dragWorldPos);
+
+      if (selection.size() > 1) {
+        if (IsFormationSettled(formation)) {
+          commandData.mCommandType = EUnitCommandType::UNITCOMMAND_FormPatrol;
+          ApplyFormationLanes(commandData, formation);
+        } else {
+          ScopedLocalUnitSet formationUnitsGuard{};
+          WeakUnitSetUserUnit& formationUnits = formationUnitsGuard.get();
+
+          SSelectionSetUserEntity::FindResult cursor{};
+          (void)selection.First(&cursor);
+          SSelectionSetUserEntity::Index iterator{&selection, cursor.mRes};
+          while (iterator.mNode != selection.mHead) {
+            UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
+            if (UserUnit* const unit = entity != nullptr ? entity->IsUserUnit() : nullptr; unit != nullptr) {
+              WeakUnitSetUserUnit::AddResult participantAdd{};
+              (void)WeakUnitSetUserUnit::Add(&participantAdd, &formationUnits, unit);
+            }
+
+            (void)iterator.Next();
+          }
+
+          const Wm3::Vector3f& formationAnchor =
+            hovered != nullptr ? hovered->mVariableData.mCurTransform.pos_ : dragWorldPos;
+          formation.ChooseFormation(formationAnchor, formationUnits, queueModifier);
+          if (formation.mBestFormation < 0) {
+            return;
+          }
+
+          ApplyFormationLanes(commandData, formation);
+          formation.Reset();
+        }
+      }
+
+      if (!otherUnits.IsEmptyFromHeadFind()) {
+        Wm3::Vector3f groupAnchor(0.0f, 0.0f, 0.0f);
+        if (ResolveGroupMoveAnchorOrDetectPatrol(selection, groupAnchor, !queueModifier)) {
+          ISSUE_Command(otherUnits, commandData, clearQueue);
+        } else {
+          IssueAnchoredThenDragPosition(
+            commandData, session, groupAnchor, dragWorldPos, clearQueue,
+            [&otherUnits](const SSTICommandIssueData& data, const bool clear) {
+              ISSUE_Command(otherUnits, data, clear);
+            }
+          );
+        }
+      }
+
+      if (!rallyPointUnits.IsEmptyFromHeadFind()) {
+        Wm3::Vector3f groupAnchor(0.0f, 0.0f, 0.0f);
+        if (ResolveGroupMoveAnchorOrDetectPatrol(selection, groupAnchor, !queueModifier)) {
+          ISSUE_FactoryCommand(rallyPointUnits, commandData, clearQueue);
+        } else {
+          IssueAnchoredThenDragPosition(
+            commandData, session, groupAnchor, dragWorldPos, clearQueue,
+            [&rallyPointUnits](const SSTICommandIssueData& data, const bool clear) {
+              ISSUE_FactoryCommand(rallyPointUnits, data, clear);
+            }
+          );
+        }
+      }
+    }
+
+    /**
+     * Address: 0x008215FD-0x008217CA (the `RULEUCC_Ferry` arm of
+     * `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * Keeps only the air transports out of the selection and gives them a
+     * ferry route. When every one of them is already ferrying, the drag
+     * position is appended as-is; otherwise their averaged current route
+     * anchor is snapped to the terrain and issued first so the ferry runs
+     * anchor -> drag position. The land-unit half of the split is built (the
+     * binary builds it too) but this arm never consumes it.
+     */
+    void IssueFerryOrderForDrag(
+      CWldSession& session,
+      SSelectionSetUserEntity& selection,
+      const Wm3::Vector3f& dragWorldPos,
+      const bool clearQueue
+    )
+    {
+      ScopedLocalSelectionSet airTransportGuard{};
+      ScopedLocalSelectionSet landUnitGuard{};
+      SSelectionSetUserEntity& airTransports = airTransportGuard.get();
+      SSelectionSetUserEntity& landUnits = landUnitGuard.get();
+      SplitSelectionForFerryCommand(selection, airTransports, landUnits);
+
+      if (airTransports.IsEmptyFromHeadFind()) {
+        return;
+      }
+
+      SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_Ferry);
+      SetGroundTarget(commandData, dragWorldPos);
+
+      Wm3::Vector3f groupAnchor(0.0f, 0.0f, 0.0f);
+      if (ResolveGroupFerryAnchorOrDetectFerry(airTransports, groupAnchor)) {
+        ISSUE_Command(airTransports, commandData, clearQueue);
+        return;
+      }
+
+      IssueAnchoredThenDragPosition(
+        commandData, session, groupAnchor, dragWorldPos, clearQueue,
+        [&airTransports](const SSTICommandIssueData& data, const bool clear) {
+          ISSUE_Command(airTransports, data, clear);
+        }
+      );
+    }
+
+    /**
+     * Address: 0x00821014-0x008215BC (the `RULEUCC_Transport` arm of
+     * `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * Four separate transport gestures, in the order the binary tests them:
+     *   1. drop on a TELEPORTBEACON while a teleport-capable unit is selected
+     *      -> unload onto the beacon;
+     *   2. drop on a unit that itself has the CallTransport capability
+     *      -> reverse-load into it;
+     *   3. otherwise, when the session's extra-select list names specific
+     *      units, unload exactly those at the drag position (as a plain Move
+     *      when every one of them is a POD, since pods are not cargo);
+     *   4. otherwise split the selection into air transports and land units:
+     *      if either half is empty the whole selection is told to unload at
+     *      the drag position, else the transports are folded into the land
+     *      group and the group is given an AssistMove there.
+     * Every path ends by re-applying the current selection, which is what
+     * refreshes the extra-select overlay.
+     */
+    void IssueTransportOrderForDrag(
+      CWldSession& session,
+      SSelectionSetUserEntity& selection,
+      UserEntity* const hovered,
+      const Wm3::Vector3f& dragWorldPos,
+      const bool clearQueue
+    )
+    {
+      if (hovered != nullptr) {
+        const msvc8::string teleportBeaconCategory("TELEPORTBEACON");
+        if (hovered->IsInCategory(teleportBeaconCategory) && SelectionContainsTeleportationUnit(selection)) {
+          IssueOrderAtEntity(
+            selection, EUnitCommandType::UNITCOMMAND_TransportUnloadUnits, *hovered, clearQueue
+          );
+          return;
+        }
+      }
+
+      if (UserUnit* const hoveredUnit = hovered != nullptr ? hovered->IsUserUnit() : nullptr;
+          hoveredUnit != nullptr) {
+        const std::uint32_t hoveredCaps = GetIUnitBridge(hoveredUnit)->GetAttributes().commandCapsMask;
+        if ((hoveredCaps & static_cast<std::uint32_t>(RULEUCC_CallTransport)) != 0u) {
+          IssueOrderAtEntity(
+            selection, EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits, *hovered, clearQueue
+          );
+          return;
+        }
+      }
+
+      ScopedCopiedSelectionSet extraSelectionGuard{};
+      SSelectionSetUserEntity& extraSelection = extraSelectionGuard.get();
+      extraSelection = session.GetExtraSelectList();
+
+      if (!extraSelection.IsEmptyFromHeadFind()) {
+        ScopedCopiedSelectionSet unloadGuard{};
+        SSelectionSetUserEntity& unloadTargets = unloadGuard.get();
+        (void)CopySelectionSetFromOther(&unloadTargets, &selection);
+
+        bool onlyPods = true;
+        SSelectionSetUserEntity::FindResult cursor{};
+        (void)extraSelection.First(&cursor);
+        SSelectionSetUserEntity::Index iterator{&extraSelection, cursor.mRes};
+        while (iterator.mNode != extraSelection.mHead) {
+          UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
+          if (entity != nullptr && entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
+            SSelectionSetUserEntity::AddResult addResult{};
+            (void)SSelectionSetUserEntity::Add(&addResult, &unloadTargets, entity);
+
+            const msvc8::string podCategory("POD");
+            if (!entity->IsInCategory(podCategory)) {
+              onlyPods = false;
+            }
+          }
+
+          (void)iterator.Next();
+        }
+
+        const EUnitCommandType unloadCommand = onlyPods
+          ? EUnitCommandType::UNITCOMMAND_Move
+          : EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits;
+        IssueOrderAtGround(unloadTargets, unloadCommand, dragWorldPos, clearQueue);
+      } else {
+        ScopedLocalSelectionSet airTransportGuard{};
+        ScopedLocalSelectionSet landUnitGuard{};
+        SSelectionSetUserEntity& airTransports = airTransportGuard.get();
+        SSelectionSetUserEntity& landUnits = landUnitGuard.get();
+        SplitSelectionForFerryCommand(selection, airTransports, landUnits);
+
+        if (airTransports.IsEmptyFromHeadFind() || landUnits.IsEmptyFromHeadFind()) {
+          IssueOrderAtGround(
+            selection, EUnitCommandType::UNITCOMMAND_TransportUnloadUnits, dragWorldPos, clearQueue
+          );
+        } else {
+          SSelectionSetUserEntity::FindResult cursor{};
+          (void)airTransports.First(&cursor);
+          SSelectionSetUserEntity::Index iterator{&airTransports, cursor.mRes};
+          while (iterator.mNode != airTransports.mHead) {
+            UserEntity* const entity = DecodeSelectionIndexOwner(&iterator);
+            if (entity != nullptr && entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
+              SSelectionSetUserEntity::AddResult addResult{};
+              (void)SSelectionSetUserEntity::Add(&addResult, &landUnits, entity);
+            }
+
+            (void)iterator.Next();
+          }
+
+          IssueOrderAtGround(landUnits, EUnitCommandType::UNITCOMMAND_AssistMove, dragWorldPos, clearQueue);
+        }
+      }
+
+      session.SetSelection(selection);
+    }
+
+    /**
+     * Address: 0x00820E01-0x0082100F (the `RULEUCC_CallTransport` arm of
+     * `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * Tells the selection to load into the hovered transport, splitting the
+     * rally-point holders off into a factory command as every other move-like
+     * arm does. The hovered transport is added to whichever half is being
+     * ordered unless it is a ferry beacon or an air staging platform - a
+     * carrier overrides that and is always loaded along with its cargo.
+     */
+    void IssueCallTransportOrderForDrag(
+      SSelectionSetUserEntity& selection,
+      UserEntity& hovered,
+      const bool clearQueue
+    )
+    {
+      const bool hoveredIsAirStaging = hovered.IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"));
+      const bool hoveredIsCarrier = hovered.IsInCategory(msvc8::string("CARRIER"));
+      const bool hoveredIsFerryBeacon = hovered.IsInCategory(msvc8::string("FERRYBEACON"));
+
+      SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
+      SetEntityTarget(commandData, hovered);
+
+      ScopedLocalSelectionSet rallyPointGuard{};
+      ScopedLocalSelectionSet otherGuard{};
+      SSelectionSetUserEntity& rallyPointUnits = rallyPointGuard.get();
+      SSelectionSetUserEntity& otherUnits = otherGuard.get();
+      SplitSelectionByRallyPointCategory(selection, rallyPointUnits, otherUnits);
+
+      const bool loadHoveredTransportToo = (!hoveredIsFerryBeacon && !hoveredIsAirStaging) || hoveredIsCarrier;
+
+      if (!otherUnits.IsEmptyFromHeadFind()) {
+        if (loadHoveredTransportToo) {
+          SSelectionSetUserEntity::AddResult addResult{};
+          (void)SSelectionSetUserEntity::Add(&addResult, &otherUnits, &hovered);
+        }
+        ISSUE_Command(otherUnits, commandData, clearQueue);
+      }
+
+      if (!rallyPointUnits.IsEmptyFromHeadFind()) {
+        if (loadHoveredTransportToo) {
+          SSelectionSetUserEntity::AddResult addResult{};
+          (void)SSelectionSetUserEntity::Add(&addResult, &rallyPointUnits, &hovered);
+        }
+        ISSUE_FactoryCommand(rallyPointUnits, commandData, clearQueue);
+      }
+    }
+
+    /**
+     * Address: 0x00821AC0-0x00821CFA (the `RULEUCC_Script` arm of
+     * `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * Hands the pending script command to
+     * `/lua/user/UserScriptCommand.lua:VerifyScriptCommand` and, when the
+     * script sets `UserValidated`, re-issues it to exactly the units the
+     * script listed in `AuthorizedUnits`. The verified descriptor rides along
+     * on the payload's Lua-object lane (minus `AuthorizedUnits`, which is
+     * nilled out first so the sim never sees it).
+     */
+    void IssueScriptCommandForDrag(
+      SSelectionSetUserEntity& selection,
+      UserEntity* const hovered,
+      const Wm3::Vector3f& dragWorldPos,
+      const bool clearQueue
+    )
+    {
+      SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_Script);
+      if (hovered != nullptr) {
+        SetEntityTarget(commandData, *hovered);
+      } else {
+        SetGroundTarget(commandData, dragWorldPos);
+      }
+
+      LuaPlus::LuaObject verifyResult = UI_VerifyScriptCommand(selection, commandData, clearQueue);
+      if (!verifyResult["UserValidated"].GetBoolean()) {
+        return;
+      }
+
+      commandData.mObject = verifyResult;
+      LuaPlus::LuaState* const state = verifyResult.m_state;
+
+      gpg::fastvector_n<UserUnit*, 1> authorizedUnits{};
+      {
+        // The binary lets the `operator[]` temporary die right after the
+        // iterator is constructed (0x00821C2D) and keeps iterating the freed
+        // slot; the table object is held for the whole walk here instead,
+        // which is the same traversal without the dangling read.
+        LuaPlus::LuaObject authorizedTable = verifyResult["AuthorizedUnits"];
+        for (LuaPlus::LuaTableIterator entry(authorizedTable, 1); !entry.m_isDone; entry.Next()) {
+          authorizedUnits.push_back(SCR_FromLua_UserUnit(entry.GetValue(), state));
+        }
+      }
+
+      verifyResult.SetNil("AuthorizedUnits");
+      ISSUE_Command(authorizedUnits, commandData, clearQueue);
+    }
+
+    /**
+     * Address: 0x00821DEE-0x00821EA2 (the `COMMOD_Build`/`COMMOD_BuildAnchored`
+     * arm of `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * While the session is previewing invalid build placements, validates the
+     * drag spot (an anchored build additionally has to be inside the builder's
+     * build radius). A legal spot - or a session that is not previewing at all
+     * - just notifies the UI script layer that a command was issued; an
+     * illegal one instead takes one build off an order this selection already
+     * has queued on that same footprint, which is what makes dragging a
+     * queued structure back onto itself cancel it.
+     */
+    void DispatchBuildCommandMode(CommandModeData& commandMode, CWldSession& session, const bool clearQueue)
+    {
+      SSelectionSetUserEntity& selection = session.mSelection;
+      const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
+      const auto* const buildBlueprint = static_cast<const RUnitBlueprint*>(commandMode.mBlueprint);
+
+      if (session.mShowInvalidBuildPlacementPreview) {
+        const SCoordsVec2 buildPosition{dragWorldPos.x, dragWorldPos.z};
+
+        const bool withinBuildDistance = commandMode.mMode != COMMOD_BuildAnchored
+          || USERUNIT_WithinBuildDistance(session, buildBlueprint, buildPosition);
+
+        bool placeable = false;
+        if (withinBuildDistance) {
+          SOccupationResult occupation{};
+          placeable = USERUNIT_CanBeBuiltAt(session, buildBlueprint, buildPosition, false, &occupation, nullptr);
+        }
+
+        if (!placeable) {
+          if (UserCommandIssueHelper* const queuedOrder =
+                FindColocatedQueuedBuildOrder(selection, dragWorldPos, buildBlueprint);
+              queuedOrder != nullptr) {
+            ISSUE_DecreaseCommandCount(queuedOrder, 1);
+          }
+          return;
+        }
+      }
+
+      SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_None);
+      UI_OnCommandIssued(selection, commandData, clearQueue);
+    }
+
+    /**
+     * Address: 0x0081FD6D-0x00821CFA plus the shared tails (the `COMMOD_Order`
+     * arm of `Moho::SCommandModeData::HandleEvent`)
+     *
+     * What it does:
+     * The command-capability switch: one arm per `ERuleBPUnitCommandCaps`
+     * value the world view can put the cursor into. Everything that is not
+     * called out below reduces to "issue this capability's command at the drag
+     * position", and `RULEUCC_Invalid` is swallowed outright.
+     */
+    void DispatchOrderCommandMode(
+      CommandModeData& commandMode,
+      CWldSession& session,
+      UserEntity* const hovered,
+      const bool isDragUpdate,
+      const bool formationModifier,
+      const bool attackMoveModifier,
+      const bool queueModifier,
+      const bool clearQueue
+    )
+    {
+      SSelectionSetUserEntity& selection = session.mSelection;
+      const Wm3::Vector3f& dragWorldPos = commandMode.mMouseDragStart.mMouseWorldPos;
+
+      switch (commandMode.mCommandCaps) {
+        case RULEUCC_Move:
+          IssueMoveOrderForDrag(commandMode, session, selection, attackMoveModifier, queueModifier, clearQueue);
+          return;
+
+        case RULEUCC_Attack: {
+          // A drag that re-targets the order it already issued withdraws that
+          // order first, so the queue never grows while the cursor moves.
+          if (isDragUpdate) {
+            ISSUE_RemoveLastCommand(selection);
+          }
+
+          if (hovered == nullptr) {
+            IssueAttackMoveToGround(session, selection, dragWorldPos, formationModifier, clearQueue);
+            return;
+          }
+
+          const CFormation& formation = *session.mCurFormation;
+          SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_Attack);
+          ApplyFormationLanes(commandData, formation);
+          if (selection.size() > 1 && (formationModifier || IsFormationSettled(formation))) {
+            commandData.mCommandType = EUnitCommandType::UNITCOMMAND_FormAttack;
+          }
+          SetEntityTarget(commandData, *hovered);
+
+          // Several players attacking the same target with one drag get the
+          // "coordinated attack" banner and share the dragged order's id.
+          if (isDragUpdate && HasDraggedCommand(commandMode)
+              && CanStartCoordinatedAttack(session, commandMode.mIsDragged)) {
+            UI_StartCursorText(
+              ToMauiMousePos(commandMode.mMouseDragStart.mMouseScreenPos),
+              "<LOC Engine0011>Coordinated Attack!",
+              kCoordinatedAttackBannerColor,
+              kCursorBannerSeconds,
+              true
+            );
+            commandData.unk04 = commandMode.mIsDragged;
+          }
+
+          ISSUE_Command(selection, commandData, clearQueue);
+          return;
+        }
+
+        case RULEUCC_Guard:
+          // A settled drag formation turns a guard gesture into a formation
+          // move (0x0082013F-0x0082014F).
+          if (IsFormationSettled(*session.mCurFormation)) {
+            IssueMoveOrderForDrag(commandMode, session, selection, attackMoveModifier, queueModifier, clearQueue);
+            return;
+          }
+          IssueGuardOrderForDrag(commandMode, session, selection, hovered, queueModifier, clearQueue);
+          return;
+
+        case RULEUCC_Patrol:
+          IssuePatrolOrderForDrag(commandMode, session, selection, hovered, queueModifier, clearQueue);
+          return;
+
+        case RULEUCC_Ferry:
+          IssueFerryOrderForDrag(session, selection, dragWorldPos, clearQueue);
+          return;
+
+        case RULEUCC_Transport:
+          IssueTransportOrderForDrag(session, selection, hovered, dragWorldPos, clearQueue);
+          return;
+
+        case RULEUCC_CallTransport:
+          if (hovered == nullptr) {
+            return;
+          }
+          IssueCallTransportOrderForDrag(selection, *hovered, clearQueue);
+          return;
+
+        case RULEUCC_Script:
+          IssueScriptCommandForDrag(selection, hovered, dragWorldPos, clearQueue);
+          return;
+
+        case RULEUCC_Reclaim: {
+          if (hovered == nullptr) {
+            return;
+          }
+
+          bool reclaimable = false;
+          {
+            const msvc8::string reclaimableCategory("RECLAIMABLE");
+            reclaimable = hovered->IsInCategory(reclaimableCategory) || hovered->IsBeingBuilt();
+          }
+          if (!reclaimable) {
+            return;
+          }
+
+          IssueOrderAtEntity(
+            selection, UnitCommandCapToCommandType(commandMode.mCommandCaps), *hovered, clearQueue
+          );
+          return;
+        }
+
+        // Sacrifice is its own emitted block in the binary (0x008217CF) but the
+        // same source shape as the repair/capture/overcharge group below.
+        case RULEUCC_Sacrifice:
+        case RULEUCC_Repair:
+        case RULEUCC_Capture:
+        case RULEUCC_Overcharge:
+          if (hovered == nullptr) {
+            return;
+          }
+          IssueOrderAtEntity(
+            selection, UnitCommandCapToCommandType(commandMode.mCommandCaps), *hovered, clearQueue
+          );
+          return;
+
+        case RULEUCC_Nuke:
+        case RULEUCC_Tactical:
+        case RULEUCC_SpecialAction:
+          if (hovered != nullptr) {
+            IssueOrderAtEntity(
+              selection, UnitCommandCapToCommandType(commandMode.mCommandCaps), *hovered, clearQueue
+            );
+          } else {
+            IssueOrderAtGround(
+              selection, UnitCommandCapToCommandType(commandMode.mCommandCaps), dragWorldPos, clearQueue
+            );
+          }
+          return;
+
+        case RULEUCC_Invalid:
+          return;
+
+        default:
+          IssueOrderAtGround(
+            selection, UnitCommandCapToCommandType(commandMode.mCommandCaps), dragWorldPos, clearQueue
+          );
+          return;
+      }
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0081FCD0 (FUN_0081FCD0, Moho::SCommandModeData::HandleEvent)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SCommandModeData::HandleEvent(
+   *     Moho::SCommandModeData *this, Moho::CWldSession *a2, char a3);
+   *
+   * What it does:
+   * Turns one committed world-view mouse gesture into command traffic for the
+   * session's current selection. The drag snapshot this object carries
+   * (`mMouseDragStart`) supplies both the world position and the hovered
+   * entity; `mModifiers` supplies the three keyboard modifier lanes; `mMode`
+   * and `mCommandCaps` select the arm:
+   *
+   *   - `COMMOD_Order` -> `DispatchOrderCommandMode`, one arm per command
+   *     capability (move / attack / guard / patrol / ferry / transport /
+   *     call-transport / reclaim / sacrifice+repair+capture+overcharge /
+   *     nuke+tactical+special-action / script), each of them documented on its
+   *     own helper above;
+   *   - `COMMOD_Build`, `COMMOD_BuildAnchored` -> `DispatchBuildCommandMode`,
+   *     the build-placement validator;
+   *   - `COMMOD_Ping` (and the unnamed mode 7 the binary's jump table routes
+   *     to the same entry) -> just leave command mode;
+   *   - `COMMOD_Move` and `COMMOD_Reclaim` are *not* handled here (the jump
+   *     table sends them to the default arm): those modes are cursor states
+   *     the world view resolves into a `COMMOD_Order` before committing.
+   *
+   * Every arm shares one derived flag: `clearQueue` is the inverse of the
+   * queue modifier, so holding shift appends the new order instead of
+   * replacing the queue.
+   */
+  void CommandModeData::HandleEvent(CWldSession& session, const bool isDragUpdate)
+  {
+    const bool queueModifier = (mModifiers & COMMODMOD_Queue) != 0;
+    const bool formationModifier = (mModifiers & COMMODMOD_Formation) != 0;
+    const bool attackMoveModifier = (mModifiers & COMMODMOD_AttackMove) != 0;
+    const bool clearQueue = !queueModifier;
+
+    UserEntity* const hovered = DecodeHoveredDragEntity(mMouseDragStart);
+
+    switch (mMode) {
+      case COMMOD_Order:
+        DispatchOrderCommandMode(
+          *this, session, hovered, isDragUpdate, formationModifier, attackMoveModifier, queueModifier, clearQueue
+        );
+        return;
+
+      case COMMOD_Build:
+      case COMMOD_BuildAnchored:
+        DispatchBuildCommandMode(*this, session, clearQueue);
+        return;
+
+      case COMMOD_Ping:
+      // The jump table at 0x00821F04 routes mode 7 to the same entry as
+      // `COMMOD_Ping`; the recovered enum has no name for it.
+      case static_cast<ECommandMode>(COMMOD_Ping + 1):
+        UI_EndCommandMode();
+        return;
+
+      default:
+        return;
+    }
+  }
+
+  /**
+   * Address: 0x0083E150 (FUN_0083E150, func_UserScriptCommandObj)
 
   /**
    * Address: 0x0083E150 (FUN_0083E150, func_UserScriptCommandObj)
