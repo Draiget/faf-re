@@ -215,6 +215,68 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x007E8B70 (FUN_007E8B70, deleting destructor lane; slot 0 of
+   * `??_7HardwareMeshBatch@Moho@@6B@`, VTABLE_CONFIRMED via the vtable's data
+   * xref to this address)
+   * Address: 0x007E7480 (FUN_007E7480, non-deleting destructor body)
+   *
+   * IDA signature:
+   * int __thiscall sub_7E7480(HardwareMeshBatch* this);
+   *
+   * What it does:
+   * Destroys one `HardwareMeshBatch`: releases this batch's own GPU
+   * resources through `ReleaseGpuResources`, then falls through to the
+   * implicit per-member destruction of the two remaining `boost::shared_ptr`
+   * members (`mDynamicVertexBuffer`, `mStaticVertexBuffer` - both already
+   * null by this point, so those are no-ops in the binary too) and the base
+   * `MeshBatch::~MeshBatch()` teardown of `mCurrentResource` and
+   * `mBoneRemapIndices`.
+   */
+  HardwareMeshBatch::~HardwareMeshBatch()
+  {
+    ReleaseGpuResources();
+  }
+
+  /**
+   * Address: 0x007E7BE0 (FUN_007E7BE0)
+   *
+   * IDA signature:
+   * void __usercall sub_7E7BE0(HardwareMeshBatch* this@<esi>);
+   *
+   * What it does:
+   * Releases every GPU-resource handle this batch owns and resets the base
+   * batch counters this instance derived during `Initialize`. Release order,
+   * exactly as compiled: index buffer, static vertex buffer, dynamic vertex
+   * buffer, vertex declaration, then the CPU scratch mirror (`operator
+   * delete[]`). The base `MeshBatch` counters `mVertexCount`, `mIndexCount`,
+   * `mBoneCount`, `mAttachCount`, `mMaxInstancesPerDraw` and
+   * `mActiveInstanceBudget` are zeroed alongside the handle releases;
+   * `mTriangleCount` is deliberately left untouched (the binary never writes
+   * it here). This is the only caller of this helper - it exists as a
+   * separate compiled function in the binary but is exercised solely from
+   * the destructor.
+   */
+  void HardwareMeshBatch::ReleaseGpuResources() noexcept
+  {
+    mVertexCount = 0;
+    mIndexCount = 0;
+    mBoneCount = 0;
+    mAttachCount = 0;
+    mMaxInstancesPerDraw = 0;
+    mActiveInstanceBudget = 0;
+
+    IndexBufferHandle().reset();
+    mStaticVertexBuffer.reset();
+    mDynamicVertexBuffer.reset();
+    VertexFormatHandle().reset();
+
+    if (mScratchVertexData != nullptr) {
+      ::operator delete[](mScratchVertexData);
+      mScratchVertexData = nullptr;
+    }
+  }
+
+  /**
    * Address: 0x007E7540 (FUN_007E7540, slot 1 override; IDA: HardwareMeshBatch::Func1)
    * Mangled slot: ??_7HardwareMeshBatch@Moho@@6B@ +0x04
    *
