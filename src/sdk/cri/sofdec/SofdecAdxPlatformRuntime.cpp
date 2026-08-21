@@ -19900,8 +19900,6 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   // Forward declarations for deeper SFX library helpers (recovered in their
   // own SFXZ / SFXLIB subsystem batches; only the address-block doc lives
   // here next to the leaf accessors that depend on them).
-  std::int32_t SFXZ_IsSetZclip(std::int32_t sfxzHandleAddress);
-  std::int32_t SFX_SetZbit(void* sfxHandle, std::int32_t zBitDepth);
   std::int32_t sfxcnv_MakeZTbl(void* sfxHandle, MwsfdSfxFrameInfo* sfxFrameInfo);
   char* SFXZ_GetZfrmRange(
     char* sfxzWorkBuffer,
@@ -19909,6 +19907,70 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     char** outRangeStart,
     std::int32_t* outRangeEnd
   );
+
+  /// Local view over the SFXZ (depth/Z-blit) handle's Z-clip lane, as read by
+  /// `SFXZ_IsSetZclip` (0x00ACDDC0: `fld dword ptr [edx+3Ch]` /
+  /// `fld dword ptr [edx+40h]`, each compared against the 0.0f constant at
+  /// 0x00E4F6E0). This TU cannot reach `moho_cri_sfx_internal::SfxzHandle`
+  /// (defined in the separate SofdecRuntime.cpp fragment chain), so this is a
+  /// thin cross-TU view over the same binary layout, matching
+  /// `SfxHandleSettingsView`'s established convention in this file.
+  struct SfxzHandleZclipView
+  {
+    std::uint8_t mUnknown00_3B[0x3C]{}; ///< +0x00..+0x3B
+    float zClipNear = 0.0f;             ///< +0x3C
+    float zClipFar = 0.0f;              ///< +0x40
+  };
+  static_assert(
+    offsetof(SfxzHandleZclipView, zClipNear) == 0x3C, "SfxzHandleZclipView::zClipNear offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(SfxzHandleZclipView, zClipFar) == 0x40, "SfxzHandleZclipView::zClipFar offset must be 0x40"
+  );
+
+  /**
+   * Address: 0x00ACDDC0 (FUN_00ACDDC0, _SFXZ_IsSetZclip)
+   *
+   * What it does:
+   * Reports whether either Z-clip plane has been set (non-zero) on the SFXZ
+   * handle at `sfxzHandleAddress`. Previously a no-argument stub in
+   * SofdecExternalStubs.cpp; every real call site (SFX_MakeTblZ16/32's
+   * "Zclip is not set" gate) silently read `false` regardless of the
+   * handle's real state.
+   */
+  std::int32_t SFXZ_IsSetZclip(const std::int32_t sfxzHandleAddress)
+  {
+    const auto* const view = reinterpret_cast<const SfxzHandleZclipView*>(sfxzHandleAddress);
+    return (view->zClipNear != 0.0f || view->zClipFar != 0.0f) ? 1 : 0;
+  }
+
+  /// Local view over the SFXZ handle's Z-bit-depth lane, as read/written by
+  /// `SFX_SetZbit` (0x00ACDFF0). Same cross-TU rationale as
+  /// `SfxzHandleZclipView` above.
+  struct SfxzHandleZbitView
+  {
+    std::int32_t used = 0;      ///< +0x00
+    std::int32_t zBitDepth = 0; ///< +0x04
+  };
+  static_assert(
+    offsetof(SfxzHandleZbitView, zBitDepth) == 0x04, "SfxzHandleZbitView::zBitDepth offset must be 0x04"
+  );
+
+  /**
+   * Address: 0x00ACDFF0 (FUN_00ACDFF0, _SFX_SetZbit)
+   *
+   * What it does:
+   * Stores the Z-bit depth on the SFX handle's child SFXZ handle
+   * (`sfxzHandleSlot`) and returns the input handle unchanged. Previously a
+   * no-argument stub; every real call site (SFX_MakeTblZ16/32) silently
+   * discarded both arguments.
+   */
+  std::int32_t SFX_SetZbit(void* const sfxHandle, const std::int32_t zBitDepth)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    reinterpret_cast<SfxzHandleZbitView*>(view->sfxzHandleSlot)->zBitDepth = zBitDepth;
+    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(sfxHandle));
+  }
 
   // Externally-visible error strings sampled by SFX_MakeTblZ16/32.
   constexpr char kSfxErrMakeTblZ32NoZclip[] = "E202281: SFX_MakeTblZ32: Zclip is not set.";

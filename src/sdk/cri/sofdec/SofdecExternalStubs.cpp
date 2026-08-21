@@ -182,7 +182,9 @@ extern "C" {
   // live, so the 33rd SFX composition handle of a session could not be built
   // and every movie past that point failed with "E201185: can't create SfxHn".
   void* SFXZ_GetZfrmRange() { return nullptr; }
-  void* SFXZ_IsSetZclip() { return nullptr; }
+  // SFXZ_IsSetZclip (0x00ACDDC0): real body in SofdecAdxPlatformRuntime.cpp,
+  // next to SFX_SetZbit. Was a no-argument stub; every real call site
+  // (SFX_MakeTblZ16/32's "Zclip is not set" gate) silently read false.
   void* SFX_DecideTableAlph3() { return nullptr; }
   // SFX_GetCompoMode (0x00ACCD40): real body in SofdecAdxPlatformRuntime.cpp.
   // It was a no-argument stub, which C linkage let satisfy the one-argument
@@ -194,7 +196,9 @@ extern "C" {
   // MWSFSFX_SetOutBufSize's sfxHandle and unitWidth arguments (C linkage let
   // a 0-arg stub satisfy the 2-arg call site), so unitWidth was never applied
   // to any played movie.
-  void* SFX_SetZbit() { return nullptr; }
+  // SFX_SetZbit (0x00ACDFF0): real body in SofdecAdxPlatformRuntime.cpp, next
+  // to SFXZ_IsSetZclip. Was a no-argument stub; SFX_MakeTblZ16/32 silently
+  // discarded both the handle and the requested bit depth.
   void* SUD_AnalyTypeCcs() { return nullptr; }
   void* SUD_Finish() { return nullptr; }
   void* SUD_Init() { return nullptr; }
