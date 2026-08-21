@@ -1,5 +1,7 @@
 #include "CGpgNetInterface.h"
 
+#include <boost/bind.hpp>
+
 #include <cstring>
 #include <cstdint>
 #include <limits>
@@ -1797,6 +1799,76 @@ void CGpgNetInterface::Connect(
   }
 }
 
+namespace
+{
+  /**
+   * Address: 0x007BC440 (FUN_007BC440) - bind_t<> assembly (member-pointer half)
+   *          0x007BD070 (FUN_007BD070) - bind_t<> assembly (bound-argument-list half)
+   *          0x007BD2D0 (FUN_007BD2D0) - list2<value<this>,value<string>> construction
+   *          0x007BC520 (FUN_007BC520) - boost::function0<void> converting ctor
+   *          0x007BD5E0 (FUN_007BD5E0) - boost::function0<void>::assign_to<Functor>
+   *          0x007BDCF0 (FUN_007BDCF0) - magic-statics guard for the local static vtable
+   *          0x007BE9F0 (FUN_007BE9F0) - basic_vtable0<>::basic_vtable0 / init(functor_obj_tag)
+   *          0x007BDD90 (FUN_007BDD90) - basic_vtable0<>::assign_to dispatcher
+   *          0x007BEAA0 (FUN_007BEAA0) - basic_vtable0<>::assign_to(...,function_obj_tag)
+   *          0x007BECE0 (FUN_007BECE0) - assign_functor() heap-allocation branch
+   *
+   * What it does:
+   * Builds the callable handed to the launch-template connect worker thread.
+   *
+   * `Connect(const msvc8::string&)` binds `this` and a copy of
+   * `launchCommandTemplate` to `ConnectThread` and hands the result to
+   * `boost::thread`'s `function0<void>` constructor. Unlike the simpler
+   * `Connect(u_long,u_short)` overload (see `boost::bind_CGpgNetInterfaceConnect`
+   * / FUN_007BC3F0), the bound argument here is a full `std::string`, which
+   * does not fit boost::function's small-object buffer, so MSVC8 emits the
+   * *heap-allocating* path instead of a single flat helper. The functor
+   * manager publishes its own RTTI at 0x00F86BE8; the mangled name reads
+   *   `.?AV?$bind_t@XV?$mf1@XVCGpgNetInterface@Moho@@VStrArg@gpg@@@_mfi@boost@@
+   *     V?$list2@V?$value@PAVCGpgNetInterface@Moho@@@_bi@boost@@
+   *       V?$value@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@23@@_bi@3@@_bi@boost@@`
+   * i.e. `boost::_bi::bind_t<void,
+   *   boost::_mfi::mf1<void, Moho::CGpgNetInterface, gpg::StrArg>,
+   *   boost::_bi::list2<boost::_bi::value<Moho::CGpgNetInterface*>,
+   *                      boost::_bi::value<std::string>>>` - the bound value is
+   * a real (Dinkumware) `std::string` copy, matching `list2`'s second
+   * `value<std::string>` slot exactly (payload copied end-to-end through
+   * FUN_007BD2D0 -> FUN_007BC440 -> FUN_007BC520 -> FUN_007BD5E0 ->
+   * FUN_007BECE0's heap clone).
+   *
+   * The RTTI shows the bound member-function-pointer target type as
+   * `gpg::StrArg`, a *class* type (`V` mangling), not the raw
+   * `using StrArg = const char*;` alias this SDK currently models in
+   * `gpg/core/containers/String.h`. `gpg/core/utils/Logging.h` documents the
+   * same collision independently (its `LogScopeEntry` comment: "the simple
+   * API-level alias `gpg::StrArg = const char*` already occupies that
+   * identifier"): the *original* `gpg::StrArg` was a real class with its own
+   * constructor (`??0StrArg@gpg@@QAE@@Z`), and today's alias is a
+   * simplification introduced by an earlier recovery pass. Untangling that
+   * is a separate, codebase-wide effort (`gpg::StrArg` / `moho::StrArg` are
+   * used as `const char*` at dozens of call sites already). This helper
+   * therefore keeps `ConnectThread`'s existing `const msvc8::string&`
+   * parameter rather than silently reintroducing a conflicting `StrArg`
+   * class here; the mismatch is a known, evidenced gap, not a guess.
+   *
+   * `FUN_007BEAA0`'s heap-allocation call chain bottoms out in two already
+   * -recovered, ICF-shared leaves cited elsewhere and intentionally not
+   * re-claimed here: `FUN_007BF120` (checked `operator new` for the 40-byte
+   * `bind_t` object, `src/sdk/legacy/containers/Vector.cpp`) and
+   * `FUN_007BF180` (raw field-copy construction of the same 40-byte shape,
+   * `src/sdk/moho/misc/CrtRuntimeHelpers.cpp`).
+   */
+  [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
+    CGpgNetInterface* const self,
+    const msvc8::string& launchCommandTemplate
+  )
+  {
+    return boost::function0<void>(
+      boost::bind(&CGpgNetInterface::ConnectThread, self, launchCommandTemplate)
+    );
+  }
+} // namespace
+
 /**
  * Address: 0x007B6BA0 (FUN_007B6BA0, func_NET_connect)
  *
@@ -1816,9 +1888,9 @@ void CGpgNetInterface::Connect(
 
   mConnectionState = kNetStateConnecting;
 
-  boost::thread* const thread = new boost::thread([this, launchCommandTemplate] {
-    ConnectThread(launchCommandTemplate);
-  });
+  boost::thread* const thread = new boost::thread(
+    MakeConnectThreadLaunchCallback(this, launchCommandTemplate)
+  );
 
   boost::thread* const oldThread = mConnectThreadWorker;
   mConnectThreadWorker = thread;
