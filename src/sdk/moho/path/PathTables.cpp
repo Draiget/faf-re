@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "gpg/core/algorithms/AStarSearch.h"
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -1545,7 +1546,7 @@ namespace
    * Copies `OccupySourceBinding` payload pairs (`{mGrid,mFootprint}`) backward
    * from source range into destination tail slots.
    */
-  [[maybe_unused]] std::uint32_t* CopyOccupySourceBindingPayloadRangeBackwardRuntime(
+  std::uint32_t* CopyOccupySourceBindingPayloadRangeBackwardRuntime(
     std::uint32_t* destinationEnd,
     const std::uint32_t* sourceEnd,
     const std::uint32_t* const sourceBegin
@@ -1575,33 +1576,119 @@ namespace
     "OccupationDataRuntimeView size must match OccupationData"
   );
 
-  template <typename T>
-  bool ResizeLegacyVectorStorage(LegacyVectorStorage<T>& storage, const std::size_t count, const T& fillValue)
+  [[noreturn]] void RuntimeThrowContainerTooLong(const char* message);
+
+  /**
+   * Address: 0x0076CBA0 (FUN_0076CBA0)
+   *
+   * What it does:
+   * Fills `count` contiguous `OccupySourceBinding` lanes from one prototype
+   * binding and returns one-past the final destination lane.
+   */
+  moho::OccupySourceBinding* FillOccupySourceBindingRangeFromPrototype(
+    moho::OccupySourceBinding* destinationBegin,
+    const std::uint32_t count,
+    const moho::OccupySourceBinding* const prototype
+  ) noexcept
   {
-    if (count == 0u) {
-      storage.mFirst = nullptr;
-      storage.mLast = nullptr;
-      storage.mEnd = nullptr;
-      return true;
+    std::uintptr_t cursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
+    for (std::uint32_t index = 0u; index < count; ++index) {
+      if (cursor != 0u && prototype != nullptr) {
+        auto* const output = reinterpret_cast<moho::OccupySourceBinding*>(cursor);
+        *output = *prototype;
+      }
+      cursor += sizeof(moho::OccupySourceBinding);
+    }
+    return reinterpret_cast<moho::OccupySourceBinding*>(cursor);
+  }
+
+  /**
+   * Address: 0x0076C490 (FUN_0076C490)
+   *
+   * IDA signature:
+   * void callcnv_73 sub_76C490(unsigned int insertCount@<ecx>,
+   *   LegacyVectorStorage_OccupySourceBinding *storage@<edx>,
+   *   OccupySourceBinding *insertPosition, const OccupySourceBinding *fillValue);
+   *
+   * What it does:
+   * Out-of-line `msvc8::vector<OccupySourceBinding>::_Insert_n(position, count, value)`
+   * grow path (each binding is 12 bytes). No-ops when `insertCount` is zero, throws
+   * `std::length_error("vector<T> too long")` (FUN_0076C730) when the requested size
+   * would exceed `max_size()`. When existing capacity already covers the new size, the
+   * `[insertPosition, mLast)` tail is shifted right in place and the vacated range is
+   * filled with `insertCount` copies of `*fillValue`. Otherwise the storage is
+   * reallocated at 1.5x growth (or exactly `newSize` when that growth would overflow
+   * or undershoot): the `[mFirst, insertPosition)` prefix and `[insertPosition, mLast)`
+   * suffix are copy-constructed into the new buffer around a freshly filled gap, the
+   * old buffer is freed, and the storage pointers are committed.
+   */
+  void InsertOccupySourceBindingRange(
+    LegacyVectorStorage<moho::OccupySourceBinding>& storage,
+    moho::OccupySourceBinding* const insertPosition,
+    const std::size_t insertCount,
+    const moho::OccupySourceBinding& fillValue
+  )
+  {
+    if (insertCount == 0u) {
+      return;
     }
 
-    auto* const begin = static_cast<T*>(::operator new(sizeof(T) * count, std::nothrow));
-    if (begin == nullptr) {
-      storage.mFirst = nullptr;
-      storage.mLast = nullptr;
-      storage.mEnd = nullptr;
-      return false;
+    constexpr std::size_t kMaxElements = 0x15555555u; // max_size() for a 12-byte element
+    const std::size_t curSize = storage.mFirst != nullptr
+      ? static_cast<std::size_t>(storage.mLast - storage.mFirst)
+      : 0u;
+    if (kMaxElements - curSize < insertCount) {
+      RuntimeThrowContainerTooLong("vector<T> too long");
     }
 
-    T* current = begin;
-    for (std::size_t i = 0; i < count; ++i, ++current) {
-      ::new (current) T(fillValue);
+    const std::size_t capacity = storage.mFirst != nullptr
+      ? static_cast<std::size_t>(storage.mEnd - storage.mFirst)
+      : 0u;
+    const std::size_t newSize = curSize + insertCount;
+
+    if (capacity >= newSize) {
+      // In-place: shift the existing [insertPosition, mLast) tail right by insertCount
+      // slots, then fill the vacated range at insertPosition with fillValue.
+      moho::OccupySourceBinding* const oldLast = storage.mLast;
+      CopyOccupySourceBindingPayloadRangeBackwardRuntime(
+        reinterpret_cast<std::uint32_t*>(oldLast + insertCount),
+        reinterpret_cast<std::uint32_t*>(oldLast),
+        reinterpret_cast<std::uint32_t*>(insertPosition)
+      );
+      FillOccupySourceBindingRangeFromPrototype(insertPosition, static_cast<std::uint32_t>(insertCount), &fillValue);
+      storage.mLast = oldLast + insertCount;
+      return;
     }
 
-    storage.mFirst = begin;
-    storage.mLast = begin + count;
-    storage.mEnd = begin + count;
-    return true;
+    // Reallocate: 1.5x growth, or exactly newSize when growth would overflow/undershoot.
+    std::size_t newCapacity = capacity + capacity / 2u;
+    if (newCapacity < newSize) {
+      newCapacity = newSize;
+    }
+
+    auto* const newFirst = static_cast<moho::OccupySourceBinding*>(
+      newCapacity != 0u
+        ? gpg::core::legacy::AllocateChecked12ByteLane(static_cast<std::uint32_t>(newCapacity))
+        : ::operator new(0)
+    );
+
+    moho::OccupySourceBinding* dest = newFirst;
+    for (const moho::OccupySourceBinding* src = storage.mFirst; src != insertPosition; ++src, ++dest) {
+      ::new (static_cast<void*>(dest)) moho::OccupySourceBinding(*src);
+    }
+    for (std::size_t i = 0; i < insertCount; ++i, ++dest) {
+      ::new (static_cast<void*>(dest)) moho::OccupySourceBinding(fillValue);
+    }
+    for (const moho::OccupySourceBinding* src = insertPosition; src != storage.mLast; ++src, ++dest) {
+      ::new (static_cast<void*>(dest)) moho::OccupySourceBinding(*src);
+    }
+
+    if (storage.mFirst != nullptr) {
+      ::operator delete(storage.mFirst);
+    }
+    storage.mFirst = newFirst;
+    storage.mLast = dest;
+    storage.mEnd = newFirst + newCapacity;
   }
 
   /**
@@ -1614,9 +1701,11 @@ namespace
    * What it does:
    * Out-of-line specialization of
    * `msvc8::vector<OccupySourceBinding>::resize(size_type, const OccupySourceBinding&)`.
-   * When `newSize <= current size`, calls the range-erase helper (FUN_0076C430) on
-   * the tail. When `newSize > current size`, forwards to the `_Insert_n` grow path
-   * (FUN_0076C490) with the prefilled binding. Each binding is 16 bytes.
+   * When `newSize <= current size`, truncates `mLast` to `mFirst + newSize` (bindings
+   * are trivially destructible, so no per-element teardown is needed). When
+   * `newSize > current size`, forwards to the `_Insert_n` grow path
+   * (`InsertOccupySourceBindingRange`, FUN_0076C490) appending `newSize - current size`
+   * copies of the prefilled binding at the tail. Each binding is 12 bytes.
    */
   void ResizeOccupySourceBindingVectorWithFill(
     LegacyVectorStorage<moho::OccupySourceBinding>& storage,
@@ -1624,7 +1713,18 @@ namespace
     const moho::OccupySourceBinding& fillValue
   )
   {
-    (void)ResizeLegacyVectorStorage(storage, newSize, fillValue);
+    const std::size_t curSize = storage.mFirst != nullptr
+      ? static_cast<std::size_t>(storage.mLast - storage.mFirst)
+      : 0u;
+
+    if (newSize <= curSize) {
+      if (storage.mFirst != nullptr) {
+        storage.mLast = storage.mFirst + newSize;
+      }
+      return;
+    }
+
+    InsertOccupySourceBindingRange(storage, storage.mLast, newSize - curSize, fillValue);
   }
 
   /**
@@ -1763,30 +1863,6 @@ namespace
       return outNext;
     }
     return nullptr;
-  }
-
-  /**
-   * Address: 0x0076CBA0 (FUN_0076CBA0)
-   *
-   * What it does:
-   * Fills `count` contiguous `OccupySourceBinding` lanes from one prototype
-   * binding and returns one-past the final destination lane.
-   */
-  [[maybe_unused]] moho::OccupySourceBinding* FillOccupySourceBindingRangeFromPrototype(
-    moho::OccupySourceBinding* destinationBegin,
-    const std::uint32_t count,
-    const moho::OccupySourceBinding* const prototype
-  ) noexcept
-  {
-    std::uintptr_t cursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    for (std::uint32_t index = 0u; index < count; ++index) {
-      if (cursor != 0u && prototype != nullptr) {
-        auto* const output = reinterpret_cast<moho::OccupySourceBinding*>(cursor);
-        *output = *prototype;
-      }
-      cursor += sizeof(moho::OccupySourceBinding);
-    }
-    return reinterpret_cast<moho::OccupySourceBinding*>(cursor);
   }
 
   /**
