@@ -8,7 +8,12 @@
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/mesh/Mesh.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/CWldTerrainDecal.h"
+#include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
+#include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/math/QuaternionMath.h"
@@ -194,6 +199,92 @@ namespace
     }
 
     return node;
+  }
+
+  /**
+   * Texture shared by the 3D dragger's two highlight decals, and also the
+   * name bound into each decal's slot-0 name lane.
+   *
+   * Binary: `aTexturesUiComm_4` at `ds:0x00E47560`, referenced four times
+   * inside `SelectionDragger3D::SetTextures` (0x00864950) - twice as the
+   * `GetTexture` path and twice as the `SetName` payload.
+   */
+  constexpr const char* kSelectionHighlightDecalTexturePath =
+    "/textures/ui/common/game/selection/selection.dds";
+
+  /**
+   * Address: 0x00864A19-0x00864B1F and 0x00864B1F-0x00864C2D
+   *          (inlined twice into `Moho::SelectionDragger3D::SetTextures`,
+   *          0x00864950)
+   *
+   * What it does:
+   * Creates one terrain highlight decal of the requested type through the
+   * decal manager, binds it into `decalSlot`, and forces it into the
+   * always-visible state the dragger needs: unrestricted fidelity, the shared
+   * selection texture in name slot 0, no near cutoff, and both the LOD cutoff
+   * and the spatial-db dissolve cutoff pushed to `FLT_MAX` so the highlight
+   * never fades out with camera distance. Flatness optimization is turned off
+   * last, because the highlight has to follow terrain relief under the drag
+   * box rather than be flattened to a single plane.
+   *
+   * The binary re-reads the weak slot and re-applies its `-4` downcast before
+   * nearly every field write rather than caching one decal pointer, which is
+   * what a body that dereferences the weak lane each time compiles to - hence
+   * this takes the slot itself, not an already-resolved reference.
+   */
+  void CreateHighlightDecal(
+    moho::CDecalManager& decalManager,
+    moho::WeakPtr<moho::CWldTerrainDecal>& decalSlot,
+    const moho::EWldTerrainDecalType decalType
+  )
+  {
+    decalSlot.Set(decalManager.LoadDecal(nullptr));
+
+    decalSlot.GetObjectPtr()->mFidelity = 0;
+    decalSlot.GetObjectPtr()->mType = decalType;
+    decalSlot.GetObjectPtr()->SetName(kSelectionHighlightDecalTexturePath, 0);
+    decalSlot.GetObjectPtr()->mNearCutoff = 0.0f;
+    decalSlot.GetObjectPtr()->mCutoffLOD = std::numeric_limits<float>::max();
+    decalSlot.GetObjectPtr()->mEntry.UpdateDissolveCutoff(std::numeric_limits<float>::max());
+    decalSlot.GetObjectPtr()->EnableFlatOptimization(false);
+  }
+
+  /**
+   * Address: 0x008644B5-0x00864519 and 0x00864519-0x0086457B
+   *          (inlined twice into `Moho::SelectionDragger3D::DragMove`,
+   *          0x00864340)
+   *
+   * What it does:
+   * Points one highlight decal at the current drag box: horizontal scale from
+   * the heading-aligned drag delta (vertical scale pinned to 1.0), origin at
+   * the drag anchor, and a pure yaw rotation matching the camera. `Update()`
+   * republishes the decal's transform and spatial-db bounds.
+   *
+   * Both decals receive byte-identical values - only their `mType` differs -
+   * so this is one helper called twice rather than two transforms.
+   */
+  void ApplyHighlightDecalTransform(
+    moho::WeakPtr<moho::CWldTerrainDecal>& decalSlot,
+    const Wm3::Vector3f& alignedDragExtent,
+    const Wm3::Vector3f& anchorPosition,
+    const float headingRotation
+  )
+  {
+    moho::CWldTerrainDecal* const decal = decalSlot.GetObjectPtr();
+
+    decal->mScale.x = alignedDragExtent.x;
+    decal->mScale.y = 1.0f;
+    decal->mScale.z = alignedDragExtent.z;
+
+    decal->mPosition.x = anchorPosition.x;
+    decal->mPosition.y = anchorPosition.y;
+    decal->mPosition.z = anchorPosition.z;
+
+    decal->mOrientation.x = 0.0f;
+    decal->mOrientation.y = headingRotation;
+    decal->mOrientation.z = 0.0f;
+
+    decal->Update();
   }
 } // namespace
 
@@ -659,10 +750,8 @@ namespace moho
     , mStretch(0)
     , pad_0025{0, 0, 0}
     , mDragEndPos(Invalid<Wm3::Vector3f>())
-    , field_0x34(0)
-    , field_0x38(0)
-    , field_0x3C(0)
-    , field_0x40(0)
+    , mAlbedoDecal()
+    , mWaterAlbedoDecal()
     , mHighlightTexture()
     , mDecalManager(session->mWldMap->mTerrainRes->GetDecalManager())
   {}
@@ -688,6 +777,160 @@ namespace moho
   }
 
   /**
+   * Address: 0x00864340 (FUN_00864340, Moho::SelectionDragger3D::Func2)
+   * Mangled: vtable slot +0x04 of ??_7SelectionDragger3D@Moho@@6B@ (0x00E47A28)
+   *
+   * IDA signature:
+   * void __thiscall Moho::SelectionDragger3D::Func2(
+   *     Moho::SelectionDragger3D *this, Moho::SMauiEventData *a2);
+   *
+   * What it does:
+   * One pointer-drag step of the volumetric dragger. Latches `mStretch` once
+   * the cursor has travelled past the click threshold, then unprojects the
+   * cursor onto the terrain surface. The first sample that lands on a valid
+   * surface while `mPos` is still the invalid sentinel *anchors* `mPos` and
+   * returns - there is no box yet. Every later sample stores the surface
+   * point in `mDragEndPos`, ensures the two highlight decals exist, stretches
+   * them across the camera-heading-aligned delta between anchor and cursor,
+   * and rebuilds the global bracket set from everything the drag volume now
+   * covers.
+   *
+   * Invocation: vtable slot +0x04 of `??_7SelectionDragger3D@Moho@@6B@`,
+   * dispatched at 0x008638A3 (`call edx`, `edx = [[this]+4]`) inside
+   * `SelectionDragger::DragRelease` (0x00863870).
+   */
+  void SelectionDragger3D::DragMove(const SMauiEventData* const eventData)
+  {
+    const float cursorX = eventData->mMousePos.x;
+    const float cursorY = eventData->mMousePos.y;
+
+    const float dragX = cursorX - mX0;
+    const float dragY = cursorY - mY0;
+    const bool stretchedPastClick =
+      std::sqrt((dragX * dragX) + (dragY * dragY)) > kSelectionDragStretchThresholdPixels;
+    // Latching `or` (0x008643BD), not an assignment: once a drag has
+    // stretched it stays stretched even if the cursor comes back.
+    mStretch = static_cast<std::uint8_t>(mStretch | (stretchedPastClick ? 1u : 0u));
+
+    Wm3::Vector2f cursorPoint{};
+    cursorPoint.x = cursorX;
+    cursorPoint.y = cursorY;
+
+    const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(cursorPoint);
+    if (!IsValidVector3f(surfacePoint)) {
+      return;
+    }
+
+    if (!IsValidVector3f(mPos)) {
+      // First surface-valid sample of this drag: anchor it and stop. The
+      // binary writes the three lanes individually here (0x008643F7) rather
+      // than assigning the vector wholesale as the `mDragEndPos` path below
+      // does.
+      mPos.x = surfacePoint.x;
+      mPos.y = surfacePoint.y;
+      mPos.z = surfacePoint.z;
+      return;
+    }
+
+    mDragEndPos.x = surfacePoint.x;
+    mDragEndPos.y = surfacePoint.y;
+    mDragEndPos.z = surfacePoint.z;
+
+    SetTextures();
+
+    // The decals are yaw-rotated *against* the camera, and the drag delta is
+    // rotated into that same frame, so the box stays screen-aligned however
+    // the camera is turned. `BuildSelectionSolid` (0x00864670) reaches the
+    // same frame from the other direction - it orients by `+heading` and
+    // rotates the delta by the conjugate.
+    const float headingRotation = -mCam->CameraGetHeading();
+
+    Wm3::Vector3f worldDelta{};
+    worldDelta.x = mDragEndPos.x - mPos.x;
+    worldDelta.y = mDragEndPos.y - mPos.y;
+    worldDelta.z = mDragEndPos.z - mPos.z;
+
+    const Wm3::Quaternionf headingOrientation = COORDS_Orient(headingRotation, 0.0f);
+
+    Wm3::Vector3f alignedDragExtent{};
+    MultQuadVec(&alignedDragExtent, &worldDelta, &headingOrientation);
+
+    ApplyHighlightDecalTransform(mAlbedoDecal, alignedDragExtent, mPos, headingRotation);
+    ApplyHighlightDecalTransform(mWaterAlbedoDecal, alignedDragExtent, mPos, headingRotation);
+
+    ScopedLocalSelectionSet draggedSelection;
+    CollectSelectionDraggerEntities(draggedSelection.get(), *this);
+
+    ClearSelectionBrackets();
+
+    SSelectionNodeUserEntity* node = draggedSelection.get().mHead->mLeft;
+    node = SSelectionSetUserEntity::find(&draggedSelection.get(), node, &node);
+    while (node != draggedSelection.get().mHead) {
+      SSelectionSetUserEntity::AddResult addResult{};
+      (void)SSelectionSetUserEntity::Add(&addResult, &sSelectionBrackets, DecodeSelectionEntity(node->mEnt));
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&draggedSelection.get(), node, &node);
+    }
+  }
+
+  /**
+   * Address: 0x00864950 (FUN_00864950, Moho::SelectionDragger3D::SetTextures)
+   *
+   * IDA signature:
+   * void __stdcall Moho::SelectionDragger3D::SetTextures(
+   *     Moho::SelectionDragger3D *a1);
+   *
+   * What it does:
+   * Lazily brings up this dragger's two terrain highlight decals. Returns
+   * immediately once `mAlbedoDecal` resolves to a live decal, so the
+   * per-motion `DragMove` call only ever builds them once. Otherwise it loads
+   * the shared selection texture, creates an `Albedo` decal for land and a
+   * `WaterAlbedo` decal for water - identical apart from `mType`, so the
+   * highlight paints across both surfaces - and raises both to the front of
+   * the manager's draw order so nothing else overdraws them.
+   *
+   * Invocation: called once from `SelectionDragger3D::DragMove` (0x00864340)
+   * at 0x00864441, on the branch that has just latched a valid drag-end
+   * world position.
+   */
+  void SelectionDragger3D::SetTextures()
+  {
+    // 0x0086496E-0x0086497D: load the weak slot, apply its `-4` downcast, and
+    // bail when the result is non-null. `mAlbedoDecal` and `mWaterAlbedoDecal`
+    // are always created together, so testing the first covers both.
+    if (mAlbedoDecal.GetObjectPtr() != nullptr) {
+      return;
+    }
+
+    ID3DDeviceResources::TextureResourceHandle highlightTexture;
+    D3D_GetDevice()->GetResources()->GetTexture(
+      highlightTexture, kSelectionHighlightDecalTexturePath, nullptr, true
+    );
+    mHighlightTexture = highlightTexture;
+
+    // `mDecalManager` is the `IDecalManager*` the terrain resource handed out,
+    // and the binary reaches both of the calls below through its vtable
+    // (+0x1C `LoadDecal`, +0x4C `MoveDecalToFront`). Those two slots live in
+    // the block `CDecalManager` has not yet promoted into its declared virtual
+    // table, so - exactly as `CConCommand.cpp`'s `NewSplatAt` call site and
+    // `CWldSession.cpp`'s `AddDecals`/`ProcessRemovals` call sites already do -
+    // they are reached through the sole implementing class. `CDecalManager` is
+    // the only class deriving from `IDecalManager` in this binary, so this is
+    // behaviourally identical to the virtual dispatch it stands in for.
+    CDecalManager& decalManager = *static_cast<CDecalManager*>(mDecalManager);
+
+    CreateHighlightDecal(decalManager, mAlbedoDecal, WldTerrainDecalType_Albedo);
+    CreateHighlightDecal(decalManager, mWaterAlbedoDecal, WldTerrainDecalType_WaterAlbedo);
+
+    // Water first, then land (0x00864C2D then 0x00864C45): each call moves its
+    // decal to index 0, so issuing them in this order leaves the land decal
+    // frontmost.
+    decalManager.MoveDecalToFront(mWaterAlbedoDecal.GetObjectPtr());
+    decalManager.MoveDecalToFront(mAlbedoDecal.GetObjectPtr());
+  }
+
+  /**
    * Address: 0x00864C80 (FUN_00864C80, Moho::SelectionDragger3D::Func4)
    * Mangled: vtable slot +0x10 of ??_7SelectionDragger3D@Moho@@6B@
    *
@@ -703,9 +946,10 @@ namespace moho
    * Address: 0x00864670 (FUN_00864670, Moho::SelectionDragger3D::Func5)
    *
    * What it does:
-   * Builds one oriented world-space box between the inherited `mPos`
-   * (current cursor world position) and `mDragEndPos` (the drag's other
-   * endpoint): orients a 3x3 frame from the active camera's heading via
+   * Builds one oriented world-space box between the inherited `mPos` (the
+   * drag anchor, latched once by `DragMove`) and `mDragEndPos` (the endpoint
+   * `DragMove` rewrites on every later sample): orients a 3x3 frame from the
+   * active camera's heading via
    * `COORDS_Orient`/`QuatToMatrix`, sets the box center to the midpoint of
    * the two points, sets the box's horizontal extents from the two points'
    * delta rotated into that frame (via `MultQuadVec` with the conjugate
