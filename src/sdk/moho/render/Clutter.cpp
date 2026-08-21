@@ -444,6 +444,14 @@ namespace
     head->right = TreeMaximum(tree, root);
   }
 
+  /**
+   * Address: 0x007D8E20 (FUN_007D8E20, sub_7D8E20)
+   *
+   * What it does:
+   * `rb_tree<ClutterRegionKeyNode>::_Lrotate`: rotates `pivot`'s right child
+   * up into `pivot`'s slot, re-parenting the moved subtree and patching the
+   * tree head's root link when `pivot` was the root.
+   */
   void RotateTreeLeft(
     moho::ClutterRegionKeyTreeState* const tree,
     moho::ClutterRegionKeyNode* const pivot
@@ -468,6 +476,13 @@ namespace
     pivot->parent = right;
   }
 
+  /**
+   * Address: 0x007D8E70 (FUN_007D8E70, sub_7D8E70)
+   *
+   * What it does:
+   * `rb_tree<ClutterRegionKeyNode>::_Rrotate`: mirror of `RotateTreeLeft`,
+   * lifting `pivot`'s left child into `pivot`'s slot.
+   */
   void RotateTreeRight(
     moho::ClutterRegionKeyTreeState* const tree,
     moho::ClutterRegionKeyNode* const pivot
