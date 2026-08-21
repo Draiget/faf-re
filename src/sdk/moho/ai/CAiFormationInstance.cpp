@@ -1326,6 +1326,25 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0056F430 (FUN_0056F430, sub_56F430)
+   *
+   * IDA signature:
+   * int **__userpurge sub_56F430@<eax>(int this@<edi>, int **outIt, int *rangeBegin, int *rangeEnd);
+   *
+   * What it does:
+   * `std::map<EntId, SCoordsVec2>::erase(first, last)`. Every reachable
+   * caller in this binary (both `CFormationInstance` constructors and its
+   * destructor, via `CleanupFormation`/`DestroyCoordCacheMapStorage`) passes
+   * `rangeBegin == head->left` and `rangeEnd == head`, i.e. always erases the
+   * whole tree -- the fast path taken here. The general per-node loop the
+   * binary also contains (erasing an arbitrary subrange one element at a
+   * time via `FUN_0056FFB0`) is unreached from any recovered or otherwise
+   * reachable call site (confirmed via xref sweep: `FUN_0056FFB0`'s only
+   * other citing caller, `FUN_0056B740`, is itself byte-verified to have
+   * zero incoming references anywhere in this binary), so it is not
+   * modelled here.
+   */
   void ResetCoordCacheMap(moho::SFormationCoordCacheMap& cache)
   {
     moho::SFormationCoordCacheNode* const head = cache.head;
@@ -1926,6 +1945,19 @@ namespace
     lane.ResetStorageToInline();
   }
 
+  /**
+   * Address: 0x00569470 (FUN_00569470, sub_569470)
+   *
+   * What it does:
+   * Tears one `SFormationCoordCacheMap` all the way down: empties the tree
+   * via the range-erase dispatcher (`ResetCoordCacheMap`, FUN_0056F430),
+   * then frees the head sentinel itself and zeroes the map back to its
+   * unconstructed state. Called (via `CleanupFormation`) from both
+   * `CFormationInstance` constructors and its destructor, always with the
+   * full-range `[head->left, head)` erase -- the only shape
+   * `ResetCoordCacheMap`'s fast path needs to cover for every reachable
+   * caller in this binary.
+   */
   void DestroyCoordCacheMapStorage(moho::SFormationCoordCacheMap& cache)
   {
     if (cache.head == nullptr) {
