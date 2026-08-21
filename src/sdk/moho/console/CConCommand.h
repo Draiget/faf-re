@@ -703,6 +703,19 @@ namespace moho
   void CON_CopySelectedUnitsToClipboard(void* commandArgs);
 
   /**
+   * Address: 0x0089E3C0 (FUN_0089E3C0, Moho::CON_AddSplat)
+   *
+   * What it does:
+   * `AddSplat [texture <path>]`. Drops one tarmac-style decal splat at the
+   * cursor's world position using the active session's terrain decal
+   * manager, textured with `/env/common/splats/tank_treads_albedo.dds`
+   * unless a `texture <path>` argument pair overrides it. Prints a localized
+   * "no session" line when there is no active session; silently does
+   * nothing if the session has no terrain resource.
+   */
+  void CON_AddSplat(void* commandArgs);
+
+  /**
    * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
    *
    * What it does:

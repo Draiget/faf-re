@@ -50,8 +50,10 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CRandomStream.h"
+#include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SimDriver.h"
@@ -2698,6 +2700,64 @@ void moho::CON_CopySelectedUnitsToClipboard(void* const commandArgs)
 }
 
 /**
+ * Address: 0x0089E3C0 (FUN_0089E3C0, Moho::CON_AddSplat)
+ *
+ * IDA signature:
+ * void __cdecl Moho::CON_AddSplat(std::vector_string *arg0);
+ *
+ * What it does:
+ * `AddSplat [texture <path>]`. Drops one decal splat at the cursor's world
+ * position through the active session's terrain decal manager, textured with
+ * `/env/common/splats/tank_treads_albedo.dds` by default. Scanning arguments
+ * 1..N-1 for a literal "texture" token overrides the texture path with the
+ * following argument. The decal type passed to `NewSplatAt` is a raw `1` in
+ * the binary (IDA's own "DECALTYPE_Tarmac" label is a mislabeled unrelated
+ * enum - the value matches `WldTerrainDecalType_Albedo`, consistent with the
+ * default texture's own "albedo" filename). Prints "No session." when there
+ * is no active session; silently does nothing when the session has no
+ * terrain resource or decal manager.
+ */
+void moho::CON_AddSplat(void* const commandArgs)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    CON_Printf("No session.");
+    return;
+  }
+
+  msvc8::string texturePath = "/env/common/splats/tank_treads_albedo.dds";
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  const std::size_t tokenCount = args.Count();
+  for (std::size_t i = 1u; i < tokenCount; ++i) {
+    if (const msvc8::string* const token = args.At(i); token != nullptr && *token == "texture") {
+      if (const msvc8::string* const path = args.At(i + 1u); path != nullptr) {
+        texturePath = *path;
+      }
+    }
+  }
+
+  IWldTerrainRes* const terrainRes = session->mWldMap != nullptr ? session->mWldMap->mTerrainRes : nullptr;
+  if (terrainRes == nullptr) {
+    return;
+  }
+
+  // `GetDecalManager()` returns the `IDecalManager` interface pointer the
+  // binary dispatches `NewSplatAt` through (vtable slot +0x44); `CDecalManager`
+  // is this engine's sole concrete implementation, and `NewSplatAt` is not
+  // yet one of the members `CDecalManager` has moved into its declared
+  // "virtual dispatch table, in binary slot order" section (see that
+  // section's own comment in CWldSplat.h), so this calls it directly on the
+  // concrete type rather than through a not-yet-modelled virtual slot --
+  // behaviorally identical while there is only one implementing class.
+  if (IDecalManager* const decalManager = terrainRes->GetDecalManager(); decalManager != nullptr) {
+    (void)static_cast<CDecalManager*>(decalManager)->NewSplatAt(
+      session->CursorWorldPos, WldTerrainDecalType_Albedo, texturePath
+    );
+  }
+}
+
+/**
  * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
  *
  * IDA signature:
@@ -3705,6 +3765,10 @@ namespace
   constexpr const char* kConsoleStartupConDestroySelectedUnitsDescription = "destroy selected units.";
   constexpr const char* kConsoleStartupConCopySelectedUnitsToClipboardDescription =
     "copy selected units as a CreateUnitAtMouse Lua script to the clipboard.";
+  /// 0x00E4B6D8, the `.data` initializer of `Moho::CConFunc_AddSplat` (read
+  /// directly from the shipped exe, matching this file's established
+  /// `.data`-readback convention for these description constants).
+  constexpr const char* kConsoleStartupConAddSplatDescription = "Add a splat to the world underneath the cursor";
   constexpr const char* kConsoleStartupConProcessInfoPairDescription =
     "set the assist mode flag for the selected units.";
   constexpr const char* kConsoleStartupConUITrackUnitDescription = "track selected units.";
@@ -3760,6 +3824,7 @@ namespace
   CConFunc gCConFunc_KillSelectedUnits{};
   CConFunc gCConFunc_DestroySelectedUnits{};
   CConFunc gCConFunc_CopySelectedUnitsToClipboard{};
+  CConFunc gCConFunc_AddSplat{};
   CConFunc gCConFunc_ProcessInfoPair{};
   CConFunc gCConFunc_UI_TrackUnit{};
   CConFunc gCConFunc_RenameUnit{};
@@ -5177,6 +5242,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C08480 (FUN_00C08480, ??1CConFunc_AddSplat@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `AddSplat`.
+   */
+  void cleanup_CConFunc_AddSplat()
+  {
+    CleanupStartupConCommand(gCConFunc_AddSplat);
+  }
+
+  /**
+   * Address: 0x00BE7CE0 (FUN_00BE7CE0, register_CConFunc_AddSplat)
+   *
+   * Callsite evidence (class 2, data xref into a function-pointer table):
+   * `FUN_0089E3C0.xrefs.txt` -> `code from=0x00BE7D00 owner=0x00BE7CE0 ...
+   * mov Moho__CConFunc_AddSplat.mFunc, offset Moho__CON_AddSplat`.
+   *
+   * What it does:
+   * Registers startup console callback for `AddSplat`.
+   */
+  void register_CConFunc_AddSplat()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_AddSplat,
+      kConsoleStartupConAddSplatDescription,
+      "AddSplat",
+      &CON_AddSplat,
+      &cleanup_CConFunc_AddSplat
+    );
+  }
+
+  /**
    * Address: 0x00C06280 (FUN_00C06280, ??1CConFunc_ProcessInfoPair@Moho@@QAE@@Z)
    *
    * What it does:
@@ -5596,6 +5693,7 @@ namespace
       moho::register_CConFunc_KillSelectedUnits();
       moho::register_CConFunc_DestroySelectedUnits();
       moho::register_CConFunc_CopySelectedUnitsToClipboard();
+      moho::register_CConFunc_AddSplat();
       moho::register_CConFunc_ProcessInfoPair();
       moho::register_CConFunc_UI_TrackUnit();
       moho::register_CConFunc_RenameUnit();
