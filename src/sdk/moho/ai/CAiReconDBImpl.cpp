@@ -981,18 +981,8 @@ namespace
     ReconBlip* const blip
   )
   {
-    auto& view = msvc8::AsVectorRuntimeView(values);
-    if (view.begin == nullptr || view.end == view.capacityEnd) {
-      GrowBlipPointerVector(values, 1u);
-      view = msvc8::AsVectorRuntimeView(values);
-      if (view.end != view.begin) {
-        *(view.end - 1) = blip;
-      }
-      return blip;
-    }
-
-    *view.end = blip;
-    ++view.end;
+    // Grow when full, otherwise store at mLast and bump it: push_back.
+    values.push_back(blip);
     return blip;
   }
 

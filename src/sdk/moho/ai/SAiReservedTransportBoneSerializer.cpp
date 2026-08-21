@@ -128,14 +128,8 @@ namespace
  */
 void* moho::ResetReservedTransportBoneEntry(SAiReservedTransportBone& bone)
 {
-  auto& reservedBonesView = msvc8::AsVectorRuntimeView(bone.reservedBones);
-  if (reservedBonesView.begin != nullptr) {
-    ::operator delete(reservedBonesView.begin);
-  }
-
-  reservedBonesView.begin = nullptr;
-  reservedBonesView.end = nullptr;
-  reservedBonesView.capacityEnd = nullptr;
+  // Free the block and null all three lanes: VC8 _Tidy().
+  bone.reservedBones = decltype(bone.reservedBones){};
 
   void* result = bone.reservedUnit.ownerLinkSlot;
   if (result != nullptr) {
@@ -184,15 +178,11 @@ void* moho::ResetReservedTransportBoneEntryThunkB(SAiReservedTransportBone& bone
  */
 void moho::ResetReservedTransportBoneVectorStorage(msvc8::vector<SAiReservedTransportBone>& storage)
 {
-  auto& view = msvc8::AsVectorRuntimeView(storage);
-  if (view.begin != nullptr) {
-    (void)DestroyReservedTransportBoneRange(view.begin, view.end);
-    ::operator delete(view.begin);
+  // Element sweep first, then VC8 _Tidy().
+  if (!storage.empty()) {
+    (void)DestroyReservedTransportBoneRange(storage.begin(), storage.end());
   }
-
-  view.begin = nullptr;
-  view.end = nullptr;
-  view.capacityEnd = nullptr;
+  storage = msvc8::vector<SAiReservedTransportBone>{};
 }
 
 /**
