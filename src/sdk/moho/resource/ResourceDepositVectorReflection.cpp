@@ -8,7 +8,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/ResourceDeposit.h"
+#include "moho/resource/ResourceDeposit.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -318,6 +318,8 @@ namespace
 
   ResourceDepositVectorReflectionBootstrap gResourceDepositVectorReflectionBootstrap;
 } // namespace
+
+gpg::RVectorType_ResourceDeposit::~RVectorType_ResourceDeposit() = default;
 
 /**
  * Address: 0x005474C0 (FUN_005474C0, gpg::RVectorType_ResourceDeposit::GetName)
