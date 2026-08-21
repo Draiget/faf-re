@@ -12936,7 +12936,7 @@ namespace
     SSTIUnitVariableDataSlotRuntime* const oldLast = storage.end;
     (void)CopySSTIUnitVariableDataSlotRangeWithRollback(oldLast - 1, oldLast, oldLast);
     ++storage.end;
-    (void)CopyAssignSSTIUnitVariableDataSlotRangeReverse(oldLast, insertPosition, oldLast - 1);
+    (void)CopyAssignSSTIUnitVariableDataSlotRangeReverse(oldLast, oldLast - 1, insertPosition);
     (void)CopyAssignSSTIUnitVariableDataSlotRange(insertPosition, insertPosition + 1, &value);
     return insertPosition;
   }
