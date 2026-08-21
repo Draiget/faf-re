@@ -17,6 +17,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00526740 (FUN_00526740, gpg::RVectorType_RUnitBlueprintWeapon::dtr)
+     */
+    ~RVectorType_RUnitBlueprintWeapon() override;
+
+    /**
      * Address: 0x00523490 (FUN_00523490, gpg::RVectorType_RUnitBlueprintWeapon::GetName)
      */
     [[nodiscard]] const char* GetName() const override;

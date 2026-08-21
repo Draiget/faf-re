@@ -9,7 +9,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -21,6 +21,11 @@ namespace
   class CurveKeyVectorTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x00517570 (FUN_00517570, gpg::RVectorType_REmitterCurveKey::dtr)
+     */
+    ~CurveKeyVectorTypeInfo() override;
+
     [[nodiscard]] const char* GetName() const override;
     /**
      * Address: 0x00515C60 (FUN_00515C60, gpg::RVectorType_REmitterCurveKey::GetLexical)
@@ -770,6 +775,11 @@ namespace
   {
     return CopyEmitterCurveKeyRange(destinationBegin, sourceBegin, sourceEnd);
   }
+
+  /**
+   * Address: 0x00517570 (FUN_00517570, gpg::RVectorType_REmitterCurveKey::dtr)
+   */
+  CurveKeyVectorTypeInfo::~CurveKeyVectorTypeInfo() = default;
 
   /**
    * Address: 0x00515BA0 (FUN_00515BA0, gpg::RVectorType_REmitterCurveKey::GetName)
