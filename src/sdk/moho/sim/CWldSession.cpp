@@ -12304,6 +12304,32 @@ namespace moho
    * Recursively destroys one weak-set subtree and unlinks each node from its
    * user-entity weak-owner intrusive lane before delete.
    */
+  /**
+   * Address: 0x007B4640 (FUN_007B4640, `_Tree::_Buynode()`)
+   *
+   * IDA signature:
+   * SSelectionNodeUserEntity* __usercall sub_7B4640@<eax>();
+   *
+   * What it does:
+   * Buys one neutral red-black tree node: `ecx = 1` into the shared checked
+   * 28-byte allocator, then all three links nulled, colour black and the
+   * sentinel flag cleared. Every weak-entity set in the engine comes up
+   * through this lane -- fourteen recovered callers reach it.
+   */
+  SSelectionNodeUserEntity* WeakEntitySetUserEntity::BuyNode()
+  {
+    auto* const node =
+      static_cast<SSelectionNodeUserEntity*>(msvc8::detail::AllocateChecked28ByteElements(1u));
+    node->mLeft = nullptr;
+    node->mParent = nullptr;
+    node->mRight = nullptr;
+    node->mColor = 1u;
+    node->mIsSentinel = 0u;
+    // The binary writes only +0x18 and +0x19 here; the two padding bytes at
+    // +0x1A keep whatever the allocator handed back, so they are left alone.
+    return node;
+  }
+
   void WeakEntitySetUserEntity::DestroySubtree(SSelectionNodeUserEntity* node)
   {
     SSelectionNodeUserEntity* cursor = node;

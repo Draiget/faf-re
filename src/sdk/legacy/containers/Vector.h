@@ -3175,6 +3175,17 @@ namespace msvc8
             std::uint32_t* insertPosition,
             std::uint32_t count,
             const std::uint32_t* valuePtr) noexcept;
+
+        /**
+         * Address: 0x007B4FA0 (FUN_007B4FA0), among others -- see the
+         * definition in Vector.cpp for the full address list.
+         *
+         * VC8's `_Allocate(count, (_Node*)0)` for the 28-byte red-black tree
+         * node, overflow guard included. Declared here so tree code outside
+         * this translation unit can buy nodes through the same checked lane
+         * the binary uses instead of open-coding `operator new`.
+         */
+        void* AllocateChecked28ByteElements(std::uint32_t count);
     } // namespace detail
 
     /**
