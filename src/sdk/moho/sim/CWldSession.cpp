@@ -2121,16 +2121,28 @@ namespace moho
      * position. Only builds one when the node has no mesh yet and its command is
      * a `BuildMobile`; every other order draws with waypoint markers alone.
      *
-     * Analyzed, not yet recovered - part of the same rebuild frontier as
-     * `AddCommandQueueToCommandGraph` / `EstimateEdgeTravelTicks` /
-     * `EstimateDrawNodeWorkTicks` below. The body resolves the command's
-     * `SSTICommandConstantData::blueprint`, asks it for its display data
-     * (virtual slot 5), hands that to `CWldSession::mRules`' virtual slot 15 to
-     * get an `RMeshBlueprint`, then builds a "UnitPlace"-shadered
-     * `MeshMaterial` from the three texture-name strings at that blueprint's
-     * +0x64 and creates the instance through `MeshRenderer::CreateMeshInstance`
-     * with colour 0xFF00FF00. Blocked on modelling `RMeshBlueprint`'s +0x64
-     * string triple and the two virtual slots, neither of which is pinned yet.
+     * The chain, with the three offsets an earlier pass could not place now
+     * resolved against the disassembly:
+     *  - `helper+0x20` is `mConstantData.blueprint` (`mConstantData` sits at
+     *    helper+0x04, `blueprint` at its own +0x1C), an `REntityBlueprint*`;
+     *  - virtual slot 5 (0x008273B2, `[eax+0x14]`) is
+     *    `REntityBlueprint::IsUnitBlueprint`, returning the `RUnitBlueprint`
+     *    whose `Display` subobject starts at +0x200 - which is what makes
+     *    +0x21C `Display.MeshBlueprint` (an `RResId`, *not* the `VTransform`
+     *    the decompiler infers from its 0x1C-byte width) and +0x270
+     *    `Display.UniformScale`;
+     *  - virtual slot 15 (0x008273D3, `[edx+0x3C]`) on `CWldSession::mRules`
+     *    is `RRuleGameRules::GetMeshBlueprint(const RResId&)`, which is why
+     *    the +0x21C `RResId` is the argument handed to it;
+     *  - the "+0x64 string triple" is not a field of `RMeshBlueprint` at all.
+     *    `mLods` starts at +0x60 and +0x64 is its `first_` lane, so the three
+     *    strings the binary addresses at +0x1C/+0x38/+0x54 off that pointer
+     *    are `mAlbedoName`/`mNormalsName`/`mSpecularName` of `mLods[0]`.
+     *
+     * Note the colour appears twice and the decompiler folds them together:
+     * `CreateMeshInstance` is handed 0xFF00FF00, then the instance's own
+     * colour lane is overwritten with 0xD800D800 - the alpha-0xD8 translucent
+     * green the ghost actually renders in.
      */
     static void CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph);
 
@@ -4979,6 +4991,98 @@ namespace moho
   /**
    * What it does: see the header.
    */
+  void UICommandGraph::CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph)
+  {
+    // 0x008274D7 hands CreateMeshInstance an opaque green, then 0x008274FB
+    // immediately overwrites the instance's own colour lane with the
+    // alpha-0xD8 shade the placement ghost actually draws in.
+    constexpr std::int32_t kPreviewCreateColor = static_cast<std::int32_t>(0xFF00FF00u);
+    constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0xD800D800u);
+
+    // Already has its ghost - the mesh outlives the rebuild that made it.
+    if (drawNode.mMeshInstance.px != nullptr) {
+      return;
+    }
+
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (helper == nullptr) {
+      return;
+    }
+
+    // Only a queued mobile build produces a unit to preview; every other order
+    // type draws with waypoint markers and orderlines alone.
+    if (ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
+      return;
+    }
+
+    const REntityBlueprint* const entityBlueprint = helper->mConstantData.blueprint;
+    if (entityBlueprint == nullptr) {
+      return;
+    }
+
+    const RUnitBlueprint* const unitBlueprint = entityBlueprint->IsUnitBlueprint();
+    if (unitBlueprint == nullptr) {
+      return;
+    }
+
+    RMeshBlueprint* const meshBlueprint =
+      graph.mSession->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
+    if (meshBlueprint == nullptr) {
+      return;
+    }
+
+    const float uniformScale = unitBlueprint->Display.UniformScale;
+    const Wm3::Vec3f previewScale{uniformScale, uniformScale, uniformScale};
+
+    // 0x008273F1 loads `mLods.first_` once and addresses the LOD's texture
+    // names off it (+0x1C/+0x38/+0x54) with no empty-vector guard - a mesh
+    // blueprint that resolved this far always carries at least one LOD.
+    const RMeshBlueprintLOD* const lod = meshBlueprint->mLods.begin();
+
+    // The ghost keeps the LOD's real albedo/normals/specular maps but swaps the
+    // shader for "UnitPlace"; the lookup and secondary slots stay empty. This
+    // is why the six-string Create overload is called directly instead of the
+    // `Create(const RMeshBlueprintLOD&, ...)` one, which would carry
+    // `lod->mShaderName` through.
+    const msvc8::string shaderName("UnitPlace");
+    const msvc8::string emptyLookupName;
+    const msvc8::string emptySecondaryName;
+    const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+      shaderName,
+      lod->mAlbedoName,
+      lod->mNormalsName,
+      lod->mSpecularName,
+      emptyLookupName,
+      emptySecondaryName,
+      nullptr
+    );
+
+    MeshInstance* const meshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
+      graph.mSession->mGameTick, kPreviewCreateColor, meshBlueprint, previewScale, false, material
+    );
+
+    boost::ResetSharedPtrRawOwning(drawNode.mMeshInstance, meshInstance);
+    drawNode.mMeshInstance.px->color = kPreviewTranslucentGreen;
+
+    // The binary builds the stance at the origin (0x00827514..0x00827532) and
+    // only afterwards divides the node's accumulated position by its weight,
+    // storing the centroid straight into the transform's translation lane - so
+    // the zero vector here is the constructor argument the original passed, not
+    // a placeholder.
+    VTransform stance{Wm3::Vec3f{0.0f, 0.0f, 0.0f}, Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f}};
+    const float invWeight = 1.0f / drawNode.mWeight;
+    stance.pos_ = Wm3::Vec3f{
+      drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
+    };
+
+    // Same transform as both start and end: the placement ghost snaps to the
+    // order's position rather than interpolating toward it.
+    drawNode.mMeshInstance.px->SetStance(stance, stance);
+  }
+
+  /**
+   * What it does: see the header.
+   */
   void UICommandGraph::CreateMeshes()
   {
     bool rebuilt = false;
@@ -5060,8 +5164,69 @@ namespace moho
    * command-issue helpers, finds-or-creates a draw node per command, adds this
    * entity's position into the queue-head node's centroid accumulator, and
    * chains consecutive orders together through `LinkCommandGraphEdge`
-   * (0x00826960). Blocked on that edge builder and the `mMapC`/tree/`mMapD`
-   * container primitives beneath it.
+   * (0x00826960).
+   *
+   * Still blocked on that edge builder, but *not* on unknown layout - every
+   * offset below is now pinned, and the earlier "the `mMapC`/tree/`mMapD`
+   * container primitives" reading was wrong about what those primitives are.
+   * They are not bespoke containers: each is an emission of a template this
+   * file (or `legacy/containers`) already models, so the remaining work is
+   * instantiating the existing templates, not writing new per-type bodies.
+   *
+   * `LinkCommandGraphEdge(toNode@ecx, fromNode@edx, graph, forceHighlight)`
+   * decomposes as:
+   *  - 0x0082B490 - find-or-create the edge in `mMapC`, keyed by the 64-bit
+   *    `{fromNode, toNode}` pair, returning `&node->mEdge` (node+0x10). It is
+   *    the exact analogue of `FindOrInsertCommandGraphDrawNode` (0x0082B300),
+   *    and confirms `HashListNode2C` is
+   *    `{mNext, mPrev, mKeyLow@0x08, mKeyHigh@0x0C, mEdge@0x10}` - the edge's
+   *    own `mFromNode`/`mToNode` at +0x08/+0x0C are written *through* that
+   *    returned payload pointer at 0x008269AA/0x008269AD.
+   *  - 0x0082C750 / 0x0082C950 / 0x0082C480 / 0x0082B5E0 - `FindHashListNode`
+   *    and `InsertOrFindHashListNode` again, for `HashListNode2C` and
+   *    `HashListNode10`. 0x0082C480 was diffed against the recovered
+   *    0x0082BFB0 body: identical load-factor test, identical incremental
+   *    one-bucket rehash, identical cascade and insert-point walks. Only the
+   *    key traits differ - the 2C lane hashes a 64-bit key as
+   *    `3863*lo + 7919*hi + 53849*(lo ^ hi)` before the same Park-Miller
+   *    Schrage tail, and compares `(lo, hi)` lexicographically. So these are
+   *    one source template over `<TNode, TKey>`, and recovering them means
+   *    generalising `FindHashListNode88`/`InsertOrFindHashListNode88` rather
+   *    than forking a copy per node size.
+   *  - 0x0082B8B0 - `mGraphRuntimeTree[texture]`, i.e. VC8
+   *    `map::operator[]`: a `lower_bound` descent whose result is handed to
+   *    the hinted insert at 0x0082CC80. That hinted insert is the same
+   *    template `legacy/containers/RbTree.h` already carries as
+   *    `insert_hint` (its batch-bucket emission is cited there at
+   *    0x007E3340), over `insert_at`(0x0082E320) and `insert_unique`
+   *    (0x0082E170). The tree is keyed on the texture's *control block*
+   *    (0x008B8D0's compare reads node+0x10 against key+0x04, both `pi`
+   *    lanes), which is precisely boost's owner-based `shared_ptr::operator<`
+   *    - so the modelled type is
+   *    `map<shared_ptr<CD3DBatchTexture>, vector<CommandGraphEdge*>>` and the
+   *    0x18-byte payload is that pair. 0x0082D330 is just its value ctor
+   *    (retain the texture, default the vector).
+   *  - 0x0082BCB0 is `bucket.mEdges.push_back(edge)`, and the two lane
+   *    appends at 0x008269C8/0x008269F4 are `AppendRangeDwordLane`
+   *    (0x0082CF20), already recovered.
+   *
+   * Two decompiler artifacts in 0x00826140/0x00826960 that must not be
+   * transcribed literally, both MSVC stack-slot reuse rather than real
+   * aliasing:
+   *  - `LinkCommandGraphEdge`'s 4th parameter looks like it is both a `bool`
+   *    and a dereferenced pointer. It is a `bool` by value; the callee
+   *    reuses that incoming slot as a local `HashListNode10*` (0x00826AA5
+   *    passes `&arg_4` to the `mMapD` find, which overwrites it).
+   *  - in 0x00826140 the slot IDA calls `var_D0` holds the hovered entity
+   *    during the pre-scan, is reset to 0 at 0x008262EA, and thereafter holds
+   *    the previous command's type. Two distinct source locals with disjoint
+   *    lifetimes.
+   *
+   * The one genuine layout gap left is `CWldSession+0x4C0`, still
+   * `char pad_04C0[8]` in the header: 0x0082624C loads it, subtracts 8, and
+   * dispatches virtual slot 3 on the result to get the entity the cursor is
+   * hovering, which the pre-scan then looks up in each command's
+   * `GetEntitiesUnderCursor` set.
    */
   void AddCommandQueueToCommandGraph(
     UserEntity& entity, UICommandGraph& graph, UserCommandQueue* queue
