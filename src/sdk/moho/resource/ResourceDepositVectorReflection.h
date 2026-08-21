@@ -17,6 +17,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00548DB0 (FUN_00548DB0, gpg::RVectorType_ResourceDeposit::dtr)
+     */
+    ~RVectorType_ResourceDeposit() override;
+
+    /**
      * Address: 0x005474C0 (FUN_005474C0, gpg::RVectorType_ResourceDeposit::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
