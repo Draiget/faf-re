@@ -1763,6 +1763,7 @@ namespace moho
 
     /**
      * Address: 0x0082FAB0 (FUN_0082FAB0, MSVC8 std::list<T>::clear inline expansion)
+     * Address: 0x0082C840 (FUN_0082C840, the HashListNode2C instantiation)
      *
      * What it does:
      * Clears one sentinel-headed hash-list in place without freeing the
@@ -1799,6 +1800,7 @@ namespace moho
 
     /**
      * Address: 0x0082D530 (FUN_0082D530, sub_82D530)
+     * Address: 0x00826620 (FUN_00826620, the no-EH emission of this same body)
      *
      * What it does:
      * Relocate-copies one command-graph draw node's full payload: command
@@ -4153,6 +4155,13 @@ namespace moho
   /**
    * Address: 0x0082FAB0 (FUN_0082FAB0, MSVC8 `std::list<T>::clear` inline expansion for
    *                      trivial-destructor hash-list nodes)
+   * Address: 0x0082C840 (FUN_0082C840, the `HashListNode2C` instantiation of this same
+   *                      template, reached from mMapC's teardown. Verified as the same
+   *                      body rather than assumed: both are 19 instructions with an
+   *                      identical mnemonic sequence, and the sole `call rel32` in each
+   *                      resolves to the same target, 0x00957A60 `operator delete`. The
+   *                      two node types compile to identical code because neither
+   *                      payload needs destroying, so only the link teardown remains.)
    *
    * IDA signature:
    * _DWORD *__usercall sub_82FAB0@<eax>(int a1@<esi>);
@@ -4212,7 +4221,21 @@ namespace moho
   }
 
   /**
-   * Address: 0x0082D530 (FUN_0082D530, sub_82D530)
+   * Address: 0x0082D530 (FUN_0082D530, sub_82D530 -- the SEH-wrapped emission:
+   *                      it installs SEH_82D530, carries unwind funclets at
+   *                      0x00B843xx and ends in ___CxxFrameHandler3_0)
+   * Address: 0x00826620 (FUN_00826620, the same source body emitted without EH
+   *                      scaffolding, 86 instructions vs 128)
+   *
+   * NOTE: these two are NOT ICF twins, despite an earlier note in the progress
+   * DB saying so - ICF folds byte-identical COMDATs and these differ in size
+   * and at the very first instruction (`push ebx` vs `mov eax, large fs:0`).
+   * They are one source function emitted twice, once in a context needing
+   * exception scaffolding and once not; the field-by-field copy order is
+   * identical in both (mCommandId, helper-link relink, the +0x0C..+0x18 float
+   * quad, the three +0x1C..+0x1E bytes, +0x20, the +0x24 weak_release/
+   * lock-xadd add_ref pair, the +0x28..+0x40 float run, +0x44, then the two
+   * dword-lane copies).
    */
   UICommandGraph::UICommandGraphDrawNode* UICommandGraph::RelocateDrawNode(
     UICommandGraphDrawNode* const destination, UICommandGraphDrawNode& source
