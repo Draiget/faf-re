@@ -228,13 +228,16 @@ namespace msvc8
             return 1;
         }
 
+        /**
+         * Erases `[first, last)` and returns a cursor on the first survivor.
+         *
+         * The whole-tree fast path and the `erase(_First++)` walk both live on
+         * `rb_tree::erase_range` - see the address block there. Re-implementing
+         * the walk here would lose the fast path the shipped bodies take.
+         */
         iterator erase(const_iterator first, const_iterator last)
         {
-            iterator it(first.node());
-            while (it != last) {
-                it = erase(const_iterator(it));
-            }
-            return it;
+            return iterator(tree_.erase_range(first.node(), last.node()));
         }
 
         void swap(map& other) noexcept { tree_.swap(other.tree_); }
