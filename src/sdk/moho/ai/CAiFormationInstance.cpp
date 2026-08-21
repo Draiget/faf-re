@@ -650,6 +650,11 @@ namespace
   {
   public:
     /**
+     * Address: 0x00571F60 (FUN_00571F60, gpg::RMapType_EntId_SUnitOffsetInfo::dtr)
+     */
+    ~RMapType_EntId_SUnitOffsetInfo() override = default;
+
+    /**
      * Address: 0x0056B930 (FUN_0056B930, gpg::RMapType_EntId_SUnitOffsetInfo::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
@@ -748,6 +753,11 @@ namespace
   class RMapType_EntId_SCoordsVec2 final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005721A0 (FUN_005721A0, gpg::RMapType_EntId_SCoordsVec2::dtr)
+     */
+    ~RMapType_EntId_SCoordsVec2() override = default;
+
     /**
      * Address: 0x0056C430 (FUN_0056C430, gpg::RMapType_EntId_SCoordsVec2::GetName)
      */
