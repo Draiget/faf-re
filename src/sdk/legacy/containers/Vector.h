@@ -2366,6 +2366,16 @@ namespace msvc8
          * 0x3FFFFFFF, overflow throw through FUN_00830620, 1.5x growth
          * (`(cap >> 1) + cap`), allocation through FUN_00831B40. Reached from
          * `resize` (FUN_0082D820) when a bucket table is rehashed.)
+         * Address: 0x00680BD0 (FUN_00680BD0, the out-of-line `std::fill` emission
+         * this method's gap-overwrite compiles to for the 0xD8-byte
+         * `Moho::SEntityVariableUpdateEntry` -- `for (p = first; p != last;
+         * p += 0xD8) { p->mEntityId = proto->mEntityId;
+         * p->mVariableData = proto->mVariableData; }`, the second field through
+         * `SSTIEntityVariableData::operator=`. Reached because
+         * `syncData->mEntityUpdates.push_back(...)` in QueueEntityVariableUpdate
+         * (SimDriver.cpp) routes here on the capacity-full path, where the
+         * tail is empty and the gap fill runs with count == 1. The element's
+         * push_back emission is cited on that method above, FUN_0067B780.)
          * Address: 0x005C6F90 (FUN_005C6F90, msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n
          * grow lane for the 52-byte element (`4EC4EC4Fh`/`sar 4` divide-by-0x34
          * magic pair, max_size 0x4EC4EC4 = 0xFFFFFFFF/52, overflow throw through
@@ -2473,6 +2483,12 @@ namespace msvc8
 
     private:
         /**
+         * Address: 0x00519BA0 (FUN_00519BA0, the range-destroy lane for the
+         * 0xCC-byte `Moho::RMeshBlueprintLOD` -- a bare
+         * `while (p != end) { p->~RMeshBlueprintLOD(); p += 0xCC; }` walk calling
+         * FUN_00519800. Instantiated by `RMeshBlueprint::mLods`
+         * (RMeshBlueprint.h:110) and reached from
+         * `gpg::RVectorType_RMeshBlueprintLOD::SerLoad`'s cleanup path.)
          * Address: 0x005617C0 (FUN_005617C0, the range-destroy lane for 568-byte
          * `Moho::SUnitVariableUpdateEntry` -- runs `~SSTIUnitVariableData` on the
          * payload at each slot's +0x08)
