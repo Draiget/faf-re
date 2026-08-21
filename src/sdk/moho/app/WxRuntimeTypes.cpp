@@ -28878,6 +28878,12 @@ bool wxReadProfileStringValue(
   return true;
 }
 
+// File-scope forward declaration for the CRT-style helper defined in
+// moho/misc/CrtRuntimeHelpers.cpp (FUN_00A8F5B3, real `wcstod`). Block-scope
+// language-linkage specifications are illegal in C++, so the declaration
+// must live at namespace (file) scope.
+extern "C" double __cdecl RuntimeWcstodFromLocale(const wchar_t* text, wchar_t** endPointer);
+
 /**
  * Address: 0x009C7AB0 (FUN_009C7AB0)
  *
@@ -28901,7 +28907,7 @@ bool wxReadProfileFloatValue(
     return false;
   }
 
-  *outValue = static_cast<float>(std::wcstod(readText, nullptr));
+  *outValue = static_cast<float>(RuntimeWcstodFromLocale(readText, nullptr));
   ::operator delete[](readText);
   return true;
 }
@@ -45867,13 +45873,21 @@ std::int32_t wxFindLastWideCharFromSetIndirectStorageAdapter(
   return wxFindLastWideCharFromSet(*textStorageStorage, characterSet, startIndex);
 }
 
+// File-scope forward declaration for the CRT-style helper defined in
+// moho/misc/CrtRuntimeHelpers.cpp (FUN_00A8F63A, real `wcsspn`). Block-scope
+// language-linkage specifications are illegal in C++, so the declaration
+// must live at namespace (file) scope.
+extern "C" std::size_t __cdecl RuntimeWcsSpanOfIncludedChars(const wchar_t* text, const wchar_t* characterSet);
+
 /**
  * Address: 0x00960310 (FUN_00960310)
  *
  * What it does:
  * From `startIndex` (`-101` means logical end), returns the relative offset
- * to the first code unit contained in `characterSet`; returns `-101` when no
- * matching code unit exists in the scanned suffix.
+ * to the first code unit *not* contained in `characterSet` (a `wcsspn`
+ * scan, matching wxWidgets' `wxString::find_first_not_of` usage in
+ * `wxStringTokenizer::HasMoreTokens`); returns `-101` when the scanned
+ * suffix consists entirely of `characterSet` code units.
  */
 std::int32_t wxFindFirstWideCharFromSetAfterIndex(
   const wchar_t** const textStorage,
@@ -45898,7 +45912,7 @@ std::int32_t wxFindFirstWideCharFromSetAfterIndex(
     return kWxStringSearchNotFound;
   }
 
-  const std::size_t relativeOffset = std::wcscspn(text + startIndex, characterSet);
+  const std::size_t relativeOffset = RuntimeWcsSpanOfIncludedChars(text + startIndex, characterSet);
   if (relativeOffset >= static_cast<std::size_t>(textLength - startIndex))
   {
     return kWxStringSearchNotFound;
@@ -47437,12 +47451,18 @@ const wchar_t* wxFindFileNameStartInPath(
   return result;
 }
 
+// File-scope forward declaration for the CRT-style helper defined in
+// moho/misc/CrtRuntimeHelpers.cpp (FUN_00A9127E, real `_wgetcwd`).
+// Block-scope language-linkage specifications are illegal in C++, so the
+// declaration must live at namespace (file) scope.
+extern "C" wchar_t* __cdecl _wgetcwd(wchar_t* buffer, int maxLength);
+
 /**
  * Address: 0x009DE480 (FUN_009DE480)
  *
  * What it does:
- * Resolves the current working directory into `buffer` and logs a localized
- * system error when retrieval fails.
+ * Resolves the current working directory into `buffer` via CRT `_wgetcwd`
+ * and logs a localized system error when retrieval fails.
  */
 wchar_t* wxGetCurrentWorkingDirectoryRuntime(
   wchar_t* buffer,
@@ -47454,7 +47474,7 @@ wchar_t* wxGetCurrentWorkingDirectoryRuntime(
     target = static_cast<wchar_t*>(::operator new((static_cast<std::size_t>(maxChars) + 1u) * sizeof(wchar_t)));
   }
 
-  if (::GetCurrentDirectoryW(maxChars, target) == 0u) {
+  if (_wgetcwd(target, static_cast<int>(maxChars)) == nullptr) {
     WxLogSysErrorLocalized(L"Failed to get the working directory");
     target[0] = L'\0';
   }

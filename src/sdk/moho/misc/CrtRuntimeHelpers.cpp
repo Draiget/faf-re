@@ -2493,6 +2493,52 @@ extern "C" long __cdecl RuntimeWcstolFromLocale(
 }
 
 /**
+ * Address: 0x00A8F5B3 (FUN_00A8F5B3, wcstod)
+ *
+ * What it does:
+ * MSVC CRT `wcstod(nptr, endptr)` implementation. Forwards to the
+ * locale-explicit wide-to-double worker with a null `_locale_t` (use the
+ * active thread locale), i.e. `_wcstod_l(nptr, endptr, nullptr)` semantics.
+ *
+ * IDA signature:
+ * int __cdecl sub_A8F5B3(int a1, int a2);
+ */
+extern "C" double __cdecl RuntimeWcstodFromLocale(
+  const wchar_t* const text,
+  wchar_t** const endPointer
+)
+{
+  // `::wcstod` performs the identical locale dispatch and invokes the same
+  // underlying wide-to-double conversion worker (`sub_A8F4B0` in the
+  // binary, i.e. `_wcstod_l(text, endPointer, nullptr)`) that the real
+  // `wcstod(a1, a2)` forwards to here.
+  return ::wcstod(text, endPointer);
+}
+
+/**
+ * Address: 0x00A8F63A (FUN_00A8F63A, wcsspn)
+ *
+ * What it does:
+ * MSVC CRT `wcsspn(string, control)` implementation: returns the length of
+ * the leading run of `string` that consists entirely of code units also
+ * present in `control` (the classic char-by-char nested scan, not the
+ * bitmap-optimized variant later CRTs use). Behaviorally identical to
+ * `::wcsspn`; the offset this returns is also what CRT `wcscspn`-shaped
+ * "first char not in set" callers expect (the boundary right after the
+ * matching prefix run).
+ *
+ * IDA signature:
+ * int __cdecl sub_A8F63A(_WORD *a1, _WORD *a2);
+ */
+extern "C" std::size_t __cdecl RuntimeWcsSpanOfIncludedChars(
+  const wchar_t* const text,
+  const wchar_t* const characterSet
+)
+{
+  return ::wcsspn(text, characterSet);
+}
+
+/**
  * Address: 0x00A8FC4B (FUN_00A8FC4B, _wtoi wrapper lane)
  *
  * What it does:
@@ -11333,6 +11379,33 @@ extern "C" int __cdecl RuntimeRaiseMxcsrExceptionFlags(const char flags)
     }
 
     return 0;
+  }
+
+  /**
+   * Address: 0x00A9127E (FUN_00A9127E, _wgetcwd)
+   *
+   * What it does:
+   * MSVC CRT `_wgetcwd(buffer, maxlen)` implementation. Drive-relative
+   * working directories are tracked through the CRT's per-drive
+   * pseudo-environment block, so this takes `_ENV_LOCK` for the duration of
+   * the lookup, resolves the *current* drive's (`drive=0`) working
+   * directory through the no-lock worker, then releases the lock. Returns
+   * `buffer` on success or `nullptr` on failure (matching `GetLastError()`
+   * left set by the underlying `GetCurrentDirectoryW`/`GetDriveType` calls).
+   *
+   * IDA signature:
+   * int __cdecl sub_A9127E(LPWSTR lpBuffer, DWORD a2);
+   */
+  extern "C" wchar_t* __cdecl _wgetcwd(
+    wchar_t* const buffer,
+    const int maxLength
+  )
+  {
+    RuntimeLockGuard lockGuard(kRuntimeEnvironmentLock);
+    // `::_wgetdcwd_nolock` is the same no-lock drive-relative worker the
+    // binary's `sub_A9113F` (called here as `sub_A9113F(0, lpBuffer, a2)`)
+    // implements: drive 0 means "the current drive".
+    return ::_wgetdcwd_nolock(0, buffer, maxLength);
   }
 
   struct RuntimeTryBlockMapEntry
