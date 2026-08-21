@@ -79,6 +79,66 @@ namespace moho
     std::uint32_t mSize;             // +0x08
 
     /**
+     * One `{owning set, current node}` iteration cursor - the shape every
+     * weak-set walk in the engine keeps on the stack while it scans.
+     *
+     * It lives on the shared header rather than on either instantiation
+     * because the tree body is the same body for both: `First` and `Next`
+     * below are single addresses that the linker folded across the
+     * `WeakSet<UserEntity>` and `WeakSet<UserUnit>` emissions, so a cursor
+     * built by one is consumed by the other.
+     */
+    struct FindResult
+    {
+      WeakEntitySetUserEntity* mSet;  // +0x00
+      SSelectionNodeUserEntity* mRes; // +0x04
+    };
+
+    /**
+     * Address: 0x0066A060 (FUN_0066A060, Moho::WeakSet_UserEntity::First)
+     * Address: 0x007B25F0 (FUN_007B25F0, sub_7B25F0)
+     *
+     * IDA signature:
+     * Moho::WeakSet_UserEntity_FindRes *__usercall sub_7B25F0@<eax>(
+     *     Moho::WeakSet_UserEntity_FindRes *result@<ebx>,
+     *     Moho::WeakSet_UserEntity *set@<eax>);
+     *
+     * What it does:
+     * Starts weak-set iteration at the left-most tree node and returns one
+     * `{set,node}` cursor pair after tombstone filtering through `find`.
+     *
+     * 0x007B25F0 is the `WeakSet<UserUnit>` emission of this same body -
+     * byte-identical to 0x0066A060 (`mHead` at `[set+4]`, `mLeft` at `[head]`,
+     * the same `PruneTombstonesAndFindLive` tail, the same `{set,node}` store).
+     * `CUIWorldView::HandleEvent` reaches it at 0x0087069F over the transient
+     * selection-unit set and at 0x00871065 over a command helper's
+     * under-cursor set.
+     */
+    [[nodiscard]] FindResult* First(FindResult* outResult);
+
+    /**
+     * Address: 0x007F0490 (FUN_007F0490, sub_7F0490)
+     *
+     * IDA signature:
+     * Moho::WeakSet_UserEntity_FindRes *__stdcall sub_7F0490(
+     *     Moho::WeakSet_UserEntity_FindRes *cursor);
+     *
+     * What it does:
+     * Advances one weak-set iteration cursor by a single *live* node: runs the
+     * red-black successor step (`Iterator_inc`) on `cursor->mRes`, then filters
+     * tombstoned entries out of the way with `find` against the cursor's own
+     * set, writing the resulting node back into `cursor->mRes` and returning
+     * the cursor.
+     *
+     * The body never touches `this` - the cursor carries its own set pointer -
+     * which is why it is `static` here and `__stdcall` in the image.
+     * `CUIWorldView::HandleEvent` calls it at 0x008706D8 (selection scan for a
+     * command-graph hover hint) and at 0x0087108C (the shift+ctrl right-release
+     * "remove this command from every unit under the cursor" loop).
+     */
+    [[nodiscard]] static FindResult* Next(FindResult* cursor);
+
+    /**
      * Address: 0x007AF740 (FUN_007AF740, sub_7AF740)
      *
      * What it does:
