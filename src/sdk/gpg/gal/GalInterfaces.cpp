@@ -5397,14 +5397,8 @@ namespace gpg::gal
     template <class T>
     void ReleaseVectorStorage(msvc8::vector<T>& vector) noexcept
     {
-      msvc8::vector_runtime_view<T>& runtime = msvc8::AsVectorRuntimeView(vector);
-      if (runtime.begin != nullptr) {
-        ::operator delete(static_cast<void*>(runtime.begin));
-      }
-
-      runtime.begin = nullptr;
-      runtime.end = nullptr;
-      runtime.capacityEnd = nullptr;
+      // Free the block and null all three lanes: VC8 _Tidy().
+      vector = msvc8::vector<T>{};
     }
 
     /**
@@ -5827,15 +5821,12 @@ namespace gpg::gal
     ReleaseVectorStorage(validFormats2);
     ReleaseVectorStorage(adapterModes);
 
-    msvc8::vector_runtime_view<HeadSampleOption>& sampleOptionsRuntime = msvc8::AsVectorRuntimeView(mStrs);
-    if (sampleOptionsRuntime.begin != nullptr) {
-      DestroyHeadSampleOptionRange(sampleOptionsRuntime.begin, sampleOptionsRuntime.end);
-      ::operator delete(static_cast<void*>(sampleOptionsRuntime.begin));
+    // Element sweep first -- HeadSampleOption's destructor is trivial -- then
+    // VC8 _Tidy(): free the block and null the three lanes.
+    if (!mStrs.empty()) {
+      DestroyHeadSampleOptionRange(mStrs.begin(), mStrs.end());
     }
-
-    sampleOptionsRuntime.begin = nullptr;
-    sampleOptionsRuntime.end = nullptr;
-    sampleOptionsRuntime.capacityEnd = nullptr;
+    mStrs = decltype(mStrs){};
 
     name.tidy(true, 0U);
   }

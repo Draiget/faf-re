@@ -476,12 +476,10 @@ namespace
     msvc8::vector<SPointVector>& storage
   ) noexcept
   {
-    auto& runtime = msvc8::AsVectorRuntimeView(storage);
-    if (runtime.begin != runtime.end) {
-      runtime.end = CopyPointVectorRangeAndReturnEnd(runtime.begin, runtime.end, runtime.end);
-    }
-
-    return runtime.end;
+    // Erasing [begin, end) leaves the run empty with capacity retained:
+    // clear(). The binary's self-range copy moves nothing.
+    storage.clear();
+    return storage.end();
   }
 
   /**
@@ -529,13 +527,8 @@ namespace
     while (begin != end) {
       begin->mScalar = 0;
 
-      auto& valuesView = msvc8::AsVectorRuntimeView(begin->mValues);
-      if (valuesView.begin != nullptr) {
-        ::operator delete(valuesView.begin);
-      }
-      valuesView.begin = nullptr;
-      valuesView.end = nullptr;
-      valuesView.capacityEnd = nullptr;
+      // Free the block and null all three lanes: VC8 _Tidy().
+      begin->mValues = decltype(begin->mValues){};
 
       ++begin;
     }
