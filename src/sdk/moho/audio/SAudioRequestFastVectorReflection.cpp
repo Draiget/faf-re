@@ -165,50 +165,6 @@ namespace
   }
 
   /**
-   * Address: 0x00762120 (FUN_00762120, sub_762120)
-   *
-   * What it does:
-   * Resizes one `fastvector<SAudioRequest>` runtime view to `requestedCount`,
-   * filling appended lanes from `fillValue` (growing past capacity reallocates).
-   */
-  [[maybe_unused]] unsigned int ResizeFastVectorSAudioRequestFill(
-    const unsigned int requestedCount,
-    const moho::SAudioRequest* const fillValue,
-    gpg::fastvector_runtime_view<moho::SAudioRequest>& view
-  )
-  {
-    moho::SAudioRequest* const begin = view.begin;
-    const unsigned int currentCount = begin ? static_cast<unsigned int>(view.end - begin) : 0u;
-    if (requestedCount < currentCount) {
-      moho::SAudioRequest* const newEnd = begin + requestedCount;
-      if (newEnd != view.end) {
-        view.end = newEnd;
-      }
-      return currentCount;
-    }
-
-    if (requestedCount > currentCount) {
-      const unsigned int currentCapacity = begin ? static_cast<unsigned int>(view.capacityEnd - begin) : 0u;
-      const moho::SAudioRequest fill = fillValue ? *fillValue : moho::SAudioRequest{};
-      if (requestedCount > currentCapacity) {
-        gpg::FastVectorRuntimeResizeFill(&fill, requestedCount, view);
-        return requestedCount;
-      }
-
-      moho::SAudioRequest* const targetEnd = view.begin + requestedCount;
-      while (view.end != targetEnd) {
-        moho::SAudioRequest* const slot = view.end;
-        view.end = slot + 1;
-        if (slot) {
-          *slot = fill;
-        }
-      }
-    }
-
-    return requestedCount;
-  }
-
-  /**
    * Address: 0x00762220 (FUN_00762220, gpg::RFastVectorType_SAudioRequest::SerLoad)
    *
    * What it does:
@@ -225,14 +181,14 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAudioRequest>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
     moho::SAudioRequest fill{};
-    ResizeFastVectorSAudioRequestFill(count, &fill, view);
+    vec.Resize(static_cast<std::size_t>(count), fill);
 
     gpg::RType* const elementType = CachedSAudioRequestType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &view.begin[i], owner);
+      archive->Read(elementType, &vec[i], owner);
     }
   }
 
@@ -249,14 +205,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SAudioRequest>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     gpg::RType* const elementType = CachedSAudioRequestType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &view.begin[i], owner);
+      archive->Write(elementType, &vec[i], owner);
     }
   }
 
@@ -349,12 +305,12 @@ namespace gpg
       return out;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAudioRequest>(obj);
-    if (!view.begin || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
 
-    gpg::RRef_SAudioRequest(&out, view.begin + ind);
+    gpg::RRef_SAudioRequest(&out, vec.Data() + ind);
     return out;
   }
 
@@ -370,12 +326,12 @@ namespace gpg
       return 0u;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SAudioRequest>(obj);
-    if (!view.begin) {
+    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    if (vec.Data() == nullptr) {
       return 0u;
     }
 
-    return static_cast<std::size_t>(view.end - view.begin);
+    return vec.size();
   }
 
   /**
@@ -391,9 +347,9 @@ namespace gpg
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SAudioRequest>(obj);
+    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
     moho::SAudioRequest fill{};
-    ResizeFastVectorSAudioRequestFill(static_cast<unsigned int>(count), &fill, view);
+    vec.Resize(static_cast<std::size_t>(count), fill);
   }
 } // namespace gpg
 
