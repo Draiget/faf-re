@@ -2432,6 +2432,14 @@ namespace msvc8
          * (SimDriver.cpp) routes here on the capacity-full path, where the
          * tail is empty and the gap fill runs with count == 1. The element's
          * push_back emission is cited on that method above, FUN_0067B780.)
+         * Address: 0x0067D320 (FUN_0067D320, msvc8::vector<Moho::SEntityVariableUpdateEntry>::_Insert_n
+         * grow-core for the same 0xD8-byte (216) element -- max_size guard
+         * `0xFFFFFFFF/216 = 19884107` overflow throw, 1.5x growth clamped to
+         * `size+1`, checked allocation, tail-shift via FUN_0067F9A0/FUN_0067F9E0,
+         * and the single-slot gap fill through the already-cited FUN_00680BD0.
+         * Reached from `Entity.cpp`'s sync-update insert path when
+         * `mEntityUpdates.push_back(...)`'s capacity-full branch grows the
+         * vector instead of filling in place.)
          * Address: 0x005C6F90 (FUN_005C6F90, msvc8::vector<Moho::SPerArmyReconInfo>::_Insert_n
          * grow lane for the 52-byte element (`4EC4EC4Fh`/`sar 4` divide-by-0x34
          * magic pair, max_size 0x4EC4EC4 = 0xFFFFFFFF/52, overflow throw through
