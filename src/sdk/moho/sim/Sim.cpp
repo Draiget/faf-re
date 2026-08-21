@@ -14444,6 +14444,36 @@ namespace
     return reinterpret_cast<EntityCategoryLookupTableView*>(rules.mEntityCategoryLookup);
   }
 
+  /**
+   * Address: 0x005555C0 (FUN_005555C0)
+   *
+   * IDA signature:
+   * int __thiscall sub_5555C0(std::vector *this, std::string *a2,
+   *                           Moho::RUnitBlueprint *arg4);
+   *
+   * What it does:
+   * Looks the category name up in the entity-category lookup map
+   * (`FindCategoryLookupNode`, 0x005561C0), inserts a fresh node when the
+   * lookup lands on the map head sentinel (`InsertCategoryLookupNode`,
+   * 0x005560B0, seeded with the table's word-universe handle), then sets
+   * this blueprint's bit in that node's `BVIntSet`. The binary reaches the
+   * set as `node + 56`, which is `node->value.Bits()` here.
+   *
+   * The binary takes the blueprint pointer and reads the bit index from it
+   * (`arg4->mBlueprintOrdinal`) at the point of use; this recovery hoists
+   * that read to the caller and passes the index, which is the same
+   * behavior for every call site.
+   *
+   * KNOWN FIDELITY DIVERGENCE (pre-existing, deliberately left alone here):
+   * the binary has neither the `categoryName.empty()` early-out nor the two
+   * `!node` null guards below. `sub_5555C0` calls the lookup unconditionally
+   * and dereferences the insert result without a null check. The guards are
+   * defensive additions; removing them would restore 1:1 behavior, but this
+   * lane is load-bearing for the whole unit-category system and the identity
+   * of the bit-index field (`mCategoryBitIndex` here vs IDA's
+   * `mBlueprintOrdinal`) is not independently confirmed, so that correction
+   * is left for a pass that can verify it at runtime.
+   */
   void AddCategoryMemberBit(
     EntityCategoryLookupTableView& lookup,
     const msvc8::string& categoryName,

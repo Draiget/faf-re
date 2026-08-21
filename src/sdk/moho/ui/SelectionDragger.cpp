@@ -735,8 +735,8 @@ namespace moho
    * (`session->mWldMap->mTerrainRes->GetDecalManager()`, matching
    * 0x00864193-0x008641A1's `[[session+0x1C]+4]` vtable-slot-0x130 dispatch,
    * confirmed as `IWldTerrainRes::GetDecalManager()`) for later use by
-   * `DragMove`/`~SelectionDragger3D` (both not yet recovered - see the class
-   * doc comment in SelectionDragger.h).
+   * `DragMove` (0x00864340) and `~SelectionDragger3D` (0x008641C0), both
+   * recovered below.
    *
    * The binary performs every one of these field writes unconditionally with
    * no null check on `session` (0x00864193 dereferences `[edi+0x1C]`
@@ -757,15 +757,72 @@ namespace moho
   {}
 
   /**
+   * Address: 0x008641C0 (FUN_008641C0, ??1SelectionDragger3D@Moho@@UAE@XZ)
+   * Mangled: ??1SelectionDragger3D@Moho@@UAE@XZ
+   *
+   * IDA signature:
+   * SelectionDragger_vtbl* __stdcall sub_8641C0(SelectionDragger_vtbl** this);
+   *
+   * What it does:
+   * Derived-destructor body for the 3D selection dragger. Hands each live
+   * highlight decal back to the cached decal manager - land lane
+   * (`mAlbedoDecal`, +0x34) first at 0x008641EE-0x00864211, then the water
+   * lane (`mWaterAlbedoDecal`, +0x3C) at 0x00864213-0x00864238 - and then
+   * drops every node from the process-global `sSelectionBrackets` weak-set
+   * through the full-range erase path at 0x0086423A, byte-identical to
+   * `~SelectionDragger2D()`.
+   *
+   * Both decal guards are the binary's `slot != 0 && slot != 4` test on the
+   * raw `WeakPtr` owner-link word followed by the `p ? p - 4 : 0` downcast,
+   * which is exactly what `WeakPtr<T>::GetObjectPtr()` computes (it maps
+   * both the null and the 0x4 sentinel encodings to `nullptr`), so the
+   * `if (auto* d = lane.GetObjectPtr())` form below is 1:1 - including the
+   * fact that `mDecalManager` is only dereferenced when a decal is live.
+   *
+   * Everything from 0x0086423E on is compiler-emitted teardown and is
+   * deliberately NOT hand-written here: the `mHighlightTexture`
+   * `sp_counted_base::release()` pair, the two `WeakPtr` owner-chain unlink
+   * loops, the `IMauiDragger` vtable restore, and the base `WeakObject`
+   * chain drain. MSVC emits all of those for the implicit member/base
+   * destructor chain that runs after this body.
+   *
+   * The manager is reached through a `static_cast` to `CDecalManager`
+   * rather than a virtual dispatch on slot +0x24 for the same reason
+   * `SetTextures` does it: `CDecalManager` is the only class deriving from
+   * `IDecalManager` in this binary, and slots 4 and up have not been
+   * promoted into the declared virtual table yet.
+   *
+   * Invocation: reached from `SelectionDragger3D::DeleteWithFlag`
+   * (0x00864C90, the `??_G` scalar-deleting-dtor vtable slot), whose
+   * `this->~SelectionDragger3D()` call is the binary's `call sub_8641C0`
+   * at 0x00864C94.
+   */
+  SelectionDragger3D::~SelectionDragger3D()
+  {
+    auto* const decalManager = static_cast<CDecalManager*>(mDecalManager);
+
+    if (CWldTerrainDecal* const albedoDecal = mAlbedoDecal.GetObjectPtr()) {
+      decalManager->DestroyDecal(albedoDecal);
+    }
+
+    if (CWldTerrainDecal* const waterAlbedoDecal = mWaterAlbedoDecal.GetObjectPtr()) {
+      decalManager->DestroyDecal(waterAlbedoDecal);
+    }
+
+    SSelectionNodeUserEntity* cursor =
+      sSelectionBrackets.mHead != nullptr ? sSelectionBrackets.mHead->mLeft : nullptr;
+    (void)sSelectionBrackets.EraseRange(&cursor, cursor, sSelectionBrackets.mHead);
+  }
+
+  /**
    * Address: 0x00864C90 (FUN_00864C90, Moho::SelectionDragger3D::Func1)
    *
    * What it does:
    * Scalar-deleting-destructor variant for `SelectionDragger3D` - delegates
    * to the destructor chain and conditionally releases the object's heap
-   * storage when bit 0 of `deleteFlags` is set. See the class doc comment in
-   * SelectionDragger.h: the destructor this chains into is the
-   * compiler-generated implicit one (still correctly chains to the base
-   * `~SelectionDragger()`), not a 1:1 port of the binary's 0x008641C0 body.
+   * storage when bit 0 of `deleteFlags` is set. The `~SelectionDragger3D()`
+   * it chains into is the recovered 0x008641C0 body above, matching the
+   * binary's `call sub_8641C0` at 0x00864C94.
    */
   SelectionDragger3D* SelectionDragger3D::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
   {
