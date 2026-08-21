@@ -87,6 +87,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/ui/CUIManager.h"
+#include "moho/unit/core/EFireStateTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
@@ -6007,8 +6008,16 @@ namespace moho
      * What it does:
      * Returns true when the dragged command is an attack/form-attack command
      * and no live selected user-unit already has that command helper queued.
+     *
+     * Invocation: sole caller in the binary is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, 2167 instructions, owned by this file), which is not
+     * recovered yet - it is gated on its own remaining leaf-callee/caller
+     * frontier (see that token's `recovered_progress.json` note). This
+     * helper is recovered and correct, waiting only on that one parent to
+     * be wired by name; un-`[[maybe_unused]]` it in the same pass that
+     * lands `HandleEvent`.
      */
-    [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
+    [[maybe_unused]] [[nodiscard]] bool CanStartCoordinatedAttack(CWldSession& session, const CmdId commandId)
     {
       UserCommandIssueHelper* const helper = FindCommandIssueHelperInSession(&session, commandId);
       if (helper == nullptr) {
@@ -6045,6 +6054,642 @@ namespace moho
       }
 
       return true;
+    }
+
+    /**
+     * Address: 0x0081DD00 (FUN_0081DD00)
+     *
+     * IDA signature:
+     * char __cdecl sub_81DD00(Moho::WeakSet_UserEntity *a1, struct_CommandIssueHelper *a2);
+     *
+     * What it does:
+     * Tests whether a just-issued Move/FormMove drag command (`helper`) may
+     * be silently restarted in place as Patrol/FormPatrol instead of being
+     * queued as a brand-new order. Returns false when `helper` is null, the
+     * selection is empty, or `helper`'s resolved command type is neither
+     * Move nor FormMove. Otherwise walks the live selection: any live,
+     * non-dead, non-destroy-queued `UserUnit` with a command queue that is
+     * in the "POD" category vetoes the restart outright. For every such
+     * unit whose queue already contains `helper` at a position other than
+     * the last entry (queue depth over 1 and `helper` is not the tail),
+     * every queued command in that unit's whole resolved queue must
+     * resolve to `helper`'s own command type, or the restart is rejected;
+     * units whose queue doesn't meet that depth/position/membership gate
+     * are simply skipped. Returns true once every live selected entity has
+     * been scanned without a rejection.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, 2167 instructions, owned by this file), from the
+     * drag-move patrol-restart arm - on success the caller skips issuing a
+     * new command and instead calls `RestartMoveCommandAsPatrol` below with
+     * the same selection and helper. `HandleEvent` is not recovered yet -
+     * it is gated on its own remaining leaf-callee/caller frontier (see
+     * that token's `recovered_progress.json` note). This helper is
+     * recovered and correct, waiting only on that one parent to be wired
+     * by name; un-`[[maybe_unused]]` it in the same pass that lands
+     * `HandleEvent`, matching the sibling `CanStartCoordinatedAttack`
+     * above.
+     */
+    [[maybe_unused]] [[nodiscard]] bool CanRestartMoveCommandAsPatrol(
+      SSelectionSetUserEntity& selection,
+      UserCommandIssueHelper* const helper
+    )
+    {
+      if (helper == nullptr) {
+        return false;
+      }
+
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return false;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+
+      const EUnitCommandType commandType = ResolveCommandIssueHelperCommandType(*helper);
+      if (node == head ||
+          (commandType != EUnitCommandType::UNITCOMMAND_Move &&
+           commandType != EUnitCommandType::UNITCOMMAND_FormMove)) {
+        return false;
+      }
+
+      const msvc8::string podCategory("POD");
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+        IUnit* const iunit = GetIUnitBridge(userUnit);
+
+        if (userUnit != nullptr && iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
+          UserCommandQueue* const manager = userUnit->GetCommandQueue();
+          if (manager != nullptr) {
+            if (userUnit->IsInCategory(podCategory)) {
+              return false;
+            }
+
+            if (GetUserUnitManagerQueueSize(manager) <= 1
+                || GetUserUnitManagerQueueTailHelperRaw(manager) == helper
+                || !UserUnitManagerContainsCommandIssueHelper(manager, helper)) {
+              return false;
+            }
+
+            if (!UserUnitManagerQueueHasUniformCommandType(manager, commandType)) {
+              return false;
+            }
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+
+      return true;
+    }
+
+    /**
+     * Address: 0x0081DEF0 (FUN_0081DEF0)
+     *
+     * IDA signature:
+     * std::map *__usercall sub_81DEF0@<eax>(Moho::WeakSet_UserEntity *ebx0@<ebx>, struct_CommandIssueHelper *a2);
+     *
+     * What it does:
+     * Companion to `CanRestartMoveCommandAsPatrol`, invoked only once that
+     * gate has confirmed the restart is safe. Resolves `helper`'s own
+     * command type (Move -> Patrol, FormMove -> FormPatrol) then walks
+     * every live selected entity's command queue via
+     * `RestartQueuedCommandsFromHelper`, which reissues every queue entry
+     * from `helper` onward (inclusive) that still shares its original
+     * command type.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), called with the same weak
+     * selection set still live in a register from the
+     * `CanRestartMoveCommandAsPatrol` call immediately before it.
+     * Un-`[[maybe_unused]]` in the same pass that lands `HandleEvent`.
+     */
+    [[maybe_unused]] void RestartMoveCommandAsPatrol(SSelectionSetUserEntity& selection, UserCommandIssueHelper* const helper)
+    {
+      const EUnitCommandType originalCommandType = ResolveCommandIssueHelperCommandType(*helper);
+      const EUnitCommandType restartCommandType =
+        (originalCommandType == EUnitCommandType::UNITCOMMAND_Move)
+          ? EUnitCommandType::UNITCOMMAND_Patrol
+          : EUnitCommandType::UNITCOMMAND_FormPatrol;
+
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+        IUnit* const iunit = GetIUnitBridge(userUnit);
+
+        if (userUnit != nullptr && iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
+          if (UserCommandQueue* const manager = userUnit->GetCommandQueue(); manager != nullptr) {
+            RestartQueuedCommandsFromHelper(manager, helper, originalCommandType, restartCommandType);
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+    }
+
+    /**
+     * Address: 0x0081E050 (FUN_0081E050)
+     *
+     * IDA signature:
+     * char __cdecl sub_81E050(Moho::WeakSet_UserEntity *arg0, float *a2, char a3);
+     *
+     * What it does:
+     * Scans the live selection for eligible `UserUnit`s (`IsUserUnit`, has a
+     * command queue, not dead, not destroy-queued), accumulating their live
+     * `IUnit::GetPosition()` into `outAnchor` for a running average. Unless
+     * `skipPatrolCheck` is set, also inspects each eligible unit's
+     * most-recently-queued command helper - taken from its factory command
+     * queue when the unit is immobile (`IUnit::IsMobile()` false), otherwise
+     * its regular command queue - and returns true immediately the moment
+     * that command resolves to Patrol/FormPatrol (the caller then reissues
+     * the drag command as-is, using the existing target, with no new
+     * anchor). Otherwise, when that command's own command-graph anchor
+     * position (`ResolveCommandGraphAnchorWorldPosition`, 0x0081CFD0)
+     * resolves to a valid (non-NaN) position, `outAnchor` is overwritten
+     * with it (last live match wins). After the scan: if `outAnchor` ended
+     * up anything other than the zero vector (an anchor override was
+     * found), it is kept as-is; otherwise `outAnchor` is replaced by the
+     * running position average. Returns false on both of those paths - only
+     * the early Patrol/FormPatrol detection returns true.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), called twice: once for a
+     * "reclaim to location" drag and once for the paired
+     * `ISSUE_FactoryCommand` drag, each time immediately followed by
+     * `Moho::STIMap::GetSurface` snapping `outAnchor` to the terrain when
+     * this returns false.
+     */
+    [[maybe_unused]] [[nodiscard]] bool ResolveGroupMoveAnchorOrDetectPatrol(
+      SSelectionSetUserEntity& selection,
+      Wm3::Vector3f& outAnchor,
+      const bool skipPatrolCheck
+    )
+    {
+      outAnchor = Wm3::Vector3f::Zero();
+
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return false;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+
+      std::int32_t eligibleCount = 0;
+      Wm3::Vector3f anchorOverride = Wm3::Vector3f::Zero();
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+
+        if (userUnit != nullptr) {
+          if (UserCommandQueue* const manager = userUnit->GetCommandQueue(); manager != nullptr) {
+            IUnit* const iunit = GetIUnitBridge(userUnit);
+            if (iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
+              ++eligibleCount;
+              const Wm3::Vec3f& position = iunit->GetPosition();
+              outAnchor.x += position.x;
+              outAnchor.y += position.y;
+              outAnchor.z += position.z;
+
+              if (!skipPatrolCheck) {
+                UserCommandIssueHelper* lastHelper = GetUserUnitManagerLastQueuedHelper(manager);
+                if (!iunit->IsMobile()) {
+                  if (UserCommandQueue* const factoryManager = userUnit->GetFactoryCommandQueue();
+                      factoryManager != nullptr) {
+                    lastHelper = GetUserUnitManagerLastQueuedHelper(factoryManager);
+                  }
+                }
+
+                if (lastHelper != nullptr) {
+                  const EUnitCommandType lastCommandType = ResolveCommandIssueHelperCommandType(*lastHelper);
+                  if (lastCommandType == EUnitCommandType::UNITCOMMAND_Patrol ||
+                      lastCommandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
+                    return true;
+                  }
+
+                  if (const Wm3::Vector3f resolvedAnchor = ResolveCommandGraphAnchorWorldPosition(*lastHelper);
+                      IsValidVector3f(resolvedAnchor)) {
+                    anchorOverride = resolvedAnchor;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+
+      if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); Wm3::Vector3f::Compare(&anchorOverride, &zero)) {
+        outAnchor = anchorOverride;
+        return false;
+      }
+
+      if (eligibleCount > 0) {
+        const float invCount = 1.0f / static_cast<float>(eligibleCount);
+        outAnchor.x *= invCount;
+        outAnchor.y *= invCount;
+        outAnchor.z *= invCount;
+      }
+
+      return false;
+    }
+
+    /**
+     * Address: 0x0081E2E0 (FUN_0081E2E0)
+     *
+     * IDA signature:
+     * char __cdecl sub_81E2E0(Moho::WeakSet_UserEntity *a1, float *a2);
+     *
+     * What it does:
+     * Ferry-command sibling of `ResolveGroupMoveAnchorOrDetectPatrol`.
+     * Scans the live selection for eligible `UserUnit`s (`IsUserUnit`, has
+     * a command queue, not dead, not destroy-queued). For each: resolves
+     * its most-recently-queued command helper; when one exists, accumulates
+     * that command's own command-graph anchor position
+     * (`ResolveCommandGraphAnchorWorldPosition`) into `outAnchor` and clears
+     * the "all still ferrying" flag unless that command is itself
+     * `UNITCOMMAND_Ferry`; when none exists, accumulates the unit's live
+     * `IUnit::GetPosition()` instead and always clears the flag. After the
+     * scan, `outAnchor` is divided by the eligible-unit count (left
+     * untouched when there were none). Returns true when every eligible
+     * unit's queued command was already `UNITCOMMAND_Ferry` (including the
+     * vacuous case of no eligible units at all - the caller then reissues
+     * the ferry command as-is), false otherwise (`outAnchor` now holds the
+     * averaged anchor/position for the caller to snap to the terrain
+     * surface).
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), from the `RULEUCC_Ferry`
+     * command-capability arm.
+     */
+    [[maybe_unused]] [[nodiscard]] bool ResolveGroupFerryAnchorOrDetectFerry(
+      SSelectionSetUserEntity& selection,
+      Wm3::Vector3f& outAnchor
+    )
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return true;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+
+      std::int32_t eligibleCount = 0;
+      bool allFerrying = true;
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+
+        if (userUnit != nullptr) {
+          if (UserCommandQueue* const manager = userUnit->GetCommandQueue(); manager != nullptr) {
+            IUnit* const iunit = GetIUnitBridge(userUnit);
+            if (iunit != nullptr && !iunit->IsDead() && !iunit->DestroyQueued()) {
+              ++eligibleCount;
+
+              UserCommandIssueHelper* const lastHelper = GetUserUnitManagerLastQueuedHelper(manager);
+              if (lastHelper != nullptr) {
+                const Wm3::Vector3f anchor = ResolveCommandGraphAnchorWorldPosition(*lastHelper);
+                outAnchor.x += anchor.x;
+                outAnchor.y += anchor.y;
+                outAnchor.z += anchor.z;
+
+                if (ResolveCommandIssueHelperCommandType(*lastHelper) != EUnitCommandType::UNITCOMMAND_Ferry) {
+                  allFerrying = false;
+                }
+              } else {
+                const Wm3::Vec3f& position = iunit->GetPosition();
+                outAnchor.x += position.x;
+                outAnchor.y += position.y;
+                outAnchor.z += position.z;
+                allFerrying = false;
+              }
+            }
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&selection, node, &node);
+      }
+
+      if (eligibleCount > 0) {
+        const float invCount = 1.0f / static_cast<float>(eligibleCount);
+        outAnchor.x *= invCount;
+        outAnchor.y *= invCount;
+        outAnchor.z *= invCount;
+      }
+
+      return allFerrying;
+    }
+
+    /**
+     * Address: 0x0081E4E0 (FUN_0081E4E0)
+     *
+     * IDA signature:
+     * int __usercall sub_81E4E0@<eax>(Moho::WeakSet_UserEntity *eax0@<eax>, Wm3::Vector3f a2, int a3);
+     *
+     * What it does:
+     * Returns the already-queued command-issue helper (if any) whose
+     * blueprint pointer exactly matches `candidateBlueprint` AND whose own
+     * command-graph anchor world position snaps to the same footprint cell
+     * as `dragPosition` - i.e. detects "about to queue a second build order
+     * for the same structure at the same spot". Only runs when the
+     * selection holds exactly one live, eligible `UserUnit` (`IsUserUnit`,
+     * has a command queue, not dead, not destroy-queued); returns null for
+     * every other case, including a selection with zero or more than one
+     * entity.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), from the factory
+     * build-command drag arm, gating whether to re-issue the existing
+     * queued order in place instead of stacking a duplicate.
+     */
+    [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindColocatedQueuedBuildOrder(
+      SSelectionSetUserEntity& selection,
+      const Wm3::Vector3f& dragPosition,
+      const REntityBlueprint* const candidateBlueprint
+    )
+    {
+      if (selection.size() != 1) {
+        return nullptr;
+      }
+
+      SSelectionNodeUserEntity* node = selection.mHead->mLeft;
+      node = SSelectionSetUserEntity::find(&selection, node, &node);
+
+      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+      if (userUnit == nullptr) {
+        return nullptr;
+      }
+
+      UserCommandQueue* const manager = userUnit->GetCommandQueue();
+      if (manager == nullptr) {
+        return nullptr;
+      }
+
+      IUnit* const iunit = GetIUnitBridge(userUnit);
+      if (iunit == nullptr || iunit->IsDead() || iunit->DestroyQueued()) {
+        return nullptr;
+      }
+
+      return FindColocatedQueuedBuildOrderInManager(manager, dragPosition, candidateBlueprint);
+    }
+
+    /**
+     * Address: 0x0081E610 (FUN_0081E610)
+     *
+     * IDA signature:
+     * std::map_uint_WeakPtr_UserEntity::_Node *__usercall sub_81E610@<eax>(
+     *     int a1@<eax>, Moho::WeakSet_UserEntity *a2, Moho::WeakSet_UserEntity *a3, Moho::WeakSet_UserEntity *a4);
+     *
+     * What it does:
+     * Splits the live entities of `source` into `rallyPointSet` (entities
+     * in the "RALLYPOINT" category) and `otherSet` (everything else). The
+     * binary inlines the same category-bitset test
+     * `Moho::UserEntity::IsInCategory` (0x008B97C0) already performs -
+     * verified field-for-field against that recovered body - so this calls
+     * it directly per entity rather than re-inlining the raw bitset index
+     * math. `a1` (the binary's category-lookup-resolver source) is not a
+     * separate parameter here: `IsInCategory` resolves it from the
+     * entity's own `mSession`, which is always the same session this
+     * selection belongs to. The binary's own return value is raw
+     * find-iterator debris from the last loop step; no caller inspects it.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), called three times to split
+     * the current selection ahead of a rally-point-aware factory/reclaim
+     * command.
+     */
+    [[maybe_unused]] void SplitSelectionByRallyPointCategory(
+      SSelectionSetUserEntity& source,
+      SSelectionSetUserEntity& rallyPointSet,
+      SSelectionSetUserEntity& otherSet
+    )
+    {
+      const msvc8::string rallyPointCategory("RALLYPOINT");
+
+      SSelectionNodeUserEntity* const head = source.mHead;
+      if (head == nullptr) {
+        return;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&source, node, &node);
+
+      while (node != head) {
+        if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
+          SSelectionSetUserEntity::AddResult addResult{};
+          if (entity->IsInCategory(rallyPointCategory)) {
+            (void)SSelectionSetUserEntity::Add(&addResult, &rallyPointSet, entity);
+          } else {
+            (void)SSelectionSetUserEntity::Add(&addResult, &otherSet, entity);
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&source, node, &node);
+      }
+    }
+
+    /**
+     * Address: 0x0081E700 (FUN_0081E700)
+     *
+     * IDA signature:
+     * std::map_uint_WeakPtr_UserEntity::_Node *__cdecl sub_81E700(
+     *     Moho::WeakSet_UserEntity *a1, Moho::WeakSet_UserEntity *a2, Moho::WeakSet_UserEntity *a3);
+     *
+     * What it does:
+     * Splits the live, mobile (`IUnit::IsMobile()`), `UserUnit` entities of
+     * `source` for a ferry-command drag: units in the "TRANSPORTATION"
+     * category that are also "AIR" or "AIRSTAGINGPLATFORM" go into
+     * `airTransportSet` (the candidate ferriers); every other mobile unit
+     * that is in the "LAND" category goes into `landUnitSet` (the
+     * candidate passengers). Non-mobile units, non-`UserUnit` entities, and
+     * mobile units that are neither an eligible air transport nor LAND are
+     * left out of both sets. The binary's own return value is raw
+     * find-iterator debris from the last loop step; no caller inspects it.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), from the `RULEUCC_Ferry`
+     * command-capability arm: `airTransportSet` becomes the selection fed
+     * into `ResolveGroupFerryAnchorOrDetectFerry` immediately afterward.
+     */
+    [[maybe_unused]] void SplitSelectionForFerryCommand(
+      SSelectionSetUserEntity& source,
+      SSelectionSetUserEntity& airTransportSet,
+      SSelectionSetUserEntity& landUnitSet
+    )
+    {
+      const msvc8::string transportationCategory("TRANSPORTATION");
+      const msvc8::string airCategory("AIR");
+      const msvc8::string airStagingCategory("AIRSTAGINGPLATFORM");
+      const msvc8::string landCategory("LAND");
+
+      SSelectionNodeUserEntity* const head = source.mHead;
+      if (head == nullptr) {
+        return;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&source, node, &node);
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+        IUnit* const iunit = GetIUnitBridge(userUnit);
+
+        if (userUnit != nullptr && iunit != nullptr && iunit->IsMobile()) {
+          const bool isAirTransport = entity->IsInCategory(transportationCategory) &&
+            (entity->IsInCategory(airCategory) || entity->IsInCategory(airStagingCategory));
+
+          SSelectionSetUserEntity::AddResult addResult{};
+          if (isAirTransport) {
+            (void)SSelectionSetUserEntity::Add(&addResult, &airTransportSet, entity);
+          } else if (entity->IsInCategory(landCategory)) {
+            (void)SSelectionSetUserEntity::Add(&addResult, &landUnitSet, entity);
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&source, node, &node);
+      }
+    }
+
+    /**
+     * Address: 0x0081E9E0 (FUN_0081E9E0)
+     *
+     * IDA signature:
+     * std::map_uint_WeakPtr_UserEntity::_Node *__cdecl sub_81E9E0(
+     *     Moho::WeakSet_UserEntity *a1, Moho::WeakSet_UserEntity *a2, Moho::WeakSet_UserEntity *a3);
+     *
+     * What it does:
+     * Splits the live `UserUnit` entities of `source` by the "REBUILDER"
+     * category: units in that category go into `rebuilderSet`, every other
+     * `UserUnit` goes into `nonRebuilderSet`. Non-`UserUnit` entities are
+     * left out of both sets. The binary's own return value is raw
+     * find-iterator debris from the last loop step; no caller inspects it.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), splitting the selection ahead
+     * of issuing a repair/assist-style command at a hovered "STRUCTURE"
+     * target - `nonRebuilderSet` is issued the command immediately after
+     * with the hovered entity as its direct target.
+     */
+    [[maybe_unused]] void SplitSelectionByRebuilderCategory(
+      SSelectionSetUserEntity& source,
+      SSelectionSetUserEntity& nonRebuilderSet,
+      SSelectionSetUserEntity& rebuilderSet
+    )
+    {
+      const msvc8::string rebuilderCategory("REBUILDER");
+
+      SSelectionNodeUserEntity* const head = source.mHead;
+      if (head == nullptr) {
+        return;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&source, node, &node);
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+
+        if (userUnit != nullptr) {
+          SSelectionSetUserEntity::AddResult addResult{};
+          if (userUnit->IsInCategory(rebuilderCategory)) {
+            (void)SSelectionSetUserEntity::Add(&addResult, &rebuilderSet, entity);
+          } else {
+            (void)SSelectionSetUserEntity::Add(&addResult, &nonRebuilderSet, entity);
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&source, node, &node);
+      }
+    }
+
+    /**
+     * Address: 0x0081EB20 (FUN_0081EB20)
+     *
+     * IDA signature:
+     * _Iterator_base **__usercall sub_81EB20@<eax>(
+     *     Moho::WeakSet_UserEntity *a1@<ebx>, Moho::WeakSet_UserEntity *a2, Moho::WeakSet_UserEntity *a3);
+     *
+     * What it does:
+     * Splits the live `UserUnit` entities of `source` for an attack-move-
+     * to-ground drag: units that are both mobile (`IUnit::IsMobile()`) and
+     * set to `FIRESTATE_ReturnFire` go into `aggressiveMoveSet` (eligible
+     * for AggressiveMove); every other live `UserUnit` (immobile, or on a
+     * different fire state) goes into `otherSet`. Non-`UserUnit` entities
+     * are left out of both sets. The binary's own return value is raw
+     * find-iterator debris from the last loop step; no caller inspects it.
+     *
+     * Invocation: sole caller is `Moho::SCommandModeData::HandleEvent`
+     * (0x0081FCD0, not yet recovered - see the note on
+     * `CanRestartMoveCommandAsPatrol` above), from the `RULEUCC_Attack`
+     * no-hover ground-target arm: `aggressiveMoveSet` is issued
+     * `UNITCOMMAND_AggressiveMove` immediately afterward when non-empty.
+     */
+    [[maybe_unused]] void SplitSelectionForAggressiveMove(
+      SSelectionSetUserEntity& source,
+      SSelectionSetUserEntity& aggressiveMoveSet,
+      SSelectionSetUserEntity& otherSet
+    )
+    {
+      SSelectionNodeUserEntity* const head = source.mHead;
+      if (head == nullptr) {
+        return;
+      }
+
+      SSelectionNodeUserEntity* node = head->mLeft;
+      node = SSelectionSetUserEntity::find(&source, node, &node);
+
+      while (node != head) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+
+        if (userUnit != nullptr) {
+          IUnit* const iunit = GetIUnitBridge(userUnit);
+          const bool eligible = iunit != nullptr && iunit->IsMobile() &&
+            userUnit->mUnitVarDat.mFireState == FIRESTATE_ReturnFire;
+
+          SSelectionSetUserEntity::AddResult addResult{};
+          if (eligible) {
+            (void)SSelectionSetUserEntity::Add(&addResult, &aggressiveMoveSet, entity);
+          } else {
+            (void)SSelectionSetUserEntity::Add(&addResult, &otherSet, entity);
+          }
+        }
+
+        SSelectionSetUserEntity::Iterator_inc(&node);
+        node = SSelectionSetUserEntity::find(&source, node, &node);
+      }
     }
 
     [[nodiscard]] bool

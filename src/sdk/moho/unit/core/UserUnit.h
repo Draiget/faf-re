@@ -46,6 +46,7 @@ namespace moho
   class UserUnitWeapon;
   class IUnit;
   class CWldSession;
+  struct REntityBlueprint;
   struct RUnitBlueprint;
   struct SCoordsVec2;
   struct SFootprint;
@@ -1012,6 +1013,19 @@ namespace moho
   [[nodiscard]] UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(UserCommandQueue* manager) noexcept;
 
   /**
+   * Address: 0x008B7320 (FUN_008B7320, struct_UserUnitManager::Get) - general
+   * cross-TU form of the file-local `GetLastQueuedUserCommandHelper`
+   * (returns the most recent non-null queued helper, scanning backward from
+   * the logical tail and skipping retired slots), for callers that need to
+   * pass an arbitrary `UserCommandQueue*` (e.g. a unit's factory command
+   * queue, not just its primary one). `GetLastQueuedUserCommandAnchor`
+   * above is the narrower unit-primary-queue-only bridge; this is the
+   * general accessor the mouse-drag "resolve group move anchor" keystone
+   * (`ResolveGroupMoveAnchorOrDetectPatrol`, CWldSession.cpp) needs.
+   */
+  [[nodiscard]] UserCommandIssueHelper* GetUserUnitManagerLastQueuedHelper(UserCommandQueue* manager) noexcept;
+
+  /**
    * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
    *
    * What it does:
@@ -1041,6 +1055,82 @@ namespace moho
    * keystone caps at 500 before enqueuing).
    */
   [[nodiscard]] std::int32_t GetUserUnitManagerQueueSize(UserCommandQueue* managerPtr) noexcept;
+
+  /**
+   * Address: 0x0081DD00 inlines this exact tail dereference
+   * (`struct_UserUnitManager::Get(...)->_M_finish - 2`, i.e. the raw last
+   * resolved link entry's helper pointer) with no null-skip - unlike
+   * `GetLastQueuedUserCommandHelper`/`ResolveUserUnitFrontCommandIssueHelper`,
+   * which both walk skipping retired (null) slots. Used to test whether a
+   * specific helper is still the very last order queued (nothing queued
+   * after it yet), which the mouse-drag "restart as patrol" gate
+   * (`CanRestartMoveCommandAsPatrol`, CWldSession.cpp) needs to reject an
+   * in-place restart when there is nothing after `helper` to revise.
+   *
+   * What it does:
+   * Rebuilds `manager`'s resolved command-queue link range and returns the
+   * helper pointer stored in its last entry, or null when the range is
+   * empty.
+   */
+  [[nodiscard]] UserCommandIssueHelper* GetUserUnitManagerQueueTailHelperRaw(UserCommandQueue* manager) noexcept;
+
+  /**
+   * Address: 0x0081E4E0 inlines this scan.
+   *
+   * What it does:
+   * Walks `manager`'s resolved command-queue link entries front to back and
+   * returns the first entry whose blueprint pointer equals
+   * `candidateBlueprint` AND whose own command-graph anchor world position
+   * (`Moho::ResolveCommandGraphAnchorWorldPosition`) snaps to the same
+   * footprint cell as `dragPosition` - i.e. an already-queued build order
+   * for the same structure at the same spot. Returns null when the queue
+   * is empty or no entry matches both conditions. Backs the mouse-drag
+   * "detect colocated queued build order" keystone
+   * (`FindColocatedQueuedBuildOrder`, CWldSession.cpp).
+   */
+  [[nodiscard]] UserCommandIssueHelper* FindColocatedQueuedBuildOrderInManager(
+    UserCommandQueue* manager,
+    const Wm3::Vector3f& dragPosition,
+    const REntityBlueprint* candidateBlueprint
+  ) noexcept;
+
+  /**
+   * Address: 0x0081DD00 inlines this scan (`struct_UserUnitManager::Get(...)`
+   * walked from `_M_start` to `_M_finish`, calling `sub_8B4140`
+   * unconditionally on each resolved link entry's helper pointer - no
+   * null-skip, matching the binary exactly).
+   *
+   * What it does:
+   * Returns true when every resolved command-queue link entry in `manager`
+   * currently resolves (via `ResolveCommandIssueHelperCommandType`) to
+   * `commandType`. Used to confirm a unit's whole queued order run is
+   * homogeneous before allowing an in-place drag restart.
+   */
+  [[nodiscard]] bool UserUnitManagerQueueHasUniformCommandType(
+    UserCommandQueue* manager, EUnitCommandType commandType
+  ) noexcept;
+
+  /**
+   * Address: 0x0081DEF0 inlines this scan.
+   *
+   * What it does:
+   * Walks `manager`'s resolved command-queue link entries front to back.
+   * Once the scan reaches `helper` itself, every entry from that point on
+   * (inclusive) whose resolved command type equals `matchCommandType` is
+   * reissued in place as `restartCommandType` - through the active sim
+   * driver's `SetCommandType` plus a mirrored local "set-type" ring event
+   * (`Moho::ReissueCommandIssueEntryAsType`, Sim.cpp). Entries before
+   * `helper`, and non-matching entries after it, are left untouched. No-op
+   * when `helper` never appears in the queue. Backs the mouse-drag
+   * "restart as patrol" keystone (`RestartMoveCommandAsPatrol`,
+   * CWldSession.cpp).
+   */
+  void RestartQueuedCommandsFromHelper(
+    UserCommandQueue* manager,
+    UserCommandIssueHelper* helper,
+    EUnitCommandType matchCommandType,
+    EUnitCommandType restartCommandType
+  ) noexcept;
 
   /**
    * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
