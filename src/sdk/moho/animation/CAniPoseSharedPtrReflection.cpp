@@ -49,6 +49,8 @@ namespace
 
 namespace gpg
 {
+  RSharedPointerType<moho::CAniPose>::~RSharedPointerType() = default;
+
   /**
    * Address: 0x0055CE20 (FUN_0055CE20, gpg::RSharedPointerType_CAniPose::GetName)
    *
