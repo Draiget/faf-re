@@ -2322,6 +2322,17 @@ namespace moho
      * the ghost of the unit that order will produce, stanced at the order's
      * position. Only builds one when the node has no mesh yet and its command is
      * a `BuildMobile`; every other order draws with waypoint markers alone.
+     *
+     * Analyzed, not yet recovered - part of the same rebuild frontier as
+     * `AddCommandQueueToCommandGraph` / `EstimateEdgeTravelTicks` /
+     * `EstimateDrawNodeWorkTicks` below. The body resolves the command's
+     * `SSTICommandConstantData::blueprint`, asks it for its display data
+     * (virtual slot 5), hands that to `CWldSession::mRules`' virtual slot 15 to
+     * get an `RMeshBlueprint`, then builds a "UnitPlace"-shadered
+     * `MeshMaterial` from the three texture-name strings at that blueprint's
+     * +0x64 and creates the instance through `MeshRenderer::CreateMeshInstance`
+     * with colour 0xFF00FF00. Blocked on modelling `RMeshBlueprint`'s +0x64
+     * string triple and the two virtual slots, neither of which is pinned yet.
      */
     static void CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph);
 
