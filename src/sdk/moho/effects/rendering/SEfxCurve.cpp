@@ -122,17 +122,17 @@ namespace gpg
     gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    moho::SEfxCurve fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    const moho::SEfxCurve fill{};
+    vec.Resize(count, fill);
 
     for (unsigned int i = 0; i < count; ++i) {
       gpg::RType* elementType = CachedSEfxCurveType();
-      archive->Read(elementType, &view.begin[i], *ownerRef);
+      archive->Read(elementType, &vec[i], *ownerRef);
     }
   }
 
@@ -146,13 +146,13 @@ namespace gpg
     gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = static_cast<unsigned int>(view.end - view.begin);
+    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     for (unsigned int i = 0; i < count; ++i) {
       gpg::RType* elementType = CachedSEfxCurveType();
-      archive->Write(elementType, &view.begin[i], *ownerRef);
+      archive->Write(elementType, &vec[i], *ownerRef);
     }
   }
 
@@ -224,8 +224,8 @@ namespace gpg
   gpg::RRef RFastVectorType<moho::SEfxCurve>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(obj);
-    gpg::RRef_SEfxCurve(&out, view.begin + ind);
+    auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
+    gpg::RRef_SEfxCurve(&out, vec.Data() + ind);
     return out;
   }
 
@@ -237,8 +237,7 @@ namespace gpg
    */
   size_t RFastVectorType<moho::SEfxCurve>::GetCount(void* obj) const
   {
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(obj);
-    return static_cast<std::size_t>(view.end - view.begin);
+    return static_cast<const gpg::fastvector<moho::SEfxCurve>*>(obj)->size();
   }
 
   /**
@@ -249,9 +248,9 @@ namespace gpg
    */
   void RFastVectorType<moho::SEfxCurve>::SetCount(void* obj, const int count) const
   {
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(obj);
-    moho::SEfxCurve fill{};
-    gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
+    auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
+    const moho::SEfxCurve fill{};
+    vec.Resize(static_cast<std::size_t>(count), fill);
   }
 
   /**
@@ -318,15 +317,9 @@ namespace moho
       return first;
     }
 
-    Wm3::Vector3f* const keysEnd = curve.mKeys.end();
-    Wm3::Vector3f* destination = first;
-    for (Wm3::Vector3f* source = last; source != keysEnd; ++source, ++destination) {
-      *destination = *source;
-    }
-
-    auto& keysView = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(&curve.mKeys);
-    keysView.end = destination;
-    return first;
+    // Shift the survivors down over [first, last) and rebase mLast -- the
+    // container's Erase(first, last) is exactly this loop.
+    return curve.mKeys.erase(first, last);
   }
 
   /**
