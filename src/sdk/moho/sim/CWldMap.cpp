@@ -1291,17 +1291,10 @@ namespace
     moho::TerrainEnvironmentLookupPair* const eraseLast
   )
   {
-    auto& runtime = msvc8::AsVectorRuntimeView(pairs);
-    moho::TerrainEnvironmentLookupPair* const oldEnd = runtime.end;
-
     if (eraseFirst != eraseLast) {
-      moho::TerrainEnvironmentLookupPair* const newEnd =
-        CopyTerrainEnvironmentLookupPairRangeForward(eraseFirst, eraseLast, oldEnd);
-
-      while (runtime.end != newEnd) {
-        --runtime.end;
-        std::destroy_at(runtime.end);
-      }
+      // Shift the survivors down over [eraseFirst, eraseLast), then destroy
+      // and drop the vacated tail: erase(first, last).
+      (void)pairs.erase(eraseFirst, eraseLast);
     }
 
     *outResult = eraseFirst;
@@ -1320,8 +1313,7 @@ namespace
   )
   {
     moho::TerrainEnvironmentLookupPair* result = nullptr;
-    auto& runtime = msvc8::AsVectorRuntimeView(pairs);
-    (void)EraseTerrainEnvironmentLookupPairRange(pairs, &result, runtime.begin, runtime.end);
+    (void)EraseTerrainEnvironmentLookupPairRange(pairs, &result, pairs.begin(), pairs.end());
     return result;
   }
 
@@ -3360,14 +3352,8 @@ namespace moho
    */
   void IWldTerrainRes::EnumerateEnvLookup(TerrainEnvironmentLookupPairs& outPairs) const
   {
-    auto& outPairsRuntime = msvc8::AsVectorRuntimeView(outPairs);
     moho::TerrainEnvironmentLookupPair* eraseResult = nullptr;
-    (void)EraseTerrainEnvironmentLookupPairRange(
-      outPairs,
-      &eraseResult,
-      outPairsRuntime.begin,
-      outPairsRuntime.end
-    );
+    (void)EraseTerrainEnvironmentLookupPairRange(outPairs, &eraseResult, outPairs.begin(), outPairs.end());
 
     TerrainEnvironmentLookupMapRuntimeView& map =
       const_cast<TerrainEnvironmentLookupMapRuntimeView&>(AsTerrainRuntimeView(this)->mEnvLookup);
