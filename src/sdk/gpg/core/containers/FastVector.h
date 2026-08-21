@@ -784,6 +784,19 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x00515890 (FUN_00515890,
+     * gpg::fastvector_n<Wm3::Vector3f, 6>::push_back -- `ecx = end_` (+0x04)
+     * tested against `capacity_` (+0x08); when they differ it stores the three
+     * floats through `end_` and advances it by 0x0C, otherwise it hands the
+     * one-element window to the 12-byte append lane FUN_00515E30
+     * (FastVectorInsertLanes.cpp). Reached from moho::ClipEdgeAgainstPlane
+     * (CTesselator.cpp), which appends clipped vertices to a
+     * FastVectorN<Wm3::Vector3f, 6>&.
+     *
+     * The +0x04/+0x08 pair is what identifies the container as a fastvector:
+     * its layout is {start_, end_, capacity_}, so a last-vs-capacity test lands
+     * there, whereas msvc8::vector's {proxy, first, last, end} would put the
+     * same test at +0x08/+0x0C.)
      * Address: 0x0059C750 (FUN_0059C750, gpg::fastvector_n64_SAssignedLocInfo::push_back)
      * Address: 0x0061C5E0 (FUN_0061C5E0, gpg::fastvector_n<SWeakRefSlot,20>::push_back —
      *   the mBlipsInRange intrusive weak-ref lane)
