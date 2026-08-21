@@ -185,11 +185,7 @@ size_t gpg::RVectorType<moho::PrefetchHandleBase>::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const msvc8::vector<moho::PrefetchHandleBase>*>(obj));
-  if (!view.begin) {
-    return 0u;
-  }
-  return static_cast<std::size_t>(view.end - view.begin);
+  return static_cast<const msvc8::vector<moho::PrefetchHandleBase>*>(obj)->size();
 }
 
 /**

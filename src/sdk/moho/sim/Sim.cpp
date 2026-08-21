@@ -14663,11 +14663,8 @@ namespace
     }
 
     const unsigned int categoryBitIndex = blueprint->mCategoryBitIndex;
-    const auto categoriesView = msvc8::AsVectorRuntimeView(blueprint->mCategories);
-    if (categoriesView.begin != nullptr && categoriesView.end != nullptr) {
-      for (msvc8::string* it = categoriesView.begin; it != categoriesView.end; ++it) {
-        AddCategoryMemberBit(*lookup, *it, categoryBitIndex);
-      }
+    for (const msvc8::string& category : blueprint->mCategories) {
+      AddCategoryMemberBit(*lookup, category, categoryBitIndex);
     }
 
     if (extraCategory != nullptr && *extraCategory != '\0') {
