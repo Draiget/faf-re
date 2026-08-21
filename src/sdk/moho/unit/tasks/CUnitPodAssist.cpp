@@ -339,6 +339,10 @@ namespace moho
 
   /**
    * Address: 0x0061D4F0 (FUN_0061D4F0, ??1CUnitPodAssist@Moho@@QAE@@Z)
+   * Address: 0x0061D580 (FUN_0061D580, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    */
   CUnitPodAssist::~CUnitPodAssist()
   {

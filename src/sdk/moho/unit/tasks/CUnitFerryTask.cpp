@@ -289,6 +289,10 @@ namespace moho
 
   /**
    * Address: 0x0060E2C0 (FUN_0060E2C0, Moho::CUnitFerryTask::~CUnitFerryTask)
+   * Address: 0x0060DD50 (FUN_0060DD50, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Aborts active unit navigation, clears ferry task owner-state bits, and

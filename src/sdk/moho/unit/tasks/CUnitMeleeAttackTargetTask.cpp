@@ -598,6 +598,10 @@ namespace moho
 
   /**
    * Address: 0x00617580 (FUN_00617580, Moho::CUnitMeleeAttackTargetTask::~CUnitMeleeAttackTargetTask)
+   * Address: 0x00615670 (FUN_00615670, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears focus/target weak links, detaches listener lanes, resets attacking

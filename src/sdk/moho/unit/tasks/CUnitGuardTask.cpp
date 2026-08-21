@@ -751,6 +751,10 @@ namespace moho
 
   /**
    * Address: 0x00611850 (FUN_00611850, ??1CUnitGuardTask@Moho@@QAE@@Z)
+   * Address: 0x006111C0 (FUN_006111C0, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * IDA signature:
    * void __thiscall Moho::CUnitGuardTask::~CUnitGuardTask(Moho::CUnitGuardTask *this);

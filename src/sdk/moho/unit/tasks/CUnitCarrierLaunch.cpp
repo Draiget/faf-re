@@ -120,6 +120,10 @@ namespace moho
 
   /**
    * Address: 0x00606F90 (FUN_00606F90, Moho::CUnitCarrierLaunch::~CUnitCarrierLaunch)
+   * Address: 0x00607450 (FUN_00607450, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Clears the carrier-launch unit-state bit before member/base teardown.

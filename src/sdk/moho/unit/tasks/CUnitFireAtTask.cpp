@@ -96,6 +96,10 @@ namespace moho
 
   /**
    * Address: 0x0060B800 (FUN_0060B800, ??1CUnitFireAtTask@Moho@@QAE@@Z)
+   * Address: 0x0060B240 (FUN_0060B240, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    * Mangled: ??1CUnitFireAtTask@Moho@@QAE@@Z
    *
    * What it does:
