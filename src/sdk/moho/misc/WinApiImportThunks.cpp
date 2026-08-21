@@ -197,6 +197,44 @@ extern "C" __declspec(dllimport) unsigned long __stdcall inet_addr(const char* t
 extern "C" __declspec(dllimport) int __stdcall WSACleanup(void);
 extern "C" __declspec(dllimport) hostent* __stdcall gethostbyaddr(const char* address, int addressLength, int addressType);
 extern "C" __declspec(dllimport) hostent* __stdcall gethostbyname(const char* name);
+extern "C" __declspec(dllimport) BOOL __stdcall WSACloseEvent(HANDLE hEvent);
+extern "C" __declspec(dllimport) BOOL __stdcall WSAResetEvent(HANDLE hEvent);
+extern "C" __declspec(dllimport) int __stdcall WSAEventSelect(std::uintptr_t socketHandle, HANDLE hEventObject, long networkEvents);
+extern "C" __declspec(dllimport) unsigned long __stdcall htonl(unsigned long hostLong);
+extern "C" __declspec(dllimport) unsigned long __stdcall ntohl(unsigned long netLong);
+extern "C" __declspec(dllimport) int __stdcall setsockopt(
+  std::uintptr_t socketHandle,
+  int level,
+  int optionName,
+  const char* optionValue,
+  int optionLength
+);
+extern "C" __declspec(dllimport) HANDLE __stdcall WSACreateEvent(void);
+extern "C" __declspec(dllimport) int __stdcall getaddrinfo(
+  const char* nodeName,
+  const char* serviceName,
+  const void* hints,
+  void** result
+);
+extern "C" __declspec(dllimport) int __stdcall getnameinfo(
+  const void* sockaddr,
+  int sockaddrLength,
+  char* nodeBuffer,
+  DWORD nodeBufferSize,
+  char* serviceBuffer,
+  DWORD serviceBufferSize,
+  int flags
+);
+extern "C" __declspec(dllimport) void __stdcall freeaddrinfo(void* addrInfo);
+extern "C" __declspec(dllimport) int __stdcall getsockname(std::uintptr_t socketHandle, void* name, int* nameLength);
+extern "C" __declspec(dllimport) int __stdcall getpeername(std::uintptr_t socketHandle, void* name, int* nameLength);
+extern "C" __declspec(dllimport) DWORD __stdcall WSAWaitForMultipleEvents(
+  DWORD eventCount,
+  const HANDLE* eventHandles,
+  BOOL waitAll,
+  DWORD timeoutMs,
+  BOOL alertable
+);
 extern "C" __declspec(dllimport) int __cdecl X3DAudioInitialize(int speakerChannelMask, int speedOfSound, int x3dHandle);
 extern "C" __declspec(dllimport) int __cdecl
 X3DAudioCalculate(int x3dHandle, int listener, int emitter, int flags, int dspSettings);
@@ -89742,6 +89780,557 @@ namespace moho::runtime
   LSTATUS ThunkRegQueryValueExA(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData)
   {
     return ::RegQueryValueExA(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData);
+  }
+  /**
+   * Address: 0x00A81F0A (FUN_00A81F0A, RegOpenKeyExA)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegOpenKeyExA`.
+   */
+  LSTATUS ThunkRegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, const DWORD ulOptions, const REGSAM samDesired, PHKEY phkResult)
+  {
+    return ::RegOpenKeyExA(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+  }
+
+  /**
+   * Address: 0x00A81F10 (FUN_00A81F10, RegCloseKey)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegCloseKey`.
+   */
+  LSTATUS ThunkRegCloseKey(HKEY hKey)
+  {
+    return ::RegCloseKey(hKey);
+  }
+
+  /**
+   * Address: 0x00A81F16 (FUN_00A81F16, RegSetValueExA)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegSetValueExA`.
+   */
+  LSTATUS ThunkRegSetValueExA(HKEY hKey, LPCSTR lpValueName, const DWORD Reserved, const DWORD dwType, const BYTE *lpData, const DWORD cbData)
+  {
+    return ::RegSetValueExA(hKey, lpValueName, Reserved, dwType, lpData, cbData);
+  }
+
+  /**
+   * Address: 0x00A81F1C (FUN_00A81F1C, RegQueryValueExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegQueryValueExW`.
+   */
+  LSTATUS ThunkRegQueryValueExW(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData)
+  {
+    return ::RegQueryValueExW(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData);
+  }
+
+  /**
+   * Address: 0x00A81F22 (FUN_00A81F22, RegOpenKeyExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegOpenKeyExW`.
+   */
+  LSTATUS ThunkRegOpenKeyExW(HKEY hKey, LPCWSTR lpSubKey, const DWORD ulOptions, const REGSAM samDesired, PHKEY phkResult)
+  {
+    return ::RegOpenKeyExW(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+  }
+
+  /**
+   * Address: 0x00A81F28 (FUN_00A81F28, GetUserNameW)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetUserNameW`.
+   */
+  BOOL ThunkGetUserNameW(LPWSTR lpBuffer, LPDWORD pcbBuffer)
+  {
+    return ::GetUserNameW(lpBuffer, pcbBuffer);
+  }
+
+  /**
+   * Address: 0x00A81F2E (FUN_00A81F2E, LookupPrivilegeValueW)
+   *
+   * What it does:
+   * Import thunk that forwards to `LookupPrivilegeValueW`.
+   */
+  BOOL ThunkLookupPrivilegeValueW(LPCWSTR lpSystemName, LPCWSTR lpName, PLUID lpLuid)
+  {
+    return ::LookupPrivilegeValueW(lpSystemName, lpName, lpLuid);
+  }
+
+  /**
+   * Address: 0x00A81F34 (FUN_00A81F34, RegOpenKeyW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegOpenKeyW`.
+   */
+  LSTATUS ThunkRegOpenKeyW(HKEY hKey, LPCWSTR lpSubKey, PHKEY phkResult)
+  {
+    return ::RegOpenKeyW(hKey, lpSubKey, phkResult);
+  }
+
+  /**
+   * Address: 0x00A81F3A (FUN_00A81F3A, RegQueryInfoKeyW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegQueryInfoKeyW`.
+   */
+  LSTATUS ThunkRegQueryInfoKeyW(HKEY hKey, LPWSTR lpClass, LPDWORD lpcchClass, LPDWORD lpReserved, LPDWORD lpcSubKeys, LPDWORD lpcbMaxSubKeyLen, LPDWORD lpcbMaxClassLen, LPDWORD lpcValues, LPDWORD lpcbMaxValueNameLen, LPDWORD lpcbMaxValueLen, LPDWORD lpcbSecurityDescriptor, PFILETIME lpftLastWriteTime)
+  {
+    return ::RegQueryInfoKeyW(hKey, lpClass, lpcchClass, lpReserved, lpcSubKeys, lpcbMaxSubKeyLen, lpcbMaxClassLen, lpcValues, lpcbMaxValueNameLen, lpcbMaxValueLen, lpcbSecurityDescriptor, lpftLastWriteTime);
+  }
+
+  /**
+   * Address: 0x00A81F40 (FUN_00A81F40, RegCreateKeyW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegCreateKeyW`.
+   */
+  LSTATUS ThunkRegCreateKeyW(HKEY hKey, LPCWSTR lpSubKey, PHKEY phkResult)
+  {
+    return ::RegCreateKeyW(hKey, lpSubKey, phkResult);
+  }
+
+  /**
+   * Address: 0x00A81F46 (FUN_00A81F46, RegDeleteValueW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegDeleteValueW`.
+   */
+  LSTATUS ThunkRegDeleteValueW(HKEY hKey, LPCWSTR lpValueName)
+  {
+    return ::RegDeleteValueW(hKey, lpValueName);
+  }
+
+  /**
+   * Address: 0x00A81F4C (FUN_00A81F4C, RegEnumValueW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegEnumValueW`.
+   */
+  LSTATUS ThunkRegEnumValueW(HKEY hKey, const DWORD dwIndex, LPWSTR lpValueName, LPDWORD lpcchValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData)
+  {
+    return ::RegEnumValueW(hKey, dwIndex, lpValueName, lpcchValueName, lpReserved, lpType, lpData, lpcbData);
+  }
+
+  /**
+   * Address: 0x00A81F52 (FUN_00A81F52, RegEnumKeyW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegEnumKeyW`.
+   */
+  LSTATUS ThunkRegEnumKeyW(HKEY hKey, const DWORD dwIndex, LPWSTR lpName, const DWORD cchName)
+  {
+    return ::RegEnumKeyW(hKey, dwIndex, lpName, cchName);
+  }
+
+  /**
+   * Address: 0x00A81F58 (FUN_00A81F58, RegSetValueExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegSetValueExW`.
+   */
+  LSTATUS ThunkRegSetValueExW(HKEY hKey, LPCWSTR lpValueName, const DWORD Reserved, const DWORD dwType, const BYTE *lpData, const DWORD cbData)
+  {
+    return ::RegSetValueExW(hKey, lpValueName, Reserved, dwType, lpData, cbData);
+  }
+
+  /**
+   * Address: 0x00A81F5E (FUN_00A81F5E, RegDeleteKeyW)
+   *
+   * What it does:
+   * Import thunk that forwards to `RegDeleteKeyW`.
+   */
+  LSTATUS ThunkRegDeleteKeyW(HKEY hKey, LPCWSTR lpSubKey)
+  {
+    return ::RegDeleteKeyW(hKey, lpSubKey);
+  }
+
+  /**
+   * Address: 0x00A81F64 (FUN_00A81F64, SHFileOperationW)
+   *
+   * What it does:
+   * Import thunk that forwards to `SHFileOperationW`.
+   */
+  int ThunkSHFileOperationW(LPSHFILEOPSTRUCTW lpFileOp)
+  {
+    return ::SHFileOperationW(lpFileOp);
+  }
+
+  /**
+   * Address: 0x00A81F6A (FUN_00A81F6A, SHGetFolderPathW)
+   *
+   * What it does:
+   * Import thunk that forwards to `SHGetFolderPathW`.
+   */
+  HRESULT ThunkSHGetFolderPathW(HWND hwnd, const int csidl, HANDLE hToken, const DWORD dwFlags, LPWSTR pszPath)
+  {
+    return ::SHGetFolderPathW(hwnd, csidl, hToken, dwFlags, pszPath);
+  }
+
+  /**
+   * Address: 0x00A81F70 (FUN_00A81F70, ShellExecuteExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ShellExecuteExW`.
+   */
+  BOOL ThunkShellExecuteExW(SHELLEXECUTEINFOW *pExecInfo)
+  {
+    return ::ShellExecuteExW(pExecInfo);
+  }
+
+  /**
+   * Address: 0x00A81F76 (FUN_00A81F76, ShellExecuteW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ShellExecuteW`.
+   */
+  HINSTANCE ThunkShellExecuteW(HWND hwnd, LPCWSTR lpOperation, LPCWSTR lpFile, LPCWSTR lpParameters, LPCWSTR lpDirectory, const INT nShowCmd)
+  {
+    return ::ShellExecuteW(hwnd, lpOperation, lpFile, lpParameters, lpDirectory, nShowCmd);
+  }
+
+  /**
+   * Address: 0x00A81F7C (FUN_00A81F7C, SHFileOperationA)
+   *
+   * What it does:
+   * Import thunk that forwards to `SHFileOperationA`.
+   */
+  int ThunkSHFileOperationA(LPSHFILEOPSTRUCTA lpFileOp)
+  {
+    return ::SHFileOperationA(lpFileOp);
+  }
+
+  /**
+   * Address: 0x00A81F82 (FUN_00A81F82, DragAcceptFiles)
+   *
+   * What it does:
+   * Import thunk that forwards to `DragAcceptFiles`.
+   */
+  void ThunkDragAcceptFiles(HWND hWnd, const BOOL fAccept)
+  {
+    ::DragAcceptFiles(hWnd, fAccept);
+  }
+
+  /**
+   * Address: 0x00A81F88 (FUN_00A81F88, DragQueryPoint)
+   *
+   * What it does:
+   * Import thunk that forwards to `DragQueryPoint`.
+   */
+  BOOL ThunkDragQueryPoint(HDROP hDrop, POINT *ppt)
+  {
+    return ::DragQueryPoint(hDrop, ppt);
+  }
+
+  /**
+   * Address: 0x00A81F8E (FUN_00A81F8E, DragFinish)
+   *
+   * What it does:
+   * Import thunk that forwards to `DragFinish`.
+   */
+  void ThunkDragFinish(HDROP hDrop)
+  {
+    ::DragFinish(hDrop);
+  }
+
+  /**
+   * Address: 0x00A81F94 (FUN_00A81F94, DragQueryFileW)
+   *
+   * What it does:
+   * Import thunk that forwards to `DragQueryFileW`.
+   */
+  UINT ThunkDragQueryFileW(HDROP hDrop, const UINT iFile, LPWSTR lpszFile, const UINT cch)
+  {
+    return ::DragQueryFileW(hDrop, iFile, lpszFile, cch);
+  }
+
+  /**
+   * Address: 0x00A81F9A (FUN_00A81F9A, ExtractIconW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExtractIconW`.
+   */
+  HICON ThunkExtractIconW(HINSTANCE hInst, LPCWSTR pszExeFileName, const UINT nIconIndex)
+  {
+    return ::ExtractIconW(hInst, pszExeFileName, nIconIndex);
+  }
+
+  /**
+   * Address: 0x00A81FA0 (FUN_00A81FA0, ExtractIconExW)
+   *
+   * What it does:
+   * Import thunk that forwards to `ExtractIconExW`.
+   */
+  UINT ThunkExtractIconExW(LPCWSTR lpszFile, const int nIconIndex, HICON *phiconLarge, HICON *phiconSmall, const UINT nIcons)
+  {
+    return ::ExtractIconExW(lpszFile, nIconIndex, phiconLarge, phiconSmall, nIcons);
+  }
+
+  /**
+   * Address: 0x00A81FA6 (FUN_00A81FA6, SHGetPathFromIDListW)
+   *
+   * What it does:
+   * Import thunk that forwards to `SHGetPathFromIDListW`.
+   */
+  BOOL ThunkSHGetPathFromIDListW(LPCITEMIDLIST pidl, LPWSTR pszPath)
+  {
+    return ::SHGetPathFromIDListW(pidl, pszPath);
+  }
+
+  /**
+   * Address: 0x00A81FAC (FUN_00A81FAC, SHGetMalloc)
+   *
+   * What it does:
+   * Import thunk that forwards to `SHGetMalloc`.
+   */
+  HRESULT ThunkSHGetMalloc(IMalloc **ppMalloc)
+  {
+    return ::SHGetMalloc(ppMalloc);
+  }
+
+  /**
+   * Address: 0x00A81FB2 (FUN_00A81FB2, SHBrowseForFolderW)
+   *
+   * What it does:
+   * Import thunk that forwards to `SHBrowseForFolderW`.
+   */
+  LPITEMIDLIST ThunkSHBrowseForFolderW(LPBROWSEINFOW lpbi)
+  {
+    return ::SHBrowseForFolderW(lpbi);
+  }
+
+  /**
+   * Address: 0x00A81FB8 (FUN_00A81FB8, CoCreateInstance)
+   *
+   * What it does:
+   * Import thunk that forwards to `CoCreateInstance`.
+   */
+  HRESULT ThunkCoCreateInstance(const IID *const rclsid, LPUNKNOWN pUnkOuter, const DWORD dwClsContext, const IID *const riid, LPVOID *ppv)
+  {
+    return ::CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+  }
+
+  /**
+   * Address: 0x00A81FBE (FUN_00A81FBE, CoInitialize)
+   *
+   * What it does:
+   * Import thunk that forwards to `CoInitialize`.
+   */
+  HRESULT ThunkCoInitialize(LPVOID pvReserved)
+  {
+    return ::CoInitialize(pvReserved);
+  }
+
+  /**
+   * Address: 0x00A81FC4 (FUN_00A81FC4, OleInitialize)
+   *
+   * What it does:
+   * Import thunk that forwards to `OleInitialize`.
+   */
+  HRESULT ThunkOleInitialize(LPVOID pvReserved)
+  {
+    return ::OleInitialize(pvReserved);
+  }
+
+  /**
+   * Address: 0x00A81FCA (FUN_00A81FCA, OleUninitialize)
+   *
+   * What it does:
+   * Import thunk that forwards to `OleUninitialize`.
+   */
+  void ThunkOleUninitialize()
+  {
+    ::OleUninitialize();
+  }
+
+  /**
+   * Address: 0x00A81FD6 (FUN_00A81FD6, CoLockObjectExternal)
+   *
+   * What it does:
+   * Import thunk that forwards to `CoLockObjectExternal`.
+   */
+  HRESULT ThunkCoLockObjectExternal(LPUNKNOWN pUnk, const BOOL fLock, const BOOL fLastUnlockReleases)
+  {
+    return ::CoLockObjectExternal(pUnk, fLock, fLastUnlockReleases);
+  }
+
+  /**
+   * Address: 0x00A81FDC (FUN_00A81FDC, RevokeDragDrop)
+   *
+   * What it does:
+   * Import thunk that forwards to `RevokeDragDrop`.
+   */
+  HRESULT ThunkRevokeDragDrop(HWND hwnd)
+  {
+    return ::RevokeDragDrop(hwnd);
+  }
+
+  /**
+   * Address: 0x00A81FE2 (FUN_00A81FE2, OleSetClipboard)
+   *
+   * What it does:
+   * Import thunk that forwards to `OleSetClipboard`.
+   */
+  HRESULT ThunkOleSetClipboard(LPDATAOBJECT pDataObj)
+  {
+    return ::OleSetClipboard(pDataObj);
+  }
+
+  /**
+   * Address: 0x00A81FE8 (FUN_00A81FE8, OleFlushClipboard)
+   *
+   * What it does:
+   * Import thunk that forwards to `OleFlushClipboard`.
+   */
+  HRESULT ThunkOleFlushClipboard()
+  {
+    return ::OleFlushClipboard();
+  }
+
+  /**
+   * Address: 0x00A81FF4 (FUN_00A81FF4, OleGetClipboard)
+   *
+   * What it does:
+   * Import thunk that forwards to `OleGetClipboard`.
+   */
+  HRESULT ThunkOleGetClipboard(LPDATAOBJECT *ppDataObj)
+  {
+    return ::OleGetClipboard(ppDataObj);
+  }
+
+  /**
+   * Address: 0x00A95DB8 (FUN_00A95DB8, GetCurrentThreadId_1)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentThreadId_1`.
+   */
+  DWORD ThunkGetCurrentThreadId_1()
+  {
+    return ::GetCurrentThreadId();
+  }
+
+  /**
+   * Address: 0x00A95DBE (FUN_00A95DBE, GetCurrentThread_0)
+   *
+   * What it does:
+   * Import thunk that forwards to `GetCurrentThread_0`.
+   */
+  HANDLE ThunkGetCurrentThread_0()
+  {
+    return ::GetCurrentThread();
+  }
+
+  /**
+   * Address: 0x00ABFA9B (FUN_00ABFA9B, std::uncaught_exception)
+   *
+   * What it does:
+   * Linker-emitted trampoline for the exported `std::uncaught_exception`
+   * symbol; jumps directly to the already-recovered `__uncaught_exception`
+   * CRT helper (0x00AA2A65) with no intervening logic.
+   */
+  bool ThunkStdUncaughtException()
+  {
+    return __uncaught_exception();
+  }
+
+  /**
+   * Address: 0x00AC641C (FUN_00AC641C, WSACloseEvent)
+   *
+   * What it does:
+   * Import thunk that forwards to `WSACloseEvent`.
+   */
+  BOOL ThunkWSACloseEvent(HANDLE hEvent)
+  {
+    return ::WSACloseEvent(hEvent);
+  }
+
+  /**
+   * Address: 0x00AC6428 (FUN_00AC6428, WSAResetEvent)
+   *
+   * What it does:
+   * Import thunk that forwards to `WSAResetEvent`.
+   */
+  BOOL ThunkWSAResetEvent(HANDLE hEvent)
+  {
+    return ::WSAResetEvent(hEvent);
+  }
+
+  /**
+   * Address: 0x00AC642E (FUN_00AC642E, WSAEventSelect)
+   *
+   * What it does:
+   * Import thunk that forwards to `WSAEventSelect`.
+   */
+  int ThunkWSAEventSelect(const std::uintptr_t socketHandle, HANDLE hEventObject, const long networkEvents)
+  {
+    return ::WSAEventSelect(socketHandle, hEventObject, networkEvents);
+  }
+
+  /**
+   * Address: 0x00AC6434 (FUN_00AC6434, htonl)
+   *
+   * What it does:
+   * Import thunk that forwards to `htonl`.
+   */
+  unsigned long Thunkhtonl(const unsigned long hostLong)
+  {
+    return ::htonl(hostLong);
+  }
+
+  /**
+   * Address: 0x00AC6440 (FUN_00AC6440, ntohl)
+   *
+   * What it does:
+   * Import thunk that forwards to `ntohl`.
+   */
+  unsigned long Thunkntohl(const unsigned long netLong)
+  {
+    return ::ntohl(netLong);
+  }
+
+  /**
+   * Address: 0x00AC6458 (FUN_00AC6458, setsockopt)
+   *
+   * What it does:
+   * Import thunk that forwards to `setsockopt`.
+   */
+  int Thunksetsockopt(const std::uintptr_t socketHandle, const int level, const int optionName, const char *optionValue, const int optionLength)
+  {
+    return ::setsockopt(socketHandle, level, optionName, optionValue, optionLength);
+  }
+
+  /**
+   * Address: 0x00AC646A (FUN_00AC646A, WSACreateEvent)
+   *
+   * What it does:
+   * Import thunk that forwards to `WSACreateEvent`.
+   */
+  HANDLE ThunkWSACreateEvent()
+  {
+    return ::WSACreateEvent();
+  }
+
+  /**
+   * Address: 0x00AC6476 (FUN_00AC6476, getaddrinfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `getaddrinfo`.
+   */
+  int Thunkgetaddrinfo(const char *nodeName, const char *serviceName, const void *hints, void **result)
+  {
+    return ::getaddrinfo(nodeName, serviceName, hints, result);
+  }
+
+  /**
+   * Address: 0x00AC647C (FUN_00AC647C, getnameinfo)
+   *
+   * What it does:
+   * Import thunk that forwards to `getnameinfo`.
+   */
+  int Thunkgetnameinfo(const void *sockaddr, const int sockaddrLength, char *nodeBuffer, const DWORD nodeBufferSize, char *serviceBuffer, const DWORD serviceBufferSize, const int flags)
+  {
+    return ::getnameinfo(sockaddr, sockaddrLength, nodeBuffer, nodeBufferSize, serviceBuffer, serviceBufferSize, flags);
   }
 } // namespace moho::runtime
 
