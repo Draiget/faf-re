@@ -205,11 +205,20 @@ namespace moho
 
     /**
      * Address: 0x0081CEA0 (FUN_0081CEA0)
+     * Address: 0x0081F760 (FUN_0081F760, sub_81F760)
+     * Address: 0x0081FC80 (FUN_0081FC80, sub_81FC80)
      *
      * What it does:
      * Initializes command mode from one cursor snapshot and one modifier lane:
      * mode/caps/blueprint are reset, drag-start is copied, drag-end is reset,
      * and trailing sentinel fields are set to `-1`.
+     *
+     * The three addresses are one constructor: the bodies are byte-identical
+     * apart from the relative call displacement and the `retn`/`retn 4`
+     * epilogue. 0x0081FC80 and 0x0081F760 are the call-site-specialised
+     * emissions `Moho::CUIWorldView::HandleEvent` instantiates from its
+     * wheel-rotation (0x008708CD) and middle-button-press (0x00870B29) arms.
+     * See the definition in CWldSession.cpp for the full comparison.
      */
     CommandModeData(const MouseInfo& mouseInfo, int modifiers);
 
@@ -355,11 +364,10 @@ namespace moho
       std::uint8_t mReserved09_0B[3]{};   // +0x09
     };
 
-    struct FindResult
-    {
-      SSelectionSetUserEntity* mSet;   // +0x00
-      SSelectionNodeUserEntity* mRes;  // +0x04
-    };
+    // `FindResult`, `First` and `Next` live on the shared
+    // `WeakEntitySetUserEntity` header (WeakEntitySet.h): the linker folded
+    // those three bodies across both weak-set instantiations, so they belong
+    // to the tree header both instantiations share rather than to this one.
 
     /**
      * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add)
@@ -464,7 +472,7 @@ namespace moho
      * (sentinel) if none remains. Result is written to `*outNode`.
      */
     [[nodiscard]] static SSelectionNodeUserEntity*
-      find(SSelectionSetUserEntity* set, SSelectionNodeUserEntity* start, SSelectionNodeUserEntity** outNode);
+      find(WeakEntitySetUserEntity* set, SSelectionNodeUserEntity* start, SSelectionNodeUserEntity** outNode);
 
     /**
      * Address: 0x007B29C0 (FUN_007B29C0, sub_7B29C0)
@@ -497,15 +505,6 @@ namespace moho
      * persistent storage pointers/counters.
      */
     std::int32_t ReleaseStorage();
-
-    /**
-     * Address: 0x0066A060 (FUN_0066A060, Moho::WeakSet_UserEntity::First)
-     *
-     * What it does:
-     * Starts weak-set iteration at the left-most tree node and returns one
-     * `{set,node}` cursor pair after tombstone filtering through `find`.
-     */
-    [[nodiscard]] FindResult* First(FindResult* outResult);
 
     /**
      * Address: 0x0066ADD0 (FUN_0066ADD0, Moho::WeakSet_UserEntity::Iterator::inc)
@@ -1060,6 +1059,34 @@ namespace moho
      * entries for currently live selected units.
      */
     void GetSelectionUnits(msvc8::vector<UserUnit*>& outUnits) const;
+
+    /**
+     * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
+     *
+     * IDA signature:
+     * void __userpurge Moho::CWldSession::GetSelectionUnits(
+     *     Moho::CWldSession *this@<ebx>, Moho::WeakSet<Moho::UserUnit> &outUnits);
+     *
+     * What it does:
+     * Walks the session selection weak-set with the shared `find`/`Iterator_inc`
+     * tombstone-pruning pair and inserts every live selected `UserUnit` into
+     * `outUnits` through `WeakSet<UserUnit>::Add`. Unlike the vector overload it
+     * does not clear the destination first - `Add` already de-duplicates by key.
+     *
+     * This is the shape the mangled symbol actually carries, and the shape
+     * every drag/formation call site feeds straight into `CFormation`:
+     * `CUIWorldView::HandleEvent` at 0x00870694 and 0x00870FCA, and its
+     * drag-formation helper at 0x0087037A, each build a `WeakSet<UserUnit>` on
+     * the stack (head sentinel from the shared 28-byte node allocator, torn
+     * down with `operator delete`) and pass it here.
+     *
+     * The `msvc8::vector<UserUnit*>&` overload above carries the same address
+     * and predates this one; several recovered call sites still depend on it
+     * (`RangeRenderer.cpp`, `CConCommand.cpp`, `Sim.cpp`). The two are kept
+     * side by side deliberately - the divergence is real and wants a separate
+     * reconciliation pass, not a silent retype here.
+     */
+    void GetSelectionUnits(WeakUnitSetUserUnit& outUnits) const;
 
     /**
      * Address: 0x00896090 (FUN_00896090, ?GetValidAttackingUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
@@ -1753,6 +1780,76 @@ namespace moho
    * `fastvector<UserUnit*>`, then calls `ISSUE_Command` once per requested count.
    */
   void ISSUE_IncreaseCommandCount(UserCommandIssueHelper* helper, int count);
+
+  /**
+   * Address: 0x008B1220 (FUN_008B1220)
+   * Mangled: ?ISSUE_RemoveCommandFromUnitQueue@Moho@@YAXPAVUserCommand@1@PAVUserUnit@1@@Z
+   *
+   * IDA signature:
+   * void __usercall Moho::ISSUE_RemoveCommandFromUnitQueue(
+   *     Moho::UserCommand *command@<ebx>, Moho::UserUnit *unit@<esi>);
+   *
+   * What it does:
+   * Drops one specific queued command from one specific unit: asks the active
+   * sim driver to remove `command`'s id from `unit`'s server-side queue, then
+   * records the removal locally against the unit's own command queue. Both
+   * arguments are null-tolerant early-outs.
+   *
+   * Defined in CWldSession.cpp beside the `ISSUE_RemoveLastCommand` pair it
+   * shares its driver/record shape with. Declared here so
+   * `Moho::CUIWorldView::HandleEvent` (UiRuntimeTypes.cpp) can call it by name
+   * from the shift+ctrl right-button-release arm, which is its sole call site
+   * in the image (0x00871082).
+   */
+  void ISSUE_RemoveCommandFromUnitQueue(UserCommandIssueHelper* command, UserUnit* unit);
+
+  /**
+   * Address: 0x008B4300 (FUN_008B4300, sub_8B4300)
+   *
+   * IDA signature:
+   * char __cdecl sub_8B4300(int commandIssueHelper, Moho::UserUnit *candidateUnit);
+   *
+   * What it does:
+   * Public entry point for the command-graph relation gate implemented as
+   * `IsCandidateExcludedByCachedRelation` in CWldSession.cpp: reports whether
+   * `candidateUnit` is excluded by the newest type-0/type-3 entry in
+   * `command`'s cached command-issue event ring. Returning `true` means "this
+   * unit is not a participant of that command".
+   *
+   * The implementation takes an anonymous-namespace runtime view of the
+   * helper; this bridge is the header-visible form over the public
+   * `UserCommandIssueHelper` type, following the same pattern
+   * `ResolveCommandIssueHelperCommandType` (UserUnit.h) uses.
+   *
+   * `Moho::CUIWorldView::HandleEvent` calls it at 0x008706C6 to decide which of
+   * the two command-graph hover banners to raise.
+   */
+  [[nodiscard]] bool IsCommandCandidateExcludedByCachedRelation(
+    UserCommandIssueHelper& command,
+    UserUnit* candidateUnit
+  ) noexcept;
+
+  /**
+   * Address: 0x0081DD00 (FUN_0081DD00, sub_81DD00)
+   *
+   * IDA signature:
+   * char __cdecl sub_81DD00(Moho::WeakSet_UserEntity *selection, struct_CommandIssueHelper *helper);
+   *
+   * What it does:
+   * Public entry point for `CanRestartMoveCommandAsPatrol` (CWldSession.cpp):
+   * reports whether the just-issued Move/FormMove drag command `helper` may be
+   * restarted in place as Patrol/FormPatrol across `selection` instead of being
+   * queued as a new order. See the implementation's own doc comment for the
+   * per-unit gate it applies.
+   *
+   * Hoisted to external linkage so `Moho::CUIWorldView::HandleEvent`
+   * (UiRuntimeTypes.cpp) can call it by name at 0x008707FC, where it gates the
+   * "convert moves into patrol" cursor banner.
+   */
+  [[nodiscard]] bool CanRestartSelectionMoveCommandAsPatrol(
+    SSelectionSetUserEntity& selection,
+    UserCommandIssueHelper* helper
+  );
 
   /**
    * Address: 0x008B05E0 (FUN_008B05E0,

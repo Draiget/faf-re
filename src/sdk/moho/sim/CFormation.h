@@ -136,7 +136,7 @@ namespace moho
      * and forwards straight into `ChooseFormation()`/`Finalize()`.
      */
     void ProcessMouse(
-      SSelectionSetUserEntity* selection,
+      WeakEntitySetUserEntity* selection,
       bool triggerActive,
       const Wm3::Vector3f& mousePos,
       bool useLastQueuedDestination
@@ -155,13 +155,13 @@ namespace moho
      * `Finalize()` again to rebuild the live formation instance from the new
      * choice, then resets `mTimeLeft` to force an immediate next tick.
      *
-     * Not yet invoked from recovered source: its sole caller,
-     * `Moho::CUIWorldView::HandleEvent` (0x008704B0, 889 instructions), is
-     * still unrecovered. Frontier orphan pending that dispatcher, matching
-     * the same pattern as `func_NewCommandDragger`/`NewSelectionDragger`
-     * (UiRuntimeTypes.cpp).
+     * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent`
+     * (0x008704B0, recovered in moho/ui/UiRuntimeTypes.cpp), which reaches it
+     * from both the left-button-press and left-button-double-click arms
+     * (0x00870BEF, shared by the jump at 0x00870CC6) whenever a drag formation
+     * is already pending when the next left click arrives.
      */
-    [[maybe_unused]] void LuaFinalize();
+    void LuaFinalize();
 
   public:
     /// The set of units currently participating in the drag-formation, a
