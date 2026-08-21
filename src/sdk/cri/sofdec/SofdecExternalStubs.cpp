@@ -189,7 +189,11 @@ extern "C" {
   // call in mwPlyFxGetCompoMode, so the composition mode always read back 0.
   void* SFX_MakeTable() { return nullptr; }
   // SFX_SetOutBufSize (0x00ACCD50): real body in SofdecSfxRuntime.cpp.
-  void* SFX_SetUnitWidth() { return nullptr; }
+  // SFX_SetUnitWidth (0x00ACCD90): real body in SofdecSfxRuntime.cpp next to
+  // SFX_SetOutBufSize. As a no-argument stub it silently discarded both
+  // MWSFSFX_SetOutBufSize's sfxHandle and unitWidth arguments (C linkage let
+  // a 0-arg stub satisfy the 2-arg call site), so unitWidth was never applied
+  // to any played movie.
   void* SFX_SetZbit() { return nullptr; }
   void* SUD_AnalyTypeCcs() { return nullptr; }
   void* SUD_Finish() { return nullptr; }
