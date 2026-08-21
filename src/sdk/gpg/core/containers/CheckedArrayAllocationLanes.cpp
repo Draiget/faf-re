@@ -93,6 +93,7 @@ namespace gpg::core::legacy
    * Address: 0x00A3A530 (FUN_00A3A530, sub_A3A530)
    * Address: 0x005A1DF0 (FUN_005A1DF0, func_Create2LinkedListN)
    * Address: 0x005ABB00 (FUN_005ABB00)
+   * Address: 0x007CC140 (FUN_007CC140)
    *
    * What it does:
    * Allocates a contiguous lane of 24-byte elements and applies the legacy
@@ -173,6 +174,20 @@ namespace gpg::core::legacy
   void* AllocateChecked32ByteLane(const std::uint32_t elementCount)
   {
     return AllocateCheckedElements(elementCount, 32u);
+  }
+
+  /**
+   * Address: 0x00544680 (FUN_00544680)
+   * Address: 0x00768DB0 (FUN_00768DB0)
+   * Address: 0x007BCD70 (FUN_007BCD70)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 36-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`.
+   */
+  void* AllocateChecked36ByteLane(const std::uint32_t elementCount)
+  {
+    return AllocateCheckedElements(elementCount, 36u);
   }
 
   /**
