@@ -74,13 +74,9 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewPrefetchSetRuntimeRef()
   {
+    // msvc8::vector's default constructor already null-initialises all three
+    // lanes; the binary's explicit zeroing here IS that constructor inlined.
     CPrefetchSetRuntime* const object = new (std::nothrow) CPrefetchSetRuntime();
-    if (object != nullptr) {
-      auto& handlesView = msvc8::AsVectorRuntimeView(object->mHandles);
-      handlesView.begin = nullptr;
-      handlesView.end = nullptr;
-      handlesView.capacityEnd = nullptr;
-    }
     return gpg::RRef(object, ResolvePrefetchSetRuntimeType());
   }
 
@@ -95,11 +91,9 @@ namespace
   {
     auto* const object = static_cast<CPrefetchSetRuntime*>(objectStorage);
     if (object != nullptr) {
+      // Placement-new runs msvc8::vector's default constructor, which is what
+      // the binary's explicit lane zeroing right after it is.
       new (object) CPrefetchSetRuntime();
-      auto& handlesView = msvc8::AsVectorRuntimeView(object->mHandles);
-      handlesView.begin = nullptr;
-      handlesView.end = nullptr;
-      handlesView.capacityEnd = nullptr;
     }
     return gpg::RRef(object, ResolvePrefetchSetRuntimeType());
   }
@@ -118,14 +112,9 @@ namespace
       return;
     }
 
-    auto& handlesView = msvc8::AsVectorRuntimeView(object->mHandles);
-    if (handlesView.begin != nullptr) {
-      DestroyPrefetchHandleRange(handlesView.begin, handlesView.end);
-      ::operator delete(handlesView.begin);
-    }
-    handlesView.begin = nullptr;
-    handlesView.end = nullptr;
-    handlesView.capacityEnd = nullptr;
+    // Element destructor sweep, free, null all three lanes: VC8 _Tidy().
+    DestroyPrefetchHandleRange(object->mHandles.begin(), object->mHandles.end());
+    object->mHandles = msvc8::vector<moho::PrefetchHandleBase>{};
 
     ::operator delete(object);
   }
@@ -144,14 +133,9 @@ namespace
       return;
     }
 
-    auto& handlesView = msvc8::AsVectorRuntimeView(object->mHandles);
-    if (handlesView.begin != nullptr) {
-      DestroyPrefetchHandleRange(handlesView.begin, handlesView.end);
-      ::operator delete(handlesView.begin);
-    }
-    handlesView.begin = nullptr;
-    handlesView.end = nullptr;
-    handlesView.capacityEnd = nullptr;
+    // Element destructor sweep, free, null all three lanes: VC8 _Tidy().
+    DestroyPrefetchHandleRange(object->mHandles.begin(), object->mHandles.end());
+    object->mHandles = msvc8::vector<moho::PrefetchHandleBase>{};
   }
 
   /**
