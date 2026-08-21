@@ -1229,30 +1229,6 @@ namespace
   }
 
   /**
-   * Address: 0x008A9DC0 (FUN_008A9DC0, sub_8A9DC0)
-   *
-   * What it does:
-   * Copies one half-open range of environment-lookup string pairs forward via
-   * member string `assign` lanes and returns one-past-last destination lane.
-   */
-  [[nodiscard]] moho::TerrainEnvironmentLookupPair* CopyTerrainEnvironmentLookupPairRangeForward(
-    moho::TerrainEnvironmentLookupPair* destinationBegin,
-    const moho::TerrainEnvironmentLookupPair* sourceBegin,
-    const moho::TerrainEnvironmentLookupPair* sourceEnd
-  )
-  {
-    moho::TerrainEnvironmentLookupPair* destination = destinationBegin;
-    const moho::TerrainEnvironmentLookupPair* source = sourceBegin;
-    while (source != sourceEnd) {
-      destination->first.assign(source->first, 0u, static_cast<std::size_t>(-1));
-      destination->second.assign(source->second, 0u, static_cast<std::size_t>(-1));
-      ++source;
-      ++destination;
-    }
-    return destination;
-  }
-
-  /**
    * Address: 0x008AA0B0 (FUN_008AA0B0, sub_8AA0B0)
    *
    * What it does:
