@@ -1710,33 +1710,13 @@ namespace
     return LaneMapRightmostNode(node);
   }
 
-  void LaneMapTransplantNode(
-    moho::SFormationLaneUnitMap& map,
-    moho::SFormationLaneUnitNode* const from,
-    moho::SFormationLaneUnitNode* const to
-  ) noexcept
-  {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (from->parent == head) {
-      head->parent = to != nullptr ? to : head;
-    } else if (from == from->parent->left) {
-      from->parent->left = to;
-    } else {
-      from->parent->right = to;
-    }
-
-    if (to != nullptr && to != head && to->isNil == 0u) {
-      to->parent = from->parent;
-    }
-  }
-
   /**
    * Address: 0x0056CEE0 (FUN_0056CEE0, sub_56CEE0)
    *
    * What it does:
    * Performs a left rotation around `pivot` inside one lane-map tree.
    */
-  [[maybe_unused]] void RotateLaneMapLeft(
+  void RotateLaneMapLeft(
     moho::SFormationLaneUnitNode* const pivot,
     moho::SFormationLaneUnitMap& map
   ) noexcept
@@ -1779,7 +1759,7 @@ namespace
    * What it does:
    * Performs a right rotation around `pivot` inside one lane-map tree.
    */
-  [[maybe_unused]] void RotateLaneMapRight(
+  void RotateLaneMapRight(
     moho::SFormationLaneUnitNode* const pivot,
     moho::SFormationLaneUnitMap& map
   ) noexcept
@@ -1858,58 +1838,163 @@ namespace
    * Address: 0x0056AC60 (FUN_0056AC60, sub_56AC60)
    *
    * What it does:
-   * Erases one validated lane-map iterator, repairs the tree links, and
-   * returns the in-order successor so callers can continue traversal.
+   * Erases one validated lane-map iterator (`std::_Tree::erase(iterator)`),
+   * running the full red-black delete fixup -- rotating via `RotateLaneMapLeft`/
+   * `RotateLaneMapRight` (FUN_0056CEE0/FUN_0056CF90) exactly as the binary
+   * does -- and returns the in-order successor so callers can continue
+   * traversal. Mirrors the proven `EraseAllUnitsTreeNode` (EntityDb.cpp)
+   * shape for the same dinkumware `_Tree::erase` algorithm over a sibling
+   * RB-tree instantiation.
    */
   [[nodiscard]] moho::SFormationLaneUnitNode* EraseLaneMapNodeAndAdvance(
     moho::SFormationLaneUnitMap& map,
-    moho::SFormationLaneUnitNode* const node
+    moho::SFormationLaneUnitNode* const erased
   )
   {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (head == nullptr || node == nullptr || node == head || node->isNil != 0u) {
+    if (erased == nullptr || erased->isNil != 0u) {
       throw std::out_of_range("invalid map/set<T> iterator");
     }
 
-    moho::SFormationLaneUnitNode* const successor = NextLaneMapNodeInOrder(node, head);
+    moho::SFormationLaneUnitNode* const head = map.head;
+    moho::SFormationLaneUnitNode* const next = NextLaneMapNodeInOrder(erased, head);
 
-    if (node->left == nullptr || node->left == head || node->left->isNil != 0u) {
-      LaneMapTransplantNode(map, node, node->right);
-    } else if (node->right == nullptr || node->right == head || node->right->isNil != 0u) {
-      LaneMapTransplantNode(map, node, node->left);
+    moho::SFormationLaneUnitNode* lifted = erased;
+    moho::SFormationLaneUnitNode* fix = nullptr;
+    moho::SFormationLaneUnitNode* fixParent = nullptr;
+
+    if (erased->left->isNil != 0u) {
+      fix = erased->right;
+    } else if (erased->right->isNil != 0u) {
+      fix = erased->left;
     } else {
-      moho::SFormationLaneUnitNode* const replacement = LaneMapMinimumNode(node->right, head);
-      if (replacement->parent != node) {
-        LaneMapTransplantNode(map, replacement, replacement->right);
-        replacement->right = node->right;
-        if (replacement->right != nullptr && replacement->right != head && replacement->right->isNil == 0u) {
-          replacement->right->parent = replacement;
-        }
-      }
-
-      LaneMapTransplantNode(map, node, replacement);
-      replacement->left = node->left;
-      if (replacement->left != nullptr && replacement->left != head && replacement->left->isNil == 0u) {
-        replacement->left->parent = replacement;
-      }
+      lifted = next;
+      fix = lifted->right;
     }
 
-    UnlinkWeakWordNode(node->linkedUnitOwnerWord, node->linkedUnitNextWord);
-    delete node;
-    if (map.size > 0u) {
+    if (lifted == erased) {
+      fixParent = erased->parent;
+      if (fix->isNil == 0u) {
+        fix->parent = fixParent;
+      }
+
+      if (head->parent == erased) {
+        head->parent = fix;
+      } else if (fixParent->left == erased) {
+        fixParent->left = fix;
+      } else {
+        fixParent->right = fix;
+      }
+
+      if (head->left == erased) {
+        head->left = (fix->isNil != 0u) ? fixParent : LaneMapMinimumNode(fix, head);
+      }
+      if (head->right == erased) {
+        head->right = (fix->isNil != 0u) ? fixParent : LaneMapMaximumNode(fix, head);
+      }
+    } else {
+      erased->left->parent = lifted;
+      lifted->left = erased->left;
+
+      if (lifted == erased->right) {
+        fixParent = lifted;
+      } else {
+        fixParent = lifted->parent;
+        if (fix->isNil == 0u) {
+          fix->parent = fixParent;
+        }
+        fixParent->left = fix;
+        lifted->right = erased->right;
+        erased->right->parent = lifted;
+      }
+
+      if (head->parent == erased) {
+        head->parent = lifted;
+      } else if (erased->parent->left == erased) {
+        erased->parent->left = lifted;
+      } else {
+        erased->parent->right = lifted;
+      }
+
+      lifted->parent = erased->parent;
+      std::swap(lifted->color, erased->color);
+    }
+
+    if (erased->color == 1u) {
+      moho::SFormationLaneUnitNode* fixCursor = fix;
+      moho::SFormationLaneUnitNode* fixParentCursor = fixParent;
+      while (fixCursor != head->parent && fixCursor->color == 1u) {
+        if (fixCursor == fixParentCursor->left) {
+          moho::SFormationLaneUnitNode* sibling = fixParentCursor->right;
+          if (sibling->color == 0u) {
+            sibling->color = 1u;
+            fixParentCursor->color = 0u;
+            RotateLaneMapLeft(fixParentCursor, map);
+            sibling = fixParentCursor->right;
+          }
+
+          if (sibling->isNil != 0u) {
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else if (sibling->left->color == 1u && sibling->right->color == 1u) {
+            sibling->color = 0u;
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else {
+            if (sibling->right->color == 1u) {
+              sibling->left->color = 1u;
+              sibling->color = 0u;
+              RotateLaneMapRight(sibling, map);
+              sibling = fixParentCursor->right;
+            }
+            sibling->color = fixParentCursor->color;
+            fixParentCursor->color = 1u;
+            sibling->right->color = 1u;
+            RotateLaneMapLeft(fixParentCursor, map);
+            fixCursor = head->parent;
+            break;
+          }
+        } else {
+          moho::SFormationLaneUnitNode* sibling = fixParentCursor->left;
+          if (sibling->color == 0u) {
+            sibling->color = 1u;
+            fixParentCursor->color = 0u;
+            RotateLaneMapRight(fixParentCursor, map);
+            sibling = fixParentCursor->left;
+          }
+
+          if (sibling->isNil != 0u) {
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else if (sibling->right->color == 1u && sibling->left->color == 1u) {
+            sibling->color = 0u;
+            fixCursor = fixParentCursor;
+            fixParentCursor = fixCursor->parent;
+          } else {
+            if (sibling->left->color == 1u) {
+              sibling->right->color = 1u;
+              sibling->color = 0u;
+              RotateLaneMapLeft(sibling, map);
+              sibling = fixParentCursor->left;
+            }
+            sibling->color = fixParentCursor->color;
+            fixParentCursor->color = 1u;
+            sibling->left->color = 1u;
+            RotateLaneMapRight(fixParentCursor, map);
+            fixCursor = head->parent;
+            break;
+          }
+        }
+      }
+      fixCursor->color = 1u;
+    }
+
+    UnlinkWeakWordNode(erased->linkedUnitOwnerWord, erased->linkedUnitNextWord);
+    delete erased;
+    if (map.size != 0u) {
       --map.size;
     }
 
-    if (map.size == 0u) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-    } else {
-      head->left = LaneMapMinimumNode(head->parent, head);
-      head->right = LaneMapMaximumNode(head->parent, head);
-    }
-
-    return successor;
+    return next;
   }
 
   void DestroyLaneMapStorage(moho::SFormationLaneUnitMap& map)
