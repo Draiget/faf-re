@@ -1514,6 +1514,10 @@ namespace moho
 
     /**
      * Address: 0x0078CBF0 (FUN_0078CBF0, Moho::CMauiCursor::~CMauiCursor body)
+     * Address: 0x0078CBD0 (FUN_0078CBD0, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body above then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Releases active/default cursor texture weak-owner lanes and destroys
@@ -1630,6 +1634,10 @@ namespace moho
 
     /**
      * Address: 0x00786D00 (FUN_00786D00, Moho::CMauiControl::~CMauiControl)
+     * Address: 0x00786A60 (FUN_00786A60, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body above then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Invalidates parent ownership, destroys/unlinks child controls, tears down
@@ -2183,6 +2191,10 @@ namespace moho
 
     /**
      * Address: 0x0078F1B0 (FUN_0078F1B0, Moho::CMauiEdit::~CMauiEdit)
+     * Address: 0x0078F190 (FUN_0078F190, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body above then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      * Mangled: ??1CMauiEdit@Moho@@QAE@XZ
      *
      * What it does:
@@ -2687,6 +2699,17 @@ namespace moho
     CMauiGroup(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x007972D0 (FUN_007972D0, Moho::CMauiGroup::dtr)
+     *
+     * What it does:
+     * `CMauiGroup` adds no data members of its own, so the vtable-slot-2
+     * scalar deleting destructor just tail-calls `CMauiControl::~CMauiControl`
+     * then conditionally frees the object -- exactly what a defaulted
+     * destructor produces for a derived class with no extra state.
+     */
+    ~CMauiGroup() override = default;
+
+    /**
      * Address: 0x00797300 (FUN_00797300, Moho::CMauiGroup::Draw)
      *
      * What it does:
@@ -2711,6 +2734,10 @@ namespace moho
 
     /**
      * Address: 0x00797840 (FUN_00797840, Moho::CMauiHistogram::~CMauiHistogram)
+     * Address: 0x00797820 (FUN_00797820, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body above then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Releases each histogram column's owned value buffer and the column array
@@ -2901,6 +2928,10 @@ namespace moho
 
     /**
      * Address: 0x007994C0 (FUN_007994C0, sub_7994C0)
+     * Address: 0x007994A0 (FUN_007994A0, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body below then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Releases list-item string storage and one intrusive font reference, then
@@ -3001,6 +3032,10 @@ namespace moho
 
     /**
      * Address: 0x0079DE70 (FUN_0079DE70, Moho::CMauiMesh::dtr)
+     * Address: 0x0079DE50 (FUN_0079DE50, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body below then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Releases the mesh preview texture shared-pointer lane and continues
@@ -3113,6 +3148,10 @@ namespace moho
 
     /**
      * Address: 0x0079EF30 (FUN_0079EF30, Moho::CMauiMovie::~CMauiMovie)
+     * Address: 0x0079EF10 (FUN_0079EF10, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body above then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Tears down one movie control in-place: destroys the two lazy-var lanes
@@ -3303,6 +3342,10 @@ namespace moho
 
     /**
      * Address: 0x00784B40 (FUN_00784B40, Moho::CMauiBorder::~CMauiBorder)
+     * Address: 0x00784B20 (FUN_00784B20, vtable-slot-2 scalar deleting
+     * destructor: tail-calls the body above then conditionally frees the
+     * object -- ordinary C++ `delete` semantics, not modeled as a separate
+     * function here)
      *
      * What it does:
      * Releases border lazy-var/object texture lanes before base
