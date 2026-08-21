@@ -2351,6 +2351,20 @@ namespace boost
       countedImpl->px = nullptr;
     }
 
+    /**
+     * `boost::detail::sp_counted_base`-derived control blocks' `destroy()`
+     * virtual slot: called once `weak_count_` also reaches zero, after
+     * `dispose()` has already released the pointee. Every `sp_counted_impl_p<T>`/
+     * `sp_counted_impl_pd<T,D>` instantiation compiles to the identical
+     * `{ delete this; }` body regardless of `T` -- there is nothing left that
+     * depends on the pointee type at this point.
+     */
+    template <class TStorage>
+    void DestroySpCountedImplSelf(TStorage* const self) noexcept
+    {
+      delete self;
+    }
+
     struct VirtualDeleteTargetRuntimeView
     {
       void** vtable;
@@ -4299,6 +4313,20 @@ namespace boost
   }
 
   /**
+   * Address: 0x0053A270 (FUN_0053A270, boost::detail::sp_counted_impl_p<Moho::RScmResource>::destroy)
+   *
+   * What it does:
+   * Frees the control block itself once both use and weak counts reach
+   * zero (the pointee was already released by `dispose()`).
+   */
+  void SpCountedImplPDestroyRScmResource(
+    SpCountedImplStorage<moho::RScmResource>* const self
+  ) noexcept
+  {
+    DestroySpCountedImplSelf(self);
+  }
+
+  /**
    * Address: 0x0053B3D0 (FUN_0053B3D0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::dispose)
    *
    * What it does:
@@ -4313,6 +4341,20 @@ namespace boost
   }
 
   /**
+   * Address: 0x0053B400 (FUN_0053B400, boost::detail::sp_counted_impl_p<Moho::RScaResource>::destroy)
+   *
+   * What it does:
+   * Frees the control block itself once both use and weak counts reach
+   * zero (the pointee was already released by `dispose()`).
+   */
+  void SpCountedImplPDestroyRScaResource(
+    SpCountedImplStorage<moho::RScaResource>* const self
+  ) noexcept
+  {
+    DestroySpCountedImplSelf(self);
+  }
+
+  /**
    * Address: 0x00545360 (FUN_00545360, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::dispose)
    *
    * What it does:
@@ -4324,6 +4366,20 @@ namespace boost
   ) noexcept
   {
     DisposeSpCountedImplPointee(countedImpl);
+  }
+
+  /**
+   * Address: 0x00545440 (FUN_00545440, boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::destroy)
+   *
+   * What it does:
+   * Frees the control block itself once both use and weak counts reach
+   * zero (the pointee was already released by `dispose()`).
+   */
+  void SpCountedImplPDestroyLaunchInfoNew(
+    SpCountedImplStorage<moho::LaunchInfoNew>* const self
+  ) noexcept
+  {
+    DestroySpCountedImplSelf(self);
   }
 
   /**
@@ -4627,6 +4683,20 @@ namespace boost
 
     auto* const runtime = reinterpret_cast<SpCountedImplPdFunctionDeleterRuntimeView*>(countedImpl);
     runtime->deleter(runtime->px);
+  }
+
+  /**
+   * Address: 0x0054EE00 (FUN_0054EE00, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::destroy)
+   *
+   * What it does:
+   * Frees the control block itself once both use and weak counts reach
+   * zero (the pointee was already released by `dispose()`).
+   */
+  void SpCountedImplPdDestroyCAniDefaultSkelFunctionDeleter(
+    SpCountedImplStorage<void>* const self
+  ) noexcept
+  {
+    DestroySpCountedImplSelf(self);
   }
 
   /**
