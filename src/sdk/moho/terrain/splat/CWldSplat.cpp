@@ -372,47 +372,37 @@ namespace
       return nullptr;
     }
 
-    auto& groupView = msvc8::AsVectorRuntimeView(manager.mDecalGroups);
+    auto& groups = manager.mDecalGroups;
     std::int32_t removedDecalIndexLane = 0;
     (void)DispatchRemoveDecalIndexToGroupRange(
       &removedDecalIndexLane,
-      groupView.begin,
-      groupView.end,
+      groups.begin(),
+      groups.end(),
       decal->mIndex
     );
     (void)ErasePrimaryDecalLookupEntriesByKey(manager.mDecalGroupLookupByDecalIndex, decal->mIndex);
 
-    auto& decalsView = msvc8::AsVectorRuntimeView(manager.mDecals);
-    moho::CWldTerrainDecal** found = decalsView.begin;
-    while (found != decalsView.end) {
-      if (*found == decal) {
-        break;
-      }
-      ++found;
+    auto& decals = manager.mDecals;
+    auto* const found = std::find(decals.begin(), decals.end(), decal);
+    if (found == decals.end()) {
+      return decals.end();
     }
 
-    if (found == decalsView.end) {
-      return decalsView.end;
-    }
-
-    const std::ptrdiff_t trailingCount = decalsView.end - (found + 1);
-    if (trailingCount > 0) {
-      const std::size_t bytesToMove = static_cast<std::size_t>(trailingCount) * sizeof(moho::CWldTerrainDecal*);
-      (void)::memmove_s(found, bytesToMove, found + 1, bytesToMove);
-    }
-    --decalsView.end;
+    // The binary's memmove-tail-down + `--mLast` is vector::erase(it), which
+    // likewise returns the slot the following element moved into.
+    auto* const next = decals.erase(found);
 
     delete decal;
 
-    for (moho::CWldTerrainDecal** it = decalsView.begin; it != decalsView.end; ++it) {
+    for (auto* it = decals.begin(); it != decals.end(); ++it) {
       moho::CWldTerrainDecal* const activeDecal = *it;
       if (activeDecal != nullptr) {
-        activeDecal->mVecIndex = static_cast<std::uint32_t>(it - decalsView.begin);
+        activeDecal->mVecIndex = static_cast<std::uint32_t>(it - decals.begin());
       }
     }
 
     manager.mDidSomething = 1u;
-    return found;
+    return next;
   }
 
   [[nodiscard]] float MoveAlphaTowardZero(const float value, const float step) noexcept
@@ -432,16 +422,11 @@ namespace
 
   [[nodiscard]] std::int32_t SortUserEntityPointerRange(gpg::fastvector<moho::UserEntity*>& entities)
   {
-    auto& view = gpg::AsFastVectorRuntimeView<moho::UserEntity*>(&entities);
-    if (view.begin != nullptr && view.end != nullptr && (view.end - view.begin) > 1) {
-      std::sort(view.begin, view.end);
+    if (entities.size() > 1u) {
+      std::sort(entities.begin(), entities.end());
     }
 
-    if (view.begin == nullptr || view.end == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(view.end - view.begin);
+    return static_cast<std::int32_t>(entities.size());
   }
 
   [[nodiscard]] moho::DecalGroupLookupNode* CreateLookupHeadSentinel()
@@ -707,53 +692,30 @@ namespace moho
    */
   CDecalManager::~CDecalManager()
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    for (CWldTerrainDecal** it = decalsView.begin; it != decalsView.end; ++it) {
-      if (*it != nullptr) {
-        delete *it;
-      }
+    for (CWldTerrainDecal* const decal : mDecals) {
+      delete decal;
     }
 
-    auto& groupsView = msvc8::AsVectorRuntimeView(mDecalGroups);
-    for (CDecalGroup** it = groupsView.begin; it != groupsView.end; ++it) {
-      if (*it != nullptr) {
-        delete *it;
-      }
+    for (CDecalGroup* const group : mDecalGroups) {
+      delete group;
     }
 
-    auto& splatsView = msvc8::AsVectorRuntimeView(mSplats);
-    for (CWldSplat** it = splatsView.begin; it != splatsView.end; ++it) {
-      if (*it != nullptr) {
-        delete *it;
-      }
+    for (CWldSplat* const splat : mSplats) {
+      delete splat;
     }
 
     AsDecalManagerSpatialDbRuntime(this)->DestroyStorage();
 
-    if (splatsView.begin != nullptr) {
-      ::operator delete(splatsView.begin);
-    }
-    splatsView.begin = nullptr;
-    splatsView.end = nullptr;
-    splatsView.capacityEnd = nullptr;
-
+    // Each `= {}` is VC8's `_Tidy()`: free the block and null the three lanes.
+    // The binary interleaves them with the two lookup-tree teardowns in this
+    // exact order.
+    mSplats = {};
     (void)ResetDecalLookupTreeSecondary(mDecalGroupLookupBySplatIndex);
 
-    if (groupsView.begin != nullptr) {
-      ::operator delete(groupsView.begin);
-    }
-    groupsView.begin = nullptr;
-    groupsView.end = nullptr;
-    groupsView.capacityEnd = nullptr;
-
+    mDecalGroups = {};
     (void)ResetDecalLookupTreePrimary(mDecalGroupLookupByDecalIndex);
 
-    if (decalsView.begin != nullptr) {
-      ::operator delete(decalsView.begin);
-    }
-    decalsView.begin = nullptr;
-    decalsView.end = nullptr;
-    decalsView.capacityEnd = nullptr;
+    mDecals = {};
   }
 
   /**
@@ -786,40 +748,26 @@ namespace moho
       return;
     }
 
-    const auto& groupsView = msvc8::AsVectorRuntimeView(mDecalGroups);
-    for (CDecalGroup** groupIt = groupsView.begin; groupIt != groupsView.end; ++groupIt) {
-      CDecalGroup* const group = *groupIt;
+    for (CDecalGroup* const group : mDecalGroups) {
       if (group != nullptr) {
         group->RemoveFromGroup(decal->mIndex);
       }
     }
 
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    CWldTerrainDecal** found = decalsView.begin;
-    while (found != decalsView.end) {
-      if (*found == decal) {
-        break;
-      }
-      ++found;
-    }
-    if (found == decalsView.end) {
+    auto* const found = std::find(mDecals.begin(), mDecals.end(), decal);
+    if (found == mDecals.end()) {
       return;
     }
 
     CWldTerrainDecal* const removedDecal = *found;
-    const std::ptrdiff_t trailingCount = decalsView.end - (found + 1);
-    if (trailingCount > 0) {
-      const std::size_t bytesToMove = static_cast<std::size_t>(trailingCount) * sizeof(CWldTerrainDecal*);
-      (void)::memmove_s(found, bytesToMove, found + 1, bytesToMove);
-    }
-    --decalsView.end;
+    (void)mDecals.erase(found);
 
     delete removedDecal;
 
-    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
+    for (auto* decalIt = mDecals.begin(); decalIt != mDecals.end(); ++decalIt) {
       CWldTerrainDecal* const activeDecal = *decalIt;
       if (activeDecal != nullptr) {
-        activeDecal->mVecIndex = static_cast<std::uint32_t>(decalIt - decalsView.begin);
+        activeDecal->mVecIndex = static_cast<std::uint32_t>(decalIt - mDecals.begin());
       }
     }
 
@@ -862,8 +810,7 @@ namespace moho
    */
   void CDecalManager::AddDecals(const msvc8::vector<SDecalInfo>& decals)
   {
-    const auto& decalsView = msvc8::AsVectorRuntimeView(decals);
-    for (const SDecalInfo* record = decalsView.begin; record != decalsView.end; ++record) {
+    for (const SDecalInfo* record = decals.begin(); record != decals.end(); ++record) {
       const bool isSplat = record->mIsSplat != 0u;
 
       // Both name lanes are resolved up front, exactly as the binary does, so a
@@ -919,12 +866,9 @@ namespace moho
    */
   void CDecalManager::RemoveDecals(const msvc8::vector<std::int32_t>& decalHandles)
   {
-    const auto& handleView = msvc8::AsVectorRuntimeView(decalHandles);
-    for (const std::int32_t* handleIt = handleView.begin; handleIt != handleView.end; ++handleIt) {
-      const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-      for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
-        CWldTerrainDecal* const decal = *decalIt;
-        if (decal->mRuntimeHandle == *handleIt) {
+    for (const std::int32_t handle : decalHandles) {
+      for (CWldTerrainDecal* const decal : mDecals) {
+        if (decal->mRuntimeHandle == handle) {
           decal->mRemoveTick = 1;
           break;
         }
@@ -941,10 +885,9 @@ namespace moho
    */
   void CDecalManager::Reindex()
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
+    for (auto* decalIt = mDecals.begin(); decalIt != mDecals.end(); ++decalIt) {
       CWldTerrainDecal* const decal = *decalIt;
-      decal->mVecIndex = static_cast<std::uint32_t>(decalIt - decalsView.begin);
+      decal->mVecIndex = static_cast<std::uint32_t>(decalIt - mDecals.begin());
     }
   }
 
@@ -957,29 +900,13 @@ namespace moho
    */
   void CDecalManager::MoveDecalToFront(CWldTerrainDecal* const decal)
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-
-    CWldTerrainDecal** found = decalsView.begin;
-    while (found != decalsView.end) {
-      if (*found == decal) {
-        break;
-      }
-      ++found;
-    }
-
-    if (found == decalsView.end) {
+    auto* found = std::find(mDecals.begin(), mDecals.end(), decal);
+    if (found == mDecals.end()) {
       return;
     }
 
-    if (found != decalsView.begin) {
-      do {
-        CWldTerrainDecal* const previous = *(found - 1);
-        *found = previous;
-        --found;
-      } while (found != decalsView.begin);
-    }
-
-    *found = decal;
+    // Shift [begin, found) right by one and drop `decal` at the front.
+    std::rotate(mDecals.begin(), found, found + 1);
     Reindex();
   }
 
@@ -992,24 +919,14 @@ namespace moho
    */
   void CDecalManager::MoveDecalTowardBack(CWldTerrainDecal* const decal)
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-
-    CWldTerrainDecal** found = decalsView.begin;
-    while (found != decalsView.end) {
-      if (*found == decal) {
-        break;
-      }
-      ++found;
-    }
-
-    if (found == decalsView.end) {
+    auto* const found = std::find(mDecals.begin(), mDecals.end(), decal);
+    if (found == mDecals.end()) {
       return;
     }
 
-    CWldTerrainDecal** const next = found + 1;
-    if (next != decalsView.end) {
-      *found = *next;
-      *next = decal;
+    auto* const next = found + 1;
+    if (next != mDecals.end()) {
+      std::iter_swap(found, next);
     }
 
     Reindex();
@@ -1024,19 +941,9 @@ namespace moho
    */
   void CDecalManager::MoveDecalTowardFront(CWldTerrainDecal* const decal)
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-
-    CWldTerrainDecal** found = decalsView.begin;
-    while (found != decalsView.end) {
-      if (*found == decal) {
-        break;
-      }
-      ++found;
-    }
-
-    if (found != decalsView.end && found != decalsView.begin) {
-      *found = *(found - 1);
-      *(found - 1) = decal;
+    auto* const found = std::find(mDecals.begin(), mDecals.end(), decal);
+    if (found != mDecals.end() && found != mDecals.begin()) {
+      std::iter_swap(found, found - 1);
       Reindex();
     }
   }
@@ -1166,10 +1073,7 @@ namespace moho
       ++mDecalCount;
     }
 
-    const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    const std::uint32_t vectorIndex =
-      decalsView.begin != nullptr ? static_cast<std::uint32_t>(decalsView.end - decalsView.begin) : 0u;
-    loaded->mVecIndex = vectorIndex;
+    loaded->mVecIndex = static_cast<std::uint32_t>(mDecals.size());
 
     AppendDecal(mDecals, loaded);
 
@@ -1199,22 +1103,9 @@ namespace moho
     std::int32_t* const groupIndexLane = group->GetIndex();
     const std::int32_t removedFromLookup = EraseLookupEntriesByKey(mDecalGroupLookupBySplatIndex, groupIndexLane);
 
-    auto& groupsView = msvc8::AsVectorRuntimeView(mDecalGroups);
-    CDecalGroup** found = groupsView.begin;
-    while (found != groupsView.end) {
-      if (*found == group) {
-        break;
-      }
-      ++found;
-    }
-
-    if (found != groupsView.end) {
-      const std::ptrdiff_t trailingCount = groupsView.end - (found + 1);
-      if (trailingCount > 0) {
-        const std::size_t bytesToMove = static_cast<std::size_t>(trailingCount) * sizeof(CDecalGroup*);
-        (void)::memmove_s(found, bytesToMove, found + 1, bytesToMove);
-      }
-      --groupsView.end;
+    auto* const found = std::find(mDecalGroups.begin(), mDecalGroups.end(), group);
+    if (found != mDecalGroups.end()) {
+      (void)mDecalGroups.erase(found);
     }
 
     delete group;
@@ -1230,26 +1121,12 @@ namespace moho
    */
   void CDecalManager::AddSplat(CWldTerrainDecal* const decal)
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    CWldTerrainDecal** found = decalsView.begin;
-    while (found != decalsView.end) {
-      if (*found == decal) {
-        break;
-      }
-      ++found;
-    }
-
-    if (found == decalsView.end) {
+    auto* const found = std::find(mDecals.begin(), mDecals.end(), decal);
+    if (found == mDecals.end()) {
       return;
     }
 
-    const std::ptrdiff_t trailingCount = decalsView.end - (found + 1);
-    if (trailingCount > 0) {
-      const std::size_t bytesToMove = static_cast<std::size_t>(trailingCount) * sizeof(CWldTerrainDecal*);
-      (void)::memmove_s(found, bytesToMove, found + 1, bytesToMove);
-    }
-    --decalsView.end;
-
+    (void)mDecals.erase(found);
     AppendDecal(mDecals, decal);
     Reindex();
   }
@@ -1263,9 +1140,8 @@ namespace moho
    */
   void CDecalManager::ProcessRemovals(const std::int32_t tick)
   {
-    auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    CWldTerrainDecal** decalIt = decalsView.begin;
-    while (decalIt != decalsView.end) {
+    auto* decalIt = mDecals.begin();
+    while (decalIt != mDecals.end()) {
       CWldTerrainDecal* const decal = *decalIt;
       if (decal != nullptr && decal->mRemoveTick > 0 && tick > decal->mRemoveTick) {
         decal->mCurrentAlpha = MoveAlphaTowardZero(decal->mCurrentAlpha, 0.2f);
@@ -1277,20 +1153,14 @@ namespace moho
       ++decalIt;
     }
 
-    auto& splatsView = msvc8::AsVectorRuntimeView(mSplats);
-    CWldSplat** splatIt = splatsView.begin;
-    while (splatIt != splatsView.end) {
+    auto* splatIt = mSplats.begin();
+    while (splatIt != mSplats.end()) {
       CWldSplat* const splat = *splatIt;
       if (splat != nullptr && splat->mRemoveTick > 0 && tick > splat->mRemoveTick) {
         splat->mCurrentAlpha = MoveAlphaTowardZero(splat->mCurrentAlpha, 0.03f);
         if (splat->mCurrentAlpha == 0.0f) {
           delete splat;
-          const std::ptrdiff_t trailingCount = splatsView.end - (splatIt + 1);
-          if (trailingCount > 0) {
-            const std::size_t bytesToMove = static_cast<std::size_t>(trailingCount) * sizeof(CWldSplat*);
-            (void)::memmove_s(splatIt, bytesToMove, splatIt + 1, bytesToMove);
-          }
-          --splatsView.end;
+          splatIt = mSplats.erase(splatIt);
           continue;
         }
       }
@@ -1577,31 +1447,23 @@ namespace moho
     writer.Write(mDecalCount);
     writer.Write(mNumDecals);
 
-    const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-
     std::uint32_t activeDecalCount = 0u;
-    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
-      CWldTerrainDecal* const decal = *decalIt;
+    for (CWldTerrainDecal* const decal : mDecals) {
       if (decal != nullptr && decal->mUnknownA0 == 0u) {
         ++activeDecalCount;
       }
     }
     writer.Write(activeDecalCount);
 
-    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
-      CWldTerrainDecal* const decal = *decalIt;
+    for (CWldTerrainDecal* const decal : mDecals) {
       if (decal != nullptr && decal->mUnknownA0 == 0u) {
         decal->DecalSave(writer);
       }
     }
 
-    const auto& groupsView = msvc8::AsVectorRuntimeView(mDecalGroups);
-    const std::uint32_t groupCount =
-      groupsView.begin != nullptr ? static_cast<std::uint32_t>(groupsView.end - groupsView.begin) : 0u;
-    writer.Write(groupCount);
+    writer.Write(static_cast<std::uint32_t>(mDecalGroups.size()));
 
-    for (CDecalGroup** groupIt = groupsView.begin; groupIt != groupsView.end; ++groupIt) {
-      CDecalGroup* const group = *groupIt;
+    for (CDecalGroup* const group : mDecalGroups) {
       if (group != nullptr) {
         group->WriteToStream(writer);
       }
@@ -1656,8 +1518,7 @@ namespace moho
       threshold = 0.0f;
     }
 
-    const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    if (decalsView.begin == nullptr || decalsView.begin == decalsView.end) {
+    if (mDecals.empty()) {
       return;
     }
 
@@ -1667,8 +1528,7 @@ namespace moho
     std::set<float> seenAreas;
     std::vector<float> distinctAreas;
 
-    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
-      CWldTerrainDecal* const decal = *decalIt;
+    for (CWldTerrainDecal* const decal : mDecals) {
       const float area = decal->mScale.z * decal->mScale.x;
       if (seenAreas.insert(area).second) {
         distinctAreas.push_back(area);
@@ -1734,11 +1594,7 @@ namespace moho
       (void)LoadDecalGroup(group);
     }
 
-    const auto& decalsView = msvc8::AsVectorRuntimeView(mDecals);
-    for (CWldTerrainDecal** decalIt = decalsView.begin; decalIt != decalsView.end; ++decalIt) {
-      CWldTerrainDecal* const decal = *decalIt;
-      decal->mVecIndex = static_cast<std::uint32_t>(decalIt - decalsView.begin);
-    }
+    Reindex();
 
     RebuildLodHistogram();
   }
