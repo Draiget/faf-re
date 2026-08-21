@@ -75,6 +75,37 @@ namespace moho
     void* mAllocProxy;               // +0x00
     SSelectionNodeUserEntity* mHead; // +0x04
     std::uint32_t mSize;             // +0x08
+
+    /**
+     * Address: 0x007AF740 (FUN_007AF740, sub_7AF740)
+     *
+     * What it does:
+     * Erases one half-open weak-set node range `[first,last)`. When the range
+     * is the full tree, it tears down the entire subtree in one pass and resets
+     * head links/size to the empty-state sentinel shape.
+     *
+     * Declared on the bare 12-byte header rather than on
+     * `SSelectionSetUserEntity`, because that is the object the binary hands
+     * these lanes: the body reads only `mHead` and writes only `mSize`, and the
+     * erase paths are reached with the per-army idle registries -- which are
+     * bare sets embedded in `UserArmy` at +0x1F8 and +0x204 -- exactly as often
+     * as with the session selection.
+     */
+    [[nodiscard]] SSelectionNodeUserEntity**
+      EraseRange(SSelectionNodeUserEntity** outNode, SSelectionNodeUserEntity* first, SSelectionNodeUserEntity* last);
+
+    /**
+     * Address: 0x007B0870 (FUN_007B0870, sub_7B0870)
+     *
+     * What it does:
+     * Recursively destroys one weak-set subtree and unlinks each node from its
+     * user-entity weak-owner intrusive lane before delete.
+     *
+     * Sits on the bare header for the same reason `EraseRange` does -- it is
+     * reached from the erase paths of every weak-entity set, and it reads no
+     * member state at all, only the nodes it is handed.
+     */
+    void DestroySubtree(SSelectionNodeUserEntity* node);
   };
 
   static_assert(sizeof(WeakEntitySetUserEntity) == 0x0C, "WeakEntitySetUserEntity size must be 0x0C");

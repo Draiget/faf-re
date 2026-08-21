@@ -7647,8 +7647,22 @@ namespace moho
       return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entityLane != nullptr ? *entityLane : nullptr));
     }
 
+    /**
+     * Address: 0x008B3130 (FUN_008B3130)
+     * Address: 0x00867E90 (FUN_00867E90)
+     *
+     * What it does:
+     * Standard VC8 `_Tree::equal_range`: one descent tracking the last node
+     * whose key compares greater than `key` (the upper bound) and a second
+     * tracking the last node whose key does not compare less (the lower bound),
+     * both starting from `mHead->mParent` and stopping at the nil sentinel.
+     *
+     * The two addresses are the same 34-instruction body emitted twice -- same
+     * mnemonics, same 80 bytes, same field offsets (`mKey` at +0x0C, the nil
+     * flag at +0x19) -- once per copy of the erase-by-key lane above.
+     */
     void ResolveSelectionEqualRangeByKey(
-      SSelectionSetUserEntity* const set,
+      WeakEntitySetUserEntity* const set,
       const std::uint32_t key,
       SSelectionNodeUserEntity*& outLowerBound,
       SSelectionNodeUserEntity*& outUpperBound
@@ -7736,7 +7750,7 @@ namespace moho
 
     [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
       const UserEntity* const* entityLane,
-      SSelectionSetUserEntity* set
+      WeakEntitySetUserEntity* set
     );
 
     [[nodiscard]] SSelectionNodeUserEntity** FindOrInsertSelectionNodeWithHint(
@@ -7747,33 +7761,22 @@ namespace moho
     );
 
     /**
-     * Address: 0x008B2890 (FUN_008B2890, sub_8B2890)
-     *
-     * What it does:
-     * Guards one entity weak-owner intrusive lane, erases all selection-set
-     * entries matching that entity pointer key, restores owner links, and
-     * returns removed-count.
-     */
-    [[nodiscard]] std::int32_t EraseSelectionEntityGuardedByOwnerLink(
-      SSelectionSetUserEntity* const set,
-      UserEntity* const entity
-    )
-    {
-      ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-      UserEntity* entityKey = entity;
-      return EraseSelectionKeyRangeAndCount(&entityKey, set);
-    }
-
-    /**
      * Address: 0x008B2E70 (FUN_008B2E70, sub_8B2E70)
+     * Address: 0x00867AC0 (FUN_00867AC0, sub_867AC0)
      *
      * What it does:
-     * Resolves one equal-key range in the selection weak-set, counts how many
-     * nodes the range contains, erases that full range, and returns the count.
+     * VC8's `_Tree::erase(const key_type&)`: resolve the equal-key range,
+     * count it by walking the iterator, erase the whole range, return the
+     * count. The key arrives by address because the binary passes it as a
+     * `const key_type&`, and the key type here is the `UserEntity*` itself.
+     *
+     * Emitted twice. At 0x00867AC0 the set arrives in `eax` and the key lane
+     * in `ebx`, and the caller at 0x008676E0 keeps that return value as its
+     * own -- it never reassigns `eax` after the call.
      */
     [[nodiscard]] std::int32_t EraseSelectionKeyRangeAndCount(
       const UserEntity* const* const entityLane,
-      SSelectionSetUserEntity* const set
+      WeakEntitySetUserEntity* const set
     )
     {
       SSelectionNodeUserEntity* first = nullptr;
@@ -11592,28 +11595,29 @@ namespace moho
    */
   /**
    * Address: 0x008676E0 (FUN_008676E0, sub_8676E0)
+   * Address: 0x008B2890 (FUN_008B2890, sub_8B2890)
    *
    * What it does:
-   * Removes one user-entity key from a weak set. The binary parks a marker in
-   * the entity's weak-owner chain for the duration of the erase and unwinds it
-   * afterwards, so the node teardown cannot lose the chain; that guard is what
-   * `ScopedSelectionOwnerLinkGuard` reproduces.
+   * Removes every entry keyed by `entity` from a weak set. The binary parks a
+   * marker in the entity's weak-owner chain for the duration of the erase and
+   * unwinds it afterwards, so the node teardown cannot lose the chain; that
+   * guard is what `ScopedSelectionOwnerLinkGuard` reproduces.
+   *
+   * The erase itself is the container's erase-by-key lane, not an open-coded
+   * find-and-unlink: at 0x008676E0 the guard is spliced in, `sub_867AC0` is
+   * called with the set in `eax` and `&entity` in `ecx`, the guard is unwound,
+   * and the count `sub_867AC0` returned is left in `eax` as this function's
+   * own result. Emitted a second time at 0x008B2890.
    */
   bool SSelectionSetUserEntity::Erase(WeakEntitySetUserEntity& set, UserEntity* const entity)
   {
-    const SSelectionNodeUserEntity* const head = set.mHead;
-    if (head == nullptr || entity == nullptr) {
+    if (set.mHead == nullptr || entity == nullptr) {
       return false;
     }
 
     ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
-    SSelectionNodeUserEntity* const node = FindSelectionNodeByKey(set, SelectionKeyFromEntity(entity));
-    if (node == nullptr || node == head) {
-      return false;
-    }
-
-    (void)EraseSelectionNodeAndAdvance(set, node);
-    return true;
+    UserEntity* entityKey = entity;
+    return EraseSelectionKeyRangeAndCount(&entityKey, &set) != 0;
   }
 
   SSelectionSetUserEntity::FindResult* SSelectionSetUserEntity::Find(
@@ -11814,7 +11818,7 @@ namespace moho
    * Recursively destroys one weak-set subtree and unlinks each node from its
    * user-entity weak-owner intrusive lane before delete.
    */
-  void SSelectionSetUserEntity::DestroySubtree(SSelectionNodeUserEntity* node)
+  void WeakEntitySetUserEntity::DestroySubtree(SSelectionNodeUserEntity* node)
   {
     SSelectionNodeUserEntity* cursor = node;
     while (cursor != nullptr && cursor->mIsSentinel == 0u) {
@@ -11835,7 +11839,7 @@ namespace moho
    * erases (`first == mHead->mLeft` and `last == mHead`) it drops the whole
    * subtree in one pass and resets tree head links to empty sentinels.
    */
-  SSelectionNodeUserEntity** SSelectionSetUserEntity::EraseRange(
+  SSelectionNodeUserEntity** WeakEntitySetUserEntity::EraseRange(
     SSelectionNodeUserEntity** const outNode,
     SSelectionNodeUserEntity* const first,
     SSelectionNodeUserEntity* const last
