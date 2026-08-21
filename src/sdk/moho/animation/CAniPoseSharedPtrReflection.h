@@ -22,6 +22,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0055EB50 (FUN_0055EB50, gpg::RSharedPointerType_CAniPose::dtr)
+     */
+    ~RSharedPointerType() override;
+
+    /**
      * Address: 0x0055CE20 (FUN_0055CE20, gpg::RSharedPointerType_CAniPose::GetName)
      *
      * What it does:
