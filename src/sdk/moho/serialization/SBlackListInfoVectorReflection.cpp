@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -229,6 +229,8 @@ gpg::RRef* gpg::RRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInf
   outRef->mType = tmp.mType;
   return outRef;
 }
+
+gpg::RVectorType<moho::SBlackListInfo>::~RVectorType() = default;
 
 /**
  * Address: 0x006DB5D0 (FUN_006DB5D0, gpg::RVectorType_SBlackListInfo::GetName)
