@@ -19972,6 +19972,31 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(sfxHandle));
   }
 
+  /**
+   * Address: 0x00ACE5D0 (FUN_00ACE5D0, _SFX_DecideTableAlph3)
+   *
+   * What it does:
+   * Picks between the two 3-value alpha table modes (4 or 5) from the
+   * conversion state's composition code, falling back to the stream state's
+   * own mirrored tag when the composition code is not one of the two
+   * recognized values ('Q'=0x51 -> 4, 'a'=0x61 -> 5). Previously a
+   * no-argument stub; every real call site (SFX_CnvFrmByCbFunc's
+   * DynamicA/B/C composition paths) silently discarded both state pointers
+   * and always got a null-pointer-shaped return.
+   */
+  std::int32_t SFX_DecideTableAlph3(
+    moho::SfxCallbackFrameContext* const conversionState, moho::SfxStreamState* const streamState
+  )
+  {
+    if (conversionState->compositionCode == 0x51) {
+      return 4;
+    }
+    if (conversionState->compositionCode == 0x61) {
+      return 5;
+    }
+    return (streamState->fallbackCompositionCode == 0x51) ? 4 : 5;
+  }
+
   // Externally-visible error strings sampled by SFX_MakeTblZ16/32.
   constexpr char kSfxErrMakeTblZ32NoZclip[] = "E202281: SFX_MakeTblZ32: Zclip is not set.";
   constexpr char kSfxErrMakeTblZ16NoZclip[] = "E202282: SFX_MakeTblZ16: Zclip is not set.";
