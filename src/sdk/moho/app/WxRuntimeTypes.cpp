@@ -2487,6 +2487,11 @@ namespace
     object->refData = nullptr;
   }
 
+  // Forward declaration for wxObject::Ref (0x00977FD0) - defined later in
+  // this translation unit at its own address-cited call site, alongside
+  // wxEventUnRefRuntime's other users.
+  void wxObjectRefRuntime(WxObjectRuntimeView* object, const WxObjectRuntimeView* clone) noexcept;
+
   class WxObjectCopyOnWriteRuntimeDispatch
   {
   public:
@@ -14727,15 +14732,237 @@ namespace
     view->lane0C = 0;
   }
 
+  /**
+   * Minimal ref-counted wxBitmap value view shared by the splash-screen
+   * classes below. `wxBitmap` itself stays the opaque forward-declared type
+   * it is everywhere else in this file (see `class wxBitmap;`); this mirrors
+   * the exact shape `WBitmapPanel::OnEraseBackground` already reads a
+   * `wxBitmap*` through elsewhere in this file (vtable + ref-data, with
+   * width/height living at ref-data +0x08/+0x0C), just promoted to a named
+   * field type so a splash object can hold one by value and share it
+   * through the already-recovered `wxObject::Ref` primitive
+   * (`wxObjectRefRuntime` above).
+   */
+  struct WxBitmapRefDataRuntimeView
+  {
+    void* vtable = nullptr;    // +0x00
+    std::int32_t refCount = 0; // +0x04
+    std::int32_t width = 0;    // +0x08
+    std::int32_t height = 0;   // +0x0C
+  };
+
+  struct WxBitmapValueRuntimeView
+  {
+    void* vtable = nullptr;
+    WxBitmapRefDataRuntimeView* refData = nullptr;
+  };
+  static_assert(sizeof(WxBitmapValueRuntimeView) == 0x8, "WxBitmapValueRuntimeView size must be 0x8");
+
+  /**
+   * Minimal wxTimer value view. `wxTimer` is not otherwise modelled in this
+   * file; this exists only so `wxSplashScreenRuntime` can carry the real
+   * binary's embedded `wxTimer m_timer` member at its real size (0x1C, per
+   * `wxTimer::wxTimer`/`wxTimer::Init`, 0x009832A0/0x009F2A30) and offset.
+   */
+  struct WxSplashTimerValueRuntimeView
+  {
+    void* vtable = nullptr;        // +0x00
+    void* refData = nullptr;       // +0x04
+    std::int32_t oneShot = 0;      // +0x08
+    std::int32_t milli = 0;        // +0x0C
+    void* owner = nullptr;         // +0x10
+    std::int32_t idTimer = -1;     // +0x14
+    std::int32_t eventsLocker = 0; // +0x18
+  };
+  static_assert(sizeof(WxSplashTimerValueRuntimeView) == 0x1C, "WxSplashTimerValueRuntimeView size must be 0x1C");
+
+  constexpr long kWxBorderNone = 0x00200000;     // wxNO_BORDER / wxBORDER_NONE
+  constexpr long kWxBorderSimple = 0x02000000;   // wxSIMPLE_BORDER / wxBORDER_SIMPLE
+  constexpr long kWxStayOnTop = 0x00008000;      // wxSTAY_ON_TOP
+  constexpr long kWxSplashCentreOnParent = 0x01; // wxSPLASH_CENTRE_ON_PARENT
+  constexpr long kWxSplashCentreOnScreen = 0x02; // wxSPLASH_CENTRE_ON_SCREEN
+  constexpr long kWxSplashTimeout = 0x04;        // wxSPLASH_TIMEOUT
+
+  // Mirrors the real `?wxPanelNameStr@@3PB_WB` data lane the binary reads at
+  // this call site (0x00F33D3C = "panel"), the same way `kWxFrameDefaultName`
+  // above mirrors `off_F33D20` ("frame") rather than relying on the external
+  // wx symbol - see the `wxDefaultPosition`-mirroring note near
+  // `WD3DViewport::WD3DViewport` elsewhere in this file for the same pattern.
+  constexpr wchar_t kWxPanelDefaultName[] = L"panel";
+
+  /**
+   * Address: 0x009AC230 (FUN_009AC230, wxSplashScreenWindow::wxSplashScreenWindow)
+   * Mangled: ??0wxSplashScreenWindow@@QAE@ABVwxBitmap@@PAVwxWindow@@HABVwxPoint@@ABVwxSize@@J@Z
+   *
+   * IDA signature:
+   * wxSplashScreenWindow *__thiscall wxSplashScreenWindow::wxSplashScreenWindow(
+   *     wxSplashScreenWindow *this, wxObject *clone, wxSplashScreen *dwExStyle,
+   *     int a3, int nHeight, const WCHAR *lpClassName, int a6);
+   *
+   * What it does:
+   * The plain child window that paints the splash bitmap (real wx source:
+   * `src/generic/splash.cpp`, `wxSplashScreenWindow::wxSplashScreenWindow`).
+   * Constructs through the same all-in-one form as
+   * `wxWindow::wxWindow(parent, id, pos, size, style, wxPanelNameStr)` -
+   * modelled here as `wxWindowMswRuntime`'s default state plus its
+   * already-recovered `Create()` (0x0096DE00), which is what that ctor's
+   * body (0x0042B7A0) reaches after `wxWindow::Init`. Then shares the
+   * caller's bitmap ref-data (`wxObject::Ref`, matching real wx's
+   * `m_bitmap = bitmap` assignment).
+   *
+   * A low-colour-depth branch follows in the real binary: on a <16bpp
+   * display, if the source bitmap carries its own palette, the window
+   * adopts it (`wxWindowBase::SetPalette`, 0x009651C0). `wxDisplayDepth()`
+   * is still called here to match the binary's evidenced call, but the
+   * adopt step is unreachable in this reconstruction:
+   * `WxBitmapValueRuntimeView` does not model a bitmap's embedded palette
+   * sub-object (`wxBitmapRefData`'s `wxPalette` member), so there is never a
+   * palette to adopt regardless of depth. `wxWindowBase::SetPalette` is left
+   * `blocked` for the same reason - see the recovery report for
+   * FUN_009AC230/FUN_009AC610.
+   */
+  class wxSplashScreenWindowRuntime final : public wxWindowMswRuntime
+  {
+  public:
+    wxSplashScreenWindowRuntime(
+      const WxBitmapValueRuntimeView& bitmap,
+      wxWindowBase* const parent,
+      const std::int32_t id,
+      const wxPoint& pos,
+      const wxSize& size,
+      const long style
+    )
+    {
+      wxStringRuntime panelName{};
+      (void)WxStringRuntimeOps::InitWith(&panelName, kWxPanelDefaultName, 0, -101);
+      (void)Create(parent, id, pos, size, style, panelName);
+
+      if (mBitmap.refData != bitmap.refData) {
+        wxObjectRefRuntime(
+          reinterpret_cast<WxObjectRuntimeView*>(&mBitmap),
+          reinterpret_cast<const WxObjectRuntimeView*>(&bitmap)
+        );
+      }
+
+      // See the class comment: the binary's follow-up SetPalette adoption
+      // never has anything to adopt in this reconstruction, so it is
+      // omitted; the depth query itself is kept for parity with the
+      // evidenced call.
+      (void)wxDisplayDepth();
+    }
+
+    std::uint8_t mUnknown004To124[0x120]{};
+    WxBitmapValueRuntimeView mBitmap{};
+  };
+
+  static_assert(
+    offsetof(wxSplashScreenWindowRuntime, mBitmap) == 0x124,
+    "wxSplashScreenWindowRuntime::mBitmap offset must be 0x124"
+  );
+  static_assert(sizeof(wxSplashScreenWindowRuntime) == 0x12C, "wxSplashScreenWindowRuntime size must be 0x12C");
+
+  /**
+   * Address: 0x009AC610 (FUN_009AC610, wxSplashScreen::wxSplashScreen)
+   * Mangled: ??0wxSplashScreen@@QAE@ABVwxBitmap@@JHPAVwxWindow@@HABVwxPoint@@ABVwxSize@@J@Z
+   *
+   * IDA signature:
+   * wxSplashScreen *__thiscall wxSplashScreen::wxSplashScreen(
+   *     wxSplashScreen *this, wxObject *bitmap, int splashStyle,
+   *     int milliseconds, wxWindow *parent, int id, const wxPoint *pos,
+   *     const wxSize *size, int style);
+   *
+   * What it does:
+   * The splash-screen top-level frame (real wx source: `src/generic/
+   * splash.cpp`, `wxSplashScreen::wxSplashScreen`). Constructs through the
+   * same all-in-one form as `wxFrame::wxFrame(parent, id, wxEmptyString,
+   * wxPoint(0,0), wxSize(100,100), style, "frame")` - modelled here as
+   * `wxFrameRuntime`'s default state plus the already-recovered
+   * `wxTopLevelWindowRuntime::Create` (0x0098CD30), which is what that
+   * ctor's body (0x004BAB30) reaches. Then:
+   *   - builds the child `wxSplashScreenWindowRuntime` that actually paints
+   *     the bitmap (0x009AC230, recovered above);
+   *   - sizes the frame's client area to the bitmap's dimensions;
+   *   - centres on the parent or the screen per `splashStyle`
+   *     (`wxWindowBase::Centre`, 0x00963320, recovered above);
+   *   - primes the auto-close timer's owner/id lanes when
+   *     `wxSPLASH_TIMEOUT` is requested (the binary's sole caller,
+   *     `Moho::WINX_InitSplash`, always passes `splashStyle = 2`
+   *     (`wxSPLASH_CENTRE_ON_SCREEN` only), so this lane and the native
+   *     `wxTimer::Start` call after it are evidenced but never reached in
+   *     this reconstruction's real caller);
+   *   - shows the frame, focuses the child window, and forces an immediate
+   *     repaint so the splash is not blank for the first frame.
+   */
+  class wxSplashScreenRuntime final : public wxFrameRuntime
+  {
+  public:
+    wxSplashScreenRuntime(
+      const WxBitmapValueRuntimeView& bitmap,
+      const long splashStyle,
+      const int milliseconds,
+      wxWindowBase* const parent,
+      const std::int32_t id,
+      const wxPoint& pos,
+      const wxSize& size,
+      const long style
+    )
+    {
+      wxStringRuntime emptyTitle{};
+      (void)WxStringRuntimeOps::InitWith(&emptyTitle, wxEmptyString, 0, -101);
+      wxStringRuntime frameName{};
+      (void)WxStringRuntimeOps::InitWith(&frameName, kWxFrameDefaultName, 0, -101);
+      (void)Create(parent, id, emptyTitle.c_str(), wxPoint{0, 0}, wxSize{100, 100}, style, frameName);
+
+      mWindow = nullptr;
+      mSplashStyle = splashStyle;
+      mMilliseconds = milliseconds;
+
+      mWindow = new (std::nothrow) wxSplashScreenWindowRuntime(
+        bitmap, this, -1, pos, size, kWxBorderNone
+      );
+
+      const std::int32_t bitmapWidth = (bitmap.refData != nullptr) ? bitmap.refData->width : 0;
+      const std::int32_t bitmapHeight = (bitmap.refData != nullptr) ? bitmap.refData->height : 0;
+      DoSetClientSize(bitmapWidth, bitmapHeight);
+
+      if ((mSplashStyle & kWxSplashCentreOnParent) != 0) {
+        Centre(0x0C); // wxBOTH (wxHORIZONTAL | wxVERTICAL)
+      } else if ((mSplashStyle & kWxSplashCentreOnScreen) != 0) {
+        Centre(0x0E); // wxCENTRE_ON_SCREEN | wxBOTH
+      }
+
+      if ((mSplashStyle & kWxSplashTimeout) != 0) {
+        mTimer.owner = this;
+        mTimer.idTimer = 9999;
+        // m_timer.Start(milliseconds, true) - never reached by this
+        // reconstruction's real caller; see the class comment above.
+      }
+
+      (void)Show(true);
+      if (mWindow != nullptr) {
+        mWindow->SetFocus();
+      }
+      Update();
+    }
+
+    std::uint8_t mUnknown004To178[0x174]{};
+    wxSplashScreenWindowRuntime* mWindow = nullptr; // +0x178
+    std::int32_t mSplashStyle = 0;                  // +0x17C
+    std::int32_t mMilliseconds = 0;                 // +0x180
+    WxSplashTimerValueRuntimeView mTimer{};         // +0x184
+  };
+
+  static_assert(offsetof(wxSplashScreenRuntime, mWindow) == 0x178, "wxSplashScreenRuntime::mWindow offset must be 0x178");
+  static_assert(offsetof(wxSplashScreenRuntime, mSplashStyle) == 0x17C, "wxSplashScreenRuntime::mSplashStyle offset must be 0x17C");
+  static_assert(offsetof(wxSplashScreenRuntime, mMilliseconds) == 0x180, "wxSplashScreenRuntime::mMilliseconds offset must be 0x180");
+  static_assert(offsetof(wxSplashScreenRuntime, mTimer) == 0x184, "wxSplashScreenRuntime::mTimer offset must be 0x184");
+  static_assert(sizeof(wxSplashScreenRuntime) == 0x1A0, "wxSplashScreenRuntime size must be 0x1A0");
+
   class SplashScreenRuntimeImpl final : public moho::SplashScreenRuntime
   {
   public:
-    SplashScreenRuntimeImpl(
-      const msvc8::string& imagePath,
-      const wxSize& size
-    )
-      : mImagePath(imagePath)
-      , mSize(size)
+    explicit SplashScreenRuntimeImpl(wxSplashScreenRuntime* const splashScreen) noexcept
+      : mSplashScreen(splashScreen)
     {}
 
     void GetClassInfo() override {}
@@ -14744,14 +14971,20 @@ namespace
       const std::uint32_t flags
     ) override
     {
+      // Matches the binary's `sSplashScreenPtr->dtr_wxObject(1)` teardown:
+      // the deleting-dtor thunk convention this file already uses for every
+      // other leaf window runtime (see WSupComFrame::DeleteWithFlag and
+      // friends above).
+      delete mSplashScreen;
+      mSplashScreen = nullptr;
+
       if ((flags & 1u) != 0u) {
         delete this;
       }
     }
 
   private:
-    msvc8::string mImagePath;
-    wxSize mSize{};
+    wxSplashScreenRuntime* mSplashScreen = nullptr;
   };
 } // namespace
 
@@ -28437,6 +28670,24 @@ int wxGetDisplaySize(
   return wxGetPrimaryDisplayPixelSize(widthPixels, heightPixels);
 }
 
+/**
+ * Address: 0x009C7DD0 (FUN_009C7DD0, wxDisplayDepth)
+ *
+ * IDA signature:
+ * int wxDisplayDepth();
+ *
+ * What it does:
+ * Returns the primary display's colour depth: planes times bits-per-pixel,
+ * read off a borrowed screen device context and released immediately after.
+ */
+int wxDisplayDepth()
+{
+  const HDC screenDc = ::GetDC(nullptr);
+  const int depth = ::GetDeviceCaps(screenDc, PLANES) * ::GetDeviceCaps(screenDc, BITSPIXEL);
+  (void)::ReleaseDC(nullptr, screenDc);
+  return depth;
+}
+
 struct WxViewportOriginCacheRuntimeView
 {
   std::uint8_t pad00[0x14]{};     // +0x00
@@ -35517,6 +35768,156 @@ bool wxWindowMswRuntime::ContainsHWND(
   return false;
 }
 
+/**
+ * Address: 0x009683C0 (FUN_009683C0, wxWindow::Update)
+ * Mangled: ?Update@wxWindow@@UAEXXZ
+ * Slot: overrides `wxWindowBase::Update`'s no-op placeholder (0x0042B700,
+ * `void wxWindowBase::Update() {}` above) with the real MSW behavior.
+ *
+ * IDA signature:
+ * BOOL __thiscall wxWindow::Update(wxWindow *this);
+ *
+ * What it does:
+ * Forces the native window to repaint synchronously, then flushes any
+ * batched GDI drawing so the repaint is visible immediately. The binary
+ * returns `GdiFlush`'s BOOL; nothing reads it, so this keeps the base
+ * slot's `void` shape.
+ */
+void wxWindowMswRuntime::Update()
+{
+  const auto nativeHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+  (void)::UpdateWindow(nativeHandle);
+  (void)::GdiFlush();
+}
+
+// Forward declaration for the desktop work-area primitive recovered
+// alongside wxGetDisplaySize/wxGetPrimaryDisplayPixelSize (see above,
+// 0x009C7E10 family) - defined later in this translation unit at its own
+// address-cited call site (0x009C7E90).
+std::int32_t* wxGetDesktopWorkAreaXywh(
+  std::int32_t* outX,
+  std::int32_t* outY,
+  std::int32_t* outWidth,
+  std::int32_t* outHeight
+) noexcept;
+
+/**
+ * Address: 0x00963320 (FUN_00963320, wxWindowBase::Centre)
+ * Mangled: ?Centre@wxWindowBase@@QAEXH@Z
+ *
+ * IDA signature:
+ * int __thiscall wxWindowBase::Centre(wxWindowBase *this, char dir);
+ *
+ * What it does:
+ * Centres this window on its nearest top-level ancestor, or on the whole
+ * screen when `direction` carries `wxCENTRE_ON_SCREEN` (0x02) or no usable
+ * ancestor is found - walking up to the nearest top-level parent for
+ * top-level windows, and skipping an iconized ancestor (centring over a
+ * minimised window would push this one off-screen on Windows; the dynamic
+ * type check here is `wxCheckDynamicCast`'s query inlined via the already
+ * recovered `wxWindowBase::IsKindOf`, since both resolve the same
+ * `wxTopLevelWindow` class-info membership test). The new position is
+ * clamped to the visible desktop work area so the title bar always stays
+ * reachable, matching real wx's `wxWindowBase::Centre` in
+ * `src/common/wincmn.cpp`.
+ */
+void wxWindowMswRuntime::Centre(const std::int32_t direction)
+{
+  constexpr std::int32_t kWxCentreOnScreen = 0x02;
+  constexpr std::int32_t kWxHorizontal = 0x04;
+  constexpr std::int32_t kWxVertical = 0x08;
+
+  std::int32_t effectiveDirection = direction;
+  std::int32_t posParentX = 0;
+  std::int32_t posParentY = 0;
+  std::int32_t widthParent = 0;
+  std::int32_t heightParent = 0;
+  wxWindowBase* parent = nullptr;
+
+  if ((effectiveDirection & kWxCentreOnScreen) == 0) {
+    // Find the window to centre on: the immediate parent for controls, but
+    // the nearest top-level ancestor for top-level windows (like dialogs).
+    parent = GetParentWindow();
+    if (IsTopLevel()) {
+      while (parent != nullptr && !parent->IsTopLevel()) {
+        const WxWindowBaseRuntimeState* const parentState = FindWxWindowBaseRuntimeState(parent);
+        parent = (parentState != nullptr) ? parentState->parentWindow : nullptr;
+      }
+    }
+
+    // Never centre over an iconized top-level window - under Windows that
+    // places the centred window completely off-screen.
+    if (parent != nullptr
+        && parent->IsKindOf(&wxTopLevelWindowRootRuntime::sm_classInfo)
+        && static_cast<wxTopLevelWindowRuntime*>(parent)->IsIconized()) {
+      parent = nullptr;
+    }
+
+    if (parent == nullptr) {
+      effectiveDirection |= kWxCentreOnScreen;
+    }
+  }
+
+  if ((effectiveDirection & kWxCentreOnScreen) != 0) {
+    // Centre with respect to the whole screen.
+    (void)wxGetDisplaySize(&widthParent, &heightParent);
+  } else if (IsTopLevel()) {
+    // Centre on the parent, adjusted to the parent's own position.
+    parent->DoGetSize(&widthParent, &heightParent);
+    parent->DoGetPosition(&posParentX, &posParentY);
+  } else {
+    // Centre inside the parent's client rectangle.
+    parent->DoGetClientSize(&widthParent, &heightParent);
+  }
+
+  std::int32_t width = 0;
+  std::int32_t height = 0;
+  DoGetSize(&width, &height);
+
+  std::int32_t xNew = -1;
+  std::int32_t yNew = -1;
+  if ((effectiveDirection & kWxHorizontal) != 0) {
+    xNew = (widthParent - width) / 2;
+  }
+  if ((effectiveDirection & kWxVertical) != 0) {
+    yNew = (heightParent - height) / 2;
+  }
+  xNew += posParentX;
+  yNew += posParentY;
+
+  // Base the final position on the visible desktop work area (excludes the
+  // taskbar), the way real wx's wxGetClientDisplayRect() does.
+  std::int32_t workAreaX = 0;
+  std::int32_t workAreaY = 0;
+  std::int32_t workAreaWidth = 0;
+  std::int32_t workAreaHeight = 0;
+  (void)wxGetDesktopWorkAreaXywh(&workAreaX, &workAreaY, &workAreaWidth, &workAreaHeight);
+
+  // wxMSW positions may be negative if the window belongs to a secondary
+  // monitor; only clamp against the primary display when the parent (or the
+  // whole screen, posParent == 0 in that case) is at least partially on it.
+  if (posParentX + widthParent >= 0) {
+    if (xNew < 0) {
+      xNew = 0;
+    } else if (xNew + width > workAreaWidth) {
+      xNew = workAreaWidth - width - 1;
+    }
+  }
+  if (posParentY + heightParent >= 0) {
+    if (yNew + height > workAreaHeight) {
+      yNew = workAreaHeight - height - 1;
+    }
+    if (yNew < 0) {
+      yNew = 0;
+    }
+  }
+
+  // wxSIZE_ALLOW_MINUS_ONE (0x04): let DoSetSize keep a -1 lane verbatim
+  // instead of substituting the current value, matching the flag literal
+  // the binary passes here.
+  DoSetSize(xNew, yNew, width, height, 4);
+}
+
 wxEventTable wxWindowBase::sm_eventTable = {nullptr, nullptr};
 
 /**
@@ -42428,7 +42829,36 @@ moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
 
   msvc8::string splashPathText;
   splashPathText.assign_owned(splashPath.generic_string());
-  return new (std::nothrow) SplashScreenRuntimeImpl(splashPathText, size);
+
+  // Matches the binary's real construction call in Moho::WINX_InitSplash
+  // (0x004F3CE0): wxSplashScreen::wxSplashScreen(bitmap,
+  // wxSPLASH_CENTRE_ON_SCREEN, 0, nullptr, -1, wxDefaultPosition, size,
+  // wxSIMPLE_BORDER | wxSTAY_ON_TOP). The binary loads `splashPathText` into
+  // a real bitmap first (wxBitmap::LoadFile + wxImage::Rescale, both still
+  // unrecovered PNG-decode-pipeline dependencies - see the recovery report
+  // for FUN_009AC230/FUN_009AC610), so this reconstruction constructs the
+  // frame with an empty (not-Ok) bitmap value rather than fabricate a decode
+  // path with no callsite evidence. Every other part of the real
+  // construction - the frame, its child window, client sizing, centring,
+  // show and focus - runs exactly as evidenced.
+  (void)splashPathText;
+  constexpr wxPoint kSplashDefaultPosition{-1, -1};
+  const WxBitmapValueRuntimeView emptyBitmap{};
+  wxSplashScreenRuntime* const splash = new (std::nothrow) wxSplashScreenRuntime(
+    emptyBitmap,
+    kWxSplashCentreOnScreen,
+    0,
+    nullptr,
+    -1,
+    kSplashDefaultPosition,
+    size,
+    kWxBorderSimple | kWxStayOnTop
+  );
+  if (splash == nullptr) {
+    return nullptr;
+  }
+
+  return new (std::nothrow) SplashScreenRuntimeImpl(splash);
 }
 
 // 0x00DFFC84: chains straight to wxWindow's table (0x00D4D740), not to
@@ -77060,6 +77490,20 @@ namespace
     return node;
   }
 
+  /**
+   * Address: 0x00977FD0 (FUN_00977FD0, wxObject::Ref)
+   * Mangled: ?Ref@wxObject@@QAEXABV1@@Z
+   *
+   * IDA signature:
+   * void __thiscall wxObject::Ref(wxObject *this, wxObject *clone);
+   *
+   * What it does:
+   * Adopts `clone`'s shared ref-data lane: releases whatever this object
+   * currently owns through `wxEventUnRefRuntime` (the recovered
+   * `wxEvent::UnRef` the binary actually calls here), then, if `clone` names
+   * real ref-data, points this object at it and bumps its refcount. A no-op
+   * when the two already share the same ref-data.
+   */
   void wxObjectRefRuntime(
     WxObjectRuntimeView* const object,
     const WxObjectRuntimeView* const clone
