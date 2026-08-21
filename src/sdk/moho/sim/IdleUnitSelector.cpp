@@ -11,6 +11,22 @@ namespace moho
   static_assert(sizeof(IdleUnitSelector) == 0x20, "IdleUnitSelector complete-object size must be 0x20");
 
   /**
+   * Address: 0x00865490 (FUN_00865490, IdleUnitSelector process-global constructor)
+   *
+   * What it does:
+   * Initializes `mIdleSet` as an empty weak-entity set: buys the self-linked
+   * sentinel head through `InitWeakEntitySetHead` and clears the trailing
+   * `mSizeMirrorOrUnused` lane. Matches the binary's explicit field-by-field
+   * setup - `WeakEntitySetUserEntity`/`SSelectionSetUserEntity` are bare
+   * structs with no member default constructors of their own.
+   */
+  IdleUnitSelector::IdleUnitSelector()
+  {
+    InitWeakEntitySetHead(mIdleSet);
+    mIdleSet.mSizeMirrorOrUnused = 0u;
+  }
+
+  /**
    * Address: 0x008656A0 (FUN_008656A0)
    *
    * What it does:
@@ -69,4 +85,38 @@ namespace moho
     (void)mIdleSet.EraseRange(&cursor, mIdleSet.mHead->mLeft, mIdleSet.mHead);
     mIdleSet.mSizeMirrorOrUnused = 0u;
   }
+
+  namespace
+  {
+    /**
+     * Address: 0x010C4408 (.data, IdleUnitSelector singleton instance).
+     *
+     * The engine constructs exactly one `IdleUnitSelector` for the process
+     * lifetime, matching the sibling `SelectionListener`/`PauseListener`
+     * singletons.
+     */
+    IdleUnitSelector& GlobalIdleUnitSelector() noexcept
+    {
+      static IdleUnitSelector sSelector;
+      return sSelector;
+    }
+
+    /**
+     * Address: 0x00BE6160 (FUN_00BE6160, IdleUnitSelector static-init thunk).
+     *
+     * What it does:
+     * Constructs the process-global `IdleUnitSelector` instance (0x00865490)
+     * and registers it with the world-session loader's teardown/attach
+     * callback vector, exactly matching `SelectionListener`'s
+     * `kSelectionListenerStaticInit` shape. The binary registers the raw
+     * object address before either vtable is written; the callback vector is
+     * never read before real process teardown, so registering after full
+     * construction here is behaviorally identical.
+     */
+    [[maybe_unused]] const bool kIdleUnitSelectorStaticInit = []() noexcept {
+      IdleUnitSelector& selector = GlobalIdleUnitSelector();
+      (void)WLD_AddOnTeardownCallback(reinterpret_cast<IWldTeardownCallback*>(&selector));
+      return true;
+    }();
+  } // namespace
 } // namespace moho
