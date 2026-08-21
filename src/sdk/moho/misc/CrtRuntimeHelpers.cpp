@@ -577,6 +577,16 @@ extern "C" int __cdecl __crtLCMapStringA(
   int codePage,
   int errorControl
 );
+extern "C" int __cdecl __crtCompareStringA(
+  _locale_t localeInfo,
+  LCID locale,
+  unsigned int compareFlags,
+  LPCCH lhsText,
+  int lhsCount,
+  LPCCH rhsText,
+  int rhsCount,
+  int codePage
+);
 extern "C" int __cdecl __crtLCMapStringW(
   int localeType,
   LCID locale,
@@ -726,13 +736,17 @@ static_assert(offsetof(RuntimeFrameInfoNode, next) == 0x4, "RuntimeFrameInfoNode
 
 struct RuntimeTidDataLocaleView
 {
-  std::uint8_t reserved00[0x6C];
+  std::uint8_t reserved00[0x68];
+  // +0x68/+0x6C read back-to-back by _LocaleUpdate::_LocaleUpdate (0x00A83031)
+  // as `mov ecx,[eax+6Ch]` / `mov ecx,[eax+68h]`.
+  RuntimeThreadMbcInfo* ptmbcinfo;
   RuntimeLocaleCodePageView* ptlocinfo;
   std::int32_t ownlocale;
   std::uint8_t reserved74[0x24];
   RuntimeFrameInfoNode* frameInfoChain;
   RuntimeSetLocLocaleView setlocData;
 };
+static_assert(offsetof(RuntimeTidDataLocaleView, ptmbcinfo) == 0x68, "RuntimeTidDataLocaleView::ptmbcinfo offset must be 0x68");
 static_assert(offsetof(RuntimeTidDataLocaleView, ptlocinfo) == 0x6C, "RuntimeTidDataLocaleView::ptlocinfo offset must be 0x6C");
 static_assert(offsetof(RuntimeTidDataLocaleView, ownlocale) == 0x70, "RuntimeTidDataLocaleView::ownlocale offset must be 0x70");
 static_assert(offsetof(RuntimeTidDataLocaleView, frameInfoChain) == 0x98, "RuntimeTidDataLocaleView::frameInfoChain offset must be 0x98");
@@ -766,12 +780,126 @@ extern "C" std::int32_t __mb_cur_max;
 extern "C" std::int32_t __globallocalestatus;
 extern "C" RuntimeTidDataLocaleView* __cdecl __getptd();
 extern "C" RuntimeLocaleCodePageView* __cdecl __updatetlocinfo();
+extern "C" RuntimeThreadMbcInfo* __ptmbcinfo;
+extern "C" RuntimeThreadMbcInfo* __cdecl __updatetmbcinfo();
 extern "C" int _getvalueindex;
 extern "C" void __cdecl _freefls(void* ptd);
 extern "C" int __cdecl _flsbuf(int character, std::FILE* stream);
 extern "C" void __cdecl _getbuf(std::FILE* stream);
 extern "C" int __cdecl _isctype_l(int character, int mask, _locale_t localeInfo);
 extern "C" int __cdecl _isleadbyte_l(int character, _locale_t localeInfo);
+
+/**
+ * Modern RAII spelling of the CRT's internal `_LocaleUpdate` guard.
+ *
+ * Construction lane: 0x00A83031 (FUN_00A83031,
+ * ??0_LocaleUpdate@@QAE@PAUlocaleinfo_struct@@@Z). The destructor is emitted
+ * inline at every use site rather than as its own body, which is why the
+ * `updated` release lane appears open-coded in each `*_l` decompile.
+ *
+ * Layout matches the binary object exactly: `locinfo` +0x00, `mbcinfo` +0x04,
+ * `thread` +0x08, `updated` +0x0C.
+ *
+ * Behaviour, straight from the construction lane:
+ *  - an explicit `_locale_t` copies both payload pointers and takes no
+ *    thread reference at all (nothing to release on scope exit),
+ *  - a null `_locale_t` reads the per-thread payloads, refreshes either one
+ *    that has drifted from the process-wide lane while this thread does not
+ *    already own a per-thread locale, and then claims the per-thread locale
+ *    bit -- recording that claim so the destructor releases it.
+ */
+class RuntimeLocaleUpdateScope
+{
+public:
+  explicit RuntimeLocaleUpdateScope(_locale_t const explicitLocale) noexcept
+  {
+    if (explicitLocale != nullptr) {
+      const auto* const handle = reinterpret_cast<const RuntimeLocaleHandle*>(explicitLocale);
+      locinfo_ = reinterpret_cast<RuntimeLocaleCodePageView*>(handle->locinfo);
+      mbcinfo_ = handle->mbcinfo;
+      return;
+    }
+
+    thread_ = __getptd();
+    locinfo_ = thread_->ptlocinfo;
+    mbcinfo_ = thread_->ptmbcinfo;
+
+    if (locinfo_ != __ptlocinfo && (thread_->ownlocale & __globallocalestatus) == 0) {
+      locinfo_ = __updatetlocinfo();
+    }
+    if (mbcinfo_ != __ptmbcinfo && (thread_->ownlocale & __globallocalestatus) == 0) {
+      mbcinfo_ = __updatetmbcinfo();
+    }
+
+    if ((thread_->ownlocale & kPerThreadLocaleBit) == 0) {
+      thread_->ownlocale |= kPerThreadLocaleBit;
+      updated_ = true;
+    }
+  }
+
+  ~RuntimeLocaleUpdateScope()
+  {
+    if (updated_ && thread_ != nullptr) {
+      thread_->ownlocale &= ~kPerThreadLocaleBit;
+    }
+  }
+
+  RuntimeLocaleUpdateScope(const RuntimeLocaleUpdateScope&) = delete;
+  RuntimeLocaleUpdateScope& operator=(const RuntimeLocaleUpdateScope&) = delete;
+
+  /**
+   * Narrow-locale payload lane as read by the collation helpers:
+   * `lc_codepage` +0x04, `lc_collate_cp` +0x08, `lc_handle[]` +0x0C.
+   */
+  struct CollateView
+  {
+    std::int32_t refcount;        // +0x00
+    std::int32_t lcCodepage;      // +0x04
+    std::int32_t lcCollateCp;     // +0x08
+    LCID lcHandle[6];             // +0x0C
+  };
+  static_assert(offsetof(CollateView, lcCollateCp) == 0x08, "CollateView::lcCollateCp offset must be 0x08");
+  static_assert(offsetof(CollateView, lcHandle) == 0x0C, "CollateView::lcHandle offset must be 0x0C");
+
+  /** Narrow-locale payload for the effective locale. */
+  [[nodiscard]] const CollateView* loc() const noexcept
+  {
+    return reinterpret_cast<const CollateView*>(locinfo_);
+  }
+
+  /** Raw `_locale_t` view of this scope, for forwarding to nested `*_l` lanes. */
+  [[nodiscard]] _locale_t asLocale() const noexcept
+  {
+    return reinterpret_cast<_locale_t>(const_cast<RuntimeLocaleUpdateScope*>(this));
+  }
+
+  /** Multibyte code-page payload for the effective locale. */
+  [[nodiscard]] const RuntimeThreadMbcInfoCaseView* mbc() const noexcept
+  {
+    return reinterpret_cast<const RuntimeThreadMbcInfoCaseView*>(mbcinfo_);
+  }
+
+  /** True when the effective locale uses a multibyte code page. */
+  [[nodiscard]] bool isMultibyteCodePage() const noexcept
+  {
+    const RuntimeThreadMbcInfoCaseView* const info = mbc();
+    return info != nullptr && info->ismbcodepage != 0u;
+  }
+
+  /** True when `byteValue` is a DBCS lead byte under the effective locale. */
+  [[nodiscard]] bool isLeadByte(const unsigned int byteValue) const noexcept
+  {
+    return (mbc()->mbctype[(byteValue & 0xFFu) + 1u] & 0x4u) != 0u;
+  }
+
+private:
+  static constexpr std::int32_t kPerThreadLocaleBit = 2;
+
+  RuntimeLocaleCodePageView* locinfo_ = nullptr;  // +0x00
+  RuntimeThreadMbcInfo* mbcinfo_ = nullptr;       // +0x04
+  RuntimeTidDataLocaleView* thread_ = nullptr;    // +0x08
+  bool updated_ = false;                          // +0x0C
+};
 extern "C" RuntimeLocaleCodePageView* __cdecl _updatetlocinfoEx_nolock(
   RuntimeLocaleCodePageView** threadLocale,
   RuntimeLocaleCodePageView* processLocale);
@@ -9646,6 +9774,15 @@ namespace moho::runtime
    */
   int RuntimeMemicmp(const void* const lhsBuffer, const void* const rhsBuffer, const std::size_t byteCount)
   {
+    // The binary tests __locale_changed first and only takes the ASCII fast
+    // path when the process is still on the initial locale; the locale-aware
+    // lane is _memicmp_l with a null locale. An earlier recovery of this body
+    // dropped the branch entirely and always went ASCII, which silently
+    // mis-compared non-ASCII bytes once any setlocale() call had run.
+    if (__locale_changed != 0) {
+      return _memicmp_l(lhsBuffer, rhsBuffer, byteCount, nullptr);
+    }
+
     if (lhsBuffer != nullptr && rhsBuffer != nullptr && byteCount <= 0x7FFFFFFFu) {
       const auto* const lhsBytes = static_cast<const unsigned char*>(lhsBuffer);
       const auto* const rhsBytes = static_cast<const unsigned char*>(rhsBuffer);
@@ -13388,6 +13525,314 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
 
     *cursor = L'\0';
     return destination;
+  }
+
+  /**
+   * Address: 0x00AB8E66 (FUN_00AB8E66, _mbschr_l)
+   *
+   * IDA signature:
+   * char *__cdecl mbschr_l(char *Str1, int Val, _LocaleUpdate *a3);
+   *
+   * What it does:
+   * Locale-aware multibyte `strchr`. Under a single-byte code page it defers
+   * to plain `strchr`; under a DBCS code page it walks the string two bytes at
+   * a time whenever the current byte is a lead byte, so a double-byte
+   * character is only matched against the full 16-bit `searchChar` and never
+   * against one of its halves. A null `text` reports `EINVAL` through the
+   * invalid-parameter lane and returns null.
+   */
+  extern "C" unsigned char* __cdecl _mbschr_l(
+    const unsigned char* const text,
+    const unsigned int searchChar,
+    _locale_t const localeInfo
+  )
+  {
+    const RuntimeLocaleUpdateScope locale(localeInfo);
+
+    if (text == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return nullptr;
+    }
+
+    if (!locale.isMultibyteCodePage()) {
+      return reinterpret_cast<unsigned char*>(
+        const_cast<char*>(std::strchr(reinterpret_cast<const char*>(text), static_cast<int>(searchChar)))
+      );
+    }
+
+    const unsigned char* cursor = text;
+    while (*cursor != '\0') {
+      if (locale.isLeadByte(*cursor)) {
+        const unsigned int leadByte = *cursor;
+        if (cursor[1] == '\0') {
+          return nullptr;
+        }
+        if (searchChar == ((leadByte << 8) | cursor[1])) {
+          return const_cast<unsigned char*>(cursor);
+        }
+        cursor += 2;
+        continue;
+      }
+
+      if (searchChar == *cursor) {
+        return const_cast<unsigned char*>(cursor);
+      }
+      ++cursor;
+    }
+
+    // Trailing NUL still matches a zero search character, as in the CRT body.
+    return (searchChar == *cursor) ? const_cast<unsigned char*>(cursor) : nullptr;
+  }
+
+  /**
+   * Address: 0x00AA48A1 (FUN_00AA48A1, _mbsrchr_l)
+   *
+   * IDA signature:
+   * char *__cdecl mbsrchr_l(char *Str, int a2, _LocaleUpdate *a3);
+   *
+   * What it does:
+   * Locale-aware multibyte `strrchr`: returns the *last* occurrence of
+   * `searchChar`. Under a single-byte code page it defers to `strrchr`;
+   * otherwise it scans forward remembering the most recent match, treating
+   * lead-byte pairs as one double-byte character. A truncated trailing lead
+   * byte ends the scan, and matches the terminator only when nothing has
+   * matched yet -- both quirks are preserved from the CRT body.
+   */
+  extern "C" unsigned char* __cdecl _mbsrchr_l(
+    const unsigned char* const text,
+    const unsigned int searchChar,
+    _locale_t const localeInfo
+  )
+  {
+    const RuntimeLocaleUpdateScope locale(localeInfo);
+
+    if (!locale.isMultibyteCodePage()) {
+      return reinterpret_cast<unsigned char*>(
+        const_cast<char*>(std::strrchr(reinterpret_cast<const char*>(text), static_cast<int>(searchChar)))
+      );
+    }
+
+    if (text == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return nullptr;
+    }
+
+    const unsigned char* lastMatch = nullptr;
+    const unsigned char* cursor = text;
+    for (;;) {
+      const unsigned int current = *cursor;
+      unsigned char scanned = *cursor;
+
+      if (locale.isLeadByte(current)) {
+        scanned = cursor[1];
+        if (scanned != '\0') {
+          if (searchChar == ((current << 8) | scanned)) {
+            lastMatch = cursor;
+          }
+          cursor += 2;
+          continue;
+        }
+        // Truncated lead byte at end of string: only the "nothing matched
+        // yet" case records this position.
+        if (lastMatch == nullptr) {
+          lastMatch = cursor + 1;
+        }
+      } else if (searchChar == current) {
+        lastMatch = cursor;
+      }
+
+      ++cursor;
+      if (scanned == '\0') {
+        break;
+      }
+    }
+
+    return const_cast<unsigned char*>(lastMatch);
+  }
+
+  /**
+   * Address: 0x00AB99FD (FUN_00AB99FD, _memicmp_l)
+   *
+   * IDA signature:
+   * int __cdecl memicmp_l(unsigned __int8 *dst, unsigned __int8 *src,
+   *                       unsigned int count, _locale_tstruct *plocinfo);
+   *
+   * What it does:
+   * Case-insensitive memory compare under an explicit locale. A zero count
+   * compares equal before the locale is even resolved. When the locale has no
+   * active ctype handle the ASCII fast path (`__ascii_memicmp`) is used;
+   * otherwise each byte pair is folded through `_tolower_l` and compared until
+   * the count runs out, a NUL is folded, or the bytes differ. Null buffers or
+   * a count above `INT_MAX` report `EINVAL` and return `INT_MAX`.
+   */
+  extern "C" int __cdecl _memicmp_l(
+    const void* const lhsBuffer,
+    const void* const rhsBuffer,
+    const std::size_t byteCount,
+    _locale_t const localeInfo
+  )
+  {
+    if (byteCount == 0u) {
+      return 0;
+    }
+
+    const RuntimeLocaleUpdateScope locale(localeInfo);
+
+    if (lhsBuffer == nullptr || rhsBuffer == nullptr || byteCount > 0x7FFFFFFFu) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return 0x7FFFFFFF;
+    }
+
+    const auto* lhsBytes = static_cast<const unsigned char*>(lhsBuffer);
+    const auto* rhsBytes = static_cast<const unsigned char*>(rhsBuffer);
+
+    if (locale.loc()->lcHandle[2] == 0) {
+      return RuntimeAsciiMemicmp(lhsBytes, rhsBytes, static_cast<int>(byteCount));
+    }
+
+    std::size_t remaining = byteCount;
+    int lhsFolded = 0;
+    int rhsFolded = 0;
+    do {
+      lhsFolded = _tolower_l(*lhsBytes++, locale.asLocale());
+      rhsFolded = _tolower_l(*rhsBytes++, locale.asLocale());
+      --remaining;
+    } while (remaining != 0u && lhsFolded != 0 && lhsFolded == rhsFolded);
+
+    return lhsFolded - rhsFolded;
+  }
+
+  /**
+   * Address: 0x00AB7F14 (FUN_00AB7F14, _strnicoll_l)
+   *
+   * IDA signature:
+   * int __usercall _strnicoll_l@<eax>(const char *String1, const char *String2,
+   *                                   size_t MaxCount, _locale_t Locale);
+   *
+   * What it does:
+   * Bounded case-insensitive narrow collation. A zero count collates equal.
+   * When the locale carries a collate handle the comparison is delegated to
+   * `__crtCompareStringA(NORM_IGNORECASE | LOCALE_USE_CP_ACP)` and the Win32
+   * 1/2/3 result is rebased to the C -1/0/1 convention; a zero return from
+   * Win32 is an error and reports `EINVAL`. Without a collate handle it falls
+   * back to the case-folding byte compare in `_memicmp_l`.
+   */
+  extern "C" int __cdecl _strnicoll_l(
+    const char* const lhsText,
+    const char* const rhsText,
+    const std::size_t maxCount,
+    _locale_t const localeInfo
+  )
+  {
+    const RuntimeLocaleUpdateScope locale(localeInfo);
+
+    if (maxCount == 0u) {
+      return 0;
+    }
+
+    if (lhsText == nullptr || rhsText == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return 0x7FFFFFFF;
+    }
+
+    if (maxCount > 0x7FFFFFFFu) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return 0x7FFFFFFF;
+    }
+
+    const LCID collateHandle = locale.loc()->lcHandle[1];
+    if (collateHandle == 0) {
+      return _memicmp_l(lhsText, rhsText, maxCount, locale.asLocale());
+    }
+
+    const int comparison = __crtCompareStringA(
+      locale.asLocale(),
+      collateHandle,
+      NORM_IGNORECASE | LOCALE_USE_CP_ACP,
+      lhsText,
+      static_cast<int>(maxCount),
+      rhsText,
+      static_cast<int>(maxCount),
+      locale.loc()->lcCollateCp
+    );
+    if (comparison == 0) {
+      *_errno() = EINVAL;
+      return 0x7FFFFFFF;
+    }
+
+    return comparison - 2;
+  }
+
+  /**
+   * Address: 0x00A9B334 (FUN_00A9B334, _mbsnbicoll_l)
+   *
+   * IDA signature:
+   * int __usercall _mbsnbicoll_l@<eax>(const unsigned __int8 *Str1,
+   *   const unsigned __int8 *Str2, size_t MaxCount, _locale_t Locale);
+   *
+   * What it does:
+   * Byte-bounded case-insensitive multibyte collation. A zero count collates
+   * equal. Under a DBCS code page the comparison runs through
+   * `__crtCompareStringA` on the multibyte LCID/code page and the Win32
+   * 1/2/3 result is rebased to -1/0/1; a zero return propagates as `INT_MAX`
+   * without touching `errno` (unlike the narrow lane). Under a single-byte
+   * code page it defers to `_strnicoll_l`, forwarding the *caller's* original
+   * locale argument rather than the resolved scope.
+   */
+  extern "C" int __cdecl _mbsnbicoll_l(
+    const unsigned char* const lhsText,
+    const unsigned char* const rhsText,
+    const std::size_t maxCount,
+    _locale_t const localeInfo
+  )
+  {
+    const RuntimeLocaleUpdateScope locale(localeInfo);
+
+    if (maxCount == 0u) {
+      return 0;
+    }
+
+    if (lhsText == nullptr || rhsText == nullptr) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return 0x7FFFFFFF;
+    }
+
+    if (maxCount > 0x7FFFFFFFu) {
+      *_errno() = EINVAL;
+      _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+      return 0x7FFFFFFF;
+    }
+
+    if (!locale.isMultibyteCodePage()) {
+      return _strnicoll_l(
+        reinterpret_cast<const char*>(lhsText),
+        reinterpret_cast<const char*>(rhsText),
+        maxCount,
+        localeInfo
+      );
+    }
+
+    const int comparison = __crtCompareStringA(
+      locale.asLocale(),
+      locale.mbc()->mblcid,
+      NORM_IGNORECASE | LOCALE_USE_CP_ACP,
+      reinterpret_cast<LPCCH>(lhsText),
+      static_cast<int>(maxCount),
+      reinterpret_cast<LPCCH>(rhsText),
+      static_cast<int>(maxCount),
+      static_cast<int>(locale.mbc()->mbcodepage)
+    );
+    if (comparison == 0) {
+      return 0x7FFFFFFF;
+    }
+
+    return comparison - 2;
   }
 
   using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
