@@ -2854,6 +2854,11 @@ namespace msvc8
          * Address: 0x008F6040 (FUN_008F6040, 0x74B)
          * Address: 0x00526080 (FUN_00526080, 0x184B, `moho::RUnitBlueprintWeapon`)
          *
+         * sizeof(T) == 56:
+         * Address: 0x0044E650 (FUN_0044E650, allocator for one 56-byte
+         * intrusive sentinel/head node used by `CD3DFileBatchTexture.cpp`'s
+         * BVSet lanes)
+         *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
          *
@@ -2906,6 +2911,9 @@ namespace msvc8
          * Address: 0x005C7290 (FUN_005C7290, the 52-byte-stride throw lane shared
          * by `BuyVectorStorage52Byte` and the `Moho::SPerArmyReconInfo`
          * `_Insert_n` grow lane FUN_005C6F90)
+         * Address: 0x00452890 (FUN_00452890, reached from
+         * `Moho::CAiSteeringImpl`'s vtable-anchored task chain via
+         * `func_DebugLineArrayAppend`, FUN_004524F0)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
