@@ -10,7 +10,7 @@
 #include "gpg/core/containers/String.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/CAiSiloBuildImplConstruct.h"
-#include "moho/ai/CAiSiloBuildImplSerializer.h"
+#include "moho/ai/CAiSiloBuildImplSerializer.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -28,6 +28,11 @@ namespace
   class ESiloTypeListTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005D0C40 (FUN_005D0C40, gpg::RListType_ESiloType::dtr)
+     */
+    ~ESiloTypeListTypeInfo() override = default;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     void Init() override;
