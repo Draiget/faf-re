@@ -154,6 +154,21 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007E8B70 (FUN_007E8B70, deleting destructor lane; slot 0 of
+     * `??_7HardwareMeshBatch@Moho@@6B@`, VTABLE_CONFIRMED via the vtable's data
+     * xref to this address)
+     * Address: 0x007E7480 (FUN_007E7480, non-deleting destructor body)
+     *
+     * What it does:
+     * Destroys one `HardwareMeshBatch`: releases this batch's own GPU
+     * resources through `ReleaseGpuResources`, then - implicitly, via the
+     * per-member and base-class teardown the compiler inserts after this
+     * body - the base `MeshBatch` resources (`mCurrentResource`,
+     * `mBoneRemapIndices`).
+     */
+    ~HardwareMeshBatch() override;
+
+    /**
      * Address: 0x007E7540 (FUN_007E7540, slot 1 override,
      * ?Initialize@HardwareMeshBatch@Moho@@ (IDA: Func1))
      *
@@ -216,6 +231,26 @@ namespace moho
     {
       return reinterpret_cast<boost::shared_ptr<gpg::gal::IndexBufferD3D9>&>(mIndexBindingHandle);
     }
+
+  private:
+    /**
+     * Address: 0x007E7BE0 (FUN_007E7BE0)
+     *
+     * IDA signature:
+     * void __usercall sub_7E7BE0(HardwareMeshBatch* this@<esi>);
+     *
+     * What it does:
+     * Releases every GPU-resource handle this batch owns - the base batch's
+     * index buffer and vertex declaration handles, and this batch's own
+     * static and dynamic vertex buffers - then frees the CPU scratch mirror
+     * used to stage per-instance vertex data. Also resets the base
+     * `MeshBatch` counters this batch derives during `Initialize`
+     * (`mVertexCount`, `mIndexCount`, `mBoneCount`, `mAttachCount`,
+     * `mMaxInstancesPerDraw`, `mActiveInstanceBudget`) back to zero;
+     * `mTriangleCount` is left untouched, matching the binary exactly. Called
+     * once, from the destructor.
+     */
+    void ReleaseGpuResources() noexcept;
 
   public:
     // +0x54 static (all-instances) GPU vertex buffer built in Initialize.
