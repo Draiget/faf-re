@@ -304,6 +304,18 @@ void wxLEAVE_CRIT_SECT(_RTL_CRITICAL_SECTION* criticalSection);
 [[nodiscard]] bool wxIsCtrlDown();
 
 /**
+ * Address: 0x009C7DD0 (FUN_009C7DD0, wxDisplayDepth)
+ *
+ * IDA signature:
+ * int wxDisplayDepth();
+ *
+ * What it does:
+ * Returns the primary display's colour depth (`GetDeviceCaps(PLANES) *
+ * GetDeviceCaps(BITSPIXEL)`) via a borrowed screen device context.
+ */
+[[nodiscard]] int wxDisplayDepth();
+
+/**
  * Address: 0x009ADC20 (FUN_009ADC20, wxMutexGuiLeave)
  *
  * What it does:
@@ -3383,6 +3395,44 @@ public:
    * whole client area.
    */
   void ScrollWindow(std::int32_t dx, std::int32_t dy, const void* rect) override;
+
+  /**
+   * Address: 0x009683C0 (FUN_009683C0, wxWindow::Update)
+   * Mangled: ?Update@wxWindow@@UAEXXZ
+   * Slot: overrides `wxWindowBase::Update`'s no-op placeholder above
+   * (0x0042B700) - the real MSW behavior every other port supplies through
+   * its own override.
+   *
+   * IDA signature:
+   * BOOL __thiscall wxWindow::Update(wxWindow *this);
+   *
+   * What it does:
+   * Forces a synchronous repaint of the native window (`::UpdateWindow`) and
+   * flushes any batched GDI drawing (`::GdiFlush`), so a caller that just
+   * changed what should be on screen does not have to wait for the next
+   * paint message. The binary returns `GdiFlush`'s BOOL; nothing reads it,
+   * so this reconstruction keeps `wxWindowBase::Update`'s `void` slot shape.
+   */
+  void Update() override;
+
+  /**
+   * Address: 0x00963320 (FUN_00963320, wxWindowBase::Centre)
+   * Mangled: ?Centre@wxWindowBase@@QAEXH@Z
+   *
+   * IDA signature:
+   * int __thiscall wxWindowBase::Centre(wxWindowBase *this, char dir);
+   *
+   * What it does:
+   * Centres this window either on its nearest top-level ancestor or on the
+   * whole screen, per the `wxCENTRE_ON_SCREEN`/`wxHORIZONTAL`/`wxVERTICAL`
+   * bits in `direction`. When centring on a parent, walks up to the nearest
+   * top-level window, but drops that parent (falling back to the screen)
+   * when it is iconized - centring over a minimised window would place this
+   * one off-screen on Windows. The result is clamped to the visible work
+   * area (`wxGetClientDisplayRect`) so the window's title bar always stays
+   * reachable.
+   */
+  void Centre(std::int32_t direction);
 
   static wxEventTable sm_eventTable;
 };
