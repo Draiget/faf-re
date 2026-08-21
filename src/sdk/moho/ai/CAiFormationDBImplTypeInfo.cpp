@@ -103,6 +103,8 @@ namespace
     gpg::fastvector_n<CAiFormationInstance*, 10>* const result
   ) noexcept
   {
+    // Inline-buffer (SBO) binding genuinely needs the runtime view: it seats
+    // the `metadata` lane at +0x0C, which no container accessor exposes.
     auto& view = gpg::AsFastVectorRuntimeView<CAiFormationInstance*>(result);
     auto* const inlineOrigin = reinterpret_cast<CAiFormationInstance**>(
       reinterpret_cast<std::uint8_t*>(result) + 0x10u
@@ -197,19 +199,19 @@ namespace
       return;
     }
 
-    auto& view = gpg::AsFastVectorRuntimeView<IFormationInstance*>(reinterpret_cast<void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<IFormationInstance*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     IFormationInstance* fill = nullptr;
-    gpg::FastVectorRuntimeResizeFill(&fill, count, view);
+    vec.Resize(static_cast<std::size_t>(count), fill);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
       if (!tracked.object) {
-        view.begin[i] = nullptr;
+        vec[i] = nullptr;
         continue;
       }
 
@@ -219,7 +221,7 @@ namespace
 
       const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIFormationInstanceType());
       if (upcast.mObj) {
-        view.begin[i] = static_cast<IFormationInstance*>(upcast.mObj);
+        vec[i] = static_cast<IFormationInstance*>(upcast.mObj);
         continue;
       }
 
@@ -242,14 +244,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<IFormationInstance*>(reinterpret_cast<const void*>(objectPtr));
+    auto& vec = *reinterpret_cast<gpg::fastvector<IFormationInstance*>*>(objectPtr);
 
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      const gpg::RRef objectRef = MakeIFormationInstanceRef(view.begin[i]);
+      const gpg::RRef objectRef = MakeIFormationInstanceRef(vec[i]);
       gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, owner);
     }
   }
@@ -388,11 +390,11 @@ size_t IFormationInstanceFastVectorTypeInfo::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = gpg::AsFastVectorRuntimeView<IFormationInstance*>(obj);
-  if (!view.Data()) {
+  auto& vec = *static_cast<gpg::fastvector<IFormationInstance*>*>(obj);
+  if (vec.Data() == nullptr) {
     return 0u;
   }
-  return view.Size();
+  return vec.size();
 }
 
 void IFormationInstanceFastVectorTypeInfo::SetCount(void* obj, const int count) const
@@ -404,7 +406,7 @@ void IFormationInstanceFastVectorTypeInfo::SetCount(void* obj, const int count) 
   }
 
   IFormationInstance* fill = nullptr;
-  gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), gpg::AsFastVectorRuntimeView<IFormationInstance*>(obj));
+  static_cast<gpg::fastvector<IFormationInstance*>*>(obj)->Resize(static_cast<std::size_t>(count), fill);
 }
 
 /**
