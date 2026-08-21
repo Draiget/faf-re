@@ -8,7 +8,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -19,6 +19,11 @@ namespace
   class VectorTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0051A7C0 (FUN_0051A7C0, gpg::RVectorType_RMeshBlueprintLOD::dtr)
+     */
+    ~VectorTypeInfo() override;
+
     [[nodiscard]] const char* GetName() const override;
     /**
      * Address: 0x00519300 (FUN_00519300, gpg::RVectorType_RMeshBlueprintLOD::GetLexical)
@@ -101,6 +106,8 @@ namespace
     out->mType = temp.mType;
     return out;
   }
+
+  VectorTypeInfo::~VectorTypeInfo() = default;
 
   /**
    * Address: 0x00519240 (FUN_00519240, gpg::RVectorType_RMeshBlueprintLOD::GetName)
