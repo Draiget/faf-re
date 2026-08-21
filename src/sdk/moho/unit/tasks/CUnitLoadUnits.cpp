@@ -183,17 +183,19 @@ namespace
     moho::SPickUpInfo* const erasePos
   ) noexcept
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (erasePos == nullptr || view.end == nullptr) {
+    if (erasePos == nullptr || storage.empty()) {
       if (outIterator != nullptr) {
         *outIterator = erasePos;
       }
       return outIterator;
     }
 
-    (void)CopyPickUpInfoWeakUnitRange(erasePos, erasePos + 1, view.end);
-    UnlinkPickUpInfoWeakUnitRange(view.end - 1, view.end);
-    view.end -= 1;
+    // Shift the tail down over `erasePos`, then unlink the stale copy left in
+    // the old last slot before shortening -- SPickUpInfo's weak-unit owner
+    // link is not released by the (trivial) element destructor.
+    (void)CopyPickUpInfoWeakUnitRange(erasePos, erasePos + 1, storage.end());
+    UnlinkPickUpInfoWeakUnitRange(storage.end() - 1, storage.end());
+    storage.pop_back_no_destroy();
 
     if (outIterator != nullptr) {
       *outIterator = erasePos;
@@ -223,21 +225,23 @@ namespace
     moho::SPickUpInfo* const rangeEnd
   ) noexcept
   {
-    auto& view = msvc8::AsVectorRuntimeView(storage);
-    if (rangeBegin != rangeEnd && view.end != nullptr) {
+    if (rangeBegin != rangeEnd && !storage.empty()) {
       // Shift `[rangeEnd, view.end)` down to `rangeBegin`. The helper
       // preserves each SPickUpInfo's intrusive weak-unit owner-chain link
       // as it relocates the entry.
-      moho::SPickUpInfo* const newEnd = CopyPickUpInfoWeakUnitRange(rangeBegin, rangeEnd, view.end);
+      moho::SPickUpInfo* const newEnd = CopyPickUpInfoWeakUnitRange(rangeBegin, rangeEnd, storage.end());
 
       // Unlink the now-vacated tail `[newEnd, view.end)` from each unit's
       // owner weak-list so the erased slots release their weak-pointer
       // subscriptions without touching vector capacity.
-      UnlinkPickUpInfoWeakUnitRange(newEnd, view.end);
+      UnlinkPickUpInfoWeakUnitRange(newEnd, storage.end());
 
-      // Shrink the active end cursor; capacity lane `view.capacityEnd`
-      // remains untouched, matching binary behavior for erase-in-place.
-      view.end = newEnd;
+      // Shrink the active run to `newEnd`; capacity is untouched, matching
+      // the binary's erase-in-place. The elements are already unlinked above,
+      // so the run is shortened without re-running destructors.
+      while (storage.end() != newEnd) {
+        storage.pop_back_no_destroy();
+      }
     }
 
     if (outIterator != nullptr) {
