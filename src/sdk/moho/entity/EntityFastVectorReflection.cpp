@@ -592,6 +592,8 @@ namespace moho
 
 namespace gpg
 {
+  RVectorType<moho::Entity*>::~RVectorType() = default;
+
   /**
    * Address: 0x0067C0F0 (FUN_0067C0F0, gpg::RVectorType_Entity_P::GetName)
    */
