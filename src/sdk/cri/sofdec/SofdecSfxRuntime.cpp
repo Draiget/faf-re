@@ -15,8 +15,11 @@
  * preserve the original control flow and side effects exactly.
  */
 
+#include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 // ---------------------------------------------------------------------------
@@ -136,7 +139,9 @@ struct SfxHandle {
   std::int32_t sfxz;          ///< +0x24 SFXZ sub-handle (SFX_Create)
   std::uint8_t mUnknown28_[0x08]; ///< +0x28 (+0x28 = 1, +0x2C = 0)
   std::int32_t sfxa;          ///< +0x30 SFXA sub-handle (SFX_Create)
-  std::int32_t reserved34;    ///< +0x34
+  /// +0x34 active composition-table pattern id (`sfxcnv_IsNeedUpdateTbl`,
+  /// `sfxcnv_MakeTable`). Sentinel 100 means "never needs a table rebuild".
+  std::int32_t tblPattern;
   std::int32_t planeBase;     ///< +0x38 work address aligned up to 32
   std::int32_t plane1;        ///< +0x3C planeBase + 1024
   std::int32_t plane2;        ///< +0x40 plane1 + 1024
@@ -164,6 +169,7 @@ static_assert(offsetof(SfxHandle, outputBufferWidth) == 0x08, "SfxHandle::output
 static_assert(offsetof(SfxHandle, outputBufferHeight) == 0x0C, "SfxHandle::outputBufferHeight must live at offset 0x0C");
 static_assert(offsetof(SfxHandle, unitWidth) == 0x10, "SfxHandle::unitWidth must live at offset 0x10");
 static_assert(offsetof(SfxHandle, sfxa) == 0x30, "SfxHandle::sfxa must live at offset 0x30");
+static_assert(offsetof(SfxHandle, tblPattern) == 0x34, "SfxHandle::tblPattern must live at offset 0x34");
 static_assert(offsetof(SfxHandle, planeBase) == 0x38, "SfxHandle::planeBase must live at offset 0x38");
 static_assert(offsetof(SfxHandle, tableBase) == 0x50, "SfxHandle::tableBase must live at offset 0x50");
 static_assert(offsetof(SfxHandle, splitField) == 0x58, "SfxHandle::splitField must live at offset 0x58");
@@ -200,19 +206,45 @@ static_assert(offsetof(SfxLibWorkHead, numErrs) == 0x10,
 static_assert(offsetof(SfxLibWorkHead, cirFx) == 0x14,
               "SfxLibWorkHead::cirFx must live at offset 0x14");
 
+/// Custom Z-conversion-table builder callback an SFXZ handle can carry at
+/// +0x44. `sfxzmv_MakeCnvZTbl` (FUN_00ACD920) prefers this over its own
+/// Z16/Z32 builders when non-null, invoking it with the org-Z32 table it just
+/// built, the raw bit patterns of the handle's near/far Z-clip planes (plain
+/// `mov`-loaded dwords in the binary, not `fld`-loaded floats, at that one
+/// call site), and the destination conversion-table buffer. No setter for
+/// this lane has been found yet in the recovered call graph, so it is always
+/// observed null in practice; the slot is still typed so the dispatch stays
+/// a named call instead of raw offset magic.
+using SfxzCustomConvertZTableCallback = std::int32_t(__cdecl*)(
+  char* outOrgZ32Table, std::int32_t zClipNearBits, std::int32_t zClipFarBits, char* outCnvZTable
+);
+
 /// Head of the SFXZ (depth/Z-blit) work area (0x011F9180, 0x98C bytes).
 /// One SFXZ (depth/Z-blit) handle; the pool stride is 0x4C.
 struct SfxzHandle {
   std::int32_t used;             ///< +0x00 set to 1 by SFXZ_Create
-  std::int32_t reserved04;       ///< +0x04 cleared by sfxzmv_InitHn
-  std::uint8_t mUnknown08[0x34]; ///< +0x08
-  std::int32_t reserved3C;       ///< +0x3C cleared by sfxzmv_InitHn
-  std::int32_t reserved40;       ///< +0x40
-  std::int32_t reserved44;       ///< +0x44
+  /// +0x04 Z-bit depth (16 or 32), cleared by sfxzmv_InitHn, set by
+  /// `SFX_SetZbit`. `sfxzmv_MakeCnvZTbl` reads this to pick the Z16 or Z32
+  /// output builder when no custom converter callback is installed.
+  std::int32_t zBitDepth;
+  std::uint8_t mUnknown08_27[0x20]; ///< +0x08..+0x27
+  std::int32_t tagValid;          ///< +0x28 set to 1 when tagData/tagSize are live (sfxzmv_GetZfrmInf)
+  std::int8_t* tagData;           ///< +0x2C embedded MwsfTagWindow.data (sfxzmv_GetZfrmInf)
+  std::int32_t tagSize;           ///< +0x30 embedded MwsfTagWindow.size (sfxzmv_GetZfrmInf)
+  std::uint8_t mUnknown34_3B[0x08]; ///< +0x34..+0x3B
+  float zClipNear;                ///< +0x3C cleared by sfxzmv_InitHn (SFXZ_IsSetZclip, sfxzmv_MakeZ16/32TblFromOrgZ32)
+  float zClipFar;                 ///< +0x40 cleared by sfxzmv_InitHn
+  SfxzCustomConvertZTableCallback customConvertZTable; ///< +0x44 cleared by sfxzmv_InitHn
   std::int32_t reserved48;       ///< +0x48
 };
 
 static_assert(sizeof(SfxzHandle) == 0x4C, "SfxzHandle size must be 0x4C");
+static_assert(offsetof(SfxzHandle, tagValid) == 0x28, "SfxzHandle::tagValid must live at offset 0x28");
+static_assert(offsetof(SfxzHandle, tagData) == 0x2C, "SfxzHandle::tagData must live at offset 0x2C");
+static_assert(offsetof(SfxzHandle, tagSize) == 0x30, "SfxzHandle::tagSize must live at offset 0x30");
+static_assert(offsetof(SfxzHandle, zClipNear) == 0x3C, "SfxzHandle::zClipNear must live at offset 0x3C");
+static_assert(offsetof(SfxzHandle, zClipFar) == 0x40, "SfxzHandle::zClipFar must live at offset 0x40");
+static_assert(offsetof(SfxzHandle, customConvertZTable) == 0x44, "SfxzHandle::customConvertZTable must live at offset 0x44");
 
 struct SfxzWorkHead {
   std::int32_t cur;         ///< +0x00 live-handle count (SFXZ_Create)
@@ -316,12 +348,39 @@ std::int32_t SFX_SetCcirFx(std::int32_t mode)
 }
 
 /**
+ * Address: 0x00ACCA60 (FUN_00ACCA60, _SFX_GetCcirFx)
+ *
+ * What it does:
+ * Reads back the CCIR matrix variant selected by `SFX_SetCcirFx`. Used by
+ * `sfxzmv_MakeOrgZ32Tbl` to pick the CCIR601-corrected or direct Z-table
+ * builder, and by `sfxcnv_ExecCopyAlphaByCbFunc`.
+ */
+std::int32_t SFX_GetCcirFx()
+{
+  return sfx_libwork.cirFx;
+}
+
+/**
  * Address: 0x00ACDDF0 (FUN_00ACDDF0, _SFXZ_SetZbufType)
  */
 std::int32_t SFXZ_SetZbufType(std::int32_t zbufType)
 {
   sfxz_work.head.zbufType = zbufType;
   return zbufType;
+}
+
+/**
+ * Address: 0x00ACDE00 (FUN_00ACDE00, _SFXZ_GetZbufType)
+ *
+ * What it does:
+ * Reads back the Z-buffer type selector installed by `SFXZ_SetZbufType`.
+ * Used by `sfxzmv_MakeZ16TblFromOrgZ32`/`sfxzmv_MakeZ32TblFromOrgZ32` to pick
+ * the direct bit-shift path (type 1) versus the near/far-clip interpolation
+ * path.
+ */
+std::int32_t SFXZ_GetZbufType()
+{
+  return sfxz_work.head.zbufType;
 }
 
 /**
@@ -783,11 +842,11 @@ moho_cri_sfx_internal::SfxzHandle* sfxzmv_SearchFreeHn()
  */
 moho_cri_sfx_internal::SfxzHandle* sfxzmv_InitHn(moho_cri_sfx_internal::SfxzHandle* const handle)
 {
-  handle->reserved3C = 0;
-  handle->reserved40 = 0;
-  handle->reserved44 = 0;
+  handle->zClipNear = 0.0f;
+  handle->zClipFar = 0.0f;
+  handle->customConvertZTable = nullptr;
   handle->reserved48 = 0;
-  handle->reserved04 = 0;
+  handle->zBitDepth = 0;
   return handle;
 }
 
@@ -832,6 +891,418 @@ void SFXZ_Destroy(void* const sfxzHandle)
 
   static_cast<moho_cri_sfx_internal::SfxzHandle*>(sfxzHandle)->used = 0;
   --sfxz_work.head.cur;
+}
+
+// ---------------------------------------------------------------------------
+// SFXZ zoom-frame-range lookup and Z-buffer conversion-table builders.
+//
+// These build the per-frame 16-bit/32-bit Z lookup table an SFXZ handle's
+// depth-blit path samples through. The chain bottoms out in `SJ_SearchTag`
+// (recovered in SofdecAdxPlatformRuntime.cpp, included earlier in this
+// merged translation unit) via `sfxzmv_GetZfrmInf`, which reads the tag
+// window embedded in the SFXZ handle at +0x28/+0x2C/+0x30.
+// ---------------------------------------------------------------------------
+
+/// Number of entries in the CCIR601 luma-correction byte lookup table shared
+/// by `SFXCNV_MakeCcirFromY` (below, in the sfxcnv_MakeTable family) and
+/// `sfxzmv_MakeOrgZ32TblByCCIR`. Both binary functions inline the identical
+/// fill loop `byte[k] = (uint8_t)(k * 1.164)` for k in [0,220); callers index
+/// it with `rawY - 16`, so the CCIR601 "-16" black-level offset lives in the
+/// caller, not in the table itself.
+constexpr std::int32_t kCcir601LumaTableEntries = 220;
+constexpr double kCcir601LumaScale = 1.164;
+
+/// Shared low-level mechanic behind `SFXCNV_MakeCcirFromY` (FUN_00ACE7B0) and
+/// `sfxzmv_MakeOrgZ32TblByCCIR` (FUN_00ACDA50): both binary functions inline
+/// this exact byte-fill loop rather than sharing a helper, so it is lifted
+/// here once instead of duplicated in the recovered source.
+void BuildCcir601LumaByteTable(std::uint8_t* const dest)
+{
+  for (std::int32_t index = 0; index < kCcir601LumaTableEntries; ++index) {
+    dest[index] = static_cast<std::uint8_t>(static_cast<std::int32_t>(static_cast<double>(index) * kCcir601LumaScale));
+  }
+}
+
+/// Number of `int32_t` entries in one org-Z32 lookup table.
+constexpr std::int32_t kOrgZ32TableEntries = 256;
+
+namespace {
+constexpr std::int32_t kOrgZ32SentinelRaw = static_cast<std::int32_t>(0x80000000);
+constexpr std::int32_t kOrgZ32SentinelClamp = 0x7FFFFFFF;
+
+/// Fills the shared near/far-interpolated org-Z32 ramp shape into `table`
+/// (256 `int32_t` entries): a 9-entry zero plateau, an 8-entry `nearValue`
+/// plateau, a 207-entry interpolated (or `nearValue`-constant, if the range
+/// is empty) ramp toward `farValue`, a 16-entry `farValue` plateau, and a
+/// trailing 16-entry `0x7FFFFFFF` sentinel plateau. Shared by
+/// `sfxzmv_MakeOrgZ32TblByDirect` and `sfxzmv_MakeOrgZ32TblByCCIR`, which
+/// both inline this exact layout in the binary.
+void FillOrgZ32Ramp(std::int32_t* const table, const std::int32_t nearValue, const std::int32_t farValue)
+{
+  std::fill_n(table, 9, 0);
+  std::fill_n(table + 9, 8, nearValue);
+  if (nearValue == farValue) {
+    std::fill_n(table + 17, 0xCF, nearValue);
+  } else {
+    const std::uint32_t step = static_cast<std::uint32_t>(farValue - nearValue) / 0xCFu;
+    std::int32_t rampValue = nearValue;
+    for (std::int32_t index = 17; index < 224; ++index) {
+      table[index] = rampValue;
+      rampValue += static_cast<std::int32_t>(step);
+    }
+  }
+  std::fill_n(table + 224, 16, farValue);
+  std::fill_n(table + 240, 16, kOrgZ32SentinelClamp);
+}
+}  // namespace
+
+/**
+ * Address: 0x00ACD9B0 (FUN_00ACD9B0, _sfxzmv_MakeOrgZ32TblByDirect)
+ *
+ * IDA signature:
+ * int __cdecl sfxzmv_MakeOrgZ32TblByDirect(int a1, int a2, int a3, int a4);
+ *
+ * What it does:
+ * Builds a 256-entry org-Z32 lookup table by linear interpolation between
+ * `rangeStart` and `rangeEnd` (each clamped from the sentinel 0x80000000 to
+ * 0x7FFFFFFF). `sfxzmv_MakeOrgZ32Tbl`'s first parameter (the owning SFXZ
+ * handle) is received but never read by this variant, so the recovered
+ * signature drops it.
+ */
+std::int32_t sfxzmv_MakeOrgZ32TblByDirect(
+  const std::int32_t rangeStart, const std::int32_t rangeEnd, std::int32_t* const outOrgZ32Table
+)
+{
+  const std::int32_t nearValue = (rangeStart == kOrgZ32SentinelRaw) ? kOrgZ32SentinelClamp : rangeStart;
+  const std::int32_t farValue = (rangeEnd == kOrgZ32SentinelRaw) ? kOrgZ32SentinelClamp : rangeEnd;
+  FillOrgZ32Ramp(outOrgZ32Table, nearValue, farValue);
+  return kOrgZ32SentinelClamp;
+}
+
+/**
+ * Address: 0x00ACDA50 (FUN_00ACDA50, _sfxzmv_MakeOrgZ32TblByCCIR)
+ *
+ * IDA signature:
+ * int __cdecl sfxzmv_MakeOrgZ32TblByCCIR(int a1, int a2, int a3, unsigned __int8 *a4);
+ *
+ * What it does:
+ * CCIR601-corrected sibling of `sfxzmv_MakeOrgZ32TblByDirect`. Builds the
+ * same near/far-interpolated 256-entry ramp as scratch space one table-width
+ * (1024 bytes) past the caller's output buffer, builds a 256-byte remap-
+ * index source right after that scratch ramp (a 16-byte zero header, the
+ * shared 220-entry CCIR601 luma table, and a trailing 20-byte 0xFFFFFFFF
+ * sentinel block), then remaps the scratch ramp through that index source
+ * back into the caller's 256-entry output at offset 0:
+ * `outOrgZ32Table[k] = scratchRamp[remapIndexHeader[k]]`. `k` in [0,16)
+ * remaps through the zero header (near plateau), `k` in [16,236) remaps
+ * through the CCIR601 luma table, and `k` in [236,256) remaps through the
+ * 0xFF sentinel bytes (far/sentinel plateau) - i.e. `outOrgZ32Table[Y] =
+ * scratchRamp[ccirLuma(Y-16)]` for raw luma `Y` in [16,235].
+ * `sfxzmv_MakeOrgZ32Tbl`'s first parameter (the owning SFXZ handle) is
+ * received but never read by this variant, so the recovered signature drops
+ * it.
+ */
+std::int32_t sfxzmv_MakeOrgZ32TblByCCIR(
+  const std::int32_t rangeStart, const std::int32_t rangeEnd, std::uint8_t* const outOrgZ32Table
+)
+{
+  auto* const scratchRamp = reinterpret_cast<std::int32_t*>(outOrgZ32Table + 1024);
+
+  std::uint8_t* const remapIndexHeader = outOrgZ32Table + 2048;
+  std::fill_n(reinterpret_cast<std::int32_t*>(remapIndexHeader), 4, 0);
+  std::uint8_t* const lumaTable = remapIndexHeader + 16;
+  BuildCcir601LumaByteTable(lumaTable);
+  std::fill_n(reinterpret_cast<std::int32_t*>(lumaTable + kCcir601LumaTableEntries), 5, -1);
+
+  const std::int32_t nearValue = (rangeStart == kOrgZ32SentinelRaw) ? kOrgZ32SentinelClamp : rangeStart;
+  const std::int32_t farValue = (rangeEnd == kOrgZ32SentinelRaw) ? kOrgZ32SentinelClamp : rangeEnd;
+  FillOrgZ32Ramp(scratchRamp, nearValue, farValue);
+
+  auto* const outTable = reinterpret_cast<std::int32_t*>(outOrgZ32Table);
+  std::int32_t result = 0;
+  for (std::int32_t index = 0; index < kOrgZ32TableEntries; ++index) {
+    result = scratchRamp[remapIndexHeader[index]];
+    outTable[index] = result;
+  }
+  return result;
+}
+
+/**
+ * Address: 0x00ACD990 (FUN_00ACD990, _sfxzmv_MakeOrgZ32Tbl)
+ *
+ * What it does:
+ * Picks the CCIR601-corrected or direct org-Z32 table builder based on the
+ * SFX library's active CCIR matrix selector (`SFX_SetCcirFx`).
+ */
+std::int32_t sfxzmv_MakeOrgZ32Tbl(
+  const std::int32_t rangeStart, const std::int32_t rangeEnd, std::uint8_t* const outOrgZ32Table
+)
+{
+  if (SFX_GetCcirFx() == 1) {
+    return sfxzmv_MakeOrgZ32TblByCCIR(rangeStart, rangeEnd, outOrgZ32Table);
+  }
+  return sfxzmv_MakeOrgZ32TblByDirect(rangeStart, rangeEnd, reinterpret_cast<std::int32_t*>(outOrgZ32Table));
+}
+
+/**
+ * Address: 0x00ACDB80 (FUN_00ACDB80, _sfxzmv_MakeZ16TblFromOrgZ32)
+ *
+ * IDA signature:
+ * int __cdecl sfxzmv_MakeZ16TblFromOrgZ32(int a1, int a2, int a3);
+ *
+ * What it does:
+ * Converts a 256-entry org-Z32 table into a 256-entry 16-bit output table.
+ * For Z-buffer type 1 (`SFXZ_SetZbufType`), a plain arithmetic right shift by
+ * 15 bits. Otherwise, normalizes each org-Z32 entry into [0,65535] against
+ * the handle's near/far Z-clip planes, replacing zero org-Z32 entries with 1
+ * to avoid a divide-by-zero.
+ */
+std::int32_t sfxzmv_MakeZ16TblFromOrgZ32(
+  const moho_cri_sfx_internal::SfxzHandle* const handle,
+  std::int32_t* const orgZ32Table,
+  std::int16_t* const outZ16Table
+)
+{
+  const float zClipNear = handle->zClipNear;
+  const float zClipFar = handle->zClipFar;
+
+  std::int32_t result = 0;
+  if (SFXZ_GetZbufType() == 1) {
+    for (std::int32_t index = 0; index < kOrgZ32TableEntries; ++index) {
+      result = orgZ32Table[index] >> 15;
+      outZ16Table[index] = static_cast<std::int16_t>(result);
+    }
+    return result;
+  }
+
+  const double farOverRange = (1.0 / (static_cast<double>(zClipFar) - static_cast<double>(zClipNear))) * zClipFar;
+  const double scaledMax = 65535.0 * farOverRange;
+  const double scaledNearOffset = farOverRange * static_cast<double>(zClipNear) * 65535.0;
+
+  for (std::int32_t index = 0; index < kOrgZ32TableEntries; ++index) {
+    if (orgZ32Table[index] == 0) {
+      orgZ32Table[index] = 1;
+    }
+    const double denom =
+      static_cast<double>(static_cast<std::uint32_t>(orgZ32Table[index])) * static_cast<double>(zClipFar) * 4.656612875245797e-10;
+    result = static_cast<std::int32_t>(scaledMax - scaledNearOffset / denom);
+    outZ16Table[index] = static_cast<std::int16_t>(result);
+  }
+  return result;
+}
+
+/**
+ * Address: 0x00ACDC50 (FUN_00ACDC50, _sfxzmv_MakeZ32TblFromOrgZ32)
+ *
+ * IDA signature:
+ * int __cdecl sfxzmv_MakeZ32TblFromOrgZ32(int a1, _DWORD *a2, int a3);
+ *
+ * What it does:
+ * 32-bit sibling of `sfxzmv_MakeZ16TblFromOrgZ32`. For Z-buffer type 1, masks
+ * off the low 7 bits of each org-Z32 entry and doubles it. Otherwise,
+ * normalizes each entry into [0,16777215] against the handle's near/far
+ * Z-clip planes, same divide-by-zero guard as the 16-bit path.
+ */
+std::int32_t sfxzmv_MakeZ32TblFromOrgZ32(
+  const moho_cri_sfx_internal::SfxzHandle* const handle,
+  std::int32_t* const orgZ32Table,
+  std::int32_t* const outZ32Table
+)
+{
+  const float zClipNear = handle->zClipNear;
+  const float zClipFar = handle->zClipFar;
+
+  std::int32_t result = 0;
+  if (SFXZ_GetZbufType() == 1) {
+    for (std::int32_t index = 0; index < kOrgZ32TableEntries; ++index) {
+      result = 2 * (orgZ32Table[index] & 0xFFFFFF80);
+      outZ32Table[index] = result;
+    }
+    return result;
+  }
+
+  const double farOverRange = (1.0 / (static_cast<double>(zClipFar) - static_cast<double>(zClipNear))) * zClipFar;
+  const double scaledMax = 16777215.0 * farOverRange;
+  const double scaledNearOffset = farOverRange * static_cast<double>(zClipNear) * 16777215.0;
+
+  for (std::int32_t index = 0; index < kOrgZ32TableEntries; ++index) {
+    if (orgZ32Table[index] == 0) {
+      orgZ32Table[index] = 1;
+    }
+    const double denom =
+      static_cast<double>(static_cast<std::uint32_t>(orgZ32Table[index])) * static_cast<double>(zClipFar) * 4.656612875245797e-10;
+    result = static_cast<std::int32_t>(scaledMax - scaledNearOffset / denom);
+    outZ32Table[index] = result;
+  }
+  return result;
+}
+
+/**
+ * Address: 0x00ACD920 (FUN_00ACD920, _sfxzmv_MakeCnvZTbl)
+ *
+ * IDA signature:
+ * int __cdecl sfxzmv_MakeCnvZTbl(_DWORD *a1, int a2, int a3, char *a4);
+ *
+ * What it does:
+ * Builds the org-Z32 lookup table 1024 bytes into the destination buffer,
+ * then converts it into the caller's final output table: through the
+ * handle's custom converter callback if one is installed (no setter for that
+ * lane has been found in the recovered call graph, so this branch has not
+ * been observed taken), otherwise through the 16-bit or 32-bit builder
+ * selected by the handle's Z-bit-depth lane (`SFX_SetZbit`).
+ */
+std::int32_t sfxzmv_MakeCnvZTbl(
+  moho_cri_sfx_internal::SfxzHandle* const handle,
+  const std::int32_t rangeStart,
+  const std::int32_t rangeEnd,
+  char* const outCnvZTable
+)
+{
+  char* const orgZ32TableBytes = outCnvZTable + 1024;
+  std::fill_n(outCnvZTable, 0x400, char{0});
+  (void)sfxzmv_MakeOrgZ32Tbl(rangeStart, rangeEnd, reinterpret_cast<std::uint8_t*>(orgZ32TableBytes));
+
+  if (handle->customConvertZTable != nullptr) {
+    return handle->customConvertZTable(
+      orgZ32TableBytes,
+      std::bit_cast<std::int32_t>(handle->zClipNear),
+      std::bit_cast<std::int32_t>(handle->zClipFar),
+      outCnvZTable
+    );
+  }
+
+  auto* const orgZ32Table = reinterpret_cast<std::int32_t*>(orgZ32TableBytes);
+  if (handle->zBitDepth == 16) {
+    return sfxzmv_MakeZ16TblFromOrgZ32(handle, orgZ32Table, reinterpret_cast<std::int16_t*>(outCnvZTable));
+  }
+  return sfxzmv_MakeZ32TblFromOrgZ32(handle, orgZ32Table, reinterpret_cast<std::int32_t*>(outCnvZTable));
+}
+
+/**
+ * Address: 0x00ACD870 (FUN_00ACD870, _sfxzmv_GetZfrmInf)
+ *
+ * IDA signature:
+ * __int8 *__cdecl sfxzmv_GetZfrmInf(int a1, char *a2, char *a3, SJCK *a4, _DWORD *a5);
+ *
+ * What it does:
+ * Looks up one tag window in the SFXZ handle's embedded metadata tag stream
+ * via `SJ_SearchTag` and returns the matched (data,size) pair through
+ * `outData`/`outSize`. Reports `(nullptr, 0)` if the handle has no live tag
+ * window (`tagValid != 1` or `tagData == nullptr`).
+ *
+ * The IDA decompile types the 4th parameter as `SJCK*` and shows `*a4 = out;`
+ * (a whole-struct assignment) - misleading, since `SJCK` does not exist
+ * anywhere in this binary. The raw asm at 0x00ACD8B7/0x00ACD8BD performs two
+ * independent scalar stores through `outData`/`outSize` (confirmed separate
+ * parameters, distinct stack slots), not a struct copy; `SJCK` is IDA's
+ * decompiler placeholder for the real type, `moho::MwsfTagWindow`. The
+ * return value differs by path (the matched data pointer on success, the
+ * `outData` parameter's own value on failure - a compiler artefact from
+ * register reuse across the two exits) and is not read by
+ * `SFXZ_GetZfrmRange`, its only caller, which re-reads `*outData` after each
+ * call instead of using the return value.
+ */
+char* sfxzmv_GetZfrmInf(
+  const moho_cri_sfx_internal::SfxzHandle* const handle,
+  const char* const beginTagName,
+  const char* const endTagName,
+  char** const outData,
+  std::int32_t* const outSize
+)
+{
+  if (handle->tagValid != 1 || handle->tagData == nullptr) {
+    *outData = nullptr;
+    *outSize = 0;
+    return nullptr;
+  }
+
+  const moho::MwsfTagWindow inputWindow{handle->tagData, handle->tagSize};
+  moho::MwsfTagWindow outputWindow{};
+  (void)SJ_SearchTag(&inputWindow, beginTagName, endTagName, &outputWindow);
+  *outData = reinterpret_cast<char*>(outputWindow.data);
+  *outSize = outputWindow.size;
+  return *outData;
+}
+
+/// Tag names for the zoom-frame-range metadata pair `SFXZ_GetZfrmRange`
+/// looks up. `kSofdecTagSfxinfe` ("SFXINFE") is already established in
+/// SofdecAdxPlatformRuntime.cpp; these two are new.
+constexpr char kSofdecTagZmfsize[] = "ZMFSIZE";
+constexpr char kSofdecTagZmfdata[] = "ZMFDATA";
+
+/**
+ * Address: 0x00ACD7A0 (FUN_00ACD7A0, _SFXZ_GetZfrmRange)
+ *
+ * What it does:
+ * Parses the "zoom frame range" out of an SFXZ handle's metadata tag stream:
+ * first the entry count from the hex `ZMFSIZE` tag, then the range triplet
+ * from the `ZMFDATA` tag at `entryStrideBytes * entryCount` bytes into its
+ * payload. On success, writes the parsed range start/end and returns the
+ * range start. On a missing `ZMFDATA` tag, `*outRangeStart` becomes the
+ * sentinel 0x7FFFFFFF (`*outRangeEnd` is left untouched, matching the
+ * binary). On a missing `ZMFSIZE` tag, `*outRangeStart` becomes null and
+ * `*outRangeEnd` becomes the sentinel. Was a no-argument stub in
+ * SofdecExternalStubs.cpp; every real call site (`sfxcnv_MakeZTbl`'s Z16/Z32
+ * table builders, through `SFX_GetZfrmRange`/`SFXZ_MakeCnvZTbl`) silently
+ * discarded all four arguments.
+ */
+char* SFXZ_GetZfrmRange(
+  char* const sfxzWorkBuffer,
+  const std::int32_t entryStrideBytes,
+  char** const outRangeStart,
+  std::int32_t* const outRangeEnd
+)
+{
+  auto* const handle = reinterpret_cast<moho_cri_sfx_internal::SfxzHandle*>(sfxzWorkBuffer);
+
+  char* rawSizeStr = nullptr;
+  std::int32_t rawSizeStrLen = 0;
+  (void)sfxzmv_GetZfrmInf(handle, kSofdecTagZmfsize, kSofdecTagSfxinfe, &rawSizeStr, &rawSizeStrLen);
+  if (rawSizeStr == nullptr) {
+    *outRangeStart = nullptr;
+    *outRangeEnd = kOrgZ32SentinelClamp;
+    return nullptr;
+  }
+
+  std::int32_t entryCount = 0;
+  (void)std::sscanf(rawSizeStr, "%lx", &entryCount);
+
+  char* rawDataStr = nullptr;
+  std::int32_t rawDataStrLen = 0;
+  (void)sfxzmv_GetZfrmInf(handle, kSofdecTagZmfdata, kSofdecTagSfxinfe, &rawDataStr, &rawDataStrLen);
+  if (rawDataStr == nullptr) {
+    *outRangeStart = reinterpret_cast<char*>(static_cast<std::intptr_t>(kOrgZ32SentinelClamp));
+    return rawDataStr;
+  }
+
+  std::int32_t discardTagBytes = 0;
+  std::int32_t rangeStart = 0;
+  std::int32_t rangeEnd = 0;
+  (void)std::sscanf(
+    rawDataStr + entryStrideBytes * entryCount, "%lx %lx %lx", &discardTagBytes, &rangeStart, &rangeEnd
+  );
+  *outRangeStart = reinterpret_cast<char*>(static_cast<std::intptr_t>(rangeStart));
+  *outRangeEnd = rangeEnd;
+  return *outRangeStart;
+}
+
+/**
+ * Address: 0x00ACD8E0 (FUN_00ACD8E0, _SFXZ_MakeCnvZTbl)
+ *
+ * What it does:
+ * Looks up the zoom-frame range for one SFXZ handle, then builds its
+ * conversion-Z table from that range.
+ */
+std::int32_t SFXZ_MakeCnvZTbl(char* const sfxzWorkBuffer, const std::int32_t entryStrideBytes, char* const outCnvZTable)
+{
+  auto* const handle = reinterpret_cast<moho_cri_sfx_internal::SfxzHandle*>(sfxzWorkBuffer);
+
+  char* rangeStart = nullptr;
+  std::int32_t rangeEnd = 0;
+  (void)SFXZ_GetZfrmRange(sfxzWorkBuffer, entryStrideBytes, &rangeStart, &rangeEnd);
+  return sfxzmv_MakeCnvZTbl(
+    handle, static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(rangeStart)), rangeEnd, outCnvZTable
+  );
 }
 
 /**
@@ -1090,6 +1561,243 @@ void sfxcnv_ExecCnvFrmByCbFunc(
       tableParams
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// sfxcnv_MakeTable family: builds the composition-mode-specific table
+// `sfxcnv_ExecCnvFrmByCbFunc` above hands to the pixel-format callback
+// through `tableParams[0]` (the handle's `planeBase`). `SFX_CnvFrmByCbFunc`
+// (SofdecAdxPlatformRuntime.cpp) calls `SFX_MakeTable` first, then
+// `sfxcnv_ExecCnvFrmByCbFunc`, for every composition mode that needs a table.
+// ---------------------------------------------------------------------------
+
+/**
+ * Address: 0x00ACE7B0 (FUN_00ACE7B0, _SFXCNV_MakeCcirFromY)
+ *
+ * IDA signature:
+ * _DWORD *__cdecl SFXCNV_MakeCcirFromY(_DWORD *a1);
+ *
+ * What it does:
+ * Builds a full-alpha composition table: a 4-dword zero header, the shared
+ * 220-entry CCIR601 luma byte table right after it, and a trailing 5-dword
+ * 0xFFFFFFFF sentinel block. The binary returns `table+59` (the sentinel
+ * block's start); that return value is not read by `sfxcnv_MakeAlpFull`, its
+ * only caller, so the recovered signature drops it.
+ */
+void SFXCNV_MakeCcirFromY(std::int32_t* const table)
+{
+  std::fill_n(table, 4, 0);
+  BuildCcir601LumaByteTable(reinterpret_cast<std::uint8_t*>(table) + 16);
+  std::fill_n(table + 59, 5, -1);
+}
+
+/**
+ * Address: 0x00ACE710 (FUN_00ACE710, _sfxcnv_IsNeedUpdateTbl)
+ *
+ * IDA signature:
+ * int __cdecl sfxcnv_IsNeedUpdateTbl(int a1, int a2);
+ *
+ * What it does:
+ * Reports whether the handle's composition table needs to be rebuilt for
+ * `tableMode`. Never needs an update once `tblPattern` is pinned to the
+ * sentinel 100. If the mode is unchanged from last time, full-alpha/3110/
+ * 3211/forced-lookup never need a rebuild, lookup mode defers to the SFXA
+ * sub-handle's own pending-update flag, and every other mode always reports
+ * "needs update" (matching the switch's default case). Any actual mode
+ * change always needs an update.
+ */
+std::int32_t sfxcnv_IsNeedUpdateTbl(
+  const moho_cri_sfx_internal::SfxHandle* const handle, const std::int32_t tableMode
+)
+{
+  constexpr std::int32_t kTblPatternNeverUpdate = 100;
+
+  if (handle->tblPattern == kTblPatternNeverUpdate) {
+    return 0;
+  }
+  if (handle->tblPattern != tableMode) {
+    return 1;
+  }
+
+  switch (tableMode) {
+    case kSfxCompoTableFullAlpha:
+    case kSfxCompoTable3110:
+    case kSfxCompoTable3211:
+    case kSfxCompoTableForced:
+      return 0;
+    case kSfxCompoTableLookup:
+      return (SFXA_IsNeedUpdateLumiTbl(handle->sfxa) == 1) ? 1 : 0;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Address: 0x00ACE7A0 (FUN_00ACE7A0, _sfxcnv_MakeAlpFull)
+ *
+ * What it does:
+ * Builds the full-alpha composition table at the handle's plane base.
+ */
+void sfxcnv_MakeAlpFull(moho_cri_sfx_internal::SfxHandle* const handle)
+{
+  SFXCNV_MakeCcirFromY(
+    reinterpret_cast<std::int32_t*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->planeBase)))
+  );
+}
+
+/**
+ * Address: 0x00ACE820 (FUN_00ACE820, _sfxcnv_MakeAlpLumiTbl)
+ *
+ * IDA signature:
+ * int (__cdecl *__cdecl sfxcnv_MakeAlpLumiTbl(int a1, int a2))(_DWORD, _DWORD, _DWORD, int);
+ *
+ * What it does:
+ * Builds the luminance-lookup composition table via the SFXA sub-handle.
+ */
+void sfxcnv_MakeAlpLumiTbl(
+  moho_cri_sfx_internal::SfxHandle* const handle, const MwsfdSfxFrameInfo* const frameInfo
+)
+{
+  (void)SFXA_MakeAlpLumiTbl(handle->sfxa, frameInfo->nfrm, handle->planeBase);
+}
+
+/**
+ * Address: 0x00ACE840 (FUN_00ACE840, _sfxcnv_MakeAlp3110Tbl)
+ *
+ * What it does:
+ * Builds the 3:1:1:0 alpha composition table via the SFXA sub-handle.
+ */
+void sfxcnv_MakeAlp3110Tbl(
+  moho_cri_sfx_internal::SfxHandle* const handle, const MwsfdSfxFrameInfo* const frameInfo
+)
+{
+  (void)SFXA_MakeAlp3110Tbl(handle->sfxa, frameInfo->nfrm, handle->planeBase);
+}
+
+/**
+ * Address: 0x00ACE860 (FUN_00ACE860, _sfxcnv_MakeAlp3211Tbl)
+ *
+ * What it does:
+ * Builds the 3:2:1:1 alpha composition table via the SFXA sub-handle.
+ */
+void sfxcnv_MakeAlp3211Tbl(
+  moho_cri_sfx_internal::SfxHandle* const handle, const MwsfdSfxFrameInfo* const frameInfo
+)
+{
+  (void)SFXA_MakeAlp3211Tbl(handle->sfxa, frameInfo->nfrm, handle->planeBase);
+}
+
+/**
+ * Address: 0x00ACE880 (FUN_00ACE880, _sfxcnv_MakeColAdjTbl)
+ *
+ * IDA signature:
+ * int (__cdecl *__cdecl sfxcnv_MakeColAdjTbl(int a1))(_DWORD);
+ *
+ * What it does:
+ * Builds the colour-adjust composition table through the handle's installed
+ * `colorAdjustTableCallback` (`SFX_SetMakeColAdjTableCbFunc`), if any.
+ */
+void sfxcnv_MakeColAdjTbl(moho_cri_sfx_internal::SfxHandle* const handle)
+{
+  if (handle->colorAdjustTableCallback != nullptr) {
+    (void)handle->colorAdjustTableCallback(handle->planeBase);
+  }
+}
+
+/**
+ * Address: 0x00ACE780 (FUN_00ACE780, _sfxcnv_MakeZTbl)
+ *
+ * What it does:
+ * Builds the Z-lookup composition table: resolves the zoom-frame range for
+ * the handle's SFXZ sub-handle and converts it into the plane-base buffer.
+ * Was a no-argument stub in SofdecExternalStubs.cpp; every real call site
+ * (`SFX_MakeTblZ16`/`SFX_MakeTblZ32` directly, and `sfxcnv_MakeTable`'s
+ * Z16/Z32 cases through `SFX_MakeTable`) silently discarded both arguments.
+ */
+std::int32_t sfxcnv_MakeZTbl(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
+{
+  auto* const handle = static_cast<moho_cri_sfx_internal::SfxHandle*>(sfxHandle);
+  return SFXZ_MakeCnvZTbl(
+    reinterpret_cast<char*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->sfxz))),
+    sfxFrameInfo->nfrm,
+    reinterpret_cast<char*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->planeBase)))
+  );
+}
+
+constexpr char kSfxErrSfxcnvMakeTableUnsupported[] = "E201311: sfxcnv_MakeTable : compo is not support.";
+
+/**
+ * Address: 0x00ACE620 (FUN_00ACE620, _sfxcnv_MakeTable)
+ *
+ * What it does:
+ * Composition-table dispatcher. Skips the rebuild entirely if
+ * `sfxcnv_IsNeedUpdateTbl` reports the existing table is still valid for
+ * `tableMode`; otherwise pins `tblPattern` to the new mode and dispatches to
+ * the matching table builder. Reports `E201311` via `SFXLIB_Error` for any
+ * mode the switch does not recognize.
+ */
+void sfxcnv_MakeTable(
+  moho_cri_sfx_internal::SfxHandle* const handle, MwsfdSfxFrameInfo* const frameInfo, const std::int32_t tableMode
+)
+{
+  if (sfxcnv_IsNeedUpdateTbl(handle, tableMode) != 1) {
+    return;
+  }
+  handle->tblPattern = tableMode;
+
+  switch (tableMode) {
+    case kSfxCompoTableFullAlpha:
+      sfxcnv_MakeAlpFull(handle);
+      return;
+    case kSfxCompoTableLookup:
+      sfxcnv_MakeAlpLumiTbl(handle, frameInfo);
+      return;
+    case kSfxCompoTable3110:
+      sfxcnv_MakeAlp3110Tbl(handle, frameInfo);
+      return;
+    case kSfxCompoTable3211:
+      sfxcnv_MakeAlp3211Tbl(handle, frameInfo);
+      return;
+    case kSfxCompoTableZ16:
+    case kSfxCompoTableZ32:
+      (void)sfxcnv_MakeZTbl(handle, frameInfo);
+      return;
+    case kSfxCompoTableForced:
+      sfxcnv_MakeColAdjTbl(handle);
+      return;
+    default:
+      SFXLIB_Error(
+        reinterpret_cast<moho::SfxCallbackFrameContext*>(handle),
+        reinterpret_cast<moho::SfxStreamState*>(frameInfo),
+        kSfxErrSfxcnvMakeTableUnsupported
+      );
+      return;
+  }
+}
+
+/**
+ * Address: 0x00ACE610 / 0x00ACE620 (FUN_00ACE610, _SFX_MakeTable; thunk over
+ * FUN_00ACE620, _sfxcnv_MakeTable)
+ *
+ * What it does:
+ * Public facade over `sfxcnv_MakeTable`. Was a no-argument stub in
+ * SofdecExternalStubs.cpp; every real call site (`SFX_CnvFrmByCbFunc`'s
+ * lookup/full-alpha/dynamic/half-alpha/forced-lookup composition paths, and
+ * `sfxcnv_CnvFrmYcc420plnToZ`/`sfxcnv_CnvFrmArgb8888mbToZ`'s Z16/Z32 paths)
+ * silently discarded all three arguments, so no composition table was ever
+ * built and every frame using a table-driven composition mode converted
+ * through whatever the plane-base buffer already held.
+ */
+void SFX_MakeTable(
+  moho::SfxCallbackFrameContext* const conversionState,
+  moho::SfxStreamState* const streamState,
+  const std::int32_t tableMode
+)
+{
+  using namespace moho_cri_sfx_internal;
+  sfxcnv_MakeTable(
+    reinterpret_cast<SfxHandle*>(conversionState), reinterpret_cast<MwsfdSfxFrameInfo*>(streamState), tableMode
+  );
 }
 
 namespace moho_cri_sfx_internal {

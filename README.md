@@ -14,9 +14,9 @@ Progress snapshot:
 
 Progress DB status breakdown:
 
-- `recovered`: `53,504` (82.21%)
+- `recovered`: `53,525` (82.24%)
 - `skip`: `6,119` (9.40%) — proven ICF aliases / thunks / EH or static-init glue with no distinct source body
-- `external_dependency`: `5,459` (8.39%) — proven third-party/import-boundary code
+- `external_dependency`: `5,438` (8.36%) — proven third-party/import-boundary code
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, external Boost internals, WildMagic/Wm3, CRI Sofdec/ADX, undname, bugsplat, CRT imports*
 - `needs_evidence`: `409` (0.61%)
 - `in_progress`: `0` (0.00%)
@@ -30,15 +30,15 @@ Progress DB status breakdown:
 
 Verdicts computed by [`fa-find-callers`](skills/fa-find-callers/SKILL.md) across the namespace's SQLite callgraph index and progress statuses. These counts show whether binary callers/dispatch evidence exists and whether caller tokens are marked recovered. They do **not** parse caller bodies or prove that a matching named call, registration, or virtual source edge exists. Verify real source wiring with `scripts/recovery_callgraph_match_audit.py` plus manual caller-body inspection.
 
-### Recovered (53,504 functions) — binary caller context
+### Recovered (53,525 functions) — binary caller context
 
 | Bucket | Count | % of recovered |
 |---|---:|---:|
-| **Recovered caller token exists** (source edge still requires verification) | `16,418` | 30.69% |
+| **Recovered caller token exists** (source edge still requires verification) | `16,443` | 30.72% |
 | Vtable-anchored (virtual override of a recovered class) | `5,896` | 11.02% |
-| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,568` | 10.41% |
-| No recovered caller token yet (orphan risk) | `2,136` | 3.99% |
-| No callsite evidence (no recorded code/data caller in the index) | `23,265` | 43.48% |
+| Framework dispatch (wx event, EH handler, Lua binding, reflection table, …) | `5,568` | 10.40% |
+| No recovered caller token yet (orphan risk) | `2,132` | 3.98% |
+| No callsite evidence (no recorded code/data caller in the index) | `23,265` | 43.47% |
 | Unclassified data xref (manual review) | `217` | 0.41% |
 | RTTI-only | `4` | 0.01% |
 
