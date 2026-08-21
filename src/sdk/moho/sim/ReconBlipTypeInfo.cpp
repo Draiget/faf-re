@@ -45,6 +45,11 @@ namespace
   class SPerArmyReconInfoVectorTypeRuntime final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005CA7B0 (FUN_005CA7B0, gpg::RVectorType_SPerArmyReconInfo::dtr)
+     */
+    ~SPerArmyReconInfoVectorTypeRuntime() override = default;
+
     [[nodiscard]] const char* GetName() const override;
 
     /**
