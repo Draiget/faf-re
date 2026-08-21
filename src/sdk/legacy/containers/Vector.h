@@ -1727,6 +1727,14 @@ namespace msvc8
          * attack_btn_up.dds / teleport_btn_up.dds draw passes that follow the
          * main per-command-link loop)
          *
+         * Address: 0x00859F70 (FUN_00859F70 — 0x10-byte element, the
+         * formation-preview ghost pair held by `gFormationPreviews` in
+         * `moho/sim/CWldSession.cpp`; identified by the `sar ecx, 4` /
+         * `sar esi, 4` pair that turns both the size and the capacity byte
+         * spans into element counts, and by the two out-of-line halves it
+         * calls — FUN_0085A920 for the in-place fast path and FUN_0085A0E0
+         * for the grow path)
+         *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
          * reaches `end_`. The MSVC8 STL emits one inlined fast-path body per
@@ -1762,6 +1770,11 @@ namespace msvc8
 
         /**
          * Pop last (no check)
+         *
+         * Address: 0x00859FE0 (FUN_00859FE0 — 0x10-byte element, the
+         * formation-preview ghost pair; rewinds `last_` by one element and
+         * runs the pair's destructor. `CWldSession::RenderMeshPreviews` calls
+         * it when the renderer refuses the mesh instance it just appended.)
          */
         void pop_back() noexcept {
             --last_;
@@ -1864,6 +1877,13 @@ namespace msvc8
         /**
          * Erase a range [first,last). Returns iterator to the position that
          * now contains the element that followed the last erased element.
+         *
+         * Address: 0x0085A130 (FUN_0085A130 — 0x10-byte element, the
+         * formation-preview ghost pair. Shifts the tail down one slot at a
+         * time through FUN_0085A9F0 (`copy_or_move_assign`), destroys the
+         * retired span through FUN_0085A1D0 (`destroy_range`), then rebases
+         * `last_`. `CWldSession::RenderMeshPreviews` and `~CWldSession` both
+         * reach it as the whole-range `clear`.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -2294,6 +2314,10 @@ namespace msvc8
     private:
         /**
          * Destroy [first,last)
+         *
+         * Address: 0x0085A1D0 (FUN_0085A1D0 — 0x10-byte element, the
+         * formation-preview ghost pair; walks the span forward calling the
+         * pair's destructor, FUN_00859E90, on each slot)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -2404,6 +2428,10 @@ namespace msvc8
 
         /**
          * Assign n elements from src to dst (dst already constructed)
+         *
+         * Address: 0x0085A9F0 (FUN_0085A9F0 — 0x10-byte element, the
+         * formation-preview ghost pair; the single-slot shared-handle assign
+         * the erase shift-down loop at FUN_0085A130 drives)
          */
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {

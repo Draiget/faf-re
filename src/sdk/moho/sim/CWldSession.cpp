@@ -87,6 +87,8 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "moho/ui/CUIManager.h"
+#include "moho/ai/CAiFormationInstance.h"
+#include "moho/math/MathReflection.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
@@ -100,19 +102,39 @@ namespace
 {
   static_assert(sizeof(moho::WeakObject::WeakLinkNodeView) == 0x8, "WeakLinkNodeView size must be 0x8");
 
-  struct FormationPreviewSharedPairRuntimeView
+  /**
+   * One formation-placement ghost: the preview mesh `MeshRenderer` handed back
+   * and the "UnitFormationPreview" material it was shaded with.
+   *
+   * The implicit destructor is the binary's FUN_00859E90 - it drops the
+   * last-declared member first (`mMaterial`, then `mMesh`), which is exactly
+   * what MSVC emits for this member order. No source line spells it out.
+   */
+  struct FormationPreviewSharedPair
   {
-    boost::shared_ptr<void> primaryRuntime;
-    boost::shared_ptr<void> secondaryRuntime;
+    boost::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
+    boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
   };
-  static_assert(
-    sizeof(FormationPreviewSharedPairRuntimeView) == 0x10,
-    "FormationPreviewSharedPairRuntimeView size must be 0x10"
-  );
+  static_assert(sizeof(FormationPreviewSharedPair) == 0x10, "FormationPreviewSharedPair size must be 0x10");
 
-  FormationPreviewSharedPairRuntimeView* gFormationPreviewSharedPairsBegin = nullptr;
-  FormationPreviewSharedPairRuntimeView* gFormationPreviewSharedPairsEnd = nullptr;
-  std::uintptr_t gFormationPreviewSharedPairsOwnerLane = 0u;
+  /**
+   * Session-global ghost list for the formation-placement preview.
+   *
+   * This is one plain `msvc8::vector` parked at 0x010C4258, not the three loose
+   * pointer globals an earlier pass modelled:
+   *   myProxy_ +0x00 -> 0x010C4258   first_ +0x04 -> 0x010C425C
+   *   last_    +0x08 -> 0x010C4260   end_   +0x0C -> 0x010C4264
+   *
+   * That the container head is 0x010C4258 is settled by FUN_0085A280 and
+   * FUN_0085A630: both are a bare `mov eax, offset 0x010C4258; retn`, i.e.
+   * they hand back the container itself. FUN_00859F70 pins the 0x10-byte
+   * element width - it derives both size and capacity by `sar ..., 4` over the
+   * same three lanes.
+   *
+   * `CWldSession::RenderMeshPreviews` (0x008599D0) is the only writer: it
+   * clears the vector at the top of every frame and repopulates it.
+   */
+  msvc8::vector<FormationPreviewSharedPair> gFormationPreviews;
 
   // `StrategicIconAuxView` (the real type) and `gStrategicIconAuxiliary`
   // live in the `moho`-scoped anonymous namespace alongside the type's
@@ -242,7 +264,7 @@ namespace
     std::uintptr_t* const outValue
   ) noexcept
   {
-    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviewSharedPairsBegin);
+    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviews.begin());
     return outValue;
   }
 
@@ -257,7 +279,7 @@ namespace
     std::uintptr_t* const outValue
   ) noexcept
   {
-    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviewSharedPairsEnd);
+    *outValue = reinterpret_cast<std::uintptr_t>(gFormationPreviews.end());
     return outValue;
   }
 
@@ -270,33 +292,36 @@ namespace
    */
   [[nodiscard]] std::int32_t GetFormationPreviewSharedPairCountLane() noexcept
   {
-    if (gFormationPreviewSharedPairsBegin == nullptr) {
+    if (gFormationPreviews.begin() == nullptr) {
       return 0;
     }
 
-    return static_cast<std::int32_t>(gFormationPreviewSharedPairsEnd - gFormationPreviewSharedPairsBegin);
+    return static_cast<std::int32_t>(gFormationPreviews.end() - gFormationPreviews.begin());
   }
 
   /**
    * Address: 0x0085A280 (FUN_0085A280)
    *
    * What it does:
-   * Returns the formation-preview shared-pair owner lane slot.
+   * Hands back the formation-preview container itself (`mov eax, offset
+   * 0x010C4258; retn 4`) - the address of `gFormationPreviews`, not of some
+   * separate owner word.
    */
   [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLanePrimary(const int /*unused*/) noexcept
   {
-    return &gFormationPreviewSharedPairsOwnerLane;
+    return &gFormationPreviews;
   }
 
   /**
    * Address: 0x0085A630 (FUN_0085A630)
    *
    * What it does:
-   * Secondary entrypoint returning the formation-preview shared-pair owner lane.
+   * Secondary entrypoint for the same thing (`mov eax, offset 0x010C4258;
+   * retn`) - the formation-preview container's own address.
    */
   [[nodiscard]] void* GetFormationPreviewSharedPairsOwnerLaneSecondary() noexcept
   {
-    return &gFormationPreviewSharedPairsOwnerLane;
+    return &gFormationPreviews;
   }
 
   /**
@@ -613,142 +638,20 @@ namespace
     return UnlinkSessionSaveDataSerializerHelperNode();
   }
 
-  /**
-   * Address: 0x00859E90 (FUN_00859E90)
-   *
-   * What it does:
-   * Releases one formation-preview shared-pair payload by dropping both
-   * retained shared ownership lanes.
-   */
-  void ReleaseFormationPreviewSharedPairRuntime(
-    FormationPreviewSharedPairRuntimeView* const sharedPair
-  ) noexcept
-  {
-    if (sharedPair == nullptr) {
-      return;
-    }
-
-    sharedPair->secondaryRuntime.~shared_ptr();
-    sharedPair->primaryRuntime.~shared_ptr();
-  }
-
-  /**
-   * Address: 0x0085A1D0 (FUN_0085A1D0)
-   *
-   * What it does:
-   * Releases every formation-preview shared-pair payload in one contiguous
-   * range `[beginPair, endPair)`.
-   */
-  void ReleaseFormationPreviewSharedPairRangeForward(
-    FormationPreviewSharedPairRuntimeView* const beginPair,
-    FormationPreviewSharedPairRuntimeView* const endPair
-  ) noexcept
-  {
-    for (FormationPreviewSharedPairRuntimeView* cursor = beginPair; cursor != endPair; ++cursor) {
-      ReleaseFormationPreviewSharedPairRuntime(cursor);
-    }
-  }
-
-  /**
-   * What it does:
-   * Move-assigns one formation-preview shared-pair entry from `src` to `dst`.
-   * Inlined from FUN_0085A9F0: copies `primaryRuntime` by bumping its use-count
-   * atomically, calls `weak_release` on the previous `dst.secondaryRuntime`
-   * slot before overwriting, then byte-copies the vtable and back-pointer lanes
-   * that follow the shared-pair header so the destination observes the exact
-   * same owner graph as the source.
-   */
-  void AssignFormationPreviewSharedPairSlotRuntime(
-    FormationPreviewSharedPairRuntimeView* const dst,
-    FormationPreviewSharedPairRuntimeView* const src
-  ) noexcept
-  {
-    if (dst == nullptr || src == nullptr) {
-      return;
-    }
-
-    dst->primaryRuntime = src->primaryRuntime;
-    dst->secondaryRuntime = src->secondaryRuntime;
-  }
-
-  /**
-   * Address: 0x0085A130 (FUN_0085A130)
-   *
-   * IDA signature:
-   * int *__stdcall sub_85A130(int *outFirst, int *first, int *last);
-   *
-   * What it does:
-   * Erases the contiguous slice `[first, last)` from the global formation-
-   * preview shared-pair vector (`0x010C425C..0x010C4260`) using the classic
-   * `std::vector::erase` shape:
-   *   1) Slide `[last, gEnd)` forward into `[first, ...)` via per-slot shared
-   *      assignment (FUN_0085A9F0), producing a new end at `first + (gEnd - last)`.
-   *   2) Destroy each retired entry in `[new_end, old_gEnd)` via the
-   *      shared-pair payload teardown helper (FUN_00859E90).
-   *   3) Rebind the global end to `new_end` and return the erase origin
-   *      through `*outFirst` so callers can resume iteration.
-   */
-  FormationPreviewSharedPairRuntimeView** EraseFormationPreviewSharedPairRange(
-    FormationPreviewSharedPairRuntimeView** const outFirstIterator,
-    FormationPreviewSharedPairRuntimeView* const first,
-    FormationPreviewSharedPairRuntimeView* const last
-  ) noexcept
-  {
-    if (first != last) {
-      FormationPreviewSharedPairRuntimeView* source = last;
-      FormationPreviewSharedPairRuntimeView* destination = first;
-
-      // Step 1: shift the tail `[last, gEnd)` down onto `[first, ...)`.
-      FormationPreviewSharedPairRuntimeView* originalEnd = gFormationPreviewSharedPairsEnd;
-      if (source != originalEnd) {
-        do {
-          AssignFormationPreviewSharedPairSlotRuntime(destination, source);
-          ++source;
-          ++destination;
-        } while (source != originalEnd);
-        originalEnd = gFormationPreviewSharedPairsEnd;
-      }
-
-      // Step 2: destroy retired entries `[new_end, old_gEnd)`.
-      FormationPreviewSharedPairRuntimeView* const newEnd = destination;
-      for (FormationPreviewSharedPairRuntimeView* cursor = newEnd; cursor != originalEnd; ++cursor) {
-        ReleaseFormationPreviewSharedPairRuntime(cursor);
-      }
-
-      // Step 3: rebind the global end to the new end.
-      gFormationPreviewSharedPairsEnd = newEnd;
-    }
-
-    if (outFirstIterator != nullptr) {
-      *outFirstIterator = first;
-    }
-    return outFirstIterator;
-  }
-
-  /**
-   * Address: 0x00859FE0 (FUN_00859FE0)
-   *
-   * What it does:
-   * Releases one tail entry from the formation-preview shared-pair container
-   * (`0x010C425C..0x010C4260`) and rewinds the active end pointer.
-   */
-  std::uintptr_t ReleaseOneFormationPreviewSharedPairFromTailRuntime() noexcept
-  {
-    std::uintptr_t result = 0u;
-    if (gFormationPreviewSharedPairsBegin == nullptr) {
-      return result;
-    }
-
-    result = reinterpret_cast<std::uintptr_t>(gFormationPreviewSharedPairsEnd);
-    if (gFormationPreviewSharedPairsEnd > gFormationPreviewSharedPairsBegin) {
-      FormationPreviewSharedPairRuntimeView* const tailEntry = gFormationPreviewSharedPairsEnd - 1;
-      ReleaseFormationPreviewSharedPairRuntime(tailEntry);
-      gFormationPreviewSharedPairsEnd = tailEntry;
-      result = reinterpret_cast<std::uintptr_t>(tailEntry);
-    }
-    return result;
-  }
-
+  // The formation-preview container emissions used to live here as one
+  // hand-written free function per operation. They are `msvc8::vector`
+  // members, so the addresses now sit on the template in
+  // `legacy/containers/Vector.h` and the call sites just use the container:
+  //
+  //   FUN_00859E90  ~FormationPreviewSharedPair (implicit, member order)
+  //   FUN_0085A1D0  destroy_range
+  //   FUN_0085A9F0  copy_or_move_assign, one slot
+  //   FUN_0085A130  erase, first..last
+  //   FUN_00859FE0  pop_back
+  //   FUN_00859F70  push_back
+  //   FUN_0085A920  uninit_fill_n / in-place construct, push_back fast path
+  //   FUN_0085A0E0  reallocate_to + insert, push_back grow path
+  //
   void LinkCursorInfoWeakOwnerRef(moho::MouseInfo& info) noexcept
   {
     moho::WeakObject::WeakLinkNodeView* const self =
@@ -11738,18 +11641,10 @@ namespace moho
     mUnknownShared40C.release();
     ClearBuildTemplates();
 
-    // Drop every formation-preview shared-pair payload still parked in the
-    // session-global preview vector. Using the recovered range-erase helper
-    // (FUN_0085A130) keeps the global begin/end pointers coherent with the
-    // destructor path the binary uses when the last world session unwinds.
-    if (gFormationPreviewSharedPairsBegin != nullptr && gFormationPreviewSharedPairsEnd != gFormationPreviewSharedPairsBegin) {
-      FormationPreviewSharedPairRuntimeView* firstIterator = nullptr;
-      (void)EraseFormationPreviewSharedPairRange(
-        &firstIterator,
-        gFormationPreviewSharedPairsBegin,
-        gFormationPreviewSharedPairsEnd
-      );
-    }
+    // Drop every formation-preview ghost still parked in the session-global
+    // preview vector. The binary runs the whole-range erase (FUN_0085A130)
+    // here, which is exactly what `clear` compiles to.
+    gFormationPreviews.clear();
 
     if (mRules) {
       delete mRules;
@@ -14680,21 +14575,134 @@ namespace moho
     primBatcher->Flush();
   }
 
+  namespace
+  {
+    /**
+     * Tint every formation-placement ghost is stamped with, written straight
+     * into `MeshInstance::color` at 0x00859E0B as the literal `0D8D8D800h`.
+     */
+    constexpr std::int32_t kFormationPreviewTint = static_cast<std::int32_t>(0xD8D8D800u);
+  }
+
   /**
    * Address: 0x008599D0 (FUN_008599D0, ?RenderMeshPreviews@CWldSession@Moho@@QAEHXZ)
+   *
+   * IDA signature:
+   * int __usercall sub_8599D0@<eax>(Moho::CWldSession *this);
+   *
+   * What it does:
+   * Rebuilds this frame's formation-placement ghosts. Last frame's previews are
+   * dropped unconditionally; then, only while the pending formation is ready,
+   * still has a live instance, and its placement timer has run out, every
+   * participant unit gets one translucent copy of its own mesh - reshaded with
+   * the "UnitFormationPreview" shader - parked on the terrain at the slot the
+   * formation assigned it and turned to face the formation heading.
    */
   void CWldSession::RenderMeshPreviews()
   {
-    // Recovered 0x008599D0 high-level flow:
-    // 1) Validate current formation + instance readiness.
-    // 2) Iterate formation units, query formation position/orientation.
-    // 3) Sample terrain elevation from STIMap/CHeightField.
-    // 4) Create "UnitFormationPreview" mesh material + mesh instances.
-    // 5) Set stance/orientation and tint preview mesh instances.
-    //
-    // Deep lift blockers:
-    // CFormation runtime layout, CAiFormationInstance accessors, MeshMaterial/MeshRenderer
-    // creation chain, and preview-instance ownership container at 0x010C425C/0x010C4260.
+    MeshRenderer* const renderer = MeshRenderer::GetInstance();
+
+    // 0x008599EF..0x00859A0A: the whole-range erase runs before every early-out
+    // below, so a formation that is no longer placeable clears its ghosts.
+    gFormationPreviews.clear();
+
+    CFormation* const formation = mCurFormation;
+    if (!formation->mReady || formation->mCurInstance == nullptr || formation->mTimeLeft > 0.0f) {
+      return;
+    }
+
+    // 0x00859AB1 / 0x00859AF8 dispatch instance slots 16 and 6, which only
+    // `CAiFormationInstance` declares - `mCurInstance` is typed as the bare
+    // `IFormationInstance` interface. Same reinterpret_cast the rest of the
+    // tree already uses to reach the concrete instance (Unit.cpp).
+    CAiFormationInstance* const instance =
+      reinterpret_cast<CAiFormationInstance*>(formation->mCurInstance);
+    WeakUnitSetUserUnit& participants = formation->mParticipants;
+
+    SSelectionNodeUserEntity* node = nullptr;
+    (void)PruneTombstonesAndFindLive(participants, &node, participants.mHead->mLeft);
+    while (node != participants.mHead) {
+      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      if (entity != nullptr) {
+        // `mParticipants` only ever holds units, so the entity doubles as a
+        // `UserUnit` and its `IUnit` bridge subobject at +0x148 is what every
+        // formation-side call below is handed.
+        UserUnit* const unit = reinterpret_cast<UserUnit*>(entity);
+        IUnit* const bridge = GetIUnitBridge(unit);
+        Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
+
+        if (!bridge->IsDead() && instance->Func17(formationUnit, false)
+            && entity->GetAttachmentParent() == nullptr) {
+          const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
+          const RMeshBlueprint* const meshBlueprint = entity->mVariableData.mMeshBlueprint;
+          if (!meshBlueprint->mLods.empty()) {
+            SCoordsVec2 slot{};
+            instance->GetFormationPosition(&slot, formationUnit, nullptr);
+
+            // 0x00859B12 builds the basis for the formation heading and then
+            // never reads it back - a dead local in the 2007 source, kept
+            // because the constructor call is a real emission.
+            [[maybe_unused]] const VAxes3 heading{formation->mDirection};
+
+            // Park the ghost on the terrain: surface height under the slot,
+            // plus the unit's own half-height and its blueprint elevation.
+            Wm3::Vec3f position{slot.x, 0.0f, slot.z};
+            position.y =
+              GetSTIMap()->GetSurface(position) + blueprint->mSizeY + blueprint->Physics.Elevation;
+
+            gFormationPreviews.push_back(FormationPreviewSharedPair{});
+            FormationPreviewSharedPair& preview = gFormationPreviews.back();
+
+            // Only the top LOD is previewed, and only its three texture lanes -
+            // the shader is forced to "UnitFormationPreview" and the lookup and
+            // secondary maps are left empty (0x00859C3F..0x00859C71).
+            const RMeshBlueprintLOD& lod = *meshBlueprint->mLods.begin();
+            preview.mMaterial = MeshMaterial::Create(
+              msvc8::string{"UnitFormationPreview"},
+              lod.mAlbedoName,
+              lod.mNormalsName,
+              lod.mSpecularName,
+              msvc8::string{},
+              msvc8::string{},
+              nullptr
+            );
+
+            const float uniformScale = blueprint->Display.UniformScale;
+            preview.mMesh = boost::shared_ptr<MeshInstance>(renderer->CreateMeshInstance(
+              0, 0, meshBlueprint, Wm3::Vec3f{uniformScale, uniformScale, uniformScale}, false,
+              preview.mMaterial
+            ));
+
+            if (preview.mMesh) {
+              VTransform stance{Wm3::Vec3f{0.0f, 0.0f, 0.0f}, Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f}};
+              stance.orient_ = formation->mDirection;
+              stance.pos_ = position;
+
+              // Start and end stance are the same transform - the ghost does
+              // not interpolate.
+              //
+              // Not reproduced here: 0x00859DE4 zero-fills an 8-byte slot that
+              // EH state 5 covers for exactly this call plus the tint store,
+              // and 0x00859E1D hands it to the shared-count teardown
+              // (FUN_0055B7A0). Both halves are null for its whole lifetime, so
+              // the teardown returns on its first branch and the pair is
+              // observably a no-op - a default-constructed shared handle the
+              // 2007 source declared and never used. Behaviour is identical
+              // without it; inventing a variable to carry it would not be.
+              preview.mMesh->SetStance(stance, stance);
+              preview.mMesh->color = kFormationPreviewTint;
+            } else {
+              // 0x00859E26: the renderer refused the instance, so the slot
+              // that was just appended is retired again.
+              gFormationPreviews.pop_back();
+            }
+          }
+        }
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      (void)PruneTombstonesAndFindLive(participants, &node, node);
+    }
   }
 
   namespace

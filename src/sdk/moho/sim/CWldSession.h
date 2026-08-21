@@ -1185,7 +1185,11 @@ namespace moho
      * Address: 0x008599D0 (FUN_008599D0, ?RenderMeshPreviews@CWldSession@Moho@@QAEHXZ)
      *
      * What it does:
-     * Builds/updates transient formation preview mesh instances.
+     * Rebuilds this frame's formation-placement ghosts: clears last frame's
+     * previews, then - while the pending formation is ready, still has a live
+     * instance and its placement timer has elapsed - spawns one translucent
+     * "UnitFormationPreview"-shaded mesh per participant unit, seated on the
+     * terrain at its assigned slot and turned to the formation heading.
      */
     void RenderMeshPreviews();
 
