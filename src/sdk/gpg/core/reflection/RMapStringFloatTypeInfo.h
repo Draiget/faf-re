@@ -14,6 +14,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006B1850 (FUN_006B1850, gpg::RMapType_string_float::dtr)
+     */
+    ~RMapStringFloatTypeInfo() override = default;
+
+    /**
      * Address: 0x006AE290 (FUN_006AE290, gpg::RMapType_string_float::GetName)
      *
      * What it does:
