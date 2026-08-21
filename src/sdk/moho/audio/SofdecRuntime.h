@@ -300,12 +300,17 @@ namespace moho
   struct SfxStreamState
   {
     std::uint8_t mUnknown00[0x90]{};
-    std::int32_t fieldTransformMode = 0; // +0x90
+    std::int32_t fieldTransformMode = 0;      // +0x90
+    std::int32_t fallbackCompositionCode = 0; // +0x94 SFX_DecideTableAlph3 fallback tag
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SfxStreamState, fieldTransformMode) == 0x90,
     "SfxStreamState::fieldTransformMode offset must be 0x90"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfxStreamState, fallbackCompositionCode) == 0x94,
+    "SfxStreamState::fallbackCompositionCode offset must be 0x94"
   );
 
   using AdxmErrorCallback = int(__cdecl*)(std::uint32_t errorCode, const char* errorText);

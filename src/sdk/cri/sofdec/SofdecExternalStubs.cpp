@@ -185,7 +185,10 @@ extern "C" {
   // SFXZ_IsSetZclip (0x00ACDDC0): real body in SofdecAdxPlatformRuntime.cpp,
   // next to SFX_SetZbit. Was a no-argument stub; every real call site
   // (SFX_MakeTblZ16/32's "Zclip is not set" gate) silently read false.
-  void* SFX_DecideTableAlph3() { return nullptr; }
+  // SFX_DecideTableAlph3 (0x00ACE5D0): real body in
+  // SofdecAdxPlatformRuntime.cpp, next to SFX_SetZbit. Was a no-argument
+  // stub; every real call site (SFX_CnvFrmByCbFunc's DynamicA/B/C paths)
+  // silently discarded both state pointers.
   // SFX_GetCompoMode (0x00ACCD40): real body in SofdecAdxPlatformRuntime.cpp.
   // It was a no-argument stub, which C linkage let satisfy the one-argument
   // call in mwPlyFxGetCompoMode, so the composition mode always read back 0.
