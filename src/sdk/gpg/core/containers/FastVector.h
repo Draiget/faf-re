@@ -1258,6 +1258,17 @@ namespace gpg::core
      * Copies `[copyBegin, copyEnd)` forward into `dest` and returns the
      * advanced destination pointer. If `dest == nullptr`, only advances.
      */
+    /**
+     * Address: 0x00577450 (FUN_00577450, the forward element copy for the
+     * 0x38-byte `Moho::SFormationScriptSlot`. Per slot it moves the 8-byte
+     * `mOffset`, the category's universe handle and first-word index, then the
+     * word lane through `gpg::fastvector_uint::cpy`, then `mWeight` -- which is
+     * the element's own assignment operator inlined into the loop. Walks up,
+     * `add 38h` on each cursor.)
+     * Address: 0x005774B0 (FUN_005774B0, the same body emitted a second time --
+     * 36 instructions and 92 bytes each, identical mnemonics and the same call
+     * target. This build did not fold identical COMDATs, so both survive.)
+     */
     static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd)
     {
       if constexpr (std::is_trivially_copyable_v<T> && ElemSize == sizeof(std::uint32_t)) {
@@ -1310,6 +1321,12 @@ namespace gpg::core
      * correct (binary `std::_Copy_backward`). Destination slots already hold
      * live objects, so this is assignment (not construction). Returns the
      * final (lowest) destination pointer written.
+     */
+    /**
+     * Address: 0x00577350 (FUN_00577350, the matching backward copy for
+     * `Moho::SFormationScriptSlot` -- the same per-element assignment as
+     * 0x00577450 but walked down, `sub 38h` on each cursor, so an overlapping
+     * shift cannot clobber the tail. 38 instructions to the forward pair's 36.)
      */
     static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
     {
