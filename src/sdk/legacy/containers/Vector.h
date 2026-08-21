@@ -2266,6 +2266,22 @@ namespace msvc8
          * (FUN_0053FC90, already cited above). Emitted via
          * mEjectRequests.push_back(SEjectRequest(requester, afterBeat)) in
          * Moho::CClientBase::AddOrUpdateEjectRequest (CClientBase.cpp))
+         * Address: 0x00653380 (FUN_00653380, msvc8::vector<moho::SDebugWorldText>::_Insert_n
+         * grow lane for the 0x30-byte (48) non-trivial element (`{Wm3::Vec3f
+         * position; msvc8::string text; int32_t style; uint32_t depth;}`,
+         * stride divide by 48, max_size 0x5555555 = 0xFFFFFFFF/48, overflow
+         * throw through FUN_00653860). `_Count` is folded to the constant 1 --
+         * both binary callers are single-element lanes. The reallocation
+         * path's by-ref value is copy-constructed into a local `_Tmp` (zeroed
+         * to empty SSO state then `text.assign(...)`) before the old range
+         * moves, so a reallocation cannot invalidate it; tail-shift and
+         * prefix/suffix range mechanics route through FUN_006539E0/
+         * FUN_00653A20/FUN_00653AD0/FUN_00653F40/FUN_00653330, and allocation
+         * through the checked 48-byte lane FUN_00653A80 (already cited in
+         * CheckedArrayAllocationLanes.cpp). Reached from the single-element
+         * `insert(iterator, const T&)` overload FUN_006532C0, already cited
+         * above, under `CDebugCanvas::AddWorldText`'s `worldText.push_back(text)`
+         * (Sim.cpp) -- called from Moho::RDebugWeapons::Tick.)
          * Address: 0x006DC600 (FUN_006DC600, msvc8::vector<moho::EntityCategorySet>::_Insert_n
          * grow-and-fill lane for the 0x28-byte non-trivial element (stride divide by
          * the 66666667h/`sar 4` magic pair, max_size 0x6666666 = 0xFFFFFFFF/40 at
@@ -2496,6 +2512,15 @@ namespace msvc8
          * of one, then rebuilds the iterator as `first_ + off * 0xD8` because
          * the insert may have reallocated. Reached from the grow half of
          * `push_back` at 0x0067B780.)
+         * Address: 0x006532C0 (FUN_006532C0,
+         * msvc8::vector<moho::SDebugWorldText>::insert(iterator, const T&) for
+         * the 0x30-byte element -- recovers the insertion index via
+         * `(pos - mFirst) / 48` *before* the insert, tail-calls the
+         * `_Insert_n` lane at 0x00653380 with a count of one, then rebuilds
+         * the iterator as `mFirst + off * 48` because the insert may have
+         * reallocated. Reached from the grow half of `push_back`, itself
+         * reached from `CDebugCanvas::AddWorldText`'s `worldText.push_back(text)`
+         * (Sim.cpp).)
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -3085,6 +3110,9 @@ namespace msvc8
          * Address: 0x00540580 (FUN_00540580, the 8-byte-stride throw lane for
          * `msvc8::vector<Moho::SEjectRequest>`, reached from the `_Insert_n`
          * grow lane FUN_00540330, already cited above)
+         * Address: 0x00653860 (FUN_00653860, the 48-byte-stride throw lane for
+         * `msvc8::vector<moho::SDebugWorldText>`, reached from the
+         * `_Insert_n` grow lane FUN_00653380, already cited above)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
