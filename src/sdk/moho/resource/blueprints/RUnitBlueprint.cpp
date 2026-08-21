@@ -338,7 +338,7 @@ namespace moho
     destinationView.capacityEnd = nullptr;
 
     if (sourceCount != 0u) {
-      if (sourceCount > msvc8::vector<float>::max_elements_sentinel()) {
+      if (sourceCount > msvc8::vector<float>::max_size()) {
         msvc8::vector<float>::throw_too_long();
       }
 
