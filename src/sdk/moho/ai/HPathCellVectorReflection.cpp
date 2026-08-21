@@ -287,12 +287,7 @@ size_t gpg::RVectorType<moho::HPathCell>::GetCount(void* const obj) const
     return 0u;
   }
 
-  const auto& view = msvc8::AsVectorRuntimeView(*static_cast<const HPathCellVector*>(obj));
-  if (!view.begin) {
-    return 0u;
-  }
-
-  return static_cast<std::size_t>(view.end - view.begin);
+  return static_cast<const HPathCellVector*>(obj)->size();
 }
 
 /**

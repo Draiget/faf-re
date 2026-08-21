@@ -2616,15 +2616,11 @@ namespace moho
       return nullptr;
     }
 
-    // The binary blasts the pointer triad to zero rather than calling clear().
-    // It assumes the caller passes a freshly-stack-constructed vector whose
-    // storage is not yet owned; matching this preserves observable behavior
-    // and matches the IDA shape `*(a2+4)=0; *(a2+8)=0; *(a2+12)=0` exactly.
-    auto& outStorage = msvc8::AsVectorRuntimeView(*outArmyList);
-    outStorage.begin       = nullptr;
-    outStorage.end         = nullptr;
-    outStorage.capacityEnd = nullptr;
-    auto& dwordView = reinterpret_cast<msvc8::vector_runtime_view<std::uint32_t>&>(outStorage);
+    // The binary blasts the pointer triad to zero (`*(a2+4)=0; *(a2+8)=0;
+    // *(a2+12)=0`) rather than freeing, because every call site hands it a
+    // freshly stack-constructed vector. _Tidy() is that plus a free of the
+    // block, which is a no-op on the empty input this is always given.
+    *outArmyList = msvc8::vector<CArmyImpl*>{};
 
     if (Allies.items_begin == nullptr || Allies.items_end == nullptr) {
       return outArmyList;
@@ -2658,28 +2654,10 @@ namespace moho
           allyArmy = Simulation->mArmiesList[armyIndex];
         }
 
-        // Match the binary's inline fast / OOL slow split exactly. The
-        // recovered helper preserves binary fidelity for the slow path and
-        // keeps `LegacyVectorDwordInsertN` linker-reachable.
-        const std::uint32_t valueWord = reinterpret_cast<std::uint32_t>(allyArmy);
-        const std::uint32_t currentSize =
-          (outStorage.begin == nullptr)
-            ? 0u
-            : static_cast<std::uint32_t>(outStorage.end - outStorage.begin);
-        const std::uint32_t currentCap =
-          (outStorage.begin == nullptr)
-            ? 0u
-            : static_cast<std::uint32_t>(outStorage.capacityEnd - outStorage.begin);
-        if (outStorage.begin != nullptr && currentSize < currentCap) {
-          *outStorage.end = allyArmy;
-          ++outStorage.end;
-        } else {
-          msvc8::detail::LegacyVectorDwordInsertN(
-            dwordView,
-            reinterpret_cast<std::uint32_t*>(outStorage.end),
-            1u,
-            &valueWord);
-        }
+        // The binary's inline-fast / out-of-line-slow split is push_back:
+        // store into spare capacity, else route one insert through the grow
+        // lane (LegacyVectorDwordInsertN), which is _Insert_n.
+        outArmyList->push_back(allyArmy);
       }
     }
 
