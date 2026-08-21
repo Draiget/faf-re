@@ -21,6 +21,11 @@ namespace gpg
   class RFastVectorType<float> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0065AC20 (FUN_0065AC20, gpg::RFastVectorType_float::dtr)
+     */
+    ~RFastVectorType() override;
+
     [[nodiscard]] const char* GetName() const override;
     /**
      * Address: 0x00659AA0 (FUN_00659AA0, gpg::RFastVectorType_float::GetLexical)
@@ -313,6 +318,11 @@ namespace gpg
   class RFastVectorType<msvc8::string> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0065AD40 (FUN_0065AD40, gpg::RFastVectorType_String::dtr)
+     */
+    ~RFastVectorType() override;
+
     [[nodiscard]] const char* GetName() const override;
     /**
      * Address: 0x0065A120 (FUN_0065A120, gpg::RFastVectorType_String::GetLexical)
@@ -1642,6 +1652,8 @@ namespace gpg
   }
 } // namespace gpg
 
+gpg::RFastVectorType<float>::~RFastVectorType() = default;
+
 /**
  * Address: 0x006599E0 (FUN_006599E0, gpg::RFastVectorType_float::GetName)
  *
@@ -2340,6 +2352,8 @@ namespace gpg
     return std::atexit(&cleanup_FastVectorStringType);
   }
 } // namespace gpg
+
+gpg::RFastVectorType<msvc8::string>::~RFastVectorType() = default;
 
 /**
  * Address: 0x0065A060 (FUN_0065A060, gpg::RFastVectorType_String::GetName)
