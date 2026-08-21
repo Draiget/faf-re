@@ -2536,6 +2536,21 @@ namespace msvc8
             return first_ + offset;
         }
 
+        /**
+         * Address: 0x008523C0 (FUN_008523C0, the `_Insert_n` core for a
+         * 12-byte three-dword element -- the `lea edx, [edi+edi*2]` and
+         * `add esi, 0Ch` pair are the stride, and it carries the full VC8
+         * shape: one `operator new`, two `operator delete` (the grow path's
+         * old-block free and the throw path's cleanup), and the
+         * `_CxxThrowException` that is `_Xlen`. Its first read is a `movss`
+         * of the fill value, so the element is float-typed at the source
+         * level even though the copy moves dwords.
+         *
+         * Reached from the recovered insert-and-rebase lane at 0x00852350,
+         * which captures the index, inserts, then rebuilds the cursor -- the
+         * single-element `insert` shape recovered onto this template in
+         * f3e3858c.)
+         */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
             const std::size_t offset = static_cast<std::size_t>(pos - first_);
