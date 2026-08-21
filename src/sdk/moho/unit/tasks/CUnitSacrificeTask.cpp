@@ -183,6 +183,10 @@ namespace moho
 
   /**
    * Address: 0x005FAE40 (FUN_005FAE40, Moho::CUnitSacrificeTask::~CUnitSacrificeTask)
+   * Address: 0x005FAF40 (FUN_005FAF40, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Unlinks command/listener lanes, clears repairing-state ownership bits,

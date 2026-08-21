@@ -239,6 +239,10 @@ namespace moho
 
   /**
    * Address: 0x00606610 (FUN_00606610, Moho::CUnitCarrierLand::~CUnitCarrierLand)
+   * Address: 0x00606B50 (FUN_00606B50, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Aborts an in-progress carrier landing: clears the unit's carrier motion

@@ -92,6 +92,10 @@ namespace moho
 
   /**
    * Address: 0x00605DD0 (FUN_00605DD0, ??1CUnitCarrierRetrieve@Moho@@QAE@@Z)
+   * Address: 0x00606220 (FUN_00606220, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * IDA signature:
    * void __stdcall Moho::CUnitCarrierRetrieve::~CUnitCarrierRetrieve(

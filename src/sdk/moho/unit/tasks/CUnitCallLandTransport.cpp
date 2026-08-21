@@ -114,6 +114,10 @@ namespace moho
 
   /**
    * Address: 0x006003F0 (FUN_006003F0, ??1CUnitCallLandTransport@Moho@@QAE@@Z)
+   * Address: 0x00600580 (FUN_00600580, vtable-slot-2 scalar deleting
+   * destructor: tail-calls the body below then conditionally frees the
+   * object -- ordinary C++ `delete` semantics, not modeled as a separate
+   * function here)
    *
    * What it does:
    * Tears down transport-call state, clears owner-unit transport flags,
