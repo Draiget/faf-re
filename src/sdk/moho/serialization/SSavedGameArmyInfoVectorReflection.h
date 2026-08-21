@@ -19,6 +19,11 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x00883AD0 (FUN_00883AD0, gpg::RVectorType_SSavedGameArmyInfo::dtr)
+     */
+    ~RVectorType_SSavedGameArmyInfo() override;
+
+    /**
      * Address: 0x00882100 (FUN_00882100)
      */
     const char* GetName() const override;

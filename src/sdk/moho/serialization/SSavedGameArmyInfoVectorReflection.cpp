@@ -4,7 +4,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-#include "legacy/containers/Vector.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -189,6 +189,8 @@ gpg::RType* gpg::ResolveSavedGameArmyInfoVectorType()
   EnsureSavedGameArmyInfoVectorRegistered();
   return gpg::LookupRType(typeid(msvc8::vector<moho::SSavedGameArmyInfo>));
 }
+
+gpg::RVectorType_SSavedGameArmyInfo::~RVectorType_SSavedGameArmyInfo() = default;
 
 /**
  * Address: 0x00882100 (FUN_00882100)
