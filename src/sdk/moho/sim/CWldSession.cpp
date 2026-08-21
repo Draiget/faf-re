@@ -2068,6 +2068,36 @@ namespace moho
      */
     void DrawCommandGraphMesh(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
 
+    /**
+     * Address: 0x00829800 (FUN_00829800, sub_829800)
+     *
+     * IDA signature:
+     * float *__userpurge sub_829800@<eax>(Moho::GeomCamera3 *a1@<esi>,
+     *   Moho::UICommandGraph *a2, _DWORD *a3, float *a4);
+     *
+     * What it does:
+     * Per-frame cursor/waypoint hit test for the command graph: walks every
+     * draw node in `mMapAB0`'s hash list, frustum-culls its averaged anchor
+     * (`mPositionSum / mWeight`) against the camera's view solid, and for
+     * every surviving node compares its projected screen position against
+     * `cursorScreenPos` within a depth-scaled, `ui_MinWaypointSize`/
+     * `ui_MaxWaypointSize`-clamped tolerance (`ui_WaypointLineScale` applied
+     * on top - the decompiled read shows as `ui_CommandClickScale`, which is
+     * not a real symbol; see `UICommandGraph::LoadPathParams`'s doc comment
+     * on why both Lua keys resolve to `ui_WaypointLineScale`), the same
+     * style knobs `DrawWaypointMarker` uses for the visible marker size).
+     * Ferry-command nodes get a small (0.1) tolerance bonus,
+     * matching the binary's dedicated `UNITCOMMAND_Ferry` branch. Among the
+     * nodes within tolerance, the closest wins unless a farther node's
+     * cursor-entity set already shares a live entity with the current
+     * session selection, in which case that node preempts distance.
+     *
+     * Returns the winning node's command id, or -1 when none qualifies.
+     */
+    [[nodiscard]] CmdId ResolveCursorHighlightCommandId(
+      const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
+    ) const;
+
   private:
     std::uint8_t mNeedsRebuild; // +0x0000
     std::uint8_t pad_0001[3];
@@ -4934,6 +4964,92 @@ namespace moho
   }
 
   /**
+   * Address: 0x00829800 (FUN_00829800, sub_829800)
+   *
+   * IDA signature:
+   * float *__userpurge sub_829800@<eax>(Moho::GeomCamera3 *a1@<esi>,
+   *   Moho::UICommandGraph *a2, _DWORD *a3, float *a4);
+   *
+   * What it does: see the declaration.
+   */
+  CmdId UICommandGraph::ResolveCursorHighlightCommandId(
+    const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
+  ) const
+  {
+    if (mMapAB0.mListHead->mNext == mMapAB0.mListHead) {
+      return -1;
+    }
+
+    float bestScaledDistance = std::numeric_limits<float>::infinity();
+    CmdId bestCommandId = -1;
+
+    for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
+      const UICommandGraphDrawNode& drawNode = node->mDraw;
+
+      const float invWeight = 1.0f / drawNode.mWeight;
+      const Wm3::Vector3f avg{
+        drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
+      };
+
+      // Frustum-cull the averaged anchor against the camera's view solid
+      // before spending a projection + hit test on it.
+      bool culledByFrustum = false;
+      for (const Wm3::Plane3f& plane : camera.solid2.planes_) {
+        const float signedDistance =
+          ((plane.Normal.x * avg.x) + (plane.Normal.y * avg.y) + (plane.Normal.z * avg.z)) - plane.Constant;
+        if (signedDistance <= 0.0f) {
+          culledByFrustum = true;
+          break;
+        }
+      }
+      if (culledByFrustum) {
+        continue;
+      }
+
+      const Wm3::Vector2f screenPos = camera.Project(avg);
+      const float dx = screenPos.x - cursorScreenPos.x;
+      const float dy = screenPos.y - cursorScreenPos.y;
+      const float pixelDistance = std::sqrt((dx * dx) + (dy * dy));
+
+      const float depthW = camera.viewport.ProjectViewportWidthRow2(avg);
+      float worldTolerance = drawNode.field_0x40 / depthW;
+      worldTolerance = std::clamp(worldTolerance, ui_MinWaypointSize, ui_MaxWaypointSize);
+
+      const float scaledTolerance = worldTolerance * depthW;
+      float scaledDistance = depthW * pixelDistance;
+
+      auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+      if (helper != nullptr && ResolveCommandIssueHelperCommandType(*helper) == EUnitCommandType::UNITCOMMAND_Ferry) {
+        // Ferry waypoints get a small extra tolerance bonus so a ferry order's
+        // markers are easier to pick back up under the cursor.
+        scaledDistance -= 0.1f;
+      }
+
+      // `ui_CommandClickScale` (the decompiled global name at this read) is
+      // not a real symbol - see the `ui_WaypointLineScale` doc comment in
+      // `UICommandGraph::LoadPathParams` above: both the `ui_WaypointLineScale`
+      // and `ui_CommandClickScale` Lua keys write the same global
+      // (0x00F57CDC), and that is what this address reads.
+      if ((ui_WaypointLineScale * scaledTolerance) < scaledDistance) {
+        continue;
+      }
+
+      bool preemptsByLiveSelection = false;
+      if (helper != nullptr) {
+        SSelectionSetUserEntity* const cursorEntities = ResolveCommandIssueCursorEntities(*helper);
+        preemptsByLiveSelection = cursorEntities->HasCommonLiveEntityWith(mSession->GetSelection());
+      }
+
+      if (bestScaledDistance > scaledDistance || preemptsByLiveSelection) {
+        bestScaledDistance = scaledDistance;
+        bestCommandId = drawNode.mCommandId;
+      }
+    }
+
+    return bestCommandId;
+  }
+
+  /**
    * Address: 0x00828DD0 (FUN_00828DD0, sub_828DD0)
    *
    * IDA signature:
@@ -5320,6 +5436,23 @@ namespace moho
     if (graph != nullptr) {
       graph->DrawCommandGraphMesh(camera, batcher, tick, tickFraction);
     }
+  }
+
+  /**
+   * Not a distinct binary function - see `DrawCommandGraphMeshIfPresent`
+   * above for why `UICommandGraph::ResolveCursorHighlightCommandId` needs a
+   * wrapper here. `Moho::CUIWorldView::UpdateSelection` (UiRuntimeTypes.cpp)
+   * calls this through the bare `UICommandGraph*` its `mComGraph` holds.
+   * Returns -1 (no highlighted command) when `graph` is null.
+   */
+  CmdId ResolveCommandGraphCursorHighlightIfPresent(
+    UICommandGraph* const graph, const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
+  )
+  {
+    if (graph == nullptr) {
+      return -1;
+    }
+    return graph->ResolveCursorHighlightCommandId(camera, cursorScreenPos);
   }
 
   // Forward declarations for functions `DrawPathPreview` below needs whose

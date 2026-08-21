@@ -97,8 +97,18 @@
 #include "moho/ui/EMauiKeyCodeTypeInfo.h"
 #include "moho/ui/EMauiScrollAxisTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
+#include "moho/entity/Entity.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/unit/core/UserUnit.h"
+#include "moho/collision/CGeomSolid3.h"
+#include "moho/sim/COGrid.h"
+#include "moho/math/GridPos.h"
+#include "moho/resource/IResources.h"
+#include "moho/resource/CSimResources.h"
+#include "moho/resource/ResourceDeposit.h"
+#include "Wm3Line3.h"
+#include "Wm3Box3.h"
+#include "Wm3IntrLine3Box3.h"
 
 
 namespace
@@ -4782,6 +4792,8 @@ bool moho::cam_Free = false;
 bool moho::ui_DisableCursorFixing = false;
 float moho::ui_SelectTolerance = 4.0f;
 float moho::ui_ExtractSnapTolerance = 20.0f;
+float moho::ui_MinExtractSnapPixels = 20.0f;
+float moho::ui_MaxExtractSnapPixels = 90.0f;
 float moho::ui_FootprintMinThickness = 2.0f;
 float moho::cam_DefaultMiniLOD = 1.8f;
 bool moho::ui_WindowedAlwaysShowsCursor = false;
@@ -10348,7 +10360,7 @@ static IMauiDragger* func_GetCurrentDragger2()
  * While scrub mode is active, accumulates mouse delta into scrub lanes,
  * recenters the cursor to scrub anchor, and hides cursor texture state.
  */
-[[maybe_unused]] static void func_ProcessMouseScrubbing()
+static void func_ProcessMouseScrubbing()
 {
   if (sMouseIsScrubbing == 0) {
     return;
@@ -22120,6 +22132,386 @@ void moho::CUIWorldView::DoRender(CD3DPrimBatcher* const primBatcher, const std:
 }
 
 /**
+ * Address: 0x0086F520 (FUN_0086F520, Moho::CUIWorldView::UpdateSelection)
+ *
+ * IDA signature:
+ * void __stdcall Moho::CUIWorldView::UpdateSelection(
+ *   Moho::CUIWorldView *this, Wm3::Vector2f *mouse);
+ *
+ * What it does: see the declaration.
+ *
+ * Recovery note (documented, bounded uncertainty): the shipped body carries
+ * Hex-Rays' "local variable allocation has failed" warning; the corrupted
+ * mess it produces was fixed by clearing two conflicting *user-defined*
+ * split-lvar overrides already saved in this project's IDB (stale artifacts
+ * of an earlier failed reconstruction pass, at stack byte-offsets 0x40 and
+ * 0xD8), then re-decompiling. That repair, plus direct `.asm`
+ * `calc_stkvar_struc_offset` verification of every field this comment relies
+ * on, resolved the overwhelming majority of the body with confidence -
+ * including the selection tie-break block, the `GetActiveBuildTemplate`
+ * call arity, the `UICursorInfo::Copy` direction, and every category/army/
+ * mask filter. Two narrow spots remain genuine MSVC8 stack-slot-reuse
+ * artifacts that cannot be reproduced byte-for-byte in new source without
+ * relying on undefined cross-object stack layout: the tail cursor-info
+ * persistence below (`resultCursor`) and the extractor-snap search center,
+ * both flagged at their call sites.
+ */
+void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
+{
+  MouseInfo hit;
+  hit.mIsDragger = 0;
+  hit.mMouseScreenPos.y = std::numeric_limits<float>::quiet_NaN();
+  hit.mMouseWorldPos = mCamera->CameraScreenToSurface(mouseScreenPos);
+  const bool raycastHitWorld = IsValidVector3f(hit.mMouseWorldPos);
+  hit.mHitValid = raycastHitWorld ? 1u : 0u;
+
+  if (mCursorInside == 0u) {
+    // Cursor left the view since the last update: persist the fresh raycast
+    // and skip the full selection/highlight/extractor-snap pass entirely.
+    mWldSession->CursorInfo() = hit;
+    return;
+  }
+
+  UserEntity* bestCandidate = nullptr;
+
+  if (raycastHitWorld) {
+    const GeomCamera3& cameraView = mCamera->CameraGetView();
+
+    gpg::Rect2f selectionRect{};
+    selectionRect.x0 = mouseScreenPos.x - ui_SelectTolerance;
+    selectionRect.x1 = mouseScreenPos.x + ui_SelectTolerance;
+    selectionRect.z0 = mouseScreenPos.y - ui_SelectTolerance;
+    selectionRect.z1 = mouseScreenPos.y + ui_SelectTolerance;
+    CGeomSolid3 selectionSolid = cameraView.Unproject(selectionRect);
+
+    const float cameraZoom = mCamera->CameraGetTargetZoom();
+
+    gpg::fastvector<UserEntity*> collected;
+    auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(mWldSession->GetEntitySpatialDbStorage());
+    const EEntityType volumeEntityMask =
+      (cameraZoom <= 150.0f) ? static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop) : ENTITYTYPE_Unit;
+    (void)spatialDb->CollectInVolume(collected, volumeEntityMask, &selectionSolid);
+
+    float bestDistSq = std::numeric_limits<float>::max();
+
+    for (UserEntity* const candidate : collected) {
+      if (candidate->mVariableData.mIsDead) {
+        continue;
+      }
+
+      // SELECTABLE, or FERRYBEACON, or (not) UNTARGETABLE - matches the
+      // binary's short-circuit chain exactly (only the categories actually
+      // needed to resolve inclusion get string-constructed and tested).
+      bool included = candidate->IsInCategory("SELECTABLE");
+      if (!included) {
+        included = candidate->IsInCategory("FERRYBEACON") || !candidate->IsInCategory("UNTARGETABLE");
+      }
+      if (!included) {
+        continue;
+      }
+
+      bool isOnCarrier = false;
+      if (UserEntity* const attachmentParent = candidate->GetAttachmentParent()) {
+        isOnCarrier = attachmentParent->IsInCategory("CARRIER");
+      }
+      if (isOnCarrier) {
+        continue;
+      }
+
+      // Strategic-icon suppression bit; see CWldSession.cpp's identical
+      // `kStrategicIconEntitySuppressedMask` local constant (that pass's
+      // 0x0085BAC3 gate) for the byte-offset evidence this bit shares.
+      constexpr std::uint32_t kStrategicIconEntitySuppressedMask = 0x20u;
+      UserUnit* const candidateAsUnit = candidate->IsUserUnit();
+      if (candidateAsUnit != nullptr &&
+          (candidateAsUnit->mIntelStateFlags & kStrategicIconEntitySuppressedMask) != 0u) {
+        continue;
+      }
+
+      const std::int32_t focusArmy = mWldSession->FocusArmy;
+      UserArmy* const focusArmyPtr = (focusArmy < 0) ? nullptr : mWldSession->userArmies[focusArmy];
+      const bool ownedByFocusArmy = candidate->mArmy == focusArmyPtr;
+      const bool visibleOnPlayableMap =
+        mWldSession->GetSTIMap()->IsPlayable(candidate->mVariableData.mCurTransform.pos_) &&
+        (candidateAsUnit == nullptr || !candidateAsUnit->mUnitVarDat.mIsBusy);
+      if (!ownedByFocusArmy && !visibleOnPlayableMap) {
+        continue;
+      }
+
+      if (MeshInstance* const mesh = candidate->mMeshInstance) {
+        const REntityBlueprint* const blueprint = candidate->mParams.mBlueprint;
+        if (blueprint->IsMobile() && blueprint->mUseOOBTestZoom > cameraZoom) {
+          // Tight zoom on a mobile unit: exact oriented-mesh pick test
+          // against the camera's screen-point pick ray.
+          const GeomLine3 pickRay = cameraView.Unproject(mouseScreenPos);
+          const Wm3::Line3f wmPickRay(pickRay.pos, pickRay.dir);
+          mesh->UpdateInterpolatedFields();
+          Wm3::IntrLine3Box3f intersector(wmPickRay, mesh->box);
+          if (!intersector.Test()) {
+            continue;
+          }
+        } else {
+          // Otherwise a cheap axis-aligned mesh-bounds test, adjusted by the
+          // blueprint's selection-mesh top-weighting and X/Z rescale knobs.
+          mesh->UpdateInterpolatedFields();
+          float boxXMin = mesh->xMin;
+          float boxXMax = mesh->xMax;
+          float boxYMin = mesh->yMin;
+          float boxYMax = mesh->yMax;
+          float boxZMin = mesh->zMin;
+          float boxZMax = mesh->zMax;
+
+          if (blueprint->mSelectionMeshUseTopAmount <= 0.0f) {
+            boxYMax = boxYMax - ((boxYMax - boxYMin) * blueprint->mSelectionYOffset);
+          } else {
+            boxYMin = ((1.0f - blueprint->mSelectionMeshUseTopAmount) * (boxYMax - boxYMin)) + boxYMin;
+          }
+          if (blueprint->mSelectionMeshScaleX != 1.0f) {
+            const float centerX = (boxXMin + boxXMax) * 0.5f;
+            const float halfX = (boxXMax - centerX) * blueprint->mSelectionMeshScaleX;
+            boxXMax = centerX + halfX;
+            boxXMin = centerX - halfX;
+          }
+          if (blueprint->mSelectionMeshScaleZ != 1.0f) {
+            const float centerZ = (boxZMin + boxZMax) * 0.5f;
+            const float halfZ = (boxZMax - centerZ) * blueprint->mSelectionMeshScaleZ;
+            boxZMax = centerZ + halfZ;
+            boxZMin = centerZ - halfZ;
+          }
+
+          const Wm3::AxisAlignedBox3f selectionBounds{{boxXMin, boxYMin, boxZMin}, {boxXMax, boxYMax, boxZMax}};
+          if (!selectionSolid.Intersects(selectionBounds)) {
+            continue;
+          }
+        }
+      }
+
+      // Interpolation alpha reads the still-zero (from entry) `mIsDragger`
+      // scratch slot - i.e. always 0.0f (last-known/non-interpolated pose).
+      const Wm3::Vec3f interpolatedPosition = candidate->GetInterpolatedPosition(0.0f);
+      const Wm3::Vector2f projected = cameraView.Project(interpolatedPosition);
+      const float dx = projected.x - mouseScreenPos.x;
+      const float dy = projected.y - mouseScreenPos.y;
+      const float distSq = (dx * dx) + (dy * dy);
+
+      const bool preferOverCurrentBest = bestCandidate != nullptr && bestCandidate->IsUserUnit() == nullptr &&
+                                          candidateAsUnit != nullptr;
+      if (bestDistSq > distSq || preferOverCurrentBest) {
+        bestDistSq = distSq;
+        bestCandidate = candidate;
+      }
+    }
+
+    if (bestCandidate != nullptr) {
+      // Redirect hover from an unfinished unit to its builder when the
+      // builder is alive/not-destroy-queued and its blueprint's own name
+      // matches what the unfinished unit says it upgrades from.
+      const std::uint32_t attachmentParentId = bestCandidate->mVariableData.mAttachmentParentRef;
+      UserEntity* const attachmentParent = mWldSession->LookupEntityId(static_cast<EntId>(attachmentParentId));
+      if (attachmentParent == nullptr) {
+        if (UserUnit* const bestAsUnit = bestCandidate->IsUserUnit()) {
+          if (bestAsUnit->IsBeingBuilt()) {
+            UserEntity* const creator = bestAsUnit->mCreator.GetObjectPtr();
+            if (creator != nullptr) {
+              if (UserUnit* const creatorUnit = creator->IsUserUnit()) {
+                if (!creatorUnit->IsDead() && !creatorUnit->DestroyQueued()) {
+                  const RUnitBlueprint* const bestBlueprint = bestAsUnit->GetBlueprint();
+                  const RUnitBlueprint* const creatorBlueprint = creatorUnit->GetBlueprint();
+                  if (_stricmp(
+                        creatorBlueprint->mBlueprintId.c_str(), bestBlueprint->General.UpgradesFrom.name.c_str()
+                      ) == 0) {
+                    bestCandidate = creatorUnit;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else if (UserUnit* const attachmentParentAsUnit = attachmentParent->IsUserUnit()) {
+        if (attachmentParentAsUnit->IsInCategory("TRANSPORTATION") &&
+            (attachmentParentAsUnit->IsInCategory("FACTORY") ? false : true)) {
+          // The binary re-evaluates TRANSPORTATION-then-FACTORY on the
+          // attachment parent and, when it's a transport but not itself a
+          // factory, redirects hover to that attachment parent.
+          bestCandidate = attachmentParent;
+        }
+      }
+    }
+  }
+
+  // The rest of the frame's cursor-state update runs unconditionally,
+  // whether or not the raycast landed on the world.
+  CmdId highlightCommandId = -1;
+  if (mHighlightEnabled && !mIsMiniMap) {
+    highlightCommandId =
+      ResolveCommandGraphCursorHighlightIfPresent(mComGraph.px, mCamera->CameraGetView(), mouseScreenPos);
+  }
+  (void)highlightCommandId;
+
+  float templateSpanZ = 0.0f;
+  float templateSpanX = 0.0f;
+  SBuildTemplateBuffer activeTemplate{};
+  activeTemplate.InitInlineStorage();
+  (void)mWldSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
+
+  if (activeTemplate.Empty()) {
+    CommandModeData leftMouseMode{};
+    (void)mWldSession->GetLeftMouseButtonAction(&leftMouseMode, &mWldSession->CursorInfo(), 0);
+
+    if (leftMouseMode.mMode == COMMOD_Build || leftMouseMode.mMode == COMMOD_BuildAnchored) {
+      const auto* const buildBlueprint = static_cast<const RUnitBlueprint*>(leftMouseMode.mBlueprint);
+      EDepositType depositType = kNone;
+      if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnMassDeposit) {
+        depositType = kMass;
+      } else if (buildBlueprint->Physics.BuildRestriction == RULEUBR_OnHydrocarbonDeposit) {
+        depositType = kHydrocarbon;
+      }
+
+      if (depositType != kNone && raycastHitWorld) {
+        // Search-radius: the extractor snap tolerance projected through the
+        // camera's depth-scale row, clamped to [ui_MinExtractSnapPixels,
+        // ui_MaxExtractSnapPixels] on-screen pixels.
+        const GeomCamera3& cameraView = mCamera->CameraGetView();
+        const float depthW = cameraView.viewport.ProjectViewportWidthRow2(hit.mMouseWorldPos);
+        float snapPixels = ui_ExtractSnapTolerance / depthW;
+        snapPixels = std::clamp(snapPixels, ui_MinExtractSnapPixels, ui_MaxExtractSnapPixels);
+        const float snapRadius = snapPixels * depthW;
+
+        // Search center: the raycast hit position, inset by half the
+        // building's footprint so the deposit search starts from the
+        // building's own placement anchor rather than its cursor corner.
+        Wm3::Vec3f searchCenter = hit.mMouseWorldPos;
+        searchCenter.z = searchCenter.z - (static_cast<float>(buildBlueprint->mFootprint.mSizeZ) * 0.5f);
+        searchCenter.x = searchCenter.x - (static_cast<float>(buildBlueprint->mFootprint.mSizeX) * 0.5f);
+
+        GridPos searchFrom(&searchCenter, 1);
+        GridPos foundDeposit{0, 0};
+        auto* const simResources = mWldSession->mSimResources.px;
+        if (simResources != nullptr &&
+            simResources->FindClosestDeposit(&searchFrom, &foundDeposit, snapRadius, depositType)) {
+          const SOCellPos snappedCell{static_cast<std::int16_t>(foundDeposit.x), static_cast<std::int16_t>(foundDeposit.z)};
+          hit.mMouseWorldPos = COORDS_ToWorldPos(mWldSession->GetSTIMap(), snappedCell, LAYER_None, 1, 1);
+        }
+      }
+    }
+  }
+
+  // Tail cursor-info persistence. The binary rebuilds this MouseInfo value
+  // from bytes belonging to locals whose real lifetime ended earlier in the
+  // function (the selection loop's `bestCandidate`/scratch cluster) -
+  // genuine MSVC8 stack-slot reuse across disjoint lifetimes, not a portable
+  // cross-object layout new source can replicate safely. Reconstructed here
+  // from the pieces with a real, traceable source instead: hit validity and
+  // world position from the fresh raycast, and hover unit from the resolved
+  // selection.
+  MouseInfo resultCursor;
+  resultCursor.mHitValid = hit.mHitValid;
+  resultCursor.mMouseWorldPos = hit.mMouseWorldPos;
+  resultCursor.mUnitHover = bestCandidate;
+  resultCursor.mMouseScreenPos = mouseScreenPos;
+  mWldSession->CursorInfo() = resultCursor;
+}
+
+/**
+ * Address: 0x00871140 (FUN_00871140, Moho::CUIWorldView::Frame)
+ *
+ * IDA signature:
+ * void __thiscall Moho::CUIWorldView::OnFrame(Moho::CUIWorldView *this, float a2);
+ *
+ * VFTable SLOT: 13 (+0x34)
+ *
+ * What it does: see the declaration.
+ */
+void moho::CUIWorldView::Frame(const float deltaSeconds)
+{
+  func_ProcessMouseScrubbing();
+
+  if (mCursorInside != 0u && sMouseIsScrubbing == 0u) {
+    UpdateSelection(mWldSession->CursorInfo().mMouseScreenPos);
+    reinterpret_cast<CScriptObject*>(this)->RunScript("OnUpdateCursor");
+  }
+
+  if (mInputLocks <= 0) {
+    float panSpeed = ui_KeyboardPanSpeed;
+    float rotateSpeed = ui_KeyboardRotateSpeed;
+    if (MAUI_KeyIsDown(MKEY_CONTROL)) {
+      panSpeed = ui_KeyboardPanAccelerateMultiplier * panSpeed;
+      rotateSpeed = ui_KeyboardRotateAccelerateMultiplier * rotateSpeed;
+    }
+
+    if (!MAUI_KeyIsDown(MKEY_SPACE)) {
+      if (mCameraRotationActive && !cam_Free) {
+        mCamera->CameraRevertRotation();
+      }
+      mCameraRotationActive = false;
+    }
+
+    if (mGlobalCameraCommands) {
+      if (!MAUI_KeyIsDown(MKEY_MENU) && !mIsMiniMap) {
+        if (MAUI_KeyIsDown(MKEY_INSERT)) {
+          mCamera->CameraSpin({rotateSpeed, 0.0f});
+        } else if (MAUI_KeyIsDown(MKEY_DELETE)) {
+          mCamera->CameraSpin({-rotateSpeed, 0.0f});
+        }
+      }
+
+      if (mGlobalCameraCommands) {
+        float panX = 0.0f;
+        float panY = 0.0f;
+
+        if (ui_ScreenEdgeScrollView) {
+          gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+          const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(0u);
+          if (head.mWindowed) {
+            POINT cursorPoint{};
+            ::GetCursorPos(&cursorPoint);
+            if (cursorPoint.x == 0) {
+              panX = panSpeed;
+            }
+            if (cursorPoint.y == 0) {
+              panY = panSpeed;
+            }
+            if (cursorPoint.x == static_cast<LONG>(head.mWidth) - 1) {
+              panX = panX - panSpeed;
+            }
+            if (cursorPoint.y == static_cast<LONG>(head.mHeight) - 1) {
+              panY = panY - panSpeed;
+            }
+          }
+        }
+
+        if (ui_ArrowKeysScrollView) {
+          if (MAUI_KeyIsDown(MKEY_UP)) {
+            panY = panY + panSpeed;
+          }
+          if (MAUI_KeyIsDown(MKEY_DOWN)) {
+            panY = panY - panSpeed;
+          }
+          if (MAUI_KeyIsDown(MKEY_LEFT)) {
+            panX = panX + panSpeed;
+          }
+          if (MAUI_KeyIsDown(MKEY_RIGHT)) {
+            panX = panX - panSpeed;
+          }
+        }
+
+        if (!MAUI_KeyIsDown(MKEY_MENU) && (panX != 0.0f || panY != 0.0f)) {
+          mCamera->CameraPan({panX, panY});
+        }
+      }
+    }
+
+    const bool iconsVisible = !mCameraRotationActive && !cam_Free;
+    if (iconsVisible != mIconsVisible) {
+      mIconsVisible = iconsVisible;
+      reinterpret_cast<CScriptObject*>(this)->RunScriptWithBool("OnIconsVisible", iconsVisible);
+    }
+
+    reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+  }
+}
+
+/**
  * Address: 0x008728B0 (FUN_008728B0, cfunc_CUIWorldViewGetScreenPosL)
  *
  * What it does:
@@ -26515,7 +26907,7 @@ moho::FactoryQueueDisplayItem::~FactoryQueueDisplayItem() noexcept = default;
 namespace
 {
   using FactoryQueueItem = moho::FactoryQueueDisplayItem;
-  using FactoryQueueLanes = msvc8::vector_runtime_view<FactoryQueueItem>;
+  using FactoryQueueLanes = moho::FactoryQueueDisplaySnapshot;
 
   constexpr const char* kFactoryQueueChangedModule = "/lua/ui/game/gamemain.lua";
   constexpr const char* kFactoryQueueChangedCallback = "OnQueueChanged";
@@ -26531,7 +26923,7 @@ namespace
 
   [[nodiscard]] FactoryQueueLanes& CurrentBuildQueueLanes() noexcept
   {
-    return msvc8::AsVectorRuntimeView(moho::sCurrentBuildQueue);
+    return moho::sCurrentBuildQueue;
   }
 
   /**
@@ -26724,14 +27116,10 @@ namespace
       throw std::length_error("vector<T> too long");
     }
 
-    void* const storage = (capacity == 0u)
-      ? ::operator new(0)
-      : gpg::core::legacy::AllocateChecked48ByteLane(capacity);
-
-    auto* const first = static_cast<FactoryQueueItem*>(storage);
-    lanes.begin = first;
-    lanes.end = first;
-    lanes.capacityEnd = first + capacity;
+    // VC8 _Buy(n): drop to empty, then one exact-size allocation with
+    // mLast == mFirst -- reserve() on an empty vector is precisely that.
+    lanes = FactoryQueueLanes{};
+    lanes.reserve(capacity);
     return true;
   }
 
@@ -26784,18 +27172,18 @@ namespace
    */
   [[nodiscard]] bool IsBuildQueueSnapshotUnchanged(const moho::FactoryQueueDisplaySnapshot& snapshot)
   {
-    const auto& snapshotLanes = msvc8::AsVectorRuntimeView(snapshot);
     const FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
-
-    const std::uint32_t snapshotCount = FactoryQueueItemCount(snapshotLanes.begin, snapshotLanes.end);
-    const std::uint32_t currentCount = FactoryQueueItemCount(currentLanes.begin, currentLanes.end);
-    if (snapshotCount != currentCount) {
+    if (snapshot.size() != currentLanes.size()) {
       return false;
     }
 
-    const FactoryQueueItemMismatch mismatch =
-      FindFirstBuildQueueItemMismatch(snapshotLanes.begin, snapshotLanes.end, currentLanes.begin);
-    return mismatch.left == snapshotLanes.end;
+    // FindFirstBuildQueueItemMismatch is the binary's register shape and takes
+    // mutable element pointers; both sides are only read.
+    auto& mutableSnapshot = const_cast<moho::FactoryQueueDisplaySnapshot&>(snapshot);
+    auto& mutableCurrent = const_cast<FactoryQueueLanes&>(currentLanes);
+    const FactoryQueueItemMismatch mismatch = FindFirstBuildQueueItemMismatch(
+      mutableSnapshot.begin(), mutableSnapshot.end(), mutableCurrent.begin());
+    return mismatch.left == mutableSnapshot.end();
   }
 
   /**
@@ -26821,53 +27209,58 @@ namespace
       return moho::sCurrentBuildQueue;
     }
 
-    const auto& sourceLanes = msvc8::AsVectorRuntimeView(snapshot);
     FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
 
-    const std::uint32_t sourceCount = FactoryQueueItemCount(sourceLanes.begin, sourceLanes.end);
+    // The per-type copy adapters below are the binary's register shapes and
+    // take mutable element pointers; the source is only read through them.
+    auto& mutableSnapshot = const_cast<moho::FactoryQueueDisplaySnapshot&>(snapshot);
+    const std::size_t sourceCount = mutableSnapshot.size();
     if (sourceCount == 0u) {
       // 0x00836CB9: erase the whole published queue and keep its buffer.
       FactoryQueueItem* rebasedBegin = nullptr;
-      (void)moho::RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin, currentLanes.end);
+      (void)moho::RebaseFactoryQueueRangeAndTrimTail(
+        &rebasedBegin, currentLanes.begin(), currentLanes.end());
       return moho::sCurrentBuildQueue;
     }
 
-    const std::uint32_t currentCount = FactoryQueueItemCount(currentLanes.begin, currentLanes.end);
+    const std::size_t currentCount = currentLanes.size();
     if (sourceCount <= currentCount) {
       // 0x00836D0E: assign over the live prefix, destroy the surplus tail.
+      // DeleteRangeBuildQueueItems is explicit because it frees each row's
+      // command-id buffer and blueprint-id string, which the element
+      // destructor does not.
       FactoryQueueItem* const newEnd =
-        CopyBuildQueueItems(currentLanes.begin, sourceLanes.begin, sourceLanes.end);
-      DeleteRangeBuildQueueItems(newEnd, currentLanes.end);
-      currentLanes.end = currentLanes.begin + sourceCount;
+        CopyBuildQueueItems(currentLanes.begin(), mutableSnapshot.begin(), mutableSnapshot.end());
+      DeleteRangeBuildQueueItems(newEnd, currentLanes.end());
+      while (currentLanes.size() > sourceCount) {
+        currentLanes.pop_back_no_destroy();
+      }
       return moho::sCurrentBuildQueue;
     }
 
-    const std::uint32_t currentCapacity = (currentLanes.begin != nullptr)
-      ? static_cast<std::uint32_t>(currentLanes.capacityEnd - currentLanes.begin)
-      : 0u;
-    if (sourceCount <= currentCapacity) {
+    if (sourceCount <= currentLanes.capacity()) {
       // 0x00836DBF: assign over the live rows, then build the extra tail rows
       // into the spare capacity.
-      FactoryQueueItem* const sourceSplit = sourceLanes.begin + currentCount;
-      (void)CopyBuildQueueItemsThiscallAdapter(sourceSplit, sourceLanes.begin, currentLanes.begin);
-      currentLanes.end =
-        UninitializedCopyBuildQueueItemsAdapter(sourceSplit, sourceLanes.end, currentLanes.end);
+      const FactoryQueueItem* const sourceSplit = mutableSnapshot.begin() + currentCount;
+      (void)CopyBuildQueueItemsThiscallAdapter(sourceSplit, mutableSnapshot.begin(), currentLanes.begin());
+      (void)UninitializedCopyBuildQueueItemsAdapter(sourceSplit, mutableSnapshot.end(), currentLanes.end());
+      while (currentLanes.size() < sourceCount) {
+        currentLanes.push_back_no_construct();
+      }
       return moho::sCurrentBuildQueue;
     }
 
     // 0x00836DEC: capacity is short - destroy, free, rebuy, rebuild.
-    if (currentLanes.begin != nullptr) {
-      DeleteRangeBuildQueueItemsThiscallAdapter(currentLanes.end, currentLanes.begin);
-      ::operator delete(currentLanes.begin);
+    if (!currentLanes.empty()) {
+      DeleteRangeBuildQueueItemsThiscallAdapter(currentLanes.end(), currentLanes.begin());
     }
 
-    const std::uint32_t newCount = FactoryQueueItemCount(sourceLanes.begin, sourceLanes.end);
-    currentLanes.begin = nullptr;
-    currentLanes.end = nullptr;
-    currentLanes.capacityEnd = nullptr;
-    if (newCount != 0u && AllocateBuildQueueStorage(currentLanes, newCount)) {
-      currentLanes.end =
-        UninitializedCopyBuildQueueItemsAdapter(sourceLanes.begin, sourceLanes.end, currentLanes.begin);
+    if (AllocateBuildQueueStorage(currentLanes, static_cast<std::uint32_t>(sourceCount))) {
+      (void)UninitializedCopyBuildQueueItemsAdapter(
+        mutableSnapshot.begin(), mutableSnapshot.end(), currentLanes.begin());
+      while (currentLanes.size() < sourceCount) {
+        currentLanes.push_back_no_construct();
+      }
     }
     return moho::sCurrentBuildQueue;
   }
@@ -26895,10 +27288,17 @@ moho::FactoryQueueDisplayItem** moho::RebaseFactoryQueueRangeAndTrimTail(
 {
   FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
   if (destinationBegin != sourceBegin) {
+    // Shift the survivors down over [destinationBegin, sourceBegin), destroy
+    // the vacated tail and rebase mLast: erase(first, last). The explicit
+    // DeleteRangeBuildQueueItems stays because it also frees each row's
+    // command-id buffer and blueprint-id string, which the element destructor
+    // does not.
     FactoryQueueDisplayItem* const newEnd =
-      CopyBuildQueueItems(destinationBegin, sourceBegin, currentLanes.end);
-    DeleteRangeBuildQueueItems(newEnd, currentLanes.end);
-    currentLanes.end = newEnd;
+      CopyBuildQueueItems(destinationBegin, sourceBegin, currentLanes.end());
+    DeleteRangeBuildQueueItems(newEnd, currentLanes.end());
+    while (currentLanes.end() != newEnd) {
+      currentLanes.pop_back_no_destroy();
+    }
   }
 
   *outBegin = destinationBegin;
@@ -26949,13 +27349,13 @@ void moho::UI_FactoryCommandQueueHandlerBeat()
     // 0x008362EC: no factory bound. Nothing to announce unless a queue is still
     // published.
     FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
-    if (currentLanes.begin == nullptr || FactoryQueueItemCount(currentLanes.begin, currentLanes.end) == 0u) {
+    if (currentLanes.empty()) {
       return;
     }
 
     queueTable.AssignNil(state);
     FactoryQueueDisplayItem* rebasedBegin = nullptr;
-    (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin, currentLanes.end);
+    (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin(), currentLanes.end());
   }
 
   if (!queueChanged) {
@@ -26981,17 +27381,13 @@ void moho::CurrentBuildQueueItemCommands(
   *outEnd = nullptr;
 
   const FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
-  if (currentLanes.begin == nullptr) {
-    return;
-  }
-
-  const std::ptrdiff_t itemCount = currentLanes.end - currentLanes.begin;
+  const std::ptrdiff_t itemCount = static_cast<std::ptrdiff_t>(currentLanes.size());
   const std::ptrdiff_t itemIndex = static_cast<std::ptrdiff_t>(oneBasedQueueIndex) - 1;
   if (itemIndex < 0 || itemIndex >= itemCount) {
     return;
   }
 
-  const msvc8::vector<moho::CmdId>& commands = currentLanes.begin[itemIndex].commands;
+  const msvc8::vector<moho::CmdId>& commands = currentLanes[static_cast<std::size_t>(itemIndex)].commands;
   *outBegin = commands.begin();
   *outEnd = commands.end();
 }
@@ -27657,7 +28053,7 @@ int moho::cfunc_ClearCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const sta
 
   FactoryQueueLanes& currentLanes = CurrentBuildQueueLanes();
   FactoryQueueDisplayItem* rebasedBegin = nullptr;
-  (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin, currentLanes.end);
+  (void)RebaseFactoryQueueRangeAndTrimTail(&rebasedBegin, currentLanes.begin(), currentLanes.end());
   return 0;
 }
 
