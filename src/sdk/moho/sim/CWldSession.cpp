@@ -2121,16 +2121,28 @@ namespace moho
      * position. Only builds one when the node has no mesh yet and its command is
      * a `BuildMobile`; every other order draws with waypoint markers alone.
      *
-     * Analyzed, not yet recovered - part of the same rebuild frontier as
-     * `AddCommandQueueToCommandGraph` / `EstimateEdgeTravelTicks` /
-     * `EstimateDrawNodeWorkTicks` below. The body resolves the command's
-     * `SSTICommandConstantData::blueprint`, asks it for its display data
-     * (virtual slot 5), hands that to `CWldSession::mRules`' virtual slot 15 to
-     * get an `RMeshBlueprint`, then builds a "UnitPlace"-shadered
-     * `MeshMaterial` from the three texture-name strings at that blueprint's
-     * +0x64 and creates the instance through `MeshRenderer::CreateMeshInstance`
-     * with colour 0xFF00FF00. Blocked on modelling `RMeshBlueprint`'s +0x64
-     * string triple and the two virtual slots, neither of which is pinned yet.
+     * The chain, with the three offsets an earlier pass could not place now
+     * resolved against the disassembly:
+     *  - `helper+0x20` is `mConstantData.blueprint` (`mConstantData` sits at
+     *    helper+0x04, `blueprint` at its own +0x1C), an `REntityBlueprint*`;
+     *  - virtual slot 5 (0x008273B2, `[eax+0x14]`) is
+     *    `REntityBlueprint::IsUnitBlueprint`, returning the `RUnitBlueprint`
+     *    whose `Display` subobject starts at +0x200 - which is what makes
+     *    +0x21C `Display.MeshBlueprint` (an `RResId`, *not* the `VTransform`
+     *    the decompiler infers from its 0x1C-byte width) and +0x270
+     *    `Display.UniformScale`;
+     *  - virtual slot 15 (0x008273D3, `[edx+0x3C]`) on `CWldSession::mRules`
+     *    is `RRuleGameRules::GetMeshBlueprint(const RResId&)`, which is why
+     *    the +0x21C `RResId` is the argument handed to it;
+     *  - the "+0x64 string triple" is not a field of `RMeshBlueprint` at all.
+     *    `mLods` starts at +0x60 and +0x64 is its `first_` lane, so the three
+     *    strings the binary addresses at +0x1C/+0x38/+0x54 off that pointer
+     *    are `mAlbedoName`/`mNormalsName`/`mSpecularName` of `mLods[0]`.
+     *
+     * Note the colour appears twice and the decompiler folds them together:
+     * `CreateMeshInstance` is handed 0xFF00FF00, then the instance's own
+     * colour lane is overwritten with 0xD800D800 - the alpha-0xD8 translucent
+     * green the ghost actually renders in.
      */
     static void CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph);
 
@@ -4974,6 +4986,98 @@ namespace moho
     if (!params["ui_CommandClickScale"].IsNil()) {
       ui_WaypointLineScale = static_cast<float>(params["ui_CommandClickScale"].GetNumber());
     }
+  }
+
+  /**
+   * What it does: see the header.
+   */
+  void UICommandGraph::CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph)
+  {
+    // 0x008274D7 hands CreateMeshInstance an opaque green, then 0x008274FB
+    // immediately overwrites the instance's own colour lane with the
+    // alpha-0xD8 shade the placement ghost actually draws in.
+    constexpr std::int32_t kPreviewCreateColor = static_cast<std::int32_t>(0xFF00FF00u);
+    constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0xD800D800u);
+
+    // Already has its ghost - the mesh outlives the rebuild that made it.
+    if (drawNode.mMeshInstance.px != nullptr) {
+      return;
+    }
+
+    auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(drawNode.mHelperLink.mHead);
+    if (helper == nullptr) {
+      return;
+    }
+
+    // Only a queued mobile build produces a unit to preview; every other order
+    // type draws with waypoint markers and orderlines alone.
+    if (ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
+      return;
+    }
+
+    const REntityBlueprint* const entityBlueprint = helper->mConstantData.blueprint;
+    if (entityBlueprint == nullptr) {
+      return;
+    }
+
+    const RUnitBlueprint* const unitBlueprint = entityBlueprint->IsUnitBlueprint();
+    if (unitBlueprint == nullptr) {
+      return;
+    }
+
+    RMeshBlueprint* const meshBlueprint =
+      graph.mSession->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
+    if (meshBlueprint == nullptr) {
+      return;
+    }
+
+    const float uniformScale = unitBlueprint->Display.UniformScale;
+    const Wm3::Vec3f previewScale{uniformScale, uniformScale, uniformScale};
+
+    // 0x008273F1 loads `mLods.first_` once and addresses the LOD's texture
+    // names off it (+0x1C/+0x38/+0x54) with no empty-vector guard - a mesh
+    // blueprint that resolved this far always carries at least one LOD.
+    const RMeshBlueprintLOD* const lod = meshBlueprint->mLods.begin();
+
+    // The ghost keeps the LOD's real albedo/normals/specular maps but swaps the
+    // shader for "UnitPlace"; the lookup and secondary slots stay empty. This
+    // is why the six-string Create overload is called directly instead of the
+    // `Create(const RMeshBlueprintLOD&, ...)` one, which would carry
+    // `lod->mShaderName` through.
+    const msvc8::string shaderName("UnitPlace");
+    const msvc8::string emptyLookupName;
+    const msvc8::string emptySecondaryName;
+    const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+      shaderName,
+      lod->mAlbedoName,
+      lod->mNormalsName,
+      lod->mSpecularName,
+      emptyLookupName,
+      emptySecondaryName,
+      nullptr
+    );
+
+    MeshInstance* const meshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
+      graph.mSession->mGameTick, kPreviewCreateColor, meshBlueprint, previewScale, false, material
+    );
+
+    boost::ResetSharedPtrRawOwning(drawNode.mMeshInstance, meshInstance);
+    drawNode.mMeshInstance.px->color = kPreviewTranslucentGreen;
+
+    // The binary builds the stance at the origin (0x00827514..0x00827532) and
+    // only afterwards divides the node's accumulated position by its weight,
+    // storing the centroid straight into the transform's translation lane - so
+    // the zero vector here is the constructor argument the original passed, not
+    // a placeholder.
+    VTransform stance{Wm3::Vec3f{0.0f, 0.0f, 0.0f}, Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f}};
+    const float invWeight = 1.0f / drawNode.mWeight;
+    stance.pos_ = Wm3::Vec3f{
+      drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
+    };
+
+    // Same transform as both start and end: the placement ghost snaps to the
+    // order's position rather than interpolating toward it.
+    drawNode.mMeshInstance.px->SetStance(stance, stance);
   }
 
   /**
