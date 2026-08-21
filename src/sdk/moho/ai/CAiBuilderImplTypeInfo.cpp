@@ -24,6 +24,11 @@ namespace
   class CAiBuilderRebuildMapTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005A1FD0 (FUN_005A1FD0, gpg::RMapType_uint_RUnitBlueprintP::dtr)
+     */
+    ~CAiBuilderRebuildMapTypeInfo() override = default;
+
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     void Init() override;
