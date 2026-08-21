@@ -5406,6 +5406,12 @@ void* AllocateChecked4ByteElementsZeroAware(const std::uint32_t count)
 
 /**
  * Address: 0x006D25B0 (FUN_006D25B0)
+ * Address: 0x004FA720 (FUN_004FA720)
+ * Address: 0x004FA7E0 (FUN_004FA7E0)
+ * Address: 0x0054E1B0 (FUN_0054E1B0)
+ * Address: 0x00733AF0 (FUN_00733AF0)
+ * Address: 0x0075FD60 (FUN_0075FD60)
+ * Address: 0x00813EB0 (FUN_00813EB0)
  *
  * What it does:
  * Allocates one checked raw block for 8-byte elements using the VC8
@@ -5467,6 +5473,14 @@ void* AllocateChecked16ByteElements(const std::uint32_t count)
 
 /**
  * Address: 0x00548B80 (FUN_00548B80)
+ * Address: 0x00688E80 (FUN_00688E80)
+ * Address: 0x00712A70 (FUN_00712A70)
+ * Address: 0x0077DB80 (FUN_0077DB80)
+ * Address: 0x00798B60 (FUN_00798B60)
+ * Address: 0x007B4E50 (FUN_007B4E50)
+ * Address: 0x007CC1C0 (FUN_007CC1C0)
+ * Address: 0x007FB9B0 (FUN_007FB9B0)
+ * Address: 0x008317B0 (FUN_008317B0)
  *
  * What it does:
  * Allocates one checked raw block for 20-byte elements using the VC8
@@ -5479,6 +5493,14 @@ void* AllocateChecked20ByteElements(const std::uint32_t count)
 
 /**
  * Address: 0x005821F0 (FUN_005821F0)
+ * Address: 0x004E50A0 (FUN_004E50A0)
+ * Address: 0x004E5160 (FUN_004E5160)
+ * Address: 0x004E51F0 (FUN_004E51F0)
+ * Address: 0x004E9B70 (FUN_004E9B70)
+ * Address: 0x00594230 (FUN_00594230)
+ * Address: 0x00688D70 (FUN_00688D70)
+ * Address: 0x006E2D90 (FUN_006E2D90)
+ * Address: 0x0083C6E0 (FUN_0083C6E0)
  *
  * What it does:
  * Allocates one checked raw block for 24-byte elements using the VC8
@@ -5491,6 +5513,10 @@ void* AllocateChecked24ByteElements(const std::uint32_t count)
 
 /**
  * Address: 0x00693190 (FUN_00693190)
+ * Address: 0x00571800 (FUN_00571800)
+ * Address: 0x005CA1E0 (FUN_005CA1E0)
+ * Address: 0x007B1420 (FUN_007B1420)
+ * Address: 0x007B4FA0 (FUN_007B4FA0)
  *
  * What it does:
  * Allocates one checked raw block for 28-byte elements using the VC8
@@ -5516,6 +5542,10 @@ void* AllocateChecked28ByteElementsZeroAware(const std::uint32_t count)
 /**
  * Address: 0x00544610 (FUN_00544610)
  * Address: 0x005EC960 (FUN_005EC960)
+ * Address: 0x004E8170 (FUN_004E8170)
+ * Address: 0x005CA280 (FUN_005CA280)
+ * Address: 0x00751C40 (FUN_00751C40)
+ * Address: 0x007B4EF0 (FUN_007B4EF0)
  *
  * What it does:
  * Allocates one checked raw block for 32-byte elements using the VC8
@@ -5530,6 +5560,11 @@ void* AllocateChecked32ByteElements(const std::uint32_t count)
  * Address: 0x004FA650 (FUN_004FA650)
  * Address: 0x006DDC80 (FUN_006DDC80)
  * Address: 0x00704750 (FUN_00704750)
+ * Address: 0x00582460 (FUN_00582460)
+ * Address: 0x00751B60 (FUN_00751B60)
+ * Address: 0x007BF120 (FUN_007BF120)
+ * Address: 0x007E56B0 (FUN_007E56B0)
+ * Address: 0x00831D10 (FUN_00831D10)
  *
  * What it does:
  * Allocates one checked raw block for 40-byte elements using the VC8
@@ -6258,6 +6293,14 @@ using CheckedElementAllocatorFn = void* (*)(std::uint32_t);
   return InitializeVectorStorageLanesFromAllocation(storage, begin, count, elementSize);
 }
 
+/**
+ * Address: 0x006EBC60 (FUN_006EBC60)
+ * Address: 0x0084A5F0 (FUN_0084A5F0)
+ *
+ * What it does:
+ * Allocates one checked raw block for 60-byte elements using the VC8
+ * `_Allocate(count, element*)` overflow guard semantics.
+ */
 [[nodiscard]] void* AllocateChecked60ByteElements(const std::uint32_t count)
 {
   return AllocateCheckedElementBlock(count, 60u);
@@ -6486,14 +6529,15 @@ bool BuyVectorStorage16ByteGuardedVariant(VectorVoidStorageView& storage, const 
 namespace
 {
 // Bridges the canonical typed `RUnitBlueprintWeapon` allocator
-// (`msvc8::vector<T>::allocate_unit_blueprint_weapon_slots_checked`,
-// `FUN_00526080`) into the `CheckedElementAllocatorFn` signature used
-// by `BuyVectorStorageGuardedByMaxCount`. Not itself a binary symbol —
+// (`msvc8::vector<T>::allocate_slots_checked`, `FUN_00526080`) into the
+// `CheckedElementAllocatorFn` signature used by
+// `BuyVectorStorageGuardedByMaxCount`. Not itself a binary symbol —
 // the canonical address block lives on the static member.
 [[nodiscard]] void* AllocateUnitBlueprintWeaponElementBlock(const std::uint32_t count)
 {
-  return msvc8::vector<moho::RUnitBlueprintWeapon>::
-    allocate_unit_blueprint_weapon_slots_checked(static_cast<std::size_t>(count));
+  return msvc8::vector<moho::RUnitBlueprintWeapon>::allocate_slots_checked(
+    static_cast<std::size_t>(count)
+  );
 }
 } // namespace
 
