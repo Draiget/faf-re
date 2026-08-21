@@ -1,5 +1,6 @@
 #include "moho/render/Clutter.h"
 
+#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
@@ -964,11 +965,18 @@ namespace
 
   /**
    * Address: 0x007D9140 (FUN_007D9140)
+   *
+   * What it does:
+   * Allocates one region-key RB-tree node through the checked 28-byte
+   * allocation lane (`AllocateChecked28ByteLane`, FUN_007D97A0) and
+   * initializes its parent/child links, key payload, and red/non-nil color
+   * flags.
    */
   [[nodiscard]] moho::ClutterRegionKeyNode* AllocateRegionKeyNode()
   {
-    auto* const node =
-      static_cast<moho::ClutterRegionKeyNode*>(::operator new(sizeof(moho::ClutterRegionKeyNode)));
+    auto* const node = static_cast<moho::ClutterRegionKeyNode*>(
+      gpg::core::legacy::AllocateChecked28ByteLane(1u)
+    );
     node->left = nullptr;
     node->parent = nullptr;
     node->right = nullptr;

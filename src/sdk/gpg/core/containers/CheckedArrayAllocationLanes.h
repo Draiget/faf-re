@@ -69,6 +69,15 @@ namespace gpg::core::legacy
   [[nodiscard]] void* AllocateChecked24ByteLane(std::uint32_t elementCount);
 
   /**
+   * Address: 0x007D97A0 (FUN_007D97A0, sub_7D97A0)
+   *
+   * What it does:
+   * Allocates a contiguous lane of 28-byte elements and applies the legacy
+   * 32-bit overflow guard before forwarding to global `operator new`.
+   */
+  [[nodiscard]] void* AllocateChecked28ByteLane(std::uint32_t elementCount);
+
+  /**
    * Address: 0x00931B60 (FUN_00931B60, sub_931B60)
    * Address: 0x00935D50 (FUN_00935D50, sub_935D50)
    *
