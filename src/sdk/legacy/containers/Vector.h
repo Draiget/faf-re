@@ -1939,6 +1939,8 @@ namespace msvc8
          * for UICommandGraph's MapAB hash-bucket table)
          * Address: 0x0082F680 (FUN_0082F680, the MapC emission of the same)
          * Address: 0x0082FB80 (FUN_0082FB80, the MapD emission of the same)
+         * Address: 0x0082DBA0 (FUN_0082DBA0, the HashListNode88 draw-node table's
+         * `mBuckets.assign(9, mListHead)` emission, UICommandGraph::PrepareForRebuild)
          *
          * What it does:
          * The VC8 `vector<T>::assign(_Count, _Val)` lane: copies `_Val` into a
