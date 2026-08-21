@@ -137,6 +137,43 @@ static_assert(
   return static_cast<DNameStatus>(static_cast<std::int32_t>(statusWord << 28u) >> 28);
 }
 
+}  // namespace
+
+/**
+ * Address: 0x00AB134A (FUN_00AB134A, und_strncpy)
+ * Mangled: ?und_strncpy@@YAPADPADPBDI@Z
+ *
+ * IDA signature:
+ * char *__usercall und_strncpy@<eax>(char *a1@<edx>, char *a2, const char *a3);
+ *
+ * What it does:
+ * The undecorator's private bounded string copy. Copies at most `maxChars`
+ * bytes from `source` into `destination`, stopping *after* storing the
+ * terminating NUL when the source ends first. Unlike CRT `strncpy` it does
+ * not zero-pad the remainder of the destination, and when the count limit is
+ * what stops the copy no terminator is written at all -- callers rely on both
+ * behaviours. Always returns `destination`.
+ */
+char* und_strncpy(char* const destination, const char* source, unsigned int maxChars) noexcept
+{
+  char* cursor = destination;
+  for (; maxChars != 0u; --maxChars) {
+    const char character = *source;
+    *cursor = character;
+    if (character == '\0') {
+      break;
+    }
+
+    ++cursor;
+    ++source;
+  }
+
+  return destination;
+}
+
+namespace
+{
+
 using DNameHeapAllocator = void* (*)(std::size_t);
 
 struct DNameHeapFrame
@@ -352,15 +389,7 @@ public:
       charsToCopy = textLength_;
     }
 
-    for (int index = 0; index < charsToCopy; ++index) {
-      const char character = text_[index];
-      out[index] = character;
-      if (character == '\0') {
-        break;
-      }
-    }
-
-    return out;
+    return und_strncpy(out, text_, static_cast<unsigned int>(charsToCopy));
   }
 
 private:
@@ -410,20 +439,7 @@ DNamePcharNode::DNamePcharNode(
     return;
   }
 
-  const char* source = text;
-  char* destination = storage;
-  unsigned int remaining = static_cast<unsigned int>(textLength);
-  while (remaining != 0u) {
-    const char ch = *source;
-    *destination = ch;
-    if (ch == '\0') {
-      break;
-    }
-
-    ++destination;
-    ++source;
-    --remaining;
-  }
+  und_strncpy(storage, text, static_cast<unsigned int>(textLength));
 }
 
 [[nodiscard]] bool IsAcceptedUndecoratorTokenChar(const unsigned char character) noexcept
@@ -509,20 +525,7 @@ char* DNameStatusNode::copyTo(
     return nullptr;
   }
 
-  const char* source = kUnknownStatusToken;
-  char* destination = out;
-  for (int remaining = charsToCopy; remaining > 0; --remaining) {
-    const char ch = *source;
-    *destination = ch;
-    if (ch == '\0') {
-      break;
-    }
-
-    ++destination;
-    ++source;
-  }
-
-  return out;
+  return und_strncpy(out, kUnknownStatusToken, static_cast<unsigned int>(charsToCopy));
 }
 
 /**
@@ -1371,21 +1374,7 @@ DNameNode* DNameNode::clone() noexcept
   }
 
   if (node->text != nullptr && out != nullptr && charsToCopy != 0) {
-    const char* source = node->text;
-    char* destination = out;
-    unsigned int remaining = static_cast<unsigned int>(charsToCopy);
-    while (remaining != 0u) {
-      const char character = *source;
-      *destination = character;
-      if (character == '\0') {
-        break;
-      }
-
-      ++destination;
-      ++source;
-      --remaining;
-    }
-    return out;
+    return und_strncpy(out, node->text, static_cast<unsigned int>(charsToCopy));
   }
 
   return nullptr;

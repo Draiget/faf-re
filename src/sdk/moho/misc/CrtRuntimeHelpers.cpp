@@ -4414,7 +4414,7 @@ extern "C" int __cdecl RuntimeAnsiCodePageFromLocale(const LCID locale)
   localeCodePage[6] = '\0';
 
   if (::GetLocaleInfoA(locale, LOCALE_IDEFAULTANSICODEPAGE, localeCodePage, kAnsiCodePageBufferLength) != 0) {
-    return static_cast<int>(std::atol(localeCodePage));
+    return static_cast<int>(::atol(localeCodePage));
   }
 
   return -1;
@@ -13259,6 +13259,135 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   )
   {
     return _wcstombs_s_l(outConvertedCount, destination, destinationSize, wideSource, maxWideChars, nullptr);
+  }
+
+  /**
+   * Address: 0x00A835A8 (FUN_00A835A8, atol)
+   *
+   * IDA signature:
+   * int __cdecl atol(const char *a1);
+   *
+   * What it does:
+   * CRT `atol()` entry point. Parses one base-10 signed long from `text`
+   * through the shared `strtol` lane, discarding the parse end pointer.
+   */
+  extern "C" long __cdecl atol(const char* const text)
+  {
+    return ::strtol(text, nullptr, 10);
+  }
+
+  /**
+   * Address: 0x00AAA764 (FUN_00AAA764, _vsnprintf)
+   *
+   * IDA signature:
+   * int __usercall vsnprintf@<eax>(char *const Buffer, const size_t BufferCount,
+   *                                const char *const Format, va_list ArgList);
+   *
+   * What it does:
+   * CRT `_vsnprintf()` entry point: forwards bounded narrow vararg formatting
+   * to the locale-aware `_vsnprintf_l` lane with a null locale, so the active
+   * thread locale is used.
+   */
+  extern "C" int __cdecl _vsnprintf(
+    char* const buffer,
+    const std::size_t count,
+    const char* const format,
+    va_list arguments
+  )
+  {
+    return ::_vsnprintf_l(buffer, count, format, nullptr, arguments);
+  }
+
+  /**
+   * Address: 0x00A8826E (FUN_00A8826E, wcsstr)
+   *
+   * IDA signature:
+   * _WORD *__cdecl sub_A8826E(_WORD *a1, char *a2);
+   *
+   * What it does:
+   * CRT `wcsstr()`: locates the first occurrence of the wide substring
+   * `needle` inside `haystack`. An empty needle matches at the start of
+   * `haystack`; returns null when no occurrence exists.
+   */
+  extern "C" wchar_t* __cdecl wcsstr(const wchar_t* haystack, const wchar_t* const needle)
+  {
+    if (*needle == L'\0') {
+      return const_cast<wchar_t*>(haystack);
+    }
+
+    for (; *haystack != L'\0'; ++haystack) {
+      const wchar_t* candidate = haystack;
+      const wchar_t* pattern = needle;
+      while (*pattern != L'\0' && *candidate == *pattern) {
+        ++candidate;
+        ++pattern;
+      }
+      if (*pattern == L'\0') {
+        return const_cast<wchar_t*>(haystack);
+      }
+    }
+
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00A8F5FB (FUN_00A8F5FB, wcspbrk)
+   *
+   * IDA signature:
+   * _WORD *__cdecl sub_A8F5FB(_WORD *a1, _WORD *a2);
+   *
+   * What it does:
+   * CRT `wcspbrk()`: returns a pointer to the first character of `text` that
+   * also occurs in the `charSet` control string, or null when `text` contains
+   * no character from the set.
+   */
+  extern "C" wchar_t* __cdecl wcspbrk(const wchar_t* text, const wchar_t* const charSet)
+  {
+    for (; *text != L'\0'; ++text) {
+      for (const wchar_t* candidate = charSet; *candidate != L'\0'; ++candidate) {
+        if (*candidate == *text) {
+          return const_cast<wchar_t*>(text);
+        }
+      }
+    }
+
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00A90ED5 (FUN_00A90ED5, wcsncat)
+   *
+   * IDA signature:
+   * _WORD *__cdecl sub_A90ED5(_WORD *a1, __int16 *a2, int a3);
+   *
+   * What it does:
+   * CRT `wcsncat()`: appends at most `maxAppend` wide characters of `source`
+   * onto the end of `destination` and terminates the result. Matches the CRT
+   * body exactly, including the "stop early on source NUL" lane and the
+   * unconditional terminator write when the count limit is what stops the
+   * copy. Returns `destination`.
+   */
+  extern "C" wchar_t* __cdecl wcsncat(
+    wchar_t* const destination,
+    const wchar_t* source,
+    std::size_t maxAppend
+  )
+  {
+    wchar_t* cursor = destination;
+    while (*cursor != L'\0') {
+      ++cursor;
+    }
+
+    for (; maxAppend != 0u; --maxAppend) {
+      const wchar_t copied = *source++;
+      *cursor++ = copied;
+      if (copied == L'\0') {
+        return destination;
+      }
+    }
+
+    *cursor = L'\0';
+    return destination;
   }
 
   using RuntimeVirtualDestroyWithFlagFn = int(__thiscall*)(void* owner, int destroyFlag);
