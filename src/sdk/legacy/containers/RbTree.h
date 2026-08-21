@@ -797,6 +797,20 @@ namespace msvc8
              * Address: 0x00704A40 (FUN_00704A40, the same lane reached from
              * `~CArmyStats`)
              */
+            /**
+             * Address: 0x00A633D0 (FUN_00A633D0, unidentified map/set instantiation
+             * -- colour/nil pair at `[node+0x10]`/`[node+0x11]`, a smaller node than
+             * every other instantiation cited above)
+             * Address: 0x00A63690 (FUN_00A63690, sibling emission of the same
+             * member for a second, differently-value-typed instantiation in the
+             * same address neighbourhood as the `rotate_left`/`insert_at`
+             * instantiation cited above -- same colour/nil offsets, same
+             * `invalid map/set<T> iterator` throw and guarded `_Mysize` decrement)
+             *
+             * Neither traced to a named owning class in this pass; the algorithm
+             * match (transplant-and-recolour shape, identical throw string,
+             * identical guarded decrement) is the evidence.
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
