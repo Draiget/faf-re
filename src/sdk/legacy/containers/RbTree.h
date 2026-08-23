@@ -118,6 +118,11 @@ namespace msvc8
          * at 0x0089A540 when the erased node was the leftmost one.
          */
         template<class V>
+        /**
+         * Address: 0x0077CCB0 (FUN_0077CCB0, the decal bucket set's left-chain
+         * descent)
+         * Address: 0x0077B120 (FUN_0077B120, the start-tick map's)
+         */
         [[nodiscard]] rb_node<V>* rb_min(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->left)) {
@@ -143,6 +148,11 @@ namespace msvc8
          * rightmost one.
          */
         template<class V>
+        /**
+         * Address: 0x0077CC90 (FUN_0077CC90, the decal bucket set's right-chain
+         * descent)
+         * Address: 0x0077B100 (FUN_0077B100, the start-tick map's)
+         */
         [[nodiscard]] rb_node<V>* rb_max(rb_node<V>* n) noexcept
         {
             while (!rb_is_nil(n->right)) {
@@ -176,6 +186,10 @@ namespace msvc8
         /**
          * Address: 0x0049AD20 (FUN_0049AD20, the in-order successor walk for the
          * trail-segment owner pool, `std::set<TrailSegmentBufferRuntime*>`)
+         */
+        /**
+         * Address: 0x0077C740 (FUN_0077C740, the decal bucket set's successor walk)
+         * Address: 0x0077CE50 (FUN_0077CE50, the start-tick map's)
          */
         rb_node<V>* rb_increment(rb_node<V>* n) noexcept
         {
@@ -217,6 +231,11 @@ namespace msvc8
          * only in MSVC8's `_Dec`. 0x0094F090 has neither.
          */
         template<class V>
+        /**
+         * Address: 0x0077CD80 (FUN_0077CD80, the decal bucket iterator retreat)
+         * Address: 0x0077D160 (FUN_0077D160, the start-tick map's; its two
+         * register-shape adapters are 0x0077C7A0 and 0x0077CE30)
+         */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
             if (rb_is_nil(n)) {
@@ -435,12 +454,23 @@ namespace msvc8
              * Address: 0x00710990 (FUN_00710990, the recursive subtree clone underneath
              * it)
              */
+            /**
+             * Address: 0x0077C1E0 (FUN_0077C1E0, the decal bucket set's copy construct)
+             * Address: 0x0077D090 (FUN_0077D090, its recursive subtree clone)
+             * Address: 0x0077CBB0 (FUN_0077CBB0, the header-and-extrema copy that
+             * finishes it)
+             * Address: 0x0077C5B0 (FUN_0077C5B0, the head-sentinel build the copy starts
+             * from; emitted again at 0x0077A8B0 and 0x0077B4C0)
+             */
             rb_tree(const rb_tree& other)
                 : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
             {
                 copy_from(other);
             }
 
+            /**
+             * Address: 0x0077E280 (FUN_0077E280, the decal bucket set's copy assign)
+             */
             rb_tree& operator=(const rb_tree& other)
             {
                 if (this != &other) {
@@ -568,6 +598,13 @@ namespace msvc8
              * The blueprint-id descent. The 0x0052Exxx six are the walk itself, one
              * per table; the 0x0052Dxxx seven are the store-result adapters over it.
              */
+            /**
+             * Address: 0x0077C020 (FUN_0077C020, outer map lower bound)
+             * Address: 0x0077B070 (FUN_0077B070, its store-to-slot adapter)
+             * Address: 0x0077C550 (FUN_0077C550, inner bucket lower bound)
+             * Address: 0x0077C580 (FUN_0077C580, inner bucket upper bound)
+             * Address: 0x0077B5B0 (FUN_0077B5B0, the inner set's equal-range pair)
+             */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
                 node_type* found = head_;
@@ -613,6 +650,9 @@ namespace msvc8
              *
              * The mesh, emitter and trail lookups respectively.
              */
+            /**
+             * Address: 0x0077BCD0 (FUN_0077BCD0, the outer map's start-tick lookup)
+             */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
                 node_type* const found = lower_bound_node(k);
@@ -646,6 +686,12 @@ namespace msvc8
              * Address: 0x00496000 (FUN_00496000, the trail-segment pool's find-or-insert
              * -- what `ReturnTrailSegmentBufferToOwnerPool` compiles to)
              * Address: 0x00497E50 (FUN_00497E50, its link half)
+             */
+            /**
+             * Address: 0x0077A930 (FUN_0077A930, the bucket set's find-or-insert -- what
+             * `mStartTickBuckets[tick].insert(handle)` compiles to on the inner set)
+             * Address: 0x0077A250 (FUN_0077A250, the outer map's `operator[]`, which the
+             * same expression compiles to on the outer map)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -828,6 +874,11 @@ namespace msvc8
              * match (transplant-and-recolour shape, identical throw string,
              * identical guarded decrement) is the evidence.
              */
+            /**
+             * Address: 0x0077C270 (FUN_0077C270, inner bucket erase with rebalance)
+             * Address: 0x0077A9F0 (FUN_0077A9F0, its erase-by-key wrapper -- what
+             * `mStartTickBuckets[tick].erase(handle)` compiles to)
+             */
             node_type* erase_node(node_type* const erased)
             {
                 assert(erased != nullptr && "msvc8 tree: erasing a null node");
@@ -984,6 +1035,13 @@ namespace msvc8
             /**
              * Address: 0x00497E10 (FUN_00497E10, the trail-segment pool's subtree destroy)
              */
+            /**
+             * Address: 0x0077B4F0 (FUN_0077B4F0, inner bucket range erase)
+             * Address: 0x00779B80 (FUN_00779B80, inner bucket storage release)
+             * Address: 0x0077B7D0 (FUN_0077B7D0, its typed wrapper)
+             * Address: 0x00779240 (FUN_00779240, outer map storage release)
+             * Address: 0x0077AC30 (FUN_0077AC30, its typed wrapper)
+             */
             void clear() noexcept
             {
                 destroy_subtree(root());
@@ -1094,6 +1152,19 @@ namespace msvc8
              * and link)
              * Address: 0x0049EC00 (FUN_0049EC00, its node-array allocate)
              */
+            /**
+             * Address: 0x00A58450 (FUN_00A58450, the unidentified `map<int32_t, T>`
+             * instantiation's node buy -- `operator new(0x24)`, writes the three
+             * link fields at `+0x00`/`+0x04`/`+0x08`, copy-constructs the 20-byte
+             * value at `+0x0C`, colour at `+0x20`, nil at `+0x21`. Reached from
+             * `insert_at`'s call site cited above (0x00A63950).)
+             */
+            /**
+             * Address: 0x0077CD00 (FUN_0077CD00, inner bucket node allocate)
+             * Address: 0x0077C690 (FUN_0077C690, its clone-from-source form)
+             * Address: 0x0077CAE0 (FUN_0077CAE0, outer map value node; emitted again at
+             * 0x0077DC40)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -1111,6 +1182,10 @@ namespace msvc8
                 return n;
             }
 
+            /**
+             * Address: 0x0077C6F0 (FUN_0077C6F0, the decal tree node delete lane;
+             * emitted again at 0x0077CF50)
+             */
             static void free_node(node_type* const n) noexcept
             {
                 n->value.~value_type();
@@ -1221,6 +1296,12 @@ namespace msvc8
              * colour/nil instantiations cited on `erase_node` above, reached
              * from their rebalance-fixup loops (0x00A633D0/0x00A63690).
              */
+            /**
+             * Address: 0x0077B0B0 (FUN_0077B0B0, the outer start-tick map)
+             * Address: 0x0077C5E0 (FUN_0077C5E0, the inner bucket set)
+             *
+             * CDecalBuffer's start-tick table is `std::map<unsigned, std::set<CDecalHandle*>>`, so each member is emitted twice -- once for the 0x20 outer node (colour/nil at +0x1C/+0x1D) and once for the 0x14 inner node (+0x10/+0x11).
+             */
             void rotate_left(node_type* const n) noexcept
             {
                 node_type* const pivot = n->right;
@@ -1261,6 +1342,10 @@ namespace msvc8
              * Right-rotate lanes for the same two `[node+0x10]`/`[node+0x11]`
              * colour/nil instantiations cited on `erase_node` above, reached
              * from their rebalance-fixup loops (0x00A633D0/0x00A63690).
+             */
+            /**
+             * Address: 0x0077B160 (FUN_0077B160, outer map)
+             * Address: 0x0077C640 (FUN_0077C640, inner bucket set)
              */
             void rotate_right(node_type* const n) noexcept
             {
@@ -1307,6 +1392,16 @@ namespace msvc8
              * buy-node call, and fixup loop shape calling `rotate_left`
              * (0x00A52800/0x00A529D0) on both the left- and right-uncle-red
              * branches; owning class not traced in this pass)
+             */
+            /**
+             * Address: 0x0077B600 (FUN_0077B600, inner bucket link-and-rebalance)
+             * Address: 0x0077BE80 (FUN_0077BE80, outer map link-and-rebalance)
+             * Address: 0x0077AF40 (FUN_0077AF40, the outer map's insert-position resolve)
+             * Address: 0x0077A3C0 (FUN_0077A3C0, the outer map's insert with
+             * rebalance -- the `_Xlen` throw, the rotates at 0x0077B0B0/0x0077B160
+             * and the successor at 0x0077CE50 are all reached from it. This was
+             * the CreateHandle insert-side left deferred when the CDecalBuffer
+             * tree first landed in 90e6ffa.)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {

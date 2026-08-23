@@ -1,5 +1,7 @@
 #pragma once
 
+#include "legacy/containers/Map.h"
+#include "legacy/containers/Set.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -20,12 +22,18 @@ namespace moho
   class CArmyImpl;
   class CDecalHandle;
 
-  struct CDecalStartTickMapStorage
-  {
-    void* allocatorCookie;
-    void* head;
-    std::uint32_t size;
-  };
+  class CDecalHandle;
+
+  /**
+   * The start-tick bucket table is
+   * `std::map<unsigned, std::set<CDecalHandle*>>`. The outer node is 0x20:
+   * links 0x0C, the tick key at +0x0C, the inner set's own 0x0C
+   * `{proxy, head, size}` header at +0x10 as the mapped value, colour and nil
+   * at +0x1C/+0x1D. The inner node is 0x14: links 0x0C, the handle pointer at
+   * +0x0C, colour and nil at +0x10/+0x11.
+   */
+  using CDecalBucketSet = msvc8::set<CDecalHandle*>;
+  using CDecalStartTickMapStorage = msvc8::map<std::uint32_t, CDecalBucketSet>;
   static_assert(sizeof(CDecalStartTickMapStorage) == 0x0C, "CDecalStartTickMapStorage size must be 0x0C");
 
   class CDecalBuffer
