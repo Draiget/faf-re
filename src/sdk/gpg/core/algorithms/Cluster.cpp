@@ -4133,7 +4133,9 @@ namespace
      *                check and its "list<T> too long" `length_error`,
      *   0x00934080 - `msvc8::vector<iterator>::resize(n, end())` from `_Grow`,
      *                itself reaching `vector::insert(pos, n, value)`
-     *                (0x00933640).
+     *                (0x00933640), whose element-range copy/shift step is
+     *                0x00932610 (a plain forward 4-byte-element copy loop,
+     *                matching `iterator`'s pointer-sized storage).
      *
      * The bucket fold is inlined into this body rather than shared with
      * 0x00932080: `gpg::HashBytes` is called directly at the top and
