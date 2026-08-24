@@ -3696,49 +3696,6 @@ namespace
     offsetof(CMauiControlLuaObjectView, luaObject) == 0x20, "CMauiControlLuaObjectView::luaObject offset must be 0x20"
   );
 
-  struct CommandDbMapNodeView
-  {
-    CommandDbMapNodeView* left;   // +0x00
-    CommandDbMapNodeView* parent; // +0x04
-    CommandDbMapNodeView* right;  // +0x08
-    std::uint32_t key;            // +0x0C
-    CUnitCommand* value;          // +0x10
-    std::uint8_t color;           // +0x14 (0 = red, 1 = black)
-    std::uint8_t isNil;           // +0x15 (1 = head/sentinel)
-    std::uint8_t reserved16[2];   // +0x16
-  };
-  static_assert(sizeof(CommandDbMapNodeView) == 0x18, "CommandDbMapNodeView size must be 0x18");
-  static_assert(offsetof(CommandDbMapNodeView, key) == 0x0C, "CommandDbMapNodeView::key offset must be 0x0C");
-  static_assert(offsetof(CommandDbMapNodeView, value) == 0x10, "CommandDbMapNodeView::value offset must be 0x10");
-  static_assert(offsetof(CommandDbMapNodeView, color) == 0x14, "CommandDbMapNodeView::color offset must be 0x14");
-  static_assert(offsetof(CommandDbMapNodeView, isNil) == 0x15, "CommandDbMapNodeView::isNil offset must be 0x15");
-
-  struct CommandDbMapStorageView
-  {
-    void* proxy;                 // +0x00
-    CommandDbMapNodeView* head;  // +0x04
-    std::uint32_t size;          // +0x08
-  };
-  static_assert(sizeof(CommandDbMapStorageView) == 0x0C, "CommandDbMapStorageView size must be 0x0C");
-
-  struct CCommandDbRuntimeView
-  {
-    // Binary-faithful view used by FUN_006E0EC0 lift:
-    // map at +0x04, IdPool at +0x10, pending released-id vector at +0xCC0.
-    Sim* sim;                                   // +0x0000
-    CommandDbMapStorageView map;                // +0x0004
-    IdPool pool;                                // +0x0010
-    msvc8::vector<CmdId> pendingReleasedCmdIds; // +0x0CC0
-  };
-  static_assert(sizeof(msvc8::vector<CmdId>) == 0x10, "msvc8::vector<CmdId> size must be 0x10");
-  static_assert(offsetof(CCommandDbRuntimeView, map) == 0x04, "CCommandDbRuntimeView::map offset must be 0x04");
-  static_assert(offsetof(CCommandDbRuntimeView, pool) == 0x10, "CCommandDbRuntimeView::pool offset must be 0x10");
-  static_assert(
-    offsetof(CCommandDbRuntimeView, pendingReleasedCmdIds) == 0xCC0,
-    "CCommandDbRuntimeView::pendingReleasedCmdIds offset must be 0xCC0"
-  );
-  static_assert(sizeof(CCommandDbRuntimeView) == 0xCD0, "CCommandDbRuntimeView size must be 0xCD0");
-
   struct CommandIssueWeakSetNode
   {
     CommandIssueWeakSetNode* left;   // +0x00
@@ -3848,13 +3805,6 @@ namespace
     "CommandIssueHelperRuntimeView::localQueue offset must be 0xB8"
   );
 
-  /// `moho::CommandManager` owns this layout; the only thing this file adds
-  /// is a typed view of the command map, whose nodes it walks directly
-  /// rather than through `msvc8::map`.
-  [[nodiscard]] inline CommandDbMapStorageView& CommandIssueMapOf(CommandManager& manager) noexcept
-  {
-    return *reinterpret_cast<CommandDbMapStorageView*>(&manager.mCommands);
-  }
   static_assert(sizeof(CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
 
   static_assert(
@@ -3866,561 +3816,10 @@ namespace
   static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
   static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
 
-  constexpr std::uint8_t kTreeRed = 0;
-  constexpr std::uint8_t kTreeBlack = 1;
-
   [[nodiscard]]
   BVIntSet& AsBitSet(SimSubRes3& slot) noexcept
   {
     return *reinterpret_cast<BVIntSet*>(&slot);
-  }
-
-  /**
-   * Address: 0x006E1F70 (FUN_006E1F70)
-   *
-   * What it does:
-   * Returns the leftmost node reachable from `node` using the map sentinel.
-   */
-  [[nodiscard]] CommandDbMapNodeView* TreeMinNode(CommandDbMapNodeView* node, CommandDbMapNodeView* head) noexcept
-  {
-    while (node->left != head) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x006E1F90 (FUN_006E1F90)
-   *
-   * What it does:
-   * Returns the rightmost node reachable from `node` using the map sentinel.
-   */
-  [[nodiscard]] CommandDbMapNodeView* TreeMaxNode(CommandDbMapNodeView* node, CommandDbMapNodeView* head) noexcept
-  {
-    while (node->right != head) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  [[nodiscard]]
-  std::uint8_t NodeColor(const CommandDbMapNodeView* node, const CommandDbMapNodeView* head) noexcept
-  {
-    if (!node || node == head) {
-      return kTreeBlack;
-    }
-    return node->color;
-  }
-
-  void RotateLeft(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    CommandDbMapNodeView* const pivot = node->right;
-
-    node->right = pivot->left;
-    if (pivot->left != head) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  void RotateRight(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    CommandDbMapNodeView* const pivot = node->left;
-
-    node->left = pivot->right;
-    if (pivot->right != head) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->right) {
-      node->parent->right = pivot;
-    } else {
-      node->parent->left = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  void ReplaceTreeNode(CommandDbMapStorageView& map, CommandDbMapNodeView* oldNode, CommandDbMapNodeView* newNode)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    if (oldNode->parent == head) {
-      head->parent = newNode;
-    } else if (oldNode == oldNode->parent->left) {
-      oldNode->parent->left = newNode;
-    } else {
-      oldNode->parent->right = newNode;
-    }
-
-    if (newNode != head) {
-      newNode->parent = oldNode->parent;
-    }
-  }
-
-  void RefreshTreeBounds(CommandDbMapStorageView& map)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    if (!head) {
-      return;
-    }
-
-    CommandDbMapNodeView* const root = head->parent;
-    if (!root || root == head || root->isNil != 0u) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    head->left = TreeMinNode(root, head);
-    head->right = TreeMaxNode(root, head);
-  }
-
-  void EraseFixup(
-    CommandDbMapStorageView& map, CommandDbMapNodeView* node, CommandDbMapNodeView* nodeParent
-  )
-  {
-    CommandDbMapNodeView* const head = map.head;
-
-    while (node != head->parent && NodeColor(node, head) == kTreeBlack) {
-      if (node == nodeParent->left) {
-        CommandDbMapNodeView* sibling = nodeParent->right;
-        if (NodeColor(sibling, head) == kTreeRed) {
-          sibling->color = kTreeBlack;
-          nodeParent->color = kTreeRed;
-          RotateLeft(map, nodeParent);
-          sibling = nodeParent->right;
-        }
-
-        if (sibling == head) {
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (NodeColor(sibling->left, head) == kTreeBlack && NodeColor(sibling->right, head) == kTreeBlack) {
-          sibling->color = kTreeRed;
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (NodeColor(sibling->right, head) == kTreeBlack) {
-          if (sibling->left != head) {
-            sibling->left->color = kTreeBlack;
-          }
-          sibling->color = kTreeRed;
-          RotateRight(map, sibling);
-          sibling = nodeParent->right;
-        }
-
-        sibling->color = nodeParent->color;
-        nodeParent->color = kTreeBlack;
-        if (sibling->right != head) {
-          sibling->right->color = kTreeBlack;
-        }
-        RotateLeft(map, nodeParent);
-      } else {
-        CommandDbMapNodeView* sibling = nodeParent->left;
-        if (NodeColor(sibling, head) == kTreeRed) {
-          sibling->color = kTreeBlack;
-          nodeParent->color = kTreeRed;
-          RotateRight(map, nodeParent);
-          sibling = nodeParent->left;
-        }
-
-        if (sibling == head) {
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (NodeColor(sibling->right, head) == kTreeBlack && NodeColor(sibling->left, head) == kTreeBlack) {
-          sibling->color = kTreeRed;
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (NodeColor(sibling->left, head) == kTreeBlack) {
-          if (sibling->right != head) {
-            sibling->right->color = kTreeBlack;
-          }
-          sibling->color = kTreeRed;
-          RotateLeft(map, sibling);
-          sibling = nodeParent->left;
-        }
-
-        sibling->color = nodeParent->color;
-        nodeParent->color = kTreeBlack;
-        if (sibling->left != head) {
-          sibling->left->color = kTreeBlack;
-        }
-        RotateRight(map, nodeParent);
-      }
-
-      node = head->parent;
-      break;
-    }
-
-    if (node != head) {
-      node->color = kTreeBlack;
-    }
-  }
-
-  /**
-   * Address: 0x006E1670 (FUN_006E1670, sub_6E1670)
-   *
-   * What it does:
-   * Removes one command-id node from the command DB map and rebalances the RB-tree.
-   */
-  void EraseCommandNode(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    CommandDbMapNodeView* y = node;
-    CommandDbMapNodeView* x = head;
-    CommandDbMapNodeView* xParent = head;
-    std::uint8_t yColor = y->color;
-
-    if (node->left == head) {
-      x = node->right;
-      xParent = node->parent;
-      ReplaceTreeNode(map, node, node->right);
-    } else if (node->right == head) {
-      x = node->left;
-      xParent = node->parent;
-      ReplaceTreeNode(map, node, node->left);
-    } else {
-      y = TreeMinNode(node->right, head);
-      yColor = y->color;
-      x = y->right;
-      if (y->parent == node) {
-        xParent = y;
-      } else {
-        xParent = y->parent;
-        ReplaceTreeNode(map, y, y->right);
-        y->right = node->right;
-        y->right->parent = y;
-      }
-
-      ReplaceTreeNode(map, node, y);
-      y->left = node->left;
-      y->left->parent = y;
-      y->color = node->color;
-    }
-
-    if (yColor == kTreeBlack) {
-      EraseFixup(map, x, xParent);
-    }
-
-    ::operator delete(node);
-    if (map.size != 0u) {
-      --map.size;
-    }
-    RefreshTreeBounds(map);
-  }
-
-  /**
-   * Address: 0x006E1940 (FUN_006E1940, sub_6E1940)
-   *
-   * What it does:
-   * Returns the exact command-id node in a command-id map view, or the
-   * head/sentinel when absent.
-   */
-  [[nodiscard]] const CommandDbMapNodeView* FindCommandNode(const CommandDbMapStorageView& map, const CmdId cmdId)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    if (!head) {
-      return nullptr;
-    }
-
-    const std::uint32_t key = static_cast<std::uint32_t>(cmdId);
-    CommandDbMapNodeView* result = head;
-    CommandDbMapNodeView* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      if (node->key >= key) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || key < result->key) {
-      return head;
-    }
-
-    return result;
-  }
-
-  [[nodiscard]] CommandDbMapNodeView* FindCommandNode(CommandDbMapStorageView& map, const CmdId cmdId)
-  {
-    return const_cast<CommandDbMapNodeView*>(FindCommandNode(static_cast<const CommandDbMapStorageView&>(map), cmdId));
-  }
-
-  [[nodiscard]] const CommandDbMapNodeView* FindCommandNode(const CCommandDbRuntimeView& commandDb, const CmdId cmdId)
-  {
-    return FindCommandNode(commandDb.map, cmdId);
-  }
-
-  [[nodiscard]] CommandDbMapNodeView* FindCommandNode(CCommandDbRuntimeView& commandDb, const CmdId cmdId)
-  {
-    return FindCommandNode(commandDb.map, cmdId);
-  }
-
-  [[nodiscard]] CommandDbMapNodeView* AllocateCommandDbMapHeadNode()
-  {
-    auto* const head = static_cast<CommandDbMapNodeView*>(::operator new(sizeof(CommandDbMapNodeView)));
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->key = 0u;
-    head->value = nullptr;
-    head->color = kTreeBlack;
-    head->isNil = 1u;
-    head->reserved16[0] = 0u;
-    head->reserved16[1] = 0u;
-    return head;
-  }
-
-  void InitializeCommandDbMapHead(CommandDbMapStorageView& map)
-  {
-    map.head = AllocateCommandDbMapHeadNode();
-    map.size = 0u;
-  }
-
-  /**
-   * Address: 0x006E0E90 (FUN_006E0E90)
-   *
-   * What it does:
-   * Looks up one command-id node in the command DB map and returns its
-   * command pointer payload, or null when the id is absent.
-   */
-  [[maybe_unused]] CUnitCommand* FindCommandByIdRuntimeMap(const CCommandDbRuntimeView& commandDb, const CmdId cmdId)
-  {
-    const CommandDbMapNodeView* const node = FindCommandNode(commandDb.map, cmdId);
-    if (node == nullptr || node == commandDb.map.head) {
-      return nullptr;
-    }
-    return node->value;
-  }
-
-  /**
-   * Address: 0x006E1520 (FUN_006E1520)
-   *
-   * What it does:
-   * Initializes one command-map sentinel/head lane and returns the owning
-   * command-db runtime pointer.
-   */
-  [[maybe_unused]] CCommandDbRuntimeView* InitializeCommandDbMapStorageLaneA(CCommandDbRuntimeView* const commandDb)
-  {
-    InitializeCommandDbMapHead(commandDb->map);
-    return commandDb;
-  }
-
-  void AdvanceCommandDbIteratorNode(CommandDbMapNodeView*& node) noexcept
-  {
-    if (node == nullptr || node->isNil != 0u) {
-      return;
-    }
-
-    CommandDbMapNodeView* right = node->right;
-    if (right->isNil != 0u) {
-      CommandDbMapNodeView* parent = node->parent;
-      while (parent->isNil == 0u) {
-        if (node != parent->right) {
-          break;
-        }
-        node = parent;
-        parent = parent->parent;
-      }
-      node = parent;
-      return;
-    }
-
-    while (right->left->isNil == 0u) {
-      right = right->left;
-    }
-    node = right;
-  }
-
-  /**
-   * Address: 0x006E1A90 (FUN_006E1A90)
-   *
-   * What it does:
-   * Advances one command-map iterator slot to its in-order successor and
-   * returns the same iterator-slot pointer.
-   */
-  [[maybe_unused]] CommandDbMapNodeView** AdvanceCommandDbIteratorSlotLaneA(CommandDbMapNodeView** const iteratorSlot)
-  {
-    if (iteratorSlot != nullptr) {
-      AdvanceCommandDbIteratorNode(*iteratorSlot);
-    }
-    return iteratorSlot;
-  }
-
-  /**
-   * Address: 0x006E1AB0 (FUN_006E1AB0)
-   *
-   * What it does:
-   * Duplicate iterator-advance lane for command-map iterator slots.
-   */
-  [[maybe_unused]] CommandDbMapNodeView** AdvanceCommandDbIteratorSlotLaneB(CommandDbMapNodeView** const iteratorSlot)
-  {
-    return AdvanceCommandDbIteratorSlotLaneA(iteratorSlot);
-  }
-
-  /**
-   * Address: 0x006E1CF0 (FUN_006E1CF0)
-   *
-   * What it does:
-   * Duplicate command-map sentinel/head initialization lane that returns the
-   * owning command-db runtime pointer.
-   */
-  [[maybe_unused]] CCommandDbRuntimeView* InitializeCommandDbMapStorageLaneB(CCommandDbRuntimeView* const commandDb)
-  {
-    return InitializeCommandDbMapStorageLaneA(commandDb);
-  }
-
-  /**
-   * Address: 0x006E2080 (FUN_006E2080)
-   *
-   * What it does:
-   * Scalar delete adapter lane for command-map allocation storage.
-   */
-  [[maybe_unused]] void DeleteCommandDbAllocationLaneA(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
-
-  /**
-   * Address: 0x006E2200 (FUN_006E2200)
-   *
-   * What it does:
-   * Advances one command-map iterator slot and returns the same iterator-slot
-   * pointer.
-   */
-  [[maybe_unused]] CommandDbMapNodeView** AdvanceCommandDbIteratorCursorSlotLaneA(
-    const std::uint32_t,
-    CommandDbMapNodeView** const iteratorSlot
-  ) noexcept
-  {
-    (void)AdvanceCommandDbIteratorSlotLaneA(iteratorSlot);
-    return iteratorSlot;
-  }
-
-  /**
-   * Address: 0x006E2390 (FUN_006E2390)
-   *
-   * What it does:
-   * Initializes one command-map sentinel/head lane and returns the newly
-   * initialized map head.
-   */
-  [[maybe_unused]] CommandDbMapNodeView* InitializeCommandDbMapStorageLaneC(CCommandDbRuntimeView* const commandDb)
-  {
-    InitializeCommandDbMapHead(commandDb->map);
-    return commandDb->map.head;
-  }
-
-  /**
-   * Address: 0x006E2470 (FUN_006E2470)
-   *
-   * What it does:
-   * Duplicate scalar delete adapter lane for command-map allocation storage.
-   */
-  [[maybe_unused]] void DeleteCommandDbAllocationLaneB(void* const allocation) noexcept
-  {
-    ::operator delete(allocation);
-  }
-
-  /**
-   * Address: 0x006E27D0 (FUN_006E27D0)
-   *
-   * What it does:
-   * Duplicate command-map iterator cursor-slot advance lane.
-   */
-  [[maybe_unused]] CommandDbMapNodeView** AdvanceCommandDbIteratorCursorSlotLaneB(
-    const std::uint32_t laneTag,
-    CommandDbMapNodeView** const iteratorSlot
-  ) noexcept
-  {
-    return AdvanceCommandDbIteratorCursorSlotLaneA(laneTag, iteratorSlot);
-  }
-
-  void DestroyCommandDbMapSubtree(CommandDbMapNodeView* const node, CommandDbMapNodeView* const head)
-  {
-    if (node == nullptr || node == head || node->isNil != 0u) {
-      return;
-    }
-
-    DestroyCommandDbMapSubtree(node->right, head);
-    DestroyCommandDbMapSubtree(node->left, head);
-    ::operator delete(node);
-  }
-
-  /**
-   * Address: 0x006E2810 (FUN_006E2810)
-   *
-   * What it does:
-   * Destroys all command-map tree nodes under the map head and resets the
-   * sentinel links and size to the empty-map state.
-   */
-  [[maybe_unused]] CommandDbMapNodeView* ClearCommandDbMapAndResetHead(CCommandDbRuntimeView* const commandDb)
-  {
-    CommandDbMapNodeView* const head = commandDb->map.head;
-    DestroyCommandDbMapSubtree(head->parent, head);
-    head->parent = head;
-    commandDb->map.size = 0u;
-    head->left = head;
-    head->right = head;
-    return head;
-  }
-
-  /**
-   * Address: 0x006E28A0 (FUN_006E28A0)
-   *
-   * What it does:
-   * Allocates storage for one command-map node lane.
-   */
-  [[maybe_unused]] CommandDbMapNodeView* AllocateSingleCommandDbMapNodeStorage()
-  {
-    return static_cast<CommandDbMapNodeView*>(::operator new(sizeof(CommandDbMapNodeView)));
-  }
-
-  /**
-   * Address: 0x006E28C0 (FUN_006E28C0)
-   *
-   * What it does:
-   * Copies one command-map iterator value into `outSlot`, advances the source
-   * iterator slot, and returns `outSlot`.
-   */
-  [[maybe_unused]] CommandDbMapNodeView** CopyAndAdvanceCommandDbIteratorSlot(
-    CommandDbMapNodeView** const sourceSlot,
-    CommandDbMapNodeView** const outSlot
-  ) noexcept
-  {
-    if (outSlot != nullptr && sourceSlot != nullptr) {
-      *outSlot = *sourceSlot;
-      AdvanceCommandDbIteratorNode(*sourceSlot);
-    }
-    return outSlot;
   }
 
   /**
@@ -4429,8 +3828,16 @@ namespace
    * What it does:
    * Finds one command-issue helper by command id in the session command-manager
    * map and returns the mapped helper pointer, or `nullptr` when absent.
+   *
+   * Real disassembly (`std::map_CmdId_CommandIssueHelper::find`, FUN_008B6160,
+   * cited on `rb_tree::find_node` in `RbTree.h`) is a plain
+   * `commandManager->mCommands.find(cmdId)`; this used to reach in through a
+   * bespoke `CommandDbMapStorageView`/`CommandDbMapNodeView` pair
+   * (`CommandIssueMapOf` + `FindCommandNode`) that hand-walked the same real
+   * `msvc8::map<CmdId, UserCommandIssueHelper*> CommandManager::mCommands`
+   * (`CommandManager.h`) member instead of calling it.
    */
-  [[maybe_unused]] [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelperInManager(
+  [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelperInManager(
     CommandManager* const commandManager,
     const CmdId cmdId
   ) noexcept
@@ -4439,13 +3846,12 @@ namespace
       return nullptr;
     }
 
-    CommandDbMapStorageView& commandIssueMap = CommandIssueMapOf(*commandManager);
-    CommandDbMapNodeView* const node = FindCommandNode(commandIssueMap, cmdId);
-    if (node == nullptr || node == commandIssueMap.head) {
+    const auto it = commandManager->mCommands.find(cmdId);
+    if (it == commandManager->mCommands.end()) {
       return nullptr;
     }
 
-    return reinterpret_cast<CommandIssueHelperRuntimeView*>(node->value);
+    return reinterpret_cast<CommandIssueHelperRuntimeView*>(it->second);
   }
 
   [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelper(CWldSession* const session, const CmdId cmdId)
@@ -5502,7 +4908,7 @@ namespace
    * Address: 0x006E1A10 (FUN_006E1A10)
    *
    * What it does:
-   * Appends one command id into `CCommandDbRuntimeView::pendingReleasedCmdIds`,
+   * Appends one command id into `CCommandDb::pendingReleasedCmdIds`,
    * growing vector storage when needed.
    */
   void AppendPendingReleasedCommandId(msvc8::vector<CmdId>& pendingReleasedCmdIds, const CmdId cmdId)
@@ -5511,16 +4917,30 @@ namespace
   }
 
   /**
-   * Address: 0x006E0EC0 (FUN_006E0EC0, sub_6E0EC0)
+   * Address: 0x006E0EC0 (FUN_006E0EC0, ?RemoveCmd@CCommandDB@Moho@@...)
    *
    * IDA signature:
-   * int __stdcall sub_6E0EC0(Moho::CCommandDB *commandDb, int cmdId);
+   * int __stdcall Moho::CCommandDB::RemoveCmd(Moho::CCommandDB *commandDb, Moho::CmdId cmdId);
    *
    * What it does:
-   * Releases an unconsumed command id from the command DB:
-   * removes the map entry when present, records recycled low-24 ids in the
-   * rolling IdPool history slot, and queues the id into the pending-release vector
-   * (matching `FUN_006E1A10` append semantics).
+   * Removes one command-id entry from the command DB's `commands` map when
+   * present (`sub_6E1940`/`sub_6E1670`, `msvc8::map<CmdId,CUnitCommand*>::
+   * find`/`erase_node` for this instantiation, cited on `rb_tree::find_node`/
+   * `erase_node` in `RbTree.h`), records recycled low-24 ids in the rolling
+   * IdPool history slot for source-byte 0x80, and queues the id into the
+   * pending-release vector (`FUN_006E1A10`, `AppendPendingReleasedCommandId`).
+   *
+   * Used to reach into `commandDb` through a bespoke `CCommandDbRuntimeView`
+   * cast; `commands`/`pool`/`pendingReleasedCmdIds` are `CCommandDb`'s own
+   * real typed members (`CCommandDb.h`), so the cast is gone.
+   *
+   * The null-`commandDb` guard and the `(cmdId & 0xFF000000) == 0xFF000000`
+   * early-out are not present in `FUN_006E0EC0`'s own body -- the mask check
+   * is applied at its real call sites instead (e.g. `Moho::UNIT_IssueCommand`,
+   * FUN_006F12C0, guards the call with `(cmdId & 0xFF000000) != 0xFF000000`).
+   * Kept here defensively: a Sim.cpp call site deliberately passes a possibly
+   * null `mCommandDB` relying on this guard, and folding three call-site
+   * guards into one is behaviourally equivalent for every real caller.
    */
   void ReleaseCommandIdIfUnconsumed(CCommandDb* commandDb, const CmdId cmdId)
   {
@@ -5532,158 +4952,21 @@ namespace
       return;
     }
 
-    auto* const runtime = reinterpret_cast<CCommandDbRuntimeView*>(commandDb);
-    if (runtime->map.head != nullptr) {
-      CommandDbMapNodeView* const node = FindCommandNode(*runtime, cmdId);
-      if (node != nullptr && node != runtime->map.head) {
-        EraseCommandNode(runtime->map, node);
-      }
+    const auto it = commandDb->commands.find(cmdId);
+    if (it != commandDb->commands.end()) {
+      commandDb->commands.erase(it);
     }
 
     const std::uint32_t commandType = static_cast<std::uint32_t>(cmdId) & 0xFF000000u;
     if (commandType == 0x80000000u) {
-      const std::int32_t retireIndex = (runtime->pool.mSubRes2.mEnd + 99) % 100;
-      SimSubRes3& retireSlot = runtime->pool.mSubRes2.mData[retireIndex];
+      const std::int32_t retireIndex = (commandDb->pool.mSubRes2.mEnd + 99) % 100;
+      SimSubRes3& retireSlot = commandDb->pool.mSubRes2.mData[retireIndex];
       AsBitSet(retireSlot).Add(static_cast<std::uint32_t>(cmdId) & 0x00FFFFFFu);
     }
 
-    AppendPendingReleasedCommandId(runtime->pendingReleasedCmdIds, cmdId);
+    AppendPendingReleasedCommandId(commandDb->pendingReleasedCmdIds, cmdId);
   }
 
-  [[maybe_unused]] void InsertCommandNodeFixup(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    while (node->parent != head && node->parent->color == kTreeRed) {
-      CommandDbMapNodeView* const grandParent = node->parent->parent;
-      if (node->parent == grandParent->left) {
-        CommandDbMapNodeView* uncle = grandParent->right;
-        if (NodeColor(uncle, head) == kTreeRed) {
-          node->parent->color = kTreeBlack;
-          if (uncle != head) {
-            uncle->color = kTreeBlack;
-          }
-          grandParent->color = kTreeRed;
-          node = grandParent;
-          continue;
-        }
-
-        if (node == node->parent->right) {
-          node = node->parent;
-          RotateLeft(map, node);
-        }
-
-        node->parent->color = kTreeBlack;
-        grandParent->color = kTreeRed;
-        RotateRight(map, grandParent);
-      } else {
-        CommandDbMapNodeView* uncle = grandParent->left;
-        if (NodeColor(uncle, head) == kTreeRed) {
-          node->parent->color = kTreeBlack;
-          if (uncle != head) {
-            uncle->color = kTreeBlack;
-          }
-          grandParent->color = kTreeRed;
-          node = grandParent;
-          continue;
-        }
-
-        if (node == node->parent->left) {
-          node = node->parent;
-          RotateRight(map, node);
-        }
-
-        node->parent->color = kTreeBlack;
-        grandParent->color = kTreeRed;
-        RotateLeft(map, grandParent);
-      }
-    }
-
-    if (head->parent != nullptr && head->parent != head) {
-      head->parent->color = kTreeBlack;
-    }
-    RefreshTreeBounds(map);
-  }
-
-  [[maybe_unused]] [[nodiscard]] CommandDbMapNodeView* AllocateCommandNode(const CmdId cmdId, CUnitCommand* const command)
-  {
-    auto* const node = static_cast<CommandDbMapNodeView*>(::operator new(sizeof(CommandDbMapNodeView)));
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->key = static_cast<std::uint32_t>(cmdId);
-    node->value = command;
-    node->color = kTreeRed;
-    node->isNil = 0u;
-    node->reserved16[0] = 0u;
-    node->reserved16[1] = 0u;
-    return node;
-  }
-
-  [[maybe_unused]] void InsertCommandNode(CommandDbMapStorageView& map, const CmdId cmdId, CUnitCommand* const command)
-  {
-    CommandDbMapNodeView* const head = map.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    CommandDbMapNodeView* parent = head;
-    CommandDbMapNodeView* cursor = head->parent;
-    bool insertLeft = true;
-    const std::uint32_t key = static_cast<std::uint32_t>(cmdId);
-
-    while (cursor != nullptr && cursor != head && cursor->isNil == 0u) {
-      parent = cursor;
-      if (key < cursor->key) {
-        insertLeft = true;
-        cursor = cursor->left;
-      } else {
-        insertLeft = false;
-        cursor = cursor->right;
-      }
-    }
-
-    auto* const node = AllocateCommandNode(cmdId, command);
-    node->left = head;
-    node->right = head;
-    node->parent = parent;
-
-    if (parent == head) {
-      head->parent = node;
-      head->left = node;
-      head->right = node;
-    } else if (insertLeft) {
-      parent->left = node;
-      if (parent == head->left) {
-        head->left = node;
-      }
-    } else {
-      parent->right = node;
-      if (parent == head->right) {
-        head->right = node;
-      }
-    }
-
-    ++map.size;
-    InsertCommandNodeFixup(map, node);
-  }
-
-  [[nodiscard]] UserCommandIssueHelper* CommandIssueHelperFromCommandNode(CommandDbMapNodeView* const node) noexcept
-  {
-    return node != nullptr ? reinterpret_cast<UserCommandIssueHelper*>(node->value) : nullptr;
-  }
-
-  [[nodiscard]] CUnitCommand* CommandIssueHelperAsCommandNodeValue(UserCommandIssueHelper* const helper) noexcept
-  {
-    return reinterpret_cast<CUnitCommand*>(helper);
-  }
-
-  /**
-   * Address: 0x008B5A70 (FUN_008B5A70, struct_CommandManager::FindDataFor)
-   *
-   * What it does:
-   * Finds an existing helper for one command id or constructs and inserts a
-   * new command-issue helper, then marks reused helper variable data dirty.
-   */
 } // namespace
 
 namespace moho
@@ -5748,6 +5031,23 @@ namespace moho
     , mCommands()
   {}
 
+  /**
+   * Address: 0x008B5A70 (FUN_008B5A70, struct_CommandManager::FindDataFor /
+   * struct_CommandManager::NewCommand)
+   *
+   * What it does:
+   * Finds an existing helper for one command id or constructs and inserts a
+   * new command-issue helper, then marks reused helper variable data dirty.
+   *
+   * Real disassembly calls `std::map_CmdId_CommandIssueHelper::find`
+   * (FUN_008B6160) then, on a miss, `sub_8B5DF0` (`insert(const value_type&)`)
+   * -- both cited on `rb_tree::find_node`/`insert_unique` in `RbTree.h` for
+   * this `msvc8::map<CmdId, UserCommandIssueHelper*>` instantiation
+   * (`CommandManager::mCommands`, `CommandManager.h`). This used to reach in
+   * through a bespoke `CommandDbMapStorageView`/`CommandDbMapNodeView` pair
+   * (`CommandIssueMapOf` + `FindCommandNode`/`InsertCommandNode`) that
+   * hand-walked the same real member instead of calling it.
+   */
   [[nodiscard]] UserCommandIssueHelper* FindOrCreateCommandIssueHelper(
     CommandManager& commandManager,
     const SSTICommandConstantData& constantData,
@@ -5756,14 +5056,14 @@ namespace moho
   )
   {
     const CmdId commandId = static_cast<CmdId>(constantData.cmd);
-    CommandDbMapNodeView* const node = FindCommandNode(CommandIssueMapOf(commandManager), commandId);
-    if (node == nullptr || node == CommandIssueMapOf(commandManager).head) {
+    const auto it = commandManager.mCommands.find(commandId);
+    if (it == commandManager.mCommands.end()) {
       auto* const helper = new UserCommandIssueHelper(constantData, deleteWhenDue, dueSeqNo);
-      InsertCommandNode(CommandIssueMapOf(commandManager), commandId, CommandIssueHelperAsCommandNodeValue(helper));
+      commandManager.mCommands.insert({commandId, helper});
       return helper;
     }
 
-    UserCommandIssueHelper* const helper = CommandIssueHelperFromCommandNode(node);
+    UserCommandIssueHelper* const helper = it->second;
     helper->mVariableDataDirty = 1u;
     helper->mDeleteWhenDue = 0u;
     return helper;
@@ -5775,6 +5075,14 @@ namespace moho
    * What it does:
    * Deletes command-issue helpers for each supplied command id and recycles
    * ids that belong to the manager's active source byte.
+   *
+   * Real disassembly calls `std::map_CmdId_CommandIssueHelper::find`
+   * (FUN_008B6160, cited on `rb_tree::find_node` in `RbTree.h`) then deletes
+   * the mapped helper directly -- it does not erase the node from
+   * `mCommands` afterward, leaving a dangling entry behind; that is the
+   * binary's own behaviour (every id passed here also gets queued for id-pool
+   * recycling below, so a stale map entry never resolves to a live helper
+   * again), preserved exactly rather than "fixed" with an added `.erase()`.
    */
   void DeleteCommandIssueHelpers(
     CommandManager& commandManager,
@@ -5783,9 +5091,9 @@ namespace moho
   {
     for (const CmdId* cursor = commandIds.begin(); cursor != commandIds.end(); ++cursor) {
       const CmdId commandId = *cursor;
-      CommandDbMapNodeView* const node = FindCommandNode(CommandIssueMapOf(commandManager), commandId);
-      if (node != nullptr && node != CommandIssueMapOf(commandManager).head) {
-        delete CommandIssueHelperFromCommandNode(node);
+      const auto it = commandManager.mCommands.find(commandId);
+      if (it != commandManager.mCommands.end()) {
+        delete it->second;
       }
 
       const std::uint32_t rawCommandId = static_cast<std::uint32_t>(commandId);
@@ -5801,21 +5109,19 @@ namespace moho
    * What it does:
    * Advances every command-issue helper to the current beat and then ticks
    * the manager id-pool recycle history.
+   *
+   * Real disassembly walks `mCommands` in ascending-key order via an inlined
+   * successor step (the same walk `msvc8::map`'s iterator performs through
+   * `rb_increment`), calling `AdvanceLocalEventsToBeat` on each mapped
+   * helper; a plain range-for over the map is the same walk.
    */
   void AdvanceCommandIssueHelpersToBeat(
     CommandManager& commandManager,
     const std::int32_t beat
   ) noexcept
   {
-    CommandDbMapNodeView* const head = CommandIssueMapOf(commandManager).head;
-    if (head != nullptr) {
-      CommandDbMapNodeView* node = head->left;
-      while (node != head) {
-        CommandDbMapNodeView* next = node;
-        AdvanceCommandDbIteratorNode(next);
-        CommandIssueHelperFromCommandNode(node)->AdvanceLocalEventsToBeat(beat);
-        node = next;
-      }
+    for (auto& [commandId, helper] : commandManager.mCommands) {
+      helper->AdvanceLocalEventsToBeat(beat);
     }
 
     commandManager.mIdPool.Update();
@@ -11309,6 +10615,15 @@ void Sim::SingleStep()
  * What it does:
  * Validates one incoming command id against active command source byte and
  * rejects already-allocated command ids in the command DB map.
+ *
+ * Real disassembly calls `std::map_uint_CUnitCommand::find` (`sub_6E1940`,
+ * cited on `rb_tree::find_node` in `RbTree.h`) directly against
+ * `mCommandDB->mCommands` and rejects only when the found node is real and
+ * its value is non-null (`a1 == head || !a1->_Myval.cmd` -> allow). It does
+ * not null-check `mCommandDB` or the map head first -- both guards were a
+ * `CCommandDbRuntimeView` reach-in artifact; `mCommandDB->commands` is
+ * `CCommandDb`'s own real typed member (`CCommandDb.h`) and is always valid
+ * once `Sim` is constructed.
  */
 bool Sim::ValidateNewCommandId(const CmdId cmdId, const char* callsiteName) const
 {
@@ -11333,27 +10648,18 @@ bool Sim::ValidateNewCommandId(const CmdId cmdId, const char* callsiteName) cons
     return false;
   }
 
-  if (!mCommandDB) {
+  const auto existingIt = mCommandDB->commands.find(cmdId);
+  if (existingIt == mCommandDB->commands.end() || existingIt->second == nullptr) {
     return true;
   }
 
-  const auto* const runtimeCommandDb = reinterpret_cast<const CCommandDbRuntimeView*>(mCommandDB);
-  if (!runtimeCommandDb->map.head) {
-    return true;
-  }
-
-  const CommandDbMapNodeView* const existingNode = FindCommandNode(*runtimeCommandDb, cmdId);
-  if (existingNode != nullptr && existingNode != runtimeCommandDb->map.head && existingNode->value != nullptr) {
-    gpg::Warnf(
-      "%s: ignoring issue of cmd id 0x%08x from %s because it is already in use.",
-      callsite,
-      cmdId,
-      GetCurrentCommandSourceName()
-    );
-    return false;
-  }
-
-  return true;
+  gpg::Warnf(
+    "%s: ignoring issue of cmd id 0x%08x from %s because it is already in use.",
+    callsite,
+    cmdId,
+    GetCurrentCommandSourceName()
+  );
+  return false;
 }
 
 /**
