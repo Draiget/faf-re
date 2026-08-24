@@ -10,6 +10,16 @@ namespace
     throw std::bad_alloc{};
   }
 
+  /**
+   * Address: 0x008AFE90 (FUN_008AFE90)
+   *
+   * What it does:
+   * A fixed-count-20 instantiation of this helper (`AllocateCheckedElements(20u, elementSize)`,
+   * with the overflow check folded against the constant 20 instead of a passed-in count).
+   * Called with `elementSize=1u` from 0x008AF625 (`sub_8AF620`) to allocate a 20-byte node,
+   * degenerating to the same result as `::operator new(20)` since the overflow guard can
+   * never trip for a 1-byte stride.
+   */
   [[nodiscard]] void* AllocateCheckedElements(const std::uint32_t elementCount, const std::uint32_t elementSize)
   {
     const std::uint32_t maxCount = std::numeric_limits<std::uint32_t>::max() / elementSize;
@@ -58,6 +68,7 @@ namespace gpg::core::legacy
    * Address: 0x00A53CB0 (FUN_00A53CB0, sub_A53CB0)
    * Address: 0x00A53D30 (FUN_00A53D30, sub_A53D30)
    * Address: 0x005CA040 (FUN_005CA040)
+   * Address: 0x00935B20 (FUN_00935B20)
    *
    * What it does:
    * Allocates a contiguous lane of 4-byte elements and applies the legacy
