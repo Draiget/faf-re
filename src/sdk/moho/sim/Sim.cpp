@@ -13878,21 +13878,26 @@ namespace
    *     `extraCategory != nullptr && *extraCategory != '\0'` check as
    *     defensive additions, matching the same kind of divergence already
    *     documented on `AddCategoryMemberBit` above.
-   *   - This function's own asm reads `this->mCategories._Myfirst`/
-   *     `_Mylast` at `this+0x64`/`this+0x68` (`mov eax,[esi+64h]` /
-   *     `mov ecx,[esi+68h]` at 0x005289F2/0x005289FC), and
-   *     `REntityBlueprint::REntityBlueprint` (FUN_00511C30) zero-inits the
-   *     same triple at `this+0x64`/`+0x68`/`+0x6C`
-   *     (`mov [esi+64h],eax` / `+68h` / `+6Ch` at 0x00511C66-0x00511C6C) --
-   *     both raw-asm sources agree on `+0x64`, four bytes later than this
-   *     header's current `offsetof(REntityBlueprint, mCategories) == 0x60`
-   *     (REntityBlueprint.h). `REntityBlueprintTypeInfo::AddFields`
-   *     (FUN_00512870) independently bakes a literal `push 60h` for the
-   *     reflected "Categories" field, so the discrepancy is evidence
-   *     against evidence, not a simple oversight, and is left for a
-   *     dedicated REntityBlueprint layout pass rather than guessed at here.
-   *     `blueprint->mCategories`/`blueprint->mBlueprintId` below use the
-   *     existing header offsets as-is pending that pass.
+   *   - This function's own asm reads `this->mCategories.begin()`/`end()`
+   *     (`_Myfirst`/`_Mylast`) at `this+0x64`/`this+0x68`
+   *     (`mov eax,[esi+64h]` / `mov ecx,[esi+68h]` at
+   *     0x005289F2/0x005289FC), which looked at first glance like it
+   *     disagreed with the header's `offsetof(REntityBlueprint,
+   *     mCategories) == 0x60` and with `REntityBlueprintTypeInfo::AddFields`
+   *     (FUN_00512870, `push 60h` for the reflected "Categories" field).
+   *     It does not: `msvc8::vector<T>` in this codebase is 16 bytes
+   *     (leading `myProxy_` before `first_`/`last_`/`end_`, matching VC8's
+   *     `_SECURE_SCL=1` `_Container_base12` proxy word), so `begin()`/
+   *     `end()` sit at the vector object's `+0x4`/`+0x8` -- `this+0x64`/
+   *     `this+0x68` -- when the vector itself starts at `this+0x60`, exactly
+   *     as reflection says. `REntityBlueprint::~REntityBlueprint`
+   *     (FUN_00511E80) confirms this directly: it computes `this+0x60` once
+   *     (`lea edi,[esi+60h]`) and its address-taken subobject-destructor
+   *     trampoline does `add ecx,60h` immediately before tail-calling
+   *     `??1vector_string@std@@QAE@@Z` (`std::vector<std::string>::
+   *     ~vector()`) -- the linker's own mangled-symbol proof that the
+   *     vector lives at `+0x60`. All sources agree; `blueprint->mCategories`
+   *     below already reads the correct field via `begin()`/`end()`.
    */
   void RegisterBlueprintCategoryMembership(
     REntityBlueprint* const blueprint,

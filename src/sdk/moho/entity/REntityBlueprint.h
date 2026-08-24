@@ -36,6 +36,12 @@ namespace moho
    * - 0x0067AE70 (`Entity::RefreshCollisionShapeFromBlueprint`) for collision block
    * - 0x00678880 (`Entity::GetFootprint`) for footprint offsets
    * - 0x0067B050 (`Entity::IsInCategory`) for category bit index
+   * - 0x00512870 (`REntityBlueprintTypeInfo::AddFields`), 0x00511E80
+   *   (`~REntityBlueprint`, including its `std::vector<std::string>::~vector`
+   *   subobject-destructor trampoline) and 0x005289D0
+   *   (`RegisterBlueprintCategoryMembership`) for `mCategories` at +0x60 -
+   *   see the field's own doc comment for the full resolution of a
+   *   previously-flagged (and now closed) +0x60-vs-+0x64 discrepancy.
    */
   struct REntityBlueprint
   {
@@ -50,6 +56,43 @@ namespace moho
     msvc8::string mBlueprintLabel;                            // +0x24 (optional label used by unique-name formatting)
     msvc8::string mSource;                                    // +0x40 (source blueprint path/id string)
     std::uint32_t mCategoryBitIndex;                          // +0x5C
+    /**
+     * Address: 0x00512870 (`Moho::REntityBlueprintTypeInfo::AddFields`) --
+     * `push 60h` / `push offset "Categories"` / `call
+     * gpg::RType::AddField<msvc8::vector<msvc8::string>>` registers the
+     * reflected "Categories" field at `this+0x60` with an explicit
+     * `vector<string>` type descriptor; the very next reflected field
+     * (`push 70h` / "ScriptModule" / `AddField<msvc8::string>`) starts
+     * exactly 0x10 bytes later, so the reflected field spans the full
+     * `[0x60, 0x70)` range with no gap.
+     *
+     * Address: 0x00511E80 (`REntityBlueprint::~REntityBlueprint`) --
+     * `lea edi,[esi+60h]` then reads/destroys/frees the vector through
+     * `[edi+4]`/`[edi+8]`/`[edi+0Ch]` and zeroes that same triple; the
+     * function's own address-taken subobject-destructor trampoline is even
+     * more direct: `add ecx,60h` immediately followed by a tail-call to
+     * `??1vector_string@std@@QAE@@Z` (`std::vector<std::string>::~vector()`).
+     * That is the linker's own mangled-symbol confirmation that the
+     * `vector<string>` subobject lives at `this+0x60`.
+     *
+     * `FUN_005289D0` (`RegisterBlueprintCategoryMembership`) and the
+     * `REntityBlueprint` constructor (`FUN_00511C30`) both read/zero
+     * `this+0x64`/`this+0x68`(/`+0x6C`) -- at first glance 4 bytes later
+     * than this field's own offset, and a prior pass flagged that as an
+     * unresolved discrepancy against the reflection/destructor evidence.
+     * It is not one: `msvc8::vector<T>` in this codebase is 16 bytes
+     * (`legacy/containers/Vector.h`, `myProxy_`/`first_`/`last_`/`end_`,
+     * matching VC8's `_SECURE_SCL=1` `_Container_base12` proxy pointer that
+     * ships even in Release), so `begin()`/`end()` (`first_`/`last_`) sit
+     * at the *vector object's* `+0x4`/`+0x8`, i.e. `this+0x64`/`this+0x68`
+     * when the vector object itself starts at `this+0x60`. The ctor's
+     * zero-triple at `+0x64`/`+0x68`/`+0x6C` is exactly `first_`/`last_`/
+     * `end_`; `+0x60` (`myProxy_`) is left uninitialized by the ctor for
+     * the same reason the following string's allocator-cookie word
+     * (`mScriptModule`'s `alVal` at `+0x70`) is also left unzeroed -
+     * neither is read anywhere in this binary. All four sources therefore
+     * agree on one layout; none actually conflicts.
+     */
     msvc8::vector<msvc8::string> mCategories;                // +0x60
     msvc8::string mScriptModule;                              // +0x70
     msvc8::string mScriptClass;                               // +0x8C
