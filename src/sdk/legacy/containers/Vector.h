@@ -1801,12 +1801,22 @@ namespace msvc8
          * msvc8::vector<Moho::ResourceDeposit>::resize for the 20-byte element
          * -- `size()` via the 66666667h/`sar 3` divide-by-0x14 magic pair,
          * growing through the `_Insert_n` lane FUN_00547FE0 and shrinking by
-         * recomputing `_Mylast` through the copy lane FUN_00548C00. Its caller
-         * `RVectorType_ResourceDeposit::SetCount` (0x00547650) shows the
+         * recomputing `_Mylast` through the copy lane FUN_00548C00. Its
+         * caller `RVectorType_ResourceDeposit::SetCount` (0x00547650) shows the
          * one-argument overload inlined into it: it reserves 0x14 stack bytes,
          * zeroes all five dwords to build the `ResourceDeposit()` temporary,
          * loads `edi`/`ebx` with the vector and the new count and falls into
          * this body, which pops the by-value `_Val` with `retn 14h`.)
+         * Address: 0x00547FE0 (FUN_00547FE0, the `_Insert_n` grow lane
+         * described above for `msvc8::vector<Moho::ResourceDeposit>`)
+         * Address: 0x00547C30 (FUN_00547C30, the advance-returning fill/copy
+         * adapter this grow lane calls: pushes a zeroed dummy byte twice as
+         * stack args, calls the count-based forward copy primitive
+         * FUN_005493B0 (`dest=edi`, `count=esi`, cited below), then computes
+         * and returns `dest + count*20` (`lea edx,[esi+esi*4]` / `lea
+         * eax,[edi+edx*4]` = `edi + esi*20`) -- the same `_Ufill`-style
+         * advance-returning shape already documented for other `uninit_fill_n`
+         * adapters in this file.)
          * Address: 0x005493B0 (FUN_005493B0, the count-based forward copy
          * primitive for the 20-byte `Moho::ResourceDeposit` element -- moves
          * `_Count` elements from `edx` into `eax` (5-dword field copy per
