@@ -7199,6 +7199,20 @@ namespace moho
    *   - `FUN_004FA000` narrow-to-wide emission with stream width/reset
    *   - `FUN_004FA2C0` one decoded code-point emission
    * - spacing helper family: `FUN_004F5AB0`.
+   *
+   * The real 0x004F73B0 constructs a `std::wostringstream`-family object (the
+   * real class held a full iostream stack: `wstringbuf` over `wstreambuf`,
+   * each with their own construction machinery), which is why the binary's
+   * call tree from that address reaches `std::locale::locale`,
+   * `std::_Lockit`, `std::wstreambuf::basic_streambuf` (0x004F8820),
+   * `std::wstreambuf::_Init` (0x004F95E0), `std::basic_stringbuf<wchar_t>::
+   * basic_stringbuf` (0x004F83C0) and `::_Tidy` (0x004F8550) beneath it. This
+   * recovery replaces the whole iostream stack with a plain `std::wstring
+   * mText` member -- same "keep behaviour, not exact function count"
+   * modernization already applied to `gpg::core::TssPtr` for
+   * `boost::thread_specific_ptr<ContextStack>` (`Tss.h`) -- so none of those
+   * addresses have a corresponding call here by design; the default ctor and
+   * implicit destructor below are their modern equivalent.
    */
   class WWinLogTextBuilder
   {
