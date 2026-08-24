@@ -13566,18 +13566,23 @@ namespace
     return ResolveRulesImpl(state);
   }
 
-  // Inlined-lift helper block for the blueprint registration chain.
+  // Helper block for the blueprint registration chain.
   //
-  // These helpers model typed sub-steps recovered from internal control/data
-  // flow of:
-  //   - FUN_005289D0 (register category membership)
-  //   - FUN_00531D80 (unit blueprint create/find path)
-  //   - FUN_00532080 (prop blueprint create/find path)
-  //   - FUN_00532380 (projectile blueprint create/find path)
-  //
-  // They are not standalone binary function boundaries, so they intentionally
-  // do not carry per-function `Address:` blocks. Canonical recovered entry
-  // points in this lane remain explicitly address-annotated.
+  // Every one of FUN_005289D0 (register category membership), FUN_00531D80
+  // (unit blueprint create/find path), FUN_00532080 (prop blueprint
+  // create/find path) and FUN_00532380 (projectile blueprint create/find
+  // path) is a real, standalone binary function boundary with its own real
+  // callers (confirmed via each token's `.xrefs.txt`), not compiler-emitted
+  // glue or inlined-away logic. FUN_00531D80/FUN_00532080/FUN_00532380 are
+  // recovered below as `CreateOrGet*BlueprintFromState` (see their own
+  // `Address:` blocks). FUN_005289D0 is recovered immediately below as
+  // `RegisterBlueprintCategoryMembership` (see its `Address:` block for the
+  // full evidence trail); a prior pass here had incorrectly claimed none of
+  // the four carried standalone boundaries and left FUN_005289D0's mapping
+  // uncited -- that claim did not hold even for this block's own siblings
+  // (`AddCategoryMemberBit`, `AppendBlueprintOrdinal` and
+  // `RegisterBlueprintInCategoryMaps` below already cite their own
+  // `FUN_005555C0`/`FUN_005347A0`/`FUN_00529B30` addresses).
   /**
    * `CategoryWordRangeView` given 8-byte alignment for exactly one purpose:
    * matching the binary's node layout for the category-lookup map's tree
@@ -13832,6 +13837,63 @@ namespace
     (void)it->second.Bits().Add(categoryBitIndex);
   }
 
+  /**
+   * Address: 0x005289D0 (FUN_005289D0, func_RegisterBlueprint)
+   *
+   * IDA signature:
+   * int __thiscall func_RegisterBlueprint(Moho::RUnitBlueprint *this,
+   *                                        Moho::RRuleGameRulesImpl *a2,
+   *                                        char *a3);
+   *
+   * Callers (all 6 confirmed via `FUN_005289D0.xrefs.txt`, `type=17`/direct
+   * call): `cfunc_RegisterUnitBlueprint` (0x00528AF0), `sub_528B90`
+   * (0x00528B90, recovered here as `RegisterUnitBlueprintFromState`),
+   * `cfunc_RegisterPropBlueprint` (0x00528BC0), `sub_528C60` (0x00528C60,
+   * `RegisterPropBlueprintFromState`), `cfunc_RegisterProjectileBlueprint`
+   * (0x00528C90), and `sub_528D30` (0x00528D30,
+   * `RegisterProjectileBlueprintFromState`). The three `sub_528xx0` bodies
+   * are wired to this helper by name below; the three `cfunc_Register*`
+   * entry points (Sim.cpp, further down) reach it transitively by
+   * delegating to those same `sub_528xx0` bodies rather than repeating the
+   * call inline, matching this file's existing cast-and-forward pattern for
+   * that trio.
+   *
+   * What it does:
+   * Three-step sequence matching the binary exactly:
+   *   1. For every string in `this->mCategories` (a msvc8-string vector),
+   *      calls `sub_5555C0` (`Address:` on `AddCategoryMemberBit`,
+   *      FUN_005555C0 above) with `a2->mEntityCategoryLookup` (read at
+   *      `a2+0xC4`, `mov ecx, [eax+0C4h]` at 0x00528A26/0x00528A82/
+   *      0x00528ABE) and the category name.
+   *   2. If `a3` (the caller's extra implicit category, e.g. "ALLUNITS")
+   *      is non-null, builds a temporary `std::string` from it and makes
+   *      the same call.
+   *   3. Unconditionally makes the same call a third time using the string
+   *      at `this+8` (`Moho::REntityBlueprint::mBlueprintId`).
+   *
+   * KNOWN FIDELITY NOTES (left open, not fixed by this pass):
+   *   - The binary has no null checks on `this`/`a2` and no empty-string
+   *     guard on `a3` (`if (a3)` tests non-null only). This C++ body adds
+   *     `!blueprint`/`!rules`/`!lookup` guards and an
+   *     `extraCategory != nullptr && *extraCategory != '\0'` check as
+   *     defensive additions, matching the same kind of divergence already
+   *     documented on `AddCategoryMemberBit` above.
+   *   - This function's own asm reads `this->mCategories._Myfirst`/
+   *     `_Mylast` at `this+0x64`/`this+0x68` (`mov eax,[esi+64h]` /
+   *     `mov ecx,[esi+68h]` at 0x005289F2/0x005289FC), and
+   *     `REntityBlueprint::REntityBlueprint` (FUN_00511C30) zero-inits the
+   *     same triple at `this+0x64`/`+0x68`/`+0x6C`
+   *     (`mov [esi+64h],eax` / `+68h` / `+6Ch` at 0x00511C66-0x00511C6C) --
+   *     both raw-asm sources agree on `+0x64`, four bytes later than this
+   *     header's current `offsetof(REntityBlueprint, mCategories) == 0x60`
+   *     (REntityBlueprint.h). `REntityBlueprintTypeInfo::AddFields`
+   *     (FUN_00512870) independently bakes a literal `push 60h` for the
+   *     reflected "Categories" field, so the discrepancy is evidence
+   *     against evidence, not a simple oversight, and is left for a
+   *     dedicated REntityBlueprint layout pass rather than guessed at here.
+   *     `blueprint->mCategories`/`blueprint->mBlueprintId` below use the
+   *     existing header offsets as-is pending that pass.
+   */
   void RegisterBlueprintCategoryMembership(
     REntityBlueprint* const blueprint,
     RRuleGameRulesImpl* const rules,
