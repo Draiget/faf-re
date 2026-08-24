@@ -347,6 +347,14 @@ namespace moho
   }
 
   /**
+   * Address: 0x00628AE0 (FUN_00628AE0, `SPickUpInfo`'s `uninit_fill_n` --
+   * repeats a SINGLE fixed source lane `count` times into destination,
+   * relinking each copied node into that same source's owner chain head.
+   * Reached from `PushBackSPickUpInfoWithRelink`'s `storage.push_back(element)`
+   * (SPickUpInfoVectorReflection.cpp) via `msvc8::vector<SPickUpInfo>::
+   * push_back`'s single-element uninit_fill_n(dst, 1, value) grow lane.
+   * Unlike the range-copy sibling below, `source` never advances -- proven
+   * by the fixed `a3` register across every loop iteration in the binary.)
    * Address: 0x00629F40 (FUN_00629F40)
    * Address: 0x00628FB0 (FUN_00628FB0)
    *
