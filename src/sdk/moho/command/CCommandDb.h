@@ -66,11 +66,17 @@ namespace moho
     /**
      * Command id -> owned command lookup.
      *
-     * The binary's node is `{left,parent,right, key@0x0C, CUnitCommand*@0x10,
-     * color@0x14, isnil@0x15}` (0x18 bytes) - see `CommandDbMapNodeRuntime` in
-     * CCommandDb.cpp - so the mapped type is a `CUnitCommand` pointer, and the
-     * container itself is the shipped 12-byte `{proxy,_Myhead,_Mysize}` triplet
-     * ending at +0x0F with the id pool starting at +0x10.
+     * The binary's node is the standard `msvc8::map` shape `{left,parent,right,
+     * key@0x0C, CUnitCommand*@0x10, color@0x14, isnil@0x15}` (0x18 bytes), and
+     * the container itself is the shipped 12-byte `{proxy,_Myhead,_Mysize}`
+     * triplet ending at +0x0F with the id pool starting at +0x10. The RB-tree
+     * mechanics (insert/erase/traversal) for this exact instantiation are
+     * address-cited on `legacy/containers/RbTree.h`'s canonical
+     * `detail::rb_tree` members (`insert_unique` FUN_006E15B0, `insert_at`
+     * FUN_006E1D60, `buy_node` FUN_006E23F0, `rotate_left`/`rotate_right`
+     * FUN_006E1F20/FUN_006E1FD0, `erase_range` FUN_006E22D0, `destroy_subtree`
+     * FUN_006E2990, `~rb_tree` FUN_006E0A70) rather than on a bespoke tree
+     * reimplementation in CCommandDb.cpp.
      */
     msvc8::map<CmdId, CUnitCommand*> commands;    // +0x0004
     IdPool pool;                                  // +0x0010
