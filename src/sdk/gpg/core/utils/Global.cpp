@@ -1601,6 +1601,13 @@ void gpg::GetHeapInfo(HeapStats* const outStats)
     ::LeaveCriticalSection(&gAllocatorSentinel);
 }
 
+/**
+ * Address: 0x008D8FA0 (FUN_008D8FA0, func_ParseNum)
+ *
+ * What it does:
+ * Parses one signed integer from `[start,end)` using legacy base autodetect
+ * rules (`0x` hex, leading `0` octal, otherwise decimal).
+ */
 bool gpg::ParseNum(const char* start, const char* end, int* dest) noexcept
 {
     std::uint8_t isNegative = 0u;
