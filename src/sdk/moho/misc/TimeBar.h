@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/containers/TDatList.h"
+
 namespace msvc8
 {
   template <class T>
@@ -40,16 +42,19 @@ namespace moho
   static_assert(offsetof(STimeBarEventRecord, mColorTag) == 0x14, "STimeBarEventRecord::mColorTag offset must be 0x14");
   static_assert(sizeof(STimeBarEventRecord) == 0x18, "STimeBarEventRecord size must be 0x18");
 
-  struct STimeBarThreadInfo
+  /**
+   * Intrusive doubly-linked ring node: `mPrevNode`/`mNextNode` at +0x00/+0x04
+   * are the classic self-linked-sentinel shape already modeled generically
+   * by `moho::TDatListItem<T, U>` (see `moho/containers/TDatList.h`) --
+   * inheriting it here replaces the hand-rolled link/unlink pointer chasing
+   * with the canonical intrusive-list template.
+   */
+  struct STimeBarThreadInfo : TDatListItem<STimeBarThreadInfo, void>
   {
-    STimeBarThreadInfo* mPrevNode;    // +0x00
-    STimeBarThreadInfo* mNextNode;    // +0x04
     CTimeBarSection* mCurrentSection; // +0x08
     std::uint32_t mColorTag;          // +0x0C
   };
 
-  static_assert(offsetof(STimeBarThreadInfo, mPrevNode) == 0x00, "STimeBarThreadInfo::mPrevNode offset must be 0x00");
-  static_assert(offsetof(STimeBarThreadInfo, mNextNode) == 0x04, "STimeBarThreadInfo::mNextNode offset must be 0x04");
   static_assert(
     offsetof(STimeBarThreadInfo, mCurrentSection) == 0x08, "STimeBarThreadInfo::mCurrentSection offset must be 0x08"
   );
