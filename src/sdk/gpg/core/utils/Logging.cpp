@@ -112,6 +112,13 @@ public:
      *   retention lane -- confirmed callsite at 0x008E498B inside this
      *   destructor's own body; absorbed here by mEntries' (msvc8::vector<Entry>)
      *   implicit destructor immediately below, same per-entry teardown)
+     * Address: 0x008E42C0 (FUN_008E42C0, the same original std::list<Entry>'s
+     *   node buy/allocate half: operator new(0x30) -- 8-byte prev/next plus
+     *   Entry's 40-byte payload (kind+severity+msvc8::string+contextDepth) --
+     *   then self-links the fresh node as an empty sentinel. Reached from
+     *   this constructor's own original list-init sequence and from
+     *   HistoryLogTarget::Log's original per-message list insert, both
+     *   superseded by mEntries' (msvc8::vector<Entry>) push_back below.)
      *
      * What it does:
      * Destroys retained history storage, releases lock state, and runs
