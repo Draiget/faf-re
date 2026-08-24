@@ -2432,6 +2432,12 @@ namespace msvc8
          * `_Tmp` by the movss block at 0x0071BEFE-0x0071BF2D. Emitted via
          * out.push_back(sample) in Moho::CInfluenceMap::GetThreatsAroundPosition
          * (CInfluenceMap.cpp:4906)).
+         * Address: 0x0071A1F0 (FUN_0071A1F0, the `uninit_copy_n` sibling of the
+         * `SPositionThreat` `_Insert_n` above: relocates the existing
+         * `[begin, insertPos)` run into the freshly-grown buffer with a
+         * 16-byte-stride (`shl eax,4`) element-count loop that forwards to the
+         * shared FPU-based 4-float block copy at FUN_0071E8E0, returning
+         * `dest + count*16` as the post-copy cursor.)
          * Address: 0x00535D60 (FUN_00535D60, msvc8::vector<Moho::RBlueprint*>::_Insert_n
          * grow lane for the 4-byte pointer element (`sar 2` stride, max_size 0x3FFFFFFF
          * = 0xFFFFFFFF/4 loaded at 0x00535D96, overflow test `max_size() - size() < 1`

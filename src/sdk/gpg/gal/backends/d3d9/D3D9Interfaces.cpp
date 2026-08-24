@@ -4251,9 +4251,8 @@ namespace gpg::gal
         }
 
         /**
-         * Address family:
-         * - 0x00432290 (FUN_00432290, shared vector tear-down helper)
-         * - 0x00942380 lane in d3d9 runtime
+         * Address: 0x00432290 (FUN_00432290, shared vector tear-down helper)
+         * Also emitted at: 0x00942380 lane in d3d9 runtime
          *
          * What it does:
          * Destroys all `EffectMacro` elements, frees vector storage, and clears
@@ -4278,9 +4277,8 @@ namespace gpg::gal
         }
 
         /**
-         * Address family:
-         * - 0x00432240 (FUN_00432240, shared vector reserve helper)
-         * - 0x00942330 lane in d3d9 runtime
+         * Address: 0x00432240 (FUN_00432240, shared vector reserve helper)
+         * Also emitted at: 0x00942330 lane in d3d9 runtime
          *
          * What it does:
          * Reserves contiguous `EffectMacro` storage for `elementCount` entries
@@ -6036,7 +6034,8 @@ namespace gpg::gal
 
     /**
      * Address: 0x00940C90 (FUN_00940C90)
-     * Scalar-deleting wrapper: 0x008F0040 (FUN_008F0040)
+     * Address: 0x008F0040 (FUN_008F0040, the scalar-deleting wrapper for the
+     * destructor above)
      *
      * What it does:
      * Destroys adapter mode list and all descriptive string lanes.
@@ -6076,7 +6075,8 @@ namespace gpg::gal
 
     /**
      * Address: 0x009409B0 (FUN_009409B0, ??1AdapterModeD3D9@gal@gpg@@QAE@@Z)
-     * Scalar-deleting wrapper: 0x008E8E40 (FUN_008E8E40)
+     * Address: 0x008E8E40 (FUN_008E8E40, the scalar-deleting wrapper for the
+     * destructor above)
      *
      * What it does:
      * Restores AdapterModeD3D9 vftable ownership; deleting-thunk lanes route
