@@ -317,6 +317,22 @@ namespace msvc8
          * predecessor lookup -- isNil@+0x15, node 0x18. Reached from
          * FUN_0070F6C0/FUN_007108D0, the copy-driver call sites already
          * cited on the copy constructor above.)
+         * Address: 0x00556E70 (FUN_00556E70, the predecessor-lookup half of
+         * `insert_unique` for the category-lookup map =
+         * `msvc8::map<msvc8::string, moho::CategoryLookupValue>`
+         * (`Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap` --
+         * IDA independently types this tree `std::map_string_EntityCategory`
+         * at the read-side lookups, FUN_005561C0/FUN_00556220/FUN_00556970).
+         * This is the one instantiation in this file whose node does *not*
+         * follow the usual "value starts at node+0x0C" shape: `isNil` sits at
+         * +0x59, but the value itself starts at +0x10 (confirmed from
+         * `buy_node`'s destination address, FUN_005569C0) because
+         * `CategoryLookupValue` (Sim.cpp) is 8-byte aligned -- see the
+         * evidence block on that type. `rb_node<V>` reproduces the same
+         * +0x10/+0x58/+0x59 layout automatically once `V` is
+         * `pair<const msvc8::string, CategoryLookupValue>`, with no template
+         * change needed here. Reached from `FUN_005560B0`, the insert cited
+         * on `insert_unique` below.)
          */
         rb_node<V>* rb_decrement(rb_node<V>* n) noexcept
         {
@@ -703,6 +719,16 @@ namespace msvc8
              * Address: 0x0077C550 (FUN_0077C550, inner bucket lower bound)
              * Address: 0x0077C580 (FUN_0077C580, inner bucket upper bound)
              * Address: 0x0077B5B0 (FUN_0077B5B0, the inner set's equal-range pair)
+             * Address: 0x00556970 (FUN_00556970, the category-lookup map's
+             * lower bound -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `Sim.cpp`'s
+             * `EntityCategoryLookupTableView::mCategoryMap`. Already
+             * recovered as `Moho::EntityCategorySet::Find` /
+             * `FindCategoryLowerBound` in
+             * `moho/entity/EntityCategoryLookupResolver.cpp`'s independent
+             * read-only view of this same tree; shared between that file's
+             * read path and this member's `find_node` (FUN_005561C0, cited
+             * below), confirming both recoveries agree on the node layout.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -751,6 +777,31 @@ namespace msvc8
              */
             /**
              * Address: 0x0077BCD0 (FUN_0077BCD0, the outer map's start-tick lookup)
+             */
+            /**
+             * Address: 0x005561C0 (FUN_005561C0, the category-lookup map's
+             * find -- `msvc8::map<msvc8::string, moho::CategoryLookupValue>`,
+             * `Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap`.
+             * Was previously (and incorrectly) marked `external_dependency`
+             * in `recovered_progress.json` -- that classification only saw
+             * the `std::operator<<char>` (STL string-compare thunk) callee
+             * and missed that the function also calls `FUN_00556970`
+             * (`Moho::EntityCategorySet::Find`, `lower_bound_node`'s
+             * emission for this instantiation, already recovered in
+             * `EntityCategoryLookupResolver.cpp`), which is real engine
+             * code. Matches this member field for field: `_Lbound` for the
+             * candidate, then `rb_is_nil(found) || comp(k, key_of(found))`
+             * -- IDA's own type inference names the tree
+             * `std::map_string_EntityCategory` here and the node's `_Myval`
+             * a `helper` struct whose `.first` is the key string, matching
+             * this instantiation's `pair<const msvc8::string,
+             * CategoryLookupValue>` `value_type`. Reached from
+             * `AddCategoryMemberBit` (FUN_005555C0, Sim.cpp) as
+             * `categoryMap.find(categoryName)`; `FUN_00556220`
+             * (`std::map_string_EntityCategory::find`, also already recovered
+             * in `EntityCategoryLookupResolver.cpp`) is a sibling emission of
+             * this same member reached from the read-only lookup path
+             * instead.)
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -853,6 +904,28 @@ namespace msvc8
              * above). Called from `insert_hint`'s fallback branch,
              * FUN_0082CC80 (cited below), matching this member's own
              * `insert_unique(v).first` tail call.)
+             */
+            /**
+             * Address: 0x005560B0 (FUN_005560B0, the category-lookup map's
+             * insert -- `msvc8::map<msvc8::string, moho::CategoryLookupValue>`,
+             * `Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap`. Opens
+             * with the same descend-recording-the-last-branch loop as this
+             * member (`v5[10] < 0x10 ? &buf : ptr` is the msvc8::string SSO
+             * read at the candidate node's key, `[v5+0x59]` its `isNil`),
+             * confirms uniqueness against the in-order predecessor when the
+             * descent bottomed out on a left branch (`v6 == head->left` is
+             * the `where == leftmost()` fast-out; otherwise `rb_decrement`,
+             * FUN_00556E70, cited above), and tail-calls `insert_at`
+             * (FUN_005565D0, cited below) either way. Reached from
+             * `AddCategoryMemberBit` (FUN_005555C0, Sim.cpp) as
+             * `categoryMap.insert(CategoryLookupMap::value_type(categoryName,
+             * freshValue))` when `categoryMap.find(categoryName)` (FUN_005561C0,
+             * cited on `find_node` below) misses.
+             *
+             * The node's value does not start at the usual `node+0x0C` --
+             * see `CategoryLookupValue`'s citation block in Sim.cpp for the
+             * 8-byte-alignment evidence that moves it to `node+0x10` and the
+             * colour/nil pair to `node+0x58`/`node+0x59`.)
              */
             std::pair<node_type*, bool> insert_unique(const value_type& v)
             {
@@ -1478,6 +1551,36 @@ namespace msvc8
              * `color=0@+0x24`/`isNil=0@+0x25`. Unique body (no ICF twins);
              * reached from `insert_at`'s emission FUN_0082E320 above.)
              */
+            /**
+             * Address: 0x005569C0 (FUN_005569C0, the category-lookup map's
+             * node buy -- `msvc8::map<msvc8::string, moho::CategoryLookupValue>`,
+             * `Sim.cpp`'s `EntityCategoryLookupTableView::mCategoryMap`.
+             * `recovered_progress.json` already tracks this address `skip`
+             * (RULE ONE: compiler emission, no hand-written body) with the
+             * note "_Myval at +0x10"; this citation is the instantiation that
+             * note refers to. Allocates one 0x60-byte node via `sub_5579D0(1)`
+             * (`operator new(0x60 * count)`), writes `left`/`right` to the
+             * caller's head argument and `parent` to the caller's `where`,
+             * then constructs the value in place at `node+0x10` through
+             * `sub_557310` and zeroes `color`/`isNil` at `node+0x58`/
+             * `node+0x59`. `sub_557310` (FUN_00557310) is `value_type`'s
+             * (`pair<const msvc8::string, CategoryLookupValue>`) implicit
+             * *copy* constructor -- it assigns the key via
+             * `msvc8::string::assign` and copies the three `CategoryLookupValue`
+             * fields (`mUniverse`/`mBits.mFirstWordIndex`/`mBits.mWords`) from
+             * its source argument's +0x20/+0x28/+0x30, i.e. from an
+             * already-fully-formed `value_type&` -- the same `args` this
+             * `buy_node` forwards from `insert_at`'s single `const value_type&`
+             * parameter. It is a compiler/template emission with no
+             * hand-written body of its own (RULE ONE), exactly like this
+             * `buy_node` member; writing `::new (...) value_type(v)` here
+             * (already the case, unmodified) is what makes the compiler emit
+             * it. The `node+0x10` destination -- not the
+             * usual `node+0x0C` -- is the primary evidence for
+             * `CategoryLookupValue`'s 8-byte alignment (Sim.cpp citation
+             * block). Reached from `insert_at`'s emission (FUN_005565D0,
+             * cited above).)
+             */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
                 node_type* const n = alloc_raw();
@@ -1882,6 +1985,29 @@ namespace msvc8
              * source-level invocation is the same generic `msvc8::map`/
              * `rb_tree` API surface every other instantiation on this
              * member already uses, not a new engine call site.)
+             */
+            /**
+             * Address: 0x005565D0 (FUN_005565D0, the link-and-rebalance half
+             * of the category-lookup map's insert -- `msvc8::map<msvc8::string,
+             * moho::CategoryLookupValue>`, `Sim.cpp`'s
+             * `EntityCategoryLookupTableView::mCategoryMap`. The
+             * `*(a2+8) >= 0x38E38E2` guard is this member's
+             * `max_size() - 1u <= size_`: `0xFFFFFFFF / 0x48 == 0x38E38E3`
+             * (this template's `max_size()` is defined over `value_type`,
+             * i.e. the 0x48-byte `pair<const msvc8::string,
+             * CategoryLookupValue>`, not the 0x60-byte node including link
+             * pointers and colour/nil), minus one is exactly `0x38E38E2` --
+             * independent confirmation that `sizeof(value_type) == 0x48` for
+             * this instantiation, matching `CategoryLookupValue`'s alignment
+             * evidence in Sim.cpp. Buys the node through `sub_5569C0`
+             * (`buy_node`, cited below), links it under the caller's
+             * `where`/`addLeft`, then repairs the red-red violation with the
+             * same rotate-on-uncle-red/recolour-on-uncle-black shape as
+             * every other `insert_at` emission in this file, writing
+             * colour/nil at `[node+0x58]`/`[node+0x59]` (the offsets that
+             * pin this node to the 8-byte-aligned shape -- see
+             * `CategoryLookupValue`'s citation block in Sim.cpp). Reached
+             * from `insert_unique`'s emission (FUN_005560B0, cited above).)
              */
             node_type* insert_at(const bool addLeft, node_type* const where, Args&&... args)
             {
