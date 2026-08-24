@@ -149,6 +149,7 @@ class wxCommandEventRuntime;
 class wxCursor;
 class wxBitmap;
 class wxBrush;
+class wxCmdLineParser;
 
 /**
  * The two stock brushes `WD3DViewport::DrawBackgroundImage` (0x00430A60)
@@ -6674,7 +6675,7 @@ public:
   virtual bool ProcessIdle();
   virtual bool IsActive() const;
   virtual wxWindowBase* GetTopWindow() const;
-  virtual void OnInitCmdLine(void* cmdLineParser);
+  virtual void OnInitCmdLine(wxCmdLineParser& parser);
   virtual bool OnCmdLineParsed(void* cmdLineParser);
   virtual bool OnCmdLineHelp(void* cmdLineParser);
   virtual bool OnCmdLineError(void* cmdLineParser);

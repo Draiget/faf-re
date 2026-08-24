@@ -284,6 +284,7 @@ wxLocale* wxGetLocale();
 // wx/msw/private.h, which is not on the public include path.
 #include <wx/log.h>
 extern int wxCharCodeMSWToWX(int keyCode);
+#include <wx/cmdline.h>
 wxStringRuntime* wxCopySharedWxStringRuntime(
   const wxStringRuntime* source,
   wxStringRuntime* outValue
@@ -66333,8 +66334,41 @@ wxWindowBase* wxApp::GetTopWindow() const
   return m_topWindow;
 }
 
-/** Address: 0x009AAAB0 (FUN_009AAAB0, wxAppBase::OnInitCmdLine) */
-void wxApp::OnInitCmdLine(void* /*cmdLineParser*/) {}
+/**
+ * Address: 0x009AAAB0 (FUN_009AAAB0, wxAppBase::OnInitCmdLine)
+ * Mangled: ?OnInitCmdLine@wxAppBase@@UAEXAAVwxCmdLineParser@@@Z
+ *
+ * IDA signature:
+ * void __thiscall wxAppBase::OnInitCmdLine(wxApp *this, wxCmdLineParser &parser);
+ *
+ * What it does:
+ * Registers this build's command-line switch table via
+ * `parser.SetDesc(...)`. Real, unmodified body: `wxApp`/`wxAppBase`/
+ * `Moho::MohoApp`'s vtable slots all point at this same address (neither
+ * overrides it), and the table contents (byte-verified against the shipped
+ * PE at 0x00D59960) are stock wxWidgets 2.4.2's default `-h/--help` and
+ * `--verbose` entries (`dependencies/wxWindows-2.4.2/src/common/
+ * appcmn.cpp:306-362`, `__WXMSW__` build, neither `__WXUNIVERSAL__` nor
+ * `__WXMGL__` so the `--theme`/`--mode` entries those macros guard are
+ * absent) -- no FAF-specific switches are registered here.
+ *
+ * Note: this tree has its own WinMain and never calls wxEntry, so nothing
+ * ever reaches this override through the standard wx startup path (see the
+ * MohoApp::OnInit / "never calls wxEntry" notes elsewhere in this file);
+ * it fills the vtable slot for ABI completeness rather than executing.
+ */
+void wxApp::OnInitCmdLine(wxCmdLineParser& parser)
+{
+  static const wxCmdLineEntryDesc s_cmdLineDesc[] =
+  {
+    { wxCMD_LINE_SWITCH, wxT("h"), wxT("help"), wxT("show this help message"),
+      wxCMD_LINE_VAL_NONE, wxCMD_LINE_OPTION_HELP },
+    { wxCMD_LINE_SWITCH, wxT(""), wxT("verbose"), wxT("generate verbose log messages"),
+      wxCMD_LINE_VAL_NONE, 0 },
+    { wxCMD_LINE_NONE, wxT(""), wxT(""), wxT(""), wxCMD_LINE_VAL_NONE, 0 }
+  };
+  parser.SetDesc(s_cmdLineDesc);
+}
 
 /** Address: 0x009AAAD0 (FUN_009AAAD0, wxAppBase::OnCmdLineParsed) */
 bool wxApp::OnCmdLineParsed(void* /*cmdLineParser*/) { return true; }
