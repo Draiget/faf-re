@@ -79,37 +79,11 @@ namespace
     return cached;
   }
 
-  /**
-   * Address: 0x00570F10 (FUN_00570F10)
-   *
-   * What it does:
-   * Resolves `IFormationInstance::sType` on demand and appends it as a base
-   * field at offset `0` for one owner runtime type.
-   */
-  [[maybe_unused]] void AddIFormationInstanceBaseField(gpg::RType* const ownerType)
-  {
-    if (ownerType == nullptr) {
-      return;
-    }
-
-    gpg::RType* baseType = moho::IFormationInstance::sType;
-    if (baseType == nullptr) {
-      baseType = gpg::LookupRType(typeid(moho::IFormationInstance));
-      moho::IFormationInstance::sType = baseType;
-    }
-
-    if (baseType == nullptr) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    ownerType->AddBase(baseField);
-  }
+  // NOTE: 0x00570F10 (Moho::AddIFormationInstanceBaseField-shaped helper) is
+  // recovered and wired at its real caller, `CFormationInstanceTypeInfo::Init`
+  // (moho/ai/CFormationInstanceTypeInfo.cpp) -- not here. This file's
+  // FUN_00570F10 duplicate was an unwired [[maybe_unused]] orphan; removed
+  // in favor of the single canonical, actually-called citation.
 
   void EnsureIFormationInstanceTypeCacheInitialized(IFormationInstanceTypeCache& cache)
   {

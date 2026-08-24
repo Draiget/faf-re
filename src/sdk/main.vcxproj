@@ -708,6 +708,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ai\IAiCommandDispatchImplConstruct.cpp" />
     <ClCompile Include="moho\ai\IAiCommandDispatchImplSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiFormationInstanceTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CFormationInstanceTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiFormationInstanceSerializer.cpp" />
     <ClCompile Include="moho\ai\IAiFormationDBTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiFormationDBImplTypeInfo.cpp" />
@@ -1920,6 +1921,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\ai\IFormationInstanceCountedPtrReflection.h" />
     <ClInclude Include="moho\ai\CAiFormationInstanceSerializer.h" />
     <ClInclude Include="moho\ai\CAiFormationInstanceTypeInfo.h" />
+    <ClInclude Include="moho\ai\CFormationInstanceTypeInfo.h" />
     <ClInclude Include="moho\ai\CBuilderArmManipulator.h" />
     <ClInclude Include="moho\ai\CBuilderArmManipulatorTypeInfo.h" />
     <ClInclude Include="moho\ai\CAimManipulator.h" />

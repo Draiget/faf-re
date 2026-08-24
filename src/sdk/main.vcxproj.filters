@@ -978,6 +978,9 @@
     <ClCompile Include="moho\ai\CAiFormationInstanceTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\CFormationInstanceTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\IFormationInstanceCountedPtrReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -4087,6 +4090,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiFormationInstanceTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\CFormationInstanceTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CBuilderArmManipulator.h">
