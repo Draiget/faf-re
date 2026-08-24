@@ -2863,6 +2863,23 @@ namespace msvc8
          * EH cleanup loop that destroys the already-constructed prefix and rethrows.
          * Reached via the thin dispatcher FUN_006539E0 from the `_Insert_n` grow
          * lane FUN_00653380, already cited above)
+         * Address: 0x007FC2F0 (FUN_007FC2F0, msvc8::vector<moho::WRenViewportWorldViewParamRuntime>::
+         * uninit_move_n for the 20-byte `{IRenderWorldView* view; int head; int depth;
+         * boost::shared_ptr<TerrainCommon> terrain}` element -- range-form loop over
+         * `[src, srcEnd)`, raw dword copy for view/head/depth/`terrain.px`, then
+         * `terrain.pn` (the `sp_counted_base*` control block) copied and, when
+         * non-null, refcount-bumped via `_InterlockedExchangeAdd` on the block's
+         * `use_count_` at +4 -- Boost 1.34.1's vendored `shared_ptr` has no move
+         * ctor, so `move_if_noexcept` degrades to copy here exactly as for
+         * SDebugWorldText above, matching the binary's copy-with-refcount-bump shape
+         * (same family as the SPendingPoseCopy/`shared_ptr<CAniPose>` uninit_copy_n
+         * entry above). The `if (result)` null guard sits *inside* the loop for the
+         * same reason as FUN_00549BC0's ResourceDeposit lane: the destination is
+         * freshly-allocated storage the compiler cannot prove non-null. Reached from
+         * `InsertWorldViewParamAt` (0x007FB060, WxRuntimeTypes.cpp)'s
+         * `worldViews->push_back(entry)` capacity-full path, whose `insert(end(),1,
+         * value)` full-reallocation branch moves the whole existing range with
+         * `uninit_move_n(first_, cur, newBuf)`)
          *
          * Uninitialized move (or copy if non-movable) N elements src->dst.
          * Used by `insert(pos, count, value)` to shift the tail and to
