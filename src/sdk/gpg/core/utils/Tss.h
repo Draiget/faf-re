@@ -92,6 +92,26 @@ namespace gpg::core
 
     inline thread_local TLRegistryDrainGuard gTlsRegistryDrainGuard{};
 
+    /**
+     * Supersedes the binary's `boost::thread_specific_ptr<T>` construction
+     * machinery for `LogContext::tss` (`ContextStack` in the original boost
+     * naming): `boost::detail::tss_adapter_ContextStack::tss_adapter_ContextStack`
+     * (0x00936B30), `boost::function1_ContextStack` (0x00937950, the cleanup-
+     * function wrapper boost's tss_adapter stores), and `boost::
+     * thread_specific_ptr_ContextStack::thread_specific_ptr_ContextStack`
+     * (0x009379F0) are all real, compiled-in boost template instantiations
+     * for this exact slot, but none has a corresponding call here: this
+     * registry-based design (a `thread_local` `TLRegistry` keyed by owner
+     * address) deliberately replaces boost's TLS-slot-allocation approach
+     * entirely rather than porting it line-for-line, matching this project's
+     * documented "keep behaviour, not exact function count" modernization
+     * philosophy for compiler/library-generated machinery. `TssPtr`'s own
+     * trivial `constexpr` default constructor is the modern equivalent of
+     * what those three addresses did in the original binary; the boost
+     * cleanup callback they registered is superseded by `ThreadStateTssDeleter`
+     * (`Logging.h`), already cited against the matching runtime addresses
+     * there (0x00936CC0/0x00936FD0).
+     */
     template<class T, class Deleter = std::default_delete<T>>
     class TssPtr
 	{
