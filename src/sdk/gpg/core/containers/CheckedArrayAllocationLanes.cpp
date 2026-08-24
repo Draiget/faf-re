@@ -19,6 +19,15 @@ namespace
    * Called with `elementSize=1u` from 0x008AF625 (`sub_8AF620`) to allocate a 20-byte node,
    * degenerating to the same result as `::operator new(20)` since the overflow guard can
    * never trip for a 1-byte stride.
+   *
+   * Address: 0x008620F0 (FUN_008620F0)
+   *
+   * What it does:
+   * A fixed-count-0xC50 (3152) instantiation of this same helper
+   * (`AllocateCheckedElements(0xC50u, elementSize)`). Called with
+   * `elementSize=1u` from 0x00861DC5 (`sub_861DC0`) to allocate a 3152-byte
+   * object, degenerating to `::operator new(0xC50)` for the same reason as
+   * the fixed-count-20 instantiation above.
    */
   [[nodiscard]] void* AllocateCheckedElements(const std::uint32_t elementCount, const std::uint32_t elementSize)
   {
@@ -30,6 +39,47 @@ namespace
     const std::size_t allocationBytes =
       static_cast<std::size_t>(elementCount) * static_cast<std::size_t>(elementSize);
     return ::operator new(allocationBytes);
+  }
+
+  /**
+   * Address: 0x00861DC0 (FUN_00861DC0)
+   *
+   * IDA signature:
+   * void* __cdecl sub_861DC0();
+   *
+   * What it does:
+   * Allocates one 3152-byte (0xC50) buffer via the fixed-count checked
+   * allocator above (`AllocateCheckedElements(0xC50u, 1u)`), zeroes the
+   * first three dwords, and marks a two-byte "initialized/not-yet-flushed"
+   * flag pair near the end of the buffer (`+0xC48 = 1`, `+0xC49 = 0`).
+   *
+   * Reached directly from the CRT static-initializer table (`__xc_a`,
+   * depth=1): this is not a normal call site, it is the constructor body of
+   * a namespace-scope static object with non-trivial construction (MSVC
+   * registers such constructors into the `__xc_a`..`__xc_z` pointer array
+   * for the CRT startup loop to invoke). Kept as a free function rather than
+   * an actually-instantiated global here, since the owning class/global name
+   * is not yet identified from the binary (none of this function's own
+   * callers -- 0x00860DE0, 0x008614D0, 0x00861A60, 0x00BE5CF0 -- are
+   * recovered source yet) and speculatively instantiating a real static
+   * object with unknown ownership would add untested startup-time
+   * allocation behavior. Address-taken-into-a-table is the intended source
+   * invocation once the owning declaration is identified.
+   */
+  [[maybe_unused]] void* AllocateAndTagStaticBootstrapBuffer3152()
+  {
+    void* const buffer = AllocateCheckedElements(0xC50u, 1u);
+    if (buffer != nullptr) {
+      auto* const dwords = static_cast<std::uint32_t*>(buffer);
+      dwords[0] = 0u;
+      dwords[1] = 0u;
+      dwords[2] = 0u;
+
+      auto* const bytes = static_cast<std::uint8_t*>(buffer);
+      bytes[0xC48] = 1u;
+      bytes[0xC49] = 0u;
+    }
+    return buffer;
   }
 } // namespace
 
