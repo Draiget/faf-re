@@ -76,47 +76,6 @@ namespace
   }
 
   /**
-   * Address: 0x007BBC10 (FUN_007BBC10, swap helper for global sGPGNet raw lane)
-   *
-   * What it does:
-   * Swaps the process-global GPGNet shared-pointer lane with another shared
-   * pointer lane and preserves the reference-counted payload ownership.
-   */
-  void SwapGlobalGpgNetPtr(
-    boost::shared_ptr<CGpgNetInterface>& lane
-  ) noexcept
-  {
-    using std::swap;
-    swap(sGPGNet, lane);
-  }
-
-  struct SharedPtrRawLaneView
-  {
-    void* object = nullptr;  // +0x00
-    void* counter = nullptr; // +0x04
-  };
-
-  static_assert(sizeof(SharedPtrRawLaneView) == 0x8, "SharedPtrRawLaneView size must be 0x8");
-
-  /**
-   * Address: 0x007BCCC0 (FUN_007BCCC0, raw-object lane swap for global sGPGNet)
-   *
-   * What it does:
-   * Swaps only the raw object pointer lane (`px`) of process-global `sGPGNet`
-   * with caller-provided pointer storage, preserving legacy lane semantics.
-   */
-  [[maybe_unused]] CGpgNetInterface** SwapGlobalGpgNetRawObjectLane(CGpgNetInterface** const lane) noexcept
-  {
-    auto* const rawShared = reinterpret_cast<SharedPtrRawLaneView*>(&sGPGNet);
-    CGpgNetInterface* const previous = static_cast<CGpgNetInterface*>(rawShared->object);
-    rawShared->object = (lane != nullptr) ? *lane : nullptr;
-    if (lane != nullptr) {
-      *lane = previous;
-    }
-    return lane;
-  }
-
-  /**
    * Address: 0x007BDB70 (FUN_007BDB70, register_WeakPtr_INetNATTraversalProvider_Type_00)
    *
    * What it does:
@@ -197,20 +156,6 @@ namespace
   )
   {
     gpg::Warnf("GPGNET: Ignoring unknown gpg.net command \"%s\".", commandName.c_str());
-  }
-
-  /**
-   * Address: 0x007B7DB0 (FUN_007B7DB0)
-   *
-   * What it does:
-   * Resets one legacy VC8 string lane back to empty SSO storage and releases
-   * any heap buffer owned by that string.
-   */
-  [[maybe_unused]] void ResetLegacyStringStorage(
-    msvc8::string& value
-  ) noexcept
-  {
-    value.tidy(true, 0U);
   }
 
   /**
@@ -481,7 +426,7 @@ namespace
   ) noexcept
   {
     for (; first != last; ++first) {
-      ResetLegacyStringStorage(first->mStr);
+      first->ResetPayload();
     }
   }
 
@@ -604,8 +549,7 @@ void moho::GPGNET_SetPtr(
   const boost::shared_ptr<CGpgNetInterface>& ptr
 )
 {
-  boost::shared_ptr<CGpgNetInterface> lane = ptr;
-  SwapGlobalGpgNetPtr(lane);
+  sGPGNet = ptr;
 }
 
 boost::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
