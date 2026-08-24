@@ -349,6 +349,9 @@ namespace
 
   /**
    * Address: 0x004CB750 (FUN_004CB750, CLuaTask member-serialize thunk)
+   * Address: 0x004CBD20 (FUN_004CBD20, duplicate member-serialize thunk emission --
+   *   same one-line forward to `CLuaTask::MemberSerialize`, distinct compiled
+   *   address; not an ICF twin since the encoded jmp displacement differs)
    *
    * What it does:
    * Thin wrapper that forwards archive + object lanes into
