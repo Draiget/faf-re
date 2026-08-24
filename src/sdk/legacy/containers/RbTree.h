@@ -1073,6 +1073,59 @@ namespace msvc8
              * calling shape per the callgraph index; not independently
              * exported/decompiled in this namespace pass.
              */
+            /**
+             * Address: 0x0052DF70 / 0x0052E150 / 0x0052E330 / 0x0052E510 /
+             * 0x0052E6E0 / 0x0052E8B0 / 0x0052EA80 -- seven `~rb_tree()`
+             * emissions for `RRuleGameRulesImpl`'s seven `RRuleGameRulesBlueprintMap`
+             * (`msvc8::map<msvc8::string, void*>`) members (`mUnitBlueprints`/
+             * `mProjectileBlueprints`/`mPropBlueprints`/`mMeshBlueprints`/
+             * `mEmitterBlueprints`/`mBeamBlueprints`/`mTrailBlueprints`,
+             * `RRuleGameRules.h:511-517`), each inlined at its own call site in
+             * `~RRuleGameRulesImpl()` (`0x00529700`, `RRuleGameRules.cpp:1949`,
+             * whose own comment already documents "the binary open-codes that
+             * teardown seven times here, in reverse declaration order, which is
+             * what member destruction does anyway"). isNil@+0x2D (45 decimal),
+             * 8-byte `{msvc8::string key; void* value}`-shaped node past the
+             * usual 12-byte link triple.
+             *
+             * Each compiled body is larger than this member's plain
+             * `erase_range(leftmost(),header())` because this project's VS2005
+             * Release build defines `_SECURE_SCL=1` (see this file's opening
+             * `rb_tree` class comment on the `Dbg` field), so every `std::map`/
+             * `msvc8::map` erase compiles with checked-iterator validation
+             * inline: alongside this member's whole-range fast path (`sub_530FA0`
+             * family below, matching `destroy_subtree` exactly), the compiler
+             * also emits a walk-and-checked-erase-per-node branch (`sub_52F3F0`
+             * family below) that validates the iterator against
+             * `out_of_range("invalid map/set<T> iterator")` before erasing.
+             * That branch is provably unreachable from every one of these
+             * seven call sites: `erase_range`'s own fast-path guard
+             * (`first==begin() && last==end()`) is always true for a
+             * destructor's `erase(leftmost(),header())` call, so the checked
+             * per-node path never executes here. This member's plain
+             * `erase_range(leftmost(),header())` -- automatic member
+             * destruction in the recovered `~RRuleGameRulesImpl()`, no
+             * explicit call needed -- reproduces this instantiation's real,
+             * reachable behavior exactly; the checked branch is `_SECURE_SCL`
+             * debug instrumentation that never fires on valid input, the same
+             * "`Dbg` in Release... not used by anything really" pattern this
+             * file's class comment already documents for the checked
+             * *iterator* type. Not modeling it does not change behavior.
+             *
+             * `destroy_subtree` halves (whole-range fast path, matches this
+             * member's shape exactly): `0x00530FA0` (for `0x0052DF70`),
+             * `0x00531130` (`0x0052E150`), `0x005312E0` (`0x0052E330`),
+             * `0x00531490` (`0x0052E510`), `0x00531640` (`0x0052E6E0`),
+             * `0x005317D0` (`0x0052E8B0`), `0x00531960` (`0x0052EA80`).
+             *
+             * Checked-erase-per-node halves (compiled but provably unreached
+             * from these seven call sites, per above -- not modeled by this
+             * member, cited here only so they are not mistaken for orphans):
+             * `0x0052F3F0` (for `0x0052DF70`), `0x0052F7A0` (`0x0052E150`),
+             * `0x0052FB40` (`0x0052E330`), `0x0052FEE0` (`0x0052E510`),
+             * `0x00530280` (`0x0052E6E0`), `0x00530630` (`0x0052E8B0`),
+             * `0x005309E0` (`0x0052EA80`).
+             */
             ~rb_tree()
             {
                 erase_range(leftmost(), header());
