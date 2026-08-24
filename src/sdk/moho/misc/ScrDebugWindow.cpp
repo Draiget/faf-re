@@ -131,10 +131,40 @@ namespace
     "ScrSourceControlRuntimeView::mPagesEnd offset must be 0x150"
   );
 
+  /**
+   * View onto the real `wxListCtrl` this file's list controls are built as
+   * (`ConstructWxListCtrl`, ctor address 0x004BB680). `mListViewHandle` at
+   * +0x108 is `wxWindow::m_hWnd` - `sizeof(wxWindowBase)`, confirmed both
+   * by `wxWindowMswRuntime::GetHandle()` (`WxRuntimeTypes.h`) and by every
+   * real wx list-operation body cited on the methods below, which all read
+   * `*(this+264)` / `this+0x108` for their native handle.
+   *
+   * The methods mirror real `wxListCtrl` operations that were previously
+   * open-coded here as ad hoc `SendMessageW`/`LVM_*` calls that diverged
+   * from what the real control does (see each method's own citation).
+   * `WxRuntimeTypes.cpp` already recovers several of the underlying
+   * wx-library bodies these mirror (`wxListCtrlSetItemStateRuntime`,
+   * `wxListCtrlDeleteAllItemsRuntime`, `wxListCtrlGetColumnWidthRuntime`,
+   * `wxListCtrlSetItemAndSyncInternalDataRuntime`), but under internal
+   * linkage, and `WxRuntimeTypes.h` is locked by a concurrent pass - so
+   * these are a minimal-scope, evidence-matched mirror of that already-
+   * recovered behavior. Consolidate by promoting them to public
+   * `wxListCtrlRuntime` methods and deleting this copy once that file
+   * unlocks.
+   */
   struct ScrListControlRuntime : wxWindowBase
   {
     std::uint8_t mUnknown004To107[0x104];
     HWND mListViewHandle = nullptr;
+
+    [[nodiscard]] std::int32_t GetColumnWidth(std::uint32_t columnIndex) const;
+    void ClearRows() noexcept;
+    [[nodiscard]] bool InsertRowText(std::int32_t rowIndex, const msvc8::string& textUtf8);
+    void SetSubItemText(std::int32_t rowIndex, std::int32_t columnIndex, const msvc8::string& textUtf8) noexcept;
+    void SetRowState(std::int32_t rowIndex, std::uint32_t stateFlags, std::uint32_t stateMask) noexcept;
+
+  private:
+    static void ApplyNativeStateBits(LVITEMW& nativeItem, std::uint8_t wxState, std::uint8_t wxStateMask) noexcept;
   };
 
   static_assert(
@@ -198,18 +228,24 @@ namespace
     preferences->SetInteger(msvc8::string(key), value);
   }
 
-  [[nodiscard]] std::int32_t GetListControlColumnWidth(
-    const ScrListControlRuntime* const listControl,
-    const std::uint32_t columnIndex
-  )
+  /**
+   * Real wx call target: 0x0099ADE0 (FUN_0099ADE0, wxListCtrl::GetColumnWidth),
+   * already recovered as `wxListCtrlGetColumnWidthRuntime` in
+   * `moho/app/WxRuntimeTypes.cpp` (real body: `SendMessageW(m_hWnd,
+   * LVM_GETCOLUMNWIDTH, col, 0)` off a `+0x108` native-handle view identical
+   * to this struct). That helper has internal linkage and `WxRuntimeTypes.h`
+   * is locked by a concurrent pass, so this mirrors the same one-message
+   * body directly instead of duplicating a public API.
+   */
+  std::int32_t ScrListControlRuntime::GetColumnWidth(const std::uint32_t columnIndex) const
   {
-    if (listControl == nullptr || listControl->mListViewHandle == nullptr) {
+    if (mListViewHandle == nullptr) {
       return -1;
     }
 
     return static_cast<std::int32_t>(
       ::SendMessageW(
-        listControl->mListViewHandle,
+        mListViewHandle,
         LVM_GETCOLUMNWIDTH,
         static_cast<WPARAM>(columnIndex),
         static_cast<LPARAM>(0)
@@ -235,27 +271,51 @@ namespace
     return column != nullptr ? column->mWidth : -1;
   }
 
-  void ClearListControlRows(ScrListControlRuntime* const listControl) noexcept
+  /**
+   * Real wx call target: 0x0099DAD0 (FUN_0099DAD0, wxListCtrl::DeleteAllItems),
+   * already recovered as `wxListCtrlDeleteAllItemsRuntime` in
+   * `moho/app/WxRuntimeTypes.cpp`. That real body also raises a
+   * delete-in-progress guard flag and releases any per-row internal payload
+   * lanes (`wxListCtrlDeleteAllInternalData`, FUN_0099D9A0) before the native
+   * message. Both steps are unreachable for every row this control ever
+   * inserts (`InsertRowText` below only ever sets `wxLIST_MASK_TEXT`, never
+   * the data/attr mask bits that would populate an internal-data lane), so
+   * the guard/cleanup pair is a documented no-op here and is not reproduced.
+   * The observable native call - `SendMessageW(hwnd, LVM_DELETEALLITEMS, 0,
+   * 0)` - is unaffected either way.
+   */
+  void ScrListControlRuntime::ClearRows() noexcept
   {
-    if (listControl == nullptr || listControl->mListViewHandle == nullptr) {
+    if (mListViewHandle == nullptr) {
       return;
     }
 
     (void)::SendMessageW(
-      listControl->mListViewHandle,
+      mListViewHandle,
       LVM_DELETEALLITEMS,
       static_cast<WPARAM>(0),
       static_cast<LPARAM>(0)
     );
   }
 
-  [[nodiscard]] bool InsertListControlRowText(
-    ScrListControlRuntime* const listControl,
-    const std::int32_t rowIndex,
-    const msvc8::string& textUtf8
-  )
+  /**
+   * Real wx call target: 0x0099D5F0 (FUN_0099D5F0, wxListCtrl::InsertItem(long,
+   * const wxString&)) - a thin wx-library convenience overload (progress DB:
+   * `external_dependency`, matching sibling overloads `wxListCtrl::InsertItem
+   * (long,int)` at 0x0099D6B0 and `InsertItem(long,const wxString&,int)` at
+   * 0x0099D760) that builds a `wxListItem{mItemId=index, mText=label,
+   * mMask=wxLIST_MASK_TEXT}` and forwards to the real `InsertItem(wxListItem&)`
+   * core at 0x0099C720, which converts it to a native `LVITEMW` via the
+   * shared conversion helper (0x0099BE70/0x0099BE10, both already recovered
+   * in `WxRuntimeTypes.cpp`) and dispatches `LVM_INSERTITEMW`. For a
+   * text-only mask on a non-virtual list (every list this file constructs
+   * uses style `32`, never `wxLC_VIRTUAL`), that conversion reduces exactly
+   * to `{mask=LVIF_TEXT, iItem=index, iSubItem=0, pszText=label}` - the body
+   * below.
+   */
+  bool ScrListControlRuntime::InsertRowText(const std::int32_t rowIndex, const msvc8::string& textUtf8)
   {
-    if (listControl == nullptr || listControl->mListViewHandle == nullptr || rowIndex < 0) {
+    if (mListViewHandle == nullptr || rowIndex < 0) {
       return false;
     }
 
@@ -267,7 +327,7 @@ namespace
     listItem.pszText = const_cast<wchar_t*>(textWide.c_str());
 
     const LRESULT insertedRow = ::SendMessageW(
-      listControl->mListViewHandle,
+      mListViewHandle,
       LVM_INSERTITEMW,
       static_cast<WPARAM>(0),
       reinterpret_cast<LPARAM>(&listItem)
@@ -275,49 +335,124 @@ namespace
     return insertedRow != -1;
   }
 
-  void SetListControlSubItemText(
-    ScrListControlRuntime* const listControl,
+  /**
+   * Real wx call target: 0x0099CC40 (FUN_0099CC40, wxListCtrl::SetItem(long,
+   * int,const wxString&,int)) - a thin convenience overload (progress DB:
+   * `external_dependency`, same shape as the InsertItem siblings above) that
+   * builds `wxListItem{mItemId=row, mColumn=col, mText=label,
+   * mMask=wxLIST_MASK_TEXT}` and forwards to the real `SetItem(wxListItem&)`
+   * core at 0x0099C5B0 (already recovered as
+   * `wxListCtrlSetItemAndSyncInternalDataRuntime` in `WxRuntimeTypes.cpp`),
+   * which converts through the same 0x0099BE70 helper and dispatches
+   * `LVM_SETITEMW` - NOT `LVM_SETITEMTEXTW`, the message this method
+   * previously sent. wx's own C++ source never calls `LVM_SETITEMTEXTW`
+   * anywhere in the `SetItem` family; that was an engine-authored shortcut
+   * that happened to share the same `+0x108` HWND but diverged from the
+   * message the real control actually receives.
+   */
+  void ScrListControlRuntime::SetSubItemText(
     const std::int32_t rowIndex,
     const std::int32_t columnIndex,
     const msvc8::string& textUtf8
   ) noexcept
   {
-    if (listControl == nullptr || listControl->mListViewHandle == nullptr || rowIndex < 0 || columnIndex < 0) {
+    if (mListViewHandle == nullptr || rowIndex < 0 || columnIndex < 0) {
       return;
     }
 
     const std::wstring textWide = gpg::STR_Utf8ToWide(textUtf8.c_str());
-    LVITEMW listItem{};
-    listItem.iSubItem = columnIndex;
-    listItem.pszText = const_cast<wchar_t*>(textWide.c_str());
+    LVITEMW nativeItem{};
+    nativeItem.mask = LVIF_TEXT;
+    nativeItem.iItem = rowIndex;
+    nativeItem.iSubItem = columnIndex;
+    nativeItem.pszText = const_cast<wchar_t*>(textWide.c_str());
 
     (void)::SendMessageW(
-      listControl->mListViewHandle,
-      LVM_SETITEMTEXTW,
-      static_cast<WPARAM>(rowIndex),
-      reinterpret_cast<LPARAM>(&listItem)
+      mListViewHandle,
+      LVM_SETITEMW,
+      static_cast<WPARAM>(0),
+      reinterpret_cast<LPARAM>(&nativeItem)
     );
   }
 
-  void SetListControlRowState(
-    ScrListControlRuntime* const listControl,
+  /**
+   * Address: 0x0099BE10 (FUN_0099BE10, wx state-bit -> native LVIS_* remap)
+   *
+   * Already recovered in `WxRuntimeTypes.cpp` as
+   * `wxListCtrlApplyNativeStateBitsRuntime`; mirrored here (internal linkage
+   * there, header locked) because `wx*` state bits do NOT equal native
+   * `LVIS_*` bits - wx remaps each bit individually:
+   *   wxLIST_STATE_CUT(0x8)         -> LVIS_CUT(0x4)
+   *   wxLIST_STATE_DROPHILITED(0x1) -> LVIS_DROPHILITED(0x8)
+   *   wxLIST_STATE_FOCUSED(0x2)     -> LVIS_FOCUSED(0x1)
+   *   wxLIST_STATE_SELECTED(0x4)    -> LVIS_SELECTED(0x2)
+   * `SetRowState` previously passed its `wxLIST_STATE_SELECTED` argument
+   * (`4u`) straight through as a native state bit, which is `LVIS_CUT`
+   * (dims the row for a pending clipboard cut) rather than `LVIS_SELECTED`
+   * (highlights it) - a real, observable behavior bug this remap fixes.
+   */
+  void ScrListControlRuntime::ApplyNativeStateBits(
+    LVITEMW& nativeItem,
+    const std::uint8_t wxState,
+    const std::uint8_t wxStateMask
+  ) noexcept
+  {
+    if ((wxStateMask & 0x08u) != 0u) {
+      nativeItem.stateMask |= LVIS_CUT;
+      if ((wxState & 0x08u) != 0u) {
+        nativeItem.state |= LVIS_CUT;
+      }
+    }
+    if ((wxStateMask & 0x01u) != 0u) {
+      nativeItem.stateMask |= LVIS_DROPHILITED;
+      if ((wxState & 0x01u) != 0u) {
+        nativeItem.state |= LVIS_DROPHILITED;
+      }
+    }
+    if ((wxStateMask & 0x02u) != 0u) {
+      nativeItem.stateMask |= LVIS_FOCUSED;
+      if ((wxState & 0x02u) != 0u) {
+        nativeItem.state |= LVIS_FOCUSED;
+      }
+    }
+    if ((wxStateMask & 0x04u) != 0u) {
+      nativeItem.stateMask |= LVIS_SELECTED;
+      if ((wxState & 0x04u) != 0u) {
+        nativeItem.state |= LVIS_SELECTED;
+      }
+    }
+  }
+
+  /**
+   * Real wx call target: 0x0099CDF0 (FUN_0099CDF0, wxListCtrl::SetItemState),
+   * already recovered as `wxListCtrlSetItemStateRuntime` in
+   * `WxRuntimeTypes.cpp`. Applies one wx `{state, stateMask}` bit pair to a
+   * row via `LVM_SETITEMSTATE` after translating wx state bits to native
+   * `LVIS_*` bits (`ApplyNativeStateBits` above). The real function
+   * additionally tracks and refreshes a previously `wxLC_SINGLE_SEL`-focused
+   * row when the focus bit changes; every call site in this file only ever
+   * passes the SELECTED bit pair (`4u, 4u`), which never satisfies that
+   * focus-bit-gated branch, so it is not reproduced here.
+   */
+  void ScrListControlRuntime::SetRowState(
     const std::int32_t rowIndex,
     const std::uint32_t stateFlags,
     const std::uint32_t stateMask
   ) noexcept
   {
-    if (listControl == nullptr || listControl->mListViewHandle == nullptr || rowIndex < 0) {
+    if (mListViewHandle == nullptr || rowIndex < 0) {
       return;
     }
 
-    LVITEMW listItem{};
-    listItem.state = stateFlags;
-    listItem.stateMask = stateMask;
+    LVITEMW nativeItem{};
+    ApplyNativeStateBits(
+      nativeItem, static_cast<std::uint8_t>(stateFlags), static_cast<std::uint8_t>(stateMask)
+    );
     (void)::SendMessageW(
-      listControl->mListViewHandle,
+      mListViewHandle,
       LVM_SETITEMSTATE,
       static_cast<WPARAM>(rowIndex),
-      reinterpret_cast<LPARAM>(&listItem)
+      reinterpret_cast<LPARAM>(&nativeItem)
     );
   }
 
@@ -1837,7 +1972,7 @@ void moho::ScrDebugWindow::OnScriptPauseEvent(void* const pauseEvent)
   }
 
   auto* const callStackControl = reinterpret_cast<ScrListControlRuntime*>(mCallStackControl);
-  ClearListControlRows(callStackControl);
+  callStackControl->ClearRows();
 
   msvc8::vector<ScrActivation> callStack;
   SCR_EnumerateCallStack(callStack);
@@ -1846,20 +1981,20 @@ void moho::ScrDebugWindow::OnScriptPauseEvent(void* const pauseEvent)
     const ScrActivation& activation = callStack[activationIndex];
     const std::int32_t rowIndex = static_cast<std::int32_t>(activationIndex);
 
-    if (!InsertListControlRowText(callStackControl, rowIndex, activation.file)) {
+    if (!callStackControl->InsertRowText(rowIndex, activation.file)) {
       continue;
     }
-    SetListControlSubItemText(callStackControl, rowIndex, 1, activation.name);
+    callStackControl->SetSubItemText(rowIndex, 1, activation.name);
 
     std::ostringstream lineNumberStream{};
     lineNumberStream << activation.line;
     msvc8::string lineNumberText{};
     lineNumberText.assign_owned(lineNumberStream.str());
-    SetListControlSubItemText(callStackControl, rowIndex, 2, lineNumberText);
+    callStackControl->SetSubItemText(rowIndex, 2, lineNumberText);
   }
 
   if (!callStack.empty()) {
-    SetListControlRowState(callStackControl, 0, 4u, 4u);
+    callStackControl->SetRowState(0, 4u, 4u);
   }
 
   msvc8::vector<ScrWatch> localWatches;
@@ -2078,9 +2213,9 @@ void moho::ScrDebugWindow::OnCallStackColumnsResized(void* const commandEvent)
   }
 
   const auto* const callStackControl = reinterpret_cast<const ScrListControlRuntime*>(mCallStackControl);
-  PersistIntegerPreference(kDebugCallStackSourceColumnPreferenceKey, GetListControlColumnWidth(callStackControl, 0U));
-  PersistIntegerPreference(kDebugCallStackBlockColumnPreferenceKey, GetListControlColumnWidth(callStackControl, 1U));
-  PersistIntegerPreference(kDebugCallStackLineColumnPreferenceKey, GetListControlColumnWidth(callStackControl, 2U));
+  PersistIntegerPreference(kDebugCallStackSourceColumnPreferenceKey, callStackControl->GetColumnWidth(0U));
+  PersistIntegerPreference(kDebugCallStackBlockColumnPreferenceKey, callStackControl->GetColumnWidth(1U));
+  PersistIntegerPreference(kDebugCallStackLineColumnPreferenceKey, callStackControl->GetColumnWidth(2U));
 }
 
 /**
