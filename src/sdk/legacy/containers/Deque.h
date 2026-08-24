@@ -56,8 +56,28 @@ namespace msvc8
           sizeof(T) <= 4 ? 4 :
           sizeof(T) <= 8 ? 2 : 1;
 
-        /** Minimal initial map slots (power-of-two not required). */
-        static constexpr size_type kInitMapSlots = 8;
+        /**
+         * Growth-map fallback slot count used by `grow_map()` when doubling
+         * from an empty or near-empty map (`max(mapsize / 2, kMinGrowSlots)`).
+         * Not a pre-allocation size -- the default-constructed deque holds
+         * no map at all (see the ctor below).
+         */
+        static constexpr size_type kMinGrowSlots = 8;
+
+        /**
+         * Map-slot ceiling before `grow_map()` throws `length_error`.
+         * Dinkumware derives this from the allocator's `max_size()` in
+         * elements (`SIZE_MAX / sizeof(T)`) further divided down to whole
+         * nodes. Confirmed against two real emissions with different
+         * element sizes: `FUN_007BB920` (`deque<SNetCommand>`, sizeof(T)==
+         * 0x30, kBlockSize==1) computes 0x05555555, and `FUN_00741030`
+         * (`deque<SSyncData*>` / 4-byte T, kBlockSize==4) computes
+         * 0x0FFFFFFF -- both match `(SIZE_MAX / sizeof(T)) / kBlockSize`
+         * exactly, so the ceiling is data-dependent and must not be
+         * hardcoded to either emission's constant.
+         */
+        static constexpr size_type kMaxSlots =
+          (static_cast<size_type>(-1) / sizeof(T)) / kBlockSize;
 
         /** Random-access iterator synthesized from container + logical offset. */
         struct iterator
@@ -96,11 +116,21 @@ namespace msvc8
             friend bool operator>=(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off >= b.off; }
         };
 
-        // ---- Ctors / Dtor ----
+        /**
+         * Address: 0x0073B570 (FUN_0073B570, `Moho::CSimDriver::CSimDriver`)
+         *
+         * What it does:
+         * Confirms the real default-construction state for a deque member:
+         * the ctor writes `_Map = 0; _Mapsize = 0; _Myoff = 0; _Mysize = 0;`
+         * directly (`this->mSyncdat._Map = 0` etc. in the decompiler export)
+         * with no call into any node/map-allocating helper. The map is
+         * built lazily by `grow_map()` on first insert, matching
+         * Dinkumware's own lazy-empty `deque` state -- there is no eager
+         * `kInitMapSlots`-sized pre-allocation.
+         */
         deque()
             : _Myproxy(nullptr), _Map(nullptr), _Mapsize(0), _Myoff(0), _Mysize(0)
         {
-            init_empty();
         }
 
         ~deque()
@@ -145,6 +175,20 @@ namespace msvc8
         iterator end() { return iterator{ this, _Mysize }; }
 
         // ---- Modifiers (minimal set) ----
+        /**
+         * Address: 0x007411A0 (FUN_007411A0, bookkeeping half of
+         * `deque<SSyncData*>::~deque` reached via `SSyncDataQueue::
+         * ~SSyncDataQueue` / `Moho::CSimDriver` teardown)
+         *
+         * What it does:
+         * The binary's size-drain loop destroys nothing itself (element
+         * destruction for a pointer-typed deque is a no-op) -- it just
+         * decrements `_Mysize` to 0 and resets `_Myoff` to 0 once it gets
+         * there, exactly mirroring `pop_back()`/`pop_front()`'s "empty
+         * resets offset" convention. Element dtors still run here for
+         * non-trivial T so this stays real `clear()` semantics; only the
+         * offset reset was missing before this citation.
+         */
         void clear()
         {
             // Destroy all elements in logical order
@@ -153,6 +197,7 @@ namespace msvc8
                 ptr_at(i)->~T();
             }
             _Mysize = 0;
+            _Myoff = 0;
             // Keep nodes and map for capacity, as Dinkumware typically did
         }
 
@@ -263,22 +308,6 @@ namespace msvc8
         size_type _Mysize;    // +0x10
 
         // ---- Helpers ----
-        void init_empty()
-        {
-            allocate_map(kInitMapSlots);
-            // Center begin offset to allow both-end growth without remap
-            _Myoff = (_Mapsize / 2) * kBlockSize;
-            _Mysize = 0;
-        }
-
-        void allocate_map(size_type slots)
-        {
-            if (slots < 2) slots = 2;
-            _Map = static_cast<T**>(::operator new(sizeof(T*) * slots));
-            _Mapsize = slots;
-            for (size_type i = 0; i < _Mapsize; ++i) _Map[i] = nullptr;
-        }
-
         static size_type node_index_from_global(size_type global, size_type mapsize) noexcept
         {
             const size_type node = (global / kBlockSize) % mapsize;
@@ -356,33 +385,37 @@ namespace msvc8
 
         /**
          * Address: 0x007BB920 (FUN_007BB920, msvc8::deque<Moho::SNetCommand>::_Growmap)
+         * Address: 0x00741030 (FUN_00741030, msvc8::deque<Moho::SSyncData*>::
+         *          _Growmap -- confirms the same body for a 4-byte T /
+         *          kBlockSize==4 instantiation; sole caller is
+         *          `FUN_007408F0` = `push_back`, called from
+         *          `SSyncDataQueue::PushBack` guard `FUN_0073F940`)
          *
          * What it does:
          * Classic Dinkumware `_Growmap`: grows the node map by
-         * `max(mapsize / 2, 8)` slots (falling back to 1 slot when that
-         * would overflow the 0x05555555-slot ceiling, which itself throws
-         * `length_error` once actually reached), then reshuffles existing
-         * node pointers with three `memmove`-shaped ranges so the new,
-         * empty slots land contiguously right after the map's previous end
-         * (wrapping around slot 0) instead of recentering the whole map.
-         * The begin node index (`_Myoff / kBlockSize`) is provably
-         * unchanged by this reshuffle -- the "tail" range `[beginNode,
-         * oldMapSize)` always maps to itself -- so `_Myoff` itself is
-         * left untouched, matching the binary (which never writes
-         * `view.mOffset` in this function).
+         * `max(mapsize / 2, kMinGrowSlots)` slots (falling back to 1 slot
+         * when that would overflow the `kMaxSlots`-slot ceiling, which
+         * itself throws `length_error` once actually reached), then
+         * reshuffles existing node pointers with three `memmove`-shaped
+         * ranges so the new, empty slots land contiguously right after the
+         * map's previous end (wrapping around slot 0) instead of
+         * recentering the whole map. The begin node index (`_Myoff /
+         * kBlockSize`) is provably unchanged by this reshuffle -- the
+         * "tail" range `[beginNode, oldMapSize)` always maps to itself --
+         * so `_Myoff` itself is left untouched, matching the binary (which
+         * never writes `view.mOffset` in this function).
          */
         void grow_map()
         {
-            constexpr size_type kMaxSlots = 0x05555555u;
             if (_Mapsize == kMaxSlots)
                 throw std::length_error("deque<T> too long");
 
             size_type growth = 1;
             const size_type half = _Mapsize >> 1;
-            if (half >= 8)
+            if (half >= kMinGrowSlots)
                 growth = half;
             else
-                growth = 8;
+                growth = kMinGrowSlots;
             if (_Mapsize > kMaxSlots - growth)
                 growth = 1;
 

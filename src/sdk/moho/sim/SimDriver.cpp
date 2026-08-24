@@ -1213,145 +1213,77 @@ void moho::PatchEntityUpdateReconMesh(
  * void __stdcall sub_73B940(int a1);
  *
  * What it does:
- * Drains every live sync-data payload currently in the ring-buffer range
- * `[head, head + size)` via `DrainLiveRingBufferRange`, then releases the
- * backing map allocation and resets bookkeeping lanes via
- * `ReleaseOwnedSlotsAndReset`. Wrapped by an SEH frame so a throw from
- * any payload destructor still unwinds cleanly to the two-phase teardown
- * exit lane shared with `CSimDriver::~CSimDriver`.
+ * Drains every live sync-data payload via `DrainLiveRingBufferRange`
+ * (deleting each queued `SSyncData*`), then lets `mSyncdat`'s own
+ * destructor (`msvc8::deque<SSyncData*>::~deque`, matching FUN_007411A0 --
+ * see `Deque.h`) release the page/map storage as a normal member
+ * teardown. Wrapped by an SEH frame in the binary so a throw from any
+ * payload destructor still unwinds cleanly to the two-phase teardown exit
+ * lane shared with `CSimDriver::~CSimDriver`.
  */
 SSyncDataQueue::~SSyncDataQueue()
 {
   DrainLiveRingBufferRange();
-  ReleaseOwnedSlotsAndReset();
 }
 
 /**
  * Address: 0x007407F0 (FUN_007407F0, SSyncDataQueue drain-live helper)
+ * Address: 0x00741980 (FUN_00741980, per-slot payload destroy loop)
  *
  * IDA signature:
  * int __usercall sub_7407F0@<eax>(int a1@<eax>);
  *
  * What it does:
  * Dispatches the inclusive destroy-range helper `sub_741980(this, head,
- * this, head + size)` that walks every live ring-buffer slot in
- * `[head, head + size)`, destroys the pointed-to `SSyncData` payload, and
- * clears the slot. Called as the first phase of both the destructor and
- * the ctor SEH unwind path via FUN_0073B940.
+ * this, head + size)` that walks every live element via the deque's real
+ * paged storage, destroys the pointed-to `SSyncData` payload, and clears
+ * the slot. Called as the first phase of the destructor via FUN_0073B940.
  */
 void SSyncDataQueue::DrainLiveRingBufferRange() noexcept
 {
-  if (map == nullptr || size == 0u || mapSize == 0u) {
-    return;
-  }
-
-  const std::uint32_t liveCount = size;
-  const std::uint32_t startSlot = head;
-  for (std::uint32_t index = 0u; index < liveCount; ++index) {
-    const std::uint32_t slot = (startSlot + index) % mapSize;
-    SSyncData* const payload = map[slot];
+  for (auto it = mSyncdat.begin(); it != mSyncdat.end(); ++it) {
+    SSyncData*& payload = *it;
     if (payload != nullptr) {
       delete payload;
-      map[slot] = nullptr;
+      payload = nullptr;
     }
   }
 }
 
 bool SSyncDataQueue::Empty() const
 {
-  return size == 0;
+  return mSyncdat.empty();
 }
 
 /**
- * Address: 0x0073F940 (FUN_0073F940) - guard half only
+ * Address: 0x0073F940 (FUN_0073F940, guard half) -> 0x007408F0
+ * (FUN_007408F0, `msvc8::deque<SSyncData*>::push_back`, see `Deque.h`)
  *
  * What it does:
  * Appends one sync-data payload. `CSimDriver::Sync` reaches this at
  * 0x0073DAD0's tail, immediately before it signals the availability event.
  *
  * A null payload throws rather than being dropped. 0x0073F940 is boost's
- * ptr_vector guard in front of the real insert at 0x007408F0, and it raises
+ * ptr_deque guard in front of the real insert at 0x007408F0, and it raises
  * `boost::bad_pointer` carrying "Null pointer in 'push_back()'". Returning
  * quietly would drop the payload and still wake the waiter with nothing
  * queued.
- *
- * Note the container mismatch: this queue is a hand-rolled ring buffer while
- * the binary uses a ptr_vector, so do not annotate the insert half of this
- * body with 0x007408F0.
  */
 void SSyncDataQueue::PushBack(SSyncData* data)
 {
   boost::EnsurePtrContainerPushBackInputNotNull(data);
-
-  if (size >= mapSize) {
-    const uint32_t newCap = (mapSize == 0) ? 8u : mapSize * 2u;
-    auto** newMap = static_cast<SSyncData**>(::operator new(static_cast<std::size_t>(newCap) * sizeof(SSyncData*)));
-    for (uint32_t i = 0; i < newCap; ++i) {
-      newMap[i] = nullptr;
-    }
-
-    for (uint32_t i = 0; i < size; ++i) {
-      newMap[i] = map[(head + i) % mapSize];
-    }
-
-    ::operator delete(static_cast<void*>(map));
-    map = newMap;
-    mapSize = newCap;
-    head = 0;
-  }
-
-  map[(head + size) % mapSize] = data;
-  ++size;
+  mSyncdat.push_back(data);
 }
 
 SSyncData* SSyncDataQueue::PopFront()
 {
-  if (size == 0 || !map) {
+  if (mSyncdat.empty()) {
     return nullptr;
   }
 
-  SSyncData* out = map[head];
-  map[head] = nullptr;
-  head = (head + 1u) % mapSize;
-  --size;
-
-  if (size == 0) {
-    head = 0;
-  }
-
-  return out;
-}
-
-/**
- * Address: 0x007411A0 (FUN_007411A0)
- *
- * What it does:
- * Drains queue-size bookkeeping, destroys every non-null queue slot payload in
- * the backing map, releases map storage, and resets queue ownership lanes.
- */
-void SSyncDataQueue::ReleaseOwnedSlotsAndReset()
-{
-  while (size != 0u) {
-    const uint32_t nextSize = size - 1u;
-    size = nextSize;
-    if (nextSize == 0u) {
-      head = 0u;
-    }
-  }
-
-  if (map != nullptr) {
-    for (uint32_t slot = mapSize; slot != 0u; --slot) {
-      SSyncData* const queuedPayload = map[slot - 1u];
-      if (queuedPayload != nullptr) {
-        delete queuedPayload;
-      }
-    }
-
-    ::operator delete(static_cast<void*>(map));
-  }
-
-  map = nullptr;
-  mapSize = 0u;
+  SSyncData* const front = mSyncdat.front();
+  mSyncdat.pop_front();
+  return front;
 }
 
 void SSyncDataQueue::ClearAndDelete()
@@ -1368,10 +1300,10 @@ void SSyncDataQueue::ClearAndDelete()
  * What it does:
  * Per-T named free helper that captures the engine-instantiated MSVC8 body of
  * `boost::ptr_sequence_adapter< std::deque<SSyncData*> >::pop_front`. The
- * binary's `mSyncdat` lane is a `boost::ptr_sequence_adapter` over a deque of
- * sync-data pointers; the recovered side models the same 0x14-byte layout as
- * `SSyncDataQueue` (`_Myproxy` / `_Map` / `_Mapsize` / `_Myoff` / `_Mysize`
- * mapped to `reserved` / `map` / `mapSize` / `head` / `size`).
+ * binary's `mSyncdat` lane is a `boost::ptr_sequence_adapter` over a real
+ * paged `std::deque<SSyncData*>`; `SSyncDataQueue::mSyncdat` is now that
+ * same container (`msvc8::deque<SSyncData*>`, see `Deque.h`), not a
+ * hand-rolled flat ring buffer.
  *
  * Binary semantics, preserved 1:1:
  *   1. If the underlying deque is empty, construct and throw
@@ -1390,7 +1322,7 @@ void SSyncDataQueue::ClearAndDelete()
  */
 SSyncData* moho::PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue)
 {
-  if (queue.size == 0u) {
+  if (queue.Empty()) {
     throw boost::bad_ptr_container_operation("'pop_front()' on empty container");
   }
 
@@ -1960,7 +1892,7 @@ void CSimDriver::ThreadRun()
     // Nothing is issued until the sim has published at least one sync, every
     // outstanding request has been answered, and the sync queue has room.
     if (mLastSyncCycleTime != 0 && mOutstandingRequests == 0
-        && mSyncDataQueue.size < kMaxQueuedSyncPacketsBeforeStalling) {
+        && mSyncDataQueue.Size() < kMaxQueuedSyncPacketsBeforeStalling) {
       int lastBeatToIssue = mNextIssueBeat - 1;
       const int beatCeiling = mLastDequeuedBeat + kMaxBeatsAheadOfExecuted;
 
@@ -2646,7 +2578,7 @@ void CSimDriver::DrawNetworkStats(
 
     const int inflight = (mNextIssueBeat - 1) - availableBeat;   // 0x0073E6D1..0x0073E6D8
     const int available = availableBeat - (mDispatchBeat - 1);   // 0x0073E6BC..0x0073E6CF
-    const int queued = static_cast<int>(mSyncDataQueue.size);    // 0x0073E6C6 (mSyncDataQueue.size @ CSimDriver+0xA0)
+    const int queued = static_cast<int>(mSyncDataQueue.Size());  // 0x0073E6C6 (mSyncDataQueue._Mysize @ CSimDriver+0xA0)
     summary.push_back(
       gpg::STR_Printf("inflight: %d, available: %d, queued: %d", inflight, available, queued)); // 0x0073E6EB
   }
