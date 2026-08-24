@@ -385,19 +385,15 @@ namespace moho
     void SetStringValueByPath(gpg::StrArg statPath, const msvc8::string& value);
 
   private:
-    /**
-     * Address: 0x00703700 (FUN_00703700, name-index erase-iterator helper)
-     */
-    [[nodiscard]] ArmyNameIndexNode* EraseNameIndexNodeAndAdvance(ArmyNameIndexNode* node);
-
-    /**
-     * Address: 0x0070DDC0 (FUN_0070DDC0, CArmyStats name-index tree cleanup)
-     *
-     * What it does:
-     * Destroys all name-index nodes, frees the sentinel head, and resets the
-     * name-index runtime lane.
-     */
-    void DestroyNameIndexTree();
+    // No source-level `EraseNameIndexNodeAndAdvance`/`DestroyNameIndexTree`
+    // helpers here: 0x00703700 is `msvc8::map`'s own `erase(iterator)` for
+    // this tree shape, already reached by `Delete()`'s `mNameIndex.erase(it)`
+    // call below and cited on that container member in RbTree.h; `mNameIndex`
+    // (a real `msvc8::map<msvc8::string, CArmyStatItem*>`) is destroyed
+    // automatically in `~CArmyStats()`'s compiler-generated epilogue, matching
+    // the binary's own inlined `erase_range`-then-delete-then-zero sequence
+    // (cited on `~rb_tree()`/`erase_range` in RbTree.h) -- there is no
+    // separate "destroy the name index" symbol anywhere in this binary.
 
     /**
      * Address: 0x00702BB0 (FUN_00702BB0, std::list<shared_ptr<STrigger>>::clear inlined helper)
