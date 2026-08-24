@@ -33,6 +33,9 @@ namespace moho
     /**
      * Address: 0x0041E8D0 (FUN_0041E8D0, deleting-thunk chain via 0x004228B0)
      * Address: 0x0041E940 (FUN_0041E940, non-deleting body)
+     * Deleting thunk: 0x004228B0 (FUN_004228B0, Moho::CLuaConOutputHandler_as_RObject::dtr) -
+     *   MI adjustor thunk on the gpg::RObject sub-object vftable; adjusts `this` by -12 and
+     *   forwards to FUN_0041E8D0.
      *
      * VFTable SLOT: 2 (gpg::RObject subobject)
      */
