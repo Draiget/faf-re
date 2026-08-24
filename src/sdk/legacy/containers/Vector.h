@@ -3169,6 +3169,52 @@ namespace msvc8
          * std::move(insertAt[i-1])` branch for a non-trivial element, the
          * same shape already documented for FUN_00653E80/SDebugWorldText
          * above.)
+         * Address: 0x00855DF0 (FUN_00855DF0, msvc8::vector<boost::
+         * shared_ptr<moho::MeshInstance>>::insert(pos, count, value) core
+         * for the 8-byte shared_ptr `(px, pn)` pair element -- `max_size`
+         * folds to `0x1FFFFFFF` (`0xFFFFFFFF/8`), matching this method's
+         * own fold for an 8-byte element. IDA's own decompile of this
+         * address is flagged "positive sp value ... may be wrong", so this
+         * citation rests on the parts independently confirmed from each
+         * callee's own (clean) decompile rather than on FUN_00855DF0's
+         * exact argument wiring: `localValue` is built on the stack first
+         * exactly like this method's own `const T localValue(value)` (the
+         * `_InterlockedExchangeAdd(pn+1, 1)` bump on construction is
+         * `boost::detail::sp_counted_base::add_ref_copy`, the closing
+         * `_InterlockedExchangeAdd(pn+1, -1)` / vtable-dispose /
+         * weak-release chain at the end is that type's `release()`/
+         * `weak_release()`, the same pattern already documented at
+         * 0x004229B0); the `0x1FFFFFFF - cur < count` guard throws through
+         * this element's own `throw_too_long` lane FUN_00856100 (cited
+         * below); the in-place branch relocates the tail through this
+         * method's own `uninit_move_n` instantiation FUN_00857A90 (reached
+         * via the thiscall bridge FUN_008571F0, cited below) and either
+         * tail-shifts the remainder by per-element copy-assign through
+         * FUN_00857880 (reached via the thin cdecl bridge FUN_00857230) or,
+         * when the gap is bigger than the live tail, constructs the
+         * trailing slots fresh through this method's own `uninit_fill_n`
+         * instantiation FUN_008575A0 (cited below); the fill step in the
+         * tail-shift sub-branch is a per-element copy-assign broadcast of
+         * `localValue`, FUN_008576A0 -- both FUN_00857880 and FUN_008576A0
+         * assign into *already-constructed* slots (add-ref the incoming
+         * pointer, release the outgoing one), matching this method's own
+         * `insertAt[...] = localValue`/`= std::move(...)` loops for a
+         * non-trivial element, the same construct-vs-assign split already
+         * documented for the SNetCommandArg entry above; the reallocation
+         * branch grows 1.5x (`(cap>>1)+cap`) clamped to the needed size,
+         * allocates through this method's own `allocate_slots_checked`
+         * instantiation FUN_00857260 (cited below), and tears the old
+         * buffer down through this method's own `destroy_range`
+         * instantiation FUN_00857630 (cited below) before `operator
+         * delete`. Reached from `push_back`'s capacity-full tail-call
+         * (`insert(last_, value)` -> this method's own single-value
+         * overload above -> this method with `count=1`) for
+         * `moho::CUIWorldViewBuildDragRuntimeView::mMeshes`
+         * (UiRuntimeTypes.h:890) -- confirmed directly from
+         * `PushBackMeshInstanceSharedPtrVector`'s (FUN_00855040,
+         * UiRuntimeTypes.cpp, already recovered) own raw decompile, which
+         * tail-calls `sub_855DF0((int)a2, a2[2], 1u, a1)` on its
+         * capacity-full path.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -3341,6 +3387,15 @@ namespace msvc8
          * (cited above on `insert`, `PushBackAdapterModeD3D9`
          * modes.push_back, D3D9Interfaces.cpp:3258), which destroys the old
          * range after relocating into the reallocated buffer.)
+         * Address: 0x00857630 (FUN_00857630, `msvc8::vector<boost::
+         * shared_ptr<moho::MeshInstance>>::destroy_range` for the 8-byte
+         * shared_ptr `(px, pn)` pair element -- forward `[first,last)` walk
+         * releasing each slot's `pn` (the `sp_counted_base::release()`
+         * chain already documented at 0x004229B0), no `operator delete`
+         * per slot since the buffer itself is freed separately by the
+         * caller. Reached from `_Insert_n` FUN_00855DF0 (cited above on
+         * `insert`), `mMeshes`'s reallocation branch, to tear down the old
+         * buffer's live range after relocating into the new one.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -3863,6 +3918,15 @@ namespace msvc8
          * append branch, FUN_007BBD60 (cited above on `insert`), with
          * `count = 1` to construct the new back element when
          * `pos == last_`.)
+         * Address: 0x008575A0 (FUN_008575A0, `msvc8::vector<boost::
+         * shared_ptr<moho::MeshInstance>>::uninit_fill_n` for the 8-byte
+         * shared_ptr `(px, pn)` pair element -- `(count@edx, dst@ecx,
+         * srcValue@esi)` loop broadcasting the same `(px, pn)` pair into
+         * `count` fresh slots, `_InterlockedExchangeAdd(pn+4,1)` add-ref
+         * per non-null copy. Reached from `_Insert_n` FUN_00855DF0 (cited
+         * above on `insert`), `mMeshes`'s in-place tail-smaller-than-gap
+         * branch (constructs the trailing gap slots that have no live tail
+         * element to relocate over them).)
          *
          * Uninitialized fill N with value starting at dst
          */
@@ -4114,6 +4178,16 @@ namespace msvc8
          * `FUN_00813900` (already recovered above), `AppendShoreCellRef`'s
          * (Shoreline.cpp) `shorelineCells.push_back(cell)` capacity-full
          * path.)
+         * Address: 0x00857A90 (FUN_00857A90, `msvc8::vector<boost::
+         * shared_ptr<moho::MeshInstance>>::uninit_move_n` -- the same
+         * per-element `{px,pn}` copy-with-refcount-bump shape as the
+         * ShoreCell entry above (forward `[src,srcEnd)` walk, `pn!=0`
+         * guards an `_InterlockedExchangeAdd(pn+4,1)` add-ref per slot).
+         * Reached via the thiscall bridge FUN_008571F0 (`LOBYTE(this)=0;
+         * return sub_857A90(a3,this,this);`, the same register-shape-
+         * adapter idiom as this method's other bridges) from `_Insert_n`
+         * FUN_00855DF0 (cited above on `insert`), `mMeshes`'s in-place
+         * tail-relocate and reallocation head/tail-copy steps.)
          * Address: 0x007BED70 (FUN_007BED70, msvc8::vector<Moho::
          * SNetCommandArg>::uninit_move_n (copy-construct, no real move --
          * see this method's own note below) for the 36-byte element. Loops
@@ -4490,6 +4564,11 @@ namespace msvc8
          * Address: 0x008B3700 (FUN_008B3700)
          * Address: 0x0094F1B0 (FUN_0094F1B0, `msvc8::vector<gpg::TypeHandle>`'s
          * `_Insert_n` reallocation path, FUN_00951F30)
+         * Address: 0x00857260 (FUN_00857260, `msvc8::vector<boost::
+         * shared_ptr<moho::MeshInstance>>::allocate_slots_checked` --
+         * `0xFFFFFFFF/count < 8` guard, `operator new(8*count)`. Reached
+         * from `_Insert_n` FUN_00855DF0 (cited above on `insert`),
+         * `mMeshes`'s reallocation branch.)
          *
          * sizeof(T) == 28 (`count > 0x0F5C28F5` throws):
          * Address: 0x00883870 (FUN_00883870, `msvc8::vector<msvc8::string>`'s
@@ -4675,6 +4754,12 @@ namespace msvc8
          * max_size test, already cited above on `insert`. Throws
          * `std::length_error("vector<T> too long")` exactly like the other
          * per-stride throw lanes in this cluster.)
+         * Address: 0x00856100 (FUN_00856100, the 8-byte-stride throw lane
+         * for `msvc8::vector<boost::shared_ptr<moho::MeshInstance>>`,
+         * reached from the `_Insert_n` grow lane FUN_00855DF0's
+         * `0x1FFFFFFF - cur < count` max_size test, already cited above on
+         * `insert`. DB previously listed this token `recovered` with no
+         * note and no citation anywhere in `src/sdk` -- corrected here.)
          *
          * What it does:
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
