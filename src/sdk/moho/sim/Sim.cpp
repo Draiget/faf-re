@@ -3371,6 +3371,14 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x008497C0 (FUN_008497C0)
+   *
+   * What it does:
+   * Advances one special-files map iterator node to its in-order successor
+   * (leftmost of the right subtree, or the nearest ancestor this node is not
+   * the right child of).
+   */
   [[nodiscard]] SpecialFilesMapNodeRuntimeView* AdvanceSpecialFilesMapIteratorNode(
     SpecialFilesMapNodeRuntimeView* node,
     SpecialFilesMapNodeRuntimeView* const head
