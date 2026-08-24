@@ -285,6 +285,8 @@ namespace
 
   /**
    * Address: 0x007BD810 (FUN_007BD810)
+   * Address: 0x007BB880 (FUN_007BB880, calling-convention trampoline into
+   *   this body -- see caller for the real dispatch)
    *
    * What it does:
    * Writes `count` copies of one command-argument prototype into contiguous
@@ -539,6 +541,9 @@ void moho::GPGNET_Attach(
 /**
  * Address: 0x007B9DD0 (FUN_007B9DD0, ?GPGNET_Shutdown@Moho@@YAXXZ thunk)
  * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ body)
+ * Address: 0x007B8190 (FUN_007B8190, boost::shared_ptr<CGpgNetInterface>::
+ *   reset() -- the real boost method instantiation invoked below, distinct
+ *   from this function's own body at 0x007BB590)
  *
  * What it does:
  * Clears the process-global GPGNet interface shared-pointer lane.
@@ -2011,6 +2016,10 @@ void CGpgNetInterface::ReadFromSocket()
       uint32_t argCount = 0;
       reader.ReadExact(argCount);
 
+      // Address: 0x007BAF70 (FUN_007BAF70) -- this per-command arg-vector
+      // prefill is the real call site of the vector(count, value)
+      // constructor cited at Vector.h FUN_007BB6A0; each slot is
+      // overwritten in place below with its decoded value.
       msvc8::vector<SNetCommandArg> args(argCount, SNetCommandArg{0});
       for (uint32_t i = 0; i < argCount; ++i) {
         args[i] = moho::NET_DecodeSocketArg(reader);
