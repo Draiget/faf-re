@@ -1568,6 +1568,12 @@ namespace
    * leftmost-of-right-subtree descent. Reached from
    * StepRbIteratorNil61BackwardLaneA/B's `RetreatRuntimeRbIteratorSlot`
    * call above.)
+   * Address: 0x0071C7D0 (FUN_0071C7D0, TNode=InfluenceNodeFlag21Runtime
+   * instantiation -- isNil@+0x15 matches this type's own
+   * offsetof(InfluenceNodeFlag21Runtime, isNil21) static_assert above.
+   * Same branch-for-branch shape as 0x0071C830. Reached from
+   * StepRbIteratorNil21BackwardLaneA's `RetreatRuntimeRbIteratorSlot`
+   * call at 0x0071BD70.)
    */
   template <typename TNode, typename TIsNil>
   [[nodiscard]] TNode* RetreatRuntimeRbIteratorSlot(TNode** const iteratorSlot, TIsNil&& isNil) noexcept
