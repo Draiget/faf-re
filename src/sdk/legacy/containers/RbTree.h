@@ -2398,6 +2398,18 @@ namespace msvc8
              * at other construction call sites (e.g. placement-new via
              * `EntityDbTypeInfo::CtrRef`/`NewEntityDbTypeLaneRef`, EntityDb.cpp).
              */
+            /**
+             * Address: 0x0087C3B0 (FUN_0087C3B0, fused allocate/self-link/
+             * isNil=1 buy_head for an unidentified `Moho::CDecalManager` map/
+             * set member -- writes `left=parent=right=0`, then `isNil@+0x14=1`,
+             * `color@+0x15=0`. Sibling FUN_0087C5F0 below is byte-identical
+             * except its `alloc_raw` callee, so the two are distinct
+             * `CDecalManager` map instantiations, not ICF twins. Both reached
+             * from `Moho::CDecalManager::CDecalManager` (0x00877A60); the
+             * owning member names are not yet pinned down.)
+             * Address: 0x0087C5F0 (FUN_0087C5F0, sibling emission described
+             * above -- a second, distinct `CDecalManager` map/set instantiation)
+             */
             [[nodiscard]] static node_type* buy_head()
             {
                 node_type* const h = alloc_raw();
