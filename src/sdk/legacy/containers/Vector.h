@@ -3066,6 +3066,19 @@ namespace msvc8
          * invocation: `cameras.push_back(camera)` in
          * `AppendGeomCameraViewAndReturnEnd`)
          *
+         * Address: 0x0064F9A0 (FUN_0064F9A0, msvc8::vector<moho::SDebugDecal>::
+         * uninit_fill_n for the 52-byte element -- broadcast-copies the same
+         * by-ref prototype `count` times via 12 `fld`/`fstp` float moves (the
+         * four corner Vector3s) plus one dword `mov` (the packed colour),
+         * source pointer never advanced, no EH cleanup since the element is
+         * trivially copyable. Reached from the `_Insert_n` grow lane
+         * FUN_0064E770 (still open; not needed to satisfy this instantiation's
+         * own caller evidence) via its advance-returning `_Ufill` adapter
+         * FUN_0064E420. Source-level invocation: `canvas->decals.push_back(decal)`
+         * in RDebugGrid.cpp / RDebugRadar.cpp)
+         * Address: 0x0064E420 (FUN_0064E420, the advance-returning `_Ufill`
+         * adapter around FUN_0064F9A0: fills then returns `dst + count`)
+         *
          * Uninitialized fill N with value starting at dst
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
